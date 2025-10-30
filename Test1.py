@@ -1,0 +1,34 @@
+class TrieNode:
+  def __init__(self):
+    self.children: dict[str, 'TrieNode'] = {}
+    self.sum = 0
+
+
+class MapSum:
+  def __init__(self):
+    self.root = TrieNode()
+    self.keyToVal = {}
+
+  def insert(self, key: str, val: int):
+    diff = val - self.keyToVal.get(key, 0)
+    node: TrieNode = self.root
+    for c in key:
+      node = node.children.setdefault(c, TrieNode())
+      node.sum += diff
+    self.keyToVal[key] = val
+
+  def sum(self, prefix: str) -> int:
+    node: TrieNode = self.root
+    for c in prefix:
+      if c not in node.children:
+        return 0
+      node = node.children[c]
+    return node.sum
+
+
+if __name__ == "__main__":
+    mapsum = MapSum()
+    mapsum.insert("apple", 3)
+    print(mapsum.sum("ap"))   # Kết quả: 3
+    mapsum.insert("app", 2)
+    print(mapsum.sum("ap"))   # Kết quả: 5
