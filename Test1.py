@@ -25,10 +25,8 @@ class MapSum:
       node = node.children[c]
     return node.sum
 
-
-if __name__ == "__main__":
-    mapsum = MapSum()
-    mapsum.insert("apple", 3)
-    print(mapsum.sum("ap"))   # Kết quả: 3
-    mapsum.insert("app", 2)
-    print(mapsum.sum("ap"))   # Kết quả: 5
+mapsum = MapSum()
+mapsum.insert("apple", 3)
+print(mapsum.sum("ap"))   # Kết quả: 3
+mapsum.insert("app", 2)
+print(mapsum.sum("ap"))   # Kết quả: 5
