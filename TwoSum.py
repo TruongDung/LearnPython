@@ -10,6 +10,5 @@ class Solution:
             seen[n] = i
         return seen
     
-#if __name__ == "__main__":
 sol = Solution()
 print(sol.TwoSumDef([2,7,11,15], 9))
