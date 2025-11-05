@@ -1,15 +1,4 @@
-import math
-import heapq
-
-# name = input("name: ")
-# print(f'hello {name}')
-
-print (f"{math.pi:.2f}")
-pq = []
-
-heapq.heappush(pq, 'b')
-heapq.heappush(pq, 'c')
-heapq.heappush(pq, 'a')
-
-
-print(heapq.heappop(pq))
+friends = ("An", "Bình", "Chi","Duy") # Tuple
+print(type(friends))
+mixed_tuple = (0, "Hello", 1.2, "World!")
+print(type(mixed_tuple))
