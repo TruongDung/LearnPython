@@ -1,32 +1,36 @@
+
 class TrieNode:
-  def __init__(self):
-    self.children: dict[str, 'TrieNode'] = {}
-    self.sum = 0
+    def __init__(self):
+        self.children = {}
+        self.isEnd = False
 
+class Trie:
+    
+    def __init__(self):
+        self.root = TrieNode()
 
-class MapSum:
-  def __init__(self):
-    self.root = TrieNode()
-    self.keyToVal = {}
+    def insert(self, word: str) -> None:
+        currentNode = self.root
+        for char in word:
+            if char not in currentNode.children:
+                currentNode.children[char] = TrieNode()
+            currentNode = currentNode.children[char]
+        currentNode.isEnd = True
+    
+    def get_all_words(self):
+        words = []
+        self._dfs(self.root, "", words)
+        return words
 
-  def insert(self, key: str, val: int):
-    diff = val - self.keyToVal.get(key, 0)
-    node: TrieNode = self.root
-    for c in key:
-      node = node.children.setdefault(c, TrieNode())
-      node.sum += diff
-    self.keyToVal[key] = val
+    def _dfs(self, node: TrieNode, prefix: str, words: list) -> None:
+        if node.isEnd:
+            words.append(prefix)
+        for char, childNode in node.children.items():
+            self._dfs(childNode, prefix + char, words)
 
-  def sum(self, prefix: str) -> int:
-    node: TrieNode = self.root
-    for c in prefix:
-      if c not in node.children:
-        return 0
-      node = node.children[c]
-    return node.sum
+obj = Trie()
+obj.insert("cat")
+obj.insert("car")
+obj.insert("can")
 
-mapsum = MapSum()
-mapsum.insert("apple", 3)
-print(mapsum.sum("ap"))   # Kết quả: 3
-mapsum.insert("app", 2)
-print(mapsum.sum("ap"))   # Kết quả: 5
+print(obj.get_all_words())  # Output: dict_keys(['c'])
