@@ -2,13 +2,13 @@ from typing import List
 
 class Solution:
     def pivotIndex(self, nums: List[int]) -> int:
-        total = sum(nums)
-        left = 0
-        for i, x in enumerate(nums):
-            if left == total - left - x:
+        s = sum(nums)
+        sumleft = 0
+        for i in range(len(nums)):
+            if sumleft == (s - nums[i]) / 2:
                 return i
-            left += x
+            sumleft += nums[i]
         return -1
     
 sol = Solution()
-print(sol.pivotIndex([1,7,3,6,5,6]))
+print(sol.pivotIndex([1,-1,4]))
