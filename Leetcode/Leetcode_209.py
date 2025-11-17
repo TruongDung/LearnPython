@@ -2,17 +2,17 @@ from typing import List
 
 class Solution:
     def minSubArrayLen(self, target: int, nums: List[int]) -> int:
-        left = 0
+        j = 0
         total = 0
         min_len = float('inf')
 
-        for right in range(len(nums)):
-            total += nums[right]
+        for i in range(len(nums)):
+            total += nums[i]
 
             while total >= target:
-                min_len = min(min_len, right - left + 1)
-                total -= nums[left]
-                left += 1
+                min_len = min(min_len, i - j + 1)
+                total -= nums[j]
+                j += 1
 
         return 0 if min_len == float('inf') else min_len
     
