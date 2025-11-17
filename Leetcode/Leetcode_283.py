@@ -2,13 +2,15 @@ from typing import List
 
 class Solution:
     def moveZeroes(self, nums: List[int]) -> None:
-        left = 0
-        right = 0
-        while(right< len(nums)):
-            if(nums[right] !=0):
-                nums[left], nums[right]= nums[right], nums[left]
-                left += 1
-            right += 1
+        j = 0
+        for i in range(len(nums)):
+            if nums[i] != 0:
+                #swap
+                nums[j], nums[i] = nums[i], nums[j]
+                j += 1
+        return nums
+
+       
 
         
 sol = Solution()
