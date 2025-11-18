@@ -16,4 +16,4 @@ class Solution:
         return count
     
 sol = Solution()
-sol.numSubarrayProductLessThanK([1,1,1], 0)
+print(sol.numSubarrayProductLessThanK([1,1,1], 0))
