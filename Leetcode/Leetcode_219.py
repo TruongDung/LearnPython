@@ -12,3 +12,6 @@ class Solution:
     
 sol = Solution()
 sol.containsNearbyDuplicate([0,1,2,3,1], k = 3)
+
+
+
