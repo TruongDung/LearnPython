@@ -11,4 +11,4 @@ class Solution:
         return False
     
 sol = Solution()
-sol.containsNearbyDuplicate([1,2,4,3,1], k = 3)
+sol.containsNearbyDuplicate([0,1,2,3,1], k = 3)
