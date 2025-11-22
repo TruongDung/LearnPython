@@ -4,11 +4,16 @@ class Solution:
         n = len(arr)
         for i in range(n-1, -1, -1):
             if i + zeroes < n:
+                print('if 1')
                 arr[i + zeroes] = arr[i]
+                print(arr)
+
             if arr[i] == 0: 
+                print('if 2')
                 zeroes -= 1
                 if i + zeroes < n:
                     arr[i + zeroes] = 0
+        #print(arr)
         return arr
 
 sol = Solution()
