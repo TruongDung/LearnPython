@@ -40,22 +40,49 @@
 
 # temporary 205 
 
-class Solution:
-    def isIsomorphic(self, s: str, t: str) -> bool:
-        char_index_s = {}
-        char_index_t = {}
+# class Solution:
+#     def isIsomorphic(self, s: str, t: str) -> bool:
+#         char_index_s = {}
+#         char_index_t = {}
 
-        for i in range(len(s)):
-            if s[i] not in char_index_s:
-                char_index_s[s[i]] = i
+#         for i in range(len(s)):
+#             if s[i] not in char_index_s:
+#                 char_index_s[s[i]] = i
 
-            if t[i] not in char_index_t:
-                char_index_t[t[i]] = i
+#             if t[i] not in char_index_t:
+#                 char_index_t[t[i]] = i
             
-            if char_index_s[s[i]] != char_index_t[t[i]]:
+#             if char_index_s[s[i]] != char_index_t[t[i]]:
+#                 return False
+
+#         return True
+    
+# sol = Solution()
+# sol.isIsomorphic('egg', 'add')
+
+class Solution:
+    def isStrobogrammatic(self, num: str) -> bool:
+        pairs = {
+            '0': '0',
+            '1': '1',
+            '6': '9',
+            '8': '8',
+            '9': '6',
+        }
+
+        l, r = 0, len(num) - 1
+
+        while l <= r:
+            if num[l] not in pairs:
                 return False
+            
+            if pairs[num[l]] != num[r]:
+                return False
+            
+            l += 1
+            r -= 1
 
         return True
     
 sol = Solution()
-sol.isIsomorphic('egg', 'add')
+print(sol.isStrobogrammatic('8118'))
