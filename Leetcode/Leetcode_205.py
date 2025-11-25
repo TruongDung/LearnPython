@@ -1,24 +1,20 @@
 class Solution:
     def isIsomorphic(self, s: str, t: str) -> bool:
-        if len(s) != len(t):
-            return False
+        char_index_s = {}
+        char_index_t = {}
 
-        d = {}
         for i in range(len(s)):
-            if s[i] in d:
-                if d[s[i]] != t[i]:
-                    return False
-            d[s[i]] = t[i]
-        
-        e = {}
+            if s[i] not in char_index_s:
+                char_index_s[s[i]] = i
 
-        for i in range(len(t)):
-            if t[i] in e:
-                if d[t[i]] != s[i]:
-                    return False
-            e[t[i]] = s[i]
+            if t[i] not in char_index_t:
+                char_index_t[t[i]] = i
+            
+            if char_index_s[s[i]] != char_index_t[t[i]]:
+                return False
+
 
         return True
     
 sol = Solution()
-sol.isIsomorphic("badc", "baba")
+print(sol.isIsomorphic("egg", "add"))
