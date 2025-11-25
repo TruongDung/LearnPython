@@ -7,7 +7,7 @@ class Solution:
         res = [0]*len(nums1)
         for i, val in enumerate(nums2):
             dict2[val] = i
-        for i,val in enumerate(nums1):
+        for i, val in enumerate(nums1):
             res[i] = dict2[val]
         return res
     
