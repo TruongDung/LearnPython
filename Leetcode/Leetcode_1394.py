@@ -13,6 +13,7 @@ class Solution:
         #         count = max(count, d[i])
         # return count
         c = Counter(arr)
+        print(type(c))
         return max([num for num, freq in c.items() if num == freq], default=-1)
 
 sol = Solution()
