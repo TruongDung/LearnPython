@@ -1,36 +1,23 @@
 class Solution:
     def tictactoe(self, moves: List[List[int]]) -> str:
-        win = (
-            ([0,0], [0,1], [0,2]), 
-            ([1,0], [1,1], [1,2]),
-            ([2,0], [2,1], [2,2]),
-            ([0,0], [1,0], [2,0]),
-            ([0,1], [1,1], [2,1]),
-            ([0,2], [1,2], [2,2]),
-            ([0,0], [1,1], [2,2]),
-            ([2,0], [1,1], [0,2])
-        )
-
-        amove = []
-        bmove = []
+        A=[0]*8
+        B=[0]*8
         for i in range(len(moves)):
-            if i %2 == 0:
-                amove.append(tuple(moves[i]))
-            else:
-                bmove.append(tuple(moves[i]))
-
-        A = set(amove)
-        B = set(bmove)
-
-        # Kiểm tra thắng
-        for combo in win:
-            if all(c in A for c in combo):
+            r,c=moves[i]
+            player = A if i%2==0 else B
+            player[r] += 1
+            player[c+3] += 1
+            if r==c:
+                player[6] += 1
+            if r==2-c:
+                player[7] += 1
+        for i in range(8):
+            if A[i]==3:
                 return "A"
-            if all(c in B for c in combo):
+            if B[i]==3:
                 return "B"
-
-
-        return "None"
+        
+        return "Draw" if len(moves) == 9 else "Pending"
     
 sol = Solution()
 print(sol.tictactoe([[0,0],[2,0],[1,1],[2,1],[2,2]]))
