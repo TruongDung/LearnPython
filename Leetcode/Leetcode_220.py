@@ -10,3 +10,6 @@ class Solution:
             if bkt+1 in seen and i - seen[bkt+1][0] <= indexDiff and abs(x - seen[bkt+1][1]) <= valueDiff: return True 
             seen[bkt] = (i, x) 
         return False 
+    
+sol = Solution()
+sol.containsNearbyAlmostDuplicate([1,2,3,1], 3, 0)
