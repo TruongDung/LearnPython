@@ -7,7 +7,7 @@ class Solution:
             player = A if i%2==0 else B
             player[r] += 1
             player[c+3] += 1
-            if r==c:
+            if r==c: 
                 player[6] += 1
             if r==2-c:
                 player[7] += 1
