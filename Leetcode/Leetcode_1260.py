@@ -11,8 +11,10 @@ class Solution:
         for i in range(size):
             new_index = (i + k) % size   # <-- compute bằng modulo
             new_arr[new_index] = arr[i]
+
+        a = -1%10
         return []
-    
+
 
 sol = Solution()
 #sol.shiftGrid( [[1,2,3],[4,5,6],[7,8,9]], 1)
