@@ -2,9 +2,15 @@ class Solution:
     def plusOne(self, digits: List[int]) -> List[int]:
         memory = 1
 
-        for i in range(len(digits)-1, -1, -1): print(i)
+        for i in range(len(digits)-1, -1, -1):
+            memory += digits[i]
+            digits[i] = memory % 10
+            memory //= 10
 
-        return []
+        if memory: return [1]+digits
+
+        return digits
     
 sol = Solution()
-sol.plusOne([1,2,3])
+print(sol.plusOne([1,2,3]))
+print(sol.plusOne([9,9,9]))
