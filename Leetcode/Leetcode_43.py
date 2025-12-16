@@ -1,15 +1,5 @@
 class Solution:
     def multiply(self, num1: str, num2: str) -> str:
-        #return str(int(num1) * int(num2))
-        # n1 = 0
-        # for i in num1:
-        #     n1 = n1*10 + (ord(i) - ord('0'))
-
-        # n2 = 0
-        # for j in num2:
-        #     n2 = n2*10 + (ord(j) - ord('0'))   
-        
-        # return str(n1*n2)
 
         if num1 == "0" or num2 == "0":
             return "0"
@@ -37,4 +27,5 @@ class Solution:
     
 sol = Solution()
 #print(sol.multiply("2", "3"))  # Kết quả: "6"
-print(sol.multiply("123", "456"))  # Kết quả: "56088"
+#print(sol.multiply("123", "456"))  # Kết quả: "56088"
+print(sol.multiply("123", "45")) 
