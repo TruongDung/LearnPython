@@ -5,8 +5,13 @@ class Solution:
             return ""
         # If strings are equal than return the substring from 0 to gcd of size(str1), size(str2)
         from math import gcd
-        a1 = gcd(len(str1), len(str2))
+        print(self.gcd(18, 48))
         return str1[:gcd(len(str1), len(str2))]
+
+    def gcd(self, a, b):
+        while b!=0:
+            a, b = b, a%b
+        return a
     
 
 sol = Solution()
