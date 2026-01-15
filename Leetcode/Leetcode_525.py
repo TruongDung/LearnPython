@@ -1,7 +1,8 @@
 class Solution:
     def findMaxLength(self, nums: List[int]) -> int:
-        dic = {}
-        dic[0] = -1
+
+        dic = {0:-1}
+
         ans = 0
         count = 0
 
@@ -20,3 +21,4 @@ class Solution:
     
 sol = Solution()
 print(sol.findMaxLength([0,1,0,0,1,1,0]))
+sol.findMaxLength([0,1,0,0,1,1,0])
