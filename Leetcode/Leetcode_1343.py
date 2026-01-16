@@ -17,4 +17,5 @@ class Solution:
         return count
     
 sol = Solution()
-print(sol.numOfSubarrays([2,2,2,2,5,5,5,8], 3, 4))
+#print(sol.numOfSubarrays([2,2,2,2,5,5,5,8], 3, 4))
+print(sol.numOfSubarrays([7,7,7,7,7,7,7], 7, 7))
