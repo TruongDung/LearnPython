@@ -1,19 +1,30 @@
 class Solution:
     def duplicateZeros(self, arr: List[int]) -> None:
-        zeroes = arr.count(0)
         n = len(arr)
-        for i in range(n-1, -1, -1):
-            if i + zeroes < n:
-                print('if 1')
-                arr[i + zeroes] = arr[i]
-                print(arr)
 
-            if arr[i] == 0: 
-                print('if 2')
-                zeroes -= 1
-                if i + zeroes < n:
-                    arr[i + zeroes] = 0
-        #print(arr)
+        i = n-1
+
+        total_len = n
+        for k in range(n):
+            if arr[k] == 0:
+                total_len += 1
+
+        j = total_len - 1
+
+        while i>=0:
+            if arr[i] == 0:
+                if j <= n-1:
+                    arr[j] = 0
+                j-=1
+                if j <= n-1:
+                    arr[j] = 0
+                j-=1
+                i-=1
+            else:
+                if j <= n-1:
+                    arr[j] = arr[i]
+                j-=1
+                i-=1
         return arr
 
 sol = Solution()
