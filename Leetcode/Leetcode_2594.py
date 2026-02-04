@@ -11,7 +11,7 @@ class Solution:
             total_cars = sum(math.isqrt(mid//rank) for rank in ranks)
 
             if total_cars == cars:
-                return mid
+                end = mid
             elif total_cars > cars:
                 end = mid
             elif total_cars < cars:
