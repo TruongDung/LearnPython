@@ -8,5 +8,5 @@ class Solution:
         return k
     
 sol = Solution()
-print(sol.findKthPositive([2,3,4,7,11], 5))
+print(sol.findKthPositive([2,4,7,11], 5))
 #print(sol.findKthPositive([1,2,3,4], 2))
