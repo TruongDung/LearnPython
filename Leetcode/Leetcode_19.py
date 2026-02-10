@@ -17,10 +17,11 @@ class Solution:
         while cur:
             if j == k:
                 pre.next = cur.next
+            pre = cur   
             cur = cur.next
             j += 1
 
-        return pre
+        return head
 
 head = ListNode(1)
 head.next = ListNode(2)
