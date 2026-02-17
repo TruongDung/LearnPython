@@ -4,20 +4,6 @@ class ListNode:
         self.next = next
 class Solution:
     def isPalindrome(self, head: Optional[ListNode]) -> bool:
-        # pre = None
-        # cur = head
-        # a = head
-        # while cur:
-        #     next_node = cur.next
-        #     cur.next = pre
-        #     pre = cur
-        #     cur = next_node
-        
-        # if pre == a:
-        #     return True
-        
-        # return False
-
         if not head or not head.next:
             return True
 
