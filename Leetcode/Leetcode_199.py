@@ -5,6 +5,9 @@
 #         self.left = left
 #         self.right = right
 
+import collections
+
+
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val = val
@@ -37,8 +40,33 @@ def build_tree(lst):
     return root
 
 # Test
-root = build_tree([3, 9, 20, None, None, 15, 7])
+root = build_tree([1, 2, 3, 4, None, None, None, 5])
 
 class Solution:
     def rightSideView(self, root: Optional[TreeNode]) -> List[int]:
-        return []
+        res = []
+        if root == None:
+            return res
+        queue = collections.deque()
+        queue.append(root)
+        while queue:
+            size = len(queue)
+            current_level_list = []
+            for _ in range(size):
+                curr = queue.popleft()
+
+                current_level_list.append(curr.val)
+
+                if curr.left:
+                   queue.append(curr.left)
+                if curr.right:
+                    queue.append(curr.right)
+
+                if _ == size - 1:
+                    res.append(curr.val)
+
+            #res.append(current_level_list)
+        return res
+    
+sol = Solution()
+print(sol.rightSideView(root))
