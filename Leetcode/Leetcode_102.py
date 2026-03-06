@@ -9,26 +9,16 @@ import collections
 
 class Solution:
     def levelOrder(self, root: Optional[TreeNode]) -> List[List[int]]:
-        res = []
-        if root == None:
-            return res
-        queue = collections.deque()
-        queue.append(root)
-        while queue:
-            size = len(queue)
-            current_level_list = []
-            for _ in range(size):
-                curr = queue.popleft()
+        def dfs(node, current):
+            if node is None:
+                return 0
+            current = current * 2 + node.val
+            if node.left is None and node.right is None:
+                return current
 
-                current_level_list.append(curr.val)
-
-                if curr.left:
-                    queue.append(curr.left)
-                if curr.right:
-                    queue.append(curr.right)
-
-            res.append(current_level_list)
-        return res
+            return dfs(node.left, current) + dfs(node.right, current)
+        
+        return dfs(root,0)
     
 
     
