@@ -6,8 +6,8 @@ class Solution:
             if start == len(nums):
                 res.append(list(temp))
 
-            for i in range(start, n):
-                if i > start and nums[i] == nums[i+1]:
+            for i in range(start, len(nums)):
+                if i > start and nums[i] == nums[i-1]:
                     continue
 
                 temp.append(nums[i])
