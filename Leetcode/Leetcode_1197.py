@@ -7,7 +7,7 @@ class Solution:
 
         directions = [ (-2,-1), (-1,-2), (1, -2), (2, -1), (-1, 2), (1, 2), (2, 1)]
 
-        queue = deque([0, 0, 0])
+        queue = deque([(0, 0, 0)])
         visited = set()
 
         while queue:
@@ -20,6 +20,6 @@ class Solution:
                 nr = dr + row
                 nc = dc + col
 
-                if(nr, nc) not in visited:
-                    visited.add(nc, nc)
+                if(nr, nc) not in visited and nr >=-2 and nc >= -2:
+                    visited.add((nr, nc))
                     queue.append((nr, nc, step + 1))
