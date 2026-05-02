@@ -29,4 +29,4 @@ class Solution:
         return dist
 
 sol = Solution()
-print(sol.updateMatrix([[0,0,0],[0,1,0],[0,0,0]]))
+print(sol.updateMatrix([[0,0,0],[0,1,0],[1,1,1]]))
