@@ -3,11 +3,15 @@ class Solution:
         count = 0
         stack = []
         for i in s:
-            if stack and i == ")":
-                stack.pop()
-            stack.append(i)
+            if i == "(":
+                stack.append(i)
+            else:
+                if len(stack)>0 and i == ")":
+                    stack.pop()
+                else:
+                    count += 1
         
-        return count
+        return count + len(stack)
 
 sol = Solution()
 print(sol.minAddToMakeValid("())"))
