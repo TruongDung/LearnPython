@@ -1,4 +1,6 @@
-from ast import List
+
+from typing import List
+
 
 class TrieNode:
     def __init__(self):
@@ -20,28 +22,32 @@ class MagicDictionary:
                 node = node.children[char]
             node.is_word = True
     def search(self, searchWord: str) -> bool:
-        def dfs(node, index, modified):
-            if index == len(searchWord):
-                return modified and node.is_word
-            
-            char = searchWord[index]
-            if char in node.children:
-                if dfs(node.children[char], index + 1, modified):
-                    return True
-            
-            if not modified:
-                for child_char, child_node in node.children.items():
-                    if child_char != char:
-                        if dfs(child_node, index + 1, True):
-                            return True
-            
+        return self._dfs(searchWord, 0, self.root, False)
+    
+    def _dfs(self, word: str, index: int, node: TrieNode, changed: bool) -> bool:
+        if node is None:
             return False
         
-        return dfs(self.root, 0, False)
+        if index == len(word):
+            return changed and node.is_word
+        
+        c = word[index]
+
+        for ch, child in node.children.items():
+            if ch == c:
+                if self._dfs(word, index + 1, child, changed):
+                    return True
+            elif not changed:
+                if self._dfs(word, index + 1, child, True):
+                    return True
+                
+        return False
+    
+    
     
 sol = MagicDictionary()
-sol.buildDict(["hello", "hallo", "leetcode"])
-print(sol.search("hello"))
+sol.buildDict(["hello", "leetcode"])
+#print(sol.search("hello"))
 print(sol.search("hhllo"))
-print(sol.search("hell"))
-print(sol.search("leetcoded"))
+#print(sol.search("hell"))
+#print(sol.search("leetcoded"))
