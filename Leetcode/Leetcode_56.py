@@ -6,9 +6,8 @@ class Solution:
 
         for start, end in intervals:
             if not res or start > res[-1][1]:
-                res.append(res[-1][1])
-
+                res.append([start, end]) # new
             else:
-                res[-1][1] = max(res[-1][1], end)
+                res[-1][1] = max(res[-1][1], end) # merge
 
         return res
