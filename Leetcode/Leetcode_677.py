@@ -37,5 +37,5 @@ class MapSum:
 sol = MapSum()
 sol.insert("apple", 3)
 print(sol.sum("ap"))  # Output: 3
-print(sol.insert("app", 2))  # Output: None
+sol.insert("app", 2)  # Output: None
 print(sol.sum("ap"))  # Output: 5
