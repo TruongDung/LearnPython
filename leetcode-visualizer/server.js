@@ -412,6 +412,7 @@ function buildSteps70(input) {
 function buildSteps300(nums) {
   const n = nums.length;
   const dp = new Array(n).fill(1);
+  const prev = new Array(n).fill(-1);
   const steps = [];
 
   steps.push({
@@ -435,6 +436,7 @@ function buildSteps300(nums) {
         bestJ = j;
       }
     }
+    prev[i] = bestJ;
 
     const highlight = bestJ >= 0 ? [bestJ, i] : [i];
     steps.push({
@@ -466,21 +468,29 @@ function buildSteps300(nums) {
     }
   }
 
+  // Reconstruct one longest subsequence by walking predecessors back from argmax.
+  const chain = [];
+  for (let i = argmax; i !== -1; i = prev[i]) {
+    chain.push(i);
+  }
+  chain.reverse();
+  const chainValues = chain.map((i) => nums[i]);
+
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
     arr: [...nums],
     sub: [...dp],
     highlight: [],
-    mark: [argmax],
+    mark: chain,
     final: true,
     codeLines: [9],
     note: {
-      vi: `Độ dài dãy con tăng dài nhất = max(dp) = ${answer} (đạt tại vị trí ${argmax}).`,
-      en: `Length of the longest increasing subsequence = max(dp) = ${answer} (achieved at index ${argmax}).`,
+      vi: `Độ dài dãy con tăng dài nhất = max(dp) = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}] (các vị trí ${chain.join(", ")}).`,
+      en: `Length of the longest increasing subsequence = max(dp) = ${answer}. One such subsequence: [${chainValues.join(", ")}] (indices ${chain.join(", ")}).`,
     },
   });
 
-  return { original: [...nums], answer, steps };
+  return { original: [...nums], answer, chain, steps };
 }
 
 /**
