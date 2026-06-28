@@ -36,8 +36,18 @@
         <p id="problemTitleVi" class="title-vi"></p>
         <p id="problemStatement" class="statement"></p>
 
+        <div id="complexity" class="complexity hidden">
+          <div class="cx-row">
+            <span class="cx-label" data-i18n="timeLabel">Thời gian</span>
+            <span id="cxTime" class="cx-badge"></span>
+            <span class="cx-label" data-i18n="spaceLabel">Bộ nhớ</span>
+            <span id="cxSpace" class="cx-badge"></span>
+          </div>
+          <p id="cxNote" class="cx-note"></p>
+        </div>
+
         <div class="input-row">
-          <label for="arrInput" data-i18n="arrLabel">Mảng đầu vào (cách nhau bởi dấu phẩy)</label>
+          <label id="arrLabel" for="arrInput" data-i18n="arrLabel">Mảng đầu vào (cách nhau bởi dấu phẩy)</label>
           <input id="arrInput" type="text" placeholder="2,2,1,2,1" />
           <div id="extraParams" class="extra-params"></div>
           <button id="runBtn" class="run-btn" data-i18n="runBtn">Trực quan hóa</button>
@@ -49,6 +59,13 @@
         <div class="viz-head">
           <h3 id="stepTitle"></h3>
           <span id="stepCounter" class="badge"></span>
+        </div>
+
+        <div id="vizComplexity" class="viz-complexity hidden">
+          <span class="cx-label" data-i18n="timeLabel">Thời gian</span>
+          <span id="vizCxTime" class="cx-badge"></span>
+          <span class="cx-label" data-i18n="spaceLabel">Bộ nhớ</span>
+          <span id="vizCxSpace" class="cx-badge"></span>
         </div>
 
         <div id="bars" class="bars"></div>

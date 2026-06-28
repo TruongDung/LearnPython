@@ -24,6 +24,8 @@ const I18N = {
     last: "⏭",
     stepCounter: (a, b) => `Bước ${a}/${b}`,
     answer: (v) => `Đáp án: ${v}`,
+    timeLabel: "Thời gian",
+    spaceLabel: "Bộ nhớ",
     errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
     errConn: "Lỗi kết nối tới server.",
@@ -44,6 +46,8 @@ const I18N = {
     last: "⏭",
     stepCounter: (a, b) => `Step ${a}/${b}`,
     answer: (v) => `Answer: ${v}`,
+    timeLabel: "Time",
+    spaceLabel: "Space",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
     errConn: "Connection error to server.",
@@ -119,7 +123,31 @@ function renderProblem() {
   $("problemTitle").textContent = pick(problemData.title);
   $("problemTitleVi").textContent = pick(problemData.titleVi);
   $("problemStatement").textContent = pick(problemData.statement);
+  // Nhãn ô nhập: dùng nhãn tùy biến của bài nếu có, ngược lại về mặc định
+  $("arrLabel").textContent = problemData.inputLabel
+    ? pick(problemData.inputLabel)
+    : t().arrLabel;
+  renderComplexity();
   renderExtraParams();
+}
+
+// Hiển thị phân tích độ phức tạp thời gian/bộ nhớ
+function renderComplexity() {
+  const cx = problemData.complexity;
+  if (!cx) {
+    hide("complexity");
+    hide("vizComplexity");
+    return;
+  }
+  $("cxTime").textContent = cx.time;
+  $("cxSpace").textContent = cx.space;
+  $("cxNote").textContent = pick(cx.note);
+  show("complexity");
+
+  // Bản gọn trong vùng trực quan hóa
+  $("vizCxTime").textContent = cx.time;
+  $("vizCxSpace").textContent = cx.space;
+  show("vizComplexity");
 }
 
 // Vẽ các ô nhập tham số phụ (vd k của bài 1004), giữ lại giá trị đã nhập khi đổi ngôn ngữ

@@ -342,6 +342,66 @@ function buildSteps152(nums) {
   return { original: [...nums], answer: result, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 70: Climbing Stairs.
+ *
+ * Quy hoạch động kiểu Fibonacci:
+ *  - dp[i] = số cách leo tới bậc i.
+ *  - dp[0] = dp[1] = 1.
+ *  - dp[i] = dp[i-1] + dp[i-2].
+ *  - Đáp án là dp[n].
+ */
+function buildSteps70(input) {
+  const n = input[0];
+  const dp = new Array(n + 1).fill(0);
+  const steps = [];
+
+  dp[0] = 1;
+  if (n >= 1) dp[1] = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    arr: [...dp],
+    highlight: n >= 1 ? [0, 1] : [0],
+    mark: [],
+    codeLines: [3, 4, 5],
+    note: {
+      vi: `n = ${n}. dp[0] = dp[1] = 1 (có 1 cách đứng yên ở bậc 0, và 1 cách lên bậc 1).`,
+      en: `n = ${n}. dp[0] = dp[1] = 1 (one way to stay at step 0, one way to reach step 1).`,
+    },
+  });
+
+  for (let i = 2; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2];
+    steps.push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      arr: [...dp],
+      highlight: [i - 2, i - 1, i],
+      mark: [],
+      codeLines: [6, 7],
+      note: {
+        vi: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
+        en: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...dp],
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeLines: [8],
+    note: {
+      vi: `Số cách leo tới bậc ${n} = dp[${n}] = ${dp[n]}.`,
+      en: `Number of distinct ways to reach step ${n} = dp[${n}] = ${dp[n]}.`,
+    },
+  });
+
+  return { n, answer: dp[n], steps };
+}
+
 const SUPPORTED = {
   1846: {
     id: 1846,
@@ -354,6 +414,14 @@ const SUPPORTED = {
     defaultInput: [2, 2, 1, 2, 1],
     inputKind: "positive", // các số nguyên dương
     extraParams: [],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(1)",
+      note: {
+        vi: "Chi phí chính là sắp xếp O(n log n); vòng lặp gán chỉ O(n). Sắp xếp tại chỗ nên không tốn thêm bộ nhớ đáng kể.",
+        en: "Sorting dominates at O(n log n); the assignment loop is only O(n). Sorting is in-place, so no significant extra memory.",
+      },
+    },
     code: [
       "class Solution:",
       "    def maximumElementAfterDecrementingAndRearranging(self, arr):",
@@ -382,6 +450,14 @@ const SUPPORTED = {
         default: 2,
       },
     ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi chỉ số i và j chỉ duyệt qua mảng đúng một lần (cửa sổ trượt), nên O(n). Chỉ dùng vài biến đếm nên bộ nhớ O(1).",
+        en: "Both pointers i and j traverse the array once (sliding window), so O(n). Only a few counters are used, so O(1) memory.",
+      },
+    },
     code: [
       "class Solution:",
       "    def longestOnes(self, nums, k):",
@@ -411,6 +487,14 @@ const SUPPORTED = {
     defaultInput: [1, 100, 1, 1, 1, 100, 1, 1, 100, 1],
     inputKind: "nonneg", // số nguyên không âm
     extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt mảng một lần để điền bảng dp nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
+        en: "A single pass fills the dp table, so O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+      },
+    },
     code: [
       "class Solution:",
       "    def minCostClimbingStairs(self, cost):",
@@ -433,6 +517,14 @@ const SUPPORTED = {
     defaultInput: [2, 3, -2, 4],
     inputKind: "integer", // số nguyên bất kỳ (cho phép âm và 0)
     extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng đúng một lần, mỗi bước chỉ cập nhật curMax/curMin/result nên O(n) thời gian và O(1) bộ nhớ.",
+        en: "A single pass updates curMax/curMin/result at each step, giving O(n) time and O(1) memory.",
+      },
+    },
     code: [
       "class Solution:",
       "    def maxProduct(self, nums):",
@@ -446,6 +538,40 @@ const SUPPORTED = {
       "        return result",
     ],
     builder: buildSteps152,
+  },
+  70: {
+    id: 70,
+    title: { vi: "Climbing Stairs", en: "Climbing Stairs" },
+    titleVi: { vi: "Leo cầu thang", en: "Climbing stairs" },
+    statement: {
+      vi: "Bạn đang leo một cầu thang có n bậc để lên đỉnh. Mỗi lần bạn được leo 1 hoặc 2 bậc. Hỏi có bao nhiêu cách khác nhau để leo lên tới đỉnh?",
+      en: "You are climbing a staircase. It takes n steps to reach the top. Each time you can climb either 1 or 2 steps. In how many distinct ways can you climb to the top?",
+    },
+    defaultInput: [5],
+    inputKind: "positive", // n là số nguyên dương
+    inputLabel: { vi: "n (số bậc thang)", en: "n (number of steps)" },
+    singleInput: true,
+    maxInput: 45,
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Điền bảng dp từ 2 đến n nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
+        en: "Filling the dp table from 2 to n is O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def climbStairs(self, n):",
+      "        dp = [0] * (n + 1)",
+      "        dp[0] = 1",
+      "        dp[1] = 1",
+      "        for i in range(2, n + 1):",
+      "            dp[i] = dp[i-1] + dp[i-2]",
+      "        return dp[n]",
+    ],
+    builder: buildSteps70,
   },
 };
 
@@ -465,6 +591,8 @@ app.get("/api/problem/:id", (req, res) => {
     defaultInput: problem.defaultInput,
     inputKind: problem.inputKind,
     extraParams: problem.extraParams || [],
+    inputLabel: problem.inputLabel || null,
+    complexity: problem.complexity || null,
     code: problem.code || [],
   });
 });
@@ -501,6 +629,15 @@ app.post("/api/problem/:id/solve", (req, res) => {
     return res.status(400).json({
       error: "Đầu vào phải là mảng các số nguyên không âm, ví dụ: 1,100,1,1,1",
     });
+  }
+
+  if (problem.singleInput) {
+    if (input.length !== 1) {
+      return res.status(400).json({ error: "Bài này chỉ nhận đúng một số." });
+    }
+    if (problem.maxInput && input[0] > problem.maxInput) {
+      return res.status(400).json({ error: `Giá trị tối đa cho phép là ${problem.maxInput}.` });
+    }
   }
 
   // Kiểm tra các tham số phụ
