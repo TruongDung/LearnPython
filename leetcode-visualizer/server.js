@@ -483,6 +483,62 @@ function buildSteps300(nums) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 509: Fibonacci Number.
+ *
+ *  - F(0) = 0, F(1) = 1.
+ *  - F(n) = F(n-1) + F(n-2).
+ */
+function buildSteps509(input) {
+  const n = input[0];
+  const dp = new Array(n + 1).fill(0);
+  const steps = [];
+
+  if (n >= 1) dp[1] = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    arr: [...dp],
+    highlight: n >= 1 ? [0, 1] : [0],
+    mark: [],
+    codeLines: n >= 1 ? [3, 4, 5] : [3],
+    note: {
+      vi: `n = ${n}. F(0) = 0 và F(1) = 1 là hai giá trị cơ sở.`,
+      en: `n = ${n}. F(0) = 0 and F(1) = 1 are the base cases.`,
+    },
+  });
+
+  for (let i = 2; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2];
+    steps.push({
+      title: { vi: `Tính F(${i})`, en: `Compute F(${i})` },
+      arr: [...dp],
+      highlight: [i - 2, i - 1, i],
+      mark: [],
+      codeLines: [6, 7],
+      note: {
+        vi: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
+        en: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...dp],
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeLines: [8],
+    note: {
+      vi: `F(${n}) = ${dp[n]}.`,
+      en: `F(${n}) = ${dp[n]}.`,
+    },
+  });
+
+  return { n, answer: dp[n], steps };
+}
+
 const SUPPORTED = {
   1846: {
     id: 1846,
@@ -691,6 +747,41 @@ const SUPPORTED = {
       "        return max(dp)",
     ],
     builder: buildSteps300,
+  },
+  509: {
+    id: 509,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Fibonacci Number", en: "Fibonacci Number" },
+    titleVi: { vi: "Số Fibonacci", en: "Fibonacci number" },
+    statement: {
+      vi: "Dãy Fibonacci F(n) được định nghĩa: F(0) = 0, F(1) = 1, và F(n) = F(n-1) + F(n-2) với n > 1. Cho n, trả về F(n).",
+      en: "The Fibonacci numbers F(n) are defined as: F(0) = 0, F(1) = 1, and F(n) = F(n-1) + F(n-2) for n > 1. Given n, return F(n).",
+    },
+    defaultInput: [10],
+    inputKind: "nonneg", // n >= 0
+    inputLabel: { vi: "n", en: "n" },
+    singleInput: true,
+    maxInput: 30,
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Điền bảng dp từ 2 đến n nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
+        en: "Filling the dp table from 2 to n is O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def fib(self, n):",
+      "        dp = [0] * (n + 1)",
+      "        if n >= 1:",
+      "            dp[1] = 1",
+      "        for i in range(2, n + 1):",
+      "            dp[i] = dp[i-1] + dp[i-2]",
+      "        return dp[n]",
+    ],
+    builder: buildSteps509,
   },
 };
 
