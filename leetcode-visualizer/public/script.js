@@ -7,6 +7,7 @@ let steps = [];
 let stepIndex = 0;
 let answerValue = null; // đáp án của lần chạy hiện tại
 let playTimer = null;
+let catalogData = null; // danh sách bài theo nhóm
 
 // ---- Chuỗi giao diện theo ngôn ngữ ----
 const I18N = {
@@ -71,6 +72,7 @@ function setLang(newLang) {
   });
   applyStaticStrings();
   renderProblem();
+  renderCatalog();
   if (steps.length) renderStep();
 }function applyStaticStrings() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -82,9 +84,80 @@ function setLang(newLang) {
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
 }
 
+// ---- Danh mục bài theo nhóm thuật toán ----
+async function loadCatalog() {
+  try {
+    const res = await fetch("/api/problems");
+    const data = await res.json();
+    if (res.ok) {
+      catalogData = data.groups;
+      renderCatalog();
+    }
+  } catch (err) {
+    // bỏ qua, vẫn có thể nhập số bài thủ công
+  }
+}
+
+function renderCatalog() {
+  const container = $("catalog");
+  if (!catalogData) return;
+  container.innerHTML = "";
+
+  catalogData.forEach((group) => {
+    const groupEl = document.createElement("div");
+    groupEl.className = "cat-group";
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "cat-title";
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = pick(group);
+    const countSpan = document.createElement("span");
+    countSpan.className = "count";
+    countSpan.textContent = `(${group.problems.length})`;
+    titleEl.appendChild(nameSpan);
+    titleEl.appendChild(countSpan);
+
+    const itemsEl = document.createElement("div");
+    itemsEl.className = "cat-items";
+
+    group.problems.forEach((p) => {
+      const chip = document.createElement("button");
+      chip.className = "prob-chip" + (p.id === currentProblemId ? " active" : "");
+      chip.dataset.id = p.id;
+
+      const pid = document.createElement("span");
+      pid.className = "pid";
+      pid.textContent = `#${p.id}`;
+
+      const pname = document.createElement("span");
+      pname.className = "pname";
+      pname.textContent = pick(p.title);
+
+      chip.appendChild(pid);
+      chip.appendChild(pname);
+      chip.addEventListener("click", () => {
+        $("problemId").value = p.id;
+        loadProblem();
+      });
+      itemsEl.appendChild(chip);
+    });
+
+    groupEl.appendChild(titleEl);
+    groupEl.appendChild(itemsEl);
+    container.appendChild(groupEl);
+  });
+}
+
+function markActiveChip() {
+  $("catalog")
+    .querySelectorAll(".prob-chip")
+    .forEach((chip) => {
+      chip.classList.toggle("active", Number(chip.dataset.id) === currentProblemId);
+    });
+}
+
 // ---- Tải thông tin bài ----
-$("loadBtn").addEventListener("click", loadProblem);
-$("problemId").addEventListener("keydown", (e) => {
+$("loadBtn").addEventListener("click", loadProblem);$("problemId").addEventListener("keydown", (e) => {
   if (e.key === "Enter") loadProblem();
 });
 
@@ -106,6 +179,7 @@ async function loadProblem() {
     problemData = data;
     renderProblem();
     $("arrInput").value = data.defaultInput.join(",");
+    markActiveChip();
 
     show("problemPanel");
     hide("vizPanel");
@@ -359,6 +433,12 @@ function renderStep() {  const step = steps[stepIndex];
 
     bar.appendChild(valEl);
     bar.appendChild(col);
+    if (step.sub) {
+      const subEl = document.createElement("div");
+      subEl.className = "dp";
+      subEl.textContent = step.sub[i];
+      bar.appendChild(subEl);
+    }
     bar.appendChild(idxEl);
     barsEl.appendChild(bar);
   });
@@ -393,4 +473,5 @@ function showError(id, msg) {
 
 // Khởi tạo
 applyStaticStrings();
+loadCatalog();
 loadProblem();

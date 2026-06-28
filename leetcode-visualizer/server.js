@@ -402,9 +402,91 @@ function buildSteps70(input) {
   return { n, answer: dp[n], steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 300: Longest Increasing Subsequence (bản DP O(n^2)).
+ *
+ *  - dp[i] = độ dài dãy con tăng dài nhất kết thúc tại i.
+ *  - dp[i] = 1 + max(dp[j]) với mọi j < i mà nums[j] < nums[i].
+ *  - Đáp án là max(dp).
+ */
+function buildSteps300(nums) {
+  const n = nums.length;
+  const dp = new Array(n).fill(1);
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    note: {
+      vi: `nums = [${nums.join(", ")}]. dp[i] = độ dài dãy tăng dài nhất kết thúc tại i, khởi tạo toàn 1 (mỗi phần tử tự nó là một dãy).`,
+      en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1 (each element alone is a subsequence).`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    let bestJ = -1;
+    for (let j = 0; j < i; j++) {
+      if (nums[j] < nums[i] && dp[j] + 1 > dp[i]) {
+        dp[i] = dp[j] + 1;
+        bestJ = j;
+      }
+    }
+
+    const highlight = bestJ >= 0 ? [bestJ, i] : [i];
+    steps.push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      arr: [...nums],
+      sub: [...dp],
+      highlight,
+      mark: [],
+      codeLines: [5, 6, 7, 8],
+      note:
+        bestJ >= 0
+          ? {
+              vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]} (dãy tăng dài nhất). dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`,
+              en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]} (best chain). dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`,
+            }
+          : {
+              vi: `Không có phần tử trước nào nhỏ hơn nums[${i}]=${nums[i]}, nên dp[${i}] giữ nguyên = 1.`,
+              en: `No earlier element is smaller than nums[${i}]=${nums[i]}, so dp[${i}] stays 1.`,
+            },
+    });
+  }
+
+  let answer = 0;
+  let argmax = 0;
+  for (let i = 0; i < n; i++) {
+    if (dp[i] > answer) {
+      answer = dp[i];
+      argmax = i;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: [],
+    mark: [argmax],
+    final: true,
+    codeLines: [9],
+    note: {
+      vi: `Độ dài dãy con tăng dài nhất = max(dp) = ${answer} (đạt tại vị trí ${argmax}).`,
+      en: `Length of the longest increasing subsequence = max(dp) = ${answer} (achieved at index ${argmax}).`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 const SUPPORTED = {
   1846: {
     id: 1846,
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
     title: { vi: "Maximum Element After Decreasing and Rearranging", en: "Maximum Element After Decreasing and Rearranging" },
     titleVi: { vi: "Giá trị lớn nhất sau khi giảm và sắp xếp lại", en: "Maximum value after decreasing and rearranging" },
     statement: {
@@ -435,6 +517,7 @@ const SUPPORTED = {
   },
   1004: {
     id: 1004,
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
     title: { vi: "Max Consecutive Ones III", en: "Max Consecutive Ones III" },
     titleVi: { vi: "Dãy số 1 liên tiếp dài nhất III", en: "Longest run of consecutive ones III" },
     statement: {
@@ -478,6 +561,7 @@ const SUPPORTED = {
   },
   746: {
     id: 746,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Min Cost Climbing Stairs", en: "Min Cost Climbing Stairs" },
     titleVi: { vi: "Chi phí leo cầu thang nhỏ nhất", en: "Minimum cost to climb stairs" },
     statement: {
@@ -508,6 +592,7 @@ const SUPPORTED = {
   },
   152: {
     id: 152,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Maximum Product Subarray", en: "Maximum Product Subarray" },
     titleVi: { vi: "Tích lớn nhất của dãy con liên tiếp", en: "Largest product of a contiguous subarray" },
     statement: {
@@ -541,6 +626,7 @@ const SUPPORTED = {
   },
   70: {
     id: 70,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Climbing Stairs", en: "Climbing Stairs" },
     titleVi: { vi: "Leo cầu thang", en: "Climbing stairs" },
     statement: {
@@ -573,7 +659,57 @@ const SUPPORTED = {
     ],
     builder: buildSteps70,
   },
+  300: {
+    id: 300,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Longest Increasing Subsequence", en: "Longest Increasing Subsequence" },
+    titleVi: { vi: "Dãy con tăng dài nhất", en: "Longest increasing subsequence" },
+    statement: {
+      vi: "Cho mảng số nguyên nums, trả về độ dài của dãy con tăng nghiêm ngặt dài nhất. Dãy con được tạo bằng cách xóa một số phần tử (có thể không xóa) mà giữ nguyên thứ tự các phần tử còn lại.",
+      en: "Given an integer array nums, return the length of the longest strictly increasing subsequence. A subsequence is derived by deleting some or no elements without changing the order of the remaining elements.",
+    },
+    defaultInput: [10, 9, 2, 5, 3, 7, 101, 18],
+    inputKind: "integer", // cho phép số âm
+    extraParams: [],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n)",
+      note: {
+        vi: "Hai vòng lặp lồng nhau (mỗi i so với mọi j < i) cho O(n²) thời gian. Bảng dp dài n nên O(n) bộ nhớ. (Có bản O(n log n) dùng tìm kiếm nhị phân.)",
+        en: "Two nested loops (each i compared with every j < i) give O(n²) time. The dp table of length n is O(n) memory. (An O(n log n) version exists using binary search.)",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def lengthOfLIS(self, nums):",
+      "        n = len(nums)",
+      "        dp = [1] * n",
+      "        for i in range(1, n):",
+      "            for j in range(i):",
+      "                if nums[j] < nums[i]:",
+      "                    dp[i] = max(dp[i], dp[j] + 1)",
+      "        return max(dp)",
+    ],
+    builder: buildSteps300,
+  },
 };
+
+app.get("/api/problems", (req, res) => {
+  // Gom các bài theo nhóm thuật toán
+  const groupsMap = {};
+  for (const key of Object.keys(SUPPORTED)) {
+    const p = SUPPORTED[key];
+    const cat = p.category || { key: "other", vi: "Khác", en: "Other" };
+    if (!groupsMap[cat.key]) {
+      groupsMap[cat.key] = { key: cat.key, vi: cat.vi, en: cat.en, problems: [] };
+    }
+    groupsMap[cat.key].problems.push({ id: p.id, title: p.title, titleVi: p.titleVi });
+  }
+  const groups = Object.values(groupsMap);
+  groups.forEach((g) => g.problems.sort((a, b) => a.id - b.id));
+  groups.sort((a, b) => a.key.localeCompare(b.key));
+  res.json({ groups });
+});
 
 app.get("/api/problem/:id", (req, res) => {
   const id = Number(req.params.id);
