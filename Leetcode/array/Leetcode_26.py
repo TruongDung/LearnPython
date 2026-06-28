@@ -1,5 +1,8 @@
+from typing import List
+
+
 class Solution:
-    def removeDuplicates(self, nums: list[int]) -> int:
+    def removeDuplicates(self, nums: List[int]) -> int:
         if not nums:
             return 0
 

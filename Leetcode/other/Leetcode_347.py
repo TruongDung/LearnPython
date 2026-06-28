@@ -1,6 +1,6 @@
-from ast import List
+from typing import List
 import heapq
-from typing import Counter
+from collections import Counter
 
 
 class Solution:
