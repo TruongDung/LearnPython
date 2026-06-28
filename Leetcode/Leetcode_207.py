@@ -1,33 +1,34 @@
+from collections import deque
 from typing import List
-import collections
 
 
 class Solution:
     def canFinish(self, numCourses: int, prerequisites: List[List[int]]) -> bool:
-        graph = [[] for _ in range(numCourses)]
-        indegree = [0] * numCourses
+        # For each course, list the courses that depend on it.
+        next_courses = [[] for _ in range(numCourses)]
+        # How many prerequisites each course still needs.
+        prereq_count = [0] * numCourses
 
-        for course, pre in prerequisites:
-            graph[pre].append(course)
-            indegree[course] += 1
+        for course, prerequisite in prerequisites:
+            next_courses[prerequisite].append(course)
+            prereq_count[course] += 1
 
+        # Start with every course that has no prerequisites.
+        queue = deque()
+        for course in range(numCourses):
+            if prereq_count[course] == 0:
+                queue.append(course)
 
-        queue = collections.deque()
-        for i in range(numCourses):
-            if indegree[i] == 0:
-                queue.append(i)
-
-        count = 0
-
+        finished = 0
         while queue:
-            size = len(queue)
-            for _ in range(size):
-                curr = queue.popleft()
-                count += 1
+            course = queue.popleft()
+            finished += 1
 
-                for neighbor in graph[curr]:
-                    indegree[neighbor] -= 1
-                    if indegree[neighbor] == 0:
-                        queue.append(neighbor)
+            # Taking this course removes one prerequisite from its dependents.
+            for next_course in next_courses[course]:
+                prereq_count[next_course] -= 1
+                if prereq_count[next_course] == 0:
+                    queue.append(next_course)
 
-        return count == numCourses
+        # If we managed to finish every course, there was no cycle.
+        return finished == numCourses
