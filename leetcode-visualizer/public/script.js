@@ -1,9 +1,82 @@
 const $ = (id) => document.getElementById(id);
 
+let lang = "vi";
 let currentProblemId = null;
+let problemData = null; // dữ liệu bài (song ngữ) đã tải
 let steps = [];
 let stepIndex = 0;
+let answerValue = null; // đáp án của lần chạy hiện tại
 let playTimer = null;
+
+// ---- Chuỗi giao diện theo ngôn ngữ ----
+const I18N = {
+  vi: {
+    subtitle: "Nhập số bài LeetCode để xem thuật toán chạy từng bước",
+    problemIdLabel: "Số bài LeetCode",
+    loadBtn: "Tải bài",
+    arrLabel: "Mảng đầu vào (cách nhau bởi dấu phẩy)",
+    runBtn: "Trực quan hóa",
+    first: "⏮",
+    prev: "◀ Lùi",
+    play: "▶ Chạy",
+    playStop: "⏸ Dừng",
+    next: "Tiến ▶",
+    last: "⏭",
+    stepCounter: (a, b) => `Bước ${a}/${b}`,
+    answer: (v) => `Đáp án: ${v}`,
+    errEmptyId: "Vui lòng nhập số bài.",
+    errLoad: "Không tải được bài.",
+    errConn: "Lỗi kết nối tới server.",
+    errArr: "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1",
+    errSolve: "Không xử lý được.",
+  },
+  en: {
+    subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
+    problemIdLabel: "LeetCode problem number",
+    loadBtn: "Load",
+    arrLabel: "Input array (comma separated)",
+    runBtn: "Visualize",
+    first: "⏮",
+    prev: "◀ Prev",
+    play: "▶ Play",
+    playStop: "⏸ Pause",
+    next: "Next ▶",
+    last: "⏭",
+    stepCounter: (a, b) => `Step ${a}/${b}`,
+    answer: (v) => `Answer: ${v}`,
+    errEmptyId: "Please enter a problem number.",
+    errLoad: "Could not load the problem.",
+    errConn: "Connection error to server.",
+    errArr: "Enter positive integers separated by commas. E.g. 2,2,1,2,1",
+    errSolve: "Could not process the request.",
+  },
+};
+
+const t = () => I18N[lang];
+
+// ---- Chuyển ngôn ngữ ----
+document.querySelectorAll(".lang-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
+
+function setLang(newLang) {
+  lang = newLang;
+  document.documentElement.lang = newLang;
+  document.querySelectorAll(".lang-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.lang === newLang);
+  });
+  applyStaticStrings();
+  renderProblem();
+  if (steps.length) renderStep();
+}function applyStaticStrings() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.dataset.i18n;
+    const val = t()[key];
+    if (typeof val === "string") el.textContent = val;
+  });
+  // nút Chạy/Dừng phụ thuộc trạng thái
+  $("playBtn").textContent = playTimer ? t().playStop : t().play;
+}
 
 // ---- Tải thông tin bài ----
 $("loadBtn").addEventListener("click", loadProblem);
@@ -15,29 +88,74 @@ async function loadProblem() {
   const id = $("problemId").value.trim();
   hide("searchError");
   if (!id) {
-    return showError("searchError", "Vui lòng nhập số bài.");
+    return showError("searchError", t().errEmptyId);
   }
 
   try {
     const res = await fetch(`/api/problem/${id}`);
     const data = await res.json();
     if (!res.ok) {
-      return showError("searchError", data.error || "Không tải được bài.");
+      return showError("searchError", data.error || t().errLoad);
     }
 
     currentProblemId = data.id;
-    $("problemId2").textContent = `#${data.id}`;
-    $("problemTitle").textContent = data.title;
-    $("problemTitleVi").textContent = data.titleVi;
-    $("problemStatement").textContent = data.statement;
+    problemData = data;
+    renderProblem();
     $("arrInput").value = data.defaultInput.join(",");
 
     show("problemPanel");
     hide("vizPanel");
+    steps = [];
     stopPlay();
   } catch (err) {
-    showError("searchError", "Lỗi kết nối tới server.");
+    showError("searchError", t().errConn);
   }
+}
+
+// Vẽ panel mô tả bài theo ngôn ngữ hiện tại
+function renderProblem() {
+  if (!problemData) return;
+  $("problemId2").textContent = `#${problemData.id}`;
+  $("problemTitle").textContent = pick(problemData.title);
+  $("problemTitleVi").textContent = pick(problemData.titleVi);
+  $("problemStatement").textContent = pick(problemData.statement);
+  renderExtraParams();
+}
+
+// Vẽ các ô nhập tham số phụ (vd k của bài 1004), giữ lại giá trị đã nhập khi đổi ngôn ngữ
+function renderExtraParams() {
+  const container = $("extraParams");
+  const params = problemData.extraParams || [];
+  const existing = {};
+  container.querySelectorAll("input[data-param]").forEach((inp) => {
+    existing[inp.dataset.param] = inp.value;
+  });
+
+  container.innerHTML = "";
+  params.forEach((p) => {
+    const wrap = document.createElement("div");
+    wrap.className = "param";
+
+    const label = document.createElement("label");
+    label.textContent = pick(p.label);
+    label.setAttribute("for", `param-${p.key}`);
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = `param-${p.key}`;
+    input.dataset.param = p.key;
+    input.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    container.appendChild(wrap);
+  });
+}
+
+// Lấy chuỗi theo ngôn ngữ; hỗ trợ cả chuỗi thường lẫn object {vi,en}
+function pick(field) {
+  if (field && typeof field === "object") return field[lang] ?? field.en ?? field.vi;
+  return field;
 }
 
 // ---- Chạy thuật toán ----
@@ -52,28 +170,42 @@ async function runViz() {
     .filter((s) => s !== "")
     .map(Number);
 
-  if (input.length === 0 || input.some((n) => !Number.isInteger(n) || n <= 0)) {
-    return showError("runError", "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1");
+  const allowNegative = problemData && problemData.inputKind === "integer";
+  const invalid =
+    input.length === 0 ||
+    input.some((n) => !Number.isInteger(n) || (!allowNegative && n < 0));
+  if (invalid) {
+    return showError("runError", t().errArr);
   }
+
+  // Thu thập tham số phụ
+  const params = {};
+  $("extraParams")
+    .querySelectorAll("input[data-param]")
+    .forEach((inp) => {
+      params[inp.dataset.param] = Number(inp.value);
+    });
 
   try {
     const res = await fetch(`/api/problem/${currentProblemId}/solve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input }),
+      body: JSON.stringify({ input, params }),
     });
     const data = await res.json();
     if (!res.ok) {
-      return showError("runError", data.error || "Không xử lý được.");
+      return showError("runError", data.error || t().errSolve);
     }
 
     steps = data.steps;
+    answerValue = data.answer;
     stepIndex = 0;
     show("vizPanel");
+    renderCode();
     renderStep();
     $("vizPanel").scrollIntoView({ behavior: "smooth" });
   } catch (err) {
-    showError("runError", "Lỗi kết nối tới server.");
+    showError("runError", t().errConn);
   }
 }
 
@@ -106,7 +238,7 @@ function togglePlay() {
     return;
   }
   if (stepIndex >= steps.length - 1) stepIndex = 0;
-  $("playBtn").textContent = "⏸ Dừng";
+  $("playBtn").textContent = t().playStop;
   playTimer = setInterval(() => {
     if (stepIndex < steps.length - 1) {
       stepIndex++;
@@ -122,34 +254,72 @@ function stopPlay() {
     clearInterval(playTimer);
     playTimer = null;
   }
-  $("playBtn").textContent = "▶ Chạy";
+  $("playBtn").textContent = t().play;
+}
+
+// ---- Vẽ code Python ----
+function renderCode() {
+  const panel = $("codePanel");
+  const code = (problemData && problemData.code) || [];
+  panel.innerHTML = "";
+  if (code.length === 0) {
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  code.forEach((line, idx) => {
+    const row = document.createElement("div");
+    row.className = "code-line";
+    row.dataset.line = idx + 1; // 1-indexed
+
+    const ln = document.createElement("span");
+    ln.className = "ln";
+    ln.textContent = idx + 1;
+
+    const txt = document.createElement("span");
+    txt.className = "txt";
+    txt.textContent = line;
+
+    row.appendChild(ln);
+    row.appendChild(txt);
+    panel.appendChild(row);
+  });
+}
+
+function updateCodeHighlight(activeLines) {
+  const set = new Set(activeLines);
+  $("codePanel")
+    .querySelectorAll(".code-line")
+    .forEach((row) => {
+      row.classList.toggle("active", set.has(Number(row.dataset.line)));
+    });
 }
 
 // ---- Vẽ một bước ----
-function renderStep() {
-  const step = steps[stepIndex];
+function renderStep() {  const step = steps[stepIndex];
   if (!step) return;
 
-  $("stepTitle").textContent = step.title;
-  $("stepCounter").textContent = `Bước ${stepIndex + 1}/${steps.length}`;
-  $("stepNote").textContent = step.note;
+  $("stepTitle").textContent = pick(step.title);
+  $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
+  $("stepNote").textContent = pick(step.note);
+  updateCodeHighlight(step.codeLines || []);
 
-  const maxVal = Math.max(...steps.flatMap((s) => s.arr), 1);
-  const isLast = stepIndex === steps.length - 1;
+  const maxVal = Math.max(...steps.flatMap((s) => s.arr.map((v) => Math.abs(v))), 1);
 
   const barsEl = $("bars");
   barsEl.innerHTML = "";
 
   step.arr.forEach((val, i) => {
-    const highlighted = step.highlight.includes(i);
-    const finalBar = isLast && i === step.arr.length - 1;
+    const marked = (step.mark || []).includes(i);
+    const highlighted = (step.highlight || []).includes(i);
 
     const bar = document.createElement("div");
-    bar.className = "bar" + (highlighted ? " highlight" : "") + (finalBar ? " final" : "");
+    bar.className = "bar" + (marked ? " final" : highlighted ? " highlight" : "");
 
     const col = document.createElement("div");
     col.className = "col";
-    col.style.height = `${(val / maxVal) * 180 + 4}px`;
+    col.style.height = `${(Math.abs(val) / maxVal) * 180 + 4}px`;
+    if (val < 0) col.classList.add("neg");
 
     const valEl = document.createElement("div");
     valEl.className = "val";
@@ -172,9 +342,8 @@ function renderStep() {
   $("lastBtn").disabled = stepIndex === steps.length - 1;
 
   // hộp kết quả
-  if (isLast) {
-    const answer = step.arr[step.arr.length - 1];
-    $("answer").textContent = `Đáp án: ${answer}`;
+  if (step.final) {
+    $("answer").textContent = t().answer(answerValue);
     show("answer");
   } else {
     hide("answer");
@@ -194,5 +363,6 @@ function showError(id, msg) {
   el.classList.remove("hidden");
 }
 
-// Tự tải bài mặc định khi mở trang
+// Khởi tạo
+applyStaticStrings();
 loadProblem();

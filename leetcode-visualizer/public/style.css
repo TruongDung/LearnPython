@@ -22,6 +22,39 @@ header h1 {
   color: #f8fafc;
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lang-switch {
+  display: flex;
+  gap: 4px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.lang-btn {
+  background: transparent;
+  color: #94a3b8;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.lang-btn:hover {
+  background: #334155;
+}
+
+.lang-btn.active {
+  background: #6366f1;
+  color: white;
+}
+
 .subtitle {
   margin: 4px 0 24px;
   color: #94a3b8;
@@ -121,6 +154,29 @@ button:disabled {
   border-top: 1px solid #334155;
 }
 
+.extra-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.extra-params .param {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.extra-params .param input {
+  width: 120px;
+  flex: none;
+}
+
+.run-btn {
+  margin-top: 14px;
+  width: 100%;
+}
+
 .viz-head {
   display: flex;
   justify-content: space-between;
@@ -171,6 +227,17 @@ button:disabled {
   background: #22c55e;
 }
 
+.bar .col.neg {
+  background: #64748b;
+  border-radius: 0 0 6px 6px;
+  align-self: flex-start;
+  opacity: 0.85;
+}
+
+.bar.highlight .col.neg {
+  background: #b45309;
+}
+
 .bar .val {
   font-size: 14px;
   font-weight: 600;
@@ -191,6 +258,44 @@ button:disabled {
   font-size: 14px;
   color: #cbd5e1;
   min-height: 44px;
+}
+
+.code-panel {
+  margin: 0 0 18px;
+  padding: 14px 0;
+  background: #0b1120;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.code-line {
+  display: flex;
+  padding: 0 14px;
+  white-space: pre;
+  color: #cbd5e1;
+}
+
+.code-line .ln {
+  display: inline-block;
+  width: 28px;
+  margin-right: 12px;
+  text-align: right;
+  color: #475569;
+  user-select: none;
+}
+
+.code-line.active {
+  background: rgba(245, 158, 11, 0.16);
+  border-left: 3px solid #f59e0b;
+  margin-left: -3px;
+}
+
+.code-line.active .ln {
+  color: #f59e0b;
 }
 
 .controls {
