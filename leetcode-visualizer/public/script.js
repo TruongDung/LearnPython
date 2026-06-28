@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 
-let lang = "vi";
+let lang = "en";
 let currentProblemId = null;
 let problemData = null; // dữ liệu bài (song ngữ) đã tải
 let steps = [];
