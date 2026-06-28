@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LeetCode Visualizer</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>LeetCode Visualizer</h1>
+        <p class="subtitle">Nhập số bài LeetCode để xem thuật toán chạy từng bước</p>
+      </header>
+
+      <section class="search">
+        <label for="problemId">Số bài LeetCode</label>
+        <div class="search-row">
+          <input id="problemId" type="number" placeholder="vd: 1846" value="1846" />
+          <button id="loadBtn">Tải bài</button>
+        </div>
+        <p id="searchError" class="error hidden"></p>
+      </section>
+
+      <section id="problemPanel" class="panel hidden">
+        <div class="problem-head">
+          <span id="problemId2" class="badge"></span>
+          <h2 id="problemTitle"></h2>
+        </div>
+        <p id="problemTitleVi" class="title-vi"></p>
+        <p id="problemStatement" class="statement"></p>
+
+        <div class="input-row">
+          <label for="arrInput">Mảng đầu vào (cách nhau bởi dấu phẩy)</label>
+          <div class="search-row">
+            <input id="arrInput" type="text" placeholder="2,2,1,2,1" />
+            <button id="runBtn">Trực quan hóa</button>
+          </div>
+          <p id="runError" class="error hidden"></p>
+        </div>
+      </section>
+
+      <section id="vizPanel" class="panel hidden">
+        <div class="viz-head">
+          <h3 id="stepTitle"></h3>
+          <span id="stepCounter" class="badge"></span>
+        </div>
+
+        <div id="bars" class="bars"></div>
+
+        <p id="stepNote" class="note"></p>
+
+        <div class="controls">
+          <button id="firstBtn" title="Về đầu">⏮</button>
+          <button id="prevBtn" title="Lùi một bước">◀ Lùi</button>
+          <button id="playBtn" title="Tự động chạy">▶ Chạy</button>
+          <button id="nextBtn" title="Tiến một bước">Tiến ▶</button>
+          <button id="lastBtn" title="Đến cuối">⏭</button>
+        </div>
+
+        <div id="answer" class="answer hidden"></div>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

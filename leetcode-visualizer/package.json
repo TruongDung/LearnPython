@@ -1,0 +1,12 @@
+{
+  "name": "leetcode-visualizer",
+  "version": "1.0.0",
+  "description": "Web app trực quan hóa thuật toán LeetCode theo từng bước",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
