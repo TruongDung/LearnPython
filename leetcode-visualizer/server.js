@@ -625,11 +625,28 @@ const SUPPORTED = {
   1846: {
     id: 1846,
     category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
-    title: { vi: "Maximum Element After Decreasing and Rearranging", en: "Maximum Element After Decreasing and Rearranging" },
+    title: {
+      vi: "Maximum Element After Decreasing and Rearranging",
+      en: "Maximum Element After Decreasing and Rearranging",
+    },
     titleVi: { vi: "Giá trị lớn nhất sau khi giảm và sắp xếp lại", en: "Maximum value after decreasing and rearranging" },
     statement: {
-      vi: "Cho mảng số nguyên dương arr. Bạn được phép: (1) giảm bất kỳ phần tử nào về một số nguyên dương nhỏ hơn; (2) sắp xếp lại mảng tùy ý. Sao cho arr[0] = 1 và |arr[i] - arr[i-1]| ≤ 1 với mọi i. Trả về giá trị lớn nhất có thể của một phần tử trong mảng sau khi thực hiện.",
-      en: "You are given an array of positive integers arr. Perform some operations (possibly none) on arr so that it satisfies these conditions: (1) The value of the first element in arr must be 1. (2) The absolute difference between any 2 adjacent elements must be less than or equal to 1, i.e. abs(arr[i] - arr[i-1]) <= 1 for each i where 1 <= i < arr.length (0-indexed). There are 2 types of operations you can perform any number of times: decrease the value of any element of arr to a smaller positive integer; rearrange the elements of arr in any order. Return the maximum possible value of an element in arr after performing the operations to satisfy the conditions.",
+      vi:
+        "Cho mảng số nguyên dương arr. " +
+        "Bạn được phép: (1) giảm bất kỳ phần tử nào về một số nguyên dương nhỏ hơn; " +
+        "(2) sắp xếp lại mảng tùy ý. " +
+        "Sao cho arr[0] = 1 và |arr[i] - arr[i-1]| ≤ 1 với mọi i. " +
+        "Trả về giá trị lớn nhất có thể của một phần tử trong mảng sau khi thực hiện.",
+      en:
+        "You are given an array of positive integers arr. " +
+        "Perform some operations (possibly none) on arr so that it satisfies these conditions: " +
+        "(1) The value of the first element in arr must be 1. " +
+        "(2) The absolute difference between any 2 adjacent elements must be less than or equal to 1, " +
+        "i.e. abs(arr[i] - arr[i-1]) <= 1 for each i where 1 <= i < arr.length (0-indexed). " +
+        "There are 2 types of operations you can perform any number of times: " +
+        "decrease the value of any element of arr to a smaller positive integer; " +
+        "rearrange the elements of arr in any order. " +
+        "Return the maximum possible value of an element in arr after performing the operations to satisfy the conditions.",
     },
     defaultInput: [2, 2, 1, 2, 1],
     inputKind: "positive", // các số nguyên dương
