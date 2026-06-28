@@ -27,7 +27,7 @@ const I18N = {
     answer: (v) => `Đáp án: ${v}`,
     timeLabel: "Thời gian",
     spaceLabel: "Bộ nhớ",
-    errEmptyId: "Vui lòng nhập số bài.",
+    kbdHint: "Phím tắt: ← Lùi · → Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",    errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
     errConn: "Lỗi kết nối tới server.",
     errArr: "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1",
@@ -49,6 +49,7 @@ const I18N = {
     answer: (v) => `Answer: ${v}`,
     timeLabel: "Time",
     spaceLabel: "Space",
+    kbdHint: "Shortcuts: ← Prev · → Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
     errConn: "Connection error to server.",
@@ -333,6 +334,40 @@ $("lastBtn").addEventListener("click", () => {
   renderStep();
 });
 $("playBtn").addEventListener("click", togglePlay);
+
+// ---- Điều hướng bằng bàn phím ----
+document.addEventListener("keydown", (e) => {
+  // Bỏ qua khi đang gõ trong ô nhập
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea") return;
+  // Chỉ hoạt động khi đang xem trực quan hóa
+  if (!steps.length || $("vizPanel").classList.contains("hidden")) return;
+
+  switch (e.key) {
+    case "ArrowLeft":
+      e.preventDefault();
+      $("prevBtn").click();
+      break;
+    case "ArrowRight":
+      e.preventDefault();
+      $("nextBtn").click();
+      break;
+    case "Home":
+      e.preventDefault();
+      $("firstBtn").click();
+      break;
+    case "End":
+      e.preventDefault();
+      $("lastBtn").click();
+      break;
+    case " ":
+      e.preventDefault();
+      $("playBtn").click();
+      break;
+    default:
+      break;
+  }
+});
 
 function togglePlay() {
   if (playTimer) {

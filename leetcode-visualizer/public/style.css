@@ -440,6 +440,13 @@ button:disabled {
   min-width: 70px;
 }
 
+.kbd-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+}
+
 .answer {
   margin-top: 18px;
   padding: 14px;
