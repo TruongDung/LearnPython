@@ -32,7 +32,7 @@ class Solution:
 
                     if x < 0 or x >= n or y < 0 or y >= n or grid[x][y] == 1:
                         continue
-                    
+
                     if not visited[x][y]:
                         queue.append((x, y))
                         visited[x][y] = True

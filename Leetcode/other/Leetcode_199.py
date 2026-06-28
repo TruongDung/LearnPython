@@ -69,6 +69,6 @@ class Solution:
 
             #res.append(current_level_list)
         return res
-    
+
 sol = Solution()
 print(sol.rightSideView(root))

@@ -11,7 +11,7 @@ class Solution:
                 l += 1
             longest = max(longest, r - l + 1)
         return longest
-    
+
 sol = Solution()
 #print(sol.characterReplacement("ABAB", 2))
 #print(sol.characterReplacement("AABABBA", 2))

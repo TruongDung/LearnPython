@@ -12,7 +12,7 @@ class Solution:
             graph[u].append(v)
             indegree[v] += 1
 
-        
+
         queue = deque()
 
         richer_map = defaultdict(set)
@@ -20,7 +20,7 @@ class Solution:
         for i in range(n):
             if indegree[i] == 0:
                 queue.append(i)
-        
+
 
         while queue:
             size = len(queue)
@@ -48,6 +48,6 @@ class Solution:
             res.append(index)
 
         return res
-    
+
 sol = Solution()
 sol.loudAndRich([[1,0],[2,1],[3,1],[3,7],[4,3],[5,3],[6,3]],[3,2,5,4,6,1,7,0])

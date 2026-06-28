@@ -11,7 +11,7 @@ class Solution:
             else:
                 stack.append(i)
         return '/' + '/'.join(stack)
-    
+
 sol = Solution()
 #print(sol.simplifyPath("/home//foo/"))
 print(sol.simplifyPath("/home/user/Documents/../Pictures"))

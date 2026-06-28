@@ -12,7 +12,7 @@ class Solution:
     #     while b!=0:
     #         a, b = b, a%b
     #     return a
-    
+
 
 sol = Solution()
 #print(sol.gcdOfStrings("ABCABC", "ABC"))

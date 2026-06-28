@@ -8,7 +8,7 @@ class Solution:
         if n <= 1:
             return 0
 
-        
+
         graph = defaultdict(list)
         for i, val in enumerate(arr):
             graph[val].append(i)
@@ -32,7 +32,7 @@ class Solution:
                         visited.add(nxt)
                         q.append(nxt)
 
-               
+
                 graph[arr[i]].clear()
 
             steps += 1

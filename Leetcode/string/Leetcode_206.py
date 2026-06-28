@@ -18,7 +18,7 @@ class Solution:
             cur = next_node
 
         return pre
-    
+
 sol = Solution()
 head = ListNode(1)
 head.next = ListNode(2)

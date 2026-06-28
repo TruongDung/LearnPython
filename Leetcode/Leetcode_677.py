@@ -8,7 +8,7 @@ class MapSum:
     def __init__(self):
         self.root = TrieNode()
         self.val = {}
-        
+
 
     def insert(self, key: str, val: int) -> None:
         delta = val - self.val.get(key, 0)
@@ -16,7 +16,7 @@ class MapSum:
 
         node = self.root
         node.total += delta
-        
+
         for ch in key:
             if ch not in node.children:
                 node.children[ch] = TrieNode()
@@ -31,7 +31,7 @@ class MapSum:
             if ch not in node.children:
                 return 0
             node = node.children[ch]
-        
+
         return node.total
 
 sol = MapSum()

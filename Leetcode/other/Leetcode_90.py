@@ -15,7 +15,7 @@ class Solution:
                 temp.append(nums[i])
                 dfs(start+1, temp)
                 temp.pop()
-                
+
             dfs(0,[])
 
         return res

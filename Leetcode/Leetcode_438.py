@@ -20,7 +20,7 @@ class Solution:
 
                 if window[s[left]] == 0:
                     del window[s[left]]
-                
+
                 left += 1
 
             if right - left + 1 == k and window == need:

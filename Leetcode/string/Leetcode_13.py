@@ -5,17 +5,17 @@ class Solution:
 
         for i in range(len(s)):
             current = s[i]
-            if i + 1 < len(s) and d[s[i+1]]>d[current]: 
+            if i + 1 < len(s) and d[s[i+1]]>d[current]:
                 total = total - d[current]
-            else: 
+            else:
                 total += d[current]
 
         return total
 
-            
-        
 
 
-            
+
+
+
 sol = Solution()
 print(sol.romanToInt('MCMXCIV'))

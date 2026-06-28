@@ -6,6 +6,6 @@ class TreeNode:
 
 
 n = TreeNode(1)
-n.left = TreeNode(2)   
+n.left = TreeNode(2)
 n.right = TreeNode(3)
 print(n.left.val)

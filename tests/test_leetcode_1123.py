@@ -21,14 +21,14 @@ def build_tree(values):
 
     while queue and i < len(values):
         node = queue.pop(0)
-        
+
         # Left child
         if i < len(values):
             if values[i] is not None:
                 node.left = TreeNode(values[i])
                 queue.append(node.left)
             i += 1
-        
+
         # Right child
         if i < len(values):
             if values[i] is not None:

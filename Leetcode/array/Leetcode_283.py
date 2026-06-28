@@ -10,9 +10,8 @@ class Solution:
                 j += 1
         return nums
 
-       
 
-        
+
+
 sol = Solution()
 print(sol.moveZeroes([0,1,0,3,12]))
-    

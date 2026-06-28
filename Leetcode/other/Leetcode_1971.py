@@ -23,10 +23,10 @@ class Solution:
                     if dfs(neightbor):
                         return True
             return False
-        
+
         return dfs(source)
-    
-sol = Solution() 
+
+sol = Solution()
 n = 6
 edges = [[0,1],[0,2],[3,5],[5,4],[4,3]]
 source = 0

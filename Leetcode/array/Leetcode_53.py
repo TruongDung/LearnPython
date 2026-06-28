@@ -10,6 +10,6 @@ class Solution:
                 current_sum = current_sum + nums[j]
                 max_val = max(max_val, current_sum)
         return max_val
-    
+
 sol = Solution()
 print(sol.maxSubArray([-2,1,-3,4,-1,2,1,-5,4]))

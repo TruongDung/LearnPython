@@ -13,6 +13,6 @@ class Solution:
             count_max = max(count_max, count_one+ count_zeros)
 
         return count_max
-            
+
 sol = Solution()
 print(sol.maxScore("011101"))

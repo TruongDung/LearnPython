@@ -13,8 +13,8 @@ class Solution:
 
         def dfs(node):
             if not node:
-                return 
-            
+                return
+
             dfs(node.right)
             dfs(node.left)
 

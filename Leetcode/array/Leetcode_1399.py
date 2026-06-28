@@ -8,7 +8,7 @@ class Solution:
             m[sum1] += 1
         max_value = max(m.values())
         return list(m.values()).count(max_value)
-    
+
     def sum_digit(self, j: int) -> int:
         sum = 0
         while j > 0:
@@ -17,6 +17,6 @@ class Solution:
         return sum
 
 
-    
+
 sol = Solution()
 print(sol.countLargestGroup(2))

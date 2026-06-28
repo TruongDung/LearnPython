@@ -22,6 +22,6 @@ class Solution:
             result[i] = abs(left_sum[i] - right_sum[i])
 
         return result
-        
+
 sol = Solution()
 print(sol.leftRightDifference([10,4,8,3]))

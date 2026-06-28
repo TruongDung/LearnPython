@@ -6,7 +6,7 @@ class Solution:
             for j in range(len(words[i])):
                 if i >= len(words[j]):
                     return False
-                if words[i][j] != words[j][i]: 
+                if words[i][j] != words[j][i]:
                     return False
 
         return True

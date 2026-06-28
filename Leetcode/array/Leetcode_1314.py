@@ -12,7 +12,7 @@ class Solution:
                     +prefix[r][c-1]
                     -prefix[r-1][c-1]
                     )
-        
+
         # 2️⃣ Tạo ma trận kết quả
         answer = [[0]*n for _ in range(m)]
         for i in range(m):
@@ -25,12 +25,12 @@ class Solution:
 
                 # Tổng hình chữ nhật bằng prefix sum
                 answer[i][j] = (
-                    prefix[r2+1][c2+1] - 
-                    prefix[r1][c2+1] - 
-                    prefix[r2+1][c1] + 
+                    prefix[r2+1][c2+1] -
+                    prefix[r1][c2+1] -
+                    prefix[r2+1][c1] +
                     prefix[r1][c1]
                 )
         return answer
-    
+
 sol = Solution()
 print(sol.matrixBlockSum([[1,2,3],[4,5,6],[7,8,9]], 1))

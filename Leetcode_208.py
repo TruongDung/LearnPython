@@ -30,7 +30,7 @@ class Trie:
             node = node.children[ch]
 
         return node.is_word
-        
+
 
     def startsWith(self, prefix: str) -> bool:
         node = self.root
@@ -41,4 +41,3 @@ class Trie:
             node = node.children[ch]
 
         return True
-

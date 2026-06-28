@@ -27,6 +27,6 @@ class Solution:
                 component += 1
 
         return component - 1
-    
+
 sol = Solution()
 print(sol.makeConnected(4,  [[0,1],[0,2],[1,2]]))

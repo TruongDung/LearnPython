@@ -18,6 +18,6 @@ class Solution:
                     break
 
         return -1 if minOps == math.inf else minOps + n - 1
-    
+
 sol = Solution()
 sol.minOperations([2,6,3,4])

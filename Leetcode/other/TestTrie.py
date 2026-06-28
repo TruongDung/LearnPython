@@ -12,7 +12,7 @@ class MapSum:
             if len(prefix) <= len(k) and k[:len(prefix)] == prefix:
                 total += self.hash_map[k]
         return total
-    
+
 
 mapSum = MapSum()
 mapSum.insert("apple", 3)

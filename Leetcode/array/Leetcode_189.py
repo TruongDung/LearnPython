@@ -13,7 +13,7 @@ class Solution:
         nums = a
         print(nums)
 
-       
-        
+
+
 sol = Solution()
 print(sol.rotate([1,2,3,4,5,6,7], 3))

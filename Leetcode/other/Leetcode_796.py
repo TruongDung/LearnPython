@@ -4,6 +4,5 @@ class Solution:
             print('s1 : ' + s[i:] + ' s2 : ' + s[:i])
             if s[i:] + s[:i] == goal:
                 return True
-            
+
         return False
-            

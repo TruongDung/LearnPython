@@ -15,7 +15,7 @@ class Solution:
 
             if row == x and col == y:
                 return step
-            
+
             for dr, dc in directions:
                 nr = dr + row
                 nc = dc + col

@@ -6,7 +6,7 @@ class NumMatrix:
         self.prefix = []
         if not matrix or not matrix[0]:
             return
-        
+
         m = len(matrix)
         n = len(matrix[0])
         self.prefix = [[0] * (n +1) for _ in range(m+1)]
@@ -17,7 +17,7 @@ class NumMatrix:
                     +self.prefix[i-1][j]
                     +self.prefix[i][j-1]
                     -self.prefix[i-1][j-1])
-                
+
         print(self.prefix)
 
     def sumRegion(self, row1: int, col1: int, row2: int, col2: int) -> int:
@@ -26,7 +26,7 @@ class NumMatrix:
         - self.prefix[row2+1][col1]
         + self.prefix[row1][col1]
         return result
- 
+
 
 # Your NumMatrix object will be instantiated and called as such:
 obj = NumMatrix([

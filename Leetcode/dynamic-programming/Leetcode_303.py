@@ -12,6 +12,6 @@ class NumArray:
 
     def sumRange(self, left: int, right: int) -> int:
         return self.prefixArr[right+1] - self.prefixArr[left]
-       
+
 obj = NumArray([-2,0,3,-5,2,1])
 obj.sumRange(0,2)

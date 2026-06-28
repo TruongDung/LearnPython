@@ -27,7 +27,7 @@ class Solution:
                 heapq.heappush(heap, (node.next.val, i, node.next))
 
         return dummy.next
-        
+
 def build_list(arr):
     dummy = ListNode(0)
     cur = dummy

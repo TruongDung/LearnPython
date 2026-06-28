@@ -4,7 +4,7 @@ class Solution:
     def merge(self, nums1: List[int], m: int, nums2: List[int], n: int) -> None:
         i = m-1 # last index in nums1
         j = n-1 # last index in nums2
-        k = m+n-1 # last index of the combined list 
+        k = m+n-1 # last index of the combined list
 
         while i >= 0 and j >= 0:
             if nums1[i] < nums2[j]:

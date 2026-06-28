@@ -38,7 +38,7 @@
 # # Display the animation
 # plt.show()
 
-# temporary 205 
+# temporary 205
 
 # class Solution:
 #     def isIsomorphic(self, s: str, t: str) -> bool:
@@ -51,12 +51,12 @@
 
 #             if t[i] not in char_index_t:
 #                 char_index_t[t[i]] = i
-            
+
 #             if char_index_s[s[i]] != char_index_t[t[i]]:
 #                 return False
 
 #         return True
-    
+
 # sol = Solution()
 # sol.isIsomorphic('egg', 'add')
 
@@ -75,14 +75,14 @@ class Solution:
         while l <= r:
             if num[l] not in pairs:
                 return False
-            
+
             if pairs[num[l]] != num[r]:
                 return False
-            
+
             l += 1
             r -= 1
 
         return True
-    
+
 sol = Solution()
 print(sol.isStrobogrammatic('8118'))

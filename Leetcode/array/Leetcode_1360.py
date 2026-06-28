@@ -6,7 +6,7 @@ class Solution:
         datetime_object2 = datetime.strptime(date2, format_pattern)
         a1 = datetime_object1 - datetime_object2
         return abs(a1.days)
-    
+
 
 sol = Solution()
 print(sol.daysBetweenDates("2019-06-29", "2019-06-30"))

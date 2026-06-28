@@ -8,6 +8,6 @@ class Solution:
             res.append(nums[(i+j)%n])
 
         return res
-    
+
 sol = Solution()
 print(sol.constructTransformedArray([3,-2,1,1]))

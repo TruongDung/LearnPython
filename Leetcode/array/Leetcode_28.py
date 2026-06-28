@@ -7,7 +7,7 @@ class Solution:
             if haystack[i:i+n] == needle:
                 return i
         return -1
-    
+
 sol = Solution()
 #print(sol.strStr("sadbutsad", "sad"))
 print(sol.strStr("aaaa", "aaaa"))

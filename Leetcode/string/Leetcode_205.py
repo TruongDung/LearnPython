@@ -9,12 +9,12 @@ class Solution:
 
             if t[i] not in char_index_t:
                 char_index_t[t[i]] = i
-            
+
             if char_index_s[s[i]] != char_index_t[t[i]]:
                 return False
 
 
         return True
-    
+
 sol = Solution()
 print(sol.isIsomorphic("egg", "add"))

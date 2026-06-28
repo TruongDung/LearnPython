@@ -27,13 +27,13 @@ class Solution:
                     y = curr[1] + direction[1]
                     if x < 0 or x >= m or y < 0 or y >= n or grid[x][y] != 1:
                         continue
-                    
+
                     grid[x][y] = 2
                     count_fresh -= 1
                     if count_fresh == 0:
                         return minutes
-                    
+
                     queue.append((x, y))
-            
+
             minutes += 1
         return -1

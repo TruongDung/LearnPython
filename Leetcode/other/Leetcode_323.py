@@ -15,12 +15,11 @@ class Solution:
             for next in graph[curr]:
                 if not visited[next]:
                     dfs(next)
-                    
+
         count = 0
         for i in range(n):
             if not visited[i]:
                 dfs(i)
                 count += 1
-                
+
         return count
-        

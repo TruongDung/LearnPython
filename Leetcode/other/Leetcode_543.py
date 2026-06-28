@@ -15,13 +15,18 @@ from typing import Optional
 #         self.right = right
 class Solution:
     def diameterOfBinaryTree(self, root: Optional[TreeNode]) -> int:
-        def post_order(node: Optional[TreeNode]) -> int:
-            if node == None:
+        diameter = 0
+
+        def depth(node: Optional[TreeNode]) -> int:
+            nonlocal diameter
+            if node is None:
                 return 0
 
-                left_depth = post_order(node.left)
-                right_depth = post_order(node.right)
+            left_depth = depth(node.left)
+            right_depth = depth(node.right)
 
-                return max(left_depth) + max(right_depth) + 1
-            
-            return post_order(root)
+            diameter = max(diameter, left_depth + right_depth)
+            return max(left_depth, right_depth) + 1
+
+        depth(root)
+        return diameter

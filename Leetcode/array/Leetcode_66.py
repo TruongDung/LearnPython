@@ -8,9 +8,9 @@ class Solution:
             memory += digits[i]
             digits[i] = memory%10
             memory = memory // 10
-            
+
         if memory == 1: return [1] + digits
-        
+
         return digits
 sol = Solution()
 print(sol.plusOne([1,2,3]))

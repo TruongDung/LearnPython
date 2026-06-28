@@ -18,17 +18,17 @@ class Solution:
 
         if len(dictS) != len(dictT):
             return False
-        
+
         for key in dictS:
             if not key in dictT:
                 return False
             if dictS[key] != dictT[key]:
                 return False
-        
+
         return True
 
-    
 
-    
+
+
 sol = Solution()
 print(sol.isAnagram('anagram', 'nagaram'))

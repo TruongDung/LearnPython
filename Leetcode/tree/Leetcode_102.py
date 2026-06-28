@@ -20,11 +20,11 @@ class Solution:
                 return current
 
             return dfs(node.left, current) + dfs(node.right, current)
-        
-        return dfs(root,0)
-    
 
-    
+        return dfs(root,0)
+
+
+
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val = val

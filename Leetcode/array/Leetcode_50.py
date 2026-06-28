@@ -13,7 +13,7 @@ class Solution:
 
 
         return res
-    
+
 sol = Solution()
 sol.myPow(2, 10)
 #print(sol.myPow(2,0))

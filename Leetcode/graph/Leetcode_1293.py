@@ -12,16 +12,16 @@ class Solution:
         m, n = len(grid), len(grid[0])
         if m == 1 and n == 1:
             return 0
-        
+
         # If k is large enough to ignore all obstacles, answer is Manhattan distance.
         if k >= m + n - 2:
             return m + n - 2
-        
+
         # BFS state: (row, col, remaining elimination count)
         dq = deque([(0, 0, k, 0)])  # r, c, remaining k, steps
         visited = {(0, 0, k)}
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-        
+
         while dq:
             r, c, rem, steps = dq.popleft()
             for dr, dc in directions:
@@ -35,9 +35,9 @@ class Solution:
                     state = (nr, nc, nk)
                     if state in visited:
                         continue
-                    # Only keep this state if this path gives more remaining eliminations than any previously seen for this cell.
+                    # Only keep this state if this path gives more remaining
+                    # eliminations than any previously seen for this cell.
                     visited.add(state)
                     dq.append((nr, nc, nk, steps + 1))
-        
+
         return -1
-        

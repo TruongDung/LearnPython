@@ -16,7 +16,7 @@ class Solution:
                 count -= 1
             else:
                 count += 1
-        
+
         return majority
 sol = Solution()
 print(sol.majorityElement([2,2,1,1,1,2,2]))

@@ -14,7 +14,7 @@ class Solution:
             max_size = max(max_size, min(w, h))
 
         return max_size * max_size
-    
+
 sol = Solution()
 #print(sol.largestSquareArea([[1,1],[1,3],[1,5]], [[5,5],[5,7],[5,9]]))
 print(sol.largestSquareArea([[1,1],[2,2],[3,1]], [[3,3],[4,4],[6,6]]))

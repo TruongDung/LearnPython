@@ -24,8 +24,8 @@ class Solution:
             result.append(str(num))
 
         return ''.join(result) if result else "0"
-    
+
 sol = Solution()
 #print(sol.multiply("2", "3"))  # Kết quả: "6"
 #print(sol.multiply("123", "456"))  # Kết quả: "56088"
-print(sol.multiply("123", "45")) 
+print(sol.multiply("123", "45"))

@@ -3,10 +3,10 @@ from typing import List
 class Solution:
     def search(self, nums: List[int], target: int) -> bool:
         start = 0
-        end = len(nums) -1 
+        end = len(nums) -1
         while start < end:
             mid = (start + end) // 2
-            if nums[mid] == target: 
+            if nums[mid] == target:
                 return True
             elif nums[start] <= nums[mid]:
                 if nums[start] <= target and target < nums[mid]:
@@ -18,10 +18,10 @@ class Solution:
                     start = mid + 1
                 else :
                     end = mid - 1
-        
+
         if nums[start] == target:
             return True
-        
+
         return False
 sol = Solution()
 print(sol.search([1,0,1,1,1],0))

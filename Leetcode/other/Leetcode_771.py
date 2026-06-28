@@ -6,9 +6,9 @@ class Solution:
         for i in jewels:
             if i in stones:
                 count += 1
-        
+
         return count
 
-    
+
 sol = Solution()
 sol.numJewelsInStones("aA", "aAAbbbb" )

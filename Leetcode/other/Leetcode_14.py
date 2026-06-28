@@ -13,7 +13,7 @@ class Solution:
                 result += strs[0][i]
             else:
                 break
-        
-    
+
+
 sol = Solution()
 print(sol.longestCommonPrefix(["flower","flow","flight"]))

@@ -12,6 +12,6 @@ class Solution:
         for i, val in enumerate(nums1):
             res[i] = dict2[val]
         return res
-    
+
 sol = Solution()
 sol.anagramMappings([12,28,46,32,50], [50,12,32,46,28])

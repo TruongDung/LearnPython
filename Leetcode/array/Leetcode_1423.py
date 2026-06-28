@@ -10,6 +10,6 @@ class Solution:
             if sum1 > max_card:
                 max_card = sum1
         return max_card
-    
+
 sol = Solution()
 sol.maxScore([1,2,3,4,5,6,1], 3)

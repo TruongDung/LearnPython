@@ -14,12 +14,12 @@ class Solution:
         for row in mat:
             for x in row:
                 arrTemp.append(x)
-        
+
         # convert
         for i in range(r):
             for j in range(c):
                 res[i][j] = arrTemp[i*c + j]
-                
+
         return res
 
 

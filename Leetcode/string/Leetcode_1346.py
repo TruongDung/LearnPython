@@ -13,6 +13,6 @@ class Solution:
             s.add(a)
 
         return False
-    
+
 sol = Solution()
 print(sol.checkIfExist([3,1,7,11]))

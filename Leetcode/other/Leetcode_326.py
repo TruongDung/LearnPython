@@ -9,7 +9,7 @@ class Solution:
             if self.myPow(3, i) == n:
                 return True
         return False
-    
+
     def myPow(self, x: float, n: int) -> float:
         if x==0:
             return 0

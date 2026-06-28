@@ -14,6 +14,6 @@ class Solution:
                 i += 1
             count = max(count, j - i + 1)
         return count
-    
+
 sol = Solution()
 print(sol.numSubarrayProductLessThanK([10, 5, 2, 6], 100))

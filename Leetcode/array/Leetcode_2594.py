@@ -20,6 +20,6 @@ class Solution:
                 start = mid + 1
 
         return start
-        
+
 sol = Solution()
 print(sol.repairCars([5,1,8], 6))

@@ -10,7 +10,7 @@ class Solution:
                     stack.pop()
                 else:
                     count += 1
-        
+
         return count + len(stack)
 
 sol = Solution()

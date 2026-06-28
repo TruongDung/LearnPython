@@ -11,13 +11,13 @@ class Solution:
                 if isConnected[curr][next] == 1:
                     if not visited[next]:
                         dfs(next)
-        
+
         for i in range(n):
             if not visited[i]:
                 dfs(i)
                 count += 1
         return count
-    
+
 
 isConnected = [
     [1, 1, 0],

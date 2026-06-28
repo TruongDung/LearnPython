@@ -13,6 +13,6 @@ class Solution:
             result += i + " "
 
         return result
-    
+
 sol = Solution()
 print(sol.reverseWords(" the  sky  is blue "))

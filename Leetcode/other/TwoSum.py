@@ -9,6 +9,6 @@ class Solution:
                 return [seen[complement], i]
             seen[n] = i
         return seen
-    
+
 sol = Solution()
 print(sol.TwoSumDef([2,7,11,15], 9))

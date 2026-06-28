@@ -4,7 +4,7 @@ from collections import Counter
 
 class Solution:
     def nextGreatestLetter(self, letters: List[str], target: str) -> str:
-        start = 0 
+        start = 0
         end = len(letters) - 1
         res = letters[0]
         while start < end:
@@ -19,6 +19,6 @@ class Solution:
             print(start)
 
         return res
-    
+
 sol = Solution()
 print(sol.nextGreatestLetter(["c","f","j"], "a"))

@@ -15,6 +15,6 @@ class Solution:
             product =product * nums[i]
 
         return res
-    
+
 sol = Solution()
 sol.productExceptSelf([1,2,3,4])

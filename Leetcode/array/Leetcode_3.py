@@ -11,8 +11,8 @@ class Solution:
 
                 char_set.add(s[i])
                 max_length = max(max_length, i - j + 1)
-                  
+
             return max_length
-    
+
 sol = Solution()
 print(sol.lengthOfLongestSubstring('abcabcbb'))

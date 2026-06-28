@@ -9,7 +9,7 @@ class Solution:
             player = A if i%2==0 else B
             player[r] += 1
             player[c+3] += 1
-            if r==c: 
+            if r==c:
                 player[6] += 1
             if r==2-c:
                 player[7] += 1
@@ -18,8 +18,8 @@ class Solution:
                 return "A"
             if B[i]==3:
                 return "B"
-        
+
         return "Draw" if len(moves) == 9 else "Pending"
-    
+
 sol = Solution()
 print(sol.tictactoe([[0,0],[2,0],[1,1],[2,1],[2,2]]))
