@@ -539,6 +539,88 @@ function buildSteps509(input) {
   return { n, answer: dp[n], steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 1: Two Sum (dùng hash map).
+ *
+ *  - Với mỗi i, kiểm tra xem (target - nums[i]) đã từng xuất hiện chưa.
+ *  - Nếu rồi: tìm thấy cặp chỉ số.
+ *  - Nếu chưa: lưu nums[i] -> i vào hash map.
+ */
+function buildSteps1(nums, params) {
+  const target = params.target;
+  const steps = [];
+  const seen = {};
+
+  const dictStr = () => {
+    const entries = Object.keys(seen).map((k) => `${k}:${seen[k]}`);
+    return `{${entries.join(", ")}}`;
+  };
+
+  steps.push({
+    title: { vi: "Khởi tạo hash map", en: "Initialize hash map" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    note: {
+      vi: `target = ${target}. Dùng hash map d (giá trị → chỉ số), ban đầu rỗng {}.`,
+      en: `target = ${target}. Use a hash map d (value → index), initially empty {}.`,
+    },
+  });
+
+  let answer = null;
+  for (let i = 0; i < nums.length; i++) {
+    const comp = target - nums[i];
+    if (Object.prototype.hasOwnProperty.call(seen, comp)) {
+      const j = seen[comp];
+      answer = [i, j];
+      steps.push({
+        title: { vi: `Tìm thấy tại i=${i}`, en: `Found at i=${i}` },
+        arr: [...nums],
+        highlight: [j, i],
+        mark: [j, i],
+        final: true,
+        codeLines: [5, 6],
+        note: {
+          vi: `target - nums[${i}] = ${target} - ${nums[i]} = ${comp} đã có trong d tại chỉ số ${j}. Trả về [${i}, ${j}].`,
+          en: `target - nums[${i}] = ${target} - ${nums[i]} = ${comp} is already in d at index ${j}. Return [${i}, ${j}].`,
+        },
+      });
+      break;
+    }
+
+    seen[nums[i]] = i;
+    steps.push({
+      title: { vi: `Xét i=${i}`, en: `Inspect i=${i}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [4, 7],
+      note: {
+        vi: `Cần ${comp} (= ${target} - ${nums[i]}) nhưng chưa có trong d. Lưu nums[${i}]=${nums[i]} → ${i}. d = ${dictStr()}.`,
+        en: `Need ${comp} (= ${target} - ${nums[i]}) but it is not in d. Store nums[${i}]=${nums[i]} → ${i}. d = ${dictStr()}.`,
+      },
+    });
+  }
+
+  if (!answer) {
+    steps.push({
+      title: { vi: "Không tìm thấy", en: "Not found" },
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [7],
+      note: {
+        vi: "Không có cặp nào có tổng bằng target.",
+        en: "No pair sums to the target.",
+      },
+    });
+  }
+
+  return { original: [...nums], target, answer: answer ? `[${answer[0]}, ${answer[1]}]` : "none", steps };
+}
+
 const SUPPORTED = {
   1846: {
     id: 1846,
@@ -783,6 +865,44 @@ const SUPPORTED = {
     ],
     builder: buildSteps509,
   },
+  1: {
+    id: 1,
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Two Sum", en: "Two Sum" },
+    titleVi: { vi: "Tổng hai số", en: "Two sum" },
+    statement: {
+      vi: "Cho mảng số nguyên nums và một số nguyên target, trả về chỉ số của hai số sao cho tổng của chúng bằng target. Mỗi đầu vào có đúng một đáp án và không dùng cùng một phần tử hai lần.",
+      en: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. Each input has exactly one solution, and you may not use the same element twice.",
+    },
+    defaultInput: [2, 7, 11, 15],
+    inputKind: "integer", // cho phép số âm
+    extraParams: [
+      {
+        key: "target",
+        label: { vi: "target (tổng cần tìm)", en: "target (target sum)" },
+        default: 9,
+        allowNegative: true,
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt mảng một lần, mỗi lần tra cứu/chèn hash map là O(1) trung bình nên O(n) thời gian. Hash map lưu tối đa n phần tử nên O(n) bộ nhớ.",
+        en: "A single pass with O(1) average hash-map lookups/inserts gives O(n) time. The hash map holds up to n entries, so O(n) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def twoSum(self, nums, target):",
+      "        d = {}",
+      "        for i in range(len(nums)):",
+      "            if target - nums[i] in d:",
+      "                return [i, d[target - nums[i]]]",
+      "            d[nums[i]] = i",
+    ],
+    builder: buildSteps1,
+  },
 };
 
 app.get("/api/problems", (req, res) => {
@@ -870,9 +990,9 @@ app.post("/api/problem/:id/solve", (req, res) => {
   // Kiểm tra các tham số phụ
   for (const p of problem.extraParams || []) {
     const v = params[p.key];
-    if (!Number.isInteger(v) || v < 0) {
+    if (!Number.isInteger(v) || (!p.allowNegative && v < 0)) {
       return res.status(400).json({
-        error: `Tham số "${p.key}" phải là số nguyên không âm.`,
+        error: `Tham số "${p.key}" phải là số nguyên${p.allowNegative ? "" : " không âm"}.`,
       });
     }
   }
