@@ -1,6 +1,6 @@
 import pytest
 
-from Leetcode.Leetcode_2 import Solution, ListNode
+from Leetcode.other.Leetcode_2 import Solution, ListNode
 
 
 def build_list(values):

@@ -1,6 +1,6 @@
 import pytest
 
-from Leetcode.Leetcode_1123 import Solution
+from Leetcode.tree.Leetcode_1123 import Solution
 
 
 class TreeNode:
