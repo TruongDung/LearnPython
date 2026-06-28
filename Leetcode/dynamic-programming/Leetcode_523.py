@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def CheckSumArray(self, nums: List[int], k:int) -> bool:
         prefix_mod = 0

@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def maximumPopulation(self, logs: List[List[int]]) -> int:
         diff = [0] * 101  # 1950 → 2050

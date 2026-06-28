@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def validMountainArray(self, arr: List[int]) -> bool:
         if len(arr)<3: return False

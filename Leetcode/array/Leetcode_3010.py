@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def minimumCost(self, nums: List[int]) -> int:
         # cost của subarray đầu tiên luôn là nums[0]

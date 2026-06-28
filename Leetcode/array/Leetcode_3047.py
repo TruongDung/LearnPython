@@ -1,3 +1,5 @@
+from typing import List
+
 from itertools import combinations
 
 class Solution:

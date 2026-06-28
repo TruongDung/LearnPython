@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def countPartitions(self, nums: List[int]) -> int:
     #     countEven = 0

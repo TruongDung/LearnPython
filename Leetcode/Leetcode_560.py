@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 
 class Solution:
     def subarraySum(self, nums, k):

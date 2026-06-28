@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import Optional
+
 class Solution:
     def reverseKGroup(self, head: Optional[ListNode], k: int) -> Optional[ListNode]:
         dummy = ListNode(0, head)

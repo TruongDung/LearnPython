@@ -1,9 +1,11 @@
+from typing import List
+
 
 from collections import deque
 
 
 class Solution:
-    def crawl(self, startUrl: str, htmlParser: 'HtmlParser') -> List[str]:
+    def crawl(self, startUrl: str, htmlParser: 'HtmlParser') -> List[str]:  # noqa: F821
         queue = deque()
         queue.append(startUrl)
         host_name = self.get_host_name(startUrl)

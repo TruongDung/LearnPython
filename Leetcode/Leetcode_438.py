@@ -1,3 +1,7 @@
+from collections import Counter
+from typing import List
+
+
 class Solution:
     def findAnagrams(self, s: str, p: str) -> List[int]:
         need = Counter(p)
@@ -15,7 +19,7 @@ class Solution:
                 window[s[left]] -= 1
 
                 if window[s[left]] == 0:
-                    def window[s[left]]
+                    del window[s[left]]
                 
                 left += 1
 

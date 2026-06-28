@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def maxFrequency(self, nums: List[int], k: int) -> int:
         l = 0

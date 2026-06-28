@@ -1,3 +1,5 @@
+from typing import List
+
 class Solution:
     def closestTarget(self, words: List[str], target: str, startIndex: int) -> int:
         res = float('int')
