@@ -2008,7 +2008,12 @@ function buildSteps648(input, params) {
  *  - cur = max(nums[i], cur + nums[i])  (extend current subarray or start fresh).
  *  - best = max(best, cur).
  */
-function buildSteps53(nums) {
+function buildSteps53(nums, params) {
+  const approach = (params && params.approach) || 1;
+  if (approach === 2) {
+    return buildSteps53DP(nums);
+  }
+
   const steps = [];
   const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
 
@@ -2018,31 +2023,44 @@ function buildSteps53(nums) {
   let bestL = 0;
   let bestR = 0;
 
+  // curHistory[i] = cur value (max sum ending at i) — the implicit dp array
+  const curHistory = new Array(nums.length).fill(null);
+  curHistory[0] = cur;
+  const subRow = () => curHistory.map((v) => (v === null ? "·" : String(v)));
+
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
     arr: [...nums],
+    sub: subRow(),
     highlight: [0],
     mark: [],
-    codeLines: [3, 4],
+    codeBlock: 2,
+    codeLines: [4, 5],
     vars: [
+      { name: "i", value: 0 },
+      { name: "nums[i]", value: nums[0] },
       { name: "cur", value: cur },
       { name: "best", value: best },
+      { name: "cur subarray", value: `[${nums[0]}]` },
+      { name: "best subarray", value: `[${nums[0]}]` },
     ],
     note: {
-      vi: `Bắt đầu tại nums[0] = ${nums[0]}: cur = best = ${nums[0]}.`,
-      en: `Start at nums[0] = ${nums[0]}: cur = best = ${nums[0]}.`,
+      vi: `Kadane's Algorithm: theo dõi tổng lớn nhất kết thúc tại mỗi vị trí (hàng dưới = cur tại mỗi i).\ncur = tổng subarray hiện tại = ${cur}\nbest = tổng lớn nhất từng thấy = ${best}`,
+      en: `Kadane's Algorithm: track the max sum ending at each position (bottom row = cur at each i).\ncur = current subarray sum = ${cur}\nbest = max sum seen so far = ${best}`,
     },
   });
 
   for (let i = 1; i < nums.length; i++) {
     const num = nums[i];
-    const restart = cur + num < num;
+    const extendSum = cur + num;
+    const restart = extendSum < num;
     if (restart) {
       cur = num;
       curStart = i;
     } else {
-      cur = cur + num;
+      cur = extendSum;
     }
+    curHistory[i] = cur;
 
     let updated = false;
     if (cur > best) {
@@ -2052,21 +2070,33 @@ function buildSteps53(nums) {
       updated = true;
     }
 
+    const curSubarray = nums.slice(curStart, i + 1);
+    const bestSubarray = nums.slice(bestL, bestR + 1);
+
     steps.push({
       title: { vi: `Xét nums[${i}] = ${num}`, en: `Inspect nums[${i}] = ${num}` },
       arr: [...nums],
+      sub: subRow(),
       highlight: inWindow(curStart, i),
-      mark: [],
-      codeLines: [5, 6, 7],
+      mark: updated ? inWindow(bestL, bestR) : [],
+      codeBlock: 2,
+      codeLines: [6, 7, 8],
       vars: [
         { name: "i", value: i },
-        { name: "num", value: num },
+        { name: "nums[i]", value: num },
+        { name: "extend?", value: `cur+nums[i] = ${extendSum} ${restart ? "<" : "≥"} nums[i] = ${num} → ${restart ? "restart" : "extend"}` },
         { name: "cur", value: cur },
+        { name: "cur subarray", value: `[${curSubarray.join(", ")}]` },
         { name: "best", value: best },
+        { name: "best subarray", value: `[${bestSubarray.join(", ")}] (i=${bestL}..${bestR})` },
       ],
       note: {
-        vi: `${restart ? `cur + ${num} < ${num} → bắt đầu lại đoạn tại i=${i}` : `mở rộng đoạn: cur += ${num}`}. cur = ${cur}. best = ${best}${updated ? " (cập nhật)" : ""}.`,
-        en: `${restart ? `cur + ${num} < ${num} → restart the run at i=${i}` : `extend the run: cur += ${num}`}. cur = ${cur}. best = ${best}${updated ? " (updated)" : ""}.`,
+        vi: restart
+          ? `cur(${extendSum - num}) + ${num} = ${extendSum} < ${num} → bắt đầu lại tại i=${i}\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`
+          : `cur(${extendSum - num}) + ${num} = ${extendSum} ≥ ${num} → mở rộng đoạn\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`,
+        en: restart
+          ? `cur(${extendSum - num}) + ${num} = ${extendSum} < ${num} → restart at i=${i}\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`
+          : `cur(${extendSum - num}) + ${num} = ${extendSum} ≥ ${num} → extend the run\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`,
       },
     });
   }
@@ -2074,21 +2104,130 @@ function buildSteps53(nums) {
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
     arr: [...nums],
+    sub: subRow(),
     highlight: [],
     mark: inWindow(bestL, bestR),
     final: true,
-    codeLines: [8],
+    codeBlock: 2,
+    codeLines: [9],
     vars: [
       { name: "best", value: best },
-      { name: "subarray", value: `[${bestL}..${bestR}]` },
+      { name: "best subarray", value: `[${nums.slice(bestL, bestR + 1).join(", ")}]` },
+      { name: "indices", value: `[${bestL}..${bestR}]` },
     ],
     note: {
-      vi: `Tổng lớn nhất của một dãy con liên tiếp = ${best}, đạt tại đoạn [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}].`,
-      en: `Maximum contiguous subarray sum = ${best}, on segment [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}].`,
+      vi: `Tổng lớn nhất = ${best}\nSubarray: [${nums.slice(bestL, bestR + 1).join(", ")}] (vị trí ${bestL}..${bestR})`,
+      en: `Maximum sum = ${best}\nSubarray: [${nums.slice(bestL, bestR + 1).join(", ")}] (indices ${bestL}..${bestR})`,
     },
   });
 
   return { original: [...nums], answer: best, steps };
+}
+
+/**
+ * Generate steps for LeetCode 53 Approach 2: DP array version.
+ * dp[i] = max subarray sum ending at i = max(dp[i-1] + nums[i], nums[i]).
+ */
+function buildSteps53DP(nums) {
+  const n = nums.length;
+  const dp = new Array(n).fill(0);
+  const steps = [];
+
+  // Initial step: dp = [0] * n (before any computation)
+  steps.push({
+    title: { vi: "Khởi tạo dp = [0] * n", en: "Initialize dp = [0] * n" },
+    arr: [...dp],
+    sub: nums.map((v) => String(v)),
+    highlight: [],
+    mark: [],
+    codeBlock: 1,
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: `[${dp.join(", ")}]` },
+      { name: "nums", value: `[${nums.join(", ")}]` },
+    ],
+    note: {
+      vi: `DP array: dp[i] = tổng lớn nhất của subarray kết thúc tại i.\nKhởi tạo dp = [0] * ${n}. Hàng trên = dp, hàng dưới = nums.`,
+      en: `DP array: dp[i] = max subarray sum ending at i.\nInitialize dp = [0] * ${n}. Top bars = dp, bottom row = nums.`,
+    },
+  });
+
+  dp[0] = nums[0];
+  let maxSum = dp[0];
+  let bestIdx = 0;
+
+  steps.push({
+    title: { vi: "dp[0] = nums[0]", en: "dp[0] = nums[0]" },
+    arr: [...dp],
+    sub: nums.map((v) => String(v)),
+    highlight: [0],
+    mark: [],
+    codeBlock: 1,
+    codeLines: [5, 6],
+    vars: [
+      { name: "dp[0]", value: dp[0] },
+      { name: "max_sum", value: maxSum },
+      { name: "dp", value: `[${dp.join(", ")}]` },
+    ],
+    note: {
+      vi: `dp[0] = nums[0] = ${dp[0]}. max_sum = ${maxSum}.`,
+      en: `dp[0] = nums[0] = ${dp[0]}. max_sum = ${maxSum}.`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const extend = dp[i - 1] + nums[i];
+    dp[i] = Math.max(extend, nums[i]);
+    let updated = false;
+    if (dp[i] > maxSum) {
+      maxSum = dp[i];
+      bestIdx = i;
+      updated = true;
+    }
+
+    steps.push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      arr: [...dp],
+      sub: nums.map((v) => String(v)),
+      highlight: [i - 1, i],
+      mark: updated ? [i] : [],
+      codeBlock: 1,
+      codeLines: [8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "dp[i]", value: `max(dp[${i - 1}]+nums[${i}], nums[${i}]) = max(${dp[i - 1]}+${nums[i]}, ${nums[i]}) = ${dp[i]}` },
+        { name: "dp", value: `[${dp.join(", ")}]` },
+        { name: "max_sum", value: maxSum },
+      ],
+      note: {
+        vi: `dp[${i}] = max(dp[${i - 1}] + nums[${i}], nums[${i}]) = max(${extend}, ${nums[i]}) = ${dp[i]}\nmax_sum = ${maxSum}${updated ? " ✓ cập nhật" : ""}`,
+        en: `dp[${i}] = max(dp[${i - 1}] + nums[${i}], nums[${i}]) = max(${extend}, ${nums[i]}) = ${dp[i]}\nmax_sum = ${maxSum}${updated ? " ✓ updated" : ""}`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...dp],
+    sub: nums.map((v) => String(v)),
+    highlight: [],
+    mark: [bestIdx],
+    final: true,
+    codeBlock: 1,
+    codeLines: [10],
+    vars: [
+      { name: "dp", value: `[${dp.join(", ")}]` },
+      { name: "max_sum", value: maxSum },
+    ],
+    note: {
+      vi: `Tổng lớn nhất = max(dp) = ${maxSum}, đạt tại dp[${bestIdx}].`,
+      en: `Maximum sum = max(dp) = ${maxSum}, reached at dp[${bestIdx}].`,
+    },
+  });
+
+  return { original: [...nums], answer: maxSum, steps };
 }
 
 /**
@@ -6515,16 +6654,40 @@ const SUPPORTED = {
     },
     defaultInput: [-2, 1, -3, 4, -1, 2, 1, -5, 4],
     inputKind: "integer", // cho phép số âm
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 2,
+        options: [
+          { value: 2, label: { vi: "DP Array O(n)", en: "DP Array O(n)" } },
+          { value: 1, label: { vi: "Kadane O(1) space", en: "Kadane O(1) space" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(1)",
+      space: "O(1) / O(n)",
       note: {
-        vi: "Duyệt mảng một lần bằng thuật toán Kadane nên O(n) thời gian. Chỉ dùng vài biến nên O(1) bộ nhớ.",
-        en: "A single pass with Kadane's algorithm gives O(n) time. Only a few variables are used, so O(1) memory.",
+        vi: "Approach 1: Kadane O(n) time, O(1) space. Approach 2: DP array O(n) time, O(n) space.",
+        en: "Approach 1: Kadane O(n) time, O(1) space. Approach 2: DP array O(n) time, O(n) space.",
       },
     },
     code: [
+      "class Solution:",
+      "    def maxSubArray(self, nums: List[int]) -> int:",
+      "        n = len(nums)",
+      "        dp = [0] * n",
+      "        dp[0] = nums[0]",
+      "        max_sum = dp[0]",
+      "        for i in range(1, n):",
+      "            dp[i] = max(dp[i-1] + nums[i], nums[i])",
+      "            max_sum = max(dp[i], max_sum)",
+      "        return max_sum",
+    ],
+    code2: [
+      "# Kadane O(1) space",
       "class Solution:",
       "    def maxSubArray(self, nums):",
       "        cur = nums[0]",
@@ -6534,6 +6697,8 @@ const SUPPORTED = {
       "            best = max(best, cur)",
       "        return best",
     ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Kadane O(1) space", en: "Approach 2: Kadane O(1) space" },
     builder: buildSteps53,
   },
   208: {
@@ -7128,6 +7293,8 @@ const SUPPORTED = {
       "            prev1 = curr",
       "        return prev1",
     ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps70,
   },
   300: {
@@ -7177,6 +7344,8 @@ const SUPPORTED = {
       "                tails[i] = num",
       "        return len(tails)",
     ],
+    codeLabel: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" },
+    code2Label: { vi: "Cách 2: Binary Search O(n log n)", en: "Approach 2: Binary Search O(n log n)" },
     builder: buildSteps300,
   },
   509: {
@@ -7238,6 +7407,8 @@ const SUPPORTED = {
       "            prev1 = curr",
       "        return prev1",
     ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps509,
   },
   1: {
@@ -7872,6 +8043,8 @@ app.get("/api/problem/:id", (req, res) => {
     complexity: problem.complexity || null,
     code: problem.code || [],
     code2: problem.code2 || null,
+    codeLabel: problem.codeLabel || null,
+    code2Label: problem.code2Label || null,
   });
 });
 

@@ -578,7 +578,8 @@ function renderCode() {
     if (code2) {
       const label = document.createElement("div");
       label.className = "code-section-label";
-      label.textContent = lang === "vi" ? "Cách 1" : "Approach 1";
+      const customLabel = problemData && problemData.codeLabel;
+      label.textContent = customLabel ? pick(customLabel) : (lang === "vi" ? "Cách 1" : "Approach 1");
       section.appendChild(label);
     }
 
@@ -612,7 +613,8 @@ function renderCode() {
 
     const sep = document.createElement("div");
     sep.className = "code-section-label";
-    sep.textContent = lang === "vi" ? "Cách 2: Tối ưu" : "Approach 2: Optimized";
+    const custom2Label = problemData && problemData.code2Label;
+    sep.textContent = custom2Label ? pick(custom2Label) : (lang === "vi" ? "Cách 2" : "Approach 2");
     section.appendChild(sep);
 
     section.appendChild(createCopyBtn(code2));
