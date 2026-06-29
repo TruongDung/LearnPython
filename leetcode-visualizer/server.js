@@ -3903,6 +3903,304 @@ function buildSteps713(nums, params) {
 }
 
 /**
+ * Generate steps for LeetCode 13: Roman to Integer.
+ *
+ * Scan left to right:
+ *  - If current value < next value → subtract current.
+ *  - Else → add current.
+ */
+function buildSteps13(input) {
+  const s = String(input).toUpperCase();
+  const roman = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  const steps = [];
+  const chars = s.split("");
+  const values = chars.map((ch) => roman[ch] || 0);
+
+  let result = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4],
+    vars: [
+      { name: "s", value: s },
+      { name: "result", value: 0 },
+    ],
+    note: {
+      vi: `Chuỗi La Mã: "${s}". Giá trị từng ký tự: [${values.join(", ")}]. Duyệt từ trái sang phải.`,
+      en: `Roman string: "${s}". Character values: [${values.join(", ")}]. Scan left to right.`,
+    },
+  });
+
+  for (let i = 0; i < s.length; i++) {
+    const cur = values[i];
+    const next = i + 1 < s.length ? values[i + 1] : 0;
+    const subtract = cur < next;
+
+    if (subtract) {
+      result -= cur;
+      steps.push({
+        title: { vi: `i=${i}: ${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → trừ`, en: `i=${i}: ${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → subtract` },
+        arr: values,
+        sub: chars,
+        highlight: [i, i + 1],
+        mark: [],
+        codeLines: [5, 6, 7],
+        vars: [
+          { name: "i", value: i },
+          { name: "s[i]", value: `${chars[i]} = ${cur}` },
+          { name: "s[i+1]", value: `${chars[i + 1]} = ${next}` },
+          { name: "action", value: `subtract ${cur}` },
+          { name: "result", value: result },
+        ],
+        note: {
+          vi: `${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → result -= ${cur}. result = ${result}.`,
+          en: `${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → result -= ${cur}. result = ${result}.`,
+        },
+      });
+    } else {
+      result += cur;
+      steps.push({
+        title: { vi: `i=${i}: ${chars[i]}(${cur}) → cộng`, en: `i=${i}: ${chars[i]}(${cur}) → add` },
+        arr: values,
+        sub: chars,
+        highlight: [i],
+        mark: [],
+        codeLines: [5, 6, 8, 9],
+        vars: [
+          { name: "i", value: i },
+          { name: "s[i]", value: `${chars[i]} = ${cur}` },
+          { name: "s[i+1]", value: i + 1 < s.length ? `${chars[i + 1]} = ${next}` : "end" },
+          { name: "action", value: `add ${cur}` },
+          { name: "result", value: result },
+        ],
+        note: {
+          vi: i + 1 < s.length
+            ? `${chars[i]}(${cur}) >= ${chars[i + 1]}(${next}) → result += ${cur}. result = ${result}.`
+            : `${chars[i]}(${cur}) là ký tự cuối → result += ${cur}. result = ${result}.`,
+          en: i + 1 < s.length
+            ? `${chars[i]}(${cur}) >= ${chars[i + 1]}(${next}) → result += ${cur}. result = ${result}.`
+            : `${chars[i]}(${cur}) is the last character → result += ${cur}. result = ${result}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [10],
+    vars: [{ name: "answer", value: result }],
+    note: {
+      vi: `"${s}" = ${result}.`,
+      en: `"${s}" = ${result}.`,
+    },
+  });
+
+  return { original: s, answer: result, steps };
+}
+
+/**
+ * Generate steps for LeetCode 205: Isomorphic Strings.
+ *
+ * Use two hash maps (s→t and t→s) to enforce bijective mapping:
+ *  - If s[i] already mapped, check it maps to t[i].
+ *  - If not mapped, check t[i] is not already mapped to another char in s.
+ *  - If any conflict → False. Otherwise → True.
+ */
+function buildSteps205(input, params) {
+  const s = String(input);
+  const t = String(params.t || "");
+  const steps = [];
+
+  // Display arrays: show both strings as paired characters
+  const sChars = s.split("");
+  const tChars = t.split("");
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: sChars.map((c, i) => 0),
+    sub: sChars.map((c, i) => `${c}→${tChars[i] || "?"}`),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4, 5],
+    vars: [
+      { name: "s", value: s },
+      { name: "t", value: t },
+      { name: "map_s", value: "{}" },
+      { name: "map_t", value: "{}" },
+    ],
+    note: {
+      vi: `So sánh "${s}" và "${t}". Dùng 2 hash map: map_s (s→t) và map_t (t→s) để kiểm tra ánh xạ 1-1.`,
+      en: `Compare "${s}" and "${t}". Use 2 hash maps: map_s (s→t) and map_t (t→s) to verify bijective mapping.`,
+    },
+  });
+
+  if (s.length !== t.length) {
+    steps.push({
+      title: { vi: "Độ dài khác nhau → False", en: "Different lengths → False" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2, 3],
+      vars: [
+        { name: "len(s)", value: s.length },
+        { name: "len(t)", value: t.length },
+        { name: "result", value: false },
+      ],
+      note: {
+        vi: `len(s)=${s.length} ≠ len(t)=${t.length} → không thể đẳng cấu → False.`,
+        en: `len(s)=${s.length} ≠ len(t)=${t.length} → cannot be isomorphic → False.`,
+      },
+    });
+    return { s, t, answer: false, steps };
+  }
+
+  const mapS = {};
+  const mapT = {};
+  let answer = true;
+
+  const fmtMap = (m) => {
+    const entries = Object.entries(m).map(([k, v]) => `${k}→${v}`);
+    return `{${entries.join(", ")}}`;
+  };
+
+  for (let i = 0; i < s.length; i++) {
+    const c1 = s[i];
+    const c2 = t[i];
+
+    if (c1 in mapS) {
+      if (mapS[c1] !== c2) {
+        // Conflict: c1 already maps to something else
+        answer = false;
+        steps.push({
+          title: { vi: `i=${i}: xung đột → False`, en: `i=${i}: conflict → False` },
+          arr: sChars.map((_, j) => j <= i ? 1 : 0),
+          sub: sChars.map((c, j) => `${c}→${tChars[j]}`),
+          highlight: [i],
+          mark: [i],
+          final: true,
+          codeLines: [6, 7, 8, 9],
+          vars: [
+            { name: "i", value: i },
+            { name: "c1", value: c1 },
+            { name: "c2", value: c2 },
+            { name: "map_s[c1]", value: mapS[c1] },
+            { name: "conflict", value: `${c1}→${mapS[c1]} but need ${c1}→${c2}` },
+            { name: "map_s", value: fmtMap(mapS) },
+            { name: "result", value: false },
+          ],
+          note: {
+            vi: `'${c1}' đã ánh xạ sang '${mapS[c1]}', nhưng bây giờ cần ánh xạ sang '${c2}' → xung đột → False.`,
+            en: `'${c1}' already maps to '${mapS[c1]}', but now needs to map to '${c2}' → conflict → False.`,
+          },
+        });
+        return { s, t, answer: false, steps };
+      }
+      // Consistent mapping
+      steps.push({
+        title: { vi: `i=${i}: ${c1}→${c2} (đã ánh xạ) ✓`, en: `i=${i}: ${c1}→${c2} (existing) ✓` },
+        arr: sChars.map((_, j) => j <= i ? 1 : 0),
+        sub: sChars.map((c, j) => `${c}→${tChars[j]}`),
+        highlight: [i],
+        mark: [],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "i", value: i },
+          { name: "c1", value: c1 },
+          { name: "c2", value: c2 },
+          { name: "map_s[c1]", value: mapS[c1] },
+          { name: "map_s", value: fmtMap(mapS) },
+          { name: "map_t", value: fmtMap(mapT) },
+        ],
+        note: {
+          vi: `'${c1}' đã ánh xạ sang '${c2}' → nhất quán, tiếp tục.`,
+          en: `'${c1}' already maps to '${c2}' → consistent, continue.`,
+        },
+      });
+    } else {
+      if (c2 in mapT) {
+        // Conflict: c2 already mapped from another char
+        answer = false;
+        steps.push({
+          title: { vi: `i=${i}: xung đột ngược → False`, en: `i=${i}: reverse conflict → False` },
+          arr: sChars.map((_, j) => j <= i ? 1 : 0),
+          sub: sChars.map((c, j) => `${c}→${tChars[j]}`),
+          highlight: [i],
+          mark: [i],
+          final: true,
+          codeLines: [6, 7, 11, 12],
+          vars: [
+            { name: "i", value: i },
+            { name: "c1", value: c1 },
+            { name: "c2", value: c2 },
+            { name: "map_t[c2]", value: mapT[c2] },
+            { name: "conflict", value: `${c2} already mapped from '${mapT[c2]}', cannot map from '${c1}'` },
+            { name: "map_t", value: fmtMap(mapT) },
+            { name: "result", value: false },
+          ],
+          note: {
+            vi: `'${c2}' đã được ánh xạ từ '${mapT[c2]}', không thể ánh xạ từ '${c1}' nữa → xung đột → False.`,
+            en: `'${c2}' is already mapped from '${mapT[c2]}', cannot also map from '${c1}' → conflict → False.`,
+          },
+        });
+        return { s, t, answer: false, steps };
+      }
+      // New mapping
+      mapS[c1] = c2;
+      mapT[c2] = c1;
+      steps.push({
+        title: { vi: `i=${i}: ${c1}→${c2} (mới)`, en: `i=${i}: ${c1}→${c2} (new)` },
+        arr: sChars.map((_, j) => j <= i ? 1 : 0),
+        sub: sChars.map((c, j) => `${c}→${tChars[j]}`),
+        highlight: [i],
+        mark: [],
+        codeLines: [6, 7, 11, 13, 14, 15],
+        vars: [
+          { name: "i", value: i },
+          { name: "c1", value: c1 },
+          { name: "c2", value: c2 },
+          { name: "map_s", value: fmtMap(mapS) },
+          { name: "map_t", value: fmtMap(mapT) },
+        ],
+        note: {
+          vi: `Tạo ánh xạ mới: '${c1}' ↔ '${c2}'. map_s = ${fmtMap(mapS)}.`,
+          en: `Create new mapping: '${c1}' ↔ '${c2}'. map_s = ${fmtMap(mapS)}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả: True", en: "Result: True" },
+    arr: sChars.map(() => 1),
+    sub: sChars.map((c, i) => `${c}→${tChars[i]}`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "map_s", value: fmtMap(mapS) },
+      { name: "result", value: true },
+    ],
+    note: {
+      vi: `Tất cả ký tự ánh xạ 1-1 không xung đột → "${s}" và "${t}" đẳng cấu → True.`,
+      en: `All characters map bijectively without conflict → "${s}" and "${t}" are isomorphic → True.`,
+    },
+  });
+
+  return { s, t, answer: true, steps };
+}
+
+/**
  * Generate steps for LeetCode 50: Pow(x, n).
  *
  * Fast exponentiation (binary exponentiation):
@@ -5607,6 +5905,107 @@ const SUPPORTED = {
       "            d[nums[i]] = i",
     ],
     builder: buildSteps1,
+  },
+  13: {
+    id: 13,
+    difficulty: "easy",
+    slug: "roman-to-integer",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Roman to Integer", en: "Roman to Integer" },
+    titleVi: { vi: "Chuyển số La Mã sang số nguyên", en: "Roman numeral to integer" },
+    statement: {
+      vi:
+        "Cho một chuỗi số La Mã, chuyển thành số nguyên. " +
+        "Quy tắc: I=1, V=5, X=10, L=50, C=100, D=500, M=1000. " +
+        "Nếu ký tự nhỏ hơn đứng trước ký tự lớn hơn (VD: IV=4, IX=9), ta trừ thay vì cộng.",
+      en:
+        "Given a Roman numeral string, convert it to an integer. " +
+        "Rules: I=1, V=5, X=10, L=50, C=100, D=500, M=1000. " +
+        "If a smaller value precedes a larger value (e.g. IV=4, IX=9), subtract instead of add.",
+    },
+    defaultInput: "MCMXCIV",
+    inputKind: "string",
+    inputLabel: { vi: "Số La Mã (VD: MCMXCIV)", en: "Roman numeral (e.g. MCMXCIV)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt chuỗi một lần từ trái sang phải, mỗi ký tự xử lý O(1) → O(n). Chỉ dùng vài biến phụ → O(1) bộ nhớ.",
+        en: "Single pass left to right, each character processed in O(1) → O(n) time. Only a few variables used → O(1) space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def romanToInt(self, s: str) -> int:",
+      "        roman = {'I':1,'V':5,'X':10,'L':50,",
+      "                 'C':100,'D':500,'M':1000}",
+      "        result = 0",
+      "        for i in range(len(s)):",
+      "            if i+1 < len(s) and roman[s[i]] < roman[s[i+1]]:",
+      "                result -= roman[s[i]]",
+      "            else:",
+      "                result += roman[s[i]]",
+      "        return result",
+    ],
+    builder: buildSteps13,
+  },
+  205: {
+    id: 205,
+    difficulty: "easy",
+    slug: "isomorphic-strings",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Isomorphic Strings", en: "Isomorphic Strings" },
+    titleVi: { vi: "Chuỗi đẳng cấu", en: "Isomorphic strings" },
+    statement: {
+      vi:
+        "Cho hai chuỗi s và t, xác định xem chúng có đẳng cấu không. " +
+        "Hai chuỗi đẳng cấu nếu mỗi ký tự trong s có thể được ánh xạ 1-1 sang ký tự trong t (giữ nguyên thứ tự). " +
+        "Không có hai ký tự khác nhau ánh xạ sang cùng một ký tự, và ngược lại.",
+      en:
+        "Given two strings s and t, determine if they are isomorphic. " +
+        "Two strings are isomorphic if each character in s can be mapped one-to-one to a character in t (preserving order). " +
+        "No two different characters may map to the same character, and vice versa.",
+    },
+    defaultInput: "egg",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [
+      {
+        key: "t",
+        type: "string",
+        label: { vi: "Chuỗi t", en: "String t" },
+        default: "add",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt chuỗi một lần O(n). Bảng ánh xạ tối đa 256 ký tự ASCII → O(1) bộ nhớ.",
+        en: "Single pass O(n). Mapping tables hold at most 256 ASCII characters → O(1) space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isIsomorphic(self, s: str, t: str) -> bool:",
+      "        if len(s) != len(t):",
+      "            return False",
+      "        map_s = {}",
+      "        map_t = {}",
+      "        for i in range(len(s)):",
+      "            c1, c2 = s[i], t[i]",
+      "            if c1 in map_s:",
+      "                if map_s[c1] != c2:",
+      "                    return False",
+      "            else:",
+      "                if c2 in map_t:",
+      "                    return False",
+      "                map_s[c1] = c2",
+      "                map_t[c2] = c1",
+      "        return True",
+    ],
+    builder: buildSteps205,
   },
 };
 
