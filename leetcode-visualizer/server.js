@@ -154,78 +154,78 @@ function buildSteps1004(nums, params) {
     },
   });
 
-  let i = 0;
+  let left = 0;
   let zeroCount = 0;
   let maxLength = 0;
-  let bestI = 0;
-  let bestJ = -1;
+  let bestL = 0;
+  let bestR = -1;
 
-  for (let j = 0; j < nums.length; j++) {
-    if (nums[j] === 0) zeroCount += 1;
+  for (let right = 0; right < nums.length; right++) {
+    if (nums[right] === 0) zeroCount += 1;
 
-    // Expand window to j
+    // Expand window to right
     steps.push({
-      title: { vi: `Mở rộng: j = ${j}`, en: `Expand: j = ${j}` },
+      title: { vi: `Mở rộng: right = ${right}`, en: `Expand: right = ${right}` },
       arr: [...nums],
-      highlight: inWindow(i, j),
+      highlight: inWindow(left, right),
       mark: [],
       codeLines: [6, 7, 8],
       vars: [
-        { name: "i", value: i },
-        { name: "j", value: j },
+        { name: "left", value: left },
+        { name: "right", value: right },
         { name: "zeroCount", value: zeroCount },
         { name: "maxLength", value: maxLength },
       ],
       note: {
-        vi: `Thêm phần tử ${nums[j]} ở vị trí ${j}. Số 0 trong cửa sổ [${i}..${j}] = ${zeroCount}.`,
-        en: `Add element ${nums[j]} at index ${j}. Zeros in window [${i}..${j}] = ${zeroCount}.`,
+        vi: `Thêm nums[${right}]=${nums[right]}. Số 0 trong cửa sổ [${left}..${right}] = ${zeroCount}.`,
+        en: `Add nums[${right}]=${nums[right]}. Zeros in window [${left}..${right}] = ${zeroCount}.`,
       },
     });
 
     // Shrink window when zeros exceed k
     while (zeroCount > k) {
-      const removed = nums[i];
-      if (nums[i] === 0) zeroCount -= 1;
-      i += 1;
+      const removed = nums[left];
+      if (nums[left] === 0) zeroCount -= 1;
+      left += 1;
       steps.push({
-        title: { vi: `Co cửa sổ: i = ${i}`, en: `Shrink: i = ${i}` },
+        title: { vi: `Co cửa sổ: left = ${left}`, en: `Shrink: left = ${left}` },
         arr: [...nums],
-        highlight: inWindow(i, j),
+        highlight: inWindow(left, right),
         mark: [],
         codeLines: [9, 10, 11, 12],
         vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
+          { name: "left", value: left },
+          { name: "right", value: right },
           { name: "zeroCount", value: zeroCount },
           { name: "maxLength", value: maxLength },
         ],
         note: {
-          vi: `Số 0 (${zeroCount + (removed === 0 ? 1 : 0)}) vượt quá k=${k}. Bỏ phần tử ${removed} ở trái, dời i → ${i}. Số 0 còn ${zeroCount}.`,
-          en: `Zeros exceeded k=${k}. Drop element ${removed} on the left, move i → ${i}. Zeros now ${zeroCount}.`,
+          vi: `Zeros vượt k=${k}. Bỏ nums[${left - 1}]=${removed} ở trái, left → ${left}. Zeros = ${zeroCount}.`,
+          en: `Zeros exceeded k=${k}. Drop nums[${left - 1}]=${removed} on left, left → ${left}. Zeros = ${zeroCount}.`,
         },
       });
     }
 
-    const length = j - i + 1;
+    const length = right - left + 1;
     if (length > maxLength) {
       maxLength = length;
-      bestI = i;
-      bestJ = j;
+      bestL = left;
+      bestR = right;
       steps.push({
         title: { vi: `Cập nhật max = ${maxLength}`, en: `Update max = ${maxLength}` },
         arr: [...nums],
-        highlight: inWindow(i, j),
+        highlight: inWindow(left, right),
         mark: [],
         codeLines: [13],
         vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
+          { name: "left", value: left },
+          { name: "right", value: right },
           { name: "maxLength", value: maxLength },
           { name: "zeroCount", value: zeroCount },
         ],
         note: {
-          vi: `Cửa sổ hợp lệ [${i}..${j}] dài ${length} > kỷ lục cũ. Cập nhật đáp án = ${maxLength}.`,
-          en: `Valid window [${i}..${j}] of length ${length} beats the record. Update answer = ${maxLength}.`,
+          vi: `Cửa sổ [${left}..${right}] dài ${length} > kỷ lục cũ. maxLength = ${maxLength}.`,
+          en: `Window [${left}..${right}] of length ${length} beats the record. maxLength = ${maxLength}.`,
         },
       });
     }
@@ -235,16 +235,16 @@ function buildSteps1004(nums, params) {
     title: { vi: "Kết quả", en: "Result" },
     arr: [...nums],
     highlight: [],
-    mark: bestJ >= 0 ? inWindow(bestI, bestJ) : [],
+    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
     final: true,
     codeLines: [14],
     vars: [
       { name: "maxLength", value: maxLength },
-      { name: "window", value: bestJ >= 0 ? `[${bestI}..${bestJ}]` : "-" },
+      { name: "window", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "-" },
     ],
     note: {
-      vi: `Cửa sổ dài nhất là [${bestI}..${bestJ}] với độ dài ${maxLength}. Đáp án = ${maxLength}.`,
-      en: `The longest window is [${bestI}..${bestJ}] with length ${maxLength}. Answer = ${maxLength}.`,
+      vi: `Cửa sổ dài nhất là [${bestL}..${bestR}] với độ dài ${maxLength}. Đáp án = ${maxLength}.`,
+      en: `The longest window is [${bestL}..${bestR}] with length ${maxLength}. Answer = ${maxLength}.`,
     },
   });
 
@@ -3422,7 +3422,7 @@ function buildSteps27(nums, params) {
   const val = params.val;
   const arr = [...nums];
   const steps = [];
-  let k = 0;
+  let left = 0;
 
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
@@ -3432,51 +3432,52 @@ function buildSteps27(nums, params) {
     codeLines: [3],
     vars: [
       { name: "val", value: val },
-      { name: "k", value: 0 },
+      { name: "left (write)", value: 0 },
+      { name: "right (read)", value: 0 },
     ],
     note: {
-      vi: `Xóa tất cả phần tử bằng ${val}. k = vị trí ghi tiếp theo.`,
-      en: `Remove all elements equal to ${val}. k = next write position.`,
+      vi: `Xóa tất cả phần tử bằng ${val}.\nleft = con trỏ ghi (write pointer)\nright = con trỏ đọc (read pointer)`,
+      en: `Remove all elements equal to ${val}.\nleft = write pointer\nright = read pointer`,
     },
   });
 
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] !== val) {
-      arr[k] = arr[i];
+  for (let right = 0; right < arr.length; right++) {
+    if (arr[right] !== val) {
+      arr[left] = arr[right];
       steps.push({
-        title: { vi: `nums[${i}]=${nums[i]} ≠ ${val} → giữ`, en: `nums[${i}]=${nums[i]} ≠ ${val} → keep` },
+        title: { vi: `nums[right=${right}]=${nums[right]} ≠ ${val} → giữ`, en: `nums[right=${right}]=${nums[right]} ≠ ${val} → keep` },
         arr: [...arr],
-        highlight: [i],
-        mark: Array.from({ length: k + 1 }, (_, x) => x),
+        highlight: [right],
+        mark: Array.from({ length: left + 1 }, (_, x) => x),
         codeLines: [4, 5, 6],
         vars: [
-          { name: "i", value: i },
-          { name: "nums[i]", value: nums[i] },
-          { name: "k", value: k + 1 },
-          { name: "action", value: "keep" },
+          { name: "right (read)", value: right },
+          { name: "nums[right]", value: nums[right] },
+          { name: "left (write)", value: left + 1 },
+          { name: "action", value: `nums[${left}] = nums[${right}] → left++` },
         ],
         note: {
-          vi: `${nums[i]} ≠ ${val} → copy vào nums[${k}]. k → ${k + 1}.`,
-          en: `${nums[i]} ≠ ${val} → copy into nums[${k}]. k → ${k + 1}.`,
+          vi: `nums[${right}]=${nums[right]} ≠ ${val} → copy vào nums[left=${left}].\nleft: ${left} → ${left + 1}`,
+          en: `nums[${right}]=${nums[right]} ≠ ${val} → copy to nums[left=${left}].\nleft: ${left} → ${left + 1}`,
         },
       });
-      k++;
+      left++;
     } else {
       steps.push({
-        title: { vi: `nums[${i}]=${nums[i]} == ${val} → bỏ`, en: `nums[${i}]=${nums[i]} == ${val} → skip` },
+        title: { vi: `nums[right=${right}]=${nums[right]} == ${val} → bỏ`, en: `nums[right=${right}]=${nums[right]} == ${val} → skip` },
         arr: [...arr],
-        highlight: [i],
-        mark: Array.from({ length: k }, (_, x) => x),
+        highlight: [right],
+        mark: Array.from({ length: left }, (_, x) => x),
         codeLines: [4],
         vars: [
-          { name: "i", value: i },
-          { name: "nums[i]", value: nums[i] },
-          { name: "k", value: k },
-          { name: "action", value: "skip" },
+          { name: "right (read)", value: right },
+          { name: "nums[right]", value: nums[right] },
+          { name: "left (write)", value: left },
+          { name: "action", value: "skip (equals val)" },
         ],
         note: {
-          vi: `${nums[i]} == ${val} → bỏ qua, không copy. k giữ nguyên = ${k}.`,
-          en: `${nums[i]} == ${val} → skip, don't copy. k stays at ${k}.`,
+          vi: `nums[${right}]=${nums[right]} == ${val} → bỏ qua.\nleft giữ nguyên = ${left}`,
+          en: `nums[${right}]=${nums[right]} == ${val} → skip.\nleft stays at ${left}`,
         },
       });
     }
@@ -3486,20 +3487,20 @@ function buildSteps27(nums, params) {
     title: { vi: "Kết quả", en: "Result" },
     arr: [...arr],
     highlight: [],
-    mark: Array.from({ length: k }, (_, x) => x),
+    mark: Array.from({ length: left }, (_, x) => x),
     final: true,
     codeLines: [7],
     vars: [
-      { name: "k", value: k },
-      { name: "result", value: arr.slice(0, k) },
+      { name: "left (result)", value: left },
+      { name: "nums[0..left-1]", value: `[${arr.slice(0, left).join(", ")}]` },
     ],
     note: {
-      vi: `Sau khi xóa: ${k} phần tử còn lại = [${arr.slice(0, k).join(", ")}].`,
-      en: `After removal: ${k} elements remain = [${arr.slice(0, k).join(", ")}].`,
+      vi: `Sau khi xóa: left = ${left} phần tử còn lại = [${arr.slice(0, left).join(", ")}].`,
+      en: `After removal: left = ${left} elements remain = [${arr.slice(0, left).join(", ")}].`,
     },
   });
 
-  return { original: [...nums], answer: k, steps };
+  return { original: [...nums], answer: left, steps };
 }
 
 /**
@@ -6205,12 +6206,12 @@ const SUPPORTED = {
     code: [
       "class Solution:",
       "    def removeElement(self, nums, val):",
-      "        k = 0",
-      "        for i in range(len(nums)):",
-      "            if nums[i] != val:",
-      "                nums[k] = nums[i]",
-      "                k += 1",
-      "        return k",
+      "        left = 0  # write pointer",
+      "        for right in range(len(nums)):  # read pointer",
+      "            if nums[right] != val:",
+      "                nums[left] = nums[right]",
+      "                left += 1",
+      "        return left",
     ],
     builder: buildSteps27,
   },
@@ -7150,17 +7151,17 @@ const SUPPORTED = {
     code: [
       "class Solution:",
       "    def longestOnes(self, nums, k):",
-      "        i = 0",
+      "        left = 0",
       "        max_length = 0",
       "        zero_count = 0",
-      "        for j in range(len(nums)):",
-      "            if nums[j] == 0:",
+      "        for right in range(len(nums)):",
+      "            if nums[right] == 0:",
       "                zero_count += 1",
       "                while zero_count > k:",
-      "                    if nums[i] == 0:",
+      "                    if nums[left] == 0:",
       "                        zero_count -= 1",
-      "                    i += 1",
-      "            max_length = max(max_length, j - i + 1)",
+      "                    left += 1",
+      "            max_length = max(max_length, right - left + 1)",
       "        return max_length",
     ],
     builder: buildSteps1004,
