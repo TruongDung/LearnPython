@@ -6665,6 +6665,561 @@ function buildSteps127(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 77: Combinations.
+ * Backtracking: build current array incrementally, only pick numbers >= start.
+ * Visualization: bar chart shows numbers 1..n, bars marked when in current.
+ */
+function buildSteps77(input, params) {
+  const n = input[0];
+  const k = params.k || 2;
+  const steps = [];
+
+  const numbers = Array.from({ length: n }, (_, i) => i + 1);
+  const current = [];
+  const results = [];
+
+  // Helper: bar array — 1 if number is in current, 0 otherwise
+  const barState = () => numbers.map((num) => (current.includes(num) ? 1 : 0));
+  const numberLabels = () => numbers.map(String);
+  const currentIdx = () => current.map((num) => num - 1);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: barState(),
+    sub: numberLabels(),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "k", value: k },
+      { name: "current", value: "[]" },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi: `Tìm tất cả tổ hợp ${k} số chọn từ [1..${n}].\nBacktracking: thêm 1 số → đệ quy → quay lui (pop).\nĐể tránh trùng: chỉ chọn số > số cuối trong current.`,
+      en: `Find all combinations of ${k} numbers from [1..${n}].\nBacktracking: add one → recurse → backtrack (pop).\nTo avoid duplicates: only pick numbers > last in current.`,
+    },
+  });
+
+  function backtrack(start, depth) {
+    if (current.length === k) {
+      results.push([...current]);
+      steps.push({
+        title: { vi: `✓ Tìm thấy: [${current.join(", ")}]`, en: `✓ Found: [${current.join(", ")}]` },
+        arr: barState(),
+        sub: numberLabels(),
+        highlight: [],
+        mark: currentIdx(),
+        codeLines: [7, 8, 9],
+        vars: [
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "len == k", value: true },
+          { name: "results count", value: results.length },
+          { name: "all results", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+        ],
+        note: {
+          vi: `len(current) == k → lưu [${current.join(", ")}] vào result. Tổng cộng: ${results.length} tổ hợp.`,
+          en: `len(current) == k → save [${current.join(", ")}] to result. Total so far: ${results.length} combinations.`,
+        },
+      });
+      return;
+    }
+
+    for (let i = start; i <= n; i++) {
+      // Pruning check (optional, but shown if obvious)
+      const needed = k - current.length;
+      const remaining = n - i + 1;
+      if (remaining < needed) break;
+
+      current.push(i);
+      steps.push({
+        title: { vi: `Thêm ${i}: current = [${current.join(", ")}]`, en: `Add ${i}: current = [${current.join(", ")}]` },
+        arr: barState(),
+        sub: numberLabels(),
+        highlight: [i - 1],
+        mark: currentIdx().slice(0, -1),
+        codeLines: [10, 11, 12],
+        vars: [
+          { name: "i (pick)", value: i },
+          { name: "start", value: start },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "depth", value: depth + 1 },
+        ],
+        note: {
+          vi: `Chọn ${i} ∈ [${start}..${n}], thêm vào current → đệ quy với start = ${i + 1}.`,
+          en: `Pick ${i} from [${start}..${n}], add to current → recurse with start = ${i + 1}.`,
+        },
+      });
+
+      backtrack(i + 1, depth + 1);
+
+      const popped = current.pop();
+      steps.push({
+        title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
+        arr: barState(),
+        sub: numberLabels(),
+        highlight: [],
+        mark: currentIdx(),
+        codeLines: [13],
+        vars: [
+          { name: "popped", value: popped },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: {
+          vi: `Quay lui: bỏ ${popped} khỏi current. Thử số tiếp theo trong vòng for.`,
+          en: `Backtrack: remove ${popped} from current. Try next number in the for-loop.`,
+        },
+      });
+    }
+  }
+
+  backtrack(1, 0);
+
+  // Final summary
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
+    arr: numbers.map(() => 0),
+    sub: numberLabels(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [15, 16],
+    vars: [
+      { name: "C(n, k)", value: `C(${n},${k}) = ${results.length}` },
+      { name: "all results", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng cộng ${results.length} tổ hợp = C(${n},${k}).\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      en: `Total ${results.length} combinations = C(${n},${k}).\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+    },
+  });
+
+  return { n, k, answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 78: Subsets.
+ * Backtracking: every recursion node is a valid subset → save current at each call.
+ */
+function buildSteps78(nums) {
+  const steps = [];
+  const current = [];
+  const results = [];
+
+  // current uses values; convert to indices for marking
+  const indicesOf = (subset) => subset.map((v) => nums.indexOf(v));
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: nums.map(() => 0),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "current", value: "[]" },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi: `Tìm tất cả tập con của [${nums.join(", ")}].\nMỗi node trong backtracking đều là một tập con hợp lệ → lưu ngay khi vào.`,
+      en: `Find all subsets of [${nums.join(", ")}].\nEvery node in backtracking is a valid subset → save it on entry.`,
+    },
+  });
+
+  function backtrack(start, depth) {
+    // Save current immediately (every node is a subset)
+    results.push([...current]);
+    const curIdx = indicesOf(current);
+    steps.push({
+      title: { vi: `Lưu: [${current.join(", ")}]`, en: `Save: [${current.join(", ")}]` },
+      arr: nums.map((_, i) => (curIdx.includes(i) ? 1 : 0)),
+      sub: nums.map(String),
+      highlight: [],
+      mark: curIdx,
+      codeLines: [6],
+      vars: [
+        { name: "current", value: `[${current.join(", ")}]` },
+        { name: "start", value: start },
+        { name: "depth", value: depth },
+        { name: "results count", value: results.length },
+      ],
+      note: {
+        vi: `Lưu [${current.join(", ")}] vào result. Tổng cộng: ${results.length} tập con.`,
+        en: `Save [${current.join(", ")}] to result. Total so far: ${results.length} subsets.`,
+      },
+    });
+
+    for (let i = start; i < nums.length; i++) {
+      const val = nums[i];
+      current.push(val);
+      steps.push({
+        title: { vi: `Thêm nums[${i}] = ${val}`, en: `Add nums[${i}] = ${val}` },
+        arr: nums.map((_, idx) => (indicesOf(current).includes(idx) ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [i],
+        mark: indicesOf(current).slice(0, -1),
+        codeLines: [7, 8, 9],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: val },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: {
+          vi: `Thêm ${val} (index ${i}) vào current → đệ quy với start = ${i + 1}.`,
+          en: `Add ${val} (index ${i}) to current → recurse with start = ${i + 1}.`,
+        },
+      });
+
+      backtrack(i + 1, depth + 1);
+
+      const popped = current.pop();
+      steps.push({
+        title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
+        arr: nums.map((_, idx) => (indicesOf(current).includes(idx) ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [],
+        mark: indicesOf(current),
+        codeLines: [10],
+        vars: [
+          { name: "popped", value: popped },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: {
+          vi: `Bỏ ${popped} khỏi current để thử nhánh khác.`,
+          en: `Remove ${popped} from current to try another branch.`,
+        },
+      });
+    }
+  }
+
+  backtrack(0, 0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tập con`, en: `Result: ${results.length} subsets` },
+    arr: nums.map(() => 0),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [12, 13],
+    vars: [
+      { name: "total", value: `2^${nums.length} = ${results.length}` },
+      { name: "all subsets", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} = 2^${nums.length} tập con.\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      en: `Total ${results.length} = 2^${nums.length} subsets.\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+    },
+  });
+
+  return { original: [...nums], answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 90: Subsets II.
+ * Same as 78 but skip duplicates at each level (after sorting).
+ */
+function buildSteps90(nums) {
+  const steps = [];
+  const sorted = [...nums].sort((a, b) => a - b);
+  const current = [];
+  const results = [];
+
+  steps.push({
+    title: { vi: "Sắp xếp + Khởi tạo", en: "Sort + Initialize" },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: sorted.map((_, i) => i),
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "nums (sorted)", value: `[${sorted.join(", ")}]` },
+      { name: "current", value: "[]" },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi: `Sắp xếp nums = [${sorted.join(", ")}] để các phần tử trùng nằm cạnh nhau.\nỞ mỗi level: skip nếu nums[i] == nums[i-1] và i > start.`,
+      en: `Sort nums = [${sorted.join(", ")}] so duplicates are adjacent.\nAt each level: skip if nums[i] == nums[i-1] and i > start.`,
+    },
+  });
+
+  function backtrack(start, depth) {
+    results.push([...current]);
+    // Find indices of current values in sorted (taking first matches without re-using)
+    const usedIdx = new Set();
+    const curIdx = [];
+    for (const v of current) {
+      for (let i = 0; i < sorted.length; i++) {
+        if (!usedIdx.has(i) && sorted[i] === v) {
+          usedIdx.add(i);
+          curIdx.push(i);
+          break;
+        }
+      }
+    }
+
+    steps.push({
+      title: { vi: `Lưu: [${current.join(", ")}]`, en: `Save: [${current.join(", ")}]` },
+      arr: sorted.map((_, i) => (curIdx.includes(i) ? 1 : 0)),
+      sub: sorted.map(String),
+      highlight: [],
+      mark: curIdx,
+      codeLines: [7],
+      vars: [
+        { name: "current", value: `[${current.join(", ")}]` },
+        { name: "start", value: start },
+        { name: "depth", value: depth },
+        { name: "results count", value: results.length },
+      ],
+      note: {
+        vi: `Lưu [${current.join(", ")}] vào result. Tổng cộng: ${results.length}.`,
+        en: `Save [${current.join(", ")}] to result. Total so far: ${results.length}.`,
+      },
+    });
+
+    for (let i = start; i < sorted.length; i++) {
+      if (i > start && sorted[i] === sorted[i - 1]) {
+        // Skip duplicate at same level
+        steps.push({
+          title: { vi: `Skip i=${i}: nums[${i}]=${sorted[i]} trùng nums[${i - 1}]`, en: `Skip i=${i}: nums[${i}]=${sorted[i]} == nums[${i - 1}]` },
+          arr: sorted.map((_, idx) => (curIdx.includes(idx) ? 1 : 0)),
+          sub: sorted.map(String),
+          highlight: [i, i - 1],
+          mark: curIdx,
+          codeLines: [9, 10],
+          vars: [
+            { name: "i", value: i },
+            { name: "start", value: start },
+            { name: "nums[i]", value: sorted[i] },
+            { name: "nums[i-1]", value: sorted[i - 1] },
+            { name: "skip", value: "duplicate at same level" },
+          ],
+          note: {
+            vi: `i=${i} > start=${start} và nums[${i}]=${sorted[i]} == nums[${i - 1}] → skip để tránh trùng tập con.`,
+            en: `i=${i} > start=${start} and nums[${i}]=${sorted[i]} == nums[${i - 1}] → skip to avoid duplicate subset.`,
+          },
+        });
+        continue;
+      }
+
+      const val = sorted[i];
+      current.push(val);
+      const newCurIdx = [...curIdx, i];
+
+      steps.push({
+        title: { vi: `Thêm nums[${i}] = ${val}`, en: `Add nums[${i}] = ${val}` },
+        arr: sorted.map((_, idx) => (newCurIdx.includes(idx) ? 1 : 0)),
+        sub: sorted.map(String),
+        highlight: [i],
+        mark: curIdx,
+        codeLines: [11, 12, 13],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: val },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: {
+          vi: `Thêm ${val} (index ${i}) vào current → đệ quy với start = ${i + 1}.`,
+          en: `Add ${val} (index ${i}) to current → recurse with start = ${i + 1}.`,
+        },
+      });
+
+      backtrack(i + 1, depth + 1);
+
+      const popped = current.pop();
+      steps.push({
+        title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
+        arr: sorted.map((_, idx) => (curIdx.includes(idx) ? 1 : 0)),
+        sub: sorted.map(String),
+        highlight: [],
+        mark: curIdx,
+        codeLines: [14],
+        vars: [
+          { name: "popped", value: popped },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: {
+          vi: `Bỏ ${popped} khỏi current để thử nhánh khác.`,
+          en: `Remove ${popped} from current to try another branch.`,
+        },
+      });
+    }
+  }
+
+  backtrack(0, 0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tập con`, en: `Result: ${results.length} subsets` },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16, 17],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "all subsets", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} tập con (đã loại trùng).\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      en: `Total ${results.length} subsets (no duplicates).\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+    },
+  });
+
+  return { original: [...nums], answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 39: Combination Sum.
+ * Backtracking with reusable candidates: recurse with start = i (not i+1).
+ */
+function buildSteps39(nums, params) {
+  const target = params.target;
+  const candidates = [...nums];
+  const steps = [];
+  const current = [];
+  const results = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: candidates.map(() => 0),
+    sub: candidates.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 16],
+    vars: [
+      { name: "candidates", value: `[${candidates.join(", ")}]` },
+      { name: "target", value: target },
+      { name: "current", value: "[]" },
+      { name: "remain", value: target },
+    ],
+    note: {
+      vi: `Tìm tất cả tổ hợp candidates có tổng = ${target}. Mỗi candidate có thể dùng nhiều lần.\nremain = target - sum(current). Đệ quy với start = i (cho phép dùng lại).`,
+      en: `Find all combinations of candidates summing to ${target}. Each candidate can be reused.\nremain = target - sum(current). Recurse with start = i (allow reuse).`,
+    },
+  });
+
+  function backtrack(start, remain, depth) {
+    if (remain === 0) {
+      results.push([...current]);
+      steps.push({
+        title: { vi: `✓ Tổng = ${target}: [${current.join(", ")}]`, en: `✓ Sum = ${target}: [${current.join(", ")}]` },
+        arr: candidates.map(() => 0),
+        sub: candidates.map(String),
+        highlight: [],
+        mark: [],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "remain", value: 0 },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "sum", value: current.reduce((a, b) => a + b, 0) },
+          { name: "results count", value: results.length },
+        ],
+        note: {
+          vi: `remain = 0 → lưu [${current.join(", ")}] vào result. Tổng cộng: ${results.length}.`,
+          en: `remain = 0 → save [${current.join(", ")}] to result. Total so far: ${results.length}.`,
+        },
+      });
+      return;
+    }
+
+    if (remain < 0) {
+      steps.push({
+        title: { vi: `✗ Vượt quá: remain = ${remain}`, en: `✗ Overshoot: remain = ${remain}` },
+        arr: candidates.map(() => 0),
+        sub: candidates.map(String),
+        highlight: [],
+        mark: [],
+        codeLines: [9, 10],
+        vars: [
+          { name: "remain", value: remain },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "sum", value: current.reduce((a, b) => a + b, 0) },
+        ],
+        note: {
+          vi: `remain = ${remain} < 0 → tổng vượt quá target. Quay lui.`,
+          en: `remain = ${remain} < 0 → sum overshoots target. Backtrack.`,
+        },
+      });
+      return;
+    }
+
+    for (let i = start; i < candidates.length; i++) {
+      const val = candidates[i];
+      current.push(val);
+      const newRemain = remain - val;
+      const curSum = current.reduce((a, b) => a + b, 0);
+
+      steps.push({
+        title: { vi: `Thêm ${val}: current = [${current.join(", ")}], remain = ${newRemain}`, en: `Add ${val}: current = [${current.join(", ")}], remain = ${newRemain}` },
+        arr: candidates.map((_, idx) => (idx === i ? 1 : 0)),
+        sub: candidates.map(String),
+        highlight: [i],
+        mark: [],
+        codeLines: [11, 12, 13],
+        vars: [
+          { name: "i", value: i },
+          { name: "candidate", value: val },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "sum", value: curSum },
+          { name: "remain", value: newRemain },
+        ],
+        note: {
+          vi: `Chọn candidates[${i}] = ${val} → current = [${current.join(", ")}]. Đệ quy với start = ${i} (dùng lại được).`,
+          en: `Pick candidates[${i}] = ${val} → current = [${current.join(", ")}]. Recurse with start = ${i} (reuse allowed).`,
+        },
+      });
+
+      backtrack(i, newRemain, depth + 1);
+
+      const popped = current.pop();
+      const remainAfterPop = remain;
+      steps.push({
+        title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
+        arr: candidates.map(() => 0),
+        sub: candidates.map(String),
+        highlight: [],
+        mark: [],
+        codeLines: [14],
+        vars: [
+          { name: "popped", value: popped },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "remain", value: remainAfterPop },
+        ],
+        note: {
+          vi: `Bỏ ${popped} khỏi current. Thử candidate tiếp theo (i + 1).`,
+          en: `Remove ${popped} from current. Try next candidate (i + 1).`,
+        },
+      });
+    }
+  }
+
+  backtrack(0, target, 0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
+    arr: candidates.map(() => 0),
+    sub: candidates.map(String),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16, 17],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "all combinations", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} tổ hợp có tổng = ${target}.\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      en: `Total ${results.length} combinations summing to ${target}.\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+    },
+  });
+
+  return { original: [...nums], target, answer: results.length, steps };
+}
+
+/**
  * Generate steps for LeetCode 743: Network Delay Time.
  * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
  */
@@ -9744,6 +10299,457 @@ const SUPPORTED = {
       "        return 0",
     ],
     builder: buildSteps127,
+  },
+  77: {
+    id: 77,
+    difficulty: "medium",
+    slug: "combinations",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Combinations", en: "Combinations" },
+    titleVi: { vi: "Tổ hợp C(n, k)", en: "All k-combinations of 1..n" },
+    statement: {
+      vi:
+        "Cho hai số nguyên dương n và k, trả về TẤT CẢ các tổ hợp gồm k số chọn từ tập [1, 2, ..., n]. " +
+        "Mỗi tổ hợp là một mảng các số khác nhau, thứ tự không quan trọng.",
+      en:
+        "Given two integers n and k, return ALL combinations of k numbers chosen from the range [1, 2, ..., n]. " +
+        "Each combination is an array of distinct numbers; order does not matter.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    inputLabel: { vi: "n (chọn từ 1..n)", en: "n (choose from 1..n)" },
+    singleInput: true,
+    maxInput: 8,
+    extraParams: [
+      { key: "k", label: { vi: "k (số phần tử mỗi tổ hợp)", en: "k (size per combination)" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Backtracking: xây dựng dần một mảng 'current'. Mỗi bước thêm 1 số rồi đệ quy.", en: "Backtracking: build the 'current' array incrementally. At each step, add one number and recurse." },
+      { vi: "Để tránh trùng (vd [1,2] và [2,1]), chỉ chọn số lớn hơn số cuối trong current.", en: "To avoid duplicates (e.g. [1,2] vs [2,1]), only pick numbers larger than the last in current." },
+      { vi: "Khi len(current) == k → lưu một bản sao vào result rồi quay lui.", en: "When len(current) == k → save a copy to result and backtrack." },
+      { vi: "Pruning: nếu số phần tử còn lại không đủ k - len(current), bỏ qua.", en: "Pruning: skip if remaining numbers are insufficient to reach size k." },
+    ],
+    complexity: {
+      time: "O(C(n,k) · k)",
+      space: "O(k)",
+      note: {
+        vi: "Có C(n,k) tổ hợp, mỗi tổ hợp tốn O(k) để copy. Đệ quy sâu nhất k tầng → O(k) stack.",
+        en: "There are C(n,k) combinations, each costs O(k) to copy. Recursion depth at most k → O(k) stack.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def combine(self, n: int, k: int):",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start):",
+      "            if len(current) == k:",
+      "                result.append(current[:])",
+      "                return",
+      "            for i in range(start, n + 1):",
+      "                current.append(i)",
+      "                backtrack(i + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(1)",
+      "        return result",
+    ],
+    builder: buildSteps77,
+  },
+  78: {
+    id: 78,
+    difficulty: "medium",
+    slug: "subsets",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Subsets", en: "Subsets" },
+    titleVi: { vi: "Tất cả tập con (Power Set)", en: "All subsets (power set)" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên nums (các phần tử khác nhau), trả về TẤT CẢ các tập con (power set). " +
+        "Không được chứa tập con trùng nhau. Thứ tự không quan trọng.",
+      en:
+        "Given an integer array nums of distinct elements, return ALL possible subsets (power set). " +
+        "Must not contain duplicate subsets. Order does not matter.",
+    },
+    defaultInput: [1, 2, 3],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi tập con là một dãy 'chọn / không chọn' cho từng phần tử → có 2ⁿ tập.", en: "Each subset is a 'pick / skip' choice per element → 2ⁿ subsets total." },
+      { vi: "Backtracking: tại mỗi bước, lưu current ngay (mọi node đều là kết quả), rồi thử thêm từng phần tử kế tiếp.", en: "Backtracking: at each step, save current immediately (every node is a valid subset), then try adding each next element." },
+      { vi: "Dùng tham số start để chỉ chọn phần tử sau index hiện tại, tránh trùng.", en: "Use a start index parameter to only pick elements after the current index, avoiding duplicates." },
+      { vi: "Sau khi đệ quy → pop để quay lui và thử nhánh khác.", en: "After recursing → pop to backtrack and try the next branch." },
+    ],
+    complexity: {
+      time: "O(n · 2ⁿ)",
+      space: "O(n)",
+      note: {
+        vi: "Có 2ⁿ tập con, mỗi tập mất O(n) để copy. Đệ quy sâu nhất n tầng → O(n) stack.",
+        en: "There are 2ⁿ subsets, each costs O(n) to copy. Recursion depth at most n → O(n) stack.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def subsets(self, nums):",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start):",
+      "            result.append(current[:])",
+      "            for i in range(start, len(nums)):",
+      "                current.append(nums[i])",
+      "                backtrack(i + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps78,
+  },
+  90: {
+    id: 90,
+    difficulty: "medium",
+    slug: "subsets-ii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Subsets II", en: "Subsets II" },
+    titleVi: { vi: "Tất cả tập con (có phần tử trùng)", en: "All subsets with duplicates" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên nums (CÓ THỂ chứa phần tử trùng), trả về TẤT CẢ các tập con (power set). " +
+        "Không được chứa tập con trùng nhau.",
+      en:
+        "Given an integer array nums that MAY contain duplicates, return all possible subsets (power set). " +
+        "Must not contain duplicate subsets.",
+    },
+    defaultInput: [1, 2, 2],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Giống bài 78 nhưng nums có phần tử trùng → các tập con dễ bị trùng.", en: "Same as 78 but nums may have duplicates → subsets can repeat." },
+      { vi: "Bước 1: SẮP XẾP nums để các phần tử trùng nằm cạnh nhau.", en: "Step 1: SORT nums so duplicates are adjacent." },
+      { vi: "Bước 2: Khi duyệt for ở mỗi level, BỎ QUA i > start nếu nums[i] == nums[i-1] (chỉ dùng bản đầu tiên).", en: "Step 2: In the for-loop at each level, SKIP if i > start and nums[i] == nums[i-1] (only use the first copy)." },
+      { vi: "Cách này đảm bảo: ở cùng một level, mỗi giá trị chỉ được thử đúng 1 lần.", en: "This ensures: at the same level, each value is tried exactly once." },
+    ],
+    complexity: {
+      time: "O(n · 2ⁿ)",
+      space: "O(n)",
+      note: {
+        vi: "Sắp xếp O(n log n). Tối đa 2ⁿ tập con, mỗi tập O(n) để copy.",
+        en: "Sort O(n log n). At most 2ⁿ subsets, each O(n) to copy.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def subsetsWithDup(self, nums):",
+      "        nums.sort()",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start):",
+      "            result.append(current[:])",
+      "            for i in range(start, len(nums)):",
+      "                if i > start and nums[i] == nums[i-1]:",
+      "                    continue",
+      "                current.append(nums[i])",
+      "                backtrack(i + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps90,
+  },
+  39: {
+    id: 39,
+    difficulty: "medium",
+    slug: "combination-sum",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Combination Sum", en: "Combination Sum" },
+    titleVi: { vi: "Tổ hợp có tổng bằng target", en: "All combinations summing to target" },
+    statement: {
+      vi:
+        "Cho mảng candidates (các số khác nhau, dương) và target. " +
+        "Tìm TẤT CẢ tổ hợp các candidate có tổng = target. Mỗi candidate có thể dùng KHÔNG GIỚI HẠN số lần. " +
+        "Hai tổ hợp khác nhau nếu số lượng phần tử khác nhau.",
+      en:
+        "Given an array candidates of distinct positive integers and a target. " +
+        "Find ALL combinations of candidates that sum to target. Each candidate may be chosen UNLIMITED times. " +
+        "Two combinations are different if their multisets of numbers differ.",
+    },
+    defaultInput: [2, 3, 6, 7],
+    inputKind: "positive",
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 7 },
+    ],
+    approach: [
+      { vi: "Backtracking: xây dựng dần một mảng current; theo dõi remain = target - sum(current).", en: "Backtracking: build current incrementally; track remain = target - sum(current)." },
+      { vi: "Nếu remain == 0 → lưu current vào result.", en: "If remain == 0 → save current to result." },
+      { vi: "Nếu remain < 0 → vượt quá, quay lui.", en: "If remain < 0 → overshoot, backtrack." },
+      { vi: "Vì được dùng lại nên đệ quy gọi với start = i (KHÔNG phải i+1) khi thử lại cùng candidate.", en: "Because reuse is allowed, recurse with start = i (NOT i+1) when retrying the same candidate." },
+      { vi: "Dùng start để tránh trùng (tránh [2,3] và [3,2] cùng xuất hiện).", en: "Use start to avoid duplicates (prevent both [2,3] and [3,2])." },
+    ],
+    complexity: {
+      time: "O(2^t)",
+      space: "O(t)",
+      note: {
+        vi: "Trong xấu nhất t = target, t/min phép gọi đệ quy lồng nhau. Bộ nhớ O(target).",
+        en: "Worst case t = target, recursion depth up to t/min. Memory O(target).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def combinationSum(self, candidates, target):",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start, remain):",
+      "            if remain == 0:",
+      "                result.append(current[:])",
+      "                return",
+      "            if remain < 0:",
+      "                return",
+      "            for i in range(start, len(candidates)):",
+      "                current.append(candidates[i])",
+      "                backtrack(i, remain - candidates[i])",
+      "                current.pop()",
+      "",
+      "        backtrack(0, target)",
+      "        return result",
+    ],
+    builder: buildSteps39,
+  },
+  40: {
+    id: 40,
+    difficulty: "medium",
+    slug: "combination-sum-ii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Combination Sum II", en: "Combination Sum II" },
+    titleVi: { vi: "Tổ hợp tổng II (mỗi candidate dùng 1 lần)", en: "Combination sum, each candidate once" },
+    statement: {
+      vi:
+        "Cho candidates (CÓ THỂ trùng) và target. Tìm tất cả tổ hợp có tổng = target, " +
+        "mỗi phần tử trong candidates chỉ được dùng MỘT lần. Không chứa tổ hợp trùng.",
+      en:
+        "Given candidates (may contain duplicates) and a target. Find all combinations summing to target, " +
+        "each element used at most ONCE. No duplicate combinations.",
+    },
+    defaultInput: [10, 1, 2, 7, 6, 1, 5],
+    inputKind: "positive",
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 8 },
+    ],
+    approach: [
+      { vi: "Giống bài 39 nhưng: (a) đệ quy với start = i+1 (dùng 1 lần), (b) skip duplicate ở cùng level.", en: "Like 39 but: (a) recurse with start = i+1 (use once), (b) skip duplicate at the same level." },
+      { vi: "Sắp xếp candidates trước để các phần tử trùng nằm cạnh nhau và pruning sớm khi vượt target.", en: "Sort candidates first so duplicates are adjacent and to prune early when overshooting." },
+      { vi: "Trong vòng for: nếu i > start và candidates[i] == candidates[i-1] → skip.", en: "In the for-loop: if i > start and candidates[i] == candidates[i-1] → skip." },
+      { vi: "Pruning: candidates[i] > remain → break vì các candidate sau đều lớn hơn.", en: "Pruning: candidates[i] > remain → break since later candidates are even larger." },
+    ],
+    complexity: {
+      time: "O(2^n)",
+      space: "O(n)",
+      note: {
+        vi: "Tối đa 2^n nhánh đệ quy, mỗi nhánh O(n) để copy. Bộ nhớ O(n) cho stack + current.",
+        en: "At most 2^n recursion branches, each O(n) to copy. Memory O(n) for stack + current.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def combinationSum2(self, candidates, target):",
+      "        candidates.sort()",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start, remain):",
+      "            if remain == 0:",
+      "                result.append(current[:])",
+      "                return",
+      "            for i in range(start, len(candidates)):",
+      "                if i > start and candidates[i] == candidates[i-1]:",
+      "                    continue",
+      "                if candidates[i] > remain:",
+      "                    break",
+      "                current.append(candidates[i])",
+      "                backtrack(i + 1, remain - candidates[i])",
+      "                current.pop()",
+      "",
+      "        backtrack(0, target)",
+      "        return result",
+    ],
+    builder: buildSteps40,
+  },
+  46: {
+    id: 46,
+    difficulty: "medium",
+    slug: "permutations",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Permutations", en: "Permutations" },
+    titleVi: { vi: "Tất cả hoán vị", en: "All permutations" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên nums (khác nhau), trả về TẤT CẢ hoán vị của nó. " +
+        "Khác Subsets/Combinations: ở đây THỨ TỰ có ý nghĩa (mỗi hoán vị có đủ n phần tử).",
+      en:
+        "Given an array nums of distinct integers, return ALL possible permutations. " +
+        "Unlike Subsets/Combinations: here ORDER matters (each permutation uses all n elements).",
+    },
+    defaultInput: [1, 2, 3],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Backtracking với mảng used[] để đánh dấu phần tử đã dùng.", en: "Backtracking with a used[] array marking elements already chosen." },
+      { vi: "Khi len(current) == n → lưu một hoán vị hoàn chỉnh.", en: "When len(current) == n → save a complete permutation." },
+      { vi: "Vòng for duyệt qua MỌI phần tử (không dùng start), chỉ chọn phần tử chưa used.", en: "The for-loop iterates over ALL elements (no start), only picks unused ones." },
+      { vi: "Có n! hoán vị → độ phức tạp O(n · n!).", en: "There are n! permutations → complexity O(n · n!)." },
+    ],
+    complexity: {
+      time: "O(n · n!)",
+      space: "O(n)",
+      note: {
+        vi: "n! hoán vị, mỗi cái O(n) copy. Stack đệ quy + current + used → O(n).",
+        en: "n! permutations, each O(n) to copy. Recursion stack + current + used → O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def permute(self, nums):",
+      "        result = []",
+      "        current = []",
+      "        used = [False] * len(nums)",
+      "",
+      "        def backtrack():",
+      "            if len(current) == len(nums):",
+      "                result.append(current[:])",
+      "                return",
+      "            for i in range(len(nums)):",
+      "                if used[i]:",
+      "                    continue",
+      "                used[i] = True",
+      "                current.append(nums[i])",
+      "                backtrack()",
+      "                current.pop()",
+      "                used[i] = False",
+      "",
+      "        backtrack()",
+      "        return result",
+    ],
+    builder: buildSteps46,
+  },
+  17: {
+    id: 17,
+    difficulty: "medium",
+    slug: "letter-combinations-of-a-phone-number",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Letter Combinations of a Phone Number", en: "Letter Combinations of a Phone Number" },
+    titleVi: { vi: "Tổ hợp chữ cái của số điện thoại", en: "Phone keypad letter combinations" },
+    statement: {
+      vi:
+        "Cho chuỗi digits (chỉ chứa 2-9), trả về TẤT CẢ tổ hợp chữ cái có thể tạo, theo bản đồ phím điện thoại: " +
+        "2=abc, 3=def, 4=ghi, 5=jkl, 6=mno, 7=pqrs, 8=tuv, 9=wxyz. " +
+        "Nếu digits rỗng, trả về [].",
+      en:
+        "Given a string digits (containing only 2-9), return ALL letter combinations possible per the phone keypad: " +
+        "2=abc, 3=def, 4=ghi, 5=jkl, 6=mno, 7=pqrs, 8=tuv, 9=wxyz. " +
+        "If digits is empty, return [].",
+    },
+    defaultInput: "23",
+    inputKind: "string",
+    inputLabel: { vi: "digits (2-9)", en: "digits (2-9)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi chữ số có 3-4 ký tự tương ứng. Mỗi vị trí trong digits là một level đệ quy.", en: "Each digit maps to 3-4 letters. Each position in digits is a recursion level." },
+      { vi: "Backtracking: ở level i, thử mọi ký tự thuộc digits[i], thêm vào current rồi đệ quy level i+1.", en: "Backtracking: at level i, try every letter for digits[i], append to current then recurse to level i+1." },
+      { vi: "Khi len(current) == len(digits) → lưu vào result.", en: "When len(current) == len(digits) → save to result." },
+      { vi: "Tổng số tổ hợp = tích số chữ cái của mỗi digit (cây k-ary).", en: "Total combinations = product of letters per digit (k-ary tree)." },
+    ],
+    complexity: {
+      time: "O(4^n · n)",
+      space: "O(n)",
+      note: {
+        vi: "Tối đa 4 chữ cái/digit, có n digits → 4^n tổ hợp, mỗi cái O(n) copy. Stack đệ quy O(n).",
+        en: "Up to 4 letters per digit, n digits → 4^n combinations, each O(n) to copy. Recursion stack O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def letterCombinations(self, digits):",
+      "        if not digits:",
+      "            return []",
+      "        mapping = {'2':'abc','3':'def','4':'ghi','5':'jkl',",
+      "                   '6':'mno','7':'pqrs','8':'tuv','9':'wxyz'}",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(idx):",
+      "            if idx == len(digits):",
+      "                result.append(''.join(current))",
+      "                return",
+      "            for letter in mapping[digits[idx]]:",
+      "                current.append(letter)",
+      "                backtrack(idx + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps17,
+  },
+  22: {
+    id: 22,
+    difficulty: "medium",
+    slug: "generate-parentheses",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Generate Parentheses", en: "Generate Parentheses" },
+    titleVi: { vi: "Sinh dãy ngoặc hợp lệ", en: "Generate all valid parenthesis sequences" },
+    statement: {
+      vi:
+        "Cho n, sinh TẤT CẢ dãy ngoặc đúng (well-formed) gồm n cặp '()' .",
+      en:
+        "Given n, generate ALL combinations of well-formed parentheses using n pairs of '()'.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    inputLabel: { vi: "n (số cặp ngoặc)", en: "n (number of pairs)" },
+    singleInput: true,
+    maxInput: 7,
+    extraParams: [],
+    approach: [
+      { vi: "Theo dõi 2 biến đếm: open (số '(' đã dùng), close (số ')' đã dùng).", en: "Track 2 counters: open (number of '(' used), close (number of ')' used)." },
+      { vi: "Thêm '(' nếu open < n.", en: "Add '(' if open < n." },
+      { vi: "Thêm ')' nếu close < open (để dãy luôn hợp lệ).", en: "Add ')' if close < open (to keep the sequence valid)." },
+      { vi: "Khi open == n và close == n → đã sinh xong một dãy hợp lệ.", en: "When open == n and close == n → a valid sequence is complete." },
+    ],
+    complexity: {
+      time: "O(4^n / √n)",
+      space: "O(n)",
+      note: {
+        vi: "Số Catalan thứ n = C(2n,n)/(n+1) ≈ 4^n/(n^1.5 √π). Stack O(n).",
+        en: "Catalan number C(n) = C(2n,n)/(n+1) ≈ 4^n/(n^1.5 √π). Stack O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def generateParenthesis(self, n):",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(open_count, close_count):",
+      "            if open_count == n and close_count == n:",
+      "                result.append(''.join(current))",
+      "                return",
+      "            if open_count < n:",
+      "                current.append('(')",
+      "                backtrack(open_count + 1, close_count)",
+      "                current.pop()",
+      "            if close_count < open_count:",
+      "                current.append(')')",
+      "                backtrack(open_count, close_count + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0, 0)",
+      "        return result",
+    ],
+    builder: buildSteps22,
   },
   743: {
     id: 743,
