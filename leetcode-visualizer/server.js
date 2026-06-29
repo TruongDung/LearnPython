@@ -28,6 +28,10 @@ function buildSteps1846(input) {
     arr: [...original],
     highlight: [],
     codeLines: [2],
+    vars: [
+      { name: "n", value: original.length },
+      { name: "arr", value: [...original] },
+    ],
     note: {
       vi: `Mảng đầu vào: [${original.join(", ")}]. Ta được phép giảm bất kỳ phần tử nào và sắp xếp lại.`,
       en: `Input array: [${original.join(", ")}]. We may decrease any element and rearrange freely.`,
@@ -40,6 +44,7 @@ function buildSteps1846(input) {
     arr: [...sorted],
     highlight: sorted.map((_, i) => i),
     codeLines: [3],
+    vars: [{ name: "arr", value: [...sorted] }],
     note: {
       vi: `Sắp xếp giúp mỗi phần tử chỉ cần lớn hơn phần tử trước tối đa 1 đơn vị: [${sorted.join(", ")}].`,
       en: `Sorting lets each element exceed the previous one by at most 1: [${sorted.join(", ")}].`,
@@ -56,6 +61,11 @@ function buildSteps1846(input) {
     arr: [...work],
     highlight: [0],
     codeLines: [4],
+    vars: [
+      { name: "before", value: before0 },
+      { name: "arr[0]", value: 1 },
+      { name: "arr", value: [...work] },
+    ],
     note: {
       vi: `Theo yêu cầu arr[0] phải bằng 1, nên giảm ${before0} → 1.`,
       en: `The constraint requires arr[0] = 1, so decrease ${before0} → 1.`,
@@ -87,6 +97,14 @@ function buildSteps1846(input) {
       arr: [...work],
       highlight: [i - 1, i],
       codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "arr[i-1]", value: work[i - 1] },
+        { name: "arr[i] (old)", value: cur },
+        { name: "cap = arr[i-1]+1", value: cap },
+        { name: "arr[i] (new)", value: next },
+        { name: "arr", value: [...work] },
+      ],
       note,
     });
   }
@@ -99,6 +117,7 @@ function buildSteps1846(input) {
     mark: [work.length - 1],
     final: true,
     codeLines: [7],
+    vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Phần tử cuối cùng là giá trị lớn nhất có thể đạt được = ${answer}.`,
       en: `The last element is the maximum achievable value = ${answer}.`,
@@ -128,6 +147,7 @@ function buildSteps1004(nums, params) {
     highlight: [],
     mark: [],
     codeLines: [3, 4, 5],
+    vars: [{ name: "k", value: k }],
     note: {
       vi: `Mảng nhị phân: [${nums.join(", ")}], k = ${k}. Được phép lật tối đa ${k} số 0 thành 1.`,
       en: `Binary array: [${nums.join(", ")}], k = ${k}. You may flip at most ${k} zeros to ones.`,
@@ -150,6 +170,12 @@ function buildSteps1004(nums, params) {
       highlight: inWindow(i, j),
       mark: [],
       codeLines: [6, 7, 8],
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: j },
+        { name: "zeroCount", value: zeroCount },
+        { name: "maxLength", value: maxLength },
+      ],
       note: {
         vi: `Thêm phần tử ${nums[j]} ở vị trí ${j}. Số 0 trong cửa sổ [${i}..${j}] = ${zeroCount}.`,
         en: `Add element ${nums[j]} at index ${j}. Zeros in window [${i}..${j}] = ${zeroCount}.`,
@@ -167,6 +193,12 @@ function buildSteps1004(nums, params) {
         highlight: inWindow(i, j),
         mark: [],
         codeLines: [9, 10, 11, 12],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "zeroCount", value: zeroCount },
+          { name: "maxLength", value: maxLength },
+        ],
         note: {
           vi: `Số 0 (${zeroCount + (removed === 0 ? 1 : 0)}) vượt quá k=${k}. Bỏ phần tử ${removed} ở trái, dời i → ${i}. Số 0 còn ${zeroCount}.`,
           en: `Zeros exceeded k=${k}. Drop element ${removed} on the left, move i → ${i}. Zeros now ${zeroCount}.`,
@@ -185,6 +217,12 @@ function buildSteps1004(nums, params) {
         highlight: inWindow(i, j),
         mark: [],
         codeLines: [13],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "maxLength", value: maxLength },
+          { name: "zeroCount", value: zeroCount },
+        ],
         note: {
           vi: `Cửa sổ hợp lệ [${i}..${j}] dài ${length} > kỷ lục cũ. Cập nhật đáp án = ${maxLength}.`,
           en: `Valid window [${i}..${j}] of length ${length} beats the record. Update answer = ${maxLength}.`,
@@ -200,6 +238,10 @@ function buildSteps1004(nums, params) {
     mark: bestJ >= 0 ? inWindow(bestI, bestJ) : [],
     final: true,
     codeLines: [14],
+    vars: [
+      { name: "maxLength", value: maxLength },
+      { name: "window", value: bestJ >= 0 ? `[${bestI}..${bestJ}]` : "-" },
+    ],
     note: {
       vi: `Cửa sổ dài nhất là [${bestI}..${bestJ}] với độ dài ${maxLength}. Đáp án = ${maxLength}.`,
       en: `The longest window is [${bestI}..${bestJ}] with length ${maxLength}. Answer = ${maxLength}.`,
@@ -229,6 +271,10 @@ function buildSteps746(cost) {
     highlight: [0, 1],
     mark: [],
     codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: [...dp] },
+    ],
     note: {
       vi: `cost = [${cost.join(", ")}]. dp có ${n + 1} ô, dp[0]=dp[1]=0 vì được phép bắt đầu ở bậc 0 hoặc 1.`,
       en: `cost = [${cost.join(", ")}]. dp has ${n + 1} cells; dp[0]=dp[1]=0 since you may start at step 0 or 1.`,
@@ -246,6 +292,13 @@ function buildSteps746(cost) {
       highlight: [i - 2, i - 1, i],
       mark: [],
       codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "optA", value: optA },
+        { name: "optB", value: optB },
+        { name: "dp[i]", value: dp[i] },
+        { name: "dp", value: [...dp] },
+      ],
       note: {
         vi: `dp[${i}] = min(dp[${i - 1}]+cost[${i - 1}], dp[${i - 2}]+cost[${i - 2}]) = min(${dp[i - 1]}+${cost[i - 1]}, ${dp[i - 2]}+${cost[i - 2]}) = min(${optA}, ${optB}) = ${dp[i]}.`,
         en: `dp[${i}] = min(dp[${i - 1}]+cost[${i - 1}], dp[${i - 2}]+cost[${i - 2}]) = min(${dp[i - 1]}+${cost[i - 1]}, ${dp[i - 2]}+${cost[i - 2]}) = min(${optA}, ${optB}) = ${dp[i]}.`,
@@ -260,6 +313,7 @@ function buildSteps746(cost) {
     mark: [n],
     final: true,
     codeLines: [7],
+    vars: [{ name: "answer", value: dp[n] }],
     note: {
       vi: `dp[${n}] = ${dp[n]} là chi phí nhỏ nhất để leo tới đỉnh. Đáp án = ${dp[n]}.`,
       en: `dp[${n}] = ${dp[n]} is the minimum cost to reach the top. Answer = ${dp[n]}.`,
@@ -290,6 +344,11 @@ function buildSteps152(nums) {
     highlight: [0],
     mark: [],
     codeLines: [3],
+    vars: [
+      { name: "curMax", value: curMax },
+      { name: "curMin", value: curMin },
+      { name: "result", value: result },
+    ],
     note: {
       vi: `Bắt đầu tại nums[0]=${nums[0]}: curMax=curMin=result=${nums[0]}.`,
       en: `Start at nums[0]=${nums[0]}: curMax=curMin=result=${nums[0]}.`,
@@ -319,6 +378,13 @@ function buildSteps152(nums) {
       highlight: [i],
       mark: [],
       codeLines: [5, 6, 7, 8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "x", value: x },
+        { name: "curMax", value: curMax },
+        { name: "curMin", value: curMin },
+        { name: "result", value: result },
+      ],
       note: {
         vi: `Ứng viên: (${a}, curMax·x=${b}, curMin·x=${c}) → curMax=${curMax}, curMin=${curMin}. result=${result}${updated ? " (cập nhật)" : ""}.`,
         en: `Candidates: (${a}, curMax·x=${b}, curMin·x=${c}) → curMax=${curMax}, curMin=${curMin}. result=${result}${updated ? " (updated)" : ""}.`,
@@ -333,6 +399,7 @@ function buildSteps152(nums) {
     mark: [bestEnd],
     final: true,
     codeLines: [10],
+    vars: [{ name: "result", value: result }],
     note: {
       vi: `Tích lớn nhất của một dãy con liên tiếp = ${result}.`,
       en: `The maximum product of a contiguous subarray = ${result}.`,
@@ -365,6 +432,10 @@ function buildSteps70(input) {
     highlight: n >= 1 ? [0, 1] : [0],
     mark: [],
     codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: [...dp] },
+    ],
     note: {
       vi: `n = ${n}. dp[0] = dp[1] = 1 (có 1 cách đứng yên ở bậc 0, và 1 cách lên bậc 1).`,
       en: `n = ${n}. dp[0] = dp[1] = 1 (one way to stay at step 0, one way to reach step 1).`,
@@ -379,6 +450,13 @@ function buildSteps70(input) {
       highlight: [i - 2, i - 1, i],
       mark: [],
       codeLines: [6, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i-1]", value: dp[i - 1] },
+        { name: "dp[i-2]", value: dp[i - 2] },
+        { name: "dp[i]", value: dp[i] },
+        { name: "dp", value: [...dp] },
+      ],
       note: {
         vi: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
         en: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
@@ -393,6 +471,7 @@ function buildSteps70(input) {
     mark: [n],
     final: true,
     codeLines: [8],
+    vars: [{ name: "answer", value: dp[n] }],
     note: {
       vi: `Số cách leo tới bậc ${n} = dp[${n}] = ${dp[n]}.`,
       en: `Number of distinct ways to reach step ${n} = dp[${n}] = ${dp[n]}.`,
@@ -422,6 +501,10 @@ function buildSteps300(nums) {
     highlight: [],
     mark: [],
     codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: [...dp] },
+    ],
     note: {
       vi: `nums = [${nums.join(", ")}]. dp[i] = độ dài dãy tăng dài nhất kết thúc tại i, khởi tạo toàn 1 (mỗi phần tử tự nó là một dãy).`,
       en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1 (each element alone is a subsequence).`,
@@ -446,6 +529,13 @@ function buildSteps300(nums) {
       highlight,
       mark: [],
       codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "bestJ", value: bestJ },
+        { name: "dp[i]", value: dp[i] },
+        { name: "dp", value: [...dp] },
+      ],
       note:
         bestJ >= 0
           ? {
@@ -484,6 +574,10 @@ function buildSteps300(nums) {
     mark: chain,
     final: true,
     codeLines: [9],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "LIS", value: chainValues },
+    ],
     note: {
       vi: `Độ dài dãy con tăng dài nhất = max(dp) = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}] (các vị trí ${chain.join(", ")}).`,
       en: `Length of the longest increasing subsequence = max(dp) = ${answer}. One such subsequence: [${chainValues.join(", ")}] (indices ${chain.join(", ")}).`,
@@ -512,6 +606,10 @@ function buildSteps509(input) {
     highlight: n >= 1 ? [0, 1] : [0],
     mark: [],
     codeLines: n >= 1 ? [3, 4, 5] : [3],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: [...dp] },
+    ],
     note: {
       vi: `n = ${n}. F(0) = 0 và F(1) = 1 là hai giá trị cơ sở.`,
       en: `n = ${n}. F(0) = 0 and F(1) = 1 are the base cases.`,
@@ -526,6 +624,13 @@ function buildSteps509(input) {
       highlight: [i - 2, i - 1, i],
       mark: [],
       codeLines: [6, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "F(i-1)", value: dp[i - 1] },
+        { name: "F(i-2)", value: dp[i - 2] },
+        { name: "F(i)", value: dp[i] },
+        { name: "dp", value: [...dp] },
+      ],
       note: {
         vi: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
         en: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
@@ -540,6 +645,7 @@ function buildSteps509(input) {
     mark: [n],
     final: true,
     codeLines: [8],
+    vars: [{ name: "answer", value: dp[n] }],
     note: {
       vi: `F(${n}) = ${dp[n]}.`,
       en: `F(${n}) = ${dp[n]}.`,
@@ -572,6 +678,10 @@ function buildSteps1(nums, params) {
     highlight: [],
     mark: [],
     codeLines: [3],
+    vars: [
+      { name: "target", value: target },
+      { name: "d", value: dictStr() },
+    ],
     note: {
       vi: `target = ${target}. Dùng hash map d (giá trị → chỉ số), ban đầu rỗng {}.`,
       en: `target = ${target}. Use a hash map d (value → index), initially empty {}.`,
@@ -591,6 +701,12 @@ function buildSteps1(nums, params) {
         mark: [j, i],
         final: true,
         codeLines: [5, 6],
+        vars: [
+          { name: "i", value: i },
+          { name: "comp", value: comp },
+          { name: "j", value: j },
+          { name: "d", value: dictStr() },
+        ],
         note: {
           vi: `target - nums[${i}] = ${target} - ${nums[i]} = ${comp} đã có trong d tại chỉ số ${j}. Trả về [${i}, ${j}].`,
           en: `target - nums[${i}] = ${target} - ${nums[i]} = ${comp} is already in d at index ${j}. Return [${i}, ${j}].`,
@@ -606,6 +722,11 @@ function buildSteps1(nums, params) {
       highlight: [i],
       mark: [],
       codeLines: [4, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "comp", value: comp },
+        { name: "d", value: dictStr() },
+      ],
       note: {
         vi: `Cần ${comp} (= ${target} - ${nums[i]}) nhưng chưa có trong d. Lưu nums[${i}]=${nums[i]} → ${i}. d = ${dictStr()}.`,
         en: `Need ${comp} (= ${target} - ${nums[i]}) but it is not in d. Store nums[${i}]=${nums[i]} → ${i}. d = ${dictStr()}.`,
@@ -621,6 +742,7 @@ function buildSteps1(nums, params) {
       mark: [],
       final: true,
       codeLines: [7],
+      vars: [{ name: "d", value: dictStr() }],
       note: {
         vi: "Không có cặp nào có tổng bằng target.",
         en: "No pair sums to the target.",

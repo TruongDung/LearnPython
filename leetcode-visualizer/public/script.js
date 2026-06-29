@@ -27,6 +27,7 @@ const I18N = {
     answer: (v) => `Đáp án: ${v}`,
     timeLabel: "Thời gian",
     spaceLabel: "Bộ nhớ",
+    varsLabel: "Biến (debug)",
     kbdHint: "Phím tắt: ← Lùi · → Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",    errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
     errConn: "Lỗi kết nối tới server.",
@@ -49,6 +50,7 @@ const I18N = {
     answer: (v) => `Answer: ${v}`,
     timeLabel: "Time",
     spaceLabel: "Space",
+    varsLabel: "Variables (debug)",
     kbdHint: "Shortcuts: ← Prev · → Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
@@ -432,6 +434,62 @@ function updateCodeHighlight(activeLines) {
     });
 }
 
+// ---- Bảng biến (debug) ----
+// Định dạng giá trị biến để hiển thị (mảng -> "[a, b, c]").
+function formatVarValue(value) {
+  if (Array.isArray(value)) return `[${value.join(", ")}]`;
+  if (value === null) return "null";
+  return String(value);
+}
+
+// Vẽ các biến của bước hiện tại; tô sáng biến vừa thay đổi so với bước trước.
+function renderVars(step, prevStep) {
+  const panel = $("varsPanel");
+  const grid = $("varsGrid");
+  const vars = step.vars;
+
+  if (!vars || !vars.length) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  const prevValues = {};
+  if (prevStep && Array.isArray(prevStep.vars)) {
+    prevStep.vars.forEach((v) => {
+      prevValues[v.name] = formatVarValue(v.value);
+    });
+  }
+
+  grid.innerHTML = "";
+  vars.forEach((v) => {
+    const valStr = formatVarValue(v.value);
+    const item = document.createElement("div");
+    item.className = "var-item";
+    if (prevStep && v.name in prevValues && prevValues[v.name] !== valStr) {
+      item.classList.add("changed");
+    }
+
+    const name = document.createElement("span");
+    name.className = "var-name";
+    name.textContent = v.name;
+
+    const eq = document.createElement("span");
+    eq.className = "var-eq";
+    eq.textContent = "=";
+
+    const value = document.createElement("span");
+    value.className = "var-value";
+    value.textContent = valStr;
+
+    item.appendChild(name);
+    item.appendChild(eq);
+    item.appendChild(value);
+    grid.appendChild(item);
+  });
+
+  panel.classList.remove("hidden");
+}
+
 // ---- Vẽ một bước ----
 function renderStep() {  const step = steps[stepIndex];
   if (!step) return;
@@ -440,6 +498,7 @@ function renderStep() {  const step = steps[stepIndex];
   $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
   $("stepNote").textContent = pick(step.note);
   updateCodeHighlight(step.codeLines || []);
+  renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
   const maxVal = Math.max(...steps.flatMap((s) => s.arr.map((v) => Math.abs(v))), 1);
 
