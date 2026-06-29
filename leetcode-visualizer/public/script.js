@@ -562,7 +562,7 @@ function renderCode() {
     if (code2) {
       const label = document.createElement("div");
       label.className = "code-section-label";
-      label.textContent = lang === "vi" ? "Cách 1: DP O(n²)" : "Approach 1: DP O(n²)";
+      label.textContent = lang === "vi" ? "Cách 1" : "Approach 1";
       section.appendChild(label);
     }
 
@@ -596,7 +596,7 @@ function renderCode() {
 
     const sep = document.createElement("div");
     sep.className = "code-section-label";
-    sep.textContent = lang === "vi" ? "Cách 2: Binary Search O(n log n)" : "Approach 2: Binary Search O(n log n)";
+    sep.textContent = lang === "vi" ? "Cách 2: Tối ưu" : "Approach 2: Optimized";
     section.appendChild(sep);
 
     section.appendChild(createCopyBtn(code2));
