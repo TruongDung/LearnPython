@@ -728,7 +728,7 @@ function buildSteps509Optimized(n) {
     });
 
     steps.push({
-      title: { vi: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}`, en: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}` },
+      title: { vi: `Bước i=${i}`, en: `Step i=${i}` },
       arr: [...history],
       sub: subLabels,
       highlight: [i - 2, i - 1, i],
@@ -737,15 +737,13 @@ function buildSteps509Optimized(n) {
       codeLines: [7, 8, 9, 10],
       vars: [
         { name: "i", value: i },
-        { name: "prev2", value: prev2 },
-        { name: "prev1", value: prev1 },
-        { name: "curr", value: curr },
-        { name: "→ prev2", value: prev1 },
-        { name: "→ prev1", value: curr },
+        { name: "curr", value: `prev1 + prev2 = ${prev1} + ${prev2} = ${curr}` },
+        { name: "prev2", value: `← ${prev1}` },
+        { name: "prev1", value: `← ${curr}` },
       ],
       note: {
-        vi: `curr = prev1(${prev1}) + prev2(${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
-        en: `curr = prev1(${prev1}) + prev2(${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
+        vi: `Tính F(${i}): curr = prev1 + prev2, sau đó dời prev2 và prev1 sang phải.`,
+        en: `Compute F(${i}): curr = prev1 + prev2, then shift prev2 and prev1 to the right.`,
       },
     });
 
