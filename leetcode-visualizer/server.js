@@ -2236,7 +2236,448 @@ function buildSteps977(nums) {
   return { original: [...nums], answer: result, steps };
 }
 
+/**
+ * LeetCode 88: Merge Sorted Array.
+ * Three pointers from the back: p1 = m-1, p2 = n-1, write = m+n-1.
+ * Compare nums1[p1] vs nums2[p2], place the larger at write position.
+ */
+function buildSteps88(input, params) {
+  const m = params.m;
+  const n = params.n;
+  const nums2Str = String(params.nums2 || "");
+  const nums2 = nums2Str.split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const nums1 = [...input]; // already has trailing zeros
+
+  const steps = [];
+  let p1 = m - 1;
+  let p2 = n - 1;
+  let write = m + n - 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums1],
+    sub: [...nums2, ...new Array(m).fill("")],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "p1", value: p1 },
+      { name: "p2", value: p2 },
+      { name: "write", value: write },
+      { name: "nums2", value: `[${nums2.join(",")}]` },
+    ],
+    note: {
+      vi: `nums1 = [${nums1.join(",")}] (m=${m} phần tử + ${n} chỗ trống). nums2 = [${nums2.join(",")}]. Điền từ cuối.`,
+      en: `nums1 = [${nums1.join(",")}] (m=${m} elements + ${n} slots). nums2 = [${nums2.join(",")}]. Fill from end.`,
+    },
+  });
+
+  while (p1 >= 0 && p2 >= 0) {
+    const v1 = nums1[p1];
+    const v2 = nums2[p2];
+    if (v1 > v2) {
+      nums1[write] = v1;
+      steps.push({
+        title: { vi: `nums1[${p1}]=${v1} > nums2[${p2}]=${v2}`, en: `nums1[${p1}]=${v1} > nums2[${p2}]=${v2}` },
+        arr: [...nums1],
+        highlight: [p1, write],
+        mark: [],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "p1", value: p1 },
+          { name: "p2", value: p2 },
+          { name: "write", value: write },
+          { name: "placed", value: v1 },
+        ],
+        note: {
+          vi: `${v1} > ${v2} → đặt ${v1} tại vị trí ${write}. p1--.`,
+          en: `${v1} > ${v2} → place ${v1} at position ${write}. p1--.`,
+        },
+      });
+      p1--;
+    } else {
+      nums1[write] = v2;
+      steps.push({
+        title: { vi: `nums2[${p2}]=${v2} ≥ nums1[${p1}]=${v1}`, en: `nums2[${p2}]=${v2} ≥ nums1[${p1}]=${v1}` },
+        arr: [...nums1],
+        highlight: [write],
+        mark: [],
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "p1", value: p1 },
+          { name: "p2", value: p2 },
+          { name: "write", value: write },
+          { name: "placed", value: v2 },
+        ],
+        note: {
+          vi: `${v2} ≥ ${v1} → đặt ${v2} (từ nums2) tại vị trí ${write}. p2--.`,
+          en: `${v2} ≥ ${v1} → place ${v2} (from nums2) at position ${write}. p2--.`,
+        },
+      });
+      p2--;
+    }
+    write--;
+  }
+
+  // Copy remaining nums2 elements
+  while (p2 >= 0) {
+    nums1[write] = nums2[p2];
+    steps.push({
+      title: { vi: `Copy nums2[${p2}]=${nums2[p2]}`, en: `Copy nums2[${p2}]=${nums2[p2]}` },
+      arr: [...nums1],
+      highlight: [write],
+      mark: [],
+      codeLines: [12, 13],
+      vars: [
+        { name: "p2", value: p2 },
+        { name: "write", value: write },
+        { name: "placed", value: nums2[p2] },
+      ],
+      note: {
+        vi: `p1 hết. Copy nums2[${p2}]=${nums2[p2]} vào vị trí ${write}.`,
+        en: `p1 exhausted. Copy nums2[${p2}]=${nums2[p2]} into position ${write}.`,
+      },
+    });
+    p2--;
+    write--;
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums1],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [14],
+    vars: [{ name: "nums1", value: [...nums1] }],
+    note: {
+      vi: `Mảng đã gộp: [${nums1.join(", ")}].`,
+      en: `Merged array: [${nums1.join(", ")}].`,
+    },
+  });
+
+  return { original: input, answer: nums1, steps };
+}
+
+/**
+ * LeetCode 27: Remove Element.
+ * Two-pointer in-place: write pointer k, read pointer i.
+ * If nums[i] != val, copy to nums[k] and advance k.
+ */
+function buildSteps27(nums, params) {
+  const val = params.val;
+  const arr = [...nums];
+  const steps = [];
+  let k = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "val", value: val },
+      { name: "k", value: 0 },
+    ],
+    note: {
+      vi: `Xóa tất cả phần tử bằng ${val}. k = vị trí ghi tiếp theo.`,
+      en: `Remove all elements equal to ${val}. k = next write position.`,
+    },
+  });
+
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] !== val) {
+      arr[k] = arr[i];
+      steps.push({
+        title: { vi: `nums[${i}]=${nums[i]} ≠ ${val} → giữ`, en: `nums[${i}]=${nums[i]} ≠ ${val} → keep` },
+        arr: [...arr],
+        highlight: [i],
+        mark: Array.from({ length: k + 1 }, (_, x) => x),
+        codeLines: [4, 5, 6],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "k", value: k + 1 },
+          { name: "action", value: "keep" },
+        ],
+        note: {
+          vi: `${nums[i]} ≠ ${val} → copy vào nums[${k}]. k → ${k + 1}.`,
+          en: `${nums[i]} ≠ ${val} → copy into nums[${k}]. k → ${k + 1}.`,
+        },
+      });
+      k++;
+    } else {
+      steps.push({
+        title: { vi: `nums[${i}]=${nums[i]} == ${val} → bỏ`, en: `nums[${i}]=${nums[i]} == ${val} → skip` },
+        arr: [...arr],
+        highlight: [i],
+        mark: Array.from({ length: k }, (_, x) => x),
+        codeLines: [4],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "k", value: k },
+          { name: "action", value: "skip" },
+        ],
+        note: {
+          vi: `${nums[i]} == ${val} → bỏ qua, không copy. k giữ nguyên = ${k}.`,
+          en: `${nums[i]} == ${val} → skip, don't copy. k stays at ${k}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: Array.from({ length: k }, (_, x) => x),
+    final: true,
+    codeLines: [7],
+    vars: [
+      { name: "k", value: k },
+      { name: "result", value: arr.slice(0, k) },
+    ],
+    note: {
+      vi: `Sau khi xóa: ${k} phần tử còn lại = [${arr.slice(0, k).join(", ")}].`,
+      en: `After removal: ${k} elements remain = [${arr.slice(0, k).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: k, steps };
+}
+
+/**
+ * LeetCode 487: Max Consecutive Ones II.
+ * Sliding window: allow flipping at most one 0 to 1.
+ */
+function buildSteps487(nums) {
+  const steps = [];
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  let left = 0;
+  let zeroCount = 0;
+  let maxLen = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "left", value: 0 },
+      { name: "zeroCount", value: 0 },
+      { name: "maxLen", value: 0 },
+    ],
+    note: {
+      vi: `Mảng nhị phân. Được lật tối đa 1 số 0 thành 1. Tìm dãy 1 liên tiếp dài nhất.`,
+      en: `Binary array. May flip at most one 0 to 1. Find the longest consecutive-ones run.`,
+    },
+  });
+
+  for (let right = 0; right < nums.length; right++) {
+    if (nums[right] === 0) zeroCount++;
+
+    steps.push({
+      title: { vi: `Mở rộng: right = ${right}`, en: `Expand: right = ${right}` },
+      arr: [...nums],
+      highlight: inWindow(left, right),
+      mark: [],
+      codeLines: [6, 7, 8],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "zeroCount", value: zeroCount },
+        { name: "maxLen", value: maxLen },
+      ],
+      note: {
+        vi: `Thêm nums[${right}]=${nums[right]}. Số 0 trong cửa sổ = ${zeroCount}.`,
+        en: `Add nums[${right}]=${nums[right]}. Zeros in window = ${zeroCount}.`,
+      },
+    });
+
+    while (zeroCount > 1) {
+      if (nums[left] === 0) zeroCount--;
+      left++;
+      steps.push({
+        title: { vi: `Co: left = ${left}`, en: `Shrink: left = ${left}` },
+        arr: [...nums],
+        highlight: left <= right ? inWindow(left, right) : [],
+        mark: [],
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "zeroCount", value: zeroCount },
+          { name: "maxLen", value: maxLen },
+        ],
+        note: {
+          vi: `zeroCount > 1 → co trái. Bỏ nums[${left - 1}]. zeroCount = ${zeroCount}.`,
+          en: `zeroCount > 1 → shrink left. Drop nums[${left - 1}]. zeroCount = ${zeroCount}.`,
+        },
+      });
+    }
+
+    const len = right - left + 1;
+    if (len > maxLen) {
+      maxLen = len;
+      bestL = left;
+      bestR = right;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
+    final: true,
+    codeLines: [12],
+    vars: [
+      { name: "maxLen", value: maxLen },
+      { name: "window", value: `[${bestL}..${bestR}]` },
+    ],
+    note: {
+      vi: `Dãy 1 liên tiếp dài nhất (lật ≤1 số 0) = ${maxLen}, đoạn [${bestL}..${bestR}].`,
+      en: `Longest consecutive ones (flipping ≤1 zero) = ${maxLen}, segment [${bestL}..${bestR}].`,
+    },
+  });
+
+  return { original: [...nums], answer: maxLen, steps };
+}
+
 const SUPPORTED = {
+  487: {
+    id: 487,
+    difficulty: "medium",
+    slug: "max-consecutive-ones-ii",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Max Consecutive Ones II", en: "Max Consecutive Ones II" },
+    titleVi: { vi: "Dãy số 1 liên tiếp dài nhất II", en: "Longest run of ones (flip 1 zero)" },
+    statement: {
+      vi: "Cho mảng nhị phân nums. Trả về số lượng 1 liên tiếp lớn nhất nếu bạn được lật tối đa một số 0 thành 1.",
+      en: "Given a binary array nums, return the maximum number of consecutive 1's if you can flip at most one 0.",
+    },
+    defaultInput: [1, 0, 1, 1, 0],
+    inputKind: "binary",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Cửa sổ trượt duyệt mảng một lần O(n). Chỉ dùng vài biến O(1).",
+        en: "Sliding window traverses once O(n). Only a few variables O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMaxConsecutiveOnes(self, nums):",
+      "        left = 0",
+      "        zero_count = 0",
+      "        max_len = 0",
+      "        for right in range(len(nums)):",
+      "            if nums[right] == 0:",
+      "                zero_count += 1",
+      "            while zero_count > 1:",
+      "                if nums[left] == 0:",
+      "                    zero_count -= 1",
+      "                left += 1",
+      "            max_len = max(max_len, right-left+1)",
+      "        return max_len",
+    ],
+    builder: buildSteps487,
+  },
+  27: {
+    id: 27,
+    difficulty: "easy",
+    slug: "remove-element",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Remove Element", en: "Remove Element" },
+    titleVi: { vi: "Xóa phần tử", en: "Remove element in-place" },
+    statement: {
+      vi: "Cho mảng nums và giá trị val. Xóa tại chỗ tất cả phần tử bằng val. Trả về số phần tử còn lại k.",
+      en: "Given an array nums and a value val, remove all instances of val in-place. Return the number of elements k remaining.",
+    },
+    defaultInput: [3, 2, 2, 3],
+    inputKind: "integer",
+    extraParams: [
+      { key: "val", type: "number", label: { vi: "val (giá trị cần xóa)", en: "val (value to remove)" }, default: 3, allowNegative: true },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần với 2 con trỏ. Tại chỗ nên O(1) bộ nhớ.",
+        en: "Single pass with 2 pointers. In-place so O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def removeElement(self, nums, val):",
+      "        k = 0",
+      "        for i in range(len(nums)):",
+      "            if nums[i] != val:",
+      "                nums[k] = nums[i]",
+      "                k += 1",
+      "        return k",
+    ],
+    builder: buildSteps27,
+  },
+  88: {
+    id: 88,
+    difficulty: "easy",
+    slug: "merge-sorted-array",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Merge Sorted Array", en: "Merge Sorted Array" },
+    titleVi: { vi: "Gộp mảng đã sắp xếp", en: "Merge two sorted arrays in-place" },
+    statement: {
+      vi:
+        "Cho mảng nums1 (kích thước m+n, m phần tử đầu đã sắp xếp, n phần tử cuối = 0 dùng làm chỗ trống) " +
+        "và mảng nums2 (n phần tử đã sắp xếp). Gộp nums2 vào nums1 tại chỗ, kết quả sắp xếp tăng dần.",
+      en:
+        "You are given nums1 of size m+n (first m elements sorted, last n are zeros as placeholders) " +
+        "and nums2 of size n (sorted). Merge nums2 into nums1 in-place so the result is sorted.",
+    },
+    defaultInput: [1, 2, 3, 0, 0, 0],
+    inputKind: "integer",
+    inputLabel: { vi: "nums1 (gồm cả chỗ trống)", en: "nums1 (including placeholders)" },
+    extraParams: [
+      { key: "nums2", type: "string", label: { vi: "nums2 (phẩy ngăn cách)", en: "nums2 (comma separated)" }, default: "2,5,6" },
+      { key: "m", type: "number", label: { vi: "m (phần tử thực của nums1)", en: "m (real elements in nums1)" }, default: 3 },
+      { key: "n", type: "number", label: { vi: "n (phần tử của nums2)", en: "n (elements in nums2)" }, default: 3 },
+    ],
+    complexity: {
+      time: "O(m+n)",
+      space: "O(1)",
+      note: {
+        vi: "Ba con trỏ duyệt tổng m+n lần. Gộp tại chỗ nên O(1) bộ nhớ phụ.",
+        en: "Three pointers traverse m+n times total. In-place merge uses O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def merge(self, nums1, m, nums2, n):",
+      "        p1 = m - 1",
+      "        p2 = n - 1",
+      "        write = m + n - 1",
+      "        while p1 >= 0 and p2 >= 0:",
+      "            if nums1[p1] > nums2[p2]:",
+      "                nums1[write] = nums1[p1]",
+      "                p1 -= 1",
+      "            else:",
+      "                nums1[write] = nums2[p2]",
+      "                p2 -= 1",
+      "            write -= 1",
+      "        nums1[:p2+1] = nums2[:p2+1]",
+    ],
+    builder: buildSteps88,
+  },
   977: {
     id: 977,
     difficulty: "easy",
