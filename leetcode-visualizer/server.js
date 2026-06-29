@@ -6058,6 +6058,350 @@ function buildSteps688(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 126: Word Ladder II.
+ * BFS to find shortest path length + build parent map, then DFS to reconstruct all paths.
+ * Visualization uses tree view to show BFS layers and found paths.
+ */
+function buildSteps126(input, params) {
+  const wordList = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+  const beginWord = (params.beginWord || "").trim();
+  const endWord = (params.endWord || "").trim();
+  const steps = [];
+
+  const wordSet = new Set(wordList);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: wordList.map(() => 0),
+    sub: wordList,
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "beginWord", value: beginWord },
+      { name: "endWord", value: endWord },
+      { name: "wordList", value: `[${wordList.join(", ")}]` },
+      { name: "endWord in list", value: wordSet.has(endWord) },
+    ],
+    note: {
+      vi: `BFS từ "${beginWord}" đến "${endWord}".\nMỗi bước thay 1 ký tự, từ mới phải có trong wordList.`,
+      en: `BFS from "${beginWord}" to "${endWord}".\nChange 1 letter per step, new word must be in wordList.`,
+    },
+  });
+
+  if (!wordSet.has(endWord)) {
+    steps.push({
+      title: { vi: `"${endWord}" không có trong wordList`, en: `"${endWord}" not in wordList` },
+      arr: wordList.map(() => 0),
+      sub: wordList,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [5, 6],
+      vars: [{ name: "result", value: "[]" }],
+      note: {
+        vi: `"${endWord}" không có trong wordList → trả về [].`,
+        en: `"${endWord}" not in wordList → return [].`,
+      },
+    });
+    return { beginWord, endWord, answer: "[]", steps };
+  }
+
+  // BFS layer by layer
+  const parents = {};
+  parents[beginWord] = [];
+  const visited = new Set([beginWord]);
+  let layer = new Set([beginWord]);
+  let found = false;
+  let bfsLevel = 0;
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const wordLen = beginWord.length;
+  const layerHistory = [[beginWord]];
+
+  while (layer.size > 0 && !found) {
+    bfsLevel++;
+    const nextLayer = new Set();
+    const tempParents = {};
+
+    for (const word of layer) {
+      for (let i = 0; i < wordLen; i++) {
+        for (const c of alphabet) {
+          if (c === word[i]) continue;
+          const newWord = word.slice(0, i) + c + word.slice(i + 1);
+          if (!wordSet.has(newWord) || visited.has(newWord)) continue;
+          if (!tempParents[newWord]) tempParents[newWord] = [];
+          tempParents[newWord].push(word);
+          nextLayer.add(newWord);
+          if (newWord === endWord) found = true;
+        }
+      }
+    }
+
+    for (const [w, ps] of Object.entries(tempParents)) {
+      parents[w] = ps;
+      visited.add(w);
+    }
+
+    if (nextLayer.size > 0) {
+      layerHistory.push([...nextLayer]);
+    }
+    layer = nextLayer;
+
+    const layerArr = [...nextLayer];
+    const wordArr = wordList.map(() => 0);
+    const subArr = wordList.slice();
+    steps.push({
+      title: { vi: `BFS level ${bfsLevel}: ${nextLayer.size} từ mới`, en: `BFS level ${bfsLevel}: ${nextLayer.size} new words` },
+      arr: wordList.map((w) => visited.has(w) ? 1 : 0),
+      sub: wordList,
+      highlight: wordList.map((w, i) => nextLayer.has(w) ? i : -1).filter((x) => x >= 0),
+      mark: wordList.map((w, i) => w === endWord && found ? i : -1).filter((x) => x >= 0),
+      codeLines: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      vars: [
+        { name: "level", value: bfsLevel },
+        { name: "layer", value: `[${layerArr.join(", ")}]` },
+        { name: "found endWord", value: found },
+        { name: "visited", value: visited.size },
+      ],
+      note: {
+        vi: found
+          ? `Level ${bfsLevel}: Tìm thấy "${endWord}"! Layer = [${layerArr.join(", ")}].`
+          : `Level ${bfsLevel}: Layer mới = [${layerArr.join(", ")}].`,
+        en: found
+          ? `Level ${bfsLevel}: Found "${endWord}"! Layer = [${layerArr.join(", ")}].`
+          : `Level ${bfsLevel}: New layer = [${layerArr.join(", ")}].`,
+      },
+    });
+
+    if (found) break;
+  }
+
+  if (!found) {
+    steps.push({
+      title: { vi: "Không có đường đi", en: "No path found" },
+      arr: wordList.map(() => 0),
+      sub: wordList,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [23, 24],
+      vars: [{ name: "result", value: "[]" }],
+      note: {
+        vi: `Không tìm thấy đường biến đổi từ "${beginWord}" đến "${endWord}".`,
+        en: `No transformation path from "${beginWord}" to "${endWord}".`,
+      },
+    });
+    return { beginWord, endWord, answer: "[]", steps };
+  }
+
+  // DFS to reconstruct all paths
+  const allPaths = [];
+  function dfs(word, path) {
+    if (word === beginWord) {
+      allPaths.push([...path].reverse());
+      return;
+    }
+    for (const parent of (parents[word] || [])) {
+      path.push(parent);
+      dfs(parent, path);
+      path.pop();
+    }
+  }
+  dfs(endWord, [endWord]);
+
+  // Show each path found
+  for (let i = 0; i < allPaths.length; i++) {
+    const path = allPaths[i];
+    steps.push({
+      title: { vi: `Path #${i + 1}: ${path.join(" → ")}`, en: `Path #${i + 1}: ${path.join(" → ")}` },
+      arr: wordList.map((w) => path.includes(w) ? 1 : 0),
+      sub: wordList,
+      highlight: wordList.map((w, idx) => path.includes(w) ? idx : -1).filter((x) => x >= 0),
+      mark: wordList.map((w, idx) => path.includes(w) ? idx : -1).filter((x) => x >= 0),
+      codeLines: [25, 26, 27, 28, 29, 30, 31, 32, 33],
+      vars: [
+        { name: `path #${i + 1}`, value: path.join(" → ") },
+        { name: "length", value: path.length },
+      ],
+      note: {
+        vi: `Path ${i + 1}: ${path.join(" → ")} (${path.length} từ, ${path.length - 1} bước).`,
+        en: `Path ${i + 1}: ${path.join(" → ")} (${path.length} words, ${path.length - 1} steps).`,
+      },
+    });
+  }
+
+  steps[steps.length - 1].final = true;
+  const answerStr = allPaths.map((p) => `[${p.join(",")}]`).join(", ");
+
+  return { beginWord, endWord, answer: `${allPaths.length} path(s)`, steps };
+}
+
+/**
+ * Generate steps for LeetCode 815: Bus Routes.
+ * BFS on routes: each route is a node, traverse shared stops to find adjacent routes.
+ */
+function buildSteps815(input, params) {
+  const routesRaw = String(input).split("|").map((r) => r.trim()).filter((r) => r.length > 0);
+  const routes = routesRaw.map((r) => r.split(",").map(Number));
+  const source = Number(params.source);
+  const target = Number(params.target);
+  const steps = [];
+
+  // Collect all unique stops
+  const allStops = [...new Set(routes.flat())].sort((a, b) => a - b);
+
+  // Build stop → routes map
+  const stopToRoutes = {};
+  for (const stop of allStops) stopToRoutes[stop] = [];
+  for (let i = 0; i < routes.length; i++) {
+    for (const stop of routes[i]) {
+      stopToRoutes[stop].push(i);
+    }
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: allStops.map((s) => s === source ? 1 : 0),
+    sub: allStops.map(String),
+    highlight: allStops.indexOf(source) >= 0 ? [allStops.indexOf(source)] : [],
+    mark: allStops.indexOf(target) >= 0 ? [allStops.indexOf(target)] : [],
+    codeLines: [3, 4, 5, 6, 7, 8],
+    vars: [
+      { name: "source", value: source },
+      { name: "target", value: target },
+      { name: "routes", value: routes.map((r, i) => `R${i}:[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `${routes.length} tuyến xe. Trạm xuất phát: ${source}, đích: ${target}.\nXây stop→routes map, BFS trên tuyến.`,
+      en: `${routes.length} bus routes. Source: ${source}, target: ${target}.\nBuild stop→routes map, BFS on routes.`,
+    },
+  });
+
+  if (source === target) {
+    steps.push({
+      title: { vi: "source == target → 0 xe", en: "source == target → 0 buses" },
+      arr: allStops.map((s) => s === source ? 1 : 0),
+      sub: allStops.map(String),
+      highlight: [allStops.indexOf(source)],
+      mark: [allStops.indexOf(source)],
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Đã ở đích rồi → 0 tuyến.", en: "Already at target → 0 buses." },
+    });
+    return { source, target, answer: 0, steps };
+  }
+
+  // BFS on routes
+  const visitedRoutes = new Set(stopToRoutes[source] || []);
+  const queue = [...(stopToRoutes[source] || [])];
+  let buses = 1;
+  let answer = -1;
+  let head = 0;
+
+  if (queue.length > 0) {
+    steps.push({
+      title: { vi: `Khởi tạo queue: ${queue.map((i) => `R${i}`).join(", ")}`, en: `Init queue: ${queue.map((i) => `R${i}`).join(", ")}` },
+      arr: allStops.map((s) => visitedRoutes.has((stopToRoutes[s] || []).find((r) => visitedRoutes.has(r))) ? 1 : 0),
+      sub: allStops.map(String),
+      highlight: allStops.map((s, i) => routes.some((r, ri) => visitedRoutes.has(ri) && r.includes(s)) ? i : -1).filter((x) => x >= 0),
+      mark: [],
+      codeLines: [9, 10, 11],
+      vars: [
+        { name: "initial routes", value: queue.map((i) => `R${i}:[${routes[i].join(",")}]`).join(", ") },
+        { name: "buses", value: buses },
+      ],
+      note: {
+        vi: `Trạm ${source} thuộc tuyến: [${queue.map((i) => `R${i}`).join(", ")}]. Bắt đầu BFS với buses=1.`,
+        en: `Stop ${source} is on routes: [${queue.map((i) => `R${i}`).join(", ")}]. Start BFS with buses=1.`,
+      },
+    });
+  }
+
+  outerLoop: while (head < queue.length) {
+    const levelSize = queue.length - head;
+
+    for (let step = 0; step < levelSize; step++) {
+      const routeIdx = queue[head++];
+      const routeStops = routes[routeIdx];
+
+      for (const stop of routeStops) {
+        if (stop === target) {
+          answer = buses;
+          steps.push({
+            title: { vi: `✓ Tìm thấy đích ${target} — buses = ${buses}`, en: `✓ Found target ${target} — buses = ${buses}` },
+            arr: allStops.map((s) => s === target ? 1 : 0),
+            sub: allStops.map(String),
+            highlight: [allStops.indexOf(stop)],
+            mark: [allStops.indexOf(stop)],
+            final: true,
+            codeLines: [16, 17, 18],
+            vars: [
+              { name: "route", value: `R${routeIdx}:[${routeStops.join(",")}]` },
+              { name: "stop", value: stop },
+              { name: "answer (buses)", value: buses },
+            ],
+            note: {
+              vi: `Tìm thấy trạm đích ${target} trên tuyến R${routeIdx}! Số tuyến cần đi = ${buses}.`,
+              en: `Found target stop ${target} on route R${routeIdx}! Buses needed = ${buses}.`,
+            },
+          });
+          break outerLoop;
+        }
+
+        for (const nextRoute of (stopToRoutes[stop] || [])) {
+          if (!visitedRoutes.has(nextRoute)) {
+            visitedRoutes.add(nextRoute);
+            queue.push(nextRoute);
+          }
+        }
+      }
+
+      steps.push({
+        title: { vi: `Xử lý R${routeIdx}: [${routeStops.join(",")}]`, en: `Process R${routeIdx}: [${routeStops.join(",")}]` },
+        arr: allStops.map((s) => routes.some((r, ri) => visitedRoutes.has(ri) && r.includes(s)) ? 1 : 0),
+        sub: allStops.map(String),
+        highlight: routeStops.map((s) => allStops.indexOf(s)).filter((x) => x >= 0),
+        mark: [],
+        codeLines: [14, 15, 16, 19, 20, 21, 22],
+        vars: [
+          { name: "route", value: `R${routeIdx}:[${routeStops.join(",")}]` },
+          { name: "buses", value: buses },
+          { name: "visited routes", value: `{${[...visitedRoutes].map((i) => `R${i}`).join(", ")}}` },
+          { name: "queue size", value: queue.length - head },
+        ],
+        note: {
+          vi: `Duyệt R${routeIdx}, dừng tại ${routeStops.join(", ")}. Thêm tuyến mới vào queue.`,
+          en: `Traverse R${routeIdx}, stops: ${routeStops.join(", ")}. Add new adjacent routes to queue.`,
+        },
+      });
+    }
+
+    if (answer !== -1) break;
+    buses++;
+  }
+
+  if (answer === -1) {
+    steps.push({
+      title: { vi: "Không thể đến đích", en: "Cannot reach target" },
+      arr: allStops.map(() => 0),
+      sub: allStops.map(String),
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [24],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: `Không có đường đi từ ${source} đến ${target}. Trả về -1.`,
+        en: `No path from ${source} to ${target}. Return -1.`,
+      },
+    });
+  }
+
+  return { source, target, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 743: Network Delay Time.
  * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
  */
@@ -8860,6 +9204,151 @@ const SUPPORTED = {
       "        return sum(dp[r][c] for r in range(n) for c in range(n))",
     ],
     builder: buildSteps688,
+  },
+  126: {
+    id: 126,
+    difficulty: "hard",
+    slug: "word-ladder-ii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Word Ladder II", en: "Word Ladder II" },
+    titleVi: { vi: "Chuỗi biến đổi từ II", en: "All shortest word transformation paths" },
+    statement: {
+      vi:
+        "Cho beginWord, endWord và wordList. Tìm TẤT CẢ chuỗi biến đổi ngắn nhất từ beginWord → endWord, " +
+        "mỗi bước thay đúng 1 ký tự và từ kết quả phải có trong wordList. " +
+        "Nhập wordList dưới dạng các từ cách nhau bởi dấu phẩy.",
+      en:
+        "Given beginWord, endWord and wordList. Find ALL shortest transformation sequences from beginWord to endWord, " +
+        "changing exactly one letter at a time where each intermediate word must be in wordList. " +
+        "Enter wordList as comma-separated words.",
+    },
+    defaultInput: "hot,dot,dog,lot,log,cog",
+    inputKind: "string",
+    inputLabel: { vi: "wordList (cách bởi dấu phẩy)", en: "wordList (comma separated)" },
+    extraParams: [
+      {
+        key: "beginWord",
+        type: "string",
+        label: { vi: "beginWord", en: "beginWord" },
+        default: "hit",
+      },
+      {
+        key: "endWord",
+        type: "string",
+        label: { vi: "endWord", en: "endWord" },
+        default: "cog",
+      },
+    ],
+    complexity: {
+      time: "O(N · L² + P · L)",
+      space: "O(N · L)",
+      note: {
+        vi: "N = số từ, L = độ dài từ. BFS: O(N·L²). Reconstruct paths: O(P·L) với P là số path. Bộ nhớ: O(N·L).",
+        en: "N = word count, L = word length. BFS: O(N·L²). Path reconstruction: O(P·L) where P = path count. Memory: O(N·L).",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "",
+      "class Solution:",
+      "    def findLadders(self, beginWord, endWord, wordList):",
+      "        word_set = set(wordList)",
+      "        if endWord not in word_set:",
+      "            return []",
+      "        parents = defaultdict(set)",
+      "        layer = {beginWord}",
+      "        found = False",
+      "        while layer and not found:",
+      "            word_set -= layer",
+      "            next_layer = set()",
+      "            for word in layer:",
+      "                for i in range(len(word)):",
+      "                    for c in 'abcdefghijklmnopqrstuvwxyz':",
+      "                        new_word = word[:i] + c + word[i+1:]",
+      "                        if new_word in word_set:",
+      "                            next_layer.add(new_word)",
+      "                            parents[new_word].add(word)",
+      "                            if new_word == endWord:",
+      "                                found = True",
+      "            layer = next_layer",
+      "        if not found:",
+      "            return []",
+      "        result = []",
+      "        def dfs(word, path):",
+      "            if word == beginWord:",
+      "                result.append(list(reversed(path)))",
+      "                return",
+      "            for parent in parents[word]:",
+      "                path.append(parent)",
+      "                dfs(parent, path)",
+      "                path.pop()",
+      "        dfs(endWord, [endWord])",
+      "        return result",
+    ],
+    builder: buildSteps126,
+  },
+  815: {
+    id: 815,
+    difficulty: "hard",
+    slug: "bus-routes",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Bus Routes", en: "Bus Routes" },
+    titleVi: { vi: "Tuyến xe buýt", en: "Minimum bus routes" },
+    statement: {
+      vi:
+        "Có nhiều tuyến xe buýt, mỗi tuyến là một mảng các trạm. " +
+        "Bạn có thể lên/xuống xe ở bất kỳ trạm nào và đổi tuyến miễn phí tại trạm chung. " +
+        "Cho source và target, tìm số tuyến xe buýt tối thiểu phải đi qua. Trả về -1 nếu không thể. " +
+        "Nhập các tuyến dưới dạng: trạm1,trạm2|trạm3,trạm4 (| phân cách các tuyến).",
+      en:
+        "You have multiple bus routes, each route is an array of stops. " +
+        "You can ride any stop on a route and transfer at shared stops for free. " +
+        "Given source and target, find the minimum number of bus routes to take. Return -1 if impossible. " +
+        "Enter routes as: stop1,stop2|stop3,stop4 (| separates routes).",
+    },
+    defaultInput: "1,2,7|3,6,7",
+    inputKind: "string",
+    inputLabel: { vi: "Routes (dùng | để phân tách tuyến)", en: "Routes (use | to separate routes)" },
+    extraParams: [
+      { key: "source", label: { vi: "source (trạm xuất phát)", en: "source (start stop)" }, default: 1 },
+      { key: "target", label: { vi: "target (trạm đích)", en: "target (destination stop)" }, default: 6 },
+    ],
+    complexity: {
+      time: "O(N²)",
+      space: "O(N²)",
+      note: {
+        vi: "N = tổng số trạm. Xây stop→routes map: O(N). BFS trên routes: O(R²) với R = số tuyến. Bộ nhớ: O(N²).",
+        en: "N = total stops. Build stop→routes map: O(N). BFS over routes: O(R²) with R = number of routes. Memory: O(N²).",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "",
+      "class Solution:",
+      "    def numBusesToDestination(self, routes, source, target):",
+      "        if source == target:",
+      "            return 0",
+      "        stop_to_routes = defaultdict(set)",
+      "        for i, route in enumerate(routes):",
+      "            for stop in route:",
+      "                stop_to_routes[stop].add(i)",
+      "        queue = deque(stop_to_routes[source])",
+      "        visited_routes = set(stop_to_routes[source])",
+      "        buses = 1",
+      "        while queue:",
+      "            for _ in range(len(queue)):",
+      "                route_idx = queue.popleft()",
+      "                for stop in routes[route_idx]:",
+      "                    if stop == target:",
+      "                        return buses",
+      "                    for next_route in stop_to_routes[stop]:",
+      "                        if next_route not in visited_routes:",
+      "                            visited_routes.add(next_route)",
+      "                            queue.append(next_route)",
+      "            buses += 1",
+      "        return -1",
+    ],
+    builder: buildSteps815,
   },
   743: {
     id: 743,
