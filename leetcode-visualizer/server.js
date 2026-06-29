@@ -698,7 +698,7 @@ function buildSteps509Optimized(n) {
   steps.push({
     title: { vi: "Khởi tạo prev2=0, prev1=1", en: "Initialize prev2=0, prev1=1" },
     arr: [...history],
-    sub: ["F(0)", "F(1)"],
+    sub: ["prev2", "prev1"],
     highlight: [0, 1],
     mark: [],
     codeBlock: 2,
@@ -718,12 +718,21 @@ function buildSteps509Optimized(n) {
     const curr = prev1 + prev2;
     history.push(curr);
 
+    // Build sub labels showing which variable points to which index
+    const subLabels = history.map((_, idx) => {
+      const labels = [];
+      if (idx === i - 2) labels.push("prev2");
+      if (idx === i - 1) labels.push("prev1");
+      if (idx === i) labels.push("curr");
+      return labels.length > 0 ? labels.join(",") : `F(${idx})`;
+    });
+
     steps.push({
       title: { vi: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}`, en: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}` },
       arr: [...history],
-      sub: history.map((_, idx) => `F(${idx})`),
-      highlight: [i],
-      mark: [],
+      sub: subLabels,
+      highlight: [i - 2, i - 1, i],
+      mark: [i],
       codeBlock: 2,
       codeLines: [7, 8, 9, 10],
       vars: [
@@ -735,8 +744,8 @@ function buildSteps509Optimized(n) {
         { name: "→ prev1", value: curr },
       ],
       note: {
-        vi: `curr = prev1 + prev2 = ${prev1} + ${prev2} = ${curr}. Sau đó: prev2 ← ${prev1}, prev1 ← ${curr}.`,
-        en: `curr = prev1 + prev2 = ${prev1} + ${prev2} = ${curr}. Then: prev2 ← ${prev1}, prev1 ← ${curr}.`,
+        vi: `curr = prev1(${prev1}) + prev2(${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
+        en: `curr = prev1(${prev1}) + prev2(${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
       },
     });
 
@@ -744,10 +753,17 @@ function buildSteps509Optimized(n) {
     prev1 = curr;
   }
 
+  // Build final sub labels
+  const finalLabels = history.map((_, idx) => {
+    if (idx === n - 1) return "prev2";
+    if (idx === n) return "prev1";
+    return `F(${idx})`;
+  });
+
   steps.push({
     title: { vi: `Kết quả: F(${n}) = ${prev1}`, en: `Result: F(${n}) = ${prev1}` },
     arr: [...history],
-    sub: history.map((_, idx) => `F(${idx})`),
+    sub: finalLabels,
     highlight: [],
     mark: [n],
     final: true,
