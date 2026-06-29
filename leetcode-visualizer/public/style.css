@@ -574,6 +574,8 @@ button:disabled {
   padding: 0 14px;
   white-space: pre;
   color: #cdd6f4;
+  width: max-content;
+  min-width: 100%;
 }
 
 .code-line .ln {
@@ -582,8 +584,14 @@ button:disabled {
   margin-right: 12px;
   text-align: right;
   color: #45475a;
+  flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.code-line .txt {
+  flex: 1;
+  min-width: 0;
 }
 
 .code-line.active {
