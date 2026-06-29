@@ -2552,7 +2552,952 @@ function buildSteps487(nums) {
   return { original: [...nums], answer: maxLen, steps };
 }
 
+/**
+ * LeetCode 941: Valid Mountain Array.
+ * Walk up from the left, walk down to the right.
+ * Valid if peak is not at either end.
+ */
+function buildSteps941(nums) {
+  const n = nums.length;
+  const steps = [];
+
+  if (n < 3) {
+    steps.push({
+      title: { vi: "Quá ngắn", en: "Too short" },
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "result", value: false }],
+      note: { vi: `Mảng cần ít nhất 3 phần tử. Trả về False.`, en: `Array needs at least 3 elements. Return False.` },
+    });
+    return { original: [...nums], answer: false, steps };
+  }
+
+  steps.push({
+    title: { vi: "Bắt đầu leo lên", en: "Start climbing up" },
+    arr: [...nums],
+    highlight: [0],
+    mark: [],
+    codeLines: [4, 5],
+    vars: [{ name: "i", value: 0 }, { name: "phase", value: "climb" }],
+    note: { vi: "Bắt đầu từ trái, đi lên bao lâu nums[i] < nums[i+1].", en: "Start from the left, climb while nums[i] < nums[i+1]." },
+  });
+
+  let i = 0;
+  while (i + 1 < n && nums[i] < nums[i + 1]) {
+    i++;
+    steps.push({
+      title: { vi: `Leo lên: i = ${i}`, en: `Climb: i = ${i}` },
+      arr: [...nums],
+      highlight: Array.from({ length: i + 1 }, (_, x) => x),
+      mark: [],
+      codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "phase", value: "climb" },
+      ],
+      note: {
+        vi: `nums[${i - 1}]=${nums[i - 1]} < nums[${i}]=${nums[i]} → tiếp tục leo.`,
+        en: `nums[${i - 1}]=${nums[i - 1]} < nums[${i}]=${nums[i]} → keep climbing.`,
+      },
+    });
+  }
+
+  const peak = i;
+  if (peak === 0 || peak === n - 1) {
+    steps.push({
+      title: { vi: "Không có đỉnh hợp lệ", en: "No valid peak" },
+      arr: [...nums],
+      highlight: [peak],
+      mark: [],
+      final: true,
+      codeLines: [7],
+      vars: [{ name: "peak", value: peak }, { name: "result", value: false }],
+      note: {
+        vi: `Đỉnh ở biên (i=${peak}) → không phải núi. Trả về False.`,
+        en: `Peak at boundary (i=${peak}) → not a mountain. Return False.`,
+      },
+    });
+    return { original: [...nums], answer: false, steps };
+  }
+
+  steps.push({
+    title: { vi: `Đỉnh tại i = ${peak}`, en: `Peak at i = ${peak}` },
+    arr: [...nums],
+    highlight: [peak],
+    mark: [peak],
+    codeLines: [7, 8],
+    vars: [{ name: "peak", value: peak }, { name: "nums[peak]", value: nums[peak] }],
+    note: { vi: `Đỉnh = nums[${peak}] = ${nums[peak]}. Bây giờ đi xuống.`, en: `Peak = nums[${peak}] = ${nums[peak]}. Now descend.` },
+  });
+
+  while (i + 1 < n && nums[i] > nums[i + 1]) {
+    i++;
+    steps.push({
+      title: { vi: `Xuống: i = ${i}`, en: `Descend: i = ${i}` },
+      arr: [...nums],
+      highlight: Array.from({ length: i - peak + 1 }, (_, x) => peak + x),
+      mark: [peak],
+      codeLines: [8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: nums[i] },
+        { name: "phase", value: "descend" },
+      ],
+      note: {
+        vi: `nums[${i - 1}]=${nums[i - 1]} > nums[${i}]=${nums[i]} → tiếp tục xuống.`,
+        en: `nums[${i - 1}]=${nums[i - 1]} > nums[${i}]=${nums[i]} → keep descending.`,
+      },
+    });
+  }
+
+  const valid = i === n - 1;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: valid ? Array.from({ length: n }, (_, x) => x) : [peak],
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "i", value: i },
+      { name: "n-1", value: n - 1 },
+      { name: "result", value: valid },
+    ],
+    note: {
+      vi: valid
+        ? `Đã xuống tới cuối (i=${i} == n-1). Đây là núi hợp lệ → True.`
+        : `Dừng sớm tại i=${i} (chưa tới cuối). Không phải núi → False.`,
+      en: valid
+        ? `Descended to the end (i=${i} == n-1). Valid mountain → True.`
+        : `Stopped early at i=${i} (not at end). Not a mountain → False.`,
+    },
+  });
+
+  return { original: [...nums], answer: valid, steps };
+}
+
+/**
+ * LeetCode 1299: Replace Elements with Greatest Element on Right Side.
+ * Traverse right to left, track running max. Replace each element with the max to its right.
+ * Last element becomes -1.
+ */
+function buildSteps1299(nums) {
+  const n = nums.length;
+  const original = [...nums];
+  const arr = [...nums];
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "rightMax", value: -1 }],
+    note: {
+      vi: `Duyệt từ phải qua trái. rightMax = -1 (phía sau phần tử cuối không có gì).`,
+      en: `Traverse right to left. rightMax = -1 (nothing to the right of the last element).`,
+    },
+  });
+
+  let rightMax = -1;
+  for (let i = n - 1; i >= 0; i--) {
+    const cur = arr[i];
+    arr[i] = rightMax;
+    rightMax = Math.max(rightMax, cur);
+
+    steps.push({
+      title: { vi: `i = ${i}: thay ${cur} → ${arr[i]}`, en: `i = ${i}: replace ${cur} → ${arr[i]}` },
+      arr: [...arr],
+      highlight: [i],
+      mark: [],
+      codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "i", value: i },
+        { name: "original", value: cur },
+        { name: "arr[i]", value: arr[i] },
+        { name: "rightMax", value: rightMax },
+      ],
+      note: {
+        vi: `arr[${i}] = rightMax cũ = ${arr[i]}. Cập nhật rightMax = max(${arr[i] === -1 && i === n - 1 ? -1 : rightMax === cur ? cur : rightMax}, ${cur}) = ${rightMax}.`,
+        en: `arr[${i}] = old rightMax = ${arr[i]}. Update rightMax = max(prev, ${cur}) = ${rightMax}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [9],
+    vars: [{ name: "result", value: [...arr] }],
+    note: {
+      vi: `Kết quả: [${arr.join(", ")}].`,
+      en: `Result: [${arr.join(", ")}].`,
+    },
+  });
+
+  return { original, answer: arr, steps };
+}
+
+/**
+ * LeetCode 905: Sort Array By Parity.
+ * Two pointers: left finds odd, right finds even, swap them.
+ */
+function buildSteps905(nums) {
+  const arr = [...nums];
+  const n = arr.length;
+  const steps = [];
+  let left = 0;
+  let right = n - 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...arr],
+    highlight: [left, right],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    note: {
+      vi: `Hai con trỏ: left = 0 (tìm lẻ), right = ${right} (tìm chẵn). Khi gặp → hoán đổi.`,
+      en: `Two pointers: left = 0 (find odd), right = ${right} (find even). When found → swap.`,
+    },
+  });
+
+  while (left < right) {
+    if (arr[left] % 2 === 0) {
+      steps.push({
+        title: { vi: `left=${left}: ${arr[left]} chẵn → tiến`, en: `left=${left}: ${arr[left]} even → advance` },
+        arr: [...arr],
+        highlight: [left],
+        mark: Array.from({ length: left }, (_, x) => x),
+        codeLines: [5, 6],
+        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "arr[left]", value: arr[left] }],
+        note: { vi: `${arr[left]} chẵn, đúng vị trí. left++.`, en: `${arr[left]} is even, correct side. left++.` },
+      });
+      left++;
+    } else if (arr[right] % 2 === 1) {
+      steps.push({
+        title: { vi: `right=${right}: ${arr[right]} lẻ → lùi`, en: `right=${right}: ${arr[right]} odd → retreat` },
+        arr: [...arr],
+        highlight: [right],
+        mark: [],
+        codeLines: [7, 8],
+        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "arr[right]", value: arr[right] }],
+        note: { vi: `${arr[right]} lẻ, đúng vị trí. right--.`, en: `${arr[right]} is odd, correct side. right--.` },
+      });
+      right--;
+    } else {
+      const tmp = arr[left];
+      arr[left] = arr[right];
+      arr[right] = tmp;
+      steps.push({
+        title: { vi: `Hoán đổi [${left}]↔[${right}]`, en: `Swap [${left}]↔[${right}]` },
+        arr: [...arr],
+        highlight: [left, right],
+        mark: [],
+        codeLines: [9, 10],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "swapped", value: `${arr[left]}↔${arr[right]}` },
+        ],
+        note: {
+          vi: `arr[${left}]=${arr[right]} (lẻ) và arr[${right}]=${arr[left]} (chẵn) → hoán đổi. left++, right--.`,
+          en: `arr[${left}]=${arr[right]} (odd) and arr[${right}]=${arr[left]} (even) → swap. left++, right--.`,
+        },
+      });
+      left++;
+      right--;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "result", value: [...arr] }],
+    note: {
+      vi: `Tất cả chẵn ở trái, lẻ ở phải: [${arr.join(", ")}].`,
+      en: `All evens on the left, odds on the right: [${arr.join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: arr, steps };
+}
+
+/**
+ * LeetCode 1089: Duplicate Zeros.
+ * In-place: first pass counts zeros to find effective end, then fill from right to left.
+ * When we encounter a zero, write it twice.
+ */
+function buildSteps1089(nums) {
+  const n = nums.length;
+  const original = [...nums];
+  const arr = [...nums];
+  const steps = [];
+
+  // Pass 1: count zeros to find where the "write" pointer would land
+  let zeros = 0;
+  for (let i = 0; i < n; i++) {
+    if (arr[i] === 0) zeros++;
+  }
+
+  steps.push({
+    title: { vi: "Đếm số 0", en: "Count zeros" },
+    arr: [...arr],
+    highlight: arr.map((v, i) => v === 0 ? i : -1).filter((i) => i >= 0),
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [{ name: "zeros", value: zeros }, { name: "n", value: n }],
+    note: {
+      vi: `Có ${zeros} số 0 cần nhân đôi. Mỗi số 0 chiếm 2 chỗ → phần cuối sẽ bị đẩy ra.`,
+      en: `Found ${zeros} zeros to duplicate. Each zero takes 2 slots → tail elements get pushed out.`,
+    },
+  });
+
+  // Pass 2: fill from right to left
+  let read = n - 1;
+  let write = n + zeros - 1;
+
+  // Adjust: skip elements that would write beyond the array
+  // We need to handle the edge case where a zero's duplicate lands exactly at n-1
+  let r = n - 1;
+  let w = n + zeros - 1;
+
+  // Simpler approach: use the standard two-pointer from-right technique
+  // First, find the last element that fits
+  let possibleDuplicates = 0;
+  let length_ = n - 1;
+  for (let i = 0; i <= length_ - possibleDuplicates; i++) {
+    if (arr[i] === 0) {
+      if (i === length_ - possibleDuplicates) {
+        // Edge case: this zero can't be fully duplicated, just copy once at end
+        arr[length_] = 0;
+        length_--;
+        break;
+      }
+      possibleDuplicates++;
+    }
+  }
+
+  // Now fill from the end
+  const last = length_ - possibleDuplicates;
+  let j = length_;
+  for (let i = last; i >= 0; i--) {
+    if (arr[i] === 0) {
+      arr[j] = 0;
+      arr[j - 1] = 0;
+      steps.push({
+        title: { vi: `Nhân đôi 0 tại i=${i}`, en: `Duplicate 0 at i=${i}` },
+        arr: [...arr],
+        highlight: [j - 1, j],
+        mark: [],
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "i (read)", value: i },
+          { name: "j (write)", value: j },
+          { name: "action", value: "duplicate 0" },
+        ],
+        note: {
+          vi: `arr[${i}]=0 → ghi 0 tại vị trí ${j} và ${j - 1}.`,
+          en: `arr[${i}]=0 → write 0 at positions ${j} and ${j - 1}.`,
+        },
+      });
+      j -= 2;
+    } else {
+      arr[j] = arr[i];
+      steps.push({
+        title: { vi: `Copy arr[${i}]=${original[i]} → [${j}]`, en: `Copy arr[${i}]=${original[i]} → [${j}]` },
+        arr: [...arr],
+        highlight: [j],
+        mark: [],
+        codeLines: [12, 13],
+        vars: [
+          { name: "i (read)", value: i },
+          { name: "j (write)", value: j },
+          { name: "action", value: `copy ${arr[j]}` },
+        ],
+        note: {
+          vi: `arr[${i}]=${original[i]} (khác 0) → copy sang vị trí ${j}.`,
+          en: `arr[${i}]=${original[i]} (non-zero) → copy to position ${j}.`,
+        },
+      });
+      j--;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [14],
+    vars: [{ name: "result", value: [...arr] }],
+    note: {
+      vi: `Kết quả: [${arr.join(", ")}].`,
+      en: `Result: [${arr.join(", ")}].`,
+    },
+  });
+
+  return { original, answer: arr, steps };
+}
+
+/**
+ * LeetCode 283: Move Zeroes.
+ * Two-pointer: write pointer places non-zeros, then fill remaining with 0.
+ */
+function buildSteps283(nums) {
+  const arr = [...nums];
+  const n = arr.length;
+  const steps = [];
+  let write = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...arr],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [{ name: "write", value: 0 }],
+    note: {
+      vi: `Di chuyển tất cả số 0 về cuối, giữ thứ tự các số khác 0. write = vị trí ghi tiếp.`,
+      en: `Move all zeros to the end, maintaining relative order of non-zeros. write = next write position.`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    if (arr[i] !== 0) {
+      arr[write] = arr[i];
+      if (write !== i) arr[i] = 0;
+      steps.push({
+        title: { vi: `nums[${i}]=${nums[i]} ≠ 0 → ghi tại [${write}]`, en: `nums[${i}]=${nums[i]} ≠ 0 → write at [${write}]` },
+        arr: [...arr],
+        highlight: [write],
+        mark: Array.from({ length: write + 1 }, (_, x) => x),
+        codeLines: [4, 5, 6],
+        vars: [
+          { name: "i", value: i },
+          { name: "write", value: write + 1 },
+          { name: "placed", value: nums[i] },
+        ],
+        note: {
+          vi: `${nums[i]} khác 0 → đặt tại vị trí ${write}. write → ${write + 1}.`,
+          en: `${nums[i]} is non-zero → place at position ${write}. write → ${write + 1}.`,
+        },
+      });
+      write++;
+    } else {
+      steps.push({
+        title: { vi: `nums[${i}]=0 → bỏ qua`, en: `nums[${i}]=0 → skip` },
+        arr: [...arr],
+        highlight: [i],
+        mark: Array.from({ length: write }, (_, x) => x),
+        codeLines: [4],
+        vars: [
+          { name: "i", value: i },
+          { name: "write", value: write },
+        ],
+        note: {
+          vi: `nums[${i}]=0 → bỏ qua, write giữ nguyên.`,
+          en: `nums[${i}]=0 → skip, write stays at ${write}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: Array.from({ length: write }, (_, x) => x),
+    final: true,
+    codeLines: [7],
+    vars: [{ name: "result", value: [...arr] }],
+    note: {
+      vi: `Kết quả: [${arr.join(", ")}]. ${write} phần tử khác 0 ở đầu, ${n - write} số 0 ở cuối.`,
+      en: `Result: [${arr.join(", ")}]. ${write} non-zeros at front, ${n - write} zeros at end.`,
+    },
+  });
+
+  return { original: [...nums], answer: arr, steps };
+}
+
+/**
+ * LeetCode 209: Minimum Size Subarray Sum.
+ * Sliding window: expand right, shrink left while sum >= target, track min length.
+ */
+function buildSteps209(nums, params) {
+  const target = params.target;
+  const n = nums.length;
+  const steps = [];
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  let left = 0;
+  let sum = 0;
+  let minLen = Infinity;
+  let bestL = 0;
+  let bestR = -1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "target", value: target },
+      { name: "left", value: 0 },
+      { name: "sum", value: 0 },
+      { name: "minLen", value: "∞" },
+    ],
+    note: {
+      vi: `Tìm đoạn con ngắn nhất có tổng ≥ ${target}. Cửa sổ trượt: mở rộng rồi co.`,
+      en: `Find shortest subarray with sum ≥ ${target}. Sliding window: expand then shrink.`,
+    },
+  });
+
+  for (let right = 0; right < n; right++) {
+    sum += nums[right];
+
+    steps.push({
+      title: { vi: `Mở rộng: right=${right}`, en: `Expand: right=${right}` },
+      arr: [...nums],
+      highlight: inWindow(left, right),
+      mark: [],
+      codeLines: [6, 7],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "sum", value: sum },
+        { name: "minLen", value: minLen === Infinity ? "∞" : minLen },
+      ],
+      note: {
+        vi: `Thêm nums[${right}]=${nums[right]}. sum=${sum}${sum >= target ? " ≥ target → co cửa sổ" : ""}.`,
+        en: `Add nums[${right}]=${nums[right]}. sum=${sum}${sum >= target ? " ≥ target → shrink" : ""}.`,
+      },
+    });
+
+    while (sum >= target) {
+      const len = right - left + 1;
+      if (len < minLen) {
+        minLen = len;
+        bestL = left;
+        bestR = right;
+      }
+      sum -= nums[left];
+      left++;
+
+      steps.push({
+        title: { vi: `Co: left=${left}, len=${len}`, en: `Shrink: left=${left}, len=${len}` },
+        arr: [...nums],
+        highlight: left <= right ? inWindow(left, right) : [],
+        mark: [],
+        codeLines: [8, 9, 10, 11],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "sum", value: sum },
+          { name: "minLen", value: minLen },
+          { name: "windowLen", value: len },
+        ],
+        note: {
+          vi: `sum cũ ≥ ${target}. Bỏ nums[${left - 1}]=${nums[left - 1]}. Đoạn dài ${len}${len === minLen ? " → cập nhật minLen" : ""}. sum=${sum}.`,
+          en: `sum was ≥ ${target}. Drop nums[${left - 1}]=${nums[left - 1]}. Window was ${len}${len === minLen ? " → update minLen" : ""}. sum=${sum}.`,
+        },
+      });
+    }
+  }
+
+  const answer = minLen === Infinity ? 0 : minLen;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
+    final: true,
+    codeLines: [12],
+    vars: [
+      { name: "minLen", value: answer },
+      { name: "window", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "none" },
+    ],
+    note: {
+      vi: answer === 0
+        ? `Không có đoạn con nào có tổng ≥ ${target}. Trả về 0.`
+        : `Đoạn ngắn nhất có tổng ≥ ${target}: [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(",")}], dài ${answer}.`,
+      en: answer === 0
+        ? `No subarray sums to ≥ ${target}. Return 0.`
+        : `Shortest subarray with sum ≥ ${target}: [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(",")}], length ${answer}.`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 713: Subarray Product Less Than K.
+ * Sliding window: expand right (multiply), shrink left (divide) while product >= k.
+ * Count of valid subarrays ending at right = right - left + 1.
+ */
+function buildSteps713(nums, params) {
+  const k = params.k;
+  const n = nums.length;
+  const steps = [];
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  if (k <= 1) {
+    steps.push({
+      title: { vi: "k ≤ 1 → 0", en: "k ≤ 1 → 0" },
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "k", value: k }, { name: "answer", value: 0 }],
+      note: { vi: `k ≤ 1: không có tích dương nào < ${k}. Trả về 0.`, en: `k ≤ 1: no positive product < ${k}. Return 0.` },
+    });
+    return { original: [...nums], answer: 0, steps };
+  }
+
+  let left = 0;
+  let product = 1;
+  let count = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [{ name: "k", value: k }, { name: "left", value: 0 }, { name: "product", value: 1 }, { name: "count", value: 0 }],
+    note: {
+      vi: `Đếm đoạn con có tích < ${k}. Cửa sổ trượt: nhân khi mở rộng, chia khi co.`,
+      en: `Count subarrays with product < ${k}. Sliding window: multiply to expand, divide to shrink.`,
+    },
+  });
+
+  for (let right = 0; right < n; right++) {
+    product *= nums[right];
+
+    while (product >= k && left <= right) {
+      product /= nums[left];
+      left++;
+    }
+
+    const added = right - left + 1;
+    count += added;
+
+    steps.push({
+      title: { vi: `right=${right}: +${added} đoạn`, en: `right=${right}: +${added} subarrays` },
+      arr: [...nums],
+      highlight: inWindow(left, right),
+      mark: [],
+      codeLines: [7, 8, 9, 10, 11],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "product", value: product },
+        { name: "added", value: added },
+        { name: "count", value: count },
+      ],
+      note: {
+        vi: `Cửa sổ [${left}..${right}], tích = ${product} < ${k}. Có ${added} đoạn con mới kết thúc tại ${right}. Tổng = ${count}.`,
+        en: `Window [${left}..${right}], product = ${product} < ${k}. ${added} new subarray(s) ending at ${right}. Total = ${count}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [12],
+    vars: [{ name: "count", value: count }],
+    note: {
+      vi: `Tổng số đoạn con có tích < ${k} = ${count}.`,
+      en: `Total subarrays with product < ${k} = ${count}.`,
+    },
+  });
+
+  return { original: [...nums], answer: count, steps };
+}
+
 const SUPPORTED = {
+  713: {
+    id: 713,
+    difficulty: "medium",
+    slug: "subarray-product-less-than-k",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Subarray Product Less Than K", en: "Subarray Product Less Than K" },
+    titleVi: { vi: "Đoạn con có tích nhỏ hơn K", en: "Subarrays with product < K" },
+    statement: {
+      vi: "Cho mảng số nguyên dương nums và k. Trả về số lượng đoạn con liên tiếp có tích các phần tử < k.",
+      en: "Given an array of positive integers nums and an integer k, return the number of contiguous subarrays where the product of all elements is strictly less than k.",
+    },
+    defaultInput: [10, 5, 2, 6],
+    inputKind: "positive",
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 100 },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi phần tử được nhân/chia tối đa một lần → O(n). O(1) bộ nhớ.",
+        en: "Each element multiplied/divided at most once → O(n). O(1) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numSubarrayProductLessThanK(self, nums, k):",
+      "        if k <= 1: return 0",
+      "        left = 0",
+      "        product = 1",
+      "        count = 0",
+      "        for right in range(len(nums)):",
+      "            product *= nums[right]",
+      "            while product >= k:",
+      "                product //= nums[left]",
+      "                left += 1",
+      "            count += right - left + 1",
+      "        return count",
+    ],
+    builder: buildSteps713,
+  },
+  209: {
+    id: 209,
+    difficulty: "medium",
+    slug: "minimum-size-subarray-sum",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Minimum Size Subarray Sum", en: "Minimum Size Subarray Sum" },
+    titleVi: { vi: "Đoạn con ngắn nhất có tổng ≥ target", en: "Shortest subarray with sum ≥ target" },
+    statement: {
+      vi: "Cho mảng số nguyên dương nums và target. Trả về độ dài ngắn nhất của một đoạn con liên tiếp có tổng ≥ target. Nếu không có, trả về 0.",
+      en: "Given an array of positive integers nums and a target, return the minimal length of a contiguous subarray whose sum is ≥ target. If there is none, return 0.",
+    },
+    defaultInput: [2, 3, 1, 2, 4, 3],
+    inputKind: "positive",
+    extraParams: [
+      { key: "target", type: "number", label: { vi: "target", en: "target" }, default: 7 },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi phần tử được thêm/bỏ khỏi cửa sổ tối đa 1 lần → O(n). O(1) bộ nhớ.",
+        en: "Each element is added/removed at most once → O(n). O(1) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minSubArrayLen(self, target, nums):",
+      "        left = 0",
+      "        total = 0",
+      "        min_len = float('inf')",
+      "        for right in range(len(nums)):",
+      "            total += nums[right]",
+      "            while total >= target:",
+      "                min_len = min(min_len, right-left+1)",
+      "                total -= nums[left]",
+      "                left += 1",
+      "        return min_len if min_len != float('inf') else 0",
+    ],
+    builder: buildSteps209,
+  },
+  283: {
+    id: 283,
+    difficulty: "easy",
+    slug: "move-zeroes",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Move Zeroes", en: "Move Zeroes" },
+    titleVi: { vi: "Di chuyển số 0 về cuối", en: "Move zeros to end" },
+    statement: {
+      vi: "Cho mảng nums. Di chuyển tất cả số 0 về cuối mảng, giữ nguyên thứ tự tương đối của các phần tử khác 0. Thực hiện tại chỗ.",
+      en: "Given an integer array nums, move all 0's to the end while maintaining the relative order of the non-zero elements. Do it in-place.",
+    },
+    defaultInput: [0, 1, 0, 3, 12],
+    inputKind: "integer",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần, ghi tại chỗ. O(1) bộ nhớ phụ.",
+        en: "Single pass, in-place writes. O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def moveZeroes(self, nums):",
+      "        write = 0",
+      "        for i in range(len(nums)):",
+      "            if nums[i] != 0:",
+      "                nums[write], nums[i] = nums[i], nums[write]",
+      "                write += 1",
+    ],
+    builder: buildSteps283,
+  },
+  1089: {
+    id: 1089,
+    difficulty: "easy",
+    slug: "duplicate-zeros",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Duplicate Zeros", en: "Duplicate Zeros" },
+    titleVi: { vi: "Nhân đôi các số 0", en: "Duplicate zeros in-place" },
+    statement: {
+      vi: "Cho mảng số nguyên arr. Nhân đôi mỗi số 0, dịch các phần tử còn lại sang phải. Kết quả cùng độ dài (bỏ phần tràn). Thực hiện tại chỗ.",
+      en: "Given a fixed-length integer array arr, duplicate each occurrence of zero, shifting the remaining elements to the right. Elements beyond the original length are dropped. Do it in-place.",
+    },
+    defaultInput: [1, 0, 2, 3, 0, 4, 5, 0],
+    inputKind: "nonneg",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Hai pass: đếm O(n) + ghi ngược O(n). Tại chỗ O(1).",
+        en: "Two passes: count O(n) + fill backward O(n). In-place O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def duplicateZeros(self, arr):",
+      "        n = len(arr)",
+      "        zeros = arr.count(0)",
+      "        j = n + zeros - 1",
+      "        for i in range(n-1, -1, -1):",
+      "            if j < n:",
+      "                arr[j] = arr[i]",
+      "            if arr[i] == 0:",
+      "                j -= 1",
+      "                if j < n:",
+      "                    arr[j] = 0",
+      "            j -= 1",
+    ],
+    builder: buildSteps1089,
+  },
+  905: {
+    id: 905,
+    difficulty: "easy",
+    slug: "sort-array-by-parity",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Sort Array By Parity", en: "Sort Array By Parity" },
+    titleVi: { vi: "Sắp xếp theo tính chẵn lẻ", en: "Sort by parity (evens first)" },
+    statement: {
+      vi: "Cho mảng nums. Sắp xếp sao cho tất cả số chẵn đứng trước tất cả số lẻ. Có thể trả về bất kỳ đáp án hợp lệ.",
+      en: "Given an integer array nums, move all even integers to the beginning followed by all odd integers. Any valid answer is accepted.",
+    },
+    defaultInput: [3, 1, 2, 4],
+    inputKind: "nonneg",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Hai con trỏ gặp nhau ở giữa → O(n). Hoán đổi tại chỗ → O(1).",
+        en: "Two pointers meet in the middle → O(n). In-place swaps → O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def sortArrayByParity(self, nums):",
+      "        left, right = 0, len(nums) - 1",
+      "        while left < right:",
+      "            if nums[left] % 2 == 0:",
+      "                left += 1",
+      "            elif nums[right] % 2 == 1:",
+      "                right -= 1",
+      "            else:",
+      "                nums[left], nums[right] = nums[right], nums[left]",
+      "                left += 1; right -= 1",
+      "        return nums",
+    ],
+    builder: buildSteps905,
+  },
+  1299: {
+    id: 1299,
+    difficulty: "easy",
+    slug: "replace-elements-with-greatest-element-on-right-side",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Replace Elements with Greatest Element on Right Side", en: "Replace Elements with Greatest Element on Right Side" },
+    titleVi: { vi: "Thay bằng phần tử lớn nhất bên phải", en: "Replace with greatest on right" },
+    statement: {
+      vi: "Cho mảng arr. Thay mỗi phần tử bằng phần tử lớn nhất nằm ở bên phải nó. Phần tử cuối trở thành -1.",
+      en: "Given an array arr, replace every element with the greatest element among the elements to its right. The last element becomes -1.",
+    },
+    defaultInput: [17, 18, 5, 4, 6, 1],
+    inputKind: "integer",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần từ phải. Thay tại chỗ nên O(1) bộ nhớ phụ.",
+        en: "Single right-to-left pass. In-place so O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def replaceElements(self, arr):",
+      "        n = len(arr)",
+      "        right_max = -1",
+      "        for i in range(n-1, -1, -1):",
+      "            cur = arr[i]",
+      "            arr[i] = right_max",
+      "            right_max = max(right_max, cur)",
+      "        return arr",
+    ],
+    builder: buildSteps1299,
+  },
+  941: {
+    id: 941,
+    difficulty: "easy",
+    slug: "valid-mountain-array",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Valid Mountain Array", en: "Valid Mountain Array" },
+    titleVi: { vi: "Mảng núi hợp lệ", en: "Check if array forms a mountain" },
+    statement: {
+      vi: "Cho mảng arr. Trả về True nếu nó là mảng núi: tăng nghiêm ngặt tới một đỉnh, rồi giảm nghiêm ngặt. Cần ít nhất 3 phần tử.",
+      en: "Given an array arr, return True if it is a valid mountain array: strictly increasing to a peak, then strictly decreasing. Needs at least 3 elements.",
+    },
+    defaultInput: [0, 3, 2, 1],
+    inputKind: "integer",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần từ trái qua đỉnh rồi xuống. O(1) bộ nhớ.",
+        en: "Single pass: climb up then descend. O(1) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def validMountainArray(self, arr):",
+      "        n = len(arr)",
+      "        if n < 3: return False",
+      "        i = 0",
+      "        while i+1 < n and arr[i] < arr[i+1]:",
+      "            i += 1",
+      "        if i == 0 or i == n-1: return False",
+      "        while i+1 < n and arr[i] > arr[i+1]:",
+      "            i += 1",
+      "        return i == n - 1",
+    ],
+    builder: buildSteps941,
+  },
   487: {
     id: 487,
     difficulty: "medium",
