@@ -2,14 +2,14 @@ const $ = (id) => document.getElementById(id);
 
 let lang = "en";
 let currentProblemId = null;
-let problemData = null; // dữ liệu bài (song ngữ) đã tải
+let problemData = null; // loaded problem data (bilingual)
 let steps = [];
 let stepIndex = 0;
-let answerValue = null; // đáp án của lần chạy hiện tại
+let answerValue = null; // answer from the current run
 let playTimer = null;
-let catalogData = null; // danh sách bài theo nhóm
+let catalogData = null; // problem list grouped by algorithm
 
-// ---- Chuỗi giao diện theo ngôn ngữ ----
+// ---- UI strings by language ----
 const I18N = {
   vi: {
     subtitle: "Nhập số bài LeetCode để xem thuật toán chạy từng bước",
@@ -62,7 +62,7 @@ const I18N = {
 
 const t = () => I18N[lang];
 
-// ---- Chuyển ngôn ngữ ----
+// ---- Language switching ----
 document.querySelectorAll(".lang-btn").forEach((btn) => {
   btn.addEventListener("click", () => setLang(btn.dataset.lang));
 });
@@ -83,11 +83,11 @@ function setLang(newLang) {
     const val = t()[key];
     if (typeof val === "string") el.textContent = val;
   });
-  // nút Chạy/Dừng phụ thuộc trạng thái
+  // Play/Pause button depends on state
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
 }
 
-// ---- Danh mục bài theo nhóm thuật toán ----
+// ---- Problem catalog grouped by algorithm ----
 async function loadCatalog() {
   try {
     const res = await fetch("/api/problems");
@@ -97,7 +97,7 @@ async function loadCatalog() {
       renderCatalog();
     }
   } catch (err) {
-    // bỏ qua, vẫn có thể nhập số bài thủ công
+    // ignore error, user can still enter problem number manually
   }
 }
 
@@ -179,7 +179,7 @@ function markActiveChip() {
     });
 }
 
-// ---- Tải thông tin bài ----
+// ---- Load problem info ----
 $("loadBtn").addEventListener("click", loadProblem);$("problemId").addEventListener("keydown", (e) => {
   if (e.key === "Enter") loadProblem();
 });
@@ -215,7 +215,7 @@ async function loadProblem() {
   }
 }
 
-// Vẽ panel mô tả bài theo ngôn ngữ hiện tại
+// Render problem description panel in current language
 function renderProblem() {
   if (!problemData) return;
   $("problemId2").textContent = `#${problemData.id}`;
@@ -241,7 +241,7 @@ function renderProblem() {
 
   $("problemTitleVi").textContent = pick(problemData.titleVi);
   $("problemStatement").textContent = pick(problemData.statement);
-  // Nhãn ô nhập: dùng nhãn tùy biến của bài nếu có, ngược lại về mặc định
+  // Input label: use custom label if provided, otherwise default
   $("arrLabel").textContent = problemData.inputLabel
     ? pick(problemData.inputLabel)
     : t().arrLabel;
@@ -249,7 +249,7 @@ function renderProblem() {
   renderExtraParams();
 }
 
-// Hiển thị phân tích độ phức tạp thời gian/bộ nhớ
+// Display time/space complexity analysis
 function renderComplexity() {
   const cx = problemData.complexity;
   if (!cx) {
@@ -262,13 +262,13 @@ function renderComplexity() {
   $("cxNote").textContent = pick(cx.note);
   show("complexity");
 
-  // Bản gọn trong vùng trực quan hóa
+  // Compact version in visualization area
   $("vizCxTime").textContent = cx.time;
   $("vizCxSpace").textContent = cx.space;
   show("vizComplexity");
 }
 
-// Vẽ các ô nhập tham số phụ (vd k của bài 1004), giữ lại giá trị đã nhập khi đổi ngôn ngữ
+// Render extra parameter inputs (e.g. k for problem 1004), preserve values on language switch
 function renderExtraParams() {
   const container = $("extraParams");
   const params = problemData.extraParams || [];
@@ -299,13 +299,13 @@ function renderExtraParams() {
   });
 }
 
-// Lấy chuỗi theo ngôn ngữ; hỗ trợ cả chuỗi thường lẫn object {vi,en}
+// Get string by language; supports both plain strings and {vi,en} objects
 function pick(field) {
   if (field && typeof field === "object") return field[lang] ?? field.en ?? field.vi;
   return field;
 }
 
-// ---- Chạy thuật toán ----
+// ---- Run algorithm ----
 $("runBtn").addEventListener("click", runViz);
 
 async function runViz() {
@@ -336,7 +336,7 @@ async function runViz() {
     }
   }
 
-  // Thu thập tham số phụ (giữ kiểu chuỗi/số theo định nghĩa)
+  // Collect extra params (preserve string/number type per definition)
   const params = {};
   $("extraParams")
     .querySelectorAll("input[data-param]")
@@ -368,7 +368,7 @@ async function runViz() {
   }
 }
 
-// ---- Điều khiển từng bước ----
+// ---- Step-by-step controls ----
 $("firstBtn").addEventListener("click", () => {
   stopPlay();
   stepIndex = 0;
@@ -391,12 +391,12 @@ $("lastBtn").addEventListener("click", () => {
 });
 $("playBtn").addEventListener("click", togglePlay);
 
-// ---- Điều hướng bằng bàn phím ----
+// ---- Keyboard navigation ----
 document.addEventListener("keydown", (e) => {
-  // Bỏ qua khi đang gõ trong ô nhập
+  // Skip when typing in input fields
   const tag = (e.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea") return;
-  // Chỉ hoạt động khi đang xem trực quan hóa
+  // Only active when visualization is visible
   if (!steps.length || $("vizPanel").classList.contains("hidden")) return;
 
   switch (e.key) {
@@ -450,7 +450,7 @@ function stopPlay() {
   $("playBtn").textContent = t().play;
 }
 
-// ---- Vẽ code Python (syntax highlight) ----
+// ---- Python code syntax highlighting ----
 function highlightPython(line) {
   // Tokenize the line to avoid breaking HTML inside tokens
   const tokens = [];
@@ -513,29 +513,66 @@ function highlightPython(line) {
 function renderCode() {
   const panel = $("codePanel");
   const code = (problemData && problemData.code) || [];
+  const code2 = (problemData && problemData.code2) || null;
   panel.innerHTML = "";
-  if (code.length === 0) {
+  if (code.length === 0 && !code2) {
     panel.classList.add("hidden");
     return;
   }
   panel.classList.remove("hidden");
-  code.forEach((line, idx) => {
-    const row = document.createElement("div");
-    row.className = "code-line";
-    row.dataset.line = idx + 1;
 
-    const ln = document.createElement("span");
-    ln.className = "ln";
-    ln.textContent = idx + 1;
+  // Render primary code
+  if (code.length > 0) {
+    if (code2) {
+      const label = document.createElement("div");
+      label.className = "code-section-label";
+      label.textContent = lang === "vi" ? "Cách 1: DP O(n²)" : "Approach 1: DP O(n²)";
+      panel.appendChild(label);
+    }
+    code.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "code-line";
+      row.dataset.line = idx + 1;
 
-    const txt = document.createElement("span");
-    txt.className = "txt";
-    txt.innerHTML = highlightPython(line);
+      const ln = document.createElement("span");
+      ln.className = "ln";
+      ln.textContent = idx + 1;
 
-    row.appendChild(ln);
-    row.appendChild(txt);
-    panel.appendChild(row);
-  });
+      const txt = document.createElement("span");
+      txt.className = "txt";
+      txt.innerHTML = highlightPython(line);
+
+      row.appendChild(ln);
+      row.appendChild(txt);
+      panel.appendChild(row);
+    });
+  }
+
+  // Render secondary code (code2) if available
+  if (code2) {
+    const sep = document.createElement("div");
+    sep.className = "code-section-label";
+    sep.textContent = lang === "vi" ? "Cách 2: Binary Search O(n log n)" : "Approach 2: Binary Search O(n log n)";
+    panel.appendChild(sep);
+
+    code2.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "code-line code2-line";
+      row.dataset.line2 = idx + 1;
+
+      const ln = document.createElement("span");
+      ln.className = "ln";
+      ln.textContent = idx + 1;
+
+      const txt = document.createElement("span");
+      txt.className = "txt";
+      txt.innerHTML = highlightPython(line);
+
+      row.appendChild(ln);
+      row.appendChild(txt);
+      panel.appendChild(row);
+    });
+  }
 }
 
 function updateCodeHighlight(activeLines) {
@@ -547,15 +584,15 @@ function updateCodeHighlight(activeLines) {
     });
 }
 
-// ---- Bảng biến (debug) ----
-// Định dạng giá trị biến để hiển thị (mảng -> "[a, b, c]").
+// ---- Variables panel (debug) ----
+// Format variable value for display (array -> "[a, b, c]").
 function formatVarValue(value) {
   if (Array.isArray(value)) return `[${value.join(", ")}]`;
   if (value === null) return "null";
   return String(value);
 }
 
-// Vẽ các biến của bước hiện tại; tô sáng biến vừa thay đổi so với bước trước.
+// Render variables for current step; highlight variables that changed from previous step.
 function renderVars(step, prevStep) {
   const panel = $("varsPanel");
   const grid = $("varsGrid");
@@ -603,7 +640,7 @@ function renderVars(step, prevStep) {
   panel.classList.remove("hidden");
 }
 
-// ---- Vẽ dạng cột (mảng) ----
+// ---- Bar chart renderer (array visualization) ----
 function renderBars(step) {
   const maxVal = Math.max(...steps.flatMap((s) => (s.arr || []).map((v) => Math.abs(v))), 1);
   const barsEl = $("bars");
@@ -642,7 +679,7 @@ function renderBars(step) {
   });
 }
 
-// ---- Vẽ dạng lưới (DP 2D) ----
+// ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
   const { dp, text1, text2, hlCell, pathCells } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
@@ -668,7 +705,7 @@ function renderGrid(step) {
   $("gridView").innerHTML = html;
 }
 
-// ---- Vẽ dạng cây (Trie) ----
+// ---- Tree renderer (Trie) ----
 function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
@@ -718,7 +755,7 @@ function renderTree(step) {
     `</svg>`;
 }
 
-// ---- Vẽ một bước ----
+// ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -746,13 +783,13 @@ function renderStep() {
     renderBars(step);
   }
 
-  // nút điều khiển
+  // navigation buttons
   $("firstBtn").disabled = stepIndex === 0;
   $("prevBtn").disabled = stepIndex === 0;
   $("nextBtn").disabled = stepIndex === steps.length - 1;
   $("lastBtn").disabled = stepIndex === steps.length - 1;
 
-  // hộp kết quả
+  // result box
   if (step.final) {
     $("answer").textContent = t().answer(answerValue);
     show("answer");
@@ -761,7 +798,7 @@ function renderStep() {
   }
 }
 
-// ---- Tiện ích ----
+// ---- Utilities ----
 function show(id) {
   $(id).classList.remove("hidden");
 }
@@ -774,7 +811,7 @@ function showError(id, msg) {
   el.classList.remove("hidden");
 }
 
-// Khởi tạo
+// Initialize
 applyStaticStrings();
 loadCatalog();
 loadProblem();

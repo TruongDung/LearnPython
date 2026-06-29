@@ -8,21 +8,21 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 /**
- * Sinh các bước cho LeetCode 1846:
+ * Generate steps for LeetCode 1846:
  * Maximum Element After Decreasing and Rearranging.
  *
- * Thuật toán:
- *  1. Sắp xếp mảng tăng dần.
+ * Algorithm:
+ *  1. Sort the array in ascending order.
  *  2. arr[0] = 1.
- *  3. Với mỗi i: arr[i] = min(arr[i], arr[i-1] + 1).
- *  4. Đáp án là phần tử cuối cùng (lớn nhất).
+ *  3. For each i: arr[i] = min(arr[i], arr[i-1] + 1).
+ *  4. The answer is the last (largest) element.
  */
 function buildSteps1846(input) {
   const original = [...input];
   const sorted = [...input].sort((a, b) => a - b);
   const steps = [];
 
-  // Bước khởi tạo: mảng gốc
+  // Initialization step: original array
   steps.push({
     title: { vi: "Mảng ban đầu", en: "Initial array" },
     arr: [...original],
@@ -38,7 +38,7 @@ function buildSteps1846(input) {
     },
   });
 
-  // Bước sắp xếp
+  // Sorting step
   steps.push({
     title: { vi: "Bước 1: Sắp xếp tăng dần", en: "Step 1: Sort ascending" },
     arr: [...sorted],
@@ -53,7 +53,7 @@ function buildSteps1846(input) {
 
   const work = [...sorted];
 
-  // Bước đặt phần tử đầu = 1
+  // Set first element = 1
   const before0 = work[0];
   work[0] = 1;
   steps.push({
@@ -72,7 +72,7 @@ function buildSteps1846(input) {
     },
   });
 
-  // Lặp gán arr[i] = min(arr[i], arr[i-1] + 1)
+  // Loop: assign arr[i] = min(arr[i], arr[i-1] + 1)
   for (let i = 1; i < work.length; i++) {
     const cur = work[i];
     const cap = work[i - 1] + 1;
@@ -128,12 +128,12 @@ function buildSteps1846(input) {
 }
 
 /**
- * Sinh các bước cho LeetCode 1004: Max Consecutive Ones III.
+ * Generate steps for LeetCode 1004: Max Consecutive Ones III.
  *
- * Thuật toán cửa sổ trượt (sliding window):
- *  - Mở rộng cửa sổ bằng cách tăng j.
- *  - Đếm số số 0 trong cửa sổ. Khi vượt quá k, co cửa sổ từ trái (tăng i).
- *  - Đáp án là độ dài cửa sổ lớn nhất từng đạt được.
+ * Sliding window algorithm:
+ *  - Expand the window by incrementing j.
+ *  - Count zeros in the window. When exceeding k, shrink from the left (increment i).
+ *  - The answer is the maximum window length achieved.
  */
 function buildSteps1004(nums, params) {
   const k = params.k;
@@ -163,7 +163,7 @@ function buildSteps1004(nums, params) {
   for (let j = 0; j < nums.length; j++) {
     if (nums[j] === 0) zeroCount += 1;
 
-    // Mở rộng cửa sổ tới j
+    // Expand window to j
     steps.push({
       title: { vi: `Mở rộng: j = ${j}`, en: `Expand: j = ${j}` },
       arr: [...nums],
@@ -182,7 +182,7 @@ function buildSteps1004(nums, params) {
       },
     });
 
-    // Co cửa sổ khi vượt quá k số 0
+    // Shrink window when zeros exceed k
     while (zeroCount > k) {
       const removed = nums[i];
       if (nums[i] === 0) zeroCount -= 1;
@@ -252,13 +252,13 @@ function buildSteps1004(nums, params) {
 }
 
 /**
- * Sinh các bước cho LeetCode 746: Min Cost Climbing Stairs.
+ * Generate steps for LeetCode 746: Min Cost Climbing Stairs.
  *
- * Quy hoạch động:
- *  - dp[i] = chi phí nhỏ nhất để đạt tới bậc i (0-indexed, có thêm "đỉnh" = n).
- *  - dp[0] = dp[1] = 0 (được phép bắt đầu ở bậc 0 hoặc 1).
+ * Dynamic programming:
+ *  - dp[i] = minimum cost to reach step i (0-indexed, with "top" = n).
+ *  - dp[0] = dp[1] = 0 (allowed to start at step 0 or 1).
  *  - dp[i] = min(dp[i-1] + cost[i-1], dp[i-2] + cost[i-2]).
- *  - Đáp án là dp[n].
+ *  - The answer is dp[n].
  */
 function buildSteps746(cost) {
   const n = cost.length;
@@ -324,12 +324,12 @@ function buildSteps746(cost) {
 }
 
 /**
- * Sinh các bước cho LeetCode 152: Maximum Product Subarray.
+ * Generate steps for LeetCode 152: Maximum Product Subarray.
  *
- * Vì số âm có thể biến tích nhỏ nhất thành lớn nhất, ta theo dõi đồng thời:
- *  - curMax: tích lớn nhất của dãy con kết thúc tại i.
- *  - curMin: tích nhỏ nhất của dãy con kết thúc tại i.
- *  - result: đáp án lớn nhất từng thấy.
+ * Since a negative number can turn the smallest product into the largest, track both:
+ *  - curMax: largest product of subarray ending at i.
+ *  - curMin: smallest product of subarray ending at i.
+ *  - result: the largest answer seen so far.
  */
 function buildSteps152(nums) {
   const steps = [];
@@ -410,13 +410,13 @@ function buildSteps152(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 70: Climbing Stairs.
+ * Generate steps for LeetCode 70: Climbing Stairs.
  *
- * Quy hoạch động kiểu Fibonacci:
- *  - dp[i] = số cách leo tới bậc i.
+ * Fibonacci-style dynamic programming:
+ *  - dp[i] = number of ways to reach step i.
  *  - dp[0] = dp[1] = 1.
  *  - dp[i] = dp[i-1] + dp[i-2].
- *  - Đáp án là dp[n].
+ *  - The answer is dp[n].
  */
 function buildSteps70(input) {
   const n = input[0];
@@ -482,11 +482,11 @@ function buildSteps70(input) {
 }
 
 /**
- * Sinh các bước cho LeetCode 300: Longest Increasing Subsequence (bản DP O(n^2)).
+ * Generate steps for LeetCode 300: Longest Increasing Subsequence (DP O(n^2) version).
  *
- *  - dp[i] = độ dài dãy con tăng dài nhất kết thúc tại i.
- *  - dp[i] = 1 + max(dp[j]) với mọi j < i mà nums[j] < nums[i].
- *  - Đáp án là max(dp).
+ *  - dp[i] = length of the longest increasing subsequence ending at i.
+ *  - dp[i] = 1 + max(dp[j]) for all j < i where nums[j] < nums[i].
+ *  - The answer is max(dp).
  */
 function buildSteps300(nums) {
   const n = nums.length;
@@ -588,7 +588,7 @@ function buildSteps300(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 509: Fibonacci Number.
+ * Generate steps for LeetCode 509: Fibonacci Number.
  *
  *  - F(0) = 0, F(1) = 1.
  *  - F(n) = F(n-1) + F(n-2).
@@ -656,11 +656,11 @@ function buildSteps509(input) {
 }
 
 /**
- * Sinh các bước cho LeetCode 1: Two Sum (dùng hash map).
+ * Generate steps for LeetCode 1: Two Sum (using hash map).
  *
- *  - Với mỗi i, kiểm tra xem (target - nums[i]) đã từng xuất hiện chưa.
- *  - Nếu rồi: tìm thấy cặp chỉ số.
- *  - Nếu chưa: lưu nums[i] -> i vào hash map.
+ *  - For each i, check if (target - nums[i]) has already appeared.
+ *  - If yes: found the pair of indices.
+ *  - If no: store nums[i] -> i in the hash map.
  */
 function buildSteps1(nums, params) {
   const target = params.target;
@@ -754,12 +754,12 @@ function buildSteps1(nums, params) {
 }
 
 /**
- * Sinh các bước cho LeetCode 1208: Get Equal Substrings Within Budget.
+ * Generate steps for LeetCode 1208: Get Equal Substrings Within Budget.
  *
- * Cửa sổ trượt trên mảng chi phí cost[i] = |s[i] - t[i]|:
- *  - Mở rộng right, cộng cost[right] vào windowCost.
- *  - Khi windowCost > maxCost, co left và trừ cost[left].
- *  - Đáp án là độ dài cửa sổ hợp lệ lớn nhất.
+ * Sliding window on cost array cost[i] = |s[i] - t[i]|:
+ *  - Expand right, add cost[right] to windowCost.
+ *  - When windowCost > maxCost, shrink left and subtract cost[left].
+ *  - The answer is the maximum valid window length.
  */
 function buildSteps1208(s, params) {
   const t = params.t;
@@ -895,12 +895,12 @@ function buildSteps1208(s, params) {
 }
 
 /**
- * Sinh các bước cho LeetCode 208: Implement Trie (Prefix Tree).
+ * Generate steps for LeetCode 208: Implement Trie (Prefix Tree).
  *
- * Trực quan hóa cây tiền tố khi:
- *  - insert(word): đi/tạo nút cho từng ký tự, đánh dấu nút cuối là is_word.
- *  - search(word): đi theo các ký tự, trả về is_word của nút cuối.
- *  - startsWith(prefix): đi theo các ký tự, trả về True nếu đi được hết.
+ * Visualize the prefix tree when:
+ *  - insert(word): traverse/create nodes for each character, mark the last node as is_word.
+ *  - search(word): traverse characters, return is_word of the last node.
+ *  - startsWith(prefix): traverse characters, return True if traversal completes.
  */
 function buildSteps208(input, params) {
   const words = String(input)
@@ -921,7 +921,7 @@ function buildSteps208(input, params) {
   const root = makeNode("\u2022", null);
   const steps = [];
 
-  // Bố cục cây: x theo thứ tự lá, y theo độ sâu.
+  // Tree layout: x by leaf order, y by depth.
   function snapshot(opts) {
     const nodes = [];
     let nextX = 0;
@@ -1091,8 +1091,8 @@ function buildSteps208(input, params) {
 }
 
 /**
- * Sinh các bước cho LeetCode 53: Maximum Subarray (thuật toán Kadane).
- *  - cur = max(nums[i], cur + nums[i])  (mở rộng đoạn hiện tại hoặc bắt đầu lại).
+ * Generate steps for LeetCode 53: Maximum Subarray (Kadane's algorithm).
+ *  - cur = max(nums[i], cur + nums[i])  (extend current subarray or start fresh).
  *  - best = max(best, cur).
  */
 function buildSteps53(nums) {
@@ -1179,11 +1179,11 @@ function buildSteps53(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 3020: Find the Maximum Number of Elements in a Subset.
+ * Generate steps for LeetCode 3020: Find the Maximum Number of Elements in a Subset.
  *
- * Tập con hợp lệ xếp theo mẫu [x, x², x⁴, …, x^k, …, x⁴, x², x].
- * Với mỗi cơ số x: đi theo chuỗi lũy thừa, mỗi mức cần ≥ 2 bản (trừ đỉnh cần ≥ 1).
- * Trường hợp x = 1 xử lý riêng (cần số lượng lẻ).
+ * Valid subsets follow the pattern [x, x², x⁴, …, x^k, …, x⁴, x², x].
+ * For each base x: follow the power chain, each level needs >= 2 copies (except the peak needs >= 1).
+ * Special case x = 1 is handled separately (needs odd count).
  */
 function buildSteps3020(nums) {
   const steps = [];
@@ -1310,12 +1310,12 @@ function buildSteps3020(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 198: House Robber.
+ * Generate steps for LeetCode 198: House Robber.
  *
- * dp[i] = tiền lớn nhất cướp được từ nhà 0..i.
+ * dp[i] = maximum money robbed from houses 0..i.
  *  - dp[0] = nums[0]
  *  - dp[1] = max(nums[0], nums[1])
- *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (bỏ nhà i hoặc cướp nhà i)
+ *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (skip house i or rob house i)
  */
 function buildSteps198(nums) {
   const n = nums.length;
@@ -1407,13 +1407,13 @@ function buildSteps198(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 213: House Robber II.
+ * Generate steps for LeetCode 213: House Robber II.
  *
- * Nhà xếp vòng tròn → không cướp cả nhà đầu lẫn nhà cuối.
- * Chạy House-Robber trên hai đoạn:
- *   Pass A: nums[0..n-2] (gồm nhà đầu, bỏ nhà cuối)
- *   Pass B: nums[1..n-1] (bỏ nhà đầu, gồm nhà cuối)
- * Đáp án = max(A, B).
+ * Houses arranged in a circle → cannot rob both the first and last house.
+ * Run House-Robber on two subarrays:
+ *   Pass A: nums[0..n-2] (includes first, excludes last)
+ *   Pass B: nums[1..n-1] (excludes first, includes last)
+ * Answer = max(A, B).
  */
 function buildSteps213(nums) {
   const n = nums.length;
@@ -1575,11 +1575,11 @@ function buildSteps213(nums) {
 }
 
 /**
- * Sinh các bước cho LeetCode 1143: Longest Common Subsequence.
+ * Generate steps for LeetCode 1143: Longest Common Subsequence.
  *
  * dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1].
- *  - Nếu text1[i-1] == text2[j-1]: dp[i][j] = dp[i-1][j-1] + 1
- *  - Ngược lại: dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+ *  - If text1[i-1] == text2[j-1]: dp[i][j] = dp[i-1][j-1] + 1
+ *  - Otherwise: dp[i][j] = max(dp[i-1][j], dp[i][j-1])
  */
 function buildSteps1143(input, params) {
   const text1 = String(input).trim();
@@ -1778,7 +1778,7 @@ function buildSteps676(input, params) {
 
 /**
  * LeetCode 1268: Search Suggestions System.
- * Trie + DFS để tìm top-3 gợi ý cho mỗi prefix khi gõ.
+ * Trie + DFS to find top-3 suggestions for each prefix while typing.
  */
 function buildSteps1268(input, params) {
   const products = String(input).split(",").map((w) => w.trim()).filter(Boolean).sort();
@@ -1900,7 +1900,7 @@ function buildSteps1268(input, params) {
 
 /**
  * LeetCode 1166: Design File System.
- * Trie trên đường dẫn: createPath(path, value), get(path).
+ * Trie on paths: createPath(path, value), get(path).
  */
 function buildSteps1166(input, params) {
   const ops = String(input).split(";").map((s) => s.trim()).filter(Boolean);
@@ -2064,7 +2064,7 @@ function buildSteps588(input, params) {
 
 /**
  * LeetCode 1295: Find Numbers with Even Number of Digits.
- * Đếm bao nhiêu số trong mảng có số lượng chữ số chẵn.
+ * Count how many numbers in the array have an even number of digits.
  */
 function buildSteps1295(nums) {
   const steps = [];
@@ -3235,13 +3235,13 @@ function buildSteps713(nums, params) {
 }
 
 /**
- * Sinh các bước cho LeetCode 50: Pow(x, n).
+ * Generate steps for LeetCode 50: Pow(x, n).
  *
- * Lũy thừa nhanh (fast exponentiation / binary exponentiation):
- *  - Nếu n < 0: x = 1/x, n = -n.
+ * Fast exponentiation (binary exponentiation):
+ *  - If n < 0: x = 1/x, n = -n.
  *  - result = 1.
- *  - Lặp: nếu n lẻ thì result *= x; x *= x; n = floor(n/2).
- *  - Đáp án là result.
+ *  - Loop: if n is odd then result *= x; x *= x; n = floor(n/2).
+ *  - The answer is result.
  */
 function buildSteps50(input, params) {
   let x = params.x;
@@ -4606,6 +4606,20 @@ const SUPPORTED = {
       "                    dp[i] = max(dp[i], dp[j] + 1)",
       "        return max(dp)",
     ],
+    code2: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def lengthOfLIS(self, nums):",
+      "        tails = []",
+      "        for num in nums:",
+      "            i = bisect_left(tails, num)",
+      "            if i == len(tails):",
+      "                tails.append(num)",
+      "            else:",
+      "                tails[i] = num",
+      "        return len(tails)",
+    ],
     builder: buildSteps300,
   },
   509: {
@@ -4688,7 +4702,7 @@ const SUPPORTED = {
 };
 
 app.get("/api/problems", (req, res) => {
-  // Gom các bài theo nhóm thuật toán
+  // Group problems by algorithm category
   const groupsMap = {};
   for (const key of Object.keys(SUPPORTED)) {
     const p = SUPPORTED[key];
@@ -4725,6 +4739,7 @@ app.get("/api/problem/:id", (req, res) => {
     inputLabel: problem.inputLabel || null,
     complexity: problem.complexity || null,
     code: problem.code || [],
+    code2: problem.code2 || null,
   });
 });
 
@@ -4779,7 +4794,7 @@ app.post("/api/problem/:id/solve", (req, res) => {
     }
   }
 
-  // Kiểm tra các tham số phụ
+  // Validate extra parameters
   for (const p of problem.extraParams || []) {
     const v = params[p.key];
     if (p.type === "string") {
@@ -4793,7 +4808,7 @@ app.post("/api/problem/:id/solve", (req, res) => {
     }
   }
 
-  // Bài dạng chuỗi cần s và t cùng độ dài
+  // String-type problems require s and t to have equal length
   if (problem.inputKind === "string" && typeof params.t === "string" && params.t.length !== input.length) {
     return res.status(400).json({ error: "Chuỗi s và t phải có cùng độ dài." });
   }
