@@ -34,7 +34,8 @@
       <section id="problemPanel" class="panel hidden">
         <div class="problem-head">
           <span id="problemId2" class="badge"></span>
-          <h2 id="problemTitle"></h2>
+          <span id="problemDiff" class="diff hidden"></span>
+          <a id="problemTitle" class="problem-title-link"></a>
         </div>
         <p id="problemTitleVi" class="title-vi"></p>
         <p id="problemStatement" class="statement"></p>
@@ -71,11 +72,16 @@
           <span id="vizCxSpace" class="cx-badge"></span>
         </div>
 
-        <div id="bars" class="bars"></div>
-
-        <div id="treeView" class="tree-view hidden"></div>
-
-        <div id="gridView" class="grid-view hidden"></div>
+        <div class="viz-split">
+          <div class="viz-left">
+            <pre id="codePanel" class="code-panel"></pre>
+          </div>
+          <div class="viz-right">
+            <div id="bars" class="bars"></div>
+            <div id="treeView" class="tree-view hidden"></div>
+            <div id="gridView" class="grid-view hidden"></div>
+          </div>
+        </div>
 
         <div id="varsPanel" class="vars-panel hidden">
           <div class="vars-head" data-i18n="varsLabel">Variables</div>
@@ -83,8 +89,6 @@
         </div>
 
         <p id="stepNote" class="note"></p>
-
-        <pre id="codePanel" class="code-panel"></pre>
 
         <div class="controls">
           <button id="firstBtn" data-i18n="first">⏮</button>

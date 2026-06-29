@@ -1789,6 +1789,9 @@ function buildSteps1268(input, params) {
   const root = makeNode("\u2022", null);
   const steps = [];
 
+  // Map word → terminal node id (for highlighting suggestions)
+  const wordNodeId = {};
+
   function snapshot(opts) {
     const nodes = [];
     let nextX = 0;
@@ -1804,15 +1807,33 @@ function buildSteps1268(input, params) {
     steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
   }
 
+  // Insert all products and show each insertion
   for (const word of products) {
     let node = root;
+    const insertPath = [root.id];
     for (const ch of word) {
       if (!node.children[ch]) node.children[ch] = makeNode(ch, node.id);
       node = node.children[ch];
+      insertPath.push(node.id);
     }
     node.isWord = true;
+    wordNodeId[word] = node.id;
+    snapshot({
+      title: { vi: `Chèn "${word}"`, en: `Insert "${word}"` },
+      codeLines: [5, 6, 7, 8, 9],
+      highlight: insertPath,
+      vars: [{ name: "word", value: word }],
+      note: { vi: `Chèn "${word}" vào Trie. Đánh dấu nút cuối là is_word.`, en: `Insert "${word}" into Trie. Mark the end node as is_word.` },
+    });
   }
-  snapshot({ title: { vi: "Trie sản phẩm", en: "Products Trie" }, highlight: [], vars: [{ name: "products", value: products.join(", ") }], note: { vi: `Đã chèn ${products.length} sản phẩm (đã sắp xếp).`, en: `Inserted ${products.length} products (sorted).` } });
+
+  snapshot({
+    title: { vi: "Trie hoàn chỉnh", en: "Trie complete" },
+    codeLines: [4],
+    highlight: [],
+    vars: [{ name: "products", value: products.join(", ") }],
+    note: { vi: `Đã chèn ${products.length} sản phẩm (đã sắp xếp). Bắt đầu gõ "${searchWord}".`, en: `Inserted ${products.length} products (sorted). Start typing "${searchWord}".` },
+  });
 
   function collectWords(node, prefix, result) {
     if (result.length >= 3) return;
@@ -1831,7 +1852,21 @@ function buildSteps1268(input, params) {
     prefix += ch;
     if (!node.children[ch]) {
       allSuggestions.push([]);
-      snapshot({ title: { vi: `Gõ "${prefix}"`, en: `Type "${prefix}"` }, highlight: [...path], vars: [{ name: "prefix", value: prefix }, { name: "suggestions", value: "[]" }], note: { vi: `Không có nhánh '${ch}' → gợi ý rỗng.`, en: `No branch '${ch}' → empty suggestions.` } });
+      snapshot({
+        title: { vi: `Gõ "${prefix}" — không có`, en: `Type "${prefix}" — missing` },
+        codeLines: [13, 14],
+        highlight: [...path],
+        vars: [
+          { name: "prefix", value: prefix },
+          { name: "suggestions", value: "[]" },
+          { name: "reason", value: `no branch '${ch}'` },
+        ],
+        note: { vi: `Không có nhánh '${ch}' → gợi ý rỗng. Các ký tự sau cũng rỗng.`, en: `No branch '${ch}' → empty suggestions. All subsequent characters too.` },
+      });
+      // Remaining characters also empty
+      for (let k = prefix.length; k < searchWord.length; k++) {
+        allSuggestions.push([]);
+      }
       node = null;
       break;
     }
@@ -1840,7 +1875,23 @@ function buildSteps1268(input, params) {
     const sugg = [];
     collectWords(node, prefix, sugg);
     allSuggestions.push(sugg);
-    snapshot({ title: { vi: `Gõ "${prefix}"`, en: `Type "${prefix}"` }, highlight: [...path], vars: [{ name: "prefix", value: prefix }, { name: "suggestions", value: `[${sugg.join(", ")}]` }], note: { vi: `Tiền tố "${prefix}" → gợi ý: [${sugg.join(", ")}].`, en: `Prefix "${prefix}" → suggestions: [${sugg.join(", ")}].` } });
+
+    // Highlight path + suggestion word-end nodes
+    const suggHl = sugg.map((w) => wordNodeId[w]).filter(Boolean);
+    snapshot({
+      title: { vi: `Gõ "${prefix}"`, en: `Type "${prefix}"` },
+      codeLines: [11, 12, 15, 16],
+      highlight: [...path, ...suggHl],
+      vars: [
+        { name: "prefix", value: prefix },
+        { name: "suggestions", value: `[${sugg.join(", ")}]` },
+        { name: "count", value: sugg.length },
+      ],
+      note: {
+        vi: `Tiền tố "${prefix}" → top-3 gợi ý: [${sugg.join(", ")}]. DFS trên nhánh '${ch}' thu được ${sugg.length} kết quả.`,
+        en: `Prefix "${prefix}" → top-3 suggestions: [${sugg.join(", ")}]. DFS from branch '${ch}' collected ${sugg.length} result(s).`,
+      },
+    });
   }
 
   if (steps.length) steps[steps.length - 1].final = true;
@@ -2011,9 +2062,258 @@ function buildSteps588(input, params) {
   return { ops, answer: results.join(" | "), steps };
 }
 
+/**
+ * LeetCode 1295: Find Numbers with Even Number of Digits.
+ * Đếm bao nhiêu số trong mảng có số lượng chữ số chẵn.
+ */
+function buildSteps1295(nums) {
+  const steps = [];
+  let count = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [{ name: "count", value: 0 }],
+    note: {
+      vi: `Duyệt từng số, đếm số lượng chữ số. Nếu chẵn → count += 1.`,
+      en: `Iterate each number, count its digits. If even → count += 1.`,
+    },
+  });
+
+  const evenIndices = [];
+  for (let i = 0; i < nums.length; i++) {
+    const num = nums[i];
+    const digits = String(num).length;
+    const isEven = digits % 2 === 0;
+    if (isEven) {
+      count++;
+      evenIndices.push(i);
+    }
+
+    steps.push({
+      title: { vi: `Xét nums[${i}] = ${num}`, en: `Check nums[${i}] = ${num}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [...evenIndices],
+      codeLines: [4, 5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+        { name: "digits", value: digits },
+        { name: "even?", value: isEven ? "yes" : "no" },
+        { name: "count", value: count },
+      ],
+      note: {
+        vi: `${num} có ${digits} chữ số (${isEven ? "chẵn → count++" : "lẻ → bỏ qua"}). count = ${count}.`,
+        en: `${num} has ${digits} digit(s) (${isEven ? "even → count++" : "odd → skip"}). count = ${count}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: [...evenIndices],
+    final: true,
+    codeLines: [7],
+    vars: [
+      { name: "count", value: count },
+      { name: "even numbers", value: evenIndices.map((i) => nums[i]) },
+    ],
+    note: {
+      vi: `Có ${count} số có số lượng chữ số chẵn: [${evenIndices.map((i) => nums[i]).join(", ")}].`,
+      en: `${count} number(s) have an even number of digits: [${evenIndices.map((i) => nums[i]).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: count, steps };
+}
+
+/**
+ * LeetCode 977: Squares of a Sorted Array.
+ * Two-pointer: compare abs(left) vs abs(right), place larger square at the end of result.
+ */
+function buildSteps977(nums) {
+  const n = nums.length;
+  const result = new Array(n).fill(0);
+  const steps = [];
+  let left = 0;
+  let right = n - 1;
+  let pos = n - 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    sub: [...result],
+    highlight: [left, right],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "left", value: left },
+      { name: "right", value: right },
+      { name: "pos", value: pos },
+    ],
+    note: {
+      vi: `Hai con trỏ: left = 0, right = ${right}. Điền result từ cuối (pos = ${pos}).`,
+      en: `Two pointers: left = 0, right = ${right}. Fill result from the end (pos = ${pos}).`,
+    },
+  });
+
+  while (left <= right) {
+    const absL = Math.abs(nums[left]);
+    const absR = Math.abs(nums[right]);
+    let chosen;
+    if (absL > absR) {
+      result[pos] = absL * absL;
+      chosen = "left";
+      steps.push({
+        title: { vi: `|nums[${left}]| > |nums[${right}]|`, en: `|nums[${left}]| > |nums[${right}]|` },
+        arr: [...nums],
+        sub: [...result],
+        highlight: [left, right],
+        mark: [left],
+        codeLines: [7, 8, 9],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "|left|", value: absL },
+          { name: "|right|", value: absR },
+          { name: "result[pos]", value: result[pos] },
+          { name: "pos", value: pos },
+        ],
+        note: {
+          vi: `|${nums[left]}| = ${absL} > |${nums[right]}| = ${absR}. result[${pos}] = ${absL}² = ${result[pos]}. Di chuyển left →.`,
+          en: `|${nums[left]}| = ${absL} > |${nums[right]}| = ${absR}. result[${pos}] = ${absL}² = ${result[pos]}. Move left →.`,
+        },
+      });
+      left++;
+    } else {
+      result[pos] = absR * absR;
+      chosen = "right";
+      steps.push({
+        title: { vi: `|nums[${right}]| ≥ |nums[${left}]|`, en: `|nums[${right}]| ≥ |nums[${left}]|` },
+        arr: [...nums],
+        sub: [...result],
+        highlight: [left, right],
+        mark: [right],
+        codeLines: [10, 11, 12],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "|left|", value: absL },
+          { name: "|right|", value: absR },
+          { name: "result[pos]", value: result[pos] },
+          { name: "pos", value: pos },
+        ],
+        note: {
+          vi: `|${nums[right]}| = ${absR} ≥ |${nums[left]}| = ${absL}. result[${pos}] = ${absR}² = ${result[pos]}. Di chuyển ← right.`,
+          en: `|${nums[right]}| = ${absR} ≥ |${nums[left]}| = ${absL}. result[${pos}] = ${absR}² = ${result[pos]}. Move right ←.`,
+        },
+      });
+      right--;
+    }
+    pos--;
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...result],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [13],
+    vars: [{ name: "result", value: [...result] }],
+    note: {
+      vi: `Mảng bình phương đã sắp xếp: [${result.join(", ")}].`,
+      en: `Sorted squares array: [${result.join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: result, steps };
+}
+
 const SUPPORTED = {
+  977: {
+    id: 977,
+    difficulty: "easy",
+    slug: "squares-of-a-sorted-array",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Squares of a Sorted Array", en: "Squares of a Sorted Array" },
+    titleVi: { vi: "Bình phương của mảng đã sắp xếp", en: "Squares of a sorted array" },
+    statement: {
+      vi: "Cho mảng số nguyên nums đã sắp xếp tăng dần. Trả về mảng bình phương các phần tử, cũng sắp xếp tăng dần.",
+      en: "Given an integer array nums sorted in non-decreasing order, return an array of the squares of each number sorted in non-decreasing order.",
+    },
+    defaultInput: [-4, -1, 0, 3, 10],
+    inputKind: "integer",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Hai con trỏ duyệt mảng một lần O(n). Mảng kết quả O(n).",
+        en: "Two pointers traverse once O(n). Result array O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def sortedSquares(self, nums):",
+      "        n = len(nums)",
+      "        result = [0] * n",
+      "        left, right, pos = 0, n-1, n-1",
+      "        while left <= right:",
+      "            if abs(nums[left]) > abs(nums[right]):",
+      "                result[pos] = nums[left] ** 2",
+      "                left += 1",
+      "            else:",
+      "                result[pos] = nums[right] ** 2",
+      "                right -= 1",
+      "            pos -= 1",
+      "        return result",
+    ],
+    builder: buildSteps977,
+  },
+  1295: {
+    id: 1295,
+    difficulty: "easy",
+    slug: "find-numbers-with-even-number-of-digits",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Find Numbers with Even Number of Digits", en: "Find Numbers with Even Number of Digits" },
+    titleVi: { vi: "Đếm số có chữ số chẵn", en: "Count numbers with even digit count" },
+    statement: {
+      vi: "Cho mảng nums chứa các số nguyên. Trả về số lượng phần tử có số lượng chữ số chẵn.",
+      en: "Given an array nums of integers, return how many of them contain an even number of digits.",
+    },
+    defaultInput: [12, 345, 2, 6, 7896],
+    inputKind: "nonneg",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần, đếm chữ số bằng log hoặc chuỗi O(1). Tổng O(n).",
+        en: "Single pass, digit count via log or string is O(1). Total O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findNumbers(self, nums):",
+      "        count = 0",
+      "        for num in nums:",
+      "            if len(str(num)) % 2 == 0:",
+      "                count += 1",
+      "        return count",
+    ],
+    builder: buildSteps1295,
+  },
   676: {
     id: 676,
+    difficulty: "medium",
+    slug: "implement-magic-dictionary",
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
     title: { vi: "Implement Magic Dictionary", en: "Implement Magic Dictionary" },
     titleVi: { vi: "Từ điển ma thuật (Trie + DFS)", en: "Magic dictionary via Trie" },
@@ -2031,6 +2331,8 @@ const SUPPORTED = {
   },
   1268: {
     id: 1268,
+    difficulty: "medium",
+    slug: "search-suggestions-system",
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
     title: { vi: "Search Suggestions System", en: "Search Suggestions System" },
     titleVi: { vi: "Gợi ý tìm kiếm (Trie)", en: "Search suggestions via Trie" },
@@ -2048,6 +2350,8 @@ const SUPPORTED = {
   },
   1166: {
     id: 1166,
+    difficulty: "medium",
+    slug: "design-file-system",
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
     title: { vi: "Design File System", en: "Design File System" },
     titleVi: { vi: "Thiết kế hệ thống file (Trie đường dẫn)", en: "File system via path Trie" },
@@ -2065,6 +2369,8 @@ const SUPPORTED = {
   },
   588: {
     id: 588,
+    difficulty: "hard",
+    slug: "design-in-memory-file-system",
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
     title: { vi: "Design In-Memory File System", en: "Design In-Memory File System" },
     titleVi: { vi: "Hệ thống file trong bộ nhớ (Trie)", en: "In-memory file system via Trie" },
@@ -2077,11 +2383,53 @@ const SUPPORTED = {
     inputLabel: { vi: "Các lệnh (;ngăn cách)", en: "Operations (semicolon separated)" },
     extraParams: [],
     complexity: { time: "O(L)", space: "O(N·L+C)", note: { vi: "Mỗi thao tác O(L). Bộ nhớ O(N·L + tổng nội dung file).", en: "Each operation O(L). Memory O(N·L + total file content)." } },
-    code: ["class FileSystem:", "    def __init__(self):", "        self.root = {'dirs': {}, 'files': {}}", "    def ls(self, path):", "        # returns sorted dir/file names", "    def mkdir(self, path):", "        # create dirs recursively", "    def addContentToFile(self, path, content):", "        # append content to file", "    def readContentFromFile(self, path):", "        # return file content"],
+    code: [
+      "class TrieNode:",
+      "    def __init__(self):",
+      "        self.children = {}",
+      "        self.content = None  # None = directory, str = file",
+      "",
+      "class FileSystem:",
+      "    def __init__(self):",
+      "        self.root = TrieNode()",
+      "",
+      "    def ls(self, path):",
+      "        node = self._navigate(path)",
+      "        if node.content is not None:",
+      "            return [path.split('/')[-1]]",
+      "        return sorted(node.children.keys())",
+      "",
+      "    def mkdir(self, path):",
+      "        self._navigate(path, create=True)",
+      "",
+      "    def addContentToFile(self, path, content):",
+      "        node = self._navigate(path, create=True)",
+      "        if node.content is None:",
+      "            node.content = ''",
+      "        node.content += content",
+      "",
+      "    def readContentFromFile(self, path):",
+      "        node = self._navigate(path)",
+      "        return node.content",
+      "",
+      "    def _navigate(self, path, create=False):",
+      "        node = self.root",
+      "        for part in path.split('/')[1:]:",
+      "            if not part:",
+      "                continue",
+      "            if part not in node.children:",
+      "                if not create:",
+      "                    return None",
+      "                node.children[part] = TrieNode()",
+      "            node = node.children[part]",
+      "        return node",
+    ],
     builder: buildSteps588,
   },
   1143: {
     id: 1143,
+    difficulty: "medium",
+    slug: "longest-common-subsequence",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Longest Common Subsequence", en: "Longest Common Subsequence" },
     titleVi: { vi: "Dãy con chung dài nhất", en: "Longest common subsequence" },
@@ -2129,6 +2477,8 @@ const SUPPORTED = {
   },
   213: {
     id: 213,
+    difficulty: "medium",
+    slug: "house-robber-ii",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "House Robber II", en: "House Robber II" },
     titleVi: { vi: "Tên cướp nhà II (vòng tròn)", en: "House robber II (circular)" },
@@ -2172,6 +2522,8 @@ const SUPPORTED = {
   },
   198: {
     id: 198,
+    difficulty: "medium",
+    slug: "house-robber",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "House Robber", en: "House Robber" },
     titleVi: { vi: "Tên cướp nhà", en: "House robber" },
@@ -2210,6 +2562,8 @@ const SUPPORTED = {
   },
   3020: {
     id: 3020,
+    difficulty: "medium",
+    slug: "find-the-maximum-number-of-elements-in-subset",
     category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
     title: { vi: "Find the Maximum Number of Elements in a Subset", en: "Find the Maximum Number of Elements in a Subset" },
     titleVi: { vi: "Số phần tử lớn nhất trong tập con theo mẫu lũy thừa", en: "Largest subset following the power pattern" },
@@ -2257,6 +2611,8 @@ const SUPPORTED = {
   },
   53: {
     id: 53,
+    difficulty: "medium",
+    slug: "maximum-subarray",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Maximum Subarray", en: "Maximum Subarray" },
     titleVi: { vi: "Dãy con liên tiếp có tổng lớn nhất", en: "Maximum contiguous subarray sum" },
@@ -2289,6 +2645,8 @@ const SUPPORTED = {
   },
   208: {
     id: 208,
+    difficulty: "medium",
+    slug: "implement-trie-prefix-tree",
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
     title: { vi: "Implement Trie (Prefix Tree)", en: "Implement Trie (Prefix Tree)" },
     titleVi: { vi: "Cài đặt Trie (cây tiền tố)", en: "Implement a prefix tree" },
@@ -2367,6 +2725,8 @@ const SUPPORTED = {
   },
   1208: {
     id: 1208,
+    difficulty: "medium",
+    slug: "get-equal-substrings-within-budget",
     category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
     title: { vi: "Get Equal Substrings Within Budget", en: "Get Equal Substrings Within Budget" },
     titleVi: { vi: "Đoạn con bằng nhau trong ngân sách", en: "Equal substring within budget" },
@@ -2422,6 +2782,8 @@ const SUPPORTED = {
   },
   1846: {
     id: 1846,
+    difficulty: "medium",
+    slug: "maximum-element-after-decreasing-and-rearranging",
     category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
     title: {
       vi: "Maximum Element After Decreasing and Rearranging",
@@ -2470,6 +2832,8 @@ const SUPPORTED = {
   },
   1004: {
     id: 1004,
+    difficulty: "medium",
+    slug: "max-consecutive-ones-iii",
     category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
     title: { vi: "Max Consecutive Ones III", en: "Max Consecutive Ones III" },
     titleVi: { vi: "Dãy số 1 liên tiếp dài nhất III", en: "Longest run of consecutive ones III" },
@@ -2514,6 +2878,8 @@ const SUPPORTED = {
   },
   746: {
     id: 746,
+    difficulty: "easy",
+    slug: "min-cost-climbing-stairs",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Min Cost Climbing Stairs", en: "Min Cost Climbing Stairs" },
     titleVi: { vi: "Chi phí leo cầu thang nhỏ nhất", en: "Minimum cost to climb stairs" },
@@ -2545,6 +2911,8 @@ const SUPPORTED = {
   },
   152: {
     id: 152,
+    difficulty: "medium",
+    slug: "maximum-product-subarray",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Maximum Product Subarray", en: "Maximum Product Subarray" },
     titleVi: { vi: "Tích lớn nhất của dãy con liên tiếp", en: "Largest product of a contiguous subarray" },
@@ -2579,6 +2947,8 @@ const SUPPORTED = {
   },
   70: {
     id: 70,
+    difficulty: "easy",
+    slug: "climbing-stairs",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Climbing Stairs", en: "Climbing Stairs" },
     titleVi: { vi: "Leo cầu thang", en: "Climbing stairs" },
@@ -2614,6 +2984,8 @@ const SUPPORTED = {
   },
   300: {
     id: 300,
+    difficulty: "medium",
+    slug: "longest-increasing-subsequence",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Longest Increasing Subsequence", en: "Longest Increasing Subsequence" },
     titleVi: { vi: "Dãy con tăng dài nhất", en: "Longest increasing subsequence" },
@@ -2647,6 +3019,8 @@ const SUPPORTED = {
   },
   509: {
     id: 509,
+    difficulty: "easy",
+    slug: "fibonacci-number",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
     title: { vi: "Fibonacci Number", en: "Fibonacci Number" },
     titleVi: { vi: "Số Fibonacci", en: "Fibonacci number" },
@@ -2682,6 +3056,8 @@ const SUPPORTED = {
   },
   1: {
     id: 1,
+    difficulty: "easy",
+    slug: "two-sum",
     category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
     title: { vi: "Two Sum", en: "Two Sum" },
     titleVi: { vi: "Tổng hai số", en: "Two sum" },
@@ -2729,7 +3105,7 @@ app.get("/api/problems", (req, res) => {
     if (!groupsMap[cat.key]) {
       groupsMap[cat.key] = { key: cat.key, vi: cat.vi, en: cat.en, problems: [] };
     }
-    groupsMap[cat.key].problems.push({ id: p.id, title: p.title, titleVi: p.titleVi });
+    groupsMap[cat.key].problems.push({ id: p.id, title: p.title, titleVi: p.titleVi, difficulty: p.difficulty || null });
   }
   const groups = Object.values(groupsMap);
   groups.forEach((g) => g.problems.sort((a, b) => a.id - b.id));
@@ -2747,6 +3123,8 @@ app.get("/api/problem/:id", (req, res) => {
   }
   res.json({
     id: problem.id,
+    difficulty: problem.difficulty || null,
+    slug: problem.slug || null,
     title: problem.title,
     titleVi: problem.titleVi,
     statement: problem.statement,

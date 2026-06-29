@@ -138,6 +138,12 @@ function renderCatalog() {
 
       chip.appendChild(pid);
       chip.appendChild(pname);
+      if (p.difficulty) {
+        const diff = document.createElement("span");
+        diff.className = `diff diff-${p.difficulty}`;
+        diff.textContent = p.difficulty;
+        chip.appendChild(diff);
+      }
       chip.addEventListener("click", () => {
         $("problemId").value = p.id;
         loadProblem();
@@ -199,7 +205,26 @@ async function loadProblem() {
 function renderProblem() {
   if (!problemData) return;
   $("problemId2").textContent = `#${problemData.id}`;
-  $("problemTitle").textContent = pick(problemData.title);
+  const titleEl = $("problemTitle");
+  titleEl.textContent = pick(problemData.title);
+  if (problemData.slug) {
+    titleEl.href = `https://leetcode.com/problems/${problemData.slug}/`;
+    titleEl.target = "_blank";
+    titleEl.rel = "noopener";
+  } else {
+    titleEl.removeAttribute("href");
+  }
+
+  // Difficulty badge
+  const diffEl = $("problemDiff");
+  if (problemData.difficulty) {
+    diffEl.textContent = problemData.difficulty;
+    diffEl.className = `diff diff-${problemData.difficulty}`;
+    diffEl.classList.remove("hidden");
+  } else {
+    diffEl.classList.add("hidden");
+  }
+
   $("problemTitleVi").textContent = pick(problemData.titleVi);
   $("problemStatement").textContent = pick(problemData.statement);
   // Nhãn ô nhập: dùng nhãn tùy biến của bài nếu có, ngược lại về mặc định
