@@ -544,6 +544,32 @@ function renderBars(step) {
   });
 }
 
+// ---- Vẽ dạng lưới (DP 2D) ----
+function renderGrid(step) {
+  const { dp, text1, text2, hlCell, pathCells } = step.grid;
+  const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
+  const m = dp.length - 1;
+  const n = dp[0].length - 1;
+
+  let html = '<table class="dp-grid"><thead><tr><th></th><th></th>';
+  for (let j = 0; j < n; j++) html += `<th>${text2[j]}</th>`;
+  html += "</tr></thead><tbody>";
+
+  for (let i = 0; i <= m; i++) {
+    html += "<tr>";
+    html += `<td class="row-label">${i === 0 ? "" : text1[i - 1]}</td>`;
+    for (let j = 0; j <= n; j++) {
+      let cls = "dp-cell";
+      if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
+      if (pathSet.has(`${i},${j}`)) cls += " path";
+      html += `<td class="${cls}">${dp[i][j]}</td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</tbody></table>";
+  $("gridView").innerHTML = html;
+}
+
 // ---- Vẽ dạng cây (Trie) ----
 function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -608,9 +634,16 @@ function renderStep() {
   if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
     renderTree(step);
+  } else if (step.grid) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.add("hidden");
+    $("gridView").classList.remove("hidden");
+    renderGrid(step);
   } else {
     $("treeView").classList.add("hidden");
+    $("gridView").classList.add("hidden");
     $("bars").classList.remove("hidden");
     renderBars(step);
   }

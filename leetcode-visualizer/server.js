@@ -1309,7 +1309,905 @@ function buildSteps3020(nums) {
   return { original: [...nums], answer: ans, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 198: House Robber.
+ *
+ * dp[i] = tiền lớn nhất cướp được từ nhà 0..i.
+ *  - dp[0] = nums[0]
+ *  - dp[1] = max(nums[0], nums[1])
+ *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (bỏ nhà i hoặc cướp nhà i)
+ */
+function buildSteps198(nums) {
+  const n = nums.length;
+  const dp = new Array(n).fill(0);
+  const steps = [];
+
+  dp[0] = nums[0];
+  if (n >= 2) dp[1] = Math.max(nums[0], nums[1]);
+
+  steps.push({
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: n >= 2 ? [0, 1] : [0],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp[0]", value: dp[0] },
+      { name: "dp[1]", value: n >= 2 ? dp[1] : "-" },
+      { name: "dp", value: [...dp] },
+    ],
+    note: {
+      vi: `nums = [${nums.join(", ")}]. dp[0] = ${dp[0]} (cướp nhà 0). ${n >= 2 ? `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}.` : ""}`,
+      en: `nums = [${nums.join(", ")}]. dp[0] = ${dp[0]} (rob house 0). ${n >= 2 ? `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}.` : ""}`,
+    },
+  });
+
+  for (let i = 2; i < n; i++) {
+    const skip = dp[i - 1];
+    const rob = dp[i - 2] + nums[i];
+    dp[i] = Math.max(skip, rob);
+    const robbed = dp[i] === rob;
+
+    steps.push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      arr: [...nums],
+      sub: [...dp],
+      highlight: [i - 2, i - 1, i],
+      mark: [],
+      codeLines: [6, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "skip (dp[i-1])", value: skip },
+        { name: "rob (dp[i-2]+nums[i])", value: rob },
+        { name: "dp[i]", value: dp[i] },
+        { name: "decision", value: robbed ? "rob" : "skip" },
+      ],
+      note: {
+        vi: `Bỏ nhà ${i}: dp[${i - 1}] = ${skip}. Cướp nhà ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
+        en: `Skip house ${i}: dp[${i - 1}] = ${skip}. Rob house ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "rob" : "skip"}).`,
+      },
+    });
+  }
+
+  // Trace back which houses were robbed.
+  const robbed = [];
+  let i = n - 1;
+  while (i >= 0) {
+    if (i === 0 || dp[i] !== dp[i - 1]) {
+      robbed.push(i);
+      i -= 2;
+    } else {
+      i -= 1;
+    }
+  }
+  robbed.reverse();
+
+  const answer = dp[n - 1];
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: [],
+    mark: robbed,
+    final: true,
+    codeLines: [8],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "robbed houses", value: robbed },
+    ],
+    note: {
+      vi: `Tiền lớn nhất = dp[${n - 1}] = ${answer}. Cướp các nhà [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
+      en: `Maximum loot = dp[${n - 1}] = ${answer}. Rob houses [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * Sinh các bước cho LeetCode 213: House Robber II.
+ *
+ * Nhà xếp vòng tròn → không cướp cả nhà đầu lẫn nhà cuối.
+ * Chạy House-Robber trên hai đoạn:
+ *   Pass A: nums[0..n-2] (gồm nhà đầu, bỏ nhà cuối)
+ *   Pass B: nums[1..n-1] (bỏ nhà đầu, gồm nhà cuối)
+ * Đáp án = max(A, B).
+ */
+function buildSteps213(nums) {
+  const n = nums.length;
+  const steps = [];
+
+  if (n === 1) {
+    steps.push({
+      title: { vi: "Một nhà duy nhất", en: "Only one house" },
+      arr: [...nums],
+      highlight: [0],
+      mark: [0],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: nums[0] }],
+      note: { vi: `Chỉ có 1 nhà → cướp nó = ${nums[0]}.`, en: `Only 1 house → rob it = ${nums[0]}.` },
+    });
+    return { original: [...nums], answer: nums[0], steps };
+  }
+
+  steps.push({
+    title: { vi: "Ý tưởng: vòng tròn", en: "Idea: circular constraint" },
+    arr: [...nums],
+    highlight: [0, n - 1],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [{ name: "n", value: n }],
+    note: {
+      vi: `Nhà 0 và nhà ${n - 1} liền kề (vòng tròn). Tách thành 2 bài: bỏ nhà cuối (Pass A) và bỏ nhà đầu (Pass B).`,
+      en: `House 0 and house ${n - 1} are adjacent (circular). Split into 2 sub-problems: exclude last (Pass A) and exclude first (Pass B).`,
+    },
+  });
+
+  function robRange(lo, hi, passLabel) {
+    const len = hi - lo + 1;
+    const dp = new Array(len).fill(0);
+    dp[0] = nums[lo];
+    if (len >= 2) dp[1] = Math.max(nums[lo], nums[lo + 1]);
+
+    const hlBase = lo;
+    steps.push({
+      title: { vi: `${passLabel}: khởi tạo dp`, en: `${passLabel}: init dp` },
+      arr: [...nums],
+      sub: new Array(lo).fill("").concat([...dp]).concat(new Array(n - hi - 1).fill("")),
+      highlight: len >= 2 ? [lo, lo + 1] : [lo],
+      mark: [],
+      codeLines: [7, 8, 9],
+      vars: [
+        { name: "range", value: `[${lo}..${hi}]` },
+        { name: "dp[0]", value: dp[0] },
+        { name: "dp[1]", value: len >= 2 ? dp[1] : "-" },
+      ],
+      note: {
+        vi: `${passLabel}: xét nums[${lo}..${hi}]. dp[0]=${dp[0]}, dp[1]=${len >= 2 ? dp[1] : "-"}.`,
+        en: `${passLabel}: consider nums[${lo}..${hi}]. dp[0]=${dp[0]}, dp[1]=${len >= 2 ? dp[1] : "-"}.`,
+      },
+    });
+
+    for (let j = 2; j < len; j++) {
+      const idx = lo + j;
+      const skip = dp[j - 1];
+      const rob = dp[j - 2] + nums[idx];
+      dp[j] = Math.max(skip, rob);
+      const robbed = dp[j] === rob;
+
+      steps.push({
+        title: { vi: `${passLabel}: dp[${j}] (nhà ${idx})`, en: `${passLabel}: dp[${j}] (house ${idx})` },
+        arr: [...nums],
+        sub: new Array(lo).fill("").concat([...dp]).concat(new Array(n - hi - 1).fill("")),
+        highlight: [lo + j - 2, lo + j - 1, idx],
+        mark: [],
+        codeLines: [10, 11],
+        vars: [
+          { name: "i", value: idx },
+          { name: "skip", value: skip },
+          { name: "rob", value: rob },
+          { name: "dp[i]", value: dp[j] },
+          { name: "decision", value: robbed ? "rob" : "skip" },
+        ],
+        note: {
+          vi: `Bỏ: dp[${j - 1}]=${skip}. Cướp: dp[${j - 2}]+${nums[idx]}=${rob}. → ${dp[j]} (${robbed ? "cướp" : "bỏ"}).`,
+          en: `Skip: dp[${j - 1}]=${skip}. Rob: dp[${j - 2}]+${nums[idx]}=${rob}. → ${dp[j]} (${robbed ? "rob" : "skip"}).`,
+        },
+      });
+    }
+
+    const result = dp[len - 1];
+
+    // Trace back which houses
+    const robbed = [];
+    let k = len - 1;
+    while (k >= 0) {
+      if (k === 0 || dp[k] !== dp[k - 1]) {
+        robbed.push(lo + k);
+        k -= 2;
+      } else {
+        k -= 1;
+      }
+    }
+    robbed.reverse();
+
+    return { result, robbed, dp };
+  }
+
+  const passA = robRange(0, n - 2, "Pass A");
+  steps.push({
+    title: { vi: "Pass A: kết quả", en: "Pass A: result" },
+    arr: [...nums],
+    highlight: [],
+    mark: passA.robbed,
+    codeLines: [12],
+    vars: [
+      { name: "passA", value: passA.result },
+      { name: "robbed", value: passA.robbed },
+    ],
+    note: {
+      vi: `Pass A (bỏ nhà ${n - 1}): max = ${passA.result}. Cướp nhà [${passA.robbed.join(",")}].`,
+      en: `Pass A (exclude house ${n - 1}): max = ${passA.result}. Rob houses [${passA.robbed.join(",")}].`,
+    },
+  });
+
+  const passB = robRange(1, n - 1, "Pass B");
+  steps.push({
+    title: { vi: "Pass B: kết quả", en: "Pass B: result" },
+    arr: [...nums],
+    highlight: [],
+    mark: passB.robbed,
+    codeLines: [12],
+    vars: [
+      { name: "passB", value: passB.result },
+      { name: "robbed", value: passB.robbed },
+    ],
+    note: {
+      vi: `Pass B (bỏ nhà 0): max = ${passB.result}. Cướp nhà [${passB.robbed.join(",")}].`,
+      en: `Pass B (exclude house 0): max = ${passB.result}. Rob houses [${passB.robbed.join(",")}].`,
+    },
+  });
+
+  const answer = Math.max(passA.result, passB.result);
+  const bestRobbed = passA.result >= passB.result ? passA.robbed : passB.robbed;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: bestRobbed,
+    final: true,
+    codeLines: [13],
+    vars: [
+      { name: "passA", value: passA.result },
+      { name: "passB", value: passB.result },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Đáp án = max(${passA.result}, ${passB.result}) = ${answer}. Cướp nhà [${bestRobbed.join(", ")}] = [${bestRobbed.map((j) => nums[j]).join(", ")}].`,
+      en: `Answer = max(${passA.result}, ${passB.result}) = ${answer}. Rob houses [${bestRobbed.join(", ")}] = [${bestRobbed.map((j) => nums[j]).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * Sinh các bước cho LeetCode 1143: Longest Common Subsequence.
+ *
+ * dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1].
+ *  - Nếu text1[i-1] == text2[j-1]: dp[i][j] = dp[i-1][j-1] + 1
+ *  - Ngược lại: dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+ */
+function buildSteps1143(input, params) {
+  const text1 = String(input).trim();
+  const text2 = String(params.text2 || "").trim();
+  const m = text1.length;
+  const n = text2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const steps = [];
+
+  function gridSnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        text1,
+        text2,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Khởi tạo bảng DP", en: "Initialize DP table" },
+    codeLines: [3, 4],
+    hlCell: null,
+    vars: [
+      { name: "text1", value: text1 },
+      { name: "text2", value: text2 },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `Tạo bảng (${m + 1})×(${n + 1}) toàn 0. dp[i][j] = LCS của text1[0..i-1] và text2[0..j-1].`,
+      en: `Create a (${m + 1})×(${n + 1}) table of zeros. dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1].`,
+    },
+  });
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const match = text1[i - 1] === text2[j - 1];
+      if (match) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+
+      gridSnap({
+        title: {
+          vi: `dp[${i}][${j}]: '${text1[i - 1]}' vs '${text2[j - 1]}'`,
+          en: `dp[${i}][${j}]: '${text1[i - 1]}' vs '${text2[j - 1]}'`,
+        },
+        codeLines: match ? [5, 6] : [7, 8],
+        hlCell: [i, j],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "text1[i-1]", value: text1[i - 1] },
+          { name: "text2[j-1]", value: text2[j - 1] },
+          { name: "match", value: match ? "yes" : "no" },
+          { name: "dp[i][j]", value: dp[i][j] },
+        ],
+        note: match
+          ? {
+              vi: `'${text1[i - 1]}' == '${text2[j - 1]}' → dp[${i}][${j}] = dp[${i - 1}][${j - 1}] + 1 = ${dp[i][j]}.`,
+              en: `'${text1[i - 1]}' == '${text2[j - 1]}' → dp[${i}][${j}] = dp[${i - 1}][${j - 1}] + 1 = ${dp[i][j]}.`,
+            }
+          : {
+              vi: `'${text1[i - 1]}' ≠ '${text2[j - 1]}' → dp[${i}][${j}] = max(dp[${i - 1}][${j}], dp[${i}][${j - 1}]) = max(${dp[i - 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+              en: `'${text1[i - 1]}' ≠ '${text2[j - 1]}' → dp[${i}][${j}] = max(dp[${i - 1}][${j}], dp[${i}][${j - 1}]) = max(${dp[i - 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+            },
+      });
+    }
+  }
+
+  // Trace back the LCS path.
+  const pathCells = [];
+  let lcs = "";
+  let pi = m;
+  let pj = n;
+  while (pi > 0 && pj > 0) {
+    if (text1[pi - 1] === text2[pj - 1]) {
+      pathCells.push([pi, pj]);
+      lcs = text1[pi - 1] + lcs;
+      pi--;
+      pj--;
+    } else if (dp[pi - 1][pj] >= dp[pi][pj - 1]) {
+      pi--;
+    } else {
+      pj--;
+    }
+  }
+  pathCells.reverse();
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: "Kết quả", en: "Result" },
+    codeLines: [9],
+    hlCell: null,
+    pathCells,
+    vars: [
+      { name: "LCS length", value: answer },
+      { name: "LCS", value: lcs },
+    ],
+    note: {
+      vi: `Dãy con chung dài nhất = "${lcs}" (độ dài ${answer}). Ô xanh = đường truy vết.`,
+      en: `Longest common subsequence = "${lcs}" (length ${answer}). Green cells = traceback path.`,
+    },
+  });
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { text1, text2, answer, lcs, steps };
+}
+
+/**
+ * LeetCode 676: Implement Magic Dictionary.
+ * Trie + search with exactly one character changed.
+ */
+function buildSteps676(input, params) {
+  const words = String(input).split(",").map((w) => w.trim()).filter(Boolean);
+  const searchWords = (params.search || "").split(",").map((w) => w.trim()).filter(Boolean);
+
+  let idCounter = 0;
+  const makeNode = (label, parentId) => ({ id: idCounter++, label, parentId, isWord: false, children: {} });
+  const root = makeNode("\u2022", null);
+  const steps = [];
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (keys.length === 0) { x = nextX++; }
+      else { const xs = keys.map((k) => dfs(node.children[k], depth + 1)); x = (xs[0] + xs[xs.length - 1]) / 2; }
+      nodes.push({ id: node.id, label: node.label, x, y: depth, parentId: node.parentId, isWord: node.isWord, hl: opts.highlight ? opts.highlight.includes(node.id) : false });
+      return x;
+    }
+    dfs(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
+  }
+
+  snapshot({ title: { vi: "Khởi tạo", en: "Initialize" }, highlight: [root.id], vars: [{ name: "words", value: words.join(", ") }], note: { vi: `Chèn từ điển: [${words.join(", ")}].`, en: `Build dictionary: [${words.join(", ")}].` } });
+
+  for (const word of words) {
+    let node = root;
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = makeNode(ch, node.id);
+      node = node.children[ch];
+    }
+    node.isWord = true;
+  }
+  snapshot({ title: { vi: "Trie đã xây", en: "Trie built" }, highlight: [], vars: [{ name: "words", value: words.join(", ") }], note: { vi: "Tất cả từ đã chèn vào Trie.", en: "All words inserted into Trie." } });
+
+  function dfsSearch(node, word, idx, misses, path) {
+    if (idx === word.length) return node.isWord && misses === 1;
+    const ch = word[idx];
+    for (const key of Object.keys(node.children).sort()) {
+      const newMiss = misses + (key !== ch ? 1 : 0);
+      if (newMiss > 1) continue;
+      if (dfsSearch(node.children[key], word, idx + 1, newMiss, path)) {
+        path.push(node.children[key].id);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const results = [];
+  for (const sw of searchWords) {
+    const path = [];
+    const found = dfsSearch(root, sw, 0, 0, path);
+    path.push(root.id);
+    path.reverse();
+    results.push(`search("${sw}") = ${found}`);
+    snapshot({
+      title: { vi: `search("${sw}")`, en: `search("${sw}")` },
+      highlight: found ? path : [],
+      vars: [{ name: "word", value: sw }, { name: "result", value: found ? "True" : "False" }],
+      note: {
+        vi: found ? `"${sw}" có thể đạt được bằng cách đổi đúng 1 ký tự → True.` : `"${sw}" không thể đổi đúng 1 ký tự để khớp → False.`,
+        en: found ? `"${sw}" can be reached by changing exactly 1 character → True.` : `"${sw}" cannot match with exactly 1 change → False.`,
+      },
+    });
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { words, answer: results.join(" | "), steps };
+}
+
+/**
+ * LeetCode 1268: Search Suggestions System.
+ * Trie + DFS để tìm top-3 gợi ý cho mỗi prefix khi gõ.
+ */
+function buildSteps1268(input, params) {
+  const products = String(input).split(",").map((w) => w.trim()).filter(Boolean).sort();
+  const searchWord = (params.searchWord || "").trim();
+
+  let idCounter = 0;
+  const makeNode = (label, parentId) => ({ id: idCounter++, label, parentId, isWord: false, children: {} });
+  const root = makeNode("\u2022", null);
+  const steps = [];
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (keys.length === 0) { x = nextX++; }
+      else { const xs = keys.map((k) => dfs(node.children[k], depth + 1)); x = (xs[0] + xs[xs.length - 1]) / 2; }
+      nodes.push({ id: node.id, label: node.label, x, y: depth, parentId: node.parentId, isWord: node.isWord, hl: opts.highlight ? opts.highlight.includes(node.id) : false });
+      return x;
+    }
+    dfs(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
+  }
+
+  for (const word of products) {
+    let node = root;
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = makeNode(ch, node.id);
+      node = node.children[ch];
+    }
+    node.isWord = true;
+  }
+  snapshot({ title: { vi: "Trie sản phẩm", en: "Products Trie" }, highlight: [], vars: [{ name: "products", value: products.join(", ") }], note: { vi: `Đã chèn ${products.length} sản phẩm (đã sắp xếp).`, en: `Inserted ${products.length} products (sorted).` } });
+
+  function collectWords(node, prefix, result) {
+    if (result.length >= 3) return;
+    if (node.isWord) result.push(prefix);
+    for (const ch of Object.keys(node.children).sort()) {
+      collectWords(node.children[ch], prefix + ch, result);
+      if (result.length >= 3) return;
+    }
+  }
+
+  const allSuggestions = [];
+  let node = root;
+  let prefix = "";
+  const path = [root.id];
+  for (const ch of searchWord) {
+    prefix += ch;
+    if (!node.children[ch]) {
+      allSuggestions.push([]);
+      snapshot({ title: { vi: `Gõ "${prefix}"`, en: `Type "${prefix}"` }, highlight: [...path], vars: [{ name: "prefix", value: prefix }, { name: "suggestions", value: "[]" }], note: { vi: `Không có nhánh '${ch}' → gợi ý rỗng.`, en: `No branch '${ch}' → empty suggestions.` } });
+      node = null;
+      break;
+    }
+    node = node.children[ch];
+    path.push(node.id);
+    const sugg = [];
+    collectWords(node, prefix, sugg);
+    allSuggestions.push(sugg);
+    snapshot({ title: { vi: `Gõ "${prefix}"`, en: `Type "${prefix}"` }, highlight: [...path], vars: [{ name: "prefix", value: prefix }, { name: "suggestions", value: `[${sugg.join(", ")}]` }], note: { vi: `Tiền tố "${prefix}" → gợi ý: [${sugg.join(", ")}].`, en: `Prefix "${prefix}" → suggestions: [${sugg.join(", ")}].` } });
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { products, searchWord, answer: allSuggestions, steps };
+}
+
+/**
+ * LeetCode 1166: Design File System.
+ * Trie trên đường dẫn: createPath(path, value), get(path).
+ */
+function buildSteps1166(input, params) {
+  const ops = String(input).split(";").map((s) => s.trim()).filter(Boolean);
+
+  let idCounter = 0;
+  const makeNode = (label, parentId) => ({ id: idCounter++, label, parentId, value: null, children: {} });
+  const root = makeNode("/", null);
+  const steps = [];
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (keys.length === 0) { x = nextX++; }
+      else { const xs = keys.map((k) => dfs(node.children[k], depth + 1)); x = (xs[0] + xs[xs.length - 1]) / 2; }
+      const lbl = node.value !== null ? `${node.label}=${node.value}` : node.label;
+      nodes.push({ id: node.id, label: lbl, x, y: depth, parentId: node.parentId, isWord: node.value !== null, hl: opts.highlight ? opts.highlight.includes(node.id) : false });
+      return x;
+    }
+    dfs(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
+  }
+
+  snapshot({ title: { vi: "Khởi tạo File System", en: "Init File System" }, highlight: [root.id], vars: [], note: { vi: "Hệ thống file rỗng, chỉ có root /.", en: "Empty file system with root /." } });
+
+  const results = [];
+  for (const op of ops) {
+    const m = op.match(/^(create|get)\(([^,]+?)(?:,\s*(\d+))?\)$/i);
+    if (!m) continue;
+    const cmd = m[1].toLowerCase();
+    const path = m[2].trim();
+    const val = m[3] !== undefined ? Number(m[3]) : undefined;
+    const parts = path.split("/").filter(Boolean);
+
+    if (cmd === "create") {
+      let node = root;
+      const pathIds = [root.id];
+      let ok = true;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!node.children[parts[i]]) { ok = false; break; }
+        node = node.children[parts[i]];
+        pathIds.push(node.id);
+      }
+      const last = parts[parts.length - 1];
+      if (ok && !node.children[last]) {
+        node.children[last] = makeNode(last, node.id);
+        node.children[last].value = val;
+        pathIds.push(node.children[last].id);
+        results.push(`create("${path}",${val}) = true`);
+      } else {
+        ok = false;
+        results.push(`create("${path}",${val}) = false`);
+      }
+      snapshot({ title: { vi: `create("${path}", ${val})`, en: `create("${path}", ${val})` }, highlight: pathIds, vars: [{ name: "op", value: `create("${path}",${val})` }, { name: "result", value: ok }], note: { vi: ok ? `Tạo đường dẫn thành công.` : `Thất bại (cha không tồn tại hoặc đã có).`, en: ok ? `Path created successfully.` : `Failed (parent missing or path exists).` } });
+    } else {
+      let node = root;
+      const pathIds = [root.id];
+      let found = true;
+      for (const p of parts) {
+        if (!node.children[p]) { found = false; break; }
+        node = node.children[p];
+        pathIds.push(node.id);
+      }
+      const v = found ? node.value : -1;
+      results.push(`get("${path}") = ${v}`);
+      snapshot({ title: { vi: `get("${path}")`, en: `get("${path}")` }, highlight: pathIds, vars: [{ name: "op", value: `get("${path}")` }, { name: "result", value: v }], note: { vi: found ? `Giá trị = ${v}.` : `Đường dẫn không tồn tại → -1.`, en: found ? `Value = ${v}.` : `Path not found → -1.` } });
+    }
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { ops, answer: results.join(" | "), steps };
+}
+
+/**
+ * LeetCode 588: Design In-Memory File System.
+ * Trie: mkdir, addContentToFile, readContentFromFile, ls.
+ */
+function buildSteps588(input, params) {
+  const ops = String(input).split(";").map((s) => s.trim()).filter(Boolean);
+
+  let idCounter = 0;
+  const makeNode = (label, parentId) => ({ id: idCounter++, label, parentId, content: null, children: {} });
+  const root = makeNode("/", null);
+  const steps = [];
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (keys.length === 0) { x = nextX++; }
+      else { const xs = keys.map((k) => dfs(node.children[k], depth + 1)); x = (xs[0] + xs[xs.length - 1]) / 2; }
+      const lbl = node.content !== null ? `📄${node.label}` : node.label;
+      nodes.push({ id: node.id, label: lbl, x, y: depth, parentId: node.parentId, isWord: node.content !== null, hl: opts.highlight ? opts.highlight.includes(node.id) : false });
+      return x;
+    }
+    dfs(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
+  }
+
+  snapshot({ title: { vi: "Khởi tạo File System", en: "Init File System" }, highlight: [root.id], vars: [], note: { vi: "Hệ thống file rỗng.", en: "Empty file system." } });
+
+  function navigate(path, create) {
+    const parts = path.split("/").filter(Boolean);
+    let node = root;
+    const ids = [root.id];
+    for (const p of parts) {
+      if (!node.children[p]) {
+        if (!create) return { node: null, ids };
+        node.children[p] = makeNode(p, node.id);
+      }
+      node = node.children[p];
+      ids.push(node.id);
+    }
+    return { node, ids };
+  }
+
+  const results = [];
+  for (const op of ops) {
+    let m;
+    if ((m = op.match(/^ls\(([^)]*)\)$/i))) {
+      const path = m[1].trim() || "/";
+      const { node, ids } = navigate(path, false);
+      let listing = [];
+      if (node) {
+        if (node.content !== null) {
+          listing = [node.label];
+        } else {
+          listing = Object.keys(node.children).sort();
+        }
+      }
+      results.push(`ls("${path}") = [${listing.join(",")}]`);
+      snapshot({ title: { vi: `ls("${path}")`, en: `ls("${path}")` }, highlight: ids, vars: [{ name: "op", value: `ls("${path}")` }, { name: "result", value: `[${listing.join(", ")}]` }], note: { vi: `Liệt kê: [${listing.join(", ")}].`, en: `List: [${listing.join(", ")}].` } });
+    } else if ((m = op.match(/^mkdir\(([^)]+)\)$/i))) {
+      const path = m[1].trim();
+      const { ids } = navigate(path, true);
+      results.push(`mkdir("${path}")`);
+      snapshot({ title: { vi: `mkdir("${path}")`, en: `mkdir("${path}")` }, highlight: ids, vars: [{ name: "op", value: `mkdir("${path}")` }], note: { vi: "Tạo thư mục (và cha nếu cần).", en: "Create directory (and parents if needed)." } });
+    } else if ((m = op.match(/^add\(([^,]+),\s*"([^"]*)"\)$/i))) {
+      const path = m[1].trim();
+      const content = m[2];
+      const { node, ids } = navigate(path, true);
+      node.content = (node.content || "") + content;
+      results.push(`addContent("${path}", "${content}")`);
+      snapshot({ title: { vi: `addContent("${path}")`, en: `addContent("${path}")` }, highlight: ids, vars: [{ name: "op", value: `add("${path}","${content}")` }, { name: "content", value: node.content }], note: { vi: `Nội dung file: "${node.content}".`, en: `File content: "${node.content}".` } });
+    } else if ((m = op.match(/^read\(([^)]+)\)$/i))) {
+      const path = m[1].trim();
+      const { node, ids } = navigate(path, false);
+      const c = node ? node.content || "" : "";
+      results.push(`read("${path}") = "${c}"`);
+      snapshot({ title: { vi: `read("${path}")`, en: `read("${path}")` }, highlight: ids, vars: [{ name: "op", value: `read("${path}")` }, { name: "content", value: c }], note: { vi: `Đọc file: "${c}".`, en: `Read file: "${c}".` } });
+    }
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { ops, answer: results.join(" | "), steps };
+}
+
 const SUPPORTED = {
+  676: {
+    id: 676,
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Implement Magic Dictionary", en: "Implement Magic Dictionary" },
+    titleVi: { vi: "Từ điển ma thuật (Trie + DFS)", en: "Magic dictionary via Trie" },
+    statement: {
+      vi: "Xây một Trie từ danh sách từ. search(word) trả về True nếu có từ trong Trie khác word đúng 1 ký tự.",
+      en: "Build a Trie from a word list. search(word) returns True if there's a word in the Trie that differs from word in exactly one character.",
+    },
+    defaultInput: "hello,hallo",
+    inputKind: "string",
+    inputLabel: { vi: "Từ điển (phẩy ngăn cách)", en: "Dictionary words (comma separated)" },
+    extraParams: [{ key: "search", type: "string", label: { vi: "Từ cần tìm (phẩy ngăn cách)", en: "Words to search (comma separated)" }, default: "hello,hhllo" }],
+    complexity: { time: "O(N·L²)", space: "O(N·L)", note: { vi: "Mỗi search duyệt Trie sâu L, thử thay 1 ký tự nên O(26·L) = O(L²). Bộ nhớ O(N·L) cho Trie.", en: "Each search traverses depth L, trying one swap → O(26·L). Memory O(N·L) for the Trie." } },
+    code: ["class MagicDictionary:", "    def __init__(self):", "        self.root = {}", "    def buildDict(self, words):", "        for w in words:", "            node = self.root", "            for ch in w:", "                node = node.setdefault(ch, {})", "            node['$'] = True", "    def search(self, word):", "        def dfs(node, i, misses):", "            if i == len(word):", "                return '$' in node and misses == 1", "            for ch in node:", "                if ch == '$': continue", "                dfs(node[ch], i+1, misses+(ch!=word[i]))", "            return False", "        return dfs(self.root, 0, 0)"],
+    builder: buildSteps676,
+  },
+  1268: {
+    id: 1268,
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Search Suggestions System", en: "Search Suggestions System" },
+    titleVi: { vi: "Gợi ý tìm kiếm (Trie)", en: "Search suggestions via Trie" },
+    statement: {
+      vi: "Cho danh sách sản phẩm và searchWord. Sau mỗi ký tự gõ, trả về tối đa 3 sản phẩm có tiền tố khớp (theo thứ tự từ điển).",
+      en: "Given a list of products and a searchWord, after each character typed, return up to 3 product suggestions that share the prefix (lexicographic order).",
+    },
+    defaultInput: "mobile,mouse,moneypot,monitor,mousepad",
+    inputKind: "string",
+    inputLabel: { vi: "Sản phẩm (phẩy ngăn cách)", en: "Products (comma separated)" },
+    extraParams: [{ key: "searchWord", type: "string", label: { vi: "searchWord", en: "searchWord" }, default: "mouse" }],
+    complexity: { time: "O(M + n·L)", space: "O(M)", note: { vi: "Xây Trie O(M) tổng ký tự sản phẩm. Mỗi ký tự gõ, DFS lấy ≤3 từ O(3·L).", en: "Build Trie O(M) total product chars. Per typed char, DFS collects ≤3 words in O(3·L)." } },
+    code: ["class Solution:", "    def suggestedProducts(self, products, searchWord):", "        products.sort()", "        root = {}", "        for w in products:", "            node = root", "            for ch in w:", "                node = node.setdefault(ch, {})", "            node['$'] = True", "        res = []", "        node, prefix = root, ''", "        for ch in searchWord:", "            prefix += ch", "            node = node.get(ch)", "            if not node: break", "            sugg = []; dfs(node, prefix, sugg)", "            res.append(sugg[:3])", "        return res"],
+    builder: buildSteps1268,
+  },
+  1166: {
+    id: 1166,
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Design File System", en: "Design File System" },
+    titleVi: { vi: "Thiết kế hệ thống file (Trie đường dẫn)", en: "File system via path Trie" },
+    statement: {
+      vi: "createPath(path, value) tạo đường dẫn mới (cha phải tồn tại). get(path) trả về value hoặc -1.",
+      en: "createPath(path, value) creates a new path (parent must exist). get(path) returns the value or -1.",
+    },
+    defaultInput: 'create(/leet,1);create(/leet/code,2);get(/leet/code);get(/leet/missing)',
+    inputKind: "string",
+    inputLabel: { vi: "Các lệnh (;ngăn cách)", en: "Operations (semicolon separated)" },
+    extraParams: [],
+    complexity: { time: "O(L)", space: "O(N·L)", note: { vi: "Mỗi thao tác O(L) theo độ dài đường dẫn. Bộ nhớ O(N·L).", en: "Each operation is O(L) by path length. Memory O(N·L)." } },
+    code: ["class FileSystem:", "    def __init__(self):", "        self.root = {}", "    def createPath(self, path, value):", "        parts = path.split('/')[1:]", "        node = self.root", "        for p in parts[:-1]:", "            if p not in node: return False", "            node = node[p]", "        if parts[-1] in node: return False", "        node[parts[-1]] = {'$val': value}", "        return True", "    def get(self, path):", "        node = self.root", "        for p in path.split('/')[1:]:", "            if p not in node: return -1", "            node = node[p]", "        return node.get('$val', -1)"],
+    builder: buildSteps1166,
+  },
+  588: {
+    id: 588,
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Design In-Memory File System", en: "Design In-Memory File System" },
+    titleVi: { vi: "Hệ thống file trong bộ nhớ (Trie)", en: "In-memory file system via Trie" },
+    statement: {
+      vi: "Hỗ trợ: ls(path), mkdir(path), addContentToFile(path, content), readContentFromFile(path).",
+      en: "Support: ls(path), mkdir(path), addContentToFile(path, content), readContentFromFile(path).",
+    },
+    defaultInput: 'mkdir(/a/b/c);add(/a/b/c/d,"hello");read(/a/b/c/d);ls(/a/b/c)',
+    inputKind: "string",
+    inputLabel: { vi: "Các lệnh (;ngăn cách)", en: "Operations (semicolon separated)" },
+    extraParams: [],
+    complexity: { time: "O(L)", space: "O(N·L+C)", note: { vi: "Mỗi thao tác O(L). Bộ nhớ O(N·L + tổng nội dung file).", en: "Each operation O(L). Memory O(N·L + total file content)." } },
+    code: ["class FileSystem:", "    def __init__(self):", "        self.root = {'dirs': {}, 'files': {}}", "    def ls(self, path):", "        # returns sorted dir/file names", "    def mkdir(self, path):", "        # create dirs recursively", "    def addContentToFile(self, path, content):", "        # append content to file", "    def readContentFromFile(self, path):", "        # return file content"],
+    builder: buildSteps588,
+  },
+  1143: {
+    id: 1143,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Longest Common Subsequence", en: "Longest Common Subsequence" },
+    titleVi: { vi: "Dãy con chung dài nhất", en: "Longest common subsequence" },
+    statement: {
+      vi:
+        "Cho hai chuỗi text1 và text2, trả về độ dài dãy con chung dài nhất. " +
+        "Dãy con là chuỗi thu được bằng cách xóa một số ký tự mà giữ nguyên thứ tự.",
+      en:
+        "Given two strings text1 and text2, return the length of their longest common subsequence. " +
+        "A subsequence is a string derived by deleting some characters without changing the order.",
+    },
+    defaultInput: "abcde",
+    inputKind: "string",
+    inputLabel: { vi: "text1", en: "text1" },
+    extraParams: [
+      {
+        key: "text2",
+        type: "string",
+        label: { vi: "text2", en: "text2" },
+        default: "ace",
+      },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Hai vòng lặp lồng nhau duyệt bảng (m+1)×(n+1) nên O(m·n). Bảng dp cùng kích thước nên O(m·n) bộ nhớ.",
+        en: "Two nested loops fill the (m+1)×(n+1) table, giving O(m·n) time and space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestCommonSubsequence(self, text1, text2):",
+      "        m, n = len(text1), len(text2)",
+      "        dp = [[0]*(n+1) for _ in range(m+1)]",
+      "        for i in range(1, m+1):",
+      "            for j in range(1, n+1):",
+      "                if text1[i-1] == text2[j-1]:",
+      "                    dp[i][j] = dp[i-1][j-1] + 1",
+      "                else:",
+      "                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps1143,
+  },
+  213: {
+    id: 213,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "House Robber II", en: "House Robber II" },
+    titleVi: { vi: "Tên cướp nhà II (vòng tròn)", en: "House robber II (circular)" },
+    statement: {
+      vi:
+        "Giống bài House Robber, nhưng các nhà xếp thành vòng tròn " +
+        "(nhà đầu và nhà cuối liền kề nhau). " +
+        "Không được cướp hai nhà liền kề. Trả về số tiền lớn nhất có thể.",
+      en:
+        "Same as House Robber, but the houses are arranged in a circle " +
+        "(the first and last house are adjacent). " +
+        "You cannot rob two adjacent houses. Return the maximum amount you can rob.",
+    },
+    defaultInput: [2, 3, 2],
+    inputKind: "nonneg",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Chạy House-Robber hai lần (mỗi lần O(n)) nên tổng vẫn O(n). Bộ nhớ O(n) cho dp (có thể O(1)).",
+        en: "Run House-Robber twice (each O(n)), total is still O(n). O(n) memory for dp (optimizable to O(1)).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def rob(self, nums):",
+      "        if len(nums) == 1:",
+      "            return nums[0]",
+      "        return max(self._rob(nums[:-1]),",
+      "                   self._rob(nums[1:]))",
+      "    def _rob(self, nums):",
+      "        dp = [0] * len(nums)",
+      "        dp[0] = nums[0]",
+      "        dp[1] = max(nums[0], nums[1])",
+      "        for i in range(2, len(nums)):",
+      "            dp[i] = max(dp[i-1], dp[i-2]+nums[i])",
+      "        return dp[-1]",
+    ],
+    builder: buildSteps213,
+  },
+  198: {
+    id: 198,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "House Robber", en: "House Robber" },
+    titleVi: { vi: "Tên cướp nhà", en: "House robber" },
+    statement: {
+      vi:
+        "Cho mảng nums[i] là số tiền trong nhà i, các nhà sắp dọc một đường. " +
+        "Nếu cướp hai nhà liền kề thì bị phát hiện. " +
+        "Trả về số tiền lớn nhất có thể cướp mà không bị phát hiện.",
+      en:
+        "Given an array nums[i] representing the amount of money in house i, houses are along a street. " +
+        "Robbing two adjacent houses triggers an alarm. " +
+        "Return the maximum amount you can rob without alerting the police.",
+    },
+    defaultInput: [2, 7, 9, 3, 1],
+    inputKind: "nonneg",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Điền bảng dp một lần nên O(n) thời gian. Bảng dp dài n nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
+        en: "A single pass to fill dp gives O(n) time. The dp table of length n is O(n) memory (optimizable to O(1) with two variables).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def rob(self, nums):",
+      "        dp = [0] * len(nums)",
+      "        dp[0] = nums[0]",
+      "        dp[1] = max(nums[0], nums[1])",
+      "        for i in range(2, len(nums)):",
+      "            dp[i] = max(dp[i-1], dp[i-2] + nums[i])",
+      "        return dp[-1]",
+    ],
+    builder: buildSteps198,
+  },
   3020: {
     id: 3020,
     category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
