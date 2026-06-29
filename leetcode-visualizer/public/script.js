@@ -28,7 +28,9 @@ const I18N = {
     timeLabel: "Thời gian",
     spaceLabel: "Bộ nhớ",
     varsLabel: "Biến (debug)",
-    kbdHint: "Phím tắt: ← Lùi · → Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",    errEmptyId: "Vui lòng nhập số bài.",
+    approachLabel: "Ý chính",
+    kbdHint: "Phím tắt: ← Lùi · → Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",
+    errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
     errConn: "Lỗi kết nối tới server.",
     errArr: "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1",
@@ -51,6 +53,7 @@ const I18N = {
     timeLabel: "Time",
     spaceLabel: "Space",
     varsLabel: "Variables (debug)",
+    approachLabel: "Key Idea",
     kbdHint: "Shortcuts: ← Prev · → Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
@@ -260,7 +263,26 @@ function renderProblem() {
     ? pick(problemData.inputLabel)
     : t().arrLabel;
   renderComplexity();
+  renderApproach();
   renderExtraParams();
+}
+
+// Render the key-idea (approach) summary as bullet points
+function renderApproach() {
+  const box = $("approachBox");
+  const list = $("approachList");
+  const approach = problemData.approach;
+  if (!approach || !approach.length) {
+    box.classList.add("hidden");
+    return;
+  }
+  list.innerHTML = "";
+  approach.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = pick(item);
+    list.appendChild(li);
+  });
+  box.classList.remove("hidden");
 }
 
 // Display time/space complexity analysis

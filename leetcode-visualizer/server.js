@@ -6402,6 +6402,269 @@ function buildSteps815(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 1368: Minimum Cost to Make at Least One Valid Path in a Grid.
+ * 0-1 BFS: follow arrow = cost 0 (add to front), change direction = cost 1 (add to back).
+ */
+function buildSteps1368(input) {
+  const grid = String(input).split("|").map((row) => row.trim().split(",").map(Number));
+  const m = grid.length;
+  const n = grid[0].length;
+  const steps = [];
+
+  // direction: 1=right, 2=left, 3=down, 4=up
+  const dirs = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0] };
+  const arrowChar = { 1: "→", 2: "←", 3: "↓", 4: "↑" };
+
+  const INF = Infinity;
+  const cost = Array.from({ length: m }, () => new Array(n).fill(INF));
+  cost[0][0] = 0;
+
+  // Grid display: show arrow + cost
+  function makeGrid(hlR, hlC) {
+    const dp = [];
+    for (let r = 0; r < m; r++) {
+      const row = [];
+      for (let c = 0; c < n; c++) {
+        const ar = arrowChar[grid[r][c]];
+        const co = cost[r][c] === INF ? "∞" : cost[r][c];
+        row.push(`${ar}${co}`);
+      }
+      dp.push(row);
+    }
+    return {
+      dp,
+      text1: Array.from({ length: m }, (_, i) => `r${i}`),
+      text2: Array.from({ length: n }, (_, i) => `c${i}`),
+      hlCell: hlR !== undefined ? [hlR, hlC] : null,
+      pathCells: [],
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo 0-1 BFS", en: "Initialize 0-1 BFS" },
+    arr: [],
+    grid: makeGrid(0, 0),
+    highlight: [],
+    mark: [],
+    codeLines: [5, 6, 7, 8, 9],
+    vars: [
+      { name: "size", value: `${m}×${n}` },
+      { name: "start", value: "(0,0)" },
+      { name: "target", value: `(${m - 1},${n - 1})` },
+    ],
+    note: {
+      vi: `Lưới ${m}×${n}. Mỗi ô hiện mũi tên + cost.\n0-1 BFS: đi theo mũi tên (cost 0) → đầu deque, đổi hướng (cost 1) → cuối deque.`,
+      en: `Grid ${m}×${n}. Each cell shows arrow + cost.\n0-1 BFS: follow arrow (cost 0) → front of deque, change direction (cost 1) → back.`,
+    },
+  });
+
+  // 0-1 BFS using a deque (array with both ends)
+  const deque = [[0, 0]];
+  let processed = 0;
+
+  while (deque.length > 0) {
+    const [r, c] = deque.shift();
+    processed++;
+
+    let relaxedCells = [];
+    for (const d of [1, 2, 3, 4]) {
+      const [dr, dc] = dirs[d];
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
+      const wt = grid[r][c] === d ? 0 : 1;
+      if (cost[r][c] + wt < cost[nr][nc]) {
+        cost[nr][nc] = cost[r][c] + wt;
+        relaxedCells.push(`(${nr},${nc})=${cost[nr][nc]}`);
+        if (wt === 0) deque.unshift([nr, nc]);
+        else deque.push([nr, nc]);
+      }
+    }
+
+    if (processed <= 30 && relaxedCells.length > 0) {
+      steps.push({
+        title: { vi: `Xử lý (${r},${c}) cost=${cost[r][c]}`, en: `Process (${r},${c}) cost=${cost[r][c]}` },
+        arr: [],
+        grid: makeGrid(r, c),
+        highlight: [],
+        mark: [],
+        codeLines: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        vars: [
+          { name: "cell", value: `(${r},${c})` },
+          { name: "arrow", value: arrowChar[grid[r][c]] },
+          { name: "cost", value: cost[r][c] },
+          { name: "relaxed", value: relaxedCells.join(", ") },
+        ],
+        note: {
+          vi: `Ô (${r},${c}) mũi tên ${arrowChar[grid[r][c]]}. Cập nhật: ${relaxedCells.join(", ")}.\nĐi thẳng theo mũi tên = cost 0, các hướng khác = cost +1.`,
+          en: `Cell (${r},${c}) arrow ${arrowChar[grid[r][c]]}. Updated: ${relaxedCells.join(", ")}.\nFollowing arrow = cost 0, other directions = cost +1.`,
+        },
+      });
+    }
+  }
+
+  const answer = cost[m - 1][n - 1];
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    grid: makeGrid(m - 1, n - 1),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [22],
+    vars: [
+      { name: "cost[target]", value: answer },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Chi phí nhỏ nhất từ (0,0) đến (${m - 1},${n - 1}) = ${answer}.\n(Số lần phải đổi hướng mũi tên ít nhất để tạo đường đi hợp lệ.)`,
+      en: `Minimum cost from (0,0) to (${m - 1},${n - 1}) = ${answer}.\n(Fewest arrow direction changes needed for a valid path.)`,
+    },
+  });
+
+  return { m, n, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 127: Word Ladder.
+ * BFS: each word is a node, neighbors differ by one letter and exist in wordList.
+ */
+function buildSteps127(input, params) {
+  const wordList = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+  const beginWord = (params.beginWord || "").trim();
+  const endWord = (params.endWord || "").trim();
+  const steps = [];
+
+  const wordSet = new Set(wordList);
+  // Display list = beginWord + wordList (unique)
+  const displayWords = [beginWord, ...wordList.filter((w) => w !== beginWord)];
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    arr: displayWords.map((w) => (w === beginWord ? 1 : 0)),
+    sub: displayWords,
+    highlight: [0],
+    mark: displayWords.indexOf(endWord) >= 0 ? [displayWords.indexOf(endWord)] : [],
+    codeLines: [5, 6, 7, 8, 9],
+    vars: [
+      { name: "beginWord", value: beginWord },
+      { name: "endWord", value: endWord },
+      { name: "endWord in list", value: wordSet.has(endWord) },
+      { name: "queue", value: `[(${beginWord}, 1)]` },
+    ],
+    note: {
+      vi: `BFS từ "${beginWord}" đến "${endWord}".\nMỗi bước thay 1 ký tự, từ mới phải có trong wordList. Đếm số từ trong chuỗi.`,
+      en: `BFS from "${beginWord}" to "${endWord}".\nChange 1 letter per step, new word must be in wordList. Count words in sequence.`,
+    },
+  });
+
+  if (!wordSet.has(endWord)) {
+    steps.push({
+      title: { vi: `"${endWord}" không có trong wordList → 0`, en: `"${endWord}" not in wordList → 0` },
+      arr: displayWords.map(() => 0),
+      sub: displayWords,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6, 7],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: `"${endWord}" không có trong wordList → không thể biến đổi → 0.`,
+        en: `"${endWord}" not in wordList → impossible → 0.`,
+      },
+    });
+    return { beginWord, endWord, answer: 0, steps };
+  }
+
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const visited = new Set([beginWord]);
+  const queue = [[beginWord, 1]];
+  let head = 0;
+  let answer = 0;
+
+  while (head < queue.length) {
+    const [word, stepCount] = queue[head++];
+
+    if (word === endWord) {
+      answer = stepCount;
+      steps.push({
+        title: { vi: `✓ Tới "${endWord}" — độ dài ${stepCount}`, en: `✓ Reached "${endWord}" — length ${stepCount}` },
+        arr: displayWords.map((w) => (w === endWord ? 1 : visited.has(w) ? 1 : 0)),
+        sub: displayWords,
+        highlight: [displayWords.indexOf(endWord)],
+        mark: [displayWords.indexOf(endWord)],
+        final: true,
+        codeLines: [11, 12],
+        vars: [
+          { name: "word", value: word },
+          { name: "steps", value: stepCount },
+          { name: "answer", value: stepCount },
+        ],
+        note: {
+          vi: `Đến "${endWord}"! Độ dài chuỗi biến đổi ngắn nhất = ${stepCount} từ.`,
+          en: `Reached "${endWord}"! Shortest transformation length = ${stepCount} words.`,
+        },
+      });
+      break;
+    }
+
+    // Find neighbors
+    const neighbors = [];
+    for (let i = 0; i < word.length; i++) {
+      for (const c of alphabet) {
+        if (c === word[i]) continue;
+        const newWord = word.slice(0, i) + c + word.slice(i + 1);
+        if (wordSet.has(newWord) && !visited.has(newWord)) {
+          visited.add(newWord);
+          queue.push([newWord, stepCount + 1]);
+          neighbors.push(newWord);
+        }
+      }
+    }
+
+    if (neighbors.length > 0) {
+      steps.push({
+        title: { vi: `Xử lý "${word}" (bước ${stepCount})`, en: `Process "${word}" (step ${stepCount})` },
+        arr: displayWords.map((w) => visited.has(w) ? 1 : 0),
+        sub: displayWords,
+        highlight: neighbors.map((nw) => displayWords.indexOf(nw)).filter((x) => x >= 0),
+        mark: [displayWords.indexOf(word)].filter((x) => x >= 0),
+        codeLines: [13, 14, 15, 16, 17, 18],
+        vars: [
+          { name: "word", value: word },
+          { name: "steps", value: stepCount },
+          { name: "neighbors", value: `[${neighbors.join(", ")}]` },
+          { name: "queue size", value: queue.length - head },
+        ],
+        note: {
+          vi: `Từ "${word}" (bước ${stepCount}): tìm thấy hàng xóm [${neighbors.join(", ")}] (khác 1 ký tự). Thêm vào queue với bước ${stepCount + 1}.`,
+          en: `From "${word}" (step ${stepCount}): found neighbors [${neighbors.join(", ")}] (differ by 1 letter). Add to queue at step ${stepCount + 1}.`,
+        },
+      });
+    }
+  }
+
+  if (answer === 0) {
+    steps.push({
+      title: { vi: "Không có đường biến đổi → 0", en: "No transformation path → 0" },
+      arr: displayWords.map((w) => visited.has(w) ? 1 : 0),
+      sub: displayWords,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [19],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: `Không tìm thấy đường biến đổi từ "${beginWord}" đến "${endWord}" → 0.`,
+        en: `No transformation path from "${beginWord}" to "${endWord}" → 0.`,
+      },
+    });
+  }
+
+  return { beginWord, endWord, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 743: Network Delay Time.
  * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
  */
@@ -9350,6 +9613,138 @@ const SUPPORTED = {
     ],
     builder: buildSteps815,
   },
+  1368: {
+    id: 1368,
+    difficulty: "hard",
+    slug: "minimum-cost-to-make-at-least-one-valid-path-in-a-grid",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Minimum Cost to Make at Least One Valid Path in a Grid", en: "Minimum Cost to Make at Least One Valid Path in a Grid" },
+    titleVi: { vi: "Chi phí nhỏ nhất tạo đường đi hợp lệ", en: "Min cost for a valid grid path" },
+    statement: {
+      vi:
+        "Lưới m×n, mỗi ô có mũi tên: 1=phải, 2=trái, 3=xuống, 4=lên. " +
+        "Đi từ (0,0) đến (m-1,n-1). Đi theo mũi tên = chi phí 0, đổi hướng mũi tên = chi phí 1. " +
+        "Tìm chi phí nhỏ nhất (0-1 BFS). Nhập lưới: hàng cách bởi |, giá trị cách bởi dấu phẩy.",
+      en:
+        "Grid m×n, each cell has an arrow: 1=right, 2=left, 3=down, 4=up. " +
+        "Travel from (0,0) to (m-1,n-1). Following the arrow costs 0, changing it costs 1. " +
+        "Find minimum cost (0-1 BFS). Enter grid: rows separated by |, values comma-separated.",
+    },
+    defaultInput: "1,1,3|3,2,2|1,1,4",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới (hàng cách bởi |)", en: "Grid (rows separated by |)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi ô là một nút. Đi theo mũi tên có sẵn = chi phí 0, đổi hướng = chi phí 1.", en: "Each cell is a node. Following the existing arrow = cost 0, changing direction = cost 1." },
+      { vi: "Đây là bài toán đường đi ngắn nhất với trọng số 0 hoặc 1 → dùng 0-1 BFS.", en: "This is a shortest-path problem with weights 0 or 1 → use 0-1 BFS." },
+      { vi: "Cạnh cost 0 → thêm vào ĐẦU deque; cạnh cost 1 → thêm vào CUỐI deque.", en: "Cost-0 edge → add to FRONT of deque; cost-1 edge → add to BACK." },
+      { vi: "Đáp án là chi phí nhỏ nhất tới ô (m-1, n-1).", en: "The answer is the minimum cost to reach cell (m-1, n-1)." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "0-1 BFS với deque: mỗi ô xử lý 1 lần → O(m·n). Bộ nhớ O(m·n) cho dist grid + deque.",
+        en: "0-1 BFS with deque: each cell processed once → O(m·n). Memory O(m·n) for dist grid + deque.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def minCost(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        dirs = {1:(0,1), 2:(0,-1), 3:(1,0), 4:(-1,0)}",
+      "        cost = [[float('inf')]*n for _ in range(m)]",
+      "        cost[0][0] = 0",
+      "        dq = deque([(0, 0)])",
+      "        while dq:",
+      "            r, c = dq.popleft()",
+      "            for d, (dr, dc) in dirs.items():",
+      "                nr, nc = r + dr, c + dc",
+      "                wt = 0 if grid[r][c] == d else 1",
+      "                if 0<=nr<m and 0<=nc<n and cost[r][c]+wt < cost[nr][nc]:",
+      "                    cost[nr][nc] = cost[r][c] + wt",
+      "                    if wt == 0:",
+      "                        dq.appendleft((nr, nc))",
+      "                    else:",
+      "                        dq.append((nr, nc))",
+      "        return cost[m-1][n-1]",
+    ],
+    builder: buildSteps1368,
+  },
+  127: {
+    id: 127,
+    difficulty: "hard",
+    slug: "word-ladder",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Word Ladder", en: "Word Ladder" },
+    titleVi: { vi: "Chuỗi biến đổi từ", en: "Shortest word transformation length" },
+    statement: {
+      vi:
+        "Cho beginWord, endWord và wordList. Tìm ĐỘ DÀI chuỗi biến đổi ngắn nhất từ beginWord → endWord, " +
+        "mỗi bước thay đúng 1 ký tự và từ kết quả phải có trong wordList. Trả về số từ trong chuỗi (gồm cả begin và end), hoặc 0 nếu không thể. " +
+        "Nhập wordList dưới dạng các từ cách nhau bởi dấu phẩy.",
+      en:
+        "Given beginWord, endWord and wordList. Find the LENGTH of the shortest transformation sequence from beginWord to endWord, " +
+        "changing exactly one letter at a time where each intermediate word must be in wordList. Return the number of words in the sequence (including begin and end), or 0 if impossible. " +
+        "Enter wordList as comma-separated words.",
+    },
+    defaultInput: "hot,dot,dog,lot,log,cog",
+    inputKind: "string",
+    inputLabel: { vi: "wordList (cách bởi dấu phẩy)", en: "wordList (comma separated)" },
+    extraParams: [
+      {
+        key: "beginWord",
+        type: "string",
+        label: { vi: "beginWord", en: "beginWord" },
+        default: "hit",
+      },
+      {
+        key: "endWord",
+        type: "string",
+        label: { vi: "endWord", en: "endWord" },
+        default: "cog",
+      },
+    ],
+    approach: [
+      { vi: "Coi mỗi từ là một nút; hai từ kề nhau nếu khác đúng 1 ký tự.", en: "Treat each word as a node; two words are adjacent if they differ by exactly 1 letter." },
+      { vi: "Dùng BFS từ beginWord — BFS đảm bảo tìm được đường ngắn nhất.", en: "Use BFS from beginWord — BFS guarantees the shortest path." },
+      { vi: "Với mỗi từ, thử thay từng vị trí bằng 'a'..'z', giữ lại từ có trong wordList và chưa thăm.", en: "For each word, try replacing each position with 'a'..'z', keep words in wordList not yet visited." },
+      { vi: "Trả về số bước khi gặp endWord, hoặc 0 nếu không thể.", en: "Return the step count when endWord is reached, or 0 if impossible." },
+    ],
+    complexity: {
+      time: "O(N · L²)",
+      space: "O(N · L)",
+      note: {
+        vi: "N = số từ, L = độ dài từ. Mỗi từ thử L vị trí × 26 ký tự, mỗi lần tạo từ O(L) → O(N·L²). Bộ nhớ O(N·L).",
+        en: "N = word count, L = word length. Each word tries L positions × 26 letters, each O(L) to build → O(N·L²). Memory O(N·L).",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def ladderLength(self, beginWord, endWord, wordList):",
+      "        word_set = set(wordList)",
+      "        if endWord not in word_set:",
+      "            return 0",
+      "        queue = deque([(beginWord, 1)])",
+      "        visited = {beginWord}",
+      "        while queue:",
+      "            word, steps = queue.popleft()",
+      "            if word == endWord:",
+      "                return steps",
+      "            for i in range(len(word)):",
+      "                for c in 'abcdefghijklmnopqrstuvwxyz':",
+      "                    new_word = word[:i] + c + word[i+1:]",
+      "                    if new_word in word_set and new_word not in visited:",
+      "                        visited.add(new_word)",
+      "                        queue.append((new_word, steps + 1))",
+      "        return 0",
+    ],
+    builder: buildSteps127,
+  },
   743: {
     id: 743,
     difficulty: "medium",
@@ -9517,6 +9912,7 @@ app.get("/api/problem/:id", (req, res) => {
     code2: problem.code2 || null,
     codeLabel: problem.codeLabel || null,
     code2Label: problem.code2Label || null,
+    approach: problem.approach || null,
   });
 });
 
