@@ -181,7 +181,9 @@ async function loadProblem() {
     currentProblemId = data.id;
     problemData = data;
     renderProblem();
-    $("arrInput").value = data.defaultInput.join(",");
+    $("arrInput").value = Array.isArray(data.defaultInput)
+      ? data.defaultInput.join(",")
+      : data.defaultInput;
     markActiveChip();
 
     show("problemPanel");
@@ -246,9 +248,10 @@ function renderExtraParams() {
     label.setAttribute("for", `param-${p.key}`);
 
     const input = document.createElement("input");
-    input.type = "number";
+    input.type = p.type === "string" ? "text" : "number";
     input.id = `param-${p.key}`;
     input.dataset.param = p.key;
+    input.dataset.type = p.type || "number";
     input.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
 
     wrap.appendChild(label);
@@ -268,27 +271,39 @@ $("runBtn").addEventListener("click", runViz);
 
 async function runViz() {
   hide("runError");
-  const raw = $("arrInput").value.trim();
-  const input = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s !== "")
-    .map(Number);
 
-  const allowNegative = problemData && problemData.inputKind === "integer";
-  const invalid =
-    input.length === 0 ||
-    input.some((n) => !Number.isInteger(n) || (!allowNegative && n < 0));
-  if (invalid) {
-    return showError("runError", t().errArr);
+  const isString = problemData && problemData.inputKind === "string";
+  let input;
+
+  if (isString) {
+    input = $("arrInput").value.trim();
+    if (input.length === 0) {
+      return showError("runError", t().errArr);
+    }
+  } else {
+    const raw = $("arrInput").value.trim();
+    input = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== "")
+      .map(Number);
+
+    const allowNegative = problemData && problemData.inputKind === "integer";
+    const invalid =
+      input.length === 0 ||
+      input.some((n) => !Number.isInteger(n) || (!allowNegative && n < 0));
+    if (invalid) {
+      return showError("runError", t().errArr);
+    }
   }
 
-  // Thu thập tham số phụ
+  // Thu thập tham số phụ (giữ kiểu chuỗi/số theo định nghĩa)
   const params = {};
   $("extraParams")
     .querySelectorAll("input[data-param]")
     .forEach((inp) => {
-      params[inp.dataset.param] = Number(inp.value);
+      params[inp.dataset.param] =
+        inp.dataset.type === "string" ? inp.value : Number(inp.value);
     });
 
   try {

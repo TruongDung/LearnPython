@@ -753,7 +753,203 @@ function buildSteps1(nums, params) {
   return { original: [...nums], target, answer: answer ? `[${answer[0]}, ${answer[1]}]` : "none", steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 1208: Get Equal Substrings Within Budget.
+ *
+ * Cửa sổ trượt trên mảng chi phí cost[i] = |s[i] - t[i]|:
+ *  - Mở rộng right, cộng cost[right] vào windowCost.
+ *  - Khi windowCost > maxCost, co left và trừ cost[left].
+ *  - Đáp án là độ dài cửa sổ hợp lệ lớn nhất.
+ */
+function buildSteps1208(s, params) {
+  const t = params.t;
+  const maxCost = params.maxCost;
+  const n = Math.min(s.length, t.length);
+
+  const cost = [];
+  const pair = [];
+  for (let i = 0; i < n; i++) {
+    cost.push(Math.abs(s.charCodeAt(i) - t.charCodeAt(i)));
+    pair.push(`${s[i]}\u2192${t[i]}`);
+  }
+
+  const steps = [];
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  steps.push({
+    title: { vi: "Mảng chi phí", en: "Cost array" },
+    arr: [...cost],
+    sub: [...pair],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "s", value: s },
+      { name: "t", value: t },
+      { name: "maxCost", value: maxCost },
+    ],
+    note: {
+      vi: `cost[i] = |s[i] - t[i]|. Chuyển "${s}" → "${t}" tốn [${cost.join(", ")}]. Ngân sách maxCost = ${maxCost}.`,
+      en: `cost[i] = |s[i] - t[i]|. Converting "${s}" → "${t}" costs [${cost.join(", ")}]. Budget maxCost = ${maxCost}.`,
+    },
+  });
+
+  let left = 0;
+  let windowCost = 0;
+  let maxLength = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  for (let right = 0; right < n; right++) {
+    windowCost += cost[right];
+
+    steps.push({
+      title: { vi: `Mở rộng: right = ${right}`, en: `Expand: right = ${right}` },
+      arr: [...cost],
+      sub: [...pair],
+      highlight: inWindow(left, right),
+      mark: [],
+      codeLines: [7, 8],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "windowCost", value: windowCost },
+        { name: "maxCost", value: maxCost },
+        { name: "maxLength", value: maxLength },
+      ],
+      note: {
+        vi: `Thêm cost[${right}] = ${cost[right]} (${pair[right]}). windowCost = ${windowCost}, ngân sách ${maxCost}.`,
+        en: `Add cost[${right}] = ${cost[right]} (${pair[right]}). windowCost = ${windowCost}, budget ${maxCost}.`,
+      },
+    });
+
+    while (windowCost > maxCost) {
+      windowCost -= cost[left];
+      left += 1;
+      steps.push({
+        title: { vi: `Co cửa sổ: left = ${left}`, en: `Shrink: left = ${left}` },
+        arr: [...cost],
+        sub: [...pair],
+        highlight: left <= right ? inWindow(left, right) : [],
+        mark: [],
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "windowCost", value: windowCost },
+          { name: "maxCost", value: maxCost },
+          { name: "maxLength", value: maxLength },
+        ],
+        note: {
+          vi: `windowCost vượt ngân sách. Bỏ cost[${left - 1}] ở trái, dời left → ${left}. windowCost = ${windowCost}.`,
+          en: `windowCost exceeded the budget. Drop cost[${left - 1}] on the left, move left → ${left}. windowCost = ${windowCost}.`,
+        },
+      });
+    }
+
+    const length = right - left + 1;
+    if (length > maxLength) {
+      maxLength = length;
+      bestL = left;
+      bestR = right;
+      steps.push({
+        title: { vi: `Cập nhật max = ${maxLength}`, en: `Update max = ${maxLength}` },
+        arr: [...cost],
+        sub: [...pair],
+        highlight: inWindow(left, right),
+        mark: [],
+        codeLines: [12],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "windowCost", value: windowCost },
+          { name: "maxLength", value: maxLength },
+        ],
+        note: {
+          vi: `Cửa sổ hợp lệ [${left}..${right}] dài ${length} > kỷ lục cũ. maxLength = ${maxLength}.`,
+          en: `Valid window [${left}..${right}] of length ${length} beats the record. maxLength = ${maxLength}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...cost],
+    sub: [...pair],
+    highlight: [],
+    mark: bestR >= 0 ? inWindow(bestL, bestR) : [],
+    final: true,
+    codeLines: [13],
+    vars: [
+      { name: "maxLength", value: maxLength },
+      { name: "window", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "-" },
+    ],
+    note: {
+      vi: `Đoạn dài nhất chuyển được trong ngân sách là [${bestL}..${bestR}], độ dài ${maxLength}. Đáp án = ${maxLength}.`,
+      en: `The longest convertible substring within budget is [${bestL}..${bestR}], length ${maxLength}. Answer = ${maxLength}.`,
+    },
+  });
+
+  return { original: s, t, maxCost, answer: maxLength, steps };
+}
+
 const SUPPORTED = {
+  1208: {
+    id: 1208,
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Get Equal Substrings Within Budget", en: "Get Equal Substrings Within Budget" },
+    titleVi: { vi: "Đoạn con bằng nhau trong ngân sách", en: "Equal substring within budget" },
+    statement: {
+      vi:
+        "Cho hai chuỗi s và t cùng độ dài. Chi phí đổi s[i] thành t[i] là |ASCII(s[i]) - ASCII(t[i])|. " +
+        "Cho ngân sách maxCost, trả về độ dài lớn nhất của một đoạn con của s có thể đổi thành đoạn con tương ứng của t với tổng chi phí ≤ maxCost.",
+      en:
+        "You are given two equal-length strings s and t. The cost of changing s[i] to t[i] is |ASCII(s[i]) - ASCII(t[i])|. " +
+        "Given a budget maxCost, return the maximum length of a substring of s that can be changed into the corresponding substring of t with total cost ≤ maxCost.",
+    },
+    defaultInput: "abcd",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [
+      {
+        key: "t",
+        type: "string",
+        label: { vi: "Chuỗi t (cùng độ dài s)", en: "String t (same length as s)" },
+        default: "bcdf",
+      },
+      {
+        key: "maxCost",
+        type: "number",
+        label: { vi: "maxCost (ngân sách)", en: "maxCost (budget)" },
+        default: 3,
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi chỉ số left và right chỉ duyệt qua chuỗi một lần (cửa sổ trượt) nên O(n) thời gian. Mảng cost dài n nên O(n) bộ nhớ.",
+        en: "Both left and right pointers traverse the string once (sliding window), so O(n) time. The cost array of length n is O(n) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def equalSubstring(self, s, t, maxCost):",
+      "        cost = [abs(ord(a) - ord(b)) for a, b in zip(s, t)]",
+      "        left = 0",
+      "        window = 0",
+      "        max_len = 0",
+      "        for right in range(len(s)):",
+      "            window += cost[right]",
+      "            while window > maxCost:",
+      "                window -= cost[left]",
+      "                left += 1",
+      "            max_len = max(max_len, right - left + 1)",
+      "        return max_len",
+    ],
+    builder: buildSteps1208,
+  },
   1846: {
     id: 1846,
     category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
@@ -1103,47 +1299,64 @@ app.post("/api/problem/:id/solve", (req, res) => {
   const input = req.body.input;
   const params = req.body.params || {};
 
-  if (!Array.isArray(input) || input.length === 0 || !input.every((n) => Number.isInteger(n))) {
-    return res.status(400).json({
-      error: "Đầu vào phải là mảng các số nguyên.",
-    });
-  }
-
-  if (problem.inputKind === "positive" && !input.every((n) => n > 0)) {
-    return res.status(400).json({
-      error: "Đầu vào phải là mảng các số nguyên dương, ví dụ: 2,2,1,2,1",
-    });
-  }
-
-  if (problem.inputKind === "binary" && !input.every((n) => n === 0 || n === 1)) {
-    return res.status(400).json({
-      error: "Đầu vào phải là mảng nhị phân chỉ gồm 0 và 1, ví dụ: 1,1,1,0,0,1",
-    });
-  }
-
-  if (problem.inputKind === "nonneg" && !input.every((n) => n >= 0)) {
-    return res.status(400).json({
-      error: "Đầu vào phải là mảng các số nguyên không âm, ví dụ: 1,100,1,1,1",
-    });
-  }
-
-  if (problem.singleInput) {
-    if (input.length !== 1) {
-      return res.status(400).json({ error: "Bài này chỉ nhận đúng một số." });
+  if (problem.inputKind === "string") {
+    if (typeof input !== "string" || input.length === 0) {
+      return res.status(400).json({
+        error: "Đầu vào s phải là một chuỗi không rỗng.",
+      });
     }
-    if (problem.maxInput && input[0] > problem.maxInput) {
-      return res.status(400).json({ error: `Giá trị tối đa cho phép là ${problem.maxInput}.` });
+  } else {
+    if (!Array.isArray(input) || input.length === 0 || !input.every((n) => Number.isInteger(n))) {
+      return res.status(400).json({
+        error: "Đầu vào phải là mảng các số nguyên.",
+      });
+    }
+
+    if (problem.inputKind === "positive" && !input.every((n) => n > 0)) {
+      return res.status(400).json({
+        error: "Đầu vào phải là mảng các số nguyên dương, ví dụ: 2,2,1,2,1",
+      });
+    }
+
+    if (problem.inputKind === "binary" && !input.every((n) => n === 0 || n === 1)) {
+      return res.status(400).json({
+        error: "Đầu vào phải là mảng nhị phân chỉ gồm 0 và 1, ví dụ: 1,1,1,0,0,1",
+      });
+    }
+
+    if (problem.inputKind === "nonneg" && !input.every((n) => n >= 0)) {
+      return res.status(400).json({
+        error: "Đầu vào phải là mảng các số nguyên không âm, ví dụ: 1,100,1,1,1",
+      });
+    }
+
+    if (problem.singleInput) {
+      if (input.length !== 1) {
+        return res.status(400).json({ error: "Bài này chỉ nhận đúng một số." });
+      }
+      if (problem.maxInput && input[0] > problem.maxInput) {
+        return res.status(400).json({ error: `Giá trị tối đa cho phép là ${problem.maxInput}.` });
+      }
     }
   }
 
   // Kiểm tra các tham số phụ
   for (const p of problem.extraParams || []) {
     const v = params[p.key];
-    if (!Number.isInteger(v) || (!p.allowNegative && v < 0)) {
+    if (p.type === "string") {
+      if (typeof v !== "string" || v.length === 0) {
+        return res.status(400).json({ error: `Tham số "${p.key}" phải là chuỗi không rỗng.` });
+      }
+    } else if (!Number.isInteger(v) || (!p.allowNegative && v < 0)) {
       return res.status(400).json({
         error: `Tham số "${p.key}" phải là số nguyên${p.allowNegative ? "" : " không âm"}.`,
       });
     }
+  }
+
+  // Bài dạng chuỗi cần s và t cùng độ dài
+  if (problem.inputKind === "string" && typeof params.t === "string" && params.t.length !== input.length) {
+    return res.status(400).json({ error: "Chuỗi s và t phải có cùng độ dài." });
   }
 
   res.json(problem.builder(input, params));
