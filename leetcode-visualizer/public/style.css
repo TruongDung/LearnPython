@@ -522,3 +522,59 @@ button:disabled {
 .hidden {
   display: none;
 }
+
+/* ---- Trie / tree visualization ---- */
+.tree-view {
+  margin-top: 4px;
+  padding: 16px;
+  background: #0f172a;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  overflow-x: auto;
+  min-height: 240px;
+}
+
+.tree-svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.tree-edge {
+  stroke: #475569;
+  stroke-width: 2;
+}
+
+.tree-node circle {
+  fill: #1e293b;
+  stroke: #475569;
+  stroke-width: 2;
+  transition: stroke 0.25s, fill 0.25s;
+}
+
+.tree-node text {
+  fill: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tree-node.word circle {
+  fill: #134e4a;
+  stroke: #2dd4bf;
+}
+
+.tree-node .tree-ring {
+  fill: none;
+  stroke: #2dd4bf;
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.tree-node.hl circle {
+  stroke: #f59e0b;
+  stroke-width: 3;
+}
+
+.tree-node.hl text {
+  fill: #fbbf24;
+}

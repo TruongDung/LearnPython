@@ -894,7 +894,281 @@ function buildSteps1208(s, params) {
   return { original: s, t, maxCost, answer: maxLength, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 208: Implement Trie (Prefix Tree).
+ *
+ * Trực quan hóa cây tiền tố khi:
+ *  - insert(word): đi/tạo nút cho từng ký tự, đánh dấu nút cuối là is_word.
+ *  - search(word): đi theo các ký tự, trả về is_word của nút cuối.
+ *  - startsWith(prefix): đi theo các ký tự, trả về True nếu đi được hết.
+ */
+function buildSteps208(input, params) {
+  const words = String(input)
+    .split(",")
+    .map((w) => w.trim())
+    .filter((w) => w.length > 0);
+  const searchWord = (params.search || "").trim();
+  const prefixWord = (params.prefix || "").trim();
+
+  let idCounter = 0;
+  const makeNode = (label, parentId) => ({
+    id: idCounter++,
+    label,
+    parentId,
+    isWord: false,
+    children: {},
+  });
+  const root = makeNode("\u2022", null);
+  const steps = [];
+
+  // Bố cục cây: x theo thứ tự lá, y theo độ sâu.
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (keys.length === 0) {
+        x = nextX++;
+      } else {
+        const xs = keys.map((k) => dfs(node.children[k], depth + 1));
+        x = (xs[0] + xs[xs.length - 1]) / 2;
+      }
+      nodes.push({
+        id: node.id,
+        label: node.label,
+        x,
+        y: depth,
+        parentId: node.parentId,
+        isWord: node.isWord,
+        hl: opts.highlight ? opts.highlight.includes(node.id) : false,
+      });
+      return x;
+    }
+    dfs(root, 0);
+
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: { nodes },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo Trie", en: "Initialize Trie" },
+    codeLines: [7, 8],
+    highlight: [root.id],
+    vars: [{ name: "words", value: `[${words.join(", ")}]` }],
+    note: {
+      vi: `Tạo Trie rỗng chỉ có nút gốc. Sẽ chèn: [${words.join(", ")}].`,
+      en: `Create an empty Trie with just a root node. Will insert: [${words.join(", ")}].`,
+    },
+  });
+
+  for (const word of words) {
+    let node = root;
+    const path = [root.id];
+    for (const ch of word) {
+      let created = false;
+      if (!node.children[ch]) {
+        node.children[ch] = makeNode(ch, node.id);
+        created = true;
+      }
+      node = node.children[ch];
+      path.push(node.id);
+      snapshot({
+        title: { vi: `insert("${word}") · '${ch}'`, en: `insert("${word}") · '${ch}'` },
+        codeLines: created ? [12, 13, 14, 15] : [12, 13, 15],
+        highlight: [...path],
+        vars: [
+          { name: "op", value: `insert("${word}")` },
+          { name: "ch", value: ch },
+          { name: "newNode", value: created ? "yes" : "no" },
+        ],
+        note: {
+          vi: created
+            ? `Ký tự '${ch}' chưa có → tạo nút mới rồi đi xuống.`
+            : `Ký tự '${ch}' đã tồn tại → đi theo nút có sẵn.`,
+          en: created
+            ? `Character '${ch}' is missing → create a node and descend.`
+            : `Character '${ch}' already exists → follow the existing node.`,
+        },
+      });
+    }
+    node.isWord = true;
+    snapshot({
+      title: { vi: `insert("${word}") · xong`, en: `insert("${word}") · done` },
+      codeLines: [16],
+      highlight: [...path],
+      vars: [
+        { name: "op", value: `insert("${word}")` },
+        { name: "is_word", value: "True" },
+      ],
+      note: {
+        vi: `Đánh dấu nút cuối là kết thúc của từ "${word}" (is_word = True).`,
+        en: `Mark the final node as the end of word "${word}" (is_word = True).`,
+      },
+    });
+  }
+
+  function traverse(target, isSearch, opLabel) {
+    let node = root;
+    const path = [root.id];
+    for (const ch of target) {
+      if (!node.children[ch]) {
+        snapshot({
+          title: { vi: `${opLabel} · thiếu '${ch}'`, en: `${opLabel} · missing '${ch}'` },
+          codeLines: isSearch ? [20, 21, 22] : [28, 29, 30],
+          highlight: [...path],
+          vars: [
+            { name: "op", value: opLabel },
+            { name: "ch", value: ch },
+            { name: "result", value: "False" },
+          ],
+          note: {
+            vi: `Không có nhánh cho '${ch}' → trả về False.`,
+            en: `No branch for '${ch}' → return False.`,
+          },
+        });
+        return false;
+      }
+      node = node.children[ch];
+      path.push(node.id);
+      snapshot({
+        title: { vi: `${opLabel} · '${ch}'`, en: `${opLabel} · '${ch}'` },
+        codeLines: isSearch ? [20, 21, 23] : [28, 29, 31],
+        highlight: [...path],
+        vars: [
+          { name: "op", value: opLabel },
+          { name: "ch", value: ch },
+        ],
+        note: {
+          vi: `Đi theo ký tự '${ch}'.`,
+          en: `Follow character '${ch}'.`,
+        },
+      });
+    }
+    const result = isSearch ? node.isWord : true;
+    snapshot({
+      title: { vi: `${opLabel} · kết quả`, en: `${opLabel} · result` },
+      codeLines: isSearch ? [24] : [32],
+      highlight: [...path],
+      vars: [
+        { name: "op", value: opLabel },
+        { name: "result", value: result ? "True" : "False" },
+      ],
+      note: {
+        vi: isSearch
+          ? `Hết "${target}": is_word = ${node.isWord ? "True" : "False"} → trả về ${result ? "True" : "False"}.`
+          : `Đi hết tiền tố "${target}" → trả về True.`,
+        en: isSearch
+          ? `End of "${target}": is_word = ${node.isWord ? "True" : "False"} → return ${result ? "True" : "False"}.`
+          : `Reached the end of prefix "${target}" → return True.`,
+      },
+    });
+    return result;
+  }
+
+  const summary = [];
+  if (searchWord) {
+    const r = traverse(searchWord, true, `search("${searchWord}")`);
+    summary.push(`search("${searchWord}") = ${r}`);
+  }
+  if (prefixWord) {
+    const r = traverse(prefixWord, false, `startsWith("${prefixWord}")`);
+    summary.push(`startsWith("${prefixWord}") = ${r}`);
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  const answer = summary.length ? summary.join("  |  ") : `inserted ${words.length} word(s)`;
+
+  return { words, answer, steps };
+}
+
 const SUPPORTED = {
+  208: {
+    id: 208,
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Implement Trie (Prefix Tree)", en: "Implement Trie (Prefix Tree)" },
+    titleVi: { vi: "Cài đặt Trie (cây tiền tố)", en: "Implement a prefix tree" },
+    statement: {
+      vi:
+        "Cài đặt Trie với các thao tác: insert(word) chèn một từ; " +
+        "search(word) trả về True nếu từ đã được chèn; " +
+        "startsWith(prefix) trả về True nếu có từ nào bắt đầu bằng tiền tố. " +
+        "Nhập danh sách từ cần chèn (cách nhau bởi dấu phẩy), một từ để search và một tiền tố để startsWith.",
+      en:
+        "Implement a Trie with: insert(word) inserts a word; " +
+        "search(word) returns True if the word was inserted; " +
+        "startsWith(prefix) returns True if any inserted word starts with the prefix. " +
+        "Enter the words to insert (comma separated), a word to search, and a prefix to test.",
+    },
+    defaultInput: "apple,apply,app",
+    inputKind: "string",
+    inputLabel: { vi: "Các từ chèn (cách nhau bởi dấu phẩy)", en: "Words to insert (comma separated)" },
+    extraParams: [
+      {
+        key: "search",
+        type: "string",
+        label: { vi: "search(word)", en: "search(word)" },
+        default: "app",
+      },
+      {
+        key: "prefix",
+        type: "string",
+        label: { vi: "startsWith(prefix)", en: "startsWith(prefix)" },
+        default: "appl",
+      },
+    ],
+    complexity: {
+      time: "O(L)",
+      space: "O(N·L)",
+      note: {
+        vi: "Mỗi thao tác (insert/search/startsWith) duyệt qua tối đa L ký tự nên O(L). Bộ nhớ tối đa O(N·L) với N từ, mỗi từ dài tối đa L.",
+        en: "Each operation (insert/search/startsWith) walks at most L characters, so O(L). Memory is at most O(N·L) for N words of length up to L.",
+      },
+    },
+    code: [
+      "class TrieNode:",
+      "    def __init__(self):",
+      "        self.children = {}",
+      "        self.is_word = False",
+      "",
+      "class Trie:",
+      "    def __init__(self):",
+      "        self.root = TrieNode()",
+      "",
+      "    def insert(self, word):",
+      "        node = self.root",
+      "        for ch in word:",
+      "            if ch not in node.children:",
+      "                node.children[ch] = TrieNode()",
+      "            node = node.children[ch]",
+      "        node.is_word = True",
+      "",
+      "    def search(self, word):",
+      "        node = self.root",
+      "        for ch in word:",
+      "            if ch not in node.children:",
+      "                return False",
+      "            node = node.children[ch]",
+      "        return node.is_word",
+      "",
+      "    def startsWith(self, prefix):",
+      "        node = self.root",
+      "        for ch in prefix:",
+      "            if ch not in node.children:",
+      "                return False",
+      "            node = node.children[ch]",
+      "        return True",
+    ],
+    builder: buildSteps208,
+  },
   1208: {
     id: 1208,
     category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },

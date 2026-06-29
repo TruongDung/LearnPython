@@ -505,18 +505,9 @@ function renderVars(step, prevStep) {
   panel.classList.remove("hidden");
 }
 
-// ---- Vẽ một bước ----
-function renderStep() {  const step = steps[stepIndex];
-  if (!step) return;
-
-  $("stepTitle").textContent = pick(step.title);
-  $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
-  $("stepNote").textContent = pick(step.note);
-  updateCodeHighlight(step.codeLines || []);
-  renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
-
-  const maxVal = Math.max(...steps.flatMap((s) => s.arr.map((v) => Math.abs(v))), 1);
-
+// ---- Vẽ dạng cột (mảng) ----
+function renderBars(step) {
+  const maxVal = Math.max(...steps.flatMap((s) => (s.arr || []).map((v) => Math.abs(v))), 1);
   const barsEl = $("bars");
   barsEl.innerHTML = "";
 
@@ -551,6 +542,78 @@ function renderStep() {  const step = steps[stepIndex];
     bar.appendChild(idxEl);
     barsEl.appendChild(bar);
   });
+}
+
+// ---- Vẽ dạng cây (Trie) ----
+function escapeXml(s) {
+  return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+function renderTree(step) {
+  const nodes = step.tree.nodes;
+  const maxX = Math.max(0, ...nodes.map((n) => n.x));
+  const maxY = Math.max(0, ...nodes.map((n) => n.y));
+  const colW = 60;
+  const rowH = 78;
+  const pad = 34;
+  const r = 18;
+  const width = pad * 2 + maxX * colW;
+  const height = pad * 2 + maxY * rowH;
+  const px = (x) => pad + x * colW;
+  const py = (y) => pad + y * rowH;
+
+  const pos = {};
+  nodes.forEach((n) => {
+    pos[n.id] = { x: px(n.x), y: py(n.y) };
+  });
+
+  let edges = "";
+  nodes.forEach((n) => {
+    if (n.parentId === null || n.parentId === undefined) return;
+    const p = pos[n.parentId];
+    const c = pos[n.id];
+    if (!p) return;
+    edges += `<line x1="${p.x}" y1="${p.y}" x2="${c.x}" y2="${c.y}" class="tree-edge" />`;
+  });
+
+  let circles = "";
+  nodes.forEach((n) => {
+    const c = pos[n.id];
+    const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "");
+    circles += `<g class="${cls}">`;
+    if (n.isWord) circles += `<circle cx="${c.x}" cy="${c.y}" r="${r + 4}" class="tree-ring" />`;
+    circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
+    circles += `<text x="${c.x}" y="${c.y}" dy="0.35em" text-anchor="middle">${escapeXml(n.label)}</text>`;
+    circles += `</g>`;
+  });
+
+  $("treeView").innerHTML =
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
+    edges +
+    circles +
+    `</svg>`;
+}
+
+// ---- Vẽ một bước ----
+function renderStep() {
+  const step = steps[stepIndex];
+  if (!step) return;
+
+  $("stepTitle").textContent = pick(step.title);
+  $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
+  $("stepNote").textContent = pick(step.note);
+  updateCodeHighlight(step.codeLines || []);
+  renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
+
+  if (step.tree) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    renderTree(step);
+  } else {
+    $("treeView").classList.add("hidden");
+    $("bars").classList.remove("hidden");
+    renderBars(step);
+  }
 
   // nút điều khiển
   $("firstBtn").disabled = stepIndex === 0;
