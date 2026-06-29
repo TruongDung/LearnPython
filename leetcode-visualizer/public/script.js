@@ -803,6 +803,104 @@ function renderTree(step) {
     `</svg>`;
 }
 
+// ---- Graph renderer (directed weighted graph) ----
+function renderGraph(step) {
+  const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
+  const n = nodes.length;
+  const r = 24;
+  const pad = 60;
+  const size = Math.max(280, n * 50);
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size / 2 - pad;
+
+  // Position nodes in a circle
+  const pos = {};
+  nodes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    pos[node.id] = {
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+    };
+  });
+
+  const hlNodeSet = new Set(hlNodes || []);
+  const visitedSet = new Set(visitedNodes || []);
+  const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}`));
+
+  // Draw edges (with arrowheads and weight labels)
+  let edgeSvg = "";
+  const arrowId = "graph-arrow";
+  const arrowHlId = "graph-arrow-hl";
+
+  for (const edge of edges) {
+    const from = pos[edge.u];
+    const to = pos[edge.v];
+    if (!from || !to) continue;
+
+    // Shorten the line so arrow doesn't overlap the circle
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / len;
+    const uy = dy / len;
+    const x1 = from.x + ux * (r + 2);
+    const y1 = from.y + uy * (r + 2);
+    const x2 = to.x - ux * (r + 6);
+    const y2 = to.y - uy * (r + 6);
+
+    const isHl = hlEdgeSet.has(`${edge.u}-${edge.v}`);
+    const cls = isHl ? "graph-edge hl" : "graph-edge";
+    const markerEnd = isHl ? `url(#${arrowHlId})` : `url(#${arrowId})`;
+
+    edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
+
+    // Weight label at midpoint
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    // Offset perpendicular to the edge
+    const perpX = -uy * 12;
+    const perpY = ux * 12;
+    edgeSvg += `<text x="${mx + perpX}" y="${my + perpY}" class="graph-weight${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${edge.w}</text>`;
+  }
+
+  // Draw nodes
+  let nodeSvg = "";
+  for (const node of nodes) {
+    const p = pos[node.id];
+    const isHl = hlNodeSet.has(node.id);
+    const isVisited = visitedSet.has(node.id);
+    let cls = "graph-node";
+    if (isHl) cls += " hl";
+    else if (isVisited) cls += " visited";
+
+    nodeSvg += `<g class="${cls}">`;
+    nodeSvg += `<circle cx="${p.x}" cy="${p.y}" r="${r}" />`;
+    nodeSvg += `<text x="${p.x}" y="${p.y}" dy="0.35em" text-anchor="middle">${node.id}</text>`;
+    // Distance label below node
+    if (node.dist !== undefined) {
+      const distLabel = node.dist === Infinity ? "∞" : node.dist;
+      nodeSvg += `<text x="${p.x}" y="${p.y + r + 14}" class="graph-dist${isHl ? " hl" : ""}" text-anchor="middle">${distLabel}</text>`;
+    }
+    nodeSvg += `</g>`;
+  }
+
+  // Arrow marker definitions
+  const defs = `<defs>
+    <marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+    <marker id="${arrowHlId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+    </marker>
+  </defs>`;
+
+  $("treeView").innerHTML =
+    `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="tree-svg graph-svg">` +
+    defs + edgeSvg + nodeSvg +
+    `</svg>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -819,6 +917,11 @@ function renderStep() {
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
     renderTree(step);
+  } else if (step.graph) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    renderGraph(step);
   } else if (step.grid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

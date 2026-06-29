@@ -4960,6 +4960,322 @@ function buildSteps1399(input) {
 }
 
 /**
+ * Generate steps for LeetCode 743: Network Delay Time.
+ * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
+ */
+function buildSteps743(input, params) {
+  const edgesRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
+  const n = params.n || 4;
+  const k = params.k || 1;
+  const steps = [];
+
+  // Parse edges
+  const edgeList = edgesRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return { u: parts[0], v: parts[1], w: parts[2] };
+  });
+
+  // Build adjacency list
+  const adjList = {};
+  for (let i = 1; i <= n; i++) adjList[i] = [];
+  for (const { u, v, w } of edgeList) {
+    adjList[u].push({ v, w });
+  }
+
+  // Initialize distances
+  const dist = {};
+  for (let i = 1; i <= n; i++) dist[i] = Infinity;
+  dist[k] = 0;
+
+  const visited = new Set();
+  const nodes = Array.from({ length: n }, (_, i) => i + 1);
+
+  // Helper: build graph data for a step
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: nodes.map((id) => ({ id, dist: dist[id] })),
+      edges: edgeList,
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: [...visited],
+    };
+  }
+
+  const distStr = () => nodes.map((id) => `${id}:${dist[id] === Infinity ? "∞" : dist[id]}`).join(", ");
+
+  steps.push({
+    title: { vi: "Khởi tạo Dijkstra", en: "Initialize Dijkstra" },
+    arr: [],
+    graph: makeGraph([k], []),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6, 7, 8, 9],
+    vars: [
+      { name: "source", value: k },
+      { name: "n", value: n },
+      { name: "edges", value: edgeList.length },
+      { name: "dist", value: `{${distStr()}}` },
+    ],
+    note: {
+      vi: `Dijkstra từ nút ${k}. dist[${k}]=0, còn lại = ∞. Đồ thị có ${n} nút, ${edgeList.length} cạnh.`,
+      en: `Dijkstra from node ${k}. dist[${k}]=0, others = ∞. Graph has ${n} nodes, ${edgeList.length} edges.`,
+    },
+  });
+
+  // Dijkstra main loop
+  for (let iter = 0; iter < n; iter++) {
+    let u = -1;
+    let minDist = Infinity;
+    for (let i = 1; i <= n; i++) {
+      if (!visited.has(i) && dist[i] < minDist) {
+        minDist = dist[i];
+        u = i;
+      }
+    }
+
+    if (u === -1) break;
+
+    visited.add(u);
+
+    steps.push({
+      title: { vi: `Pop nút ${u} (dist=${minDist})`, en: `Pop node ${u} (dist=${minDist})` },
+      arr: [],
+      graph: makeGraph([u], []),
+      highlight: [],
+      mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "u", value: u },
+        { name: "dist[u]", value: minDist },
+        { name: "visited", value: `{${[...visited].join(", ")}}` },
+        { name: "dist", value: `{${distStr()}}` },
+      ],
+      note: {
+        vi: `Chọn nút chưa thăm có dist nhỏ nhất: nút ${u} (dist=${minDist}). Đánh dấu đã thăm.`,
+        en: `Pick unvisited node with smallest dist: node ${u} (dist=${minDist}). Mark as visited.`,
+      },
+    });
+
+    // Relax neighbors
+    for (const { v, w } of adjList[u]) {
+      const newDist = dist[u] + w;
+      if (newDist < dist[v]) {
+        const oldDist = dist[v];
+        dist[v] = newDist;
+
+        steps.push({
+          title: { vi: `Relax ${u}→${v}: ${oldDist === Infinity ? "∞" : oldDist} → ${newDist}`, en: `Relax ${u}→${v}: ${oldDist === Infinity ? "∞" : oldDist} → ${newDist}` },
+          arr: [],
+          graph: makeGraph([u, v], [[u, v]]),
+          highlight: [],
+          mark: [],
+          codeLines: [13, 14, 15, 16, 17],
+          vars: [
+            { name: "u", value: u },
+            { name: "v", value: v },
+            { name: "w", value: w },
+            { name: "dist[u]+w", value: newDist },
+            { name: "dist[v] (old)", value: oldDist === Infinity ? "∞" : oldDist },
+            { name: "dist[v] (new)", value: newDist },
+            { name: "dist", value: `{${distStr()}}` },
+          ],
+          note: {
+            vi: `Cạnh ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} < ${oldDist === Infinity ? "∞" : oldDist} → cập nhật dist[${v}]=${newDist}.`,
+            en: `Edge ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} < ${oldDist === Infinity ? "∞" : oldDist} → update dist[${v}]=${newDist}.`,
+          },
+        });
+      } else {
+        steps.push({
+          title: { vi: `Cạnh ${u}→${v}: không cải thiện`, en: `Edge ${u}→${v}: no improvement` },
+          arr: [],
+          graph: makeGraph([u, v], [[u, v]]),
+          highlight: [],
+          mark: [],
+          codeLines: [13, 14, 15],
+          vars: [
+            { name: "u", value: u },
+            { name: "v", value: v },
+            { name: "w", value: w },
+            { name: "dist[u]+w", value: newDist },
+            { name: "dist[v]", value: dist[v] === Infinity ? "∞" : dist[v] },
+          ],
+          note: {
+            vi: `Cạnh ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} ≥ dist[${v}]=${dist[v] === Infinity ? "∞" : dist[v]} → bỏ qua.`,
+            en: `Edge ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} ≥ dist[${v}]=${dist[v] === Infinity ? "∞" : dist[v]} → skip.`,
+          },
+        });
+      }
+    }
+  }
+
+  // Final result
+  const maxDist = Math.max(...nodes.map((node) => dist[node]));
+  const answer = maxDist === Infinity ? -1 : maxDist;
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    graph: makeGraph(maxDist !== Infinity ? nodes.filter((id) => dist[id] === maxDist) : [], []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18, 19],
+    vars: [
+      { name: "dist", value: `{${distStr()}}` },
+      { name: "max(dist)", value: maxDist === Infinity ? "∞" : maxDist },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: answer === -1
+        ? `Có nút không thể đạt tới từ nút ${k} → trả về -1.`
+        : `Thời gian tối đa = max(dist) = ${answer}. Tất cả ${n} nút đều nhận tín hiệu trong ${answer} đơn vị thời gian.`,
+      en: answer === -1
+        ? `Some nodes are unreachable from node ${k} → return -1.`
+        : `Maximum time = max(dist) = ${answer}. All ${n} nodes receive the signal within ${answer} time units.`,
+    },
+  });
+
+  return { edges: edgesRaw, n, k, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 851: Loud and Rich.
+ * DFS on reversed richer graph: for each node, find the quietest person among all richer people.
+ */
+function buildSteps851(input, params) {
+  const richerRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
+  const quietArr = String(params.quiet || "").split(",").map((s) => parseInt(s.trim(), 10));
+  const n = quietArr.length;
+  const steps = [];
+
+  // Parse richer edges: a-b means a is richer than b
+  const richerEdges = richerRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return { a: parts[0], b: parts[1] };
+  });
+
+  // Build graph: b -> [a] (people richer than b)
+  const graph = {};
+  for (let i = 0; i < n; i++) graph[i] = [];
+  for (const { a, b } of richerEdges) {
+    graph[b].push(a);
+  }
+
+  const answer = new Array(n).fill(-1);
+  const nodes = Array.from({ length: n }, (_, i) => i);
+
+  // Graph visualization helper
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: nodes.map((id) => ({ id, dist: answer[id] === -1 ? undefined : quietArr[answer[id]] })),
+      edges: richerEdges.map(({ a, b }) => ({ u: a, v: b, w: "" })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: nodes.filter((i) => answer[i] !== -1),
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4, 5, 6],
+    vars: [
+      { name: "n", value: n },
+      { name: "quiet", value: `[${quietArr.join(", ")}]` },
+      { name: "richer edges", value: richerEdges.length },
+    ],
+    note: {
+      vi: `${n} người, quiet = [${quietArr.join(", ")}]. Đồ thị: cạnh a→b nghĩa là a giàu hơn b. DFS từ mỗi nút tìm người ít ồn nhất trong tất cả người giàu hơn.`,
+      en: `${n} people, quiet = [${quietArr.join(", ")}]. Graph: edge a→b means a is richer than b. DFS from each node to find quietest among all richer people.`,
+    },
+  });
+
+  // DFS with memoization
+  function dfs(node, depth) {
+    if (answer[node] !== -1) return;
+
+    answer[node] = node; // initially, the quietest richer person is itself
+
+    steps.push({
+      title: { vi: `DFS(${node}): answer[${node}] = ${node}`, en: `DFS(${node}): answer[${node}] = ${node}` },
+      arr: [],
+      graph: makeGraph([node], []),
+      highlight: [],
+      mark: [],
+      codeLines: [8, 9, 10, 11],
+      vars: [
+        { name: "node", value: node },
+        { name: "quiet[node]", value: quietArr[node] },
+        { name: "answer[node]", value: node },
+        { name: "answer", value: `[${answer.join(", ")}]` },
+      ],
+      note: {
+        vi: `Bắt đầu DFS tại nút ${node} (quiet=${quietArr[node]}). Khởi tạo answer[${node}] = ${node}.`,
+        en: `Start DFS at node ${node} (quiet=${quietArr[node]}). Initialize answer[${node}] = ${node}.`,
+      },
+    });
+
+    for (const neighbor of graph[node]) {
+      dfs(neighbor, depth + 1);
+
+      const hlEdge = [[neighbor, node]]; // neighbor is richer than node
+      if (quietArr[answer[neighbor]] < quietArr[answer[node]]) {
+        const oldAns = answer[node];
+        answer[node] = answer[neighbor];
+
+        steps.push({
+          title: { vi: `${node}←${neighbor}: quiet[${answer[neighbor]}]=${quietArr[answer[neighbor]]} < quiet[${oldAns}]=${quietArr[oldAns]} → cập nhật`, en: `${node}←${neighbor}: quiet[${answer[neighbor]}]=${quietArr[answer[neighbor]]} < quiet[${oldAns}]=${quietArr[oldAns]} → update` },
+          arr: [],
+          graph: makeGraph([node, neighbor], hlEdge),
+          highlight: [],
+          mark: [],
+          codeLines: [12, 13, 14, 15],
+          vars: [
+            { name: "node", value: node },
+            { name: "neighbor", value: neighbor },
+            { name: "answer[neighbor]", value: answer[neighbor] },
+            { name: "quiet comparison", value: `${quietArr[answer[neighbor]]} < ${quietArr[oldAns]}` },
+            { name: "answer[node]", value: answer[node] },
+          ],
+          note: {
+            vi: `Người ${answer[neighbor]} (quiet=${quietArr[answer[neighbor]]}) ít ồn hơn ${oldAns} (quiet=${quietArr[oldAns]}) → answer[${node}] = ${answer[node]}.`,
+            en: `Person ${answer[neighbor]} (quiet=${quietArr[answer[neighbor]]}) is quieter than ${oldAns} (quiet=${quietArr[oldAns]}) → answer[${node}] = ${answer[node]}.`,
+          },
+        });
+      }
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    if (answer[i] === -1) {
+      dfs(i, 0);
+    }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: [${answer.join(", ")}]`, en: `Result: [${answer.join(", ")}]` },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [17, 18, 19],
+    vars: [
+      { name: "answer", value: `[${answer.join(", ")}]` },
+    ],
+    note: {
+      vi: `Với mỗi người i, answer[i] là người ít ồn nhất trong tất cả những người giàu hơn hoặc bằng i. Kết quả: [${answer.join(", ")}].`,
+      en: `For each person i, answer[i] is the quietest person among all people richer than or equal to i. Result: [${answer.join(", ")}].`,
+    },
+  });
+
+  return { richer: richerRaw, quiet: quietArr, answer: `[${answer.join(", ")}]`, steps };
+}
+
+/**
  * Generate steps for LeetCode 50: Pow(x, n).
  *
  * Fast exponentiation (binary exponentiation):
@@ -7097,6 +7413,130 @@ const SUPPORTED = {
       "        return sum(1 for v in groups.values() if v == max_size)",
     ],
     builder: buildSteps1399,
+  },
+  743: {
+    id: 743,
+    difficulty: "medium",
+    slug: "network-delay-time",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Network Delay Time", en: "Network Delay Time" },
+    titleVi: { vi: "Thời gian trễ mạng", en: "Network delay time" },
+    statement: {
+      vi:
+        "Cho n nút mạng (đánh số 1..n), danh sách cạnh có hướng [u, v, w] (từ u đến v, trọng số w), và nút nguồn k. " +
+        "Tìm thời gian ngắn nhất để tín hiệu từ k đến được TẤT CẢ các nút. Nếu không thể, trả về -1. " +
+        "Dùng thuật toán Dijkstra.",
+      en:
+        "Given n network nodes (labeled 1..n), a list of directed edges [u, v, w] (from u to v with weight w), and a source node k. " +
+        "Find the minimum time for a signal from k to reach ALL nodes. If impossible, return -1. " +
+        "Uses Dijkstra's algorithm.",
+    },
+    defaultInput: "2-1-1,2-3-1,3-4-1",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u-v-w, cách bởi dấu phẩy)", en: "Edges (u-v-w, comma separated)" },
+    extraParams: [
+      {
+        key: "n",
+        label: { vi: "n (số nút)", en: "n (number of nodes)" },
+        default: 4,
+      },
+      {
+        key: "k",
+        label: { vi: "k (nút nguồn)", en: "k (source node)" },
+        default: 2,
+      },
+    ],
+    complexity: {
+      time: "O((V+E) log V)",
+      space: "O(V + E)",
+      note: {
+        vi: "Dijkstra với min-heap: mỗi nút pop 1 lần O(V log V), mỗi cạnh relax O(E log V). Bộ nhớ O(V+E) cho adjacency list + dist array.",
+        en: "Dijkstra with min-heap: each node popped once O(V log V), each edge relaxed O(E log V). Memory O(V+E) for adjacency list + dist array.",
+      },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def networkDelayTime(self, times, n, k):",
+      "        graph = defaultdict(list)",
+      "        for u, v, w in times:",
+      "            graph[u].append((v, w))",
+      "        dist = {node: float('inf') for node in range(1, n+1)}",
+      "        dist[k] = 0",
+      "        heap = [(0, k)]",
+      "        while heap:",
+      "            d, u = heapq.heappop(heap)",
+      "            if d > dist[u]:",
+      "                continue",
+      "            for v, w in graph[u]:",
+      "                if dist[u] + w < dist[v]:",
+      "                    dist[v] = dist[u] + w",
+      "                    heapq.heappush(heap, (dist[v], v))",
+      "        ans = max(dist.values())",
+      "        return ans if ans < float('inf') else -1",
+    ],
+    builder: buildSteps743,
+  },
+  851: {
+    id: 851,
+    difficulty: "medium",
+    slug: "loud-and-rich",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Loud and Rich", en: "Loud and Rich" },
+    titleVi: { vi: "Ồn ào và Giàu có", en: "Loud and rich" },
+    statement: {
+      vi:
+        "Có n người (0..n-1). richer[i] = [a, b] nghĩa là a giàu hơn b. quiet[i] là độ ồn của người i. " +
+        "Với mỗi người x, tìm người y ít ồn nhất sao cho y giàu hơn hoặc bằng x (y có thể là x). " +
+        "Trả về mảng answer[x] = y.",
+      en:
+        "There are n people (0..n-1). richer[i] = [a, b] means a is richer than b. quiet[i] is the quietness of person i. " +
+        "For each person x, find the least quiet person y such that y is richer than or equal to x (y can be x itself). " +
+        "Return array answer[x] = y.",
+    },
+    defaultInput: "1-0,2-1,3-1,3-7,4-3,5-3,6-3",
+    inputKind: "string",
+    inputLabel: { vi: "richer (a-b, cách bởi dấu phẩy)", en: "richer edges (a-b, comma separated)" },
+    extraParams: [
+      {
+        key: "quiet",
+        type: "string",
+        label: { vi: "quiet[] (cách bởi dấu phẩy)", en: "quiet[] (comma separated)" },
+        default: "3,2,5,4,6,1,7,0",
+      },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V + E)",
+      note: {
+        vi: "DFS/BFS trên đồ thị: mỗi nút thăm 1 lần O(V+E). Bộ nhớ O(V+E) cho adjacency list + answer array.",
+        en: "DFS on the graph: each node visited once O(V+E). Memory O(V+E) for adjacency list + answer array.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def loudAndRich(self, richer, quiet):",
+      "        n = len(quiet)",
+      "        graph = defaultdict(list)  # b -> [a] (a richer than b)",
+      "        for a, b in richer:",
+      "            graph[b].append(a)",
+      "        answer = [-1] * n",
+      "",
+      "        def dfs(node):",
+      "            if answer[node] != -1:",
+      "                return",
+      "            answer[node] = node",
+      "            for neighbor in graph[node]:",
+      "                dfs(neighbor)",
+      "                if quiet[answer[neighbor]] < quiet[answer[node]]:",
+      "                    answer[node] = answer[neighbor]",
+      "",
+      "        for i in range(n):",
+      "            dfs(i)",
+      "        return answer",
+    ],
+    builder: buildSteps851,
   },
 };
 
