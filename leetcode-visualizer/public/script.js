@@ -438,29 +438,62 @@ function stopPlay() {
 
 // ---- Vẽ code Python (syntax highlight) ----
 function highlightPython(line) {
-  // Order matters: strings first, then comments, then keywords, etc.
-  let html = line
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  // Tokenize the line to avoid breaking HTML inside tokens
+  const tokens = [];
+  let remaining = line;
 
-  // Strings (single/double quoted)
-  html = html.replace(/(&#39;[^&#]*?&#39;|&quot;[^&]*?&quot;|'[^']*?'|"[^"]*?")/g, '<span class="py-str">$1</span>');
-  // Comments
-  html = html.replace(/(#.*)$/, '<span class="py-comment">$1</span>');
-  // Numbers
-  html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="py-num">$1</span>');
-  // Keywords
-  const kw = "\\b(class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|as|self|break|continue|pass|lambda|with|yield|raise|try|except|finally)\\b";
-  html = html.replace(new RegExp(kw, "g"), '<span class="py-kw">$1</span>');
-  // Built-in functions
-  const bf = "\\b(len|range|max|min|abs|sum|int|str|float|list|dict|set|print|enumerate|zip|sorted|type|isinstance|map|filter|super|__init__)\\b";
-  html = html.replace(new RegExp(bf, "g"), '<span class="py-builtin">$1</span>');
-  // Function/class names after def/class
-  html = html.replace(/(<span class="py-kw">def<\/span>\s+)(\w+)/g, '$1<span class="py-fn">$2</span>');
-  html = html.replace(/(<span class="py-kw">class<\/span>\s+)(\w+)/g, '$1<span class="py-cls">$2</span>');
+  // Patterns in priority order
+  const patterns = [
+    { type: "str", re: /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/ },
+    { type: "comment", re: /^#.*$/ },
+    { type: "kw", re: /^(?:class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|as|self|break|continue|pass|lambda|with|yield|raise|try|except|finally)\b/ },
+    { type: "builtin", re: /^(?:len|range|max|min|abs|sum|int|str|float|list|dict|set|print|enumerate|zip|sorted|type|isinstance|map|filter|super|__init__)\b/ },
+    { type: "num", re: /^-?\d+\.?\d*/ },
+    { type: "ident", re: /^\w+/ },
+    { type: "space", re: /^\s+/ },
+    { type: "op", re: /^[^\w\s]+/ },
+  ];
 
-  return html;
+  while (remaining.length > 0) {
+    let matched = false;
+    for (const p of patterns) {
+      const m = remaining.match(p.re);
+      if (m) {
+        tokens.push({ type: p.type, text: m[0] });
+        remaining = remaining.slice(m[0].length);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      tokens.push({ type: "op", text: remaining[0] });
+      remaining = remaining.slice(1);
+    }
+  }
+
+  // Mark function/class names (token after def/class keyword)
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i].type === "kw" && (tokens[i].text === "def" || tokens[i].text === "class")) {
+      // Find next ident token (skip spaces)
+      for (let j = i + 1; j < tokens.length; j++) {
+        if (tokens[j].type === "space") continue;
+        if (tokens[j].type === "ident" || tokens[j].type === "builtin") {
+          tokens[j].type = tokens[i].text === "def" ? "fn" : "cls";
+        }
+        break;
+      }
+    }
+  }
+
+  // Render tokens to HTML
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const classMap = { kw: "py-kw", builtin: "py-builtin", fn: "py-fn", cls: "py-cls", str: "py-str", comment: "py-comment", num: "py-num" };
+
+  return tokens.map((t) => {
+    const cls = classMap[t.type];
+    const escaped = esc(t.text);
+    return cls ? `<span class="${cls}">${escaped}</span>` : escaped;
+  }).join("");
 }
 
 function renderCode() {
