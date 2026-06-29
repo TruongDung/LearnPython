@@ -115,7 +115,7 @@ function renderCatalog() {
 
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "cat-toggle";
-    toggleBtn.textContent = "−";
+    toggleBtn.textContent = "+";
 
     const nameSpan = document.createElement("span");
     nameSpan.textContent = pick(group);
@@ -128,7 +128,7 @@ function renderCatalog() {
     titleEl.appendChild(countSpan);
 
     const itemsEl = document.createElement("div");
-    itemsEl.className = "cat-items";
+    itemsEl.className = "cat-items collapsed";
 
     group.problems.forEach((p) => {
       const chip = document.createElement("button");

@@ -3234,7 +3234,212 @@ function buildSteps713(nums, params) {
   return { original: [...nums], answer: count, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 50: Pow(x, n).
+ *
+ * Lũy thừa nhanh (fast exponentiation / binary exponentiation):
+ *  - Nếu n < 0: x = 1/x, n = -n.
+ *  - result = 1.
+ *  - Lặp: nếu n lẻ thì result *= x; x *= x; n = floor(n/2).
+ *  - Đáp án là result.
+ */
+function buildSteps50(input, params) {
+  let x = params.x;
+  let n = input[0];
+  const steps = [];
+  const origX = x;
+  const origN = n;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3],
+    vars: [
+      { name: "x", value: x },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `Tính ${x}^${n} bằng lũy thừa nhanh (Binary Exponentiation).`,
+      en: `Compute ${x}^${n} using fast exponentiation (Binary Exponentiation).`,
+    },
+  });
+
+  if (n < 0) {
+    x = 1 / x;
+    n = -n;
+    steps.push({
+      title: { vi: "n âm → đảo x", en: "Negative n → invert x" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [4, 5],
+      vars: [
+        { name: "x", value: x },
+        { name: "n", value: n },
+      ],
+      note: {
+        vi: `n < 0 nên đổi x = 1/x = ${x}, n = -n = ${n}.`,
+        en: `n < 0, so set x = 1/x = ${x}, n = -n = ${n}.`,
+      },
+    });
+  }
+
+  let result = 1;
+  let iteration = 0;
+
+  steps.push({
+    title: { vi: "Bắt đầu vòng lặp", en: "Start loop" },
+    arr: [],
+    highlight: [],
+    mark: [],
+    codeLines: [6],
+    vars: [
+      { name: "result", value: result },
+      { name: "x", value: x },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `result = 1. Lặp: nếu n lẻ thì nhân result với x, rồi bình phương x và chia đôi n.`,
+      en: `result = 1. Loop: if n is odd, multiply result by x, then square x and halve n.`,
+    },
+  });
+
+  while (n > 0) {
+    iteration++;
+    const nBin = n.toString(2);
+    const isOdd = n % 2 === 1;
+
+    if (isOdd) {
+      result *= x;
+      steps.push({
+        title: { vi: `Lần ${iteration}: n lẻ → result *= x`, en: `Iter ${iteration}: n odd → result *= x` },
+        arr: [],
+        highlight: [],
+        mark: [],
+        codeLines: [7, 8],
+        vars: [
+          { name: "n (bin)", value: nBin },
+          { name: "n", value: n },
+          { name: "n % 2", value: 1 },
+          { name: "result", value: +result.toFixed(10) },
+          { name: "x", value: +x.toFixed(10) },
+        ],
+        note: {
+          vi: `n=${n} (nhị phân: ${nBin}) là lẻ → result = result × x = ${+result.toFixed(10)}.`,
+          en: `n=${n} (binary: ${nBin}) is odd → result = result × x = ${+result.toFixed(10)}.`,
+        },
+      });
+    } else {
+      steps.push({
+        title: { vi: `Lần ${iteration}: n chẵn → bỏ qua`, en: `Iter ${iteration}: n even → skip` },
+        arr: [],
+        highlight: [],
+        mark: [],
+        codeLines: [7],
+        vars: [
+          { name: "n (bin)", value: nBin },
+          { name: "n", value: n },
+          { name: "n % 2", value: 0 },
+          { name: "result", value: +result.toFixed(10) },
+          { name: "x", value: +x.toFixed(10) },
+        ],
+        note: {
+          vi: `n=${n} (nhị phân: ${nBin}) là chẵn → không nhân result.`,
+          en: `n=${n} (binary: ${nBin}) is even → do not multiply result.`,
+        },
+      });
+    }
+
+    x *= x;
+    n = Math.floor(n / 2);
+
+    steps.push({
+      title: { vi: `Bình phương x, chia đôi n`, en: `Square x, halve n` },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [9, 10],
+      vars: [
+        { name: "x", value: +x.toFixed(10) },
+        { name: "n", value: n },
+        { name: "result", value: +result.toFixed(10) },
+      ],
+      note: {
+        vi: `x = x² = ${+x.toFixed(10)}, n = ⌊n/2⌋ = ${n}.`,
+        en: `x = x² = ${+x.toFixed(10)}, n = ⌊n/2⌋ = ${n}.`,
+      },
+    });
+  }
+
+  const finalResult = +result.toFixed(10);
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "answer", value: finalResult }],
+    note: {
+      vi: `${origX}^${origN} = ${finalResult}.`,
+      en: `${origX}^${origN} = ${finalResult}.`,
+    },
+  });
+
+  return { x: origX, n: origN, answer: finalResult, steps };
+}
+
 const SUPPORTED = {
+  50: {
+    id: 50,
+    difficulty: "medium",
+    slug: "powx-n",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Pow(x, n)", en: "Pow(x, n)" },
+    titleVi: { vi: "Lũy thừa x mũ n", en: "Power x to the n" },
+    statement: {
+      vi: "Cho x (số thực) và n (số nguyên), tính x^n (tức x mũ n). Sử dụng thuật toán lũy thừa nhanh (binary exponentiation) với độ phức tạp O(log n).",
+      en: "Implement pow(x, n), which calculates x raised to the power n. Use fast exponentiation (binary exponentiation) in O(log n) time.",
+    },
+    defaultInput: [10],
+    inputKind: "integer",
+    inputLabel: { vi: "n (số mũ)", en: "n (exponent)" },
+    singleInput: true,
+    maxInput: 30,
+    extraParams: [
+      {
+        key: "x",
+        label: { vi: "x (cơ số)", en: "x (base)" },
+        default: 2,
+        allowNegative: true,
+      },
+    ],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi vòng lặp chia n cho 2, nên chỉ cần O(log n) phép nhân. Chỉ dùng vài biến phụ nên O(1) bộ nhớ.",
+        en: "Each iteration halves n, so only O(log n) multiplications are needed. Only a few extra variables are used, so O(1) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def myPow(self, x: float, n: int) -> float:",
+      "        if n < 0:",
+      "            x = 1 / x",
+      "            n = -n",
+      "        result = 1",
+      "        while n > 0:",
+      "            if n % 2 == 1:",
+      "                result *= x",
+      "            x *= x",
+      "            n //= 2",
+      "        return result",
+    ],
+    builder: buildSteps50,
+  },
   713: {
     id: 713,
     difficulty: "medium",
