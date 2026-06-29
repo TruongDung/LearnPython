@@ -863,3 +863,31 @@ function showError(id, msg) {
 applyStaticStrings();
 loadCatalog();
 loadProblem();
+
+// ---- Theme toggle (dark/light) ----
+(function initTheme() {
+  const saved = localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = saved || (prefersDark ? "dark" : "dark"); // default dark
+  applyTheme(theme);
+})();
+
+$("themeToggle").addEventListener("click", () => {
+  const current = document.documentElement.dataset.theme || "dark";
+  const next = current === "dark" ? "light" : "dark";
+  applyTheme(next);
+  localStorage.setItem("theme", next);
+});
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const moonIcon = $("themeIconMoon");
+  const sunIcon = $("themeIconSun");
+  if (theme === "dark") {
+    moonIcon.classList.add("hidden");
+    sunIcon.classList.remove("hidden");
+  } else {
+    moonIcon.classList.remove("hidden");
+    sunIcon.classList.add("hidden");
+  }
+}

@@ -72,8 +72,8 @@ header h1 {
 }
 
 .cat-group {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 16px;
   padding: 14px 18px;
   backdrop-filter: blur(12px);
@@ -81,8 +81,8 @@ header h1 {
 }
 
 .cat-group:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .cat-title {
@@ -112,8 +112,8 @@ header h1 {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   padding: 8px 14px;
   cursor: pointer;
@@ -122,13 +122,14 @@ header h1 {
 }
 
 .prob-chip:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
 }
 
 .prob-chip.active {
   border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(99, 102, 241, 0.14);
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.3);
 }
 
@@ -140,7 +141,7 @@ header h1 {
 
 .prob-chip .pname {
   font-size: 11px;
-  color: #94a3b8;
+  color: #cbd5e1;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -890,4 +891,346 @@ button:disabled {
 
 .cat-items.collapsed {
   display: none;
+}
+
+
+/* ---- Header actions row ---- */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: none;
+}
+
+.theme-toggle:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  transform: none;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+}
+
+/* ============================================
+   LIGHT THEME OVERRIDES
+   ============================================ */
+[data-theme="light"] body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+[data-theme="light"] header h1 {
+  color: #0f172a;
+}
+
+[data-theme="light"] .subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .lang-switch {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .lang-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .lang-btn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme="light"] .theme-toggle {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .theme-toggle:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #6366f1;
+}
+
+[data-theme="light"] .cat-group {
+  background: white;
+  border-color: #e2e8f0;
+  backdrop-filter: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .cat-group:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .cat-title {
+  color: #4f46e5;
+}
+
+[data-theme="light"] .prob-chip {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .prob-chip:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+[data-theme="light"] .prob-chip.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+[data-theme="light"] .prob-chip .pid {
+  color: #0f172a;
+}
+
+[data-theme="light"] .prob-chip .pname {
+  color: #64748b;
+}
+
+[data-theme="light"] input {
+  background: white;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+[data-theme="light"] label {
+  color: #475569;
+}
+
+[data-theme="light"] .panel {
+  background: white;
+  border-color: #e2e8f0;
+  backdrop-filter: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .problem-title-link {
+  color: #0f172a;
+}
+
+[data-theme="light"] .problem-title-link:hover {
+  color: #6366f1;
+}
+
+[data-theme="light"] .title-vi {
+  color: #6366f1;
+}
+
+[data-theme="light"] .statement {
+  color: #475569;
+}
+
+[data-theme="light"] .complexity {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+[data-theme="light"] .cx-badge {
+  color: #059669;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+[data-theme="light"] .cx-note {
+  color: #475569;
+}
+
+[data-theme="light"] .input-row {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .viz-head h3 {
+  color: #0f172a;
+}
+
+[data-theme="light"] .bars {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .bar .col {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] .bar .val {
+  color: #0f172a;
+}
+
+[data-theme="light"] .bar .dp {
+  color: #059669;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+[data-theme="light"] .note {
+  background: #eef2ff;
+  color: #334155;
+}
+
+[data-theme="light"] .vars-panel {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .var-item {
+  background: white;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .var-item .var-value {
+  color: #0f172a;
+}
+
+[data-theme="light"] .var-item.changed {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+[data-theme="light"] .var-item.changed .var-value {
+  color: #b45309;
+}
+
+[data-theme="light"] .controls button {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .controls button:hover {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .controls button:disabled {
+  background: #f8fafc;
+  color: #cbd5e1;
+}
+
+[data-theme="light"] .answer {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
+[data-theme="light"] .error {
+  color: #dc2626;
+}
+
+[data-theme="light"] .tree-view {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .tree-edge {
+  stroke: #cbd5e1;
+}
+
+[data-theme="light"] .tree-node circle {
+  fill: white;
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .tree-node text {
+  fill: #1e293b;
+}
+
+[data-theme="light"] .tree-node.word circle {
+  fill: #ecfdf5;
+  stroke: #10b981;
+}
+
+[data-theme="light"] .tree-node.hl circle {
+  fill: #fffbeb;
+  stroke: #f59e0b;
+}
+
+[data-theme="light"] .tree-node.hl text {
+  fill: #b45309;
+}
+
+[data-theme="light"] .grid-view {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .dp-grid th,
+[data-theme="light"] .dp-grid td {
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .dp-grid th {
+  background: #f1f5f9;
+  color: #6366f1;
+}
+
+[data-theme="light"] .dp-grid .row-label {
+  background: #f1f5f9;
+  color: #6366f1;
+}
+
+[data-theme="light"] .dp-grid .dp-cell {
+  background: white;
+  color: #1e293b;
+}
+
+[data-theme="light"] .dp-grid .dp-cell.hl {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+[data-theme="light"] .dp-grid .dp-cell.path {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+[data-theme="light"] .diff-easy {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #6ee7b7;
+}
+
+[data-theme="light"] .diff-medium {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: #fbbf24;
+}
+
+[data-theme="light"] .diff-hard {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .cat-toggle {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .cat-toggle:hover {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+
+[data-theme="light"] .kbd-hint {
+  color: #94a3b8;
 }
