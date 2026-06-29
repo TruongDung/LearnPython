@@ -715,3 +715,34 @@ button:disabled {
   color: #fca5a5;
   border: 1px solid #dc2626;
 }
+
+/* ---- Python syntax highlighting ---- */
+.py-kw {
+  color: #c084fc; /* purple - keywords */
+  font-weight: 600;
+}
+
+.py-builtin {
+  color: #67e8f9; /* cyan - built-in functions */
+}
+
+.py-fn {
+  color: #93c5fd; /* blue - function names */
+}
+
+.py-cls {
+  color: #fcd34d; /* yellow - class names */
+}
+
+.py-str {
+  color: #86efac; /* green - strings */
+}
+
+.py-comment {
+  color: #64748b; /* gray - comments */
+  font-style: italic;
+}
+
+.py-num {
+  color: #fdba74; /* orange - numbers */
+}

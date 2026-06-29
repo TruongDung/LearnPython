@@ -436,7 +436,33 @@ function stopPlay() {
   $("playBtn").textContent = t().play;
 }
 
-// ---- Vẽ code Python ----
+// ---- Vẽ code Python (syntax highlight) ----
+function highlightPython(line) {
+  // Order matters: strings first, then comments, then keywords, etc.
+  let html = line
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Strings (single/double quoted)
+  html = html.replace(/(&#39;[^&#]*?&#39;|&quot;[^&]*?&quot;|'[^']*?'|"[^"]*?")/g, '<span class="py-str">$1</span>');
+  // Comments
+  html = html.replace(/(#.*)$/, '<span class="py-comment">$1</span>');
+  // Numbers
+  html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="py-num">$1</span>');
+  // Keywords
+  const kw = "\\b(class|def|return|if|elif|else|for|while|in|not|and|or|is|None|True|False|import|from|as|self|break|continue|pass|lambda|with|yield|raise|try|except|finally)\\b";
+  html = html.replace(new RegExp(kw, "g"), '<span class="py-kw">$1</span>');
+  // Built-in functions
+  const bf = "\\b(len|range|max|min|abs|sum|int|str|float|list|dict|set|print|enumerate|zip|sorted|type|isinstance|map|filter|super|__init__)\\b";
+  html = html.replace(new RegExp(bf, "g"), '<span class="py-builtin">$1</span>');
+  // Function/class names after def/class
+  html = html.replace(/(<span class="py-kw">def<\/span>\s+)(\w+)/g, '$1<span class="py-fn">$2</span>');
+  html = html.replace(/(<span class="py-kw">class<\/span>\s+)(\w+)/g, '$1<span class="py-cls">$2</span>');
+
+  return html;
+}
+
 function renderCode() {
   const panel = $("codePanel");
   const code = (problemData && problemData.code) || [];
@@ -449,7 +475,7 @@ function renderCode() {
   code.forEach((line, idx) => {
     const row = document.createElement("div");
     row.className = "code-line";
-    row.dataset.line = idx + 1; // 1-indexed
+    row.dataset.line = idx + 1;
 
     const ln = document.createElement("span");
     ln.className = "ln";
@@ -457,7 +483,7 @@ function renderCode() {
 
     const txt = document.createElement("span");
     txt.className = "txt";
-    txt.textContent = line;
+    txt.innerHTML = highlightPython(line);
 
     row.appendChild(ln);
     row.appendChild(txt);
