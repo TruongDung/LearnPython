@@ -5345,6 +5345,719 @@ function buildSteps1399(input) {
 }
 
 /**
+ * Generate steps for LeetCode 1967: Number of Strings That Appear as Substrings in Word.
+ * Simple iteration: check if each pattern is a substring of word.
+ */
+function buildSteps1967(input, params) {
+  const patterns = String(input).split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  const word = String(params.word || "");
+  const steps = [];
+
+  let count = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: patterns.map(() => 0),
+    sub: patterns,
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [
+      { name: "word", value: word },
+      { name: "patterns", value: `[${patterns.join(", ")}]` },
+      { name: "count", value: 0 },
+    ],
+    note: {
+      vi: `Kiểm tra từng pattern xem có phải substring của "${word}" không.`,
+      en: `Check each pattern to see if it's a substring of "${word}".`,
+    },
+  });
+
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i];
+    const found = word.includes(pattern);
+    if (found) count++;
+
+    steps.push({
+      title: { vi: `"${pattern}" ${found ? "∈" : "∉"} "${word}"`, en: `"${pattern}" ${found ? "∈" : "∉"} "${word}"` },
+      arr: patterns.map((_, idx) => {
+        if (idx < i) return word.includes(patterns[idx]) ? 1 : 0;
+        if (idx === i) return found ? 1 : 0;
+        return 0;
+      }),
+      sub: patterns,
+      highlight: [i],
+      mark: found ? [i] : [],
+      codeLines: [3, 4, 5],
+      vars: [
+        { name: "pattern", value: pattern },
+        { name: "in word?", value: found },
+        { name: "count", value: count },
+      ],
+      note: {
+        vi: found
+          ? `"${pattern}" là substring của "${word}" ✓ → count = ${count}`
+          : `"${pattern}" KHÔNG phải substring của "${word}" ✗`,
+        en: found
+          ? `"${pattern}" is a substring of "${word}" ✓ → count = ${count}`
+          : `"${pattern}" is NOT a substring of "${word}" ✗`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${count}`, en: `Result: ${count}` },
+    arr: patterns.map((p) => (word.includes(p) ? 1 : 0)),
+    sub: patterns,
+    highlight: [],
+    mark: patterns.map((p, idx) => (word.includes(p) ? idx : -1)).filter((x) => x >= 0),
+    final: true,
+    codeLines: [6],
+    vars: [{ name: "count", value: count }],
+    note: {
+      vi: `${count} trong ${patterns.length} patterns là substring của "${word}".`,
+      en: `${count} out of ${patterns.length} patterns are substrings of "${word}".`,
+    },
+  });
+
+  return { patterns, word, answer: count, steps };
+}
+
+/**
+ * Generate steps for LeetCode 51: N-Queens.
+ * Backtracking: place queens row by row, checking safety at each position.
+ * Uses grid view to display the board state.
+ */
+function buildSteps51(input) {
+  const n = input[0];
+  const steps = [];
+  const board = Array.from({ length: n }, () => new Array(n).fill("."));
+  const solutions = [];
+
+  // Grid visualization helper
+  function makeGrid(hlCell) {
+    const dp = board.map((row) => [...row]);
+    return {
+      dp: dp.map((row) => row.map((c) => (c === "Q" ? "♛" : "·"))),
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: hlCell || null,
+      pathCells: [],
+    };
+  }
+
+  // Find all queen positions for marking
+  function queenCells() {
+    const cells = [];
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        if (board[r][c] === "Q") cells.push([r, c]);
+    return cells;
+  }
+
+  function isSafe(row, col) {
+    for (let i = 0; i < row; i++) {
+      if (board[i][col] === "Q") return false;
+      if (col - (row - i) >= 0 && board[i][col - (row - i)] === "Q") return false;
+      if (col + (row - i) < n && board[i][col + (row - i)] === "Q") return false;
+    }
+    return true;
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo bàn cờ", en: "Initialize board" },
+    arr: [],
+    grid: makeGrid(),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3],
+    vars: [
+      { name: "n", value: n },
+      { name: "solutions found", value: 0 },
+    ],
+    note: {
+      vi: `Bàn cờ ${n}×${n} trống. Backtracking: thử đặt hậu từng hàng từ trên xuống.`,
+      en: `Empty ${n}×${n} board. Backtracking: try placing a queen in each row from top to bottom.`,
+    },
+  });
+
+  function backtrack(row) {
+    if (row === n) {
+      solutions.push(board.map((r) => r.join("")));
+      const grid = makeGrid();
+      grid.pathCells = queenCells();
+      steps.push({
+        title: { vi: `✓ Tìm thấy lời giải #${solutions.length}`, en: `✓ Found solution #${solutions.length}` },
+        arr: [],
+        grid,
+        highlight: [],
+        mark: [],
+        codeLines: [16, 17],
+        vars: [
+          { name: "solutions", value: solutions.length },
+          { name: "board", value: solutions[solutions.length - 1].join(" | ") },
+        ],
+        note: {
+          vi: `Đã đặt ${n} hậu hợp lệ! Đây là lời giải thứ ${solutions.length}.`,
+          en: `All ${n} queens placed successfully! This is solution #${solutions.length}.`,
+        },
+      });
+      return;
+    }
+
+    for (let col = 0; col < n; col++) {
+      const safe = isSafe(row, col);
+
+      if (!safe) {
+        // Only show a few "not safe" steps to avoid too many steps
+        if (steps.length < 80) {
+          steps.push({
+            title: { vi: `Row ${row}, Col ${col}: ✗ không an toàn`, en: `Row ${row}, Col ${col}: ✗ not safe` },
+            arr: [],
+            grid: makeGrid([row, col]),
+            highlight: [],
+            mark: [],
+            codeLines: [19, 20],
+            vars: [
+              { name: "row", value: row },
+              { name: "col", value: col },
+              { name: "is_safe", value: false },
+            ],
+            note: {
+              vi: `Thử (${row},${col}): bị tấn công bởi hậu ở hàng trước → bỏ qua.`,
+              en: `Try (${row},${col}): attacked by a queen in a previous row → skip.`,
+            },
+          });
+        }
+        continue;
+      }
+
+      // Place queen
+      board[row][col] = "Q";
+      const gridPlace = makeGrid([row, col]);
+      gridPlace.pathCells = queenCells();
+      steps.push({
+        title: { vi: `Row ${row}, Col ${col}: ✓ đặt hậu`, en: `Row ${row}, Col ${col}: ✓ place queen` },
+        arr: [],
+        grid: gridPlace,
+        highlight: [],
+        mark: [],
+        codeLines: [19, 20, 21],
+        vars: [
+          { name: "row", value: row },
+          { name: "col", value: col },
+          { name: "is_safe", value: true },
+          { name: "queens", value: queenCells().map(([r, c]) => `(${r},${c})`).join(", ") },
+        ],
+        note: {
+          vi: `(${row},${col}) an toàn → đặt hậu. Tiếp tục hàng ${row + 1}.`,
+          en: `(${row},${col}) is safe → place queen. Continue to row ${row + 1}.`,
+        },
+      });
+
+      backtrack(row + 1);
+
+      // Remove queen (backtrack)
+      board[row][col] = ".";
+      if (steps.length < 80) {
+        steps.push({
+          title: { vi: `Backtrack: bỏ hậu (${row},${col})`, en: `Backtrack: remove queen (${row},${col})` },
+          arr: [],
+          grid: makeGrid([row, col]),
+          highlight: [],
+          mark: [],
+          codeLines: [23],
+          vars: [
+            { name: "row", value: row },
+            { name: "col", value: col },
+            { name: "action", value: "backtrack" },
+          ],
+          note: {
+            vi: `Quay lui: bỏ hậu tại (${row},${col}), thử cột tiếp theo.`,
+            en: `Backtrack: remove queen at (${row},${col}), try next column.`,
+          },
+        });
+      }
+    }
+  }
+
+  backtrack(0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${solutions.length} lời giải`, en: `Result: ${solutions.length} solutions` },
+    arr: [],
+    grid: makeGrid(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [25, 26],
+    vars: [
+      { name: "total solutions", value: solutions.length },
+    ],
+    note: {
+      vi: `Tổng cộng ${solutions.length} cách đặt ${n} hậu trên bàn ${n}×${n}.`,
+      en: `Total ${solutions.length} ways to place ${n} queens on a ${n}×${n} board.`,
+    },
+  });
+
+  return { n, answer: solutions.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 52: N-Queens II.
+ * Same backtracking as 51, but uses sets for O(1) conflict checking and only counts solutions.
+ */
+function buildSteps52(input) {
+  const n = input[0];
+  const steps = [];
+  const board = Array.from({ length: n }, () => new Array(n).fill("."));
+  const cols = new Set();
+  const diag1 = new Set(); // row - col
+  const diag2 = new Set(); // row + col
+  let count = 0;
+
+  function makeGrid(hlCell) {
+    const dp = board.map((row) => [...row]);
+    return {
+      dp: dp.map((row) => row.map((c) => (c === "Q" ? "♛" : "·"))),
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: hlCell || null,
+      pathCells: [],
+    };
+  }
+
+  function queenCells() {
+    const cells = [];
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        if (board[r][c] === "Q") cells.push([r, c]);
+    return cells;
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    grid: makeGrid(),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "cols", value: "∅" },
+      { name: "diag1 (row-col)", value: "∅" },
+      { name: "diag2 (row+col)", value: "∅" },
+      { name: "count", value: 0 },
+    ],
+    note: {
+      vi: `Dùng 3 set để kiểm tra O(1): cols (cột), diag1 (row-col), diag2 (row+col).\nChỉ đếm số lời giải, không cần lưu board.`,
+      en: `Use 3 sets for O(1) checking: cols (columns), diag1 (row-col), diag2 (row+col).\nOnly count solutions, no need to store boards.`,
+    },
+  });
+
+  function backtrack(row) {
+    if (row === n) {
+      count++;
+      const grid = makeGrid();
+      grid.pathCells = queenCells();
+      steps.push({
+        title: { vi: `✓ Lời giải #${count}`, en: `✓ Solution #${count}` },
+        arr: [],
+        grid,
+        highlight: [],
+        mark: [],
+        codeLines: [9, 10],
+        vars: [
+          { name: "count", value: count },
+          { name: "queens", value: queenCells().map(([r, c]) => `(${r},${c})`).join(", ") },
+        ],
+        note: {
+          vi: `Tìm thấy lời giải thứ ${count}!`,
+          en: `Found solution #${count}!`,
+        },
+      });
+      return;
+    }
+
+    for (let col = 0; col < n; col++) {
+      const blocked = cols.has(col) || diag1.has(row - col) || diag2.has(row + col);
+
+      if (blocked) {
+        if (steps.length < 80) {
+          steps.push({
+            title: { vi: `(${row},${col}): bị chặn`, en: `(${row},${col}): blocked` },
+            arr: [],
+            grid: makeGrid([row, col]),
+            highlight: [],
+            mark: [],
+            codeLines: [12, 13],
+            vars: [
+              { name: "row", value: row },
+              { name: "col", value: col },
+              { name: "col in cols", value: cols.has(col) },
+              { name: "row-col in diag1", value: diag1.has(row - col) },
+              { name: "row+col in diag2", value: diag2.has(row + col) },
+            ],
+            note: {
+              vi: `(${row},${col}) bị chặn: ${cols.has(col) ? "cùng cột" : diag1.has(row - col) ? "đường chéo ↘" : "đường chéo ↗"} → skip.`,
+              en: `(${row},${col}) blocked: ${cols.has(col) ? "same column" : diag1.has(row - col) ? "diagonal ↘" : "diagonal ↗"} → skip.`,
+            },
+          });
+        }
+        continue;
+      }
+
+      // Place
+      board[row][col] = "Q";
+      cols.add(col);
+      diag1.add(row - col);
+      diag2.add(row + col);
+
+      const gridPlace = makeGrid([row, col]);
+      gridPlace.pathCells = queenCells();
+      steps.push({
+        title: { vi: `(${row},${col}): ✓ đặt hậu`, en: `(${row},${col}): ✓ place` },
+        arr: [],
+        grid: gridPlace,
+        highlight: [],
+        mark: [],
+        codeLines: [14, 15, 16, 17],
+        vars: [
+          { name: "row", value: row },
+          { name: "col", value: col },
+          { name: "cols", value: `{${[...cols].join(", ")}}` },
+          { name: "diag1", value: `{${[...diag1].join(", ")}}` },
+          { name: "diag2", value: `{${[...diag2].join(", ")}}` },
+        ],
+        note: {
+          vi: `(${row},${col}) an toàn → đặt hậu. cols={${[...cols].join(",")}}.`,
+          en: `(${row},${col}) safe → place queen. cols={${[...cols].join(",")}}.`,
+        },
+      });
+
+      backtrack(row + 1);
+
+      // Remove
+      board[row][col] = ".";
+      cols.delete(col);
+      diag1.delete(row - col);
+      diag2.delete(row + col);
+
+      if (steps.length < 80) {
+        steps.push({
+          title: { vi: `Backtrack (${row},${col})`, en: `Backtrack (${row},${col})` },
+          arr: [],
+          grid: makeGrid([row, col]),
+          highlight: [],
+          mark: [],
+          codeLines: [19, 20, 21],
+          vars: [
+            { name: "row", value: row },
+            { name: "col", value: col },
+            { name: "action", value: "remove & try next col" },
+          ],
+          note: {
+            vi: `Quay lui: bỏ hậu (${row},${col}), thử cột tiếp.`,
+            en: `Backtrack: remove queen (${row},${col}), try next col.`,
+          },
+        });
+      }
+    }
+  }
+
+  backtrack(0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${count}`, en: `Result: ${count}` },
+    arr: [],
+    grid: makeGrid(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [23, 24],
+    vars: [{ name: "count", value: count }],
+    note: {
+      vi: `Tổng cộng ${count} cách đặt ${n} hậu trên bàn ${n}×${n}.`,
+      en: `Total ${count} ways to place ${n} queens on a ${n}×${n} board.`,
+    },
+  });
+
+  return { n, answer: count, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1197: Minimum Knight Moves.
+ * BFS from (0,0) to (|x|,|y|), tracking visited cells on a grid.
+ */
+function buildSteps1197(input, params) {
+  const tx = Math.abs(parseInt(String(input), 10) || 0);
+  const ty = Math.abs(params.y || 0);
+  const steps = [];
+
+  const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+  // BFS with bounded grid for visualization
+  const minR = -2, minC = -2;
+  const maxR = tx + 2, maxC = ty + 2;
+  const rows = maxR - minR + 1;
+  const colsN = maxC - minC + 1;
+
+  // Grid to track distances
+  const dist = {};
+  const key = (r, c) => `${r},${c}`;
+  dist[key(0, 0)] = 0;
+
+  const queue = [[0, 0, 0]];
+  let answer = -1;
+  let bfsSteps = 0;
+
+  // Build grid view
+  function makeGrid(hlCell, pathCells) {
+    const dp = [];
+    for (let r = minR; r <= maxR; r++) {
+      const row = [];
+      for (let c = minC; c <= maxC; c++) {
+        const d = dist[key(r, c)];
+        row.push(d !== undefined ? String(d) : "·");
+      }
+      dp.push(row);
+    }
+    return {
+      dp,
+      text1: Array.from({ length: rows }, (_, i) => String(minR + i)),
+      text2: Array.from({ length: colsN }, (_, i) => String(minC + i)),
+      hlCell: hlCell ? [hlCell[0] - minR, hlCell[1] - minC] : null,
+      pathCells: (pathCells || []).map(([r, c]) => [r - minR, c - minC]),
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    arr: [],
+    grid: makeGrid([0, 0], []),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6, 7, 8],
+    vars: [
+      { name: "start", value: "(0, 0)" },
+      { name: "target", value: `(${tx}, ${ty})` },
+      { name: "queue", value: "[(0,0,0)]" },
+    ],
+    note: {
+      vi: `BFS từ (0,0) đến (${tx},${ty}). Mã di chuyển L-shape: 8 hướng.\nGrid hiển thị số bước tới mỗi ô đã thăm.`,
+      en: `BFS from (0,0) to (${tx},${ty}). Knight moves in L-shape: 8 directions.\nGrid shows steps to reach each visited cell.`,
+    },
+  });
+
+  // Run BFS
+  let head = 0;
+  while (head < queue.length) {
+    const [cx, cy, curSteps] = queue[head++];
+
+    if (cx === tx && cy === ty) {
+      answer = curSteps;
+      // Reconstruct path (BFS guarantees shortest)
+      steps.push({
+        title: { vi: `✓ Đã tới (${tx},${ty}) trong ${answer} bước`, en: `✓ Reached (${tx},${ty}) in ${answer} moves` },
+        arr: [],
+        grid: makeGrid([tx, ty], [[0, 0], [tx, ty]]),
+        highlight: [],
+        mark: [],
+        codeLines: [11, 12],
+        vars: [
+          { name: "position", value: `(${cx}, ${cy})` },
+          { name: "steps", value: curSteps },
+          { name: "visited", value: Object.keys(dist).length },
+        ],
+        note: {
+          vi: `Đến đích (${tx},${ty})! Số bước tối thiểu = ${answer}.`,
+          en: `Reached target (${tx},${ty})! Minimum moves = ${answer}.`,
+        },
+      });
+      break;
+    }
+
+    bfsSteps++;
+    // Only show some BFS expansion steps to keep it manageable
+    const showThisStep = bfsSteps <= 15 || curSteps <= 2;
+
+    let expanded = 0;
+    for (const [dx, dy] of knightMoves) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (nx < minR || nx > maxR || ny < minC || ny > maxC) continue;
+      if (dist[key(nx, ny)] !== undefined) continue;
+
+      dist[key(nx, ny)] = curSteps + 1;
+      queue.push([nx, ny, curSteps + 1]);
+      expanded++;
+    }
+
+    if (showThisStep && expanded > 0) {
+      steps.push({
+        title: { vi: `BFS: (${cx},${cy}) step=${curSteps}`, en: `BFS: (${cx},${cy}) step=${curSteps}` },
+        arr: [],
+        grid: makeGrid([cx, cy], []),
+        highlight: [],
+        mark: [],
+        codeLines: [9, 10, 13, 14, 15, 16, 17],
+        vars: [
+          { name: "position", value: `(${cx}, ${cy})` },
+          { name: "steps", value: curSteps },
+          { name: "expanded", value: expanded },
+          { name: "queue size", value: queue.length - head },
+          { name: "visited", value: Object.keys(dist).length },
+        ],
+        note: {
+          vi: `Xử lý (${cx},${cy}) ở bước ${curSteps}. Thêm ${expanded} ô mới vào queue.`,
+          en: `Process (${cx},${cy}) at step ${curSteps}. Added ${expanded} new cells to queue.`,
+        },
+      });
+    }
+
+    if (steps.length > 60) break; // Safety limit
+  }
+
+  if (answer === -1) answer = 0;
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    grid: makeGrid([tx, ty], [[0, 0], [tx, ty]]),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [12],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "cells visited", value: Object.keys(dist).length },
+    ],
+    note: {
+      vi: `Số bước mã tối thiểu từ (0,0) đến (${tx},${ty}) = ${answer}.`,
+      en: `Minimum knight moves from (0,0) to (${tx},${ty}) = ${answer}.`,
+    },
+  });
+
+  return { x: tx, y: ty, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 688: Knight Probability in Chessboard.
+ * DP: dp[r][c] = probability of being at (r,c) after current number of steps.
+ */
+function buildSteps688(input, params) {
+  const n = input[0];
+  const k = params.k || 2;
+  const startRow = params.row || 0;
+  const startCol = params.col || 0;
+  const steps = [];
+
+  const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+  // Initialize dp
+  let dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  dp[startRow][startCol] = 1.0;
+
+  function makeGrid(hlCell) {
+    return {
+      dp: dp.map((row) => row.map((v) => v > 0 ? v.toFixed(3) : "·")),
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: hlCell || null,
+      pathCells: [],
+    };
+  }
+
+  function totalProb() {
+    let s = 0;
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        s += dp[r][c];
+    return s;
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    arr: [],
+    grid: makeGrid([startRow, startCol]),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "k", value: k },
+      { name: "start", value: `(${startRow}, ${startCol})` },
+      { name: "dp[start]", value: 1.0 },
+      { name: "total prob", value: "1.000" },
+    ],
+    note: {
+      vi: `Bàn cờ ${n}×${n}. Mã bắt đầu tại (${startRow},${startCol}) với xác suất 1.0.\nSau ${k} bước, tính xác suất còn trên bàn.`,
+      en: `Board ${n}×${n}. Knight starts at (${startRow},${startCol}) with probability 1.0.\nAfter ${k} moves, compute probability of staying on board.`,
+    },
+  });
+
+  for (let step = 0; step < k; step++) {
+    const newDp = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (dp[r][c] > 0) {
+          for (const [dr, dc] of knightMoves) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
+              newDp[nr][nc] += dp[r][c] / 8;
+            }
+            // else: probability "falls off" the board
+          }
+        }
+      }
+    }
+
+    dp = newDp;
+    const prob = totalProb();
+
+    steps.push({
+      title: { vi: `Bước ${step + 1}/${k}: P = ${prob.toFixed(4)}`, en: `Step ${step + 1}/${k}: P = ${prob.toFixed(4)}` },
+      arr: [],
+      grid: makeGrid(),
+      highlight: [],
+      mark: [],
+      codeLines: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      vars: [
+        { name: "step", value: step + 1 },
+        { name: "total prob", value: prob.toFixed(6) },
+        { name: "lost", value: (1 - prob).toFixed(6) },
+      ],
+      note: {
+        vi: `Sau bước ${step + 1}: xác suất còn trên bàn = ${prob.toFixed(6)}.\nĐã rơi ra ngoài = ${(1 - prob).toFixed(6)}.`,
+        en: `After step ${step + 1}: probability on board = ${prob.toFixed(6)}.\nFell off = ${(1 - prob).toFixed(6)}.`,
+      },
+    });
+  }
+
+  const answer = totalProb();
+  steps.push({
+    title: { vi: `Kết quả: ${answer.toFixed(5)}`, en: `Result: ${answer.toFixed(5)}` },
+    arr: [],
+    grid: makeGrid(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "answer", value: answer.toFixed(6) },
+    ],
+    note: {
+      vi: `Xác suất mã còn trên bàn ${n}×${n} sau ${k} bước từ (${startRow},${startCol}) = ${answer.toFixed(6)}.`,
+      en: `Probability knight stays on ${n}×${n} board after ${k} moves from (${startRow},${startCol}) = ${answer.toFixed(6)}.`,
+    },
+  });
+
+  return { n, k, answer: +answer.toFixed(5), steps };
+}
+
+/**
  * Generate steps for LeetCode 743: Network Delay Time.
  * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
  */
@@ -6206,8 +6919,8 @@ const SUPPORTED = {
     code: [
       "class Solution:",
       "    def removeElement(self, nums, val):",
-      "        left = 0  # write pointer",
-      "        for right in range(len(nums)):  # read pointer",
+      "        left = 0",
+      "        for right in range(len(nums)):",
       "            if nums[right] != val:",
       "                nums[left] = nums[right]",
       "                left += 1",
@@ -7444,11 +8157,12 @@ const SUPPORTED = {
     code: [
       "class Solution:",
       "    def twoSum(self, nums, target):",
-      "        d = {}",
+      "        seen = {}",
       "        for i in range(len(nums)):",
-      "            if target - nums[i] in d:",
-      "                return [i, d[target - nums[i]]]",
-      "            d[nums[i]] = i",
+      "            complement = target - nums[i]",
+      "            if complement in seen:",
+      "                return [i, seen[complement]]",
+      "            seen[nums[i]] = i",
     ],
     builder: buildSteps1,
   },
@@ -7537,18 +8251,18 @@ const SUPPORTED = {
       "    def isIsomorphic(self, s: str, t: str) -> bool:",
       "        if len(s) != len(t):",
       "            return False",
-      "        map_s = {}",
-      "        map_t = {}",
+      "        s_to_t = {}",
+      "        t_to_s = {}",
       "        for i in range(len(s)):",
-      "            c1, c2 = s[i], t[i]",
-      "            if c1 in map_s:",
-      "                if map_s[c1] != c2:",
+      "            char_s, char_t = s[i], t[i]",
+      "            if char_s in s_to_t:",
+      "                if s_to_t[char_s] != char_t:",
       "                    return False",
       "            else:",
-      "                if c2 in map_t:",
+      "                if char_t in t_to_s:",
       "                    return False",
-      "                map_s[c1] = c2",
-      "                map_t[c2] = c1",
+      "                s_to_t[char_s] = char_t",
+      "                t_to_s[char_t] = char_s",
       "        return True",
     ],
     builder: buildSteps205,
@@ -7878,6 +8592,274 @@ const SUPPORTED = {
       "        return sum(1 for v in groups.values() if v == max_size)",
     ],
     builder: buildSteps1399,
+  },
+  1967: {
+    id: 1967,
+    difficulty: "easy",
+    slug: "number-of-strings-that-appear-as-substrings-in-word",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Number of Strings That Appear as Substrings in Word", en: "Number of Strings That Appear as Substrings in Word" },
+    titleVi: { vi: "Số chuỗi xuất hiện như chuỗi con", en: "Count patterns that are substrings" },
+    statement: {
+      vi:
+        "Cho mảng patterns và chuỗi word. Đếm số lượng chuỗi trong patterns là chuỗi con (substring) của word.",
+      en:
+        "Given an array of strings patterns and a string word. Count how many strings in patterns are substrings of word.",
+    },
+    defaultInput: "a,abc,bc,d",
+    inputKind: "string",
+    inputLabel: { vi: "patterns (cách bởi dấu phẩy)", en: "patterns (comma separated)" },
+    extraParams: [
+      {
+        key: "word",
+        type: "string",
+        label: { vi: "word", en: "word" },
+        default: "abc",
+      },
+    ],
+    complexity: {
+      time: "O(n × m)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt n patterns, mỗi pattern kiểm tra substring O(m) với m = len(word). Tổng O(n×m). O(1) bộ nhớ extra.",
+        en: "Iterate n patterns, each substring check is O(m) where m = len(word). Total O(n×m). O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numOfStrings(self, patterns, word):",
+      "        count = 0",
+      "        for pattern in patterns:",
+      "            if pattern in word:",
+      "                count += 1",
+      "        return count",
+    ],
+    builder: buildSteps1967,
+  },
+  51: {
+    id: 51,
+    difficulty: "hard",
+    slug: "n-queens",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "N-Queens", en: "N-Queens" },
+    titleVi: { vi: "N quân hậu", en: "N-Queens" },
+    statement: {
+      vi:
+        "Đặt n quân hậu trên bàn cờ n×n sao cho không có hai quân hậu nào tấn công nhau " +
+        "(cùng hàng, cùng cột, hoặc cùng đường chéo). Trả về tất cả các cách đặt hợp lệ.",
+      en:
+        "Place n queens on an n×n chessboard so that no two queens attack each other " +
+        "(same row, column, or diagonal). Return all distinct valid placements.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    inputLabel: { vi: "n (kích thước bàn cờ)", en: "n (board size)" },
+    singleInput: true,
+    maxInput: 8,
+    extraParams: [],
+    complexity: {
+      time: "O(n!)",
+      space: "O(n²)",
+      note: {
+        vi: "Backtracking thử từng hàng, mỗi hàng tối đa n cột → xấu nhất O(n!). Bàn cờ n×n → O(n²) bộ nhớ.",
+        en: "Backtracking tries each row, at most n columns per row → worst case O(n!). Board is n×n → O(n²) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def solveNQueens(self, n):",
+      "        result = []",
+      "        board = [['.' ] * n for _ in range(n)]",
+      "",
+      "        def is_safe(row, col):",
+      "            for i in range(row):",
+      "                if board[i][col] == 'Q':",
+      "                    return False",
+      "                if col-(row-i) >= 0 and board[i][col-(row-i)] == 'Q':",
+      "                    return False",
+      "                if col+(row-i) < n and board[i][col+(row-i)] == 'Q':",
+      "                    return False",
+      "            return True",
+      "",
+      "        def backtrack(row):",
+      "            if row == n:",
+      "                result.append([''.join(r) for r in board])",
+      "                return",
+      "            for col in range(n):",
+      "                if is_safe(row, col):",
+      "                    board[row][col] = 'Q'",
+      "                    backtrack(row + 1)",
+      "                    board[row][col] = '.'",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps51,
+  },
+  52: {
+    id: 52,
+    difficulty: "hard",
+    slug: "n-queens-ii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "N-Queens II", en: "N-Queens II" },
+    titleVi: { vi: "N quân hậu II (đếm số lời giải)", en: "N-Queens II (count solutions)" },
+    statement: {
+      vi:
+        "Cho số nguyên n, trả về SỐ LƯỢNG cách đặt n quân hậu trên bàn cờ n×n sao cho không có hai quân hậu nào tấn công nhau.",
+      en:
+        "Given an integer n, return the NUMBER of distinct solutions to the n-queens puzzle.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    inputLabel: { vi: "n (kích thước bàn cờ)", en: "n (board size)" },
+    singleInput: true,
+    maxInput: 8,
+    extraParams: [],
+    complexity: {
+      time: "O(n!)",
+      space: "O(n)",
+      note: {
+        vi: "Backtracking O(n!). Dùng 3 set (cột, chéo trái, chéo phải) → O(n) bộ nhớ thay vì O(n²).",
+        en: "Backtracking O(n!). Uses 3 sets (cols, left-diag, right-diag) → O(n) memory instead of O(n²).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def totalNQueens(self, n: int) -> int:",
+      "        cols = set()",
+      "        diag1 = set()  # row - col",
+      "        diag2 = set()  # row + col",
+      "        count = 0",
+      "",
+      "        def backtrack(row):",
+      "            nonlocal count",
+      "            if row == n:",
+      "                count += 1",
+      "                return",
+      "            for col in range(n):",
+      "                if col in cols or row-col in diag1 or row+col in diag2:",
+      "                    continue",
+      "                cols.add(col)",
+      "                diag1.add(row - col)",
+      "                diag2.add(row + col)",
+      "                backtrack(row + 1)",
+      "                cols.remove(col)",
+      "                diag1.remove(row - col)",
+      "                diag2.remove(row + col)",
+      "",
+      "        backtrack(0)",
+      "        return count",
+    ],
+    builder: buildSteps52,
+  },
+  1197: {
+    id: 1197,
+    difficulty: "medium",
+    slug: "minimum-knight-moves",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Minimum Knight Moves", en: "Minimum Knight Moves" },
+    titleVi: { vi: "Số bước mã tối thiểu", en: "Minimum knight moves" },
+    statement: {
+      vi:
+        "Trên bàn cờ vô hạn, quân mã bắt đầu tại (0,0). Tìm số bước di chuyển tối thiểu để đến ô (x,y). " +
+        "Mã di chuyển theo hình chữ L: (±1,±2) hoặc (±2,±1). Dùng BFS.",
+      en:
+        "On an infinite chessboard, a knight starts at (0,0). Find the minimum number of moves to reach (x,y). " +
+        "A knight moves in an L-shape: (±1,±2) or (±2,±1). Uses BFS.",
+    },
+    defaultInput: "2",
+    inputKind: "string",
+    inputLabel: { vi: "x (tọa độ đích)", en: "x (target x)" },
+    extraParams: [
+      {
+        key: "y",
+        label: { vi: "y (tọa độ đích)", en: "y (target y)" },
+        default: 1,
+      },
+    ],
+    complexity: {
+      time: "O(|x|·|y|)",
+      space: "O(|x|·|y|)",
+      note: {
+        vi: "BFS khám phá tối đa O(|x|·|y|) ô. Queue + visited set → O(|x|·|y|) bộ nhớ.",
+        en: "BFS explores at most O(|x|·|y|) cells. Queue + visited set → O(|x|·|y|) memory.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def minKnightMoves(self, x: int, y: int) -> int:",
+      "        x, y = abs(x), abs(y)",
+      "        queue = deque([(0, 0, 0)])",
+      "        visited = {(0, 0)}",
+      "        moves = [(-2,-1),(-2,1),(-1,-2),(-1,2),",
+      "                 (1,-2),(1,2),(2,-1),(2,1)]",
+      "        while queue:",
+      "            cx, cy, steps = queue.popleft()",
+      "            if cx == x and cy == y:",
+      "                return steps",
+      "            for dx, dy in moves:",
+      "                nx, ny = cx+dx, cy+dy",
+      "                if (nx,ny) not in visited and -2<=nx<=x+2 and -2<=ny<=y+2:",
+      "                    visited.add((nx, ny))",
+      "                    queue.append((nx, ny, steps+1))",
+    ],
+    builder: buildSteps1197,
+  },
+  688: {
+    id: 688,
+    difficulty: "medium",
+    slug: "knight-probability-in-chessboard",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Knight Probability in Chessboard", en: "Knight Probability in Chessboard" },
+    titleVi: { vi: "Xác suất mã ở trên bàn cờ", en: "Knight probability on board" },
+    statement: {
+      vi:
+        "Trên bàn cờ n×n, quân mã bắt đầu tại (row, col). Sau đúng k bước di chuyển (mỗi bước chọn ngẫu nhiên 1 trong 8 hướng L), " +
+        "trả về xác suất mã vẫn còn trên bàn cờ. Dùng DP.",
+      en:
+        "On an n×n chessboard, a knight starts at (row, col). After exactly k moves (each move randomly chosen from 8 L-directions), " +
+        "return the probability the knight remains on the board. Uses DP.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    inputLabel: { vi: "n (kích thước bàn cờ)", en: "n (board size)" },
+    singleInput: true,
+    maxInput: 8,
+    extraParams: [
+      { key: "k", label: { vi: "k (số bước)", en: "k (moves)" }, default: 2 },
+      { key: "row", label: { vi: "row (hàng bắt đầu)", en: "row (start row)" }, default: 0 },
+      { key: "col", label: { vi: "col (cột bắt đầu)", en: "col (start col)" }, default: 0 },
+    ],
+    complexity: {
+      time: "O(k·n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Mỗi bước duyệt n² ô, lặp k lần → O(k·n²). Lưu 2 bảng n×n → O(n²) bộ nhớ.",
+        en: "Each step iterates n² cells, repeat k times → O(k·n²). Store 2 n×n tables → O(n²) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def knightProbability(self, n, k, row, col):",
+      "        moves = [(-2,-1),(-2,1),(-1,-2),(-1,2),",
+      "                 (1,-2),(1,2),(2,-1),(2,1)]",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        dp[row][col] = 1.0",
+      "        for step in range(k):",
+      "            new_dp = [[0]*n for _ in range(n)]",
+      "            for r in range(n):",
+      "                for c in range(n):",
+      "                    if dp[r][c] > 0:",
+      "                        for dr, dc in moves:",
+      "                            nr, nc = r+dr, c+dc",
+      "                            if 0<=nr<n and 0<=nc<n:",
+      "                                new_dp[nr][nc] += dp[r][c]/8",
+      "            dp = new_dp",
+      "        return sum(dp[r][c] for r in range(n) for c in range(n))",
+    ],
+    builder: buildSteps688,
   },
   743: {
     id: 743,
