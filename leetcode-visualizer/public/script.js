@@ -175,7 +175,20 @@ function markActiveChip() {
   $("catalog")
     .querySelectorAll(".prob-chip")
     .forEach((chip) => {
-      chip.classList.toggle("active", Number(chip.dataset.id) === currentProblemId);
+      const isActive = Number(chip.dataset.id) === currentProblemId;
+      chip.classList.toggle("active", isActive);
+      // Auto-expand the parent group of the active problem
+      if (isActive) {
+        const group = chip.closest(".cat-group");
+        if (group) {
+          const items = group.querySelector(".cat-items");
+          const toggle = group.querySelector(".cat-toggle");
+          if (items && items.classList.contains("collapsed")) {
+            items.classList.remove("collapsed");
+            if (toggle) toggle.textContent = "−";
+          }
+        }
+      }
     });
 }
 
@@ -521,14 +534,40 @@ function renderCode() {
   }
   panel.classList.remove("hidden");
 
+  // Helper: create a copy button for a code block
+  function createCopyBtn(codeLines) {
+    const btn = document.createElement("button");
+    btn.className = "code-copy-btn";
+    btn.title = "Copy";
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    btn.addEventListener("click", () => {
+      const text = codeLines.join("\n");
+      navigator.clipboard.writeText(text).then(() => {
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    });
+    return btn;
+  }
+
   // Render primary code
   if (code.length > 0) {
+    const section = document.createElement("div");
+    section.className = "code-section";
+
     if (code2) {
       const label = document.createElement("div");
       label.className = "code-section-label";
       label.textContent = lang === "vi" ? "Cách 1: DP O(n²)" : "Approach 1: DP O(n²)";
-      panel.appendChild(label);
+      section.appendChild(label);
     }
+
+    section.appendChild(createCopyBtn(code));
+
     code.forEach((line, idx) => {
       const row = document.createElement("div");
       row.className = "code-line";
@@ -544,16 +583,23 @@ function renderCode() {
 
       row.appendChild(ln);
       row.appendChild(txt);
-      panel.appendChild(row);
+      section.appendChild(row);
     });
+
+    panel.appendChild(section);
   }
 
   // Render secondary code (code2) if available
   if (code2) {
+    const section = document.createElement("div");
+    section.className = "code-section";
+
     const sep = document.createElement("div");
     sep.className = "code-section-label";
     sep.textContent = lang === "vi" ? "Cách 2: Binary Search O(n log n)" : "Approach 2: Binary Search O(n log n)";
-    panel.appendChild(sep);
+    section.appendChild(sep);
+
+    section.appendChild(createCopyBtn(code2));
 
     code2.forEach((line, idx) => {
       const row = document.createElement("div");
@@ -570,8 +616,10 @@ function renderCode() {
 
       row.appendChild(ln);
       row.appendChild(txt);
-      panel.appendChild(row);
+      section.appendChild(row);
     });
+
+    panel.appendChild(section);
   }
 }
 
