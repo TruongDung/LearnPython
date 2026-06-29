@@ -4201,6 +4201,765 @@ function buildSteps205(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 246: Strobogrammatic Number.
+ *
+ * Two pointers from both ends:
+ *  - Check if num[left] has a valid rotated pair.
+ *  - Check if the pair matches num[right].
+ *  - Move pointers inward until they meet.
+ */
+function buildSteps246(input) {
+  const num = String(input);
+  const pairs = { "0": "0", "1": "1", "6": "9", "8": "8", "9": "6" };
+  const steps = [];
+  const digits = num.split("");
+  const digitNums = digits.map(Number);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: digitNums,
+    sub: digits,
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3],
+    vars: [
+      { name: "num", value: num },
+      { name: "pairs", value: "0↔0, 1↔1, 6↔9, 8↔8, 9↔6" },
+      { name: "left", value: 0 },
+      { name: "right", value: num.length - 1 },
+    ],
+    note: {
+      vi: `Kiểm tra "${num}" có phải strobogrammatic không. Dùng 2 con trỏ: left=0, right=${num.length - 1}.`,
+      en: `Check if "${num}" is strobogrammatic. Use two pointers: left=0, right=${num.length - 1}.`,
+    },
+  });
+
+  let left = 0;
+  let right = num.length - 1;
+  let answer = true;
+
+  while (left <= right) {
+    const lChar = num[left];
+    const rChar = num[right];
+
+    if (!(lChar in pairs)) {
+      answer = false;
+      steps.push({
+        title: { vi: `'${lChar}' không hợp lệ → False`, en: `'${lChar}' invalid → False` },
+        arr: digitNums,
+        sub: digits,
+        highlight: [left],
+        mark: [left],
+        final: true,
+        codeLines: [4, 5, 6],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "num[left]", value: lChar },
+          { name: "valid_digits", value: "0,1,6,8,9" },
+          { name: "result", value: false },
+        ],
+        note: {
+          vi: `'${lChar}' không nằm trong tập {0,1,6,8,9} nên không thể xoay 180° → False.`,
+          en: `'${lChar}' is not in {0,1,6,8,9} so it cannot be rotated 180° → False.`,
+        },
+      });
+      return { num, answer: false, steps };
+    }
+
+    if (pairs[lChar] !== rChar) {
+      answer = false;
+      steps.push({
+        title: { vi: `'${lChar}'↔'${rChar}' không khớp → False`, en: `'${lChar}'↔'${rChar}' mismatch → False` },
+        arr: digitNums,
+        sub: digits,
+        highlight: [left, right],
+        mark: [left, right],
+        final: true,
+        codeLines: [4, 7, 8],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "num[left]", value: lChar },
+          { name: "num[right]", value: rChar },
+          { name: "expected", value: pairs[lChar] },
+          { name: "result", value: false },
+        ],
+        note: {
+          vi: `'${lChar}' xoay 180° thành '${pairs[lChar]}', nhưng num[right]='${rChar}' ≠ '${pairs[lChar]}' → False.`,
+          en: `'${lChar}' rotated 180° becomes '${pairs[lChar]}', but num[right]='${rChar}' ≠ '${pairs[lChar]}' → False.`,
+        },
+      });
+      return { num, answer: false, steps };
+    }
+
+    // Match
+    steps.push({
+      title: { vi: `'${lChar}'↔'${rChar}' ✓`, en: `'${lChar}'↔'${rChar}' ✓` },
+      arr: digitNums,
+      sub: digits,
+      highlight: [left, right],
+      mark: [],
+      codeLines: [4, 7, 9, 10],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "num[left]", value: lChar },
+        { name: "num[right]", value: rChar },
+        { name: "pairs[left]", value: pairs[lChar] },
+      ],
+      note: {
+        vi: left === right
+          ? `Ký tự giữa '${lChar}' xoay 180° vẫn là '${pairs[lChar]}' = '${rChar}' ✓.`
+          : `'${lChar}' xoay 180° = '${pairs[lChar]}' khớp với num[${right}]='${rChar}' ✓. Dời con trỏ.`,
+        en: left === right
+          ? `Middle character '${lChar}' rotated 180° is still '${pairs[lChar]}' = '${rChar}' ✓.`
+          : `'${lChar}' rotated 180° = '${pairs[lChar]}' matches num[${right}]='${rChar}' ✓. Move pointers.`,
+      },
+    });
+
+    left++;
+    right--;
+  }
+
+  steps.push({
+    title: { vi: "Kết quả: True", en: "Result: True" },
+    arr: digitNums,
+    sub: digits,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "result", value: true }],
+    note: {
+      vi: `Tất cả cặp ký tự đều hợp lệ → "${num}" là strobogrammatic → True.`,
+      en: `All character pairs are valid → "${num}" is strobogrammatic → True.`,
+    },
+  });
+
+  return { num, answer: true, steps };
+}
+
+/**
+ * Generate steps for LeetCode 734: Sentence Similarity.
+ *
+ * Build a set of similar pairs (both directions), then check each word pair.
+ */
+function buildSteps734(input, params) {
+  const s1 = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+  const s2 = String(params.sentence2 || "").split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+  const pairsRaw = String(params.pairs || "").split(",").map((p) => p.trim()).filter((p) => p.length > 0);
+  const pairs = pairsRaw.map((p) => {
+    const parts = p.split("-");
+    return [parts[0] || "", parts[1] || ""];
+  });
+
+  const steps = [];
+
+  // Build pair set
+  const pairSet = new Set();
+  for (const [a, b] of pairs) {
+    pairSet.add(`${a}|${b}`);
+    pairSet.add(`${b}|${a}`);
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: s1.map(() => 0),
+    sub: s1.map((w, i) => `${w}↔${s2[i] || "?"}`),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 4, 5, 6, 7],
+    vars: [
+      { name: "sentence1", value: `[${s1.join(", ")}]` },
+      { name: "sentence2", value: `[${s2.join(", ")}]` },
+      { name: "pairs", value: pairs.map(([a, b]) => `(${a},${b})`).join(", ") },
+      { name: "pairSet size", value: pairSet.size },
+    ],
+    note: {
+      vi: `sentence1 = [${s1.join(", ")}], sentence2 = [${s2.join(", ")}]. Xây set từ ${pairs.length} cặp tương đồng.`,
+      en: `sentence1 = [${s1.join(", ")}], sentence2 = [${s2.join(", ")}]. Build set from ${pairs.length} similar pairs.`,
+    },
+  });
+
+  // Check length
+  if (s1.length !== s2.length) {
+    steps.push({
+      title: { vi: "Độ dài khác nhau → False", en: "Different lengths → False" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2, 3],
+      vars: [
+        { name: "len(s1)", value: s1.length },
+        { name: "len(s2)", value: s2.length },
+        { name: "result", value: false },
+      ],
+      note: {
+        vi: `len(sentence1)=${s1.length} ≠ len(sentence2)=${s2.length} → False.`,
+        en: `len(sentence1)=${s1.length} ≠ len(sentence2)=${s2.length} → False.`,
+      },
+    });
+    return { s1, s2, pairs, answer: false, steps };
+  }
+
+  // Check each word
+  for (let i = 0; i < s1.length; i++) {
+    const w1 = s1[i];
+    const w2 = s2[i];
+
+    if (w1 === w2) {
+      steps.push({
+        title: { vi: `i=${i}: "${w1}" == "${w2}" ✓`, en: `i=${i}: "${w1}" == "${w2}" ✓` },
+        arr: s1.map((_, j) => j <= i ? 1 : 0),
+        sub: s1.map((w, j) => `${w}↔${s2[j]}`),
+        highlight: [i],
+        mark: [],
+        codeLines: [8, 9, 10],
+        vars: [
+          { name: "i", value: i },
+          { name: "s1[i]", value: w1 },
+          { name: "s2[i]", value: w2 },
+          { name: "match", value: "identical" },
+        ],
+        note: {
+          vi: `"${w1}" == "${w2}" → giống nhau, bỏ qua.`,
+          en: `"${w1}" == "${w2}" → identical, skip.`,
+        },
+      });
+      continue;
+    }
+
+    const inSet = pairSet.has(`${w1}|${w2}`);
+    if (!inSet) {
+      steps.push({
+        title: { vi: `i=${i}: "${w1}"↔"${w2}" không tương đồng → False`, en: `i=${i}: "${w1}"↔"${w2}" not similar → False` },
+        arr: s1.map((_, j) => j <= i ? 1 : 0),
+        sub: s1.map((w, j) => `${w}↔${s2[j]}`),
+        highlight: [i],
+        mark: [i],
+        final: true,
+        codeLines: [8, 11, 12],
+        vars: [
+          { name: "i", value: i },
+          { name: "s1[i]", value: w1 },
+          { name: "s2[i]", value: w2 },
+          { name: "inPairSet", value: false },
+          { name: "result", value: false },
+        ],
+        note: {
+          vi: `"${w1}" ≠ "${w2}" và cặp ("${w1}","${w2}") không có trong similarPairs → False.`,
+          en: `"${w1}" ≠ "${w2}" and pair ("${w1}","${w2}") is not in similarPairs → False.`,
+        },
+      });
+      return { s1, s2, pairs, answer: false, steps };
+    }
+
+    steps.push({
+      title: { vi: `i=${i}: "${w1}"↔"${w2}" tương đồng ✓`, en: `i=${i}: "${w1}"↔"${w2}" similar ✓` },
+      arr: s1.map((_, j) => j <= i ? 1 : 0),
+      sub: s1.map((w, j) => `${w}↔${s2[j]}`),
+      highlight: [i],
+      mark: [],
+      codeLines: [8, 11],
+      vars: [
+        { name: "i", value: i },
+        { name: "s1[i]", value: w1 },
+        { name: "s2[i]", value: w2 },
+        { name: "inPairSet", value: true },
+      ],
+      note: {
+        vi: `"${w1}" ≠ "${w2}" nhưng cặp ("${w1}","${w2}") có trong similarPairs → tương đồng ✓.`,
+        en: `"${w1}" ≠ "${w2}" but pair ("${w1}","${w2}") is in similarPairs → similar ✓.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả: True", en: "Result: True" },
+    arr: s1.map(() => 1),
+    sub: s1.map((w, i) => `${w}↔${s2[i]}`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [13],
+    vars: [{ name: "result", value: true }],
+    note: {
+      vi: `Mọi cặp từ đều giống nhau hoặc tương đồng → hai câu tương đồng → True.`,
+      en: `All word pairs are identical or similar → the sentences are similar → True.`,
+    },
+  });
+
+  return { s1, s2, pairs, answer: true, steps };
+}
+
+/**
+ * Generate steps for LeetCode 760: Find Anagram Mappings.
+ * Build a hash map from nums2 (value → index), then map each element of nums1.
+ */
+function buildSteps760(input, params) {
+  const nums1 = String(input).split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+  const nums2 = String(params.nums2 || "").split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+  const steps = [];
+
+  // Build index map from nums2
+  const indexMap = {};
+  for (let i = 0; i < nums2.length; i++) {
+    indexMap[nums2[i]] = i;
+  }
+
+  const fmtMap = () => {
+    const entries = Object.entries(indexMap).map(([k, v]) => `${k}:${v}`);
+    return `{${entries.join(", ")}}`;
+  };
+
+  steps.push({
+    title: { vi: "Xây hash map từ nums2", en: "Build hash map from nums2" },
+    arr: [...nums2],
+    highlight: nums2.map((_, i) => i),
+    mark: [],
+    codeLines: [2, 3, 4],
+    vars: [
+      { name: "nums1", value: `[${nums1.join(", ")}]` },
+      { name: "nums2", value: `[${nums2.join(", ")}]` },
+      { name: "index_map", value: fmtMap() },
+    ],
+    note: {
+      vi: `Xây hash map: value → index từ nums2. index_map = ${fmtMap()}.`,
+      en: `Build hash map: value → index from nums2. index_map = ${fmtMap()}.`,
+    },
+  });
+
+  const result = [];
+  for (let i = 0; i < nums1.length; i++) {
+    const val = nums1[i];
+    const j = indexMap[val];
+    result.push(j);
+
+    steps.push({
+      title: { vi: `nums1[${i}]=${val} → index ${j}`, en: `nums1[${i}]=${val} → index ${j}` },
+      arr: [...nums2],
+      highlight: [j],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums1[i]", value: val },
+        { name: "index_map[val]", value: j },
+        { name: "result", value: `[${result.join(", ")}]` },
+      ],
+      note: {
+        vi: `nums1[${i}]=${val} nằm ở vị trí ${j} trong nums2 → mapping[${i}] = ${j}.`,
+        en: `nums1[${i}]=${val} is at position ${j} in nums2 → mapping[${i}] = ${j}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...result],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [5],
+    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
+    note: {
+      vi: `Mapping: [${result.join(", ")}].`,
+      en: `Mapping: [${result.join(", ")}].`,
+    },
+  });
+
+  return { nums1, nums2, answer: `[${result.join(", ")}]`, steps };
+}
+
+/**
+ * Generate steps for LeetCode 771: Jewels and Stones.
+ * Build a set from jewels, then count stones that are in the set.
+ */
+function buildSteps771(input, params) {
+  const jewels = String(input);
+  const stones = String(params.stones || "");
+  const steps = [];
+  const jewelSet = new Set(jewels.split(""));
+
+  steps.push({
+    title: { vi: "Xây set đá quý", en: "Build jewel set" },
+    arr: stones.split("").map(() => 0),
+    sub: stones.split(""),
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [
+      { name: "jewels", value: jewels },
+      { name: "stones", value: stones },
+      { name: "jewel_set", value: `{${jewels.split("").join(", ")}}` },
+    ],
+    note: {
+      vi: `Đá quý: "${jewels}" → set = {${jewels.split("").join(", ")}}. Đếm trong "${stones}".`,
+      en: `Jewels: "${jewels}" → set = {${jewels.split("").join(", ")}}. Count in "${stones}".`,
+    },
+  });
+
+  let count = 0;
+  const stoneChars = stones.split("");
+  for (let i = 0; i < stoneChars.length; i++) {
+    const s = stoneChars[i];
+    const isJewel = jewelSet.has(s);
+    if (isJewel) count++;
+
+    steps.push({
+      title: { vi: `i=${i}: '${s}' ${isJewel ? "→ đá quý ✓" : "→ không"}`, en: `i=${i}: '${s}' ${isJewel ? "→ jewel ✓" : "→ not jewel"}` },
+      arr: stoneChars.map((c, j) => j <= i ? (jewelSet.has(c) ? 1 : 0) : 0),
+      sub: stoneChars,
+      highlight: [i],
+      mark: isJewel ? [i] : [],
+      codeLines: [3, 4, 5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "stone", value: s },
+        { name: "isJewel", value: isJewel },
+        { name: "count", value: count },
+      ],
+      note: {
+        vi: isJewel
+          ? `'${s}' ∈ jewel_set → count = ${count}.`
+          : `'${s}' ∉ jewel_set → bỏ qua. count = ${count}.`,
+        en: isJewel
+          ? `'${s}' ∈ jewel_set → count = ${count}.`
+          : `'${s}' ∉ jewel_set → skip. count = ${count}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${count}`, en: `Result: ${count}` },
+    arr: stoneChars.map((c) => (jewelSet.has(c) ? 1 : 0)),
+    sub: stoneChars,
+    highlight: [],
+    mark: stoneChars.map((c, i) => (jewelSet.has(c) ? i : -1)).filter((i) => i >= 0),
+    final: true,
+    codeLines: [7],
+    vars: [{ name: "answer", value: count }],
+    note: {
+      vi: `Có ${count} viên đá là đá quý trong "${stones}".`,
+      en: `There are ${count} jewels among the stones in "${stones}".`,
+    },
+  });
+
+  return { jewels, stones, answer: count, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1275: Find Winner on a Tic Tac Toe Game.
+ * Simulate each move on a 3x3 board and check for a winner.
+ */
+function buildSteps1275(input) {
+  const movesRaw = String(input).split(",").map((m) => m.trim()).filter((m) => m.length > 0);
+  const moves = movesRaw.map((m) => {
+    const parts = m.split("-");
+    return [parseInt(parts[0], 10), parseInt(parts[1], 10)];
+  });
+  const steps = [];
+
+  const board = [
+    ["", "", ""],
+    ["", "", ""],
+    ["", "", ""],
+  ];
+
+  const boardStr = () => board.map((r) => r.map((c) => c || ".").join("")).join("|");
+
+  function checkWin(player) {
+    for (let i = 0; i < 3; i++) {
+      if (board[i][0] === player && board[i][1] === player && board[i][2] === player) return true;
+      if (board[0][i] === player && board[1][i] === player && board[2][i] === player) return true;
+    }
+    if (board[0][0] === player && board[1][1] === player && board[2][2] === player) return true;
+    if (board[0][2] === player && board[1][1] === player && board[2][0] === player) return true;
+    return false;
+  }
+
+  // Flatten board to 9-cell array for bar visualization
+  const flatBoard = () => {
+    const flat = [];
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 3; c++)
+        flat.push(board[r][c] === "A" ? 1 : board[r][c] === "B" ? -1 : 0);
+    return flat;
+  };
+  const flatLabels = () => {
+    const flat = [];
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 3; c++)
+        flat.push(board[r][c] || ".");
+    return flat;
+  };
+
+  steps.push({
+    title: { vi: "Bàn cờ trống", en: "Empty board" },
+    arr: flatBoard(),
+    sub: flatLabels(),
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [
+      { name: "moves", value: movesRaw.join(", ") },
+      { name: "board", value: boardStr() },
+    ],
+    note: {
+      vi: `Bàn 3×3 trống. A đi trước (nước lẻ), B đi sau (nước chẵn).`,
+      en: `Empty 3×3 board. A goes first (odd moves), B goes second (even moves).`,
+    },
+  });
+
+  let winner = null;
+  for (let i = 0; i < moves.length; i++) {
+    const [r, c] = moves[i];
+    const player = i % 2 === 0 ? "A" : "B";
+    board[r][c] = player;
+    const cellIdx = r * 3 + c;
+
+    const won = checkWin(player);
+    if (won) winner = player;
+
+    steps.push({
+      title: { vi: `Nước ${i + 1}: ${player} → (${r},${c})${won ? " 🏆" : ""}`, en: `Move ${i + 1}: ${player} → (${r},${c})${won ? " 🏆" : ""}` },
+      arr: flatBoard(),
+      sub: flatLabels(),
+      highlight: [cellIdx],
+      mark: won ? flatBoard().map((v, idx) => (v === (player === "A" ? 1 : -1) ? idx : -1)).filter((x) => x >= 0) : [],
+      final: won,
+      codeLines: [3, 4],
+      vars: [
+        { name: "move", value: i + 1 },
+        { name: "player", value: player },
+        { name: "cell", value: `(${r},${c})` },
+        { name: "board", value: boardStr() },
+        { name: "winner", value: won ? player : "none" },
+      ],
+      note: {
+        vi: won
+          ? `${player} đánh ô (${r},${c}) và THẮNG! 🏆`
+          : `${player} đánh ô (${r},${c}). Board: ${boardStr()}.`,
+        en: won
+          ? `${player} plays (${r},${c}) and WINS! 🏆`
+          : `${player} plays (${r},${c}). Board: ${boardStr()}.`,
+      },
+    });
+
+    if (won) {
+      return { moves: movesRaw, answer: winner, steps };
+    }
+  }
+
+  const answer = moves.length === 9 ? "Draw" : "Pending";
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: flatBoard(),
+    sub: flatLabels(),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: answer === "Draw"
+        ? "Hết ô mà không ai thắng → Hòa."
+        : `Còn ô trống và chưa ai thắng → Pending.`,
+      en: answer === "Draw"
+        ? "All cells filled with no winner → Draw."
+        : `Empty cells remain and no winner → Pending.`,
+    },
+  });
+
+  return { moves: movesRaw, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1394: Find Lucky Integer in an Array.
+ * Count frequencies, then find the largest number whose frequency equals itself.
+ */
+function buildSteps1394(nums) {
+  const steps = [];
+
+  // Count frequencies
+  const freq = {};
+  for (const num of nums) {
+    freq[num] = (freq[num] || 0) + 1;
+  }
+
+  const fmtFreq = () => {
+    const entries = Object.entries(freq).map(([k, v]) => `${k}:${v}`);
+    return `{${entries.join(", ")}}`;
+  };
+
+  steps.push({
+    title: { vi: "Đếm tần suất", en: "Count frequencies" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4],
+    vars: [
+      { name: "arr", value: `[${nums.join(", ")}]` },
+      { name: "freq", value: fmtFreq() },
+    ],
+    note: {
+      vi: `Đếm tần suất từng số: ${fmtFreq()}.`,
+      en: `Count frequency of each number: ${fmtFreq()}.`,
+    },
+  });
+
+  // Find lucky numbers
+  let result = -1;
+  const luckyNums = [];
+  const entries = Object.entries(freq).sort(([a], [b]) => Number(a) - Number(b));
+
+  for (const [numStr, count] of entries) {
+    const num = Number(numStr);
+    const isLucky = num === count;
+    if (isLucky) {
+      luckyNums.push(num);
+      result = Math.max(result, num);
+    }
+
+    steps.push({
+      title: { vi: `${num}: freq=${count} ${isLucky ? "= num → lucky ✓" : "≠ num"}`, en: `${num}: freq=${count} ${isLucky ? "= num → lucky ✓" : "≠ num"}` },
+      arr: [...nums],
+      highlight: nums.map((v, i) => v === num ? i : -1).filter((i) => i >= 0),
+      mark: isLucky ? nums.map((v, i) => v === num ? i : -1).filter((i) => i >= 0) : [],
+      codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "num", value: num },
+        { name: "count", value: count },
+        { name: "isLucky", value: isLucky },
+        { name: "result", value: result },
+      ],
+      note: {
+        vi: isLucky
+          ? `${num} xuất hiện ${count} lần = chính nó → lucky! result = ${result}.`
+          : `${num} xuất hiện ${count} lần ≠ ${num} → không phải lucky.`,
+        en: isLucky
+          ? `${num} appears ${count} times = itself → lucky! result = ${result}.`
+          : `${num} appears ${count} times ≠ ${num} → not lucky.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${result}`, en: `Result: ${result}` },
+    arr: [...nums],
+    highlight: [],
+    mark: result > 0 ? nums.map((v, i) => v === result ? i : -1).filter((i) => i >= 0) : [],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "lucky_numbers", value: luckyNums.length ? `[${luckyNums.join(", ")}]` : "none" },
+      { name: "answer", value: result },
+    ],
+    note: {
+      vi: result === -1
+        ? "Không có số lucky nào → trả về -1."
+        : `Số lucky lớn nhất = ${result}.`,
+      en: result === -1
+        ? "No lucky number exists → return -1."
+        : `Largest lucky number = ${result}.`,
+    },
+  });
+
+  return { original: [...nums], answer: result, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1399: Count Largest Group.
+ * Group numbers 1..n by digit sum, find how many groups have the max size.
+ */
+function buildSteps1399(input) {
+  const n = input[0];
+  const steps = [];
+  const groups = {};
+
+  // Build groups
+  for (let i = 1; i <= n; i++) {
+    const digitSum = String(i).split("").reduce((s, d) => s + Number(d), 0);
+    if (!groups[digitSum]) groups[digitSum] = [];
+    groups[digitSum].push(i);
+  }
+
+  const sortedKeys = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const groupSizes = sortedKeys.map((k) => groups[k].length);
+  const groupLabels = sortedKeys.map((k) => `Σ=${k}`);
+
+  steps.push({
+    title: { vi: "Nhóm theo tổng chữ số", en: "Group by digit sum" },
+    arr: groupSizes,
+    sub: groupLabels,
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "groups", value: sortedKeys.length },
+    ],
+    note: {
+      vi: `Nhóm các số 1..${n} theo tổng chữ số. Có ${sortedKeys.length} nhóm.`,
+      en: `Group numbers 1..${n} by digit sum. There are ${sortedKeys.length} groups.`,
+    },
+  });
+
+  // Show each group
+  for (const key of sortedKeys) {
+    const members = groups[key];
+    const idx = sortedKeys.indexOf(key);
+    steps.push({
+      title: { vi: `Σ=${key}: [${members.join(",")}] (${members.length})`, en: `Σ=${key}: [${members.join(",")}] (${members.length})` },
+      arr: groupSizes,
+      sub: groupLabels,
+      highlight: [idx],
+      mark: [],
+      codeLines: [3, 4, 5],
+      vars: [
+        { name: "digit_sum", value: key },
+        { name: "members", value: `[${members.join(", ")}]` },
+        { name: "size", value: members.length },
+      ],
+      note: {
+        vi: `Nhóm tổng chữ số = ${key}: gồm ${members.length} số [${members.join(", ")}].`,
+        en: `Group with digit sum = ${key}: contains ${members.length} numbers [${members.join(", ")}].`,
+      },
+    });
+  }
+
+  // Find max and count
+  const maxSize = Math.max(...groupSizes);
+  const largestGroups = sortedKeys.filter((k) => groups[k].length === maxSize);
+  const answer = largestGroups.length;
+
+  const maxIndices = sortedKeys.map((k, i) => groups[k].length === maxSize ? i : -1).filter((i) => i >= 0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: groupSizes,
+    sub: groupLabels,
+    highlight: [],
+    mark: maxIndices,
+    final: true,
+    codeLines: [6, 7],
+    vars: [
+      { name: "max_size", value: maxSize },
+      { name: "largest_groups", value: largestGroups.map((k) => `Σ=${k}`).join(", ") },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Kích thước nhóm lớn nhất = ${maxSize}. Có ${answer} nhóm đạt kích thước này: [${largestGroups.map((k) => `Σ=${k}`).join(", ")}].`,
+      en: `Largest group size = ${maxSize}. There are ${answer} groups with this size: [${largestGroups.map((k) => `Σ=${k}`).join(", ")}].`,
+    },
+  });
+
+  return { n, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 50: Pow(x, n).
  *
  * Fast exponentiation (binary exponentiation):
@@ -6006,6 +6765,332 @@ const SUPPORTED = {
       "        return True",
     ],
     builder: buildSteps205,
+  },
+  246: {
+    id: 246,
+    difficulty: "easy",
+    slug: "strobogrammatic-number",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Strobogrammatic Number", en: "Strobogrammatic Number" },
+    titleVi: { vi: "Số đối xứng quay 180°", en: "Strobogrammatic number" },
+    statement: {
+      vi:
+        "Một số strobogrammatic là số trông giống hệt khi xoay 180°. " +
+        "Các chữ số hợp lệ khi xoay: 0↔0, 1↔1, 6↔9, 8↔8, 9↔6. " +
+        "Cho một chuỗi num, xác định xem nó có phải số strobogrammatic không.",
+      en:
+        "A strobogrammatic number looks the same when rotated 180 degrees. " +
+        "Valid rotated digit pairs: 0↔0, 1↔1, 6↔9, 8↔8, 9↔6. " +
+        "Given a string num, determine if it is strobogrammatic.",
+    },
+    defaultInput: "69",
+    inputKind: "string",
+    inputLabel: { vi: "Số (chuỗi chữ số)", en: "Number (digit string)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Dùng hai con trỏ từ hai đầu vào giữa, mỗi bước O(1) → O(n). Chỉ dùng bảng ánh xạ cố định → O(1) bộ nhớ.",
+        en: "Two pointers from both ends toward center, each step O(1) → O(n). Only a fixed mapping table → O(1) space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isStrobogrammatic(self, num: str) -> bool:",
+      "        pairs = {'0':'0','1':'1','6':'9','8':'8','9':'6'}",
+      "        left, right = 0, len(num) - 1",
+      "        while left <= right:",
+      "            if num[left] not in pairs:",
+      "                return False",
+      "            if pairs[num[left]] != num[right]:",
+      "                return False",
+      "            left += 1",
+      "            right -= 1",
+      "        return True",
+    ],
+    builder: buildSteps246,
+  },
+  734: {
+    id: 734,
+    difficulty: "easy",
+    slug: "sentence-similarity",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Sentence Similarity", en: "Sentence Similarity" },
+    titleVi: { vi: "Độ tương đồng câu", en: "Sentence similarity" },
+    statement: {
+      vi:
+        "Cho hai câu sentence1 và sentence2 (mỗi câu là danh sách từ) và danh sách cặp từ tương đồng similarPairs. " +
+        "Hai câu tương đồng nếu chúng cùng độ dài và mỗi cặp từ tương ứng hoặc giống nhau, hoặc nằm trong similarPairs. " +
+        "Lưu ý: quan hệ tương đồng KHÔNG bắc cầu (similar(a,b) và similar(b,c) KHÔNG suy ra similar(a,c)).",
+      en:
+        "Given two sentences sentence1 and sentence2 (each a list of words) and a list of similar word pairs similarPairs. " +
+        "Two sentences are similar if they have the same length and each corresponding pair of words is either identical or in similarPairs. " +
+        "Note: similarity is NOT transitive (similar(a,b) and similar(b,c) does NOT imply similar(a,c)).",
+    },
+    defaultInput: "great,acting,skills",
+    inputKind: "string",
+    inputLabel: { vi: "sentence1 (từ cách nhau bởi dấu phẩy)", en: "sentence1 (words comma separated)" },
+    extraParams: [
+      {
+        key: "sentence2",
+        type: "string",
+        label: { vi: "sentence2 (từ cách nhau bởi dấu phẩy)", en: "sentence2 (words comma separated)" },
+        default: "fine,drama,talent",
+      },
+      {
+        key: "pairs",
+        type: "string",
+        label: { vi: "similarPairs (vd: great-fine,acting-drama)", en: "similarPairs (e.g. great-fine,acting-drama)" },
+        default: "great-fine,acting-drama,skills-talent",
+      },
+    ],
+    complexity: {
+      time: "O(N + P)",
+      space: "O(P)",
+      note: {
+        vi: "Xây set từ P cặp: O(P). Duyệt N từ, mỗi từ tra set O(1): O(N). Tổng O(N+P). Bộ nhớ O(P) cho set.",
+        en: "Build set from P pairs: O(P). Iterate N words, each set lookup O(1): O(N). Total O(N+P). Memory O(P) for the set.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def areSentencesSimilar(self, s1, s2, pairs):",
+      "        if len(s1) != len(s2):",
+      "            return False",
+      "        pairSet = set()",
+      "        for a, b in pairs:",
+      "            pairSet.add((a, b))",
+      "            pairSet.add((b, a))",
+      "        for i in range(len(s1)):",
+      "            if s1[i] == s2[i]:",
+      "                continue",
+      "            if (s1[i], s2[i]) not in pairSet:",
+      "                return False",
+      "        return True",
+    ],
+    builder: buildSteps734,
+  },
+  760: {
+    id: 760,
+    difficulty: "easy",
+    slug: "find-anagram-mappings",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Find Anagram Mappings", en: "Find Anagram Mappings" },
+    titleVi: { vi: "Tìm ánh xạ Anagram", en: "Find anagram mappings" },
+    statement: {
+      vi:
+        "Cho hai mảng nums1 và nums2, trong đó nums2 là một hoán vị (anagram) của nums1. " +
+        "Trả về mảng mapping sao cho mapping[i] = j nghĩa là nums1[i] xuất hiện tại nums2[j]. " +
+        "Nếu có nhiều đáp án, trả về bất kỳ đáp án hợp lệ nào.",
+      en:
+        "Given two arrays nums1 and nums2 where nums2 is an anagram of nums1. " +
+        "Return an array mapping such that mapping[i] = j means nums1[i] appears at nums2[j]. " +
+        "If there are multiple answers, return any valid one.",
+    },
+    defaultInput: "12,28,46,32,50",
+    inputKind: "string",
+    inputLabel: { vi: "nums1 (cách nhau bởi dấu phẩy)", en: "nums1 (comma separated)" },
+    extraParams: [
+      {
+        key: "nums2",
+        type: "string",
+        label: { vi: "nums2 (hoán vị của nums1)", en: "nums2 (anagram of nums1)" },
+        default: "50,12,32,46,28",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Xây hash map từ nums2: O(n). Duyệt nums1, mỗi phần tử tra O(1): O(n). Bộ nhớ O(n) cho map.",
+        en: "Build hash map from nums2: O(n). Iterate nums1, each lookup O(1): O(n). Memory O(n) for the map.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def anagramMappings(self, nums1, nums2):",
+      "        index_map = {}",
+      "        for i, num in enumerate(nums2):",
+      "            index_map[num] = i",
+      "        return [index_map[num] for num in nums1]",
+    ],
+    builder: buildSteps760,
+  },
+  771: {
+    id: 771,
+    difficulty: "easy",
+    slug: "jewels-and-stones",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Jewels and Stones", en: "Jewels and Stones" },
+    titleVi: { vi: "Đá quý và Đá", en: "Jewels and stones" },
+    statement: {
+      vi:
+        "Cho chuỗi jewels chứa các loại đá quý (mỗi ký tự là một loại) và chuỗi stones chứa các viên đá bạn có. " +
+        "Đếm số viên đá trong stones cũng là đá quý. Phân biệt hoa thường.",
+      en:
+        "Given a string jewels representing types of stones that are jewels, and a string stones representing stones you have. " +
+        "Count how many of your stones are also jewels. Letters are case sensitive.",
+    },
+    defaultInput: "aA",
+    inputKind: "string",
+    inputLabel: { vi: "jewels (các loại đá quý)", en: "jewels (jewel types)" },
+    extraParams: [
+      {
+        key: "stones",
+        type: "string",
+        label: { vi: "stones (các viên đá bạn có)", en: "stones (your stones)" },
+        default: "aAAbbbb",
+      },
+    ],
+    complexity: {
+      time: "O(J + S)",
+      space: "O(J)",
+      note: {
+        vi: "Xây set từ jewels: O(J). Duyệt stones, mỗi ký tự tra set O(1): O(S). Bộ nhớ O(J).",
+        en: "Build set from jewels: O(J). Iterate stones, each set lookup O(1): O(S). Memory O(J).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numJewelsInStones(self, jewels, stones):",
+      "        jewel_set = set(jewels)",
+      "        count = 0",
+      "        for s in stones:",
+      "            if s in jewel_set:",
+      "                count += 1",
+      "        return count",
+    ],
+    builder: buildSteps771,
+  },
+  1275: {
+    id: 1275,
+    difficulty: "easy",
+    slug: "find-winner-on-a-tic-tac-toe-game",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Find Winner on a Tic Tac Toe Game", en: "Find Winner on a Tic Tac Toe Game" },
+    titleVi: { vi: "Tìm người thắng Tic-Tac-Toe", en: "Find Tic-Tac-Toe winner" },
+    statement: {
+      vi:
+        "Cho danh sách nước đi trên bàn cờ 3x3. Nước đi lẻ là của A, nước chẵn là của B. " +
+        "Trả về 'A' nếu A thắng, 'B' nếu B thắng, 'Draw' nếu hòa (hết ô), hoặc 'Pending' nếu chưa kết thúc.",
+      en:
+        "Given a list of moves on a 3x3 board. Odd moves belong to A, even moves to B. " +
+        "Return 'A' if A wins, 'B' if B wins, 'Draw' if it's a draw (all cells filled), or 'Pending' if game is not over.",
+    },
+    defaultInput: "0-0,2-0,1-1,2-1,2-2",
+    inputKind: "string",
+    inputLabel: { vi: "Nước đi (row-col, cách bởi dấu phẩy)", en: "Moves (row-col, comma separated)" },
+    extraParams: [],
+    complexity: {
+      time: "O(M)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt M nước đi, mỗi nước kiểm tra thắng O(1) (bàn cố định 3×3). Bộ nhớ O(1) cho bàn 3×3.",
+        en: "Iterate M moves, each check for win is O(1) (fixed 3×3 board). Memory O(1) for the 3×3 board.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def tictactoe(self, moves):",
+      "        board = [['' for _ in range(3)] for _ in range(3)]",
+      "        for i, (r, c) in enumerate(moves):",
+      "            board[r][c] = 'A' if i % 2 == 0 else 'B'",
+      "        # Check rows, cols, diagonals",
+      "        for player in ['A', 'B']:",
+      "            for i in range(3):",
+      "                if all(board[i][j]==player for j in range(3)):",
+      "                    return player",
+      "                if all(board[j][i]==player for j in range(3)):",
+      "                    return player",
+      "            if all(board[i][i]==player for i in range(3)):",
+      "                return player",
+      "            if all(board[i][2-i]==player for i in range(3)):",
+      "                return player",
+      "        return 'Draw' if len(moves)==9 else 'Pending'",
+    ],
+    builder: buildSteps1275,
+  },
+  1394: {
+    id: 1394,
+    difficulty: "easy",
+    slug: "find-lucky-integer-in-an-array",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Find Lucky Integer in an Array", en: "Find Lucky Integer in an Array" },
+    titleVi: { vi: "Tìm số may mắn trong mảng", en: "Find lucky integer" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên arr. Một số nguyên 'lucky' nếu tần suất xuất hiện của nó trong mảng bằng chính giá trị đó. " +
+        "Trả về số lucky lớn nhất. Nếu không có, trả về -1.",
+      en:
+        "Given an array of integers arr. An integer is 'lucky' if its frequency in the array equals its value. " +
+        "Return the largest lucky number. If none exists, return -1.",
+    },
+    defaultInput: [2, 2, 3, 4],
+    inputKind: "positive",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Đếm tần suất O(n), duyệt map tìm lucky O(n). Bộ nhớ O(n) cho frequency map.",
+        en: "Count frequencies O(n), iterate map to find lucky O(n). Memory O(n) for frequency map.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findLucky(self, arr):",
+      "        freq = {}",
+      "        for num in arr:",
+      "            freq[num] = freq.get(num, 0) + 1",
+      "        result = -1",
+      "        for num, count in freq.items():",
+      "            if num == count:",
+      "                result = max(result, num)",
+      "        return result",
+    ],
+    builder: buildSteps1394,
+  },
+  1399: {
+    id: 1399,
+    difficulty: "easy",
+    slug: "count-largest-group",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Count Largest Group", en: "Count Largest Group" },
+    titleVi: { vi: "Đếm nhóm lớn nhất", en: "Count largest group" },
+    statement: {
+      vi:
+        "Cho số nguyên n. Nhóm các số từ 1 đến n theo tổng các chữ số. " +
+        "Trả về số lượng nhóm có kích thước lớn nhất.",
+      en:
+        "Given an integer n. Group numbers from 1 to n by their digit sum. " +
+        "Return the number of groups that have the largest size.",
+    },
+    defaultInput: [13],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 100,
+    inputLabel: { vi: "n", en: "n" },
+    extraParams: [],
+    complexity: {
+      time: "O(n · log₁₀(n))",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt n số, mỗi số tính tổng chữ số O(log₁₀(n)). Bộ nhớ O(n) cho map nhóm.",
+        en: "Iterate n numbers, digit sum of each is O(log₁₀(n)). Memory O(n) for group map.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countLargestGroup(self, n: int) -> int:",
+      "        groups = {}",
+      "        for i in range(1, n + 1):",
+      "            digit_sum = sum(int(d) for d in str(i))",
+      "            groups[digit_sum] = groups.get(digit_sum, 0) + 1",
+      "        max_size = max(groups.values())",
+      "        return sum(1 for v in groups.values() if v == max_size)",
+    ],
+    builder: buildSteps1399,
   },
 };
 
