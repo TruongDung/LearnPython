@@ -286,8 +286,8 @@ function renderExtraParams() {
   const container = $("extraParams");
   const params = problemData.extraParams || [];
   const existing = {};
-  container.querySelectorAll("input[data-param]").forEach((inp) => {
-    existing[inp.dataset.param] = inp.value;
+  container.querySelectorAll("[data-param]").forEach((el) => {
+    existing[el.dataset.param] = el.value;
   });
 
   container.innerHTML = "";
@@ -299,15 +299,30 @@ function renderExtraParams() {
     label.textContent = pick(p.label);
     label.setAttribute("for", `param-${p.key}`);
 
-    const input = document.createElement("input");
-    input.type = p.type === "string" ? "text" : "number";
-    input.id = `param-${p.key}`;
-    input.dataset.param = p.key;
-    input.dataset.type = p.type || "number";
-    input.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
+    let inputEl;
+    if (p.type === "select" && p.options) {
+      inputEl = document.createElement("select");
+      inputEl.id = `param-${p.key}`;
+      inputEl.dataset.param = p.key;
+      inputEl.dataset.type = "number";
+      p.options.forEach((opt) => {
+        const option = document.createElement("option");
+        option.value = opt.value;
+        option.textContent = pick(opt.label);
+        inputEl.appendChild(option);
+      });
+      inputEl.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
+    } else {
+      inputEl = document.createElement("input");
+      inputEl.type = p.type === "string" ? "text" : "number";
+      inputEl.id = `param-${p.key}`;
+      inputEl.dataset.param = p.key;
+      inputEl.dataset.type = p.type || "number";
+      inputEl.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
+    }
 
     wrap.appendChild(label);
-    wrap.appendChild(input);
+    wrap.appendChild(inputEl);
     container.appendChild(wrap);
   });
 }
@@ -352,7 +367,7 @@ async function runViz() {
   // Collect extra params (preserve string/number type per definition)
   const params = {};
   $("extraParams")
-    .querySelectorAll("input[data-param]")
+    .querySelectorAll("[data-param]")
     .forEach((inp) => {
       params[inp.dataset.param] =
         inp.dataset.type === "string" ? inp.value : Number(inp.value);
@@ -623,12 +638,14 @@ function renderCode() {
   }
 }
 
-function updateCodeHighlight(activeLines) {
+function updateCodeHighlight(activeLines, codeBlock) {
   const set = new Set(activeLines);
+  const targetAttr = codeBlock === 2 ? "line2" : "line";
   $("codePanel")
     .querySelectorAll(".code-line")
     .forEach((row) => {
-      row.classList.toggle("active", set.has(Number(row.dataset.line)));
+      const lineNum = Number(row.dataset[targetAttr]);
+      row.classList.toggle("active", !isNaN(lineNum) && set.has(lineNum));
     });
 }
 
@@ -909,7 +926,7 @@ function renderStep() {
   $("stepTitle").textContent = pick(step.title);
   $("stepCounter").textContent = t().stepCounter(stepIndex + 1, steps.length);
   $("stepNote").textContent = pick(step.note);
-  updateCodeHighlight(step.codeLines || []);
+  updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
   if (step.tree) {

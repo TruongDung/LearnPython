@@ -593,8 +593,14 @@ function buildSteps300(nums) {
  *  - F(0) = 0, F(1) = 1.
  *  - F(n) = F(n-1) + F(n-2).
  */
-function buildSteps509(input) {
+function buildSteps509(input, params) {
   const n = input[0];
+  const approach = (params && params.approach) || 1;
+
+  if (approach === 2) {
+    return buildSteps509Optimized(n);
+  }
+
   const dp = new Array(n + 1).fill(0);
   const steps = [];
 
@@ -611,8 +617,8 @@ function buildSteps509(input) {
       { name: "dp", value: [...dp] },
     ],
     note: {
-      vi: `n = ${n}. F(0) = 0 và F(1) = 1 là hai giá trị cơ sở.`,
-      en: `n = ${n}. F(0) = 0 and F(1) = 1 are the base cases.`,
+      vi: `Approach 1: DP array. n = ${n}. F(0) = 0 và F(1) = 1 là hai giá trị cơ sở.`,
+      en: `Approach 1: DP array. n = ${n}. F(0) = 0 and F(1) = 1 are the base cases.`,
     },
   });
 
@@ -653,6 +659,111 @@ function buildSteps509(input) {
   });
 
   return { n, answer: dp[n], steps };
+}
+
+/**
+ * Generate steps for LeetCode 509 Approach 2: Optimized O(1) space.
+ * Only track prev2, prev1, curr.
+ */
+function buildSteps509Optimized(n) {
+  const steps = [];
+
+  if (n <= 1) {
+    steps.push({
+      title: { vi: `n ≤ 1 → return ${n}`, en: `n ≤ 1 → return ${n}` },
+      arr: [n],
+      highlight: [0],
+      mark: [0],
+      final: true,
+      codeBlock: 2,
+      codeLines: [4, 5],
+      vars: [
+        { name: "n", value: n },
+        { name: "answer", value: n },
+      ],
+      note: {
+        vi: `Approach 2 (O(1) space): n=${n} ≤ 1 → trả về ${n} trực tiếp.`,
+        en: `Approach 2 (O(1) space): n=${n} ≤ 1 → return ${n} directly.`,
+      },
+    });
+    return { n, answer: n, steps };
+  }
+
+  let prev2 = 0;
+  let prev1 = 1;
+
+  // Track history for bar visualization
+  const history = [0, 1];
+
+  steps.push({
+    title: { vi: "Khởi tạo prev2=0, prev1=1", en: "Initialize prev2=0, prev1=1" },
+    arr: [...history],
+    sub: ["F(0)", "F(1)"],
+    highlight: [0, 1],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "n", value: n },
+      { name: "prev2", value: prev2 },
+      { name: "prev1", value: prev1 },
+    ],
+    note: {
+      vi: `Approach 2 (O(1) space): chỉ dùng 2 biến. prev2 = F(0) = 0, prev1 = F(1) = 1.`,
+      en: `Approach 2 (O(1) space): only 2 variables. prev2 = F(0) = 0, prev1 = F(1) = 1.`,
+    },
+  });
+
+  for (let i = 2; i <= n; i++) {
+    const curr = prev1 + prev2;
+    history.push(curr);
+
+    steps.push({
+      title: { vi: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}`, en: `i=${i}: curr = ${prev1} + ${prev2} = ${curr}` },
+      arr: [...history],
+      sub: history.map((_, idx) => `F(${idx})`),
+      highlight: [i],
+      mark: [],
+      codeBlock: 2,
+      codeLines: [7, 8, 9, 10],
+      vars: [
+        { name: "i", value: i },
+        { name: "prev2", value: prev2 },
+        { name: "prev1", value: prev1 },
+        { name: "curr", value: curr },
+        { name: "→ prev2", value: prev1 },
+        { name: "→ prev1", value: curr },
+      ],
+      note: {
+        vi: `curr = prev1 + prev2 = ${prev1} + ${prev2} = ${curr}. Sau đó: prev2 ← ${prev1}, prev1 ← ${curr}.`,
+        en: `curr = prev1 + prev2 = ${prev1} + ${prev2} = ${curr}. Then: prev2 ← ${prev1}, prev1 ← ${curr}.`,
+      },
+    });
+
+    prev2 = prev1;
+    prev1 = curr;
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: F(${n}) = ${prev1}`, en: `Result: F(${n}) = ${prev1}` },
+    arr: [...history],
+    sub: history.map((_, idx) => `F(${idx})`),
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeBlock: 2,
+    codeLines: [11],
+    vars: [
+      { name: "answer", value: prev1 },
+      { name: "space used", value: "O(1) — only prev2, prev1" },
+    ],
+    note: {
+      vi: `F(${n}) = ${prev1}. Chỉ dùng O(1) bộ nhớ (2 biến) thay vì mảng dp dài ${n + 1}.`,
+      en: `F(${n}) = ${prev1}. Used only O(1) memory (2 variables) instead of a dp array of size ${n + 1}.`,
+    },
+  });
+
+  return { n, answer: prev1, steps };
 }
 
 /**
@@ -6922,17 +7033,28 @@ const SUPPORTED = {
       en: "The Fibonacci numbers F(n) are defined as: F(0) = 0, F(1) = 1, and F(n) = F(n-1) + F(n-2) for n > 1. Given n, return F(n).",
     },
     defaultInput: [10],
-    inputKind: "nonneg", // n >= 0
+    inputKind: "nonneg",
     inputLabel: { vi: "n", en: "n" },
     singleInput: true,
     maxInput: 30,
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 — DP Array O(n)", en: "1 — DP Array O(n)" } },
+          { value: 2, label: { vi: "2 — Optimized O(1) space", en: "2 — Optimized O(1) space" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Điền bảng dp từ 2 đến n nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
-        en: "Filling the dp table from 2 to n is O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+        vi: "Approach 1: O(n) time, O(n) space (bảng dp). Approach 2: O(n) time, O(1) space (2 biến).",
+        en: "Approach 1: O(n) time, O(n) space (dp table). Approach 2: O(n) time, O(1) space (2 variables).",
       },
     },
     code: [
