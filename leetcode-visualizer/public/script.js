@@ -112,11 +112,18 @@ function renderCatalog() {
 
     const titleEl = document.createElement("div");
     titleEl.className = "cat-title";
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "cat-toggle";
+    toggleBtn.textContent = "−";
+
     const nameSpan = document.createElement("span");
     nameSpan.textContent = pick(group);
     const countSpan = document.createElement("span");
     countSpan.className = "count";
     countSpan.textContent = `(${group.problems.length})`;
+
+    titleEl.appendChild(toggleBtn);
     titleEl.appendChild(nameSpan);
     titleEl.appendChild(countSpan);
 
@@ -149,6 +156,13 @@ function renderCatalog() {
         loadProblem();
       });
       itemsEl.appendChild(chip);
+    });
+
+    // Toggle collapse/expand
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const collapsed = itemsEl.classList.toggle("collapsed");
+      toggleBtn.textContent = collapsed ? "+" : "−";
     });
 
     groupEl.appendChild(titleEl);
