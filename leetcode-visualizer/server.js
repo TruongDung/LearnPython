@@ -1090,7 +1090,305 @@ function buildSteps208(input, params) {
   return { words, answer, steps };
 }
 
+/**
+ * Sinh các bước cho LeetCode 53: Maximum Subarray (thuật toán Kadane).
+ *  - cur = max(nums[i], cur + nums[i])  (mở rộng đoạn hiện tại hoặc bắt đầu lại).
+ *  - best = max(best, cur).
+ */
+function buildSteps53(nums) {
+  const steps = [];
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  let cur = nums[0];
+  let best = nums[0];
+  let curStart = 0;
+  let bestL = 0;
+  let bestR = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [0],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "cur", value: cur },
+      { name: "best", value: best },
+    ],
+    note: {
+      vi: `Bắt đầu tại nums[0] = ${nums[0]}: cur = best = ${nums[0]}.`,
+      en: `Start at nums[0] = ${nums[0]}: cur = best = ${nums[0]}.`,
+    },
+  });
+
+  for (let i = 1; i < nums.length; i++) {
+    const num = nums[i];
+    const restart = cur + num < num;
+    if (restart) {
+      cur = num;
+      curStart = i;
+    } else {
+      cur = cur + num;
+    }
+
+    let updated = false;
+    if (cur > best) {
+      best = cur;
+      bestL = curStart;
+      bestR = i;
+      updated = true;
+    }
+
+    steps.push({
+      title: { vi: `Xét nums[${i}] = ${num}`, en: `Inspect nums[${i}] = ${num}` },
+      arr: [...nums],
+      highlight: inWindow(curStart, i),
+      mark: [],
+      codeLines: [5, 6, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+        { name: "cur", value: cur },
+        { name: "best", value: best },
+      ],
+      note: {
+        vi: `${restart ? `cur + ${num} < ${num} → bắt đầu lại đoạn tại i=${i}` : `mở rộng đoạn: cur += ${num}`}. cur = ${cur}. best = ${best}${updated ? " (cập nhật)" : ""}.`,
+        en: `${restart ? `cur + ${num} < ${num} → restart the run at i=${i}` : `extend the run: cur += ${num}`}. cur = ${cur}. best = ${best}${updated ? " (updated)" : ""}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: inWindow(bestL, bestR),
+    final: true,
+    codeLines: [8],
+    vars: [
+      { name: "best", value: best },
+      { name: "subarray", value: `[${bestL}..${bestR}]` },
+    ],
+    note: {
+      vi: `Tổng lớn nhất của một dãy con liên tiếp = ${best}, đạt tại đoạn [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}].`,
+      en: `Maximum contiguous subarray sum = ${best}, on segment [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: best, steps };
+}
+
+/**
+ * Sinh các bước cho LeetCode 3020: Find the Maximum Number of Elements in a Subset.
+ *
+ * Tập con hợp lệ xếp theo mẫu [x, x², x⁴, …, x^k, …, x⁴, x², x].
+ * Với mỗi cơ số x: đi theo chuỗi lũy thừa, mỗi mức cần ≥ 2 bản (trừ đỉnh cần ≥ 1).
+ * Trường hợp x = 1 xử lý riêng (cần số lượng lẻ).
+ */
+function buildSteps3020(nums) {
+  const steps = [];
+  const freq = {};
+  nums.forEach((v) => {
+    freq[v] = (freq[v] || 0) + 1;
+  });
+  const freqStr = (f) =>
+    `{${Object.keys(f)
+      .map((k) => `${k}:${f[k]}`)
+      .join(", ")}}`;
+  const idxOf = (val) => nums.map((v, i) => (v === val ? i : -1)).filter((i) => i >= 0);
+
+  let ans = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "ans", value: ans },
+      { name: "freq", value: freqStr(freq) },
+    ],
+    note: {
+      vi: "Đếm tần suất các số. Mẫu hợp lệ: [x, x², x⁴, …, x^k, …, x⁴, x², x]. Tìm tập con dài nhất.",
+      en: "Count value frequencies. Valid pattern: [x, x², x⁴, …, x^k, …, x⁴, x², x]. Find the longest such subset.",
+    },
+  });
+
+  const bases = [...new Set(nums)].sort((a, b) => a - b);
+  for (const x of bases) {
+    if (x === 1) {
+      const cnt = freq[1];
+      const val = cnt % 2 === 0 ? cnt - 1 : cnt;
+      if (val > ans) ans = val;
+      steps.push({
+        title: { vi: "Trường hợp x = 1", en: "Case x = 1" },
+        arr: [...nums],
+        highlight: idxOf(1),
+        mark: [],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "x", value: 1 },
+          { name: "freq[1]", value: cnt },
+          { name: "ans", value: ans },
+        ],
+        note: {
+          vi: `Có ${cnt} số 1. Mẫu chỉ gồm số 1 cần số lượng lẻ → dùng ${val}. ans = ${ans}.`,
+          en: `There are ${cnt} ones. A subset of only 1s needs an odd count → use ${val}. ans = ${ans}.`,
+        },
+      });
+      continue;
+    }
+
+    let cnt = 0;
+    let cur = x;
+    while ((freq[cur] || 0) >= 2) {
+      cnt += 2;
+      steps.push({
+        title: { vi: `Cơ số x = ${x}: lũy thừa ${cur}`, en: `Base x = ${x}: power ${cur}` },
+        arr: [...nums],
+        highlight: idxOf(cur),
+        mark: [],
+        codeLines: [12, 13, 14],
+        vars: [
+          { name: "x", value: x },
+          { name: "cur", value: cur },
+          { name: "freq[cur]", value: freq[cur] || 0 },
+          { name: "cnt", value: cnt },
+          { name: "ans", value: ans },
+        ],
+        note: {
+          vi: `freq[${cur}] = ${freq[cur]} ≥ 2 → thêm một cặp (cnt += 2 = ${cnt}), tiếp tục với ${cur * cur}.`,
+          en: `freq[${cur}] = ${freq[cur]} ≥ 2 → add a pair (cnt += 2 = ${cnt}), continue with ${cur * cur}.`,
+        },
+      });
+      cur = cur * cur;
+    }
+
+    const hasPeak = (freq[cur] || 0) >= 1;
+    cnt += hasPeak ? 1 : -1;
+    if (cnt > ans) ans = cnt;
+    steps.push({
+      title: { vi: `Cơ số x = ${x}: đỉnh`, en: `Base x = ${x}: peak` },
+      arr: [...nums],
+      highlight: hasPeak ? idxOf(cur) : [],
+      mark: [],
+      codeLines: [15, 16],
+      vars: [
+        { name: "x", value: x },
+        { name: "cur", value: cur },
+        { name: "freq[cur]", value: freq[cur] || 0 },
+        { name: "cnt", value: cnt },
+        { name: "ans", value: ans },
+      ],
+      note: {
+        vi: hasPeak
+          ? `freq[${cur}] ≥ 1 → có phần tử đỉnh, cnt += 1 = ${cnt}. ans = ${ans}.`
+          : `freq[${cur}] = 0 → thiếu đỉnh, bỏ bớt một phần tử (cnt -= 1 = ${cnt}). ans = ${ans}.`,
+        en: hasPeak
+          ? `freq[${cur}] ≥ 1 → peak element exists, cnt += 1 = ${cnt}. ans = ${ans}.`
+          : `freq[${cur}] = 0 → no peak, drop one element (cnt -= 1 = ${cnt}). ans = ${ans}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [17],
+    vars: [{ name: "ans", value: ans }],
+    note: {
+      vi: `Số phần tử lớn nhất của một tập con hợp lệ = ${ans}.`,
+      en: `Maximum number of elements in a valid subset = ${ans}.`,
+    },
+  });
+
+  return { original: [...nums], answer: ans, steps };
+}
+
 const SUPPORTED = {
+  3020: {
+    id: 3020,
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Find the Maximum Number of Elements in a Subset", en: "Find the Maximum Number of Elements in a Subset" },
+    titleVi: { vi: "Số phần tử lớn nhất trong tập con theo mẫu lũy thừa", en: "Largest subset following the power pattern" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên dương nums. Chọn một tập con và xếp thành mảng theo mẫu " +
+        "[x, x², x⁴, …, x^(k/2), x^k, x^(k/2), …, x⁴, x², x] (k là lũy thừa của 2). " +
+        "Trả về số phần tử lớn nhất của một tập con như vậy.",
+      en:
+        "You are given an array of positive integers nums. Select a subset that can be placed in an array following the pattern " +
+        "[x, x², x⁴, …, x^(k/2), x^k, x^(k/2), …, x⁴, x², x] (k is a power of 2). " +
+        "Return the maximum number of elements in such a subset.",
+    },
+    defaultInput: [5, 4, 1, 2, 2],
+    inputKind: "positive", // số nguyên dương
+    extraParams: [],
+    complexity: {
+      time: "O(n log(max))",
+      space: "O(n)",
+      note: {
+        vi: "Với mỗi cơ số, chuỗi lũy thừa dài tối đa O(log(max)) mức; tổng cộng O(n log(max)). Bảng tần suất tốn O(n) bộ nhớ.",
+        en: "For each base, the power chain has at most O(log(max)) levels; overall O(n log(max)). The frequency map uses O(n) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maximumLength(self, nums):",
+      "        freq = Counter(nums)",
+      "        ans = 1",
+      "        for x in set(nums):",
+      "            if x == 1:",
+      "                cnt = freq[1]",
+      "                ans = max(ans, cnt - (cnt % 2 == 0))",
+      "                continue",
+      "            cnt = 0",
+      "            cur = x",
+      "            while freq[cur] >= 2:",
+      "                cnt += 2",
+      "                cur = cur * cur",
+      "            cnt += 1 if freq[cur] >= 1 else -1",
+      "            ans = max(ans, cnt)",
+      "        return ans",
+    ],
+    builder: buildSteps3020,
+  },
+  53: {
+    id: 53,
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Maximum Subarray", en: "Maximum Subarray" },
+    titleVi: { vi: "Dãy con liên tiếp có tổng lớn nhất", en: "Maximum contiguous subarray sum" },
+    statement: {
+      vi: "Cho mảng số nguyên nums, tìm dãy con liên tiếp (gồm ít nhất một phần tử) có tổng lớn nhất và trả về tổng đó.",
+      en: "Given an integer array nums, find the contiguous subarray (containing at least one element) with the largest sum and return its sum.",
+    },
+    defaultInput: [-2, 1, -3, 4, -1, 2, 1, -5, 4],
+    inputKind: "integer", // cho phép số âm
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng một lần bằng thuật toán Kadane nên O(n) thời gian. Chỉ dùng vài biến nên O(1) bộ nhớ.",
+        en: "A single pass with Kadane's algorithm gives O(n) time. Only a few variables are used, so O(1) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSubArray(self, nums):",
+      "        cur = nums[0]",
+      "        best = nums[0]",
+      "        for i in range(1, len(nums)):",
+      "            cur = max(nums[i], cur + nums[i])",
+      "            best = max(best, cur)",
+      "        return best",
+    ],
+    builder: buildSteps53,
+  },
   208: {
     id: 208,
     category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
