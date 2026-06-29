@@ -212,6 +212,7 @@ async function loadProblem() {
     }
 
     currentProblemId = data.id;
+    localStorage.setItem("lastProblemId", data.id);
     problemData = data;
     renderProblem();
     $("arrInput").value = Array.isArray(data.defaultInput)
@@ -982,6 +983,12 @@ function showError(id, msg) {
 // Initialize
 applyStaticStrings();
 loadCatalog();
+
+// Restore last opened problem from localStorage
+const savedId = localStorage.getItem("lastProblemId");
+if (savedId) {
+  $("problemId").value = savedId;
+}
 loadProblem();
 
 // ---- Theme toggle (dark/light) ----

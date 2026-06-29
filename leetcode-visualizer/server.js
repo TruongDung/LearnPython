@@ -418,8 +418,14 @@ function buildSteps152(nums) {
  *  - dp[i] = dp[i-1] + dp[i-2].
  *  - The answer is dp[n].
  */
-function buildSteps70(input) {
+function buildSteps70(input, params) {
   const n = input[0];
+  const approach = (params && params.approach) || 1;
+
+  if (approach === 2) {
+    return buildSteps70Optimized(n);
+  }
+
   const dp = new Array(n + 1).fill(0);
   const steps = [];
 
@@ -437,8 +443,8 @@ function buildSteps70(input) {
       { name: "dp", value: [...dp] },
     ],
     note: {
-      vi: `n = ${n}. dp[0] = dp[1] = 1 (có 1 cách đứng yên ở bậc 0, và 1 cách lên bậc 1).`,
-      en: `n = ${n}. dp[0] = dp[1] = 1 (one way to stay at step 0, one way to reach step 1).`,
+      vi: `Approach 1: DP array. n = ${n}. dp[0] = dp[1] = 1.`,
+      en: `Approach 1: DP array. n = ${n}. dp[0] = dp[1] = 1.`,
     },
   });
 
@@ -455,7 +461,6 @@ function buildSteps70(input) {
         { name: "dp[i-1]", value: dp[i - 1] },
         { name: "dp[i-2]", value: dp[i - 2] },
         { name: "dp[i]", value: dp[i] },
-        { name: "dp", value: [...dp] },
       ],
       note: {
         vi: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
@@ -479,6 +484,121 @@ function buildSteps70(input) {
   });
 
   return { n, answer: dp[n], steps };
+}
+
+/**
+ * Generate steps for LeetCode 70 Approach 2: Optimized O(1) space.
+ * Climbing stairs is Fibonacci-like: ways(n) = ways(n-1) + ways(n-2).
+ */
+function buildSteps70Optimized(n) {
+  const steps = [];
+
+  if (n <= 2) {
+    steps.push({
+      title: { vi: `n ≤ 2 → return ${n}`, en: `n ≤ 2 → return ${n}` },
+      arr: [n],
+      highlight: [0],
+      mark: [0],
+      final: true,
+      codeBlock: 2,
+      codeLines: [4, 5],
+      vars: [
+        { name: "n", value: n },
+        { name: "answer", value: n },
+      ],
+      note: {
+        vi: `Approach 2 (O(1) space): n=${n} ≤ 2 → trả về ${n} trực tiếp.`,
+        en: `Approach 2 (O(1) space): n=${n} ≤ 2 → return ${n} directly.`,
+      },
+    });
+    return { n, answer: n, steps };
+  }
+
+  let prev2 = 1; // ways(1)
+  let prev1 = 2; // ways(2)
+  const history = [0, 1, 2]; // ways(0)=dummy, ways(1)=1, ways(2)=2
+
+  steps.push({
+    title: { vi: "Khởi tạo prev2=1, prev1=2", en: "Initialize prev2=1, prev1=2" },
+    arr: [...history],
+    sub: ["—", "prev2", "prev1"],
+    highlight: [1, 2],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "n", value: n },
+      { name: "prev2", value: `ways(1) = ${prev2}` },
+      { name: "prev1", value: `ways(2) = ${prev1}` },
+    ],
+    note: {
+      vi: `Approach 2 (O(1) space): prev2 = ways(1) = 1, prev1 = ways(2) = 2.`,
+      en: `Approach 2 (O(1) space): prev2 = ways(1) = 1, prev1 = ways(2) = 2.`,
+    },
+  });
+
+  for (let i = 3; i <= n; i++) {
+    const curr = prev1 + prev2;
+    history.push(curr);
+
+    const subLabels = history.map((_, idx) => {
+      const labels = [];
+      if (idx === i - 2) labels.push("prev2");
+      if (idx === i - 1) labels.push("prev1");
+      if (idx === i) labels.push("curr");
+      return labels.length > 0 ? labels.join(",") : idx === 0 ? "—" : `(${idx})`;
+    });
+
+    steps.push({
+      title: { vi: `Bước i=${i}`, en: `Step i=${i}` },
+      arr: [...history],
+      sub: subLabels,
+      highlight: [i - 2, i - 1, i],
+      mark: [i],
+      codeBlock: 2,
+      codeLines: [7, 8, 9, 10],
+      vars: [
+        { name: "i", value: i },
+        { name: "curr", value: `prev1 + prev2 = ${prev1} + ${prev2} = ${curr}` },
+        { name: "prev2", value: `← ${prev1}` },
+        { name: "prev1", value: `← ${curr}` },
+      ],
+      note: {
+        vi: `Tính ways(${i}): curr = prev1 + prev2, dời pointers sang phải.`,
+        en: `Compute ways(${i}): curr = prev1 + prev2, shift pointers right.`,
+      },
+    });
+
+    prev2 = prev1;
+    prev1 = curr;
+  }
+
+  const finalLabels = history.map((_, idx) => {
+    if (idx === n - 1) return "prev2";
+    if (idx === n) return "prev1";
+    return idx === 0 ? "—" : `(${idx})`;
+  });
+
+  steps.push({
+    title: { vi: `Kết quả: ways(${n}) = ${prev1}`, en: `Result: ways(${n}) = ${prev1}` },
+    arr: [...history],
+    sub: finalLabels,
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeBlock: 2,
+    codeLines: [11],
+    vars: [
+      { name: "answer", value: prev1 },
+      { name: "space", value: "O(1)" },
+    ],
+    note: {
+      vi: `ways(${n}) = ${prev1}. Chỉ dùng O(1) bộ nhớ.`,
+      en: `ways(${n}) = ${prev1}. Used only O(1) memory.`,
+    },
+  });
+
+  return { n, answer: prev1, steps };
 }
 
 /**
@@ -6961,17 +7081,28 @@ const SUPPORTED = {
       en: "You are climbing a staircase. It takes n steps to reach the top. Each time you can climb either 1 or 2 steps. In how many distinct ways can you climb to the top?",
     },
     defaultInput: [5],
-    inputKind: "positive", // n là số nguyên dương
+    inputKind: "positive",
     inputLabel: { vi: "n (số bậc thang)", en: "n (number of steps)" },
     singleInput: true,
     maxInput: 45,
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 — DP Array O(n)", en: "1 — DP Array O(n)" } },
+          { value: 2, label: { vi: "2 — Optimized O(1) space", en: "2 — Optimized O(1) space" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Điền bảng dp từ 2 đến n nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
-        en: "Filling the dp table from 2 to n is O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+        vi: "Approach 1: O(n) time, O(n) space (bảng dp). Approach 2: O(n) time, O(1) space (2 biến).",
+        en: "Approach 1: O(n) time, O(n) space (dp table). Approach 2: O(n) time, O(1) space (2 variables).",
       },
     },
     code: [
@@ -6983,6 +7114,19 @@ const SUPPORTED = {
       "        for i in range(2, n + 1):",
       "            dp[i] = dp[i-1] + dp[i-2]",
       "        return dp[n]",
+    ],
+    code2: [
+      "# Optimized O(1) space",
+      "class Solution:",
+      "    def climbStairs(self, n: int) -> int:",
+      "        if n <= 2:",
+      "            return n",
+      "        prev2, prev1 = 1, 2",
+      "        for i in range(3, n + 1):",
+      "            curr = prev1 + prev2",
+      "            prev2 = prev1",
+      "            prev1 = curr",
+      "        return prev1",
     ],
     builder: buildSteps70,
   },
