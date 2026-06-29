@@ -3250,6 +3250,10 @@ function buildSteps50(input, params) {
   const origX = x;
   const origN = n;
 
+  // Track result history for bar visualization
+  const resultHistory = [];
+  const labels = [];
+
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
     arr: [],
@@ -3288,17 +3292,20 @@ function buildSteps50(input, params) {
 
   let result = 1;
   let iteration = 0;
+  resultHistory.push(result);
+  labels.push("init");
 
   steps.push({
     title: { vi: "Bắt đầu vòng lặp", en: "Start loop" },
-    arr: [],
-    highlight: [],
+    arr: [...resultHistory],
+    highlight: [resultHistory.length - 1],
     mark: [],
     codeLines: [6],
     vars: [
       { name: "result", value: result },
       { name: "x", value: x },
       { name: "n", value: n },
+      { name: "n (bin)", value: n.toString(2) },
     ],
     note: {
       vi: `result = 1. Lặp: nếu n lẻ thì nhân result với x, rồi bình phương x và chia đôi n.`,
@@ -3313,10 +3320,12 @@ function buildSteps50(input, params) {
 
     if (isOdd) {
       result *= x;
+      resultHistory.push(+result.toFixed(10));
+      labels.push(`×x`);
       steps.push({
         title: { vi: `Lần ${iteration}: n lẻ → result *= x`, en: `Iter ${iteration}: n odd → result *= x` },
-        arr: [],
-        highlight: [],
+        arr: [...resultHistory],
+        highlight: [resultHistory.length - 1],
         mark: [],
         codeLines: [7, 8],
         vars: [
@@ -3334,7 +3343,7 @@ function buildSteps50(input, params) {
     } else {
       steps.push({
         title: { vi: `Lần ${iteration}: n chẵn → bỏ qua`, en: `Iter ${iteration}: n even → skip` },
-        arr: [],
+        arr: [...resultHistory],
         highlight: [],
         mark: [],
         codeLines: [7],
@@ -3357,13 +3366,14 @@ function buildSteps50(input, params) {
 
     steps.push({
       title: { vi: `Bình phương x, chia đôi n`, en: `Square x, halve n` },
-      arr: [],
+      arr: [...resultHistory],
       highlight: [],
       mark: [],
       codeLines: [9, 10],
       vars: [
         { name: "x", value: +x.toFixed(10) },
         { name: "n", value: n },
+        { name: "n (bin)", value: n > 0 ? n.toString(2) : "0" },
         { name: "result", value: +result.toFixed(10) },
       ],
       note: {
@@ -3376,9 +3386,9 @@ function buildSteps50(input, params) {
   const finalResult = +result.toFixed(10);
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
-    arr: [],
+    arr: [...resultHistory],
     highlight: [],
-    mark: [],
+    mark: [resultHistory.length - 1],
     final: true,
     codeLines: [11],
     vars: [{ name: "answer", value: finalResult }],
