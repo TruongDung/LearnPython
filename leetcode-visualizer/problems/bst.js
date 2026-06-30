@@ -331,27 +331,71 @@ function buildSteps1382(input) {
 
   // Step 1: Inorder traversal to get sorted values
   const sorted = [];
-  function inorder(node) { if (!node) return; inorder(node.left); sorted.push(node.val); inorder(node.right); }
+  const inorderIds = [];
+  function inorder(node) { if (!node) return; inorder(node.left); sorted.push(node.val); inorderIds.push(node.id); inorder(node.right); }
   inorder(root);
 
-  steps.push(snapshot(root, { title: { vi: "Bước 1: Inorder → sorted array", en: "Step 1: Inorder → sorted array" }, codeLines: [3, 4, 5], vars: [{ name: "sorted", value: `[${sorted.join(", ")}]` }, { name: "n", value: sorted.length }], note: { vi: `Inorder traversal BST → mảng đã sắp xếp: [${sorted.join(", ")}].\nBước 2: xây BST cân bằng từ mảng sorted (chia đôi).`, en: `Inorder traversal of BST → sorted array: [${sorted.join(", ")}].\nStep 2: build balanced BST from sorted array (divide and conquer).` } }));
+  steps.push(snapshot(root, {
+    title: { vi: "Bài toán: cân bằng lại BST", en: "Problem: rebalance the BST" },
+    codeLines: [2],
+    vars: [{ name: "n", value: sorted.length }],
+    note: {
+      vi:
+        `Cây hiện tại bị LỆCH (cao, mất cân bằng).\n` +
+        `Ý tưởng 2 bước:\n` +
+        `• B1: Duyệt Inorder → mảng đã sắp xếp tăng dần.\n` +
+        `• B2: Chọn phần tử GIỮA làm gốc, đệ quy 2 nửa → cây cân bằng (mỗi nửa số nút gần bằng nhau).`,
+      en:
+        `The current tree is SKEWED (tall, unbalanced).\n` +
+        `2-step idea:\n` +
+        `• Step 1: Inorder traversal → sorted ascending array.\n` +
+        `• Step 2: Pick the MIDDLE element as the root, recurse on both halves → balanced tree.`,
+    },
+  }));
 
-  // Step 2: Build balanced BST
+  steps.push(snapshot(root, {
+    title: { vi: `Bước 1: Inorder → [${sorted.join(", ")}]`, en: `Step 1: Inorder → [${sorted.join(", ")}]` },
+    wordSet: new Set(inorderIds), codeLines: [3, 4, 5],
+    vars: [{ name: "sorted", value: `[${sorted.join(", ")}]` }, { name: "n", value: sorted.length }],
+    note: { vi: `Duyệt inorder cây cũ → mảng tăng dần: [${sorted.join(", ")}].\nGiờ chỉ cần dựng lại cây cân bằng từ mảng này.`, en: `Inorder of the old tree → sorted array: [${sorted.join(", ")}].\nNow rebuild a balanced tree from this array.` },
+  }));
+
+  // Step 2: Build balanced BST top-down, snapshotting each node as it is attached.
   let idCounter = 0;
-  function buildBalanced(arr, lo, hi) {
-    if (lo > hi) return null;
+  let builtRoot = null;
+  function build(lo, hi, attach, sideLabel) {
+    if (lo > hi) { attach(null); return; }
     const mid = Math.floor((lo + hi) / 2);
-    const node = { id: idCounter++, val: arr[mid], left: null, right: null };
-    node.left = buildBalanced(arr, lo, mid - 1);
-    node.right = buildBalanced(arr, mid + 1, hi);
-    return node;
+    const node = { id: idCounter++, val: sorted[mid], left: null, right: null };
+    attach(node);
+    const leftArr = sorted.slice(lo, mid).join(",") || "∅";
+    const rightArr = sorted.slice(mid + 1, hi + 1).join(",") || "∅";
+    steps.push(snapshot(builtRoot, {
+      title: { vi: `Giữa của [${sorted.slice(lo, hi + 1).join(",")}] = ${sorted[mid]}`, en: `Mid of [${sorted.slice(lo, hi + 1).join(",")}] = ${sorted[mid]}` },
+      hlSet: new Set([node.id]), codeLines: [8, 9, 10, 11, 12],
+      vars: [
+        { name: "đoạn / range", value: `[${sorted.slice(lo, hi + 1).join(",")}]` },
+        { name: "mid", value: `${sorted[mid]}` },
+        { name: "→ vị trí", value: sideLabel },
+        { name: "nửa trái", value: `[${leftArr}]` },
+        { name: "nửa phải", value: `[${rightArr}]` },
+      ],
+      note: { vi: `Lấy phần tử GIỮA ${sorted[mid]} làm gốc của đoạn này (${sideLabel}). Đệ quy: nửa trái [${leftArr}] → con trái, nửa phải [${rightArr}] → con phải.`, en: `Take the MIDDLE element ${sorted[mid]} as the root of this range (${sideLabel}). Recurse: left half [${leftArr}] → left child, right half [${rightArr}] → right child.` },
+    }));
+    build(lo, mid - 1, (c) => { node.left = c; }, "con trái / left");
+    build(mid + 1, hi, (c) => { node.right = c; }, "con phải / right");
   }
-  const balanced = buildBalanced(sorted, 0, sorted.length - 1);
+  build(0, sorted.length - 1, (c) => { builtRoot = c; }, "gốc / root");
 
-  steps.push(snapshot(balanced, { title: { vi: "Bước 2: BST cân bằng", en: "Step 2: Balanced BST" }, wordSet: new Set(Array.from({ length: sorted.length }, (_, i) => i)), codeLines: [7, 8, 9, 10, 11], vars: [{ name: "root", value: balanced ? balanced.val : "null" }, { name: "height", value: Math.ceil(Math.log2(sorted.length + 1)) }], note: { vi: `Chọn mid = arr[n/2] làm root, đệ quy 2 nửa → cây cân bằng chiều cao ≈ log₂(${sorted.length}).`, en: `Pick mid = arr[n/2] as root, recurse on halves → balanced tree height ≈ log₂(${sorted.length}).` } }));
-  steps[steps.length - 1].final = true;
+  const fs = snapshot(builtRoot, {
+    title: { vi: "Bước 2 xong: BST cân bằng", en: "Step 2 done: balanced BST" },
+    wordSet: new Set(Array.from({ length: sorted.length }, (_, i) => i)), codeLines: [13],
+    vars: [{ name: "root", value: builtRoot ? builtRoot.val : "null" }, { name: "chiều cao", value: `≈ log₂(${sorted.length}) = ${Math.ceil(Math.log2(sorted.length + 1))}` }],
+    note: { vi: `Mọi đoạn đều chọn phần tử giữa làm gốc → 2 cây con luôn lệch nhau ≤ 1 nút → cây cân bằng chiều cao tối thiểu ≈ log₂(${sorted.length}).`, en: `Every range picks its middle as root → the two subtrees differ by ≤ 1 node → minimum-height balanced tree ≈ log₂(${sorted.length}).` },
+  });
+  fs.final = true; steps.push(fs);
 
-  return { input, answer: balanced ? balanced.val : "null", steps };
+  return { input, answer: builtRoot ? builtRoot.val : "null", steps };
 }
 
 // ─── 426: Convert BST to Sorted Doubly Linked List ───
@@ -418,22 +462,185 @@ function buildSteps230(input, params) {
 
 // ─── 108: Convert Sorted Array to BST ───
 function buildSteps108(input) {
-  const nums = String(input).split(",").map(Number); const steps = []; let idc = 0;
-  function build(lo, hi) { if (lo > hi) return null; const mid = Math.floor((lo+hi)/2); const n = { id: idc++, val: nums[mid], left: null, right: null }; n.left = build(lo, mid-1); n.right = build(mid+1, hi); return n; }
-  const bal = build(0, nums.length-1);
-  steps.push(snapshot(bal, { title: { vi: `Sorted → BST cân bằng`, en: `Sorted → Balanced BST` }, wordSet: new Set(Array.from({length:nums.length},(_,i)=>i)), vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "root", value: bal?bal.val:"null" }], note: { vi: `Chọn mid làm root, đệ quy 2 nửa → cây cân bằng.`, en: `Pick mid as root, recurse halves → balanced tree.` } }));
-  steps[steps.length-1].final = true;
-  return { input, answer: bal?bal.val:"null", steps };
+  const nums = String(input).split(",").map(Number);
+  const steps = [];
+
+  steps.push(snapshot(null, {
+    title: { vi: "Mảng sorted → BST cân bằng", en: "Sorted array → Balanced BST" },
+    codeLines: [2],
+    vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "n", value: nums.length }],
+    note: {
+      vi:
+        `Mảng đã sắp xếp tăng dần. Để cây CÂN BẰNG chiều cao:\n` +
+        `• Chọn phần tử GIỮA làm gốc → 2 nửa số phần tử gần bằng nhau.\n` +
+        `• Đệ quy: nửa trái → con trái, nửa phải → con phải.`,
+      en:
+        `The array is sorted ascending. For a height-BALANCED tree:\n` +
+        `• Pick the MIDDLE element as the root → both halves have nearly equal size.\n` +
+        `• Recurse: left half → left child, right half → right child.`,
+    },
+  }));
+
+  // Build top-down, snapshotting each node as it is attached so the tree grows on screen.
+  let idCounter = 0;
+  let builtRoot = null;
+  function build(lo, hi, attach, sideLabel) {
+    if (lo > hi) { attach(null); return; }
+    const mid = Math.floor((lo + hi) / 2);
+    const node = { id: idCounter++, val: nums[mid], left: null, right: null };
+    attach(node);
+    const leftArr = nums.slice(lo, mid).join(",") || "∅";
+    const rightArr = nums.slice(mid + 1, hi + 1).join(",") || "∅";
+    steps.push(snapshot(builtRoot, {
+      title: { vi: `Giữa của [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}`, en: `Mid of [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}` },
+      hlSet: new Set([node.id]), codeLines: [3, 4, 5, 6, 7],
+      vars: [
+        { name: "đoạn / range", value: `[${nums.slice(lo, hi + 1).join(",")}]` },
+        { name: "mid", value: `index ${mid} → ${nums[mid]}` },
+        { name: "→ vị trí", value: sideLabel },
+        { name: "nửa trái", value: `[${leftArr}]` },
+        { name: "nửa phải", value: `[${rightArr}]` },
+      ],
+      note: { vi: `Lấy phần tử GIỮA ${nums[mid]} làm gốc đoạn này (${sideLabel}). Đệ quy: nửa trái [${leftArr}] → con trái, nửa phải [${rightArr}] → con phải.`, en: `Take the MIDDLE element ${nums[mid]} as the root of this range (${sideLabel}). Recurse: left half [${leftArr}] → left child, right half [${rightArr}] → right child.` },
+    }));
+    build(lo, mid - 1, (c) => { node.left = c; }, "con trái / left");
+    build(mid + 1, hi, (c) => { node.right = c; }, "con phải / right");
+  }
+  build(0, nums.length - 1, (c) => { builtRoot = c; }, "gốc / root");
+
+  const fs = snapshot(builtRoot, {
+    title: { vi: "Hoàn tất: BST cân bằng", en: "Done: balanced BST" },
+    wordSet: new Set(Array.from({ length: nums.length }, (_, i) => i)), codeLines: [8],
+    vars: [{ name: "root", value: builtRoot ? builtRoot.val : "null" }, { name: "chiều cao", value: `≈ log₂(${nums.length}) = ${Math.ceil(Math.log2(nums.length + 1))}` }],
+    note: { vi: `Mọi đoạn đều chọn phần tử giữa làm gốc → 2 cây con lệch nhau ≤ 1 nút → cây cân bằng chiều cao tối thiểu.`, en: `Every range picks its middle as root → subtrees differ by ≤ 1 node → minimum-height balanced tree.` },
+  });
+  fs.final = true; steps.push(fs);
+
+  return { input, answer: builtRoot ? builtRoot.val : "null", steps };
 }
 
 // ─── 450: Delete Node in BST ───
 function buildSteps450(input, params) {
-  const root = parseBST(input); const key = params.key || 3; const steps = [];
-  steps.push(snapshot(root, { title: { vi: `Xóa nút ${key}`, en: `Delete ${key}` }, vars: [{ name: "key", value: key }], note: { vi: `Tìm ${key} rồi xóa. 3 case: lá/1 con/2 con (successor).`, en: `Find ${key} then delete. 3 cases: leaf/1 child/2 children (successor).` } }));
+  let root = parseBST(input);
+  const key = params.key !== undefined ? Number(params.key) : 3;
+  const steps = [];
+
+  steps.push(snapshot(root, {
+    title: { vi: `Xóa nút ${key} khỏi BST`, en: `Delete node ${key} from BST` },
+    codeLines: [2],
+    vars: [{ name: "key", value: key }],
+    note: {
+      vi:
+        `Bước 1: TÌM nút ${key} bằng tính chất BST (key < nút → trái, key > nút → phải).\n` +
+        `Bước 2: XÓA theo 1 trong 3 trường hợp:\n` +
+        `• Lá (không con) → xóa thẳng.\n` +
+        `• 1 con → thay nút bằng con đó.\n` +
+        `• 2 con → chép giá trị SUCCESSOR (nút nhỏ nhất ở cây con phải) vào nút, rồi xóa successor.`,
+      en:
+        `Step 1: FIND node ${key} using BST property (key < node → left, key > node → right).\n` +
+        `Step 2: DELETE by one of 3 cases:\n` +
+        `• Leaf (no child) → remove directly.\n` +
+        `• 1 child → replace node with that child.\n` +
+        `• 2 children → copy the SUCCESSOR value (smallest in right subtree) into the node, then delete the successor.`,
+    },
+  }));
+
+  // Map each node id → { node: parent, side } so we can re-link children.
+  const parent = new Map();
+  (function build(n, p, side) { if (!n) return; parent.set(n.id, { node: p, side }); build(n.left, n, "left"); build(n.right, n, "right"); })(root, null, null);
+
+  function replaceInParent(oldNode, newNode) {
+    const p = parent.get(oldNode.id);
+    if (!p || !p.node) { root = newNode; return; }
+    p.node[p.side] = newNode;
+  }
+
+  // ── Step 1: search for the key ──
   let node = root;
-  while (node && node.val !== key) { node = key < node.val ? node.left : node.right; }
-  if (node) { steps.push(snapshot(root, { title: { vi: `Tìm thấy ${key}`, en: `Found ${key}` }, hlSet: new Set([node.id]), vars: [{ name: "node", value: key }, { name: "left", value: !!node.left }, { name: "right", value: !!node.right }], note: { vi: `Nút ${key} tìm thấy. Xóa theo case phù hợp.`, en: `Node ${key} found. Delete by appropriate case.` } })); }
-  const fs = snapshot(root, { title: { vi: `Đã xóa ${key}`, en: `Deleted ${key}` }, vars: [{ name: "answer", value: "done" }], note: { vi: `BST sau xóa vẫn hợp lệ.`, en: `BST remains valid after deletion.` } }); fs.final = true; steps.push(fs);
+  while (node && node.val !== key) {
+    const goLeft = key < node.val;
+    steps.push(snapshot(root, {
+      title: { vi: `So sánh ${key} với ${node.val}`, en: `Compare ${key} with ${node.val}` },
+      hlSet: new Set([node.id]), codeLines: [3, 4, 5],
+      vars: [{ name: "current", value: node.val }, { name: "key", value: key }, { name: "hướng đi", value: goLeft ? "trái (key < node)" : "phải (key > node)" }],
+      note: { vi: `${key} ${goLeft ? "<" : ">"} ${node.val} → đi sang con ${goLeft ? "TRÁI" : "PHẢI"}.`, en: `${key} ${goLeft ? "<" : ">"} ${node.val} → go ${goLeft ? "LEFT" : "RIGHT"}.` },
+    }));
+    node = goLeft ? node.left : node.right;
+  }
+
+  if (!node) {
+    const fs = snapshot(root, { title: { vi: `Không tìm thấy ${key}`, en: `${key} not found` }, vars: [{ name: "answer", value: "cây giữ nguyên" }], note: { vi: `Đi tới null → ${key} không có trong cây. Không xóa gì.`, en: `Reached null → ${key} is not in the tree. Nothing to delete.` } });
+    fs.final = true; steps.push(fs);
+    return { input, answer: "not found", steps };
+  }
+
+  const target = node;
+  const hasLeft = !!target.left, hasRight = !!target.right;
+  const kase = (!hasLeft && !hasRight) ? "leaf" : (hasLeft && hasRight) ? "two" : "one";
+  const kaseVi = kase === "leaf" ? "Lá (0 con)" : kase === "one" ? "1 con" : "2 con";
+
+  steps.push(snapshot(root, {
+    title: { vi: `Tìm thấy ${key} → trường hợp: ${kaseVi}`, en: `Found ${key} → case: ${kase === "leaf" ? "Leaf" : kase === "one" ? "1 child" : "2 children"}` },
+    hlSet: new Set([target.id]), wordSet: new Set([target.id]), codeLines: [6],
+    vars: [{ name: "node", value: target.val }, { name: "con trái", value: hasLeft ? target.left.val : "—" }, { name: "con phải", value: hasRight ? target.right.val : "—" }, { name: "trường hợp", value: kaseVi }],
+    note: { vi: `Đã tìm thấy ${key}. Nút có ${hasLeft ? 1 : 0} con trái và ${hasRight ? 1 : 0} con phải → xử lý theo trường hợp "${kaseVi}".`, en: `Found ${key}. It has ${hasLeft ? 1 : 0} left child and ${hasRight ? 1 : 0} right child → handle case.` },
+  }));
+
+  if (kase === "leaf") {
+    replaceInParent(target, null);
+    const fs = snapshot(root, { title: { vi: `Xóa lá ${key}`, en: `Remove leaf ${key}` }, vars: [{ name: "answer", value: "BST hợp lệ" }], note: { vi: `${key} là lá → cắt bỏ trực tiếp khỏi cha. Cây vẫn là BST hợp lệ.`, en: `${key} is a leaf → cut it directly from its parent. Tree stays a valid BST.` } });
+    fs.final = true; steps.push(fs);
+  } else if (kase === "one") {
+    const child = target.left || target.right;
+    replaceInParent(target, child);
+    const fs = snapshot(root, { title: { vi: `Thay ${key} bằng con ${child.val}`, en: `Replace ${key} with child ${child.val}` }, wordSet: new Set([child.id]), vars: [{ name: "answer", value: "BST hợp lệ" }], note: { vi: `${key} chỉ có 1 con (${child.val}) → nối thẳng con đó lên vị trí của ${key}. Cây vẫn hợp lệ.`, en: `${key} has only one child (${child.val}) → link that child directly into ${key}'s spot. Tree stays valid.` } });
+    fs.final = true; steps.push(fs);
+  } else {
+    // Two children: find inorder successor = smallest in the right subtree.
+    steps.push(snapshot(root, {
+      title: { vi: `Tìm successor trong cây con phải`, en: `Find successor in right subtree` },
+      hlSet: new Set([target.right.id]), codeLines: [9, 10],
+      vars: [{ name: "bắt đầu", value: target.right.val }],
+      note: { vi: `Successor = nút NHỎ NHẤT lớn hơn ${key}. Đi sang con PHẢI 1 bước (${target.right.val}), rồi đi TRÁI hết cỡ.`, en: `Successor = SMALLEST node greater than ${key}. Step to the RIGHT child (${target.right.val}), then go LEFT as far as possible.` },
+    }));
+    let succParent = target;
+    let succ = target.right;
+    while (succ.left) {
+      steps.push(snapshot(root, {
+        title: { vi: `${succ.val} còn con trái → đi tiếp`, en: `${succ.val} has a left child → keep going` },
+        hlSet: new Set([succ.id]), codeLines: [10],
+        vars: [{ name: "current", value: succ.val }],
+        note: { vi: `${succ.val} vẫn còn con trái (${succ.left.val}) → chưa phải nhỏ nhất, đi sang trái.`, en: `${succ.val} still has a left child (${succ.left.val}) → not the smallest yet, go left.` },
+      }));
+      succParent = succ; succ = succ.left;
+    }
+    steps.push(snapshot(root, {
+      title: { vi: `Successor = ${succ.val}`, en: `Successor = ${succ.val}` },
+      hlSet: new Set([succ.id]), wordSet: new Set([succ.id]), codeLines: [10],
+      vars: [{ name: "successor", value: succ.val }],
+      note: { vi: `${succ.val} không còn con trái → đây là nút nhỏ nhất của cây con phải = successor của ${key}.`, en: `${succ.val} has no left child → it is the smallest node in the right subtree = successor of ${key}.` },
+    }));
+
+    const oldVal = target.val;
+    target.val = succ.val;
+    steps.push(snapshot(root, {
+      title: { vi: `Chép ${succ.val} đè lên ${oldVal}`, en: `Copy ${succ.val} over ${oldVal}` },
+      hlSet: new Set([target.id]), wordSet: new Set([target.id]), codeLines: [11],
+      vars: [{ name: "nút cần xóa", value: `${oldVal} → ${succ.val}` }],
+      note: { vi: `Ghi đè giá trị ${oldVal} bằng ${succ.val}. Giờ giá trị ${key} đã biến mất, nhưng còn 1 bản sao ${succ.val} ở vị trí successor cũ cần dọn.`, en: `Overwrite ${oldVal} with ${succ.val}. The value ${key} is gone, but a duplicate ${succ.val} still sits at the old successor spot to clean up.` },
+    }));
+
+    // Remove the old successor node (it has no left child, may have a right child).
+    if (succParent.left === succ) succParent.left = succ.right; else succParent.right = succ.right;
+    steps.push(snapshot(root, {
+      title: { vi: `Xóa successor cũ`, en: `Remove old successor` },
+      codeLines: [12],
+      vars: [{ name: "answer", value: "BST hợp lệ" }],
+      note: { vi: `Xóa nút successor ở vị trí cũ (chỉ có thể có con phải, nối lên thay nó). Cây sau cùng vẫn là BST hợp lệ.`, en: `Remove the old successor node (it can only have a right child, which takes its place). Final tree is still a valid BST.` },
+    }));
+    steps[steps.length - 1].final = true;
+  }
+
   return { input, answer: `deleted ${key}`, steps };
 }
 
@@ -490,12 +697,66 @@ function buildSteps99(input) {
 
 // ─── 109: Convert Sorted List to BST ───
 function buildSteps109(input) {
-  const nums = String(input).split(",").map(Number); const steps = []; let idc = 0;
-  function build(lo, hi) { if (lo > hi) return null; const mid = Math.floor((lo+hi)/2); const n = { id: idc++, val: nums[mid], left: null, right: null }; n.left = build(lo, mid-1); n.right = build(mid+1, hi); return n; }
-  const bal = build(0, nums.length-1);
-  steps.push(snapshot(bal, { title: { vi: `Sorted List → BST cân bằng`, en: `Sorted List → Balanced BST` }, wordSet: new Set(Array.from({length:nums.length},(_,i)=>i)), vars: [{ name: "list", value: `[${nums.join("→")}]` }, { name: "root", value: bal?bal.val:"null" }], note: { vi: `Danh sách liên kết đã sắp xếp tăng dần. Phần tử giữa = root, đệ quy 2 nửa → BST cân bằng (giống bài 108 nhưng input là linked list).`, en: `Linked list is sorted ascending. Middle element = root, recurse on halves → balanced BST (like 108 but the input is a linked list).` } }));
-  steps[steps.length-1].final = true;
-  return { input, answer: bal?bal.val:"null", steps };
+  const nums = String(input).split(",").map(Number);
+  const steps = [];
+
+  const listStr = nums.join(" → ") + " → null";
+  steps.push(snapshot(null, {
+    title: { vi: "Linked list sorted → BST cân bằng", en: "Sorted linked list → Balanced BST" },
+    codeLines: [2],
+    vars: [{ name: "list", value: listStr }, { name: "n", value: nums.length }],
+    note: {
+      vi:
+        `Danh sách liên kết đã sắp xếp tăng dần.\n` +
+        `Cách đơn giản: đọc list ra MẢNG, rồi giống hệt bài 108:\n` +
+        `• Chọn phần tử GIỮA làm gốc → 2 nửa gần bằng nhau.\n` +
+        `• Đệ quy: nửa trái → con trái, nửa phải → con phải.\n` +
+        `(Cách tối ưu O(1) bộ nhớ: dùng slow/fast pointer tìm giữa trực tiếp trên list.)`,
+      en:
+        `The linked list is sorted ascending.\n` +
+        `Simple approach: read the list into an ARRAY, then exactly like 108:\n` +
+        `• Pick the MIDDLE element as the root → halves nearly equal.\n` +
+        `• Recurse: left half → left child, right half → right child.\n` +
+        `(Optimal O(1) space: use slow/fast pointers to find the middle on the list directly.)`,
+    },
+  }));
+
+  // Build top-down, snapshotting each node as it is attached.
+  let idCounter = 0;
+  let builtRoot = null;
+  function build(lo, hi, attach, sideLabel) {
+    if (lo > hi) { attach(null); return; }
+    const mid = Math.floor((lo + hi) / 2);
+    const node = { id: idCounter++, val: nums[mid], left: null, right: null };
+    attach(node);
+    const leftArr = nums.slice(lo, mid).join(",") || "∅";
+    const rightArr = nums.slice(mid + 1, hi + 1).join(",") || "∅";
+    steps.push(snapshot(builtRoot, {
+      title: { vi: `Giữa của [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}`, en: `Mid of [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}` },
+      hlSet: new Set([node.id]), codeLines: [3, 4, 5, 6, 7],
+      vars: [
+        { name: "đoạn / range", value: `[${nums.slice(lo, hi + 1).join(",")}]` },
+        { name: "mid", value: `index ${mid} → ${nums[mid]}` },
+        { name: "→ vị trí", value: sideLabel },
+        { name: "nửa trái", value: `[${leftArr}]` },
+        { name: "nửa phải", value: `[${rightArr}]` },
+      ],
+      note: { vi: `Lấy phần tử GIỮA ${nums[mid]} làm gốc đoạn này (${sideLabel}). Đệ quy: nửa trái [${leftArr}] → con trái, nửa phải [${rightArr}] → con phải.`, en: `Take the MIDDLE element ${nums[mid]} as the root of this range (${sideLabel}). Recurse: left half [${leftArr}] → left child, right half [${rightArr}] → right child.` },
+    }));
+    build(lo, mid - 1, (c) => { node.left = c; }, "con trái / left");
+    build(mid + 1, hi, (c) => { node.right = c; }, "con phải / right");
+  }
+  build(0, nums.length - 1, (c) => { builtRoot = c; }, "gốc / root");
+
+  const fs = snapshot(builtRoot, {
+    title: { vi: "Hoàn tất: BST cân bằng", en: "Done: balanced BST" },
+    wordSet: new Set(Array.from({ length: nums.length }, (_, i) => i)), codeLines: [8],
+    vars: [{ name: "root", value: builtRoot ? builtRoot.val : "null" }, { name: "chiều cao", value: `≈ log₂(${nums.length}) = ${Math.ceil(Math.log2(nums.length + 1))}` }],
+    note: { vi: `Mọi đoạn đều chọn phần tử giữa làm gốc → 2 cây con lệch nhau ≤ 1 nút → cây cân bằng chiều cao tối thiểu.`, en: `Every range picks its middle as root → subtrees differ by ≤ 1 node → minimum-height balanced tree.` },
+  });
+  fs.final = true; steps.push(fs);
+
+  return { input, answer: builtRoot ? builtRoot.val : "null", steps };
 }
 
 // ─── 270: Closest BST Value ───
