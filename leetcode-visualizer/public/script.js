@@ -769,6 +769,24 @@ function renderBars(step) {
   });
 }
 
+// ---- BFS Grid renderer (pathfinding) ----
+function renderBfsGrid(step) {
+  const { cells, rows, cols } = step.bfsGrid;
+  const el = $("bfsGridView");
+  el.style.textAlign = "center";
+  let html = `<div class="bfs-grid" style="grid-template-columns:repeat(${cols},32px)">`;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = cells[r][c];
+      const cls = cell.cls || "empty";
+      const label = cell.label || "";
+      html += `<div class="bfs-cell ${cls}">${label}</div>`;
+    }
+  }
+  html += "</div>";
+  el.innerHTML = html;
+}
+
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
   const { dp, text1, text2, hlCell, pathCells } = step.grid;
@@ -958,20 +976,30 @@ function renderStep() {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
     renderTree(step);
   } else if (step.graph) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
     renderGraph(step);
   } else if (step.grid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");
     $("gridView").classList.remove("hidden");
+    $("bfsGridView").classList.add("hidden");
     renderGrid(step);
+  } else if (step.bfsGrid) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.add("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.remove("hidden");
+    renderBfsGrid(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
     $("bars").classList.remove("hidden");
     renderBars(step);
   }
