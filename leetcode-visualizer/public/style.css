@@ -1955,3 +1955,237 @@ html, body {
     left: -5px;
   }
 }
+
+
+/* ---- Category Learning Guide (collapsible) ---- */
+.cat-guide {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 0;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.cat-guide summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c4b5fd;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s;
+}
+
+.cat-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.cat-guide summary::after {
+  content: "▸";
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+  transition: transform 0.2s;
+}
+
+.cat-guide[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.cat-guide summary:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.cat-guide-icon {
+  font-size: 14px;
+}
+
+.cat-guide-body {
+  padding: 4px 16px 16px;
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.65;
+}
+
+.cat-guide-intro {
+  margin: 8px 0 16px;
+  padding: 12px;
+  background: rgba(99, 102, 241, 0.06);
+  border-left: 3px solid #6366f1;
+  border-radius: 0 8px 8px 0;
+}
+
+.cat-guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.cat-guide-table th {
+  text-align: left;
+  padding: 6px 8px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cat-guide-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cat-guide-table tr:last-child td {
+  border-bottom: none;
+}
+
+.cat-guide-table .g-step {
+  width: 28px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.cat-guide-table .g-pattern {
+  color: #a5b4fc;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+}
+
+.cat-guide-table .g-id {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
+  color: #c4b5fd;
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.cat-guide-stage {
+  margin: 14px 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.cat-guide-stage h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #a5b4fc;
+  font-weight: 700;
+}
+
+.cat-guide-stage p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.cat-guide-problems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cat-guide-conclusion {
+  margin: 16px 0 0;
+  padding: 12px;
+  background: rgba(16, 185, 129, 0.06);
+  border-left: 3px solid #10b981;
+  border-radius: 0 8px 8px 0;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+/* Light theme overrides */
+[data-theme="light"] .cat-guide {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+[data-theme="light"] .cat-guide summary {
+  color: #4f46e5;
+}
+
+[data-theme="light"] .cat-guide summary:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="light"] .cat-guide-body {
+  color: #475569;
+}
+
+[data-theme="light"] .cat-guide-intro {
+  background: white;
+  border-left-color: #6366f1;
+}
+
+[data-theme="light"] .cat-guide-table th {
+  background: #f1f5f9;
+  color: #4f46e5;
+}
+
+[data-theme="light"] .cat-guide-table td {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .cat-guide-table .g-step {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .cat-guide-table .g-pattern {
+  color: #6366f1;
+}
+
+[data-theme="light"] .cat-guide-table .g-id {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+[data-theme="light"] .cat-guide-stage {
+  background: white;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .cat-guide-stage h4 {
+  color: #4f46e5;
+}
+
+[data-theme="light"] .cat-guide-stage p {
+  color: #475569;
+}
+
+[data-theme="light"] .cat-guide-conclusion {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .cat-guide-body {
+    padding: 4px 10px 12px;
+    font-size: 12px;
+  }
+  .cat-guide-table {
+    font-size: 11px;
+  }
+  .cat-guide-table th,
+  .cat-guide-table td {
+    padding: 4px 6px;
+  }
+  .cat-guide-stage {
+    padding: 8px 10px;
+  }
+}

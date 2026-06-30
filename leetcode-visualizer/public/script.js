@@ -141,6 +141,75 @@ function renderCatalog() {
       itemsEl.appendChild(banner);
     }
 
+    // Show learning guide if available (collapsible)
+    if (group.guide) {
+      const guide = pick(group.guide);
+      const guideBox = document.createElement("details");
+      guideBox.className = "cat-guide";
+
+      const summary = document.createElement("summary");
+      summary.innerHTML = `<span class="cat-guide-icon">📘</span><span>${lang === "vi" ? "Lộ trình học chi tiết" : "Detailed learning path"}</span>`;
+      guideBox.appendChild(summary);
+
+      const body = document.createElement("div");
+      body.className = "cat-guide-body";
+
+      // Intro
+      const intro = document.createElement("p");
+      intro.className = "cat-guide-intro";
+      intro.textContent = guide.intro;
+      body.appendChild(intro);
+
+      // Patterns table
+      if (guide.patterns && guide.patterns.length) {
+        const tbl = document.createElement("table");
+        tbl.className = "cat-guide-table";
+        const thead = document.createElement("thead");
+        thead.innerHTML = `<tr><th>#</th><th>${lang === "vi" ? "Bài" : "Problem"}</th><th>Pattern</th></tr>`;
+        tbl.appendChild(thead);
+        const tbody = document.createElement("tbody");
+        guide.patterns.forEach((p, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td class="g-step">${i + 1}</td><td><span class="g-id">#${p.id}</span> ${p.name}</td><td class="g-pattern">${p.pattern}</td>`;
+          tbody.appendChild(tr);
+        });
+        tbl.appendChild(tbody);
+        body.appendChild(tbl);
+      }
+
+      // Stages
+      if (guide.stages && guide.stages.length) {
+        guide.stages.forEach((stage) => {
+          const sec = document.createElement("div");
+          sec.className = "cat-guide-stage";
+          const h = document.createElement("h4");
+          h.textContent = stage.title;
+          sec.appendChild(h);
+          const desc = document.createElement("p");
+          desc.textContent = stage.description;
+          sec.appendChild(desc);
+          if (stage.problems && stage.problems.length) {
+            const probs = document.createElement("div");
+            probs.className = "cat-guide-problems";
+            probs.innerHTML = stage.problems.map((id) => `<span class="g-id">#${id}</span>`).join(" ");
+            sec.appendChild(probs);
+          }
+          body.appendChild(sec);
+        });
+      }
+
+      // Conclusion
+      if (guide.conclusion) {
+        const conc = document.createElement("p");
+        conc.className = "cat-guide-conclusion";
+        conc.textContent = guide.conclusion;
+        body.appendChild(conc);
+      }
+
+      guideBox.appendChild(body);
+      itemsEl.appendChild(guideBox);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");

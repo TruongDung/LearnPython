@@ -110,108 +110,241 @@ function buildSteps1293(input, params) {
   return {original, answer, steps};
 }
 
-// ─── 1368: Minimum Cost Valid Path in Grid ───
+// ─── 1368: Minimum Cost Valid Path in Grid (0-1 BFS) ───
 function buildSteps1368(input, params) {
-  // Parse input: can be a string "1,1,3|3,2,2|1,1,4" or flat array with rows/cols params
+  // Parse input: "1,1,3|3,2,2|1,1,4" → [[1,1,3],[3,2,2],[1,1,4]]
   let grid;
   if (typeof input === "string") {
-    grid = input.split("|").map(row => row.split(",").map(Number));
+    grid = input.split("|").map((row) => row.trim().split(",").map(Number));
   } else {
-    const rows = params.rows || 3;
-    const cols = params.cols || Math.ceil(input.length / rows);
+    const r = params.rows || 3;
+    const c = params.cols || Math.ceil(input.length / r);
     grid = [];
-    for (let r = 0; r < rows; r++) grid.push(input.slice(r * cols, (r + 1) * cols));
+    for (let i = 0; i < r; i++) grid.push(input.slice(i * c, (i + 1) * c));
   }
-  const rows = grid.length;
-  const cols = grid[0].length;
-  const original = grid.map(row => [...row]);
+  const m = grid.length;
+  const n = grid[0].length;
   const steps = [];
-  const arrowMap = {1: "→", 2: "←", 3: "↓", 4: "↑"};
-  const dirMap = {1: [0,1], 2: [0,-1], 3: [1,0], 4: [-1,0]};
-  const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
 
-  // 0-1 BFS using deque
-  const dist = Array.from({length: rows}, () => new Array(cols).fill(Infinity));
-  dist[0][0] = 0;
-  const deque = [[0, 0]]; // [row, col]
+  // direction: 1=right, 2=left, 3=down, 4=up
+  const dirs = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0] };
+  const arrowChar = { 1: "→", 2: "←", 3: "↓", 4: "↑" };
 
-  function snapshot(currentSet, costColors) {
-    return Array.from({length: rows}, (_, r) =>
-      Array.from({length: cols}, (_, c) => {
-        const arrow = arrowMap[grid[r][c]] || "?";
-        let cls = "empty";
-        if (currentSet && currentSet.has(`${r},${c}`)) cls = "current";
-        else if (dist[r][c] < Infinity) {
-          cls = dist[r][c] === 0 ? "start" : "visited";
-        }
-        return {cls, label: arrow};
-      })
-    );
+  const INF = Infinity;
+  const cost = Array.from({ length: m }, () => new Array(n).fill(INF));
+  cost[0][0] = 0;
+
+  // Build grid display: each cell shows "arrow cost" (e.g., "→0", "↓∞")
+  function makeGrid(hlR, hlC, pathSet) {
+    const dp = [];
+    for (let r = 0; r < m; r++) {
+      const row = [];
+      for (let c = 0; c < n; c++) {
+        const ar = arrowChar[grid[r][c]];
+        const co = cost[r][c] === INF ? "∞" : cost[r][c];
+        row.push(`${ar}${co}`);
+      }
+      dp.push(row);
+    }
+    return {
+      dp,
+      text1: Array.from({ length: m }, (_, i) => `r${i}`),
+      text2: Array.from({ length: n }, (_, i) => `c${i}`),
+      hlCell: hlR !== undefined && hlR !== null ? [hlR, hlC] : null,
+      pathCells: pathSet ? [...pathSet].map((s) => s.split(",").map(Number)) : [],
+    };
   }
 
+  // Show input grid first
+  const gridStr = grid.map((row) => row.map((v) => arrowChar[v]).join("")).join(" / ");
   steps.push({
-    title: {vi: "Khởi tạo 0-1 BFS", en: "Initialize 0-1 BFS"},
-    arr: [], highlight: [], mark: [], codeLines: [],
-    bfsGrid: {cells: snapshot(new Set(["0,0"]), null), rows, cols},
-    vars: [{name: "start", value: "(0,0)"}, {name: "cost", value: 0}],
-    note: {vi: "Đi theo mũi tên: chi phí 0. Đổi hướng: chi phí 1. Dùng 0-1 BFS (deque).",
-           en: "Following arrow: cost 0. Changing direction: cost 1. Using 0-1 BFS (deque)."}
+    title: { vi: "Đề bài", en: "Problem" },
+    arr: [],
+    grid: makeGrid(0, 0, new Set(["0,0"])),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5],
+    vars: [
+      { name: "size", value: `${m}×${n}` },
+      { name: "grid", value: gridStr },
+      { name: "start", value: "(0,0)" },
+      { name: "target", value: `(${m - 1},${n - 1})` },
+    ],
+    note: {
+      vi:
+        `Lưới ${m}×${n}: mỗi ô có 1 mũi tên (→ ← ↓ ↑).\n` +
+        `Bạn đi từ (0,0) đến (${m - 1},${n - 1}). Mỗi ô buộc bạn đi theo mũi tên.\n` +
+        `Bạn có thể "đổi mũi tên" của 1 ô — mỗi lần đổi tốn 1 chi phí.\n` +
+        `→ Tìm số ô cần đổi mũi tên ít nhất để có đường đi hợp lệ.`,
+      en:
+        `Grid ${m}×${n}: each cell has an arrow (→ ← ↓ ↑).\n` +
+        `Travel from (0,0) to (${m - 1},${n - 1}). Each cell forces you to follow its arrow.\n` +
+        `You may "change the arrow" of a cell — each change costs 1.\n` +
+        `→ Find the minimum number of changes to create a valid path.`,
+    },
   });
 
-  let maxCostSeen = 0;
+  steps.push({
+    title: { vi: "Khởi tạo 0-1 BFS", en: "Initialize 0-1 BFS" },
+    arr: [],
+    grid: makeGrid(0, 0),
+    highlight: [],
+    mark: [],
+    codeLines: [7, 8, 9],
+    vars: [
+      { name: "cost[0][0]", value: 0 },
+      { name: "deque", value: "[(0,0)]" },
+      { name: "rules", value: "follow arrow = +0; change = +1" },
+    ],
+    note: {
+      vi:
+        `Mỗi ô hiển thị: mũi tên + chi phí nhỏ nhất tới ô đó.\n` +
+        `(0,0) = 0 (điểm bắt đầu), các ô còn lại = ∞ (chưa tới).\n` +
+        `0-1 BFS: cạnh cost 0 (đi theo mũi tên) → thêm ĐẦU deque.\n` +
+        `Cạnh cost 1 (đổi hướng) → thêm CUỐI deque.`,
+      en:
+        `Each cell shows: arrow + min cost to reach it.\n` +
+        `(0,0) = 0 (start), all others = ∞ (not yet reached).\n` +
+        `0-1 BFS: cost-0 edge (follow arrow) → add to FRONT of deque.\n` +
+        `Cost-1 edge (change direction) → add to BACK.`,
+    },
+  });
+
+  // 0-1 BFS
+  const deque = [[0, 0]];
+  let processed = 0;
+  const MAX_SHOW = 25;
+
   while (deque.length > 0) {
     const [r, c] = deque.shift();
-    if (dist[r][c] > maxCostSeen) {
-      maxCostSeen = dist[r][c];
-      if (steps.length < 18) {
-        const frontier = new Set();
-        for (const [fr, fc] of deque) frontier.add(`${fr},${fc}`);
-        steps.push({
-          title: {vi: `Xử lý cost = ${maxCostSeen}`, en: `Processing cost = ${maxCostSeen}`},
-          arr: [], highlight: [], mark: [], codeLines: [],
-          bfsGrid: {cells: snapshot(frontier, null), rows, cols},
-          vars: [{name: "cost_level", value: maxCostSeen}, {name: "deque_size", value: deque.length}],
-          note: {vi: `Đang xử lý các ô có chi phí ${maxCostSeen}.`,
-                 en: `Processing cells at cost level ${maxCostSeen}.`}
+    processed++;
+
+    const curArrow = arrowChar[grid[r][c]];
+    const relaxations = [];
+
+    for (const d of [1, 2, 3, 4]) {
+      const [dr, dc] = dirs[d];
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
+      const followArrow = grid[r][c] === d;
+      const wt = followArrow ? 0 : 1;
+      const newCost = cost[r][c] + wt;
+      if (newCost < cost[nr][nc]) {
+        const prevCost = cost[nr][nc];
+        cost[nr][nc] = newCost;
+        relaxations.push({
+          to: `(${nr},${nc})`,
+          dir: arrowChar[d],
+          followArrow,
+          wt,
+          newCost,
+          prevCost: prevCost === INF ? "∞" : prevCost,
         });
-      }
-    }
-    for (const [dr, dc] of dirs) {
-      const nr = r + dr, nc = c + dc;
-      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-      const dirIdx = dirs.findIndex(d => d[0] === dr && d[1] === dc);
-      const arrowDirs = [[0,1],[0,-1],[1,0],[-1,0]];
-      const isArrow = grid[r][c] >= 1 && grid[r][c] <= 4 &&
-        arrowDirs[grid[r][c]-1][0] === dr && arrowDirs[grid[r][c]-1][1] === dc;
-      const w = isArrow ? 0 : 1;
-      const newDist = dist[r][c] + w;
-      if (newDist < dist[nr][nc]) {
-        dist[nr][nc] = newDist;
-        if (w === 0) deque.unshift([nr, nc]);
+        if (wt === 0) deque.unshift([nr, nc]);
         else deque.push([nr, nc]);
       }
     }
+
+    if (processed <= MAX_SHOW) {
+      const relaxStr = relaxations.length
+        ? relaxations
+            .map((rx) =>
+              `${rx.to} ${rx.dir} ${rx.followArrow ? "theo MT" : "đổi MT"} (+${rx.wt}) → ${rx.newCost}`,
+            )
+            .join("\n")
+        : "(không có ô nào cải thiện)";
+
+      const relaxStrEn = relaxations.length
+        ? relaxations
+            .map((rx) =>
+              `${rx.to} ${rx.dir} ${rx.followArrow ? "follow" : "change"} (+${rx.wt}) → ${rx.newCost}`,
+            )
+            .join("\n")
+        : "(no relaxations)";
+
+      steps.push({
+        title: { vi: `Pop (${r},${c}) [${curArrow}] cost=${cost[r][c]}`, en: `Pop (${r},${c}) [${curArrow}] cost=${cost[r][c]}` },
+        arr: [],
+        grid: makeGrid(r, c),
+        highlight: [],
+        mark: [],
+        codeLines: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+        vars: [
+          { name: "cell", value: `(${r},${c})` },
+          { name: "arrow ở ô", value: curArrow },
+          { name: "cost hiện tại", value: cost[r][c] },
+          { name: "relaxations", value: relaxations.length },
+          { name: "deque size", value: deque.length },
+        ],
+        note: {
+          vi:
+            `Lấy ô (${r},${c}) ra khỏi đầu deque. Mũi tên ô này: ${curArrow}.\n` +
+            `Thử 4 hướng từ ô này:\n${relaxStr}`,
+          en:
+            `Pop cell (${r},${c}) from front of deque. Arrow here: ${curArrow}.\n` +
+            `Try 4 directions from this cell:\n${relaxStrEn}`,
+        },
+      });
+    }
   }
 
-  const answer = dist[rows-1][cols-1] === Infinity ? -1 : dist[rows-1][cols-1];
+  const answer = cost[m - 1][n - 1];
+
+  // Trace a path from target back to start (any path with optimal cost)
+  const pathSet = new Set();
+  if (answer !== INF) {
+    let pr = m - 1;
+    let pc = n - 1;
+    pathSet.add(`${pr},${pc}`);
+    while (pr !== 0 || pc !== 0) {
+      // Find a neighbor that could have led here
+      let foundPrev = null;
+      for (const d of [1, 2, 3, 4]) {
+        const [dr, dc] = dirs[d];
+        const prR = pr - dr;
+        const prC = pc - dc;
+        if (prR < 0 || prR >= m || prC < 0 || prC >= n) continue;
+        const followArrow = grid[prR][prC] === d;
+        const wt = followArrow ? 0 : 1;
+        if (cost[prR][prC] + wt === cost[pr][pc]) {
+          foundPrev = [prR, prC];
+          break;
+        }
+      }
+      if (!foundPrev) break;
+      pr = foundPrev[0];
+      pc = foundPrev[1];
+      pathSet.add(`${pr},${pc}`);
+    }
+  }
+
   steps.push({
-    title: {vi: "Kết quả", en: "Result"},
-    arr: [], highlight: [], mark: [], codeLines: [],
-    bfsGrid: {cells: Array.from({length: rows}, (_, r) =>
-      Array.from({length: cols}, (_, c) => {
-        const arrow = arrowMap[grid[r][c]] || "?";
-        let cls = dist[r][c] === answer && (r === rows-1 && c === cols-1) ? "path" : "visited";
-        if (r === 0 && c === 0) cls = "start";
-        if (r === rows-1 && c === cols-1) cls = "path";
-        return {cls, label: `${arrow}(${dist[r][c] === Infinity ? "∞" : dist[r][c]})`};
-      })
-    ), rows, cols},
-    vars: [{name: "answer", value: answer}],
-    note: {vi: `Chi phí tối thiểu đến (${rows-1},${cols-1}) = ${answer}.`,
-           en: `Minimum cost to reach (${rows-1},${cols-1}) = ${answer}.`}
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    grid: makeGrid(m - 1, n - 1, pathSet),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [22],
+    vars: [
+      { name: "cost[target]", value: answer === INF ? -1 : answer },
+      { name: "answer", value: answer === INF ? -1 : answer },
+      { name: "changes needed", value: answer === INF ? "N/A" : answer },
+    ],
+    note: {
+      vi:
+        `Chi phí nhỏ nhất tới (${m - 1},${n - 1}) = ${answer === INF ? -1 : answer}.\n` +
+        `Đây là SỐ LẦN ÍT NHẤT phải đổi mũi tên để tạo đường đi hợp lệ.\n` +
+        `Đường đi được tô xanh trên lưới (truy ngược từ đích về (0,0)).`,
+      en:
+        `Minimum cost to reach (${m - 1},${n - 1}) = ${answer === INF ? -1 : answer}.\n` +
+        `This is the MINIMUM number of arrow changes needed for a valid path.\n` +
+        `Path is highlighted on the grid (traced back from target to (0,0)).`,
+    },
   });
 
-  return {original, answer, steps};
+  return { original: grid, answer: answer === INF ? -1 : answer, steps };
 }
 
 // ─── 1377: Frog Position After T Seconds ───
