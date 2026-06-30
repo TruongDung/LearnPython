@@ -436,8 +436,9 @@ function buildSteps126(input, params) {
 function buildSteps815(input, params) {
   const source = params.source != null ? params.source : 1;
   const target = params.target != null ? params.target : 6;
-  // Parse routes: "1,2,7;3,6,7" → [[1,2,7],[3,6,7]]
-  const routes = input ? input.split(";").map(s => s.split(",").map(Number)) : [[1,2,7],[3,6,7]];
+  // Parse routes: "1,2,7|3,6,7" or "1,2,7;3,6,7" → [[1,2,7],[3,6,7]]
+  const sep = input && input.includes("|") ? "|" : ";";
+  const routes = input ? input.split(sep).map(s => s.split(",").map(Number)) : [[1,2,7],[3,6,7]];
   const original = routes.map(r => r.join(",")).join(";");
   const steps = [];
 
