@@ -129,6 +129,10 @@ app.post("/api/problem/:id/solve", (req, res) => {
       if (typeof v !== "string" || v.length === 0) {
         return res.status(400).json({ error: `Tham số "${p.key}" phải là chuỗi không rỗng.` });
       }
+    } else if (p.type === "float") {
+      if (typeof v !== "number" || !isFinite(v)) {
+        return res.status(400).json({ error: `Tham số "${p.key}" phải là một số.` });
+      }
     } else if (!Number.isInteger(v) || (!p.allowNegative && v < 0)) {
       return res.status(400).json({
         error: `Tham số "${p.key}" phải là số nguyên${p.allowNegative ? "" : " không âm"}.`,

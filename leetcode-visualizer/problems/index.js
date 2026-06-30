@@ -22,6 +22,8 @@ const categories = {
   greedy: require("./greedy"),
   string: require("./string"),
   backtracking: require("./backtracking"),
+  bst: require("./bst"),
+  "binary-tree": require("./tree"),
 };
 
 const SUPPORTED = {};
