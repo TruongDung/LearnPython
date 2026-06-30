@@ -2048,8 +2048,8 @@ function buildSteps53(nums, params) {
       { name: "best subarray", value: `[${nums[0]}]` },
     ],
     note: {
-      vi: `Kadane's Algorithm: theo dõi tổng lớn nhất kết thúc tại mỗi vị trí (hàng dưới = cur tại mỗi i).\ncur = tổng subarray hiện tại = ${cur}\nbest = tổng lớn nhất từng thấy = ${best}`,
-      en: `Kadane's Algorithm: track the max sum ending at each position (bottom row = cur at each i).\ncur = current subarray sum = ${cur}\nbest = max sum seen so far = ${best}`,
+      vi: `Kadane's Algorithm:\n  dp[i] = max(dp[i-1] + nums[i],  # Mở rộng subarray hiện tại\n              nums[i])             # Bắt đầu subarray mới\n  best = max(best, dp[i])\n\ncur = dp[0] = ${cur}, best = ${best}`,
+      en: `Kadane's Algorithm:\n  dp[i] = max(dp[i-1] + nums[i],  # Extend the current subarray\n              nums[i])             # Start a new subarray\n  best = max(best, dp[i])\n\ncur = dp[0] = ${cur}, best = ${best}`,
     },
   });
 
@@ -2095,11 +2095,11 @@ function buildSteps53(nums, params) {
       ],
       note: {
         vi: restart
-          ? `cur(${extendSum - num}) + ${num} = ${extendSum} < ${num} → bắt đầu lại tại i=${i}\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`
-          : `cur(${extendSum - num}) + ${num} = ${extendSum} ≥ ${num} → mở rộng đoạn\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`,
+          ? `dp[i] = max(dp[i-1]+nums[i], nums[i]) = max(${extendSum}, ${num}) = ${num} → bắt đầu subarray mới\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`
+          : `dp[i] = max(dp[i-1]+nums[i], nums[i]) = max(${extendSum}, ${num}) = ${extendSum} → mở rộng subarray\ncur = ${cur}, best = ${best}${updated ? " ✓ cập nhật" : ""}`,
         en: restart
-          ? `cur(${extendSum - num}) + ${num} = ${extendSum} < ${num} → restart at i=${i}\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`
-          : `cur(${extendSum - num}) + ${num} = ${extendSum} ≥ ${num} → extend the run\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`,
+          ? `dp[i] = max(dp[i-1]+nums[i], nums[i]) = max(${extendSum}, ${num}) = ${num} → start new subarray\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`
+          : `dp[i] = max(dp[i-1]+nums[i], nums[i]) = max(${extendSum}, ${num}) = ${extendSum} → extend current subarray\ncur = ${cur}, best = ${best}${updated ? " ✓ updated" : ""}`,
       },
     });
   }
