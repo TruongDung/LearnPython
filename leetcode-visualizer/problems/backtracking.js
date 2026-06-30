@@ -1047,6 +1047,430 @@ function buildSteps39(nums, params) {
   return { original: [...nums], target, answer: results.length, steps };
 }
 
+/**
+ * Generate steps for LeetCode 40: Combination Sum II.
+ * Sort + backtracking; skip duplicate at same level; each element used once (start = i+1).
+ */
+function buildSteps40(nums, params) {
+  const target = params.target;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const steps = [];
+  const current = [];
+  const results = [];
+
+  steps.push({
+    title: { vi: "Sắp xếp + Khởi tạo", en: "Sort + Initialize" },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: sorted.map((_, i) => i),
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "sorted", value: `[${sorted.join(", ")}]` },
+      { name: "target", value: target },
+      { name: "current", value: "[]" },
+      { name: "remain", value: target },
+    ],
+    note: {
+      vi:
+        `Sắp xếp candidates = [${sorted.join(", ")}].\n` +
+        `Giống bài 39 nhưng: mỗi phần tử dùng 1 LẦN (start=i+1) + skip duplicate ở cùng level.`,
+      en:
+        `Sort candidates = [${sorted.join(", ")}].\n` +
+        `Like 39 but: each element used ONCE (start=i+1) + skip duplicates at same level.`,
+    },
+  });
+
+  function backtrack(start, remain) {
+    if (remain === 0) {
+      results.push([...current]);
+      steps.push({
+        title: { vi: `✓ Tổng = ${target}: [${current.join(", ")}]`, en: `✓ Sum = ${target}: [${current.join(", ")}]` },
+        arr: sorted.map(() => 0),
+        sub: sorted.map(String),
+        highlight: [],
+        mark: [],
+        codeLines: [8, 9],
+        vars: [
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "count", value: results.length },
+        ],
+        note: {
+          vi: `remain = 0 → lưu [${current.join(", ")}]. Tổng: ${results.length}.`,
+          en: `remain = 0 → save [${current.join(", ")}]. Total: ${results.length}.`,
+        },
+      });
+      return;
+    }
+
+    for (let i = start; i < sorted.length; i++) {
+      if (sorted[i] > remain) break; // pruning
+
+      if (i > start && sorted[i] === sorted[i - 1]) {
+        // Skip duplicate at same level
+        if (steps.length < 60) {
+          steps.push({
+            title: { vi: `Skip: sorted[${i}]=${sorted[i]} trùng`, en: `Skip: sorted[${i}]=${sorted[i]} duplicate` },
+            arr: sorted.map(() => 0),
+            sub: sorted.map(String),
+            highlight: [i, i - 1],
+            mark: [],
+            codeLines: [12, 13],
+            vars: [
+              { name: "i", value: i },
+              { name: "start", value: start },
+              { name: "sorted[i]", value: sorted[i] },
+              { name: "skip reason", value: `i > start AND sorted[${i}] == sorted[${i - 1}]` },
+            ],
+            note: {
+              vi: `sorted[${i}]=${sorted[i]} == sorted[${i - 1}] và i > start → skip tránh trùng.`,
+              en: `sorted[${i}]=${sorted[i]} == sorted[${i - 1}] and i > start → skip to avoid duplicate.`,
+            },
+          });
+        }
+        continue;
+      }
+
+      current.push(sorted[i]);
+      const newRemain = remain - sorted[i];
+
+      if (steps.length < 60) {
+        steps.push({
+          title: { vi: `Chọn sorted[${i}]=${sorted[i]}, remain=${newRemain}`, en: `Pick sorted[${i}]=${sorted[i]}, remain=${newRemain}` },
+          arr: sorted.map((_, j) => (j === i ? 1 : 0)),
+          sub: sorted.map(String),
+          highlight: [i],
+          mark: [],
+          codeLines: [14, 16, 17],
+          vars: [
+            { name: "i", value: i },
+            { name: "sorted[i]", value: sorted[i] },
+            { name: "current", value: `[${current.join(", ")}]` },
+            { name: "remain", value: newRemain },
+          ],
+          note: {
+            vi: `Chọn ${sorted[i]} → current=[${current.join(", ")}], remain=${newRemain}. Đệ quy start=${i + 1} (dùng 1 lần).`,
+            en: `Pick ${sorted[i]} → current=[${current.join(", ")}], remain=${newRemain}. Recurse start=${i + 1} (use once).`,
+          },
+        });
+      }
+
+      backtrack(i + 1, newRemain);
+
+      current.pop();
+      if (steps.length < 60) {
+        steps.push({
+          title: { vi: `Quay lui: bỏ ${sorted[i]}`, en: `Backtrack: pop ${sorted[i]}` },
+          arr: sorted.map(() => 0),
+          sub: sorted.map(String),
+          highlight: [],
+          mark: [],
+          codeLines: [18],
+          vars: [
+            { name: "popped", value: sorted[i] },
+            { name: "current", value: `[${current.join(", ")}]` },
+            { name: "remain", value: remain },
+          ],
+          note: {
+            vi: `Bỏ ${sorted[i]}, quay lui. Thử phần tử tiếp theo.`,
+            en: `Pop ${sorted[i]}, backtrack. Try next element.`,
+          },
+        });
+      }
+    }
+  }
+
+  backtrack(0, target);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
+    arr: sorted.map(() => 0),
+    sub: sorted.map(String),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [20, 21],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "all", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} tổ hợp có tổng = ${target}.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
+      en: `Total ${results.length} combinations summing to ${target}.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
+    },
+  });
+
+  return { original: [...nums], target, answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 17: Letter Combinations of a Phone Number.
+ * Backtracking on phone keypad mapping. Each digit position is a recursion level.
+ */
+function buildSteps17(input) {
+  const digits = String(input);
+  const steps = [];
+  const mapping = { "2": "abc", "3": "def", "4": "ghi", "5": "jkl", "6": "mno", "7": "pqrs", "8": "tuv", "9": "wxyz" };
+
+  if (digits.length === 0) {
+    steps.push({
+      title: { vi: "digits rỗng → []", en: "digits empty → []" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3, 4],
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "digits rỗng → trả về [].", en: "digits is empty → return []." },
+    });
+    return { digits, answer: 0, steps };
+  }
+
+  const results = [];
+  const current = [];
+
+  // Show digit-to-letters mapping
+  const mapStr = digits.split("").map((d) => `${d}→"${mapping[d] || "?"}"`).join(", ");
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: digits.split("").map(() => 0),
+    sub: digits.split("").map((d) => mapping[d] || "?"),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7, 8],
+    vars: [
+      { name: "digits", value: digits },
+      { name: "mapping", value: mapStr },
+      { name: "total combos", value: digits.split("").reduce((p, d) => p * (mapping[d] || "").length, 1) },
+    ],
+    note: {
+      vi:
+        `digits = "${digits}". Mỗi digit map đến 3-4 chữ cái:\n${mapStr}.\n` +
+        `Mỗi vị trí là 1 level đệ quy. Thử mọi chữ cái rồi đệ quy level tiếp.`,
+      en:
+        `digits = "${digits}". Each digit maps to 3-4 letters:\n${mapStr}.\n` +
+        `Each position is a recursion level. Try every letter then recurse to next level.`,
+    },
+  });
+
+  function backtrack(idx) {
+    if (idx === digits.length) {
+      results.push(current.join(""));
+      steps.push({
+        title: { vi: `✓ "${current.join("")}"`, en: `✓ "${current.join("")}"` },
+        arr: digits.split("").map(() => 1),
+        sub: [...current],
+        highlight: [],
+        mark: digits.split("").map((_, i) => i),
+        codeLines: [11, 12],
+        vars: [
+          { name: "combo", value: current.join("") },
+          { name: "count", value: results.length },
+        ],
+        note: {
+          vi: `Đã chọn đủ ${digits.length} ký tự → lưu "${current.join("")}". Tổng: ${results.length}.`,
+          en: `All ${digits.length} chars chosen → save "${current.join("")}". Total: ${results.length}.`,
+        },
+      });
+      return;
+    }
+
+    const letters = mapping[digits[idx]] || "";
+    for (const letter of letters) {
+      current.push(letter);
+
+      steps.push({
+        title: { vi: `Level ${idx}: chọn '${letter}' (digit '${digits[idx]}')`, en: `Level ${idx}: pick '${letter}' (digit '${digits[idx]}')` },
+        arr: digits.split("").map((_, i) => (i <= idx ? 1 : 0)),
+        sub: digits.split("").map((d, i) => (i < idx ? current[i] : i === idx ? letter : mapping[d] || "?")),
+        highlight: [idx],
+        mark: [],
+        codeLines: [14, 15],
+        vars: [
+          { name: "idx", value: idx },
+          { name: "digit", value: digits[idx] },
+          { name: "letters", value: `"${letters}"` },
+          { name: "pick", value: letter },
+          { name: "current", value: `"${current.join("")}"` },
+        ],
+        note: {
+          vi: `digit '${digits[idx]}' → letters "${letters}". Chọn '${letter}' → đệ quy level ${idx + 1}.`,
+          en: `digit '${digits[idx]}' → letters "${letters}". Pick '${letter}' → recurse level ${idx + 1}.`,
+        },
+      });
+
+      backtrack(idx + 1);
+      current.pop();
+    }
+  }
+
+  backtrack(0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
+    arr: digits.split("").map(() => 0),
+    sub: digits.split("").map((d) => mapping[d] || "?"),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [19, 20],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "all", value: results.join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} tổ hợp:\n${results.join(", ")}`,
+      en: `Total ${results.length} combinations:\n${results.join(", ")}`,
+    },
+  });
+
+  return { digits, answer: results.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 784: Letter Case Permutation.
+ * At each letter position: branch into lowercase and uppercase.
+ * Digits are kept unchanged (no branching).
+ */
+function buildSteps784(input) {
+  const s = String(input);
+  const steps = [];
+  const results = [];
+  const current = s.split("");
+
+  const letterCount = s.split("").filter((c) => /[a-zA-Z]/.test(c)).length;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: current.map(() => 0),
+    sub: [...current],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "s", value: s },
+      { name: "letters", value: letterCount },
+      { name: "total combos", value: Math.pow(2, letterCount) },
+    ],
+    note: {
+      vi:
+        `s = "${s}". Có ${letterCount} chữ cái → 2^${letterCount} = ${Math.pow(2, letterCount)} kết quả.\n` +
+        `Tại mỗi chữ cái: 2 nhánh (hoa/thường). Chữ số: giữ nguyên.`,
+      en:
+        `s = "${s}". Has ${letterCount} letters → 2^${letterCount} = ${Math.pow(2, letterCount)} results.\n` +
+        `At each letter: 2 branches (upper/lower). Digits: keep unchanged.`,
+    },
+  });
+
+  function backtrack(idx) {
+    if (idx === s.length) {
+      results.push(current.join(""));
+      steps.push({
+        title: { vi: `✓ "${current.join("")}"`, en: `✓ "${current.join("")}"` },
+        arr: current.map(() => 1),
+        sub: [...current],
+        highlight: [],
+        mark: current.map((_, i) => i),
+        codeLines: [7, 8],
+        vars: [
+          { name: "result", value: current.join("") },
+          { name: "count", value: results.length },
+        ],
+        note: {
+          vi: `Hết chuỗi → lưu "${current.join("")}". Tổng: ${results.length}.`,
+          en: `End of string → save "${current.join("")}". Total: ${results.length}.`,
+        },
+      });
+      return;
+    }
+
+    if (/\d/.test(current[idx])) {
+      // Digit: no branching, just move on
+      steps.push({
+        title: { vi: `idx=${idx}: '${current[idx]}' là số → giữ nguyên`, en: `idx=${idx}: '${current[idx]}' is digit → keep` },
+        arr: current.map((_, i) => (i <= idx ? 1 : 0)),
+        sub: [...current],
+        highlight: [idx],
+        mark: [],
+        codeLines: [10, 11],
+        vars: [
+          { name: "idx", value: idx },
+          { name: "char", value: current[idx] },
+          { name: "type", value: "digit → skip (no branch)" },
+        ],
+        note: {
+          vi: `'${current[idx]}' là chữ số → không phân nhánh, tiến sang idx=${idx + 1}.`,
+          en: `'${current[idx]}' is a digit → no branching, move to idx=${idx + 1}.`,
+        },
+      });
+      backtrack(idx + 1);
+    } else {
+      // Letter: branch lower then upper
+      current[idx] = current[idx].toLowerCase();
+      steps.push({
+        title: { vi: `idx=${idx}: thử '${current[idx]}' (thường)`, en: `idx=${idx}: try '${current[idx]}' (lower)` },
+        arr: current.map((_, i) => (i <= idx ? 1 : 0)),
+        sub: [...current],
+        highlight: [idx],
+        mark: [],
+        codeLines: [13, 14],
+        vars: [
+          { name: "idx", value: idx },
+          { name: "branch", value: `lowercase '${current[idx]}'` },
+          { name: "current", value: `"${current.join("")}"` },
+        ],
+        note: {
+          vi: `Nhánh 1: '${current[idx]}' (thường). Đệ quy idx=${idx + 1}.`,
+          en: `Branch 1: '${current[idx]}' (lower). Recurse idx=${idx + 1}.`,
+        },
+      });
+      backtrack(idx + 1);
+
+      current[idx] = current[idx].toUpperCase();
+      steps.push({
+        title: { vi: `idx=${idx}: thử '${current[idx]}' (hoa)`, en: `idx=${idx}: try '${current[idx]}' (upper)` },
+        arr: current.map((_, i) => (i <= idx ? 1 : 0)),
+        sub: [...current],
+        highlight: [idx],
+        mark: [],
+        codeLines: [15, 16],
+        vars: [
+          { name: "idx", value: idx },
+          { name: "branch", value: `uppercase '${current[idx]}'` },
+          { name: "current", value: `"${current.join("")}"` },
+        ],
+        note: {
+          vi: `Nhánh 2: '${current[idx]}' (hoa). Đệ quy idx=${idx + 1}.`,
+          en: `Branch 2: '${current[idx]}' (upper). Recurse idx=${idx + 1}.`,
+        },
+      });
+      backtrack(idx + 1);
+    }
+  }
+
+  backtrack(0);
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length}`, en: `Result: ${results.length}` },
+    arr: current.map(() => 0),
+    sub: s.split(""),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18, 19],
+    vars: [
+      { name: "total", value: results.length },
+      { name: "all", value: results.join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} = 2^${letterCount} kết quả:\n${results.join(", ")}`,
+      en: `Total ${results.length} = 2^${letterCount} results:\n${results.join(", ")}`,
+    },
+  });
+
+  return { s, answer: results.length, steps };
+}
+
 module.exports = {
   51: {
     id: 51,
@@ -1432,5 +1856,153 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps39,
+  },
+  40: {
+    id: 40,
+    difficulty: "medium",
+    slug: "combination-sum-ii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Combination Sum II", en: "Combination Sum II" },
+    titleVi: { vi: "Tổ hợp tổng II (mỗi phần tử dùng 1 lần)", en: "Combination sum, each element once" },
+    statement: {
+      vi: "Cho candidates (CÓ THỂ trùng) và target. Tìm tất cả tổ hợp có tổng = target, mỗi phần tử dùng MỘT lần. Không chứa tổ hợp trùng.",
+      en: "Given candidates (may have duplicates) and target. Find all combinations summing to target, each element used at most ONCE. No duplicate combinations.",
+    },
+    defaultInput: [10, 1, 2, 7, 6, 1, 5],
+    inputKind: "positive",
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 8 },
+    ],
+    approach: [
+      { vi: "Sắp xếp trước để skip duplicate + pruning sớm khi vượt target.", en: "Sort first to skip duplicates + prune early when overshooting." },
+      { vi: "Đệ quy start = i+1 (dùng 1 lần). Trong for: if i>start && sorted[i]==sorted[i-1] → skip.", en: "Recurse start = i+1 (use once). In for: if i>start && sorted[i]==sorted[i-1] → skip." },
+      { vi: "sorted[i] > remain → break (phần tử sau đều lớn hơn).", en: "sorted[i] > remain → break (all later are larger)." },
+    ],
+    complexity: {
+      time: "O(2^n)",
+      space: "O(n)",
+      note: { vi: "Tối đa 2^n nhánh, mỗi O(n) copy.", en: "At most 2^n branches, each O(n) copy." },
+    },
+    code: [
+      "class Solution:",
+      "    def combinationSum2(self, candidates, target):",
+      "        candidates.sort()",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start, remain):",
+      "            if remain == 0:",
+      "                result.append(current[:])",
+      "                return",
+      "            for i in range(start, len(candidates)):",
+      "                if i > start and candidates[i] == candidates[i-1]:",
+      "                    continue",
+      "                if candidates[i] > remain:",
+      "                    break",
+      "                current.append(candidates[i])",
+      "                backtrack(i + 1, remain - candidates[i])",
+      "                current.pop()",
+      "",
+      "        backtrack(0, target)",
+      "        return result",
+    ],
+    builder: buildSteps40,
+  },
+  17: {
+    id: 17,
+    difficulty: "medium",
+    slug: "letter-combinations-of-a-phone-number",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Letter Combinations of a Phone Number", en: "Letter Combinations of a Phone Number" },
+    titleVi: { vi: "Tổ hợp chữ cái bàn phím điện thoại", en: "Phone keypad letter combinations" },
+    statement: {
+      vi: "Cho chuỗi digits (2-9), trả về tất cả tổ hợp chữ cái theo bàn phím điện thoại: 2=abc, 3=def, 4=ghi, 5=jkl, 6=mno, 7=pqrs, 8=tuv, 9=wxyz.",
+      en: "Given a string digits (2-9), return all letter combinations per phone keypad: 2=abc, 3=def, 4=ghi, 5=jkl, 6=mno, 7=pqrs, 8=tuv, 9=wxyz.",
+    },
+    defaultInput: "23",
+    inputKind: "string",
+    inputLabel: { vi: "digits (2-9)", en: "digits (2-9)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi digit map tới 3-4 chữ cái. Mỗi vị trí = 1 level đệ quy.", en: "Each digit maps to 3-4 letters. Each position = 1 recursion level." },
+      { vi: "Ở level i: thử mọi chữ cái thuộc digits[i], thêm vào current rồi đệ quy level i+1.", en: "At level i: try every letter for digits[i], append to current then recurse to level i+1." },
+      { vi: "Khi len(current) == len(digits) → lưu.", en: "When len(current) == len(digits) → save." },
+    ],
+    complexity: {
+      time: "O(4^n · n)",
+      space: "O(n)",
+      note: { vi: "Tối đa 4 chữ/digit → 4^n combo × O(n) copy.", en: "Up to 4 letters/digit → 4^n combos × O(n) copy." },
+    },
+    code: [
+      "class Solution:",
+      "    def letterCombinations(self, digits):",
+      "        if not digits:",
+      "            return []",
+      "        mapping = {'2':'abc','3':'def','4':'ghi','5':'jkl',",
+      "                   '6':'mno','7':'pqrs','8':'tuv','9':'wxyz'}",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(idx):",
+      "            if idx == len(digits):",
+      "                result.append(''.join(current))",
+      "                return",
+      "            for letter in mapping[digits[idx]]:",
+      "                current.append(letter)",
+      "                backtrack(idx + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps17,
+  },
+  784: {
+    id: 784,
+    difficulty: "medium",
+    slug: "letter-case-permutation",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Letter Case Permutation", en: "Letter Case Permutation" },
+    titleVi: { vi: "Hoán vị hoa/thường", en: "All upper/lower permutations" },
+    statement: {
+      vi: "Cho chuỗi s gồm chữ cái và số. Với mỗi chữ cái, có thể chọn HOA hoặc thường. Trả về TẤT CẢ chuỗi có thể. Chữ số giữ nguyên.",
+      en: "Given a string s of letters and digits. For each letter, you can choose UPPER or lower case. Return ALL possible strings. Digits stay unchanged.",
+    },
+    defaultInput: "a1b2",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ cái + số)", en: "s (letters + digits)" },
+    extraParams: [],
+    approach: [
+      { vi: "Tại mỗi vị trí: nếu là số → giữ nguyên, tiến sang vị trí tiếp.", en: "At each position: if digit → keep as is, move to next." },
+      { vi: "Nếu là chữ cái → 2 nhánh: (1) lowercase, (2) uppercase. Đệ quy sang vị trí tiếp.", en: "If letter → 2 branches: (1) lowercase, (2) uppercase. Recurse to next position." },
+      { vi: "Khi hết chuỗi → lưu kết quả. Có 2^(số chữ cái) kết quả.", en: "When end of string → save result. There are 2^(letter count) results." },
+    ],
+    complexity: {
+      time: "O(2^L · n)",
+      space: "O(n)",
+      note: { vi: "L = số chữ cái. 2^L nhánh × O(n) copy. Stack O(n).", en: "L = letter count. 2^L branches × O(n) copy. Stack O(n)." },
+    },
+    code: [
+      "class Solution:",
+      "    def letterCasePermutation(self, s: str):",
+      "        result = []",
+      "        current = list(s)",
+      "",
+      "        def backtrack(idx):",
+      "            if idx == len(s):",
+      "                result.append(''.join(current))",
+      "                return",
+      "            if current[idx].isdigit():",
+      "                backtrack(idx + 1)",
+      "            else:",
+      "                current[idx] = current[idx].lower()",
+      "                backtrack(idx + 1)",
+      "                current[idx] = current[idx].upper()",
+      "                backtrack(idx + 1)",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: buildSteps784,
   },
 };
