@@ -1883,3 +1883,75 @@ html, body {
     width: 100%;
   }
 }
+
+
+/* ---- Recommended learning order banner ---- */
+.cat-order-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4b5fd;
+  letter-spacing: 0.02em;
+}
+
+.cat-order-icon {
+  font-size: 14px;
+}
+
+[data-theme="light"] .cat-order-banner {
+  background: linear-gradient(90deg, #eef2ff, #faf5ff);
+  border-color: #c7d2fe;
+  color: #5b21b6;
+}
+
+/* Step number badge inside chip (for ordered categories) */
+.prob-chip {
+  position: relative;
+}
+
+.prob-step {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.35);
+  z-index: 1;
+}
+
+[data-theme="light"] .prob-step {
+  background: #4f46e5;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .cat-order-banner {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .prob-step {
+    min-width: 16px;
+    height: 16px;
+    font-size: 9px;
+    top: -5px;
+    left: -5px;
+  }
+}

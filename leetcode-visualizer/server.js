@@ -9,6 +9,17 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const SUPPORTED = require("./problems");
 
+// Recommended learning order per category. Problems not in the list are sorted by ID at the end.
+const CATEGORY_ORDER = {
+  dp: {
+    order: [70, 746, 198, 213, 740, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416],
+    label: {
+      vi: "Thứ tự học được khuyến nghị",
+      en: "Recommended learning order",
+    },
+  },
+};
+
 app.get("/api/problems", (req, res) => {
   // Group problems by algorithm category
   const groupsMap = {};
@@ -21,7 +32,21 @@ app.get("/api/problems", (req, res) => {
     groupsMap[cat.key].problems.push({ id: p.id, title: p.title, titleVi: p.titleVi, difficulty: p.difficulty || null });
   }
   const groups = Object.values(groupsMap);
-  groups.forEach((g) => g.problems.sort((a, b) => a.id - b.id));
+  groups.forEach((g) => {
+    const ordering = CATEGORY_ORDER[g.key];
+    if (ordering) {
+      const orderMap = new Map(ordering.order.map((id, idx) => [id, idx]));
+      g.problems.sort((a, b) => {
+        const ai = orderMap.has(a.id) ? orderMap.get(a.id) : Infinity;
+        const bi = orderMap.has(b.id) ? orderMap.get(b.id) : Infinity;
+        if (ai !== bi) return ai - bi;
+        return a.id - b.id;
+      });
+      g.recommendedOrderLabel = ordering.label;
+    } else {
+      g.problems.sort((a, b) => a.id - b.id);
+    }
+  });
   groups.sort((a, b) => a.key.localeCompare(b.key));
   res.json({ groups });
 });

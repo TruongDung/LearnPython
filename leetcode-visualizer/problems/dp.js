@@ -77,77 +77,104 @@ function buildSteps746(cost, params) {
 }
 
 /**
- * LeetCode 746 — Approach 2: dp[i] = cost[i] + min(dp[i-1], dp[i-2]).
- * dp[i] = min cost to STEP ON stair i (including paying cost[i]).
- * Answer = min(dp[n-1], dp[n-2]) — can reach the top from either of the last two.
+ * LeetCode 746 — Approach 2: Optimized O(1) space.
+ * Track only prev2 = cost to land on i-2, prev1 = cost to land on i-1.
+ * curr = cost[i] + min(prev1, prev2); shift prev2 = prev1, prev1 = curr.
+ * Answer = min(prev1, prev2).
  */
 function buildSteps746B(cost) {
   const n = cost.length;
-  const dp = new Array(n).fill(0);
-  dp[0] = cost[0];
-  dp[1] = cost[1];
   const steps = [];
 
+  // History array tracks the value at each index (for bar chart visualization)
+  const history = [cost[0], cost[1]];
+  let prev2 = cost[0];
+  let prev1 = cost[1];
+
   steps.push({
-    title: { vi: "Khởi tạo (Cách 2)", en: "Initialize (Approach 2)" },
-    arr: [...dp],
-    sub: cost.map((c) => String(c)),
+    title: { vi: "Khởi tạo prev2, prev1", en: "Initialize prev2, prev1" },
+    arr: [...history],
+    sub: ["prev2", "prev1"],
     highlight: [0, 1],
     mark: [],
-    codeLines: [3, 4, 5],
+    codeBlock: 2,
+    codeLines: [3, 4],
     vars: [
-      { name: "dp[0]", value: dp[0] },
-      { name: "dp[1]", value: dp[1] },
+      { name: "n", value: n },
+      { name: "prev2", value: `cost[0] = ${prev2}` },
+      { name: "prev1", value: `cost[1] = ${prev1}` },
     ],
     note: {
-      vi: `Cách 2: dp[i] = cost[i] + min(dp[i-1], dp[i-2]).\ndp[i] = chi phí tối thiểu để ĐỨNG LÊN bậc i (đã trả cost[i]).\ndp[0] = cost[0] = ${dp[0]}, dp[1] = cost[1] = ${dp[1]}.\nĐáp án = min(dp[n-1], dp[n-2]).`,
-      en: `Approach 2: dp[i] = cost[i] + min(dp[i-1], dp[i-2]).\ndp[i] = min cost to STAND ON stair i (cost[i] already paid).\ndp[0] = cost[0] = ${dp[0]}, dp[1] = cost[1] = ${dp[1]}.\nAnswer = min(dp[n-1], dp[n-2]).`,
+      vi: `Approach 2 (O(1) space): chỉ dùng 2 biến.\nprev2 = cost[0] = ${prev2} (chi phí đứng trên bậc 0)\nprev1 = cost[1] = ${prev1} (chi phí đứng trên bậc 1)`,
+      en: `Approach 2 (O(1) space): only 2 variables.\nprev2 = cost[0] = ${prev2} (cost to stand on stair 0)\nprev1 = cost[1] = ${prev1} (cost to stand on stair 1)`,
     },
   });
 
   for (let i = 2; i < n; i++) {
-    dp[i] = cost[i] + Math.min(dp[i - 1], dp[i - 2]);
-    const from = dp[i - 1] <= dp[i - 2] ? "i-1" : "i-2";
+    const curr = cost[i] + Math.min(prev1, prev2);
+    history.push(curr);
+
+    // Sub labels showing pointer positions
+    const subLabels = history.map((_, idx) => {
+      const labels = [];
+      if (idx === i - 2) labels.push("prev2");
+      if (idx === i - 1) labels.push("prev1");
+      if (idx === i) labels.push("curr");
+      return labels.length > 0 ? labels.join(",") : `c[${idx}]`;
+    });
 
     steps.push({
-      title: { vi: `dp[${i}]`, en: `dp[${i}]` },
-      arr: [...dp],
-      sub: cost.map((c) => String(c)),
+      title: { vi: `Bước i=${i}`, en: `Step i=${i}` },
+      arr: [...history],
+      sub: subLabels,
       highlight: [i - 2, i - 1, i],
-      mark: [],
-      codeLines: [6, 7],
+      mark: [i],
+      codeBlock: 2,
+      codeLines: [6, 7, 8, 9],
       vars: [
         { name: "i", value: i },
         { name: "cost[i]", value: cost[i] },
-        { name: "dp[i-1]", value: dp[i - 1] },
-        { name: "dp[i-2]", value: dp[i - 2] },
-        { name: "dp[i]", value: dp[i] },
-        { name: "from", value: from },
+        { name: "curr", value: `cost[${i}] + min(prev1, prev2) = ${cost[i]} + min(${prev1}, ${prev2}) = ${curr}` },
+        { name: "prev2", value: `← ${prev1}` },
+        { name: "prev1", value: `← ${curr}` },
       ],
       note: {
-        vi: `dp[${i}] = cost[${i}] + min(dp[${i - 1}], dp[${i - 2}]) = ${cost[i]} + min(${dp[i - 1]}, ${dp[i - 2]}) = ${dp[i]} (từ ${from}).`,
-        en: `dp[${i}] = cost[${i}] + min(dp[${i - 1}], dp[${i - 2}]) = ${cost[i]} + min(${dp[i - 1]}, ${dp[i - 2]}) = ${dp[i]} (from ${from}).`,
+        vi: `curr = cost[${i}] + min(prev1, prev2) = ${cost[i]} + min(${prev1}, ${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
+        en: `curr = cost[${i}] + min(prev1, prev2) = ${cost[i]} + min(${prev1}, ${prev2}) = ${curr}\nprev2 ← ${prev1}\nprev1 ← ${curr}`,
       },
     });
+
+    prev2 = prev1;
+    prev1 = curr;
   }
 
-  const answer = Math.min(dp[n - 1], dp[n - 2]);
+  const answer = Math.min(prev1, prev2);
+
+  // Final sub labels — last two are prev2 and prev1
+  const finalLabels = history.map((_, idx) => {
+    if (idx === n - 2) return "prev2";
+    if (idx === n - 1) return "prev1";
+    return `c[${idx}]`;
+  });
+
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...dp],
-    sub: cost.map((c) => String(c)),
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [...history],
+    sub: finalLabels,
     highlight: [],
-    mark: [n - 1, n - 2],
+    mark: [n - 2, n - 1],
     final: true,
-    codeLines: [8],
+    codeBlock: 2,
+    codeLines: [11],
     vars: [
-      { name: "dp[n-1]", value: dp[n - 1] },
-      { name: "dp[n-2]", value: dp[n - 2] },
-      { name: "answer", value: answer },
+      { name: "prev2", value: prev2 },
+      { name: "prev1", value: prev1 },
+      { name: "answer", value: `min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}` },
+      { name: "space", value: "O(1)" },
     ],
     note: {
-      vi: `Đáp án = min(dp[${n - 1}], dp[${n - 2}]) = min(${dp[n - 1]}, ${dp[n - 2]}) = ${answer}.\n(Có thể nhảy tới đỉnh từ bậc n-1 hoặc n-2.)`,
-      en: `Answer = min(dp[${n - 1}], dp[${n - 2}]) = min(${dp[n - 1]}, ${dp[n - 2]}) = ${answer}.\n(Can reach the top from either stair n-1 or n-2.)`,
+      vi: `Đáp án = min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}.\nChỉ dùng O(1) bộ nhớ (2 biến) thay vì mảng dp.`,
+      en: `Answer = min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}.\nUsed only O(1) memory (2 variables) instead of a dp array.`,
     },
   });
 
@@ -3230,20 +3257,35 @@ module.exports = {
     title: { vi: "Min Cost Climbing Stairs", en: "Min Cost Climbing Stairs" },
     titleVi: { vi: "Chi phí leo cầu thang nhỏ nhất", en: "Minimum cost to climb stairs" },
     statement: {
-      vi: "Cho mảng số nguyên cost, trong đó cost[i] là chi phí của bậc thứ i trên cầu thang. Sau khi trả phí, bạn có thể leo lên 1 hoặc 2 bậc. Bạn được bắt đầu từ bậc 0 hoặc bậc 1. Trả về chi phí nhỏ nhất để lên tới đỉnh cầu thang.",
-      en: "You are given an integer array cost where cost[i] is the cost of the i-th step on a staircase. Once you pay the cost, you can climb either 1 or 2 steps. You can start from step 0 or step 1. Return the minimum cost to reach the top of the floor.",
+      vi: "Cho mảng cost, cost[i] là chi phí của bậc i. Sau khi trả phí, bạn có thể leo 1 hoặc 2 bậc. Bắt đầu từ bậc 0 hoặc 1. Trả về chi phí nhỏ nhất để lên tới đỉnh cầu thang.",
+      en: "Given an array cost where cost[i] is the cost of step i. After paying, you may climb 1 or 2 steps. Start from step 0 or 1. Return the minimum cost to reach the top.",
     },
     defaultInput: [1, 100, 1, 1, 1, 100, 1, 1, 100, 1],
-    inputKind: "nonneg", // số nguyên không âm
+    inputKind: "nonneg",
     extraParams: [
-      { key: "approach", label: { vi: "Cách (1=đến bậc, 2=đứng trên bậc)", en: "Approach (1=reach step, 2=stand on step)" }, default: 1 },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "DP Array O(n) — dp[i] = chi phí tới bậc i", en: "DP Array O(n) — dp[i] = cost to reach step i" } },
+          { value: 2, label: { vi: "Optimized O(1) — chỉ 2 biến", en: "Optimized O(1) — only 2 variables" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Có 2 cách hiểu dp: dp[i] = chi phí tới bậc i (cách 1) hoặc dp[i] = chi phí đứng trên bậc i (cách 2).", en: "Two interpretations: dp[i] = cost to REACH step i (approach 1) or dp[i] = cost to STAND ON step i (approach 2)." },
+      { vi: "Cách 1: dp[i] = min(dp[i-1] + cost[i-1], dp[i-2] + cost[i-2]). Đáp án = dp[n].", en: "Approach 1: dp[i] = min(dp[i-1] + cost[i-1], dp[i-2] + cost[i-2]). Answer = dp[n]." },
+      { vi: "Cách 2 (tối ưu): chỉ cần 2 biến prev2, prev1. curr = cost[i] + min(prev1, prev2), rồi dời pointers.", en: "Approach 2 (optimized): only need 2 vars prev2, prev1. curr = cost[i] + min(prev1, prev2), then shift pointers." },
+      { vi: "Cách 2 đáp án = min(prev1, prev2) — nhảy tới đỉnh từ bậc n-1 hoặc n-2.", en: "Approach 2 answer = min(prev1, prev2) — jump to top from step n-1 or n-2." },
     ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Duyệt mảng một lần để điền bảng dp nên O(n) thời gian. Bảng dp dài n+1 nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
-        en: "A single pass fills the dp table, so O(n) time. The dp table has n+1 cells, so O(n) memory (optimizable to O(1) with two variables).",
+        vi: "Approach 1: O(n) time, O(n) space (bảng dp). Approach 2: O(n) time, O(1) space (2 biến).",
+        en: "Approach 1: O(n) time, O(n) space (dp table). Approach 2: O(n) time, O(1) space (2 variables).",
       },
     },
     code: [
@@ -3255,6 +3297,20 @@ module.exports = {
       "            dp[i] = min(dp[i-1] + cost[i-1], dp[i-2] + cost[i-2])",
       "        return dp[n]",
     ],
+    code2: [
+      "# Optimized O(1) space",
+      "class Solution:",
+      "    def minCostClimbingStairs(self, cost: List[int]) -> int:",
+      "        prev2 = cost[0]",
+      "        prev1 = cost[1]",
+      "        for i in range(2, len(cost)):",
+      "            curr = cost[i] + min(prev1, prev2)",
+      "            prev2 = prev1",
+      "            prev1 = curr",
+      "        return min(prev1, prev2)",
+    ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps746,
   },
   152: {

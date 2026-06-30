@@ -133,10 +133,26 @@ function renderCatalog() {
     const itemsEl = document.createElement("div");
     itemsEl.className = "cat-items collapsed";
 
-    group.problems.forEach((p) => {
+    // Show recommended learning order banner if available
+    if (group.recommendedOrderLabel) {
+      const banner = document.createElement("div");
+      banner.className = "cat-order-banner";
+      banner.innerHTML = `<span class="cat-order-icon">✨</span><span>${pick(group.recommendedOrderLabel)}</span>`;
+      itemsEl.appendChild(banner);
+    }
+
+    const hasOrder = !!group.recommendedOrderLabel;
+    group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
       chip.className = "prob-chip" + (p.id === currentProblemId ? " active" : "");
       chip.dataset.id = p.id;
+
+      if (hasOrder) {
+        const step = document.createElement("span");
+        step.className = "prob-step";
+        step.textContent = idx + 1;
+        chip.appendChild(step);
+      }
 
       const pid = document.createElement("span");
       pid.className = "pid";
