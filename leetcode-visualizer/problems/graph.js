@@ -619,6 +619,468 @@ function buildSteps851(input, params) {
   return { richer: richerRaw, quiet: quietArr, answer: `[${answer.join(", ")}]`, steps };
 }
 
+/**
+ * Generate steps for LeetCode 752: Open the Lock.
+ * BFS in state space — each state is a 4-digit string; 8 neighbors per state.
+ */
+function buildSteps752(input, params) {
+  const deadendsRaw = String(input).split(",").map((s) => s.trim()).filter((s) => s.length === 4);
+  const target = String(params.target || "0202").padStart(4, "0").slice(0, 4);
+  const steps = [];
+  const start = "0000";
+
+  const deadSet = new Set(deadendsRaw);
+
+  // Helper: format state as bars (digits 0-9)
+  function makeBars(state, label) {
+    return {
+      arr: state.split("").map(Number),
+      sub: ["w0", "w1", "w2", "w3"],
+      label,
+    };
+  }
+
+  // Initial step
+  if (deadSet.has(start)) {
+    steps.push({
+      title: { vi: "0000 là deadend → -1", en: "0000 is a deadend → -1" },
+      arr: [0, 0, 0, 0],
+      sub: ["w0", "w1", "w2", "w3"],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6, 7],
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Trạng thái bắt đầu 0000 nằm trong deadends → không mở được.", en: "Start state 0000 is in deadends → cannot open." },
+    });
+    return { target, deadends: deadendsRaw, answer: -1, steps };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    arr: [0, 0, 0, 0],
+    sub: ["w0", "w1", "w2", "w3"],
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6, 7, 8, 9],
+    vars: [
+      { name: "start", value: start },
+      { name: "target", value: target },
+      { name: "deadends", value: deadendsRaw.length ? deadendsRaw.join(", ") : "none" },
+      { name: "queue", value: `[(${start}, 0)]` },
+    ],
+    note: {
+      vi:
+        `Ổ khóa 4 chữ số, bắt đầu "${start}". Mỗi bước xoay 1 vành 1 nấc (lên/xuống).\n` +
+        `Tìm số bước ít nhất để đạt "${target}". Tránh deadends [${deadendsRaw.join(", ") || "—"}].\n` +
+        `Dùng BFS — mỗi level = 1 bước xoay.`,
+      en:
+        `4-digit lock, start at "${start}". Each move turns one wheel up/down by 1.\n` +
+        `Find min moves to reach "${target}". Avoid deadends [${deadendsRaw.join(", ") || "—"}].\n` +
+        `Use BFS — each level = 1 turn.`,
+    },
+  });
+
+  // BFS
+  const visited = new Set([start]);
+  let frontier = [start];
+  let answer = -1;
+  let level = 0;
+  const MAX_STEPS_SHOW = 20;
+  let stepShown = 1;
+
+  if (start === target) {
+    answer = 0;
+  }
+
+  while (frontier.length > 0 && answer === -1) {
+    level++;
+    const nextFrontier = [];
+    const expandedFrom = frontier[0]; // for display
+
+    for (const state of frontier) {
+      // Generate 8 neighbors
+      for (let i = 0; i < 4; i++) {
+        for (const delta of [-1, 1]) {
+          const d = (Number(state[i]) + delta + 10) % 10;
+          const next = state.slice(0, i) + d + state.slice(i + 1);
+          if (visited.has(next) || deadSet.has(next)) continue;
+          visited.add(next);
+          if (next === target) {
+            answer = level;
+          }
+          nextFrontier.push(next);
+        }
+      }
+      if (answer !== -1) break;
+    }
+
+    if (stepShown < MAX_STEPS_SHOW) {
+      stepShown++;
+      const sampleState = nextFrontier[0] || expandedFrom;
+      steps.push({
+        title: { vi: `Bước ${level}: ${nextFrontier.length} trạng thái mới`, en: `Step ${level}: ${nextFrontier.length} new states` },
+        arr: sampleState.split("").map(Number),
+        sub: ["w0", "w1", "w2", "w3"],
+        highlight: [],
+        mark: answer !== -1 && nextFrontier.includes(target) ? [0, 1, 2, 3] : [],
+        codeLines: [11, 12, 13, 14, 15, 16, 17, 18],
+        vars: [
+          { name: "level (turns)", value: level },
+          { name: "frontier size", value: frontier.length },
+          { name: "next frontier", value: nextFrontier.length },
+          { name: "sample new state", value: nextFrontier[0] || "(none)" },
+          { name: "visited", value: visited.size },
+          { name: "found target", value: answer !== -1 },
+        ],
+        note: {
+          vi:
+            `Bước ${level}: từ ${frontier.length} trạng thái, sinh ${nextFrontier.length} trạng thái mới (bỏ visited & deadends).\n` +
+            (answer !== -1
+              ? `✓ Đã tới "${target}" sau ${level} bước!`
+              : `Tiếp tục BFS với frontier mới.`),
+          en:
+            `Step ${level}: from ${frontier.length} states, generated ${nextFrontier.length} new (skip visited & deadends).\n` +
+            (answer !== -1
+              ? `✓ Reached "${target}" in ${level} turns!`
+              : `Continue BFS with new frontier.`),
+        },
+      });
+    }
+
+    if (answer !== -1 || nextFrontier.length === 0) break;
+    frontier = nextFrontier;
+  }
+
+  // Final
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: target.split("").map(Number),
+    sub: ["w0", "w1", "w2", "w3"],
+    highlight: [],
+    mark: answer !== -1 ? [0, 1, 2, 3] : [],
+    final: true,
+    codeLines: [19],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "states explored", value: visited.size },
+    ],
+    note: {
+      vi: answer >= 0
+        ? `Mở được khóa "${target}" sau ${answer} bước xoay (đã khám phá ${visited.size} trạng thái).`
+        : `Không thể mở khóa "${target}" do bị chặn bởi deadends.`,
+      en: answer >= 0
+        ? `Opened lock "${target}" in ${answer} turns (explored ${visited.size} states).`
+        : `Cannot open lock "${target}" — blocked by deadends.`,
+    },
+  });
+
+  return { target, deadends: deadendsRaw, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1236: Web Crawler.
+ * BFS from startUrl, follow only links with the SAME hostname.
+ * Hostname = substring before the first '/' (or whole string if no slash).
+ */
+function buildSteps1236(input, params) {
+  const urls = String(input).split(";").map((u) => u.trim()).filter((u) => u.length > 0);
+  const edgesRaw = String(params.edges || "")
+    .split(";")
+    .map((e) => e.trim())
+    .filter((e) => e.length > 0);
+  const startUrl = String(params.startUrl || "").trim();
+  const steps = [];
+
+  // Build adjacency map
+  const adj = {};
+  for (const u of urls) adj[u] = [];
+  for (const e of edgesRaw) {
+    const arrow = e.split("->");
+    if (arrow.length !== 2) continue;
+    const [from, to] = arrow.map((s) => s.trim());
+    if (adj[from]) adj[from].push(to);
+  }
+
+  // Extract hostname (everything up to the first '/')
+  const hostOf = (u) => {
+    const i = u.indexOf("/");
+    return i < 0 ? u : u.slice(0, i);
+  };
+
+  const startHost = hostOf(startUrl);
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    arr: urls.map((u) => (u === startUrl ? 1 : 0)),
+    sub: urls,
+    highlight: urls.indexOf(startUrl) >= 0 ? [urls.indexOf(startUrl)] : [],
+    mark: [],
+    codeLines: [4, 5, 6, 7],
+    vars: [
+      { name: "startUrl", value: startUrl },
+      { name: "hostname", value: startHost },
+      { name: "queue", value: `[${startUrl}]` },
+      { name: "visited", value: 1 },
+    ],
+    note: {
+      vi:
+        `Crawl từ "${startUrl}". Hostname = "${startHost}".\n` +
+        `BFS: chỉ follow link nếu URL đích cùng hostname.\n` +
+        `Bỏ qua URL đã thăm để tránh lặp vô hạn.`,
+      en:
+        `Crawl from "${startUrl}". Hostname = "${startHost}".\n` +
+        `BFS: only follow links whose target URL has the same hostname.\n` +
+        `Skip already-visited URLs to avoid infinite loops.`,
+    },
+  });
+
+  // BFS
+  const visited = new Set([startUrl]);
+  const queue = [startUrl];
+  let head = 0;
+  const result = [];
+
+  while (head < queue.length) {
+    const cur = queue[head++];
+    result.push(cur);
+
+    const links = adj[cur] || [];
+    const followed = [];
+    const skippedHost = [];
+    const skippedVisited = [];
+
+    for (const link of links) {
+      if (hostOf(link) !== startHost) {
+        skippedHost.push(link);
+        continue;
+      }
+      if (visited.has(link)) {
+        skippedVisited.push(link);
+        continue;
+      }
+      visited.add(link);
+      queue.push(link);
+      followed.push(link);
+    }
+
+    const noteLines = [];
+    if (followed.length) noteLines.push(`✓ Follow (cùng host): ${followed.join(", ")}`);
+    if (skippedHost.length) noteLines.push(`✗ Skip (khác host): ${skippedHost.join(", ")}`);
+    if (skippedVisited.length) noteLines.push(`↩ Skip (đã thăm): ${skippedVisited.join(", ")}`);
+    if (noteLines.length === 0) noteLines.push("(không có link nào)");
+
+    const noteLinesEn = [];
+    if (followed.length) noteLinesEn.push(`✓ Follow (same host): ${followed.join(", ")}`);
+    if (skippedHost.length) noteLinesEn.push(`✗ Skip (different host): ${skippedHost.join(", ")}`);
+    if (skippedVisited.length) noteLinesEn.push(`↩ Skip (already visited): ${skippedVisited.join(", ")}`);
+    if (noteLinesEn.length === 0) noteLinesEn.push("(no links)");
+
+    steps.push({
+      title: { vi: `Crawl: ${cur}`, en: `Crawl: ${cur}` },
+      arr: urls.map((u) => (visited.has(u) ? 1 : 0)),
+      sub: urls,
+      highlight: followed.map((u) => urls.indexOf(u)).filter((i) => i >= 0),
+      mark: [urls.indexOf(cur)].filter((i) => i >= 0),
+      codeLines: [9, 10, 11, 12, 13, 14, 15, 16],
+      vars: [
+        { name: "current", value: cur },
+        { name: "links found", value: links.length },
+        { name: "followed", value: followed.length },
+        { name: "skipped (host)", value: skippedHost.length },
+        { name: "skipped (seen)", value: skippedVisited.length },
+        { name: "queue size", value: queue.length - head },
+        { name: "visited", value: visited.size },
+      ],
+      note: {
+        vi: `Lấy "${cur}" ra khỏi queue. Có ${links.length} link.\n` + noteLines.join("\n"),
+        en: `Pop "${cur}" from queue. Has ${links.length} link(s).\n` + noteLinesEn.join("\n"),
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${result.length} URL`, en: `Result: ${result.length} URLs` },
+    arr: urls.map((u) => (visited.has(u) ? 1 : 0)),
+    sub: urls,
+    highlight: [],
+    mark: urls.map((u, i) => (visited.has(u) ? i : -1)).filter((i) => i >= 0),
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "total crawled", value: result.length },
+      { name: "URLs", value: result.join(", ") },
+    ],
+    note: {
+      vi: `Đã crawl ${result.length} URL cùng hostname "${startHost}":\n${result.join("\n")}`,
+      en: `Crawled ${result.length} URLs on hostname "${startHost}":\n${result.join("\n")}`,
+    },
+  });
+
+  return { startUrl, hostname: startHost, answer: result.length, steps };
+}
+
+/**
+ * Generate steps for LeetCode 1136: Parallel Courses.
+ * Topological sort (Kahn's algorithm / BFS):
+ *  - Find all courses with in-degree 0 → take them this semester.
+ *  - Decrement in-degree of their dependents.
+ *  - Repeat until all courses taken (return semester count) or stuck (cycle → -1).
+ */
+function buildSteps1136(input, params) {
+  const n = params.n || 3;
+  const edgesRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
+  const edges = edgesRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return [parts[0], parts[1]]; // [prereq, course]
+  });
+  const steps = [];
+
+  // Build adjacency + in-degree
+  const adj = {};
+  const inDeg = {};
+  const courses = Array.from({ length: n }, (_, i) => i + 1);
+  for (const c of courses) { adj[c] = []; inDeg[c] = 0; }
+  for (const [u, v] of edges) {
+    adj[u].push(v);
+    inDeg[v] = (inDeg[v] || 0) + 1;
+  }
+
+  const taken = new Set();
+
+  // Graph snapshot helper
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: courses.map((id) => ({ id, dist: inDeg[id] })),
+      edges: edges.map(([u, v]) => ({ u, v, w: "" })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: [...taken],
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7],
+    vars: [
+      { name: "n", value: n },
+      { name: "prerequisites", value: edges.map(([u, v]) => `${u}→${v}`).join(", ") || "none" },
+      { name: "in-degree", value: courses.map((c) => `${c}:${inDeg[c]}`).join(", ") },
+    ],
+    note: {
+      vi:
+        `Có ${n} môn (1..${n}), ${edges.length} điều kiện tiên quyết.\n` +
+        `Số bên dưới mỗi nút = in-degree (số môn phải học trước môn đó).\n` +
+        `Mỗi học kỳ học MỌI môn có in-degree = 0. Sau đó giảm in-degree các môn phụ thuộc.\n` +
+        `Lặp đến khi hết hoặc còn nút mà mọi cái đều có in-degree > 0 (có chu trình → -1).`,
+      en:
+        `${n} courses (1..${n}), ${edges.length} prerequisites.\n` +
+        `Number below each node = in-degree (number of prerequisites).\n` +
+        `Each semester, take EVERY course with in-degree = 0. Then decrement in-degree of dependents.\n` +
+        `Repeat until done, or stuck (cycle → -1).`,
+    },
+  });
+
+  let semester = 0;
+  let answer = -1;
+
+  while (taken.size < n) {
+    // Find courses with in-degree 0 and not yet taken
+    const available = courses.filter((c) => !taken.has(c) && inDeg[c] === 0);
+
+    if (available.length === 0) {
+      // Stuck → cycle detected
+      steps.push({
+        title: { vi: "Bế tắc → có chu trình", en: "Stuck → cycle detected" },
+        arr: [],
+        graph: makeGraph(courses.filter((c) => !taken.has(c)), []),
+        highlight: [],
+        mark: [],
+        final: true,
+        codeLines: [14, 15],
+        vars: [
+          { name: "semester", value: semester },
+          { name: "taken", value: `${taken.size}/${n}` },
+          { name: "remaining in-degrees", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") },
+          { name: "answer", value: -1 },
+        ],
+        note: {
+          vi:
+            `Không còn môn nào có in-degree = 0, nhưng vẫn còn ${n - taken.size} môn chưa học.\n` +
+            `Đồ thị có chu trình → không thể hoàn thành → trả về -1.`,
+          en:
+            `No course has in-degree = 0, but ${n - taken.size} courses remain.\n` +
+            `Graph has a cycle → impossible → return -1.`,
+        },
+      });
+      return { n, edges: edgesRaw, answer: -1, steps };
+    }
+
+    semester++;
+    // Take all available courses this semester
+    for (const c of available) taken.add(c);
+
+    // Decrement in-degree of their dependents
+    const hlEdges = [];
+    for (const c of available) {
+      for (const next of adj[c]) {
+        inDeg[next]--;
+        hlEdges.push([c, next]);
+      }
+    }
+
+    steps.push({
+      title: { vi: `Học kỳ ${semester}: học ${available.length} môn`, en: `Semester ${semester}: take ${available.length} course(s)` },
+      arr: [],
+      graph: makeGraph(available, hlEdges),
+      highlight: [],
+      mark: [],
+      codeLines: [9, 10, 11, 12, 13],
+      vars: [
+        { name: "semester", value: semester },
+        { name: "take this term", value: `[${available.join(", ")}]` },
+        { name: "after decrement", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") || "(all taken)" },
+        { name: "total taken", value: `${taken.size}/${n}` },
+      ],
+      note: {
+        vi:
+          `Học kỳ ${semester}: lấy mọi môn có in-degree = 0 → [${available.join(", ")}].\n` +
+          `Giảm in-degree các môn phụ thuộc qua ${hlEdges.length} cạnh.\n` +
+          `Đã học ${taken.size}/${n} môn.`,
+        en:
+          `Semester ${semester}: take all courses with in-degree = 0 → [${available.join(", ")}].\n` +
+          `Decrement in-degree of dependents through ${hlEdges.length} edges.\n` +
+          `Total taken: ${taken.size}/${n}.`,
+      },
+    });
+  }
+
+  answer = semester;
+  steps.push({
+    title: { vi: `Kết quả: ${answer} học kỳ`, en: `Result: ${answer} semesters` },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "semesters", value: answer },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Hoàn thành tất cả ${n} môn trong ${answer} học kỳ.`,
+      en: `Completed all ${n} courses in ${answer} semesters.`,
+    },
+  });
+
+  return { n, edges: edgesRaw, answer, steps };
+}
+
 module.exports = {
   1293: {
     id: 1293,
@@ -1115,5 +1577,210 @@ module.exports = {
       "        return answer",
     ],
     builder: buildSteps851,
+  },
+  1136: {
+    id: 1136,
+    difficulty: "medium",
+    slug: "parallel-courses",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Parallel Courses", en: "Parallel Courses" },
+    titleVi: { vi: "Học môn song song", en: "Parallel courses (min semesters)" },
+    statement: {
+      vi:
+        "Có n môn học (đánh số 1..n) và danh sách điều kiện tiên quyết: cặp (u, v) nghĩa là phải học u trước v. " +
+        "Trong một học kỳ, bạn có thể học BAO NHIÊU MÔN cũng được, miễn là mọi tiên quyết đã được thỏa mãn. " +
+        "Trả về số học kỳ tối thiểu để học hết tất cả, hoặc -1 nếu không thể (có chu trình). " +
+        "Nhập tiên quyết: u-v cách bởi dấu phẩy (vd: 1-3,2-3).",
+      en:
+        "There are n courses (1..n) and a list of prerequisites: pair (u, v) means u must be taken before v. " +
+        "In one semester you may take ANY NUMBER of courses as long as all their prerequisites are satisfied. " +
+        "Return the minimum number of semesters to finish all courses, or -1 if impossible (cycle). " +
+        "Enter prerequisites as: u-v comma separated (e.g. 1-3,2-3).",
+    },
+    defaultInput: "1-3,2-3",
+    inputKind: "string",
+    inputLabel: { vi: "Tiên quyết (u-v, cách bởi dấu phẩy)", en: "Prerequisites (u-v, comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số môn học)", en: "n (number of courses)" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Bài toán topological sort: tìm thứ tự học mà mỗi môn được học sau tất cả tiên quyết của nó.", en: "Topological sort: find an order where each course comes after its prerequisites." },
+      { vi: "Dùng Kahn's algorithm (BFS): lặp đi lặp lại lấy mọi nút có in-degree = 0.", en: "Use Kahn's algorithm (BFS): repeatedly take all nodes with in-degree = 0." },
+      { vi: "Mỗi lần lấy = 1 học kỳ. Học xong → giảm in-degree các môn phụ thuộc.", en: "Each batch = 1 semester. After taking → decrement in-degree of dependents." },
+      { vi: "Nếu kẹt lại (còn môn nhưng không nút nào có in-degree 0) → có chu trình → trả -1.", en: "If stuck (courses remain but no node has in-degree 0) → cycle exists → return -1." },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V + E)",
+      note: {
+        vi: "Mỗi nút duyệt 1 lần, mỗi cạnh giảm in-degree 1 lần. Bộ nhớ cho adjacency list + in-degree array.",
+        en: "Each node visited once, each edge decremented once. Memory for adjacency list + in-degree array.",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "",
+      "class Solution:",
+      "    def minimumSemesters(self, n, relations):",
+      "        adj = defaultdict(list)",
+      "        in_deg = [0] * (n + 1)",
+      "        for u, v in relations:",
+      "            adj[u].append(v)",
+      "            in_deg[v] += 1",
+      "        queue = deque([i for i in range(1, n+1) if in_deg[i] == 0])",
+      "        taken = 0",
+      "        semesters = 0",
+      "        while queue:",
+      "            semesters += 1",
+      "            size = len(queue)",
+      "            for _ in range(size):",
+      "                u = queue.popleft()",
+      "                taken += 1",
+      "                for v in adj[u]:",
+      "                    in_deg[v] -= 1",
+      "                    if in_deg[v] == 0:",
+      "                        queue.append(v)",
+      "        return semesters if taken == n else -1",
+    ],
+    builder: buildSteps1136,
+  },
+  752: {
+    id: 752,
+    difficulty: "medium",
+    slug: "open-the-lock",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Open the Lock", en: "Open the Lock" },
+    titleVi: { vi: "Mở khóa số 4 vành", en: "Open the 4-digit lock" },
+    statement: {
+      vi:
+        "Ổ khóa có 4 vành số, mỗi vành 0..9 (xoay vòng). Khóa bắt đầu ở '0000'. " +
+        "Mỗi lần bạn xoay 1 vành lên hoặc xuống 1 nấc. " +
+        "Cho danh sách deadends (khóa sẽ kẹt nếu rơi vào), và target. Trả về số nước xoay tối thiểu để đạt target, hoặc -1. " +
+        "Nhập deadends: các chuỗi 4 ký tự cách bởi dấu phẩy (vd: 0201,0101,0102,1212,2002).",
+      en:
+        "Lock has 4 wheels (0..9, wraps). Starts at '0000'. " +
+        "Each move turns one wheel up or down by 1. " +
+        "Given a list of deadends (lock jams if landed on) and a target, return the min number of moves, or -1. " +
+        "Enter deadends as 4-char strings comma separated (e.g. 0201,0101,0102,1212,2002).",
+    },
+    defaultInput: "0201,0101,0102,1212,2002",
+    inputKind: "string",
+    inputLabel: { vi: "Deadends (cách bởi dấu phẩy)", en: "Deadends (comma separated)" },
+    extraParams: [
+      { key: "target", type: "string", label: { vi: "target (4 chữ số)", en: "target (4 digits)" }, default: "0202" },
+    ],
+    approach: [
+      { vi: "Coi mỗi trạng thái 4 chữ số là một nút (có 10^4 = 10000 trạng thái).", en: "Treat each 4-digit state as a node (10^4 = 10000 states)." },
+      { vi: "Từ mỗi nút có 8 nút kề: 4 vành × 2 hướng (lên/xuống), modulo 10.", en: "Each node has 8 neighbors: 4 wheels × 2 directions (up/down), modulo 10." },
+      { vi: "BFS từ '0000' — vì cạnh không trọng số, BFS đảm bảo tìm đường ngắn nhất.", en: "BFS from '0000' — unweighted edges, so BFS finds the shortest path." },
+      { vi: "Bỏ qua deadends và trạng thái đã visited. Khi gặp target → trả số level.", en: "Skip deadends and visited states. When target is reached → return the level count." },
+    ],
+    complexity: {
+      time: "O(10^4 · 8)",
+      space: "O(10^4)",
+      note: {
+        vi: "Tối đa 10000 trạng thái, mỗi cái có 8 hàng xóm → O(8·10^4). Set visited + queue → O(10^4) bộ nhớ.",
+        en: "At most 10000 states, each with 8 neighbors → O(8·10^4). Visited set + queue → O(10^4) memory.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def openLock(self, deadends, target):",
+      "        dead = set(deadends)",
+      "        if '0000' in dead:",
+      "            return -1",
+      "        visited = {'0000'}",
+      "        queue = deque([('0000', 0)])",
+      "        while queue:",
+      "            state, turns = queue.popleft()",
+      "            if state == target:",
+      "                return turns",
+      "            for i in range(4):",
+      "                for d in (-1, 1):",
+      "                    nd = (int(state[i]) + d) % 10",
+      "                    nxt = state[:i] + str(nd) + state[i+1:]",
+      "                    if nxt in visited or nxt in dead:",
+      "                        continue",
+      "                    visited.add(nxt)",
+      "                    queue.append((nxt, turns + 1))",
+      "        return -1",
+    ],
+    builder: buildSteps752,
+  },
+  1236: {
+    id: 1236,
+    difficulty: "medium",
+    slug: "web-crawler",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Web Crawler", en: "Web Crawler" },
+    titleVi: { vi: "Web Crawler đơn giản", en: "Same-hostname web crawler" },
+    statement: {
+      vi:
+        "Cho startUrl và mạng các trang web (URL → các URL liên kết). " +
+        "Crawl bằng BFS và CHỈ follow link nếu URL đích cùng hostname với startUrl. " +
+        "Trả về danh sách URL đã thăm. " +
+        "Định dạng input: urls cách bởi ';', links bằng 'url1->url2' cách bởi ';'. " +
+        "Hostname = phần trước dấu '/' đầu tiên.",
+      en:
+        "Given a startUrl and a web of pages (URL → linked URLs). " +
+        "Crawl via BFS and ONLY follow links whose target URL has the same hostname as startUrl. " +
+        "Return all visited URLs. " +
+        "Input format: urls semicolon-separated, edges as 'url1->url2' semicolon-separated. " +
+        "Hostname = substring before first '/'.",
+    },
+    defaultInput: "news.yahoo.com;news.yahoo.com/news;news.yahoo.com/topics;news.google.com;news.yahoo.com/us",
+    inputKind: "string",
+    inputLabel: { vi: "URLs (cách bởi ';')", en: "URLs (semicolon separated)" },
+    extraParams: [
+      {
+        key: "edges",
+        type: "string",
+        label: { vi: "Links (url1->url2 ; ...)", en: "Links (url1->url2 ; ...)" },
+        default: "news.yahoo.com->news.yahoo.com/news;news.yahoo.com->news.google.com;news.yahoo.com->news.yahoo.com/us;news.yahoo.com/news->news.yahoo.com/topics",
+      },
+      {
+        key: "startUrl",
+        type: "string",
+        label: { vi: "startUrl", en: "startUrl" },
+        default: "news.yahoo.com",
+      },
+    ],
+    approach: [
+      { vi: "BFS từ startUrl, mỗi URL là một nút, mỗi link là cạnh có hướng.", en: "BFS from startUrl, each URL is a node, each link is a directed edge." },
+      { vi: "Lấy hostname từ startUrl (phần trước dấu '/' đầu tiên).", en: "Extract hostname from startUrl (substring before first '/')." },
+      { vi: "Khi pop một URL: thử mọi link của nó. Chỉ follow nếu cùng hostname và chưa visited.", en: "When popping a URL: try each of its links. Only follow if same hostname and not visited." },
+      { vi: "Dùng set 'visited' để tránh lặp và bỏ qua URL đã crawl.", en: "Use a 'visited' set to avoid loops and skip already-crawled URLs." },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V)",
+      note: {
+        vi: "BFS chuẩn: mỗi URL ghé 1 lần, mỗi link xét 1 lần. Bộ nhớ O(V) cho visited + queue.",
+        en: "Standard BFS: each URL visited once, each link processed once. Memory O(V) for visited + queue.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def crawl(self, startUrl, htmlParser):",
+      "        host = startUrl.split('/')[2] if '://' in startUrl else startUrl.split('/')[0]",
+      "        visited = {startUrl}",
+      "        queue = deque([startUrl])",
+      "        while queue:",
+      "            url = queue.popleft()",
+      "            for link in htmlParser.getUrls(url):",
+      "                link_host = link.split('/')[2] if '://' in link else link.split('/')[0]",
+      "                if link_host != host:",
+      "                    continue",
+      "                if link in visited:",
+      "                    continue",
+      "                visited.add(link)",
+      "                queue.append(link)",
+      "        return list(visited)",
+    ],
+    builder: buildSteps1236,
   },
 };
