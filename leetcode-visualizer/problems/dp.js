@@ -3614,10 +3614,10 @@ module.exports = {
     ],
     complexity: {
       time: "O(n)",
-      space: "O(1) / O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Approach 1: Kadane O(n) time, O(1) space. Approach 2: DP array O(n) time, O(n) space.",
-        en: "Approach 1: Kadane O(n) time, O(1) space. Approach 2: DP array O(n) time, O(n) space.",
+        vi: "Approach 1 (mặc định): DP array O(n) time, O(n) space. Approach 2: Kadane O(n) time, O(1) space.",
+        en: "Approach 1 (default): DP array O(n) time, O(n) space. Approach 2: Kadane O(n) time, O(1) space.",
       },
     },
     code: [
