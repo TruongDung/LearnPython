@@ -1109,16 +1109,33 @@ function buildSteps213(nums) {
     return { original: [...nums], answer: nums[0], steps };
   }
 
+  // Step 1: Explain the circular problem
   steps.push({
-    title: { vi: "Ý tưởng: vòng tròn", en: "Idea: circular constraint" },
+    title: { vi: "Vấn đề: Nhà xếp vòng tròn", en: "Problem: Houses in a circle" },
     arr: [...nums],
     highlight: [0, n - 1],
     mark: [],
-    codeLines: [3, 4, 5],
-    vars: [{ name: "n", value: n }],
+    codeLines: [2, 3],
+    vars: [
+      { name: "n", value: n },
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "constraint", value: `house[0] & house[${n - 1}] are adjacent` },
+    ],
     note: {
-      vi: `Nhà 0 và nhà ${n - 1} liền kề (vòng tròn). Tách thành 2 bài: bỏ nhà cuối (Pass A) và bỏ nhà đầu (Pass B).`,
-      en: `House 0 and house ${n - 1} are adjacent (circular). Split into 2 sub-problems: exclude last (Pass A) and exclude first (Pass B).`,
+      vi:
+        `Nhà 0 và nhà ${n - 1} LIỀN KỀ nhau (vòng tròn) → không thể cướp cả hai.\n` +
+        `Giống bài 198 House Robber nhưng thêm ràng buộc vòng.\n\n` +
+        `→ Mẹo: CHIA THÀNH 2 BÀI House Robber riêng biệt:\n` +
+        `  Pass A: xét nhà [0..${n - 2}] (bỏ nhà cuối)\n` +
+        `  Pass B: xét nhà [1..${n - 1}] (bỏ nhà đầu)\n` +
+        `  Đáp án = max(A, B)`,
+      en:
+        `House 0 and house ${n - 1} are ADJACENT (circle) → cannot rob both.\n` +
+        `Same as 198 House Robber but with a circular constraint.\n\n` +
+        `→ Trick: SPLIT into 2 separate House Robber problems:\n` +
+        `  Pass A: houses [0..${n - 2}] (exclude last)\n` +
+        `  Pass B: houses [1..${n - 1}] (exclude first)\n` +
+        `  Answer = max(A, B)`,
     },
   });
 
@@ -1128,22 +1145,34 @@ function buildSteps213(nums) {
     dp[0] = nums[lo];
     if (len >= 2) dp[1] = Math.max(nums[lo], nums[lo + 1]);
 
-    const hlBase = lo;
+    // Sub-labels: show dp values at each position, blank outside range
+    const subOf = () => {
+      const sub = new Array(n).fill("");
+      for (let i = 0; i < len; i++) sub[lo + i] = String(dp[i]);
+      return sub;
+    };
+
     steps.push({
-      title: { vi: `${passLabel}: khởi tạo dp`, en: `${passLabel}: init dp` },
+      title: { vi: `${passLabel}: nums[${lo}..${hi}]`, en: `${passLabel}: nums[${lo}..${hi}]` },
       arr: [...nums],
-      sub: new Array(lo).fill("").concat([...dp]).concat(new Array(n - hi - 1).fill("")),
+      sub: subOf(),
       highlight: len >= 2 ? [lo, lo + 1] : [lo],
       mark: [],
       codeLines: [7, 8, 9],
       vars: [
-        { name: "range", value: `[${lo}..${hi}]` },
-        { name: "dp[0]", value: dp[0] },
-        { name: "dp[1]", value: len >= 2 ? dp[1] : "-" },
+        { name: "range", value: `nhà [${lo}..${hi}]` },
+        { name: "dp[0]", value: `nums[${lo}] = ${dp[0]}` },
+        { name: "dp[1]", value: len >= 2 ? `max(nums[${lo}], nums[${lo + 1}]) = max(${nums[lo]}, ${nums[lo + 1]}) = ${dp[1]}` : "-" },
       ],
       note: {
-        vi: `${passLabel}: xét nums[${lo}..${hi}]. dp[0]=${dp[0]}, dp[1]=${len >= 2 ? dp[1] : "-"}.`,
-        en: `${passLabel}: consider nums[${lo}..${hi}]. dp[0]=${dp[0]}, dp[1]=${len >= 2 ? dp[1] : "-"}.`,
+        vi:
+          `${passLabel}: chạy House Robber trên nums[${lo}..${hi}].\n` +
+          `dp[i] = max(dp[i-1], dp[i-2] + nums[i])\n` +
+          `dp[0] = ${dp[0]}, dp[1] = ${len >= 2 ? dp[1] : "-"}`,
+        en:
+          `${passLabel}: run House Robber on nums[${lo}..${hi}].\n` +
+          `dp[i] = max(dp[i-1], dp[i-2] + nums[i])\n` +
+          `dp[0] = ${dp[0]}, dp[1] = ${len >= 2 ? dp[1] : "-"}`,
       },
     });
 
@@ -1155,22 +1184,31 @@ function buildSteps213(nums) {
       const robbed = dp[j] === rob;
 
       steps.push({
-        title: { vi: `${passLabel}: dp[${j}] (nhà ${idx})`, en: `${passLabel}: dp[${j}] (house ${idx})` },
+        title: { vi: `${passLabel}: nhà ${idx} → ${robbed ? "cướp" : "bỏ"}`, en: `${passLabel}: house ${idx} → ${robbed ? "rob" : "skip"}` },
         arr: [...nums],
-        sub: new Array(lo).fill("").concat([...dp]).concat(new Array(n - hi - 1).fill("")),
-        highlight: [lo + j - 2, lo + j - 1, idx],
-        mark: [],
+        sub: subOf(),
+        highlight: [idx],
+        mark: robbed ? [idx] : [],
         codeLines: [10, 11],
         vars: [
-          { name: "i", value: idx },
-          { name: "skip", value: skip },
-          { name: "rob", value: rob },
-          { name: "dp[i]", value: dp[j] },
-          { name: "decision", value: robbed ? "rob" : "skip" },
+          { name: "house", value: idx },
+          { name: "nums[i]", value: nums[idx] },
+          { name: "skip (dp[i-1])", value: skip },
+          { name: "rob (dp[i-2]+nums[i])", value: `${dp[j - 2]} + ${nums[idx]} = ${rob}` },
+          { name: "dp[i]", value: `max(${skip}, ${rob}) = ${dp[j]}` },
+          { name: "decision", value: robbed ? "ROB ✓" : "SKIP" },
         ],
         note: {
-          vi: `Bỏ: dp[${j - 1}]=${skip}. Cướp: dp[${j - 2}]+${nums[idx]}=${rob}. → ${dp[j]} (${robbed ? "cướp" : "bỏ"}).`,
-          en: `Skip: dp[${j - 1}]=${skip}. Rob: dp[${j - 2}]+${nums[idx]}=${rob}. → ${dp[j]} (${robbed ? "rob" : "skip"}).`,
+          vi:
+            `Nhà ${idx} (giá trị ${nums[idx]}):\n` +
+            `  Bỏ qua: dp[${j - 1}] = ${skip}\n` +
+            `  Cướp: dp[${j - 2}] + nums[${idx}] = ${dp[j - 2]} + ${nums[idx]} = ${rob}\n` +
+            `  → dp[${j}] = max(${skip}, ${rob}) = ${dp[j]} (${robbed ? "CƯỚP" : "BỎ"})`,
+          en:
+            `House ${idx} (value ${nums[idx]}):\n` +
+            `  Skip: dp[${j - 1}] = ${skip}\n` +
+            `  Rob: dp[${j - 2}] + nums[${idx}] = ${dp[j - 2]} + ${nums[idx]} = ${rob}\n` +
+            `  → dp[${j}] = max(${skip}, ${rob}) = ${dp[j]} (${robbed ? "ROB" : "SKIP"})`,
         },
       });
     }
@@ -1178,72 +1216,81 @@ function buildSteps213(nums) {
     const result = dp[len - 1];
 
     // Trace back which houses
-    const robbed = [];
+    const robbedHouses = [];
     let k = len - 1;
     while (k >= 0) {
       if (k === 0 || dp[k] !== dp[k - 1]) {
-        robbed.push(lo + k);
+        robbedHouses.push(lo + k);
         k -= 2;
       } else {
         k -= 1;
       }
     }
-    robbed.reverse();
+    robbedHouses.reverse();
 
-    return { result, robbed, dp };
+    return { result, robbed: robbedHouses, dp };
   }
 
   const passA = robRange(0, n - 2, "Pass A");
   steps.push({
-    title: { vi: "Pass A: kết quả", en: "Pass A: result" },
+    title: { vi: `Pass A xong: ${passA.result}`, en: `Pass A done: ${passA.result}` },
     arr: [...nums],
     highlight: [],
     mark: passA.robbed,
     codeLines: [12],
     vars: [
-      { name: "passA", value: passA.result },
-      { name: "robbed", value: passA.robbed },
+      { name: "pass A range", value: `nhà [0..${n - 2}]` },
+      { name: "pass A max", value: passA.result },
+      { name: "houses robbed", value: `[${passA.robbed.join(", ")}] = [${passA.robbed.map((j) => nums[j]).join(", ")}]` },
     ],
     note: {
-      vi: `Pass A (bỏ nhà ${n - 1}): max = ${passA.result}. Cướp nhà [${passA.robbed.join(",")}].`,
-      en: `Pass A (exclude house ${n - 1}): max = ${passA.result}. Rob houses [${passA.robbed.join(",")}].`,
+      vi: `Pass A (bỏ nhà cuối ${n - 1}): tối đa = ${passA.result}.\nCướp nhà [${passA.robbed.join(", ")}] → tổng [${passA.robbed.map((j) => nums[j]).join(" + ")}] = ${passA.result}.`,
+      en: `Pass A (exclude last house ${n - 1}): max = ${passA.result}.\nRob houses [${passA.robbed.join(", ")}] → sum [${passA.robbed.map((j) => nums[j]).join(" + ")}] = ${passA.result}.`,
     },
   });
 
   const passB = robRange(1, n - 1, "Pass B");
   steps.push({
-    title: { vi: "Pass B: kết quả", en: "Pass B: result" },
+    title: { vi: `Pass B xong: ${passB.result}`, en: `Pass B done: ${passB.result}` },
     arr: [...nums],
     highlight: [],
     mark: passB.robbed,
     codeLines: [12],
     vars: [
-      { name: "passB", value: passB.result },
-      { name: "robbed", value: passB.robbed },
+      { name: "pass B range", value: `nhà [1..${n - 1}]` },
+      { name: "pass B max", value: passB.result },
+      { name: "houses robbed", value: `[${passB.robbed.join(", ")}] = [${passB.robbed.map((j) => nums[j]).join(", ")}]` },
     ],
     note: {
-      vi: `Pass B (bỏ nhà 0): max = ${passB.result}. Cướp nhà [${passB.robbed.join(",")}].`,
-      en: `Pass B (exclude house 0): max = ${passB.result}. Rob houses [${passB.robbed.join(",")}].`,
+      vi: `Pass B (bỏ nhà đầu 0): tối đa = ${passB.result}.\nCướp nhà [${passB.robbed.join(", ")}] → tổng [${passB.robbed.map((j) => nums[j]).join(" + ")}] = ${passB.result}.`,
+      en: `Pass B (exclude first house 0): max = ${passB.result}.\nRob houses [${passB.robbed.join(", ")}] → sum [${passB.robbed.map((j) => nums[j]).join(" + ")}] = ${passB.result}.`,
     },
   });
 
   const answer = Math.max(passA.result, passB.result);
   const bestRobbed = passA.result >= passB.result ? passA.robbed : passB.robbed;
+  const bestPass = passA.result >= passB.result ? "A" : "B";
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
     arr: [...nums],
     highlight: [],
     mark: bestRobbed,
     final: true,
     codeLines: [13],
     vars: [
-      { name: "passA", value: passA.result },
-      { name: "passB", value: passB.result },
-      { name: "answer", value: answer },
+      { name: "pass A", value: passA.result },
+      { name: "pass B", value: passB.result },
+      { name: "answer", value: `max(${passA.result}, ${passB.result}) = ${answer}` },
+      { name: "best pass", value: bestPass },
+      { name: "rob houses", value: `[${bestRobbed.join(", ")}] = [${bestRobbed.map((j) => nums[j]).join(", ")}]` },
     ],
     note: {
-      vi: `Đáp án = max(${passA.result}, ${passB.result}) = ${answer}. Cướp nhà [${bestRobbed.join(", ")}] = [${bestRobbed.map((j) => nums[j]).join(", ")}].`,
-      en: `Answer = max(${passA.result}, ${passB.result}) = ${answer}. Rob houses [${bestRobbed.join(", ")}] = [${bestRobbed.map((j) => nums[j]).join(", ")}].`,
+      vi:
+        `Đáp án = max(Pass A, Pass B) = max(${passA.result}, ${passB.result}) = ${answer}.\n` +
+        `Chọn Pass ${bestPass}: cướp nhà [${bestRobbed.join(", ")}] → [${bestRobbed.map((j) => nums[j]).join(" + ")}] = ${answer}.`,
+      en:
+        `Answer = max(Pass A, Pass B) = max(${passA.result}, ${passB.result}) = ${answer}.\n` +
+        `Pick Pass ${bestPass}: rob houses [${bestRobbed.join(", ")}] → [${bestRobbed.map((j) => nums[j]).join(" + ")}] = ${answer}.`,
     },
   });
 

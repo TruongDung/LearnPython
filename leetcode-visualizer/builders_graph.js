@@ -4,110 +4,180 @@
  */
 
 // ─── 1293: Shortest Path in Grid with Obstacles Elimination ───
+// BFS with 3D state: (row, col, eliminations_remaining).
+// Grid view shows cells with distances/obstacles, BFS levels expanding.
 function buildSteps1293(input, params) {
-  const rows = params.rows || 3;
-  const cols = params.cols || 4;
+  // Parse grid: "0,0,0|1,1,0|0,0,0|0,1,1|0,0,0" or flat array
+  let grid;
+  if (typeof input === "string") {
+    grid = input.split("|").map((row) => row.trim().split(",").map(Number));
+  } else {
+    const rows = params.rows || 3;
+    const cols = params.cols || Math.ceil(input.length / rows);
+    grid = [];
+    for (let r = 0; r < rows; r++) grid.push(input.slice(r * cols, (r + 1) * cols));
+  }
+  const m = grid.length;
+  const n = grid[0].length;
   const k = params.k != null ? params.k : 1;
-  const grid = [];
-  for (let r = 0; r < rows; r++) {
-    grid.push(input.slice(r * cols, (r + 1) * cols));
-  }
-  const original = grid.map(row => [...row]);
   const steps = [];
-  const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
 
-  // 3D visited: visited[r][c][elim]
-  const visited = Array.from({length: rows}, () =>
-    Array.from({length: cols}, () => new Array(k + 1).fill(false))
-  );
-
-  // BFS queue: [row, col, remainingK, dist]
-  let queue = [[0, 0, k, 0]];
-  visited[0][0][k] = true;
-  let answer = -1;
-
-  // Helper to build bfsGrid cells snapshot
-  function snapshot(levelCells, frontierCells, pathCells) {
-    const cells = Array.from({length: rows}, (_, r) =>
-      Array.from({length: cols}, (_, c) => {
-        if (pathCells && pathCells.has(`${r},${c}`)) return {cls: "path", label: ""};
-        if (frontierCells && frontierCells.has(`${r},${c}`)) return {cls: "queued", label: ""};
-        if (levelCells && levelCells.has(`${r},${c}`)) return {cls: "visited", label: ""};
-        if (grid[r][c] === 1) return {cls: "wall", label: "■"};
-        return {cls: "empty", label: ""};
-      })
-    );
-    cells[0][0] = {...cells[0][0], cls: cells[0][0].cls === "path" ? "path" : "start", label: "S"};
-    if (rows > 0 && cols > 0) {
-      const er = rows - 1, ec = cols - 1;
-      if (cells[er][ec].cls !== "path") cells[er][ec] = {cls: "end", label: "E"};
-      else cells[er][ec].label = "E";
+  // Display cell: ■ for obstacle, · for empty
+  function makeGrid(distMap, hlCell, pathSet) {
+    const dp = [];
+    for (let r = 0; r < m; r++) {
+      const row = [];
+      for (let c = 0; c < n; c++) {
+        if (grid[r][c] === 1) {
+          const d = distMap[`${r},${c}`];
+          row.push(d !== undefined ? `■${d}` : "■");
+        } else {
+          const d = distMap[`${r},${c}`];
+          row.push(d !== undefined ? String(d) : "·");
+        }
+      }
+      dp.push(row);
     }
-    return cells;
+    return {
+      dp,
+      text1: Array.from({ length: m }, (_, i) => `${i}`),
+      text2: Array.from({ length: n }, (_, i) => `${i}`),
+      hlCell: hlCell || null,
+      pathCells: pathSet ? [...pathSet].map((s) => s.split(",").map(Number)) : [],
+    };
   }
 
-  const allVisitedCells = new Set();
-  allVisitedCells.add("0,0");
-
-  // Initial step
+  // Intro
   steps.push({
-    title: {vi: "Khởi tạo BFS", en: "Initialize BFS"},
-    arr: [], highlight: [], mark: [], codeLines: [],
-    bfsGrid: {cells: snapshot(allVisitedCells, new Set(["0,0"]), null), rows, cols},
-    vars: [{name: "k", value: k}, {name: "queue", value: "[(0,0)]"}, {name: "dist", value: 0}],
-    note: {vi: `Bắt đầu BFS từ (0,0), được phép phá tối đa k=${k} vật cản.`,
-           en: `Start BFS from (0,0), allowed to eliminate up to k=${k} obstacles.`}
+    title: { vi: "Đề bài", en: "Problem" },
+    arr: [],
+    grid: makeGrid({}, [0, 0]),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "size", value: `${m}×${n}` },
+      { name: "k", value: k },
+      { name: "start", value: "(0,0)" },
+      { name: "target", value: `(${m - 1},${n - 1})` },
+    ],
+    note: {
+      vi:
+        `Lưới ${m}×${n}: ■ = vật cản (1), · = trống (0).\n` +
+        `Đi từ (0,0) đến (${m - 1},${n - 1}) bằng 4 hướng (lên/xuống/trái/phải).\n` +
+        `Được phá TỐI ĐA ${k} vật cản. Tìm đường ngắn nhất.\n` +
+        `BFS với state 3D: (row, col, k_còn_lại).`,
+      en:
+        `Grid ${m}×${n}: ■ = obstacle (1), · = empty (0).\n` +
+        `Move from (0,0) to (${m - 1},${n - 1}) in 4 directions.\n` +
+        `May eliminate AT MOST ${k} obstacles. Find shortest path.\n` +
+        `BFS with 3D state: (row, col, k_remaining).`,
+    },
   });
 
-  let found = false;
-  let level = 0;
-  while (queue.length > 0 && !found && steps.length < 20) {
-    const nextQueue = [];
-    const frontierSet = new Set();
-    for (const [r, c, rem, dist] of queue) {
-      if (r === rows - 1 && c === cols - 1) { answer = dist; found = true; break; }
+  // BFS
+  const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const visited = Array.from({ length: m }, () =>
+    Array.from({ length: n }, () => new Array(k + 1).fill(false))
+  );
+  visited[0][0][k] = true;
+  let frontier = [[0, 0, k]];
+  let dist = 0;
+  let answer = -1;
+  const distMap = {};
+  distMap["0,0"] = 0;
+  const MAX_STEPS = 15;
+  let stepCount = 1;
+
+  // Check trivial case
+  if (m === 1 && n === 1) {
+    answer = 0;
+  }
+
+  while (frontier.length > 0 && answer === -1) {
+    dist++;
+    const nextFrontier = [];
+
+    for (const [r, c, rem] of frontier) {
       for (const [dr, dc] of dirs) {
-        const nr = r + dr, nc = c + dc;
-        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
         const newK = grid[nr][nc] === 1 ? rem - 1 : rem;
         if (newK < 0) continue;
         if (visited[nr][nc][newK]) continue;
         visited[nr][nc][newK] = true;
-        allVisitedCells.add(`${nr},${nc}`);
-        frontierSet.add(`${nr},${nc}`);
-        nextQueue.push([nr, nc, newK, dist + 1]);
+        if (distMap[`${nr},${nc}`] === undefined) distMap[`${nr},${nc}`] = dist;
+        nextFrontier.push([nr, nc, newK]);
+        if (nr === m - 1 && nc === n - 1) {
+          answer = dist;
+          break;
+        }
       }
+      if (answer !== -1) break;
     }
-    if (found) break;
-    level++;
-    queue = nextQueue;
-    if (queue.length > 0) {
+
+    if (stepCount < MAX_STEPS) {
+      stepCount++;
+      const newCells = nextFrontier.length;
+      const obstacles = nextFrontier.filter(([r, c]) => grid[r][c] === 1).length;
+
       steps.push({
-        title: {vi: `BFS level ${level}`, en: `BFS level ${level}`},
-        arr: [], highlight: [], mark: [], codeLines: [],
-        bfsGrid: {cells: snapshot(allVisitedCells, frontierSet, null), rows, cols},
-        vars: [{name: "level", value: level}, {name: "frontier", value: queue.length}, {name: "k_left", value: "varies"}],
-        note: {vi: `Mở rộng ${queue.length} ô ở khoảng cách ${level}.`,
-               en: `Expanded ${queue.length} cells at distance ${level}.`}
+        title: { vi: `BFS level ${dist}: ${newCells} ô mới`, en: `BFS level ${dist}: ${newCells} new cells` },
+        arr: [],
+        grid: makeGrid(distMap, null),
+        highlight: [],
+        mark: [],
+        codeLines: [10, 11, 12, 13, 14, 15, 16, 17],
+        vars: [
+          { name: "dist", value: dist },
+          { name: "new cells", value: newCells },
+          { name: "obstacles broken", value: obstacles },
+          { name: "frontier size (prev)", value: frontier.length },
+          { name: "found target", value: answer !== -1 },
+        ],
+        note: {
+          vi:
+            `Level ${dist}: khám phá ${newCells} ô mới (${obstacles} ô vật cản đã phá).\n` +
+            (answer !== -1 ? `✓ Đã tới (${m - 1},${n - 1}) sau ${dist} bước!` : "Tiếp tục BFS."),
+          en:
+            `Level ${dist}: explored ${newCells} new cells (${obstacles} obstacles broken).\n` +
+            (answer !== -1 ? `✓ Reached (${m - 1},${n - 1}) in ${dist} steps!` : "Continue BFS."),
+        },
       });
     }
-    // Check if target reached in next level
-    for (const [r, c, , dist] of queue) {
-      if (r === rows - 1 && c === cols - 1) { answer = dist; found = true; break; }
-    }
+
+    if (answer !== -1) break;
+    frontier = nextFrontier;
+    if (frontier.length === 0) break;
   }
 
-  // Final step
+  // Final
   steps.push({
-    title: {vi: "Kết quả", en: "Result"},
-    arr: [], highlight: [], mark: [], codeLines: [],
-    bfsGrid: {cells: snapshot(allVisitedCells, null, found ? allVisitedCells : null), rows, cols},
-    vars: [{name: "answer", value: answer}],
-    note: {vi: answer >= 0 ? `Đường đi ngắn nhất = ${answer} bước.` : "Không tìm được đường đi.",
-           en: answer >= 0 ? `Shortest path = ${answer} steps.` : "No valid path found."}
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    grid: makeGrid(distMap, [m - 1, n - 1]),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "cells reached", value: Object.keys(distMap).length },
+    ],
+    note: {
+      vi:
+        answer >= 0
+          ? `Đường ngắn nhất từ (0,0) đến (${m - 1},${n - 1}) = ${answer} bước (phá tối đa ${k} vật cản).\nLưới hiển thị khoảng cách BFS tới mỗi ô đã tới.`
+          : `Không có đường đi nào tới (${m - 1},${n - 1}) dù phá ${k} vật cản.`,
+      en:
+        answer >= 0
+          ? `Shortest path from (0,0) to (${m - 1},${n - 1}) = ${answer} steps (eliminating at most ${k} obstacles).\nGrid shows BFS distance to each reached cell.`
+          : `No path to (${m - 1},${n - 1}) even with ${k} obstacle eliminations.`,
+    },
   });
 
-  return {original, answer, steps};
+  return { original: grid, answer, steps };
 }
 
 // ─── 1368: Minimum Cost Valid Path in Grid (0-1 BFS) ───

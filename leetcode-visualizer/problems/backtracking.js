@@ -771,6 +771,135 @@ function buildSteps90(nums) {
 }
 
 /**
+ * Generate steps for LeetCode 46: Permutations.
+ * Backtracking with used[] array — order matters, use all elements.
+ */
+function buildSteps46(nums) {
+  const steps = [];
+  const current = [];
+  const results = [];
+  const used = new Array(nums.length).fill(false);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: nums.map(() => 0),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "current", value: "[]" },
+      { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
+    ],
+    note: {
+      vi:
+        `Tìm TẤT CẢ hoán vị của [${nums.join(", ")}].\n` +
+        `Khác Subsets: ở đây THỨ TỰ quan trọng, mỗi hoán vị có ĐỦ n phần tử.\n` +
+        `Dùng used[] để đánh dấu phần tử đã chọn (tránh dùng lại).`,
+      en:
+        `Find ALL permutations of [${nums.join(", ")}].\n` +
+        `Unlike Subsets: ORDER matters here, each permutation uses ALL n elements.\n` +
+        `Use used[] to mark chosen elements (prevent reuse).`,
+    },
+  });
+
+  function backtrack() {
+    if (current.length === nums.length) {
+      results.push([...current]);
+      steps.push({
+        title: { vi: `✓ Hoán vị: [${current.join(", ")}]`, en: `✓ Permutation: [${current.join(", ")}]` },
+        arr: nums.map((_, i) => (used[i] ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [],
+        mark: nums.map((_, i) => i),
+        codeLines: [8, 9, 10],
+        vars: [
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "count", value: results.length },
+        ],
+        note: {
+          vi: `len(current) == ${nums.length} → lưu [${current.join(", ")}]. Tổng: ${results.length} hoán vị.`,
+          en: `len(current) == ${nums.length} → save [${current.join(", ")}]. Total: ${results.length} permutations.`,
+        },
+      });
+      return;
+    }
+
+    for (let i = 0; i < nums.length; i++) {
+      if (used[i]) continue;
+
+      used[i] = true;
+      current.push(nums[i]);
+
+      steps.push({
+        title: { vi: `Chọn nums[${i}] = ${nums[i]}`, en: `Pick nums[${i}] = ${nums[i]}` },
+        arr: nums.map((_, j) => (used[j] ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [i],
+        mark: [],
+        codeLines: [11, 12, 13, 14, 15, 16],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
+        ],
+        note: {
+          vi: `nums[${i}]=${nums[i]} chưa dùng → chọn. current = [${current.join(", ")}].`,
+          en: `nums[${i}]=${nums[i]} not used → pick. current = [${current.join(", ")}].`,
+        },
+      });
+
+      backtrack();
+
+      current.pop();
+      used[i] = false;
+
+      steps.push({
+        title: { vi: `Quay lui: bỏ ${nums[i]}`, en: `Backtrack: pop ${nums[i]}` },
+        arr: nums.map((_, j) => (used[j] ? 1 : 0)),
+        sub: nums.map(String),
+        highlight: [],
+        mark: [],
+        codeLines: [17, 18],
+        vars: [
+          { name: "popped", value: nums[i] },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "used", value: used.map((u) => (u ? "T" : "F")).join("") },
+        ],
+        note: {
+          vi: `Bỏ ${nums[i]}, used[${i}]=F. Thử phần tử tiếp theo.`,
+          en: `Pop ${nums[i]}, used[${i}]=F. Try next element.`,
+        },
+      });
+    }
+  }
+
+  backtrack();
+
+  steps.push({
+    title: { vi: `Kết quả: ${results.length} hoán vị`, en: `Result: ${results.length} permutations` },
+    arr: nums.map(() => 0),
+    sub: nums.map(String),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [20, 21],
+    vars: [
+      { name: "total", value: `${nums.length}! = ${results.length}` },
+      { name: "all", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng ${results.length} = ${nums.length}! hoán vị.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
+      en: `Total ${results.length} = ${nums.length}! permutations.\n${results.map((r) => `[${r.join(",")}]`).join(", ")}`,
+    },
+  });
+
+  return { original: [...nums], answer: results.length, steps };
+}
+
+/**
  * Generate steps for LeetCode 39: Combination Sum.
  * Backtracking with reusable candidates: recurse with start = i (not i+1).
  */
@@ -1034,6 +1163,56 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps52,
+  },
+  46: {
+    id: 46,
+    difficulty: "medium",
+    slug: "permutations",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Permutations", en: "Permutations" },
+    titleVi: { vi: "Tất cả hoán vị", en: "All permutations" },
+    statement: {
+      vi: "Cho mảng nums (các phần tử khác nhau), trả về TẤT CẢ hoán vị. Khác Subsets: THỨ TỰ quan trọng, mỗi hoán vị có đủ n phần tử.",
+      en: "Given an array nums of distinct integers, return ALL possible permutations. Unlike Subsets: ORDER matters, each permutation uses all n elements.",
+    },
+    defaultInput: [1, 2, 3],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Backtracking với mảng used[] để đánh dấu phần tử đã dùng.", en: "Backtracking with a used[] array marking elements already chosen." },
+      { vi: "Khi len(current) == n → lưu một hoán vị hoàn chỉnh.", en: "When len(current) == n → save a complete permutation." },
+      { vi: "Vòng for duyệt qua MỌI phần tử (không dùng start), chỉ chọn phần tử chưa used.", en: "The for-loop iterates over ALL elements (no start), only picks unused ones." },
+      { vi: "Có n! hoán vị → độ phức tạp O(n · n!).", en: "There are n! permutations → complexity O(n · n!)." },
+    ],
+    complexity: {
+      time: "O(n · n!)",
+      space: "O(n)",
+      note: { vi: "n! hoán vị × O(n) copy. Stack + used → O(n).", en: "n! permutations × O(n) copy. Stack + used → O(n)." },
+    },
+    code: [
+      "class Solution:",
+      "    def permute(self, nums):",
+      "        result = []",
+      "        current = []",
+      "        used = [False] * len(nums)",
+      "",
+      "        def backtrack():",
+      "            if len(current) == len(nums):",
+      "                result.append(current[:])",
+      "                return",
+      "            for i in range(len(nums)):",
+      "                if used[i]:",
+      "                    continue",
+      "                used[i] = True",
+      "                current.append(nums[i])",
+      "                backtrack()",
+      "                current.pop()",
+      "                used[i] = False",
+      "",
+      "        backtrack()",
+      "        return result",
+    ],
+    builder: buildSteps46,
   },
   77: {
     id: 77,
