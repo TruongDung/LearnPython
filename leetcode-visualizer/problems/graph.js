@@ -921,6 +921,160 @@ function buildSteps1236(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 207: Course Schedule.
+ * Topological sort (Kahn's algorithm) — detects cycle.
+ * prerequisites[i] = [a, b] means to take a you must first take b (b → a).
+ * Returns true if all courses can be finished.
+ */
+function buildSteps207(input, params) {
+  const numCourses = params.numCourses || 2;
+  const edgesRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
+  // Each "a-b" means [a, b] in LeetCode → b is prereq of a (b → a)
+  const pairs = edgesRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return [parts[0], parts[1]]; // [course, prereq]
+  });
+  const steps = [];
+
+  const adj = {};
+  const inDeg = {};
+  const courses = Array.from({ length: numCourses }, (_, i) => i);
+  for (const c of courses) { adj[c] = []; inDeg[c] = 0; }
+  for (const [a, b] of pairs) {
+    // b → a (must take b before a)
+    adj[b].push(a);
+    inDeg[a] = (inDeg[a] || 0) + 1;
+  }
+
+  const taken = new Set();
+
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      nodes: courses.map((id) => ({ id, dist: inDeg[id] })),
+      edges: pairs.map(([a, b]) => ({ u: b, v: a, w: "" })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: [...taken],
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7],
+    vars: [
+      { name: "numCourses", value: numCourses },
+      { name: "prerequisites", value: pairs.map(([a, b]) => `[${a},${b}]`).join(", ") || "none" },
+      { name: "in-degree", value: courses.map((c) => `${c}:${inDeg[c]}`).join(", ") },
+    ],
+    note: {
+      vi:
+        `Có ${numCourses} môn (0..${numCourses - 1}), ${pairs.length} điều kiện tiên quyết.\n` +
+        `Mỗi cặp [a, b] nghĩa là phải học b trước a → cạnh b → a.\n` +
+        `Số bên dưới nút = in-degree (số môn phải học trước nó).\n` +
+        `Mục tiêu: kiểm tra có thể học hết không (đồ thị không có chu trình)?`,
+      en:
+        `${numCourses} courses (0..${numCourses - 1}), ${pairs.length} prerequisites.\n` +
+        `Each [a, b] means take b before a → edge b → a.\n` +
+        `Number below node = in-degree (number of prerequisites).\n` +
+        `Goal: can all be finished (no cycle)?`,
+    },
+  });
+
+  let answer = true;
+
+  while (taken.size < numCourses) {
+    const available = courses.filter((c) => !taken.has(c) && inDeg[c] === 0);
+
+    if (available.length === 0) {
+      // Cycle
+      answer = false;
+      steps.push({
+        title: { vi: "Bế tắc → có chu trình → false", en: "Stuck → cycle detected → false" },
+        arr: [],
+        graph: makeGraph(courses.filter((c) => !taken.has(c)), []),
+        highlight: [],
+        mark: [],
+        final: true,
+        codeLines: [15, 16],
+        vars: [
+          { name: "taken", value: `${taken.size}/${numCourses}` },
+          { name: "remaining", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") },
+          { name: "answer", value: false },
+        ],
+        note: {
+          vi:
+            `Không còn môn nào có in-degree = 0, nhưng vẫn còn ${numCourses - taken.size} môn chưa học.\n` +
+            `→ Đồ thị có chu trình → KHÔNG thể hoàn thành → return false.`,
+          en:
+            `No course has in-degree = 0, but ${numCourses - taken.size} courses remain.\n` +
+            `→ Cycle exists → CANNOT finish → return false.`,
+        },
+      });
+      return { numCourses, edges: edgesRaw, answer: false, steps };
+    }
+
+    // Take all available this round
+    for (const c of available) taken.add(c);
+    const hlEdges = [];
+    for (const c of available) {
+      for (const next of adj[c]) {
+        inDeg[next]--;
+        hlEdges.push([c, next]);
+      }
+    }
+
+    steps.push({
+      title: { vi: `Lấy ${available.length} môn có in-deg = 0`, en: `Pop ${available.length} courses with in-deg = 0` },
+      arr: [],
+      graph: makeGraph(available, hlEdges),
+      highlight: [],
+      mark: [],
+      codeLines: [9, 10, 11, 12, 13, 14],
+      vars: [
+        { name: "available", value: `[${available.join(", ")}]` },
+        { name: "edges decremented", value: hlEdges.length },
+        { name: "in-degree after", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") || "(all done)" },
+        { name: "taken", value: `${taken.size}/${numCourses}` },
+      ],
+      note: {
+        vi:
+          `Lấy mọi môn có in-degree = 0: [${available.join(", ")}].\n` +
+          `Giảm in-degree các môn phụ thuộc (${hlEdges.length} cạnh).\n` +
+          `Đã học ${taken.size}/${numCourses} môn.`,
+        en:
+          `Pop all courses with in-degree = 0: [${available.join(", ")}].\n` +
+          `Decrement in-degree of dependents (${hlEdges.length} edges).\n` +
+          `Taken: ${taken.size}/${numCourses}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "✓ Hoàn thành tất cả → true", en: "✓ All done → true" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "taken", value: `${numCourses}/${numCourses}` },
+      { name: "answer", value: true },
+    ],
+    note: {
+      vi: `Đã học hết ${numCourses} môn → đồ thị không có chu trình → return true.`,
+      en: `All ${numCourses} courses taken → no cycle → return true.`,
+    },
+  });
+
+  return { numCourses, edges: edgesRaw, answer: true, steps };
+}
+
+/**
  * Generate steps for LeetCode 1136: Parallel Courses.
  * Topological sort (Kahn's algorithm / BFS):
  *  - Find all courses with in-degree 0 → take them this semester.
@@ -1782,5 +1936,65 @@ module.exports = {
       "        return list(visited)",
     ],
     builder: buildSteps1236,
+  },
+  207: {
+    id: 207,
+    difficulty: "medium",
+    slug: "course-schedule",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Course Schedule", en: "Course Schedule" },
+    titleVi: { vi: "Lịch học (kiểm tra chu trình)", en: "Can finish all courses?" },
+    statement: {
+      vi:
+        "Có numCourses môn học (đánh số 0..numCourses-1) và mảng prerequisites, trong đó [a, b] nghĩa là PHẢI HỌC b TRƯỚC a. " +
+        "Trả về true nếu có thể hoàn thành tất cả môn học (đồ thị không có chu trình), false nếu không. " +
+        "Nhập tiên quyết: cặp a-b cách bởi dấu phẩy (vd: 1-0,2-1).",
+      en:
+        "There are numCourses courses (0..numCourses-1) and an array prerequisites where [a, b] means b must be taken before a. " +
+        "Return true if you can finish all courses (no cycle), false otherwise. " +
+        "Enter prerequisites as a-b pairs separated by comma (e.g. 1-0,2-1).",
+    },
+    defaultInput: "1-0,2-1,3-2",
+    inputKind: "string",
+    inputLabel: { vi: "Tiên quyết (a-b = học b trước a)", en: "Prerequisites (a-b = b before a)" },
+    extraParams: [
+      { key: "numCourses", label: { vi: "numCourses (số môn)", en: "numCourses" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Đây là bài topological sort cổ điển — kiểm tra đồ thị có chu trình không.", en: "Classic topological sort — detect whether the graph has a cycle." },
+      { vi: "Mỗi [a, b] tạo cạnh b → a (b là tiên quyết của a). Đếm in-degree mỗi nút.", en: "Each [a, b] creates edge b → a (b is prereq of a). Count in-degree for each node." },
+      { vi: "Kahn's algorithm: lặp đi lặp lại, lấy mọi nút có in-degree = 0, giảm in-degree các nút phụ thuộc.", en: "Kahn's algorithm: repeatedly take all nodes with in-degree = 0, decrement dependents." },
+      { vi: "Nếu cuối cùng học hết tất cả → không chu trình → true. Nếu kẹt lại (còn nút mà in-degree > 0) → có chu trình → false.", en: "If all nodes are processed → no cycle → true. If stuck (nodes remain with in-degree > 0) → cycle → false." },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V + E)",
+      note: {
+        vi: "Mỗi nút duyệt 1 lần, mỗi cạnh giảm in-degree 1 lần. Bộ nhớ cho adjacency list + in-degree array + queue.",
+        en: "Each node visited once, each edge decremented once. Memory for adjacency list + in-degree array + queue.",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "",
+      "class Solution:",
+      "    def canFinish(self, numCourses, prerequisites):",
+      "        adj = defaultdict(list)",
+      "        in_deg = [0] * numCourses",
+      "        for a, b in prerequisites:",
+      "            adj[b].append(a)",
+      "            in_deg[a] += 1",
+      "        queue = deque([i for i in range(numCourses) if in_deg[i] == 0])",
+      "        taken = 0",
+      "        while queue:",
+      "            u = queue.popleft()",
+      "            taken += 1",
+      "            for v in adj[u]:",
+      "                in_deg[v] -= 1",
+      "                if in_deg[v] == 0:",
+      "                    queue.append(v)",
+      "        return taken == numCourses",
+    ],
+    builder: buildSteps207,
   },
 };
