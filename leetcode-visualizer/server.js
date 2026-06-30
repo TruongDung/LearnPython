@@ -7098,7 +7098,133 @@ function buildSteps50(input, params) {
   return { x: origX, n: origN, answer: finalResult, steps };
 }
 
+/**
+ * LeetCode 1358: Number of Substrings Containing All Three Characters.
+ * Sliding window: expand right until window has all 3 chars, then
+ * all substrings starting from left..current_left ending at right..n-1 are valid.
+ * Count += n - right for each valid window position after shrinking.
+ */
+function buildSteps1358(input) {
+  const s = typeof input === "string" ? input : String(input);
+  const n = s.length;
+  const steps = [];
+
+  const count = { a: 0, b: 0, c: 0 };
+  let left = 0;
+  let total = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: s.split("").map((ch) => ch.charCodeAt(0) - 96), // a=1,b=2,c=3 for bar heights
+    sub: s.split(""),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "s", value: s },
+      { name: "count", value: "{a:0, b:0, c:0}" },
+      { name: "total", value: 0 },
+    ],
+    note: {
+      vi: `Đếm số substring chứa ít nhất 1 'a', 1 'b', 1 'c'. Dùng cửa sổ trượt: khi cửa sổ hợp lệ → mọi mở rộng sang phải cũng hợp lệ.`,
+      en: `Count substrings containing at least one 'a', 'b', and 'c'. Sliding window: once valid, all extensions to the right are also valid.`,
+    },
+  });
+
+  const inWindow = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  for (let right = 0; right < n; right++) {
+    count[s[right]]++;
+
+    // Shrink while all three present
+    while (count.a >= 1 && count.b >= 1 && count.c >= 1) {
+      const added = n - right;
+      total += added;
+
+      steps.push({
+        title: { vi: `Hợp lệ: left=${left}, right=${right}`, en: `Valid: left=${left}, right=${right}` },
+        arr: s.split("").map((ch) => ch.charCodeAt(0) - 96),
+        sub: s.split(""),
+        highlight: inWindow(left, right),
+        mark: [],
+        codeLines: [6, 7, 8, 9, 10],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "count", value: `{a:${count.a}, b:${count.b}, c:${count.c}}` },
+          { name: "+substrings", value: `${added} (n - right = ${n} - ${right})` },
+          { name: "total", value: total },
+        ],
+        note: {
+          vi: `Cửa sổ [${left}..${right}] chứa cả a,b,c → ${added} substring hợp lệ bắt đầu tại left=${left} (kéo dài đến cuối). total = ${total}. Co left.`,
+          en: `Window [${left}..${right}] has all a,b,c → ${added} valid substrings starting at left=${left} (extend to end). total = ${total}. Shrink left.`,
+        },
+      });
+
+      count[s[left]]--;
+      left++;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: s.split("").map((ch) => ch.charCodeAt(0) - 96),
+    sub: s.split(""),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "total", value: total }],
+    note: {
+      vi: `Tổng số substring chứa cả 'a', 'b', 'c' = ${total}.`,
+      en: `Total substrings containing all three characters = ${total}.`,
+    },
+  });
+
+  return { original: s, answer: total, steps };
+}
+
 const SUPPORTED = {
+  1358: {
+    id: 1358,
+    difficulty: "medium",
+    slug: "number-of-substrings-containing-all-three-characters",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Number of Substrings Containing All Three Characters", en: "Number of Substrings Containing All Three Characters" },
+    titleVi: { vi: "Số substring chứa cả a, b, c", en: "Substrings with all three chars" },
+    statement: {
+      vi: "Cho chuỗi s chỉ gồm 'a', 'b', 'c'. Trả về số lượng substring chứa ít nhất một 'a', một 'b', và một 'c'.",
+      en: "Given a string s consisting only of 'a', 'b', and 'c', return the number of substrings containing at least one occurrence of all three characters.",
+    },
+    defaultInput: "abcabc",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s (chỉ a,b,c)", en: "String s (only a,b,c)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi ký tự được thêm/bỏ khỏi cửa sổ tối đa 1 lần → O(n). Chỉ dùng 3 biến đếm.",
+        en: "Each character added/removed at most once → O(n). Only 3 counters used.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numberOfSubstrings(self, s):",
+      "        count = {'a': 0, 'b': 0, 'c': 0}",
+      "        left = 0",
+      "        total = 0",
+      "        for right in range(len(s)):",
+      "            count[s[right]] += 1",
+      "            while all(count[c] >= 1",
+      "                      for c in 'abc'):",
+      "                total += len(s) - right",
+      "                count[s[left]] -= 1",
+      "                left += 1",
+      "        return total",
+    ],
+    builder: buildSteps1358,
+  },
   1293: {
     id: 1293,
     difficulty: "hard",

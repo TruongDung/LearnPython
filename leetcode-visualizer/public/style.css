@@ -562,8 +562,8 @@ button:disabled {
   overflow-y: auto;
   max-height: 420px;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.55;
   position: sticky;
   top: 0;
   backdrop-filter: blur(12px);
