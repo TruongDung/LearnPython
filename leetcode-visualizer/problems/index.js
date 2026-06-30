@@ -24,6 +24,7 @@ const categories = {
   backtracking: require("./backtracking"),
   bst: require("./bst"),
   "binary-tree": require("./tree"),
+  heap: require("./heap"),
 };
 
 const SUPPORTED = {};
