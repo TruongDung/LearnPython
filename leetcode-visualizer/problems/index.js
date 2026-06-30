@@ -6,26 +6,28 @@
 // Output:
 //   SUPPORTED       — { [problemId]: problem }
 //   CATEGORY_ORDER  — { [categoryKey]: meta }
+//
+// Note: use literal require() calls (not dynamic) so bundlers like Vercel
+// can statically detect and include all category files.
 
-const fileToCategory = {
-  "./dp": "dp",
-  "./sliding": "sliding",
-  "./graph": "graph",
-  "./math": "math",
-  "./two-pointer": "two-pointer",
-  "./array": "array",
-  "./trie": "trie",
-  "./hashmap": "hashmap",
-  "./greedy": "greedy",
-  "./string": "string",
-  "./backtracking": "backtracking",
+const categories = {
+  dp: require("./dp"),
+  sliding: require("./sliding"),
+  graph: require("./graph"),
+  math: require("./math"),
+  "two-pointer": require("./two-pointer"),
+  array: require("./array"),
+  trie: require("./trie"),
+  hashmap: require("./hashmap"),
+  greedy: require("./greedy"),
+  string: require("./string"),
+  backtracking: require("./backtracking"),
 };
 
 const SUPPORTED = {};
 const CATEGORY_ORDER = {};
 
-for (const [file, catKey] of Object.entries(fileToCategory)) {
-  const mod = require(file);
+for (const [catKey, mod] of Object.entries(categories)) {
   const { __meta, ...problems } = mod;
   Object.assign(SUPPORTED, problems);
   if (__meta) CATEGORY_ORDER[catKey] = __meta;
