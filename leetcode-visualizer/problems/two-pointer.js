@@ -488,7 +488,263 @@ function buildSteps283(nums) {
   return { original: [...nums], answer: arr, steps };
 }
 
+/**
+ * LeetCode 26: Remove Duplicates from Sorted Array.
+ * Two-pointer in-place: write pointer k tracks the next unique slot.
+ * If nums[i] != nums[k-1], we found a new unique value → write it.
+ */
+function buildSteps26(nums) {
+  const arr = [...nums];
+  const n = arr.length;
+  const steps = [];
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Mảng rỗng", en: "Empty array" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "k", value: 0 }],
+      note: { vi: "Mảng rỗng → k = 0.", en: "Empty array → k = 0." },
+    });
+    return { original: [...nums], answer: 0, steps };
+  }
+  let k = 1;
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...arr],
+    highlight: [0],
+    mark: [0],
+    codeLines: [3, 4],
+    vars: [{ name: "k", value: 1 }, { name: "nums[0]", value: arr[0] }],
+    note: {
+      vi: `Mảng đã sắp xếp. k = vị trí ghi tiếp.\nnums[0]=${arr[0]} luôn được giữ → k = 1.`,
+      en: `Sorted array. k = next write position.\nnums[0]=${arr[0]} is always kept → k = 1.`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    if (arr[i] !== arr[k - 1]) {
+      arr[k] = arr[i];
+      steps.push({
+        title: { vi: `nums[${i}]=${nums[i]} mới → giữ`, en: `nums[${i}]=${nums[i]} new → keep` },
+        arr: [...arr],
+        highlight: [i],
+        mark: Array.from({ length: k + 1 }, (_, x) => x),
+        codeLines: [5, 6, 7, 8],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "nums[k-1]", value: arr[k - 1] },
+          { name: "k", value: k + 1 },
+          { name: "action", value: "new value, write" },
+        ],
+        note: {
+          vi: `${nums[i]} ≠ ${arr[k - 1]} (nums[k-1]) → giá trị mới. Ghi vào vị trí ${k}. k → ${k + 1}.`,
+          en: `${nums[i]} ≠ ${arr[k - 1]} (nums[k-1]) → new value. Write to position ${k}. k → ${k + 1}.`,
+        },
+      });
+      k++;
+    } else {
+      steps.push({
+        title: { vi: `nums[${i}]=${nums[i]} trùng → bỏ`, en: `nums[${i}]=${nums[i]} duplicate → skip` },
+        arr: [...arr],
+        highlight: [i],
+        mark: Array.from({ length: k }, (_, x) => x),
+        codeLines: [5],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "nums[k-1]", value: arr[k - 1] },
+          { name: "k", value: k },
+          { name: "action", value: "duplicate, skip" },
+        ],
+        note: {
+          vi: `${nums[i]} == ${arr[k - 1]} (nums[k-1]) → trùng, bỏ qua. k giữ nguyên.`,
+          en: `${nums[i]} == ${arr[k - 1]} (nums[k-1]) → duplicate, skip. k unchanged.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...arr],
+    highlight: [],
+    mark: Array.from({ length: k }, (_, x) => x),
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "k", value: k },
+      { name: "result", value: arr.slice(0, k) },
+    ],
+    note: {
+      vi: `${k} phần tử khác nhau còn lại = [${arr.slice(0, k).join(", ")}].`,
+      en: `${k} unique elements remain = [${arr.slice(0, k).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer: k, steps };
+}
+
+/**
+ * LeetCode 485: Max Consecutive Ones.
+ * Single-pass counter: track current run of 1s, update max when run breaks.
+ */
+function buildSteps485(nums) {
+  const steps = [];
+  let curr = 0;
+  let maxRun = 0;
+  let curStart = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "curr", value: 0 }, { name: "max", value: 0 }],
+    note: {
+      vi: `curr = số 1 liên tiếp hiện tại. max = kỷ lục lớn nhất.`,
+      en: `curr = current run of 1s. max = best run seen so far.`,
+    },
+  });
+
+  const inRange = (lo, hi) => Array.from({ length: hi - lo + 1 }, (_, x) => lo + x);
+
+  for (let i = 0; i < nums.length; i++) {
+    if (nums[i] === 1) {
+      if (curr === 0) curStart = i;
+      curr++;
+      const updated = curr > maxRun;
+      if (updated) {
+        maxRun = curr;
+        bestL = curStart;
+        bestR = i;
+      }
+      steps.push({
+        title: { vi: `nums[${i}]=1 → curr=${curr}`, en: `nums[${i}]=1 → curr=${curr}` },
+        arr: [...nums],
+        highlight: inRange(curStart, i),
+        mark: [],
+        codeLines: [5, 6, 7],
+        vars: [
+          { name: "i", value: i },
+          { name: "curr", value: curr },
+          { name: "max", value: maxRun },
+        ],
+        note: {
+          vi: `1 → tăng curr=${curr}. max=${maxRun}${updated ? " ✓ cập nhật" : ""}.`,
+          en: `1 → curr=${curr}. max=${maxRun}${updated ? " ✓ updated" : ""}.`,
+        },
+      });
+    } else {
+      steps.push({
+        title: { vi: `nums[${i}]=0 → reset curr`, en: `nums[${i}]=0 → reset curr` },
+        arr: [...nums],
+        highlight: [i],
+        mark: [],
+        codeLines: [8, 9],
+        vars: [
+          { name: "i", value: i },
+          { name: "curr", value: 0 },
+          { name: "max", value: maxRun },
+        ],
+        note: {
+          vi: `0 → reset curr=0. max vẫn = ${maxRun}.`,
+          en: `0 → reset curr=0. max stays at ${maxRun}.`,
+        },
+      });
+      curr = 0;
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: bestR >= 0 ? inRange(bestL, bestR) : [],
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "max", value: maxRun },
+      { name: "run", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "none" },
+    ],
+    note: {
+      vi: `Số 1 liên tiếp dài nhất = ${maxRun}${bestR >= 0 ? ` (đoạn [${bestL}..${bestR}])` : ""}.`,
+      en: `Longest run of 1s = ${maxRun}${bestR >= 0 ? ` (segment [${bestL}..${bestR}])` : ""}.`,
+    },
+  });
+
+  return { original: [...nums], answer: maxRun, steps };
+}
+
 module.exports = {
+  26: {
+    id: 26,
+    difficulty: "easy",
+    slug: "remove-duplicates-from-sorted-array",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Remove Duplicates from Sorted Array", en: "Remove Duplicates from Sorted Array" },
+    titleVi: { vi: "Xóa phần tử trùng (mảng đã sắp xếp)", en: "Remove duplicates in-place" },
+    statement: {
+      vi: "Cho mảng nums đã sắp xếp tăng dần. Xóa các phần tử trùng tại chỗ, mỗi phần tử chỉ giữ 1 bản. Trả về số phần tử khác nhau k.",
+      en: "Given a sorted array nums, remove duplicates in-place so each unique element appears once. Return the number of unique elements k.",
+    },
+    defaultInput: [1, 1, 2, 3, 3, 4],
+    inputKind: "integer",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyệt 1 lần với 2 con trỏ. Tại chỗ O(1).", en: "Single pass with 2 pointers. In-place O(1)." },
+    },
+    code: [
+      "class Solution:",
+      "    def removeDuplicates(self, nums):",
+      "        if not nums: return 0",
+      "        k = 1",
+      "        for i in range(1, len(nums)):",
+      "            if nums[i] != nums[k-1]:",
+      "                nums[k] = nums[i]",
+      "                k += 1",
+      "        return k",
+    ],
+    builder: buildSteps26,
+  },
+  485: {
+    id: 485,
+    difficulty: "easy",
+    slug: "max-consecutive-ones",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Max Consecutive Ones", en: "Max Consecutive Ones" },
+    titleVi: { vi: "Dãy số 1 liên tiếp dài nhất", en: "Longest run of consecutive ones" },
+    statement: {
+      vi: "Cho mảng nhị phân nums. Trả về số lượng 1 liên tiếp lớn nhất.",
+      en: "Given a binary array nums, return the maximum number of consecutive 1s.",
+    },
+    defaultInput: [1, 1, 0, 1, 1, 1],
+    inputKind: "binary",
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyệt mảng 1 lần, 2 biến đếm.", en: "Single pass, 2 counters." },
+    },
+    code: [
+      "class Solution:",
+      "    def findMaxConsecutiveOnes(self, nums):",
+      "        curr = 0",
+      "        max_run = 0",
+      "        for x in nums:",
+      "            if x == 1:",
+      "                curr += 1",
+      "                max_run = max(max_run, curr)",
+      "            else:",
+      "                curr = 0",
+      "        return max_run",
+    ],
+    builder: buildSteps485,
+  },
   283: {
     id: 283,
     difficulty: "easy",
