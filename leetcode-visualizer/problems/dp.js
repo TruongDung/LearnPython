@@ -2397,6 +2397,214 @@ function buildSteps120(input) {
 }
 
 /**
+ * LeetCode 741: Cherry Pickup.
+ * Two simultaneous walkers from (0,0) to (n-1,n-1).
+ * State dp[c1][c2] for step t = r1+c1 = r2+c2 (r1 = t-c1, r2 = t-c2).
+ * Visualization shows the grid + the two walker positions at each step.
+ */
+function buildSteps741(input) {
+  // Parse grid: "0,1,-1|1,0,-1|1,1,1" → [[0,1,-1],[1,0,-1],[1,1,1]]
+  const grid = String(input).split("|").map((row) => row.trim().split(",").map(Number));
+  const n = grid.length;
+  const steps = [];
+  const NEG = -Infinity;
+
+  const cellLabel = (v) => (v === -1 ? "✗" : v === 1 ? "🍒" : "·");
+
+  function makeGrid(hlCells, pathCells) {
+    return {
+      dp: grid.map((row) => row.map((v) => cellLabel(v))),
+      text1: Array.from({ length: n }, (_, i) => `r${i}`),
+      text2: Array.from({ length: n }, (_, i) => `c${i}`),
+      hlCell: null,
+      pathCells: hlCells || [],
+      // reuse pathCells for highlighting both walkers
+      _extraPath: pathCells || [],
+    };
+  }
+
+  // Intro
+  steps.push({
+    title: { vi: "Đề bài", en: "Problem" },
+    arr: [],
+    grid: makeGrid([]),
+    highlight: [],
+    mark: [],
+    codeLines: [2, 3],
+    vars: [
+      { name: "size", value: `${n}×${n}` },
+      { name: "cells", value: "🍒=cherry(1), ✗=thorn(-1), ·=empty(0)" },
+    ],
+    note: {
+      vi:
+        `Lưới ${n}×${n}: 1=anh đào 🍒, 0=trống, -1=gai (không đi được).\n` +
+        `Đi từ (0,0) → (n-1,n-1) (chỉ phải/xuống), nhặt anh đào (ô thành 0), rồi quay về (0,0) (chỉ trái/lên).\n` +
+        `Tối đa hóa số anh đào nhặt được.`,
+      en:
+        `Grid ${n}×${n}: 1=cherry 🍒, 0=empty, -1=thorn (blocked).\n` +
+        `Go (0,0) → (n-1,n-1) (right/down only), pick cherries (cell becomes 0), then return to (0,0) (left/up).\n` +
+        `Maximize cherries collected.`,
+    },
+  });
+
+  // Key trick step
+  steps.push({
+    title: { vi: "Mẹo: 2 người cùng đi", en: "Trick: two simultaneous walkers" },
+    arr: [],
+    grid: makeGrid([[0, 0]]),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "walker A", value: "(r1, c1)" },
+      { name: "walker B", value: "(r2, c2)" },
+      { name: "constraint", value: "r1+c1 == r2+c2 == t" },
+    ],
+    note: {
+      vi:
+        `Thay vì đi-rồi-về, coi như HAI người cùng xuất phát (0,0) → (n-1,n-1).\n` +
+        `Cả hai đi cùng số bước t = r+c. Nên r1+c1 = r2+c2 = t → chỉ cần 3 biến (t, c1, c2).\n` +
+        `Nếu hai người ở cùng ô → chỉ tính anh đào 1 lần.`,
+      en:
+        `Instead of go-then-return, treat as TWO walkers both going (0,0) → (n-1,n-1).\n` +
+        `Both take t = r+c steps. So r1+c1 = r2+c2 = t → only 3 vars needed (t, c1, c2).\n` +
+        `If both on the same cell → count its cherry once.`,
+    },
+  });
+
+  // DP with memoization
+  const memo = new Map();
+  const key = (r1, c1, c2) => `${r1},${c1},${c2}`;
+
+  function dfs(r1, c1, c2) {
+    const r2 = r1 + c1 - c2;
+    // Out of bounds or thorn
+    if (r1 >= n || c1 >= n || r2 >= n || c2 >= n || grid[r1][c1] === -1 || grid[r2][c2] === -1) {
+      return NEG;
+    }
+    // Reached destination
+    if (r1 === n - 1 && c1 === n - 1) {
+      return grid[r1][c1];
+    }
+    const k = key(r1, c1, c2);
+    if (memo.has(k)) return memo.get(k);
+
+    // Cherries at current positions
+    let cherries = grid[r1][c1];
+    if (c1 !== c2) cherries += grid[r2][c2];
+
+    // Two walkers each move right or down: 4 combinations
+    const best = Math.max(
+      dfs(r1, c1 + 1, c2 + 1), // both right
+      dfs(r1 + 1, c1, c2 + 1), // A down, B right
+      dfs(r1, c1 + 1, c2),     // A right, B down
+      dfs(r1 + 1, c1, c2),     // both down
+    );
+
+    const result = best === NEG ? NEG : cherries + best;
+    memo.set(k, result);
+    return result;
+  }
+
+  const raw = dfs(0, 0, 0);
+  const answer = Math.max(0, raw === NEG ? 0 : raw);
+
+  // Reconstruct the two paths for visualization
+  const pathA = [];
+  const pathB = [];
+  if (answer > 0 || raw !== NEG) {
+    let r1 = 0, c1 = 0, c2 = 0;
+    while (true) {
+      pathA.push([r1, c1]);
+      const r2 = r1 + c1 - c2;
+      pathB.push([r2, c2]);
+      if (r1 === n - 1 && c1 === n - 1) break;
+      // Choose the move that matches the optimal value
+      const moves = [
+        [r1, c1 + 1, c2 + 1],
+        [r1 + 1, c1, c2 + 1],
+        [r1, c1 + 1, c2],
+        [r1 + 1, c1, c2],
+      ];
+      let chosen = null;
+      let bestVal = NEG;
+      for (const [nr1, nc1, nc2] of moves) {
+        const nr2 = nr1 + nc1 - nc2;
+        if (nr1 >= n || nc1 >= n || nr2 >= n || nc2 >= n) continue;
+        if (grid[nr1][nc1] === -1 || grid[nr2][nc2] === -1) continue;
+        const v = memo.has(key(nr1, nc1, nc2)) ? memo.get(key(nr1, nc1, nc2)) : dfs(nr1, nc1, nc2);
+        if (v > bestVal) { bestVal = v; chosen = [nr1, nc1, nc2]; }
+      }
+      if (!chosen) break;
+      [r1, c1, c2] = chosen;
+    }
+  }
+
+  // Show a few key path steps
+  const totalT = 2 * (n - 1);
+  const shown = Math.min(pathA.length, 6);
+  for (let idx = 0; idx < pathA.length; idx++) {
+    // Only show a handful of evenly-spaced steps to keep it concise
+    if (pathA.length > 6 && idx % Math.ceil(pathA.length / 6) !== 0 && idx !== pathA.length - 1) continue;
+    const [ar, ac] = pathA[idx];
+    const [br, bc] = pathB[idx];
+    const t = ar + ac;
+    const hl = ac === bc ? [[ar, ac]] : [[ar, ac], [br, bc]];
+
+    steps.push({
+      title: { vi: `t=${t}: A(${ar},${ac}) B(${br},${bc})`, en: `t=${t}: A(${ar},${ac}) B(${br},${bc})` },
+      arr: [],
+      grid: makeGrid(hl, pathA.slice(0, idx + 1)),
+      highlight: [],
+      mark: [],
+      codeLines: [9, 10, 11, 12, 13, 14],
+      vars: [
+        { name: "t (step)", value: t },
+        { name: "walker A", value: `(${ar}, ${ac}) = ${grid[ar][ac] === -1 ? "✗" : grid[ar][ac]}` },
+        { name: "walker B", value: `(${br}, ${bc}) = ${grid[br][bc] === -1 ? "✗" : grid[br][bc]}` },
+        { name: "same cell?", value: ac === bc },
+      ],
+      note: {
+        vi:
+          `Bước t=${t}: A ở (${ar},${ac}), B ở (${br},${bc}).\n` +
+          (ac === bc
+            ? `Hai người cùng ô → chỉ tính anh đào 1 lần.`
+            : `Hai người khác ô → cộng anh đào của cả hai.`),
+        en:
+          `Step t=${t}: A at (${ar},${ac}), B at (${br},${bc}).\n` +
+          (ac === bc
+            ? `Both on same cell → count cherry once.`
+            : `Different cells → add cherries from both.`),
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    grid: makeGrid([], pathA),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [15],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "states memoized", value: memo.size },
+    ],
+    note: {
+      vi:
+        `Số anh đào tối đa nhặt được = ${answer}.\n` +
+        (raw === NEG ? "(Không có đường đi hợp lệ → 0)" : `Đã memo ${memo.size} trạng thái (c1, c2 theo từng t).`),
+      en:
+        `Maximum cherries collected = ${answer}.\n` +
+        (raw === NEG ? "(No valid path → 0)" : `Memoized ${memo.size} states.`),
+    },
+  });
+
+  return { original: grid, answer, steps };
+}
+
+/**
  * LeetCode 931: Minimum Falling Path Sum.
  * dp[r][c] = matrix[r][c] + min(dp[r-1][c-1], dp[r-1][c], dp[r-1][c+1]).
  * First row = matrix first row. Answer = min of last row.
@@ -2838,6 +3046,64 @@ module.exports = {
       "        return min(dp[n-1])",
     ],
     builder: buildSteps931,
+  },
+  741: {
+    id: 741,
+    difficulty: "hard",
+    slug: "cherry-pickup",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Cherry Pickup", en: "Cherry Pickup" },
+    titleVi: { vi: "Nhặt anh đào (DP 3 chiều)", en: "Cherry pickup (3D DP)" },
+    statement: {
+      vi:
+        "Lưới n×n: 1=anh đào, 0=trống, -1=gai (chặn). Đi từ (0,0) đến (n-1,n-1) chỉ phải/xuống (nhặt anh đào, ô thành 0), " +
+        "rồi quay về (0,0) chỉ trái/lên. Tối đa hóa số anh đào nhặt được. Nếu không có đường đi → 0. " +
+        "Nhập lưới: hàng cách bởi '|', giá trị cách bởi ','.",
+      en:
+        "Grid n×n: 1=cherry, 0=empty, -1=thorn (blocked). Go from (0,0) to (n-1,n-1) moving right/down (pick cherries, cell becomes 0), " +
+        "then return to (0,0) moving left/up. Maximize cherries collected. If no valid path → 0. " +
+        "Enter grid: rows separated by '|', values by ','.",
+    },
+    defaultInput: "0,1,-1|1,0,-1|1,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới (hàng cách '|')", en: "Grid (rows separated by '|')" },
+    extraParams: [],
+    approach: [
+      { vi: "Đi-rồi-về khó tối ưu trực tiếp. Mẹo: coi như 2 người CÙNG đi từ (0,0) → (n-1,n-1).", en: "Go-then-return is hard to optimize directly. Trick: treat as 2 walkers BOTH going (0,0) → (n-1,n-1)." },
+      { vi: "Hai người đi cùng số bước t = r+c. Nên r1+c1 = r2+c2 → state chỉ cần (t, c1, c2) hoặc (r1, c1, c2).", en: "Both take t = r+c steps. So r1+c1 = r2+c2 → state only needs (t, c1, c2) or (r1, c1, c2)." },
+      { vi: "Mỗi bước, mỗi người chọn phải hoặc xuống → 4 tổ hợp chuyển trạng thái.", en: "Each step, each walker chooses right or down → 4 transition combinations." },
+      { vi: "Nếu hai người ở CÙNG ô → chỉ tính anh đào 1 lần (tránh đếm trùng).", en: "If both on the SAME cell → count its cherry only once (avoid double-counting)." },
+      { vi: "Đáp án = max(0, dp(0,0,0)). Nếu mọi đường bị gai chặn → 0.", en: "Answer = max(0, dp(0,0,0)). If all paths are blocked by thorns → 0." },
+    ],
+    complexity: {
+      time: "O(n³)",
+      space: "O(n³)",
+      note: {
+        vi: "State (r1, c1, c2) có O(n³) khả năng, mỗi state O(1). Memo O(n³).",
+        en: "State (r1, c1, c2) has O(n³) possibilities, each O(1). Memo O(n³).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def cherryPickup(self, grid):",
+      "        n = len(grid)",
+      "        from functools import lru_cache",
+      "        @lru_cache(None)",
+      "        def dp(r1, c1, c2):",
+      "            r2 = r1 + c1 - c2",
+      "            if (r1>=n or c1>=n or r2>=n or c2>=n",
+      "                    or grid[r1][c1]==-1 or grid[r2][c2]==-1):",
+      "                return float('-inf')",
+      "            if r1==n-1 and c1==n-1:",
+      "                return grid[r1][c1]",
+      "            cherries = grid[r1][c1]",
+      "            if c1 != c2: cherries += grid[r2][c2]",
+      "            cherries += max(dp(r1,c1+1,c2+1), dp(r1+1,c1,c2+1),",
+      "                            dp(r1,c1+1,c2),   dp(r1+1,c1,c2))",
+      "            return cherries",
+      "        return max(0, dp(0, 0, 0))",
+    ],
+    builder: buildSteps741,
   },
   120: {
     id: 120,

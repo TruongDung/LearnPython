@@ -921,6 +921,432 @@ function buildSteps1236(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 847 Approach 2: DP Bitmask + Floyd-Warshall.
+ * Phase 1: Floyd-Warshall → dist[i][j] = shortest path between any pair.
+ * Phase 2: TSP DP — dp[mask][i] = min cost to visit nodes in mask, ending at i.
+ */
+function buildSteps847DP(input) {
+  const adj = String(input)
+    .split("|")
+    .map((row) => row.trim())
+    .map((row) => (row.length === 0 ? [] : row.split(",").map(Number).filter((v) => !isNaN(v))));
+  const n = adj.length;
+  const steps = [];
+  const fullMask = (1 << n) - 1;
+  const INF = Infinity;
+
+  // Build edge list for graph display
+  const edgeList = [];
+  const seenE = new Set();
+  for (let u = 0; u < n; u++) {
+    for (const v of adj[u]) {
+      const k = u < v ? `${u}-${v}` : `${v}-${u}`;
+      if (!seenE.has(k)) { seenE.add(k); edgeList.push({ u, v, w: "" }); }
+    }
+  }
+  const nodes = Array.from({ length: n }, (_, i) => i);
+
+  const maskBin = (m) => m.toString(2).padStart(n, "0");
+  const maskNodes = (m) => {
+    const a = [];
+    for (let i = 0; i < n; i++) if (m & (1 << i)) a.push(i);
+    return a;
+  };
+
+  function makeGraph(hlNodes, visitedNodes) {
+    return {
+      nodes: nodes.map((id) => ({ id })),
+      edges: edgeList,
+      hlNodes: hlNodes || [],
+      hlEdges: [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  // Intro
+  steps.push({
+    title: { vi: "Approach 2: DP Bitmask + Floyd-Warshall", en: "Approach 2: DP Bitmask + Floyd-Warshall" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "n", value: n },
+      { name: "fullMask", value: maskBin(fullMask) },
+      { name: "phases", value: "1) Floyd-Warshall  2) TSP DP" },
+    ],
+    note: {
+      vi:
+        `Bài này có thể giải bằng DP TSP-like, nhưng cần Floyd-Warshall trước.\n` +
+        `Phase 1: tính dist[i][j] = đường ngắn nhất giữa mọi cặp i,j (FW O(n³)).\n` +
+        `Phase 2: dp[mask][i] = chi phí nhỏ nhất thăm các nút trong mask, KẾT THÚC tại i.\n` +
+        `Đáp án = min(dp[fullMask][i]) với mọi i.`,
+      en:
+        `This problem can be solved with TSP-like DP, but needs Floyd-Warshall first.\n` +
+        `Phase 1: compute dist[i][j] = shortest path between every pair (FW O(n³)).\n` +
+        `Phase 2: dp[mask][i] = min cost to visit nodes in mask, ENDING at i.\n` +
+        `Answer = min(dp[fullMask][i]) over all i.`,
+    },
+  });
+
+  // Phase 1: Floyd-Warshall
+  const dist = Array.from({ length: n }, () => new Array(n).fill(INF));
+  for (let i = 0; i < n; i++) {
+    dist[i][i] = 0;
+    for (const j of adj[i]) dist[i][j] = 1;
+  }
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (dist[i][k] + dist[k][j] < dist[i][j]) {
+          dist[i][j] = dist[i][k] + dist[k][j];
+        }
+      }
+    }
+  }
+
+  // Show distance matrix
+  const distMatrix = dist.map((row) => row.map((v) => (v === INF ? "∞" : String(v))));
+  steps.push({
+    title: { vi: "Phase 1: Floyd-Warshall xong", en: "Phase 1: Floyd-Warshall done" },
+    arr: [],
+    grid: {
+      dp: distMatrix,
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: null,
+      pathCells: [],
+    },
+    highlight: [],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [7, 8, 9, 10, 11, 12, 13, 14, 15],
+    vars: [
+      { name: "dist matrix", value: `${n}×${n}` },
+      { name: "max distance", value: Math.max(...dist.flat().filter((v) => v !== INF)) },
+    ],
+    note: {
+      vi:
+        `Floyd-Warshall đã chạy xong. Ma trận dist[i][j] = đường ngắn nhất từ i đến j.\n` +
+        `Lưới hiện tại: hàng = i, cột = j, giá trị = dist[i][j].\n` +
+        `Nhờ dist[][], DP TSP có thể nhảy thẳng giữa 2 nút bất kỳ (không cần qua trung gian).`,
+      en:
+        `Floyd-Warshall done. dist[i][j] = shortest path from i to j.\n` +
+        `Grid: row = i, col = j, value = dist[i][j].\n` +
+        `With dist[][], TSP DP can jump directly between any pair (no need for intermediate nodes).`,
+    },
+  });
+
+  // Phase 2: TSP DP
+  const dp = Array.from({ length: 1 << n }, () => new Array(n).fill(INF));
+  for (let i = 0; i < n; i++) dp[1 << i][i] = 0;
+
+  // Group masks by popcount and show snapshots
+  const popcount = (m) => {
+    let c = 0;
+    while (m) { c += m & 1; m >>>= 1; }
+    return c;
+  };
+
+  // Process masks in order
+  for (let mask = 0; mask < 1 << n; mask++) {
+    for (let i = 0; i < n; i++) {
+      if (dp[mask][i] === INF) continue;
+      for (let j = 0; j < n; j++) {
+        if (mask & (1 << j)) continue;
+        const newMask = mask | (1 << j);
+        const cost = dp[mask][i] + dist[i][j];
+        if (cost < dp[newMask][j]) dp[newMask][j] = cost;
+      }
+    }
+  }
+
+  // Show one snapshot per popcount level (after all masks of that size processed)
+  for (let pc = 1; pc <= n; pc++) {
+    // Find masks with this popcount
+    const masksOfPc = [];
+    for (let m = 0; m < 1 << n; m++) if (popcount(m) === pc) masksOfPc.push(m);
+
+    // Pick best example: the mask with smallest min dp value at popcount pc
+    let bestMask = masksOfPc[0];
+    let bestEnd = 0;
+    let bestVal = INF;
+    for (const m of masksOfPc) {
+      for (let i = 0; i < n; i++) {
+        if (dp[m][i] < bestVal) {
+          bestVal = dp[m][i];
+          bestMask = m;
+          bestEnd = i;
+        }
+      }
+    }
+
+    if (bestVal === INF) continue;
+    const visitedNodes = maskNodes(bestMask);
+
+    steps.push({
+      title: { vi: `DP: popcount=${pc} (đã thăm ${pc}/${n} nút)`, en: `DP: popcount=${pc} (visited ${pc}/${n} nodes)` },
+      arr: [],
+      graph: makeGraph([bestEnd], visitedNodes),
+      highlight: [],
+      mark: [],
+      codeBlock: 2,
+      codeLines: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+      vars: [
+        { name: "popcount", value: pc },
+        { name: "example mask", value: maskBin(bestMask) },
+        { name: "visited", value: `[${visitedNodes.join(", ")}]` },
+        { name: "end node", value: bestEnd },
+        { name: "dp[mask][end]", value: bestVal },
+      ],
+      note: {
+        vi:
+          `Sau khi xử lý mọi mask có popcount = ${pc}.\n` +
+          `Ví dụ: mask = ${maskBin(bestMask)} (thăm [${visitedNodes.join(", ")}]), kết thúc tại nút ${bestEnd}, dp = ${bestVal}.\n` +
+          `Transition: dp[mask | (1<<j)][j] = min(dp[mask][i] + dist[i][j]).`,
+        en:
+          `After processing all masks with popcount = ${pc}.\n` +
+          `Example: mask = ${maskBin(bestMask)} (visited [${visitedNodes.join(", ")}]), ending at node ${bestEnd}, dp = ${bestVal}.\n` +
+          `Transition: dp[mask | (1<<j)][j] = min(dp[mask][i] + dist[i][j]).`,
+      },
+    });
+  }
+
+  // Final answer
+  let answer = INF;
+  let bestEnd = 0;
+  for (let i = 0; i < n; i++) {
+    if (dp[fullMask][i] < answer) { answer = dp[fullMask][i]; bestEnd = i; }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    graph: makeGraph([bestEnd], nodes),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeBlock: 2,
+    codeLines: [28],
+    vars: [
+      { name: "fullMask", value: maskBin(fullMask) },
+      { name: "best end node", value: bestEnd },
+      { name: "answer", value: answer },
+      { name: "dp[fullMask] row", value: dp[fullMask].map((v) => (v === INF ? "∞" : v)).join(", ") },
+    ],
+    note: {
+      vi:
+        `Đáp án = min(dp[fullMask][i]) với mọi i = ${answer}.\n` +
+        `Nút kết thúc tốt nhất: ${bestEnd}.\n` +
+        `Các giá trị dp[fullMask][i]: [${dp[fullMask].map((v) => (v === INF ? "∞" : v)).join(", ")}].`,
+      en:
+        `Answer = min(dp[fullMask][i]) over all i = ${answer}.\n` +
+        `Best ending node: ${bestEnd}.\n` +
+        `dp[fullMask][i] values: [${dp[fullMask].map((v) => (v === INF ? "∞" : v)).join(", ")}].`,
+    },
+  });
+
+  return { adj: input, answer, steps };
+}
+
+/**
+ * Generate steps for LeetCode 847: Shortest Path Visiting All Nodes.
+ * BFS with state = (node, visited_mask). Each level = 1 step.
+ * Starts from EVERY node simultaneously (any starting point allowed).
+ */
+function buildSteps847(input, params) {
+  const approach = (params && params.approach) || 1;
+  if (approach === 2) return buildSteps847DP(input);
+
+  // Parse adjacency: "1,2,3|0|0|0" → [[1,2,3],[0],[0],[0]]
+  const adj = String(input)
+    .split("|")
+    .map((row) => row.trim())
+    .map((row) => (row.length === 0 ? [] : row.split(",").map(Number).filter((v) => !isNaN(v))));
+  const n = adj.length;
+  const steps = [];
+  const fullMask = (1 << n) - 1;
+
+  // Build edge list for graph display
+  const edgeList = [];
+  const seenEdges = new Set();
+  for (let u = 0; u < n; u++) {
+    for (const v of adj[u]) {
+      const key = u < v ? `${u}-${v}` : `${v}-${u}`;
+      if (!seenEdges.has(key)) {
+        seenEdges.add(key);
+        edgeList.push({ u, v, w: "" });
+      }
+    }
+  }
+
+  const nodes = Array.from({ length: n }, (_, i) => i);
+
+  // Helper: format mask as binary string + visited nodes
+  const maskBinary = (m) => m.toString(2).padStart(n, "0");
+  const visitedSet = (m) => {
+    const arr = [];
+    for (let i = 0; i < n; i++) if (m & (1 << i)) arr.push(i);
+    return arr;
+  };
+
+  function makeGraph(hlNodes, visitedNodes) {
+    return {
+      nodes: nodes.map((id) => ({ id })),
+      edges: edgeList,
+      hlNodes: hlNodes || [],
+      hlEdges: [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    arr: [],
+    graph: makeGraph([], []),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "n", value: n },
+      { name: "fullMask (target)", value: maskBinary(fullMask) + " = " + fullMask },
+      { name: "starting states", value: n },
+    ],
+    note: {
+      vi:
+        `${n} nút. Mục tiêu: đường ngắn nhất thăm TẤT CẢ nút (có thể bắt đầu/kết thúc ở bất kỳ nút nào, được thăm lại).\n` +
+        `BFS với state = (node, visited_mask). fullMask = ${maskBinary(fullMask)} (tất cả ${n} bit = 1).\n` +
+        `Bắt đầu BFS đồng thời từ MỌI nút: thêm (i, 1<<i, 0) vào queue cho i = 0..${n - 1}.`,
+      en:
+        `${n} nodes. Goal: shortest path visiting ALL nodes (can start/end anywhere, may revisit).\n` +
+        `BFS with state = (node, visited_mask). fullMask = ${maskBinary(fullMask)} (all ${n} bits set).\n` +
+        `Start BFS simultaneously from EVERY node: enqueue (i, 1<<i, 0) for i = 0..${n - 1}.`,
+    },
+  });
+
+  if (n === 1) {
+    steps.push({
+      title: { vi: "n=1 → answer = 0", en: "n=1 → answer = 0" },
+      arr: [],
+      graph: makeGraph([0], [0]),
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Chỉ có 1 nút, đường đi rỗng.", en: "Only 1 node, empty path." },
+    });
+    return { adj: input, answer: 0, steps };
+  }
+
+  // BFS
+  const visited = new Set();
+  let frontier = [];
+  for (let i = 0; i < n; i++) {
+    const mask = 1 << i;
+    frontier.push([i, mask]);
+    visited.add(`${i},${mask}`);
+  }
+
+  let answer = -1;
+  let dist = 0;
+  const MAX_STEPS_SHOW = 12;
+  let stepShown = 1;
+
+  // Check if any starting state already covers all (only if n==1)
+  for (const [node, mask] of frontier) {
+    if (mask === fullMask) { answer = 0; break; }
+  }
+
+  while (frontier.length > 0 && answer === -1) {
+    dist++;
+    const nextFrontier = [];
+
+    for (const [node, mask] of frontier) {
+      for (const next of adj[node]) {
+        const newMask = mask | (1 << next);
+        const key = `${next},${newMask}`;
+        if (visited.has(key)) continue;
+        if (newMask === fullMask) {
+          answer = dist;
+          frontier = []; // break outer loop
+          break;
+        }
+        visited.add(key);
+        nextFrontier.push([next, newMask]);
+      }
+      if (answer !== -1) break;
+    }
+
+    // Show a sample step
+    if (stepShown < MAX_STEPS_SHOW) {
+      stepShown++;
+      // Pick sample state for display
+      const sample = nextFrontier[0] || (answer !== -1 ? [n - 1, fullMask] : null);
+      const sampleNode = sample ? sample[0] : 0;
+      const sampleMask = sample ? sample[1] : 0;
+      const visitedArr = visitedSet(sampleMask);
+
+      steps.push({
+        title: { vi: `Bước ${dist}: ${answer !== -1 ? "tới đích" : nextFrontier.length + " state mới"}`, en: `Step ${dist}: ${answer !== -1 ? "reached target" : nextFrontier.length + " new states"}` },
+        arr: [],
+        graph: makeGraph([sampleNode], visitedArr),
+        highlight: [],
+        mark: [],
+        codeLines: [9, 10, 11, 12, 13, 14, 15, 16],
+        vars: [
+          { name: "dist", value: dist },
+          { name: "frontier processed", value: frontier.length },
+          { name: "new states", value: nextFrontier.length },
+          { name: "sample state", value: `node=${sampleNode}, mask=${maskBinary(sampleMask)}` },
+          { name: "sample visited", value: `[${visitedArr.join(", ")}]` },
+          { name: "total visited", value: visited.size },
+        ],
+        note: {
+          vi:
+            `Bước ${dist}: từ ${frontier.length} state, sinh ${nextFrontier.length} state mới.\n` +
+            `Ví dụ: ở nút ${sampleNode} đã thăm [${visitedArr.join(", ")}] (mask=${maskBinary(sampleMask)}).\n` +
+            (answer !== -1 ? `✓ Có state đạt fullMask sau ${dist} bước → answer = ${dist}.` : "Tiếp tục BFS."),
+          en:
+            `Step ${dist}: from ${frontier.length} states, generated ${nextFrontier.length} new.\n` +
+            `Sample: at node ${sampleNode} having visited [${visitedArr.join(", ")}] (mask=${maskBinary(sampleMask)}).\n` +
+            (answer !== -1 ? `✓ A state reached fullMask after ${dist} steps → answer = ${dist}.` : "Continue BFS."),
+        },
+      });
+    }
+
+    if (answer !== -1) break;
+    frontier = nextFrontier;
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    graph: makeGraph([], nodes),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "states explored", value: visited.size },
+    ],
+    note: {
+      vi:
+        `Đường đi ngắn nhất thăm tất cả ${n} nút có độ dài ${answer}.\n` +
+        `Tổng số state (node, mask) đã khám phá: ${visited.size}.`,
+      en:
+        `Shortest path visiting all ${n} nodes has length ${answer}.\n` +
+        `Total (node, mask) states explored: ${visited.size}.`,
+    },
+  });
+
+  return { adj: input, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 207: Course Schedule.
  * Topological sort (Kahn's algorithm) — detects cycle.
  * prerequisites[i] = [a, b] means to take a you must first take b (b → a).
@@ -1996,5 +2422,109 @@ module.exports = {
       "        return taken == numCourses",
     ],
     builder: buildSteps207,
+  },
+  847: {
+    id: 847,
+    difficulty: "hard",
+    slug: "shortest-path-visiting-all-nodes",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Shortest Path Visiting All Nodes", en: "Shortest Path Visiting All Nodes" },
+    titleVi: { vi: "Đường ngắn nhất thăm mọi nút", en: "Shortest path covering all nodes" },
+    statement: {
+      vi:
+        "Cho đồ thị vô hướng liên thông có n nút (0..n-1), graph[i] là danh sách kề của nút i. " +
+        "Trả về độ dài đường đi ngắn nhất thăm TẤT CẢ nút. Có thể bắt đầu/kết thúc ở bất kỳ nút nào, được thăm lại nút/cạnh. " +
+        "Nhập: mỗi hàng cách bởi '|', các nút kề cách bởi ','. Ví dụ: '1,2,3|0|0|0'.",
+      en:
+        "Given a connected undirected graph with n nodes (0..n-1), graph[i] is the adjacency list of node i. " +
+        "Return the length of the shortest path that visits EVERY node. May start/end anywhere; nodes/edges may be revisited. " +
+        "Input: rows separated by '|', neighbors by ','. E.g. '1,2,3|0|0|0'.",
+    },
+    defaultInput: "1,2,3|0|0|0",
+    inputKind: "string",
+    inputLabel: { vi: "Adjacency list (hàng cách '|')", en: "Adjacency list (rows separated by '|')" },
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "BFS state-space (node, mask)", en: "BFS state-space (node, mask)" } },
+          { value: 2, label: { vi: "DP Bitmask + Floyd-Warshall", en: "DP Bitmask + Floyd-Warshall" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Đây là bài Shortest Path nhưng state KHÔNG chỉ là nút — phải nhớ đã thăm những nút nào.", en: "Shortest path, but state is NOT just the node — must track which nodes have been visited." },
+      { vi: "Dùng bitmask: visited_mask có n bit, bit i = 1 nghĩa là đã thăm nút i.", en: "Use a bitmask: visited_mask has n bits; bit i = 1 means node i has been visited." },
+      { vi: "State BFS = (node, mask). Mục tiêu: đạt state có mask == (1 << n) - 1 (tất cả bit 1).", en: "BFS state = (node, mask). Goal: reach a state where mask == (1 << n) - 1 (all bits set)." },
+      { vi: "Vì bắt đầu ở đâu cũng được → khởi tạo queue với MỌI nút: (i, 1<<i, 0) cho i = 0..n-1.", en: "Any node can be the start → initialize queue with EVERY node: (i, 1<<i, 0) for i = 0..n-1." },
+      { vi: "Mỗi level BFS = 1 bước đi. Khi pop state có mask = fullMask → trả về dist hiện tại.", en: "Each BFS level = 1 step. When popping a state with mask = fullMask → return the current dist." },
+    ],
+    complexity: {
+      time: "O(n² · 2ⁿ)",
+      space: "O(n · 2ⁿ)",
+      note: {
+        vi: "Có n·2ⁿ state (node, mask). Mỗi state thử tối đa n hàng xóm. Bộ nhớ visited set + queue.",
+        en: "There are n·2ⁿ (node, mask) states. Each tries up to n neighbors. Memory for visited set + queue.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def shortestPathLength(self, graph):",
+      "        n = len(graph)",
+      "        if n == 1: return 0",
+      "        full = (1 << n) - 1",
+      "        visited = {(i, 1 << i) for i in range(n)}",
+      "        queue = deque([(i, 1 << i, 0) for i in range(n)])",
+      "        while queue:",
+      "            node, mask, dist = queue.popleft()",
+      "            for nxt in graph[node]:",
+      "                new_mask = mask | (1 << nxt)",
+      "                if new_mask == full:",
+      "                    return dist + 1",
+      "                if (nxt, new_mask) in visited:",
+      "                    continue",
+      "                visited.add((nxt, new_mask))",
+      "                queue.append((nxt, new_mask, dist + 1))",
+      "        return -1",
+    ],
+    code2: [
+      "# Bitmask DP + Floyd-Warshall (TSP-like)",
+      "class Solution:",
+      "    def shortestPathLength(self, graph):",
+      "        n = len(graph)",
+      "        if n == 1: return 0",
+      "        INF = float('inf')",
+      "        # Step 1: Floyd-Warshall — dist[i][j] = shortest path i→j",
+      "        dist = [[INF]*n for _ in range(n)]",
+      "        for i in range(n):",
+      "            dist[i][i] = 0",
+      "            for j in graph[i]: dist[i][j] = 1",
+      "        for k in range(n):",
+      "            for i in range(n):",
+      "                for j in range(n):",
+      "                    if dist[i][k] + dist[k][j] < dist[i][j]:",
+      "                        dist[i][j] = dist[i][k] + dist[k][j]",
+      "        # Step 2: TSP DP — dp[mask][i] = min path visiting mask, ending at i",
+      "        full = (1 << n) - 1",
+      "        dp = [[INF]*n for _ in range(1 << n)]",
+      "        for i in range(n): dp[1 << i][i] = 0",
+      "        for mask in range(1 << n):",
+      "            for i in range(n):",
+      "                if dp[mask][i] == INF: continue",
+      "                for j in range(n):",
+      "                    if mask & (1 << j): continue",
+      "                    nm = mask | (1 << j)",
+      "                    if dp[mask][i] + dist[i][j] < dp[nm][j]:",
+      "                        dp[nm][j] = dp[mask][i] + dist[i][j]",
+      "        return min(dp[full])",
+    ],
+    codeLabel: { vi: "Cách 1: BFS state-space", en: "Approach 1: BFS state-space" },
+    code2Label: { vi: "Cách 2: DP Bitmask + Floyd-Warshall", en: "Approach 2: DP Bitmask + Floyd-Warshall" },
+    builder: buildSteps847,
   },
 };

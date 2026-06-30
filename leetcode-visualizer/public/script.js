@@ -681,6 +681,7 @@ function renderCode() {
   if (code.length > 0) {
     const section = document.createElement("div");
     section.className = "code-section";
+    section.dataset.block = "1";
 
     if (code2) {
       const label = document.createElement("div");
@@ -717,6 +718,7 @@ function renderCode() {
   if (code2) {
     const section = document.createElement("div");
     section.className = "code-section";
+    section.dataset.block = "2";
 
     const sep = document.createElement("div");
     sep.className = "code-section-label";
@@ -750,7 +752,17 @@ function renderCode() {
 
 function updateCodeHighlight(activeLines, codeBlock) {
   const set = new Set(activeLines);
+  const block = codeBlock === 2 ? "2" : "1";
   const targetAttr = codeBlock === 2 ? "line2" : "line";
+
+  // Show only the active section (hide the other); fall back to showing all if no sections labeled.
+  const sections = $("codePanel").querySelectorAll(".code-section");
+  if (sections.length > 1) {
+    sections.forEach((sec) => {
+      sec.classList.toggle("hidden", sec.dataset.block !== block);
+    });
+  }
+
   $("codePanel")
     .querySelectorAll(".code-line")
     .forEach((row) => {
