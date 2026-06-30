@@ -62,6 +62,20 @@ function snapshot(root, opts) {
 
 const TREE_CAT = { key: "binary-tree", vi: "Cây nhị phân", en: "Binary Tree" };
 
+// Find a node by value (first match in preorder).
+function findNode(root, val) {
+  let found = null;
+  (function dfs(n) { if (!n || found) return; if (n.val === val) { found = n; return; } dfs(n.left); dfs(n.right); })(root);
+  return found;
+}
+
+// Map each node id → its parent node (null for root).
+function buildParents(root) {
+  const parent = new Map();
+  (function dfs(n, p) { if (!n) return; parent.set(n.id, p); dfs(n.left, n); dfs(n.right, n); })(root, null);
+  return parent;
+}
+
 // ─── 144: Binary Tree Preorder Traversal (Root → Left → Right) ───
 function buildSteps144(input) {
   const root = parseTree(input); const steps = []; const result = []; const visited = new Set();
@@ -433,6 +447,331 @@ function buildSteps199(input) {
   return { input, answer: `[${view.join(",")}]`, steps };
 }
 
+// ─── 236: Lowest Common Ancestor of a Binary Tree ───
+function buildSteps236(input, params) {
+  const root = parseTree(input); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: `LCA của ${pv} và ${qv}`, en: `LCA of ${pv} and ${qv}` },
+    codeLines: [2, 3], vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
+    note: { vi: `Đệ quy: nếu nút == p hoặc q → trả nút đó. Nếu CẢ 2 nhánh con đều trả về khác null → nút hiện tại là LCA.`, en: `Recursion: if node == p or q → return it. If BOTH child branches return non-null → current node is the LCA.` },
+  }));
+  let answer = null;
+  function lca(node) {
+    if (!node) return null;
+    if (node.val === pv || node.val === qv) {
+      steps.push(snapshot(root, { title: { vi: `Tìm thấy ${node.val}`, en: `Found ${node.val}` }, hlSet: new Set([node.id]), codeLines: [4, 5], vars: [{ name: "node", value: node.val }], note: { vi: `${node.val} là p hoặc q → trả về nút này.`, en: `${node.val} is p or q → return this node.` } }));
+      return node;
+    }
+    const L = lca(node.left), R = lca(node.right);
+    if (L && R) {
+      if (!answer) answer = node;
+      steps.push(snapshot(root, { title: { vi: `${node.val} là LCA (split)`, en: `${node.val} is LCA (split)` }, hlSet: new Set([node.id]), wordSet: new Set([L.id, R.id]), codeLines: [7, 8], vars: [{ name: "left", value: L.val }, { name: "right", value: R.val }, { name: "LCA", value: node.val }], note: { vi: `p và q nằm ở 2 nhánh khác nhau của ${node.val} → ${node.val} là LCA.`, en: `p and q lie in different branches of ${node.val} → ${node.val} is the LCA.` } }));
+      return node;
+    }
+    return L || R;
+  }
+  lca(root);
+  const fs = snapshot(root, { title: { vi: `LCA = ${answer ? answer.val : "null"}`, en: `LCA = ${answer ? answer.val : "null"}` }, wordSet: answer ? new Set([answer.id]) : undefined, vars: [{ name: "answer", value: answer ? answer.val : "null" }], note: { vi: `Tổ tiên chung thấp nhất = ${answer ? answer.val : "null"}.`, en: `Lowest common ancestor = ${answer ? answer.val : "null"}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: answer ? answer.val : "null", steps };
+}
+
+// ─── 1644: LCA of a Binary Tree II (p or q may be absent) ───
+function buildSteps1644(input, params) {
+  const root = parseTree(input); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: `LCA II của ${pv} và ${qv}`, en: `LCA II of ${pv} and ${qv}` },
+    codeLines: [2, 3], vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
+    note: { vi: `Giống bài 236 nhưng p hoặc q CÓ THỂ KHÔNG tồn tại. Phải duyệt HẾT cây để đếm, chỉ trả LCA nếu tìm thấy CẢ p và q.`, en: `Like 236 but p or q MAY be absent. Must traverse the WHOLE tree to count; only return LCA if BOTH p and q exist.` },
+  }));
+  let pFound = false, qFound = false, ans = null;
+  function dfs(node) {
+    if (!node) return null;
+    const L = dfs(node.left), R = dfs(node.right);
+    let mid = null;
+    if (node.val === pv) { pFound = true; mid = node; }
+    if (node.val === qv) { qFound = true; mid = node; }
+    const cnt = [L, R, mid].filter(Boolean).length;
+    if (cnt >= 2 && !ans) {
+      ans = node;
+      steps.push(snapshot(root, { title: { vi: `Ứng viên LCA: ${node.val}`, en: `LCA candidate: ${node.val}` }, hlSet: new Set([node.id]), codeLines: [6, 7], vars: [{ name: "node", value: node.val }], note: { vi: `Tại ${node.val} gặp đủ 2 phía → ứng viên LCA (vẫn duyệt tiếp để xác nhận tồn tại).`, en: `At ${node.val} two sides matched → LCA candidate (keep traversing to confirm existence).` } }));
+    }
+    return L || R || mid;
+  }
+  dfs(root);
+  const valid = pFound && qFound;
+  const fs = snapshot(root, { title: { vi: valid ? `LCA = ${ans.val}` : `null (thiếu p hoặc q)`, en: valid ? `LCA = ${ans.val}` : `null (p or q missing)` }, wordSet: valid ? new Set([ans.id]) : undefined, vars: [{ name: "pFound", value: pFound }, { name: "qFound", value: qFound }, { name: "answer", value: valid ? ans.val : "null" }], note: { vi: valid ? `Cả p và q đều tồn tại → LCA = ${ans.val}.` : `Thiếu ${!pFound ? pv : qv} → trả về null.`, en: valid ? `Both p and q exist → LCA = ${ans.val}.` : `Missing ${!pFound ? pv : qv} → return null.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: valid ? ans.val : "null", steps };
+}
+
+// ─── 1650: LCA of a Binary Tree III (parent pointers) ───
+function buildSteps1650(input, params) {
+  const root = parseTree(input); const parent = buildParents(root); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
+  const p = findNode(root, pv), q = findNode(root, qv);
+  steps.push(snapshot(root, {
+    title: { vi: `LCA III của ${pv} và ${qv}`, en: `LCA III of ${pv} and ${qv}` },
+    codeLines: [2, 3], vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
+    note: { vi: `Mỗi nút có con trỏ CHA. Thu tất cả tổ tiên của p (đi lên tới gốc), rồi đi lên từ q, gặp tổ tiên chung đầu tiên → LCA.`, en: `Each node has a PARENT pointer. Collect all ancestors of p (walk up to root), then walk up from q; the first shared ancestor → LCA.` },
+  }));
+  const anc = new Set(); let cur = p;
+  while (cur) {
+    anc.add(cur.id);
+    steps.push(snapshot(root, { title: { vi: `Tổ tiên của p: ${cur.val}`, en: `Ancestor of p: ${cur.val}` }, hlSet: new Set([cur.id]), wordSet: new Set(anc), codeLines: [4, 5], vars: [{ name: "node", value: cur.val }, { name: "ancestors(p)", value: `{${[...anc].map((id) => findNodeById(root, id)).join(",")}}` }], note: { vi: `Thêm ${cur.val} vào tập tổ tiên của p, đi lên cha.`, en: `Add ${cur.val} to p's ancestor set, move up to parent.` } }));
+    cur = parent.get(cur.id);
+  }
+  cur = q; let lca = null;
+  while (cur) {
+    if (anc.has(cur.id)) {
+      lca = cur;
+      steps.push(snapshot(root, { title: { vi: `✓ ${cur.val} là tổ tiên chung`, en: `✓ ${cur.val} is common ancestor` }, hlSet: new Set([cur.id]), wordSet: new Set([cur.id]), codeLines: [6, 7], vars: [{ name: "node", value: cur.val }, { name: "LCA", value: cur.val }], note: { vi: `${cur.val} có trong tổ tiên của p → đây là LCA.`, en: `${cur.val} is in p's ancestors → this is the LCA.` } }));
+      break;
+    }
+    steps.push(snapshot(root, { title: { vi: `${cur.val} chưa phải`, en: `${cur.val} not yet` }, hlSet: new Set([cur.id]), codeLines: [6], vars: [{ name: "node", value: cur.val }], note: { vi: `${cur.val} không thuộc tổ tiên của p → đi lên cha của q.`, en: `${cur.val} not in p's ancestors → go up from q.` } }));
+    cur = parent.get(cur.id);
+  }
+  const fs = snapshot(root, { title: { vi: `LCA = ${lca ? lca.val : "null"}`, en: `LCA = ${lca ? lca.val : "null"}` }, wordSet: lca ? new Set([lca.id]) : undefined, vars: [{ name: "answer", value: lca ? lca.val : "null" }], note: { vi: `Tổ tiên chung thấp nhất = ${lca ? lca.val : "null"}.`, en: `Lowest common ancestor = ${lca ? lca.val : "null"}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: lca ? lca.val : "null", steps };
+}
+function findNodeById(root, id) { let v = null; (function dfs(n) { if (!n || v !== null) return; if (n.id === id) { v = n.val; return; } dfs(n.left); dfs(n.right); })(root); return v; }
+
+// ─── 1676: LCA of a Binary Tree IV (array of nodes) ───
+function buildSteps1676(input, params) {
+  const root = parseTree(input); const targets = String(params.nodes || "").split(",").map((s) => Number(s.trim())); const tset = new Set(targets); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: `LCA IV của [${targets.join(",")}]`, en: `LCA IV of [${targets.join(",")}]` },
+    codeLines: [2, 3], vars: [{ name: "nodes", value: `[${targets.join(",")}]` }],
+    note: { vi: `Tổng quát hóa 236 cho NHIỀU nút. Đệ quy: nếu nút thuộc tập đích → trả về nút. Nếu ≥2 nhánh trả khác null → nút hiện tại là LCA.`, en: `Generalize 236 to MANY nodes. Recursion: if node is in the target set → return it. If ≥2 branches return non-null → current node is the LCA.` },
+  }));
+  let answer = null;
+  function lca(node) {
+    if (!node) return null;
+    if (tset.has(node.val)) {
+      steps.push(snapshot(root, { title: { vi: `Gặp đích ${node.val}`, en: `Hit target ${node.val}` }, hlSet: new Set([node.id]), codeLines: [4, 5], vars: [{ name: "node", value: node.val }], note: { vi: `${node.val} thuộc tập đích → trả về nút này.`, en: `${node.val} is a target → return this node.` } }));
+      return node;
+    }
+    const L = lca(node.left), R = lca(node.right);
+    if (L && R) {
+      answer = node;
+      steps.push(snapshot(root, { title: { vi: `${node.val}: điểm gộp`, en: `${node.val}: merge point` }, hlSet: new Set([node.id]), codeLines: [7, 8], vars: [{ name: "node", value: node.val }, { name: "left", value: L.val }, { name: "right", value: R.val }], note: { vi: `Có đích ở cả 2 nhánh của ${node.val} → ${node.val} là tổ tiên chung (điểm gộp cao nhất sẽ là LCA).`, en: `Targets in both branches of ${node.val} → ${node.val} is a common ancestor (the highest merge point is the LCA).` } }));
+      return node;
+    }
+    return L || R;
+  }
+  const lcaNode = lca(root);
+  if (lcaNode) answer = lcaNode;
+  const fs = snapshot(root, { title: { vi: `LCA = ${answer ? answer.val : "null"}`, en: `LCA = ${answer ? answer.val : "null"}` }, wordSet: answer ? new Set([answer.id]) : undefined, vars: [{ name: "answer", value: answer ? answer.val : "null" }], note: { vi: `Tổ tiên chung thấp nhất của tất cả nút = ${answer ? answer.val : "null"}.`, en: `Lowest common ancestor of all nodes = ${answer ? answer.val : "null"}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: answer ? answer.val : "null", steps };
+}
+
+// ─── 1123: LCA of Deepest Leaves ───
+function buildSteps1123(input) {
+  const root = parseTree(input); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: "LCA của các lá sâu nhất", en: "LCA of deepest leaves" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "return (depth, lca)" }],
+    note: { vi: `Đệ quy trả về (độ sâu, lca). Nếu trái và phải sâu BẰNG nhau → nút hiện tại là LCA của các lá sâu nhất bên dưới. Ngược lại theo nhánh sâu hơn.`, en: `Recursion returns (depth, lca). If left and right are EQUALLY deep → current node is the LCA of the deepest leaves below. Otherwise follow the deeper branch.` },
+  }));
+  function dfs(node) {
+    if (!node) return [0, null];
+    const [ld, ln] = dfs(node.left); const [rd, rn] = dfs(node.right);
+    let res;
+    if (ld === rd) res = [ld + 1, node];
+    else res = ld > rd ? [ld + 1, ln] : [rd + 1, rn];
+    steps.push(snapshot(root, { title: { vi: `Nút ${node.val}: depth=${res[0]}, lca=${res[1] ? res[1].val : "null"}`, en: `Node ${node.val}: depth=${res[0]}, lca=${res[1] ? res[1].val : "null"}` }, hlSet: new Set([node.id]), wordSet: res[1] ? new Set([res[1].id]) : undefined, codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "leftDepth", value: ld }, { name: "rightDepth", value: rd }, { name: "lca", value: res[1] ? res[1].val : "null" }], note: { vi: ld === rd ? `Trái = phải (${ld}) → ${node.val} là LCA cục bộ.` : `Nhánh ${ld > rd ? "trái" : "phải"} sâu hơn → giữ lca = ${res[1] ? res[1].val : "null"}.`, en: ld === rd ? `Left = right (${ld}) → ${node.val} is the local LCA.` : `${ld > rd ? "Left" : "Right"} branch deeper → keep lca = ${res[1] ? res[1].val : "null"}.` } }));
+    return res;
+  }
+  const [, lcaNode] = dfs(root);
+  const fs = snapshot(root, { title: { vi: `LCA = ${lcaNode ? lcaNode.val : "null"}`, en: `LCA = ${lcaNode ? lcaNode.val : "null"}` }, wordSet: lcaNode ? new Set([lcaNode.id]) : undefined, vars: [{ name: "answer", value: lcaNode ? lcaNode.val : "null" }], note: { vi: `LCA của các lá sâu nhất = ${lcaNode ? lcaNode.val : "null"}.`, en: `LCA of the deepest leaves = ${lcaNode ? lcaNode.val : "null"}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: lcaNode ? lcaNode.val : "null", steps };
+}
+
+// ─── 366: Find Leaves of Binary Tree ───
+function buildSteps366(input) {
+  const root = parseTree(input); const steps = []; const groups = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Lần lượt gỡ lá", en: "Repeatedly remove leaves" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "height = 1 + max(left, right)" }],
+    note: { vi: `Mỗi nút thuộc nhóm = CHIỀU CAO của nó từ dưới lên (lá = 0). Gỡ lá vòng 0, rồi lá mới vòng 1... height(node) = 1 + max(height con).`, en: `Each node belongs to a group = its HEIGHT from the bottom (leaf = 0). Remove round-0 leaves, then new leaves round 1... height(node) = 1 + max(child heights).` },
+  }));
+  const nodesByGroup = [];
+  function dfs(node) {
+    if (!node) return -1;
+    const h = 1 + Math.max(dfs(node.left), dfs(node.right));
+    if (!groups[h]) { groups[h] = []; nodesByGroup[h] = []; }
+    groups[h].push(node.val); nodesByGroup[h].push(node.id);
+    return h;
+  }
+  dfs(root);
+  const cumulative = new Set();
+  for (let g = 0; g < groups.length; g++) {
+    nodesByGroup[g].forEach((id) => cumulative.add(id));
+    steps.push(snapshot(root, { title: { vi: `Vòng ${g}: gỡ [${groups[g].join(",")}]`, en: `Round ${g}: remove [${groups[g].join(",")}]` }, hlSet: new Set(nodesByGroup[g]), wordSet: new Set(cumulative), codeLines: [4, 5], vars: [{ name: "round", value: g }, { name: "removed", value: `[${groups[g].join(",")}]` }, { name: "result", value: JSON.stringify(groups.slice(0, g + 1)) }], note: { vi: `Các nút có chiều cao ${g} (lá hiện tại) bị gỡ cùng lúc.`, en: `Nodes with height ${g} (current leaves) are removed together.` } }));
+  }
+  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(groups)}`, en: `Result: ${JSON.stringify(groups)}` }, vars: [{ name: "answer", value: JSON.stringify(groups) }], note: { vi: `Mỗi mảng con = 1 vòng gỡ lá.`, en: `Each sublist = one round of leaf removal.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: JSON.stringify(groups), steps };
+}
+
+// ─── 863: All Nodes Distance K in Binary Tree ───
+function buildSteps863(input, params) {
+  const root = parseTree(input); const tv = Number(params.target); const k = Number(params.k); const steps = [];
+  const parent = buildParents(root); const target = findNode(root, tv);
+  steps.push(snapshot(root, {
+    title: { vi: `Các nút cách ${tv} đúng ${k} bước`, en: `Nodes at distance ${k} from ${tv}` },
+    codeLines: [2, 3], vars: [{ name: "target", value: tv }, { name: "k", value: k }],
+    note: { vi: `Coi cây như ĐỒ THỊ (thêm cạnh con→cha qua parent map). BFS từ target, lấy tất cả nút ở lớp thứ k.`, en: `Treat the tree as a GRAPH (add child→parent edges via a parent map). BFS from target, take all nodes at layer k.` },
+  }));
+  const result = [];
+  if (target) {
+    let queue = [target]; const visited = new Set([target.id]); let dist = 0;
+    while (queue.length) {
+      if (dist === k) { result.push(...queue.map((n) => n.val)); steps.push(snapshot(root, { title: { vi: `Khoảng cách ${dist}: [${queue.map((n) => n.val).join(",")}]`, en: `Distance ${dist}: [${queue.map((n) => n.val).join(",")}]` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [6, 7], vars: [{ name: "dist", value: dist }, { name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Đạt khoảng cách ${k} → đây là kết quả.`, en: `Reached distance ${k} → these are the answer.` } })); break; }
+      steps.push(snapshot(root, { title: { vi: `Khoảng cách ${dist}: [${queue.map((n) => n.val).join(",")}]`, en: `Distance ${dist}: [${queue.map((n) => n.val).join(",")}]` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [4, 5], vars: [{ name: "dist", value: dist }, { name: "frontier", value: `[${queue.map((n) => n.val).join(",")}]` }], note: { vi: `Mở rộng sang hàng xóm (trái, phải, cha) chưa thăm.`, en: `Expand to unvisited neighbors (left, right, parent).` } }));
+      const next = [];
+      for (const n of queue) {
+        for (const nb of [n.left, n.right, parent.get(n.id)]) {
+          if (nb && !visited.has(nb.id)) { visited.add(nb.id); next.push(nb); }
+        }
+      }
+      queue = next; dist++;
+    }
+  }
+  const fs = snapshot(root, { title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Các nút cách ${tv} đúng ${k} bước = [${result.join(",")}].`, en: `Nodes exactly ${k} away from ${tv} = [${result.join(",")}].` } }); fs.final = true; steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
+// ─── 156: Binary Tree Upside Down ───
+function buildSteps156(input) {
+  const root = parseTree(input); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Lật ngược cây", en: "Turn the tree upside down" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "left→new root, right→new left, root→new right" }],
+    note: { vi: `Đi theo nhánh TRÁI nhất. Con trái cũ thành cha mới; con phải cũ thành con trái mới; cha cũ thành con phải mới.`, en: `Follow the LEFTMOST path. Old left child becomes new parent; old right child becomes new left; old parent becomes new right.` },
+  }));
+  const chain = []; let c = root; while (c && c.left) { chain.push(c); c = c.left; }
+  const newRootVal = c ? c.val : (root ? root.val : "null");
+  chain.forEach((n) => {
+    steps.push(snapshot(root, { title: { vi: `Xoay quanh ${n.val}`, en: `Rotate around ${n.val}` }, hlSet: new Set([n.id, n.left.id].concat(n.right ? [n.right.id] : [])), codeLines: [4, 5, 6], vars: [{ name: "node", value: n.val }, { name: "left (→ parent)", value: n.left.val }, { name: "right (→ new left)", value: n.right ? n.right.val : "null" }], note: { vi: `${n.left.val} thành cha; ${n.right ? n.right.val : "null"} thành con trái; ${n.val} thành con phải.`, en: `${n.left.val} becomes parent; ${n.right ? n.right.val : "null"} becomes left child; ${n.val} becomes right child.` } }));
+  });
+  function rec(node) { if (!node || !node.left) return node; const nr = rec(node.left); node.left.left = node.right; node.left.right = node; node.left = null; node.right = null; return nr; }
+  const finalRoot = rec(root);
+  const fs = snapshot(finalRoot, { title: { vi: `Gốc mới = ${finalRoot ? finalRoot.val : "null"}`, en: `New root = ${finalRoot ? finalRoot.val : "null"}` }, vars: [{ name: "answer", value: finalRoot ? finalRoot.val : "null" }], note: { vi: `Cây đã lật ngược, gốc mới = ${newRootVal}.`, en: `Tree turned upside down, new root = ${newRootVal}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: finalRoot ? finalRoot.val : "null", steps };
+}
+
+// ─── 337: House Robber III ───
+function buildSteps337(input) {
+  const root = parseTree(input); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: "House Robber III (DP trên cây)", en: "House Robber III (tree DP)" },
+    codeLines: [2, 3], vars: [{ name: "state", value: "(rob, skip) per node" }],
+    note: { vi: `Mỗi nút trả về [rob, skip]. rob = node.val + skip(trái) + skip(phải). skip = max(con trái) + max(con phải). Không cướp 2 nhà nối trực tiếp.`, en: `Each node returns [rob, skip]. rob = node.val + skip(left) + skip(right). skip = max(left) + max(right). Cannot rob two directly-linked houses.` },
+  }));
+  function dfs(node) {
+    if (!node) return [0, 0];
+    const [lr, ls] = dfs(node.left); const [rr, rs] = dfs(node.right);
+    const rob = node.val + ls + rs;
+    const skip = Math.max(lr, ls) + Math.max(rr, rs);
+    steps.push(snapshot(root, { title: { vi: `Nút ${node.val}: rob=${rob}, skip=${skip}`, en: `Node ${node.val}: rob=${rob}, skip=${skip}` }, hlSet: new Set([node.id]), codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "rob (cướp)", value: `${node.val}+${ls}+${rs} = ${rob}` }, { name: "skip (bỏ)", value: `${Math.max(lr, ls)}+${Math.max(rr, rs)} = ${skip}` }], note: { vi: `Cướp ${node.val} → phải bỏ 2 con. Bỏ ${node.val} → lấy max mỗi con.`, en: `Rob ${node.val} → must skip both children. Skip ${node.val} → take max of each child.` } }));
+    return [rob, skip];
+  }
+  const [r, s] = dfs(root); const answer = Math.max(r, s);
+  const fs = snapshot(root, { title: { vi: `Tối đa = ${answer}`, en: `Max = ${answer}` }, vars: [{ name: "answer", value: answer }], note: { vi: `Số tiền lớn nhất cướp được = max(${r}, ${s}) = ${answer}.`, en: `Maximum money robbed = max(${r}, ${s}) = ${answer}.` } }); fs.final = true; steps.push(fs);
+  return { input, answer, steps };
+}
+
+// ─── 116: Populating Next Right Pointers in Each Node ───
+function buildSteps116(input) {
+  const root = parseTree(input); const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Nối con trỏ next mỗi tầng", en: "Populate next pointers per level" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "next = node to the right, else null" }],
+    note: { vi: `Mỗi nút có con trỏ next trỏ tới nút bên PHẢI cùng tầng; nút phải nhất → null. Duyệt BFS theo tầng để nối.`, en: `Each node's next points to the node to its RIGHT on the same level; rightmost → null. BFS by level to connect.` },
+  }));
+  const chains = [];
+  if (root) {
+    let queue = [root]; const visited = new Set(); let lvl = 0;
+    while (queue.length) {
+      const chainStr = queue.map((n) => n.val).join(" → ") + " → null";
+      chains.push(chainStr); queue.forEach((n) => visited.add(n.id));
+      steps.push(snapshot(root, { title: { vi: `Tầng ${lvl}: ${chainStr}`, en: `Level ${lvl}: ${chainStr}` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [4, 5, 6], vars: [{ name: "level", value: lvl }, { name: "next chain", value: chainStr }], note: { vi: `Nối next lần lượt các nút tầng ${lvl} từ trái sang phải, cuối cùng → null.`, en: `Link next across level ${lvl} nodes left to right, last → null.` } }));
+      const next = []; for (const n of queue) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } queue = next; lvl++;
+    }
+  }
+  const fs = snapshot(root, { title: { vi: `Hoàn tất`, en: `Done` }, vars: [{ name: "answer", value: "next pointers set" }], note: { vi: `Đã nối next cho mọi tầng:\n${chains.join("\n")}`, en: `next pointers set for all levels:\n${chains.join("\n")}` } }); fs.final = true; steps.push(fs);
+  return { input, answer: chains.join(" | "), steps };
+}
+
+// ─── 103: Binary Tree Zigzag Level Order Traversal ───
+function buildSteps103(input) {
+  const root = parseTree(input); const steps = []; const result = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Zigzag Level Order", en: "Zigzag Level Order" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "alternate L→R, R→L" }],
+    note: { vi: `BFS theo tầng, nhưng ĐẢO chiều xen kẽ: tầng 0 trái→phải, tầng 1 phải→trái, tầng 2 trái→phải...`, en: `BFS by level, but ALTERNATE direction: level 0 left→right, level 1 right→left, level 2 left→right...` },
+  }));
+  if (root) {
+    let queue = [root]; const visited = new Set(); let lvl = 0;
+    while (queue.length) {
+      const vals = queue.map((n) => n.val);
+      const ordered = lvl % 2 === 0 ? vals.slice() : vals.slice().reverse();
+      result.push(ordered); queue.forEach((n) => visited.add(n.id));
+      steps.push(snapshot(root, { title: { vi: `Tầng ${lvl} (${lvl % 2 === 0 ? "→" : "←"}): [${ordered.join(",")}]`, en: `Level ${lvl} (${lvl % 2 === 0 ? "→" : "←"}): [${ordered.join(",")}]` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [4, 5, 6], vars: [{ name: "level", value: lvl }, { name: "direction", value: lvl % 2 === 0 ? "left→right" : "right→left" }, { name: "row", value: `[${ordered.join(",")}]` }], note: { vi: `Tầng ${lvl} đọc theo chiều ${lvl % 2 === 0 ? "trái→phải" : "phải→trái"}.`, en: `Level ${lvl} read ${lvl % 2 === 0 ? "left→right" : "right→left"}.` } }));
+      const next = []; for (const n of queue) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } queue = next; lvl++;
+    }
+  }
+  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Zigzag hoàn tất.`, en: `Zigzag complete.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: JSON.stringify(result), steps };
+}
+
+// ─── 314: Binary Tree Vertical Order Traversal ───
+function buildSteps314(input) {
+  const root = parseTree(input); const steps = []; const colMap = new Map();
+  steps.push(snapshot(root, {
+    title: { vi: "Duyệt theo cột dọc", en: "Vertical order traversal" },
+    codeLines: [2, 3], vars: [{ name: "rule", value: "col: root=0, left=-1, right=+1" }],
+    note: { vi: `Gán mỗi nút 1 CỘT: gốc = 0, đi trái → cột-1, đi phải → cột+1. BFS để giữ thứ tự trên→dưới, trái→phải. Gom theo cột tăng dần.`, en: `Assign each node a COLUMN: root = 0, go left → col-1, go right → col+1. BFS to keep top→bottom, left→right order. Group by ascending column.` },
+  }));
+  if (root) {
+    let queue = [{ node: root, col: 0 }]; const visited = new Set();
+    while (queue.length) {
+      const { node, col } = queue.shift();
+      if (!colMap.has(col)) colMap.set(col, []);
+      colMap.get(col).push(node.val); visited.add(node.id);
+      const cols = [...colMap.keys()].sort((a, b) => a - b);
+      steps.push(snapshot(root, { title: { vi: `Nút ${node.val} → cột ${col}`, en: `Node ${node.val} → column ${col}` }, hlSet: new Set([node.id]), wordSet: new Set(visited), codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "column", value: col }, { name: "columns", value: JSON.stringify(cols.map((c) => colMap.get(c))) }], note: { vi: `Thêm ${node.val} vào cột ${col}. Con trái → cột ${col - 1}, con phải → cột ${col + 1}.`, en: `Add ${node.val} to column ${col}. Left child → col ${col - 1}, right child → col ${col + 1}.` } }));
+      if (node.left) queue.push({ node: node.left, col: col - 1 });
+      if (node.right) queue.push({ node: node.right, col: col + 1 });
+    }
+  }
+  const sortedCols = [...colMap.keys()].sort((a, b) => a - b);
+  const result = sortedCols.map((c) => colMap.get(c));
+  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Đọc các cột từ trái sang phải.`, en: `Read columns left to right.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: JSON.stringify(result), steps };
+}
+
+// ─── 297: Serialize and Deserialize Binary Tree ───
+function buildSteps297(input) {
+  const root = parseTree(input); const steps = []; const tokens = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Serialize (preorder + null)", en: "Serialize (preorder + null)" },
+    codeLines: [2, 3], vars: [{ name: "result", value: "" }],
+    note: { vi: `SERIALIZE: duyệt preorder, ghi giá trị nút, ghi '#' cho null. Chuỗi này đủ để khôi phục cây.`, en: `SERIALIZE: preorder traversal, write node value, write '#' for null. This string is enough to rebuild the tree.` },
+  }));
+  function ser(node) {
+    if (!node) {
+      tokens.push("#");
+      steps.push(snapshot(root, { title: { vi: `null → '#'`, en: `null → '#'` }, codeLines: [4, 5], vars: [{ name: "serialized", value: tokens.join(",") }], note: { vi: `Gặp null → ghi '#'.`, en: `Reached null → write '#'.` } }));
+      return;
+    }
+    tokens.push(String(node.val));
+    steps.push(snapshot(root, { title: { vi: `Ghi ${node.val}`, en: `Write ${node.val}` }, hlSet: new Set([node.id]), codeLines: [6, 7], vars: [{ name: "node", value: node.val }, { name: "serialized", value: tokens.join(",") }], note: { vi: `Ghi giá trị ${node.val}, rồi đệ quy con trái → con phải.`, en: `Write value ${node.val}, then recurse left → right.` } }));
+    ser(node.left); ser(node.right);
+  }
+  ser(root);
+  const serialized = tokens.join(",");
+  const fs = snapshot(root, { title: { vi: `Chuỗi: ${serialized}`, en: `String: ${serialized}` }, vars: [{ name: "answer", value: serialized }], note: { vi: `DESERIALIZE: đọc token theo thứ tự; '#' → null, số → tạo nút rồi đệ quy dựng con trái, con phải. Khôi phục lại đúng cây ban đầu.`, en: `DESERIALIZE: read tokens in order; '#' → null, number → create node then recursively build left, right. Rebuilds the exact original tree.` } }); fs.final = true; steps.push(fs);
+  return { input, answer: serialized, steps };
+}
+
 module.exports = {
   144: {
     id: 144, difficulty: "easy", slug: "binary-tree-preorder-traversal",
@@ -630,5 +969,216 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng.", en: "Queue holds at most one level." } },
     code: ["class Solution:", "    def rightSideView(self, root):", "        if not root: return []", "        res, queue = [], [root]", "        while queue:", "            res.append(queue[-1].val)   # rightmost", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
     builder: buildSteps199,
+  },
+  236: {
+    id: 236, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Lowest Common Ancestor of a Binary Tree", en: "Lowest Common Ancestor of a Binary Tree" },
+    titleVi: { vi: "Tổ tiên chung thấp nhất", en: "LCA of a binary tree" },
+    statement: { vi: "Cho root và 2 giá trị p, q (đảm bảo tồn tại), tìm tổ tiên chung THẤP NHẤT. Nhập level-order.", en: "Given root and two values p, q (guaranteed to exist), find their LOWEST common ancestor. Enter as level-order." },
+    defaultInput: "3,5,1,6,2,0,8",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 5 }, { key: "q", label: { vi: "q", en: "q" }, allowNegative: true, default: 1 }],
+    approach: [
+      { vi: "Đệ quy: nếu nút là p/q → trả nút. Nếu 2 nhánh con đều khác null → nút hiện tại là LCA.", en: "Recursion: if node is p/q → return it. If both child branches non-null → current node is LCA." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần.", en: "Visit each node once." } },
+    code: ["class Solution:", "    def lowestCommonAncestor(self, root, p, q):", "        if not root:", "            return None", "        if root == p or root == q:", "            return root", "        left = self.lowestCommonAncestor(root.left, p, q)", "        right = self.lowestCommonAncestor(root.right, p, q)", "        if left and right:", "            return root", "        return left or right"],
+    builder: buildSteps236,
+  },
+  1644: {
+    id: 1644, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree-ii",
+    category: TREE_CAT,
+    title: { vi: "LCA of a Binary Tree II", en: "Lowest Common Ancestor of a Binary Tree II" },
+    titleVi: { vi: "LCA II (p/q có thể vắng)", en: "LCA II (p/q may be absent)" },
+    statement: { vi: "Như bài 236 nhưng p hoặc q CÓ THỂ không tồn tại trong cây. Nếu thiếu một trong hai → trả null. Nhập level-order.", en: "Like 236 but p or q MAY not exist in the tree. If either is missing → return null. Enter as level-order." },
+    defaultInput: "3,5,1,6,2,0,8",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 5 }, { key: "q", label: { vi: "q (thử 9 = vắng)", en: "q (try 9 = absent)" }, allowNegative: true, default: 1 }],
+    approach: [
+      { vi: "Phải duyệt HẾT cây để xác nhận cả p và q tồn tại. Đếm số phía khớp (con trái, con phải, chính nút).", en: "Must traverse the WHOLE tree to confirm both p and q exist. Count matched sides (left, right, self)." },
+      { vi: "Nút đầu tiên có ≥2 phía khớp là ứng viên LCA; chỉ hợp lệ nếu cả p và q đều được tìm thấy.", en: "First node with ≥2 matched sides is the LCA candidate; valid only if both p and q were found." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt toàn bộ cây 1 lần.", en: "Full traversal once." } },
+    code: ["class Solution:", "    def lowestCommonAncestor(self, root, p, q):", "        self.ans = None", "        self.count = 0", "        def dfs(node):", "            if not node: return False", "            l = dfs(node.left)", "            r = dfs(node.right)", "            mid = node == p or node == q", "            if mid + l + r >= 2 and not self.ans:", "                self.ans = node", "            if mid: self.count += 1", "            return l or r or mid", "        dfs(root)", "        return self.ans if self.count == 2 else None"],
+    builder: buildSteps1644,
+  },
+  1650: {
+    id: 1650, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree-iii",
+    category: TREE_CAT,
+    title: { vi: "LCA of a Binary Tree III", en: "Lowest Common Ancestor of a Binary Tree III" },
+    titleVi: { vi: "LCA III (có con trỏ cha)", en: "LCA III (with parent pointers)" },
+    statement: { vi: "Mỗi nút có con trỏ tới CHA. Cho 2 nút p, q, tìm LCA mà không cần root. Nhập level-order (mô phỏng parent qua cấu trúc).", en: "Each node has a pointer to its PARENT. Given two nodes p, q, find LCA without the root. Enter as level-order (parents simulated from structure)." },
+    defaultInput: "3,5,1,6,2,0,8",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 6 }, { key: "q", label: { vi: "q", en: "q" }, allowNegative: true, default: 0 }],
+    approach: [
+      { vi: "Thu tập tổ tiên của p (đi lên qua parent). Đi lên từ q, nút đầu tiên có trong tập đó là LCA.", en: "Collect p's ancestors (walk up via parent). Walk up from q; the first node in that set is the LCA." },
+      { vi: "Hoặc dùng 2 con trỏ kiểu giao 2 danh sách liên kết: a=a.parent or q, b=b.parent or p.", en: "Or use two pointers like linked-list intersection: a=a.parent or q, b=b.parent or p." },
+    ],
+    complexity: { time: "O(h)", space: "O(h)", note: { vi: "Đi lên 2 đường tới gốc.", en: "Two upward walks to the root." } },
+    code: ["class Solution:", "    def lowestCommonAncestor(self, p, q):", "        ancestors = set()", "        node = p", "        while node:", "            ancestors.add(node)", "            node = node.parent", "        node = q", "        while node:", "            if node in ancestors:", "                return node", "            node = node.parent", "        return None"],
+    builder: buildSteps1650,
+  },
+  1676: {
+    id: 1676, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree-iv",
+    category: TREE_CAT,
+    title: { vi: "LCA of a Binary Tree IV", en: "Lowest Common Ancestor of a Binary Tree IV" },
+    titleVi: { vi: "LCA IV (mảng nút)", en: "LCA IV (array of nodes)" },
+    statement: { vi: "Cho root và một MẢNG các nút, tìm LCA của tất cả chúng. Nhập level-order; nhập danh sách giá trị nút cần tìm LCA.", en: "Given root and an ARRAY of nodes, find their LCA. Enter as level-order; provide the list of node values." },
+    defaultInput: "3,5,1,6,2,0,8",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "nodes", label: { vi: "nodes (vd: 6,2,0)", en: "nodes (e.g. 6,2,0)" }, type: "string", default: "6,2,0" }],
+    approach: [
+      { vi: "Tổng quát hóa 236: đệ quy, nếu nút thuộc tập đích → trả nút; nếu 2 nhánh đều khác null → LCA.", en: "Generalize 236: recursion, if node is in target set → return it; if both branches non-null → LCA." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần.", en: "Visit each node once." } },
+    code: ["class Solution:", "    def lowestCommonAncestor(self, root, nodes):", "        targets = set(nodes)", "        def dfs(node):", "            if not node:", "                return None", "            if node in targets:", "                return node", "            left = dfs(node.left)", "            right = dfs(node.right)", "            if left and right:", "                return node", "            return left or right", "        return dfs(root)"],
+    builder: buildSteps1676,
+  },
+  1123: {
+    id: 1123, difficulty: "medium", slug: "lowest-common-ancestor-of-deepest-leaves",
+    category: TREE_CAT,
+    title: { vi: "LCA of Deepest Leaves", en: "Lowest Common Ancestor of Deepest Leaves" },
+    titleVi: { vi: "LCA của các lá sâu nhất", en: "LCA of the deepest leaves" },
+    statement: { vi: "Cho root, tìm tổ tiên chung thấp nhất của TẤT CẢ các lá sâu nhất. Nhập level-order.", en: "Given root, find the lowest common ancestor of ALL the deepest leaves. Enter as level-order." },
+    defaultInput: "3,5,1,6,2,0,8,7,4",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đệ quy trả (độ sâu, lca). Nếu trái và phải sâu bằng nhau → nút hiện tại là lca. Ngược lại theo nhánh sâu hơn.", en: "Recursion returns (depth, lca). If left and right equally deep → current node is lca. Else follow the deeper side." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder.", en: "One postorder pass." } },
+    code: ["class Solution:", "    def lcaDeepestLeaves(self, root):", "        def dfs(node):", "            if not node:", "                return (0, None)", "            ld, ln = dfs(node.left)", "            rd, rn = dfs(node.right)", "            if ld == rd:", "                return (ld + 1, node)", "            return (ld + 1, ln) if ld > rd else (rd + 1, rn)", "        return dfs(root)[1]"],
+    builder: buildSteps1123,
+  },
+  366: {
+    id: 366, difficulty: "medium", slug: "find-leaves-of-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Find Leaves of Binary Tree", en: "Find Leaves of Binary Tree" },
+    titleVi: { vi: "Gỡ lá theo vòng", en: "Collect leaves round by round" },
+    statement: { vi: "Lần lượt thu các lá rồi gỡ chúng, lặp lại cho tới khi cây rỗng. Trả về danh sách các vòng. Nhập level-order.", en: "Repeatedly collect leaves and remove them until the tree is empty. Return the list of rounds. Enter as level-order." },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Nhóm của mỗi nút = chiều cao từ dưới lên (lá = 0). height(node) = 1 + max(con).", en: "Each node's group = its height from the bottom (leaf = 0). height(node) = 1 + max(children)." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder.", en: "One postorder pass." } },
+    code: ["class Solution:", "    def findLeaves(self, root):", "        res = []", "        def dfs(node):", "            if not node:", "                return -1", "            h = 1 + max(dfs(node.left), dfs(node.right))", "            if h == len(res):", "                res.append([])", "            res[h].append(node.val)", "            return h", "        dfs(root)", "        return res"],
+    builder: buildSteps366,
+  },
+  863: {
+    id: 863, difficulty: "medium", slug: "all-nodes-distance-k-in-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "All Nodes Distance K in Binary Tree", en: "All Nodes Distance K in Binary Tree" },
+    titleVi: { vi: "Các nút cách target K bước", en: "Nodes at distance K from target" },
+    statement: { vi: "Cho root, một nút target và số k, trả về giá trị tất cả nút cách target đúng k cạnh. Nhập level-order.", en: "Given root, a target node, and k, return values of all nodes exactly k edges from target. Enter as level-order." },
+    defaultInput: "3,5,1,6,2,0,8,7,4",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, allowNegative: true, default: 5 }, { key: "k", label: { vi: "k", en: "k" }, default: 2 }],
+    approach: [
+      { vi: "Xây map con→cha để biến cây thành đồ thị vô hướng. BFS từ target, lấy lớp thứ k.", en: "Build a child→parent map to turn the tree into an undirected graph. BFS from target, take layer k." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Map cha + BFS đều O(n).", en: "Parent map + BFS both O(n)." } },
+    code: ["class Solution:", "    def distanceK(self, root, target, k):", "        parent = {}", "        def dfs(node, par):", "            if not node: return", "            parent[node] = par", "            dfs(node.left, node); dfs(node.right, node)", "        dfs(root, None)", "        from collections import deque", "        q = deque([(target, 0)])", "        seen = {target}", "        res = []", "        while q:", "            node, d = q.popleft()", "            if d == k:", "                res.append(node.val); continue", "            for nb in (node.left, node.right, parent[node]):", "                if nb and nb not in seen:", "                    seen.add(nb); q.append((nb, d + 1))", "        return res"],
+    builder: buildSteps863,
+  },
+  156: {
+    id: 156, difficulty: "medium", slug: "binary-tree-upside-down",
+    category: TREE_CAT,
+    title: { vi: "Binary Tree Upside Down", en: "Binary Tree Upside Down" },
+    titleVi: { vi: "Lật ngược cây", en: "Turn the tree upside down" },
+    statement: { vi: "Cây mà mọi nút phải là lá có anh em trái và không con. Lật ngược: con trái cũ thành gốc mới. Nhập level-order (cây lệch trái).", en: "A tree where every right node is a leaf with a left sibling and no children. Turn it upside down: old left child becomes the new root. Enter as level-order (left-leaning)." },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đi theo nhánh trái nhất. Tại mỗi nút: left.left = right; left.right = node; xóa con của node.", en: "Follow the leftmost path. At each node: left.left = right; left.right = node; clear node's children." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Đi theo 1 nhánh trái.", en: "Follow one left spine." } },
+    code: ["class Solution:", "    def upsideDownBinaryTree(self, root):", "        if not root or not root.left:", "            return root", "        new_root = self.upsideDownBinaryTree(root.left)", "        root.left.left = root.right", "        root.left.right = root", "        root.left = None", "        root.right = None", "        return new_root"],
+    builder: buildSteps156,
+  },
+  337: {
+    id: 337, difficulty: "medium", slug: "house-robber-iii",
+    category: TREE_CAT,
+    title: { vi: "House Robber III", en: "House Robber III" },
+    titleVi: { vi: "Trộm nhà III (trên cây)", en: "Rob houses arranged in a tree" },
+    statement: { vi: "Nhà xếp thành cây. Không được trộm 2 nhà nối trực tiếp (cha-con). Tìm số tiền tối đa. Nhập level-order.", en: "Houses form a tree. Cannot rob two directly-linked houses (parent-child). Find the maximum money. Enter as level-order." },
+    defaultInput: "3,2,3,null,3,null,1",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "DP trên cây: mỗi nút trả [rob, skip]. rob = val + skip(trái) + skip(phải). skip = max(trái) + max(phải).", en: "Tree DP: each node returns [rob, skip]. rob = val + skip(left) + skip(right). skip = max(left) + max(right)." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder.", en: "One postorder pass." } },
+    code: ["class Solution:", "    def rob(self, root):", "        def dfs(node):", "            if not node:", "                return (0, 0)", "            l = dfs(node.left)", "            r = dfs(node.right)", "            rob = node.val + l[1] + r[1]", "            skip = max(l) + max(r)", "            return (rob, skip)", "        return max(dfs(root))"],
+    builder: buildSteps337,
+  },
+  116: {
+    id: 116, difficulty: "medium", slug: "populating-next-right-pointers-in-each-node",
+    category: TREE_CAT,
+    title: { vi: "Populating Next Right Pointers in Each Node", en: "Populating Next Right Pointers in Each Node" },
+    titleVi: { vi: "Nối con trỏ next mỗi tầng", en: "Populate next right pointers" },
+    statement: { vi: "Cho cây nhị phân HOÀN HẢO, nối mỗi nút tới nút bên phải cùng tầng (next); nút phải nhất → null. Nhập level-order.", en: "Given a PERFECT binary tree, connect each node to its right neighbor on the same level (next); rightmost → null. Enter as level-order." },
+    defaultInput: "1,2,3,4,5,6,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "BFS theo tầng, nối lần lượt các nút. Hoặc O(1) bộ nhớ: dùng next của tầng trên để đi ngang tầng dưới.", en: "BFS by level, link nodes in order. Or O(1) memory: use the parent level's next to traverse the next level." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS O(n) (O(1) nếu dùng next có sẵn).", en: "BFS O(n) (O(1) if reusing next pointers)." } },
+    code: ["class Solution:", "    def connect(self, root):", "        if not root: return root", "        leftmost = root", "        while leftmost.left:", "            node = leftmost", "            while node:", "                node.left.next = node.right", "                if node.next:", "                    node.right.next = node.next.left", "                node = node.next", "            leftmost = leftmost.left", "        return root"],
+    builder: buildSteps116,
+  },
+  103: {
+    id: 103, difficulty: "medium", slug: "binary-tree-zigzag-level-order-traversal",
+    category: TREE_CAT,
+    title: { vi: "Binary Tree Zigzag Level Order Traversal", en: "Binary Tree Zigzag Level Order Traversal" },
+    titleVi: { vi: "Duyệt tầng kiểu zigzag", en: "Zigzag level order" },
+    statement: { vi: "Cho root, duyệt theo tầng nhưng đảo chiều xen kẽ (trái→phải, rồi phải→trái...). Nhập level-order.", en: "Given root, traverse by level but alternate direction (left→right, then right→left...). Enter as level-order." },
+    defaultInput: "1,2,3,4,5,6,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "BFS theo tầng. Tầng chẵn giữ nguyên, tầng lẻ đảo ngược mảng giá trị.", en: "BFS by level. Even levels keep order, odd levels reverse the values." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng.", en: "Queue holds at most one level." } },
+    code: ["class Solution:", "    def zigzagLevelOrder(self, root):", "        if not root: return []", "        res, queue, ltr = [], [root], True", "        while queue:", "            vals = [n.val for n in queue]", "            res.append(vals if ltr else vals[::-1])", "            ltr = not ltr", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
+    builder: buildSteps103,
+  },
+  314: {
+    id: 314, difficulty: "medium", slug: "binary-tree-vertical-order-traversal",
+    category: TREE_CAT,
+    title: { vi: "Binary Tree Vertical Order Traversal", en: "Binary Tree Vertical Order Traversal" },
+    titleVi: { vi: "Duyệt theo cột dọc", en: "Vertical order traversal" },
+    statement: { vi: "Cho root, trả về duyệt theo CỘT từ trái sang phải; trong cùng cột, theo thứ tự trên→dưới (cùng hàng thì trái→phải). Nhập level-order.", en: "Given root, return the VERTICAL order (columns left to right); within a column, top→bottom (same row → left→right). Enter as level-order." },
+    defaultInput: "3,9,20,15,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Gán cột: gốc 0, trái -1, phải +1. BFS để giữ đúng thứ tự, gom theo cột rồi sắp xếp cột.", en: "Assign columns: root 0, left -1, right +1. BFS to keep correct order, group by column then sort columns." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS + gom theo cột.", en: "BFS + group by column." } },
+    code: ["class Solution:", "    def verticalOrder(self, root):", "        if not root: return []", "        from collections import defaultdict, deque", "        cols = defaultdict(list)", "        q = deque([(root, 0)])", "        while q:", "            node, c = q.popleft()", "            cols[c].append(node.val)", "            if node.left: q.append((node.left, c - 1))", "            if node.right: q.append((node.right, c + 1))", "        return [cols[c] for c in sorted(cols)]"],
+    builder: buildSteps314,
+  },
+  297: {
+    id: 297, difficulty: "hard", slug: "serialize-and-deserialize-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Serialize and Deserialize Binary Tree", en: "Serialize and Deserialize Binary Tree" },
+    titleVi: { vi: "Mã hóa & giải mã cây", en: "Serialize / deserialize a tree" },
+    statement: { vi: "Thiết kế thuật toán mã hóa cây thành chuỗi và giải mã chuỗi về lại cây. Dùng preorder + ký hiệu null. Nhập level-order.", en: "Design an algorithm to encode a tree to a string and decode it back. Use preorder + null markers. Enter as level-order." },
+    defaultInput: "1,2,3,null,null,4,5",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "SERIALIZE: preorder, ghi giá trị, ghi '#' cho null → chuỗi duy nhất.", en: "SERIALIZE: preorder, write value, write '#' for null → a unique string." },
+      { vi: "DESERIALIZE: đọc token theo thứ tự; '#' → null, số → tạo nút rồi dựng con trái, con phải.", en: "DESERIALIZE: read tokens in order; '#' → null, number → create node then build left, right." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi nút ghi/đọc 1 lần.", en: "Each node written/read once." } },
+    code: ["class Codec:", "    def serialize(self, root):", "        res = []", "        def dfs(node):", "            if not node:", "                res.append('#'); return", "            res.append(str(node.val))", "            dfs(node.left); dfs(node.right)", "        dfs(root)", "        return ','.join(res)", "    def deserialize(self, data):", "        vals = iter(data.split(','))", "        def build():", "            v = next(vals)", "            if v == '#': return None", "            node = TreeNode(int(v))", "            node.left = build(); node.right = build()", "            return node", "        return build()"],
+    builder: buildSteps297,
   },
 };
