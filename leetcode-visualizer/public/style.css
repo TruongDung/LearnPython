@@ -1523,3 +1523,363 @@ select option {
 .bfs-cell.path { background: #22c55e; color: #0f172a; }
 .bfs-cell.start { background: #6366f1; color: white; }
 .bfs-cell.end { background: #ec4899; color: white; }
+
+
+/* ====================================================================
+   MOBILE RESPONSIVE (iPhone & Android)
+   Breakpoints: tablet 768px, phone 640px, small phone 480px
+   ==================================================================== */
+
+@media (max-width: 768px) {
+  .app {
+    padding: 16px 12px 48px;
+  }
+
+  header h1 {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    margin: 4px 0 16px;
+  }
+
+  /* Compact header actions */
+  .header-actions {
+    gap: 6px;
+  }
+
+  .theme-toggle {
+    width: 34px;
+    height: 34px;
+  }
+
+  .lang-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* Catalog */
+  .catalog {
+    margin-top: 16px;
+    gap: 8px;
+  }
+
+  .cat-group {
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .cat-title {
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .cat-items {
+    gap: 6px;
+  }
+
+  .prob-chip {
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+
+  .prob-chip .pid {
+    font-size: 12px;
+  }
+
+  .prob-chip .pname {
+    font-size: 10px;
+    max-width: 130px;
+  }
+
+  /* Panels */
+  .panel {
+    margin-top: 18px;
+    padding: 16px 14px;
+    border-radius: 14px;
+  }
+
+  .problem-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .problem-title-link {
+    font-size: 17px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .badge {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .title-vi {
+    font-size: 13px;
+    margin: 6px 0;
+  }
+
+  .statement {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* Approach box */
+  .approach-box {
+    padding: 12px 14px;
+    border-radius: 10px;
+  }
+
+  .approach-list {
+    font-size: 13px;
+    padding-left: 16px;
+    line-height: 1.6;
+  }
+
+  /* Complexity */
+  .complexity {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .cx-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .cx-note {
+    font-size: 12px;
+  }
+
+  /* Inputs */
+  input,
+  select {
+    font-size: 16px; /* >=16px prevents iOS Safari zoom on focus */
+    padding: 10px 12px;
+    border-radius: 9px;
+  }
+
+  label {
+    font-size: 13px;
+  }
+
+  .search-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .search-row button {
+    width: 100%;
+  }
+
+  .extra-params {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .extra-params .param {
+    width: 100%;
+  }
+
+  .extra-params .param input,
+  .extra-params .param select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  button {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .run-btn {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  /* Visualization head */
+  .viz-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .viz-head h3 {
+    font-size: 16px;
+  }
+
+  /* Code panel: full width, smaller font, scrollable */
+  .code-panel {
+    max-height: 280px;
+    font-size: 12px;
+    border-radius: 10px;
+    position: static; /* disable sticky on mobile */
+  }
+
+  .code-line {
+    padding: 0 10px;
+  }
+
+  .code-line .ln {
+    width: 22px;
+    margin-right: 8px;
+  }
+
+  /* Bars: tighter spacing */
+  .bars {
+    gap: 6px;
+    min-height: 200px;
+    padding: 12px 10px;
+    border-radius: 10px;
+  }
+
+  .bar .val {
+    font-size: 12px;
+  }
+
+  .bar .idx {
+    font-size: 10px;
+  }
+
+  .bar .dp {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  /* Note */
+  .note {
+    margin: 12px 0;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 0 10px 10px 0;
+  }
+
+  /* Variables panel */
+  .vars-panel {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .var-item {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Controls — wrap to 2 rows on phone */
+  .controls {
+    gap: 6px;
+  }
+
+  .controls button {
+    min-width: 0;
+    padding: 10px 6px;
+    font-size: 13px;
+    flex: 1 1 calc(33% - 6px);
+  }
+
+  .kbd-hint {
+    font-size: 11px;
+  }
+
+  /* Answer box */
+  .answer {
+    font-size: 16px;
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  /* Tree/Graph view */
+  .tree-view,
+  .grid-view {
+    padding: 12px 8px;
+    border-radius: 10px;
+    min-height: 200px;
+  }
+
+  /* DP grid cells: smaller on mobile */
+  .dp-grid th,
+  .dp-grid td {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+}
+
+/* iPhone SE and smaller phones */
+@media (max-width: 480px) {
+  .app {
+    padding: 12px 10px 40px;
+  }
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  .header-top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Hide problem name on tiny screens, show only ID */
+  .prob-chip .pname {
+    display: none;
+  }
+
+  .prob-chip {
+    padding: 6px 10px;
+    min-width: 50px;
+    align-items: center;
+  }
+
+  /* DP grid even smaller */
+  .dp-grid th,
+  .dp-grid td {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  /* Controls in 2 rows of buttons */
+  .controls button {
+    flex: 1 1 calc(50% - 3px);
+  }
+
+  /* Code copy button smaller and repositioned */
+  .code-copy-btn {
+    top: 4px;
+    right: 4px;
+    padding: 3px 5px;
+  }
+
+  /* Code section label */
+  .code-section-label {
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+}
+
+/* Prevent horizontal page scroll */
+html, body {
+  overflow-x: hidden;
+}
+
+/* iPhone notch / safe area support */
+@supports (padding: env(safe-area-inset-left)) {
+  .app {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(48px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Smooth scrolling for sticky elements */
+@media (max-width: 768px) {
+  .viz-left,
+  .viz-right {
+    width: 100%;
+  }
+}
