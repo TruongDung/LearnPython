@@ -565,6 +565,307 @@ function buildSteps1631(input) {
   return { input, answer, steps };
 }
 
+// ─── 1101: The Earliest Moment When Everyone Become Friends ───
+function buildSteps1101(input, params) {
+  // input: logs as "t1,a1,b1;t2,a2,b2;..."
+  // n: number of people
+  const n = params.n !== undefined ? Number(params.n) : 6;
+  const logs = String(input).split(";").map((s) => {
+    const [t, a, b] = s.trim().split(",").map(Number);
+    return { t, a, b };
+  }).sort((x, y) => x.t - y.t);
+
+  const steps = [];
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const rnk = new Array(n).fill(0);
+  let components = n;
+  const addedEdges = new Set(); // "a-b" keys already union-ed
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(x, y) {
+    const rx = find(x), ry = find(y);
+    if (rx === ry) return false;
+    if (rnk[rx] >= rnk[ry]) { parent[ry] = rx; if (rnk[rx] === rnk[ry]) rnk[rx]++; }
+    else { parent[rx] = ry; }
+    return true;
+  }
+  function compCount() {
+    const cnt = new Map();
+    for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+    return cnt;
+  }
+
+  function graphSnap(title, note, hlNodes, hlEdges, vars, codeLines) {
+    const cnt = compCount();
+    const visited = Array.from({ length: n }, (_, i) => cnt.get(find(i)) > 1 ? i : -1).filter(x => x >= 0);
+    const gEdges = [];
+    for (const key of addedEdges) {
+      const [u, v] = key.split("-").map(Number);
+      gEdges.push({ u, v, w: "" });
+    }
+    return {
+      title,
+      arr: [...parent],
+      sub: [...rnk],
+      highlight: hlNodes || [],
+      mark: Array.from({ length: n }, (_, i) => i).filter(i => parent[i] === i),
+      graph: {
+        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+        edges: gEdges,
+        hlNodes: hlNodes || [],
+        hlEdges: hlEdges || [],
+        visitedNodes: visited,
+      },
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  const logsStr = logs.map((l) => `t=${l.t}:(${l.a},${l.b})`).join(", ");
+
+  // ── Step 0: intro ──
+  steps.push(graphSnap(
+    { vi: "Khởi tạo: mọi người chưa quen ai", en: "Init: everyone is a stranger" },
+    {
+      vi:
+        `${n} người (0‥${n-1}), ${logs.length} sự kiện.\n` +
+        `Sắp logs theo timestamp tăng dần: ${logsStr}\n\n` +
+        `Dùng Union-Find: lần lượt xử lý từng log.\n` +
+        `Khi chỉ còn 1 nhóm (components = 1) → mọi người đã quen nhau → trả timestamp đó.`,
+      en:
+        `${n} people (0‥${n-1}), ${logs.length} events.\n` +
+        `Sort logs by timestamp ascending: ${logsStr}\n\n` +
+        `Union-Find approach: process each log in order.\n` +
+        `When only 1 component remains → everyone knows each other → return that timestamp.`,
+    },
+    [], [],
+    [{ name: "n", value: n }, { name: "components", value: components }, { name: "logs (sorted)", value: logsStr }],
+    [2, 3]
+  ));
+
+  // ── Process each log ──
+  let answer = -1;
+  for (const log of logs) {
+    const { t, a, b } = log;
+    const ra = find(a), rb = find(b);
+    const alreadySame = ra === rb;
+
+    if (!alreadySame) {
+      union(a, b);
+      components--;
+      addedEdges.add(`${Math.min(a,b)}-${Math.max(a,b)}`);
+    }
+
+    const done = components === 1;
+    steps.push(graphSnap(
+      {
+        vi: done
+          ? `✓ t=${t}: (${a},${b}) quen nhau → TẤT CẢ kết nối!`
+          : alreadySame
+            ? `t=${t}: (${a},${b}) đã quen nhau rồi`
+            : `t=${t}: (${a},${b}) quen nhau → ${components} nhóm`,
+        en: done
+          ? `✓ t=${t}: (${a},${b}) become friends → EVERYONE connected!`
+          : alreadySame
+            ? `t=${t}: (${a},${b}) already friends, skip`
+            : `t=${t}: (${a},${b}) become friends → ${components} group(s)`,
+      },
+      {
+        vi:
+          (alreadySame
+            ? `${a} và ${b} đã cùng nhóm (find=${ra}) → bỏ qua.\n`
+            : `Union(${a}, ${b}): gộp 2 nhóm. parent=[${parent.join(",")}]\n`) +
+          (done
+            ? `🎯 components = 1 → timestamp sớm nhất để mọi người quen = ${t}.`
+            : `Còn ${components} nhóm, tiếp tục.`),
+        en:
+          (alreadySame
+            ? `${a} and ${b} already in the same group (root=${ra}) → skip.\n`
+            : `Union(${a}, ${b}): merged two groups. parent=[${parent.join(",")}]\n`) +
+          (done
+            ? `🎯 components = 1 → earliest moment everyone knows each other = ${t}.`
+            : `${components} group(s) remain, continue.`),
+      },
+      [a, b],
+      alreadySame ? [] : [`${Math.min(a,b)}-${Math.max(a,b)}`],
+      [
+        { name: "timestamp", value: t },
+        { name: "pair", value: `(${a}, ${b})` },
+        { name: "same group?", value: alreadySame },
+        { name: "components", value: components },
+        { name: "parent", value: `[${parent.join(",")}]` },
+      ],
+      [5, 6, 7, 8]
+    ));
+
+    if (done) { answer = t; break; }
+  }
+
+  const fs = graphSnap(
+    { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    {
+      vi: answer === -1
+        ? `Không bao giờ tất cả kết nối → trả -1.`
+        : `Timestamp ${answer} là thời điểm sớm nhất tất cả ${n} người đều quen nhau.`,
+      en: answer === -1
+        ? `Everyone never all connected → return -1.`
+        : `Timestamp ${answer} is the earliest moment all ${n} people know each other.`,
+    },
+    [], [],
+    [{ name: "answer", value: answer }],
+    [9]
+  );
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
+// ─── 323: Number of Connected Components in an Undirected Graph ───
+function buildSteps323(input, params) {
+  const n = params.n !== undefined ? Number(params.n) : 5;
+  const edgeList = String(input).split(";").map((s) => {
+    const [a, b] = s.trim().split(",").map(Number);
+    return { a, b };
+  }).filter((e) => !isNaN(e.a) && !isNaN(e.b));
+
+  const steps = [];
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const rnk = new Array(n).fill(0);
+  let components = n;
+  const addedEdges = new Set();
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(x, y) {
+    const rx = find(x), ry = find(y);
+    if (rx === ry) return false;
+    if (rnk[rx] >= rnk[ry]) { parent[ry] = rx; if (rnk[rx] === rnk[ry]) rnk[rx]++; }
+    else { parent[rx] = ry; }
+    return true;
+  }
+  function compCount() {
+    const cnt = new Map();
+    for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+    return cnt;
+  }
+
+  function graphSnap(title, note, hlNodes, hlEdges, vars, codeLines) {
+    const cnt = compCount();
+    const visited = Array.from({ length: n }, (_, i) => cnt.get(find(i)) > 1 ? i : -1).filter(x => x >= 0);
+    const gEdges = [];
+    for (const key of addedEdges) {
+      const [u, v] = key.split("-").map(Number);
+      gEdges.push({ u, v, w: "" });
+    }
+    return {
+      title,
+      arr: [...parent],
+      sub: [...rnk],
+      highlight: hlNodes || [],
+      mark: Array.from({ length: n }, (_, i) => i).filter(i => parent[i] === i),
+      graph: {
+        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+        edges: gEdges,
+        hlNodes: hlNodes || [],
+        hlEdges: hlEdges || [],
+        visitedNodes: visited,
+      },
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  const edgesStr = edgeList.map((e) => `(${e.a},${e.b})`).join(", ");
+
+  // ── Step 0: intro ──
+  steps.push(graphSnap(
+    { vi: "Khởi tạo: mỗi nút là 1 nhóm riêng", en: "Init: each node is its own component" },
+    {
+      vi:
+        `${n} nút (0‥${n-1}), ${edgeList.length} cạnh: ${edgesStr}.\n` +
+        `parent[i] = i, components = ${n}.\n\n` +
+        `Dùng Union-Find: với mỗi cạnh (a,b), nếu a và b khác nhóm → gộp lại, components--.\n` +
+        `Nút VÀNG = đang xét. Nút XANH = đã cùng nhóm với nút khác.`,
+      en:
+        `${n} nodes (0‥${n-1}), ${edgeList.length} edges: ${edgesStr}.\n` +
+        `parent[i] = i, components = ${n}.\n\n` +
+        `Union-Find: for each edge (a,b), if a and b are in different groups → merge, components--.\n` +
+        `AMBER node = being processed. BLUE node = already in a multi-node component.`,
+    },
+    [], [],
+    [{ name: "n", value: n }, { name: "components", value: components }, { name: "edges", value: edgesStr }],
+    [2, 3]
+  ));
+
+  // ── Process each edge ──
+  for (const { a, b } of edgeList) {
+    const ra = find(a), rb = find(b);
+    const alreadySame = ra === rb;
+
+    if (!alreadySame) {
+      union(a, b);
+      components--;
+      addedEdges.add(`${Math.min(a,b)}-${Math.max(a,b)}`);
+    }
+
+    steps.push(graphSnap(
+      {
+        vi: alreadySame
+          ? `Cạnh (${a},${b}): đã cùng nhóm, bỏ qua`
+          : `Union(${a},${b}) → ${components} nhóm`,
+        en: alreadySame
+          ? `Edge (${a},${b}): already same component, skip`
+          : `Union(${a},${b}) → ${components} component(s)`,
+      },
+      {
+        vi:
+          alreadySame
+            ? `find(${a}) = ${ra} = find(${b}) → cùng nhóm rồi, không cần union.`
+            : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → gộp 2 nhóm.\nparent = [${parent.join(",")}], components = ${components}.`,
+        en:
+          alreadySame
+            ? `find(${a}) = ${ra} = find(${b}) → already same group, skip.`
+            : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → merge two groups.\nparent = [${parent.join(",")}], components = ${components}.`,
+      },
+      [a, b],
+      alreadySame ? [] : [`${Math.min(a,b)}-${Math.max(a,b)}`],
+      [
+        { name: "edge", value: `(${a}, ${b})` },
+        { name: "find(a)", value: ra },
+        { name: "find(b)", value: rb },
+        { name: "same?", value: alreadySame },
+        { name: "components", value: components },
+        { name: "parent", value: `[${parent.join(",")}]` },
+      ],
+      [5, 6, 7, 8]
+    ));
+  }
+
+  // ── Final ──
+  const fs = graphSnap(
+    { vi: `Kết quả: ${components} nhóm`, en: `Result: ${components} component(s)` },
+    {
+      vi: `Đã xử lý hết ${edgeList.length} cạnh. Số nhóm kết nối = ${components}.`,
+      en: `Processed all ${edgeList.length} edges. Number of connected components = ${components}.`,
+    },
+    [], [],
+    [{ name: "answer", value: components }],
+    [9]
+  );
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer: components, steps };
+}
+
 module.exports = {
   547: {
     id: 547,
@@ -748,5 +1049,92 @@ module.exports = {
       "        return 0",
     ],
     builder: buildSteps1631,
+  },
+  1101: {
+    id: 1101,
+    difficulty: "medium",
+    slug: "the-earliest-moment-when-everyone-become-friends",
+    category: UF_CAT,
+    title: { vi: "The Earliest Moment When Everyone Become Friends", en: "The Earliest Moment When Everyone Become Friends" },
+    titleVi: { vi: "Thời điểm sớm nhất mọi người quen nhau", en: "Earliest moment all friends" },
+    statement: {
+      vi: "Có n người (0‥n-1). Mỗi log [t, a, b] nghĩa là a và b quen nhau tại thời điểm t. Tìm timestamp SỚM NHẤT để mọi người đều kết nối (trực tiếp hoặc gián tiếp). Nhập logs: 't,a,b;t,a,b;...'.",
+      en: "There are n people (0‥n-1). Each log [t, a, b] means a and b become friends at time t. Find the EARLIEST timestamp when everyone is connected (directly or indirectly). Enter logs as 't,a,b;t,a,b;...'.",
+    },
+    defaultInput: "20,0,2;50,1,3;10,0,1;80,3,4;70,2,3",
+    inputKind: "string",
+    inputLabel: { vi: "Logs (t,a,b cách bởi ';')", en: "Logs (t,a,b separated by ';')" },
+    extraParams: [{ key: "n", label: { vi: "n (số người)", en: "n (number of people)" }, default: 5 }],
+    approach: [
+      { vi: "Sắp logs theo timestamp tăng dần.", en: "Sort logs by timestamp ascending." },
+      { vi: "Union-Find: lần lượt union từng cặp (a, b). Mỗi union giảm components đi 1.", en: "Union-Find: union each pair (a, b). Each merge decreases component count by 1." },
+      { vi: "Khi components = 1 → trả timestamp của log đó. Nếu không bao giờ về 1 → trả -1.", en: "When components = 1 → return that log's timestamp. If it never reaches 1 → return -1." },
+    ],
+    complexity: {
+      time: "O(m log m + m·α(n))",
+      space: "O(n)",
+      note: { vi: "m = số logs, sắp xếp O(m log m). Mỗi union/find gần O(1).", en: "m = number of logs, sort O(m log m). Each union/find near O(1)." },
+    },
+    code: [
+      "class Solution:",
+      "    def earliestAcq(self, logs, n):",
+      "        logs.sort()  # sort by timestamp",
+      "        parent = list(range(n))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        components = n",
+      "        for t, a, b in logs:",
+      "            ra, rb = find(a), find(b)",
+      "            if ra != rb:",
+      "                parent[ra] = rb",
+      "                components -= 1",
+      "            if components == 1:",
+      "                return t",
+      "        return -1",
+    ],
+    builder: buildSteps1101,
+  },
+  323: {
+    id: 323,
+    difficulty: "medium",
+    slug: "number-of-connected-components-in-an-undirected-graph",
+    category: UF_CAT,
+    title: { vi: "Number of Connected Components in an Undirected Graph", en: "Number of Connected Components in an Undirected Graph" },
+    titleVi: { vi: "Số nhóm kết nối (Union-Find)", en: "Count connected components (Union-Find)" },
+    statement: {
+      vi: "Cho n nút (0‥n-1) và danh sách cạnh vô hướng. Tìm số nhóm kết nối. Nhập cạnh dạng 'a,b;a,b;...'.",
+      en: "Given n nodes (0‥n-1) and a list of undirected edges, find the number of connected components. Enter edges as 'a,b;a,b;...'.",
+    },
+    defaultInput: "0,1;1,2;3,4",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (a,b cách bởi ';')", en: "Edges (a,b separated by ';')" },
+    extraParams: [{ key: "n", label: { vi: "n (số nút)", en: "n (number of nodes)" }, default: 5 }],
+    approach: [
+      { vi: "Khởi tạo parent[i]=i, components=n.", en: "Initialize parent[i]=i, components=n." },
+      { vi: "Với mỗi cạnh (a,b): nếu khác nhóm → union, components--.", en: "For each edge (a,b): if different groups → union, components--." },
+      { vi: "Kết quả = components sau khi xử lý hết cạnh.", en: "Result = components after processing all edges." },
+    ],
+    complexity: { time: "O((n+e)·α(n))", space: "O(n)", note: { vi: "e = số cạnh.", en: "e = number of edges." } },
+    code: [
+      "class Solution:",
+      "    def countComponents(self, n, edges):",
+      "        parent = list(range(n))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        components = n",
+      "        for a, b in edges:",
+      "            ra, rb = find(a), find(b)",
+      "            if ra != rb:",
+      "                parent[ra] = rb",
+      "                components -= 1",
+      "        return components",
+    ],
+    builder: buildSteps323,
   },
 };
