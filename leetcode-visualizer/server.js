@@ -133,6 +133,11 @@ app.post("/api/problem/:id/solve", (req, res) => {
       if (typeof v !== "number" || !isFinite(v)) {
         return res.status(400).json({ error: `Tham số "${p.key}" phải là một số.` });
       }
+    } else if (p.type === "select") {
+      // select params are sent as numbers; accept any finite number or skip if undefined
+      if (v !== undefined && typeof v !== "number" && typeof v !== "string") {
+        return res.status(400).json({ error: `Tham số "${p.key}" không hợp lệ.` });
+      }
     } else if (!Number.isInteger(v) || (!p.allowNegative && v < 0)) {
       return res.status(400).json({
         error: `Tham số "${p.key}" phải là số nguyên${p.allowNegative ? "" : " không âm"}.`,
