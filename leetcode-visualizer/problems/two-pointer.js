@@ -678,6 +678,73 @@ function buildSteps485(nums) {
   return { original: [...nums], answer: maxRun, steps };
 }
 
+// ─── 1089: Duplicate Zeros ───
+// Two-pointer (read i from back, write j from back).
+// Pass 1: count zeros → write pointer j = n + zeros - 1.
+// Pass 2: read i right-to-left; if zero write twice, else write once.
+function buildSteps1089(nums) {
+  const n = nums.length;
+  const arr = [...nums];
+  const steps = [];
+
+  // Pass 1: count zeros.
+  let zeros = 0;
+  for (let i = 0; i < n; i++) { if (arr[i] === 0) zeros++; }
+
+  steps.push({
+    title: { vi: "Bước 1: Đếm số 0, tính con trỏ ghi", en: "Step 1: Count zeros, set write pointer" },
+    arr: [...arr], sub: null,
+    highlight: arr.map((v, i) => v === 0 ? i : -1).filter((x) => x >= 0),
+    mark: [], codeLines: [3, 4, 5],
+    vars: [{ name: "zeros", value: zeros }, { name: "j (write)", value: `n + zeros - 1 = ${n + zeros - 1}` }],
+    note: {
+      vi: `Có ${zeros} số 0 → mỗi cái cần thêm 1 ô. Con trỏ GHI bắt đầu ở j = ${n} + ${zeros} - 1 = ${n + zeros - 1} (ngoài mảng, chỉ ghi khi j < n).`,
+      en: `${zeros} zeros → each needs one extra slot. WRITE pointer starts at j = ${n} + ${zeros} - 1 = ${n + zeros - 1} (out of bounds; only write when j < n).`,
+    },
+  });
+
+  // Pass 2: fill right-to-left.
+  let j = n + zeros - 1;
+  for (let i = n - 1; i >= 0; i--) {
+    if (arr[i] === 0) {
+      // Write two zeros.
+      if (j < n) { arr[j] = 0; }
+      j--;
+      if (j < n) { arr[j] = 0; }
+      const writePosA = j + 1, writePosB = j;
+      steps.push({
+        title: { vi: `i=${i}: arr[i]=0 → ghi 0 hai lần tại j=${writePosA} và j=${writePosB}`, en: `i=${i}: arr[i]=0 → write 0 twice at j=${writePosA} and j=${writePosB}` },
+        arr: [...arr], highlight: [writePosA, writePosB].filter((x) => x >= 0 && x < n),
+        mark: arr.map((_, k) => k < i ? -1 : k).filter((x) => x >= 0), codeLines: [8, 9, 10, 11],
+        vars: [{ name: "i (read)", value: i }, { name: "j (write)", value: j }, { name: "arr", value: `[${arr.join(",")}]` }],
+        note: { vi: `Số 0 → ghi 0 tại j=${writePosA} và j=${writePosB} (nếu < n). Mỗi 0 được nhân đôi.`, en: `Zero → write 0 at j=${writePosA} and j=${writePosB} (if < n). Each zero is duplicated.` },
+      });
+    } else {
+      // Write once.
+      if (j < n) { arr[j] = arr[i]; }
+      const writePos = j;
+      steps.push({
+        title: { vi: `i=${i}: arr[i]=${nums[i]} → copy sang j=${writePos}`, en: `i=${i}: arr[i]=${nums[i]} → copy to j=${writePos}` },
+        arr: [...arr], highlight: writePos < n ? [writePos] : [],
+        mark: arr.map((_, k) => k < i ? -1 : k).filter((x) => x >= 0), codeLines: [6, 7],
+        vars: [{ name: "i (read)", value: i }, { name: "j (write)", value: j }, { name: "arr", value: `[${arr.join(",")}]` }],
+        note: { vi: `Số khác 0 → copy ${nums[i]} sang j=${writePos}${writePos >= n ? " (bỏ, ngoài mảng)" : ""}.`, en: `Non-zero → copy ${nums[i]} to j=${writePos}${writePos >= n ? " (dropped, out of bounds)" : ""}.` },
+      });
+    }
+    j--;
+  }
+
+  const fs = {
+    title: { vi: `Kết quả: [${arr.join(",")}]`, en: `Result: [${arr.join(",")}]` },
+    arr: [...arr], highlight: [], mark: arr.map((_, i) => i),
+    final: true, codeLines: [12],
+    vars: [{ name: "result", value: `[${arr.join(",")}]` }],
+    note: { vi: `Hoàn tất. Mọi số 0 được nhân đôi tại chỗ.`, en: `Done. Every zero has been duplicated in-place.` },
+  };
+  steps.push(fs);
+  return { input: nums, answer: arr, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -940,5 +1007,41 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps977,
+  },
+  1089: {
+    id: 1089,
+    difficulty: "easy",
+    slug: "duplicate-zeros",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Duplicate Zeros", en: "Duplicate Zeros" },
+    titleVi: { vi: "Nhân đôi các số 0 (tại chỗ)", en: "Duplicate zeros in-place" },
+    statement: {
+      vi: "Cho mảng arr. Nhân đôi mỗi số 0, dịch các phần tử còn lại sang phải. Kết quả cùng độ dài (bỏ phần tràn). Thực hiện tại chỗ.",
+      en: "Given a fixed-length array arr, duplicate each zero, shifting remaining elements right. Elements beyond original length are dropped. Do it in-place.",
+    },
+    defaultInput: [1, 0, 2, 3, 0, 4, 5, 0],
+    inputKind: "nonneg",
+    extraParams: [],
+    approach: [
+      { vi: "Pass 1: đếm số 0 → tính vị trí con trỏ ghi (write = n + zeros - 1).", en: "Pass 1: count zeros → compute write pointer (write = n + zeros - 1)." },
+      { vi: "Pass 2: con trỏ đọc (i) từ cuối về đầu; con trỏ ghi (j) từ cuối ghi ngược. Số 0 được ghi 2 lần.", en: "Pass 2: read pointer (i) from back to front; write pointer (j) fills backwards. Zeros written twice." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Hai pass O(n). Tại chỗ O(1).", en: "Two passes O(n). In-place O(1)." } },
+    code: [
+      "class Solution:",
+      "    def duplicateZeros(self, arr):",
+      "        n = len(arr)",
+      "        zeros = arr.count(0)",
+      "        j = n + zeros - 1",
+      "        for i in range(n - 1, -1, -1):",
+      "            if j < n:",
+      "                arr[j] = arr[i]",
+      "            if arr[i] == 0:",
+      "                j -= 1",
+      "                if j < n:",
+      "                    arr[j] = 0",
+      "            j -= 1",
+    ],
+    builder: buildSteps1089,
   },
 };
