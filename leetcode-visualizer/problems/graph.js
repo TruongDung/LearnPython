@@ -147,6 +147,225 @@ function buildSteps127(input, params) {
   return { beginWord, endWord, answer, steps };
 }
 
+function parseBinaryGrid(input) {
+  return String(input)
+    .split("|")
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+}
+
+/**
+ * LeetCode 3286: Find a Safe Walk Through a Grid.
+ * BFS over states, keeping the best remaining health seen for each cell.
+ */
+function buildSteps3286(input, params) {
+  const grid = parseBinaryGrid(input);
+  const health = Number(params.health || 0);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== 0 && v !== 1))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: false }],
+      note: {
+        vi: "Lưới phải gồm các hàng cách bởi '|', mỗi ô là 0 hoặc 1. Ví dụ: 1,0,0|0,1,0|0,0,0.",
+        en: "Grid must use rows separated by '|', each cell 0 or 1. Example: 1,0,0|0,1,0|0,0,0.",
+      },
+    });
+    return { original: grid, answer: false, steps };
+  }
+
+  const m = grid.length;
+  const n = grid[0].length;
+  const best = Array.from({ length: m }, () => Array(n).fill(-1));
+  const queued = new Set();
+  const parents = new Map();
+  const key = (r, c, h) => `${r},${c},${h}`;
+  const cellKey = (r, c) => `${r},${c}`;
+
+  function makeCells(current, pathCells) {
+    const path = new Set((pathCells || []).map(([r, c]) => cellKey(r, c)));
+    return grid.map((row, r) =>
+      row.map((cost, c) => {
+        let cls = cost === 1 ? "wall" : "empty";
+        if (best[r][c] >= 0) cls = "visited";
+        if (queued.has(cellKey(r, c))) cls = "queued";
+        if (path.has(cellKey(r, c))) cls = "path";
+        if (r === 0 && c === 0) cls = "start";
+        if (r === m - 1 && c === n - 1) cls = "end";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        const label = best[r][c] >= 0 ? String(best[r][c]) : String(cost);
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current, codeLines, vars, note, final = false, pathCells = [] }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows: m, cols: n, cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  const startHealth = health - grid[0][0];
+  if (startHealth <= 0) {
+    best[0][0] = Math.max(startHealth, 0);
+    pushStep({
+      title: { vi: "Không đủ máu để bắt đầu", en: "Not enough health to start" },
+      current: [0, 0],
+      final: true,
+      codeLines: [6, 7],
+      vars: [
+        { name: "health", value: health },
+        { name: "grid[0][0]", value: grid[0][0] },
+        { name: "remaining", value: startHealth },
+        { name: "answer", value: false },
+      ],
+      note: {
+        vi: `Sau khi vào ô bắt đầu còn ${startHealth} máu. Cần máu > 0, nên không có đường an toàn.`,
+        en: `After entering the start cell, remaining health is ${startHealth}. Health must stay > 0, so no safe walk exists.`,
+      },
+    });
+    return { original: grid, health, answer: false, steps };
+  }
+
+  best[0][0] = startHealth;
+  const queue = [[0, 0, startHealth]];
+  queued.add(cellKey(0, 0));
+  pushStep({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    current: [0, 0],
+    codeLines: [6, 8, 9, 10],
+    vars: [
+      { name: "health", value: health },
+      { name: "start remaining", value: startHealth },
+      { name: "queue", value: "[(0,0)]" },
+    ],
+    note: {
+      vi: `Trừ chi phí ô bắt đầu (${grid[0][0]}). Còn ${startHealth} máu. Mỗi ô hiển thị máu tốt nhất còn lại khi tới ô đó.`,
+      en: `Subtract the start cell cost (${grid[0][0]}). Remaining health is ${startHealth}. Each cell shows the best remaining health seen there.`,
+    },
+  });
+
+  const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+  let head = 0;
+  let answer = false;
+  let finalState = null;
+
+  while (head < queue.length && steps.length < 80) {
+    const [r, c, curHealth] = queue[head++];
+    queued.delete(cellKey(r, c));
+
+    pushStep({
+      title: { vi: `Xử lý ô (${r},${c})`, en: `Process cell (${r},${c})` },
+      current: [r, c],
+      codeLines: [11, 12, 13],
+      vars: [
+        { name: "cell", value: `(${r}, ${c})` },
+        { name: "remaining health", value: curHealth },
+        { name: "queue size", value: queue.length - head },
+      ],
+      note: {
+        vi: `Pop (${r},${c}) với ${curHealth} máu còn lại. Thử đi 4 hướng.`,
+        en: `Pop (${r},${c}) with ${curHealth} health remaining. Try all 4 directions.`,
+      },
+    });
+
+    if (r === m - 1 && c === n - 1) {
+      answer = true;
+      finalState = [r, c, curHealth];
+      break;
+    }
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
+
+      const nextHealth = curHealth - grid[nr][nc];
+      if (nextHealth <= 0 || nextHealth <= best[nr][nc]) continue;
+
+      best[nr][nc] = nextHealth;
+      parents.set(key(nr, nc, nextHealth), key(r, c, curHealth));
+      queue.push([nr, nc, nextHealth]);
+      queued.add(cellKey(nr, nc));
+
+      pushStep({
+        title: { vi: `Thêm (${nr},${nc}) vào queue`, en: `Enqueue (${nr},${nc})` },
+        current: [nr, nc],
+        codeLines: [14, 15, 16, 17, 18, 19],
+        vars: [
+          { name: "from", value: `(${r}, ${c})` },
+          { name: "to", value: `(${nr}, ${nc})` },
+          { name: "cell cost", value: grid[nr][nc] },
+          { name: "new health", value: nextHealth },
+        ],
+        note: {
+          vi: `Đi tới (${nr},${nc}) tốn ${grid[nr][nc]} máu, còn ${nextHealth}. Đây là lượng máu tốt nhất từng thấy ở ô này.`,
+          en: `Move to (${nr},${nc}) costs ${grid[nr][nc]} health, leaving ${nextHealth}. This is the best health seen for this cell.`,
+        },
+      });
+    }
+  }
+
+  if (answer && finalState) {
+    const pathCells = [];
+    let cur = key(finalState[0], finalState[1], finalState[2]);
+    while (cur) {
+      const [r, c] = cur.split(",").map(Number);
+      pathCells.push([r, c]);
+      cur = parents.get(cur);
+    }
+    pathCells.reverse();
+
+    pushStep({
+      title: { vi: "Tìm thấy đường an toàn", en: "Safe walk found" },
+      current: [m - 1, n - 1],
+      pathCells,
+      final: true,
+      codeLines: [12, 13],
+      vars: [
+        { name: "answer", value: true },
+        { name: "finish health", value: finalState[2] },
+        { name: "path length", value: pathCells.length },
+      ],
+      note: {
+        vi: `Đã tới đích với ${finalState[2]} máu còn lại (> 0), nên trả về True.`,
+        en: `Reached the destination with ${finalState[2]} health remaining (> 0), so return True.`,
+      },
+    });
+  } else {
+    pushStep({
+      title: { vi: "Không tìm thấy đường an toàn", en: "No safe walk found" },
+      current: null,
+      final: true,
+      codeLines: [20],
+      vars: [
+        { name: "answer", value: false },
+        { name: "visited cells", value: best.flat().filter((v) => v >= 0).length },
+      ],
+      note: {
+        vi: "Queue rỗng: mọi đường có thể đi đều hết máu hoặc không cải thiện lượng máu đã biết. Trả về False.",
+        en: "Queue is empty: every possible route runs out of health or does not improve the best known health. Return False.",
+      },
+    });
+  }
+
+  return { original: grid, health, answer, steps };
+}
+
 /**
  * Generate steps for LeetCode 1197: Minimum Knight Moves.
  * BFS from (0,0) to (|x|,|y|), tracking visited cells on a grid.
@@ -1709,6 +1928,70 @@ module.exports = {
       "        return -1",
     ],
     builder: buildSteps1293,
+  },
+  3286: {
+    id: 3286,
+    difficulty: "medium",
+    slug: "find-a-safe-walk-through-a-grid",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Find a Safe Walk Through a Grid", en: "Find a Safe Walk Through a Grid" },
+    titleVi: { vi: "Tìm đường đi an toàn qua lưới", en: "Safe walk with health" },
+    statement: {
+      vi:
+        "Cho lưới nhị phân m×n và health ban đầu. Bắt đầu ở (0,0), đi 4 hướng tới (m-1,n-1). " +
+        "Khi vào một ô, mất grid[r][c] máu. Luôn phải còn máu > 0 sau khi vào ô. " +
+        "Trả về true nếu tồn tại đường đi an toàn. Nhập lưới: hàng cách '|', giá trị 0/1 cách ','.",
+      en:
+        "Given an m×n binary grid and initial health. Start at (0,0), move 4 directions to (m-1,n-1). " +
+        "Entering a cell costs grid[r][c] health. Health must remain > 0 after entering every cell. " +
+        "Return true if a safe walk exists. Enter grid rows separated by '|', values 0/1 by ','.",
+    },
+    defaultInput: "0,1,0,0,0|0,1,0,1,0|0,0,0,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    extraParams: [
+      { key: "health", label: { vi: "health (máu ban đầu)", en: "health (initial health)" }, default: 1 },
+    ],
+    approach: [
+      { vi: "State BFS là (row, col, health_còn_lại), vì cùng một ô nhưng còn nhiều máu hơn thì tốt hơn.", en: "BFS state is (row, col, remaining_health), because reaching the same cell with more health is better." },
+      { vi: "Khi bước vào ô mới, trừ grid[nr][nc]. Chỉ được đi tiếp nếu health mới > 0.", en: "When entering a new cell, subtract grid[nr][nc]. Continue only if the new health is > 0." },
+      { vi: "Tối ưu visited bằng best[r][c] = lượng máu nhiều nhất từng có khi tới ô đó; bỏ qua state yếu hơn.", en: "Optimize visited with best[r][c] = most health ever seen at that cell; skip weaker states." },
+      { vi: "BFS kết thúc thành công khi pop hoặc enqueue được ô đích với máu dương.", en: "BFS succeeds once the destination is reached with positive health." },
+    ],
+    complexity: {
+      time: "O(m·n·health)",
+      space: "O(m·n)",
+      note: {
+        vi: "Bản state đầy đủ có thể có m·n·health trạng thái. Visualizer giữ best health mỗi ô để cắt tỉa state yếu hơn.",
+        en: "The full state space can be m·n·health. The visualizer keeps best health per cell to prune weaker states.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def findSafeWalk(self, grid, health):",
+      "        m, n = len(grid), len(grid[0])",
+      "        start = health - grid[0][0]",
+      "        if start <= 0:",
+      "            return False",
+      "        best = [[-1] * n for _ in range(m)]",
+      "        best[0][0] = start",
+      "        queue = deque([(0, 0, start)])",
+      "        while queue:",
+      "            r, c, hp = queue.popleft()",
+      "            if r == m - 1 and c == n - 1:",
+      "                return True",
+      "            for dr, dc in [(0,1),(1,0),(0,-1),(-1,0)]:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < m and 0 <= nc < n:",
+      "                    nhp = hp - grid[nr][nc]",
+      "                    if nhp > 0 and nhp > best[nr][nc]:",
+      "                        best[nr][nc] = nhp",
+      "                        queue.append((nr, nc, nhp))",
+      "        return False",
+    ],
+    builder: buildSteps3286,
   },
   1377: {
     id: 1377,
