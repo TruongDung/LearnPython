@@ -746,6 +746,216 @@ function buildSteps994(input) {
 }
 
 /**
+ * LeetCode 1091: Shortest Path in Binary Matrix.
+ * BFS in 8 directions. Path length counts cells, so the start cell has distance 1.
+ */
+function buildSteps1091(input) {
+  const grid = parseIslandGrid(input).map((row) => row.map((v) => Number(v)));
+  const steps = [];
+
+  if (!grid.length || grid.length !== grid[0].length || grid.some((row) => row.length !== grid.length || row.some((v) => v !== 0 && v !== 1))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải là ma trận vuông chỉ gồm 0/1. Ví dụ: 011|101|110 hoặc 0,1,1|1,0,1|1,1,0.",
+        en: "Grid must be a square matrix containing only 0/1. Example: 011|101|110 or 0,1,1|1,0,1|1,1,0.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const n = grid.length;
+  const dist = Array.from({ length: n }, () => Array(n).fill(0));
+  const parent = Array.from({ length: n }, () => Array(n).fill(null));
+  const queued = new Set();
+  const key = (r, c) => `${r},${c}`;
+  const dirs = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [0, -1],           [0, 1],
+    [1, -1],  [1, 0],  [1, 1],
+  ];
+
+  function makeCells(current = null, pathCells = new Set()) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const cellKey = key(r, c);
+        let cls = cell === 1 ? "wall" : "empty";
+        let label = cell === 1 ? "1" : ".";
+        if (dist[r][c] > 0) {
+          cls = "visited";
+          label = String(dist[r][c]);
+        }
+        if (queued.has(cellKey)) cls = "queued";
+        if (pathCells.has(cellKey)) cls = "path";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, pathCells, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows: n, cols: n, cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo BFS 8 hướng", en: "Initialize 8-direction BFS" },
+    codeLines: [4, 5, 6, 7, 8, 9],
+    vars: [
+      { name: "n", value: n },
+      { name: "start", value: "(0, 0)" },
+      { name: "target", value: `(${n - 1}, ${n - 1})` },
+    ],
+    note: {
+      vi: "Đường đi chỉ được qua ô 0 và có thể đi 8 hướng, gồm cả đường chéo. Độ dài đường đi tính cả ô bắt đầu và ô kết thúc.",
+      en: "The path may only use 0-cells and can move in 8 directions, including diagonals. Path length counts both start and target cells.",
+    },
+  });
+
+  if (grid[0][0] !== 0 || grid[n - 1][n - 1] !== 0) {
+    pushStep({
+      title: { vi: "Start hoặc target bị chặn → -1", en: "Start or target is blocked → -1" },
+      current: grid[0][0] !== 0 ? [0, 0] : [n - 1, n - 1],
+      final: true,
+      codeLines: [5, 6],
+      vars: [
+        { name: "grid[0][0]", value: grid[0][0] },
+        { name: `grid[${n - 1}][${n - 1}]`, value: grid[n - 1][n - 1] },
+        { name: "answer", value: -1 },
+      ],
+      note: {
+        vi: "Nếu ô đầu hoặc ô cuối là 1, không thể có clear path.",
+        en: "If either endpoint is 1, no clear path can exist.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  dist[0][0] = 1;
+  queued.add(key(0, 0));
+  let queue = [[0, 0]];
+  let found = n === 1;
+
+  pushStep({
+    title: { vi: "Đưa (0,0) vào queue", en: "Enqueue (0,0)" },
+    current: [0, 0],
+    codeLines: [8, 9],
+    vars: [
+      { name: "dist[0][0]", value: 1 },
+      { name: "queue", value: "[(0, 0)]" },
+    ],
+    note: {
+      vi: "BFS bắt đầu tại (0,0) với khoảng cách 1 vì độ dài path tính theo số ô.",
+      en: "BFS starts at (0,0) with distance 1 because the path length counts cells.",
+    },
+  });
+
+  while (queue.length && !found) {
+    const next = [];
+    for (const [r, c] of queue) {
+      queued.delete(key(r, c));
+
+      pushStep({
+        title: { vi: `Xử lý ô (${r},${c})`, en: `Process cell (${r},${c})` },
+        current: [r, c],
+        codeLines: [10, 11, 12],
+        vars: [
+          { name: "cell", value: `(${r}, ${c})` },
+          { name: "dist", value: dist[r][c] },
+          { name: "queue level size", value: queue.length },
+        ],
+        note: {
+          vi: `Từ (${r},${c}), thử 8 hướng xung quanh. Ô hợp lệ phải nằm trong biên, là 0, và chưa được thăm.`,
+          en: `From (${r},${c}), try all 8 surrounding directions. A valid neighbor must be in bounds, be 0, and be unvisited.`,
+        },
+      });
+
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+        if (grid[nr][nc] !== 0 || dist[nr][nc] !== 0) continue;
+
+        dist[nr][nc] = dist[r][c] + 1;
+        parent[nr][nc] = [r, c];
+        next.push([nr, nc]);
+        queued.add(key(nr, nc));
+
+        pushStep({
+          title: { vi: `Thêm (${nr},${nc}) với dist = ${dist[nr][nc]}`, en: `Enqueue (${nr},${nc}) with dist = ${dist[nr][nc]}` },
+          current: [nr, nc],
+          codeLines: [13, 14, 15, 16, 17],
+          vars: [
+            { name: "from", value: `(${r}, ${c})` },
+            { name: "neighbor", value: `(${nr}, ${nc})` },
+            { name: "dist[neighbor]", value: dist[nr][nc] },
+          ],
+          note: {
+            vi: `(${nr},${nc}) là ô 0 chưa thăm, nên gán dist = ${dist[r][c]} + 1 và lưu parent để truy vết đường đi.`,
+            en: `(${nr},${nc}) is an unvisited 0-cell, so set dist = ${dist[r][c]} + 1 and store its parent for path tracing.`,
+          },
+        });
+
+        if (nr === n - 1 && nc === n - 1) {
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    queue = next;
+  }
+
+  const answer = dist[n - 1][n - 1] || -1;
+  const pathCells = new Set();
+  if (answer !== -1) {
+    let cur = [n - 1, n - 1];
+    while (cur) {
+      pathCells.add(key(cur[0], cur[1]));
+      cur = parent[cur[0]][cur[1]];
+    }
+  }
+
+  pushStep({
+    title: answer === -1
+      ? { vi: "Không tìm thấy clear path → -1", en: "No clear path found → -1" }
+      : { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    current: [n - 1, n - 1],
+    pathCells,
+    final: true,
+    codeLines: [18, 19],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "target dist", value: dist[n - 1][n - 1] || "unreached" },
+    ],
+    note: {
+      vi: answer === -1
+        ? "BFS đã hết queue nhưng chưa tới ô cuối, nên không tồn tại clear path."
+        : `BFS tới target lần đầu với dist = ${answer}. Vì BFS theo từng level, đây là đường ngắn nhất. Đường đi được tô xanh.`,
+      en: answer === -1
+        ? "BFS exhausted the queue without reaching the target, so no clear path exists."
+        : `BFS first reached the target with dist = ${answer}. Because BFS expands level by level, this is shortest. The path is highlighted.`,
+    },
+  });
+
+  return { original: grid, answer, steps };
+}
+
+/**
  * LeetCode 3286: Find a Safe Walk Through a Grid.
  * BFS over states, keeping the best remaining health seen for each cell.
  */
@@ -2474,7 +2684,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 994, 1091, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -2665,6 +2875,64 @@ module.exports = {
       "        return minutes if fresh == 0 else -1",
     ],
     builder: buildSteps994,
+  },
+  1091: {
+    id: 1091,
+    difficulty: "medium",
+    slug: "shortest-path-in-binary-matrix",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Shortest Path in Binary Matrix", en: "Shortest Path in Binary Matrix" },
+    titleVi: { vi: "Đường đi ngắn nhất trong ma trận nhị phân", en: "Shortest clear path in a binary matrix" },
+    statement: {
+      vi:
+        "Cho ma trận vuông n×n chỉ gồm 0 và 1. Clear path là đường đi từ (0,0) đến (n-1,n-1) " +
+        "chỉ qua ô 0 và mỗi bước đi được 8 hướng (ngang, dọc, chéo). Trả về độ dài clear path ngắn nhất, " +
+        "tính theo số ô trên đường đi, hoặc -1 nếu không có. Nhập grid: hàng cách bởi '|', giá trị có thể viết liền hoặc cách bằng dấu phẩy.",
+      en:
+        "Given an n×n binary matrix. A clear path goes from (0,0) to (n-1,n-1), uses only 0-cells, " +
+        "and each move may go in any of 8 directions (horizontal, vertical, diagonal). Return the shortest clear path length, " +
+        "counted by number of cells, or -1 if none exists. Enter rows separated by '|', either compact or comma-separated.",
+    },
+    defaultInput: "0,0,0|1,1,0|1,1,0",
+    inputKind: "string",
+    inputLabel: { vi: "Grid vuông 0/1 (hàng cách '|')", en: "Square 0/1 grid (rows separated by '|')" },
+    approach: [
+      { vi: "Nếu ô đầu hoặc ô cuối là 1 thì trả -1 ngay.", en: "If the start or target cell is 1, return -1 immediately." },
+      { vi: "Dùng BFS từ (0,0), vì mọi cạnh có cùng cost 1.", en: "Use BFS from (0,0), because every move has equal cost 1." },
+      { vi: "Mỗi ô có tối đa 8 hàng xóm: 4 hướng thẳng và 4 hướng chéo.", en: "Each cell has up to 8 neighbors: 4 straight and 4 diagonal directions." },
+      { vi: "Lần đầu BFS tới (n-1,n-1) là độ dài đường đi ngắn nhất.", en: "The first time BFS reaches (n-1,n-1), that distance is the shortest path length." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Mỗi ô được đưa vào queue tối đa một lần; mỗi ô xét tối đa 8 hướng. Queue/dist/parent dùng O(n²).",
+        en: "Each cell enters the queue at most once; each cell checks up to 8 directions. Queue/dist/parent use O(n²).",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def shortestPathBinaryMatrix(self, grid):",
+      "        n = len(grid)",
+      "        if grid[0][0] or grid[n - 1][n - 1]:",
+      "            return -1",
+      "        dirs = [(-1,-1), (-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0), (1,1)]",
+      "        q = deque([(0, 0, 1)])",
+      "        grid[0][0] = 1",
+      "        while q:",
+      "            r, c, dist = q.popleft()",
+      "            if r == n - 1 and c == n - 1:",
+      "                return dist",
+      "            for dr, dc in dirs:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 0:",
+      "                    grid[nr][nc] = 1",
+      "                    q.append((nr, nc, dist + 1))",
+      "        return -1",
+    ],
+    builder: buildSteps1091,
   },
   1293: {
     id: 1293,
