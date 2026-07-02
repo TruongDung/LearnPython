@@ -344,6 +344,220 @@ function buildSteps200(input) {
 }
 
 /**
+ * LeetCode 695: Max Area of Island.
+ * Flood-fill every unvisited land component and keep the largest component size.
+ */
+function buildSteps695(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "0" && v !== "1"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Grid phải gồm 0/1. Ví dụ: 00100|01110|00100 hoặc 0,0,1,0,0|0,1,1,1,0.",
+        en: "Grid must contain 0/1. Example: 00100|01110|00100 or 0,0,1,0,0|0,1,1,1,0.",
+      },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const queued = new Set();
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(current, bestCells = new Set()) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const cellKey = key(r, c);
+        let cls = cell === "0" ? "wall" : "empty";
+        let label = cell;
+        if (visited[r][c]) {
+          cls = "visited";
+          label = String(islandId[r][c]);
+        }
+        if (bestCells.has(cellKey)) cls = "path";
+        if (queued.has(cellKey)) cls = "queued";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, bestCells, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, bestCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Quét grid và tìm đảo lớn nhất", en: "Scan grid and find the largest island" },
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "rows", value: rows },
+      { name: "cols", value: cols },
+      { name: "max_area", value: 0 },
+    ],
+    note: {
+      vi: "Tương tự Number of Islands, nhưng thay vì chỉ đếm đảo, ta đếm diện tích từng đảo và giữ diện tích lớn nhất.",
+      en: "Like Number of Islands, but instead of only counting components, count each island area and keep the maximum.",
+    },
+  });
+
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let maxArea = 0;
+  let island = 0;
+  let bestCells = new Set();
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "1" || visited[r][c]) continue;
+
+      island++;
+      let area = 0;
+      const cells = [];
+      const stack = [[r, c]];
+      visited[r][c] = true;
+      islandId[r][c] = island;
+      queued.add(key(r, c));
+
+      pushStep({
+        title: { vi: `Bắt đầu đảo #${island}`, en: `Start island #${island}` },
+        current: [r, c],
+        codeLines: [7, 8, 9, 10],
+        vars: [
+          { name: "start", value: `(${r}, ${c})` },
+          { name: "area", value: area },
+          { name: "max_area", value: maxArea },
+        ],
+        note: {
+          vi: `Gặp đất chưa thăm tại (${r},${c}). Bắt đầu DFS để đo diện tích đảo #${island}.`,
+          en: `Found unvisited land at (${r},${c}). Start DFS to measure island #${island}.`,
+        },
+      });
+
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        queued.delete(key(cr, cc));
+        area++;
+        cells.push(key(cr, cc));
+
+        pushStep({
+          title: { vi: `Đếm ô (${cr},${cc}) → area = ${area}`, en: `Count cell (${cr},${cc}) → area = ${area}` },
+          current: [cr, cc],
+          codeLines: [11, 12, 13],
+          vars: [
+            { name: "current", value: `(${cr}, ${cc})` },
+            { name: "area", value: area },
+            { name: "stack size", value: stack.length },
+            { name: "max_area", value: maxArea },
+          ],
+          note: {
+            vi: `Mỗi ô đất trong DFS đóng góp 1 vào diện tích. Đảo #${island} hiện có area = ${area}.`,
+            en: `Each land cell reached by DFS contributes 1 to area. Island #${island} now has area = ${area}.`,
+          },
+        });
+
+        for (const [dr, dc] of dirs) {
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (grid[nr][nc] !== "1" || visited[nr][nc]) continue;
+
+          visited[nr][nc] = true;
+          islandId[nr][nc] = island;
+          stack.push([nr, nc]);
+          queued.add(key(nr, nc));
+
+          pushStep({
+            title: { vi: `Thêm ô kề (${nr},${nc})`, en: `Add adjacent cell (${nr},${nc})` },
+            current: [nr, nc],
+            codeLines: [14, 15, 16, 17, 18],
+            vars: [
+              { name: "from", value: `(${cr}, ${cc})` },
+              { name: "neighbor", value: `(${nr}, ${nc})` },
+              { name: "area", value: area },
+              { name: "stack size", value: stack.length },
+            ],
+            note: {
+              vi: `(${nr},${nc}) là đất nối 4 hướng và chưa thăm, nên sẽ được tính vào cùng đảo #${island}.`,
+              en: `(${nr},${nc}) is 4-directionally connected unvisited land, so it will count toward island #${island}.`,
+            },
+          });
+        }
+      }
+
+      if (area > maxArea) {
+        maxArea = area;
+        bestCells = new Set(cells);
+        pushStep({
+          title: { vi: `Cập nhật max_area = ${maxArea}`, en: `Update max_area = ${maxArea}` },
+          bestCells,
+          codeLines: [19],
+          vars: [
+            { name: "island", value: island },
+            { name: "area", value: area },
+            { name: "max_area", value: maxArea },
+          ],
+          note: {
+            vi: `Đảo #${island} có diện tích ${area}, lớn hơn kết quả cũ. Lưu lại làm đảo lớn nhất hiện tại.`,
+            en: `Island #${island} has area ${area}, larger than the previous best. Save it as the current largest island.`,
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: `Đảo #${island} có area = ${area}`, en: `Island #${island} has area = ${area}` },
+          bestCells,
+          codeLines: [19],
+          vars: [
+            { name: "island", value: island },
+            { name: "area", value: area },
+            { name: "max_area", value: maxArea },
+          ],
+          note: {
+            vi: `Diện tích ${area} không vượt max_area hiện tại (${maxArea}), nên giữ nguyên đáp án.`,
+            en: `Area ${area} does not exceed current max_area (${maxArea}), so the answer stays unchanged.`,
+          },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: `Kết quả: ${maxArea}`, en: `Result: ${maxArea}` },
+    bestCells,
+    final: true,
+    codeLines: [20],
+    vars: [
+      { name: "answer", value: maxArea },
+      { name: "islands scanned", value: island },
+    ],
+    note: {
+      vi: `Sau khi đo toàn bộ đảo, diện tích lớn nhất là ${maxArea}. Nếu grid toàn nước thì kết quả sẽ là 0.`,
+      en: `After measuring every island, the largest area is ${maxArea}. If the grid is all water, the result is 0.`,
+    },
+  });
+
+  return { original: grid, answer: maxArea, steps };
+}
+
+/**
  * LeetCode 3286: Find a Safe Walk Through a Grid.
  * BFS over states, keeping the best remaining health seen for each cell.
  */
@@ -2072,7 +2286,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -2139,6 +2353,61 @@ module.exports = {
       "        return islands",
     ],
     builder: buildSteps200,
+  },
+  695: {
+    id: 695,
+    difficulty: "medium",
+    slug: "max-area-of-island",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Max Area of Island", en: "Max Area of Island" },
+    titleVi: { vi: "Diện tích đảo lớn nhất", en: "Largest island area" },
+    statement: {
+      vi:
+        "Cho grid m×n gồm 1 = đất và 0 = nước. Diện tích của một đảo là số ô đất trong nhóm ô nối nhau theo 4 hướng. " +
+        "Hãy trả về diện tích lớn nhất trong grid, hoặc 0 nếu không có đất. Nhập grid: hàng cách bởi '|', có thể viết liền ký tự hoặc cách bằng dấu phẩy.",
+      en:
+        "Given an m×n grid of 1 land and 0 water. An island's area is the number of land cells in a 4-directionally connected component. " +
+        "Return the largest island area, or 0 if there is no land. Enter rows separated by '|', either compact or comma-separated.",
+    },
+    defaultInput: "0010000|0111000|0010000|0000111|0000101",
+    inputKind: "string",
+    inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    approach: [
+      { vi: "Duyệt từng ô. Nếu là nước hoặc đã thăm thì bỏ qua.", en: "Scan every cell. Skip water and already visited cells." },
+      { vi: "Khi gặp đất chưa thăm, chạy DFS/BFS để gom toàn bộ đảo đó.", en: "When unvisited land is found, run DFS/BFS to collect that whole island." },
+      { vi: "Mỗi ô đất pop ra khỏi stack làm area += 1.", en: "Each land cell popped from the stack increments area by 1." },
+      { vi: "Sau mỗi đảo, cập nhật max_area = max(max_area, area).", en: "After each island, update max_area = max(max_area, area)." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được thăm tối đa một lần. Stack/visited có thể lên tới O(m·n) trong trường hợp cả grid là đất.",
+        en: "Each cell is visited at most once. Stack/visited can reach O(m·n) if the whole grid is land.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxAreaOfIsland(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        max_area = 0",
+      "        ",
+      "        def dfs(r, c):",
+      "            if r < 0 or r == m or c < 0 or c == n:",
+      "                return 0",
+      "            if grid[r][c] == 0:",
+      "                return 0",
+      "            grid[r][c] = 0",
+      "            return 1 + dfs(r + 1, c) + dfs(r - 1, c) + dfs(r, c + 1) + dfs(r, c - 1)",
+      "        ",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if grid[r][c] == 1:",
+      "                    area = dfs(r, c)",
+      "                    max_area = max(max_area, area)",
+      "        return max_area",
+    ],
+    builder: buildSteps695,
   },
   1293: {
     id: 1293,
