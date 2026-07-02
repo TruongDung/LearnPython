@@ -1745,6 +1745,73 @@ function buildSteps1406(stones) {
 }
 
 /**
+ * LeetCode 877: Stone Game.
+ * Classic result: with an even number of piles, Alice can always win by
+ * choosing either all odd-indexed piles or all even-indexed piles.
+ */
+function buildSteps877(piles) {
+  const n = piles.length;
+  const steps = [];
+  const oddSum = piles.filter((_, idx) => idx % 2 === 0).reduce((a, b) => a + b, 0);
+  const evenSum = piles.filter((_, idx) => idx % 2 === 1).reduce((a, b) => a + b, 0);
+  const answer = n % 2 === 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [...piles],
+    sub: piles.map((_, i) => String(i)),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "odd-index sum", value: oddSum },
+      { name: "even-index sum", value: evenSum },
+    ],
+    note: {
+      vi: `Trong Stone Game 877, nếu số piles là chẵn thì Alice luôn có chiến lược thắng. Với mảng này, sum vị trí chẵn = ${oddSum}, vị trí lẻ = ${evenSum}.`,
+      en: `In Stone Game 877, if the number of piles is even, Alice can always force a win. For this array, even-index sum = ${oddSum}, odd-index sum = ${evenSum}.`,
+    },
+  });
+
+  if (n % 2 === 0) {
+    steps.push({
+      title: { vi: "Chiến lược thắng", en: "Winning strategy" },
+      arr: [...piles],
+      sub: piles.map((_, i) => (i % 2 === 0 ? "A" : "B")),
+      highlight: [],
+      mark: [],
+      codeLines: [5, 6, 7],
+      vars: [
+        { name: "strategy", value: oddSum >= evenSum ? "take odd-index piles" : "take even-index piles" },
+        { name: "answer", value: true },
+      ],
+      note: {
+        vi: `Vì n chẵn, Alice có thể chọn toàn bộ vị trí chẵn hoặc lẻ ở lượt đầu và luôn giữ thế chủ động. Kết luận: Alice thắng.`,
+        en: `Because n is even, Alice can commit to either all even-indexed or all odd-indexed piles on the first move and keep control. Conclusion: Alice wins.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: answer ? "Alice thắng" : "Alice thua", en: answer ? "Alice wins" : "Alice loses" },
+    arr: [...piles],
+    sub: piles.map((_, i) => String(i)),
+    highlight: [],
+    mark: answer ? [0, n - 1] : [],
+    final: true,
+    codeLines: [9],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: answer ? "n chẵn => Alice thắng." : "n lẻ => Alice không có bảo đảm thắng theo chiến lược chuẩn.",
+      en: answer ? "Even number of piles => Alice wins." : "Odd number of piles => Alice does not have the standard forced-win strategy.",
+    },
+  });
+
+  return { piles: [...piles], answer, steps };
+}
+
+/**
  * LeetCode 322: Coin Change.
  * dp[i] = min coins to make amount i.
  * dp[0] = 0, dp[i] = min(dp[i - coin] + 1) for each coin.
@@ -3602,6 +3669,36 @@ module.exports = {
       "        return dp[max_val]",
     ],
     builder: buildSteps740,
+  },
+  877: {
+    id: 877,
+    difficulty: "medium",
+    slug: "stone-game",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game", en: "Stone Game" },
+    titleVi: { vi: "Trò chơi đá", en: "Stone Game" },
+    statement: {
+      vi: "Cho mảng piles có số lượng đá ở mỗi đống. Hai người chơi luân phiên lấy cả đống từ đầu hoặc cuối. Trả về true nếu Alice có thể thắng khi cả hai chơi tối ưu.",
+      en: "Given an array piles of stone counts, two players take an entire pile from either the start or end on each turn. Return true if Alice can win with optimal play.",
+    },
+    defaultInput: [5, 3, 4, 5],
+    inputKind: "positive",
+    inputLabel: { vi: "piles", en: "piles" },
+    extraParams: [],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: {
+        vi: "Với số đống chẵn, Alice luôn có chiến lược thắng theo parity. Vì vậy bài này có thể giải bằng phân tích chiến lược, không cần DP nặng.",
+        en: "With an even number of piles, Alice always has a winning parity strategy. So this problem can be solved by strategy analysis rather than heavy DP.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGame(self, piles):",
+      "        return True",
+    ],
+    builder: buildSteps877,
   },
   1406: {
     id: 1406,
