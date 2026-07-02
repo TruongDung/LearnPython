@@ -1660,6 +1660,91 @@ function buildSteps740(nums) {
 }
 
 /**
+ * LeetCode 1406: Stone Game III.
+ * dp[i] = best score difference current player can force from stones[i...].
+ * Transition: take 1-3 stones and maximize (sum_taken - dp[next]).
+ */
+function buildSteps1406(stones) {
+  const n = stones.length;
+  const dp = new Array(n + 1).fill(0);
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    arr: [...dp],
+    sub: Array.from({ length: n + 1 }, (_, i) => String(i)),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: [...dp] },
+    ],
+    note: {
+      vi: `dp[i] là chênh lệch điểm tốt nhất người chơi hiện tại có thể ép được từ stones[i...]. dp[${n}] = 0 vì không còn đá.`,
+      en: `dp[i] is the best score difference the current player can force from stones[i...]. dp[${n}] = 0 because no stones remain.`,
+    },
+  });
+
+  for (let i = n - 1; i >= 0; i--) {
+    let take = 0;
+    let best = -Infinity;
+    const options = [];
+
+    for (let k = 0; k < 3 && i + k < n; k++) {
+      take += stones[i + k];
+      const next = i + k + 1;
+      const diff = take - dp[next];
+      options.push({ count: k + 1, take, next, diff });
+      if (diff > best) best = diff;
+    }
+
+    dp[i] = best;
+
+    steps.push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      arr: [...dp],
+      sub: Array.from({ length: n + 1 }, (_, idx) => String(idx)),
+      highlight: [i],
+      mark: [i],
+      codeLines: [6, 7, 8, 9, 10],
+      vars: [
+        { name: "i", value: i },
+        { name: "best", value: best },
+        { name: "options", value: options.map((o) => `${o.count}:${o.diff}`).join(", ") },
+      ],
+      note: {
+        vi: `Thử 1-3 viên từ vị trí ${i}: ${options.map((o) => `${o.count} viên => ${o.take} - dp[${o.next}] = ${o.diff}`).join("; ")}. Chọn lớn nhất => dp[${i}] = ${dp[i]}.`,
+        en: `Try taking 1-3 stones from index ${i}: ${options.map((o) => `${o.count} stone(s) => ${o.take} - dp[${o.next}] = ${o.diff}`).join("; ")}. Pick the maximum => dp[${i}] = ${dp[i]}.`,
+      },
+    });
+  }
+
+  const diff = dp[0];
+  const answer = diff > 0 ? "Alice" : diff < 0 ? "Bob" : "Tie";
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [...dp],
+    sub: Array.from({ length: n + 1 }, (_, i) => String(i)),
+    highlight: [],
+    mark: [0],
+    final: true,
+    codeLines: [12],
+    vars: [
+      { name: "dp[0]", value: diff },
+      { name: "winner", value: answer },
+    ],
+    note: {
+      vi: `dp[0] = ${diff}. Dương => Alice thắng, âm => Bob thắng, 0 => hòa. Kết quả: ${answer}.`,
+      en: `dp[0] = ${diff}. Positive => Alice wins, negative => Bob wins, 0 => tie. Result: ${answer}.`,
+    },
+  });
+
+  return { stones: [...stones], answer, steps };
+}
+
+/**
  * LeetCode 322: Coin Change.
  * dp[i] = min coins to make amount i.
  * dp[0] = 0, dp[i] = min(dp[i - coin] + 1) for each coin.
@@ -2912,7 +2997,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416],
+    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -2927,6 +3012,7 @@ module.exports = {
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
+          { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
           { id: 152, name: "Maximum Product Subarray", pattern: "DP (max/min state)" },
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
@@ -2952,7 +3038,7 @@ module.exports = {
           {
             title: "Giai đoạn 2 — DP trên mảng",
             description: "Học Kadane và pattern theo dõi cả max/min. LIS dùng 1D DP, sau đó nâng cấp O(n log n).",
-            problems: [53, 152, 300],
+            problems: [1406, 53, 152, 300],
           },
           {
             title: "Giai đoạn 3 — Knapsack",
@@ -2987,6 +3073,7 @@ module.exports = {
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
+          { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
           { id: 152, name: "Maximum Product Subarray", pattern: "DP (max/min state)" },
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
@@ -3012,7 +3099,7 @@ module.exports = {
           {
             title: "Stage 2 — Array DP",
             description: "Learn Kadane and tracking both max/min state. LIS in 1D, then upgrade to O(n log n).",
-            problems: [53, 152, 300],
+            problems: [1406, 53, 152, 300],
           },
           {
             title: "Stage 3 — Knapsack",
@@ -3515,6 +3602,47 @@ module.exports = {
       "        return dp[max_val]",
     ],
     builder: buildSteps740,
+  },
+  1406: {
+    id: 1406,
+    difficulty: "hard",
+    slug: "stone-game-iii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game III", en: "Stone Game III" },
+    titleVi: { vi: "Trò chơi đá III (suffix DP)", en: "Stone Game III (suffix DP)" },
+    statement: {
+      vi: "Cho mảng stones. Hai người chơi lần lượt lấy 1 đến 3 viên đá từ đầu mảng. Mỗi viên đá có điểm số tương ứng. Trả về Alice, Bob hoặc Tie tùy theo ai có tổng điểm cao hơn.",
+      en: "Given an array stones, two players take 1 to 3 stones from the start of the array on each turn. Each stone has a score. Return Alice, Bob, or Tie depending on who ends with the higher total.",
+    },
+    defaultInput: [1, 2, 3, 7],
+    inputKind: "positive",
+    inputLabel: { vi: "stones", en: "stones" },
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi vị trí i thử tối đa 3 lựa chọn, nên thời gian O(n). Dùng mảng dp kích thước n+1.",
+        en: "Each index i tries at most 3 choices, so time is O(n). Uses a dp array of size n+1.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGameIII(self, stones):",
+      "        n = len(stones)",
+      "        dp = [0] * (n + 1)",
+      "        for i in range(n - 1, -1, -1):",
+      "            take = 0",
+      "            dp[i] = float('-inf')",
+      "            for k in range(3):",
+      "                if i + k < n:",
+      "                    take += stones[i + k]",
+      "                    dp[i] = max(dp[i], take - dp[i + k + 1])",
+      "        if dp[0] > 0: return 'Alice'",
+      "        if dp[0] < 0: return 'Bob'",
+      "        return 'Tie'",
+    ],
+    builder: buildSteps1406,
   },
   1143: {
     id: 1143,
