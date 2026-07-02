@@ -1940,6 +1940,163 @@ function buildSteps1236(input, params) {
 }
 
 /**
+ * LeetCode 1926: Nearest Exit from Entrance in Maze.
+ * BFS from the entrance. Each level represents the number of steps taken.
+ * Exit = any open cell on the border except the entrance itself.
+ */
+function buildSteps1926(input, params) {
+  const rawRows = String(input)
+    .split("|")
+    .map((row) => row.trim())
+    .filter((row) => row.length > 0);
+
+  const maze = rawRows.map((row) => row.split(",").map((c) => c.trim()));
+  const entranceRow = Number(params.entranceRow ?? 0);
+  const entranceCol = Number(params.entranceCol ?? 0);
+  const rows = maze.length;
+  const cols = rows > 0 ? maze[0].length : 0;
+  const steps = [];
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const dist = Array.from({ length: rows }, () => Array(cols).fill("â€¢"));
+  const q = [[entranceRow, entranceCol, 0]];
+  let head = 0;
+  visited[entranceRow][entranceCol] = true;
+  dist[entranceRow][entranceCol] = 0;
+
+  const isOpen = (r, c) => maze[r] && maze[r][c] === ".";
+  const isBorder = (r, c) => r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+
+  steps.push({
+    title: { vi: "Khởi tạo BFS", en: "Initialize BFS" },
+    grid: {
+      maze: maze.map((row) => [...row]),
+      dist: dist.map((row) => [...row]),
+      hlCell: [entranceRow, entranceCol],
+      pathCells: [],
+    },
+    highlight: [entranceRow * cols + entranceCol],
+    mark: [entranceRow * cols + entranceCol],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "entrance", value: `(${entranceRow}, ${entranceCol})` },
+      { name: "queue", value: `[(${entranceRow},${entranceCol},0)]` },
+    ],
+    note: {
+      vi: `Bắt đầu BFS tại (${entranceRow}, ${entranceCol}). Một ô được coi là lối thoát nếu nó ở biên và không phải entrance.`,
+      en: `Start BFS at (${entranceRow}, ${entranceCol}). A cell is an exit if it is on the border and is not the entrance.`,
+    },
+  });
+
+  const prev = new Map();
+  let answer = -1;
+  let exitCell = null;
+
+  while (head < q.length) {
+    const [r, c, d] = q[head++];
+
+    if ((r !== entranceRow || c !== entranceCol) && isBorder(r, c)) {
+      answer = d;
+      exitCell = [r, c];
+      break;
+    }
+
+    const expanded = [];
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue;
+      if (visited[nr][nc] || !isOpen(nr, nc)) continue;
+      visited[nr][nc] = true;
+      dist[nr][nc] = d + 1;
+      q.push([nr, nc, d + 1]);
+      prev.set(`${nr},${nc}`, [r, c]);
+      expanded.push([nr, nc]);
+    }
+
+    steps.push({
+      title: { vi: `BFS bước ${d}`, en: `BFS step ${d}` },
+      grid: {
+        maze: maze.map((row) => [...row]),
+        dist: dist.map((row) => [...row]),
+        hlCell: [r, c],
+        pathCells: expanded,
+      },
+      highlight: expanded.map(([rr, cc]) => rr * cols + cc),
+      mark: [r * cols + c],
+      codeLines: [7, 8, 9, 10, 11, 12],
+      vars: [
+        { name: "current", value: `(${r}, ${c})` },
+        { name: "distance", value: d },
+        { name: "new cells", value: expanded.length ? expanded.map((p) => `(${p[0]},${p[1]})`).join(", ") : "none" },
+      ],
+      note: {
+        vi: expanded.length
+          ? `Từ (${r}, ${c}) mở rộng tới: ${expanded.map((p) => `(${p[0]}, ${p[1]})`).join(", ")}. BFS đảm bảo level sau là số bước +1.`
+          : `Từ (${r}, ${c}) không mở rộng thêm được ô nào hợp lệ.`,
+        en: expanded.length
+          ? `From (${r}, ${c}) expanded to: ${expanded.map((p) => `(${p[0]}, ${p[1]})`).join(", ")}. BFS ensures the next level is one more step.`
+          : `From (${r}, ${c}) there were no valid cells to expand to.`,
+      },
+    });
+  }
+
+  if (answer >= 0) {
+    const pathCells = [];
+    let cur = exitCell;
+    while (cur) {
+      pathCells.push(cur);
+      const key = `${cur[0]},${cur[1]}`;
+      cur = prev.get(key) || null;
+    }
+    pathCells.reverse();
+
+    steps.push({
+      title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+      grid: {
+        maze: maze.map((row) => [...row]),
+        dist: dist.map((row) => [...row]),
+        hlCell: exitCell,
+        pathCells,
+      },
+      highlight: exitCell ? [exitCell[0] * cols + exitCell[1]] : [],
+      mark: exitCell ? [exitCell[0] * cols + exitCell[1]] : [],
+      final: true,
+      codeLines: [13],
+      vars: [
+        { name: "answer", value: answer },
+        { name: "exit", value: exitCell ? `(${exitCell[0]}, ${exitCell[1]})` : "none" },
+      ],
+      note: {
+        vi: `Lối thoát gần nhất cách entrance ${answer} bước. BFS tìm ra đường ngắn nhất theo từng level.`,
+        en: `The nearest exit is ${answer} steps away. BFS finds the shortest path level by level.`,
+      },
+    });
+  } else {
+    steps.push({
+      title: { vi: "Không có lối thoát", en: "No exit found" },
+      grid: {
+        maze: maze.map((row) => [...row]),
+        dist: dist.map((row) => [...row]),
+        hlCell: [entranceRow, entranceCol],
+        pathCells: [],
+      },
+      highlight: [],
+      mark: [entranceRow * cols + entranceCol],
+      final: true,
+      codeLines: [13],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "BFS đã duyệt hết các ô có thể đi tới nhưng không gặp lối thoát hợp lệ.",
+        en: "BFS explored all reachable cells but never found a valid exit.",
+      },
+    });
+  }
+
+  return { maze, entrance: [entranceRow, entranceCol], answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 847 Approach 2: DP Bitmask + Floyd-Warshall.
  * Phase 1: Floyd-Warshall → dist[i][j] = shortest path between any pair.
  * Phase 2: TSP DP — dp[mask][i] = min cost to visit nodes in mask, ending at i.
@@ -3773,6 +3930,53 @@ module.exports = {
       "        return list(visited)",
     ],
     builder: buildSteps1236,
+  },
+  1926: {
+    id: 1926,
+    difficulty: "medium",
+    slug: "nearest-exit-from-entrance-in-maze",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Nearest Exit from Entrance in Maze", en: "Nearest Exit from Entrance in Maze" },
+    titleVi: { vi: "Lối ra gần nhất trong mê cung", en: "Nearest exit in a maze" },
+    statement: {
+      vi: "Cho mê cung dạng lưới gồm '.' là ô trống và '+' là tường. Bạn bắt đầu tại entrance. Hãy tìm số bước ít nhất để đi tới một ô biên bất kỳ khác entrance. Nếu không có lối ra, trả về -1.",
+      en: "Given a maze grid where '.' is an empty cell and '+' is a wall. Start from entrance. Find the minimum number of steps to reach any border cell other than the entrance. Return -1 if no exit exists.",
+    },
+    defaultInput: ".+.+|....|+...|....",
+    inputKind: "string",
+    inputLabel: { vi: "Mê cung (hàng cách bởi |, ô cách bởi ,)", en: "Maze (rows separated by |, cells by ,)" },
+    extraParams: [
+      { key: "entranceRow", label: { vi: "entranceRow", en: "entranceRow" }, default: 1 },
+      { key: "entranceCol", label: { vi: "entranceCol", en: "entranceCol" }, default: 1 },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được thăm tối đa 1 lần trong BFS, nên thời gian O(m·n). Cần visited và queue kích thước O(m·n).",
+        en: "Each cell is visited at most once by BFS, so time is O(m·n). visited and queue take O(m·n) space.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def nearestExit(self, maze, entrance):",
+      "        m, n = len(maze), len(maze[0])",
+      "        q = deque([(entrance[0], entrance[1], 0)])",
+      "        seen = {tuple(entrance)}",
+      "        while q:",
+      "            r, c, d = q.popleft()",
+      "            if [r, c] != entrance and (r == 0 or c == 0 or r == m - 1 or c == n - 1):",
+      "                return d",
+      "            for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < m and 0 <= nc < n and maze[nr][nc] == '.' and (nr, nc) not in seen:",
+      "                    seen.add((nr, nc))",
+      "                    q.append((nr, nc, d + 1))",
+      "        return -1",
+    ],
+    builder: buildSteps1926,
   },
   207: {
     id: 207,
