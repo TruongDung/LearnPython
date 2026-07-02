@@ -466,7 +466,10 @@ function buildSteps70Optimized(n) {
  *  - dp[i] = 1 + max(dp[j]) for all j < i where nums[j] < nums[i].
  *  - The answer is max(dp).
  */
-function buildSteps300(nums) {
+function buildSteps300(nums, params) {
+  const approach = (params && Number(params.approach)) || 1;
+  if (approach === 2) return buildSteps300BinarySearch(nums);
+  // ── Approach 1: O(n²) DP ──
   const n = nums.length;
   const dp = new Array(n).fill(1);
   const prev = new Array(n).fill(-1);
@@ -476,93 +479,112 @@ function buildSteps300(nums) {
     title: { vi: "Khởi tạo dp", en: "Initialize dp" },
     arr: [...nums],
     sub: [...dp],
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4],
-    vars: [
-      { name: "n", value: n },
-      { name: "dp", value: [...dp] },
-    ],
+    highlight: [], mark: [],
+    codeLines: [3, 4], codeBlock: 1,
+    vars: [{ name: "n", value: n }, { name: "dp", value: [...dp] }],
     note: {
       vi: `nums = [${nums.join(", ")}]. dp[i] = độ dài dãy tăng dài nhất kết thúc tại i, khởi tạo toàn 1 (mỗi phần tử tự nó là một dãy).`,
-      en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1 (each element alone is a subsequence).`,
+      en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1.`,
     },
   });
 
   for (let i = 1; i < n; i++) {
     let bestJ = -1;
     for (let j = 0; j < i; j++) {
-      if (nums[j] < nums[i] && dp[j] + 1 > dp[i]) {
-        dp[i] = dp[j] + 1;
-        bestJ = j;
-      }
+      if (nums[j] < nums[i] && dp[j] + 1 > dp[i]) { dp[i] = dp[j] + 1; bestJ = j; }
     }
     prev[i] = bestJ;
-
-    const highlight = bestJ >= 0 ? [bestJ, i] : [i];
     steps.push({
       title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
-      arr: [...nums],
-      sub: [...dp],
-      highlight,
-      mark: [],
-      codeLines: [5, 6, 7, 8],
-      vars: [
-        { name: "i", value: i },
-        { name: "nums[i]", value: nums[i] },
-        { name: "bestJ", value: bestJ },
-        { name: "dp[i]", value: dp[i] },
-        { name: "dp", value: [...dp] },
-      ],
-      note:
-        bestJ >= 0
-          ? {
-              vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]} (dãy tăng dài nhất). dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`,
-              en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]} (best chain). dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`,
-            }
-          : {
-              vi: `Không có phần tử trước nào nhỏ hơn nums[${i}]=${nums[i]}, nên dp[${i}] giữ nguyên = 1.`,
-              en: `No earlier element is smaller than nums[${i}]=${nums[i]}, so dp[${i}] stays 1.`,
-            },
+      arr: [...nums], sub: [...dp],
+      highlight: bestJ >= 0 ? [bestJ, i] : [i], mark: [],
+      codeLines: [5, 6, 7, 8], codeBlock: 1,
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "bestJ", value: bestJ }, { name: "dp[i]", value: dp[i] }, { name: "dp", value: [...dp] }],
+      note: bestJ >= 0
+        ? { vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`, en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.` }
+        : { vi: `Không có phần tử trước nào nhỏ hơn ${nums[i]}, dp[${i}] = 1.`, en: `No earlier element smaller than ${nums[i]}, dp[${i}] stays 1.` },
     });
   }
 
-  let answer = 0;
-  let argmax = 0;
-  for (let i = 0; i < n; i++) {
-    if (dp[i] > answer) {
-      answer = dp[i];
-      argmax = i;
-    }
-  }
-
-  // Reconstruct one longest subsequence by walking predecessors back from argmax.
-  const chain = [];
-  for (let i = argmax; i !== -1; i = prev[i]) {
-    chain.push(i);
-  }
-  chain.reverse();
+  let answer = 0, argmax = 0;
+  for (let i = 0; i < n; i++) { if (dp[i] > answer) { answer = dp[i]; argmax = i; } }
+  const chain = []; for (let i = argmax; i !== -1; i = prev[i]) chain.push(i); chain.reverse();
   const chainValues = chain.map((i) => nums[i]);
+  steps.push({ title: { vi: "Kết quả", en: "Result" }, arr: [...nums], sub: [...dp], highlight: [], mark: chain, final: true, codeLines: [9], codeBlock: 1, vars: [{ name: "answer", value: answer }, { name: "LIS", value: chainValues }], note: { vi: `LIS = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}].`, en: `LIS = ${answer}. One such subsequence: [${chainValues.join(", ")}].` } });
+  return { original: [...nums], answer, chain, steps };
+}
+
+// ── Approach 2: Patience Sorting — O(n log n) ──
+function buildSteps300BinarySearch(nums) {
+  const n = nums.length;
+  const tails = []; // tails[i] = smallest tail of all IS of length i+1
+  const steps = [];
 
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums],
-    sub: [...dp],
-    highlight: [],
-    mark: chain,
-    final: true,
-    codeLines: [9],
-    vars: [
-      { name: "answer", value: answer },
-      { name: "LIS", value: chainValues },
-    ],
+    title: { vi: "Patience Sorting: tìm vị trí chèn bằng Binary Search", en: "Patience Sorting: find insertion position via Binary Search" },
+    arr: [...nums], sub: Array(n).fill(-1),
+    highlight: [], mark: [],
+    codeLines: [5], codeBlock: 2,
+    vars: [{ name: "tails", value: "[]" }],
     note: {
-      vi: `Độ dài dãy con tăng dài nhất = max(dp) = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}] (các vị trí ${chain.join(", ")}).`,
-      en: `Length of the longest increasing subsequence = max(dp) = ${answer}. One such subsequence: [${chainValues.join(", ")}] (indices ${chain.join(", ")}).`,
+      vi:
+        `Duy trì mảng tails[] (không phải LIS thực sự, nhưng len(tails) = độ dài LIS):\n` +
+        `• tails[i] = phần tử NHỎ NHẤT có thể làm đuôi của dãy tăng dài i+1.\n` +
+        `• Với mỗi num: Binary Search tìm vị trí i đầu tiên sao cho tails[i] ≥ num.\n` +
+        `  - Nếu không tìm thấy → num > tất cả → thêm vào cuối (dãy dài hơn 1).\n` +
+        `  - Nếu tìm thấy → thay tails[i] = num (tối ưu đuôi nhỏ hơn).\n` +
+        `Đáp án = len(tails).`,
+      en:
+        `Maintain tails[] (not the actual LIS, but len(tails) = LIS length):\n` +
+        `• tails[i] = the SMALLEST possible tail element of any increasing seq. of length i+1.\n` +
+        `• For each num: Binary Search for the first i where tails[i] ≥ num.\n` +
+        `  - Not found → num > all → append (extend by 1).\n` +
+        `  - Found → replace tails[i] = num (keep a smaller tail, more room to grow).\n` +
+        `Answer = len(tails).`,
     },
   });
 
-  return { original: [...nums], answer, chain, steps };
+  for (let k = 0; k < n; k++) {
+    const num = nums[k];
+    // Binary search: find leftmost index where tails[idx] >= num
+    let lo = 0, hi = tails.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < num) lo = mid + 1; else hi = mid; }
+    const pos = lo;
+    const extended = pos === tails.length;
+    if (extended) tails.push(num); else tails[pos] = num;
+
+    const tailsCopy = [...tails];
+    const sub = Array(n).fill(-1);
+    tails.forEach((v, idx) => { sub[idx] = v; });
+
+    steps.push({
+      title: { vi: `num=${num}: chèn tại pos=${pos} → tails=[${tailsCopy.join(",")}]`, en: `num=${num}: insert at pos=${pos} → tails=[${tailsCopy.join(",")}]` },
+      arr: [...nums], sub,
+      highlight: [k], mark: Array.from({ length: n }, (_, i) => i < k ? i : -1).filter(x => x >= 0),
+      codeLines: extended ? [7, 8, 9] : [7, 10, 11], codeBlock: 2,
+      vars: [
+        { name: "num", value: num },
+        { name: "pos (bisect_left)", value: pos },
+        { name: "action", value: extended ? `append → dài hơn 1` : `replace tails[${pos}]` },
+        { name: "tails", value: `[${tailsCopy.join(",")}]` },
+        { name: "LIS length", value: tails.length },
+      ],
+      note: {
+        vi: extended
+          ? `num=${num} LỚN HƠN mọi đuôi hiện tại → thêm vào cuối. Dãy dài nhất có thể dài hơn 1 → LIS length = ${tails.length}.`
+          : `Binary search tìm được tails[${pos}]=${tails[pos] !== num ? "?" : num} ≥ ${num} → thay bằng ${num} (đuôi nhỏ hơn → tốt hơn). LIS length vẫn = ${tails.length}.`,
+        en: extended
+          ? `num=${num} is LARGER than all current tails → append. Longest possible sequence grows by 1 → LIS length = ${tails.length}.`
+          : `Binary search found tails[${pos}] ≥ ${num} → replace with ${num} (smaller tail = more room to grow). LIS length stays = ${tails.length}.`,
+      },
+    });
+  }
+
+  const answer = tails.length;
+  const sub = Array(n).fill(-1); tails.forEach((v, i) => { sub[i] = v; });
+  const fs = { title: { vi: `LIS length = ${answer}`, en: `LIS length = ${answer}` }, arr: [...nums], sub, highlight: [], mark: Array.from({ length: answer }, (_, i) => i), final: true, codeLines: [12], codeBlock: 2, vars: [{ name: "answer", value: answer }, { name: "tails", value: `[${tails.join(",")}]` }], note: { vi: `len(tails) = ${answer}. Lưu ý: tails[] không phải LIS thực sự, chỉ là công cụ đếm.`, en: `len(tails) = ${answer}. Note: tails[] is not the actual LIS, just a counting tool.` } };
+  fs.final = true; steps.push(fs);
+  return { original: [...nums], answer, chain: [], steps };
 }
 
 /**
@@ -3869,14 +3891,29 @@ module.exports = {
       en: "Given an integer array nums, return the length of the longest strictly increasing subsequence. A subsequence is derived by deleting some or no elements without changing the order of the remaining elements.",
     },
     defaultInput: [10, 9, 2, 5, 3, 7, 101, 18],
-    inputKind: "integer", // cho phép số âm
-    extraParams: [],
+    inputKind: "integer",
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DP O(n²)", en: "Approach 1: DP O(n²)" } },
+          { value: "2", label: { vi: "Cách 2: Patience Sort O(n log n)", en: "Approach 2: Patience Sort O(n log n)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 (O(n²)): dp[i] = độ dài LIS kết thúc tại i. dp[i] = 1 + max(dp[j]) với j<i và nums[j]<nums[i].", en: "Approach 1 (O(n²)): dp[i] = LIS length ending at i. dp[i] = 1 + max(dp[j]) for j<i and nums[j]<nums[i]." },
+      { vi: "Cách 2 (O(n log n)): Patience Sorting. Duy trì tails[]: tails[k] = đuôi nhỏ nhất của mọi IS dài k+1. Binary search để tìm vị trí chèn.", en: "Approach 2 (O(n log n)): Patience Sorting. Maintain tails[]: tails[k] = smallest tail of any IS of length k+1. Binary search to find insertion position." },
+    ],
     complexity: {
-      time: "O(n²)",
+      time: "O(n²) / O(n log n)",
       space: "O(n)",
       note: {
-        vi: "Hai vòng lặp lồng nhau (mỗi i so với mọi j < i) cho O(n²) thời gian. Bảng dp dài n nên O(n) bộ nhớ. (Có bản O(n log n) dùng tìm kiếm nhị phân.)",
-        en: "Two nested loops (each i compared with every j < i) give O(n²) time. The dp table of length n is O(n) memory. (An O(n log n) version exists using binary search.)",
+        vi: "Cách 1: 2 vòng lặp lồng → O(n²). Cách 2: Patience Sorting với binary search → O(n log n).",
+        en: "Approach 1: two nested loops → O(n²). Approach 2: Patience Sorting with binary search → O(n log n).",
       },
     },
     code: [

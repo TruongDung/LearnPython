@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Big-O Complexity — LeetCode Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><rect x='5' y='17' width='5' height='10' rx='1.5' fill='%23f8fafc'/><rect x='13' y='10' width='5' height='17' rx='1.5' fill='%23fbbf24'/><rect x='21' y='5' width='5' height='22' rx='1.5' fill='%23f8fafc'/></svg>" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .cx-page{max-width:900px;margin:0 auto;padding:24px 20px 60px}
+    .cx-page h2{font-size:1.35rem;font-weight:700;margin-bottom:6px;color:var(--text-primary,#e2e8f0)}
+    .cx-page .cx-subtitle{font-size:.85rem;color:var(--text-muted,#94a3b8);margin-bottom:28px}
+    .back-link{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--accent,#6366f1);text-decoration:none;margin-bottom:20px;opacity:.85}
+    .back-link:hover{opacity:1}
+    .chart-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:28px 24px 20px;margin-bottom:28px}
+    .chart-wrap{position:relative;width:100%}
+    canvas#bigOChart{width:100%;height:auto;display:block;border-radius:8px}
+    .legend{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:16px}
+    .legend-item{display:flex;align-items:center;gap:7px;font-size:.8rem;color:var(--text-secondary,#cbd5e1)}
+    .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+    .chart-note{font-size:.75rem;color:var(--text-muted,#94a3b8);margin-top:10px;text-align:center}
+    .cx-table-wrap{overflow-x:auto}
+    table.cx-table{width:100%;border-collapse:collapse;font-size:.85rem}
+    table.cx-table th{text-align:left;padding:8px 12px;color:var(--text-muted,#94a3b8);font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}
+    table.cx-table td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text-secondary,#cbd5e1);vertical-align:top}
+    table.cx-table tr:last-child td{border-bottom:none}
+    .cx-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+    .cx-list li{display:flex;gap:12px}
+    .cx-list .dot{width:13px;height:13px;border-radius:50%;margin-top:3px;flex-shrink:0}
+    .cx-label-big{font-weight:700;font-size:.95rem;color:var(--text-primary,#e2e8f0)}
+    .cx-desc{font-size:.83rem;color:var(--text-secondary,#cbd5e1);margin-top:2px}
+    .section-title{font-size:1rem;font-weight:700;color:var(--text-primary,#e2e8f0);margin:28px 0 14px}
+    .n-slider-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+    .n-slider-row label{font-size:.83rem;color:var(--text-secondary,#cbd5e1);white-space:nowrap}
+    #nSlider{flex:1;accent-color:#6366f1}
+    #nVal{font-weight:700;color:var(--accent,#6366f1);min-width:28px;text-align:center}
+    .slider-hint{font-size:.75rem;color:#94a3b8;white-space:nowrap}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="header-top">
+      <h1>LeetCode Visualizer</h1>
+      <div class="header-actions">
+        <button id="themeToggle" class="theme-toggle" type="button" title="Toggle theme">
+          <svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="themeIconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        </button>
+        <div class="lang-switch">
+          <button id="langVi" class="lang-btn" type="button" data-lang="vi">VI</button>
+          <button id="langEn" class="lang-btn active" type="button" data-lang="en">EN</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="cx-page">
+    <a href="index.html" class="back-link" id="backLink">← Back to Visualizer</a>
+    <h2 id="pageTitle">Algorithm Complexity (Big-O)</h2>
+    <p class="cx-subtitle" id="pageSubtitle">Compare growth rates of common complexities from O(1) → O(2ⁿ)</p>
+
+    <div class="chart-card">
+      <div class="n-slider-row">
+        <label for="nSlider" id="sliderLabel">Max n: <span id="nVal">20</span></label>
+        <input id="nSlider" type="range" min="5" max="30" value="20" step="1" title="Max n" />
+        <span class="slider-hint" id="sliderHint">Y-axis: log scale</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="bigOChart" width="860" height="440"></canvas>
+      </div>
+      <div class="legend" id="legend"></div>
+      <p class="chart-note" id="chartNote">Y-axis uses logarithmic scale because O(2ⁿ) grows much faster than the rest</p>
+    </div>
+
+    <p class="section-title" id="detailTitle">Complexity Details</p>
+    <ul class="cx-list" id="cxList"></ul>
+
+    <p class="section-title" id="tableTitle">Comparison Table</p>
+    <div class="cx-table-wrap">
+      <table class="cx-table" id="cxTable"></table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Language ──
+let lang = localStorage.getItem("cxLang") || localStorage.getItem("lang") || "en";
+function pick(obj) { return typeof obj === "object" ? (obj[lang] ?? obj.en) : obj; }
+function setLang(l) {
+  lang = l;
+  localStorage.setItem("cxLang", l);
+  document.getElementById("langVi").classList.toggle("active", l === "vi");
+  document.getElementById("langEn").classList.toggle("active", l === "en");
+  applyI18n();
+  rebuildLists();
+  drawChart(Number(document.getElementById("nSlider").value));
+}
+document.getElementById("langVi").addEventListener("click", () => setLang("vi"));
+document.getElementById("langEn").addEventListener("click", () => setLang("en"));
+
+// ── Theme ──
+const root = document.documentElement;
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) root.setAttribute("data-theme", savedTheme);
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const cur = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+  root.setAttribute("data-theme", cur);
+  localStorage.setItem("theme", cur);
+  syncThemeIcons();
+  setTimeout(() => drawChart(Number(document.getElementById("nSlider").value)), 50);
+});
+function syncThemeIcons() {
+  const isDark = root.getAttribute("data-theme") !== "light";
+  document.getElementById("themeIconMoon").classList.toggle("hidden", !isDark);
+  document.getElementById("themeIconSun").classList.toggle("hidden", isDark);
+}
+syncThemeIcons();
+
+// ── i18n strings ──
+const I18N = {
+  backLink:    { vi: "← Quay lại Visualizer",   en: "← Back to Visualizer" },
+  pageTitle:   { vi: "Độ phức tạp thuật toán (Big-O)", en: "Algorithm Complexity (Big-O)" },
+  pageSubtitle:{ vi: "So sánh tốc độ tăng của các độ phức tạp phổ biến từ O(1) → O(2ⁿ)", en: "Compare growth rates of common complexities from O(1) → O(2ⁿ)" },
+  sliderLabel: { vi: "n tối đa: ",               en: "Max n: " },
+  sliderHint:  { vi: "Trục dọc: thang log",      en: "Y-axis: log scale" },
+  chartNote:   { vi: "Trục dọc dùng thang logarit vì O(2ⁿ) tăng quá nhanh so với các độ phức tạp còn lại", en: "Y-axis uses log scale because O(2ⁿ) grows much faster than all others" },
+  detailTitle: { vi: "Chi tiết từng độ phức tạp", en: "Complexity Details" },
+  tableTitle:  { vi: "Bảng so sánh tại các giá trị n", en: "Comparison Table at Various n" },
+  complexity:  { vi: "Độ phức tạp",              en: "Complexity" },
+  exPrefix:    { vi: "Ví dụ: ",                  en: "Example: " },
+  chartXLabel: { vi: "Kích thước đầu vào (n)",   en: "Input size (n)" },
+  chartYLabel: { vi: "Số phép toán (thang log)", en: "Operations (log scale)" },
+  chartTitle:  { vi: "Biểu đồ Big-O từ O(1) đến O(2ⁿ)", en: "Big-O Chart from O(1) to O(2ⁿ)" },
+};
+function applyI18n() {
+  Object.keys(I18N).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === "sliderLabel") {
+      el.childNodes[0].textContent = pick(I18N[id]);
+    } else {
+      el.textContent = pick(I18N[id]);
+    }
+  });
+}
+
+// ── Data ──
+const COMPLEXITIES = [
+  { label: "O(1)",       labelFull: { vi: "O(1) – Hằng số",       en: "O(1) – Constant" },       color: "#3b82f6", fn: () => 1 },
+  { label: "O(log n)",   labelFull: { vi: "O(log n) – Logarit",    en: "O(log n) – Logarithmic" }, color: "#22c55e", fn: n => Math.log2(n) },
+  { label: "O(n)",       labelFull: { vi: "O(n) – Tuyến tính",     en: "O(n) – Linear" },          color: "#16a34a", fn: n => n },
+  { label: "O(n log n)", labelFull: { vi: "O(n log n)",             en: "O(n log n) – Linearithmic" }, color: "#f59e0b", fn: n => n * Math.log2(n) },
+  { label: "O(n²)",      labelFull: { vi: "O(n²) – Bậc hai",       en: "O(n²) – Quadratic" },      color: "#f97316", fn: n => n * n },
+  { label: "O(2ⁿ)",      labelFull: { vi: "O(2ⁿ) – Lũy thừa",     en: "O(2ⁿ) – Exponential" },   color: "#ef4444", fn: n => Math.pow(2, n) },
+];
+const DESCRIPTIONS = [
+  { ex: { vi: "Truy cập phần tử mảng theo chỉ số, hash map lookup",         en: "Array index access, hash map lookup" } },
+  { ex: { vi: "Tìm kiếm nhị phân, Union-Find (path compression)",            en: "Binary search, Union-Find with path compression" } },
+  { ex: { vi: "Duyệt qua một mảng, đếm tần suất",                           en: "Single array traversal, frequency count" } },
+  { ex: { vi: "Merge Sort, Heap Sort, Patience Sorting (LIS O(n log n))",    en: "Merge Sort, Heap Sort, Patience Sorting (LIS O(n log n))" } },
+  { ex: { vi: "Hai vòng lặp lồng nhau, Bubble Sort, LIS DP O(n²)",          en: "Nested loops, Bubble Sort, LIS DP O(n²)" } },
+  { ex: { vi: "Đệ quy tính tập con, bài toán túi xách brute-force, N-Queens", en: "Subset generation, brute-force knapsack, N-Queens" } },
+];
+
+// ── Build legend + list (called on lang change) ──
+function rebuildLists() {
+  // Legend
+  const legendEl = document.getElementById("legend");
+  legendEl.innerHTML = "";
+  COMPLEXITIES.forEach(c => {
+    const item = document.createElement("div"); item.className = "legend-item";
+    const dot = document.createElement("div"); dot.className = "legend-dot"; dot.style.background = c.color;
+    const lbl = document.createElement("span"); lbl.textContent = pick(c.labelFull);
+    item.append(dot, lbl); legendEl.append(item);
+  });
+
+  // Description list
+  const cxListEl = document.getElementById("cxList");
+  cxListEl.innerHTML = "";
+  COMPLEXITIES.forEach((c, i) => {
+    const li = document.createElement("li");
+    const dot = document.createElement("div"); dot.className = "dot"; dot.style.background = c.color;
+    const body = document.createElement("div");
+    body.innerHTML = `<div class="cx-label-big">${pick(c.labelFull)}</div>` +
+      `<div class="cx-desc">${pick(I18N.exPrefix)}${pick(DESCRIPTIONS[i].ex)}</div>`;
+    li.append(dot, body); cxListEl.append(li);
+  });
+
+  // Table
+  const NS = [1, 2, 5, 10, 20, 50, 100];
+  const tableEl = document.getElementById("cxTable");
+  tableEl.innerHTML = "";
+  const thead = document.createElement("thead");
+  const hrow = document.createElement("tr");
+  hrow.innerHTML = `<th>${pick(I18N.complexity)}</th>` + NS.map(n => `<th>n=${n}</th>`).join("");
+  thead.append(hrow); tableEl.append(thead);
+  const tbody = document.createElement("tbody");
+  COMPLEXITIES.forEach(c => {
+    const tr = document.createElement("tr");
+    const fmt = v => v >= 1e9 ? "~∞" : v >= 1e6 ? (v/1e6).toFixed(1)+"M" : v >= 1e3 ? (v/1e3).toFixed(1)+"K" : v.toFixed(v < 10 ? 2 : 0);
+    const dotHtml = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:6px;vertical-align:middle"></span>`;
+    tr.innerHTML = `<td>${dotHtml}<b>${c.label}</b></td>` + NS.map(n => `<td>${fmt(c.fn(n))}</td>`).join("");
+    tbody.append(tr);
+  });
+  tableEl.append(tbody);
+}
+
+// ── Canvas chart ──
+const canvas = document.getElementById("bigOChart");
+const ctx = canvas.getContext("2d");
+
+function drawChart(maxN) {
+  const W = canvas.width, H = canvas.height;
+  const PAD = { top: 30, right: 70, bottom: 60, left: 72 };
+  const plotW = W - PAD.left - PAD.right, plotH = H - PAD.top - PAD.bottom;
+  const light = root.getAttribute("data-theme") === "light";
+  const bgColor   = light ? "#f8fafc" : "#0c0a1a";
+  const gridColor = light ? "rgba(0,0,0,.08)" : "rgba(255,255,255,.07)";
+  const textColor = light ? "#334155"  : "#94a3b8";
+  const axisColor = light ? "#64748b"  : "#475569";
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = bgColor; ctx.fillRect(0, 0, W, H);
+
+  const maxVal = Math.pow(2, maxN);
+  const logMin = Math.log10(0.8);
+  const logMax = Math.log10(maxVal);
+  const toY = v => { const lv = Math.log10(Math.min(Math.max(v, 0.8), maxVal)); return PAD.top + plotH - ((lv - logMin) / (logMax - logMin)) * plotH; };
+  const toX = n => PAD.left + ((n - 1) / (maxN - 1)) * plotW;
+
+  // Y grid & ticks
+  const logTicks = [];
+  for (let p = 0; p <= logMax; p++) logTicks.push(Math.pow(10, p));
+  logTicks.forEach(v => {
+    const y = toY(v);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + plotW, y); ctx.stroke();
+    ctx.fillStyle = textColor; ctx.font = "11px system-ui,sans-serif"; ctx.textAlign = "right";
+    const lbl = v >= 1e6 ? (v/1e6)+"M" : v >= 1e3 ? (v/1e3)+"K" : String(v);
+    ctx.fillText(lbl, PAD.left - 6, y + 4);
+  });
+
+  // X grid & ticks
+  for (let n = 1; n <= maxN; n++) {
+    const x = toX(n);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + plotH); ctx.stroke();
+    if (n % 2 === 0 || maxN <= 12 || n === 1) {
+      ctx.fillStyle = textColor; ctx.font = "11px system-ui,sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(String(n), x, PAD.top + plotH + 18);
+    }
+  }
+
+  // Axes
+  ctx.strokeStyle = axisColor; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + plotH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD.left, PAD.top + plotH); ctx.lineTo(PAD.left + plotW, PAD.top + plotH); ctx.stroke();
+
+  // Axis labels (bilingual)
+  ctx.fillStyle = textColor; ctx.font = "12px system-ui,sans-serif";
+  ctx.save(); ctx.translate(14, PAD.top + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center"; ctx.fillText(pick(I18N.chartYLabel), 0, 0); ctx.restore();
+  ctx.textAlign = "center"; ctx.fillText(pick(I18N.chartXLabel), PAD.left + plotW / 2, H - 8);
+
+  // Chart title
+  ctx.textAlign = "left"; ctx.fillStyle = textColor; ctx.font = "12px system-ui,sans-serif";
+  ctx.fillText(pick(I18N.chartTitle), PAD.left, PAD.top - 10);
+
+  // Curves + end labels
+  COMPLEXITIES.forEach(c => {
+    ctx.beginPath(); ctx.strokeStyle = c.color; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    let first = true;
+    for (let n = 1; n <= maxN; n++) {
+      const x = toX(n), y = toY(Math.max(0.8, c.fn(n)));
+      if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const lastY = toY(Math.max(0.8, Math.min(c.fn(maxN), maxVal)));
+    const lx = toX(maxN) + 6;
+    if (lastY > PAD.top + 6 && lastY < PAD.top + plotH - 4) {
+      ctx.fillStyle = c.color; ctx.font = "bold 11px system-ui,sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(c.label, lx, lastY + 4);
+    }
+  });
+}
+
+// ── Init ──
+applyI18n();
+rebuildLists();
+
+const slider = document.getElementById("nSlider");
+const nValEl = document.getElementById("nVal");
+function update() { nValEl.textContent = slider.value; drawChart(Number(slider.value)); }
+slider.addEventListener("input", update);
+update();
+</script>
+</body>
+</html>

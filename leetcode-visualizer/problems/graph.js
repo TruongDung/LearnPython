@@ -15,6 +15,10 @@ const {
  * (number of words including beginWord and endWord), or 0 if impossible.
  */
 function buildSteps127(input, params) {
+  const approach = Number(params.approach) || 1;
+  if (approach === 2) return buildSteps127Bidir(input, params);
+
+  // ── Approach 1: One-way BFS ──
   const wordList = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
   const beginWord = (params.beginWord || "").trim();
   const endWord = (params.endWord || "").trim();
@@ -147,6 +151,7 @@ function buildSteps127(input, params) {
   return { beginWord, endWord, answer, steps };
 }
 
+<<<<<<< HEAD
 function parseBinaryGrid(input) {
   return String(input)
     .split("|")
@@ -364,6 +369,153 @@ function buildSteps3286(input, params) {
   }
 
   return { original: grid, health, answer, steps };
+=======
+// ── Approach 2: Bidirectional BFS ──
+function buildSteps127Bidir(input, params) {
+  const wordList = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+  const beginWord = (params.beginWord || "").trim();
+  const endWord   = (params.endWord   || "").trim();
+  const steps = [];
+  const wordSet = new Set(wordList);
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const displayWords = [beginWord, ...wordList.filter((w) => w !== beginWord)];
+  const allWords = displayWords;
+
+  const arrOf = (frontSet, backSet, visitedFront, visitedBack) =>
+    allWords.map((w) => {
+      if (frontSet && frontSet.has(w)) return 2;      // amber = front frontier
+      if (backSet  && backSet.has(w))  return 2;      // amber = back frontier
+      if (visitedFront && visitedFront.has(w)) return 1;
+      if (visitedBack  && visitedBack.has(w))  return 1;
+      return 0;
+    });
+  const hlOf = (s) => allWords.map((w, i) => s && s.has(w) ? i : -1).filter(x => x >= 0);
+  const mkOf = (s) => allWords.map((w, i) => s && s.has(w) ? i : -1).filter(x => x >= 0);
+
+  steps.push({
+    title: { vi: "Khởi tạo Bidirectional BFS", en: "Initialize Bidirectional BFS" },
+    arr: arrOf(new Set([beginWord]), new Set([endWord]), new Set(), new Set()),
+    sub: allWords,
+    highlight: [0, allWords.indexOf(endWord)].filter(x => x >= 0),
+    mark: [], codeLines: [5, 6, 7], codeBlock: 2,
+    vars: [
+      { name: "front (begin)", value: `{${beginWord}}` },
+      { name: "back  (end)",   value: `{${endWord}}`   },
+      { name: "steps",         value: 1                },
+    ],
+    note: {
+      vi: `Bidirectional BFS: mở rộng đồng thời từ 2 đầu.\n` +
+          `• front = frontier từ "${beginWord}" (tô vàng trái).\n` +
+          `• back = frontier từ "${endWord}" (tô vàng phải).\n` +
+          `Mỗi vòng: luôn chọn FRONTIER NHỎ HƠN để expand → giảm số node xét.\n` +
+          `Khi front ∩ back ≠ ∅ → tìm thấy đường.`,
+      en: `Bidirectional BFS: expand simultaneously from both ends.\n` +
+          `• front = frontier from "${beginWord}" (amber left).\n` +
+          `• back  = frontier from "${endWord}" (amber right).\n` +
+          `Each round: always expand the SMALLER frontier → fewer nodes processed.\n` +
+          `When front ∩ back ≠ ∅ → path found.`,
+    },
+  });
+
+  if (!wordSet.has(endWord)) {
+    const fs = { title: { vi: `"${endWord}" không có trong wordList → 0`, en: `"${endWord}" not in wordList → 0` }, arr: allWords.map(() => 0), sub: allWords, highlight: [], mark: [], final: true, codeLines: [6], codeBlock: 2, vars: [{ name: "answer", value: 0 }], note: { vi: `Không thể → 0.`, en: `Impossible → 0.` } };
+    steps.push(fs);
+    return { beginWord, endWord, answer: 0, steps };
+  }
+
+  let frontSet = new Set([beginWord]);
+  let backSet  = new Set([endWord]);
+  const visitedFront = new Set([beginWord]);
+  const visitedBack  = new Set([endWord]);
+  let stepCount = 1;
+  let answer = 0;
+
+  while (frontSet.size && backSet.size) {
+    stepCount++;
+    // Always expand the smaller side.
+    const expandFront = frontSet.size <= backSet.size;
+    const expanding   = expandFront ? frontSet  : backSet;
+    const other       = expandFront ? backSet   : frontSet;
+    const myVisited   = expandFront ? visitedFront : visitedBack;
+    const side        = expandFront ? "front" : "back";
+
+    const nextSet = new Set();
+    let met = null;
+    for (const word of expanding) {
+      for (let i = 0; i < word.length; i++) {
+        for (const c of alphabet) {
+          if (c === word[i]) continue;
+          const nw = word.slice(0, i) + c + word.slice(i + 1);
+          if (!wordSet.has(nw) && nw !== beginWord && nw !== endWord) continue;
+          if (other.has(nw)) { met = nw; }
+          if (!myVisited.has(nw)) { nextSet.add(nw); myVisited.add(nw); }
+        }
+      }
+    }
+
+    const prevFront = new Set(frontSet), prevBack = new Set(backSet);
+    if (expandFront) frontSet = nextSet; else backSet = nextSet;
+
+    const curFront = expandFront ? frontSet : prevFront;
+    const curBack  = expandFront ? prevBack : backSet;
+
+    if (met) {
+      answer = stepCount;
+      const fs = {
+        title: { vi: `✓ Hai đầu gặp nhau tại "${met}" — độ dài ${stepCount}`, en: `✓ Frontiers meet at "${met}" — length ${stepCount}` },
+        arr: arrOf(curFront, curBack, visitedFront, visitedBack),
+        sub: allWords,
+        highlight: [allWords.indexOf(met)].filter(x => x >= 0),
+        mark: [allWords.indexOf(met)].filter(x => x >= 0),
+        final: true, codeLines: [13, 14], codeBlock: 2,
+        vars: [
+          { name: "met at",     value: met       },
+          { name: "step count", value: stepCount },
+          { name: "answer",     value: stepCount },
+        ],
+        note: {
+          vi: `"${met}" xuất hiện trong cả 2 frontier → đường ngắn nhất = ${stepCount} từ!\nBidirectional BFS gặp nhau ở giữa → xét ít node hơn BFS 1 chiều.`,
+          en: `"${met}" appears in both frontiers → shortest path = ${stepCount} words!\nBidirectional BFS met in the middle → far fewer nodes visited than one-way BFS.`,
+        },
+      };
+      steps.push(fs);
+      break;
+    }
+
+    steps.push({
+      title: { vi: `Expand ${side} (${expanding.size} từ) → ${nextSet.size} từ mới — bước ${stepCount}`, en: `Expand ${side} (${expanding.size} words) → ${nextSet.size} new words — step ${stepCount}` },
+      arr: arrOf(curFront, curBack, visitedFront, visitedBack),
+      sub: allWords,
+      highlight: hlOf(nextSet),
+      mark: mkOf(expanding),
+      codeLines: [8, 9, 10, 11, 12], codeBlock: 2,
+      vars: [
+        { name: "expanding",  value: side },
+        { name: "frontier",   value: `{${[...expanding].join(", ")}}` },
+        { name: "new words",  value: `{${[...nextSet].join(", ")}}` },
+        { name: "front size", value: curFront.size },
+        { name: "back size",  value: curBack.size  },
+        { name: "steps so far", value: stepCount   },
+      ],
+      note: {
+        vi: `Expand ${side} (frontier nhỏ hơn, ${expanding.size} từ). Tìm thấy ${nextSet.size} từ mới.\n` +
+            `Chưa gặp nhau. Vòng sau: expand frontier ${curFront.size <= curBack.size ? "front" : "back"} (nhỏ hơn).`,
+        en: `Expand ${side} (smaller frontier, ${expanding.size} words). Found ${nextSet.size} new words.\n` +
+            `No intersection yet. Next: expand ${curFront.size <= curBack.size ? "front" : "back"} (smaller).`,
+      },
+    });
+
+    if (expandFront && !frontSet.size) break;
+    if (!expandFront && !backSet.size) break;
+  }
+
+  if (!answer) {
+    const fs = { title: { vi: "Không có đường → 0", en: "No path → 0" }, arr: arrOf(frontSet, backSet, visitedFront, visitedBack), sub: allWords, highlight: [], mark: [], final: true, codeLines: [15], codeBlock: 2, vars: [{ name: "answer", value: 0 }], note: { vi: `Hai frontier không gặp nhau → 0.`, en: `Frontiers never met → 0.` } };
+    steps.push(fs);
+  }
+
+  return { beginWord, endWord, answer, steps };
+>>>>>>> 881ed8d973164bcbd36f034d02bd7367902d7a65
 }
 
 /**
@@ -2306,19 +2458,28 @@ module.exports = {
         label: { vi: "endWord", en: "endWord" },
         default: "cog",
       },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: BFS một chiều", en: "Approach 1: One-way BFS" } },
+          { value: "2", label: { vi: "Cách 2: Bidirectional BFS (nhanh hơn)", en: "Approach 2: Bidirectional BFS (faster)" } },
+        ],
+      },
     ],
     approach: [
-      { vi: "Coi mỗi từ là một nút; hai từ kề nhau nếu khác đúng 1 ký tự.", en: "Treat each word as a node; two words are adjacent if they differ by exactly 1 letter." },
-      { vi: "Dùng BFS từ beginWord — BFS đảm bảo tìm được đường ngắn nhất.", en: "Use BFS from beginWord — BFS guarantees the shortest path." },
-      { vi: "Với mỗi từ, thử thay từng vị trí bằng 'a'..'z', giữ lại từ có trong wordList và chưa thăm.", en: "For each word, try replacing each position with 'a'..'z', keep words in wordList not yet visited." },
-      { vi: "Trả về số bước khi gặp endWord, hoặc 0 nếu không thể.", en: "Return the step count when endWord is reached, or 0 if impossible." },
+      { vi: "Cách 1 — BFS một chiều: expand từ beginWord ra ngoài đến khi gặp endWord.", en: "Approach 1 — One-way BFS: expand outward from beginWord until endWord is reached." },
+      { vi: "Cách 2 — Bidirectional BFS: mở rộng đồng thời từ 2 đầu (begin và end). Luôn expand frontier NHỎ HƠN.", en: "Approach 2 — Bidirectional BFS: expand simultaneously from both ends (begin and end). Always expand the SMALLER frontier." },
+      { vi: "Bidirectional: số node xét ~2·b^(d/2) thay vì b^d → nhanh hơn ~2–10× trong thực tế.", en: "Bidirectional: nodes visited ~2·b^(d/2) instead of b^d → ~2–10× faster in practice." },
     ],
     complexity: {
-      time: "O(N · L²)",
-      space: "O(N · L)",
+      time: "O(N·L²)",
+      space: "O(N·L)",
       note: {
-        vi: "N = số từ, L = độ dài từ. Mỗi từ thử L vị trí × 26 ký tự, mỗi lần tạo từ O(L) → O(N·L²). Bộ nhớ O(N·L).",
-        en: "N = word count, L = word length. Each word tries L positions × 26 letters, each O(L) to build → O(N·L²). Memory O(N·L).",
+        vi: "Cả 2 cách đều O(N·L²) worst-case, nhưng Bidirectional thực tế nhanh hơn nhiều vì gặp nhau ở giữa.",
+        en: "Both are O(N·L²) worst-case, but Bidirectional is much faster in practice due to meeting in the middle.",
       },
     },
     code: [
@@ -2343,6 +2504,33 @@ module.exports = {
       "                        queue.append((new_word, steps + 1))",
       "        return 0",
     ],
+    code2: [
+      "class Solution:",
+      "    def ladderLength(self, beginWord, endWord, wordList):",
+      "        word_set = set(wordList)",
+      "        if endWord not in word_set: return 0",
+      "        front, back = {beginWord}, {endWord}",
+      "        visited_f, visited_b = {beginWord}, {endWord}",
+      "        steps = 1",
+      "        while front and back:",
+      "            steps += 1",
+      "            # Always expand the smaller frontier",
+      "            if len(front) > len(back):",
+      "                front, back = back, front",
+      "                visited_f, visited_b = visited_b, visited_f",
+      "            nxt = set()",
+      "            for word in front:",
+      "                for i in range(len(word)):",
+      "                    for c in 'abcdefghijklmnopqrstuvwxyz':",
+      "                        nw = word[:i] + c + word[i+1:]",
+      "                        if nw in back: return steps   # MET!",
+      "                        if nw in word_set and nw not in visited_f:",
+      "                            nxt.add(nw); visited_f.add(nw)",
+      "            front = nxt",
+      "        return 0",
+    ],
+    codeLabel:  { vi: "Cách 1: BFS một chiều", en: "Approach 1: One-way BFS" },
+    code2Label: { vi: "Cách 2: Bidirectional BFS", en: "Approach 2: Bidirectional BFS" },
     builder: buildSteps127,
   },
   743: {

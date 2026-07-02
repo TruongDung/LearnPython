@@ -678,6 +678,104 @@ function buildSteps485(nums) {
   return { original: [...nums], answer: maxRun, steps };
 }
 
+// ─── 1089: Duplicate Zeros ───
+// Two-pointer: read (right-to-left) and write (right-to-left, starts at n+zeros-1).
+// Pass 1: count zeros. Pass 2: for each element, copy once (non-zero) or twice (zero).
+function buildSteps1089(nums) {
+  const n = nums.length;
+  const arr = [...nums];
+  const steps = [];
+
+  // Pass 1: count zeros.
+  let zeros = 0;
+  for (let left = 0; left < n; left++) { if (arr[left] === 0) zeros++; }
+
+  steps.push({
+    title: { vi: "Bước 1: Đếm số 0, đặt con trỏ right", en: "Step 1: Count zeros, set right pointer" },
+    arr: [...arr], sub: null,
+    highlight: arr.map((v, i) => v === 0 ? i : -1).filter((x) => x >= 0),
+    mark: [], codeLines: [3, 4, 5],
+    vars: [
+      { name: "zeros", value: zeros },
+      { name: "left", value: n - 1 },
+      { name: "right", value: n + zeros - 1 },
+    ],
+    note: {
+      vi:
+        `Có ${zeros} số 0 → mỗi cái chiếm thêm 1 ô.\n` +
+        `• left  bắt đầu từ CUỐI mảng gốc (index ${n - 1}) — con trỏ ĐỌC.\n` +
+        `• right bắt đầu tại n + zeros - 1 = ${n + zeros - 1} — con trỏ GHI (chỉ ghi khi right < n).`,
+      en:
+        `${zeros} zeros → each takes one extra slot.\n` +
+        `• left  starts at the END of the original array (index ${n - 1}) — READ pointer.\n` +
+        `• right starts at n + zeros - 1 = ${n + zeros - 1} — WRITE pointer (only write when right < n).`,
+    },
+  });
+
+  // Pass 2: fill right-to-left.
+  let right = n + zeros - 1;
+  for (let left = n - 1; left >= 0; left--) {
+    if (arr[left] === 0) {
+      // Write two zeros.
+      if (right < n) { arr[right] = 0; }
+      right--;
+      if (right < n) { arr[right] = 0; }
+      const wa = right + 1, wb = right;
+      steps.push({
+        title: { vi: `left=${left}: gặp 0 → ghi 0 hai lần tại right=${wa}, ${wb}`, en: `left=${left}: zero → write 0 twice at right=${wa}, ${wb}` },
+        arr: [...arr],
+        highlight: [wa, wb].filter((x) => x >= 0 && x < n),
+        mark: arr.map((_, k) => k <= left ? -1 : k).filter((x) => x >= 0),
+        codeLines: [8, 9, 10, 11],
+        vars: [
+          { name: "left  (read)", value: left },
+          { name: "right (write)", value: right },
+          { name: "arr[left]", value: 0 },
+          { name: "action", value: "write 0 × 2" },
+          { name: "arr", value: `[${arr.join(",")}]` },
+        ],
+        note: {
+          vi: `arr[left=${left}] = 0 → nhân đôi: ghi 0 tại right=${wa} và right=${wb}. Cả 2 con trỏ đều lùi.`,
+          en: `arr[left=${left}] = 0 → duplicate: write 0 at right=${wa} and right=${wb}. Both pointers step back.`,
+        },
+      });
+    } else {
+      // Write once.
+      if (right < n) { arr[right] = arr[left]; }
+      const w = right;
+      steps.push({
+        title: { vi: `left=${left}: arr[left]=${nums[left]} → copy sang right=${w}`, en: `left=${left}: arr[left]=${nums[left]} → copy to right=${w}` },
+        arr: [...arr],
+        highlight: w < n ? [w] : [],
+        mark: arr.map((_, k) => k <= left ? -1 : k).filter((x) => x >= 0),
+        codeLines: [6, 7],
+        vars: [
+          { name: "left  (read)", value: left },
+          { name: "right (write)", value: w },
+          { name: "arr[left]", value: nums[left] },
+          { name: "action", value: w >= n ? "dropped (out of bounds)" : `write ${nums[left]}` },
+          { name: "arr", value: `[${arr.join(",")}]` },
+        ],
+        note: {
+          vi: `arr[left=${left}] = ${nums[left]} (khác 0) → copy sang right=${w}${w >= n ? " (bị bỏ, ngoài mảng)" : ""}. right lùi 1.`,
+          en: `arr[left=${left}] = ${nums[left]} (non-zero) → copy to right=${w}${w >= n ? " (dropped)" : ""}. right steps back.`,
+        },
+      });
+    }
+    right--;
+  }
+
+  const fs = {
+    title: { vi: `Kết quả: [${arr.join(",")}]`, en: `Result: [${arr.join(",")}]` },
+    arr: [...arr], highlight: [], mark: arr.map((_, i) => i),
+    final: true, codeLines: [12],
+    vars: [{ name: "result", value: `[${arr.join(",")}]` }],
+    note: { vi: `Hoàn tất. left và right đều về 0. Mọi số 0 đã được nhân đôi tại chỗ.`, en: `Done. left and right both reached 0. Every zero duplicated in-place.` },
+  };
+  steps.push(fs);
+  return { input: nums, answer: arr, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -940,5 +1038,41 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps977,
+  },
+  1089: {
+    id: 1089,
+    difficulty: "easy",
+    slug: "duplicate-zeros",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Duplicate Zeros", en: "Duplicate Zeros" },
+    titleVi: { vi: "Nhân đôi các số 0 (tại chỗ)", en: "Duplicate zeros in-place" },
+    statement: {
+      vi: "Cho mảng arr. Nhân đôi mỗi số 0, dịch các phần tử còn lại sang phải. Kết quả cùng độ dài (bỏ phần tràn). Thực hiện tại chỗ.",
+      en: "Given a fixed-length array arr, duplicate each zero, shifting remaining elements right. Elements beyond original length are dropped. Do it in-place.",
+    },
+    defaultInput: [1, 0, 2, 3, 0, 4, 5, 0],
+    inputKind: "nonneg",
+    extraParams: [],
+    approach: [
+      { vi: "Pass 1: đếm số 0 → tính vị trí con trỏ ghi (write = n + zeros - 1).", en: "Pass 1: count zeros → compute write pointer (write = n + zeros - 1)." },
+      { vi: "Pass 2: con trỏ đọc (i) từ cuối về đầu; con trỏ ghi (j) từ cuối ghi ngược. Số 0 được ghi 2 lần.", en: "Pass 2: read pointer (i) from back to front; write pointer (j) fills backwards. Zeros written twice." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Hai pass O(n). Tại chỗ O(1).", en: "Two passes O(n). In-place O(1)." } },
+    code: [
+      "class Solution:",
+      "    def duplicateZeros(self, arr):",
+      "        n = len(arr)",
+      "        zeros = arr.count(0)",
+      "        right = n + zeros - 1",
+      "        for left in range(n - 1, -1, -1):",
+      "            if right < n:",
+      "                arr[right] = arr[left]",
+      "            if arr[left] == 0:",
+      "                right -= 1",
+      "                if right < n:",
+      "                    arr[right] = 0",
+      "            right -= 1",
+    ],
+    builder: buildSteps1089,
   },
 };
