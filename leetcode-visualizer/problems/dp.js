@@ -1756,11 +1756,27 @@ function buildSteps877(piles) {
   const steps = [];
   const dp = Array.from({ length: n }, () => Array(n).fill(0));
 
+  function makeGrid(hlCell = null) {
+    const gridDp = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        gridDp[r + 1][c + 1] = dp[r][c];
+      }
+    }
+    return {
+      dp: gridDp,
+      text1: Array.from({ length: n }, (_, i) => String(i)).join(""),
+      text2: Array.from({ length: n }, (_, i) => String(i)).join(""),
+      hlCell,
+      pathCells: [],
+    };
+  }
+
   steps.push({
     title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
     arr: [...piles],
     sub: piles.map((_, i) => String(i)),
-    grid: dp.map((row) => [...row]),
+    grid: makeGrid(),
     highlight: [],
     mark: [],
     codeLines: [3, 4, 5],
@@ -1780,7 +1796,7 @@ function buildSteps877(piles) {
       title: { vi: `Đáy: dp[${i}][${i}]`, en: `Base case: dp[${i}][${i}]` },
       arr: [...piles],
       sub: piles.map((_, idx) => String(idx)),
-      grid: dp.map((row) => [...row]),
+      grid: makeGrid([i + 1, i + 1]),
       highlight: [i],
       mark: [i],
       codeLines: [3, 4, 5, 6],
@@ -1806,7 +1822,7 @@ function buildSteps877(piles) {
         title: { vi: `Tính dp[${i}][${j}]`, en: `Compute dp[${i}][${j}]` },
         arr: [...piles],
         sub: piles.map((_, idx) => String(idx)),
-        grid: dp.map((row) => [...row]),
+        grid: makeGrid([i + 1, j + 1]),
         highlight: [i, j],
         mark: [i, j],
         codeLines: [7, 8, 9],
@@ -1831,7 +1847,7 @@ function buildSteps877(piles) {
     title: { vi: answer ? "Alice thắng" : "Alice thua", en: answer ? "Alice wins" : "Alice loses" },
     arr: [...piles],
     sub: piles.map((_, i) => String(i)),
-    grid: dp.map((row) => [...row]),
+    grid: makeGrid([1, n]),
     highlight: [],
     mark: [0, n - 1],
     final: true,
