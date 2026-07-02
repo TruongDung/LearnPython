@@ -1746,65 +1746,221 @@ function buildSteps1406(stones) {
 
 /**
  * LeetCode 877: Stone Game.
- * Classic result: with an even number of piles, Alice can always win by
- * choosing either all odd-indexed piles or all even-indexed piles.
+ * Interval DP on score difference:
+ *   dp[i][j] = best difference current player can force from piles[i..j].
+ * Transition:
+ *   dp[i][j] = max(piles[i] - dp[i+1][j], piles[j] - dp[i][j-1])
  */
 function buildSteps877(piles) {
   const n = piles.length;
   const steps = [];
-  const oddSum = piles.filter((_, idx) => idx % 2 === 0).reduce((a, b) => a + b, 0);
-  const evenSum = piles.filter((_, idx) => idx % 2 === 1).reduce((a, b) => a + b, 0);
-  const answer = n % 2 === 0;
+  const dp = Array.from({ length: n }, () => Array(n).fill(0));
+
+  steps.push({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    arr: [...piles],
+    sub: piles.map((_, i) => String(i)),
+    grid: dp.map((row) => [...row]),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "dp", value: "n x n table" },
+    ],
+    note: {
+      vi: `Ta dùng dp[i][j] = chênh lệch điểm tốt nhất người chơi hiện tại có thể ép được từ đoạn piles[i..j].`,
+      en: `We use dp[i][j] = the best score difference the current player can force from piles[i..j].`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    dp[i][i] = piles[i];
+    steps.push({
+      title: { vi: `Đáy: dp[${i}][${i}]`, en: `Base case: dp[${i}][${i}]` },
+      arr: [...piles],
+      sub: piles.map((_, idx) => String(idx)),
+      grid: dp.map((row) => [...row]),
+      highlight: [i],
+      mark: [i],
+      codeLines: [3, 4, 5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i][i]", value: dp[i][i] },
+      ],
+      note: {
+        vi: `Đoạn chỉ có 1 đống nên dp[${i}][${i}] = piles[${i}] = ${piles[i]}.`,
+        en: `A single pile means dp[${i}][${i}] = piles[${i}] = ${piles[i]}.`,
+      },
+    });
+  }
+
+  for (let len = 2; len <= n; len++) {
+    for (let i = 0; i + len - 1 < n; i++) {
+      const j = i + len - 1;
+      const takeLeft = piles[i] - dp[i + 1][j];
+      const takeRight = piles[j] - dp[i][j - 1];
+      dp[i][j] = Math.max(takeLeft, takeRight);
+
+      steps.push({
+        title: { vi: `Tính dp[${i}][${j}]`, en: `Compute dp[${i}][${j}]` },
+        arr: [...piles],
+        sub: piles.map((_, idx) => String(idx)),
+        grid: dp.map((row) => [...row]),
+        highlight: [i, j],
+        mark: [i, j],
+        codeLines: [7, 8, 9],
+        vars: [
+          { name: "len", value: len },
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "takeLeft", value: takeLeft },
+          { name: "takeRight", value: takeRight },
+          { name: "dp[i][j]", value: dp[i][j] },
+        ],
+        note: {
+          vi: `dp[${i}][${j}] = max(piles[${i}] - dp[${i + 1}][${j}] = ${takeLeft}, piles[${j}] - dp[${i}][${j - 1}] = ${takeRight}) = ${dp[i][j]}.`,
+          en: `dp[${i}][${j}] = max(piles[${i}] - dp[${i + 1}][${j}] = ${takeLeft}, piles[${j}] - dp[${i}][${j - 1}] = ${takeRight}) = ${dp[i][j]}.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[0][n - 1] > 0;
+  steps.push({
+    title: { vi: answer ? "Alice thắng" : "Alice thua", en: answer ? "Alice wins" : "Alice loses" },
+    arr: [...piles],
+    sub: piles.map((_, i) => String(i)),
+    grid: dp.map((row) => [...row]),
+    highlight: [],
+    mark: [0, n - 1],
+    final: true,
+    codeLines: [10, 11],
+    vars: [
+      { name: "dp[0][n-1]", value: dp[0][n - 1] },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `dp[0][${n - 1}] = ${dp[0][n - 1]}. Nếu chênh lệch dương thì Alice thắng; ở bài này kết quả luôn dương với input chuẩn. Alice thắng.`,
+      en: `dp[0][${n - 1}] = ${dp[0][n - 1]}. A positive difference means Alice wins; for the standard problem this is always positive. Alice wins.`,
+    },
+  });
+
+  return { piles: [...piles], answer, steps };
+}
+
+/**
+ * LeetCode 1140: Stone Game II.
+ * dp[i][m] = max stones the current player can obtain from piles[i...]
+ * when the current M value is m.
+ *
+ * Transition:
+ *   if 2m >= remaining, take all suffix stones.
+ *   otherwise choose x in [1, 2m] and maximize suffixSum[i] - dp[i+x][max(m, x)].
+ */
+function buildSteps1140(piles) {
+  const n = piles.length;
+  const steps = [];
+  const suffix = new Array(n + 1).fill(0);
+  for (let i = n - 1; i >= 0; i--) suffix[i] = suffix[i + 1] + piles[i];
+
+  const dp = Array.from({ length: n + 1 }, () => Array(n + 1).fill(0));
 
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
     arr: [...piles],
     sub: piles.map((_, i) => String(i)),
+    grid: dp.map((row) => [...row]),
     highlight: [],
     mark: [],
-    codeLines: [3, 4],
+    codeLines: [3, 4, 5, 6],
     vars: [
       { name: "n", value: n },
-      { name: "odd-index sum", value: oddSum },
-      { name: "even-index sum", value: evenSum },
+      { name: "suffix", value: `[${suffix.slice(0, n).join(", ")}]` },
     ],
     note: {
-      vi: `Trong Stone Game 877, nếu số piles là chẵn thì Alice luôn có chiến lược thắng. Với mảng này, sum vị trí chẵn = ${oddSum}, vị trí lẻ = ${evenSum}.`,
-      en: `In Stone Game 877, if the number of piles is even, Alice can always force a win. For this array, even-index sum = ${oddSum}, odd-index sum = ${evenSum}.`,
+      vi: `suffix[i] là tổng số đá còn lại từ vị trí i. dp[i][M] là số đá tối đa người chơi hiện tại có thể lấy được từ i khi M hiện tại = M.`,
+      en: `suffix[i] is the remaining total from position i. dp[i][M] is the maximum stones the current player can obtain from i with current M = M.`,
     },
   });
 
-  if (n % 2 === 0) {
-    steps.push({
-      title: { vi: "Chiến lược thắng", en: "Winning strategy" },
-      arr: [...piles],
-      sub: piles.map((_, i) => (i % 2 === 0 ? "A" : "B")),
-      highlight: [],
-      mark: [],
-      codeLines: [5, 6, 7],
-      vars: [
-        { name: "strategy", value: oddSum >= evenSum ? "take odd-index piles" : "take even-index piles" },
-        { name: "answer", value: true },
-      ],
-      note: {
-        vi: `Vì n chẵn, Alice có thể chọn toàn bộ vị trí chẵn hoặc lẻ ở lượt đầu và luôn giữ thế chủ động. Kết luận: Alice thắng.`,
-        en: `Because n is even, Alice can commit to either all even-indexed or all odd-indexed piles on the first move and keep control. Conclusion: Alice wins.`,
-      },
-    });
+  for (let i = n - 1; i >= 0; i--) {
+    for (let m = 1; m <= n; m++) {
+      const remaining = n - i;
+      if (2 * m >= remaining) {
+        dp[i][m] = suffix[i];
+        steps.push({
+          title: { vi: `dp[${i}][${m}]`, en: `dp[${i}][${m}]` },
+          arr: [...piles],
+          sub: piles.map((_, idx) => String(idx)),
+          grid: dp.map((row) => [...row]),
+          highlight: [i],
+          mark: [i],
+          codeLines: [8, 9],
+          vars: [
+            { name: "i", value: i },
+            { name: "M", value: m },
+            { name: "remaining", value: remaining },
+            { name: "dp[i][M]", value: dp[i][m] },
+          ],
+          note: {
+            vi: `Vì 2M = ${2 * m} >= số đá còn lại ${remaining}, người chơi hiện tại lấy hết suffix => dp[${i}][${m}] = suffix[${i}] = ${suffix[i]}.`,
+            en: `Because 2M = ${2 * m} >= remaining stones ${remaining}, the current player can take the whole suffix => dp[${i}][${m}] = suffix[${i}] = ${suffix[i]}.`,
+          },
+        });
+        continue;
+      }
+
+      let best = 0;
+      const options = [];
+      for (let x = 1; x <= 2 * m && i + x <= n; x++) {
+        const nextM = Math.max(m, x);
+        const gained = suffix[i] - dp[i + x][nextM];
+        options.push({ x, nextM, gained });
+        if (gained > best) best = gained;
+      }
+      dp[i][m] = best;
+
+      steps.push({
+        title: { vi: `Tính dp[${i}][${m}]`, en: `Compute dp[${i}][${m}]` },
+        arr: [...piles],
+        sub: piles.map((_, idx) => String(idx)),
+        grid: dp.map((row) => [...row]),
+        highlight: [i],
+        mark: [i],
+        codeLines: [10, 11, 12, 13],
+        vars: [
+          { name: "i", value: i },
+          { name: "M", value: m },
+          { name: "options", value: options.map((o) => `x=${o.x}: ${o.gained}`).join(", ") },
+          { name: "dp[i][M]", value: dp[i][m] },
+        ],
+        note: {
+          vi: `Thử lấy x = 1..${2 * m}. Các lựa chọn: ${options.map((o) => `x=${o.x} => suffix[${i}] - dp[${i + o.x}][${o.nextM}] = ${o.gained}`).join("; ")}. Chọn lớn nhất => dp[${i}][${m}] = ${dp[i][m]}.`,
+          en: `Try x = 1..${2 * m}. Options: ${options.map((o) => `x=${o.x} => suffix[${i}] - dp[${i + o.x}][${o.nextM}] = ${o.gained}`).join("; ")}. Pick the maximum => dp[${i}][${m}] = ${dp[i][m]}.`,
+        },
+      });
+    }
   }
 
+  const answer = dp[0][1];
   steps.push({
-    title: { vi: answer ? "Alice thắng" : "Alice thua", en: answer ? "Alice wins" : "Alice loses" },
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
     arr: [...piles],
     sub: piles.map((_, i) => String(i)),
+    grid: dp.map((row) => [...row]),
     highlight: [],
-    mark: answer ? [0, n - 1] : [],
+    mark: [0],
     final: true,
-    codeLines: [9],
-    vars: [{ name: "answer", value: answer }],
+    codeLines: [15],
+    vars: [
+      { name: "dp[0][1]", value: answer },
+      { name: "Alice stones", value: answer },
+      { name: "Bob stones", value: suffix[0] - answer },
+    ],
     note: {
-      vi: answer ? "n chẵn => Alice thắng." : "n lẻ => Alice không có bảo đảm thắng theo chiến lược chuẩn.",
-      en: answer ? "Even number of piles => Alice wins." : "Odd number of piles => Alice does not have the standard forced-win strategy.",
+      vi: `Alice có thể lấy tối đa ${answer} viên. Bob nhận ${suffix[0] - answer} viên còn lại. Vì vậy Alice thắng/đạt kết quả tối ưu theo DP.`,
+      en: `Alice can obtain at most ${answer} stones. Bob gets the remaining ${suffix[0] - answer}. So Alice wins or achieves the optimal DP result.`,
     },
   });
 
@@ -3669,6 +3825,50 @@ module.exports = {
       "        return dp[max_val]",
     ],
     builder: buildSteps740,
+  },
+  1140: {
+    id: 1140,
+    difficulty: "medium",
+    slug: "stone-game-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game II", en: "Stone Game II" },
+    titleVi: { vi: "Trò chơi đá II", en: "Stone Game II (suffix + M DP)" },
+    statement: {
+      vi: "Cho mảng piles. Hai người chơi lần lượt lấy x đống đá từ đầu dãy, với 1 <= x <= 2M. Sau khi lấy x, M = max(M, x). Trả về số đá tối đa Alice có thể lấy được nếu cả hai chơi tối ưu.",
+      en: "Given an array piles, two players take x piles from the front where 1 <= x <= 2M. After taking x, M becomes max(M, x). Return the maximum stones Alice can obtain with optimal play.",
+    },
+    defaultInput: [2, 7, 9, 4, 4],
+    inputKind: "positive",
+    inputLabel: { vi: "piles", en: "piles" },
+    extraParams: [],
+    complexity: {
+      time: "O(n^3)",
+      space: "O(n^2)",
+      note: {
+        vi: "Có O(n^2) trạng thái dp[i][M], mỗi trạng thái thử tối đa 2M lựa chọn nên xấu nhất là O(n^3).",
+        en: "There are O(n^2) dp[i][M] states, and each state tries up to 2M choices, giving worst-case O(n^3) time.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGameII(self, piles):",
+      "        n = len(piles)",
+      "        suffix = [0] * (n + 1)",
+      "        for i in range(n - 1, -1, -1):",
+      "            suffix[i] = suffix[i + 1] + piles[i]",
+      "        dp = [[0] * (n + 1) for _ in range(n + 1)]",
+      "        for i in range(n - 1, -1, -1):",
+      "            for m in range(1, n + 1):",
+      "                if 2 * m >= n - i:",
+      "                    dp[i][m] = suffix[i]",
+      "                else:",
+      "                    best = 0",
+      "                    for x in range(1, 2 * m + 1):",
+      "                        best = max(best, suffix[i] - dp[i + x][max(m, x)])",
+      "                    dp[i][m] = best",
+      "        return dp[0][1]",
+    ],
+    builder: buildSteps1140,
   },
   877: {
     id: 877,
