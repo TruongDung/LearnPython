@@ -159,6 +159,190 @@ function parseBinaryGrid(input) {
     .map((row) => row.split(",").map((v) => Number(v.trim())));
 }
 
+function parseIslandGrid(input) {
+  return String(input)
+    .split("|")
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => {
+      const values = row.includes(",")
+        ? row.split(",").map((v) => v.trim())
+        : row.split("");
+      return values.map((v) => String(v).replace(/^"|"$/g, ""));
+    });
+}
+
+/**
+ * LeetCode 200: Number of Islands.
+ * Scan every cell. When an unvisited land cell is found, count a new island
+ * and flood-fill its connected land cells in 4 directions.
+ */
+function buildSteps200(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "0" && v !== "1"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Grid phải gồm 0/1. Ví dụ: 11110|11010|11000|00000 hoặc 1,1,1,1,0|1,1,0,1,0.",
+        en: "Grid must contain 0/1. Example: 11110|11010|11000|00000 or 1,1,1,1,0|1,1,0,1,0.",
+      },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const queued = new Set();
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(current) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        let cls = cell === "0" ? "wall" : "empty";
+        let label = cell;
+        if (visited[r][c]) {
+          cls = "visited";
+          label = String(islandId[r][c]);
+        }
+        if (queued.has(key(r, c))) cls = "queued";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Quét grid từ trái sang phải", en: "Scan the grid left to right" },
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "rows", value: rows },
+      { name: "cols", value: cols },
+      { name: "islands", value: 0 },
+    ],
+    note: {
+      vi: "Ta duyệt từng ô. Gặp đất '1' chưa thăm thì đó là điểm bắt đầu của một đảo mới.",
+      en: "Scan every cell. An unvisited '1' starts a new island.",
+    },
+  });
+
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let islands = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "1" || visited[r][c]) continue;
+
+      islands++;
+      const stack = [[r, c]];
+      visited[r][c] = true;
+      islandId[r][c] = islands;
+      queued.add(key(r, c));
+
+      pushStep({
+        title: { vi: `Bắt đầu đảo #${islands} tại (${r},${c})`, en: `Start island #${islands} at (${r},${c})` },
+        current: [r, c],
+        codeLines: [7, 8, 9, 10],
+        vars: [
+          { name: "cell", value: `(${r}, ${c})` },
+          { name: "islands", value: islands },
+          { name: "stack", value: `[(${r},${c})]` },
+        ],
+        note: {
+          vi: `Ô (${r},${c}) là đất chưa thăm, nên tăng islands lên ${islands} và flood fill toàn bộ phần đất nối với nó.`,
+          en: `Cell (${r},${c}) is unvisited land, so increment islands to ${islands} and flood-fill its connected land.`,
+        },
+      });
+
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        queued.delete(key(cr, cc));
+
+        pushStep({
+          title: { vi: `DFS pop (${cr},${cc})`, en: `DFS pop (${cr},${cc})` },
+          current: [cr, cc],
+          codeLines: [11, 12],
+          vars: [
+            { name: "current", value: `(${cr}, ${cc})` },
+            { name: "island", value: islands },
+            { name: "stack size", value: stack.length },
+          ],
+          note: {
+            vi: `Đang mở rộng đảo #${islands} từ ô (${cr},${cc}). Kiểm tra 4 hướng: lên, xuống, trái, phải.`,
+            en: `Expanding island #${islands} from (${cr},${cc}). Check four directions: up, down, left, right.`,
+          },
+        });
+
+        for (const [dr, dc] of dirs) {
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (grid[nr][nc] !== "1" || visited[nr][nc]) continue;
+
+          visited[nr][nc] = true;
+          islandId[nr][nc] = islands;
+          stack.push([nr, nc]);
+          queued.add(key(nr, nc));
+
+          pushStep({
+            title: { vi: `Thêm đất nối liền (${nr},${nc})`, en: `Add connected land (${nr},${nc})` },
+            current: [nr, nc],
+            codeLines: [13, 14, 15, 16, 17],
+            vars: [
+              { name: "from", value: `(${cr}, ${cc})` },
+              { name: "neighbor", value: `(${nr}, ${nc})` },
+              { name: "island", value: islands },
+              { name: "stack size", value: stack.length },
+            ],
+            note: {
+              vi: `(${nr},${nc}) là đất kề 4 hướng và chưa thăm, nên thuộc cùng đảo #${islands}.`,
+              en: `(${nr},${nc}) is 4-directionally adjacent unvisited land, so it belongs to island #${islands}.`,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: `Kết quả: ${islands} đảo`, en: `Result: ${islands} islands` },
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "answer", value: islands },
+      { name: "visited land cells", value: islandId.flat().filter(Boolean).length },
+    ],
+    note: {
+      vi: `Mỗi lần gặp đất chưa thăm là một đảo mới. Sau khi DFS đánh dấu hết đất nối liền, tổng số đảo = ${islands}.`,
+      en: `Each unvisited land cell starts one new island. After DFS marks all connected land, total islands = ${islands}.`,
+    },
+  });
+
+  return { original: grid, answer: islands, steps };
+}
+
 /**
  * LeetCode 3286: Find a Safe Walk Through a Grid.
  * BFS over states, keeping the best remaining health seen for each cell.
@@ -1888,11 +2072,73 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [126, 127, 207, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
     },
+  },
+  200: {
+    id: 200,
+    difficulty: "medium",
+    slug: "number-of-islands",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Number of Islands", en: "Number of Islands" },
+    titleVi: { vi: "Đếm số đảo trong lưới", en: "Count islands in a grid" },
+    statement: {
+      vi:
+        "Cho grid m×n gồm '1' = đất và '0' = nước. Một đảo là nhóm các ô đất nối nhau theo 4 hướng " +
+        "(trên, dưới, trái, phải), được bao quanh bởi nước hoặc biên grid. Hãy đếm số đảo. " +
+        "Nhập grid: hàng cách bởi '|', có thể viết liền ký tự hoặc cách bằng dấu phẩy.",
+      en:
+        "Given an m×n grid of '1' land and '0' water. An island is a group of land cells connected in 4 directions " +
+        "(up, down, left, right), surrounded by water or grid boundaries. Count the islands. " +
+        "Enter rows separated by '|', either as compact characters or comma-separated values.",
+    },
+    defaultInput: "11110|11010|11000|00000",
+    inputKind: "string",
+    inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    approach: [
+      { vi: "Duyệt từng ô trong grid. Nếu ô là nước hoặc đã thăm thì bỏ qua.", en: "Scan every cell. Skip water and already visited cells." },
+      { vi: "Khi gặp một ô đất chưa thăm, đó là một đảo mới → islands += 1.", en: "When an unvisited land cell is found, it starts a new island → islands += 1." },
+      { vi: "Dùng DFS/BFS từ ô đó để đánh dấu toàn bộ đất nối liền theo 4 hướng.", en: "Use DFS/BFS from that cell to mark all 4-directionally connected land." },
+      { vi: "Sau khi quét xong grid, islands là đáp án.", en: "After scanning the grid, islands is the answer." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được thăm tối đa một lần. Bộ nhớ cho visited/stack trong trường hợp xấu nhất là O(m·n).",
+        en: "Each cell is visited at most once. Visited/stack memory is O(m·n) in the worst case.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numIslands(self, grid):",
+      "        if not grid:",
+      "            return 0",
+      "        m, n = len(grid), len(grid[0])",
+      "        islands = 0",
+      "        ",
+      "        def dfs(r, c):",
+      "            if r < 0 or r == m or c < 0 or c == n:",
+      "                return",
+      "            if grid[r][c] != '1':",
+      "                return",
+      "            grid[r][c] = '0'",
+      "            dfs(r + 1, c)",
+      "            dfs(r - 1, c)",
+      "            dfs(r, c + 1)",
+      "            dfs(r, c - 1)",
+      "        ",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if grid[r][c] == '1':",
+      "                    islands += 1",
+      "                    dfs(r, c)",
+      "        return islands",
+    ],
+    builder: buildSteps200,
   },
   1293: {
     id: 1293,
