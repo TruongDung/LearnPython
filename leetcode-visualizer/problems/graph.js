@@ -240,11 +240,11 @@ function buildSteps200(input) {
     vars: [
       { name: "rows", value: rows },
       { name: "cols", value: cols },
-      { name: "islands", value: 0 },
+      { name: "count", value: 0 },
     ],
     note: {
-      vi: "Ta duyệt từng ô. Gặp đất '1' chưa thăm thì đó là điểm bắt đầu của một đảo mới.",
-      en: "Scan every cell. An unvisited '1' starts a new island.",
+      vi: "Ta duyệt từng ô. Gặp đất '1' chưa thăm thì gọi dfs(i, j) để đánh dấu toàn bộ đảo trong visited.",
+      en: "Scan every cell. An unvisited '1' triggers dfs(i, j), marking the whole island in visited.",
     },
   });
 
@@ -262,17 +262,17 @@ function buildSteps200(input) {
       queued.add(key(r, c));
 
       pushStep({
-        title: { vi: `Bắt đầu đảo #${islands} tại (${r},${c})`, en: `Start island #${islands} at (${r},${c})` },
+        title: { vi: `Gọi dfs(${r},${c}) cho đảo #${islands}`, en: `Call dfs(${r},${c}) for island #${islands}` },
         current: [r, c],
-        codeLines: [7, 8, 9, 10],
+        codeLines: [5, 6, 7, 8],
         vars: [
           { name: "cell", value: `(${r}, ${c})` },
-          { name: "islands", value: islands },
-          { name: "stack", value: `[(${r},${c})]` },
+          { name: "count before dfs", value: islands - 1 },
+          { name: "visited[i][j]", value: true },
         ],
         note: {
-          vi: `Ô (${r},${c}) là đất chưa thăm, nên tăng islands lên ${islands} và flood fill toàn bộ phần đất nối với nó.`,
-          en: `Cell (${r},${c}) is unvisited land, so increment islands to ${islands} and flood-fill its connected land.`,
+          vi: `Ô (${r},${c}) là đất chưa thăm. DFS bắt đầu bằng visited[${r}][${c}] = True, rồi lan 4 hướng.`,
+          en: `Cell (${r},${c}) is unvisited land. DFS starts by setting visited[${r}][${c}] = True, then explores 4 directions.`,
         },
       });
 
@@ -281,17 +281,17 @@ function buildSteps200(input) {
         queued.delete(key(cr, cc));
 
         pushStep({
-          title: { vi: `DFS pop (${cr},${cc})`, en: `DFS pop (${cr},${cc})` },
+          title: { vi: `DFS đang ở (${cr},${cc})`, en: `DFS at (${cr},${cc})` },
           current: [cr, cc],
-          codeLines: [11, 12],
+          codeLines: [9, 10, 11, 12, 13, 14],
           vars: [
             { name: "current", value: `(${cr}, ${cc})` },
             { name: "island", value: islands },
-            { name: "stack size", value: stack.length },
+            { name: "pending recursive calls", value: stack.length },
           ],
           note: {
-            vi: `Đang mở rộng đảo #${islands} từ ô (${cr},${cc}). Kiểm tra 4 hướng: lên, xuống, trái, phải.`,
-            en: `Expanding island #${islands} from (${cr},${cc}). Check four directions: up, down, left, right.`,
+            vi: `Từ (${cr},${cc}), thử từng direction. Nếu ra ngoài biên hoặc gặp '0' thì continue; nếu đất chưa visited thì gọi dfs tiếp.`,
+            en: `From (${cr},${cc}), try each direction. Continue on out-of-bounds or '0'; recurse on unvisited land.`,
           },
         });
 
@@ -307,29 +307,42 @@ function buildSteps200(input) {
           queued.add(key(nr, nc));
 
           pushStep({
-            title: { vi: `Thêm đất nối liền (${nr},${nc})`, en: `Add connected land (${nr},${nc})` },
+            title: { vi: `dfs(${nr},${nc}) vì đất chưa visited`, en: `dfs(${nr},${nc}) because land is unvisited` },
             current: [nr, nc],
-            codeLines: [13, 14, 15, 16, 17],
+            codeLines: [15, 16, 17],
             vars: [
               { name: "from", value: `(${cr}, ${cc})` },
               { name: "neighbor", value: `(${nr}, ${nc})` },
               { name: "island", value: islands },
-              { name: "stack size", value: stack.length },
+              { name: "visited[x][y]", value: true },
             ],
             note: {
-              vi: `(${nr},${nc}) là đất kề 4 hướng và chưa thăm, nên thuộc cùng đảo #${islands}.`,
-              en: `(${nr},${nc}) is 4-directionally adjacent unvisited land, so it belongs to island #${islands}.`,
+              vi: `(${nr},${nc}) là đất kề 4 hướng và chưa visited, nên DFS đánh dấu nó thuộc cùng đảo #${islands}.`,
+              en: `(${nr},${nc}) is 4-directionally adjacent unvisited land, so DFS marks it as part of island #${islands}.`,
             },
           });
         }
       }
+
+      pushStep({
+        title: { vi: `DFS xong → count = ${islands}`, en: `DFS done → count = ${islands}` },
+        codeLines: [23, 24],
+        vars: [
+          { name: "finished island", value: islands },
+          { name: "count", value: islands },
+        ],
+        note: {
+          vi: `Sau khi dfs(${r},${c}) quay về, toàn bộ đảo đã được visited. Lúc này mới count += 1.`,
+          en: `After dfs(${r},${c}) returns, the whole island is visited. Now count += 1.`,
+        },
+      });
     }
   }
 
   pushStep({
     title: { vi: `Kết quả: ${islands} đảo`, en: `Result: ${islands} islands` },
     final: true,
-    codeLines: [18],
+    codeLines: [26],
     vars: [
       { name: "answer", value: islands },
       { name: "visited land cells", value: islandId.flat().filter(Boolean).length },
@@ -364,7 +377,7 @@ function buildSteps695(input) {
         en: "Grid must contain 0/1. Example: 00100|01110|00100 or 0,0,1,0,0|0,1,1,1,0.",
       },
     });
-    return { original: grid, answer: 0, steps };
+    return { original, answer: 0, steps };
   }
 
   const rows = grid.length;
@@ -555,6 +568,181 @@ function buildSteps695(input) {
   });
 
   return { original: grid, answer: maxArea, steps };
+}
+
+/**
+ * LeetCode 994: Rotting Oranges.
+ * Multi-source BFS: all initially rotten oranges spread rot at the same time.
+ */
+function buildSteps994(input) {
+  const grid = parseIslandGrid(input);
+  const original = grid.map((row) => [...row]);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "0" && v !== "1" && v !== "2"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải gồm 0, 1, 2. Ví dụ: 2,1,1|1,1,0|0,1,1 hoặc viết gọn: 211|110|011.",
+        en: "Grid must contain 0, 1, 2. Example: 2,1,1|1,1,0|0,1,1 or compact: 211|110|011.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const rottenAt = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const key = (r, c) => `${r},${c}`;
+  let fresh = 0;
+  let queue = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === "1") fresh++;
+      if (grid[r][c] === "2") {
+        rottenAt[r][c] = 0;
+        queue.push([r, c]);
+      }
+    }
+  }
+
+  function makeCells(current = null, frontier = new Set(), newlyRotten = new Set()) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const cellKey = key(r, c);
+        let cls = "empty";
+        let label = cell;
+        if (cell === "0") {
+          cls = "wall";
+          label = "";
+        } else if (rottenAt[r][c] >= 0) {
+          cls = "visited";
+          label = rottenAt[r][c] === 0 ? "2" : String(rottenAt[r][c]);
+        }
+        if (frontier.has(cellKey)) cls = "queued";
+        if (newlyRotten.has(cellKey)) cls = "path";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, frontier, newlyRotten, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, frontier, newlyRotten) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo multi-source BFS", en: "Initialize multi-source BFS" },
+    frontier: new Set(queue.map(([r, c]) => key(r, c))),
+    codeLines: [4, 5, 6, 7, 8, 9],
+    vars: [
+      { name: "initial rotten", value: queue.length },
+      { name: "fresh", value: fresh },
+      { name: "minutes", value: 0 },
+    ],
+    note: {
+      vi: "Tất cả cam thối ban đầu là nguồn BFS. Mỗi level của BFS tương ứng 1 phút lan sang các cam tươi kề 4 hướng.",
+      en: "All initially rotten oranges are BFS sources. Each BFS level is one minute of spreading to 4-directionally adjacent fresh oranges.",
+    },
+  });
+
+  if (fresh === 0) {
+    pushStep({
+      title: { vi: "Không có cam tươi → 0 phút", en: "No fresh oranges → 0 minutes" },
+      final: true,
+      codeLines: [10, 11],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Grid không có cam tươi, nên không cần chờ phút nào.",
+        en: "There are no fresh oranges, so no time is needed.",
+      },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let minutes = 0;
+
+  while (queue.length && fresh > 0) {
+    const next = [];
+    const rottedThisMinute = [];
+    const frontier = new Set(queue.map(([r, c]) => key(r, c)));
+
+    for (const [r, c] of queue) {
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        if (grid[nr][nc] !== "1" || rottenAt[nr][nc] >= 0) continue;
+
+        rottenAt[nr][nc] = minutes + 1;
+        fresh--;
+        next.push([nr, nc]);
+        rottedThisMinute.push([nr, nc]);
+      }
+    }
+
+    if (!rottedThisMinute.length) break;
+    minutes++;
+
+    pushStep({
+      title: { vi: `Phút ${minutes}: thối ${rottedThisMinute.length} cam`, en: `Minute ${minutes}: rot ${rottedThisMinute.length} orange(s)` },
+      frontier,
+      newlyRotten: new Set(rottedThisMinute.map(([r, c]) => key(r, c))),
+      codeLines: [12, 13, 14, 15, 16, 17, 18],
+      vars: [
+        { name: "minute", value: minutes },
+        { name: "rotted now", value: rottedThisMinute.map(([r, c]) => `(${r},${c})`).join(", ") },
+        { name: "fresh left", value: fresh },
+        { name: "next frontier", value: next.length },
+      ],
+      note: {
+        vi: `Các cam đang thối ở đầu phút lan sang cam tươi kề 4 hướng. Sau phút ${minutes}, còn ${fresh} cam tươi.`,
+        en: `The current rotten frontier spreads to adjacent fresh oranges. After minute ${minutes}, ${fresh} fresh orange(s) remain.`,
+      },
+    });
+
+    queue = next;
+  }
+
+  const answer = fresh === 0 ? minutes : -1;
+  pushStep({
+    title: answer === -1
+      ? { vi: "Còn cam tươi bị cô lập → -1", en: "Fresh oranges remain isolated → -1" }
+      : { vi: `Kết quả: ${minutes} phút`, en: `Result: ${minutes} minutes` },
+    final: true,
+    codeLines: [19, 20],
+    vars: [
+      { name: "fresh left", value: fresh },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: answer === -1
+        ? "BFS dừng nhưng vẫn còn cam tươi, nghĩa là chúng không thể bị lan thối từ bất kỳ cam thối nào."
+        : `Tất cả cam tươi đã bị thối sau ${minutes} phút.`,
+      en: answer === -1
+        ? "BFS stopped while fresh oranges remain, so they cannot be reached by rot from any rotten orange."
+        : `All fresh oranges have rotted after ${minutes} minute(s).`,
+    },
+  });
+
+  return { original, answer, steps };
 }
 
 /**
@@ -2286,7 +2474,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 994, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -2314,9 +2502,9 @@ module.exports = {
     inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
     approach: [
       { vi: "Duyệt từng ô trong grid. Nếu ô là nước hoặc đã thăm thì bỏ qua.", en: "Scan every cell. Skip water and already visited cells." },
-      { vi: "Khi gặp một ô đất chưa thăm, đó là một đảo mới → islands += 1.", en: "When an unvisited land cell is found, it starts a new island → islands += 1." },
-      { vi: "Dùng DFS/BFS từ ô đó để đánh dấu toàn bộ đất nối liền theo 4 hướng.", en: "Use DFS/BFS from that cell to mark all 4-directionally connected land." },
-      { vi: "Sau khi quét xong grid, islands là đáp án.", en: "After scanning the grid, islands is the answer." },
+      { vi: "Khi gặp đất chưa thăm, gọi dfs(i, j) để đánh dấu toàn bộ đảo trong mảng visited.", en: "When unvisited land is found, call dfs(i, j) to mark the whole island in visited." },
+      { vi: "DFS thử 4 hướng; bỏ qua nếu ra ngoài biên hoặc gặp nước '0'.", en: "DFS tries 4 directions; skip out-of-bounds cells and water '0'." },
+      { vi: "Sau khi dfs quay về, tăng count thêm 1 vì vừa xử lý xong một đảo.", en: "After dfs returns, increment count by 1 because one island has been fully processed." },
     ],
     complexity: {
       time: "O(m·n)",
@@ -2327,30 +2515,35 @@ module.exports = {
       },
     },
     code: [
+      "from typing import List",
+      "",
       "class Solution:",
-      "    def numIslands(self, grid):",
-      "        if not grid:",
-      "            return 0",
+      "    def numIslands(self, grid: List[List[str]]) -> int:",
       "        m, n = len(grid), len(grid[0])",
-      "        islands = 0",
+      "        visited = [[False for j in range(n)] for i in range(m)]",
+      "        directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]",
+      "",
+      "        def dfs(i, j):",
+      "            visited[i][j] = True",
+      "",
+      "            for direction in directions:",
+      "                x = i + direction[0]",
+      "                y = j + direction[1]",
+      "",
+      "                if x < 0 or x >= m or y < 0 or y >= n or grid[x][y] == '0':",
+      "                    continue",
+      "                if not visited[x][y]:",
+      "                    dfs(x, y)",
       "        ",
-      "        def dfs(r, c):",
-      "            if r < 0 or r == m or c < 0 or c == n:",
-      "                return",
-      "            if grid[r][c] != '1':",
-      "                return",
-      "            grid[r][c] = '0'",
-      "            dfs(r + 1, c)",
-      "            dfs(r - 1, c)",
-      "            dfs(r, c + 1)",
-      "            dfs(r, c - 1)",
-      "        ",
-      "        for r in range(m):",
-      "            for c in range(n):",
-      "                if grid[r][c] == '1':",
-      "                    islands += 1",
-      "                    dfs(r, c)",
-      "        return islands",
+      "        count = 0",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if grid[i][j] == '1':",
+      "                    if not visited[i][j]:",
+      "                        dfs(i, j)",
+      "                        count += 1",
+      "",
+      "        return count",
     ],
     builder: buildSteps200,
   },
@@ -2408,6 +2601,70 @@ module.exports = {
       "        return max_area",
     ],
     builder: buildSteps695,
+  },
+  994: {
+    id: 994,
+    difficulty: "medium",
+    slug: "rotting-oranges",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Rotting Oranges", en: "Rotting Oranges" },
+    titleVi: { vi: "Cam thối lan theo từng phút", en: "Minute-by-minute rotting BFS" },
+    statement: {
+      vi:
+        "Cho grid m×n: 0 = ô trống, 1 = cam tươi, 2 = cam thối. Mỗi phút, cam thối làm thối các cam tươi kề 4 hướng. " +
+        "Trả về số phút tối thiểu để không còn cam tươi, hoặc -1 nếu không thể. Nhập grid: hàng cách bởi '|', giá trị có thể cách bằng dấu phẩy hoặc viết liền.",
+      en:
+        "Given an m×n grid: 0 = empty, 1 = fresh orange, 2 = rotten orange. Each minute, rotten oranges rot adjacent fresh oranges in 4 directions. " +
+        "Return the minimum minutes until no fresh oranges remain, or -1 if impossible. Enter rows separated by '|', comma-separated or compact.",
+    },
+    defaultInput: "2,1,1|1,1,0|0,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Grid 0/1/2 (hàng cách '|')", en: "0/1/2 grid (rows separated by '|')" },
+    approach: [
+      { vi: "Đưa tất cả cam thối ban đầu vào queue cùng lúc: đây là multi-source BFS.", en: "Put all initially rotten oranges into the queue at once: this is multi-source BFS." },
+      { vi: "Đếm số cam tươi ban đầu. Mỗi khi một cam tươi bị thối, fresh -= 1.", en: "Count initial fresh oranges. Whenever one rots, decrement fresh." },
+      { vi: "Mỗi level BFS là 1 phút: frontier hiện tại làm thối các ô tươi kề 4 hướng.", en: "Each BFS level is 1 minute: the current frontier rots 4-directionally adjacent fresh cells." },
+      { vi: "Nếu fresh = 0 thì trả số phút. Nếu queue hết mà vẫn còn fresh thì trả -1.", en: "If fresh reaches 0, return minutes. If the queue empties while fresh remains, return -1." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được đưa vào queue tối đa một lần. Queue trong trường hợp xấu nhất chứa O(m·n) ô.",
+        en: "Each cell enters the queue at most once. In the worst case, the queue stores O(m·n) cells.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def orangesRotting(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        q = deque()",
+      "        fresh = 0",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if grid[r][c] == 1:",
+      "                    fresh += 1",
+      "                elif grid[r][c] == 2:",
+      "                    q.append((r, c))",
+      "        if fresh == 0:",
+      "            return 0",
+      "        minutes = 0",
+      "        dirs = [(1,0), (-1,0), (0,1), (0,-1)]",
+      "        while q and fresh > 0:",
+      "            for _ in range(len(q)):",
+      "                r, c = q.popleft()",
+      "                for dr, dc in dirs:",
+      "                    nr, nc = r + dr, c + dc",
+      "                    if 0 <= nr < m and 0 <= nc < n and grid[nr][nc] == 1:",
+      "                        grid[nr][nc] = 2",
+      "                        fresh -= 1",
+      "                        q.append((nr, nc))",
+      "            minutes += 1",
+      "        return minutes if fresh == 0 else -1",
+    ],
+    builder: buildSteps994,
   },
   1293: {
     id: 1293,
