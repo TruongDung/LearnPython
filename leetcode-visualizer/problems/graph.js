@@ -16,7 +16,7 @@ const {
  */
 function buildSteps127(input, params) {
   const approach = Number(params.approach) || 1;
-  if (approach === 2) return buildSteps127Bidir(input, params);
+  if (approach === 2 && typeof buildSteps127Bidir === "function") return buildSteps127Bidir(input, params);
 
   // ── Approach 1: One-way BFS ──
   const wordList = String(input).split(",").map((w) => w.trim()).filter((w) => w.length > 0);
@@ -1885,6 +1885,15 @@ function buildSteps1136(input, params) {
 }
 
 module.exports = {
+  // Category metadata: recommended display order for the Graph tag.
+  // Picked up by problems/index.js and exposed to the catalog UI.
+  __meta: {
+    order: [126, 127, 207, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    label: {
+      vi: "Thứ tự học được khuyến nghị",
+      en: "Recommended learning order",
+    },
+  },
   1293: {
     id: 1293,
     difficulty: "hard",
