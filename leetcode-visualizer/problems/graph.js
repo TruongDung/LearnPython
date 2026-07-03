@@ -1950,14 +1950,43 @@ function buildSteps1926(input, params) {
     .map((row) => row.trim())
     .filter((row) => row.length > 0);
 
-  const maze = rawRows.map((row) => row.split(",").map((c) => c.trim()));
+  const maze = rawRows.map((row) =>
+    row.includes(",") ? row.split(",").map((c) => c.trim()) : row.split("")
+  );
   const entranceRow = Number(params.entranceRow ?? 0);
   const entranceCol = Number(params.entranceCol ?? 0);
   const rows = maze.length;
   const cols = rows > 0 ? maze[0].length : 0;
   const steps = [];
+  const invalidMaze =
+    rows === 0 ||
+    cols === 0 ||
+    maze.some((row) => row.length !== cols || row.some((cell) => cell !== "." && cell !== "+")) ||
+    entranceRow < 0 ||
+    entranceRow >= rows ||
+    entranceCol < 0 ||
+    entranceCol >= cols ||
+    maze[entranceRow][entranceCol] !== ".";
+
+  if (invalidMaze) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3, 4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Maze phải gồm '.' và '+', các hàng cùng độ dài, entrance nằm trong maze và là ô '.'. Ví dụ: +.+|...|+.. với entranceRow=1, entranceCol=0.",
+        en: "Maze must contain '.' and '+', all rows must have the same length, and entrance must be an open '.' cell. Example: +.+|...|+.. with entranceRow=1, entranceCol=0.",
+      },
+    });
+    return { maze, entrance: [entranceRow, entranceCol], answer: -1, steps };
+  }
+
   const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const dist = Array.from({ length: rows }, () => Array(cols).fill("â€¢"));
+  const dist = Array.from({ length: rows }, () => Array(cols).fill("."));
   const q = [[entranceRow, entranceCol, 0]];
   let head = 0;
   visited[entranceRow][entranceCol] = true;
@@ -3100,7 +3129,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 1091, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
