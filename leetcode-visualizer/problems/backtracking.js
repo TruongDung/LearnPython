@@ -1471,7 +1471,325 @@ function buildSteps784(input) {
   return { s, answer: results.length, steps };
 }
 
+/**
+ * LeetCode 980: Unique Paths III.
+ *
+ * DFS + backtracking on a grid:
+ *   1  = start   (exactly one)
+ *   2  = end     (exactly one)
+ *   0  = walkable empty cell
+ *   -1 = obstacle
+ *
+ * Count all paths from the start to the end that walk over EVERY non-obstacle
+ * cell exactly once (start and end included). A path is a sequence of 4-way
+ * neighbor moves that never revisits a cell.
+ *
+ * The visualization steps through the DFS:
+ *   - Highlight the current cell being tried.
+ *   - Mark visited cells so you can see the frontier growing.
+ *   - When a valid path is completed, flash the whole path green.
+ *   - On backtrack, un-mark the last cell.
+ */
+function buildSteps980(input) {
+  // Parse grid: rows separated by |, cells by comma. Accept 1/2/0/-1.
+  const rawRows = String(input || "").split("|").map((r) => r.trim()).filter(Boolean);
+  const grid = rawRows.map((row) =>
+    row.split(",").map((s) => {
+      const n = Number(s.trim());
+      return Number.isFinite(n) ? n : 0;
+    })
+  );
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+
+  const steps = [];
+
+  // Basic validation
+  if (
+    rows === 0 ||
+    cols === 0 ||
+    grid.some((row) => row.length !== cols) ||
+    grid.flat().filter((v) => v === 1).length !== 1 ||
+    grid.flat().filter((v) => v === 2).length !== 1
+  ) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3, 4, 5],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Grid phải là chữ nhật, có đúng 1 ô '1' (start) và 1 ô '2' (end). Ví dụ: 1,0,0,0|0,0,0,0|0,0,2,-1",
+        en: "Grid must be rectangular with exactly one '1' (start) and one '2' (end). Example: 1,0,0,0|0,0,0,0|0,0,2,-1",
+      },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  // Locate start/end and count walkable cells (0/1/2)
+  let startR = 0, startC = 0, endR = 0, endC = 0;
+  let remaining = 0; // cells we still need to step on
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = grid[r][c];
+      if (v === 1) { startR = r; startC = c; }
+      if (v === 2) { endR = r; endC = c; }
+      if (v !== -1) remaining += 1;
+    }
+  }
+
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+  function cellLabel(r, c) {
+    const v = grid[r][c];
+    if (r === startR && c === startC) return "S";
+    if (r === endR && c === endC) return "E";
+    if (v === -1) return "■";
+    return "";
+  }
+
+  function makeCells(currentR, currentC, pathCells) {
+    const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
+    return grid.map((row, r) =>
+      row.map((v, c) => {
+        let cls;
+        if (v === -1) cls = "wall";
+        else if (pathSet.has(`${r},${c}`)) cls = "path";
+        else if (r === currentR && c === currentC) cls = "current";
+        else if (visited[r][c]) cls = "visited";
+        else if (r === startR && c === startC) cls = "start";
+        else if (r === endR && c === endC) cls = "end";
+        else cls = "empty";
+        return { label: cellLabel(r, c), cls };
+      })
+    );
+  }
+
+  const STEP_LIMIT = 80;
+  let pathCount = 0;
+  let truncated = false;
+
+  function pushStep(opts) {
+    if (steps.length >= STEP_LIMIT) {
+      truncated = true;
+      return false;
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: opts.cells },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+    return true;
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    cells: makeCells(startR, startC, null),
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "start", value: `(${startR},${startC})` },
+      { name: "end", value: `(${endR},${endC})` },
+      { name: "cells to walk", value: remaining },
+      { name: "paths found", value: 0 },
+    ],
+    note: {
+      vi:
+        `Cần đi từ S (start=(${startR},${startC})) đến E (end=(${endR},${endC})) đi qua ĐÚNG một lần ` +
+        `mỗi ô không phải chướng ngại. Có ${remaining} ô phải bước lên (kể cả S và E). ` +
+        `Thuật toán: DFS + backtrack.`,
+      en:
+        `We must walk from S (start=(${startR},${startC})) to E (end=(${endR},${endC})) crossing EVERY ` +
+        `non-obstacle cell exactly once. There are ${remaining} cells to walk on (including S and E). ` +
+        `Algorithm: DFS + backtracking.`,
+    },
+  });
+
+  const path = []; // stack of [r, c]
+
+  function dfs(r, c, remain) {
+    // Enter cell
+    visited[r][c] = true;
+    path.push([r, c]);
+    const remainAfter = remain - 1;
+
+    // If we're on the end cell:
+    if (r === endR && c === endC) {
+      if (remainAfter === 0) {
+        pathCount += 1;
+        pushStep({
+          title: { vi: `✓ Tìm thấy đường đi (path #${pathCount})`, en: `✓ Found valid path (#${pathCount})` },
+          cells: makeCells(r, c, [...path]),
+          codeLines: [10, 11, 12],
+          vars: [
+            { name: "at", value: `(${r},${c})` },
+            { name: "remain", value: remainAfter },
+            { name: "paths found", value: pathCount },
+          ],
+          note: {
+            vi: `Đến E với remain=0 → đây là một đường đi hợp lệ. Tổng số đường tìm được: ${pathCount}.`,
+            en: `Reached E with remain=0 → this is a valid path. Total paths so far: ${pathCount}.`,
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: `Đến E sớm (còn ${remainAfter} ô chưa đi)`, en: `Reached E too early (${remainAfter} cells left)` },
+          cells: makeCells(r, c, null),
+          codeLines: [10, 13],
+          vars: [
+            { name: "at", value: `(${r},${c})` },
+            { name: "remain", value: remainAfter },
+          ],
+          note: {
+            vi: `Đến E nhưng vẫn còn ${remainAfter} ô chưa bước qua → không hợp lệ, backtrack.`,
+            en: `Reached E but ${remainAfter} cells are still un-walked → invalid, backtrack.`,
+          },
+        });
+      }
+      // Undo and return either way
+      visited[r][c] = false;
+      path.pop();
+      return;
+    }
+
+    // Otherwise: recurse in 4 directions
+    pushStep({
+      title: { vi: `Vào ô (${r},${c})`, en: `Enter cell (${r},${c})` },
+      cells: makeCells(r, c, null),
+      codeLines: [14, 15, 16],
+      vars: [
+        { name: "at", value: `(${r},${c})` },
+        { name: "remain", value: remainAfter },
+        { name: "path length", value: path.length },
+      ],
+      note: {
+        vi: `Bước lên (${r},${c}). Còn ${remainAfter} ô chưa đi. Thử 4 hướng.`,
+        en: `Step onto (${r},${c}). ${remainAfter} cells still un-walked. Try 4 directions.`,
+      },
+    });
+
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+      if (grid[nr][nc] === -1) continue;
+      if (visited[nr][nc]) continue;
+      dfs(nr, nc, remainAfter);
+    }
+
+    // Backtrack
+    visited[r][c] = false;
+    path.pop();
+
+    pushStep({
+      title: { vi: `Backtrack khỏi (${r},${c})`, en: `Backtrack from (${r},${c})` },
+      cells: makeCells(-1, -1, null),
+      codeLines: [17, 18],
+      vars: [
+        { name: "backtrack", value: `(${r},${c})` },
+        { name: "path length", value: path.length },
+        { name: "paths found", value: pathCount },
+      ],
+      note: {
+        vi: `Bỏ đánh dấu (${r},${c}), quay về ô trước để thử hướng khác.`,
+        en: `Un-mark (${r},${c}) and return to the previous cell to try another direction.`,
+      },
+    });
+  }
+
+  dfs(startR, startC, remaining);
+
+  // Result step
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [],
+    bfsGrid: { rows, cols, cells: makeCells(-1, -1, null) },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [19],
+    vars: [
+      { name: "unique paths", value: pathCount },
+      ...(truncated ? [{ name: "note", value: "steps truncated to keep demo short" }] : []),
+    ],
+    note: {
+      vi: truncated
+        ? `Đã dừng render sau ${STEP_LIMIT} bước để trực quan hoá gọn gàng. Tổng số đường đi tìm thấy trong phần render: ${pathCount}.`
+        : `Số đường đi duy nhất từ S đến E đi qua đúng mỗi ô một lần = ${pathCount}.`,
+      en: truncated
+        ? `Rendering stopped after ${STEP_LIMIT} steps to keep the demo short. Paths found within the rendered portion: ${pathCount}.`
+        : `Unique paths from S to E that walk each cell exactly once = ${pathCount}.`,
+    },
+  });
+
+  return { original: grid, answer: pathCount, steps };
+}
+
 module.exports = {
+  980: {
+    id: 980,
+    difficulty: "hard",
+    slug: "unique-paths-iii",
+    category: { key: "backtracking", vi: "Quay lui (Backtracking)", en: "Backtracking" },
+    title: { vi: "Unique Paths III", en: "Unique Paths III" },
+    titleVi: { vi: "Đếm số đường đi duy nhất III", en: "Count unique full-coverage paths" },
+    statement: {
+      vi:
+        "Cho lưới m×n với 1=start, 2=end, 0=ô trống, -1=chướng ngại. " +
+        "Đếm số đường đi từ start đến end đi qua ĐÚNG MỘT LẦN mỗi ô không phải chướng ngại " +
+        "(kể cả start và end). Mỗi bước đi sang ô kề (trên/dưới/trái/phải), không được lặp.",
+      en:
+        "Given an m×n grid with 1=start, 2=end, 0=empty, -1=obstacle. " +
+        "Count paths from start to end that walk over EVERY non-obstacle cell exactly once " +
+        "(including start and end). Each step moves to a 4-neighbor cell; no revisits allowed.",
+    },
+    defaultInput: "1,0,0,0|0,0,0,0|0,0,2,-1",
+    inputKind: "string",
+    inputLabel: { vi: "grid (hàng cách bởi |, ô cách bởi ,)", en: "grid (rows split by |, cells by ,)" },
+    extraParams: [],
+    complexity: {
+      time: "O(4^k)",
+      space: "O(k)",
+      note: {
+        vi: "k = số ô có thể bước lên. Mỗi ô có tối đa 4 lựa chọn kế tiếp, độ sâu đệ quy tối đa k.",
+        en: "k = walkable cells. Each cell tries up to 4 neighbours; recursion depth is at most k.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def uniquePathsIII(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        # locate start/end and count cells to walk",
+      "        empty = 0; start = end = (0, 0)",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                v = grid[r][c]",
+      "                if v != -1: empty += 1",
+      "                if v == 1: start = (r, c)",
+      "                if v == 2: end = (r, c)",
+      "",
+      "        self.ans = 0",
+      "        def dfs(r, c, remain):",
+      "            if not (0 <= r < m and 0 <= c < n): return",
+      "            if grid[r][c] == -1: return",
+      "            if (r, c) == end:",
+      "                if remain == 1: self.ans += 1",
+      "                return",
+      "            grid[r][c] = -1                    # visit",
+      "            for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):",
+      "                dfs(r+dr, c+dc, remain - 1)",
+      "            grid[r][c] = 0                     # backtrack",
+      "",
+      "        dfs(start[0], start[1], empty)",
+      "        return self.ans",
+    ],
+    builder: buildSteps980,
+  },
   51: {
     id: 51,
     difficulty: "hard",
