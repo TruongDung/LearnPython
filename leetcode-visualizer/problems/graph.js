@@ -3125,11 +3125,184 @@ function buildSteps3620(input, params) {
   return { n, edges: edgesRaw, online, k, answer, steps };
 }
 
+/**
+ * LeetCode 2492: Minimum Score of a Path Between Two Cities — Union-Find.
+ *
+ * Key insight: since paths may revisit nodes/edges, the reachable set from
+ * city 1 is exactly its connected component. ANY edge inside that component
+ * can appear on SOME path from 1 to n (walk there, cross it, walk back).
+ * So the answer = the minimum edge weight among all edges whose endpoints
+ * lie in city 1's connected component.
+ *
+ * Algorithm:
+ *   1) Union every edge (a, b) regardless of weight — this just discovers
+ *      which cities are reachable from each other.
+ *   2) Find root = find(1).
+ *   3) Re-scan all edges; for any edge with an endpoint in root's component,
+ *      take the min weight.
+ */
+function buildSteps2492(input, params) {
+  const n = params.n || 4;
+  const edges = String(input || "")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map(Number)); // [a, b, dist]
+
+  const parent = Array.from({ length: n + 1 }, (_, i) => i);
+  const steps = [];
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+
+  function snapshot(opts) {
+    const nodes = Array.from({ length: n }, (_, i) => {
+      const city = i + 1;
+      return { id: city, label: `${city}${find(city) !== city ? `→${find(city)}` : ""}` };
+    });
+    const edgeList = (opts.edges || []).map(([a, b, d]) => ({ u: a, v: b, w: d }));
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes,
+        edges: edgeList,
+        hlNodes: opts.highlight || [],
+        hlEdges: (opts.hlEdges || []).map(([a, b]) => [a, b]),
+      },
+      highlight: [], mark: [], codeLines: opts.codeLines || [],
+      vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo Union-Find", en: "Initialize Union-Find" },
+    codeLines: [3, 4],
+    edges: [],
+    vars: [
+      { name: "n", value: n },
+      { name: "edges", value: edges.length },
+    ],
+    note: {
+      vi:
+        `Ý tưởng: đường đi được lặp lại đỉnh/cạnh → mọi cạnh trong component chứa thành phố 1 ` +
+        `đều có thể xuất hiện trên MỘT đường đi từ 1 đến n (đi tới, qua cạnh đó, rồi đi lui). ` +
+        `Vậy đáp án = trọng số nhỏ nhất trong các cạnh có ít nhất 1 đầu nằm trong component của 1.\n` +
+        `Bước 1: Union tất cả cạnh (bỏ qua trọng số) để tìm component.`,
+      en:
+        `Idea: since paths may revisit nodes/edges, EVERY edge inside city 1's connected ` +
+        `component can appear on SOME path from 1 to n (walk there, cross it, walk back). ` +
+        `So the answer = the minimum weight among edges with at least one endpoint in 1's component.\n` +
+        `Step 1: Union all edges (ignoring weight) to discover the component.`,
+    },
+  });
+
+  // Step 1: Union every edge, ignoring weight
+  const processedEdges = [];
+  for (const [a, b, d] of edges) {
+    const ra = find(a);
+    const rb = find(b);
+    processedEdges.push([a, b, d]);
+    if (ra !== rb) {
+      parent[ra] = rb;
+      snapshot({
+        title: { vi: `Union(${a}, ${b})`, en: `Union(${a}, ${b})` },
+        codeLines: [9, 10, 11],
+        highlight: [a, b],
+        edges: [...processedEdges],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b}) dist=${d}` },
+          { name: "find(a)", value: ra },
+          { name: "find(b)", value: rb },
+          { name: "merged", value: "yes" },
+        ],
+        note: {
+          vi: `Nối ${a} và ${b} (bỏ qua dist=${d}, chỉ quan tâm kết nối). parent[${ra}] = ${rb}.`,
+          en: `Connect ${a} and ${b} (ignore dist=${d}, only care about connectivity). parent[${ra}] = ${rb}.`,
+        },
+      });
+    } else {
+      snapshot({
+        title: { vi: `(${a}, ${b}) đã cùng nhóm`, en: `(${a}, ${b}) same group` },
+        codeLines: [9, 10],
+        highlight: [a, b],
+        edges: [...processedEdges],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b}) dist=${d}` },
+          { name: "find(a)", value: ra },
+          { name: "find(b)", value: rb },
+        ],
+        note: {
+          vi: `${a} và ${b} đã cùng root ${ra} → bỏ qua (chỉ nối, không tính min ở bước này).`,
+          en: `${a} and ${b} already share root ${ra} → skip (union step doesn't track min yet).`,
+        },
+      });
+    }
+  }
+
+  // Step 2: find root of city 1
+  const root = find(1);
+  snapshot({
+    title: { vi: `Component của thành phố 1`, en: `City 1's component` },
+    codeLines: [13],
+    edges: processedEdges,
+    highlight: [1],
+    vars: [{ name: "root of city 1", value: root }],
+    note: {
+      vi: `Root của thành phố 1 = ${root}. Bây giờ quét lại các cạnh để tìm trọng số nhỏ nhất trong component này.`,
+      en: `Root of city 1 = ${root}. Now re-scan edges to find the minimum weight within this component.`,
+    },
+  });
+
+  // Step 3: re-scan edges for the min weight within root's component
+  let answer = Infinity;
+  for (const [a, b, d] of edges) {
+    if (find(a) === root) {
+      const updated = d < answer;
+      if (updated) answer = d;
+      snapshot({
+        title: { vi: `Xét cạnh (${a},${b}) dist=${d}`, en: `Check edge (${a},${b}) dist=${d}` },
+        codeLines: [15, 16, 17],
+        edges: processedEdges,
+        highlight: [a, b],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b})` },
+          { name: "dist", value: d },
+          { name: "in component?", value: "yes" },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `(${a},${b}) nằm trong component của thành phố 1. dist=${d}${updated ? ` < answer cũ → cập nhật answer=${d}` : ` ≥ answer=${answer}, giữ nguyên`}.`,
+          en: `(${a},${b}) is inside city 1's component. dist=${d}${updated ? ` < previous answer → update answer=${d}` : ` ≥ answer=${answer}, unchanged`}.`,
+        },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "Kết quả", en: "Result" },
+    codeLines: [18],
+    edges: processedEdges,
+    highlight: [1, n],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Điểm nhỏ nhất của đường đi từ 1 đến ${n} = ${answer} (cạnh nhỏ nhất trong component chứa cả 1 và ${n}).`,
+      en: `Minimum score of a path from 1 to ${n} = ${answer} (smallest edge weight in the component containing both 1 and ${n}).`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { original: input, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -4526,5 +4699,55 @@ module.exports = {
     codeLabel: { vi: "Cách 1: BFS state-space", en: "Approach 1: BFS state-space" },
     code2Label: { vi: "Cách 2: DP Bitmask + Floyd-Warshall", en: "Approach 2: DP Bitmask + Floyd-Warshall" },
     builder: buildSteps847,
+  },
+  2492: {
+    id: 2492,
+    difficulty: "medium",
+    slug: "minimum-score-of-a-path-between-two-cities",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Minimum Score of a Path Between Two Cities", en: "Minimum Score of a Path Between Two Cities" },
+    titleVi: { vi: "Điểm nhỏ nhất của đường đi (Union-Find)", en: "Minimum path score (Union-Find)" },
+    statement: {
+      vi:
+        "Cho n thành phố và các cạnh có trọng số (distance). Điểm của một đường đi = cạnh có trọng số NHỎ NHẤT trên đường đó. " +
+        "Trả về điểm nhỏ nhất có thể của một đường đi từ thành phố 1 đến thành phố n (có thể đi qua lại, không cần đường đơn giản).",
+      en:
+        "Given n cities and weighted edges (roads). The score of a path is the MINIMUM weight edge on that path. " +
+        "Return the minimum possible score of any path from city 1 to city n (revisiting nodes/edges is allowed).",
+    },
+    defaultInput: "1,2,9;2,3,6;2,4,5;1,4,7",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b,dist; ngăn bởi ;)", en: "edges (a,b,dist; semicolon separated)" },
+    extraParams: [{ key: "n", label: { vi: "n (số thành phố)", en: "n (cities)" }, default: 4 }],
+    complexity: {
+      time: "O(m α(n))",
+      space: "O(n)",
+      note: {
+        vi: "Union-Find: mỗi cạnh union gần O(1). Duyệt lại các cạnh để lấy min trong component chứa 1 và n cũng O(m).",
+        en: "Union-Find: each union is near O(1). Re-scanning edges for the min within city 1/n's component is also O(m).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minScore(self, n, roads):",
+      "        parent = list(range(n + 1))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        def union(a, b):",
+      "            ra, rb = find(a), find(b)",
+      "            if ra != rb: parent[ra] = rb",
+      "        for a, b, d in roads:",
+      "            union(a, b)",
+      "        root = find(1)",
+      "        ans = float('inf')",
+      "        for a, b, d in roads:",
+      "            if find(a) == root:",
+      "                ans = min(ans, d)",
+      "        return ans",
+    ],
+    builder: buildSteps2492,
   },
 };
