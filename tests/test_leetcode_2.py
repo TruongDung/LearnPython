@@ -1,6 +1,9 @@
 import pytest
 
-from Leetcode.other.Leetcode_2 import Solution, ListNode
+from Leetcode.other.Leetcode_2 import Solution, ListNode  # pylint: disable=no-name-in-module
+# Leetcode/__init__.py rewrites __path__ to point at Leetcode-sln/ at runtime
+# (Python identifiers can't contain hyphens), which pylint's static analysis
+# can't follow. The import resolves correctly at runtime and under pytest.
 
 
 def build_list(values):
