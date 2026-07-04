@@ -1120,6 +1120,7 @@ function buildSteps198(nums) {
         { name: "rob (dp[i-2]+nums[i])", value: rob },
         { name: "dp[i]", value: dp[i] },
         { name: "decision", value: robbed ? "rob" : "skip" },
+        { name: "dp", value: [...dp] },
       ],
       note: {
         vi: `Bỏ nhà ${i}: dp[${i - 1}] = ${skip}. Cướp nhà ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
@@ -1153,6 +1154,7 @@ function buildSteps198(nums) {
     vars: [
       { name: "answer", value: answer },
       { name: "robbed houses", value: robbed },
+      { name: "dp", value: [...dp] },
     ],
     note: {
       vi: `Tiền lớn nhất = dp[${n - 1}] = ${answer}. Cướp các nhà [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
