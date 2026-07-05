@@ -47,8 +47,8 @@ function buildSteps746(cost, params) {
       codeLines: [5, 6],
       vars: [
         { name: "i", value: i },
-        { name: "optA", value: optA },
-        { name: "optB", value: optB },
+        { name: "dp[i-1] + cost[i-1]", value: optA },
+        { name: "dp[i-2] + cost[i-2]", value: optB },
         { name: "dp[i]", value: dp[i] },
         { name: "dp", value: [...dp] },
       ],
