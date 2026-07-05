@@ -1953,15 +1953,21 @@ select option {
     gap: 8px;
   }
 
-  /* Hide problem name on tiny screens, show only ID */
+  /* On tiny screens still show the problem name — just trim to fit. */
   .prob-chip .pname {
-    display: none;
+    display: block;
+    font-size: 9.5px;
+    line-height: 1.25;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .prob-chip {
     padding: 6px 10px;
     min-width: 50px;
-    align-items: center;
+    align-items: flex-start;
   }
 
   /* DP grid even smaller */
