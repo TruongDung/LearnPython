@@ -646,6 +646,26 @@ function highlightPython(line) {
   }).join("");
 }
 
+// Render a code line with indent guides (subtle vertical dashed lines at every
+// 4-column indent level). Leading whitespace is emitted as fixed-width spans
+// carrying the guide border; the rest of the line is fed through highlightPython.
+function renderCodeLineHtml(line) {
+  const m = /^([ \t]*)(.*)$/.exec(line);
+  const leading = m ? m[1] : "";
+  const rest = m ? m[2] : line;
+  // Expand tabs to 4 spaces for counting; assume code uses spaces (which it does here).
+  const expanded = leading.replace(/\t/g, "    ");
+  const levels = Math.floor(expanded.length / 4);
+  const remainder = expanded.length % 4;
+  let html = "";
+  for (let i = 0; i < levels; i++) {
+    html += '<span class="indent-guide">    </span>';
+  }
+  if (remainder > 0) html += " ".repeat(remainder);
+  html += highlightPython(rest);
+  return html;
+}
+
 function renderCode() {
   const panel = $("codePanel");
   const code = (problemData && problemData.code) || [];
@@ -704,7 +724,7 @@ function renderCode() {
 
       const txt = document.createElement("span");
       txt.className = "txt";
-      txt.innerHTML = highlightPython(line);
+      txt.innerHTML = renderCodeLineHtml(line);
 
       row.appendChild(ln);
       row.appendChild(txt);
@@ -739,7 +759,7 @@ function renderCode() {
 
       const txt = document.createElement("span");
       txt.className = "txt";
-      txt.innerHTML = highlightPython(line);
+      txt.innerHTML = renderCodeLineHtml(line);
 
       row.appendChild(ln);
       row.appendChild(txt);

@@ -622,6 +622,26 @@ button:disabled {
   user-select: none;
 }
 
+/* Indent guide: subtle vertical dashed line at each 4-column indent level.
+   Each guide span occupies exactly 4 monospace characters and carries a
+   left border, so the guide sits on the left edge of that indent level. */
+.code-line .indent-guide {
+  display: inline-block;
+  width: 4ch;
+  border-left: 1px dashed rgba(180, 190, 210, 0.18);
+  vertical-align: top;
+  white-space: pre;
+  /* The border is drawn on the left edge; the space that precedes it in the
+     line is provided by the previous guide (or, for the first guide, by the
+     .txt element's own start). */
+}
+
+/* Highlight the guides that are inside the currently-active line so it's
+   easy to trace where you are in a nested block. */
+.code-line.active .indent-guide {
+  border-left-color: rgba(249, 115, 22, 0.45);
+}
+
 .code-line .txt {
   flex: 0 0 auto;
   white-space: pre;
