@@ -4197,17 +4197,36 @@ module.exports = {
     inputLabel: { vi: "piles", en: "piles" },
     extraParams: [],
     complexity: {
-      time: "O(1)",
-      space: "O(1)",
+      time: "O(n²)",
+      space: "O(n²)",
       note: {
-        vi: "Với số đống chẵn, Alice luôn có chiến lược thắng theo parity. Vì vậy bài này có thể giải bằng phân tích chiến lược, không cần DP nặng.",
-        en: "With an even number of piles, Alice always has a winning parity strategy. So this problem can be solved by strategy analysis rather than heavy DP.",
+        vi:
+          "Bảng dp[i][j] kích thước n×n; mỗi ô O(1) → O(n²) thời gian và bộ nhớ.\n" +
+          "Mẹo O(1): với số đống chẵn và tổng lẻ, Alice luôn thắng nên `return True` là đủ — nhưng ở đây ta trực quan hoá DP để hiểu bản chất.",
+        en:
+          "The dp[i][j] table has n×n cells; each is O(1) → O(n²) time and space.\n" +
+          "O(1) trick: with an even number of piles and odd total, Alice always wins so `return True` suffices — but we visualize the DP here to understand the mechanics.",
       },
     },
     code: [
       "class Solution:",
       "    def stoneGame(self, piles):",
-      "        return True",
+      "        n = len(piles)",
+      "        # dp[i][j] = max score difference the current player",
+      "        # can force on the subarray piles[i..j].",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for i in range(n):",
+      "            dp[i][i] = piles[i]",
+      "        for length in range(2, n + 1):",
+      "            for i in range(n - length + 1):",
+      "                j = i + length - 1",
+      "                take_left  = piles[i] - dp[i + 1][j]",
+      "                take_right = piles[j] - dp[i][j - 1]",
+      "                dp[i][j] = max(take_left, take_right)",
+      "        return dp[0][n - 1] > 0",
+      "",
+      "# O(1) trick: with n even and odd total, Alice always wins.",
+      "#     return True",
     ],
     builder: buildSteps877,
   },
