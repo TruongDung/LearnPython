@@ -2,12 +2,22 @@
   box-sizing: border-box;
 }
 
+/* Stop iOS Safari from auto-zooming long code lines in landscape /
+   after selecting text. Without this, a wide line inside a
+   horizontally-scrolling <pre> renders bigger than its siblings. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   background: #0c0a1a;
   color: #e2e8f0;
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app {
@@ -612,6 +622,9 @@ button:disabled {
   /* Prevent iOS rendering bugs with sticky + overflow */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  /* Belt-and-braces: keep iOS Safari from auto-inflating long lines. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .code-line {
