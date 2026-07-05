@@ -3293,11 +3293,245 @@ function buildSteps416(nums) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 1301: Number of Paths with Max Score.
+ *
+ * Grid characters:
+ *   'S' = start (bottom-right, does NOT contribute to score)
+ *   'E' = end   (top-left, does NOT contribute to score)
+ *   'X' = obstacle (unreachable)
+ *   '0'..'9' = digit added to the score when you step on that cell
+ *
+ * You move from S toward E going UP, LEFT, or UP-LEFT (diagonally). Both the
+ * max total score and the number of paths that achieve it must be reported
+ * (mod 1e9+7). If E is unreachable, return [0, 0].
+ *
+ * DP filled bottom-right → top-left:
+ *   dp[r][c]  = max score to reach (r, c) starting from S
+ *   cnt[r][c] = number of ways to reach (r, c) achieving dp[r][c]
+ * From cell (r, c) you can come from (r+1, c), (r, c+1), or (r+1, c+1).
+ */
+function buildSteps1301(input) {
+  const MOD = 1_000_000_007;
+  // Parse: rows separated by |, cells run together ("E23|2X2|12S") or
+  // separated by commas ("E,2,3|2,X,2|1,2,S"). Trim whitespace.
+  const rawRows = String(input || "").split("|").map((r) => r.trim()).filter(Boolean);
+  const board = rawRows.map((row) => {
+    const cells = row.includes(",") ? row.split(",").map((s) => s.trim()) : row.split("");
+    return cells.map((s) => s.replace(/^["']|["']$/g, ""));
+  });
+
+  const steps = [];
+
+  const rows = board.length;
+  const cols = rows > 0 ? board[0].length : 0;
+
+  function invalid() {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3, 4, 5],
+      vars: [{ name: "answer", value: [0, 0] }],
+      note: {
+        vi: "Grid phải là hình chữ nhật, có đúng 1 ô 'E' (trên-trái) và 1 ô 'S' (dưới-phải). Ví dụ: E23|2X2|12S",
+        en: "Grid must be rectangular with exactly one 'E' (top-left) and one 'S' (bottom-right). Example: E23|2X2|12S",
+      },
+    });
+    return { original: board, answer: [0, 0], steps };
+  }
+
+  if (rows === 0 || cols === 0 || board.some((row) => row.length !== cols)) return invalid();
+  if (board[0][0] !== "E" || board[rows - 1][cols - 1] !== "S") return invalid();
+
+  // dp[r][c]/cnt[r][c] — dp = -1 means unreachable.
+  const dp = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const cnt = Array.from({ length: rows }, () => Array(cols).fill(0));
+  dp[rows - 1][cols - 1] = 0;
+  cnt[rows - 1][cols - 1] = 1;
+
+  function cellLabel(r, c) {
+    const raw = board[r][c];
+    if (raw === "X") return "■";
+    const s = dp[r][c];
+    const k = cnt[r][c];
+    if (s < 0) return raw; // unreached
+    return `${raw}\n${s}|${k}`;
+  }
+
+  function cellClass(r, c, currentR, currentC, hlPreds) {
+    const raw = board[r][c];
+    if (raw === "X") return "wall";
+    if (r === currentR && c === currentC) return "current";
+    if (hlPreds && hlPreds.some(([pr, pc]) => pr === r && pc === c)) return "queued";
+    if (raw === "S") return "start";
+    if (raw === "E") return "end";
+    if (dp[r][c] >= 0) return "visited";
+    return "empty";
+  }
+
+  function pushStep({ title, currentR, currentC, hlPreds, codeLines, vars, note, final }) {
+    const cells = board.map((row, r) =>
+      row.map((_, c) => ({ label: cellLabel(r, c), cls: cellClass(r, c, currentR, currentC, hlPreds) }))
+    );
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells },
+      highlight: [],
+      mark: [],
+      final: !!final,
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo (S = 0, 1 cách)", en: "Initialize (S = 0 score, 1 way)" },
+    currentR: rows - 1, currentC: cols - 1,
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "start (S)", value: `(${rows - 1},${cols - 1})` },
+      { name: "end (E)", value: "(0,0)" },
+      { name: "dp[S]", value: 0 },
+      { name: "cnt[S]", value: 1 },
+    ],
+    note: {
+      vi:
+        `Bắt đầu ở S=(${rows - 1},${cols - 1}) với dp=0, cnt=1. Điền bảng theo thứ tự ngược ` +
+        `(dưới-phải → trên-trái). Từ mỗi ô (r,c), ba tiền nhiệm khả dĩ là (r+1,c), (r,c+1), (r+1,c+1). ` +
+        `dp[r][c] = max các dp tiền nhiệm + digit tại (r,c); cnt = tổng cnt của tiền nhiệm đạt max đó.`,
+      en:
+        `Start at S=(${rows - 1},${cols - 1}) with dp=0, cnt=1. Fill the table in reverse order ` +
+        `(bottom-right → top-left). For each cell (r,c) the three possible predecessors are (r+1,c), (r,c+1), (r+1,c+1). ` +
+        `dp[r][c] = max of predecessor dp + digit at (r,c); cnt = sum of cnts of predecessors achieving that max.`,
+    },
+  });
+
+  // Walk cells in reverse row-major order (skip S itself).
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      if (r === rows - 1 && c === cols - 1) continue;
+      const raw = board[r][c];
+      if (raw === "X") continue;
+
+      const preds = [];
+      if (r + 1 < rows) preds.push([r + 1, c, "↓"]);
+      if (c + 1 < cols) preds.push([r, c + 1, "→"]);
+      if (r + 1 < rows && c + 1 < cols) preds.push([r + 1, c + 1, "↘"]);
+
+      let best = -1;
+      let ways = 0;
+      const contribs = []; // {pr,pc,arrow,score,count,used}
+
+      for (const [pr, pc, arrow] of preds) {
+        const s = dp[pr][pc];
+        const k = cnt[pr][pc];
+        contribs.push({ pr, pc, arrow, score: s, count: k, used: false });
+        if (s < 0) continue;
+        if (s > best) {
+          best = s;
+          ways = k;
+        } else if (s === best) {
+          ways = (ways + k) % MOD;
+        }
+      }
+      contribs.forEach((c2) => {
+        c2.used = c2.score === best && best >= 0;
+      });
+
+      if (best < 0) {
+        // Unreachable from S
+        pushStep({
+          title: { vi: `(${r},${c}): không đến được`, en: `(${r},${c}): unreachable` },
+          currentR: r, currentC: c,
+          hlPreds: preds.map(([pr, pc]) => [pr, pc]),
+          codeLines: [7, 8, 9, 10],
+          vars: [
+            { name: "cell", value: `(${r},${c})` },
+            { name: "char", value: raw },
+            { name: "predecessors", value: contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=${x.score}|${x.count}`).join(" ") },
+            { name: "dp[r][c]", value: -1 },
+            { name: "cnt[r][c]", value: 0 },
+          ],
+          note: {
+            vi: `Không có tiền nhiệm nào đến được (tất cả đều -1). (${r},${c}) không đạt được từ S.`,
+            en: `No predecessor is reachable (all -1). (${r},${c}) is unreachable from S.`,
+          },
+        });
+        continue;
+      }
+
+      const digit = /^[0-9]$/.test(raw) ? Number(raw) : 0;
+      dp[r][c] = best + digit;
+      cnt[r][c] = ways;
+
+      pushStep({
+        title: { vi: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}` },
+        currentR: r, currentC: c,
+        hlPreds: preds.map(([pr, pc]) => [pr, pc]),
+        codeLines: [11, 12, 13, 14, 15, 16],
+        vars: [
+          { name: "cell", value: `(${r},${c})` },
+          { name: "char", value: raw },
+          { name: "digit", value: digit },
+          { name: "predecessors (score|cnt)", value: contribs.map((x) => `${x.arrow}${x.score < 0 ? "×" : ""}${x.score}|${x.count}${x.used ? "*" : ""}`).join(" ") },
+          { name: "max predecessor score", value: best },
+          { name: "combined cnt", value: ways },
+          { name: "dp[r][c]", value: dp[r][c] },
+          { name: "cnt[r][c]", value: cnt[r][c] },
+        ],
+        note: {
+          vi:
+            `Ký tự '${raw}' (digit=${digit}). Xét ${preds.length} tiền nhiệm: ` +
+            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (bỏ)" : ""}, cnt ${x.count}`).join("; ") +
+            `. Max score tiền nhiệm = ${best}, tổng cnt đạt max = ${ways}. ` +
+            `Vậy dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
+          en:
+            `Char '${raw}' (digit=${digit}). ${preds.length} predecessors: ` +
+            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (skip)" : ""}, cnt ${x.count}`).join("; ") +
+            `. Max predecessor score = ${best}, combined cnt = ${ways}. ` +
+            `So dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
+        },
+      });
+    }
+  }
+
+  const finalScore = dp[0][0];
+  const finalCnt = cnt[0][0];
+  const reachable = finalScore >= 0 && finalCnt > 0;
+  const answer = reachable ? [finalScore, finalCnt] : [0, 0];
+
+  pushStep({
+    title: { vi: "Kết quả", en: "Result" },
+    currentR: 0, currentC: 0,
+    codeLines: [17, 18],
+    vars: [
+      { name: "dp[0][0]", value: finalScore },
+      { name: "cnt[0][0]", value: finalCnt },
+      { name: "answer", value: `[${answer[0]}, ${answer[1]}]` },
+    ],
+    note: {
+      vi: reachable
+        ? `E đến được với điểm tối đa = ${finalScore}, số đường đạt điểm đó = ${finalCnt} (mod 1e9+7).`
+        : `E không đến được từ S → trả về [0, 0].`,
+      en: reachable
+        ? `E is reachable with max score = ${finalScore}, number of paths = ${finalCnt} (mod 1e9+7).`
+        : `E is unreachable from S → return [0, 0].`,
+    },
+    final: true,
+  });
+
+  return { original: board, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416],
+    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 1301],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -4563,5 +4797,66 @@ module.exports = {
       "        return sum(dp[r][c] for r in range(n) for c in range(n))",
     ],
     builder: buildSteps688,
+  },
+  1301: {
+    id: 1301,
+    difficulty: "hard",
+    slug: "number-of-paths-with-max-score",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Number of Paths with Max Score", en: "Number of Paths with Max Score" },
+    titleVi: { vi: "Số đường đi đạt điểm cao nhất", en: "Number of paths achieving max score" },
+    statement: {
+      vi:
+        "Cho bảng chữ (E ở góc trên-trái, S ở góc dưới-phải, các số 0..9 là điểm cộng khi bước lên, 'X' là chướng ngại). " +
+        "Từ S đi về E, mỗi bước có thể lên/trái/lên-trái theo đường chéo. Trả về [điểm cao nhất, số đường đạt điểm đó mod 1e9+7]. " +
+        "Nếu không đến được E, trả về [0, 0].",
+      en:
+        "You are given a square board with 'E' at the top-left, 'S' at the bottom-right, digits 0..9 that add to your score when stepped on, and 'X' for obstacles. " +
+        "From S you move up, left, or diagonally up-left toward E. Return [max score, number of paths achieving it mod 1e9+7]. " +
+        "If E is unreachable, return [0, 0].",
+    },
+    defaultInput: "E23|2X2|12S",
+    inputKind: "string",
+    inputLabel: { vi: "board (hàng cách bởi |; chữ liền nhau hoặc cách bởi dấu phẩy)", en: "board (rows split by |; chars run together or comma-separated)" },
+    extraParams: [],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Điền bảng dp/cnt kích thước m×n, mỗi ô O(1) → O(m·n).",
+        en: "Fill an m×n dp/cnt table, O(1) per cell → O(m·n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def pathsWithMaxScore(self, board):",
+      "        MOD = 10**9 + 7",
+      "        m, n = len(board), len(board[0])",
+      "        # dp[r][c] = max score, cnt[r][c] = # paths",
+      "        dp = [[-1]*n for _ in range(m)]",
+      "        cnt = [[0]*n for _ in range(m)]",
+      "        dp[m-1][n-1], cnt[m-1][n-1] = 0, 1",
+      "        for r in range(m-1, -1, -1):",
+      "            for c in range(n-1, -1, -1):",
+      "                if (r, c) == (m-1, n-1) or board[r][c] == 'X':",
+      "                    continue",
+      "                best, ways = -1, 0",
+      "                for dr, dc in ((1,0),(0,1),(1,1)):",
+      "                    pr, pc = r+dr, c+dc",
+      "                    if pr >= m or pc >= n or dp[pr][pc] < 0:",
+      "                        continue",
+      "                    if dp[pr][pc] > best:",
+      "                        best, ways = dp[pr][pc], cnt[pr][pc]",
+      "                    elif dp[pr][pc] == best:",
+      "                        ways = (ways + cnt[pr][pc]) % MOD",
+      "                if best < 0:",
+      "                    continue",
+      "                digit = int(board[r][c]) if board[r][c].isdigit() else 0",
+      "                dp[r][c], cnt[r][c] = best + digit, ways",
+      "        if dp[0][0] < 0:",
+      "            return [0, 0]",
+      "        return [dp[0][0], cnt[0][0]]",
+    ],
+    builder: buildSteps1301,
   },
 };
