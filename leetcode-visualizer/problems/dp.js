@@ -4445,6 +4445,101 @@ function buildSteps174(input) {
   return { input, answer, steps };
 }
 
+/**
+ * LeetCode 1049: Last Stone Weight II.
+ * Equivalent to partitioning stones into 2 groups to minimize |sum1 - sum2|.
+ * Same as 416 but find the closest-to-half subset sum.
+ * dp[j] = true if we can achieve total weight j with a subset of stones.
+ */
+function buildSteps1049(nums) {
+  const steps = [];
+  const total = nums.reduce((a, b) => a + b, 0);
+  const target = Math.floor(total / 2);
+  const dp = new Array(target + 1).fill(false);
+  dp[0] = true;
+
+  const trueIndices = () => dp.map((v, i) => v ? i : null).filter(x => x !== null);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: dp.map((v) => (v ? 1 : 0)),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [0], mark: [], codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "stones", value: `[${nums.join(",")}]` },
+      { name: "sum", value: total },
+      { name: "target", value: `floor(${total}/2) = ${target}` },
+      { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
+    ],
+    note: {
+      vi:
+        `Bài toán tương đương: chia đá thành 2 nhóm sao cho |sum1 - sum2| TỐI THIỂU.\n` +
+        `= Tìm subset có tổng GẦN total/2 nhất (0/1 Knapsack).\n` +
+        `dp[j] = True nếu tổng j đạt được. target = floor(${total}/2) = ${target}.\n` +
+        `Đáp án = total - 2 * (tổng lớn nhất đạt được ≤ target).`,
+      en:
+        `Equivalent: partition stones into 2 groups minimizing |sum1 - sum2|.\n` +
+        `= Find a subset sum as CLOSE to total/2 as possible (0/1 Knapsack).\n` +
+        `dp[j] = True if sum j is achievable. target = floor(${total}/2) = ${target}.\n` +
+        `Answer = total - 2 * (largest achievable sum ≤ target).`,
+    },
+  });
+
+  for (const stone of nums) {
+    const changed = [];
+    for (let j = target; j >= stone; j--) {
+      if (!dp[j] && dp[j - stone]) {
+        dp[j] = true;
+        changed.push(j);
+      }
+    }
+
+    steps.push({
+      title: { vi: `Thêm đá ${stone}`, en: `Add stone ${stone}` },
+      arr: dp.map((v) => (v ? 1 : 0)),
+      sub: dp.map((_, i) => String(i)),
+      highlight: changed,
+      mark: [],
+      codeLines: [7, 8, 9],
+      vars: [
+        { name: "stone", value: stone },
+        { name: "new sums", value: changed.length > 0 ? `[${changed.join(",")}]` : "none" },
+        { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
+      ],
+      note: {
+        vi: `Xử lý stone=${stone}: tổng mới đạt được = [${changed.join(",")}].`,
+        en: `Process stone=${stone}: newly reachable sums = [${changed.join(",")}].`,
+      },
+    });
+  }
+
+  // Find largest j where dp[j] is true
+  let bestJ = 0;
+  for (let j = target; j >= 0; j--) {
+    if (dp[j]) { bestJ = j; break; }
+  }
+  const answer = total - 2 * bestJ;
+
+  const fs = {
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: dp.map((v) => (v ? 1 : 0)),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [bestJ], mark: [bestJ], final: true, codeLines: [10],
+    vars: [
+      { name: "best subset sum", value: bestJ },
+      { name: "answer", value: `${total} - 2×${bestJ} = ${answer}` },
+      { name: "dp (true)", value: `{${trueIndices().join(", ")}}` },
+    ],
+    note: {
+      vi: `Tổng lớn nhất đạt được ≤ ${target} là ${bestJ}.\nĐáp án = ${total} - 2×${bestJ} = ${answer}.\n(Nhóm 1 nặng ${bestJ}, nhóm 2 nặng ${total - bestJ}, hiệu = ${answer}.)`,
+      en: `Largest achievable sum ≤ ${target} is ${bestJ}.\nAnswer = ${total} - 2×${bestJ} = ${answer}.\n(Group 1 weighs ${bestJ}, group 2 weighs ${total - bestJ}, difference = ${answer}.)`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
@@ -6051,5 +6146,42 @@ module.exports = {
       "        return dp[0][0]",
     ],
     builder: buildSteps174,
+  },
+  1049: {
+    id: 1049,
+    difficulty: "medium",
+    slug: "last-stone-weight-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Last Stone Weight II", en: "Last Stone Weight II" },
+    titleVi: { vi: "Trọng lượng đá cuối (DP)", en: "Min last stone weight (DP knapsack)" },
+    statement: {
+      vi: "Mỗi lần lấy 2 hòn đá x, y đập nhau → còn |x-y|. Tìm trọng lượng NHỎ NHẤT có thể còn lại. Nhập mảng số nguyên dương.",
+      en: "Each turn take two stones x, y and smash → |x-y| remains. Find the minimum possible weight of the last stone. Enter positive integer array.",
+    },
+    defaultInput: [2, 7, 4, 1, 8, 1],
+    inputKind: "positive",
+    inputLabel: { vi: "Trọng lượng đá (dấu phẩy)", en: "Stone weights (comma-sep)" },
+    extraParams: [],
+    approach: [
+      { vi: "Tương đương: chia đá thành 2 nhóm sao cho |sum1 - sum2| TỐI THIỂU.", en: "Equivalent: partition stones into 2 groups minimizing |sum1 - sum2|." },
+      { vi: "0/1 Knapsack: dp[j] = True nếu subset tổng j đạt được. target = floor(total/2).", en: "0/1 Knapsack: dp[j] = True if subset sum j is achievable. target = floor(total/2)." },
+      { vi: "Đáp án = total - 2 × (tổng lớn nhất ≤ target đạt được).", en: "Answer = total - 2 × (largest achievable sum ≤ target)." },
+    ],
+    complexity: { time: "O(n · S)", space: "O(S)", note: { vi: "S = total/2. Mỗi đá duyệt S ô.", en: "S = total/2. Each stone iterates S cells." } },
+    code: [
+      "class Solution:",
+      "    def lastStoneWeightII(self, stones):",
+      "        total = sum(stones)",
+      "        target = total // 2",
+      "        dp = [False] * (target + 1)",
+      "        dp[0] = True",
+      "        for s in stones:",
+      "            for j in range(target, s - 1, -1):",
+      "                dp[j] = dp[j] or dp[j - s]",
+      "        for j in range(target, -1, -1):",
+      "            if dp[j]:",
+      "                return total - 2 * j",
+    ],
+    builder: buildSteps1049,
   },
 };
