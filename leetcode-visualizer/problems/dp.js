@@ -3658,11 +3658,226 @@ function buildSteps1301(input) {
   return { original: board, answer, steps };
 }
 
+/**
+ * LeetCode 1388: Pizza With 3n Slices.
+ *
+ * You have a circular pizza with 3n slices. Each round:
+ *   1. You pick any remaining slice.
+ *   2. Alice takes the slice next to yours in anti-clockwise direction.
+ *   3. Bob takes the slice next to yours in clockwise direction.
+ *   4. Repeat until nothing left. You get n slices total.
+ *
+ * KEY INSIGHT: the greedy "you pick, they pick neighbours" rule means the n
+ * slices you end up with must all be non-adjacent in the original circle.
+ * So the problem is:
+ *   Pick n non-adjacent slices from a circular array of 3n to maximise sum.
+ *
+ * Circular → the standard trick: run the linear version twice
+ *   maxPick(slices[0..3n-2], n)  // consider first, drop last
+ *   maxPick(slices[1..3n-1], n)  // drop first, consider last
+ * and take the max, so we never pick both endpoints of the original circle.
+ *
+ * Linear DP:
+ *   dp[i][j] = max sum choosing j non-adjacent elements from arr[0..i]
+ *   dp[i][j] = max(dp[i-1][j],                 # skip arr[i]
+ *                  dp[i-2][j-1] + arr[i])      # take arr[i]
+ * Base: dp[-1][*] = 0, dp[*][0] = 0.
+ * Answer of one pass = dp[len(arr)-1][n].
+ */
+function buildSteps1388(slices) {
+  const total = slices.length;
+  const n = Math.floor(total / 3);
+  const steps = [];
+
+  // Validation
+  if (total === 0 || total % 3 !== 0) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [...slices],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Số miếng phải là bội của 3 (bài yêu cầu 3n miếng).",
+        en: "Slice count must be a multiple of 3 (problem states 3n slices).",
+      },
+    });
+    return { original: [...slices], answer: 0, steps };
+  }
+
+  // --- Intro ---
+  steps.push({
+    title: { vi: "Ý tưởng", en: "Idea" },
+    arr: [...slices],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7],
+    vars: [
+      { name: "total slices", value: total },
+      { name: "n = total/3", value: n },
+    ],
+    note: {
+      vi:
+        `Bạn được ${n} miếng trong ${total} = 3n miếng. Do Alice/Bob luôn ăn 2 miếng kề, ` +
+        `${n} miếng của bạn phải không kề nhau trong vòng tròn ban đầu. ` +
+        `Vòng tròn → chạy 2 lần bài tuyến tính: bỏ miếng cuối, và bỏ miếng đầu, lấy max.`,
+      en:
+        `You get ${n} slices out of ${total} = 3n. Because Alice/Bob always take the two neighbours, ` +
+        `your ${n} slices must be non-adjacent in the original circle. ` +
+        `Circular → run the linear version twice: drop last slice, then drop first, take the max.`,
+    },
+  });
+
+  // --- Linear pass helper ---
+  // Returns { best, picks } where picks[] is the indices (into arr) that were chosen.
+  function linearPass(arr, passLabel, offset) {
+    const m = arr.length;
+    // dp[i][j] = max sum picking j non-adjacent from arr[0..i-1]. dp has m+1 rows.
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+    // Pass intro
+    steps.push({
+      title: { vi: `${passLabel}: khởi tạo`, en: `${passLabel}: initialize` },
+      arr: [...slices],
+      highlight: arr.map((_, k) => k + offset),
+      mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "pass", value: passLabel },
+        { name: "sub-array length", value: m },
+        { name: "pick n", value: n },
+      ],
+      note: {
+        vi: `${passLabel}: xét mảng con dài ${m}, cần chọn ${n} phần tử không kề nhau để tổng lớn nhất.`,
+        en: `${passLabel}: work on a subarray of length ${m}, pick ${n} non-adjacent elements to maximise the sum.`,
+      },
+    });
+
+    // Fill DP with per-cell steps only for small grids; otherwise per-row.
+    const cellCap = 40; // cap the number of "compute" steps per pass
+    let cellStepsPushed = 0;
+    for (let i = 1; i <= m; i++) {
+      const val = arr[i - 1];
+      for (let j = 1; j <= n; j++) {
+        const skip = dp[i - 1][j];
+        const take = i >= 2 ? dp[i - 2][j - 1] + val : (j === 1 ? val : -Infinity);
+        // For j=1 and i=1, taking is fine (0 + val = val)
+        const takeVal = i === 1 ? (j === 1 ? val : -Infinity) : dp[i - 2][j - 1] + val;
+        dp[i][j] = Math.max(skip, takeVal);
+
+        if (cellStepsPushed < cellCap && (i <= 4 || i >= m - 1 || j === n)) {
+          const chose = takeVal > skip ? "take" : "skip";
+          steps.push({
+            title: { vi: `${passLabel}: dp[${i}][${j}]`, en: `${passLabel}: dp[${i}][${j}]` },
+            arr: [...slices],
+            highlight: [i - 1 + offset],
+            mark: [],
+            codeLines: [13, 14, 15, 16],
+            vars: [
+              { name: "i (in pass)", value: i },
+              { name: "j", value: j },
+              { name: "arr[i-1]", value: val },
+              { name: "skip = dp[i-1][j]", value: skip },
+              { name: "take = dp[i-2][j-1] + arr[i-1]", value: Number.isFinite(takeVal) ? takeVal : "-∞" },
+              { name: "dp[i][j]", value: dp[i][j] },
+              { name: "decision", value: chose },
+            ],
+            note: {
+              vi:
+                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
+                `${chose === "take" ? `Cướp miếng thứ ${i - 1} (giá trị ${val}).` : "Bỏ miếng này."}`,
+              en:
+                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
+                `${chose === "take" ? `Pick element ${i - 1} (value ${val}).` : "Skip this element."}`,
+            },
+          });
+          cellStepsPushed += 1;
+        }
+      }
+    }
+
+    const best = dp[m][n];
+
+    // Trace back which indices were picked
+    const picks = [];
+    let ci = m;
+    let cj = n;
+    while (ci > 0 && cj > 0) {
+      const skip = dp[ci - 1][cj];
+      const takeVal = ci >= 2 ? dp[ci - 2][cj - 1] + arr[ci - 1] : (cj === 1 ? arr[ci - 1] : -Infinity);
+      if (takeVal >= skip) {
+        // pick arr[ci-1] (index offset within the sub-array + offset in original)
+        picks.push(ci - 1);
+        ci -= 2;
+        cj -= 1;
+      } else {
+        ci -= 1;
+      }
+    }
+    picks.reverse();
+
+    steps.push({
+      title: { vi: `${passLabel}: kết quả`, en: `${passLabel}: result` },
+      arr: [...slices],
+      highlight: [],
+      mark: picks.map((k) => k + offset),
+      codeLines: [17, 18],
+      vars: [
+        { name: "pass", value: passLabel },
+        { name: "picks (original indices)", value: picks.map((k) => k + offset).join(",") },
+        { name: "best sum", value: best },
+      ],
+      note: {
+        vi: `${passLabel} chọn ${picks.length} miếng ở vị trí gốc [${picks.map((k) => k + offset).join(", ")}], tổng = ${best}.`,
+        en: `${passLabel} picks ${picks.length} slices at original indices [${picks.map((k) => k + offset).join(", ")}], sum = ${best}.`,
+      },
+    });
+
+    return { best, picks: picks.map((k) => k + offset) };
+  }
+
+  // --- Pass A: drop last slice ---
+  const passA = linearPass(slices.slice(0, total - 1), "Pass A (drop last)", 0);
+  // --- Pass B: drop first slice ---
+  const passB = linearPass(slices.slice(1), "Pass B (drop first)", 1);
+
+  const answer = Math.max(passA.best, passB.best);
+  const winnerPicks = passA.best >= passB.best ? passA.picks : passB.picks;
+  const winnerLabel = passA.best >= passB.best ? "A" : "B";
+
+  steps.push({
+    title: { vi: "Kết quả cuối", en: "Final result" },
+    arr: [...slices],
+    highlight: [],
+    mark: winnerPicks,
+    final: true,
+    codeLines: [19, 20],
+    vars: [
+      { name: "pass A best", value: passA.best },
+      { name: "pass B best", value: passB.best },
+      { name: "winner", value: `Pass ${winnerLabel}` },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi:
+        `Đáp án = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
+        `Chọn từ Pass ${winnerLabel}: miếng tại vị trí gốc [${winnerPicks.join(", ")}].`,
+      en:
+        `Answer = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
+        `Winning picks from Pass ${winnerLabel}: original indices [${winnerPicks.join(", ")}].`,
+    },
+  });
+
+  return { original: [...slices], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 1301],
+    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5031,5 +5246,58 @@ module.exports = {
       "        return [dp[0][0], cnt[0][0]]",
     ],
     builder: buildSteps1301,
+  },
+  1388: {
+    id: 1388,
+    difficulty: "hard",
+    slug: "pizza-with-3n-slices",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Pizza With 3n Slices", en: "Pizza With 3n Slices" },
+    titleVi: { vi: "Chia bánh 3n miếng (House Robber circular tổng quát)", en: "Pizza with 3n slices" },
+    statement: {
+      vi:
+        "Có 3n miếng pizza xếp thành vòng tròn. Mỗi lượt: bạn chọn một miếng bất kỳ; Alice ăn miếng kề bên trái theo chiều ngược kim đồng hồ; Bob ăn miếng kề bên phải theo chiều kim đồng hồ. Lặp cho đến hết. " +
+        "Trả về tổng lớn nhất bạn có thể ăn.",
+      en:
+        "You have a pizza with 3n slices arranged in a circle. Each round: you pick any slice; Alice picks the neighbour anti-clockwise; Bob picks the neighbour clockwise. Repeat until all slices are gone. " +
+        "Return the maximum total size of slices you can pick.",
+    },
+    defaultInput: [1, 2, 3, 4, 5, 6],
+    inputKind: "nonneg",
+    inputLabel: { vi: "slices (3n miếng)", en: "slices (3n slices)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi:
+          "Bài quy về: chọn n phần tử KHÔNG KỀ NHAU từ mảng vòng tròn 3n để tổng lớn nhất. " +
+          "Vòng tròn → chạy 2 lần tuyến tính (bỏ đầu / bỏ cuối). " +
+          "Mỗi lần dùng DP 2D dp[i][j] với i ≤ 3n, j ≤ n → O(n²) thời gian và bộ nhớ.",
+        en:
+          "Reduces to: pick n NON-ADJACENT elements from a circular array of 3n to maximise sum. " +
+          "Circular → run two linear DPs (drop first / drop last). " +
+          "Each pass is a 2D DP dp[i][j] with i ≤ 3n, j ≤ n → O(n²) time and space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSizeSlices(self, slices):",
+      "        # Reduce to: pick n non-adjacent from circular array of 3n.",
+      "        n = len(slices) // 3",
+      "        def pick(arr):",
+      "            m = len(arr)",
+      "            # dp[i][j] = max sum picking j non-adjacent from arr[0..i-1]",
+      "            dp = [[0]*(n+1) for _ in range(m+1)]",
+      "            for i in range(1, m+1):",
+      "                for j in range(1, n+1):",
+      "                    skip = dp[i-1][j]",
+      "                    take = (dp[i-2][j-1] + arr[i-1]) if i >= 2 else (arr[i-1] if j == 1 else -10**9)",
+      "                    dp[i][j] = max(skip, take)",
+      "            return dp[m][n]",
+      "        # Circular trick: drop first or drop last, take max.",
+      "        return max(pick(slices[:-1]), pick(slices[1:]))",
+    ],
+    builder: buildSteps1388,
   },
 };
