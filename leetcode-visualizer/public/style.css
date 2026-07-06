@@ -1825,20 +1825,21 @@ select option {
     padding: 4px 8px;
   }
 
-  /* Controls — wrap to 2 rows on phone */
+  /* Controls — keep 5 buttons on 1 row, shrink to fit */
   .controls {
-    gap: 6px;
+    flex-wrap: nowrap;
+    gap: 5px;
   }
 
   .controls button {
     min-width: 0;
-    padding: 10px 6px;
-    font-size: 13px;
-    flex: 1 1 calc(33% - 6px);
+    padding: 10px 4px;
+    font-size: 12px;
+    flex: 1;
   }
 
   .kbd-hint {
-    font-size: 11px;
+    display: none;
   }
 
   /* Answer box */
@@ -1917,9 +1918,17 @@ select option {
     font-size: 10px;
   }
 
-  /* Controls in 2 rows of buttons */
+  /* Controls: still 1 row on tiny phones */
+  .controls {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
   .controls button {
-    flex: 1 1 calc(50% - 3px);
+    flex: 1;
+    min-width: 0;
+    padding: 9px 2px;
+    font-size: 11px;
   }
 
   /* Code copy button smaller and repositioned */
