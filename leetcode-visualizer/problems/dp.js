@@ -3480,6 +3480,7 @@ function buildSteps416(nums) {
       { name: "sum", value: total },
       { name: "target", value: target },
       { name: "dp[0]", value: true },
+      { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` },
     ],
     note: {
       vi: `Tổng = ${total}, target = ${target}. Bài toán: có subset tổng = ${target}?\ndp[j] = True nếu tạo được tổng j.\ndp[0] = True. Với mỗi num: dp[j] |= dp[j-num] (duyệt giảm).`,
@@ -3508,6 +3509,7 @@ function buildSteps416(nums) {
         { name: "num", value: num },
         { name: "new sums", value: changed.length > 0 ? `[${changed.join(",")}]` : "none" },
         { name: "dp[target]", value: dp[target] },
+        { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` },
       ],
       note: {
         vi: `Xử lý num=${num}: tổng mới đạt được = [${changed.join(",")}].${dp[target] ? ` ✓ Đạt target=${target}!` : ""}`,
@@ -3524,7 +3526,7 @@ function buildSteps416(nums) {
     arr: dp.map((v) => (v ? 1 : 0)),
     sub: dp.map((_, i) => String(i)),
     highlight: [], mark: answer ? [target] : [], final: true, codeLines: [10],
-    vars: [{ name: "answer", value: answer }, { name: "target", value: target }],
+    vars: [{ name: "answer", value: answer }, { name: "target", value: target }, { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` }],
     note: {
       vi: answer ? `dp[${target}] = True → có thể chia thành 2 tập bằng nhau (mỗi tập tổng ${target}).` : `dp[${target}] = False → không thể chia đều.`,
       en: answer ? `dp[${target}] = True → can partition into two equal subsets (each sum ${target}).` : `dp[${target}] = False → cannot partition equally.`,
