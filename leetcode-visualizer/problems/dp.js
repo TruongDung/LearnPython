@@ -899,6 +899,7 @@ function buildSteps53(nums, params) {
     curHistory[i] = cur;
 
     let updated = false;
+    const prevBest = best;
     if (cur > best) {
       best = cur;
       bestL = curStart;
@@ -923,6 +924,7 @@ function buildSteps53(nums, params) {
         { name: "cur + nums[i]", value: `${extendSum - num} + (${num}) = ${extendSum}` },
         { name: "decision", value: restart ? `${extendSum} < ${num} → restart` : `${extendSum} ≥ ${num} → extend` },
         { name: "cur", value: cur },
+        { name: "best = max(best, cur)", value: `max(${prevBest}, ${cur}) = ${best}` },
       ],
       note: {
         vi: restart
