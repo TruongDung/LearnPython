@@ -920,7 +920,8 @@ function buildSteps53(nums, params) {
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: num },
-        { name: "extend?", value: `cur+nums[i] = ${extendSum} ${restart ? "<" : "≥"} nums[i] = ${num} → ${restart ? "restart" : "extend"}` },
+        { name: "cur + nums[i]", value: extendSum },
+        { name: "decision", value: restart ? `${extendSum} < ${num} → restart` : `${extendSum} ≥ ${num} → extend` },
         { name: "cur", value: cur },
         { name: "cur subarray", value: `[${curSubarray.join(", ")}]` },
         { name: "best", value: best },

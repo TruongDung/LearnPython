@@ -1545,7 +1545,7 @@ select {
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.04);
   color: #f1f5f9;
   font-size: 15px;
   cursor: pointer;
@@ -1570,10 +1570,12 @@ select option {
 }
 
 [data-theme="light"] select {
-  background: white;
+  background-color: white;
   border-color: #e2e8f0;
   color: #0f172a;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
 }
 
 [data-theme="light"] select option {
