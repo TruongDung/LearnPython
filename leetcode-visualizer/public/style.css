@@ -1670,6 +1670,35 @@ select option {
 .bfs-cell.start { background: #6366f1; color: white; }
 .bfs-cell.end { background: #ec4899; color: white; }
 
+/* Light theme: BFS grid */
+[data-theme="light"] .bfs-grid-view {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .bfs-cell.empty { background: #e2e8f0; color: #475569; }
+[data-theme="light"] .bfs-cell.wall { background: #94a3b8; color: white; }
+[data-theme="light"] .bfs-cell.visited { background: #dbeafe; color: #1d4ed8; }
+[data-theme="light"] .bfs-cell.queued { background: #fef3c7; color: #b45309; }
+[data-theme="light"] .bfs-cell.current { background: #f59e0b; color: white; }
+[data-theme="light"] .bfs-cell.path { background: #86efac; color: #064e3b; }
+[data-theme="light"] .bfs-cell.start { background: #6366f1; color: white; }
+[data-theme="light"] .bfs-cell.end { background: #ec4899; color: white; }
+
+/* Light theme: graph SVG */
+[data-theme="light"] .tree-view {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .tree-edge {
+  stroke: #cbd5e1;
+}
+[data-theme="light"] .graph-edge {
+  stroke: #94a3b8;
+}
+[data-theme="light"] .graph-edge.hl {
+  stroke: #f59e0b;
+}
+
 
 /* ====================================================================
    MOBILE RESPONSIVE (iPhone & Android)
