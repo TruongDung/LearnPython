@@ -47,8 +47,8 @@ function buildSteps746(cost, params) {
       codeLines: [5, 6],
       vars: [
         { name: "i", value: i },
-        { name: "optA", value: optA },
-        { name: "optB", value: optB },
+        { name: "dp[i-1] + cost[i-1]", value: optA },
+        { name: "dp[i-2] + cost[i-2]", value: optB },
         { name: "dp[i]", value: dp[i] },
         { name: "dp", value: [...dp] },
       ],
@@ -481,7 +481,12 @@ function buildSteps300(nums, params) {
     sub: [...dp],
     highlight: [], mark: [],
     codeLines: [3, 4], codeBlock: 1,
-    vars: [{ name: "n", value: n }, { name: "dp", value: [...dp] }],
+    vars: [
+      { name: "n", value: n },
+      { name: "i", value: "-" },
+      { name: "j", value: "-" },
+      { name: "dp", value: [...dp] },
+    ],
     note: {
       vi: `nums = [${nums.join(", ")}]. dp[i] = độ dài dãy tăng dài nhất kết thúc tại i, khởi tạo toàn 1 (mỗi phần tử tự nó là một dãy).`,
       en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1.`,
@@ -491,7 +496,52 @@ function buildSteps300(nums, params) {
   for (let i = 1; i < n; i++) {
     let bestJ = -1;
     for (let j = 0; j < i; j++) {
-      if (nums[j] < nums[i] && dp[j] + 1 > dp[i]) { dp[i] = dp[j] + 1; bestJ = j; }
+      const canExtend = nums[j] < nums[i];
+      const candidate = canExtend ? dp[j] + 1 : "-";
+      const oldDpi = dp[i];
+      let updated = false;
+      if (canExtend && dp[j] + 1 > dp[i]) {
+        dp[i] = dp[j] + 1;
+        bestJ = j;
+        updated = true;
+      }
+
+      steps.push({
+        title: { vi: `So sánh i=${i}, j=${j}`, en: `Compare i=${i}, j=${j}` },
+        arr: [...nums],
+        sub: [...dp],
+        highlight: [j, i],
+        mark: bestJ >= 0 ? [bestJ] : [],
+        codeLines: updated ? [5, 6, 7, 8] : [5, 6, 7],
+        codeBlock: 1,
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "nums[i]", value: nums[i] },
+          { name: "nums[j]", value: nums[j] },
+          { name: "nums[j] < nums[i]", value: canExtend },
+          { name: "dp[j]", value: dp[j] },
+          { name: "dp[j] + 1", value: candidate },
+          { name: "dp[i] (before)", value: oldDpi },
+          { name: "dp[i]", value: dp[i] },
+          { name: "bestJ", value: bestJ },
+          { name: "dp", value: [...dp] },
+        ],
+        note: updated
+          ? {
+              vi: `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]}, candidate = dp[${j}] + 1 = ${candidate}. Cập nhật dp[${i}]: ${oldDpi} → ${dp[i]}.`,
+              en: `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]}, candidate = dp[${j}] + 1 = ${candidate}. Update dp[${i}]: ${oldDpi} → ${dp[i]}.`,
+            }
+          : canExtend
+            ? {
+                vi: `Có thể nối nums[${j}] trước nums[${i}], nhưng candidate ${candidate} không tốt hơn dp[${i}] hiện tại (${dp[i]}).`,
+                en: `nums[${j}] can extend into nums[${i}], but candidate ${candidate} does not improve current dp[${i}] (${dp[i]}).`,
+              }
+            : {
+                vi: `Không nối được vì nums[${j}]=${nums[j]} không nhỏ hơn nums[${i}]=${nums[i]}.`,
+                en: `Cannot extend because nums[${j}]=${nums[j]} is not smaller than nums[${i}]=${nums[i]}.`,
+              },
+      });
     }
     prev[i] = bestJ;
     steps.push({
@@ -499,7 +549,16 @@ function buildSteps300(nums, params) {
       arr: [...nums], sub: [...dp],
       highlight: bestJ >= 0 ? [bestJ, i] : [i], mark: [],
       codeLines: [5, 6, 7, 8], codeBlock: 1,
-      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "bestJ", value: bestJ }, { name: "dp[i]", value: dp[i] }, { name: "dp", value: [...dp] }],
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: i - 1 },
+        { name: "nums[i]", value: nums[i] },
+        { name: "nums[j]", value: nums[i - 1] },
+        { name: "bestJ", value: bestJ },
+        { name: "nums[bestJ]", value: bestJ >= 0 ? nums[bestJ] : "-" },
+        { name: "dp[i]", value: dp[i] },
+        { name: "dp", value: [...dp] },
+      ],
       note: bestJ >= 0
         ? { vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`, en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.` }
         : { vi: `Không có phần tử trước nào nhỏ hơn ${nums[i]}, dp[${i}] = 1.`, en: `No earlier element smaller than ${nums[i]}, dp[${i}] stays 1.` },
@@ -510,7 +569,7 @@ function buildSteps300(nums, params) {
   for (let i = 0; i < n; i++) { if (dp[i] > answer) { answer = dp[i]; argmax = i; } }
   const chain = []; for (let i = argmax; i !== -1; i = prev[i]) chain.push(i); chain.reverse();
   const chainValues = chain.map((i) => nums[i]);
-  steps.push({ title: { vi: "Kết quả", en: "Result" }, arr: [...nums], sub: [...dp], highlight: [], mark: chain, final: true, codeLines: [9], codeBlock: 1, vars: [{ name: "answer", value: answer }, { name: "LIS", value: chainValues }], note: { vi: `LIS = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}].`, en: `LIS = ${answer}. One such subsequence: [${chainValues.join(", ")}].` } });
+  steps.push({ title: { vi: "Kết quả", en: "Result" }, arr: [...nums], sub: [...dp], highlight: [], mark: chain, final: true, codeLines: [9], codeBlock: 1, vars: [{ name: "i", value: "-" }, { name: "j", value: "-" }, { name: "answer", value: answer }, { name: "LIS", value: chainValues }], note: { vi: `LIS = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}].`, en: `LIS = ${answer}. One such subsequence: [${chainValues.join(", ")}].` } });
   return { original: [...nums], answer, chain, steps };
 }
 
@@ -1015,7 +1074,10 @@ function buildSteps53DP(nums) {
  *  - dp[1] = max(nums[0], nums[1])
  *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (skip house i or rob house i)
  */
-function buildSteps198(nums) {
+function buildSteps198(nums, params) {
+  const approach = (params && Number(params.approach)) || 1;
+  if (approach === 2) return buildSteps198B(nums);
+
   const n = nums.length;
   const dp = new Array(n).fill(0);
   const steps = [];
@@ -1061,6 +1123,7 @@ function buildSteps198(nums) {
         { name: "rob (dp[i-2]+nums[i])", value: rob },
         { name: "dp[i]", value: dp[i] },
         { name: "decision", value: robbed ? "rob" : "skip" },
+        { name: "dp", value: [...dp] },
       ],
       note: {
         vi: `Bỏ nhà ${i}: dp[${i - 1}] = ${skip}. Cướp nhà ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
@@ -1094,10 +1157,139 @@ function buildSteps198(nums) {
     vars: [
       { name: "answer", value: answer },
       { name: "robbed houses", value: robbed },
+      { name: "dp", value: [...dp] },
     ],
     note: {
       vi: `Tiền lớn nhất = dp[${n - 1}] = ${answer}. Cướp các nhà [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
       en: `Maximum loot = dp[${n - 1}] = ${answer}. Rob houses [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 198 — Approach 2: Rolling variables (O(1) space).
+ *
+ * Instead of storing the whole dp[] array, keep only the last two values:
+ *   max_rob  = best loot up to the current house
+ *   prev_rob = best loot up to the house before that
+ *
+ * For each house `current`:
+ *   temp = max(max_rob,             # skip this house
+ *              prev_rob + current)  # rob this house (plus best before previous)
+ *   prev_rob, max_rob = max_rob, temp
+ *
+ * Answer = max_rob after the loop.
+ */
+function buildSteps198B(nums) {
+  const steps = [];
+  let prevRob = 0;
+  let maxRob = 0;
+
+  // Track which houses got robbed for a final highlight (approximate: whenever
+  // maxRob strictly increased and the "rob" branch won, we mark that house).
+  const robbedFlags = new Array(nums.length).fill(false);
+
+  steps.push({
+    title: { vi: "Khởi tạo (O(1) space)", en: "Initialize (O(1) space)" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    codeBlock: 2,
+    vars: [
+      { name: "prev_rob", value: prevRob },
+      { name: "max_rob", value: maxRob },
+    ],
+    note: {
+      vi:
+        `Cách 2 chỉ dùng 2 biến thay cho cả bảng dp:\n` +
+        `  max_rob  = tiền lớn nhất cướp được tới nhà hiện tại\n` +
+        `  prev_rob = tiền lớn nhất cướp được tới nhà TRƯỚC đó\n` +
+        `Với mỗi nhà current: temp = max(max_rob, prev_rob + current), rồi dời (prev_rob, max_rob) ← (max_rob, temp).`,
+      en:
+        `Approach 2 keeps only 2 variables instead of the whole dp array:\n` +
+        `  max_rob  = best loot up to the current house\n` +
+        `  prev_rob = best loot up to the house BEFORE that\n` +
+        `For each house current: temp = max(max_rob, prev_rob + current), then shift (prev_rob, max_rob) ← (max_rob, temp).`,
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const current = nums[i];
+    const skipVal = maxRob;
+    const robVal = prevRob + current;
+    const temp = Math.max(skipVal, robVal);
+    const chose = robVal > skipVal ? "rob" : (robVal === skipVal ? "rob=skip" : "skip");
+
+    // Track for the final visualization: if strictly robbing this house is
+    // better than skipping, mark it as robbed.
+    if (robVal > skipVal) robbedFlags[i] = true;
+
+    // 1) show the comparison BEFORE the shift
+    steps.push({
+      title: { vi: `Xét nhà ${i} (tiền = ${current})`, en: `House ${i} (money = ${current})` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [5, 6],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "current", value: current },
+        { name: "prev_rob", value: prevRob },
+        { name: "max_rob", value: maxRob },
+        { name: "prev_rob + current", value: robVal },
+        { name: "temp = max(...)", value: temp },
+        { name: "decision", value: chose },
+      ],
+      note: {
+        vi: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Quyết định: ${chose === "skip" ? "bỏ nhà" : chose === "rob" ? "cướp nhà" : "cướp (bằng bỏ)"} ${i}.`,
+        en: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Decision: ${chose === "skip" ? "skip" : chose === "rob" ? "rob" : "rob (tie)"} house ${i}.`,
+      },
+    });
+
+    // 2) apply the shift
+    prevRob = maxRob;
+    maxRob = temp;
+
+    steps.push({
+      title: { vi: `Dời (prev_rob, max_rob)`, en: `Shift (prev_rob, max_rob)` },
+      arr: [...nums],
+      highlight: [i],
+      mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+      codeLines: [7],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "prev_rob", value: prevRob },
+        { name: "max_rob", value: maxRob },
+      ],
+      note: {
+        vi: `Sau lần dời: prev_rob = ${prevRob}, max_rob = ${maxRob} (giá trị mới sau khi xử lý nhà ${i}).`,
+        en: `After the shift: prev_rob = ${prevRob}, max_rob = ${maxRob} (new value after processing house ${i}).`,
+      },
+    });
+  }
+
+  const answer = maxRob;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+    final: true,
+    codeLines: [9],
+    codeBlock: 2,
+    vars: [
+      { name: "prev_rob", value: prevRob },
+      { name: "max_rob", value: maxRob },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Sau khi duyệt xong: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ so với O(n) của cách 1.`,
+      en: `After the loop: max_rob = ${answer}. Uses O(1) memory vs O(n) in approach 1.`,
     },
   });
 
@@ -3232,11 +3424,620 @@ function buildSteps416(nums) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 1301: Number of Paths with Max Score.
+ *
+ * Grid characters:
+ *   'S' = start (bottom-right, does NOT contribute to score)
+ *   'E' = end   (top-left, does NOT contribute to score)
+ *   'X' = obstacle (unreachable)
+ *   '0'..'9' = digit added to the score when you step on that cell
+ *
+ * You move from S toward E going UP, LEFT, or UP-LEFT (diagonally). Both the
+ * max total score and the number of paths that achieve it must be reported
+ * (mod 1e9+7). If E is unreachable, return [0, 0].
+ *
+ * DP filled bottom-right → top-left:
+ *   dp[r][c]  = max score to reach (r, c) starting from S
+ *   cnt[r][c] = number of ways to reach (r, c) achieving dp[r][c]
+ * From cell (r, c) you can come from (r+1, c), (r, c+1), or (r+1, c+1).
+ */
+function buildSteps1301(input) {
+  const MOD = 1_000_000_007;
+  // Parse: rows separated by |, cells run together ("E23|2X2|12S") or
+  // separated by commas ("E,2,3|2,X,2|1,2,S"). Trim whitespace.
+  const rawRows = String(input || "").split("|").map((r) => r.trim()).filter(Boolean);
+  const board = rawRows.map((row) => {
+    const cells = row.includes(",") ? row.split(",").map((s) => s.trim()) : row.split("");
+    return cells.map((s) => s.replace(/^["']|["']$/g, ""));
+  });
+
+  const steps = [];
+
+  const rows = board.length;
+  const cols = rows > 0 ? board[0].length : 0;
+
+  function invalid() {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3, 4, 5],
+      vars: [{ name: "answer", value: [0, 0] }],
+      note: {
+        vi: "Grid phải là hình chữ nhật, có đúng 1 ô 'E' (trên-trái) và 1 ô 'S' (dưới-phải). Ví dụ: E23|2X2|12S",
+        en: "Grid must be rectangular with exactly one 'E' (top-left) and one 'S' (bottom-right). Example: E23|2X2|12S",
+      },
+    });
+    return { original: board, answer: [0, 0], steps };
+  }
+
+  if (rows === 0 || cols === 0 || board.some((row) => row.length !== cols)) return invalid();
+  if (board[0][0] !== "E" || board[rows - 1][cols - 1] !== "S") return invalid();
+
+  // dp[r][c]/cnt[r][c] — dp = -1 means unreachable.
+  const dp = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const cnt = Array.from({ length: rows }, () => Array(cols).fill(0));
+  dp[rows - 1][cols - 1] = 0;
+  cnt[rows - 1][cols - 1] = 1;
+
+  function cellLabel(r, c) {
+    const raw = board[r][c];
+    if (raw === "X") return "■";
+    const s = dp[r][c];
+    const k = cnt[r][c];
+    if (s < 0) return raw; // unreached
+    return `${raw}\n${s}|${k}`;
+  }
+
+  function cellClass(r, c, currentR, currentC, hlPreds) {
+    const raw = board[r][c];
+    if (raw === "X") return "wall";
+    if (r === currentR && c === currentC) return "current";
+    if (hlPreds && hlPreds.some(([pr, pc]) => pr === r && pc === c)) return "queued";
+    if (raw === "S") return "start";
+    if (raw === "E") return "end";
+    if (dp[r][c] >= 0) return "visited";
+    return "empty";
+  }
+
+  function pushStep({ title, currentR, currentC, hlPreds, codeLines, vars, note, final }) {
+    const cells = board.map((row, r) =>
+      row.map((_, c) => ({ label: cellLabel(r, c), cls: cellClass(r, c, currentR, currentC, hlPreds) }))
+    );
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells },
+      highlight: [],
+      mark: [],
+      final: !!final,
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo (S = 0, 1 cách)", en: "Initialize (S = 0 score, 1 way)" },
+    currentR: rows - 1, currentC: cols - 1,
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "start (S)", value: `(${rows - 1},${cols - 1})` },
+      { name: "end (E)", value: "(0,0)" },
+      { name: "dp[S]", value: 0 },
+      { name: "cnt[S]", value: 1 },
+    ],
+    note: {
+      vi:
+        `Bắt đầu ở S=(${rows - 1},${cols - 1}) với dp=0, cnt=1. Điền bảng theo thứ tự ngược ` +
+        `(dưới-phải → trên-trái). Từ mỗi ô (r,c), ba tiền nhiệm khả dĩ là (r+1,c), (r,c+1), (r+1,c+1). ` +
+        `dp[r][c] = max các dp tiền nhiệm + digit tại (r,c); cnt = tổng cnt của tiền nhiệm đạt max đó.`,
+      en:
+        `Start at S=(${rows - 1},${cols - 1}) with dp=0, cnt=1. Fill the table in reverse order ` +
+        `(bottom-right → top-left). For each cell (r,c) the three possible predecessors are (r+1,c), (r,c+1), (r+1,c+1). ` +
+        `dp[r][c] = max of predecessor dp + digit at (r,c); cnt = sum of cnts of predecessors achieving that max.`,
+    },
+  });
+
+  // Walk cells in reverse row-major order (skip S itself).
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      if (r === rows - 1 && c === cols - 1) continue;
+      const raw = board[r][c];
+      if (raw === "X") continue;
+
+      const preds = [];
+      if (r + 1 < rows) preds.push([r + 1, c, "↓"]);
+      if (c + 1 < cols) preds.push([r, c + 1, "→"]);
+      if (r + 1 < rows && c + 1 < cols) preds.push([r + 1, c + 1, "↘"]);
+
+      let best = -1;
+      let ways = 0;
+      const contribs = []; // {pr,pc,arrow,score,count,used}
+
+      for (const [pr, pc, arrow] of preds) {
+        const s = dp[pr][pc];
+        const k = cnt[pr][pc];
+        contribs.push({ pr, pc, arrow, score: s, count: k, used: false });
+        if (s < 0) continue;
+        if (s > best) {
+          best = s;
+          ways = k;
+        } else if (s === best) {
+          ways = (ways + k) % MOD;
+        }
+      }
+      contribs.forEach((c2) => {
+        c2.used = c2.score === best && best >= 0;
+      });
+
+      if (best < 0) {
+        // Unreachable from S
+        pushStep({
+          title: { vi: `(${r},${c}): không đến được`, en: `(${r},${c}): unreachable` },
+          currentR: r, currentC: c,
+          hlPreds: preds.map(([pr, pc]) => [pr, pc]),
+          codeLines: [7, 8, 9, 10],
+          vars: [
+            { name: "cell", value: `(${r},${c})` },
+            { name: "char", value: raw },
+            { name: "predecessors", value: contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=${x.score}|${x.count}`).join(" ") },
+            { name: "dp[r][c]", value: -1 },
+            { name: "cnt[r][c]", value: 0 },
+          ],
+          note: {
+            vi: `Không có tiền nhiệm nào đến được (tất cả đều -1). (${r},${c}) không đạt được từ S.`,
+            en: `No predecessor is reachable (all -1). (${r},${c}) is unreachable from S.`,
+          },
+        });
+        continue;
+      }
+
+      const digit = /^[0-9]$/.test(raw) ? Number(raw) : 0;
+      dp[r][c] = best + digit;
+      cnt[r][c] = ways;
+
+      pushStep({
+        title: { vi: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}` },
+        currentR: r, currentC: c,
+        hlPreds: preds.map(([pr, pc]) => [pr, pc]),
+        codeLines: [11, 12, 13, 14, 15, 16],
+        vars: [
+          { name: "cell", value: `(${r},${c})` },
+          { name: "char", value: raw },
+          { name: "digit", value: digit },
+          { name: "predecessors (score|cnt)", value: contribs.map((x) => `${x.arrow}${x.score < 0 ? "×" : ""}${x.score}|${x.count}${x.used ? "*" : ""}`).join(" ") },
+          { name: "max predecessor score", value: best },
+          { name: "combined cnt", value: ways },
+          { name: "dp[r][c]", value: dp[r][c] },
+          { name: "cnt[r][c]", value: cnt[r][c] },
+        ],
+        note: {
+          vi:
+            `Ký tự '${raw}' (digit=${digit}). Xét ${preds.length} tiền nhiệm: ` +
+            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (bỏ)" : ""}, cnt ${x.count}`).join("; ") +
+            `. Max score tiền nhiệm = ${best}, tổng cnt đạt max = ${ways}. ` +
+            `Vậy dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
+          en:
+            `Char '${raw}' (digit=${digit}). ${preds.length} predecessors: ` +
+            contribs.map((x) => `${x.arrow}(${x.pr},${x.pc})=score ${x.score}${x.score < 0 ? " (skip)" : ""}, cnt ${x.count}`).join("; ") +
+            `. Max predecessor score = ${best}, combined cnt = ${ways}. ` +
+            `So dp[${r}][${c}] = ${best} + ${digit} = ${dp[r][c]}, cnt = ${ways}.`,
+        },
+      });
+    }
+  }
+
+  const finalScore = dp[0][0];
+  const finalCnt = cnt[0][0];
+  const reachable = finalScore >= 0 && finalCnt > 0;
+  const answer = reachable ? [finalScore, finalCnt] : [0, 0];
+
+  pushStep({
+    title: { vi: "Kết quả", en: "Result" },
+    currentR: 0, currentC: 0,
+    codeLines: [17, 18],
+    vars: [
+      { name: "dp[0][0]", value: finalScore },
+      { name: "cnt[0][0]", value: finalCnt },
+      { name: "answer", value: `[${answer[0]}, ${answer[1]}]` },
+    ],
+    note: {
+      vi: reachable
+        ? `E đến được với điểm tối đa = ${finalScore}, số đường đạt điểm đó = ${finalCnt} (mod 1e9+7).`
+        : `E không đến được từ S → trả về [0, 0].`,
+      en: reachable
+        ? `E is reachable with max score = ${finalScore}, number of paths = ${finalCnt} (mod 1e9+7).`
+        : `E is unreachable from S → return [0, 0].`,
+    },
+    final: true,
+  });
+
+  return { original: board, answer, steps };
+}
+
+/**
+ * LeetCode 1388: Pizza With 3n Slices.
+ *
+ * You have a circular pizza with 3n slices. Each round:
+ *   1. You pick any remaining slice.
+ *   2. Alice takes the slice next to yours in anti-clockwise direction.
+ *   3. Bob takes the slice next to yours in clockwise direction.
+ *   4. Repeat until nothing left. You get n slices total.
+ *
+ * KEY INSIGHT: the greedy "you pick, they pick neighbours" rule means the n
+ * slices you end up with must all be non-adjacent in the original circle.
+ * So the problem is:
+ *   Pick n non-adjacent slices from a circular array of 3n to maximise sum.
+ *
+ * Circular → the standard trick: run the linear version twice
+ *   maxPick(slices[0..3n-2], n)  // consider first, drop last
+ *   maxPick(slices[1..3n-1], n)  // drop first, consider last
+ * and take the max, so we never pick both endpoints of the original circle.
+ *
+ * Linear DP:
+ *   dp[i][j] = max sum choosing j non-adjacent elements from arr[0..i]
+ *   dp[i][j] = max(dp[i-1][j],                 # skip arr[i]
+ *                  dp[i-2][j-1] + arr[i])      # take arr[i]
+ * Base: dp[-1][*] = 0, dp[*][0] = 0.
+ * Answer of one pass = dp[len(arr)-1][n].
+ */
+function buildSteps1388(slices) {
+  const total = slices.length;
+  const n = Math.floor(total / 3);
+  const steps = [];
+
+  // Validation
+  if (total === 0 || total % 3 !== 0) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [...slices],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Số miếng phải là bội của 3 (bài yêu cầu 3n miếng).",
+        en: "Slice count must be a multiple of 3 (problem states 3n slices).",
+      },
+    });
+    return { original: [...slices], answer: 0, steps };
+  }
+
+  // --- Intro ---
+  steps.push({
+    title: { vi: "Ý tưởng", en: "Idea" },
+    arr: [...slices],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7],
+    vars: [
+      { name: "total slices", value: total },
+      { name: "n = total/3", value: n },
+    ],
+    note: {
+      vi:
+        `Bạn được ${n} miếng trong ${total} = 3n miếng. Do Alice/Bob luôn ăn 2 miếng kề, ` +
+        `${n} miếng của bạn phải không kề nhau trong vòng tròn ban đầu. ` +
+        `Vòng tròn → chạy 2 lần bài tuyến tính: bỏ miếng cuối, và bỏ miếng đầu, lấy max.`,
+      en:
+        `You get ${n} slices out of ${total} = 3n. Because Alice/Bob always take the two neighbours, ` +
+        `your ${n} slices must be non-adjacent in the original circle. ` +
+        `Circular → run the linear version twice: drop last slice, then drop first, take the max.`,
+    },
+  });
+
+  // --- Linear pass helper ---
+  // Returns { best, picks } where picks[] is the indices (into arr) that were chosen.
+  function linearPass(arr, passLabel, offset) {
+    const m = arr.length;
+    // dp[i][j] = max sum picking j non-adjacent from arr[0..i-1]. dp has m+1 rows.
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+    // Pass intro
+    steps.push({
+      title: { vi: `${passLabel}: khởi tạo`, en: `${passLabel}: initialize` },
+      arr: [...slices],
+      highlight: arr.map((_, k) => k + offset),
+      mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "pass", value: passLabel },
+        { name: "sub-array length", value: m },
+        { name: "pick n", value: n },
+      ],
+      note: {
+        vi: `${passLabel}: xét mảng con dài ${m}, cần chọn ${n} phần tử không kề nhau để tổng lớn nhất.`,
+        en: `${passLabel}: work on a subarray of length ${m}, pick ${n} non-adjacent elements to maximise the sum.`,
+      },
+    });
+
+    // Fill DP with per-cell steps only for small grids; otherwise per-row.
+    const cellCap = 40; // cap the number of "compute" steps per pass
+    let cellStepsPushed = 0;
+    for (let i = 1; i <= m; i++) {
+      const val = arr[i - 1];
+      for (let j = 1; j <= n; j++) {
+        const skip = dp[i - 1][j];
+        const take = i >= 2 ? dp[i - 2][j - 1] + val : (j === 1 ? val : -Infinity);
+        // For j=1 and i=1, taking is fine (0 + val = val)
+        const takeVal = i === 1 ? (j === 1 ? val : -Infinity) : dp[i - 2][j - 1] + val;
+        dp[i][j] = Math.max(skip, takeVal);
+
+        if (cellStepsPushed < cellCap && (i <= 4 || i >= m - 1 || j === n)) {
+          const chose = takeVal > skip ? "take" : "skip";
+          steps.push({
+            title: { vi: `${passLabel}: dp[${i}][${j}]`, en: `${passLabel}: dp[${i}][${j}]` },
+            arr: [...slices],
+            highlight: [i - 1 + offset],
+            mark: [],
+            codeLines: [13, 14, 15, 16],
+            vars: [
+              { name: "i (in pass)", value: i },
+              { name: "j", value: j },
+              { name: "arr[i-1]", value: val },
+              { name: "skip = dp[i-1][j]", value: skip },
+              { name: "take = dp[i-2][j-1] + arr[i-1]", value: Number.isFinite(takeVal) ? takeVal : "-∞" },
+              { name: "dp[i][j]", value: dp[i][j] },
+              { name: "decision", value: chose },
+            ],
+            note: {
+              vi:
+                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
+                `${chose === "take" ? `Cướp miếng thứ ${i - 1} (giá trị ${val}).` : "Bỏ miếng này."}`,
+              en:
+                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
+                `${chose === "take" ? `Pick element ${i - 1} (value ${val}).` : "Skip this element."}`,
+            },
+          });
+          cellStepsPushed += 1;
+        }
+      }
+    }
+
+    const best = dp[m][n];
+
+    // Trace back which indices were picked
+    const picks = [];
+    let ci = m;
+    let cj = n;
+    while (ci > 0 && cj > 0) {
+      const skip = dp[ci - 1][cj];
+      const takeVal = ci >= 2 ? dp[ci - 2][cj - 1] + arr[ci - 1] : (cj === 1 ? arr[ci - 1] : -Infinity);
+      if (takeVal >= skip) {
+        // pick arr[ci-1] (index offset within the sub-array + offset in original)
+        picks.push(ci - 1);
+        ci -= 2;
+        cj -= 1;
+      } else {
+        ci -= 1;
+      }
+    }
+    picks.reverse();
+
+    steps.push({
+      title: { vi: `${passLabel}: kết quả`, en: `${passLabel}: result` },
+      arr: [...slices],
+      highlight: [],
+      mark: picks.map((k) => k + offset),
+      codeLines: [17, 18],
+      vars: [
+        { name: "pass", value: passLabel },
+        { name: "picks (original indices)", value: picks.map((k) => k + offset).join(",") },
+        { name: "best sum", value: best },
+      ],
+      note: {
+        vi: `${passLabel} chọn ${picks.length} miếng ở vị trí gốc [${picks.map((k) => k + offset).join(", ")}], tổng = ${best}.`,
+        en: `${passLabel} picks ${picks.length} slices at original indices [${picks.map((k) => k + offset).join(", ")}], sum = ${best}.`,
+      },
+    });
+
+    return { best, picks: picks.map((k) => k + offset) };
+  }
+
+  // --- Pass A: drop last slice ---
+  const passA = linearPass(slices.slice(0, total - 1), "Pass A (drop last)", 0);
+  // --- Pass B: drop first slice ---
+  const passB = linearPass(slices.slice(1), "Pass B (drop first)", 1);
+
+  const answer = Math.max(passA.best, passB.best);
+  const winnerPicks = passA.best >= passB.best ? passA.picks : passB.picks;
+  const winnerLabel = passA.best >= passB.best ? "A" : "B";
+
+  steps.push({
+    title: { vi: "Kết quả cuối", en: "Final result" },
+    arr: [...slices],
+    highlight: [],
+    mark: winnerPicks,
+    final: true,
+    codeLines: [19, 20],
+    vars: [
+      { name: "pass A best", value: passA.best },
+      { name: "pass B best", value: passB.best },
+      { name: "winner", value: `Pass ${winnerLabel}` },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi:
+        `Đáp án = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
+        `Chọn từ Pass ${winnerLabel}: miếng tại vị trí gốc [${winnerPicks.join(", ")}].`,
+      en:
+        `Answer = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
+        `Winning picks from Pass ${winnerLabel}: original indices [${winnerPicks.join(", ")}].`,
+    },
+  });
+
+  return { original: [...slices], answer, steps };
+}
+
+/**
+ * LeetCode 494: Target Sum.
+ *
+ * Assign '+' or '−' to each element of nums so the signed sum equals target.
+ * Return the count of such assignments.
+ *
+ * REDUCTION → subset sum:
+ *   Let P = subset chosen with '+' sign, N = subset chosen with '−' sign.
+ *   P + N = total = sum(nums)  and  P − N = target
+ *   ⇒ P = (total + target) / 2
+ *
+ * Answer = number of subsets of nums summing to P.
+ * Feasibility: (total + target) must be non-negative and even,
+ *              and |target| ≤ total.
+ *
+ * 1D DP (same shape as bài 416 / 518):
+ *   dp[j] = number of subsets summing to j
+ *   dp[0] = 1
+ *   for num in nums:
+ *       for j in range(P, num-1, -1):     # iterate DOWN to reuse dp[j-num]
+ *           dp[j] += dp[j - num]
+ */
+function buildSteps494(nums, params) {
+  const target = params && Number.isFinite(Number(params.target)) ? Number(params.target) : 3;
+  const steps = [];
+  const total = nums.reduce((a, b) => a + b, 0);
+
+  // ── Feasibility check ───────────────────────────────────
+  if (Math.abs(target) > total || ((total + target) % 2 !== 0)) {
+    const reason = Math.abs(target) > total
+      ? `|target| = ${Math.abs(target)} > total = ${total}`
+      : `(total + target) = ${total + target} là số lẻ, không chia đôi được`;
+    steps.push({
+      title: { vi: "Không khả thi", en: "Infeasible" },
+      arr: [...nums],
+      highlight: [], mark: [],
+      final: true, codeLines: [3, 4],
+      vars: [
+        { name: "total", value: total },
+        { name: "target", value: target },
+        { name: "answer", value: 0 },
+      ],
+      note: {
+        vi: `${reason}. Không tồn tại cách gán → 0.`,
+        en: `${reason.replace("là số lẻ, không chia đôi được", "is odd, cannot be halved")}. No assignment exists → 0.`,
+      },
+    });
+    return { original: [...nums], answer: 0, steps };
+  }
+
+  const P = (total + target) / 2;
+
+  // ── Intro / reduction ───────────────────────────────────
+  steps.push({
+    title: { vi: "Đưa về subset sum", en: "Reduce to subset sum" },
+    arr: [...nums],
+    highlight: [], mark: [],
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "target", value: target },
+      { name: "total = sum(nums)", value: total },
+      { name: "P = (total + target)/2", value: P },
+    ],
+    note: {
+      vi:
+        `Đặt P = subset chọn dấu '+', N = subset chọn dấu '−'.\n` +
+        `P + N = ${total} và P − N = ${target} ⇒ P = ${P}.\n` +
+        `Câu hỏi trở thành: đếm số subset của nums có tổng = ${P}.`,
+      en:
+        `Let P = subset assigned '+', N = subset assigned '−'.\n` +
+        `P + N = ${total} and P − N = ${target} ⇒ P = ${P}.\n` +
+        `The problem becomes: count subsets of nums that sum to ${P}.`,
+    },
+  });
+
+  // ── DP init ─────────────────────────────────────────────
+  const dp = new Array(P + 1).fill(0);
+  dp[0] = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo DP", en: "Initialize DP" },
+    arr: dp.slice(),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [0], mark: [],
+    codeLines: [7, 8],
+    vars: [
+      { name: "P", value: P },
+      { name: "dp[0]", value: 1 },
+      { name: "dp", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi:
+        `dp[j] = số subset của các phần tử đã xét có tổng = j.\n` +
+        `dp[0] = 1 (subset rỗng có tổng 0).\n` +
+        `Với mỗi num, duyệt j từ P xuống num: dp[j] += dp[j - num] (0/1 knapsack: mỗi phần tử dùng ≤ 1 lần).`,
+      en:
+        `dp[j] = number of subsets (of elements processed so far) summing to j.\n` +
+        `dp[0] = 1 (the empty subset sums to 0).\n` +
+        `For each num, iterate j from P down to num: dp[j] += dp[j - num] (0/1 knapsack — each element used at most once).`,
+    },
+  });
+
+  // ── Process each num ────────────────────────────────────
+  for (const num of nums) {
+    const before = dp.slice();
+    // Iterate j downward so each num is used at most once (0/1 knapsack)
+    const updatedIdx = [];
+    for (let j = P; j >= num; j--) {
+      const added = dp[j - num];
+      if (added > 0) {
+        dp[j] += added;
+        updatedIdx.push(j);
+      }
+    }
+
+    steps.push({
+      title: { vi: `Thêm num = ${num}`, en: `Add num = ${num}` },
+      arr: dp.slice(),
+      sub: dp.map((_, i) => String(i)),
+      highlight: updatedIdx,
+      mark: [],
+      codeLines: [9, 10, 11, 12],
+      vars: [
+        { name: "num", value: num },
+        { name: "dp (before)", value: `[${before.join(",")}]` },
+        { name: "dp (after)", value: `[${dp.join(",")}]` },
+        { name: "cells changed", value: updatedIdx.join(",") || "(none)" },
+      ],
+      note: {
+        vi:
+          `Xử lý num = ${num}: dp[j] += dp[j − ${num}] cho j từ ${P} xuống ${num} (duyệt ngược để không dùng lại num).\n` +
+          `Ô thay đổi: [${updatedIdx.join(", ")}]. Sau khi thêm: dp = [${dp.join(", ")}].`,
+        en:
+          `Process num = ${num}: dp[j] += dp[j − ${num}] for j from ${P} down to ${num} (downward to avoid reusing num).\n` +
+          `Changed cells: [${updatedIdx.join(", ")}]. After: dp = [${dp.join(", ")}].`,
+      },
+    });
+  }
+
+  const answer = dp[P];
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: dp.slice(),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [], mark: [P], final: true, codeLines: [13],
+    vars: [
+      { name: "dp", value: `[${dp.join(",")}]` },
+      { name: "dp[P]", value: answer },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Số subset có tổng = ${P} = dp[${P}] = ${answer}. Đó cũng là số cách gán dấu ± để tổng = ${target}.`,
+      en: `Number of subsets summing to ${P} = dp[${P}] = ${answer}. This equals the number of ± assignments totalling ${target}.`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416],
+    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -3902,17 +4703,36 @@ module.exports = {
     inputLabel: { vi: "piles", en: "piles" },
     extraParams: [],
     complexity: {
-      time: "O(1)",
-      space: "O(1)",
+      time: "O(n²)",
+      space: "O(n²)",
       note: {
-        vi: "Với số đống chẵn, Alice luôn có chiến lược thắng theo parity. Vì vậy bài này có thể giải bằng phân tích chiến lược, không cần DP nặng.",
-        en: "With an even number of piles, Alice always has a winning parity strategy. So this problem can be solved by strategy analysis rather than heavy DP.",
+        vi:
+          "Bảng dp[i][j] kích thước n×n; mỗi ô O(1) → O(n²) thời gian và bộ nhớ.\n" +
+          "Mẹo O(1): với số đống chẵn và tổng lẻ, Alice luôn thắng nên `return True` là đủ — nhưng ở đây ta trực quan hoá DP để hiểu bản chất.",
+        en:
+          "The dp[i][j] table has n×n cells; each is O(1) → O(n²) time and space.\n" +
+          "O(1) trick: with an even number of piles and odd total, Alice always wins so `return True` suffices — but we visualize the DP here to understand the mechanics.",
       },
     },
     code: [
       "class Solution:",
       "    def stoneGame(self, piles):",
-      "        return True",
+      "        n = len(piles)",
+      "        # dp[i][j] = max score difference the current player",
+      "        # can force on the subarray piles[i..j].",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for i in range(n):",
+      "            dp[i][i] = piles[i]",
+      "        for length in range(2, n + 1):",
+      "            for i in range(n - length + 1):",
+      "                j = i + length - 1",
+      "                take_left  = piles[i] - dp[i + 1][j]",
+      "                take_right = piles[j] - dp[i][j - 1]",
+      "                dp[i][j] = max(take_left, take_right)",
+      "        return dp[0][n - 1] > 0",
+      "",
+      "# O(1) trick: with n even and odd total, Alice always wins.",
+      "#     return True",
     ],
     builder: buildSteps877,
   },
@@ -4070,13 +4890,24 @@ module.exports = {
     },
     defaultInput: [2, 7, 9, 3, 1],
     inputKind: "nonneg",
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "DP Array O(n) — dp[i] = tiền tối đa tới nhà i", en: "DP Array O(n) — dp[i] = max loot up to house i" } },
+          { value: 2, label: { vi: "Tối ưu O(1) — 2 biến prev_rob & max_rob", en: "Optimized O(1) — 2 vars prev_rob & max_rob" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Điền bảng dp một lần nên O(n) thời gian. Bảng dp dài n nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
-        en: "A single pass to fill dp gives O(n) time. The dp table of length n is O(n) memory (optimizable to O(1) with two variables).",
+        vi: "Cách 1: O(n) thời gian + O(n) bộ nhớ (bảng dp). Cách 2: O(n) thời gian + O(1) bộ nhớ (2 biến prev_rob, max_rob).",
+        en: "Approach 1: O(n) time + O(n) memory (dp table). Approach 2: O(n) time + O(1) memory (2 variables prev_rob, max_rob).",
       },
     },
     code: [
@@ -4095,6 +4926,18 @@ module.exports = {
       "            dp[i] = max(dp[i-1], dp[i-2] + nums[i])",
       "        return dp[-1]",
     ],
+    code2: [
+      "# Optimized O(1) space",
+      "class Solution:",
+      "    def rob(self, nums: List[int]) -> int:",
+      "        prev_rob, max_rob = 0, 0",
+      "        for current in nums:",
+      "            temp = max(max_rob, prev_rob + current)",
+      "            prev_rob, max_rob = max_rob, temp",
+      "        return max_rob",
+    ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps198,
   },
   53: {
@@ -4502,5 +5345,173 @@ module.exports = {
       "        return sum(dp[r][c] for r in range(n) for c in range(n))",
     ],
     builder: buildSteps688,
+  },
+  1301: {
+    id: 1301,
+    difficulty: "hard",
+    slug: "number-of-paths-with-max-score",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Number of Paths with Max Score", en: "Number of Paths with Max Score" },
+    titleVi: { vi: "Số đường đi đạt điểm cao nhất", en: "Number of paths achieving max score" },
+    statement: {
+      vi:
+        "Cho bảng chữ (E ở góc trên-trái, S ở góc dưới-phải, các số 0..9 là điểm cộng khi bước lên, 'X' là chướng ngại). " +
+        "Từ S đi về E, mỗi bước có thể lên/trái/lên-trái theo đường chéo. Trả về [điểm cao nhất, số đường đạt điểm đó mod 1e9+7]. " +
+        "Nếu không đến được E, trả về [0, 0].",
+      en:
+        "You are given a square board with 'E' at the top-left, 'S' at the bottom-right, digits 0..9 that add to your score when stepped on, and 'X' for obstacles. " +
+        "From S you move up, left, or diagonally up-left toward E. Return [max score, number of paths achieving it mod 1e9+7]. " +
+        "If E is unreachable, return [0, 0].",
+    },
+    defaultInput: "E23|2X2|12S",
+    inputKind: "string",
+    inputLabel: { vi: "board (hàng cách bởi |; chữ liền nhau hoặc cách bởi dấu phẩy)", en: "board (rows split by |; chars run together or comma-separated)" },
+    extraParams: [],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Điền bảng dp/cnt kích thước m×n, mỗi ô O(1) → O(m·n).",
+        en: "Fill an m×n dp/cnt table, O(1) per cell → O(m·n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def pathsWithMaxScore(self, board):",
+      "        MOD = 10**9 + 7",
+      "        m, n = len(board), len(board[0])",
+      "        # dp[r][c] = max score, cnt[r][c] = # paths",
+      "        dp = [[-1]*n for _ in range(m)]",
+      "        cnt = [[0]*n for _ in range(m)]",
+      "        dp[m-1][n-1], cnt[m-1][n-1] = 0, 1",
+      "        for r in range(m-1, -1, -1):",
+      "            for c in range(n-1, -1, -1):",
+      "                if (r, c) == (m-1, n-1) or board[r][c] == 'X':",
+      "                    continue",
+      "                best, ways = -1, 0",
+      "                for dr, dc in ((1,0),(0,1),(1,1)):",
+      "                    pr, pc = r+dr, c+dc",
+      "                    if pr >= m or pc >= n or dp[pr][pc] < 0:",
+      "                        continue",
+      "                    if dp[pr][pc] > best:",
+      "                        best, ways = dp[pr][pc], cnt[pr][pc]",
+      "                    elif dp[pr][pc] == best:",
+      "                        ways = (ways + cnt[pr][pc]) % MOD",
+      "                if best < 0:",
+      "                    continue",
+      "                digit = int(board[r][c]) if board[r][c].isdigit() else 0",
+      "                dp[r][c], cnt[r][c] = best + digit, ways",
+      "        if dp[0][0] < 0:",
+      "            return [0, 0]",
+      "        return [dp[0][0], cnt[0][0]]",
+    ],
+    builder: buildSteps1301,
+  },
+  1388: {
+    id: 1388,
+    difficulty: "hard",
+    slug: "pizza-with-3n-slices",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Pizza With 3n Slices", en: "Pizza With 3n Slices" },
+    titleVi: { vi: "Chia bánh 3n miếng (House Robber circular tổng quát)", en: "Pizza with 3n slices" },
+    statement: {
+      vi:
+        "Có 3n miếng pizza xếp thành vòng tròn. Mỗi lượt: bạn chọn một miếng bất kỳ; Alice ăn miếng kề bên trái theo chiều ngược kim đồng hồ; Bob ăn miếng kề bên phải theo chiều kim đồng hồ. Lặp cho đến hết. " +
+        "Trả về tổng lớn nhất bạn có thể ăn.",
+      en:
+        "You have a pizza with 3n slices arranged in a circle. Each round: you pick any slice; Alice picks the neighbour anti-clockwise; Bob picks the neighbour clockwise. Repeat until all slices are gone. " +
+        "Return the maximum total size of slices you can pick.",
+    },
+    defaultInput: [1, 2, 3, 4, 5, 6],
+    inputKind: "nonneg",
+    inputLabel: { vi: "slices (3n miếng)", en: "slices (3n slices)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi:
+          "Bài quy về: chọn n phần tử KHÔNG KỀ NHAU từ mảng vòng tròn 3n để tổng lớn nhất. " +
+          "Vòng tròn → chạy 2 lần tuyến tính (bỏ đầu / bỏ cuối). " +
+          "Mỗi lần dùng DP 2D dp[i][j] với i ≤ 3n, j ≤ n → O(n²) thời gian và bộ nhớ.",
+        en:
+          "Reduces to: pick n NON-ADJACENT elements from a circular array of 3n to maximise sum. " +
+          "Circular → run two linear DPs (drop first / drop last). " +
+          "Each pass is a 2D DP dp[i][j] with i ≤ 3n, j ≤ n → O(n²) time and space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSizeSlices(self, slices):",
+      "        # Reduce to: pick n non-adjacent from circular array of 3n.",
+      "        n = len(slices) // 3",
+      "        def pick(arr):",
+      "            m = len(arr)",
+      "            # dp[i][j] = max sum picking j non-adjacent from arr[0..i-1]",
+      "            dp = [[0]*(n+1) for _ in range(m+1)]",
+      "            for i in range(1, m+1):",
+      "                for j in range(1, n+1):",
+      "                    skip = dp[i-1][j]",
+      "                    take = (dp[i-2][j-1] + arr[i-1]) if i >= 2 else (arr[i-1] if j == 1 else -10**9)",
+      "                    dp[i][j] = max(skip, take)",
+      "            return dp[m][n]",
+      "        # Circular trick: drop first or drop last, take max.",
+      "        return max(pick(slices[:-1]), pick(slices[1:]))",
+    ],
+    builder: buildSteps1388,
+  },
+  494: {
+    id: 494,
+    difficulty: "medium",
+    slug: "target-sum",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Target Sum", en: "Target Sum" },
+    titleVi: { vi: "Gán ± cho tổng bằng target (subset sum)", en: "Assign ± to reach target (subset sum)" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên không âm nums và số nguyên target. Gán '+' hoặc '−' cho mỗi phần tử " +
+        "để tổng có dấu bằng target. Trả về SỐ CÁCH gán.",
+      en:
+        "Given a non-negative integer array nums and an integer target, assign '+' or '−' to each element " +
+        "so the signed sum equals target. Return the number of such assignments.",
+    },
+    defaultInput: [1, 1, 1, 1, 1],
+    inputKind: "nonneg",
+    extraParams: [
+      {
+        key: "target",
+        type: "number",
+        label: { vi: "target", en: "target" },
+        default: 3,
+        allowNegative: true,
+      },
+    ],
+    complexity: {
+      time: "O(n · P)",
+      space: "O(P)",
+      note: {
+        vi:
+          "Sau khi quy về subset sum, P = (sum+target)/2. Bảng dp dài P+1, mỗi num duyệt xuống một lần → O(n·P) thời gian, O(P) bộ nhớ.",
+        en:
+          "After reducing to subset sum, P = (sum+target)/2. A dp array of length P+1 with one downward pass per num → O(n·P) time and O(P) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findTargetSumWays(self, nums, target):",
+      "        total = sum(nums)",
+      "        # Feasibility: (total+target) even AND |target| <= total",
+      "        if abs(target) > total or (total + target) % 2 != 0:",
+      "            return 0",
+      "        P = (total + target) // 2",
+      "        # dp[j] = number of subsets summing to j",
+      "        dp = [0] * (P + 1)",
+      "        dp[0] = 1",
+      "        for num in nums:",
+      "            for j in range(P, num - 1, -1):",
+      "                dp[j] += dp[j - num]",
+      "        return dp[P]",
+    ],
+    builder: buildSteps494,
   },
 };

@@ -1,6 +1,9 @@
 import pytest
 
-from Leetcode.tree.Leetcode_1123 import Solution
+from Leetcode.tree.Leetcode_1123 import Solution  # pylint: disable=no-name-in-module
+# Leetcode/__init__.py rewrites __path__ to point at Leetcode-sln/ at runtime
+# (Python identifiers can't contain hyphens), which pylint's static analysis
+# can't follow. The import resolves correctly at runtime and under pytest.
 
 
 class TreeNode:

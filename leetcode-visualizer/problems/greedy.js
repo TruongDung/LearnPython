@@ -121,7 +121,235 @@ function buildSteps1846(input) {
   return { original, sorted, answer, steps };
 }
 
+/**
+ * LeetCode 1288: Remove Covered Intervals.
+ *
+ * Interval [a, b] is covered by [c, d] iff c <= a AND b <= d.
+ *
+ * Strategy:
+ *   1) Sort intervals by start ASC; when starts tie, by end DESC. This way if
+ *      two intervals share the same start, the longer one appears first, so
+ *      the shorter one is guaranteed to be covered.
+ *   2) Walk through sorted intervals, tracking the max end seen so far.
+ *      - If current end <= max_end → this interval is covered, skip it.
+ *      - Otherwise → keep it, update max_end.
+ *   3) Answer = number of kept intervals.
+ */
+function buildSteps1288(input) {
+  const steps = [];
+
+  // ── Parse input ─────────────────────────────────────────
+  // Accept "1,4;3,6;2,8" style: intervals separated by ';', bounds by ','.
+  const raw = String(input || "").trim();
+  const parsed = raw
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map((x) => Number(x.trim())));
+
+  if (parsed.length === 0 || parsed.some((iv) => iv.length !== 2 || !Number.isFinite(iv[0]) || !Number.isFinite(iv[1]) || iv[0] > iv[1])) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [], mark: [],
+      final: true, codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: `Định dạng: "l,r;l,r;..." với l ≤ r. Ví dụ: 1,4;3,6;2,8.`,
+        en: `Format: "l,r;l,r;..." with l ≤ r. Example: 1,4;3,6;2,8.`,
+      },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  const original = parsed.map((iv) => [...iv]);
+  const n = original.length;
+
+  // For the bar chart, use the interval width as bar height and put "[l, r]"
+  // in the sub-label so users see both the length and the bounds.
+  const widths = original.map(([l, r]) => Math.max(1, r - l + 1));
+  const subLabels = original.map(([l, r]) => `[${l},${r}]`);
+
+  steps.push({
+    title: { vi: "Mảng ban đầu", en: "Original intervals" },
+    arr: [...widths],
+    sub: [...subLabels],
+    highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: n },
+      { name: "intervals", value: subLabels.join(" ") },
+    ],
+    note: {
+      vi:
+        `Có ${n} đoạn. Một đoạn [a,b] bị bao bởi [c,d] khi c ≤ a và b ≤ d.\n` +
+        `Chiến lược: sắp xếp theo start tăng dần, nếu trùng start thì end giảm dần (để đoạn dài hơn đứng trước). ` +
+        `Sau đó quét, giữ lại các đoạn có end > max_end đã thấy.`,
+      en:
+        `${n} intervals. [a,b] is covered by [c,d] iff c ≤ a and b ≤ d.\n` +
+        `Strategy: sort by start ASC, tie-break by end DESC (longer intervals first when starts match). ` +
+        `Then scan; keep any interval whose end > max_end seen so far.`,
+    },
+  });
+
+  // ── Sort intervals ──────────────────────────────────────
+  const indexed = original.map(([l, r], i) => ({ l, r, origIdx: i }));
+  indexed.sort((a, b) => (a.l - b.l) || (b.r - a.r));
+
+  // Re-order the display arrays to match the sort so highlights align.
+  const sortedWidths = indexed.map((iv) => Math.max(1, iv.r - iv.l + 1));
+  const sortedLabels = indexed.map((iv) => `[${iv.l},${iv.r}]`);
+
+  steps.push({
+    title: { vi: "Sắp xếp", en: "Sort" },
+    arr: [...sortedWidths],
+    sub: [...sortedLabels],
+    highlight: indexed.map((_, i) => i),
+    mark: [],
+    codeLines: [5, 6],
+    vars: [
+      { name: "sorted", value: sortedLabels.join(" ") },
+      { name: "rule", value: "start ASC, end DESC" },
+    ],
+    note: {
+      vi:
+        `Sau khi sắp xếp: ${sortedLabels.join(" ")}.\n` +
+        `Nhờ tie-break end DESC, nếu 2 đoạn cùng start thì đoạn dài hơn đứng trước → đoạn ngắn hơn chắc chắn bị bao.`,
+      en:
+        `After sorting: ${sortedLabels.join(" ")}.\n` +
+        `Thanks to the end-DESC tie-break, when two intervals share a start the longer comes first, so the shorter is guaranteed covered.`,
+    },
+  });
+
+  // ── Scan and mark ───────────────────────────────────────
+  let maxEnd = -Infinity;
+  let kept = 0;
+  const keptIdx = [];    // indices in the SORTED array
+  const covered = new Set(); // indices in the SORTED array
+
+  for (let i = 0; i < indexed.length; i++) {
+    const { l, r } = indexed[i];
+    const isCovered = r <= maxEnd;
+    if (isCovered) {
+      covered.add(i);
+      steps.push({
+        title: { vi: `[${l},${r}] bị bao (bỏ)`, en: `[${l},${r}] is covered (drop)` },
+        arr: [...sortedWidths],
+        sub: [...sortedLabels],
+        highlight: [i],
+        mark: keptIdx.slice(),
+        codeLines: [8, 9, 10],
+        vars: [
+          { name: "i (sorted)", value: i },
+          { name: "current", value: `[${l},${r}]` },
+          { name: "max_end so far", value: maxEnd },
+          { name: "r <= max_end?", value: true },
+          { name: "kept", value: kept },
+        ],
+        note: {
+          vi: `end ${r} ≤ max_end ${maxEnd} → đoạn này nằm trọn trong đoạn kept trước đó. Bỏ.`,
+          en: `end ${r} ≤ max_end ${maxEnd} → this interval fits inside a previously kept one. Drop it.`,
+        },
+      });
+    } else {
+      kept += 1;
+      keptIdx.push(i);
+      const oldMax = maxEnd;
+      maxEnd = r;
+      steps.push({
+        title: { vi: `Giữ [${l},${r}]`, en: `Keep [${l},${r}]` },
+        arr: [...sortedWidths],
+        sub: [...sortedLabels],
+        highlight: [i],
+        mark: keptIdx.slice(),
+        codeLines: [11, 12, 13],
+        vars: [
+          { name: "i (sorted)", value: i },
+          { name: "current", value: `[${l},${r}]` },
+          { name: "max_end (old)", value: oldMax === -Infinity ? "-∞" : oldMax },
+          { name: "max_end (new)", value: maxEnd },
+          { name: "kept", value: kept },
+        ],
+        note: {
+          vi: `end ${r} > max_end cũ (${oldMax === -Infinity ? "-∞" : oldMax}) → giữ đoạn này. max_end ← ${maxEnd}. Đã giữ: ${kept}.`,
+          en: `end ${r} > old max_end (${oldMax === -Infinity ? "-∞" : oldMax}) → keep it. max_end ← ${maxEnd}. Kept so far: ${kept}.`,
+        },
+      });
+    }
+  }
+
+  // ── Final ───────────────────────────────────────────────
+  const droppedList = indexed
+    .map((iv, i) => (covered.has(i) ? `[${iv.l},${iv.r}]` : null))
+    .filter(Boolean);
+  const keptList = keptIdx.map((i) => `[${indexed[i].l},${indexed[i].r}]`);
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...sortedWidths],
+    sub: [...sortedLabels],
+    highlight: [],
+    mark: keptIdx.slice(),
+    final: true,
+    codeLines: [14],
+    vars: [
+      { name: "kept intervals", value: keptList.join(" ") || "(none)" },
+      { name: "dropped intervals", value: droppedList.join(" ") || "(none)" },
+      { name: "answer", value: kept },
+    ],
+    note: {
+      vi: `Sau khi bỏ ${droppedList.length} đoạn bị bao, còn lại ${kept}: ${keptList.join(" ")}.`,
+      en: `After dropping ${droppedList.length} covered interval(s), ${kept} remain: ${keptList.join(" ")}.`,
+    },
+  });
+
+  return { original, answer: kept, steps };
+}
+
 module.exports = {
+  1288: {
+    id: 1288,
+    difficulty: "medium",
+    slug: "remove-covered-intervals",
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
+    title: { vi: "Remove Covered Intervals", en: "Remove Covered Intervals" },
+    titleVi: { vi: "Đếm đoạn còn lại sau khi bỏ đoạn bị bao", en: "Count intervals after removing covered ones" },
+    statement: {
+      vi:
+        "Cho danh sách intervals[i] = [l, r]. Đoạn [a, b] bị bao bởi đoạn [c, d] khi c ≤ a và b ≤ d. " +
+        "Trả về số đoạn còn lại sau khi bỏ hết các đoạn bị bao.",
+      en:
+        "Given intervals[i] = [l, r]. Interval [a, b] is covered by [c, d] iff c ≤ a and b ≤ d. " +
+        "Return the number of intervals remaining after removing all covered ones.",
+    },
+    defaultInput: "1,4;3,6;2,8",
+    inputKind: "string",
+    inputLabel: { vi: "intervals (l,r; l,r; …)", en: "intervals (l,r; l,r; …)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(1)",
+      note: {
+        vi: "Sắp xếp O(n log n) chi phối; quét sau đó O(n). Bộ nhớ phụ O(1).",
+        en: "Sort dominates at O(n log n); the pass is O(n). O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def removeCoveredIntervals(self, intervals):",
+      "        # start ASC, then end DESC on ties so longer wins",
+      "        intervals.sort(key=lambda iv: (iv[0], -iv[1]))",
+      "        max_end = 0",
+      "        kept = 0",
+      "        for l, r in intervals:",
+      "            if r <= max_end:",
+      "                continue        # covered, drop it",
+      "            kept += 1",
+      "            max_end = r",
+      "        return kept",
+    ],
+    builder: buildSteps1288,
+  },
   1846: {
     id: 1846,
     difficulty: "medium",

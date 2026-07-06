@@ -2,12 +2,22 @@
   box-sizing: border-box;
 }
 
+/* Stop iOS Safari from auto-zooming long code lines in landscape /
+   after selecting text. Without this, a wide line inside a
+   horizontally-scrolling <pre> renders bigger than its siblings. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   background: #0c0a1a;
   color: #e2e8f0;
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app {
@@ -546,7 +556,10 @@ button:disabled {
 .var-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -554,6 +567,16 @@ button:disabled {
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;
   font-size: 12px;
   transition: background 0.2s, border-color 0.2s;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.var-item .var-name,
+.var-item .var-value {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .var-item .var-name {
@@ -599,6 +622,9 @@ button:disabled {
   /* Prevent iOS rendering bugs with sticky + overflow */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  /* Belt-and-braces: keep iOS Safari from auto-inflating long lines. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .code-line {
@@ -620,6 +646,26 @@ button:disabled {
   flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Indent guide: subtle vertical dashed line at each 4-column indent level.
+   Each guide span occupies exactly 4 monospace characters and carries a
+   left border, so the guide sits on the left edge of that indent level. */
+.code-line .indent-guide {
+  display: inline-block;
+  width: 4ch;
+  border-left: 1px dashed rgba(180, 190, 210, 0.18);
+  vertical-align: top;
+  white-space: pre;
+  /* The border is drawn on the left edge; the space that precedes it in the
+     line is provided by the previous guide (or, for the first guide, by the
+     .txt element's own start). */
+}
+
+/* Highlight the guides that are inside the currently-active line so it's
+   easy to trace where you are in a nested block. */
+.code-line.active .indent-guide {
+  border-left-color: rgba(249, 115, 22, 0.45);
 }
 
 .code-line .txt {
@@ -1820,9 +1866,18 @@ select option {
     border-radius: 10px;
   }
 
+  /* On phone, put each variable on its own row so long names like
+     "dp[i-1] + cost[i-1]" always fit without breaking the layout. */
+  .vars-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .var-item {
     font-size: 11px;
     padding: 4px 8px;
+    width: 100%;
+    flex-basis: auto;
   }
 
   /* Controls — keep 5 buttons on 1 row, shrink to fit */
@@ -1899,15 +1954,21 @@ select option {
     gap: 8px;
   }
 
-  /* Hide problem name on tiny screens, show only ID */
+  /* On tiny screens still show the problem name — just trim to fit. */
   .prob-chip .pname {
-    display: none;
+    display: block;
+    font-size: 9.5px;
+    line-height: 1.25;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .prob-chip {
     padding: 6px 10px;
     min-width: 50px;
-    align-items: center;
+    align-items: flex-start;
   }
 
   /* DP grid even smaller */

@@ -1950,14 +1950,43 @@ function buildSteps1926(input, params) {
     .map((row) => row.trim())
     .filter((row) => row.length > 0);
 
-  const maze = rawRows.map((row) => row.split(",").map((c) => c.trim()));
+  const maze = rawRows.map((row) =>
+    row.includes(",") ? row.split(",").map((c) => c.trim()) : row.split("")
+  );
   const entranceRow = Number(params.entranceRow ?? 0);
   const entranceCol = Number(params.entranceCol ?? 0);
   const rows = maze.length;
   const cols = rows > 0 ? maze[0].length : 0;
   const steps = [];
+  const invalidMaze =
+    rows === 0 ||
+    cols === 0 ||
+    maze.some((row) => row.length !== cols || row.some((cell) => cell !== "." && cell !== "+")) ||
+    entranceRow < 0 ||
+    entranceRow >= rows ||
+    entranceCol < 0 ||
+    entranceCol >= cols ||
+    maze[entranceRow][entranceCol] !== ".";
+
+  if (invalidMaze) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3, 4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Maze phải gồm '.' và '+', các hàng cùng độ dài, entrance nằm trong maze và là ô '.'. Ví dụ: +.+|...|+.. với entranceRow=1, entranceCol=0.",
+        en: "Maze must contain '.' and '+', all rows must have the same length, and entrance must be an open '.' cell. Example: +.+|...|+.. with entranceRow=1, entranceCol=0.",
+      },
+    });
+    return { maze, entrance: [entranceRow, entranceCol], answer: -1, steps };
+  }
+
   const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const dist = Array.from({ length: rows }, () => Array(cols).fill("â€¢"));
+  const dist = Array.from({ length: rows }, () => Array(cols).fill("."));
   const q = [[entranceRow, entranceCol, 0]];
   let head = 0;
   visited[entranceRow][entranceCol] = true;
@@ -2837,11 +2866,443 @@ function buildSteps1136(input, params) {
   return { n, edges: edgesRaw, answer, steps };
 }
 
+/**
+ * LeetCode 3620: Network Recovery Pathways.
+ * Binary search the path score. For a candidate score x, keep only online nodes
+ * and edges with cost >= x, then compute the cheapest 0 -> n-1 path on the DAG.
+ */
+function buildSteps3620(input, params) {
+  const edgesRaw = String(input).split(",").map((e) => e.trim()).filter(Boolean);
+  const edges = edgesRaw.map((e) => {
+    const [u, v, w] = e.split("-").map((x) => Number(x.trim()));
+    return { u, v, w };
+  }).filter((e) => Number.isFinite(e.u) && Number.isFinite(e.v) && Number.isFinite(e.w));
+
+  const online = String(params.online || "")
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .map((s) => s === "true" || s === "1" || s === "yes");
+
+  let n = Number(params.n) || online.length || 0;
+  for (const { u, v } of edges) n = Math.max(n, u + 1, v + 1);
+  while (online.length < n) online.push(true);
+  if (n > 0) {
+    online[0] = true;
+    online[n - 1] = true;
+  }
+
+  const k = Number(params.k) || 0;
+  const nodes = Array.from({ length: n }, (_, i) => i);
+  const adj = Array.from({ length: n }, () => []);
+  const indeg = Array(n).fill(0);
+  for (const edge of edges) {
+    if (edge.u >= 0 && edge.u < n && edge.v >= 0 && edge.v < n) {
+      adj[edge.u].push(edge);
+      indeg[edge.v]++;
+    }
+  }
+
+  const topo = [];
+  const q = [];
+  for (let i = 0; i < n; i++) if (indeg[i] === 0) q.push(i);
+  for (let head = 0; head < q.length; head++) {
+    const u = q[head];
+    topo.push(u);
+    for (const { v } of adj[u]) {
+      indeg[v]--;
+      if (indeg[v] === 0) q.push(v);
+    }
+  }
+  if (topo.length < n) {
+    for (let i = 0; i < n; i++) if (!topo.includes(i)) topo.push(i);
+  }
+
+  const steps = [];
+  const fmtCost = (x) => (x === Infinity ? "∞" : x);
+  const costStr = (dist) => nodes.map((id) => `${id}:${fmtCost(dist[id])}`).join(", ");
+  const onlineStr = online.map((v, i) => `${i}:${v ? "on" : "off"}`).join(", ");
+  const isUsableNode = (node) => node === 0 || node === n - 1 || online[node];
+
+  function makeGraph(dist, hlNodes, hlEdges, visitedNodes) {
+    return {
+      nodes: nodes.map((id) => ({
+        id,
+        dist: online[id] ? fmtCost(dist?.[id] ?? Infinity) : "off",
+      })),
+      edges,
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  function check(score, capture) {
+    const dist = Array(n).fill(Infinity);
+    const prev = Array(n).fill(null);
+    const processed = [];
+    if (n > 0) dist[0] = 0;
+
+    if (capture) {
+      steps.push({
+        title: { vi: `Thử score >= ${score}`, en: `Try score >= ${score}` },
+        arr: [],
+        graph: makeGraph(dist, [0], edges.filter((e) => e.w >= score).map((e) => [e.u, e.v]), []),
+        highlight: [],
+        mark: [],
+        codeLines: [12, 13, 14, 15],
+        vars: [
+          { name: "candidate score", value: score },
+          { name: "k", value: k },
+          { name: "online", value: `{${onlineStr}}` },
+        ],
+        note: {
+          vi:
+            `Kiểm tra có path 0→${n - 1} nào dùng toàn cạnh cost >= ${score}, đi qua node online, ` +
+            `và tổng cost <= ${k} không.`,
+          en:
+            `Check whether a 0→${n - 1} path can use only edges with cost >= ${score}, online nodes, ` +
+            `and total cost <= ${k}.`,
+        },
+      });
+    }
+
+    for (const u of topo) {
+      if (!isUsableNode(u) || dist[u] === Infinity) continue;
+      processed.push(u);
+      const relaxed = [];
+      const blocked = [];
+
+      for (const edge of adj[u]) {
+        const { v, w } = edge;
+        if (!isUsableNode(v)) {
+          blocked.push(`${u}→${v} offline`);
+          continue;
+        }
+        if (w < score) {
+          blocked.push(`${u}→${v} cost ${w}<${score}`);
+          continue;
+        }
+        const nd = dist[u] + w;
+        if (nd < dist[v]) {
+          dist[v] = nd;
+          prev[v] = u;
+          relaxed.push([u, v]);
+        }
+      }
+
+      if (capture && (relaxed.length || blocked.length || u === 0 || u === n - 1)) {
+        steps.push({
+          title: { vi: `DP tại node ${u}`, en: `DP at node ${u}` },
+          arr: [],
+          graph: makeGraph(dist, [u], relaxed, processed.slice()),
+          highlight: [],
+          mark: [],
+          codeLines: [16, 17, 18, 19, 20, 21, 22],
+          vars: [
+            { name: "u", value: u },
+            { name: "dist[u]", value: fmtCost(dist[u]) },
+            { name: "relaxed", value: relaxed.map(([a, b]) => `${a}→${b}`).join(", ") || "none" },
+            { name: "blocked", value: blocked.slice(0, 4).join(", ") || "none" },
+            { name: "dist", value: `{${costStr(dist)}}` },
+          ],
+          note: {
+            vi:
+              `Duyệt node ${u} theo topo order. Chỉ relax cạnh đủ mạnh (cost >= ${score}) và đi tới node online.\n` +
+              `Chi phí tốt nhất hiện tại tới ${n - 1}: ${fmtCost(dist[n - 1])}.`,
+            en:
+              `Process node ${u} in topological order. Relax only strong enough edges (cost >= ${score}) into online nodes.\n` +
+              `Current best cost to ${n - 1}: ${fmtCost(dist[n - 1])}.`,
+          },
+        });
+      }
+    }
+
+    const ok = dist[n - 1] <= k;
+    const pathEdges = [];
+    if (ok) {
+      let cur = n - 1;
+      while (prev[cur] !== null) {
+        pathEdges.push([prev[cur], cur]);
+        cur = prev[cur];
+      }
+      pathEdges.reverse();
+    }
+
+    if (capture) {
+      steps.push({
+        title: {
+          vi: ok ? `Score ${score} hợp lệ` : `Score ${score} không hợp lệ`,
+          en: ok ? `Score ${score} is feasible` : `Score ${score} is not feasible`,
+        },
+        arr: [],
+        graph: makeGraph(dist, ok ? [0, n - 1] : [n - 1], pathEdges, processed),
+        highlight: [],
+        mark: [],
+        codeLines: [23, 24],
+        vars: [
+          { name: "best cost to target", value: fmtCost(dist[n - 1]) },
+          { name: "k", value: k },
+          { name: "feasible", value: ok },
+        ],
+        note: {
+          vi: ok
+            ? `Có path tổng cost ${dist[n - 1]} <= ${k}. Candidate ${score} có thể là đáp án hoặc còn tăng được.`
+            : `Không có path nào đạt score ${score} với tổng cost <= ${k}. Phải thử score nhỏ hơn.`,
+          en: ok
+            ? `Found a path with total cost ${dist[n - 1]} <= ${k}. Candidate ${score} may be the answer or can go higher.`
+            : `No path reaches score ${score} with total cost <= ${k}. Try a smaller score.`,
+        },
+      });
+    }
+
+    return { ok, dist, pathEdges };
+  }
+
+  const scores = [...new Set(edges.map((e) => e.w))].sort((a, b) => a - b);
+  steps.push({
+    title: { vi: "Khởi tạo binary search", en: "Initialize binary search" },
+    arr: scores,
+    graph: makeGraph(Array(n).fill(Infinity), [0, n - 1], [], []),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6, 7, 8, 9, 10],
+    vars: [
+      { name: "n", value: n },
+      { name: "edges", value: edges.length },
+      { name: "k", value: k },
+      { name: "candidate scores", value: `[${scores.join(", ")}]` },
+    ],
+    note: {
+      vi:
+        `Score của một path là cạnh nhỏ nhất trên path, nên đáp án chỉ có thể là một cost cạnh.\n` +
+        `Binary search trên các cost cạnh. Với mỗi score X, chạy DP shortest path trên DAG đã lọc.`,
+      en:
+        `A path score is its minimum edge cost, so the answer must be one of the edge costs.\n` +
+        `Binary search edge costs. For each score X, run shortest-path DP on the filtered DAG.`,
+    },
+  });
+
+  let lo = 0;
+  let hi = scores.length - 1;
+  let answer = -1;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const score = scores[mid];
+    const { ok } = check(score, true);
+    if (ok) {
+      answer = score;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  const finalRun = answer >= 0 ? check(answer, false) : { dist: Array(n).fill(Infinity), pathEdges: [] };
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: scores,
+    graph: makeGraph(finalRun.dist, answer >= 0 ? [0, n - 1] : [], finalRun.pathEdges, []),
+    highlight: answer >= 0 ? [scores.indexOf(answer)] : [],
+    mark: [],
+    final: true,
+    codeLines: [25, 26, 27],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "best path cost", value: answer >= 0 ? fmtCost(finalRun.dist[n - 1]) : "none" },
+    ],
+    note: {
+      vi: answer >= 0
+        ? `Score lớn nhất tìm được là ${answer}. Đường được highlight có mọi cạnh >= ${answer} và tổng cost <= ${k}.`
+        : `Không tồn tại path hợp lệ từ 0 tới ${n - 1} với các node trung gian online và tổng cost <= ${k}.`,
+      en: answer >= 0
+        ? `The maximum feasible score is ${answer}. The highlighted path uses only edges >= ${answer} and total cost <= ${k}.`
+        : `No valid path exists from 0 to ${n - 1} with online intermediate nodes and total cost <= ${k}.`,
+    },
+  });
+
+  return { n, edges: edgesRaw, online, k, answer, steps };
+}
+
+/**
+ * LeetCode 2492: Minimum Score of a Path Between Two Cities — Union-Find.
+ *
+ * Key insight: since paths may revisit nodes/edges, the reachable set from
+ * city 1 is exactly its connected component. ANY edge inside that component
+ * can appear on SOME path from 1 to n (walk there, cross it, walk back).
+ * So the answer = the minimum edge weight among all edges whose endpoints
+ * lie in city 1's connected component.
+ *
+ * Algorithm:
+ *   1) Union every edge (a, b) regardless of weight — this just discovers
+ *      which cities are reachable from each other.
+ *   2) Find root = find(1).
+ *   3) Re-scan all edges; for any edge with an endpoint in root's component,
+ *      take the min weight.
+ */
+function buildSteps2492(input, params) {
+  const n = params.n || 4;
+  const edges = String(input || "")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map(Number)); // [a, b, dist]
+
+  const parent = Array.from({ length: n + 1 }, (_, i) => i);
+  const steps = [];
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+
+  function snapshot(opts) {
+    const nodes = Array.from({ length: n }, (_, i) => {
+      const city = i + 1;
+      return { id: city, label: `${city}${find(city) !== city ? `→${find(city)}` : ""}` };
+    });
+    const edgeList = (opts.edges || []).map(([a, b, d]) => ({ u: a, v: b, w: d }));
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes,
+        edges: edgeList,
+        hlNodes: opts.highlight || [],
+        hlEdges: (opts.hlEdges || []).map(([a, b]) => [a, b]),
+      },
+      highlight: [], mark: [], codeLines: opts.codeLines || [],
+      vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo Union-Find", en: "Initialize Union-Find" },
+    codeLines: [3, 4],
+    edges: [],
+    vars: [
+      { name: "n", value: n },
+      { name: "edges", value: edges.length },
+    ],
+    note: {
+      vi:
+        `Ý tưởng: đường đi được lặp lại đỉnh/cạnh → mọi cạnh trong component chứa thành phố 1 ` +
+        `đều có thể xuất hiện trên MỘT đường đi từ 1 đến n (đi tới, qua cạnh đó, rồi đi lui). ` +
+        `Vậy đáp án = trọng số nhỏ nhất trong các cạnh có ít nhất 1 đầu nằm trong component của 1.\n` +
+        `Bước 1: Union tất cả cạnh (bỏ qua trọng số) để tìm component.`,
+      en:
+        `Idea: since paths may revisit nodes/edges, EVERY edge inside city 1's connected ` +
+        `component can appear on SOME path from 1 to n (walk there, cross it, walk back). ` +
+        `So the answer = the minimum weight among edges with at least one endpoint in 1's component.\n` +
+        `Step 1: Union all edges (ignoring weight) to discover the component.`,
+    },
+  });
+
+  // Step 1: Union every edge, ignoring weight
+  const processedEdges = [];
+  for (const [a, b, d] of edges) {
+    const ra = find(a);
+    const rb = find(b);
+    processedEdges.push([a, b, d]);
+    if (ra !== rb) {
+      parent[ra] = rb;
+      snapshot({
+        title: { vi: `Union(${a}, ${b})`, en: `Union(${a}, ${b})` },
+        codeLines: [9, 10, 11],
+        highlight: [a, b],
+        edges: [...processedEdges],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b}) dist=${d}` },
+          { name: "find(a)", value: ra },
+          { name: "find(b)", value: rb },
+          { name: "merged", value: "yes" },
+        ],
+        note: {
+          vi: `Nối ${a} và ${b} (bỏ qua dist=${d}, chỉ quan tâm kết nối). parent[${ra}] = ${rb}.`,
+          en: `Connect ${a} and ${b} (ignore dist=${d}, only care about connectivity). parent[${ra}] = ${rb}.`,
+        },
+      });
+    } else {
+      snapshot({
+        title: { vi: `(${a}, ${b}) đã cùng nhóm`, en: `(${a}, ${b}) same group` },
+        codeLines: [9, 10],
+        highlight: [a, b],
+        edges: [...processedEdges],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b}) dist=${d}` },
+          { name: "find(a)", value: ra },
+          { name: "find(b)", value: rb },
+        ],
+        note: {
+          vi: `${a} và ${b} đã cùng root ${ra} → bỏ qua (chỉ nối, không tính min ở bước này).`,
+          en: `${a} and ${b} already share root ${ra} → skip (union step doesn't track min yet).`,
+        },
+      });
+    }
+  }
+
+  // Step 2: find root of city 1
+  const root = find(1);
+  snapshot({
+    title: { vi: `Component của thành phố 1`, en: `City 1's component` },
+    codeLines: [13],
+    edges: processedEdges,
+    highlight: [1],
+    vars: [{ name: "root of city 1", value: root }],
+    note: {
+      vi: `Root của thành phố 1 = ${root}. Bây giờ quét lại các cạnh để tìm trọng số nhỏ nhất trong component này.`,
+      en: `Root of city 1 = ${root}. Now re-scan edges to find the minimum weight within this component.`,
+    },
+  });
+
+  // Step 3: re-scan edges for the min weight within root's component
+  let answer = Infinity;
+  for (const [a, b, d] of edges) {
+    if (find(a) === root) {
+      const updated = d < answer;
+      if (updated) answer = d;
+      snapshot({
+        title: { vi: `Xét cạnh (${a},${b}) dist=${d}`, en: `Check edge (${a},${b}) dist=${d}` },
+        codeLines: [15, 16, 17],
+        edges: processedEdges,
+        highlight: [a, b],
+        hlEdges: [[a, b]],
+        vars: [
+          { name: "edge", value: `(${a},${b})` },
+          { name: "dist", value: d },
+          { name: "in component?", value: "yes" },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `(${a},${b}) nằm trong component của thành phố 1. dist=${d}${updated ? ` < answer cũ → cập nhật answer=${d}` : ` ≥ answer=${answer}, giữ nguyên`}.`,
+          en: `(${a},${b}) is inside city 1's component. dist=${d}${updated ? ` < previous answer → update answer=${d}` : ` ≥ answer=${answer}, unchanged`}.`,
+        },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "Kết quả", en: "Result" },
+    codeLines: [18],
+    edges: processedEdges,
+    highlight: [1, n],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Điểm nhỏ nhất của đường đi từ 1 đến ${n} = ${answer} (cạnh nhỏ nhất trong component chứa cả 1 và ${n}).`,
+      en: `Minimum score of a path from 1 to ${n} = ${answer} (smallest edge weight in the component containing both 1 and ${n}).`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { original: input, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 1091, 207, 126, 127, 743, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377],
+    order: [200, 695, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -3666,6 +4127,103 @@ module.exports = {
     ],
     builder: buildSteps743,
   },
+  3620: {
+    id: 3620,
+    difficulty: "hard",
+    slug: "network-recovery-pathways",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Network Recovery Pathways", en: "Network Recovery Pathways" },
+    titleVi: { vi: "Đường phục hồi mạng", en: "Network recovery pathways" },
+    statement: {
+      vi:
+        "Cho DAG có n node 0..n-1, cạnh có hướng [u, v, cost], mảng online cho biết node nào đang online, " +
+        "và giới hạn tổng cost k. Một path 0→n-1 hợp lệ nếu mọi node trung gian online và tổng cost <= k. " +
+        "Score của path là cost nhỏ nhất trong các cạnh trên path. Trả về score lớn nhất trong mọi path hợp lệ, hoặc -1.",
+      en:
+        "Given a DAG with n nodes 0..n-1, directed edges [u, v, cost], an online array, and total cost limit k. " +
+        "A 0→n-1 path is valid if every intermediate node is online and total cost <= k. " +
+        "The path score is the minimum edge cost on that path. Return the maximum valid path score, or -1.",
+    },
+    defaultInput: "0-1-7,1-4-5,0-2-6,2-3-6,3-4-2,2-4-6",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u-v-cost, cách bởi dấu phẩy)", en: "Edges (u-v-cost, comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (number of nodes)" }, default: 5 },
+      { key: "online", type: "string", label: { vi: "online (true/false)", en: "online (true/false)" }, default: "true,true,true,false,true" },
+      { key: "k", label: { vi: "k (giới hạn tổng cost)", en: "k (total cost limit)" }, default: 12 },
+    ],
+    approach: [
+      {
+        vi: "Score của path là min edge cost, nên đáp án nằm trong các cost cạnh.",
+        en: "A path score is the minimum edge cost, so the answer is one of the edge costs.",
+      },
+      {
+        vi: "Binary search score X: chỉ giữ cạnh có cost >= X và bỏ node offline.",
+        en: "Binary search score X: keep only edges with cost >= X and remove offline nodes.",
+      },
+      {
+        vi: "Vì graph là DAG, kiểm tra X bằng DP shortest path theo topological order: dist[v] = tổng cost nhỏ nhất từ 0 tới v.",
+        en: "Because the graph is a DAG, check X with shortest-path DP in topological order: dist[v] = cheapest total cost from 0 to v.",
+      },
+      {
+        vi: "Nếu dist[n-1] <= k thì X hợp lệ, thử tăng X; ngược lại giảm X.",
+        en: "If dist[n-1] <= k, X is feasible and we try higher; otherwise try lower.",
+      },
+    ],
+    complexity: {
+      time: "O((V + E) log E)",
+      space: "O(V + E)",
+      note: {
+        vi: "Mỗi lần check duyệt topo + cạnh một lần: O(V+E). Binary search trên các cost cạnh khác nhau. Bộ nhớ cho adjacency, topo, dist.",
+        en: "Each check scans the topological order and edges once: O(V+E). Binary search over distinct edge costs. Memory for adjacency, topo, and dist.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def findMaxPathScore(self, edges, online, k):",
+      "        n = len(online)",
+      "        graph = [[] for _ in range(n)]",
+      "        indeg = [0] * n",
+      "        for u, v, c in edges:",
+      "            graph[u].append((v, c))",
+      "            indeg[v] += 1",
+      "        q = deque([i for i in range(n) if indeg[i] == 0])",
+      "        topo = []",
+      "        while q:",
+      "            u = q.popleft()",
+      "            topo.append(u)",
+      "            for v, _ in graph[u]:",
+      "                indeg[v] -= 1",
+      "                if indeg[v] == 0:",
+      "                    q.append(v)",
+      "",
+      "        def feasible(score):",
+      "            INF = 10**30",
+      "            dist = [INF] * n",
+      "            dist[0] = 0",
+      "            for u in topo:",
+      "                if dist[u] == INF or not online[u]:",
+      "                    continue",
+      "                for v, c in graph[u]:",
+      "                    if c >= score and online[v]:",
+      "                        dist[v] = min(dist[v], dist[u] + c)",
+      "            return dist[n - 1] <= k",
+      "",
+      "        vals = sorted(set(c for _, _, c in edges))",
+      "        ans, lo, hi = -1, 0, len(vals) - 1",
+      "        while lo <= hi:",
+      "            mid = (lo + hi) // 2",
+      "            if feasible(vals[mid]):",
+      "                ans = vals[mid]",
+      "                lo = mid + 1",
+      "            else:",
+      "                hi = mid - 1",
+      "        return ans",
+    ],
+    builder: buildSteps3620,
+  },
   851: {
     id: 851,
     difficulty: "medium",
@@ -4141,5 +4699,55 @@ module.exports = {
     codeLabel: { vi: "Cách 1: BFS state-space", en: "Approach 1: BFS state-space" },
     code2Label: { vi: "Cách 2: DP Bitmask + Floyd-Warshall", en: "Approach 2: DP Bitmask + Floyd-Warshall" },
     builder: buildSteps847,
+  },
+  2492: {
+    id: 2492,
+    difficulty: "medium",
+    slug: "minimum-score-of-a-path-between-two-cities",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Minimum Score of a Path Between Two Cities", en: "Minimum Score of a Path Between Two Cities" },
+    titleVi: { vi: "Điểm nhỏ nhất của đường đi (Union-Find)", en: "Minimum path score (Union-Find)" },
+    statement: {
+      vi:
+        "Cho n thành phố và các cạnh có trọng số (distance). Điểm của một đường đi = cạnh có trọng số NHỎ NHẤT trên đường đó. " +
+        "Trả về điểm nhỏ nhất có thể của một đường đi từ thành phố 1 đến thành phố n (có thể đi qua lại, không cần đường đơn giản).",
+      en:
+        "Given n cities and weighted edges (roads). The score of a path is the MINIMUM weight edge on that path. " +
+        "Return the minimum possible score of any path from city 1 to city n (revisiting nodes/edges is allowed).",
+    },
+    defaultInput: "1,2,9;2,3,6;2,4,5;1,4,7",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b,dist; ngăn bởi ;)", en: "edges (a,b,dist; semicolon separated)" },
+    extraParams: [{ key: "n", label: { vi: "n (số thành phố)", en: "n (cities)" }, default: 4 }],
+    complexity: {
+      time: "O(m α(n))",
+      space: "O(n)",
+      note: {
+        vi: "Union-Find: mỗi cạnh union gần O(1). Duyệt lại các cạnh để lấy min trong component chứa 1 và n cũng O(m).",
+        en: "Union-Find: each union is near O(1). Re-scanning edges for the min within city 1/n's component is also O(m).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minScore(self, n, roads):",
+      "        parent = list(range(n + 1))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        def union(a, b):",
+      "            ra, rb = find(a), find(b)",
+      "            if ra != rb: parent[ra] = rb",
+      "        for a, b, d in roads:",
+      "            union(a, b)",
+      "        root = find(1)",
+      "        ans = float('inf')",
+      "        for a, b, d in roads:",
+      "            if find(a) == root:",
+      "                ans = min(ans, d)",
+      "        return ans",
+    ],
+    builder: buildSteps2492,
   },
 };
