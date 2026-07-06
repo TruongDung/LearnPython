@@ -3873,11 +3873,171 @@ function buildSteps1388(slices) {
   return { original: [...slices], answer, steps };
 }
 
+/**
+ * LeetCode 494: Target Sum.
+ *
+ * Assign '+' or '−' to each element of nums so the signed sum equals target.
+ * Return the count of such assignments.
+ *
+ * REDUCTION → subset sum:
+ *   Let P = subset chosen with '+' sign, N = subset chosen with '−' sign.
+ *   P + N = total = sum(nums)  and  P − N = target
+ *   ⇒ P = (total + target) / 2
+ *
+ * Answer = number of subsets of nums summing to P.
+ * Feasibility: (total + target) must be non-negative and even,
+ *              and |target| ≤ total.
+ *
+ * 1D DP (same shape as bài 416 / 518):
+ *   dp[j] = number of subsets summing to j
+ *   dp[0] = 1
+ *   for num in nums:
+ *       for j in range(P, num-1, -1):     # iterate DOWN to reuse dp[j-num]
+ *           dp[j] += dp[j - num]
+ */
+function buildSteps494(nums, params) {
+  const target = params && Number.isFinite(Number(params.target)) ? Number(params.target) : 3;
+  const steps = [];
+  const total = nums.reduce((a, b) => a + b, 0);
+
+  // ── Feasibility check ───────────────────────────────────
+  if (Math.abs(target) > total || ((total + target) % 2 !== 0)) {
+    const reason = Math.abs(target) > total
+      ? `|target| = ${Math.abs(target)} > total = ${total}`
+      : `(total + target) = ${total + target} là số lẻ, không chia đôi được`;
+    steps.push({
+      title: { vi: "Không khả thi", en: "Infeasible" },
+      arr: [...nums],
+      highlight: [], mark: [],
+      final: true, codeLines: [3, 4],
+      vars: [
+        { name: "total", value: total },
+        { name: "target", value: target },
+        { name: "answer", value: 0 },
+      ],
+      note: {
+        vi: `${reason}. Không tồn tại cách gán → 0.`,
+        en: `${reason.replace("là số lẻ, không chia đôi được", "is odd, cannot be halved")}. No assignment exists → 0.`,
+      },
+    });
+    return { original: [...nums], answer: 0, steps };
+  }
+
+  const P = (total + target) / 2;
+
+  // ── Intro / reduction ───────────────────────────────────
+  steps.push({
+    title: { vi: "Đưa về subset sum", en: "Reduce to subset sum" },
+    arr: [...nums],
+    highlight: [], mark: [],
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "target", value: target },
+      { name: "total = sum(nums)", value: total },
+      { name: "P = (total + target)/2", value: P },
+    ],
+    note: {
+      vi:
+        `Đặt P = subset chọn dấu '+', N = subset chọn dấu '−'.\n` +
+        `P + N = ${total} và P − N = ${target} ⇒ P = ${P}.\n` +
+        `Câu hỏi trở thành: đếm số subset của nums có tổng = ${P}.`,
+      en:
+        `Let P = subset assigned '+', N = subset assigned '−'.\n` +
+        `P + N = ${total} and P − N = ${target} ⇒ P = ${P}.\n` +
+        `The problem becomes: count subsets of nums that sum to ${P}.`,
+    },
+  });
+
+  // ── DP init ─────────────────────────────────────────────
+  const dp = new Array(P + 1).fill(0);
+  dp[0] = 1;
+
+  steps.push({
+    title: { vi: "Khởi tạo DP", en: "Initialize DP" },
+    arr: dp.slice(),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [0], mark: [],
+    codeLines: [7, 8],
+    vars: [
+      { name: "P", value: P },
+      { name: "dp[0]", value: 1 },
+      { name: "dp", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi:
+        `dp[j] = số subset của các phần tử đã xét có tổng = j.\n` +
+        `dp[0] = 1 (subset rỗng có tổng 0).\n` +
+        `Với mỗi num, duyệt j từ P xuống num: dp[j] += dp[j - num] (0/1 knapsack: mỗi phần tử dùng ≤ 1 lần).`,
+      en:
+        `dp[j] = number of subsets (of elements processed so far) summing to j.\n` +
+        `dp[0] = 1 (the empty subset sums to 0).\n` +
+        `For each num, iterate j from P down to num: dp[j] += dp[j - num] (0/1 knapsack — each element used at most once).`,
+    },
+  });
+
+  // ── Process each num ────────────────────────────────────
+  for (const num of nums) {
+    const before = dp.slice();
+    // Iterate j downward so each num is used at most once (0/1 knapsack)
+    const updatedIdx = [];
+    for (let j = P; j >= num; j--) {
+      const added = dp[j - num];
+      if (added > 0) {
+        dp[j] += added;
+        updatedIdx.push(j);
+      }
+    }
+
+    steps.push({
+      title: { vi: `Thêm num = ${num}`, en: `Add num = ${num}` },
+      arr: dp.slice(),
+      sub: dp.map((_, i) => String(i)),
+      highlight: updatedIdx,
+      mark: [],
+      codeLines: [9, 10, 11, 12],
+      vars: [
+        { name: "num", value: num },
+        { name: "dp (before)", value: `[${before.join(",")}]` },
+        { name: "dp (after)", value: `[${dp.join(",")}]` },
+        { name: "cells changed", value: updatedIdx.join(",") || "(none)" },
+      ],
+      note: {
+        vi:
+          `Xử lý num = ${num}: dp[j] += dp[j − ${num}] cho j từ ${P} xuống ${num} (duyệt ngược để không dùng lại num).\n` +
+          `Ô thay đổi: [${updatedIdx.join(", ")}]. Sau khi thêm: dp = [${dp.join(", ")}].`,
+        en:
+          `Process num = ${num}: dp[j] += dp[j − ${num}] for j from ${P} down to ${num} (downward to avoid reusing num).\n` +
+          `Changed cells: [${updatedIdx.join(", ")}]. After: dp = [${dp.join(", ")}].`,
+      },
+    });
+  }
+
+  const answer = dp[P];
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: dp.slice(),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [], mark: [P], final: true, codeLines: [13],
+    vars: [
+      { name: "dp", value: `[${dp.join(",")}]` },
+      { name: "dp[P]", value: answer },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Số subset có tổng = ${P} = dp[${P}] = ${answer}. Đó cũng là số cách gán dấu ± để tổng = ${target}.`,
+      en: `Number of subsets summing to ${P} = dp[${P}] = ${answer}. This equals the number of ± assignments totalling ${target}.`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5299,5 +5459,59 @@ module.exports = {
       "        return max(pick(slices[:-1]), pick(slices[1:]))",
     ],
     builder: buildSteps1388,
+  },
+  494: {
+    id: 494,
+    difficulty: "medium",
+    slug: "target-sum",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Target Sum", en: "Target Sum" },
+    titleVi: { vi: "Gán ± cho tổng bằng target (subset sum)", en: "Assign ± to reach target (subset sum)" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên không âm nums và số nguyên target. Gán '+' hoặc '−' cho mỗi phần tử " +
+        "để tổng có dấu bằng target. Trả về SỐ CÁCH gán.",
+      en:
+        "Given a non-negative integer array nums and an integer target, assign '+' or '−' to each element " +
+        "so the signed sum equals target. Return the number of such assignments.",
+    },
+    defaultInput: [1, 1, 1, 1, 1],
+    inputKind: "nonneg",
+    extraParams: [
+      {
+        key: "target",
+        type: "number",
+        label: { vi: "target", en: "target" },
+        default: 3,
+        allowNegative: true,
+      },
+    ],
+    complexity: {
+      time: "O(n · P)",
+      space: "O(P)",
+      note: {
+        vi:
+          "Sau khi quy về subset sum, P = (sum+target)/2. Bảng dp dài P+1, mỗi num duyệt xuống một lần → O(n·P) thời gian, O(P) bộ nhớ.",
+        en:
+          "After reducing to subset sum, P = (sum+target)/2. A dp array of length P+1 with one downward pass per num → O(n·P) time and O(P) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findTargetSumWays(self, nums, target):",
+      "        total = sum(nums)",
+      "        # Feasibility: (total+target) even AND |target| <= total",
+      "        if abs(target) > total or (total + target) % 2 != 0:",
+      "            return 0",
+      "        P = (total + target) // 2",
+      "        # dp[j] = number of subsets summing to j",
+      "        dp = [0] * (P + 1)",
+      "        dp[0] = 1",
+      "        for num in nums:",
+      "            for j in range(P, num - 1, -1):",
+      "                dp[j] += dp[j - num]",
+      "        return dp[P]",
+    ],
+    builder: buildSteps494,
   },
 };
