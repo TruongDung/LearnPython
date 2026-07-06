@@ -1074,7 +1074,10 @@ function buildSteps53DP(nums) {
  *  - dp[1] = max(nums[0], nums[1])
  *  - dp[i] = max(dp[i-1], dp[i-2] + nums[i])  (skip house i or rob house i)
  */
-function buildSteps198(nums) {
+function buildSteps198(nums, params) {
+  const approach = (params && Number(params.approach)) || 1;
+  if (approach === 2) return buildSteps198B(nums);
+
   const n = nums.length;
   const dp = new Array(n).fill(0);
   const steps = [];
@@ -1159,6 +1162,134 @@ function buildSteps198(nums) {
     note: {
       vi: `Tiền lớn nhất = dp[${n - 1}] = ${answer}. Cướp các nhà [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
       en: `Maximum loot = dp[${n - 1}] = ${answer}. Rob houses [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 198 — Approach 2: Rolling variables (O(1) space).
+ *
+ * Instead of storing the whole dp[] array, keep only the last two values:
+ *   max_rob  = best loot up to the current house
+ *   prev_rob = best loot up to the house before that
+ *
+ * For each house `current`:
+ *   temp = max(max_rob,             # skip this house
+ *              prev_rob + current)  # rob this house (plus best before previous)
+ *   prev_rob, max_rob = max_rob, temp
+ *
+ * Answer = max_rob after the loop.
+ */
+function buildSteps198B(nums) {
+  const steps = [];
+  let prevRob = 0;
+  let maxRob = 0;
+
+  // Track which houses got robbed for a final highlight (approximate: whenever
+  // maxRob strictly increased and the "rob" branch won, we mark that house).
+  const robbedFlags = new Array(nums.length).fill(false);
+
+  steps.push({
+    title: { vi: "Khởi tạo (O(1) space)", en: "Initialize (O(1) space)" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    codeBlock: 2,
+    vars: [
+      { name: "prev_rob", value: prevRob },
+      { name: "max_rob", value: maxRob },
+    ],
+    note: {
+      vi:
+        `Cách 2 chỉ dùng 2 biến thay cho cả bảng dp:\n` +
+        `  max_rob  = tiền lớn nhất cướp được tới nhà hiện tại\n` +
+        `  prev_rob = tiền lớn nhất cướp được tới nhà TRƯỚC đó\n` +
+        `Với mỗi nhà current: temp = max(max_rob, prev_rob + current), rồi dời (prev_rob, max_rob) ← (max_rob, temp).`,
+      en:
+        `Approach 2 keeps only 2 variables instead of the whole dp array:\n` +
+        `  max_rob  = best loot up to the current house\n` +
+        `  prev_rob = best loot up to the house BEFORE that\n` +
+        `For each house current: temp = max(max_rob, prev_rob + current), then shift (prev_rob, max_rob) ← (max_rob, temp).`,
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const current = nums[i];
+    const skipVal = maxRob;
+    const robVal = prevRob + current;
+    const temp = Math.max(skipVal, robVal);
+    const chose = robVal > skipVal ? "rob" : (robVal === skipVal ? "rob=skip" : "skip");
+
+    // Track for the final visualization: if strictly robbing this house is
+    // better than skipping, mark it as robbed.
+    if (robVal > skipVal) robbedFlags[i] = true;
+
+    // 1) show the comparison BEFORE the shift
+    steps.push({
+      title: { vi: `Xét nhà ${i} (tiền = ${current})`, en: `House ${i} (money = ${current})` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [5, 6],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "current", value: current },
+        { name: "prev_rob", value: prevRob },
+        { name: "max_rob", value: maxRob },
+        { name: "prev_rob + current", value: robVal },
+        { name: "temp = max(...)", value: temp },
+        { name: "decision", value: chose },
+      ],
+      note: {
+        vi: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Quyết định: ${chose === "skip" ? "bỏ nhà" : chose === "rob" ? "cướp nhà" : "cướp (bằng bỏ)"} ${i}.`,
+        en: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Decision: ${chose === "skip" ? "skip" : chose === "rob" ? "rob" : "rob (tie)"} house ${i}.`,
+      },
+    });
+
+    // 2) apply the shift
+    prevRob = maxRob;
+    maxRob = temp;
+
+    steps.push({
+      title: { vi: `Dời (prev_rob, max_rob)`, en: `Shift (prev_rob, max_rob)` },
+      arr: [...nums],
+      highlight: [i],
+      mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+      codeLines: [7],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "prev_rob", value: prevRob },
+        { name: "max_rob", value: maxRob },
+      ],
+      note: {
+        vi: `Sau lần dời: prev_rob = ${prevRob}, max_rob = ${maxRob} (giá trị mới sau khi xử lý nhà ${i}).`,
+        en: `After the shift: prev_rob = ${prevRob}, max_rob = ${maxRob} (new value after processing house ${i}).`,
+      },
+    });
+  }
+
+  const answer = maxRob;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...nums],
+    highlight: [],
+    mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+    final: true,
+    codeLines: [9],
+    codeBlock: 2,
+    vars: [
+      { name: "prev_rob", value: prevRob },
+      { name: "max_rob", value: maxRob },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Sau khi duyệt xong: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ so với O(n) của cách 1.`,
+      en: `After the loop: max_rob = ${answer}. Uses O(1) memory vs O(n) in approach 1.`,
     },
   });
 
@@ -4384,13 +4515,24 @@ module.exports = {
     },
     defaultInput: [2, 7, 9, 3, 1],
     inputKind: "nonneg",
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "DP Array O(n) — dp[i] = tiền tối đa tới nhà i", en: "DP Array O(n) — dp[i] = max loot up to house i" } },
+          { value: 2, label: { vi: "Tối ưu O(1) — 2 biến prev_rob & max_rob", en: "Optimized O(1) — 2 vars prev_rob & max_rob" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Điền bảng dp một lần nên O(n) thời gian. Bảng dp dài n nên O(n) bộ nhớ (có thể tối ưu xuống O(1) bằng 2 biến).",
-        en: "A single pass to fill dp gives O(n) time. The dp table of length n is O(n) memory (optimizable to O(1) with two variables).",
+        vi: "Cách 1: O(n) thời gian + O(n) bộ nhớ (bảng dp). Cách 2: O(n) thời gian + O(1) bộ nhớ (2 biến prev_rob, max_rob).",
+        en: "Approach 1: O(n) time + O(n) memory (dp table). Approach 2: O(n) time + O(1) memory (2 variables prev_rob, max_rob).",
       },
     },
     code: [
@@ -4409,6 +4551,18 @@ module.exports = {
       "            dp[i] = max(dp[i-1], dp[i-2] + nums[i])",
       "        return dp[-1]",
     ],
+    code2: [
+      "# Optimized O(1) space",
+      "class Solution:",
+      "    def rob(self, nums: List[int]) -> int:",
+      "        prev_rob, max_rob = 0, 0",
+      "        for current in nums:",
+      "            temp = max(max_rob, prev_rob + current)",
+      "            prev_rob, max_rob = max_rob, temp",
+      "        return max_rob",
+    ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps198,
   },
   53: {
