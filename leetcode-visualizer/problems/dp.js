@@ -551,13 +551,12 @@ function buildSteps300(nums, params) {
       codeLines: [5, 6, 7, 8], codeBlock: 1,
       vars: [
         { name: "i", value: i },
-        { name: "j", value: i - 1 },
         { name: "nums[i]", value: nums[i] },
-        { name: "nums[j]", value: nums[i - 1] },
-        { name: "bestJ", value: bestJ },
-        { name: "nums[bestJ]", value: bestJ >= 0 ? nums[bestJ] : "-" },
+        { name: "bestJ", value: bestJ >= 0 ? bestJ : "none" },
+        { name: "nums[bestJ]", value: bestJ >= 0 ? nums[bestJ] : "—" },
+        { name: "dp[bestJ]+1", value: bestJ >= 0 ? `dp[${bestJ}]+1 = ${dp[bestJ]-1}+1 = ${dp[i]}` : "—" },
         { name: "dp[i]", value: dp[i] },
-        { name: "dp", value: [...dp] },
+        { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: bestJ >= 0
         ? { vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`, en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.` }
