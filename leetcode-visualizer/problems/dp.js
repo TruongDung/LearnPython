@@ -2568,6 +2568,116 @@ function buildSteps139(input, params) {
 }
 
 /**
+ * LeetCode 132: Palindrome Partitioning II.
+ * dp[i] = minimum cuts needed for s[0..i-1] to be split into all palindromes.
+ * isPalin[j][i] = true if s[j..i] is a palindrome.
+ * Transition: dp[i] = min(dp[j] + 1) for all j where s[j..i-1] is palindrome.
+ */
+function buildSteps132(input) {
+  const s = typeof input === "string" ? input : String(input);
+  const n = s.length;
+  const steps = [];
+
+  // Build isPalin table (expand from center or DP).
+  const isPalin = Array.from({ length: n }, () => new Array(n).fill(false));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = i; j < n; j++) {
+      if (s[i] === s[j] && (j - i <= 2 || isPalin[i + 1][j - 1])) {
+        isPalin[i][j] = true;
+      }
+    }
+  }
+
+  // dp[i] = min cuts for s[0..i-1]. dp[0] = -1 base.
+  const dp = new Array(n + 1).fill(0);
+  dp[0] = -1;
+  for (let i = 1; i <= n; i++) dp[i] = i - 1; // worst case: cut each char
+
+  const sub = s.split("");
+
+  steps.push({
+    title: { vi: "Khởi tạo DP", en: "Initialize DP" },
+    arr: [...dp],
+    sub: ["-1", ...sub],
+    highlight: [], mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "s", value: s },
+      { name: "n", value: n },
+      { name: "dp (worst)", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi:
+        `s = "${s}" (dài ${n}).\n` +
+        `dp[i] = số CẮT TỐI THIỂU cho s[0..i-1] thành toàn palindrome.\n` +
+        `dp[0] = -1 (base). Khởi tạo dp[i] = i-1 (worst: mỗi ký tự 1 đoạn).\n` +
+        `isPalin[i][j] đã được tiền xử lý.`,
+      en:
+        `s = "${s}" (length ${n}).\n` +
+        `dp[i] = minimum CUTS for s[0..i-1] to all be palindromes.\n` +
+        `dp[0] = -1 (base). Initialize dp[i] = i-1 (worst: each char is a segment).\n` +
+        `isPalin[i][j] has been precomputed.`,
+    },
+  });
+
+  for (let i = 1; i <= n; i++) {
+    let bestJ = i - 1; // default: dp[i-1]+1 (cut single char)
+    for (let j = 0; j < i; j++) {
+      if (isPalin[j][i - 1] && dp[j] + 1 < dp[i]) {
+        dp[i] = dp[j] + 1;
+        bestJ = j;
+      }
+    }
+
+    const palinStr = s.slice(bestJ, i);
+    steps.push({
+      title: { vi: `dp[${i}] = ${dp[i]}`, en: `dp[${i}] = ${dp[i]}` },
+      arr: [...dp],
+      sub: ["-1", ...sub],
+      highlight: Array.from({ length: i - bestJ }, (_, k) => bestJ + 1 + k).filter(x => x <= n),
+      mark: dp[i] === 0 ? Array.from({ length: n + 1 }, (_, k) => k) : [],
+      codeLines: [6, 7, 8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "s[0..i-1]", value: s.slice(0, i) },
+        { name: "best j", value: bestJ },
+        { name: "palindrome", value: `s[${bestJ}..${i-1}] = "${palinStr}"` },
+        { name: "dp[i]", value: dp[i] },
+      ],
+      note: {
+        vi:
+          `Xét s[0..${i-1}] = "${s.slice(0,i)}".\n` +
+          `Tìm j sao cho s[j..${i-1}] là palindrome và dp[j]+1 nhỏ nhất.\n` +
+          `Tốt nhất: j=${bestJ}, s[${bestJ}..${i-1}] = "${palinStr}" (palindrome${isPalin[bestJ][i-1] ? " ✓" : ""}).\n` +
+          `dp[${i}] = dp[${bestJ}] + 1 = ${dp[bestJ]} + 1 = ${dp[i]}.` +
+          (dp[i] === 0 ? ` (Toàn bộ chuỗi đã là palindrome → 0 cắt!)` : ``),
+        en:
+          `Consider s[0..${i-1}] = "${s.slice(0,i)}".\n` +
+          `Find j such that s[j..${i-1}] is a palindrome and dp[j]+1 is minimized.\n` +
+          `Best: j=${bestJ}, s[${bestJ}..${i-1}] = "${palinStr}" (palindrome${isPalin[bestJ][i-1] ? " ✓" : ""}).\n` +
+          `dp[${i}] = dp[${bestJ}] + 1 = ${dp[bestJ]} + 1 = ${dp[i]}.` +
+          (dp[i] === 0 ? ` (Entire string is palindrome → 0 cuts!)` : ``),
+      },
+    });
+  }
+
+  const answer = dp[n];
+  const fs = {
+    title: { vi: `Kết quả: ${answer} cắt`, en: `Result: ${answer} cut(s)` },
+    arr: [...dp], sub: ["-1", ...sub],
+    highlight: [], mark: [n],
+    final: true, codeLines: [10],
+    vars: [{ name: "answer", value: answer }, { name: "dp", value: `[${dp.join(",")}]` }],
+    note: {
+      vi: `dp[${n}] = ${answer} → cần tối thiểu ${answer} lần cắt để "${s}" thành toàn palindrome.`,
+      en: `dp[${n}] = ${answer} → minimum ${answer} cut(s) needed to split "${s}" into all palindromes.`,
+    },
+  };
+  steps.push(fs);
+  return { input: s, answer, steps };
+}
+
+/**
  * LeetCode 91: Decode Ways.
  * dp[i] = number of ways to decode s[0..i-1].
  * Single digit s[i-1] != '0': dp[i] += dp[i-1].
@@ -4033,6 +4143,306 @@ function buildSteps494(nums, params) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 1463: Cherry Pickup II.
+ * 2 robots on a grid. Robot1 starts at (0,0), Robot2 at (0,cols-1).
+ * Move row-by-row (down-left, down, down-right). Maximize total cherries.
+ * dp[r][c1][c2] = max cherries collected starting from row r with positions (c1, c2).
+ */
+function buildSteps1463(input) {
+  const grid = String(input).split(";").map((row) => row.split(",").map((s) => Number(s.trim())));
+  const rows = grid.length, cols = grid[0].length;
+  const steps = [];
+
+  // DP bottom-up: dp[c1][c2] = max cherries from current row down
+  let dp = Array.from({ length: cols }, () => new Array(cols).fill(0));
+  let prev = Array.from({ length: cols }, () => new Array(cols).fill(0));
+
+  // Grid snapshot for renderGrid
+  function gridSnap(title, note, r, c1, c2, path1, path2, vars, codeLines) {
+    // Build dp 2D as grid.dp for display, with column headers as indices
+    const gDp = [];
+    for (let i = 0; i < rows; i++) {
+      const row = [];
+      for (let j = 0; j < cols; j++) {
+        row.push(grid[i][j]);
+      }
+      gDp.push(row);
+    }
+    const text1 = Array.from({ length: rows }, (_, i) => String(i));
+    const text2 = Array.from({ length: cols }, (_, j) => String(j));
+    const hlCells = [];
+    if (r >= 0) { hlCells.push([r, c1]); if (c1 !== c2) hlCells.push([r, c2]); }
+    const pathCells = [];
+    path1.forEach((p) => pathCells.push(p));
+    path2.forEach((p) => pathCells.push(p));
+
+    return {
+      title,
+      arr: [],
+      grid: { dp: gDp, text1, text2, hlCell: hlCells.length > 0 ? hlCells[0] : null, pathCells },
+      highlight: [], mark: [],
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  // Intro step
+  const gridStr = grid.map((r) => `[${r.join(",")}]`).join(" ");
+  steps.push(gridSnap(
+    { vi: "Cherry Pickup II: 2 robots trên grid", en: "Cherry Pickup II: 2 robots on grid" },
+    {
+      vi:
+        `Grid ${rows}×${cols}. Robot 1 bắt đầu tại (0, 0), Robot 2 tại (0, ${cols - 1}).\n` +
+        `Cả 2 di chuyển ĐỒNG THỜI xuống mỗi bước (↙, ↓, ↘). Thu cherry tại ô đi qua.\n` +
+        `Nếu cùng ô thì chỉ thu 1 lần.\n\n` +
+        `DP 3D: dp[r][c1][c2] = max cherry từ hàng r trở xuống khi robot ở (c1, c2).\n` +
+        `Tính bottom-up (từ hàng cuối lên).`,
+      en:
+        `Grid ${rows}×${cols}. Robot 1 starts at (0, 0), Robot 2 at (0, ${cols - 1}).\n` +
+        `Both move SIMULTANEOUSLY down one row per step (↙, ↓, ↘). Collect cherries at visited cells.\n` +
+        `If both visit the same cell, only collect once.\n\n` +
+        `3D DP: dp[r][c1][c2] = max cherries from row r down when robots are at columns (c1, c2).\n` +
+        `Computed bottom-up (from the last row upward).`,
+    },
+    -1, -1, -1, [], [],
+    [{ name: "rows", value: rows }, { name: "cols", value: cols }, { name: "grid", value: gridStr }],
+    [2, 3, 4]
+  ));
+
+  // Bottom-up DP
+  for (let r = rows - 1; r >= 0; r--) {
+    const cur = Array.from({ length: cols }, () => new Array(cols).fill(0));
+    for (let c1 = 0; c1 < cols; c1++) {
+      for (let c2 = c1; c2 < cols; c2++) {
+        const cherries = c1 === c2 ? grid[r][c1] : grid[r][c1] + grid[r][c2];
+        let best = 0;
+        if (r < rows - 1) {
+          for (const dc1 of [-1, 0, 1]) {
+            for (const dc2 of [-1, 0, 1]) {
+              const nc1 = c1 + dc1, nc2 = c2 + dc2;
+              if (nc1 >= 0 && nc1 < cols && nc2 >= 0 && nc2 < cols) {
+                best = Math.max(best, prev[nc1][nc2]);
+              }
+            }
+          }
+        }
+        cur[c1][c2] = cherries + best;
+        cur[c2][c1] = cur[c1][c2]; // symmetric
+      }
+    }
+    prev = cur;
+    dp = cur;
+
+    // Only show a step for a few key rows to keep it concise
+    if (r === rows - 1 || r === 0 || r === Math.floor(rows / 2)) {
+      steps.push(gridSnap(
+        { vi: `Hàng ${r}: dp tính xong`, en: `Row ${r}: dp computed` },
+        {
+          vi:
+            `Hàng ${r}: với mỗi cặp (c1, c2), tính dp[${r}][c1][c2] = grid[${r}][c1] + grid[${r}][c2] + max(dp[${r + 1}][...]).\n` +
+            `dp[${r}][0][${cols - 1}] = ${cur[0][cols - 1]}` +
+            (r === 0 ? ` ← đây chính là đáp án (robot bắt đầu ở col 0 và col ${cols - 1}).` : `.`),
+          en:
+            `Row ${r}: for each (c1, c2) pair, dp[${r}][c1][c2] = grid[${r}][c1] + grid[${r}][c2] + max(dp[${r + 1}][...]).\n` +
+            `dp[${r}][0][${cols - 1}] = ${cur[0][cols - 1]}` +
+            (r === 0 ? ` ← this is the answer (robots start at col 0 and col ${cols - 1}).` : `.`),
+        },
+        r, 0, cols - 1, [], [],
+        [{ name: "row", value: r }, { name: "dp[r][0][cols-1]", value: cur[0][cols - 1] }],
+        [6, 7, 8, 9, 10]
+      ));
+    }
+  }
+
+  // Reconstruct path (greedy forward from dp)
+  const path1 = [[0, 0]], path2 = [[0, cols - 1]];
+  let pc1 = 0, pc2 = cols - 1;
+
+  // Rebuild dp from scratch for path reconstruction
+  const fullDp = Array.from({ length: rows }, () => Array.from({ length: cols }, () => new Array(cols).fill(-1)));
+  // Fill fullDp bottom-up
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c1 = 0; c1 < cols; c1++) {
+      for (let c2 = c1; c2 < cols; c2++) {
+        const ch = c1 === c2 ? grid[r][c1] : grid[r][c1] + grid[r][c2];
+        let best = 0;
+        if (r < rows - 1) {
+          for (const dc1 of [-1, 0, 1]) for (const dc2 of [-1, 0, 1]) {
+            const nc1 = c1 + dc1, nc2 = c2 + dc2;
+            if (nc1 >= 0 && nc1 < cols && nc2 >= 0 && nc2 < cols) best = Math.max(best, fullDp[r + 1][nc1][nc2]);
+          }
+        }
+        fullDp[r][c1][c2] = ch + best;
+        fullDp[r][c2][c1] = fullDp[r][c1][c2];
+      }
+    }
+  }
+
+  for (let r = 0; r < rows - 1; r++) {
+    let bestVal = -1, bc1 = pc1, bc2 = pc2;
+    for (const dc1 of [-1, 0, 1]) for (const dc2 of [-1, 0, 1]) {
+      const nc1 = pc1 + dc1, nc2 = pc2 + dc2;
+      if (nc1 >= 0 && nc1 < cols && nc2 >= 0 && nc2 < cols && fullDp[r + 1][nc1][nc2] > bestVal) {
+        bestVal = fullDp[r + 1][nc1][nc2]; bc1 = nc1; bc2 = nc2;
+      }
+    }
+    pc1 = bc1; pc2 = bc2;
+    path1.push([r + 1, pc1]); path2.push([r + 1, pc2]);
+  }
+
+  const answer = fullDp[0][0][cols - 1];
+  const allPath = [...path1, ...path2];
+  const fs = gridSnap(
+    { vi: `Kết quả: ${answer} cherry`, en: `Result: ${answer} cherries` },
+    {
+      vi:
+        `Max cherry = dp[0][0][${cols - 1}] = ${answer}.\n` +
+        `Đường đi Robot 1: ${path1.map((p) => `(${p.join(",")})`).join("→")}\n` +
+        `Đường đi Robot 2: ${path2.map((p) => `(${p.join(",")})`).join("→")}`,
+      en:
+        `Max cherries = dp[0][0][${cols - 1}] = ${answer}.\n` +
+        `Robot 1 path: ${path1.map((p) => `(${p.join(",")})`).join("→")}\n` +
+        `Robot 2 path: ${path2.map((p) => `(${p.join(",")})`).join("→")}`,
+    },
+    -1, -1, -1, path1, path2,
+    [{ name: "answer", value: answer }],
+    [11]
+  );
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
+/**
+ * LeetCode 174: Dungeon Game.
+ * dp[i][j] = minimum HP needed to enter cell (i,j) and still reach (m-1,n-1) alive.
+ * Fill bottom-right → top-left: dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) - dungeon[i][j]).
+ */
+function buildSteps174(input) {
+  const grid = String(input).split(";").map((row) => row.split(",").map((s) => Number(s.trim())));
+  const m = grid.length, n = grid[0].length;
+  const steps = [];
+
+  // dp[i][j] = min HP needed when entering (i,j)
+  const dp = Array.from({ length: m }, () => new Array(n).fill(Infinity));
+
+  // Base: bottom-right corner
+  dp[m - 1][n - 1] = Math.max(1, 1 - grid[m - 1][n - 1]);
+
+  // Fill last row (right→left)
+  for (let j = n - 2; j >= 0; j--) dp[m - 1][j] = Math.max(1, dp[m - 1][j + 1] - grid[m - 1][j]);
+  // Fill last column (bottom→up)
+  for (let i = m - 2; i >= 0; i--) dp[i][n - 1] = Math.max(1, dp[i + 1][n - 1] - grid[i][n - 1]);
+  // Fill rest
+  for (let i = m - 2; i >= 0; i--)
+    for (let j = n - 2; j >= 0; j--)
+      dp[i][j] = Math.max(1, Math.min(dp[i + 1][j], dp[i][j + 1]) - grid[i][j]);
+
+  function gridSnap(title, note, hlCell, pathCells, vars, codeLines) {
+    return {
+      title,
+      arr: [],
+      grid: { dp, text1: Array.from({ length: m }, (_, i) => String(i)), text2: Array.from({ length: n }, (_, j) => String(j)), hlCell, pathCells: pathCells || [] },
+      highlight: [], mark: [],
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  const gridStr = grid.map((r) => `[${r.join(",")}]`).join(" ");
+
+  steps.push(gridSnap(
+    { vi: "Dungeon Game: DP ngược", en: "Dungeon Game: Reverse DP" },
+    {
+      vi:
+        `Grid ${m}×${n}: ${gridStr}\n` +
+        `Hiệp sĩ đi từ (0,0) → (${m - 1},${n - 1}), chỉ đi phải hoặc xuống.\n` +
+        `HP phải luôn ≥ 1 tại MỌI ô (bao gồm cả ô cuối).\n\n` +
+        `Ý tưởng: DP NGƯỢC từ góc dưới-phải → trên-trái.\n` +
+        `dp[i][j] = HP TỐI THIỂU cần có KHI VÀO ô (i,j) để sống tới đích.\n` +
+        `dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j]).\n` +
+        `Đáp án = dp[0][0].`,
+      en:
+        `Grid ${m}×${n}: ${gridStr}\n` +
+        `Knight goes from (0,0) → (${m - 1},${n - 1}), can only move right or down.\n` +
+        `HP must stay ≥ 1 at EVERY cell (including the last one).\n\n` +
+        `Idea: REVERSE DP from bottom-right → top-left.\n` +
+        `dp[i][j] = minimum HP required UPON ENTERING cell (i,j) to survive to the goal.\n` +
+        `dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j]).\n` +
+        `Answer = dp[0][0].`,
+    },
+    null, [],
+    [{ name: "rows", value: m }, { name: "cols", value: n }, { name: "dungeon", value: gridStr }],
+    [2, 3, 4]
+  ));
+
+  // Show dp filled step by step for a few key cells
+  steps.push(gridSnap(
+    { vi: `dp[${m-1}][${n-1}] = ${dp[m-1][n-1]}`, en: `dp[${m-1}][${n-1}] = ${dp[m-1][n-1]}` },
+    {
+      vi: `Ô đích (${m-1},${n-1}): dungeon=${grid[m-1][n-1]}. Cần HP ≥ 1 SAU khi chịu damage.\ndp = max(1, 1 − ${grid[m-1][n-1]}) = ${dp[m-1][n-1]}.`,
+      en: `Goal cell (${m-1},${n-1}): dungeon=${grid[m-1][n-1]}. Need HP ≥ 1 AFTER taking damage.\ndp = max(1, 1 − ${grid[m-1][n-1]}) = ${dp[m-1][n-1]}.`,
+    },
+    [m-1, n-1], [],
+    [{ name: "cell", value: `(${m-1},${n-1})` }, { name: "dungeon", value: grid[m-1][n-1] }, { name: "dp", value: dp[m-1][n-1] }],
+    [5, 6]
+  ));
+
+  // Show last row and last column
+  steps.push(gridSnap(
+    { vi: "Điền hàng cuối & cột cuối", en: "Fill last row & last column" },
+    {
+      vi: `Hàng cuối (chỉ đi phải): dp[${m-1}][j] = max(1, dp[${m-1}][j+1] − grid[${m-1}][j]).\nCột cuối (chỉ đi xuống): dp[i][${n-1}] = max(1, dp[i+1][${n-1}] − grid[i][${n-1}]).`,
+      en: `Last row (can only go right): dp[${m-1}][j] = max(1, dp[${m-1}][j+1] − grid[${m-1}][j]).\nLast col (can only go down): dp[i][${n-1}] = max(1, dp[i+1][${n-1}] − grid[i][${n-1}]).`,
+    },
+    null, [],
+    [{ name: "dp last row", value: `[${dp[m-1].join(",")}]` }, { name: "dp last col", value: `[${dp.map((r) => r[n-1]).join(",")}]` }],
+    [7, 8]
+  ));
+
+  // Show remaining cells
+  steps.push(gridSnap(
+    { vi: "Điền phần còn lại (bottom-right → top-left)", en: "Fill remaining cells (bottom-right → top-left)" },
+    {
+      vi: `Với mỗi ô (i,j) từ (${m-2},${n-2}) lên (0,0):\ndp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j]).\nĐi theo hướng nào cần ít HP hơn.`,
+      en: `For each cell (i,j) from (${m-2},${n-2}) to (0,0):\ndp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j]).\nGo in the direction requiring less HP.`,
+    },
+    [0, 0], [],
+    [{ name: "dp[0][0]", value: dp[0][0] }],
+    [9, 10, 11]
+  ));
+
+  // Reconstruct path
+  const path = [[0, 0]];
+  let ci = 0, cj = 0;
+  while (ci < m - 1 || cj < n - 1) {
+    if (ci === m - 1) { cj++; }
+    else if (cj === n - 1) { ci++; }
+    else { if (dp[ci + 1][cj] <= dp[ci][cj + 1]) ci++; else cj++; }
+    path.push([ci, cj]);
+  }
+
+  const answer = dp[0][0];
+  const fs = gridSnap(
+    { vi: `Đáp án: HP tối thiểu = ${answer}`, en: `Answer: minimum HP = ${answer}` },
+    {
+      vi: `dp[0][0] = ${answer}. Hiệp sĩ cần BẮT ĐẦU với ít nhất ${answer} HP để sống qua mọi ô.\nĐường đi: ${path.map((p) => `(${p.join(",")})`).join("→")}.`,
+      en: `dp[0][0] = ${answer}. Knight must START with at least ${answer} HP to survive every cell.\nPath: ${path.map((p) => `(${p.join(",")})`).join("→")}.`,
+    },
+    null, path,
+    [{ name: "answer", value: answer }, { name: "path", value: path.map((p) => `(${p.join(",")})`).join("→") }],
+    [12]
+  );
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
@@ -4450,6 +4860,47 @@ module.exports = {
       "        return dp[n]",
     ],
     builder: buildSteps91,
+  },
+  132: {
+    id: 132,
+    difficulty: "hard",
+    slug: "palindrome-partitioning-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Palindrome Partitioning II", en: "Palindrome Partitioning II" },
+    titleVi: { vi: "Số cắt tối thiểu (palindrome)", en: "Min cuts for palindrome partitioning" },
+    statement: {
+      vi: "Cho chuỗi s, trả về SỐ CẮT TỐI THIỂU để chia s thành các đoạn con đều là palindrome. Nhập chuỗi chữ thường.",
+      en: "Given a string s, return the MINIMUM number of cuts so every substring in the partition is a palindrome. Enter a lowercase string.",
+    },
+    defaultInput: "aab",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Tiền xử lý isPalin[i][j] = s[i..j] có phải palindrome không (DP 2D O(n²)).", en: "Precompute isPalin[i][j] = whether s[i..j] is a palindrome (2D DP O(n²))." },
+      { vi: "dp[i] = số cắt tối thiểu cho s[0..i-1]. dp[0] = -1 (base). dp[i] = min(dp[j]+1) với mọi j mà s[j..i-1] palindrome.", en: "dp[i] = min cuts for s[0..i-1]. dp[0] = -1 (base). dp[i] = min(dp[j]+1) for all j where s[j..i-1] is a palindrome." },
+      { vi: "Đáp án = dp[n].", en: "Answer = dp[n]." },
+    ],
+    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "n² cho isPalin + n² cho dp fill.", en: "n² for isPalin + n² for dp fill." } },
+    code: [
+      "class Solution:",
+      "    def minCut(self, s):",
+      "        n = len(s)",
+      "        # Precompute isPalin[i][j]",
+      "        isPalin = [[False]*n for _ in range(n)]",
+      "        for i in range(n-1, -1, -1):",
+      "            for j in range(i, n):",
+      "                if s[i]==s[j] and (j-i<=2 or isPalin[i+1][j-1]):",
+      "                    isPalin[i][j] = True",
+      "        # DP",
+      "        dp = list(range(-1, n))  # dp[0]=-1, dp[1]=0,...",
+      "        for i in range(1, n+1):",
+      "            for j in range(i):",
+      "                if isPalin[j][i-1]:",
+      "                    dp[i] = min(dp[i], dp[j] + 1)",
+      "        return dp[n]",
+    ],
+    builder: buildSteps132,
   },
   139: {
     id: 139,
@@ -5513,5 +5964,90 @@ module.exports = {
       "        return dp[P]",
     ],
     builder: buildSteps494,
+  },
+  1463: {
+    id: 1463,
+    difficulty: "hard",
+    slug: "cherry-pickup-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Cherry Pickup II", en: "Cherry Pickup II" },
+    titleVi: { vi: "Thu cherry (2 robots trên grid)", en: "2 robots collect max cherries" },
+    statement: {
+      vi: "Grid rows×cols, mỗi ô chứa cherry. Robot1 tại (0,0), Robot2 tại (0,cols-1). Cả 2 cùng đi xuống (↙/↓/↘). Nếu cùng ô thì chỉ thu 1 lần. Tìm tổng cherry TỐI ĐA. Nhập grid: hàng cách ';', giá trị cách ','.",
+      en: "Grid rows×cols, each cell has cherries. Robot1 at (0,0), Robot2 at (0,cols-1). Both move down (↙/↓/↘). If same cell, only collect once. Find MAX total cherries. Enter grid: rows by ';', values by ','.",
+    },
+    defaultInput: "3,1,1;2,5,1;1,5,5;2,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Grid (hàng cách ';')", en: "Grid (rows by ';')" },
+    extraParams: [],
+    approach: [
+      { vi: "DP 3D: dp[r][c1][c2] = max cherry từ hàng r trở xuống khi robots ở cột c1 và c2.", en: "3D DP: dp[r][c1][c2] = max cherries from row r downward with robots at columns c1 and c2." },
+      { vi: "Base: hàng cuối, dp = grid[r][c1] + grid[r][c2] (hoặc chỉ 1 lần nếu c1==c2).", en: "Base: last row, dp = grid[r][c1] + grid[r][c2] (or once if c1==c2)." },
+      { vi: "Transition: dp[r][c1][c2] = cherries + max(dp[r+1][c1±1/0][c2±1/0]) — 9 tổ hợp.", en: "Transition: dp[r][c1][c2] = cherries + max(dp[r+1][c1±1/0][c2±1/0]) — 9 combinations." },
+      { vi: "Đáp án = dp[0][0][cols-1].", en: "Answer = dp[0][0][cols-1]." },
+    ],
+    complexity: { time: "O(rows · cols² · 9)", space: "O(cols²)", note: { vi: "Mỗi hàng xét cols² cặp × 9 di chuyển. Bộ nhớ: 2 lớp cols².", en: "Each row checks cols² pairs × 9 moves. Memory: two cols² layers." } },
+    code: [
+      "class Solution:",
+      "    def cherryPickup(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        dp = [[-1]*cols for _ in range(cols)]",
+      "        dp[0][cols-1] = grid[0][0] + grid[0][cols-1]",
+      "        for r in range(1, rows):",
+      "            ndp = [[-1]*cols for _ in range(cols)]",
+      "            for c1 in range(min(r+1, cols)):",
+      "                for c2 in range(max(0, cols-1-r), cols):",
+      "                    for dc1 in (-1, 0, 1):",
+      "                        for dc2 in (-1, 0, 1):",
+      "                            pc1, pc2 = c1-dc1, c2-dc2",
+      "                            if 0<=pc1<cols and 0<=pc2<cols and dp[pc1][pc2]>=0:",
+      "                                val = grid[r][c1]+(grid[r][c2] if c1!=c2 else 0)",
+      "                                ndp[c1][c2] = max(ndp[c1][c2], dp[pc1][pc2]+val)",
+      "            dp = ndp",
+      "        return max(max(row) for row in dp)",
+    ],
+    builder: buildSteps1463,
+  },
+  174: {
+    id: 174,
+    difficulty: "hard",
+    slug: "dungeon-game",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Dungeon Game", en: "Dungeon Game" },
+    titleVi: { vi: "HP tối thiểu qua dungeon", en: "Min initial HP to survive" },
+    statement: {
+      vi: "Hiệp sĩ đi từ (0,0) đến (m-1,n-1), chỉ được đi PHẢI hoặc XUỐNG. Mỗi ô có giá trị (âm=mất HP, dương=hồi HP). HP phải luôn ≥ 1. Tìm HP KHỞI ĐẦU tối thiểu. Nhập grid: hàng cách ';', giá trị cách ','.",
+      en: "Knight goes from (0,0) to (m-1,n-1), can only move RIGHT or DOWN. Each cell has a value (negative=damage, positive=heal). HP must always ≥ 1. Find the minimum INITIAL HP. Enter grid: rows by ';', values by ','.",
+    },
+    defaultInput: "-2,-3,3;-5,-10,1;10,30,-5",
+    inputKind: "string",
+    inputLabel: { vi: "Grid (hàng cách ';')", en: "Grid (rows by ';')" },
+    extraParams: [],
+    approach: [
+      { vi: "DP NGƯỢC (bottom-right → top-left): dp[i][j] = HP tối thiểu khi VÀO ô (i,j) để sống tới đích.", en: "REVERSE DP (bottom-right → top-left): dp[i][j] = min HP when ENTERING cell (i,j) to survive to the goal." },
+      { vi: "dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j]).", en: "dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) − grid[i][j])." },
+      { vi: "max(1,...) vì HP không được rớt dưới 1 tại bất kỳ ô nào.", en: "max(1,...) because HP cannot drop below 1 at any cell." },
+      { vi: "Đáp án = dp[0][0]. Không thể dùng DP xuôi vì path tối ưu phụ thuộc cả tương lai.", en: "Answer = dp[0][0]. Cannot use forward DP because the optimal path depends on future cells." },
+    ],
+    complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "1 lần fill bảng m×n.", en: "Single pass to fill the m×n table." } },
+    code: [
+      "class Solution:",
+      "    def calculateMinimumHP(self, dungeon):",
+      "        m, n = len(dungeon), len(dungeon[0])",
+      "        dp = [[0]*n for _ in range(m)]",
+      "        dp[m-1][n-1] = max(1, 1 - dungeon[m-1][n-1])",
+      "        # Last row",
+      "        for j in range(n-2, -1, -1):",
+      "            dp[m-1][j] = max(1, dp[m-1][j+1] - dungeon[m-1][j])",
+      "        # Last col",
+      "        for i in range(m-2, -1, -1):",
+      "            dp[i][n-1] = max(1, dp[i+1][n-1] - dungeon[i][n-1])",
+      "        # Rest",
+      "        for i in range(m-2, -1, -1):",
+      "            for j in range(n-2, -1, -1):",
+      "                dp[i][j] = max(1, min(dp[i+1][j], dp[i][j+1]) - dungeon[i][j])",
+      "        return dp[0][0]",
+    ],
+    builder: buildSteps174,
   },
 };
