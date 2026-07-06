@@ -2229,6 +2229,7 @@ function buildSteps322(nums, params) {
           { name: "dp[i]", value: dp[i] >= INF ? "∞" : dp[i] },
           { name: "best coin", value: bestCoin > 0 ? bestCoin : "none" },
           { name: "from", value: bestCoin > 0 ? `dp[${i - bestCoin}]+1 = ${dp[i]}` : "no coin fits" },
+          { name: "dp", value: `[${dp.map((v) => v >= INF ? "∞" : v).join(", ")}]` },
         ],
         note: {
           vi: bestCoin > 0
