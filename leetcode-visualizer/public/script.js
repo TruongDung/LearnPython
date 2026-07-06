@@ -670,12 +670,33 @@ function renderCode() {
   const panel = $("codePanel");
   const code = (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;
+  const codeCsharp = (problemData && problemData.codeCsharp) || null;
   panel.innerHTML = "";
-  if (code.length === 0 && !code2) {
+  if (code.length === 0 && !code2 && !codeCsharp) {
     panel.classList.add("hidden");
     return;
   }
   panel.classList.remove("hidden");
+
+  // ── Language tabs (Python | C#) ──
+  if (codeCsharp) {
+    const tabBar = document.createElement("div");
+    tabBar.className = "code-lang-tabs";
+    ["Python", "C#"].forEach((lbl, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "code-lang-tab" + (i === 0 ? " active" : "");
+      btn.textContent = lbl;
+      btn.dataset.codeLang = i === 0 ? "python" : "csharp";
+      btn.addEventListener("click", () => {
+        tabBar.querySelectorAll(".code-lang-tab").forEach(t => t.classList.remove("active"));
+        btn.classList.add("active");
+        panel.querySelectorAll(".code-lang-block").forEach(b => b.classList.toggle("hidden", b.dataset.codeLang !== btn.dataset.codeLang));
+      });
+      tabBar.appendChild(btn);
+    });
+    panel.appendChild(tabBar);
+  }
 
   // Helper: create a copy button for a code block
   function createCopyBtn(codeLines) {
@@ -698,6 +719,9 @@ function renderCode() {
   }
 
   // Render primary code
+  const pyBlock = document.createElement("div");
+  pyBlock.className = "code-lang-block";
+  pyBlock.dataset.codeLang = "python";
   if (code.length > 0) {
     const section = document.createElement("div");
     section.className = "code-section";
@@ -731,7 +755,7 @@ function renderCode() {
       section.appendChild(row);
     });
 
-    panel.appendChild(section);
+    pyBlock.appendChild(section);
   }
 
   // Render secondary code (code2) if available
@@ -766,7 +790,28 @@ function renderCode() {
       section.appendChild(row);
     });
 
-    panel.appendChild(section);
+    pyBlock.appendChild(section);
+  }
+  panel.appendChild(pyBlock);
+
+  // ── C# block ──
+  if (codeCsharp) {
+    const csBlock = document.createElement("div");
+    csBlock.className = "code-lang-block hidden";
+    csBlock.dataset.codeLang = "csharp";
+    const section = document.createElement("div");
+    section.className = "code-section";
+    section.appendChild(createCopyBtn(codeCsharp));
+    codeCsharp.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "code-line";
+      row.dataset.line = idx + 1;
+      const ln = document.createElement("span"); ln.className = "ln"; ln.textContent = idx + 1;
+      const txt = document.createElement("span"); txt.className = "txt"; txt.innerHTML = renderCodeLineHtml(line);
+      row.appendChild(ln); row.appendChild(txt); section.appendChild(row);
+    });
+    csBlock.appendChild(section);
+    panel.appendChild(csBlock);
   }
 }
 
@@ -775,15 +820,19 @@ function updateCodeHighlight(activeLines, codeBlock) {
   const block = codeBlock === 2 ? "2" : "1";
   const targetAttr = codeBlock === 2 ? "line2" : "line";
 
+  // Only operate on the currently visible language block (or the whole panel if no lang blocks).
+  const panel = $("codePanel");
+  const visibleLangBlock = panel.querySelector(".code-lang-block:not(.hidden)") || panel;
+
   // Show only the active section (hide the other); fall back to showing all if no sections labeled.
-  const sections = $("codePanel").querySelectorAll(".code-section");
+  const sections = visibleLangBlock.querySelectorAll(".code-section");
   if (sections.length > 1) {
     sections.forEach((sec) => {
       sec.classList.toggle("hidden", sec.dataset.block !== block);
     });
   }
 
-  $("codePanel")
+  visibleLangBlock
     .querySelectorAll(".code-line")
     .forEach((row) => {
       const lineNum = Number(row.dataset[targetAttr]);

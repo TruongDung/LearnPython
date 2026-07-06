@@ -26,7 +26,7 @@ function buildSteps1(nums, params) {
     codeLines: [3],
     vars: [
       { name: "target", value: target },
-      { name: "d", value: dictStr() },
+      { name: "seen", value: dictStr() },
     ],
     note: {
       vi: `target = ${target}. Dùng hash map d (giá trị → chỉ số), ban đầu rỗng {}.`,
@@ -51,7 +51,7 @@ function buildSteps1(nums, params) {
           { name: "i", value: i },
           { name: "comp", value: comp },
           { name: "j", value: j },
-          { name: "d", value: dictStr() },
+          { name: "seen", value: dictStr() },
         ],
         note: {
           vi: `target - nums[${i}] = ${target} - ${nums[i]} = ${comp} đã có trong d tại chỉ số ${j}. Trả về [${i}, ${j}].`,
@@ -71,7 +71,7 @@ function buildSteps1(nums, params) {
       vars: [
         { name: "i", value: i },
         { name: "comp", value: comp },
-        { name: "d", value: dictStr() },
+        { name: "seen", value: dictStr() },
       ],
       note: {
         vi: `Cần ${comp} (= ${target} - ${nums[i]}) nhưng chưa có trong d. Lưu nums[${i}]=${nums[i]} → ${i}. d = ${dictStr()}.`,
@@ -88,7 +88,7 @@ function buildSteps1(nums, params) {
       mark: [],
       final: true,
       codeLines: [7],
-      vars: [{ name: "d", value: dictStr() }],
+      vars: [{ name: "seen", value: dictStr() }],
       note: {
         vi: "Không có cặp nào có tổng bằng target.",
         en: "No pair sums to the target.",
@@ -1004,6 +1004,21 @@ module.exports = {
       "            if complement in seen:",
       "                return [i, seen[complement]]",
       "            seen[nums[i]] = i",
+    ],
+    codeCsharp: [
+      "public class Solution {",
+      "    public int[] TwoSum(int[] nums, int target) {",
+      "        var seen = new Dictionary<int, int>();",
+      "        for (int i = 0; i < nums.Length; i++) {",
+      "            int complement = target - nums[i];",
+      "            if (seen.ContainsKey(complement)) {",
+      "                return new int[] { i, seen[complement] };",
+      "            }",
+      "            seen[nums[i]] = i;",
+      "        }",
+      "        return new int[] {};",
+      "    }",
+      "}",
     ],
     builder: buildSteps1,
   },

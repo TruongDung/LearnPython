@@ -697,6 +697,65 @@ button:disabled {
   margin-top: 0;
 }
 
+/* Language tabs (Python | C#) */
+.code-lang-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+  padding: 0 12px;
+}
+.code-lang-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.code-lang-tab:hover { color: #e2e8f0; }
+.code-lang-tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+[data-theme="light"] .code-lang-tabs { border-bottom-color: rgba(0,0,0,.08); }
+[data-theme="light"] .code-lang-tab { color: #64748b; }
+[data-theme="light"] .code-lang-tab:hover { color: #1e293b; }
+[data-theme="light"] .code-lang-tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+/* Light theme: code panel — light background, dark text */
+[data-theme="light"] .code-panel {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  backdrop-filter: none;
+}
+[data-theme="light"] .code-line {
+  color: #1e293b;
+}
+[data-theme="light"] .code-line .ln {
+  color: #94a3b8;
+}
+[data-theme="light"] .code-line.active {
+  background: rgba(99, 102, 241, 0.08);
+  border-left-color: #6366f1;
+}
+[data-theme="light"] .code-section-label {
+  color: #475569;
+  border-bottom-color: #e2e8f0;
+}
+/* Syntax colors for light theme */
+[data-theme="light"] .py-kw { color: #7c3aed; }
+[data-theme="light"] .py-builtin { color: #0891b2; }
+[data-theme="light"] .py-fn { color: #2563eb; }
+[data-theme="light"] .py-cls { color: #b45309; }
+[data-theme="light"] .py-str { color: #16a34a; }
+[data-theme="light"] .py-comment { color: #64748b; }
+[data-theme="light"] .py-num { color: #c2410c; }
+[data-theme="light"] .py-self { color: #7c3aed; }
+[data-theme="light"] .indent-guide {
+  border-left-color: #e2e8f0;
+}
+
 .code-section {
   position: relative;
 }
