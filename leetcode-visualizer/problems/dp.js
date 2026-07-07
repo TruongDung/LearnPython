@@ -609,21 +609,26 @@ function buildSteps300BinarySearch(nums) {
     while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < num) lo = mid + 1; else hi = mid; }
     const pos = lo;
     const extended = pos === tails.length;
+    const tailsBefore = [...tails];
     if (extended) tails.push(num); else tails[pos] = num;
 
     const tailsCopy = [...tails];
     const sub = Array(n).fill(-1);
     tails.forEach((v, idx) => { sub[idx] = v; });
 
+    const bisectExplain = extended
+      ? `bisect_left(tails=[${tailsBefore.join(",")}], ${num}) = ${pos} (vượt cuối → append)`
+      : `bisect_left(tails=[${tailsBefore.join(",")}], ${num}) = ${pos} (tails[${pos}]=${tailsBefore[pos]} ≥ ${num})`;
+
     steps.push({
-      title: { vi: `num=${num}: chèn tại pos=${pos} → tails=[${tailsCopy.join(",")}]`, en: `num=${num}: insert at pos=${pos} → tails=[${tailsCopy.join(",")}]` },
+      title: { vi: `num=${num}: pos=${pos} → tails=[${tailsCopy.join(",")}]`, en: `num=${num}: pos=${pos} → tails=[${tailsCopy.join(",")}]` },
       arr: [...nums], sub,
       highlight: [k], mark: Array.from({ length: n }, (_, i) => i < k ? i : -1).filter(x => x >= 0),
       codeLines: extended ? [7, 8, 9] : [7, 10, 11], codeBlock: 2,
       vars: [
         { name: "num", value: num },
-        { name: "pos (bisect_left)", value: pos },
-        { name: "action", value: extended ? `append → dài hơn 1` : `replace tails[${pos}]` },
+        { name: "i = bisect_left", value: bisectExplain },
+        { name: "action", value: extended ? `i == len(tails) → append ${num}` : `tails[${pos}] = ${num} (replace)` },
         { name: "tails", value: `[${tailsCopy.join(",")}]` },
         { name: "LIS length", value: tails.length },
       ],
