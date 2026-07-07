@@ -794,19 +794,18 @@ function buildSteps19(input, params) {
   let fast = 0, slow = 0;
 
   function graphSnap(title, note, hlNodesOverride, removedIdx, vars, codeLines) {
-    // Build nodes: append "F" for fast, "S" for slow to label
-    const nodes = allNodes.map((nd, i) => {
-      let lbl = nodeIds[i];
-      if (i === fast && fast < allNodes.length && i === slow) lbl += " F,S";
-      else if (i === fast && fast < allNodes.length) lbl += " F";
-      else if (i === slow) lbl += " S";
-      return { id: nd.id, label: lbl };
-    });
+    // Nodes keep original short labels; fast/slow shown by annotation
+    const nodes = allNodes.map((nd) => ({ id: nd.id, label: nodeIds[nd.id] }));
 
-    // hlNodes = fast node (amber), visitedNodes = slow node (green/blue)
+    // hlNodes = fast node (amber border), visitedNodes = slow node (green fill)
     const hl = [];
     if (fast >= 0 && fast < allNodes.length) hl.push(fast);
     const visited = [slow];
+
+    // Annotations: "fast" above fast node, "slow" above slow node
+    const annotations = {};
+    if (fast >= 0 && fast < allNodes.length) annotations[fast] = "fast";
+    annotations[slow] = "slow";
 
     return {
       title,
@@ -817,6 +816,7 @@ function buildSteps19(input, params) {
         hlNodes: hl,
         hlEdges: [],
         visitedNodes: visited,
+        annotations,
       },
       highlight: [], mark: [],
       codeLines: codeLines || [],
@@ -825,11 +825,13 @@ function buildSteps19(input, params) {
     };
   }
 
+  const LEGEND = { vi: "\n\n🟡 viền vàng = fast  |  🟢 fill xanh = slow", en: "\n\n🟡 amber border = fast  |  🟢 green fill = slow" };
+
   steps.push(graphSnap(
     { vi: "Khởi tạo: dummy → linked list", en: "Init: dummy → linked list" },
     {
-      vi: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nBước 1: fast đi trước n+1 = ${n + 1} bước.`,
-      en: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nStep 1: fast advances n+1 = ${n + 1} steps ahead.`,
+      vi: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nBước 1: fast đi trước n+1 = ${n + 1} bước.` + LEGEND.vi,
+      en: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nStep 1: fast advances n+1 = ${n + 1} steps ahead.` + LEGEND.en,
     },
     [0], null,
     [{ name: "linked list", value: `D → ${vals.join(" → ")} → null` }, { name: "n", value: n }, { name: "fast", value: "D" }, { name: "slow", value: "D" }],
@@ -913,6 +915,94 @@ function buildSteps19(input, params) {
   steps.push(fs);
 
   return { input, answer: `[${resultVals.join(",")}]`, steps };
+}
+
+// ─── 234: Palindrome Linked List ───
+function buildSteps234(input) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const n = vals.length;
+  const steps = [];
+
+  // Graph nodes & edges for linked list
+  const nodeIds = vals.map(String);
+  const allNodes = vals.map((v, i) => ({ id: i, label: String(v) }));
+  const allEdges = [];
+  for (let i = 0; i < n - 1; i++) allEdges.push({ u: i, v: i + 1, w: "" });
+
+  let slow = 0, fast = 0;
+
+  function graphSnap(title, note, annotations, hlNodes, visitedNodes, vars, codeLines) {
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges: allEdges, hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [],
+      codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Step 1: Find middle
+  steps.push(graphSnap(
+    { vi: "Bước 1: Tìm giữa (slow/fast)", en: "Step 1: Find middle (slow/fast)" },
+    { vi: `slow đi 1 bước, fast đi 2 bước. Khi fast tới cuối → slow ở giữa.`, en: `slow moves 1 step, fast moves 2 steps. When fast reaches the end → slow is at the middle.` },
+    { [slow]: "slow", [fast]: "fast" }, [fast], [slow],
+    [{ name: "slow", value: `${vals[slow]} (index ${slow})` }, { name: "fast", value: `${vals[fast]} (index ${fast})` }],
+    [3, 4, 5, 6]
+  ));
+
+  while (fast < n - 1 && fast + 1 < n) {
+    slow++; fast += 2;
+    if (fast >= n) fast = n - 1;
+    const ann = {}; ann[slow] = "slow"; if (fast < n) ann[fast] = "fast";
+    steps.push(graphSnap(
+      { vi: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}`, en: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}` },
+      { vi: `slow → index ${slow} (${vals[slow]}), fast → index ${fast}.`, en: `slow → index ${slow} (${vals[slow]}), fast → index ${fast}.` },
+      ann, fast < n ? [fast] : [], [slow],
+      [{ name: "slow", value: `${vals[slow]} (index ${slow})` }, { name: "fast", value: fast < n ? `${vals[fast]} (index ${fast})` : "end" }],
+      [5, 6]
+    ));
+    if (fast >= n - 1) break;
+  }
+
+  // Step 2: Reverse second half
+  const mid = slow;
+  const secondHalf = vals.slice(mid);
+  const reversed = [...secondHalf].reverse();
+  steps.push(graphSnap(
+    { vi: `Bước 2: Đảo nửa sau [${secondHalf.join(",")}] → [${reversed.join(",")}]`, en: `Step 2: Reverse second half [${secondHalf.join(",")}] → [${reversed.join(",")}]` },
+    { vi: `Nửa sau (từ index ${mid}): [${secondHalf.join(",")}] → đảo thành [${reversed.join(",")}].`, en: `Second half (from index ${mid}): [${secondHalf.join(",")}] → reversed to [${reversed.join(",")}].` },
+    {}, [], Array.from({ length: n - mid }, (_, i) => mid + i),
+    [{ name: "mid", value: mid }, { name: "reversed", value: `[${reversed.join(",")}]` }],
+    [8, 9, 10, 11, 12, 13]
+  ));
+
+  // Step 3: Compare
+  const firstHalf = vals.slice(0, reversed.length);
+  let isPalin = true;
+  let mismatchIdx = -1;
+  for (let i = 0; i < reversed.length; i++) {
+    if (firstHalf[i] !== reversed[i]) { isPalin = false; mismatchIdx = i; break; }
+  }
+
+  if (isPalin) {
+    steps.push(graphSnap(
+      { vi: `✓ Palindrome!`, en: `✓ Palindrome!` },
+      { vi: `Nửa đầu [${firstHalf.join(",")}] == nửa sau đảo [${reversed.join(",")}] → Palindrome!`, en: `First half [${firstHalf.join(",")}] == reversed second half [${reversed.join(",")}] → Palindrome!` },
+      {}, [], Array.from({ length: n }, (_, i) => i),
+      [{ name: "answer", value: true }, { name: "first half", value: `[${firstHalf.join(",")}]` }, { name: "reversed 2nd", value: `[${reversed.join(",")}]` }],
+      [15, 16, 17, 18, 19, 20]
+    ));
+  } else {
+    steps.push(graphSnap(
+      { vi: `✗ Không phải palindrome`, en: `✗ Not a palindrome` },
+      { vi: `Vị trí ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]} → KHÔNG phải palindrome.`, en: `Position ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]} → NOT a palindrome.` },
+      {}, [mismatchIdx, n - 1 - mismatchIdx], [],
+      [{ name: "answer", value: false }, { name: "mismatch at", value: `index ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]}` }],
+      [17, 18]
+    ));
+  }
+
+  steps[steps.length - 1].final = true;
+  return { input, answer: isPalin, steps };
 }
 
 module.exports = {
@@ -1218,7 +1308,7 @@ module.exports = {
     id: 19,
     difficulty: "medium",
     slug: "remove-nth-node-from-end-of-list",
-    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
     title: { vi: "Remove Nth Node From End of List", en: "Remove Nth Node From End of List" },
     titleVi: { vi: "Xóa nút thứ n từ cuối", en: "Remove nth node from the end" },
     statement: {
@@ -1252,5 +1342,52 @@ module.exports = {
       "        return dummy.next",
     ],
     builder: buildSteps19,
+  },
+  234: {
+    id: 234,
+    difficulty: "easy",
+    slug: "palindrome-linked-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Palindrome Linked List", en: "Palindrome Linked List" },
+    titleVi: { vi: "Kiểm tra linked list palindrome", en: "Check if linked list is a palindrome" },
+    statement: {
+      vi: "Cho head linked list, kiểm tra list có phải palindrome không. Dùng slow/fast tìm giữa → đảo nửa sau → so sánh. Nhập danh sách giá trị cách bởi dấu phẩy.",
+      en: "Given head of a linked list, check if it is a palindrome. Use slow/fast to find the middle → reverse the second half → compare. Enter values comma-separated.",
+    },
+    defaultInput: "1,2,2,1",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Slow/fast tìm giữa: slow đi 1, fast đi 2 → khi fast tới cuối, slow ở giữa.", en: "Slow/fast to find middle: slow moves 1, fast moves 2 → when fast reaches end, slow is at the middle." },
+      { vi: "Đảo ngược nửa sau (từ slow đến cuối).", en: "Reverse the second half (from slow to end)." },
+      { vi: "So sánh nửa đầu với nửa sau đã đảo. Nếu khớp → palindrome.", en: "Compare first half with reversed second half. If they match → palindrome." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Tìm giữa O(n) + đảo O(n/2) + so sánh O(n/2).", en: "Find middle O(n) + reverse O(n/2) + compare O(n/2)." } },
+    code: [
+      "class Solution:",
+      "    def isPalindrome(self, head):",
+      "        # Find middle with slow/fast",
+      "        slow = fast = head",
+      "        while fast and fast.next:",
+      "            slow = slow.next",
+      "            fast = fast.next.next",
+      "        # Reverse second half",
+      "        prev = None",
+      "        while slow:",
+      "            nxt = slow.next",
+      "            slow.next = prev",
+      "            prev = slow",
+      "            slow = nxt",
+      "        # Compare both halves",
+      "        left, right = head, prev",
+      "        while right:",
+      "            if left.val != right.val:",
+      "                return False",
+      "            left = left.next",
+      "            right = right.next",
+      "        return True",
+    ],
+    builder: buildSteps234,
   },
 };

@@ -1092,6 +1092,7 @@ function renderGraph(step) {
 
   // Draw nodes
   let nodeSvg = "";
+  const annotations = step.graph.annotations || null; // { nodeId: "label" } e.g. { 2: "slow", 5: "fast" }
   for (const node of nodes) {
     const p = pos[node.id];
     const isHl = hlNodeSet.has(node.id);
@@ -1102,8 +1103,14 @@ function renderGraph(step) {
 
     nodeSvg += `<g class="${cls}">`;
     nodeSvg += `<circle cx="${p.x}" cy="${p.y}" r="${r}" />`;
-    nodeSvg += `<text x="${p.x}" y="${p.y}" dy="0.35em" text-anchor="middle">${node.id}</text>`;
-    // Distance label below node
+    nodeSvg += `<text x="${p.x}" y="${p.y}" dy="0.35em" text-anchor="middle">${escapeXml(node.label || String(node.id))}</text>`;
+    // Annotation label above/below node (e.g. "fast", "slow") — only when explicitly provided
+    if (annotations && annotations[node.id] !== undefined) {
+      const ann = annotations[node.id];
+      const color = ann === "fast" ? "#f59e0b" : ann === "slow" ? "#22c55e" : "#94a3b8";
+      nodeSvg += `<text x="${p.x}" y="${p.y - r - 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${color}">${escapeXml(ann)}</text>`;
+    }
+    // Distance label below node (for Dijkstra etc.)
     if (node.dist !== undefined) {
       const distLabel = node.dist === Infinity ? "∞" : node.dist;
       nodeSvg += `<text x="${p.x}" y="${p.y + r + 14}" class="graph-dist${isHl ? " hl" : ""}" text-anchor="middle">${distLabel}</text>`;
