@@ -1673,6 +1673,91 @@ function buildSteps160(input) {
   return { input, answer: hasIntersect ? intersectVal : "null", steps };
 }
 
+// ─── 2: Add Two Numbers ───
+function buildSteps2(input) {
+  const parts = String(input).split(";");
+  const l1 = parts[0].split(",").map(Number);
+  const l2 = parts[1] ? parts[1].split(",").map(Number) : [];
+  const steps = [];
+  const maxLen = Math.max(l1.length, l2.length);
+  const result = [];
+  let carry = 0;
+
+  const num1 = [...l1].reverse().join("");
+  const num2 = [...l2].reverse().join("");
+
+  // Graph: l1 nodes (row 0), l2 nodes (row 1), result nodes (row 2) — laid out in tree view
+  function treeSnap(title, note, curPos, vars, codeLines) {
+    // Build nodes: l1 at y=0, l2 at y=1, result at y=2
+    const nodes = [];
+    // l1 nodes
+    l1.forEach((v, i) => {
+      nodes.push({ id: i, label: String(v), x: i * 2, y: 0, parentId: i > 0 ? i - 1 : null, hl: i === curPos, isWord: false });
+    });
+    // l2 nodes (offset ids)
+    const l2Offset = l1.length;
+    l2.forEach((v, i) => {
+      nodes.push({ id: l2Offset + i, label: String(v), x: i * 2, y: 1, parentId: i > 0 ? l2Offset + i - 1 : null, hl: i === curPos, isWord: false });
+    });
+    // result nodes
+    const resOffset = l1.length + l2.length;
+    result.forEach((v, i) => {
+      nodes.push({ id: resOffset + i, label: String(v), x: i * 2, y: 2, parentId: i > 0 ? resOffset + i - 1 : null, hl: false, isWord: i === result.length - 1 });
+    });
+
+    return {
+      title, arr: [],
+      tree: { nodes },
+      highlight: [], mark: [],
+      codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  steps.push(treeSnap(
+    { vi: `Cộng: ${num1} + ${num2}`, en: `Add: ${num1} + ${num2}` },
+    {
+      vi: `Hàng 1: l1 = ${l1.join("→")} (số ${num1})\nHàng 2: l2 = ${l2.join("→")} (số ${num2})\nHàng 3: result (build dần)\n\nCộng từng cặp chữ số + carry, từ trái sang phải.`,
+      en: `Row 1: l1 = ${l1.join("→")} (number ${num1})\nRow 2: l2 = ${l2.join("→")} (number ${num2})\nRow 3: result (building)\n\nAdd digit pairs + carry, left to right.`,
+    },
+    -1,
+    [{ name: "l1", value: `${l1.join("→")} = ${num1}` }, { name: "l2", value: `${l2.join("→")} = ${num2}` }, { name: "carry", value: 0 }],
+    [2, 3, 4, 5]
+  ));
+
+  for (let i = 0; i < maxLen || carry > 0; i++) {
+    const v1 = i < l1.length ? l1[i] : 0;
+    const v2 = i < l2.length ? l2[i] : 0;
+    const total = v1 + v2 + carry;
+    const digit = total % 10;
+    const oldCarry = carry;
+    carry = Math.floor(total / 10);
+    result.push(digit);
+
+    steps.push(treeSnap(
+      { vi: `[${i}]: ${v1}+${v2}+${oldCarry}=${total} → ${digit}, carry=${carry}`, en: `[${i}]: ${v1}+${v2}+${oldCarry}=${total} → ${digit}, carry=${carry}` },
+      {
+        vi: `sum = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total}%10 = ${digit}\ncarry = ${total}//10 = ${carry}`,
+        en: `sum = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total}%10 = ${digit}\ncarry = ${total}//10 = ${carry}`,
+      },
+      i,
+      [{ name: "l1.val", value: v1 }, { name: "l2.val", value: v2 }, { name: "carry in", value: oldCarry }, { name: "total", value: total }, { name: "digit", value: digit }, { name: "carry out", value: carry }, { name: "result", value: result.join("→") }],
+      [6, 7, 8, 9, 10, 11, 12]
+    ));
+  }
+
+  const resultNum = [...result].reverse().join("");
+  const fs = treeSnap(
+    { vi: `Kết quả: ${result.join("→")} = ${resultNum}`, en: `Result: ${result.join("→")} = ${resultNum}` },
+    { vi: `${num1} + ${num2} = ${resultNum}. List: ${result.join("→")}.`, en: `${num1} + ${num2} = ${resultNum}. List: ${result.join("→")}.` },
+    -1,
+    [{ name: "answer", value: `${result.join("→")} = ${resultNum}` }],
+    [14, 15]
+  );
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -2219,5 +2304,44 @@ module.exports = {
       "        return pA  # intersection or None",
     ],
     builder: buildSteps160,
+  },
+  2: {
+    id: 2,
+    difficulty: "medium",
+    slug: "add-two-numbers",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Add Two Numbers", en: "Add Two Numbers" },
+    titleVi: { vi: "Cộng 2 số (linked list)", en: "Add two numbers as linked lists" },
+    statement: {
+      vi: "Cho 2 linked list biểu diễn 2 số nguyên không âm (chữ số đảo ngược). Cộng 2 số và trả về kết quả dưới dạng linked list. Nhập: l1;l2 (giá trị cách bởi dấu phẩy).",
+      en: "Given two linked lists representing non-negative integers (digits in reverse order). Add them and return the sum as a linked list. Enter: l1;l2 (values comma-separated).",
+    },
+    defaultInput: "2,4,3;5,6,4",
+    inputKind: "string",
+    inputLabel: { vi: "l1;l2 (chữ số đảo ngược)", en: "l1;l2 (digits reversed)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt song song 2 list + carry. Mỗi bước: sum = l1.val + l2.val + carry.", en: "Traverse both lists + carry. Each step: sum = l1.val + l2.val + carry." },
+      { vi: "digit = sum % 10, carry = sum // 10. Tạo node mới với digit.", en: "digit = sum % 10, carry = sum // 10. Create new node with digit." },
+    ],
+    complexity: { time: "O(max(m,n))", space: "O(max(m,n))", note: { vi: "m, n = độ dài 2 list.", en: "m, n = lengths of both lists." } },
+    code: [
+      "class Solution:",
+      "    def addTwoNumbers(self, l1, l2):",
+      "        dummy = ListNode(0)",
+      "        cur = dummy",
+      "        carry = 0",
+      "        while l1 or l2 or carry:",
+      "            val1 = l1.val if l1 else 0",
+      "            val2 = l2.val if l2 else 0",
+      "            total = val1 + val2 + carry",
+      "            carry = total // 10",
+      "            cur.next = ListNode(total % 10)",
+      "            cur = cur.next",
+      "            l1 = l1.next if l1 else None",
+      "            l2 = l2.next if l2 else None",
+      "        return dummy.next",
+    ],
+    builder: buildSteps2,
   },
 };
