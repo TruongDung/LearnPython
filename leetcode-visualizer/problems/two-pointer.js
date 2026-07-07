@@ -1837,6 +1837,79 @@ function buildSteps206(input) {
   return { input, answer: `[${vals.slice().reverse().join(",")}]`, steps };
 }
 
+// ─── 21: Merge Two Sorted Lists ───
+function buildSteps21(input) {
+  const parts = String(input).split(";");
+  const l1 = parts[0].split(",").map(Number).filter((x) => !isNaN(x));
+  const l2 = parts[1] ? parts[1].split(",").map(Number).filter((x) => !isNaN(x)) : [];
+  const steps = [];
+  const result = [];
+  let i = 0, j = 0;
+
+  steps.push({
+    title: { vi: `Gộp [${l1.join(",")}] + [${l2.join(",")}]`, en: `Merge [${l1.join(",")}] + [${l2.join(",")}]` },
+    arr: [...l1, ...l2],
+    sub: [...l1.map((_, idx) => `l1[${idx}]`), ...l2.map((_, idx) => `l2[${idx}]`)],
+    highlight: [0, l1.length], mark: [],
+    codeLines: [2, 3, 4, 5],
+    vars: [{ name: "l1", value: l1.join("→") }, { name: "l2", value: l2.join("→") }, { name: "result", value: "[]" }],
+    note: { vi: `So sánh đầu l1 và l2, lấy nhỏ hơn vào result. Lặp tới khi 1 list hết.`, en: `Compare heads of l1 and l2, take the smaller into result. Loop until one is exhausted.` },
+  });
+
+  while (i < l1.length && j < l2.length) {
+    const takeL1 = l1[i] <= l2[j];
+    if (takeL1) { result.push(l1[i]); i++; }
+    else { result.push(l2[j]); j++; }
+
+    steps.push({
+      title: { vi: `Lấy ${result[result.length-1]} ← ${takeL1 ? "l1" : "l2"}`, en: `Take ${result[result.length-1]} ← ${takeL1 ? "l1" : "l2"}` },
+      arr: result.slice(),
+      sub: result.map(String),
+      highlight: [result.length - 1], mark: [],
+      codeLines: takeL1 ? [5, 6, 7] : [8, 9, 10],
+      vars: [
+        { name: "l1 head", value: i < l1.length ? l1[i] : "done" },
+        { name: "l2 head", value: j < l2.length ? l2[j] : "done" },
+        { name: "took", value: `${result[result.length-1]} from ${takeL1 ? "l1" : "l2"} (${takeL1 ? l1[i-1]+"≤"+l2[j] : l2[j-1]+"<"+l1[i]})` },
+        { name: "result", value: result.join("→") },
+      ],
+      note: {
+        vi: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → lấy ${result[result.length-1]} từ ${takeL1 ? "l1" : "l2"}.`,
+        en: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → take ${result[result.length-1]} from ${takeL1 ? "l1" : "l2"}.`,
+      },
+    });
+  }
+
+  // Append remaining
+  const remaining = i < l1.length ? l1.slice(i) : l2.slice(j);
+  const fromList = i < l1.length ? "l1" : "l2";
+  if (remaining.length > 0) {
+    result.push(...remaining);
+    steps.push({
+      title: { vi: `Nối phần còn lại ${fromList}: [${remaining.join(",")}]`, en: `Append rest of ${fromList}: [${remaining.join(",")}]` },
+      arr: result.slice(),
+      sub: result.map(String),
+      highlight: Array.from({ length: remaining.length }, (_, k) => result.length - remaining.length + k), mark: [],
+      codeLines: [12],
+      vars: [{ name: "remaining", value: `${fromList}: [${remaining.join(",")}]` }, { name: "result", value: result.join("→") }],
+      note: { vi: `${fromList === "l1" ? "l2" : "l1"} hết → nối toàn bộ ${fromList} còn lại.`, en: `${fromList === "l1" ? "l2" : "l1"} exhausted → append all remaining ${fromList}.` },
+    });
+  }
+
+  // Final
+  const fs = {
+    title: { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
+    arr: result.slice(),
+    sub: result.map(String),
+    highlight: [], mark: result.map((_, k) => k), final: true,
+    codeLines: [13, 14],
+    vars: [{ name: "answer", value: result.join("→") }],
+    note: { vi: `Merged: ${result.join("→")}.`, en: `Merged: ${result.join("→")}.` },
+  };
+  steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -2456,5 +2529,43 @@ module.exports = {
       "        return prev",
     ],
     builder: buildSteps206,
+  },
+  21: {
+    id: 21,
+    difficulty: "easy",
+    slug: "merge-two-sorted-lists",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Merge Two Sorted Lists", en: "Merge Two Sorted Lists" },
+    titleVi: { vi: "Gộp 2 danh sách đã sắp xếp", en: "Merge two sorted linked lists" },
+    statement: {
+      vi: "Cho 2 linked list đã sắp xếp tăng dần, gộp thành 1 list tăng dần. Nhập: l1;l2 (giá trị cách bởi dấu phẩy).",
+      en: "Given two sorted linked lists, merge them into one sorted list. Enter: l1;l2 (values comma-separated).",
+    },
+    defaultInput: "1,2,4;1,3,4",
+    inputKind: "string",
+    inputLabel: { vi: "l1;l2 (đã sắp xếp)", en: "l1;l2 (sorted)" },
+    extraParams: [],
+    approach: [
+      { vi: "2 pointers so sánh đầu mỗi list, lấy nhỏ hơn vào result.", en: "Two pointers compare heads, take the smaller into result." },
+      { vi: "Khi 1 list hết → nối phần còn lại của list kia.", en: "When one list is exhausted → append the rest of the other." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(1)", note: { vi: "m, n = độ dài 2 list. Tại chỗ (chỉ đổi next pointers).", en: "m, n = list lengths. In-place (only re-link next pointers)." } },
+    code: [
+      "class Solution:",
+      "    def mergeTwoLists(self, l1, l2):",
+      "        dummy = ListNode(0)",
+      "        cur = dummy",
+      "        while l1 and l2:",
+      "            if l1.val <= l2.val:",
+      "                cur.next = l1",
+      "                l1 = l1.next",
+      "            else:",
+      "                cur.next = l2",
+      "                l2 = l2.next",
+      "            cur = cur.next",
+      "        cur.next = l1 or l2",
+      "        return dummy.next",
+    ],
+    builder: buildSteps21,
   },
 };
