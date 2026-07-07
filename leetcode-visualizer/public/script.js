@@ -1134,6 +1134,91 @@ function renderGraph(step) {
     `</svg>`;
 }
 
+// ---- Linked List renderer (horizontal box nodes with next arrows + curved random arrows) ----
+function renderLinkedList(step) {
+  const { nodes, hlIdx, markIdx } = step.linkedList;
+  // nodes: [{ val, randomTarget (val or null), randomIdx }]
+  const n = nodes.length;
+  const boxW = 90, boxH = 50, gap = 44, padX = 30, padY = 60;
+  const totalW = padX * 2 + n * boxW + (n - 1) * gap;
+  const totalH = padY * 2 + boxH + 80; // extra space for curved arrows below
+
+  const hlSet = new Set(hlIdx || []);
+  const markSet = new Set(markIdx || []);
+  const light = document.documentElement.getAttribute("data-theme") === "light";
+
+  const boxFill = light ? "#dbeafe" : "rgba(99,130,200,0.2)";
+  const boxStroke = light ? "#3b82f6" : "#6366f1";
+  const boxHlFill = light ? "#fef3c7" : "rgba(251,191,36,0.2)";
+  const boxHlStroke = light ? "#f59e0b" : "#fbbf24";
+  const boxMarkFill = light ? "#dcfce7" : "rgba(34,197,94,0.15)";
+  const boxMarkStroke = light ? "#22c55e" : "#34d399";
+  const textColor = light ? "#1e293b" : "#e2e8f0";
+  const subColor = light ? "#64748b" : "#94a3b8";
+  const arrowColor = light ? "#475569" : "#94a3b8";
+  const randomColor = light ? "#7c3aed" : "#a78bfa";
+
+  function nodeX(i) { return padX + i * (boxW + gap); }
+  const nodeY = padY;
+
+  let svg = "";
+
+  // Arrowhead markers
+  svg += `<defs>
+    <marker id="ll-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${arrowColor}"/></marker>
+    <marker id="ll-random-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="${randomColor}"/></marker>
+  </defs>`;
+
+  // Next arrows (horizontal between boxes — from right dot to left edge of next box)
+  for (let i = 0; i < n - 1; i++) {
+    const x1 = nodeX(i) + boxW - 4;
+    const x2 = nodeX(i + 1);
+    const y = nodeY + boxH / 4;
+    svg += `<line x1="${x1}" y1="${y}" x2="${x2 - 2}" y2="${y}" stroke="${arrowColor}" stroke-width="1.5" marker-end="url(#ll-arrow)" />`;
+  }
+  // Arrow to null box
+  const nullX = nodeX(n - 1) + boxW + gap / 2;
+  svg += `<line x1="${nodeX(n-1)+boxW-4}" y1="${nodeY+boxH/4}" x2="${nullX}" y2="${nodeY+boxH/4}" stroke="${arrowColor}" stroke-width="1.5" marker-end="url(#ll-arrow)" />`;
+  svg += `<rect x="${nullX}" y="${nodeY + 4}" width="36" height="${boxH - 8}" rx="4" fill="none" stroke="${arrowColor}" stroke-dasharray="4 2" />`;
+  svg += `<text x="${nullX+18}" y="${nodeY+boxH/2}" dy="0.35em" text-anchor="middle" font-size="11" fill="${subColor}">null</text>`;
+
+  // Random arrows (curved below)
+  for (let i = 0; i < n; i++) {
+    const rIdx = nodes[i].randomIdx;
+    if (rIdx < 0) continue; // null random
+    const fromX = nodeX(i) + boxW / 2;
+    const fromY = nodeY + boxH;
+    const toX = nodeX(rIdx) + boxW / 2;
+    const toY = nodeY + boxH;
+    const dist = Math.abs(rIdx - i);
+    const curveY = fromY + 20 + dist * 12; // curve depth proportional to distance
+    svg += `<path d="M${fromX} ${fromY} C${fromX} ${curveY}, ${toX} ${curveY}, ${toX} ${toY}" fill="none" stroke="${randomColor}" stroke-width="1.2" stroke-dasharray="4 2" marker-end="url(#ll-random-arrow)" />`;
+  }
+
+  // Boxes
+  for (let i = 0; i < n; i++) {
+    const x = nodeX(i), y = nodeY;
+    let fill = boxFill, stroke = boxStroke;
+    if (hlSet.has(i)) { fill = boxHlFill; stroke = boxHlStroke; }
+    else if (markSet.has(i)) { fill = boxMarkFill; stroke = boxMarkStroke; }
+
+    svg += `<rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />`;
+    // Divider line
+    svg += `<line x1="${x}" y1="${y + boxH/2}" x2="${x + boxW}" y2="${y + boxH/2}" stroke="${stroke}" stroke-width="0.5" opacity="0.5" />`;
+    // Value (top half — centered, large)
+    svg += `<text x="${x + boxW/2}" y="${y + boxH/4}" dy="0.35em" text-anchor="middle" font-size="14" font-weight="700" fill="${textColor}">${nodes[i].val}</text>`;
+    // "random → target" label (bottom half)
+    const rTarget = nodes[i].randomIdx >= 0 ? nodes[nodes[i].randomIdx].val : "∅";
+    svg += `<text x="${x + 8}" y="${y + 3*boxH/4}" dy="0.35em" font-size="10" fill="${randomColor}">rand→${rTarget}</text>`;
+    // Small dot at right edge top (next pointer origin)
+    svg += `<circle cx="${x + boxW - 8}" cy="${y + boxH/4}" r="4" fill="${arrowColor}" opacity="0.5" />`;
+    // Small dot at bottom center (random pointer origin)
+    svg += `<circle cx="${x + boxW/2}" cy="${y + boxH}" r="3" fill="${randomColor}" opacity="0.6" />`;
+  }
+
+  $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1169,6 +1254,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.remove("hidden");
     renderBfsGrid(step);
+  } else if (step.linkedList) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLinkedList(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

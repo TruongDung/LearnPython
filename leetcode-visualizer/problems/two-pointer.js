@@ -1323,6 +1323,80 @@ function buildSteps143(input) {
   return { input, answer: `[${resultArr.join(",")}]`, steps };
 }
 
+// ─── 138: Copy List with Random Pointer ───
+function buildSteps138(input) {
+  const entries = String(input).split(",").map((s) => {
+    const [v, r] = s.trim().split(":");
+    return { val: Number(v), randomIdx: Number(r) };
+  });
+  const n = entries.length;
+  const steps = [];
+
+  const nodes = entries.map((e) => ({ val: e.val, randomIdx: e.randomIdx }));
+
+  function llSnap(title, note, hlIdx, markIdx, vars, codeLines) {
+    return {
+      title,
+      arr: [],
+      linkedList: { nodes, hlIdx: hlIdx || [], markIdx: markIdx || [] },
+      highlight: [], mark: [],
+      codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Step 0: show original list
+  steps.push(llSnap(
+    { vi: "Danh sách gốc (next → + random ⤹)", en: "Original list (next → + random ⤹)" },
+    {
+      vi: `Mỗi hộp: trên = val + next pointer, dưới = random pointer.\nMũi tên ngang = next. Đường cong dưới = random.\nMục tiêu: deep copy toàn bộ.`,
+      en: `Each box: top = val + next pointer, bottom = random pointer.\nHorizontal arrows = next. Curved lines below = random.\nGoal: deep copy everything.`,
+    },
+    [], [],
+    [{ name: "nodes", value: entries.map((e) => `${e.val}(R→${e.randomIdx >= 0 ? entries[e.randomIdx].val : "∅"})`).join(", ") }],
+    [2, 3]
+  ));
+
+  // Pass 1: create copies
+  const mapVals = [];
+  for (let i = 0; i < n; i++) {
+    mapVals.push(entries[i].val);
+    steps.push(llSnap(
+      { vi: `Pass 1: copy ${entries[i].val} (${i+1}/${n})`, en: `Pass 1: copy ${entries[i].val} (${i+1}/${n})` },
+      { vi: `map[${entries[i].val}] = Node(${entries[i].val})`, en: `map[${entries[i].val}] = Node(${entries[i].val})` },
+      [i], Array.from({ length: i }, (_, x) => x),
+      [{ name: "cur", value: entries[i].val }, { name: "map", value: `{${mapVals.join(", ")}}` }],
+      [5, 6, 7, 8]
+    ));
+  }
+
+  // Pass 2: assign next and random
+  for (let i = 0; i < n; i++) {
+    const nextVal = i + 1 < n ? entries[i + 1].val : "null";
+    const randIdx = entries[i].randomIdx;
+    const randVal = randIdx >= 0 ? entries[randIdx].val : "null";
+
+    steps.push(llSnap(
+      { vi: `Pass 2: ${entries[i].val}.next=${nextVal}, .random=${randVal}`, en: `Pass 2: ${entries[i].val}.next=${nextVal}, .random=${randVal}` },
+      { vi: `copy.next = map[${nextVal}]\ncopy.random = map[${randVal}]`, en: `copy.next = map[${nextVal}]\ncopy.random = map[${randVal}]` },
+      randIdx >= 0 ? [i, randIdx] : [i], [],
+      [{ name: "cur", value: entries[i].val }, { name: "copy.next", value: nextVal }, { name: "copy.random", value: randVal }],
+      [11, 12, 13, 14, 15]
+    ));
+  }
+
+  // Final
+  const fs = llSnap(
+    { vi: "Deep copy hoàn tất!", en: "Deep copy complete!" },
+    { vi: `HashMap đảm bảo random trỏ đúng node COPY.`, en: `HashMap ensures random points to COPY nodes.` },
+    [], Array.from({ length: n }, (_, i) => i),
+    [{ name: "answer", value: "deep copy done" }],
+    [16, 17]
+  );
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: "copied", steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -1751,5 +1825,46 @@ module.exports = {
       "            second.next, second = first, second.next",
     ],
     builder: buildSteps143,
+  },
+  138: {
+    id: 138,
+    difficulty: "medium",
+    slug: "copy-list-with-random-pointer",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Copy List with Random Pointer", en: "Copy List with Random Pointer" },
+    titleVi: { vi: "Deep copy linked list có random pointer", en: "Deep copy list with random pointer" },
+    statement: {
+      vi: "Cho linked list mỗi node có next và random pointer (trỏ tới node bất kỳ hoặc null). Tạo deep copy. Dùng HashMap: old→new. Nhập dạng 'val:randomIdx' cách bởi ','  (randomIdx = -1 nếu null).",
+      en: "Given a linked list where each node has next and a random pointer (points to any node or null). Create a deep copy. Use HashMap: old→new. Enter as 'val:randomIdx' comma-separated (randomIdx = -1 for null).",
+    },
+    defaultInput: "7:-1,13:0,11:4,10:2,1:0",
+    inputKind: "string",
+    inputLabel: { vi: "Nodes (val:randomIdx)", en: "Nodes (val:randomIdx)" },
+    extraParams: [],
+    approach: [
+      { vi: "Pass 1: Tạo copy mỗi node, lưu map old→new (HashMap).", en: "Pass 1: Create a copy of each node, store old→new mapping (HashMap)." },
+      { vi: "Pass 2: Gán next và random cho mỗi copy dựa trên map.", en: "Pass 2: Assign next and random for each copy using the map." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "2 pass O(n). HashMap O(n).", en: "2 passes O(n). HashMap O(n)." } },
+    code: [
+      "class Solution:",
+      "    def copyRandomList(self, head):",
+      "        if not head: return None",
+      "        # Pass 1: create copies, build old→new map",
+      "        old_to_new = {}",
+      "        cur = head",
+      "        while cur:",
+      "            old_to_new[cur] = Node(cur.val)",
+      "            cur = cur.next",
+      "        # Pass 2: assign next and random",
+      "        cur = head",
+      "        while cur:",
+      "            copy = old_to_new[cur]",
+      "            copy.next = old_to_new.get(cur.next)",
+      "            copy.random = old_to_new.get(cur.random)",
+      "            cur = cur.next",
+      "        return old_to_new[head]",
+    ],
+    builder: buildSteps138,
   },
 };
