@@ -1093,6 +1093,157 @@ function buildSteps234(input) {
   return { input, answer: isPalin, steps };
 }
 
+// ─── 143: Reorder List ───
+function buildSteps143(input) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const n = vals.length;
+  const steps = [];
+
+  const allNodes = vals.map((v, i) => ({ id: i, label: String(v) }));
+  const allEdges = [];
+  for (let i = 0; i < n - 1; i++) allEdges.push({ u: i, v: i + 1, w: "" });
+
+  function graphSnap(title, note, edges, annotations, hlNodes, visitedNodes, vars, codeLines) {
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges, hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [],
+      codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Step 1: Find middle
+  let slow = 0, fast = 0;
+  steps.push(graphSnap(
+    { vi: "Bước 1: Tìm giữa (slow/fast)", en: "Step 1: Find middle (slow/fast)" },
+    { vi: `slow/fast đều ở đầu. fast đi 2 bước, slow đi 1 bước.`, en: `slow/fast both at head. fast moves 2, slow moves 1.` },
+    allEdges, { [slow]: "slow", [fast]: "fast" }, [fast], [slow],
+    [{ name: "slow", value: `${vals[slow]}` }, { name: "fast", value: `${vals[fast]}` }],
+    [3, 4, 5, 6]
+  ));
+
+  while (fast < n - 1 && fast + 1 < n) {
+    slow++; fast += 2; if (fast >= n) fast = n - 1;
+    const ann = {}; ann[slow] = "slow"; if (fast < n) ann[fast] = "fast";
+    steps.push(graphSnap(
+      { vi: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}`, en: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}` },
+      { vi: `slow → ${vals[slow]}, fast → ${fast < n ? vals[fast] : "end"}.`, en: `slow → ${vals[slow]}, fast → ${fast < n ? vals[fast] : "end"}.` },
+      allEdges, ann, fast < n ? [fast] : [], [slow],
+      [{ name: "slow", value: `${vals[slow]} (mid)` }, { name: "fast", value: fast < n ? `${vals[fast]}` : "end" }],
+      [5, 6]
+    ));
+    if (fast >= n - 1) break;
+  }
+
+  const mid = slow;
+
+  // Step 2: Reverse second half
+  const secondHalf = vals.slice(mid);
+  const reversed = [...secondHalf].reverse();
+  const revEdges = [];
+  for (let i = 0; i < mid - 1; i++) revEdges.push({ u: i, v: i + 1, w: "" });
+  if (mid > 0) revEdges.push({ u: mid - 1, v: mid, w: "" });
+  for (let i = mid; i < n - 1; i++) revEdges.push({ u: i + 1, v: i, w: "" }); // reversed arrows
+
+  steps.push(graphSnap(
+    { vi: `Bước 2: Đảo nửa sau [${secondHalf.join(",")}] → [${reversed.join(",")}]`, en: `Step 2: Reverse 2nd half [${secondHalf.join(",")}] → [${reversed.join(",")}]` },
+    { vi: `Nửa sau từ index ${mid}: đảo mũi tên. Giờ prev = ${vals[n-1]} (head nửa đảo).`, en: `Second half from index ${mid}: reverse arrows. Now prev = ${vals[n-1]} (head of reversed half).` },
+    revEdges, { [n-1]: "prev" }, [n-1], Array.from({ length: n - mid }, (_, i) => mid + i),
+    [{ name: "first half", value: vals.slice(0, mid).join("→") }, { name: "reversed 2nd", value: reversed.join("→") }],
+    [8, 9, 10, 11, 12, 13]
+  ));
+
+  // Step 3: Merge/interleave — simulate actual pointer manipulation
+  // first = head (index 0), second = prev (last node = index n-1 in reversed order)
+  const firstH = vals.slice(0, mid);
+  const secondH = [...reversed]; // reversed second half
+
+  // Simulate the actual interleaving with first/second pointers
+  let fi = 0, si = 0; // indices into firstH and secondH
+  const resultArr = [];
+
+  steps.push({
+    title: { vi: "Bước 3: Merge xen kẽ (first, second)", en: "Step 3: Interleave (first, second)" },
+    arr: [...firstH, ...secondH], sub: [...firstH.map(String), ...secondH.map(String)],
+    highlight: [0, firstH.length], mark: [],
+    codeLines: [15, 16], codeBlock: 1,
+    vars: [
+      { name: "first", value: `${firstH[0]} (head of 1st half)` },
+      { name: "second", value: `${secondH[0]} (head of reversed 2nd half)` },
+      { name: "1st half", value: firstH.join("→") },
+      { name: "2nd half (reversed)", value: secondH.join("→") },
+    ],
+    note: {
+      vi: `first = head nửa đầu (${firstH[0]}), second = head nửa đảo (${secondH[0]}).\nLặp: chèn second SAU first, rồi cả 2 tiến.`,
+      en: `first = head of first half (${firstH[0]}), second = head of reversed half (${secondH[0]}).\nLoop: insert second AFTER first, then both advance.`,
+    },
+  });
+
+  while (fi < firstH.length && si < secondH.length) {
+    const fVal = firstH[fi];
+    const sVal = secondH[si];
+    const fNext = fi + 1 < firstH.length ? firstH[fi + 1] : "null";
+
+    // Action: first.next = second; first = first.next (old)
+    resultArr.push(fVal);
+    resultArr.push(sVal);
+    fi++; si++;
+
+    const sNext = si < secondH.length ? secondH[si] : "null";
+
+    steps.push({
+      title: { vi: `Chèn ${sVal} sau ${fVal} → ...${fVal}→${sVal}→${fNext}...`, en: `Insert ${sVal} after ${fVal} → ...${fVal}→${sVal}→${fNext}...` },
+      arr: resultArr.slice(), sub: resultArr.map((v, idx) => {
+        if (idx === resultArr.length - 2) return `${v} ←first`;
+        if (idx === resultArr.length - 1) return `${v} ←second`;
+        return String(v);
+      }),
+      highlight: [resultArr.length - 2, resultArr.length - 1], mark: [],
+      codeLines: [17, 18], codeBlock: 1,
+      vars: [
+        { name: "first", value: `${fVal}` },
+        { name: "second", value: `${sVal}` },
+        { name: "first.next = second", value: `${fVal}.next = ${sVal}` },
+        { name: "first → next", value: `${fNext}` },
+        { name: "second.next = first", value: `${sVal}.next = ${fNext}` },
+        { name: "second → next", value: `${sNext}` },
+        { name: "result so far", value: resultArr.join("→") },
+      ],
+      note: {
+        vi:
+          `first.next, first = second, first.next\n` +
+          `  → ${fVal}.next = ${sVal} (chèn ${sVal} ngay sau ${fVal})\n` +
+          `  → first tiến sang ${fNext}\n` +
+          `second.next, second = first, second.next\n` +
+          `  → ${sVal}.next = ${fNext} (nối ${sVal} với ${fNext})\n` +
+          `  → second tiến sang ${sNext}`,
+        en:
+          `first.next, first = second, first.next\n` +
+          `  → ${fVal}.next = ${sVal} (insert ${sVal} right after ${fVal})\n` +
+          `  → first advances to ${fNext}\n` +
+          `second.next, second = first, second.next\n` +
+          `  → ${sVal}.next = ${fNext} (link ${sVal} to ${fNext})\n` +
+          `  → second advances to ${sNext}`,
+      },
+    });
+  }
+  // Append any remaining
+  while (fi < firstH.length) resultArr.push(firstH[fi++]);
+  while (si < secondH.length) resultArr.push(secondH[si++]);
+
+  // Final
+  const fs = {
+    title: { vi: `Kết quả: [${resultArr.join(",")}]`, en: `Result: [${resultArr.join(",")}]` },
+    arr: resultArr, sub: resultArr.map(String),
+    highlight: [], mark: resultArr.map((_, i) => i), final: true,
+    codeLines: [17, 18],
+    vars: [{ name: "answer", value: resultArr.join("→") }],
+    note: { vi: `Linked list đã sắp lại: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...`, en: `Linked list reordered: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...` },
+  };
+  steps.push(fs);
+  return { input, answer: `[${resultArr.join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -1477,5 +1628,49 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps234,
+  },
+  143: {
+    id: 143,
+    difficulty: "medium",
+    slug: "reorder-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Reorder List", en: "Reorder List" },
+    titleVi: { vi: "Sắp lại linked list xen kẽ đầu-cuối", en: "Reorder list interleaving head and tail" },
+    statement: {
+      vi: "Cho linked list L0→L1→...→Ln. Sắp lại thành L0→Ln→L1→Ln-1→L2→Ln-2→... (xen kẽ đầu và cuối). Nhập giá trị cách bởi dấu phẩy.",
+      en: "Given linked list L0→L1→...→Ln. Reorder to L0→Ln→L1→Ln-1→L2→Ln-2→... (interleave head and tail). Enter values comma-separated.",
+    },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Bước 1: Slow/fast tìm giữa → cắt list thành 2 nửa.", en: "Step 1: Slow/fast find middle → split list into two halves." },
+      { vi: "Bước 2: Đảo ngược nửa sau.", en: "Step 2: Reverse the second half." },
+      { vi: "Bước 3: Merge xen kẽ nửa đầu với nửa sau đã đảo.", en: "Step 3: Merge/interleave first half with reversed second half." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "3 pass O(n) mỗi cái. Tại chỗ.", en: "3 passes O(n) each. In-place." } },
+    code: [
+      "class Solution:",
+      "    def reorderList(self, head):",
+      "        # Step 1: Find middle",
+      "        slow = fast = head",
+      "        while fast and fast.next:",
+      "            slow = slow.next",
+      "            fast = fast.next.next",
+      "        # Step 2: Reverse second half",
+      "        prev, cur = None, slow",
+      "        while cur:",
+      "            nxt = cur.next",
+      "            cur.next = prev",
+      "            prev = cur",
+      "            cur = nxt",
+      "        # Step 3: Merge/interleave",
+      "        first, second = head, prev",
+      "        while second.next:",
+      "            first.next, first = second, first.next",
+      "            second.next, second = first, second.next",
+    ],
+    builder: buildSteps143,
   },
 };
