@@ -413,6 +413,224 @@ function buildSteps50(input, params) {
   return { x: origX, n: origN, answer: finalResult, steps };
 }
 
+/**
+ * LeetCode 3754: Concatenate Non-Zero Digits and Multiply by Sum I.
+ *
+ * Given a positive integer n:
+ *   1. Sum every digit of n → s.
+ *   2. Build x by concatenating the NON-ZERO digits of n in their original
+ *      left-to-right order.
+ *   3. Return x * s.
+ *
+ * Example: n = 10203004 → digits [1,0,2,0,3,0,0,4]
+ *   s = 1+0+2+0+3+0+0+4 = 10
+ *   x = 1234 (drop zeros, keep original order)
+ *   answer = 10 * 1234 = 12340
+ *
+ * The user's Python approach walks digits right-to-left with n%10, so `temp`
+ * ends up with non-zero digits in REVERSED order and must be reversed again.
+ * We visualize exactly that flow so the animation matches the code.
+ */
+function buildSteps3754(input) {
+  const rawN = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+
+  if (!Number.isFinite(rawN) || rawN <= 0 || !Number.isInteger(rawN)) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "n phải là số nguyên dương.",
+        en: "n must be a positive integer.",
+      },
+    });
+    return { original: rawN, answer: 0, steps };
+  }
+
+  // Digits left-to-right (for display)
+  const digits = String(rawN).split("").map(Number);
+  const D = digits.length;
+
+  // Track consumption from the RIGHT (matches the Python n%10 loop)
+  const consumed = new Array(D).fill(false);
+  let s = 0;
+  let temp = 0;   // grows by temp = temp*10 + digit each non-zero digit consumed
+  let rev = 0;    // final reversed number (built after the loop)
+
+  function pushDigitStep(opts) {
+    const label = opts.label;
+    // Bars: use each digit value as bar height (min 1 so zeros still show)
+    const arr = digits.map((d) => (d === 0 ? 0.5 : d));
+    const sub = digits.map((d, i) => (consumed[i] ? `·` : String(d)));
+    steps.push({
+      title: opts.title,
+      arr,
+      sub,
+      highlight: opts.highlight || [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "n (remaining)", value: opts.n },
+        { name: "digit = n%10", value: label.digit },
+        { name: "sum s", value: s },
+        { name: "temp", value: temp },
+        ...(opts.extra || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  // ── Intro ───────────────────────────────────────────────
+  steps.push({
+    title: { vi: "Đầu vào", en: "Input" },
+    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+    sub: digits.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: rawN },
+      { name: "digits", value: `[${digits.join(",")}]` },
+      { name: "s", value: 0 },
+      { name: "temp", value: 0 },
+    ],
+    note: {
+      vi:
+        `n = ${rawN}. Quét từng chữ số từ phải sang trái (n%10):\n` +
+        `  s += digit  (cộng vào tổng)\n` +
+        `  Nếu digit ≠ 0: temp = temp*10 + digit  (dồn các chữ số khác 0)\n` +
+        `Vì quét ngược, temp sẽ đảo ngược so với thứ tự gốc → phải reverse ở cuối.`,
+      en:
+        `n = ${rawN}. Scan digits right-to-left with n%10:\n` +
+        `  s += digit  (accumulate sum)\n` +
+        `  If digit ≠ 0: temp = temp*10 + digit  (pack non-zero digits)\n` +
+        `Because we scan backwards, temp ends up REVERSED and must be flipped at the end.`,
+    },
+  });
+
+  // ── Phase 1: consume digits right-to-left ───────────────
+  let m = rawN;
+  for (let posFromRight = 0; posFromRight < D; posFromRight++) {
+    const idxLTR = D - 1 - posFromRight; // index in the left-to-right display
+    const digit = m % 10;
+
+    // Update s
+    s += digit;
+
+    // Update temp (only for non-zero digits)
+    const kept = digit !== 0;
+    if (kept) temp = temp * 10 + digit;
+
+    // Mark this digit as consumed
+    consumed[idxLTR] = true;
+    const nextN = Math.floor(m / 10);
+
+    pushDigitStep({
+      title: kept
+        ? { vi: `digit = ${digit} (khác 0, giữ)`, en: `digit = ${digit} (non-zero, keep)` }
+        : { vi: `digit = ${digit} (là 0, bỏ)`, en: `digit = ${digit} (zero, drop)` },
+      n: m,
+      label: { digit },
+      highlight: [idxLTR],
+      codeLines: kept ? [4, 5, 6, 7, 8] : [4, 5, 6, 8],
+      note: {
+        vi: kept
+          ? `n%10 = ${digit}. s += ${digit} → s = ${s}. Vì ${digit} ≠ 0, temp = temp*10 + ${digit} = ${temp}. Tiếp: n = n//10 = ${nextN}.`
+          : `n%10 = ${digit}. s += ${digit} → s = ${s}. Vì ${digit} = 0, không thêm vào temp. Tiếp: n = n//10 = ${nextN}.`,
+        en: kept
+          ? `n%10 = ${digit}. s += ${digit} → s = ${s}. Since ${digit} ≠ 0, temp = temp*10 + ${digit} = ${temp}. Next: n = n//10 = ${nextN}.`
+          : `n%10 = ${digit}. s += ${digit} → s = ${s}. Since ${digit} = 0, skip temp. Next: n = n//10 = ${nextN}.`,
+      },
+    });
+
+    m = nextN;
+  }
+
+  // ── Phase 2: reverse temp → rev ─────────────────────────
+  let t = temp;
+  const reverseFrames = [];
+  while (t > 0) {
+    const last = t % 10;
+    rev = rev * 10 + last;
+    t = Math.floor(t / 10);
+    reverseFrames.push({ last, rev, t });
+  }
+
+  // Show a compact "reverse" step (or none if temp === 0)
+  if (temp === 0) {
+    steps.push({
+      title: { vi: "Không có chữ số khác 0", en: "No non-zero digits" },
+      arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+      sub: digits.map(String),
+      highlight: [],
+      mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "s", value: s },
+        { name: "temp", value: 0 },
+        { name: "rev", value: 0 },
+      ],
+      note: {
+        vi: `Không có digit khác 0 → rev = 0.`,
+        en: `No non-zero digits → rev = 0.`,
+      },
+    });
+  } else {
+    // One combined step showing the reversal
+    steps.push({
+      title: { vi: `Reverse temp → rev`, en: `Reverse temp → rev` },
+      arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+      sub: digits.map(String),
+      highlight: [],
+      mark: [],
+      codeLines: [10, 11, 12],
+      vars: [
+        { name: "temp (before reverse)", value: temp },
+        { name: "rev (after reverse)", value: rev },
+        { name: "steps taken", value: reverseFrames.length },
+      ],
+      note: {
+        vi:
+          `Reverse temp = ${temp} thành rev = ${rev} bằng vòng lặp:\n` +
+          `  rev = rev*10 + temp%10; temp //= 10.\n` +
+          `Kết quả: rev = ${rev} (đúng bằng các chữ số khác 0 của n theo thứ tự gốc trái → phải).`,
+        en:
+          `Reverse temp = ${temp} into rev = ${rev} via the loop:\n` +
+          `  rev = rev*10 + temp%10; temp //= 10.\n` +
+          `Result: rev = ${rev} (exactly the non-zero digits of n in original left-to-right order).`,
+      },
+    });
+  }
+
+  // ── Final ───────────────────────────────────────────────
+  const answer = s * rev;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+    sub: digits.map(String),
+    highlight: [],
+    mark: digits.map((d, i) => (d !== 0 ? i : -1)).filter((i) => i >= 0),
+    final: true,
+    codeLines: [13, 14],
+    vars: [
+      { name: "s (sum of digits)", value: s },
+      { name: "rev (non-zero digits)", value: rev },
+      { name: "answer = s × rev", value: answer },
+    ],
+    note: {
+      vi: `answer = s × rev = ${s} × ${rev} = ${answer}. (Các chữ số khác 0 được đánh dấu xanh.)`,
+      en: `answer = s × rev = ${s} × ${rev} = ${answer}. (Non-zero digits highlighted in green.)`,
+    },
+  });
+
+  return { original: rawN, answer, steps };
+}
+
 module.exports = {
   50: {
     id: 50,
@@ -550,5 +768,53 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps246,
+  },
+  3754: {
+    id: 3754,
+    difficulty: "easy",
+    slug: "concatenate-non-zero-digits-and-multiply-by-sum-i",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Concatenate Non-Zero Digits and Multiply by Sum I", en: "Concatenate Non-Zero Digits and Multiply by Sum I" },
+    titleVi: { vi: "Ghép các chữ số khác 0 rồi nhân với tổng chữ số", en: "Concat non-zero digits × sum of digits" },
+    statement: {
+      vi:
+        "Cho số nguyên dương n. Gọi x là số được tạo bằng cách nối các chữ số khác 0 của n theo đúng thứ tự trái sang phải. " +
+        "Gọi sum là tổng các chữ số của n. Trả về x × sum.",
+      en:
+        "Given a positive integer n. Let x be the number formed by concatenating the non-zero digits of n in their original left-to-right order. " +
+        "Let sum be the sum of all digits of n. Return x × sum.",
+    },
+    defaultInput: [10203004],
+    inputKind: "positive",
+    inputLabel: { vi: "n", en: "n" },
+    singleInput: true,
+    maxInput: 100000000,
+    extraParams: [],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Quét ~log₁₀(n) chữ số, mỗi bước O(1); reverse temp cũng O(log n). Chỉ dùng vài biến phụ.",
+        en: "About log₁₀(n) digits, each processed in O(1); reversing temp is also O(log n). Only a few extra variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def sumAndMultiply(self, n: int) -> int:",
+      "        s = 0",
+      "        temp = 0",
+      "        while n > 0:",
+      "            digit = n % 10",
+      "            s += digit",
+      "            if digit != 0:",
+      "                temp = temp * 10 + digit",
+      "            n //= 10",
+      "        rev = 0",
+      "        while temp > 0:",
+      "            rev = rev * 10 + temp % 10",
+      "            temp //= 10",
+      "        return s * rev",
+    ],
+    builder: buildSteps3754,
   },
 };
