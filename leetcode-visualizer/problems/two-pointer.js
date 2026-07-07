@@ -776,6 +776,145 @@ function buildSteps1089(nums) {
   return { input: nums, answer: arr, steps };
 }
 
+// ─── 19: Remove Nth Node From End of List ───
+// Two pointers: fast goes n+1 ahead, then both advance. When fast=null, slow.next is the target.
+function buildSteps19(input, params) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const n = params.n !== undefined ? Number(params.n) : 2;
+  const steps = [];
+
+  // Build graph representation of linked list: dummy → v1 → v2 → ... → null
+  const nodeIds = ["D", ...vals.map((v, i) => `${v}`)];
+  const allNodes = nodeIds.map((lbl, i) => ({ id: i, label: lbl }));
+  const allEdges = [];
+  for (let i = 0; i < allNodes.length - 1; i++) {
+    allEdges.push({ u: i, v: i + 1, w: "" });
+  }
+
+  let fast = 0, slow = 0;
+
+  function graphSnap(title, note, hlNodes, removedIdx, vars, codeLines) {
+    // Build edges (skip the removed node if any)
+    const edges = removedIdx === null
+      ? allEdges.slice()
+      : allEdges.filter((e) => e.u !== removedIdx && e.v !== removedIdx)
+          .concat(removedIdx > 0 && removedIdx < allNodes.length - 1
+            ? [{ u: removedIdx - 1, v: removedIdx + 1, w: "" }]
+            : []);
+    const nodes = removedIdx === null
+      ? allNodes
+      : allNodes.filter((_, i) => i !== removedIdx);
+    const visited = [];
+    // Mark nodes between slow and fast as "visited" (traversed)
+    for (let i = 0; i <= Math.min(fast, allNodes.length - 1); i++) visited.push(i);
+
+    return {
+      title,
+      arr: [],
+      graph: {
+        nodes: removedIdx === null ? allNodes : allNodes,
+        edges: allEdges,
+        hlNodes: hlNodes || [],
+        hlEdges: [],
+        visitedNodes: visited,
+      },
+      highlight: [], mark: [],
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  steps.push(graphSnap(
+    { vi: "Khởi tạo: dummy → linked list", en: "Init: dummy → linked list" },
+    {
+      vi: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nBước 1: fast đi trước n+1 = ${n + 1} bước.`,
+      en: `D → ${vals.join(" → ")} → null\nfast = slow = dummy (node D).\nStep 1: fast advances n+1 = ${n + 1} steps ahead.`,
+    },
+    [0], null,
+    [{ name: "linked list", value: `D → ${vals.join(" → ")} → null` }, { name: "n", value: n }, { name: "fast", value: "D" }, { name: "slow", value: "D" }],
+    [3, 4, 5]
+  ));
+
+  // Step 1: fast advances n+1 steps.
+  for (let i = 0; i < n + 1 && fast < allNodes.length - 1; i++) {
+    fast++;
+    steps.push(graphSnap(
+      { vi: `fast → ${nodeIds[fast]} (bước ${i + 1}/${n + 1})`, en: `fast → ${nodeIds[fast]} (step ${i + 1}/${n + 1})` },
+      {
+        vi: `fast tiến 1 bước → ${nodeIds[fast]}. Gap = ${fast - slow}.`,
+        en: `fast advances → ${nodeIds[fast]}. Gap = ${fast - slow}.`,
+      },
+      [fast, slow], null,
+      [{ name: "fast", value: `${nodeIds[fast]} (index ${fast})` }, { name: "slow", value: `${nodeIds[slow]} (index ${slow})` }, { name: "gap", value: fast - slow }],
+      [6, 7, 8]
+    ));
+  }
+
+  // Step 2: both advance until fast passes the last node.
+  while (fast < allNodes.length) {
+    fast++;
+    slow++;
+    const atEnd = fast >= allNodes.length;
+    steps.push(graphSnap(
+      { vi: `Cùng đi: fast=${atEnd ? "null" : nodeIds[fast]}, slow=${nodeIds[slow]}`, en: `Together: fast=${atEnd ? "null" : nodeIds[fast]}, slow=${nodeIds[slow]}` },
+      {
+        vi: atEnd
+          ? `fast = null → DỪNG.\nslow = ${nodeIds[slow]}. slow.next = ${nodeIds[slow + 1]} ← nút thứ ${n} từ cuối cần XÓA.`
+          : `Cả 2 tiến 1 bước. Gap vẫn = ${n + 1}.`,
+        en: atEnd
+          ? `fast = null → STOP.\nslow = ${nodeIds[slow]}. slow.next = ${nodeIds[slow + 1]} ← the ${n}th node from end to REMOVE.`
+          : `Both advance 1. Gap stays = ${n + 1}.`,
+      },
+      [fast < allNodes.length ? fast : -1, slow].filter(x => x >= 0 && x < allNodes.length), null,
+      [
+        { name: "fast", value: atEnd ? "null (past end)" : `${nodeIds[fast]}` },
+        { name: "slow", value: `${nodeIds[slow]}` },
+        { name: "to remove", value: `slow.next = ${nodeIds[slow + 1]}` },
+      ],
+      [9, 10, 11, 12]
+    ));
+    if (atEnd) break;
+  }
+
+  // Remove node
+  const removedIdx = slow + 1;
+  const removedVal = nodeIds[removedIdx];
+  const resultVals = vals.filter((_, i) => i !== removedIdx - 1);
+
+  // Final: show graph with removed node highlighted differently
+  const finalNodes = allNodes.filter((_, i) => i !== removedIdx);
+  const finalEdges = [];
+  for (let i = 0; i < finalNodes.length - 1; i++) {
+    finalEdges.push({ u: finalNodes[i].id, v: finalNodes[i + 1].id, w: "" });
+  }
+
+  const fs = {
+    title: { vi: `Xóa nút ${removedVal} → [${resultVals.join(",")}]`, en: `Remove ${removedVal} → [${resultVals.join(",")}]` },
+    arr: [],
+    graph: {
+      nodes: finalNodes,
+      edges: finalEdges,
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: finalNodes.map((n) => n.id),
+    },
+    highlight: [], mark: [],
+    final: true, codeLines: [13, 14, 15],
+    vars: [
+      { name: "removed", value: `${removedVal} (thứ ${n} từ cuối / ${n}th from end)` },
+      { name: "result", value: resultVals.join(" → ") + " → null" },
+    ],
+    note: {
+      vi: `slow.next = slow.next.next → bỏ nút ${removedVal}.\nKết quả: ${resultVals.join(" → ")} → null.`,
+      en: `slow.next = slow.next.next → skip ${removedVal}.\nResult: ${resultVals.join(" → ")} → null.`,
+    },
+  };
+  steps.push(fs);
+
+  return { input, answer: `[${resultVals.join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -1074,5 +1213,44 @@ module.exports = {
       "            right -= 1",
     ],
     builder: buildSteps1089,
+  },
+  19: {
+    id: 19,
+    difficulty: "medium",
+    slug: "remove-nth-node-from-end-of-list",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Remove Nth Node From End of List", en: "Remove Nth Node From End of List" },
+    titleVi: { vi: "Xóa nút thứ n từ cuối", en: "Remove nth node from the end" },
+    statement: {
+      vi: "Cho head linked list và n. Xóa nút thứ n tính từ CUỐI và trả về head. Dùng 2 con trỏ fast/slow cách nhau n bước. Nhập danh sách giá trị cách bởi dấu phẩy.",
+      en: "Given head of a linked list and n. Remove the nth node from the END and return head. Use two pointers fast/slow spaced n apart. Enter list values comma-separated.",
+    },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [{ key: "n", label: { vi: "n (từ cuối)", en: "n (from end)" }, default: 2 }],
+    approach: [
+      { vi: "fast đi trước n bước. Sau đó fast và slow cùng đi tới khi fast = null.", en: "fast advances n steps ahead. Then fast and slow move together until fast = null." },
+      { vi: "Khi fast = null → slow đang ở nút TRƯỚC nút cần xóa → slow.next = slow.next.next.", en: "When fast = null → slow is at the node BEFORE the target → slow.next = slow.next.next." },
+    ],
+    complexity: { time: "O(L)", space: "O(1)", note: { vi: "L = độ dài list. 1 pass.", en: "L = list length. Single pass." } },
+    code: [
+      "class Solution:",
+      "    def removeNthFromEnd(self, head, n):",
+      "        dummy = ListNode(0, head)",
+      "        fast = dummy",
+      "        slow = dummy",
+      "        # fast goes n+1 steps ahead",
+      "        for _ in range(n + 1):",
+      "            fast = fast.next",
+      "        # move both until fast = null",
+      "        while fast:",
+      "            fast = fast.next",
+      "            slow = slow.next",
+      "        # remove the node",
+      "        slow.next = slow.next.next",
+      "        return dummy.next",
+    ],
+    builder: buildSteps19,
   },
 };
