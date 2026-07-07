@@ -793,18 +793,20 @@ function buildSteps19(input, params) {
 
   let fast = 0, slow = 0;
 
-  function graphSnap(title, note, hlNodes, removedIdx, vars, codeLines) {
-    // Build nodes with fast/slow indicators in the label
+  function graphSnap(title, note, hlNodesOverride, removedIdx, vars, codeLines) {
+    // Build nodes: append "F" for fast, "S" for slow to label
     const nodes = allNodes.map((nd, i) => {
       let lbl = nodeIds[i];
-      if (i === fast && fast < allNodes.length && i === slow) lbl = `⚡${lbl}🐢`;
-      else if (i === fast && fast < allNodes.length) lbl = `⚡${lbl}`;
-      else if (i === slow) lbl = `🐢${lbl}`;
+      if (i === fast && fast < allNodes.length && i === slow) lbl += " F,S";
+      else if (i === fast && fast < allNodes.length) lbl += " F";
+      else if (i === slow) lbl += " S";
       return { id: nd.id, label: lbl };
     });
 
-    const visited = [];
-    for (let i = 0; i <= Math.min(fast, allNodes.length - 1); i++) visited.push(i);
+    // hlNodes = fast node (amber), visitedNodes = slow node (green/blue)
+    const hl = [];
+    if (fast >= 0 && fast < allNodes.length) hl.push(fast);
+    const visited = [slow];
 
     return {
       title,
@@ -812,7 +814,7 @@ function buildSteps19(input, params) {
       graph: {
         nodes,
         edges: allEdges,
-        hlNodes: hlNodes || [],
+        hlNodes: hl,
         hlEdges: [],
         visitedNodes: visited,
       },
