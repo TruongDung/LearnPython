@@ -1397,6 +1397,110 @@ function buildSteps138(input) {
   return { input, answer: "copied", steps };
 }
 
+// ─── 25: Reverse Nodes in k-Group ───
+function buildSteps25(input, params) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const k = params.k !== undefined ? Number(params.k) : 3;
+  const n = vals.length;
+  const steps = [];
+
+  const result = [...vals];
+
+  steps.push({
+    title: { vi: `Đảo từng nhóm ${k} nodes`, en: `Reverse every ${k}-node group` },
+    arr: result.map((v) => v),
+    sub: result.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [2, 3, 4],
+    vars: [{ name: "list", value: result.join("→") }, { name: "k", value: k }],
+    note: {
+      vi: `List: ${vals.join("→")}. k = ${k}.\nLặp: đếm đủ k nodes → đảo nhóm tại chỗ. Nhóm cuối < k → giữ nguyên.`,
+      en: `List: ${vals.join("→")}. k = ${k}.\nLoop: count k nodes → reverse group in-place. Last group < k → leave as-is.`,
+    },
+  });
+
+  let groupStart = 0;
+  let groupNum = 0;
+
+  while (groupStart + k <= n) {
+    groupNum++;
+    const groupEnd = groupStart + k - 1;
+
+    // Show group before reverse
+    const groupVals = result.slice(groupStart, groupStart + k);
+    const hlIndices = Array.from({ length: k }, (_, i) => groupStart + i);
+
+    steps.push({
+      title: { vi: `Nhóm ${groupNum}: [${groupVals.join(",")}] (index ${groupStart}..${groupEnd})`, en: `Group ${groupNum}: [${groupVals.join(",")}] (index ${groupStart}..${groupEnd})` },
+      arr: result.map((v) => v),
+      sub: result.map((v, i) => i >= groupStart && i <= groupEnd ? `grp${groupNum}` : `[${i}]`),
+      highlight: hlIndices, mark: [],
+      codeLines: [5, 6, 7, 8, 9, 10],
+      vars: [
+        { name: "group", value: groupNum },
+        { name: "range", value: `index ${groupStart}..${groupEnd}` },
+        { name: "nodes", value: `[${groupVals.join(",")}]` },
+        { name: "action", value: "đếm đủ k → sắp đảo" },
+      ],
+      note: {
+        vi: `Nhóm ${groupNum}: [${groupVals.join(",")}] có đủ ${k} nodes → đảo ngược.`,
+        en: `Group ${groupNum}: [${groupVals.join(",")}] has ${k} nodes → will reverse.`,
+      },
+    });
+
+    // Reverse this segment in result array
+    const segment = result.slice(groupStart, groupStart + k);
+    segment.reverse();
+    for (let i = 0; i < k; i++) result[groupStart + i] = segment[i];
+
+    steps.push({
+      title: { vi: `Đã đảo nhóm ${groupNum}: [${segment.join(",")}]`, en: `Reversed group ${groupNum}: [${segment.join(",")}]` },
+      arr: result.map((v) => v),
+      sub: result.map((v, i) => i >= groupStart && i <= groupEnd ? `grp${groupNum}` : `[${i}]`),
+      highlight: [], mark: hlIndices,
+      codeLines: [11, 12, 13, 14, 15, 16, 17],
+      vars: [
+        { name: "group", value: groupNum },
+        { name: "reversed", value: `[${segment.join(",")}]` },
+        { name: "list now", value: result.join("→") },
+      ],
+      note: {
+        vi: `Đảo xong: [${groupVals.join(",")}] → [${segment.join(",")}].\nList hiện tại: ${result.join("→")}.`,
+        en: `Reversed: [${groupVals.join(",")}] → [${segment.join(",")}].\nList now: ${result.join("→")}.`,
+      },
+    });
+
+    groupStart += k;
+  }
+
+  // Show remaining (< k nodes, not reversed)
+  if (groupStart < n) {
+    const remaining = result.slice(groupStart);
+    steps.push({
+      title: { vi: `Còn lại [${remaining.join(",")}] < ${k} → giữ nguyên`, en: `Remaining [${remaining.join(",")}] < ${k} → keep as-is` },
+      arr: result.map((v) => v),
+      sub: result.map((_, i) => `[${i}]`),
+      highlight: Array.from({ length: n - groupStart }, (_, i) => groupStart + i), mark: [],
+      codeLines: [9, 10],
+      vars: [{ name: "remaining", value: `[${remaining.join(",")}]` }, { name: "count", value: n - groupStart }],
+      note: { vi: `Chỉ còn ${n - groupStart} nodes (< ${k}) → không đảo.`, en: `Only ${n - groupStart} nodes left (< ${k}) → don't reverse.` },
+    });
+  }
+
+  // Final
+  const fs = {
+    title: { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
+    arr: result.map((v) => v),
+    sub: result.map(String),
+    highlight: [], mark: Array.from({ length: n }, (_, i) => i), final: true,
+    codeLines: [18, 19, 20, 21],
+    vars: [{ name: "answer", value: result.join("→") }],
+    note: { vi: `Linked list sau khi đảo từng nhóm ${k}: ${result.join("→")}.`, en: `List after reversing every ${k}-group: ${result.join("→")}.` },
+  };
+  steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -1866,5 +1970,51 @@ module.exports = {
       "        return old_to_new[head]",
     ],
     builder: buildSteps138,
+  },
+  25: {
+    id: 25,
+    difficulty: "hard",
+    slug: "reverse-nodes-in-k-group",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Reverse Nodes in k-Group", en: "Reverse Nodes in k-Group" },
+    titleVi: { vi: "Đảo từng nhóm k nodes", en: "Reverse every k-node group" },
+    statement: {
+      vi: "Cho linked list và k, đảo ngược từng nhóm k nodes liên tiếp. Nếu nhóm cuối < k thì giữ nguyên. Nhập giá trị cách bởi dấu phẩy.",
+      en: "Given a linked list and k, reverse every group of k consecutive nodes. If the last group has fewer than k nodes, leave them as-is. Enter values comma-separated.",
+    },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [{ key: "k", label: { vi: "k (kích thước nhóm)", en: "k (group size)" }, default: 3 }],
+    approach: [
+      { vi: "Lặp: đếm đủ k nodes → đảo nhóm đó tại chỗ → nối với nhóm trước/sau.", en: "Loop: count k nodes → reverse that group in-place → link with prev/next groups." },
+      { vi: "Nếu còn < k nodes → dừng (không đảo).", en: "If fewer than k nodes remain → stop (don't reverse)." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi node xử lý đúng 1 lần.", en: "Each node processed exactly once." } },
+    code: [
+      "class Solution:",
+      "    def reverseKGroup(self, head, k):",
+      "        dummy = ListNode(0, head)",
+      "        prev_group = dummy",
+      "        while True:",
+      "            # Check if k nodes exist",
+      "            kth = prev_group",
+      "            for _ in range(k):",
+      "                kth = kth.next",
+      "                if not kth: return dummy.next",
+      "            next_group = kth.next",
+      "            # Reverse the group",
+      "            prev, cur = kth.next, prev_group.next",
+      "            for _ in range(k):",
+      "                nxt = cur.next",
+      "                cur.next = prev",
+      "                prev = cur",
+      "                cur = nxt",
+      "            # Connect with previous group",
+      "            tmp = prev_group.next",
+      "            prev_group.next = kth",
+      "            prev_group = tmp",
+    ],
+    builder: buildSteps25,
   },
 };
