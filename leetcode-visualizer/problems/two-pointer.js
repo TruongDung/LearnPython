@@ -1456,8 +1456,30 @@ function buildSteps25(input, params) {
       [5, 6, 7, 8, 9, 10]
     ));
 
-    // Reverse this segment
+    // Reverse this segment — show each pointer swap step
     const segment = result.slice(groupStart, groupStart + k);
+    // Sub-steps: simulate prev/cur/nxt inside the group
+    const tempArr = [...segment]; // working copy
+    for (let step = 0; step < k; step++) {
+      // At this point, step elements have been reversed
+      // Show cur = tempArr[step] being moved
+      const curVal = segment[step];
+      const prevVal = step > 0 ? segment[step - 1] : "null";
+      const nxtVal = step + 1 < k ? segment[step + 1] : "next_group";
+
+      const annRev = {};
+      annRev[groupStart + step] = "cur";
+      if (step > 0) annRev[groupStart + step - 1] = "prev";
+
+      steps.push(graphSnap(
+        { vi: `  cur=${curVal}, prev=${prevVal}: cur.next=prev`, en: `  cur=${curVal}, prev=${prevVal}: cur.next=prev` },
+        { vi: `nxt = cur.next (${nxtVal})\ncur.next = prev (${curVal}→${prevVal})\nprev = cur (${curVal})\ncur = nxt (${nxtVal})`, en: `nxt = cur.next (${nxtVal})\ncur.next = prev (${curVal}→${prevVal})\nprev = cur (${curVal})\ncur = nxt (${nxtVal})` },
+        forwardEdges(), annRev, [groupStart + step], visitedSoFar,
+        [{ name: "prev", value: prevVal }, { name: "cur", value: curVal }, { name: "nxt", value: nxtVal }, { name: "step", value: `${step + 1}/${k}` }],
+        [14, 15, 16, 17, 18]
+      ));
+    }
+
     segment.reverse();
     for (let i = 0; i < k; i++) result[groupStart + i] = segment[i];
 
@@ -1502,6 +1524,153 @@ function buildSteps25(input, params) {
   fs.final = true;
   steps.push(fs);
   return { input, answer: `[${result.join(",")}]`, steps };
+}
+
+// ─── 160: Intersection of Two Linked Lists ───
+function buildSteps160(input) {
+  const parts = String(input).split(";");
+  const listA = parts[0].split(",").map(Number);
+  const listB = parts[1] ? parts[1].split(",").map(Number) : [];
+  const intersectVal = parts[2] ? Number(parts[2]) : -1;
+  const steps = [];
+
+  const intIdxA = intersectVal >= 0 ? listA.indexOf(intersectVal) : -1;
+  const intIdxB = intersectVal >= 0 ? listB.indexOf(intersectVal) : -1;
+  const hasIntersect = intIdxA >= 0 && intIdxB >= 0;
+
+  // Unique part of A (before intersection), unique part of B, shared tail
+  const uniqueA = hasIntersect ? listA.slice(0, intIdxA) : listA;
+  const uniqueB = hasIntersect ? listB.slice(0, intIdxB) : listB;
+  const shared = hasIntersect ? listA.slice(intIdxA) : [];
+
+  // Build graph nodes: uniqueA nodes (id: a0,a1..), uniqueB nodes (id: b0,b1..), shared (id: s0,s1..)
+  const allNodes = [];
+  const aIds = [], bIds = [], sIds = [];
+  uniqueA.forEach((v, i) => { const id = allNodes.length; aIds.push(id); allNodes.push({ id, label: String(v) }); });
+  uniqueB.forEach((v, i) => { const id = allNodes.length; bIds.push(id); allNodes.push({ id, label: String(v) }); });
+  shared.forEach((v, i) => { const id = allNodes.length; sIds.push(id); allNodes.push({ id, label: String(v) }); });
+
+  // Edges: A chain → shared, B chain → shared
+  const allEdges = [];
+  for (let i = 0; i < aIds.length - 1; i++) allEdges.push({ u: aIds[i], v: aIds[i + 1], w: "" });
+  for (let i = 0; i < bIds.length - 1; i++) allEdges.push({ u: bIds[i], v: bIds[i + 1], w: "" });
+  for (let i = 0; i < sIds.length - 1; i++) allEdges.push({ u: sIds[i], v: sIds[i + 1], w: "" });
+  // Connect A tail → shared start
+  if (aIds.length > 0 && sIds.length > 0) allEdges.push({ u: aIds[aIds.length - 1], v: sIds[0], w: "" });
+  else if (aIds.length === 0 && sIds.length > 0) {} // A starts at shared
+  // Connect B tail → shared start
+  if (bIds.length > 0 && sIds.length > 0) allEdges.push({ u: bIds[bIds.length - 1], v: sIds[0], w: "" });
+
+  // Map list positions to node ids
+  function getNodeId(list, idx, isOnOther) {
+    if (list === "A") {
+      if (idx < uniqueA.length) return aIds[idx];
+      const sIdx = idx - uniqueA.length;
+      return sIdx < sIds.length ? sIds[sIdx] : -1;
+    } else {
+      if (idx < uniqueB.length) return bIds[idx];
+      const sIdx = idx - uniqueB.length;
+      return sIdx < sIds.length ? sIds[sIdx] : -1;
+    }
+  }
+
+  function graphSnap(title, note, pANodeId, pBNodeId, annotations, visitedNodes, vars, codeLines) {
+    const hl = [];
+    if (pANodeId >= 0) hl.push(pANodeId);
+    if (pBNodeId >= 0 && pBNodeId !== pANodeId) hl.push(pBNodeId);
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges: allEdges, hlNodes: hl, hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Intro
+  const ann0 = {};
+  if (aIds.length > 0) ann0[aIds[0]] = "pA";
+  if (bIds.length > 0) ann0[bIds[0]] = "pB";
+  steps.push(graphSnap(
+    { vi: "2 pointers: pA từ headA, pB từ headB", en: "Two pointers: pA from headA, pB from headB" },
+    {
+      vi: `listA: ${listA.join("→")}\nlistB: ${listB.join("→")}\nGiao điểm: ${hasIntersect ? intersectVal : "không"}.\n\nKhi pointer tới null → nhảy sang đầu list kia.\nCả 2 đi tổng lenA+lenB bước → gặp tại giao điểm.`,
+      en: `listA: ${listA.join("→")}\nlistB: ${listB.join("→")}\nIntersection: ${hasIntersect ? intersectVal : "none"}.\n\nWhen a pointer reaches null → jump to other list's head.\nBoth traverse lenA+lenB steps → meet at intersection.`,
+    },
+    aIds.length > 0 ? aIds[0] : (sIds.length > 0 ? sIds[0] : -1),
+    bIds.length > 0 ? bIds[0] : (sIds.length > 0 ? sIds[0] : -1),
+    ann0, sIds,
+    [{ name: "pA", value: listA[0] }, { name: "pB", value: listB[0] }, { name: "intersect", value: hasIntersect ? intersectVal : "none" }],
+    [2, 3]
+  ));
+
+  // Simulate
+  let pA = 0, pB = 0, pAList = "A", pBList = "B";
+  let found = false;
+
+  for (let s = 0; s < listA.length + listB.length + 2 && !found; s++) {
+    const pAId = getNodeId(pAList, pA);
+    const pBId = getNodeId(pBList, pB);
+    const pAVal = pAList === "A" ? (pA < listA.length ? listA[pA] : null) : (pA < listB.length ? listB[pA] : null);
+    const pBVal = pBList === "B" ? (pB < listB.length ? listB[pB] : null) : (pB < listA.length ? listA[pB] : null);
+
+    if (pAId >= 0 && pBId >= 0 && pAId === pBId) {
+      found = true;
+      const ann = {}; ann[pAId] = "pA=pB";
+      const fs = graphSnap(
+        { vi: `✓ Gặp nhau tại ${allNodes[pAId].label}!`, en: `✓ Meet at ${allNodes[pAId].label}!` },
+        { vi: `pA == pB → giao điểm = ${allNodes[pAId].label}!`, en: `pA == pB → intersection = ${allNodes[pAId].label}!` },
+        pAId, pBId, ann, sIds,
+        [{ name: "answer", value: allNodes[pAId].label }],
+        [4, 5, 6, 7]
+      );
+      fs.final = true; steps.push(fs);
+      break;
+    }
+
+    // Advance pA
+    let jumpA = false;
+    const pAListLen = pAList === "A" ? listA.length : listB.length;
+    pA++;
+    if (pA >= pAListLen) {
+      pAList = pAList === "A" ? "B" : "A"; pA = 0; jumpA = true;
+    }
+    // Advance pB
+    let jumpB = false;
+    const pBListLen = pBList === "B" ? listB.length : listA.length;
+    pB++;
+    if (pB >= pBListLen) {
+      pBList = pBList === "B" ? "A" : "B"; pB = 0; jumpB = true;
+    }
+
+    const newPAId = getNodeId(pAList, pA);
+    const newPBId = getNodeId(pBList, pB);
+    const ann = {};
+    if (newPAId >= 0) ann[newPAId] = "pA";
+    if (newPBId >= 0 && newPBId !== newPAId) ann[newPBId] = "pB";
+    if (newPBId >= 0 && newPBId === newPAId) ann[newPBId] = "pA,pB";
+
+    const newPAVal = pAList === "A" ? (pA < listA.length ? listA[pA] : "null") : (pA < listB.length ? listB[pA] : "null");
+    const newPBVal = pBList === "B" ? (pB < listB.length ? listB[pB] : "null") : (pB < listA.length ? listA[pB] : "null");
+
+    steps.push(graphSnap(
+      { vi: `pA=${newPAVal}${jumpA ? " (→head" + pAList + ")" : ""}, pB=${newPBVal}${jumpB ? " (→head" + pBList + ")" : ""}`, en: `pA=${newPAVal}${jumpA ? " (→head" + pAList + ")" : ""}, pB=${newPBVal}${jumpB ? " (→head" + pBList + ")" : ""}` },
+      { vi: jumpA ? `pA tới null → nhảy sang head${pAList}.` : jumpB ? `pB tới null → nhảy sang head${pBList}.` : `Cả 2 tiến 1 bước.`, en: jumpA ? `pA reached null → jump to head${pAList}.` : jumpB ? `pB reached null → jump to head${pBList}.` : `Both advance.` },
+      newPAId, newPBId, ann, sIds,
+      [{ name: "pA", value: `${newPAVal} (on ${pAList})` }, { name: "pB", value: `${newPBVal} (on ${pBList})` }],
+      [4, 5, 6]
+    ));
+  }
+
+  if (!found) {
+    const fs = graphSnap(
+      { vi: "Không giao → null", en: "No intersection → null" },
+      { vi: `Cả 2 tới null → không giao.`, en: `Both reached null → no intersection.` },
+      -1, -1, {}, [],
+      [{ name: "answer", value: "null" }], [7]
+    );
+    fs.final = true; steps.push(fs);
+  }
+
+  return { input, answer: hasIntersect ? intersectVal : "null", steps };
 }
 
 module.exports = {
@@ -2019,5 +2188,36 @@ module.exports = {
       "            prev_group = tmp",
     ],
     builder: buildSteps25,
+  },
+  160: {
+    id: 160,
+    difficulty: "easy",
+    slug: "intersection-of-two-linked-lists",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Intersection of Two Linked Lists", en: "Intersection of Two Linked Lists" },
+    titleVi: { vi: "Tìm giao điểm 2 linked lists", en: "Find intersection of two linked lists" },
+    statement: {
+      vi: "Cho 2 linked list có thể giao nhau (chung phần đuôi). Tìm node giao điểm (hoặc null). Dùng 2 pointers: khi tới null thì nhảy sang đầu list kia. Nhập: listA;listB;intersectVal (phần chung bắt đầu từ đâu).",
+      en: "Given two linked lists that may intersect (shared tail). Find the intersection node (or null). Two pointers: when reaching null, jump to the other list's head. Enter: listA;listB;intersectVal.",
+    },
+    defaultInput: "4,1,8,4,5;5,6,1,8,4,5;8",
+    inputKind: "string",
+    inputLabel: { vi: "listA;listB;intersectVal", en: "listA;listB;intersectVal" },
+    extraParams: [],
+    approach: [
+      { vi: "2 pointers (pA, pB) chạy đồng thời. Khi pA tới null → nhảy sang headB. Khi pB tới null → nhảy sang headA.", en: "Two pointers (pA, pB) traverse simultaneously. When pA reaches null → jump to headB. When pB reaches null → jump to headA." },
+      { vi: "Cả 2 sẽ đi tổng cộng lenA + lenB bước → gặp nhau tại giao điểm (hoặc cả 2 = null nếu không giao).", en: "Both traverse lenA + lenB total steps → meet at intersection (or both = null if no intersection)." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(1)", note: { vi: "m, n = độ dài 2 list.", en: "m, n = lengths of two lists." } },
+    code: [
+      "class Solution:",
+      "    def getIntersectionNode(self, headA, headB):",
+      "        pA, pB = headA, headB",
+      "        while pA != pB:",
+      "            pA = pA.next if pA else headB",
+      "            pB = pB.next if pB else headA",
+      "        return pA  # intersection or None",
+    ],
+    builder: buildSteps160,
   },
 };
