@@ -1135,111 +1135,190 @@ function buildSteps143(input) {
     if (fast >= n - 1) break;
   }
 
+  // Step 2: Reverse second half — show each cur step with edges changing
   const mid = slow;
-
-  // Step 2: Reverse second half
   const secondHalf = vals.slice(mid);
   const reversed = [...secondHalf].reverse();
-  const revEdges = [];
-  for (let i = 0; i < mid - 1; i++) revEdges.push({ u: i, v: i + 1, w: "" });
-  if (mid > 0) revEdges.push({ u: mid - 1, v: mid, w: "" });
-  for (let i = mid; i < n - 1; i++) revEdges.push({ u: i + 1, v: i, w: "" }); // reversed arrows
+
+  // Track reversed edges for visualization
+  const reversedEdgeSet = new Set();
+
+  function getRevEdges() {
+    const edges = [];
+    for (let i = 0; i < n - 1; i++) {
+      if (i >= mid && reversedEdgeSet.has(i)) {
+        edges.push({ u: i + 1, v: i, w: "" }); // reversed
+      } else {
+        edges.push({ u: i, v: i + 1, w: "" }); // original
+      }
+    }
+    return edges;
+  }
+
+  let prevIdx = -1;
+  let curIdx = mid;
 
   steps.push(graphSnap(
-    { vi: `Bước 2: Đảo nửa sau [${secondHalf.join(",")}] → [${reversed.join(",")}]`, en: `Step 2: Reverse 2nd half [${secondHalf.join(",")}] → [${reversed.join(",")}]` },
-    { vi: `Nửa sau từ index ${mid}: đảo mũi tên. Giờ prev = ${vals[n-1]} (head nửa đảo).`, en: `Second half from index ${mid}: reverse arrows. Now prev = ${vals[n-1]} (head of reversed half).` },
-    revEdges, { [n-1]: "prev" }, [n-1], Array.from({ length: n - mid }, (_, i) => mid + i),
-    [{ name: "first half", value: vals.slice(0, mid).join("→") }, { name: "reversed 2nd", value: reversed.join("→") }],
-    [8, 9, 10, 11, 12, 13]
+    { vi: `Bước 2: Reverse nửa sau. prev=null, cur=${vals[curIdx]}`, en: `Step 2: Reverse 2nd half. prev=null, cur=${vals[curIdx]}` },
+    { vi: `Bắt đầu đảo từ index ${mid}. prev=null, cur=${vals[curIdx]}.\nMỗi bước: cur.next = prev, prev = cur, cur = nxt.`, en: `Start reverse from index ${mid}. prev=null, cur=${vals[curIdx]}.\nEach step: cur.next = prev, prev = cur, cur = nxt.` },
+    getRevEdges(), { [curIdx]: "cur" }, [curIdx], [],
+    [{ name: "prev", value: "null" }, { name: "cur", value: `${vals[curIdx]}` }],
+    [8, 9, 10]
   ));
 
-  // Step 3: Merge/interleave — simulate actual pointer manipulation
-  // first = head (index 0), second = prev (last node = index n-1 in reversed order)
+  while (curIdx < n) {
+    const nxtIdx = curIdx + 1 < n ? curIdx + 1 : -1;
+    if (curIdx < n - 1) reversedEdgeSet.add(curIdx);
+
+    const ann = {};
+    if (prevIdx >= 0) ann[prevIdx] = "prev";
+    ann[curIdx] = "cur";
+    if (nxtIdx >= 0 && nxtIdx < n) ann[nxtIdx] = "nxt";
+
+    prevIdx = curIdx;
+    curIdx = nxtIdx >= 0 ? nxtIdx : n;
+
+    if (curIdx < n) {
+      steps.push(graphSnap(
+        { vi: `prev=${vals[prevIdx]}, cur=${vals[curIdx]}`, en: `prev=${vals[prevIdx]}, cur=${vals[curIdx]}` },
+        { vi: `Đảo: ${vals[prevIdx]}←${vals[curIdx]}. prev=${vals[prevIdx]}, cur=${vals[curIdx]}.`, en: `Reverse: ${vals[prevIdx]}←${vals[curIdx]}. prev=${vals[prevIdx]}, cur=${vals[curIdx]}.` },
+        getRevEdges(), ann, [prevIdx], [],
+        [{ name: "prev", value: `${vals[prevIdx]}` }, { name: "cur", value: `${vals[curIdx]}` }, { name: "nxt", value: curIdx + 1 < n ? `${vals[curIdx + 1]}` : "null" }],
+        [10, 11, 12, 13]
+      ));
+    } else {
+      steps.push(graphSnap(
+        { vi: `Đảo xong! prev=${vals[prevIdx]}, cur=null`, en: `Reverse done! prev=${vals[prevIdx]}, cur=null` },
+        { vi: `Nửa sau đã đảo: ${reversed.join("←")}. prev = head mới.`, en: `Second half reversed: ${reversed.join("←")}. prev = new head.` },
+        getRevEdges(), { [prevIdx]: "prev" }, [prevIdx], Array.from({ length: n - mid }, (_, i) => mid + i),
+        [{ name: "prev (head)", value: `${vals[prevIdx]}` }, { name: "reversed", value: reversed.join("←") }],
+        [10, 11, 12, 13]
+      ));
+    }
+  }
+
+  const revEdges = getRevEdges();
+
+  // Step 3: Merge/interleave — simulate with graph view showing pointer manipulation
   const firstH = vals.slice(0, mid);
-  const secondH = [...reversed]; // reversed second half
+  const secondH = [...reversed];
 
-  // Simulate the actual interleaving with first/second pointers
-  let fi = 0, si = 0; // indices into firstH and secondH
+  // Build the interleaved result by simulating actual pointer ops
+  // first starts at index 0 (head), second starts at index n-1 (prev = reversed head)
+  let firstPtr = 0; // index in vals for first pointer
+  let secondPtr = n - 1; // index in vals for second pointer
+  const resultOrder = []; // track order of nodes in result
+
+  // Current edges representing the linked list being built
+  let buildEdges = [...revEdges]; // start with edges after reverse
+
+  steps.push(graphSnap(
+    { vi: "Bước 3: Merge xen kẽ (first, second)", en: "Step 3: Interleave (first, second)" },
+    { vi: `first = head (${vals[firstPtr]}), second = prev (${vals[secondPtr]}).\nLặp: chèn second vào SAU first, rồi cả 2 tiến.`, en: `first = head (${vals[firstPtr]}), second = prev (${vals[secondPtr]}).\nLoop: insert second AFTER first, then both advance.` },
+    buildEdges, { [firstPtr]: "first", [secondPtr]: "second" }, [firstPtr, secondPtr], [],
+    [{ name: "first", value: `${vals[firstPtr]} (index ${firstPtr})` }, { name: "second", value: `${vals[secondPtr]} (index ${secondPtr})` }, { name: "1st half", value: firstH.join("→") }, { name: "2nd half (rev)", value: secondH.join("→") }],
+    [15, 16, 17]
+  ));
+
+  // Simulate the interleave loop
+  let fi = 0, si = 0;
   const resultArr = [];
-
-  steps.push({
-    title: { vi: "Bước 3: Merge xen kẽ (first, second)", en: "Step 3: Interleave (first, second)" },
-    arr: [...firstH, ...secondH], sub: [...firstH.map(String), ...secondH.map(String)],
-    highlight: [0, firstH.length], mark: [],
-    codeLines: [15, 16], codeBlock: 1,
-    vars: [
-      { name: "first", value: `${firstH[0]} (head of 1st half)` },
-      { name: "second", value: `${secondH[0]} (head of reversed 2nd half)` },
-      { name: "1st half", value: firstH.join("→") },
-      { name: "2nd half (reversed)", value: secondH.join("→") },
-    ],
-    note: {
-      vi: `first = head nửa đầu (${firstH[0]}), second = head nửa đảo (${secondH[0]}).\nLặp: chèn second SAU first, rồi cả 2 tiến.`,
-      en: `first = head of first half (${firstH[0]}), second = head of reversed half (${secondH[0]}).\nLoop: insert second AFTER first, then both advance.`,
-    },
-  });
 
   while (fi < firstH.length && si < secondH.length) {
     const fVal = firstH[fi];
     const sVal = secondH[si];
-    const fNext = fi + 1 < firstH.length ? firstH[fi + 1] : "null";
+    const fNextVal = fi + 1 < firstH.length ? firstH[fi + 1] : "null";
+    const sNextVal = si + 1 < secondH.length ? secondH[si + 1] : "null";
 
-    // Action: first.next = second; first = first.next (old)
-    resultArr.push(fVal);
-    resultArr.push(sVal);
+    // After this operation:
+    // first.next = second (link first → second)
+    // first = old first.next (advance first)
+    // second.next = new first (link second → new first)
+    // second = old second.next (advance second)
+    resultArr.push(fVal, sVal);
     fi++; si++;
 
-    const sNext = si < secondH.length ? secondH[si] : "null";
+    // Determine node indices
+    const fIdx = firstH.indexOf(fVal) < mid ? vals.indexOf(fVal) : -1;
+    const sIdx = n - 1 - (si - 1); // second walks from end backward
+    const fNextIdx = fi < firstH.length ? vals.indexOf(firstH[fi]) : -1;
+    const sNextIdx = si < secondH.length ? n - 1 - si : -1;
 
-    steps.push({
-      title: { vi: `Chèn ${sVal} sau ${fVal} → ...${fVal}→${sVal}→${fNext}...`, en: `Insert ${sVal} after ${fVal} → ...${fVal}→${sVal}→${fNext}...` },
-      arr: resultArr.slice(), sub: resultArr.map((v, idx) => {
-        if (idx === resultArr.length - 2) return `${v} ←first`;
-        if (idx === resultArr.length - 1) return `${v} ←second`;
-        return String(v);
-      }),
-      highlight: [resultArr.length - 2, resultArr.length - 1], mark: [],
-      codeLines: [17, 18], codeBlock: 1,
-      vars: [
-        { name: "first", value: `${fVal}` },
-        { name: "second", value: `${sVal}` },
-        { name: "first.next = second", value: `${fVal}.next = ${sVal}` },
-        { name: "first → next", value: `${fNext}` },
-        { name: "second.next = first", value: `${sVal}.next = ${fNext}` },
-        { name: "second → next", value: `${sNext}` },
-        { name: "result so far", value: resultArr.join("→") },
-      ],
-      note: {
+    // Build new edges showing the interleaved connections made so far
+    const newEdges = [];
+    for (let r = 0; r < resultArr.length - 1; r++) {
+      const fromIdx = vals.indexOf(resultArr[r]);
+      const toIdx = vals.indexOf(resultArr[r + 1]);
+      if (fromIdx >= 0 && toIdx >= 0) newEdges.push({ u: fromIdx, v: toIdx, w: "" });
+    }
+    // Remaining first half edges
+    if (fNextIdx >= 0) {
+      for (let x = fi; x < firstH.length - 1; x++) {
+        newEdges.push({ u: vals.indexOf(firstH[x]), v: vals.indexOf(firstH[x + 1]), w: "" });
+      }
+    }
+    // Remaining second half edges (reversed)
+    if (sNextIdx >= 0) {
+      for (let x = si; x < secondH.length - 1; x++) {
+        const fromI = vals.lastIndexOf(secondH[x]);
+        const toI = vals.lastIndexOf(secondH[x + 1]);
+        if (fromI >= 0 && toI >= 0) newEdges.push({ u: fromI, v: toI, w: "" });
+      }
+    }
+
+    const ann = {};
+    if (fNextIdx >= 0) ann[fNextIdx] = "first";
+    if (sNextIdx >= 0) ann[sNextIdx] = "second";
+
+    steps.push(graphSnap(
+      { vi: `${fVal}→${sVal}→${fNextVal === "null" ? "end" : fNextVal}`, en: `${fVal}→${sVal}→${fNextVal === "null" ? "end" : fNextVal}` },
+      {
         vi:
-          `first.next, first = second, first.next\n` +
-          `  → ${fVal}.next = ${sVal} (chèn ${sVal} ngay sau ${fVal})\n` +
-          `  → first tiến sang ${fNext}\n` +
-          `second.next, second = first, second.next\n` +
-          `  → ${sVal}.next = ${fNext} (nối ${sVal} với ${fNext})\n` +
-          `  → second tiến sang ${sNext}`,
+          `first.next, first = second, first.next:\n` +
+          `  ${fVal}.next = ${sVal}, first tiến → ${fNextVal}\n` +
+          `second.next, second = first, second.next:\n` +
+          `  ${sVal}.next = ${fNextVal}, second tiến → ${sNextVal}\n` +
+          `Kết quả hiện tại: ${resultArr.join("→")}${fNextVal !== "null" ? "→..." : ""}`,
         en:
-          `first.next, first = second, first.next\n` +
-          `  → ${fVal}.next = ${sVal} (insert ${sVal} right after ${fVal})\n` +
-          `  → first advances to ${fNext}\n` +
-          `second.next, second = first, second.next\n` +
-          `  → ${sVal}.next = ${fNext} (link ${sVal} to ${fNext})\n` +
-          `  → second advances to ${sNext}`,
+          `first.next, first = second, first.next:\n` +
+          `  ${fVal}.next = ${sVal}, first advances → ${fNextVal}\n` +
+          `second.next, second = first, second.next:\n` +
+          `  ${sVal}.next = ${fNextVal}, second advances → ${sNextVal}\n` +
+          `Result so far: ${resultArr.join("→")}${fNextVal !== "null" ? "→..." : ""}`,
       },
-    });
+      newEdges, ann,
+      fNextIdx >= 0 ? [fNextIdx] : [],
+      resultArr.map((v) => vals.indexOf(v)).filter((x) => x >= 0),
+      [
+        { name: "first", value: fNextVal },
+        { name: "second", value: sNextVal },
+        { name: "linked", value: `${fVal}→${sVal}→${fNextVal}` },
+        { name: "result", value: resultArr.join("→") },
+      ],
+      [17, 18, 19]
+    ));
   }
-  // Append any remaining
+  // Append remaining
   while (fi < firstH.length) resultArr.push(firstH[fi++]);
   while (si < secondH.length) resultArr.push(secondH[si++]);
 
   // Final
-  const fs = {
-    title: { vi: `Kết quả: [${resultArr.join(",")}]`, en: `Result: [${resultArr.join(",")}]` },
-    arr: resultArr, sub: resultArr.map(String),
-    highlight: [], mark: resultArr.map((_, i) => i), final: true,
-    codeLines: [17, 18],
-    vars: [{ name: "answer", value: resultArr.join("→") }],
-    note: { vi: `Linked list đã sắp lại: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...`, en: `Linked list reordered: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...` },
-  };
+  const finalEdges = [];
+  for (let r = 0; r < resultArr.length - 1; r++) {
+    const fromIdx = vals.indexOf(resultArr[r]);
+    const toIdx = vals.indexOf(resultArr[r + 1]);
+    if (fromIdx >= 0 && toIdx >= 0) finalEdges.push({ u: fromIdx, v: toIdx, w: "" });
+  }
+  const fs = graphSnap(
+    { vi: `Kết quả: ${resultArr.join("→")}`, en: `Result: ${resultArr.join("→")}` },
+    { vi: `Linked list đã sắp lại: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...`, en: `Reordered: ${resultArr.join("→")}.\nL0→Ln→L1→Ln-1→...` },
+    finalEdges, {},
+    [],
+    resultArr.map((v) => vals.indexOf(v)).filter((x) => x >= 0),
+    [{ name: "answer", value: resultArr.join("→") }],
+    [17, 18, 19]
+  );
+  fs.final = true;
   steps.push(fs);
   return { input, answer: `[${resultArr.join(",")}]`, steps };
 }
@@ -1640,7 +1719,7 @@ module.exports = {
       vi: "Cho linked list L0→L1→...→Ln. Sắp lại thành L0→Ln→L1→Ln-1→L2→Ln-2→... (xen kẽ đầu và cuối). Nhập giá trị cách bởi dấu phẩy.",
       en: "Given linked list L0→L1→...→Ln. Reorder to L0→Ln→L1→Ln-1→L2→Ln-2→... (interleave head and tail). Enter values comma-separated.",
     },
-    defaultInput: "1,2,3,4,5",
+    defaultInput: "1,2,3,4,5,6,7,8,9,10",
     inputKind: "string",
     inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
     extraParams: [],
