@@ -794,25 +794,23 @@ function buildSteps19(input, params) {
   let fast = 0, slow = 0;
 
   function graphSnap(title, note, hlNodes, removedIdx, vars, codeLines) {
-    // Build edges (skip the removed node if any)
-    const edges = removedIdx === null
-      ? allEdges.slice()
-      : allEdges.filter((e) => e.u !== removedIdx && e.v !== removedIdx)
-          .concat(removedIdx > 0 && removedIdx < allNodes.length - 1
-            ? [{ u: removedIdx - 1, v: removedIdx + 1, w: "" }]
-            : []);
-    const nodes = removedIdx === null
-      ? allNodes
-      : allNodes.filter((_, i) => i !== removedIdx);
+    // Build nodes with fast/slow indicators in the label
+    const nodes = allNodes.map((nd, i) => {
+      let lbl = nodeIds[i];
+      if (i === fast && fast < allNodes.length && i === slow) lbl = `⚡${lbl}🐢`;
+      else if (i === fast && fast < allNodes.length) lbl = `⚡${lbl}`;
+      else if (i === slow) lbl = `🐢${lbl}`;
+      return { id: nd.id, label: lbl };
+    });
+
     const visited = [];
-    // Mark nodes between slow and fast as "visited" (traversed)
     for (let i = 0; i <= Math.min(fast, allNodes.length - 1); i++) visited.push(i);
 
     return {
       title,
       arr: [],
       graph: {
-        nodes: removedIdx === null ? allNodes : allNodes,
+        nodes,
         edges: allEdges,
         hlNodes: hlNodes || [],
         hlEdges: [],
