@@ -18,3 +18,4 @@ class Solution:
 
 sol = Solution()
 print(sol.sumAndMultiply(10203004))
+

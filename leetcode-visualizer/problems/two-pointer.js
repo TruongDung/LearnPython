@@ -963,41 +963,129 @@ function buildSteps234(input) {
     if (fast >= n - 1) break;
   }
 
-  // Step 2: Reverse second half
+  // Step 2: Reverse second half — show each step with edges changing
   const mid = slow;
   const secondHalf = vals.slice(mid);
   const reversed = [...secondHalf].reverse();
-  steps.push(graphSnap(
-    { vi: `Bước 2: Đảo nửa sau [${secondHalf.join(",")}] → [${reversed.join(",")}]`, en: `Step 2: Reverse second half [${secondHalf.join(",")}] → [${reversed.join(",")}]` },
-    { vi: `Nửa sau (từ index ${mid}): [${secondHalf.join(",")}] → đảo thành [${reversed.join(",")}].`, en: `Second half (from index ${mid}): [${secondHalf.join(",")}] → reversed to [${reversed.join(",")}].` },
-    {}, [], Array.from({ length: n - mid }, (_, i) => mid + i),
-    [{ name: "mid", value: mid }, { name: "reversed", value: `[${reversed.join(",")}]` }],
-    [8, 9, 10, 11, 12, 13]
+
+  // Track which edges have been reversed (for visualization)
+  let reversedEdges = new Set(); // set of "from-to" reversed
+
+  function getEdges() {
+    // Build edges: original for first half, reversed for processed second half
+    const edges = [];
+    // First half edges (always forward)
+    for (let i = 0; i < mid - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+    // Second half: reversed edges we've processed + remaining forward
+    for (let i = mid; i < n - 1; i++) {
+      if (reversedEdges.has(i)) {
+        edges.push({ u: i + 1, v: i, w: "" }); // reversed arrow
+      } else {
+        edges.push({ u: i, v: i + 1, w: "" }); // original forward
+      }
+    }
+    // Edge from first half end to second half start (mid-1 → mid) if exists
+    if (mid > 0 && mid < n) edges.push({ u: mid - 1, v: mid, w: "" });
+    return edges;
+  }
+
+  function graphSnapWithEdges(title, note, annotations, hlNodes, visitedNodes, vars, codeLines) {
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges: getEdges(), hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [],
+      codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Simulate reverse step by step
+  let prevIdx = -1; // -1 = null
+  let slowIdx = mid;
+  steps.push(graphSnapWithEdges(
+    { vi: `Bước 2: Đảo nửa sau, prev=null, slow=${vals[mid]}`, en: `Step 2: Reverse 2nd half, prev=null, slow=${vals[mid]}` },
+    { vi: `Bắt đầu đảo từ index ${mid}. prev = null, cur = ${vals[mid]}.\nMũi tên sẽ đảo chiều khi mỗi node được xử lý.`, en: `Start reversing from index ${mid}. prev = null, cur = ${vals[mid]}.\nArrows will reverse direction as each node is processed.` },
+    { [slowIdx]: "slow" }, [slowIdx], [],
+    [{ name: "prev", value: "null" }, { name: "slow", value: `${vals[slowIdx]} (index ${slowIdx})` }],
+    [8, 9, 10]
   ));
 
-  // Step 3: Compare
+  while (slowIdx < n) {
+    const nxtIdx = slowIdx + 1 < n ? slowIdx + 1 : -1;
+    // Reverse the edge: slowIdx now points back to prevIdx
+    if (slowIdx < n - 1) reversedEdges.add(slowIdx);
+
+    const ann = {};
+    if (prevIdx >= 0) ann[prevIdx] = "prev";
+    ann[slowIdx] = "slow";
+    if (nxtIdx >= 0 && nxtIdx < n) ann[nxtIdx] = "nxt";
+
+    prevIdx = slowIdx;
+    slowIdx = nxtIdx >= 0 ? nxtIdx : n;
+
+    if (slowIdx < n) {
+      steps.push(graphSnapWithEdges(
+        { vi: `prev=${vals[prevIdx]}, slow=${vals[slowIdx]}`, en: `prev=${vals[prevIdx]}, slow=${vals[slowIdx]}` },
+        { vi: `Đảo mũi tên: ${vals[prevIdx]}←${vals[slowIdx]} (thay vì ${vals[prevIdx]}→${vals[slowIdx]}). Tiến.`, en: `Reverse arrow: ${vals[prevIdx]}←${vals[slowIdx]} (instead of ${vals[prevIdx]}→${vals[slowIdx]}). Advance.` },
+        ann, [prevIdx], [],
+        [{ name: "prev", value: `${vals[prevIdx]} (index ${prevIdx})` }, { name: "slow", value: `${vals[slowIdx]} (index ${slowIdx})` }, { name: "reversed so far", value: vals.slice(mid, prevIdx + 1).reverse().join("←") }],
+        [10, 11, 12, 13]
+      ));
+    } else {
+      steps.push(graphSnapWithEdges(
+        { vi: `Đảo xong! prev=${vals[prevIdx]}, slow=null`, en: `Reverse done! prev=${vals[prevIdx]}, slow=null` },
+        { vi: `cur = null → DỪNG. Nửa sau: ${reversed.join("←")} (mũi tên đảo). prev = head mới.`, en: `cur = null → STOP. Second half: ${reversed.join("←")} (arrows reversed). prev = new head.` },
+        { [prevIdx]: "prev" }, [prevIdx], Array.from({ length: n - mid }, (_, i) => mid + i),
+        [{ name: "prev (new head)", value: `${vals[prevIdx]}` }, { name: "reversed half", value: reversed.join("←") }],
+        [10, 11, 12, 13]
+      ));
+    }
+  }
+
+  // Step 3: Compare both halves — show left/right step by step
+  // right traverses the reversed half: starts at n-1, follows reversed arrows
   const firstHalf = vals.slice(0, reversed.length);
   let isPalin = true;
   let mismatchIdx = -1;
+
   for (let i = 0; i < reversed.length; i++) {
-    if (firstHalf[i] !== reversed[i]) { isPalin = false; mismatchIdx = i; break; }
+    const leftIdx = i;
+    const rightIdx = n - 1 - i; // right walks reversed: n-1, n-2, ...
+    const match = firstHalf[i] === reversed[i];
+
+    const ann = {};
+    ann[leftIdx] = "left";
+    ann[rightIdx] = "right";
+
+    steps.push(graphSnapWithEdges(
+      { vi: `So sánh: left=${firstHalf[i]}, right=${reversed[i]}${match ? " ✓" : " ✗"}`, en: `Compare: left=${firstHalf[i]}, right=${reversed[i]}${match ? " ✓" : " ✗"}` },
+      {
+        vi: `left = ${firstHalf[i]} (index ${leftIdx}) đi theo nửa đầu →.\nright = ${reversed[i]} (index ${rightIdx}) đi theo nửa sau đã đảo ←.${match ? " Khớp → tiếp." : ` KHÔNG khớp!`}`,
+        en: `left = ${firstHalf[i]} (index ${leftIdx}) follows first half →.\nright = ${reversed[i]} (index ${rightIdx}) follows reversed second half ←.${match ? " Match → continue." : ` MISMATCH!`}`,
+      },
+      ann, match ? [] : [leftIdx, rightIdx], match ? [leftIdx, rightIdx] : [],
+      [{ name: "left", value: `${firstHalf[i]} (index ${leftIdx})` }, { name: "right", value: `${reversed[i]} (index ${rightIdx})` }, { name: "match?", value: match }],
+      [16, 17, 18, 19, 20, 21]
+    ));
+
+    if (!match) { isPalin = false; mismatchIdx = i; break; }
   }
 
+  // Final
   if (isPalin) {
-    steps.push(graphSnap(
+    steps.push(graphSnapWithEdges(
       { vi: `✓ Palindrome!`, en: `✓ Palindrome!` },
-      { vi: `Nửa đầu [${firstHalf.join(",")}] == nửa sau đảo [${reversed.join(",")}] → Palindrome!`, en: `First half [${firstHalf.join(",")}] == reversed second half [${reversed.join(",")}] → Palindrome!` },
+      { vi: `Tất cả các cặp left/right đều khớp → Palindrome!\nNửa đầu → khớp ← nửa sau đảo.`, en: `All left/right pairs matched → Palindrome!\nFirst half → matches ← reversed second half.` },
       {}, [], Array.from({ length: n }, (_, i) => i),
-      [{ name: "answer", value: true }, { name: "first half", value: `[${firstHalf.join(",")}]` }, { name: "reversed 2nd", value: `[${reversed.join(",")}]` }],
-      [15, 16, 17, 18, 19, 20]
+      [{ name: "answer", value: true }],
+      [22]
     ));
   } else {
-    steps.push(graphSnap(
+    steps.push(graphSnapWithEdges(
       { vi: `✗ Không phải palindrome`, en: `✗ Not a palindrome` },
-      { vi: `Vị trí ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]} → KHÔNG phải palindrome.`, en: `Position ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]} → NOT a palindrome.` },
+      { vi: `left=${firstHalf[mismatchIdx]} ≠ right=${reversed[mismatchIdx]} → KHÔNG palindrome.`, en: `left=${firstHalf[mismatchIdx]} ≠ right=${reversed[mismatchIdx]} → NOT a palindrome.` },
       {}, [mismatchIdx, n - 1 - mismatchIdx], [],
-      [{ name: "answer", value: false }, { name: "mismatch at", value: `index ${mismatchIdx}: ${firstHalf[mismatchIdx]} ≠ ${reversed[mismatchIdx]}` }],
-      [17, 18]
+      [{ name: "answer", value: false }],
+      [18, 19]
     ));
   }
 
@@ -1354,7 +1442,7 @@ module.exports = {
       vi: "Cho head linked list, kiểm tra list có phải palindrome không. Dùng slow/fast tìm giữa → đảo nửa sau → so sánh. Nhập danh sách giá trị cách bởi dấu phẩy.",
       en: "Given head of a linked list, check if it is a palindrome. Use slow/fast to find the middle → reverse the second half → compare. Enter values comma-separated.",
     },
-    defaultInput: "1,2,2,1",
+    defaultInput: "1,2,3,4,5,6,6,5,4,3,2,1",
     inputKind: "string",
     inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
     extraParams: [],
