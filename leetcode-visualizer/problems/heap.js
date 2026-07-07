@@ -858,6 +858,205 @@ function buildSteps767(input) {
   return { input, answer, steps };
 }
 
+// ─── 23: Merge k Sorted Lists ───
+function buildSteps23(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps23DC(input);
+  return buildSteps23Heap(input);
+}
+
+function buildSteps23Heap(input) {
+  const lists = String(input).split(";").map((s) => s.split(",").map(Number).filter((x) => !isNaN(x)));
+  const k = lists.length;
+  const steps = [];
+  const label = (e) => `${e.val}`;
+  const heap = [];
+  const less = (a, b) => a.val < b.val;
+  const arrStr = () => `[${heap.map((e) => e.val).join(",")}]`;
+  const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
+
+  const result = [];
+  const listsStr = lists.map((l, i) => `L${i}: [${l.join(",")}]`).join("  ");
+
+  steps.push(heapSnapshot([], label, {
+    title: { vi: `Gộp ${k} danh sách đã sắp xếp`, en: `Merge ${k} sorted lists` },
+    codeLines: [4, 5],
+    vars: [{ name: "lists", value: listsStr }, { name: "k", value: k }],
+    note: {
+      vi:
+        `${k} list: ${listsStr}\n\n` +
+        `Dùng MIN-HEAP kích thước ≤ ${k}:\n` +
+        `• Đẩy head mỗi list vào heap.\n` +
+        `• Pop nhỏ nhất → thêm vào kết quả.\n` +
+        `• Đẩy node tiếp theo của list đó vào heap.\n` +
+        `• Lặp cho đến hết.`,
+      en:
+        `${k} lists: ${listsStr}\n\n` +
+        `Use a MIN-HEAP of size ≤ ${k}:\n` +
+        `• Push head of each list into heap.\n` +
+        `• Pop the smallest → add to result.\n` +
+        `• Push the next node of that list into heap.\n` +
+        `• Repeat until done.`,
+    },
+  }));
+
+  // Track pointers into each list
+  const ptrs = lists.map(() => 0);
+
+  // Init: push head of each list
+  for (let i = 0; i < k; i++) {
+    if (lists[i].length > 0) {
+      heap.push({ val: lists[i][0], listIdx: i });
+      steps.push(heapSnapshot(heap, label, {
+        title: { vi: `Push head L${i}: ${lists[i][0]}`, en: `Push head L${i}: ${lists[i][0]}` },
+        hlSet: new Set([heap.length - 1]), codeLines: [6, 7, 8],
+        vars: [{ name: "heap", value: arrStr() }],
+        note: { vi: `Đẩy đầu list ${i} (= ${lists[i][0]}) vào min-heap.`, en: `Push head of list ${i} (= ${lists[i][0]}) into the min-heap.` },
+      }));
+      siftUp(heap.length - 1);
+      ptrs[i] = 1;
+    }
+  }
+
+  // Pop loop
+  while (heap.length > 0) {
+    const root = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) heap[0] = last;
+    result.push(root.val);
+
+    const li = root.listIdx;
+    const hasNext = ptrs[li] < lists[li].length;
+
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Pop ${root.val} (L${li}) → result=[${result.join(",")}]`, en: `Pop ${root.val} (L${li}) → result=[${result.join(",")}]` },
+      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [10, 11, 12, 13],
+      vars: [
+        { name: "popped", value: `${root.val} (from L${li})` },
+        { name: "result", value: `[${result.join(",")}]` },
+        { name: "heap", value: arrStr() },
+        { name: "next from L" + li, value: hasNext ? lists[li][ptrs[li]] : "null (end)" },
+      ],
+      note: {
+        vi: `Pop nhỏ nhất = ${root.val} (từ list ${li}). Thêm vào kết quả.${hasNext ? ` Đẩy phần tử kế tiếp L${li}[${ptrs[li]}] = ${lists[li][ptrs[li]]} vào heap.` : ` List ${li} hết.`}`,
+        en: `Pop smallest = ${root.val} (from list ${li}). Add to result.${hasNext ? ` Push next L${li}[${ptrs[li]}] = ${lists[li][ptrs[li]]} into heap.` : ` List ${li} exhausted.`}`,
+      },
+    }));
+    if (heap.length > 0) siftDown(0);
+
+    if (hasNext) {
+      heap.push({ val: lists[li][ptrs[li]], listIdx: li });
+      ptrs[li]++;
+      siftUp(heap.length - 1);
+    }
+  }
+
+  // Final
+  const fs = heapSnapshot(heap, label, {
+    title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` },
+    codeLines: [16],
+    vars: [{ name: "answer", value: `[${result.join(",")}]` }, { name: "total nodes", value: result.length }],
+    note: { vi: `Đã gộp ${k} list thành 1 list tăng dần: [${result.join(",")}].`, en: `Merged ${k} lists into one sorted list: [${result.join(",")}].` },
+  });
+  fs.final = true; steps.push(fs);
+
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
+// ─── 23 Approach 2: Divide & Conquer (merge pairs) ───
+function buildSteps23DC(input) {
+  const lists = String(input).split(";").map((s) => s.split(",").map(Number).filter((x) => !isNaN(x)));
+  const steps = [];
+  const k = lists.length;
+
+  const listsStr = lists.map((l, i) => `L${i}:[${l.join(",")}]`).join("  ");
+  steps.push({
+    title: { vi: "Divide & Conquer: gộp từng cặp", en: "Divide & Conquer: merge pairwise" },
+    arr: lists.flat(), sub: lists.flat().map(String),
+    highlight: [], mark: [], codeLines: [2, 3, 4, 5], codeBlock: 2,
+    vars: [{ name: "lists", value: listsStr }, { name: "k", value: k }],
+    note: {
+      vi: `${k} lists: ${listsStr}\n\nLặp: mỗi vòng gộp từng CẶP (0+1, 2+3, ...). Số list giảm một nửa → log(k) vòng.\nMỗi merge dùng 2 pointers so sánh đầu, lấy nhỏ hơn.`,
+      en: `${k} lists: ${listsStr}\n\nLoop: each round merges PAIRS (0+1, 2+3, ...). List count halves → log(k) rounds.\nEach merge uses 2 pointers comparing heads, taking the smaller.`,
+    },
+  });
+
+  let current = lists.map((l) => [...l]);
+  let round = 0;
+
+  while (current.length > 1) {
+    round++;
+    const merged = [];
+    for (let p = 0; p < current.length; p += 2) {
+      const l1 = current[p];
+      const l2 = p + 1 < current.length ? current[p + 1] : null;
+
+      if (!l2) { merged.push(l1); continue; }
+
+      // Detail: show each comparison step inside mergeTwoLists
+      const res = [];
+      let i = 0, j = 0;
+
+      steps.push({
+        title: { vi: `Vòng ${round}: bắt đầu merge [${l1.join(",")}] + [${l2.join(",")}]`, en: `Round ${round}: start merge [${l1.join(",")}] + [${l2.join(",")}]` },
+        arr: [...l1, ...l2], sub: [...l1.map(String), ...l2.map(String)],
+        highlight: [0, l1.length], mark: [], codeLines: [14, 15, 16, 17], codeBlock: 2,
+        vars: [{ name: "l1", value: `[${l1.join(",")}]` }, { name: "l2", value: `[${l2.join(",")}]` }, { name: "result", value: "[]" }],
+        note: { vi: `Dùng 2 con trỏ: so sánh đầu l1 và l2, lấy nhỏ hơn vào result.`, en: `Two pointers: compare heads of l1 and l2, take the smaller into result.` },
+      });
+
+      while (i < l1.length && j < l2.length) {
+        const takeL1 = l1[i] <= l2[j];
+        if (takeL1) { res.push(l1[i]); i++; } else { res.push(l2[j]); j++; }
+
+        steps.push({
+          title: { vi: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"} → result=[${res.join(",")}]`, en: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"} → result=[${res.join(",")}]` },
+          arr: res, sub: res.map(String),
+          highlight: [res.length - 1], mark: [], codeLines: takeL1 ? [18, 19, 20] : [21, 22, 23], codeBlock: 2,
+          vars: [
+            { name: "l1[i]", value: i < l1.length ? l1[i] : "end" },
+            { name: "l2[j]", value: j < l2.length ? l2[j] : "end" },
+            { name: "took", value: `${takeL1 ? l1[i-1] + " from l1" : l2[j-1] + " from l2"} (${takeL1 ? l1[i-1] + "≤" + l2[j-1] : l2[j-1] + "<" + l1[i-1]})` },
+            { name: "result", value: `[${res.join(",")}]` },
+          ],
+          note: {
+            vi: `So sánh l1[${i-Number(takeL1)}]=${takeL1?l1[i-1]:l1[i]} vs l2[${j-Number(!takeL1)}]=${takeL1?l2[j]:l2[j-1]} → lấy ${takeL1?l1[i-1]:l2[j-1]} từ ${takeL1?"l1":"l2"}.`,
+            en: `Compare l1 head vs l2 head → take ${takeL1?l1[i-1]:l2[j-1]} from ${takeL1?"l1":"l2"}.`,
+          },
+        });
+      }
+      // Append remaining
+      while (i < l1.length) res.push(l1[i++]);
+      while (j < l2.length) res.push(l2[j++]);
+
+      if (i > 0 || j > 0) {
+        const remaining = i < l1.length ? l1.slice(i) : l2.slice(j);
+        steps.push({
+          title: { vi: `Merge xong → [${res.join(",")}]`, en: `Merge done → [${res.join(",")}]` },
+          arr: res, sub: res.map(String),
+          highlight: [], mark: res.map((_, idx) => idx), codeLines: [24, 25], codeBlock: 2,
+          vars: [{ name: "merged result", value: `[${res.join(",")}]` }],
+          note: { vi: `Nối phần còn lại. Kết quả merge: [${res.join(",")}].`, en: `Append remainder. Merge result: [${res.join(",")}].` },
+        });
+      }
+
+      merged.push(res);
+    }
+    current = merged;
+  }
+
+  const result = current[0] || [];
+  const fs = {
+    title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` },
+    arr: result, sub: result.map(String),
+    highlight: [], mark: result.map((_, i) => i), final: true, codeLines: [11, 12], codeBlock: 2,
+    vars: [{ name: "answer", value: `[${result.join(",")}]` }, { name: "rounds", value: round }],
+    note: { vi: `Sau ${round} vòng gộp cặp, còn lại 1 list sorted: [${result.join(",")}].`, en: `After ${round} pairwise merge rounds, one sorted list remains: [${result.join(",")}].` },
+  };
+  steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
 module.exports = {
   347: {
     id: 347, difficulty: "medium", slug: "top-k-frequent-elements",
@@ -1116,5 +1315,86 @@ module.exports = {
       "        return out if len(out) == len(s) else ''",
     ],
     builder: buildSteps767,
+  },
+  23: {
+    id: 23,
+    difficulty: "hard",
+    slug: "merge-k-sorted-lists",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Merge k Sorted Lists", en: "Merge k Sorted Lists" },
+    titleVi: { vi: "Gộp k danh sách đã sắp xếp", en: "Merge k sorted linked lists" },
+    statement: {
+      vi: "Cho k danh sách liên kết đã sắp xếp tăng dần, gộp tất cả thành 1 danh sách duy nhất cũng tăng dần. Nhập các list cách bởi ';', giá trị cách bởi ','.",
+      en: "Given k sorted linked lists, merge them into one sorted list. Enter lists separated by ';', values by ','.",
+    },
+    defaultInput: "1,4,5;1,3,4;2,6",
+    inputKind: "string",
+    inputLabel: { vi: "Các list (cách bởi ';')", en: "Lists (separated by ';')" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Min-Heap O(n log k)", en: "Approach 1: Min-Heap O(n log k)" } },
+          { value: "2", label: { vi: "Cách 2: Divide & Conquer O(n log k)", en: "Approach 2: Divide & Conquer O(n log k)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1: Min-heap chứa head mỗi list. Pop nhỏ nhất, push node kế.", en: "Approach 1: Min-heap holds head of each list. Pop smallest, push next node." },
+      { vi: "Cách 2: Merge từng cặp list (giống merge sort). Lặp cho tới còn 1 list.", en: "Approach 2: Merge lists pairwise (like merge sort). Repeat until one list remains." },
+    ],
+    complexity: { time: "O(n log k)", space: "O(k) / O(1)", note: { vi: "Cả 2 cách đều O(n log k). Heap dùng O(k), D&C dùng O(1) extra.", en: "Both are O(n log k). Heap uses O(k) space, D&C uses O(1) extra." } },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def mergeKLists(self, lists):",
+      "        heap = []",
+      "        for i, lst in enumerate(lists):",
+      "            if lst:",
+      "                heapq.heappush(heap, (lst.val, i, lst))",
+      "        dummy = node = ListNode(0)",
+      "        while heap:",
+      "            val, i, cur = heapq.heappop(heap)",
+      "            node.next = cur",
+      "            node = node.next",
+      "            if cur.next:",
+      "                heapq.heappush(heap, (cur.next.val, i, cur.next))",
+      "        return dummy.next",
+    ],
+    code2: [
+      "class Solution:",
+      "    def mergeKLists(self, lists):",
+      "        if not lists:",
+      "            return None",
+      "        while len(lists) > 1:",
+      "            merged = []",
+      "            for i in range(0, len(lists), 2):",
+      "                l1 = lists[i]",
+      "                l2 = lists[i+1] if i+1 < len(lists) else None",
+      "                merged.append(self.mergeTwoLists(l1, l2))",
+      "            lists = merged",
+      "        return lists[0]",
+      "",
+      "    def mergeTwoLists(self, l1, l2):",
+      "        dummy = ListNode(0)",
+      "        cur = dummy",
+      "        while l1 and l2:",
+      "            if l1.val < l2.val:",
+      "                cur.next = l1",
+      "                l1 = l1.next",
+      "            else:",
+      "                cur.next = l2",
+      "                l2 = l2.next",
+      "            cur = cur.next",
+      "        cur.next = l1 or l2",
+      "        return dummy.next",
+    ],
+    codeLabel: { vi: "Cách 1: Min-Heap", en: "Approach 1: Min-Heap" },
+    code2Label: { vi: "Cách 2: Divide & Conquer", en: "Approach 2: Divide & Conquer" },
+    builder: buildSteps23,
   },
 };
