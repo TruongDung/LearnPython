@@ -1758,6 +1758,85 @@ function buildSteps2(input) {
   return { input, answer: `[${result.join(",")}]`, steps };
 }
 
+// ─── 206: Reverse Linked List ───
+function buildSteps206(input) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const n = vals.length;
+  const steps = [];
+
+  const allNodes = vals.map((v, i) => ({ id: i, label: String(v) }));
+  const reversedEdges = new Set(); // track which edges have been flipped
+
+  function getEdges() {
+    const edges = [];
+    for (let i = 0; i < n - 1; i++) {
+      if (reversedEdges.has(i)) edges.push({ u: i + 1, v: i, w: "" }); // reversed
+      else edges.push({ u: i, v: i + 1, w: "" }); // original
+    }
+    return edges;
+  }
+
+  function graphSnap(title, note, annotations, hlNodes, visitedNodes, vars, codeLines) {
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges: getEdges(), hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  // Intro
+  steps.push(graphSnap(
+    { vi: "Đảo linked list: prev=null, cur=head", en: "Reverse list: prev=null, cur=head" },
+    { vi: `${vals.join("→")}.\nprev = null, cur = ${vals[0]}.\nLặp: nxt=cur.next, cur.next=prev (đảo), prev=cur, cur=nxt.`, en: `${vals.join("→")}.\nprev = null, cur = ${vals[0]}.\nLoop: nxt=cur.next, cur.next=prev (reverse), prev=cur, cur=nxt.` },
+    { 0: "cur" }, [0], [],
+    [{ name: "prev", value: "null" }, { name: "cur", value: vals[0] }],
+    [2, 3, 4]
+  ));
+
+  // Process each node
+  let prevIdx = -1;
+  for (let curIdx = 0; curIdx < n; curIdx++) {
+    const nxtIdx = curIdx + 1 < n ? curIdx + 1 : -1;
+    const nxtVal = nxtIdx >= 0 ? vals[nxtIdx] : "null";
+    const prevVal = prevIdx >= 0 ? vals[prevIdx] : "null";
+
+    // Reverse edge at curIdx
+    if (curIdx < n - 1) reversedEdges.add(curIdx);
+
+    const ann = {};
+    if (prevIdx >= 0) ann[prevIdx] = "prev";
+    ann[curIdx] = "cur";
+    if (nxtIdx >= 0) ann[nxtIdx] = "nxt";
+
+    const visited = Array.from({ length: curIdx + 1 }, (_, i) => i);
+
+    steps.push(graphSnap(
+      { vi: `cur=${vals[curIdx]}: cur.next=prev(${prevVal}), tiến`, en: `cur=${vals[curIdx]}: cur.next=prev(${prevVal}), advance` },
+      {
+        vi: `nxt = cur.next = ${nxtVal}\ncur.next = prev → ${vals[curIdx]}→${prevVal} (mũi tên đảo)\nprev = cur = ${vals[curIdx]}\ncur = nxt = ${nxtVal}`,
+        en: `nxt = cur.next = ${nxtVal}\ncur.next = prev → ${vals[curIdx]}→${prevVal} (arrow reversed)\nprev = cur = ${vals[curIdx]}\ncur = nxt = ${nxtVal}`,
+      },
+      ann, [curIdx], visited,
+      [{ name: "prev", value: vals[curIdx] }, { name: "cur", value: nxtVal }, { name: "nxt", value: nxtVal }, { name: "reversed so far", value: vals.slice(0, curIdx + 1).reverse().join("←") }],
+      [5, 6, 7, 8]
+    ));
+
+    prevIdx = curIdx;
+  }
+
+  // Final
+  const fs = graphSnap(
+    { vi: `Xong! Head mới = ${vals[n - 1]}`, en: `Done! New head = ${vals[n - 1]}` },
+    { vi: `cur = null → dừng. prev = ${vals[n-1]} = head mới.\nList: ${vals.slice().reverse().join("→")}.`, en: `cur = null → stop. prev = ${vals[n-1]} = new head.\nList: ${vals.slice().reverse().join("→")}.` },
+    { [n - 1]: "prev (new head)" }, [], Array.from({ length: n }, (_, i) => i),
+    [{ name: "answer", value: vals.slice().reverse().join("→") }],
+    [9]
+  );
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: `[${vals.slice().reverse().join(",")}]`, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -2343,5 +2422,39 @@ module.exports = {
       "        return dummy.next",
     ],
     builder: buildSteps2,
+  },
+  206: {
+    id: 206,
+    difficulty: "easy",
+    slug: "reverse-linked-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Reverse Linked List", en: "Reverse Linked List" },
+    titleVi: { vi: "Đảo ngược linked list", en: "Reverse a linked list" },
+    statement: {
+      vi: "Cho head linked list, đảo ngược toàn bộ list và trả về head mới. Nhập giá trị cách bởi dấu phẩy.",
+      en: "Given head of a linked list, reverse the entire list and return the new head. Enter values comma-separated.",
+    },
+    defaultInput: "1,2,3,4,5",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "3 biến: prev=null, cur=head, nxt. Lặp: nxt=cur.next, cur.next=prev, prev=cur, cur=nxt.", en: "3 variables: prev=null, cur=head, nxt. Loop: nxt=cur.next, cur.next=prev, prev=cur, cur=nxt." },
+      { vi: "Khi cur=null → prev là head mới.", en: "When cur=null → prev is the new head." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "1 pass O(n). Tại chỗ.", en: "Single pass O(n). In-place." } },
+    code: [
+      "class Solution:",
+      "    def reverseList(self, head):",
+      "        prev = None",
+      "        cur = head",
+      "        while cur:",
+      "            nxt = cur.next",
+      "            cur.next = prev",
+      "            prev = cur",
+      "            cur = nxt",
+      "        return prev",
+    ],
+    builder: buildSteps206,
   },
 };
