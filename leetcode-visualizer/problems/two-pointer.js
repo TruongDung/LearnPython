@@ -1686,23 +1686,24 @@ function buildSteps2(input) {
   const num1 = [...l1].reverse().join("");
   const num2 = [...l2].reverse().join("");
 
-  // Graph: l1 nodes (row 0), l2 nodes (row 1), result nodes (row 2) — laid out in tree view
+  // Graph: l1 nodes (row 0), l2 nodes (row 1), result nodes (row 2) with dummy + cur marker
   function treeSnap(title, note, curPos, vars, codeLines) {
-    // Build nodes: l1 at y=0, l2 at y=1, result at y=2
     const nodes = [];
-    // l1 nodes
+    // l1 nodes (y=0) — first node labeled "l1:"
     l1.forEach((v, i) => {
-      nodes.push({ id: i, label: String(v), x: i * 2, y: 0, parentId: i > 0 ? i - 1 : null, hl: i === curPos, isWord: false });
+      nodes.push({ id: i, label: i === 0 ? `l1:${v}` : String(v), x: (i + 1) * 2, y: 0, parentId: i > 0 ? i - 1 : null, hl: i === curPos, isWord: false });
     });
-    // l2 nodes (offset ids)
+    // l2 nodes (y=1) — first node labeled "l2:"
     const l2Offset = l1.length;
     l2.forEach((v, i) => {
-      nodes.push({ id: l2Offset + i, label: String(v), x: i * 2, y: 1, parentId: i > 0 ? l2Offset + i - 1 : null, hl: i === curPos, isWord: false });
+      nodes.push({ id: l2Offset + i, label: i === 0 ? `l2:${v}` : String(v), x: (i + 1) * 2, y: 1, parentId: i > 0 ? l2Offset + i - 1 : null, hl: i === curPos, isWord: false });
     });
-    // result nodes
+    // result nodes (y=2): dummy "D" at start, last node = "cur"
     const resOffset = l1.length + l2.length;
+    nodes.push({ id: resOffset, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
     result.forEach((v, i) => {
-      nodes.push({ id: resOffset + i, label: String(v), x: i * 2, y: 2, parentId: i > 0 ? resOffset + i - 1 : null, hl: false, isWord: i === result.length - 1 });
+      const isCur = i === result.length - 1;
+      nodes.push({ id: resOffset + 1 + i, label: isCur ? `${v} cur` : String(v), x: (i + 1) * 2, y: 2, parentId: resOffset + i, hl: false, isWord: isCur });
     });
 
     return {
@@ -1846,68 +1847,126 @@ function buildSteps21(input) {
   const result = [];
   let i = 0, j = 0;
 
-  steps.push({
-    title: { vi: `Gộp [${l1.join(",")}] + [${l2.join(",")}]`, en: `Merge [${l1.join(",")}] + [${l2.join(",")}]` },
-    arr: [...l1, ...l2],
-    sub: [...l1.map((_, idx) => `l1[${idx}]`), ...l2.map((_, idx) => `l2[${idx}]`)],
-    highlight: [0, l1.length], mark: [],
-    codeLines: [2, 3, 4, 5],
-    vars: [{ name: "l1", value: l1.join("→") }, { name: "l2", value: l2.join("→") }, { name: "result", value: "[]" }],
-    note: { vi: `So sánh đầu l1 và l2, lấy nhỏ hơn vào result. Lặp tới khi 1 list hết.`, en: `Compare heads of l1 and l2, take the smaller into result. Loop until one is exhausted.` },
-  });
+  // Tree view: l1 at y=0, l2 at y=1, result at y=2 (with dummy node "D" at start)
+  function treeSnap(title, note, curI, curJ, vars, codeLines) {
+    const nodes = [];
+    // l1 nodes (y=0) — label "l1:" on first node
+    l1.forEach((v, idx) => {
+      nodes.push({ id: idx, label: idx === 0 ? `l1:${v}` : String(v), x: (idx + 1) * 2, y: 0, parentId: idx > 0 ? idx - 1 : null, hl: idx === curI, isWord: false });
+    });
+    // l2 nodes (y=1) — label "l2:" on first node
+    const l2Off = l1.length;
+    l2.forEach((v, idx) => {
+      nodes.push({ id: l2Off + idx, label: idx === 0 ? `l2:${v}` : String(v), x: (idx + 1) * 2, y: 1, parentId: idx > 0 ? l2Off + idx - 1 : null, hl: idx === curJ, isWord: false });
+    });
+    // result nodes (y=2) — dummy "D" at x=0, then values; last node marked as "cur"
+    const resOff = l1.length + l2.length;
+    // Dummy node
+    nodes.push({ id: resOff, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
+    // Result value nodes
+    result.forEach((v, idx) => {
+      const isCur = idx === result.length - 1;
+      nodes.push({ id: resOff + 1 + idx, label: isCur ? `${v} cur` : String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
+    });
+    return { title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
+  }
+
+  steps.push(treeSnap(
+    { vi: `Gộp 2 list sorted`, en: `Merge two sorted lists` },
+    { vi: `Hàng 1: l1 = ${l1.join("→")}\nHàng 2: l2 = ${l2.join("→")}\nHàng 3: result (build dần)\n\nSo sánh đầu l1 vs l2, lấy nhỏ hơn. Lặp tới hết.`, en: `Row 1: l1 = ${l1.join("→")}\nRow 2: l2 = ${l2.join("→")}\nRow 3: result (building)\n\nCompare l1 head vs l2 head, take smaller. Repeat.` },
+    0, 0,
+    [{ name: "l1", value: l1.join("→") }, { name: "l2", value: l2.join("→") }],
+    [2, 3, 4, 5]
+  ));
 
   while (i < l1.length && j < l2.length) {
     const takeL1 = l1[i] <= l2[j];
     if (takeL1) { result.push(l1[i]); i++; }
     else { result.push(l2[j]); j++; }
 
-    steps.push({
-      title: { vi: `Lấy ${result[result.length-1]} ← ${takeL1 ? "l1" : "l2"}`, en: `Take ${result[result.length-1]} ← ${takeL1 ? "l1" : "l2"}` },
-      arr: result.slice(),
-      sub: result.map(String),
-      highlight: [result.length - 1], mark: [],
-      codeLines: takeL1 ? [5, 6, 7] : [8, 9, 10],
-      vars: [
-        { name: "l1 head", value: i < l1.length ? l1[i] : "done" },
-        { name: "l2 head", value: j < l2.length ? l2[j] : "done" },
-        { name: "took", value: `${result[result.length-1]} from ${takeL1 ? "l1" : "l2"} (${takeL1 ? l1[i-1]+"≤"+l2[j] : l2[j-1]+"<"+l1[i]})` },
-        { name: "result", value: result.join("→") },
-      ],
-      note: {
-        vi: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → lấy ${result[result.length-1]} từ ${takeL1 ? "l1" : "l2"}.`,
-        en: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → take ${result[result.length-1]} from ${takeL1 ? "l1" : "l2"}.`,
-      },
-    });
+    steps.push(treeSnap(
+      { vi: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"}`, en: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"}` },
+      { vi: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → lấy ${result[result.length-1]}.`, en: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → take ${result[result.length-1]}.` },
+      i < l1.length ? i : -1, j < l2.length ? j : -1,
+      [{ name: "took", value: `${result[result.length-1]} from ${takeL1 ? "l1" : "l2"}` }, { name: "result", value: result.join("→") }],
+      takeL1 ? [5, 6, 7] : [8, 9, 10]
+    ));
   }
 
   // Append remaining
-  const remaining = i < l1.length ? l1.slice(i) : l2.slice(j);
-  const fromList = i < l1.length ? "l1" : "l2";
-  if (remaining.length > 0) {
-    result.push(...remaining);
-    steps.push({
-      title: { vi: `Nối phần còn lại ${fromList}: [${remaining.join(",")}]`, en: `Append rest of ${fromList}: [${remaining.join(",")}]` },
-      arr: result.slice(),
-      sub: result.map(String),
-      highlight: Array.from({ length: remaining.length }, (_, k) => result.length - remaining.length + k), mark: [],
-      codeLines: [12],
-      vars: [{ name: "remaining", value: `${fromList}: [${remaining.join(",")}]` }, { name: "result", value: result.join("→") }],
-      note: { vi: `${fromList === "l1" ? "l2" : "l1"} hết → nối toàn bộ ${fromList} còn lại.`, en: `${fromList === "l1" ? "l2" : "l1"} exhausted → append all remaining ${fromList}.` },
-    });
+  while (i < l1.length) { result.push(l1[i]); i++; }
+  while (j < l2.length) { result.push(l2[j]); j++; }
+
+  const fs = treeSnap(
+    { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
+    { vi: `Merged: ${result.join("→")}.`, en: `Merged: ${result.join("→")}.` },
+    -1, -1,
+    [{ name: "answer", value: result.join("→") }],
+    [12, 13, 14]
+  );
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: `[${result.join(",")}]`, steps };
+}
+
+// ─── 876: Middle of the Linked List ───
+function buildSteps876(input) {
+  const vals = String(input).split(",").map((s) => Number(s.trim()));
+  const n = vals.length;
+  const steps = [];
+
+  const allNodes = vals.map((v, i) => ({ id: i, label: String(v) }));
+  const allEdges = [];
+  for (let i = 0; i < n - 1; i++) allEdges.push({ u: i, v: i + 1, w: "" });
+
+  function graphSnap(title, note, slowIdx, fastIdx, vars, codeLines) {
+    const ann = {};
+    ann[slowIdx] = "slow";
+    if (fastIdx >= 0 && fastIdx < n) ann[fastIdx] = fastIdx === slowIdx ? "slow,fast" : "fast";
+    return {
+      title, arr: [],
+      graph: { nodes: allNodes, edges: allEdges, hlNodes: fastIdx >= 0 && fastIdx < n ? [fastIdx] : [], hlEdges: [], visitedNodes: [slowIdx], annotations: ann },
+      highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  let slow = 0, fast = 0;
+
+  steps.push(graphSnap(
+    { vi: "Tìm giữa: slow=fast=head", en: "Find middle: slow=fast=head" },
+    { vi: `slow đi 1 bước, fast đi 2 bước.\nKhi fast tới cuối (null hoặc cuối list) → slow ở GIỮA.`, en: `slow moves 1, fast moves 2.\nWhen fast reaches end (null or last) → slow is at the MIDDLE.` },
+    slow, fast,
+    [{ name: "slow", value: `${vals[slow]} (index ${slow})` }, { name: "fast", value: `${vals[fast]} (index ${fast})` }],
+    [2, 3, 4]
+  ));
+
+  while (fast < n - 1 && fast + 1 < n) {
+    slow++;
+    fast += 2;
+    if (fast >= n) fast = n; // past end
+
+    steps.push(graphSnap(
+      { vi: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}`, en: `slow=${vals[slow]}, fast=${fast < n ? vals[fast] : "end"}` },
+      { vi: `slow → ${vals[slow]} (index ${slow}). fast → ${fast < n ? vals[fast] + " (index " + fast + ")" : "end"}.`, en: `slow → ${vals[slow]} (index ${slow}). fast → ${fast < n ? vals[fast] + " (index " + fast + ")" : "end"}.` },
+      slow, fast,
+      [{ name: "slow", value: `${vals[slow]} (index ${slow})` }, { name: "fast", value: fast < n ? `${vals[fast]} (index ${fast})` : "end" }],
+      [5, 6]
+    ));
+
+    if (fast >= n - 1) break;
   }
 
   // Final
-  const fs = {
-    title: { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
-    arr: result.slice(),
-    sub: result.map(String),
-    highlight: [], mark: result.map((_, k) => k), final: true,
-    codeLines: [13, 14],
-    vars: [{ name: "answer", value: result.join("→") }],
-    note: { vi: `Merged: ${result.join("→")}.`, en: `Merged: ${result.join("→")}.` },
-  };
+  const fs = graphSnap(
+    { vi: `✓ Giữa = ${vals[slow]} (index ${slow})`, en: `✓ Middle = ${vals[slow]} (index ${slow})` },
+    { vi: `fast tới cuối → slow = ${vals[slow]} là node GIỮA.\n${n % 2 === 0 ? "(Số chẵn → lấy node giữa THỨ 2.)" : "(Số lẻ → đúng chính giữa.)"}`, en: `fast reached end → slow = ${vals[slow]} is the MIDDLE node.\n${n % 2 === 0 ? "(Even count → take the SECOND middle.)" : "(Odd count → exact middle.)"}` },
+    slow, fast,
+    [{ name: "answer", value: `${vals[slow]} (index ${slow})` }],
+    [7]
+  );
+  fs.final = true;
   steps.push(fs);
-  return { input, answer: `[${result.join(",")}]`, steps };
+  return { input, answer: vals[slow], steps };
 }
 
 module.exports = {
@@ -2567,5 +2626,35 @@ module.exports = {
       "        return dummy.next",
     ],
     builder: buildSteps21,
+  },
+  876: {
+    id: 876,
+    difficulty: "easy",
+    slug: "middle-of-the-linked-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Middle of the Linked List", en: "Middle of the Linked List" },
+    titleVi: { vi: "Tìm nút giữa linked list", en: "Find middle node of linked list" },
+    statement: {
+      vi: "Cho head linked list, trả về node GIỮA. Nếu có 2 node giữa, trả về node thứ 2. Dùng slow/fast pointer. Nhập giá trị cách bởi dấu phẩy.",
+      en: "Given head of a linked list, return the MIDDLE node. If two middle nodes, return the second one. Use slow/fast pointers. Enter values comma-separated.",
+    },
+    defaultInput: "1,2,3,4,5,6",
+    inputKind: "string",
+    inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "slow đi 1 bước, fast đi 2 bước. Khi fast tới cuối → slow ở giữa.", en: "slow moves 1 step, fast moves 2 steps. When fast reaches the end → slow is at the middle." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "1 pass. 2 pointers.", en: "Single pass. 2 pointers." } },
+    code: [
+      "class Solution:",
+      "    def middleNode(self, head):",
+      "        slow = fast = head",
+      "        while fast and fast.next:",
+      "            slow = slow.next",
+      "            fast = fast.next.next",
+      "        return slow",
+    ],
+    builder: buildSteps876,
   },
 };
