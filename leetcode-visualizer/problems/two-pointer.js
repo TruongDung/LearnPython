@@ -1404,20 +1404,32 @@ function buildSteps25(input, params) {
   const n = vals.length;
   const steps = [];
 
+  // Result array (will be mutated as groups are reversed)
   const result = [...vals];
 
-  steps.push({
-    title: { vi: `Đảo từng nhóm ${k} nodes`, en: `Reverse every ${k}-node group` },
-    arr: result.map((v) => v),
-    sub: result.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    codeLines: [2, 3, 4],
-    vars: [{ name: "list", value: result.join("→") }, { name: "k", value: k }],
-    note: {
-      vi: `List: ${vals.join("→")}. k = ${k}.\nLặp: đếm đủ k nodes → đảo nhóm tại chỗ. Nhóm cuối < k → giữ nguyên.`,
-      en: `List: ${vals.join("→")}. k = ${k}.\nLoop: count k nodes → reverse group in-place. Last group < k → leave as-is.`,
-    },
-  });
+  // Build graph nodes (fixed positions — values will be updated via labels)
+  function graphSnap(title, note, edges, annotations, hlNodes, visitedNodes, vars, codeLines) {
+    const nodes = result.map((v, i) => ({ id: i, label: String(v) }));
+    return {
+      title, arr: [],
+      graph: { nodes, edges, hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  function forwardEdges() {
+    const edges = [];
+    for (let i = 0; i < n - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+    return edges;
+  }
+
+  steps.push(graphSnap(
+    { vi: `Đảo từng nhóm ${k} nodes`, en: `Reverse every ${k}-node group` },
+    { vi: `List: ${vals.join("→")}. k=${k}.\nLặp: đếm đủ k → đảo nhóm tại chỗ. Còn < k → giữ nguyên.`, en: `List: ${vals.join("→")}. k=${k}.\nLoop: count k → reverse group. Remaining < k → leave.` },
+    forwardEdges(), {}, [], [],
+    [{ name: "list", value: vals.join("→") }, { name: "k", value: k }],
+    [2, 3, 4]
+  ));
 
   let groupStart = 0;
   let groupNum = 0;
@@ -1425,78 +1437,69 @@ function buildSteps25(input, params) {
   while (groupStart + k <= n) {
     groupNum++;
     const groupEnd = groupStart + k - 1;
-
-    // Show group before reverse
     const groupVals = result.slice(groupStart, groupStart + k);
     const hlIndices = Array.from({ length: k }, (_, i) => groupStart + i);
 
-    steps.push({
-      title: { vi: `Nhóm ${groupNum}: [${groupVals.join(",")}] (index ${groupStart}..${groupEnd})`, en: `Group ${groupNum}: [${groupVals.join(",")}] (index ${groupStart}..${groupEnd})` },
-      arr: result.map((v) => v),
-      sub: result.map((v, i) => i >= groupStart && i <= groupEnd ? `grp${groupNum}` : `[${i}]`),
-      highlight: hlIndices, mark: [],
-      codeLines: [5, 6, 7, 8, 9, 10],
-      vars: [
-        { name: "group", value: groupNum },
-        { name: "range", value: `index ${groupStart}..${groupEnd}` },
-        { name: "nodes", value: `[${groupVals.join(",")}]` },
-        { name: "action", value: "đếm đủ k → sắp đảo" },
-      ],
-      note: {
-        vi: `Nhóm ${groupNum}: [${groupVals.join(",")}] có đủ ${k} nodes → đảo ngược.`,
-        en: `Group ${groupNum}: [${groupVals.join(",")}] has ${k} nodes → will reverse.`,
-      },
-    });
+    // Annotation: mark the group
+    const ann = {};
+    ann[groupStart] = "start";
+    ann[groupEnd] = "kth";
 
-    // Reverse this segment in result array
+    // visitedSoFar = nodes from previous groups already reversed
+    const visitedSoFar = Array.from({ length: groupStart }, (_, i) => i);
+
+    steps.push(graphSnap(
+      { vi: `Nhóm ${groupNum}: [${groupVals.join(",")}]`, en: `Group ${groupNum}: [${groupVals.join(",")}]` },
+      { vi: `Đếm đủ ${k} nodes (index ${groupStart}..${groupEnd}). Đảo nhóm này.`, en: `Found ${k} nodes (index ${groupStart}..${groupEnd}). Reverse this group.` },
+      forwardEdges(), ann, hlIndices, visitedSoFar,
+      [{ name: "group", value: groupNum }, { name: "nodes", value: groupVals.join("→") }],
+      [5, 6, 7, 8, 9, 10]
+    ));
+
+    // Reverse this segment
     const segment = result.slice(groupStart, groupStart + k);
     segment.reverse();
     for (let i = 0; i < k; i++) result[groupStart + i] = segment[i];
 
-    steps.push({
-      title: { vi: `Đã đảo nhóm ${groupNum}: [${segment.join(",")}]`, en: `Reversed group ${groupNum}: [${segment.join(",")}]` },
-      arr: result.map((v) => v),
-      sub: result.map((v, i) => i >= groupStart && i <= groupEnd ? `grp${groupNum}` : `[${i}]`),
-      highlight: [], mark: hlIndices,
-      codeLines: [11, 12, 13, 14, 15, 16, 17],
-      vars: [
-        { name: "group", value: groupNum },
-        { name: "reversed", value: `[${segment.join(",")}]` },
-        { name: "list now", value: result.join("→") },
-      ],
-      note: {
-        vi: `Đảo xong: [${groupVals.join(",")}] → [${segment.join(",")}].\nList hiện tại: ${result.join("→")}.`,
-        en: `Reversed: [${groupVals.join(",")}] → [${segment.join(",")}].\nList now: ${result.join("→")}.`,
-      },
-    });
+    // Build edges with current result order
+    const edges = [];
+    for (let i = 0; i < n - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+
+    // After reverse: all nodes up to groupEnd are "visited" (done)
+    const visitedAfter = Array.from({ length: groupStart + k }, (_, i) => i);
+
+    steps.push(graphSnap(
+      { vi: `Đảo xong: [${segment.join(",")}]`, en: `Reversed: [${segment.join(",")}]` },
+      { vi: `[${groupVals.join(",")}] → [${segment.join(",")}]. List: ${result.join("→")}.`, en: `[${groupVals.join(",")}] → [${segment.join(",")}]. List: ${result.join("→")}.` },
+      edges, {}, [], visitedAfter,
+      [{ name: "reversed", value: segment.join("→") }, { name: "list", value: result.join("→") }],
+      [11, 12, 13, 14, 15, 16, 17]
+    ));
 
     groupStart += k;
   }
 
-  // Show remaining (< k nodes, not reversed)
+  // Remaining < k
   if (groupStart < n) {
     const remaining = result.slice(groupStart);
-    steps.push({
-      title: { vi: `Còn lại [${remaining.join(",")}] < ${k} → giữ nguyên`, en: `Remaining [${remaining.join(",")}] < ${k} → keep as-is` },
-      arr: result.map((v) => v),
-      sub: result.map((_, i) => `[${i}]`),
-      highlight: Array.from({ length: n - groupStart }, (_, i) => groupStart + i), mark: [],
-      codeLines: [9, 10],
-      vars: [{ name: "remaining", value: `[${remaining.join(",")}]` }, { name: "count", value: n - groupStart }],
-      note: { vi: `Chỉ còn ${n - groupStart} nodes (< ${k}) → không đảo.`, en: `Only ${n - groupStart} nodes left (< ${k}) → don't reverse.` },
-    });
+    steps.push(graphSnap(
+      { vi: `Còn [${remaining.join(",")}] < ${k} → giữ nguyên`, en: `[${remaining.join(",")}] left < ${k} → keep` },
+      { vi: `Chỉ còn ${n - groupStart} nodes (< ${k}) → không đảo.`, en: `Only ${n - groupStart} nodes (< ${k}) → don't reverse.` },
+      forwardEdges(), {}, Array.from({ length: n - groupStart }, (_, i) => groupStart + i), [],
+      [{ name: "remaining", value: remaining.join("→") }],
+      [9, 10]
+    ));
   }
 
   // Final
-  const fs = {
-    title: { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
-    arr: result.map((v) => v),
-    sub: result.map(String),
-    highlight: [], mark: Array.from({ length: n }, (_, i) => i), final: true,
-    codeLines: [18, 19, 20, 21],
-    vars: [{ name: "answer", value: result.join("→") }],
-    note: { vi: `Linked list sau khi đảo từng nhóm ${k}: ${result.join("→")}.`, en: `List after reversing every ${k}-group: ${result.join("→")}.` },
-  };
+  const fs = graphSnap(
+    { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
+    { vi: `List sau đảo từng nhóm ${k}: ${result.join("→")}.`, en: `After reversing every ${k}-group: ${result.join("→")}.` },
+    forwardEdges(), {}, [], Array.from({ length: n }, (_, i) => i),
+    [{ name: "answer", value: result.join("→") }],
+    [18, 19, 20, 21]
+  );
+  fs.final = true;
   steps.push(fs);
   return { input, answer: `[${result.join(",")}]`, steps };
 }
@@ -1982,7 +1985,7 @@ module.exports = {
       vi: "Cho linked list và k, đảo ngược từng nhóm k nodes liên tiếp. Nếu nhóm cuối < k thì giữ nguyên. Nhập giá trị cách bởi dấu phẩy.",
       en: "Given a linked list and k, reverse every group of k consecutive nodes. If the last group has fewer than k nodes, leave them as-is. Enter values comma-separated.",
     },
-    defaultInput: "1,2,3,4,5",
+    defaultInput: "1,2,3,4,5,6,7,8,9,10",
     inputKind: "string",
     inputLabel: { vi: "Linked list (dấu phẩy)", en: "Linked list (comma-separated)" },
     extraParams: [{ key: "k", label: { vi: "k (kích thước nhóm)", en: "k (group size)" }, default: 3 }],
