@@ -1406,13 +1406,19 @@ function buildSteps25(input, params) {
 
   // Result array (will be mutated as groups are reversed)
   const result = [...vals];
+  let prevGroupIdx = -1; // -1 = dummy node
 
-  // Build graph nodes (fixed positions — values will be updated via labels)
+  // Build graph nodes with dummy "D" at start
   function graphSnap(title, note, edges, annotations, hlNodes, visitedNodes, vars, codeLines) {
-    const nodes = result.map((v, i) => ({ id: i, label: String(v) }));
+    const nodes = [{ id: 999, label: "D" }, ...result.map((v, i) => ({ id: i, label: String(v) }))];
+    const edgesWithDummy = [{ u: 999, v: 0, w: "" }, ...edges];
+    // Add prev_group annotation
+    const ann = { ...annotations };
+    if (prevGroupIdx === -1) ann[999] = "prev_grp";
+    else if (prevGroupIdx >= 0) ann[prevGroupIdx] = ann[prevGroupIdx] ? ann[prevGroupIdx] + ",prev_grp" : "prev_grp";
     return {
       title, arr: [],
-      graph: { nodes, edges, hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: annotations || {} },
+      graph: { nodes, edges: edgesWithDummy, hlNodes: hlNodes || [], hlEdges: [], visitedNodes: visitedNodes || [], annotations: ann },
       highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
     };
   }
@@ -1527,6 +1533,9 @@ function buildSteps25(input, params) {
       [{ name: "prev_group.next", value: `${prevGroupVal}→${kthVal}` }, { name: "prev_group (new)", value: tmpVal }, { name: "list", value: result.join("→") }],
       [19, 20, 21, 22]
     ));
+
+    // Update prevGroupIdx: it's now the last node of the reversed group (= old first = groupStart + k - 1 after reverse)
+    prevGroupIdx = groupStart + k - 1;
 
     // After reverse: all nodes up to groupEnd are "visited"
     const visitedAfter = Array.from({ length: groupStart + k }, (_, i) => i);
