@@ -1794,35 +1794,69 @@ function buildSteps206(input) {
     [2, 3, 4]
   ));
 
-  // Process each node
+  // Process each node — 4 sub-steps per iteration
   let prevIdx = -1;
   for (let curIdx = 0; curIdx < n; curIdx++) {
     const nxtIdx = curIdx + 1 < n ? curIdx + 1 : -1;
     const nxtVal = nxtIdx >= 0 ? vals[nxtIdx] : "null";
     const prevVal = prevIdx >= 0 ? vals[prevIdx] : "null";
 
-    // Reverse edge at curIdx
-    if (curIdx < n - 1) reversedEdges.add(curIdx);
-
-    const ann = {};
-    if (prevIdx >= 0) ann[prevIdx] = "prev";
-    ann[curIdx] = "cur";
-    if (nxtIdx >= 0) ann[nxtIdx] = "nxt";
-
-    const visited = Array.from({ length: curIdx + 1 }, (_, i) => i);
+    // Sub-step 1: nxt = cur.next
+    const ann1 = {};
+    if (prevIdx >= 0) ann1[prevIdx] = "prev";
+    ann1[curIdx] = "cur";
+    if (nxtIdx >= 0) ann1[nxtIdx] = "nxt";
 
     steps.push(graphSnap(
-      { vi: `cur=${vals[curIdx]}: cur.next=prev(${prevVal}), tiến`, en: `cur=${vals[curIdx]}: cur.next=prev(${prevVal}), advance` },
-      {
-        vi: `nxt = cur.next = ${nxtVal}\ncur.next = prev → ${vals[curIdx]}→${prevVal} (mũi tên đảo)\nprev = cur = ${vals[curIdx]}\ncur = nxt = ${nxtVal}`,
-        en: `nxt = cur.next = ${nxtVal}\ncur.next = prev → ${vals[curIdx]}→${prevVal} (arrow reversed)\nprev = cur = ${vals[curIdx]}\ncur = nxt = ${nxtVal}`,
-      },
-      ann, [curIdx], visited,
-      [{ name: "prev", value: vals[curIdx] }, { name: "cur", value: nxtVal }, { name: "nxt", value: nxtVal }, { name: "reversed so far", value: vals.slice(0, curIdx + 1).reverse().join("←") }],
-      [5, 6, 7, 8]
+      { vi: `nxt = cur.next → ${nxtVal}`, en: `nxt = cur.next → ${nxtVal}` },
+      { vi: `Lưu con trỏ tiếp theo: nxt = cur.next = ${nxtVal}.`, en: `Save the next pointer: nxt = cur.next = ${nxtVal}.` },
+      ann1, [curIdx], [],
+      [{ name: "nxt", value: nxtVal }, { name: "cur", value: vals[curIdx] }, { name: "prev", value: prevVal }],
+      [5]
     ));
 
+    // Sub-step 2: cur.next = prev (reverse the edge)
+    if (curIdx < n - 1) reversedEdges.add(curIdx);
+
+    const ann2 = {};
+    if (prevIdx >= 0) ann2[prevIdx] = "prev";
+    ann2[curIdx] = "cur";
+    if (nxtIdx >= 0) ann2[nxtIdx] = "nxt";
+
+    steps.push(graphSnap(
+      { vi: `cur.next = prev → ${vals[curIdx]}→${prevVal}`, en: `cur.next = prev → ${vals[curIdx]}→${prevVal}` },
+      { vi: `Đảo mũi tên: cur (${vals[curIdx]}) trỏ về prev (${prevVal}) thay vì nxt.`, en: `Reverse arrow: cur (${vals[curIdx]}) now points to prev (${prevVal}) instead of next.` },
+      ann2, [curIdx, ...(prevIdx >= 0 ? [prevIdx] : [])], [],
+      [{ name: "cur.next", value: `→ ${prevVal} (reversed!)` }, { name: "cur", value: vals[curIdx] }, { name: "prev", value: prevVal }],
+      [6]
+    ));
+
+    // Sub-step 3: prev = cur
+    const ann3 = {};
+    ann3[curIdx] = "prev";
+    if (nxtIdx >= 0) ann3[nxtIdx] = "nxt";
+
+    steps.push(graphSnap(
+      { vi: `prev = cur → ${vals[curIdx]}`, en: `prev = cur → ${vals[curIdx]}` },
+      { vi: `prev tiến tới cur: prev = ${vals[curIdx]}.`, en: `prev advances to cur: prev = ${vals[curIdx]}.` },
+      ann3, [curIdx], [],
+      [{ name: "prev", value: vals[curIdx] }, { name: "cur", value: vals[curIdx] }, { name: "nxt", value: nxtVal }],
+      [7]
+    ));
+
+    // Sub-step 4: cur = nxt
     prevIdx = curIdx;
+    const ann4 = {};
+    ann4[curIdx] = "prev";
+    if (nxtIdx >= 0) ann4[nxtIdx] = "cur";
+
+    steps.push(graphSnap(
+      { vi: `cur = nxt → ${nxtVal}`, en: `cur = nxt → ${nxtVal}` },
+      { vi: `cur tiến sang nxt: cur = ${nxtVal}.${nxtIdx < 0 ? " (null → dừng vòng lặp)" : ""}`, en: `cur advances to nxt: cur = ${nxtVal}.${nxtIdx < 0 ? " (null → loop ends)" : ""}` },
+      ann4, nxtIdx >= 0 ? [nxtIdx] : [], [],
+      [{ name: "prev", value: vals[curIdx] }, { name: "cur", value: nxtVal }, { name: "reversed so far", value: vals.slice(0, curIdx + 1).reverse().join("←") }],
+      [8]
+    ));
   }
 
   // Final
