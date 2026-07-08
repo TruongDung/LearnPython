@@ -408,23 +408,6 @@ function buildSteps203(input, params) {
     // Always label dummy
     if (!annotations["d"]) annotations["d"] = "dummy";
     else if (!String(annotations["d"]).includes("dummy")) annotations["d"] = "dummy " + annotations["d"];
-    // Show prev.next and curr.next as faded annotations
-    // Find next non-removed node after a given index
-    function nextAlive(from) {
-      for (let i = from + 1; i < n; i++) {
-        if (!removed.has(i)) return i;
-      }
-      return -1;
-    }
-    const prevNext = prevIdx === -1 ? (values.findIndex((_, i) => !removed.has(i))) : nextAlive(prevIdx);
-    const currNext = currIdx >= 0 ? nextAlive(currIdx) : -1;
-    if (prevNext >= 0 && !annotations[prevNext]) annotations[prevNext] = "prev.next";
-    if (currNext >= 0 && !annotations[currNext]) annotations[currNext] = "curr.next";
-    // If prev.next and curr.next are the same node, combine
-    if (prevNext >= 0 && currNext >= 0 && prevNext === currNext && annotations[prevNext] === "prev.next") {
-      annotations[prevNext] = "prev.next";
-    }
-
     // Label head (first non-removed real node)
     const headIdx = values.findIndex((_, i) => !removed.has(i));
     if (headIdx >= 0 && !annotations[headIdx]) annotations[headIdx] = "head";
