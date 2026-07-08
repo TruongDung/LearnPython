@@ -1104,11 +1104,18 @@ function renderGraph(step) {
     nodeSvg += `<g class="${cls}">`;
     nodeSvg += `<circle cx="${p.x}" cy="${p.y}" r="${r}" />`;
     nodeSvg += `<text x="${p.x}" y="${p.y}" dy="0.35em" text-anchor="middle">${escapeXml(node.label || String(node.id))}</text>`;
-    // Annotation label above/below node (e.g. "fast", "slow") — only when explicitly provided
+    // Annotation label above node (e.g. "fast", "slow", "head") — only when explicitly provided
     if (annotations && annotations[node.id] !== undefined) {
       const ann = annotations[node.id];
-      const color = ann === "fast" ? "#f59e0b" : ann === "slow" ? "#22c55e" : "#94a3b8";
-      nodeSvg += `<text x="${p.x}" y="${p.y - r - 5}" text-anchor="middle" font-size="10" font-weight="700" fill="${color}">${escapeXml(ann)}</text>`;
+      let color = "#94a3b8"; // default gray
+      if (ann.includes("fast.next")) color = "#fb923c"; // lighter orange
+      else if (ann.includes("fast")) color = "#f59e0b"; // amber
+      if (ann.includes("slow")) color = "#22c55e"; // green
+      if (ann === "slow+fast") color = "#ec4899"; // pink for both
+      if (ann === "head") color = "#6366f1"; // indigo
+      if (ann.startsWith("head ")) color = "#6366f1"; // head combined
+      const opacity = ann === "fast.next" ? "0.45" : "1";
+      nodeSvg += `<text x="${p.x}" y="${p.y - r - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}" opacity="${opacity}">${escapeXml(ann)}</text>`;
     }
     // Distance label below node (for Dijkstra etc.)
     if (node.dist !== undefined) {
