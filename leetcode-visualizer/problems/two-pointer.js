@@ -1456,13 +1456,10 @@ function buildSteps25(input, params) {
       [5, 6, 7, 8, 9, 10]
     ));
 
-    // Reverse this segment — show each pointer swap step
+    // Reverse this segment — 4 sub-steps per node + connect step
     const segment = result.slice(groupStart, groupStart + k);
-    // Sub-steps: simulate prev/cur/nxt inside the group
-    const tempArr = [...segment]; // working copy
+
     for (let step = 0; step < k; step++) {
-      // At this point, step elements have been reversed
-      // Show cur = tempArr[step] being moved
       const curVal = segment[step];
       const prevVal = step > 0 ? segment[step - 1] : "null";
       const nxtVal = step + 1 < k ? segment[step + 1] : "next_group";
@@ -1470,30 +1467,74 @@ function buildSteps25(input, params) {
       const annRev = {};
       annRev[groupStart + step] = "cur";
       if (step > 0) annRev[groupStart + step - 1] = "prev";
+      if (step + 1 < k) annRev[groupStart + step + 1] = "nxt";
 
+      // Sub-step A: nxt = cur.next
       steps.push(graphSnap(
-        { vi: `  cur=${curVal}, prev=${prevVal}: cur.next=prev`, en: `  cur=${curVal}, prev=${prevVal}: cur.next=prev` },
-        { vi: `nxt = cur.next (${nxtVal})\ncur.next = prev (${curVal}→${prevVal})\nprev = cur (${curVal})\ncur = nxt (${nxtVal})`, en: `nxt = cur.next (${nxtVal})\ncur.next = prev (${curVal}→${prevVal})\nprev = cur (${curVal})\ncur = nxt (${nxtVal})` },
+        { vi: `  nxt = cur.next = ${nxtVal}`, en: `  nxt = cur.next = ${nxtVal}` },
+        { vi: `Lưu con trỏ next của cur (${curVal}) trước khi đảo.`, en: `Save cur's next pointer before reversing.` },
         forwardEdges(), annRev, [groupStart + step], visitedSoFar,
         [{ name: "prev", value: prevVal }, { name: "cur", value: curVal }, { name: "nxt", value: nxtVal }, { name: "step", value: `${step + 1}/${k}` }],
-        [14, 15, 16, 17, 18]
+        [15]
+      ));
+
+      // Sub-step B: cur.next = prev
+      steps.push(graphSnap(
+        { vi: `  cur.next = prev → ${curVal}→${prevVal}`, en: `  cur.next = prev → ${curVal}→${prevVal}` },
+        { vi: `Đảo pointer: ${curVal}.next = ${prevVal} (thay vì ${nxtVal}).`, en: `Reverse pointer: ${curVal}.next = ${prevVal} (instead of ${nxtVal}).` },
+        forwardEdges(), annRev, [groupStart + step], visitedSoFar,
+        [{ name: "prev", value: prevVal }, { name: "cur", value: curVal }, { name: "action", value: `${curVal}.next = ${prevVal}` }],
+        [16]
+      ));
+
+      // Sub-step C: prev = cur
+      steps.push(graphSnap(
+        { vi: `  prev = cur = ${curVal}`, en: `  prev = cur = ${curVal}` },
+        { vi: `Tiến prev: prev = ${curVal}.`, en: `Advance prev: prev = ${curVal}.` },
+        forwardEdges(), { [groupStart + step]: "prev" }, [groupStart + step], visitedSoFar,
+        [{ name: "prev", value: curVal }, { name: "cur", value: "→ nxt" }],
+        [17]
+      ));
+
+      // Sub-step D: cur = nxt
+      const annAfterD = {};
+      if (step + 1 < k) annAfterD[groupStart + step + 1] = "cur";
+      annAfterD[groupStart + step] = "prev";
+      steps.push(graphSnap(
+        { vi: `  cur = nxt = ${nxtVal}`, en: `  cur = nxt = ${nxtVal}` },
+        { vi: `Tiến cur: cur = ${nxtVal}.`, en: `Advance cur: cur = ${nxtVal}.` },
+        forwardEdges(), annAfterD, step + 1 < k ? [groupStart + step + 1] : [], visitedSoFar,
+        [{ name: "prev", value: curVal }, { name: "cur", value: nxtVal }],
+        [18]
       ));
     }
 
     segment.reverse();
     for (let i = 0; i < k; i++) result[groupStart + i] = segment[i];
 
-    // Build edges with current result order
-    const edges = [];
-    for (let i = 0; i < n - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+    // Connect step: prev_group.next = kth, prev_group = tmp
+    const prevGroupVal = groupStart > 0 ? result[groupStart - 1] : "D";
+    const kthVal = segment[0]; // first of reversed = was last = kth
+    const tmpVal = segment[segment.length - 1]; // last of reversed = was first = will be new prev_group
 
-    // After reverse: all nodes up to groupEnd are "visited" (done)
+    steps.push(graphSnap(
+      { vi: `Connect: ${prevGroupVal}.next = ${kthVal}, prev_group = ${tmpVal}`, en: `Connect: ${prevGroupVal}.next = ${kthVal}, prev_group = ${tmpVal}` },
+      {
+        vi: `Nối nhóm đã đảo với nhóm trước:\n  prev_group.next = kth (${prevGroupVal}→${kthVal})\n  prev_group = tmp = ${tmpVal} (đầu cũ của nhóm, giờ ở cuối)`,
+        en: `Link reversed group with previous:\n  prev_group.next = kth (${prevGroupVal}→${kthVal})\n  prev_group = tmp = ${tmpVal} (old group head, now at end)`,
+      },
+      forwardEdges(), {}, [], Array.from({ length: groupStart + k }, (_, i) => i),
+      [{ name: "prev_group.next", value: `${prevGroupVal}→${kthVal}` }, { name: "prev_group (new)", value: tmpVal }, { name: "list", value: result.join("→") }],
+      [19, 20, 21, 22]
+    ));
+
+    // After reverse: all nodes up to groupEnd are "visited"
     const visitedAfter = Array.from({ length: groupStart + k }, (_, i) => i);
 
     steps.push(graphSnap(
-      { vi: `Đảo xong: [${segment.join(",")}]`, en: `Reversed: [${segment.join(",")}]` },
-      { vi: `[${groupVals.join(",")}] → [${segment.join(",")}]. List: ${result.join("→")}.`, en: `[${groupVals.join(",")}] → [${segment.join(",")}]. List: ${result.join("→")}.` },
-      edges, {}, [], visitedAfter,
+      { vi: `Đảo xong nhóm ${groupNum}: [${segment.join(",")}]`, en: `Group ${groupNum} reversed: [${segment.join(",")}]` },
+      { vi: `List hiện tại: ${result.join("→")}.`, en: `Current list: ${result.join("→")}.` },
+      forwardEdges(), {}, [], visitedAfter,
       [{ name: "reversed", value: segment.join("→") }, { name: "list", value: result.join("→") }],
       [11, 12, 13, 14, 15, 16, 17]
     ));
