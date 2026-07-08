@@ -1008,10 +1008,17 @@ function renderTree(step) {
     const p = pos[n.parentId];
     const c = pos[n.id];
     if (!p) return;
-    edges += `<line x1="${p.x}" y1="${p.y}" x2="${c.x}" y2="${c.y}" class="tree-edge" />`;
+    // Shorten line so arrowhead doesn't overlap the circle
+    const dx = c.x - p.x, dy = c.y - p.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const ux = dx/len, uy = dy/len;
+    const x1 = p.x + ux * (r + 2), y1 = p.y + uy * (r + 2);
+    const x2 = c.x - ux * (r + 4), y2 = c.y - uy * (r + 4);
+    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="tree-edge" marker-end="url(#tree-arrow)" />`;
   });
 
   let circles = "";
+  const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" }
   nodes.forEach((n) => {
     const c = pos[n.id];
     const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "");
@@ -1019,11 +1026,18 @@ function renderTree(step) {
     if (n.isWord) circles += `<circle cx="${c.x}" cy="${c.y}" r="${r + 4}" class="tree-ring" />`;
     circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
     circles += `<text x="${c.x}" y="${c.y}" dy="0.35em" text-anchor="middle">${escapeXml(n.label)}</text>`;
+    // Annotation above node (e.g. "l1", "l2", "cur", "slow")
+    if (treeAnnotations[n.id] !== undefined) {
+      const ann = treeAnnotations[n.id];
+      const color = n.hl ? "#f59e0b" : n.isWord ? "#22c55e" : "#6366f1";
+      circles += `<text x="${c.x}" y="${c.y - r - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${escapeXml(ann)}</text>`;
+    }
     circles += `</g>`;
   });
 
   $("treeView").innerHTML =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
+    `<defs><marker id="tree-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +
     `</svg>`;

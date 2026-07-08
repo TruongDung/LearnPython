@@ -1689,26 +1689,33 @@ function buildSteps2(input) {
   // Graph: l1 nodes (row 0), l2 nodes (row 1), result nodes (row 2) with dummy + cur marker
   function treeSnap(title, note, curPos, vars, codeLines) {
     const nodes = [];
-    // l1 nodes (y=0) — first node labeled "l1:"
+    // l1 nodes (y=0)
     l1.forEach((v, i) => {
-      nodes.push({ id: i, label: i === 0 ? `l1:${v}` : String(v), x: (i + 1) * 2, y: 0, parentId: i > 0 ? i - 1 : null, hl: i === curPos, isWord: false });
+      nodes.push({ id: i, label: String(v), x: i * 2, y: 0, parentId: i > 0 ? i - 1 : null, hl: i === curPos, isWord: false });
     });
-    // l2 nodes (y=1) — first node labeled "l2:"
+
+    // l2 nodes (y=1)
     const l2Offset = l1.length;
     l2.forEach((v, i) => {
-      nodes.push({ id: l2Offset + i, label: i === 0 ? `l2:${v}` : String(v), x: (i + 1) * 2, y: 1, parentId: i > 0 ? l2Offset + i - 1 : null, hl: i === curPos, isWord: false });
+      nodes.push({ id: l2Offset + i, label: String(v), x: i * 2, y: 1, parentId: i > 0 ? l2Offset + i - 1 : null, hl: i === curPos, isWord: false });
     });
-    // result nodes (y=2): dummy "D" at start, last node = "cur"
+    // result nodes (y=2): dummy "D" + values
     const resOffset = l1.length + l2.length;
     nodes.push({ id: resOffset, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
     result.forEach((v, i) => {
       const isCur = i === result.length - 1;
-      nodes.push({ id: resOffset + 1 + i, label: isCur ? `${v} cur` : String(v), x: (i + 1) * 2, y: 2, parentId: resOffset + i, hl: false, isWord: isCur });
+      nodes.push({ id: resOffset + 1 + i, label: String(v), x: (i + 1) * 2, y: 2, parentId: resOffset + i, hl: false, isWord: isCur });
     });
+
+    // Annotations above nodes: "l1" on first l1 node, "l2" on first l2 node, "cur" on last result
+    const annotations = {};
+    if (l1.length > 0) annotations[0] = "l1";
+    if (l2.length > 0) annotations[l2Offset] = "l2";
+    if (result.length > 0) annotations[resOffset + result.length] = "cur";
 
     return {
       title, arr: [],
-      tree: { nodes },
+      tree: { nodes, annotations },
       highlight: [], mark: [],
       codeLines: codeLines || [], vars: vars || [], note,
     };
