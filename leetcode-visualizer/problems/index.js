@@ -26,6 +26,7 @@ const categories = {
   "binary-tree": require("./tree"),
   heap: require("./heap"),
   "union-find": require("./union-find"),
+  "linked-list": require("./linked-list"),
 };
 
 const SUPPORTED = {};
