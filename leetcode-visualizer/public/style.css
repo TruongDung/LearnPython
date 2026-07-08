@@ -1970,10 +1970,20 @@ select option {
     flex-basis: auto;
   }
 
-  /* Controls — keep 5 buttons on 1 row, shrink to fit */
+  /* Controls — sticky at bottom of viewport on mobile so
+     tapping Next/Prev doesn't jump the screen */
   .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    background: #0c0a1a;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
     flex-wrap: nowrap;
     gap: 5px;
+    margin: 0 -12px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .controls button {
@@ -2421,5 +2431,28 @@ html, body {
   }
   .cat-guide-stage {
     padding: 8px 10px;
+  }
+}
+
+/* ---- Prevent mobile scroll jumping during step navigation ---- */
+@media (max-width: 768px) {
+  /* Fix the viz-right area height so content changes don't resize the page */
+  .viz-right {
+    min-height: 280px;
+    overflow-y: auto;
+    max-height: 50vh;
+  }
+
+  /* Note area: fixed height to prevent layout shift */
+  #vizPanel .note {
+    min-height: 60px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  /* Variables panel: limit height */
+  #vizPanel .vars-panel {
+    max-height: 140px;
+    overflow-y: auto;
   }
 }
