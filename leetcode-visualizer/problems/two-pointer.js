@@ -1906,28 +1906,31 @@ function buildSteps21(input) {
   const result = [];
   let i = 0, j = 0;
 
-  // Tree view: l1 at y=0, l2 at y=1, result at y=2 (with dummy node "D" at start)
+  // Tree view: l1 at y=0, l2 at y=1, result at y=2 (with dummy "D" + annotations)
   function treeSnap(title, note, curI, curJ, vars, codeLines) {
     const nodes = [];
-    // l1 nodes (y=0) — label "l1:" on first node
+    // l1 nodes (y=0)
     l1.forEach((v, idx) => {
-      nodes.push({ id: idx, label: idx === 0 ? `l1:${v}` : String(v), x: (idx + 1) * 2, y: 0, parentId: idx > 0 ? idx - 1 : null, hl: idx === curI, isWord: false });
+      nodes.push({ id: idx, label: String(v), x: idx * 2, y: 0, parentId: idx > 0 ? idx - 1 : null, hl: idx === curI, isWord: false });
     });
-    // l2 nodes (y=1) — label "l2:" on first node
+    // l2 nodes (y=1)
     const l2Off = l1.length;
     l2.forEach((v, idx) => {
-      nodes.push({ id: l2Off + idx, label: idx === 0 ? `l2:${v}` : String(v), x: (idx + 1) * 2, y: 1, parentId: idx > 0 ? l2Off + idx - 1 : null, hl: idx === curJ, isWord: false });
+      nodes.push({ id: l2Off + idx, label: String(v), x: idx * 2, y: 1, parentId: idx > 0 ? l2Off + idx - 1 : null, hl: idx === curJ, isWord: false });
     });
-    // result nodes (y=2) — dummy "D" at x=0, then values; last node marked as "cur"
+    // result nodes (y=2): dummy "D" + values
     const resOff = l1.length + l2.length;
-    // Dummy node
     nodes.push({ id: resOff, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
-    // Result value nodes
     result.forEach((v, idx) => {
       const isCur = idx === result.length - 1;
-      nodes.push({ id: resOff + 1 + idx, label: isCur ? `${v} cur` : String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
+      nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
     });
-    return { title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
+    // Annotations: "l1" above first l1 node, "l2" above first l2 node, "cur" above last result
+    const annotations = {};
+    if (l1.length > 0) annotations[0] = "l1";
+    if (l2.length > 0) annotations[l2Off] = "l2";
+    if (result.length > 0) annotations[resOff + result.length] = "cur";
+    return { title, arr: [], tree: { nodes, annotations }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
   }
 
   steps.push(treeSnap(
