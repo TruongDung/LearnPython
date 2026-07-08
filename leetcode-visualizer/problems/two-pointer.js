@@ -1728,21 +1728,39 @@ function buildSteps2(input) {
   for (let i = 0; i < maxLen || carry > 0; i++) {
     const v1 = i < l1.length ? l1[i] : 0;
     const v2 = i < l2.length ? l2[i] : 0;
+    const oldCarry = carry;
+
+    // Sub-step 1: read values
+    steps.push(treeSnap(
+      { vi: `[${i}] Đọc: l1.val=${v1}, l2.val=${v2}, carry=${oldCarry}`, en: `[${i}] Read: l1.val=${v1}, l2.val=${v2}, carry=${oldCarry}` },
+      { vi: `val1 = l1.val = ${v1}${i >= l1.length ? " (l1 hết → 0)" : ""}\nval2 = l2.val = ${v2}${i >= l2.length ? " (l2 hết → 0)" : ""}\ncarry = ${oldCarry}`, en: `val1 = l1.val = ${v1}${i >= l1.length ? " (l1 exhausted → 0)" : ""}\nval2 = l2.val = ${v2}${i >= l2.length ? " (l2 exhausted → 0)" : ""}\ncarry = ${oldCarry}` },
+      i,
+      [{ name: "position", value: i }, { name: "l1.val", value: `${v1}${i >= l1.length ? " (hết)" : ""}` }, { name: "l2.val", value: `${v2}${i >= l2.length ? " (hết)" : ""}` }, { name: "carry", value: oldCarry }],
+      [6, 7, 8]
+    ));
+
+    // Sub-step 2: compute total, digit, carry
     const total = v1 + v2 + carry;
     const digit = total % 10;
-    const oldCarry = carry;
     carry = Math.floor(total / 10);
+
+    steps.push(treeSnap(
+      { vi: `[${i}] Tính: ${v1}+${v2}+${oldCarry}=${total} → digit=${digit}, carry=${carry}`, en: `[${i}] Compute: ${v1}+${v2}+${oldCarry}=${total} → digit=${digit}, carry=${carry}` },
+      { vi: `total = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total} % 10 = ${digit}\ncarry = ${total} // 10 = ${carry}`, en: `total = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total} % 10 = ${digit}\ncarry = ${total} // 10 = ${carry}` },
+      i,
+      [{ name: "total", value: `${v1}+${v2}+${oldCarry} = ${total}` }, { name: "digit", value: `${total}%10 = ${digit}` }, { name: "carry", value: `${total}//10 = ${carry}` }],
+      [9, 10]
+    ));
+
+    // Sub-step 3: create node, advance
     result.push(digit);
 
     steps.push(treeSnap(
-      { vi: `[${i}]: ${v1}+${v2}+${oldCarry}=${total} → ${digit}, carry=${carry}`, en: `[${i}]: ${v1}+${v2}+${oldCarry}=${total} → ${digit}, carry=${carry}` },
-      {
-        vi: `sum = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total}%10 = ${digit}\ncarry = ${total}//10 = ${carry}`,
-        en: `sum = ${v1} + ${v2} + ${oldCarry} = ${total}\ndigit = ${total}%10 = ${digit}\ncarry = ${total}//10 = ${carry}`,
-      },
+      { vi: `[${i}] Tạo node ${digit} → result: ${result.join("→")}`, en: `[${i}] Create node ${digit} → result: ${result.join("→")}` },
+      { vi: `cur.next = Node(${digit})\ncur = cur.next\nresult: D→${result.join("→")}`, en: `cur.next = Node(${digit})\ncur = cur.next\nresult: D→${result.join("→")}` },
       i,
-      [{ name: "l1.val", value: v1 }, { name: "l2.val", value: v2 }, { name: "carry in", value: oldCarry }, { name: "total", value: total }, { name: "digit", value: digit }, { name: "carry out", value: carry }, { name: "result", value: result.join("→") }],
-      [6, 7, 8, 9, 10, 11, 12]
+      [{ name: "new node", value: digit }, { name: "result", value: `D→${result.join("→")}` }, { name: "carry for next", value: carry }],
+      [11, 12, 13, 14]
     ));
   }
 
