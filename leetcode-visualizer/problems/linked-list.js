@@ -230,7 +230,6 @@ function buildSteps83(input) {
 
   function snapshot(opts) {
     const currIdx = opts.currIdx != null ? opts.currIdx : -1;
-    const currNextIdx = opts.currNextIdx != null ? opts.currNextIdx : -1;
     const nodes = values.map((v, i) => ({ id: i, label: `${v}` }));
     const edges = [];
     // Build edges skipping removed nodes (curr.next = curr.next.next)
@@ -243,7 +242,6 @@ function buildSteps83(input) {
     // Annotations
     const annotations = {};
     if (currIdx >= 0) annotations[currIdx] = "curr";
-    if (currNextIdx >= 0 && currNextIdx !== currIdx) annotations[currNextIdx] = "curr.next";
     // Head always labeled
     if (!removed.has(0)) {
       annotations[0] = annotations[0] ? "head " + annotations[0] : "head";
@@ -298,7 +296,6 @@ function buildSteps83(input) {
       snapshot({
         title: { vi: `${values[curr]} == ${values[nextIdx]} → bỏ node ${nextIdx}`, en: `${values[curr]} == ${values[nextIdx]} → remove node ${nextIdx}` },
         currIdx: curr,
-        currNextIdx: nextIdx,
         codeLines: [5, 6],
         hlNodes: [curr, nextIdx],
         vars: [
