@@ -918,36 +918,66 @@ function buildSteps23Heap(input) {
     }
   }
 
-  // Pop loop
+  // Pop loop — detailed sub-steps
   while (heap.length > 0) {
     const root = heap[0];
+    const li = root.listIdx;
+    const hasNext = ptrs[li] < lists[li].length;
+
+    // Sub-step 1: identify root (smallest in heap)
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Gốc heap = ${root.val} (L${li}) → nhỏ nhất`, en: `Heap root = ${root.val} (L${li}) → smallest` },
+      hlSet: new Set([0]), codeLines: [10, 11],
+      vars: [{ name: "heap root", value: `${root.val} (from L${li})` }, { name: "heap", value: arrStr() }, { name: "linked list so far", value: result.length > 0 ? `D→${result.join("→")}` : "D (empty)" }],
+      note: { vi: `Gốc min-heap = ${root.val} → đây là phần tử nhỏ nhất hiện tại. Sắp pop ra nối vào node.next.`, en: `Min-heap root = ${root.val} → current smallest. About to pop and link to node.next.` },
+    }));
+
+    // Sub-step 2: pop root, move last to root
     const last = heap.pop();
     if (heap.length > 0) heap[0] = last;
     result.push(root.val);
 
-    const li = root.listIdx;
-    const hasNext = ptrs[li] < lists[li].length;
-
     steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Pop ${root.val} (L${li}) → result=[${result.join(",")}]`, en: `Pop ${root.val} (L${li}) → result=[${result.join(",")}]` },
-      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [10, 11, 12, 13],
+      title: { vi: `Pop ${root.val} → result=[${result.join(",")}]`, en: `Pop ${root.val} → result=[${result.join(",")}]` },
+      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [11, 12, 13],
       vars: [
-        { name: "popped", value: `${root.val} (from L${li})` },
-        { name: "result", value: `[${result.join(",")}]` },
-        { name: "heap", value: arrStr() },
-        { name: "next from L" + li, value: hasNext ? lists[li][ptrs[li]] : "null (end)" },
+        { name: "popped", value: root.val },
+        { name: "node (cur)", value: `→ ${root.val} (mới nối)` },
+        { name: "linked list", value: `D→${result.join("→")} (cur=${root.val})` },
+        { name: "last → root", value: heap.length > 0 ? `${heap[0].val} moved to root` : "heap empty" },
       ],
-      note: {
-        vi: `Pop nhỏ nhất = ${root.val} (từ list ${li}). Thêm vào kết quả.${hasNext ? ` Đẩy phần tử kế tiếp L${li}[${ptrs[li]}] = ${lists[li][ptrs[li]]} vào heap.` : ` List ${li} hết.`}`,
-        en: `Pop smallest = ${root.val} (from list ${li}). Add to result.${hasNext ? ` Push next L${li}[${ptrs[li]}] = ${lists[li][ptrs[li]]} into heap.` : ` List ${li} exhausted.`}`,
-      },
+      note: { vi: `Pop ${root.val}, nối vào result. Đưa phần tử cuối lên gốc → cần sift-down.`, en: `Pop ${root.val}, append to result. Move last element to root → need sift-down.` },
     }));
+
+    // Sub-step 3: sift-down (each swap is a separate step via makeSifters)
     if (heap.length > 0) siftDown(0);
 
+    // Sub-step 4: push next from same list (if available)
     if (hasNext) {
-      heap.push({ val: lists[li][ptrs[li]], listIdx: li });
+      const nextVal = lists[li][ptrs[li]];
+      heap.push({ val: nextVal, listIdx: li });
+
+      steps.push(heapSnapshot(heap, label, {
+        title: { vi: `Push L${li}[${ptrs[li]}]=${nextVal} vào heap`, en: `Push L${li}[${ptrs[li]}]=${nextVal} into heap` },
+        hlSet: new Set([heap.length - 1]), codeLines: [14, 15],
+        vars: [
+          { name: "from list", value: `L${li}` },
+          { name: "next val", value: nextVal },
+          { name: "heap", value: arrStr() },
+        ],
+        note: { vi: `Đẩy phần tử tiếp theo của L${li} (= ${nextVal}) vào cuối heap → cần sift-up.`, en: `Push next element of L${li} (= ${nextVal}) at the end of heap → need sift-up.` },
+      }));
+
       ptrs[li]++;
+      // Sub-step 5: sift-up (each swap is a separate step via makeSifters)
       siftUp(heap.length - 1);
+    } else {
+      steps.push(heapSnapshot(heap, label, {
+        title: { vi: `L${li} hết → không push`, en: `L${li} exhausted → no push` },
+        codeLines: [14],
+        vars: [{ name: "L" + li, value: "exhausted" }, { name: "heap", value: arrStr() }],
+        note: { vi: `List ${li} không còn phần tử → không push gì vào heap.`, en: `List ${li} has no more elements → nothing to push.` },
+      }));
     }
   }
 
@@ -976,8 +1006,8 @@ function buildSteps23DC(input) {
     highlight: [], mark: [], codeLines: [2, 3, 4, 5], codeBlock: 2,
     vars: [{ name: "lists", value: listsStr }, { name: "k", value: k }],
     note: {
-      vi: `${k} lists: ${listsStr}\n\nLặp: mỗi vòng gộp từng CẶP (0+1, 2+3, ...). Số list giảm một nửa → log(k) vòng.\nMỗi merge dùng 2 pointers so sánh đầu, lấy nhỏ hơn.`,
-      en: `${k} lists: ${listsStr}\n\nLoop: each round merges PAIRS (0+1, 2+3, ...). List count halves → log(k) rounds.\nEach merge uses 2 pointers comparing heads, taking the smaller.`,
+      vi: `${k} lists: ${listsStr}\n\nLặp: mỗi vòng gộp từng CẶP. Số list giảm một nửa → log(k) vòng.\nMỗi merge dùng 2 pointers so sánh đầu, lấy nhỏ hơn.`,
+      en: `${k} lists: ${listsStr}\n\nLoop: each round merges PAIRS. List count halves → log(k) rounds.\nEach merge uses 2 pointers comparing heads, taking the smaller.`,
     },
   });
 
@@ -988,57 +1018,69 @@ function buildSteps23DC(input) {
     round++;
     const merged = [];
     for (let p = 0; p < current.length; p += 2) {
-      const l1 = current[p];
-      const l2 = p + 1 < current.length ? current[p + 1] : null;
+      const la = current[p];
+      const lb = p + 1 < current.length ? current[p + 1] : null;
 
-      if (!l2) { merged.push(l1); continue; }
+      if (!lb) { merged.push(la); continue; }
 
-      // Detail: show each comparison step inside mergeTwoLists
+      // Tree view: la at y=0, lb at y=1, result at y=2
       const res = [];
       let i = 0, j = 0;
 
-      steps.push({
-        title: { vi: `Vòng ${round}: bắt đầu merge [${l1.join(",")}] + [${l2.join(",")}]`, en: `Round ${round}: start merge [${l1.join(",")}] + [${l2.join(",")}]` },
-        arr: [...l1, ...l2], sub: [...l1.map(String), ...l2.map(String)],
-        highlight: [0, l1.length], mark: [], codeLines: [14, 15, 16, 17], codeBlock: 2,
-        vars: [{ name: "l1", value: `[${l1.join(",")}]` }, { name: "l2", value: `[${l2.join(",")}]` }, { name: "result", value: "[]" }],
-        note: { vi: `Dùng 2 con trỏ: so sánh đầu l1 và l2, lấy nhỏ hơn vào result.`, en: `Two pointers: compare heads of l1 and l2, take the smaller into result.` },
-      });
-
-      while (i < l1.length && j < l2.length) {
-        const takeL1 = l1[i] <= l2[j];
-        if (takeL1) { res.push(l1[i]); i++; } else { res.push(l2[j]); j++; }
-
-        steps.push({
-          title: { vi: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"} → result=[${res.join(",")}]`, en: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"} → result=[${res.join(",")}]` },
-          arr: res, sub: res.map(String),
-          highlight: [res.length - 1], mark: [], codeLines: takeL1 ? [18, 19, 20] : [21, 22, 23], codeBlock: 2,
-          vars: [
-            { name: "l1[i]", value: i < l1.length ? l1[i] : "end" },
-            { name: "l2[j]", value: j < l2.length ? l2[j] : "end" },
-            { name: "took", value: `${takeL1 ? l1[i-1] + " from l1" : l2[j-1] + " from l2"} (${takeL1 ? l1[i-1] + "≤" + l2[j-1] : l2[j-1] + "<" + l1[i-1]})` },
-            { name: "result", value: `[${res.join(",")}]` },
-          ],
-          note: {
-            vi: `So sánh l1[${i-Number(takeL1)}]=${takeL1?l1[i-1]:l1[i]} vs l2[${j-Number(!takeL1)}]=${takeL1?l2[j]:l2[j-1]} → lấy ${takeL1?l1[i-1]:l2[j-1]} từ ${takeL1?"l1":"l2"}.`,
-            en: `Compare l1 head vs l2 head → take ${takeL1?l1[i-1]:l2[j-1]} from ${takeL1?"l1":"l2"}.`,
-          },
+      // Intro step for this pair
+      function treeSnap(title, note, curI, curJ, vars, codeLines) {
+        const nodes = [];
+        // la nodes (y=0)
+        la.forEach((v, idx) => { nodes.push({ id: idx, label: String(v), x: idx * 2, y: 0, parentId: idx > 0 ? idx - 1 : null, hl: idx === curI, isWord: false }); });
+        // lb nodes (y=1)
+        const lbOff = la.length;
+        lb.forEach((v, idx) => { nodes.push({ id: lbOff + idx, label: String(v), x: idx * 2, y: 1, parentId: idx > 0 ? lbOff + idx - 1 : null, hl: idx === curJ, isWord: false }); });
+        // result nodes (y=2): dummy "D" + values
+        const resOff = la.length + lb.length;
+        nodes.push({ id: resOff, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
+        res.forEach((v, idx) => {
+          const isCur = idx === res.length - 1;
+          nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
         });
+        const ann = {};
+        if (curI >= 0 && curI < la.length) ann[curI] = "l1";
+        if (curJ >= 0 && curJ < lb.length) ann[la.length + curJ] = "l2";
+        if (res.length > 0) ann[resOff + res.length] = "cur";
+        return { title, arr: [], tree: { nodes, annotations: ann }, highlight: [], mark: [], codeLines: codeLines || [], codeBlock: 2, vars: vars || [], note };
+      }
+
+      steps.push(treeSnap(
+        { vi: `Vòng ${round}: merge [${la.join(",")}] + [${lb.join(",")}]`, en: `Round ${round}: merge [${la.join(",")}] + [${lb.join(",")}]` },
+        { vi: `So sánh đầu mỗi list, lấy nhỏ hơn.`, en: `Compare heads, take the smaller.` },
+        0, 0,
+        [{ name: "l1", value: la.join("→") }, { name: "l2", value: lb.join("→") }],
+        [7, 8, 9, 10]
+      ));
+
+      // Merge step by step
+      while (i < la.length && j < lb.length) {
+        const takeL1 = la[i] <= lb[j];
+        if (takeL1) { res.push(la[i]); i++; } else { res.push(lb[j]); j++; }
+
+        steps.push(treeSnap(
+          { vi: `${res[res.length-1]} ← ${takeL1 ? "l1" : "l2"}`, en: `${res[res.length-1]} ← ${takeL1 ? "l1" : "l2"}` },
+          { vi: `${takeL1 ? `l1=${la[i-1]}≤l2=${lb[j]}` : `l2=${lb[j-1]}<l1=${la[i]}`} → lấy ${res[res.length-1]}.`, en: `${takeL1 ? `l1=${la[i-1]}≤l2=${lb[j]}` : `l2=${lb[j-1]}<l1=${la[i]}`} → take ${res[res.length-1]}.` },
+          i < la.length ? i : -1, j < lb.length ? j : -1,
+          [{ name: "took", value: `${res[res.length-1]} from ${takeL1?"l1":"l2"}` }, { name: "result", value: res.join("→") }],
+          takeL1 ? [17, 18, 19] : [20, 21, 22]
+        ));
       }
       // Append remaining
-      while (i < l1.length) res.push(l1[i++]);
-      while (j < l2.length) res.push(l2[j++]);
+      while (i < la.length) res.push(la[i++]);
+      while (j < lb.length) res.push(lb[j++]);
 
-      if (i > 0 || j > 0) {
-        const remaining = i < l1.length ? l1.slice(i) : l2.slice(j);
-        steps.push({
-          title: { vi: `Merge xong → [${res.join(",")}]`, en: `Merge done → [${res.join(",")}]` },
-          arr: res, sub: res.map(String),
-          highlight: [], mark: res.map((_, idx) => idx), codeLines: [24, 25], codeBlock: 2,
-          vars: [{ name: "merged result", value: `[${res.join(",")}]` }],
-          note: { vi: `Nối phần còn lại. Kết quả merge: [${res.join(",")}].`, en: `Append remainder. Merge result: [${res.join(",")}].` },
-        });
-      }
+      steps.push(treeSnap(
+        { vi: `Merge xong: [${res.join(",")}]`, en: `Merge done: [${res.join(",")}]` },
+        { vi: `Kết quả: ${res.join("→")}.`, en: `Result: ${res.join("→")}.` },
+        -1, -1,
+        [{ name: "merged", value: res.join("→") }],
+        [24, 25]
+      ));
 
       merged.push(res);
     }
@@ -1047,11 +1089,11 @@ function buildSteps23DC(input) {
 
   const result = current[0] || [];
   const fs = {
-    title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` },
+    title: { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
     arr: result, sub: result.map(String),
     highlight: [], mark: result.map((_, i) => i), final: true, codeLines: [11, 12], codeBlock: 2,
-    vars: [{ name: "answer", value: `[${result.join(",")}]` }, { name: "rounds", value: round }],
-    note: { vi: `Sau ${round} vòng gộp cặp, còn lại 1 list sorted: [${result.join(",")}].`, en: `After ${round} pairwise merge rounds, one sorted list remains: [${result.join(",")}].` },
+    vars: [{ name: "answer", value: result.join("→") }, { name: "rounds", value: round }],
+    note: { vi: `Sau ${round} vòng gộp cặp: ${result.join("→")}.`, en: `After ${round} pairwise merge rounds: ${result.join("→")}.` },
   };
   steps.push(fs);
   return { input, answer: `[${result.join(",")}]`, steps };

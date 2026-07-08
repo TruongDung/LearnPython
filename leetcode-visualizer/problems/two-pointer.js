@@ -1707,10 +1707,10 @@ function buildSteps2(input) {
       nodes.push({ id: resOffset + 1 + i, label: String(v), x: (i + 1) * 2, y: 2, parentId: resOffset + i, hl: false, isWord: isCur });
     });
 
-    // Annotations above nodes: "l1" on first l1 node, "l2" on first l2 node, "cur" on last result
+    // Annotations above nodes: "l1" on current l1 position, "l2" on current l2 position, "cur" on last result
     const annotations = {};
-    if (l1.length > 0) annotations[0] = "l1";
-    if (l2.length > 0) annotations[l2Offset] = "l2";
+    if (curPos >= 0 && curPos < l1.length) annotations[curPos] = "l1";
+    if (curPos >= 0 && curPos < l2.length) annotations[l2Offset + curPos] = "l2";
     if (result.length > 0) annotations[resOffset + result.length] = "cur";
 
     return {
@@ -1925,10 +1925,10 @@ function buildSteps21(input) {
       const isCur = idx === result.length - 1;
       nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
     });
-    // Annotations: "l1" above first l1 node, "l2" above first l2 node, "cur" above last result
+    // Annotations: "l1" on current l1 pointer, "l2" on current l2 pointer, "cur" on last result
     const annotations = {};
-    if (l1.length > 0) annotations[0] = "l1";
-    if (l2.length > 0) annotations[l2Off] = "l2";
+    if (curI >= 0 && curI < l1.length) annotations[curI] = "l1";
+    if (curJ >= 0 && curJ < l2.length) annotations[l2Off + curJ] = "l2";
     if (result.length > 0) annotations[resOff + result.length] = "cur";
     return { title, arr: [], tree: { nodes, annotations }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
   }
