@@ -631,6 +631,108 @@ function buildSteps3754(input) {
   return { original: rawN, answer, steps };
 }
 
+/**
+ * LeetCode 3756: Concatenate Non-Zero Digits and Multiply by Sum II.
+ *
+ * Given string s and queries [l, r]:
+ *   - Extract substring s[l..r].
+ *   - Form x by concatenating non-zero digits (in order). If none, x = 0.
+ *   - sum = digit sum of x.
+ *   - answer[i] = x * sum mod 10^9+7.
+ *
+ * Visualization: show the string with each query highlighting the substring,
+ * then stepping through forming x, computing sum, and the multiplication.
+ */
+function buildSteps3756(input, params) {
+  const s = String(input || "");
+  const MOD = 1_000_000_007;
+  const queriesRaw = String(params.queries || "").split(";").map((q) => q.trim()).filter(Boolean)
+    .map((q) => q.split(",").map(Number));
+  const steps = [];
+
+  // Show the string
+  const digits = s.split("");
+  steps.push({
+    title: { vi: "Chuỗi đầu vào", en: "Input string" },
+    arr: digits.map((d) => Number(d) || 0.5),
+    sub: digits,
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "s", value: s },
+      { name: "queries", value: queriesRaw.length },
+    ],
+    note: {
+      vi: `Chuỗi s = "${s}" (${s.length} ký tự). Có ${queriesRaw.length} truy vấn.`,
+      en: `String s = "${s}" (${s.length} chars). ${queriesRaw.length} queries.`,
+    },
+  });
+
+  const answers = [];
+  for (let qi = 0; qi < queriesRaw.length; qi++) {
+    const [l, r] = queriesRaw[qi];
+    const sub = s.slice(l, r + 1);
+    const nonZero = sub.split("").filter((c) => c !== "0").join("");
+    const x = nonZero.length > 0 ? BigInt(nonZero) : 0n;
+    const digitSum = nonZero.split("").reduce((acc, c) => acc + Number(c), 0);
+    const result = Number((x * BigInt(digitSum)) % BigInt(MOD));
+    answers.push(result);
+
+    // Highlight the substring range
+    const hlRange = Array.from({ length: r - l + 1 }, (_, k) => l + k);
+
+    steps.push({
+      title: { vi: `Query ${qi + 1}: [${l}, ${r}]`, en: `Query ${qi + 1}: [${l}, ${r}]` },
+      arr: digits.map((d) => Number(d) || 0.5),
+      sub: digits,
+      highlight: hlRange,
+      mark: [],
+      codeLines: [5, 6, 7, 8, 9],
+      vars: [
+        { name: "query", value: `[${l}, ${r}]` },
+        { name: "substring", value: `"${sub}"` },
+        { name: "non-zero digits", value: nonZero || "(none)" },
+        { name: "x", value: x.toString() },
+        { name: "digit sum of x", value: digitSum },
+        { name: "x × sum", value: `${x} × ${digitSum} = ${(x * BigInt(digitSum)).toString()}` },
+        { name: "answer (mod)", value: result },
+      ],
+      note: {
+        vi:
+          `s[${l}..${r}] = "${sub}". Chữ số khác 0: "${nonZero}" → x = ${x}. ` +
+          `sum = ${nonZero.split("").join("+")} = ${digitSum}. ` +
+          `x × sum = ${x} × ${digitSum} = ${(x * BigInt(digitSum)).toString()}` +
+          (x * BigInt(digitSum) >= BigInt(MOD) ? ` mod 10⁹+7 = ${result}.` : `.`),
+        en:
+          `s[${l}..${r}] = "${sub}". Non-zero digits: "${nonZero}" → x = ${x}. ` +
+          `sum = ${nonZero.split("").join("+")} = ${digitSum}. ` +
+          `x × sum = ${x} × ${digitSum} = ${(x * BigInt(digitSum)).toString()}` +
+          (x * BigInt(digitSum) >= BigInt(MOD) ? ` mod 10⁹+7 = ${result}.` : `.`),
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: digits.map((d) => Number(d) || 0.5),
+    sub: digits,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "answers", value: `[${answers.join(", ")}]` },
+    ],
+    note: {
+      vi: `Kết quả: [${answers.join(", ")}].`,
+      en: `Result: [${answers.join(", ")}].`,
+    },
+  });
+
+  return { original: s, answer: answers, steps };
+}
+
 module.exports = {
   50: {
     id: 50,
@@ -816,5 +918,63 @@ module.exports = {
       "        return s * rev",
     ],
     builder: buildSteps3754,
+  },
+  3756: {
+    id: 3756,
+    difficulty: "medium",
+    slug: "concatenate-non-zero-digits-and-multiply-by-sum-ii",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Concatenate Non-Zero Digits and Multiply by Sum II", en: "Concatenate Non-Zero Digits and Multiply by Sum II" },
+    titleVi: { vi: "Ghép chữ số khác 0 × tổng (nhiều truy vấn)", en: "Concat non-zero digits × sum (multiple queries)" },
+    statement: {
+      vi:
+        "Cho chuỗi s gồm chữ số và mảng queries. Mỗi query [l,r]: " +
+        "lấy substring s[l..r], ghép các chữ số khác 0 thành x, tính sum = tổng chữ số x, trả về x × sum mod 10^9+7.",
+      en:
+        "Given digit string s and queries [l,r]: " +
+        "extract substring s[l..r], concatenate non-zero digits into x, let sum = digit sum of x, return x × sum mod 10^9+7.",
+    },
+    defaultInput: "10203004",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi chữ số)", en: "s (digit string)" },
+    extraParams: [
+      { key: "queries", type: "string", label: { vi: "queries (l,r;l,r;...)", en: "queries (l,r;l,r;...)" }, default: "0,7;1,3;4,6" },
+    ],
+    complexity: {
+      time: "O(m + q·k)",
+      time: "O(n + q)",
+      space: "O(n)",
+      note: {
+        vi: "Xây prefix arrays O(n). Mỗi query O(1) bằng phép trừ prefix. Tổng O(n + q).",
+        en: "Build prefix arrays in O(n). Each query is O(1) via prefix subtraction. Total O(n + q).",
+      },
+    },
+    code: [
+      "MOD = 10**9 + 7",
+      "pow10 = [1] * 100001",
+      "for i in range(1, 100001):",
+      "    pow10[i] = pow10[i - 1] * 10 % MOD",
+      "",
+      "class Solution:",
+      "    def sumAndMultiply(self, s: str, queries: List[List[int]]) -> List[int]:",
+      "        n = len(s)",
+      "        sum = [0] * (n + 1)",
+      "        x = [0] * (n + 1)",
+      "        cnt = [0] * (n + 1)",
+      "        for i, c in enumerate(s):",
+      "            d = int(c)",
+      "            sum[i + 1] = sum[i] + d",
+      "            x[i + 1] = (x[i] * 10 + d) % MOD if d > 0 else x[i]",
+      "            cnt[i + 1] = cnt[i] + (d > 0)",
+      "        m = len(queries)",
+      "        res = [0] * m",
+      "        for i in range(m):",
+      "            l = queries[i][0]",
+      "            r = queries[i][1] + 1",
+      "            length = cnt[r] - cnt[l]",
+      "            res[i] = (x[r] - x[l] * pow10[length]) * (sum[r] - sum[l]) % MOD",
+      "        return res",
+    ],
+    builder: buildSteps3756,
   },
 };

@@ -230,6 +230,7 @@ function buildSteps83(input) {
 
   function snapshot(opts) {
     const currIdx = opts.currIdx != null ? opts.currIdx : -1;
+    const currNextIdx = opts.currNextIdx != null ? opts.currNextIdx : -1;
     const nodes = values.map((v, i) => ({ id: i, label: `${v}` }));
     const edges = [];
     // Build edges skipping removed nodes (curr.next = curr.next.next)
@@ -242,6 +243,7 @@ function buildSteps83(input) {
     // Annotations
     const annotations = {};
     if (currIdx >= 0) annotations[currIdx] = "curr";
+    if (currNextIdx >= 0 && currNextIdx !== currIdx) annotations[currNextIdx] = "curr.next";
     // Head always labeled
     if (!removed.has(0)) {
       annotations[0] = annotations[0] ? "head " + annotations[0] : "head";
@@ -296,6 +298,7 @@ function buildSteps83(input) {
       snapshot({
         title: { vi: `${values[curr]} == ${values[nextIdx]} → bỏ node ${nextIdx}`, en: `${values[curr]} == ${values[nextIdx]} → remove node ${nextIdx}` },
         currIdx: curr,
+        currNextIdx: nextIdx,
         codeLines: [5, 6],
         hlNodes: [curr, nextIdx],
         vars: [
@@ -343,6 +346,185 @@ function buildSteps83(input) {
     note: {
       vi: `Sau khi xóa ${removed.size} node trùng: [${result.join(" → ")}].`,
       en: `After removing ${removed.size} duplicate node(s): [${result.join(" → ")}].`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { original: values, answer: result, steps };
+}
+
+/**
+ * LeetCode 203: Remove Linked List Elements.
+ * Use a dummy node → prev/curr walk. When curr.val == val, skip it (prev.next = curr.next).
+ * Visualization: graph with annotations "prev", "curr", removed nodes greyed out.
+ */
+function buildSteps203(input, params) {
+  const values = String(input || "").split(",").map((s) => Number(s.trim()));
+  const val = params && Number.isFinite(Number(params.val)) ? Number(params.val) : 6;
+  const n = values.length;
+  const steps = [];
+  const removed = new Set();
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "List rỗng", en: "Empty list" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "List rỗng → trả về null.", en: "Empty list → return null." },
+    });
+    return { original: values, answer: [], steps };
+  }
+
+  function snapshot(opts) {
+    const prevIdx = opts.prevIdx != null ? opts.prevIdx : -1; // -1 = dummy
+    const currIdx = opts.currIdx != null ? opts.currIdx : -1;
+    // Include dummy node (id = -1 displayed as index 0, real nodes shifted +1)
+    // Actually simpler: prepend a "D" dummy node at id "d"
+    const nodes = [{ id: "d", label: "D" }, ...values.map((v, i) => ({ id: i, label: `${v}` }))];
+    // Build edges: dummy → first non-removed, then chain non-removed nodes
+    const edges = [];
+    let prev = "d";
+    for (let i = 0; i < n; i++) {
+      if (removed.has(i)) continue;
+      edges.push({ u: prev, v: i, w: "" });
+      prev = i;
+    }
+    // If all removed, dummy points nowhere (no edge)
+    // Annotations
+    const annotations = {};
+    // Always show prev (even when on dummy)
+    const prevKey = prevIdx === -1 ? "d" : prevIdx;
+    annotations[prevKey] = "prev";
+    // Show curr
+    if (currIdx >= 0) {
+      const currLabel = removed.has(currIdx) ? "curr ✗" : "curr";
+      if (currIdx === prevIdx) {
+        // same node: combine
+        annotations[currIdx] = "prev " + currLabel;
+      } else {
+        annotations[currIdx] = currLabel;
+      }
+    }
+    // Always label dummy
+    if (!annotations["d"]) annotations["d"] = "dummy";
+    else if (!String(annotations["d"]).includes("dummy")) annotations["d"] = "dummy " + annotations["d"];
+    // Show prev.next and curr.next as faded annotations
+    // Find next non-removed node after a given index
+    function nextAlive(from) {
+      for (let i = from + 1; i < n; i++) {
+        if (!removed.has(i)) return i;
+      }
+      return -1;
+    }
+    const prevNext = prevIdx === -1 ? (values.findIndex((_, i) => !removed.has(i))) : nextAlive(prevIdx);
+    const currNext = currIdx >= 0 ? nextAlive(currIdx) : -1;
+    if (prevNext >= 0 && !annotations[prevNext]) annotations[prevNext] = "prev.next";
+    if (currNext >= 0 && !annotations[currNext]) annotations[currNext] = "curr.next";
+    // If prev.next and curr.next are the same node, combine
+    if (prevNext >= 0 && currNext >= 0 && prevNext === currNext && annotations[prevNext] === "prev.next") {
+      annotations[prevNext] = "prev.next";
+    }
+
+    // Label head (first non-removed real node)
+    const headIdx = values.findIndex((_, i) => !removed.has(i));
+    if (headIdx >= 0 && !annotations[headIdx]) annotations[headIdx] = "head";
+    else if (headIdx >= 0 && annotations[headIdx] && !String(annotations[headIdx]).includes("head")) {
+      annotations[headIdx] = "head " + annotations[headIdx];
+    }
+
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes,
+        edges,
+        annotations,
+        hlNodes: opts.hlNodes || [],
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: [...removed],
+      },
+      highlight: [], mark: [], codeLines: opts.codeLines || [],
+      vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  // Init: dummy → head
+  snapshot({
+    title: { vi: "Khởi tạo dummy → prev = dummy, curr = head", en: "Init dummy → prev = dummy, curr = head" },
+    prevIdx: -1, currIdx: 0,
+    codeLines: [3, 4, 5],
+    hlNodes: [0],
+    vars: [
+      { name: "val to remove", value: val },
+      { name: "prev", value: "dummy" },
+      { name: "curr", value: `node 0 (val=${values[0]})` },
+    ],
+    note: {
+      vi: `Dùng dummy node trước head. prev = dummy, curr = head. Xóa mọi node có val = ${val}.`,
+      en: `Use a dummy node before head. prev = dummy, curr = head. Remove all nodes with val = ${val}.`,
+    },
+  });
+
+  // Walk
+  let prevIdx = -1; // -1 means dummy
+  let currIdx = 0;
+
+  while (currIdx < n) {
+    if (values[currIdx] === val) {
+      // Remove currIdx
+      removed.add(currIdx);
+      snapshot({
+        title: { vi: `curr.val=${values[currIdx]} == ${val} → xóa`, en: `curr.val=${values[currIdx]} == ${val} → remove` },
+        prevIdx, currIdx,
+        codeLines: [6, 7, 8],
+        hlNodes: [currIdx],
+        vars: [
+          { name: "prev", value: prevIdx >= 0 ? `node ${prevIdx} (val=${values[prevIdx]})` : "dummy" },
+          { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
+          { name: "action", value: "remove (prev.next = curr.next)" },
+        ],
+        note: {
+          vi: `curr.val (${values[currIdx]}) == val (${val}) → bỏ node ${currIdx}. prev.next nhảy qua node này.`,
+          en: `curr.val (${values[currIdx]}) == val (${val}) → remove node ${currIdx}. prev.next skips this node.`,
+        },
+      });
+    } else {
+      // Keep — advance prev
+      prevIdx = currIdx;
+      snapshot({
+        title: { vi: `curr.val=${values[currIdx]} ≠ ${val} → giữ`, en: `curr.val=${values[currIdx]} ≠ ${val} → keep` },
+        prevIdx, currIdx,
+        codeLines: [6, 9, 10],
+        hlNodes: [currIdx],
+        vars: [
+          { name: "prev", value: `node ${prevIdx} (val=${values[prevIdx]})` },
+          { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
+          { name: "action", value: "keep (prev = curr)" },
+        ],
+        note: {
+          vi: `curr.val (${values[currIdx]}) ≠ val (${val}) → giữ. Tiến prev = curr.`,
+          en: `curr.val (${values[currIdx]}) ≠ val (${val}) → keep it. Advance prev = curr.`,
+        },
+      });
+    }
+
+    // Advance curr to next non-processed node
+    currIdx++;
+  }
+
+  // Result
+  const result = values.filter((_, i) => !removed.has(i));
+  snapshot({
+    title: { vi: "Kết quả", en: "Result" },
+    prevIdx: -1, currIdx: -1,
+    codeLines: [12],
+    vars: [
+      { name: "result", value: `[${result.join(", ")}]` },
+      { name: "removed", value: removed.size },
+    ],
+    note: {
+      vi: `Xóa ${removed.size} node có val=${val}. List còn lại: [${result.join(" → ")}].`,
+      en: `Removed ${removed.size} node(s) with val=${val}. Remaining: [${result.join(" → ")}].`,
     },
   });
   steps[steps.length - 1].final = true;
@@ -427,5 +609,43 @@ module.exports = {
       "        return head",
     ],
     builder: buildSteps83,
+  },
+  203: {
+    id: 203,
+    difficulty: "easy",
+    slug: "remove-linked-list-elements",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Remove Linked List Elements", en: "Remove Linked List Elements" },
+    titleVi: { vi: "Xóa node có giá trị bằng val", en: "Remove all nodes with given value" },
+    statement: {
+      vi: "Cho head và val. Xóa tất cả node có val bằng giá trị cho trước. Trả về list mới.",
+      en: "Given head and val, remove all nodes whose value equals val. Return the new list.",
+    },
+    defaultInput: "1,2,6,3,4,5,6",
+    inputKind: "string",
+    inputLabel: { vi: "Giá trị node (phẩy ngăn)", en: "Node values (comma separated)" },
+    extraParams: [
+      { key: "val", label: { vi: "val (giá trị cần xóa)", en: "val (value to remove)" }, default: 6, allowNegative: true },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyệt 1 lần, xóa tại chỗ.", en: "Single traversal, in-place removal." },
+    },
+    code: [
+      "class Solution:",
+      "    def removeElements(self, head, val):",
+      "        dummy = ListNode(0, head)",
+      "        prev = dummy",
+      "        curr = head",
+      "        while curr:",
+      "            if curr.val == val:",
+      "                prev.next = curr.next",
+      "            else:",
+      "                prev = curr",
+      "            curr = curr.next",
+      "        return dummy.next",
+    ],
+    builder: buildSteps203,
   },
 };

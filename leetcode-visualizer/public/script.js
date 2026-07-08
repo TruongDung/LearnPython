@@ -1114,7 +1114,8 @@ function renderGraph(step) {
       if (ann === "slow+fast") color = "#ec4899"; // pink for both
       if (ann === "head") color = "#6366f1"; // indigo
       if (ann.startsWith("head ")) color = "#6366f1"; // head combined
-      const opacity = ann === "fast.next" ? "0.45" : "1";
+      const isFaded = ann.includes(".next");
+      const opacity = isFaded ? "0.45" : "1";
       nodeSvg += `<text x="${p.x}" y="${p.y - r - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}" opacity="${opacity}">${escapeXml(ann)}</text>`;
     }
     // Distance label below node (for Dijkstra etc.)
