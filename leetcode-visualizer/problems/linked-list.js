@@ -435,6 +435,7 @@ function buildSteps203(input, params) {
     codeLines: [3, 4, 5],
     hlNodes: [0],
     vars: [
+      { name: "dummy", value: `ListNode(0, head) → dummy.next = node 0` },
       { name: "val to remove", value: val },
       { name: "prev", value: "dummy" },
       { name: "curr", value: `node 0 (val=${values[0]})` },
@@ -461,11 +462,11 @@ function buildSteps203(input, params) {
         vars: [
           { name: "prev", value: prevIdx >= 0 ? `node ${prevIdx} (val=${values[prevIdx]})` : "dummy" },
           { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
-          { name: "action", value: "remove (prev.next = curr.next)" },
+          { name: "action", value: "remove → skip node" },
         ],
         note: {
-          vi: `curr.val (${values[currIdx]}) == val (${val}) → bỏ node ${currIdx}. prev.next nhảy qua node này.`,
-          en: `curr.val (${values[currIdx]}) == val (${val}) → remove node ${currIdx}. prev.next skips this node.`,
+          vi: `curr.val (${values[currIdx]}) == val (${val}) → bỏ node ${currIdx}. Nhảy qua node này.`,
+          en: `curr.val (${values[currIdx]}) == val (${val}) → remove node ${currIdx}. Skip this node.`,
         },
       });
     } else {
