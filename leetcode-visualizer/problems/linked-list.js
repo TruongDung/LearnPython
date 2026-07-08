@@ -451,45 +451,62 @@ function buildSteps203(input, params) {
   let currIdx = 0;
 
   while (currIdx < n) {
+    // Step A: show curr arriving at this node (prev stays where it was)
+    snapshot({
+      title: { vi: `curr = curr.next → node ${currIdx}`, en: `curr = curr.next → node ${currIdx}` },
+      prevIdx, currIdx,
+      codeLines: [11],
+      hlNodes: [currIdx],
+      vars: [
+        { name: "prev", value: prevIdx >= 0 ? `node ${prevIdx} (val=${values[prevIdx]})` : "dummy" },
+        { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
+      ],
+      note: {
+        vi: `curr tiến đến node ${currIdx} (val=${values[currIdx]}). Kiểm tra: curr.val == val (${val})?`,
+        en: `curr advances to node ${currIdx} (val=${values[currIdx]}). Check: curr.val == val (${val})?`,
+      },
+    });
+
+    // Step B: decide based on value
     if (values[currIdx] === val) {
       // Remove currIdx
       removed.add(currIdx);
       snapshot({
-        title: { vi: `curr.val=${values[currIdx]} == ${val} → xóa`, en: `curr.val=${values[currIdx]} == ${val} → remove` },
+        title: { vi: `${values[currIdx]} == ${val} → xóa node ${currIdx}`, en: `${values[currIdx]} == ${val} → remove node ${currIdx}` },
         prevIdx, currIdx,
         codeLines: [6, 7, 8],
         hlNodes: [currIdx],
         vars: [
           { name: "prev", value: prevIdx >= 0 ? `node ${prevIdx} (val=${values[prevIdx]})` : "dummy" },
-          { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
+          { name: "curr", value: `node ${currIdx} (val=${values[currIdx]}) ✗ removed` },
           { name: "action", value: "remove → skip node" },
         ],
         note: {
-          vi: `curr.val (${values[currIdx]}) == val (${val}) → bỏ node ${currIdx}. Nhảy qua node này.`,
-          en: `curr.val (${values[currIdx]}) == val (${val}) → remove node ${currIdx}. Skip this node.`,
+          vi: `curr.val == ${val} → xóa. prev giữ nguyên, chỉ nhảy qua node ${currIdx}.`,
+          en: `curr.val == ${val} → remove. prev stays, just skip node ${currIdx}.`,
         },
       });
     } else {
-      // Keep — advance prev
+      // Keep — show prev moving to curr (separate from curr advance)
+      const oldPrev = prevIdx;
       prevIdx = currIdx;
       snapshot({
-        title: { vi: `curr.val=${values[currIdx]} ≠ ${val} → giữ`, en: `curr.val=${values[currIdx]} ≠ ${val} → keep` },
+        title: { vi: `${values[currIdx]} ≠ ${val} → giữ. prev = curr`, en: `${values[currIdx]} ≠ ${val} → keep. prev = curr` },
         prevIdx, currIdx,
         codeLines: [6, 9, 10],
         hlNodes: [currIdx],
         vars: [
-          { name: "prev", value: `node ${prevIdx} (val=${values[prevIdx]})` },
-          { name: "curr", value: `node ${currIdx} (val=${values[currIdx]})` },
-          { name: "action", value: "keep (prev = curr)" },
+          { name: "prev (was)", value: oldPrev >= 0 ? `node ${oldPrev} (val=${values[oldPrev]})` : "dummy" },
+          { name: "prev = curr", value: `node ${currIdx} (val=${values[currIdx]})` },
+          { name: "action", value: "keep → prev = curr" },
         ],
         note: {
-          vi: `curr.val (${values[currIdx]}) ≠ val (${val}) → giữ. Tiến prev = curr.`,
-          en: `curr.val (${values[currIdx]}) ≠ val (${val}) → keep it. Advance prev = curr.`,
+          vi: `curr.val ≠ ${val} → giữ. prev dời: ${oldPrev >= 0 ? `node ${oldPrev}` : "dummy"} → node ${currIdx}.`,
+          en: `curr.val ≠ ${val} → keep. prev moves: ${oldPrev >= 0 ? `node ${oldPrev}` : "dummy"} → node ${currIdx}.`,
         },
       });
     }
 
-    // Advance curr to next non-processed node
     currIdx++;
   }
 
@@ -497,7 +514,7 @@ function buildSteps203(input, params) {
   const result = values.filter((_, i) => !removed.has(i));
   snapshot({
     title: { vi: "Kết quả", en: "Result" },
-    prevIdx: -1, currIdx: -1,
+    prevIdx: prevIdx, currIdx: -1,
     codeLines: [12],
     vars: [
       { name: "result", value: `[${result.join(", ")}]` },
