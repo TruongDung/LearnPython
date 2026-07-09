@@ -323,27 +323,31 @@ function buildSteps121Greedy(nums) {
   let maxProfit = 0;
   let buyDay = 0, sellDay = 0;
 
-  // Intro
+  // Intro line 2: min_price = inf
   steps.push({
-    title: { vi: "Ý tưởng: tìm ngày mua rẻ nhất, bán đắt nhất SAU đó", en: "Idea: find cheapest buy day, most expensive sell day AFTER it" },
+    title: { vi: "Khởi tạo min_price = ∞", en: "Initialize min_price = ∞" },
     arr: [...prices],
     sub: prices.map((_, i) => `day ${i}`),
     highlight: [], mark: [],
-    codeLines: [2, 3, 4],
-    vars: [{ name: "prices", value: `[${prices.join(",")}]` }, { name: "min_price", value: "∞" }, { name: "max_profit", value: 0 }],
+    codeLines: [3],
+    vars: [{ name: "prices", value: `[${prices.join(",")}]` }, { name: "min_price", value: "∞" }],
     note: {
-      vi:
-        `📈 Giá cổ phiếu: [${prices.join(", ")}].\n` +
-        `💡 Duyệt 1 lần, track:\n` +
-        `  • min_price = giá MUA thấp nhất tới hiện tại\n` +
-        `  • max_profit = lợi nhuận TỐI ĐA = max(price - min_price)\n\n` +
-        `Mỗi ngày: "nếu bán hôm nay, lời bao nhiêu?" → so với max_profit.`,
-      en:
-        `📈 Stock prices: [${prices.join(", ")}].\n` +
-        `💡 Single pass, track:\n` +
-        `  • min_price = lowest BUY price so far\n` +
-        `  • max_profit = MAXIMUM profit = max(price - min_price)\n\n` +
-        `Each day: "if I sell today, what's my profit?" → compare with max_profit.`,
+      vi: `📈 Giá cổ phiếu: [${prices.join(", ")}]. Khởi tạo min_price = ∞ (giá mua thấp nhất).`,
+      en: `📈 Stock prices: [${prices.join(", ")}]. Initialize min_price = ∞ (lowest buy price).`,
+    },
+  });
+
+  // Intro line 3: max_profit = 0
+  steps.push({
+    title: { vi: "Khởi tạo max_profit = 0", en: "Initialize max_profit = 0" },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [], mark: [],
+    codeLines: [4],
+    vars: [{ name: "min_price", value: "∞" }, { name: "max_profit", value: 0 }],
+    note: {
+      vi: `max_profit = 0 (lợi nhuận tối đa ban đầu).`,
+      en: `max_profit = 0 (initial maximum profit).`,
     },
   });
 
@@ -351,60 +355,122 @@ function buildSteps121Greedy(nums) {
     const price = prices[i];
     const oldMin = minPrice;
     const oldProfit = maxProfit;
-    let action = "";
+
+    // Step: for price in prices (line 5)
+    steps.push({
+      title: { vi: `Vòng lặp: price = prices[${i}] = ${price}`, en: `Loop: price = prices[${i}] = ${price}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => idx === buyDay && minPrice !== Infinity ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
+      highlight: [i],
+      mark: maxProfit > 0 ? [buyDay, sellDay] : (minPrice !== Infinity ? [buyDay] : []),
+      codeLines: [5],
+      vars: [
+        { name: "price", value: price },
+        { name: "min_price", value: oldMin === Infinity ? "∞" : oldMin },
+        { name: "max_profit", value: oldProfit },
+      ],
+      note: {
+        vi: `Xét ngày ${i}: price = ${price}.`,
+        en: `Consider day ${i}: price = ${price}.`,
+      },
+    });
 
     if (price < minPrice) {
+      // Step: if price < min_price (line 6) → True
+      steps.push({
+        title: { vi: `${price} < ${oldMin === Infinity ? "∞" : oldMin}? ✓ → cập nhật min_price`, en: `${price} < ${oldMin === Infinity ? "∞" : oldMin}? ✓ → update min_price` },
+        arr: [...prices],
+        sub: prices.map((_, idx) => idx === i ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
+        highlight: [i],
+        mark: [i],
+        codeLines: [6],
+        vars: [
+          { name: "price", value: price },
+          { name: `price < min_price?`, value: `${price} < ${oldMin === Infinity ? "∞" : oldMin} → True` },
+        ],
+        note: {
+          vi: `price ${price} < min_price ${oldMin === Infinity ? "∞" : oldMin} → điều kiện ĐÚNG.`,
+          en: `price ${price} < min_price ${oldMin === Infinity ? "∞" : oldMin} → condition TRUE.`,
+        },
+      });
+
       minPrice = price;
       buyDay = i;
-      action = "new min";
+
+      // Step: min_price = price (line 7)
+      steps.push({
+        title: { vi: `min_price = ${price} 📉`, en: `min_price = ${price} 📉` },
+        arr: [...prices],
+        sub: prices.map((_, idx) => idx === buyDay ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
+        highlight: [i],
+        mark: [buyDay],
+        codeLines: [7],
+        vars: [
+          { name: "min_price", value: `${oldMin === Infinity ? "∞" : oldMin} → ${minPrice}` },
+          { name: "max_profit", value: maxProfit },
+        ],
+        note: {
+          vi: `Cập nhật min_price = ${price}. Ngày mua tiềm năng mới!`,
+          en: `Update min_price = ${price}. New potential buy day!`,
+        },
+      });
     } else {
+      // Step: if price < min_price (line 6) → False → else
       const profit = price - minPrice;
+
+      steps.push({
+        title: { vi: `${price} < ${minPrice}? ✗ → else`, en: `${price} < ${minPrice}? ✗ → else` },
+        arr: [...prices],
+        sub: prices.map((_, idx) => idx === buyDay ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
+        highlight: [i],
+        mark: maxProfit > 0 ? [buyDay, sellDay] : [buyDay],
+        codeLines: [8],
+        vars: [
+          { name: "price", value: price },
+          { name: `price < min_price?`, value: `${price} < ${minPrice} → False` },
+        ],
+        note: {
+          vi: `price ${price} ≥ min_price ${minPrice} → vào nhánh else: tính profit.`,
+          en: `price ${price} ≥ min_price ${minPrice} → enter else branch: compute profit.`,
+        },
+      });
+
+      // Step: max_profit = max(max_profit, price - min_price) (line 9)
       if (profit > maxProfit) {
         maxProfit = profit;
         sellDay = i;
-        action = "new max profit";
-      } else {
-        action = "no change";
       }
-    }
 
-    const profit = price - minPrice;
-    steps.push({
-      title: { vi: `Day ${i}: price=${price}${action === "new min" ? " 📉 min mới!" : action === "new max profit" ? " 📈 profit mới!" : ""}`, en: `Day ${i}: price=${price}${action === "new min" ? " 📉 new min!" : action === "new max profit" ? " 📈 new max profit!" : ""}` },
-      arr: [...prices],
-      sub: prices.map((_, idx) => idx === buyDay ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
-      highlight: [i],
-      mark: maxProfit > 0 ? [buyDay, sellDay] : [buyDay],
-      codeLines: action === "new min" ? [7] : [9],
-      vars: [
-        { name: "day", value: i },
-        { name: "price", value: price },
-        { name: "min_price", value: `${oldMin === Infinity ? "∞" : oldMin}${action === "new min" ? ` → ${minPrice} 📉` : ` = ${minPrice}`}` },
-        { name: "profit today", value: `${price} - ${minPrice} = ${profit}` },
-        { name: "max_profit", value: `${oldProfit}${action === "new max profit" ? ` → ${maxProfit} 📈` : ` (unchanged)`}` },
-      ],
-      note: {
-        vi: action === "new min"
-          ? `price ${price} < min_price ${oldMin === Infinity ? "∞" : oldMin} → cập nhật min_price = ${price}. Đây là ngày mua tiềm năng mới!`
-          : action === "new max profit"
-            ? `Nếu bán hôm nay: profit = ${price} - ${minPrice} = ${profit} > max_profit ${oldProfit} → cập nhật max_profit = ${maxProfit}! 🎉`
-            : `profit = ${price} - ${minPrice} = ${profit} ≤ max_profit ${maxProfit} → giữ nguyên.`,
-        en: action === "new min"
-          ? `price ${price} < min_price ${oldMin === Infinity ? "∞" : oldMin} → update min_price = ${price}. New potential buy day!`
-          : action === "new max profit"
-            ? `If sell today: profit = ${price} - ${minPrice} = ${profit} > max_profit ${oldProfit} → update max_profit = ${maxProfit}! 🎉`
-            : `profit = ${price} - ${minPrice} = ${profit} ≤ max_profit ${maxProfit} → no change.`,
-      },
-    });
+      steps.push({
+        title: { vi: `max_profit = max(${oldProfit}, ${price}-${minPrice}) = max(${oldProfit}, ${profit}) = ${maxProfit}`, en: `max_profit = max(${oldProfit}, ${price}-${minPrice}) = max(${oldProfit}, ${profit}) = ${maxProfit}` },
+        arr: [...prices],
+        sub: prices.map((_, idx) => idx === buyDay ? "📉buy" : idx === sellDay && maxProfit > 0 ? "📈sell" : `day ${idx}`),
+        highlight: [i],
+        mark: maxProfit > 0 ? [buyDay, sellDay] : [buyDay],
+        codeLines: [9],
+        vars: [
+          { name: "price - min_price", value: `${price} - ${minPrice} = ${profit}` },
+          { name: "max_profit", value: `max(${oldProfit}, ${profit}) = ${maxProfit}${profit > oldProfit ? " 📈" : ""}` },
+        ],
+        note: {
+          vi: profit > oldProfit
+            ? `profit = ${profit} > max_profit cũ ${oldProfit} → cập nhật max_profit = ${maxProfit}! 🎉`
+            : `profit = ${profit} ≤ max_profit ${maxProfit} → giữ nguyên.`,
+          en: profit > oldProfit
+            ? `profit = ${profit} > old max_profit ${oldProfit} → update max_profit = ${maxProfit}! 🎉`
+            : `profit = ${profit} ≤ max_profit ${maxProfit} → no change.`,
+        },
+      });
+    }
   }
 
-  // Final
-  const fs = {
-    title: { vi: `Kết quả: max profit = ${maxProfit} 💰`, en: `Result: max profit = ${maxProfit} 💰` },
+  // Final: return max_profit (line 10)
+  steps.push({
+    title: { vi: `Kết quả: max_profit = ${maxProfit} 💰`, en: `Result: max_profit = ${maxProfit} 💰` },
     arr: [...prices],
     sub: prices.map((_, idx) => idx === buyDay ? "📉BUY" : idx === sellDay && maxProfit > 0 ? "📈SELL" : `day ${idx}`),
     highlight: [], mark: maxProfit > 0 ? [buyDay, sellDay] : [],
-    final: true, codeLines: [9],
+    final: true, codeLines: [10],
     vars: [
       { name: "max_profit", value: maxProfit },
       { name: "buy day", value: maxProfit > 0 ? `day ${buyDay} (price ${prices[buyDay]})` : "n/a" },
@@ -412,14 +478,13 @@ function buildSteps121Greedy(nums) {
     ],
     note: {
       vi: maxProfit > 0
-        ? `💰 Mua ngày ${buyDay} (giá ${prices[buyDay]}), bán ngày ${sellDay} (giá ${prices[sellDay]}). Lợi nhuận = ${prices[sellDay]} - ${prices[buyDay]} = ${maxProfit}.`
-        : `Giá giảm liên tục → không có ngày bán lời → profit = 0.`,
+        ? `💰 Mua ngày ${buyDay} (giá ${prices[buyDay]}), bán ngày ${sellDay} (giá ${prices[sellDay]}). Lợi nhuận = ${maxProfit}.`
+        : `Giá giảm liên tục → profit = 0.`,
       en: maxProfit > 0
-        ? `💰 Buy day ${buyDay} (price ${prices[buyDay]}), sell day ${sellDay} (price ${prices[sellDay]}). Profit = ${prices[sellDay]} - ${prices[buyDay]} = ${maxProfit}.`
-        : `Prices only decrease → no profitable trade → profit = 0.`,
+        ? `💰 Buy day ${buyDay} (price ${prices[buyDay]}), sell day ${sellDay} (price ${prices[sellDay]}). Profit = ${maxProfit}.`
+        : `Prices only decrease → profit = 0.`,
     },
-  };
-  steps.push(fs);
+  });
   return { original: [...prices], answer: maxProfit, steps };
 }
 
@@ -431,54 +496,110 @@ function buildSteps121DP(nums) {
   const dp = new Array(n).fill(0);
   let minPrice = prices[0];
 
+  // Line 3: dp = [0] * n
   steps.push({
-    title: { vi: "DP Array: dp[i] = max profit tới ngày i", en: "DP Array: dp[i] = max profit up to day i" },
+    title: { vi: "Khởi tạo dp = [0] * n", en: "Initialize dp = [0] * n" },
     arr: [...prices], sub: dp.map(String),
-    highlight: [0], mark: [], codeLines: [3, 4, 5], codeBlock: 2,
-    vars: [{ name: "prices", value: `[${prices.join(",")}]` }, { name: "min_price", value: prices[0] }, { name: "dp[0]", value: 0 }],
+    highlight: [], mark: [], codeLines: [3], codeBlock: 2,
+    vars: [{ name: "n", value: n }, { name: "dp", value: `[${dp.join(",")}]` }],
     note: {
-      vi: `dp[i] = max profit nếu bán vào hoặc trước ngày i.\ndp[0] = 0 (ngày đầu không bán được).\nmin_price = ${prices[0]} (giá mua thấp nhất tới hiện tại).`,
-      en: `dp[i] = max profit selling on or before day i.\ndp[0] = 0 (can't sell on first day).\nmin_price = ${prices[0]} (lowest buy price so far).`,
+      vi: `dp[i] = max profit nếu bán vào hoặc trước ngày i. Khởi tạo tất cả = 0.`,
+      en: `dp[i] = max profit selling on or before day i. Initialize all to 0.`,
+    },
+  });
+
+  // Line 4: dp[0] = 0 (implicit)
+  steps.push({
+    title: { vi: "dp[0] = 0 (ngày đầu không bán được)", en: "dp[0] = 0 (can't sell on first day)" },
+    arr: [...prices], sub: dp.map(String),
+    highlight: [0], mark: [], codeLines: [4], codeBlock: 2,
+    vars: [{ name: "dp[0]", value: 0 }],
+    note: {
+      vi: `dp[0] = 0 vì ngày đầu tiên không thể bán (chưa mua).`,
+      en: `dp[0] = 0 since you can't sell on the first day (haven't bought yet).`,
+    },
+  });
+
+  // Line 5: min_price = prices[0]
+  steps.push({
+    title: { vi: `min_price = prices[0] = ${prices[0]}`, en: `min_price = prices[0] = ${prices[0]}` },
+    arr: [...prices], sub: dp.map(String),
+    highlight: [0], mark: [], codeLines: [5], codeBlock: 2,
+    vars: [{ name: "min_price", value: prices[0] }, { name: "dp", value: `[${dp.join(",")}]` }],
+    note: {
+      vi: `min_price = ${prices[0]} (giá mua thấp nhất tới hiện tại).`,
+      en: `min_price = ${prices[0]} (lowest buy price so far).`,
     },
   });
 
   for (let i = 1; i < n; i++) {
     const skipProfit = dp[i - 1];
     const sellProfit = prices[i] - minPrice;
-    dp[i] = Math.max(skipProfit, sellProfit);
-    const sold = dp[i] === sellProfit && sellProfit > skipProfit;
 
+    // Line 6: for i in range(1, n)
     steps.push({
-      title: { vi: `dp[${i}]: max(dp[${i-1}], price-min) = max(${skipProfit}, ${sellProfit}) = ${dp[i]}`, en: `dp[${i}]: max(dp[${i-1}], price-min) = max(${skipProfit}, ${sellProfit}) = ${dp[i]}` },
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
       arr: [...prices], sub: dp.map((v, idx) => idx <= i ? String(v) : "·"),
-      highlight: [i], mark: [], codeLines: [7], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
       vars: [
         { name: "i", value: i },
         { name: "prices[i]", value: prices[i] },
         { name: "min_price", value: minPrice },
-        { name: "① keep (dp[i-1])", value: skipProfit },
-        { name: "② sell (price-min)", value: `${prices[i]}-${minPrice} = ${sellProfit}` },
+        { name: "dp[i-1]", value: skipProfit },
+        { name: "dp", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `Xét ngày i=${i}: prices[${i}]=${prices[i]}, min_price=${minPrice}.`,
+        en: `Consider day i=${i}: prices[${i}]=${prices[i]}, min_price=${minPrice}.`,
+      },
+    });
+
+    // Line 7: dp[i] = max(dp[i-1], prices[i] - min_price)
+    dp[i] = Math.max(skipProfit, sellProfit);
+    const sold = dp[i] === sellProfit && sellProfit > skipProfit;
+
+    steps.push({
+      title: { vi: `dp[${i}] = max(${skipProfit}, ${sellProfit}) = ${dp[i]}${sold ? " 📈" : ""}`, en: `dp[${i}] = max(${skipProfit}, ${sellProfit}) = ${dp[i]}${sold ? " 📈" : ""}` },
+      arr: [...prices], sub: dp.map((v, idx) => idx <= i ? String(v) : "·"),
+      highlight: [i], mark: [i], codeLines: [7], codeBlock: 2,
+      vars: [
+        { name: "dp[i-1] (keep)", value: skipProfit },
+        { name: "prices[i]-min_price (sell)", value: `${prices[i]}-${minPrice} = ${sellProfit}` },
         { name: "dp[i] = max(①,②)", value: `max(${skipProfit}, ${sellProfit}) = ${dp[i]}` },
         { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi: `① Giữ profit cũ: dp[${i-1}] = ${skipProfit}\n② Bán hôm nay: ${prices[i]} - ${minPrice} = ${sellProfit}\n→ dp[${i}] = max(${skipProfit}, ${sellProfit}) = ${dp[i]}${sold ? " 📈" : ""}`,
-        en: `① Keep old profit: dp[${i-1}] = ${skipProfit}\n② Sell today: ${prices[i]} - ${minPrice} = ${sellProfit}\n→ dp[${i}] = max(${skipProfit}, ${sellProfit}) = ${dp[i]}${sold ? " 📈" : ""}`,
+        vi: `dp[${i}] = max(dp[${i-1}]=${skipProfit}, ${prices[i]}-${minPrice}=${sellProfit}) = ${dp[i]}${sold ? " 📈 profit mới!" : ""}`,
+        en: `dp[${i}] = max(dp[${i-1}]=${skipProfit}, ${prices[i]}-${minPrice}=${sellProfit}) = ${dp[i]}${sold ? " 📈 new max!" : ""}`,
       },
     });
 
+    // Line 8: min_price = min(min_price, prices[i])
+    const oldMin = minPrice;
     minPrice = Math.min(minPrice, prices[i]);
+    steps.push({
+      title: { vi: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}`, en: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}` },
+      arr: [...prices], sub: dp.map((v, idx) => idx <= i ? String(v) : "·"),
+      highlight: [i], mark: [], codeLines: [8], codeBlock: 2,
+      vars: [
+        { name: "min_price", value: `min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " 📉" : ""}` },
+        { name: "dp", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `Cập nhật min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " (giá mua mới!)" : ""}.`,
+        en: `Update min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " (new buy price!)" : ""}.`,
+      },
+    });
   }
 
   const answer = dp[n - 1];
-  const fs = {
+  steps.push({
     title: { vi: `Kết quả: dp[${n-1}] = ${answer} 💰`, en: `Result: dp[${n-1}] = ${answer} 💰` },
     arr: [...prices], sub: dp.map(String),
     highlight: [], mark: [n - 1], final: true, codeLines: [9], codeBlock: 2,
     vars: [{ name: "answer", value: answer }, { name: "dp", value: `[${dp.join(",")}]` }],
     note: { vi: `Max profit = dp[${n-1}] = ${answer}.`, en: `Max profit = dp[${n-1}] = ${answer}.` },
-  };
-  steps.push(fs);
+  });
   return { original: [...prices], answer, steps };
 }
 
@@ -490,51 +611,319 @@ function buildSteps121Rolling(nums) {
   let minPrice = prices[0];
   let prevDp = 0;
 
+  // Line 3: min_price = prices[0]
   steps.push({
-    title: { vi: "DP Rolling O(1): prev_dp thay cho dp[]", en: "DP Rolling O(1): prev_dp replaces dp[]" },
+    title: { vi: `min_price = prices[0] = ${prices[0]}`, en: `min_price = prices[0] = ${prices[0]}` },
     arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
-    highlight: [0], mark: [], codeLines: [3, 4], codeBlock: 2,
+    highlight: [0], mark: [], codeLines: [3], codeBlock: 2,
+    vars: [{ name: "min_price", value: prices[0] }],
+    note: {
+      vi: `O(1) space: chỉ dùng prev_dp thay cho dp[]. Khởi tạo min_price = ${prices[0]}.`,
+      en: `O(1) space: use prev_dp instead of dp[]. Initialize min_price = ${prices[0]}.`,
+    },
+  });
+
+  // Line 4: prev_dp = 0
+  steps.push({
+    title: { vi: "prev_dp = 0", en: "prev_dp = 0" },
+    arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
+    highlight: [0], mark: [], codeLines: [4], codeBlock: 2,
     vars: [{ name: "min_price", value: prices[0] }, { name: "prev_dp", value: 0 }],
     note: {
-      vi: `Giống DP Array nhưng dp[i] chỉ phụ thuộc dp[i-1] → không cần mảng!\nChỉ giữ 1 biến prev_dp = dp[i-1].\ncur_dp = max(prev_dp, price - min_price)\nSau đó: prev_dp = cur_dp, min_price = min(min_price, price).`,
-      en: `Same as DP Array but dp[i] only depends on dp[i-1] → no array needed!\nJust keep prev_dp = dp[i-1].\ncur_dp = max(prev_dp, price - min_price)\nThen: prev_dp = cur_dp, min_price = min(min_price, price).`,
+      vi: `prev_dp = 0 (dp[0] = 0, ngày đầu không bán được).`,
+      en: `prev_dp = 0 (dp[0] = 0, can't sell on first day).`,
     },
   });
 
   for (let i = 1; i < n; i++) {
-    const curDp = Math.max(prevDp, prices[i] - minPrice);
     const sellProfit = prices[i] - minPrice;
 
+    // Line 5: for i in range(1, n)
     steps.push({
-      title: { vi: `Day ${i}: cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}`, en: `Day ${i}: cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}` },
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
       arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
-      highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [5], codeBlock: 2,
       vars: [
         { name: "i", value: i },
-        { name: "price", value: prices[i] },
+        { name: "prices[i]", value: prices[i] },
         { name: "min_price", value: minPrice },
         { name: "prev_dp", value: prevDp },
-        { name: "cur_dp = max(prev_dp, price-min)", value: `max(${prevDp}, ${prices[i]}-${minPrice}) = max(${prevDp}, ${sellProfit}) = ${curDp}` },
       ],
       note: {
-        vi: `cur_dp = max(prev_dp=${prevDp}, price-min=${sellProfit}) = ${curDp}.\nSau: prev_dp ← ${curDp}, min_price ← min(${minPrice}, ${prices[i]}) = ${Math.min(minPrice, prices[i])}.`,
-        en: `cur_dp = max(prev_dp=${prevDp}, price-min=${sellProfit}) = ${curDp}.\nThen: prev_dp ← ${curDp}, min_price ← min(${minPrice}, ${prices[i]}) = ${Math.min(minPrice, prices[i])}.`,
+        vi: `Xét ngày i=${i}: prices[${i}]=${prices[i]}.`,
+        en: `Consider day i=${i}: prices[${i}]=${prices[i]}.`,
       },
     });
 
-    minPrice = Math.min(minPrice, prices[i]);
+    // Line 6: cur_dp = max(prev_dp, prices[i] - min_price)
+    const curDp = Math.max(prevDp, sellProfit);
+    steps.push({
+      title: { vi: `cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}`, en: `cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}` },
+      arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
+      highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
+      vars: [
+        { name: "cur_dp = max(prev_dp, price-min)", value: `max(${prevDp}, ${prices[i]}-${minPrice}) = max(${prevDp}, ${sellProfit}) = ${curDp}` },
+      ],
+      note: {
+        vi: `cur_dp = max(prev_dp=${prevDp}, price-min=${sellProfit}) = ${curDp}.`,
+        en: `cur_dp = max(prev_dp=${prevDp}, price-min=${sellProfit}) = ${curDp}.`,
+      },
+    });
+
+    // Line 7: prev_dp = cur_dp
     prevDp = curDp;
+    steps.push({
+      title: { vi: `prev_dp = ${prevDp}`, en: `prev_dp = ${prevDp}` },
+      arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
+      highlight: [i], mark: [], codeLines: [7], codeBlock: 2,
+      vars: [{ name: "prev_dp", value: prevDp }],
+      note: {
+        vi: `Gán prev_dp = cur_dp = ${prevDp}.`,
+        en: `Set prev_dp = cur_dp = ${prevDp}.`,
+      },
+    });
+
+    // Line 8: min_price = min(min_price, prices[i])
+    const oldMin = minPrice;
+    minPrice = Math.min(minPrice, prices[i]);
+    steps.push({
+      title: { vi: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}`, en: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}` },
+      arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
+      highlight: [i], mark: [], codeLines: [8], codeBlock: 2,
+      vars: [{ name: "min_price", value: `min(${oldMin}, ${prices[i]}) = ${minPrice}` }],
+      note: {
+        vi: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " 📉" : ""}.`,
+        en: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " 📉" : ""}.`,
+      },
+    });
   }
 
-  const fs = {
+  steps.push({
     title: { vi: `Kết quả: ${prevDp} 💰 (O(1) space!)`, en: `Result: ${prevDp} 💰 (O(1) space!)` },
     arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
     highlight: [], mark: [], final: true, codeLines: [9], codeBlock: 2,
     vars: [{ name: "answer", value: prevDp }],
-    note: { vi: `prev_dp = ${prevDp}. Cùng kết quả với DP Array nhưng O(1) bộ nhớ!`, en: `prev_dp = ${prevDp}. Same result as DP Array but O(1) memory!` },
-  };
-  steps.push(fs);
+    note: { vi: `prev_dp = ${prevDp}. O(1) bộ nhớ!`, en: `prev_dp = ${prevDp}. O(1) memory!` },
+  });
   return { original: [...prices], answer: prevDp, steps };
+}
+
+// ─── 122: Best Time to Buy and Sell Stock II ───
+function buildSteps122(nums, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps122DP(nums);
+  return buildSteps122Greedy(nums);
+}
+
+function buildSteps122Greedy(nums) {
+  const prices = nums;
+  const n = prices.length;
+  const steps = [];
+  let profit = 0;
+
+  // Line 3: profit = 0
+  steps.push({
+    title: { vi: "Khởi tạo profit = 0", en: "Initialize profit = 0" },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "prices", value: `[${prices.join(",")}]` }, { name: "profit", value: 0 }],
+    note: {
+      vi: `💡 Greedy: cộng mọi đoạn tăng liên tiếp.\nNếu prices[i] > prices[i-1] → profit += chênh lệch.\nĐây tương đương mua-bán mỗi ngày lời.`,
+      en: `💡 Greedy: collect every consecutive gain.\nIf prices[i] > prices[i-1] → profit += difference.\nThis equals buying/selling on every profitable day.`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const diff = prices[i] - prices[i - 1];
+
+    // Line 4: for i in range(1, n)
+    steps.push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i - 1, i],
+      mark: [],
+      codeLines: [4],
+      vars: [
+        { name: "i", value: i },
+        { name: "prices[i]", value: prices[i] },
+        { name: "prices[i-1]", value: prices[i - 1] },
+        { name: "profit", value: profit },
+      ],
+      note: {
+        vi: `So sánh prices[${i}]=${prices[i]} với prices[${i-1}]=${prices[i-1]}.`,
+        en: `Compare prices[${i}]=${prices[i]} with prices[${i-1}]=${prices[i-1]}.`,
+      },
+    });
+
+    // Line 5: if prices[i] > prices[i-1]
+    const gained = diff > 0;
+    steps.push({
+      title: { vi: `${prices[i]} > ${prices[i-1]}? ${gained ? "✓" : "✗"}`, en: `${prices[i]} > ${prices[i-1]}? ${gained ? "✓" : "✗"}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i - 1, i],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: `prices[${i}] > prices[${i-1}]?`, value: `${prices[i]} > ${prices[i-1]} → ${gained}` },
+      ],
+      note: {
+        vi: gained
+          ? `${prices[i]} > ${prices[i-1]} → giá TĂNG! Có lời → sẽ cộng vào profit.`
+          : `${prices[i]} ≤ ${prices[i-1]} → giá GIẢM hoặc bằng. Không lời → bỏ qua.`,
+        en: gained
+          ? `${prices[i]} > ${prices[i-1]} → price UP! Profitable → will add to profit.`
+          : `${prices[i]} ≤ ${prices[i-1]} → price DOWN or equal. No profit → skip.`,
+      },
+    });
+
+    // Line 6: profit += prices[i] - prices[i-1] (only if gained)
+    if (gained) {
+      profit += diff;
+      steps.push({
+        title: { vi: `profit += ${diff} → profit = ${profit} 📈`, en: `profit += ${diff} → profit = ${profit} 📈` },
+        arr: [...prices],
+        sub: prices.map((_, idx) => `day ${idx}`),
+        highlight: [i - 1, i],
+        mark: [i],
+        codeLines: [6],
+        vars: [
+          { name: `profit += ${prices[i]}-${prices[i-1]}`, value: `+= ${diff} → profit = ${profit}` },
+        ],
+        note: {
+          vi: `Cộng chênh lệch: profit += ${prices[i]} - ${prices[i-1]} = ${diff}. Tổng profit = ${profit}.`,
+          en: `Add gain: profit += ${prices[i]} - ${prices[i-1]} = ${diff}. Total profit = ${profit}.`,
+        },
+      });
+    }
+  }
+
+  // Line 7: return profit
+  steps.push({
+    title: { vi: `Kết quả: profit = ${profit} 💰`, en: `Result: profit = ${profit} 💰` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [], mark: [],
+    final: true, codeLines: [7],
+    vars: [{ name: "profit", value: profit }],
+    note: {
+      vi: `💰 Tổng lợi nhuận = ${profit}. Cộng tất cả đoạn giá tăng liên tiếp.`,
+      en: `💰 Total profit = ${profit}. Sum of all consecutive price gains.`,
+    },
+  });
+  return { original: [...prices], answer: profit, steps };
+}
+
+function buildSteps122DP(nums) {
+  const prices = nums;
+  const n = prices.length;
+  const steps = [];
+  let hold = -prices[0];
+  let cash = 0;
+
+  // Line 5: hold = -prices[0]
+  steps.push({
+    title: { vi: `hold = -prices[0] = ${hold}`, en: `hold = -prices[0] = ${hold}` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [0], mark: [],
+    codeLines: [5], codeBlock: 2,
+    vars: [{ name: "hold", value: hold }, { name: "cash", value: "chưa gán" }],
+    note: {
+      vi: `hold = profit tối đa khi ĐANG GIỮ stock. Mua ngày 0 → hold = -${prices[0]}.`,
+      en: `hold = max profit while HOLDING stock. Buy day 0 → hold = -${prices[0]}.`,
+    },
+  });
+
+  // Line 6: cash = 0
+  steps.push({
+    title: { vi: "cash = 0", en: "cash = 0" },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [0], mark: [],
+    codeLines: [6], codeBlock: 2,
+    vars: [{ name: "hold", value: hold }, { name: "cash", value: 0 }],
+    note: {
+      vi: `cash = profit tối đa khi KHÔNG GIỮ stock. Ban đầu = 0 (chưa giao dịch).`,
+      en: `cash = max profit while NOT HOLDING stock. Initially = 0 (no transaction yet).`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const oldHold = hold;
+    const oldCash = cash;
+
+    // Line 7: for i in range(1, n)
+    steps.push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i], mark: [],
+      codeLines: [7], codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "prices[i]", value: prices[i] },
+        { name: "hold", value: hold },
+        { name: "cash", value: cash },
+      ],
+      note: {
+        vi: `Xét ngày ${i}: prices[${i}]=${prices[i]}.`,
+        en: `Consider day ${i}: prices[${i}]=${prices[i]}.`,
+      },
+    });
+
+    // Line 8: hold = max(hold, cash - prices[i])
+    hold = Math.max(oldHold, oldCash - prices[i]);
+    steps.push({
+      title: { vi: `hold = max(${oldHold}, ${oldCash}-${prices[i]}) = ${hold}`, en: `hold = max(${oldHold}, ${oldCash}-${prices[i]}) = ${hold}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i], mark: [],
+      codeLines: [8], codeBlock: 2,
+      vars: [
+        { name: "hold = max(keep, buy)", value: `max(${oldHold}, ${oldCash}-${prices[i]}) = max(${oldHold}, ${oldCash - prices[i]}) = ${hold}` },
+      ],
+      note: {
+        vi: `hold = max(giữ nguyên=${oldHold}, mua hôm nay=cash-price=${oldCash}-${prices[i]}=${oldCash-prices[i]}) = ${hold}.`,
+        en: `hold = max(keep=${oldHold}, buy today=cash-price=${oldCash}-${prices[i]}=${oldCash-prices[i]}) = ${hold}.`,
+      },
+    });
+
+    // Line 9: cash = max(cash, hold + prices[i])
+    cash = Math.max(oldCash, hold + prices[i]);
+    steps.push({
+      title: { vi: `cash = max(${oldCash}, ${hold}+${prices[i]}) = ${cash}`, en: `cash = max(${oldCash}, ${hold}+${prices[i]}) = ${cash}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i], mark: [],
+      codeLines: [9], codeBlock: 2,
+      vars: [
+        { name: "cash = max(keep, sell)", value: `max(${oldCash}, ${hold}+${prices[i]}) = max(${oldCash}, ${hold+prices[i]}) = ${cash}` },
+      ],
+      note: {
+        vi: `cash = max(giữ nguyên=${oldCash}, bán hôm nay=hold+price=${hold}+${prices[i]}=${hold+prices[i]}) = ${cash}.`,
+        en: `cash = max(keep=${oldCash}, sell today=hold+price=${hold}+${prices[i]}=${hold+prices[i]}) = ${cash}.`,
+      },
+    });
+  }
+
+  // Line 10: return cash
+  steps.push({
+    title: { vi: `Kết quả: cash = ${cash} 💰`, en: `Result: cash = ${cash} 💰` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [], mark: [],
+    final: true, codeLines: [10], codeBlock: 2,
+    vars: [{ name: "cash", value: cash }, { name: "hold", value: hold }],
+    note: {
+      vi: `💰 Max profit = cash = ${cash}. Trạng thái cuối: không giữ stock.`,
+      en: `💰 Max profit = cash = ${cash}. Final state: not holding any stock.`,
+    },
+  });
+  return { original: [...prices], answer: cash, steps };
 }
 
 module.exports = {
@@ -684,5 +1073,51 @@ module.exports = {
     codeLabel: { vi: "Cách 1: Greedy O(1)", en: "Approach 1: Greedy O(1)" },
     code2Label: { vi: "Cách 2: DP Array O(n)", en: "Approach 2: DP Array O(n)" },
     builder: buildSteps121,
+  },
+  122: {
+    id: 122,
+    difficulty: "medium",
+    slug: "best-time-to-buy-and-sell-stock-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Best Time to Buy and Sell Stock II", en: "Best Time to Buy and Sell Stock II" },
+    titleVi: { vi: "Mua bán cổ phiếu (nhiều lần)", en: "Buy and sell stock multiple times" },
+    statement: {
+      vi: "Cho mảng prices[i] = giá cổ phiếu ngày i. Được phép MUA BÁN NHIỀU LẦN (nhưng chỉ giữ tối đa 1 cổ phiếu cùng lúc). Tìm lợi nhuận TỐI ĐA.",
+      en: "Given prices[i] = stock price on day i. You may BUY and SELL MULTIPLE times (hold at most 1 share at a time). Find MAXIMUM profit.",
+    },
+    defaultInput: [7, 1, 5, 3, 6, 4],
+    inputKind: "integer",
+    inputLabel: { vi: "Giá cổ phiếu (dấu phẩy)", en: "Stock prices (comma-separated)" },
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Greedy (cộng mọi đoạn tăng)", en: "Approach 1: Greedy (collect every gain)" } },
+        { value: "2", label: { vi: "Cách 2: DP (hold/not-hold)", en: "Approach 2: DP (hold/not-hold)" } },
+      ] },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Cả 2 cách đều O(n) time, O(1) space.", en: "Both approaches are O(n) time, O(1) space." } },
+    code: [
+      "class Solution:",
+      "    def maxProfit(self, prices):",
+      "        profit = 0",
+      "        for i in range(1, len(prices)):",
+      "            if prices[i] > prices[i-1]:",
+      "                profit += prices[i] - prices[i-1]",
+      "        return profit",
+    ],
+    code2: [
+      "class Solution:",
+      "    def maxProfit(self, prices):",
+      "        # hold = max profit khi ĐANG giữ stock",
+      "        # cash = max profit khi KHÔNG giữ stock",
+      "        hold = -prices[0]",
+      "        cash = 0",
+      "        for i in range(1, len(prices)):",
+      "            hold = max(hold, cash - prices[i])",
+      "            cash = max(cash, hold + prices[i])",
+      "        return cash",
+    ],
+    codeLabel: { vi: "Cách 1: Greedy", en: "Approach 1: Greedy" },
+    code2Label: { vi: "Cách 2: DP hold/cash", en: "Approach 2: DP hold/cash" },
+    builder: buildSteps122,
   },
 };

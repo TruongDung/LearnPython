@@ -674,35 +674,73 @@ function buildSteps509(input, params) {
     arr: [...dp],
     highlight: n >= 1 ? [0, 1] : [0],
     mark: [],
-    codeLines: n >= 1 ? [3, 4, 5] : [3],
+    codeLines: [3],
     vars: [
       { name: "n", value: n },
-      { name: "dp", value: [...dp] },
+      { name: "dp[0]", value: 0 },
+      { name: "dp", value: `[${dp.join(",")}]` },
     ],
     note: {
-      vi: `Approach 1: DP array. n = ${n}. F(0) = 0 và F(1) = 1 là hai giá trị cơ sở.`,
-      en: `Approach 1: DP array. n = ${n}. F(0) = 0 and F(1) = 1 are the base cases.`,
+      vi: `Approach 1: DP array. n = ${n}. Khởi tạo dp = [0] * (n+1).`,
+      en: `Approach 1: DP array. n = ${n}. Initialize dp = [0] * (n+1).`,
     },
   });
 
-  for (let i = 2; i <= n; i++) {
-    dp[i] = dp[i - 1] + dp[i - 2];
+  if (n >= 1) {
     steps.push({
-      title: { vi: `Tính F(${i})`, en: `Compute F(${i})` },
+      title: { vi: "Base case: dp[1] = 1", en: "Base case: dp[1] = 1" },
       arr: [...dp],
-      highlight: [i - 2, i - 1, i],
+      highlight: [0, 1],
       mark: [],
-      codeLines: [6, 7],
+      codeLines: [5],
       vars: [
-        { name: "i", value: i },
-        { name: "F(i-1)", value: dp[i - 1] },
-        { name: "F(i-2)", value: dp[i - 2] },
-        { name: "F(i) = F(i-1)+F(i-2)", value: `${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
-        { name: "dp", value: [...dp] },
+        { name: "dp[0]", value: 0 },
+        { name: "dp[1]", value: 1 },
+        { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
-        en: `F(${i}) = F(${i - 1}) + F(${i - 2}) = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
+        vi: `F(0) = 0, F(1) = 1 là hai giá trị cơ sở.`,
+        en: `F(0) = 0, F(1) = 1 are the two base cases.`,
+      },
+    });
+  }
+
+  for (let i = 2; i <= n; i++) {
+    // Step: for i → enter loop
+    steps.push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      arr: [...dp],
+      highlight: [i],
+      mark: [],
+      codeLines: [6],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i-1]", value: dp[i - 1] },
+        { name: "dp[i-2]", value: dp[i - 2] },
+        { name: "dp", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `Bắt đầu tính F(${i}). Cần F(${i-1})=${dp[i-1]} và F(${i-2})=${dp[i-2]}.`,
+        en: `Start computing F(${i}). Need F(${i-1})=${dp[i-1]} and F(${i-2})=${dp[i-2]}.`,
+      },
+    });
+
+    // Step: dp[i] = dp[i-1] + dp[i-2]
+    dp[i] = dp[i - 1] + dp[i - 2];
+    steps.push({
+      title: { vi: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}`, en: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
+      arr: [...dp],
+      highlight: [i - 2, i - 1, i],
+      mark: [i],
+      codeLines: [7],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i] = dp[i-1]+dp[i-2]", value: `${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
+        { name: "dp", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `F(${i}) = F(${i-1}) + F(${i-2}) = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}.`,
+        en: `F(${i}) = F(${i-1}) + F(${i-2}) = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}.`,
       },
     });
   }
@@ -714,7 +752,7 @@ function buildSteps509(input, params) {
     mark: [n],
     final: true,
     codeLines: [8],
-    vars: [{ name: "answer", value: dp[n] }],
+    vars: [{ name: "answer", value: dp[n] }, { name: "dp", value: `[${dp.join(",")}]` }],
     note: {
       vi: `F(${n}) = ${dp[n]}.`,
       en: `F(${n}) = ${dp[n]}.`,
