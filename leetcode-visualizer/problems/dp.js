@@ -1086,28 +1086,59 @@ function buildSteps198(nums, params) {
   const dp = new Array(n).fill(0);
   const steps = [];
 
+  // Step 0: Explain the DP idea for beginners
+  steps.push({
+    title: { vi: "Ý tưởng: tại mỗi nhà có 2 lựa chọn", en: "Idea: at each house you have 2 choices" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `nhà ${i}`),
+    highlight: [], mark: [],
+    codeLines: [2, 3],
+    vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "rule", value: "không cướp 2 nhà liền kề" }],
+    note: {
+      vi:
+        `🏠 Bạn là tên trộm. Dãy nhà: [${nums.join(", ")}] (tiền mỗi nhà).\n` +
+        `⚠️ Luật: KHÔNG ĐƯỢC cướp 2 nhà LIỀN KỀ (hệ thống báo động).\n\n` +
+        `💡 Ý tưởng DP:\n` +
+        `dp[i] = tiền TỐI ĐA cướp được tính đến nhà i.\n` +
+        `Tại nhà i, có 2 lựa chọn:\n` +
+        `  ① BỎ QUA nhà i → dp[i] = dp[i-1] (giữ nguyên tiền cũ)\n` +
+        `  ② CƯỚP nhà i → dp[i] = dp[i-2] + nums[i] (tiền trước đó 2 nhà + nhà này)\n` +
+        `dp[i] = max(①, ②)`,
+      en:
+        `🏠 You are a robber. Houses: [${nums.join(", ")}] (money in each).\n` +
+        `⚠️ Rule: CANNOT rob 2 ADJACENT houses (alarm system).\n\n` +
+        `💡 DP Idea:\n` +
+        `dp[i] = MAXIMUM money robbed up to house i.\n` +
+        `At house i, 2 choices:\n` +
+        `  ① SKIP house i → dp[i] = dp[i-1] (keep previous best)\n` +
+        `  ② ROB house i → dp[i] = dp[i-2] + nums[i] (best before prev + this house)\n` +
+        `dp[i] = max(①, ②)`,
+    },
+  });
+
+  // Base cases
   dp[0] = nums[0];
   if (n >= 2) dp[1] = Math.max(nums[0], nums[1]);
 
   steps.push({
-    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    title: { vi: "Base case: dp[0] và dp[1]", en: "Base cases: dp[0] and dp[1]" },
     arr: [...nums],
-    sub: [...dp],
+    sub: dp.map((v) => v || "·"),
     highlight: n >= 2 ? [0, 1] : [0],
     mark: [],
-    codeLines: [3, 4, 5],
+    codeLines: [4, 5, 6, 7],
     vars: [
-      { name: "n", value: n },
-      { name: "dp[0]", value: dp[0] },
-      { name: "dp[1]", value: n >= 2 ? dp[1] : "-" },
-      { name: "dp", value: [...dp] },
+      { name: "dp[0]", value: `nums[0] = ${dp[0]} (chỉ có 1 nhà → cướp nó)` },
+      { name: "dp[1]", value: n >= 2 ? `max(nums[0], nums[1]) = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` : "-" },
+      { name: "dp", value: `[${dp.join(",")}]` },
     ],
     note: {
-      vi: `nums = [${nums.join(", ")}]. dp[0] = ${dp[0]} (cướp nhà 0). ${n >= 2 ? `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}.` : ""}`,
-      en: `nums = [${nums.join(", ")}]. dp[0] = ${dp[0]} (rob house 0). ${n >= 2 ? `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}.` : ""}`,
+      vi: `dp[0] = ${nums[0]} (chỉ 1 nhà → cướp thôi).\ndp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]} (chọn nhà lớn hơn trong 2 nhà đầu).`,
+      en: `dp[0] = ${nums[0]} (only 1 house → rob it).\ndp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]} (pick the richer of the first 2).`,
     },
   });
 
+  // Fill DP
   for (let i = 2; i < n; i++) {
     const skip = dp[i - 1];
     const rob = dp[i - 2] + nums[i];
@@ -1115,57 +1146,63 @@ function buildSteps198(nums, params) {
     const robbed = dp[i] === rob;
 
     steps.push({
-      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      title: { vi: `Nhà ${i} (${nums[i]}$): ${robbed ? "CƯỚP 💰" : "bỏ qua ✗"}`, en: `House ${i} ($${nums[i]}): ${robbed ? "ROB 💰" : "skip ✗"}` },
       arr: [...nums],
-      sub: [...dp],
-      highlight: [i - 2, i - 1, i],
-      mark: [],
-      codeLines: [6, 7],
+      sub: dp.map((v, idx) => idx <= i ? (idx === i ? (robbed ? `💰${v}` : `✗ ${v}`) : String(v)) : "·"),
+      highlight: [i],
+      mark: robbed ? [i - 2, i] : [i - 1],
+      codeLines: [8, 9],
       vars: [
         { name: "i", value: i },
-        { name: "skip (dp[i-1])", value: skip },
-        { name: "rob (dp[i-2]+nums[i])", value: rob },
-        { name: "dp[i]", value: dp[i] },
-        { name: "decision", value: robbed ? "rob" : "skip" },
-        { name: "dp", value: [...dp] },
+        { name: "nums[i]", value: `${nums[i]}$` },
+        { name: "① BỎ (dp[i-1])", value: skip },
+        { name: "② CƯỚP (dp[i-2]+nums[i])", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
+        { name: "dp[i] = max(①,②)", value: `max(${skip}, ${rob}) = ${dp[i]}` },
+        { name: "quyết định", value: robbed ? `CƯỚP nhà ${i} 💰` : `BỎ QUA nhà ${i}` },
+        { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi: `Bỏ nhà ${i}: dp[${i - 1}] = ${skip}. Cướp nhà ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
-        en: `Skip house ${i}: dp[${i - 1}] = ${skip}. Rob house ${i}: dp[${i - 2}] + ${nums[i]} = ${rob}. → dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} (${robbed ? "rob" : "skip"}).`,
+        vi:
+          `Nhà ${i}: ${nums[i]}$.\n` +
+          `① Bỏ qua → giữ dp[${i-1}] = ${skip}\n` +
+          `② Cướp → dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}\n` +
+          `→ dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? `CƯỚP! 💰` : `bỏ qua (giữ tiền cũ tốt hơn)`}`,
+        en:
+          `House ${i}: $${nums[i]}.\n` +
+          `① Skip → keep dp[${i-1}] = ${skip}\n` +
+          `② Rob → dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}\n` +
+          `→ dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? `ROB! 💰` : `skip (keeping old loot is better)`}`,
       },
     });
   }
 
-  // Trace back which houses were robbed.
-  const robbed = [];
-  let i = n - 1;
-  while (i >= 0) {
-    if (i === 0 || dp[i] !== dp[i - 1]) {
-      robbed.push(i);
-      i -= 2;
-    } else {
-      i -= 1;
-    }
+  // Trace back
+  const robbedHouses = [];
+  let idx = n - 1;
+  while (idx >= 0) {
+    if (idx === 0 || dp[idx] !== dp[idx - 1]) { robbedHouses.push(idx); idx -= 2; }
+    else { idx -= 1; }
   }
-  robbed.reverse();
+  robbedHouses.reverse();
+  const robbedSet = new Set(robbedHouses);
 
   const answer = dp[n - 1];
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
+    title: { vi: `Kết quả: ${answer}$ 💰`, en: `Result: $${answer} 💰` },
     arr: [...nums],
-    sub: [...dp],
+    sub: dp.map((v, i) => robbedSet.has(i) ? `💰${v}` : `✗ ${v}`),
     highlight: [],
-    mark: robbed,
+    mark: robbedHouses,
     final: true,
-    codeLines: [8],
+    codeLines: [10],
     vars: [
-      { name: "answer", value: answer },
-      { name: "robbed houses", value: robbed },
-      { name: "dp", value: [...dp] },
+      { name: "answer", value: `${answer}$` },
+      { name: "nhà đã cướp", value: `[${robbedHouses.join(",")}] = [${robbedHouses.map((j) => nums[j]).join("+")}] = ${answer}` },
+      { name: "dp", value: `[${dp.join(",")}]` },
     ],
     note: {
-      vi: `Tiền lớn nhất = dp[${n - 1}] = ${answer}. Cướp các nhà [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
-      en: `Maximum loot = dp[${n - 1}] = ${answer}. Rob houses [${robbed.join(", ")}] = [${robbed.map((j) => nums[j]).join(", ")}].`,
+      vi: `🎉 Tối đa = ${answer}$. Cướp các nhà [${robbedHouses.join(", ")}] (giá trị ${robbedHouses.map((j) => nums[j]).join(" + ")} = ${answer}).\n💰 = đã cướp, ✗ = bỏ qua.`,
+      en: `🎉 Maximum = $${answer}. Rob houses [${robbedHouses.join(", ")}] (values ${robbedHouses.map((j) => nums[j]).join(" + ")} = ${answer}).\n💰 = robbed, ✗ = skipped.`,
     },
   });
 
@@ -5466,18 +5503,15 @@ module.exports = {
     code: [
       "class Solution:",
       "    def rob(self, nums):",
-      "        if len(nums) == 0:",
-      "            return 0",
-      "        if len(nums) == 1:",
+      "        n = len(nums)",
+      "        if n == 1:",
       "            return nums[0]",
-      "        if len(nums) == 2:",
-      "            return max(nums[0], nums[1])",
       "        dp = [0] * len(nums)",
       "        dp[0] = nums[0]",
       "        dp[1] = max(nums[0], nums[1])",
       "        for i in range(2, len(nums)):",
       "            dp[i] = max(dp[i-1], dp[i-2] + nums[i])",
-      "        return dp[-1]",
+      "        return dp[n-1]",
     ],
     code2: [
       "# Optimized O(1) space",
