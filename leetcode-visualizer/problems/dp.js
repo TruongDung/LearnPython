@@ -2727,6 +2727,9 @@ function buildSteps132(input) {
  */
 function buildSteps91(input) {
   const s = typeof input === "string" ? input : String(input);
+  const params = arguments[1] || {};
+  const approach = Number(params.approach) || 1;
+  if (approach === 2) return buildSteps91B(s);
   const n = s.length;
   const steps = [];
   const dp = new Array(n + 1).fill(0);
@@ -2813,6 +2816,74 @@ function buildSteps91(input) {
   });
 
   return { original: s, answer: dp[n], steps };
+}
+
+// ─── 91 Approach 2: O(1) space rolling variables ───
+function buildSteps91B(s) {
+  const n = s.length;
+  const steps = [];
+  if (s[0] === "0") {
+    steps.push({ title: { vi: "s[0]='0' → 0", en: "s[0]='0' → 0" }, arr: [0], sub: [s[0]], highlight: [], mark: [], final: true, codeLines: [3, 4], codeBlock: 2, vars: [{ name: "answer", value: 0 }], note: { vi: "Bắt đầu bằng '0' → không decode được.", en: "Starts with '0' → cannot decode." } });
+    return { original: s, answer: 0, steps };
+  }
+
+  let prev2 = 1, prev1 = 1;
+  const sArr = s.split("");
+
+  steps.push({
+    title: { vi: "O(1) space: chỉ dùng prev2, prev1", en: "O(1) space: only prev2, prev1" },
+    arr: sArr.map(() => 0), sub: sArr,
+    highlight: [0], mark: [], codeLines: [3, 4, 5, 6], codeBlock: 2,
+    vars: [{ name: "s", value: `"${s}"` }, { name: "prev2 (dp[i-2])", value: prev2 }, { name: "prev1 (dp[i-1])", value: prev1 }],
+    note: {
+      vi: `Không cần mảng dp[]. Chỉ cần 2 biến:\n  prev2 = dp[i-2] = 1\n  prev1 = dp[i-1] = 1\nMỗi bước tính cur, rồi roll: prev2=prev1, prev1=cur.`,
+      en: `No dp[] array needed. Just 2 variables:\n  prev2 = dp[i-2] = 1\n  prev1 = dp[i-1] = 1\nEach step compute cur, then roll: prev2=prev1, prev1=cur.`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    let cur = 0;
+    const oneDigit = s[i];
+    const oneChar = oneDigit !== "0" ? String.fromCharCode(64 + parseInt(oneDigit)) : "✗";
+    const twoDigit = s.slice(i - 1, i + 1);
+    const twoVal = parseInt(twoDigit, 10);
+    const twoChar = twoVal >= 10 && twoVal <= 26 ? String.fromCharCode(64 + twoVal) : "✗";
+
+    const addSingle = oneDigit !== "0";
+    const addDouble = twoVal >= 10 && twoVal <= 26;
+    if (addSingle) cur += prev1;
+    if (addDouble) cur += prev2;
+
+    steps.push({
+      title: { vi: `i=${i}: cur=${cur}`, en: `i=${i}: cur=${cur}` },
+      arr: sArr.map((_, idx) => idx <= i ? 1 : 0), sub: sArr,
+      highlight: [i], mark: [], codeLines: [7, 8, 9, 10, 11], codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: `① '${oneDigit}'→${oneChar}`, value: addSingle ? `+prev1=${prev1} ✓` : "✗" },
+        { name: `② '${twoDigit}'→${twoChar}`, value: addDouble ? `+prev2=${prev2} ✓` : "✗" },
+        { name: "cur", value: cur },
+        { name: "roll", value: `prev2=${prev1}, prev1=${cur}` },
+      ],
+      note: {
+        vi: `cur = ${addSingle ? `prev1(${prev1})` : "0"}${addDouble ? ` + prev2(${prev2})` : ""} = ${cur}.\nRoll: prev2 ← ${prev1}, prev1 ← ${cur}.`,
+        en: `cur = ${addSingle ? `prev1(${prev1})` : "0"}${addDouble ? ` + prev2(${prev2})` : ""} = ${cur}.\nRoll: prev2 ← ${prev1}, prev1 ← ${cur}.`,
+      },
+    });
+
+    prev2 = prev1;
+    prev1 = cur;
+  }
+
+  const fs = {
+    title: { vi: `Kết quả: ${prev1} cách`, en: `Result: ${prev1} ways` },
+    arr: sArr.map(() => 1), sub: sArr,
+    highlight: [], mark: sArr.map((_, i) => i), final: true, codeLines: [12], codeBlock: 2,
+    vars: [{ name: "answer", value: prev1 }],
+    note: { vi: `🎉 "${s}" có ${prev1} cách decode. O(1) space!`, en: `🎉 "${s}" has ${prev1} decode ways. O(1) space!` },
+  };
+  steps.push(fs);
+  return { original: s, answer: prev1, steps };
 }
 
 /**
@@ -4980,13 +5051,18 @@ module.exports = {
     defaultInput: "226",
     inputKind: "string",
     inputLabel: { vi: "s (chuỗi chữ số)", en: "s (digit string)" },
-    extraParams: [],
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: DP Array O(n)", en: "Approach 1: DP Array O(n)" } },
+        { value: "2", label: { vi: "Cách 2: Rolling O(1) space", en: "Approach 2: Rolling O(1) space" } },
+      ] },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Duyệt chuỗi 1 lần, mỗi vị trí kiểm tra 1-2 chữ số → O(n). Bảng dp O(n).",
-        en: "Single pass, check 1-2 digits each position → O(n). DP table O(n).",
+        vi: "Cách 1: O(n) space (mảng dp). Cách 2: O(1) space (2 biến prev2, prev1).",
+        en: "Approach 1: O(n) space (dp array). Approach 2: O(1) space (2 rolling vars).",
       },
     },
     code: [
@@ -5002,6 +5078,23 @@ module.exports = {
       "                dp[i] += dp[i-2]",
       "        return dp[n]",
     ],
+    code2: [
+      "class Solution:",
+      "    def numDecodings(self, s):",
+      "        if s[0] == '0': return 0",
+      "        prev2, prev1 = 1, 1",
+      "        for i in range(1, len(s)):",
+      "            cur = 0",
+      "            if s[i] != '0':",
+      "                cur += prev1",
+      "            two = int(s[i-1:i+1])",
+      "            if 10 <= two <= 26:",
+      "                cur += prev2",
+      "            prev2, prev1 = prev1, cur",
+      "        return prev1",
+    ],
+    codeLabel: { vi: "Cách 1: DP Array O(n)", en: "Approach 1: DP Array O(n)" },
+    code2Label: { vi: "Cách 2: Rolling O(1) space", en: "Approach 2: Rolling O(1) space" },
     builder: buildSteps91,
   },
   132: {
