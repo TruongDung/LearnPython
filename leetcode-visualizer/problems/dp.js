@@ -318,7 +318,7 @@ function buildSteps70(input, params) {
         { name: "i", value: i },
         { name: "dp[i-1]", value: dp[i - 1] },
         { name: "dp[i-2]", value: dp[i - 2] },
-        { name: "dp[i]", value: dp[i] },
+        { name: "dp[i] = dp[i-1]+dp[i-2]", value: `${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
       ],
       note: {
         vi: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${dp[i - 1]} + ${dp[i - 2]} = ${dp[i]}.`,
@@ -697,7 +697,7 @@ function buildSteps509(input, params) {
         { name: "i", value: i },
         { name: "F(i-1)", value: dp[i - 1] },
         { name: "F(i-2)", value: dp[i - 2] },
-        { name: "F(i)", value: dp[i] },
+        { name: "F(i) = F(i-1)+F(i-2)", value: `${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
         { name: "dp", value: [...dp] },
       ],
       note: {
