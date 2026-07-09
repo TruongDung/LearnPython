@@ -844,6 +844,188 @@ function buildSteps509Optimized(n) {
 }
 
 /**
+ * Generate steps for LeetCode 1137: N-th Tribonacci Number.
+ *
+ *  - T(0) = 0, T(1) = 1, T(2) = 1.
+ *  - T(n) = T(n-1) + T(n-2) + T(n-3).
+ */
+function buildSteps1137(input, params) {
+  const n = input[0];
+  const approach = (params && params.approach) || 1;
+  if (approach === 2) return buildSteps1137Rolling(n);
+
+  const dp = new Array(Math.max(n + 1, 3)).fill(0);
+  dp[1] = 1;
+  dp[2] = 1;
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    arr: dp.slice(0, Math.max(n + 1, 3)),
+    highlight: [0, 1, 2],
+    mark: [],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "T(0)", value: 0 },
+      { name: "T(1)", value: 1 },
+      { name: "T(2)", value: 1 },
+      { name: "dp", value: dp.slice(0, Math.max(n + 1, 3)).toString() },
+    ],
+    note: {
+      vi: `Tribonacci: T(0)=0, T(1)=1, T(2)=1. Với n ≥ 3: T(n) = T(n-1) + T(n-2) + T(n-3).\nn = ${n}.`,
+      en: `Tribonacci: T(0)=0, T(1)=1, T(2)=1. For n ≥ 3: T(n) = T(n-1) + T(n-2) + T(n-3).\nn = ${n}.`,
+    },
+  });
+
+  for (let i = 3; i <= n; i++) {
+    dp[i] = dp[i - 1] + dp[i - 2] + dp[i - 3];
+    steps.push({
+      title: { vi: `Tính T(${i})`, en: `Compute T(${i})` },
+      arr: dp.slice(0, n + 1),
+      highlight: [i - 3, i - 2, i - 1, i],
+      mark: [],
+      codeLines: [6, 7],
+      vars: [
+        { name: "i", value: i },
+        { name: "T(i-1)", value: dp[i - 1] },
+        { name: "T(i-2)", value: dp[i - 2] },
+        { name: "T(i-3)", value: dp[i - 3] },
+        { name: "T(i) = T(i-1)+T(i-2)+T(i-3)", value: `${dp[i-1]} + ${dp[i-2]} + ${dp[i-3]} = ${dp[i]}` },
+        { name: "dp", value: dp.slice(0, n + 1).toString() },
+      ],
+      note: {
+        vi: `T(${i}) = T(${i-1}) + T(${i-2}) + T(${i-3}) = ${dp[i-1]} + ${dp[i-2]} + ${dp[i-3]} = ${dp[i]}.`,
+        en: `T(${i}) = T(${i-1}) + T(${i-2}) + T(${i-3}) = ${dp[i-1]} + ${dp[i-2]} + ${dp[i-3]} = ${dp[i]}.`,
+      },
+    });
+  }
+
+  const answer = dp[n];
+  steps.push({
+    title: { vi: `Kết quả: T(${n}) = ${answer}`, en: `Result: T(${n}) = ${answer}` },
+    arr: dp.slice(0, n + 1),
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeLines: [8],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `T(${n}) = ${answer}.`,
+      en: `T(${n}) = ${answer}.`,
+    },
+  });
+
+  return { n, answer, steps };
+}
+
+/**
+ * LeetCode 1137 Approach 2: O(1) space rolling.
+ * Keep a, b, c = T(i-3), T(i-2), T(i-1).
+ */
+function buildSteps1137Rolling(n) {
+  const steps = [];
+
+  if (n === 0) {
+    steps.push({ title: { vi: "n=0 → T(0)=0", en: "n=0 → T(0)=0" }, arr: [0], highlight: [0], mark: [0], final: true, codeBlock: 2, codeLines: [3, 4], vars: [{ name: "answer", value: 0 }], note: { vi: "Base case: T(0)=0.", en: "Base case: T(0)=0." } });
+    return { n, answer: 0, steps };
+  }
+  if (n === 1 || n === 2) {
+    steps.push({ title: { vi: `n=${n} → T(${n})=1`, en: `n=${n} → T(${n})=1` }, arr: n === 1 ? [0, 1] : [0, 1, 1], highlight: [n], mark: [n], final: true, codeBlock: 2, codeLines: [3, 4], vars: [{ name: "answer", value: 1 }], note: { vi: `Base case: T(${n})=1.`, en: `Base case: T(${n})=1.` } });
+    return { n, answer: 1, steps };
+  }
+
+  let a = 0, b = 1, c = 1;
+  const history = [0, 1, 1];
+
+  steps.push({
+    title: { vi: "Khởi tạo a=0, b=1, c=1", en: "Initialize a=0, b=1, c=1" },
+    arr: [...history],
+    sub: ["a", "b", "c"],
+    highlight: [0, 1, 2],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "a (T0)", value: 0 },
+      { name: "b (T1)", value: 1 },
+      { name: "c (T2)", value: 1 },
+    ],
+    note: {
+      vi: `O(1) space: chỉ dùng 3 biến a, b, c = T(i-3), T(i-2), T(i-1).\nnext = a + b + c. Sau đó: a←b, b←c, c←next.`,
+      en: `O(1) space: only 3 variables a, b, c = T(i-3), T(i-2), T(i-1).\nnext = a + b + c. Then: a←b, b←c, c←next.`,
+    },
+  });
+
+  for (let i = 3; i <= n; i++) {
+    const next = a + b + c;
+    history.push(next);
+
+    const subLabels = history.map((_, idx) => {
+      const labels = [];
+      if (idx === i - 2) labels.push("a");
+      if (idx === i - 1) labels.push("b");
+      if (idx === i) labels.push("c");
+      return labels.length > 0 ? labels.join(",") : `T(${idx})`;
+    });
+
+    steps.push({
+      title: { vi: `T(${i}) = ${a}+${b}+${c} = ${next}`, en: `T(${i}) = ${a}+${b}+${c} = ${next}` },
+      arr: [...history],
+      sub: subLabels,
+      highlight: [i - 3, i - 2, i - 1, i],
+      mark: [i],
+      codeBlock: 2,
+      codeLines: [6, 7, 8, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "next = a+b+c", value: `${a} + ${b} + ${c} = ${next}` },
+        { name: "a ← b", value: `← ${b}` },
+        { name: "b ← c", value: `← ${c}` },
+        { name: "c ← next", value: `← ${next}` },
+      ],
+      note: {
+        vi: `T(${i}) = a+b+c = ${a}+${b}+${c} = ${next}. Dời: a←b, b←c, c←next.`,
+        en: `T(${i}) = a+b+c = ${a}+${b}+${c} = ${next}. Shift: a←b, b←c, c←next.`,
+      },
+    });
+
+    a = b;
+    b = c;
+    c = next;
+  }
+
+  const finalLabels = history.map((_, idx) => {
+    if (idx === n - 2) return "a";
+    if (idx === n - 1) return "b";
+    if (idx === n) return "c";
+    return `T(${idx})`;
+  });
+
+  steps.push({
+    title: { vi: `Kết quả: T(${n}) = ${c}`, en: `Result: T(${n}) = ${c}` },
+    arr: [...history],
+    sub: finalLabels,
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeBlock: 2,
+    codeLines: [10],
+    vars: [
+      { name: "answer", value: c },
+      { name: "space", value: "O(1) — chỉ 3 biến" },
+    ],
+    note: {
+      vi: `T(${n}) = ${c}. O(1) bộ nhớ (3 biến) thay vì mảng dp dài ${n + 1}.`,
+      en: `T(${n}) = ${c}. O(1) memory (3 variables) instead of a dp array of size ${n + 1}.`,
+    },
+  });
+
+  return { n, answer: c, steps };
+}
+
+/**
  * Generate steps for LeetCode 53: Maximum Subarray (Kadane's algorithm).
  *  - cur = max(nums[i], cur + nums[i])  (extend current subarray or start fresh).
  *  - best = max(best, cur).
@@ -5975,6 +6157,68 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
     code2Label: { vi: "Cách 2: Tối ưu O(1) space", en: "Approach 2: Optimized O(1) space" },
     builder: buildSteps509,
+  },
+  1137: {
+    id: 1137,
+    difficulty: "easy",
+    slug: "n-th-tribonacci-number",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "N-th Tribonacci Number", en: "N-th Tribonacci Number" },
+    titleVi: { vi: "Số Tribonacci thứ N", en: "N-th Tribonacci number" },
+    statement: {
+      vi: "Dãy Tribonacci: T(0)=0, T(1)=1, T(2)=1, và T(n) = T(n-1) + T(n-2) + T(n-3) với n ≥ 3. Cho n, trả về T(n).",
+      en: "The Tribonacci sequence: T(0)=0, T(1)=1, T(2)=1, and T(n) = T(n-1) + T(n-2) + T(n-3) for n ≥ 3. Given n, return T(n).",
+    },
+    defaultInput: [10],
+    inputKind: "nonneg",
+    inputLabel: { vi: "n", en: "n" },
+    singleInput: true,
+    maxInput: 37,
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 — DP Array O(n)", en: "1 — DP Array O(n)" } },
+          { value: 2, label: { vi: "2 — Rolling O(1) space", en: "2 — Rolling O(1) space" } },
+        ],
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n) / O(1)",
+      note: {
+        vi: "Approach 1: O(n) time, O(n) space (bảng dp). Approach 2: O(n) time, O(1) space (3 biến).",
+        en: "Approach 1: O(n) time, O(n) space (dp table). Approach 2: O(n) time, O(1) space (3 variables).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def tribonacci(self, n):",
+      "        dp = [0] * max(n + 1, 3)",
+      "        dp[1] = 1",
+      "        dp[2] = 1",
+      "        for i in range(3, n + 1):",
+      "            dp[i] = dp[i-1] + dp[i-2] + dp[i-3]",
+      "        return dp[n]",
+    ],
+    code2: [
+      "# Rolling O(1) space",
+      "class Solution:",
+      "    def tribonacci(self, n):",
+      "        if n == 0: return 0",
+      "        if n <= 2: return 1",
+      "        a, b, c = 0, 1, 1",
+      "        for i in range(3, n + 1):",
+      "            a, b, c = b, c, a + b + c",
+      "            # next = a+b+c; shift a←b, b←c, c←next",
+      "        return c",
+    ],
+    codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
+    code2Label: { vi: "Cách 2: Rolling O(1) space", en: "Approach 2: Rolling O(1) space" },
+    builder: buildSteps1137,
   },
   688: {
     id: 688,
