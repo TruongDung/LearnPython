@@ -866,6 +866,155 @@ function buildSteps323(input, params) {
   return { input, answer: components, steps };
 }
 
+// ─── 3532: Path Existence Queries in a Graph I ───
+function buildSteps3532(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps3532Prefix(input, params);
+  return buildSteps3532UF(input, params);
+}
+
+function buildSteps3532UF(input, params) {
+  const nums = String(input).split(",").map((s) => Number(s.trim()));
+  const n = nums.length;
+  const maxDiff = params.maxDiff !== undefined ? Number(params.maxDiff) : 1;
+  const queries = String(params.queries || "").split(",").map((s) => { const [u, v] = s.trim().split(":").map(Number); return [u, v]; });
+  const steps = [];
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const rnk = new Array(n).fill(0);
+  const addedEdges = new Set();
+
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+  function union(x, y) {
+    const rx = find(x), ry = find(y);
+    if (rx === ry) return false;
+    if (rnk[rx] >= rnk[ry]) { parent[ry] = rx; if (rnk[rx] === rnk[ry]) rnk[rx]++; }
+    else { parent[rx] = ry; }
+    return true;
+  }
+
+  function graphSnap(title, note, hlNodes, hlEdges, visitedNodes, vars, codeLines) {
+    const gEdges = [];
+    for (const key of addedEdges) { const [u, v] = key.split("-").map(Number); gEdges.push({ u, v, w: "" }); }
+    return {
+      title, arr: [],
+      graph: { nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: `${i}(${nums[i]})` })), edges: gEdges, hlNodes: hlNodes || [], hlEdges: hlEdges || [], visitedNodes: visitedNodes || [], annotations: {} },
+      highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note,
+    };
+  }
+
+  steps.push(graphSnap(
+    { vi: `Khởi tạo: ${n} nodes, maxDiff=${maxDiff}`, en: `Init: ${n} nodes, maxDiff=${maxDiff}` },
+    { vi: `nums = [${nums.join(",")}]. maxDiff = ${maxDiff}.\nEdge giữa i và i+1 nếu |nums[i]-nums[i+1]| ≤ ${maxDiff}.\nDùng Union-Find gộp.`, en: `nums = [${nums.join(",")}]. maxDiff = ${maxDiff}.\nEdge between i and i+1 if |nums[i]-nums[i+1]| ≤ ${maxDiff}.\nUse Union-Find.` },
+    [], [], [],
+    [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "maxDiff", value: maxDiff }],
+    [2, 3]
+  ));
+
+  // Build edges
+  for (let i = 1; i < n; i++) {
+    const diff = Math.abs(nums[i] - nums[i - 1]);
+    const canConnect = diff <= maxDiff;
+    if (canConnect) {
+      union(i - 1, i);
+      addedEdges.add(`${i - 1}-${i}`);
+    }
+    steps.push(graphSnap(
+      { vi: `|nums[${i}]-nums[${i-1}]| = ${diff} ${canConnect ? "≤" : ">"} ${maxDiff} → ${canConnect ? "Union" : "Skip"}`, en: `|nums[${i}]-nums[${i-1}]| = ${diff} ${canConnect ? "≤" : ">"} ${maxDiff} → ${canConnect ? "Union" : "Skip"}` },
+      { vi: `|${nums[i]} - ${nums[i-1]}| = ${diff}. ${canConnect ? `≤ ${maxDiff} → nối edge (${i-1},${i}).` : `> ${maxDiff} → không nối.`}`, en: `|${nums[i]} - ${nums[i-1]}| = ${diff}. ${canConnect ? `≤ ${maxDiff} → add edge (${i-1},${i}).` : `> ${maxDiff} → no edge.`}` },
+      [i - 1, i], canConnect ? [`${i-1}-${i}`] : [], [],
+      [{ name: "i", value: i }, { name: "diff", value: `|${nums[i]}-${nums[i-1]}| = ${diff}` }, { name: "connect?", value: canConnect }, { name: "parent", value: `[${parent.join(",")}]` }],
+      [9, 10, 11]
+    ));
+  }
+
+  // Answer queries
+  const answers = [];
+  for (const [u, v] of queries) {
+    const ru = find(u), rv = find(v);
+    const ans = ru === rv;
+    answers.push(ans);
+    steps.push(graphSnap(
+      { vi: `Query (${u},${v}): find(${u})=${ru}, find(${v})=${rv} → ${ans}`, en: `Query (${u},${v}): find(${u})=${ru}, find(${v})=${rv} → ${ans}` },
+      { vi: `${ans ? "✓ Cùng nhóm → có đường." : "✗ Khác nhóm → không có đường."}`, en: `${ans ? "✓ Same group → path exists." : "✗ Different groups → no path."}` },
+      [u, v], [], [],
+      [{ name: "query", value: `(${u}, ${v})` }, { name: "find(u)", value: ru }, { name: "find(v)", value: rv }, { name: "answer", value: ans }],
+      [12]
+    ));
+  }
+
+  const fs = graphSnap(
+    { vi: `Kết quả: [${answers.join(",")}]`, en: `Result: [${answers.join(",")}]` },
+    { vi: `Đáp án: [${answers.join(",")}].`, en: `Answers: [${answers.join(",")}].` },
+    [], [], Array.from({ length: n }, (_, i) => i),
+    [{ name: "answer", value: `[${answers.join(",")}]` }],
+    [12]
+  );
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: `[${answers.join(",")}]`, steps };
+}
+
+// ─── 3532 Approach 2: Prefix Array O(n + q) ───
+function buildSteps3532Prefix(input, params) {
+  const nums = String(input).split(",").map((s) => Number(s.trim()));
+  const n = nums.length;
+  const maxDiff = params.maxDiff !== undefined ? Number(params.maxDiff) : 1;
+  const queries = String(params.queries || "").split(",").map((s) => { const [u, v] = s.trim().split(":").map(Number); return [u, v]; });
+  const steps = [];
+
+  const pre = new Array(n).fill(0);
+
+  steps.push({
+    title: { vi: "Prefix Array: gán nhóm liên tiếp", en: "Prefix Array: assign consecutive groups" },
+    arr: nums, sub: pre.map(String),
+    highlight: [], mark: [], codeLines: [2, 3], codeBlock: 2,
+    vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "maxDiff", value: maxDiff }, { name: "pre", value: `[${pre.join(",")}]` }],
+    note: {
+      vi: `pre[i] = ID nhóm kết nối của node i.\npre[0] = 0. Nếu |nums[i]-nums[i-1]| ≤ maxDiff → cùng nhóm (pre[i]=pre[i-1]).\nNgược lại → nhóm mới (pre[i]=pre[i-1]+1).`,
+      en: `pre[i] = connected component ID of node i.\npre[0] = 0. If |nums[i]-nums[i-1]| ≤ maxDiff → same group (pre[i]=pre[i-1]).\nOtherwise → new group (pre[i]=pre[i-1]+1).`,
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    const diff = Math.abs(nums[i] - nums[i - 1]);
+    const same = diff <= maxDiff;
+    pre[i] = same ? pre[i - 1] : pre[i - 1] + 1;
+
+    steps.push({
+      title: { vi: `i=${i}: |${nums[i]}-${nums[i-1]}|=${diff} ${same ? "≤" : ">"} ${maxDiff} → pre[${i}]=${pre[i]}`, en: `i=${i}: |${nums[i]}-${nums[i-1]}|=${diff} ${same ? "≤" : ">"} ${maxDiff} → pre[${i}]=${pre[i]}` },
+      arr: nums, sub: pre.map(String),
+      highlight: [i - 1, i], mark: [], codeLines: [4, 5, 6, 7], codeBlock: 2,
+      vars: [{ name: "i", value: i }, { name: "diff", value: `|${nums[i]}-${nums[i-1]}| = ${diff}` }, { name: "same group?", value: same }, { name: "pre[i]", value: pre[i] }, { name: "pre", value: `[${pre.join(",")}]` }],
+      note: { vi: same ? `Cùng nhóm: pre[${i}] = pre[${i-1}] = ${pre[i]}.` : `Nhóm mới: pre[${i}] = pre[${i-1}]+1 = ${pre[i]}.`, en: same ? `Same group: pre[${i}] = pre[${i-1}] = ${pre[i]}.` : `New group: pre[${i}] = pre[${i-1}]+1 = ${pre[i]}.` },
+    });
+  }
+
+  // Queries
+  const answers = [];
+  for (const [u, v] of queries) {
+    const ans = pre[u] === pre[v];
+    answers.push(ans);
+    steps.push({
+      title: { vi: `Query (${u},${v}): pre[${u}]=${pre[u]}, pre[${v}]=${pre[v]} → ${ans}`, en: `Query (${u},${v}): pre[${u}]=${pre[u]}, pre[${v}]=${pre[v]} → ${ans}` },
+      arr: nums, sub: pre.map(String),
+      highlight: [u, v], mark: ans ? [u, v] : [], codeLines: [8, 9], codeBlock: 2,
+      vars: [{ name: "query", value: `(${u},${v})` }, { name: "pre[u]", value: pre[u] }, { name: "pre[v]", value: pre[v] }, { name: "answer", value: ans }],
+      note: { vi: ans ? `pre[${u}] == pre[${v}] → cùng nhóm → có đường.` : `pre[${u}] ≠ pre[${v}] → khác nhóm → không có đường.`, en: ans ? `pre[${u}] == pre[${v}] → same group → path exists.` : `pre[${u}] ≠ pre[${v}] → different groups → no path.` },
+    });
+  }
+
+  const fs = {
+    title: { vi: `Kết quả: [${answers.join(",")}]`, en: `Result: [${answers.join(",")}]` },
+    arr: nums, sub: pre.map(String),
+    highlight: [], mark: Array.from({ length: n }, (_, i) => i), final: true, codeLines: [9], codeBlock: 2,
+    vars: [{ name: "answer", value: `[${answers.join(",")}]` }, { name: "pre", value: `[${pre.join(",")}]` }],
+    note: { vi: `Prefix array O(n) + mỗi query O(1). Tổng O(n+q).`, en: `Prefix array O(n) + each query O(1). Total O(n+q).` },
+  };
+  steps.push(fs);
+  return { input, answer: `[${answers.join(",")}]`, steps };
+}
+
 module.exports = {
   547: {
     id: 547,
@@ -1136,5 +1285,61 @@ module.exports = {
       "        return components",
     ],
     builder: buildSteps323,
+  },
+  3532: {
+    id: 3532,
+    difficulty: "medium",
+    slug: "path-existence-queries-in-a-graph-i",
+    category: UF_CAT,
+    title: { vi: "Path Existence Queries in a Graph I", en: "Path Existence Queries in a Graph I" },
+    titleVi: { vi: "Truy vấn đường đi (Union-Find)", en: "Path existence queries (Union-Find)" },
+    statement: {
+      vi: "Có n nodes, mỗi node i có giá trị nums[i]. Edge tồn tại giữa node liền kề i và i+1 nếu |nums[i]-nums[i+1]| ≤ maxDiff. Trả lời mỗi query [u,v]: có đường nối u-v không? Nhập: nums (dấu phẩy); maxDiff; queries (u:v cách bởi dấu phẩy).",
+      en: "There are n nodes, each with value nums[i]. An edge exists between adjacent nodes i and i+1 if |nums[i]-nums[i+1]| ≤ maxDiff. Answer queries [u,v]: is there a path from u to v? Enter: nums (comma); maxDiff; queries (u:v comma-sep).",
+    },
+    defaultInput: "4,4,2,3",
+    inputKind: "string",
+    inputLabel: { vi: "nums (dấu phẩy)", en: "nums (comma-separated)" },
+    extraParams: [
+      { key: "maxDiff", label: { vi: "maxDiff", en: "maxDiff" }, default: 1 },
+      { key: "queries", label: { vi: "queries (u:v,u:v)", en: "queries (u:v,u:v)" }, type: "string", default: "2:3,0:3" },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" } },
+        { value: "2", label: { vi: "Cách 2: Prefix Array O(n+q)", en: "Approach 2: Prefix Array O(n+q)" } },
+      ] },
+    ],
+    approach: [
+      { vi: "Cách 1: Union-Find — union(i-1,i) nếu |nums[i]-nums[i-1]| ≤ maxDiff.", en: "Approach 1: Union-Find — union(i-1,i) if |nums[i]-nums[i-1]| ≤ maxDiff." },
+      { vi: "Cách 2: Prefix Array — pre[i] = group ID. Cùng group ↔ có đường. O(n+q).", en: "Approach 2: Prefix Array — pre[i] = group ID. Same group ↔ path exists. O(n+q)." },
+    ],
+    complexity: { time: "O(n·α(n)+q) / O(n+q)", space: "O(n)", note: { vi: "UF: n unions + q finds. Prefix: 1 pass + O(1)/query.", en: "UF: n unions + q finds. Prefix: 1 pass + O(1)/query." } },
+    code: [
+      "class Solution:",
+      "    def pathExistenceQueries(self, n, nums, maxDiff, queries):",
+      "        parent = list(range(n))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        for i in range(1, n):",
+      "            if abs(nums[i] - nums[i-1]) <= maxDiff:",
+      "                parent[find(i)] = find(i-1)",
+      "        return [find(u) == find(v) for u, v in queries]",
+    ],
+    code2: [
+      "class Solution:",
+      "    def pathExistenceQueries(self, n, nums, maxDiff, queries):",
+      "        pre = [0] * n",
+      "        for i in range(1, n):",
+      "            if abs(nums[i] - nums[i-1]) <= maxDiff:",
+      "                pre[i] = pre[i-1]",
+      "            else:",
+      "                pre[i] = pre[i-1] + 1",
+      "        return [pre[u] == pre[v] for u, v in queries]",
+    ],
+    codeLabel: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" },
+    code2Label: { vi: "Cách 2: Prefix Array", en: "Approach 2: Prefix Array" },
+    builder: buildSteps3532,
   },
 };
