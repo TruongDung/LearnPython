@@ -2732,79 +2732,83 @@ function buildSteps91(input) {
   const dp = new Array(n + 1).fill(0);
   dp[0] = 1;
 
+  // Intro step — explain the problem clearly
   steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
+    title: { vi: "Ý tưởng: mỗi vị trí có 1-2 cách giải mã", en: "Idea: each position has 1-2 decode options" },
     arr: dp.slice(),
     sub: ["ε", ...s.split("")],
-    highlight: [0],
-    mark: [],
-    codeLines: [3, 4],
-    vars: [
-      { name: "s", value: s },
-      { name: "dp[0]", value: 1 },
-    ],
+    highlight: [], mark: [],
+    codeLines: [2, 3],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "mapping", value: "A=1, B=2, ..., Z=26" }],
     note: {
-      vi: `A=1..Z=26. dp[i] = số cách decode s[0..i-1].\ndp[0] = 1 (chuỗi rỗng = 1 cách).\nVới mỗi i:\n  - 1 chữ số s[i-1] ≠ '0': dp[i] += dp[i-1]\n  - 2 chữ số s[i-2:i] ∈ [10..26]: dp[i] += dp[i-2]`,
-      en: `A=1..Z=26. dp[i] = ways to decode s[0..i-1].\ndp[0] = 1 (empty = 1 way).\nFor each i:\n  - Single digit s[i-1] ≠ '0': dp[i] += dp[i-1]\n  - Two digits s[i-2:i] ∈ [10..26]: dp[i] += dp[i-2]`,
+      vi:
+        `🔤 Giải mã chuỗi số "${s}" thành chữ cái (A=1, B=2, ..., Z=26).\n` +
+        `💡 dp[i] = số cách giải mã s[0..i-1].\n\n` +
+        `Tại mỗi vị trí i, tối đa 2 lựa chọn:\n` +
+        `  ① 1 chữ số: s[i-1] ≠ '0' → decode thành 1 ký tự → dp[i] += dp[i-1]\n` +
+        `  ② 2 chữ số: s[i-2:i] ∈ [10..26] → decode thành 1 ký tự → dp[i] += dp[i-2]\n\n` +
+        `dp[0] = 1 (chuỗi rỗng "ε" = 1 cách).`,
+      en:
+        `🔤 Decode number string "${s}" into letters (A=1, B=2, ..., Z=26).\n` +
+        `💡 dp[i] = number of ways to decode s[0..i-1].\n\n` +
+        `At each position i, up to 2 options:\n` +
+        `  ① Single digit: s[i-1] ≠ '0' → decode as 1 letter → dp[i] += dp[i-1]\n` +
+        `  ② Two digits: s[i-2:i] ∈ [10..26] → decode as 1 letter → dp[i] += dp[i-2]\n\n` +
+        `dp[0] = 1 (empty string "ε" = 1 way).`,
     },
   });
 
   for (let i = 1; i <= n; i++) {
     const oneDigit = s[i - 1];
+    const oneChar = oneDigit !== "0" ? String.fromCharCode(64 + parseInt(oneDigit)) : "✗";
     const twoDigit = i >= 2 ? s.slice(i - 2, i) : "";
     const twoVal = twoDigit ? parseInt(twoDigit, 10) : 0;
+    const twoChar = (i >= 2 && twoVal >= 10 && twoVal <= 26) ? String.fromCharCode(64 + twoVal) : "✗";
     let addedFrom1 = false;
     let addedFrom2 = false;
 
-    if (oneDigit !== "0") {
-      dp[i] += dp[i - 1];
-      addedFrom1 = true;
-    }
-    if (i >= 2 && twoVal >= 10 && twoVal <= 26) {
-      dp[i] += dp[i - 2];
-      addedFrom2 = true;
-    }
-
-    const parts = [];
-    if (addedFrom1) parts.push(`'${oneDigit}'→dp[${i - 1}]=${dp[i - 1]}`);
-    if (addedFrom2) parts.push(`'${twoDigit}'→dp[${i - 2}]=${i >= 2 ? dp[i - 2] : 0}`);
+    if (oneDigit !== "0") { dp[i] += dp[i - 1]; addedFrom1 = true; }
+    if (i >= 2 && twoVal >= 10 && twoVal <= 26) { dp[i] += dp[i - 2]; addedFrom2 = true; }
 
     steps.push({
-      title: { vi: `dp[${i}]: "${s.slice(0, i)}"`, en: `dp[${i}]: "${s.slice(0, i)}"` },
+      title: { vi: `dp[${i}] = ${dp[i]} (decode "${s.slice(0, i)}")`, en: `dp[${i}] = ${dp[i]} (decode "${s.slice(0, i)}")` },
       arr: dp.slice(),
-      sub: ["ε", ...s.split("")],
+      sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
       highlight: [i],
       mark: [addedFrom1 ? i - 1 : -1, addedFrom2 ? i - 2 : -1].filter((v) => v >= 0),
-      codeLines: [5, 6, 7, 8],
+      codeLines: addedFrom1 && addedFrom2 ? [5, 6, 7, 8] : addedFrom1 ? [5, 6] : addedFrom2 ? [7, 8] : [5],
       vars: [
         { name: "i", value: i },
-        { name: "1-digit", value: `'${oneDigit}' ${oneDigit !== "0" ? "✓" : "✗ (zero)"}` },
-        { name: "2-digit", value: i >= 2 ? `'${twoDigit}'=${twoVal} ${twoVal >= 10 && twoVal <= 26 ? "✓" : "✗"}` : "n/a" },
-        { name: "dp[i]", value: dp[i] },
+        { name: `① '${oneDigit}'→${oneChar}`, value: addedFrom1 ? `dp[${i-1}]=${dp[i-1]} ✓` : `'0' invalid ✗` },
+        { name: `② '${twoDigit}'→${twoChar}`, value: i >= 2 ? (addedFrom2 ? `dp[${i-2}]=${dp[i-2]} ✓` : `${twoVal} not in [10..26] ✗`) : "n/a" },
+        { name: "dp[i]", value: `${addedFrom1 ? dp[i-1] : 0}${addedFrom2 ? " + " + (i>=2?dp[i-2]:0) : ""} = ${dp[i]}` },
+        { name: "dp", value: `[${dp.slice(0, i + 1).join(",")}]` },
       ],
       note: {
-        vi: parts.length > 0
-          ? `dp[${i}] = ${parts.join(" + ")} = ${dp[i]}.`
-          : `dp[${i}] = 0 (s[${i - 1}]='0' đứng một mình, không tạo 2 chữ số hợp lệ).`,
-        en: parts.length > 0
-          ? `dp[${i}] = ${parts.join(" + ")} = ${dp[i]}.`
-          : `dp[${i}] = 0 ('${oneDigit}' alone is invalid, no valid 2-digit pair).`,
+        vi:
+          `Xét s[0..${i-1}] = "${s.slice(0, i)}":\n` +
+          `  ① 1 chữ số '${oneDigit}' → ${oneChar} ${addedFrom1 ? `✓ (dp[${i}] += dp[${i-1}]=${dp[i-1]})` : `✗ (số 0 không decode được)`}\n` +
+          `  ② 2 chữ số '${twoDigit}' → ${twoChar} ${i >= 2 ? (addedFrom2 ? `✓ (dp[${i}] += dp[${i-2}]=${dp[i-2]})` : `✗ (${twoVal} ngoài [10..26])`) : "(chưa đủ 2 chữ số)"}\n` +
+          `→ dp[${i}] = ${dp[i]}`,
+        en:
+          `Consider s[0..${i-1}] = "${s.slice(0, i)}":\n` +
+          `  ① Single '${oneDigit}' → ${oneChar} ${addedFrom1 ? `✓ (dp[${i}] += dp[${i-1}]=${dp[i-1]})` : `✗ ('0' cannot stand alone)`}\n` +
+          `  ② Two '${twoDigit}' → ${twoChar} ${i >= 2 ? (addedFrom2 ? `✓ (dp[${i}] += dp[${i-2}]=${dp[i-2]})` : `✗ (${twoVal} not in [10..26])`) : "(not enough digits)"}\n` +
+          `→ dp[${i}] = ${dp[i]}`,
       },
     });
   }
 
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
+    title: { vi: `Kết quả: ${dp[n]} cách`, en: `Result: ${dp[n]} ways` },
     arr: dp.slice(),
     sub: ["ε", ...s.split("")],
-    highlight: [],
-    mark: [n],
-    final: true,
+    highlight: [], mark: [n], final: true,
     codeLines: [9],
-    vars: [{ name: "answer", value: dp[n] }],
+    vars: [{ name: "answer", value: dp[n] }, { name: "dp", value: `[${dp.join(",")}]` }],
     note: {
-      vi: `Số cách decode "${s}" = dp[${n}] = ${dp[n]}.`,
-      en: `Number of ways to decode "${s}" = dp[${n}] = ${dp[n]}.`,
+      vi: `🎉 "${s}" có ${dp[n]} cách giải mã. dp[${n}] = ${dp[n]}.`,
+      en: `🎉 "${s}" has ${dp[n]} decode ways. dp[${n}] = ${dp[n]}.`,
     },
   });
 
