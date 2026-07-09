@@ -1090,7 +1090,7 @@ function buildSteps198(nums, params) {
   steps.push({
     title: { vi: "Ý tưởng: tại mỗi nhà có 2 lựa chọn", en: "Idea: at each house you have 2 choices" },
     arr: [...nums],
-    sub: nums.map((_, i) => `nhà ${i}`),
+    sub: nums.map((_, i) => `[${i}]`),
     highlight: [], mark: [],
     codeLines: [2, 3],
     vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "rule", value: "không cướp 2 nhà liền kề" }],
@@ -1158,7 +1158,7 @@ function buildSteps198(nums, params) {
         { name: "① BỎ (dp[i-1])", value: skip },
         { name: "② CƯỚP (dp[i-2]+nums[i])", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
         { name: "dp[i] = max(①,②)", value: `max(${skip}, ${rob}) = ${dp[i]}` },
-        { name: "quyết định", value: robbed ? `CƯỚP nhà ${i} 💰` : `BỎ QUA nhà ${i}` },
+        { name: "decision", value: robbed ? `ROB 💰` : `SKIP ✗` },
         { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
@@ -1197,7 +1197,7 @@ function buildSteps198(nums, params) {
     codeLines: [10],
     vars: [
       { name: "answer", value: `${answer}$` },
-      { name: "nhà đã cướp", value: `[${robbedHouses.join(",")}] = [${robbedHouses.map((j) => nums[j]).join("+")}] = ${answer}` },
+      { name: "robbed", value: `[${robbedHouses.join(",")}] = [${robbedHouses.map((j) => nums[j]).join("+")}] = ${answer}` },
       { name: "dp", value: `[${dp.join(",")}]` },
     ],
     note: {
