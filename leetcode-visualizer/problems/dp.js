@@ -870,7 +870,7 @@ function buildSteps1137(input, params) {
       { name: "T(0)", value: 0 },
       { name: "T(1)", value: 1 },
       { name: "T(2)", value: 1 },
-      { name: "dp", value: dp.slice(0, Math.max(n + 1, 3)).toString() },
+      { name: "dp", value: `[${dp.slice(0, Math.max(n + 1, 3)).join(",")}]` },
     ],
     note: {
       vi: `Tribonacci: T(0)=0, T(1)=1, T(2)=1. Với n ≥ 3: T(n) = T(n-1) + T(n-2) + T(n-3).\nn = ${n}.`,
@@ -892,7 +892,7 @@ function buildSteps1137(input, params) {
         { name: "T(i-2)", value: dp[i - 2] },
         { name: "T(i-3)", value: dp[i - 3] },
         { name: "T(i) = T(i-1)+T(i-2)+T(i-3)", value: `${dp[i-1]} + ${dp[i-2]} + ${dp[i-3]} = ${dp[i]}` },
-        { name: "dp", value: dp.slice(0, n + 1).toString() },
+        { name: "dp", value: `[${dp.slice(0, n + 1).join(",")}]` },
       ],
       note: {
         vi: `T(${i}) = T(${i-1}) + T(${i-2}) + T(${i-3}) = ${dp[i-1]} + ${dp[i-2]} + ${dp[i-3]} = ${dp[i]}.`,
@@ -2949,39 +2949,119 @@ function buildSteps91(input) {
     const twoDigit = i >= 2 ? s.slice(i - 2, i) : "";
     const twoVal = twoDigit ? parseInt(twoDigit, 10) : 0;
     const twoChar = (i >= 2 && twoVal >= 10 && twoVal <= 26) ? String.fromCharCode(64 + twoVal) : "✗";
-    let addedFrom1 = false;
-    let addedFrom2 = false;
 
-    if (oneDigit !== "0") { dp[i] += dp[i - 1]; addedFrom1 = true; }
-    if (i >= 2 && twoVal >= 10 && twoVal <= 26) { dp[i] += dp[i - 2]; addedFrom2 = true; }
-
+    // Step: for i in range → enter loop
     steps.push({
-      title: { vi: `dp[${i}] = ${dp[i]} (decode "${s.slice(0, i)}")`, en: `dp[${i}] = ${dp[i]} (decode "${s.slice(0, i)}")` },
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
       arr: dp.slice(),
       sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
       highlight: [i],
-      mark: [addedFrom1 ? i - 1 : -1, addedFrom2 ? i - 2 : -1].filter((v) => v >= 0),
-      codeLines: addedFrom1 && addedFrom2 ? [5, 6, 7, 8] : addedFrom1 ? [5, 6] : addedFrom2 ? [7, 8] : [5],
+      mark: [],
+      codeLines: [6],
       vars: [
         { name: "i", value: i },
-        { name: `① '${oneDigit}'→${oneChar}`, value: addedFrom1 ? `dp[${i-1}]=${dp[i-1]} ✓` : `'0' invalid ✗` },
-        { name: `② '${twoDigit}'→${twoChar}`, value: i >= 2 ? (addedFrom2 ? `dp[${i-2}]=${dp[i-2]} ✓` : `${twoVal} not in [10..26] ✗`) : "n/a" },
-        { name: "dp[i]", value: `${addedFrom1 ? dp[i-1] : 0}${addedFrom2 ? " + " + (i>=2?dp[i-2]:0) : ""} = ${dp[i]}` },
-        { name: "dp", value: `[${dp.slice(0, i + 1).join(",")}]` },
+        { name: "s[i-1]", value: `'${oneDigit}'` },
+        { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi:
-          `Xét s[0..${i-1}] = "${s.slice(0, i)}":\n` +
-          `  ① 1 chữ số '${oneDigit}' → ${oneChar} ${addedFrom1 ? `✓ (dp[${i}] += dp[${i-1}]=${dp[i-1]})` : `✗ (số 0 không decode được)`}\n` +
-          `  ② 2 chữ số '${twoDigit}' → ${twoChar} ${i >= 2 ? (addedFrom2 ? `✓ (dp[${i}] += dp[${i-2}]=${dp[i-2]})` : `✗ (${twoVal} ngoài [10..26])`) : "(chưa đủ 2 chữ số)"}\n` +
-          `→ dp[${i}] = ${dp[i]}`,
-        en:
-          `Consider s[0..${i-1}] = "${s.slice(0, i)}":\n` +
-          `  ① Single '${oneDigit}' → ${oneChar} ${addedFrom1 ? `✓ (dp[${i}] += dp[${i-1}]=${dp[i-1]})` : `✗ ('0' cannot stand alone)`}\n` +
-          `  ② Two '${twoDigit}' → ${twoChar} ${i >= 2 ? (addedFrom2 ? `✓ (dp[${i}] += dp[${i-2}]=${dp[i-2]})` : `✗ (${twoVal} not in [10..26])`) : "(not enough digits)"}\n` +
-          `→ dp[${i}] = ${dp[i]}`,
+        vi: `Bắt đầu xét vị trí i=${i}, s[${i-1}]='${oneDigit}'.`,
+        en: `Start processing position i=${i}, s[${i-1}]='${oneDigit}'.`,
       },
     });
+
+    // Step: check single digit condition
+    const singleValid = oneDigit !== "0";
+    steps.push({
+      title: { vi: `Kiểm tra s[${i-1}]='${oneDigit}' ≠ '0'? ${singleValid ? "✓" : "✗"}`, en: `Check s[${i-1}]='${oneDigit}' ≠ '0'? ${singleValid ? "✓" : "✗"}` },
+      arr: dp.slice(),
+      sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
+      highlight: [i],
+      mark: singleValid ? [i - 1] : [],
+      codeLines: [7],
+      vars: [
+        { name: "i", value: i },
+        { name: `s[i-1]='${oneDigit}' → ${oneChar}`, value: singleValid ? "✓ decode được" : "✗ số 0" },
+        { name: "dp", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: singleValid
+          ? `'${oneDigit}' ≠ '0' → decode thành '${oneChar}' (chữ số ${oneDigit} → ký tự thứ ${oneDigit} trong bảng chữ). Sẽ cộng dp[${i-1}].`
+          : `'${oneDigit}' = '0' → không thể decode 1 chữ số '0' đơn lẻ. Bỏ qua.`,
+        en: singleValid
+          ? `'${oneDigit}' ≠ '0' → decode as '${oneChar}' (digit ${oneDigit} → ${oneDigit}th letter). Will add dp[${i-1}].`
+          : `'${oneDigit}' = '0' → cannot decode single '0'. Skip.`,
+      },
+    });
+
+    // Step: dp[i] += dp[i-1] (if valid)
+    if (singleValid) {
+      dp[i] += dp[i - 1];
+      steps.push({
+        title: { vi: `dp[${i}] += dp[${i-1}] = ${dp[i-1]} → dp[${i}]=${dp[i]}`, en: `dp[${i}] += dp[${i-1}] = ${dp[i-1]} → dp[${i}]=${dp[i]}` },
+        arr: dp.slice(),
+        sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
+        highlight: [i],
+        mark: [i - 1, i],
+        codeLines: [8],
+        vars: [
+          { name: "i", value: i },
+          { name: `dp[${i}] += dp[${i-1}]`, value: `+= ${dp[i-1]} → dp[${i}] = ${dp[i]}` },
+          { name: "dp", value: `[${dp.join(",")}]` },
+        ],
+        note: {
+          vi: `dp[${i}] += dp[${i-1}] = ${dp[i-1]}. Hiện dp[${i}] = ${dp[i]}.`,
+          en: `dp[${i}] += dp[${i-1}] = ${dp[i-1]}. Now dp[${i}] = ${dp[i]}.`,
+        },
+      });
+    }
+
+    // Step: check two-digit condition
+    if (i >= 2) {
+      const twoValid = twoVal >= 10 && twoVal <= 26;
+      steps.push({
+        title: { vi: `Kiểm tra '${twoDigit}' ∈ [10..26]? ${twoValid ? "✓" : "✗"}`, en: `Check '${twoDigit}' ∈ [10..26]? ${twoValid ? "✓" : "✗"}` },
+        arr: dp.slice(),
+        sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
+        highlight: [i],
+        mark: twoValid ? [i - 2] : [],
+        codeLines: [9],
+        vars: [
+          { name: "i", value: i },
+          { name: `s[${i-2}:${i}]='${twoDigit}' → ${twoChar}`, value: twoValid ? `${twoVal} ∈ [10..26] ✓` : `${twoVal} ∉ [10..26] ✗` },
+          { name: "dp", value: `[${dp.join(",")}]` },
+        ],
+        note: {
+          vi: twoValid
+            ? `'${twoDigit}' = ${twoVal} nằm trong [10..26] → decode thành '${twoChar}'. Sẽ cộng dp[${i-2}].`
+            : `'${twoDigit}' = ${twoVal} nằm ngoài [10..26] → không decode được 2 chữ số. Bỏ qua.`,
+          en: twoValid
+            ? `'${twoDigit}' = ${twoVal} is in [10..26] → decode as '${twoChar}'. Will add dp[${i-2}].`
+            : `'${twoDigit}' = ${twoVal} is NOT in [10..26] → cannot decode 2 digits. Skip.`,
+        },
+      });
+
+      // Step: dp[i] += dp[i-2] (if valid)
+      if (twoValid) {
+        dp[i] += dp[i - 2];
+        steps.push({
+          title: { vi: `dp[${i}] += dp[${i-2}] = ${dp[i-2]} → dp[${i}]=${dp[i]}`, en: `dp[${i}] += dp[${i-2}] = ${dp[i-2]} → dp[${i}]=${dp[i]}` },
+          arr: dp.slice(),
+          sub: ["ε", ...s.split("").map((c, idx) => idx < i ? `${c}` : "·")],
+          highlight: [i],
+          mark: [i - 2, i],
+          codeLines: [10],
+          vars: [
+            { name: "i", value: i },
+            { name: `dp[${i}] += dp[${i-2}]`, value: `+= ${dp[i-2]} → dp[${i}] = ${dp[i]}` },
+            { name: "dp", value: `[${dp.join(",")}]` },
+          ],
+          note: {
+            vi: `dp[${i}] += dp[${i-2}] = ${dp[i-2]}. Hiện dp[${i}] = ${dp[i]}.`,
+            en: `dp[${i}] += dp[${i-2}] = ${dp[i-2]}. Now dp[${i}] = ${dp[i]}.`,
+          },
+        });
+      }
+    }
   }
 
   steps.push({
