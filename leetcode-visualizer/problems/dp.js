@@ -622,106 +622,164 @@ function buildSteps70Optimized(n) {
 function buildSteps300(nums, params) {
   const approach = (params && Number(params.approach)) || 1;
   if (approach === 2) return buildSteps300BinarySearch(nums);
-  // ── Approach 1: O(n²) DP ──
+  // ── Approach 1: O(n²) DP — line-by-line debug ──
   const n = nums.length;
   const dp = new Array(n).fill(1);
   const prev = new Array(n).fill(-1);
   const steps = [];
 
+  // Line 3: n = len(nums)
   steps.push({
-    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    title: { vi: "n = len(nums)", en: "n = len(nums)" },
     arr: [...nums],
     sub: [...dp],
     highlight: [], mark: [],
-    codeLines: [3, 4], codeBlock: 1,
+    codeLines: [3], codeBlock: 1,
     vars: [
       { name: "n", value: n },
-      { name: "i", value: "-" },
-      { name: "j", value: "-" },
+    ],
+    note: {
+      en: `n = ${n}. Array has ${n} elements.`,
+      vi: `n = ${n}. Mảng có ${n} phần tử.`,
+    },
+  });
+
+  // Line 4: dp = [1] * n
+  steps.push({
+    title: { vi: "dp = [1] * n", en: "dp = [1] * n" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: [], mark: [],
+    codeLines: [4], codeBlock: 1,
+    vars: [
       { name: "dp", value: [...dp] },
     ],
     note: {
-      vi: `nums = [${nums.join(", ")}]. dp[i] = độ dài dãy tăng dài nhất kết thúc tại i, khởi tạo toàn 1 (mỗi phần tử tự nó là một dãy).`,
-      en: `nums = [${nums.join(", ")}]. dp[i] = length of the longest increasing subsequence ending at i, all initialized to 1.`,
+      en: `Initialize dp = [${dp.join(", ")}]. Each element alone is a subsequence of length 1.`,
+      vi: `Khởi tạo dp = [${dp.join(", ")}]. Mỗi phần tử tự nó là dãy con dài 1.`,
     },
   });
 
   for (let i = 1; i < n; i++) {
     let bestJ = -1;
-    for (let j = 0; j < i; j++) {
-      const canExtend = nums[j] < nums[i];
-      const candidate = canExtend ? dp[j] + 1 : "-";
-      const oldDpi = dp[i];
-      let updated = false;
-      if (canExtend && dp[j] + 1 > dp[i]) {
-        dp[i] = dp[j] + 1;
-        bestJ = j;
-        updated = true;
-      }
 
-      steps.push({
-        title: { vi: `So sánh i=${i}, j=${j}`, en: `Compare i=${i}, j=${j}` },
-        arr: [...nums],
-        sub: [...dp],
-        highlight: [j, i],
-        mark: bestJ >= 0 ? [bestJ] : [],
-        codeLines: updated ? [5, 6, 7, 8] : [5, 6, 7],
-        codeBlock: 1,
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "nums[i]", value: nums[i] },
-          { name: "nums[j]", value: nums[j] },
-          { name: "nums[j] < nums[i]", value: canExtend },
-          { name: "dp[j]", value: dp[j] },
-          { name: "dp[j] + 1", value: candidate },
-          { name: "dp[i] (before)", value: oldDpi },
-          { name: "dp[i]", value: dp[i] },
-          { name: "bestJ", value: bestJ },
-          { name: "dp", value: [...dp] },
-        ],
-        note: updated
-          ? {
-              vi: `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]}, candidate = dp[${j}] + 1 = ${candidate}. Cập nhật dp[${i}]: ${oldDpi} → ${dp[i]}.`,
-              en: `nums[${j}]=${nums[j]} < nums[${i}]=${nums[i]}, candidate = dp[${j}] + 1 = ${candidate}. Update dp[${i}]: ${oldDpi} → ${dp[i]}.`,
-            }
-          : canExtend
-            ? {
-                vi: `Có thể nối nums[${j}] trước nums[${i}], nhưng candidate ${candidate} không tốt hơn dp[${i}] hiện tại (${dp[i]}).`,
-                en: `nums[${j}] can extend into nums[${i}], but candidate ${candidate} does not improve current dp[${i}] (${dp[i]}).`,
-              }
-            : {
-                vi: `Không nối được vì nums[${j}]=${nums[j]} không nhỏ hơn nums[${i}]=${nums[i]}.`,
-                en: `Cannot extend because nums[${j}]=${nums[j]} is not smaller than nums[${i}]=${nums[i]}.`,
-              },
-      });
-    }
-    prev[i] = bestJ;
+    // Line 5: for i in range(1, n) — entering iteration i
     steps.push({
-      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
-      arr: [...nums], sub: [...dp],
-      highlight: bestJ >= 0 ? [bestJ, i] : [i], mark: [],
-      codeLines: [5, 6, 7, 8], codeBlock: 1,
+      title: { vi: `for i = ${i}`, en: `for i = ${i}` },
+      arr: [...nums],
+      sub: [...dp],
+      highlight: [i], mark: [],
+      codeLines: [5], codeBlock: 1,
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: nums[i] },
-        { name: "bestJ", value: bestJ >= 0 ? bestJ : "none" },
-        { name: "nums[bestJ]", value: bestJ >= 0 ? nums[bestJ] : "—" },
-        { name: "dp[bestJ]+1", value: bestJ >= 0 ? `dp[${bestJ}]+1 = ${dp[bestJ]-1}+1 = ${dp[i]}` : "—" },
         { name: "dp[i]", value: dp[i] },
-        { name: "dp", value: `[${dp.join(",")}]` },
+        { name: "dp", value: [...dp] },
       ],
-      note: bestJ >= 0
-        ? { vi: `nums[${i}]=${nums[i]} nối sau nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.`, en: `nums[${i}]=${nums[i]} extends after nums[${bestJ}]=${nums[bestJ]}. dp[${i}] = dp[${bestJ}] + 1 = ${dp[i]}.` }
-        : { vi: `Không có phần tử trước nào nhỏ hơn ${nums[i]}, dp[${i}] = 1.`, en: `No earlier element smaller than ${nums[i]}, dp[${i}] stays 1.` },
+      note: {
+        en: `Start outer loop: i = ${i}, nums[i] = ${nums[i]}.`,
+        vi: `Bắt đầu vòng ngoài: i = ${i}, nums[i] = ${nums[i]}.`,
+      },
     });
+
+    for (let j = 0; j < i; j++) {
+      // Line 6: for j in range(i)
+      steps.push({
+        title: { vi: `for j = ${j}`, en: `for j = ${j}` },
+        arr: [...nums],
+        sub: [...dp],
+        highlight: [j, i], mark: [],
+        codeLines: [6], codeBlock: 1,
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "nums[j]", value: nums[j] },
+          { name: "nums[i]", value: nums[i] },
+          { name: "dp", value: [...dp] },
+        ],
+        note: {
+          en: `Inner loop: j = ${j}. Compare nums[${j}] = ${nums[j]} with nums[${i}] = ${nums[i]}.`,
+          vi: `Vòng trong: j = ${j}. So sánh nums[${j}] = ${nums[j]} với nums[${i}] = ${nums[i]}.`,
+        },
+      });
+
+      // Line 7: if nums[j] < nums[i]
+      const canExtend = nums[j] < nums[i];
+      steps.push({
+        title: { vi: `if nums[${j}] < nums[${i}]`, en: `if nums[${j}] < nums[${i}]` },
+        arr: [...nums],
+        sub: [...dp],
+        highlight: [j, i], mark: [],
+        codeLines: [7], codeBlock: 1,
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: `nums[${j}] < nums[${i}]`, value: `${nums[j]} < ${nums[i]} → ${canExtend}` },
+          { name: "dp", value: [...dp] },
+        ],
+        note: canExtend
+          ? { en: `${nums[j]} < ${nums[i]} → True. Can extend subsequence ending at j=${j}.`, vi: `${nums[j]} < ${nums[i]} → True. Có thể nối dãy con kết thúc tại j=${j}.` }
+          : { en: `${nums[j]} < ${nums[i]} → False. Cannot extend. Skip.`, vi: `${nums[j]} < ${nums[i]} → False. Không nối được. Bỏ qua.` },
+      });
+
+      // Line 8: dp[i] = max(dp[i], dp[j] + 1) — only if canExtend
+      if (canExtend) {
+        const oldDpi = dp[i];
+        const candidate = dp[j] + 1;
+        let updated = false;
+        if (candidate > dp[i]) {
+          dp[i] = candidate;
+          bestJ = j;
+          updated = true;
+        }
+        steps.push({
+          title: { vi: `dp[${i}] = max(dp[${i}], dp[${j}] + 1)`, en: `dp[${i}] = max(dp[${i}], dp[${j}] + 1)` },
+          arr: [...nums],
+          sub: [...dp],
+          highlight: [j, i], mark: updated ? [i] : [],
+          codeLines: [8], codeBlock: 1,
+          vars: [
+            { name: "i", value: i },
+            { name: "j", value: j },
+            { name: "dp[j] + 1", value: candidate },
+            { name: "dp[i] (before)", value: oldDpi },
+            { name: "dp[i] (after)", value: dp[i] },
+            { name: "updated?", value: updated ? "YES" : "no (not better)" },
+            { name: "dp", value: [...dp] },
+          ],
+          note: updated
+            ? { en: `dp[${i}] = max(${oldDpi}, ${dp[j]}+1) = ${dp[i]}. Updated!`, vi: `dp[${i}] = max(${oldDpi}, ${dp[j]}+1) = ${dp[i]}. Cập nhật!` }
+            : { en: `dp[${i}] = max(${oldDpi}, ${candidate}) = ${dp[i]}. No improvement.`, vi: `dp[${i}] = max(${oldDpi}, ${candidate}) = ${dp[i]}. Không cải thiện.` },
+        });
+      }
+    }
+    prev[i] = bestJ;
   }
 
+  // Line 9: return max(dp)
   let answer = 0, argmax = 0;
   for (let i = 0; i < n; i++) { if (dp[i] > answer) { answer = dp[i]; argmax = i; } }
   const chain = []; for (let i = argmax; i !== -1; i = prev[i]) chain.push(i); chain.reverse();
   const chainValues = chain.map((i) => nums[i]);
-  steps.push({ title: { vi: "Kết quả", en: "Result" }, arr: [...nums], sub: [...dp], highlight: [], mark: chain, final: true, codeLines: [9], codeBlock: 1, vars: [{ name: "i", value: "-" }, { name: "j", value: "-" }, { name: "answer", value: answer }, { name: "LIS", value: chainValues }], note: { vi: `LIS = ${answer}. Một dãy đạt được: [${chainValues.join(", ")}].`, en: `LIS = ${answer}. One such subsequence: [${chainValues.join(", ")}].` } });
+
+  steps.push({
+    title: { vi: "return max(dp)", en: "return max(dp)" },
+    arr: [...nums],
+    sub: [...dp],
+    highlight: [], mark: chain,
+    final: true,
+    codeLines: [9], codeBlock: 1,
+    vars: [
+      { name: "max(dp)", value: answer },
+      { name: "LIS", value: `[${chainValues.join(", ")}]` },
+      { name: "dp", value: [...dp] },
+    ],
+    note: {
+      en: `LIS length = ${answer}. One such subsequence: [${chainValues.join(", ")}].`,
+      vi: `Độ dài LIS = ${answer}. Một dãy con đạt được: [${chainValues.join(", ")}].`,
+    },
+  });
+
   return { original: [...nums], answer, chain, steps };
 }
 
