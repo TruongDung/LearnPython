@@ -2594,20 +2594,37 @@ function buildSteps740(nums) {
   });
 
   steps.push({
-    title: { vi: "Xây earn từ nums", en: "Build earn from nums" },
+    title: { vi: "Bắt đầu lặp nums", en: "Start loop over nums" },
+    arr: earn.slice(),
+    sub: earn.map((_, i) => String(i)),
+    highlight: [],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "earn", value: `[${earn.join(",")}]` },
+    ],
+    note: {
+      vi: `Bắt đầu lặp qua nums để xây earn[].`,
+      en: `Begin looping through nums to build earn[].`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Cập nhật earn[num]", en: "Update earn[num]" },
     arr: earn.slice(),
     sub: earn.map((_, i) => String(i)),
     highlight: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
     mark: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
-    codeLines: [5, 6],
+    codeLines: [6],
     vars: [
       { name: "nums", value: `[${nums.join(",")}]` },
       { name: "earn", value: `[${earn.join(",")}]` },
       { name: "mapping", value: mapping },
     ],
     note: {
-      vi: `earn[v] = tổng của mọi phần tử bằng v trong nums. Với nums = [${nums.join(",")}], ta có ${mapping}.`,
-      en: `earn[v] = sum of all elements equal to v in nums. For nums = [${nums.join(",")}], we get ${mapping}.`,
+      vi: `earn[num] += num với mỗi num trong nums để tổng hợp điểm của mỗi giá trị.`,
+      en: `earn[num] += num for each num in nums to aggregate the score for each value.`,
     },
   });
 
@@ -2617,19 +2634,35 @@ function buildSteps740(nums) {
   }
 
   steps.push({
-    title: { vi: "Chuyển về House Robber", en: "Reduce to House Robber" },
+    title: { vi: "Chuyển sang House Robber", en: "House Robber idea" },
     arr: earn.slice(),
     sub: earn.map((_, i) => String(i)),
     highlight: nonzeroEarn,
     mark: nonzeroEarn,
-    codeLines: [3, 4, 5],
+    codeLines: [4],
     vars: [
       { name: "nums", value: `[${nums.join(",")}]` },
       { name: "earn", value: `[${earn.join(",")}]` },
     ],
     note: {
-      vi: `earn[v] = v × count(v). Chọn v thì mất v-1 và v+1 → giống House Robber trên mảng earn.\nVì vậy dp[i] chỉ có thể chọn giữa dp[i-1] và dp[i-2] + earn[i].\nearn = [${earn.join(", ")}] (index = giá trị số).`,
-      en: `earn[v] = v × count(v). Taking v removes v-1 and v+1 → same as House Robber on earn array.\nSo dp[i] must choose between dp[i-1] and dp[i-2] + earn[i].\nearn = [${earn.join(", ")}] (index = number value).`,
+      vi: `earn[v] = v × count(v). Chọn v thì mất v-1 và v+1 → giống House Robber trên mảng earn.`,
+      en: `earn[v] = v × count(v). Taking v removes v-1 and v+1 → same as House Robber on earn array.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Công thức DP", en: "DP formula" },
+    arr: earn.slice(),
+    sub: earn.map((_, i) => String(i)),
+    highlight: nonzeroEarn,
+    mark: nonzeroEarn,
+    codeLines: [5],
+    vars: [
+      { name: "earn", value: `[${earn.join(",")}]` },
+    ],
+    note: {
+      vi: `dp[i] = max(dp[i-1], dp[i-2] + earn[i]).`,
+      en: `dp[i] = max(dp[i-1], dp[i-2] + earn[i]).`,
     },
   });
 
@@ -2639,38 +2672,92 @@ function buildSteps740(nums) {
   if (maxVal >= 1) dp[1] = Math.max(earn[0], earn[1]);
 
   steps.push({
-    title: { vi: "Khởi tạo DP", en: "Initialize DP" },
+    title: { vi: "Tạo mảng dp", en: "Create dp array" },
     arr: earn.slice(),
     sub: dp.map((v) => String(v)),
-    highlight: maxVal >= 1 ? [0, 1] : [0],
+    highlight: [],
     mark: [],
-    codeLines: [7, 8, 9],
+    codeLines: [7],
     vars: [
-      { name: "dp[0]", value: dp[0] },
-      { name: "dp[1]", value: maxVal >= 1 ? dp[1] : "-" },
+      { name: "dp", value: `[${dp.join(",")}]` },
     ],
     note: {
-      vi: `dp[0] = earn[0] = ${dp[0]}. dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
-      en: `dp[0] = earn[0] = ${dp[0]}. dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
+      vi: `Khởi tạo dp có độ dài max_val+1 với tất cả giá trị bằng 0.`,
+      en: `Initialize dp with length max_val+1 and all values 0.`,
     },
   });
+
+  steps.push({
+    title: { vi: "Đặt dp[0]", en: "Set dp[0]" },
+    arr: earn.slice(),
+    sub: dp.map((v) => String(v)),
+    highlight: [0],
+    mark: [],
+    codeLines: [8],
+    vars: [
+      { name: "dp[0]", value: dp[0] },
+      { name: "earn[0]", value: earn[0] },
+    ],
+    note: {
+      vi: `dp[0] được gán earn[0] = ${earn[0]}.`,
+      en: `dp[0] is assigned earn[0] = ${earn[0]}.`,
+    },
+  });
+
+  if (maxVal >= 1) {
+    steps.push({
+      title: { vi: "Đặt dp[1]", en: "Set dp[1]" },
+      arr: earn.slice(),
+      sub: dp.map((v) => String(v)),
+      highlight: [1],
+      mark: [],
+      codeLines: [9],
+      vars: [
+        { name: "dp[1]", value: dp[1] },
+        { name: "earn[0]", value: earn[0] },
+        { name: "earn[1]", value: earn[1] },
+      ],
+      note: {
+        vi: `dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
+        en: `dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
+      },
+    });
+  }
 
   for (let i = 2; i <= maxVal; i++) {
     const skip = dp[i - 1];
     const take = dp[i - 2] + earn[i];
+    steps.push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      arr: earn.slice(),
+      sub: dp.map((v) => String(v)),
+      highlight: [i - 2, i - 1],
+      mark: [i],
+      codeLines: [10],
+      vars: [
+        { name: "i", value: i },
+        { name: "skip (dp[i-1])", value: skip },
+        { name: "take (dp[i-2] + earn[i])", value: take },
+        { name: "earn[i]", value: earn[i] },
+      ],
+      note: {
+        vi: `Tiếp tục vòng lặp với i = ${i}. So sánh dp[i-1] và dp[i-2] + earn[i].`,
+        en: `Continue loop with i = ${i}. Compare dp[i-1] and dp[i-2] + earn[i].`,
+      },
+    });
+
     dp[i] = Math.max(skip, take);
     const took = dp[i] === take;
 
     steps.push({
-      title: { vi: `dp[${i}]`, en: `dp[${i}]` },
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
       arr: earn.slice(),
       sub: dp.map((v) => String(v)),
       highlight: [i - 2, i - 1, i],
       mark: [],
-      codeLines: [10, 11],
+      codeLines: [11],
       vars: [
         { name: "i", value: i },
-        { name: "earn[i]", value: earn[i] },
         { name: "skip (dp[i-1])", value: skip },
         { name: "take (dp[i-2]+earn[i])", value: take },
         { name: "dp[i]", value: dp[i] },
