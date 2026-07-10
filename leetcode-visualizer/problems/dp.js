@@ -2286,7 +2286,7 @@ function buildSteps213(nums) {
 }
 
 /**
- * LeetCode 256: Paint Fence.
+ * LeetCode 276: Paint Fence.
  * dp[i] = number of ways to paint i posts with k colors, with no more than two
  * adjacent posts having the same color.
  *  - same = ways where post i has same color as post i-1
@@ -2294,7 +2294,7 @@ function buildSteps213(nums) {
  *  - same[i] = diff[i-1]
  *  - diff[i] = (same[i-1] + diff[i-1]) * (k-1)
  */
-function buildSteps256(input, params) {
+function buildSteps276(input, params) {
   const n = input[0] || 0;
   const k = params.k !== undefined ? params.k : 3;
   const steps = [];
@@ -5927,7 +5927,7 @@ module.exports = {
           { id: 746, name: "Min Cost Climbing Stairs", pattern: "Fibonacci + Cost" },
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
-          { id: 256, name: "Paint Fence", pattern: "Same/Diff DP" },
+          { id: 276, name: "Paint Fence", pattern: "Same/Diff DP" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
@@ -5950,7 +5950,7 @@ module.exports = {
           {
             title: "Giai đoạn 1 — DP cơ bản (phải thuộc)",
             description: "Những bài xây nền tảng. Hiểu DP là gì, công thức truy hồi, lựa chọn Take / Skip.",
-            problems: [70, 746, 198, 213, 256, 740],
+            problems: [70, 746, 198, 213, 276, 740],
           },
           {
             title: "Giai đoạn 2 — DP trên mảng",
@@ -5989,7 +5989,7 @@ module.exports = {
           { id: 746, name: "Min Cost Climbing Stairs", pattern: "Fibonacci + Cost" },
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
-          { id: 256, name: "Paint Fence", pattern: "Same/Diff DP" },
+          { id: 276, name: "Paint Fence", pattern: "Same/Diff DP" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
@@ -6012,7 +6012,7 @@ module.exports = {
           {
             title: "Stage 1 — DP Basics (must know)",
             description: "Foundation problems. Understand what DP is, recurrence, Take / Skip choice.",
-            problems: [70, 746, 198, 213, 256, 740],
+            problems: [70, 746, 198, 213, 276, 740],
           },
           {
             title: "Stage 2 — Array DP",
@@ -6598,8 +6598,8 @@ module.exports = {
     ],
     builder: buildSteps740,
   },
-  256: {
-    id: 256,
+  276: {
+    id: 276,
     difficulty: "medium",
     slug: "paint-fence",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
@@ -6629,7 +6629,7 @@ module.exports = {
       "            same, diff = diff, (same + diff) * (k - 1)",
       "        return same + diff",
     ],
-    builder: buildSteps256,
+    builder: buildSteps276,
   },
   1140: {
     id: 1140,
