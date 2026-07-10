@@ -2538,21 +2538,98 @@ function buildSteps740(nums) {
   const earn = new Array(maxVal + 1).fill(0);
   for (const num of nums) earn[num] += num;
 
-  // Show transformation
+  // Original input
+  const mapping = earn
+    .map((v, i) => (v > 0 ? `${i}→${v}` : null))
+    .filter(Boolean)
+    .join(", ");
+
+  steps.push({
+    title: { vi: "Đầu vào gốc", en: "Original input" },
+    arr: nums.slice(),
+    sub: nums.map((_, i) => String(i)),
+    highlight: nums.map((_, i) => i),
+    mark: [],
+    codeLines: [1, 2],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "maxVal", value: maxVal },
+    ],
+    note: {
+      vi: `Bắt đầu với mảng nums. Mỗi giá trị sẽ được cộng vào earn[] theo giá trị số tương ứng.`,
+      en: `Start with nums. Each value will be aggregated into earn[] by its numeric value.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Tính max_val", en: "Compute max_val" },
+    arr: nums.slice(),
+    sub: nums.map((_, i) => String(i)),
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "maxVal", value: maxVal },
+    ],
+    note: {
+      vi: `max_val là giá trị lớn nhất trong nums, dùng để xác định kích thước của earn[].`,
+      en: `max_val is the largest value in nums, used to size the earn array.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo earn", en: "Initialize earn" },
+    arr: earn.slice(),
+    sub: earn.map((_, i) => String(i)),
+    highlight: earn.map((_, i) => i),
+    mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "earn", value: `[${earn.join(",")}]` },
+    ],
+    note: {
+      vi: `Tạo mảng earn có độ dài max_val+1 và khởi tạo tất cả phần tử bằng 0.`,
+      en: `Create earn array of length max_val+1 and initialize all entries to 0.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Xây earn từ nums", en: "Build earn from nums" },
+    arr: earn.slice(),
+    sub: earn.map((_, i) => String(i)),
+    highlight: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
+    mark: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
+    codeLines: [5, 6],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "earn", value: `[${earn.join(",")}]` },
+      { name: "mapping", value: mapping },
+    ],
+    note: {
+      vi: `earn[v] = tổng của mọi phần tử bằng v trong nums. Với nums = [${nums.join(",")}], ta có ${mapping}.`,
+      en: `earn[v] = sum of all elements equal to v in nums. For nums = [${nums.join(",")}], we get ${mapping}.`,
+    },
+  });
+
+  const nonzeroEarn = [];
+  for (let i = 0; i < earn.length; i++) {
+    if (earn[i] > 0) nonzeroEarn.push(i);
+  }
+
   steps.push({
     title: { vi: "Chuyển về House Robber", en: "Reduce to House Robber" },
     arr: earn.slice(),
     sub: earn.map((_, i) => String(i)),
-    highlight: [],
-    mark: [],
+    highlight: nonzeroEarn,
+    mark: nonzeroEarn,
     codeLines: [3, 4, 5],
     vars: [
       { name: "nums", value: `[${nums.join(",")}]` },
       { name: "earn", value: `[${earn.join(",")}]` },
     ],
     note: {
-      vi: `earn[v] = v × count(v). Chọn v thì mất v-1 và v+1 → giống House Robber trên mảng earn.\nearn = [${earn.join(", ")}] (index = giá trị số).`,
-      en: `earn[v] = v × count(v). Taking v removes v-1 and v+1 → same as House Robber on earn array.\nearn = [${earn.join(", ")}] (index = number value).`,
+      vi: `earn[v] = v × count(v). Chọn v thì mất v-1 và v+1 → giống House Robber trên mảng earn.\nVì vậy dp[i] chỉ có thể chọn giữa dp[i-1] và dp[i-2] + earn[i].\nearn = [${earn.join(", ")}] (index = giá trị số).`,
+      en: `earn[v] = v × count(v). Taking v removes v-1 and v+1 → same as House Robber on earn array.\nSo dp[i] must choose between dp[i-1] and dp[i-2] + earn[i].\nearn = [${earn.join(", ")}] (index = number value).`,
     },
   });
 
@@ -6253,6 +6330,20 @@ module.exports = {
       "        for i in range(2, max_val + 1):",
       "            dp[i] = max(dp[i-1], dp[i-2] + earn[i])",
       "        return dp[max_val]",
+    ],
+    approach: [
+      {
+        vi: "Chuyển mảng nums thành earn[] với earn[v] = v × count(v).",
+        en: "Transform nums into earn[] where earn[v] = v × count(v).",
+      },
+      {
+        vi: "Bài toán trở thành House Robber trên earn[]: chọn earn[i] nghĩa là bỏ i-1 và i+1.",
+        en: "The problem becomes House Robber on earn[]: taking earn[i] means skipping i-1 and i+1.",
+      },
+      {
+        vi: "Dùng dp[i] = max(dp[i-1], dp[i-2] + earn[i]) và trả về dp[max_val] .",
+        en: "Use dp[i] = max(dp[i-1], dp[i-2] + earn[i]) and return dp[max_val].",
+      },
     ],
     builder: buildSteps740,
   },
