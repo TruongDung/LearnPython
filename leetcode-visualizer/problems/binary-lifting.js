@@ -41,7 +41,7 @@ function buildSteps3534(input, params) {
   // ─── Line: for i, node in enumerate(sorted_idx): pos[node] = i ───
   push(
     { vi: "pos[node] = i cho mỗi node", en: "pos[node] = i for each node" },
-    [5, 6],
+    [6],
     [{ name: "pos[]", value: `[${pos.join(",")}]` }],
     { vi: `pos[node] = vị trí của node trong sorted order. pos = [${pos.join(",")}].`, en: `pos[node] = position of node in sorted order. pos = [${pos.join(",")}].` }
   );
@@ -81,7 +81,7 @@ function buildSteps3534(input, params) {
     }
     push(
       { vi: `up[${k}][i] = up[${k-1}][up[${k-1}][i]]  (2^${k}=${1<<k} bước)`, en: `up[${k}][i] = up[${k-1}][up[${k-1}][i]]  (2^${k}=${1<<k} steps)` },
-      [15, 16, 17],
+      [17],
       [
         { name: "k", value: k },
         { name: `up[${k}]`, value: `[${up[k].join(",")}]` },
@@ -100,16 +100,30 @@ function buildSteps3534(input, params) {
     let pv = pos[v];
     if (pu > pv) { const tmp = pu; pu = pv; pv = tmp; }
 
-    // Line: pu, pv = pos[u], pos[v]; swap if needed
+    // Line 19: for u, v in queries
     push(
-      { vi: `Query(${u},${v}): pu=${pu}, pv=${pv}`, en: `Query(${u},${v}): pu=${pu}, pv=${pv}` },
-      [19, 20, 21],
-      [
-        { name: "u", value: u }, { name: "v", value: v },
-        { name: "pu = pos[u]", value: pu },
-        { name: "pv = pos[v]", value: pv },
-      ],
-      { vi: `Tìm vị trí sorted: u=n${u} ở pos ${pu}, v=n${v} ở pos ${pv}.`, en: `Find sorted positions: u=n${u} at pos ${pu}, v=n${v} at pos ${pv}.` },
+      { vi: `Query(${u},${v})`, en: `Query(${u},${v})` },
+      [19],
+      [{ name: "u", value: u }, { name: "v", value: v }],
+      { vi: `Bắt đầu query: u=${u}, v=${v}.`, en: `Start query: u=${u}, v=${v}.` },
+      []
+    );
+
+    // Line 20: pu, pv = pos[u], pos[v]
+    push(
+      { vi: `pu, pv = pos[${u}], pos[${v}] = ${pu}, ${pv}`, en: `pu, pv = pos[${u}], pos[${v}] = ${pu}, ${pv}` },
+      [20],
+      [{ name: "pu = pos[u]", value: pu }, { name: "pv = pos[v]", value: pv }],
+      { vi: `Vị trí sorted: pu=${pu}, pv=${pv}.`, en: `Sorted positions: pu=${pu}, pv=${pv}.` },
+      [pu, pv]
+    );
+
+    // Line 21: if pu > pv: swap
+    push(
+      { vi: `if pu > pv: swap → pu=${pu}, pv=${pv}`, en: `if pu > pv: swap → pu=${pu}, pv=${pv}` },
+      [21],
+      [{ name: "pu", value: pu }, { name: "pv", value: pv }, { name: "swapped?", value: pos[u] > pos[v] ? "yes" : "no" }],
+      { vi: `${pos[u] > pos[v] ? "Đã swap để pu < pv." : "Không cần swap (pu ≤ pv)."}`, en: `${pos[u] > pos[v] ? "Swapped so pu < pv." : "No swap needed (pu ≤ pv)."}` },
       [pu, pv]
     );
 
@@ -149,7 +163,7 @@ function buildSteps3534(input, params) {
         dist += (1 << k);
         push(
           { vi: `k=${k}: up[${k}][${oldCur}]=${cur} < ${pv} → nhảy! dist+=${1<<k}`, en: `k=${k}: up[${k}][${oldCur}]=${cur} < ${pv} → jump! dist+=${1<<k}` },
-          [24, 25, 26],
+          [26],
           [
             { name: "k", value: k },
             { name: `up[${k}][${oldCur}]`, value: cur },
@@ -162,7 +176,7 @@ function buildSteps3534(input, params) {
       } else {
         push(
           { vi: `k=${k}: up[${k}][${cur}]=${up[k][cur]} ≥ ${pv} → bỏ qua`, en: `k=${k}: up[${k}][${cur}]=${up[k][cur]} ≥ ${pv} → skip` },
-          [24, 25],
+          [25],
           [
             { name: "k", value: k },
             { name: `up[${k}][${cur}]`, value: up[k][cur] },
