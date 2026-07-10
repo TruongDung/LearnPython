@@ -5557,41 +5557,94 @@ function buildSteps494(nums, params) {
 
   // ── Process each num ────────────────────────────────────
   for (const num of nums) {
-    const before = dp.slice();
-    // Iterate j downward so each num is used at most once (0/1 knapsack)
-    const updatedIdx = [];
+    steps.push({
+      title: { vi: `Bắt đầu num = ${num}`, en: `Start num = ${num}` },
+      arr: dp.slice(),
+      sub: dp.map((_, i) => String(i)),
+      highlight: [],
+      mark: [],
+      codeLines: [9],
+      vars: [
+        { name: "num", value: num },
+        { name: "dp (before)", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `Xử lý num = ${num}. Duyệt j từ ${P} xuống ${num}: dp[j] += dp[j - ${num}].`,
+        en: `Process num = ${num}. Iterate j from ${P} down to ${num}: dp[j] += dp[j - ${num}].`,
+      },
+    });
+
     for (let j = P; j >= num; j--) {
-      const added = dp[j - num];
-      if (added > 0) {
-        dp[j] += added;
-        updatedIdx.push(j);
-      }
+      const beforeValue = dp[j];
+      const addWays = dp[j - num];
+      const updated = addWays > 0;
+
+      steps.push({
+        title: { vi: `Xét j = ${j}`, en: `Consider j = ${j}` },
+        arr: dp.slice(),
+        sub: dp.map((_, i) => String(i)),
+        highlight: [j, j - num],
+        mark: [j - num],
+        codeLines: [10],
+        vars: [
+          { name: "num", value: num },
+          { name: "j", value: j },
+          { name: `dp[${j - num}]`, value: addWays },
+          { name: `dp[${j}] (before)`, value: beforeValue },
+        ],
+        note: updated
+          ? {
+              vi: `dp[${j - num}] = ${addWays} → dp[${j}] sẽ tăng từ ${beforeValue}.`, 
+              en: `dp[${j - num}] = ${addWays} → dp[${j}] will increase from ${beforeValue}.`, 
+            }
+          : {
+              vi: `dp[${j - num}] = 0 → dp[${j}] không thay đổi.`, 
+              en: `dp[${j - num}] = 0 → dp[${j}] stays unchanged.`, 
+            },
+      });
+
+      dp[j] += addWays;
+      steps.push({
+        title: { vi: `dp[${j}] += dp[${j - num}]`, en: `dp[${j}] += dp[${j - num}]` },
+        arr: dp.slice(),
+        sub: dp.map((_, i) => String(i)),
+        highlight: [j],
+        mark: [j - num],
+        codeLines: [11],
+        vars: [
+          { name: `dp[${j}] (before)`, value: beforeValue },
+          { name: `dp[${j - num}]`, value: addWays },
+          { name: `dp[${j}] (after)`, value: dp[j] },
+        ],
+        note: updated
+          ? {
+              vi: `Cập nhật dp[${j}] từ ${beforeValue} thành ${dp[j]}.`, 
+              en: `Updated dp[${j}] from ${beforeValue} to ${dp[j]}.`, 
+            }
+          : {
+              vi: `dp[${j}] vẫn là ${dp[j]}.`, 
+              en: `dp[${j}] remains ${dp[j]}.`, 
+            },
+      });
     }
 
     steps.push({
-      title: { vi: `Thêm num = ${num}`, en: `Add num = ${num}` },
+      title: { vi: `Sau num = ${num}`, en: `After num = ${num}` },
       arr: dp.slice(),
       sub: dp.map((_, i) => String(i)),
-      highlight: updatedIdx,
+      highlight: Array.from({ length: P - num + 1 }, (_, x) => x + num),
       mark: [],
-      codeLines: [9, 10, 11, 12],
+      codeLines: [9, 10, 11],
       vars: [
         { name: "num", value: num },
-        { name: "dp (before)", value: `[${before.join(",")}]` },
         { name: "dp (after)", value: `[${dp.join(",")}]` },
-        { name: "cells changed", value: updatedIdx.join(",") || "(none)" },
       ],
       note: {
-        vi:
-          `Xử lý num = ${num}: dp[j] += dp[j − ${num}] cho j từ ${P} xuống ${num} (duyệt ngược để không dùng lại num).\n` +
-          `Ô thay đổi: [${updatedIdx.join(", ")}]. Sau khi thêm: dp = [${dp.join(", ")}].`,
-        en:
-          `Process num = ${num}: dp[j] += dp[j − ${num}] for j from ${P} down to ${num} (downward to avoid reusing num).\n` +
-          `Changed cells: [${updatedIdx.join(", ")}]. After: dp = [${dp.join(", ")}].`,
+        vi: `Hoàn tất xử lý num = ${num}. dp hiện tại = [${dp.join(",")}].`, 
+        en: `Finished processing num = ${num}. Current dp = [${dp.join(",")}].`, 
       },
     });
   }
-
   const answer = dp[P];
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
