@@ -2644,7 +2644,7 @@ function buildSteps740(nums) {
     sub: dp.map((v) => String(v)),
     highlight: maxVal >= 1 ? [0, 1] : [0],
     mark: [],
-    codeLines: [6, 7, 8],
+    codeLines: [7, 8, 9],
     vars: [
       { name: "dp[0]", value: dp[0] },
       { name: "dp[1]", value: maxVal >= 1 ? dp[1] : "-" },
@@ -2667,7 +2667,7 @@ function buildSteps740(nums) {
       sub: dp.map((v) => String(v)),
       highlight: [i - 2, i - 1, i],
       mark: [],
-      codeLines: [9, 10],
+      codeLines: [10, 11],
       vars: [
         { name: "i", value: i },
         { name: "earn[i]", value: earn[i] },
@@ -2691,7 +2691,7 @@ function buildSteps740(nums) {
     highlight: [],
     mark: [maxVal],
     final: true,
-    codeLines: [11],
+    codeLines: [12],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Điểm tối đa = dp[${maxVal}] = ${answer}.`,
