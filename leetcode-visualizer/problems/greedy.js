@@ -615,7 +615,7 @@ function buildSteps121Rolling(nums) {
   steps.push({
     title: { vi: `min_price = prices[0] = ${prices[0]}`, en: `min_price = prices[0] = ${prices[0]}` },
     arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
-    highlight: [0], mark: [], codeLines: [3], codeBlock: 2,
+    highlight: [0], mark: [], codeLines: [3], codeBlock: 3,
     vars: [{ name: "min_price", value: prices[0] }],
     note: {
       vi: `O(1) space: chỉ dùng prev_dp thay cho dp[]. Khởi tạo min_price = ${prices[0]}.`,
@@ -627,7 +627,7 @@ function buildSteps121Rolling(nums) {
   steps.push({
     title: { vi: "prev_dp = 0", en: "prev_dp = 0" },
     arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
-    highlight: [0], mark: [], codeLines: [4], codeBlock: 2,
+    highlight: [0], mark: [], codeLines: [4], codeBlock: 3,
     vars: [{ name: "min_price", value: prices[0] }, { name: "prev_dp", value: 0 }],
     note: {
       vi: `prev_dp = 0 (dp[0] = 0, ngày đầu không bán được).`,
@@ -642,7 +642,7 @@ function buildSteps121Rolling(nums) {
     steps.push({
       title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
       arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
-      highlight: [i], mark: [], codeLines: [5], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [5], codeBlock: 3,
       vars: [
         { name: "i", value: i },
         { name: "prices[i]", value: prices[i] },
@@ -660,7 +660,7 @@ function buildSteps121Rolling(nums) {
     steps.push({
       title: { vi: `cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}`, en: `cur_dp = max(${prevDp}, ${sellProfit}) = ${curDp}` },
       arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
-      highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [6], codeBlock: 3,
       vars: [
         { name: "cur_dp = max(prev_dp, price-min)", value: `max(${prevDp}, ${prices[i]}-${minPrice}) = max(${prevDp}, ${sellProfit}) = ${curDp}` },
       ],
@@ -675,7 +675,7 @@ function buildSteps121Rolling(nums) {
     steps.push({
       title: { vi: `prev_dp = ${prevDp}`, en: `prev_dp = ${prevDp}` },
       arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
-      highlight: [i], mark: [], codeLines: [7], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [7], codeBlock: 3,
       vars: [{ name: "prev_dp", value: prevDp }],
       note: {
         vi: `Gán prev_dp = cur_dp = ${prevDp}.`,
@@ -689,7 +689,7 @@ function buildSteps121Rolling(nums) {
     steps.push({
       title: { vi: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}`, en: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}` },
       arr: [...prices], sub: prices.map((_, idx) => idx === i ? `◄ day ${idx}` : `day ${idx}`),
-      highlight: [i], mark: [], codeLines: [8], codeBlock: 2,
+      highlight: [i], mark: [], codeLines: [8], codeBlock: 3,
       vars: [{ name: "min_price", value: `min(${oldMin}, ${prices[i]}) = ${minPrice}` }],
       note: {
         vi: `min_price = min(${oldMin}, ${prices[i]}) = ${minPrice}${minPrice < oldMin ? " 📉" : ""}.`,
@@ -701,7 +701,7 @@ function buildSteps121Rolling(nums) {
   steps.push({
     title: { vi: `Kết quả: ${prevDp} 💰 (O(1) space!)`, en: `Result: ${prevDp} 💰 (O(1) space!)` },
     arr: [...prices], sub: prices.map((_, i) => `day ${i}`),
-    highlight: [], mark: [], final: true, codeLines: [9], codeBlock: 2,
+    highlight: [], mark: [], final: true, codeLines: [9], codeBlock: 3,
     vars: [{ name: "answer", value: prevDp }],
     note: { vi: `prev_dp = ${prevDp}. O(1) bộ nhớ!`, en: `prev_dp = ${prevDp}. O(1) memory!` },
   });
@@ -1070,8 +1070,20 @@ module.exports = {
       "            min_price = min(min_price, prices[i])",
       "        return dp[n-1]",
     ],
+    code3: [
+      "class Solution:",
+      "    def maxProfit(self, prices):",
+      "        min_price = prices[0]",
+      "        prev_dp = 0",
+      "        for i in range(1, len(prices)):",
+      "            cur_dp = max(prev_dp, prices[i] - min_price)",
+      "            prev_dp = cur_dp",
+      "            min_price = min(min_price, prices[i])",
+      "        return prev_dp",
+    ],
     codeLabel: { vi: "Cách 1: Greedy O(1)", en: "Approach 1: Greedy O(1)" },
     code2Label: { vi: "Cách 2: DP Array O(n)", en: "Approach 2: DP Array O(n)" },
+    code3Label: { vi: "Cách 3: DP Rolling O(1) space", en: "Approach 3: DP Rolling O(1) space" },
     builder: buildSteps121,
   },
   122: {
