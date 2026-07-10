@@ -221,6 +221,9 @@ function buildSteps152(nums) {
   let curMin = nums[0];
   let result = nums[0];
   let bestEnd = 0;
+  let bestStart = 0;
+  let curMaxStart = 0;
+  let curMinStart = 0;
 
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
@@ -247,29 +250,53 @@ function buildSteps152(nums) {
     const b = prevMax * x;
     const c = prevMin * x;
 
-    // Sub-step 1: compute candidates
+    // Sub-step 1a: x = nums[i]
     steps.push({
-      title: { vi: `i=${i}: candidates = (${a}, ${b}, ${c})`, en: `i=${i}: candidates = (${a}, ${b}, ${c})` },
+      title: { vi: `x = nums[${i}] = ${x}`, en: `x = nums[${i}] = ${x}` },
       arr: [...nums],
       highlight: [i],
       mark: [],
-      codeLines: [5, 6],
+      codeLines: [5],
       vars: [
         { name: "i", value: i },
-        { name: "nums[i]", value: x },
-        { name: "a = nums[i]", value: a },
-        { name: "b = curMax * nums[i]", value: `${prevMax} × ${x} = ${b}` },
-        { name: "c = curMin * nums[i]", value: `${prevMin} × ${x} = ${c}` },
+        { name: "x = nums[i]", value: x },
       ],
       note: {
-        vi: `3 ứng viên: a=${a} (bắt đầu lại), b=curMax×x=${prevMax}×${x}=${b}, c=curMin×x=${prevMin}×${x}=${c}.`,
-        en: `3 candidates: a=${a} (restart), b=curMax×x=${prevMax}×${x}=${b}, c=curMin×x=${prevMin}×${x}=${c}.`,
+        vi: `Lấy phần tử tiếp theo: x = nums[${i}] = ${x}.`,
+        en: `Get next element: x = nums[${i}] = ${x}.`,
+      },
+    });
+
+    // Sub-step 1b: compute candidates
+    steps.push({
+      title: { vi: `candidates = (${a}, ${b}, ${c})`, en: `candidates = (${a}, ${b}, ${c})` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [6],
+      vars: [
+        { name: "a = x", value: a },
+        { name: "b = curMax × x", value: `${prevMax} × ${x} = ${b}` },
+        { name: "c = curMin × x", value: `${prevMin} × ${x} = ${c}` },
+      ],
+      note: {
+        vi: `3 ứng viên: a=${a} (bắt đầu lại), b=${prevMax}×${x}=${b} (mở rộng max), c=${prevMin}×${x}=${c} (mở rộng min).`,
+        en: `3 candidates: a=${a} (restart), b=${prevMax}×${x}=${b} (extend max), c=${prevMin}×${x}=${c} (extend min).`,
       },
     });
 
     // Sub-step 2: curMax = max(a, b, c)
     const newMax = Math.max(a, b, c);
+    const prevMaxStart = curMaxStart;
+    const prevMinStart = curMinStart;
     curMax = newMax;
+    // Track where the current max subarray starts
+    if (curMax === a) {
+      curMaxStart = i; // restart: subarray starts at current index
+    } else if (curMax === c) {
+      curMaxStart = prevMinStart; // came from curMin path
+    }
+    // else curMax === b: stays at previous curMaxStart
     steps.push({
       title: { vi: `curMax = max(${a}, ${b}, ${c}) = ${curMax}`, en: `curMax = max(${a}, ${b}, ${c}) = ${curMax}` },
       arr: [...nums],
@@ -289,6 +316,13 @@ function buildSteps152(nums) {
     // Sub-step 3: curMin = min(a, b, c)
     const newMin = Math.min(a, b, c);
     curMin = newMin;
+    // Track where the current min subarray starts
+    if (curMin === a) {
+      curMinStart = i; // restart
+    } else if (curMin === b) {
+      curMinStart = prevMaxStart; // came from curMax path
+    }
+    // else curMin === c: stays at previous curMinStart
     steps.push({
       title: { vi: `curMin = min(${a}, ${b}, ${c}) = ${curMin}`, en: `curMin = min(${a}, ${b}, ${c}) = ${curMin}` },
       arr: [...nums],
@@ -310,6 +344,7 @@ function buildSteps152(nums) {
     if (curMax > result) {
       result = curMax;
       bestEnd = i;
+      bestStart = curMaxStart;
       updated = true;
     }
     steps.push({
@@ -335,17 +370,20 @@ function buildSteps152(nums) {
     });
   }
 
+  // Build mark array for the full best subarray range
+  const markRange = Array.from({ length: bestEnd - bestStart + 1 }, (_, k) => bestStart + k);
+
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
     arr: [...nums],
     highlight: [],
-    mark: [bestEnd],
+    mark: markRange,
     final: true,
     codeLines: [10],
-    vars: [{ name: "result", value: result }],
+    vars: [{ name: "result", value: result }, { name: "subarray", value: `nums[${bestStart}..${bestEnd}]` }],
     note: {
       vi: `Tích lớn nhất của một dãy con liên tiếp = ${result}.`,
-      en: `The maximum product of a contiguous subarray = ${result}.`,
+      en: `The maximum product of a contiguous subarray = ${result} (indices ${bestStart} to ${bestEnd}).`,
     },
   });
 
