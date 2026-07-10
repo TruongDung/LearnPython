@@ -3545,7 +3545,6 @@ function buildSteps279(input) {
   const dp = new Array(n + 1).fill(Infinity);
   dp[0] = 0;
 
-  // Available squares
   const squares = [];
   for (let j = 1; j * j <= n; j++) squares.push(j * j);
 
@@ -3562,45 +3561,88 @@ function buildSteps279(input) {
       { name: "dp[0]", value: 0 },
     ],
     note: {
-      vi: `dp[i] = số bình phương hoàn hảo ít nhất có tổng = i.\nCác bình phương ≤ ${n}: [${squares.join(", ")}].\ndp[i] = min(dp[i - j²] + 1) ∀ j² ≤ i.`,
-      en: `dp[i] = min perfect squares summing to i.\nSquares ≤ ${n}: [${squares.join(", ")}].\ndp[i] = min(dp[i - j²] + 1) for all j² ≤ i.`,
+      vi: `dp[i] = số bình phương hoàn hảo ít nhất có tổng = i.\nCác bình phương ≤ ${n}: [${squares.join(", ")}].\ndp[i] = min(dp[i - j²] + 1) với j² ≤ i.`,
+      en: `dp[i] = min perfect squares summing to i.\nSquares ≤ ${n}: [${squares.join(", ")}].\ndp[i] = min(dp[i - j²] + 1) for j² ≤ i.`,
     },
   });
 
   for (let i = 1; i <= n; i++) {
     let bestSq = -1;
+    let bestValue = dp[i];
+    steps.push({
+      title: { vi: `Bắt đầu dp[${i}]`, en: `Start dp[${i}]` },
+      arr: dp.slice(0, i + 1).map((v) => (v === Infinity ? 0 : v)),
+      sub: dp.slice(0, i + 1).map((v) => (v === Infinity ? "∞" : String(v))),
+      highlight: [i],
+      mark: [],
+      codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i] (initial)", value: bestValue === Infinity ? "∞" : String(bestValue) },
+      ],
+      note: {
+        vi: `Tìm dp[${i}] bằng cách thử các bình phương ≤ ${i}.`,
+        en: `Compute dp[${i}] by testing squares ≤ ${i}.`,
+      },
+    });
+
     for (const sq of squares) {
       if (sq > i) break;
-      if (dp[i - sq] + 1 < dp[i]) {
-        dp[i] = dp[i - sq] + 1;
+      const candidate = dp[i - sq] + 1;
+      const improved = candidate < bestValue;
+      if (improved) {
+        bestValue = candidate;
         bestSq = sq;
       }
-    }
 
-    // Show all steps for small n, or key steps for larger n
-    if (n <= 13 || squares.includes(i) || i === n) {
       steps.push({
-        title: { vi: `dp[${i}]`, en: `dp[${i}]` },
+        title: { vi: `Thử ${sq} (${Math.sqrt(sq)}²)`, en: `Try ${sq} (${Math.sqrt(sq)}²)` },
         arr: dp.slice(0, i + 1).map((v) => (v === Infinity ? 0 : v)),
         sub: dp.slice(0, i + 1).map((v) => (v === Infinity ? "∞" : String(v))),
-        highlight: [i],
-        mark: bestSq > 0 ? [i - bestSq] : [],
-        codeLines: [5, 6, 7],
+        highlight: [i, i - sq],
+        mark: improved ? [i] : [],
+        codeLines: [7, 8],
         vars: [
-          { name: "i", value: i },
-          { name: "dp[i]", value: dp[i] },
-          { name: "best square", value: bestSq },
-          { name: "from", value: bestSq > 0 ? `dp[${i - bestSq}]+1 = ${dp[i]}` : "-" },
+          { name: "square", value: sq },
+          { name: `dp[${i - sq}]`, value: dp[i - sq] },
+          { name: "candidate", value: candidate },
+          { name: "bestValue", value: bestValue === Infinity ? "∞" : String(bestValue) },
         ],
         note: {
-          vi: `dp[${i}] = dp[${i}-${bestSq}] + 1 = dp[${i - bestSq}] + 1 = ${dp[i]}. Dùng ${bestSq} (=${Math.sqrt(bestSq)}²).`,
-          en: `dp[${i}] = dp[${i}-${bestSq}] + 1 = dp[${i - bestSq}] + 1 = ${dp[i]}. Use ${bestSq} (=${Math.sqrt(bestSq)}²).`,
+          vi: improved
+            ? `dp[${i}] cập nhật: min(∞, dp[${i - sq}] + 1) = ${candidate}.`
+            : `dp[${i}] không thay đổi. dp[${i - sq}] + 1 = ${candidate}.`,
+          en: improved
+            ? `Update dp[${i}]: min(∞, dp[${i - sq}] + 1) = ${candidate}.`
+            : `dp[${i}] unchanged. dp[${i - sq}] + 1 = ${candidate}.`,
         },
       });
     }
+
+    dp[i] = bestValue;
+    steps.push({
+      title: { vi: `Kết thúc dp[${i}]`, en: `Finish dp[${i}]` },
+      arr: dp.slice(0, i + 1).map((v) => (v === Infinity ? 0 : v)),
+      sub: dp.slice(0, i + 1).map((v) => (v === Infinity ? "∞" : String(v))),
+      highlight: [i],
+      mark: bestSq > 0 ? [i - bestSq] : [],
+      codeLines: [5, 6, 7, 8],
+      vars: [
+        { name: "i", value: i },
+        { name: "dp[i]", value: dp[i] },
+        { name: "best square", value: bestSq > 0 ? `${bestSq} (${Math.sqrt(bestSq)}²)` : "none" },
+      ],
+      note: {
+        vi: bestSq > 0
+          ? `dp[${i}] = ${dp[i]} bằng cách dùng ${bestSq} = ${Math.sqrt(bestSq)}².`
+          : `Không có cách cải thiện dp[${i}] với các bình phương hiện có.`,
+        en: bestSq > 0
+          ? `dp[${i}] = ${dp[i]} by using ${bestSq} = ${Math.sqrt(bestSq)}².`
+          : `No improvement found for dp[${i}] with available squares.`,
+      },
+    });
   }
 
-  // Trace back
   const used = [];
   let rem = n;
   while (rem > 0) {
@@ -3620,7 +3662,7 @@ function buildSteps279(input) {
     highlight: [],
     mark: [n],
     final: true,
-    codeLines: [8],
+    codeLines: [10],
     vars: [
       { name: "answer", value: dp[n] },
       { name: "decomposition", value: `[${used.map((sq) => Math.sqrt(sq) + "²").join(" + ")}] = ${n}` },
