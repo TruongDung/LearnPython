@@ -5506,28 +5506,53 @@ function buildSteps494(nums, params) {
 
   // ── Intro / reduction ───────────────────────────────────
   steps.push({
-    title: { vi: "Đưa về subset sum", en: "Reduce to subset sum" },
+    title: { vi: "Tính tổng nums", en: "Compute total" },
     arr: [...nums],
     highlight: [], mark: [],
-    codeLines: [3, 4, 5, 6],
+    codeLines: [3],
     vars: [
       { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "target", value: target },
-      { name: "total = sum(nums)", value: total },
-      { name: "P = (total + target)/2", value: P },
+      { name: "total", value: total },
     ],
     note: {
-      vi:
-        `Đặt P = subset chọn dấu '+', N = subset chọn dấu '−'.\n` +
-        `P + N = ${total} và P − N = ${target} ⇒ P = ${P}.\n` +
-        `Câu hỏi trở thành: đếm số subset của nums có tổng = ${P}.`,
-      en:
-        `Let P = subset assigned '+', N = subset assigned '−'.\n` +
-        `P + N = ${total} and P − N = ${target} ⇒ P = ${P}.\n` +
-        `The problem becomes: count subsets of nums that sum to ${P}.`,
+      vi: `Tổng các phần tử nums = ${total}.`, 
+      en: `The sum of nums = ${total}.`, 
     },
   });
 
+  steps.push({
+    title: { vi: "Kiểm tra khả thi", en: "Check feasibility" },
+    arr: [...nums],
+    highlight: [], mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "target", value: target },
+      { name: "total", value: total },
+      { name: "P formula", value: `(total + target) / 2` },
+    ],
+    note: {
+      vi: `Kiểm tra điều kiện: |target| ≤ total và (total + target) chẵn.`, 
+      en: `Check condition: |target| ≤ total and (total + target) is even.`, 
+    },
+  });
+
+  steps.push({
+    title: { vi: "Tính P", en: "Compute P" },
+    arr: [...nums],
+    highlight: [], mark: [],
+    codeLines: [7],
+    vars: [
+      { name: "P", value: P },
+      { name: "total", value: total },
+      { name: "target", value: target },
+    ],
+    note: {
+      vi: `P = (total + target) / 2 = ${P}. Giờ bài trở thành subset sum với tổng ${P}.`, 
+      en: `P = (total + target) / 2 = ${P}. The problem becomes subset sum to ${P}.`, 
+    },
+  });
+
+  // ── DP init ─────────────────────────────────────────────
   // ── DP init ─────────────────────────────────────────────
   const dp = new Array(P + 1).fill(0);
   dp[0] = 1;
