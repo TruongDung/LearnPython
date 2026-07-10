@@ -1614,40 +1614,68 @@ function buildSteps198(nums, params) {
     },
   });
 
-  // Fill DP
+  // Fill DP — 3 sub-steps per iteration for line-by-line debugging
   for (let i = 2; i < n; i++) {
+    // Sub-step 1: skip = dp[i-1]
     const skip = dp[i - 1];
-    const rob = dp[i - 2] + nums[i];
-    dp[i] = Math.max(skip, rob);
-    const robbed = dp[i] === rob;
-
     steps.push({
-      title: { vi: `Nhà ${i} (${nums[i]}$): ${robbed ? "CƯỚP 💰" : "bỏ qua ✗"}`, en: `House ${i} ($${nums[i]}): ${robbed ? "ROB 💰" : "skip ✗"}` },
+      title: { vi: `Nhà ${i}: ① skip = dp[${i-1}] = ${skip}`, en: `House ${i}: ① skip = dp[${i-1}] = ${skip}` },
       arr: [...nums],
-      sub: dp.map((v, idx) => idx <= i ? (idx === i ? (robbed ? `💰${v}` : `✗ ${v}`) : String(v)) : "·"),
-      highlight: [i],
-      mark: robbed ? [i - 2, i] : [i - 1],
-      codeLines: [8, 9],
+      sub: dp.map((v, idx) => idx < i ? String(v) : "·"),
+      highlight: [i - 1],
+      mark: [],
+      codeLines: [8],
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: `${nums[i]}$` },
-        { name: "① BỎ (dp[i-1])", value: skip },
-        { name: "② CƯỚP (dp[i-2]+nums[i])", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
-        { name: "dp[i] = max(①,②)", value: `max(${skip}, ${rob}) = ${dp[i]}` },
-        { name: "decision", value: robbed ? `ROB 💰` : `SKIP ✗` },
+        { name: "skip = dp[i-1]", value: skip },
+      ],
+      note: {
+        vi: `Nếu BỎ nhà ${i}: giữ nguyên tiền cũ = dp[${i-1}] = ${skip}.`,
+        en: `If we SKIP house ${i}: keep the old loot = dp[${i-1}] = ${skip}.`,
+      },
+    });
+
+    // Sub-step 2: rob = dp[i-2] + nums[i]
+    const rob = dp[i - 2] + nums[i];
+    steps.push({
+      title: { vi: `Nhà ${i}: ② rob = dp[${i-2}] + nums[${i}] = ${rob}`, en: `House ${i}: ② rob = dp[${i-2}] + ${nums[i]} = ${rob}` },
+      arr: [...nums],
+      sub: dp.map((v, idx) => idx < i ? String(v) : "·"),
+      highlight: [i - 2, i],
+      mark: [],
+      codeLines: [8],
+      vars: [
+        { name: "i", value: i },
+        { name: "rob = dp[i-2] + nums[i]", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
+        { name: "skip (for comparison)", value: skip },
+      ],
+      note: {
+        vi: `Nếu CƯỚP nhà ${i}: dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}.\n(Lấy tiền tốt nhất trước nhà ${i-1}, cộng tiền nhà ${i}.)`,
+        en: `If we ROB house ${i}: dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}.\n(Best loot before house ${i-1}, plus house ${i}'s money.)`,
+      },
+    });
+
+    // Sub-step 3: dp[i] = max(skip, rob)
+    dp[i] = Math.max(skip, rob);
+    const robbed = dp[i] === rob;
+    steps.push({
+      title: { vi: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "CƯỚP 💰" : "BỎ ✗"}`, en: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "ROB 💰" : "SKIP ✗"}` },
+      arr: [...nums],
+      sub: dp.map((v, idx) => idx <= i ? (idx === i ? (robbed ? `💰${v}` : `✗${v}`) : String(v)) : "·"),
+      highlight: [i],
+      mark: robbed ? [i - 2, i] : [i - 1],
+      codeLines: [9],
+      vars: [
+        { name: "skip", value: skip },
+        { name: "rob", value: rob },
+        { name: "dp[i] = max(skip, rob)", value: dp[i] },
+        { name: "decision", value: robbed ? "ROB 💰" : "SKIP ✗" },
         { name: "dp", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi:
-          `Nhà ${i}: ${nums[i]}$.\n` +
-          `① Bỏ qua → giữ dp[${i-1}] = ${skip}\n` +
-          `② Cướp → dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}\n` +
-          `→ dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? `CƯỚP! 💰` : `bỏ qua (giữ tiền cũ tốt hơn)`}`,
-        en:
-          `House ${i}: $${nums[i]}.\n` +
-          `① Skip → keep dp[${i-1}] = ${skip}\n` +
-          `② Rob → dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}\n` +
-          `→ dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? `ROB! 💰` : `skip (keeping old loot is better)`}`,
+        vi: `dp[${i}] = max(①=${skip}, ②=${rob}) = ${dp[i]}. → ${robbed ? `CƯỚP nhà ${i}! 💰` : `Bỏ qua nhà ${i} (giữ tiền cũ tốt hơn).`}`,
+        en: `dp[${i}] = max(①=${skip}, ②=${rob}) = ${dp[i]}. → ${robbed ? `ROB house ${i}! 💰` : `SKIP house ${i} (keeping old loot is better).`}`,
       },
     });
   }
