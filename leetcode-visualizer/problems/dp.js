@@ -2286,6 +2286,168 @@ function buildSteps213(nums) {
 }
 
 /**
+ * LeetCode 256: Paint Fence.
+ * dp[i] = number of ways to paint i posts with k colors, with no more than two
+ * adjacent posts having the same color.
+ *  - same = ways where post i has same color as post i-1
+ *  - diff = ways where post i has different color than post i-1
+ *  - same[i] = diff[i-1]
+ *  - diff[i] = (same[i-1] + diff[i-1]) * (k-1)
+ */
+function buildSteps256(input, params) {
+  const n = input[0] || 0;
+  const k = params.k !== undefined ? params.k : 3;
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Đầu vào: n, k", en: "Input: n, k" },
+    arr: [n, k],
+    sub: ["n", "k"],
+    highlight: [0, 1],
+    mark: [],
+    codeLines: [2],
+    vars: [
+      { name: "n", value: n },
+      { name: "k", value: k },
+    ],
+    note: {
+      vi: `Có ${n} cột rào và ${k} màu. Mỗi cột được sơn một màu, tối đa 2 cột liền nhau cùng màu.`, 
+      en: `There are ${n} posts and ${k} colors. Paint each post so no more than two adjacent posts share the same color.`, 
+    },
+  });
+
+  if (n === 0) {
+    const answer = 0;
+    steps.push({
+      title: { vi: "Trường hợp n = 0", en: "Case n = 0" },
+      arr: [],
+      sub: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Không có cột nào → không có cách sơn nào trừ cách không làm gì (0).`, 
+        en: `No posts means 0 ways to paint.`, 
+      },
+    });
+    return { original: { n, k }, answer, steps };
+  }
+
+  if (n === 1) {
+    const answer = k;
+    steps.push({
+      title: { vi: "Trường hợp n = 1", en: "Case n = 1" },
+      arr: [k],
+      sub: ["ways"],
+      highlight: [0],
+      mark: [],
+      final: true,
+      codeLines: [4],
+      vars: [
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Chỉ có 1 cột → có ${k} cách sơn (mỗi màu một cách).`, 
+        en: `With 1 post there are ${k} ways to paint it.`, 
+      },
+    });
+    return { original: { n, k }, answer, steps };
+  }
+
+  let same = k;
+  let diff = k * (k - 1);
+  steps.push({
+    title: { vi: "Khởi tạo same và diff", en: "Initialize same and diff" },
+    arr: [same, diff],
+    sub: ["same", "diff"],
+    highlight: [0, 1],
+    mark: [],
+    codeLines: [5, 6],
+    vars: [
+      { name: "same", value: same },
+      { name: "diff", value: diff },
+      { name: "total", value: same + diff },
+    ],
+    note: {
+      vi: `Với 2 cột đầu: same = ${same} (2 cùng màu), diff = ${diff} (2 khác màu). Tổng = ${same + diff}.`, 
+      en: `With 2 posts: same = ${same} (same color), diff = ${diff} (different colors). Total = ${same + diff}.`, 
+    },
+  });
+
+  for (let i = 3; i <= n; i++) {
+    const nextSame = diff;
+    const nextDiff = (same + diff) * (k - 1);
+
+    steps.push({
+      title: { vi: `Cập nhật hàng i = ${i}`, en: `Update i = ${i}` },
+      arr: [same, diff],
+      sub: ["same", "diff"],
+      highlight: [0, 1],
+      mark: [],
+      codeLines: [7],
+      vars: [
+        { name: "i", value: i },
+        { name: "same (previous)", value: same },
+        { name: "diff (previous)", value: diff },
+        { name: "nextSame = diff", value: nextSame },
+        { name: "nextDiff = (same+diff)*(k-1)", value: nextDiff },
+      ],
+      note: {
+        vi: `Vị trí ${i}: nếu cùng màu với cột trước → nextSame = diff = ${nextSame}. Nếu khác màu → nextDiff = (${same} + ${diff}) × (${k} - 1) = ${nextDiff}.`, 
+        en: `For post ${i}: same color count = diff = ${nextSame}. Different color count = (same+diff)×(k-1) = ${nextDiff}.`, 
+      },
+    });
+
+    same = nextSame;
+    diff = nextDiff;
+
+    steps.push({
+      title: { vi: `Đặt same và diff cho i = ${i}`, en: `Set same and diff for i = ${i}` },
+      arr: [same, diff],
+      sub: ["same", "diff"],
+      highlight: [0, 1],
+      mark: [],
+      codeLines: [8],
+      vars: [
+        { name: "same", value: same },
+        { name: "diff", value: diff },
+        { name: "total", value: same + diff },
+      ],
+      note: {
+        vi: `Cập nhật same = ${same}, diff = ${diff}. Tổng cách sơn tới cột ${i} = ${same + diff}.`, 
+        en: `Update same = ${same}, diff = ${diff}. Total ways up to post ${i} = ${same + diff}.`, 
+      },
+    });
+  }
+
+  const answer = same + diff;
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [same, diff],
+    sub: ["same", "diff"],
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "same", value: same },
+      { name: "diff", value: diff },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Tổng số cách sơn ${n} cột = ${answer}.`, 
+      en: `Total ways to paint ${n} posts = ${answer}.`, 
+    },
+  });
+
+  return { original: { n, k }, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 1143: Longest Common Subsequence.
  *
  * dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1].
@@ -5751,7 +5913,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5765,6 +5927,7 @@ module.exports = {
           { id: 746, name: "Min Cost Climbing Stairs", pattern: "Fibonacci + Cost" },
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
+          { id: 256, name: "Paint Fence", pattern: "Same/Diff DP" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
@@ -5787,7 +5950,7 @@ module.exports = {
           {
             title: "Giai đoạn 1 — DP cơ bản (phải thuộc)",
             description: "Những bài xây nền tảng. Hiểu DP là gì, công thức truy hồi, lựa chọn Take / Skip.",
-            problems: [70, 746, 198, 213, 740],
+            problems: [70, 746, 198, 213, 256, 740],
           },
           {
             title: "Giai đoạn 2 — DP trên mảng",
@@ -5826,6 +5989,7 @@ module.exports = {
           { id: 746, name: "Min Cost Climbing Stairs", pattern: "Fibonacci + Cost" },
           { id: 198, name: "House Robber", pattern: "Linear DP" },
           { id: 213, name: "House Robber II", pattern: "Linear DP + Circle" },
+          { id: 256, name: "Paint Fence", pattern: "Same/Diff DP" },
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
@@ -5848,7 +6012,7 @@ module.exports = {
           {
             title: "Stage 1 — DP Basics (must know)",
             description: "Foundation problems. Understand what DP is, recurrence, Take / Skip choice.",
-            problems: [70, 746, 198, 213, 740],
+            problems: [70, 746, 198, 213, 256, 740],
           },
           {
             title: "Stage 2 — Array DP",
@@ -6433,6 +6597,39 @@ module.exports = {
       },
     ],
     builder: buildSteps740,
+  },
+  256: {
+    id: 256,
+    difficulty: "medium",
+    slug: "paint-fence",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Paint Fence", en: "Paint Fence" },
+    titleVi: { vi: "Sơn hàng rào", en: "Paint fence" },
+    statement: {
+      vi: "Cho n cột rào và k màu. Sơn mỗi cột một màu sao cho không có nhiều hơn hai cột liền nhau cùng màu.",
+      en: "Given n posts and k colors, paint each post so that no more than two adjacent posts have the same color.",
+    },
+    defaultInput: [3],
+    inputKind: "positive",
+    inputLabel: { vi: "n (posts)", en: "n (posts)" },
+    singleInput: true,
+    maxInput: 12,
+    extraParams: [
+      { key: "k", label: { vi: "k (colors)", en: "k (colors)" }, default: 3 },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ dùng hai biến same và diff để theo dõi số cách.", en: "Only two variables same and diff are needed." } },
+    code: [
+      "class Solution:",
+      "    def numWays(self, n, k):",
+      "        if n == 0: return 0",
+      "        if n == 1: return k",
+      "        same = k",
+      "        diff = k * (k - 1)",
+      "        for i in range(3, n + 1):",
+      "            same, diff = diff, (same + diff) * (k - 1)",
+      "        return same + diff",
+    ],
+    builder: buildSteps256,
   },
   1140: {
     id: 1140,
