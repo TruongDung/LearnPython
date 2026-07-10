@@ -789,75 +789,149 @@ function buildSteps300BinarySearch(nums) {
   const tails = []; // tails[i] = smallest tail of all IS of length i+1
   const steps = [];
 
+  // Line 5: tails = []
   steps.push({
-    title: { vi: "Patience Sorting: tìm vị trí chèn bằng Binary Search", en: "Patience Sorting: find insertion position via Binary Search" },
+    title: { vi: "tails = []", en: "tails = []" },
     arr: [...nums], sub: Array(n).fill(-1),
     highlight: [], mark: [],
     codeLines: [5], codeBlock: 2,
     vars: [{ name: "tails", value: "[]" }],
     note: {
-      vi:
-        `Duy trì mảng tails[] (không phải LIS thực sự, nhưng len(tails) = độ dài LIS):\n` +
-        `• tails[i] = phần tử NHỎ NHẤT có thể làm đuôi của dãy tăng dài i+1.\n` +
-        `• Với mỗi num: Binary Search tìm vị trí i đầu tiên sao cho tails[i] ≥ num.\n` +
-        `  - Nếu không tìm thấy → num > tất cả → thêm vào cuối (dãy dài hơn 1).\n` +
-        `  - Nếu tìm thấy → thay tails[i] = num (tối ưu đuôi nhỏ hơn).\n` +
-        `Đáp án = len(tails).`,
-      en:
-        `Maintain tails[] (not the actual LIS, but len(tails) = LIS length):\n` +
-        `• tails[i] = the SMALLEST possible tail element of any increasing seq. of length i+1.\n` +
-        `• For each num: Binary Search for the first i where tails[i] ≥ num.\n` +
-        `  - Not found → num > all → append (extend by 1).\n` +
-        `  - Found → replace tails[i] = num (keep a smaller tail, more room to grow).\n` +
-        `Answer = len(tails).`,
+      en: `Initialize tails = []. tails[i] = smallest tail of any increasing subsequence of length i+1. Answer = len(tails).`,
+      vi: `Khởi tạo tails = []. tails[i] = đuôi nhỏ nhất của mọi dãy tăng dài i+1. Đáp án = len(tails).`,
     },
   });
 
   for (let k = 0; k < n; k++) {
     const num = nums[k];
+
+    // Line 6: for num in nums
+    const sub6 = Array(n).fill(-1);
+    tails.forEach((v, idx) => { sub6[idx] = v; });
+    steps.push({
+      title: { vi: `for num = ${num}`, en: `for num = ${num}` },
+      arr: [...nums], sub: sub6,
+      highlight: [k], mark: [],
+      codeLines: [6], codeBlock: 2,
+      vars: [
+        { name: "num", value: num },
+        { name: "tails", value: `[${tails.join(", ")}]` },
+      ],
+      note: {
+        en: `Next element: num = nums[${k}] = ${num}.`,
+        vi: `Phần tử tiếp theo: num = nums[${k}] = ${num}.`,
+      },
+    });
+
     // Binary search: find leftmost index where tails[idx] >= num
     let lo = 0, hi = tails.length;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < num) lo = mid + 1; else hi = mid; }
     const pos = lo;
     const extended = pos === tails.length;
     const tailsBefore = [...tails];
-    if (extended) tails.push(num); else tails[pos] = num;
 
-    const tailsCopy = [...tails];
-    const sub = Array(n).fill(-1);
-    tails.forEach((v, idx) => { sub[idx] = v; });
-
-    const bisectExplain = extended
-      ? `bisect_left(tails=[${tailsBefore.join(",")}], ${num}) = ${pos} (vượt cuối → append)`
-      : `bisect_left(tails=[${tailsBefore.join(",")}], ${num}) = ${pos} (tails[${pos}]=${tailsBefore[pos]} ≥ ${num})`;
-
+    // Line 7: i = bisect_left(tails, num)
+    const sub7 = Array(n).fill(-1);
+    tails.forEach((v, idx) => { sub7[idx] = v; });
     steps.push({
-      title: { vi: `num=${num}: pos=${pos} → tails=[${tailsCopy.join(",")}]`, en: `num=${num}: pos=${pos} → tails=[${tailsCopy.join(",")}]` },
-      arr: [...nums], sub,
-      highlight: [k], mark: Array.from({ length: n }, (_, i) => i < k ? i : -1).filter(x => x >= 0),
-      codeLines: extended ? [7, 8, 9] : [7, 10, 11], codeBlock: 2,
+      title: { vi: `i = bisect_left(tails, ${num}) = ${pos}`, en: `i = bisect_left(tails, ${num}) = ${pos}` },
+      arr: [...nums], sub: sub7,
+      highlight: [k], mark: [],
+      codeLines: [7], codeBlock: 2,
       vars: [
         { name: "num", value: num },
-        { name: "i = bisect_left", value: bisectExplain },
-        { name: "action", value: extended ? `i == len(tails) → append ${num}` : `tails[${pos}] = ${num} (replace)` },
-        { name: "tails", value: `[${tailsCopy.join(",")}]` },
-        { name: "LIS length", value: tails.length },
+        { name: "tails", value: `[${tails.join(", ")}]` },
+        { name: "i", value: pos },
+        { name: "meaning", value: extended ? `i == len(tails) → num > all tails` : `tails[${pos}] = ${tails[pos]} ≥ ${num}` },
       ],
-      note: {
-        vi: extended
-          ? `num=${num} LỚN HƠN mọi đuôi hiện tại → thêm vào cuối. Dãy dài nhất có thể dài hơn 1 → LIS length = ${tails.length}.`
-          : `Binary search tìm được tails[${pos}]=${tails[pos] !== num ? "?" : num} ≥ ${num} → thay bằng ${num} (đuôi nhỏ hơn → tốt hơn). LIS length vẫn = ${tails.length}.`,
-        en: extended
-          ? `num=${num} is LARGER than all current tails → append. Longest possible sequence grows by 1 → LIS length = ${tails.length}.`
-          : `Binary search found tails[${pos}] ≥ ${num} → replace with ${num} (smaller tail = more room to grow). LIS length stays = ${tails.length}.`,
-      },
+      note: extended
+        ? { en: `bisect_left finds pos=${pos} which equals len(tails)=${tails.length}. num=${num} is larger than all current tails.`, vi: `bisect_left tìm pos=${pos} bằng len(tails)=${tails.length}. num=${num} lớn hơn mọi đuôi hiện tại.` }
+        : { en: `bisect_left finds pos=${pos}. tails[${pos}]=${tails[pos]} ≥ ${num}.`, vi: `bisect_left tìm pos=${pos}. tails[${pos}]=${tails[pos]} ≥ ${num}.` },
     });
+
+    // Line 8: if i == len(tails)
+    const sub8 = Array(n).fill(-1);
+    tails.forEach((v, idx) => { sub8[idx] = v; });
+    steps.push({
+      title: { vi: `if ${pos} == len(tails)=${tails.length}`, en: `if ${pos} == len(tails)=${tails.length}` },
+      arr: [...nums], sub: sub8,
+      highlight: [k], mark: [],
+      codeLines: [8], codeBlock: 2,
+      vars: [
+        { name: "i", value: pos },
+        { name: "len(tails)", value: tails.length },
+        { name: `i == len(tails)`, value: extended },
+      ],
+      note: extended
+        ? { en: `${pos} == ${tails.length} → True. Will append num to tails.`, vi: `${pos} == ${tails.length} → True. Sẽ thêm num vào cuối tails.` }
+        : { en: `${pos} == ${tails.length} → False. Will replace tails[${pos}].`, vi: `${pos} == ${tails.length} → False. Sẽ thay thế tails[${pos}].` },
+    });
+
+    // Line 9 or 11: tails.append(num) or tails[i] = num
+    if (extended) {
+      tails.push(num);
+      const sub9 = Array(n).fill(-1);
+      tails.forEach((v, idx) => { sub9[idx] = v; });
+      steps.push({
+        title: { vi: `tails.append(${num})`, en: `tails.append(${num})` },
+        arr: [...nums], sub: sub9,
+        highlight: [k], mark: [],
+        codeLines: [9], codeBlock: 2,
+        vars: [
+          { name: "num", value: num },
+          { name: "tails (after)", value: `[${tails.join(", ")}]` },
+          { name: "LIS length", value: tails.length },
+        ],
+        note: {
+          en: `Append ${num} to tails. LIS length grows to ${tails.length}.`,
+          vi: `Thêm ${num} vào cuối tails. Độ dài LIS tăng lên ${tails.length}.`,
+        },
+      });
+    } else {
+      const oldVal = tails[pos];
+      tails[pos] = num;
+      const sub11 = Array(n).fill(-1);
+      tails.forEach((v, idx) => { sub11[idx] = v; });
+      steps.push({
+        title: { vi: `tails[${pos}] = ${num}`, en: `tails[${pos}] = ${num}` },
+        arr: [...nums], sub: sub11,
+        highlight: [k], mark: [],
+        codeLines: [11], codeBlock: 2,
+        vars: [
+          { name: "i", value: pos },
+          { name: `tails[${pos}] (before)`, value: oldVal },
+          { name: `tails[${pos}] (after)`, value: num },
+          { name: "tails", value: `[${tails.join(", ")}]` },
+          { name: "LIS length", value: tails.length },
+        ],
+        note: {
+          en: `Replace tails[${pos}]: ${oldVal} → ${num}. Smaller tail = more room to grow. LIS length stays ${tails.length}.`,
+          vi: `Thay tails[${pos}]: ${oldVal} → ${num}. Đuôi nhỏ hơn → dễ mở rộng. Độ dài LIS vẫn = ${tails.length}.`,
+        },
+      });
+    }
   }
 
+  // Line 12: return len(tails)
   const answer = tails.length;
-  const sub = Array(n).fill(-1); tails.forEach((v, i) => { sub[i] = v; });
-  const fs = { title: { vi: `LIS length = ${answer}`, en: `LIS length = ${answer}` }, arr: [...nums], sub, highlight: [], mark: Array.from({ length: answer }, (_, i) => i), final: true, codeLines: [12], codeBlock: 2, vars: [{ name: "answer", value: answer }, { name: "tails", value: `[${tails.join(",")}]` }], note: { vi: `len(tails) = ${answer}. Lưu ý: tails[] không phải LIS thực sự, chỉ là công cụ đếm.`, en: `len(tails) = ${answer}. Note: tails[] is not the actual LIS, just a counting tool.` } };
-  fs.final = true; steps.push(fs);
+  const subFinal = Array(n).fill(-1);
+  tails.forEach((v, i) => { subFinal[i] = v; });
+  steps.push({
+    title: { vi: `return len(tails) = ${answer}`, en: `return len(tails) = ${answer}` },
+    arr: [...nums], sub: subFinal,
+    highlight: [], mark: Array.from({ length: answer }, (_, i) => i),
+    final: true,
+    codeLines: [12], codeBlock: 2,
+    vars: [
+      { name: "len(tails)", value: answer },
+      { name: "tails", value: `[${tails.join(", ")}]` },
+    ],
+    note: {
+      en: `LIS length = len(tails) = ${answer}. Note: tails[] is not the actual LIS, just a counting tool.`,
+      vi: `Độ dài LIS = len(tails) = ${answer}. Lưu ý: tails[] không phải LIS thực sự, chỉ là công cụ đếm.`,
+    },
+  });
+
   return { original: [...nums], answer, chain: [], steps };
 }
 
