@@ -3490,13 +3490,71 @@ function buildSteps518(nums, params) {
   });
 
   for (const coin of coins) {
-    const before = dp.slice();
+    steps.push({
+      title: { vi: `Bắt đầu xu ${coin}`, en: `Start coin ${coin}` },
+      arr: dp.slice(),
+      sub: dp.map((v) => String(v)),
+      highlight: [0],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: "coin", value: coin },
+        { name: "dp (before)", value: `[${dp.join(",")}]` },
+      ],
+      note: {
+        vi: `Xử lý xu ${coin} bằng cách cộng số cách tạo i-${coin} vào dp[i] cho i = ${coin}..${amount}.`,
+        en: `Process coin ${coin} by adding ways to make i-${coin} into dp[i] for i = ${coin}..${amount}.`,
+      },
+    });
+
     for (let i = coin; i <= amount; i++) {
-      dp[i] += dp[i - coin];
+      const beforeValue = dp[i];
+      const addWays = dp[i - coin];
+      steps.push({
+        title: { vi: `Xét i=${i}`, en: `Consider i=${i}` },
+        arr: dp.slice(),
+        sub: dp.map((v) => String(v)),
+        highlight: [i, i - coin],
+        mark: [i - coin],
+        codeLines: [6],
+        vars: [
+          { name: "coin", value: coin },
+          { name: "i", value: i },
+          { name: `dp[${i - coin}]`, value: addWays },
+          { name: `dp[${i}] (before)`, value: beforeValue },
+        ],
+        note: {
+          vi: addWays > 0
+            ? `Có ${addWays} cách tạo ${i - coin}, nên dp[${i}] sẽ tăng.`
+            : `Không có cách tạo ${i - coin} hiện tại nên dp[${i}] không đổi.`,
+          en: addWays > 0
+            ? `${addWays} ways to make ${i - coin}, so dp[${i}] will increase.`
+            : `No ways to make ${i - coin} yet, so dp[${i}] stays unchanged.`,
+        },
+      });
+
+      dp[i] += addWays;
+      steps.push({
+        title: { vi: `dp[${i}] += dp[${i - coin}]`, en: `dp[${i}] += dp[${i - coin}]` },
+        arr: dp.slice(),
+        sub: dp.map((v) => String(v)),
+        highlight: [i, i - coin],
+        mark: [i],
+        codeLines: [7],
+        vars: [
+          { name: `dp[${i}] (before)`, value: beforeValue },
+          { name: `dp[${i - coin}]`, value: addWays },
+          { name: `dp[${i}] (after)`, value: dp[i] },
+        ],
+        note: {
+          vi: `Cập nhật dp[${i}] từ ${beforeValue} thành ${dp[i]} bằng cách cộng ${addWays}.`, 
+          en: `Update dp[${i}] from ${beforeValue} to ${dp[i]} by adding ${addWays}.`, 
+        },
+      });
     }
 
     steps.push({
-      title: { vi: `Thêm xu ${coin}`, en: `Add coin ${coin}` },
+      title: { vi: `Sau xu ${coin}`, en: `After coin ${coin}` },
       arr: dp.slice(),
       sub: dp.map((v) => String(v)),
       highlight: Array.from({ length: amount - coin + 1 }, (_, x) => x + coin),
@@ -3504,16 +3562,14 @@ function buildSteps518(nums, params) {
       codeLines: [5, 6, 7],
       vars: [
         { name: "coin", value: coin },
-        { name: "dp (before)", value: `[${before.join(",")}]` },
         { name: "dp (after)", value: `[${dp.join(",")}]` },
       ],
       note: {
-        vi: `Xử lý xu ${coin}: dp[i] += dp[i-${coin}] cho i = ${coin}..${amount}.\nSau khi thêm xu ${coin}: dp = [${dp.join(", ")}].`,
-        en: `Process coin ${coin}: dp[i] += dp[i-${coin}] for i = ${coin}..${amount}.\nAfter adding coin ${coin}: dp = [${dp.join(", ")}].`,
+        vi: `Kết thúc xử lý xu ${coin}. dp hiện tại = [${dp.join(",")}].`, 
+        en: `Finished processing coin ${coin}. Current dp = [${dp.join(",")}].`, 
       },
     });
   }
-
   const answer = dp[amount];
   steps.push({
     title: { vi: "Kết quả", en: "Result" },
