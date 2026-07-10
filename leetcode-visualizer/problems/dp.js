@@ -241,37 +241,96 @@ function buildSteps152(nums) {
 
   for (let i = 1; i < nums.length; i++) {
     const x = nums[i];
+    const prevMax = curMax;
+    const prevMin = curMin;
     const a = x;
-    const b = curMax * x;
-    const c = curMin * x;
-    const newMax = Math.max(a, b, c);
-    const newMin = Math.min(a, b, c);
-    curMax = newMax;
-    curMin = newMin;
+    const b = prevMax * x;
+    const c = prevMin * x;
 
+    // Sub-step 1: compute candidates
+    steps.push({
+      title: { vi: `i=${i}: candidates = (${a}, ${b}, ${c})`, en: `i=${i}: candidates = (${a}, ${b}, ${c})` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: x },
+        { name: "a = nums[i]", value: a },
+        { name: "b = curMax * nums[i]", value: `${prevMax} × ${x} = ${b}` },
+        { name: "c = curMin * nums[i]", value: `${prevMin} × ${x} = ${c}` },
+      ],
+      note: {
+        vi: `3 ứng viên: a=${a} (bắt đầu lại), b=curMax×x=${prevMax}×${x}=${b}, c=curMin×x=${prevMin}×${x}=${c}.`,
+        en: `3 candidates: a=${a} (restart), b=curMax×x=${prevMax}×${x}=${b}, c=curMin×x=${prevMin}×${x}=${c}.`,
+      },
+    });
+
+    // Sub-step 2: curMax = max(a, b, c)
+    const newMax = Math.max(a, b, c);
+    curMax = newMax;
+    steps.push({
+      title: { vi: `curMax = max(${a}, ${b}, ${c}) = ${curMax}`, en: `curMax = max(${a}, ${b}, ${c}) = ${curMax}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [7],
+      vars: [
+        { name: "curMax (new)", value: curMax },
+        { name: "from", value: curMax === a ? "nums[i] (restart)" : curMax === b ? "curMax×x (extend)" : "curMin×x (flip sign)" },
+      ],
+      note: {
+        vi: `curMax = max(${a}, ${b}, ${c}) = ${curMax}. ${curMax === c ? "Tích âm × âm → dương lớn!" : ""}`,
+        en: `curMax = max(${a}, ${b}, ${c}) = ${curMax}. ${curMax === c ? "Negative × negative → large positive!" : ""}`,
+      },
+    });
+
+    // Sub-step 3: curMin = min(a, b, c)
+    const newMin = Math.min(a, b, c);
+    curMin = newMin;
+    steps.push({
+      title: { vi: `curMin = min(${a}, ${b}, ${c}) = ${curMin}`, en: `curMin = min(${a}, ${b}, ${c}) = ${curMin}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: [],
+      codeLines: [8],
+      vars: [
+        { name: "curMin (new)", value: curMin },
+        { name: "why track min?", value: "negative × negative can become max later" },
+      ],
+      note: {
+        vi: `curMin = min(${a}, ${b}, ${c}) = ${curMin}. Giữ min vì số âm × số âm sau này có thể thành max!`,
+        en: `curMin = min(${a}, ${b}, ${c}) = ${curMin}. Keep min because neg × neg can become max later!`,
+      },
+    });
+
+    // Sub-step 4: result = max(result, curMax)
     let updated = false;
     if (curMax > result) {
       result = curMax;
       bestEnd = i;
       updated = true;
     }
-
     steps.push({
-      title: { vi: `Xét nums[${i}] = ${x}`, en: `Inspect nums[${i}] = ${x}` },
+      title: { vi: `result = max(${result}, ${curMax}) = ${result}${updated ? " ✓" : ""}`, en: `result = max(${result}, ${curMax}) = ${result}${updated ? " ✓" : ""}` },
       arr: [...nums],
       highlight: [i],
-      mark: [],
-      codeLines: [5, 6, 7, 8, 9],
+      mark: updated ? [i] : [],
+      codeLines: [9],
       vars: [
-        { name: "i", value: i },
-        { name: "x", value: x },
+        { name: "result", value: result },
+        { name: "updated?", value: updated ? `YES (new max at i=${i})` : "no" },
         { name: "curMax", value: curMax },
         { name: "curMin", value: curMin },
-        { name: "result", value: result },
       ],
       note: {
-        vi: `Ứng viên: (${a}, curMax·x=${b}, curMin·x=${c}) → curMax=${curMax}, curMin=${curMin}. result=${result}${updated ? " (cập nhật)" : ""}.`,
-        en: `Candidates: (${a}, curMax·x=${b}, curMin·x=${c}) → curMax=${curMax}, curMin=${curMin}. result=${result}${updated ? " (updated)" : ""}.`,
+        vi: updated
+          ? `curMax=${curMax} > result cũ → cập nhật result = ${result}. Tích lớn nhất hiện tại kết thúc tại i=${i}.`
+          : `curMax=${curMax} ≤ result=${result} → giữ nguyên.`,
+        en: updated
+          ? `curMax=${curMax} > old result → update result = ${result}. Best product ends at i=${i}.`
+          : `curMax=${curMax} ≤ result=${result} → unchanged.`,
       },
     });
   }

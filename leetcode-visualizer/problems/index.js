@@ -27,6 +27,7 @@ const categories = {
   heap: require("./heap"),
   "union-find": require("./union-find"),
   "linked-list": require("./linked-list"),
+  "binary-lifting": require("./binary-lifting"),
 };
 
 const SUPPORTED = {};
