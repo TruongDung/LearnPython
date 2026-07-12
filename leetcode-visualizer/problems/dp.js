@@ -6085,6 +6085,160 @@ function buildSteps1049(nums) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 97: Interleaving String.
+ * DP[i][j] = True if s3[0:i+j] is an interleaving of s1[0:i] and s2[0:j].
+ * dp[i][j] = (dp[i-1][j] && s1[i-1] == s3[i+j-1]) || (dp[i][j-1] && s2[j-1] == s3[i+j-1])
+ */
+function buildSteps97(input) {
+  // Parse input: s1,s2,s3
+  const parts = input.split(",").map(s => s.trim());
+  const [s1, s2, s3] = parts.length >= 3 ? parts : ["ab", "ca", "aabca"];
+  
+  if (s1.length + s2.length !== s3.length) {
+    return {
+      s1, s2, s3,
+      answer: false,
+      steps: [{
+        title: { vi: "Sai: len(s1) + len(s2) ≠ len(s3)", en: "False: len(s1) + len(s2) ≠ len(s3)" },
+        arr: [],
+        highlight: [],
+        mark: [],
+        final: true,
+        codeLines: [1],
+        vars: [
+          { name: "len(s1)", value: s1.length },
+          { name: "len(s2)", value: s2.length },
+          { name: "len(s3)", value: s3.length },
+        ],
+        note: { vi: "Nếu độ dài không khớp, không thể là xen kẽ.", en: "If lengths don't match, can't be interleaving." },
+      }],
+    };
+  }
+
+  const m = s1.length;
+  const n = s2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
+  dp[0][0] = true;
+
+  const steps = [];
+
+  // Initialize
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    grid: dp.map(row => [...row]),
+    highlight: [[0, 0]],
+    mark: [[0, 0]],
+    codeLines: [1, 2],
+    vars: [
+      { name: "s1", value: `"${s1}"` },
+      { name: "s2", value: `"${s2}"` },
+      { name: "s3", value: `"${s3}"` },
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "dp[0][0]", value: "True" },
+    ],
+    note: {
+      vi: `Khởi tạo DP table ${m+1}×${n+1}. dp[0][0]=True (chuỗi rỗng xen kẽ với rỗng).`,
+      en: `Initialize DP table ${m+1}×${n+1}. dp[0][0]=True (empty interleaves to empty).`,
+    },
+  });
+
+  // Fill first row (using only s2)
+  for (let j = 1; j <= n; j++) {
+    dp[0][j] = dp[0][j - 1] && s2[j - 1] === s3[j - 1];
+    steps.push({
+      title: { vi: `dp[0][${j}] = dp[0][${j-1}] ∧ s2[${j-1}]=='${s2[j-1]}' == s3[${j-1}]=='${s3[j-1]}'`, en: `dp[0][${j}] = dp[0][${j-1}] ∧ s2[${j-1}]=='${s2[j-1]}' == s3[${j-1}]=='${s3[j-1]}'` },
+      arr: [],
+      grid: dp.map(row => [...row]),
+      highlight: [[0, j], [0, j - 1]],
+      mark: [[0, j]],
+      codeLines: [3, 4],
+      vars: [
+        { name: `dp[0][${j}]`, value: dp[0][j] },
+        { name: `s2[${j-1}]`, value: `"${s2[j-1]}"` },
+        { name: `s3[${j-1}]`, value: `"${s3[j-1]}"` },
+      ],
+      note: { vi: `Dòng 0: chỉ có s2, phải match toàn bộ s3[0:${j}].`, en: `Row 0: only s2, must match full s3[0:${j}].` },
+    });
+  }
+
+  // Fill first column (using only s1)
+  for (let i = 1; i <= m; i++) {
+    dp[i][0] = dp[i - 1][0] && s1[i - 1] === s3[i - 1];
+    steps.push({
+      title: { vi: `dp[${i}][0] = dp[${i-1}][0] ∧ s1[${i-1}]=='${s1[i-1]}' == s3[${i-1}]=='${s3[i-1]}'`, en: `dp[${i}][0] = dp[${i-1}][0] ∧ s1[${i-1}]=='${s1[i-1]}' == s3[${i-1}]=='${s3[i-1]}'` },
+      arr: [],
+      grid: dp.map(row => [...row]),
+      highlight: [[i, 0], [i - 1, 0]],
+      mark: [[i, 0]],
+      codeLines: [5, 6],
+      vars: [
+        { name: `dp[${i}][0]`, value: dp[i][0] },
+        { name: `s1[${i-1}]`, value: `"${s1[i-1]}"` },
+        { name: `s3[${i-1}]`, value: `"${s3[i-1]}"` },
+      ],
+      note: { vi: `Cột 0: chỉ có s1, phải match toàn bộ s3[0:${i}].`, en: `Col 0: only s1, must match full s3[0:${i}].` },
+    });
+  }
+
+  // Fill the rest
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const fromUp = dp[i - 1][j] && s1[i - 1] === s3[i + j - 1];
+      const fromLeft = dp[i][j - 1] && s2[j - 1] === s3[i + j - 1];
+      dp[i][j] = fromUp || fromLeft;
+
+      steps.push({
+        title: {
+          vi: `dp[${i}][${j}]: s3[${i + j - 1}]='${s3[i + j - 1]}'`,
+          en: `dp[${i}][${j}]: s3[${i + j - 1}]='${s3[i + j - 1]}'`,
+        },
+        arr: [],
+        grid: dp.map(row => [...row]),
+        highlight: [[i - 1, j], [i, j - 1], [i, j]],
+        mark: dp[i][j] ? [[i, j]] : [],
+        codeLines: [7, 8],
+        vars: [
+          { name: `s1[${i-1}]`, value: `"${s1[i-1]}"` },
+          { name: `s2[${j-1}]`, value: `"${s2[j-1]}"` },
+          { name: `s3[${i+j-1}]`, value: `"${s3[i + j - 1]}"` },
+          { name: `dp[${i-1}][${j}] ∧ match`, value: fromUp },
+          { name: `dp[${i}][${j-1}] ∧ match`, value: fromLeft },
+          { name: `dp[${i}][${j}]`, value: dp[i][j] },
+        ],
+        note: {
+          vi: `dp[${i}][${j}] = (dp[${i-1}][${j}]∧s1[${i-1}]=='${s3[i+j-1]}') ∨ (dp[${i}][${j-1}]∧s2[${j-1}]=='${s3[i+j-1]}') = ${fromUp} ∨ ${fromLeft} = ${dp[i][j]}.`,
+          en: `dp[${i}][${j}] = (dp[${i-1}][${j}]∧s1[${i-1}]=='${s3[i+j-1]}') ∨ (dp[${i}][${j-1}]∧s2[${j-1}]=='${s3[i+j-1]}') = ${fromUp} ∨ ${fromLeft} = ${dp[i][j]}.`,
+        },
+      });
+    }
+  }
+
+  // Final answer
+  const answer = dp[m][n];
+  steps.push({
+    title: { vi: `Kết quả: dp[${m}][${n}] = ${answer}`, en: `Result: dp[${m}][${n}] = ${answer}` },
+    arr: [],
+    grid: dp.map(row => [...row]),
+    highlight: [],
+    mark: [[m, n]],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `dp[${m}][${n}]`, value: answer },
+    ],
+    note: {
+      vi: `${answer ? `✓ "${s3}" là xen kẽ của "${s1}" và "${s2}".` : `✗ "${s3}" không phải xen kẽ của "${s1}" và "${s2}".`}`,
+      en: `${answer ? `✓ "${s3}" is an interleaving of "${s1}" and "${s2}".` : `✗ "${s3}" is not an interleaving of "${s1}" and "${s2}".`}`,
+    },
+  });
+
+  return { s1, s2, s3, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
@@ -7858,5 +8012,47 @@ module.exports = {
       "                return total - 2 * j",
     ],
     builder: buildSteps1049,
+  },
+  97: {
+    id: 97,
+    difficulty: "medium",
+    slug: "interleaving-string",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Interleaving String", en: "Interleaving String" },
+    titleVi: { vi: "Xen kẽ chuỗi", en: "Check if s3 interleaves s1 and s2" },
+    statement: {
+      vi: "Cho 3 chuỗi s1, s2, s3. Kiểm tra s3 có phải là xen kẽ của s1 và s2 không? Xen kẽ: duyệt s1 và s2 từ đầu đến cuối, chọn từ s1 hoặc s2 để ghép thành s3. Nhập 3 chuỗi cách dấu phẩy.",
+      en: "Given three strings s1, s2, s3. Check if s3 is an interleaving of s1 and s2. Interleaving: traverse s1 and s2 from start to end, pick from s1 or s2 to form s3. Enter 3 strings comma-separated.",
+    },
+    defaultInput: "aabcc,dbbca,aadbbcbcac",
+    inputKind: "string",
+    inputLabel: { vi: "s1, s2, s3 (dấu phẩy)", en: "s1, s2, s3 (comma-sep)" },
+    extraParams: [],
+    approach: [
+      { vi: "DP 2D: dp[i][j] = True nếu s3[0:i+j] là xen kẽ của s1[0:i] và s2[0:j].", en: "2D DP: dp[i][j] = True if s3[0:i+j] is an interleaving of s1[0:i] and s2[0:j]." },
+      { vi: "dp[0][0] = True (chuỗi rỗng xen kẽ với chuỗi rỗng).", en: "dp[0][0] = True (empty strings interleave to empty)." },
+      { vi: "dp[i][j] = (dp[i-1][j] ∧ s1[i-1]==s3[i+j-1]) ∨ (dp[i][j-1] ∧ s2[j-1]==s3[i+j-1]).", en: "dp[i][j] = (dp[i-1][j] ∧ s1[i-1]==s3[i+j-1]) ∨ (dp[i][j-1] ∧ s2[j-1]==s3[i+j-1])." },
+      { vi: "Đáp án = dp[len(s1)][len(s2)].", en: "Answer = dp[len(s1)][len(s2)]." },
+    ],
+    complexity: { time: "O(m·n)", space: "O(m·n)", note: { vi: "m=len(s1), n=len(s2). Bảng m+1 × n+1.", en: "m=len(s1), n=len(s2). Table (m+1) × (n+1)." } },
+    code: [
+      "class Solution:",
+      "    def isInterleave(self, s1: str, s2: str, s3: str) -> bool:",
+      "        if len(s1) + len(s2) != len(s3):",
+      "            return False",
+      "        m, n = len(s1), len(s2)",
+      "        dp = [[False]*(n+1) for _ in range(m+1)]",
+      "        dp[0][0] = True",
+      "        for i in range(1, m+1):",
+      "            dp[i][0] = dp[i-1][0] and s1[i-1] == s3[i-1]",
+      "        for j in range(1, n+1):",
+      "            dp[0][j] = dp[0][j-1] and s2[j-1] == s3[j-1]",
+      "        for i in range(1, m+1):",
+      "            for j in range(1, n+1):",
+      "                dp[i][j] = (dp[i-1][j] and s1[i-1] == s3[i+j-1]) or \\",
+      "                            (dp[i][j-1] and s2[j-1] == s3[i+j-1])",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps97,
   },
 };

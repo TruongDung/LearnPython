@@ -635,6 +635,8 @@ button:disabled {
   width: max-content;
   min-width: 100%;
   box-sizing: border-box;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+  position: relative;
 }
 
 .code-line .ln {
@@ -646,6 +648,7 @@ button:disabled {
   flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
+  transition: color 0.2s ease, font-weight 0.2s ease;
 }
 
 /* Indent guide: subtle vertical dashed line at each 4-column indent level.
@@ -676,10 +679,49 @@ button:disabled {
 .code-line.active {
   background: rgba(249, 115, 22, 0.1);
   box-shadow: inset 3px 0 0 #f97316;
+  animation: highlightPulse 0.3s ease-out;
 }
 
 .code-line.active .ln {
   color: #f97316;
+  font-weight: 700;
+}
+
+/* Line-by-line debug mode: execution marker */
+.code-line.active::before {
+  content: "▶";
+  display: inline-block;
+  width: 16px;
+  margin-right: 4px;
+  color: #f97316;
+  font-size: 10px;
+  vertical-align: center;
+  animation: executeArrow 0.4s ease-in-out;
+}
+
+@keyframes highlightPulse {
+  0% {
+    background: rgba(249, 115, 22, 0.25);
+    box-shadow: inset 3px 0 0 #f97316, 0 0 8px rgba(249, 115, 22, 0.5);
+  }
+  100% {
+    background: rgba(249, 115, 22, 0.1);
+    box-shadow: inset 3px 0 0 #f97316;
+  }
+}
+
+@keyframes executeArrow {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .code-section-label {

@@ -868,12 +868,30 @@ function updateCodeHighlight(activeLines, codeBlock) {
     });
   }
 
+  let firstActiveRow = null;
   visibleLangBlock
     .querySelectorAll(".code-line")
     .forEach((row) => {
       const lineNum = Number(row.dataset[targetAttr]);
-      row.classList.toggle("active", !isNaN(lineNum) && set.has(lineNum));
+      const isActive = !isNaN(lineNum) && set.has(lineNum);
+      row.classList.toggle("active", isActive);
+      if (isActive && !firstActiveRow) {
+        firstActiveRow = row;
+      }
     });
+
+  // Auto-scroll to active line (line-by-line debug mode)
+  if (firstActiveRow && panel) {
+    setTimeout(() => {
+      const panelRect = panel.getBoundingClientRect();
+      const rowRect = firstActiveRow.getBoundingClientRect();
+      
+      // If row is not fully visible in viewport
+      if (rowRect.top < panelRect.top || rowRect.bottom > panelRect.bottom) {
+        firstActiveRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 0);
+  }
 }
 
 // ---- Variables panel (debug) ----
