@@ -6399,6 +6399,234 @@ function buildSteps1049(nums) {
 }
 
 /**
+ * LeetCode 516: Longest Palindromic Subsequence.
+ * Interval DP:
+ *   dp[i][j] = length of the longest palindromic subsequence inside s[i..j].
+ *   dp[i][i] = 1.
+ *   if s[i] == s[j]: dp[i][j] = dp[i+1][j-1] + 2
+ *   else: dp[i][j] = max(dp[i+1][j], dp[i][j-1])
+ */
+function buildSteps516(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const steps = [];
+
+  function makeGrid(hl = null, deps = []) {
+    const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        display[i + 1][j + 1] = i <= j ? dp[i][j] : "";
+      }
+    }
+    const shift = (cell) => cell ? [cell[0] + 1, cell[1] + 1] : null;
+    return {
+      dp: display,
+      text1: s,
+      text2: s,
+      hlCell: shift(hl),
+      pathCells: deps.map(shift).filter(Boolean),
+    };
+  }
+
+  function gridSnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "n = len(s)", en: "n = len(s)" },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `Chuỗi "${s}" có độ dài n=${n}.`,
+      en: `String "${s}" has length n=${n}.`,
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Tạo bảng dp", en: "Create dp table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${n} x ${n}` },
+      { name: "initial value", value: 0 },
+    ],
+    note: {
+      vi: "dp[i][j] = độ dài palindromic subsequence dài nhất trong đoạn s[i..j].",
+      en: "dp[i][j] = length of the longest palindromic subsequence inside s[i..j].",
+    },
+  });
+
+  if (n === 0) {
+    gridSnap({
+      title: { vi: "Chuỗi rỗng", en: "Empty string" },
+      codeLines: [11],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Chuỗi rỗng có đáp án 0.", en: "An empty string has answer 0." },
+    });
+    steps[steps.length - 1].final = true;
+    return { s, answer: 0, steps };
+  }
+
+  for (let i = n - 1; i >= 0; i--) {
+    gridSnap({
+      title: { vi: `Vòng ngoài i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [5],
+      hlCell: [i, i],
+      vars: [
+        { name: "i", value: i },
+        { name: `s[${i}]`, value: s[i] },
+      ],
+      note: {
+        vi: `Đi từ phải sang trái để các đoạn con ngắn hơn đã có sẵn khi tính dp[i][j].`,
+        en: `Move right-to-left so shorter intervals are already known when computing dp[i][j].`,
+      },
+    });
+
+    dp[i][i] = 1;
+    gridSnap({
+      title: { vi: `Base: dp[${i}][${i}] = 1`, en: `Base: dp[${i}][${i}] = 1` },
+      codeLines: [6],
+      hlCell: [i, i],
+      vars: [
+        { name: `s[${i}]`, value: s[i] },
+        { name: `dp[${i}][${i}]`, value: 1 },
+      ],
+      note: {
+        vi: `Một ký tự luôn là palindrome độ dài 1.`,
+        en: `A single character is always a palindrome of length 1.`,
+      },
+    });
+
+    for (let j = i + 1; j < n; j++) {
+      gridSnap({
+        title: { vi: `Vòng trong j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [7],
+        hlCell: [i, j],
+        pathCells: [[i + 1, j - 1], [i + 1, j], [i, j - 1]].filter(([r, c]) => r < n && c >= 0 && r <= c),
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "substring", value: `"${s.slice(i, j + 1)}"` },
+        ],
+        note: {
+          vi: `Chuẩn bị tính dp[${i}][${j}] cho đoạn "${s.slice(i, j + 1)}".`,
+          en: `Prepare to compute dp[${i}][${j}] for substring "${s.slice(i, j + 1)}".`,
+        },
+      });
+
+      const same = s[i] === s[j];
+      gridSnap({
+        title: {
+          vi: `So sánh s[${i}]='${s[i]}' và s[${j}]='${s[j]}'`,
+          en: `Compare s[${i}]='${s[i]}' and s[${j}]='${s[j]}'`,
+        },
+        codeLines: [8],
+        hlCell: [i, j],
+        pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
+        vars: [
+          { name: `s[${i}]`, value: s[i] },
+          { name: `s[${j}]`, value: s[j] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same
+            ? "Hai đầu giống nhau, có thể bọc palindrome ở giữa bằng 2 ký tự này."
+            : "Hai đầu khác nhau, bỏ một trong hai đầu và lấy kết quả tốt hơn.",
+          en: same
+            ? "The ends match, so they can wrap the middle palindrome."
+            : "The ends differ, so drop one end and keep the better result.",
+        },
+      });
+
+      if (same) {
+        const middle = i + 1 <= j - 1 ? dp[i + 1][j - 1] : 0;
+        dp[i][j] = middle + 2;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [9],
+          hlCell: [i, j],
+          pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
+          vars: [
+            { name: "middle", value: middle },
+            { name: `dp[${i}][${j}]`, value: `${middle} + 2 = ${dp[i][j]}` },
+          ],
+          note: {
+            vi: i + 1 <= j - 1
+              ? `s[${i}] == s[${j}], nên dp[${i}][${j}] = dp[${i + 1}][${j - 1}] + 2 = ${middle} + 2 = ${dp[i][j]}.`
+              : `s[${i}] == s[${j}] và đoạn giữa rỗng, nên dp[${i}][${j}] = 0 + 2 = ${dp[i][j]}.`,
+            en: i + 1 <= j - 1
+              ? `s[${i}] == s[${j}], so dp[${i}][${j}] = dp[${i + 1}][${j - 1}] + 2 = ${middle} + 2 = ${dp[i][j]}.`
+              : `s[${i}] == s[${j}] and the middle is empty, so dp[${i}][${j}] = 0 + 2 = ${dp[i][j]}.`,
+          },
+        });
+      } else {
+        gridSnap({
+          title: { vi: "Nhánh else", en: "Else branch" },
+          codeLines: [10],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j], [i, j - 1]],
+          vars: [
+            { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
+            { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
+          ],
+          note: {
+            vi: `Không thể dùng cả hai đầu cùng lúc, so sánh bỏ trái với bỏ phải.`,
+            en: `Cannot use both ends together, compare dropping left vs dropping right.`,
+          },
+        });
+
+        dp[i][j] = Math.max(dp[i + 1][j], dp[i][j - 1]);
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [11],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j], [i, j - 1]],
+          vars: [
+            { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
+            { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: {
+            vi: `dp[${i}][${j}] = max(${dp[i + 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+            en: `dp[${i}][${j}] = max(${dp[i + 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = dp[0][n - 1];
+  gridSnap({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [12],
+    hlCell: [0, n - 1],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `dp[0][${n - 1}]`, value: answer },
+    ],
+    note: {
+      vi: `Longest palindromic subsequence của "${s}" có độ dài ${answer}.`,
+      en: `The longest palindromic subsequence of "${s}" has length ${answer}.`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 97: Interleaving String.
  * DP[i][j] = True if s3[0:i+j] is an interleaving of s1[0:i] and s2[0:j].
  * dp[i][j] = (dp[i-1][j] && s1[i-1] == s3[i+j-1]) || (dp[i][j-1] && s2[j-1] == s3[i+j-1])
@@ -6710,7 +6938,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 516, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -6740,6 +6968,7 @@ module.exports = {
           { id: 120, name: "Triangle", pattern: "Grid DP" },
           { id: 931, name: "Minimum Falling Path Sum", pattern: "Matrix DP" },
           { id: 1143, name: "Longest Common Subsequence", pattern: "2D DP" },
+          { id: 516, name: "Longest Palindromic Subsequence", pattern: "Interval DP" },
           { id: 72, name: "Edit Distance", pattern: "2D DP" },
           { id: 416, name: "Partition Equal Subset Sum", pattern: "0/1 Knapsack" },
         ],
@@ -8502,6 +8731,55 @@ module.exports = {
       "                return total - 2 * j",
     ],
     builder: buildSteps1049,
+  },
+  516: {
+    id: 516,
+    difficulty: "medium",
+    slug: "longest-palindromic-subsequence",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Longest Palindromic Subsequence", en: "Longest Palindromic Subsequence" },
+    titleVi: { vi: "Dãy con đối xứng dài nhất", en: "Longest palindromic subsequence" },
+    statement: {
+      vi:
+        "Cho chuỗi s, trả về độ dài dãy con đối xứng dài nhất. " +
+        "Dãy con giữ nguyên thứ tự ký tự nhưng có thể xóa một số ký tự.",
+      en:
+        "Given a string s, return the length of the longest palindromic subsequence. " +
+        "A subsequence keeps character order while allowing deletions.",
+    },
+    defaultInput: "bbbab",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Interval DP: dp[i][j] = độ dài LPS trong đoạn s[i..j].", en: "Interval DP: dp[i][j] = LPS length inside s[i..j]." },
+      { vi: "Base: dp[i][i] = 1 vì một ký tự là palindrome.", en: "Base: dp[i][i] = 1 because one character is a palindrome." },
+      { vi: "Nếu s[i] == s[j], lấy cả hai đầu: dp[i][j] = dp[i+1][j-1] + 2.", en: "If s[i] == s[j], take both ends: dp[i][j] = dp[i+1][j-1] + 2." },
+      { vi: "Nếu khác nhau, bỏ một đầu: max(dp[i+1][j], dp[i][j-1]).", en: "If different, drop one end: max(dp[i+1][j], dp[i][j-1])." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Có O(n²) đoạn con (i,j), mỗi đoạn tính O(1). Bảng dp kích thước n×n.",
+        en: "There are O(n²) intervals (i,j), each computed in O(1). The dp table is n×n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestPalindromeSubseq(self, s: str) -> int:",
+      "        n = len(s)",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for i in range(n - 1, -1, -1):",
+      "            dp[i][i] = 1",
+      "            for j in range(i + 1, n):",
+      "                if s[i] == s[j]:",
+      "                    dp[i][j] = dp[i + 1][j - 1] + 2",
+      "                else:",
+      "                    dp[i][j] = max(dp[i + 1][j], dp[i][j - 1])",
+      "        return dp[0][n - 1]",
+    ],
+    builder: buildSteps516,
   },
   97: {
     id: 97,
