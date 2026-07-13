@@ -926,6 +926,156 @@ function buildSteps122DP(nums) {
   return { original: [...prices], answer: cash, steps };
 }
 
+// ─── 714: Best Time to Buy and Sell Stock with Transaction Fee ───
+function buildSteps714(nums, params) {
+  const prices = nums;
+  const fee = Number(params && params.fee !== undefined ? params.fee : 2);
+  const steps = [];
+
+  if (!prices.length) {
+    steps.push({
+      title: { vi: "Khong co ngay giao dich", en: "No trading days" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Khong co gia co phieu nao, loi nhuan toi da la 0.",
+        en: "No prices are provided, so the maximum profit is 0.",
+      },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  let hold = -prices[0];
+  let cash = 0;
+
+  steps.push({
+    title: { vi: `hold = -prices[0] = ${hold}`, en: `hold = -prices[0] = ${hold}` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [0],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "fee", value: fee },
+      { name: "hold", value: hold },
+      { name: "cash", value: cash },
+    ],
+    note: {
+      vi: `hold la loi nhuan tot nhat khi dang giu co phieu. Mua ngay 0: hold = -${prices[0]}.`,
+      en: `hold is the best profit while holding a stock. Buy on day 0: hold = -${prices[0]}.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "cash = 0", en: "cash = 0" },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [0],
+    mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "fee", value: fee },
+      { name: "hold", value: hold },
+      { name: "cash", value: cash },
+    ],
+    note: {
+      vi: "cash la loi nhuan tot nhat khi khong giu co phieu. Ban dau chua giao dich nen bang 0.",
+      en: "cash is the best profit while not holding a stock. Initially it is 0.",
+    },
+  });
+
+  for (let i = 1; i < prices.length; i++) {
+    const price = prices[i];
+    const oldHold = hold;
+    const oldCash = cash;
+
+    steps.push({
+      title: { vi: `Ngay ${i}: price = ${price}`, en: `Day ${i}: price = ${price}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "price", value: price },
+        { name: "hold", value: oldHold },
+        { name: "cash", value: oldCash },
+        { name: "fee", value: fee },
+      ],
+      note: {
+        vi: `Xet ngay ${i}. Co 2 trang thai: giu co phieu (hold) hoac khong giu (cash).`,
+        en: `Consider day ${i}. There are two states: holding stock (hold) or not holding (cash).`,
+      },
+    });
+
+    const buyCandidate = oldCash - price;
+    hold = Math.max(oldHold, buyCandidate);
+    steps.push({
+      title: { vi: `hold = max(${oldHold}, ${oldCash}-${price}) = ${hold}`, en: `hold = max(${oldHold}, ${oldCash}-${price}) = ${hold}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i],
+      mark: hold === buyCandidate && buyCandidate > oldHold ? [i] : [],
+      codeLines: [6],
+      vars: [
+        { name: "keep holding", value: oldHold },
+        { name: "buy today", value: `${oldCash} - ${price} = ${buyCandidate}` },
+        { name: "hold", value: hold },
+      ],
+      note: {
+        vi: `Chon tot hon giua giu trang thai cu (${oldHold}) va mua hom nay (${buyCandidate}).`,
+        en: `Choose the better of keeping the old hold (${oldHold}) and buying today (${buyCandidate}).`,
+      },
+    });
+
+    const sellCandidate = oldHold + price - fee;
+    cash = Math.max(oldCash, sellCandidate);
+    steps.push({
+      title: { vi: `cash = max(${oldCash}, ${oldHold}+${price}-${fee}) = ${cash}`, en: `cash = max(${oldCash}, ${oldHold}+${price}-${fee}) = ${cash}` },
+      arr: [...prices],
+      sub: prices.map((_, idx) => `day ${idx}`),
+      highlight: [i],
+      mark: cash === sellCandidate && sellCandidate > oldCash ? [i] : [],
+      codeLines: [7],
+      vars: [
+        { name: "keep cash", value: oldCash },
+        { name: "sell today", value: `${oldHold} + ${price} - ${fee} = ${sellCandidate}` },
+        { name: "cash", value: cash },
+      ],
+      note: {
+        vi: `Khi ban phai tru phi ${fee}. Chon tot hon giua khong ban (${oldCash}) va ban hom nay (${sellCandidate}).`,
+        en: `Selling pays the fee ${fee}. Choose the better of not selling (${oldCash}) and selling today (${sellCandidate}).`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Ket qua: cash = ${cash}`, en: `Result: cash = ${cash}` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `day ${i}`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [8],
+    vars: [
+      { name: "answer", value: cash },
+      { name: "hold", value: hold },
+      { name: "cash", value: cash },
+    ],
+    note: {
+      vi: `Ket thuc nen khong giu co phieu. Loi nhuan toi da = cash = ${cash}.`,
+      en: `We finish without holding stock. Maximum profit = cash = ${cash}.`,
+    },
+  });
+
+  return { original: [...prices], answer: cash, steps };
+}
+
 module.exports = {
   1288: {
     id: 1288,
@@ -1131,5 +1281,44 @@ module.exports = {
     codeLabel: { vi: "Cách 1: Greedy", en: "Approach 1: Greedy" },
     code2Label: { vi: "Cách 2: DP hold/cash", en: "Approach 2: DP hold/cash" },
     builder: buildSteps122,
+  },
+  714: {
+    id: 714,
+    difficulty: "medium",
+    slug: "best-time-to-buy-and-sell-stock-with-transaction-fee",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Best Time to Buy and Sell Stock with Transaction Fee", en: "Best Time to Buy and Sell Stock with Transaction Fee" },
+    titleVi: { vi: "Mua ban co phieu co phi giao dich", en: "Buy and sell stock with transaction fee" },
+    statement: {
+      vi: "Cho prices[i] la gia co phieu ngay i va phi giao dich fee. Duoc mua/ban nhieu lan, nhung moi lan ban phai tra fee va chi giu toi da 1 co phieu. Tim loi nhuan toi da.",
+      en: "Given prices[i] and a transaction fee. You may buy and sell multiple times, but each sale pays fee and you may hold at most one share. Find the maximum profit.",
+    },
+    defaultInput: [1, 3, 2, 8, 4, 9],
+    inputKind: "integer",
+    inputLabel: { vi: "Gia co phieu (dau phay)", en: "Stock prices (comma-separated)" },
+    extraParams: [
+      { key: "fee", label: { vi: "fee (phi giao dich)", en: "fee (transaction fee)" }, type: "number", default: 2 },
+    ],
+    approach: [
+      { vi: "Dung 2 trang thai: hold = loi nhuan tot nhat khi dang giu co phieu; cash = loi nhuan tot nhat khi khong giu.", en: "Use 2 states: hold = best profit while holding stock; cash = best profit while not holding." },
+      { vi: "Mua: hold = max(hold, cash - price). Ban: cash = max(cash, hold + price - fee).", en: "Buy: hold = max(hold, cash - price). Sell: cash = max(cash, hold + price - fee)." },
+      { vi: "Dap an la cash vi ket thuc toi uu la khong giu co phieu.", en: "The answer is cash because the optimal final state holds no stock." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyet prices mot lan, chi giu hai bien hold va cash.", en: "Scan prices once and keep only hold and cash." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxProfit(self, prices, fee):",
+      "        hold = -prices[0]",
+      "        cash = 0",
+      "        for i in range(1, len(prices)):",
+      "            hold = max(hold, cash - prices[i])",
+      "            cash = max(cash, hold + prices[i] - fee)",
+      "        return cash",
+    ],
+    builder: buildSteps714,
   },
 };
