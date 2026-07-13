@@ -1,5 +1,6 @@
 from collections import defaultdict
 from collections import Counter
+from typing import List
 
 class Solution:
     def arrayRankTransform(self, arr: List[int]) -> List[int]:
