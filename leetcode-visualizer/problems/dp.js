@@ -5880,7 +5880,7 @@ function buildSteps931(input) {
  * If word1[i-1] == word2[j-1]: dp[i][j] = dp[i-1][j-1] (no op).
  * Else: dp[i][j] = 1 + min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]).
  */
-function buildSteps72(input, params) {
+function buildSteps72Table(input, params) {
   const word1 = typeof input === "string" ? input : String(input);
   const word2 = (params.word2 || "").trim();
   const m = word1.length;
@@ -6099,6 +6099,202 @@ function buildSteps72(input, params) {
   steps[steps.length - 1].final = true;
   return { word1, word2, answer, steps };
 }
+function buildSteps72(input, params) {
+  const approach = String(params && params.approach ? params.approach : "1");
+  if (approach === "2") return buildSteps72Rolling(input, params);
+  return buildSteps72Table(input, params);
+}
+
+function buildSteps72Rolling(input, params) {
+  const word1 = typeof input === "string" ? input : String(input);
+  const word2 = (params.word2 || "").trim();
+  const m = word1.length;
+  const n = word2.length;
+  const steps = [];
+  let prev = Array.from({ length: n + 1 }, (_, idx) => idx);
+  let curr = null;
+  const labels = Array.from({ length: n + 1 }, (_, idx) => idx === 0 ? "j=0" : `j=${idx}\n${word2[idx - 1]}`);
+
+  function rowSnap(opts) {
+    const arr = opts.arr || (curr ? [...curr] : [...prev]);
+    const vars = [];
+    if (opts.i !== undefined) vars.push({ name: "i", value: opts.i });
+    if (opts.j !== undefined) vars.push({ name: "j", value: opts.j });
+    for (const item of opts.vars || []) vars.push(item);
+    steps.push({
+      title: opts.title,
+      arr,
+      sub: labels,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars,
+      note: opts.note,
+    });
+  }
+
+  rowSnap({
+    title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
+    arr: [],
+    codeLines: [3],
+    vars: [
+      { name: "word1", value: word1 },
+      { name: "word2", value: word2 },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `m = ${m}, n = ${n}. Approach 2 chi giu prev va curr.`,
+      en: `m = ${m}, n = ${n}. Approach 2 keeps only prev and curr.`,
+    },
+  });
+
+  rowSnap({
+    title: { vi: `prev = [0..${n}]`, en: `prev = [0..${n}]` },
+    arr: [...prev],
+    highlight: [],
+    codeLines: [4],
+    vars: [{ name: "prev", value: `[${prev.join(", ")}]` }],
+    note: {
+      vi: "prev bieu dien hang dp cua i-1. Ban dau i=0, can chen j ky tu de tao word2[:j].",
+      en: "prev represents row i-1. Initially i=0, inserting j characters creates word2[:j].",
+    },
+  });
+
+  for (let i = 1; i <= m; i++) {
+    rowSnap({
+      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
+      arr: [...prev],
+      highlight: [],
+      codeLines: [6],
+      i,
+      vars: [
+        { name: `word1[${i - 1}]`, value: word1[i - 1] },
+        { name: "prev", value: `[${prev.join(", ")}]` },
+      ],
+      note: {
+        vi: `Xu ly word1[:${i}] = "${word1.slice(0, i)}". prev la hang i-1.`,
+        en: `Process word1[:${i}] = "${word1.slice(0, i)}". prev is row i-1.`,
+      },
+    });
+
+    curr = [i, ...Array(n).fill(0)];
+    rowSnap({
+      title: { vi: `curr = [${i}, 0...]`, en: `curr = [${i}, 0...]` },
+      arr: [...curr],
+      highlight: [0],
+      codeLines: [7],
+      i,
+      j: 0,
+      vars: [{ name: "curr[0]", value: i }],
+      note: {
+        vi: `curr[0] = ${i}: xoa ${i} ky tu de bien word1[:${i}] thanh chuoi rong.`,
+        en: `curr[0] = ${i}: delete ${i} character(s) to convert word1[:${i}] to empty string.`,
+      },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      const same = word1[i - 1] === word2[j - 1];
+      rowSnap({
+        title: { vi: `So sanh '${word1[i - 1]}' va '${word2[j - 1]}'`, en: `Compare '${word1[i - 1]}' and '${word2[j - 1]}'` },
+        arr: [...curr],
+        highlight: [j],
+        codeLines: [8, 9],
+        i,
+        j,
+        vars: [
+          { name: `word1[${i - 1}]`, value: word1[i - 1] },
+          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same ? "Hai ky tu giong nhau, lay prev[j-1]." : "Hai ky tu khac nhau, tinh min cua xoa/chen/thay the.",
+          en: same ? "Characters match, take prev[j-1]." : "Characters differ, take min of delete/insert/replace.",
+        },
+      });
+
+      if (same) {
+        curr[j] = prev[j - 1];
+        rowSnap({
+          title: { vi: `curr[${j}] = ${curr[j]}`, en: `curr[${j}] = ${curr[j]}` },
+          arr: [...curr],
+          highlight: [j],
+          mark: [j - 1],
+          codeLines: [10],
+          i,
+          j,
+          vars: [
+            { name: `prev[${j - 1}]`, value: prev[j - 1] },
+            { name: `curr[${j}]`, value: curr[j] },
+          ],
+          note: {
+            vi: `curr[${j}] = prev[${j - 1}] = ${curr[j]}.`,
+            en: `curr[${j}] = prev[${j - 1}] = ${curr[j]}.`,
+          },
+        });
+      } else {
+        const del = prev[j];
+        const ins = curr[j - 1];
+        const rep = prev[j - 1];
+        curr[j] = 1 + Math.min(del, ins, rep);
+        rowSnap({
+          title: { vi: `curr[${j}] = ${curr[j]}`, en: `curr[${j}] = ${curr[j]}` },
+          arr: [...curr],
+          highlight: [j],
+          mark: [j - 1],
+          codeLines: [12],
+          i,
+          j,
+          vars: [
+            { name: "delete", value: `prev[${j}] = ${del}` },
+            { name: "insert", value: `curr[${j - 1}] = ${ins}` },
+            { name: "replace", value: `prev[${j - 1}] = ${rep}` },
+            { name: `curr[${j}]`, value: `1 + min(${del}, ${ins}, ${rep}) = ${curr[j]}` },
+          ],
+          note: {
+            vi: `curr[${j}] = 1 + min(${del}, ${ins}, ${rep}) = ${curr[j]}.`,
+            en: `curr[${j}] = 1 + min(${del}, ${ins}, ${rep}) = ${curr[j]}.`,
+          },
+        });
+      }
+    }
+
+    prev = curr;
+    rowSnap({
+      title: { vi: "prev = curr", en: "prev = curr" },
+      arr: [...prev],
+      highlight: [],
+      codeLines: [13],
+      i,
+      vars: [{ name: "prev", value: `[${prev.join(", ")}]` }],
+      note: {
+        vi: `Ket thuc hang i=${i}, gan prev = curr de xu ly hang tiep theo.`,
+        en: `Finish row i=${i}; assign prev = curr for the next row.`,
+      },
+    });
+  }
+
+  const answer = prev[n];
+  rowSnap({
+    title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
+    arr: [...prev],
+    highlight: [n],
+    final: true,
+    codeLines: [15],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `prev[${n}]`, value: answer },
+    ],
+    note: {
+      vi: `Edit distance("${word1}", "${word2}") = prev[${n}] = ${answer}.`,
+      en: `Edit distance("${word1}", "${word2}") = prev[${n}] = ${answer}.`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+  return { word1, word2, answer, steps };
+}
+
 
 /**
  * LeetCode 416: Partition Equal Subset Sum.
@@ -8306,7 +8502,13 @@ module.exports = {
     titleVi: { vi: "Khoảng cách chỉnh sửa (Levenshtein)", en: "Edit distance (Levenshtein)" },
     statement: { vi: "Cho hai chuỗi word1, word2. Trả về số thao tác (chèn/xóa/thay) ít nhất để chuyển word1 thành word2.", en: "Given two strings word1 and word2, return the minimum number of operations (insert/delete/replace) to convert word1 into word2." },
     defaultInput: "horse", inputKind: "string", inputLabel: { vi: "word1", en: "word1" },
-    extraParams: [{ key: "word2", type: "string", label: { vi: "word2", en: "word2" }, default: "ros" }],
+    extraParams: [
+      { key: "word2", type: "string", label: { vi: "word2", en: "word2" }, default: "ros" },
+      { key: "approach", label: { vi: "Cach giai", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cach 1: DP bang O(m*n)", en: "Approach 1: DP table O(m*n)" } },
+        { value: "2", label: { vi: "Cach 2: Rolling array O(n)", en: "Approach 2: Rolling array O(n)" } },
+      ] },
+    ],
     complexity: { time: "O(m×n)", space: "O(m×n)", note: { vi: "Bảng (m+1)×(n+1) → O(m×n).", en: "Table (m+1)×(n+1) → O(m×n)." } },
     code: [
       "class Solution:",
@@ -8368,6 +8570,24 @@ module.exports = {
       "        ",
       "        return dp[m][n]",
     ],
+    code2: [
+      "class Solution:",
+      "    def minDistance(self, word1: str, word2: str) -> int:",
+      "        m, n = len(word1), len(word2)",
+      "        prev = list(range(n + 1))",
+      "        ",
+      "        for i in range(1, m + 1):",
+      "            curr = [i] + [0] * n",
+      "            for j in range(1, n + 1):",
+      "                if word1[i - 1] == word2[j - 1]:",
+      "                    curr[j] = prev[j - 1]",
+      "                else:",
+      "                    curr[j] = 1 + min(prev[j], curr[j - 1], prev[j - 1])",
+      "            prev = curr",
+      "        ",
+      "        return prev[n]",
+    ],
+    code2Label: { vi: "Cach 2: Rolling array O(n)", en: "Approach 2: Rolling array O(n)" },
     builder: buildSteps72,
   },
   931: {
