@@ -1076,6 +1076,206 @@ function buildSteps714(nums, params) {
   return { original: [...prices], answer: cash, steps };
 }
 
+// ─── 123: Best Time to Buy and Sell Stock III ───
+function buildSteps123(nums) {
+  const prices = nums;
+  const steps = [];
+  const labels = prices.map((_, i) => `day ${i}`);
+
+  if (!prices.length) {
+    steps.push({
+      title: { vi: "Khong co ngay giao dich", en: "No trading days" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Khong co gia co phieu nao, loi nhuan toi da la 0.",
+        en: "No prices are provided, so the maximum profit is 0.",
+      },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  let buy1 = -prices[0];
+  let sell1 = 0;
+  let buy2 = -prices[0];
+  let sell2 = 0;
+
+  steps.push({
+    title: { vi: `buy1 = buy2 = -prices[0] = ${buy1}`, en: `buy1 = buy2 = -prices[0] = ${buy1}` },
+    arr: [...prices],
+    sub: labels,
+    highlight: [0],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "price", value: prices[0] },
+      { name: "buy1", value: buy1 },
+      { name: "sell1", value: sell1 },
+      { name: "buy2", value: buy2 },
+      { name: "sell2", value: sell2 },
+    ],
+    note: {
+      vi: `Sau ngay 0, neu mua lan 1 thi buy1 = -${prices[0]}. Trang thai buy2 cung khoi tao bang -${prices[0]} de cong thuc chay gon.`,
+      en: `After day 0, buying the first stock gives buy1 = -${prices[0]}. buy2 is initialized the same way so the rolling formulas stay compact.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "sell1 = sell2 = 0", en: "sell1 = sell2 = 0" },
+    arr: [...prices],
+    sub: labels,
+    highlight: [0],
+    mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "buy1", value: buy1 },
+      { name: "sell1", value: sell1 },
+      { name: "buy2", value: buy2 },
+      { name: "sell2", value: sell2 },
+    ],
+    note: {
+      vi: "Ban dau chua ban lan nao nen loi nhuan sau lan ban 1 va ban 2 deu la 0.",
+      en: "Initially no sale has happened, so profit after the first and second sale is 0.",
+    },
+  });
+
+  for (let i = 1; i < prices.length; i++) {
+    const price = prices[i];
+
+    steps.push({
+      title: { vi: `Ngay ${i}: price = ${price}`, en: `Day ${i}: price = ${price}` },
+      arr: [...prices],
+      sub: labels,
+      highlight: [i],
+      mark: [],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "price", value: price },
+        { name: "buy1", value: buy1 },
+        { name: "sell1", value: sell1 },
+        { name: "buy2", value: buy2 },
+        { name: "sell2", value: sell2 },
+      ],
+      note: {
+        vi: `Xet ngay ${i}. Moi ngay cap nhat 4 trang thai theo thu tu: mua 1, ban 1, mua 2, ban 2.`,
+        en: `Consider day ${i}. Update four states in order: first buy, first sell, second buy, second sell.`,
+      },
+    });
+
+    const oldBuy1 = buy1;
+    const buy1Candidate = -price;
+    buy1 = Math.max(buy1, buy1Candidate);
+    steps.push({
+      title: { vi: `buy1 = max(${oldBuy1}, -${price}) = ${buy1}`, en: `buy1 = max(${oldBuy1}, -${price}) = ${buy1}` },
+      arr: [...prices],
+      sub: labels,
+      highlight: [i],
+      mark: buy1 === buy1Candidate && buy1Candidate > oldBuy1 ? [i] : [],
+      codeLines: [6],
+      vars: [
+        { name: "keep buy1", value: oldBuy1 },
+        { name: "buy first today", value: `-${price} = ${buy1Candidate}` },
+        { name: "buy1", value: buy1 },
+      ],
+      note: {
+        vi: `Trang thai sau khi mua lan 1: giu gia tri cu ${oldBuy1} hoac mua hom nay thanh ${buy1Candidate}.`,
+        en: `State after the first buy: keep ${oldBuy1} or buy today for ${buy1Candidate}.`,
+      },
+    });
+
+    const oldSell1 = sell1;
+    const sell1Candidate = buy1 + price;
+    sell1 = Math.max(sell1, sell1Candidate);
+    steps.push({
+      title: { vi: `sell1 = max(${oldSell1}, ${buy1}+${price}) = ${sell1}`, en: `sell1 = max(${oldSell1}, ${buy1}+${price}) = ${sell1}` },
+      arr: [...prices],
+      sub: labels,
+      highlight: [i],
+      mark: sell1 === sell1Candidate && sell1Candidate > oldSell1 ? [i] : [],
+      codeLines: [7],
+      vars: [
+        { name: "keep sell1", value: oldSell1 },
+        { name: "sell first today", value: `${buy1} + ${price} = ${sell1Candidate}` },
+        { name: "sell1", value: sell1 },
+      ],
+      note: {
+        vi: `Trang thai sau khi ban lan 1: giu loi nhuan cu ${oldSell1} hoac ban hom nay duoc ${sell1Candidate}.`,
+        en: `State after the first sale: keep ${oldSell1} or sell today for ${sell1Candidate}.`,
+      },
+    });
+
+    const oldBuy2 = buy2;
+    const buy2Candidate = sell1 - price;
+    buy2 = Math.max(buy2, buy2Candidate);
+    steps.push({
+      title: { vi: `buy2 = max(${oldBuy2}, ${sell1}-${price}) = ${buy2}`, en: `buy2 = max(${oldBuy2}, ${sell1}-${price}) = ${buy2}` },
+      arr: [...prices],
+      sub: labels,
+      highlight: [i],
+      mark: buy2 === buy2Candidate && buy2Candidate > oldBuy2 ? [i] : [],
+      codeLines: [8],
+      vars: [
+        { name: "keep buy2", value: oldBuy2 },
+        { name: "buy second today", value: `${sell1} - ${price} = ${buy2Candidate}` },
+        { name: "buy2", value: buy2 },
+      ],
+      note: {
+        vi: `Mua lan 2 dung loi nhuan da co sau lan ban 1: sell1 - price = ${sell1} - ${price}.`,
+        en: `The second buy uses profit already earned after the first sale: sell1 - price = ${sell1} - ${price}.`,
+      },
+    });
+
+    const oldSell2 = sell2;
+    const sell2Candidate = buy2 + price;
+    sell2 = Math.max(sell2, sell2Candidate);
+    steps.push({
+      title: { vi: `sell2 = max(${oldSell2}, ${buy2}+${price}) = ${sell2}`, en: `sell2 = max(${oldSell2}, ${buy2}+${price}) = ${sell2}` },
+      arr: [...prices],
+      sub: labels,
+      highlight: [i],
+      mark: sell2 === sell2Candidate && sell2Candidate > oldSell2 ? [i] : [],
+      codeLines: [9],
+      vars: [
+        { name: "keep sell2", value: oldSell2 },
+        { name: "sell second today", value: `${buy2} + ${price} = ${sell2Candidate}` },
+        { name: "sell2", value: sell2 },
+      ],
+      note: {
+        vi: `Trang thai sau khi ban lan 2: day la loi nhuan tot nhat voi toi da 2 giao dich.`,
+        en: `State after the second sale: this is the best profit with at most two transactions.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Ket qua: sell2 = ${sell2}`, en: `Result: sell2 = ${sell2}` },
+    arr: [...prices],
+    sub: labels,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "buy1", value: buy1 },
+      { name: "sell1", value: sell1 },
+      { name: "buy2", value: buy2 },
+      { name: "sell2", value: sell2 },
+      { name: "answer", value: sell2 },
+    ],
+    note: {
+      vi: `Ket thuc khong giu co phieu. Loi nhuan toi da voi toi da 2 giao dich la sell2 = ${sell2}.`,
+      en: `We finish without holding stock. Maximum profit with at most two transactions is sell2 = ${sell2}.`,
+    },
+  });
+
+  return { original: [...prices], answer: sell2, steps };
+}
+
 module.exports = {
   1288: {
     id: 1288,
@@ -1281,6 +1481,45 @@ module.exports = {
     codeLabel: { vi: "Cách 1: Greedy", en: "Approach 1: Greedy" },
     code2Label: { vi: "Cách 2: DP hold/cash", en: "Approach 2: DP hold/cash" },
     builder: buildSteps122,
+  },
+  123: {
+    id: 123,
+    difficulty: "hard",
+    slug: "best-time-to-buy-and-sell-stock-iii",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Best Time to Buy and Sell Stock III", en: "Best Time to Buy and Sell Stock III" },
+    titleVi: { vi: "Mua ban co phieu toi da 2 lan", en: "Buy and sell stock at most twice" },
+    statement: {
+      vi: "Cho prices[i] la gia co phieu ngay i. Duoc thuc hien toi da 2 giao dich, moi giao dich gom mua roi ban, va khong duoc giu nhieu hon 1 co phieu cung luc. Tim loi nhuan toi da.",
+      en: "Given prices[i] as the stock price on day i. You may complete at most two transactions, each transaction is one buy followed by one sell, and you may hold at most one share at a time. Find the maximum profit.",
+    },
+    defaultInput: [3, 3, 5, 0, 0, 3, 1, 4],
+    inputKind: "integer",
+    inputLabel: { vi: "Gia co phieu (dau phay)", en: "Stock prices (comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Dung 4 trang thai rolling: buy1, sell1, buy2, sell2.", en: "Use four rolling states: buy1, sell1, buy2, sell2." },
+      { vi: "buy1 = loi nhuan tot nhat sau lan mua 1; sell1 = sau lan ban 1; buy2 = sau lan mua 2; sell2 = sau lan ban 2.", en: "buy1 = best profit after first buy; sell1 = after first sell; buy2 = after second buy; sell2 = after second sell." },
+      { vi: "Dap an la sell2, loi nhuan tot nhat sau toi da 2 giao dich va khong giu co phieu.", en: "The answer is sell2, the best profit after at most two transactions while holding no stock." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyet prices mot lan va chi giu 4 bien trang thai.", en: "Scan prices once and keep only four state variables." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxProfit(self, prices):",
+      "        buy1 = buy2 = -prices[0]",
+      "        sell1 = sell2 = 0",
+      "        for i in range(1, len(prices)):",
+      "            buy1 = max(buy1, -prices[i])",
+      "            sell1 = max(sell1, buy1 + prices[i])",
+      "            buy2 = max(buy2, sell1 - prices[i])",
+      "            sell2 = max(sell2, buy2 + prices[i])",
+      "        return sell2",
+    ],
+    builder: buildSteps123,
   },
   714: {
     id: 714,

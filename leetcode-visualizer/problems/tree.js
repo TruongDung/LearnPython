@@ -291,6 +291,117 @@ function buildSteps543(input) {
   return { input, answer: best, steps };
 }
 
+// ─── 124: Binary Tree Maximum Path Sum ───
+function buildSteps124(input) {
+  const root = parseTree(input);
+  const steps = [];
+  let maxSum = -Infinity;
+  let bestId = null;
+
+  steps.push(snapshot(root, {
+    title: { vi: "Maximum Path Sum", en: "Maximum Path Sum" },
+    codeLines: [3, 4],
+    vars: [{ name: "max_sum", value: "-inf" }, { name: "rule", value: "node.val + left_gain + right_gain" }],
+    note: {
+      vi: "Dung postorder. Tai moi node, tinh gain tot nhat di len cha va cap nhat duong di tot nhat di QUA node do.",
+      en: "Use postorder. At each node, compute the best gain to return to the parent and update the best path passing THROUGH that node.",
+    },
+  }));
+
+  if (!root) {
+    const fs = snapshot(root, {
+      title: { vi: "Cay rong", en: "Empty tree" },
+      codeLines: [11],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Cay rong nen tra 0 trong visualization.", en: "The visualization returns 0 for an empty tree." },
+    });
+    fs.final = true;
+    steps.push(fs);
+    return { input, answer: 0, steps };
+  }
+
+  function gain(node) {
+    if (!node) return 0;
+
+    const leftGain = Math.max(gain(node.left), 0);
+    const rightGain = Math.max(gain(node.right), 0);
+    steps.push(snapshot(root, {
+      title: { vi: `Node ${node.val}: left/right gain`, en: `Node ${node.val}: left/right gain` },
+      hlSet: new Set([node.id]),
+      wordSet: bestId !== null ? new Set([bestId]) : undefined,
+      codeLines: [6, 7],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "left_gain", value: leftGain },
+        { name: "right_gain", value: rightGain },
+        { name: "max_sum", value: maxSum === -Infinity ? "-inf" : maxSum },
+      ],
+      note: {
+        vi: `Gain am bi bo qua bang max(gain, 0). Tai node ${node.val}: left_gain = ${leftGain}, right_gain = ${rightGain}.`,
+        en: `Negative gains are ignored with max(gain, 0). At node ${node.val}: left_gain = ${leftGain}, right_gain = ${rightGain}.`,
+      },
+    }));
+
+    const pathThrough = node.val + leftGain + rightGain;
+    const oldMax = maxSum;
+    if (pathThrough > maxSum) {
+      maxSum = pathThrough;
+      bestId = node.id;
+    }
+    steps.push(snapshot(root, {
+      title: { vi: `Qua ${node.val}: ${pathThrough}`, en: `Through ${node.val}: ${pathThrough}` },
+      hlSet: new Set([node.id]),
+      wordSet: bestId !== null ? new Set([bestId]) : undefined,
+      codeLines: [8],
+      vars: [
+        { name: "node.val", value: node.val },
+        { name: "left_gain", value: leftGain },
+        { name: "right_gain", value: rightGain },
+        { name: "path_sum", value: `${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}` },
+        { name: "max_sum before", value: oldMax === -Infinity ? "-inf" : oldMax },
+        { name: "max_sum after", value: maxSum },
+      ],
+      note: {
+        vi: `Duong di tot nhat di qua node nay = ${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}. Cap nhat max_sum = ${maxSum}.`,
+        en: `Best path passing through this node = ${node.val} + ${leftGain} + ${rightGain} = ${pathThrough}. Update max_sum = ${maxSum}.`,
+      },
+    }));
+
+    const returnGain = node.val + Math.max(leftGain, rightGain);
+    steps.push(snapshot(root, {
+      title: { vi: `Return gain = ${returnGain}`, en: `Return gain = ${returnGain}` },
+      hlSet: new Set([node.id]),
+      wordSet: bestId !== null ? new Set([bestId]) : undefined,
+      codeLines: [9],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "return", value: `${node.val} + max(${leftGain}, ${rightGain}) = ${returnGain}` },
+        { name: "max_sum", value: maxSum },
+      ],
+      note: {
+        vi: `Tra ve cha chi duoc chon 1 nhanh: node.val + max(left_gain, right_gain) = ${returnGain}.`,
+        en: `Return only one branch to the parent: node.val + max(left_gain, right_gain) = ${returnGain}.`,
+      },
+    }));
+    return returnGain;
+  }
+
+  gain(root);
+  const fs = snapshot(root, {
+    title: { vi: `Max path sum = ${maxSum}`, en: `Max path sum = ${maxSum}` },
+    wordSet: bestId !== null ? new Set([bestId]) : undefined,
+    codeLines: [11],
+    vars: [{ name: "answer", value: maxSum }],
+    note: {
+      vi: `Ket qua la max_sum = ${maxSum}. Duong di co the bat dau va ket thuc o bat ky node nao.`,
+      en: `The answer is max_sum = ${maxSum}. The path may start and end at any nodes.`,
+    },
+  });
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: maxSum, steps };
+}
+
 // ─── 1022: Sum of Root To Leaf Binary Numbers ───
 function buildSteps1022(input) {
   const root = parseTree(input); const steps = []; let total = 0;
@@ -773,6 +884,13 @@ function buildSteps297(input) {
 }
 
 module.exports = {
+  __meta: {
+    order: [144, 94, 145, 104, 102, 543, 124, 226, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 297],
+    label: {
+      vi: "Tag Binary Tree",
+      en: "Binary Tree tag",
+    },
+  },
   144: {
     id: 144, difficulty: "easy", slug: "binary-tree-preorder-traversal",
     category: TREE_CAT,
@@ -887,6 +1005,36 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder. Stack O(h).", en: "One postorder pass. Stack O(h)." } },
     code: ["class Solution:", "    def diameterOfBinaryTree(self, root):", "        self.best = 0", "        def depth(node):", "            if not node: return 0", "            l = depth(node.left)", "            r = depth(node.right)", "            self.best = max(self.best, l + r)", "            return 1 + max(l, r)", "        depth(root)", "        return self.best"],
     builder: buildSteps543,
+  },
+  124: {
+    id: 124, difficulty: "hard", slug: "binary-tree-maximum-path-sum",
+    category: TREE_CAT,
+    title: { vi: "Binary Tree Maximum Path Sum", en: "Binary Tree Maximum Path Sum" },
+    titleVi: { vi: "Tong duong di lon nhat trong cay", en: "Maximum path sum in a binary tree" },
+    statement: { vi: "Cho root cua cay nhi phan, tim tong lon nhat cua mot duong di bat ky. Duong di phai noi cac node ke nhau theo canh cha-con, va moi node xuat hien toi da 1 lan. Nhap level-order.", en: "Given the root of a binary tree, return the maximum path sum of any non-empty path. A path follows parent-child edges and each node appears at most once. Enter level-order." },
+    defaultInput: "-10,9,20,null,null,15,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Postorder tu duoi len. Tai moi node, lay left_gain = max(gain(left), 0), right_gain = max(gain(right), 0).", en: "Postorder bottom-up. At each node, use left_gain = max(gain(left), 0), right_gain = max(gain(right), 0)." },
+      { vi: "Duong di tot nhat DI QUA node = node.val + left_gain + right_gain; dung gia tri nay de cap nhat max_sum.", en: "Best path THROUGH a node = node.val + left_gain + right_gain; use it to update max_sum." },
+      { vi: "Gia tri tra ve cho cha chi duoc chon 1 nhanh: node.val + max(left_gain, right_gain).", en: "The value returned to the parent can choose only one branch: node.val + max(left_gain, right_gain)." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyet moi node 1 lan. Stack de quy O(h).", en: "Visit each node once. Recursion stack O(h)." } },
+    code: [
+      "class Solution:",
+      "    def maxPathSum(self, root):",
+      "        self.max_sum = float('-inf')",
+      "        def gain(node):",
+      "            if not node: return 0",
+      "            left_gain = max(gain(node.left), 0)",
+      "            right_gain = max(gain(node.right), 0)",
+      "            self.max_sum = max(self.max_sum, node.val + left_gain + right_gain)",
+      "            return node.val + max(left_gain, right_gain)",
+      "        gain(root)",
+      "        return self.max_sum",
+    ],
+    builder: buildSteps124,
   },
   1022: {
     id: 1022, difficulty: "easy", slug: "sum-of-root-to-leaf-binary-numbers",
