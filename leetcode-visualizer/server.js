@@ -65,6 +65,8 @@ app.get("/api/problem/:id", (req, res) => {
     inputLabel: problem.inputLabel || null,
     complexity: problem.complexity || null,
     code: problem.code || [],
+    codeVi: problem.codeVi || null,
+    codeEn: problem.codeEn || null,
     code2: problem.code2 || null,
     code3: problem.code3 || null,
     codeCsharp: problem.codeCsharp || null,

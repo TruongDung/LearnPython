@@ -698,7 +698,8 @@ function renderCodeLineHtml(line) {
 
 function renderCode() {
   const panel = $("codePanel");
-  const code = (problemData && problemData.code) || [];
+  const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
+  const code = localizedCode || (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;
   const code3 = (problemData && problemData.code3) || null;
   const codeCsharp = (problemData && problemData.codeCsharp) || null;

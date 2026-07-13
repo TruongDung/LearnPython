@@ -5936,97 +5936,101 @@ function buildSteps72(input, params) {
 
   gridSnap({
     title: { vi: "Tao bang dp", en: "Create dp table" },
-    codeLines: [4],
+    codeLines: [6],
     vars: [
       { name: "dp size", value: `${m + 1} x ${n + 1}` },
       { name: "initial value", value: 0 },
     ],
     note: {
-      vi: `dp[i][j] = edit distance giua word1[:i] va word2[:j].`,
-      en: `dp[i][j] = edit distance between word1[:i] and word2[:j].`,
+      vi: "dp[i][j] = so buoc it nhat de bien word1[:i] thanh word2[:j].",
+      en: "dp[i][j] = minimum steps to convert word1[:i] into word2[:j].",
     },
   });
 
+  for (let j = 0; j <= n; j++) {
+    gridSnap({
+      title: { vi: `Base word2 j=${j}`, en: `Base word2 j=${j}` },
+      codeLines: [9],
+      hlCell: [0, j],
+      vars: [
+        { name: "word2 prefix", value: `"${word2.slice(0, j)}"` },
+      ],
+      note: {
+        vi: `Bien chuoi rong thanh "${word2.slice(0, j)}" can chen ${j} ky tu.`,
+        en: `Converting empty string to "${word2.slice(0, j)}" needs ${j} insertion(s).`,
+      },
+    });
+    dp[0][j] = j;
+    gridSnap({
+      title: { vi: `dp[0][${j}] = ${j}`, en: `dp[0][${j}] = ${j}` },
+      codeLines: [10],
+      hlCell: [0, j],
+      vars: [{ name: `dp[0][${j}]`, value: dp[0][j] }],
+      note: {
+        vi: `Gan dp[0][${j}] = ${j}.`,
+        en: `Set dp[0][${j}] = ${j}.`,
+      },
+    });
+  }
+
   for (let i = 0; i <= m; i++) {
     gridSnap({
-      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
-      codeLines: [6],
+      title: { vi: `Base word1 i=${i}`, en: `Base word1 i=${i}` },
+      codeLines: [13],
       hlCell: [i, 0],
-      vars: [{ name: "word1 prefix", value: `"${word1.slice(0, i)}"` }],
+      vars: [
+        { name: "word1 prefix", value: `"${word1.slice(0, i)}"` },
+      ],
       note: {
-        vi: `Xet hang i=${i}: word1[:${i}] = "${word1.slice(0, i)}".`,
-        en: `Consider row i=${i}: word1[:${i}] = "${word1.slice(0, i)}".`,
+        vi: `Bien "${word1.slice(0, i)}" thanh chuoi rong can xoa ${i} ky tu.`,
+        en: `Converting "${word1.slice(0, i)}" to empty string needs ${i} deletion(s).`,
+      },
+    });
+    dp[i][0] = i;
+    gridSnap({
+      title: { vi: `dp[${i}][0] = ${i}`, en: `dp[${i}][0] = ${i}` },
+      codeLines: [14],
+      hlCell: [i, 0],
+      vars: [{ name: `dp[${i}][0]`, value: dp[i][0] }],
+      note: {
+        vi: `Gan dp[${i}][0] = ${i}.`,
+        en: `Set dp[${i}][0] = ${i}.`,
+      },
+    });
+  }
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [16],
+      hlCell: [i, 0],
+      vars: [{ name: `word1[${i - 1}]`, value: word1[i - 1] }],
+      note: {
+        vi: `Xet word1[:${i}] = "${word1.slice(0, i)}".`,
+        en: `Consider word1[:${i}] = "${word1.slice(0, i)}".`,
       },
     });
 
-    for (let j = 0; j <= n; j++) {
+    for (let j = 1; j <= n; j++) {
       gridSnap({
         title: { vi: `Vong trong j=${j}`, en: `Inner loop j=${j}` },
-        codeLines: [7],
+        codeLines: [17],
         hlCell: [i, j],
-        pathCells: i > 0 && j > 0 ? [[i - 1, j - 1], [i, j - 1], [i - 1, j]] : [],
-        vars: [{ name: "word2 prefix", value: `"${word2.slice(0, j)}"` }],
+        pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
+        vars: [
+          { name: `word1[${i - 1}]`, value: word1[i - 1] },
+          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+        ],
         note: {
           vi: `Chuan bi tinh dp[${i}][${j}] cho "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
           en: `Prepare to compute dp[${i}][${j}] for "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
         },
       });
 
-      if (i === 0) {
-        gridSnap({
-          title: { vi: "if i == 0", en: "if i == 0" },
-          codeLines: [8],
-          hlCell: [i, j],
-          vars: [{ name: "i == 0", value: true }],
-          note: {
-            vi: "Hang 0: chuyen chuoi rong thanh word2[:j] bang cach chen j ky tu.",
-            en: "Top row: convert empty string to word2[:j] by inserting j characters.",
-          },
-        });
-        dp[i][j] = j;
-        gridSnap({
-          title: { vi: `dp[0][${j}] = ${j}`, en: `dp[0][${j}] = ${j}` },
-          codeLines: [9],
-          hlCell: [i, j],
-          vars: [{ name: `dp[0][${j}]`, value: dp[i][j] }],
-          note: {
-            vi: `Can chen ${j} ky tu.`,
-            en: `Need ${j} insertion(s).`,
-          },
-        });
-        continue;
-      }
-
-      gridSnap({
-        title: { vi: "elif j == 0", en: "elif j == 0" },
-        codeLines: [10],
-        hlCell: [i, j],
-        vars: [{ name: "j == 0", value: j === 0 }],
-        note: {
-          vi: j === 0 ? "Cot 0: chuyen word1[:i] thanh chuoi rong bang cach xoa i ky tu." : "Khong phai cot 0, so sanh hai ky tu cuoi.",
-          en: j === 0 ? "Left column: convert word1[:i] to empty string by deleting i characters." : "Not the left column, compare the last two characters.",
-        },
-      });
-
-      if (j === 0) {
-        dp[i][j] = i;
-        gridSnap({
-          title: { vi: `dp[${i}][0] = ${i}`, en: `dp[${i}][0] = ${i}` },
-          codeLines: [11],
-          hlCell: [i, j],
-          vars: [{ name: `dp[${i}][0]`, value: dp[i][j] }],
-          note: {
-            vi: `Can xoa ${i} ky tu.`,
-            en: `Need ${i} deletion(s).`,
-          },
-        });
-        continue;
-      }
-
       const match = word1[i - 1] === word2[j - 1];
       gridSnap({
         title: { vi: `So sanh '${word1[i - 1]}' va '${word2[j - 1]}'`, en: `Compare '${word1[i - 1]}' and '${word2[j - 1]}'` },
-        codeLines: [12],
+        codeLines: [18],
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1]],
         vars: [
@@ -6035,8 +6039,8 @@ function buildSteps72(input, params) {
           { name: "match", value: match },
         ],
         note: {
-          vi: match ? "Hai ky tu giong nhau, copy duong cheo." : "Hai ky tu khac nhau, can replace/insert/delete.",
-          en: match ? "The characters match, copy the diagonal." : "The characters differ, use replace/insert/delete.",
+          vi: match ? "Ky tu giong nhau, khong can thao tac them." : "Ky tu khac nhau, tinh min cua xoa/chen/thay the.",
+          en: match ? "Characters match, no extra operation needed." : "Characters differ, take the minimum of delete/insert/replace.",
         },
       });
 
@@ -6044,7 +6048,7 @@ function buildSteps72(input, params) {
         dp[i][j] = dp[i - 1][j - 1];
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
-          codeLines: [13],
+          codeLines: [20],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
           vars: [
@@ -6052,29 +6056,29 @@ function buildSteps72(input, params) {
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
-            vi: `Khong can min nua: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
-            en: `No min needed: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
+            vi: `Khong can thao tac: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
+            en: `No operation needed: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
           },
         });
       } else {
-        const replaceCost = dp[i - 1][j - 1] + 1;
-        const insertCost = dp[i][j - 1] + 1;
         const deleteCost = dp[i - 1][j] + 1;
-        dp[i][j] = Math.min(replaceCost, insertCost, deleteCost);
+        const insertCost = dp[i][j - 1] + 1;
+        const replaceCost = dp[i - 1][j - 1] + 1;
+        dp[i][j] = Math.min(deleteCost, insertCost, replaceCost);
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
-          codeLines: [15],
+          codeLines: [22, 23, 24, 25, 26],
           hlCell: [i, j],
-          pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
+          pathCells: [[i - 1, j], [i, j - 1], [i - 1, j - 1]],
           vars: [
-            { name: "replace", value: `dp[${i - 1}][${j - 1}] + 1 = ${replaceCost}` },
-            { name: "insert", value: `dp[${i}][${j - 1}] + 1 = ${insertCost}` },
             { name: "delete", value: `dp[${i - 1}][${j}] + 1 = ${deleteCost}` },
+            { name: "insert", value: `dp[${i}][${j - 1}] + 1 = ${insertCost}` },
+            { name: "replace", value: `dp[${i - 1}][${j - 1}] + 1 = ${replaceCost}` },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
-            vi: `dp[${i}][${j}] = 1 + min(${dp[i - 1][j - 1]}, ${dp[i][j - 1]}, ${dp[i - 1][j]}) = ${dp[i][j]}.`,
-            en: `dp[${i}][${j}] = 1 + min(${dp[i - 1][j - 1]}, ${dp[i][j - 1]}, ${dp[i - 1][j]}) = ${dp[i][j]}.`,
+            vi: `dp[${i}][${j}] = min(${deleteCost}, ${insertCost}, ${replaceCost}) = ${dp[i][j]}.`,
+            en: `dp[${i}][${j}] = min(${deleteCost}, ${insertCost}, ${replaceCost}) = ${dp[i][j]}.`,
           },
         });
       }
@@ -6085,7 +6089,7 @@ function buildSteps72(input, params) {
   gridSnap({
     title: { vi: "Ket qua", en: "Result" },
     hlCell: [m, n],
-    codeLines: [17],
+    codeLines: [28],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Edit distance("${word1}", "${word2}") = ${answer} thao tac.`,
@@ -6095,7 +6099,6 @@ function buildSteps72(input, params) {
   steps[steps.length - 1].final = true;
   return { word1, word2, answer, steps };
 }
-
 
 /**
  * LeetCode 416: Partition Equal Subset Sum.
@@ -8309,18 +8312,59 @@ module.exports = {
       "class Solution:",
       "    def minDistance(self, word1: str, word2: str) -> int:",
       "        m, n = len(word1), len(word2)",
+      "        ",
+      "        # dp[i][j] = số bước ít nhất để biến word1[:i] thành word2[:j]",
       "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
       "        ",
+      "        # Base case: biến chuỗi rỗng thành word2[:j] cần j bước chèn",
+      "        for j in range(n + 1):",
+      "            dp[0][j] = j",
+      "        ",
+      "        # Base case: biến word1[:i] thành chuỗi rỗng cần i bước xóa",
       "        for i in range(m + 1):",
-      "            for j in range(n + 1):",
-      "                if i == 0:",
-      "                    dp[i][j] = j",
-      "                elif j == 0:",
-      "                    dp[i][j] = i",
-      "                elif word1[i - 1] == word2[j - 1]:",
-      "                    dp[i][j] = dp[i - 1][j - 1]  # không cần min nữa",
+      "            dp[i][0] = i",
+      "        ",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if word1[i - 1] == word2[j - 1]:",
+      "                    # Ký tự giống nhau, không cần thao tác gì thêm",
+      "                    dp[i][j] = dp[i - 1][j - 1]",
       "                else:",
-      "                    dp[i][j] = 1 + min(dp[i - 1][j - 1], dp[i][j - 1], dp[i - 1][j])",
+      "                    dp[i][j] = 1 + min(",
+      "                        dp[i - 1][j],     # Xóa ký tự word1[i-1]",
+      "                        dp[i][j - 1],     # Chèn ký tự word2[j-1]",
+      "                        dp[i - 1][j - 1]  # Thay thế word1[i-1] bằng word2[j-1]",
+      "                    )",
+      "        ",
+      "        return dp[m][n]",
+    ],
+    codeEn: [
+      "class Solution:",
+      "    def minDistance(self, word1: str, word2: str) -> int:",
+      "        m, n = len(word1), len(word2)",
+      "        ",
+      "        # dp[i][j] = minimum steps to convert word1[:i] into word2[:j]",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        ",
+      "        # Base case: converting empty string to word2[:j] needs j insertions",
+      "        for j in range(n + 1):",
+      "            dp[0][j] = j",
+      "        ",
+      "        # Base case: converting word1[:i] to empty string needs i deletions",
+      "        for i in range(m + 1):",
+      "            dp[i][0] = i",
+      "        ",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if word1[i - 1] == word2[j - 1]:",
+      "                    # Same character, no extra operation needed",
+      "                    dp[i][j] = dp[i - 1][j - 1]",
+      "                else:",
+      "                    dp[i][j] = 1 + min(",
+      "                        dp[i - 1][j],     # Delete word1[i-1]",
+      "                        dp[i][j - 1],     # Insert word2[j-1]",
+      "                        dp[i - 1][j - 1]  # Replace word1[i-1] with word2[j-1]",
+      "                    )",
       "        ",
       "        return dp[m][n]",
     ],
