@@ -7270,6 +7270,8 @@ function buildSteps97(input) {
   const parts = input.split(",").map(s => s.trim());
   const [s1, s2, s3] = parts.length >= 3 ? parts : ["ab", "ca", "aabca"];
   const steps = [];
+  const m = s1.length;
+  const n = s2.length;
 
   const makeGrid = (dp, hlCell = null, pathCells = []) => ({
     dp: dp.map((row) => row.map((v) => (v ? "T" : "F"))),
@@ -7280,11 +7282,30 @@ function buildSteps97(input) {
   });
 
   steps.push({
-    title: { vi: "Kiểm tra độ dài", en: "Check lengths" },
+    title: { vi: "Láº¥y kÃ­ch thÆ°á»›c m, n", en: "Read sizes m, n" },
     arr: [],
     highlight: [],
     mark: [],
     codeLines: [3],
+    vars: [
+      { name: "s1", value: `"${s1}"` },
+      { name: "s2", value: `"${s2}"` },
+      { name: "s3", value: `"${s3}"` },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `m=${m}, n=${n}. Báº£ng DP sáº½ cÃ³ kÃ­ch thÆ°á»›c ${m + 1}Ã—${n + 1}.`,
+      en: `m=${m}, n=${n}. The DP table will have size ${m + 1}Ã—${n + 1}.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Kiểm tra độ dài", en: "Check lengths" },
+    arr: [],
+    highlight: [],
+    mark: [],
+    codeLines: [5],
     vars: [
       { name: "len(s1)", value: s1.length },
       { name: "len(s2)", value: s2.length },
@@ -7304,7 +7325,7 @@ function buildSteps97(input) {
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [4],
+      codeLines: [6],
       vars: [{ name: "answer", value: false }],
       note: { vi: "Độ dài không khớp, nên không thể ghép xen kẽ.", en: "Lengths do not match, so interleaving is impossible." },
     });
@@ -7315,29 +7336,8 @@ function buildSteps97(input) {
     };
   }
 
-  const m = s1.length;
-  const n = s2.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
 
-  steps.push({
-    title: { vi: "Lấy kích thước m, n", en: "Read sizes m, n" },
-    arr: [],
-    grid: makeGrid(dp),
-    highlight: [],
-    mark: [],
-    codeLines: [5],
-    vars: [
-      { name: "s1", value: `"${s1}"` },
-      { name: "s2", value: `"${s2}"` },
-      { name: "s3", value: `"${s3}"` },
-      { name: "m", value: m },
-      { name: "n", value: n },
-    ],
-    note: {
-      vi: `m=${m}, n=${n}. Bảng DP sẽ có kích thước ${m + 1}×${n + 1}.`,
-      en: `m=${m}, n=${n}. The DP table will have size ${m + 1}×${n + 1}.`,
-    },
-  });
 
   steps.push({
     title: { vi: "Tạo bảng dp toàn False", en: "Create all-False dp table" },
@@ -7345,7 +7345,7 @@ function buildSteps97(input) {
     grid: makeGrid(dp),
     highlight: [],
     mark: [],
-    codeLines: [6],
+    codeLines: [9],
     vars: [{ name: "dp size", value: `${m + 1} x ${n + 1}` }],
     note: {
       vi: "dp[i][j] = True nếu s3[0:i+j] có thể tạo từ s1[0:i] và s2[0:j].",
@@ -7360,53 +7360,13 @@ function buildSteps97(input) {
     grid: makeGrid(dp, [0, 0]),
     highlight: [],
     mark: [],
-    codeLines: [7],
+    codeLines: [10],
     vars: [{ name: "dp[0][0]", value: true }],
     note: {
       vi: "Chuỗi rỗng của s1 và chuỗi rỗng của s2 tạo được chuỗi rỗng của s3.",
       en: "Empty s1 and empty s2 can form empty s3.",
     },
   });
-
-  // Fill first column (using only s1)
-  for (let i = 1; i <= m; i++) {
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: [],
-      grid: makeGrid(dp, [i, 0], [[i - 1, 0]]),
-      highlight: [],
-      mark: [],
-      codeLines: [8],
-      vars: [{ name: "i", value: i }],
-      note: {
-        vi: `Đang xử lý cột 0: chỉ dùng prefix của s1 để khớp s3[0:${i}].`,
-        en: `Processing column 0: only a prefix of s1 is used to match s3[0:${i}].`,
-      },
-    });
-
-    const prev = dp[i - 1][0];
-    const match = s1[i - 1] === s3[i - 1];
-    dp[i][0] = prev && match;
-    steps.push({
-      title: { vi: `dp[${i}][0] = ${dp[i][0]}`, en: `dp[${i}][0] = ${dp[i][0]}` },
-      arr: [],
-      grid: makeGrid(dp, [i, 0], [[i - 1, 0]]),
-      highlight: [],
-      mark: [],
-      codeLines: [9],
-      vars: [
-        { name: `dp[${i - 1}][0]`, value: prev },
-        { name: `s1[${i - 1}]`, value: `"${s1[i - 1]}"` },
-        { name: `s3[${i - 1}]`, value: `"${s3[i - 1]}"` },
-        { name: "chars match", value: match },
-        { name: `dp[${i}][0]`, value: dp[i][0] },
-      ],
-      note: {
-        vi: `dp[${i}][0] = dp[${i - 1}][0] AND s1[${i - 1}] == s3[${i - 1}] = ${prev} AND ${match} = ${dp[i][0]}.`,
-        en: `dp[${i}][0] = dp[${i - 1}][0] AND s1[${i - 1}] == s3[${i - 1}] = ${prev} AND ${match} = ${dp[i][0]}.`,
-      },
-    });
-  }
 
   // Fill first row (using only s2)
   for (let j = 1; j <= n; j++) {
@@ -7416,7 +7376,7 @@ function buildSteps97(input) {
       grid: makeGrid(dp, [0, j], [[0, j - 1]]),
       highlight: [],
       mark: [],
-      codeLines: [10],
+      codeLines: [13],
       vars: [{ name: "j", value: j }],
       note: {
         vi: `Đang xử lý hàng 0: chỉ dùng prefix của s2 để khớp s3[0:${j}].`,
@@ -7433,7 +7393,7 @@ function buildSteps97(input) {
       grid: makeGrid(dp, [0, j], [[0, j - 1]]),
       highlight: [],
       mark: [],
-      codeLines: [11],
+      codeLines: [14],
       vars: [
         { name: `dp[0][${j - 1}]`, value: prev },
         { name: `s2[${j - 1}]`, value: `"${s2[j - 1]}"` },
@@ -7448,6 +7408,46 @@ function buildSteps97(input) {
     });
   }
 
+  // Fill first column (using only s1)
+  for (let i = 1; i <= m; i++) {
+    steps.push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      arr: [],
+      grid: makeGrid(dp, [i, 0], [[i - 1, 0]]),
+      highlight: [],
+      mark: [],
+      codeLines: [17],
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Đang xử lý cột 0: chỉ dùng prefix của s1 để khớp s3[0:${i}].`,
+        en: `Processing column 0: only a prefix of s1 is used to match s3[0:${i}].`,
+      },
+    });
+
+    const prev = dp[i - 1][0];
+    const match = s1[i - 1] === s3[i - 1];
+    dp[i][0] = prev && match;
+    steps.push({
+      title: { vi: `dp[${i}][0] = ${dp[i][0]}`, en: `dp[${i}][0] = ${dp[i][0]}` },
+      arr: [],
+      grid: makeGrid(dp, [i, 0], [[i - 1, 0]]),
+      highlight: [],
+      mark: [],
+      codeLines: [18],
+      vars: [
+        { name: `dp[${i - 1}][0]`, value: prev },
+        { name: `s1[${i - 1}]`, value: `"${s1[i - 1]}"` },
+        { name: `s3[${i - 1}]`, value: `"${s3[i - 1]}"` },
+        { name: "chars match", value: match },
+        { name: `dp[${i}][0]`, value: dp[i][0] },
+      ],
+      note: {
+        vi: `dp[${i}][0] = dp[${i - 1}][0] AND s1[${i - 1}] == s3[${i - 1}] = ${prev} AND ${match} = ${dp[i][0]}.`,
+        en: `dp[${i}][0] = dp[${i - 1}][0] AND s1[${i - 1}] == s3[${i - 1}] = ${prev} AND ${match} = ${dp[i][0]}.`,
+      },
+    });
+  }
+
   // Fill the rest
   for (let i = 1; i <= m; i++) {
     steps.push({
@@ -7456,7 +7456,7 @@ function buildSteps97(input) {
       grid: makeGrid(dp, [i, 1]),
       highlight: [],
       mark: [],
-      codeLines: [12],
+      codeLines: [21],
       vars: [{ name: "i", value: i }, { name: `s1[${i - 1}]`, value: `"${s1[i - 1]}"` }],
       note: {
         vi: `Bắt đầu xét các ô dùng s1[0:${i}] và từng prefix của s2.`,
@@ -7471,7 +7471,7 @@ function buildSteps97(input) {
         grid: makeGrid(dp, [i, j], [[i - 1, j], [i, j - 1]]),
         highlight: [],
         mark: [],
-        codeLines: [13],
+        codeLines: [22],
         vars: [
           { name: "i", value: i },
           { name: "j", value: j },
@@ -7490,7 +7490,7 @@ function buildSteps97(input) {
         grid: makeGrid(dp, [i, j], [[i - 1, j]]),
         highlight: [],
         mark: [],
-        codeLines: [14],
+        codeLines: [23],
         vars: [
           { name: `dp[${i - 1}][${j}]`, value: dp[i - 1][j] },
           { name: `s1[${i - 1}]`, value: `"${s1[i - 1]}"` },
@@ -7510,7 +7510,7 @@ function buildSteps97(input) {
         grid: makeGrid(dp, [i, j], [[i, j - 1]]),
         highlight: [],
         mark: [],
-        codeLines: [15],
+        codeLines: [24],
         vars: [
           { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
           { name: `s2[${j - 1}]`, value: `"${s2[j - 1]}"` },
@@ -7531,7 +7531,7 @@ function buildSteps97(input) {
         grid: makeGrid(dp, [i, j], [[i - 1, j], [i, j - 1]]),
         highlight: [],
         mark: [],
-        codeLines: [16],
+        codeLines: [23, 24],
         vars: [
           { name: "from_s1", value: fromUp },
           { name: "from_s2", value: fromLeft },
@@ -7554,7 +7554,7 @@ function buildSteps97(input) {
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [17],
+    codeLines: [26],
     vars: [
       { name: "answer", value: answer },
       { name: `dp[${m}][${n}]`, value: answer },
@@ -9495,28 +9495,28 @@ module.exports = {
     code: [
       "class Solution:",
       "    def isInterleave(self, s1: str, s2: str, s3: str) -> bool:",
-      "        m = len(s1)",
-      "        n = len(s2)",
-      "        k = len(s3)",
+      "        m, n = len(s1), len(s2)",
       "",
-      "        if m + n != k:",
+      "        if m + n != len(s3):",
       "            return False",
       "",
-      "        dp = [[False for _ in range(n + 1)] for _ in range(m + 1)]",
+      "        # dp[i][j] = True nếu s3[:i+j] có thể tạo thành từ s1[:i] và s2[:j]",
+      "        dp = [[False] * (n + 1) for _ in range(m + 1)]",
+      "        dp[0][0] = True",
       "",
-      "        for i in range(m + 1):",
-      "            for j in range(n + 1):",
-      "                if i == 0 and j == 0:",
-      "                    dp[i][j] = True",
-      "                elif i == 0:",
-      "                    dp[0][j] = s3[j - 1] == s2[j - 1] and dp[0][j - 1]",
-      "                elif j == 0:",
-      "                    dp[i][0] = s3[i - 1] == s1[i - 1] and dp[i - 1][0]",
-      "                else:",
-      "                    dp[i][j] = (",
-      "                        (s3[i + j - 1] == s2[j - 1] and dp[i][j - 1])",
-      "                        or (s3[i + j - 1] == s1[i - 1] and dp[i - 1][j])",
-      "                    )",
+      "        # Khởi tạo hàng đầu tiên (chỉ dùng s2)",
+      "        for j in range(1, n + 1):",
+      "            dp[0][j] = dp[0][j - 1] and s2[j - 1] == s3[j - 1]",
+      "",
+      "        # Khởi tạo cột đầu tiên (chỉ dùng s1)",
+      "        for i in range(1, m + 1):",
+      "            dp[i][0] = dp[i - 1][0] and s1[i - 1] == s3[i - 1]",
+      "",
+      "        # Điền bảng DP",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                dp[i][j] = (dp[i - 1][j] and s1[i - 1] == s3[i + j - 1]) or \\",
+      "                           (dp[i][j - 1] and s2[j - 1] == s3[i + j - 1])",
       "",
       "        return dp[m][n]",
     ],
