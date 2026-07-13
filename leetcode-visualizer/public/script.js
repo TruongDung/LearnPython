@@ -320,6 +320,7 @@ async function loadProblem() {
 // Render problem description panel in current language
 function renderProblem() {
   if (!problemData) return;
+  $("problemPanel").dataset.problemId = String(problemData.id);
   $("problemId2").textContent = `#${problemData.id}`;
   const titleEl = $("problemTitle");
   titleEl.textContent = pick(problemData.title);

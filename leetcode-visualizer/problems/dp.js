@@ -2597,6 +2597,8 @@ function buildSteps1143(input, params) {
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1]],
         vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
           { name: `text1[${i - 1}]`, value: text1[i - 1] },
           { name: `text2[${j - 1}]`, value: text2[j - 1] },
           { name: "match", value: match },
@@ -2620,6 +2622,8 @@ function buildSteps1143(input, params) {
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
           vars: [
+            { name: "i", value: i },
+            { name: "j", value: j },
             { name: `dp[${i - 1}][${j - 1}]`, value: diag },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
@@ -2635,6 +2639,8 @@ function buildSteps1143(input, params) {
           hlCell: [i, j],
           pathCells: [[i - 1, j], [i, j - 1]],
           vars: [
+            { name: "i", value: i },
+            { name: "j", value: j },
             { name: `dp[${i - 1}][${j}]`, value: dp[i - 1][j] },
             { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
           ],
@@ -2653,6 +2659,8 @@ function buildSteps1143(input, params) {
           hlCell: [i, j],
           pathCells: [[i - 1, j], [i, j - 1]],
           vars: [
+            { name: "i", value: i },
+            { name: "j", value: j },
             { name: `dp[${i - 1}][${j}]`, value: top },
             { name: `dp[${i}][${j - 1}]`, value: left },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
