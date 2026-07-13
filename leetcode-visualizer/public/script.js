@@ -1053,7 +1053,8 @@ function renderGrid(step) {
     return escapeXml(String(label));
   };
 
-  let html = '<table class="dp-grid"><thead><tr><th></th><th></th>';
+  const hasCellLabels = Object.keys(labels).length > 0;
+  let html = `<table class="dp-grid${hasCellLabels ? " has-cell-labels" : ""}"><thead><tr><th></th><th></th>`;
   for (let j = 0; j < n; j++) {
     const colLabel = colLabels && colLabels[j]
       ? axisLabelHtml(colLabels[j])

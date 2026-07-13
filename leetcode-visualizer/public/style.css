@@ -1132,6 +1132,36 @@ button:disabled {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 
+.dp-grid.has-cell-labels th,
+.dp-grid.has-cell-labels td {
+  width: 58px;
+  min-width: 58px;
+  height: 46px;
+}
+
+.dp-grid.has-cell-labels .dp-cell {
+  padding: 3px 4px;
+}
+
+.dp-grid.has-cell-labels .cell-label {
+  position: static;
+  display: block;
+  max-width: 100%;
+  margin: 0 auto 4px;
+  transform: none;
+  padding: 1px 3px;
+  font-size: 9px;
+  line-height: 1.1;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+}
+
+.dp-grid.has-cell-labels .cell-value {
+  display: block;
+  line-height: 1.1;
+}
+
 .dp-grid .dp-cell.hl {
   background: rgba(245, 158, 11, 0.12);
   color: #fbbf24;
@@ -2255,6 +2285,24 @@ select option {
     font-size: 6px;
     line-height: 1.15;
     box-shadow: none;
+  }
+
+  .dp-grid.has-cell-labels th,
+  .dp-grid.has-cell-labels td {
+    width: 50px;
+    min-width: 50px;
+    height: 44px;
+  }
+
+  .dp-grid.has-cell-labels .cell-label {
+    position: static;
+    display: block;
+    margin: 0 auto 3px;
+    transform: none;
+    font-size: 8px;
+    line-height: 1.1;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
