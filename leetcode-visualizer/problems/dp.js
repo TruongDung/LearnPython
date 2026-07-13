@@ -7452,6 +7452,229 @@ function buildSteps516(input) {
 }
 
 /**
+ * LeetCode 1312: Minimum Insertion Steps to Make a String Palindrome.
+ * Interval DP:
+ *   dp[i][j] = minimum insertions needed to make s[i..j] a palindrome.
+ *   if s[i] == s[j]: dp[i][j] = dp[i+1][j-1]
+ *   else: dp[i][j] = 1 + min(dp[i+1][j], dp[i][j-1])
+ */
+function buildSteps1312(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const steps = [];
+  const axisLabels = Array.from({ length: n }, (_, idx) => ({ char: s[idx] }));
+
+  function makeGrid(hl = null, deps = []) {
+    const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        display[i + 1][j + 1] = i <= j ? dp[i][j] : "";
+      }
+    }
+    const shift = (cell) => cell ? [cell[0] + 1, cell[1] + 1] : null;
+    return {
+      dp: display,
+      text1: s,
+      text2: s,
+      rowLabels: axisLabels.map(({ char }, idx) => ({ index: `i=${idx}`, char })),
+      colLabels: axisLabels.map(({ char }, idx) => ({ index: `j=${idx}`, char })),
+      hlCell: shift(hl),
+      pathCells: deps.map(shift).filter(Boolean),
+    };
+  }
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "n = len(s)", en: "n = len(s)" },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `String "${s}" co do dai n = ${n}.`,
+      en: `String "${s}" has length n = ${n}.`,
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Tao bang dp", en: "Create dp table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${n} x ${n}` },
+      { name: "initial value", value: 0 },
+    ],
+    note: {
+      vi: "dp[i][j] = so lan chen it nhat de s[i..j] thanh palindrome.",
+      en: "dp[i][j] = minimum insertions needed to make s[i..j] a palindrome.",
+    },
+  });
+
+  if (n === 0) {
+    gridSnap({
+      title: { vi: "Chuoi rong", en: "Empty string" },
+      codeLines: [11],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Chuoi rong da la palindrome, can 0 lan chen.", en: "An empty string is already a palindrome, so it needs 0 insertions." },
+    });
+    steps[steps.length - 1].final = true;
+    return { s, answer: 0, steps };
+  }
+
+  for (let i = n - 1; i >= 0; i--) {
+    gridSnap({
+      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [5],
+      hlCell: [i, i],
+      vars: [
+        { name: `s[${i}]`, value: s[i] },
+        { name: `dp[${i}][${i}]`, value: 0 },
+      ],
+      note: {
+        vi: `Mot ky tu "${s[i]}" da la palindrome, nen dp[${i}][${i}] = 0.`,
+        en: `One character "${s[i]}" is already a palindrome, so dp[${i}][${i}] = 0.`,
+      },
+    });
+
+    for (let j = i + 1; j < n; j++) {
+      gridSnap({
+        title: { vi: `Vong trong j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [6],
+        hlCell: [i, j],
+        pathCells: [[i + 1, j - 1], [i + 1, j], [i, j - 1]].filter(([r, c]) => r < n && c >= 0 && r <= c),
+        vars: [
+          { name: "substring", value: `"${s.slice(i, j + 1)}"` },
+        ],
+        note: {
+          vi: `Chuan bi tinh dp[${i}][${j}] cho substring "${s.slice(i, j + 1)}".`,
+          en: `Prepare to compute dp[${i}][${j}] for substring "${s.slice(i, j + 1)}".`,
+        },
+      });
+
+      const same = s[i] === s[j];
+      gridSnap({
+        title: {
+          vi: `So sanh s[${i}]='${s[i]}' va s[${j}]='${s[j]}'`,
+          en: `Compare s[${i}]='${s[i]}' and s[${j}]='${s[j]}'`,
+        },
+        codeLines: [7],
+        hlCell: [i, j],
+        pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
+        vars: [
+          { name: `s[${i}]`, value: s[i] },
+          { name: `s[${j}]`, value: s[j] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same
+            ? "Hai dau giong nhau, khong can chen them o hai dau; lay bai toan ben trong."
+            : "Hai dau khac nhau, phai chen 1 ky tu de khop mot trong hai dau.",
+          en: same
+            ? "The two ends match, so no extra insertion is needed at the ends; use the inside interval."
+            : "The two ends differ, so insert 1 character to match one of the two ends.",
+        },
+      });
+
+      if (same) {
+        const middle = i + 1 <= j - 1 ? dp[i + 1][j - 1] : 0;
+        dp[i][j] = middle;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [8],
+          hlCell: [i, j],
+          pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
+          vars: [
+            { name: "middle", value: middle },
+            { name: `dp[${i}][${j}]`, value: middle },
+          ],
+          note: {
+            vi: i + 1 <= j - 1
+              ? `s[${i}] == s[${j}], nen dp[${i}][${j}] = dp[${i + 1}][${j - 1}] = ${middle}.`
+              : `s[${i}] == s[${j}] va doan giua rong, nen dp[${i}][${j}] = 0.`,
+            en: i + 1 <= j - 1
+              ? `s[${i}] == s[${j}], so dp[${i}][${j}] = dp[${i + 1}][${j - 1}] = ${middle}.`
+              : `s[${i}] == s[${j}] and the inside is empty, so dp[${i}][${j}] = 0.`,
+          },
+        });
+      } else {
+        gridSnap({
+          title: { vi: "Nhanh else", en: "Else branch" },
+          codeLines: [9],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j], [i, j - 1]],
+          vars: [
+            { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
+            { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
+          ],
+          note: {
+            vi: `Thu chen de khop dau trai hoac dau phai, roi lay cach it hon.`,
+            en: `Try inserting to match either the left or right end, then take the cheaper option.`,
+          },
+        });
+
+        dp[i][j] = 1 + Math.min(dp[i + 1][j], dp[i][j - 1]);
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [10],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j], [i, j - 1]],
+          vars: [
+            { name: `dp[${i + 1}][${j}]`, value: dp[i + 1][j] },
+            { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
+            { name: `dp[${i}][${j}]`, value: `1 + min(${dp[i + 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}` },
+          ],
+          note: {
+            vi: `dp[${i}][${j}] = 1 + min(${dp[i + 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+            en: `dp[${i}][${j}] = 1 + min(${dp[i + 1][j]}, ${dp[i][j - 1]}) = ${dp[i][j]}.`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = dp[0][n - 1];
+  gridSnap({
+    title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [11],
+    hlCell: [0, n - 1],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `dp[0][${n - 1}]`, value: answer },
+    ],
+    note: {
+      vi: `Can it nhat ${answer} lan chen de bien "${s}" thanh palindrome.`,
+      en: `Minimum ${answer} insertion(s) are needed to make "${s}" a palindrome.`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 97: Interleaving String.
  * DP[i][j] = True if s3[0:i+j] is an interleaving of s1[0:i] and s2[0:j].
  * dp[i][j] = (dp[i-1][j] && s1[i-1] == s3[i+j-1]) || (dp[i][j-1] && s2[j-1] == s3[i+j-1])
@@ -7763,7 +7986,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 516, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 516, 1312, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -9660,6 +9883,49 @@ module.exports = {
       "        return dp[0][n - 1]",
     ],
     builder: buildSteps516,
+  },
+  1312: {
+    id: 1312,
+    difficulty: "hard",
+    slug: "minimum-insertion-steps-to-make-a-string-palindrome",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Minimum Insertion Steps to Make a String Palindrome", en: "Minimum Insertion Steps to Make a String Palindrome" },
+    titleVi: { vi: "Chen it nhat de thanh palindrome", en: "Minimum insertions to make palindrome" },
+    statement: {
+      vi: "Cho chuoi s, moi buoc duoc chen mot ky tu bat ky vao vi tri bat ky. Tra ve so buoc chen it nhat de bien s thanh palindrome.",
+      en: "Given a string s, in one step you may insert any character at any position. Return the minimum number of insertion steps to make s a palindrome.",
+    },
+    defaultInput: "mbadm",
+    inputKind: "string",
+    inputLabel: { vi: "Chuoi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Interval DP: dp[i][j] = so lan chen it nhat de s[i..j] thanh palindrome.", en: "Interval DP: dp[i][j] = minimum insertions needed to make s[i..j] a palindrome." },
+      { vi: "Neu s[i] == s[j], hai dau da khop: dp[i][j] = dp[i+1][j-1].", en: "If s[i] == s[j], the ends already match: dp[i][j] = dp[i+1][j-1]." },
+      { vi: "Neu khac nhau, chen 1 ky tu de khop mot dau: dp[i][j] = 1 + min(dp[i+1][j], dp[i][j-1]).", en: "If they differ, insert one character to match one end: dp[i][j] = 1 + min(dp[i+1][j], dp[i][j-1])." },
+    ],
+    complexity: {
+      time: "O(n^2)",
+      space: "O(n^2)",
+      note: {
+        vi: "Co O(n^2) interval (i,j), moi interval tinh O(1).",
+        en: "There are O(n^2) intervals (i,j), each computed in O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minInsertions(self, s: str) -> int:",
+      "        n = len(s)",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for i in range(n - 1, -1, -1):",
+      "            for j in range(i + 1, n):",
+      "                if s[i] == s[j]:",
+      "                    dp[i][j] = dp[i + 1][j - 1]",
+      "                else:",
+      "                    dp[i][j] = 1 + min(dp[i + 1][j], dp[i][j - 1])",
+      "        return dp[0][n - 1]",
+    ],
+    builder: buildSteps1312,
   },
   97: {
     id: 97,
