@@ -2715,8 +2715,8 @@ function buildSteps1143(input, params) {
           vars: [
             { name: "i", value: i },
             { name: "j", value: j },
-            { name: `dp[${i - 1}][${j}]`, value: dp[i - 1][j] },
-            { name: `dp[${i}][${j - 1}]`, value: dp[i][j - 1] },
+            { name: "dp[i-1][j]", value: `dp[${i}-1][${j}] = dp[${i - 1}][${j}] = ${dp[i - 1][j]}` },
+            { name: "dp[i][j-1]", value: `dp[${i}][${j}-1] = dp[${i}][${j - 1}] = ${dp[i][j - 1]}` },
           ],
           note: {
             vi: `Ký tự khác nhau, nên chọn LCS tốt hơn từ ô trên hoặc ô trái.`,
@@ -2735,8 +2735,8 @@ function buildSteps1143(input, params) {
           vars: [
             { name: "i", value: i },
             { name: "j", value: j },
-            { name: `dp[${i - 1}][${j}]`, value: top },
-            { name: `dp[${i}][${j - 1}]`, value: left },
+            { name: "dp[i-1][j]", value: `dp[${i}-1][${j}] = dp[${i - 1}][${j}] = ${top}` },
+            { name: "dp[i][j-1]", value: `dp[${i}][${j}-1] = dp[${i}][${j - 1}] = ${left}` },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
