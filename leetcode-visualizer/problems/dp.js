@@ -6113,20 +6113,35 @@ function buildSteps72Rolling(input, params) {
   const steps = [];
   let prev = Array.from({ length: n + 1 }, (_, idx) => idx);
   let curr = null;
-  const labels = Array.from({ length: n + 1 }, (_, idx) => idx === 0 ? "j=0" : `j=${idx}\n${word2[idx - 1]}`);
+  const blankRow = () => Array(n + 1).fill("");
+  const colLabels = Array.from({ length: n }, (_, idx) => ({
+    index: `j=${idx + 1}`,
+    char: word2[idx],
+  }));
 
   function rowSnap(opts) {
-    const arr = opts.arr || (curr ? [...curr] : [...prev]);
     const vars = [];
     if (opts.i !== undefined) vars.push({ name: "i", value: opts.i });
     if (opts.j !== undefined) vars.push({ name: "j", value: opts.j });
     for (const item of opts.vars || []) vars.push(item);
+    const activeRow = opts.activeRow === undefined ? null : opts.activeRow;
+    const activeCol = opts.activeCol === undefined ? 0 : opts.activeCol;
+    const currRow = curr ? [...curr] : blankRow();
     steps.push({
       title: opts.title,
-      arr,
-      sub: labels,
-      highlight: opts.highlight || [],
-      mark: opts.mark || [],
+      grid: {
+        dp: [blankRow(), [...prev], currRow],
+        text1: "pc",
+        text2: word2,
+        rowLabels: [
+          { index: "prev", char: opts.prevLabel || (opts.i === undefined ? "i=0" : `i-1=${Math.max(0, opts.i - 1)}`) },
+          { index: "curr", char: opts.currLabel || (opts.i === undefined ? "not started" : `i=${opts.i}`) },
+        ],
+        colLabels,
+        hlCell: activeRow === null ? null : [activeRow, activeCol],
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+      },
       codeLines: opts.codeLines || [],
       codeBlock: 2,
       vars,
@@ -6138,6 +6153,8 @@ function buildSteps72Rolling(input, params) {
     title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
     arr: [],
     codeLines: [3],
+    activeRow: 1,
+    activeCol: 0,
     vars: [
       { name: "word1", value: word1 },
       { name: "word2", value: word2 },
@@ -6145,8 +6162,8 @@ function buildSteps72Rolling(input, params) {
       { name: "n", value: n },
     ],
     note: {
-      vi: `m = ${m}, n = ${n}. Approach 2 chi giu prev va curr.`,
-      en: `m = ${m}, n = ${n}. Approach 2 keeps only prev and curr.`,
+      vi: `m = ${m}, n = ${n}. Grid nay chi co 2 hang: prev la hang i-1, curr la hang i dang tinh.`,
+      en: `m = ${m}, n = ${n}. This grid has only 2 rows: prev is row i-1, curr is the row being computed.`,
     },
   });
 
@@ -6155,6 +6172,8 @@ function buildSteps72Rolling(input, params) {
     arr: [...prev],
     highlight: [],
     codeLines: [4],
+    activeRow: 1,
+    activeCol: 0,
     vars: [{ name: "prev", value: `[${prev.join(", ")}]` }],
     note: {
       vi: "prev bieu dien hang dp cua i-1. Ban dau i=0, can chen j ky tu de tao word2[:j].",
@@ -6169,6 +6188,8 @@ function buildSteps72Rolling(input, params) {
       highlight: [],
       codeLines: [6],
       i,
+      activeRow: 1,
+      activeCol: 0,
       vars: [
         { name: `word1[${i - 1}]`, value: word1[i - 1] },
         { name: "prev", value: `[${prev.join(", ")}]` },
@@ -6187,6 +6208,8 @@ function buildSteps72Rolling(input, params) {
       codeLines: [7],
       i,
       j: 0,
+      activeRow: 2,
+      activeCol: 0,
       vars: [{ name: "curr[0]", value: i }],
       note: {
         vi: `curr[0] = ${i}: xoa ${i} ky tu de bien word1[:${i}] thanh chuoi rong.`,
@@ -6203,6 +6226,12 @@ function buildSteps72Rolling(input, params) {
         codeLines: [8, 9],
         i,
         j,
+        activeRow: 2,
+        activeCol: j,
+        pathCells: same ? [[1, j - 1]] : [[1, j], [2, j - 1], [1, j - 1]],
+        cellLabels: same
+          ? { [`1,${j - 1}`]: "prev[j-1]" }
+          : { [`1,${j}`]: "prev[j]", [`2,${j - 1}`]: "curr[j-1]", [`1,${j - 1}`]: "prev[j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: word1[i - 1] },
           { name: `word2[${j - 1}]`, value: word2[j - 1] },
@@ -6224,6 +6253,10 @@ function buildSteps72Rolling(input, params) {
           codeLines: [10],
           i,
           j,
+          activeRow: 2,
+          activeCol: j,
+          pathCells: [[1, j - 1]],
+          cellLabels: { [`1,${j - 1}`]: "prev[j-1]" },
           vars: [
             { name: `prev[${j - 1}]`, value: prev[j - 1] },
             { name: `curr[${j}]`, value: curr[j] },
@@ -6246,6 +6279,14 @@ function buildSteps72Rolling(input, params) {
           codeLines: [12],
           i,
           j,
+          activeRow: 2,
+          activeCol: j,
+          pathCells: [[1, j], [2, j - 1], [1, j - 1]],
+          cellLabels: {
+            [`1,${j}`]: "prev[j]",
+            [`2,${j - 1}`]: "curr[j-1]",
+            [`1,${j - 1}`]: "prev[j-1]",
+          },
           vars: [
             { name: "delete", value: `prev[${j}] = ${del}` },
             { name: "insert", value: `curr[${j - 1}] = ${ins}` },
@@ -6267,6 +6308,9 @@ function buildSteps72Rolling(input, params) {
       highlight: [],
       codeLines: [13],
       i,
+      activeRow: 1,
+      activeCol: 0,
+      currLabel: "copied",
       vars: [{ name: "prev", value: `[${prev.join(", ")}]` }],
       note: {
         vi: `Ket thuc hang i=${i}, gan prev = curr de xu ly hang tiep theo.`,
@@ -6282,6 +6326,8 @@ function buildSteps72Rolling(input, params) {
     highlight: [n],
     final: true,
     codeLines: [15],
+    activeRow: 1,
+    activeCol: n,
     vars: [
       { name: "answer", value: answer },
       { name: `prev[${n}]`, value: answer },
