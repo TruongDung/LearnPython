@@ -4062,103 +4062,268 @@ function buildSteps132(input) {
   const s = typeof input === "string" ? input : String(input);
   const n = s.length;
   const steps = [];
+  const chars = s.split("");
+  const rowLabels = Array.from({ length: n }, (_, idx) => String(idx));
+  const indices = Array.from({ length: n + 1 }, (_, idx) => idx);
+  const dpLabels = ["dp[0]", ...chars.map((ch, idx) => `dp[${idx + 1}]\n${ch}`)];
+  const sliceHighlight = (start, end) =>
+    start <= end ? Array.from({ length: end - start + 1 }, (_, k) => start + k) : [];
+  const dpSliceHighlight = (start, end) =>
+    start <= end ? Array.from({ length: end - start + 1 }, (_, k) => start + 1 + k) : [];
 
-  // Build isPalin table (expand from center or DP).
+  steps.push({
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    arr: indices,
+    sub: dpLabels,
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "s", value: s },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `Doc do dai chuoi: n = len("${s}") = ${n}.`,
+      en: `Read the string length: n = len("${s}") = ${n}.`,
+    },
+  });
+
   const isPalin = Array.from({ length: n }, () => new Array(n).fill(false));
+  steps.push({
+    title: { vi: "Tao bang isPalin", en: "Create isPalin table" },
+    matrix: isPalin.map(row => [...row]),
+    rowLabels,
+    colLabels: rowLabels,
+    highlight: [],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "isPalin size", value: `${n} x ${n}` },
+      { name: "default", value: "False" },
+    ],
+    note: {
+      vi: "Khoi tao isPalin[i][j] = False cho moi substring s[i..j].",
+      en: "Initialize isPalin[i][j] = False for every substring s[i..j].",
+    },
+  });
+
   for (let i = n - 1; i >= 0; i--) {
+    steps.push({
+      title: { vi: `Vong ngoai i = ${i}`, en: `Outer loop i = ${i}` },
+      arr: chars,
+      sub: rowLabels,
+      highlight: [i],
+      mark: [],
+      codeLines: [6],
+      vars: [
+        { name: "i", value: i },
+        { name: "s[i]", value: s[i] ?? "" },
+      ],
+      note: {
+        vi: `Bat dau tinh cac palindrome co diem bat dau i = ${i}.`,
+        en: `Start computing palindromes that begin at i = ${i}.`,
+      },
+    });
+
     for (let j = i; j < n; j++) {
-      if (s[i] === s[j] && (j - i <= 2 || isPalin[i + 1][j - 1])) {
+      steps.push({
+        title: { vi: `Vong trong j = ${j}`, en: `Inner loop j = ${j}` },
+        arr: chars,
+        sub: rowLabels,
+        highlight: sliceHighlight(i, j),
+        mark: [i, j],
+        codeLines: [7],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "s[i..j]", value: s.slice(i, j + 1) },
+        ],
+        note: {
+          vi: `Dang xet substring s[${i}..${j}] = "${s.slice(i, j + 1)}".`,
+          en: `Checking substring s[${i}..${j}] = "${s.slice(i, j + 1)}".`,
+        },
+      });
+
+      const sameEnds = s[i] === s[j];
+      const shortEnough = j - i <= 2;
+      const innerValue = shortEnough ? true : isPalin[i + 1][j - 1];
+      const pal = sameEnds && innerValue;
+      steps.push({
+        title: { vi: pal ? "Dieu kien dung" : "Dieu kien sai", en: pal ? "Condition true" : "Condition false" },
+        matrix: isPalin.map(row => [...row]),
+        rowLabels,
+        colLabels: rowLabels,
+        activeCell: [i, j],
+        highlight: [[i, j]],
+        mark: pal ? [[i, j]] : [],
+        codeLines: [8],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "s[i] == s[j]", value: `${JSON.stringify(s[i])} == ${JSON.stringify(s[j])} -> ${sameEnds}` },
+          { name: "j - i <= 2", value: shortEnough },
+          { name: shortEnough ? "inner check" : `isPalin[${i + 1}][${j - 1}]`, value: innerValue },
+          { name: `isPalin[${i}][${j}]`, value: pal },
+        ],
+        note: {
+          vi: `Kiem tra s[${i}] == s[${j}] va phan ben trong co palindrome khong. Ket qua: ${pal}.`,
+          en: `Check matching ends and whether the inside is a palindrome. Result: ${pal}.`,
+        },
+      });
+
+      if (pal) {
         isPalin[i][j] = true;
+        steps.push({
+          title: { vi: `isPalin[${i}][${j}] = True`, en: `isPalin[${i}][${j}] = True` },
+          matrix: isPalin.map(row => [...row]),
+          rowLabels,
+          colLabels: rowLabels,
+          activeCell: [i, j],
+          highlight: [[i, j]],
+          mark: [[i, j]],
+          codeLines: [9],
+          vars: [
+            { name: `s[${i}..${j}]`, value: s.slice(i, j + 1) },
+            { name: `isPalin[${i}][${j}]`, value: true },
+          ],
+          note: {
+            vi: `Danh dau "${s.slice(i, j + 1)}" la palindrome.`,
+            en: `Mark "${s.slice(i, j + 1)}" as a palindrome.`,
+          },
+        });
       }
     }
   }
 
-  // dp[i] = min cuts for s[0..i-1]. dp[0] = -1 base.
-  const dp = new Array(n + 1).fill(0);
-  dp[0] = -1;
-  for (let i = 1; i <= n; i++) dp[i] = i - 1; // worst case: cut each char
-
-  const sub = s.split("");
-
+  const dp = Array.from({ length: n + 1 }, (_, idx) => idx - 1);
   steps.push({
-    title: { vi: "Khởi tạo DP", en: "Initialize DP" },
+    title: { vi: "Khoi tao dp", en: "Initialize dp" },
     arr: [...dp],
-    sub: ["-1", ...sub],
-    highlight: [], mark: [],
-    codeLines: [3, 4, 5],
+    sub: dpLabels,
+    highlight: [],
+    mark: [0],
+    codeLines: [11],
     vars: [
-      { name: "s", value: s },
-      { name: "n", value: n },
-      { name: "dp (worst)", value: `[${dp.join(",")}]` },
+      { name: "dp", value: `[${dp.join(", ")}]` },
+      { name: "dp[0]", value: -1 },
     ],
     note: {
-      vi:
-        `s = "${s}" (dài ${n}).\n` +
-        `dp[i] = số CẮT TỐI THIỂU cho s[0..i-1] thành toàn palindrome.\n` +
-        `dp[0] = -1 (base). Khởi tạo dp[i] = i-1 (worst: mỗi ký tự 1 đoạn).\n` +
-        `isPalin[i][j] đã được tiền xử lý.`,
-      en:
-        `s = "${s}" (length ${n}).\n` +
-        `dp[i] = minimum CUTS for s[0..i-1] to all be palindromes.\n` +
-        `dp[0] = -1 (base). Initialize dp[i] = i-1 (worst: each char is a segment).\n` +
-        `isPalin[i][j] has been precomputed.`,
+      vi: "dp[i] = so lan cat toi thieu cho s[0..i-1]. Gia tri ban dau la worst case: dp[i] = i - 1.",
+      en: "dp[i] = minimum cuts for s[0..i-1]. Initial values are the worst case: dp[i] = i - 1.",
     },
   });
 
   for (let i = 1; i <= n; i++) {
-    let bestJ = i - 1; // default: dp[i-1]+1 (cut single char)
-    for (let j = 0; j < i; j++) {
-      if (isPalin[j][i - 1] && dp[j] + 1 < dp[i]) {
-        dp[i] = dp[j] + 1;
-        bestJ = j;
-      }
-    }
-
-    const palinStr = s.slice(bestJ, i);
     steps.push({
-      title: { vi: `dp[${i}] = ${dp[i]}`, en: `dp[${i}] = ${dp[i]}` },
+      title: { vi: `Vong DP i = ${i}`, en: `DP outer loop i = ${i}` },
       arr: [...dp],
-      sub: ["-1", ...sub],
-      highlight: Array.from({ length: i - bestJ }, (_, k) => bestJ + 1 + k).filter(x => x <= n),
-      mark: dp[i] === 0 ? Array.from({ length: n + 1 }, (_, k) => k) : [],
-      codeLines: [6, 7, 8, 9],
+      sub: dpLabels,
+      highlight: dpSliceHighlight(0, i - 1),
+      mark: [i],
+      codeLines: [12],
       vars: [
         { name: "i", value: i },
         { name: "s[0..i-1]", value: s.slice(0, i) },
-        { name: "best j", value: bestJ },
-        { name: "palindrome", value: `s[${bestJ}..${i-1}] = "${palinStr}"` },
-        { name: "dp[i]", value: dp[i] },
+        { name: `dp[${i}]`, value: dp[i] },
       ],
       note: {
-        vi:
-          `Xét s[0..${i-1}] = "${s.slice(0,i)}".\n` +
-          `Tìm j sao cho s[j..${i-1}] là palindrome và dp[j]+1 nhỏ nhất.\n` +
-          `Tốt nhất: j=${bestJ}, s[${bestJ}..${i-1}] = "${palinStr}" (palindrome${isPalin[bestJ][i-1] ? " ✓" : ""}).\n` +
-          `dp[${i}] = dp[${bestJ}] + 1 = ${dp[bestJ]} + 1 = ${dp[i]}.` +
-          (dp[i] === 0 ? ` (Toàn bộ chuỗi đã là palindrome → 0 cắt!)` : ``),
-        en:
-          `Consider s[0..${i-1}] = "${s.slice(0,i)}".\n` +
-          `Find j such that s[j..${i-1}] is a palindrome and dp[j]+1 is minimized.\n` +
-          `Best: j=${bestJ}, s[${bestJ}..${i-1}] = "${palinStr}" (palindrome${isPalin[bestJ][i-1] ? " ✓" : ""}).\n` +
-          `dp[${i}] = dp[${bestJ}] + 1 = ${dp[bestJ]} + 1 = ${dp[i]}.` +
-          (dp[i] === 0 ? ` (Entire string is palindrome → 0 cuts!)` : ``),
+        vi: `Tinh dp[${i}] cho prefix "${s.slice(0, i)}".`,
+        en: `Compute dp[${i}] for prefix "${s.slice(0, i)}".`,
       },
     });
+
+    for (let j = 0; j < i; j++) {
+      const fragment = s.slice(j, i);
+      steps.push({
+        title: { vi: `Thu j = ${j}`, en: `Try j = ${j}` },
+        arr: [...dp],
+        sub: dpLabels,
+        highlight: dpSliceHighlight(j, i - 1),
+        mark: [j, i],
+        codeLines: [13],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: `s[${j}..${i - 1}]`, value: fragment },
+          { name: `dp[${i}] before`, value: dp[i] },
+        ],
+        note: {
+          vi: `Thu cat truoc vi tri ${j}; doan cuoi la "${fragment}".`,
+          en: `Try cutting before index ${j}; the last segment is "${fragment}".`,
+        },
+      });
+
+      const pal = isPalin[j][i - 1];
+      const candidate = dp[j] + 1;
+      steps.push({
+        title: { vi: pal ? "Substring la palindrome" : "Substring khong palindrome", en: pal ? "Substring is palindrome" : "Substring is not palindrome" },
+        matrix: isPalin.map(row => [...row]),
+        rowLabels,
+        colLabels: rowLabels,
+        activeCell: [j, i - 1],
+        highlight: [[j, i - 1]],
+        mark: pal ? [[j, i - 1]] : [],
+        codeLines: [14],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: `isPalin[${j}][${i - 1}]`, value: pal },
+          { name: pal ? `dp[${j}] + 1` : "candidate", value: pal ? `${dp[j]} + 1 = ${candidate}` : "skip" },
+        ],
+        note: {
+          vi: pal
+            ? `"${fragment}" la palindrome, co the cap nhat bang dp[${j}] + 1.`
+            : `"${fragment}" khong phai palindrome, bo qua j = ${j}.`,
+          en: pal
+            ? `"${fragment}" is a palindrome, so dp[${j}] + 1 can update the answer.`
+            : `"${fragment}" is not a palindrome, so skip j = ${j}.`,
+        },
+      });
+
+      if (pal) {
+        const before = dp[i];
+        dp[i] = Math.min(dp[i], candidate);
+        steps.push({
+          title: { vi: `dp[${i}] = ${dp[i]}`, en: `dp[${i}] = ${dp[i]}` },
+          arr: [...dp],
+          sub: dpLabels,
+          highlight: dpSliceHighlight(j, i - 1),
+          mark: [j, i],
+          codeLines: [15],
+          vars: [
+            { name: `dp[${i}] before`, value: before },
+            { name: `dp[${j}] + 1`, value: `${dp[j]} + 1 = ${candidate}` },
+            { name: `dp[${i}] after`, value: dp[i] },
+          ],
+          note: {
+            vi: `Cap nhat dp[${i}] = min(${before}, ${candidate}) = ${dp[i]}.`,
+            en: `Update dp[${i}] = min(${before}, ${candidate}) = ${dp[i]}.`,
+          },
+        });
+      }
+    }
   }
 
   const answer = dp[n];
-  const fs = {
-    title: { vi: `Kết quả: ${answer} cắt`, en: `Result: ${answer} cut(s)` },
-    arr: [...dp], sub: ["-1", ...sub],
-    highlight: [], mark: [n],
-    final: true, codeLines: [10],
-    vars: [{ name: "answer", value: answer }, { name: "dp", value: `[${dp.join(",")}]` }],
+  steps.push({
+    title: { vi: `Ket qua: ${answer} cat`, en: `Result: ${answer} cut(s)` },
+    arr: [...dp],
+    sub: dpLabels,
+    highlight: [],
+    mark: [n],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `dp[${n}]`, value: answer },
+      { name: "dp", value: `[${dp.join(", ")}]` },
+    ],
     note: {
-      vi: `dp[${n}] = ${answer} → cần tối thiểu ${answer} lần cắt để "${s}" thành toàn palindrome.`,
-      en: `dp[${n}] = ${answer} → minimum ${answer} cut(s) needed to split "${s}" into all palindromes.`,
+      vi: `return dp[${n}] = ${answer}.`,
+      en: `return dp[${n}] = ${answer}.`,
     },
-  };
-  steps.push(fs);
+  });
+
   return { input: s, answer, steps };
 }
 
