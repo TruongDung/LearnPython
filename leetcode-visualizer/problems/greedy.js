@@ -330,7 +330,11 @@ function buildSteps121Greedy(nums) {
     sub: prices.map((_, i) => `day ${i}`),
     highlight: [], mark: [],
     codeLines: [3],
-    vars: [{ name: "prices", value: `[${prices.join(",")}]` }, { name: "min_price", value: "∞" }],
+    vars: [
+      { name: "prices", value: `[${prices.join(",")}]` },
+      { name: "min_price", value: "∞" },
+      { name: "max_profit", value: maxProfit },
+    ],
     note: {
       vi: `📈 Giá cổ phiếu: [${prices.join(", ")}]. Khởi tạo min_price = ∞ (giá mua thấp nhất).`,
       en: `📈 Stock prices: [${prices.join(", ")}]. Initialize min_price = ∞ (lowest buy price).`,
@@ -386,6 +390,8 @@ function buildSteps121Greedy(nums) {
         codeLines: [6],
         vars: [
           { name: "price", value: price },
+          { name: "min_price", value: oldMin === Infinity ? "∞" : oldMin },
+          { name: "max_profit", value: maxProfit },
           { name: `price < min_price?`, value: `${price} < ${oldMin === Infinity ? "∞" : oldMin} → True` },
         ],
         note: {
@@ -406,7 +412,7 @@ function buildSteps121Greedy(nums) {
         mark: [buyDay],
         codeLines: [7],
         vars: [
-          { name: "min_price", value: `${oldMin === Infinity ? "∞" : oldMin} → ${minPrice}` },
+          { name: "min_price", value: minPrice },
           { name: "max_profit", value: maxProfit },
         ],
         note: {
@@ -427,6 +433,8 @@ function buildSteps121Greedy(nums) {
         codeLines: [8],
         vars: [
           { name: "price", value: price },
+          { name: "min_price", value: minPrice },
+          { name: "max_profit", value: maxProfit },
           { name: `price < min_price?`, value: `${price} < ${minPrice} → False` },
         ],
         note: {
@@ -450,6 +458,7 @@ function buildSteps121Greedy(nums) {
         codeLines: [9],
         vars: [
           { name: "price - min_price", value: `${price} - ${minPrice} = ${profit}` },
+          { name: "min_price", value: minPrice },
           { name: "max_profit", value: `max(${oldProfit}, ${profit}) = ${maxProfit}${profit > oldProfit ? " 📈" : ""}` },
         ],
         note: {
@@ -472,6 +481,7 @@ function buildSteps121Greedy(nums) {
     highlight: [], mark: maxProfit > 0 ? [buyDay, sellDay] : [],
     final: true, codeLines: [10],
     vars: [
+      { name: "min_price", value: minPrice === Infinity ? "∞" : minPrice },
       { name: "max_profit", value: maxProfit },
       { name: "buy day", value: maxProfit > 0 ? `day ${buyDay} (price ${prices[buyDay]})` : "n/a" },
       { name: "sell day", value: maxProfit > 0 ? `day ${sellDay} (price ${prices[sellDay]})` : "n/a" },
