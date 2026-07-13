@@ -5900,7 +5900,8 @@ function buildSteps72(input, params) {
       currentVars.push(item);
     }
     steps.push({
-      title: opts.title, arr: [],
+      title: opts.title,
+      arr: [],
       grid: {
         dp: dp.map((r) => [...r]),
         text1: word1,
@@ -5910,200 +5911,122 @@ function buildSteps72(input, params) {
         hlCell: opts.hlCell || null,
         pathCells: opts.pathCells || [],
       },
-      highlight: [], mark: [], codeLines: opts.codeLines || [], vars: currentVars, note: opts.note,
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
     });
   }
 
   gridSnap({
-    title: { vi: "m = len(word1)", en: "m = len(word1)" },
+    title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
     codeLines: [3],
     vars: [
       { name: "word1", value: word1 },
-      { name: "m", value: m },
-    ],
-    note: {
-      vi: `m = len("${word1}") = ${m}.`,
-      en: `m = len("${word1}") = ${m}.`,
-    },
-  });
-
-  gridSnap({
-    title: { vi: "n = len(word2)", en: "n = len(word2)" },
-    codeLines: [4],
-    vars: [
       { name: "word2", value: word2 },
+      { name: "m", value: m },
       { name: "n", value: n },
     ],
     note: {
-      vi: `n = len("${word2}") = ${n}.`,
-      en: `n = len("${word2}") = ${n}.`,
+      vi: `m = len(word1) = ${m}, n = len(word2) = ${n}.`,
+      en: `m = len(word1) = ${m}, n = len(word2) = ${n}.`,
     },
   });
 
   gridSnap({
-    title: { vi: "Tạo bảng dp", en: "Create dp table" },
-    codeLines: [6],
+    title: { vi: "Tao bang dp", en: "Create dp table" },
+    codeLines: [4],
     vars: [
       { name: "dp size", value: `${m + 1} x ${n + 1}` },
       { name: "initial value", value: 0 },
     ],
     note: {
-      vi: `dp[i][j] = số thao tác ít nhất để chuyển word1[0:i] thành word2[0:j].`,
-      en: `dp[i][j] = minimum operations to convert word1[0:i] into word2[0:j].`,
+      vi: `dp[i][j] = edit distance giua word1[:i] va word2[:j].`,
+      en: `dp[i][j] = edit distance between word1[:i] and word2[:j].`,
     },
   });
 
   for (let i = 0; i <= m; i++) {
     gridSnap({
-      title: { vi: `Vòng ngoài i=${i}`, en: `Outer loop i=${i}` },
-      codeLines: [8],
+      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [6],
       hlCell: [i, 0],
-      vars: [
-        { name: "i", value: i },
-        { name: "word1 prefix", value: `"${word1.slice(0, i)}"` },
-      ],
+      vars: [{ name: "word1 prefix", value: `"${word1.slice(0, i)}"` }],
       note: {
-        vi: `Xét hàng i=${i}, tức prefix word1[0:${i}] = "${word1.slice(0, i)}".`,
-        en: `Consider row i=${i}, prefix word1[0:${i}] = "${word1.slice(0, i)}".`,
+        vi: `Xet hang i=${i}: word1[:${i}] = "${word1.slice(0, i)}".`,
+        en: `Consider row i=${i}: word1[:${i}] = "${word1.slice(0, i)}".`,
       },
     });
 
     for (let j = 0; j <= n; j++) {
       gridSnap({
-        title: { vi: `Vòng trong j=${j}`, en: `Inner loop j=${j}` },
-        codeLines: [9],
+        title: { vi: `Vong trong j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [7],
         hlCell: [i, j],
-        pathCells: i > 0 && j > 0 ? [[i - 1, j - 1], [i - 1, j], [i, j - 1]] : [],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "word2 prefix", value: `"${word2.slice(0, j)}"` },
-        ],
+        pathCells: i > 0 && j > 0 ? [[i - 1, j - 1], [i, j - 1], [i - 1, j]] : [],
+        vars: [{ name: "word2 prefix", value: `"${word2.slice(0, j)}"` }],
         note: {
-          vi: `Chuẩn bị tính dp[${i}][${j}] cho "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
+          vi: `Chuan bi tinh dp[${i}][${j}] cho "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
           en: `Prepare to compute dp[${i}][${j}] for "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
         },
       });
 
-      const isOrigin = i === 0 && j === 0;
-      gridSnap({
-        title: { vi: `Kiểm tra i==0 và j==0`, en: `Check i==0 and j==0` },
-        codeLines: [10],
-        hlCell: [i, j],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "i == 0 and j == 0", value: isOrigin },
-        ],
-        note: {
-          vi: isOrigin ? "Ô gốc: chuỗi rỗng -> chuỗi rỗng." : "Không phải ô gốc, kiểm tra các base case tiếp theo.",
-          en: isOrigin ? "Origin cell: empty string -> empty string." : "Not the origin, check the next base cases.",
-        },
-      });
-
-      if (isOrigin) {
-        dp[i][j] = 0;
+      if (i === 0) {
         gridSnap({
-          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
-          codeLines: [11],
+          title: { vi: "if i == 0", en: "if i == 0" },
+          codeLines: [8],
           hlCell: [i, j],
-          vars: [{ name: `dp[${i}][${j}]`, value: dp[i][j] }],
+          vars: [{ name: "i == 0", value: true }],
           note: {
-            vi: "Không cần thao tác nào để chuyển chuỗi rỗng thành chuỗi rỗng.",
-            en: "No operation is needed to convert the empty string into the empty string.",
+            vi: "Hang 0: chuyen chuoi rong thanh word2[:j] bang cach chen j ky tu.",
+            en: "Top row: convert empty string to word2[:j] by inserting j characters.",
           },
         });
-        continue;
-      }
-
-      const isTopRow = i === 0;
-      gridSnap({
-        title: { vi: "Kiểm tra i == 0", en: "Check i == 0" },
-        codeLines: [12],
-        hlCell: [i, j],
-        vars: [
-          { name: "i", value: i },
-          { name: "i == 0", value: isTopRow },
-        ],
-        note: {
-          vi: isTopRow ? "Hàng 0: chỉ có thể chèn ký tự từ word2." : "Không ở hàng 0, kiểm tra cột 0.",
-          en: isTopRow ? "Top row: only insertions from word2 are possible." : "Not the top row, check column 0.",
-        },
-      });
-
-      if (isTopRow) {
         dp[i][j] = j;
         gridSnap({
           title: { vi: `dp[0][${j}] = ${j}`, en: `dp[0][${j}] = ${j}` },
-          codeLines: [13],
+          codeLines: [9],
           hlCell: [i, j],
-          vars: [
-            { name: "j", value: j },
-            { name: `dp[0][${j}]`, value: dp[i][j] },
-          ],
+          vars: [{ name: `dp[0][${j}]`, value: dp[i][j] }],
           note: {
-            vi: `Cần chèn ${j} ký tự để chuyển chuỗi rỗng thành "${word2.slice(0, j)}".`,
-            en: `Need ${j} insertion(s) to convert the empty string to "${word2.slice(0, j)}".`,
+            vi: `Can chen ${j} ky tu.`,
+            en: `Need ${j} insertion(s).`,
           },
         });
         continue;
       }
 
-      const isLeftCol = j === 0;
       gridSnap({
-        title: { vi: "Kiểm tra j == 0", en: "Check j == 0" },
-        codeLines: [14],
+        title: { vi: "elif j == 0", en: "elif j == 0" },
+        codeLines: [10],
         hlCell: [i, j],
-        vars: [
-          { name: "j", value: j },
-          { name: "j == 0", value: isLeftCol },
-        ],
+        vars: [{ name: "j == 0", value: j === 0 }],
         note: {
-          vi: isLeftCol ? "Cột 0: chỉ có thể xóa ký tự từ word1." : "Không phải base case, đi vào công thức quy hoạch động.",
-          en: isLeftCol ? "Left column: only deletions from word1 are possible." : "Not a base case, enter the DP recurrence.",
+          vi: j === 0 ? "Cot 0: chuyen word1[:i] thanh chuoi rong bang cach xoa i ky tu." : "Khong phai cot 0, so sanh hai ky tu cuoi.",
+          en: j === 0 ? "Left column: convert word1[:i] to empty string by deleting i characters." : "Not the left column, compare the last two characters.",
         },
       });
 
-      if (isLeftCol) {
+      if (j === 0) {
         dp[i][j] = i;
         gridSnap({
           title: { vi: `dp[${i}][0] = ${i}`, en: `dp[${i}][0] = ${i}` },
-          codeLines: [15],
+          codeLines: [11],
           hlCell: [i, j],
-          vars: [
-            { name: "i", value: i },
-            { name: `dp[${i}][0]`, value: dp[i][j] },
-          ],
+          vars: [{ name: `dp[${i}][0]`, value: dp[i][j] }],
           note: {
-            vi: `Cần xóa ${i} ký tự để chuyển "${word1.slice(0, i)}" thành chuỗi rỗng.`,
-            en: `Need ${i} deletion(s) to convert "${word1.slice(0, i)}" to the empty string.`,
+            vi: `Can xoa ${i} ky tu.`,
+            en: `Need ${i} deletion(s).`,
           },
         });
         continue;
       }
 
-      gridSnap({
-        title: { vi: "Nhánh else tổng quát", en: "General else branch" },
-        codeLines: [16],
-        hlCell: [i, j],
-        pathCells: [[i - 1, j - 1], [i - 1, j], [i, j - 1]],
-        vars: [
-          { name: "i", value: i },
-          { name: "j", value: j },
-        ],
-        note: {
-          vi: "Cả hai prefix đều không rỗng, dùng công thức edit distance.",
-          en: "Both prefixes are non-empty, use the edit distance recurrence.",
-        },
-      });
-
       const match = word1[i - 1] === word2[j - 1];
       gridSnap({
-        title: {
-          vi: `So sánh '${word1[i - 1]}' và '${word2[j - 1]}'`,
-          en: `Compare '${word1[i - 1]}' and '${word2[j - 1]}'`,
-        },
-        codeLines: [17],
+        title: { vi: `So sanh '${word1[i - 1]}' va '${word2[j - 1]}'`, en: `Compare '${word1[i - 1]}' and '${word2[j - 1]}'` },
+        codeLines: [12],
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1]],
         vars: [
@@ -6112,64 +6035,46 @@ function buildSteps72(input, params) {
           { name: "match", value: match },
         ],
         note: {
-          vi: match ? "Ký tự giống nhau: có thể copy ô chéo không tốn thao tác." : "Ký tự khác nhau: phải tính replace/insert/delete đều +1.",
-          en: match ? "Characters match: can copy the diagonal with no extra operation." : "Characters differ: replace/insert/delete all cost +1.",
+          vi: match ? "Hai ky tu giong nhau, copy duong cheo." : "Hai ky tu khac nhau, can replace/insert/delete.",
+          en: match ? "The characters match, copy the diagonal." : "The characters differ, use replace/insert/delete.",
         },
       });
 
-      const diag = dp[i - 1][j - 1];
-      const insertCost = dp[i][j - 1] + 1;
-      const deleteCost = dp[i - 1][j] + 1;
       if (match) {
-        dp[i][j] = Math.min(diag, Math.min(insertCost, deleteCost));
+        dp[i][j] = dp[i - 1][j - 1];
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
-          codeLines: [18],
+          codeLines: [13],
           hlCell: [i, j],
-          pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
+          pathCells: [[i - 1, j - 1]],
           vars: [
-            { name: `dp[${i - 1}][${j - 1}]`, value: diag },
-            { name: `dp[${i}][${j - 1}] + 1`, value: insertCost },
-            { name: `dp[${i - 1}][${j}] + 1`, value: deleteCost },
+            { name: `dp[${i - 1}][${j - 1}]`, value: dp[i - 1][j - 1] },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
-            vi: `Ký tự giống nhau: min(${diag}, min(${insertCost}, ${deleteCost})) = ${dp[i][j]}.`,
-            en: `Characters match: min(${diag}, min(${insertCost}, ${deleteCost})) = ${dp[i][j]}.`,
+            vi: `Khong can min nua: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
+            en: `No min needed: dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
           },
         });
       } else {
-        gridSnap({
-          title: { vi: "Nhánh ký tự khác nhau", en: "Different-character branch" },
-          codeLines: [19],
-          hlCell: [i, j],
-          pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
-          vars: [
-            { name: `word1[${i - 1}]`, value: word1[i - 1] },
-            { name: `word2[${j - 1}]`, value: word2[j - 1] },
-          ],
-          note: {
-            vi: "Ký tự khác nhau nên replace cũng tốn thêm 1 thao tác.",
-            en: "Characters differ, so replace also costs one extra operation.",
-          },
-        });
-
-        const replaceCost = diag + 1;
-        dp[i][j] = Math.min(replaceCost, Math.min(insertCost, deleteCost));
+        const replaceCost = dp[i - 1][j - 1] + 1;
+        const insertCost = dp[i][j - 1] + 1;
+        const deleteCost = dp[i - 1][j] + 1;
+        dp[i][j] = Math.min(replaceCost, insertCost, deleteCost);
         gridSnap({
           title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
-          codeLines: [20],
+          codeLines: [15],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
           vars: [
-            { name: `dp[${i - 1}][${j - 1}] + 1`, value: replaceCost },
-            { name: `dp[${i}][${j - 1}] + 1`, value: insertCost },
-            { name: `dp[${i - 1}][${j}] + 1`, value: deleteCost },
+            { name: "replace", value: `dp[${i - 1}][${j - 1}] + 1 = ${replaceCost}` },
+            { name: "insert", value: `dp[${i}][${j - 1}] + 1 = ${insertCost}` },
+            { name: "delete", value: `dp[${i - 1}][${j}] + 1 = ${deleteCost}` },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
-            vi: `Ký tự khác nhau: min(${replaceCost}, min(${insertCost}, ${deleteCost})) = ${dp[i][j]}.`,
-            en: `Characters differ: min(${replaceCost}, min(${insertCost}, ${deleteCost})) = ${dp[i][j]}.`,
+            vi: `dp[${i}][${j}] = 1 + min(${dp[i - 1][j - 1]}, ${dp[i][j - 1]}, ${dp[i - 1][j]}) = ${dp[i][j]}.`,
+            en: `dp[${i}][${j}] = 1 + min(${dp[i - 1][j - 1]}, ${dp[i][j - 1]}, ${dp[i - 1][j]}) = ${dp[i][j]}.`,
           },
         });
       }
@@ -6178,13 +6083,19 @@ function buildSteps72(input, params) {
 
   const answer = dp[m][n];
   gridSnap({
-    title: { vi: "Kết quả", en: "Result" }, hlCell: [m, n], codeLines: [22],
+    title: { vi: "Ket qua", en: "Result" },
+    hlCell: [m, n],
+    codeLines: [17],
     vars: [{ name: "answer", value: answer }],
-    note: { vi: `Edit distance("${word1}", "${word2}") = ${answer} thao tác.`, en: `Edit distance("${word1}", "${word2}") = ${answer} operation(s).` },
+    note: {
+      vi: `Edit distance("${word1}", "${word2}") = ${answer} thao tac.`,
+      en: `Edit distance("${word1}", "${word2}") = ${answer} operation(s).`,
+    },
   });
   steps[steps.length - 1].final = true;
   return { word1, word2, answer, steps };
 }
+
 
 /**
  * LeetCode 416: Partition Equal Subset Sum.
@@ -8397,25 +8308,20 @@ module.exports = {
     code: [
       "class Solution:",
       "    def minDistance(self, word1: str, word2: str) -> int:",
-      "        m = len(word1)",
-      "        n = len(word2)",
-      "",
-      "        dp = [[0 for _ in range(n+1)] for _ in range(m+1)]",
-      "",
-      "        for i in range(m+1):",
-      "            for j in range(n+1):",
-      "                if i == 0 and j == 0:",
-      "                    dp[i][j] = 0",
-      "                elif i == 0:",
+      "        m, n = len(word1), len(word2)",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        ",
+      "        for i in range(m + 1):",
+      "            for j in range(n + 1):",
+      "                if i == 0:",
       "                    dp[i][j] = j",
       "                elif j == 0:",
       "                    dp[i][j] = i",
+      "                elif word1[i - 1] == word2[j - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1]  # không cần min nữa",
       "                else:",
-      "                    if word1[i-1] == word2[j-1]:",
-      "                        dp[i][j] = min(dp[i-1][j-1], min(dp[i][j-1] + 1, dp[i-1][j] + 1))",
-      "                    else:",
-      "                        dp[i][j] = min(dp[i-1][j-1]+1, min(dp[i][j-1]+1, dp[i-1][j]+1))",
-      "",
+      "                    dp[i][j] = 1 + min(dp[i - 1][j - 1], dp[i][j - 1], dp[i - 1][j])",
+      "        ",
       "        return dp[m][n]",
     ],
     builder: buildSteps72,
