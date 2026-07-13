@@ -1039,8 +1039,9 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
+  const labels = cellLabels || {};
   const m = dp.length - 1;
   const n = dp[0].length - 1;
 
@@ -1055,7 +1056,9 @@ function renderGrid(step) {
       let cls = "dp-cell";
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
       if (pathSet.has(`${i},${j}`)) cls += " path";
-      html += `<td class="${cls}">${dp[i][j]}</td>`;
+      const key = `${i},${j}`;
+      const label = labels[key] ? `<span class="cell-label">${escapeXml(labels[key])}</span>` : "";
+      html += `<td class="${cls}">${label}<span class="cell-value">${dp[i][j]}</span></td>`;
     }
     html += "</tr>";
   }
