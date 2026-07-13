@@ -1057,7 +1057,11 @@ function renderGrid(step) {
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
       if (pathSet.has(`${i},${j}`)) cls += " path";
       const key = `${i},${j}`;
-      const label = labels[key] ? `<span class="cell-label">${escapeXml(labels[key])}</span>` : "";
+      const fullLabel = labels[key] || "";
+      const shortLabel = fullLabel === "dp[i-1][j-1]" ? "diag" : fullLabel;
+      const label = fullLabel
+        ? `<span class="cell-label" title="${escapeXml(fullLabel)}"><span class="cell-label-full">${escapeXml(fullLabel)}</span><span class="cell-label-short">${escapeXml(shortLabel)}</span></span>`
+        : "";
       html += `<td class="${cls}">${label}<span class="cell-value">${dp[i][j]}</span></td>`;
     }
     html += "</tr>";
