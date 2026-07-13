@@ -10,7 +10,7 @@ class Solution:
             if num not in num_to_rank:
                 count += 1
             num_to_rank[num] = count
-            
+
         res = []
         for num in arr:
             res.append(num_to_rank[num])
