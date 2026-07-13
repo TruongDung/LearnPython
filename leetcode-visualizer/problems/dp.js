@@ -4995,16 +4995,46 @@ function buildSteps120(input) {
 
   // Bottom-up: from row n-2 up to 0
   for (let r = n - 2; r >= 0; r--) {
+    gridSnap({
+      title: { vi: `Hang r=${r}`, en: `Row r=${r}` },
+      hlCell: [r, 0],
+      codeLines: [4],
+      vars: [{ name: "r", value: r }],
+      note: {
+        vi: `Bat dau xu ly hang ${r}. Moi o se lay min cua 2 o ke ben duoi.`,
+        en: `Start processing row ${r}. Each cell will use the minimum of the two adjacent cells below.`,
+      },
+    });
+
     for (let c = 0; c <= r; c++) {
       const below = dp[r + 1][c];
       const belowRight = dp[r + 1][c + 1];
+      gridSnap({
+        title: { vi: `Chon o c=${c}`, en: `Choose cell c=${c}` },
+        hlCell: [r, c],
+        pathCells: [[r + 1, c], [r + 1, c + 1]],
+        codeLines: [5],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+          { name: "tri[r][c]", value: triangle[r][c] },
+          { name: "dp[r+1][c]", value: below },
+          { name: "dp[r+1][c+1]", value: belowRight },
+        ],
+        note: {
+          vi: `Chuan bi tinh dp[${r}][${c}] tu 2 o ben duoi: ${below} va ${belowRight}.`,
+          en: `Prepare to compute dp[${r}][${c}] from the two cells below: ${below} and ${belowRight}.`,
+        },
+      });
+
       dp[r][c] = triangle[r][c] + Math.min(below, belowRight);
       const dir = below <= belowRight ? "↓" : "↘";
 
       gridSnap({
         title: { vi: `dp[${r}][${c}]`, en: `dp[${r}][${c}]` },
         hlCell: [r, c],
-        codeLines: [4, 5, 6],
+        pathCells: [[r + 1, c], [r + 1, c + 1]],
+        codeLines: [6],
         vars: [
           { name: "r", value: r },
           { name: "c", value: c },
@@ -7793,8 +7823,7 @@ module.exports = {
       "        dp = [row[:] for row in triangle]",
       "        for r in range(len(dp)-2, -1, -1):",
       "            for c in range(r+1):",
-      "                dp[r][c] = triangle[r][c] + \\",
-      "                    min(dp[r+1][c], dp[r+1][c+1])",
+      "                dp[r][c] = triangle[r][c] + min(dp[r+1][c], dp[r+1][c+1])",
       "        return dp[0][0]",
     ],
     builder: buildSteps120,

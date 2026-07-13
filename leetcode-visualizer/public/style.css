@@ -62,15 +62,23 @@ header h1 {
 }
 
 .lang-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
   background: transparent;
   color: #94a3b8;
-  padding: 5px 12px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0.04em;
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s;
+  font-family: inherit;
+  text-transform: uppercase;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .lang-btn:hover {
@@ -80,7 +88,7 @@ header h1 {
 
 .lang-btn.active {
   background: #6366f1;
-  color: white;
+  color: #ffffff;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
@@ -1244,6 +1252,10 @@ button:disabled {
 [data-theme="light"] .lang-btn:hover {
   background: #e2e8f0;
   color: #334155;
+}
+
+[data-theme="light"] .lang-btn.active {
+  color: #ffffff;
 }
 
 [data-theme="light"] .theme-toggle {
