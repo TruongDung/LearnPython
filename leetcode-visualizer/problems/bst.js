@@ -801,6 +801,152 @@ function buildSteps501(input) {
   return { input, answer: `[${modes.join(",")}]`, steps };
 }
 
+// ─── 538: Convert BST to Greater Tree ───
+function buildSteps538(input) {
+  const root = parseBST(input);
+  const steps = [];
+  let total = 0;
+  const visited = new Set();
+
+  function levelOrder(rootNode) {
+    if (!rootNode) return [];
+    const out = [];
+    const q = [rootNode];
+    while (q.length) {
+      const node = q.shift();
+      if (!node) {
+        out.push(null);
+        continue;
+      }
+      out.push(node.val);
+      q.push(node.left || null);
+      q.push(node.right || null);
+    }
+    while (out.length && out[out.length - 1] === null) out.pop();
+    return out;
+  }
+  const formatLevel = (arr) => `[${arr.map((v) => v === null ? "null" : String(v)).join(",")}]`;
+
+  if (!root) {
+    const fs = snapshot(null, {
+      title: { vi: "Cay rong", en: "Empty tree" },
+      codeLines: [10],
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "Cay rong thi ket qua van la null/empty.", en: "An empty tree remains null/empty." },
+    });
+    fs.final = true;
+    steps.push(fs);
+    return { input, answer: "[]", steps };
+  }
+
+  steps.push(snapshot(root, {
+    title: { vi: "Reverse inorder: phai -> node -> trai", en: "Reverse inorder: right -> node -> left" },
+    hlSet: new Set([root.id]),
+    codeLines: [3, 4],
+    vars: [
+      { name: "total", value: total },
+      { name: "order", value: "right, node, left" },
+    ],
+    note: {
+      vi: "BST inorder tang dan, nen reverse inorder se di tu gia tri lon den nho. total giu tong cac gia tri lon hon node hien tai.",
+      en: "BST inorder is ascending, so reverse inorder visits values from largest to smallest. total stores the sum of values greater than the current node.",
+    },
+  }));
+
+  function convert(node) {
+    if (!node) return;
+    steps.push(snapshot(root, {
+      title: { vi: `Di sang phai tu ${node.val}`, en: `Go right from ${node.val}` },
+      hlSet: new Set([node.id]),
+      wordSet: new Set(visited),
+      codeLines: [6],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "total", value: total },
+      ],
+      note: {
+        vi: `Duyet subtree phai truoc vi cac node ben phai lon hon ${node.val}.`,
+        en: `Visit the right subtree first because those nodes are greater than ${node.val}.`,
+      },
+    }));
+
+    convert(node.right);
+
+    const oldVal = node.val;
+    const newVal = oldVal + total;
+    steps.push(snapshot(root, {
+      title: { vi: `Cap nhat node ${oldVal}`, en: `Update node ${oldVal}` },
+      hlSet: new Set([node.id]),
+      wordSet: new Set(visited),
+      codeLines: [7],
+      vars: [
+        { name: "old value", value: oldVal },
+        { name: "total before", value: total },
+        { name: "new value", value: `${oldVal} + ${total} = ${newVal}` },
+      ],
+      note: {
+        vi: `Gia tri moi cua node = gia tri cu + tong cac node lon hon = ${oldVal} + ${total} = ${newVal}.`,
+        en: `New node value = old value + sum of greater nodes = ${oldVal} + ${total} = ${newVal}.`,
+      },
+    }));
+
+    node.val = newVal;
+    total = newVal;
+    visited.add(node.id);
+    steps.push(snapshot(root, {
+      title: { vi: `total = ${total}`, en: `total = ${total}` },
+      hlSet: new Set([node.id]),
+      wordSet: new Set(visited),
+      codeLines: [8],
+      vars: [
+        { name: "node.val", value: node.val },
+        { name: "total", value: total },
+      ],
+      note: {
+        vi: `Sau khi cap nhat node, total tro thanh ${total}. Cac node ben trai se cong them total nay.`,
+        en: `After updating the node, total becomes ${total}. Nodes on the left will add this total.`,
+      },
+    }));
+
+    steps.push(snapshot(root, {
+      title: { vi: `Di sang trai tu ${node.val}`, en: `Go left from ${node.val}` },
+      hlSet: new Set([node.id]),
+      wordSet: new Set(visited),
+      codeLines: [9],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "total", value: total },
+      ],
+      note: {
+        vi: "Bay gio moi duyet subtree trai, vi cac node trai nho hon va can cong tong cac node lon hon.",
+        en: "Now visit the left subtree; those smaller nodes need the sum of all greater nodes.",
+      },
+    }));
+
+    convert(node.left);
+  }
+
+  convert(root);
+  const answer = levelOrder(root);
+  const answerText = formatLevel(answer);
+  const fs = snapshot(root, {
+    title: { vi: "Hoan tat Greater Tree", en: "Greater Tree complete" },
+    wordSet: new Set(visited),
+    codeLines: [11],
+    vars: [
+      { name: "answer", value: answerText },
+      { name: "total", value: total },
+    ],
+    note: {
+      vi: `Tat ca node da duoc thay bang old value + tong cac node lon hon. Level-order moi: ${answerText}.`,
+      en: `Every node is replaced by old value + sum of greater nodes. New level-order: ${answerText}.`,
+    },
+  });
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: answerText, steps };
+}
+
 module.exports = {
   98: {
     id: 98,
@@ -1141,5 +1287,35 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Inorder + đếm tần suất.", en: "Inorder + frequency count." } },
     code: ["class Solution:", "    def findMode(self, root):", "        from collections import Counter", "        freq = Counter()", "        def inorder(node):", "            if not node: return", "            inorder(node.left)", "            freq[node.val] += 1", "            inorder(node.right)", "        inorder(root)", "        max_freq = max(freq.values())", "        return [v for v, f in freq.items() if f == max_freq]"],
     builder: buildSteps501,
+  },
+  538: {
+    id: 538, difficulty: "medium", slug: "convert-bst-to-greater-tree",
+    category: { key: "bst", vi: "Cây nhị phân tìm kiếm (BST)", en: "Binary Search Tree" },
+    title: { vi: "Convert BST to Greater Tree", en: "Convert BST to Greater Tree" },
+    titleVi: { vi: "Chuyen BST thanh Greater Tree", en: "Convert BST to Greater Tree" },
+    statement: { vi: "Cho root cua BST, bien doi sao cho moi node co gia tri moi bang gia tri cu cong tong tat ca node co gia tri lon hon no. Nhap level-order.", en: "Given the root of a BST, transform it so every node's new value is its old value plus the sum of all values greater than it. Enter level-order." },
+    defaultInput: "4,1,6,0,2,5,7,null,null,null,3,null,null,null,8",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "BST inorder cho gia tri tang dan, nen reverse inorder (phai -> node -> trai) di tu lon den nho.", en: "BST inorder is ascending, so reverse inorder (right -> node -> left) visits values from largest to smallest." },
+      { vi: "Giu bien total = tong cac node da duyet, tuc cac gia tri lon hon node hien tai.", en: "Keep total = sum of visited nodes, which are the values greater than the current node." },
+      { vi: "Tai moi node: node.val += total, roi total = node.val.", en: "At each node: node.val += total, then total = node.val." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyet moi node mot lan. Stack de quy O(h).", en: "Visit each node once. Recursion stack O(h)." } },
+    code: [
+      "class Solution:",
+      "    def convertBST(self, root):",
+      "        self.total = 0",
+      "        def dfs(node):",
+      "            if not node: return",
+      "            dfs(node.right)",
+      "            node.val += self.total",
+      "            self.total = node.val",
+      "            dfs(node.left)",
+      "        dfs(root)",
+      "        return root",
+    ],
+    builder: buildSteps538,
   },
 };
