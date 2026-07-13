@@ -1039,28 +1039,37 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const labels = cellLabels || {};
   const m = dp.length - 1;
   const n = dp[0].length - 1;
 
   let html = '<table class="dp-grid"><thead><tr><th></th><th></th>';
-  for (let j = 0; j < n; j++) html += `<th>${text2[j]}</th>`;
+  for (let j = 0; j < n; j++) {
+    const colLabel = showIndices
+      ? `<span class="axis-index">j=${j + 1}</span><span class="axis-char">${escapeXml(text2[j])}</span>`
+      : escapeXml(text2[j]);
+    html += `<th>${colLabel}</th>`;
+  }
   html += "</tr></thead><tbody>";
 
   for (let i = 0; i <= m; i++) {
     html += "<tr>";
-    html += `<td class="row-label">${i === 0 ? "" : text1[i - 1]}</td>`;
+    const rowLabel = i === 0
+      ? ""
+      : showIndices
+        ? `<span class="axis-index">i=${i}</span><span class="axis-char">${escapeXml(text1[i - 1])}</span>`
+        : escapeXml(text1[i - 1]);
+    html += `<td class="row-label">${rowLabel}</td>`;
     for (let j = 0; j <= n; j++) {
       let cls = "dp-cell";
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
       if (pathSet.has(`${i},${j}`)) cls += " path";
       const key = `${i},${j}`;
       const fullLabel = labels[key] || "";
-      const shortLabel = fullLabel === "dp[i-1][j-1]" ? "diag" : fullLabel;
       const label = fullLabel
-        ? `<span class="cell-label" title="${escapeXml(fullLabel)}"><span class="cell-label-full">${escapeXml(fullLabel)}</span><span class="cell-label-short">${escapeXml(shortLabel)}</span></span>`
+        ? `<span class="cell-label" title="${escapeXml(fullLabel)}">${escapeXml(fullLabel)}</span>`
         : "";
       html += `<td class="${cls}">${label}<span class="cell-value">${dp[i][j]}</span></td>`;
     }

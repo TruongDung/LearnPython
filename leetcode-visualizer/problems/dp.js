@@ -2586,6 +2586,7 @@ function buildSteps1143(input, params) {
         hlCell: opts.hlCell || null,
         pathCells: opts.pathCells || [],
         cellLabels: opts.cellLabels || {},
+        showIndices: true,
       },
       highlight: [],
       mark: [],

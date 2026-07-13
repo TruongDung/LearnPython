@@ -1042,6 +1042,24 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.dp-grid .axis-index,
+.dp-grid .axis-char {
+  display: block;
+  line-height: 1.05;
+}
+
+.dp-grid .axis-index {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.dp-grid .axis-char {
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .dp-grid .dp-cell {
   position: relative;
   background: rgba(255, 255, 255, 0.03);
@@ -1057,10 +1075,10 @@ button:disabled {
 .dp-grid .cell-label {
   position: absolute;
   left: 50%;
-  top: -13px;
+  top: -11px;
   z-index: 3;
   transform: translateX(-50%);
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 5px;
   border: 1px solid rgba(45, 212, 191, 0.55);
   background: #0f172a;
@@ -1072,10 +1090,6 @@ button:disabled {
   white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-}
-
-.dp-grid .cell-label-short {
-  display: none;
 }
 
 .dp-grid .dp-cell.hl {
@@ -1512,6 +1526,14 @@ button:disabled {
 [data-theme="light"] .dp-grid .row-label {
   background: #f1f5f9;
   color: #6366f1;
+}
+
+[data-theme="light"] .dp-grid .axis-index {
+  color: #64748b;
+}
+
+[data-theme="light"] .dp-grid .axis-char {
+  color: #4f46e5;
 }
 
 [data-theme="light"] .dp-grid .dp-cell {
@@ -2181,17 +2203,9 @@ select option {
     transform: none;
     padding: 0 3px;
     border-radius: 4px;
-    font-size: 7px;
+    font-size: 6px;
     line-height: 1.15;
     box-shadow: none;
-  }
-
-  .dp-grid .cell-label-full {
-    display: none;
-  }
-
-  .dp-grid .cell-label-short {
-    display: inline;
   }
 }
 
