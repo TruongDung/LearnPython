@@ -2657,7 +2657,7 @@ function buildSteps1143(input, params) {
         codeLines: [6],
         hlCell: [i, j],
         pathCells: [[i - 1, j], [i, j - 1], [i - 1, j - 1]],
-        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
+        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]" },
         vars: [
           { name: "i", value: i },
           { name: "j", value: j },
@@ -2678,7 +2678,7 @@ function buildSteps1143(input, params) {
         codeLines: [7],
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1]],
-        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
+        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]" },
         vars: [
           { name: "i", value: i },
           { name: "j", value: j },
@@ -2704,7 +2704,7 @@ function buildSteps1143(input, params) {
           codeLines: [8],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
-          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]" },
           vars: [
             { name: "i", value: i },
             { name: "j", value: j },

@@ -1060,6 +1060,10 @@ button:disabled {
   font-size: 13px;
 }
 
+.dp-grid.has-cell-labels {
+  table-layout: fixed;
+}
+
 .dp-grid th,
 .dp-grid td {
   width: 34px;
@@ -1146,14 +1150,18 @@ button:disabled {
 .dp-grid.has-cell-labels .cell-label {
   position: static;
   display: block;
+  box-sizing: border-box;
+  width: 100%;
   max-width: 100%;
   margin: 0 auto 4px;
   transform: none;
   padding: 1px 3px;
   font-size: 9px;
   line-height: 1.1;
-  white-space: normal;
+  white-space: pre-line;
+  word-break: break-word;
   overflow-wrap: anywhere;
+  overflow: hidden;
   box-shadow: none;
 }
 
@@ -2301,7 +2309,7 @@ select option {
     transform: none;
     font-size: 8px;
     line-height: 1.1;
-    white-space: normal;
+    white-space: pre-line;
     overflow-wrap: anywhere;
   }
 }
