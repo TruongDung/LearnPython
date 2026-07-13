@@ -55,6 +55,7 @@ app.get("/api/problem/:id", (req, res) => {
     id: problem.id,
     difficulty: problem.difficulty || null,
     slug: problem.slug || null,
+    category: problem.category || null,
     title: problem.title,
     titleVi: problem.titleVi,
     statement: problem.statement,

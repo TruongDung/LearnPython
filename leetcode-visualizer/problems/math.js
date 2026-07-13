@@ -247,6 +247,165 @@ function buildSteps246(input) {
 }
 
 /**
+ * LeetCode 1291: Sequential Digits.
+ * Generate candidates by taking substrings of "123456789".
+ */
+function buildSteps1291(input, params) {
+  const low = Array.isArray(input) ? input[0] : Number(input);
+  const high = Number(params.high);
+  const digits = "123456789";
+  const minLen = String(low).length;
+  const maxLen = String(high).length;
+  const steps = [];
+  const seen = [];
+  const accepted = [];
+  const acceptedIndices = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: [],
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "low", value: low },
+      { name: "high", value: high },
+      { name: "digits", value: digits },
+      { name: "ans", value: "[]" },
+    ],
+    note: {
+      vi: `Mọi số sequential digits đều là một substring liên tiếp của "${digits}". Thử độ dài từ ${minLen} đến ${maxLen}.`,
+      en: `Every sequential digit number is a contiguous substring of "${digits}". Try lengths from ${minLen} to ${maxLen}.`,
+    },
+  });
+
+  for (let length = minLen; length <= maxLen; length++) {
+    steps.push({
+      title: { vi: `Độ dài = ${length}`, en: `Length = ${length}` },
+      arr: [...seen],
+      highlight: [],
+      mark: [...acceptedIndices],
+      codeLines: [5],
+      vars: [
+        { name: "length", value: length },
+        { name: "start range", value: `0..${9 - length}` },
+        { name: "ans", value: `[${accepted.join(", ")}]` },
+      ],
+      note: {
+        vi: `Tạo các số có ${length} chữ số bằng cách cắt substring độ dài ${length}.`,
+        en: `Create ${length}-digit numbers by slicing substrings of length ${length}.`,
+      },
+    });
+
+    for (let start = 0; start <= 9 - length; start++) {
+      steps.push({
+        title: { vi: `start = ${start}`, en: `start = ${start}` },
+        arr: [...seen],
+        highlight: [],
+        mark: [...acceptedIndices],
+        codeLines: [6],
+        vars: [
+          { name: "length", value: length },
+          { name: "start", value: start },
+          { name: "slice", value: `digits[${start}:${start + length}]` },
+        ],
+        note: {
+          vi: `Lấy digits[${start}:${start + length}] = "${digits.slice(start, start + length)}".`,
+          en: `Take digits[${start}:${start + length}] = "${digits.slice(start, start + length)}".`,
+        },
+      });
+
+      const raw = digits.slice(start, start + length);
+      const num = Number(raw);
+      seen.push(num);
+      const idx = seen.length - 1;
+
+      steps.push({
+        title: { vi: `num = ${num}`, en: `num = ${num}` },
+        arr: [...seen],
+        sub: seen.map((_, i) => String(i)),
+        highlight: [idx],
+        mark: [...acceptedIndices],
+        codeLines: [7],
+        vars: [
+          { name: "raw", value: raw },
+          { name: "num", value: num },
+        ],
+        note: {
+          vi: `Chuyển substring "${raw}" thành số ${num}.`,
+          en: `Convert substring "${raw}" to number ${num}.`,
+        },
+      });
+
+      const inRange = low <= num && num <= high;
+      steps.push({
+        title: {
+          vi: inRange ? `${low} <= ${num} <= ${high} ✓` : `${num} ngoài khoảng`,
+          en: inRange ? `${low} <= ${num} <= ${high} ✓` : `${num} out of range`,
+        },
+        arr: [...seen],
+        sub: seen.map((_, i) => String(i)),
+        highlight: [idx],
+        mark: [...acceptedIndices],
+        codeLines: [8],
+        vars: [
+          { name: "low", value: low },
+          { name: "num", value: num },
+          { name: "high", value: high },
+          { name: "in range?", value: inRange },
+        ],
+        note: {
+          vi: inRange
+            ? `${num} nằm trong [${low}, ${high}], thêm vào ans.`
+            : `${num} không nằm trong [${low}, ${high}], bỏ qua.`,
+          en: inRange
+            ? `${num} is inside [${low}, ${high}], append it to ans.`
+            : `${num} is not inside [${low}, ${high}], skip it.`,
+        },
+      });
+
+      if (inRange) {
+        accepted.push(num);
+        acceptedIndices.push(idx);
+        steps.push({
+          title: { vi: `append(${num})`, en: `append(${num})` },
+          arr: [...seen],
+          sub: seen.map((_, i) => String(i)),
+          highlight: [idx],
+          mark: [...acceptedIndices],
+          codeLines: [9],
+          vars: [
+            { name: "num", value: num },
+            { name: "ans", value: `[${accepted.join(", ")}]` },
+          ],
+          note: {
+            vi: `ans = [${accepted.join(", ")}].`,
+            en: `ans = [${accepted.join(", ")}].`,
+          },
+        });
+      }
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [...seen],
+    sub: seen.map((_, i) => String(i)),
+    highlight: [],
+    mark: [...acceptedIndices],
+    final: true,
+    codeLines: [10],
+    vars: [{ name: "answer", value: `[${accepted.join(", ")}]` }],
+    note: {
+      vi: `Các số sequential digits trong [${low}, ${high}] là [${accepted.join(", ")}].`,
+      en: `Sequential digit numbers in [${low}, ${high}] are [${accepted.join(", ")}].`,
+    },
+  });
+
+  return { low, high, answer: accepted, steps };
+}
+
+/**
  * Generate steps for LeetCode 50: Pow(x, n).
  *
  * Fast exponentiation (binary exponentiation):
@@ -825,6 +984,56 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps13,
+  },
+  1291: {
+    id: 1291,
+    difficulty: "medium",
+    slug: "sequential-digits",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Sequential Digits", en: "Sequential Digits" },
+    titleVi: { vi: "Số có chữ số liên tiếp tăng dần", en: "Numbers with sequential increasing digits" },
+    statement: {
+      vi:
+        "Một số có sequential digits nếu mỗi chữ số hơn chữ số trước đúng 1. " +
+        "Cho low và high, trả về mọi số sequential digits trong khoảng [low, high], tăng dần.",
+      en:
+        "An integer has sequential digits if each digit is one more than the previous digit. " +
+        "Given low and high, return all sequential digit numbers in [low, high], sorted.",
+    },
+    defaultInput: [100],
+    inputKind: "positive",
+    inputLabel: { vi: "low", en: "low" },
+    singleInput: true,
+    maxInput: 1000000000,
+    extraParams: [
+      { key: "high", type: "number", label: { vi: "high", en: "high" }, default: 300 },
+    ],
+    approach: [
+      { vi: "Mọi số hợp lệ là substring của chuỗi '123456789'.", en: "Every valid number is a substring of '123456789'." },
+      { vi: "Duyệt độ dài từ len(low) đến len(high), rồi duyệt vị trí bắt đầu.", en: "Iterate lengths from len(low) to len(high), then each start position." },
+      { vi: "Nếu candidate nằm trong [low, high] thì thêm vào kết quả.", en: "If a candidate lies inside [low, high], append it to the answer." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: {
+        vi: "Tối đa chỉ có 36 số sequential digits từ chuỗi '123456789', nên số bước bị chặn bởi hằng số.",
+        en: "There are at most 36 sequential digit numbers from '123456789', so the work is bounded by a constant.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def sequentialDigits(self, low: int, high: int) -> List[int]:",
+      "        ans = []",
+      "        digits = '123456789'",
+      "        for length in range(len(str(low)), len(str(high)) + 1):",
+      "            for start in range(0, 10 - length):",
+      "                num = int(digits[start:start + length])",
+      "                if low <= num <= high:",
+      "                    ans.append(num)",
+      "        return ans",
+    ],
+    builder: buildSteps1291,
   },
   246: {
     id: 246,

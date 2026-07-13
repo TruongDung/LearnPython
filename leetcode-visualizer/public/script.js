@@ -441,6 +441,33 @@ function pick(field) {
   return field;
 }
 
+function shouldUseLineByLineDebug() {
+  return problemData && problemData.category && problemData.category.key === "dp";
+}
+
+function expandStepsLineByLine(rawSteps) {
+  const expanded = [];
+  (rawSteps || []).forEach((step) => {
+    const lines = Array.isArray(step.codeLines)
+      ? step.codeLines.filter((line) => Number.isInteger(line))
+      : [];
+
+    if (lines.length <= 1) {
+      expanded.push(step);
+      return;
+    }
+
+    lines.forEach((line, idx) => {
+      expanded.push({
+        ...step,
+        codeLines: [line],
+        final: Boolean(step.final && idx === lines.length - 1),
+      });
+    });
+  });
+  return expanded;
+}
+
 // ---- Run algorithm ----
 $("runBtn").addEventListener("click", runViz);
 
@@ -492,7 +519,9 @@ async function runViz() {
       return showError("runError", data.error || t().errSolve);
     }
 
-    steps = data.steps;
+    steps = shouldUseLineByLineDebug()
+      ? expandStepsLineByLine(data.steps)
+      : (data.steps || []);
     answerValue = data.answer;
     stepIndex = 0;
     show("vizPanel");

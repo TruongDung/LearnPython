@@ -1791,13 +1791,12 @@ function buildSteps198(nums, params) {
   const dp = new Array(n).fill(0);
   const steps = [];
 
-  // Step 0: Explain the DP idea for beginners
   steps.push({
-    title: { vi: "Ý tưởng: tại mỗi nhà có 2 lựa chọn", en: "Idea: at each house you have 2 choices" },
+    title: { vi: `n = len(nums) = ${n}`, en: `n = len(nums) = ${n}` },
     arr: [...nums],
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [], mark: [],
-    codeLines: [2, 3],
+    codeLines: [3],
     vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "rule", value: "không cướp 2 nhà liền kề" }],
     note: {
       vi:
@@ -1821,71 +1820,116 @@ function buildSteps198(nums, params) {
     },
   });
 
-  // Base cases
-  dp[0] = nums[0];
-  if (n >= 2) dp[1] = Math.max(nums[0], nums[1]);
-
   steps.push({
-    title: { vi: "Base case: dp[0] và dp[1]", en: "Base cases: dp[0] and dp[1]" },
+    title: { vi: `if n == 1: ${n === 1}`, en: `if n == 1: ${n === 1}` },
     arr: [...nums],
-    sub: dp.map((v) => v || "·"),
-    highlight: n >= 2 ? [0, 1] : [0],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: n === 1 ? [0] : [],
     mark: [],
-    codeLines: [4, 5, 6, 7],
+    codeLines: [4],
     vars: [
-      { name: "dp[0]", value: `nums[0] = ${dp[0]} (chỉ có 1 nhà → cướp nó)` },
-      { name: "dp[1]", value: n >= 2 ? `max(nums[0], nums[1]) = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` : "-" },
-      { name: "dp", value: `[${dp.join(",")}]` },
+      { name: "n", value: n },
+      { name: "n == 1", value: n === 1 },
     ],
     note: {
-      vi: `dp[0] = ${nums[0]} (chỉ 1 nhà → cướp thôi).\ndp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]} (chọn nhà lớn hơn trong 2 nhà đầu).`,
-      en: `dp[0] = ${nums[0]} (only 1 house → rob it).\ndp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]} (pick the richer of the first 2).`,
+      vi: n === 1 ? `Chỉ có một nhà, đáp án là nums[0].` : `Có nhiều hơn một nhà, tiếp tục tạo bảng dp.`,
+      en: n === 1 ? `There is only one house, so the answer is nums[0].` : `There is more than one house, continue with the dp table.`,
     },
   });
 
-  // Fill DP — 3 sub-steps per iteration for line-by-line debugging
-  for (let i = 2; i < n; i++) {
-    // Sub-step 1: skip = dp[i-1]
-    const skip = dp[i - 1];
+  if (n === 1) {
     steps.push({
-      title: { vi: `Nhà ${i}: ① skip = dp[${i-1}] = ${skip}`, en: `House ${i}: ① skip = dp[${i-1}] = ${skip}` },
+      title: { vi: `return nums[0] = ${nums[0]}`, en: `return nums[0] = ${nums[0]}` },
+      arr: [...nums],
+      sub: [`${nums[0]}`],
+      highlight: [0],
+      mark: [0],
+      final: true,
+      codeLines: [5],
+      vars: [{ name: "answer", value: nums[0] }],
+      note: {
+        vi: `Không có nhà liền kề để so sánh, cướp nhà duy nhất.`,
+        en: `No adjacent choice exists, rob the only house.`,
+      },
+    });
+    return { original: [...nums], answer: nums[0], steps };
+  }
+
+  steps.push({
+    title: { vi: "dp = [0] * len(nums)", en: "dp = [0] * len(nums)" },
+    arr: [...nums],
+    sub: dp.map(() => "0"),
+    highlight: [],
+    mark: [],
+    codeLines: [6],
+    vars: [
+      { name: "dp", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi: `Tạo dp, trong đó dp[i] là số tiền tối đa có thể cướp từ nhà 0 đến nhà i.`,
+      en: `Create dp, where dp[i] is the maximum loot from house 0 through house i.`,
+    },
+  });
+
+  dp[0] = nums[0];
+  steps.push({
+    title: { vi: `dp[0] = nums[0] = ${dp[0]}`, en: `dp[0] = nums[0] = ${dp[0]}` },
+    arr: [...nums],
+    sub: dp.map((v) => v || "·"),
+    highlight: [0],
+    mark: [],
+    codeLines: [7],
+    vars: [
+      { name: "dp[0]", value: `nums[0] = ${dp[0]} (chỉ có 1 nhà → cướp nó)` },
+      { name: "dp", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi: `Nếu chỉ xét nhà 0, tốt nhất là cướp nhà đó: dp[0] = ${nums[0]}.`,
+      en: `Considering only house 0, the best choice is to rob it: dp[0] = ${nums[0]}.`,
+    },
+  });
+
+  dp[1] = Math.max(nums[0], nums[1]);
+  steps.push({
+    title: { vi: `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}`, en: `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` },
+    arr: [...nums],
+    sub: dp.map((v) => v || "·"),
+    highlight: [0, 1],
+    mark: [nums[1] > nums[0] ? 1 : 0],
+    codeLines: [8],
+    vars: [
+      { name: "dp[1]", value: `max(nums[0], nums[1]) = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` },
+      { name: "dp", value: `[${dp.join(",")}]` },
+    ],
+    note: {
+      vi: `Trong hai nhà đầu, không được cướp cả hai, nên chọn nhà có tiền lớn hơn.`,
+      en: `Among the first two houses, both cannot be robbed, so choose the richer one.`,
+    },
+  });
+
+  // Fill DP.
+  for (let i = 2; i < n; i++) {
+    const skip = dp[i - 1];
+    const rob = dp[i - 2] + nums[i];
+    steps.push({
+      title: { vi: `for i = ${i}`, en: `for i = ${i}` },
       arr: [...nums],
       sub: dp.map((v, idx) => idx < i ? String(v) : "·"),
-      highlight: [i - 1],
+      highlight: [i],
       mark: [],
-      codeLines: [8],
+      codeLines: [9],
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: `${nums[i]}$` },
         { name: "skip = dp[i-1]", value: skip },
-      ],
-      note: {
-        vi: `Nếu BỎ nhà ${i}: giữ nguyên tiền cũ = dp[${i-1}] = ${skip}.`,
-        en: `If we SKIP house ${i}: keep the old loot = dp[${i-1}] = ${skip}.`,
-      },
-    });
-
-    // Sub-step 2: rob = dp[i-2] + nums[i]
-    const rob = dp[i - 2] + nums[i];
-    steps.push({
-      title: { vi: `Nhà ${i}: ② rob = dp[${i-2}] + nums[${i}] = ${rob}`, en: `House ${i}: ② rob = dp[${i-2}] + ${nums[i]} = ${rob}` },
-      arr: [...nums],
-      sub: dp.map((v, idx) => idx < i ? String(v) : "·"),
-      highlight: [i - 2, i],
-      mark: [],
-      codeLines: [8],
-      vars: [
-        { name: "i", value: i },
         { name: "rob = dp[i-2] + nums[i]", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
-        { name: "skip (for comparison)", value: skip },
       ],
       note: {
-        vi: `Nếu CƯỚP nhà ${i}: dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}.\n(Lấy tiền tốt nhất trước nhà ${i-1}, cộng tiền nhà ${i}.)`,
-        en: `If we ROB house ${i}: dp[${i-2}] + nums[${i}] = ${dp[i-2]} + ${nums[i]} = ${rob}.\n(Best loot before house ${i-1}, plus house ${i}'s money.)`,
+        vi: `Xét nhà ${i}. Nếu bỏ: dp[${i-1}] = ${skip}. Nếu cướp: dp[${i-2}] + nums[${i}] = ${rob}.`,
+        en: `Consider house ${i}. If skipped: dp[${i-1}] = ${skip}. If robbed: dp[${i-2}] + nums[${i}] = ${rob}.`,
       },
     });
 
-    // Sub-step 3: dp[i] = max(skip, rob)
     dp[i] = Math.max(skip, rob);
     const robbed = dp[i] === rob;
     steps.push({
@@ -1894,7 +1938,7 @@ function buildSteps198(nums, params) {
       sub: dp.map((v, idx) => idx <= i ? (idx === i ? (robbed ? `💰${v}` : `✗${v}`) : String(v)) : "·"),
       highlight: [i],
       mark: robbed ? [i - 2, i] : [i - 1],
-      codeLines: [9],
+      codeLines: [10],
       vars: [
         { name: "skip", value: skip },
         { name: "rob", value: rob },
@@ -1927,7 +1971,7 @@ function buildSteps198(nums, params) {
     highlight: [],
     mark: robbedHouses,
     final: true,
-    codeLines: [10],
+    codeLines: [11],
     vars: [
       { name: "answer", value: `${answer}$` },
       { name: "robbed", value: `[${robbedHouses.join(",")}] = [${robbedHouses.map((j) => nums[j]).join("+")}] = ${answer}` },
@@ -2054,7 +2098,7 @@ function buildSteps198B(nums) {
     highlight: [],
     mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
     final: true,
-    codeLines: [9],
+    codeLines: [8],
     codeBlock: 2,
     vars: [
       { name: "prev_rob", value: prevRob },
@@ -4361,7 +4405,7 @@ function buildSteps62(input, params) {
   gridSnap({
     title: { vi: "Kết quả", en: "Result" },
     hlCell: [m - 1, n - 1],
-    codeLines: [8],
+    codeLines: [7],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Số đường đi duy nhất từ (0,0) đến (${m - 1},${n - 1}) = ${answer}.`,
@@ -5236,10 +5280,26 @@ function buildSteps416(nums) {
   const steps = [];
   const total = nums.reduce((a, b) => a + b, 0);
 
+  steps.push({
+    title: { vi: `total = sum(nums) = ${total}`, en: `total = sum(nums) = ${total}` },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "total", value: total },
+    ],
+    note: {
+      vi: `Tính tổng mảng trước. Muốn chia đều thì tổng phải là số chẵn.`,
+      en: `Compute the total first. Equal partition is possible only when the total is even.`,
+    },
+  });
+
   if (total % 2 !== 0) {
     steps.push({
       title: { vi: "Tổng lẻ → False", en: "Odd sum → False" },
-      arr: [...nums], highlight: [], mark: [], final: true, codeLines: [3, 4],
+      arr: [...nums], highlight: [], mark: [], final: true, codeLines: [4],
       vars: [{ name: "sum", value: total }, { name: "answer", value: false }],
       note: { vi: `Tổng = ${total} (lẻ) → không thể chia đều. False.`, en: `Sum = ${total} (odd) → cannot partition equally. False.` },
     });
@@ -5251,53 +5311,123 @@ function buildSteps416(nums) {
   dp[0] = true;
 
   steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
+    title: { vi: `target = ${target}`, en: `target = ${target}` },
     arr: dp.map((v) => (v ? 1 : 0)),
     sub: dp.map((_, i) => String(i)),
-    highlight: [0], mark: [], codeLines: [3, 4, 5, 6],
+    highlight: [],
+    mark: [],
+    codeLines: [5],
     vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "sum", value: total },
+      { name: "total", value: total },
       { name: "target", value: target },
+    ],
+    note: {
+      vi: `Nếu tồn tại subset có tổng ${target}, phần còn lại cũng có tổng ${target}.`,
+      en: `If a subset sums to ${target}, the remaining subset also sums to ${target}.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Tạo bảng dp toàn False", en: "Create all-False dp table" },
+    arr: new Array(target + 1).fill(0),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [],
+    mark: [],
+    codeLines: [6],
+    vars: [
+      { name: "target", value: target },
+      { name: "dp", value: `[${new Array(target + 1).fill(".").join("")}]` },
+    ],
+    note: {
+      vi: `dp[j] = True nghĩa là tạo được tổng j từ các số đã xét.`,
+      en: `dp[j] = True means sum j is reachable using numbers processed so far.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "dp[0] = True", en: "dp[0] = True" },
+    arr: dp.map((v) => (v ? 1 : 0)),
+    sub: dp.map((_, i) => String(i)),
+    highlight: [0],
+    mark: [0],
+    codeLines: [7],
+    vars: [
       { name: "dp[0]", value: true },
       { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` },
     ],
     note: {
-      vi: `Tổng = ${total}, target = ${target}. Bài toán: có subset tổng = ${target}?\ndp[j] = True nếu tạo được tổng j.\ndp[0] = True. Với mỗi num: dp[j] |= dp[j-num] (duyệt giảm).`,
-      en: `Sum = ${total}, target = ${target}. Problem: is there a subset summing to ${target}?\ndp[j] = True if sum j is achievable.\ndp[0] = True. For each num: dp[j] |= dp[j-num] (iterate backwards).`,
+      vi: `Tổng 0 luôn tạo được bằng cách không chọn phần tử nào.`,
+      en: `Sum 0 is always reachable by choosing no elements.`,
     },
   });
 
   for (const num of nums) {
-    const before = dp.slice();
-    const changed = [];
-    for (let j = target; j >= num; j--) {
-      if (!dp[j] && dp[j - num]) {
-        dp[j] = true;
-        changed.push(j);
-      }
-    }
-
     steps.push({
-      title: { vi: `Thêm ${num}`, en: `Add ${num}` },
+      title: { vi: `for num in nums: num = ${num}`, en: `for num in nums: num = ${num}` },
       arr: dp.map((v) => (v ? 1 : 0)),
       sub: dp.map((_, i) => String(i)),
-      highlight: changed,
+      highlight: [],
       mark: dp[target] ? [target] : [],
-      codeLines: [7, 8, 9],
+      codeLines: [8],
       vars: [
         { name: "num", value: num },
-        { name: "new sums", value: changed.length > 0 ? `[${changed.join(",")}]` : "none" },
         { name: "dp[target]", value: dp[target] },
-        { name: "dp", value: `[${dp.map((v) => v ? "T" : ".").join("")}]` },
       ],
       note: {
-        vi: `Xử lý num=${num}: tổng mới đạt được = [${changed.join(",")}].${dp[target] ? ` ✓ Đạt target=${target}!` : ""}`,
-        en: `Process num=${num}: newly reachable sums = [${changed.join(",")}].${dp[target] ? ` ✓ Reached target=${target}!` : ""}`,
+        vi: `Bắt đầu xét số ${num}. Duyệt j giảm để mỗi số chỉ được dùng một lần.`,
+        en: `Start processing ${num}. Iterate j backwards so each number is used at most once.`,
       },
     });
 
-    if (dp[target]) break; // Early exit
+    for (let j = target; j >= num; j--) {
+      const beforeJ = dp[j];
+      const source = dp[j - num];
+
+      steps.push({
+        title: { vi: `for j: j = ${j}`, en: `for j: j = ${j}` },
+        arr: dp.map((v) => (v ? 1 : 0)),
+        sub: dp.map((_, i) => String(i)),
+        highlight: [j, j - num],
+        mark: dp[target] ? [target] : [],
+        codeLines: [9],
+        vars: [
+          { name: "num", value: num },
+          { name: "j", value: j },
+          { name: "dp[j]", value: beforeJ },
+          { name: "dp[j-num]", value: source },
+        ],
+        note: {
+          vi: `Kiểm tra có thể tạo tổng ${j} bằng cách thêm ${num} vào tổng ${j - num} không.`,
+          en: `Check whether sum ${j} can be reached by adding ${num} to sum ${j - num}.`,
+        },
+      });
+
+      dp[j] = dp[j] || dp[j - num];
+      steps.push({
+        title: { vi: `dp[${j}] = ${beforeJ} or ${source} → ${dp[j]}`, en: `dp[${j}] = ${beforeJ} or ${source} → ${dp[j]}` },
+        arr: dp.map((v) => (v ? 1 : 0)),
+        sub: dp.map((_, i) => String(i)),
+        highlight: [j, j - num],
+        mark: dp[j] && !beforeJ ? [j] : (dp[target] ? [target] : []),
+        codeLines: [10],
+        vars: [
+          { name: "num", value: num },
+          { name: "j", value: j },
+          { name: `old dp[${j}]`, value: beforeJ },
+          { name: `dp[${j - num}]`, value: source },
+          { name: `new dp[${j}]`, value: dp[j] },
+          { name: "dp[target]", value: dp[target] },
+        ],
+        note: {
+          vi: beforeJ === dp[j]
+            ? `Giá trị dp[${j}] không đổi.`
+            : `Tạo được tổng ${j}: lấy một subset tổng ${j - num}, rồi thêm ${num}.`,
+          en: beforeJ === dp[j]
+            ? `dp[${j}] stays unchanged.`
+            : `Sum ${j} is now reachable: take a subset summing to ${j - num}, then add ${num}.`,
+        },
+      });
+    }
   }
 
   const answer = dp[target];
@@ -5715,7 +5845,7 @@ function buildSteps1388(slices) {
       arr: [...slices],
       highlight: [],
       mark: picks.map((k) => k + offset),
-      codeLines: [17, 18],
+      codeLines: [14],
       vars: [
         { name: "pass", value: passLabel },
         { name: "picks (original indices)", value: picks.map((k) => k + offset).join(",") },
@@ -5745,7 +5875,7 @@ function buildSteps1388(slices) {
     highlight: [],
     mark: winnerPicks,
     final: true,
-    codeLines: [19, 20],
+    codeLines: [16],
     vars: [
       { name: "pass A best", value: passA.best },
       { name: "pass B best", value: passB.best },
