@@ -2798,6 +2798,226 @@ function buildSteps1143(input, params) {
 }
 
 /**
+ * LeetCode 583: Delete Operation for Two Strings.
+ * dp[i][j] = minimum deletions to make word1[0..i-1] and word2[0..j-1] equal.
+ */
+function buildSteps583(input, params) {
+  const word1 = String(input).trim();
+  const word2 = String(params.word2 || "").trim();
+  const m = word1.length;
+  const n = word2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const steps = [];
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        text1: word1,
+        text2: word2,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Doc m, n", en: "Read m, n" },
+    codeLines: [3],
+    vars: [
+      { name: "word1", value: word1 },
+      { name: "word2", value: word2 },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: { vi: `m = ${m}, n = ${n}.`, en: `m = ${m}, n = ${n}.` },
+  });
+
+  gridSnap({
+    title: { vi: "Tao bang dp", en: "Create dp table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${m + 1} x ${n + 1}` },
+      { name: "meaning", value: "min deletions" },
+    ],
+    note: {
+      vi: "dp[i][j] = so lan xoa it nhat de word1[:i] va word2[:j] giong nhau.",
+      en: "dp[i][j] = minimum deletions needed to make word1[:i] and word2[:j] equal.",
+    },
+  });
+
+  for (let i = 0; i <= m; i++) {
+    dp[i][0] = i;
+    gridSnap({
+      title: { vi: `Base dp[${i}][0] = ${i}`, en: `Base dp[${i}][0] = ${i}` },
+      codeLines: [5, 6],
+      hlCell: [i, 0],
+      vars: [
+        { name: "word1 prefix", value: `"${word1.slice(0, i)}"` },
+        { name: `dp[${i}][0]`, value: i },
+      ],
+      note: {
+        vi: `De bien "${word1.slice(0, i)}" thanh chuoi rong, can xoa ${i} ky tu.`,
+        en: `To make "${word1.slice(0, i)}" equal to empty string, delete ${i} character(s).`,
+      },
+    });
+  }
+
+  for (let j = 0; j <= n; j++) {
+    dp[0][j] = j;
+    gridSnap({
+      title: { vi: `Base dp[0][${j}] = ${j}`, en: `Base dp[0][${j}] = ${j}` },
+      codeLines: [7, 8],
+      hlCell: [0, j],
+      vars: [
+        { name: "word2 prefix", value: `"${word2.slice(0, j)}"` },
+        { name: `dp[0][${j}]`, value: j },
+      ],
+      note: {
+        vi: `De khop voi chuoi rong, can xoa ${j} ky tu tu word2.`,
+        en: `To match the empty string, delete ${j} character(s) from word2.`,
+      },
+    });
+  }
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [9],
+      hlCell: [i, 0],
+      vars: [{ name: `word1[${i - 1}]`, value: word1[i - 1] }],
+      note: {
+        vi: `Xet prefix word1[:${i}] = "${word1.slice(0, i)}".`,
+        en: `Consider prefix word1[:${i}] = "${word1.slice(0, i)}".`,
+      },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      gridSnap({
+        title: { vi: `Vong trong j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [10],
+        hlCell: [i, j],
+        pathCells: [[i - 1, j - 1], [i - 1, j], [i, j - 1]],
+        vars: [
+          { name: `word1[${i - 1}]`, value: word1[i - 1] },
+          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+        ],
+        note: {
+          vi: `Chuan bi tinh dp[${i}][${j}] cho "${word1.slice(0, i)}" va "${word2.slice(0, j)}".`,
+          en: `Prepare to compute dp[${i}][${j}] for "${word1.slice(0, i)}" and "${word2.slice(0, j)}".`,
+        },
+      });
+
+      const same = word1[i - 1] === word2[j - 1];
+      gridSnap({
+        title: { vi: `So sanh '${word1[i - 1]}' va '${word2[j - 1]}'`, en: `Compare '${word1[i - 1]}' and '${word2[j - 1]}'` },
+        codeLines: [11],
+        hlCell: [i, j],
+        pathCells: same ? [[i - 1, j - 1]] : [[i - 1, j], [i, j - 1]],
+        vars: [
+          { name: `word1[${i - 1}]`, value: word1[i - 1] },
+          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same ? "Hai ky tu giong nhau, giu ca hai." : "Hai ky tu khac nhau, xoa mot ky tu tu word1 hoac word2.",
+          en: same ? "The characters match, keep both." : "The characters differ, delete one character from word1 or word2.",
+        },
+      });
+
+      if (same) {
+        dp[i][j] = dp[i - 1][j - 1];
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [12],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
+          vars: [
+            { name: `dp[${i - 1}][${j - 1}]`, value: dp[i - 1][j - 1] },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: {
+            vi: `'${word1[i - 1]}' == '${word2[j - 1]}', nen dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
+            en: `'${word1[i - 1]}' == '${word2[j - 1]}', so dp[${i}][${j}] = dp[${i - 1}][${j - 1}] = ${dp[i][j]}.`,
+          },
+        });
+      } else {
+        const del1 = dp[i - 1][j];
+        const del2 = dp[i][j - 1];
+        gridSnap({
+          title: { vi: "Nhanh else", en: "Else branch" },
+          codeLines: [13],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j], [i, j - 1]],
+          vars: [
+            { name: "delete from word1", value: `dp[${i - 1}][${j}] = ${del1}` },
+            { name: "delete from word2", value: `dp[${i}][${j - 1}] = ${del2}` },
+          ],
+          note: {
+            vi: "Chon xoa 1 ky tu tu word1 hoac word2, roi cong them 1 thao tac.",
+            en: "Choose deleting one character from word1 or word2, then add one operation.",
+          },
+        });
+
+        dp[i][j] = 1 + Math.min(del1, del2);
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [14],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j], [i, j - 1]],
+          vars: [
+            { name: `dp[${i - 1}][${j}]`, value: del1 },
+            { name: `dp[${i}][${j - 1}]`, value: del2 },
+            { name: `dp[${i}][${j}]`, value: `1 + min(${del1}, ${del2}) = ${dp[i][j]}` },
+          ],
+          note: {
+            vi: `dp[${i}][${j}] = 1 + min(${del1}, ${del2}) = ${dp[i][j]}.`,
+            en: `dp[${i}][${j}] = 1 + min(${del1}, ${del2}) = ${dp[i][j]}.`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [15],
+    hlCell: [m, n],
+    vars: [
+      { name: "answer", value: answer },
+      { name: `dp[${m}][${n}]`, value: answer },
+    ],
+    note: {
+      vi: `Can it nhat ${answer} thao tac xoa de "${word1}" va "${word2}" giong nhau.`,
+      en: `Minimum ${answer} deletion operation(s) are needed to make "${word1}" and "${word2}" equal.`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+  return { word1, word2, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 688: Knight Probability in Chessboard.
  * DP: dp[r][c] = probability of being at (r,c) after current number of steps.
  */
@@ -7986,7 +8206,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 516, 1312, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -8965,6 +9185,50 @@ module.exports = {
       "        return dp[m][n]",
     ],
     builder: buildSteps1143,
+  },
+  583: {
+    id: 583,
+    difficulty: "medium",
+    slug: "delete-operation-for-two-strings",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Delete Operation for Two Strings", en: "Delete Operation for Two Strings" },
+    titleVi: { vi: "Xoa ky tu de hai chuoi bang nhau", en: "Delete characters to make strings equal" },
+    statement: {
+      vi: "Cho hai chuoi word1 va word2. Moi buoc duoc xoa mot ky tu trong mot trong hai chuoi. Tra ve so buoc xoa it nhat de hai chuoi bang nhau.",
+      en: "Given two strings word1 and word2. In one step you can delete one character in either string. Return the minimum number of deletions required to make the two strings equal.",
+    },
+    defaultInput: "sea",
+    inputKind: "string",
+    inputLabel: { vi: "word1", en: "word1" },
+    extraParams: [{ key: "word2", type: "string", label: { vi: "word2", en: "word2" }, default: "eat" }],
+    approach: [
+      { vi: "dp[i][j] = so lan xoa it nhat de word1[:i] va word2[:j] bang nhau.", en: "dp[i][j] = minimum deletions needed to make word1[:i] and word2[:j] equal." },
+      { vi: "Neu word1[i-1] == word2[j-1], giu ca hai: dp[i][j] = dp[i-1][j-1].", en: "If word1[i-1] == word2[j-1], keep both: dp[i][j] = dp[i-1][j-1]." },
+      { vi: "Neu khac nhau, xoa tu mot chuoi: dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1]).", en: "If they differ, delete from one string: dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1])." },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: { vi: "Dien bang (m+1) x (n+1).", en: "Fill a (m+1) x (n+1) table." },
+    },
+    code: [
+      "class Solution:",
+      "    def minDistance(self, word1: str, word2: str) -> int:",
+      "        m, n = len(word1), len(word2)",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        for i in range(m + 1):",
+      "            dp[i][0] = i",
+      "        for j in range(n + 1):",
+      "            dp[0][j] = j",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if word1[i - 1] == word2[j - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1]",
+      "                else:",
+      "                    dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1])",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps583,
   },
   213: {
     id: 213,
