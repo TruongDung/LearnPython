@@ -4444,7 +4444,17 @@ function buildSteps63(input) {
   const steps = [];
 
   function makeDisplay() {
-    return dp.map((row, r) => row.map((v, c) => obstacleGrid[r][c] === 1 ? "X" : v));
+    const display = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(""));
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        display[r + 1][c + 1] = obstacleGrid[r][c] === 1 ? "X" : dp[r][c];
+      }
+    }
+    return display;
+  }
+
+  function shiftCell(cell) {
+    return cell ? [cell[0] + 1, cell[1] + 1] : null;
   }
 
   function gridSnap(opts) {
@@ -4455,8 +4465,8 @@ function buildSteps63(input) {
         dp: makeDisplay(),
         text1: Array.from({ length: m }, (_, r) => String(r)).join(""),
         text2: Array.from({ length: n }, (_, c) => String(c)).join(""),
-        hlCell: opts.hlCell || null,
-        pathCells: opts.pathCells || [],
+        hlCell: shiftCell(opts.hlCell || null),
+        pathCells: (opts.pathCells || []).map(shiftCell).filter(Boolean),
       },
       highlight: [],
       mark: [],
@@ -4482,9 +4492,19 @@ function buildSteps63(input) {
 
   if (obstacleGrid[0][0] === 1) {
     gridSnap({
+      title: { vi: "Kiểm tra ô bắt đầu", en: "Check start cell" },
+      hlCell: [0, 0],
+      codeLines: [5],
+      vars: [{ name: "obstacleGrid[0][0]", value: 1 }],
+      note: {
+        vi: "Dòng 5 kiểm tra ô bắt đầu có phải vật cản không.",
+        en: "Line 5 checks whether the start cell is blocked.",
+      },
+    });
+    gridSnap({
       title: { vi: "Start bị chặn", en: "Start is blocked" },
       hlCell: [0, 0],
-      codeLines: [5, 6],
+      codeLines: [6],
       vars: [{ name: "answer", value: 0 }],
       note: {
         vi: "Ô bắt đầu (0,0) là vật cản, robot không thể xuất phát. Trả về 0.",
@@ -4494,6 +4514,17 @@ function buildSteps63(input) {
     steps[steps.length - 1].final = true;
     return { original: obstacleGrid, answer: 0, steps };
   }
+
+  gridSnap({
+    title: { vi: "Kiểm tra ô bắt đầu", en: "Check start cell" },
+    hlCell: [0, 0],
+    codeLines: [5],
+    vars: [{ name: "obstacleGrid[0][0]", value: 0 }],
+    note: {
+      vi: "Ô bắt đầu không bị chặn, tiếp tục khởi tạo dp[0][0].",
+      en: "The start cell is open, so continue to initialize dp[0][0].",
+    },
+  });
 
   dp[0][0] = 1;
   gridSnap({
@@ -4508,13 +4539,24 @@ function buildSteps63(input) {
   });
 
   for (let c = 1; c < n; c++) {
+    gridSnap({
+      title: { vi: `Vòng lặp hàng đầu c=${c}`, en: `First-row loop c=${c}` },
+      hlCell: [0, c],
+      codeLines: [8],
+      vars: [{ name: "c", value: c }],
+      note: {
+        vi: `Đang xử lý hàng đầu tại ô (0,${c}). Hàng đầu chỉ có thể nhận đường đi từ ô bên trái.`,
+        en: `Processing first-row cell (0,${c}). The first row can only receive paths from the left.`,
+      },
+    });
+
     const blocked = obstacleGrid[0][c] === 1;
     dp[0][c] = blocked ? 0 : dp[0][c - 1];
     gridSnap({
       title: { vi: `Hàng đầu: dp[0][${c}] = ${dp[0][c]}`, en: `First row: dp[0][${c}] = ${dp[0][c]}` },
       hlCell: [0, c],
       pathCells: [[0, c - 1]],
-      codeLines: [8, 9],
+      codeLines: [9],
       vars: [
         { name: "blocked?", value: blocked },
         { name: `dp[0][${c - 1}]`, value: dp[0][c - 1] },
@@ -4532,13 +4574,24 @@ function buildSteps63(input) {
   }
 
   for (let r = 1; r < m; r++) {
+    gridSnap({
+      title: { vi: `Vòng lặp cột đầu r=${r}`, en: `First-column loop r=${r}` },
+      hlCell: [r, 0],
+      codeLines: [10],
+      vars: [{ name: "r", value: r }],
+      note: {
+        vi: `Đang xử lý cột đầu tại ô (${r},0). Cột đầu chỉ có thể nhận đường đi từ ô phía trên.`,
+        en: `Processing first-column cell (${r},0). The first column can only receive paths from above.`,
+      },
+    });
+
     const blocked = obstacleGrid[r][0] === 1;
     dp[r][0] = blocked ? 0 : dp[r - 1][0];
     gridSnap({
       title: { vi: `Cột đầu: dp[${r}][0] = ${dp[r][0]}`, en: `First column: dp[${r}][0] = ${dp[r][0]}` },
       hlCell: [r, 0],
       pathCells: [[r - 1, 0]],
-      codeLines: [10, 11],
+      codeLines: [11],
       vars: [
         { name: "blocked?", value: blocked },
         { name: `dp[${r - 1}][0]`, value: dp[r - 1][0] },
@@ -4556,31 +4609,102 @@ function buildSteps63(input) {
   }
 
   for (let r = 1; r < m; r++) {
+    gridSnap({
+      title: { vi: `Vòng ngoài r=${r}`, en: `Outer loop r=${r}` },
+      hlCell: [r, 1],
+      codeLines: [12],
+      vars: [{ name: "r", value: r }],
+      note: {
+        vi: `Bắt đầu xử lý các ô bên trong ở hàng ${r}.`,
+        en: `Start processing inner cells in row ${r}.`,
+      },
+    });
+
     for (let c = 1; c < n; c++) {
+      gridSnap({
+        title: { vi: `Vòng trong c=${c}`, en: `Inner loop c=${c}` },
+        hlCell: [r, c],
+        pathCells: [[r - 1, c], [r, c - 1]],
+        codeLines: [13],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+        ],
+        note: {
+          vi: `Chuẩn bị tính dp[${r}][${c}] từ ô trên và ô trái, trừ khi ô này là vật cản.`,
+          en: `Prepare to compute dp[${r}][${c}] from top and left, unless this cell is blocked.`,
+        },
+      });
+
       const blocked = obstacleGrid[r][c] === 1;
       const fromTop = dp[r - 1][c];
       const fromLeft = dp[r][c - 1];
-      dp[r][c] = blocked ? 0 : fromTop + fromLeft;
       gridSnap({
-        title: { vi: `dp[${r}][${c}] = ${dp[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}` },
+        title: { vi: `Kiểm tra obstacle tại (${r},${c})`, en: `Check obstacle at (${r},${c})` },
         hlCell: [r, c],
-        pathCells: [[r - 1, c], [r, c - 1]],
-        codeLines: [12, 13, 14, 15],
+        codeLines: [14],
         vars: [
+          { name: `obstacleGrid[${r}][${c}]`, value: obstacleGrid[r][c] },
           { name: "blocked?", value: blocked },
-          { name: "from top", value: fromTop },
-          { name: "from left", value: fromLeft },
-          { name: `dp[${r}][${c}]`, value: dp[r][c] },
         ],
         note: {
           vi: blocked
-            ? `Ô (${r},${c}) là vật cản, nên dp[${r}][${c}] = 0.`
-            : `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+            ? `Ô (${r},${c}) là vật cản, đi vào nhánh if.`
+            : `Ô (${r},${c}) không bị chặn, đi vào nhánh else.`,
           en: blocked
-            ? `Cell (${r},${c}) is an obstacle, so dp[${r}][${c}] = 0.`
-            : `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+            ? `Cell (${r},${c}) is an obstacle, take the if branch.`
+            : `Cell (${r},${c}) is open, take the else branch.`,
         },
       });
+
+      if (blocked) {
+        dp[r][c] = 0;
+        gridSnap({
+          title: { vi: `dp[${r}][${c}] = 0`, en: `dp[${r}][${c}] = 0` },
+          hlCell: [r, c],
+          codeLines: [15],
+          vars: [
+            { name: "blocked?", value: true },
+            { name: `dp[${r}][${c}]`, value: 0 },
+          ],
+          note: {
+            vi: `Vật cản không thể đi qua, nên dp[${r}][${c}] = 0.`,
+            en: `An obstacle cannot be crossed, so dp[${r}][${c}] = 0.`,
+          },
+        });
+      } else {
+        gridSnap({
+          title: { vi: "Nhánh else", en: "Else branch" },
+          hlCell: [r, c],
+          pathCells: [[r - 1, c], [r, c - 1]],
+          codeLines: [16],
+          vars: [
+            { name: "from top", value: fromTop },
+            { name: "from left", value: fromLeft },
+          ],
+          note: {
+            vi: "Ô trống nên cộng số đường đi từ trên và từ trái.",
+            en: "The cell is open, so add paths from above and from the left.",
+          },
+        });
+
+        dp[r][c] = fromTop + fromLeft;
+        gridSnap({
+          title: { vi: `dp[${r}][${c}] = ${dp[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}` },
+          hlCell: [r, c],
+          pathCells: [[r - 1, c], [r, c - 1]],
+          codeLines: [17],
+          vars: [
+            { name: "from top", value: fromTop },
+            { name: "from left", value: fromLeft },
+            { name: `dp[${r}][${c}]`, value: dp[r][c] },
+          ],
+          note: {
+            vi: `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+            en: `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+          },
+        });
+      }
     }
   }
 
@@ -4588,7 +4712,7 @@ function buildSteps63(input) {
   gridSnap({
     title: { vi: "Kết quả", en: "Result" },
     hlCell: [m - 1, n - 1],
-    codeLines: [16],
+    codeLines: [18],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Số đường đi hợp lệ từ (0,0) đến (${m - 1},${n - 1}) = ${answer}.`,
