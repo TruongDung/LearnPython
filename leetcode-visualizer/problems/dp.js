@@ -4745,21 +4745,28 @@ function buildSteps64(input, params) {
   const dp = Array.from({ length: m }, () => new Array(n).fill(0));
   const steps = [];
 
-  // Fill dp
-  dp[0][0] = grid[0][0];
-  for (let c = 1; c < n; c++) dp[0][c] = dp[0][c - 1] + grid[0][c];
-  for (let r = 1; r < m; r++) dp[r][0] = dp[r - 1][0] + grid[r][0];
+  function makeDisplay() {
+    const display = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(""));
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) display[r + 1][c + 1] = dp[r][c];
+    }
+    return display;
+  }
+
+  function shiftCell(cell) {
+    return cell ? [cell[0] + 1, cell[1] + 1] : null;
+  }
 
   function gridSnap(opts) {
     steps.push({
       title: opts.title,
       arr: [],
       grid: {
-        dp: dp.map((row) => [...row]),
+        dp: makeDisplay(),
         text1: Array.from({ length: m }, (_, r) => String(r)).join(""),
         text2: Array.from({ length: n }, (_, c) => String(c)).join(""),
-        hlCell: opts.hlCell || null,
-        pathCells: opts.pathCells || [],
+        hlCell: shiftCell(opts.hlCell || null),
+        pathCells: (opts.pathCells || []).map(shiftCell).filter(Boolean),
       },
       highlight: [],
       mark: [],
@@ -4770,26 +4777,118 @@ function buildSteps64(input, params) {
   }
 
   gridSnap({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    codeLines: [3, 4, 5, 6],
+    title: { vi: "Lay kich thuoc m, n", en: "Read sizes m, n" },
+    codeLines: [3],
     vars: [{ name: "m", value: m }, { name: "n", value: n }],
     note: {
-      vi: `Lưới ${m}×${n}. dp[r][c] = chi phí nhỏ nhất đến (r,c).\nHàng đầu: cộng dồn từ trái. Cột đầu: cộng dồn từ trên.\ndp[r][c] = grid[r][c] + min(dp[r-1][c], dp[r][c-1]).`,
-      en: `Grid ${m}×${n}. dp[r][c] = min cost to reach (r,c).\nFirst row: prefix sum from left. First col: prefix sum from top.\ndp[r][c] = grid[r][c] + min(dp[r-1][c], dp[r][c-1]).`,
+      vi: `Grid ${m}x${n}. dp[r][c] = chi phi nho nhat de di tu (0,0) den (r,c).`,
+      en: `Grid ${m}x${n}. dp[r][c] = minimum cost to move from (0,0) to (r,c).`,
     },
   });
 
+  gridSnap({
+    title: { vi: "Tao bang dp toan 0", en: "Create zero-filled dp table" },
+    codeLines: [4],
+    vars: [{ name: "dp size", value: `${m} x ${n}` }],
+    note: {
+      vi: "Khoi tao dp bang 0, roi dien base, hang dau, cot dau va phan con lai.",
+      en: "Initialize dp with 0, then fill the base cell, first row, first column, and remaining cells.",
+    },
+  });
+
+  dp[0][0] = grid[0][0];
+  gridSnap({
+    title: { vi: `dp[0][0] = grid[0][0] = ${dp[0][0]}`, en: `dp[0][0] = grid[0][0] = ${dp[0][0]}` },
+    hlCell: [0, 0],
+    codeLines: [5],
+    vars: [
+      { name: "grid[0][0]", value: grid[0][0] },
+      { name: "dp[0][0]", value: dp[0][0] },
+    ],
+    note: {
+      vi: "O bat dau chi co chi phi cua chinh no.",
+      en: "The start cell has only its own cost.",
+    },
+  });
+
+  for (let c = 1; c < n; c++) {
+    dp[0][c] = dp[0][c - 1] + grid[0][c];
+    gridSnap({
+      title: { vi: `Hang dau: dp[0][${c}] = ${dp[0][c]}`, en: `First row: dp[0][${c}] = ${dp[0][c]}` },
+      hlCell: [0, c],
+      pathCells: [[0, c - 1]],
+      codeLines: [6],
+      vars: [
+        { name: "c", value: c },
+        { name: `dp[0][${c - 1}]`, value: dp[0][c - 1] },
+        { name: `grid[0][${c}]`, value: grid[0][c] },
+        { name: `dp[0][${c}]`, value: dp[0][c] },
+      ],
+      note: {
+        vi: `Hang dau chi di tu trai sang: dp[0][${c}] = dp[0][${c - 1}] + grid[0][${c}] = ${dp[0][c - 1]} + ${grid[0][c]} = ${dp[0][c]}.`,
+        en: `The first row can only come from the left: dp[0][${c}] = dp[0][${c - 1}] + grid[0][${c}] = ${dp[0][c - 1]} + ${grid[0][c]} = ${dp[0][c]}.`,
+      },
+    });
+  }
+
   for (let r = 1; r < m; r++) {
+    dp[r][0] = dp[r - 1][0] + grid[r][0];
+    gridSnap({
+      title: { vi: `Cot dau: dp[${r}][0] = ${dp[r][0]}`, en: `First column: dp[${r}][0] = ${dp[r][0]}` },
+      hlCell: [r, 0],
+      pathCells: [[r - 1, 0]],
+      codeLines: [7],
+      vars: [
+        { name: "r", value: r },
+        { name: `dp[${r - 1}][0]`, value: dp[r - 1][0] },
+        { name: `grid[${r}][0]`, value: grid[r][0] },
+        { name: `dp[${r}][0]`, value: dp[r][0] },
+      ],
+      note: {
+        vi: `Cot dau chi di tu tren xuong: dp[${r}][0] = dp[${r - 1}][0] + grid[${r}][0] = ${dp[r - 1][0]} + ${grid[r][0]} = ${dp[r][0]}.`,
+        en: `The first column can only come from above: dp[${r}][0] = dp[${r - 1}][0] + grid[${r}][0] = ${dp[r - 1][0]} + ${grid[r][0]} = ${dp[r][0]}.`,
+      },
+    });
+  }
+
+  for (let r = 1; r < m; r++) {
+    gridSnap({
+      title: { vi: `Vong ngoai r=${r}`, en: `Outer loop r=${r}` },
+      hlCell: [r, 1],
+      codeLines: [8],
+      vars: [{ name: "r", value: r }],
+      note: {
+        vi: `Bat dau xu ly cac o ben trong o hang ${r}.`,
+        en: `Start processing inner cells in row ${r}.`,
+      },
+    });
+
     for (let c = 1; c < n; c++) {
+      gridSnap({
+        title: { vi: `Vong trong c=${c}`, en: `Inner loop c=${c}` },
+        hlCell: [r, c],
+        pathCells: [[r - 1, c], [r, c - 1]],
+        codeLines: [9],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+        ],
+        note: {
+          vi: `Chuan bi tinh dp[${r}][${c}] tu o tren va o trai.`,
+          en: `Prepare to compute dp[${r}][${c}] from the top and left cells.`,
+        },
+      });
+
       const fromTop = dp[r - 1][c];
       const fromLeft = dp[r][c - 1];
       dp[r][c] = grid[r][c] + Math.min(fromTop, fromLeft);
-      const dir = fromTop <= fromLeft ? "↑" : "←";
+      const dir = fromTop <= fromLeft ? "top" : "left";
 
       gridSnap({
         title: { vi: `dp[${r}][${c}]`, en: `dp[${r}][${c}]` },
         hlCell: [r, c],
-        codeLines: [7, 8],
+        pathCells: [[r - 1, c], [r, c - 1]],
+        codeLines: [10],
         vars: [
           { name: "r", value: r },
           { name: "c", value: c },
@@ -4800,14 +4899,13 @@ function buildSteps64(input, params) {
           { name: "direction", value: dir },
         ],
         note: {
-          vi: `dp[${r}][${c}] = ${grid[r][c]} + min(${fromTop}, ${fromLeft}) = ${grid[r][c]} + ${Math.min(fromTop, fromLeft)} = ${dp[r][c]} (từ ${dir === "↑" ? "trên" : "trái"}).`,
-          en: `dp[${r}][${c}] = ${grid[r][c]} + min(${fromTop}, ${fromLeft}) = ${grid[r][c]} + ${Math.min(fromTop, fromLeft)} = ${dp[r][c]} (from ${dir === "↑" ? "top" : "left"}).`,
+          vi: `dp[${r}][${c}] = grid[${r}][${c}] + min(dp[${r - 1}][${c}], dp[${r}][${c - 1}]) = ${grid[r][c]} + min(${fromTop}, ${fromLeft}) = ${dp[r][c]} (tu ${dir === "top" ? "tren" : "trai"}).`,
+          en: `dp[${r}][${c}] = grid[${r}][${c}] + min(dp[${r - 1}][${c}], dp[${r}][${c - 1}]) = ${grid[r][c]} + min(${fromTop}, ${fromLeft}) = ${dp[r][c]} (from ${dir}).`,
         },
       });
     }
   }
 
-  // Trace back path
   const pathCells = [[m - 1, n - 1]];
   let r = m - 1, c = n - 1;
   while (r > 0 || c > 0) {
@@ -4821,16 +4919,16 @@ function buildSteps64(input, params) {
 
   const answer = dp[m - 1][n - 1];
   gridSnap({
-    title: { vi: "Kết quả", en: "Result" },
-    hlCell: null,
+    title: { vi: "Ket qua", en: "Result" },
+    hlCell: [m - 1, n - 1],
     pathCells,
-    codeLines: [9],
+    codeLines: [11],
     vars: [
       { name: "answer", value: answer },
-      { name: "path", value: pathCells.map(([r, c]) => `(${r},${c})`).join("→") },
+      { name: "path", value: pathCells.map(([r, c]) => `(${r},${c})`).join("->") },
     ],
     note: {
-      vi: `Chi phí nhỏ nhất = ${answer}. Đường đi: ${pathCells.map(([r, c]) => grid[r][c]).join("+")} = ${answer}.`,
+      vi: `Chi phi nho nhat = ${answer}. Duong di: ${pathCells.map(([r, c]) => grid[r][c]).join("+")} = ${answer}.`,
       en: `Minimum path sum = ${answer}. Path: ${pathCells.map(([r, c]) => grid[r][c]).join("+")} = ${answer}.`,
     },
   });
@@ -4838,7 +4936,6 @@ function buildSteps64(input, params) {
 
   return { original: grid, answer, steps };
 }
-
 /**
  * LeetCode 120: Triangle.
  * Bottom-up DP: dp[r][c] = triangle[r][c] + min(dp[r+1][c], dp[r+1][c+1]).
