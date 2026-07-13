@@ -2576,6 +2576,16 @@ function buildSteps1143(input, params) {
   const steps = [];
 
   function gridSnap(opts) {
+    const currentVars = [];
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
     steps.push({
       title: opts.title,
       arr: [],
@@ -2591,7 +2601,7 @@ function buildSteps1143(input, params) {
       highlight: [],
       mark: [],
       codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
+      vars: currentVars,
       note: opts.note,
     });
   }
@@ -7210,6 +7220,10 @@ function buildSteps516(input) {
   const n = s.length;
   const dp = Array.from({ length: n }, () => new Array(n).fill(0));
   const steps = [];
+  const axisLabels = Array.from({ length: n }, (_, idx) => ({
+    index: `i/j=${idx}`,
+    char: s[idx],
+  }));
 
   function makeGrid(hl = null, deps = []) {
     const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
@@ -7223,12 +7237,24 @@ function buildSteps516(input) {
       dp: display,
       text1: s,
       text2: s,
+      rowLabels: axisLabels.map(({ char }, idx) => ({ index: `i=${idx}`, char })),
+      colLabels: axisLabels.map(({ char }, idx) => ({ index: `j=${idx}`, char })),
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
     };
   }
 
   function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
     steps.push({
       title: opts.title,
       arr: [],
@@ -7236,7 +7262,7 @@ function buildSteps516(input) {
       highlight: [],
       mark: [],
       codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
+      vars: currentVars,
       note: opts.note,
     });
   }

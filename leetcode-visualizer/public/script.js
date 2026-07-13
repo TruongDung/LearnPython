@@ -1039,15 +1039,24 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const labels = cellLabels || {};
   const m = dp.length - 1;
   const n = dp[0].length - 1;
+  const axisLabelHtml = (label) => {
+    if (!label) return "";
+    if (typeof label === "object") {
+      return `<span class="axis-index">${escapeXml(label.index || "")}</span><span class="axis-char">${escapeXml(label.char || "")}</span>`;
+    }
+    return escapeXml(String(label));
+  };
 
   let html = '<table class="dp-grid"><thead><tr><th></th><th></th>';
   for (let j = 0; j < n; j++) {
-    const colLabel = showIndices
+    const colLabel = colLabels && colLabels[j]
+      ? axisLabelHtml(colLabels[j])
+      : showIndices
       ? `<span class="axis-index">j=${j + 1}</span><span class="axis-char">${escapeXml(text2[j])}</span>`
       : escapeXml(text2[j]);
     html += `<th>${colLabel}</th>`;
@@ -1058,7 +1067,9 @@ function renderGrid(step) {
     html += "<tr>";
     const rowLabel = i === 0
       ? ""
-      : showIndices
+      : rowLabels && rowLabels[i - 1]
+        ? axisLabelHtml(rowLabels[i - 1])
+        : showIndices
         ? `<span class="axis-index">i=${i}</span><span class="axis-char">${escapeXml(text1[i - 1])}</span>`
         : escapeXml(text1[i - 1]);
     html += `<td class="row-label">${rowLabel}</td>`;
