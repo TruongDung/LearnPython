@@ -872,6 +872,7 @@ button:disabled {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin: 12px 0 0;
 }
 
 .controls button {
