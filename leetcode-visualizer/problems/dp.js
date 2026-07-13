@@ -2344,7 +2344,7 @@ function buildSteps276(input, params) {
   const steps = [];
 
   steps.push({
-    title: { vi: "Đầu vào: n, k", en: "Input: n, k" },
+    title: { vi: "Dau vao: n, k", en: "Input: n, k" },
     arr: [n, k],
     sub: ["n", "k"],
     highlight: [0, 1],
@@ -2355,15 +2355,15 @@ function buildSteps276(input, params) {
       { name: "k", value: k },
     ],
     note: {
-      vi: `Có ${n} cột rào và ${k} màu. Mỗi cột được sơn một màu, tối đa 2 cột liền nhau cùng màu.`, 
-      en: `There are ${n} posts and ${k} colors. Paint each post so no more than two adjacent posts share the same color.`, 
+      vi: `Co ${n} cot rao va ${k} mau. Moi cot duoc son mot mau, toi da 2 cot lien nhau cung mau.`,
+      en: `There are ${n} posts and ${k} colors. Paint each post so no more than two adjacent posts share the same color.`,
     },
   });
 
   if (n === 0) {
     const answer = 0;
     steps.push({
-      title: { vi: "Trường hợp n = 0", en: "Case n = 0" },
+      title: { vi: "Truong hop n = 0", en: "Case n = 0" },
       arr: [],
       sub: [],
       highlight: [],
@@ -2374,8 +2374,8 @@ function buildSteps276(input, params) {
         { name: "answer", value: answer },
       ],
       note: {
-        vi: `Không có cột nào → không có cách sơn nào trừ cách không làm gì (0).`, 
-        en: `No posts means 0 ways to paint.`, 
+        vi: "Khong co cot nao thi co 0 cach son.",
+        en: "No posts means 0 ways to paint.",
       },
     });
     return { original: { n, k }, answer, steps };
@@ -2384,7 +2384,7 @@ function buildSteps276(input, params) {
   if (n === 1) {
     const answer = k;
     steps.push({
-      title: { vi: "Trường hợp n = 1", en: "Case n = 1" },
+      title: { vi: "Truong hop n = 1", en: "Case n = 1" },
       arr: [k],
       sub: ["ways"],
       highlight: [0],
@@ -2395,39 +2395,52 @@ function buildSteps276(input, params) {
         { name: "answer", value: answer },
       ],
       note: {
-        vi: `Chỉ có 1 cột → có ${k} cách sơn (mỗi màu một cách).`, 
-        en: `With 1 post there are ${k} ways to paint it.`, 
+        vi: `Chi co 1 cot nen co ${k} cach son.`,
+        en: `With 1 post there are ${k} ways to paint it.`,
       },
     });
     return { original: { n, k }, answer, steps };
   }
 
   let same = k;
+  steps.push({
+    title: { vi: "Khoi tao same", en: "Initialize same" },
+    arr: [same, ""],
+    sub: ["same", "diff"],
+    highlight: [0],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "same", value: same },
+    ],
+    note: {
+      vi: `Voi 2 cot dau, same = ${same}: hai cot dau cung mau.`,
+      en: `For the first 2 posts, same = ${same}: the two posts use the same color.`,
+    },
+  });
+
   let diff = k * (k - 1);
   steps.push({
-    title: { vi: "Khởi tạo same và diff", en: "Initialize same and diff" },
+    title: { vi: "Khoi tao diff", en: "Initialize diff" },
     arr: [same, diff],
     sub: ["same", "diff"],
-    highlight: [0, 1],
+    highlight: [1],
     mark: [],
-    codeLines: [5, 6],
+    codeLines: [6],
     vars: [
       { name: "same", value: same },
       { name: "diff", value: diff },
       { name: "total", value: same + diff },
     ],
     note: {
-      vi: `Với 2 cột đầu: same = ${same} (2 cùng màu), diff = ${diff} (2 khác màu). Tổng = ${same + diff}.`, 
-      en: `With 2 posts: same = ${same} (same color), diff = ${diff} (different colors). Total = ${same + diff}.`, 
+      vi: `diff = ${k} * (${k} - 1) = ${diff}: hai cot dau khac mau. Tong = ${same + diff}.`,
+      en: `diff = ${k} * (${k} - 1) = ${diff}: the two posts use different colors. Total = ${same + diff}.`,
     },
   });
 
   for (let i = 3; i <= n; i++) {
-    const nextSame = diff;
-    const nextDiff = (same + diff) * (k - 1);
-
     steps.push({
-      title: { vi: `Cập nhật hàng i = ${i}`, en: `Update i = ${i}` },
+      title: { vi: `Vong lap i = ${i}`, en: `Loop i = ${i}` },
       arr: [same, diff],
       sub: ["same", "diff"],
       highlight: [0, 1],
@@ -2435,56 +2448,112 @@ function buildSteps276(input, params) {
       codeLines: [7],
       vars: [
         { name: "i", value: i },
-        { name: "same (previous)", value: same },
-        { name: "diff (previous)", value: diff },
-        { name: "nextSame = diff", value: nextSame },
-        { name: "nextDiff = (same+diff)*(k-1)", value: nextDiff },
+        { name: "same", value: same },
+        { name: "diff", value: diff },
       ],
       note: {
-        vi: `Vị trí ${i}: nếu cùng màu với cột trước → nextSame = diff = ${nextSame}. Nếu khác màu → nextDiff = (${same} + ${diff}) × (${k} - 1) = ${nextDiff}.`, 
-        en: `For post ${i}: same color count = diff = ${nextSame}. Different color count = (same+diff)×(k-1) = ${nextDiff}.`, 
+        vi: `Xu ly cot ${i}. Trang thai truoc do: same = ${same}, diff = ${diff}.`,
+        en: `Process post ${i}. Previous state: same = ${same}, diff = ${diff}.`,
+      },
+    });
+
+    const nextSame = diff;
+    steps.push({
+      title: { vi: `nextSame cho i = ${i}`, en: `nextSame for i = ${i}` },
+      arr: [same, diff, nextSame],
+      sub: ["same", "diff", "nextSame"],
+      highlight: [2],
+      mark: [1],
+      codeLines: [8],
+      vars: [
+        { name: "i", value: i },
+        { name: "diff", value: diff },
+        { name: "nextSame", value: nextSame },
+      ],
+      note: {
+        vi: `De cot ${i} cung mau voi cot ${i - 1}, cot ${i - 1} phai khac mau voi cot ${i - 2}: nextSame = diff = ${nextSame}.`,
+        en: `For post ${i} to match post ${i - 1}, post ${i - 1} must differ from post ${i - 2}: nextSame = diff = ${nextSame}.`,
+      },
+    });
+
+    const nextDiff = (same + diff) * (k - 1);
+    steps.push({
+      title: { vi: `nextDiff cho i = ${i}`, en: `nextDiff for i = ${i}` },
+      arr: [same, diff, nextSame, nextDiff],
+      sub: ["same", "diff", "nextSame", "nextDiff"],
+      highlight: [3],
+      mark: [0, 1],
+      codeLines: [9],
+      vars: [
+        { name: "i", value: i },
+        { name: "same", value: same },
+        { name: "diff", value: diff },
+        { name: "k - 1", value: k - 1 },
+        { name: "nextDiff", value: nextDiff },
+      ],
+      note: {
+        vi: `Neu cot ${i} khac mau voi cot ${i - 1}: nextDiff = (${same} + ${diff}) * (${k} - 1) = ${nextDiff}.`,
+        en: `If post ${i} differs from post ${i - 1}: nextDiff = (${same} + ${diff}) * (${k} - 1) = ${nextDiff}.`,
       },
     });
 
     same = nextSame;
-    diff = nextDiff;
-
     steps.push({
-      title: { vi: `Đặt same và diff cho i = ${i}`, en: `Set same and diff for i = ${i}` },
+      title: { vi: `Gan same cho i = ${i}`, en: `Set same for i = ${i}` },
+      arr: [same, diff, nextSame, nextDiff],
+      sub: ["same", "diff", "nextSame", "nextDiff"],
+      highlight: [0],
+      mark: [2],
+      codeLines: [10],
+      vars: [
+        { name: "same", value: same },
+        { name: "diff", value: diff },
+        { name: "nextSame", value: nextSame },
+        { name: "nextDiff", value: nextDiff },
+      ],
+      note: {
+        vi: `Cap nhat same = nextSame = ${same}. diff van la gia tri cu cho toi dong tiep theo.`,
+        en: `Update same = nextSame = ${same}. diff still has the previous value until the next line.`,
+      },
+    });
+
+    diff = nextDiff;
+    steps.push({
+      title: { vi: `Gan diff cho i = ${i}`, en: `Set diff for i = ${i}` },
       arr: [same, diff],
       sub: ["same", "diff"],
-      highlight: [0, 1],
+      highlight: [1],
       mark: [],
-      codeLines: [8],
+      codeLines: [11],
       vars: [
         { name: "same", value: same },
         { name: "diff", value: diff },
         { name: "total", value: same + diff },
       ],
       note: {
-        vi: `Cập nhật same = ${same}, diff = ${diff}. Tổng cách sơn tới cột ${i} = ${same + diff}.`, 
-        en: `Update same = ${same}, diff = ${diff}. Total ways up to post ${i} = ${same + diff}.`, 
+        vi: `Cap nhat diff = nextDiff = ${diff}. Tong cach son toi cot ${i} = ${same + diff}.`,
+        en: `Update diff = nextDiff = ${diff}. Total ways up to post ${i} = ${same + diff}.`,
       },
     });
   }
 
   const answer = same + diff;
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
+    title: { vi: "Ket qua", en: "Result" },
     arr: [same, diff],
     sub: ["same", "diff"],
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [9],
+    codeLines: [12],
     vars: [
       { name: "same", value: same },
       { name: "diff", value: diff },
       { name: "answer", value: answer },
     ],
     note: {
-      vi: `Tổng số cách sơn ${n} cột = ${answer}.`, 
-      en: `Total ways to paint ${n} posts = ${answer}.`, 
+      vi: `Tong so cach son ${n} cot = ${answer}.`,
+      en: `Total ways to paint ${n} posts = ${answer}.`,
     },
   });
 
@@ -8291,7 +8360,10 @@ module.exports = {
       "        same = k",
       "        diff = k * (k - 1)",
       "        for i in range(3, n + 1):",
-      "            same, diff = diff, (same + diff) * (k - 1)",
+      "            nextSame = diff",
+      "            nextDiff = (same + diff) * (k - 1)",
+      "            same = nextSame",
+      "            diff = nextDiff",
       "        return same + diff",
     ],
     builder: buildSteps276,
