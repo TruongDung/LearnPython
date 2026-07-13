@@ -4430,6 +4430,177 @@ function buildSteps62(input, params) {
 }
 
 /**
+ * LeetCode 63: Unique Paths II.
+ * Same grid DP as #62, but blocked cells contribute 0 paths.
+ * obstacleGrid[r][c] = 1 means blocked, 0 means open.
+ */
+function buildSteps63(input) {
+  const obstacleGrid = typeof input === "string"
+    ? input.split("|").map((row) => row.split(",").map((s) => Number(s.trim())))
+    : [[0, 0, 0], [0, 1, 0], [0, 0, 0]];
+  const m = obstacleGrid.length;
+  const n = obstacleGrid[0].length;
+  const dp = Array.from({ length: m }, () => new Array(n).fill(0));
+  const steps = [];
+
+  function makeDisplay() {
+    return dp.map((row, r) => row.map((v, c) => obstacleGrid[r][c] === 1 ? "X" : v));
+  }
+
+  function gridSnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: makeDisplay(),
+        text1: Array.from({ length: m }, (_, r) => String(r)).join(""),
+        text2: Array.from({ length: n }, (_, c) => String(c)).join(""),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Khởi tạo lưới có vật cản", en: "Initialize obstacle grid" },
+    codeLines: [3, 4],
+    vars: [
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "obstacle", value: "1 = blocked, 0 = open" },
+    ],
+    note: {
+      vi: `Lưới ${m}x${n}. Ô có giá trị 1 là vật cản nên số đường đi tới ô đó luôn bằng 0.`,
+      en: `Grid ${m}x${n}. A cell with value 1 is blocked, so paths to that cell are always 0.`,
+    },
+  });
+
+  if (obstacleGrid[0][0] === 1) {
+    gridSnap({
+      title: { vi: "Start bị chặn", en: "Start is blocked" },
+      hlCell: [0, 0],
+      codeLines: [5, 6],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Ô bắt đầu (0,0) là vật cản, robot không thể xuất phát. Trả về 0.",
+        en: "The start cell (0,0) is blocked, so the robot cannot start. Return 0.",
+      },
+    });
+    steps[steps.length - 1].final = true;
+    return { original: obstacleGrid, answer: 0, steps };
+  }
+
+  dp[0][0] = 1;
+  gridSnap({
+    title: { vi: "Base: dp[0][0] = 1", en: "Base: dp[0][0] = 1" },
+    hlCell: [0, 0],
+    codeLines: [7],
+    vars: [{ name: "dp[0][0]", value: 1 }],
+    note: {
+      vi: "Ô bắt đầu không bị chặn, có đúng 1 cách đứng tại đây.",
+      en: "The start cell is open, so there is exactly 1 way to stand here.",
+    },
+  });
+
+  for (let c = 1; c < n; c++) {
+    const blocked = obstacleGrid[0][c] === 1;
+    dp[0][c] = blocked ? 0 : dp[0][c - 1];
+    gridSnap({
+      title: { vi: `Hàng đầu: dp[0][${c}] = ${dp[0][c]}`, en: `First row: dp[0][${c}] = ${dp[0][c]}` },
+      hlCell: [0, c],
+      pathCells: [[0, c - 1]],
+      codeLines: [8, 9],
+      vars: [
+        { name: "blocked?", value: blocked },
+        { name: `dp[0][${c - 1}]`, value: dp[0][c - 1] },
+        { name: `dp[0][${c}]`, value: dp[0][c] },
+      ],
+      note: {
+        vi: blocked
+          ? `Ô (0,${c}) bị chặn nên dp[0][${c}] = 0.`
+          : `Hàng đầu chỉ có thể đi từ trái sang: dp[0][${c}] = dp[0][${c - 1}] = ${dp[0][c]}.`,
+        en: blocked
+          ? `Cell (0,${c}) is blocked, so dp[0][${c}] = 0.`
+          : `First row can only come from the left: dp[0][${c}] = dp[0][${c - 1}] = ${dp[0][c]}.`,
+      },
+    });
+  }
+
+  for (let r = 1; r < m; r++) {
+    const blocked = obstacleGrid[r][0] === 1;
+    dp[r][0] = blocked ? 0 : dp[r - 1][0];
+    gridSnap({
+      title: { vi: `Cột đầu: dp[${r}][0] = ${dp[r][0]}`, en: `First column: dp[${r}][0] = ${dp[r][0]}` },
+      hlCell: [r, 0],
+      pathCells: [[r - 1, 0]],
+      codeLines: [10, 11],
+      vars: [
+        { name: "blocked?", value: blocked },
+        { name: `dp[${r - 1}][0]`, value: dp[r - 1][0] },
+        { name: `dp[${r}][0]`, value: dp[r][0] },
+      ],
+      note: {
+        vi: blocked
+          ? `Ô (${r},0) bị chặn nên dp[${r}][0] = 0.`
+          : `Cột đầu chỉ có thể đi từ trên xuống: dp[${r}][0] = dp[${r - 1}][0] = ${dp[r][0]}.`,
+        en: blocked
+          ? `Cell (${r},0) is blocked, so dp[${r}][0] = 0.`
+          : `First column can only come from above: dp[${r}][0] = dp[${r - 1}][0] = ${dp[r][0]}.`,
+      },
+    });
+  }
+
+  for (let r = 1; r < m; r++) {
+    for (let c = 1; c < n; c++) {
+      const blocked = obstacleGrid[r][c] === 1;
+      const fromTop = dp[r - 1][c];
+      const fromLeft = dp[r][c - 1];
+      dp[r][c] = blocked ? 0 : fromTop + fromLeft;
+      gridSnap({
+        title: { vi: `dp[${r}][${c}] = ${dp[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}` },
+        hlCell: [r, c],
+        pathCells: [[r - 1, c], [r, c - 1]],
+        codeLines: [12, 13, 14, 15],
+        vars: [
+          { name: "blocked?", value: blocked },
+          { name: "from top", value: fromTop },
+          { name: "from left", value: fromLeft },
+          { name: `dp[${r}][${c}]`, value: dp[r][c] },
+        ],
+        note: {
+          vi: blocked
+            ? `Ô (${r},${c}) là vật cản, nên dp[${r}][${c}] = 0.`
+            : `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+          en: blocked
+            ? `Cell (${r},${c}) is an obstacle, so dp[${r}][${c}] = 0.`
+            : `dp[${r}][${c}] = dp[${r - 1}][${c}] + dp[${r}][${c - 1}] = ${fromTop} + ${fromLeft} = ${dp[r][c]}.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[m - 1][n - 1];
+  gridSnap({
+    title: { vi: "Kết quả", en: "Result" },
+    hlCell: [m - 1, n - 1],
+    codeLines: [16],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Số đường đi hợp lệ từ (0,0) đến (${m - 1},${n - 1}) = ${answer}.`,
+      en: `Valid paths from (0,0) to (${m - 1},${n - 1}) = ${answer}.`,
+    },
+  });
+  steps[steps.length - 1].final = true;
+
+  return { original: obstacleGrid, answer, steps };
+}
+
+/**
  * LeetCode 64: Minimum Path Sum.
  * dp[r][c] = min cost to reach (r,c) from (0,0), only moving right or down.
  * dp[r][c] = grid[r][c] + min(dp[r-1][c], dp[r][c-1]).
@@ -7080,7 +7251,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 64, 120, 931, 1143, 516, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 516, 72, 416, 494, 1301, 1388],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -7106,6 +7277,7 @@ module.exports = {
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
+          { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
           { id: 120, name: "Triangle", pattern: "Grid DP" },
           { id: 931, name: "Minimum Falling Path Sum", pattern: "Matrix DP" },
@@ -7138,7 +7310,7 @@ module.exports = {
           {
             title: "Giai đoạn 5 — Grid DP",
             description: "dp[i][j] phụ thuộc ô trên + ô trái. Bottom-up. Mở rộng cho path 3 hướng.",
-            problems: [62, 64, 120, 931],
+            problems: [62, 63, 64, 120, 931],
           },
           {
             title: "Giai đoạn 6 — 2D DP",
@@ -7169,6 +7341,7 @@ module.exports = {
           { id: 139, name: "Word Break", pattern: "String DP" },
           { id: 91, name: "Decode Ways", pattern: "String DP" },
           { id: 62, name: "Unique Paths", pattern: "Grid DP" },
+          { id: 63, name: "Unique Paths II", pattern: "Grid DP + Obstacles" },
           { id: 64, name: "Minimum Path Sum", pattern: "Grid DP" },
           { id: 120, name: "Triangle", pattern: "Grid DP" },
           { id: 931, name: "Minimum Falling Path Sum", pattern: "Matrix DP" },
@@ -7200,7 +7373,7 @@ module.exports = {
           {
             title: "Stage 5 — Grid DP",
             description: "dp[i][j] depends on top + left. Bottom-up. Extend to 3-way paths.",
-            problems: [62, 64, 120, 931],
+            problems: [62, 63, 64, 120, 931],
           },
           {
             title: "Stage 6 — 2D DP",
@@ -7481,6 +7654,57 @@ module.exports = {
       "        return dp[m-1][n-1]",
     ],
     builder: buildSteps62,
+  },
+  63: {
+    id: 63,
+    difficulty: "medium",
+    slug: "unique-paths-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Unique Paths II", en: "Unique Paths II" },
+    titleVi: { vi: "Số đường đi có vật cản (DP 2D)", en: "Unique paths with obstacles (2D grid DP)" },
+    statement: {
+      vi: "Robot ở góc trái trên lưới m x n và chỉ đi phải hoặc xuống. Một số ô có vật cản (1). Đếm số đường đi đến góc phải dưới mà không đi qua vật cản. Nhập grid: hàng cách bởi '|', giá trị cách bởi ','.",
+      en: "A robot starts at the top-left of an m x n grid and can only move right or down. Some cells contain obstacles (1). Count paths to the bottom-right without stepping on obstacles. Enter grid: rows separated by '|', values by ','.",
+    },
+    defaultInput: "0,0,0|0,1,0|0,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Obstacle grid (0/1, hàng cách '|')", en: "Obstacle grid (0/1, rows separated by '|')" },
+    extraParams: [],
+    approach: [
+      { vi: "DP 2D: dp[r][c] = số đường hợp lệ đến ô (r,c).", en: "2D DP: dp[r][c] = number of valid paths to cell (r,c)." },
+      { vi: "Nếu obstacleGrid[r][c] == 1 thì dp[r][c] = 0.", en: "If obstacleGrid[r][c] == 1, then dp[r][c] = 0." },
+      { vi: "Nếu ô trống: dp[r][c] = dp[r-1][c] + dp[r][c-1].", en: "If the cell is open: dp[r][c] = dp[r-1][c] + dp[r][c-1]." },
+      { vi: "Đáp án = dp[m-1][n-1].", en: "Answer = dp[m-1][n-1]." },
+    ],
+    complexity: {
+      time: "O(m x n)",
+      space: "O(m x n)",
+      note: {
+        vi: "Điền mỗi ô đúng một lần. Có thể tối ưu bộ nhớ xuống O(n) bằng một hàng dp.",
+        en: "Each cell is filled once. Memory can be optimized to O(n) with one dp row.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def uniquePathsWithObstacles(self, obstacleGrid):",
+      "        m, n = len(obstacleGrid), len(obstacleGrid[0])",
+      "        dp = [[0] * n for _ in range(m)]",
+      "        if obstacleGrid[0][0] == 1:",
+      "            return 0",
+      "        dp[0][0] = 1",
+      "        for c in range(1, n):",
+      "            dp[0][c] = 0 if obstacleGrid[0][c] else dp[0][c-1]",
+      "        for r in range(1, m):",
+      "            dp[r][0] = 0 if obstacleGrid[r][0] else dp[r-1][0]",
+      "        for r in range(1, m):",
+      "            for c in range(1, n):",
+      "                if obstacleGrid[r][c] == 1:",
+      "                    dp[r][c] = 0",
+      "                else:",
+      "                    dp[r][c] = dp[r-1][c] + dp[r][c-1]",
+      "        return dp[m-1][n-1]",
+    ],
+    builder: buildSteps63,
   },
   91: {
     id: 91,
