@@ -5889,10 +5889,28 @@ function buildSteps72(input, params) {
   const steps = [];
 
   function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
     steps.push({
       title: opts.title, arr: [],
-      grid: { dp: dp.map((r) => [...r]), text1: word1, text2: word2, hlCell: opts.hlCell || null, pathCells: opts.pathCells || [] },
-      highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+      grid: {
+        dp: dp.map((r) => [...r]),
+        text1: word1,
+        text2: word2,
+        rowLabels: Array.from({ length: m }, (_, idx) => ({ index: `i=${idx + 1}`, char: word1[idx] })),
+        colLabels: Array.from({ length: n }, (_, idx) => ({ index: `j=${idx + 1}`, char: word2[idx] })),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+      },
+      highlight: [], mark: [], codeLines: opts.codeLines || [], vars: currentVars, note: opts.note,
     });
   }
 
