@@ -423,6 +423,46 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+#problemPanel[data-problem-id="72"] .input-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(260px, 1.2fr);
+  column-gap: 14px;
+  row-gap: 8px;
+  align-items: end;
+}
+
+#problemPanel[data-problem-id="72"] #arrLabel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#problemPanel[data-problem-id="72"] #arrInput {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+}
+
+#problemPanel[data-problem-id="72"] .extra-params {
+  grid-column: 2 / 4;
+  grid-row: 1 / 3;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(240px, 1.2fr);
+  column-gap: 14px;
+  row-gap: 8px;
+  margin-top: 0;
+  align-items: end;
+}
+
+#problemPanel[data-problem-id="72"] .extra-params .param input,
+#problemPanel[data-problem-id="72"] .extra-params .param select {
+  width: 100%;
+}
+
+#problemPanel[data-problem-id="72"] .run-btn,
+#problemPanel[data-problem-id="72"] #runError {
+  grid-column: 1 / -1;
+}
+
 .run-btn {
   margin-top: 14px;
   width: 100%;
@@ -2034,6 +2074,15 @@ select option {
   }
 
   #problemPanel[data-problem-id="1143"] .extra-params {
+    display: flex;
+    margin-top: 12px;
+  }
+
+  #problemPanel[data-problem-id="72"] .input-row {
+    display: block;
+  }
+
+  #problemPanel[data-problem-id="72"] .extra-params {
     display: flex;
     margin-top: 12px;
   }
