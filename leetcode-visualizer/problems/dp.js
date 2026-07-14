@@ -2593,6 +2593,7 @@ function buildSteps1143(input, params) {
         dp: dp.map((row) => [...row]),
         text1,
         text2,
+        largeCells: true,
         hlCell: opts.hlCell || null,
         pathCells: opts.pathCells || [],
         cellLabels: opts.cellLabels || {},
