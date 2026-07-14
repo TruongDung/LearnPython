@@ -743,6 +743,34 @@ button:disabled {
   -webkit-user-select: none;
   user-select: none;
   transition: color 0.2s ease, font-weight 0.2s ease;
+  cursor: pointer;
+}
+
+.code-line .breakpoint-dot {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px rgba(127, 29, 29, 0.5);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.code-line:hover .breakpoint-dot {
+  opacity: 0.35;
+}
+
+.code-line.has-breakpoint .breakpoint-dot {
+  opacity: 1;
+}
+
+.code-line.has-breakpoint .breakpoint-dot:hover {
+  transform: translateY(-50%) scale(1.12);
 }
 
 /* Indent guide: subtle vertical dashed line at each 4-column indent level.

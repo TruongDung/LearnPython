@@ -8,6 +8,7 @@ let stepIndex = 0;
 let answerValue = null; // answer from the current run
 let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
+let debugBreakpoints = new Set();
 
 // ---- UI strings by language ----
 const I18N = {
@@ -446,6 +447,36 @@ function shouldUseLineByLineDebug() {
   return problemData && problemData.category && problemData.category.key === "dp";
 }
 
+function breakpointKey(codeBlock, line) {
+  return `${Number(codeBlock || 1)}:${Number(line)}`;
+}
+
+function seedDefaultBreakpoints() {
+  debugBreakpoints = new Set();
+  if (Number(currentProblemId) !== 72) return;
+  const defaults = problemData && problemData.code2
+    ? [
+        [1, 9], [1, 13], [1, 17], [1, 18], [1, 20], [1, 22],
+        [2, 8], [2, 10], [2, 12],
+      ]
+    : [[1, 9], [1, 13], [1, 17], [1, 18], [1, 20], [1, 22]];
+  defaults.forEach(([block, line]) => debugBreakpoints.add(breakpointKey(block, line)));
+}
+
+function stepHitsBreakpoint(step) {
+  if (!step || debugBreakpoints.size === 0) return false;
+  const block = step.codeBlock || 1;
+  return (step.codeLines || []).some((line) => debugBreakpoints.has(breakpointKey(block, line)));
+}
+
+function findBreakpointStep(startIndex, direction) {
+  if (debugBreakpoints.size === 0) return -1;
+  for (let i = startIndex + direction; i >= 0 && i < steps.length; i += direction) {
+    if (stepHitsBreakpoint(steps[i])) return i;
+  }
+  return -1;
+}
+
 function expandStepsLineByLine(rawSteps) {
   const expanded = [];
   (rawSteps || []).forEach((step) => {
@@ -525,6 +556,7 @@ async function runViz() {
       : (data.steps || []);
     answerValue = data.answer;
     stepIndex = 0;
+    seedDefaultBreakpoints();
     show("vizPanel");
     renderCode();
     renderStep();
@@ -542,12 +574,16 @@ $("firstBtn").addEventListener("click", () => {
 });
 $("prevBtn").addEventListener("click", () => {
   stopPlay();
-  if (stepIndex > 0) stepIndex--;
+  const breakpointIndex = findBreakpointStep(stepIndex, -1);
+  if (breakpointIndex >= 0) stepIndex = breakpointIndex;
+  else if (stepIndex > 0) stepIndex--;
   renderStep();
 });
 $("nextBtn").addEventListener("click", () => {
   stopPlay();
-  if (stepIndex < steps.length - 1) stepIndex++;
+  const breakpointIndex = findBreakpointStep(stepIndex, 1);
+  if (breakpointIndex >= 0) stepIndex = breakpointIndex;
+  else if (stepIndex < steps.length - 1) stepIndex++;
   renderStep();
 });
 $("lastBtn").addEventListener("click", () => {
@@ -754,6 +790,23 @@ function renderCode() {
   const pyBlock = document.createElement("div");
   pyBlock.className = "code-lang-block";
   pyBlock.dataset.codeLang = "python";
+  function attachBreakpoint(row, block, line) {
+    const marker = document.createElement("span");
+    marker.className = "breakpoint-dot";
+    marker.title = "Toggle breakpoint";
+    row.appendChild(marker);
+    row.classList.toggle("has-breakpoint", debugBreakpoints.has(breakpointKey(block, line)));
+    const toggle = (e) => {
+      e.stopPropagation();
+      const key = breakpointKey(block, line);
+      if (debugBreakpoints.has(key)) debugBreakpoints.delete(key);
+      else debugBreakpoints.add(key);
+      row.classList.toggle("has-breakpoint", debugBreakpoints.has(key));
+    };
+    marker.addEventListener("click", toggle);
+    row.querySelector(".ln").addEventListener("click", toggle);
+  }
+
   if (code.length > 0) {
     const section = document.createElement("div");
     section.className = "code-section";
@@ -784,6 +837,7 @@ function renderCode() {
 
       row.appendChild(ln);
       row.appendChild(txt);
+      attachBreakpoint(row, 1, idx + 1);
       section.appendChild(row);
     });
 
@@ -819,6 +873,7 @@ function renderCode() {
 
       row.appendChild(ln);
       row.appendChild(txt);
+      attachBreakpoint(row, 2, idx + 1);
       section.appendChild(row);
     });
 
@@ -854,6 +909,7 @@ function renderCode() {
 
       row.appendChild(ln);
       row.appendChild(txt);
+      attachBreakpoint(row, 3, idx + 1);
       section.appendChild(row);
     });
 
