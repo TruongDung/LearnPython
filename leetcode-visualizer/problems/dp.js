@@ -8376,11 +8376,200 @@ function buildSteps97(input) {
   return { s1, s2, s3, answer, steps };
 }
 
+/**
+ * LeetCode 3336: Find the Number of Subsequences With Equal GCD.
+ *
+ * dp[g1][g2] = number of ways to build two disjoint subsequences where
+ * seq1 has gcd g1 and seq2 has gcd g2. gcd 0 means that subsequence is empty.
+ */
+function buildSteps3336(nums) {
+  const MOD = 1000000007;
+  const maxG = Math.max(...nums);
+  const steps = [];
+  const maxDetailedTransitions = 120;
+  let detailedTransitions = 0;
+
+  function gcd(a, b) {
+    while (b !== 0) {
+      const t = a % b;
+      a = b;
+      b = t;
+    }
+    return Math.abs(a);
+  }
+
+  function nextGcd(oldG, x) {
+    return oldG === 0 ? x : gcd(oldG, x);
+  }
+
+  function blankGrid() {
+    return Array.from({ length: maxG + 1 }, () => Array(maxG + 1).fill(0));
+  }
+
+  function cloneGrid(grid) {
+    return grid.map((row) => [...row]);
+  }
+
+  function gridSnap(opts) {
+    steps.push({
+      title: opts.title,
+      grid: {
+        dp: cloneGrid(opts.dp),
+        text1: "g",
+        text2: "g",
+        showIndices: false,
+        rowLabels: Array.from({ length: maxG }, (_, idx) => ({
+          index: `g1=${idx + 1}`,
+          char: "",
+        })),
+        colLabels: Array.from({ length: maxG }, (_, idx) => ({
+          index: `g2=${idx + 1}`,
+          char: "",
+        })),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+      },
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  let dp = blankGrid();
+  dp[0][0] = 1;
+  gridSnap({
+    title: { vi: "Khoi tao dp[0][0] = 1", en: "Initialize dp[0][0] = 1" },
+    dp,
+    hlCell: [0, 0],
+    codeLines: [5, 6, 7, 8],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "max_g", value: maxG },
+      { name: "dp[0][0]", value: 1 },
+    ],
+    note: {
+      vi: "gcd = 0 nghia la subsequence rong. Ban dau ca seq1 va seq2 deu rong.",
+      en: "gcd = 0 means the subsequence is empty. Initially both seq1 and seq2 are empty.",
+    },
+  });
+
+  nums.forEach((x, idx) => {
+    const ndp = cloneGrid(dp);
+    gridSnap({
+      title: { vi: `Xu ly nums[${idx}] = ${x}`, en: `Process nums[${idx}] = ${x}` },
+      dp,
+      hlCell: [0, 0],
+      codeLines: [10, 11],
+      vars: [
+        { name: "i", value: idx },
+        { name: "x", value: x },
+        { name: "choices", value: "skip / seq1 / seq2" },
+      ],
+      note: {
+        vi: `Voi moi state hien co, so ${x} co 3 lua chon: bo qua, dua vao seq1, hoac dua vao seq2.`,
+        en: `For each existing state, ${x} has 3 choices: skip, put into seq1, or put into seq2.`,
+      },
+    });
+
+    for (let g1 = 0; g1 <= maxG; g1++) {
+      for (let g2 = 0; g2 <= maxG; g2++) {
+        const count = dp[g1][g2];
+        if (count === 0) continue;
+        const ng1 = nextGcd(g1, x);
+        const ng2 = nextGcd(g2, x);
+
+        ndp[ng1][g2] = (ndp[ng1][g2] + count) % MOD;
+        if (detailedTransitions < maxDetailedTransitions) {
+          detailedTransitions++;
+          gridSnap({
+            title: { vi: `Them ${x} vao seq1`, en: `Put ${x} into seq1` },
+            dp: ndp,
+            hlCell: [ng1, g2],
+            pathCells: [[g1, g2]],
+            cellLabels: { [`${g1},${g2}`]: "from", [`${ng1},${g2}`]: "seq1" },
+            codeLines: [17, 18],
+            vars: [
+              { name: "from", value: `dp[${g1}][${g2}] = ${count}` },
+              { name: "new_g1", value: `gcd(${g1 || "empty"}, ${x}) = ${ng1}` },
+              { name: `ndp[${ng1}][${g2}]`, value: ndp[ng1][g2] },
+            ],
+            note: {
+              vi: `Dua ${x} vao seq1: g1 moi = ${ng1}, g2 giu nguyen = ${g2}.`,
+              en: `Put ${x} into seq1: new g1 = ${ng1}, g2 stays ${g2}.`,
+            },
+          });
+        }
+
+        ndp[g1][ng2] = (ndp[g1][ng2] + count) % MOD;
+        if (detailedTransitions < maxDetailedTransitions) {
+          detailedTransitions++;
+          gridSnap({
+            title: { vi: `Them ${x} vao seq2`, en: `Put ${x} into seq2` },
+            dp: ndp,
+            hlCell: [g1, ng2],
+            pathCells: [[g1, g2]],
+            cellLabels: { [`${g1},${g2}`]: "from", [`${g1},${ng2}`]: "seq2" },
+            codeLines: [19, 20],
+            vars: [
+              { name: "from", value: `dp[${g1}][${g2}] = ${count}` },
+              { name: "new_g2", value: `gcd(${g2 || "empty"}, ${x}) = ${ng2}` },
+              { name: `ndp[${g1}][${ng2}]`, value: ndp[g1][ng2] },
+            ],
+            note: {
+              vi: `Dua ${x} vao seq2: g1 giu nguyen = ${g1}, g2 moi = ${ng2}.`,
+              en: `Put ${x} into seq2: g1 stays ${g1}, new g2 = ${ng2}.`,
+            },
+          });
+        }
+      }
+    }
+
+    dp = ndp;
+    gridSnap({
+      title: { vi: `Ket thuc nums[${idx}] = ${x}`, en: `Finish nums[${idx}] = ${x}` },
+      dp,
+      codeLines: [21],
+      vars: [{ name: "processed", value: `[${nums.slice(0, idx + 1).join(", ")}]` }],
+      note: {
+        vi: "Gan dp = ndp de chuyen sang so tiep theo.",
+        en: "Assign dp = ndp before moving to the next number.",
+      },
+    });
+  });
+
+  let answer = 0;
+  const diagonal = [];
+  for (let g = 1; g <= maxG; g++) {
+    if (dp[g][g] > 0) diagonal.push([g, dp[g][g]]);
+    answer = (answer + dp[g][g]) % MOD;
+  }
+
+  gridSnap({
+    title: { vi: `Ket qua = ${answer}`, en: `Result = ${answer}` },
+    dp,
+    pathCells: diagonal.map(([g]) => [g, g]),
+    codeLines: [23],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "diagonal", value: diagonal.map(([g, v]) => `dp[${g}][${g}]=${v}`).join(", ") || "empty" },
+    ],
+    note: {
+      vi: "Cong cac o duong cheo dp[g][g] voi g > 0, vi ca hai subsequence phai khong rong va co GCD bang nhau.",
+      en: "Sum diagonal cells dp[g][g] for g > 0, because both subsequences must be non-empty and have equal GCD.",
+    },
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 494, 1301, 1388],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -10424,6 +10613,62 @@ module.exports = {
       "        return dp[0][n - 1]",
     ],
     builder: buildSteps1312,
+  },
+  3336: {
+    id: 3336,
+    difficulty: "hard",
+    slug: "find-the-number-of-subsequences-with-equal-gcd",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Find the Number of Subsequences With Equal GCD", en: "Find the Number of Subsequences With Equal GCD" },
+    titleVi: { vi: "Dem cap subsequence co GCD bang nhau", en: "Count subsequence pairs with equal GCD" },
+    statement: {
+      vi: "Cho nums, dem so cap subsequence khong rong, roi nhau (moi phan tu chi vao toi da mot subsequence) sao cho GCD cua hai subsequence bang nhau.",
+      en: "Given nums, count pairs of non-empty disjoint subsequences where the GCD of the first subsequence equals the GCD of the second subsequence.",
+    },
+    defaultInput: [1, 2, 3, 4],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (so nguyen duong, dau phay)", en: "nums (positive integers, comma-sep)" },
+    extraParams: [],
+    approach: [
+      { vi: "State: dp[g1][g2] = so cach sau prefix hien tai, voi GCD(seq1)=g1 va GCD(seq2)=g2.", en: "State: dp[g1][g2] = number of ways after the current prefix, with GCD(seq1)=g1 and GCD(seq2)=g2." },
+      { vi: "g = 0 nghia la subsequence rong. Ban dau dp[0][0] = 1.", en: "g = 0 means the subsequence is empty. Initially dp[0][0] = 1." },
+      { vi: "Moi so x co 3 lua chon: bo qua, them vao seq1, hoac them vao seq2.", en: "Each number x has 3 choices: skip it, put it into seq1, or put it into seq2." },
+      { vi: "Dap an = tong dp[g][g] voi g > 0.", en: "Answer = sum dp[g][g] for g > 0." },
+    ],
+    complexity: {
+      time: "O(n * max(nums)^2 * log max(nums))",
+      space: "O(max(nums)^2)",
+      note: {
+        vi: "Moi phan tu duyet tat ca cap (g1,g2). Moi update tinh gcd.",
+        en: "For each number, iterate all (g1,g2) states. Each update computes a gcd.",
+      },
+    },
+    code: [
+      "from math import gcd",
+      "",
+      "class Solution:",
+      "    def subsequencePairCount(self, nums: List[int]) -> int:",
+      "        MOD = 10**9 + 7",
+      "        mx = max(nums)",
+      "        dp = [[0] * (mx + 1) for _ in range(mx + 1)]",
+      "        dp[0][0] = 1",
+      "",
+      "        for x in nums:",
+      "            ndp = [row[:] for row in dp]",
+      "            for g1 in range(mx + 1):",
+      "                for g2 in range(mx + 1):",
+      "                    cnt = dp[g1][g2]",
+      "                    if cnt == 0:",
+      "                        continue",
+      "                    ng1 = x if g1 == 0 else gcd(g1, x)",
+      "                    ndp[ng1][g2] = (ndp[ng1][g2] + cnt) % MOD",
+      "                    ng2 = x if g2 == 0 else gcd(g2, x)",
+      "                    ndp[g1][ng2] = (ndp[g1][ng2] + cnt) % MOD",
+      "            dp = ndp",
+      "",
+      "        return sum(dp[g][g] for g in range(1, mx + 1)) % MOD",
+    ],
+    builder: buildSteps3336,
   },
   97: {
     id: 97,
