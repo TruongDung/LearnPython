@@ -3243,6 +3243,232 @@ function buildSteps583(input, params) {
 }
 
 /**
+ * LeetCode 712: Minimum ASCII Delete Sum for Two Strings.
+ * dp[i][j] = minimum ASCII delete sum to make s1[0..i-1] and s2[0..j-1] equal.
+ */
+function buildSteps712(input, params) {
+  const s1 = String(input).trim();
+  const s2 = String(params.s2 || "").trim();
+  const m = s1.length;
+  const n = s2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const steps = [];
+  const ascii = (ch) => ch.charCodeAt(0);
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        text1: s1,
+        text2: s2,
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Read m, n", en: "Read m, n" },
+    codeLines: [3],
+    vars: [
+      { name: "s1", value: s1 },
+      { name: "s2", value: s2 },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: { vi: `m = ${m}, n = ${n}.`, en: `m = ${m}, n = ${n}.` },
+  });
+
+  gridSnap({
+    title: { vi: "Create dp table", en: "Create dp table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${m + 1} x ${n + 1}` },
+      { name: "meaning", value: "minimum ASCII delete sum" },
+    ],
+    note: {
+      vi: "dp[i][j] = minimum ASCII delete sum to make s1[:i] and s2[:j] equal.",
+      en: "dp[i][j] = minimum ASCII delete sum to make s1[:i] and s2[:j] equal.",
+    },
+  });
+
+  for (let i = 1; i <= m; i++) {
+    const cost = ascii(s1[i - 1]);
+    dp[i][0] = dp[i - 1][0] + cost;
+    gridSnap({
+      title: { vi: `Base dp[${i}][0] = ${dp[i][0]}`, en: `Base dp[${i}][0] = ${dp[i][0]}` },
+      codeLines: [5, 6],
+      hlCell: [i, 0],
+      pathCells: [[i - 1, 0]],
+      cellLabels: { [`${i - 1},0`]: "prev" },
+      vars: [
+        { name: `s1[${i - 1}]`, value: s1[i - 1] },
+        { name: `ord('${s1[i - 1]}')`, value: cost },
+        { name: `dp[${i - 1}][0]`, value: dp[i - 1][0] },
+        { name: `dp[${i}][0]`, value: `${dp[i - 1][0]} + ${cost} = ${dp[i][0]}` },
+      ],
+      note: {
+        vi: `To match empty s2, delete "${s1.slice(0, i)}" from s1. Add ASCII '${s1[i - 1]}' = ${cost}.`,
+        en: `To match empty s2, delete "${s1.slice(0, i)}" from s1. Add ASCII '${s1[i - 1]}' = ${cost}.`,
+      },
+    });
+  }
+
+  for (let j = 1; j <= n; j++) {
+    const cost = ascii(s2[j - 1]);
+    dp[0][j] = dp[0][j - 1] + cost;
+    gridSnap({
+      title: { vi: `Base dp[0][${j}] = ${dp[0][j]}`, en: `Base dp[0][${j}] = ${dp[0][j]}` },
+      codeLines: [7, 8],
+      hlCell: [0, j],
+      pathCells: [[0, j - 1]],
+      cellLabels: { [`0,${j - 1}`]: "prev" },
+      vars: [
+        { name: `s2[${j - 1}]`, value: s2[j - 1] },
+        { name: `ord('${s2[j - 1]}')`, value: cost },
+        { name: `dp[0][${j - 1}]`, value: dp[0][j - 1] },
+        { name: `dp[0][${j}]`, value: `${dp[0][j - 1]} + ${cost} = ${dp[0][j]}` },
+      ],
+      note: {
+        vi: `To match empty s1, delete "${s2.slice(0, j)}" from s2. Add ASCII '${s2[j - 1]}' = ${cost}.`,
+        en: `To match empty s1, delete "${s2.slice(0, j)}" from s2. Add ASCII '${s2[j - 1]}' = ${cost}.`,
+      },
+    });
+  }
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [9],
+      hlCell: [i, 0],
+      vars: [
+        { name: `s1[${i - 1}]`, value: s1[i - 1] },
+        { name: `ord('${s1[i - 1]}')`, value: ascii(s1[i - 1]) },
+      ],
+      note: { vi: `Consider s1[:${i}] = "${s1.slice(0, i)}".`, en: `Consider s1[:${i}] = "${s1.slice(0, i)}".` },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      gridSnap({
+        title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [10],
+        hlCell: [i, j],
+        pathCells: [[i - 1, j - 1], [i - 1, j], [i, j - 1]],
+        cellLabels: {
+          [`${i - 1},${j - 1}`]: "diag",
+          [`${i - 1},${j}`]: "del s1",
+          [`${i},${j - 1}`]: "del s2",
+        },
+        vars: [
+          { name: `s1[${i - 1}]`, value: s1[i - 1] },
+          { name: `s2[${j - 1}]`, value: s2[j - 1] },
+        ],
+        note: { vi: `Compute dp[${i}][${j}] for "${s1.slice(0, i)}" and "${s2.slice(0, j)}".`, en: `Compute dp[${i}][${j}] for "${s1.slice(0, i)}" and "${s2.slice(0, j)}".` },
+      });
+
+      const same = s1[i - 1] === s2[j - 1];
+      gridSnap({
+        title: { vi: `Compare '${s1[i - 1]}' and '${s2[j - 1]}'`, en: `Compare '${s1[i - 1]}' and '${s2[j - 1]}'` },
+        codeLines: [11],
+        hlCell: [i, j],
+        pathCells: same ? [[i - 1, j - 1]] : [[i - 1, j], [i, j - 1]],
+        cellLabels: same ? { [`${i - 1},${j - 1}`]: "keep" } : { [`${i - 1},${j}`]: "delete s1", [`${i},${j - 1}`]: "delete s2" },
+        vars: [
+          { name: `s1[${i - 1}]`, value: s1[i - 1] },
+          { name: `s2[${j - 1}]`, value: s2[j - 1] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same ? "Characters match, keep both with no delete cost." : "Characters differ, choose the cheaper delete.",
+          en: same ? "Characters match, keep both with no delete cost." : "Characters differ, choose the cheaper delete.",
+        },
+      });
+
+      if (same) {
+        dp[i][j] = dp[i - 1][j - 1];
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [12],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]" },
+          vars: [
+            { name: `dp[${i - 1}][${j - 1}]`, value: dp[i - 1][j - 1] },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: { vi: `'${s1[i - 1]}' == '${s2[j - 1]}', so keep both characters.`, en: `'${s1[i - 1]}' == '${s2[j - 1]}', so keep both characters.` },
+        });
+      } else {
+        const cost1 = ascii(s1[i - 1]);
+        const cost2 = ascii(s2[j - 1]);
+        const delS1 = cost1 + dp[i - 1][j];
+        const delS2 = cost2 + dp[i][j - 1];
+        gridSnap({
+          title: { vi: `min(${delS1}, ${delS2})`, en: `min(${delS1}, ${delS2})` },
+          codeLines: [14],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j], [i, j - 1]],
+          cellLabels: { [`${i - 1},${j}`]: "delete s1", [`${i},${j - 1}`]: "delete s2" },
+          vars: [
+            { name: "delete s1[i-1]", value: `ord('${s1[i - 1]}') + dp[${i - 1}][${j}] = ${cost1} + ${dp[i - 1][j]} = ${delS1}` },
+            { name: "delete s2[j-1]", value: `ord('${s2[j - 1]}') + dp[${i}][${j - 1}] = ${cost2} + ${dp[i][j - 1]} = ${delS2}` },
+          ],
+          note: { vi: "Try deleting the current char from either string, then choose lower ASCII cost.", en: "Try deleting the current char from either string, then choose lower ASCII cost." },
+        });
+
+        dp[i][j] = Math.min(delS1, delS2);
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [14],
+          hlCell: [i, j],
+          pathCells: delS1 <= delS2 ? [[i - 1, j]] : [[i, j - 1]],
+          vars: [
+            { name: `dp[${i}][${j}]`, value: `min(${delS1}, ${delS2}) = ${dp[i][j]}` },
+          ],
+          note: { vi: `Choose minimum delete sum = ${dp[i][j]}.`, en: `Choose minimum delete sum = ${dp[i][j]}.` },
+        });
+      }
+    }
+  }
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: `return dp[m][n] = ${answer}`, en: `return dp[m][n] = ${answer}` },
+    codeLines: [15],
+    hlCell: [m, n],
+    vars: [
+      { name: `dp[${m}][${n}]`, value: answer },
+      { name: "return", value: answer },
+    ],
+    note: { vi: `Minimum ASCII delete sum = ${answer}.`, en: `Minimum ASCII delete sum = ${answer}.` },
+    final: true,
+  });
+
+  return { s1, s2, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 688: Knight Probability in Chessboard.
  * DP: dp[r][c] = probability of being at (r,c) after current number of steps.
  */
@@ -9931,6 +10157,53 @@ module.exports = {
       "        return dp[m][n]",
     ],
     builder: buildSteps583,
+  },
+  712: {
+    id: 712,
+    difficulty: "medium",
+    slug: "minimum-ascii-delete-sum-for-two-strings",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Minimum ASCII Delete Sum for Two Strings", en: "Minimum ASCII Delete Sum for Two Strings" },
+    titleVi: { vi: "Tong ASCII xoa nho nhat", en: "Minimum ASCII delete sum" },
+    statement: {
+      vi: "Cho hai chuoi s1 va s2. Moi lan co the xoa mot ky tu, chi phi bang ma ASCII cua ky tu do. Tra ve tong chi phi xoa nho nhat de hai chuoi bang nhau.",
+      en: "Given two strings s1 and s2. You can delete characters, paying the ASCII value of each deleted character. Return the minimum delete sum needed to make the strings equal.",
+    },
+    defaultInput: "sea",
+    inputKind: "string",
+    inputLabel: { vi: "s1", en: "s1" },
+    extraParams: [{ key: "s2", type: "string", label: { vi: "s2", en: "s2" }, default: "eat" }],
+    approach: [
+      { vi: "dp[i][j] = tong ASCII xoa nho nhat de s1[:i] va s2[:j] bang nhau.", en: "dp[i][j] = minimum ASCII delete sum to make s1[:i] and s2[:j] equal." },
+      { vi: "Neu ky tu bang nhau, giu ca hai: dp[i][j] = dp[i-1][j-1].", en: "If characters match, keep both: dp[i][j] = dp[i-1][j-1]." },
+      { vi: "Neu khac nhau, xoa ky tu tu s1 hoac s2 va cong ASCII cost.", en: "If they differ, delete from s1 or s2 and add the ASCII cost." },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: { vi: "Dien bang (m+1) x (n+1).", en: "Fill a (m+1) x (n+1) table." },
+    },
+    code: [
+      "class Solution:",
+      "    def minimumDeleteSum(self, s1: str, s2: str) -> int:",
+      "        m, n = len(s1), len(s2)",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        for i in range(1, m + 1):",
+      "            dp[i][0] = dp[i - 1][0] + ord(s1[i - 1])",
+      "        for j in range(1, n + 1):",
+      "            dp[0][j] = dp[0][j - 1] + ord(s2[j - 1])",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if s1[i - 1] == s2[j - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1]",
+      "                else:",
+      "                    dp[i][j] = min(",
+      "                        ord(s1[i - 1]) + dp[i - 1][j],",
+      "                        ord(s2[j - 1]) + dp[i][j - 1]",
+      "                    )",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps712,
   },
   213: {
     id: 213,
