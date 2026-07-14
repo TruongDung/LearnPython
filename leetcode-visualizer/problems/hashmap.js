@@ -1041,6 +1041,7 @@ module.exports = {
     },
     defaultInput: "egg",
     inputKind: "string",
+    requireEqualLength: true,
     inputLabel: { vi: "Chuỗi s", en: "String s" },
     extraParams: [
       {

@@ -151,8 +151,8 @@ app.post("/api/problem/:id/solve", (req, res) => {
     }
   }
 
-  // String-type problems require s and t to have equal length
-  if (problem.inputKind === "string" && typeof params.t === "string" && params.t.length !== input.length) {
+  // Only some string problems require s and t to have equal length.
+  if (problem.requireEqualLength && typeof params.t === "string" && params.t.length !== input.length) {
     return res.status(400).json({ error: "Chuỗi s và t phải có cùng độ dài." });
   }
 
