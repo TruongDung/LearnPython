@@ -2640,16 +2640,19 @@ function buildSteps115(input, params) {
   for (let i = 0; i <= m; i++) {
     dp[i][0] = 1;
     gridSnap({
-      title: { vi: `dp[${i}][0] = 1`, en: `dp[${i}][0] = 1` },
+      title: { vi: `Base case: dp[${i}][0] = 1`, en: `Base case: dp[${i}][0] = 1` },
       codeLines: [5, 6],
       hlCell: [i, 0],
+      cellLabels: { [`${i},0`]: "empty\ntarget" },
       vars: [
         { name: "i", value: i },
+        { name: "s[:i]", value: i === 0 ? '""' : s.slice(0, i) },
+        { name: "t[:0]", value: '""' },
         { name: `dp[${i}][0]`, value: 1 },
       ],
       note: {
-        vi: "Empty target can always be formed in exactly one way: delete every chosen character.",
-        en: "Empty target can always be formed in exactly one way: delete every chosen character.",
+        vi: "t[:0] is the empty string. There is exactly 1 way to form it: choose nothing from s[:i].",
+        en: "t[:0] is the empty string. There is exactly 1 way to form it: choose nothing from s[:i].",
       },
     });
   }
