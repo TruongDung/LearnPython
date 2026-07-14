@@ -5910,6 +5910,7 @@ function buildSteps72Table(input, params) {
         colLabels: Array.from({ length: n }, (_, idx) => ({ index: `j=${idx + 1}`, char: word2[idx] })),
         hlCell: opts.hlCell || null,
         pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
       },
       highlight: [],
       mark: [],
@@ -6017,6 +6018,7 @@ function buildSteps72Table(input, params) {
         codeLines: [17],
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
+        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: word1[i - 1] },
           { name: `word2[${j - 1}]`, value: word2[j - 1] },
@@ -6033,6 +6035,7 @@ function buildSteps72Table(input, params) {
         codeLines: [18],
         hlCell: [i, j],
         pathCells: [[i - 1, j - 1]],
+        cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: word1[i - 1] },
           { name: `word2[${j - 1}]`, value: word2[j - 1] },
@@ -6051,6 +6054,7 @@ function buildSteps72Table(input, params) {
           codeLines: [20],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
           vars: [
             { name: `dp[${i - 1}][${j - 1}]`, value: dp[i - 1][j - 1] },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
@@ -6070,6 +6074,7 @@ function buildSteps72Table(input, params) {
           codeLines: [22, 23, 24, 25, 26],
           hlCell: [i, j],
           pathCells: [[i - 1, j], [i, j - 1], [i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
           vars: [
             { name: "delete", value: `dp[${i - 1}][${j}] + 1 = ${deleteCost}` },
             { name: "insert", value: `dp[${i}][${j - 1}] + 1 = ${insertCost}` },
@@ -6230,8 +6235,8 @@ function buildSteps72Rolling(input, params) {
         activeCol: j,
         pathCells: same ? [[1, j - 1]] : [[1, j], [2, j - 1], [1, j - 1]],
         cellLabels: same
-          ? { [`1,${j - 1}`]: "prev[j-1]" }
-          : { [`1,${j}`]: "prev[j]", [`2,${j - 1}`]: "curr[j-1]", [`1,${j - 1}`]: "prev[j-1]" },
+          ? { [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" }
+          : { [`1,${j}`]: "prev[j]", [`2,${j - 1}`]: "curr[j-1]", [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: word1[i - 1] },
           { name: `word2[${j - 1}]`, value: word2[j - 1] },
@@ -6256,7 +6261,7 @@ function buildSteps72Rolling(input, params) {
           activeRow: 2,
           activeCol: j,
           pathCells: [[1, j - 1]],
-          cellLabels: { [`1,${j - 1}`]: "prev[j-1]" },
+          cellLabels: { [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" },
           vars: [
             { name: `prev[${j - 1}]`, value: prev[j - 1] },
             { name: `curr[${j}]`, value: curr[j] },
@@ -6285,7 +6290,7 @@ function buildSteps72Rolling(input, params) {
           cellLabels: {
             [`1,${j}`]: "prev[j]",
             [`2,${j - 1}`]: "curr[j-1]",
-            [`1,${j - 1}`]: "prev[j-1]",
+            [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]",
           },
           vars: [
             { name: "delete", value: `prev[${j}] = ${del}` },
