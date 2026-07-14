@@ -444,14 +444,14 @@ function pick(field) {
 }
 
 function shouldUseLineByLineDebug() {
-  return problemData && problemData.category && problemData.category.key === "dp";
+  return Boolean(problemData);
 }
 
 function breakpointKey(codeBlock, line) {
   return `${Number(codeBlock || 1)}:${Number(line)}`;
 }
 
-function seedDefaultBreakpoints() {
+function resetBreakpoints() {
   debugBreakpoints = new Set();
 }
 
@@ -548,7 +548,7 @@ async function runViz() {
       : (data.steps || []);
     answerValue = data.answer;
     stepIndex = 0;
-    seedDefaultBreakpoints();
+    resetBreakpoints();
     show("vizPanel");
     renderCode();
     renderStep();
@@ -627,7 +627,11 @@ function togglePlay() {
   if (stepIndex >= steps.length - 1) stepIndex = 0;
   $("playBtn").textContent = t().playStop;
   playTimer = setInterval(() => {
-    if (stepIndex < steps.length - 1) {
+    const breakpointIndex = findBreakpointStep(stepIndex, 1);
+    if (breakpointIndex >= 0) {
+      stepIndex = breakpointIndex;
+      renderStep();
+    } else if (stepIndex < steps.length - 1 && debugBreakpoints.size === 0) {
       stepIndex++;
       renderStep();
     } else {
@@ -923,7 +927,7 @@ function renderCode() {
       row.dataset.line = idx + 1;
       const ln = document.createElement("span"); ln.className = "ln"; ln.textContent = idx + 1;
       const txt = document.createElement("span"); txt.className = "txt"; txt.innerHTML = renderCodeLineHtml(line);
-      row.appendChild(ln); row.appendChild(txt); section.appendChild(row);
+      row.appendChild(ln); row.appendChild(txt); attachBreakpoint(row, 1, idx + 1); section.appendChild(row);
     });
     csBlock.appendChild(section);
     panel.appendChild(csBlock);
