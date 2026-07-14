@@ -3455,7 +3455,7 @@ function buildSteps712(input, params) {
   const answer = dp[m][n];
   gridSnap({
     title: { vi: `return dp[m][n] = ${answer}`, en: `return dp[m][n] = ${answer}` },
-    codeLines: [15],
+    codeLines: [18],
     hlCell: [m, n],
     vars: [
       { name: `dp[${m}][${n}]`, value: answer },
