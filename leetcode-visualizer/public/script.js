@@ -453,14 +453,6 @@ function breakpointKey(codeBlock, line) {
 
 function seedDefaultBreakpoints() {
   debugBreakpoints = new Set();
-  if (Number(currentProblemId) !== 72) return;
-  const defaults = problemData && problemData.code2
-    ? [
-        [1, 9], [1, 13], [1, 17], [1, 18], [1, 20], [1, 22],
-        [2, 8], [2, 10], [2, 12],
-      ]
-    : [[1, 9], [1, 13], [1, 17], [1, 18], [1, 20], [1, 22]];
-  defaults.forEach(([block, line]) => debugBreakpoints.add(breakpointKey(block, line)));
 }
 
 function stepHitsBreakpoint(step) {
