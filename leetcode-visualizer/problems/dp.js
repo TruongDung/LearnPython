@@ -3745,63 +3745,130 @@ function buildSteps688(input, params) {
 
   const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
 
-  // Initialize dp
   let dp = Array.from({ length: n }, () => new Array(n).fill(0));
   dp[startRow][startCol] = 1.0;
 
-  function makeGrid(hlCell) {
+  function fmt(v) {
+    return v > 0 ? v.toFixed(3) : ".";
+  }
+
+  function makeGrid(hlCell, pathCells = [], matrix = dp, cellLabels = {}) {
     return {
-      dp: dp.map((row) => row.map((v) => v > 0 ? v.toFixed(3) : "·")),
+      dp: matrix.map((row) => row.map(fmt)),
       text1: Array.from({ length: n }, (_, i) => String(i)),
       text2: Array.from({ length: n }, (_, i) => String(i)),
+      largeCells: true,
       hlCell: hlCell || null,
-      pathCells: [],
+      pathCells,
+      cellLabels,
+      showIndices: true,
     };
   }
 
-  function totalProb() {
-    let s = 0;
-    for (let r = 0; r < n; r++)
-      for (let c = 0; c < n; c++)
-        s += dp[r][c];
-    return s;
+  function totalProb(matrix = dp) {
+    let sum = 0;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) sum += matrix[r][c];
+    }
+    return sum;
   }
 
   steps.push({
-    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
+    title: { vi: "Initialize dp", en: "Initialize dp" },
     arr: [],
     grid: makeGrid([startRow, startCol]),
     highlight: [],
     mark: [],
-    codeLines: [4, 5],
+    codeLines: [5, 6],
     vars: [
       { name: "n", value: n },
       { name: "k", value: k },
       { name: "start", value: `(${startRow}, ${startCol})` },
-      { name: "dp[start]", value: 1.0 },
-      { name: "total prob", value: "1.000" },
+      { name: "dp[row][col]", value: "1.000" },
+      { name: "total on board", value: "1.000" },
     ],
     note: {
-      vi: `Bàn cờ ${n}×${n}. Mã bắt đầu tại (${startRow},${startCol}) với xác suất 1.0.\nSau ${k} bước, tính xác suất còn trên bàn.`,
-      en: `Board ${n}×${n}. Knight starts at (${startRow},${startCol}) with probability 1.0.\nAfter ${k} moves, compute probability of staying on board.`,
+      vi: `Knight starts at (${startRow},${startCol}) with probability 1. Every move splits probability equally into 8 directions; off-board moves are lost.`,
+      en: `Knight starts at (${startRow},${startCol}) with probability 1. Every move splits probability equally into 8 directions; off-board moves are lost.`,
     },
   });
 
   for (let step = 0; step < k; step++) {
+    const oldDp = dp;
     const newDp = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    steps.push({
+      title: { vi: `Move ${step + 1}: start new_dp`, en: `Move ${step + 1}: start new_dp` },
+      arr: [],
+      grid: makeGrid(null, [], oldDp),
+      highlight: [],
+      mark: [],
+      codeLines: [7, 8],
+      vars: [
+        { name: "move", value: `${step + 1}/${k}` },
+        { name: "current total", value: totalProb(oldDp).toFixed(6) },
+        { name: "new_dp", value: "all zeros" },
+      ],
+      note: {
+        vi: "For this move, read probabilities from dp and write the next probabilities into a fresh new_dp table.",
+        en: "For this move, read probabilities from dp and write the next probabilities into a fresh new_dp table.",
+      },
+    });
 
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
-        if (dp[r][c] > 0) {
-          for (const [dr, dc] of knightMoves) {
-            const nr = r + dr;
-            const nc = c + dc;
-            if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
-              newDp[nr][nc] += dp[r][c] / 8;
-            }
-            // else: probability "falls off" the board
-          }
+        const p = oldDp[r][c];
+        if (p <= 0) continue;
+
+        const valid = [];
+        const offBoard = [];
+        for (const [dr, dc] of knightMoves) {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (nr >= 0 && nr < n && nc >= 0 && nc < n) valid.push([nr, nc]);
+          else offBoard.push([nr, nc]);
         }
+        const share = p / 8;
+        const labels = Object.fromEntries(valid.map(([nr, nc]) => [`${nr},${nc}`, `+${share.toFixed(3)}`]));
+
+        steps.push({
+          title: { vi: `From (${r},${c}): split ${p.toFixed(3)} / 8`, en: `From (${r},${c}): split ${p.toFixed(3)} / 8` },
+          arr: [],
+          grid: makeGrid([r, c], valid, oldDp, labels),
+          highlight: [],
+          mark: [],
+          codeLines: [9, 10, 11, 12, 13, 14],
+          vars: [
+            { name: "move", value: `${step + 1}/${k}` },
+            { name: `dp[${r}][${c}]`, value: p.toFixed(6) },
+            { name: "each move gets", value: `${p.toFixed(6)} / 8 = ${share.toFixed(6)}` },
+            { name: "valid moves", value: valid.map(([nr, nc]) => `(${nr},${nc})`).join(", ") || "none" },
+            { name: "off-board moves", value: offBoard.length },
+          ],
+          note: {
+            vi: `${valid.length} valid destination(s) receive ${share.toFixed(6)} each. ${offBoard.length} move(s) fall off the board and disappear.`,
+            en: `${valid.length} valid destination(s) receive ${share.toFixed(6)} each. ${offBoard.length} move(s) fall off the board and disappear.`,
+          },
+        });
+
+        for (const [nr, nc] of valid) newDp[nr][nc] += share;
+
+        steps.push({
+          title: { vi: `Update new_dp from (${r},${c})`, en: `Update new_dp from (${r},${c})` },
+          arr: [],
+          grid: makeGrid(null, valid, newDp, labels),
+          highlight: [],
+          mark: [],
+          codeLines: [15],
+          vars: [
+            { name: "added to each valid cell", value: share.toFixed(6) },
+            { name: "new_dp total so far", value: totalProb(newDp).toFixed(6) },
+          ],
+          note: {
+            vi: "new_dp now shows the accumulated probabilities for the next move.",
+            en: "new_dp now shows the accumulated probabilities for the next move.",
+          },
+        });
       }
     }
 
@@ -3809,45 +3876,45 @@ function buildSteps688(input, params) {
     const prob = totalProb();
 
     steps.push({
-      title: { vi: `Bước ${step + 1}/${k}: P = ${prob.toFixed(4)}`, en: `Step ${step + 1}/${k}: P = ${prob.toFixed(4)}` },
+      title: { vi: `After move ${step + 1}: on board = ${prob.toFixed(4)}`, en: `After move ${step + 1}: on board = ${prob.toFixed(4)}` },
       arr: [],
       grid: makeGrid(),
       highlight: [],
       mark: [],
-      codeLines: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      codeLines: [16],
       vars: [
-        { name: "step", value: step + 1 },
-        { name: "total prob", value: prob.toFixed(6) },
-        { name: "lost", value: (1 - prob).toFixed(6) },
+        { name: "move", value: step + 1 },
+        { name: "total on board", value: prob.toFixed(6) },
+        { name: "lost this/previous moves", value: (1 - prob).toFixed(6) },
       ],
       note: {
-        vi: `Sau bước ${step + 1}: xác suất còn trên bàn = ${prob.toFixed(6)}.\nĐã rơi ra ngoài = ${(1 - prob).toFixed(6)}.`,
-        en: `After step ${step + 1}: probability on board = ${prob.toFixed(6)}.\nFell off = ${(1 - prob).toFixed(6)}.`,
+        vi: `End of move ${step + 1}. Sum every cell in dp: ${prob.toFixed(6)} is still on board.`,
+        en: `End of move ${step + 1}. Sum every cell in dp: ${prob.toFixed(6)} is still on board.`,
       },
     });
   }
 
   const answer = totalProb();
   steps.push({
-    title: { vi: `Kết quả: ${answer.toFixed(5)}`, en: `Result: ${answer.toFixed(5)}` },
+    title: { vi: `return ${answer.toFixed(5)}`, en: `return ${answer.toFixed(5)}` },
     arr: [],
     grid: makeGrid(),
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [16],
+    codeLines: [17],
     vars: [
       { name: "answer", value: answer.toFixed(6) },
+      { name: "sum(dp)", value: answer.toFixed(6) },
     ],
     note: {
-      vi: `Xác suất mã còn trên bàn ${n}×${n} sau ${k} bước từ (${startRow},${startCol}) = ${answer.toFixed(6)}.`,
-      en: `Probability knight stays on ${n}×${n} board after ${k} moves from (${startRow},${startCol}) = ${answer.toFixed(6)}.`,
+      vi: `Final answer is the sum of all probabilities left on the board after ${k} move(s).`,
+      en: `Final answer is the sum of all probabilities left on the board after ${k} move(s).`,
     },
   });
 
   return { n, k, answer: +answer.toFixed(5), steps };
 }
-
 /**
  * LeetCode 740: Delete and Earn.
  * Reduce to House Robber: build earn[v] = v * count(v), then dp on earn[0..maxVal].
