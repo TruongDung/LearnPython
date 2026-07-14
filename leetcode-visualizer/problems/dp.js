@@ -2626,7 +2626,7 @@ function buildSteps115(input, params) {
 
   gridSnap({
     title: { vi: "Initialize DP table", en: "Initialize DP table" },
-    codeLines: [4],
+    codeLines: [5],
     vars: [
       { name: "dp size", value: `${m + 1} x ${n + 1}` },
       { name: "meaning", value: "dp[i][j] counts t[:j] from s[:i]" },
@@ -9402,7 +9402,7 @@ function buildSteps10(input, params) {
   dp[0][0] = true;
   gridSnap({
     title: { vi: "Base: dp[0][0] = True", en: "Base: dp[0][0] = True" },
-    codeLines: [4],
+    codeLines: [5],
     hlCell: [0, 0],
     vars: [
       { name: "s[:0]", value: '""' },
@@ -9417,7 +9417,7 @@ function buildSteps10(input, params) {
     dp[0][j] = dp[0][j - 2];
     gridSnap({
       title: { vi: `Empty s: dp[0][${j}] = ${dp[0][j]}`, en: `Empty s: dp[0][${j}] = ${dp[0][j]}` },
-      codeLines: [5, 6, 7],
+      codeLines: [6, 7, 8],
       hlCell: [0, j],
       pathCells: [[0, j - 2]],
       cellLabels: { [`0,${j - 2}`]: "drop x*" },
@@ -9436,7 +9436,7 @@ function buildSteps10(input, params) {
   for (let i = 1; i <= m; i++) {
     gridSnap({
       title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
-      codeLines: [8],
+      codeLines: [11],
       hlCell: [i, 0],
       vars: [
         { name: `s[${i - 1}]`, value: s[i - 1] },
@@ -9448,7 +9448,7 @@ function buildSteps10(input, params) {
     for (let j = 1; j <= n; j++) {
       gridSnap({
         title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
-        codeLines: [9],
+        codeLines: [12],
         hlCell: [i, j],
         vars: [
           { name: `s[${i - 1}]`, value: s[i - 1] },
@@ -9464,7 +9464,7 @@ function buildSteps10(input, params) {
         dp[i][j] = prev;
         gridSnap({
           title: { vi: `Direct match -> ${dp[i][j]}`, en: `Direct match -> ${dp[i][j]}` },
-          codeLines: [10, 11],
+          codeLines: [13, 14],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
           cellLabels: { [`${i - 1},${j - 1}`]: "diag" },
@@ -9537,6 +9537,175 @@ function buildSteps10(input, params) {
 
   return { s, p, answer, steps };
 }
+
+/**
+ * LeetCode 44: Wildcard Matching.
+ * dp[i][j] = whether s[:i] matches p[:j]. Pattern supports "?" and "*".
+ */
+function buildSteps44(input, params) {
+  const s = String(input).trim();
+  const p = String(params.p || "").trim();
+  const m = s.length;
+  const n = p.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));
+  const steps = [];
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => row.map((v) => (v ? "T" : "F"))),
+        text1: s,
+        text2: p,
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  dp[0][0] = true;
+  gridSnap({
+    title: { vi: "Base: dp[0][0] = True", en: "Base: dp[0][0] = True" },
+    codeLines: [5],
+    hlCell: [0, 0],
+    vars: [
+      { name: "s[:0]", value: '""' },
+      { name: "p[:0]", value: '""' },
+      { name: "dp[0][0]", value: true },
+    ],
+    note: { vi: "Empty string matches empty pattern.", en: "Empty string matches empty pattern." },
+  });
+
+  for (let j = 1; j <= n; j++) {
+    if (p[j - 1] !== "*") break;
+    dp[0][j] = dp[0][j - 1];
+    gridSnap({
+      title: { vi: `Empty s: leading '*' -> ${dp[0][j]}`, en: `Empty s: leading '*' -> ${dp[0][j]}` },
+      codeLines: [6, 7, 8],
+      hlCell: [0, j],
+      pathCells: [[0, j - 1]],
+      cellLabels: { [`0,${j - 1}`]: "empty" },
+      vars: [
+        { name: `p[${j - 1}]`, value: "*" },
+        { name: `dp[0][${j - 1}]`, value: dp[0][j - 1] },
+        { name: `dp[0][${j}]`, value: dp[0][j] },
+      ],
+      note: { vi: "A leading '*' can match the empty string.", en: "A leading '*' can match the empty string." },
+    });
+  }
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [11],
+      hlCell: [i, 0],
+      vars: [
+        { name: `s[${i - 1}]`, value: s[i - 1] },
+        { name: "s[:i]", value: s.slice(0, i) },
+      ],
+      note: { vi: `Compute row for s[:${i}] = "${s.slice(0, i)}".`, en: `Compute row for s[:${i}] = "${s.slice(0, i)}".` },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      gridSnap({
+        title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [12],
+        hlCell: [i, j],
+        vars: [
+          { name: `s[${i - 1}]`, value: s[i - 1] },
+          { name: `p[${j - 1}]`, value: p[j - 1] },
+          { name: "p[:j]", value: p.slice(0, j) },
+        ],
+        note: { vi: `Decide if "${s.slice(0, i)}" matches pattern "${p.slice(0, j)}".`, en: `Decide if "${s.slice(0, i)}" matches pattern "${p.slice(0, j)}".` },
+      });
+
+      const pc = p[j - 1];
+      if (pc === "?" || pc === s[i - 1]) {
+        const prev = dp[i - 1][j - 1];
+        dp[i][j] = prev;
+        gridSnap({
+          title: { vi: `Single-char match -> ${dp[i][j]}`, en: `Single-char match -> ${dp[i][j]}` },
+          codeLines: [13, 14],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "diag" },
+          vars: [
+            { name: "token matches one char", value: true },
+            { name: `dp[${i - 1}][${j - 1}]`, value: prev },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: { vi: pc === "?" ? "'?' matches exactly one character, so use dp[i-1][j-1]." : "Characters are equal, so use dp[i-1][j-1].", en: pc === "?" ? "'?' matches exactly one character, so use dp[i-1][j-1]." : "Characters are equal, so use dp[i-1][j-1]." },
+        });
+      } else if (pc === "*") {
+        const empty = dp[i][j - 1];
+        const consume = dp[i - 1][j];
+        dp[i][j] = Boolean(empty || consume);
+        gridSnap({
+          title: { vi: `'*' wildcard -> ${dp[i][j]}`, en: `'*' wildcard -> ${dp[i][j]}` },
+          codeLines: [15, 16],
+          hlCell: [i, j],
+          pathCells: [[i, j - 1], [i - 1, j]],
+          cellLabels: { [`${i},${j - 1}`]: "empty", [`${i - 1},${j}`]: "consume" },
+          vars: [
+            { name: "empty string", value: `dp[${i}][${j - 1}] = ${empty}` },
+            { name: "consume s[i-1]", value: `dp[${i - 1}][${j}] = ${consume}` },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: { vi: "Wildcard '*' has two choices: match empty (left cell), or consume one more char from s (top cell).", en: "Wildcard '*' has two choices: match empty (left cell), or consume one more char from s (top cell)." },
+        });
+      } else {
+        dp[i][j] = false;
+        gridSnap({
+          title: { vi: "No match -> False", en: "No match -> False" },
+          codeLines: [17, 18],
+          hlCell: [i, j],
+          vars: [
+            { name: `s[${i - 1}]`, value: s[i - 1] },
+            { name: `p[${j - 1}]`, value: pc },
+            { name: `dp[${i}][${j}]`, value: false },
+          ],
+          note: { vi: "Characters differ and pattern token is not '?' or '*'.", en: "Characters differ and pattern token is not '?' or '*'." },
+        });
+      }
+    }
+  }
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    codeLines: [19],
+    hlCell: [m, n],
+    vars: [
+      { name: `dp[${m}][${n}]`, value: answer },
+      { name: "return", value: answer },
+    ],
+    note: { vi: `Full string "${s}" ${answer ? "matches" : "does not match"} wildcard pattern "${p}".`, en: `Full string "${s}" ${answer ? "matches" : "does not match"} wildcard pattern "${p}".` },
+    final: true,
+  });
+
+  return { s, p, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
@@ -9722,6 +9891,54 @@ module.exports = {
       "        return dp[m][n]",
     ],
     builder: buildSteps10,
+  },
+  44: {
+    id: 44,
+    difficulty: "hard",
+    slug: "wildcard-matching",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Wildcard Matching", en: "Wildcard Matching" },
+    titleVi: { vi: "So khop wildcard", en: "Wildcard matching" },
+    statement: {
+      vi: "Cho chuoi s va pattern p. Pattern ho tro '?' khop dung mot ky tu va '*' khop bat ky chuoi nao ke ca rong. Kiem tra toan bo s co khop p khong.",
+      en: "Given a string s and a pattern p. The pattern supports '?' to match exactly one character and '*' to match any sequence including empty. Return whether the entire string matches the pattern.",
+    },
+    defaultInput: "adceb",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [{ key: "p", type: "string", label: { vi: "p", en: "p" }, default: "*a*b" }],
+    approach: [
+      { vi: "dp[i][j] = s[:i] co khop p[:j] hay khong.", en: "dp[i][j] = whether s[:i] matches p[:j]." },
+      { vi: "'?' hoac ky tu bang nhau thi lay dp[i-1][j-1].", en: "'?' or an equal character uses dp[i-1][j-1]." },
+      { vi: "'*' co 2 cach: khop chuoi rong dp[i][j-1], hoac an them mot ky tu dp[i-1][j].", en: "'*' has 2 choices: match empty via dp[i][j-1], or consume one more character via dp[i-1][j]." },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: { vi: "Dien bang (m+1) x (n+1).", en: "Fill a (m+1) x (n+1) table." },
+    },
+    code: [
+      "class Solution:",
+      "    def isMatch(self, s: str, p: str) -> bool:",
+      "        m, n = len(s), len(p)",
+      "        dp = [[False] * (n + 1) for _ in range(m + 1)]",
+      "        dp[0][0] = True",
+      "        for j in range(1, n + 1):",
+      "            if p[j - 1] == '*':",
+      "                dp[0][j] = dp[0][j - 1]",
+      "            else:",
+      "                break",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if p[j - 1] == '?' or p[j - 1] == s[i - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1]",
+      "                elif p[j - 1] == '*':",
+      "                    dp[i][j] = dp[i][j - 1] or dp[i - 1][j]",
+      "                else:",
+      "                    dp[i][j] = False",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps44,
   },
   416: {
     id: 416, difficulty: "medium", slug: "partition-equal-subset-sum",
