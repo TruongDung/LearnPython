@@ -1040,7 +1040,7 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const labels = cellLabels || {};
   const m = dp.length - 1;
@@ -1053,7 +1053,7 @@ function renderGrid(step) {
     return escapeXml(String(label));
   };
 
-  const hasCellLabels = Object.keys(labels).length > 0;
+  const hasCellLabels = Object.keys(labels).length > 0 || largeCells;
   let html = `<table class="dp-grid${hasCellLabels ? " has-cell-labels" : ""}"><thead><tr><th></th><th></th>`;
   for (let j = 0; j < n; j++) {
     const colLabel = colLabels && colLabels[j]

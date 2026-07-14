@@ -5906,6 +5906,7 @@ function buildSteps72Table(input, params) {
         dp: dp.map((r) => [...r]),
         text1: word1,
         text2: word2,
+        largeCells: true,
         rowLabels: Array.from({ length: m }, (_, idx) => ({ index: `i=${idx + 1}`, char: word1[idx] })),
         colLabels: Array.from({ length: n }, (_, idx) => ({ index: `j=${idx + 1}`, char: word2[idx] })),
         hlCell: opts.hlCell || null,
@@ -6138,6 +6139,7 @@ function buildSteps72Rolling(input, params) {
         dp: [blankRow(), [...prev], currRow],
         text1: "pc",
         text2: word2,
+        largeCells: true,
         rowLabels: [
           { index: "prev", char: opts.prevLabel || (opts.i === undefined ? "i=0" : `i-1=${Math.max(0, opts.i - 1)}`) },
           { index: "curr", char: opts.currLabel || (opts.i === undefined ? "not started" : `i=${opts.i}`) },
