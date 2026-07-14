@@ -388,7 +388,8 @@ button:disabled {
   flex: none;
 }
 
-#problemPanel[data-problem-id="1143"] .input-row {
+#problemPanel[data-problem-id="1143"] .input-row,
+#problemPanel[data-problem-id="115"] .input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 14px;
@@ -396,30 +397,36 @@ button:disabled {
   align-items: end;
 }
 
-#problemPanel[data-problem-id="1143"] #arrLabel {
+#problemPanel[data-problem-id="1143"] #arrLabel,
+#problemPanel[data-problem-id="115"] #arrLabel {
   grid-column: 1;
   grid-row: 1;
 }
 
-#problemPanel[data-problem-id="1143"] #arrInput {
+#problemPanel[data-problem-id="1143"] #arrInput,
+#problemPanel[data-problem-id="115"] #arrInput {
   grid-column: 1;
   grid-row: 2;
   width: 100%;
 }
 
-#problemPanel[data-problem-id="1143"] .extra-params {
+#problemPanel[data-problem-id="1143"] .extra-params,
+#problemPanel[data-problem-id="115"] .extra-params {
   grid-column: 2;
   grid-row: 1 / 3;
   display: block;
   margin-top: 0;
 }
 
-#problemPanel[data-problem-id="1143"] .extra-params .param input {
+#problemPanel[data-problem-id="1143"] .extra-params .param input,
+#problemPanel[data-problem-id="115"] .extra-params .param input {
   width: 100%;
 }
 
 #problemPanel[data-problem-id="1143"] .run-btn,
-#problemPanel[data-problem-id="1143"] #runError {
+#problemPanel[data-problem-id="1143"] #runError,
+#problemPanel[data-problem-id="115"] .run-btn,
+#problemPanel[data-problem-id="115"] #runError {
   grid-column: 1 / -1;
 }
 
@@ -2182,11 +2189,13 @@ select option {
     min-width: 0;
   }
 
-  #problemPanel[data-problem-id="1143"] .input-row {
+  #problemPanel[data-problem-id="1143"] .input-row,
+  #problemPanel[data-problem-id="115"] .input-row {
     display: block;
   }
 
-  #problemPanel[data-problem-id="1143"] .extra-params {
+  #problemPanel[data-problem-id="1143"] .extra-params,
+  #problemPanel[data-problem-id="115"] .extra-params {
     display: flex;
     margin-top: 12px;
   }
