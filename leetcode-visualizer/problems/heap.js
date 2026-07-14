@@ -237,17 +237,9 @@ function buildSteps373(input, params) {
   function siftUp(i) {
     while (i > 0) {
       const p = Math.floor((i - 1) / 2);
-      if (less(heap[i], heap[p])) {
-        const a = heap[i], b = heap[p];
-        [heap[i], heap[p]] = [heap[p], heap[i]];
-        steps.push(heapSnapshot(heap, label, {
-          title: { vi: `Sift-up: tổng ${a.sum} ↑ đổi với tổng ${b.sum}`, en: `Sift-up: sum ${a.sum} ↑ swap with sum ${b.sum}` },
-          hlSet: new Set([i, p]), codeLines: [9],
-          vars: [{ name: "heap", value: arrStr() }, { name: "i", value: a.i }, { name: "j", value: a.j }],
-          note: { vi: `Tổng ${a.sum} < ${b.sum} → con nhỏ hơn cha, đổi chỗ để gốc luôn là tổng nhỏ nhất.`, en: `Sum ${a.sum} < ${b.sum} → child smaller than parent, swap so the root stays the smallest sum.` },
-        }));
-        i = p;
-      } else break;
+      if (!less(heap[i], heap[p])) break;
+      [heap[i], heap[p]] = [heap[p], heap[i]];
+      i = p;
     }
   }
   function siftDown(i) {
@@ -257,14 +249,7 @@ function buildSteps373(input, params) {
       if (l < n && less(heap[l], heap[s])) s = l;
       if (r < n && less(heap[r], heap[s])) s = r;
       if (s === i) break;
-      const a = heap[i], b = heap[s];
       [heap[i], heap[s]] = [heap[s], heap[i]];
-      steps.push(heapSnapshot(heap, label, {
-        title: { vi: `Sift-down: tổng ${a.sum} ↓ đổi với tổng ${b.sum}`, en: `Sift-down: sum ${a.sum} ↓ swap with sum ${b.sum}` },
-        hlSet: new Set([i, s]), codeLines: [13],
-        vars: [{ name: "heap", value: arrStr() }, { name: "i", value: a.i }, { name: "j", value: a.j }],
-        note: { vi: `Cha lớn hơn con nhỏ nhất → đẩy xuống để khôi phục min-heap.`, en: `Parent larger than smallest child → push down to restore the min-heap.` },
-      }));
       i = s;
     }
   }
@@ -313,36 +298,97 @@ function buildSteps373(input, params) {
     siftUp(heap.length - 1);
   }
 
+  steps.push(pairSnapshot({
+    title: { vi: "res = []", en: "res = []" },
+    codeLines: [8],
+    vars: [{ name: "res", value: "[]" }, { name: "heap", value: arrStr() }],
+    note: {
+      vi: "Khoi tao danh sach ket qua rong. Heap da co cac ung vien ban dau.",
+      en: "Initialize the empty result list. The heap already has the initial candidates.",
+    },
+  }));
+
   // Pop k times.
   while (result.length < k && heap.length > 0) {
+    steps.push(pairSnapshot({
+      title: { vi: "while heap and len(res) < k", en: "while heap and len(res) < k" },
+      codeLines: [9],
+      vars: [
+        { name: "len(res)", value: result.length },
+        { name: "k", value: k },
+        { name: "heap", value: arrStr() },
+      ],
+      note: {
+        vi: "Con ung vien trong heap va chua lay du k cap.",
+        en: "There are still heap candidates and fewer than k pairs have been collected.",
+      },
+    }));
+
     const root = heap[0];
     const last = heap.pop();
     if (heap.length > 0) heap[0] = last;
+    if (heap.length > 0) siftDown(0);
+
+    steps.push(pairSnapshot({
+      title: { vi: `heappop -> (${root.u},${root.v})`, en: `heappop -> (${root.u},${root.v})` },
+      activePair: [root.i, root.j, "pop"],
+      codeLines: [10],
+      vars: [
+        { name: "s", value: root.sum },
+        { name: "i", value: root.i },
+        { name: "j", value: root.j },
+        { name: "heap", value: arrStr() },
+      ],
+      note: {
+        vi: "Pop goc heap: day la cap co tong nho nhat trong frontier hien tai.",
+        en: "Pop the heap root: this is the smallest-sum pair in the current frontier.",
+      },
+    }));
+
     result.push([root.u, root.v]);
     picked.add(pickedKey(root.i, root.j));
     const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
     steps.push(pairSnapshot({
-      title: { vi: `Lấy cặp nhỏ nhất (${root.u},${root.v}) tổng ${root.sum}`, en: `Pop smallest pair (${root.u},${root.v}) sum ${root.sum}` },
-      activePair: [root.i, root.j, "pop"],
-      codeLines: [8, 9, 10],
-      vars: [{ name: "lấy ra", value: `(${root.u},${root.v}) = ${root.sum}` }, { name: "result", value: `[${resStr}]` }, { name: "heap", value: arrStr() }],
-      note: { vi: `Gốc = cặp tổng nhỏ nhất → thêm (${root.u},${root.v}) vào kết quả. Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Root = pair with smallest sum → add (${root.u},${root.v}) to the result. Move last to root then sift-down.` },
+      title: { vi: `res.append([${root.u}, ${root.v}])`, en: `res.append([${root.u}, ${root.v}])` },
+      activePair: [root.i, root.j, "result"],
+      codeLines: [11],
+      vars: [
+        { name: "s", value: root.sum },
+        { name: "i", value: root.i },
+        { name: "j", value: root.j },
+        { name: "res", value: `[${resStr}]` },
+        { name: "heap", value: arrStr() },
+      ],
+      note: { vi: "Them cap vua pop vao res.", en: "Append the popped pair to res." },
     }));
-    if (heap.length > 0) siftDown(0);
 
     // Push the next candidate from the same nums1 element.
     if (root.j + 1 < nums2.length) {
+      steps.push(pairSnapshot({
+        title: { vi: "if j + 1 < len(nums2)", en: "if j + 1 < len(nums2)" },
+        activePair: [root.i, root.j, "result"],
+        codeLines: [12],
+        vars: [
+          { name: "j + 1", value: root.j + 1 },
+          { name: "len(nums2)", value: nums2.length },
+        ],
+        note: {
+          vi: "Neu hang nay con cot tiep theo, day ung vien tiep theo vao heap.",
+          en: "If this row has a next column, push the next candidate into the heap.",
+        },
+      }));
+
       const nj = root.j + 1;
       const el = { u: root.u, v: nums2[nj], i: root.i, j: nj, sum: root.u + nums2[nj] };
       heap.push(el);
-      steps.push(pairSnapshot({
-        title: { vi: `Đẩy cặp kế tiếp (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Push next pair (${el.u}, ${el.v}) sum ${el.sum}` },
-        activePair: [el.i, el.j, "push"],
-        hlSet: new Set([heap.length - 1]), codeLines: [11, 12],
-        vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
-        note: { vi: `Giữ nguyên u=${el.u}, lùi sang phần tử kế của nums2 (v=${el.v}). Đây là ứng viên nhỏ tiếp theo của hàng này.`, en: `Keep u=${el.u}, advance to the next nums2 element (v=${el.v}). This is the next smallest candidate for this row.` },
-      }));
       siftUp(heap.length - 1);
+      steps.push(pairSnapshot({
+        title: { vi: `Push next pair (${el.u}, ${el.v}) sum ${el.sum}`, en: `Push next pair (${el.u}, ${el.v}) sum ${el.sum}` },
+        activePair: [el.i, el.j, "push"],
+        hlSet: new Set([heap.findIndex((x) => x.i === el.i && x.j === el.j)]), codeLines: [13],
+        vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
+        note: { vi: `Giu u=${el.u}, di sang nums2[j+1] = ${el.v}.`, en: `Keep u=${el.u}, advance to nums2[j+1] = ${el.v}.` },
+      }));
     }
   }
 
