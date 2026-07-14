@@ -175,6 +175,64 @@ function buildSteps373(input, params) {
   const heap = [];
   const less = (a, b) => a.sum < b.sum;
   const arrStr = () => `[${heap.map((e) => `(${e.u},${e.v}):${e.sum}`).join(", ")}]`;
+  const result = [];
+  const picked = new Set();
+
+  function pickedKey(i, j) {
+    return `${i},${j}`;
+  }
+
+  function pairSnapshot(opts) {
+    const dp = Array.from({ length: nums1.length + 1 }, () => Array(nums2.length + 1).fill(""));
+    for (let i = 0; i < nums1.length; i++) {
+      for (let j = 0; j < nums2.length; j++) {
+        dp[i + 1][j + 1] = nums1[i] + nums2[j];
+      }
+    }
+
+    const pathCells = [];
+    const cellLabels = {};
+    for (const item of heap) {
+      const key = `${item.i + 1},${item.j + 1}`;
+      pathCells.push([item.i + 1, item.j + 1]);
+      cellLabels[key] = "heap";
+    }
+    for (const key of picked) {
+      const [i, j] = key.split(",").map(Number);
+      pathCells.push([i + 1, j + 1]);
+      cellLabels[`${i + 1},${j + 1}`] = "result";
+    }
+
+    const highlighted = opts.hlSet ? [...opts.hlSet].map((idx) => heap[idx]).find(Boolean) : null;
+    const activePair = opts.activePair || (highlighted ? [highlighted.i, highlighted.j, "heap"] : null);
+    if (activePair) {
+      cellLabels[`${activePair[0] + 1},${activePair[1] + 1}`] = activePair[2] || "current";
+    }
+
+    return {
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp,
+        text1: "nums1",
+        text2: "nums2",
+        largeCells: true,
+        rowLabels: nums1.map((value, idx) => ({ index: `i=${idx}`, char: String(value) })),
+        colLabels: nums2.map((value, idx) => ({ index: `j=${idx}`, char: String(value) })),
+        hlCell: activePair ? [activePair[0] + 1, activePair[1] + 1] : null,
+        pathCells,
+        cellLabels,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    };
+  }
+
+  const heapSnapshot = (_heap, _label, opts) => pairSnapshot(opts);
 
   function siftUp(i) {
     while (i > 0) {
@@ -211,7 +269,7 @@ function buildSteps373(input, params) {
     }
   }
 
-  steps.push(heapSnapshot([], label, {
+  steps.push(pairSnapshot({
     title: { vi: `Tìm ${k} cặp có tổng nhỏ nhất`, en: `Find ${k} pairs with smallest sums` },
     codeLines: [2],
     vars: [{ name: "nums1", value: `[${nums1.join(",")}]` }, { name: "nums2", value: `[${nums2.join(",")}]` }, { name: "k", value: k }],
@@ -236,7 +294,7 @@ function buildSteps373(input, params) {
   for (let i = 0; i < lim; i++) {
     const el = { u: nums1[i], v: nums2[0], i, j: 0, sum: nums1[i] + nums2[0] };
     heap.push(el);
-    steps.push(heapSnapshot(heap, label, {
+    steps.push(pairSnapshot({
       title: { vi: `Khởi tạo: push (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Init: push (${el.u}, ${el.v}) sum ${el.sum}` },
       hlSet: new Set([heap.length - 1]), codeLines: [5, 6],
       vars: [{ name: "heap", value: arrStr() }],
@@ -246,16 +304,17 @@ function buildSteps373(input, params) {
   }
 
   // Pop k times.
-  const result = [];
   while (result.length < k && heap.length > 0) {
     const root = heap[0];
     const last = heap.pop();
     if (heap.length > 0) heap[0] = last;
     result.push([root.u, root.v]);
+    picked.add(pickedKey(root.i, root.j));
     const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
-    steps.push(heapSnapshot(heap, label, {
+    steps.push(pairSnapshot({
       title: { vi: `Lấy cặp nhỏ nhất (${root.u},${root.v}) tổng ${root.sum}`, en: `Pop smallest pair (${root.u},${root.v}) sum ${root.sum}` },
-      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [8, 9, 10],
+      activePair: [root.i, root.j, "pop"],
+      codeLines: [8, 9, 10],
       vars: [{ name: "lấy ra", value: `(${root.u},${root.v}) = ${root.sum}` }, { name: "result", value: `[${resStr}]` }, { name: "heap", value: arrStr() }],
       note: { vi: `Gốc = cặp tổng nhỏ nhất → thêm (${root.u},${root.v}) vào kết quả. Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Root = pair with smallest sum → add (${root.u},${root.v}) to the result. Move last to root then sift-down.` },
     }));
@@ -266,8 +325,9 @@ function buildSteps373(input, params) {
       const nj = root.j + 1;
       const el = { u: root.u, v: nums2[nj], i: root.i, j: nj, sum: root.u + nums2[nj] };
       heap.push(el);
-      steps.push(heapSnapshot(heap, label, {
+      steps.push(pairSnapshot({
         title: { vi: `Đẩy cặp kế tiếp (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Push next pair (${el.u}, ${el.v}) sum ${el.sum}` },
+        activePair: [el.i, el.j, "push"],
         hlSet: new Set([heap.length - 1]), codeLines: [11, 12],
         vars: [{ name: "heap", value: arrStr() }],
         note: { vi: `Giữ nguyên u=${el.u}, lùi sang phần tử kế của nums2 (v=${el.v}). Đây là ứng viên nhỏ tiếp theo của hàng này.`, en: `Keep u=${el.u}, advance to the next nums2 element (v=${el.v}). This is the next smallest candidate for this row.` },
@@ -277,7 +337,7 @@ function buildSteps373(input, params) {
   }
 
   const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
-  const fs = heapSnapshot(heap, label, {
+  const fs = pairSnapshot({
     title: { vi: `Kết quả: [${resStr}]`, en: `Result: [${resStr}]` },
     codeLines: [13],
     vars: [{ name: "answer", value: `[${resStr}]` }],
