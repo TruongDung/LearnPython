@@ -9542,7 +9542,7 @@ function buildSteps10(input, params) {
  * LeetCode 44: Wildcard Matching.
  * dp[i][j] = whether s[:i] matches p[:j]. Pattern supports "?" and "*".
  */
-function buildSteps44(input, params) {
+function buildSteps44Table(input, params) {
   const s = String(input).trim();
   const p = String(params.p || "").trim();
   const m = s.length;
@@ -9704,6 +9704,202 @@ function buildSteps44(input, params) {
   });
 
   return { s, p, answer, steps };
+}
+
+function buildSteps44Greedy(input, params) {
+  const s = String(input).trim();
+  const p = String(params.p || "").trim();
+  const steps = [];
+  const width = Math.max(s.length, p.length, 1);
+  const sCells = Array.from({ length: width }, (_, idx) => s[idx] || "");
+  const pCells = Array.from({ length: width }, (_, idx) => p[idx] || "");
+  const colLabels = Array.from({ length: width }, (_, idx) => ({ index: idx, char: "" }));
+  let i = 0;
+  let j = 0;
+  let star = -1;
+  let match = 0;
+
+  function pointerCell(row, idx) {
+    return idx >= 0 && idx < width ? [row, idx] : null;
+  }
+
+  function snap(opts) {
+    const pathCells = [];
+    if (star >= 0 && star < width) pathCells.push([1, star]);
+    if (match >= 0 && match < width) pathCells.push([0, match]);
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: [sCells, pCells],
+        rowLabels: [
+          { index: "s", char: "" },
+          { index: "p", char: "" },
+        ],
+        colLabels,
+        largeCells: true,
+        hlCell: opts.hlCell || pointerCell(0, i),
+        pathCells: opts.pathCells || pathCells,
+        cellLabels: opts.cellLabels || {},
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: j },
+        { name: "star", value: star },
+        { name: "match", value: match },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  snap({
+    title: { vi: "Khoi tao con tro", en: "Initialize pointers" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "s", value: s },
+      { name: "p", value: p },
+    ],
+    note: {
+      vi: "i doc chuoi s, j doc pattern p. star luu vi tri '*' gan nhat, match luu vi tri s dang thu cho '*'.",
+      en: "i scans s, j scans p. star stores the latest '*', and match stores the s position currently assigned to that '*'.",
+    },
+  });
+
+  while (i < s.length) {
+    snap({
+      title: { vi: `while i < len(s): i=${i}`, en: `while i < len(s): i=${i}` },
+      codeLines: [7],
+      hlCell: pointerCell(0, i),
+      pathCells: j < p.length ? [[1, j]] : [],
+      cellLabels: j < p.length ? { [`1,${j}`]: "j" } : {},
+      vars: [
+        { name: `s[${i}]`, value: s[i] },
+        { name: j < p.length ? `p[${j}]` : "p[j]", value: j < p.length ? p[j] : "END" },
+      ],
+      note: { vi: "So sanh ky tu hien tai cua s voi token hien tai cua p.", en: "Compare the current s character with the current p token." },
+    });
+
+    if (j < p.length && (p[j] === s[i] || p[j] === "?")) {
+      const oldI = i;
+      const oldJ = j;
+      i += 1;
+      j += 1;
+      snap({
+        title: { vi: "Khop 1 ky tu", en: "Match one character" },
+        codeLines: [8, 9, 10],
+        hlCell: pointerCell(0, oldI),
+        pathCells: [[1, oldJ]],
+        cellLabels: { [`0,${oldI}`]: "i", [`1,${oldJ}`]: "j" },
+        vars: [
+          { name: "match token", value: p[oldJ] },
+          { name: "next i", value: i },
+          { name: "next j", value: j },
+        ],
+        note: { vi: "Ky tu bang nhau, hoac '?' khop dung mot ky tu. Tang ca i va j.", en: "Characters are equal, or '?' matches exactly one character. Advance both i and j." },
+      });
+    } else if (j < p.length && p[j] === "*") {
+      const oldJ = j;
+      star = j;
+      match = i;
+      j += 1;
+      snap({
+        title: { vi: "Gap '*' -> luu checkpoint", en: "See '*' -> save checkpoint" },
+        codeLines: [12, 13, 14, 15],
+        hlCell: pointerCell(1, oldJ),
+        pathCells: [[0, match], [1, star]],
+        cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "match" },
+        vars: [
+          { name: "saved star", value: star },
+          { name: "saved match", value: match },
+          { name: "next j", value: j },
+        ],
+        note: { vi: "'*' co the khop chuoi rong truoc; neu sau nay bi mismatch, ta quay lai va cho '*' an them ky tu.", en: "'*' first tries to match empty; if a later mismatch happens, we return here and let '*' consume more characters." },
+      });
+    } else if (star !== -1) {
+      const oldI = i;
+      const oldJ = j;
+      j = star + 1;
+      match += 1;
+      i = match;
+      snap({
+        title: { vi: "Mismatch -> backtrack ve '*'", en: "Mismatch -> backtrack to '*'" },
+        codeLines: [17, 18, 19, 20],
+        hlCell: pointerCell(0, oldI),
+        pathCells: [[1, star], [0, match]],
+        cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "new match" },
+        vars: [
+          { name: "old i", value: oldI },
+          { name: "old j", value: oldJ },
+          { name: "new i", value: i },
+          { name: "new j", value: j },
+        ],
+        note: { vi: "Da tung gap '*', nen cho '*' khop them mot ky tu cua s va thu lai pattern sau '*'.", en: "Because we have seen a '*', let it consume one more s character and retry the pattern after '*'." },
+      });
+    } else {
+      snap({
+        title: { vi: "Khong khop va khong co '*'", en: "No match and no previous '*'" },
+        codeLines: [22, 23],
+        hlCell: pointerCell(0, i),
+        pathCells: j < p.length ? [[1, j]] : [],
+        vars: [{ name: "return", value: false }],
+        note: { vi: "Khong co checkpoint '*' de backtrack, nen tra ve False.", en: "There is no previous '*' checkpoint to backtrack to, so return False." },
+        final: true,
+      });
+      return { s, p, answer: false, steps };
+    }
+  }
+
+  snap({
+    title: { vi: "Da doc het s", en: "Finished scanning s" },
+    codeLines: [25],
+    hlCell: j < p.length ? pointerCell(1, j) : null,
+    vars: [{ name: "remaining pattern", value: p.slice(j) || '""' }],
+    note: { vi: "Sau khi het s, pattern con lai chi duoc phep la cac dau '*'.", en: "After s is consumed, the remaining pattern may contain only '*' tokens." },
+  });
+
+  while (j < p.length && p[j] === "*") {
+    const oldJ = j;
+    j += 1;
+    snap({
+      title: { vi: "Bo qua trailing '*'", en: "Skip trailing '*'" },
+      codeLines: [25, 26],
+      hlCell: pointerCell(1, oldJ),
+      pathCells: [[1, oldJ]],
+      cellLabels: { [`1,${oldJ}`]: "*" },
+      vars: [{ name: "next j", value: j }],
+      note: { vi: "'*' o cuoi co the khop chuoi rong.", en: "A trailing '*' can match the empty string." },
+    });
+  }
+
+  const answer = j === p.length;
+  snap({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    codeLines: [28],
+    hlCell: j < p.length ? pointerCell(1, j) : null,
+    vars: [
+      { name: "j == len(p)", value: answer },
+      { name: "return", value: answer },
+    ],
+    note: {
+      vi: answer ? "Da dung het pattern, nen s khop p." : "Pattern van con token khong phai '*', nen khong khop.",
+      en: answer ? "The whole pattern is consumed, so s matches p." : "The pattern still has a non-'*' token, so it does not match.",
+    },
+    final: true,
+  });
+
+  return { s, p, answer, steps };
+}
+
+function buildSteps44(input, params) {
+  const approach = String(params && params.approach ? params.approach : "1");
+  if (approach === "2") return buildSteps44Greedy(input, params);
+  return buildSteps44Table(input, params);
 }
 
 module.exports = {
@@ -9906,17 +10102,24 @@ module.exports = {
     defaultInput: "adceb",
     inputKind: "string",
     inputLabel: { vi: "s", en: "s" },
-    extraParams: [{ key: "p", type: "string", label: { vi: "p", en: "p" }, default: "*a*b" }],
+    extraParams: [
+      { key: "p", type: "string", label: { vi: "p", en: "p" }, default: "*a*b" },
+      { key: "approach", label: { vi: "Cach giai", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Approach 1: DP table O(m*n)", en: "Approach 1: DP table O(m*n)" } },
+        { value: "2", label: { vi: "Approach 2: Greedy O(1)", en: "Approach 2: Greedy O(1)" } },
+      ] },
+    ],
     approach: [
-      { vi: "dp[i][j] = s[:i] co khop p[:j] hay khong.", en: "dp[i][j] = whether s[:i] matches p[:j]." },
-      { vi: "'?' hoac ky tu bang nhau thi lay dp[i-1][j-1].", en: "'?' or an equal character uses dp[i-1][j-1]." },
-      { vi: "'*' co 2 cach: khop chuoi rong dp[i][j-1], hoac an them mot ky tu dp[i-1][j].", en: "'*' has 2 choices: match empty via dp[i][j-1], or consume one more character via dp[i-1][j]." },
+      { vi: "Approach 1: DP table, dp[i][j] = s[:i] co khop p[:j] hay khong.", en: "Approach 1: DP table, dp[i][j] = whether s[:i] matches p[:j]." },
+      { vi: "Approach 2: Greedy hai con tro. Luu vi tri '*' gan nhat va quay lai do khi mismatch.", en: "Approach 2: two-pointer greedy. Store the latest '*' position and backtrack there on mismatch." },
+      { vi: "Greedy toi uu hon: time O(m+n), space O(1), trong khi DP dung O(m*n) space.", en: "Greedy is more optimal: O(m+n) time and O(1) space, while DP uses O(m*n) space." },
     ],
     complexity: {
-      time: "O(m*n)",
-      space: "O(m*n)",
-      note: { vi: "Dien bang (m+1) x (n+1).", en: "Fill a (m+1) x (n+1) table." },
+      time: "O(m*n) / O(m+n)",
+      space: "O(m*n) / O(1)",
+      note: { vi: "Approach 1 dien bang DP. Approach 2 dung greedy voi i, j, star, match.", en: "Approach 1 fills a DP table. Approach 2 uses greedy pointers i, j, star, match." },
     },
+    codeLabel: { vi: "Approach 1: DP table", en: "Approach 1: DP table" },
     code: [
       "class Solution:",
       "    def isMatch(self, s: str, p: str) -> bool:",
@@ -9937,6 +10140,37 @@ module.exports = {
       "                else:",
       "                    dp[i][j] = False",
       "        return dp[m][n]",
+    ],
+    code2Label: { vi: "Approach 2: Greedy O(1)", en: "Approach 2: Greedy O(1)" },
+    code2: [
+      "class Solution:",
+      "    def isMatch(self, s: str, p: str) -> bool:",
+      "        i = j = 0",
+      "        star = -1",
+      "        match = 0",
+      "",
+      "        while i < len(s):",
+      "            if j < len(p) and (p[j] == s[i] or p[j] == '?'):",
+      "                i += 1",
+      "                j += 1",
+      "",
+      "            elif j < len(p) and p[j] == '*':",
+      "                star = j",
+      "                match = i",
+      "                j += 1",
+      "",
+      "            elif star != -1:",
+      "                j = star + 1",
+      "                match += 1",
+      "                i = match",
+      "",
+      "            else:",
+      "                return False",
+      "",
+      "        while j < len(p) and p[j] == '*':",
+      "            j += 1",
+      "",
+      "        return j == len(p)",
     ],
     builder: buildSteps44,
   },
