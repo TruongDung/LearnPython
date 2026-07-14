@@ -394,10 +394,10 @@ function buildSteps373(input, params) {
 
   const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
   const fs = pairSnapshot({
-    title: { vi: `Kết quả: [${resStr}]`, en: `Result: [${resStr}]` },
-    codeLines: [13],
-    vars: [{ name: "answer", value: `[${resStr}]` }, { name: "res", value: `[${resStr}]` }],
-    note: { vi: `Đã lấy ${result.length} cặp có tổng nhỏ nhất theo thứ tự tăng dần.`, en: `Collected ${result.length} pairs with the smallest sums in ascending order.` },
+    title: { vi: `return res -> [${resStr}]`, en: `return res -> [${resStr}]` },
+    codeLines: [14],
+    vars: [{ name: "res", value: `[${resStr}]` }, { name: "return", value: `[${resStr}]` }],
+    note: { vi: "Ket thuc ham va tra ve res.", en: "Finish the function and return res." },
   });
   fs.final = true; steps.push(fs);
 
