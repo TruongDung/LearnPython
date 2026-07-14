@@ -289,6 +289,16 @@ function buildSteps373(input, params) {
     },
   }));
 
+  steps.push(pairSnapshot({
+    title: { vi: "heap = []", en: "heap = []" },
+    codeLines: [5],
+    vars: [{ name: "heap", value: arrStr() }],
+    note: {
+      vi: "Khoi tao heap rong. Chua push cap nao vao heap.",
+      en: "Initialize an empty heap. No pair has been pushed yet.",
+    },
+  }));
+
   // Init: push (nums1[i], nums2[0]).
   const lim = Math.min(k, nums1.length);
   for (let i = 0; i < lim; i++) {
@@ -296,7 +306,7 @@ function buildSteps373(input, params) {
     heap.push(el);
     steps.push(pairSnapshot({
       title: { vi: `Khởi tạo: push (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Init: push (${el.u}, ${el.v}) sum ${el.sum}` },
-      hlSet: new Set([heap.length - 1]), codeLines: [5, 6],
+      hlSet: new Set([heap.length - 1]), codeLines: [7],
       vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
       note: { vi: `Mỗi phần tử nums1 ghép với phần tử ĐẦU của nums2 (nhỏ nhất). Thêm vào heap rồi sift-up.`, en: `Pair each nums1 element with the FIRST (smallest) of nums2. Add to heap then sift-up.` },
     }));
