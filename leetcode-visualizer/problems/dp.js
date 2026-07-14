@@ -3023,6 +3023,270 @@ function buildSteps1143(input, params) {
 }
 
 /**
+ * LeetCode 1092: Shortest Common Supersequence.
+ * Build the LCS table, then trace backward to merge both strings with minimum length.
+ */
+function buildSteps1092(input, params) {
+  const str1 = String(input).trim();
+  const str2 = String(params.str2 || "").trim();
+  const m = str1.length;
+  const n = str2.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const steps = [];
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        text1: str1,
+        text2: str2,
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Read m, n", en: "Read m, n" },
+    codeLines: [3],
+    vars: [
+      { name: "str1", value: str1 },
+      { name: "str2", value: str2 },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: { vi: `m = ${m}, n = ${n}.`, en: `m = ${m}, n = ${n}.` },
+  });
+
+  gridSnap({
+    title: { vi: "Build LCS table", en: "Build LCS table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${m + 1} x ${n + 1}` },
+      { name: "meaning", value: "dp[i][j] = LCS length of prefixes" },
+    ],
+    note: {
+      vi: "First compute LCS lengths. The traceback uses this table to build the shortest common supersequence.",
+      en: "First compute LCS lengths. The traceback uses this table to build the shortest common supersequence.",
+    },
+  });
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [5],
+      hlCell: [i, 0],
+      vars: [{ name: `str1[${i - 1}]`, value: str1[i - 1] }],
+      note: { vi: `Consider str1[:${i}] = "${str1.slice(0, i)}".`, en: `Consider str1[:${i}] = "${str1.slice(0, i)}".` },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      gridSnap({
+        title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [6],
+        hlCell: [i, j],
+        pathCells: [[i - 1, j - 1], [i - 1, j], [i, j - 1]],
+        cellLabels: { [`${i - 1},${j - 1}`]: "diag", [`${i - 1},${j}`]: "up", [`${i},${j - 1}`]: "left" },
+        vars: [
+          { name: `str1[${i - 1}]`, value: str1[i - 1] },
+          { name: `str2[${j - 1}]`, value: str2[j - 1] },
+        ],
+        note: { vi: `Compute LCS length for "${str1.slice(0, i)}" and "${str2.slice(0, j)}".`, en: `Compute LCS length for "${str1.slice(0, i)}" and "${str2.slice(0, j)}".` },
+      });
+
+      const same = str1[i - 1] === str2[j - 1];
+      gridSnap({
+        title: { vi: `Compare '${str1[i - 1]}' and '${str2[j - 1]}'`, en: `Compare '${str1[i - 1]}' and '${str2[j - 1]}'` },
+        codeLines: [7],
+        hlCell: [i, j],
+        pathCells: same ? [[i - 1, j - 1]] : [[i - 1, j], [i, j - 1]],
+        vars: [
+          { name: `str1[${i - 1}]`, value: str1[i - 1] },
+          { name: `str2[${j - 1}]`, value: str2[j - 1] },
+          { name: "same", value: same },
+        ],
+        note: {
+          vi: same ? "Characters match, extend the LCS from diagonal." : "Characters differ, take the better LCS from up or left.",
+          en: same ? "Characters match, extend the LCS from diagonal." : "Characters differ, take the better LCS from up or left.",
+        },
+      });
+
+      if (same) {
+        const diag = dp[i - 1][j - 1];
+        dp[i][j] = diag + 1;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          codeLines: [8],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j - 1]],
+          cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]" },
+          vars: [
+            { name: `dp[${i - 1}][${j - 1}]`, value: diag },
+            { name: `dp[${i}][${j}]`, value: `${diag} + 1 = ${dp[i][j]}` },
+          ],
+          note: { vi: `Match '${str1[i - 1]}': dp[${i}][${j}] = ${diag} + 1.`, en: `Match '${str1[i - 1]}': dp[${i}][${j}] = ${diag} + 1.` },
+        });
+      } else {
+        const up = dp[i - 1][j];
+        const left = dp[i][j - 1];
+        dp[i][j] = Math.max(up, left);
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = max(${up}, ${left}) = ${dp[i][j]}`, en: `dp[${i}][${j}] = max(${up}, ${left}) = ${dp[i][j]}` },
+          codeLines: [10],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j], [i, j - 1]],
+          cellLabels: { [`${i - 1},${j}`]: "up", [`${i},${j - 1}`]: "left" },
+          vars: [
+            { name: "dp[i-1][j]", value: `dp[${i - 1}][${j}] = ${up}` },
+            { name: "dp[i][j-1]", value: `dp[${i}][${j - 1}] = ${left}` },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: { vi: "Keep the longer LCS prefix; this later tells traceback which character to append.", en: "Keep the longer LCS prefix; this later tells traceback which character to append." },
+        });
+      }
+    }
+  }
+
+  let i = m;
+  let j = n;
+  const res = [];
+  const traceCells = [];
+
+  gridSnap({
+    title: { vi: "Start traceback", en: "Start traceback" },
+    codeLines: [11, 12],
+    hlCell: [i, j],
+    pathCells: [[i, j]],
+    vars: [
+      { name: "i", value: i },
+      { name: "j", value: j },
+      { name: "res", value: "[]" },
+    ],
+    note: { vi: "Walk backward from dp[m][n]. res is built in reverse order.", en: "Walk backward from dp[m][n]. res is built in reverse order." },
+  });
+
+  while (i > 0 && j > 0) {
+    traceCells.push([i, j]);
+    const same = str1[i - 1] === str2[j - 1];
+    if (same) {
+      res.push(str1[i - 1]);
+      gridSnap({
+        title: { vi: `Match: append '${str1[i - 1]}'`, en: `Match: append '${str1[i - 1]}'` },
+        codeLines: [13, 14, 15],
+        hlCell: [i, j],
+        pathCells: [...traceCells],
+        vars: [
+          { name: `str1[${i - 1}]`, value: str1[i - 1] },
+          { name: `str2[${j - 1}]`, value: str2[j - 1] },
+          { name: "res reversed", value: res.join("") },
+        ],
+        note: { vi: "Same character appears in both strings, append it once and move diagonally.", en: "Same character appears in both strings, append it once and move diagonally." },
+      });
+      i--;
+      j--;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      res.push(str1[i - 1]);
+      gridSnap({
+        title: { vi: `Take str1 char '${str1[i - 1]}'`, en: `Take str1 char '${str1[i - 1]}'` },
+        codeLines: [16, 17],
+        hlCell: [i, j],
+        pathCells: [...traceCells, [i - 1, j]],
+        cellLabels: { [`${i - 1},${j}`]: "go up" },
+        vars: [
+          { name: "dp[i-1][j]", value: `dp[${i - 1}][${j}] = ${dp[i - 1][j]}` },
+          { name: "dp[i][j-1]", value: `dp[${i}][${j - 1}] = ${dp[i][j - 1]}` },
+          { name: "res reversed", value: res.join("") },
+        ],
+        note: { vi: "Move up, so append the current str1 character to keep str1 as a subsequence.", en: "Move up, so append the current str1 character to keep str1 as a subsequence." },
+      });
+      i--;
+    } else {
+      res.push(str2[j - 1]);
+      gridSnap({
+        title: { vi: `Take str2 char '${str2[j - 1]}'`, en: `Take str2 char '${str2[j - 1]}'` },
+        codeLines: [18, 19],
+        hlCell: [i, j],
+        pathCells: [...traceCells, [i, j - 1]],
+        cellLabels: { [`${i},${j - 1}`]: "go left" },
+        vars: [
+          { name: "dp[i-1][j]", value: `dp[${i - 1}][${j}] = ${dp[i - 1][j]}` },
+          { name: "dp[i][j-1]", value: `dp[${i}][${j - 1}] = ${dp[i][j - 1]}` },
+          { name: "res reversed", value: res.join("") },
+        ],
+        note: { vi: "Move left, so append the current str2 character to keep str2 as a subsequence.", en: "Move left, so append the current str2 character to keep str2 as a subsequence." },
+      });
+      j--;
+    }
+  }
+
+  while (i > 0) {
+    res.push(str1[i - 1]);
+    traceCells.push([i, 0]);
+    gridSnap({
+      title: { vi: `Append remaining str1 '${str1[i - 1]}'`, en: `Append remaining str1 '${str1[i - 1]}'` },
+      codeLines: [20, 21],
+      hlCell: [i, 0],
+      pathCells: [...traceCells],
+      vars: [{ name: "res reversed", value: res.join("") }],
+      note: { vi: "str2 is exhausted, append the remaining str1 characters.", en: "str2 is exhausted, append the remaining str1 characters." },
+    });
+    i--;
+  }
+
+  while (j > 0) {
+    res.push(str2[j - 1]);
+    traceCells.push([0, j]);
+    gridSnap({
+      title: { vi: `Append remaining str2 '${str2[j - 1]}'`, en: `Append remaining str2 '${str2[j - 1]}'` },
+      codeLines: [22, 23],
+      hlCell: [0, j],
+      pathCells: [...traceCells],
+      vars: [{ name: "res reversed", value: res.join("") }],
+      note: { vi: "str1 is exhausted, append the remaining str2 characters.", en: "str1 is exhausted, append the remaining str2 characters." },
+    });
+    j--;
+  }
+
+  const answer = res.slice().reverse().join("");
+  gridSnap({
+    title: { vi: `return "${answer}"`, en: `return "${answer}"` },
+    codeLines: [24],
+    hlCell: [m, n],
+    pathCells: traceCells,
+    vars: [
+      { name: "reversed(res)", value: answer },
+      { name: "length", value: answer.length },
+      { name: "return", value: answer },
+    ],
+    note: { vi: `"${answer}" contains both str1 and str2 as subsequences with minimum length.`, en: `"${answer}" contains both str1 and str2 as subsequences with minimum length.` },
+    final: true,
+  });
+
+  return { str1, str2, answer, steps };
+}
+
+/**
  * LeetCode 583: Delete Operation for Two Strings.
  * dp[i][j] = minimum deletions to make word1[0..i-1] and word2[0..j-1] equal.
  */
@@ -10113,6 +10377,59 @@ module.exports = {
       "        return dp[m][n]",
     ],
     builder: buildSteps1143,
+  },
+  1092: {
+    id: 1092,
+    difficulty: "hard",
+    slug: "shortest-common-supersequence",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Shortest Common Supersequence", en: "Shortest Common Supersequence" },
+    titleVi: { vi: "Chuoi cha chung ngan nhat", en: "Shortest common supersequence" },
+    statement: {
+      vi: "Cho hai chuoi str1 va str2, tra ve chuoi ngan nhat co ca str1 va str2 la subsequence.",
+      en: "Given two strings str1 and str2, return the shortest string that has both str1 and str2 as subsequences.",
+    },
+    defaultInput: "abac",
+    inputKind: "string",
+    inputLabel: { vi: "str1", en: "str1" },
+    extraParams: [{ key: "str2", type: "string", label: { vi: "str2", en: "str2" }, default: "cab" }],
+    approach: [
+      { vi: "Tinh bang LCS dp[i][j] cho str1[:i] va str2[:j].", en: "Build the LCS table dp[i][j] for str1[:i] and str2[:j]." },
+      { vi: "Traceback tu dp[m][n]: ky tu giong nhau thi them mot lan, khac nhau thi di theo huong LCS tot hon.", en: "Trace back from dp[m][n]: matching chars are appended once, otherwise follow the better LCS direction." },
+      { vi: "res duoc tao nguoc, nen cuoi cung return reversed(res).", en: "res is built backward, so return reversed(res)." },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: { vi: "Dien bang LCS kich thuoc (m+1) x (n+1), sau do traceback O(m+n).", en: "Fill an LCS table of size (m+1) x (n+1), then trace back in O(m+n)." },
+    },
+    code: [
+      "class Solution:",
+      "    def shortestCommonSupersequence(self, str1: str, str2: str) -> str:",
+      "        m, n = len(str1), len(str2)",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if str1[i - 1] == str2[j - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1] + 1",
+      "                else:",
+      "                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])",
+      "        i, j = m, n",
+      "        res = []",
+      "        while i > 0 and j > 0:",
+      "            if str1[i - 1] == str2[j - 1]:",
+      "                res.append(str1[i - 1]); i -= 1; j -= 1",
+      "            elif dp[i - 1][j] >= dp[i][j - 1]:",
+      "                res.append(str1[i - 1]); i -= 1",
+      "            else:",
+      "                res.append(str2[j - 1]); j -= 1",
+      "        while i > 0:",
+      "            res.append(str1[i - 1]); i -= 1",
+      "        while j > 0:",
+      "            res.append(str2[j - 1]); j -= 1",
+      "        return ''.join(reversed(res))",
+    ],
+    builder: buildSteps1092,
   },
   583: {
     id: 583,
