@@ -9,6 +9,7 @@ let answerValue = null; // answer from the current run
 let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
 let debugBreakpoints = new Set();
+let debugWatches = [];
 
 // ---- UI strings by language ----
 const I18N = {
@@ -494,6 +495,35 @@ function expandStepsLineByLine(rawSteps) {
 
 // ---- Run algorithm ----
 $("runBtn").addEventListener("click", runViz);
+
+function addDebugWatchFromInput() {
+  const input = $("watchInput");
+  if (!input) return;
+  const names = input.value
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  names.forEach((name) => {
+    if (!debugWatches.includes(name)) debugWatches.push(name);
+  });
+  input.value = "";
+  if (steps.length) renderStep();
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "watchAddBtn") addDebugWatchFromInput();
+  if (e.target && e.target.dataset && e.target.dataset.removeWatch) {
+    debugWatches = debugWatches.filter((name) => name !== e.target.dataset.removeWatch);
+    if (steps.length) renderStep();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.target && e.target.id === "watchInput" && e.key === "Enter") {
+    e.preventDefault();
+    addDebugWatchFromInput();
+  }
+});
 
 async function runViz() {
   hide("runError");
@@ -989,9 +1019,10 @@ function formatVarValue(value) {
 function renderVars(step, prevStep) {
   const panel = $("varsPanel");
   const grid = $("varsGrid");
-  const vars = step.vars;
+  const watchGrid = $("watchGrid");
+  const vars = step.vars || [];
 
-  if (!vars || !vars.length) {
+  if (!vars.length && !debugWatches.length) {
     panel.classList.add("hidden");
     return;
   }
@@ -1003,11 +1034,10 @@ function renderVars(step, prevStep) {
     });
   }
 
-  grid.innerHTML = "";
-  vars.forEach((v) => {
+  const makeVarItem = (v, opts = {}) => {
     const valStr = formatVarValue(v.value);
     const item = document.createElement("div");
-    item.className = "var-item";
+    item.className = opts.watch ? "var-item watch-item" : "var-item";
     if (prevStep && v.name in prevValues && prevValues[v.name] !== valStr) {
       item.classList.add("changed");
     }
@@ -1027,7 +1057,36 @@ function renderVars(step, prevStep) {
     item.appendChild(name);
     item.appendChild(eq);
     item.appendChild(value);
-    grid.appendChild(item);
+    if (opts.watch) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "watch-remove";
+      remove.textContent = "x";
+      remove.dataset.removeWatch = v.name;
+      item.appendChild(remove);
+    }
+    return item;
+  };
+
+  const varsByName = {};
+  vars.forEach((v) => {
+    varsByName[v.name] = v;
+  });
+
+  if (watchGrid) {
+    watchGrid.innerHTML = "";
+    debugWatches.forEach((name) => {
+      const watched = varsByName[name] || { name, value: "not in scope" };
+      const item = makeVarItem(watched, { watch: true });
+      if (!varsByName[name]) item.classList.add("missing");
+      watchGrid.appendChild(item);
+    });
+    watchGrid.classList.toggle("hidden", debugWatches.length === 0);
+  }
+
+  grid.innerHTML = "";
+  vars.forEach((v) => {
+    grid.appendChild(makeVarItem(v));
   });
 
   panel.classList.remove("hidden");

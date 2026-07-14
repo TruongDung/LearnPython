@@ -174,7 +174,7 @@ function buildSteps373(input, params) {
   const label = (e) => `(${e.u},${e.v})·s${e.sum}`;
   const heap = [];
   const less = (a, b) => a.sum < b.sum;
-  const arrStr = () => `[${heap.map((e) => `(${e.u},${e.v}):${e.sum}`).join(", ")}]`;
+  const arrStr = () => `[${heap.map((e) => `(${e.sum}, ${e.i}, ${e.j})`).join(", ")}]`;
   const result = [];
   const picked = new Set();
 
@@ -243,7 +243,7 @@ function buildSteps373(input, params) {
         steps.push(heapSnapshot(heap, label, {
           title: { vi: `Sift-up: tổng ${a.sum} ↑ đổi với tổng ${b.sum}`, en: `Sift-up: sum ${a.sum} ↑ swap with sum ${b.sum}` },
           hlSet: new Set([i, p]), codeLines: [9],
-          vars: [{ name: "heap", value: arrStr() }],
+          vars: [{ name: "heap", value: arrStr() }, { name: "i", value: a.i }, { name: "j", value: a.j }],
           note: { vi: `Tổng ${a.sum} < ${b.sum} → con nhỏ hơn cha, đổi chỗ để gốc luôn là tổng nhỏ nhất.`, en: `Sum ${a.sum} < ${b.sum} → child smaller than parent, swap so the root stays the smallest sum.` },
         }));
         i = p;
@@ -262,7 +262,7 @@ function buildSteps373(input, params) {
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Sift-down: tổng ${a.sum} ↓ đổi với tổng ${b.sum}`, en: `Sift-down: sum ${a.sum} ↓ swap with sum ${b.sum}` },
         hlSet: new Set([i, s]), codeLines: [13],
-        vars: [{ name: "heap", value: arrStr() }],
+        vars: [{ name: "heap", value: arrStr() }, { name: "i", value: a.i }, { name: "j", value: a.j }],
         note: { vi: `Cha lớn hơn con nhỏ nhất → đẩy xuống để khôi phục min-heap.`, en: `Parent larger than smallest child → push down to restore the min-heap.` },
       }));
       i = s;
@@ -297,7 +297,7 @@ function buildSteps373(input, params) {
     steps.push(pairSnapshot({
       title: { vi: `Khởi tạo: push (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Init: push (${el.u}, ${el.v}) sum ${el.sum}` },
       hlSet: new Set([heap.length - 1]), codeLines: [5, 6],
-      vars: [{ name: "heap", value: arrStr() }],
+      vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
       note: { vi: `Mỗi phần tử nums1 ghép với phần tử ĐẦU của nums2 (nhỏ nhất). Thêm vào heap rồi sift-up.`, en: `Pair each nums1 element with the FIRST (smallest) of nums2. Add to heap then sift-up.` },
     }));
     siftUp(heap.length - 1);
@@ -329,7 +329,7 @@ function buildSteps373(input, params) {
         title: { vi: `Đẩy cặp kế tiếp (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Push next pair (${el.u}, ${el.v}) sum ${el.sum}` },
         activePair: [el.i, el.j, "push"],
         hlSet: new Set([heap.length - 1]), codeLines: [11, 12],
-        vars: [{ name: "heap", value: arrStr() }],
+        vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
         note: { vi: `Giữ nguyên u=${el.u}, lùi sang phần tử kế của nums2 (v=${el.v}). Đây là ứng viên nhỏ tiếp theo của hàng này.`, en: `Keep u=${el.u}, advance to the next nums2 element (v=${el.v}). This is the next smallest candidate for this row.` },
       }));
       siftUp(heap.length - 1);
@@ -340,7 +340,7 @@ function buildSteps373(input, params) {
   const fs = pairSnapshot({
     title: { vi: `Kết quả: [${resStr}]`, en: `Result: [${resStr}]` },
     codeLines: [13],
-    vars: [{ name: "answer", value: `[${resStr}]` }],
+    vars: [{ name: "answer", value: `[${resStr}]` }, { name: "res", value: `[${resStr}]` }],
     note: { vi: `Đã lấy ${result.length} cặp có tổng nhỏ nhất theo thứ tự tăng dần.`, en: `Collected ${result.length} pairs with the smallest sums in ascending order.` },
   });
   fs.final = true; steps.push(fs);

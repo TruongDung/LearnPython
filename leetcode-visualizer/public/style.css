@@ -641,6 +641,53 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.watch-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.watch-row input {
+  min-width: 220px;
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+  color: inherit;
+  font: inherit;
+}
+
+.watch-row button,
+.watch-remove {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.12);
+  color: inherit;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.watch-grid {
+  margin-bottom: 8px;
+}
+
+.var-item.watch-item {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.var-item.watch-item.missing {
+  border-color: rgba(148, 163, 184, 0.18);
+  opacity: 0.72;
+}
+
+.watch-remove {
+  padding: 0 6px;
+  line-height: 1.35;
+  font-family: inherit;
+}
+
 .vars-grid {
   display: flex;
   flex-wrap: wrap;
