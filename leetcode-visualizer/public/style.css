@@ -391,7 +391,8 @@ button:disabled {
 #problemPanel[data-problem-id="1143"] .input-row,
 #problemPanel[data-problem-id="115"] .input-row,
 #problemPanel[data-problem-id="712"] .input-row,
-#problemPanel[data-problem-id="1092"] .input-row {
+#problemPanel[data-problem-id="1092"] .input-row,
+#problemPanel[data-problem-id="10"] .input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 14px;
@@ -402,7 +403,8 @@ button:disabled {
 #problemPanel[data-problem-id="1143"] #arrLabel,
 #problemPanel[data-problem-id="115"] #arrLabel,
 #problemPanel[data-problem-id="712"] #arrLabel,
-#problemPanel[data-problem-id="1092"] #arrLabel {
+#problemPanel[data-problem-id="1092"] #arrLabel,
+#problemPanel[data-problem-id="10"] #arrLabel {
   grid-column: 1;
   grid-row: 1;
 }
@@ -410,7 +412,8 @@ button:disabled {
 #problemPanel[data-problem-id="1143"] #arrInput,
 #problemPanel[data-problem-id="115"] #arrInput,
 #problemPanel[data-problem-id="712"] #arrInput,
-#problemPanel[data-problem-id="1092"] #arrInput {
+#problemPanel[data-problem-id="1092"] #arrInput,
+#problemPanel[data-problem-id="10"] #arrInput {
   grid-column: 1;
   grid-row: 2;
   width: 100%;
@@ -419,7 +422,8 @@ button:disabled {
 #problemPanel[data-problem-id="1143"] .extra-params,
 #problemPanel[data-problem-id="115"] .extra-params,
 #problemPanel[data-problem-id="712"] .extra-params,
-#problemPanel[data-problem-id="1092"] .extra-params {
+#problemPanel[data-problem-id="1092"] .extra-params,
+#problemPanel[data-problem-id="10"] .extra-params {
   grid-column: 2;
   grid-row: 1 / 3;
   display: block;
@@ -429,7 +433,8 @@ button:disabled {
 #problemPanel[data-problem-id="1143"] .extra-params .param input,
 #problemPanel[data-problem-id="115"] .extra-params .param input,
 #problemPanel[data-problem-id="712"] .extra-params .param input,
-#problemPanel[data-problem-id="1092"] .extra-params .param input {
+#problemPanel[data-problem-id="1092"] .extra-params .param input,
+#problemPanel[data-problem-id="10"] .extra-params .param input {
   width: 100%;
 }
 
@@ -440,7 +445,9 @@ button:disabled {
 #problemPanel[data-problem-id="712"] .run-btn,
 #problemPanel[data-problem-id="712"] #runError,
 #problemPanel[data-problem-id="1092"] .run-btn,
-#problemPanel[data-problem-id="1092"] #runError {
+#problemPanel[data-problem-id="1092"] #runError,
+#problemPanel[data-problem-id="10"] .run-btn,
+#problemPanel[data-problem-id="10"] #runError {
   grid-column: 1 / -1;
 }
 
@@ -2206,14 +2213,16 @@ select option {
   #problemPanel[data-problem-id="1143"] .input-row,
   #problemPanel[data-problem-id="115"] .input-row,
   #problemPanel[data-problem-id="712"] .input-row,
-  #problemPanel[data-problem-id="1092"] .input-row {
+  #problemPanel[data-problem-id="1092"] .input-row,
+  #problemPanel[data-problem-id="10"] .input-row {
     display: block;
   }
 
   #problemPanel[data-problem-id="1143"] .extra-params,
   #problemPanel[data-problem-id="115"] .extra-params,
   #problemPanel[data-problem-id="712"] .extra-params,
-  #problemPanel[data-problem-id="1092"] .extra-params {
+  #problemPanel[data-problem-id="1092"] .extra-params,
+  #problemPanel[data-problem-id="10"] .extra-params {
     display: flex;
     margin-top: 12px;
   }
