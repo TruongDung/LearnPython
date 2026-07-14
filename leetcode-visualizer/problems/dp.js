@@ -2561,6 +2561,227 @@ function buildSteps276(input, params) {
 }
 
 /**
+ * Generate steps for LeetCode 115: Distinct Subsequences.
+ *
+ * dp[i][j] = number of ways to form t[0..j-1] from s[0..i-1].
+ *  - Empty target: dp[i][0] = 1 for every i.
+ *  - If s[i-1] == t[j-1]: use or skip s[i-1].
+ *  - Otherwise: skip s[i-1].
+ */
+function buildSteps115(input, params) {
+  const s = String(input).trim();
+  const t = String(params.t || "").trim();
+  const m = s.length;
+  const n = t.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const steps = [];
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        text1: s,
+        text2: t,
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Read lengths", en: "Read lengths" },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: s },
+      { name: "t", value: t },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `m = len(s) = ${m}, n = len(t) = ${n}.`,
+      en: `m = len(s) = ${m}, n = len(t) = ${n}.`,
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Initialize DP table", en: "Initialize DP table" },
+    codeLines: [4],
+    vars: [
+      { name: "dp size", value: `${m + 1} x ${n + 1}` },
+      { name: "meaning", value: "dp[i][j] counts t[:j] from s[:i]" },
+    ],
+    note: {
+      vi: "Create the DP table filled with 0.",
+      en: "Create the DP table filled with 0.",
+    },
+  });
+
+  for (let i = 0; i <= m; i++) {
+    dp[i][0] = 1;
+    gridSnap({
+      title: { vi: `dp[${i}][0] = 1`, en: `dp[${i}][0] = 1` },
+      codeLines: [5, 6],
+      hlCell: [i, 0],
+      vars: [
+        { name: "i", value: i },
+        { name: `dp[${i}][0]`, value: 1 },
+      ],
+      note: {
+        vi: "Empty target can always be formed in exactly one way: delete every chosen character.",
+        en: "Empty target can always be formed in exactly one way: delete every chosen character.",
+      },
+    });
+  }
+
+  for (let i = 1; i <= m; i++) {
+    gridSnap({
+      title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
+      codeLines: [7],
+      hlCell: [i, 0],
+      vars: [
+        { name: "i", value: i },
+        { name: `s[${i - 1}]`, value: s[i - 1] },
+        { name: "s[:i]", value: s.slice(0, i) },
+      ],
+      note: {
+        vi: `Consider source prefix s[:${i}] = "${s.slice(0, i)}".`,
+        en: `Consider source prefix s[:${i}] = "${s.slice(0, i)}".`,
+      },
+    });
+
+    for (let j = 1; j <= n; j++) {
+      gridSnap({
+        title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
+        codeLines: [8],
+        hlCell: [i, j],
+        pathCells: [[i - 1, j], [i - 1, j - 1]],
+        cellLabels: {
+          [`${i - 1},${j}`]: "dp[i-1]\n[j]",
+          [`${i - 1},${j - 1}`]: "dp[i-1]\n[j-1]",
+        },
+        vars: [
+          { name: "j", value: j },
+          { name: `t[${j - 1}]`, value: t[j - 1] },
+          { name: "t[:j]", value: t.slice(0, j) },
+        ],
+        note: {
+          vi: `Compute dp[${i}][${j}]: ways to form "${t.slice(0, j)}" from "${s.slice(0, i)}".`,
+          en: `Compute dp[${i}][${j}]: ways to form "${t.slice(0, j)}" from "${s.slice(0, i)}".`,
+        },
+      });
+
+      const match = s[i - 1] === t[j - 1];
+      gridSnap({
+        title: {
+          vi: `Compare '${s[i - 1]}' and '${t[j - 1]}'`,
+          en: `Compare '${s[i - 1]}' and '${t[j - 1]}'`,
+        },
+        codeLines: [9],
+        hlCell: [i, j],
+        pathCells: match ? [[i - 1, j], [i - 1, j - 1]] : [[i - 1, j]],
+        cellLabels: match
+          ? { [`${i - 1},${j}`]: "skip", [`${i - 1},${j - 1}`]: "use" }
+          : { [`${i - 1},${j}`]: "skip" },
+        vars: [
+          { name: `s[${i - 1}]`, value: s[i - 1] },
+          { name: `t[${j - 1}]`, value: t[j - 1] },
+          { name: "match", value: match },
+        ],
+        note: {
+          vi: match
+            ? "Characters match: add ways that use this character and ways that skip it."
+            : "Characters differ: this source character cannot finish t[:j], so skip it.",
+          en: match
+            ? "Characters match: add ways that use this character and ways that skip it."
+            : "Characters differ: this source character cannot finish t[:j], so skip it.",
+        },
+      });
+
+      const skip = dp[i - 1][j];
+      const use = match ? dp[i - 1][j - 1] : 0;
+      if (match) {
+        dp[i][j] = use + skip;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${use} + ${skip} = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${use} + ${skip} = ${dp[i][j]}` },
+          codeLines: [10],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j - 1], [i - 1, j]],
+          cellLabels: {
+            [`${i - 1},${j - 1}`]: "use",
+            [`${i - 1},${j}`]: "skip",
+          },
+          vars: [
+            { name: "dp[i-1][j-1]", value: `dp[${i - 1}][${j - 1}] = ${use}` },
+            { name: "dp[i-1][j]", value: `dp[${i - 1}][${j}] = ${skip}` },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: {
+            vi: `Use '${s[i - 1]}' to match '${t[j - 1]}' (${use}) plus skip it (${skip}).`,
+            en: `Use '${s[i - 1]}' to match '${t[j - 1]}' (${use}) plus skip it (${skip}).`,
+          },
+        });
+      } else {
+        dp[i][j] = skip;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = ${skip}`, en: `dp[${i}][${j}] = ${skip}` },
+          codeLines: [12],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j]],
+          cellLabels: { [`${i - 1},${j}`]: "skip" },
+          vars: [
+            { name: "dp[i-1][j]", value: `dp[${i - 1}][${j}] = ${skip}` },
+            { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          ],
+          note: {
+            vi: `Skip '${s[i - 1]}', so dp[${i}][${j}] = dp[${i - 1}][${j}] = ${skip}.`,
+            en: `Skip '${s[i - 1]}', so dp[${i}][${j}] = dp[${i - 1}][${j}] = ${skip}.`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: `return dp[m][n] = ${answer}`, en: `return dp[m][n] = ${answer}` },
+    codeLines: [13],
+    hlCell: [m, n],
+    vars: [
+      { name: `dp[${m}][${n}]`, value: answer },
+      { name: "return", value: answer },
+    ],
+    note: {
+      vi: `There are ${answer} distinct subsequences of s that equal t.`,
+      en: `There are ${answer} distinct subsequences of s that equal t.`,
+    },
+    final: true,
+  });
+
+  return { s, t, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 1143: Longest Common Subsequence.
  *
  * dp[i][j] = LCS of text1[0..i-1] and text2[0..j-1].
@@ -9567,6 +9788,53 @@ module.exports = {
       "        return 'Tie'",
     ],
     builder: buildSteps1406,
+  },
+  115: {
+    id: 115,
+    difficulty: "hard",
+    slug: "distinct-subsequences",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Distinct Subsequences", en: "Distinct Subsequences" },
+    titleVi: { vi: "Dem so subsequence khac nhau", en: "Count distinct subsequences" },
+    statement: {
+      vi: "Cho hai chuoi s va t, dem so subsequence khac nhau cua s bang t.",
+      en: "Given two strings s and t, count how many distinct subsequences of s equal t.",
+    },
+    defaultInput: "rabbbit",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      {
+        key: "t",
+        type: "string",
+        label: { vi: "t", en: "t" },
+        default: "rabbit",
+      },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: {
+        vi: "Duyet bang DP kich thuoc (m+1)*(n+1).",
+        en: "Fill a DP table of size (m+1)*(n+1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numDistinct(self, s: str, t: str) -> int:",
+      "        m, n = len(s), len(t)",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        for i in range(m + 1):",
+      "            dp[i][0] = 1",
+      "        for i in range(1, m + 1):",
+      "            for j in range(1, n + 1):",
+      "                if s[i - 1] == t[j - 1]:",
+      "                    dp[i][j] = dp[i - 1][j - 1] + dp[i - 1][j]",
+      "                else:",
+      "                    dp[i][j] = dp[i - 1][j]",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps115,
   },
   1143: {
     id: 1143,
