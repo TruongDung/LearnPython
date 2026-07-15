@@ -1010,7 +1010,7 @@ function buildSteps20(input) {
     const top = stack.length ? stack[stack.length - 1] : null;
     pushStep({
       title: { vi: `Need '${expected}'`, en: `Need '${expected}'` },
-      codeLine: 11,
+      codeLine: 12,
       current: i,
       expected,
       highlight: [i],
@@ -1049,7 +1049,7 @@ function buildSteps20(input) {
     stack.pop();
     pushStep({
       title: { vi: `Pop '${expected}'`, en: `Pop '${expected}'` },
-      codeLine: 15,
+      codeLine: 16,
       current: i,
       expected,
       highlight: [i],
@@ -1065,7 +1065,7 @@ function buildSteps20(input) {
   const answer = stack.length === 0;
   pushStep({
     title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
-    codeLine: 17,
+    codeLine: 18,
     mark: answer ? chars.map((_, i) => i) : [],
     vars: [{ name: "answer", value: answer }],
     note: {
