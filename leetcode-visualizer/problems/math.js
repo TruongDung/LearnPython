@@ -892,6 +892,164 @@ function buildSteps3756(input, params) {
   return { original: s, answer: answers, steps };
 }
 
+/**
+ * LeetCode 2470: Number of Subarrays With LCM Equal to K.
+ * Enumerate every start index and extend the subarray while maintaining LCM.
+ */
+function buildSteps2470(nums, params) {
+  const k = Number(params && params.k !== undefined ? params.k : 6);
+  const steps = [];
+
+  function gcd(a, b) {
+    a = Math.abs(a);
+    b = Math.abs(b);
+    while (b !== 0) {
+      const t = a % b;
+      a = b;
+      b = t;
+    }
+    return a;
+  }
+
+  function lcm(a, b) {
+    if (a === 0 || b === 0) return 0;
+    return Math.abs((a / gcd(a, b)) * b);
+  }
+
+  let answer = 0;
+
+  steps.push({
+    title: { vi: "Khoi tao", en: "Initialize" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "k", value: k },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: "Thu moi subarray nums[i..j], cap nhat LCM dan khi j tang.",
+      en: "Try every subarray nums[i..j], updating the LCM as j expands.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    let curLcm = 1;
+    steps.push({
+      title: { vi: `Start i=${i}`, en: `Start i=${i}` },
+      arr: [...nums],
+      sub: nums.map((_, idx) => `[${idx}]`),
+      highlight: [i],
+      mark: [],
+      codeLines: [4, 5],
+      vars: [
+        { name: "i", value: i },
+        { name: "cur_lcm", value: curLcm },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Bat dau subarray moi tai i=${i}.`,
+        en: `Start a new subarray at i=${i}.`,
+      },
+    });
+
+    for (let j = i; j < nums.length; j++) {
+      const prevLcm = curLcm;
+      const g = gcd(curLcm, nums[j]);
+      curLcm = lcm(curLcm, nums[j]);
+      const range = Array.from({ length: j - i + 1 }, (_, idx) => i + idx);
+
+      steps.push({
+        title: { vi: `j=${j}: lcm(${prevLcm}, ${nums[j]}) = ${curLcm}`, en: `j=${j}: lcm(${prevLcm}, ${nums[j]}) = ${curLcm}` },
+        arr: [...nums],
+        sub: nums.map((_, idx) => `[${idx}]`),
+        highlight: range,
+        mark: [j],
+        codeLines: [6, 7],
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "nums[j]", value: nums[j] },
+          { name: "gcd", value: g },
+          { name: "cur_lcm", value: curLcm },
+          { name: "subarray", value: `[${nums.slice(i, j + 1).join(", ")}]` },
+        ],
+        note: {
+          vi: `LCM hien tai = prev_lcm / gcd(prev_lcm, nums[j]) * nums[j] = ${prevLcm} / ${g} * ${nums[j]} = ${curLcm}.`,
+          en: `Current LCM = prev_lcm / gcd(prev_lcm, nums[j]) * nums[j] = ${prevLcm} / ${g} * ${nums[j]} = ${curLcm}.`,
+        },
+      });
+
+      if (curLcm === k) {
+        answer += 1;
+        steps.push({
+          title: { vi: `LCM == k -> answer = ${answer}`, en: `LCM == k -> answer = ${answer}` },
+          arr: [...nums],
+          sub: nums.map((_, idx) => `[${idx}]`),
+          highlight: range,
+          mark: range,
+          codeLines: [8, 9],
+          vars: [
+            { name: "subarray", value: `[${nums.slice(i, j + 1).join(", ")}]` },
+            { name: "cur_lcm", value: curLcm },
+            { name: "k", value: k },
+            { name: "answer", value: answer },
+          ],
+          note: {
+            vi: `Subarray nums[${i}..${j}] co LCM dung bang k=${k}, dem them 1.`,
+            en: `Subarray nums[${i}..${j}] has LCM equal to k=${k}, count it.`,
+          },
+        });
+      }
+
+      if (curLcm > k || k % curLcm !== 0) {
+        steps.push({
+          title: { vi: "Dung som", en: "Break early" },
+          arr: [...nums],
+          sub: nums.map((_, idx) => `[${idx}]`),
+          highlight: range,
+          mark: [],
+          codeLines: [10, 11],
+          vars: [
+            { name: "cur_lcm", value: curLcm },
+            { name: "k", value: k },
+            { name: "reason", value: curLcm > k ? "cur_lcm > k" : "k % cur_lcm != 0" },
+          ],
+          note: {
+            vi: curLcm > k
+              ? "LCM chi co the giu nguyen hoac tang khi them phan tu, nen neu da lon hon k thi dung."
+              : "LCM hien tai khong chia het k, them phan tu ve sau se khong the quay ve dung k.",
+            en: curLcm > k
+              ? "LCM can only stay the same or increase as we add elements, so once it is greater than k we stop."
+              : "The current LCM does not divide k, so extending this subarray cannot make it exactly k.",
+          },
+        });
+        break;
+      }
+    }
+  }
+
+  steps.push({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [12],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Co ${answer} subarray co LCM bang ${k}.`,
+      en: `There are ${answer} subarray(s) with LCM equal to ${k}.`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
   50: {
     id: 50,
@@ -1079,6 +1237,49 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps246,
+  },
+  2470: {
+    id: 2470,
+    difficulty: "medium",
+    slug: "number-of-subarrays-with-lcm-equal-to-k",
+    category: { key: "math", vi: "Toan / De quy", en: "Math / Recursion" },
+    title: { vi: "Number of Subarrays With LCM Equal to K", en: "Number of Subarrays With LCM Equal to K" },
+    titleVi: { vi: "So subarray co LCM bang K", en: "Subarrays with LCM equal to K" },
+    statement: {
+      vi: "Cho mang nums va so k. Dem so subarray lien tiep co boi chung nho nhat LCM bang k.",
+      en: "Given nums and k, count the contiguous subarrays whose least common multiple is exactly k.",
+    },
+    defaultInput: [3, 6, 2, 7, 1],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "k", label: { vi: "k", en: "k" }, default: 6 },
+    ],
+    approach: [
+      { vi: "Thu moi diem bat dau i, roi mo rong j sang phai.", en: "Try every start index i, then expand j to the right." },
+      { vi: "Cap nhat cur_lcm = lcm(cur_lcm, nums[j]) bang gcd.", en: "Update cur_lcm = lcm(cur_lcm, nums[j]) using gcd." },
+      { vi: "Neu cur_lcm == k thi dem. Neu cur_lcm > k hoac k khong chia het cur_lcm thi dung som.", en: "If cur_lcm == k, count it. If cur_lcm > k or k is not divisible by cur_lcm, break early." },
+    ],
+    complexity: {
+      time: "O(n^2 * log V)",
+      space: "O(1)",
+      note: { vi: "Co toi da O(n^2) subarray, moi lan cap nhat LCM dung gcd O(log V).", en: "There are up to O(n^2) subarrays; each LCM update uses gcd in O(log V)." },
+    },
+    code: [
+      "class Solution:",
+      "    def subarrayLCM(self, nums: List[int], k: int) -> int:",
+      "        answer = 0",
+      "        for i in range(len(nums)):",
+      "            cur_lcm = 1",
+      "            for j in range(i, len(nums)):",
+      "                cur_lcm = cur_lcm * nums[j] // gcd(cur_lcm, nums[j])",
+      "                if cur_lcm == k:",
+      "                    answer += 1",
+      "                if cur_lcm > k or k % cur_lcm != 0:",
+      "                    break",
+      "        return answer",
+    ],
+    builder: buildSteps2470,
   },
   3754: {
     id: 3754,
