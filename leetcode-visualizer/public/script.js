@@ -706,14 +706,15 @@ function togglePlay() {
   if (stepIndex >= steps.length - 1) stepIndex = 0;
   $("playBtn").textContent = t().playStop;
   playTimer = setInterval(() => {
-    const breakpointIndex = findBreakpointStep(stepIndex, 1);
-    if (breakpointIndex >= 0) {
-      stepIndex = breakpointIndex;
-      renderStep();
-    } else if (stepIndex < steps.length - 1 && debugBreakpoints.size === 0) {
-      stepIndex++;
-      renderStep();
-    } else {
+    if (stepIndex >= steps.length - 1) {
+      stopPlay();
+      return;
+    }
+
+    stepIndex++;
+    renderStep();
+
+    if (stepHitsBreakpoint(steps[stepIndex]) || stepIndex >= steps.length - 1) {
       stopPlay();
     }
   }, 1100);
