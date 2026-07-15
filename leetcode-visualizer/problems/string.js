@@ -134,6 +134,7 @@ function buildSteps1598Depth(input) {
     pushStep({
       title: { vi: `Read logs[${i}]`, en: `Read logs[${i}]` },
       codeLine: 4,
+      current: i,
       highlight: [i],
       vars: [
         { name: "i", value: i },
@@ -944,6 +945,12 @@ function buildSteps20(input) {
       highlight: opts.highlight || [],
       mark: opts.mark || [],
       codeLines: [opts.codeLine],
+      stackView: {
+        items: stack.slice(),
+        input: chars,
+        current: Number.isInteger(opts.current) ? opts.current : -1,
+        expected: opts.expected || "",
+      },
       vars: [
         { name: "stack", value: stackLabel() },
         { name: "top", value: stack.length ? stack[stack.length - 1] : "empty" },
@@ -970,6 +977,7 @@ function buildSteps20(input) {
     pushStep({
       title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
       codeLine: 4,
+      current: i,
       highlight: [i],
       vars: [
         { name: "i", value: i },
@@ -986,6 +994,7 @@ function buildSteps20(input) {
       pushStep({
         title: { vi: `Push '${ch}'`, en: `Push '${ch}'` },
         codeLine: 6,
+        current: i,
         highlight: [i],
         mark: [i],
         vars: [{ name: "action", value: "push" }],
@@ -1002,6 +1011,8 @@ function buildSteps20(input) {
     pushStep({
       title: { vi: `Need '${expected}'`, en: `Need '${expected}'` },
       codeLine: 8,
+      current: i,
+      expected,
       highlight: [i],
       vars: [
         { name: "closing", value: ch },
@@ -1018,6 +1029,8 @@ function buildSteps20(input) {
       pushStep({
         title: { vi: "Mismatch -> False", en: "Mismatch -> False" },
         codeLine: 9,
+        current: i,
+        expected,
         highlight: [i],
         vars: [{ name: "answer", value: false }],
         note: {
@@ -1037,6 +1050,8 @@ function buildSteps20(input) {
     pushStep({
       title: { vi: `Pop '${expected}'`, en: `Pop '${expected}'` },
       codeLine: 10,
+      current: i,
+      expected,
       highlight: [i],
       mark: [i],
       vars: [{ name: "action", value: "pop" }],

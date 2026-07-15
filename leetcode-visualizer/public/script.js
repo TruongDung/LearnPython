@@ -471,6 +471,15 @@ function pick(field) {
   return field;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function shouldUseLineByLineDebug() {
   return Boolean(problemData);
 }
@@ -1505,6 +1514,54 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderStackView(step) {
+  const view = step.stackView || {};
+  const stack = Array.isArray(view.items) ? view.items : [];
+  const input = Array.isArray(view.input) ? view.input : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const expected = view.expected || "";
+  const top = stack.length ? stack[stack.length - 1] : "";
+
+  const stackItems = stack.length
+    ? stack
+        .map((item, idx) => {
+          const isTop = idx === stack.length - 1;
+          return `<div class="stack-cell${isTop ? " top" : ""}">
+            <span class="stack-value">${escapeHtml(String(item))}</span>
+            ${isTop ? `<span class="stack-tag">top</span>` : ""}
+          </div>`;
+        })
+        .reverse()
+        .join("")
+    : `<div class="stack-empty">empty stack</div>`;
+
+  const inputItems = input
+    .map((ch, idx) => {
+      const cls = idx === current ? " current" : idx < current ? " done" : "";
+      return `<div class="stack-input-token${cls}">
+        <span>${escapeHtml(String(ch))}</span>
+        <small>${idx}</small>
+      </div>`;
+    })
+    .join("");
+
+  $("treeView").innerHTML = `
+    <div class="stack-viz">
+      <div class="stack-panel">
+        <div class="stack-title">Stack</div>
+        <div class="stack-container">${stackItems}</div>
+        <div class="stack-base"></div>
+      </div>
+      <div class="stack-side">
+        <div class="stack-status">
+          <div><span>top</span><strong>${top ? escapeHtml(String(top)) : "empty"}</strong></div>
+          <div><span>expected</span><strong>${expected ? escapeHtml(String(expected)) : "-"}</strong></div>
+        </div>
+        <div class="stack-input-row">${inputItems}</div>
+      </div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1546,6 +1603,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.stackView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStackView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
