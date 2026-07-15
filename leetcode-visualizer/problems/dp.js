@@ -4959,6 +4959,209 @@ function buildSteps279(input) {
 }
 
 /**
+ * LeetCode 1639: Number of Ways to Form a Target String Given a Dictionary.
+ * Count column character frequencies, then update dp backwards.
+ * dp[i] = number of ways to form target[:i] using processed columns.
+ */
+function buildSteps1639(input, params) {
+  const MOD = 1_000_000_007;
+  const words = String(input || "")
+    .split(",")
+    .map((w) => w.trim())
+    .filter(Boolean);
+  const target = String((params && params.target) || "").trim();
+  const cols = words.length ? words[0].length : 0;
+  const t = target.length;
+  const steps = [];
+
+  const valid = words.length > 0 && target.length > 0 && words.every((w) => w.length === cols);
+  if (!valid) {
+    steps.push({
+      title: { vi: "Input khong hop le", en: "Invalid input" },
+      arr: [],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Nhap words cung do dai, cach nhau boi dau phay, va target khong rong. Vi du: acca,bbbb,caca + target=aba",
+        en: "Enter same-length words separated by commas and a non-empty target. Example: acca,bbbb,caca + target=aba",
+      },
+      final: true,
+    });
+    return { words, target, answer: 0, steps };
+  }
+
+  const freq = Array.from({ length: cols }, () => ({}));
+  const dp = Array(t + 1).fill(0);
+  dp[0] = 1;
+
+  function freqGrid(activeCol = null, activeChar = null) {
+    const chars = Array.from(new Set(target.split(""))).sort();
+    const matrix = [["char", ...Array.from({ length: cols }, (_, c) => `c${c}`)]];
+    for (const ch of chars) {
+      matrix.push([ch, ...Array.from({ length: cols }, (_, c) => freq[c][ch] || 0)]);
+    }
+    const labels = {};
+    let hlCell = null;
+    if (activeCol !== null && activeChar !== null) {
+      const row = chars.indexOf(activeChar) + 1;
+      if (row > 0) {
+        hlCell = [row, activeCol + 1];
+        labels[`${row},${activeCol + 1}`] = "freq";
+      }
+    }
+    return { matrix, chars, hlCell, labels };
+  }
+
+  function pushFreqStep(opts) {
+    const g = freqGrid(opts.col ?? null, opts.ch ?? null);
+    steps.push({
+      title: opts.title,
+      arr: dp.map((v) => v),
+      sub: ["empty", ...target.split("").map((ch, i) => `${i + 1}:${ch}`)],
+      highlight: opts.i === undefined ? [] : [opts.i],
+      mark: [],
+      grid: {
+        dp: g.matrix,
+        rowLabels: g.matrix.slice(1).map((row) => ({ index: row[0], char: "" })),
+        colLabels: Array.from({ length: cols + 1 }, (_, idx) => ({ index: idx === 0 ? "" : `col=${idx - 1}`, char: "" })),
+        largeCells: true,
+        hlCell: g.hlCell,
+        cellLabels: g.labels,
+      },
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  function pushDpStep(opts) {
+    steps.push({
+      title: opts.title,
+      arr: dp.map((v) => v),
+      sub: ["empty", ...target.split("").map((ch, i) => `${i + 1}:${ch}`)],
+      highlight: opts.i === undefined ? [] : [opts.i],
+      mark: opts.mark || [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  pushDpStep({
+    title: { vi: "Khoi tao dp[0] = 1", en: "Initialize dp[0] = 1" },
+    codeLines: [3, 4, 5, 6, 7],
+    highlight: 0,
+    vars: [
+      { name: "words", value: `[${words.join(", ")}]` },
+      { name: "target", value: target },
+      { name: "columns", value: cols },
+    ],
+    note: {
+      vi: "dp[i] la so cach tao target[:i] bang cac cot da xu ly. dp[0]=1 vi chuoi rong tao duoc bang cach khong chon gi.",
+      en: "dp[i] is the number of ways to form target[:i] using processed columns. dp[0]=1 because the empty prefix can be formed by choosing nothing.",
+    },
+  });
+
+  for (let c = 0; c < cols; c++) {
+    for (const word of words) {
+      const ch = word[c];
+      freq[c][ch] = (freq[c][ch] || 0) + 1;
+    }
+    pushFreqStep({
+      title: { vi: `Dem tan suat cot ${c}`, en: `Count frequencies for column ${c}` },
+      col: c,
+      ch: target.includes(words[0][c]) ? words[0][c] : target[0],
+      codeLines: [5],
+      vars: [
+        { name: "col", value: c },
+        { name: "column chars", value: words.map((w) => w[c]).join(",") },
+        { name: "freq used by target", value: target.split("").map((ch) => `${ch}:${freq[c][ch] || 0}`).join(", ") },
+      ],
+      note: {
+        vi: `Cot ${c} co cac ky tu [${words.map((w) => w[c]).join(", ")}]. Chi tan suat cac ky tu trong target moi anh huong dp.`,
+        en: `Column ${c} has characters [${words.map((w) => w[c]).join(", ")}]. Only frequencies of target characters affect dp.`,
+      },
+    });
+  }
+
+  for (let c = 0; c < cols; c++) {
+    pushDpStep({
+      title: { vi: `Xu ly cot ${c}`, en: `Process column ${c}` },
+      codeLines: [9],
+      vars: [{ name: "col", value: c }],
+      note: {
+        vi: "Duyet target nguoc de moi cot chi duoc dung mot lan.",
+        en: "Iterate target backwards so each column is used at most once.",
+      },
+    });
+
+    for (let i = t - 1; i >= 0; i--) {
+      const ch = target[i];
+      const count = freq[c][ch] || 0;
+      const before = dp[i + 1];
+      const add = (dp[i] * count) % MOD;
+      pushFreqStep({
+        title: { vi: `Cot ${c}: thu tao target[${i}]='${ch}'`, en: `Column ${c}: try target[${i}]='${ch}'` },
+        col: c,
+        ch,
+        i: i + 1,
+        codeLines: [10, 11],
+        vars: [
+          { name: `target[${i}]`, value: ch },
+          { name: `freq[${c}]['${ch}']`, value: count },
+          { name: `dp[${i}]`, value: dp[i] },
+          { name: "add", value: `${dp[i]} * ${count} = ${add}` },
+        ],
+        note: {
+          vi: count > 0
+            ? `Co ${count} word co ky tu '${ch}' o cot ${c}. Moi cach tao target[:${i}] sinh them ${count} cach tao target[:${i + 1}].`
+            : `Khong co ky tu '${ch}' o cot ${c}, nen khong them cach nao.`,
+          en: count > 0
+            ? `${count} word(s) have '${ch}' at column ${c}. Each way to form target[:${i}] creates ${count} way(s) to form target[:${i + 1}].`
+            : `No '${ch}' at column ${c}, so this adds no ways.`,
+        },
+      });
+
+      dp[i + 1] = (dp[i + 1] + add) % MOD;
+      pushDpStep({
+        title: { vi: `dp[${i + 1}] = ${dp[i + 1]}`, en: `dp[${i + 1}] = ${dp[i + 1]}` },
+        i: i + 1,
+        mark: [i],
+        codeLines: [11],
+        vars: [
+          { name: "before", value: before },
+          { name: "add", value: add },
+          { name: `dp[${i + 1}]`, value: dp[i + 1] },
+        ],
+        note: {
+          vi: `dp[${i + 1}] = (${before} + ${add}) mod MOD = ${dp[i + 1]}.`,
+          en: `dp[${i + 1}] = (${before} + ${add}) mod MOD = ${dp[i + 1]}.`,
+        },
+      });
+    }
+  }
+
+  const answer = dp[t];
+  pushDpStep({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    i: t,
+    codeLines: [13],
+    vars: [
+      { name: `dp[${t}]`, value: answer },
+      { name: "return", value: answer },
+    ],
+    note: {
+      vi: `So cach tao target "${target}" la ${answer}.`,
+      en: `The number of ways to form target "${target}" is ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { words, target, answer, steps };
+}
+
+/**
  * LeetCode 139: Word Break.
  * dp[i] = True if s[0..i-1] can be segmented into dictionary words.
  * dp[0] = True (empty string).
@@ -10554,7 +10757,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11293,6 +11496,50 @@ module.exports = {
       "        return dp[m-1][n-1]",
     ],
     builder: buildSteps63,
+  },
+  1639: {
+    id: 1639,
+    difficulty: "hard",
+    slug: "number-of-ways-to-form-a-target-string-given-a-dictionary",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Number of Ways to Form Target String", en: "Number of Ways to Form Target String" },
+    titleVi: { vi: "So cach tao chuoi target", en: "Number of ways to form target" },
+    statement: {
+      vi: "Cho danh sach words co cung do dai va target. Moi buoc chon mot ky tu tu mot cot chua dung, cac cot phai tang dan trai sang phai. Dem so cach tao target.",
+      en: "Given same-length words and a target. At each step choose a character from an unused column, and chosen columns must increase left to right. Count ways to form target.",
+    },
+    defaultInput: "acca,bbbb,caca",
+    inputKind: "string",
+    inputLabel: { vi: "words (phay ngan)", en: "words (comma separated)" },
+    extraParams: [
+      { key: "target", type: "string", label: { vi: "target", en: "target" }, default: "aba" },
+    ],
+    approach: [
+      { vi: "Dem tan suat moi ky tu trong tung cot cua words.", en: "Count character frequencies in each column of words." },
+      { vi: "dp[i] = so cach tao target[:i] bang cac cot da xu ly.", en: "dp[i] = number of ways to form target[:i] using processed columns." },
+      { vi: "Voi moi cot, duyet i nguoc: dp[i+1] += dp[i] * freq[col][target[i]].", en: "For each column, iterate i backward: dp[i+1] += dp[i] * freq[col][target[i]]." },
+    ],
+    complexity: {
+      time: "O(words*cols + cols*target)",
+      space: "O(cols*alphabet + target)",
+      note: { vi: "Dem tan suat theo cot, sau do moi cot cap nhat mang dp mot chieu.", en: "Count column frequencies, then each column updates a one-dimensional dp array." },
+    },
+    code: [
+      "class Solution:",
+      "    def numWays(self, words: List[str], target: str) -> int:",
+      "        MOD = 10**9 + 7",
+      "        cols = len(words[0])",
+      "        freq = [Counter(word[c] for word in words) for c in range(cols)]",
+      "        dp = [0] * (len(target) + 1)",
+      "        dp[0] = 1",
+      "",
+      "        for c in range(cols):",
+      "            for i in range(len(target) - 1, -1, -1):",
+      "                dp[i + 1] = (dp[i + 1] + dp[i] * freq[c][target[i]]) % MOD",
+      "",
+      "        return dp[len(target)]",
+    ],
+    builder: buildSteps1639,
   },
   91: {
     id: 91,
