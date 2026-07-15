@@ -9486,6 +9486,240 @@ function buildSteps516(input) {
 }
 
 /**
+ * LeetCode 1682: Longest Palindromic Subsequence II.
+ * Top-down interval DP:
+ *   dfs(i, j, prev) = best good palindrome inside s[i..j],
+ *   where the next outer pair cannot use character prev.
+ */
+function buildSteps1682(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const n = s.length;
+  const steps = [];
+  const memo = new Map();
+  const best = Array.from({ length: n }, () => new Array(n).fill(""));
+  const chars = Array.from(new Set(s.split(""))).sort();
+  const ROOT = "{none}";
+  const MAX_RECORDED_STEPS = 180;
+
+  function key(i, j, prev) {
+    return `${i},${j},${prev}`;
+  }
+
+  function makeGrid(hl = null, deps = []) {
+    const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        display[i + 1][j + 1] = i <= j ? best[i][j] : "";
+      }
+    }
+    const shift = (cell) => cell ? [cell[0] + 1, cell[1] + 1] : null;
+    return {
+      dp: display,
+      text1: s,
+      text2: s,
+      rowLabels: Array.from({ length: n }, (_, idx) => ({ index: `i=${idx}`, char: s[idx] })),
+      colLabels: Array.from({ length: n }, (_, idx) => ({ index: `j=${idx}`, char: s[idx] })),
+      hlCell: shift(hl),
+      pathCells: deps.map(shift).filter(Boolean),
+    };
+  }
+
+  function snap(opts) {
+    if (steps.length >= MAX_RECORDED_STEPS && !opts.final) return;
+    steps.push({
+      title: opts.title,
+      arr: s.split(""),
+      grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  snap({
+    title: { vi: "Good palindromic subsequence", en: "Good palindromic subsequence" },
+    codeLines: [5],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "chars", value: `[${chars.join(", ")}]` },
+    ],
+    note: {
+      vi: "Can tim palindrome co do dai chan, va khong co 2 ky tu ke nhau bang nhau, tru cap o giua.",
+      en: "Find an even-length palindrome with no equal adjacent characters, except the middle pair.",
+    },
+  });
+
+  if (n < 2) {
+    snap({
+      title: { vi: "Qua ngan", en: "Too short" },
+      codeLines: [4, 20],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Good palindrome phai co do dai chan va can it nhat 2 ky tu.",
+        en: "A good palindrome is even-length and needs at least two characters.",
+      },
+      final: true,
+    });
+    return { s, answer: 0, steps };
+  }
+
+  function dfs(i, j, prev, depth = 0) {
+    const stateKey = key(i, j, prev);
+    const prevLabel = prev === ROOT ? "none" : prev;
+
+    snap({
+      title: { vi: `dfs(${i}, ${j}, prev=${prevLabel})`, en: `dfs(${i}, ${j}, prev=${prevLabel})` },
+      codeLines: [8],
+      hlCell: i <= j ? [i, j] : null,
+      highlight: Array.from({ length: Math.max(0, j - i + 1) }, (_, idx) => i + idx),
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: j },
+        { name: "prev", value: prevLabel },
+        { name: "substring", value: i <= j ? `"${s.slice(i, j + 1)}"` : "\"\"" },
+      ],
+      note: {
+        vi: `State nay tim ket qua tot nhat trong s[${i}..${j}], nhung cap boc ngoai ke tiep khong duoc dung '${prevLabel}'.`,
+        en: `This state searches s[${i}..${j}], but the next outer pair may not use '${prevLabel}'.`,
+      },
+    });
+
+    if (i >= j) {
+      snap({
+        title: { vi: "Base case = 0", en: "Base case = 0" },
+        codeLines: [9, 10],
+        vars: [{ name: `dfs(${i},${j},${prevLabel})`, value: 0 }],
+        note: {
+          vi: "Khong con du 2 ky tu de tao cap doi xung.",
+          en: "Fewer than two characters remain, so no pair can be added.",
+        },
+      });
+      memo.set(stateKey, 0);
+      return 0;
+    }
+
+    if (memo.has(stateKey)) {
+      const cached = memo.get(stateKey);
+      snap({
+        title: { vi: `Memo hit = ${cached}`, en: `Memo hit = ${cached}` },
+        codeLines: [7],
+        hlCell: [i, j],
+        vars: [{ name: `memo[${i},${j},${prevLabel}]`, value: cached }],
+        note: {
+          vi: "State nay da tinh roi, dung lai ket qua trong memo.",
+          en: "This state was already computed, reuse the memo value.",
+        },
+      });
+      return cached;
+    }
+
+    let ans = 0;
+    const candidates = [];
+
+    for (const ch of chars) {
+      const left = s.indexOf(ch, i);
+      const right = s.lastIndexOf(ch, j);
+      const usable = ch !== prev && left !== -1 && right !== -1 && left < right;
+
+      snap({
+        title: { vi: `Thu ky tu '${ch}'`, en: `Try character '${ch}'` },
+        codeLines: [13, 14, 15, 16],
+        hlCell: i <= j ? [i, j] : null,
+        pathCells: usable ? [[left, right]] : [],
+        highlight: usable ? [left, right] : [],
+        vars: [
+          { name: "ch", value: ch },
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "usable", value: usable },
+        ],
+        note: {
+          vi: usable
+            ? `Co the boc bang '${ch}' tai ${left} va ${right}, vi '${ch}' khac prev='${prevLabel}'.`
+            : `Bo qua '${ch}': can 2 vi tri khac nhau va khong duoc bang prev='${prevLabel}'.`,
+          en: usable
+            ? `Can wrap with '${ch}' at ${left} and ${right}, because it differs from prev='${prevLabel}'.`
+            : `Skip '${ch}': need two positions and it must differ from prev='${prevLabel}'.`,
+        },
+      });
+
+      if (!usable) continue;
+      const inner = dfs(left + 1, right - 1, ch, depth + 1);
+      const value = inner + 2;
+      candidates.push(`${ch}:${value}`);
+
+      snap({
+        title: { vi: `'${ch}' tao do dai ${value}`, en: `'${ch}' gives length ${value}` },
+        codeLines: [17],
+        hlCell: [i, j],
+        pathCells: [[left, right], [left + 1, right - 1]].filter(([r, c]) => r <= c),
+        highlight: [left, right],
+        mark: [left, right],
+        vars: [
+          { name: "inner", value: inner },
+          { name: "candidate", value: `${inner} + 2 = ${value}` },
+          { name: "best so far", value: Math.max(ans, value) },
+        ],
+        note: {
+          vi: `Them cap '${ch}' vao hai dau. Ben trong phai tranh lap '${ch}' ngay sat cap nay.`,
+          en: `Add '${ch}' on both ends. The inside must avoid placing '${ch}' immediately next to this pair.`,
+        },
+      });
+
+      ans = Math.max(ans, value);
+    }
+
+    memo.set(stateKey, ans);
+    if (i <= j) best[i][j] = best[i][j] === "" ? ans : Math.max(Number(best[i][j]), ans);
+
+    snap({
+      title: { vi: `Luu memo = ${ans}`, en: `Store memo = ${ans}` },
+      codeLines: [18],
+      hlCell: [i, j],
+      vars: [
+        { name: `memo[${i},${j},${prevLabel}]`, value: ans },
+        { name: "candidates", value: candidates.length ? candidates.join(", ") : "none" },
+      ],
+      note: {
+        vi: `Ket qua tot nhat cho state nay la ${ans}.`,
+        en: `The best result for this state is ${ans}.`,
+      },
+    });
+
+    return ans;
+  }
+
+  const answer = dfs(0, n - 1, ROOT);
+  if (steps.length >= MAX_RECORDED_STEPS) {
+    snap({
+      title: { vi: "Da rut gon buoc hien thi", en: "Display steps were capped" },
+      codeLines: [18],
+      vars: [{ name: "recorded steps", value: MAX_RECORDED_STEPS }],
+      note: {
+        vi: "Mot so state memo tuong tu duoc tinh nhung khong hien het de visualizer gon hon.",
+        en: "Some similar memo states were computed but not all were shown to keep the visualizer compact.",
+      },
+    });
+  }
+  snap({
+    title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [20],
+    hlCell: [0, n - 1],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Longest good palindromic subsequence cua "${s}" co do dai ${answer}.`,
+      en: `The longest good palindromic subsequence of "${s}" has length ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 1312: Minimum Insertion Steps to Make a String Palindrome.
  * Interval DP:
  *   dp[i][j] = minimum insertions needed to make s[i..j] a palindrome.
@@ -10757,7 +10991,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -10789,6 +11023,7 @@ module.exports = {
           { id: 931, name: "Minimum Falling Path Sum", pattern: "Matrix DP" },
           { id: 1143, name: "Longest Common Subsequence", pattern: "2D DP" },
           { id: 516, name: "Longest Palindromic Subsequence", pattern: "Interval DP" },
+          { id: 1682, name: "Longest Palindromic Subsequence II", pattern: "Interval DP + last char state" },
           { id: 72, name: "Edit Distance", pattern: "2D DP" },
           { id: 416, name: "Partition Equal Subset Sum", pattern: "0/1 Knapsack" },
         ],
@@ -13221,6 +13456,60 @@ module.exports = {
       "        return dp[0][n - 1]",
     ],
     builder: buildSteps516,
+  },
+  1682: {
+    id: 1682,
+    difficulty: "medium",
+    premium: true,
+    slug: "longest-palindromic-subsequence-ii",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Longest Palindromic Subsequence II", en: "Longest Palindromic Subsequence II" },
+    titleVi: { vi: "Day con palindrome tot dai nhat II", en: "Longest good palindromic subsequence" },
+    statement: {
+      vi: "Cho chuoi s, tim do dai day con palindrome tot dai nhat. Good palindrome phai co do dai chan va khong co 2 ky tu ke nhau bang nhau, ngoai tru cap o giua.",
+      en: "Given a string s, return the length of the longest good palindromic subsequence. A good palindrome has even length and no two consecutive characters are equal, except the two middle ones.",
+    },
+    defaultInput: "abcabcabb",
+    inputKind: "string",
+    inputLabel: { vi: "Chuoi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "State: dfs(i,j,prev) = ket qua tot nhat trong s[i..j], khi cap boc ngoai tiep theo khong duoc dung prev.", en: "State: dfs(i,j,prev) = best answer inside s[i..j], where the next wrapping pair may not use prev." },
+      { vi: "Thu moi ky tu ch: tim vi tri trai/phai dau-cuoi cua ch trong interval. Neu co 2 vi tri va ch != prev, co the lay 2 + dfs(left+1,right-1,ch).", en: "Try each character ch: find the first/last ch in the interval. If there are two positions and ch != prev, take 2 + dfs(left+1,right-1,ch)." },
+      { vi: "Dieu kien ch != prev ngan 2 ky tu ke nhau bang nhau o canh cap vua them; cap giua van duoc phep giong nhau.", en: "The ch != prev rule prevents equal adjacent characters next to the pair just added; the middle pair is still allowed to be equal." },
+      { vi: "Dung memo de tranh tinh lai cung state.", en: "Use memoization to avoid recomputing the same state." },
+    ],
+    complexity: {
+      time: "O(n^2 * C^2)",
+      space: "O(n^2 * C)",
+      note: {
+        vi: "Co O(n^2*C) state dfs(i,j,prev). Moi state thu toi da C ky tu; C=26 voi chu cai thuong.",
+        en: "There are O(n^2*C) states dfs(i,j,prev). Each state tries up to C characters; C=26 for lowercase letters.",
+      },
+    },
+    code: [
+      "from functools import cache",
+      "",
+      "class Solution:",
+      "    def longestPalindromeSubseq(self, s: str) -> int:",
+      "        chars = sorted(set(s))",
+      "",
+      "        @cache",
+      "        def dfs(i: int, j: int, prev: str) -> int:",
+      "            if i >= j:",
+      "                return 0",
+      "",
+      "            ans = 0",
+      "            for ch in chars:",
+      "                left = s.find(ch, i, j + 1)",
+      "                right = s.rfind(ch, i, j + 1)",
+      "                if ch != prev and left != -1 and left < right:",
+      "                    ans = max(ans, 2 + dfs(left + 1, right - 1, ch))",
+      "            return ans",
+      "",
+      "        return dfs(0, len(s) - 1, \"\")",
+    ],
+    builder: buildSteps1682,
   },
   1312: {
     id: 1312,
