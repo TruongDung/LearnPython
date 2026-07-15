@@ -37,6 +37,8 @@ const I18N = {
     errConn: "Lỗi kết nối tới server.",
     errArr: "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1",
     errSolve: "Không xử lý được.",
+    premiumLabel: "LeetCode Premium",
+    premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -62,6 +64,8 @@ const I18N = {
     errConn: "Connection error to server.",
     errArr: "Enter positive integers separated by commas. E.g. 2,2,1,2,1",
     errSolve: "Could not process the request.",
+    premiumLabel: "LeetCode Premium",
+    premiumHidden: "LeetCode description hidden because this is a Premium problem.",
   },
 };
 
@@ -229,11 +233,23 @@ function renderCatalog() {
       pid.className = "pid";
       pid.textContent = `#${p.id}`;
 
+      const metaRow = document.createElement("span");
+      metaRow.className = "prob-meta";
+      metaRow.appendChild(pid);
+      if (p.premium) {
+        const premium = document.createElement("span");
+        premium.className = "premium-key";
+        premium.textContent = "🔑";
+        premium.title = t().premiumLabel;
+        premium.setAttribute("aria-label", t().premiumLabel);
+        metaRow.appendChild(premium);
+      }
+
       const pname = document.createElement("span");
       pname.className = "pname";
       pname.textContent = pick(p.title);
 
-      chip.appendChild(pid);
+      chip.appendChild(metaRow);
       chip.appendChild(pname);
       if (p.difficulty) {
         const diff = document.createElement("span");
@@ -345,7 +361,14 @@ function renderProblem() {
   }
 
   $("problemTitleVi").textContent = pick(problemData.titleVi);
-  $("problemStatement").textContent = pick(problemData.statement);
+  const statementEl = $("problemStatement");
+  if (problemData.premium) {
+    statementEl.textContent = t().premiumHidden;
+    statementEl.classList.add("premium-hidden-statement");
+  } else {
+    statementEl.textContent = pick(problemData.statement);
+    statementEl.classList.remove("premium-hidden-statement");
+  }
   // Input label: use custom label if provided, otherwise default
   $("arrLabel").textContent = problemData.inputLabel
     ? pick(problemData.inputLabel)

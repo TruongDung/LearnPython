@@ -168,6 +168,27 @@ header h1 {
   color: #f1f5f9;
 }
 
+.prob-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.premium-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.36);
+  color: #fbbf24;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .prob-chip .pname {
   font-size: 11px;
   color: #cbd5e1;
@@ -321,6 +342,24 @@ button:disabled {
   color: #cbd5e1;
   font-size: 14px;
   line-height: 1.7;
+}
+
+.premium-hidden-statement {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  margin: 10px 0 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  color: #fde68a;
+}
+
+.premium-hidden-statement::before {
+  content: "🔑";
+  font-size: 14px;
 }
 
 /* ---- Complexity ---- */
@@ -1511,6 +1550,12 @@ button:disabled {
   color: #64748b;
 }
 
+[data-theme="light"] .premium-key {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
 [data-theme="light"] input {
   background: white;
   border-color: #e2e8f0;
@@ -1542,6 +1587,12 @@ button:disabled {
 
 [data-theme="light"] .statement {
   color: #475569;
+}
+
+[data-theme="light"] .premium-hidden-statement {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
 }
 
 [data-theme="light"] .complexity {

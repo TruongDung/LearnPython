@@ -9,7 +9,14 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const { SUPPORTED, CATEGORY_ORDER } = require("./problems");
 
+const PREMIUM_PROBLEM_IDS = new Set([
+  156, 246, 253, 270, 276, 285, 314, 323, 366, 426, 487, 588, 734, 760, 1101,
+  1136, 1166, 1197, 1236, 1258, 1644, 1650, 1676,
+]);
 
+function isPremium(problem) {
+  return Boolean(problem.premium || PREMIUM_PROBLEM_IDS.has(problem.id));
+}
 
 app.get("/api/problems", (req, res) => {
   // Group problems by algorithm category
@@ -20,7 +27,13 @@ app.get("/api/problems", (req, res) => {
     if (!groupsMap[cat.key]) {
       groupsMap[cat.key] = { key: cat.key, vi: cat.vi, en: cat.en, problems: [] };
     }
-    groupsMap[cat.key].problems.push({ id: p.id, title: p.title, titleVi: p.titleVi, difficulty: p.difficulty || null });
+    groupsMap[cat.key].problems.push({
+      id: p.id,
+      title: p.title,
+      titleVi: p.titleVi,
+      difficulty: p.difficulty || null,
+      premium: isPremium(p),
+    });
   }
   const groups = Object.values(groupsMap);
   groups.forEach((g) => {
@@ -54,6 +67,7 @@ app.get("/api/problem/:id", (req, res) => {
   res.json({
     id: problem.id,
     difficulty: problem.difficulty || null,
+    premium: isPremium(problem),
     slug: problem.slug || null,
     category: problem.category || null,
     title: problem.title,
