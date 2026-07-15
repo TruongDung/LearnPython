@@ -256,7 +256,7 @@ function buildSteps1598Stack(input) {
 
   pushStep({
     title: { vi: "Initialize stack", en: "Initialize stack" },
-    codeLine: 3,
+    codeLine: 4,
     vars: [{ name: "stack", value: "[]" }],
     note: {
       vi: "Use stack to store the current path. Top of stack is the current folder.",
@@ -976,7 +976,7 @@ function buildSteps20(input) {
     const ch = chars[i];
     pushStep({
       title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
-      codeLine: 4,
+      codeLine: 5,
       current: i,
       highlight: [i],
       vars: [
@@ -993,7 +993,7 @@ function buildSteps20(input) {
       stack.push(ch);
       pushStep({
         title: { vi: `Push '${ch}'`, en: `Push '${ch}'` },
-        codeLine: 6,
+        codeLine: 7,
         current: i,
         highlight: [i],
         mark: [i],
@@ -1010,7 +1010,7 @@ function buildSteps20(input) {
     const top = stack.length ? stack[stack.length - 1] : null;
     pushStep({
       title: { vi: `Need '${expected}'`, en: `Need '${expected}'` },
-      codeLine: 8,
+      codeLine: 11,
       current: i,
       expected,
       highlight: [i],
@@ -1028,7 +1028,7 @@ function buildSteps20(input) {
     if (!top || top !== expected) {
       pushStep({
         title: { vi: "Mismatch -> False", en: "Mismatch -> False" },
-        codeLine: 9,
+        codeLine: !top ? 9 : 13,
         current: i,
         expected,
         highlight: [i],
@@ -1049,7 +1049,7 @@ function buildSteps20(input) {
     stack.pop();
     pushStep({
       title: { vi: `Pop '${expected}'`, en: `Pop '${expected}'` },
-      codeLine: 10,
+      codeLine: 15,
       current: i,
       expected,
       highlight: [i],
@@ -1065,7 +1065,7 @@ function buildSteps20(input) {
   const answer = stack.length === 0;
   pushStep({
     title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
-    codeLine: 11,
+    codeLine: 17,
     mark: answer ? chars.map((_, i) => i) : [],
     vars: [{ name: "answer", value: answer }],
     note: {
@@ -1116,13 +1116,20 @@ module.exports = {
       "class Solution:",
       "    def isValid(self, s: str) -> bool:",
       "        stack = []",
+      "        pairs = {')': '(', ']': '[', '}': '{'}",
       "        for ch in s:",
       "            if ch in '([{':",
       "                stack.append(ch)",
       "            else:",
-      "                if not stack or stack[-1] != {')':'(', ']':'[', '}':'{'}[ch]:",
+      "                if not stack:",
       "                    return False",
+      "",
+      "                expected_open = pairs[ch]",
+      "                if stack[-1] != expected_open:",
+      "                    return False",
+      "",
       "                stack.pop()",
+      "",
       "        return not stack",
     ],
     builder: buildSteps20,
