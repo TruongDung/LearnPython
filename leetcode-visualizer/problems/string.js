@@ -938,6 +938,14 @@ function buildSteps20(input) {
   }
 
   function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    const explicitVars = opts.vars || [];
+    const hasCurrentChar = current >= 0 && current < chars.length;
+    const currentCharVar =
+      hasCurrentChar && !explicitVars.some((item) => item.name === "ch")
+        ? [{ name: "ch", value: chars[current] }]
+        : [];
+
     steps.push({
       title: opts.title,
       arr: chars.map((ch) => (opens.has(ch) ? 1 : -1)),
@@ -948,14 +956,15 @@ function buildSteps20(input) {
       stackView: {
         items: stack.slice(),
         input: chars,
-        current: Number.isInteger(opts.current) ? opts.current : -1,
+        current,
         expected: opts.expected || "",
       },
       vars: [
         { name: "stack", value: stackLabel() },
         { name: "top", value: stack.length ? stack[stack.length - 1] : "empty" },
         { name: "s", value: `"${s}"` },
-        ...(opts.vars || []),
+        ...currentCharVar,
+        ...explicitVars,
       ],
       note: opts.note,
       final: Boolean(opts.final),
