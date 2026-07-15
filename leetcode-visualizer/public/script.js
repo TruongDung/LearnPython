@@ -240,14 +240,6 @@ function renderCatalog() {
       const metaRow = document.createElement("span");
       metaRow.className = "prob-meta";
       metaRow.appendChild(pid);
-      if (p.premium) {
-        const premium = document.createElement("span");
-        premium.className = "premium-key";
-        premium.textContent = "🔑";
-        premium.title = t().premiumLabel;
-        premium.setAttribute("aria-label", t().premiumLabel);
-        metaRow.appendChild(premium);
-      }
 
       const pname = document.createElement("span");
       pname.className = "pname";
