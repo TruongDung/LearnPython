@@ -1025,6 +1025,7 @@ function buildSteps20(input) {
       highlight: [i],
       vars: [
         { name: "closing", value: ch },
+        { name: "pairs[ch]", value: expected },
         { name: "expected top", value: expected },
         { name: "actual top", value: top || "empty" },
       ],
@@ -1041,7 +1042,10 @@ function buildSteps20(input) {
         current: i,
         expected,
         highlight: [i],
-        vars: [{ name: "answer", value: false }],
+        vars: [
+          { name: "pairs[ch]", value: expected },
+          { name: "answer", value: false },
+        ],
         note: {
           vi: !top
             ? `Stack is empty, so '${ch}' has no matching opener.`
@@ -1063,7 +1067,10 @@ function buildSteps20(input) {
       expected,
       highlight: [i],
       mark: [i],
-      vars: [{ name: "action", value: "pop" }],
+      vars: [
+        { name: "pairs[ch]", value: expected },
+        { name: "action", value: "pop" },
+      ],
       note: {
         vi: `Matched '${expected}${ch}', so pop '${expected}' from the stack.`,
         en: `Matched '${expected}${ch}', so pop '${expected}' from the stack.`,
