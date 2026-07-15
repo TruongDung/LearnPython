@@ -920,7 +920,198 @@ function buildSteps1670(input) {
   return { operations: ops, answer: lastResult, steps };
 }
 
+/**
+ * LeetCode 20: Valid Parentheses.
+ * Use a stack of opening brackets and match every closing bracket with the top.
+ */
+function buildSteps20(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const chars = s.split("");
+  const stack = [];
+  const steps = [];
+  const pairs = { ")": "(", "]": "[", "}": "{" };
+  const opens = new Set(["(", "[", "{"]);
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function pushStep(opts) {
+    steps.push({
+      title: opts.title,
+      arr: chars.map((ch) => (opens.has(ch) ? 1 : -1)),
+      sub: chars,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: [opts.codeLine],
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "top", value: stack.length ? stack[stack.length - 1] : "empty" },
+        { name: "s", value: `"${s}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 3,
+    vars: [{ name: "n", value: chars.length }],
+    note: {
+      vi: "Scan left to right. Opening brackets go onto the stack; closing brackets must match the stack top.",
+      en: "Scan left to right. Opening brackets go onto the stack; closing brackets must match the stack top.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    pushStep({
+      title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
+      codeLine: 4,
+      highlight: [i],
+      vars: [
+        { name: "i", value: i },
+        { name: "ch", value: ch },
+      ],
+      note: {
+        vi: `Process s[${i}] = '${ch}'.`,
+        en: `Process s[${i}] = '${ch}'.`,
+      },
+    });
+
+    if (opens.has(ch)) {
+      stack.push(ch);
+      pushStep({
+        title: { vi: `Push '${ch}'`, en: `Push '${ch}'` },
+        codeLine: 6,
+        highlight: [i],
+        mark: [i],
+        vars: [{ name: "action", value: "push" }],
+        note: {
+          vi: `'${ch}' is an opening bracket, so push it onto the stack.`,
+          en: `'${ch}' is an opening bracket, so push it onto the stack.`,
+        },
+      });
+      continue;
+    }
+
+    const expected = pairs[ch];
+    const top = stack.length ? stack[stack.length - 1] : null;
+    pushStep({
+      title: { vi: `Need '${expected}'`, en: `Need '${expected}'` },
+      codeLine: 8,
+      highlight: [i],
+      vars: [
+        { name: "closing", value: ch },
+        { name: "expected top", value: expected },
+        { name: "actual top", value: top || "empty" },
+      ],
+      note: {
+        vi: `To match '${ch}', the stack top must be '${expected}'.`,
+        en: `To match '${ch}', the stack top must be '${expected}'.`,
+      },
+    });
+
+    if (!top || top !== expected) {
+      pushStep({
+        title: { vi: "Mismatch -> False", en: "Mismatch -> False" },
+        codeLine: 9,
+        highlight: [i],
+        vars: [{ name: "answer", value: false }],
+        note: {
+          vi: !top
+            ? `Stack is empty, so '${ch}' has no matching opener.`
+            : `Top '${top}' does not match '${ch}'.`,
+          en: !top
+            ? `Stack is empty, so '${ch}' has no matching opener.`
+            : `Top '${top}' does not match '${ch}'.`,
+        },
+        final: true,
+      });
+      return { s, answer: false, steps };
+    }
+
+    stack.pop();
+    pushStep({
+      title: { vi: `Pop '${expected}'`, en: `Pop '${expected}'` },
+      codeLine: 10,
+      highlight: [i],
+      mark: [i],
+      vars: [{ name: "action", value: "pop" }],
+      note: {
+        vi: `Matched '${expected}${ch}', so pop '${expected}' from the stack.`,
+        en: `Matched '${expected}${ch}', so pop '${expected}' from the stack.`,
+      },
+    });
+  }
+
+  const answer = stack.length === 0;
+  pushStep({
+    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    codeLine: 11,
+    mark: answer ? chars.map((_, i) => i) : [],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: answer
+        ? "Every closing bracket matched and the stack is empty."
+        : `Input ended but stack still contains ${stackLabel()}.`,
+      en: answer
+        ? "Every closing bracket matched and the stack is empty."
+        : `Input ended but stack still contains ${stackLabel()}.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
 module.exports = {
+  20: {
+    id: 20,
+    difficulty: "easy",
+    slug: "valid-parentheses",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Valid Parentheses", en: "Valid Parentheses" },
+    titleVi: { vi: "Kiểm tra ngoặc hợp lệ", en: "Check if brackets are valid" },
+    statement: {
+      vi: "Cho chuỗi chỉ gồm '(', ')', '[', ']', '{', '}'. Kiểm tra các ngoặc có đóng/mở đúng thứ tự hay không.",
+      en: "Given a string containing only '(', ')', '[', ']', '{', '}', determine whether the brackets are closed in the correct order.",
+    },
+    defaultInput: "()[]{}",
+    inputKind: "string",
+    inputLabel: { vi: "String s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt từng ký tự từ trái sang phải.", en: "Scan each character from left to right." },
+      { vi: "Nếu là ngoặc mở, push vào stack.", en: "If it is an opening bracket, push it onto the stack." },
+      { vi: "Nếu là ngoặc đóng, stack top phải là ngoặc mở tương ứng; nếu không thì false.", en: "If it is a closing bracket, the stack top must be the matching opener; otherwise return false." },
+      { vi: "Cuối cùng stack phải rỗng.", en: "At the end, the stack must be empty." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt mỗi ký tự một lần. Stack tệ nhất chứa toàn bộ các ngoặc mở.",
+        en: "Each character is processed once. In the worst case, the stack stores all opening brackets.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isValid(self, s: str) -> bool:",
+      "        stack = []",
+      "        for ch in s:",
+      "            if ch in '([{':",
+      "                stack.append(ch)",
+      "            else:",
+      "                if not stack or stack[-1] != {')':'(', ']':'[', '}':'{'}[ch]:",
+      "                    return False",
+      "                stack.pop()",
+      "        return not stack",
+    ],
+    builder: buildSteps20,
+  },
   1670: {
     id: 1670,
     difficulty: "medium",
