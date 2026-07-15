@@ -4284,6 +4284,13 @@ function buildSteps1406(stones) {
   }
 
   function step(opts) {
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "dp")) {
+      vars.push({ name: "dp", value: formatDp() });
+    }
+    if (!vars.some((item) => item.name === "stones")) {
+      vars.push({ name: "stones", value: `[${stones.join(", ")}]` });
+    }
     steps.push({
       title: opts.title,
       arr: visibleDp(),
@@ -4291,7 +4298,7 @@ function buildSteps1406(stones) {
       highlight: opts.highlight || [],
       mark: opts.mark || [],
       codeLines: [opts.codeLine],
-      vars: opts.vars || [],
+      vars,
       note: opts.note,
       final: Boolean(opts.final),
     });
