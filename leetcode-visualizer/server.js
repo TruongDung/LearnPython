@@ -93,6 +93,12 @@ app.post("/api/problem/:id/solve", (req, res) => {
         error: "Đầu vào s phải là một chuỗi không rỗng.",
       });
     }
+  } else if (problem.inputKind === "stringArray") {
+    if (!Array.isArray(input) || input.length === 0 || !input.every((s) => typeof s === "string")) {
+      return res.status(400).json({
+        error: "Input must be an array of strings, e.g. [\"10\",\"0001\",\"1\",\"0\"].",
+      });
+    }
   } else {
     if (!Array.isArray(input) || input.length === 0 || !input.every((n) => Number.isInteger(n))) {
       return res.status(400).json({

@@ -306,7 +306,7 @@ async function loadProblem() {
     problemData = data;
     renderProblem();
     $("arrInput").value = Array.isArray(data.defaultInput)
-      ? data.defaultInput.join(",")
+      ? (data.inputKind === "stringArray" ? JSON.stringify(data.defaultInput) : data.defaultInput.join(","))
       : data.defaultInput;
     markActiveChip();
 
@@ -529,12 +529,25 @@ async function runViz() {
   hide("runError");
 
   const isString = problemData && problemData.inputKind === "string";
+  const isStringArray = problemData && problemData.inputKind === "stringArray";
   let input;
 
   if (isString) {
     input = $("arrInput").value.trim();
     if (input.length === 0) {
       return showError("runError", t().errArr);
+    }
+  } else if (isStringArray) {
+    const raw = $("arrInput").value.trim();
+    try {
+      input = raw.startsWith("[")
+        ? JSON.parse(raw)
+        : raw.split(",").map((s) => s.trim()).filter((s) => s !== "");
+    } catch (err) {
+      return showError("runError", 'Enter strings as JSON, e.g. ["10","0001","1","0"], or comma separated.');
+    }
+    if (!Array.isArray(input) || input.length === 0 || input.some((s) => typeof s !== "string")) {
+      return showError("runError", 'Enter strings as JSON, e.g. ["10","0001","1","0"], or comma separated.');
     }
   } else {
     const raw = $("arrInput").value.trim();

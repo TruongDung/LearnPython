@@ -7758,6 +7758,198 @@ function buildSteps1388(slices) {
 }
 
 /**
+ * LeetCode 474: Ones and Zeroes.
+ * 0/1 knapsack with two capacities: zeros (m) and ones (n).
+ * dp[z][o] = maximum number of strings using at most z zeroes and o ones.
+ */
+function buildSteps474(strs, params) {
+  const m = Number.isFinite(Number(params.m)) ? Number(params.m) : 5;
+  const n = Number.isFinite(Number(params.n)) ? Number(params.n) : 3;
+  const clean = strs.map((s) => String(s));
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  const steps = [];
+
+  function count01(str) {
+    let zeros = 0;
+    let ones = 0;
+    for (const ch of str) {
+      if (ch === "0") zeros += 1;
+      else if (ch === "1") ones += 1;
+    }
+    return { zeros, ones };
+  }
+
+  function gridSnap(opts) {
+    const vars = [];
+    if (opts.idx !== undefined) vars.push({ name: "idx", value: opts.idx });
+    if (opts.z !== undefined) vars.push({ name: "z", value: opts.z });
+    if (opts.o !== undefined) vars.push({ name: "o", value: opts.o });
+    for (const item of opts.vars || []) vars.push(item);
+    steps.push({
+      title: opts.title,
+      arr: clean.map((s) => s.length),
+      sub: clean.map((s, idx) => `${idx}: ${s}`),
+      highlight: opts.idx === undefined ? [] : [opts.idx],
+      mark: opts.mark || [],
+      grid: {
+        dp: dp.map((row) => [...row]),
+        rowLabels: Array.from({ length: m + 1 }, (_, z) => ({ index: `z=${z}`, char: "0s" })),
+        colLabels: Array.from({ length: n + 1 }, (_, o) => ({ index: `o=${o}`, char: "1s" })),
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+        showIndices: true,
+      },
+      codeLines: opts.codeLines || [],
+      vars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  gridSnap({
+    title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
+    codeLines: [3],
+    vars: [
+      { name: "strs", value: `[${clean.map((s) => `"${s}"`).join(", ")}]` },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: "dp[z][o] luu so chuoi nhieu nhat co the chon voi toi da z so 0 va o so 1.",
+      en: "dp[z][o] stores the maximum number of strings using at most z zeroes and o ones.",
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Khoi tao bang DP", en: "Initialize DP table" },
+    codeLines: [5],
+    vars: [{ name: "dp size", value: `${m + 1} x ${n + 1}` }],
+    note: {
+      vi: "Ban dau chua chon chuoi nao, moi o bang 0.",
+      en: "Before choosing any string, every capacity has value 0.",
+    },
+  });
+
+  clean.forEach((str, idx) => {
+    const { zeros, ones } = count01(str);
+    gridSnap({
+      title: { vi: `Xet strs[${idx}] = "${str}"`, en: `Process strs[${idx}] = "${str}"` },
+    codeLines: [5, 6, 7],
+      idx,
+      vars: [
+        { name: "string", value: str },
+        { name: "zeros", value: zeros },
+        { name: "ones", value: ones },
+      ],
+      note: {
+        vi: `"${str}" co ${zeros} so 0 va ${ones} so 1. Cap nhat nguoc de moi chuoi chi duoc dung mot lan.`,
+        en: `"${str}" has ${zeros} zeroes and ${ones} ones. Iterate backward so this string is used at most once.`,
+      },
+    });
+
+    if (zeros > m || ones > n) {
+      gridSnap({
+        title: { vi: "Bo qua: vuot capacity", en: "Skip: exceeds capacity" },
+        codeLines: [9],
+        idx,
+        vars: [
+          { name: "zeros", value: zeros },
+          { name: "ones", value: ones },
+          { name: "capacity", value: `m=${m}, n=${n}` },
+        ],
+        note: {
+          vi: "Chuoi nay tu no da vuot qua so 0 hoac so 1 cho phep, nen khong cap nhat o nao.",
+          en: "This string alone exceeds the allowed zero/one capacity, so no cell can be updated.",
+        },
+      });
+      return;
+    }
+
+    for (let z = m; z >= zeros; z--) {
+      gridSnap({
+        title: { vi: `Loop z=${z}`, en: `Loop z=${z}` },
+        codeLines: [9],
+        idx,
+        z,
+        vars: [
+          { name: "zeros", value: zeros },
+          { name: "ones", value: ones },
+        ],
+        note: {
+          vi: "Duyet z giam dan de tranh dung lai cung mot chuoi trong lan cap nhat nay.",
+          en: "Scan z downward to avoid reusing the same string during this update.",
+        },
+      });
+
+      for (let o = n; o >= ones; o--) {
+        const skip = dp[z][o];
+        const takeFrom = dp[z - zeros][o - ones];
+        const take = takeFrom + 1;
+        gridSnap({
+          title: { vi: `Thu dat "${str}" vao dp[${z}][${o}]`, en: `Try taking "${str}" for dp[${z}][${o}]` },
+          codeLines: [10, 11, 12, 13],
+          idx,
+          z,
+          o,
+          hlCell: [z, o],
+          pathCells: [[z - zeros, o - ones]],
+          cellLabels: { [`${z - zeros},${o - ones}`]: "take from" },
+          vars: [
+            { name: "skip", value: `dp[${z}][${o}] = ${skip}` },
+            { name: "take", value: `dp[${z - zeros}][${o - ones}] + 1 = ${takeFrom} + 1 = ${take}` },
+          ],
+          note: {
+            vi: `So sanh khong lay chuoi (${skip}) voi lay chuoi (${take}).`,
+            en: `Compare skipping the string (${skip}) vs taking it (${take}).`,
+          },
+        });
+
+        dp[z][o] = Math.max(skip, take);
+        gridSnap({
+          title: { vi: `dp[${z}][${o}] = ${dp[z][o]}`, en: `dp[${z}][${o}] = ${dp[z][o]}` },
+          codeLines: [11, 12, 13, 14],
+          idx,
+          z,
+          o,
+          hlCell: [z, o],
+          pathCells: [[z - zeros, o - ones]],
+          cellLabels: { [`${z - zeros},${o - ones}`]: "take from" },
+          vars: [
+            { name: "skip", value: skip },
+            { name: "take", value: take },
+            { name: `dp[${z}][${o}]`, value: dp[z][o] },
+          ],
+          note: {
+            vi: `Lay max(${skip}, ${take}) = ${dp[z][o]}.`,
+            en: `Take max(${skip}, ${take}) = ${dp[z][o]}.`,
+          },
+        });
+      }
+    }
+  });
+
+  const answer = dp[m][n];
+  gridSnap({
+    title: { vi: `return dp[${m}][${n}] = ${answer}`, en: `return dp[${m}][${n}] = ${answer}` },
+    codeLines: [16],
+    hlCell: [m, n],
+    vars: [
+      { name: `dp[${m}][${n}]`, value: answer },
+      { name: "return", value: answer },
+    ],
+    note: {
+      vi: `Ket qua la ${answer} chuoi nhieu nhat co the chon.`,
+      en: `The result is the maximum ${answer} strings that can be selected.`,
+    },
+    final: true,
+  });
+
+  return { strs: clean, m, n, answer, steps };
+}
+
+/**
  * LeetCode 494: Target Sum.
  *
  * Assign '+' or '−' to each element of nums so the signed sum equals target.
@@ -9906,7 +10098,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -10198,6 +10390,54 @@ module.exports = {
       "        return dp[target]",
     ],
     builder: buildSteps416,
+  },
+  474: {
+    id: 474,
+    difficulty: "medium",
+    slug: "ones-and-zeroes",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Ones and Zeroes", en: "Ones and Zeroes" },
+    titleVi: { vi: "So luong chuoi 0/1 toi da", en: "Maximum binary strings" },
+    statement: {
+      vi: "Cho mang chuoi nhi phan strs va hai so m, n. Chon nhieu chuoi nhat sao cho tong so 0 khong vuot m va tong so 1 khong vuot n.",
+      en: "Given binary strings strs and integers m, n. Pick the maximum number of strings using at most m zeroes and n ones.",
+    },
+    defaultInput: ["10", "0001", "111001", "1", "0"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "strs", en: "strs" },
+    extraParams: [
+      { key: "m", type: "number", label: { vi: "m (so 0)", en: "m (zeroes)" }, default: 5 },
+      { key: "n", type: "number", label: { vi: "n (so 1)", en: "n (ones)" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Day la 0/1 knapsack voi 2 capacity: so 0 va so 1.", en: "This is 0/1 knapsack with two capacities: zeroes and ones." },
+      { vi: "dp[z][o] = so chuoi nhieu nhat co the chon voi toi da z so 0 va o so 1.", en: "dp[z][o] = max strings that can be picked using at most z zeroes and o ones." },
+      { vi: "Voi moi chuoi, dem zeros/ones roi duyet z va o giam dan de moi chuoi chi duoc dung mot lan.", en: "For each string, count zeroes/ones, then scan z and o downward so each string is used at most once." },
+    ],
+    complexity: {
+      time: "O(len(strs)*m*n)",
+      space: "O(m*n)",
+      note: { vi: "Bang DP co (m+1)*(n+1) o, moi chuoi cap nhat mot lan.", en: "The DP table has (m+1)*(n+1) cells, and each string updates it once." },
+    },
+    code: [
+      "class Solution:",
+      "    def findMaxForm(self, strs: List[str], m: int, n: int) -> int:",
+      "        dp = [[0] * (n + 1) for _ in range(m + 1)]",
+      "",
+      "        for s in strs:",
+      "            zeros = s.count('0')",
+      "            ones = s.count('1')",
+      "",
+      "            for z in range(m, zeros - 1, -1):",
+      "                for o in range(n, ones - 1, -1):",
+      "                    dp[z][o] = max(",
+      "                        dp[z][o],",
+      "                        dp[z - zeros][o - ones] + 1",
+      "                    )",
+      "",
+      "        return dp[m][n]",
+    ],
+    builder: buildSteps474,
   },
   72: {
     id: 72, difficulty: "medium", slug: "edit-distance",
