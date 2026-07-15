@@ -648,7 +648,344 @@ function buildSteps641(input) {
   return { operations: ops, answer: lastResult, steps };
 }
 
+/**
+ * LeetCode 1670: Design Front Middle Back Queue.
+ * Visualize the standard two-half deque approach.
+ */
+function buildSteps1670(input) {
+  const ops = parseDequeOps641(input);
+  if (ops[0] && ops[0].name === "FrontMiddleBackQueue") ops.shift();
+
+  const left = [];
+  const right = [];
+  const steps = [];
+  let lastResult = null;
+
+  function queueValues() {
+    return left.concat(right);
+  }
+
+  function middleIndex() {
+    const n = queueValues().length;
+    return n === 0 ? -1 : Math.floor((n - 1) / 2);
+  }
+
+  function labels() {
+    const q = queueValues();
+    const mid = middleIndex();
+    return q.map((_, idx) => {
+      const marks = [];
+      if (idx === 0) marks.push("F");
+      if (idx === mid) marks.push("M");
+      if (idx === q.length - 1) marks.push("B");
+      return marks.length ? `${idx}:${marks.join("")}` : String(idx);
+    });
+  }
+
+  function vars(extra = []) {
+    return [
+      { name: "queue", value: `[${queueValues().join(", ")}]` },
+      { name: "left", value: `[${left.join(", ")}]` },
+      { name: "right", value: `[${right.join(", ")}]` },
+      { name: "middleIndex", value: middleIndex() },
+      { name: "size", value: queueValues().length },
+      { name: "lastResult", value: lastResult === null ? "none" : lastResult },
+      ...extra,
+    ];
+  }
+
+  function pushStep(opts) {
+    const q = queueValues();
+    const mid = middleIndex();
+    const mark = [];
+    if (q.length) {
+      mark.push(0);
+      if (!mark.includes(mid)) mark.push(mid);
+      if (!mark.includes(q.length - 1)) mark.push(q.length - 1);
+    }
+    steps.push({
+      title: opts.title,
+      arr: q.length ? q : [0],
+      sub: q.length ? labels() : ["empty"],
+      highlight: opts.highlight || [],
+      mark: opts.mark || mark,
+      codeLines: [opts.codeLine],
+      vars: vars(opts.vars || []),
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  function balance() {
+    let moved = null;
+    if (left.length < right.length) {
+      moved = right.shift();
+      left.push(moved);
+    } else if (left.length > right.length + 1) {
+      moved = left.pop();
+      right.unshift(moved);
+    }
+    return moved;
+  }
+
+  pushStep({
+    title: { vi: "Initialize queue", en: "Initialize queue" },
+    codeLine: 3,
+    vars: [{ name: "operation", value: "FrontMiddleBackQueue()" }],
+    note: {
+      vi: "Use two halves. left stores the front half and may have one extra item.",
+      en: "Use two halves. left stores the front half and may have one extra item.",
+    },
+  });
+
+  for (let stepIndex = 0; stepIndex < ops.length; stepIndex++) {
+    const { name, args } = ops[stepIndex];
+    const value = args[0];
+    pushStep({
+      title: { vi: `Call ${name}`, en: `Call ${name}` },
+      codeLine: 4,
+      vars: [
+        { name: "step", value: stepIndex + 1 },
+        { name: "operation", value: `${name}(${args.join(",")})` },
+      ],
+      note: {
+        vi: `Process operation ${stepIndex + 1}: ${name}(${args.join(",")}).`,
+        en: `Process operation ${stepIndex + 1}: ${name}(${args.join(",")}).`,
+      },
+    });
+
+    if (name === "pushFront") {
+      left.unshift(value);
+      pushStep({
+        title: { vi: `pushFront(${value})`, en: `pushFront(${value})` },
+        codeLine: 7,
+        highlight: [0],
+        vars: [{ name: "value", value }],
+        note: {
+          vi: `Insert ${value} at the front of left.`,
+          en: `Insert ${value} at the front of left.`,
+        },
+      });
+      const moved = balance();
+      pushStep({
+        title: { vi: "Balance halves", en: "Balance halves" },
+        codeLine: 8,
+        vars: [{ name: "moved", value: moved === null ? "none" : moved }],
+        note: {
+          vi: "Keep left length equal to right length, or exactly one larger.",
+          en: "Keep left length equal to right length, or exactly one larger.",
+        },
+      });
+    } else if (name === "pushMiddle") {
+      if (left.length > right.length) {
+        const moved = left.pop();
+        right.unshift(moved);
+        pushStep({
+          title: { vi: "Make room for middle", en: "Make room for middle" },
+          codeLine: 11,
+          vars: [{ name: "moved", value: moved }],
+          note: {
+            vi: `left had one extra item, so move ${moved} to the front of right first.`,
+            en: `left had one extra item, so move ${moved} to the front of right first.`,
+          },
+        });
+      }
+      left.push(value);
+      pushStep({
+        title: { vi: `pushMiddle(${value})`, en: `pushMiddle(${value})` },
+        codeLine: 12,
+        highlight: [middleIndex()],
+        vars: [{ name: "value", value }],
+        note: {
+          vi: `Place ${value} at the end of left, which is the middle position.`,
+          en: `Place ${value} at the end of left, which is the middle position.`,
+        },
+      });
+    } else if (name === "pushBack") {
+      right.push(value);
+      pushStep({
+        title: { vi: `pushBack(${value})`, en: `pushBack(${value})` },
+        codeLine: 15,
+        highlight: [queueValues().length - 1],
+        vars: [{ name: "value", value }],
+        note: {
+          vi: `Insert ${value} at the back of right.`,
+          en: `Insert ${value} at the back of right.`,
+        },
+      });
+      const moved = balance();
+      pushStep({
+        title: { vi: "Balance halves", en: "Balance halves" },
+        codeLine: 16,
+        vars: [{ name: "moved", value: moved === null ? "none" : moved }],
+        note: {
+          vi: "If right became larger, move its front into left.",
+          en: "If right became larger, move its front into left.",
+        },
+      });
+    } else if (name === "popFront") {
+      if (!left.length && !right.length) {
+        lastResult = -1;
+        pushStep({
+          title: { vi: "popFront -> -1", en: "popFront -> -1" },
+          codeLine: 19,
+          note: { vi: "Queue is empty.", en: "Queue is empty." },
+        });
+      } else {
+        lastResult = left.length ? left.shift() : right.shift();
+        pushStep({
+          title: { vi: `popFront -> ${lastResult}`, en: `popFront -> ${lastResult}` },
+          codeLine: 20,
+          highlight: [0],
+          vars: [{ name: "removed", value: lastResult }],
+          note: { vi: "Remove the front item.", en: "Remove the front item." },
+        });
+        const moved = balance();
+        pushStep({
+          title: { vi: "Balance halves", en: "Balance halves" },
+          codeLine: 21,
+          vars: [{ name: "moved", value: moved === null ? "none" : moved }],
+          note: { vi: "Restore the size invariant.", en: "Restore the size invariant." },
+        });
+      }
+    } else if (name === "popMiddle") {
+      if (!left.length && !right.length) {
+        lastResult = -1;
+        pushStep({
+          title: { vi: "popMiddle -> -1", en: "popMiddle -> -1" },
+          codeLine: 24,
+          note: { vi: "Queue is empty.", en: "Queue is empty." },
+        });
+      } else {
+        const idx = middleIndex();
+        lastResult = left.pop();
+        pushStep({
+          title: { vi: `popMiddle -> ${lastResult}`, en: `popMiddle -> ${lastResult}` },
+          codeLine: 25,
+          highlight: [idx],
+          vars: [{ name: "removed", value: lastResult }],
+          note: {
+            vi: "The front-most middle is always the last item of left.",
+            en: "The front-most middle is always the last item of left.",
+          },
+        });
+        const moved = balance();
+        pushStep({
+          title: { vi: "Balance halves", en: "Balance halves" },
+          codeLine: 26,
+          vars: [{ name: "moved", value: moved === null ? "none" : moved }],
+          note: { vi: "Restore the size invariant.", en: "Restore the size invariant." },
+        });
+      }
+    } else if (name === "popBack") {
+      if (!left.length && !right.length) {
+        lastResult = -1;
+        pushStep({
+          title: { vi: "popBack -> -1", en: "popBack -> -1" },
+          codeLine: 29,
+          note: { vi: "Queue is empty.", en: "Queue is empty." },
+        });
+      } else {
+        const idx = queueValues().length - 1;
+        lastResult = right.length ? right.pop() : left.pop();
+        pushStep({
+          title: { vi: `popBack -> ${lastResult}`, en: `popBack -> ${lastResult}` },
+          codeLine: 30,
+          highlight: [idx],
+          vars: [{ name: "removed", value: lastResult }],
+          note: { vi: "Remove the back item.", en: "Remove the back item." },
+        });
+        const moved = balance();
+        pushStep({
+          title: { vi: "Balance halves", en: "Balance halves" },
+          codeLine: 31,
+          vars: [{ name: "moved", value: moved === null ? "none" : moved }],
+          note: { vi: "Restore the size invariant.", en: "Restore the size invariant." },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: "Finished operations", en: "Finished operations" },
+    codeLine: 31,
+    final: true,
+    vars: [{ name: "answer", value: lastResult === null ? "None" : lastResult }],
+    note: {
+      vi: `All operations processed. Final queue = [${queueValues().join(", ")}].`,
+      en: `All operations processed. Final queue = [${queueValues().join(", ")}].`,
+    },
+  });
+
+  return { operations: ops, answer: lastResult, steps };
+}
+
 module.exports = {
+  1670: {
+    id: 1670,
+    difficulty: "medium",
+    slug: "design-front-middle-back-queue",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Design Front Middle Back Queue", en: "Design Front Middle Back Queue" },
+    titleVi: { vi: "Thiết kế hàng đợi Front-Middle-Back", en: "Design a front-middle-back queue" },
+    statement: {
+      vi: "Thiết kế queue hỗ trợ pushFront, pushMiddle, pushBack và popFront, popMiddle, popBack. popMiddle lấy phần tử middle phía trước nếu có hai middle.",
+      en: "Design a queue that supports pushFront, pushMiddle, pushBack and popFront, popMiddle, popBack. popMiddle removes the front-most middle when there are two middles.",
+    },
+    defaultInput: "FrontMiddleBackQueue(), pushFront(1), pushBack(2), pushMiddle(3), pushMiddle(4), popFront(), popMiddle(), popMiddle(), popBack(), popFront()",
+    inputKind: "string",
+    inputLabel: { vi: "operations", en: "operations" },
+    extraParams: [],
+    approach: [
+      { vi: "Giữ hai nửa left/right. left là nửa trước và có thể nhiều hơn right đúng 1 phần tử.", en: "Keep two halves: left and right. left is the front half and may contain exactly one extra item." },
+      { vi: "Middle front-most chính là phần tử cuối của left.", en: "The front-most middle is the last item of left." },
+      { vi: "Sau mỗi push/pop, cân bằng lại để left.length == right.length hoặc left.length == right.length + 1.", en: "After each push/pop, rebalance so left.length == right.length or left.length == right.length + 1." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(n)",
+      note: {
+        vi: "Với deque thật, mỗi thao tác push/pop ở hai đầu là O(1). Bộ nhớ lưu n phần tử.",
+        en: "With real deques, each end operation is O(1). Memory stores n elements.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class FrontMiddleBackQueue:",
+      "    def __init__(self):",
+      "        self.left = deque()",
+      "        self.right = deque()",
+      "    def _balance(self):",
+      "        if len(self.left) < len(self.right):",
+      "            self.left.append(self.right.popleft())",
+      "        if len(self.left) > len(self.right) + 1:",
+      "            self.right.appendleft(self.left.pop())",
+      "    def pushFront(self, val: int) -> None:",
+      "        self.left.appendleft(val)",
+      "        self._balance()",
+      "    def pushMiddle(self, val: int) -> None:",
+      "        if len(self.left) > len(self.right):",
+      "            self.right.appendleft(self.left.pop())",
+      "        self.left.append(val)",
+      "    def pushBack(self, val: int) -> None:",
+      "        self.right.append(val)",
+      "        self._balance()",
+      "    def popFront(self) -> int:",
+      "        if not self.left and not self.right: return -1",
+      "        ans = self.left.popleft() if self.left else self.right.popleft()",
+      "        self._balance(); return ans",
+      "    def popMiddle(self) -> int:",
+      "        if not self.left and not self.right: return -1",
+      "        ans = self.left.pop()",
+      "        self._balance(); return ans",
+      "    def popBack(self) -> int:",
+      "        if not self.left and not self.right: return -1",
+      "        ans = self.right.pop() if self.right else self.left.pop()",
+      "        self._balance(); return ans",
+    ],
+    builder: buildSteps1670,
+  },
   641: {
     id: 641,
     difficulty: "medium",
