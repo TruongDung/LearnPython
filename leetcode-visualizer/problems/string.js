@@ -1037,7 +1037,7 @@ function buildSteps20(input) {
     if (!top || top !== expected) {
       pushStep({
         title: { vi: "Mismatch -> False", en: "Mismatch -> False" },
-        codeLine: !top ? 9 : 13,
+        codeLine: !top ? 9 : 12,
         current: i,
         expected,
         highlight: [i],
@@ -1058,7 +1058,7 @@ function buildSteps20(input) {
     stack.pop();
     pushStep({
       title: { vi: `Pop '${expected}'`, en: `Pop '${expected}'` },
-      codeLine: 16,
+      codeLine: 15,
       current: i,
       expected,
       highlight: [i],
@@ -1074,7 +1074,7 @@ function buildSteps20(input) {
   const answer = stack.length === 0;
   pushStep({
     title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
-    codeLine: 18,
+    codeLine: 17,
     mark: answer ? chars.map((_, i) => i) : [],
     vars: [{ name: "answer", value: answer }],
     note: {
@@ -1133,8 +1133,7 @@ module.exports = {
       "                if not stack:",
       "                    return False",
       "",
-      "                expected_open = pairs[ch]",
-      "                if stack[-1] != expected_open:",
+      "                if stack[-1] != pairs[ch]:",
       "                    return False",
       "",
       "                stack.pop()",
