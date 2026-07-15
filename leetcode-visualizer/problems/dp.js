@@ -8583,6 +8583,203 @@ function buildSteps1049(nums) {
 }
 
 /**
+ * LeetCode 5: Longest Palindromic Substring.
+ * Expand around every possible center. Odd center: (c, c), even center: (c, c+1).
+ */
+function buildSteps5(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const steps = [];
+  let bestStart = 0;
+  let bestEnd = 0;
+  const n = s.length;
+
+  function charsGrid(opts = {}) {
+    const labels = {};
+    if (opts.center !== undefined && opts.center >= 0 && opts.center < n) labels[`0,${opts.center + 1}`] = "center";
+    if (opts.left !== undefined && opts.left >= 0 && opts.left < n) labels[`0,${opts.left + 1}`] = "L";
+    if (opts.right !== undefined && opts.right >= 0 && opts.right < n) labels[`0,${opts.right + 1}`] = labels[`0,${opts.right + 1}`] ? "L/R" : "R";
+    if (bestStart <= bestEnd && n > 0) labels[`0,${bestStart + 1}`] = labels[`0,${bestStart + 1}`] || "best";
+    const pathCells = [];
+    if (opts.range) {
+      for (let k = opts.range[0]; k <= opts.range[1]; k++) {
+        if (k >= 0 && k < n) pathCells.push([0, k + 1]);
+      }
+    }
+    return {
+      dp: [["", ...s.split("")]],
+      text1: "",
+      text2: s,
+      colLabels: s.split("").map((ch, idx) => ({ index: `idx=${idx}`, char: ch })),
+      hlCell: opts.left !== undefined && opts.left >= 0 && opts.left < n ? [0, opts.left + 1] : null,
+      pathCells,
+      cellLabels: labels,
+      largeCells: true,
+    };
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: charsGrid(opts),
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: [
+        ...(opts.center !== undefined ? [{ name: "center", value: opts.center }] : []),
+        ...(opts.left !== undefined ? [{ name: "left", value: opts.left }] : []),
+        ...(opts.right !== undefined ? [{ name: "right", value: opts.right }] : []),
+        { name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' },
+        { name: "best range", value: n ? `[${bestStart}, ${bestEnd}]` : "[]" },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  snap({
+    title: { vi: "Khoi tao best", en: "Initialize best" },
+    codeLines: [3],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "n", value: n }],
+    note: {
+      vi: "Ta se thu moi vi tri lam tam palindrome, gom ca tam le va tam chan.",
+      en: "Try every position as a palindrome center, including odd and even centers.",
+    },
+  });
+
+  if (n === 0) {
+    snap({
+      title: { vi: "Chuoi rong", en: "Empty string" },
+      codeLines: [17],
+      vars: [{ name: "return", value: '""' }],
+      note: { vi: "Chuoi rong tra ve chuoi rong.", en: "Empty string returns an empty string." },
+      final: true,
+    });
+    return { s, answer: "", steps };
+  }
+
+  function expand(left, right, center, kind) {
+    snap({
+      title: { vi: `${kind}: start left=${left}, right=${right}`, en: `${kind}: start left=${left}, right=${right}` },
+      codeLines: kind === "Odd" ? [14] : [15],
+      center,
+      left,
+      right,
+      range: [Math.max(0, left), Math.min(n - 1, right)],
+      vars: [{ name: "kind", value: kind }],
+      note: {
+        vi: kind === "Odd" ? "Tam le bat dau tu cung mot ky tu." : "Tam chan bat dau giua hai ky tu lien tiep.",
+        en: kind === "Odd" ? "Odd center starts from one character." : "Even center starts between two adjacent characters.",
+      },
+    });
+
+    while (left >= 0 && right < n && s[left] === s[right]) {
+      snap({
+        title: { vi: `Match '${s[left]}' va '${s[right]}'`, en: `Match '${s[left]}' and '${s[right]}'` },
+        codeLines: [7],
+        center,
+        left,
+        right,
+        range: [left, right],
+        vars: [{ name: "current palindrome", value: `"${s.slice(left, right + 1)}"` }],
+        note: {
+          vi: `s[${left}] == s[${right}], doan "${s.slice(left, right + 1)}" la palindrome.`,
+          en: `s[${left}] == s[${right}], so "${s.slice(left, right + 1)}" is a palindrome.`,
+        },
+      });
+
+      if (right - left > bestEnd - bestStart) {
+        bestStart = left;
+        bestEnd = right;
+        snap({
+          title: { vi: `Cap nhat best = "${s.slice(bestStart, bestEnd + 1)}"`, en: `Update best = "${s.slice(bestStart, bestEnd + 1)}"` },
+          codeLines: [8, 9],
+          center,
+          left,
+          right,
+          range: [left, right],
+          vars: [
+            { name: "new length", value: right - left + 1 },
+            { name: "best", value: `"${s.slice(bestStart, bestEnd + 1)}"` },
+          ],
+          note: {
+            vi: "Palindrome hien tai dai hon best cu, nen luu lai range nay.",
+            en: "The current palindrome is longer than the previous best, so save this range.",
+          },
+        });
+      }
+
+      left -= 1;
+      right += 1;
+      snap({
+        title: { vi: "Mo rong ra ngoai", en: "Expand outward" },
+        codeLines: [10, 11],
+        center,
+        left,
+        right,
+        range: [Math.max(0, left + 1), Math.min(n - 1, right - 1)],
+        note: {
+          vi: "Giam left va tang right de thu palindrome lon hon.",
+          en: "Move left down and right up to try a larger palindrome.",
+        },
+      });
+    }
+
+    const reason = left < 0
+      ? "left < 0"
+      : right >= n
+        ? "right >= len(s)"
+        : `s[${left}] != s[${right}]`;
+    snap({
+      title: { vi: `Dung expand: ${reason}`, en: `Stop expanding: ${reason}` },
+      codeLines: [7],
+      center,
+      left,
+      right,
+      range: [Math.max(0, left + 1), Math.min(n - 1, right - 1)],
+      vars: [{ name: "stop reason", value: reason }],
+      note: {
+        vi: "Khong the mo rong palindrome nay them nua.",
+        en: "This palindrome cannot be expanded any further.",
+      },
+    });
+  }
+
+  for (let center = 0; center < n; center++) {
+    snap({
+      title: { vi: `for center = ${center}`, en: `for center = ${center}` },
+      codeLines: [13],
+      center,
+      left: center,
+      right: center,
+      range: [center, center],
+      note: {
+        vi: `Thu tam tai index ${center}, ky tu '${s[center]}'.`,
+        en: `Try center at index ${center}, character '${s[center]}'.`,
+      },
+    });
+    expand(center, center, center, "Odd");
+    expand(center, center + 1, center, "Even");
+  }
+
+  const answer = s.slice(bestStart, bestEnd + 1);
+  snap({
+    title: { vi: `return "${answer}"`, en: `return "${answer}"` },
+    codeLines: [17],
+    range: [bestStart, bestEnd],
+    vars: [{ name: "return", value: `"${answer}"` }],
+    note: {
+      vi: `Longest palindromic substring la "${answer}".`,
+      en: `The longest palindromic substring is "${answer}".`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 516: Longest Palindromic Subsequence.
  * Interval DP:
  *   dp[i][j] = length of the longest palindromic subsequence inside s[i..j].
@@ -10098,7 +10295,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -12377,6 +12574,52 @@ module.exports = {
       "                return total - 2 * j",
     ],
     builder: buildSteps1049,
+  },
+  5: {
+    id: 5,
+    difficulty: "medium",
+    slug: "longest-palindromic-substring",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Longest Palindromic Substring", en: "Longest Palindromic Substring" },
+    titleVi: { vi: "Chuoi con doi xung dai nhat", en: "Longest palindromic substring" },
+    statement: {
+      vi: "Cho chuoi s, tra ve chuoi con lien tiep dai nhat la palindrome.",
+      en: "Given a string s, return the longest contiguous substring that is a palindrome.",
+    },
+    defaultInput: "babad",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "Palindrome substring co tam o mot ky tu (le) hoac giua hai ky tu (chan).", en: "A palindromic substring has a center at one character (odd) or between two characters (even)." },
+      { vi: "Voi moi center, mo rong left/right khi s[left] == s[right].", en: "For each center, expand left/right while s[left] == s[right]." },
+      { vi: "Moi lan tim duoc palindrome dai hon, cap nhat bestStart/bestEnd.", en: "Whenever a longer palindrome is found, update bestStart/bestEnd." },
+    ],
+    complexity: {
+      time: "O(n^2)",
+      space: "O(1)",
+      note: { vi: "Co 2n-1 tam, moi lan expand toi da O(n).", en: "There are 2n-1 centers, and each expansion can take O(n)." },
+    },
+    code: [
+      "class Solution:",
+      "    def longestPalindrome(self, s: str) -> str:",
+      "        best_start = best_end = 0",
+      "",
+      "        def expand(left: int, right: int):",
+      "            nonlocal best_start, best_end",
+      "            while left >= 0 and right < len(s) and s[left] == s[right]:",
+      "                if right - left > best_end - best_start:",
+      "                    best_start, best_end = left, right",
+      "                left -= 1",
+      "                right += 1",
+      "",
+      "        for center in range(len(s)):",
+      "            expand(center, center)",
+      "            expand(center, center + 1)",
+      "",
+      "        return s[best_start:best_end + 1]",
+    ],
+    builder: buildSteps5,
   },
   516: {
     id: 516,
