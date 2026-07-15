@@ -80,7 +80,179 @@ function buildSteps1967(input, params) {
   return { patterns, word, answer: count, steps };
 }
 
+/**
+ * LeetCode 1598: Crawler Log Folder.
+ * Track the current folder depth while reading each operation.
+ */
+function buildSteps1598(input) {
+  const logs = Array.isArray(input)
+    ? input.map((s) => String(s).trim()).filter(Boolean)
+    : String(input).split(",").map((s) => s.trim()).filter(Boolean);
+  const steps = [];
+  const depths = new Array(logs.length).fill(0);
+  const path = [];
+
+  function pathLabel() {
+    return path.length ? `/${path.join("/")}/` : "/";
+  }
+
+  function pushStep(opts) {
+    steps.push({
+      title: opts.title,
+      arr: depths.slice(),
+      sub: logs,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: [opts.codeLine],
+      vars: [
+        { name: "depth", value: path.length },
+        { name: "path", value: pathLabel() },
+        { name: "logs", value: `[${logs.join(", ")}]` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize depth", en: "Initialize depth" },
+    codeLine: 3,
+    vars: [{ name: "path stack", value: "[]" }],
+    note: {
+      vi: "Start at the main folder. depth = 0 and path stack is empty.",
+      en: "Start at the main folder. depth = 0 and path stack is empty.",
+    },
+  });
+
+  for (let i = 0; i < logs.length; i++) {
+    const log = logs[i];
+    pushStep({
+      title: { vi: `Read logs[${i}]`, en: `Read logs[${i}]` },
+      codeLine: 4,
+      highlight: [i],
+      vars: [
+        { name: "i", value: i },
+        { name: "log", value: log },
+      ],
+      note: {
+        vi: `Current operation is "${log}".`,
+        en: `Current operation is "${log}".`,
+      },
+    });
+
+    if (log === "../") {
+      const before = pathLabel();
+      if (path.length > 0) path.pop();
+      depths[i] = path.length;
+      pushStep({
+        title: { vi: "Move to parent", en: "Move to parent" },
+        codeLine: 6,
+        highlight: [i],
+        vars: [
+          { name: "operation", value: "../" },
+          { name: "before", value: before },
+          { name: "after", value: pathLabel() },
+        ],
+        note: {
+          vi: path.length === 0 && before === "/"
+            ? "Already at the main folder, so '../' keeps depth at 0."
+            : `Go up one level: ${before} -> ${pathLabel()}.`,
+          en: path.length === 0 && before === "/"
+            ? "Already at the main folder, so '../' keeps depth at 0."
+            : `Go up one level: ${before} -> ${pathLabel()}.`,
+        },
+      });
+    } else if (log === "./") {
+      depths[i] = path.length;
+      pushStep({
+        title: { vi: "Stay in current folder", en: "Stay in current folder" },
+        codeLine: 8,
+        highlight: [i],
+        vars: [{ name: "operation", value: "./" }],
+        note: {
+          vi: "'./' means stay in the same folder, so depth does not change.",
+          en: "'./' means stay in the same folder, so depth does not change.",
+        },
+      });
+    } else {
+      const folder = log.endsWith("/") ? log.slice(0, -1) : log;
+      path.push(folder);
+      depths[i] = path.length;
+      pushStep({
+        title: { vi: `Enter ${folder}`, en: `Enter ${folder}` },
+        codeLine: 10,
+        highlight: [i],
+        mark: [i],
+        vars: [
+          { name: "folder", value: folder },
+          { name: "path stack", value: `[${path.join(", ")}]` },
+        ],
+        note: {
+          vi: `Enter child folder "${folder}", so depth becomes ${path.length}.`,
+          en: `Enter child folder "${folder}", so depth becomes ${path.length}.`,
+        },
+      });
+    }
+
+    for (let j = i + 1; j < depths.length; j++) depths[j] = path.length;
+  }
+
+  const answer = path.length;
+  pushStep({
+    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    codeLine: 11,
+    mark: logs.map((_, idx) => idx),
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Minimum operations to return to the main folder equals current depth = ${answer}.`,
+      en: `Minimum operations to return to the main folder equals current depth = ${answer}.`,
+    },
+  });
+
+  return { logs, answer, steps };
+}
+
 module.exports = {
+  1598: {
+    id: 1598,
+    difficulty: "easy",
+    slug: "crawler-log-folder",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Crawler Log Folder", en: "Crawler Log Folder" },
+    titleVi: { vi: "Theo dõi thư mục crawler", en: "Track crawler folder depth" },
+    statement: {
+      vi: "Cho danh sách log thao tác thư mục. '../' quay về thư mục cha, './' giữ nguyên, còn 'x/' đi vào thư mục con x. Trả về số bước tối thiểu để quay về thư mục chính.",
+      en: "Given folder operation logs. '../' moves to the parent folder, './' stays, and 'x/' enters child folder x. Return the minimum operations needed to go back to the main folder.",
+    },
+    defaultInput: ["d1/", "d2/", "../", "d21/", "./"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "logs (JSON hoặc comma-separated)", en: "logs (JSON or comma-separated)" },
+    extraParams: [],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt mỗi log một lần. Visualizer giữ path stack để dễ xem; lời giải chỉ cần biến depth O(1).",
+        en: "Read each log once. The visualizer keeps a path stack for clarity; the core solution only needs O(1) depth.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minOperations(self, logs):",
+      "        depth = 0",
+      "        for log in logs:",
+      "            if log == '../':",
+      "                depth = max(0, depth - 1)",
+      "            elif log == './':",
+      "                continue",
+      "            else:",
+      "                depth += 1",
+      "        return depth",
+    ],
+    builder: buildSteps1598,
+  },
   1967: {
     id: 1967,
     difficulty: "easy",
