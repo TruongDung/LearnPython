@@ -2625,6 +2625,29 @@ html, body {
   position: relative;
 }
 
+.prob-chip[data-premium="true"] {
+  padding-right: 38px;
+}
+
+.prob-chip[data-premium="true"]::after {
+  content: "🔑";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  color: #fbbf24;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.16);
+}
+
 .prob-step {
   position: absolute;
   top: -6px;
@@ -2647,6 +2670,13 @@ html, body {
 [data-theme="light"] .prob-step {
   background: #4f46e5;
   box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+}
+
+[data-theme="light"] .prob-chip[data-premium="true"]::after {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  box-shadow: 0 1px 4px rgba(146, 64, 14, 0.14);
 }
 
 /* Mobile adjustments */

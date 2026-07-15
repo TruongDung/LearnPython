@@ -221,6 +221,10 @@ function renderCatalog() {
       const chip = document.createElement("button");
       chip.className = "prob-chip" + (p.id === currentProblemId ? " active" : "");
       chip.dataset.id = p.id;
+      if (p.premium) {
+        chip.dataset.premium = "true";
+        chip.title = t().premiumLabel;
+      }
 
       if (hasOrder) {
         const step = document.createElement("span");
