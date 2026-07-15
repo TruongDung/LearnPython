@@ -46,7 +46,7 @@ function buildSteps1(nums, params) {
         highlight: [j, i],
         mark: [j, i],
         final: true,
-        codeLines: [5, 6],
+        codeLines: [7],
         vars: [
           { name: "i", value: i },
           { name: "comp", value: comp },
@@ -87,7 +87,7 @@ function buildSteps1(nums, params) {
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [7],
+      codeLines: [8],
       vars: [{ name: "seen", value: dictStr() }],
       note: {
         vi: "Không có cặp nào có tổng bằng target.",
