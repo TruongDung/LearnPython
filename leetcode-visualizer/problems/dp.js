@@ -3095,7 +3095,7 @@ function buildSteps1092(input, params) {
   for (let i = 1; i <= m; i++) {
     gridSnap({
       title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
-      codeLines: [5],
+      codeLines: [5, 6],
       hlCell: [i, 0],
       vars: [{ name: `str1[${i - 1}]`, value: str1[i - 1] }],
       note: { vi: `Consider str1[:${i}] = "${str1.slice(0, i)}".`, en: `Consider str1[:${i}] = "${str1.slice(0, i)}".` },
@@ -6654,6 +6654,265 @@ function buildSteps931(input) {
   });
   steps[steps.length - 1].final = true;
   return { original: matrix, answer, steps };
+}
+
+/**
+ * LeetCode 1937: Maximum Number of Points with Cost.
+ * prev[c] = best score ending at column c on the previous row.
+ * Transition:
+ *   curr[c] = points[r][c] + max(prev[k] - abs(k-c)).
+ * Optimize the max with two passes:
+ *   left[c]  = max(prev[k] - (c-k)) for k <= c
+ *   right[c] = max(prev[k] - (k-c)) for k >= c
+ */
+function buildSteps1937(input) {
+  let points;
+  if (typeof input === "string") {
+    points = input
+      .split("|")
+      .map((row) => row.trim())
+      .filter(Boolean)
+      .map((row) => row.split(",").map((x) => Number(x.trim())));
+  } else {
+    return { original: input, answer: 0, steps: [] };
+  }
+
+  const m = points.length;
+  const n = m > 0 ? points[0].length : 0;
+  const valid = m > 0 && n > 0 && points.every((row) => row.length === n && row.every(Number.isFinite));
+  const steps = [];
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Input khong hop le", en: "Invalid input" },
+      arr: [],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Nhap matrix bang cac hang cach nhau boi |, so cach nhau boi dau phay. Vi du: 1,2,3|1,5,1|3,1,1",
+        en: "Enter a matrix with rows separated by | and numbers separated by commas. Example: 1,2,3|1,5,1|3,1,1",
+      },
+      final: true,
+    });
+    return { original: points, answer: 0, steps };
+  }
+
+  let prev = [...points[0]];
+  let left = Array(n).fill("");
+  let right = Array(n).fill("");
+  let curr = Array(n).fill("");
+
+  function rowLabels(r) {
+    return [
+      { index: `points[${r}]`, char: "row" },
+      { index: "prev", char: "dp" },
+      { index: "left", char: "L" },
+      { index: "right", char: "R" },
+      { index: "curr", char: "new" },
+    ];
+  }
+
+  function gridSnap(opts) {
+    const r = opts.r === undefined ? 0 : opts.r;
+    steps.push({
+      title: opts.title,
+      arr: points[r] ? [...points[r]] : [],
+      sub: Array.from({ length: n }, (_, c) => `col ${c}`),
+      highlight: opts.c === undefined ? [] : [opts.c],
+      mark: opts.mark || [],
+      grid: {
+        dp: [
+          [...points[r]],
+          [...prev],
+          [...left],
+          [...right],
+          [...curr],
+        ],
+        rowLabels: rowLabels(r),
+        colLabels: Array.from({ length: n }, (_, c) => ({ index: `c=${c}`, char: "" })),
+        largeCells: true,
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        cellLabels: opts.cellLabels || {},
+      },
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  gridSnap({
+    title: { vi: "Khoi tao prev = points[0]", en: "Initialize prev = points[0]" },
+    r: 0,
+    codeLines: [3],
+    pathCells: Array.from({ length: n }, (_, c) => [1, c]),
+    vars: [
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "prev", value: `[${prev.join(", ")}]` },
+    ],
+    note: {
+      vi: "Hang dau tien khong co cost tu hang truoc, nen prev bang points[0].",
+      en: "The first row has no transition cost, so prev is just points[0].",
+    },
+  });
+
+  for (let r = 1; r < m; r++) {
+    left = Array(n).fill("");
+    right = Array(n).fill("");
+    curr = Array(n).fill("");
+
+    gridSnap({
+      title: { vi: `Xu ly row ${r}`, en: `Process row ${r}` },
+      r,
+      codeLines: [4],
+      vars: [
+        { name: "row", value: r },
+        { name: "points[row]", value: `[${points[r].join(", ")}]` },
+        { name: "prev", value: `[${prev.join(", ")}]` },
+      ],
+      note: {
+        vi: "Can tinh max(prev[k] - abs(k-c)) cho moi cot c.",
+        en: "For each column c, compute max(prev[k] - abs(k-c)).",
+      },
+    });
+
+    left[0] = prev[0];
+    gridSnap({
+      title: { vi: `left[0] = prev[0] = ${left[0]}`, en: `left[0] = prev[0] = ${left[0]}` },
+      r,
+      c: 0,
+      codeLines: [5],
+      hlCell: [2, 0],
+      pathCells: [[1, 0]],
+      cellLabels: { "1,0": "prev[0]" },
+      vars: [{ name: "left[0]", value: left[0] }],
+      note: {
+        vi: "Tu ben trai, cot 0 chi co the lay prev[0].",
+        en: "From the left pass, column 0 can only use prev[0].",
+      },
+    });
+
+    for (let c = 1; c < n; c++) {
+      const carry = Number(left[c - 1]) - 1;
+      left[c] = Math.max(carry, prev[c]);
+      gridSnap({
+        title: { vi: `left[${c}] = ${left[c]}`, en: `left[${c}] = ${left[c]}` },
+        r,
+        c,
+        codeLines: [7, 8],
+        hlCell: [2, c],
+        pathCells: [[2, c - 1], [1, c]],
+        cellLabels: { [`2,${c - 1}`]: "left[c-1]-1", [`1,${c}`]: "prev[c]" },
+        vars: [
+          { name: `left[${c - 1}] - 1`, value: carry },
+          { name: `prev[${c}]`, value: prev[c] },
+          { name: `left[${c}]`, value: left[c] },
+        ],
+        note: {
+          vi: `left[${c}] = max(left[${c - 1}] - 1, prev[${c}]) = max(${carry}, ${prev[c]}) = ${left[c]}.`,
+          en: `left[${c}] = max(left[${c - 1}] - 1, prev[${c}]) = max(${carry}, ${prev[c]}) = ${left[c]}.`,
+        },
+      });
+    }
+
+    right[n - 1] = prev[n - 1];
+    gridSnap({
+      title: { vi: `right[${n - 1}] = prev[${n - 1}] = ${right[n - 1]}`, en: `right[${n - 1}] = prev[${n - 1}] = ${right[n - 1]}` },
+      r,
+      c: n - 1,
+      codeLines: [9, 10],
+      hlCell: [3, n - 1],
+      pathCells: [[1, n - 1]],
+      cellLabels: { [`1,${n - 1}`]: `prev[${n - 1}]` },
+      vars: [{ name: `right[${n - 1}]`, value: right[n - 1] }],
+      note: {
+        vi: "Tu ben phai, cot cuoi chi co the lay prev[cot cuoi].",
+        en: "From the right pass, the last column can only use the last prev value.",
+      },
+    });
+
+    for (let c = n - 2; c >= 0; c--) {
+      const carry = Number(right[c + 1]) - 1;
+      right[c] = Math.max(carry, prev[c]);
+      gridSnap({
+        title: { vi: `right[${c}] = ${right[c]}`, en: `right[${c}] = ${right[c]}` },
+        r,
+        c,
+        codeLines: [11, 12],
+        hlCell: [3, c],
+        pathCells: [[3, c + 1], [1, c]],
+        cellLabels: { [`3,${c + 1}`]: "right[c+1]-1", [`1,${c}`]: "prev[c]" },
+        vars: [
+          { name: `right[${c + 1}] - 1`, value: carry },
+          { name: `prev[${c}]`, value: prev[c] },
+          { name: `right[${c}]`, value: right[c] },
+        ],
+        note: {
+          vi: `right[${c}] = max(right[${c + 1}] - 1, prev[${c}]) = max(${carry}, ${prev[c]}) = ${right[c]}.`,
+          en: `right[${c}] = max(right[${c + 1}] - 1, prev[${c}]) = max(${carry}, ${prev[c]}) = ${right[c]}.`,
+        },
+      });
+    }
+
+    for (let c = 0; c < n; c++) {
+      const bestPrev = Math.max(Number(left[c]), Number(right[c]));
+      curr[c] = points[r][c] + bestPrev;
+      gridSnap({
+        title: { vi: `curr[${c}] = ${curr[c]}`, en: `curr[${c}] = ${curr[c]}` },
+        r,
+        c,
+        codeLines: [13, 14, 15],
+        hlCell: [4, c],
+        pathCells: [[0, c], [2, c], [3, c]],
+        cellLabels: { [`0,${c}`]: "points", [`2,${c}`]: "left", [`3,${c}`]: "right" },
+        vars: [
+          { name: `points[${r}][${c}]`, value: points[r][c] },
+          { name: `max(left[${c}], right[${c}])`, value: bestPrev },
+          { name: `curr[${c}]`, value: curr[c] },
+        ],
+        note: {
+          vi: `curr[${c}] = points[${r}][${c}] + max(left[${c}], right[${c}]) = ${points[r][c]} + ${bestPrev} = ${curr[c]}.`,
+          en: `curr[${c}] = points[${r}][${c}] + max(left[${c}], right[${c}]) = ${points[r][c]} + ${bestPrev} = ${curr[c]}.`,
+        },
+      });
+    }
+
+    prev = [...curr];
+    gridSnap({
+      title: { vi: `prev = curr sau row ${r}`, en: `prev = curr after row ${r}` },
+      r,
+      codeLines: [16],
+      pathCells: Array.from({ length: n }, (_, c) => [4, c]),
+      vars: [{ name: "prev", value: `[${prev.join(", ")}]` }],
+      note: {
+        vi: "Ket qua row hien tai tro thanh prev cho row tiep theo.",
+        en: "The current row result becomes prev for the next row.",
+      },
+    });
+  }
+
+  const answer = Math.max(...prev);
+  const bestCol = prev.indexOf(answer);
+  gridSnap({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    r: m - 1,
+    codeLines: [17],
+    hlCell: [1, bestCol],
+    pathCells: [[1, bestCol]],
+    cellLabels: { [`1,${bestCol}`]: "max" },
+    vars: [
+      { name: "prev", value: `[${prev.join(", ")}]` },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Diem cao nhat o hang cuoi la max(prev) = ${answer}.`,
+      en: `The best final score is max(prev) = ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { original: points, answer, steps };
 }
 
 /**
@@ -10295,7 +10554,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -10768,6 +11027,52 @@ module.exports = {
       "        return min(dp[n-1])",
     ],
     builder: buildSteps931,
+  },
+  1937: {
+    id: 1937,
+    difficulty: "medium",
+    slug: "maximum-number-of-points-with-cost",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Maximum Number of Points with Cost", en: "Maximum Number of Points with Cost" },
+    titleVi: { vi: "Diem toi da co tru chi phi", en: "Maximum points with cost" },
+    statement: {
+      vi: "Cho ma tran points. Moi hang chon dung mot o. Neu hang truoc chon cot c1 va hang sau chon cot c2 thi bi tru |c1-c2| diem. Tra ve diem toi da.",
+      en: "Given a points matrix. Pick exactly one cell from each row. Moving from column c1 to c2 between adjacent rows costs |c1-c2| points. Return the maximum score.",
+    },
+    defaultInput: "1,2,3|1,5,1|3,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "points (hang cach |, so cach ,)", en: "points (rows by |, numbers by ,)" },
+    extraParams: [],
+    approach: [
+      { vi: "dp hang truoc: prev[c] = diem tot nhat neu ket thuc o cot c cua hang truoc.", en: "Previous-row DP: prev[c] = best score ending at column c of the previous row." },
+      { vi: "Cong thuc truc tiep curr[c] = points[r][c] + max(prev[k] - abs(k-c)) se la O(n^2) moi hang.", en: "Direct transition curr[c] = points[r][c] + max(prev[k] - abs(k-c)) would be O(n^2) per row." },
+      { vi: "Toi uu bang 2 pass: left[c]=max(left[c-1]-1, prev[c]), right[c]=max(right[c+1]-1, prev[c]).", en: "Optimize with 2 passes: left[c]=max(left[c-1]-1, prev[c]), right[c]=max(right[c+1]-1, prev[c])." },
+    ],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(n)",
+      note: { vi: "Moi hang quet trai, quet phai, roi tinh curr: 3 lan O(n).", en: "Each row does a left pass, right pass, then curr pass: three O(n) scans." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxPoints(self, points: List[List[int]]) -> int:",
+      "        prev = points[0]",
+      "        for r in range(1, len(points)):",
+      "            left = [0] * len(prev)",
+      "            left[0] = prev[0]",
+      "            for c in range(1, len(prev)):",
+      "                left[c] = max(left[c - 1] - 1, prev[c])",
+      "            right = [0] * len(prev)",
+      "            right[-1] = prev[-1]",
+      "            for c in range(len(prev) - 2, -1, -1):",
+      "                right[c] = max(right[c + 1] - 1, prev[c])",
+      "            curr = [0] * len(prev)",
+      "            for c in range(len(prev)):",
+      "                curr[c] = points[r][c] + max(left[c], right[c])",
+      "            prev = curr",
+      "        return max(prev)",
+    ],
+    builder: buildSteps1937,
   },
   741: {
     id: 741,
