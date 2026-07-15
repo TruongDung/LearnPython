@@ -385,7 +385,7 @@ module.exports = {
     id: 1598,
     difficulty: "easy",
     slug: "crawler-log-folder",
-    category: { key: "string", vi: "Chuỗi", en: "String" },
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
     title: { vi: "Crawler Log Folder", en: "Crawler Log Folder" },
     titleVi: { vi: "Theo dõi thư mục crawler", en: "Track crawler folder depth" },
     statement: {
