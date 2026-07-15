@@ -7406,7 +7406,7 @@ function buildSteps1301(input) {
   pushStep({
     title: { vi: "Khởi tạo (S = 0, 1 cách)", en: "Initialize (S = 0 score, 1 way)" },
     currentR: rows - 1, currentC: cols - 1,
-    codeLines: [3, 4, 5],
+    codeLines: [3, 4, 5, 6, 7, 8],
     vars: [
       { name: "start (S)", value: `(${rows - 1},${cols - 1})` },
       { name: "end (E)", value: "(0,0)" },
@@ -7463,7 +7463,7 @@ function buildSteps1301(input) {
           title: { vi: `(${r},${c}): không đến được`, en: `(${r},${c}): unreachable` },
           currentR: r, currentC: c,
           hlPreds: preds.map(([pr, pc]) => [pr, pc]),
-          codeLines: [7, 8, 9, 10],
+          codeLines: [14, 15, 16, 17, 22, 23],
           vars: [
             { name: "cell", value: `(${r},${c})` },
             { name: "char", value: raw },
@@ -7487,7 +7487,7 @@ function buildSteps1301(input) {
         title: { vi: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}`, en: `dp[${r}][${c}] = ${dp[r][c]}, cnt = ${cnt[r][c]}` },
         currentR: r, currentC: c,
         hlPreds: preds.map(([pr, pc]) => [pr, pc]),
-        codeLines: [11, 12, 13, 14, 15, 16],
+        codeLines: [13, 14, 15, 16, 17, 18, 19, 20, 21, 24, 25],
         vars: [
           { name: "cell", value: `(${r},${c})` },
           { name: "char", value: raw },
@@ -7522,7 +7522,7 @@ function buildSteps1301(input) {
   pushStep({
     title: { vi: "Kết quả", en: "Result" },
     currentR: 0, currentC: 0,
-    codeLines: [17, 18],
+    codeLines: reachable ? [28] : [26, 27],
     vars: [
       { name: "dp[0][0]", value: finalScore },
       { name: "cnt[0][0]", value: finalCnt },
