@@ -4262,6 +4262,208 @@ function buildSteps1406(stones) {
   return { stones: [...stones], answer, steps };
 }
 
+// More granular Stone Game III visualizer.
+// This later declaration intentionally replaces the compact version above so
+// every visual step matches the highlighted source line.
+function buildSteps1406(stones) {
+  const n = stones.length;
+  const dp = new Array(n + 1).fill(0);
+  const steps = [];
+  const labels = Array.from({ length: n + 1 }, (_, i) => String(i));
+
+  function visibleDp() {
+    return dp.map((v) => (Number.isFinite(v) ? v : 0));
+  }
+
+  function formatDp() {
+    return `[${dp.map((v) => (Number.isFinite(v) ? v : "-inf")).join(", ")}]`;
+  }
+
+  function range(start, count) {
+    return Array.from({ length: count }, (_, offset) => start + offset);
+  }
+
+  function step(opts) {
+    steps.push({
+      title: opts.title,
+      arr: visibleDp(),
+      sub: labels,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: [opts.codeLine],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  step({
+    title: { vi: "Read n", en: "Read n" },
+    codeLine: 3,
+    vars: [
+      { name: "n", value: n },
+      { name: "stones", value: `[${stones.join(", ")}]` },
+    ],
+    note: {
+      vi: `There are ${n} stones.`,
+      en: `There are ${n} stones.`,
+    },
+  });
+
+  step({
+    title: { vi: "Initialize dp", en: "Initialize dp" },
+    codeLine: 4,
+    vars: [
+      { name: "dp", value: formatDp() },
+    ],
+    note: {
+      vi: `dp[i] = best score difference from stones[i...]. dp[${n}] = 0 because no stones remain.`,
+      en: `dp[i] = best score difference from stones[i...]. dp[${n}] = 0 because no stones remain.`,
+    },
+  });
+
+  for (let i = n - 1; i >= 0; i--) {
+    step({
+      title: { vi: `Start i = ${i}`, en: `Start i = ${i}` },
+      codeLine: 5,
+      highlight: [i],
+      vars: [
+        { name: "i", value: i },
+        { name: `stones[${i}]`, value: stones[i] },
+      ],
+      note: {
+        vi: `Compute dp[${i}] from right to left so dp[next] values are already known.`,
+        en: `Compute dp[${i}] from right to left so dp[next] values are already known.`,
+      },
+    });
+
+    let take = 0;
+    step({
+      title: { vi: "Reset take", en: "Reset take" },
+      codeLine: 6,
+      highlight: [i],
+      vars: [
+        { name: "i", value: i },
+        { name: "take", value: take },
+      ],
+      note: {
+        vi: "take accumulates the stones chosen on this turn.",
+        en: "take accumulates the stones chosen on this turn.",
+      },
+    });
+
+    dp[i] = -Infinity;
+    step({
+      title: { vi: `Set dp[${i}] = -inf`, en: `Set dp[${i}] = -inf` },
+      codeLine: 7,
+      highlight: [i],
+      vars: [
+        { name: `dp[${i}]`, value: "-inf" },
+        { name: "dp", value: formatDp() },
+      ],
+      note: {
+        vi: "Start with the worst value, then maximize over taking 1, 2, or 3 stones.",
+        en: "Start with the worst value, then maximize over taking 1, 2, or 3 stones.",
+      },
+    });
+
+    for (let k = 0; k < 3; k++) {
+      const valid = i + k < n;
+      step({
+        title: { vi: `Loop k = ${k}`, en: `Loop k = ${k}` },
+        codeLine: 8,
+        highlight: [i],
+        vars: [
+          { name: "i", value: i },
+          { name: "k", value: k },
+        ],
+        note: {
+          vi: "Try one of the three possible move sizes: take 1, 2, or 3 stones.",
+          en: "Try one of the three possible move sizes: take 1, 2, or 3 stones.",
+        },
+      });
+
+      step({
+        title: { vi: `Check k = ${k}`, en: `Check k = ${k}` },
+        codeLine: 9,
+        highlight: valid ? range(i, k + 1) : [i],
+        vars: [
+          { name: "i", value: i },
+          { name: "k", value: k },
+          { name: "i + k < n", value: `${i + k} < ${n} => ${valid}` },
+        ],
+        note: {
+          vi: valid
+            ? `Taking ${k + 1} stone(s) is allowed.`
+            : `Index ${i + k} is outside the array, so skip this k.`,
+          en: valid
+            ? `Taking ${k + 1} stone(s) is allowed.`
+            : `Index ${i + k} is outside the array, so skip this k.`,
+        },
+      });
+
+      if (!valid) continue;
+
+      take += stones[i + k];
+      step({
+        title: { vi: `Add stones[${i + k}]`, en: `Add stones[${i + k}]` },
+        codeLine: 10,
+        highlight: range(i, k + 1),
+        vars: [
+          { name: `stones[${i + k}]`, value: stones[i + k] },
+          { name: "take", value: take },
+        ],
+        note: {
+          vi: `After taking ${k + 1} stone(s), take = ${take}.`,
+          en: `After taking ${k + 1} stone(s), take = ${take}.`,
+        },
+      });
+
+      const next = i + k + 1;
+      const candidate = take - dp[next];
+      const before = dp[i];
+      dp[i] = Math.max(dp[i], candidate);
+      step({
+        title: { vi: `Update dp[${i}]`, en: `Update dp[${i}]` },
+        codeLine: 11,
+        highlight: range(i, k + 1),
+        mark: [i],
+        vars: [
+          { name: "next", value: next },
+          { name: "take", value: take },
+          { name: `dp[${next}]`, value: dp[next] },
+          { name: "candidate", value: `${take} - ${dp[next]} = ${candidate}` },
+          { name: "old dp[i]", value: Number.isFinite(before) ? before : "-inf" },
+          { name: `dp[${i}]`, value: dp[i] },
+        ],
+        note: {
+          vi: `Candidate = current score taken minus the opponent's best difference from index ${next}. Keep the maximum.`,
+          en: `Candidate = current score taken minus the opponent's best difference from index ${next}. Keep the maximum.`,
+        },
+      });
+    }
+  }
+
+  const diff = dp[0];
+  const answer = diff > 0 ? "Alice" : diff < 0 ? "Bob" : "Tie";
+  step({
+    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    codeLine: diff > 0 ? 12 : diff < 0 ? 13 : 14,
+    mark: [0],
+    final: true,
+    vars: [
+      { name: "dp[0]", value: diff },
+      { name: "winner", value: answer },
+    ],
+    note: {
+      vi: `dp[0] = ${diff}. Positive means Alice wins, negative means Bob wins, zero means Tie.`,
+      en: `dp[0] = ${diff}. Positive means Alice wins, negative means Bob wins, zero means Tie.`,
+    },
+  });
+
+  return { stones: [...stones], answer, steps };
+}
+
 /**
  * LeetCode 877: Stone Game.
  * Interval DP on score difference:
@@ -13566,7 +13768,7 @@ module.exports = {
       en: "Given nums, count pairs of non-empty disjoint subsequences where the GCD of the first subsequence equals the GCD of the second subsequence.",
     },
     defaultInput: [1, 2, 3, 4],
-    inputKind: "positive",
+    inputKind: "integer",
     inputLabel: { vi: "nums (so nguyen duong, dau phay)", en: "nums (positive integers, comma-sep)" },
     extraParams: [],
     approach: [
