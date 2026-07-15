@@ -922,6 +922,177 @@ function buildSteps1670(input) {
 }
 
 /**
+ * LeetCode 150: Evaluate Reverse Polish Notation.
+ * Use a stack: push numbers, pop two operands when an operator appears.
+ */
+function buildSteps150(input) {
+  const tokens = Array.isArray(input)
+    ? input.map((item) => String(item).trim()).filter((item) => item.length > 0)
+    : String(input)
+        .split(",")
+        .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+        .filter((item) => item.length > 0);
+  const stack = [];
+  const steps = [];
+  const operators = new Set(["+", "-", "*", "/"]);
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function tokenValues() {
+    return tokens.map((token) => (/^-?\d+$/.test(token) ? Number(token) : 0));
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    const explicitVars = opts.vars || [];
+    const tokenVar =
+      current >= 0 && current < tokens.length && !explicitVars.some((item) => item.name === "token")
+        ? [{ name: "token", value: tokens[current] }]
+        : [];
+
+    steps.push({
+      title: opts.title,
+      arr: tokenValues(),
+      sub: tokens,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      codeLines: [opts.codeLine],
+      stackView: {
+        items: stack.slice(),
+        input: tokens,
+        current,
+        expected: "",
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "top", value: stack.length ? stack[stack.length - 1] : "empty" },
+        ...tokenVar,
+        ...explicitVars,
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  function applyOperator(a, b, op) {
+    if (op === "+") return a + b;
+    if (op === "-") return a - b;
+    if (op === "*") return a * b;
+    return Math.trunc(a / b);
+  }
+
+  function operatorLine(op) {
+    if (op === "+") return 10;
+    if (op === "-") return 11;
+    if (op === "*") return 12;
+    return 13;
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 3,
+    vars: [{ name: "tokens.length", value: tokens.length }],
+    note: {
+      vi: "Read tokens left to right. Numbers are pushed; operators consume the top two stack values.",
+      en: "Read tokens left to right. Numbers are pushed; operators consume the top two stack values.",
+    },
+  });
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    pushStep({
+      title: { vi: `Read '${token}'`, en: `Read '${token}'` },
+      codeLine: 4,
+      current: i,
+      highlight: [i],
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Process tokens[${i}] = '${token}'.`,
+        en: `Process tokens[${i}] = '${token}'.`,
+      },
+    });
+
+    if (!operators.has(token)) {
+      const value = Number(token);
+      stack.push(value);
+      pushStep({
+        title: { vi: `Push ${value}`, en: `Push ${value}` },
+        codeLine: 6,
+        current: i,
+        highlight: [i],
+        mark: [i],
+        vars: [
+          { name: "value", value },
+          { name: "action", value: "push number" },
+        ],
+        note: {
+          vi: `'${token}' is a number, so push ${value} onto the operand stack.`,
+          en: `'${token}' is a number, so push ${value} onto the operand stack.`,
+        },
+      });
+      continue;
+    }
+
+    const b = stack.pop();
+    const a = stack.pop();
+    pushStep({
+      title: { vi: `Pop ${a}, ${b}`, en: `Pop ${a}, ${b}` },
+      codeLine: 8,
+      current: i,
+      operator: token,
+      highlight: [i],
+      vars: [
+        { name: "a", value: a },
+        { name: "b", value: b },
+        { name: "operator", value: token },
+      ],
+      note: {
+        vi: `Pop b = ${b} first, then a = ${a}. The order matters for '-' and '/'.`,
+        en: `Pop b = ${b} first, then a = ${a}. The order matters for '-' and '/'.`,
+      },
+    });
+
+    const value = applyOperator(a, b, token);
+    stack.push(value);
+    pushStep({
+      title: { vi: `${a} ${token} ${b} = ${value}`, en: `${a} ${token} ${b} = ${value}` },
+      codeLine: operatorLine(token),
+      current: i,
+      operator: token,
+      highlight: [i],
+      mark: [i],
+      vars: [
+        { name: "a", value: a },
+        { name: "b", value: b },
+        { name: "operator", value: token },
+        { name: "value", value },
+      ],
+      note: {
+        vi: `Compute ${a} ${token} ${b}, then push ${value} back onto the stack.`,
+        en: `Compute ${a} ${token} ${b}, then push ${value} back onto the stack.`,
+      },
+    });
+  }
+
+  const answer = stack[stack.length - 1];
+  pushStep({
+    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    codeLine: 14,
+    mark: tokens.map((_, i) => i),
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `After all tokens, the only remaining stack value is ${answer}.`,
+      en: `After all tokens, the only remaining stack value is ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { tokens, answer, steps };
+}
+
+/**
  * LeetCode 20: Valid Parentheses.
  * Use a stack of opening brackets and match every closing bracket with the top.
  */
@@ -1148,6 +1319,53 @@ module.exports = {
       "        return not stack",
     ],
     builder: buildSteps20,
+  },
+  150: {
+    id: 150,
+    difficulty: "medium",
+    slug: "evaluate-reverse-polish-notation",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Evaluate Reverse Polish Notation", en: "Evaluate Reverse Polish Notation" },
+    titleVi: { vi: "Tinh gia tri bieu thuc hau to", en: "Evaluate postfix expression" },
+    statement: {
+      vi: "Cho mang tokens bieu dien bieu thuc Reverse Polish Notation. Tinh gia tri bieu thuc, trong do phep chia lay phan nguyen cat ve 0.",
+      en: "Given tokens representing a Reverse Polish Notation expression. Evaluate it, with division truncating toward zero.",
+    },
+    defaultInput: ["2", "1", "+", "3", "*"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "tokens (JSON hoac comma-separated)", en: "tokens (JSON or comma-separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyet token tu trai sang phai.", en: "Scan tokens from left to right." },
+      { vi: "Neu token la so, push vao stack.", en: "If the token is a number, push it onto the stack." },
+      { vi: "Neu token la operator, pop b truoc, pop a sau, tinh a op b.", en: "If the token is an operator, pop b first, then a, and compute a op b." },
+      { vi: "Push ket qua lai vao stack. Sau cung stack con mot gia tri la dap an.", en: "Push the result back. At the end, the only stack value is the answer." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Moi token duoc xu ly mot lan. Stack co the chua toi da O(n) so.",
+        en: "Each token is processed once. The stack can store up to O(n) numbers.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def evalRPN(self, tokens):",
+      "        stack = []",
+      "        for token in tokens:",
+      "            if token not in '+-*/':",
+      "                stack.append(int(token))",
+      "            else:",
+      "                b = stack.pop()",
+      "                a = stack.pop()",
+      "                if token == '+': stack.append(a + b)",
+      "                elif token == '-': stack.append(a - b)",
+      "                elif token == '*': stack.append(a * b)",
+      "                else: stack.append(int(a / b))",
+      "        return stack[-1]",
+    ],
+    builder: buildSteps150,
   },
   1670: {
     id: 1670,
