@@ -1326,6 +1326,207 @@ function buildSteps1700(input, params) {
 }
 
 /**
+ * LeetCode 921: Minimum Add to Make Parentheses Valid.
+ * Keep unmatched opening parentheses on a stack and count missing openers.
+ */
+function buildSteps921(input) {
+  const s = String(input).trim();
+  const chars = s.split("");
+  const stack = [];
+  const steps = [];
+  let additions;
+  let ch;
+
+  function valueLabel(value) {
+    return value === undefined ? "not in scope" : value;
+  }
+
+  function stackItems() {
+    return stack.map((index) => ({ value: "(", detail: `index ${index}` }));
+  }
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function totalNeeded() {
+    return additions === undefined ? "not in scope" : additions + stack.length;
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Unmatched '(' stack",
+        emptyLabel: "no unmatched '('",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "Parentheses string",
+        status: [
+          { label: "missing '('", value: valueLabel(additions) },
+          { label: "missing ')'", value: stack.length },
+          { label: "total additions", value: totalNeeded() },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "ch", value: ch === undefined ? "not in scope" : `'${ch}'` },
+        { name: "additions", value: valueLabel(additions) },
+        { name: "len(stack)", value: stack.length },
+        { name: "additions + len(stack)", value: totalNeeded() },
+        { name: "s", value: `"${s}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 3,
+    note: {
+      vi: "Stack luu index cua cac '(' chua duoc ghep voi dau ')' nao.",
+      en: "The stack stores indices of '(' characters that have not been matched with a ')'.",
+    },
+  });
+
+  additions = 0;
+  pushStep({
+    title: { vi: "Initialize additions", en: "Initialize additions" },
+    codeLine: 4,
+    note: {
+      vi: "additions dem so dau '(' can them khi gap ')' ma stack dang rong.",
+      en: "additions counts missing '(' characters when a ')' appears while the stack is empty.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    ch = chars[i];
+    pushStep({
+      title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
+      codeLine: 5,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `s[${i}]`, value: `'${ch}'` },
+      ],
+      note: {
+        vi: `Xu ly s[${i}] = '${ch}'.`,
+        en: `Process s[${i}] = '${ch}'.`,
+      },
+    });
+
+    if (ch === "(") {
+      pushStep({
+        title: { vi: "Opening parenthesis", en: "Opening parenthesis" },
+        codeLine: 6,
+        current: i,
+        vars: [{ name: "ch == '('", value: true }],
+        note: {
+          vi: "Day la dau mo, nen can cho mot dau ')' o phia sau de ghep cap.",
+          en: "This is an opener, so it waits for a later ')' to form a pair.",
+        },
+      });
+
+      stack.push(i);
+      pushStep({
+        title: { vi: `Push '(' at ${i}`, en: `Push '(' at ${i}` },
+        codeLine: 7,
+        current: i,
+        vars: [
+          { name: "pushed index", value: i },
+          { name: "action", value: "stack.append(i)" },
+        ],
+        note: {
+          vi: `Push index ${i}; hien co ${stack.length} dau '(' chua ghep cap.`,
+          en: `Push index ${i}; there are now ${stack.length} unmatched '(' characters.`,
+        },
+      });
+      continue;
+    }
+
+    if (stack.length) {
+      pushStep({
+        title: { vi: "A matching '(' exists", en: "A matching '(' exists" },
+        codeLine: 8,
+        current: i,
+        vars: [{ name: "bool(stack)", value: true }],
+        note: {
+          vi: "Stack khong rong, nen ')' hien tai co the ghep voi dau '(' tren top.",
+          en: "The stack is not empty, so the current ')' can match the '(' on top.",
+        },
+      });
+
+      const openIndex = stack.pop();
+      pushStep({
+        title: { vi: `Match indices ${openIndex} and ${i}`, en: `Match indices ${openIndex} and ${i}` },
+        codeLine: 9,
+        current: i,
+        vars: [
+          { name: "open index", value: openIndex },
+          { name: "close index", value: i },
+          { name: "matched pair", value: "()" },
+        ],
+        note: {
+          vi: `Ghep '(' tai index ${openIndex} voi ')' tai index ${i}, roi pop khoi stack.`,
+          en: `Match '(' at index ${openIndex} with ')' at index ${i}, then pop it from the stack.`,
+        },
+      });
+      continue;
+    }
+
+    pushStep({
+      title: { vi: "No matching '(' exists", en: "No matching '(' exists" },
+      codeLine: 10,
+      current: i,
+      vars: [{ name: "bool(stack)", value: false }],
+      note: {
+        vi: "Stack rong, nen ')' hien tai thieu mot dau '(' o phia truoc.",
+        en: "The stack is empty, so the current ')' needs an added '(' before it.",
+      },
+    });
+
+    additions += 1;
+    pushStep({
+      title: { vi: `additions = ${additions}`, en: `additions = ${additions}` },
+      codeLine: 11,
+      current: i,
+      vars: [
+        { name: "action", value: "additions += 1" },
+        { name: "added character", value: "'('" },
+      ],
+      note: {
+        vi: `Them mot '(' truoc ')' tai index ${i}; tong so dau '(' can them la ${additions}.`,
+        en: `Add a '(' before ')' at index ${i}; ${additions} opening parenthesis must now be added.`,
+      },
+    });
+  }
+
+  const answer = additions + stack.length;
+  pushStep({
+    title: { vi: `Result: ${answer} addition${answer === 1 ? "" : "s"}`, en: `Result: ${answer} addition${answer === 1 ? "" : "s"}` },
+    codeLine: 13,
+    current: chars.length,
+    vars: [
+      { name: "missing '('", value: additions },
+      { name: "missing ')'", value: stack.length },
+      { name: "answer", value: `${additions} + ${stack.length} = ${answer}` },
+    ],
+    note: {
+      vi: `Can them ${additions} dau '(' cho cac dau ')' bi thua va ${stack.length} dau ')' cho cac dau '(' con trong stack. Ket qua = ${answer}.`,
+      en: `Add ${additions} '(' for unmatched closers and ${stack.length} ')' for openers left in the stack. The answer is ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 1963: Minimum Number of Swaps to Make the String Balanced.
  * Match closing brackets with a stack and count those that have no opener.
  */
@@ -2554,6 +2755,52 @@ module.exports = {
       "        return self.size == self.k",
     ],
     builder: buildSteps641,
+  },
+  921: {
+    id: 921,
+    difficulty: "medium",
+    slug: "minimum-add-to-make-parentheses-valid",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Minimum Add to Make Parentheses Valid", en: "Minimum Add to Make Parentheses Valid" },
+    titleVi: { vi: "Them it dau ngoac nhat de chuoi hop le", en: "Minimum additions for valid parentheses" },
+    statement: {
+      vi: "Cho chuoi chi gom '(' va ')'. Moi lan co the chen mot dau ngoac vao bat ky vi tri nao. Tra ve so lan chen it nhat de chuoi ngoac hop le.",
+      en: "Given a string containing only '(' and ')', one parenthesis may be inserted at any position per move. Return the minimum additions needed to make the string valid.",
+    },
+    defaultInput: "()))((",
+    inputKind: "string",
+    inputLabel: { vi: "Parentheses string s", en: "Parentheses string s" },
+    extraParams: [],
+    approach: [
+      { vi: "Stack luu cac dau '(' chua ghep cap.", en: "Keep unmatched '(' characters on a stack." },
+      { vi: "Gap ')' va stack khong rong: pop mot '(' de tao cap ().", en: "For ')' with a nonempty stack, pop one '(' to form a pair." },
+      { vi: "Gap ')' khi stack rong: can them mot '(', nen additions tang 1.", en: "For ')' with an empty stack, one '(' is missing, so increment additions." },
+      { vi: "Sau khi duyet, moi '(' con trong stack can them mot ')'. Ket qua la additions + len(stack).", en: "After the scan, each '(' left in the stack needs a ')'. Return additions + len(stack)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyet moi ky tu mot lan. Stack co the luu toi da n dau '('. Co the toi uu space ve O(1) bang bien dem open.",
+        en: "Each character is processed once. The stack may store n opening parentheses; an open counter can optimize the extra space to O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minAddToMakeValid(self, s: str) -> int:",
+      "        stack = []",
+      "        additions = 0",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '(':",
+      "                stack.append(i)",
+      "            elif stack:",
+      "                stack.pop()",
+      "            else:",
+      "                additions += 1",
+      "",
+      "        return additions + len(stack)",
+    ],
+    builder: buildSteps921,
   },
   1598: {
     id: 1598,
