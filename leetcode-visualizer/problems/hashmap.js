@@ -1277,6 +1277,189 @@ function buildSteps525(nums) {
   return { steps, answer: maxLen };
 }
 
+function buildSteps1590(nums, params) {
+  const p = Math.max(1, Math.abs(Number.parseInt(params && params.p, 10) || 1));
+  const total = nums.reduce((sum, num) => sum + num, 0);
+  const need = total % p;
+  const lastSeen = new Map([[0, -1]]);
+  const prefixSums = new Array(nums.length).fill(null);
+  const remainders = new Array(nums.length).fill(null);
+  const steps = [];
+  let prefixSum = 0;
+  let bestLen = nums.length;
+  let bestStart = -1;
+  let bestEnd = -1;
+
+  const mapEntries = () => [...lastSeen.entries()].map(([remainder, index]) => ({ remainder, index }));
+  const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const makeView = ({ current = -1, matchStart = bestStart, matchEnd = bestEnd, status = [] } = {}) => ({
+    nums: [...nums],
+    prefixSums: [...prefixSums],
+    remainders: [...remainders],
+    current,
+    matchStart,
+    matchEnd,
+    entries: mapEntries(),
+    heading: "Numbers / prefix / remainder",
+    prefixLabel: "sum",
+    remainderLabel: "rem",
+    mapTitle: "Latest remainder index",
+    mapKeyLabel: "remainder",
+    mapValueLabel: "index",
+    status,
+  });
+
+  steps.push({
+    title: { vi: `Total % p = ${need}`, en: `Total % p = ${need}` },
+    codeLines: [3, 4],
+    prefixRemainderView: makeView({
+      matchStart: -1,
+      matchEnd: -1,
+      status: [
+        { label: "total", value: total },
+        { label: "p", value: p },
+        { label: "need remove", value: need },
+      ],
+    }),
+    vars: [{ name: "total", value: total }, { name: "p", value: p }, { name: "need", value: need }],
+    note: {
+      vi: `Tong mang du ${need} khi chia cho ${p}. Can xoa mot subarray co tong du ${need}.`,
+      en: `The array sum leaves remainder ${need} modulo ${p}. Remove a subarray whose sum has that same remainder.`,
+    },
+  });
+
+  if (need === 0) {
+    steps.push({
+      title: { vi: "Da chia het, khong can xoa", en: "Already divisible, remove nothing" },
+      codeLines: [5],
+      prefixRemainderView: makeView({
+        matchStart: -1,
+        matchEnd: -1,
+        status: [
+          { label: "need", value: 0 },
+          { label: "answer", value: 0 },
+        ],
+      }),
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Tong mang da chia het cho p, nen tra ve 0.",
+        en: "The total is already divisible by p, so return 0.",
+      },
+      final: true,
+    });
+    return { steps, answer: 0 };
+  }
+
+  for (let i = 0; i < nums.length; i += 1) {
+    prefixSum += nums[i];
+    const remainder = prefixSum % p;
+    const target = (remainder - need + p) % p;
+    prefixSums[i] = prefixSum;
+    remainders[i] = remainder;
+
+    steps.push({
+      title: { vi: `Doc nums[${i}] = ${nums[i]}`, en: `Read nums[${i}] = ${nums[i]}` },
+      codeLines: [8, 9, 10],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "prefix", value: prefixSum },
+          { label: "remainder", value: remainder },
+          { label: "target", value: target },
+        ],
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+        { name: "prefix", value: prefixSum },
+        { name: "remainder", value: remainder },
+        { name: "target", value: `(${remainder} - ${need} + ${p}) % ${p} = ${target}` },
+      ],
+      note: {
+        vi: `Neu tung thay remainder ${target}, doan giua se co tong du ${need}.`,
+        en: `If remainder ${target} was seen before, the subarray between then and now has remainder ${need}.`,
+      },
+    });
+
+    if (lastSeen.has(target)) {
+      const previous = lastSeen.get(target);
+      const start = previous + 1;
+      const length = i - previous;
+      const end = i;
+      if (length < bestLen) {
+        bestLen = length;
+        bestStart = start;
+        bestEnd = end;
+      }
+      steps.push({
+        title: { vi: `Candidate remove [${start}..${end}]`, en: `Candidate remove [${start}..${end}]` },
+        codeLines: [11, 12],
+        prefixRemainderView: makeView({
+          current: i,
+          matchStart: start,
+          matchEnd: end,
+          status: [
+            { label: "target index", value: previous },
+            { label: "candidate len", value: length },
+            { label: "best len", value: bestLen },
+          ],
+        }),
+        vars: [
+          { name: "target", value: target },
+          { name: `last_seen[${target}]`, value: previous },
+          { name: "candidate", value: `[${start}..${end}]` },
+          { name: "best_len", value: bestLen },
+        ],
+        note: {
+          vi: `Xoa nums[${start}..${end}] lam phan con lai chia het cho ${p}. Cap nhat do dai nho nhat neu tot hon.`,
+          en: `Removing nums[${start}..${end}] makes the remaining sum divisible by ${p}. Update the shortest length if it improves.`,
+        },
+      });
+    }
+
+    lastSeen.set(remainder, i);
+    steps.push({
+      title: { vi: `Luu remainder ${remainder} tai index ${i}`, en: `Store remainder ${remainder} at index ${i}` },
+      codeLines: [13],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "stored", value: `${remainder} -> ${i}` },
+          { label: "best len", value: bestLen === nums.length ? "-" : bestLen },
+        ],
+      }),
+      vars: [{ name: "last_seen", value: mapString() }, { name: "best_len", value: bestLen === nums.length ? "inf" : bestLen }],
+      note: {
+        vi: "Dung index moi nhat cho moi remainder de subarray can xoa ngan nhat.",
+        en: "Keep the latest index for each remainder to make the removable subarray as short as possible.",
+      },
+    });
+  }
+
+  const answer = bestLen < nums.length ? bestLen : -1;
+  steps.push({
+    title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
+    codeLines: [14],
+    prefixRemainderView: makeView({
+      current: -1,
+      matchStart: answer === -1 ? -1 : bestStart,
+      matchEnd: answer === -1 ? -1 : bestEnd,
+      status: [
+        { label: "remove", value: answer === -1 ? "none" : `[${bestStart}..${bestEnd}]` },
+        { label: "answer", value: answer },
+      ],
+    }),
+    vars: [{ name: "answer", value: answer }, { name: "best_len", value: bestLen === nums.length ? "inf" : bestLen }],
+    note: {
+      vi: answer === -1 ? "Chi co the xoa ca mang, khong hop le nen tra ve -1." : `Subarray can xoa ngan nhat la nums[${bestStart}..${bestEnd}], do dai ${answer}.`,
+      en: answer === -1 ? "Only removing the whole array would work, which is not allowed, so return -1." : `The shortest removable subarray is nums[${bestStart}..${bestEnd}], length ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { steps, answer };
+}
+
 module.exports = {
   3020: {
     id: 3020,
@@ -1530,6 +1713,55 @@ module.exports = {
       "        return max_len",
     ],
     builder: buildSteps525,
+  },
+  1590: {
+    id: 1590,
+    difficulty: "medium",
+    slug: "make-sum-divisible-by-p",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Make Sum Divisible by P", en: "Make Sum Divisible by P" },
+    titleVi: { vi: "Xoa day con ngan nhat de tong chia het cho p", en: "Remove shortest subarray to make sum divisible" },
+    statement: {
+      vi: "Cho mang so nguyen duong nums va so nguyen p. Xoa mot day con lien tiep ngan nhat sao cho tong phan con lai chia het cho p. Khong duoc xoa ca mang.",
+      en: "Given positive integers nums and p, remove the shortest contiguous subarray so the remaining sum is divisible by p. Removing the whole array is not allowed.",
+    },
+    defaultInput: [3, 1, 4, 2],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "p", type: "number", label: { vi: "p", en: "p" }, default: 6 },
+    ],
+    approach: [
+      { vi: "Tinh need = sum(nums) % p. Can xoa subarray co tong du need.", en: "Compute need = sum(nums) % p. We need to remove a subarray whose sum has remainder need." },
+      { vi: "Duyet prefix modulo p. Voi remainder hien tai r, can tim target = (r - need + p) % p.", en: "Scan prefix modulo p. For current remainder r, look for target = (r - need + p) % p." },
+      { vi: "Luu index moi nhat cua moi remainder de candidate remove ngan nhat.", en: "Store the latest index for each remainder to get the shortest removable candidate." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(min(n, p))",
+      note: {
+        vi: "Mot lan duyet; hash map luu remainder prefix gan nhat.",
+        en: "One pass; the hash map stores the latest prefix index for each remainder.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minSubarray(self, nums: List[int], p: int) -> int:",
+      "        need = sum(nums) % p",
+      "        if need == 0:",
+      "            return 0",
+      "        last_seen = {0: -1}",
+      "        prefix = 0",
+      "        ans = len(nums)",
+      "        for i, num in enumerate(nums):",
+      "            prefix = (prefix + num) % p",
+      "            target = (prefix - need + p) % p",
+      "            if target in last_seen:",
+      "                ans = min(ans, i - last_seen[target])",
+      "            last_seen[prefix] = i",
+      "        return ans if ans < len(nums) else -1",
+    ],
+    builder: buildSteps1590,
   },
   734: {
     id: 734,
