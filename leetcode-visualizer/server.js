@@ -10,7 +10,7 @@ app.use(express.static(path.join(__dirname, "public")));
 const { SUPPORTED, CATEGORY_ORDER } = require("./problems");
 
 const PREMIUM_PROBLEM_IDS = new Set([
-  156, 246, 253, 270, 276, 285, 314, 323, 366, 426, 487, 588, 734, 760, 1101,
+  156, 246, 253, 270, 276, 285, 314, 323, 366, 370, 426, 487, 588, 734, 760, 1101,
   1136, 1166, 1197, 1236, 1258, 1644, 1650, 1676, 1804,
 ]);
 

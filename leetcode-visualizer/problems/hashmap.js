@@ -1460,6 +1460,203 @@ function buildSteps1590(nums, params) {
   return { steps, answer };
 }
 
+function parseRangeUpdates(raw, length) {
+  let rows = [];
+  if (Array.isArray(raw)) {
+    rows = raw;
+  } else {
+    const text = String(raw || "").trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) rows = parsed;
+    } catch (_) {
+      rows = text
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => part.split(",").map((value) => Number.parseInt(value.trim(), 10)));
+    }
+  }
+
+  return rows
+    .filter((row) => Array.isArray(row) && row.length >= 3)
+    .map((row) => row.slice(0, 3).map((value) => Number.parseInt(value, 10)))
+    .filter(([start, end, inc]) => Number.isInteger(start) && Number.isInteger(end) && Number.isInteger(inc))
+    .map(([start, end, inc]) => [
+      Math.max(0, Math.min(length - 1, start)),
+      Math.max(0, Math.min(length - 1, end)),
+      inc,
+    ])
+    .filter(([start, end]) => start <= end);
+}
+
+function buildSteps370(input, params) {
+  const length = Math.max(1, Math.min(20, Number.parseInt(input && input[0], 10) || 5));
+  const updates = parseRangeUpdates(params && params.updates, length);
+  const diff = new Array(length + 1).fill(0);
+  const result = new Array(length).fill(null);
+  const steps = [];
+
+  const makeView = ({
+    currentUpdate = -1,
+    activeStart = -1,
+    activeEnd = -1,
+    activeBoundary = -1,
+    currentResult = -1,
+    status = [],
+  } = {}) => ({
+    length,
+    diff: [...diff],
+    result: [...result],
+    updates: updates.map(([start, end, inc]) => ({ start, end, inc })),
+    currentUpdate,
+    activeStart,
+    activeEnd,
+    activeBoundary,
+    currentResult,
+    status,
+  });
+
+  steps.push({
+    title: { vi: `Khoi tao diff length ${length + 1}`, en: `Initialize diff length ${length + 1}` },
+    codeLines: [3],
+    differenceArrayView: makeView({
+      status: [
+        { label: "length", value: length },
+        { label: "updates", value: updates.length },
+      ],
+    }),
+    vars: [{ name: "length", value: length }, { name: "diff", value: `[${diff.join(", ")}]` }],
+    note: {
+      vi: "Dung diff co them 1 o cuoi de danh dau diem ket thuc range bang diff[end + 1].",
+      en: "Use one extra diff cell so each range can close at diff[end + 1].",
+    },
+  });
+
+  updates.forEach(([start, end, inc], updateIndex) => {
+    steps.push({
+      title: { vi: `Update ${updateIndex}: [${start}, ${end}, ${inc}]`, en: `Update ${updateIndex}: [${start}, ${end}, ${inc}]` },
+      codeLines: [4],
+      differenceArrayView: makeView({
+        currentUpdate: updateIndex,
+        activeStart: start,
+        activeEnd: end,
+        status: [
+          { label: "start", value: start },
+          { label: "end", value: end },
+          { label: "inc", value: inc },
+        ],
+      }),
+      vars: [{ name: "start", value: start }, { name: "end", value: end }, { name: "inc", value: inc }],
+      note: {
+        vi: `Range [${start}..${end}] se tang ${inc}. Thay vi cap nhat tung o, ta chi danh dau hai bien.`,
+        en: `Range [${start}..${end}] will increase by ${inc}. Instead of updating every cell, mark the two boundaries.`,
+      },
+    });
+
+    diff[start] += inc;
+    steps.push({
+      title: { vi: `diff[${start}] += ${inc}`, en: `diff[${start}] += ${inc}` },
+      codeLines: [5],
+      differenceArrayView: makeView({
+        currentUpdate: updateIndex,
+        activeStart: start,
+        activeEnd: end,
+        activeBoundary: start,
+        status: [
+          { label: "open range", value: `+${inc} at ${start}` },
+          { label: `diff[${start}]`, value: diff[start] },
+        ],
+      }),
+      vars: [{ name: `diff[${start}]`, value: diff[start] }, { name: "diff", value: `[${diff.join(", ")}]` }],
+      note: {
+        vi: `Tu index ${start}, prefix sum se bat dau cong ${inc}.`,
+        en: `Starting at index ${start}, the prefix sum begins adding ${inc}.`,
+      },
+    });
+
+    diff[end + 1] -= inc;
+    steps.push({
+      title: { vi: `diff[${end + 1}] -= ${inc}`, en: `diff[${end + 1}] -= ${inc}` },
+      codeLines: [6],
+      differenceArrayView: makeView({
+        currentUpdate: updateIndex,
+        activeStart: start,
+        activeEnd: end,
+        activeBoundary: end + 1,
+        status: [
+          { label: "close range", value: `-${inc} at ${end + 1}` },
+          { label: `diff[${end + 1}]`, value: diff[end + 1] },
+        ],
+      }),
+      vars: [{ name: `diff[${end + 1}]`, value: diff[end + 1] }, { name: "diff", value: `[${diff.join(", ")}]` }],
+      note: {
+        vi: `Sau index ${end}, tac dong ${inc} phai dung lai, nen tru lai tai ${end + 1}.`,
+        en: `After index ${end}, the effect of ${inc} must stop, so subtract it at ${end + 1}.`,
+      },
+    });
+  });
+
+  let running = 0;
+  steps.push({
+    title: { vi: "Bat dau prefix sum", en: "Start prefix sum" },
+    codeLines: [7, 8],
+    differenceArrayView: makeView({
+      status: [
+        { label: "running", value: running },
+        { label: "diff", value: `[${diff.join(", ")}]` },
+      ],
+    }),
+    vars: [{ name: "running", value: running }, { name: "result", value: "[]" }],
+    note: {
+      vi: "Sau khi danh dau moi update, lay prefix sum cua diff de ra mang cuoi.",
+      en: "After marking every update, take the prefix sum of diff to build the final array.",
+    },
+  });
+
+  for (let i = 0; i < length; i += 1) {
+    running += diff[i];
+    result[i] = running;
+    steps.push({
+      title: { vi: `result[${i}] = ${running}`, en: `result[${i}] = ${running}` },
+      codeLines: [9, 10, 11],
+      differenceArrayView: makeView({
+        currentResult: i,
+        status: [
+          { label: "i", value: i },
+          { label: `diff[${i}]`, value: diff[i] },
+          { label: "running", value: running },
+        ],
+      }),
+      vars: [{ name: "i", value: i }, { name: "running", value: running }, { name: "result", value: `[${result.map((v) => v == null ? "_" : v).join(", ")}]` }],
+      note: {
+        vi: `Cong diff[${i}] = ${diff[i]} vao running, gia tri that tai index ${i} la ${running}.`,
+        en: `Add diff[${i}] = ${diff[i]} to running; the real value at index ${i} is ${running}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Ket qua: [${result.join(", ")}]`, en: `Result: [${result.join(", ")}]` },
+    codeLines: [12],
+    differenceArrayView: makeView({
+      status: [
+        { label: "answer", value: `[${result.join(", ")}]` },
+        { label: "updates", value: updates.length },
+      ],
+    }),
+    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
+    note: {
+      vi: "Prefix sum cua diff da ap dung tat ca range updates.",
+      en: "The prefix sum of diff has applied all range updates.",
+    },
+    final: true,
+  });
+
+  return { steps, answer: result };
+}
+
 module.exports = {
   3020: {
     id: 3020,
@@ -1713,6 +1910,60 @@ module.exports = {
       "        return max_len",
     ],
     builder: buildSteps525,
+  },
+  370: {
+    id: 370,
+    difficulty: "medium",
+    premium: true,
+    slug: "range-addition",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Range Addition", en: "Range Addition" },
+    titleVi: { vi: "Cong doan bang mang hieu", en: "Range updates with a difference array" },
+    statement: {
+      vi: "Cho length va danh sach updates [start, end, inc]. Bat dau voi mang toan 0, moi update cong inc vao moi phan tu tu start den end. Tra ve mang sau cung.",
+      en: "Given length and updates [start, end, inc], start with an all-zero array and add inc to every element from start to end for each update. Return the final array.",
+    },
+    defaultInput: [5],
+    inputKind: "positive",
+    singleInput: true,
+    maxInput: 20,
+    inputLabel: { vi: "length", en: "length" },
+    extraParams: [
+      {
+        key: "updates",
+        type: "string",
+        label: { vi: "updates (JSON hoac start,end,inc;...)", en: "updates (JSON or start,end,inc;...)" },
+        default: "[[1,3,2],[2,4,3],[0,2,-2]]",
+      },
+    ],
+    approach: [
+      { vi: "Dung difference array diff co them mot o phu o cuoi.", en: "Use a difference array diff with one extra sentinel cell at the end." },
+      { vi: "Voi update [start,end,inc]: diff[start] += inc va diff[end+1] -= inc.", en: "For update [start,end,inc]: diff[start] += inc and diff[end+1] -= inc." },
+      { vi: "Lay prefix sum cua diff de tao mang ket qua.", en: "Take the prefix sum of diff to build the final array." },
+    ],
+    complexity: {
+      time: "O(n + k)",
+      space: "O(n)",
+      note: {
+        vi: "k la so updates. Moi update O(1), sau do mot lan prefix sum O(n).",
+        en: "k is the number of updates. Each update is O(1), then one O(n) prefix pass.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def getModifiedArray(self, length: int, updates: List[List[int]]) -> List[int]:",
+      "        diff = [0] * (length + 1)",
+      "        for start, end, inc in updates:",
+      "            diff[start] += inc",
+      "            diff[end + 1] -= inc",
+      "        result = []",
+      "        running = 0",
+      "        for i in range(length):",
+      "            running += diff[i]",
+      "            result.append(running)",
+      "        return result",
+    ],
+    builder: buildSteps370,
   },
   1590: {
     id: 1590,

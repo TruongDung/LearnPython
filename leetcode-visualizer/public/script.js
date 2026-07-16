@@ -1804,6 +1804,64 @@ function renderPrefixRemainderView(step) {
     </div>`;
 }
 
+function renderDifferenceArrayView(step) {
+  const view = step.differenceArrayView || {};
+  const diff = Array.isArray(view.diff) ? view.diff : [];
+  const result = Array.isArray(view.result) ? view.result : [];
+  const updates = Array.isArray(view.updates) ? view.updates : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const currentUpdate = Number.isInteger(view.currentUpdate) ? view.currentUpdate : -1;
+  const activeStart = Number.isInteger(view.activeStart) ? view.activeStart : -1;
+  const activeEnd = Number.isInteger(view.activeEnd) ? view.activeEnd : -1;
+  const activeBoundary = Number.isInteger(view.activeBoundary) ? view.activeBoundary : -1;
+  const currentResult = Number.isInteger(view.currentResult) ? view.currentResult : -1;
+
+  const diffCells = diff.map((value, index) => {
+    const inRange = activeStart >= 0 && index >= activeStart && index <= activeEnd;
+    const isBoundary = index === activeBoundary;
+    const isSentinel = index === diff.length - 1;
+    return `<div class="diff-cell${inRange ? " in-range" : ""}${isBoundary ? " boundary" : ""}${isSentinel ? " sentinel" : ""}">
+      <span>[${index}]</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      ${isSentinel ? "<small>end</small>" : ""}
+    </div>`;
+  }).join("");
+
+  const resultCells = result.map((value, index) => `<div class="diff-cell result${index === currentResult ? " boundary" : ""}">
+    <span>[${index}]</span>
+    <strong>${value == null ? "-" : escapeHtml(String(value))}</strong>
+  </div>`).join("");
+
+  const updateItems = updates.length
+    ? updates.map((update, index) => `<div class="diff-update${index === currentUpdate ? " current" : ""}">
+      <span>${index}</span>
+      <strong>[${escapeHtml(String(update.start))}, ${escapeHtml(String(update.end))}, ${escapeHtml(String(update.inc))}]</strong>
+    </div>`).join("")
+    : `<div class="diff-update empty"><strong>no updates</strong></div>`;
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="diff-viz">
+      <div>
+        <div class="diff-heading">Updates</div>
+        <div class="diff-updates">${updateItems}</div>
+      </div>
+      <div>
+        <div class="diff-heading">Difference array</div>
+        <div class="diff-cells">${diffCells}</div>
+      </div>
+      <div>
+        <div class="diff-heading">Result prefix sum</div>
+        <div class="diff-cells result-row">${resultCells}</div>
+      </div>
+      <div class="diff-status">${statusItems}</div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1875,6 +1933,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefixRemainderView(step);
+  } else if (step.differenceArrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDifferenceArrayView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
