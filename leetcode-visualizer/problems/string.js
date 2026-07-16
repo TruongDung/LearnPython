@@ -1527,6 +1527,265 @@ function buildSteps921(input) {
 }
 
 /**
+ * LeetCode 1249: Minimum Remove to Make Valid Parentheses.
+ * Match closing parentheses with opening indices and remove unmatched ones.
+ */
+function buildSteps1249(input) {
+  const s = String(input);
+  const originalChars = s.split("");
+  const chars = originalChars.slice();
+  const stack = [];
+  const removedIndices = new Set();
+  const steps = [];
+  let ch;
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function charsLabel() {
+    return JSON.stringify(chars);
+  }
+
+  function visibleChars() {
+    return chars.map((value, index) => removedIndices.has(index) ? "X" : value);
+  }
+
+  function visibleString() {
+    return chars.join("");
+  }
+
+  function removedLabel() {
+    return `[${Array.from(removedIndices).sort((a, b) => a - b).join(", ")}]`;
+  }
+
+  function stackItems() {
+    return stack.map((index) => ({ value: "(", detail: `index ${index}` }));
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Unmatched '(' indices",
+        emptyLabel: "no unmatched '('",
+        items: stackItems(),
+        input: visibleChars(),
+        current,
+        inputLabel: "Characters (X = removed)",
+        status: [
+          { label: "current character", value: ch === undefined ? "-" : `'${ch}'` },
+          { label: "unmatched '('", value: stack.length },
+          { label: "removed indices", value: removedLabel() },
+        ],
+      },
+      vars: [
+        { name: "chars", value: charsLabel() },
+        { name: "stack", value: stackLabel() },
+        { name: "ch", value: ch === undefined ? "not in scope" : `'${ch}'` },
+        { name: "removed_indices", value: removedLabel() },
+        { name: "current string", value: `"${visibleString()}"` },
+        { name: "s", value: `"${s}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Convert string to character list", en: "Convert string to character list" },
+    codeLine: 3,
+    vars: [{ name: "len(chars)", value: chars.length }],
+    note: {
+      vi: "Dung list de co the danh dau ky tu can xoa bang chuoi rong ''.",
+      en: "Use a list so invalid characters can be marked for removal with an empty string.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 4,
+    note: {
+      vi: "Stack luu index cua cac dau '(' chua tim thay ')' ghep cap.",
+      en: "The stack stores indices of '(' characters that have not found a matching ')'.",
+    },
+  });
+
+  for (let i = 0; i < originalChars.length; i++) {
+    ch = originalChars[i];
+    pushStep({
+      title: { vi: `Read '${ch}' at ${i}`, en: `Read '${ch}' at ${i}` },
+      codeLine: 5,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `chars[${i}]`, value: `'${ch}'` },
+      ],
+      note: {
+        vi: `Xu ly ky tu '${ch}' tai index ${i}.`,
+        en: `Process character '${ch}' at index ${i}.`,
+      },
+    });
+
+    if (ch === "(") {
+      pushStep({
+        title: { vi: "Opening parenthesis", en: "Opening parenthesis" },
+        codeLine: 6,
+        current: i,
+        vars: [{ name: "ch == '('", value: true }],
+        note: {
+          vi: "Day la dau mo; luu index de cho mot dau ')' o phia sau.",
+          en: "This is an opener; save its index for a possible ')' later.",
+        },
+      });
+
+      stack.push(i);
+      pushStep({
+        title: { vi: `Push index ${i}`, en: `Push index ${i}` },
+        codeLine: 7,
+        current: i,
+        vars: [
+          { name: "pushed index", value: i },
+          { name: "action", value: "stack.append(i)" },
+        ],
+        note: {
+          vi: `Index ${i} duoc push. Stack hien tai la ${stackLabel()}.`,
+          en: `Push index ${i}. The stack is now ${stackLabel()}.`,
+        },
+      });
+      continue;
+    }
+
+    if (ch !== ")") continue;
+
+    pushStep({
+      title: { vi: "Closing parenthesis", en: "Closing parenthesis" },
+      codeLine: 8,
+      current: i,
+      vars: [{ name: "ch == ')'", value: true }],
+      note: {
+        vi: "Day la dau dong; can mot index '(' trong stack de ghep cap.",
+        en: "This is a closer; it needs a '(' index from the stack.",
+      },
+    });
+
+    if (stack.length) {
+      pushStep({
+        title: { vi: "Matching opener exists", en: "Matching opener exists" },
+        codeLine: 9,
+        current: i,
+        vars: [{ name: "bool(stack)", value: true }],
+        note: {
+          vi: "Stack khong rong, nen dau ')' nay hop le.",
+          en: "The stack is not empty, so this ')' is valid.",
+        },
+      });
+
+      const openIndex = stack.pop();
+      pushStep({
+        title: { vi: `Match ${openIndex} with ${i}`, en: `Match ${openIndex} with ${i}` },
+        codeLine: 10,
+        current: i,
+        vars: [
+          { name: "open index", value: openIndex },
+          { name: "close index", value: i },
+          { name: "matched pair", value: `chars[${openIndex}] + chars[${i}] = ()` },
+        ],
+        note: {
+          vi: `Pop index ${openIndex}; '(' tai ${openIndex} ghep voi ')' tai ${i}.`,
+          en: `Pop index ${openIndex}; '(' at ${openIndex} matches ')' at ${i}.`,
+        },
+      });
+      continue;
+    }
+
+    pushStep({
+      title: { vi: "No matching opener", en: "No matching opener" },
+      codeLine: 11,
+      current: i,
+      vars: [{ name: "bool(stack)", value: false }],
+      note: {
+        vi: `Stack rong, nen ')' tai index ${i} khong hop le va phai bi xoa.`,
+        en: `The stack is empty, so ')' at index ${i} is invalid and must be removed.`,
+      },
+    });
+
+    chars[i] = "";
+    removedIndices.add(i);
+    pushStep({
+      title: { vi: `Remove ')' at ${i}`, en: `Remove ')' at ${i}` },
+      codeLine: 12,
+      current: i,
+      vars: [
+        { name: `chars[${i}]`, value: "''" },
+        { name: "action", value: `remove index ${i}` },
+      ],
+      note: {
+        vi: `Danh dau index ${i} bang ''. Tren hinh, ky tu bi xoa duoc hien la X.`,
+        en: `Mark index ${i} with ''. In the visual, a removed character appears as X.`,
+      },
+    });
+  }
+
+  while (stack.length) {
+    const openIndex = stack[stack.length - 1];
+    ch = originalChars[openIndex];
+    pushStep({
+      title: { vi: `Unmatched '(' remains at ${openIndex}`, en: `Unmatched '(' remains at ${openIndex}` },
+      codeLine: 14,
+      current: openIndex,
+      vars: [
+        { name: "stack top", value: openIndex },
+        { name: "scan complete", value: true },
+      ],
+      note: {
+        vi: `Khong con ')' nao o phia sau de ghep voi '(' tai index ${openIndex}.`,
+        en: `No later ')' remains to match '(' at index ${openIndex}.`,
+      },
+    });
+
+    stack.pop();
+    chars[openIndex] = "";
+    removedIndices.add(openIndex);
+    pushStep({
+      title: { vi: `Remove '(' at ${openIndex}`, en: `Remove '(' at ${openIndex}` },
+      codeLine: 15,
+      current: openIndex,
+      vars: [
+        { name: "removed index", value: openIndex },
+        { name: `chars[${openIndex}]`, value: "''" },
+      ],
+      note: {
+        vi: `Pop index ${openIndex} va danh dau dau '(' khong ghep cap de xoa.`,
+        en: `Pop index ${openIndex} and mark the unmatched '(' for removal.`,
+      },
+    });
+  }
+
+  const answer = chars.join("");
+  ch = undefined;
+  pushStep({
+    title: { vi: `Result: "${answer}"`, en: `Result: "${answer}"` },
+    codeLine: 17,
+    current: chars.length,
+    vars: [
+      { name: "answer", value: `"${answer}"` },
+      { name: "removed count", value: removedIndices.size },
+    ],
+    note: {
+      vi: `Join cac ky tu con lai sau khi xoa index ${removedLabel()}. Ket qua la "${answer}".`,
+      en: `Join the remaining characters after removing indices ${removedLabel()}. The result is "${answer}".`,
+    },
+    final: true,
+  });
+
+  return { s, answer, removedIndices: Array.from(removedIndices).sort((a, b) => a - b), steps };
+}
+
+/**
  * LeetCode 1963: Minimum Number of Swaps to Make the String Balanced.
  * Match closing brackets with a stack and count those that have no opener.
  */
@@ -3493,6 +3752,56 @@ module.exports = {
       "        return additions + len(stack)",
     ],
     builder: buildSteps921,
+  },
+  1249: {
+    id: 1249,
+    difficulty: "medium",
+    slug: "minimum-remove-to-make-valid-parentheses",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Minimum Remove to Make Valid Parentheses", en: "Minimum Remove to Make Valid Parentheses" },
+    titleVi: { vi: "Xoa it dau ngoac nhat de chuoi hop le", en: "Minimum removals for valid parentheses" },
+    statement: {
+      vi: "Cho chuoi gom chu cai va dau ngoac. Xoa so ky tu it nhat de tao mot chuoi ngoac hop le va tra ve mot ket qua bat ky hop le.",
+      en: "Given a string containing letters and parentheses, remove the minimum number of parentheses so the result is valid, and return any valid result.",
+    },
+    defaultInput: "lee(t(c)o)de)",
+    inputKind: "string",
+    inputLabel: { vi: "String s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyet trai sang phai va push index cua moi dau '(' vao stack.", en: "Scan left to right and push every '(' index onto the stack." },
+      { vi: "Gap ')' va stack khong rong thi pop de ghep cap.", en: "When ')' has an available opener, pop one index to match the pair." },
+      { vi: "Gap ')' khi stack rong thi danh dau no de xoa ngay.", en: "When ')' appears with an empty stack, mark it for immediate removal." },
+      { vi: "Sau khi duyet, xoa cac dau '(' con trong stack, roi join cac ky tu.", en: "After the scan, remove every '(' index left in the stack, then join the characters." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyet va join moi ky tu mot lan. Stack va character list dung toi da O(n) bo nho.",
+        en: "The scan and join each process every character once. The stack and character list use O(n) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minRemoveToMakeValid(self, s: str) -> str:",
+      "        chars = list(s)",
+      "        stack = []",
+      "        for i, ch in enumerate(chars):",
+      "            if ch == '(':",
+      "                stack.append(i)",
+      "            elif ch == ')':",
+      "                if stack:",
+      "                    stack.pop()",
+      "                else:",
+      "                    chars[i] = ''",
+      "",
+      "        while stack:",
+      "            chars[stack.pop()] = ''",
+      "",
+      "        return ''.join(chars)",
+    ],
+    builder: buildSteps1249,
   },
   1598: {
     id: 1598,
