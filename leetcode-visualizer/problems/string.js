@@ -2259,6 +2259,274 @@ function buildSteps150(input) {
 }
 
 /**
+ * LeetCode 155: Min Stack.
+ * Store (value, minimum at this level) so every operation stays O(1).
+ */
+function buildSteps155(input) {
+  const operations = parseDequeOps641(input);
+  const stack = [];
+  const steps = [];
+  const outputs = [];
+  let lastResult;
+
+  function operationLabel(op) {
+    return `${op.name}(${op.args.join(", ")})`;
+  }
+
+  function stackLabel() {
+    return stack.length
+      ? `[${stack.map((item) => `(${item.value}, ${item.min})`).join(", ")}]`
+      : "[]";
+  }
+
+  function topLabel() {
+    return stack.length ? stack[stack.length - 1].value : "empty";
+  }
+
+  function minLabel() {
+    return stack.length ? stack[stack.length - 1].min : "empty";
+  }
+
+  function resultLabel() {
+    return lastResult === undefined || lastResult === null ? "None" : lastResult;
+  }
+
+  function stackItems() {
+    return stack.map((item) => ({
+      value: item.value,
+      detail: `min = ${item.min}`,
+    }));
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Min Stack: (value, minimum)",
+        emptyLabel: "empty MinStack",
+        items: stackItems(),
+        input: operations.map(operationLabel),
+        current,
+        inputLabel: "Operations",
+        status: [
+          { label: "top", value: topLabel() },
+          { label: "current minimum", value: minLabel() },
+          { label: "last output", value: resultLabel() },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "top", value: topLabel() },
+        { name: "getMin()", value: minLabel() },
+        { name: "lastResult", value: resultLabel() },
+        { name: "outputs", value: `[${outputs.map((value) => value === null ? "None" : value).join(", ")}]` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  let startIndex = 0;
+  if (operations[0] && operations[0].name === "MinStack") {
+    outputs.push(null);
+    pushStep({
+      title: { vi: "Call MinStack()", en: "Call MinStack()" },
+      codeLine: 2,
+      current: 0,
+      vars: [{ name: "operation", value: "MinStack()" }],
+      note: {
+        vi: "Constructor tao mot MinStack moi.",
+        en: "The constructor creates a new MinStack.",
+      },
+    });
+    startIndex = 1;
+  }
+
+  pushStep({
+    title: { vi: "Initialize empty stack", en: "Initialize empty stack" },
+    codeLine: 3,
+    current: operations.length ? 0 : -1,
+    note: {
+      vi: "Moi entry se luu (value, minimum tinh den entry do).",
+      en: "Each entry stores (value, minimum up to that entry).",
+    },
+  });
+
+  for (let i = startIndex; i < operations.length; i++) {
+    const op = operations[i];
+    const value = op.args[0];
+    lastResult = null;
+
+    if (op.name === "push") {
+      pushStep({
+        title: { vi: `Call push(${value})`, en: `Call push(${value})` },
+        codeLine: 5,
+        current: i,
+        vars: [
+          { name: "operation", value: operationLabel(op) },
+          { name: "val", value },
+        ],
+        note: {
+          vi: `Push ${value} va tinh minimum moi truoc khi luu entry.`,
+          en: `Push ${value} after computing the new minimum.`,
+        },
+      });
+
+      const previousMin = stack.length ? stack[stack.length - 1].min : null;
+      const currentMin = previousMin === null ? value : Math.min(value, previousMin);
+      pushStep({
+        title: { vi: `current_min = ${currentMin}`, en: `current_min = ${currentMin}` },
+        codeLine: 6,
+        current: i,
+        vars: [
+          { name: "val", value },
+          { name: "previous minimum", value: previousMin === null ? "none" : previousMin },
+          {
+            name: "calculation",
+            value: previousMin === null ? `first value -> ${value}` : `min(${value}, ${previousMin}) = ${currentMin}`,
+          },
+        ],
+        note: {
+          vi: previousMin === null
+            ? `${value} la phan tu dau tien, nen no cung la minimum.`
+            : `So sanh ${value} voi minimum cu ${previousMin}; minimum moi la ${currentMin}.`,
+          en: previousMin === null
+            ? `${value} is the first value, so it is also the minimum.`
+            : `Compare ${value} with the previous minimum ${previousMin}; the new minimum is ${currentMin}.`,
+        },
+      });
+
+      stack.push({ value, min: currentMin });
+      outputs.push(null);
+      pushStep({
+        title: { vi: `Push (${value}, ${currentMin})`, en: `Push (${value}, ${currentMin})` },
+        codeLine: 7,
+        current: i,
+        vars: [
+          { name: "entry", value: `(${value}, ${currentMin})` },
+          { name: "action", value: "stack.append((val, current_min))" },
+        ],
+        note: {
+          vi: `Entry tren cung luu value = ${value} va minimum hien tai = ${currentMin}.`,
+          en: `The new top entry stores value = ${value} and current minimum = ${currentMin}.`,
+        },
+      });
+      continue;
+    }
+
+    if (op.name === "pop") {
+      pushStep({
+        title: { vi: "Call pop()", en: "Call pop()" },
+        codeLine: 9,
+        current: i,
+        vars: [{ name: "operation", value: "pop()" }],
+        note: {
+          vi: "pop() loai bo toan bo entry tren cung, gom ca value va minimum cua level do.",
+          en: "pop() removes the complete top entry, including its value and level minimum.",
+        },
+      });
+
+      const removed = stack.pop();
+      outputs.push(null);
+      pushStep({
+        title: {
+          vi: removed ? `Pop (${removed.value}, ${removed.min})` : "Stack already empty",
+          en: removed ? `Pop (${removed.value}, ${removed.min})` : "Stack already empty",
+        },
+        codeLine: 10,
+        current: i,
+        vars: [
+          { name: "removed", value: removed ? `(${removed.value}, ${removed.min})` : "none" },
+          { name: "restored minimum", value: minLabel() },
+        ],
+        note: {
+          vi: removed
+            ? `Sau khi bo ${removed.value}, minimum duoc khoi phuc truc tiep tu entry top moi: ${minLabel()}.`
+            : "Khong co entry nao de pop.",
+          en: removed
+            ? `After removing ${removed.value}, the minimum is restored directly from the new top entry: ${minLabel()}.`
+            : "There is no entry to pop.",
+        },
+      });
+      continue;
+    }
+
+    if (op.name === "top") {
+      pushStep({
+        title: { vi: "Call top()", en: "Call top()" },
+        codeLine: 12,
+        current: i,
+        vars: [{ name: "operation", value: "top()" }],
+        note: {
+          vi: "top() chi doc value cua entry tren cung.",
+          en: "top() reads only the value from the top entry.",
+        },
+      });
+
+      lastResult = stack.length ? stack[stack.length - 1].value : null;
+      outputs.push(lastResult);
+      pushStep({
+        title: { vi: `top() -> ${resultLabel()}`, en: `top() -> ${resultLabel()}` },
+        codeLine: 13,
+        current: i,
+        vars: [{ name: "return", value: resultLabel() }],
+        note: {
+          vi: `Gia tri cua entry top la ${resultLabel()}.`,
+          en: `The value stored in the top entry is ${resultLabel()}.`,
+        },
+      });
+      continue;
+    }
+
+    if (op.name === "getMin") {
+      pushStep({
+        title: { vi: "Call getMin()", en: "Call getMin()" },
+        codeLine: 15,
+        current: i,
+        vars: [{ name: "operation", value: "getMin()" }],
+        note: {
+          vi: "getMin() chi doc minimum da luu trong entry top, khong can duyet lai stack.",
+          en: "getMin() reads the minimum stored in the top entry without scanning the stack.",
+        },
+      });
+
+      lastResult = stack.length ? stack[stack.length - 1].min : null;
+      outputs.push(lastResult);
+      pushStep({
+        title: { vi: `getMin() -> ${resultLabel()}`, en: `getMin() -> ${resultLabel()}` },
+        codeLine: 16,
+        current: i,
+        vars: [{ name: "return", value: resultLabel() }],
+        note: {
+          vi: `Minimum hien tai duoc lay trong O(1): ${resultLabel()}.`,
+          en: `The current minimum is returned in O(1): ${resultLabel()}.`,
+        },
+      });
+    }
+  }
+
+  pushStep({
+    title: { vi: "Finished operations", en: "Finished operations" },
+    codeLine: 16,
+    current: operations.length,
+    final: true,
+    vars: [
+      { name: "answer", value: resultLabel() },
+      { name: "all outputs", value: `[${outputs.map((value) => value === null ? "None" : value).join(", ")}]` },
+    ],
+    note: {
+      vi: `Da xu ly tat ca operations. Stack cuoi = ${stackLabel()}.`,
+      en: `All operations are complete. Final stack = ${stackLabel()}.`,
+    },
+  });
+
+  return { operations, outputs, answer: lastResult, steps };
+}
+
+/**
  * LeetCode 20: Valid Parentheses.
  * Use a stack of opening brackets and match every closing bracket with the top.
  */
@@ -2577,6 +2845,55 @@ module.exports = {
       "        return stack[-1]",
     ],
     builder: buildSteps150,
+  },
+  155: {
+    id: 155,
+    difficulty: "medium",
+    slug: "min-stack",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Min Stack", en: "Min Stack" },
+    titleVi: { vi: "Stack ho tro truy van minimum", en: "Stack with constant-time minimum" },
+    statement: {
+      vi: "Thiet ke stack ho tro push, pop, top va lay phan tu nho nhat trong thoi gian O(1).",
+      en: "Design a stack that supports push, pop, top, and retrieving the minimum element in O(1) time.",
+    },
+    defaultInput: "MinStack(), push(-2), push(0), push(-3), getMin(), pop(), top(), getMin()",
+    inputKind: "string",
+    inputLabel: { vi: "operations", en: "operations" },
+    extraParams: [],
+    approach: [
+      { vi: "Moi entry luu cap (value, minimum tinh den vi tri do).", en: "Store (value, minimum up to this position) in every entry." },
+      { vi: "push(val) tinh current_min = min(val, minimum cu), roi push ca cap.", en: "push(val) computes current_min = min(val, previous minimum), then pushes both." },
+      { vi: "pop() tu dong khoi phuc minimum cua level truoc vi no da nam trong entry top moi.", en: "pop() automatically restores the previous level's minimum from the new top entry." },
+      { vi: "top() doc value, con getMin() doc minimum trong entry top; ca hai deu O(1).", en: "top() reads the value and getMin() reads the minimum from the top entry; both are O(1)." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(n)",
+      note: {
+        vi: "Moi operation chi doc hoac cap nhat entry top nen O(1). Stack luu toi da n cap (value, minimum).",
+        en: "Every operation reads or updates only the top entry, so it is O(1). The stack stores up to n (value, minimum) pairs.",
+      },
+    },
+    code: [
+      "class MinStack:",
+      "    def __init__(self):",
+      "        self.stack = []",
+      "",
+      "    def push(self, val: int) -> None:",
+      "        current_min = min(val, self.stack[-1][1]) if self.stack else val",
+      "        self.stack.append((val, current_min))",
+      "",
+      "    def pop(self) -> None:",
+      "        self.stack.pop()",
+      "",
+      "    def top(self) -> int:",
+      "        return self.stack[-1][0]",
+      "",
+      "    def getMin(self) -> int:",
+      "        return self.stack[-1][1]",
+    ],
+    builder: buildSteps155,
   },
   394: {
     id: 394,
