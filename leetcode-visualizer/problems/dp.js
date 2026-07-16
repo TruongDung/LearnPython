@@ -7342,6 +7342,7 @@ function buildSteps72Table(input, params) {
   const steps = [];
   const charValue = (ch) => `'${ch}'`;
   const word1IndexValue = (i) => `word1[${i} - 1] = ${charValue(word1[i - 1])}`;
+  const word2IndexValue = (j) => `word2[${j} - 1] = ${charValue(word2[j - 1])}`;
 
   function gridSnap(opts) {
     const hasActiveCell = Array.isArray(opts.hlCell);
@@ -7480,7 +7481,7 @@ function buildSteps72Table(input, params) {
         cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
-          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
+          { name: `word2[${j - 1}]`, value: word2IndexValue(j) },
         ],
         note: {
           vi: `Chuan bi tinh dp[${i}][${j}] cho "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
@@ -7497,7 +7498,7 @@ function buildSteps72Table(input, params) {
         cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
-          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
+          { name: `word2[${j - 1}]`, value: word2IndexValue(j) },
           { name: "match", value: match },
         ],
         note: {
@@ -7580,6 +7581,7 @@ function buildSteps72Rolling(input, params) {
   const blankRow = () => Array(n + 1).fill("");
   const charValue = (ch) => `'${ch}'`;
   const word1IndexValue = (i) => `word1[${i} - 1] = ${charValue(word1[i - 1])}`;
+  const word2IndexValue = (j) => `word2[${j} - 1] = ${charValue(word2[j - 1])}`;
   const colLabels = Array.from({ length: n }, (_, idx) => ({
     index: `j=${idx + 1}`,
     char: word2[idx],
@@ -7709,7 +7711,7 @@ function buildSteps72Rolling(input, params) {
           : { [`1,${j}`]: "prev[j]", [`2,${j - 1}`]: "curr[j-1]", [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" },
         vars: [
           { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
-          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
+          { name: `word2[${j - 1}]`, value: word2IndexValue(j) },
           { name: "same", value: same },
         ],
         note: {
