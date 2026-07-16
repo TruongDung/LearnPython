@@ -1086,7 +1086,7 @@ function buildSteps71(input) {
  * LeetCode 1963: Minimum Number of Swaps to Make the String Balanced.
  * Match closing brackets with a stack and count those that have no opener.
  */
-function buildSteps1963(input) {
+function buildSteps1963Stack(input) {
   const s = String(input).trim();
   const chars = s.split("");
   const stack = [];
@@ -1249,6 +1249,159 @@ function buildSteps1963(input) {
   });
 
   return { s, answer, steps };
+}
+
+function buildSteps1963Balance(input) {
+  const s = String(input).trim();
+  const chars = s.split("");
+  const balances = new Array(chars.length).fill(0);
+  const swapIndices = [];
+  const steps = [];
+  let balance = 0;
+  let swaps;
+  let ch;
+
+  function valueLabel(value) {
+    return value === undefined ? "not in scope" : value;
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      arr: balances.slice(),
+      sub: chars,
+      highlight: current >= 0 && current < chars.length ? [current] : [],
+      mark: swapIndices.slice(),
+      codeLines: [opts.codeLine],
+      codeBlock: 2,
+      vars: [
+        { name: "balance", value: valueLabel(balance) },
+        { name: "swaps", value: valueLabel(swaps) },
+        { name: "ch", value: ch === undefined ? "not in scope" : `'${ch}'` },
+        { name: "s", value: `"${s}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize balance", en: "Initialize balance" },
+    codeLine: 3,
+    note: {
+      vi: "balance tang voi '[' va giam voi ']'. Balance am nghia la prefix hien tai thua ngoac dong.",
+      en: "balance increases for '[' and decreases for ']'. A negative balance means the current prefix has too many closers.",
+    },
+  });
+
+  swaps = 0;
+  pushStep({
+    title: { vi: "Initialize swaps", en: "Initialize swaps" },
+    codeLine: 4,
+    note: {
+      vi: "swaps dem so lan can doi mot ']' hien tai voi mot '[' o phia sau.",
+      en: "swaps counts how often the current ']' must exchange with a later '['.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    ch = chars[i];
+    pushStep({
+      title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
+      codeLine: 6,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `s[${i}]`, value: `'${ch}'` },
+      ],
+      note: {
+        vi: `Xu ly s[${i}] = '${ch}'.`,
+        en: `Process s[${i}] = '${ch}'.`,
+      },
+    });
+
+    if (ch === "[") {
+      balance += 1;
+      balances[i] = balance;
+      pushStep({
+        title: { vi: `balance = ${balance}`, en: `balance = ${balance}` },
+        codeLine: 8,
+        current: i,
+        vars: [{ name: "action", value: "balance += 1" }],
+        note: {
+          vi: "Gap ngoac mo '[', nen tang balance len 1.",
+          en: "An opening '[' increases balance by 1.",
+        },
+      });
+    } else {
+      balance -= 1;
+      balances[i] = balance;
+      pushStep({
+        title: { vi: `balance = ${balance}`, en: `balance = ${balance}` },
+        codeLine: 10,
+        current: i,
+        vars: [{ name: "action", value: "balance -= 1" }],
+        note: {
+          vi: "Gap ngoac dong ']', nen giam balance di 1.",
+          en: "A closing ']' decreases balance by 1.",
+        },
+      });
+    }
+
+    if (balance < 0) {
+      swaps += 1;
+      swapIndices.push(i);
+      pushStep({
+        title: { vi: `Plan swap #${swaps}`, en: `Plan swap #${swaps}` },
+        codeLine: 13,
+        current: i,
+        vars: [
+          { name: "balance < 0", value: true },
+          { name: "swap index", value: i },
+        ],
+        note: {
+          vi: `Prefix bi mat can bang tai index ${i}, nen tang swaps len ${swaps}.`,
+          en: `The prefix becomes invalid at index ${i}, so increment swaps to ${swaps}.`,
+        },
+      });
+
+      balance = 1;
+      balances[i] = balance;
+      pushStep({
+        title: { vi: "Reset balance to 1", en: "Reset balance to 1" },
+        codeLine: 14,
+        current: i,
+        vars: [{ name: "action", value: "balance = 1" }],
+        note: {
+          vi: "Doi ']' hien tai voi mot '[' o phia sau lam contribution thay doi tu -1 thanh +1, nen balance tang 2: -1 -> 1.",
+          en: "Swapping the current ']' with a later '[' changes its contribution from -1 to +1, so balance increases by 2: -1 -> 1.",
+        },
+      });
+    }
+  }
+
+  const answer = swaps;
+  pushStep({
+    title: { vi: `Result: ${answer} swap${answer === 1 ? "" : "s"}`, en: `Result: ${answer} swap${answer === 1 ? "" : "s"}` },
+    codeLine: 16,
+    current: chars.length,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Greedy da sua moi prefix bi am ngay khi no xuat hien. So swap toi thieu la ${answer}. Balance cuoi co the duong vi code chi dem swap gia lap, khong doi lai cac ky tu o phia sau.`,
+      en: `The greedy scan repairs every negative prefix as soon as it appears. The minimum number of swaps is ${answer}. The final balance may be positive because the code counts conceptual swaps without rewriting their later partner characters.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+function buildSteps1963(input, params) {
+  const approach = String(params && params.approach ? params.approach : "1");
+  if (approach === "2") return buildSteps1963Balance(input);
+  return buildSteps1963Stack(input);
 }
 
 /**
@@ -2246,21 +2399,33 @@ module.exports = {
     defaultInput: "][][",
     inputKind: "string",
     inputLabel: { vi: "Bracket string s", en: "Bracket string s" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cach tiep can", en: "Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 - Stack", en: "1 - Stack" } },
+          { value: 2, label: { vi: "2 - Greedy balance O(1)", en: "2 - Greedy balance O(1)" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Push moi '[' chua ghep cap vao stack.", en: "Push each unmatched '[' onto the stack." },
-      { vi: "Voi ']', pop mot '[' neu stack khong rong; neu rong thi tang unmatched_close.", en: "For ']', pop one '[' when possible; otherwise increment unmatched_close." },
-      { vi: "Mot swap co the sua toi da hai unmatched closing brackets.", en: "One swap can fix up to two unmatched closing brackets." },
-      { vi: "Ket qua la (unmatched_close + 1) // 2.", en: "The answer is (unmatched_close + 1) // 2." },
+      { vi: "Approach 1 - Stack: ghep tung ']' voi '[' gan nhat va dem unmatched_close.", en: "Approach 1 - Stack: match each ']' with the nearest '[' and count unmatched_close." },
+      { vi: "Approach 1 tra ve (unmatched_close + 1) // 2.", en: "Approach 1 returns (unmatched_close + 1) // 2." },
+      { vi: "Approach 2 - Greedy: cap nhat balance; khi balance < 0 thi swaps++ va reset balance = 1.", en: "Approach 2 - Greedy: update balance; when balance < 0, increment swaps and reset balance to 1." },
+      { vi: "Hai approach cho cung dap an; greedy chi dung O(1) extra space.", en: "Both approaches return the same answer; greedy uses only O(1) extra space." },
     ],
     complexity: {
       time: "O(n)",
-      space: "O(n)",
+      space: "O(n) / O(1)",
       note: {
-        vi: "Duyet chuoi mot lan. Stack luu toi da n/2 ngoac mo; co the toi uu thanh O(1) bang mot bien dem.",
-        en: "Scan the string once. The stack stores up to n/2 openers; it can be optimized to O(1) with a counter.",
+        vi: "Ca hai deu O(n) time. Approach 1 dung O(n) stack; Approach 2 dung O(1) extra space.",
+        en: "Both take O(n) time. Approach 1 uses an O(n) stack; Approach 2 uses O(1) extra space.",
       },
     },
+    codeLabel: { vi: "Approach 1: Stack", en: "Approach 1: Stack" },
     code: [
       "class Solution:",
       "    def minSwaps(self, s: str) -> int:",
@@ -2274,6 +2439,25 @@ module.exports = {
       "            else:",
       "                unmatched_close += 1",
       "        return (unmatched_close + 1) // 2",
+    ],
+    code2Label: { vi: "Approach 2: Greedy balance O(1)", en: "Approach 2: Greedy balance O(1)" },
+    code2: [
+      "class Solution:",
+      "    def minSwaps(self, s: str) -> int:",
+      "        balance = 0",
+      "        swaps = 0",
+      "",
+      "        for ch in s:",
+      "            if ch == '[':",
+      "                balance += 1",
+      "            else:",
+      "                balance -= 1",
+      "",
+      "            if balance < 0:",
+      "                swaps += 1",
+      "                balance = 1",
+      "",
+      "        return swaps",
     ],
     builder: buildSteps1963,
   },
