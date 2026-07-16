@@ -7341,6 +7341,7 @@ function buildSteps72Table(input, params) {
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   const steps = [];
   const charValue = (ch) => `'${ch}'`;
+  const word1IndexValue = (i) => `word1[${i} - 1] = ${charValue(word1[i - 1])}`;
 
   function gridSnap(opts) {
     const hasActiveCell = Array.isArray(opts.hlCell);
@@ -7349,7 +7350,7 @@ function buildSteps72Table(input, params) {
       currentVars.push({ name: "i", value: opts.hlCell[0] });
       currentVars.push({ name: "j", value: opts.hlCell[1] });
       if (opts.hlCell[0] > 0) {
-        currentVars.push({ name: "word1[i - 1]", value: charValue(word1[opts.hlCell[0] - 1]) });
+        currentVars.push({ name: "word1[i - 1]", value: word1IndexValue(opts.hlCell[0]) });
       }
     }
     for (const item of opts.vars || []) {
@@ -7578,6 +7579,7 @@ function buildSteps72Rolling(input, params) {
   let curr = null;
   const blankRow = () => Array(n + 1).fill("");
   const charValue = (ch) => `'${ch}'`;
+  const word1IndexValue = (i) => `word1[${i} - 1] = ${charValue(word1[i - 1])}`;
   const colLabels = Array.from({ length: n }, (_, idx) => ({
     index: `j=${idx + 1}`,
     char: word2[idx],
@@ -7593,7 +7595,7 @@ function buildSteps72Rolling(input, params) {
       opts.i > 0 &&
       !explicitVars.some((item) => item.name === "word1[i - 1]")
     ) {
-      vars.push({ name: "word1[i - 1]", value: charValue(word1[opts.i - 1]) });
+      vars.push({ name: "word1[i - 1]", value: word1IndexValue(opts.i) });
     }
     for (const item of explicitVars) vars.push(item);
     const activeRow = opts.activeRow === undefined ? null : opts.activeRow;
