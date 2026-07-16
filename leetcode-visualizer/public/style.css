@@ -2648,6 +2648,52 @@ button:disabled {
   color: #0f172a;
 }
 
+[data-theme="light"] .diff-viz {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .diff-heading {
+  color: #64748b;
+}
+
+[data-theme="light"] .diff-update,
+[data-theme="light"] .diff-cell,
+[data-theme="light"] .diff-status div {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .diff-update.current,
+[data-theme="light"] .diff-cell.boundary {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14);
+}
+
+[data-theme="light"] .diff-cell.in-range {
+  background: #ecfdf5;
+  border-color: #34d399;
+}
+
+[data-theme="light"] .diff-cell.result {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+[data-theme="light"] .diff-update span,
+[data-theme="light"] .diff-cell span,
+[data-theme="light"] .diff-cell small,
+[data-theme="light"] .diff-status span {
+  color: #475569;
+}
+
+[data-theme="light"] .diff-update strong,
+[data-theme="light"] .diff-cell strong,
+[data-theme="light"] .diff-status strong {
+  color: #0f172a;
+}
+
 [data-theme="light"] .bar .col {
   background: linear-gradient(180deg, #cbd5e1 0%, #e2e8f0 100%);
 }
