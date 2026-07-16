@@ -1750,6 +1750,54 @@ function renderPrefix2DView(step) {
     </div>`;
 }
 
+function renderPrefixRemainderView(step) {
+  const view = step.prefixRemainderView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefixSums = Array.isArray(view.prefixSums) ? view.prefixSums : [];
+  const remainders = Array.isArray(view.remainders) ? view.remainders : [];
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const matchStart = Number.isInteger(view.matchStart) ? view.matchStart : -1;
+  const matchEnd = Number.isInteger(view.matchEnd) ? view.matchEnd : -1;
+
+  const cells = nums.map((num, index) => {
+    const isCurrent = index === current;
+    const isMatch = matchStart >= 0 && index >= matchStart && index <= matchEnd;
+    const prefix = prefixSums[index];
+    const remainder = remainders[index];
+    return `<div class="remainder-cell${isMatch ? " match" : ""}${isCurrent ? " current" : ""}">
+      <span class="remainder-index">[${index}]</span>
+      <strong>${escapeHtml(String(num))}</strong>
+      <span>sum ${prefix == null ? "-" : escapeHtml(String(prefix))}</span>
+      <span>rem ${remainder == null ? "-" : escapeHtml(String(remainder))}</span>
+    </div>`;
+  }).join("");
+
+  const mapCells = entries.map((entry) => `<div class="remainder-map-cell">
+    <span>remainder ${escapeHtml(String(entry.remainder))}</span>
+    <strong>index ${escapeHtml(String(entry.index))}</strong>
+  </div>`).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="remainder-viz">
+      <div>
+        <div class="remainder-heading">Numbers / prefix / remainder</div>
+        <div class="remainder-cells">${cells}</div>
+      </div>
+      <div>
+        <div class="remainder-heading">Earliest remainder index</div>
+        <div class="remainder-map">${mapCells}</div>
+      </div>
+      <div class="remainder-status">${statusItems}</div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1815,6 +1863,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefix2DView(step);
+  } else if (step.prefixRemainderView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefixRemainderView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

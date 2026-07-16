@@ -1257,6 +1257,130 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+/* ---- Prefix remainder visualization ---- */
+.remainder-viz {
+  min-height: 280px;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.remainder-heading {
+  margin-bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.remainder-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.remainder-cell {
+  min-width: 0;
+  min-height: 98px;
+  padding: 7px;
+  display: grid;
+  gap: 3px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 7px;
+  background: rgba(148, 163, 184, 0.07);
+  color: #94a3b8;
+}
+
+.remainder-cell strong {
+  color: #f8fafc;
+  font-size: 18px;
+}
+
+.remainder-cell > span:not(.remainder-index) {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.remainder-index {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.remainder-cell.match {
+  border-color: rgba(16, 185, 129, 0.62);
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+}
+
+.remainder-cell.current {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+}
+
+.remainder-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.remainder-map-cell {
+  min-width: 0;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.34);
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.11);
+  color: #c7d2fe;
+}
+
+.remainder-map-cell span,
+.remainder-map-cell strong {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.remainder-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.remainder-status div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.remainder-status span {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.remainder-status strong {
+  display: block;
+  margin-top: 3px;
+  color: #f8fafc;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Step note ---- */
 .note {
   margin: 16px 0;
@@ -2355,6 +2479,53 @@ button:disabled {
 }
 
 [data-theme="light"] .prefix2d-status strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .remainder-viz {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .remainder-heading,
+[data-theme="light"] .remainder-status span {
+  color: #64748b;
+}
+
+[data-theme="light"] .remainder-cell {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+[data-theme="light"] .remainder-cell strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .remainder-cell.match {
+  background: #ecfdf5;
+  border-color: #34d399;
+  color: #047857;
+}
+
+[data-theme="light"] .remainder-cell.current {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+[data-theme="light"] .remainder-map-cell {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
+
+[data-theme="light"] .remainder-status div {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .remainder-status strong {
   color: #0f172a;
 }
 
