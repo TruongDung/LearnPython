@@ -1651,7 +1651,8 @@ function renderStep() {
 
   // result box
   if (step.final) {
-    $("answer").textContent = t().answer(answerValue);
+    const displayedAnswer = Array.isArray(answerValue) ? JSON.stringify(answerValue) : answerValue;
+    $("answer").textContent = t().answer(displayedAnswer);
     show("answer");
   } else {
     hide("answer");

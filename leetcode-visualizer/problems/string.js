@@ -2527,6 +2527,320 @@ function buildSteps155(input) {
 }
 
 /**
+ * LeetCode 636: Exclusive Time of Functions.
+ * Track the active nested calls with a stack and assign each elapsed interval.
+ */
+function buildSteps636(input, params) {
+  const logs = Array.isArray(input)
+    ? input.map((log) => String(log).trim())
+    : String(input).split(",").map((log) => log.trim()).filter(Boolean);
+  const inferredN = logs.reduce((maxId, log) => {
+    const id = Number(log.split(":")[0]);
+    return Number.isInteger(id) ? Math.max(maxId, id + 1) : maxId;
+  }, 0);
+  const nValue = Number(params && params.n);
+  const n = Number.isInteger(nValue) && nValue > 0 ? nValue : Math.max(1, inferredN);
+  const answer = new Array(n).fill(0);
+  const stack = [];
+  const steps = [];
+  let prevTime;
+  let currentLog;
+  let functionId;
+  let event;
+  let timestamp;
+
+  function valueLabel(value) {
+    return value === undefined ? "not in scope" : value;
+  }
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function answerLabel() {
+    return `[${answer.join(", ")}]`;
+  }
+
+  function activeLabel() {
+    return stack.length ? `function ${stack[stack.length - 1]}` : "CPU idle";
+  }
+
+  function stackItems() {
+    return stack.map((id, index) => ({
+      value: `function ${id}`,
+      detail: index === stack.length - 1 ? "running" : "paused",
+    }));
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Function call stack",
+        emptyLabel: "no active function",
+        items: stackItems(),
+        input: logs,
+        current,
+        inputLabel: "Execution logs",
+        status: [
+          { label: "active", value: activeLabel() },
+          { label: "prev_time", value: valueLabel(prevTime) },
+          { label: "exclusive times", value: answerLabel() },
+        ],
+      },
+      vars: [
+        { name: "answer", value: answerLabel() },
+        { name: "stack", value: stackLabel() },
+        { name: "prev_time", value: valueLabel(prevTime) },
+        { name: "log", value: currentLog === undefined ? "not in scope" : `"${currentLog}"` },
+        { name: "function_id", value: valueLabel(functionId) },
+        { name: "event", value: event === undefined ? "not in scope" : `"${event}"` },
+        { name: "timestamp", value: valueLabel(timestamp) },
+        { name: "active function", value: activeLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize answer", en: "Initialize answer" },
+    codeLine: 3,
+    vars: [
+      { name: "n", value: n },
+      { name: "answer", value: `[0] * ${n} = ${answerLabel()}` },
+    ],
+    note: {
+      vi: `answer[id] se luu exclusive time cua moi function. Ban dau ca ${n} gia tri bang 0.`,
+      en: `answer[id] stores each function's exclusive time. All ${n} values start at 0.`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Initialize call stack", en: "Initialize call stack" },
+    codeLine: 4,
+    note: {
+      vi: "Stack luu cac function dang active; top la function hien dang chiem CPU.",
+      en: "The stack stores active calls; its top is the function currently using the CPU.",
+    },
+  });
+
+  prevTime = 0;
+  pushStep({
+    title: { vi: "Initialize prev_time", en: "Initialize prev_time" },
+    codeLine: 5,
+    note: {
+      vi: "prev_time la dau moc cua khoang thoi gian chua duoc cong cho function nao.",
+      en: "prev_time marks the beginning of the elapsed interval that has not yet been assigned.",
+    },
+  });
+
+  for (let i = 0; i < logs.length; i++) {
+    currentLog = logs[i];
+    functionId = undefined;
+    event = undefined;
+    timestamp = undefined;
+    pushStep({
+      title: { vi: `Read log ${i}`, en: `Read log ${i}` },
+      codeLine: 7,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `logs[${i}]`, value: `"${currentLog}"` },
+      ],
+      note: {
+        vi: `Xu ly logs[${i}] = "${currentLog}".`,
+        en: `Process logs[${i}] = "${currentLog}".`,
+      },
+    });
+
+    const parts = currentLog.split(":");
+    functionId = parts[0];
+    event = parts[1];
+    timestamp = parts[2];
+    pushStep({
+      title: { vi: `Split "${currentLog}"`, en: `Split "${currentLog}"` },
+      codeLine: 8,
+      current: i,
+      vars: [
+        { name: "raw function_id", value: `"${functionId}"` },
+        { name: "raw event", value: `"${event}"` },
+        { name: "raw timestamp", value: `"${timestamp}"` },
+      ],
+      note: {
+        vi: "Tach log thanh function_id, event start/end va timestamp.",
+        en: "Split the log into function_id, start/end event, and timestamp.",
+      },
+    });
+
+    functionId = Number(functionId);
+    timestamp = Number(timestamp);
+    pushStep({
+      title: { vi: `Parse id=${functionId}, time=${timestamp}`, en: `Parse id=${functionId}, time=${timestamp}` },
+      codeLine: 9,
+      current: i,
+      vars: [
+        { name: "int(function_id)", value: functionId },
+        { name: "int(timestamp)", value: timestamp },
+      ],
+      note: {
+        vi: "Chuyen function_id va timestamp sang integer de tinh toan.",
+        en: "Convert function_id and timestamp to integers for arithmetic.",
+      },
+    });
+
+    if (event === "start") {
+      pushStep({
+        title: { vi: `Function ${functionId} starts`, en: `Function ${functionId} starts` },
+        codeLine: 11,
+        current: i,
+        vars: [{ name: "event == 'start'", value: true }],
+        note: {
+          vi: `Function ${functionId} bat dau tai timestamp ${timestamp}.`,
+          en: `Function ${functionId} starts at timestamp ${timestamp}.`,
+        },
+      });
+
+      if (stack.length) {
+        const activeId = stack[stack.length - 1];
+        pushStep({
+          title: { vi: `Pause function ${activeId}`, en: `Pause function ${activeId}` },
+          codeLine: 12,
+          current: i,
+          vars: [
+            { name: "stack is not empty", value: true },
+            { name: "paused function", value: activeId },
+          ],
+          note: {
+            vi: `Function ${activeId} dang chay se bi function ${functionId} tam dung.`,
+            en: `Running function ${activeId} is paused by function ${functionId}.`,
+          },
+        });
+
+        const elapsed = timestamp - prevTime;
+        answer[activeId] += elapsed;
+        pushStep({
+          title: { vi: `Credit function ${activeId}: +${elapsed}`, en: `Credit function ${activeId}: +${elapsed}` },
+          codeLine: 13,
+          current: i,
+          vars: [
+            { name: "credited function", value: activeId },
+            { name: "elapsed", value: `${timestamp} - ${prevTime} = ${elapsed}` },
+            { name: `answer[${activeId}]`, value: answer[activeId] },
+          ],
+          note: {
+            vi: `Cong khoang [${prevTime}, ${timestamp}) dai ${elapsed} cho function ${activeId}.`,
+            en: `Credit interval [${prevTime}, ${timestamp}), length ${elapsed}, to function ${activeId}.`,
+          },
+        });
+      }
+
+      stack.push(functionId);
+      pushStep({
+        title: { vi: `Push function ${functionId}`, en: `Push function ${functionId}` },
+        codeLine: 14,
+        current: i,
+        vars: [
+          { name: "pushed", value: functionId },
+          { name: "new active function", value: functionId },
+        ],
+        note: {
+          vi: `Push function ${functionId}; no tro thanh top va bat dau chiem CPU.`,
+          en: `Push function ${functionId}; it becomes the top call and starts using the CPU.`,
+        },
+      });
+
+      prevTime = timestamp;
+      pushStep({
+        title: { vi: `prev_time = ${timestamp}`, en: `prev_time = ${timestamp}` },
+        codeLine: 15,
+        current: i,
+        vars: [{ name: "action", value: `prev_time = ${timestamp}` }],
+        note: {
+          vi: "Khoang chua tinh tiep theo bat dau tai timestamp cua log start.",
+          en: "The next unassigned interval begins at the start timestamp.",
+        },
+      });
+      continue;
+    }
+
+    pushStep({
+      title: { vi: `Function ${functionId} ends`, en: `Function ${functionId} ends` },
+      codeLine: 16,
+      current: i,
+      vars: [{ name: "event == 'end'", value: true }],
+      note: {
+        vi: `Function ${functionId} ket thuc tai timestamp ${timestamp}, va timestamp end duoc tinh inclusive.`,
+        en: `Function ${functionId} ends at timestamp ${timestamp}, and an end timestamp is inclusive.`,
+      },
+    });
+
+    const finished = stack.pop();
+    pushStep({
+      title: { vi: `Pop function ${finished}`, en: `Pop function ${finished}` },
+      codeLine: 17,
+      current: i,
+      vars: [
+        { name: "finished", value: finished },
+        { name: "resumed function", value: stack.length ? stack[stack.length - 1] : "none" },
+      ],
+      note: {
+        vi: `Function ${finished} da hoan tat, nen pop khoi call stack.`,
+        en: `Function ${finished} has completed, so pop it from the call stack.`,
+      },
+    });
+
+    const elapsed = timestamp - prevTime + 1;
+    if (Number.isInteger(finished) && finished >= 0 && finished < answer.length) {
+      answer[finished] += elapsed;
+    }
+    pushStep({
+      title: { vi: `Credit function ${finished}: +${elapsed}`, en: `Credit function ${finished}: +${elapsed}` },
+      codeLine: 18,
+      current: i,
+      vars: [
+        { name: "finished", value: finished },
+        { name: "inclusive duration", value: `${timestamp} - ${prevTime} + 1 = ${elapsed}` },
+        { name: `answer[${finished}]`, value: answer[finished] },
+      ],
+      note: {
+        vi: `Log end inclusive, nen tinh ca timestamp ${timestamp}: ${timestamp} - ${prevTime} + 1 = ${elapsed}.`,
+        en: `The end log is inclusive, so timestamp ${timestamp} counts: ${timestamp} - ${prevTime} + 1 = ${elapsed}.`,
+      },
+    });
+
+    prevTime = timestamp + 1;
+    pushStep({
+      title: { vi: `prev_time = ${prevTime}`, en: `prev_time = ${prevTime}` },
+      codeLine: 19,
+      current: i,
+      vars: [{ name: "calculation", value: `${timestamp} + 1 = ${prevTime}` }],
+      note: {
+        vi: `Timestamp ${timestamp} da duoc tinh cho function ket thuc, nen khoang moi bat dau tai ${prevTime}.`,
+        en: `Timestamp ${timestamp} was assigned to the finished function, so the next interval begins at ${prevTime}.`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Result: ${answerLabel()}`, en: `Result: ${answerLabel()}` },
+    codeLine: 21,
+    current: logs.length,
+    vars: [{ name: "return", value: answerLabel() }],
+    note: {
+      vi: `Moi khoang CPU da duoc gan dung mot lan. Exclusive times cuoi la ${answerLabel()}.`,
+      en: `Every CPU interval was assigned exactly once. The final exclusive times are ${answerLabel()}.`,
+    },
+    final: true,
+  });
+
+  return { n, logs, answer, steps };
+}
+
+/**
  * LeetCode 20: Valid Parentheses.
  * Use a stack of opening brackets and match every closing bracket with the top.
  */
@@ -2945,6 +3259,67 @@ module.exports = {
       "        return current",
     ],
     builder: buildSteps394,
+  },
+  636: {
+    id: 636,
+    difficulty: "medium",
+    slug: "exclusive-time-of-functions",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Exclusive Time of Functions", en: "Exclusive Time of Functions" },
+    titleVi: { vi: "Thoi gian chay rieng cua cac function", en: "Exclusive execution time of functions" },
+    statement: {
+      vi: "Cho n function chay tren mot CPU va danh sach log start/end theo thu tu. Tra ve exclusive time cua moi function, khong tinh thoi gian bi function con tam dung.",
+      en: "Given n functions running on one CPU and their ordered start/end logs, return each function's exclusive time without counting time spent paused by nested calls.",
+    },
+    defaultInput: ["0:start:0", "1:start:2", "1:end:5", "0:end:6"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "logs (JSON hoac comma-separated)", en: "logs (JSON or comma-separated)" },
+    extraParams: [
+      {
+        key: "n",
+        type: "number",
+        label: { vi: "Number of functions n", en: "Number of functions n" },
+        default: 2,
+      },
+    ],
+    approach: [
+      { vi: "Stack luu cac function active; top la function dang chiem CPU.", en: "Keep active calls on a stack; the top function currently owns the CPU." },
+      { vi: "prev_time danh dau dau khoang CPU chua duoc gan vao answer.", en: "prev_time marks the beginning of the CPU interval not yet assigned." },
+      { vi: "Tai start log, cong timestamp - prev_time cho function top cu, roi push function moi.", en: "At a start log, credit timestamp - prev_time to the old top, then push the new function." },
+      { vi: "Tai end log, pop va cong timestamp - prev_time + 1 vi end timestamp la inclusive.", en: "At an end log, pop and credit timestamp - prev_time + 1 because the end timestamp is inclusive." },
+    ],
+    complexity: {
+      time: "O(m)",
+      space: "O(n)",
+      note: {
+        vi: "Moi log duoc xu ly mot lan, voi m la so logs. Answer va call stack dung toi da O(n) bo nho.",
+        en: "Each of the m logs is processed once. The answer and call stack use up to O(n) memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def exclusiveTime(self, n: int, logs):",
+      "        answer = [0] * n",
+      "        stack = []",
+      "        prev_time = 0",
+      "",
+      "        for log in logs:",
+      "            function_id, event, timestamp = log.split(':')",
+      "            function_id, timestamp = int(function_id), int(timestamp)",
+      "",
+      "            if event == 'start':",
+      "                if stack:",
+      "                    answer[stack[-1]] += timestamp - prev_time",
+      "                stack.append(function_id)",
+      "                prev_time = timestamp",
+      "            else:",
+      "                finished = stack.pop()",
+      "                answer[finished] += timestamp - prev_time + 1",
+      "                prev_time = timestamp + 1",
+      "",
+      "        return answer",
+    ],
+    builder: buildSteps636,
   },
   1670: {
     id: 1670,
