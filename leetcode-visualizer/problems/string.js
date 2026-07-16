@@ -1083,6 +1083,175 @@ function buildSteps71(input) {
 }
 
 /**
+ * LeetCode 1963: Minimum Number of Swaps to Make the String Balanced.
+ * Match closing brackets with a stack and count those that have no opener.
+ */
+function buildSteps1963(input) {
+  const s = String(input).trim();
+  const chars = s.split("");
+  const stack = [];
+  const steps = [];
+  let unmatchedClose;
+  let ch;
+
+  function stackItems() {
+    return stack.map((index) => ({ value: "[", detail: `index ${index}` }));
+  }
+
+  function stackLabel() {
+    return `[${stack.join(", ")}]`;
+  }
+
+  function charLabel() {
+    return ch === undefined ? "not in scope" : `'${ch}'`;
+  }
+
+  function unmatchedLabel() {
+    return unmatchedClose === undefined ? "not in scope" : unmatchedClose;
+  }
+
+  function swapsLabel() {
+    return unmatchedClose === undefined ? "not in scope" : Math.ceil(unmatchedClose / 2);
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Unmatched '[' stack",
+        emptyLabel: "no unmatched '['",
+        items: stackItems(),
+        input: chars,
+        current,
+        inputLabel: "Bracket string",
+        status: [
+          { label: "unmatched ']'", value: unmatchedLabel() },
+          { label: "minimum swaps", value: swapsLabel() },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "ch", value: charLabel() },
+        { name: "unmatched_close", value: unmatchedLabel() },
+        { name: "(unmatched_close + 1) // 2", value: swapsLabel() },
+        { name: "s", value: `"${s}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 3,
+    note: {
+      vi: "Stack luu index cua cac '[' chua duoc ghep voi ']'.",
+      en: "The stack stores indices of '[' brackets that have not been matched with ']'.",
+    },
+  });
+
+  unmatchedClose = 0;
+  pushStep({
+    title: { vi: "Initialize unmatched_close", en: "Initialize unmatched_close" },
+    codeLine: 4,
+    note: {
+      vi: "unmatched_close dem cac ']' xuat hien khi stack dang rong.",
+      en: "unmatched_close counts ']' brackets encountered while the stack is empty.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    ch = chars[i];
+    pushStep({
+      title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
+      codeLine: 5,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `s[${i}]`, value: `'${ch}'` },
+      ],
+      note: {
+        vi: `Xu ly s[${i}] = '${ch}'.`,
+        en: `Process s[${i}] = '${ch}'.`,
+      },
+    });
+
+    if (ch === "[") {
+      stack.push(i);
+      pushStep({
+        title: { vi: `Push '[' at ${i}`, en: `Push '[' at ${i}` },
+        codeLine: 7,
+        current: i,
+        vars: [
+          { name: "pushed index", value: i },
+          { name: "action", value: "stack.append(i)" },
+        ],
+        note: {
+          vi: "Day la ngoac mo. Push index vao stack de cho mot ']' o phia sau ghep cap.",
+          en: "This is an opening bracket. Push its index so a later ']' can match it.",
+        },
+      });
+      continue;
+    }
+
+    if (stack.length) {
+      const openIndex = stack.pop();
+      pushStep({
+        title: {
+          vi: `Match '[' at ${openIndex} with ']' at ${i}`,
+          en: `Match '[' at ${openIndex} with ']' at ${i}`,
+        },
+        codeLine: 9,
+        current: i,
+        vars: [
+          { name: "open index", value: openIndex },
+          { name: "close index", value: i },
+          { name: "action", value: "stack.pop()" },
+        ],
+        note: {
+          vi: `Ghep '[' tai index ${openIndex} voi ']' tai index ${i}, roi pop ngoac mo khoi stack.`,
+          en: `Match '[' at index ${openIndex} with ']' at index ${i}, then pop the opener from the stack.`,
+        },
+      });
+      continue;
+    }
+
+    unmatchedClose += 1;
+    pushStep({
+      title: { vi: `Unmatched ']' at ${i}`, en: `Unmatched ']' at ${i}` },
+      codeLine: 11,
+      current: i,
+      vars: [
+        { name: "unmatched index", value: i },
+        { name: "action", value: "unmatched_close += 1" },
+      ],
+      note: {
+        vi: `Stack rong, nen ']' tai index ${i} chua co '[' phia truoc de ghep.`,
+        en: `The stack is empty, so ']' at index ${i} has no earlier '[' to match.`,
+      },
+    });
+  }
+
+  const answer = Math.ceil(unmatchedClose / 2);
+  pushStep({
+    title: { vi: `Result: ${answer} swap${answer === 1 ? "" : "s"}`, en: `Result: ${answer} swap${answer === 1 ? "" : "s"}` },
+    codeLine: 12,
+    current: chars.length,
+    vars: [{ name: "answer", value: `(${unmatchedClose} + 1) // 2 = ${answer}` }],
+    note: {
+      vi: `Mot swap co the sua toi da hai dau ']' khong ghep cap, nen answer = (${unmatchedClose} + 1) // 2 = ${answer}.`,
+      en: `One swap can fix up to two unmatched ']' brackets, so answer = (${unmatchedClose} + 1) // 2 = ${answer}.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 394: Decode String.
  * Save the prefix and repeat count for each nested group on a stack.
  */
@@ -2059,6 +2228,54 @@ module.exports = {
       "        return len(stack)",
     ],
     builder: buildSteps1598,
+  },
+  1963: {
+    id: 1963,
+    difficulty: "medium",
+    slug: "minimum-number-of-swaps-to-make-the-string-balanced",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: {
+      vi: "Minimum Number of Swaps to Make the String Balanced",
+      en: "Minimum Number of Swaps to Make the String Balanced",
+    },
+    titleVi: { vi: "So swap toi thieu de can bang chuoi ngoac", en: "Minimum swaps to balance brackets" },
+    statement: {
+      vi: "Cho chuoi gom so luong '[' va ']' bang nhau. Moi swap co the doi cho hai ky tu bat ky. Tim so swap toi thieu de chuoi ngoac can bang.",
+      en: "Given a string with equal numbers of '[' and ']'. One swap may exchange any two characters. Return the minimum swaps needed to balance the bracket string.",
+    },
+    defaultInput: "][][",
+    inputKind: "string",
+    inputLabel: { vi: "Bracket string s", en: "Bracket string s" },
+    extraParams: [],
+    approach: [
+      { vi: "Push moi '[' chua ghep cap vao stack.", en: "Push each unmatched '[' onto the stack." },
+      { vi: "Voi ']', pop mot '[' neu stack khong rong; neu rong thi tang unmatched_close.", en: "For ']', pop one '[' when possible; otherwise increment unmatched_close." },
+      { vi: "Mot swap co the sua toi da hai unmatched closing brackets.", en: "One swap can fix up to two unmatched closing brackets." },
+      { vi: "Ket qua la (unmatched_close + 1) // 2.", en: "The answer is (unmatched_close + 1) // 2." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyet chuoi mot lan. Stack luu toi da n/2 ngoac mo; co the toi uu thanh O(1) bang mot bien dem.",
+        en: "Scan the string once. The stack stores up to n/2 openers; it can be optimized to O(1) with a counter.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minSwaps(self, s: str) -> int:",
+      "        stack = []",
+      "        unmatched_close = 0",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '[':",
+      "                stack.append(i)",
+      "            elif stack:",
+      "                stack.pop()",
+      "            else:",
+      "                unmatched_close += 1",
+      "        return (unmatched_close + 1) // 2",
+    ],
+    builder: buildSteps1963,
   },
   1967: {
     id: 1967,
