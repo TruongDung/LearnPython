@@ -1083,6 +1083,249 @@ function buildSteps71(input) {
 }
 
 /**
+ * LeetCode 1700: Number of Students Unable to Eat Lunch.
+ * Simulate students as a FIFO queue and sandwiches as a top-first stack.
+ */
+function buildSteps1700(input, params) {
+  const students = Array.isArray(input)
+    ? input.map(Number)
+    : String(input).split(",").map((value) => Number(value.trim()));
+  const sandwiches = String(params && params.sandwiches !== undefined ? params.sandwiches : "")
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isInteger(value));
+  const queue = students.map((preference, id) => ({ id, preference }));
+  let sandwichStack;
+  let rotations;
+  const steps = [];
+
+  function foodName(type) {
+    if (type === 0) return "circle";
+    if (type === 1) return "square";
+    return "not in scope";
+  }
+
+  function queueValues() {
+    return queue.map((student) => `S${student.id}:${student.preference}`);
+  }
+
+  function queueLabel() {
+    return `[${queueValues().join(", ")}]`;
+  }
+
+  function sandwichLabel() {
+    return sandwichStack === undefined ? "not in scope" : `[${sandwichStack.join(", ")}]`;
+  }
+
+  function sandwichItems() {
+    if (sandwichStack === undefined) return [];
+    return sandwichStack
+      .slice()
+      .reverse()
+      .map((type) => ({ value: type, detail: foodName(type) }));
+  }
+
+  function frontStudentLabel() {
+    return queue.length ? `S${queue[0].id} wants ${queue[0].preference}` : "queue empty";
+  }
+
+  function topSandwichLabel() {
+    return sandwichStack && sandwichStack.length
+      ? `${sandwichStack[0]} (${foodName(sandwichStack[0])})`
+      : sandwichStack === undefined
+        ? "not in scope"
+        : "none";
+  }
+
+  function pushStep(opts) {
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Sandwich stack (top first)",
+        emptyLabel: sandwichStack === undefined ? "sandwiches not initialized" : "no sandwiches left",
+        items: sandwichItems(),
+        input: queueValues(),
+        current: queue.length ? 0 : -1,
+        inputLabel: "Student queue (0=circle, 1=square): FRONT -> REAR",
+        status: [
+          { label: "front student", value: frontStudentLabel() },
+          { label: "top sandwich", value: topSandwichLabel() },
+        ],
+      },
+      vars: [
+        { name: "student_queue", value: queueLabel() },
+        { name: "sandwich_stack", value: sandwichLabel() },
+        { name: "rotations", value: rotations === undefined ? "not in scope" : rotations },
+        { name: "queue length", value: queue.length },
+        { name: "front student", value: frontStudentLabel() },
+        { name: "top sandwich", value: topSandwichLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize student queue", en: "Initialize student queue" },
+    codeLine: 5,
+    vars: [{ name: "students", value: `[${students.join(", ")}]` }],
+    note: {
+      vi: "Queue la FIFO: hoc sinh o FRONT duoc xu ly truoc; neu khong nhan sandwich thi hoc sinh do chuyen xuong REAR.",
+      en: "A queue is FIFO: the student at the FRONT is processed first; if they refuse the sandwich, they move to the REAR.",
+    },
+  });
+
+  sandwichStack = sandwiches.slice();
+  pushStep({
+    title: { vi: "Initialize sandwich stack", en: "Initialize sandwich stack" },
+    codeLine: 6,
+    vars: [{ name: "sandwiches", value: `[${sandwiches.join(", ")}]` }],
+    note: {
+      vi: "sandwiches[0] la sandwich tren cung. 0 la circular, 1 la square.",
+      en: "sandwiches[0] is the top sandwich. 0 means circular and 1 means square.",
+    },
+  });
+
+  rotations = 0;
+  pushStep({
+    title: { vi: "Initialize rotations", en: "Initialize rotations" },
+    codeLine: 7,
+    note: {
+      vi: "rotations dem so hoc sinh lien tiep tu choi sandwich hien tai. Khi co nguoi an, reset ve 0.",
+      en: "rotations counts consecutive students who reject the current sandwich. Reset it to 0 whenever someone eats.",
+    },
+  });
+
+  while (queue.length && rotations < queue.length) {
+    const student = queue[0];
+    const sandwich = sandwichStack[0];
+    const matches = student.preference === sandwich;
+
+    pushStep({
+      title: {
+        vi: `Check S${student.id}: ${student.preference} ${matches ? "=" : "!="} ${sandwich}`,
+        en: `Check S${student.id}: ${student.preference} ${matches ? "=" : "!="} ${sandwich}`,
+      },
+      codeLine: 9,
+      vars: [
+        { name: "student_queue[0]", value: student.preference },
+        { name: "sandwich_stack[0]", value: sandwich },
+        { name: "preference matches", value: matches },
+      ],
+      note: {
+        vi: `So sanh preference cua S${student.id} o front voi sandwich tren cung.`,
+        en: `Compare the preference of S${student.id} at the front with the top sandwich.`,
+      },
+    });
+
+    if (matches) {
+      pushStep({
+        title: { vi: `S${student.id} accepts sandwich ${sandwich}`, en: `S${student.id} accepts sandwich ${sandwich}` },
+        codeLine: 10,
+        vars: [{ name: "match", value: `${student.preference} == ${sandwich}` }],
+        note: {
+          vi: "Preference khop, nen hoc sinh roi queue va sandwich tren cung duoc lay di.",
+          en: "The preference matches, so the student leaves the queue and the top sandwich is removed.",
+        },
+      });
+
+      const servedStudent = queue.shift();
+      pushStep({
+        title: { vi: `Remove S${servedStudent.id} from front`, en: `Remove S${servedStudent.id} from front` },
+        codeLine: 11,
+        vars: [
+          { name: "served student", value: `S${servedStudent.id}` },
+          { name: "preference", value: servedStudent.preference },
+        ],
+        note: {
+          vi: `popleft() loai S${servedStudent.id} khoi front cua queue.`,
+          en: `popleft() removes S${servedStudent.id} from the front of the queue.`,
+        },
+      });
+
+      const eatenSandwich = sandwichStack.shift();
+      pushStep({
+        title: { vi: `Remove sandwich ${eatenSandwich}`, en: `Remove sandwich ${eatenSandwich}` },
+        codeLine: 12,
+        vars: [{ name: "eaten sandwich", value: `${eatenSandwich} (${foodName(eatenSandwich)})` }],
+        note: {
+          vi: "popleft() loai sandwich vua duoc an; sandwich tiep theo tro thanh top.",
+          en: "popleft() removes the eaten sandwich; the next sandwich becomes the top.",
+        },
+      });
+
+      rotations = 0;
+      pushStep({
+        title: { vi: "Reset rotations", en: "Reset rotations" },
+        codeLine: 13,
+        vars: [{ name: "action", value: "rotations = 0" }],
+        note: {
+          vi: "Da co progress vi mot hoc sinh an duoc, nen bat dau dem lai tu 0.",
+          en: "Progress was made because one student ate, so restart the rejection count at 0.",
+        },
+      });
+    } else {
+      const movedStudent = queue.shift();
+      queue.push(movedStudent);
+      pushStep({
+        title: { vi: `Move S${movedStudent.id} to rear`, en: `Move S${movedStudent.id} to rear` },
+        codeLine: 15,
+        vars: [
+          { name: "moved student", value: `S${movedStudent.id}` },
+          { name: "queue operation", value: "append(popleft())" },
+        ],
+        note: {
+          vi: `S${movedStudent.id} khong muon sandwich ${sandwich}, nen roi front va duoc append vao rear cua queue.`,
+          en: `S${movedStudent.id} does not want sandwich ${sandwich}, so they leave the front and are appended to the rear of the queue.`,
+        },
+      });
+
+      rotations += 1;
+      pushStep({
+        title: { vi: `rotations = ${rotations}`, en: `rotations = ${rotations}` },
+        codeLine: 16,
+        vars: [
+          { name: "rotations", value: rotations },
+          { name: "rotations == queue length", value: rotations === queue.length },
+        ],
+        note: {
+          vi: rotations === queue.length
+            ? "Queue da quay du mot vong ma khong ai nhan sandwich top. Simulation se dung."
+            : "Chua quay het queue, tiep tuc kiem tra hoc sinh moi o front.",
+          en: rotations === queue.length
+            ? "The queue completed a full rotation without anyone accepting the top sandwich. The simulation will stop."
+            : "The queue has not completed a full rotation, so check the new front student next.",
+        },
+      });
+    }
+  }
+
+  const answer = queue.length;
+  const stopped = answer > 0;
+  pushStep({
+    title: { vi: `Result: ${answer} unable to eat`, en: `Result: ${answer} unable to eat` },
+    codeLine: 18,
+    vars: [
+      { name: "answer", value: answer },
+      { name: "stop reason", value: stopped ? "full rotation without a match" : "queue empty" },
+    ],
+    note: {
+      vi: stopped
+        ? `Con ${answer} hoc sinh. Tat ca deu tu choi sandwich top ${sandwichStack[0]}, nen khong ai co the an tiep.`
+        : "Queue rong: moi hoc sinh deu da nhan sandwich.",
+      en: stopped
+        ? `${answer} students remain. Every one of them rejects top sandwich ${sandwichStack[0]}, so nobody else can eat.`
+        : "The queue is empty: every student received a sandwich.",
+    },
+    final: true,
+  });
+
+  return { students, sandwiches, answer, steps };
+}
+
+/**
  * LeetCode 1963: Minimum Number of Swaps to Make the String Balanced.
  * Match closing brackets with a stack and count those that have no opener.
  */
@@ -2381,6 +2624,67 @@ module.exports = {
       "        return len(stack)",
     ],
     builder: buildSteps1598,
+  },
+  1700: {
+    id: 1700,
+    difficulty: "easy",
+    slug: "number-of-students-unable-to-eat-lunch",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: {
+      vi: "Number of Students Unable to Eat Lunch",
+      en: "Number of Students Unable to Eat Lunch",
+    },
+    titleVi: { vi: "So hoc sinh khong the an trua", en: "Students unable to eat lunch" },
+    statement: {
+      vi: "Hoc sinh dung trong queue, moi em thich sandwich circular (0) hoac square (1). Neu hoc sinh o front thich sandwich top thi em lay no va roi queue; neu khong, em chuyen xuong rear. Tra ve so hoc sinh khong the an.",
+      en: "Students stand in a queue and prefer either circular (0) or square (1) sandwiches. If the front student wants the top sandwich, they take it and leave; otherwise they move to the rear. Return how many students cannot eat.",
+    },
+    defaultInput: [1, 1, 1, 0, 0, 1],
+    inputKind: "binary",
+    inputLabel: { vi: "students (0=circle, 1=square)", en: "students (0=circle, 1=square)" },
+    extraParams: [
+      {
+        key: "sandwiches",
+        type: "string",
+        label: { vi: "sandwiches (comma separated)", en: "sandwiches (comma separated)" },
+        default: "1,0,0,0,1,1",
+      },
+    ],
+    approach: [
+      { vi: "Queue la FIFO: xu ly hoc sinh o front; hoc sinh tu choi se chuyen xuong rear.", en: "The queue is FIFO: process the front student; a student who refuses moves to the rear." },
+      { vi: "Sandwich dau tien la top. Neu preference khop, loai ca student va sandwich.", en: "The first sandwich is the top. If the preference matches, remove both the student and sandwich." },
+      { vi: "rotations dem so lan tu choi lien tiep va reset ve 0 sau khi co hoc sinh an.", en: "rotations counts consecutive refusals and resets to 0 after a student eats." },
+      { vi: "Khi rotations == len(queue), queue da quay du mot vong ma khong co match; tat ca hoc sinh con lai khong the an.", en: "When rotations == len(queue), the queue made a full pass without a match; every remaining student is unable to eat." },
+    ],
+    complexity: {
+      time: "O(n^2)",
+      space: "O(n)",
+      note: {
+        vi: "Queue simulation co the rotate O(n) lan cho moi sandwich, nen worst case O(n^2). Hai deque luu toi da n phan tu.",
+        en: "The queue simulation may rotate O(n) times per sandwich, so the worst case is O(n^2). The two deques store up to n items.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def countStudents(self, students, sandwiches):",
+      "        student_queue = deque(students)",
+      "        sandwich_stack = deque(sandwiches)",
+      "        rotations = 0",
+      "",
+      "        while student_queue and rotations < len(student_queue):",
+      "            if student_queue[0] == sandwich_stack[0]:",
+      "                student_queue.popleft()",
+      "                sandwich_stack.popleft()",
+      "                rotations = 0",
+      "            else:",
+      "                student_queue.append(student_queue.popleft())",
+      "                rotations += 1",
+      "",
+      "        return len(student_queue)",
+    ],
+    builder: buildSteps1700,
   },
   1963: {
     id: 1963,
