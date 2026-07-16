@@ -1439,7 +1439,7 @@ function buildSteps1590(nums, params) {
   const answer = bestLen < nums.length ? bestLen : -1;
   steps.push({
     title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
-    codeLines: [14],
+    codeLines: [15],
     prefixRemainderView: makeView({
       current: -1,
       matchStart: answer === -1 ? -1 : bestStart,
