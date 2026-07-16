@@ -400,6 +400,217 @@ function parseDequeOps641(input) {
   return raw.split(",").map((part) => ({ name: part.trim(), args: [] })).filter((op) => op.name);
 }
 
+/**
+ * LeetCode 346: Moving Average from Data Stream.
+ * Keep only the latest size values in a FIFO queue and maintain their sum.
+ */
+function buildSteps346(input) {
+  const operations = parseDequeOps641(input);
+  const constructor = operations[0] && operations[0].name === "MovingAverage"
+    ? operations[0]
+    : { name: "MovingAverage", args: [3] };
+  const size = Number.isInteger(constructor.args[0]) && constructor.args[0] > 0
+    ? constructor.args[0]
+    : 3;
+  const startIndex = operations[0] && operations[0].name === "MovingAverage" ? 1 : 0;
+  const nextOperations = operations.slice(startIndex).filter((op) => op.name === "next");
+  const stream = nextOperations.map((op) => op.args[0]).filter((value) => Number.isFinite(value));
+  const queue = [];
+  const outputs = [null];
+  const steps = [];
+  let windowSum = 0;
+  let average = null;
+  let removed = null;
+
+  function numberLabel(value) {
+    if (value === null || value === undefined) return "none";
+    if (Number.isInteger(value)) return String(value);
+    return String(Number(value.toFixed(6)));
+  }
+
+  function outputLabel() {
+    return `[${outputs.map((value) => value === null ? "None" : numberLabel(value)).join(", ")}]`;
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      queueView: {
+        title: "Sliding window queue",
+        items: queue.slice(),
+        capacity: Math.max(size, queue.length),
+        stream,
+        current,
+        active: Number.isInteger(opts.active) ? opts.active : -1,
+        status: [
+          { label: "capacity", value: size },
+          { label: "window_sum", value: numberLabel(windowSum) },
+          { label: "average", value: numberLabel(average) },
+          { label: "evicted", value: numberLabel(removed) },
+        ],
+      },
+      vars: [
+        { name: "size", value: size },
+        { name: "queue", value: `[${queue.join(", ")}]` },
+        { name: "window_sum", value: windowSum },
+        { name: "average", value: numberLabel(average) },
+        { name: "removed", value: numberLabel(removed) },
+        { name: "outputs", value: outputLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: `Khoi tao size = ${size}`, en: `Initialize size = ${size}` },
+    codeLine: 5,
+    note: {
+      vi: `Cua so chi giu toi da ${size} gia tri moi nhat.`,
+      en: `The window keeps at most the latest ${size} values.`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khoi tao queue rong", en: "Initialize empty queue" },
+    codeLine: 6,
+    note: {
+      vi: "Queue theo thu tu FIFO: gia tri cu nhat o FRONT, gia tri moi nhat o REAR.",
+      en: "The queue is FIFO: the oldest value is at FRONT and the newest is at REAR.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khoi tao window_sum = 0", en: "Initialize window_sum = 0" },
+    codeLine: 7,
+    note: {
+      vi: "Luu rolling sum de khong phai cong lai toan bo queue sau moi lan next().",
+      en: "Keep a rolling sum so next() never has to sum the whole queue again.",
+    },
+  });
+
+  for (let i = 0; i < stream.length; i++) {
+    const value = stream[i];
+    removed = null;
+
+    queue.push(value);
+    pushStep({
+      title: { vi: `Them ${value} vao REAR`, en: `Append ${value} at REAR` },
+      codeLine: 10,
+      current: i,
+      active: queue.length - 1,
+      vars: [
+        { name: "val", value },
+        { name: "action", value: `queue.append(${value})` },
+      ],
+      note: {
+        vi: `next(${value}) them gia tri moi vao cuoi queue.`,
+        en: `next(${value}) appends the new value to the rear of the queue.`,
+      },
+    });
+
+    windowSum += value;
+    pushStep({
+      title: { vi: `window_sum += ${value}`, en: `window_sum += ${value}` },
+      codeLine: 11,
+      current: i,
+      active: queue.length - 1,
+      vars: [
+        { name: "val", value },
+        { name: "calculation", value: `${windowSum - value} + ${value} = ${windowSum}` },
+      ],
+      note: {
+        vi: `Cong ${value} vao rolling sum, duoc ${windowSum}.`,
+        en: `Add ${value} to the rolling sum, giving ${windowSum}.`,
+      },
+    });
+
+    const overflowing = queue.length > size;
+    pushStep({
+      title: {
+        vi: overflowing ? `${queue.length} > ${size}: cua so bi tran` : `${queue.length} <= ${size}: chua can loai`,
+        en: overflowing ? `${queue.length} > ${size}: window overflow` : `${queue.length} <= ${size}: no eviction`,
+      },
+      codeLine: 13,
+      current: i,
+      active: overflowing ? 0 : queue.length - 1,
+      vars: [{ name: "len(queue) > size", value: overflowing }],
+      note: {
+        vi: overflowing
+          ? "Queue vuot capacity, nen gia tri cu nhat tai FRONT phai roi cua so."
+          : "Queue van nam trong capacity, nen moi gia tri hien tai deu duoc tinh.",
+        en: overflowing
+          ? "The queue exceeds capacity, so the oldest FRONT value must leave the window."
+          : "The queue is within capacity, so every current value remains in the average.",
+      },
+    });
+
+    if (overflowing) {
+      removed = queue.shift();
+      pushStep({
+        title: { vi: `Loai FRONT = ${removed}`, en: `Evict FRONT = ${removed}` },
+        codeLine: 14,
+        current: i,
+        vars: [
+          { name: "removed", value: removed },
+          { name: "action", value: `queue.popleft() -> ${removed}` },
+        ],
+        note: {
+          vi: `${removed} la gia tri cu nhat, nen bi popleft khoi queue.`,
+          en: `${removed} is the oldest value, so popleft removes it from the queue.`,
+        },
+      });
+
+      const sumBeforeRemoval = windowSum;
+      windowSum -= removed;
+      pushStep({
+        title: { vi: `window_sum -= ${removed}`, en: `window_sum -= ${removed}` },
+        codeLine: 15,
+        current: i,
+        vars: [{ name: "calculation", value: `${sumBeforeRemoval} - ${removed} = ${windowSum}` }],
+        note: {
+          vi: `Tru gia tri da roi cua so; rolling sum moi la ${windowSum}.`,
+          en: `Subtract the evicted value; the new rolling sum is ${windowSum}.`,
+        },
+      });
+    }
+
+    average = windowSum / queue.length;
+    outputs.push(average);
+    pushStep({
+      title: { vi: `Average = ${numberLabel(average)}`, en: `Average = ${numberLabel(average)}` },
+      codeLine: 17,
+      current: i,
+      vars: [
+        { name: "len(queue)", value: queue.length },
+        { name: "calculation", value: `${windowSum} / ${queue.length} = ${numberLabel(average)}` },
+        { name: "return", value: numberLabel(average) },
+      ],
+      note: {
+        vi: `Trung binh cua cua so [${queue.join(", ")}] la ${windowSum} / ${queue.length} = ${numberLabel(average)}.`,
+        en: `The average of [${queue.join(", ")}] is ${windowSum} / ${queue.length} = ${numberLabel(average)}.`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Ket qua cuoi: ${numberLabel(average)}`, en: `Final result: ${numberLabel(average)}` },
+    codeLine: 17,
+    current: stream.length,
+    final: true,
+    vars: [{ name: "all outputs", value: outputLabel() }],
+    note: {
+      vi: `Da xu ly toan bo stream. Queue cuoi cung la [${queue.join(", ")}].`,
+      en: `The full stream is processed. The final queue is [${queue.join(", ")}].`,
+    },
+  });
+
+  return { operations, outputs, answer: average, steps };
+}
+
 function buildSteps641(input) {
   const ops = parseDequeOps641(input);
   const first = ops[0] && ops[0].name === "MyCircularDeque" ? ops.shift() : { args: [3] };
@@ -3644,6 +3855,57 @@ module.exports = {
       "        self._balance(); return ans",
     ],
     builder: buildSteps1670,
+  },
+  346: {
+    id: 346,
+    difficulty: "easy",
+    premium: true,
+    slug: "moving-average-from-data-stream",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Moving Average from Data Stream", en: "Moving Average from Data Stream" },
+    titleVi: { vi: "Trung binh truot tu dong du lieu", en: "Moving average from a data stream" },
+    statement: {
+      vi: "Thiet ke lop tinh trung binh cua toi da size gia tri moi nhat trong dong du lieu.",
+      en: "Design a class that calculates the average of at most the latest size values in a data stream.",
+    },
+    defaultInput: "MovingAverage(3), next(1), next(10), next(3), next(5)",
+    inputKind: "string",
+    inputLabel: { vi: "operations", en: "operations" },
+    extraParams: [],
+    approach: [
+      { vi: "Dung deque lam sliding window: FRONT la gia tri cu nhat, REAR la gia tri moi nhat.", en: "Use a deque as the sliding window: FRONT is the oldest value and REAR is the newest." },
+      { vi: "Moi next(val), append val va cong vao window_sum.", en: "For each next(val), append val and add it to window_sum." },
+      { vi: "Neu queue dai hon size, popleft gia tri cu nhat va tru no khoi window_sum.", en: "If the queue grows beyond size, popleft the oldest value and subtract it from window_sum." },
+      { vi: "Tra ve window_sum / len(queue), nen moi operation la O(1).", en: "Return window_sum / len(queue), so every operation is O(1)." },
+    ],
+    complexity: {
+      time: "O(1) per next",
+      space: "O(size)",
+      note: {
+        vi: "Moi gia tri vao va roi queue dung mot lan. Queue chi giu toi da size gia tri.",
+        en: "Each value enters and leaves the queue once. The queue stores at most size values.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class MovingAverage:",
+      "    def __init__(self, size: int):",
+      "        self.size = size",
+      "        self.queue = deque()",
+      "        self.window_sum = 0",
+      "",
+      "    def next(self, val: int) -> float:",
+      "        self.queue.append(val)",
+      "        self.window_sum += val",
+      "",
+      "        if len(self.queue) > self.size:",
+      "            removed = self.queue.popleft()",
+      "            self.window_sum -= removed",
+      "",
+      "        return self.window_sum / len(self.queue)",
+    ],
+    builder: buildSteps346,
   },
   641: {
     id: 641,

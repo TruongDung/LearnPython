@@ -1588,6 +1588,49 @@ function renderStackView(step) {
     </div>`;
 }
 
+function renderQueueView(step) {
+  const view = step.queueView || {};
+  const items = Array.isArray(view.items) ? view.items : [];
+  const capacity = Math.max(Number(view.capacity) || 0, items.length, 1);
+  const stream = Array.isArray(view.stream) ? view.stream : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const active = Number.isInteger(view.active) ? view.active : -1;
+  const statuses = Array.isArray(view.status) ? view.status : [];
+
+  const cells = Array.from({ length: capacity }, (_, idx) => {
+    const hasValue = idx < items.length;
+    const tags = [];
+    if (hasValue && idx === 0) tags.push("FRONT");
+    if (hasValue && idx === items.length - 1) tags.push("REAR");
+    return `<div class="queue-cell${hasValue ? "" : " empty"}${idx === active ? " active" : ""}">
+      <span class="queue-tags">${tags.map((tag) => `<small>${tag}</small>`).join("")}</span>
+      <strong>${hasValue ? escapeHtml(String(items[idx])) : "empty"}</strong>
+      <span class="queue-index">[${idx}]</span>
+    </div>`;
+  }).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const streamItems = stream.map((value, idx) => {
+    const cls = idx === current ? " current" : idx < current ? " done" : "";
+    return `<div class="stack-input-token${cls}"><span>${escapeHtml(String(value))}</span><small>${idx}</small></div>`;
+  }).join("");
+
+  $("treeView").innerHTML = `
+    <div class="queue-viz">
+      <div class="queue-heading">${escapeHtml(String(view.title || "Queue"))}</div>
+      <div class="queue-cells">${cells}</div>
+      <div class="queue-status">${statusItems}</div>
+      <div>
+        <div class="stack-input-label">Incoming stream</div>
+        <div class="stack-input-row">${streamItems}</div>
+      </div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1635,6 +1678,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderStackView(step);
+  } else if (step.queueView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderQueueView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
