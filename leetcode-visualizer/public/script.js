@@ -1869,6 +1869,42 @@ function renderDifferenceArrayView(step) {
     </div>`;
 }
 
+function renderRunningSumView(step) {
+  const view = step.runningSumView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const running = Array.isArray(view.running) ? view.running : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+
+  const columns = nums.map((num, index) => {
+    const isCurrent = index === current;
+    const isDone = running[index] != null;
+    return `<div class="running-column${isCurrent ? " current" : ""}${isDone ? " done" : ""}">
+      <span class="running-index">[${index}]</span>
+      <div class="running-input">
+        <small>nums</small>
+        <strong>${escapeHtml(String(num))}</strong>
+      </div>
+      <div class="running-arrow">+</div>
+      <div class="running-output">
+        <small>sum</small>
+        <strong>${running[index] == null ? "-" : escapeHtml(String(running[index]))}</strong>
+      </div>
+    </div>`;
+  }).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="running-viz">
+      <div class="running-strip">${columns}</div>
+      <div class="running-status">${statusItems}</div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1946,6 +1982,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDifferenceArrayView(step);
+  } else if (step.runningSumView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRunningSumView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

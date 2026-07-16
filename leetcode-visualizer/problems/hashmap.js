@@ -1657,6 +1657,83 @@ function buildSteps370(input, params) {
   return { steps, answer: result };
 }
 
+function buildSteps1480(nums) {
+  const running = new Array(nums.length).fill(null);
+  const steps = [];
+  let total = 0;
+
+  const makeView = ({ current = -1, status = [] } = {}) => ({
+    nums: [...nums],
+    running: [...running],
+    current,
+    status,
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao running sum", en: "Initialize running sum" },
+    codeLines: [3],
+    runningSumView: makeView({
+      status: [
+        { label: "running", value: 0 },
+        { label: "result", value: "[]" },
+      ],
+    }),
+    vars: [{ name: "running", value: 0 }, { name: "result", value: "[]" }],
+    note: {
+      vi: "running giu tong tu nums[0] den index hien tai.",
+      en: "running stores the sum from nums[0] through the current index.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i += 1) {
+    const before = total;
+    total += nums[i];
+    running[i] = total;
+    steps.push({
+      title: { vi: `runningSum[${i}] = ${total}`, en: `runningSum[${i}] = ${total}` },
+      codeLines: [4, 5, 6],
+      runningSumView: makeView({
+        current: i,
+        status: [
+          { label: "i", value: i },
+          { label: "previous", value: before },
+          { label: `nums[${i}]`, value: nums[i] },
+          { label: "running", value: total },
+        ],
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: "running", value: `${before} + ${nums[i]} = ${total}` },
+        { name: "result", value: `[${running.map((v) => v == null ? "_" : v).join(", ")}]` },
+      ],
+      note: {
+        vi: `Cong nums[${i}] = ${nums[i]} vao tong truoc do ${before}, duoc ${total}.`,
+        en: `Add nums[${i}] = ${nums[i]} to the previous total ${before}, giving ${total}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Ket qua: [${running.join(", ")}]`, en: `Result: [${running.join(", ")}]` },
+    codeLines: [7],
+    runningSumView: makeView({
+      current: -1,
+      status: [
+        { label: "answer", value: `[${running.join(", ")}]` },
+        { label: "length", value: nums.length },
+      ],
+    }),
+    vars: [{ name: "answer", value: `[${running.join(", ")}]` }],
+    note: {
+      vi: "Moi vi tri la tong tat ca phan tu tu dau mang den vi tri do.",
+      en: "Each position is the sum of all elements from the start through that position.",
+    },
+    final: true,
+  });
+
+  return { steps, answer: running };
+}
+
 module.exports = {
   3020: {
     id: 3020,
@@ -1910,6 +1987,44 @@ module.exports = {
       "        return max_len",
     ],
     builder: buildSteps525,
+  },
+  1480: {
+    id: 1480,
+    difficulty: "easy",
+    slug: "running-sum-of-1d-array",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Running Sum of 1D Array", en: "Running Sum of 1D Array" },
+    titleVi: { vi: "Tong chay cua mang 1D", en: "Running prefix sum" },
+    statement: {
+      vi: "Cho mang nums. runningSum[i] bang tong nums[0] + nums[1] + ... + nums[i]. Tra ve mang runningSum.",
+      en: "Given an array nums, runningSum[i] is nums[0] + nums[1] + ... + nums[i]. Return the running sum array.",
+    },
+    defaultInput: [1, 2, 3, 4],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    approach: [
+      { vi: "Duyet tu trai sang phai va giu bien running.", en: "Scan from left to right and keep a running total." },
+      { vi: "Tai moi index, running += nums[i].", en: "At each index, running += nums[i]." },
+      { vi: "Ghi running vao result[i].", en: "Write running into result[i]." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1) extra",
+      note: {
+        vi: "Neu tinh in-place thi chi can mot bien running ngoai mang ket qua.",
+        en: "If done in-place, only one running variable is needed besides the output array.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def runningSum(self, nums: List[int]) -> List[int]:",
+      "        running = 0",
+      "        for i in range(len(nums)):",
+      "            running += nums[i]",
+      "            nums[i] = running",
+      "        return nums",
+    ],
+    builder: buildSteps1480,
   },
   370: {
     id: 370,
