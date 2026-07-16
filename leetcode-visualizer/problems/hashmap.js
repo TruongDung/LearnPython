@@ -438,6 +438,7 @@ function buildSteps734(input, params) {
   });
 
   const steps = [];
+  const states = Array.from({ length: Math.max(s1.length, s2.length) }, () => "pending");
 
   // Build pair set
   const pairSet = new Set();
@@ -446,13 +447,31 @@ function buildSteps734(input, params) {
     pairSet.add(`${b}|${a}`);
   }
 
+  function makeSentenceView(current = -1, relation = "pending") {
+    const hasCurrent = current >= 0 && current < Math.max(s1.length, s2.length);
+    return {
+      sentence1: s1,
+      sentence2: s2,
+      states: states.slice(),
+      current,
+      pairs: pairs.map(([a, b]) => `${a} <-> ${b}`),
+      status: [
+        { label: "index", value: hasCurrent ? current : "-" },
+        { label: "sentence1[i]", value: hasCurrent ? (s1[current] || "missing") : "-" },
+        { label: "sentence2[i]", value: hasCurrent ? (s2[current] || "missing") : "-" },
+        { label: "relation", value: relation },
+      ],
+    };
+  }
+
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
     arr: s1.map(() => 0),
     sub: s1.map((w, i) => `${w}↔${s2[i] || "?"}`),
     highlight: [],
     mark: [],
-    codeLines: [2, 4, 5, 6, 7],
+    codeLines: [8],
+    sentenceView: makeSentenceView(-1, "pair set ready"),
     vars: [
       { name: "sentence1", value: `[${s1.join(", ")}]` },
       { name: "sentence2", value: `[${s2.join(", ")}]` },
@@ -467,13 +486,15 @@ function buildSteps734(input, params) {
 
   // Check length
   if (s1.length !== s2.length) {
+    for (let i = 0; i < states.length; i++) states[i] = "different";
     steps.push({
       title: { vi: "Độ dài khác nhau → False", en: "Different lengths → False" },
       arr: [],
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [2, 3],
+      codeLines: [4],
+      sentenceView: makeSentenceView(-1, "different lengths"),
       vars: [
         { name: "len(s1)", value: s1.length },
         { name: "len(s2)", value: s2.length },
@@ -493,13 +514,15 @@ function buildSteps734(input, params) {
     const w2 = s2[i];
 
     if (w1 === w2) {
+      states[i] = "identical";
       steps.push({
         title: { vi: `i=${i}: "${w1}" == "${w2}" ✓`, en: `i=${i}: "${w1}" == "${w2}" ✓` },
         arr: s1.map((_, j) => j <= i ? 1 : 0),
         sub: s1.map((w, j) => `${w}↔${s2[j]}`),
         highlight: [i],
         mark: [],
-        codeLines: [8, 9, 10],
+        codeLines: [11],
+        sentenceView: makeSentenceView(i, "identical"),
         vars: [
           { name: "i", value: i },
           { name: "s1[i]", value: w1 },
@@ -516,6 +539,7 @@ function buildSteps734(input, params) {
 
     const inSet = pairSet.has(`${w1}|${w2}`);
     if (!inSet) {
+      states[i] = "different";
       steps.push({
         title: { vi: `i=${i}: "${w1}"↔"${w2}" không tương đồng → False`, en: `i=${i}: "${w1}"↔"${w2}" not similar → False` },
         arr: s1.map((_, j) => j <= i ? 1 : 0),
@@ -523,7 +547,8 @@ function buildSteps734(input, params) {
         highlight: [i],
         mark: [i],
         final: true,
-        codeLines: [8, 11, 12],
+        codeLines: [13],
+        sentenceView: makeSentenceView(i, "not similar"),
         vars: [
           { name: "i", value: i },
           { name: "s1[i]", value: w1 },
@@ -539,13 +564,15 @@ function buildSteps734(input, params) {
       return { s1, s2, pairs, answer: false, steps };
     }
 
+    states[i] = "similar";
     steps.push({
       title: { vi: `i=${i}: "${w1}"↔"${w2}" tương đồng ✓`, en: `i=${i}: "${w1}"↔"${w2}" similar ✓` },
       arr: s1.map((_, j) => j <= i ? 1 : 0),
       sub: s1.map((w, j) => `${w}↔${s2[j]}`),
       highlight: [i],
       mark: [],
-      codeLines: [8, 11],
+      codeLines: [12],
+      sentenceView: makeSentenceView(i, "similar pair"),
       vars: [
         { name: "i", value: i },
         { name: "s1[i]", value: w1 },
@@ -566,7 +593,8 @@ function buildSteps734(input, params) {
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [13],
+    codeLines: [14],
+    sentenceView: makeSentenceView(-1, "all pairs pass"),
     vars: [{ name: "result", value: true }],
     note: {
       vi: `Mọi cặp từ đều giống nhau hoặc tương đồng → hai câu tương đồng → True.`,
@@ -1083,6 +1111,7 @@ module.exports = {
   734: {
     id: 734,
     difficulty: "easy",
+    premium: true,
     slug: "sentence-similarity",
     category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
     title: { vi: "Sentence Similarity", en: "Sentence Similarity" },

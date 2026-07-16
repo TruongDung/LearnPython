@@ -1631,6 +1631,56 @@ function renderQueueView(step) {
     </div>`;
 }
 
+function renderSentenceView(step) {
+  const view = step.sentenceView || {};
+  const sentence1 = Array.isArray(view.sentence1) ? view.sentence1 : [];
+  const sentence2 = Array.isArray(view.sentence2) ? view.sentence2 : [];
+  const states = Array.isArray(view.states) ? view.states : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const pairs = Array.isArray(view.pairs) ? view.pairs : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const length = Math.max(sentence1.length, sentence2.length);
+
+  const symbolFor = (state) => ({
+    identical: "=",
+    similar: "<->",
+    different: "x",
+    pending: "?",
+  })[state] || "?";
+
+  const columns = Array.from({ length }, (_, idx) => {
+    const state = states[idx] || "pending";
+    const word1 = sentence1[idx] ?? "missing";
+    const word2 = sentence2[idx] ?? "missing";
+    return `<div class="sentence-column ${escapeHtml(state)}${idx === current ? " current" : ""}">
+      <div class="sentence-word sentence-word-top">${escapeHtml(String(word1))}</div>
+      <div class="sentence-relation" aria-label="${escapeHtml(state)}">${escapeHtml(symbolFor(state))}</div>
+      <div class="sentence-word sentence-word-bottom">${escapeHtml(String(word2))}</div>
+      <small>[${idx}]</small>
+    </div>`;
+  }).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const pairItems = pairs.length
+    ? pairs.map((pair) => `<span class="sentence-pair">${escapeHtml(String(pair))}</span>`).join("")
+    : `<span class="sentence-pair empty">no similar pairs</span>`;
+
+  $("treeView").innerHTML = `
+    <div class="sentence-viz">
+      <div class="sentence-title">Aligned word pairs</div>
+      <div class="sentence-columns">${columns}</div>
+      <div class="sentence-status">${statusItems}</div>
+      <div>
+        <div class="sentence-pairs-label">Similar pairs (bidirectional)</div>
+        <div class="sentence-pairs">${pairItems}</div>
+      </div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1684,6 +1734,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderQueueView(step);
+  } else if (step.sentenceView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSentenceView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
