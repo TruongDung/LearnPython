@@ -7347,6 +7347,9 @@ function buildSteps72Table(input, params) {
     if (hasActiveCell) {
       currentVars.push({ name: "i", value: opts.hlCell[0] });
       currentVars.push({ name: "j", value: opts.hlCell[1] });
+      if (opts.hlCell[0] > 0) {
+        currentVars.push({ name: "word1[i - 1]", value: word1[opts.hlCell[0] - 1] });
+      }
     }
     for (const item of opts.vars || []) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
@@ -7582,7 +7585,15 @@ function buildSteps72Rolling(input, params) {
     const vars = [];
     if (opts.i !== undefined) vars.push({ name: "i", value: opts.i });
     if (opts.j !== undefined) vars.push({ name: "j", value: opts.j });
-    for (const item of opts.vars || []) vars.push(item);
+    const explicitVars = opts.vars || [];
+    if (
+      opts.i !== undefined &&
+      opts.i > 0 &&
+      !explicitVars.some((item) => item.name === "word1[i - 1]")
+    ) {
+      vars.push({ name: "word1[i - 1]", value: word1[opts.i - 1] });
+    }
+    for (const item of explicitVars) vars.push(item);
     const activeRow = opts.activeRow === undefined ? null : opts.activeRow;
     const activeCol = opts.activeCol === undefined ? 0 : opts.activeCol;
     const currRow = curr ? [...curr] : blankRow();
