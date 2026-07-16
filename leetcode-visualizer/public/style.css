@@ -1384,17 +1384,19 @@ button:disabled {
 /* ---- Difference array visualization ---- */
 .diff-viz {
   min-height: 280px;
-  padding: 16px;
+  padding: 18px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
   align-content: center;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.08), transparent 34%),
+    rgba(15, 23, 42, 0.28);
 }
 
 .diff-heading {
-  margin-bottom: 8px;
+  margin-bottom: 9px;
   color: #94a3b8;
   font-size: 11px;
   font-weight: 800;
@@ -1406,46 +1408,75 @@ button:disabled {
 .diff-cells,
 .diff-status {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .diff-updates {
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .diff-cells {
-  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
 }
 
 .diff-update,
 .diff-cell,
 .diff-status div {
   min-width: 0;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 7px;
-  background: rgba(148, 163, 184, 0.07);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
 }
 
 .diff-update {
-  padding: 8px 10px;
+  padding: 10px;
   display: grid;
-  gap: 3px;
+  gap: 8px;
 }
 
 .diff-update.current {
   border-color: rgba(245, 158, 11, 0.7);
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 158, 11, 0.13);
+  box-shadow: 0 10px 22px rgba(245, 158, 11, 0.12);
 }
 
-.diff-update span,
-.diff-cell span,
+.diff-update-index,
+.diff-index,
 .diff-status span {
   color: #64748b;
   font-size: 11px;
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.diff-update strong,
+.diff-update-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.diff-update-values span {
+  min-width: 0;
+  padding: 6px 7px;
+  display: grid;
+  gap: 2px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.09);
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.diff-update-values small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .diff-status strong {
   color: #f8fafc;
   font-size: 14px;
@@ -1453,17 +1484,27 @@ button:disabled {
 }
 
 .diff-cell {
-  min-height: 74px;
-  padding: 7px;
+  min-height: 86px;
+  padding: 8px;
   display: grid;
-  gap: 3px;
+  gap: 4px;
   place-items: center;
   color: #94a3b8;
 }
 
-.diff-cell strong {
+.diff-value {
   color: #f8fafc;
-  font-size: 17px;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.diff-value.positive {
+  color: #86efac;
+}
+
+.diff-value.negative {
+  color: #fca5a5;
 }
 
 .diff-cell small {
@@ -1474,8 +1515,8 @@ button:disabled {
 }
 
 .diff-cell.in-range {
-  border-color: rgba(16, 185, 129, 0.48);
-  background: rgba(16, 185, 129, 0.11);
+  border-color: rgba(16, 185, 129, 0.46);
+  background: rgba(16, 185, 129, 0.12);
 }
 
 .diff-cell.boundary {
@@ -1484,12 +1525,21 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
 }
 
+.diff-marker {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
 .diff-cell.sentinel {
   border-style: dashed;
+  opacity: 0.86;
 }
 
 .diff-cell.result {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(99, 102, 241, 0.13);
+  border-color: rgba(129, 140, 248, 0.28);
 }
 
 .diff-status {
@@ -2649,7 +2699,9 @@ button:disabled {
 }
 
 [data-theme="light"] .diff-viz {
-  background: #f8fafc;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.07), transparent 36%),
+    #f8fafc;
   border-color: #e2e8f0;
 }
 
@@ -2671,6 +2723,15 @@ button:disabled {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14);
 }
 
+[data-theme="light"] .diff-update-values span {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+[data-theme="light"] .diff-update-values small {
+  color: #64748b;
+}
+
 [data-theme="light"] .diff-cell.in-range {
   background: #ecfdf5;
   border-color: #34d399;
@@ -2681,17 +2742,29 @@ button:disabled {
   border-color: #c7d2fe;
 }
 
-[data-theme="light"] .diff-update span,
-[data-theme="light"] .diff-cell span,
+[data-theme="light"] .diff-update-index,
+[data-theme="light"] .diff-index,
 [data-theme="light"] .diff-cell small,
 [data-theme="light"] .diff-status span {
   color: #475569;
 }
 
-[data-theme="light"] .diff-update strong,
-[data-theme="light"] .diff-cell strong,
+[data-theme="light"] .diff-marker {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+[data-theme="light"] .diff-value,
 [data-theme="light"] .diff-status strong {
   color: #0f172a;
+}
+
+[data-theme="light"] .diff-value.positive {
+  color: #047857;
+}
+
+[data-theme="light"] .diff-value.negative {
+  color: #b91c1c;
 }
 
 [data-theme="light"] .bar .col {

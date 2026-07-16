@@ -1820,22 +1820,29 @@ function renderDifferenceArrayView(step) {
     const inRange = activeStart >= 0 && index >= activeStart && index <= activeEnd;
     const isBoundary = index === activeBoundary;
     const isSentinel = index === diff.length - 1;
+    const boundaryLabel = isBoundary && activeBoundary === activeStart ? "start" : isBoundary ? "end + 1" : "";
+    const signClass = value > 0 ? " positive" : value < 0 ? " negative" : "";
     return `<div class="diff-cell${inRange ? " in-range" : ""}${isBoundary ? " boundary" : ""}${isSentinel ? " sentinel" : ""}">
-      <span>[${index}]</span>
-      <strong>${escapeHtml(String(value))}</strong>
+      <span class="diff-index">[${index}]</span>
+      <strong class="diff-value${signClass}">${escapeHtml(String(value))}</strong>
+      ${boundaryLabel ? `<small class="diff-marker">${escapeHtml(boundaryLabel)}</small>` : ""}
       ${isSentinel ? "<small>end</small>" : ""}
     </div>`;
   }).join("");
 
   const resultCells = result.map((value, index) => `<div class="diff-cell result${index === currentResult ? " boundary" : ""}">
-    <span>[${index}]</span>
-    <strong>${value == null ? "-" : escapeHtml(String(value))}</strong>
+    <span class="diff-index">[${index}]</span>
+    <strong class="diff-value">${value == null ? "-" : escapeHtml(String(value))}</strong>
   </div>`).join("");
 
   const updateItems = updates.length
     ? updates.map((update, index) => `<div class="diff-update${index === currentUpdate ? " current" : ""}">
-      <span>${index}</span>
-      <strong>[${escapeHtml(String(update.start))}, ${escapeHtml(String(update.end))}, ${escapeHtml(String(update.inc))}]</strong>
+      <span class="diff-update-index">update ${index}</span>
+      <div class="diff-update-values">
+        <span><small>start</small>${escapeHtml(String(update.start))}</span>
+        <span><small>end</small>${escapeHtml(String(update.end))}</span>
+        <span><small>inc</small>${escapeHtml(String(update.inc))}</span>
+      </div>
     </div>`).join("")
     : `<div class="diff-update empty"><strong>no updates</strong></div>`;
 
