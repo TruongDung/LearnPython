@@ -11379,7 +11379,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 304, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11520,7 +11520,7 @@ module.exports = {
     id: 304,
     difficulty: "medium",
     slug: "range-sum-query-2d-immutable",
-    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
     title: { vi: "Range Sum Query 2D - Immutable", en: "Range Sum Query 2D - Immutable" },
     titleVi: { vi: "Tong vung 2D bat bien", en: "Immutable 2D range sums" },
     statement: {
