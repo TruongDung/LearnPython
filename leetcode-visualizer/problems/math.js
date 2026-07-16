@@ -1230,7 +1230,7 @@ module.exports = {
       "from math import gcd",
       "",
       "class Solution:",
-      "    def sumOfGcdPairs(self, nums):",
+      "    def gcdSum(self, nums):",
       "        prefixGcd = []",
       "        mx = 0",
       "        for x in nums:",
