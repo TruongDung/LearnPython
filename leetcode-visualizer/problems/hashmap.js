@@ -1122,6 +1122,161 @@ function buildSteps523(nums, params) {
   return { steps, answer };
 }
 
+function buildSteps525(nums) {
+  const bits = nums.map((num) => (num === 1 ? 1 : 0));
+  const firstSeen = new Map([[0, -1]]);
+  const balances = new Array(bits.length).fill(null);
+  const firstValues = new Array(bits.length).fill(null);
+  const steps = [];
+  let balance = 0;
+  let maxLen = 0;
+  let bestStart = -1;
+  let bestEnd = -1;
+
+  const mapEntries = () => [...firstSeen.entries()].map(([remainder, index]) => ({ remainder, index }));
+  const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const makeView = ({ current = -1, matchStart = bestStart, matchEnd = bestEnd, status = [] } = {}) => ({
+    nums: [...bits],
+    prefixSums: [...balances],
+    remainders: [...firstValues],
+    current,
+    matchStart,
+    matchEnd,
+    entries: mapEntries(),
+    heading: "Bits / balance / first seen",
+    prefixLabel: "balance",
+    remainderLabel: "first",
+    mapTitle: "Earliest balance index",
+    mapKeyLabel: "balance",
+    mapValueLabel: "index",
+    status,
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao balance 0 tai index -1", en: "Seed balance 0 at index -1" },
+    codeLines: [3],
+    prefixRemainderView: makeView({
+      matchStart: -1,
+      matchEnd: -1,
+      status: [
+        { label: "0 counts as", value: -1 },
+        { label: "1 counts as", value: 1 },
+        { label: "first_seen", value: "{0: -1}" },
+      ],
+    }),
+    vars: [{ name: "first_seen", value: "{0: -1}" }, { name: "balance", value: 0 }, { name: "max_len", value: 0 }],
+    note: {
+      vi: "Doi 0 thanh -1 va 1 thanh +1. Neu balance lap lai, doan giua co so 0 va 1 bang nhau.",
+      en: "Treat 0 as -1 and 1 as +1. When a balance repeats, the middle subarray has equal 0s and 1s.",
+    },
+  });
+
+  for (let i = 0; i < bits.length; i += 1) {
+    const delta = bits[i] === 1 ? 1 : -1;
+    balance += delta;
+    balances[i] = balance;
+    firstValues[i] = firstSeen.has(balance) ? firstSeen.get(balance) : "new";
+
+    steps.push({
+      title: { vi: `Doc nums[${i}] = ${bits[i]}`, en: `Read nums[${i}] = ${bits[i]}` },
+      codeLines: [5, 6],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "delta", value: delta },
+          { label: "balance", value: balance },
+          { label: "first seen", value: firstValues[i] },
+        ],
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: bits[i] },
+        { name: "delta", value: delta },
+        { name: "balance", value: balance },
+      ],
+      note: {
+        vi: `${bits[i]} lam balance thay doi ${delta > 0 ? "+1" : "-1"}, nen balance hien tai = ${balance}.`,
+        en: `${bits[i]} changes balance by ${delta > 0 ? "+1" : "-1"}, so the current balance is ${balance}.`,
+      },
+    });
+
+    if (firstSeen.has(balance)) {
+      const previous = firstSeen.get(balance);
+      const length = i - previous;
+      const start = previous + 1;
+      if (length > maxLen) {
+        maxLen = length;
+        bestStart = start;
+        bestEnd = i;
+      }
+      steps.push({
+        title: { vi: `Balance ${balance} lap lai`, en: `Balance ${balance} repeats` },
+        codeLines: [7, 8],
+        prefixRemainderView: makeView({
+          current: i,
+          matchStart: start,
+          matchEnd: i,
+          status: [
+            { label: "previous", value: previous },
+            { label: "candidate", value: `[${start}..${i}]` },
+            { label: "length", value: length },
+            { label: "max_len", value: maxLen },
+          ],
+        }),
+        vars: [
+          { name: "balance", value: balance },
+          { name: `first_seen[${balance}]`, value: previous },
+          { name: "length", value: `${i} - (${previous}) = ${length}` },
+          { name: "max_len", value: maxLen },
+        ],
+        note: {
+          vi: `Balance tai ${previous} va ${i} giong nhau, nen nums[${start}..${i}] co so 0 va 1 bang nhau.`,
+          en: `The balance at ${previous} and ${i} is the same, so nums[${start}..${i}] has equal 0s and 1s.`,
+        },
+      });
+    } else {
+      firstSeen.set(balance, i);
+      firstValues[i] = i;
+      steps.push({
+        title: { vi: `Luu balance ${balance} tai index ${i}`, en: `Store balance ${balance} at index ${i}` },
+        codeLines: [10],
+        prefixRemainderView: makeView({
+          current: i,
+          status: [
+            { label: "stored", value: `${balance} -> ${i}` },
+            { label: "map size", value: firstSeen.size },
+          ],
+        }),
+        vars: [{ name: "balance", value: balance }, { name: "first_seen", value: mapString() }],
+        note: {
+          vi: "Chi luu index dau tien cua moi balance de tao do dai lon nhat.",
+          en: "Keep the earliest index for each balance so later repeats produce the longest length.",
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `Ket qua: ${maxLen}`, en: `Result: ${maxLen}` },
+    codeLines: [11],
+    prefixRemainderView: makeView({
+      current: -1,
+      status: [
+        { label: "best", value: bestStart >= 0 ? `[${bestStart}..${bestEnd}]` : "-" },
+        { label: "max_len", value: maxLen },
+      ],
+    }),
+    vars: [{ name: "first_seen", value: mapString() }, { name: "max_len", value: maxLen }],
+    note: {
+      vi: maxLen > 0 ? `Doan dai nhat la nums[${bestStart}..${bestEnd}], do dai ${maxLen}.` : "Khong co doan nao co so 0 va 1 bang nhau.",
+      en: maxLen > 0 ? `The longest subarray is nums[${bestStart}..${bestEnd}], length ${maxLen}.` : "No subarray has equal 0s and 1s.",
+    },
+    final: true,
+  });
+
+  return { steps, answer: maxLen };
+}
+
 module.exports = {
   3020: {
     id: 3020,
@@ -1290,7 +1445,7 @@ module.exports = {
     id: 523,
     difficulty: "medium",
     slug: "continuous-subarray-sum",
-    category: { key: "hashmap", vi: "Bang bam (Hash Map)", en: "Hash Map" },
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
     title: { vi: "Continuous Subarray Sum", en: "Continuous Subarray Sum" },
     titleVi: { vi: "Tong day con lien tiep", en: "Continuous subarray sum" },
     statement: {
@@ -1332,6 +1487,49 @@ module.exports = {
       "        return False",
     ],
     builder: buildSteps523,
+  },
+  525: {
+    id: 525,
+    difficulty: "medium",
+    slug: "contiguous-array",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Contiguous Array", en: "Contiguous Array" },
+    titleVi: { vi: "Mang con lien tiep co 0 va 1 bang nhau", en: "Longest balanced binary subarray" },
+    statement: {
+      vi: "Cho mang nhi phan nums. Tra ve do dai lon nhat cua day con lien tiep co so luong 0 va 1 bang nhau.",
+      en: "Given a binary array nums, return the maximum length of a contiguous subarray with an equal number of 0 and 1.",
+    },
+    defaultInput: [0, 1, 0, 1, 1, 0, 0],
+    inputKind: "binary",
+    inputLabel: { vi: "nums", en: "nums" },
+    approach: [
+      { vi: "Doi 0 thanh -1 va 1 thanh +1 de bien bai toan thanh prefix balance.", en: "Convert 0 to -1 and 1 to +1 to turn the problem into prefix balance tracking." },
+      { vi: "Neu balance lap lai tai hai index, tong delta o giua bang 0, nen so 0 va 1 bang nhau.", en: "If a balance repeats at two indices, the delta sum between them is 0, so zeros and ones are equal." },
+      { vi: "Luu index dau tien cua moi balance de lay do dai lon nhat.", en: "Store the earliest index for each balance to maximize the length." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyet mot lan; hash map luu balance dau tien gap duoc.",
+        en: "One pass; the hash map stores the first index where each balance appears.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMaxLength(self, nums: List[int]) -> int:",
+      "        first_seen = {0: -1}",
+      "        balance = 0",
+      "        max_len = 0",
+      "        for i, num in enumerate(nums):",
+      "            balance += 1 if num == 1 else -1",
+      "            if balance in first_seen:",
+      "                max_len = max(max_len, i - first_seen[balance])",
+      "            else:",
+      "                first_seen[balance] = i",
+      "        return max_len",
+    ],
+    builder: buildSteps525,
   },
   734: {
     id: 734,

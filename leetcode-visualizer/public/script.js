@@ -1760,6 +1760,12 @@ function renderPrefixRemainderView(step) {
   const current = Number.isInteger(view.current) ? view.current : -1;
   const matchStart = Number.isInteger(view.matchStart) ? view.matchStart : -1;
   const matchEnd = Number.isInteger(view.matchEnd) ? view.matchEnd : -1;
+  const heading = view.heading || "Numbers / prefix / remainder";
+  const prefixLabel = view.prefixLabel || "sum";
+  const remainderLabel = view.remainderLabel || "rem";
+  const mapTitle = view.mapTitle || "Earliest remainder index";
+  const mapKeyLabel = view.mapKeyLabel || "remainder";
+  const mapValueLabel = view.mapValueLabel || "index";
 
   const cells = nums.map((num, index) => {
     const isCurrent = index === current;
@@ -1769,14 +1775,14 @@ function renderPrefixRemainderView(step) {
     return `<div class="remainder-cell${isMatch ? " match" : ""}${isCurrent ? " current" : ""}">
       <span class="remainder-index">[${index}]</span>
       <strong>${escapeHtml(String(num))}</strong>
-      <span>sum ${prefix == null ? "-" : escapeHtml(String(prefix))}</span>
-      <span>rem ${remainder == null ? "-" : escapeHtml(String(remainder))}</span>
+      <span>${escapeHtml(String(prefixLabel))} ${prefix == null ? "-" : escapeHtml(String(prefix))}</span>
+      <span>${escapeHtml(String(remainderLabel))} ${remainder == null ? "-" : escapeHtml(String(remainder))}</span>
     </div>`;
   }).join("");
 
   const mapCells = entries.map((entry) => `<div class="remainder-map-cell">
-    <span>remainder ${escapeHtml(String(entry.remainder))}</span>
-    <strong>index ${escapeHtml(String(entry.index))}</strong>
+    <span>${escapeHtml(String(mapKeyLabel))} ${escapeHtml(String(entry.remainder))}</span>
+    <strong>${escapeHtml(String(mapValueLabel))} ${escapeHtml(String(entry.index))}</strong>
   </div>`).join("");
 
   const statusItems = statuses.map((item) => `<div>
@@ -1787,11 +1793,11 @@ function renderPrefixRemainderView(step) {
   $("treeView").innerHTML = `
     <div class="remainder-viz">
       <div>
-        <div class="remainder-heading">Numbers / prefix / remainder</div>
+        <div class="remainder-heading">${escapeHtml(String(heading))}</div>
         <div class="remainder-cells">${cells}</div>
       </div>
       <div>
-        <div class="remainder-heading">Earliest remainder index</div>
+        <div class="remainder-heading">${escapeHtml(String(mapTitle))}</div>
         <div class="remainder-map">${mapCells}</div>
       </div>
       <div class="remainder-status">${statusItems}</div>
