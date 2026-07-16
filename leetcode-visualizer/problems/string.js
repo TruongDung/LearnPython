@@ -611,6 +611,182 @@ function buildSteps346(input) {
   return { operations, outputs, answer: average, steps };
 }
 
+/**
+ * LeetCode 933: Number of Recent Calls.
+ * Keep request timestamps from the inclusive interval [t - 3000, t].
+ */
+function buildSteps933(input) {
+  const operations = parseDequeOps641(input);
+  const startIndex = operations[0] && operations[0].name === "RecentCounter" ? 1 : 0;
+  const pingOperations = operations.slice(startIndex).filter((op) => op.name === "ping");
+  const stream = pingOperations.map((op) => op.args[0]).filter((value) => Number.isFinite(value));
+  const requests = [];
+  const outputs = [null];
+  const steps = [];
+  let t = null;
+  let lowerBound = null;
+  let result = null;
+  let removed = [];
+
+  function outputLabel() {
+    return `[${outputs.map((value) => value === null ? "None" : value).join(", ")}]`;
+  }
+
+  function rangeLabel() {
+    return lowerBound === null ? "none" : `[${lowerBound}, ${t}]`;
+  }
+
+  function removedLabel() {
+    return removed.length ? `[${removed.join(", ")}]` : "none";
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      queueView: {
+        title: "Recent requests queue",
+        items: requests.slice(),
+        capacity: Math.max(stream.length, requests.length, 1),
+        stream,
+        current,
+        active: Number.isInteger(opts.active) ? opts.active : -1,
+        status: [
+          { label: "t", value: t === null ? "none" : t },
+          { label: "valid range", value: rangeLabel() },
+          { label: "recent count", value: requests.length },
+          { label: "removed", value: removedLabel() },
+        ],
+      },
+      vars: [
+        { name: "requests", value: `[${requests.join(", ")}]` },
+        { name: "t", value: t === null ? "none" : t },
+        { name: "t - 3000", value: lowerBound === null ? "none" : `${t} - 3000 = ${lowerBound}` },
+        { name: "len(requests)", value: requests.length },
+        { name: "removed", value: removedLabel() },
+        { name: "outputs", value: outputLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khoi tao RecentCounter", en: "Initialize RecentCounter" },
+    codeLine: 5,
+    note: {
+      vi: "Queue ban dau rong. FRONT se luu request cu nhat va REAR luu request moi nhat.",
+      en: "The queue starts empty. FRONT holds the oldest request and REAR holds the newest.",
+    },
+  });
+
+  for (let i = 0; i < stream.length; i++) {
+    t = stream[i];
+    lowerBound = t - 3000;
+    removed = [];
+    result = null;
+
+    requests.push(t);
+    pushStep({
+      title: { vi: `ping(${t}): them vao REAR`, en: `ping(${t}): append at REAR` },
+      codeLine: 8,
+      current: i,
+      active: requests.length - 1,
+      vars: [
+        { name: "operation", value: `ping(${t})` },
+        { name: "action", value: `requests.append(${t})` },
+      ],
+      note: {
+        vi: `Them request moi tai thoi diem ${t}. Cua so hop le hien tai la [${lowerBound}, ${t}].`,
+        en: `Add the request at time ${t}. The current valid window is [${lowerBound}, ${t}].`,
+      },
+    });
+
+    while (requests[0] < lowerBound) {
+      const stale = requests[0];
+      pushStep({
+        title: { vi: `${stale} < ${lowerBound}: request da cu`, en: `${stale} < ${lowerBound}: request is stale` },
+        codeLine: 9,
+        current: i,
+        active: 0,
+        vars: [
+          { name: "requests[0]", value: stale },
+          { name: "requests[0] < t - 3000", value: `${stale} < ${lowerBound} = True` },
+        ],
+        note: {
+          vi: `${stale} nam ngoai khoang [${lowerBound}, ${t}], nen phai roi FRONT.`,
+          en: `${stale} is outside [${lowerBound}, ${t}], so it must leave from FRONT.`,
+        },
+      });
+
+      removed.push(requests.shift());
+      pushStep({
+        title: { vi: `popleft ${removed[removed.length - 1]}`, en: `Popleft ${removed[removed.length - 1]}` },
+        codeLine: 10,
+        current: i,
+        vars: [
+          { name: "popped", value: removed[removed.length - 1] },
+          { name: "action", value: "requests.popleft()" },
+        ],
+        note: {
+          vi: `Loai request cu nhat. Queue con lai la [${requests.join(", ")}].`,
+          en: `Remove the oldest request. The queue is now [${requests.join(", ")}].`,
+        },
+      });
+    }
+
+    pushStep({
+      title: {
+        vi: `${requests[0]} >= ${lowerBound}: FRONT con hop le`,
+        en: `${requests[0]} >= ${lowerBound}: FRONT is valid`,
+      },
+      codeLine: 9,
+      current: i,
+      active: 0,
+      vars: [
+        { name: "requests[0]", value: requests[0] },
+        { name: "requests[0] < t - 3000", value: `${requests[0]} < ${lowerBound} = False` },
+      ],
+      note: {
+        vi: `FRONT = ${requests[0]} nam trong khoang inclusive [${lowerBound}, ${t}], nen dung popleft.`,
+        en: `FRONT = ${requests[0]} is inside the inclusive interval [${lowerBound}, ${t}], so pruning stops.`,
+      },
+    });
+
+    result = requests.length;
+    outputs.push(result);
+    pushStep({
+      title: { vi: `Tra ve ${result}`, en: `Return ${result}` },
+      codeLine: 12,
+      current: i,
+      vars: [
+        { name: "return", value: result },
+        { name: "valid requests", value: `[${requests.join(", ")}]` },
+      ],
+      note: {
+        vi: `Co ${result} request trong khoang [${lowerBound}, ${t}].`,
+        en: `There are ${result} requests in [${lowerBound}, ${t}].`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Ket qua cuoi: ${result}`, en: `Final result: ${result}` },
+    codeLine: 12,
+    current: stream.length,
+    final: true,
+    vars: [{ name: "all outputs", value: outputLabel() }],
+    note: {
+      vi: `Da xu ly toan bo ping. Queue cuoi cung la [${requests.join(", ")}].`,
+      en: `All ping calls are complete. The final queue is [${requests.join(", ")}].`,
+    },
+  });
+
+  return { operations, outputs, answer: result, steps };
+}
+
 function buildSteps641(input) {
   const ops = parseDequeOps641(input);
   const first = ops[0] && ops[0].name === "MyCircularDeque" ? ops.shift() : { args: [3] };
@@ -3906,6 +4082,51 @@ module.exports = {
       "        return self.window_sum / len(self.queue)",
     ],
     builder: buildSteps346,
+  },
+  933: {
+    id: 933,
+    difficulty: "easy",
+    slug: "number-of-recent-calls",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Number of Recent Calls", en: "Number of Recent Calls" },
+    titleVi: { vi: "Dem so request gan day", en: "Count recent requests" },
+    statement: {
+      vi: "RecentCounter nhan cac lenh ping(t) voi t tang dan. Moi ping them request tai thoi diem t va tra ve so request trong khoang inclusive [t - 3000, t].",
+      en: "RecentCounter receives ping(t) calls with increasing t. Each ping adds a request at time t and returns the number of requests in the inclusive interval [t - 3000, t].",
+    },
+    defaultInput: "RecentCounter(), ping(1), ping(100), ping(3001), ping(3002)",
+    inputKind: "string",
+    inputLabel: { vi: "operations", en: "operations" },
+    extraParams: [],
+    approach: [
+      { vi: "Dung deque luu timestamp cua cac request con nam trong cua so 3000 ms.", en: "Use a deque to store timestamps that remain inside the 3000 ms window." },
+      { vi: "Moi ping(t), append t vao REAR vi cac timestamp tang dan.", en: "For each ping(t), append t at REAR because timestamps are increasing." },
+      { vi: "Trong khi FRONT < t - 3000, popleft request da qua cu.", en: "While FRONT < t - 3000, popleft the stale request." },
+      { vi: "Sau khi loai xong, moi timestamp trong queue deu thuoc [t - 3000, t], nen dap an la len(queue).", en: "After pruning, every timestamp in the queue belongs to [t - 3000, t], so the answer is len(queue)." },
+    ],
+    complexity: {
+      time: "O(1) amortized per ping",
+      space: "O(n)",
+      note: {
+        vi: "Moi timestamp duoc append va popleft toi da mot lan, nen tong thoi gian cho n lenh ping la O(n). Queue chi luu cac request gan day.",
+        en: "Each timestamp is appended and removed at most once, so n ping calls take O(n) total time. The queue stores only recent requests.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class RecentCounter:",
+      "    def __init__(self):",
+      "        self.requests = deque()",
+      "",
+      "    def ping(self, t: int) -> int:",
+      "        self.requests.append(t)",
+      "        while self.requests[0] < t - 3000:",
+      "            self.requests.popleft()",
+      "",
+      "        return len(self.requests)",
+    ],
+    builder: buildSteps933,
   },
   641: {
     id: 641,
