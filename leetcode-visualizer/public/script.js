@@ -1905,6 +1905,52 @@ function renderRunningSumView(step) {
     </div>`;
 }
 
+function renderPrefix1DView(step) {
+  const view = step.prefix1DView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const prefixIndex = Number.isInteger(view.prefixIndex) ? view.prefixIndex : -1;
+  const query = view.query || null;
+  const left = query && Number.isInteger(query.left) ? query.left : -1;
+  const right = query && Number.isInteger(query.right) ? query.right : -1;
+
+  const numsCells = nums.map((num, index) => {
+    const inQuery = left >= 0 && index >= left && index <= right;
+    return `<div class="prefix1d-cell input${index === current ? " current" : ""}${inQuery ? " in-query" : ""}">
+      <span>[${index}]</span>
+      <strong>${escapeHtml(String(num))}</strong>
+    </div>`;
+  }).join("");
+
+  const prefixCells = prefix.map((value, index) => {
+    const isQueryEdge = query && (index === left || index === right + 1);
+    return `<div class="prefix1d-cell prefix${index === prefixIndex ? " current" : ""}${isQueryEdge ? " edge" : ""}">
+      <span>p[${index}]</span>
+      <strong>${value == null ? "-" : escapeHtml(String(value))}</strong>
+    </div>`;
+  }).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="prefix1d-viz">
+      <div>
+        <div class="prefix1d-heading">nums</div>
+        <div class="prefix1d-row">${numsCells}</div>
+      </div>
+      <div>
+        <div class="prefix1d-heading">prefix</div>
+        <div class="prefix1d-row prefix-row">${prefixCells}</div>
+      </div>
+      <div class="prefix1d-status">${statusItems}</div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1988,6 +2034,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRunningSumView(step);
+  } else if (step.prefix1DView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefix1DView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

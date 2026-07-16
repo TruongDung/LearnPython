@@ -1734,6 +1734,98 @@ function buildSteps1480(nums) {
   return { steps, answer: running };
 }
 
+function buildSteps303(nums, params) {
+  const n = nums.length;
+  const leftRaw = Number.parseInt(params && params.left, 10);
+  const rightRaw = Number.parseInt(params && params.right, 10);
+  const left = Math.max(0, Math.min(n - 1, Number.isInteger(leftRaw) ? leftRaw : 0));
+  const right = Math.max(left, Math.min(n - 1, Number.isInteger(rightRaw) ? rightRaw : n - 1));
+  const prefix = new Array(n + 1).fill(null);
+  prefix[0] = 0;
+  const steps = [];
+
+  const makeView = ({ current = -1, prefixIndex = -1, query = null, status = [] } = {}) => ({
+    nums: [...nums],
+    prefix: [...prefix],
+    current,
+    prefixIndex,
+    query,
+    status,
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao prefix[0] = 0", en: "Initialize prefix[0] = 0" },
+    codeLines: [3],
+    prefix1DView: makeView({
+      prefixIndex: 0,
+      status: [
+        { label: "left", value: left },
+        { label: "right", value: right },
+      ],
+    }),
+    vars: [{ name: "prefix[0]", value: 0 }, { name: "query", value: `[${left}, ${right}]` }],
+    note: {
+      vi: "prefix co them 1 o dau. prefix[i] la tong nums[0..i-1].",
+      en: "prefix has one extra leading cell. prefix[i] is the sum of nums[0..i-1].",
+    },
+  });
+
+  for (let i = 0; i < n; i += 1) {
+    const before = prefix[i];
+    prefix[i + 1] = before + nums[i];
+    steps.push({
+      title: { vi: `prefix[${i + 1}] = ${prefix[i + 1]}`, en: `prefix[${i + 1}] = ${prefix[i + 1]}` },
+      codeLines: [4, 5],
+      prefix1DView: makeView({
+        current: i,
+        prefixIndex: i + 1,
+        status: [
+          { label: "i", value: i },
+          { label: `prefix[${i}]`, value: before },
+          { label: `nums[${i}]`, value: nums[i] },
+          { label: `prefix[${i + 1}]`, value: `${before} + ${nums[i]} = ${prefix[i + 1]}` },
+        ],
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: `prefix[${i + 1}]`, value: `${before} + ${nums[i]} = ${prefix[i + 1]}` },
+        { name: "prefix", value: `[${prefix.map((v) => v == null ? "_" : v).join(", ")}]` },
+      ],
+      note: {
+        vi: `Lay tong truoc do ${before} cong nums[${i}] = ${nums[i]}.`,
+        en: `Take the previous sum ${before} plus nums[${i}] = ${nums[i]}.`,
+      },
+    });
+  }
+
+  const answer = prefix[right + 1] - prefix[left];
+  steps.push({
+    title: { vi: `sumRange(${left}, ${right}) = ${answer}`, en: `sumRange(${left}, ${right}) = ${answer}` },
+    codeLines: [8],
+    prefix1DView: makeView({
+      query: { left, right },
+      prefixIndex: -1,
+      status: [
+        { label: `prefix[${right + 1}]`, value: prefix[right + 1] },
+        { label: `prefix[${left}]`, value: prefix[left] },
+        { label: "answer", value: `${prefix[right + 1]} - ${prefix[left]} = ${answer}` },
+      ],
+    }),
+    vars: [
+      { name: "left", value: left },
+      { name: "right", value: right },
+      { name: "answer", value: `${prefix[right + 1]} - ${prefix[left]} = ${answer}` },
+    ],
+    note: {
+      vi: `Tong nums[${left}..${right}] = prefix[${right + 1}] - prefix[${left}].`,
+      en: `Sum nums[${left}..${right}] = prefix[${right + 1}] - prefix[${left}].`,
+    },
+    final: true,
+  });
+
+  return { steps, answer };
+}
+
 module.exports = {
   3020: {
     id: 3020,
@@ -2025,6 +2117,49 @@ module.exports = {
       "        return nums",
     ],
     builder: buildSteps1480,
+  },
+  303: {
+    id: 303,
+    difficulty: "easy",
+    slug: "range-sum-query-immutable",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Range Sum Query - Immutable", en: "Range Sum Query - Immutable" },
+    titleVi: { vi: "Truy van tong doan bat bien", en: "Immutable range sum query" },
+    statement: {
+      vi: "Cho mang nums khong thay doi. Thiet ke NumArray de tra ve tong nums[left..right] nhieu lan.",
+      en: "Given an immutable array nums, design NumArray to return the sum of nums[left..right] many times.",
+    },
+    defaultInput: [-2, 0, 3, -5, 2, -1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "left", type: "number", label: { vi: "left", en: "left" }, default: 0 },
+      { key: "right", type: "number", label: { vi: "right", en: "right" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Build prefix voi prefix[0] = 0.", en: "Build prefix with prefix[0] = 0." },
+      { vi: "prefix[i + 1] = prefix[i] + nums[i].", en: "prefix[i + 1] = prefix[i] + nums[i]." },
+      { vi: "sumRange(left, right) = prefix[right + 1] - prefix[left].", en: "sumRange(left, right) = prefix[right + 1] - prefix[left]." },
+    ],
+    complexity: {
+      time: "O(n) build, O(1) query",
+      space: "O(n)",
+      note: {
+        vi: "Moi query chi doc hai o prefix.",
+        en: "Each query reads only two prefix cells.",
+      },
+    },
+    code: [
+      "class NumArray:",
+      "    def __init__(self, nums: List[int]):",
+      "        self.prefix = [0]",
+      "        for num in nums:",
+      "            self.prefix.append(self.prefix[-1] + num)",
+      "",
+      "    def sumRange(self, left: int, right: int) -> int:",
+      "        return self.prefix[right + 1] - self.prefix[left]",
+    ],
+    builder: buildSteps303,
   },
   370: {
     id: 370,
