@@ -922,6 +922,245 @@ function buildSteps1670(input) {
 }
 
 /**
+ * LeetCode 394: Decode String.
+ * Save the prefix and repeat count for each nested group on a stack.
+ */
+function buildSteps394(input) {
+  const s = String(input).trim();
+  const chars = s.split("");
+  const stack = [];
+  const steps = [];
+  let current;
+  let number;
+
+  function frameItems() {
+    return stack.map((frame) => ({
+      value: `${frame.repeat}x`,
+      detail: `prefix = "${frame.prefix}"`,
+    }));
+  }
+
+  function stackLabel() {
+    return stack.length
+      ? `[${stack.map((frame) => `("${frame.prefix}", ${frame.repeat})`).join(", ")}]`
+      : "[]";
+  }
+
+  function currentLabel() {
+    return current === undefined ? "not in scope" : `"${current}"`;
+  }
+
+  function numberLabel() {
+    return number === undefined ? "not in scope" : number;
+  }
+
+  function pushStep(opts) {
+    const index = Number.isInteger(opts.current) ? opts.current : -1;
+    const explicitVars = opts.vars || [];
+    const charVar =
+      index >= 0 && index < chars.length && !explicitVars.some((item) => item.name === "ch")
+        ? [{ name: "ch", value: `'${chars[index]}'` }]
+        : [];
+
+    steps.push({
+      title: opts.title,
+      codeLines: opts.codeLines,
+      stackView: {
+        title: "Saved frames",
+        emptyLabel: "no saved frames",
+        items: frameItems(),
+        input: chars,
+        current: index,
+        inputLabel: "Encoded string",
+        status: [
+          { label: "current", value: currentLabel() },
+          { label: "number", value: numberLabel() },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "current", value: currentLabel() },
+        { name: "number", value: numberLabel() },
+        ...charVar,
+        ...explicitVars,
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLines: [3],
+    vars: [{ name: "s", value: `"${s}"` }],
+    note: {
+      vi: "The stack will save the outer prefix and repeat count for each nested group.",
+      en: "The stack will save the outer prefix and repeat count for each nested group.",
+    },
+  });
+
+  current = "";
+  pushStep({
+    title: { vi: "Initialize current", en: "Initialize current" },
+    codeLines: [4],
+    note: {
+      vi: "current builds the decoded text at the active nesting level.",
+      en: "current builds the decoded text at the active nesting level.",
+    },
+  });
+
+  number = 0;
+  pushStep({
+    title: { vi: "Initialize number", en: "Initialize number" },
+    codeLines: [5],
+    note: {
+      vi: "number accumulates the repeat count before the next '['.",
+      en: "number accumulates the repeat count before the next '['.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    pushStep({
+      title: { vi: `Read '${ch}'`, en: `Read '${ch}'` },
+      codeLines: [6],
+      current: i,
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Process s[${i}] = '${ch}'.`,
+        en: `Process s[${i}] = '${ch}'.`,
+      },
+    });
+
+    if (/\d/.test(ch)) {
+      const previousNumber = number;
+      number = number * 10 + Number(ch);
+      pushStep({
+        title: { vi: `Build number: ${number}`, en: `Build number: ${number}` },
+        codeLines: [8],
+        current: i,
+        vars: [
+          { name: "digit", value: Number(ch) },
+          { name: "calculation", value: `${previousNumber} * 10 + ${ch} = ${number}` },
+        ],
+        note: {
+          vi: `Append digit ${ch} to the repeat count. This also supports multi-digit counts such as 12.`,
+          en: `Append digit ${ch} to the repeat count. This also supports multi-digit counts such as 12.`,
+        },
+      });
+      continue;
+    }
+
+    if (ch === "[") {
+      const savedPrefix = current;
+      const savedRepeat = number;
+      stack.push({ prefix: savedPrefix, repeat: savedRepeat });
+      pushStep({
+        title: { vi: `Save frame ${savedRepeat}x`, en: `Save frame ${savedRepeat}x` },
+        codeLines: [10],
+        current: i,
+        vars: [
+          { name: "saved prefix", value: `"${savedPrefix}"` },
+          { name: "saved repeat", value: savedRepeat },
+          { name: "action", value: "stack.append((current, number))" },
+        ],
+        note: {
+          vi: `Push (prefix = "${savedPrefix}", repeat = ${savedRepeat}) so the outer state can be restored at ']'.`,
+          en: `Push (prefix = "${savedPrefix}", repeat = ${savedRepeat}) so the outer state can be restored at ']'.`,
+        },
+      });
+
+      current = "";
+      pushStep({
+        title: { vi: "Reset current", en: "Reset current" },
+        codeLines: [11],
+        current: i,
+        vars: [{ name: "action", value: "current = ''" }],
+        note: {
+          vi: "Start building the text inside this new bracket group.",
+          en: "Start building the text inside this new bracket group.",
+        },
+      });
+
+      number = 0;
+      pushStep({
+        title: { vi: "Reset number", en: "Reset number" },
+        codeLines: [12],
+        current: i,
+        vars: [{ name: "action", value: "number = 0" }],
+        note: {
+          vi: "The repeat count is saved in the frame, so reset number for the next group.",
+          en: "The repeat count is saved in the frame, so reset number for the next group.",
+        },
+      });
+      continue;
+    }
+
+    if (ch === "]") {
+      const frame = stack.pop();
+      const nested = current;
+      pushStep({
+        title: { vi: `Pop frame ${frame.repeat}x`, en: `Pop frame ${frame.repeat}x` },
+        codeLines: [14],
+        current: i,
+        vars: [
+          { name: "previous", value: `"${frame.prefix}"` },
+          { name: "repeat", value: frame.repeat },
+          { name: "nested", value: `"${nested}"` },
+        ],
+        note: {
+          vi: `The group "${nested}" is complete. Restore its saved prefix and repeat count.`,
+          en: `The group "${nested}" is complete. Restore its saved prefix and repeat count.`,
+        },
+      });
+
+      current = frame.prefix + nested.repeat(frame.repeat);
+      pushStep({
+        title: { vi: `Expand to "${current}"`, en: `Expand to "${current}"` },
+        codeLines: [15],
+        current: i,
+        vars: [
+          { name: "previous", value: `"${frame.prefix}"` },
+          { name: "repeat * nested", value: `${frame.repeat} * "${nested}"` },
+          { name: "current", value: `"${current}"` },
+        ],
+        note: {
+          vi: `current = "${frame.prefix}" + ${frame.repeat} * "${nested}" = "${current}".`,
+          en: `current = "${frame.prefix}" + ${frame.repeat} * "${nested}" = "${current}".`,
+        },
+      });
+      continue;
+    }
+
+    current += ch;
+    pushStep({
+      title: { vi: `Append '${ch}'`, en: `Append '${ch}'` },
+      codeLines: [17],
+      current: i,
+      vars: [{ name: "action", value: `current += '${ch}'` }],
+      note: {
+        vi: `'${ch}' is a letter, so append it to the current nesting level.`,
+        en: `'${ch}' is a letter, so append it to the current nesting level.`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Result: "${current}"`, en: `Result: "${current}"` },
+    codeLines: [18],
+    current: chars.length,
+    vars: [{ name: "answer", value: `"${current}"` }],
+    note: {
+      vi: `All groups are expanded, so the decoded string is "${current}".`,
+      en: `All groups are expanded, so the decoded string is "${current}".`,
+    },
+    final: true,
+  });
+
+  return { s, answer: current, steps };
+}
+
+/**
  * LeetCode 150: Evaluate Reverse Polish Notation.
  * Use a stack: push numbers, pop two operands when an operator appears.
  */
@@ -1366,6 +1605,57 @@ module.exports = {
       "        return stack[-1]",
     ],
     builder: buildSteps150,
+  },
+  394: {
+    id: 394,
+    difficulty: "medium",
+    slug: "decode-string",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Decode String", en: "Decode String" },
+    titleVi: { vi: "Giai ma chuoi long nhau", en: "Decode a nested string" },
+    statement: {
+      vi: "Cho chuoi da ma hoa theo dang k[encoded_string]. Giai ma chuoi, trong do encoded_string duoc lap lai dung k lan va cac nhom co the long nhau.",
+      en: "Given a string encoded as k[encoded_string], decode it by repeating each bracketed string k times. Groups may be nested.",
+    },
+    defaultInput: "3[a2[c]]",
+    inputKind: "string",
+    inputLabel: { vi: "Encoded string s", en: "Encoded string s" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyet tung ky tu va ghep cac chu so vao bien number.", en: "Scan each character and accumulate digits in number." },
+      { vi: "Khi gap '[', push (current, number) vao stack, sau do reset current va number.", en: "At '[', push (current, number) onto the stack, then reset both values." },
+      { vi: "Khi gap ']', pop frame va ghep previous + repeat * current.", en: "At ']', pop one frame and combine previous + repeat * current." },
+      { vi: "Chu cai duoc noi truc tiep vao current.", en: "Append letters directly to current." },
+    ],
+    complexity: {
+      time: "O(n + output)",
+      space: "O(n + output)",
+      note: {
+        vi: "Moi ky tu ma hoa duoc doc mot lan; viec tao chuoi ty le voi do dai ket qua. Stack luu cac nhom long nhau.",
+        en: "Each encoded character is read once; string construction is proportional to the decoded output. The stack stores nested groups.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def decodeString(self, s: str) -> str:",
+      "        stack = []",
+      "        current = ''",
+      "        number = 0",
+      "        for ch in s:",
+      "            if ch.isdigit():",
+      "                number = number * 10 + int(ch)",
+      "            elif ch == '[':",
+      "                stack.append((current, number))",
+      "                current = ''",
+      "                number = 0",
+      "            elif ch == ']':",
+      "                previous, repeat = stack.pop()",
+      "                current = previous + repeat * current",
+      "            else:",
+      "                current += ch",
+      "        return current",
+    ],
+    builder: buildSteps394,
   },
   1670: {
     id: 1670,

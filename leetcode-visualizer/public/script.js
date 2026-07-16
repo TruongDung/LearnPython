@@ -1514,19 +1514,52 @@ function renderStackView(step) {
   const current = Number.isInteger(view.current) ? view.current : -1;
   const expected = view.expected || "";
   const top = stack.length ? stack[stack.length - 1] : "";
+  const stackTitle = view.title || "Stack";
+  const emptyLabel = view.emptyLabel || "empty stack";
+
+  function itemParts(item) {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      return {
+        value: item.value ?? item.label ?? "",
+        detail: item.detail ?? "",
+      };
+    }
+    return { value: item, detail: "" };
+  }
+
+  const topParts = itemParts(top);
+  const statuses = Array.isArray(view.status)
+    ? view.status
+    : [
+        { label: "top", value: topParts.value || "empty" },
+        { label: "expected", value: expected || "-" },
+      ];
 
   const stackItems = stack.length
     ? stack
         .map((item, idx) => {
           const isTop = idx === stack.length - 1;
+          const parts = itemParts(item);
           return `<div class="stack-cell${isTop ? " top" : ""}">
-            <span class="stack-value">${escapeHtml(String(item))}</span>
+            <span class="stack-cell-content">
+              <span class="stack-value">${escapeHtml(String(parts.value))}</span>
+              ${parts.detail ? `<small class="stack-detail">${escapeHtml(String(parts.detail))}</small>` : ""}
+            </span>
             ${isTop ? `<span class="stack-tag">top</span>` : ""}
           </div>`;
         })
         .reverse()
         .join("")
-    : `<div class="stack-empty">empty stack</div>`;
+    : `<div class="stack-empty">${escapeHtml(String(emptyLabel))}</div>`;
+
+  const statusItems = statuses
+    .map(
+      (item) => `<div>
+        <span>${escapeHtml(String(item.label ?? ""))}</span>
+        <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+      </div>`,
+    )
+    .join("");
 
   const inputItems = input
     .map((ch, idx) => {
@@ -1541,16 +1574,16 @@ function renderStackView(step) {
   $("treeView").innerHTML = `
     <div class="stack-viz">
       <div class="stack-panel">
-        <div class="stack-title">Stack</div>
+        <div class="stack-title">${escapeHtml(String(stackTitle))}</div>
         <div class="stack-container">${stackItems}</div>
         <div class="stack-base"></div>
       </div>
       <div class="stack-side">
-        <div class="stack-status">
-          <div><span>top</span><strong>${top ? escapeHtml(String(top)) : "empty"}</strong></div>
-          <div><span>expected</span><strong>${expected ? escapeHtml(String(expected)) : "-"}</strong></div>
+        <div class="stack-status">${statusItems}</div>
+        <div>
+          ${view.inputLabel ? `<div class="stack-input-label">${escapeHtml(String(view.inputLabel))}</div>` : ""}
+          <div class="stack-input-row">${inputItems}</div>
         </div>
-        <div class="stack-input-row">${inputItems}</div>
       </div>
     </div>`;
 }
