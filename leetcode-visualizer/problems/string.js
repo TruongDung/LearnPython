@@ -922,6 +922,167 @@ function buildSteps1670(input) {
 }
 
 /**
+ * LeetCode 71: Simplify Path.
+ * Keep canonical directory names on a stack while scanning path segments.
+ */
+function buildSteps71(input) {
+  const path = String(input).trim();
+  const parts = path.split("/");
+  const displayParts = parts.map((part) => (part === "" ? '""' : part));
+  const stack = [];
+  const steps = [];
+  let part;
+
+  function canonicalPath() {
+    return `/${stack.join("/")}`;
+  }
+
+  function stackLabel() {
+    return `[${stack.map((name) => `'${name}'`).join(", ")}]`;
+  }
+
+  function partLabel() {
+    return part === undefined ? "not in scope" : `'${part}'`;
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      stackView: {
+        title: "Directory stack",
+        emptyLabel: "root only",
+        items: stack.slice(),
+        input: displayParts,
+        current,
+        inputLabel: "path.split('/')",
+        status: [
+          { label: "part", value: partLabel() },
+          { label: "canonical path", value: canonicalPath() },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "part", value: partLabel() },
+        { name: "canonical path", value: `"${canonicalPath()}"` },
+        { name: "path", value: `"${path}"` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Initialize stack", en: "Initialize stack" },
+    codeLine: 3,
+    note: {
+      vi: "Stack rong dai dien cho thu muc goc '/'. Moi ten thu muc hop le se duoc push vao stack.",
+      en: "An empty stack represents root '/'. Each valid directory name will be pushed onto the stack.",
+    },
+  });
+
+  for (let i = 0; i < parts.length; i++) {
+    part = parts[i];
+    pushStep({
+      title: { vi: `Read part ${displayParts[i]}`, en: `Read part ${displayParts[i]}` },
+      codeLine: 4,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: `path.split('/')[${i}]`, value: `'${part}'` },
+      ],
+      note: {
+        vi: `Xu ly segment thu ${i}: ${part === "" ? "empty segment" : `'${part}'`}.`,
+        en: `Process segment ${i}: ${part === "" ? "empty segment" : `'${part}'`}.`,
+      },
+    });
+
+    if (part === "" || part === ".") {
+      pushStep({
+        title: { vi: part === "" ? "Skip empty part" : "Skip '.'", en: part === "" ? "Skip empty part" : "Skip '.'" },
+        codeLine: 6,
+        current: i,
+        vars: [{ name: "action", value: "continue" }],
+        note: {
+          vi: part === ""
+            ? "Dau '/' o dau, cuoi, hoac lap lai tao empty segment; bo qua no."
+            : "'.' nghia la thu muc hien tai, nen stack khong thay doi.",
+          en: part === ""
+            ? "A leading, trailing, or repeated '/' creates an empty segment; ignore it."
+            : "'.' means the current directory, so the stack does not change.",
+        },
+      });
+      continue;
+    }
+
+    if (part === "..") {
+      if (stack.length) {
+        const before = canonicalPath();
+        const removed = stack.pop();
+        pushStep({
+          title: { vi: `Pop '${removed}'`, en: `Pop '${removed}'` },
+          codeLine: 9,
+          current: i,
+          vars: [
+            { name: "removed", value: `'${removed}'` },
+            { name: "before", value: `"${before}"` },
+            { name: "after", value: `"${canonicalPath()}"` },
+          ],
+          note: {
+            vi: `'..' quay ve thu muc cha, nen pop '${removed}' khoi stack.`,
+            en: `'..' moves to the parent directory, so pop '${removed}' from the stack.`,
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: "Stay at root", en: "Stay at root" },
+          codeLine: 8,
+          current: i,
+          vars: [{ name: "stack empty", value: true }],
+          note: {
+            vi: "Da o root '/', nen '..' khong the di len them va stack van rong.",
+            en: "Already at root '/', so '..' cannot move higher and the stack stays empty.",
+          },
+        });
+      }
+      continue;
+    }
+
+    stack.push(part);
+    pushStep({
+      title: { vi: `Push '${part}'`, en: `Push '${part}'` },
+      codeLine: 11,
+      current: i,
+      vars: [
+        { name: "directory", value: `'${part}'` },
+        { name: "action", value: "stack.append(part)" },
+      ],
+      note: {
+        vi: `'${part}' la ten thu muc hop le. Push vao stack de tao ${canonicalPath()}.`,
+        en: `'${part}' is a valid directory name. Push it to form ${canonicalPath()}.`,
+      },
+    });
+  }
+
+  const answer = canonicalPath();
+  pushStep({
+    title: { vi: `Result: "${answer}"`, en: `Result: "${answer}"` },
+    codeLine: 12,
+    current: parts.length,
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: {
+      vi: `Noi cac thu muc trong stack bang '/', sau do them '/' o dau: "${answer}".`,
+      en: `Join the stack with '/', then add the leading '/': "${answer}".`,
+    },
+    final: true,
+  });
+
+  return { path, parts, answer, steps };
+}
+
+/**
  * LeetCode 394: Decode String.
  * Save the prefix and repeat count for each nested group on a stack.
  */
@@ -1558,6 +1719,51 @@ module.exports = {
       "        return not stack",
     ],
     builder: buildSteps20,
+  },
+  71: {
+    id: 71,
+    difficulty: "medium",
+    slug: "simplify-path",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Simplify Path", en: "Simplify Path" },
+    titleVi: { vi: "Rut gon duong dan Unix", en: "Simplify a Unix path" },
+    statement: {
+      vi: "Cho mot absolute path Unix. Chuyen path ve dang canonical: mot dau '/' giua cac thu muc, bo qua '.', va '..' quay ve thu muc cha neu co the.",
+      en: "Given an absolute Unix path, convert it to its canonical form: one '/' between directories, ignore '.', and let '..' move to the parent when possible.",
+    },
+    defaultInput: "/a/./b/../../c/",
+    inputKind: "string",
+    inputLabel: { vi: "Unix path", en: "Unix path" },
+    extraParams: [],
+    approach: [
+      { vi: "Tach path theo dau '/' va duyet tung segment.", en: "Split the path by '/' and scan every segment." },
+      { vi: "Bo qua empty segment va '.'.", en: "Ignore empty segments and '.'." },
+      { vi: "Voi '..', pop thu muc gan nhat neu stack khong rong.", en: "For '..', pop the nearest directory when the stack is not empty." },
+      { vi: "Push ten thu muc binh thuong, roi join stack de tao canonical path.", en: "Push normal directory names, then join the stack to build the canonical path." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Moi ky tu va segment duoc xu ly mot lan. Stack luu toi da tat ca ten thu muc trong path.",
+        en: "Each character and segment is processed once. The stack may store every directory name in the path.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def simplifyPath(self, path: str) -> str:",
+      "        stack = []",
+      "        for part in path.split('/'):",
+      "            if part == '' or part == '.':",
+      "                continue",
+      "            if part == '..':",
+      "                if stack:",
+      "                    stack.pop()",
+      "            else:",
+      "                stack.append(part)",
+      "        return '/' + '/'.join(stack)",
+    ],
+    builder: buildSteps71,
   },
   150: {
     id: 150,
