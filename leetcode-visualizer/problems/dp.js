@@ -7340,6 +7340,7 @@ function buildSteps72Table(input, params) {
   const n = word2.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   const steps = [];
+  const charValue = (ch) => `'${ch}'`;
 
   function gridSnap(opts) {
     const hasActiveCell = Array.isArray(opts.hlCell);
@@ -7348,7 +7349,7 @@ function buildSteps72Table(input, params) {
       currentVars.push({ name: "i", value: opts.hlCell[0] });
       currentVars.push({ name: "j", value: opts.hlCell[1] });
       if (opts.hlCell[0] > 0) {
-        currentVars.push({ name: "word1[i - 1]", value: word1[opts.hlCell[0] - 1] });
+        currentVars.push({ name: "word1[i - 1]", value: charValue(word1[opts.hlCell[0] - 1]) });
       }
     }
     for (const item of opts.vars || []) {
@@ -7462,7 +7463,7 @@ function buildSteps72Table(input, params) {
       title: { vi: `Vong ngoai i=${i}`, en: `Outer loop i=${i}` },
       codeLines: [16],
       hlCell: [i, 0],
-      vars: [{ name: `word1[${i - 1}]`, value: word1[i - 1] }],
+      vars: [{ name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) }],
       note: {
         vi: `Xet word1[:${i}] = "${word1.slice(0, i)}".`,
         en: `Consider word1[:${i}] = "${word1.slice(0, i)}".`,
@@ -7477,8 +7478,8 @@ function buildSteps72Table(input, params) {
         pathCells: [[i - 1, j - 1], [i, j - 1], [i - 1, j]],
         cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
-          { name: `word1[${i - 1}]`, value: word1[i - 1] },
-          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+          { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
+          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
         ],
         note: {
           vi: `Chuan bi tinh dp[${i}][${j}] cho "${word1.slice(0, i)}" -> "${word2.slice(0, j)}".`,
@@ -7494,8 +7495,8 @@ function buildSteps72Table(input, params) {
         pathCells: [[i - 1, j - 1]],
         cellLabels: { [`${i - 1},${j - 1}`]: "dp[i-1][j-1]" },
         vars: [
-          { name: `word1[${i - 1}]`, value: word1[i - 1] },
-          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+          { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
+          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
           { name: "match", value: match },
         ],
         note: {
@@ -7576,6 +7577,7 @@ function buildSteps72Rolling(input, params) {
   let prev = Array.from({ length: n + 1 }, (_, idx) => idx);
   let curr = null;
   const blankRow = () => Array(n + 1).fill("");
+  const charValue = (ch) => `'${ch}'`;
   const colLabels = Array.from({ length: n }, (_, idx) => ({
     index: `j=${idx + 1}`,
     char: word2[idx],
@@ -7591,7 +7593,7 @@ function buildSteps72Rolling(input, params) {
       opts.i > 0 &&
       !explicitVars.some((item) => item.name === "word1[i - 1]")
     ) {
-      vars.push({ name: "word1[i - 1]", value: word1[opts.i - 1] });
+      vars.push({ name: "word1[i - 1]", value: charValue(word1[opts.i - 1]) });
     }
     for (const item of explicitVars) vars.push(item);
     const activeRow = opts.activeRow === undefined ? null : opts.activeRow;
@@ -7662,7 +7664,7 @@ function buildSteps72Rolling(input, params) {
       activeRow: 1,
       activeCol: 0,
       vars: [
-        { name: `word1[${i - 1}]`, value: word1[i - 1] },
+        { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
         { name: "prev", value: `[${prev.join(", ")}]` },
       ],
       note: {
@@ -7704,8 +7706,8 @@ function buildSteps72Rolling(input, params) {
           ? { [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" }
           : { [`1,${j}`]: "prev[j]", [`2,${j - 1}`]: "curr[j-1]", [`1,${j - 1}`]: "prev[j-1]\ndp[i-1][j-1]" },
         vars: [
-          { name: `word1[${i - 1}]`, value: word1[i - 1] },
-          { name: `word2[${j - 1}]`, value: word2[j - 1] },
+          { name: `word1[${i - 1}]`, value: charValue(word1[i - 1]) },
+          { name: `word2[${j - 1}]`, value: charValue(word2[j - 1]) },
           { name: "same", value: same },
         ],
         note: {
