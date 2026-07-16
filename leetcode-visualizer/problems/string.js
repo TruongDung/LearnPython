@@ -612,6 +612,198 @@ function buildSteps346(input) {
 }
 
 /**
+ * LeetCode 362: Design Hit Counter.
+ * Store chronological hit timestamps and discard hits older than 300 seconds.
+ */
+function buildSteps362(input) {
+  const operations = parseDequeOps641(input);
+  const startIndex = operations[0] && operations[0].name === "HitCounter" ? 1 : 0;
+  const calls = operations.slice(startIndex).filter((op) => op.name === "hit" || op.name === "getHits");
+  const operationLabels = calls.map((op) => `${op.name}(${op.args.join(", ")})`);
+  const hits = [];
+  const outputs = [null];
+  const steps = [];
+  let currentOperation = "HitCounter()";
+  let timestamp = null;
+  let expireAt = null;
+  let lastResult = null;
+  let removed = [];
+
+  function outputLabel() {
+    return `[${outputs.map((value) => value === null ? "None" : value).join(", ")}]`;
+  }
+
+  function rangeLabel() {
+    return timestamp === null ? "none" : `[${timestamp - 299}, ${timestamp}]`;
+  }
+
+  function removedLabel() {
+    return removed.length ? `[${removed.join(", ")}]` : "none";
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    steps.push({
+      title: opts.title,
+      codeLines: [opts.codeLine],
+      queueView: {
+        title: "Hits from the past 300 seconds",
+        items: hits.slice(),
+        capacity: Math.max(calls.filter((op) => op.name === "hit").length, hits.length, 1),
+        stream: operationLabels,
+        current,
+        active: Number.isInteger(opts.active) ? opts.active : -1,
+        status: [
+          { label: "operation", value: currentOperation },
+          { label: "valid range", value: rangeLabel() },
+          { label: "hit count", value: hits.length },
+          { label: "removed", value: removedLabel() },
+        ],
+      },
+      vars: [
+        { name: "hits", value: `[${hits.join(", ")}]` },
+        { name: "timestamp", value: timestamp === null ? "none" : timestamp },
+        { name: "timestamp - 300", value: expireAt === null ? "none" : `${timestamp} - 300 = ${expireAt}` },
+        { name: "len(hits)", value: hits.length },
+        { name: "removed", value: removedLabel() },
+        { name: "lastResult", value: lastResult === null ? "None" : lastResult },
+        { name: "outputs", value: outputLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khoi tao HitCounter", en: "Initialize HitCounter" },
+    codeLine: 5,
+    note: {
+      vi: "Queue ban dau rong. FRONT la hit cu nhat, REAR la hit moi nhat.",
+      en: "The queue starts empty. FRONT is the oldest hit and REAR is the newest hit.",
+    },
+  });
+
+  for (let i = 0; i < calls.length; i++) {
+    const op = calls[i];
+    timestamp = op.args[0];
+    expireAt = timestamp - 300;
+    currentOperation = operationLabels[i];
+    removed = [];
+    lastResult = null;
+
+    if (op.name === "hit") {
+      hits.push(timestamp);
+      outputs.push(null);
+      pushStep({
+        title: { vi: `Ghi nhan hit tai ${timestamp}`, en: `Record hit at ${timestamp}` },
+        codeLine: 8,
+        current: i,
+        active: hits.length - 1,
+        vars: [
+          { name: "action", value: `hits.append(${timestamp})` },
+          { name: "return", value: "None" },
+        ],
+        note: {
+          vi: `Append timestamp ${timestamp} vao REAR. hit() khong tra ve gia tri.`,
+          en: `Append timestamp ${timestamp} at REAR. hit() does not return a value.`,
+        },
+      });
+      continue;
+    }
+
+    while (hits.length && hits[0] <= expireAt) {
+      const stale = hits[0];
+      pushStep({
+        title: { vi: `${stale} <= ${expireAt}: hit da het han`, en: `${stale} <= ${expireAt}: hit expired` },
+        codeLine: 11,
+        current: i,
+        active: 0,
+        vars: [
+          { name: "hits[0]", value: stale },
+          { name: "hits[0] <= timestamp - 300", value: `${stale} <= ${expireAt} = True` },
+        ],
+        note: {
+          vi: `Hit ${stale} khong nam trong 300 giay gan nhat [${timestamp - 299}, ${timestamp}], nen phai roi FRONT.`,
+          en: `Hit ${stale} is outside the latest 300 seconds [${timestamp - 299}, ${timestamp}], so it must leave FRONT.`,
+        },
+      });
+
+      removed.push(hits.shift());
+      pushStep({
+        title: { vi: `popleft ${removed[removed.length - 1]}`, en: `Popleft ${removed[removed.length - 1]}` },
+        codeLine: 12,
+        current: i,
+        vars: [
+          { name: "popped", value: removed[removed.length - 1] },
+          { name: "action", value: "hits.popleft()" },
+        ],
+        note: {
+          vi: `Loai hit het han. Queue con lai la [${hits.join(", ")}].`,
+          en: `Remove the expired hit. The queue is now [${hits.join(", ")}].`,
+        },
+      });
+    }
+
+    const frontIsValid = hits.length > 0;
+    pushStep({
+      title: {
+        vi: frontIsValid ? `${hits[0]} > ${expireAt}: FRONT con hop le` : "Queue rong: dung loai",
+        en: frontIsValid ? `${hits[0]} > ${expireAt}: FRONT is valid` : "Queue empty: stop pruning",
+      },
+      codeLine: 11,
+      current: i,
+      active: frontIsValid ? 0 : -1,
+      vars: [
+        { name: "hits is not empty", value: frontIsValid },
+        {
+          name: "hits[0] <= timestamp - 300",
+          value: frontIsValid ? `${hits[0]} <= ${expireAt} = False` : "not evaluated",
+        },
+      ],
+      note: {
+        vi: frontIsValid
+          ? `FRONT = ${hits[0]} nam trong khoang [${timestamp - 299}, ${timestamp}], nen dung popleft.`
+          : "Khong con hit nao de kiem tra, nen vong while ket thuc.",
+        en: frontIsValid
+          ? `FRONT = ${hits[0]} is inside [${timestamp - 299}, ${timestamp}], so pruning stops.`
+          : "There are no hits left to inspect, so the while loop ends.",
+      },
+    });
+
+    lastResult = hits.length;
+    outputs.push(lastResult);
+    pushStep({
+      title: { vi: `getHits(${timestamp}) -> ${lastResult}`, en: `getHits(${timestamp}) -> ${lastResult}` },
+      codeLine: 14,
+      current: i,
+      vars: [
+        { name: "valid hits", value: `[${hits.join(", ")}]` },
+        { name: "return", value: lastResult },
+      ],
+      note: {
+        vi: `Co ${lastResult} hit trong 300 giay gan nhat [${timestamp - 299}, ${timestamp}].`,
+        en: `There are ${lastResult} hits in the latest 300 seconds [${timestamp - 299}, ${timestamp}].`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Ket qua cuoi: ${lastResult}`, en: `Final result: ${lastResult}` },
+    codeLine: 14,
+    current: calls.length,
+    final: true,
+    vars: [{ name: "all outputs", value: outputLabel() }],
+    note: {
+      vi: `Da xu ly toan bo operations. Queue cuoi cung la [${hits.join(", ")}].`,
+      en: `All operations are complete. The final queue is [${hits.join(", ")}].`,
+    },
+  });
+
+  return { operations, outputs, answer: lastResult, steps };
+}
+
+/**
  * LeetCode 933: Number of Recent Calls.
  * Keep request timestamps from the inclusive interval [t - 3000, t].
  */
@@ -4082,6 +4274,54 @@ module.exports = {
       "        return self.window_sum / len(self.queue)",
     ],
     builder: buildSteps346,
+  },
+  362: {
+    id: 362,
+    difficulty: "medium",
+    premium: true,
+    slug: "design-hit-counter",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Design Hit Counter", en: "Design Hit Counter" },
+    titleVi: { vi: "Thiet ke bo dem hit", en: "Design a hit counter" },
+    statement: {
+      vi: "Thiet ke HitCounter de ghi nhan hit theo timestamp va dem so hit trong 300 giay gan nhat.",
+      en: "Design HitCounter to record timestamped hits and count the hits received in the latest 300 seconds.",
+    },
+    defaultInput: "HitCounter(), hit(1), hit(2), hit(3), getHits(4), hit(300), getHits(300), getHits(301)",
+    inputKind: "string",
+    inputLabel: { vi: "operations", en: "operations" },
+    extraParams: [],
+    approach: [
+      { vi: "Dung deque luu timestamp cua tung hit theo thu tu tang dan.", en: "Use a deque to store each hit timestamp in chronological order." },
+      { vi: "hit(timestamp) append timestamp vao REAR trong O(1).", en: "hit(timestamp) appends the timestamp at REAR in O(1)." },
+      { vi: "getHits(timestamp) popleft trong khi FRONT <= timestamp - 300, vi cac hit do da qua 300 giay.", en: "getHits(timestamp) pops from FRONT while FRONT <= timestamp - 300 because those hits are at least 300 seconds old." },
+      { vi: "Sau khi loai, moi hit con lai nam trong [timestamp - 299, timestamp], nen dap an la len(queue).", en: "After pruning, every remaining hit lies in [timestamp - 299, timestamp], so the answer is len(queue)." },
+    ],
+    complexity: {
+      time: "O(1) amortized per operation",
+      space: "O(n)",
+      note: {
+        vi: "Moi hit duoc append va popleft toi da mot lan. Queue chi luu cac hit chua het han.",
+        en: "Each hit is appended and removed at most once. The queue stores only hits that have not expired.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class HitCounter:",
+      "    def __init__(self):",
+      "        self.hits = deque()",
+      "",
+      "    def hit(self, timestamp: int) -> None:",
+      "        self.hits.append(timestamp)",
+      "",
+      "    def getHits(self, timestamp: int) -> int:",
+      "        while self.hits and self.hits[0] <= timestamp - 300:",
+      "            self.hits.popleft()",
+      "",
+      "        return len(self.hits)",
+    ],
+    builder: buildSteps362,
   },
   933: {
     id: 933,
