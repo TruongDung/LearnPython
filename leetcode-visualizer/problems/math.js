@@ -1050,7 +1050,202 @@ function buildSteps2470(nums, params) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 3867: Sum of GCD of Formed Pairs.
+ * Build prefixGcd, sort it, then pair smallest with largest.
+ */
+function buildSteps3867(nums) {
+  const steps = [];
+  const prefixGcd = [];
+
+  function gcd(a, b) {
+    a = Math.abs(a);
+    b = Math.abs(b);
+    while (b !== 0) {
+      const t = a % b;
+      a = b;
+      b = t;
+    }
+    return a;
+  }
+
+  function vars(extra = []) {
+    return [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "prefixGcd", value: `[${prefixGcd.join(", ")}]` },
+      ...extra,
+    ];
+  }
+
+  steps.push({
+    title: { vi: "Initialize prefixGcd", en: "Initialize prefixGcd" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [5, 6],
+    vars: vars([{ name: "mx", value: 0 }]),
+    note: {
+      vi: "First build prefixGcd[i] = gcd(nums[i], max(nums[0..i])).",
+      en: "First build prefixGcd[i] = gcd(nums[i], max(nums[0..i])).",
+    },
+  });
+
+  let mx = 0;
+  for (let i = 0; i < nums.length; i++) {
+    const prevMx = mx;
+    mx = Math.max(mx, nums[i]);
+    const g = gcd(nums[i], mx);
+    prefixGcd.push(g);
+
+    steps.push({
+      title: { vi: `i=${i}: gcd(${nums[i]}, ${mx}) = ${g}`, en: `i=${i}: gcd(${nums[i]}, ${mx}) = ${g}` },
+      arr: [...nums],
+      sub: nums.map((_, idx) => `[${idx}]`),
+      highlight: [i],
+      mark: [i],
+      codeLines: [7, 8, 9],
+      vars: vars([
+        { name: "i", value: i },
+        { name: "previous mx", value: prevMx },
+        { name: "mx", value: mx },
+        { name: "nums[i]", value: nums[i] },
+        { name: "gcd(nums[i], mx)", value: g },
+      ]),
+      note: {
+        vi: `mx = max(${prevMx}, ${nums[i]}) = ${mx}; prefixGcd[${i}] = gcd(${nums[i]}, ${mx}) = ${g}.`,
+        en: `mx = max(${prevMx}, ${nums[i]}) = ${mx}; prefixGcd[${i}] = gcd(${nums[i]}, ${mx}) = ${g}.`,
+      },
+    });
+  }
+
+  const sorted = [...prefixGcd].sort((a, b) => a - b);
+  steps.push({
+    title: { vi: "Sort prefixGcd", en: "Sort prefixGcd" },
+    arr: [...sorted],
+    sub: sorted.map((_, i) => `[${i}]`),
+    highlight: sorted.map((_, i) => i),
+    mark: [],
+    codeLines: [10],
+    vars: [
+      { name: "prefixGcd before sort", value: `[${prefixGcd.join(", ")}]` },
+      { name: "prefixGcd after sort", value: `[${sorted.join(", ")}]` },
+    ],
+    note: {
+      vi: `Sort prefixGcd from [${prefixGcd.join(", ")}] to [${sorted.join(", ")}].`,
+      en: `Sort prefixGcd from [${prefixGcd.join(", ")}] to [${sorted.join(", ")}].`,
+    },
+  });
+
+  let left = 0;
+  let right = sorted.length - 1;
+  let answer = 0;
+
+  while (left < right) {
+    const g = gcd(sorted[left], sorted[right]);
+    answer += g;
+    steps.push({
+      title: { vi: `Pair ${sorted[left]} with ${sorted[right]}`, en: `Pair ${sorted[left]} with ${sorted[right]}` },
+      arr: [...sorted],
+      sub: sorted.map((_, i) => `[${i}]`),
+      highlight: [left, right],
+      mark: [left, right],
+      codeLines: [13, 14, 15],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "a", value: sorted[left] },
+        { name: "b", value: sorted[right] },
+        { name: "gcd(a, b)", value: g },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Take smallest unpaired ${sorted[left]} and largest unpaired ${sorted[right]}. gcd = ${g}; answer = ${answer}.`,
+        en: `Take smallest unpaired ${sorted[left]} and largest unpaired ${sorted[right]}. gcd = ${g}; answer = ${answer}.`,
+      },
+    });
+    left += 1;
+    right -= 1;
+  }
+
+  steps.push({
+    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    arr: [...sorted],
+    sub: sorted.map((_, i) => `[${i}]`),
+    highlight: left === right ? [left] : [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "sorted prefixGcd", value: `[${sorted.join(", ")}]` },
+      { name: "ignored middle", value: left === right ? sorted[left] : "none" },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: left === right
+        ? `n is odd, so middle value ${sorted[left]} is ignored. Return ${answer}.`
+        : `All values were paired. Return ${answer}.`,
+      en: left === right
+        ? `n is odd, so middle value ${sorted[left]} is ignored. Return ${answer}.`
+        : `All values were paired. Return ${answer}.`,
+    },
+  });
+
+  return { original: [...nums], prefixGcd, sorted, answer, steps };
+}
+
 module.exports = {
+  3867: {
+    id: 3867,
+    difficulty: "medium",
+    slug: "sum-of-gcd-of-formed-pairs",
+    category: { key: "math", vi: "Toan / De quy", en: "Math / Recursion" },
+    title: { vi: "Sum of GCD of Formed Pairs", en: "Sum of GCD of Formed Pairs" },
+    titleVi: { vi: "Tong GCD cua cac cap duoc tao", en: "Sum of GCD of formed pairs" },
+    statement: {
+      vi:
+        "Cho mang nums. Tao prefixGcd[i] = gcd(nums[i], max(nums[0..i])). Sau do sort prefixGcd, ghep phan tu nho nhat voi lon nhat va cong gcd cua tung cap. Neu n le, bo qua phan tu giua.",
+      en:
+        "Given nums. Build prefixGcd[i] = gcd(nums[i], max(nums[0..i])). Sort prefixGcd, pair the smallest with the largest, and sum the gcd of each pair. If n is odd, ignore the middle value.",
+    },
+    defaultInput: [3, 6, 2, 8],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyet nums va giu mx la max prefix hien tai.", en: "Scan nums while tracking the current prefix maximum mx." },
+      { vi: "Tinh prefixGcd[i] = gcd(nums[i], mx).", en: "Compute prefixGcd[i] = gcd(nums[i], mx)." },
+      { vi: "Sort prefixGcd tang dan.", en: "Sort prefixGcd in non-decreasing order." },
+      { vi: "Dung hai pointer de ghep nho nhat voi lon nhat, cong gcd cua moi cap.", en: "Use two pointers to pair smallest with largest and add each pair gcd." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Xay prefixGcd O(n log V) do gcd, sort O(n log n), sau do ghep cap O(n log V). Can O(n) bo nho cho prefixGcd.",
+        en: "Build prefixGcd in O(n log V) for gcd, sort in O(n log n), then pair in O(n log V). Uses O(n) memory for prefixGcd.",
+      },
+    },
+    code: [
+      "from math import gcd",
+      "",
+      "class Solution:",
+      "    def sumOfGcdPairs(self, nums):",
+      "        prefixGcd = []",
+      "        mx = 0",
+      "        for x in nums:",
+      "            mx = max(mx, x)",
+      "            prefixGcd.append(gcd(x, mx))",
+      "        prefixGcd.sort()",
+      "        answer = 0",
+      "        left, right = 0, len(prefixGcd) - 1",
+      "        while left < right:",
+      "            answer += gcd(prefixGcd[left], prefixGcd[right])",
+      "            left += 1; right -= 1",
+      "        return answer",
+    ],
+    builder: buildSteps3867,
+  },
   50: {
     id: 50,
     difficulty: "medium",
