@@ -10,6 +10,168 @@
  *  - dp[i] = min(dp[i-1] + cost[i-1], dp[i-2] + cost[i-2]).
  *  - The answer is dp[n].
  */
+function buildSteps304(input, params) {
+  const fallback = [[3, 0, 1, 4, 2], [5, 6, 3, 2, 1], [1, 2, 0, 1, 5], [4, 1, 0, 1, 7], [1, 0, 3, 0, 5]];
+  let matrix;
+  try {
+    const raw = String(input ?? "").trim();
+    matrix = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(";").map((row) => row.split(",").map((value) => Number(value.trim())));
+  } catch (_error) {
+    matrix = fallback;
+  }
+
+  const valid = Array.isArray(matrix)
+    && matrix.length > 0
+    && Array.isArray(matrix[0])
+    && matrix[0].length > 0
+    && matrix.every((row) => row.length === matrix[0].length && row.every(Number.isFinite));
+  if (!valid) matrix = fallback;
+
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const clamp = (value, max) => Math.max(0, Math.min(max, Number.parseInt(value, 10) || 0));
+  const firstRow = clamp(params && params.row1, rows - 1);
+  const firstCol = clamp(params && params.col1, cols - 1);
+  const secondRow = clamp(params && params.row2, rows - 1);
+  const secondCol = clamp(params && params.col2, cols - 1);
+  const row1 = Math.min(firstRow, secondRow);
+  const col1 = Math.min(firstCol, secondCol);
+  const row2 = Math.max(firstRow, secondRow);
+  const col2 = Math.max(firstCol, secondCol);
+  const prefix = Array.from({ length: rows + 1 }, () => Array(cols + 1).fill(0));
+  const steps = [];
+
+  const view = ({ matrixCell = null, prefixCell = null, region = null, terms = [], status = [] } = {}) => ({
+    matrix: matrix.map((row) => [...row]),
+    prefix: prefix.map((row) => [...row]),
+    matrixCell,
+    prefixCell,
+    region,
+    terms,
+    status,
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao bang prefix co vien 0", en: "Initialize a zero-padded prefix table" },
+    codeLines: [4],
+    prefix2DView: view({
+      status: [
+        { label: "matrix", value: `${rows} x ${cols}` },
+        { label: "prefix", value: `${rows + 1} x ${cols + 1}` },
+      ],
+    }),
+    vars: [{ name: "m", value: rows }, { name: "n", value: cols }, { name: "prefix", value: JSON.stringify(prefix) }],
+    note: {
+      vi: "Them mot hang va mot cot 0 de moi cong thuc deu dung, ke ca o nam tren bien.",
+      en: "The extra zero row and column keep the same formula valid at every boundary.",
+    },
+  });
+
+  for (let row = 1; row <= rows; row += 1) {
+    for (let col = 1; col <= cols; col += 1) {
+      const value = matrix[row - 1][col - 1];
+      const up = prefix[row - 1][col];
+      const left = prefix[row][col - 1];
+      const overlap = prefix[row - 1][col - 1];
+      prefix[row][col] = value + up + left - overlap;
+      steps.push({
+        title: { vi: `prefix[${row}][${col}] = ${prefix[row][col]}`, en: `prefix[${row}][${col}] = ${prefix[row][col]}` },
+        codeLines: [7],
+        prefix2DView: view({
+          matrixCell: [row - 1, col - 1],
+          prefixCell: [row, col],
+          terms: [
+            { row: row - 1, col, label: "+UP", kind: "add" },
+            { row, col: col - 1, label: "+LEFT", kind: "add" },
+            { row: row - 1, col: col - 1, label: "-DIAG", kind: "subtract" },
+          ],
+          status: [
+            { label: "matrix cell", value },
+            { label: "formula", value: `${value} + ${up} + ${left} - ${overlap}` },
+            { label: "prefix value", value: prefix[row][col] },
+          ],
+        }),
+        vars: [
+          { name: "row", value: row },
+          { name: "col", value: col },
+          { name: `matrix[${row - 1}][${col - 1}]`, value },
+          { name: `prefix[${row}][${col}]`, value: prefix[row][col] },
+        ],
+        note: {
+          vi: `${value} + tren ${up} + trai ${left} - phan giao ${overlap} = ${prefix[row][col]}.`,
+          en: `${value} + up ${up} + left ${left} - overlap ${overlap} = ${prefix[row][col]}.`,
+        },
+      });
+    }
+  }
+
+  const region = { row1, col1, row2, col2 };
+  const queryTerms = [
+    { row: row2 + 1, col: col2 + 1, label: "+BR", kind: "add" },
+    { row: row1, col: col2 + 1, label: "-TOP", kind: "subtract" },
+    { row: row2 + 1, col: col1, label: "-LEFT", kind: "subtract" },
+    { row: row1, col: col1, label: "+OVR", kind: "add" },
+  ];
+  const bottomRight = prefix[row2 + 1][col2 + 1];
+  const above = prefix[row1][col2 + 1];
+  const left = prefix[row2 + 1][col1];
+  const overlap = prefix[row1][col1];
+  const answer = bottomRight - above - left + overlap;
+  const queryVars = [
+    { name: "row1", value: row1 }, { name: "col1", value: col1 },
+    { name: "row2", value: row2 }, { name: "col2", value: col2 },
+  ];
+
+  [
+    { line: 15, title: "bottom_right", value: bottomRight },
+    { line: 16, title: "above", value: above },
+    { line: 17, title: "left", value: left },
+    { line: 18, title: "overlap", value: overlap },
+  ].forEach((item, index) => {
+    steps.push({
+      title: { vi: `${item.title} = ${item.value}`, en: `${item.title} = ${item.value}` },
+      codeLines: [item.line],
+      prefix2DView: view({
+        region,
+        terms: queryTerms.slice(0, index + 1),
+        status: [
+          { label: "query", value: `(${row1},${col1}) -> (${row2},${col2})` },
+          { label: item.title, value: item.value },
+        ],
+      }),
+      vars: [...queryVars, { name: item.title, value: item.value }],
+      note: {
+        vi: "Moi goc cua bang prefix them hoac bot mot hinh chu nhat lon.",
+        en: "Each prefix-table corner adds or removes one larger rectangle.",
+      },
+    });
+  });
+
+  steps.push({
+    title: { vi: `Ket qua sumRegion = ${answer}`, en: `sumRegion result = ${answer}` },
+    codeLines: [19],
+    prefix2DView: view({
+      region,
+      terms: queryTerms,
+      status: [
+        { label: "region", value: `(${row1},${col1}) -> (${row2},${col2})` },
+        { label: "formula", value: `${bottomRight} - ${above} - ${left} + ${overlap}` },
+        { label: "result", value: answer },
+      ],
+    }),
+    vars: [...queryVars, { name: "result", value: answer }],
+    note: {
+      vi: `Lay ${bottomRight} - ${above} - ${left} + ${overlap} = ${answer}. Truy van chi can 4 o prefix nen la O(1).`,
+      en: `${bottomRight} - ${above} - ${left} + ${overlap} = ${answer}. The query reads four prefix cells, so it is O(1).`,
+    },
+    final: true,
+  });
+
+  return { steps, answer };
+}
+
 function buildSteps746(cost, params) {
   const approach = (params && params.approach) || 1;
   if (approach === 2) return buildSteps746B(cost);
@@ -11217,7 +11379,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 304, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11352,6 +11514,60 @@ module.exports = {
           "This is a popular path for tech interviews. After mastering these 20, you'll know the core patterns: Fibonacci, Take/Skip, Kadane, LIS, Knapsack, String DP, Grid DP and 2D DP. Next, advanced patterns: Bitmask DP, Interval DP, Tree DP, Digit DP.",
       },
     },
+  },
+
+  304: {
+    id: 304,
+    difficulty: "medium",
+    slug: "range-sum-query-2d-immutable",
+    category: { key: "dp", vi: "Quy hoach dong", en: "Dynamic Programming" },
+    title: { vi: "Range Sum Query 2D - Immutable", en: "Range Sum Query 2D - Immutable" },
+    titleVi: { vi: "Tong vung 2D bat bien", en: "Immutable 2D range sums" },
+    statement: {
+      vi: "Cho ma tran 2D khong thay doi. Thiet ke NumMatrix de tra ve tong cac phan tu trong hinh chu nhat tu (row1, col1) den (row2, col2).",
+      en: "Given an immutable 2D matrix, design NumMatrix to return the sum inside the rectangle from (row1, col1) to (row2, col2).",
+    },
+    defaultInput: "[[3,0,1,4,2],[5,6,3,2,1],[1,2,0,1,5],[4,1,0,1,7],[1,0,3,0,5]]",
+    inputKind: "string",
+    inputLabel: { vi: "matrix (JSON hoac cac hang cach nhau bang ;)", en: "matrix (JSON or semicolon-separated rows)" },
+    extraParams: [
+      { key: "row1", type: "number", label: { vi: "row1", en: "row1" }, default: 2 },
+      { key: "col1", type: "number", label: { vi: "col1", en: "col1" }, default: 1 },
+      { key: "row2", type: "number", label: { vi: "row2", en: "row2" }, default: 4 },
+      { key: "col2", type: "number", label: { vi: "col2", en: "col2" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Tao bang prefix co them mot hang va mot cot 0.", en: "Build a prefix table with one extra zero row and column." },
+      { vi: "prefix[r][c] la tong hinh chu nhat tu goc (0,0) den matrix[r-1][c-1].", en: "prefix[r][c] stores the rectangle sum from (0,0) through matrix[r-1][c-1]." },
+      { vi: "sumRegion = goc duoi-phai - phia tren - ben trai + phan giao bi tru hai lan.", en: "sumRegion = bottom-right - above - left + the overlap subtracted twice." },
+    ],
+    complexity: {
+      time: "O(m*n) build, O(1) query",
+      space: "O(m*n)",
+      note: { vi: "Moi truy van chi doc bon o trong bang prefix.", en: "Each query reads exactly four prefix-table cells." },
+    },
+    code: [
+      "class NumMatrix:",
+      "    def __init__(self, matrix):",
+      "        m, n = len(matrix), len(matrix[0])",
+      "        self.prefix = [[0] * (n + 1) for _ in range(m + 1)]",
+      "        for row in range(1, m + 1):",
+      "            for col in range(1, n + 1):",
+      "                self.prefix[row][col] = (",
+      "                    matrix[row - 1][col - 1]",
+      "                    + self.prefix[row - 1][col]",
+      "                    + self.prefix[row][col - 1]",
+      "                    - self.prefix[row - 1][col - 1]",
+      "                )",
+      "",
+      "    def sumRegion(self, row1: int, col1: int, row2: int, col2: int) -> int:",
+      "        bottom_right = self.prefix[row2 + 1][col2 + 1]",
+      "        above = self.prefix[row1][col2 + 1]",
+      "        left = self.prefix[row2 + 1][col1]",
+      "        overlap = self.prefix[row1][col1]",
+      "        return bottom_right - above - left + overlap",
+    ],
+    builder: buildSteps304,
   },
 
   10: {

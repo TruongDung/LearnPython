@@ -1681,6 +1681,75 @@ function renderSentenceView(step) {
     </div>`;
 }
 
+function renderPrefix2DView(step) {
+  const view = step.prefix2DView || {};
+  const matrix = Array.isArray(view.matrix) ? view.matrix : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const terms = Array.isArray(view.terms) ? view.terms : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const region = view.region || null;
+  const matrixCell = Array.isArray(view.matrixCell) ? view.matrixCell : null;
+  const prefixCell = Array.isArray(view.prefixCell) ? view.prefixCell : null;
+
+  const termMap = new Map();
+  terms.forEach((term) => {
+    const key = `${term.row}:${term.col}`;
+    const previous = termMap.get(key);
+    termMap.set(key, previous
+      ? { ...term, kind: previous.kind === term.kind ? term.kind : "mixed", label: `${previous.label}, ${term.label}` }
+      : term);
+  });
+
+  const table = (values, type) => {
+    const rowCount = values.length;
+    const colCount = rowCount && Array.isArray(values[0]) ? values[0].length : 0;
+    const cells = [`<div class="prefix2d-axis corner"></div>`];
+    for (let col = 0; col < colCount; col += 1) {
+      cells.push(`<div class="prefix2d-axis">c${col}</div>`);
+    }
+    for (let row = 0; row < rowCount; row += 1) {
+      cells.push(`<div class="prefix2d-axis">r${row}</div>`);
+      for (let col = 0; col < colCount; col += 1) {
+        const classes = ["prefix2d-cell"];
+        let badge = "";
+        if (type === "matrix") {
+          if (region && row >= region.row1 && row <= region.row2 && col >= region.col1 && col <= region.col2) classes.push("in-region");
+          if (matrixCell && row === matrixCell[0] && col === matrixCell[1]) classes.push("active");
+        } else {
+          const term = termMap.get(`${row}:${col}`);
+          if (prefixCell && row === prefixCell[0] && col === prefixCell[1]) classes.push("active");
+          if (term) {
+            classes.push(`term-${term.kind}`);
+            badge = `<small>${escapeHtml(String(term.label))}</small>`;
+          }
+        }
+        cells.push(`<div class="${classes.join(" ")}"><strong>${escapeHtml(String(values[row][col]))}</strong>${badge}</div>`);
+      }
+    }
+    return `<div class="prefix2d-table" style="grid-template-columns: 30px repeat(${colCount}, minmax(0, 1fr))">${cells.join("")}</div>`;
+  };
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="prefix2d-viz">
+      <div class="prefix2d-panels">
+        <section>
+          <div class="prefix2d-heading">Matrix</div>
+          ${table(matrix, "matrix")}
+        </section>
+        <section>
+          <div class="prefix2d-heading">Prefix sum (padded)</div>
+          ${table(prefix, "prefix")}
+        </section>
+      </div>
+      <div class="prefix2d-status">${statusItems}</div>
+    </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -1740,6 +1809,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSentenceView(step);
+  } else if (step.prefix2DView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefix2DView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
