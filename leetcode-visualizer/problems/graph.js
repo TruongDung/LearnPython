@@ -3491,6 +3491,12 @@ function buildSteps2492(input, params) {
  * DFS each component, count nodes and total degree, then check completeness.
  */
 function buildSteps2685(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps2685Recursive(input, params);
+  return buildSteps2685Iterative(input, params);
+}
+
+function buildSteps2685Iterative(input, params) {
   const n = params && params.n !== undefined ? Number(params.n) : 6;
   const edgeList = String(input || "")
     .split(";")
@@ -3812,6 +3818,307 @@ function buildSteps2685(input, params) {
   });
 
   return { n, edges: edgeList, answer: count, steps };
+}
+
+/**
+ * LeetCode 2685, approach 2: recursive DFS.
+ * Each DFS call returns the component's node count and degree sum.
+ */
+function buildSteps2685Recursive(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 6;
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((edge) => edge.length === 2 && !edge.some(Number.isNaN));
+  const steps = [];
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, id) => id);
+  const allEdges = [];
+
+  function visitedNodes(visited) {
+    return allNodes.filter((id) => visited[id]);
+  }
+
+  function makeGraph(hlNodes = [], hlEdges = [], visited = []) {
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visited,
+    };
+  }
+
+  function push({ title, hlNodes, hlEdges, visited, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visited),
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: DFS đệ quy trả về (số đỉnh, tổng bậc)", en: "Idea: recursive DFS returns (node count, degree sum)" },
+    codeLines: [2],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edgeList.length }],
+    note: {
+      vi: "Mỗi lời gọi dfs(node) xử lý một nhánh chưa thăm và trả về số đỉnh cùng tổng bậc của nhánh đó.",
+      en: "Each dfs(node) call processes an unvisited branch and returns its node count and degree sum.",
+    },
+  });
+
+  push({
+    title: { vi: "graph = [[] for _ in range(n)]", en: "graph = [[] for _ in range(n)]" },
+    codeLines: [3],
+    vars: [{ name: "graph", value: `${n} danh sách rỗng` }],
+    note: { vi: `Tạo adjacency list rỗng cho ${n} đỉnh.`, en: `Create an empty adjacency list for ${n} nodes.` },
+  });
+
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `Vòng lặp: a, b = ${a}, ${b}`, en: `Loop: a, b = ${a}, ${b}` },
+      hlNodes: [a, b],
+      codeLines: [4],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cạnh vô hướng (${a}, ${b}).`, en: `Process undirected edge (${a}, ${b}).` },
+    });
+    adj[a].push(b);
+    push({
+      title: { vi: `graph[${a}].append(${b})`, en: `graph[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [5],
+      vars: [{ name: `graph[${a}]`, value: `[${adj[a].join(", ")}]` }],
+      note: { vi: `Thêm ${b} vào danh sách kề của ${a}.`, en: `Add ${b} to ${a}'s adjacency list.` },
+    });
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "" });
+    push({
+      title: { vi: `graph[${b}].append(${a})`, en: `graph[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [6],
+      vars: [{ name: `graph[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm ${a} vào danh sách kề của ${b}.`, en: `Add ${a} to ${b}'s adjacency list.` },
+    });
+  }
+
+  const visited = new Array(n).fill(false);
+  let ans = 0;
+  push({
+    title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+    codeLines: [7],
+    vars: [{ name: "visited", value: `[${visited.map(() => "F").join(", ")}]` }],
+    note: { vi: "Ban đầu chưa thăm đỉnh nào.", en: "Initially, no node has been visited." },
+  });
+  push({
+    title: { vi: "ans = 0", en: "ans = 0" },
+    codeLines: [8],
+    vars: [{ name: "ans", value: ans }],
+    note: { vi: "ans đếm số complete components.", en: "ans counts complete components." },
+  });
+  push({
+    title: { vi: "Định nghĩa dfs(node)", en: "Define dfs(node)" },
+    codeLines: [9],
+    vars: [{ name: "dfs", value: "returns (nodes, degree_sum)" }],
+    note: { vi: "Hàm DFS sẽ trả về số đỉnh và tổng bậc của phần đồ thị nó duyệt.", en: "The DFS function returns the node count and degree sum of its traversal." },
+  });
+
+  function dfs(node, depth) {
+    visited[node] = true;
+    push({
+      title: { vi: `dfs(${node}): visited[${node}] = True`, en: `dfs(${node}): visited[${node}] = True` },
+      hlNodes: [node],
+      visited: visitedNodes(visited),
+      codeLines: [10],
+      vars: [{ name: "node", value: node }, { name: "depth", value: depth }],
+      note: { vi: `Đánh dấu ${node} đã thăm để không DFS lại qua cạnh ngược.`, en: `Mark ${node} visited so reverse edges do not recurse again.` },
+    });
+
+    let nodes = 1;
+    push({
+      title: { vi: `dfs(${node}): nodes = 1`, en: `dfs(${node}): nodes = 1` },
+      hlNodes: [node],
+      visited: visitedNodes(visited),
+      codeLines: [11],
+      vars: [{ name: "nodes", value: nodes }, { name: "node", value: node }],
+      note: { vi: `Lời gọi dfs(${node}) tự chứa đỉnh ${node}, nên bắt đầu với 1 đỉnh.`, en: `The dfs(${node}) call contains node ${node}, so start with one node.` },
+    });
+
+    let degreeSum = adj[node].length;
+    push({
+      title: { vi: `degree_sum = len(graph[${node}]) = ${degreeSum}`, en: `degree_sum = len(graph[${node}]) = ${degreeSum}` },
+      hlNodes: [node],
+      hlEdges: adj[node].map((neighbor) => [node, neighbor]),
+      visited: visitedNodes(visited),
+      codeLines: [12],
+      vars: [{ name: "degree_sum", value: degreeSum }, { name: `degree(${node})`, value: adj[node].length }],
+      note: { vi: `Cộng toàn bộ bậc của ${node}: có ${adj[node].length} hàng xóm.`, en: `Start with node ${node}'s full degree: ${adj[node].length} neighbors.` },
+    });
+
+    for (const neighbor of adj[node]) {
+      push({
+        title: { vi: `for nei in graph[${node}]: nei = ${neighbor}`, en: `for nei in graph[${node}]: nei = ${neighbor}` },
+        hlNodes: [node, neighbor],
+        hlEdges: [[node, neighbor]],
+        visited: visitedNodes(visited),
+        codeLines: [13],
+        vars: [{ name: "node", value: node }, { name: "nei", value: neighbor }],
+        note: { vi: `Duyệt hàng xóm ${neighbor} của ${node}.`, en: `Inspect neighbor ${neighbor} of ${node}.` },
+      });
+
+      if (visited[neighbor]) {
+        push({
+          title: { vi: `visited[${neighbor}] = True → không DFS lại`, en: `visited[${neighbor}] = True → do not recurse` },
+          hlNodes: [node, neighbor],
+          hlEdges: [[node, neighbor]],
+          visited: visitedNodes(visited),
+          codeLines: [14],
+          vars: [{ name: "visited[nei]", value: true }],
+          note: { vi: `${neighbor} đã được tính trong lời gọi DFS trước đó, nên bỏ qua để tránh vòng lặp.`, en: `${neighbor} was counted by an earlier DFS call, so skip it to avoid a cycle.` },
+        });
+        continue;
+      }
+
+      push({
+        title: { vi: `visited[${neighbor}] = False → DFS vào ${neighbor}`, en: `visited[${neighbor}] = False → recurse into ${neighbor}` },
+        hlNodes: [node, neighbor],
+        hlEdges: [[node, neighbor]],
+        visited: visitedNodes(visited),
+        codeLines: [14],
+        vars: [{ name: "visited[nei]", value: false }],
+        note: { vi: `${neighbor} chưa thăm, nên sẽ gọi DFS đệ quy.`, en: `${neighbor} is unvisited, so recurse into it.` },
+      });
+      push({
+        title: { vi: `x, y = dfs(${neighbor})`, en: `x, y = dfs(${neighbor})` },
+        hlNodes: [neighbor],
+        hlEdges: [[node, neighbor]],
+        visited: visitedNodes(visited),
+        codeLines: [15],
+        vars: [{ name: "x, y", value: "đợi dfs trả về" }, { name: "depth", value: depth + 1 }],
+        note: { vi: `Tạm dừng dfs(${node}) và đi sâu vào dfs(${neighbor}).`, en: `Pause dfs(${node}) and descend into dfs(${neighbor}).` },
+      });
+      const child = dfs(neighbor, depth + 1);
+      nodes += child.nodes;
+      push({
+        title: { vi: `nodes += x → ${nodes}`, en: `nodes += x → ${nodes}` },
+        hlNodes: [node],
+        visited: visitedNodes(visited),
+        codeLines: [16],
+        vars: [{ name: "x", value: child.nodes }, { name: "nodes", value: nodes }],
+        note: { vi: `dfs(${neighbor}) trả x = ${child.nodes} đỉnh; cộng vào lời gọi dfs(${node}).`, en: `dfs(${neighbor}) returned x = ${child.nodes} nodes; add them into dfs(${node}).` },
+      });
+      degreeSum += child.degreeSum;
+      push({
+        title: { vi: `degree_sum += y → ${degreeSum}`, en: `degree_sum += y → ${degreeSum}` },
+        hlNodes: [node],
+        visited: visitedNodes(visited),
+        codeLines: [17],
+        vars: [{ name: "y", value: child.degreeSum }, { name: "degree_sum", value: degreeSum }],
+        note: { vi: `dfs(${neighbor}) trả y = ${child.degreeSum}; cộng tổng bậc của nhánh con.`, en: `dfs(${neighbor}) returned y = ${child.degreeSum}; add its degree sum.` },
+      });
+    }
+
+    push({
+      title: { vi: `return (${nodes}, ${degreeSum})`, en: `return (${nodes}, ${degreeSum})` },
+      hlNodes: [node],
+      visited: visitedNodes(visited),
+      codeLines: [18],
+      vars: [{ name: "nodes", value: nodes }, { name: "degree_sum", value: degreeSum }],
+      note: { vi: `dfs(${node}) hoàn tất và trả về hai giá trị cho lời gọi cha.`, en: `dfs(${node}) finishes and returns both values to its caller.` },
+    });
+    return { nodes, degreeSum };
+  }
+
+  for (let i = 0; i < n; i++) {
+    push({
+      title: { vi: `for i in range(n): i = ${i}`, en: `for i in range(n): i = ${i}` },
+      hlNodes: [i],
+      visited: visitedNodes(visited),
+      codeLines: [19],
+      vars: [{ name: "i", value: i }, { name: "visited[i]", value: visited[i] }],
+      note: { vi: `Xét đỉnh ${i} để xem nó có mở đầu một component mới không.`, en: `Check whether node ${i} starts a new component.` },
+    });
+    if (visited[i]) {
+      push({
+        title: { vi: `visited[${i}] = True → bỏ qua`, en: `visited[${i}] = True → skip` },
+        hlNodes: [i],
+        visited: visitedNodes(visited),
+        codeLines: [20],
+        vars: [{ name: "visited[i]", value: true }],
+        note: { vi: `${i} đã thuộc component đã xử lý.`, en: `${i} already belongs to a processed component.` },
+      });
+      continue;
+    }
+
+    push({
+      title: { vi: `visited[${i}] = False → component mới`, en: `visited[${i}] = False → new component` },
+      hlNodes: [i],
+      visited: visitedNodes(visited),
+      codeLines: [20],
+      vars: [{ name: "visited[i]", value: false }],
+      note: { vi: `Bắt đầu DFS đệ quy từ ${i}.`, en: `Start recursive DFS from ${i}.` },
+    });
+    push({
+      title: { vi: `nodes, degree_sum = dfs(${i})`, en: `nodes, degree_sum = dfs(${i})` },
+      hlNodes: [i],
+      visited: visitedNodes(visited),
+      codeLines: [21],
+      vars: [{ name: "dfs root", value: i }],
+      note: { vi: `Gọi DFS. Các bước tiếp theo đi vào thân hàm dfs rồi mới quay lại dòng này.`, en: `Call DFS. The next steps enter dfs before returning to this assignment.` },
+    });
+    const component = dfs(i, 0);
+    const edgeCount = component.degreeSum / 2;
+    push({
+      title: { vi: `edge_count = ${component.degreeSum} // 2 = ${edgeCount}`, en: `edge_count = ${component.degreeSum} // 2 = ${edgeCount}` },
+      hlNodes: allNodes.filter((id) => visited[id]),
+      visited: visitedNodes(visited),
+      codeLines: [22],
+      vars: [{ name: "degree_sum", value: component.degreeSum }, { name: "edge_count", value: edgeCount }],
+      note: { vi: `Mỗi cạnh bị tính hai lần trong degree_sum, một lần ở mỗi đầu mút.`, en: `Each edge appears twice in degree_sum, once from each endpoint.` },
+    });
+    const requiredEdges = component.nodes * (component.nodes - 1) / 2;
+    const complete = edgeCount === requiredEdges;
+    push({
+      title: { vi: `${edgeCount} == ${component.nodes}·(${component.nodes}-1)//2? ${complete ? "✓" : "✗"}`, en: `${edgeCount} == ${component.nodes}·(${component.nodes}-1)//2? ${complete ? "✓" : "✗"}` },
+      hlNodes: allNodes.filter((id) => visited[id]),
+      visited: visitedNodes(visited),
+      codeLines: [23],
+      vars: [{ name: "nodes", value: component.nodes }, { name: "edge_count", value: edgeCount }, { name: "cần có", value: requiredEdges }],
+      note: complete
+        ? { vi: `Component có đủ ${requiredEdges} cạnh cho ${component.nodes} đỉnh → complete.`, en: `The component has all ${requiredEdges} required edges for ${component.nodes} nodes → complete.` }
+        : { vi: `Component chỉ có ${edgeCount} cạnh, cần ${requiredEdges} → không complete.`, en: `The component has ${edgeCount} edges but needs ${requiredEdges} → not complete.` },
+    });
+    if (complete) {
+      ans++;
+      push({
+        title: { vi: `ans += 1 → ${ans}`, en: `ans += 1 → ${ans}` },
+        visited: visitedNodes(visited),
+        codeLines: [24],
+        vars: [{ name: "ans", value: ans }],
+        note: { vi: "Tăng đáp án vì component này đầy đủ.", en: "Increment the answer because this component is complete." },
+      });
+    }
+  }
+
+  push({
+    title: { vi: `return ${ans}`, en: `return ${ans}` },
+    visited: visitedNodes(visited),
+    codeLines: [25],
+    vars: [{ name: "answer", value: ans }],
+    final: true,
+    note: { vi: `Có ${ans} complete component(s).`, en: `There are ${ans} complete component(s).` },
+  });
+  return { n, edges: edgeList, answer: ans, steps };
 }
 
 /**
@@ -4603,6 +4910,10 @@ module.exports = {
     inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
     extraParams: [
       { key: "n", label: { vi: "n (số đỉnh)", en: "n (vertices)" }, default: 6 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" } },
+        { value: "2", label: { vi: "Cách 2: DFS đệ quy trả về (nodes, degree_sum)", en: "Approach 2: Recursive DFS returning (nodes, degree_sum)" } },
+      ] },
     ],
     approach: [
       { vi: "Xây adjacency list. DFS từ mỗi đỉnh chưa thăm để tìm 1 component.", en: "Build adjacency list. DFS from each unvisited node to find a component." },
@@ -4645,6 +4956,35 @@ module.exports = {
       "                    count += 1",
       "        return count",
     ],
+    code2: [
+      "class Solution:",
+      "    def countCompleteComponents(self, n, edges):",
+      "        graph = [[] for _ in range(n)]",
+      "        for a, b in edges:",
+      "            graph[a].append(b)",
+      "            graph[b].append(a)",
+      "        visited = [False] * n",
+      "        ans = 0",
+      "        def dfs(node):",
+      "            visited[node] = True",
+      "            nodes = 1",
+      "            degree_sum = len(graph[node])",
+      "            for nei in graph[node]:",
+      "                if not visited[nei]:",
+      "                    x, y = dfs(nei)",
+      "                    nodes += x",
+      "                    degree_sum += y",
+      "            return nodes, degree_sum",
+      "        for i in range(n):",
+      "            if not visited[i]:",
+      "                nodes, degree_sum = dfs(i)",
+      "                edge_count = degree_sum // 2",
+      "                if edge_count == nodes * (nodes - 1) // 2:",
+      "                    ans += 1",
+      "        return ans",
+    ],
+    codeLabel: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" },
+    code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
   },
   695: {
