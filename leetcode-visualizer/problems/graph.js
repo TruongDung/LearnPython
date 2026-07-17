@@ -5024,7 +5024,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 694, 994, 130, 2685, 1971, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 695, 694, 994, 130, 2685, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5349,7 +5349,7 @@ module.exports = {
     id: 1971,
     difficulty: "easy",
     slug: "find-if-path-exists-in-graph",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Find if Path Exists in Graph", en: "Find if Path Exists in Graph" },
     titleVi: { vi: "Kiểm tra tồn tại đường đi trong đồ thị", en: "Check if a path exists in the graph" },
     statement: {
