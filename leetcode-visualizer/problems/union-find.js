@@ -35,7 +35,13 @@ const UF_CAT = { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU
 // 24                  if isConnected[i][j]:
 // 25                      uf.union(i, j)
 // 26          return uf.components
-function buildSteps547(input) {
+function buildSteps547(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps547DFS(input);
+  return buildSteps547UnionFind(input);
+}
+
+function buildSteps547UnionFind(input) {
   // Accept both [[1,0],[0,1]] and "1,0;0,1" formats
   const raw = String(input).trim();
   let matrix;
@@ -310,6 +316,218 @@ function buildSteps547(input) {
   steps.push(fs);
 
   return { input, answer: components, steps };
+}
+
+// ─── 547, approach 2: recursive DFS ───
+// Line-by-line trace of the exact Python code shown to the user:
+//  1  class Solution:
+//  2      def findCircleNum(self, isConnected):
+//  3          n = len(isConnected)
+//  4          count = 0
+//  5          visited = [False for _ in range(n)]
+//  6          def dfs(curr):
+//  7              visited[curr] = True
+//  8              for next in range(n):
+//  9                  if isConnected[curr][next] == 1:
+// 10                      if not visited[next]:
+// 11                          dfs(next)
+// 12          for i in range(n):
+// 13              if not visited[i]:
+// 14                  dfs(i)
+// 15                  count += 1
+// 16          return count
+function buildSteps547DFS(input) {
+  const raw = String(input).trim();
+  let matrix;
+  if (raw.startsWith("[")) {
+    try {
+      matrix = JSON.parse(raw);
+    } catch (e) {
+      matrix = raw.replace(/^\[|\]$/g, "").split("],[").map((row) => row.replace(/\[|\]/g, "").split(",").map(Number));
+    }
+  } else {
+    matrix = raw.split(";").map((row) => row.split(",").map((s) => Number(s.trim())));
+  }
+  const n = matrix.length;
+  const steps = [];
+
+  const visited = new Array(n).fill(false);
+  const componentId = new Array(n).fill(0);
+  let count = 0;
+  const addedSet = new Set(); // "u-v" edges revealed as we DFS
+
+  function graphSnap({ hlNodes = [], hlEdges = [], title, note, vars, codeLines }) {
+    const gNodes = Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) }));
+    const gEdges = [];
+    for (const key of addedSet) {
+      const [u, v] = key.split("-").map(Number);
+      gEdges.push({ u, v, w: "" });
+    }
+    return {
+      title,
+      arr: [],
+      graph: { nodes: gNodes, edges: gEdges, hlNodes, hlEdges, visitedNodes: visited.map((v, i) => (v ? i : -1)).filter((x) => x >= 0) },
+      highlight: [],
+      mark: [],
+      codeBlock: 2,
+      codeLines,
+      vars: vars || [],
+      note,
+    };
+  }
+  function push(opts) { steps.push(graphSnap(opts)); }
+
+  // Line 3: n = len(isConnected)
+  push({
+    title: { vi: "n = len(isConnected)", en: "n = len(isConnected)" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }],
+    note: { vi: `Có ${n} thành phố.`, en: `There are ${n} cities.` },
+  });
+
+  // Line 4: count = 0
+  push({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [4],
+    vars: [{ name: "count", value: count }],
+    note: { vi: "Biến đếm số tỉnh.", en: "Counter for the number of provinces." },
+  });
+
+  // Line 5: visited = [False for _ in range(n)]
+  push({
+    title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+    codeLines: [5],
+    vars: [{ name: "visited", value: `[${visited.map(() => "F").join(", ")}]` }],
+    note: { vi: "Chưa thăm thành phố nào.", en: "No city visited yet." },
+  });
+
+  push({
+    title: { vi: "Định nghĩa dfs(curr)", en: "Define dfs(curr)" },
+    codeLines: [6],
+    vars: [],
+    note: { vi: "Hàm DFS đệ quy sẽ quét hết 1 component chứa curr.", en: "The recursive DFS function will explore the whole component containing curr." },
+  });
+
+  function dfs(curr, comp) {
+    // Line 7: visited[curr] = True
+    visited[curr] = true;
+    componentId[curr] = comp;
+    push({
+      title: { vi: `dfs(${curr}): visited[${curr}] = True`, en: `dfs(${curr}): visited[${curr}] = True` },
+      hlNodes: [curr],
+      codeLines: [7],
+      vars: [{ name: "curr", value: curr }],
+      note: { vi: `Đánh dấu ${curr} đã thăm, thuộc tỉnh #${comp}.`, en: `Mark ${curr} visited, part of province #${comp}.` },
+    });
+
+    for (let next = 0; next < n; next++) {
+      // Line 8: for next in range(n)
+      push({
+        title: { vi: `dfs(${curr}): for next in range(n): next = ${next}`, en: `dfs(${curr}): for next in range(n): next = ${next}` },
+        hlNodes: [curr, next],
+        codeLines: [8],
+        vars: [{ name: "curr", value: curr }, { name: "next", value: next }],
+        note: { vi: `Xét thành phố ${next} như hàng xóm tiềm năng của ${curr}.`, en: `Check city ${next} as a potential neighbor of ${curr}.` },
+      });
+
+      // Line 9: if isConnected[curr][next] == 1
+      const connected = matrix[curr][next] === 1;
+      push({
+        title: { vi: `isConnected[${curr}][${next}] == 1? ${connected}`, en: `isConnected[${curr}][${next}] == 1? ${connected}` },
+        hlNodes: [curr, next],
+        codeLines: [9],
+        vars: [{ name: `isConnected[${curr}][${next}]`, value: matrix[curr][next] }],
+        note: {
+          vi: connected ? `${curr} và ${next} kết nối trực tiếp.` : `${curr} và ${next} không kết nối trực tiếp → bỏ qua.`,
+          en: connected ? `${curr} and ${next} are directly connected.` : `${curr} and ${next} are not directly connected → skip.`,
+        },
+      });
+      if (!connected) continue;
+
+      // Line 10: if not visited[next]
+      const already = visited[next];
+      push({
+        title: { vi: `not visited[${next}]? ${!already}`, en: `not visited[${next}]? ${!already}` },
+        hlNodes: [curr, next],
+        hlEdges: [[curr, next]],
+        codeLines: [10],
+        vars: [{ name: `visited[${next}]`, value: already }],
+        note: {
+          vi: already ? `${next} đã thăm → không đệ quy lại.` : `${next} chưa thăm → đệ quy vào ${next}.`,
+          en: already ? `${next} already visited → do not recurse again.` : `${next} unvisited → recurse into ${next}.`,
+        },
+      });
+      if (already) continue;
+
+      addedSet.add(`${Math.min(curr, next)}-${Math.max(curr, next)}`);
+      // Line 11: dfs(next)
+      push({
+        title: { vi: `dfs(${next})`, en: `dfs(${next})` },
+        hlNodes: [curr, next],
+        hlEdges: [[curr, next]],
+        codeLines: [11],
+        vars: [{ name: "calling", value: next }],
+        note: { vi: `Tạm dừng dfs(${curr}), đi sâu vào dfs(${next}).`, en: `Pause dfs(${curr}), descend into dfs(${next}).` },
+      });
+      dfs(next, comp);
+    }
+  }
+
+  // Line 12-15: for i in range(n)
+  for (let i = 0; i < n; i++) {
+    push({
+      title: { vi: `for i in range(n): i = ${i}`, en: `for i in range(n): i = ${i}` },
+      hlNodes: [i],
+      codeLines: [12],
+      vars: [{ name: "i", value: i }, { name: "count", value: count }],
+      note: { vi: `Xét thành phố ${i}.`, en: `Consider city ${i}.` },
+    });
+
+    // Line 13: if not visited[i]
+    const already = visited[i];
+    push({
+      title: { vi: `not visited[${i}]? ${!already}`, en: `not visited[${i}]? ${!already}` },
+      hlNodes: [i],
+      codeLines: [13],
+      vars: [{ name: `visited[${i}]`, value: already }],
+      note: {
+        vi: already ? `${i} đã thuộc một tỉnh xử lý trước → bỏ qua.` : `${i} chưa thăm → bắt đầu tỉnh mới.`,
+        en: already ? `${i} already belongs to a processed province → skip.` : `${i} unvisited → start a new province.`,
+      },
+    });
+    if (already) continue;
+
+    // Line 14: dfs(i)
+    push({
+      title: { vi: `dfs(${i})`, en: `dfs(${i})` },
+      hlNodes: [i],
+      codeLines: [14],
+      vars: [{ name: "calling", value: i }],
+      note: { vi: `Gọi DFS để quét hết tỉnh chứa ${i}.`, en: `Call DFS to explore the whole province containing ${i}.` },
+    });
+    dfs(i, count + 1);
+
+    // Line 15: count += 1
+    count++;
+    push({
+      title: { vi: `count += 1 → ${count}`, en: `count += 1 → ${count}` },
+      codeLines: [15],
+      vars: [{ name: "count", value: count }],
+      note: { vi: `Vừa quét xong tỉnh #${count}.`, en: `Just finished exploring province #${count}.` },
+    });
+  }
+
+  // Line 16: return count
+  const fs = graphSnap({
+    title: { vi: `return count → ${count}`, en: `return count → ${count}` },
+    codeLines: [16],
+    vars: [{ name: "answer", value: count }],
+    note: { vi: `Duyệt hết ${n} thành phố. Có ${count} tỉnh.`, en: `Scanned all ${n} cities. There are ${count} province(s).` },
+  });
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer: count, steps };
 }
 
 // ─── 1258: Synonymous Sentences ───
@@ -1531,7 +1749,12 @@ module.exports = {
     defaultInput: "[[1,1,0],[1,1,0],[0,0,1]]",
     inputKind: "string",
     inputLabel: { vi: "Ma trận kề dạng [[1,1,0],[1,1,0],[0,0,1]]", en: "Adjacency matrix e.g. [[1,1,0],[1,1,0],[0,0,1]]" },
-    extraParams: [],
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Union-Find (DSU)", en: "Approach 1: Union-Find (DSU)" } },
+        { value: "2", label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" } },
+      ] },
+    ],
     approach: [
       { vi: "Union-Find (DSU): mỗi thành phố bắt đầu là 1 tỉnh riêng (parent[i]=i).", en: "Union-Find (DSU): each city starts as its own province (parent[i]=i)." },
       { vi: "Duyệt ma trận: nếu isConnected[i][j]=1 → Union(i, j), gộp 2 nhóm lại, giảm đếm components.", en: "Scan matrix: if isConnected[i][j]=1 → Union(i,j), merge two groups, decrement component count." },
@@ -1574,6 +1797,26 @@ module.exports = {
       "                    uf.union(i, j)",
       "        return uf.components",
     ],
+    code2: [
+      "class Solution:",
+      "    def findCircleNum(self, isConnected):",
+      "        n = len(isConnected)",
+      "        count = 0",
+      "        visited = [False for _ in range(n)]",
+      "        def dfs(curr):",
+      "            visited[curr] = True",
+      "            for next in range(n):",
+      "                if isConnected[curr][next] == 1:",
+      "                    if not visited[next]:",
+      "                        dfs(next)",
+      "        for i in range(n):",
+      "            if not visited[i]:",
+      "                dfs(i)",
+      "                count += 1",
+      "        return count",
+    ],
+    codeLabel: { vi: "Cách 1: Union-Find (DSU)", en: "Approach 1: Union-Find (DSU)" },
+    code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps547,
   },
   1258: {
