@@ -4156,6 +4156,7 @@ module.exports = {
   694: {
     id: 694,
     difficulty: "medium",
+    premium: true,
     slug: "number-of-distinct-islands",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "Number of Distinct Islands", en: "Number of Distinct Islands" },
