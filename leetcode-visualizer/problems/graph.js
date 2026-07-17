@@ -3485,6 +3485,336 @@ function buildSteps2492(input, params) {
 }
 
 /**
+ * LeetCode 2685: Count the Number of Complete Components.
+ * A connected component with k nodes is COMPLETE iff it has k*(k-1)/2 edges,
+ * i.e. sum of degrees inside the component == k*(k-1).
+ * DFS each component, count nodes and total degree, then check completeness.
+ */
+function buildSteps2685(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 6;
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !isNaN(e[0]) && !isNaN(e[1]));
+
+  const steps = [];
+
+  // Adjacency list
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, i) => i);
+  const allEdges = [];
+
+  function makeGraph(hlNodes, hlEdges, visitedNodes) {
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  function push({ title, hlNodes, hlEdges, visitedNodes, codeLines, vars, note, final }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visitedNodes),
+      highlight: [],
+      mark: [],
+      final: final || false,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  // ── Intro (line 2) ──
+  push({
+    title: { vi: "Ý tưởng: component đầy đủ", en: "Idea: complete component" },
+    codeLines: [2],
+    vars: [
+      { name: "n", value: n },
+      { name: "edges", value: edgeList.length },
+    ],
+    note: {
+      vi:
+        `Một component có k đỉnh là ĐẦY ĐỦ nếu mọi cặp đỉnh đều có cạnh → đúng k·(k-1)/2 cạnh.\n` +
+        `Mẹo: tổng bậc các đỉnh trong component = 2·(số cạnh). Nên component đầy đủ khi tổng bậc == k·(k-1).\n` +
+        `DFS từng component, đếm số đỉnh k và tổng bậc, rồi kiểm tra.`,
+      en:
+        `A component with k nodes is COMPLETE if every pair has an edge → exactly k·(k-1)/2 edges.\n` +
+        `Trick: sum of degrees inside = 2·(edge count). So complete ⟺ total degree == k·(k-1).\n` +
+        `DFS each component, count nodes k and total degree, then check.`,
+    },
+  });
+
+  // ── Line 3: adj = [[] for _ in range(n)] ──
+  push({
+    title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
+    codeLines: [3],
+    vars: [{ name: "adj", value: `${n} danh sách rỗng` }],
+    note: { vi: `Tạo adjacency list rỗng cho ${n} đỉnh.`, en: `Create an empty adjacency list for ${n} nodes.` },
+  });
+
+  // ── Lines 4-6: build adjacency (per edge, line by line) ──
+  for (const [a, b] of edgeList) {
+    // Line 4: for a, b in edges
+    push({
+      title: { vi: `Cạnh (${a},${b})`, en: `Edge (${a},${b})` },
+      hlNodes: [a, b],
+      codeLines: [4],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cạnh (${a},${b}). Thêm vào adjacency list cả 2 chiều.`, en: `Process edge (${a},${b}). Add to adjacency list both ways.` },
+    });
+
+    // Line 5: adj[a].append(b)
+    adj[a].push(b);
+    push({
+      title: { vi: `adj[${a}].append(${b})`, en: `adj[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [5],
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }],
+      note: { vi: `Thêm ${b} vào danh sách kề của ${a}.`, en: `Add ${b} to ${a}'s neighbor list.` },
+    });
+
+    // Line 6: adj[b].append(a)
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "" });
+    push({
+      title: { vi: `adj[${b}].append(${a})`, en: `adj[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [6],
+      vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm ${a} vào danh sách kề của ${b}. Cạnh (${a},${b}) đã xong.`, en: `Add ${a} to ${b}'s neighbor list. Edge (${a},${b}) done.` },
+    });
+  }
+
+  const visited = new Array(n).fill(false);
+  let count = 0;
+
+  // ── Line 7: visited = [False]*n ──
+  push({
+    title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+    codeLines: [7],
+    vars: [{ name: "visited", value: `[${visited.map(() => "F").join(",")}]` }],
+    note: { vi: `Mảng đánh dấu đỉnh đã thăm, ban đầu tất cả False.`, en: `Visited flags, all False initially.` },
+  });
+
+  // ── Line 8: count = 0 ──
+  push({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [8],
+    vars: [{ name: "count", value: 0 }],
+    note: { vi: `Biến đếm số component đầy đủ.`, en: `Counter for complete components.` },
+  });
+
+  // ── Line 9-24: main loop ──
+  for (let i = 0; i < n; i++) {
+    // Line 9: for i in range(n)
+    push({
+      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
+      hlNodes: [i],
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [9],
+      vars: [{ name: "i", value: i }, { name: "visited[i]", value: visited[i] }],
+      note: { vi: `Xét đỉnh ${i}.`, en: `Consider node ${i}.` },
+    });
+
+    // Line 10: if not visited[i]
+    if (visited[i]) {
+      push({
+        title: { vi: `visited[${i}] = True → bỏ qua`, en: `visited[${i}] = True → skip` },
+        hlNodes: [i],
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [10],
+        vars: [{ name: "visited[i]", value: true }],
+        note: { vi: `Đỉnh ${i} đã thuộc một component xử lý trước → bỏ qua.`, en: `Node ${i} already belongs to a processed component → skip.` },
+      });
+      continue;
+    }
+
+    push({
+      title: { vi: `visited[${i}] = False → component mới`, en: `visited[${i}] = False → new component` },
+      hlNodes: [i],
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [10],
+      vars: [{ name: "visited[i]", value: false }],
+      note: { vi: `Đỉnh ${i} chưa thăm → bắt đầu DFS một component mới.`, en: `Node ${i} unvisited → start DFS for a new component.` },
+    });
+
+    // Line 11: nodes, total_deg = [], 0
+    const compNodes = [];
+    let totalDeg = 0;
+    push({
+      title: { vi: "nodes, total_deg = [], 0", en: "nodes, total_deg = [], 0" },
+      hlNodes: [i],
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [11],
+      vars: [{ name: "nodes", value: "[]" }, { name: "total_deg", value: 0 }],
+      note: { vi: `Khởi tạo danh sách đỉnh và tổng bậc cho component này.`, en: `Init node list and total degree for this component.` },
+    });
+
+    // Line 12: stack = [i]
+    const stack = [i];
+    push({
+      title: { vi: `stack = [${i}]`, en: `stack = [${i}]` },
+      hlNodes: [i],
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [12],
+      vars: [{ name: "stack", value: `[${i}]` }],
+      note: { vi: `Đưa đỉnh gốc ${i} vào stack DFS.`, en: `Push start node ${i} onto the DFS stack.` },
+    });
+
+    // Line 13: visited[i] = True
+    visited[i] = true;
+    push({
+      title: { vi: `visited[${i}] = True`, en: `visited[${i}] = True` },
+      hlNodes: [i],
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [13],
+      vars: [{ name: "visited[i]", value: true }],
+      note: { vi: `Đánh dấu đỉnh gốc ${i} đã thăm.`, en: `Mark start node ${i} visited.` },
+    });
+
+    // DFS: while stack
+    while (stack.length) {
+      // Line 15: cur = stack.pop()
+      const cur = stack.pop();
+      push({
+        title: { vi: `cur = stack.pop() = ${cur}`, en: `cur = stack.pop() = ${cur}` },
+        hlNodes: [cur],
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [15],
+        vars: [{ name: "cur", value: cur }, { name: "stack", value: `[${stack.join(", ")}]` }],
+        note: { vi: `Lấy đỉnh ${cur} ra khỏi stack để xử lý.`, en: `Pop node ${cur} from the stack to process.` },
+      });
+
+      // Line 16: nodes.append(cur)
+      compNodes.push(cur);
+      push({
+        title: { vi: `nodes.append(${cur})`, en: `nodes.append(${cur})` },
+        hlNodes: compNodes.slice(),
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [16],
+        vars: [{ name: "nodes", value: `[${compNodes.join(", ")}]` }],
+        note: { vi: `Thêm ${cur} vào component hiện tại.`, en: `Add ${cur} to the current component.` },
+      });
+
+      // Line 17: total_deg += len(adj[cur])
+      const deg = adj[cur].length;
+      totalDeg += deg;
+      push({
+        title: { vi: `total_deg += len(adj[${cur}]) = +${deg} → ${totalDeg}`, en: `total_deg += len(adj[${cur}]) = +${deg} → ${totalDeg}` },
+        hlNodes: [cur],
+        hlEdges: adj[cur].map((nb) => [cur, nb]),
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [17],
+        vars: [
+          { name: `bậc(${cur})`, value: deg },
+          { name: "total_deg", value: totalDeg },
+        ],
+        note: { vi: `Đỉnh ${cur} có bậc ${deg} (${adj[cur].length ? "kề " + adj[cur].join(",") : "không kề ai"}). Cộng vào total_deg = ${totalDeg}.`, en: `Node ${cur} has degree ${deg}. Add to total_deg = ${totalDeg}.` },
+      });
+
+      // Line 18-21: scan neighbors
+      const pushed = [];
+      for (const nb of adj[cur]) {
+        if (!visited[nb]) {
+          visited[nb] = true;
+          stack.push(nb);
+          pushed.push(nb);
+        }
+      }
+      push({
+        title: { vi: `Duyệt hàng xóm của ${cur}`, en: `Scan neighbors of ${cur}` },
+        hlNodes: [cur, ...pushed],
+        hlEdges: adj[cur].map((nb) => [cur, nb]),
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [18, 19, 20, 21],
+        vars: [
+          { name: "neighbors", value: `[${adj[cur].join(", ")}]` },
+          { name: "mới thăm & push", value: pushed.length ? `[${pushed.join(", ")}]` : "(không có)" },
+          { name: "stack", value: `[${stack.join(", ")}]` },
+        ],
+        note: {
+          vi: `Với mỗi hàng xóm chưa thăm của ${cur}: đánh dấu visited và push vào stack. ${pushed.length ? "Đã push: " + pushed.join(", ") : "Không có hàng xóm mới."}`,
+          en: `For each unvisited neighbor of ${cur}: mark visited and push. ${pushed.length ? "Pushed: " + pushed.join(", ") : "No new neighbors."}`,
+        },
+      });
+    }
+
+    // Line 22: k = len(nodes)
+    const k = compNodes.length;
+    push({
+      title: { vi: `k = len(nodes) = ${k}`, en: `k = len(nodes) = ${k}` },
+      hlNodes: compNodes.slice(),
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [22],
+      vars: [
+        { name: "component", value: `[${compNodes.join(", ")}]` },
+        { name: "k (số đỉnh)", value: k },
+        { name: "total_deg", value: totalDeg },
+      ],
+      note: { vi: `Component gồm ${k} đỉnh: [${compNodes.join(", ")}]. Tổng bậc = ${totalDeg}.`, en: `Component has ${k} nodes: [${compNodes.join(", ")}]. Total degree = ${totalDeg}.` },
+    });
+
+    // Line 23: if total_deg == k*(k-1)
+    const need = k * (k - 1);
+    const complete = totalDeg === need;
+    push({
+      title: { vi: `total_deg == k·(k-1)? ${totalDeg} == ${need}? ${complete ? "✓" : "✗"}`, en: `total_deg == k·(k-1)? ${totalDeg} == ${need}? ${complete ? "✓" : "✗"}` },
+      hlNodes: compNodes.slice(),
+      hlEdges: allEdges.filter((e) => compNodes.includes(e.u) && compNodes.includes(e.v)).map((e) => [e.u, e.v]),
+      visitedNodes: allNodes.filter((x) => visited[x]),
+      codeLines: [23],
+      vars: [
+        { name: "total_deg", value: totalDeg },
+        { name: "k·(k-1)", value: `${k}·${k - 1} = ${need}` },
+        { name: "đầy đủ?", value: complete },
+      ],
+      note: {
+        vi: complete
+          ? `${totalDeg} == ${need} → ĐẦY ĐỦ! Component này có đủ ${need / 2} cạnh (mọi cặp đều nối).`
+          : `${totalDeg} ≠ ${need} → KHÔNG đầy đủ. Có ${totalDeg / 2} cạnh, cần ${need / 2}.`,
+        en: complete
+          ? `${totalDeg} == ${need} → COMPLETE! It has all ${need / 2} edges (every pair connected).`
+          : `${totalDeg} ≠ ${need} → NOT complete. Has ${totalDeg / 2} edges, needs ${need / 2}.`,
+      },
+    });
+
+    // Line 24: count += 1 (if complete)
+    if (complete) {
+      count++;
+      push({
+        title: { vi: `count += 1 → ${count}`, en: `count += 1 → ${count}` },
+        hlNodes: compNodes.slice(),
+        visitedNodes: allNodes.filter((x) => visited[x]),
+        codeLines: [24],
+        vars: [{ name: "count", value: count }],
+        note: { vi: `Component đầy đủ → tăng count = ${count}.`, en: `Complete component → increment count = ${count}.` },
+      });
+    }
+  }
+
+  // ── Line 25: return count ──
+  push({
+    title: { vi: `Kết quả: ${count} component đầy đủ`, en: `Result: ${count} complete components` },
+    hlNodes: [],
+    visitedNodes: allNodes,
+    codeLines: [25],
+    vars: [{ name: "answer", value: count }],
+    final: true,
+    note: { vi: `Có ${count} component đầy đủ trong đồ thị.`, en: `There are ${count} complete components in the graph.` },
+  });
+
+  return { n, edges: edgeList, answer: count, steps };
+}
+
+/**
  * LeetCode 694: Number of Distinct Islands.
  * DFS each island; record its shape as relative coordinates from the start.
  * Two islands are the same if their (translated) shapes match → use a set.
@@ -4029,7 +4359,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 694, 994, 130, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 695, 694, 994, 130, 2685, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -4252,6 +4582,70 @@ module.exports = {
       "        return len(seen)",
     ],
     builder: buildStepsDistinctIslands,
+  },
+  2685: {
+    id: 2685,
+    difficulty: "medium",
+    slug: "count-the-number-of-complete-components",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Count the Number of Complete Components", en: "Count the Number of Complete Components" },
+    titleVi: { vi: "Đếm số component đầy đủ", en: "Count complete connected components" },
+    statement: {
+      vi:
+        "Cho n đỉnh (0..n-1) và danh sách cạnh không hướng. Một connected component gọi là ĐẦY ĐỦ nếu mọi cặp đỉnh trong đó đều có cạnh nối (tức component có đúng k·(k-1)/2 cạnh với k đỉnh). " +
+        "Đếm số component đầy đủ. Nhập cạnh: 'a,b' cách bởi ';'.",
+      en:
+        "Given n vertices (0..n-1) and an undirected edge list. A connected component is COMPLETE if every pair of its vertices is connected by an edge (i.e. it has exactly k·(k-1)/2 edges for k vertices). " +
+        "Return the number of complete components. Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;0,2;1,2;3,4;3,5",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số đỉnh)", en: "n (vertices)" }, default: 6 },
+    ],
+    approach: [
+      { vi: "Xây adjacency list. DFS từ mỗi đỉnh chưa thăm để tìm 1 component.", en: "Build adjacency list. DFS from each unvisited node to find a component." },
+      { vi: "Trong lúc DFS, đếm số đỉnh k và TỔNG BẬC của component.", en: "During DFS, count nodes k and the component's TOTAL DEGREE." },
+      { vi: "Tổng bậc = 2·(số cạnh). Component đầy đủ khi total_deg == k·(k-1).", en: "Total degree = 2·(edge count). Complete when total_deg == k·(k-1)." },
+      { vi: "Đáp án = số component thỏa điều kiện.", en: "Answer = number of components satisfying the condition." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n + E)",
+      note: {
+        vi: "Xây adjacency list O(E). DFS thăm mỗi đỉnh/cạnh đúng 1 lần → O(n+E).",
+        en: "Build adjacency list O(E). DFS visits each node/edge once → O(n+E).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countCompleteComponents(self, n, edges):",
+      "        adj = [[] for _ in range(n)]",
+      "        for a, b in edges:",
+      "            adj[a].append(b)",
+      "            adj[b].append(a)",
+      "        visited = [False] * n",
+      "        count = 0",
+      "        for i in range(n):",
+      "            if not visited[i]:",
+      "                nodes, total_deg = [], 0",
+      "                stack = [i]",
+      "                visited[i] = True",
+      "                while stack:",
+      "                    cur = stack.pop()",
+      "                    nodes.append(cur)",
+      "                    total_deg += len(adj[cur])",
+      "                    for nb in adj[cur]:",
+      "                        if not visited[nb]:",
+      "                            visited[nb] = True",
+      "                            stack.append(nb)",
+      "                k = len(nodes)",
+      "                if total_deg == k * (k - 1):",
+      "                    count += 1",
+      "        return count",
+    ],
+    builder: buildSteps2685,
   },
   695: {
     id: 695,
