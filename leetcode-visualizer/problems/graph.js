@@ -4944,6 +4944,8 @@ module.exports = {
       "                components += 1",
       "        return components - 1",
     ],
+    builder: buildSteps1319DFS,
+  },
   2492: {
     id: 2492,
     difficulty: "medium",
