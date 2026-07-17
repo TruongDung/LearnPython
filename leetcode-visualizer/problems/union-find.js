@@ -6,6 +6,7 @@
 //   - mark      = nodes that are roots (green)
 
 const UF_CAT = { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" };
+const DFS_CAT = { key: "dfs", vi: "DFS", en: "DFS" };
 
 // ─── 547: Number of Provinces ───
 // Line-by-line trace of the exact Python code shown to the user:
@@ -1739,7 +1740,7 @@ module.exports = {
     id: 547,
     difficulty: "medium",
     slug: "number-of-provinces",
-    category: UF_CAT,
+    category: DFS_CAT,
     title: { vi: "Number of Provinces", en: "Number of Provinces" },
     titleVi: { vi: "Số lượng tỉnh (Union-Find)", en: "Number of connected components" },
     statement: {
