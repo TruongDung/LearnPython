@@ -358,7 +358,9 @@ function buildSteps200(input) {
 
 /**
  * LeetCode 695: Max Area of Island.
- * Flood-fill every unvisited land component and keep the largest component size.
+ * Recursive DFS: dfs(r, c) marks the cell visited (sets it to 0) and returns
+ * 1 + the area collected from all 4 neighbors. The outer loop keeps the max.
+ * Matches the exact recursive code shown to the user, one code line per step.
  */
 function buildSteps695(input) {
   const grid = parseIslandGrid(input);
@@ -370,21 +372,22 @@ function buildSteps695(input) {
       arr: [],
       bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
       final: true,
-      codeLines: [4, 5],
+      codeLines: [3],
       vars: [{ name: "answer", value: 0 }],
       note: {
         vi: "Grid phải gồm 0/1. Ví dụ: 00100|01110|00100 hoặc 0,0,1,0,0|0,1,1,1,0.",
         en: "Grid must contain 0/1. Example: 00100|01110|00100 or 0,0,1,0,0|0,1,1,1,0.",
       },
     });
-    return { original, answer: 0, steps };
+    return { original: grid, answer: 0, steps };
   }
 
   const rows = grid.length;
   const cols = grid[0].length;
-  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  // work[r][c]: same mutation the code performs (land 1 -> 0 once visited).
+  const work = grid.map((row) => row.map((v) => Number(v)));
+  const consumed = Array.from({ length: rows }, () => Array(cols).fill(false)); // land cell already dfs'd (for coloring)
   const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
-  const queued = new Set();
   const key = (r, c) => `${r},${c}`;
 
   function makeCells(current, bestCells = new Set()) {
@@ -393,12 +396,11 @@ function buildSteps695(input) {
         const cellKey = key(r, c);
         let cls = cell === "0" ? "wall" : "empty";
         let label = cell;
-        if (visited[r][c]) {
+        if (consumed[r][c]) {
           cls = "visited";
           label = String(islandId[r][c]);
         }
         if (bestCells.has(cellKey)) cls = "path";
-        if (queued.has(cellKey)) cls = "queued";
         if (current && current[0] === r && current[1] === c) cls = "current";
         return { label, cls };
       })
@@ -419,148 +421,225 @@ function buildSteps695(input) {
     });
   }
 
+  // Line 3: m, n = len(grid), len(grid[0])
   pushStep({
-    title: { vi: "Quét grid và tìm đảo lớn nhất", en: "Scan grid and find the largest island" },
-    codeLines: [4, 5, 6],
-    vars: [
-      { name: "rows", value: rows },
-      { name: "cols", value: cols },
-      { name: "max_area", value: 0 },
-    ],
-    note: {
-      vi: "Tương tự Number of Islands, nhưng thay vì chỉ đếm đảo, ta đếm diện tích từng đảo và giữ diện tích lớn nhất.",
-      en: "Like Number of Islands, but instead of only counting components, count each island area and keep the maximum.",
-    },
+    title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
+    note: { vi: `Lưới có ${rows} dòng, ${cols} cột.`, en: `The grid has ${rows} rows, ${cols} columns.` },
   });
 
-  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  // Line 4: max_area = 0
   let maxArea = 0;
+  pushStep({
+    title: { vi: "max_area = 0", en: "max_area = 0" },
+    codeLines: [4],
+    vars: [{ name: "max_area", value: maxArea }],
+    note: { vi: "Biến lưu diện tích đảo lớn nhất tìm được.", en: "Tracks the largest island area found so far." },
+  });
+
+  const DIRS = [
+    { dr: 1, dc: 0, label: "dfs(r+1, c)" },
+    { dr: -1, dc: 0, label: "dfs(r-1, c)" },
+    { dr: 0, dc: 1, label: "dfs(r, c+1)" },
+    { dr: 0, dc: -1, label: "dfs(r, c-1)" },
+  ];
+
   let island = 0;
   let bestCells = new Set();
+  let currentIslandCells = [];
+
+  function dfs(r, c, depth) {
+    // Line 7: boundary check
+    const outOfBounds = r < 0 || r === rows || c < 0 || c === cols;
+    pushStep({
+      title: { vi: `dfs(${r},${c}): kiểm tra biên`, en: `dfs(${r},${c}): boundary check` },
+      current: outOfBounds ? null : [r, c],
+      codeLines: [7],
+      vars: [{ name: "r,c", value: `${r},${c}` }, { name: "out of bounds?", value: outOfBounds }],
+      note: {
+        vi: outOfBounds ? `(${r},${c}) nằm ngoài lưới.` : `(${r},${c}) nằm trong lưới, tiếp tục kiểm tra.`,
+        en: outOfBounds ? `(${r},${c}) is outside the grid.` : `(${r},${c}) is inside the grid, keep checking.`,
+      },
+    });
+    if (outOfBounds) {
+      // Line 8: return 0
+      pushStep({
+        title: { vi: "return 0 (ngoài biên)", en: "return 0 (out of bounds)" },
+        bestCells,
+        codeLines: [8],
+        vars: [{ name: "returns", value: 0 }],
+        note: { vi: "Ngoài lưới không đóng góp diện tích.", en: "Outside the grid contributes no area." },
+      });
+      return 0;
+    }
+
+    // Line 9: if grid[r][c] == 0
+    const isWaterOrVisited = work[r][c] === 0;
+    pushStep({
+      title: { vi: `dfs(${r},${c}): grid[r][c] == 0?`, en: `dfs(${r},${c}): grid[r][c] == 0?` },
+      current: [r, c],
+      bestCells,
+      codeLines: [9],
+      vars: [{ name: "grid[r][c]", value: work[r][c] }],
+      note: {
+        vi: isWaterOrVisited ? `(${r},${c}) là nước hoặc đã thăm.` : `(${r},${c}) là đất chưa thăm.`,
+        en: isWaterOrVisited ? `(${r},${c}) is water or already visited.` : `(${r},${c}) is unvisited land.`,
+      },
+    });
+    if (isWaterOrVisited) {
+      // Line 10: return 0
+      pushStep({
+        title: { vi: "return 0 (nước / đã thăm)", en: "return 0 (water / already visited)" },
+        current: [r, c],
+        bestCells,
+        codeLines: [10],
+        vars: [{ name: "returns", value: 0 }],
+        note: { vi: "Không đếm lại ô này.", en: "Do not count this cell again." },
+      });
+      return 0;
+    }
+
+    // Line 11: grid[r][c] = 0  (mark visited)
+    work[r][c] = 0;
+    consumed[r][c] = true;
+    islandId[r][c] = island;
+    currentIslandCells.push(key(r, c));
+    pushStep({
+      title: { vi: `grid[${r}][${c}] = 0 (đánh dấu đã thăm)`, en: `grid[${r}][${c}] = 0 (mark visited)` },
+      current: [r, c],
+      bestCells,
+      codeLines: [11],
+      vars: [{ name: "grid[r][c]", value: 0 }],
+      note: { vi: `Đánh dấu (${r},${c}) đã thăm, thuộc đảo #${island}.`, en: `Mark (${r},${c}) visited, part of island #${island}.` },
+    });
+
+    // Line 12: return 1 + dfs(...) x4 — walk through the single line step by step.
+    let total = 1;
+    pushStep({
+      title: { vi: "total = 1 (tính cả ô hiện tại)", en: "total = 1 (count this cell)" },
+      current: [r, c],
+      bestCells,
+      codeLines: [12],
+      vars: [{ name: "total", value: total }],
+      note: { vi: `Ô (${r},${c}) tự đóng góp 1 vào diện tích.`, en: `Cell (${r},${c}) contributes 1 to the area by itself.` },
+    });
+
+    for (const { dr, dc, label } of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Gọi ${label}`, en: `Call ${label}` },
+        current: [r, c],
+        bestCells,
+        codeLines: [12],
+        vars: [{ name: "calling", value: `(${nr}, ${nc})` }, { name: "total so far", value: total }],
+        note: { vi: `Đệ quy tiếp vào (${nr},${nc}).`, en: `Recurse into (${nr},${nc}).` },
+      });
+      const child = dfs(nr, nc, depth + 1);
+      total += child;
+      pushStep({
+        title: { vi: `${label} trả về ${child} → total = ${total}`, en: `${label} returned ${child} → total = ${total}` },
+        current: [r, c],
+        bestCells,
+        codeLines: [12],
+        vars: [{ name: "returned", value: child }, { name: "total", value: total }],
+        note: { vi: `Cộng kết quả từ (${nr},${nc}) vào total.`, en: `Add the result from (${nr},${nc}) into total.` },
+      });
+    }
+
+    pushStep({
+      title: { vi: `return ${total}`, en: `return ${total}` },
+      current: [r, c],
+      bestCells,
+      codeLines: [12],
+      vars: [{ name: "returns", value: total }],
+      note: { vi: `dfs(${r},${c}) hoàn tất, trả về diện tích ${total}.`, en: `dfs(${r},${c}) finishes, returning area ${total}.` },
+    });
+    return total;
+  }
 
   for (let r = 0; r < rows; r++) {
+    // Line 14: for r in range(m)
+    pushStep({
+      title: { vi: `for r in range(m): r = ${r}`, en: `for r in range(m): r = ${r}` },
+      bestCells,
+      codeLines: [14],
+      vars: [{ name: "r", value: r }, { name: "max_area", value: maxArea }],
+      note: { vi: `Xét dòng ${r}.`, en: `Scan row ${r}.` },
+    });
+
     for (let c = 0; c < cols; c++) {
-      if (grid[r][c] !== "1" || visited[r][c]) continue;
-
-      island++;
-      let area = 0;
-      const cells = [];
-      const stack = [[r, c]];
-      visited[r][c] = true;
-      islandId[r][c] = island;
-      queued.add(key(r, c));
-
+      // Line 15: for c in range(n)
       pushStep({
-        title: { vi: `Bắt đầu đảo #${island}`, en: `Start island #${island}` },
+        title: { vi: `for c in range(n): c = ${c}`, en: `for c in range(n): c = ${c}` },
         current: [r, c],
-        codeLines: [7, 8, 9, 10],
-        vars: [
-          { name: "start", value: `(${r}, ${c})` },
-          { name: "area", value: area },
-          { name: "max_area", value: maxArea },
-        ],
-        note: {
-          vi: `Gặp đất chưa thăm tại (${r},${c}). Bắt đầu DFS để đo diện tích đảo #${island}.`,
-          en: `Found unvisited land at (${r},${c}). Start DFS to measure island #${island}.`,
-        },
+        bestCells,
+        codeLines: [15],
+        vars: [{ name: "c", value: c }, { name: "grid[r][c]", value: work[r][c] }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Check cell (${r},${c}).` },
       });
 
-      while (stack.length) {
-        const [cr, cc] = stack.pop();
-        queued.delete(key(cr, cc));
-        area++;
-        cells.push(key(cr, cc));
+      // Line 16: if grid[r][c] == 1
+      const isLand = work[r][c] === 1;
+      pushStep({
+        title: { vi: `grid[${r}][${c}] == 1?`, en: `grid[${r}][${c}] == 1?` },
+        current: [r, c],
+        bestCells,
+        codeLines: [16],
+        vars: [{ name: "grid[r][c]", value: work[r][c] }, { name: "is land?", value: isLand }],
+        note: {
+          vi: isLand ? `(${r},${c}) là đất chưa thăm → bắt đầu đo đảo mới.` : `(${r},${c}) là nước hoặc đã thăm → bỏ qua.`,
+          en: isLand ? `(${r},${c}) is unvisited land → start measuring a new island.` : `(${r},${c}) is water or visited → skip.`,
+        },
+      });
+      if (!isLand) continue;
 
-        pushStep({
-          title: { vi: `Đếm ô (${cr},${cc}) → area = ${area}`, en: `Count cell (${cr},${cc}) → area = ${area}` },
-          current: [cr, cc],
-          codeLines: [11, 12, 13],
-          vars: [
-            { name: "current", value: `(${cr}, ${cc})` },
-            { name: "area", value: area },
-            { name: "stack size", value: stack.length },
-            { name: "max_area", value: maxArea },
-          ],
-          note: {
-            vi: `Mỗi ô đất trong DFS đóng góp 1 vào diện tích. Đảo #${island} hiện có area = ${area}.`,
-            en: `Each land cell reached by DFS contributes 1 to area. Island #${island} now has area = ${area}.`,
-          },
-        });
+      island++;
+      currentIslandCells = [];
 
-        for (const [dr, dc] of dirs) {
-          const nr = cr + dr;
-          const nc = cc + dc;
-          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-          if (grid[nr][nc] !== "1" || visited[nr][nc]) continue;
+      // Line 17: area = dfs(r, c)
+      pushStep({
+        title: { vi: `area = dfs(${r}, ${c})`, en: `area = dfs(${r}, ${c})` },
+        current: [r, c],
+        bestCells,
+        codeLines: [17],
+        vars: [{ name: "island", value: island }],
+        note: { vi: `Gọi DFS để đo diện tích đảo #${island} bắt đầu từ (${r},${c}).`, en: `Call DFS to measure island #${island} starting at (${r},${c}).` },
+      });
+      const area = dfs(r, c, 0);
+      pushStep({
+        title: { vi: `area = ${area}`, en: `area = ${area}` },
+        bestCells,
+        codeLines: [17],
+        vars: [{ name: "area", value: area }, { name: "island", value: island }],
+        note: { vi: `dfs trả về diện tích đảo #${island} = ${area}.`, en: `dfs returned island #${island}'s area = ${area}.` },
+      });
 
-          visited[nr][nc] = true;
-          islandId[nr][nc] = island;
-          stack.push([nr, nc]);
-          queued.add(key(nr, nc));
-
-          pushStep({
-            title: { vi: `Thêm ô kề (${nr},${nc})`, en: `Add adjacent cell (${nr},${nc})` },
-            current: [nr, nc],
-            codeLines: [14, 15, 16, 17, 18],
-            vars: [
-              { name: "from", value: `(${cr}, ${cc})` },
-              { name: "neighbor", value: `(${nr}, ${nc})` },
-              { name: "area", value: area },
-              { name: "stack size", value: stack.length },
-            ],
-            note: {
-              vi: `(${nr},${nc}) là đất nối 4 hướng và chưa thăm, nên sẽ được tính vào cùng đảo #${island}.`,
-              en: `(${nr},${nc}) is 4-directionally connected unvisited land, so it will count toward island #${island}.`,
-            },
-          });
-        }
-      }
-
-      if (area > maxArea) {
-        maxArea = area;
-        bestCells = new Set(cells);
-        pushStep({
-          title: { vi: `Cập nhật max_area = ${maxArea}`, en: `Update max_area = ${maxArea}` },
-          bestCells,
-          codeLines: [19],
-          vars: [
-            { name: "island", value: island },
-            { name: "area", value: area },
-            { name: "max_area", value: maxArea },
-          ],
-          note: {
-            vi: `Đảo #${island} có diện tích ${area}, lớn hơn kết quả cũ. Lưu lại làm đảo lớn nhất hiện tại.`,
-            en: `Island #${island} has area ${area}, larger than the previous best. Save it as the current largest island.`,
-          },
-        });
-      } else {
-        pushStep({
-          title: { vi: `Đảo #${island} có area = ${area}`, en: `Island #${island} has area = ${area}` },
-          bestCells,
-          codeLines: [19],
-          vars: [
-            { name: "island", value: island },
-            { name: "area", value: area },
-            { name: "max_area", value: maxArea },
-          ],
-          note: {
-            vi: `Diện tích ${area} không vượt max_area hiện tại (${maxArea}), nên giữ nguyên đáp án.`,
-            en: `Area ${area} does not exceed current max_area (${maxArea}), so the answer stays unchanged.`,
-          },
-        });
-      }
+      // Line 18: max_area = max(max_area, area)
+      const isNewMax = area > maxArea;
+      maxArea = Math.max(maxArea, area);
+      if (isNewMax) bestCells = new Set(currentIslandCells);
+      pushStep({
+        title: { vi: `max_area = max(max_area, area) = ${maxArea}`, en: `max_area = max(max_area, area) = ${maxArea}` },
+        bestCells,
+        codeLines: [18],
+        vars: [{ name: "area", value: area }, { name: "max_area", value: maxArea } ],
+        note: {
+          vi: isNewMax ? `Đảo #${island} (area=${area}) lớn hơn kỷ lục cũ → cập nhật max_area.` : `Đảo #${island} (area=${area}) không vượt max_area hiện tại (${maxArea}).`,
+          en: isNewMax ? `Island #${island} (area=${area}) beats the previous record → update max_area.` : `Island #${island} (area=${area}) does not exceed current max_area (${maxArea}).`,
+        },
+      });
     }
   }
 
+  // Line 19: return max_area
   pushStep({
-    title: { vi: `Kết quả: ${maxArea}`, en: `Result: ${maxArea}` },
+    title: { vi: `return ${maxArea}`, en: `return ${maxArea}` },
     bestCells,
     final: true,
-    codeLines: [20],
-    vars: [
-      { name: "answer", value: maxArea },
-      { name: "islands scanned", value: island },
-    ],
+    codeLines: [19],
+    vars: [{ name: "answer", value: maxArea }, { name: "islands scanned", value: island }],
     note: {
       vi: `Sau khi đo toàn bộ đảo, diện tích lớn nhất là ${maxArea}. Nếu grid toàn nước thì kết quả sẽ là 0.`,
       en: `After measuring every island, the largest area is ${maxArea}. If the grid is all water, the result is 0.`,
