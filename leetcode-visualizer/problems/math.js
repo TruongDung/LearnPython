@@ -1194,7 +1194,253 @@ function buildSteps3867(nums) {
   return { original: [...nums], prefixGcd, sorted, answer, steps };
 }
 
+/**
+ * LeetCode 3312: Sorted GCD Pair Queries.
+ *
+ * Key idea:
+ *  1. Count freq[v] = number of times value v appears.
+ *  2. For each g from 1..max:
+ *     cntMultiples[g] = sum of freq[g], freq[2g], freq[3g], ...
+ *     exact[g] = C(cntMultiples[g], 2) − exact[2g] − exact[3g] − ...
+ *     This is Euler-sieve style inclusion-exclusion.
+ *  3. Build gcdPairs: for each g where exact[g] > 0, push g exactly exact[g] times.
+ *     Sort ascending → sorted list of all pair GCDs.
+ *  4. Prefix sum on sorted gcdPairs for O(1) query answer via bisect.
+ */
+function buildSteps3312(input, params) {
+  const nums = Array.isArray(input) ? input : [input];
+  const queriesRaw = String(params && params.queries !== undefined ? params.queries : "0,2,2")
+    .split(";").map(s => s.trim()).filter(Boolean).map(Number);
+
+  const steps = [];
+  const n = nums.length;
+
+  function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
+  function comb2(k) { return k < 2 ? 0 : k * (k - 1) / 2; }
+
+  // ── Phase 1: freq array ──────────────────────────────────
+  const maxVal = Math.max(...nums);
+  const freq = new Array(maxVal + 1).fill(0);
+  for (const v of nums) freq[v]++;
+
+  steps.push({
+    title: { vi: "Bước 1: đếm tần số", en: "Step 1: count frequencies" },
+    arr: nums.slice(0, 30),
+    sub: nums.slice(0, 30).map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "max", value: maxVal },
+      { name: "freq (non-zero)", value: freq.map((c, v) => c > 0 ? `${v}→${c}` : null).filter(Boolean).join(", ") },
+    ],
+    note: {
+      en: `Build freq[] where freq[v] = count of v in nums. Used to count how many multiples of each g exist.`,
+      vi: `Xây freq[]: freq[v] = số lần xuất hiện của v. Dùng để đếm bội số của từng g.`,
+    },
+  });
+
+  // ── Phase 2: sieve – count multiples and compute exact pairs ──
+  // Must process g from maxVal DOWN to 1 so that exact[2g], exact[3g]... are ready
+  const cntMult = new Array(maxVal + 1).fill(0);
+  const exact = new Array(maxVal + 1).fill(0);
+
+  const sievePreviewLimit = Math.min(maxVal, 6);
+  // First pass: compute cntMult for all g
+  for (let g = 1; g <= maxVal; g++) {
+    let total = 0;
+    for (let mul = g; mul <= maxVal; mul += g) total += freq[mul];
+    cntMult[g] = total;
+  }
+  // Second pass: exact[g] from high to low
+  for (let g = maxVal; g >= 1; g--) {
+    let sub = comb2(cntMult[g]);
+    for (let mul = 2 * g; mul <= maxVal; mul += g) sub -= exact[mul];
+    exact[g] = sub;
+
+    // Show steps for small g values (display order: small first, so we collect and show after)
+  }
+  // Show sieve steps (low g first for pedagogical clarity)
+  for (let g = 1; g <= sievePreviewLimit; g++) {
+    const multiples = [];
+    for (let mul = g; mul <= maxVal; mul += g) if (freq[mul] > 0) multiples.push(`${mul}(×${freq[mul]})`);
+    const higherExact = [];
+    for (let mul = 2 * g; mul <= maxVal; mul += g) if (exact[mul] > 0) higherExact.push(`exact[${mul}]=${exact[mul]}`);
+
+    steps.push({
+      title: { vi: `Sieve g=${g}`, en: `Sieve g=${g}` },
+      arr: nums.slice(0, 30),
+      sub: nums.slice(0, 30).map(v => v % g === 0 ? `÷${g}` : String(v)),
+      highlight: nums.slice(0, 30).map((v, i) => v % g === 0 ? i : -1).filter(x => x >= 0),
+      mark: [],
+      codeLines: [8, 9, 10, 11],
+      vars: [
+        { name: "g", value: g },
+        { name: "multiples of g in nums", value: multiples.join(", ") || "none" },
+        { name: "cntMult[g]", value: cntMult[g] },
+        { name: "C(cntMult, 2)", value: comb2(cntMult[g]) },
+        { name: "subtract exact[multiples]", value: higherExact.join(", ") || "none (0)" },
+        { name: "exact[g]", value: exact[g] },
+      ],
+      note: {
+        en: `g=${g}: ${cntMult[g]} elements divisible by g. Pairs with gcd divisible by g = C(${cntMult[g]},2)=${comb2(cntMult[g])}. Subtract pairs with gcd = ${higherExact.length > 0 ? "multiple of g" : "already none"}: ${higherExact.join(", ") || "0"}. exact[${g}] = ${exact[g]}.`,
+        vi: `g=${g}: ${cntMult[g]} phần tử chia hết cho g. Cặp chia hết = C(${cntMult[g]},2)=${comb2(cntMult[g])}. Trừ cặp GCD lớn hơn: ${higherExact.join(", ") || "0"}. exact[${g}] = ${exact[g]}.`,
+      },
+    });
+  }
+
+  if (maxVal > sievePreviewLimit) {
+    steps.push({
+      title: { vi: `Sieve hoàn tất (g=1..${maxVal})`, en: `Sieve done (g=1..${maxVal})` },
+      arr: nums.slice(0, 30),
+      sub: nums.slice(0, 30).map((_, i) => `[${i}]`),
+      highlight: [],
+      mark: [],
+      codeLines: [8, 9, 10, 11],
+      vars: exact.map((v, g) => v > 0 ? ({ name: `exact[${g}]`, value: v }) : null).filter(Boolean).slice(0, 12),
+      note: {
+        en: `All g from 1..${maxVal} processed. Non-zero exact[g] shown. Each exact[g] = pairs with GCD exactly g.`,
+        vi: `Đã xử lý g từ 1..${maxVal}. Các exact[g] khác 0. Mỗi exact[g] = số cặp có GCD đúng bằng g.`,
+      },
+    });
+  }
+
+  // ── Phase 3: build sorted gcdPairs (conceptually) via prefix sum ──
+  // Build prefix: prefix[i] = total pairs with GCD <= i
+  const prefix = new Array(maxVal + 2).fill(0);
+  for (let g = 1; g <= maxVal; g++) prefix[g] = prefix[g - 1] + exact[g];
+  const totalPairs = prefix[maxVal];
+
+  // Show top gcd values
+  const gcdEntries = [];
+  for (let g = 1; g <= maxVal; g++) if (exact[g] > 0) gcdEntries.push({ g, count: exact[g] });
+
+  steps.push({
+    title: { vi: "Bước 3: mảng gcdPairs đã sắp xếp (prefix sum)", en: "Step 3: sorted gcdPairs via prefix sum" },
+    arr: gcdEntries.slice(0, 20).map(e => e.g),
+    sub: gcdEntries.slice(0, 20).map(e => `×${e.count}`),
+    highlight: [],
+    mark: [],
+    codeLines: [13, 14],
+    vars: [
+      { name: "total pairs", value: totalPairs },
+      { name: "gcd distribution", value: gcdEntries.map(e => `${e.g}(×${e.count})`).join(", ") },
+      { name: "prefix[max]", value: totalPairs },
+    ],
+    note: {
+      en: `gcdPairs (sorted) has ${totalPairs} entries. Build prefix sum: prefix[g] = count of pairs with GCD ≤ g. Query k → binary search on prefix.`,
+      vi: `gcdPairs (đã sắp xếp) có ${totalPairs} phần tử. Xây prefix sum: prefix[g] = số cặp có GCD ≤ g. Truy vấn k → binary search.`,
+    },
+  });
+
+  // ── Phase 4: answer queries ──────────────────────────────
+  const answers = [];
+  for (let qi = 0; qi < queriesRaw.length; qi++) {
+    const q = queriesRaw[qi];
+    // Binary search: find smallest g where prefix[g] >= q+1
+    let lo = 1, hi = maxVal;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (prefix[mid] < q + 1) lo = mid + 1;
+      else hi = mid;
+    }
+    const ans = lo;
+    answers.push(ans);
+
+    steps.push({
+      title: { vi: `Query ${qi + 1}: queries[${qi}] = ${q}`, en: `Query ${qi + 1}: queries[${qi}] = ${q}` },
+      arr: gcdEntries.slice(0, 20).map(e => e.g),
+      sub: gcdEntries.slice(0, 20).map(e => `×${e.count}`),
+      highlight: gcdEntries.slice(0, 20).map((e, i) => e.g === ans ? i : -1).filter(x => x >= 0),
+      mark: [],
+      codeLines: [16, 17],
+      vars: [
+        { name: `queries[${qi}]`, value: q },
+        { name: "find gcd at rank", value: `prefix rank ${q} (0-indexed)` },
+        { name: "binary search range", value: `[1, ${maxVal}]` },
+        { name: "prefix[ans-1]", value: ans > 1 ? prefix[ans - 1] : 0 },
+        { name: `prefix[${ans}]`, value: prefix[ans] },
+        { name: `answer`, value: ans },
+      ],
+      note: {
+        en: `Find smallest g where prefix[g] ≥ ${q + 1}. prefix[${ans - 1 > 0 ? ans - 1 : 0}]=${ans > 1 ? prefix[ans - 1] : 0} < ${q + 1} ≤ prefix[${ans}]=${prefix[ans]}. gcdPairs[${q}] = ${ans}.`,
+        vi: `Tìm g nhỏ nhất sao cho prefix[g] ≥ ${q + 1}. prefix[${ans > 1 ? ans - 1 : 0}]=${ans > 1 ? prefix[ans - 1] : 0} < ${q + 1} ≤ prefix[${ans}]=${prefix[ans]}. gcdPairs[${q}] = ${ans}.`,
+      },
+    });
+  }
+
+  // ── Final ────────────────────────────────────────────────
+  steps.push({
+    title: { vi: "Kết quả", en: "Result" },
+    arr: gcdEntries.slice(0, 20).map(e => e.g),
+    sub: gcdEntries.slice(0, 20).map(e => `×${e.count}`),
+    highlight: [],
+    mark: gcdEntries.slice(0, 20).map((e, i) => answers.includes(e.g) ? i : -1).filter(x => x >= 0),
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "answers", value: `[${answers.join(", ")}]` },
+      { name: "queries", value: `[${queriesRaw.join(", ")}]` },
+    ],
+    note: {
+      en: `For each query q, answer = the q-th element (0-indexed) of sorted gcdPairs. Result: [${answers.join(", ")}].`,
+      vi: `Với mỗi truy vấn q, đáp án = phần tử thứ q (0-indexed) của mảng gcdPairs sắp xếp. Kết quả: [${answers.join(", ")}].`,
+    },
+  });
+
+  return { original: nums, answer: answers, steps };
+}
+
 module.exports = {
+  3312: {
+    id: 3312,
+    difficulty: "hard",
+    slug: "sorted-gcd-pair-queries",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Sorted GCD Pair Queries", en: "Sorted GCD Pair Queries" },
+    titleVi: { vi: "Truy vấn GCD cặp đã sắp xếp", en: "Sorted GCD pair queries" },
+    statement: {
+      vi: "Cho mảng nums và mảng queries. Với mỗi cặp (i,j) với i<j, tính gcd(nums[i],nums[j]) rồi sắp xếp tất cả gcd này thành mảng gcdPairs. Trả về gcdPairs[queries[k]] cho mỗi k.",
+      en: "Given nums and queries. For every pair (i,j) with i<j, compute gcd(nums[i],nums[j]). Sort all these GCDs into array gcdPairs (ascending). Return gcdPairs[queries[k]] for each k.",
+    },
+    defaultInput: [2, 3, 4],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "queries", label: { vi: "queries (cách nhau ;)", en: "queries (semicolon-separated)" }, default: "0;2;2", type: "text" },
+    ],
+    approach: [
+      { vi: "Đếm freq[v] = số lần v xuất hiện trong nums.", en: "Count freq[v] = occurrences of v in nums." },
+      { vi: "Với mỗi g (sieve): cntMult[g] = tổng freq[g]+freq[2g]+... Dùng inclusion-exclusion: exact[g] = C(cntMult[g],2) - Σ exact[k·g].", en: "For each g (sieve): cntMult[g] = sum of freq[g]+freq[2g]+... Use inclusion-exclusion: exact[g] = C(cntMult[g],2) - Σ exact[k·g]." },
+      { vi: "Xây prefix sum để trả lời query bằng binary search.", en: "Build prefix sum to answer each query via binary search." },
+    ],
+    complexity: {
+      time: "O(V log V + Q log V)",
+      space: "O(V)",
+      note: {
+        vi: "V = max(nums). Sieve O(V log V) (harmonic series). Mỗi query O(log V).",
+        en: "V = max(nums). Sieve is O(V log V) by the harmonic series. Each query is O(log V).",
+      },
+    },
+    code: [
+      "from math import gcd",
+      "",
+      "class Solution:",
+      "    def gcdValues(self, nums, queries):",
+      "        freq = Counter(nums)",
+      "        maxVal = max(nums)",
+      "        exact = [0] * (maxVal + 1)",
+      "        for g in range(1, maxVal + 1):",
+      "            cntMult = sum(freq[g * k] for k in range(1, maxVal // g + 1))",
+      "            exact[g] = cntMult * (cntMult - 1) // 2",
+      "            for k in range(2, maxVal // g + 1):",
+      "                exact[g] -= exact[g * k]",
+      "        prefix = list(accumulate(exact))",
+      "        return [bisect_left(prefix, q + 1) for q in queries]",
+    ],
+    builder: buildSteps3312,
+  },
   3867: {
     id: 3867,
     difficulty: "medium",
