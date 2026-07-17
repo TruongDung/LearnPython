@@ -3685,6 +3685,265 @@ function buildSteps1971(input, params) {
   return { n, edges: edgeList, source, destination, answer: found, steps };
 }
 
+/**
+ * LeetCode 133: Clone Graph.
+ * Recursive DFS + hashmap: visited[curr] = clone lets us handle cycles —
+ * register the clone BEFORE recursing into neighbors, so a cycle back to
+ * curr finds the (partially built) clone instead of looping forever.
+ * Line-by-line trace of the exact Python code shown to the user:
+ *  1  class Node:
+ *  2      def __init__(self, val=0, neighbors=None):
+ *  3          self.val = val
+ *  4          self.neighbors = neighbors if neighbors is not None else []
+ *  5  class Solution:
+ *  6      def cloneGraph(self, node):
+ *  7          if not node:
+ *  8              return None
+ *  9          visited = {}
+ * 10          def dfs(curr):
+ * 11              if curr in visited:
+ * 12                  return visited[curr]
+ * 13              clone = Node(curr.val)
+ * 14              visited[curr] = clone
+ * 15              for nei in curr.neighbors:
+ * 16                  clone.neighbors.append(dfs(nei))
+ * 17              return clone
+ * 18          return dfs(node)
+ */
+function buildSteps133(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 4;
+  const start = params && params.start !== undefined ? Number(params.start) : 1;
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+
+  const steps = [];
+  // 1-indexed adjacency: values 1..n
+  const adj = {};
+  for (let v = 1; v <= n; v++) adj[v] = [];
+  for (const [a, b] of edgeList) {
+    if (!adj[a].includes(b)) adj[a].push(b);
+    if (!adj[b].includes(a)) adj[b].push(a);
+  }
+
+  const CLONE_OFFSET = 1000;
+  const cloneAdj = {}; // origId -> [cloneNeighborIds built so far]
+  const visited = new Map(); // origId -> cloneId (registered as soon as clone is created)
+
+  function currentNodes() {
+    const originals = Array.from({ length: n }, (_, i) => ({ id: i + 1, label: String(i + 1) }));
+    const clones = [...visited.keys()].map((origId) => ({ id: CLONE_OFFSET + origId, label: `${origId}'` }));
+    return [...originals, ...clones];
+  }
+  function currentEdges() {
+    const gEdges = [];
+    const seen = new Set();
+    for (const [a, b] of edgeList) {
+      const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
+      if (!seen.has(key)) { seen.add(key); gEdges.push({ u: a, v: b, w: "" }); }
+    }
+    // mapping edges: orig -> its clone
+    for (const origId of visited.keys()) gEdges.push({ u: origId, v: CLONE_OFFSET + origId, w: "" });
+    // clone-to-clone edges built so far
+    for (const [origId, nbrs] of Object.entries(cloneAdj)) {
+      for (const cNbr of nbrs) gEdges.push({ u: CLONE_OFFSET + Number(origId), v: cNbr, w: "" });
+    }
+    return gEdges;
+  }
+  function visitedNodeIds() {
+    return [...visited.keys()].map((origId) => CLONE_OFFSET + origId);
+  }
+
+  function push({ hlNodes = [], hlEdges = [], title, note, vars, codeLines, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: { nodes: currentNodes(), edges: currentEdges(), hlNodes, hlEdges, visitedNodes: visitedNodeIds() },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: DFS đệ quy + hashmap visited", en: "Idea: recursive DFS + visited hashmap" },
+    hlNodes: [start],
+    codeLines: [6],
+    vars: [{ name: "n", value: n }, { name: "start", value: start }],
+    note: {
+      vi:
+        "visited[curr] lưu clone tương ứng, được gán NGAY khi tạo clone, TRƯỚC khi đệ quy vào hàng xóm.\n" +
+        "Nhờ vậy nếu đồ thị có chu trình quay lại curr, ta trả về clone đã có, không đệ quy vô hạn.",
+      en:
+        "visited[curr] stores curr's clone, assigned RIGHT AFTER creating it, BEFORE recursing into neighbors.\n" +
+        "So if a cycle loops back to curr, we return the existing clone instead of recursing forever.",
+    },
+  });
+
+  // Line 7-8: if not node / return None
+  push({
+    title: { vi: `node? Có (giá trị ${start}) → không None`, en: `node? Present (value ${start}) → not None` },
+    hlNodes: [start],
+    codeLines: [7],
+    vars: [{ name: "node", value: start }],
+    note: { vi: "Đồ thị đầu vào không rỗng, tiếp tục.", en: "Input graph is non-empty, proceed." },
+  });
+
+  // Line 9: visited = {}
+  push({
+    title: { vi: "visited = {}", en: "visited = {}" },
+    codeLines: [9],
+    vars: [{ name: "visited", value: "{}" }],
+    note: { vi: "Hashmap: node gốc → node clone tương ứng.", en: "Hashmap: original node → its clone." },
+  });
+
+  push({
+    title: { vi: "Định nghĩa dfs(curr)", en: "Define dfs(curr)" },
+    codeLines: [10],
+    vars: [],
+    note: { vi: "Hàm đệ quy sẽ clone curr rồi clone toàn bộ hàng xóm.", en: "The recursive function clones curr, then clones all its neighbors." },
+  });
+
+  function dfs(curr) {
+    // Line 11: if curr in visited
+    const already = visited.has(curr);
+    push({
+      title: { vi: `dfs(${curr}): curr in visited? ${already}`, en: `dfs(${curr}): curr in visited? ${already}` },
+      hlNodes: already ? [curr, CLONE_OFFSET + curr] : [curr],
+      codeLines: [11],
+      vars: [{ name: "curr", value: curr }, { name: "in visited?", value: already }],
+      note: {
+        vi: already
+          ? `${curr} đã được clone trước đó (có thể do chu trình) → dùng lại clone cũ, tránh đệ quy vô hạn.`
+          : `${curr} chưa được clone → tạo clone mới.`,
+        en: already
+          ? `${curr} was already cloned before (possibly due to a cycle) → reuse the existing clone, avoiding infinite recursion.`
+          : `${curr} not cloned yet → create a new clone.`,
+      },
+    });
+    if (already) {
+      // Line 12: return visited[curr]
+      const cloneId = visited.get(curr);
+      push({
+        title: { vi: `return visited[${curr}] → clone ${curr}'`, en: `return visited[${curr}] → clone ${curr}'` },
+        hlNodes: [curr, cloneId],
+        codeLines: [12],
+        vars: [{ name: "returns", value: `${curr}'` }],
+        note: { vi: "Trả về clone đã tồn tại, không tạo thêm.", en: "Return the existing clone, no new allocation." },
+      });
+      return cloneId;
+    }
+
+    // Line 13: clone = Node(curr.val)  (not yet registered in `visited`, so it won't render until line 14)
+    const cloneId = CLONE_OFFSET + curr;
+    push({
+      title: { vi: `clone = Node(${curr}) → tạo clone ${curr}'`, en: `clone = Node(${curr}) → create clone ${curr}'` },
+      hlNodes: [curr],
+      codeLines: [13],
+      vars: [{ name: "clone.val", value: curr }],
+      note: { vi: `Tạo node clone mới mang giá trị ${curr}.`, en: `Create a new clone node with value ${curr}.` },
+    });
+
+    // Line 14: visited[curr] = clone
+    visited.set(curr, cloneId);
+    cloneAdj[curr] = [];
+    push({
+      title: { vi: `visited[${curr}] = clone ${curr}'`, en: `visited[${curr}] = clone ${curr}'` },
+      hlNodes: [curr, cloneId],
+      hlEdges: [[curr, cloneId]],
+      codeLines: [14],
+      vars: [{ name: `visited[${curr}]`, value: `${curr}'` }],
+      note: {
+        vi: "Đăng ký clone NGAY, trước khi đệ quy vào hàng xóm — chìa khóa để xử lý chu trình.",
+        en: "Register the clone RIGHT AWAY, before recursing into neighbors — the key to handling cycles.",
+      },
+    });
+
+    // Line 15: for nei in curr.neighbors
+    for (const nei of adj[curr]) {
+      push({
+        title: { vi: `for nei in ${curr}.neighbors: nei = ${nei}`, en: `for nei in ${curr}.neighbors: nei = ${nei}` },
+        hlNodes: [curr, nei],
+        hlEdges: [[curr, nei]],
+        codeLines: [15],
+        vars: [{ name: "curr", value: curr }, { name: "nei", value: nei }],
+        note: { vi: `Xét hàng xóm ${nei} của ${curr}.`, en: `Process neighbor ${nei} of ${curr}.` },
+      });
+
+      // Line 16: clone.neighbors.append(dfs(nei))
+      push({
+        title: { vi: `clone.neighbors.append(dfs(${nei}))`, en: `clone.neighbors.append(dfs(${nei}))` },
+        hlNodes: [curr, nei],
+        codeLines: [16],
+        vars: [{ name: "calling", value: `dfs(${nei})` }],
+        note: { vi: `Tạm dừng dfs(${curr}), đệ quy vào dfs(${nei}).`, en: `Pause dfs(${curr}), recurse into dfs(${nei}).` },
+      });
+      const neiCloneId = dfs(nei);
+      cloneAdj[curr].push(neiCloneId);
+      push({
+        title: { vi: `clone.neighbors += [${nei}'] (từ dfs(${nei}))`, en: `clone.neighbors += [${nei}'] (from dfs(${nei}))` },
+        hlNodes: [cloneId, neiCloneId],
+        hlEdges: [[cloneId, neiCloneId]],
+        codeLines: [16],
+        vars: [{ name: `clone(${curr}).neighbors`, value: `[${cloneAdj[curr].map((c) => c - CLONE_OFFSET + "'").join(", ")}]` }],
+        note: { vi: `dfs(${nei}) trả về clone ${nei}'. Thêm vào danh sách hàng xóm của clone ${curr}'.`, en: `dfs(${nei}) returned clone ${nei}'. Append it to clone ${curr}''s neighbor list.` },
+      });
+    }
+
+    // Line 17: return clone
+    push({
+      title: { vi: `return clone (${curr}')`, en: `return clone (${curr}')` },
+      hlNodes: [curr, cloneId],
+      codeLines: [17],
+      vars: [{ name: "returns", value: `${curr}'` }],
+      note: { vi: `dfs(${curr}) hoàn tất, trả về clone ${curr}'.`, en: `dfs(${curr}) finishes, returning clone ${curr}'.` },
+    });
+    return cloneId;
+  }
+
+  // Line 18: return dfs(node)
+  push({
+    title: { vi: `return dfs(${start})`, en: `return dfs(${start})` },
+    hlNodes: [start],
+    codeLines: [18],
+    vars: [{ name: "calling", value: `dfs(${start})` }],
+    note: { vi: "Gọi DFS từ node xuất phát để clone toàn bộ đồ thị.", en: "Call DFS from the start node to clone the entire graph." },
+  });
+  dfs(start);
+
+  // Build a serialized adjacency list of the CLONE graph (LeetCode-style output) to verify correctness.
+  const cloneAdjList = [];
+  for (let v = 1; v <= n; v++) {
+    const nbrs = (cloneAdj[v] || []).map((cid) => cid - CLONE_OFFSET).sort((a, b) => a - b);
+    cloneAdjList.push(nbrs);
+  }
+  const answerStr = `[${cloneAdjList.map((nbrs) => `[${nbrs.join(",")}]`).join(",")}]`;
+
+  const fs = {
+    title: { vi: `Kết quả: đồ thị clone = ${answerStr}`, en: `Result: cloned graph = ${answerStr}` },
+    arr: [],
+    graph: { nodes: currentNodes(), edges: currentEdges(), hlNodes: [], hlEdges: [], visitedNodes: visitedNodeIds() },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18],
+    vars: [{ name: "answer", value: answerStr }],
+    note: {
+      vi: `Đã clone đủ ${n} node và toàn bộ cạnh. Danh sách kề của đồ thị clone: ${answerStr}.`,
+      en: `Cloned all ${n} nodes and every edge. The clone graph's adjacency list: ${answerStr}.`,
+    },
+  };
+  steps.push(fs);
+
+  return { n, edges: edgeList, start, answer: answerStr, steps };
+}
+
 function buildSteps2492(input, params) {
   const n = params.n || 4;
   const edges = String(input || "")
@@ -5096,6 +5355,64 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps200,
+  },
+  133: {
+    id: 133,
+    difficulty: "medium",
+    slug: "clone-graph",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    title: { vi: "Clone Graph", en: "Clone Graph" },
+    titleVi: { vi: "Sao chép đồ thị (DFS + hashmap)", en: "Deep copy a graph via DFS + hashmap" },
+    statement: {
+      vi:
+        "Cho một node bất kỳ của đồ thị vô hướng liên thông (mỗi node có val và danh sách neighbors). Hãy trả về một BẢN SAO SÂU (deep copy) của đồ thị này, " +
+        "bắt đầu từ node tương ứng. Đồ thị có thể chứa chu trình. Nhập cạnh 'a,b' cách bởi ';', giá trị node là số nguyên 1..n.",
+      en:
+        "Given a reference of one node in a connected undirected graph (each node has val and a list of neighbors), return a DEEP COPY of the graph, " +
+        "starting from that corresponding node. The graph may contain cycles. Enter edges as 'a,b' separated by ';'; node values are integers 1..n.",
+    },
+    defaultInput: "1,2;1,4;2,3;3,4",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 4 },
+      { key: "start", label: { vi: "node xuất phát", en: "start node" }, default: 1 },
+    ],
+    approach: [
+      { vi: "DFS đệ quy: dfs(curr) tạo clone của curr rồi clone lần lượt các hàng xóm.", en: "Recursive DFS: dfs(curr) creates curr's clone, then clones each neighbor." },
+      { vi: "Dùng hashmap visited[node gốc] = node clone để không clone trùng 1 node hai lần.", en: "Use a hashmap visited[original] = clone so no node is cloned twice." },
+      { vi: "MẤU CHỐT xử lý chu trình: đăng ký visited[curr] = clone NGAY sau khi tạo clone, TRƯỚC khi đệ quy vào hàng xóm.", en: "KEY to handling cycles: register visited[curr] = clone RIGHT AFTER creating it, BEFORE recursing into neighbors." },
+      { vi: "Nếu gặp lại 1 node đã có trong visited (do chu trình), trả ngay clone đã lưu, không đệ quy nữa.", en: "If a node is already in visited (due to a cycle), return its stored clone immediately instead of recursing again." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi node được clone đúng 1 lần, mỗi cạnh được xử lý đúng 1 lần từ mỗi đầu → O(n+E). Bộ nhớ cho visited + đệ quy là O(n).",
+        en: "Each node is cloned exactly once, each edge processed once per endpoint → O(n+E). visited + recursion stack use O(n) memory.",
+      },
+    },
+    code: [
+      "class Node:",
+      "    def __init__(self, val=0, neighbors=None):",
+      "        self.val = val",
+      "        self.neighbors = neighbors if neighbors is not None else []",
+      "class Solution:",
+      "    def cloneGraph(self, node):",
+      "        if not node:",
+      "            return None",
+      "        visited = {}",
+      "        def dfs(curr):",
+      "            if curr in visited:",
+      "                return visited[curr]",
+      "            clone = Node(curr.val)",
+      "            visited[curr] = clone",
+      "            for nei in curr.neighbors:",
+      "                clone.neighbors.append(dfs(nei))",
+      "            return clone",
+      "        return dfs(node)",
+    ],
+    builder: buildSteps133,
   },
   130: {
     id: 130,
