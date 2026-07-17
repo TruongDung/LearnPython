@@ -1431,7 +1431,7 @@ module.exports = {
       "        freq = Counter(nums)",
       "        maxVal = max(nums)",
       "        exact = [0] * (maxVal + 1)",
-      "        for g in range(1, maxVal + 1):",
+      "        for g in range(maxVal, 0, -1):",
       "            cntMult = sum(freq[g * k] for k in range(1, maxVal // g + 1))",
       "            exact[g] = cntMult * (cntMult - 1) // 2",
       "            for k in range(2, maxVal // g + 1):",
