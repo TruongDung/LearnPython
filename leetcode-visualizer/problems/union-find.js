@@ -1372,6 +1372,26 @@ function buildSteps1319DFS(input, params) {
 }
 
 
+// ─── 1319 Union-Find: Number of Operations to Make Network Connected ───
+// Line-by-line trace of the exact code shown to the user:
+//  1  class Solution:
+//  2      def makeConnected(self, n, connections):
+//  3          if len(connections) < n - 1:
+//  4              return -1
+//  5          parent = list(range(n))
+//  6          def find(x):
+//  7              while parent[x] != x:
+//  8                  parent[x] = parent[parent[x]]
+//  9                  x = parent[x]
+// 10             return x
+// 11         components, redundant = n, 0
+// 12         for a, b in connections:
+// 13             if find(a) == find(b):
+// 14                 redundant += 1
+// 15             else:
+// 16                 parent[find(a)] = find(b)
+// 17                 components -= 1
+// 18         return components - 1
 function buildSteps1319(input, params) {
   const n = params.n !== undefined ? Number(params.n) : 4;
   const edgeList = String(input).split(";").map((s) => {
@@ -1381,32 +1401,14 @@ function buildSteps1319(input, params) {
 
   const steps = [];
   const parent = Array.from({ length: n }, (_, i) => i);
-  const rnk = new Array(n).fill(0);
-  let components = n;
-  let redundant = 0;
   const addedEdges = new Set();
   const redundantEdges = new Set();
 
-  function find(x) {
-    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-    return x;
-  }
-  function union(x, y) {
-    const rx = find(x), ry = find(y);
-    if (rx === ry) return false;
-    if (rnk[rx] >= rnk[ry]) { parent[ry] = rx; if (rnk[rx] === rnk[ry]) rnk[rx]++; }
-    else { parent[rx] = ry; }
-    return true;
-  }
-  function compCount() {
+  function graphSnap({ hlNodes = [], hlEdges = [], title, note, vars, codeLines, final = false }) {
+    const rootOf = (x) => { let r = x; while (parent[r] !== r) r = parent[r]; return r; };
     const cnt = new Map();
-    for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
-    return cnt;
-  }
-
-  function graphSnap(title, note, hlNodes, hlEdges, vars, codeLines) {
-    const cnt = compCount();
-    const visited = Array.from({ length: n }, (_, i) => cnt.get(find(i)) > 1 ? i : -1).filter(x => x >= 0);
+    for (let i = 0; i < n; i++) { const r = rootOf(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+    const visited = Array.from({ length: n }, (_, i) => (cnt.get(rootOf(i)) > 1 ? i : -1)).filter((x) => x >= 0);
     const gEdges = [];
     for (const key of addedEdges) {
       const [u, v] = key.split("-").map(Number);
@@ -1419,157 +1421,182 @@ function buildSteps1319(input, params) {
     return {
       title,
       arr: [...parent],
-      sub: parent.map((p, i) => p === i ? "root" : `→${p}`),
-      highlight: hlNodes || [],
-      mark: Array.from({ length: n }, (_, i) => i).filter(i => parent[i] === i),
-      graph: {
-        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
-        edges: gEdges,
-        hlNodes: hlNodes || [],
-        hlEdges: hlEdges || [],
-        visitedNodes: visited,
-      },
-      codeLines: codeLines || [],
+      sub: parent.map((p, i) => (p === i ? "root" : `→${p}`)),
+      highlight: hlNodes,
+      mark: Array.from({ length: n }, (_, i) => i).filter((i) => parent[i] === i),
+      graph: { nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })), edges: gEdges, hlNodes, hlEdges, visitedNodes: visited },
+      final,
+      codeLines,
       vars: vars || [],
       note,
     };
   }
+  function push(opts) { steps.push(graphSnap(opts)); }
 
-  const edgesStr = edgeList.map((e) => `(${e.a},${e.b})`).join(", ");
+  // Line 3: if len(connections) < n - 1
   const impossible = edgeList.length < n - 1;
-
-  // ── Step 0: feasibility check ──────────────────────────────────────
-  steps.push(graphSnap(
-    { vi: "Bước 1: kiểm tra khả thi", en: "Step 1: feasibility check" },
-    {
-      en:
-        `${n} computers, ${edgeList.length} cables: ${edgesStr}.\n` +
-        `Need at least n-1 = ${n-1} cables to connect ${n} computers.\n` +
-        (impossible
-          ? `${edgeList.length} < ${n-1} → IMPOSSIBLE. Return -1.`
-          : `${edgeList.length} ≥ ${n-1} → may be possible. Run Union-Find to count redundant cables.`),
-      vi:
-        `${n} máy tính, ${edgeList.length} cáp: ${edgesStr}.\n` +
-        `Cần ít nhất n-1 = ${n-1} cáp để nối ${n} máy tính.\n` +
-        (impossible
-          ? `${edgeList.length} < ${n-1} → KHÔNG THỂ. Trả -1.`
-          : `${edgeList.length} ≥ ${n-1} → có thể được. Chạy Union-Find đếm cáp dư.`),
+  push({
+    title: { vi: `len(connections) < n-1? ${impossible} (${edgeList.length} vs ${n - 1})`, en: `len(connections) < n-1? ${impossible} (${edgeList.length} vs ${n - 1})` },
+    codeLines: [3],
+    vars: [{ name: "len(connections)", value: edgeList.length }, { name: "n-1", value: n - 1 }],
+    note: {
+      vi: impossible ? "Không đủ cáp để nối tất cả máy tính." : "Đủ cáp (chưa chắc đúng vị trí) → tiếp tục.",
+      en: impossible ? "Not enough cables to connect every computer." : "Enough cables (positions may still be wrong) → continue.",
     },
-    [], [],
-    [
-      { name: "n (computers)", value: n },
-      { name: "edges (cables)", value: edgeList.length },
-      { name: "need min cables", value: n - 1 },
-      { name: "feasible?", value: !impossible },
-    ],
-    [3, 4]
-  ));
-
+  });
   if (impossible) {
-    const fs = graphSnap(
-      { vi: "Kết quả: -1 (không đủ cáp)", en: "Result: -1 (not enough cables)" },
-      { en: `${edgeList.length} cables < ${n-1} needed → impossible. Return -1.`, vi: `${edgeList.length} cáp < ${n-1} cần → trả -1.` },
-      [], [],
-      [{ name: "answer", value: -1 }],
-      [3, 4]
-    );
-    fs.final = true;
-    steps.push(fs);
+    push({
+      title: { vi: "return -1", en: "return -1" },
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Không thể nối hết → trả -1.", en: "Cannot connect everything → return -1." },
+    });
     return { input, answer: -1, steps };
   }
 
-  // ── Step 1: intro to union-find pass ──────────────────────────────
-  steps.push(graphSnap(
-    { vi: "Bước 2: Union-Find — gộp các máy tính", en: "Step 2: Union-Find — merge computers" },
-    {
-      en:
-        `Start Union-Find. parent[i] = i, components = ${n}.\n` +
-        `For each cable (a,b):\n` +
-        `  • If find(a) ≠ find(b) → union them, components--  (useful cable)\n` +
-        `  • If find(a) = find(b) → cycle! redundant++  (can be repurposed)\n` +
-        `Answer = components - 1 if redundant ≥ components - 1, else -1.`,
-      vi:
-        `Bắt đầu Union-Find. parent[i] = i, components = ${n}.\n` +
-        `Với mỗi cáp (a,b):\n` +
-        `  • Nếu find(a) ≠ find(b) → gộp, components--  (cáp hữu ích)\n` +
-        `  • Nếu find(a) = find(b) → vòng lặp! redundant++  (cáp dư, dùng lại được)\n` +
-        `Đáp án = components - 1 nếu redundant ≥ components - 1, ngược lại -1.`,
-    },
-    [], [],
-    [{ name: "components", value: components }, { name: "redundant", value: redundant }],
-    [5, 6, 7]
-  ));
+  // Line 5: parent = list(range(n))
+  push({
+    title: { vi: "parent = list(range(n))", en: "parent = list(range(n))" },
+    codeLines: [5],
+    vars: [{ name: "parent", value: `[${parent.join(",")}]` }],
+    note: { vi: "Mỗi máy tính tự làm gốc của chính nó.", en: "Each computer starts as its own root." },
+  });
 
-  // ── Process each edge ─────────────────────────────────────────────
-  for (const { a, b } of edgeList) {
-    const ra = find(a), rb = find(b);
-    const isCycle = ra === rb;
-    const edgeKey = `${Math.min(a,b)}-${Math.max(a,b)}`;
+  push({
+    title: { vi: "Định nghĩa find(x)", en: "Define find(x)" },
+    codeLines: [6],
+    vars: [],
+    note: { vi: "find(x) trả về gốc của x, có path compression.", en: "find(x) returns x's root, with path compression." },
+  });
 
-    if (!isCycle) {
-      union(a, b);
-      components--;
-      addedEdges.add(edgeKey);
-    } else {
-      redundant++;
-      redundantEdges.add(edgeKey);
+  // Line 11: components, redundant = n, 0
+  let components = n;
+  let redundant = 0;
+  push({
+    title: { vi: `components, redundant = ${n}, 0`, en: `components, redundant = ${n}, 0` },
+    codeLines: [11],
+    vars: [{ name: "components", value: components }, { name: "redundant", value: redundant }],
+    note: { vi: `Ban đầu có ${n} nhóm riêng biệt, chưa có cáp dư.`, en: `Initially ${n} separate groups, no redundant cable yet.` },
+  });
+
+  function find(x, label) {
+    while (true) {
+      const done = parent[x] === x;
+      push({
+        hlNodes: [x],
+        title: { vi: `find(${label}): while parent[${x}] != ${x}? ${done ? "False" : "True"}`, en: `find(${label}): while parent[${x}] != ${x}? ${done ? "False" : "True"}` },
+        codeLines: [7],
+        vars: [{ name: "x", value: x }, { name: "parent[x]", value: parent[x] }],
+        note: {
+          vi: done ? `${x} đã là gốc.` : `${x} chưa là gốc (parent[${x}]=${parent[x]}), tiếp tục đi lên.`,
+          en: done ? `${x} is already a root.` : `${x} is not a root yet (parent[${x}]=${parent[x]}), keep climbing.`,
+        },
+      });
+      if (done) {
+        push({
+          hlNodes: [x],
+          title: { vi: `return ${x}`, en: `return ${x}` },
+          codeLines: [10],
+          vars: [{ name: "root", value: x }],
+          note: { vi: `find(${label}) trả về gốc ${x}.`, en: `find(${label}) returns root ${x}.` },
+        });
+        return x;
+      }
+      const before = parent[x];
+      const grand = parent[parent[x]];
+      parent[x] = grand;
+      push({
+        hlNodes: [x],
+        title: { vi: `parent[${x}] = parent[parent[${x}]] = ${grand}`, en: `parent[${x}] = parent[parent[${x}]] = ${grand}` },
+        codeLines: [8],
+        vars: [{ name: "parent[x] before", value: before }, { name: "parent[x] after", value: grand }, { name: "parent", value: `[${parent.join(",")}]` }],
+        note: { vi: "Path compression: rút ngắn đường về gốc.", en: "Path compression: shortens the path to the root." },
+      });
+      x = parent[x];
+      push({
+        hlNodes: [x],
+        title: { vi: `x = parent[x] = ${x}`, en: `x = parent[x] = ${x}` },
+        codeLines: [9],
+        vars: [{ name: "x", value: x }],
+        note: { vi: `Tiếp tục xét đỉnh ${x}.`, en: `Continue checking node ${x}.` },
+      });
     }
-
-    steps.push(graphSnap(
-      {
-        vi: isCycle
-          ? `Cáp (${a},${b}): dư (vòng lặp) → redundant = ${redundant}`
-          : `Cáp (${a},${b}): hữu ích → components = ${components}`,
-        en: isCycle
-          ? `Cable (${a},${b}): redundant (cycle) → redundant = ${redundant}`
-          : `Cable (${a},${b}): useful → components = ${components}`,
-      },
-      {
-        en: isCycle
-          ? `find(${a}) = ${ra} = find(${b}) → already same component! This cable creates a cycle.\nIt can be removed and reused to bridge a disconnected component.\nredundant = ${redundant}.`
-          : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → different components. Merge them.\ncomponents = ${components}, redundant = ${redundant}.`,
-        vi: isCycle
-          ? `find(${a}) = ${ra} = find(${b}) → đã cùng nhóm! Cáp này tạo vòng lặp.\nCó thể tháo ra và dùng để nối nhóm khác.\nredundant = ${redundant}.`
-          : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → khác nhóm. Gộp lại.\ncomponents = ${components}, redundant = ${redundant}.`,
-      },
-      [a, b],
-      isCycle ? [] : [edgeKey],
-      [
-        { name: "cable", value: `(${a}, ${b})` },
-        { name: "find(a)", value: ra },
-        { name: "find(b)", value: rb },
-        { name: "cycle (redundant)?", value: isCycle },
-        { name: "components", value: components },
-        { name: "redundant", value: redundant },
-        { name: "parent", value: `[${parent.join(",")}]` },
-      ],
-      isCycle ? [9, 10] : [7, 8]
-    ));
   }
 
-  // ── Final ─────────────────────────────────────────────────────────
-  const answer = redundant >= components - 1 ? components - 1 : -1;
-  const fs = graphSnap(
-    { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    {
-      en:
-        `${components} disconnected component(s) remain. Need ${components - 1} operations to connect them.\n` +
-        `Redundant cables available: ${redundant}.\n` +
-        `${redundant} ≥ ${components - 1} → answer = ${components - 1}.`,
-      vi:
-        `Còn ${components} nhóm chưa nối. Cần ${components - 1} thao tác.\n` +
-        `Cáp dư có: ${redundant}.\n` +
-        `${redundant} ≥ ${components - 1} → đáp án = ${components - 1}.`,
+  for (const { a, b } of edgeList) {
+    // Line 12: for a, b in connections
+    push({
+      title: { vi: `for a, b in connections: a,b = ${a},${b}`, en: `for a, b in connections: a,b = ${a},${b}` },
+      hlNodes: [a, b],
+      codeLines: [12],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cáp (${a}, ${b}).`, en: `Process cable (${a}, ${b}).` },
+    });
+
+    const ra = find(a, "a");
+    const rb = find(b, "b");
+
+    // Line 13: if find(a) == find(b)
+    const isCycle = ra === rb;
+    push({
+      title: { vi: `find(a) == find(b)? ${isCycle} (${ra} vs ${rb})`, en: `find(a) == find(b)? ${isCycle} (${ra} vs ${rb})` },
+      hlNodes: [ra, rb],
+      codeLines: [13],
+      vars: [{ name: "find(a)", value: ra }, { name: "find(b)", value: rb }],
+      note: {
+        vi: isCycle ? "Cùng gốc → cáp này tạo vòng lặp, dư." : "Khác gốc → cáp hữu ích, cần gộp nhóm.",
+        en: isCycle ? "Same root → this cable creates a cycle, redundant." : "Different roots → useful cable, merge groups.",
+      },
+    });
+
+    const edgeKey = `${Math.min(a, b)}-${Math.max(a, b)}`;
+    if (isCycle) {
+      // Line 14: redundant += 1
+      redundant++;
+      redundantEdges.add(edgeKey);
+      push({
+        title: { vi: `redundant += 1 → ${redundant}`, en: `redundant += 1 → ${redundant}` },
+        hlNodes: [a, b],
+        codeLines: [14],
+        vars: [{ name: "redundant", value: redundant }],
+        note: { vi: `Cáp (${a},${b}) dư, có thể tháo ra dùng lại chỗ khác.`, en: `Cable (${a},${b}) is redundant, can be reused elsewhere.` },
+      });
+    } else {
+      // Line 16: parent[find(a)] = find(b)  (find(a), find(b) recomputed but return same roots since nothing changed since line 13)
+      parent[ra] = rb;
+      addedEdges.add(edgeKey);
+      push({
+        title: { vi: `parent[find(a)] = find(b) → parent[${ra}] = ${rb}`, en: `parent[find(a)] = find(b) → parent[${ra}] = ${rb}` },
+        hlNodes: [ra, rb],
+        hlEdges: [[a, b]],
+        codeLines: [16],
+        vars: [{ name: "parent", value: `[${parent.join(",")}]` }],
+        note: { vi: `Gắn gốc ${ra} vào gốc ${rb}. Cáp (${a}─${b}) xuất hiện trên đồ thị.`, en: `Attach root ${ra} under root ${rb}. Cable (${a}─${b}) appears on the graph.` },
+      });
+
+      // Line 17: components -= 1
+      components--;
+      push({
+        title: { vi: `components -= 1 → ${components}`, en: `components -= 1 → ${components}` },
+        codeLines: [17],
+        vars: [{ name: "components", value: components }],
+        note: { vi: "Hai nhóm vừa được gộp lại.", en: "Two groups just merged." },
+      });
+    }
+  }
+
+  // Line 18: return components - 1
+  const answer = components - 1;
+  const fs = graphSnap({
+    title: { vi: `return components - 1 → ${answer}`, en: `return components - 1 → ${answer}` },
+    codeLines: [18],
+    vars: [{ name: "components", value: components }, { name: "answer", value: answer }],
+    note: {
+      vi: `Còn ${components} nhóm chưa nối. Cần ${answer} thao tác chuyển cáp để nối tất cả.`,
+      en: `${components} disconnected group(s) remain. Need ${answer} cable move(s) to connect them all.`,
     },
-    [], [],
-    [
-      { name: "components", value: components },
-      { name: "redundant cables", value: redundant },
-      { name: "need operations", value: components - 1 },
-      { name: "answer", value: answer },
-    ],
-    [11]
-  );
+  });
   fs.final = true;
   steps.push(fs);
 
