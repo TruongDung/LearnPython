@@ -3491,9 +3491,14 @@ function buildSteps2492(input, params) {
  *  Phase 1: DFS from every border 'O', mark connected 'O' as safe ('#').
  *  Phase 2: scan grid — 'O' → 'X' (captured), '#' → 'O' (restore safe).
  */
-function buildStepsSurroundedRegions(input) {
+function buildStepsSurroundedRegions(input, params) {
   const grid = parseIslandGrid(input);
   const steps = [];
+
+  // Approach 2 = recursive DFS with 'S' marker; shares the same algorithm/visual.
+  const approach = Number(params && params.approach) || 1;
+  const cb = approach === 2 ? 2 : 1;          // which code block to highlight
+  const markSafeLine = approach === 2 ? 9 : 11; // line where safe cell is marked
 
   if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "X" && v !== "O"))) {
     steps.push({
@@ -3501,7 +3506,8 @@ function buildStepsSurroundedRegions(input) {
       arr: [],
       bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
       final: true,
-      codeLines: [3, 4],
+      codeBlock: cb,
+      codeLines: [3],
       vars: [{ name: "error", value: "invalid" }],
       note: {
         vi: "Grid phải gồm ký tự 'X' và 'O'. Ví dụ: XXXX|XOOX|XXOX|XOXX.",
@@ -3542,6 +3548,7 @@ function buildStepsSurroundedRegions(input) {
       highlight: [],
       mark: [],
       final,
+      codeBlock: cb,
       codeLines,
       vars,
       note,
@@ -3623,7 +3630,7 @@ function buildStepsSurroundedRegions(input) {
 
     pushStep({
       title: { vi: `Vùng an toàn từ (${br},${bc}) đã đánh dấu`, en: `Safe region from (${br},${bc}) marked` },
-      codeLines: [11],
+      codeLines: [markSafeLine],
       vars: [
         { name: "safe cells so far", value: status.flat().filter((v) => v === "safe").length },
       ],
@@ -3719,6 +3726,7 @@ function buildStepsSurroundedRegions(input) {
     highlight: [],
     mark: [],
     final: true,
+    codeBlock: cb,
     codeLines: [23],
     vars: [
       { name: "captured", value: captured },
@@ -3828,6 +3836,12 @@ module.exports = {
     defaultInput: "XXXX|XOOX|XXOX|XOXX",
     inputKind: "string",
     inputLabel: { vi: "Lưới X/O (hàng cách '|')", en: "X/O board (rows separated by '|')" },
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: DFS dùng stack ('#')", en: "Approach 1: DFS iterative ('#')" } },
+        { value: "2", label: { vi: "Cách 2: DFS đệ quy ('S')", en: "Approach 2: DFS recursive ('S')" } },
+      ] },
+    ],
     approach: [
       { vi: "Mọi 'O' nối tới 'O' ở BIÊN thì thoát được → an toàn, không bị bắt.", en: "Any 'O' connected to a BORDER 'O' escapes → safe, not captured." },
       { vi: "Phase 1: DFS từ mọi 'O' ở biên, đánh dấu vùng nối chúng là an toàn.", en: "Phase 1: DFS from every border 'O', mark the connected region as safe." },
@@ -3867,6 +3881,33 @@ module.exports = {
       "                elif board[i][j] == '#':",
       "                    board[i][j] = 'O'   # restore safe",
     ],
+    code2: [
+      "class Solution:",
+      "    def solve(self, board):",
+      "        if not board or not board[0]:",
+      "            return",
+      "        m, n = len(board), len(board[0])",
+      "        def dfs(r, c):",
+      "            if r < 0 or r >= m or c < 0 or c >= n or board[r][c] != 'O':",
+      "                return",
+      "            board[r][c] = 'S'",
+      "            dfs(r+1, c)",
+      "            dfs(r-1, c)",
+      "            dfs(r, c+1)",
+      "            dfs(r, c-1)",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if (r == 0 or r == m-1 or c == 0 or c == n-1) and board[r][c] == 'O':",
+      "                    dfs(r, c)",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if board[r][c] == 'O':",
+      "                    board[r][c] = 'X'",
+      "                elif board[r][c] == 'S':",
+      "                    board[r][c] = 'O'",
+    ],
+    codeLabel: { vi: "Cách 1: DFS dùng stack ('#')", en: "Approach 1: DFS iterative ('#')" },
+    code2Label: { vi: "Cách 2: DFS đệ quy ('S')", en: "Approach 2: DFS recursive ('S')" },
     builder: buildStepsSurroundedRegions,
   },
   695: {
