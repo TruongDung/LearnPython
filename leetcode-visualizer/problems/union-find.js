@@ -1055,6 +1055,33 @@ function buildSteps1101(input, params) {
 }
 
 // ─── 1319 DFS: Number of Operations to Make Network Connected ───
+// Line-by-line trace of the exact code2 shown to the user:
+//  1  from collections import defaultdict
+//  2  (blank)
+//  3  class Solution:
+//  4      def makeConnected(self, n, connections):
+//  5          if len(connections) < n - 1:
+//  6              return -1
+//  7          graph = defaultdict(list)
+//  8          for a, b in connections:
+//  9              graph[a].append(b)
+// 10              graph[b].append(a)
+// 11          visited = set()
+// 12          def dfs(node):
+// 13              stack = [node]
+// 14              while stack:
+// 15                  cur = stack.pop()
+// 16                  for nb in graph[cur]:
+// 17                      if nb not in visited:
+// 18                          visited.add(nb)
+// 19                          stack.append(nb)
+// 20          components = 0
+// 21          for i in range(n):
+// 22              if i not in visited:
+// 23                  visited.add(i)
+// 24                  dfs(i)
+// 25                  components += 1
+// 26          return components - 1
 function buildSteps1319DFS(input, params) {
   const n = params.n !== undefined ? Number(params.n) : 4;
   const edgeList = String(input).split(";").map((s) => {
@@ -1063,20 +1090,12 @@ function buildSteps1319DFS(input, params) {
   }).filter((e) => !isNaN(e[0]) && !isNaN(e[1]));
 
   const steps = [];
-
-  // Build adjacency list
-  const adj = Array.from({ length: n }, () => []);
-  for (const [a, b] of edgeList) {
-    adj[a].push(b);
-    adj[b].push(a);
-  }
-
   const allNodes = Array.from({ length: n }, (_, i) => i);
   const allEdges = edgeList.map(([a, b]) => ({ u: a, v: b, w: "" }));
 
   function makeGraph(hlNodes, hlEdges, visitedNodes) {
     return {
-      nodes: allNodes.map(id => ({ id, label: String(id) })),
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
       edges: allEdges,
       hlNodes: hlNodes || [],
       hlEdges: hlEdges || [],
@@ -1084,158 +1103,270 @@ function buildSteps1319DFS(input, params) {
     };
   }
 
-  const visited = new Set();
-  let components = 0;
-  const impossible = edgeList.length < n - 1;
+  function push({ title, hlNodes, hlEdges, visited, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visited || []),
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
 
-  // ── Step 0: feasibility check ──────────────────────────────────────
-  steps.push({
-    title: { en: "Step 1: feasibility check", vi: "Bước 1: kiểm tra khả thi" },
-    arr: [],
-    graph: makeGraph([], [], []),
-    highlight: [], mark: [],
-    codeLines: [3, 4],
-    vars: [
-      { name: "n (computers)", value: n },
-      { name: "cables", value: edgeList.length },
-      { name: "min needed (n-1)", value: n - 1 },
-      { name: "feasible?", value: !impossible },
-    ],
+  // Line 5: if len(connections) < n - 1
+  const impossible = edgeList.length < n - 1;
+  push({
+    title: { vi: `len(connections) < n-1? ${impossible} (${edgeList.length} vs ${n - 1})`, en: `len(connections) < n-1? ${impossible} (${edgeList.length} vs ${n - 1})` },
+    codeLines: [5],
+    vars: [{ name: "len(connections)", value: edgeList.length }, { name: "n-1", value: n - 1 }],
     note: {
-      en: `${n} computers, ${edgeList.length} cables. Need ≥ n-1 = ${n-1} cables to connect all. ` +
-          (impossible ? `${edgeList.length} < ${n-1} → impossible, return -1.` : `${edgeList.length} ≥ ${n-1} → may be possible. Count components via DFS.`),
-      vi: `${n} máy tính, ${edgeList.length} cáp. Cần ≥ n-1 = ${n-1} cáp. ` +
-          (impossible ? `${edgeList.length} < ${n-1} → không thể, trả -1.` : `${edgeList.length} ≥ ${n-1} → có thể. Đếm components bằng DFS.`),
+      vi: impossible ? "Không đủ cáp để nối tất cả máy tính." : "Đủ cáp (chưa chắc đúng vị trí) → tiếp tục.",
+      en: impossible ? "Not enough cables to connect every computer." : "Enough cables (positions may still be wrong) → continue.",
     },
   });
-
   if (impossible) {
-    const fs = {
-      title: { en: "Result: -1 (not enough cables)", vi: "Kết quả: -1 (không đủ cáp)" },
-      arr: [], graph: makeGraph([], [], []),
-      highlight: [], mark: [], final: true, codeLines: [3, 4],
+    push({
+      title: { vi: "return -1", en: "return -1" },
+      final: true,
+      codeLines: [6],
       vars: [{ name: "answer", value: -1 }],
-      note: { en: "Impossible: return -1.", vi: "Không thể: trả -1." },
-    };
-    fs.final = true;
-    steps.push(fs);
+      note: { vi: "Không thể nối hết → trả -1.", en: "Cannot connect everything → return -1." },
+    });
     return { input, answer: -1, steps };
   }
 
-  // ── Step 1: init visited ────────────────────────────────────────────
-  steps.push({
-    title: { en: "Init: visited = set(), components = 0", vi: "Khởi tạo: visited = {}, components = 0" },
-    arr: [],
-    graph: makeGraph([], [], []),
-    highlight: [], mark: [],
-    codeLines: [6, 7],
-    vars: [
-      { name: "visited", value: "{}" },
-      { name: "components", value: 0 },
-    ],
-    note: {
-      en: `Build adjacency list from ${edgeList.length} cables. DFS from each unvisited node counts one new component.`,
-      vi: `Xây adjacency list từ ${edgeList.length} cáp. DFS từ mỗi nút chưa thăm = 1 component mới.`,
-    },
+  // Line 7: graph = defaultdict(list)
+  const adj = Array.from({ length: n }, () => []);
+  push({
+    title: { vi: "graph = defaultdict(list)", en: "graph = defaultdict(list)" },
+    codeLines: [7],
+    vars: [{ name: "graph", value: "{}" }],
+    note: { vi: "Tạo adjacency list rỗng.", en: "Create an empty adjacency list." },
   });
 
-  // ── DFS per component ────────────────────────────────────────────
-  for (let start = 0; start < n; start++) {
-    if (visited.has(start)) continue;
-
-    // Show: starting DFS from this node
-    steps.push({
-      title: { en: `for i=${start}: not visited → start DFS`, vi: `for i=${start}: chưa thăm → bắt đầu DFS` },
-      arr: [],
-      graph: makeGraph([start], [], [...visited]),
-      highlight: [], mark: [],
-      codeLines: [9, 10, 11],
-      vars: [
-        { name: "i", value: start },
-        { name: "visited", value: `{${[...visited].join(", ")}}` },
-        { name: "components", value: components },
-      ],
-      note: {
-        en: `Node ${start} not in visited → launch DFS to discover all computers in this component.`,
-        vi: `Node ${start} chưa trong visited → DFS để khám phá tất cả máy tính cùng nhóm.`,
-      },
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `for a, b in connections: a,b = ${a},${b}`, en: `for a, b in connections: a,b = ${a},${b}` },
+      hlNodes: [a, b],
+      codeLines: [8],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cáp nối (${a}, ${b}).`, en: `Process cable (${a}, ${b}).` },
     });
-
-    // Iterative DFS, record order
-    const stack = [start];
-    const componentNodes = [];
-    visited.add(start);
-
-    while (stack.length > 0) {
-      const node = stack.pop();
-      componentNodes.push(node);
-      const unvisitedNeighbors = adj[node].filter(nb => !visited.has(nb));
-
-      steps.push({
-        title: { en: `DFS: visit node ${node}`, vi: `DFS: thăm node ${node}` },
-        arr: [],
-        graph: makeGraph([node], [], [...visited]),
-        highlight: [], mark: [],
-        codeLines: [12, 13, 14, 15],
-        vars: [
-          { name: "node", value: node },
-          { name: "neighbors", value: `[${adj[node].join(", ")}]` },
-          { name: "unvisited neighbors", value: `[${unvisitedNeighbors.join(", ")}]` },
-          { name: "stack (after pop)", value: `[${stack.join(", ")}]` },
-          { name: "visited", value: `{${[...visited].join(", ")}}` },
-        ],
-        note: {
-          en: `Visit node ${node}. Neighbors: [${adj[node].join(", ")}]. Push unvisited [${unvisitedNeighbors.join(", ")}] onto stack.`,
-          vi: `Thăm node ${node}. Hàng xóm: [${adj[node].join(", ")}]. Đẩy chưa thăm [${unvisitedNeighbors.join(", ")}] vào stack.`,
-        },
-      });
-
-      for (const nb of unvisitedNeighbors) {
-        visited.add(nb);
-        stack.push(nb);
-      }
-    }
-
-    components++;
-
-    steps.push({
-      title: { en: `Component ${components} found: [${componentNodes.join(", ")}]`, vi: `Tìm thấy component ${components}: [${componentNodes.join(", ")}]` },
-      arr: [],
-      graph: makeGraph(componentNodes, [], [...visited]),
-      highlight: [], mark: [],
-      codeLines: [16],
-      vars: [
-        { name: "component nodes", value: `[${componentNodes.join(", ")}]` },
-        { name: "components", value: components },
-        { name: "visited", value: `{${[...visited].join(", ")}}` },
-      ],
-      note: {
-        en: `DFS from node ${start} finished. Found ${componentNodes.length} computer(s) in this component. Total components so far: ${components}.`,
-        vi: `DFS từ node ${start} xong. Tìm thấy ${componentNodes.length} máy tính trong nhóm này. Tổng components hiện tại: ${components}.`,
-      },
+    adj[a].push(b);
+    push({
+      title: { vi: `graph[${a}].append(${b})`, en: `graph[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [9],
+      vars: [{ name: `graph[${a}]`, value: `[${adj[a].join(", ")}]` }],
+      note: { vi: `Thêm ${b} vào danh sách kề của ${a}.`, en: `Add ${b} to ${a}'s adjacency list.` },
+    });
+    adj[b].push(a);
+    push({
+      title: { vi: `graph[${b}].append(${a})`, en: `graph[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [10],
+      vars: [{ name: `graph[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm ${a} vào danh sách kề của ${b}.`, en: `Add ${a} to ${b}'s adjacency list.` },
     });
   }
 
-  // ── Final ─────────────────────────────────────────────────────────
+  // Line 11: visited = set()
+  const visited = new Set();
+  push({
+    title: { vi: "visited = set()", en: "visited = set()" },
+    codeLines: [11],
+    vars: [{ name: "visited", value: "{}" }],
+    note: { vi: "Chưa thăm máy tính nào.", en: "No computer visited yet." },
+  });
+
+  push({
+    title: { vi: "Định nghĩa dfs(node)", en: "Define dfs(node)" },
+    codeLines: [12],
+    vars: [],
+    note: { vi: "Hàm DFS lặp (dùng stack) sẽ quét hết 1 component.", en: "The iterative DFS function (using a stack) explores one whole component." },
+  });
+
+  function dfs(node) {
+    // Line 13: stack = [node]
+    const stack = [node];
+    push({
+      title: { vi: `stack = [${node}]`, en: `stack = [${node}]` },
+      hlNodes: [node],
+      visited: [...visited],
+      codeLines: [13],
+      vars: [{ name: "stack", value: `[${node}]` }],
+      note: { vi: `Đưa ${node} vào stack DFS.`, en: `Push ${node} onto the DFS stack.` },
+    });
+
+    while (stack.length) {
+      // Line 14: while stack
+      push({
+        title: { vi: "while stack: stack không rỗng", en: "while stack: stack is non-empty" },
+        visited: [...visited],
+        codeLines: [14],
+        vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+        note: { vi: "Còn đỉnh trong stack, tiếp tục DFS.", en: "Stack still has nodes, keep exploring." },
+      });
+
+      // Line 15: cur = stack.pop()
+      const cur = stack.pop();
+      push({
+        title: { vi: `cur = stack.pop() = ${cur}`, en: `cur = stack.pop() = ${cur}` },
+        hlNodes: [cur],
+        visited: [...visited],
+        codeLines: [15],
+        vars: [{ name: "cur", value: cur }, { name: "stack", value: `[${stack.join(", ")}]` }],
+        note: { vi: `Lấy ${cur} ra khỏi stack để xử lý.`, en: `Pop ${cur} from the stack to process.` },
+      });
+
+      // Line 16: for nb in graph[cur]
+      push({
+        title: { vi: `for nb in graph[${cur}]: [${adj[cur].join(", ")}]`, en: `for nb in graph[${cur}]: [${adj[cur].join(", ")}]` },
+        hlNodes: [cur],
+        hlEdges: adj[cur].map((nb) => [cur, nb]),
+        visited: [...visited],
+        codeLines: [16],
+        vars: [{ name: "neighbors", value: `[${adj[cur].join(", ")}]` }],
+        note: { vi: `Duyệt các máy tính nối trực tiếp với ${cur}.`, en: `Check computers directly wired to ${cur}.` },
+      });
+
+      for (const nb of adj[cur]) {
+        // Line 17: if nb not in visited
+        const already = visited.has(nb);
+        push({
+          title: { vi: `nb not in visited? ${!already} (nb=${nb})`, en: `nb not in visited? ${!already} (nb=${nb})` },
+          hlNodes: [cur, nb],
+          hlEdges: [[cur, nb]],
+          visited: [...visited],
+          codeLines: [17],
+          vars: [{ name: "nb", value: nb }, { name: "in visited?", value: already }],
+          note: {
+            vi: already ? `${nb} đã thăm → bỏ qua.` : `${nb} chưa thăm → thêm vào visited và push vào stack.`,
+            en: already ? `${nb} already visited → skip.` : `${nb} unvisited → mark visited and push onto the stack.`,
+          },
+        });
+        if (already) continue;
+
+        // Line 18: visited.add(nb)
+        visited.add(nb);
+        push({
+          title: { vi: `visited.add(${nb})`, en: `visited.add(${nb})` },
+          hlNodes: [nb],
+          visited: [...visited],
+          codeLines: [18],
+          vars: [{ name: "visited", value: `{${[...visited].join(", ")}}` }],
+          note: { vi: `Đánh dấu ${nb} đã thăm.`, en: `Mark ${nb} visited.` },
+        });
+
+        // Line 19: stack.append(nb)
+        stack.push(nb);
+        push({
+          title: { vi: `stack.append(${nb})`, en: `stack.append(${nb})` },
+          hlNodes: [nb],
+          visited: [...visited],
+          codeLines: [19],
+          vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+          note: { vi: `Đưa ${nb} vào stack để xử lý sau.`, en: `Push ${nb} onto the stack to process later.` },
+        });
+      }
+    }
+    push({
+      title: { vi: "while stack: stack rỗng → dfs kết thúc", en: "while stack: stack is empty → dfs finishes" },
+      visited: [...visited],
+      codeLines: [14],
+      vars: [{ name: "stack", value: "[]" }],
+      note: { vi: "Đã duyệt hết component chứa node xuất phát.", en: "The whole component containing the start node has been explored." },
+    });
+  }
+
+  // Line 20: components = 0
+  let components = 0;
+  push({
+    title: { vi: "components = 0", en: "components = 0" },
+    codeLines: [20],
+    vars: [{ name: "components", value: components }],
+    note: { vi: "Biến đếm số nhóm máy tính rời rạc.", en: "Counter for disconnected computer groups." },
+  });
+
+  for (let i = 0; i < n; i++) {
+    // Line 21: for i in range(n)
+    push({
+      title: { vi: `for i in range(n): i = ${i}`, en: `for i in range(n): i = ${i}` },
+      hlNodes: [i],
+      visited: [...visited],
+      codeLines: [21],
+      vars: [{ name: "i", value: i }, { name: "components", value: components }],
+      note: { vi: `Xét máy tính ${i}.`, en: `Consider computer ${i}.` },
+    });
+
+    // Line 22: if i not in visited
+    const already = visited.has(i);
+    push({
+      title: { vi: `i not in visited? ${!already}`, en: `i not in visited? ${!already}` },
+      hlNodes: [i],
+      visited: [...visited],
+      codeLines: [22],
+      vars: [{ name: "in visited?", value: already }],
+      note: {
+        vi: already ? `${i} đã thuộc nhóm xử lý trước → bỏ qua.` : `${i} chưa thăm → bắt đầu nhóm mới.`,
+        en: already ? `${i} already belongs to a processed group → skip.` : `${i} unvisited → start a new group.`,
+      },
+    });
+    if (already) continue;
+
+    // Line 23: visited.add(i)
+    visited.add(i);
+    push({
+      title: { vi: `visited.add(${i})`, en: `visited.add(${i})` },
+      hlNodes: [i],
+      visited: [...visited],
+      codeLines: [23],
+      vars: [{ name: "visited", value: `{${[...visited].join(", ")}}` }],
+      note: { vi: `Đánh dấu ${i} đã thăm.`, en: `Mark ${i} visited.` },
+    });
+
+    // Line 24: dfs(i)
+    push({
+      title: { vi: `dfs(${i})`, en: `dfs(${i})` },
+      hlNodes: [i],
+      visited: [...visited],
+      codeLines: [24],
+      vars: [{ name: "calling", value: i }],
+      note: { vi: `Gọi DFS để khám phá hết nhóm chứa ${i}.`, en: `Call DFS to explore the whole group containing ${i}.` },
+    });
+    dfs(i);
+
+    // Line 25: components += 1
+    components++;
+    push({
+      title: { vi: `components += 1 → ${components}`, en: `components += 1 → ${components}` },
+      visited: [...visited],
+      codeLines: [25],
+      vars: [{ name: "components", value: components }],
+      note: { vi: `Vừa khám phá xong 1 nhóm máy tính.`, en: `Just finished exploring one computer group.` },
+    });
+  }
+
+  // Line 26: return components - 1
   const answer = components - 1;
-  const fs = {
-    title: { en: `Result: ${answer} operation(s)`, vi: `Kết quả: ${answer} thao tác` },
-    arr: [],
-    graph: makeGraph([], [], [...visited]),
-    highlight: [], mark: [],
+  push({
+    title: { vi: `return components - 1 → ${answer}`, en: `return components - 1 → ${answer}` },
+    visited: [...visited],
     final: true,
-    codeLines: [17],
-    vars: [
-      { name: "components", value: components },
-      { name: "operations needed", value: `components - 1 = ${components} - 1 = ${answer}` },
-      { name: "answer", value: answer },
-    ],
+    codeLines: [26],
+    vars: [{ name: "components", value: components }, { name: "answer", value: answer }],
     note: {
-      en: `${components} disconnected component(s). Need to move ${answer} cable(s) to bridge them all into 1. Answer = components - 1 = ${answer}.`,
-      vi: `${components} nhóm riêng lẻ. Cần chuyển ${answer} cáp để nối tất cả. Đáp án = components - 1 = ${answer}.`,
+      vi: `${components} nhóm riêng lẻ. Cần chuyển ${answer} cáp để nối tất cả thành 1 nhóm.`,
+      en: `${components} disconnected group(s). Need ${answer} cable move(s) to merge them all into one.`,
     },
-  };
-  steps.push(fs);
+  });
 
   return { input, answer, steps };
 }
