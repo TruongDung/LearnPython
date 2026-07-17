@@ -3484,11 +3484,215 @@ function buildSteps2492(input, params) {
   return { original: input, answer, steps };
 }
 
+/**
+ * LeetCode 130: Surrounded Regions.
+ * Capture all 'O' regions 4-directionally surrounded by 'X'.
+ * Trick: any 'O' connected to a border 'O' is SAFE (not captured).
+ *  Phase 1: DFS from every border 'O', mark connected 'O' as safe ('#').
+ *  Phase 2: scan grid — 'O' → 'X' (captured), '#' → 'O' (restore safe).
+ */
+function buildStepsSurroundedRegions(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "X" && v !== "O"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3, 4],
+      vars: [{ name: "error", value: "invalid" }],
+      note: {
+        vi: "Grid phải gồm ký tự 'X' và 'O'. Ví dụ: XXXX|XOOX|XXOX|XOXX.",
+        en: "Grid must contain 'X' and 'O'. Example: XXXX|XOOX|XXOX|XOXX.",
+      },
+    });
+    return { original: grid, answer: grid, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  // status[r][c]: "X" | "O" | "safe" | "captured"
+  const status = grid.map((row) => row.map((v) => v));
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(current, frontier) {
+    const fset = frontier ? new Set(frontier.map(([r, c]) => key(r, c))) : null;
+    return status.map((row, r) =>
+      row.map((v, c) => {
+        let cls, label;
+        if (v === "X") { cls = "wall"; label = "X"; }
+        else if (v === "safe") { cls = "path"; label = "O"; }       // green = escaped/safe
+        else if (v === "captured") { cls = "visited"; label = "X"; } // blue = flipped
+        else { cls = "empty"; label = "O"; }                          // plain O
+        if (fset && fset.has(key(r, c))) cls = "queued";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, frontier = null, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, frontier) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  // Intro
+  pushStep({
+    title: { vi: "Ý tưởng: 'O' nối biên thì AN TOÀN", en: "Idea: border-connected 'O' is SAFE" },
+    codeLines: [3, 4],
+    vars: [
+      { name: "rows", value: rows },
+      { name: "cols", value: cols },
+    ],
+    note: {
+      vi:
+        `Bắt 'O' bị bao QUANH bởi 'X'. 'O' nào nối (4 hướng) tới 'O' ở BIÊN thì thoát được → AN TOÀN.\n` +
+        `Phase 1: DFS từ mọi 'O' ở biên, đánh dấu chúng AN TOÀN (màu xanh).\n` +
+        `Phase 2: quét lưới — 'O' còn lại → 'X' (bị bắt), 'O' an toàn → giữ 'O'.`,
+      en:
+        `Capture 'O' regions surrounded by 'X'. Any 'O' connected (4-dir) to a BORDER 'O' escapes → SAFE.\n` +
+        `Phase 1: DFS from every border 'O', mark them SAFE (green).\n` +
+        `Phase 2: scan grid — remaining 'O' → 'X' (captured), safe 'O' stays 'O'.`,
+    },
+  });
+
+  // Phase 1: DFS from border 'O' cells
+  const borderCells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isBorder = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+      if (isBorder && status[r][c] === "O") borderCells.push([r, c]);
+    }
+  }
+
+  pushStep({
+    title: { vi: `Phase 1: tìm ${borderCells.length} ô 'O' ở biên`, en: `Phase 1: find ${borderCells.length} border 'O' cells` },
+    frontier: borderCells,
+    codeLines: [6, 7, 8],
+    vars: [
+      { name: "border 'O' cells", value: borderCells.map(([r, c]) => `(${r},${c})`).join(" ") || "(none)" },
+    ],
+    note: {
+      vi: `Các ô 'O' nằm ở biên (vàng) là điểm xuất phát DFS. Mọi 'O' nối tới chúng đều an toàn.`,
+      en: `Border 'O' cells (yellow) are DFS start points. Every 'O' connected to them is safe.`,
+    },
+  });
+
+  for (const [br, bc] of borderCells) {
+    if (status[br][bc] !== "O") continue; // already marked safe
+
+    const stack = [[br, bc]];
+    status[br][bc] = "safe";
+
+    pushStep({
+      title: { vi: `DFS từ biên (${br},${bc})`, en: `DFS from border (${br},${bc})` },
+      current: [br, bc],
+      codeLines: [9, 10],
+      vars: [
+        { name: "start", value: `(${br}, ${bc})` },
+        { name: "mark", value: "safe" },
+      ],
+      note: {
+        vi: `Ô biên (${br},${bc}) là 'O' → đánh dấu AN TOÀN, rồi lan 4 hướng.`,
+        en: `Border cell (${br},${bc}) is 'O' → mark SAFE, then spread 4 directions.`,
+      },
+    });
+
+    while (stack.length) {
+      const [cr, cc] = stack.pop();
+      for (const [dr, dc] of dirs) {
+        const nr = cr + dr, nc = cc + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        if (status[nr][nc] !== "O") continue;
+        status[nr][nc] = "safe";
+        stack.push([nr, nc]);
+      }
+    }
+
+    pushStep({
+      title: { vi: `Vùng an toàn từ (${br},${bc}) đã đánh dấu`, en: `Safe region from (${br},${bc}) marked` },
+      codeLines: [11, 12, 13],
+      vars: [
+        { name: "safe cells so far", value: status.flat().filter((v) => v === "safe").length },
+      ],
+      note: {
+        vi: `Toàn bộ 'O' nối với (${br},${bc}) đã tô xanh (an toàn).`,
+        en: `All 'O' connected to (${br},${bc}) are now green (safe).`,
+      },
+    });
+  }
+
+  // Phase 2: flip
+  let captured = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (status[r][c] === "O") {
+        status[r][c] = "captured";
+        captured++;
+        pushStep({
+          title: { vi: `Bắt (${r},${c}): 'O' → 'X'`, en: `Capture (${r},${c}): 'O' → 'X'` },
+          current: [r, c],
+          codeLines: [15, 16, 17],
+          vars: [
+            { name: "cell", value: `(${r}, ${c})` },
+            { name: "captured so far", value: captured },
+          ],
+          note: {
+            vi: `Ô (${r},${c}) là 'O' KHÔNG an toàn → bị bao quanh → lật thành 'X'.`,
+            en: `Cell (${r},${c}) is an unsafe 'O' → surrounded → flip to 'X'.`,
+          },
+        });
+      }
+    }
+  }
+
+  // Final: restore safe → 'O'
+  const finalGrid = status.map((row) => row.map((v) => (v === "captured" ? "X" : v === "safe" ? "O" : v)));
+
+  steps.push({
+    title: { vi: `Kết quả: bắt ${captured} ô`, en: `Result: captured ${captured} cells` },
+    arr: [],
+    bfsGrid: {
+      rows,
+      cols,
+      cells: finalGrid.map((row) =>
+        row.map((v) => (v === "X" ? { label: "X", cls: "wall" } : { label: "O", cls: "path" }))
+      ),
+    },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "captured", value: captured },
+      { name: "result", value: finalGrid.map((row) => row.join("")).join(" | ") },
+    ],
+    note: {
+      vi: `Đã lật ${captured} ô 'O' bị bao quanh thành 'X'. Các 'O' an toàn (xanh) giữ nguyên.`,
+      en: `Flipped ${captured} surrounded 'O' cells to 'X'. Safe 'O' cells (green) stay unchanged.`,
+    },
+  });
+
+  return { original: grid, answer: finalGrid, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 695, 994, 130, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -3560,6 +3764,65 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps200,
+  },
+  130: {
+    id: 130,
+    difficulty: "medium",
+    slug: "surrounded-regions",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Surrounded Regions", en: "Surrounded Regions" },
+    titleVi: { vi: "Bắt vùng bị bao quanh", en: "Capture surrounded regions" },
+    statement: {
+      vi:
+        "Cho lưới m×n gồm 'X' và 'O'. Hãy bắt mọi vùng 'O' bị bao quanh 4 hướng bởi 'X' bằng cách lật chúng thành 'X'. " +
+        "Một 'O' nối (4 hướng) tới 'O' nằm ở BIÊN thì KHÔNG bị bắt. Nhập lưới: hàng cách bởi '|', ký tự viết liền hoặc cách bằng dấu phẩy.",
+      en:
+        "Given an m×n board of 'X' and 'O', capture all regions of 'O' that are 4-directionally surrounded by 'X' by flipping them to 'X'. " +
+        "An 'O' connected (4-dir) to a BORDER 'O' is NOT captured. Enter rows separated by '|', compact or comma-separated.",
+    },
+    defaultInput: "XXXX|XOOX|XXOX|XOXX",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới X/O (hàng cách '|')", en: "X/O board (rows separated by '|')" },
+    approach: [
+      { vi: "Mọi 'O' nối tới 'O' ở BIÊN thì thoát được → an toàn, không bị bắt.", en: "Any 'O' connected to a BORDER 'O' escapes → safe, not captured." },
+      { vi: "Phase 1: DFS từ mọi 'O' ở biên, đánh dấu vùng nối chúng là an toàn.", en: "Phase 1: DFS from every border 'O', mark the connected region as safe." },
+      { vi: "Phase 2: quét lưới — 'O' còn lại (không an toàn) → lật thành 'X'.", en: "Phase 2: scan grid — remaining unsafe 'O' → flip to 'X'." },
+      { vi: "'O' an toàn giữ nguyên là 'O'.", en: "Safe 'O' cells stay as 'O'." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được thăm tối đa một lần. Bộ nhớ cho stack/đánh dấu là O(m·n).",
+        en: "Each cell visited at most once. Stack/marking memory is O(m·n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def solve(self, board):",
+      "        if not board or not board[0]:",
+      "            return",
+      "        m, n = len(board), len(board[0])",
+      "        def dfs(i, j):",
+      "            if i < 0 or i >= m or j < 0 or j >= n:",
+      "                return",
+      "            if board[i][j] != 'O':",
+      "                return",
+      "            board[i][j] = '#'  # mark safe",
+      "            for di, dj in ((1,0),(-1,0),(0,1),(0,-1)):",
+      "                dfs(i + di, j + dj)",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if (i in (0, m-1) or j in (0, n-1)) and board[i][j] == 'O':",
+      "                    dfs(i, j)",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if board[i][j] == 'O':",
+      "                    board[i][j] = 'X'   # captured",
+      "                elif board[i][j] == '#':",
+      "                    board[i][j] = 'O'   # restore safe",
+    ],
+    builder: buildStepsSurroundedRegions,
   },
   695: {
     id: 695,
