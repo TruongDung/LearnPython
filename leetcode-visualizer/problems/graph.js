@@ -3551,7 +3551,7 @@ function buildStepsSurroundedRegions(input) {
   // Intro
   pushStep({
     title: { vi: "Ý tưởng: 'O' nối biên thì AN TOÀN", en: "Idea: border-connected 'O' is SAFE" },
-    codeLines: [3, 4],
+    codeLines: [2],
     vars: [
       { name: "rows", value: rows },
       { name: "cols", value: cols },
@@ -3580,7 +3580,7 @@ function buildStepsSurroundedRegions(input) {
   pushStep({
     title: { vi: `Phase 1: tìm ${borderCells.length} ô 'O' ở biên`, en: `Phase 1: find ${borderCells.length} border 'O' cells` },
     frontier: borderCells,
-    codeLines: [6, 7, 8],
+    codeLines: [16],
     vars: [
       { name: "border 'O' cells", value: borderCells.map(([r, c]) => `(${r},${c})`).join(" ") || "(none)" },
     ],
@@ -3599,14 +3599,14 @@ function buildStepsSurroundedRegions(input) {
     pushStep({
       title: { vi: `DFS từ biên (${br},${bc})`, en: `DFS from border (${br},${bc})` },
       current: [br, bc],
-      codeLines: [9, 10],
+      codeLines: [17],
       vars: [
         { name: "start", value: `(${br}, ${bc})` },
-        { name: "mark", value: "safe" },
+        { name: "call", value: `dfs(${br}, ${bc})` },
       ],
       note: {
-        vi: `Ô biên (${br},${bc}) là 'O' → đánh dấu AN TOÀN, rồi lan 4 hướng.`,
-        en: `Border cell (${br},${bc}) is 'O' → mark SAFE, then spread 4 directions.`,
+        vi: `Ô biên (${br},${bc}) là 'O' → gọi dfs(${br},${bc}) để đánh dấu vùng an toàn.`,
+        en: `Border cell (${br},${bc}) is 'O' → call dfs(${br},${bc}) to mark the safe region.`,
       },
     });
 
@@ -3623,7 +3623,7 @@ function buildStepsSurroundedRegions(input) {
 
     pushStep({
       title: { vi: `Vùng an toàn từ (${br},${bc}) đã đánh dấu`, en: `Safe region from (${br},${bc}) marked` },
-      codeLines: [11, 12, 13],
+      codeLines: [11],
       vars: [
         { name: "safe cells so far", value: status.flat().filter((v) => v === "safe").length },
       ],
@@ -3634,31 +3634,76 @@ function buildStepsSurroundedRegions(input) {
     });
   }
 
-  // Phase 2: flip
+  // Phase 2 intro
+  pushStep({
+    title: { vi: "Phase 2: quét lại toàn lưới", en: "Phase 2: scan the whole grid" },
+    codeLines: [18],
+    vars: [
+      { name: "safe cells", value: status.flat().filter((v) => v === "safe").length },
+    ],
+    note: {
+      vi: `Quét lại từng ô: 'O' (không an toàn) → 'X' (bắt); '#' (an toàn) → 'O' (khôi phục).`,
+      en: `Rescan each cell: 'O' (unsafe) → 'X' (capture); '#' (safe) → 'O' (restore).`,
+    },
+  });
+
+  // Phase 2: flip unsafe 'O' → 'X'
   let captured = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (status[r][c] === "O") {
+        // Step: check board[i][j] == 'O' (line 20)
+        pushStep({
+          title: { vi: `(${r},${c}) là 'O' không an toàn?`, en: `Is (${r},${c}) an unsafe 'O'?` },
+          current: [r, c],
+          codeLines: [20],
+          vars: [
+            { name: "cell", value: `(${r}, ${c})` },
+            { name: "board[i][j]", value: "'O'" },
+          ],
+          note: {
+            vi: `Ô (${r},${c}) = 'O' và KHÔNG được đánh dấu an toàn → bị bao quanh.`,
+            en: `Cell (${r},${c}) = 'O' and NOT marked safe → surrounded.`,
+          },
+        });
+
+        // Step: board[i][j] = 'X' (line 21)
         status[r][c] = "captured";
         captured++;
         pushStep({
           title: { vi: `Bắt (${r},${c}): 'O' → 'X'`, en: `Capture (${r},${c}): 'O' → 'X'` },
           current: [r, c],
-          codeLines: [15, 16, 17],
+          codeLines: [21],
           vars: [
             { name: "cell", value: `(${r}, ${c})` },
             { name: "captured so far", value: captured },
           ],
           note: {
-            vi: `Ô (${r},${c}) là 'O' KHÔNG an toàn → bị bao quanh → lật thành 'X'.`,
-            en: `Cell (${r},${c}) is an unsafe 'O' → surrounded → flip to 'X'.`,
+            vi: `Lật ô (${r},${c}) thành 'X'.`,
+            en: `Flip cell (${r},${c}) to 'X'.`,
           },
         });
       }
     }
   }
 
-  // Final: restore safe → 'O'
+  // Restore safe cells: '#' → 'O' (line 22-23)
+  const safeCount = status.flat().filter((v) => v === "safe").length;
+  if (safeCount > 0) {
+    pushStep({
+      title: { vi: `Khôi phục ${safeCount} ô an toàn: '#' → 'O'`, en: `Restore ${safeCount} safe cells: '#' → 'O'` },
+      codeLines: [23],
+      vars: [
+        { name: "safe cells restored", value: safeCount },
+      ],
+      note: {
+        vi: `Các ô an toàn (xanh) được khôi phục lại thành 'O'.`,
+        en: `Safe cells (green) are restored back to 'O'.`,
+      },
+    });
+  }
+
+  // Final result
   const finalGrid = status.map((row) => row.map((v) => (v === "captured" ? "X" : v === "safe" ? "O" : v)));
 
   steps.push({
@@ -3674,7 +3719,7 @@ function buildStepsSurroundedRegions(input) {
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [18],
+    codeLines: [23],
     vars: [
       { name: "captured", value: captured },
       { name: "result", value: finalGrid.map((row) => row.join("")).join(" | ") },
