@@ -3482,6 +3482,7 @@ function buildSteps583(input, params) {
         pathCells: opts.pathCells || [],
         cellLabels: opts.cellLabels || {},
         showIndices: true,
+        largeCells: true,
       },
       highlight: [],
       mark: [],
