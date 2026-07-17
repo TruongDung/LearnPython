@@ -8,6 +8,33 @@
 const UF_CAT = { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" };
 
 // ─── 547: Number of Provinces ───
+// Line-by-line trace of the exact Python code shown to the user:
+//  1  class UnionFind:
+//  2      def __init__(self, n):
+//  3          self.parent = list(range(n))
+//  4          self.rank = [0] * n
+//  5          self.components = n
+//  6      def find(self, x):
+//  7          while self.parent[x] != x:
+//  8              self.parent[x] = self.parent[self.parent[x]]  # path compression
+//  9              x = self.parent[x]
+// 10          return x
+// 11      def union(self, x, y):
+// 12          rx, ry = self.find(x), self.find(y)
+// 13          if rx == ry: return
+// 14          if self.rank[rx] < self.rank[ry]: rx, ry = ry, rx
+// 15          self.parent[ry] = rx
+// 16          if self.rank[rx] == self.rank[ry]: self.rank[rx] += 1
+// 17          self.components -= 1
+// 18  class Solution:
+// 19      def findCircleNum(self, isConnected):
+// 20          n = len(isConnected)
+// 21          uf = UnionFind(n)
+// 22          for i in range(n):
+// 23              for j in range(i + 1, n):
+// 24                  if isConnected[i][j]:
+// 25                      uf.union(i, j)
+// 26          return uf.components
 function buildSteps547(input) {
   // Accept both [[1,0],[0,1]] and "1,0;0,1" formats
   const raw = String(input).trim();
@@ -30,172 +57,255 @@ function buildSteps547(input) {
   const n = matrix.length;
   const steps = [];
 
-  // ── Union-Find ──
   const parent = Array.from({ length: n }, (_, i) => i);
   const rank = new Array(n).fill(0);
   let components = n;
+  const addedSet = new Set(); // "u-v" edges already unioned, for the graph view
 
-  function find(x) {
-    let r = x;
-    while (parent[r] !== r) r = parent[r];
-    return r;
+  function roots() {
+    const rs = new Set();
+    for (let i = 0; i < n; i++) {
+      let x = i;
+      while (parent[x] !== x) x = parent[x];
+      rs.add(x);
+    }
+    return rs;
   }
-  function findWithCompress(x) {
-    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-    return x;
-  }
-  function roots() { return new Set(Array.from({length:n},(_,i)=>find(i))); }
 
-  // ── Build edge list from upper triangle ──
-  const allEdges = [];
-  for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++)
-      if (matrix[i][j] === 1) allEdges.push({ u: i, v: j });
-
-  // ── Graph snapshot helper ──
-  // addedEdges: Set of "u-v" strings already merged into graph
-  // hlNodes: nodes to highlight amber (currently being processed)
-  // hlEdges: edges to highlight amber
-  // visitedNodes: nodes that are in a multi-node component (tô xanh nhạt)
-  const addedSet = new Set(); // "u-v" added edges so far
-
-  function graphSnap(hlNodes, hlEdges, title, note, vars, codeLines) {
-    // Build graph nodes
-    const gNodes = Array.from({length:n}, (_, i) => ({ id: i, label: String(i) }));
-
-    // Build graph edges: only edges already unioned
+  function graphSnap({ hlNodes = [], hlEdges = [], title, note, vars, codeLines }) {
+    const gNodes = Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) }));
     const gEdges = [];
     for (const key of addedSet) {
       const [u, v] = key.split("-").map(Number);
       gEdges.push({ u, v, w: "" });
     }
 
-    // visitedNodes = nodes that share a component with at least 1 other node
+    // visitedNodes = nodes that share a component with at least one other node
+    const rootOf = (x) => { let r = x; while (parent[r] !== r) r = parent[r]; return r; };
     const compCount = new Map();
     for (let i = 0; i < n; i++) {
-      const r = find(i);
+      const r = rootOf(i);
       compCount.set(r, (compCount.get(r) || 0) + 1);
     }
-    const visited = Array.from({length:n}, (_, i) => compCount.get(find(i)) > 1 ? i : -1).filter(x => x >= 0);
+    const visited = Array.from({ length: n }, (_, i) => (compCount.get(rootOf(i)) > 1 ? i : -1)).filter((x) => x >= 0);
+    const rootSet = roots();
 
     return {
       title,
       arr: [...parent],
       sub: [...rank],
-      highlight: (hlNodes || []),
-      mark: Array.from({length:n}, (_, i) => i).filter(i => roots().has(i) && parent[i] === i),
-      graph: {
-        nodes: gNodes,
-        edges: gEdges,
-        hlNodes: hlNodes || [],
-        hlEdges: hlEdges || [],
-        visitedNodes: visited,
-      },
-      codeLines: codeLines || [],
+      highlight: hlNodes,
+      mark: Array.from({ length: n }, (_, i) => i).filter((i) => rootSet.has(i)),
+      graph: { nodes: gNodes, edges: gEdges, hlNodes, hlEdges, visitedNodes: visited },
+      codeLines,
       vars: vars || [],
       note,
     };
   }
 
-  // ── Step 0: intro — graph with no edges ──
-  steps.push(graphSnap(
-    [], [],
-    { vi: "Khởi tạo: mỗi thành phố là 1 tỉnh riêng", en: "Init: each city is its own province" },
-    {
-      vi:
-        `${n} thành phố, chưa có kết nối nào.\n` +
-        `parent[i] = i, rank[i] = 0, components = ${n}.\n\n` +
-        `Vòng tròn = thành phố; cạnh = kết nối trực tiếp (sẽ thêm dần).\n` +
-        `Nút VÀNG = đang xét. Nút XANH = đã cùng tỉnh với ít nhất 1 nút khác.`,
-      en:
-        `${n} cities, no connections yet.\n` +
-        `parent[i] = i, rank[i] = 0, components = ${n}.\n\n` +
-        `Circle = city; edge = direct connection (added one by one).\n` +
-        `AMBER node = being processed. BLUE node = already in a multi-city province.`,
-    },
-    [{ name: "components", value: components }, { name: "parent", value: `[${parent.join(",")}]` }],
-    [2, 3, 4]
-  ));
+  function push(opts) { steps.push(graphSnap(opts)); }
 
-  // ── Process each edge in the upper triangle ──
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      if (matrix[i][j] !== 1) continue;
+  // Line 20: n = len(isConnected)
+  push({
+    title: { vi: "n = len(isConnected)", en: "n = len(isConnected)" },
+    codeLines: [20],
+    vars: [{ name: "n", value: n }],
+    note: { vi: `Có ${n} thành phố.`, en: `There are ${n} cities.` },
+  });
 
-      const ri = find(i), rj = find(j);
-      const alreadySame = ri === rj;
+  // Line 21: uf = UnionFind(n)  → enters __init__ (lines 2-5)
+  push({
+    title: { vi: "uf = UnionFind(n)", en: "uf = UnionFind(n)" },
+    codeLines: [21],
+    vars: [{ name: "n", value: n }],
+    note: { vi: "Khởi tạo Union-Find, gọi __init__.", en: "Initialize the Union-Find object, calling __init__." },
+  });
+  push({
+    title: { vi: "self.parent = list(range(n))", en: "self.parent = list(range(n))" },
+    codeLines: [3],
+    vars: [{ name: "parent", value: `[${parent.join(",")}]` }],
+    note: { vi: "Mỗi thành phố tự làm gốc của chính nó.", en: "Each city starts as its own root." },
+  });
+  push({
+    title: { vi: "self.rank = [0] * n", en: "self.rank = [0] * n" },
+    codeLines: [4],
+    vars: [{ name: "rank", value: `[${rank.join(",")}]` }],
+    note: { vi: "Rank (chiều cao cây) ban đầu = 0.", en: "Rank (tree height) starts at 0." },
+  });
+  push({
+    title: { vi: "self.components = n", en: "self.components = n" },
+    codeLines: [5],
+    vars: [{ name: "components", value: components }],
+    note: { vi: `Ban đầu có ${n} tỉnh riêng biệt.`, en: `Initially there are ${n} separate provinces.` },
+  });
 
-      // Step: check this edge
-      steps.push(graphSnap(
-        [i, j], [],
-        { vi: `Kiểm tra (${i}, ${j}): connected = 1`, en: `Check (${i}, ${j}): connected = 1` },
-        {
-          vi:
-            `matrix[${i}][${j}] = 1 → thành phố ${i} và ${j} kết nối trực tiếp.\n` +
-            `find(${i}) = ${ri},  find(${j}) = ${rj}.\n` +
-            (alreadySame
-              ? `Cùng gốc ${ri} → đã cùng tỉnh, bỏ qua.`
-              : `Khác gốc → cần UNION.`),
-          en:
-            `matrix[${i}][${j}] = 1 → cities ${i} and ${j} are directly connected.\n` +
-            `find(${i}) = ${ri},  find(${j}) = ${rj}.\n` +
-            (alreadySame
-              ? `Same root ${ri} → already same province, skip.`
-              : `Different roots → need to UNION.`),
+  // Recursive-ish find() with real path compression, one code line per step.
+  function find(x, label) {
+    while (true) {
+      const done = parent[x] === x;
+      push({
+        hlNodes: [x],
+        title: { vi: `find(${label}): while parent[${x}] != ${x}? ${done ? "False" : "True"}`, en: `find(${label}): while parent[${x}] != ${x}? ${done ? "False" : "True"}` },
+        codeLines: [7],
+        vars: [{ name: "x", value: x }, { name: "parent[x]", value: parent[x] }],
+        note: {
+          vi: done ? `${x} đã là gốc.` : `${x} chưa là gốc (parent[${x}]=${parent[x]}), tiếp tục đi lên.`,
+          en: done ? `${x} is already a root.` : `${x} is not a root yet (parent[${x}]=${parent[x]}), keep climbing.`,
         },
-        [{ name: "edge", value: `(${i}, ${j})` }, { name: "find(i)", value: ri }, { name: "find(j)", value: rj }, { name: "same?", value: alreadySame }],
-        [6, 7, 8]
-      ));
-
-      if (alreadySame) continue;
-
-      // Union by rank
-      let from, to;
-      if (rank[ri] < rank[rj]) { parent[ri] = rj; from = ri; to = rj; }
-      else if (rank[ri] > rank[rj]) { parent[rj] = ri; from = rj; to = ri; }
-      else { parent[rj] = ri; rank[ri]++; from = rj; to = ri; }
-      components--;
-
-      // Add edge to graph
-      addedSet.add(`${Math.min(i,j)}-${Math.max(i,j)}`);
-
-      steps.push(graphSnap(
-        [i, j], [`${Math.min(i,j)}-${Math.max(i,j)}`],
-        { vi: `Union(${i}, ${j}) → ${components} tỉnh`, en: `Union(${i}, ${j}) → ${components} province(s)` },
-        {
-          vi:
-            `Gắn gốc ${from} vào gốc ${to} (union by rank).\n` +
-            `parent[${from}] = ${to}, rank[${to}] = ${rank[to]}.\n` +
-            `Cạnh (${i}─${j}) xuất hiện trên đồ thị. Số tỉnh còn lại = ${components}.`,
-          en:
-            `Attach root ${from} under ${to} (union by rank).\n` +
-            `parent[${from}] = ${to}, rank[${to}] = ${rank[to]}.\n` +
-            `Edge (${i}─${j}) appears on the graph. Provinces remaining = ${components}.`,
-        },
-        [{ name: "from", value: from }, { name: "to (root)", value: to }, { name: "parent", value: `[${parent.join(",")}]` }, { name: "rank", value: `[${rank.join(",")}]` }, { name: "components", value: components }],
-        [9, 10, 11]
-      ));
+      });
+      if (done) {
+        push({
+          hlNodes: [x],
+          title: { vi: `return ${x}`, en: `return ${x}` },
+          codeLines: [10],
+          vars: [{ name: "root", value: x }],
+          note: { vi: `find(${label}) trả về gốc ${x}.`, en: `find(${label}) returns root ${x}.` },
+        });
+        return x;
+      }
+      const before = parent[x];
+      const grand = parent[parent[x]];
+      parent[x] = grand;
+      push({
+        hlNodes: [x],
+        title: { vi: `parent[${x}] = parent[parent[${x}]] = ${grand}`, en: `parent[${x}] = parent[parent[${x}]] = ${grand}` },
+        codeLines: [8],
+        vars: [{ name: "parent[x] before", value: before }, { name: "parent[x] after", value: grand }, { name: "parent", value: `[${parent.join(",")}]` }],
+        note: { vi: "Path compression: rút ngắn đường về gốc.", en: "Path compression: shortens the path to the root." },
+      });
+      const nx = parent[x];
+      x = nx;
+      push({
+        hlNodes: [x],
+        title: { vi: `x = parent[x] = ${x}`, en: `x = parent[x] = ${x}` },
+        codeLines: [9],
+        vars: [{ name: "x", value: x }],
+        note: { vi: `Tiếp tục xét đỉnh ${x}.`, en: `Continue checking node ${x}.` },
+      });
     }
   }
 
-  // ── Final ──
-  const finalRoots = [...roots()];
-  const fs = graphSnap(
-    [], [],
-    { vi: `Kết quả: ${components} tỉnh`, en: `Result: ${components} province(s)` },
-    {
-      vi:
-        `Duyệt hết ma trận. ${components} nhóm kết nối = ${components} tỉnh.\n` +
-        `Các gốc đại diện: {${finalRoots.join(", ")}}.\n` +
-        `Trên đồ thị: mỗi tập nút nối nhau = 1 tỉnh.`,
-      en:
-        `Matrix fully processed. ${components} connected components = ${components} province(s).\n` +
-        `Representative roots: {${finalRoots.join(", ")}}.\n` +
-        `On the graph: each cluster of connected nodes = one province.`,
+  // Line 22-25: nested loop calling uf.union(i, j)
+  for (let i = 0; i < n; i++) {
+    push({
+      title: { vi: `for i in range(n): i = ${i}`, en: `for i in range(n): i = ${i}` },
+      hlNodes: [i],
+      codeLines: [22],
+      vars: [{ name: "i", value: i }],
+      note: { vi: `Xét thành phố ${i}.`, en: `Consider city ${i}.` },
+    });
+    for (let j = i + 1; j < n; j++) {
+      push({
+        title: { vi: `for j in range(i+1, n): j = ${j}`, en: `for j in range(i+1, n): j = ${j}` },
+        hlNodes: [i, j],
+        codeLines: [23],
+        vars: [{ name: "i", value: i }, { name: "j", value: j }],
+        note: { vi: `So với thành phố ${j}.`, en: `Compare with city ${j}.` },
+      });
+
+      const connected = matrix[i][j] === 1;
+      push({
+        title: { vi: `isConnected[${i}][${j}]? ${connected}`, en: `isConnected[${i}][${j}]? ${connected}` },
+        hlNodes: [i, j],
+        codeLines: [24],
+        vars: [{ name: `isConnected[${i}][${j}]`, value: matrix[i][j] }],
+        note: {
+          vi: connected ? `${i} và ${j} kết nối trực tiếp → cần union.` : `${i} và ${j} không kết nối trực tiếp → bỏ qua.`,
+          en: connected ? `${i} and ${j} are directly connected → need to union.` : `${i} and ${j} are not directly connected → skip.`,
+        },
+      });
+      if (!connected) continue;
+
+      // Line 25: uf.union(i, j) → enters union() body
+      push({
+        title: { vi: `uf.union(${i}, ${j})`, en: `uf.union(${i}, ${j})` },
+        hlNodes: [i, j],
+        codeLines: [25],
+        vars: [{ name: "x", value: i }, { name: "y", value: j }],
+        note: { vi: "Gọi union, bắt đầu bằng find(x) và find(y).", en: "Call union, starting with find(x) and find(y)." },
+      });
+
+      const rx0 = find(i, "x");
+      const ry0 = find(j, "y");
+      push({
+        title: { vi: `rx, ry = ${rx0}, ${ry0}`, en: `rx, ry = ${rx0}, ${ry0}` },
+        hlNodes: [rx0, ry0],
+        codeLines: [12],
+        vars: [{ name: "rx", value: rx0 }, { name: "ry", value: ry0 }],
+        note: { vi: "Đã có gốc của x và y.", en: "Now have the roots of x and y." },
+      });
+
+      let rx = rx0, ry = ry0;
+      const sameRoot = rx === ry;
+      push({
+        title: { vi: `rx == ry? ${sameRoot}`, en: `rx == ry? ${sameRoot}` },
+        hlNodes: [rx, ry],
+        codeLines: [13],
+        vars: [{ name: "rx", value: rx }, { name: "ry", value: ry }],
+        note: {
+          vi: sameRoot ? "Cùng gốc → đã cùng tỉnh, return ngay." : "Khác gốc → tiếp tục union by rank.",
+          en: sameRoot ? "Same root → already same province, return immediately." : "Different roots → proceed with union by rank.",
+        },
+      });
+      if (sameRoot) continue;
+
+      const swapNeeded = rank[rx] < rank[ry];
+      push({
+        title: { vi: `rank[rx] < rank[ry]? ${swapNeeded} (${rank[rx]} vs ${rank[ry]})`, en: `rank[rx] < rank[ry]? ${swapNeeded} (${rank[rx]} vs ${rank[ry]})` },
+        hlNodes: [rx, ry],
+        codeLines: [14],
+        vars: [{ name: "rank[rx]", value: rank[rx] }, { name: "rank[ry]", value: rank[ry] }],
+        note: {
+          vi: swapNeeded ? "rank[rx] nhỏ hơn → đổi chỗ rx và ry để gắn cây thấp vào cây cao." : "Không cần đổi chỗ rx, ry.",
+          en: swapNeeded ? "rank[rx] is smaller → swap rx and ry so the shorter tree attaches to the taller one." : "No need to swap rx, ry.",
+        },
+      });
+      if (swapNeeded) { const t = rx; rx = ry; ry = t; }
+
+      parent[ry] = rx;
+      addedSet.add(`${Math.min(i, j)}-${Math.max(i, j)}`);
+      push({
+        title: { vi: `self.parent[ry] = rx → parent[${ry}] = ${rx}`, en: `self.parent[ry] = rx → parent[${ry}] = ${rx}` },
+        hlNodes: [rx, ry],
+        hlEdges: [[i, j]],
+        codeLines: [15],
+        vars: [{ name: "parent", value: `[${parent.join(",")}]` }],
+        note: { vi: `Gắn gốc ${ry} vào gốc ${rx}. Cạnh (${i}─${j}) xuất hiện trên đồ thị.`, en: `Attach root ${ry} under root ${rx}. Edge (${i}─${j}) appears on the graph.` },
+      });
+
+      const rankTie = rank[rx] === rank[ry];
+      if (rankTie) rank[rx]++;
+      push({
+        title: { vi: `rank[rx] == rank[ry]? ${rankTie}${rankTie ? ` → rank[${rx}] += 1` : ""}`, en: `rank[rx] == rank[ry]? ${rankTie}${rankTie ? ` → rank[${rx}] += 1` : ""}` },
+        hlNodes: [rx],
+        codeLines: [16],
+        vars: [{ name: "rank", value: `[${rank.join(",")}]` }],
+        note: {
+          vi: rankTie ? `Hai rank bằng nhau → tăng rank[${rx}] để giữ cây thấp.` : "Rank khác nhau → không cần tăng.",
+          en: rankTie ? `Ranks tied → increment rank[${rx}] to keep the tree shallow.` : "Ranks differ → no increment needed.",
+        },
+      });
+
+      components--;
+      push({
+        title: { vi: `self.components -= 1 → ${components}`, en: `self.components -= 1 → ${components}` },
+        codeLines: [17],
+        vars: [{ name: "components", value: components }],
+        note: { vi: `Hai tỉnh vừa gộp lại. Còn ${components} tỉnh.`, en: `Two provinces just merged. ${components} province(s) remain.` },
+      });
+    }
+  }
+
+  // Line 26: return uf.components
+  const fs = graphSnap({
+    title: { vi: `return uf.components → ${components}`, en: `return uf.components → ${components}` },
+    codeLines: [26],
+    vars: [{ name: "answer", value: components }],
+    note: {
+      vi: `Duyệt hết ma trận. Có ${components} tỉnh.`,
+      en: `Matrix fully processed. There are ${components} province(s).`,
     },
-    [{ name: "answer", value: components }],
-    [12]
-  );
+  });
   fs.final = true;
   steps.push(fs);
 
