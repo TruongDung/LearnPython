@@ -1995,7 +1995,7 @@ module.exports = {
     id: 1319,
     difficulty: "medium",
     slug: "number-of-operations-to-make-network-connected",
-    category: UF_CAT,
+    category: DFS_CAT,
     title: { vi: "Number of Operations to Make Network Connected", en: "Number of Operations to Make Network Connected" },
     titleVi: { vi: "Số thao tác để nối mạng", en: "Operations to connect all computers" },
     statement: {

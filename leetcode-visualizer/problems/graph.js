@@ -5024,7 +5024,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 694, 994, 130, 2685, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5101,7 +5101,7 @@ module.exports = {
     id: 130,
     difficulty: "medium",
     slug: "surrounded-regions",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Surrounded Regions", en: "Surrounded Regions" },
     titleVi: { vi: "Bắt vùng bị bao quanh", en: "Capture surrounded regions" },
     statement: {
@@ -5194,7 +5194,7 @@ module.exports = {
     difficulty: "medium",
     premium: true,
     slug: "number-of-distinct-islands",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Number of Distinct Islands", en: "Number of Distinct Islands" },
     titleVi: { vi: "Đếm số đảo khác hình", en: "Count distinct island shapes" },
     statement: {
@@ -5252,7 +5252,7 @@ module.exports = {
     id: 2685,
     difficulty: "medium",
     slug: "count-the-number-of-complete-components",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Count the Number of Complete Components", en: "Count the Number of Complete Components" },
     titleVi: { vi: "Đếm số component đầy đủ", en: "Count complete connected components" },
     statement: {
@@ -5411,7 +5411,7 @@ module.exports = {
     id: 695,
     difficulty: "medium",
     slug: "max-area-of-island",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Max Area of Island", en: "Max Area of Island" },
     titleVi: { vi: "Diện tích đảo lớn nhất", en: "Largest island area" },
     statement: {
@@ -6736,7 +6736,7 @@ module.exports = {
     id: 1319,
     difficulty: "medium",
     slug: "number-of-operations-to-make-network-connected",
-    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
     title: { vi: "Number of Operations to Make Network Connected", en: "Number of Operations to Make Network Connected" },
     titleVi: { vi: "Số thao tác để nối mạng (DFS)", en: "Operations to connect all computers (DFS)" },
     statement: {
