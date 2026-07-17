@@ -3485,6 +3485,239 @@ function buildSteps2492(input, params) {
 }
 
 /**
+ * LeetCode 694: Number of Distinct Islands.
+ * DFS each island; record its shape as relative coordinates from the start.
+ * Two islands are the same if their (translated) shapes match → use a set.
+ */
+function buildStepsDistinctIslands(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "0" && v !== "1"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "error", value: "invalid" }],
+      note: {
+        vi: "Grid phải gồm 0/1. Ví dụ: 11000|11000|00011|00011.",
+        en: "Grid must contain 0/1. Example: 11000|11000|00011|00011.",
+      },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const shapeIdOf = Array.from({ length: rows }, () => Array(cols).fill(0)); // distinct shape id, 0 = none
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(current, buildingCells) {
+    const bset = buildingCells ? new Set(buildingCells.map(([r, c]) => key(r, c))) : null;
+    return grid.map((row, r) =>
+      row.map((v, c) => {
+        let cls, label;
+        if (v === "0") { cls = "wall"; label = "0"; }
+        else if (shapeIdOf[r][c] > 0) { cls = "visited"; label = String(shapeIdOf[r][c]); } // finished island: label = distinct shape #
+        else { cls = "empty"; label = "1"; }
+        if (bset && bset.has(key(r, c))) cls = "queued";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, buildingCells = null, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, buildingCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  // Intro
+  pushStep({
+    title: { vi: "Ý tưởng: ghi chữ ký hình dạng đảo", en: "Idea: record each island's shape signature" },
+    codeLines: [2],
+    vars: [
+      { name: "rows", value: rows },
+      { name: "cols", value: cols },
+    ],
+    note: {
+      vi:
+        `Đếm số ĐẢO KHÁC HÌNH. Hai đảo giống nhau nếu dịch tịnh tiến (không xoay/lật) thì trùng.\n` +
+        `Với mỗi đảo, DFS ghi lại tọa độ các ô TƯƠNG ĐỐI so với ô gốc → 'chữ ký'.\n` +
+        `Bỏ chữ ký vào set. Đáp án = số chữ ký khác nhau.`,
+      en:
+        `Count DISTINCT island shapes. Two islands are the same if a translation (no rotation/reflection) matches them.\n` +
+        `For each island, DFS records cell coordinates RELATIVE to the start → a 'signature'.\n` +
+        `Add signature to a set. Answer = number of distinct signatures.`,
+    },
+  });
+
+  const seen = new Set();
+  let islandCount = 0;
+  let distinctCount = 0;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== "1" || visited[r][c]) continue;
+
+      islandCount++;
+      const r0 = r, c0 = c;
+
+      // Step: found new land (line 16)
+      pushStep({
+        title: { vi: `Tìm thấy đất mới tại (${r},${c})`, en: `New land found at (${r},${c})` },
+        current: [r, c],
+        codeLines: [16],
+        vars: [
+          { name: "start", value: `(${r}, ${c})` },
+          { name: "island #", value: islandCount },
+        ],
+        note: {
+          vi: `Ô (${r},${c}) = '1' chưa thăm → bắt đầu đảo mới. Ô này là GỐC (0,0) của chữ ký.`,
+          en: `Cell (${r},${c}) = '1' unvisited → start a new island. This is the ORIGIN (0,0) of the signature.`,
+        },
+      });
+
+      // Step: shape = [] (line 17)
+      const shape = [];
+      pushStep({
+        title: { vi: "shape = [] (khởi tạo chữ ký)", en: "shape = [] (init signature)" },
+        current: [r, c],
+        codeLines: [17],
+        vars: [{ name: "shape", value: "[]" }],
+        note: {
+          vi: `Tạo danh sách rỗng để ghi tọa độ tương đối của các ô trong đảo.`,
+          en: `Create an empty list to record relative coordinates of the island's cells.`,
+        },
+      });
+
+      // Step: dfs call (line 18)
+      pushStep({
+        title: { vi: `Gọi dfs(${r},${c})`, en: `Call dfs(${r},${c})` },
+        current: [r, c],
+        codeLines: [18],
+        vars: [{ name: "origin", value: `(${r0}, ${c0})` }],
+        note: {
+          vi: `Bắt đầu DFS để lan khắp đảo và ghi hình dạng.`,
+          en: `Start DFS to spread across the island and record its shape.`,
+        },
+      });
+
+      // DFS traversal — one step per cell (line-by-line)
+      const stack = [[r, c]];
+      visited[r][c] = true;
+      const buildingCells = [];
+      while (stack.length) {
+        const [cr, cc] = stack.pop();
+        const rel = [cr - r0, cc - c0];
+        shape.push(rel);
+        buildingCells.push([cr, cc]);
+
+        // collect valid neighbors and mark visited (so we don't requeue)
+        const queuedNb = [];
+        for (const [dr, dc] of dirs) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+          if (grid[nr][nc] !== "1" || visited[nr][nc]) continue;
+          visited[nr][nc] = true;
+          queuedNb.push([nr, nc]);
+        }
+
+        // Step: visit cell + record relative coord (line 9)
+        pushStep({
+          title: { vi: `dfs(${cr},${cc}): rel = (${rel[0]},${rel[1]})`, en: `dfs(${cr},${cc}): rel = (${rel[0]},${rel[1]})` },
+          current: [cr, cc],
+          buildingCells: buildingCells.slice(),
+          codeLines: [9],
+          vars: [
+            { name: "cell", value: `(${cr}, ${cc})` },
+            { name: "relative", value: `(${cr}-${r0}, ${cc}-${c0}) = (${rel[0]}, ${rel[1]})` },
+            { name: "shape", value: `[${shape.map(([a, b]) => `(${a},${b})`).join(", ")}]` },
+          ],
+          note: {
+            vi: `Thăm ô (${cr},${cc}). Tọa độ tương đối = (${rel[0]},${rel[1]}). Thêm vào shape.`,
+            en: `Visit cell (${cr},${cc}). Relative coord = (${rel[0]},${rel[1]}). Append to shape.`,
+          },
+        });
+
+        for (const nb of queuedNb) stack.push(nb);
+      }
+
+      // Canonical signature: sort relative coords so traversal order doesn't matter
+      const sig = shape
+        .map(([a, b]) => `${a},${b}`)
+        .sort()
+        .join("|");
+      const isNew = !seen.has(sig);
+      if (isNew) {
+        seen.add(sig);
+        distinctCount++;
+      }
+      const thisShapeId = isNew ? distinctCount : [...seen].indexOf(sig) + 1;
+      // Assign shape id for coloring the finished island cells
+      for (const [cr, cc] of buildingCells) shapeIdOf[cr][cc] = thisShapeId;
+
+      // Step: seen.add(tuple(shape)) (line 19)
+      pushStep({
+        title: {
+          vi: isNew ? `Chữ ký MỚI → distinct = ${distinctCount}` : `Chữ ký TRÙNG (đã có) → không tăng`,
+          en: isNew ? `NEW signature → distinct = ${distinctCount}` : `DUPLICATE signature → no increment`,
+        },
+        buildingCells: buildingCells.slice(),
+        codeLines: [19],
+        vars: [
+          { name: "signature", value: `{${sig}}` },
+          { name: "is new?", value: isNew },
+          { name: "distinct count", value: distinctCount },
+        ],
+        note: {
+          vi: isNew
+            ? `Chữ ký {${sig}} chưa có trong seen → thêm vào. Số đảo khác hình = ${distinctCount}.`
+            : `Chữ ký {${sig}} đã tồn tại trong seen → đảo này TRÙNG hình với đảo trước. Không tăng.`,
+          en: isNew
+            ? `Signature {${sig}} not in seen → add it. Distinct islands = ${distinctCount}.`
+            : `Signature {${sig}} already in seen → this island is a DUPLICATE shape. No increment.`,
+        },
+      });
+    }
+  }
+
+  // Final (line 20)
+  steps.push({
+    title: { vi: `Kết quả: ${distinctCount} đảo khác hình`, en: `Result: ${distinctCount} distinct islands` },
+    arr: [],
+    bfsGrid: { rows, cols, cells: makeCells(null, null) },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [20],
+    vars: [
+      { name: "total islands", value: islandCount },
+      { name: "distinct shapes", value: distinctCount },
+    ],
+    note: {
+      vi: `Có ${islandCount} đảo, trong đó ${distinctCount} hình khác nhau (số trên mỗi đảo = id hình dạng; đảo cùng số = cùng hình).`,
+      en: `${islandCount} islands total, ${distinctCount} distinct shapes (number on each island = shape id; same number = same shape).`,
+    },
+  });
+
+  return { original: grid, answer: distinctCount, steps };
+}
+
+/**
  * LeetCode 130: Surrounded Regions.
  * Capture all 'O' regions 4-directionally surrounded by 'X'.
  * Trick: any 'O' connected to a border 'O' is SAFE (not captured).
@@ -3755,7 +3988,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 994, 130, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 695, 694, 994, 130, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -3919,6 +4152,64 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DFS dùng stack ('#')", en: "Approach 1: DFS iterative ('#')" },
     code2Label: { vi: "Cách 2: DFS đệ quy ('S')", en: "Approach 2: DFS recursive ('S')" },
     builder: buildStepsSurroundedRegions,
+  },
+  694: {
+    id: 694,
+    difficulty: "medium",
+    slug: "number-of-distinct-islands",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Number of Distinct Islands", en: "Number of Distinct Islands" },
+    titleVi: { vi: "Đếm số đảo khác hình", en: "Count distinct island shapes" },
+    statement: {
+      vi:
+        "Cho lưới m×n gồm 1 = đất và 0 = nước. Một đảo là nhóm ô đất nối nhau 4 hướng. Hai đảo được coi là GIỐNG nhau nếu " +
+        "dịch chuyển tịnh tiến (không xoay, không lật) thì trùng khít. Hãy đếm số đảo KHÁC HÌNH. " +
+        "Nhập lưới: hàng cách bởi '|', ký tự viết liền hoặc cách bằng dấu phẩy.",
+      en:
+        "Given an m×n grid of 1 land and 0 water. An island is a group of 4-directionally connected land cells. Two islands are the SAME if " +
+        "one can be translated (no rotation/reflection) to equal the other. Count the number of DISTINCT island shapes. " +
+        "Enter rows separated by '|', compact or comma-separated.",
+    },
+    defaultInput: "11000|11000|00011|00011",
+    inputKind: "string",
+    inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    approach: [
+      { vi: "Duyệt từng ô. Gặp đất '1' chưa thăm → bắt đầu một đảo mới.", en: "Scan every cell. Unvisited land '1' → start a new island." },
+      { vi: "DFS lan khắp đảo, ghi tọa độ mỗi ô TƯƠNG ĐỐI so với ô gốc → chữ ký hình dạng.", en: "DFS across the island, record each cell RELATIVE to the origin → shape signature." },
+      { vi: "Bỏ chữ ký (dạng chuẩn hóa) vào một set.", en: "Add the (canonical) signature to a set." },
+      { vi: "Đáp án = số chữ ký khác nhau = kích thước set.", en: "Answer = number of distinct signatures = set size." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được thăm một lần trong DFS. Set lưu chữ ký tốn tối đa O(m·n).",
+        en: "Each cell visited once in DFS. Signature set uses up to O(m·n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numDistinctIslands(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        seen = set()",
+      "        def dfs(r, c, r0, c0, shape):",
+      "            if r < 0 or r >= m or c < 0 or c >= n or grid[r][c] == 0:",
+      "                return",
+      "            grid[r][c] = 0",
+      "            shape.append((r - r0, c - c0))",
+      "            dfs(r + 1, c, r0, c0, shape)",
+      "            dfs(r - 1, c, r0, c0, shape)",
+      "            dfs(r, c + 1, r0, c0, shape)",
+      "            dfs(r, c - 1, r0, c0, shape)",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if grid[i][j] == 1:",
+      "                    shape = []",
+      "                    dfs(i, j, i, j, shape)",
+      "                    seen.add(tuple(shape))",
+      "        return len(seen)",
+    ],
+    builder: buildStepsDistinctIslands,
   },
   695: {
     id: 695,
