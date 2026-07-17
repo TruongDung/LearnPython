@@ -3600,11 +3600,9 @@ function buildStepsSurroundedRegions(input, params) {
   for (const [br, bc] of borderCells) {
     if (status[br][bc] !== "O") continue; // already marked safe
 
-    const stack = [[br, bc]];
-    status[br][bc] = "safe";
-
+    // Step: DFS call from this border cell (line 17)
     pushStep({
-      title: { vi: `DFS từ biên (${br},${bc})`, en: `DFS from border (${br},${bc})` },
+      title: { vi: `Gọi dfs(${br},${bc}) từ biên`, en: `Call dfs(${br},${bc}) from border` },
       current: [br, bc],
       codeLines: [17],
       vars: [
@@ -3612,33 +3610,45 @@ function buildStepsSurroundedRegions(input, params) {
         { name: "call", value: `dfs(${br}, ${bc})` },
       ],
       note: {
-        vi: `Ô biên (${br},${bc}) là 'O' → gọi dfs(${br},${bc}) để đánh dấu vùng an toàn.`,
-        en: `Border cell (${br},${bc}) is 'O' → call dfs(${br},${bc}) to mark the safe region.`,
+        vi: `Ô biên (${br},${bc}) là 'O' → gọi dfs(${br},${bc}) để lan vùng an toàn từng ô.`,
+        en: `Border cell (${br},${bc}) is 'O' → call dfs(${br},${bc}) to spread safe cell by cell.`,
       },
     });
 
+    // DFS traversal — one step per cell visited (line-by-line)
+    const stack = [[br, bc]];
     while (stack.length) {
       const [cr, cc] = stack.pop();
+      if (status[cr][cc] === "safe") continue; // already marked
+      status[cr][cc] = "safe";
+
+      // Step: mark this cell safe (line 11 for approach 1, line 9 for approach 2)
+      const neighborsQueued = [];
       for (const [dr, dc] of dirs) {
         const nr = cr + dr, nc = cc + dc;
         if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
         if (status[nr][nc] !== "O") continue;
-        status[nr][nc] = "safe";
-        stack.push([nr, nc]);
+        neighborsQueued.push([nr, nc]);
       }
-    }
 
-    pushStep({
-      title: { vi: `Vùng an toàn từ (${br},${bc}) đã đánh dấu`, en: `Safe region from (${br},${bc}) marked` },
-      codeLines: [markSafeLine],
-      vars: [
-        { name: "safe cells so far", value: status.flat().filter((v) => v === "safe").length },
-      ],
-      note: {
-        vi: `Toàn bộ 'O' nối với (${br},${bc}) đã tô xanh (an toàn).`,
-        en: `All 'O' connected to (${br},${bc}) are now green (safe).`,
-      },
-    });
+      pushStep({
+        title: { vi: `dfs(${cr},${cc}): đánh dấu an toàn`, en: `dfs(${cr},${cc}): mark safe` },
+        current: [cr, cc],
+        frontier: neighborsQueued,
+        codeLines: [markSafeLine],
+        vars: [
+          { name: "cell", value: `(${cr}, ${cc})` },
+          { name: "mark", value: approach === 2 ? "'S' (safe)" : "'#' (safe)" },
+          { name: "safe cells so far", value: status.flat().filter((v) => v === "safe").length },
+        ],
+        note: {
+          vi: `Ô (${cr},${cc}) = 'O' → đánh dấu an toàn (xanh). Tiếp tục DFS sang 4 ô kề còn là 'O' (vàng).`,
+          en: `Cell (${cr},${cc}) = 'O' → mark safe (green). Continue DFS to 4 adjacent 'O' cells (yellow).`,
+        },
+      });
+
+      for (const nb of neighborsQueued) stack.push(nb);
+    }
   }
 
   // Phase 2 intro
