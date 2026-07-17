@@ -3406,6 +3406,285 @@ function buildSteps1319DFS(input, params) {
   return { input, answer, steps };
 }
 
+/**
+ * LeetCode 1971: Find if Path Exists in Graph.
+ * Iterative DFS from source; return true as soon as destination is popped/found,
+ * otherwise false once the stack is exhausted. One code line highlighted per step.
+ */
+function buildSteps1971(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 6;
+  const source = params && params.source !== undefined ? Number(params.source) : 0;
+  const destination = params && params.destination !== undefined ? Number(params.destination) : 5;
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+
+  const steps = [];
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, id) => id);
+  const allEdges = [];
+
+  function visitedList(visited) {
+    return allNodes.filter((id) => visited[id]);
+  }
+
+  function makeGraph(hlNodes = [], hlEdges = [], visited = []) {
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visited,
+    };
+  }
+
+  function push({ title, hlNodes, hlEdges, visited, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visited),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: DFS từ source, tìm destination", en: "Idea: DFS from source, look for destination" },
+    hlNodes: [source, destination],
+    codeLines: [2],
+    vars: [{ name: "n", value: n }, { name: "source", value: source }, { name: "destination", value: destination }],
+    note: {
+      vi: "Chỉ cần kiểm tra source và destination có nằm cùng connected component không.",
+      en: "Just check whether source and destination lie in the same connected component.",
+    },
+  });
+
+  // Line 3-4: source == destination shortcut
+  if (source === destination) {
+    push({
+      title: { vi: "source == destination? True", en: "source == destination? True" },
+      hlNodes: [source],
+      codeLines: [3],
+      vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
+      note: { vi: "source và destination là cùng một đỉnh.", en: "source and destination are the same node." },
+    });
+    push({
+      title: { vi: "return True", en: "return True" },
+      hlNodes: [source],
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: true }],
+      note: { vi: "Không cần di chuyển gì cả, đã ở đích.", en: "No movement needed, already at the destination." },
+    });
+    return { n, edges: edgeList, source, destination, answer: true, steps };
+  }
+  push({
+    title: { vi: "source == destination? False", en: "source == destination? False" },
+    hlNodes: [source, destination],
+    codeLines: [3],
+    vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
+    note: { vi: "Hai đỉnh khác nhau, cần DFS để kiểm tra kết nối.", en: "Different nodes, need DFS to check connectivity." },
+  });
+
+  // Line 5: adj = [[] for _ in range(n)]
+  push({
+    title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
+    codeLines: [5],
+    vars: [{ name: "adj", value: `${n} danh sách rỗng` }],
+    note: { vi: `Tạo adjacency list rỗng cho ${n} đỉnh.`, en: `Create an empty adjacency list for ${n} nodes.` },
+  });
+
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `for a, b in edges: a,b = ${a},${b}`, en: `for a, b in edges: a,b = ${a},${b}` },
+      hlNodes: [a, b],
+      codeLines: [6],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cạnh vô hướng (${a}, ${b}).`, en: `Process undirected edge (${a}, ${b}).` },
+    });
+    adj[a].push(b);
+    push({
+      title: { vi: `adj[${a}].append(${b})`, en: `adj[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [7],
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }],
+      note: { vi: `Thêm ${b} vào danh sách kề của ${a}.`, en: `Add ${b} to ${a}'s adjacency list.` },
+    });
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "" });
+    push({
+      title: { vi: `adj[${b}].append(${a})`, en: `adj[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [8],
+      vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm ${a} vào danh sách kề của ${b}.`, en: `Add ${a} to ${b}'s adjacency list.` },
+    });
+  }
+
+  const visited = new Array(n).fill(false);
+
+  // Line 9: visited = [False] * n
+  push({
+    title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+    codeLines: [9],
+    vars: [{ name: "visited", value: `[${visited.map(() => "F").join(", ")}]` }],
+    note: { vi: "Ban đầu chưa thăm đỉnh nào.", en: "Initially, no node has been visited." },
+  });
+
+  // Line 10: stack = [source]
+  const stack = [source];
+  push({
+    title: { vi: `stack = [${source}]`, en: `stack = [${source}]` },
+    hlNodes: [source],
+    codeLines: [10],
+    vars: [{ name: "stack", value: `[${source}]` }],
+    note: { vi: `Đưa source (${source}) vào stack DFS.`, en: `Push source (${source}) onto the DFS stack.` },
+  });
+
+  // Line 11: visited[source] = True
+  visited[source] = true;
+  push({
+    title: { vi: `visited[${source}] = True`, en: `visited[${source}] = True` },
+    hlNodes: [source],
+    visited: visitedList(visited),
+    codeLines: [11],
+    vars: [{ name: "visited[source]", value: true }],
+    note: { vi: `Đánh dấu source (${source}) đã thăm.`, en: `Mark source (${source}) visited.` },
+  });
+
+  let found = false;
+
+  while (stack.length) {
+    // Line 12: while stack
+    push({
+      title: { vi: `while stack: stack không rỗng`, en: `while stack: stack is non-empty` },
+      visited: visitedList(visited),
+      codeLines: [12],
+      vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: "Còn đỉnh trong stack, tiếp tục DFS.", en: "Stack still has nodes, keep exploring." },
+    });
+
+    // Line 13: node = stack.pop()
+    const node = stack.pop();
+    push({
+      title: { vi: `node = stack.pop() = ${node}`, en: `node = stack.pop() = ${node}` },
+      hlNodes: [node],
+      visited: visitedList(visited),
+      codeLines: [13],
+      vars: [{ name: "node", value: node }, { name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: `Lấy đỉnh ${node} ra khỏi stack để xử lý.`, en: `Pop node ${node} from the stack to process.` },
+    });
+
+    // Line 14: if node == destination
+    const isDest = node === destination;
+    push({
+      title: { vi: `node == destination? ${isDest ? "True" : "False"}`, en: `node == destination? ${isDest ? "True" : "False"}` },
+      hlNodes: [node, destination],
+      visited: visitedList(visited),
+      codeLines: [14],
+      vars: [{ name: "node", value: node }, { name: "destination", value: destination }],
+      note: {
+        vi: isDest ? `Đã tới destination (${destination})!` : `${node} chưa phải destination (${destination}).`,
+        en: isDest ? `Reached destination (${destination})!` : `${node} is not the destination (${destination}) yet.`,
+      },
+    });
+    if (isDest) {
+      // Line 15: return True
+      push({
+        title: { vi: "return True", en: "return True" },
+        hlNodes: [node],
+        visited: visitedList(visited),
+        final: true,
+        codeLines: [15],
+        vars: [{ name: "answer", value: true }],
+        note: { vi: "Có đường đi từ source tới destination.", en: "A path exists from source to destination." },
+      });
+      found = true;
+      break;
+    }
+
+    // Line 16: for nb in adj[node]
+    push({
+      title: { vi: `for nb in adj[${node}]: [${adj[node].join(", ")}]`, en: `for nb in adj[${node}]: [${adj[node].join(", ")}]` },
+      hlNodes: [node],
+      hlEdges: adj[node].map((nb) => [node, nb]),
+      visited: visitedList(visited),
+      codeLines: [16],
+      vars: [{ name: "neighbors", value: `[${adj[node].join(", ")}]` }],
+      note: { vi: `Duyệt các hàng xóm của ${node}.`, en: `Iterate over ${node}'s neighbors.` },
+    });
+
+    for (const nb of adj[node]) {
+      const already = visited[nb];
+      push({
+        title: { vi: `visited[${nb}]? ${already ? "True → bỏ qua" : "False → thăm"}`, en: `visited[${nb}]? ${already ? "True → skip" : "False → visit"}` },
+        hlNodes: [node, nb],
+        hlEdges: [[node, nb]],
+        visited: visitedList(visited),
+        codeLines: [17],
+        vars: [{ name: "nb", value: nb }, { name: "visited[nb]", value: already }],
+        note: {
+          vi: already ? `${nb} đã thăm, không cần push lại.` : `${nb} chưa thăm, sẽ đánh dấu và push vào stack.`,
+          en: already ? `${nb} already visited, no need to push again.` : `${nb} unvisited, will mark and push onto the stack.`,
+        },
+      });
+      if (!already) {
+        visited[nb] = true;
+        push({
+          title: { vi: `visited[${nb}] = True`, en: `visited[${nb}] = True` },
+          hlNodes: [nb],
+          visited: visitedList(visited),
+          codeLines: [18],
+          vars: [{ name: "visited[nb]", value: true }],
+          note: { vi: `Đánh dấu ${nb} đã thăm.`, en: `Mark ${nb} visited.` },
+        });
+        stack.push(nb);
+        push({
+          title: { vi: `stack.append(${nb})`, en: `stack.append(${nb})` },
+          hlNodes: [nb],
+          visited: visitedList(visited),
+          codeLines: [19],
+          vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+          note: { vi: `Đưa ${nb} vào stack để xử lý sau.`, en: `Push ${nb} onto the stack to process later.` },
+        });
+      }
+    }
+  }
+
+  if (!found) {
+    // Line 12 check false, then line 20 return False
+    push({
+      title: { vi: "while stack: stack rỗng", en: "while stack: stack is empty" },
+      visited: visitedList(visited),
+      codeLines: [12],
+      vars: [{ name: "stack", value: "[]" }],
+      note: { vi: "Stack rỗng, đã duyệt hết component chứa source.", en: "Stack empty, the whole component containing source has been explored." },
+    });
+    push({
+      title: { vi: "return False", en: "return False" },
+      visited: visitedList(visited),
+      final: true,
+      codeLines: [20],
+      vars: [{ name: "answer", value: false }],
+      note: {
+        vi: `destination (${destination}) không nằm trong component chứa source (${source}).`,
+        en: `destination (${destination}) is not in the component containing source (${source}).`,
+      },
+    });
+  }
+
+  return { n, edges: edgeList, source, destination, answer: found, steps };
+}
+
 function buildSteps2492(input, params) {
   const n = params.n || 4;
   const edges = String(input || "")
@@ -4745,7 +5024,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 695, 694, 994, 130, 2685, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 695, 694, 994, 130, 2685, 1971, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -5065,6 +5344,68 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" },
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
+  },
+  1971: {
+    id: 1971,
+    difficulty: "easy",
+    slug: "find-if-path-exists-in-graph",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Find if Path Exists in Graph", en: "Find if Path Exists in Graph" },
+    titleVi: { vi: "Kiểm tra tồn tại đường đi trong đồ thị", en: "Check if a path exists in the graph" },
+    statement: {
+      vi:
+        "Cho n đỉnh (0..n-1), danh sách cạnh không hướng, hai đỉnh source và destination. Hãy kiểm tra có đường đi nào từ source tới destination không " +
+        "(có thể đi qua nhiều đỉnh/cạnh trung gian). Nhập cạnh: 'a,b' cách bởi ';'.",
+      en:
+        "Given n vertices (0..n-1), an undirected edge list, and two nodes source and destination. Determine whether there is a valid path from source to destination " +
+        "(possibly through other vertices). Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;1,2;2,0;3,5;4,3",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số đỉnh)", en: "n (vertices)" }, default: 6 },
+      { key: "source", label: { vi: "source", en: "source" }, default: 0 },
+      { key: "destination", label: { vi: "destination", en: "destination" }, default: 5 },
+    ],
+    approach: [
+      { vi: "source và destination chỉ cần nằm trong cùng connected component.", en: "source and destination just need to be in the same connected component." },
+      { vi: "Xây adjacency list từ danh sách cạnh (đồ thị vô hướng).", en: "Build an adjacency list from the edge list (undirected graph)." },
+      { vi: "DFS (dùng stack) từ source; nếu gặp destination thì trả True.", en: "DFS (using a stack) from source; return True if destination is reached." },
+      { vi: "Nếu stack rỗng mà chưa gặp destination thì trả False.", en: "If the stack empties without reaching destination, return False." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n + E)",
+      note: {
+        vi: "Xây adjacency list O(E). DFS thăm mỗi đỉnh/cạnh tối đa một lần → O(n+E).",
+        en: "Build adjacency list O(E). DFS visits each node/edge at most once → O(n+E).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def validPath(self, n, edges, source, destination):",
+      "        # source and destination just need to share a component",
+      "        if source == destination:",
+      "            return True",
+      "        adj = [[] for _ in range(n)]",
+      "        for a, b in edges:",
+      "            adj[a].append(b)",
+      "            adj[b].append(a)",
+      "        visited = [False] * n",
+      "        stack = [source]",
+      "        visited[source] = True",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            if node == destination:",
+      "                return True",
+      "            for nb in adj[node]:",
+      "                if not visited[nb]:",
+      "                    visited[nb] = True",
+      "                    stack.append(nb)",
+      "        return False",
+    ],
+    builder: buildSteps1971,
   },
   695: {
     id: 695,
