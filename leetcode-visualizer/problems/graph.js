@@ -3545,7 +3545,7 @@ function buildStepsDistinctIslands(input) {
     });
   }
 
-  // Intro
+  // Intro (line 2)
   pushStep({
     title: { vi: "Ý tưởng: ghi chữ ký hình dạng đảo", en: "Idea: record each island's shape signature" },
     codeLines: [2],
@@ -3557,17 +3557,43 @@ function buildStepsDistinctIslands(input) {
       vi:
         `Đếm số ĐẢO KHÁC HÌNH. Hai đảo giống nhau nếu dịch tịnh tiến (không xoay/lật) thì trùng.\n` +
         `Với mỗi đảo, DFS ghi lại tọa độ các ô TƯƠNG ĐỐI so với ô gốc → 'chữ ký'.\n` +
-        `Bỏ chữ ký vào set. Đáp án = số chữ ký khác nhau.`,
+        `Bỏ chữ ký vào set. Đáp án = số chữ ký khác nhau.\n\n` +
+        `Lưu ý: dfs() định nghĩa ở dòng 5-13 nhưng được GỌI ở dòng 18, nên con trỏ sẽ nhảy lên/xuống — đó là cách đệ quy chạy.`,
       en:
         `Count DISTINCT island shapes. Two islands are the same if a translation (no rotation/reflection) matches them.\n` +
         `For each island, DFS records cell coordinates RELATIVE to the start → a 'signature'.\n` +
-        `Add signature to a set. Answer = number of distinct signatures.`,
+        `Add signature to a set. Answer = number of distinct signatures.\n\n` +
+        `Note: dfs() is defined at lines 5-13 but CALLED at line 18, so the pointer jumps up/down — that's how recursion runs.`,
     },
   });
 
   const seen = new Set();
   let islandCount = 0;
   let distinctCount = 0;
+
+  // Line 3: m, n = len(grid), len(grid[0])
+  pushStep({
+    title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
+    note: { vi: `Kích thước lưới: m=${rows} hàng, n=${cols} cột.`, en: `Grid size: m=${rows} rows, n=${cols} cols.` },
+  });
+
+  // Line 4: seen = set()
+  pushStep({
+    title: { vi: "seen = set() (tập chữ ký)", en: "seen = set() (signature set)" },
+    codeLines: [4],
+    vars: [{ name: "seen", value: "{}" }],
+    note: { vi: `Tạo set rỗng để lưu các chữ ký hình dạng khác nhau.`, en: `Create an empty set to store distinct shape signatures.` },
+  });
+
+  // Line 14: for i in range(m) — start scanning
+  pushStep({
+    title: { vi: "Bắt đầu quét lưới (for i, for j)", en: "Start scanning grid (for i, for j)" },
+    codeLines: [14],
+    vars: [{ name: "scan", value: "0..m-1, 0..n-1" }],
+    note: { vi: `Duyệt từng ô. Gặp đất '1' chưa thăm thì bắt đầu một đảo mới.`, en: `Scan every cell. Unvisited land '1' starts a new island.` },
+  });
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -3636,20 +3662,35 @@ function buildStepsDistinctIslands(input) {
           queuedNb.push([nr, nc]);
         }
 
-        // Step: visit cell + record relative coord (line 9)
+        // Step: grid[r][c] = 0 — mark visited (line 8)
         pushStep({
-          title: { vi: `dfs(${cr},${cc}): rel = (${rel[0]},${rel[1]})`, en: `dfs(${cr},${cc}): rel = (${rel[0]},${rel[1]})` },
+          title: { vi: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (đánh dấu)`, en: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (mark visited)` },
+          current: [cr, cc],
+          buildingCells: buildingCells.slice(),
+          codeLines: [8],
+          vars: [
+            { name: "cell", value: `(${cr}, ${cc})` },
+            { name: "grid[r][c]", value: "0 (đã thăm)" },
+          ],
+          note: {
+            vi: `Ô (${cr},${cc}) là đất → đánh dấu đã thăm bằng cách gán grid = 0 (tránh lặp).`,
+            en: `Cell (${cr},${cc}) is land → mark visited by setting grid = 0 (avoid revisiting).`,
+          },
+        });
+
+        // Step: shape.append((r-r0, c-c0)) — record relative coord (line 9)
+        pushStep({
+          title: { vi: `shape.append((${rel[0]},${rel[1]}))`, en: `shape.append((${rel[0]},${rel[1]}))` },
           current: [cr, cc],
           buildingCells: buildingCells.slice(),
           codeLines: [9],
           vars: [
-            { name: "cell", value: `(${cr}, ${cc})` },
             { name: "relative", value: `(${cr}-${r0}, ${cc}-${c0}) = (${rel[0]}, ${rel[1]})` },
             { name: "shape", value: `[${shape.map(([a, b]) => `(${a},${b})`).join(", ")}]` },
           ],
           note: {
-            vi: `Thăm ô (${cr},${cc}). Tọa độ tương đối = (${rel[0]},${rel[1]}). Thêm vào shape.`,
-            en: `Visit cell (${cr},${cc}). Relative coord = (${rel[0]},${rel[1]}). Append to shape.`,
+            vi: `Ghi tọa độ TƯƠNG ĐỐI so với gốc (${r0},${c0}): (${rel[0]},${rel[1]}). Đây là 1 phần của chữ ký.`,
+            en: `Record coord RELATIVE to origin (${r0},${c0}): (${rel[0]},${rel[1]}). Part of the signature.`,
           },
         });
 
