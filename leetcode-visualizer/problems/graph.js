@@ -3141,6 +3141,192 @@ function buildSteps3620(input, params) {
  *   3) Re-scan all edges; for any edge with an endpoint in root's component,
  *      take the min weight.
  */
+// ─── 1319 DFS: Number of Operations to Make Network Connected ───
+function buildSteps1319DFS(input, params) {
+  const n = params.n !== undefined ? Number(params.n) : 4;
+  const edgeList = String(input).split(";").map((s) => {
+    const parts = s.trim().split(",").map(Number);
+    return [parts[0], parts[1]];
+  }).filter((e) => !isNaN(e[0]) && !isNaN(e[1]));
+
+  const steps = [];
+
+  // Build adjacency list
+  const adj = Array.from({ length: n }, () => []);
+  for (const [a, b] of edgeList) {
+    adj[a].push(b);
+    adj[b].push(a);
+  }
+
+  const allNodes = Array.from({ length: n }, (_, i) => i);
+  const allEdges = edgeList.map(([a, b]) => ({ u: a, v: b, w: "" }));
+
+  function makeGraph(hlNodes, hlEdges, visitedNodes) {
+    return {
+      nodes: allNodes.map(id => ({ id, label: String(id) })),
+      edges: allEdges,
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  const visited = new Set();
+  let components = 0;
+  const impossible = edgeList.length < n - 1;
+
+  // ── Step 0: feasibility check ──────────────────────────────────────
+  steps.push({
+    title: { en: "Step 1: feasibility check", vi: "Bước 1: kiểm tra khả thi" },
+    arr: [],
+    graph: makeGraph([], [], []),
+    highlight: [], mark: [],
+    codeLines: [5, 6],
+    vars: [
+      { name: "n (computers)", value: n },
+      { name: "cables", value: edgeList.length },
+      { name: "min needed (n-1)", value: n - 1 },
+      { name: "feasible?", value: !impossible },
+    ],
+    note: {
+      en: `${n} computers, ${edgeList.length} cables. Need ≥ n-1 = ${n-1} cables to connect all. ` +
+          (impossible ? `${edgeList.length} < ${n-1} → impossible, return -1.` : `${edgeList.length} ≥ ${n-1} → may be possible. Count components via DFS.`),
+      vi: `${n} máy tính, ${edgeList.length} cáp. Cần ≥ n-1 = ${n-1} cáp. ` +
+          (impossible ? `${edgeList.length} < ${n-1} → không thể, trả -1.` : `${edgeList.length} ≥ ${n-1} → có thể. Đếm components bằng DFS.`),
+    },
+  });
+
+  if (impossible) {
+    const fs = {
+      title: { en: "Result: -1 (not enough cables)", vi: "Kết quả: -1 (không đủ cáp)" },
+      arr: [], graph: makeGraph([], [], []),
+      highlight: [], mark: [], final: true, codeLines: [5, 6],
+      vars: [{ name: "answer", value: -1 }],
+      note: { en: "Impossible: return -1.", vi: "Không thể: trả -1." },
+    };
+    fs.final = true;
+    steps.push(fs);
+    return { input, answer: -1, steps };
+  }
+
+  // ── Step 1: show graph + init ─────────────────────────────────────
+  steps.push({
+    title: { en: "Build graph, init visited = {}", vi: "Xây đồ thị, khởi tạo visited = {}" },
+    arr: [],
+    graph: makeGraph([], [], []),
+    highlight: [], mark: [],
+    codeLines: [7, 8, 9, 10, 11],
+    vars: [
+      { name: "visited", value: "{}" },
+      { name: "components", value: 0 },
+      { name: "graph edges", value: edgeList.map(([a,b]) => `${a}↔${b}`).join(", ") },
+    ],
+    note: {
+      en: `Build adjacency list. DFS from each unvisited node discovers one full component and increments components.`,
+      vi: `Xây adjacency list. DFS từ mỗi nút chưa thăm khám phá 1 component và tăng components.`,
+    },
+  });
+
+  // ── DFS per component ────────────────────────────────────────────
+  for (let start = 0; start < n; start++) {
+    if (visited.has(start)) continue;
+
+    // Show: entering loop for this start node
+    steps.push({
+      title: { en: `i=${start}: not in visited → DFS`, vi: `i=${start}: chưa thăm → DFS` },
+      arr: [],
+      graph: makeGraph([start], [], [...visited]),
+      highlight: [], mark: [],
+      codeLines: [20, 21, 22],
+      vars: [
+        { name: "i", value: start },
+        { name: "visited", value: `{${[...visited].join(", ")}}` || "{}" },
+        { name: "components", value: components },
+      ],
+      note: {
+        en: `Node ${start} not yet visited. Add to visited, call dfs(${start}) to discover its component.`,
+        vi: `Node ${start} chưa thăm. Thêm vào visited, gọi dfs(${start}) để khám phá nhóm.`,
+      },
+    });
+
+    // Iterative DFS
+    visited.add(start);
+    const stack = [start];
+    const componentNodes = [start];
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      const unvisitedNeighbors = adj[node].filter(nb => !visited.has(nb));
+
+      steps.push({
+        title: { en: `dfs: pop node ${node}`, vi: `dfs: lấy node ${node} ra khỏi stack` },
+        arr: [],
+        graph: makeGraph([node], adj[node].map(nb => `${Math.min(node,nb)}-${Math.max(node,nb)}`), [...visited]),
+        highlight: [], mark: [],
+        codeLines: [13, 14, 15, 16, 17, 18],
+        vars: [
+          { name: "cur", value: node },
+          { name: "neighbors", value: `[${adj[node].join(", ")}]` },
+          { name: "unvisited", value: unvisitedNeighbors.length > 0 ? `[${unvisitedNeighbors.join(", ")}]` : "none" },
+          { name: "stack", value: `[${stack.join(", ")}]` },
+          { name: "visited", value: `{${[...visited].join(", ")}}` },
+        ],
+        note: {
+          en: `Pop node ${node} from stack. Check neighbors [${adj[node].join(", ")}]. Unvisited: [${unvisitedNeighbors.join(", ") || "none"}] → push to stack.`,
+          vi: `Lấy node ${node} từ stack. Kiểm tra hàng xóm [${adj[node].join(", ")}]. Chưa thăm: [${unvisitedNeighbors.join(", ") || "none"}] → đẩy vào stack.`,
+        },
+      });
+
+      for (const nb of unvisitedNeighbors) {
+        visited.add(nb);
+        stack.push(nb);
+        componentNodes.push(nb);
+      }
+    }
+
+    components++;
+
+    steps.push({
+      title: { en: `Component ${components} done: [${componentNodes.join(", ")}]`, vi: `Component ${components} xong: [${componentNodes.join(", ")}]` },
+      arr: [],
+      graph: makeGraph(componentNodes, [], [...visited]),
+      highlight: [], mark: [],
+      codeLines: [23],
+      vars: [
+        { name: "component", value: `[${componentNodes.join(", ")}]` },
+        { name: "components", value: components },
+        { name: "visited", value: `{${[...visited].join(", ")}}` },
+      ],
+      note: {
+        en: `DFS from node ${start} finished. Component ${components} = [${componentNodes.join(", ")}]. ${n - visited.size} computer(s) not yet visited.`,
+        vi: `DFS từ node ${start} xong. Component ${components} = [${componentNodes.join(", ")}]. Còn ${n - visited.size} máy tính chưa thăm.`,
+      },
+    });
+  }
+
+  // ── Final ─────────────────────────────────────────────────────────
+  const answer = components - 1;
+  const fs = {
+    title: { en: `Result: ${answer} operation(s)`, vi: `Kết quả: ${answer} thao tác` },
+    arr: [],
+    graph: makeGraph([], [], [...visited]),
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [24],
+    vars: [
+      { name: "components", value: components },
+      { name: "answer = components - 1", value: `${components} - 1 = ${answer}` },
+    ],
+    note: {
+      en: `${components} component(s) found. Need ${answer} cable move(s) to connect them all into one network.`,
+      vi: `Tìm thấy ${components} nhóm. Cần ${answer} lần chuyển cáp để nối tất cả thành 1 mạng.`,
+    },
+  };
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
 function buildSteps2492(input, params) {
   const n = params.n || 4;
   const edges = String(input || "")
@@ -4700,6 +4886,64 @@ module.exports = {
     code2Label: { vi: "Cách 2: DP Bitmask + Floyd-Warshall", en: "Approach 2: DP Bitmask + Floyd-Warshall" },
     builder: buildSteps847,
   },
+  1319: {
+    id: 1319,
+    difficulty: "medium",
+    slug: "number-of-operations-to-make-network-connected",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Number of Operations to Make Network Connected", en: "Number of Operations to Make Network Connected" },
+    titleVi: { vi: "Số thao tác để nối mạng (DFS)", en: "Operations to connect all computers (DFS)" },
+    statement: {
+      vi: "Có n máy tính (0..n-1) và connections là các cáp mạng. Mỗi thao tác: tháo 1 cáp và cắm lại nơi khác. Tìm số thao tác ít nhất để tất cả máy tính liên thông. Không được thì trả -1. Nhập cạnh: 'a,b' cách bởi ';'.",
+      en: "There are n computers (0..n-1) and connections are cables. One operation: remove a cable and plug it elsewhere. Find the minimum operations to connect all computers. Return -1 if impossible. Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;0,2;1,2",
+    inputKind: "string",
+    inputLabel: { vi: "connections (a,b;a,b...)", en: "connections (a,b;a,b...)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số máy tính)", en: "n (computers)" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Nếu số cáp < n-1 → trả -1 ngay (không đủ cáp để nối n máy tính).", en: "If edges < n-1 → return -1 immediately (never enough cables)." },
+      { vi: "DFS từ mỗi nút chưa thăm để đếm số connected components.", en: "DFS from each unvisited node to count connected components." },
+      { vi: "Cần components-1 thao tác để nối tất cả các nhóm lại. Luôn có đủ cáp dư vì edges ≥ n-1.", en: "Need components-1 operations to connect all groups. Always have spare cables since edges ≥ n-1." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n + E)",
+      note: {
+        vi: "Xây adjacency list O(E). DFS thăm mỗi nút/cạnh đúng 1 lần O(n+E).",
+        en: "Build adjacency list O(E). DFS visits each node/edge once O(n+E).",
+      },
+    },
+    code: [
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def makeConnected(self, n, connections):",
+      "        if len(connections) < n - 1:",
+      "            return -1",
+      "        graph = defaultdict(list)",
+      "        for a, b in connections:",
+      "            graph[a].append(b)",
+      "            graph[b].append(a)",
+      "        visited = set()",
+      "        def dfs(node):",
+      "            stack = [node]",
+      "            while stack:",
+      "                cur = stack.pop()",
+      "                for nb in graph[cur]:",
+      "                    if nb not in visited:",
+      "                        visited.add(nb)",
+      "                        stack.append(nb)",
+      "        components = 0",
+      "        for i in range(n):",
+      "            if i not in visited:",
+      "                visited.add(i)",
+      "                dfs(i)",
+      "                components += 1",
+      "        return components - 1",
+    ],
   2492: {
     id: 2492,
     difficulty: "medium",

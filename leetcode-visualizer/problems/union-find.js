@@ -725,6 +725,397 @@ function buildSteps1101(input, params) {
   return { input, answer, steps };
 }
 
+// ─── 1319 DFS: Number of Operations to Make Network Connected ───
+function buildSteps1319DFS(input, params) {
+  const n = params.n !== undefined ? Number(params.n) : 4;
+  const edgeList = String(input).split(";").map((s) => {
+    const parts = s.trim().split(",").map(Number);
+    return [parts[0], parts[1]];
+  }).filter((e) => !isNaN(e[0]) && !isNaN(e[1]));
+
+  const steps = [];
+
+  // Build adjacency list
+  const adj = Array.from({ length: n }, () => []);
+  for (const [a, b] of edgeList) {
+    adj[a].push(b);
+    adj[b].push(a);
+  }
+
+  const allNodes = Array.from({ length: n }, (_, i) => i);
+  const allEdges = edgeList.map(([a, b]) => ({ u: a, v: b, w: "" }));
+
+  function makeGraph(hlNodes, hlEdges, visitedNodes) {
+    return {
+      nodes: allNodes.map(id => ({ id, label: String(id) })),
+      edges: allEdges,
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  const visited = new Set();
+  let components = 0;
+  const impossible = edgeList.length < n - 1;
+
+  // ── Step 0: feasibility check ──────────────────────────────────────
+  steps.push({
+    title: { en: "Step 1: feasibility check", vi: "Bước 1: kiểm tra khả thi" },
+    arr: [],
+    graph: makeGraph([], [], []),
+    highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n (computers)", value: n },
+      { name: "cables", value: edgeList.length },
+      { name: "min needed (n-1)", value: n - 1 },
+      { name: "feasible?", value: !impossible },
+    ],
+    note: {
+      en: `${n} computers, ${edgeList.length} cables. Need ≥ n-1 = ${n-1} cables to connect all. ` +
+          (impossible ? `${edgeList.length} < ${n-1} → impossible, return -1.` : `${edgeList.length} ≥ ${n-1} → may be possible. Count components via DFS.`),
+      vi: `${n} máy tính, ${edgeList.length} cáp. Cần ≥ n-1 = ${n-1} cáp. ` +
+          (impossible ? `${edgeList.length} < ${n-1} → không thể, trả -1.` : `${edgeList.length} ≥ ${n-1} → có thể. Đếm components bằng DFS.`),
+    },
+  });
+
+  if (impossible) {
+    const fs = {
+      title: { en: "Result: -1 (not enough cables)", vi: "Kết quả: -1 (không đủ cáp)" },
+      arr: [], graph: makeGraph([], [], []),
+      highlight: [], mark: [], final: true, codeLines: [3, 4],
+      vars: [{ name: "answer", value: -1 }],
+      note: { en: "Impossible: return -1.", vi: "Không thể: trả -1." },
+    };
+    fs.final = true;
+    steps.push(fs);
+    return { input, answer: -1, steps };
+  }
+
+  // ── Step 1: init visited ────────────────────────────────────────────
+  steps.push({
+    title: { en: "Init: visited = set(), components = 0", vi: "Khởi tạo: visited = {}, components = 0" },
+    arr: [],
+    graph: makeGraph([], [], []),
+    highlight: [], mark: [],
+    codeLines: [6, 7],
+    vars: [
+      { name: "visited", value: "{}" },
+      { name: "components", value: 0 },
+    ],
+    note: {
+      en: `Build adjacency list from ${edgeList.length} cables. DFS from each unvisited node counts one new component.`,
+      vi: `Xây adjacency list từ ${edgeList.length} cáp. DFS từ mỗi nút chưa thăm = 1 component mới.`,
+    },
+  });
+
+  // ── DFS per component ────────────────────────────────────────────
+  for (let start = 0; start < n; start++) {
+    if (visited.has(start)) continue;
+
+    // Show: starting DFS from this node
+    steps.push({
+      title: { en: `for i=${start}: not visited → start DFS`, vi: `for i=${start}: chưa thăm → bắt đầu DFS` },
+      arr: [],
+      graph: makeGraph([start], [], [...visited]),
+      highlight: [], mark: [],
+      codeLines: [9, 10, 11],
+      vars: [
+        { name: "i", value: start },
+        { name: "visited", value: `{${[...visited].join(", ")}}` },
+        { name: "components", value: components },
+      ],
+      note: {
+        en: `Node ${start} not in visited → launch DFS to discover all computers in this component.`,
+        vi: `Node ${start} chưa trong visited → DFS để khám phá tất cả máy tính cùng nhóm.`,
+      },
+    });
+
+    // Iterative DFS, record order
+    const stack = [start];
+    const componentNodes = [];
+    visited.add(start);
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      componentNodes.push(node);
+      const unvisitedNeighbors = adj[node].filter(nb => !visited.has(nb));
+
+      steps.push({
+        title: { en: `DFS: visit node ${node}`, vi: `DFS: thăm node ${node}` },
+        arr: [],
+        graph: makeGraph([node], [], [...visited]),
+        highlight: [], mark: [],
+        codeLines: [12, 13, 14, 15],
+        vars: [
+          { name: "node", value: node },
+          { name: "neighbors", value: `[${adj[node].join(", ")}]` },
+          { name: "unvisited neighbors", value: `[${unvisitedNeighbors.join(", ")}]` },
+          { name: "stack (after pop)", value: `[${stack.join(", ")}]` },
+          { name: "visited", value: `{${[...visited].join(", ")}}` },
+        ],
+        note: {
+          en: `Visit node ${node}. Neighbors: [${adj[node].join(", ")}]. Push unvisited [${unvisitedNeighbors.join(", ")}] onto stack.`,
+          vi: `Thăm node ${node}. Hàng xóm: [${adj[node].join(", ")}]. Đẩy chưa thăm [${unvisitedNeighbors.join(", ")}] vào stack.`,
+        },
+      });
+
+      for (const nb of unvisitedNeighbors) {
+        visited.add(nb);
+        stack.push(nb);
+      }
+    }
+
+    components++;
+
+    steps.push({
+      title: { en: `Component ${components} found: [${componentNodes.join(", ")}]`, vi: `Tìm thấy component ${components}: [${componentNodes.join(", ")}]` },
+      arr: [],
+      graph: makeGraph(componentNodes, [], [...visited]),
+      highlight: [], mark: [],
+      codeLines: [16],
+      vars: [
+        { name: "component nodes", value: `[${componentNodes.join(", ")}]` },
+        { name: "components", value: components },
+        { name: "visited", value: `{${[...visited].join(", ")}}` },
+      ],
+      note: {
+        en: `DFS from node ${start} finished. Found ${componentNodes.length} computer(s) in this component. Total components so far: ${components}.`,
+        vi: `DFS từ node ${start} xong. Tìm thấy ${componentNodes.length} máy tính trong nhóm này. Tổng components hiện tại: ${components}.`,
+      },
+    });
+  }
+
+  // ── Final ─────────────────────────────────────────────────────────
+  const answer = components - 1;
+  const fs = {
+    title: { en: `Result: ${answer} operation(s)`, vi: `Kết quả: ${answer} thao tác` },
+    arr: [],
+    graph: makeGraph([], [], [...visited]),
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "components", value: components },
+      { name: "operations needed", value: `components - 1 = ${components} - 1 = ${answer}` },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      en: `${components} disconnected component(s). Need to move ${answer} cable(s) to bridge them all into 1. Answer = components - 1 = ${answer}.`,
+      vi: `${components} nhóm riêng lẻ. Cần chuyển ${answer} cáp để nối tất cả. Đáp án = components - 1 = ${answer}.`,
+    },
+  };
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
+
+function buildSteps1319(input, params) {
+  const n = params.n !== undefined ? Number(params.n) : 4;
+  const edgeList = String(input).split(";").map((s) => {
+    const parts = s.trim().split(",").map(Number);
+    return { a: parts[0], b: parts[1] };
+  }).filter((e) => !isNaN(e.a) && !isNaN(e.b));
+
+  const steps = [];
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const rnk = new Array(n).fill(0);
+  let components = n;
+  let redundant = 0;
+  const addedEdges = new Set();
+  const redundantEdges = new Set();
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(x, y) {
+    const rx = find(x), ry = find(y);
+    if (rx === ry) return false;
+    if (rnk[rx] >= rnk[ry]) { parent[ry] = rx; if (rnk[rx] === rnk[ry]) rnk[rx]++; }
+    else { parent[rx] = ry; }
+    return true;
+  }
+  function compCount() {
+    const cnt = new Map();
+    for (let i = 0; i < n; i++) { const r = find(i); cnt.set(r, (cnt.get(r) || 0) + 1); }
+    return cnt;
+  }
+
+  function graphSnap(title, note, hlNodes, hlEdges, vars, codeLines) {
+    const cnt = compCount();
+    const visited = Array.from({ length: n }, (_, i) => cnt.get(find(i)) > 1 ? i : -1).filter(x => x >= 0);
+    const gEdges = [];
+    for (const key of addedEdges) {
+      const [u, v] = key.split("-").map(Number);
+      gEdges.push({ u, v, w: "" });
+    }
+    for (const key of redundantEdges) {
+      const [u, v] = key.split("-").map(Number);
+      gEdges.push({ u, v, w: "extra", style: "dashed" });
+    }
+    return {
+      title,
+      arr: [...parent],
+      sub: parent.map((p, i) => p === i ? "root" : `→${p}`),
+      highlight: hlNodes || [],
+      mark: Array.from({ length: n }, (_, i) => i).filter(i => parent[i] === i),
+      graph: {
+        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+        edges: gEdges,
+        hlNodes: hlNodes || [],
+        hlEdges: hlEdges || [],
+        visitedNodes: visited,
+      },
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    };
+  }
+
+  const edgesStr = edgeList.map((e) => `(${e.a},${e.b})`).join(", ");
+  const impossible = edgeList.length < n - 1;
+
+  // ── Step 0: feasibility check ──────────────────────────────────────
+  steps.push(graphSnap(
+    { vi: "Bước 1: kiểm tra khả thi", en: "Step 1: feasibility check" },
+    {
+      en:
+        `${n} computers, ${edgeList.length} cables: ${edgesStr}.\n` +
+        `Need at least n-1 = ${n-1} cables to connect ${n} computers.\n` +
+        (impossible
+          ? `${edgeList.length} < ${n-1} → IMPOSSIBLE. Return -1.`
+          : `${edgeList.length} ≥ ${n-1} → may be possible. Run Union-Find to count redundant cables.`),
+      vi:
+        `${n} máy tính, ${edgeList.length} cáp: ${edgesStr}.\n` +
+        `Cần ít nhất n-1 = ${n-1} cáp để nối ${n} máy tính.\n` +
+        (impossible
+          ? `${edgeList.length} < ${n-1} → KHÔNG THỂ. Trả -1.`
+          : `${edgeList.length} ≥ ${n-1} → có thể được. Chạy Union-Find đếm cáp dư.`),
+    },
+    [], [],
+    [
+      { name: "n (computers)", value: n },
+      { name: "edges (cables)", value: edgeList.length },
+      { name: "need min cables", value: n - 1 },
+      { name: "feasible?", value: !impossible },
+    ],
+    [3, 4]
+  ));
+
+  if (impossible) {
+    const fs = graphSnap(
+      { vi: "Kết quả: -1 (không đủ cáp)", en: "Result: -1 (not enough cables)" },
+      { en: `${edgeList.length} cables < ${n-1} needed → impossible. Return -1.`, vi: `${edgeList.length} cáp < ${n-1} cần → trả -1.` },
+      [], [],
+      [{ name: "answer", value: -1 }],
+      [3, 4]
+    );
+    fs.final = true;
+    steps.push(fs);
+    return { input, answer: -1, steps };
+  }
+
+  // ── Step 1: intro to union-find pass ──────────────────────────────
+  steps.push(graphSnap(
+    { vi: "Bước 2: Union-Find — gộp các máy tính", en: "Step 2: Union-Find — merge computers" },
+    {
+      en:
+        `Start Union-Find. parent[i] = i, components = ${n}.\n` +
+        `For each cable (a,b):\n` +
+        `  • If find(a) ≠ find(b) → union them, components--  (useful cable)\n` +
+        `  • If find(a) = find(b) → cycle! redundant++  (can be repurposed)\n` +
+        `Answer = components - 1 if redundant ≥ components - 1, else -1.`,
+      vi:
+        `Bắt đầu Union-Find. parent[i] = i, components = ${n}.\n` +
+        `Với mỗi cáp (a,b):\n` +
+        `  • Nếu find(a) ≠ find(b) → gộp, components--  (cáp hữu ích)\n` +
+        `  • Nếu find(a) = find(b) → vòng lặp! redundant++  (cáp dư, dùng lại được)\n` +
+        `Đáp án = components - 1 nếu redundant ≥ components - 1, ngược lại -1.`,
+    },
+    [], [],
+    [{ name: "components", value: components }, { name: "redundant", value: redundant }],
+    [5, 6, 7]
+  ));
+
+  // ── Process each edge ─────────────────────────────────────────────
+  for (const { a, b } of edgeList) {
+    const ra = find(a), rb = find(b);
+    const isCycle = ra === rb;
+    const edgeKey = `${Math.min(a,b)}-${Math.max(a,b)}`;
+
+    if (!isCycle) {
+      union(a, b);
+      components--;
+      addedEdges.add(edgeKey);
+    } else {
+      redundant++;
+      redundantEdges.add(edgeKey);
+    }
+
+    steps.push(graphSnap(
+      {
+        vi: isCycle
+          ? `Cáp (${a},${b}): dư (vòng lặp) → redundant = ${redundant}`
+          : `Cáp (${a},${b}): hữu ích → components = ${components}`,
+        en: isCycle
+          ? `Cable (${a},${b}): redundant (cycle) → redundant = ${redundant}`
+          : `Cable (${a},${b}): useful → components = ${components}`,
+      },
+      {
+        en: isCycle
+          ? `find(${a}) = ${ra} = find(${b}) → already same component! This cable creates a cycle.\nIt can be removed and reused to bridge a disconnected component.\nredundant = ${redundant}.`
+          : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → different components. Merge them.\ncomponents = ${components}, redundant = ${redundant}.`,
+        vi: isCycle
+          ? `find(${a}) = ${ra} = find(${b}) → đã cùng nhóm! Cáp này tạo vòng lặp.\nCó thể tháo ra và dùng để nối nhóm khác.\nredundant = ${redundant}.`
+          : `find(${a}) = ${ra} ≠ find(${b}) = ${rb} → khác nhóm. Gộp lại.\ncomponents = ${components}, redundant = ${redundant}.`,
+      },
+      [a, b],
+      isCycle ? [] : [edgeKey],
+      [
+        { name: "cable", value: `(${a}, ${b})` },
+        { name: "find(a)", value: ra },
+        { name: "find(b)", value: rb },
+        { name: "cycle (redundant)?", value: isCycle },
+        { name: "components", value: components },
+        { name: "redundant", value: redundant },
+        { name: "parent", value: `[${parent.join(",")}]` },
+      ],
+      isCycle ? [9, 10] : [7, 8]
+    ));
+  }
+
+  // ── Final ─────────────────────────────────────────────────────────
+  const answer = redundant >= components - 1 ? components - 1 : -1;
+  const fs = graphSnap(
+    { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    {
+      en:
+        `${components} disconnected component(s) remain. Need ${components - 1} operations to connect them.\n` +
+        `Redundant cables available: ${redundant}.\n` +
+        `${redundant} ≥ ${components - 1} → answer = ${components - 1}.`,
+      vi:
+        `Còn ${components} nhóm chưa nối. Cần ${components - 1} thao tác.\n` +
+        `Cáp dư có: ${redundant}.\n` +
+        `${redundant} ≥ ${components - 1} → đáp án = ${components - 1}.`,
+    },
+    [], [],
+    [
+      { name: "components", value: components },
+      { name: "redundant cables", value: redundant },
+      { name: "need operations", value: components - 1 },
+      { name: "answer", value: answer },
+    ],
+    [11]
+  );
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer, steps };
+}
+
 // ─── 323: Number of Connected Components in an Undirected Graph ───
 function buildSteps323(input, params) {
   const n = params.n !== undefined ? Number(params.n) : 5;
@@ -1245,6 +1636,98 @@ module.exports = {
       "        return -1",
     ],
     builder: buildSteps1101,
+  },
+  1319: {
+    id: 1319,
+    difficulty: "medium",
+    slug: "number-of-operations-to-make-network-connected",
+    category: UF_CAT,
+    title: { vi: "Number of Operations to Make Network Connected", en: "Number of Operations to Make Network Connected" },
+    titleVi: { vi: "Số thao tác để nối mạng", en: "Operations to connect all computers" },
+    statement: {
+      vi: "Có n máy tính (0..n-1) và connections[][2] là các cáp mạng. Mỗi thao tác: tháo 1 cáp và cắm lại nơi khác. Tìm số thao tác ít nhất để tất cả máy tính liên thông. Không được thì trả -1. Nhập cạnh: 'a,b' cách bởi ';'.",
+      en: "There are n computers (0..n-1) and connections[][2] are cables. One operation: remove a cable and plug it elsewhere. Find the minimum operations to make all computers connected. Return -1 if impossible. Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;0,2;1,2",
+    inputKind: "string",
+    inputLabel: { vi: "connections (a,b;a,b...)", en: "connections (a,b;a,b...)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số máy tính)", en: "n (computers)" }, default: 4 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" } },
+          { value: "2", label: { vi: "Cách 2: DFS (đếm components)", en: "Approach 2: DFS (count components)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Nếu số cáp < n-1 → trả -1 ngay.", en: "If edges < n-1 → return -1 immediately." },
+      { vi: "Cách 1 (Union-Find): cáp hữu ích gộp nhóm; cáp dư = vòng lặp. Đáp án = components-1.", en: "Approach 1 (Union-Find): useful cable merges groups; redundant = cycle. Answer = components-1." },
+      { vi: "Cách 2 (DFS): DFS từ mỗi nút chưa thăm đếm số components. Đáp án = components-1.", en: "Approach 2 (DFS): DFS from each unvisited node counts components. Answer = components-1." },
+    ],
+    complexity: {
+      time: "O(E · α(n)) / O(n + E)",
+      space: "O(n)",
+      note: {
+        vi: "Cách 1: Union-Find O(E·α(n)). Cách 2: DFS O(n+E).",
+        en: "Approach 1: Union-Find O(E·α(n)). Approach 2: DFS O(n+E).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def makeConnected(self, n, connections):",
+      "        if len(connections) < n - 1:",
+      "            return -1",
+      "        parent = list(range(n))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        components, redundant = n, 0",
+      "        for a, b in connections:",
+      "            if find(a) == find(b):",
+      "                redundant += 1",
+      "            else:",
+      "                parent[find(a)] = find(b)",
+      "                components -= 1",
+      "        return components - 1",
+    ],
+    code2: [
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def makeConnected(self, n, connections):",
+      "        if len(connections) < n - 1:",
+      "            return -1",
+      "        graph = defaultdict(list)",
+      "        for a, b in connections:",
+      "            graph[a].append(b)",
+      "            graph[b].append(a)",
+      "        visited = set()",
+      "        def dfs(node):",
+      "            stack = [node]",
+      "            while stack:",
+      "                cur = stack.pop()",
+      "                for nb in graph[cur]:",
+      "                    if nb not in visited:",
+      "                        visited.add(nb)",
+      "                        stack.append(nb)",
+      "        components = 0",
+      "        for i in range(n):",
+      "            if i not in visited:",
+      "                visited.add(i)",
+      "                dfs(i)",
+      "                components += 1",
+      "        return components - 1",
+    ],
+    codeLabel: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" },
+    code2Label: { vi: "Cách 2: DFS", en: "Approach 2: DFS" },
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps1319DFS(input, params) : buildSteps1319(input, params);
+    },
   },
   323: {
     id: 323,
