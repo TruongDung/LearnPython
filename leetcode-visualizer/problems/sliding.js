@@ -126,6 +126,258 @@ function buildSteps1004(nums, params) {
 }
 
 /**
+ * LeetCode 1100: Find K-Length Substrings With No Repeated Characters.
+ * Sliding window with a frequency map:
+ *  - Expand right and count s[right].
+ *  - Shrink while the window has a duplicate of s[right] or is longer than k.
+ *  - Count windows whose length is exactly k.
+ */
+function buildSteps1100(input, params) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const k = params.k;
+  const n = s.length;
+  const chars = s.split("");
+  const arr = chars.map((ch) => Math.max(1, ch.charCodeAt(0) - 96));
+  const steps = [];
+  const count = {};
+  let left = 0;
+  let answer = 0;
+  const validStarts = [];
+
+  const inWindow = (lo, hi) => (
+    lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []
+  );
+  const countText = () => {
+    const entries = Object.entries(count).filter(([, v]) => v > 0);
+    return entries.length ? `{${entries.map(([ch, v]) => `${ch}:${v}`).join(", ")}}` : "{}";
+  };
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...arr],
+      sub: [...chars],
+      highlight: opts.highlight || [],
+      mark: opts.mark || validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "k", value: k },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: "Đếm substring liên tiếp độ dài k mà không có ký tự lặp.",
+      en: "Count contiguous substrings of length k with no repeated characters.",
+    },
+  });
+
+  if (k <= 0 || k > n) {
+    snap({
+      title: { vi: "Không thể có cửa sổ hợp lệ", en: "No valid window possible" },
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: `k=${k} không tạo được substring hợp lệ trong chuỗi dài ${n}.`,
+        en: `k=${k} cannot form a valid substring in a string of length ${n}.`,
+      },
+      final: true,
+    });
+    return { s, k, answer: 0, steps };
+  }
+
+  snap({
+    title: { vi: "left = 0", en: "left = 0" },
+    codeLines: [4],
+    vars: [{ name: "left", value: left }],
+    note: {
+      vi: "left là đầu cửa sổ hiện tại.",
+      en: "left is the start of the current window.",
+    },
+  });
+
+  snap({
+    title: { vi: "count = {}", en: "count = {}" },
+    codeLines: [5],
+    vars: [{ name: "count", value: countText() }],
+    note: {
+      vi: "count lưu số lần xuất hiện của từng ký tự trong cửa sổ.",
+      en: "count stores each character's frequency inside the window.",
+    },
+  });
+
+  snap({
+    title: { vi: "answer = 0", en: "answer = 0" },
+    codeLines: [6],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: "answer đếm số cửa sổ hợp lệ độ dài k.",
+      en: "answer counts valid windows of length k.",
+    },
+  });
+
+  for (let right = 0; right < n; right++) {
+    const ch = s[right];
+    snap({
+      title: { vi: `for right=${right}, ch='${ch}'`, en: `for right=${right}, ch='${ch}'` },
+      codeLines: [7],
+      highlight: inWindow(left, right),
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "ch", value: ch },
+        { name: "window", value: `"${s.slice(left, right + 1)}"` },
+      ],
+      note: {
+        vi: `Mở rộng cửa sổ sang phải, thêm s[${right}]='${ch}'.`,
+        en: `Expand the window to the right, adding s[${right}]='${ch}'.`,
+      },
+    });
+
+    count[ch] = (count[ch] || 0) + 1;
+    snap({
+      title: { vi: `count['${ch}'] = ${count[ch]}`, en: `count['${ch}'] = ${count[ch]}` },
+      codeLines: [8],
+      highlight: inWindow(left, right),
+      vars: [
+        { name: "ch", value: ch },
+        { name: "count", value: countText() },
+      ],
+      note: {
+        vi: `Tăng tần suất của '${ch}' trong cửa sổ.`,
+        en: `Increase the frequency of '${ch}' in the window.`,
+      },
+    });
+
+    while ((count[ch] || 0) > 1 || right - left + 1 > k) {
+      const tooMany = (count[ch] || 0) > 1;
+      const tooLong = right - left + 1 > k;
+      snap({
+        title: { vi: `while invalid -> true`, en: `while invalid -> true` },
+        codeLines: [9],
+        highlight: inWindow(left, right),
+        vars: [
+          { name: `count['${ch}'] > 1`, value: tooMany },
+          { name: "window length > k", value: tooLong },
+          { name: "window length", value: right - left + 1 },
+          { name: "k", value: k },
+        ],
+        note: {
+          vi: tooMany
+            ? `Cửa sổ có ký tự '${ch}' bị lặp, cần co trái.`
+            : `Cửa sổ dài hơn k=${k}, cần co trái.`,
+          en: tooMany
+            ? `The window repeats '${ch}', so shrink from the left.`
+            : `The window is longer than k=${k}, so shrink from the left.`,
+        },
+      });
+
+      const removed = s[left];
+      count[removed] -= 1;
+      snap({
+        title: { vi: `count[s[left]] -= 1`, en: `count[s[left]] -= 1` },
+        codeLines: [10],
+        highlight: inWindow(left, right),
+        vars: [
+          { name: "removed", value: removed },
+          { name: "count", value: countText() },
+        ],
+        note: {
+          vi: `Bỏ s[${left}]='${removed}' khỏi cửa sổ.`,
+          en: `Remove s[${left}]='${removed}' from the window.`,
+        },
+      });
+
+      left += 1;
+      snap({
+        title: { vi: `left = ${left}`, en: `left = ${left}` },
+        codeLines: [11],
+        highlight: inWindow(left, right),
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "window", value: `"${s.slice(left, right + 1)}"` },
+          { name: "count", value: countText() },
+        ],
+        note: {
+          vi: `Dời left sang ${left}.`,
+          en: `Move left to ${left}.`,
+        },
+      });
+    }
+
+    const windowLen = right - left + 1;
+    const isValidK = windowLen === k;
+    snap({
+      title: { vi: `if window length == k -> ${isValidK}`, en: `if window length == k -> ${isValidK}` },
+      codeLines: [12],
+      highlight: inWindow(left, right),
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "window", value: `"${s.slice(left, right + 1)}"` },
+        { name: "window length", value: windowLen },
+        { name: "k", value: k },
+      ],
+      note: isValidK
+        ? {
+            vi: "Cửa sổ hiện tại có đúng độ dài k và không có ký tự lặp.",
+            en: "The current window has exactly length k and no repeated characters.",
+          }
+        : {
+            vi: "Cửa sổ chưa đủ độ dài k.",
+            en: "The window is not length k yet.",
+          },
+    });
+
+    if (isValidK) {
+      answer += 1;
+      validStarts.push(left);
+      snap({
+        title: { vi: `answer = ${answer}`, en: `answer = ${answer}` },
+        codeLines: [13],
+        highlight: inWindow(left, right),
+        mark: validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+        vars: [
+          { name: "valid substring", value: `"${s.slice(left, right + 1)}"` },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `Đếm substring "${s.slice(left, right + 1)}".`,
+          en: `Count substring "${s.slice(left, right + 1)}".`,
+        },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    codeLines: [14],
+    highlight: [],
+    mark: validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+    vars: [
+      { name: "answer", value: answer },
+      { name: "valid windows", value: validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none" },
+    ],
+    note: {
+      vi: `Có ${answer} substring độ dài ${k} không có ký tự lặp.`,
+      en: `There are ${answer} substring(s) of length ${k} with no repeated characters.`,
+    },
+    final: true,
+  });
+
+  return { s, k, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 1208: Get Equal Substrings Within Budget.
  *
  * Sliding window on cost array cost[i] = |s[i] - t[i]|:
@@ -973,6 +1225,50 @@ module.exports = {
       "        return max_len",
     ],
     builder: buildSteps1208,
+  },
+  1100: {
+    id: 1100,
+    difficulty: "medium",
+    premium: true,
+    slug: "find-k-length-substrings-with-no-repeated-characters",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Find K-Length Substrings With No Repeated Characters", en: "Find K-Length Substrings With No Repeated Characters" },
+    titleVi: { vi: "Đếm substring độ dài K không lặp ký tự", en: "K-length substrings with no repeated characters" },
+    statement: {
+      vi: "Cho chuỗi s và số nguyên k. Trả về số substring liên tiếp có độ dài k mà không có ký tự nào lặp lại.",
+      en: "Given a string s and an integer k, return the number of contiguous substrings of length k with no repeated characters.",
+    },
+    defaultInput: "havefunonleetcode",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 5 },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(min(n, charset))",
+      note: {
+        vi: "Mỗi ký tự vào/ra cửa sổ tối đa một lần. Bảng đếm giữ ký tự trong cửa sổ.",
+        en: "Each character enters and leaves the window at most once. The frequency map stores characters in the window.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numKLenSubstrNoRepeats(self, s: str, k: int) -> int:",
+      "        if k <= 0 or k > len(s): return 0",
+      "        left = 0",
+      "        count = {}",
+      "        answer = 0",
+      "        for right, ch in enumerate(s):",
+      "            count[ch] = count.get(ch, 0) + 1",
+      "            while count[ch] > 1 or right - left + 1 > k:",
+      "                count[s[left]] -= 1",
+      "                left += 1",
+      "            if right - left + 1 == k:",
+      "                answer += 1",
+      "        return answer",
+    ],
+    builder: buildSteps1100,
   },
   1004: {
     id: 1004,
