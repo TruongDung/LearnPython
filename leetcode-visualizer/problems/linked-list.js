@@ -610,8 +610,9 @@ function buildSteps1472(input, params) {
   }
 
   const steps = [];
-  const nodes = [{ id: 0, url: commands[0].url || "leetcode.com", prev: null, next: null, alive: true }];
-  let currentId = 0;
+  const homepage = commands[0].url || "leetcode.com";
+  const nodes = [];
+  let currentId = null;
   let nextId = 1;
   const outputs = [null];
 
@@ -631,6 +632,7 @@ function buildSteps1472(input, params) {
 
   function activeChain() {
     const result = [];
+    if (currentId == null) return result;
     let node = nodes[0];
     while (node) {
       result.push(node);
@@ -641,7 +643,7 @@ function buildSteps1472(input, params) {
 
   function nodeLabel(id) {
     const node = nodes.find((item) => item.id === id);
-    return node ? shortUrl(node.url) : "null";
+    return node && node.url ? shortUrl(node.url) : "null";
   }
 
   function snapshot(opts) {
@@ -654,9 +656,13 @@ function buildSteps1472(input, params) {
       .filter((node) => visibleIds.has(node.id))
       .map((node) => ({
         id: node.id,
-        label: displayUrl(node.url),
-        row: chainIds.includes(node.id) ? "main" : "discarded",
-        sub: node.id === 0 ? "home" : node.id === currentId ? "current" : "",
+        label: opts.nodeLabels && opts.nodeLabels[node.id] != null
+          ? opts.nodeLabels[node.id]
+          : displayUrl(node.url || "new Node"),
+        row: chainIds.includes(node.id) || (opts.mainIds || []).includes(node.id) ? "main" : "discarded",
+        sub: opts.nodeSubs && opts.nodeSubs[node.id] != null
+          ? opts.nodeSubs[node.id]
+          : node.id === 0 && currentId != null ? "home" : node.id === currentId ? "current" : "",
       }));
     const edges = [];
     for (const node of nodes) {
@@ -669,8 +675,8 @@ function buildSteps1472(input, params) {
     }
 
     const annotations = {};
-    annotations[currentId] = "curr";
-    if (currentId !== 0) annotations[0] = "home";
+    if (currentId != null && opts.showCurrent !== false) annotations[currentId] = "curr";
+    if (currentId != null && currentId !== 0) annotations[0] = "home";
     for (const [nodeIdx, label] of Object.entries(opts.annotations || {})) {
       annotations[nodeIdx] = annotations[nodeIdx] ? `${annotations[nodeIdx]}\n${label}` : label;
     }
@@ -695,10 +701,12 @@ function buildSteps1472(input, params) {
       mark: [],
       codeLines: opts.codeLines || [],
       vars: [
-        { name: "chain", value: `[${chain.join(", ")}]` },
-        { name: "curr", value: nodeLabel(currentId) },
-        { name: "curr.prev", value: curr && curr.prev != null ? nodeLabel(curr.prev) : "null" },
-        { name: "curr.next", value: curr && curr.next != null ? nodeLabel(curr.next) : "null" },
+        ...(opts.includeState === false ? [] : [
+          { name: "chain", value: `[${chain.join(", ")}]` },
+          { name: "curr", value: currentId == null ? "unassigned" : nodeLabel(currentId) },
+          { name: "curr.prev", value: curr && curr.prev != null ? nodeLabel(curr.prev) : "null" },
+          { name: "curr.next", value: curr && curr.next != null ? nodeLabel(curr.next) : "null" },
+        ]),
         ...(opts.vars || []),
       ],
       note: opts.note,
@@ -707,22 +715,129 @@ function buildSteps1472(input, params) {
   }
 
   snapshot({
-    title: { vi: `BrowserHistory("${nodeLabel(0)}")`, en: `BrowserHistory("${nodeLabel(0)}")` },
+    title: { vi: `BrowserHistory("${shortUrl(homepage)}")`, en: `BrowserHistory("${shortUrl(homepage)}")` },
     codeLines: [8],
-    vars: [{ name: "output", value: "null" }],
+    includeState: false,
+    caption: "history: empty",
+    vars: [
+      { name: "homepage", value: shortUrl(homepage) },
+      { name: "self.curr", value: "unassigned" },
+    ],
     note: {
-      vi: `Tạo node homepage "${nodeLabel(0)}" và cho curr trỏ vào node này.`,
-      en: `Create the homepage node "${nodeLabel(0)}" and point curr to it.`,
+      vi: `Bắt đầu BrowserHistory.__init__. Lúc này chưa tạo node và self.curr chưa trỏ vào đâu.`,
+      en: `Enter BrowserHistory.__init__. No node exists yet and self.curr does not point anywhere.`,
     },
   });
 
   snapshot({
-    title: { vi: "curr.prev = curr.next = null", en: "curr.prev = curr.next = null" },
-    codeLines: [4, 5],
-    vars: [{ name: "head", value: nodeLabel(0) }],
+    title: { vi: "self.curr = Node(homepage)", en: "self.curr = Node(homepage)" },
+    codeLines: [9],
+    includeState: false,
+    caption: "calling Node(homepage)",
+    vars: [
+      { name: "homepage", value: shortUrl(homepage) },
+      { name: "self.curr", value: "waiting for Node(...)" },
+    ],
     note: {
-      vi: "Ban đầu chỉ có 1 node nên chưa có trang trước/sau.",
-      en: "Initially there is only one node, so prev/next are null.",
+      vi: "Python phải chạy xong Node(homepage) trước, sau đó mới gán kết quả vào self.curr.",
+      en: "Python must finish Node(homepage) before assigning its result to self.curr.",
+    },
+  });
+
+  const homepageNode = { id: 0, url: "", prev: null, next: null, alive: true };
+  nodes.push(homepageNode);
+
+  snapshot({
+    title: { vi: `Node.__init__("${shortUrl(homepage)}", prev=None)`, en: `Node.__init__("${shortUrl(homepage)}", prev=None)` },
+    codeLines: [2],
+    includeState: false,
+    showIds: [0],
+    mainIds: [0],
+    nodeLabels: { 0: "new Node" },
+    nodeSubs: { 0: "being created" },
+    annotations: { 0: "self" },
+    hlNodes: [0],
+    caption: "inside Node.__init__",
+    vars: [
+      { name: "self", value: "new Node" },
+      { name: "url", value: shortUrl(homepage) },
+      { name: "prev", value: "None" },
+    ],
+    note: {
+      vi: "Tạo một object Node mới. self là object đang được khởi tạo; các field chưa được gán lần lượt.",
+      en: "Create a new Node object. self is the object being initialized; its fields have not been assigned line by line yet.",
+    },
+  });
+
+  homepageNode.url = homepage;
+  snapshot({
+    title: { vi: "self.url = url", en: "self.url = url" },
+    codeLines: [3],
+    includeState: false,
+    showIds: [0],
+    mainIds: [0],
+    nodeSubs: { 0: "url assigned" },
+    annotations: { 0: "self" },
+    hlNodes: [0],
+    caption: "building homepage node",
+    vars: [
+      { name: "url", value: shortUrl(homepage) },
+      { name: "self.url", value: shortUrl(homepage) },
+    ],
+    note: {
+      vi: `Gán địa chỉ "${shortUrl(homepage)}" vào field self.url của node đầu tiên.`,
+      en: `Assign "${shortUrl(homepage)}" to the first node's self.url field.`,
+    },
+  });
+
+  snapshot({
+    title: { vi: "self.prev = prev", en: "self.prev = prev" },
+    codeLines: [4],
+    includeState: false,
+    showIds: [0],
+    mainIds: [0],
+    nodeSubs: { 0: "prev = None" },
+    annotations: { 0: "self" },
+    hlNodes: [0],
+    caption: "building homepage node",
+    vars: [
+      { name: "prev", value: "None" },
+      { name: "self.prev", value: "None" },
+    ],
+    note: {
+      vi: "Homepage không có trang đứng trước, nên self.prev = None.",
+      en: "The homepage has no previous page, so self.prev = None.",
+    },
+  });
+
+  snapshot({
+    title: { vi: "self.next = None", en: "self.next = None" },
+    codeLines: [5],
+    includeState: false,
+    showIds: [0],
+    mainIds: [0],
+    nodeSubs: { 0: "prev = None | next = None" },
+    annotations: { 0: "self" },
+    hlNodes: [0],
+    caption: "homepage node complete",
+    vars: [
+      { name: "self.prev", value: "None" },
+      { name: "self.next", value: "None" },
+    ],
+    note: {
+      vi: "Homepage chưa có trang phía sau, nên self.next = None. Node đầu tiên đã hoàn chỉnh.",
+      en: "The homepage has no following page, so self.next = None. The first node is now complete.",
+    },
+  });
+
+  currentId = 0;
+  snapshot({
+    title: { vi: "self.curr = homepage_node", en: "self.curr = homepage_node" },
+    codeLines: [9],
+    vars: [{ name: "output", value: "null" }],
+    note: {
+      vi: `Node(homepage) đã trả về. Bây giờ self.curr mới trỏ vào node "${nodeLabel(0)}"; đây cũng là home.`,
+      en: `Node(homepage) has returned. self.curr now points to "${nodeLabel(0)}", which is also home.`,
     },
   });
 
