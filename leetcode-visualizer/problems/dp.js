@@ -9669,10 +9669,8 @@ function buildSteps5DP(input) {
   }
 
   function formatDpMatrix() {
-    // dp[i][j] only meaningful when i <= j; show "·" otherwise.
-    return dp
-      .map((row, i) => `${i}:[${row.map((v, j) => (j < i ? "·" : v ? "T" : "F")).join(",")}]`)
-      .join(" ");
+    // Mirror the exact Python structure: dp = [[False]*n for _ in range(n)]
+    return `[${dp.map((row) => `[${row.map((v) => (v ? "True" : "False")).join(", ")}]`).join(", ")}]`;
   }
 
   function gridSnap(opts) {
