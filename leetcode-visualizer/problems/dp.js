@@ -9668,11 +9668,6 @@ function buildSteps5DP(input) {
     };
   }
 
-  function formatDpMatrix() {
-    // Mirror the exact Python structure: dp = [[False]*n for _ in range(n)]
-    return `[${dp.map((row) => `[${row.map((v) => (v ? "True" : "False")).join(", ")}]`).join(", ")}]`;
-  }
-
   function gridSnap(opts) {
     const hasActiveCell = Array.isArray(opts.hlCell);
     const currentVars = [];
@@ -9684,7 +9679,6 @@ function buildSteps5DP(input) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
-    currentVars.push({ name: "dp", value: n ? formatDpMatrix() : "[]" });
     currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
     steps.push({
       title: opts.title,
