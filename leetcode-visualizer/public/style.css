@@ -3340,6 +3340,14 @@ button:disabled {
   stroke-width: 3;
 }
 
+.graph-edge.prev {
+  stroke: #38bdf8;
+}
+
+.graph-edge.prev.hl {
+  stroke: #f59e0b;
+}
+
 .graph-weight {
   fill: #94a3b8;
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;
@@ -3348,6 +3356,14 @@ button:disabled {
 }
 
 .graph-weight.hl {
+  fill: #fbbf24;
+}
+
+.graph-weight.prev {
+  fill: #7dd3fc;
+}
+
+.graph-weight.prev.hl {
   fill: #fbbf24;
 }
 
@@ -3411,8 +3427,24 @@ button:disabled {
   stroke: #f59e0b;
 }
 
+[data-theme="light"] .graph-edge.prev {
+  stroke: #0284c7;
+}
+
+[data-theme="light"] .graph-edge.prev.hl {
+  stroke: #f59e0b;
+}
+
 [data-theme="light"] .graph-weight {
   fill: #64748b;
+}
+
+[data-theme="light"] .graph-weight.prev {
+  fill: #0369a1;
+}
+
+[data-theme="light"] .graph-weight.prev.hl {
+  fill: #d97706;
 }
 
 [data-theme="light"] .graph-caption,

@@ -1360,11 +1360,12 @@ function renderGraph(step) {
 
   const hlNodeSet = new Set(hlNodes || []);
   const visitedSet = new Set(visitedNodes || []);
-  const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}`));
+  const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}${e[2] ? `-${e[2]}` : ""}`));
 
   // Draw edges (with arrowheads and weight labels)
   let edgeSvg = "";
   const arrowId = "graph-arrow";
+  const arrowPrevId = "graph-arrow-prev";
   const arrowHlId = "graph-arrow-hl";
 
   for (const edge of edges) {
@@ -1372,7 +1373,6 @@ function renderGraph(step) {
     const to = pos[edge.v];
     if (!from || !to) continue;
 
-    // Shorten the line so arrow doesn't overlap the circle
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -1383,19 +1383,34 @@ function renderGraph(step) {
     const x2 = to.x - ux * (r + 6);
     const y2 = to.y - uy * (r + 6);
 
-    const isHl = hlEdgeSet.has(`${edge.u}-${edge.v}`);
-    const cls = isHl ? "graph-edge hl" : "graph-edge";
-    const markerEnd = isHl ? `url(#${arrowHlId})` : `url(#${arrowId})`;
+    const edgeKey = `${edge.u}-${edge.v}`;
+    const typedEdgeKey = `${edgeKey}${edge.kind ? `-${edge.kind}` : ""}`;
+    const isHl = hlEdgeSet.has(edgeKey) || hlEdgeSet.has(typedEdgeKey);
+    const kindClass = edge.kind ? ` ${edge.kind}` : "";
+    const cls = `graph-edge${kindClass}${isHl ? " hl" : ""}`;
+    const markerId = isHl ? arrowHlId : edge.kind === "prev" ? arrowPrevId : arrowId;
+    const markerEnd = `url(#${markerId})`;
+    const isPointerLane = isLinear && (edge.kind === "next" || edge.kind === "prev") && Math.abs(dy) < 1;
 
-    edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
+    let mx = (x1 + x2) / 2;
+    let my = (y1 + y2) / 2;
+    let labelX = mx - uy * 12;
+    let labelY = my + ux * 12;
+    if (isPointerLane) {
+      const laneY = from.y + (edge.kind === "prev" ? 13 : -13);
+      const direction = Math.sign(dx) || 1;
+      const laneX1 = from.x + direction * (r + 2);
+      const laneX2 = to.x - direction * (r + 6);
+      edgeSvg += `<line x1="${laneX1}" y1="${laneY}" x2="${laneX2}" y2="${laneY}" class="${cls}" marker-end="${markerEnd}" />`;
+      mx = (laneX1 + laneX2) / 2;
+      my = laneY;
+      labelX = mx;
+      labelY = laneY + (edge.kind === "prev" ? 15 : -15);
+    } else {
+      edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
+    }
 
-    // Weight label at midpoint
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    // Offset perpendicular to the edge
-    const perpX = -uy * 12;
-    const perpY = ux * 12;
-    const weight = edge.w ? `<text x="${mx + perpX}" y="${my + perpY}" class="graph-weight${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${edge.w}</text>` : "";
+    const weight = edge.w ? `<text x="${labelX}" y="${labelY}" class="graph-weight${kindClass}${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${escapeXml(edge.w)}</text>` : "";
     edgeSvg += weight;
   }
 
@@ -1442,6 +1457,9 @@ function renderGraph(step) {
   const defs = `<defs>
     <marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+    <marker id="${arrowPrevId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
     </marker>
     <marker id="${arrowHlId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />

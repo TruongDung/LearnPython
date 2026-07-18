@@ -661,7 +661,10 @@ function buildSteps1472(input, params) {
     const edges = [];
     for (const node of nodes) {
       if (visibleIds.has(node.id) && node.next != null && visibleIds.has(node.next)) {
-        edges.push({ u: node.id, v: node.next, w: "" });
+        edges.push({ u: node.id, v: node.next, w: "next", kind: "next" });
+      }
+      if (visibleIds.has(node.id) && node.prev != null && visibleIds.has(node.prev)) {
+        edges.push({ u: node.id, v: node.prev, w: "prev", kind: "prev" });
       }
     }
 
@@ -792,6 +795,7 @@ function buildSteps1472(input, params) {
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
         hlNodes: [currentId, newNode.id],
+        hlEdges: [[newNode.id, currentId, "prev"]],
         annotations: { [newNode.id]: "self", [currentId]: "prev" },
         vars: [
           { name: "prev", value: nodeLabel(currentId) },
@@ -830,7 +834,7 @@ function buildSteps1472(input, params) {
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
         hlNodes: [currentId, newNode.id],
-        hlEdges: [[currentId, newNode.id]],
+        hlEdges: [[currentId, newNode.id, "next"]],
         annotations: { [newNode.id]: "new" },
         vars: [
           { name: "old forward", value: discarded.length ? discarded.map((id) => nodeLabel(id)).join(", ") : "none" },
@@ -885,7 +889,7 @@ function buildSteps1472(input, params) {
           title: { vi: `curr = curr.prev → "${nodeLabel(currentId)}"`, en: `curr = curr.prev → "${nodeLabel(currentId)}"` },
           codeLines: [18, 19],
           hlNodes: [from, currentId],
-          hlEdges: [[currentId, from]],
+          hlEdges: [[from, currentId, "prev"]],
           vars: [
             { name: "steps left", value: remaining },
             { name: "moved", value: `${nodeLabel(from)} -> ${nodeLabel(currentId)}` },
@@ -932,7 +936,7 @@ function buildSteps1472(input, params) {
           title: { vi: `curr = curr.next → "${nodeLabel(currentId)}"`, en: `curr = curr.next → "${nodeLabel(currentId)}"` },
           codeLines: [24, 25],
           hlNodes: [from, currentId],
-          hlEdges: [[from, currentId]],
+          hlEdges: [[from, currentId, "next"]],
           vars: [
             { name: "steps left", value: remaining },
             { name: "moved", value: `${nodeLabel(from)} -> ${nodeLabel(currentId)}` },
