@@ -1438,6 +1438,125 @@ function buildSteps3312(input, params) {
   return { original: nums, answer: answers, steps };
 }
 
+/**
+ * LeetCode 1979: Find Greatest Common Divisor of Array.
+ * Line-by-line: find min, find max, then Euclid's GCD step by step.
+ */
+function buildSteps1979(input) {
+  const nums = Array.isArray(input) ? input : [input];
+  const steps = [];
+
+  function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
+
+  // Line 5: mn = min(nums)
+  const mn = Math.min(...nums);
+  const minIdx = nums.indexOf(mn);
+  steps.push({
+    title: { en: "mn = min(nums)", vi: "mn = min(nums)" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [minIdx],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "mn", value: mn },
+    ],
+    note: {
+      en: `Find minimum: mn = min(nums) = ${mn} (at index ${minIdx}).`,
+      vi: `Tìm min: mn = min(nums) = ${mn} (tại index ${minIdx}).`,
+    },
+  });
+
+  // Line 6: mx = max(nums)
+  const mx = Math.max(...nums);
+  const maxIdx = nums.indexOf(mx);
+  steps.push({
+    title: { en: "mx = max(nums)", vi: "mx = max(nums)" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [maxIdx],
+    mark: [minIdx],
+    codeLines: [6],
+    vars: [
+      { name: "mn", value: mn },
+      { name: "mx", value: mx },
+    ],
+    note: {
+      en: `Find maximum: mx = max(nums) = ${mx} (at index ${maxIdx}).`,
+      vi: `Tìm max: mx = max(nums) = ${mx} (tại index ${maxIdx}).`,
+    },
+  });
+
+  // Line 7: return gcd(mn, mx) — show Euclid's algorithm step by step
+  let a = mx, b = mn;
+  steps.push({
+    title: { en: `gcd(${mn}, ${mx}) — Euclid's algorithm`, vi: `gcd(${mn}, ${mx}) — thuật toán Euclid` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [minIdx, maxIdx],
+    mark: [],
+    codeLines: [7],
+    vars: [
+      { name: "a", value: a },
+      { name: "b", value: b },
+    ],
+    note: {
+      en: `Compute gcd(${mn}, ${mx}) using Euclid: repeatedly replace (a, b) with (b, a % b) until b = 0.`,
+      vi: `Tính gcd(${mn}, ${mx}) bằng Euclid: lặp thay (a, b) bằng (b, a % b) cho đến khi b = 0.`,
+    },
+  });
+
+  // Euclid steps
+  let iteration = 0;
+  while (b !== 0) {
+    iteration++;
+    const remainder = a % b;
+    steps.push({
+      title: { en: `Euclid step ${iteration}: ${a} % ${b} = ${remainder}`, vi: `Euclid bước ${iteration}: ${a} % ${b} = ${remainder}` },
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: [minIdx, maxIdx],
+      mark: [],
+      codeLines: [7],
+      vars: [
+        { name: "a", value: a },
+        { name: "b", value: b },
+        { name: "a % b", value: remainder },
+        { name: "next (a, b)", value: `(${b}, ${remainder})` },
+      ],
+      note: {
+        en: `${a} % ${b} = ${remainder}. Next: a = ${b}, b = ${remainder}.`,
+        vi: `${a} % ${b} = ${remainder}. Tiếp: a = ${b}, b = ${remainder}.`,
+      },
+    });
+    [a, b] = [b, remainder];
+  }
+
+  // Final result
+  const answer = a;
+  steps.push({
+    title: { en: `return gcd = ${answer}`, vi: `return gcd = ${answer}` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [minIdx, maxIdx],
+    mark: [minIdx, maxIdx],
+    final: true,
+    codeLines: [7],
+    vars: [
+      { name: "mn", value: mn },
+      { name: "mx", value: mx },
+      { name: "gcd(mn, mx)", value: answer },
+    ],
+    note: {
+      en: `b = 0, so gcd = a = ${answer}. The GCD of the smallest (${mn}) and largest (${mx}) element is ${answer}.`,
+      vi: `b = 0, vậy gcd = a = ${answer}. GCD của phần tử nhỏ nhất (${mn}) và lớn nhất (${mx}) là ${answer}.`,
+    },
+  });
+
+  return { original: nums, answer, steps };
+}
+
 module.exports = {
   3312: {
     id: 3312,
@@ -1873,5 +1992,40 @@ module.exports = {
       "        return res",
     ],
     builder: buildSteps3756,
+  },
+  1979: {
+    id: 1979,
+    difficulty: "easy",
+    slug: "find-greatest-common-divisor-of-array",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Find Greatest Common Divisor of Array", en: "Find Greatest Common Divisor of Array" },
+    titleVi: { vi: "GCD của min và max trong mảng", en: "GCD of min and max in array" },
+    statement: {
+      vi: "Cho mảng nums, trả về GCD của phần tử nhỏ nhất và lớn nhất trong mảng.",
+      en: "Given an integer array nums, return the GCD of the smallest and largest numbers in nums.",
+    },
+    defaultInput: [2, 5, 6, 9, 10],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Tìm min và max của mảng.", en: "Find min and max of the array." },
+      { vi: "Tính GCD(min, max) bằng thuật toán Euclid.", en: "Compute GCD(min, max) using the Euclidean algorithm." },
+    ],
+    complexity: {
+      time: "O(n + log(min))",
+      space: "O(1)",
+      note: { vi: "O(n) tìm min/max, O(log(min)) cho GCD Euclid.", en: "O(n) to find min/max, O(log(min)) for Euclidean GCD." },
+    },
+    code: [
+      "from math import gcd",
+      "",
+      "class Solution:",
+      "    def findGCD(self, nums):",
+      "        mn = min(nums)",
+      "        mx = max(nums)",
+      "        return gcd(mn, mx)",
+    ],
+    builder: buildSteps1979,
   },
 };
