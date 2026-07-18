@@ -816,7 +816,7 @@ function buildSteps1472(input, params) {
     includeState: false,
     showIds: [0],
     mainIds: [0],
-    nodeSubs: { 0: "prev = None | next = None" },
+    nodeSubs: { 0: "prev=None | next=None" },
     annotations: { 0: "self" },
     hlNodes: [0],
     caption: "homepage node complete",

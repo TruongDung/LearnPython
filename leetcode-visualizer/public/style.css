@@ -3411,7 +3411,7 @@ button:disabled {
   fill: #fbbf24;
 }
 
-.graph-sub {
+.graph-node .graph-sub {
   fill: #94a3b8;
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;
   font-size: 11px;
