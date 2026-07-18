@@ -1193,9 +1193,11 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, caption, mutedCells } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, mutedCells } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const mutedSet = new Set((mutedCells || []).map(([r, c]) => `${r},${c}`));
+  const bestSet = new Set((bestCells || []).map(([r, c]) => `${r},${c}`));
+  if (bestCell) bestSet.add(`${bestCell[0]},${bestCell[1]}`);
   const labels = cellLabels || {};
   const m = dp.length - 1;
   const n = dp[0].length - 1;
@@ -1233,7 +1235,7 @@ function renderGrid(step) {
       let cls = "dp-cell";
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
       if (pathSet.has(`${i},${j}`)) cls += " path";
-      if (bestCell && bestCell[0] === i && bestCell[1] === j) cls += " best";
+      if (bestSet.has(`${i},${j}`)) cls += " best";
       if (mutedSet.has(`${i},${j}`)) cls += " muted";
       const key = `${i},${j}`;
       const fullLabel = labels[key] || "";

@@ -9449,13 +9449,15 @@ function buildSteps5(input) {
     if (opts.center !== undefined && opts.center >= 0 && opts.center < n) labels[`0,${opts.center + 1}`] = "center";
     if (opts.left !== undefined && opts.left >= 0 && opts.left < n) labels[`0,${opts.left + 1}`] = "L";
     if (opts.right !== undefined && opts.right >= 0 && opts.right < n) labels[`0,${opts.right + 1}`] = labels[`0,${opts.right + 1}`] ? "L/R" : "R";
-    if (bestStart <= bestEnd && n > 0) labels[`0,${bestStart + 1}`] = labels[`0,${bestStart + 1}`] || "best";
     const pathCells = [];
     if (opts.range) {
       for (let k = opts.range[0]; k <= opts.range[1]; k++) {
         if (k >= 0 && k < n) pathCells.push([0, k + 1]);
       }
     }
+    const bestCells = n > 0
+      ? [[0, bestStart + 1], [0, bestEnd + 1]]
+      : [];
     return {
       dp: [["", ...s.split("")]],
       text1: "",
@@ -9463,6 +9465,7 @@ function buildSteps5(input) {
       colLabels: s.split("").map((ch, idx) => ({ index: `idx=${idx}`, char: ch })),
       hlCell: opts.left !== undefined && opts.left >= 0 && opts.left < n ? [0, opts.left + 1] : null,
       pathCells,
+      bestCells,
       cellLabels: labels,
       largeCells: true,
     };
@@ -9481,7 +9484,8 @@ function buildSteps5(input) {
         ...(opts.left !== undefined ? [{ name: "left", value: opts.left }] : []),
         ...(opts.right !== undefined ? [{ name: "right", value: opts.right }] : []),
         { name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' },
-        { name: "best range", value: n ? `[${bestStart}, ${bestEnd}]` : "[]" },
+        { name: "best_start", value: n ? bestStart : "" },
+        { name: "best_end", value: n ? bestEnd : "" },
         ...(opts.vars || []),
       ],
       note: opts.note,
@@ -9540,19 +9544,43 @@ function buildSteps5(input) {
         },
       });
 
-      if (right - left > bestEnd - bestStart) {
+      const shouldUpdateBest = right - left > bestEnd - bestStart;
+      snap({
+        title: { vi: `Kiem tra co cap nhat best`, en: `Check whether to update best` },
+        codeLines: [8],
+        center,
+        left,
+        right,
+        range: [left, right],
+        vars: [
+          { name: "current length", value: right - left + 1 },
+          { name: "best length", value: bestEnd - bestStart + 1 },
+          { name: "condition", value: shouldUpdateBest },
+        ],
+        note: shouldUpdateBest
+          ? {
+              vi: "Palindrome hien tai dai hon best cu, nen dong tiep theo se cap nhat best.",
+              en: "The current palindrome is longer than the previous best, so the next line updates best.",
+            }
+          : {
+              vi: "Palindrome hien tai khong dai hon best cu, nen giu nguyen best.",
+              en: "The current palindrome is not longer than the previous best, so keep best unchanged.",
+            },
+      });
+
+      if (shouldUpdateBest) {
+
         bestStart = left;
         bestEnd = right;
         snap({
           title: { vi: `Cap nhat best = "${s.slice(bestStart, bestEnd + 1)}"`, en: `Update best = "${s.slice(bestStart, bestEnd + 1)}"` },
-          codeLines: [8, 9],
+          codeLines: [9],
           center,
           left,
           right,
           range: [left, right],
           vars: [
             { name: "new length", value: right - left + 1 },
-            { name: "best", value: `"${s.slice(bestStart, bestEnd + 1)}"` },
           ],
           note: {
             vi: "Palindrome hien tai dai hon best cu, nen luu lai range nay.",
@@ -9564,15 +9592,27 @@ function buildSteps5(input) {
       left -= 1;
       right += 1;
       snap({
-        title: { vi: "Mo rong ra ngoai", en: "Expand outward" },
-        codeLines: [10, 11],
+        title: { vi: "left -= 1", en: "left -= 1" },
+        codeLines: [10],
+        center,
+        left,
+        right: right - 1,
+        range: [Math.max(0, left + 1), Math.min(n - 1, right - 1)],
+        note: {
+          vi: "Giam left de chuan bi thu palindrome lon hon.",
+          en: "Move left down to prepare for a larger palindrome.",
+        },
+      });
+      snap({
+        title: { vi: "right += 1", en: "right += 1" },
+        codeLines: [11],
         center,
         left,
         right,
         range: [Math.max(0, left + 1), Math.min(n - 1, right - 1)],
         note: {
-          vi: "Giam left va tang right de thu palindrome lon hon.",
-          en: "Move left down and right up to try a larger palindrome.",
+          vi: "Tang right; lan lap tiep theo se kiem tra bien va so sanh hai dau.",
+          en: "Move right up; the next loop iteration checks bounds and compares both ends.",
         },
       });
     }
@@ -9660,6 +9700,7 @@ function buildSteps5DP(input) {
       }
     }
     const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
+    const bestShifted = shift([bestStart, bestEnd]);
     return {
       dp: display,
       text1: s,
@@ -9668,7 +9709,7 @@ function buildSteps5DP(input) {
       colLabels: axisLabels.map((char, idx) => ({ index: `j=${idx}`, char })),
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
-      bestCell: shift([bestStart, bestEnd]),
+      bestCell: bestShifted,
       mutedCells,
     };
   }
@@ -9684,7 +9725,15 @@ function buildSteps5DP(input) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
-    currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
+    if (!currentVars.some((item) => item.name === "best")) {
+      currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
+    }
+    if (!currentVars.some((item) => item.name === "best_start")) {
+      currentVars.push({ name: "best_start", value: n ? bestStart : "" });
+    }
+    if (!currentVars.some((item) => item.name === "best_end")) {
+      currentVars.push({ name: "best_end", value: n ? bestEnd : "" });
+    }
     steps.push({
       title: opts.title,
       arr: [],
@@ -9724,7 +9773,7 @@ function buildSteps5DP(input) {
   if (n === 0) {
     gridSnap({
       title: { vi: "Chuỗi rỗng", en: "Empty string" },
-      codeLines: [20],
+      codeLines: [22],
       vars: [{ name: "return", value: '""' }],
       note: { vi: "Chuỗi rỗng trả về chuỗi rỗng.", en: "Empty string returns an empty string." },
       final: true,
@@ -9804,16 +9853,27 @@ function buildSteps5DP(input) {
     if (match2) {
       // Line 12-13: dp[i][i+1] = True; best_start, best_end = i, i+1
       dp[i][i + 1] = true;
+      gridSnap({
+        title: { vi: `dp[${i}][${i + 1}] = True`, en: `dp[${i}][${i + 1}] = True` },
+        codeLines: [12],
+        hlCell: [i, i + 1],
+        vars: [{ name: `dp[${i}][${i + 1}]`, value: true }],
+        note: {
+          vi: `Đánh dấu "${s.slice(i, i + 2)}" là palindrome độ dài 2.`,
+          en: `Mark "${s.slice(i, i + 2)}" as a length-2 palindrome.`,
+        },
+      });
+
       bestStart = i;
       bestEnd = i + 1;
       gridSnap({
-        title: { vi: `dp[${i}][${i + 1}] = True, best = "${s.slice(i, i + 2)}"`, en: `dp[${i}][${i + 1}] = True, best = "${s.slice(i, i + 2)}"` },
-        codeLines: [12, 13],
+        title: { vi: `best = "${s.slice(i, i + 2)}"`, en: `best = "${s.slice(i, i + 2)}"` },
+        codeLines: [13],
         hlCell: [i, i + 1],
-        vars: [{ name: `dp[${i}][${i + 1}]`, value: true }, { name: "best_start, best_end", value: `${i}, ${i + 1}` }],
+        vars: [{ name: "best_start, best_end", value: `${i}, ${i + 1}` }],
         note: {
-          vi: `dp[${i}][${i + 1}] = True. Cập nhật best = "${s.slice(i, i + 2)}".`,
-          en: `dp[${i}][${i + 1}] = True. Update best = "${s.slice(i, i + 2)}".`,
+          vi: `Cập nhật best = "${s.slice(i, i + 2)}".`,
+          en: `Update best = "${s.slice(i, i + 2)}".`,
         },
       });
     }
@@ -9837,8 +9897,21 @@ function buildSteps5DP(input) {
 
       // Line 16-17: for i, compute j
       gridSnap({
-        title: { vi: `for i=${i} → j=${j}`, en: `for i=${i} → j=${j}` },
-        codeLines: [16, 17],
+        title: { vi: `for i=${i}`, en: `for i=${i}` },
+        codeLines: [16],
+        vars: [
+          { name: "i", value: i },
+          { name: "length", value: length },
+        ],
+        note: {
+          vi: `Bắt đầu lượt i=${i} cho độ dài ${length}.`,
+          en: `Start the i=${i} iteration for length ${length}.`,
+        },
+      });
+
+      gridSnap({
+        title: { vi: `j = ${j}`, en: `j = ${j}` },
+        codeLines: [17],
         hlCell: [i, j],
         pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
         vars: [
@@ -9847,8 +9920,8 @@ function buildSteps5DP(input) {
           { name: "substring", value: `"${s.slice(i, j + 1)}"` },
         ],
         note: {
-          vi: `Chuẩn bị xét dp[${i}][${j}] cho đoạn "${s.slice(i, j + 1)}".`,
-          en: `Prepare to check dp[${i}][${j}] for substring "${s.slice(i, j + 1)}".`,
+          vi: `Tính j=${j}; chuẩn bị xét dp[${i}][${j}] cho đoạn "${s.slice(i, j + 1)}".`,
+          en: `Compute j=${j}; prepare to check dp[${i}][${j}] for substring "${s.slice(i, j + 1)}".`,
         },
       });
 
@@ -9880,17 +9953,29 @@ function buildSteps5DP(input) {
       if (isPalin) {
         // Line 19-20: dp[i][j] = True; best_start, best_end = i, j
         dp[i][j] = true;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = True`, en: `dp[${i}][${j}] = True` },
+          codeLines: [19],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j - 1]],
+          vars: [{ name: `dp[${i}][${j}]`, value: true }],
+          note: {
+            vi: `Đánh dấu "${s.slice(i, j + 1)}" là palindrome.`,
+            en: `Mark "${s.slice(i, j + 1)}" as a palindrome.`,
+          },
+        });
+
         bestStart = i;
         bestEnd = j;
         gridSnap({
-          title: { vi: `dp[${i}][${j}] = True, best = "${s.slice(i, j + 1)}"`, en: `dp[${i}][${j}] = True, best = "${s.slice(i, j + 1)}"` },
-          codeLines: [19, 20],
+          title: { vi: `best = "${s.slice(i, j + 1)}"`, en: `best = "${s.slice(i, j + 1)}"` },
+          codeLines: [20],
           hlCell: [i, j],
           pathCells: [[i + 1, j - 1]],
-          vars: [{ name: `dp[${i}][${j}]`, value: true }, { name: "best_start, best_end", value: `${i}, ${j}` }],
+          vars: [{ name: "best_start, best_end", value: `${i}, ${j}` }],
           note: {
-            vi: `dp[${i}][${j}] = True. Cập nhật best = "${s.slice(i, j + 1)}" (độ dài ${length}).`,
-            en: `dp[${i}][${j}] = True. Update best = "${s.slice(i, j + 1)}" (length ${length}).`,
+            vi: `Cập nhật best = "${s.slice(i, j + 1)}" (độ dài ${length}).`,
+            en: `Update best = "${s.slice(i, j + 1)}" (length ${length}).`,
           },
         });
       }
