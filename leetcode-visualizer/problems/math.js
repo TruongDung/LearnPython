@@ -1446,9 +1446,7 @@ function buildSteps1979(input) {
   const nums = Array.isArray(input) ? input : [input];
   const steps = [];
 
-  function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
-
-  // Line 5: mn = min(nums)
+  // Line 3: mn = min(nums)
   const mn = Math.min(...nums);
   const minIdx = nums.indexOf(mn);
   steps.push({
@@ -1457,7 +1455,7 @@ function buildSteps1979(input) {
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [minIdx],
     mark: [],
-    codeLines: [5],
+    codeLines: [3],
     vars: [
       { name: "nums", value: `[${nums.join(", ")}]` },
       { name: "mn", value: mn },
@@ -1468,7 +1466,7 @@ function buildSteps1979(input) {
     },
   });
 
-  // Line 6: mx = max(nums)
+  // Line 4: mx = max(nums)
   const mx = Math.max(...nums);
   const maxIdx = nums.indexOf(mx);
   steps.push({
@@ -1477,7 +1475,7 @@ function buildSteps1979(input) {
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [maxIdx],
     mark: [minIdx],
-    codeLines: [6],
+    codeLines: [4],
     vars: [
       { name: "mn", value: mn },
       { name: "mx", value: mx },
@@ -1488,69 +1486,108 @@ function buildSteps1979(input) {
     },
   });
 
-  // Line 7: return gcd(mn, mx) — show Euclid's algorithm step by step
+  // Line 5: a, b = mx, mn
   let a = mx, b = mn;
   steps.push({
-    title: { en: `gcd(${mn}, ${mx}) — Euclid's algorithm`, vi: `gcd(${mn}, ${mx}) — thuật toán Euclid` },
+    title: { en: `a, b = ${mx}, ${mn}`, vi: `a, b = ${mx}, ${mn}` },
     arr: [...nums],
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [minIdx, maxIdx],
     mark: [],
-    codeLines: [7],
+    codeLines: [5],
     vars: [
       { name: "a", value: a },
       { name: "b", value: b },
     ],
     note: {
-      en: `Compute gcd(${mn}, ${mx}) using Euclid: repeatedly replace (a, b) with (b, a % b) until b = 0.`,
-      vi: `Tính gcd(${mn}, ${mx}) bằng Euclid: lặp thay (a, b) bằng (b, a % b) cho đến khi b = 0.`,
+      en: `Start Euclid's algorithm with a = mx = ${mx}, b = mn = ${mn}.`,
+      vi: `Bắt đầu thuật toán Euclid với a = mx = ${mx}, b = mn = ${mn}.`,
     },
   });
 
-  // Euclid steps
-  let iteration = 0;
+  // Euclid loop
   while (b !== 0) {
-    iteration++;
-    const remainder = a % b;
+    // Line 6: while b != 0
     steps.push({
-      title: { en: `Euclid step ${iteration}: ${a} % ${b} = ${remainder}`, vi: `Euclid bước ${iteration}: ${a} % ${b} = ${remainder}` },
+      title: { en: `while b=${b} != 0 → True`, vi: `while b=${b} != 0 → True` },
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: [minIdx, maxIdx],
+      mark: [],
+      codeLines: [6],
+      vars: [
+        { name: "a", value: a },
+        { name: "b", value: b },
+        { name: "b != 0", value: true },
+      ],
+      note: {
+        en: `b = ${b} ≠ 0 → continue loop.`,
+        vi: `b = ${b} ≠ 0 → tiếp tục vòng lặp.`,
+      },
+    });
+
+    // Line 7: a, b = b, a % b
+    const remainder = a % b;
+    const oldA = a, oldB = b;
+    a = b;
+    b = remainder;
+    steps.push({
+      title: { en: `a, b = ${oldB}, ${oldA} % ${oldB} = ${oldB}, ${remainder}`, vi: `a, b = ${oldB}, ${oldA} % ${oldB} = ${oldB}, ${remainder}` },
       arr: [...nums],
       sub: nums.map((_, i) => `[${i}]`),
       highlight: [minIdx, maxIdx],
       mark: [],
       codeLines: [7],
       vars: [
-        { name: "a", value: a },
-        { name: "b", value: b },
-        { name: "a % b", value: remainder },
-        { name: "next (a, b)", value: `(${b}, ${remainder})` },
+        { name: "a (old)", value: oldA },
+        { name: "b (old)", value: oldB },
+        { name: `${oldA} % ${oldB}`, value: remainder },
+        { name: "a (new)", value: a },
+        { name: "b (new)", value: b },
       ],
       note: {
-        en: `${a} % ${b} = ${remainder}. Next: a = ${b}, b = ${remainder}.`,
-        vi: `${a} % ${b} = ${remainder}. Tiếp: a = ${b}, b = ${remainder}.`,
+        en: `a, b = b, a%b = ${oldB}, ${oldA}%${oldB} = (${a}, ${b}).`,
+        vi: `a, b = b, a%b = ${oldB}, ${oldA}%${oldB} = (${a}, ${b}).`,
       },
     });
-    [a, b] = [b, remainder];
   }
 
-  // Final result
+  // Line 6 again: while b != 0 → False
+  steps.push({
+    title: { en: `while b=0 != 0 → False (exit loop)`, vi: `while b=0 != 0 → False (thoát vòng lặp)` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [minIdx, maxIdx],
+    mark: [],
+    codeLines: [6],
+    vars: [
+      { name: "a", value: a },
+      { name: "b", value: b },
+      { name: "b != 0", value: false },
+    ],
+    note: {
+      en: `b = 0 → exit while loop. GCD is stored in a.`,
+      vi: `b = 0 → thoát vòng lặp. GCD nằm trong a.`,
+    },
+  });
+
+  // Line 8: return a
   const answer = a;
   steps.push({
-    title: { en: `return gcd = ${answer}`, vi: `return gcd = ${answer}` },
+    title: { en: `return a = ${answer}`, vi: `return a = ${answer}` },
     arr: [...nums],
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [minIdx, maxIdx],
     mark: [minIdx, maxIdx],
     final: true,
-    codeLines: [7],
+    codeLines: [8],
     vars: [
-      { name: "mn", value: mn },
-      { name: "mx", value: mx },
-      { name: "gcd(mn, mx)", value: answer },
+      { name: "a", value: answer },
+      { name: "gcd(mn, mx)", value: `gcd(${mn}, ${mx}) = ${answer}` },
     ],
     note: {
-      en: `b = 0, so gcd = a = ${answer}. The GCD of the smallest (${mn}) and largest (${mx}) element is ${answer}.`,
-      vi: `b = 0, vậy gcd = a = ${answer}. GCD của phần tử nhỏ nhất (${mn}) và lớn nhất (${mx}) là ${answer}.`,
+      en: `GCD of smallest (${mn}) and largest (${mx}) = ${answer}.`,
+      vi: `GCD của nhỏ nhất (${mn}) và lớn nhất (${mx}) = ${answer}.`,
     },
   });
 
@@ -2018,13 +2055,14 @@ module.exports = {
       note: { vi: "O(n) tìm min/max, O(log(min)) cho GCD Euclid.", en: "O(n) to find min/max, O(log(min)) for Euclidean GCD." },
     },
     code: [
-      "from math import gcd",
-      "",
       "class Solution:",
       "    def findGCD(self, nums):",
       "        mn = min(nums)",
       "        mx = max(nums)",
-      "        return gcd(mn, mx)",
+      "        a, b = mx, mn",
+      "        while b != 0:",
+      "            a, b = b, a % b",
+      "        return a",
     ],
     builder: buildSteps1979,
   },
