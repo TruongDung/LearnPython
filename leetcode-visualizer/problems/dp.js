@@ -9648,11 +9648,15 @@ function buildSteps5DP(input) {
   const axisLabels = Array.from({ length: n }, (_, idx) => s[idx]);
 
   function makeGrid(hl = null, deps = []) {
-    // display[0][0] unused corner; display[i+1][j+1] = dp[i][j] (only i<=j meaningful)
+    // display[i+1][j+1] = dp[i][j]. In Python every cell is False (dp is a full
+    // n×n matrix), but only i<=j is ever USED. Lower triangle (j<i) is shown
+    // muted so it's clear it holds False yet is never accessed.
     const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    const mutedCells = [];
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
-        if (i <= j) display[i + 1][j + 1] = dp[i][j] ? "True" : "False";
+        display[i + 1][j + 1] = dp[i][j] ? "T" : "F";
+        if (j < i) mutedCells.push([i + 1, j + 1]); // unused lower triangle
       }
     }
     const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
@@ -9665,13 +9669,8 @@ function buildSteps5DP(input) {
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
       bestCell: shift([bestStart, bestEnd]),
-      caption: "dp[i][j] = True if s[i..j] is a palindrome",
+      mutedCells,
     };
-  }
-
-  function formatDpMatrix() {
-    // Mirror the exact Python structure: dp = [[False]*n for _ in range(n)]
-    return `[${dp.map((row) => `[${row.map((v) => (v ? "True" : "False")).join(", ")}]`).join(", ")}]`;
   }
 
   function gridSnap(opts) {
@@ -9685,7 +9684,6 @@ function buildSteps5DP(input) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
-    currentVars.push({ name: "dp", value: n ? formatDpMatrix() : "[]" });
     currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
     steps.push({
       title: opts.title,
