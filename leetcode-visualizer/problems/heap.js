@@ -42,6 +42,270 @@ function heapSnapshot(heap, labelFn, opts) {
   };
 }
 
+// ─── 3092: Most Frequent IDs ───
+function buildSteps3092(nums, params) {
+  const changes = String(params.freq || "")
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isInteger(value));
+  const steps = [];
+
+  if (changes.length !== nums.length || nums.length === 0) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [4],
+      vars: [
+        { name: "nums.length", value: nums.length },
+        { name: "freq.length", value: changes.length },
+      ],
+      note: {
+        vi: "nums và freq phải có cùng độ dài và không được rỗng.",
+        en: "nums and freq must have equal non-zero length.",
+      },
+      final: true,
+    });
+    return { original: { nums: [...nums], freq: changes }, answer: null, steps };
+  }
+
+  const counts = new Map();
+  const heap = [];
+  const answer = [];
+
+  const higherPriority = (a, b) => a.count > b.count || (a.count === b.count && a.id < b.id);
+  const isCurrent = (entry) => (counts.get(entry.id) || 0) === entry.count;
+  const label = (entry) => `${entry.id}·f${entry.count}${isCurrent(entry) ? "" : " old"}`;
+  const countsText = () => {
+    const entries = [...counts.entries()].sort((a, b) => a[0] - b[0]);
+    return `{${entries.map(([id, count]) => `${id}: ${count}`).join(", ")}}`;
+  };
+  const heapText = () => `[${heap.map((entry) => `(${entry.id},${entry.count}${isCurrent(entry) ? "" : ",old"})`).join(", ")}]`;
+  const validIndices = () => new Set(heap.map((entry, index) => isCurrent(entry) ? index : -1).filter((index) => index >= 0));
+
+  function snapshot(opts) {
+    const step = heapSnapshot([...heap], label, {
+      title: opts.title,
+      codeLines: opts.codeLines,
+      hlSet: opts.hlSet || new Set(),
+      markSet: opts.markSet || validIndices(),
+      vars: opts.vars,
+      note: opts.note,
+    });
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  function siftUp(index) {
+    let child = index;
+    while (child > 0) {
+      const parent = Math.floor((child - 1) / 2);
+      if (!higherPriority(heap[child], heap[parent])) break;
+      [heap[child], heap[parent]] = [heap[parent], heap[child]];
+      child = parent;
+    }
+  }
+
+  function siftDown(index) {
+    let parent = index;
+    while (true) {
+      let best = parent;
+      const left = parent * 2 + 1;
+      const right = left + 1;
+      if (left < heap.length && higherPriority(heap[left], heap[best])) best = left;
+      if (right < heap.length && higherPriority(heap[right], heap[best])) best = right;
+      if (best === parent) break;
+      [heap[parent], heap[best]] = [heap[best], heap[parent]];
+      parent = best;
+    }
+  }
+
+  function push(entry) {
+    heap.push(entry);
+    siftUp(heap.length - 1);
+  }
+
+  function popRoot() {
+    const removed = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+      heap[0] = last;
+      siftDown(0);
+    }
+    return removed;
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo counts, heap và answer", en: "Initialize counts, heap, and answer" },
+    codeLines: [5, 6, 7],
+    vars: [
+      { name: "counts", value: "{}" },
+      { name: "heap", value: "[]" },
+      { name: "answer", value: "[]" },
+    ],
+    note: {
+      vi: "counts giữ tần suất thật hiện tại. Heap có thể chứa cả entry mới lẫn entry cũ; entry cũ sẽ bị xóa khi lên root.",
+      en: "counts stores each current frequency. The heap may contain current and stale entries; stale entries are removed when they reach the root.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const id = nums[i];
+    const delta = changes[i];
+    const oldCount = counts.get(id) || 0;
+
+    snapshot({
+      title: { vi: `Update ${i}: ID ${id}, delta ${delta}`, en: `Update ${i}: ID ${id}, delta ${delta}` },
+      codeLines: [8],
+      vars: [
+        { name: "i", value: i },
+        { name: "id", value: id },
+        { name: "delta", value: delta },
+        { name: "old count", value: oldCount },
+        { name: "answer", value: `[${answer.join(", ")}]` },
+      ],
+      note: {
+        vi: `Áp dụng thay đổi ${delta >= 0 ? "+" : ""}${delta} cho ID ${id}.`,
+        en: `Apply change ${delta >= 0 ? "+" : ""}${delta} to ID ${id}.`,
+      },
+    });
+
+    const newCount = oldCount + delta;
+    counts.set(id, newCount);
+    snapshot({
+      title: { vi: `counts[${id}] = ${oldCount} + (${delta}) = ${newCount}`, en: `counts[${id}] = ${oldCount} + (${delta}) = ${newCount}` },
+      codeLines: [9],
+      vars: [
+        { name: "id", value: id },
+        { name: "old count", value: oldCount },
+        { name: "delta", value: delta },
+        { name: "new count", value: newCount },
+        { name: "counts", value: countsText() },
+        { name: "heap", value: heapText() },
+      ],
+      note: {
+        vi: heap.length
+          ? `Hash map đã cập nhật. Các heap entry cũ của ID ${id} lập tức trở thành stale nếu count không còn khớp.`
+          : "Hash map đã cập nhật; heap hiện vẫn rỗng.",
+        en: heap.length
+          ? `The map is updated. Older heap entries for ID ${id} immediately become stale when their count no longer matches.`
+          : "The map is updated; the heap is still empty.",
+      },
+    });
+
+    push({ id, count: newCount });
+    const pushedIndex = heap.findIndex((entry) => entry.id === id && entry.count === newCount);
+    snapshot({
+      title: { vi: `heappush((${newCount === 0 ? 0 : -newCount}, ${id}))`, en: `heappush((${newCount === 0 ? 0 : -newCount}, ${id}))` },
+      codeLines: [10],
+      hlSet: pushedIndex >= 0 ? new Set([pushedIndex]) : new Set([0]),
+      vars: [
+        { name: "pushed", value: `ID ${id}, count ${newCount}` },
+        { name: "heap", value: heapText() },
+        { name: "root", value: `ID ${heap[0].id}, count ${heap[0].count}` },
+      ],
+      note: {
+        vi: `Python dùng (-count, id) để biến heapq thành max-heap. Cây đang hiển thị count dương cho dễ đọc.`,
+        en: `Python stores (-count, id) to use heapq as a max-heap. The tree displays positive counts for readability.`,
+      },
+    });
+
+    while (heap.length > 0 && !isCurrent(heap[0])) {
+      const stale = heap[0];
+      const currentCount = counts.get(stale.id) || 0;
+      snapshot({
+        title: { vi: `Root ID ${stale.id}, f${stale.count} đã cũ`, en: `Root ID ${stale.id}, f${stale.count} is stale` },
+        codeLines: [11],
+        hlSet: new Set([0]),
+        vars: [
+          { name: "root stored count", value: stale.count },
+          { name: `counts[${stale.id}]`, value: currentCount },
+          { name: "condition", value: `${stale.count} != ${currentCount}` },
+        ],
+        note: {
+          vi: `Heap root nói ID ${stale.id} có ${stale.count}, nhưng hash map nói ${currentCount}. Root này không còn hợp lệ nên phải pop.`,
+          en: `The heap root says ID ${stale.id} has ${stale.count}, but the map says ${currentCount}. This root is stale and must be popped.`,
+        },
+      });
+
+      const removed = popRoot();
+      snapshot({
+        title: { vi: `heappop stale (${removed.id}, ${removed.count})`, en: `heappop stale (${removed.id}, ${removed.count})` },
+        codeLines: [12],
+        hlSet: heap.length ? new Set([0]) : new Set(),
+        vars: [
+          { name: "removed", value: `ID ${removed.id}, count ${removed.count}` },
+          { name: "heap", value: heapText() },
+          { name: "new root", value: heap.length ? `ID ${heap[0].id}, count ${heap[0].count}` : "none" },
+        ],
+        note: {
+          vi: heap.length
+            ? "Xóa root cũ và khôi phục heap. Vòng while sẽ kiểm tra root mới lần nữa."
+            : "Xóa root cũ; heap tạm thời rỗng.",
+          en: heap.length
+            ? "Remove the stale root and restore the heap. The while loop checks the new root again."
+            : "Remove the stale root; the heap is temporarily empty.",
+        },
+      });
+    }
+
+    snapshot({
+      title: { vi: "Root hiện tại hợp lệ", en: "Current root is valid" },
+      codeLines: [11],
+      hlSet: new Set([0]),
+      vars: [
+        { name: "root ID", value: heap[0].id },
+        { name: "root count", value: heap[0].count },
+        { name: `counts[${heap[0].id}]`, value: counts.get(heap[0].id) || 0 },
+        { name: "condition", value: "false - stop popping" },
+      ],
+      note: {
+        vi: `Root có count ${heap[0].count}, khớp hash map. Vì đây là max-heap, ${heap[0].count} là tần suất lớn nhất hiện tại.`,
+        en: `The root count ${heap[0].count} matches the map. Because this is a max-heap, ${heap[0].count} is the current maximum frequency.`,
+      },
+    });
+
+    answer.push(heap[0].count);
+    snapshot({
+      title: { vi: `answer.append(${heap[0].count})`, en: `answer.append(${heap[0].count})` },
+      codeLines: [13],
+      hlSet: new Set([0]),
+      vars: [
+        { name: "i", value: i },
+        { name: "max frequency", value: heap[0].count },
+        { name: "answer", value: `[${answer.join(", ")}]` },
+        { name: "counts", value: countsText() },
+      ],
+      note: {
+        vi: `Sau update ${i}, tần suất lớn nhất là ${heap[0].count}.`,
+        en: `After update ${i}, the largest frequency is ${heap[0].count}.`,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: `Kết quả: [${answer.join(", ")}]`, en: `Result: [${answer.join(", ")}]` },
+    codeLines: [14],
+    markSet: validIndices(),
+    vars: [
+      { name: "answer", value: `[${answer.join(", ")}]` },
+      { name: "final counts", value: countsText() },
+    ],
+    note: {
+      vi: `Hoàn tất ${nums.length} update. Mỗi phần tử answer là tần suất lớn nhất ngay sau update tương ứng.`,
+      en: `Completed ${nums.length} updates. Each answer value is the maximum frequency immediately after its update.`,
+    },
+    final: true,
+  });
+
+  return {
+    original: { nums: [...nums], freq: changes },
+    answer,
+    steps,
+  };
+}
+
 // ─── 347: Top K Frequent Elements ───
 function buildSteps347(input, params) {
   const nums = String(input).split(",").map((s) => Number(s.trim()));
@@ -1216,6 +1480,68 @@ function buildSteps23DC(input) {
 }
 
 module.exports = {
+  3092: {
+    id: 3092,
+    difficulty: "medium",
+    slug: "most-frequent-ids",
+    category: HEAP_CAT,
+    title: { vi: "Most Frequent IDs", en: "Most Frequent IDs" },
+    titleVi: { vi: "ID có tần suất lớn nhất sau mỗi update", en: "Maximum ID frequency after every update" },
+    statement: {
+      vi: "Với update i, cộng freq[i] vào tần suất của nums[i]. Sau mỗi update, trả về tần suất lớn nhất trong tất cả ID.",
+      en: "At update i, add freq[i] to the frequency of nums[i]. After every update, return the largest frequency among all IDs.",
+    },
+    defaultInput: [2, 3, 2, 1],
+    inputKind: "nonneg",
+    inputLabel: { vi: "nums (ID được cập nhật)", en: "nums (IDs being updated)" },
+    extraParams: [
+      {
+        key: "freq",
+        type: "string",
+        label: { vi: "freq (mức thay đổi, phẩy ngăn)", en: "freq (changes, comma separated)" },
+        default: "3,2,-3,1",
+      },
+    ],
+    approach: [
+      {
+        vi: "Hash map counts lưu tần suất thật hiện tại của mỗi ID.",
+        en: "A counts hash map stores each ID's true current frequency.",
+      },
+      {
+        vi: "Mỗi update push (-count, id) mới vào heap. Entry cũ không xóa ngay mà trở thành stale.",
+        en: "Each update pushes a new (-count, id) into the heap. Older entries remain as stale entries.",
+      },
+      {
+        vi: "Pop root trong khi count trong heap không khớp hash map; root hợp lệ tiếp theo chính là maximum.",
+        en: "Pop while the heap root count does not match the map; the next valid root is the maximum.",
+      },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi update push một entry; mỗi stale entry chỉ bị pop một lần. Tổng O(n log n), bộ nhớ O(n).",
+        en: "Each update pushes one entry, and every stale entry is popped at most once. Total O(n log n) time and O(n) space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def mostFrequentIDs(self, nums, freq):",
+      "        from collections import defaultdict",
+      "        import heapq",
+      "        counts = defaultdict(int)",
+      "        heap = []",
+      "        answer = []",
+      "        for id, delta in zip(nums, freq):",
+      "            counts[id] += delta",
+      "            heapq.heappush(heap, (-counts[id], id))",
+      "            while -heap[0][0] != counts[heap[0][1]]:",
+      "                heapq.heappop(heap)",
+      "            answer.append(-heap[0][0])",
+      "        return answer",
+    ],
+    builder: buildSteps3092,
+  },
   347: {
     id: 347, difficulty: "medium", slug: "top-k-frequent-elements",
     category: HEAP_CAT,
