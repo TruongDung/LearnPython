@@ -2395,6 +2395,7 @@ button:disabled {
 .dp-grid.has-cell-labels .cell-value {
   display: block;
   line-height: 1.1;
+  font-size: 11px;
 }
 
 .dp-grid .dp-cell.hl {

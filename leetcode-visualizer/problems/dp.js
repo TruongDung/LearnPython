@@ -9652,7 +9652,7 @@ function buildSteps5DP(input) {
     const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
-        if (i <= j) display[i + 1][j + 1] = dp[i][j] ? "T" : "F";
+        if (i <= j) display[i + 1][j + 1] = dp[i][j] ? "True" : "False";
       }
     }
     const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
