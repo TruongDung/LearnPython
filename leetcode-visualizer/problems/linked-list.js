@@ -532,8 +532,9 @@ function buildSteps203(input, params) {
 
 /**
  * LeetCode 1472: Design Browser History.
- * Model the browser history as a linear list plus one current index.
- * visit(url) discards all forward history, appends url, and moves current there.
+ * Approach 2: Doubly Linked List.
+ * Each page is a node. current.prev powers back(), current.next powers forward().
+ * visit(url) cuts current.next, creates a new node, links prev/next, then moves current.
  */
 function buildSteps1472(input) {
   const raw = String(input || "").trim();
@@ -596,36 +597,74 @@ function buildSteps1472(input) {
     commands.unshift({ op: "init", url: "leetcode.com" });
   }
 
-  let history = [commands[0].url || "leetcode.com"];
-  let index = 0;
+  const nodes = [{ id: 0, url: commands[0].url || "leetcode.com", prev: null, next: null, alive: true }];
+  let currentId = 0;
+  let nextId = 1;
   const outputs = [null];
 
   function shortUrl(url) {
     return String(url || "").replace(/^https?:\/\//, "");
   }
 
+  function currentNode() {
+    return nodes.find((node) => node.id === currentId);
+  }
+
+  function collectForward(startId) {
+    const result = [];
+    let node = nodes.find((item) => item.id === startId);
+    while (node) {
+      result.push(node.id);
+      node = node.next == null ? null : nodes.find((item) => item.id === node.next);
+    }
+    return result;
+  }
+
+  function activeChain() {
+    const result = [];
+    let node = nodes[0];
+    while (node) {
+      result.push(node);
+      node = node.next == null ? null : nodes.find((item) => item.id === node.next);
+    }
+    return result;
+  }
+
+  function nodeLabel(id) {
+    const node = nodes.find((item) => item.id === id);
+    return node ? shortUrl(node.url) : "null";
+  }
+
   function snapshot(opts) {
-    const viewHistory = opts.history || history;
-    const current = opts.index == null ? index : opts.index;
-    const nodes = viewHistory.map((url, i) => ({ id: i, label: shortUrl(url) }));
+    const visibleIds = new Set(activeChain().map((node) => node.id));
+    for (const id of opts.showIds || []) visibleIds.add(id);
+    const graphNodes = nodes
+      .filter((node) => visibleIds.has(node.id))
+      .map((node) => ({ id: node.id, label: shortUrl(node.url) }));
     const edges = [];
-    for (let i = 0; i < viewHistory.length - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+    for (const node of nodes) {
+      if (visibleIds.has(node.id) && node.next != null && visibleIds.has(node.next)) {
+        edges.push({ u: node.id, v: node.next, w: "next" });
+      }
+    }
 
     const annotations = {};
-    if (current >= 0 && current < viewHistory.length) annotations[current] = "current";
-    if (viewHistory.length > 0 && current !== 0) annotations[0] = "home";
+    annotations[currentId] = "curr";
+    if (currentId !== 0) annotations[0] = "home";
     for (const [nodeIdx, label] of Object.entries(opts.annotations || {})) {
       annotations[nodeIdx] = annotations[nodeIdx] ? `${annotations[nodeIdx]}\n${label}` : label;
     }
 
+    const curr = currentNode();
+    const chain = activeChain().map((node) => shortUrl(node.url));
     steps.push({
       title: opts.title,
       arr: [],
       graph: {
-        nodes,
+        nodes: graphNodes,
         edges,
         annotations,
-        hlNodes: opts.hlNodes || (current >= 0 ? [current] : []),
+        hlNodes: opts.hlNodes || [currentId],
         hlEdges: opts.hlEdges || [],
         visitedNodes: opts.visitedNodes || [],
       },
@@ -633,9 +672,10 @@ function buildSteps1472(input) {
       mark: [],
       codeLines: opts.codeLines || [],
       vars: [
-        { name: "history", value: `[${history.map((url) => shortUrl(url)).join(", ")}]` },
-        { name: "index", value: index },
-        { name: "current", value: shortUrl(history[index]) },
+        { name: "chain", value: `[${chain.join(", ")}]` },
+        { name: "curr", value: nodeLabel(currentId) },
+        { name: "curr.prev", value: curr && curr.prev != null ? nodeLabel(curr.prev) : "null" },
+        { name: "curr.next", value: curr && curr.next != null ? nodeLabel(curr.next) : "null" },
         ...(opts.vars || []),
       ],
       note: opts.note,
@@ -644,22 +684,22 @@ function buildSteps1472(input) {
   }
 
   snapshot({
-    title: { vi: `BrowserHistory("${shortUrl(history[0])}")`, en: `BrowserHistory("${shortUrl(history[0])}")` },
-    codeLines: [3],
+    title: { vi: `BrowserHistory("${nodeLabel(0)}")`, en: `BrowserHistory("${nodeLabel(0)}")` },
+    codeLines: [8],
     vars: [{ name: "output", value: "null" }],
     note: {
-      vi: `Khởi tạo history với homepage "${shortUrl(history[0])}".`,
-      en: `Initialize history with homepage "${shortUrl(history[0])}".`,
+      vi: `Tạo node homepage "${nodeLabel(0)}" và cho curr trỏ vào node này.`,
+      en: `Create the homepage node "${nodeLabel(0)}" and point curr to it.`,
     },
   });
 
   snapshot({
-    title: { vi: "index = 0", en: "index = 0" },
-    codeLines: [4],
-    vars: [{ name: "index", value: index }],
+    title: { vi: "curr.prev = curr.next = null", en: "curr.prev = curr.next = null" },
+    codeLines: [4, 5],
+    vars: [{ name: "head", value: nodeLabel(0) }],
     note: {
-      vi: "Con trỏ current bắt đầu ở homepage.",
-      en: "The current pointer starts at the homepage.",
+      vi: "Ban đầu chỉ có 1 node nên chưa có trang trước/sau.",
+      en: "Initially there is only one node, so prev/next are null.",
     },
   });
 
@@ -668,120 +708,165 @@ function buildSteps1472(input) {
 
     if (command.op === "visit") {
       const url = command.url || "about:blank";
-      const discarded = [];
-      for (let i = index + 1; i < history.length; i++) discarded.push(i);
+      const curr = currentNode();
+      const discarded = curr && curr.next != null ? collectForward(curr.next) : [];
 
       snapshot({
         title: { vi: `visit("${shortUrl(url)}")`, en: `visit("${shortUrl(url)}")` },
-        codeLines: [6],
+        codeLines: [10],
+        showIds: discarded,
         visitedNodes: discarded,
         vars: [
           { name: "url", value: shortUrl(url) },
-          { name: "discard forward", value: discarded.length ? discarded.map((i) => shortUrl(history[i])).join(", ") : "none" },
+          { name: "discard forward", value: discarded.length ? discarded.map((id) => nodeLabel(id)).join(", ") : "none" },
         ],
         note: {
-          vi: "Khi vào trang mới, mọi history phía trước current sẽ bị xoá.",
-          en: "When visiting a new page, all forward history after current is discarded.",
+          vi: "Khi vào trang mới, toàn bộ chuỗi curr.next phía trước sẽ bị cắt.",
+          en: "When visiting a new page, the whole curr.next forward chain is cut.",
         },
       });
 
-      history = history.slice(0, index + 1);
+      for (const id of discarded) {
+        const node = nodes.find((item) => item.id === id);
+        if (node) node.alive = false;
+      }
+      if (curr) curr.next = null;
+
       snapshot({
-        title: { vi: "Cắt forward history", en: "Trim forward history" },
-        codeLines: [6],
-        vars: [{ name: "history after trim", value: `[${history.map((item) => shortUrl(item)).join(", ")}]` }],
+        title: { vi: "curr.next = None", en: "curr.next = None" },
+        codeLines: [10],
+        vars: [{ name: "cut", value: discarded.length ? "forward chain removed" : "nothing to remove" }],
         note: {
-          vi: "Giữ lại history từ homepage đến current.",
-          en: "Keep only history from homepage through current.",
+          vi: "Sau khi cắt, forward history cũ không còn reachable từ homepage.",
+          en: "After the cut, old forward history is no longer reachable from the homepage.",
         },
       });
 
-      history.push(url);
+      const newNode = { id: nextId++, url, prev: currentId, next: null, alive: true };
+      nodes.push(newNode);
+      if (curr) curr.next = newNode.id;
+
       snapshot({
-        title: { vi: `Thêm "${shortUrl(url)}"`, en: `Append "${shortUrl(url)}"` },
-        codeLines: [7],
-        index: history.length - 2,
-        hlNodes: [history.length - 1],
-        annotations: { [history.length - 1]: "new" },
-        vars: [{ name: "history append", value: shortUrl(url) }],
+        title: { vi: `Nối node mới "${shortUrl(url)}"`, en: `Link new node "${shortUrl(url)}"` },
+        codeLines: [10],
+        hlNodes: [currentId, newNode.id],
+        hlEdges: [[currentId, newNode.id]],
+        annotations: { [newNode.id]: "new" },
+        vars: [
+          { name: "new.prev", value: nodeLabel(newNode.prev) },
+          { name: "new.next", value: "null" },
+        ],
         note: {
-          vi: `Thêm "${shortUrl(url)}" vào cuối history.`,
-          en: `Append "${shortUrl(url)}" to the end of history.`,
+          vi: `Tạo node mới, đặt new.prev = curr, rồi curr.next trỏ tới node mới.`,
+          en: `Create the new node, set new.prev = curr, then make curr.next point to it.`,
         },
       });
 
-      index = history.length - 1;
+      currentId = newNode.id;
       outputs.push(null);
       snapshot({
-        title: { vi: `current = "${shortUrl(history[index])}"`, en: `current = "${shortUrl(history[index])}"` },
-        codeLines: [8],
+        title: { vi: `curr = "${nodeLabel(currentId)}"`, en: `curr = "${nodeLabel(currentId)}"` },
+        codeLines: [11],
         vars: [
-          { name: "index", value: index },
           { name: "output", value: "null" },
         ],
         note: {
-          vi: "Sau visit, current trỏ tới trang vừa thêm.",
-          en: "After visit, current points to the newly appended page.",
+          vi: "Sau visit, curr chuyển sang trang vừa thêm.",
+          en: "After visit, curr moves to the newly added page.",
         },
       });
     } else if (command.op === "back") {
       const amount = command.steps;
-      const oldIndex = index;
-      const nextIndex = Math.max(0, index - amount);
+      let remaining = amount;
 
       snapshot({
         title: { vi: `back(${amount})`, en: `back(${amount})` },
-        codeLines: [11],
-        hlNodes: [oldIndex, nextIndex].filter((v, i, arr) => arr.indexOf(v) === i),
+        codeLines: [13],
         vars: [
           { name: "steps", value: amount },
-          { name: "max(0, index-steps)", value: nextIndex },
+          { name: "condition", value: currentNode().prev != null && remaining > 0 ? "curr.prev and steps > 0" : "stop" },
         ],
         note: {
-          vi: `Đi lùi tối đa ${amount} bước, nhưng không vượt qua homepage.`,
-          en: `Move back up to ${amount} step(s), but not before the homepage.`,
+          vi: `Đi lùi từng node bằng curr.prev, tối đa ${amount} bước.`,
+          en: `Move backward one node at a time through curr.prev, up to ${amount} step(s).`,
         },
       });
 
-      index = nextIndex;
-      outputs.push(history[index]);
+      while (currentNode().prev != null && remaining > 0) {
+        const from = currentId;
+        currentId = currentNode().prev;
+        remaining--;
+        snapshot({
+          title: { vi: `curr = curr.prev → "${nodeLabel(currentId)}"`, en: `curr = curr.prev → "${nodeLabel(currentId)}"` },
+          codeLines: [14, 15],
+          hlNodes: [from, currentId],
+          hlEdges: [[currentId, from]],
+          vars: [
+            { name: "steps left", value: remaining },
+            { name: "moved", value: `${nodeLabel(from)} -> ${nodeLabel(currentId)}` },
+          ],
+          note: {
+            vi: `Lùi 1 bước từ "${nodeLabel(from)}" về "${nodeLabel(currentId)}".`,
+            en: `Move back 1 step from "${nodeLabel(from)}" to "${nodeLabel(currentId)}".`,
+          },
+        });
+      }
+
+      outputs.push(currentNode().url);
       snapshot({
-        title: { vi: `return "${shortUrl(history[index])}"`, en: `return "${shortUrl(history[index])}"` },
-        codeLines: [12],
-        vars: [{ name: "output", value: shortUrl(history[index]) }],
+        title: { vi: `return "${nodeLabel(currentId)}"`, en: `return "${nodeLabel(currentId)}"` },
+        codeLines: [16],
+        vars: [{ name: "output", value: nodeLabel(currentId) }],
         note: {
-          vi: `Current bây giờ là "${shortUrl(history[index])}".`,
-          en: `Current is now "${shortUrl(history[index])}".`,
+          vi: `Dừng vì hết bước hoặc curr.prev = null. Trả về "${nodeLabel(currentId)}".`,
+          en: `Stop because steps are exhausted or curr.prev is null. Return "${nodeLabel(currentId)}".`,
         },
       });
     } else if (command.op === "forward") {
       const amount = command.steps;
-      const oldIndex = index;
-      const nextIndex = Math.min(history.length - 1, index + amount);
+      let remaining = amount;
 
       snapshot({
         title: { vi: `forward(${amount})`, en: `forward(${amount})` },
-        codeLines: [15],
-        hlNodes: [oldIndex, nextIndex].filter((v, i, arr) => arr.indexOf(v) === i),
+        codeLines: [18],
         vars: [
           { name: "steps", value: amount },
-          { name: "min(last, index+steps)", value: nextIndex },
+          { name: "condition", value: currentNode().next != null && remaining > 0 ? "curr.next and steps > 0" : "stop" },
         ],
         note: {
-          vi: `Đi tới tối đa ${amount} bước, nhưng không vượt quá trang mới nhất còn trong history.`,
-          en: `Move forward up to ${amount} step(s), but not beyond the newest page in history.`,
+          vi: `Đi tới từng node bằng curr.next, tối đa ${amount} bước.`,
+          en: `Move forward one node at a time through curr.next, up to ${amount} step(s).`,
         },
       });
 
-      index = nextIndex;
-      outputs.push(history[index]);
+      while (currentNode().next != null && remaining > 0) {
+        const from = currentId;
+        currentId = currentNode().next;
+        remaining--;
+        snapshot({
+          title: { vi: `curr = curr.next → "${nodeLabel(currentId)}"`, en: `curr = curr.next → "${nodeLabel(currentId)}"` },
+          codeLines: [19, 20],
+          hlNodes: [from, currentId],
+          hlEdges: [[from, currentId]],
+          vars: [
+            { name: "steps left", value: remaining },
+            { name: "moved", value: `${nodeLabel(from)} -> ${nodeLabel(currentId)}` },
+          ],
+          note: {
+            vi: `Tiến 1 bước từ "${nodeLabel(from)}" tới "${nodeLabel(currentId)}".`,
+            en: `Move forward 1 step from "${nodeLabel(from)}" to "${nodeLabel(currentId)}".`,
+          },
+        });
+      }
+
+      outputs.push(currentNode().url);
       snapshot({
-        title: { vi: `return "${shortUrl(history[index])}"`, en: `return "${shortUrl(history[index])}"` },
-        codeLines: [16],
-        vars: [{ name: "output", value: shortUrl(history[index]) }],
+        title: { vi: `return "${nodeLabel(currentId)}"`, en: `return "${nodeLabel(currentId)}"` },
+        codeLines: [21],
+        vars: [{ name: "output", value: nodeLabel(currentId) }],
         note: {
-          vi: `Current bây giờ là "${shortUrl(history[index])}".`,
-          en: `Current is now "${shortUrl(history[index])}".`,
+          vi: `Dừng vì hết bước hoặc curr.next = null. Trả về "${nodeLabel(currentId)}".`,
+          en: `Stop because steps are exhausted or curr.next is null. Return "${nodeLabel(currentId)}".`,
         },
       });
     }
@@ -789,14 +874,14 @@ function buildSteps1472(input) {
 
   snapshot({
     title: { vi: "Kết quả", en: "Result" },
-    codeLines: [16],
+    codeLines: [21],
     vars: [
       { name: "outputs", value: `[${outputs.map((item) => item == null ? "null" : `"${shortUrl(item)}"`).join(", ")}]` },
-      { name: "current", value: shortUrl(history[index]) },
+      { name: "current", value: nodeLabel(currentId) },
     ],
     note: {
-      vi: `Hoàn tất ${commands.length} thao tác. Current cuối cùng là "${shortUrl(history[index])}".`,
-      en: `Finished ${commands.length} operation(s). Final current page is "${shortUrl(history[index])}".`,
+      vi: `Hoàn tất ${commands.length} thao tác. Current cuối cùng là "${nodeLabel(currentId)}".`,
+      en: `Finished ${commands.length} operation(s). Final current page is "${nodeLabel(currentId)}".`,
     },
     final: true,
   });
@@ -940,36 +1025,44 @@ module.exports = {
     inputLabel: { vi: "Các thao tác, ngăn bằng |", en: "Operations separated by |" },
     extraParams: [],
     approach: [
-      { vi: "Dùng mảng history và chỉ số index đại diện trang hiện tại.", en: "Use a history array and an index pointing to the current page." },
-      { vi: "visit(url): xoá mọi phần tử sau index, append url, rồi index trỏ tới cuối.", en: "visit(url): drop everything after index, append url, then move index to the end." },
-      { vi: "back/forward: clamp index trong [0, history.length-1].", en: "back/forward: clamp index inside [0, history.length-1]." },
+      { vi: "Cách 2: dùng doubly linked list, mỗi trang là một node có prev và next.", en: "Approach 2: use a doubly linked list, where each page is a node with prev and next." },
+      { vi: "curr luôn trỏ tới trang hiện tại. back đi qua curr.prev, forward đi qua curr.next.", en: "curr always points to the current page. back walks through curr.prev, forward walks through curr.next." },
+      { vi: "visit(url): cắt curr.next để xoá forward history, nối node mới sau curr, rồi curr trỏ sang node mới.", en: "visit(url): cut curr.next to discard forward history, link a new node after curr, then move curr to the new node." },
     ],
     complexity: {
-      time: "O(n) visit, O(1) back/forward",
+      time: "O(steps) back/forward, O(1) visit",
       space: "O(n)",
       note: {
-        vi: "n là số trang trong history. visit có thể cắt forward history; back/forward chỉ cập nhật index.",
-        en: "n is the number of pages in history. visit may trim forward history; back/forward only update the index.",
+        vi: "n là số trang còn reachable trong history. visit chỉ đổi vài con trỏ; back/forward đi từng node theo số bước thực tế.",
+        en: "n is the number of reachable pages in history. visit only rewires pointers; back/forward walk node by node for the actual number of steps.",
       },
     },
     code: [
+      "class Node:",
+      "    def __init__(self, url: str, prev=None):",
+      "        self.url = url",
+      "        self.prev = prev",
+      "        self.next = None",
+      "",
       "class BrowserHistory:",
       "    def __init__(self, homepage: str):",
-      "        self.history = [homepage]",
-      "        self.index = 0",
+      "        self.curr = Node(homepage)",
       "",
       "    def visit(self, url: str) -> None:",
-      "        self.history = self.history[:self.index + 1]",
-      "        self.history.append(url)",
-      "        self.index += 1",
+      "        self.curr.next = Node(url, self.curr)",
+      "        self.curr = self.curr.next",
       "",
       "    def back(self, steps: int) -> str:",
-      "        self.index = max(0, self.index - steps)",
-      "        return self.history[self.index]",
+      "        while self.curr.prev and steps > 0:",
+      "            self.curr = self.curr.prev",
+      "            steps -= 1",
+      "        return self.curr.url",
       "",
       "    def forward(self, steps: int) -> str:",
-      "        self.index = min(len(self.history) - 1, self.index + steps)",
-      "        return self.history[self.index]",
+      "        while self.curr.next and steps > 0:",
+      "            self.curr = self.curr.next",
+      "            steps -= 1",
+      "        return self.curr.url",
     ],
     builder: buildSteps1472,
   },
