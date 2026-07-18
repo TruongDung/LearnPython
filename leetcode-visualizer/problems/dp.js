@@ -9631,6 +9631,284 @@ function buildSteps5(input) {
 }
 
 /**
+ * LeetCode 5 — Approach 2: 2D DP table.
+ * dp[i][j] = True if s[i..j] is a palindrome.
+ * Base cases: dp[i][i] = True (length 1), dp[i][i+1] = (s[i]==s[i+1]) (length 2).
+ * Recurrence: dp[i][j] = (s[i]==s[j]) and dp[i+1][j-1], processed by increasing length
+ * so the shorter inner interval dp[i+1][j-1] is already known.
+ */
+function buildSteps5DP(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(false));
+  const steps = [];
+  let bestStart = 0;
+  let bestEnd = 0;
+
+  const axisLabels = Array.from({ length: n }, (_, idx) => s[idx]);
+
+  function makeGrid(hl = null, deps = []) {
+    // display[0][0] unused corner; display[i+1][j+1] = dp[i][j] (only i<=j meaningful)
+    const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i <= j) display[i + 1][j + 1] = dp[i][j] ? "T" : "F";
+      }
+    }
+    const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
+    return {
+      dp: display,
+      text1: s,
+      text2: s,
+      rowLabels: axisLabels.map((char, idx) => ({ index: `i=${idx}`, char })),
+      colLabels: axisLabels.map((char, idx) => ({ index: `j=${idx}`, char })),
+      hlCell: shift(hl),
+      pathCells: deps.map(shift).filter(Boolean),
+    };
+  }
+
+  function gridSnap(opts) {
+    const hasActiveCell = Array.isArray(opts.hlCell);
+    const currentVars = [];
+    if (hasActiveCell) {
+      currentVars.push({ name: "i", value: opts.hlCell[0] });
+      currentVars.push({ name: "j", value: opts.hlCell[1] });
+    }
+    for (const item of opts.vars || []) {
+      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      currentVars.push(item);
+    }
+    currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
+      highlight: [],
+      mark: [],
+      codeBlock: 2,
+      codeLines: opts.codeLines || [],
+      vars: currentVars,
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  // Line 3: n = len(s)
+  gridSnap({
+    title: { vi: "n = len(s)", en: "n = len(s)" },
+    codeLines: [3],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "n", value: n }],
+    note: {
+      vi: `Chuỗi "${s}" có độ dài n=${n}.`,
+      en: `String "${s}" has length n=${n}.`,
+    },
+  });
+
+  // Line 4: dp = [[False]*n for _ in range(n)]
+  gridSnap({
+    title: { vi: "dp = bảng n×n toàn False", en: "dp = n×n table of False" },
+    codeLines: [4],
+    vars: [{ name: "dp size", value: `${n} x ${n}` }],
+    note: {
+      vi: `dp[i][j] = True nếu s[i..j] là palindrome. Khởi tạo toàn False.`,
+      en: `dp[i][j] = True if s[i..j] is a palindrome. Initialize all False.`,
+    },
+  });
+
+  if (n === 0) {
+    gridSnap({
+      title: { vi: "Chuỗi rỗng", en: "Empty string" },
+      codeLines: [20],
+      vars: [{ name: "return", value: '""' }],
+      note: { vi: "Chuỗi rỗng trả về chuỗi rỗng.", en: "Empty string returns an empty string." },
+      final: true,
+    });
+    return { s, answer: "", steps };
+  }
+
+  // Line 5: best_start, best_end = 0, 0
+  gridSnap({
+    title: { vi: "best_start, best_end = 0, 0", en: "best_start, best_end = 0, 0" },
+    codeLines: [5],
+    vars: [{ name: "best_start", value: 0 }, { name: "best_end", value: 0 }],
+    note: {
+      vi: `Mặc định palindrome tốt nhất ban đầu là s[0] (độ dài 1).`,
+      en: `Default best palindrome initially is s[0] (length 1).`,
+    },
+  });
+
+  // Line 7-8: base case length 1
+  for (let i = 0; i < n; i++) {
+    // Line 7: for i in range(n)
+    gridSnap({
+      title: { vi: `for i=${i}`, en: `for i=${i}` },
+      codeLines: [7],
+      hlCell: [i, i],
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Xét vị trí i=${i}.`,
+        en: `Consider position i=${i}.`,
+      },
+    });
+
+    // Line 8: dp[i][i] = True
+    dp[i][i] = true;
+    gridSnap({
+      title: { vi: `dp[${i}][${i}] = True`, en: `dp[${i}][${i}] = True` },
+      codeLines: [8],
+      hlCell: [i, i],
+      vars: [{ name: `s[${i}]`, value: s[i] }, { name: `dp[${i}][${i}]`, value: true }],
+      note: {
+        vi: `Một ký tự luôn là palindrome. dp[${i}][${i}] = True.`,
+        en: `A single character is always a palindrome. dp[${i}][${i}] = True.`,
+      },
+    });
+  }
+
+  // Line 10-12: base case length 2
+  for (let i = 0; i < n - 1; i++) {
+    // Line 10: for i in range(n - 1)
+    gridSnap({
+      title: { vi: `for i=${i} (độ dài 2)`, en: `for i=${i} (length 2)` },
+      codeLines: [10],
+      hlCell: [i, i + 1],
+      vars: [{ name: "i", value: i }, { name: `s[${i}]`, value: s[i] }, { name: `s[${i + 1}]`, value: s[i + 1] }],
+      note: {
+        vi: `Xét đoạn 2 ký tự s[${i}..${i + 1}] = "${s.slice(i, i + 2)}".`,
+        en: `Consider 2-character substring s[${i}..${i + 1}] = "${s.slice(i, i + 2)}".`,
+      },
+    });
+
+    const match2 = s[i] === s[i + 1];
+    // Line 11: if s[i] == s[i+1]
+    gridSnap({
+      title: { vi: `if s[${i}]==s[${i + 1}] → ${match2}`, en: `if s[${i}]==s[${i + 1}] → ${match2}` },
+      codeLines: [11],
+      hlCell: [i, i + 1],
+      vars: [
+        { name: `s[${i}]`, value: s[i] },
+        { name: `s[${i + 1}]`, value: s[i + 1] },
+        { name: "match?", value: match2 },
+      ],
+      note: match2
+        ? { vi: `'${s[i]}' == '${s[i + 1]}' → True. "${s.slice(i, i + 2)}" là palindrome.`, en: `'${s[i]}' == '${s[i + 1]}' → True. "${s.slice(i, i + 2)}" is a palindrome.` }
+        : { vi: `'${s[i]}' ≠ '${s[i + 1]}' → False. Bỏ qua.`, en: `'${s[i]}' ≠ '${s[i + 1]}' → False. Skip.` },
+    });
+
+    if (match2) {
+      // Line 12-13: dp[i][i+1] = True; best_start, best_end = i, i+1
+      dp[i][i + 1] = true;
+      bestStart = i;
+      bestEnd = i + 1;
+      gridSnap({
+        title: { vi: `dp[${i}][${i + 1}] = True, best = "${s.slice(i, i + 2)}"`, en: `dp[${i}][${i + 1}] = True, best = "${s.slice(i, i + 2)}"` },
+        codeLines: [12, 13],
+        hlCell: [i, i + 1],
+        vars: [{ name: `dp[${i}][${i + 1}]`, value: true }, { name: "best_start, best_end", value: `${i}, ${i + 1}` }],
+        note: {
+          vi: `dp[${i}][${i + 1}] = True. Cập nhật best = "${s.slice(i, i + 2)}".`,
+          en: `dp[${i}][${i + 1}] = True. Update best = "${s.slice(i, i + 2)}".`,
+        },
+      });
+    }
+  }
+
+  // Lines 15-19: length >= 3
+  for (let length = 3; length <= n; length++) {
+    // Line 15: for length in range(3, n+1)
+    gridSnap({
+      title: { vi: `for length=${length}`, en: `for length=${length}` },
+      codeLines: [15],
+      vars: [{ name: "length", value: length }],
+      note: {
+        vi: `Xét mọi đoạn con có độ dài ${length}.`,
+        en: `Consider every substring of length ${length}.`,
+      },
+    });
+
+    for (let i = 0; i <= n - length; i++) {
+      const j = i + length - 1;
+
+      // Line 16-17: for i, compute j
+      gridSnap({
+        title: { vi: `for i=${i} → j=${j}`, en: `for i=${i} → j=${j}` },
+        codeLines: [16, 17],
+        hlCell: [i, j],
+        pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
+        vars: [
+          { name: "i", value: i },
+          { name: "j = i+length-1", value: j },
+          { name: "substring", value: `"${s.slice(i, j + 1)}"` },
+        ],
+        note: {
+          vi: `Chuẩn bị xét dp[${i}][${j}] cho đoạn "${s.slice(i, j + 1)}".`,
+          en: `Prepare to check dp[${i}][${j}] for substring "${s.slice(i, j + 1)}".`,
+        },
+      });
+
+      const endsMatch = s[i] === s[j];
+      const innerOk = dp[i + 1][j - 1];
+      const isPalin = endsMatch && innerOk;
+
+      // Line 18: if s[i]==s[j] and dp[i+1][j-1]
+      gridSnap({
+        title: {
+          vi: `if s[${i}]==s[${j}] và dp[${i + 1}][${j - 1}] → ${isPalin}`,
+          en: `if s[${i}]==s[${j}] and dp[${i + 1}][${j - 1}] → ${isPalin}`,
+        },
+        codeLines: [18],
+        hlCell: [i, j],
+        pathCells: [[i + 1, j - 1]],
+        vars: [
+          { name: `s[${i}]`, value: s[i] },
+          { name: `s[${j}]`, value: s[j] },
+          { name: "ends match?", value: endsMatch },
+          { name: `dp[${i + 1}][${j - 1}]`, value: innerOk },
+          { name: "condition", value: isPalin },
+        ],
+        note: isPalin
+          ? { vi: `'${s[i]}'=='${s[j]}' và dp[${i + 1}][${j - 1}]=True → "${s.slice(i, j + 1)}" là palindrome!`, en: `'${s[i]}'=='${s[j]}' and dp[${i + 1}][${j - 1}]=True → "${s.slice(i, j + 1)}" is a palindrome!` }
+          : { vi: !endsMatch ? `'${s[i]}' ≠ '${s[j]}' → không phải palindrome.` : `Đầu khớp nhưng dp[${i + 1}][${j - 1}]=False → không phải palindrome.`, en: !endsMatch ? `'${s[i]}' ≠ '${s[j]}' → not a palindrome.` : `Ends match but dp[${i + 1}][${j - 1}]=False → not a palindrome.` },
+      });
+
+      if (isPalin) {
+        // Line 19-20: dp[i][j] = True; best_start, best_end = i, j
+        dp[i][j] = true;
+        bestStart = i;
+        bestEnd = j;
+        gridSnap({
+          title: { vi: `dp[${i}][${j}] = True, best = "${s.slice(i, j + 1)}"`, en: `dp[${i}][${j}] = True, best = "${s.slice(i, j + 1)}"` },
+          codeLines: [19, 20],
+          hlCell: [i, j],
+          pathCells: [[i + 1, j - 1]],
+          vars: [{ name: `dp[${i}][${j}]`, value: true }, { name: "best_start, best_end", value: `${i}, ${j}` }],
+          note: {
+            vi: `dp[${i}][${j}] = True. Cập nhật best = "${s.slice(i, j + 1)}" (độ dài ${length}).`,
+            en: `dp[${i}][${j}] = True. Update best = "${s.slice(i, j + 1)}" (length ${length}).`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = s.slice(bestStart, bestEnd + 1);
+  // Line 22: return s[best_start:best_end+1]
+  gridSnap({
+    title: { vi: `return "${answer}"`, en: `return "${answer}"` },
+    codeLines: [22],
+    hlCell: [bestStart, bestEnd],
+    vars: [{ name: "best_start", value: bestStart }, { name: "best_end", value: bestEnd }, { name: "answer", value: `"${answer}"` }],
+    note: {
+      vi: `Longest palindromic substring = "${answer}".`,
+      en: `Longest palindromic substring = "${answer}".`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 516: Longest Palindromic Subsequence.
  * Interval DP:
  *   dp[i][j] = length of the longest palindromic subsequence inside s[i..j].
@@ -13819,16 +14097,24 @@ module.exports = {
     defaultInput: "babad",
     inputKind: "string",
     inputLabel: { vi: "s", en: "s" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Expand Around Center", en: "Approach 1: Expand Around Center" } },
+          { value: "2", label: { vi: "Cách 2: DP bảng 2D", en: "Approach 2: 2D DP table" } },
+        ],
+      },
+    ],
     approach: [
       { vi: "Palindrome substring co tam o mot ky tu (le) hoac giua hai ky tu (chan).", en: "A palindromic substring has a center at one character (odd) or between two characters (even)." },
-      { vi: "Voi moi center, mo rong left/right khi s[left] == s[right].", en: "For each center, expand left/right while s[left] == s[right]." },
-      { vi: "Moi lan tim duoc palindrome dai hon, cap nhat bestStart/bestEnd.", en: "Whenever a longer palindrome is found, update bestStart/bestEnd." },
+      { vi: "Cách 1: mở rộng left/right khi s[left] == s[right]. O(1) bộ nhớ.", en: "Approach 1: expand left/right while s[left] == s[right]. O(1) space." },
+      { vi: "Cách 2: dp[i][j] = True nếu s[i..j] là palindrome. Xét theo độ dài tăng dần.", en: "Approach 2: dp[i][j] = True if s[i..j] is a palindrome. Process by increasing length." },
     ],
     complexity: {
       time: "O(n^2)",
-      space: "O(1)",
-      note: { vi: "Co 2n-1 tam, moi lan expand toi da O(n).", en: "There are 2n-1 centers, and each expansion can take O(n)." },
+      space: "O(1) / O(n^2)",
+      note: { vi: "Cách 1: O(n²) time, O(1) space. Cách 2: O(n²) time, O(n²) space (bảng dp).", en: "Approach 1: O(n²) time, O(1) space. Approach 2: O(n²) time, O(n²) space (dp table)." },
     },
     code: [
       "class Solution:",
@@ -13849,7 +14135,36 @@ module.exports = {
       "",
       "        return s[best_start:best_end + 1]",
     ],
-    builder: buildSteps5,
+    code2: [
+      "class Solution:",
+      "    def longestPalindrome(self, s: str) -> str:",
+      "        n = len(s)",
+      "        dp = [[False] * n for _ in range(n)]",
+      "        best_start, best_end = 0, 0",
+      "",
+      "        for i in range(n):",
+      "            dp[i][i] = True",
+      "",
+      "        for i in range(n - 1):",
+      "            if s[i] == s[i + 1]:",
+      "                dp[i][i + 1] = True",
+      "                best_start, best_end = i, i + 1",
+      "",
+      "        for length in range(3, n + 1):",
+      "            for i in range(n - length + 1):",
+      "                j = i + length - 1",
+      "                if s[i] == s[j] and dp[i + 1][j - 1]:",
+      "                    dp[i][j] = True",
+      "                    best_start, best_end = i, j",
+      "",
+      "        return s[best_start:best_end + 1]",
+    ],
+    codeLabel: { vi: "Cách 1: Expand Around Center", en: "Approach 1: Expand Around Center" },
+    code2Label: { vi: "Cách 2: DP bảng 2D", en: "Approach 2: 2D DP table" },
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps5DP(input) : buildSteps5(input);
+    },
   },
   516: {
     id: 516,
