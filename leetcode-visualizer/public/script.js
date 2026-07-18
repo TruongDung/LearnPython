@@ -1193,7 +1193,7 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell } = step.grid;
+  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, caption } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const labels = cellLabels || {};
   const m = dp.length - 1;
@@ -1243,7 +1243,8 @@ function renderGrid(step) {
     html += "</tr>";
   }
   html += "</tbody></table>";
-  $("gridView").innerHTML = html;
+  const captionHtml = caption ? `<div class="dp-grid-caption">${escapeXml(caption)}</div>` : "";
+  $("gridView").innerHTML = captionHtml + html;
 }
 
 // ---- Tree renderer (Trie) ----

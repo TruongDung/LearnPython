@@ -2280,6 +2280,20 @@ button:disabled {
   overflow-x: auto;
 }
 
+.dp-grid-caption {
+  text-align: center;
+  color: #a5b4fc;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+
+[data-theme="light"] .dp-grid-caption {
+  color: #4f46e5;
+}
+
 .dp-grid {
   border-collapse: collapse;
   margin: 0 auto;

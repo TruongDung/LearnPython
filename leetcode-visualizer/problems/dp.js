@@ -9665,6 +9665,7 @@ function buildSteps5DP(input) {
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
       bestCell: shift([bestStart, bestEnd]),
+      caption: "dp[i][j] = True if s[i..j] is a palindrome",
     };
   }
 
