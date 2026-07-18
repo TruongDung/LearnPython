@@ -137,7 +137,6 @@ function buildSteps1100(input, params) {
   const k = params.k;
   const n = s.length;
   const chars = s.split("");
-  const arr = chars.map((ch) => Math.max(1, ch.charCodeAt(0) - 96));
   const steps = [];
   const count = {};
   let left = 0;
@@ -151,14 +150,49 @@ function buildSteps1100(input, params) {
     const entries = Object.entries(count).filter(([, v]) => v > 0);
     return entries.length ? `{${entries.map(([ch, v]) => `${ch}:${v}`).join(", ")}}` : "{}";
   };
+  const validCells = () => validStarts.flatMap((start) =>
+    inWindow(start, start + k - 1).map((idx) => [0, idx + 1])
+  );
+  const setLabel = (labels, idx, label) => {
+    if (idx < 0 || idx >= n) return;
+    const key = `0,${idx + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const makeGrid = (opts = {}) => {
+    const lo = Number.isInteger(opts.left) ? opts.left : left;
+    const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const labels = {};
+    setLabel(labels, lo, "L");
+    setLabel(labels, hi, hi === lo ? "R" : "R");
+    if (opts.duplicateChar) {
+      for (let idx = lo; idx <= hi; idx++) {
+        if (s[idx] === opts.duplicateChar) setLabel(labels, idx, "dup");
+      }
+    }
+    if (opts.valid) {
+      for (let idx = lo; idx <= hi; idx++) setLabel(labels, idx, "valid");
+    }
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, idx) => ({ index: `idx=${idx}`, char })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      pathCells: inWindow(lo, hi).map((idx) => [0, idx + 1]),
+      bestCells: opts.showValid === false ? [] : validCells(),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · count=${countText()} · answer=${answer}`,
+    };
+  };
 
   function snap(opts) {
     steps.push({
       title: opts.title,
-      arr: [...arr],
-      sub: [...chars],
-      highlight: opts.highlight || [],
-      mark: opts.mark || validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+      arr: [],
+      grid: makeGrid(opts.grid || {}),
+      highlight: [],
+      mark: [],
       codeLines: opts.codeLines || [],
       vars: opts.vars || [],
       note: opts.note,
@@ -169,6 +203,7 @@ function buildSteps1100(input, params) {
   snap({
     title: { vi: "Khởi tạo", en: "Initialize" },
     codeLines: [3],
+    grid: { left: 0, right: -1, showValid: false, caption: `s="${s}" · k=${k}` },
     vars: [
       { name: "s", value: `"${s}"` },
       { name: "k", value: k },
@@ -184,6 +219,7 @@ function buildSteps1100(input, params) {
     snap({
       title: { vi: "Không thể có cửa sổ hợp lệ", en: "No valid window possible" },
       codeLines: [3],
+      grid: { left: 0, right: -1, showValid: false, caption: `k=${k} · n=${n} · answer=0` },
       vars: [{ name: "answer", value: 0 }],
       note: {
         vi: `k=${k} không tạo được substring hợp lệ trong chuỗi dài ${n}.`,
@@ -197,6 +233,7 @@ function buildSteps1100(input, params) {
   snap({
     title: { vi: "left = 0", en: "left = 0" },
     codeLines: [4],
+    grid: { left, right: -1, showValid: false },
     vars: [{ name: "left", value: left }],
     note: {
       vi: "left là đầu cửa sổ hiện tại.",
@@ -207,6 +244,7 @@ function buildSteps1100(input, params) {
   snap({
     title: { vi: "count = {}", en: "count = {}" },
     codeLines: [5],
+    grid: { left, right: -1, showValid: false },
     vars: [{ name: "count", value: countText() }],
     note: {
       vi: "count lưu số lần xuất hiện của từng ký tự trong cửa sổ.",
@@ -217,6 +255,7 @@ function buildSteps1100(input, params) {
   snap({
     title: { vi: "answer = 0", en: "answer = 0" },
     codeLines: [6],
+    grid: { left, right: -1, showValid: false },
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: "answer đếm số cửa sổ hợp lệ độ dài k.",
@@ -229,7 +268,7 @@ function buildSteps1100(input, params) {
     snap({
       title: { vi: `for right=${right}, ch='${ch}'`, en: `for right=${right}, ch='${ch}'` },
       codeLines: [7],
-      highlight: inWindow(left, right),
+      grid: { left, right, focus: right },
       vars: [
         { name: "left", value: left },
         { name: "right", value: right },
@@ -246,7 +285,7 @@ function buildSteps1100(input, params) {
     snap({
       title: { vi: `count['${ch}'] = ${count[ch]}`, en: `count['${ch}'] = ${count[ch]}` },
       codeLines: [8],
-      highlight: inWindow(left, right),
+      grid: { left, right, focus: right, duplicateChar: count[ch] > 1 ? ch : null },
       vars: [
         { name: "ch", value: ch },
         { name: "count", value: countText() },
@@ -263,7 +302,7 @@ function buildSteps1100(input, params) {
       snap({
         title: { vi: `while invalid -> true`, en: `while invalid -> true` },
         codeLines: [9],
-        highlight: inWindow(left, right),
+        grid: { left, right, focus: tooMany ? right : left, duplicateChar: tooMany ? ch : null },
         vars: [
           { name: `count['${ch}'] > 1`, value: tooMany },
           { name: "window length > k", value: tooLong },
@@ -285,7 +324,7 @@ function buildSteps1100(input, params) {
       snap({
         title: { vi: `count[s[left]] -= 1`, en: `count[s[left]] -= 1` },
         codeLines: [10],
-        highlight: inWindow(left, right),
+        grid: { left, right, focus: left, duplicateChar: (count[ch] || 0) > 1 ? ch : null },
         vars: [
           { name: "removed", value: removed },
           { name: "count", value: countText() },
@@ -300,7 +339,7 @@ function buildSteps1100(input, params) {
       snap({
         title: { vi: `left = ${left}`, en: `left = ${left}` },
         codeLines: [11],
-        highlight: inWindow(left, right),
+        grid: { left, right, focus: left },
         vars: [
           { name: "left", value: left },
           { name: "right", value: right },
@@ -319,7 +358,7 @@ function buildSteps1100(input, params) {
     snap({
       title: { vi: `if window length == k -> ${isValidK}`, en: `if window length == k -> ${isValidK}` },
       codeLines: [12],
-      highlight: inWindow(left, right),
+      grid: { left, right, focus: right, valid: isValidK },
       vars: [
         { name: "left", value: left },
         { name: "right", value: right },
@@ -344,8 +383,7 @@ function buildSteps1100(input, params) {
       snap({
         title: { vi: `answer = ${answer}`, en: `answer = ${answer}` },
         codeLines: [13],
-        highlight: inWindow(left, right),
-        mark: validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+        grid: { left, right, focus: right, valid: true },
         vars: [
           { name: "valid substring", value: `"${s.slice(left, right + 1)}"` },
           { name: "answer", value: answer },
@@ -361,8 +399,11 @@ function buildSteps1100(input, params) {
   snap({
     title: { vi: `return ${answer}`, en: `return ${answer}` },
     codeLines: [14],
-    highlight: [],
-    mark: validStarts.flatMap((start) => inWindow(start, start + k - 1)),
+    grid: {
+      left: 0,
+      right: -1,
+      caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · answer=${answer}`,
+    },
     vars: [
       { name: "answer", value: answer },
       { name: "valid windows", value: validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none" },

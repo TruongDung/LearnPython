@@ -530,6 +530,284 @@ function buildSteps203(input, params) {
   return { original: values, answer: result, steps };
 }
 
+/**
+ * LeetCode 1472: Design Browser History.
+ * Model the browser history as a linear list plus one current index.
+ * visit(url) discards all forward history, appends url, and moves current there.
+ */
+function buildSteps1472(input) {
+  const raw = String(input || "").trim();
+  const steps = [];
+
+  function parseCommand(segment, idx) {
+    const text = String(segment || "").trim();
+    if (!text) return null;
+
+    if (idx === 0 && !/^(BrowserHistory|visit|back|forward)\b/i.test(text)) {
+      return { op: "init", url: text };
+    }
+
+    const parts = text.split(/\s+/);
+    const op = parts[0].replace(/[(),]/g, "");
+    if (/^BrowserHistory$/i.test(op)) {
+      return { op: "init", url: parts.slice(1).join(" ").replace(/^["']|["']$/g, "") };
+    }
+    if (/^visit$/i.test(op)) {
+      return { op: "visit", url: parts.slice(1).join(" ").replace(/^["']|["']$/g, "") };
+    }
+    if (/^back$/i.test(op)) {
+      return { op: "back", steps: Number(parts[1]) || 0 };
+    }
+    if (/^forward$/i.test(op)) {
+      return { op: "forward", steps: Number(parts[1]) || 0 };
+    }
+    return null;
+  }
+
+  function parseInput(value) {
+    if (!value) return [{ op: "init", url: "leetcode.com" }];
+
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
+        return parsed
+          .map((item) => {
+            const op = item[0];
+            if (op === "BrowserHistory") return { op: "init", url: String(item[1] || "") };
+            if (op === "visit") return { op: "visit", url: String(item[1] || "") };
+            if (op === "back") return { op: "back", steps: Number(item[1]) || 0 };
+            if (op === "forward") return { op: "forward", steps: Number(item[1]) || 0 };
+            return null;
+          })
+          .filter(Boolean);
+      }
+    } catch (err) {
+      // Fall back to the compact pipe-separated format below.
+    }
+
+    return value
+      .split(/[|\n;]/)
+      .map((segment, idx) => parseCommand(segment, idx))
+      .filter(Boolean);
+  }
+
+  const commands = parseInput(raw);
+  if (!commands.length || commands[0].op !== "init") {
+    commands.unshift({ op: "init", url: "leetcode.com" });
+  }
+
+  let history = [commands[0].url || "leetcode.com"];
+  let index = 0;
+  const outputs = [null];
+
+  function shortUrl(url) {
+    return String(url || "").replace(/^https?:\/\//, "");
+  }
+
+  function snapshot(opts) {
+    const viewHistory = opts.history || history;
+    const current = opts.index == null ? index : opts.index;
+    const nodes = viewHistory.map((url, i) => ({ id: i, label: shortUrl(url) }));
+    const edges = [];
+    for (let i = 0; i < viewHistory.length - 1; i++) edges.push({ u: i, v: i + 1, w: "" });
+
+    const annotations = {};
+    if (current >= 0 && current < viewHistory.length) annotations[current] = "current";
+    if (viewHistory.length > 0 && current !== 0) annotations[0] = "home";
+    for (const [nodeIdx, label] of Object.entries(opts.annotations || {})) {
+      annotations[nodeIdx] = annotations[nodeIdx] ? `${annotations[nodeIdx]}\n${label}` : label;
+    }
+
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes,
+        edges,
+        annotations,
+        hlNodes: opts.hlNodes || (current >= 0 ? [current] : []),
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: opts.visitedNodes || [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "history", value: `[${history.map((url) => shortUrl(url)).join(", ")}]` },
+        { name: "index", value: index },
+        { name: "current", value: shortUrl(history[index]) },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  snapshot({
+    title: { vi: `BrowserHistory("${shortUrl(history[0])}")`, en: `BrowserHistory("${shortUrl(history[0])}")` },
+    codeLines: [3],
+    vars: [{ name: "output", value: "null" }],
+    note: {
+      vi: `Khởi tạo history với homepage "${shortUrl(history[0])}".`,
+      en: `Initialize history with homepage "${shortUrl(history[0])}".`,
+    },
+  });
+
+  snapshot({
+    title: { vi: "index = 0", en: "index = 0" },
+    codeLines: [4],
+    vars: [{ name: "index", value: index }],
+    note: {
+      vi: "Con trỏ current bắt đầu ở homepage.",
+      en: "The current pointer starts at the homepage.",
+    },
+  });
+
+  for (let commandIndex = 1; commandIndex < commands.length; commandIndex++) {
+    const command = commands[commandIndex];
+
+    if (command.op === "visit") {
+      const url = command.url || "about:blank";
+      const discarded = [];
+      for (let i = index + 1; i < history.length; i++) discarded.push(i);
+
+      snapshot({
+        title: { vi: `visit("${shortUrl(url)}")`, en: `visit("${shortUrl(url)}")` },
+        codeLines: [6],
+        visitedNodes: discarded,
+        vars: [
+          { name: "url", value: shortUrl(url) },
+          { name: "discard forward", value: discarded.length ? discarded.map((i) => shortUrl(history[i])).join(", ") : "none" },
+        ],
+        note: {
+          vi: "Khi vào trang mới, mọi history phía trước current sẽ bị xoá.",
+          en: "When visiting a new page, all forward history after current is discarded.",
+        },
+      });
+
+      history = history.slice(0, index + 1);
+      snapshot({
+        title: { vi: "Cắt forward history", en: "Trim forward history" },
+        codeLines: [6],
+        vars: [{ name: "history after trim", value: `[${history.map((item) => shortUrl(item)).join(", ")}]` }],
+        note: {
+          vi: "Giữ lại history từ homepage đến current.",
+          en: "Keep only history from homepage through current.",
+        },
+      });
+
+      history.push(url);
+      snapshot({
+        title: { vi: `Thêm "${shortUrl(url)}"`, en: `Append "${shortUrl(url)}"` },
+        codeLines: [7],
+        index: history.length - 2,
+        hlNodes: [history.length - 1],
+        annotations: { [history.length - 1]: "new" },
+        vars: [{ name: "history append", value: shortUrl(url) }],
+        note: {
+          vi: `Thêm "${shortUrl(url)}" vào cuối history.`,
+          en: `Append "${shortUrl(url)}" to the end of history.`,
+        },
+      });
+
+      index = history.length - 1;
+      outputs.push(null);
+      snapshot({
+        title: { vi: `current = "${shortUrl(history[index])}"`, en: `current = "${shortUrl(history[index])}"` },
+        codeLines: [8],
+        vars: [
+          { name: "index", value: index },
+          { name: "output", value: "null" },
+        ],
+        note: {
+          vi: "Sau visit, current trỏ tới trang vừa thêm.",
+          en: "After visit, current points to the newly appended page.",
+        },
+      });
+    } else if (command.op === "back") {
+      const amount = command.steps;
+      const oldIndex = index;
+      const nextIndex = Math.max(0, index - amount);
+
+      snapshot({
+        title: { vi: `back(${amount})`, en: `back(${amount})` },
+        codeLines: [11],
+        hlNodes: [oldIndex, nextIndex].filter((v, i, arr) => arr.indexOf(v) === i),
+        vars: [
+          { name: "steps", value: amount },
+          { name: "max(0, index-steps)", value: nextIndex },
+        ],
+        note: {
+          vi: `Đi lùi tối đa ${amount} bước, nhưng không vượt qua homepage.`,
+          en: `Move back up to ${amount} step(s), but not before the homepage.`,
+        },
+      });
+
+      index = nextIndex;
+      outputs.push(history[index]);
+      snapshot({
+        title: { vi: `return "${shortUrl(history[index])}"`, en: `return "${shortUrl(history[index])}"` },
+        codeLines: [12],
+        vars: [{ name: "output", value: shortUrl(history[index]) }],
+        note: {
+          vi: `Current bây giờ là "${shortUrl(history[index])}".`,
+          en: `Current is now "${shortUrl(history[index])}".`,
+        },
+      });
+    } else if (command.op === "forward") {
+      const amount = command.steps;
+      const oldIndex = index;
+      const nextIndex = Math.min(history.length - 1, index + amount);
+
+      snapshot({
+        title: { vi: `forward(${amount})`, en: `forward(${amount})` },
+        codeLines: [15],
+        hlNodes: [oldIndex, nextIndex].filter((v, i, arr) => arr.indexOf(v) === i),
+        vars: [
+          { name: "steps", value: amount },
+          { name: "min(last, index+steps)", value: nextIndex },
+        ],
+        note: {
+          vi: `Đi tới tối đa ${amount} bước, nhưng không vượt quá trang mới nhất còn trong history.`,
+          en: `Move forward up to ${amount} step(s), but not beyond the newest page in history.`,
+        },
+      });
+
+      index = nextIndex;
+      outputs.push(history[index]);
+      snapshot({
+        title: { vi: `return "${shortUrl(history[index])}"`, en: `return "${shortUrl(history[index])}"` },
+        codeLines: [16],
+        vars: [{ name: "output", value: shortUrl(history[index]) }],
+        note: {
+          vi: `Current bây giờ là "${shortUrl(history[index])}".`,
+          en: `Current is now "${shortUrl(history[index])}".`,
+        },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: "Kết quả", en: "Result" },
+    codeLines: [16],
+    vars: [
+      { name: "outputs", value: `[${outputs.map((item) => item == null ? "null" : `"${shortUrl(item)}"`).join(", ")}]` },
+      { name: "current", value: shortUrl(history[index]) },
+    ],
+    note: {
+      vi: `Hoàn tất ${commands.length} thao tác. Current cuối cùng là "${shortUrl(history[index])}".`,
+      en: `Finished ${commands.length} operation(s). Final current page is "${shortUrl(history[index])}".`,
+    },
+    final: true,
+  });
+
+  return {
+    original: raw,
+    answer: outputs,
+    steps,
+  };
+}
+
 module.exports = {
   141: {
     id: 141,
@@ -645,5 +923,54 @@ module.exports = {
       "        return dummy.next",
     ],
     builder: buildSteps203,
+  },
+  1472: {
+    id: 1472,
+    difficulty: "medium",
+    slug: "design-browser-history",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Design Browser History", en: "Design Browser History" },
+    titleVi: { vi: "Thiết kế lịch sử trình duyệt", en: "Design browser history" },
+    statement: {
+      vi: "Thiết kế BrowserHistory với visit(url), back(steps), forward(steps). visit xoá forward history rồi thêm trang mới.",
+      en: "Design BrowserHistory with visit(url), back(steps), and forward(steps). visit discards forward history and appends a new page.",
+    },
+    defaultInput: "leetcode.com | visit google.com | visit facebook.com | visit youtube.com | back 1 | back 1 | forward 1 | visit linkedin.com | forward 2 | back 2 | back 7",
+    inputKind: "string",
+    inputLabel: { vi: "Các thao tác, ngăn bằng |", en: "Operations separated by |" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng mảng history và chỉ số index đại diện trang hiện tại.", en: "Use a history array and an index pointing to the current page." },
+      { vi: "visit(url): xoá mọi phần tử sau index, append url, rồi index trỏ tới cuối.", en: "visit(url): drop everything after index, append url, then move index to the end." },
+      { vi: "back/forward: clamp index trong [0, history.length-1].", en: "back/forward: clamp index inside [0, history.length-1]." },
+    ],
+    complexity: {
+      time: "O(n) visit, O(1) back/forward",
+      space: "O(n)",
+      note: {
+        vi: "n là số trang trong history. visit có thể cắt forward history; back/forward chỉ cập nhật index.",
+        en: "n is the number of pages in history. visit may trim forward history; back/forward only update the index.",
+      },
+    },
+    code: [
+      "class BrowserHistory:",
+      "    def __init__(self, homepage: str):",
+      "        self.history = [homepage]",
+      "        self.index = 0",
+      "",
+      "    def visit(self, url: str) -> None:",
+      "        self.history = self.history[:self.index + 1]",
+      "        self.history.append(url)",
+      "        self.index += 1",
+      "",
+      "    def back(self, steps: int) -> str:",
+      "        self.index = max(0, self.index - steps)",
+      "        return self.history[self.index]",
+      "",
+      "    def forward(self, steps: int) -> str:",
+      "        self.index = min(len(self.history) - 1, self.index + steps)",
+      "        return self.history[self.index]",
+    ],
+    builder: buildSteps1472,
   },
 };
