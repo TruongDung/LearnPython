@@ -1319,22 +1319,44 @@ function renderTree(step) {
 function renderGraph(step) {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
   const n = nodes.length;
-  const r = 24;
-  const pad = 60;
+  const isLinear = step.graph.layout === "linear";
+  const r = isLinear ? 44 : 24;
+  const pad = isLinear ? 64 : 60;
   const size = Math.max(280, n * 50);
   const cx = size / 2;
   const cy = size / 2;
   const radius = size / 2 - pad;
 
-  // Position nodes in a circle
   const pos = {};
-  nodes.forEach((node, i) => {
-    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-    pos[node.id] = {
-      x: cx + radius * Math.cos(angle),
-      y: cy + radius * Math.sin(angle),
-    };
-  });
+  let svgWidth = size;
+  let svgHeight = size;
+  if (isLinear) {
+    const order = step.graph.order || nodes.map((node) => node.id);
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const orderedNodes = order.map((id) => nodeById.get(id)).filter(Boolean);
+    const remainingNodes = nodes.filter((node) => !order.includes(node.id));
+    const allOrdered = orderedNodes.concat(remainingNodes);
+    const hasDiscardedRow = allOrdered.some((node) => node.row === "discarded");
+    const gap = 196;
+    const left = 96;
+    svgWidth = Math.max(420, left * 2 + Math.max(0, allOrdered.length - 1) * gap);
+    svgHeight = hasDiscardedRow ? 250 : 180;
+    allOrdered.forEach((node, i) => {
+      pos[node.id] = {
+        x: left + i * gap,
+        y: node.row === "discarded" ? 178 : 86,
+      };
+    });
+  } else {
+    // Position nodes in a circle
+    nodes.forEach((node, i) => {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+      pos[node.id] = {
+        x: cx + radius * Math.cos(angle),
+        y: cy + radius * Math.sin(angle),
+      };
+    });
+  }
 
   const hlNodeSet = new Set(hlNodes || []);
   const visitedSet = new Set(visitedNodes || []);
@@ -1373,7 +1395,8 @@ function renderGraph(step) {
     // Offset perpendicular to the edge
     const perpX = -uy * 12;
     const perpY = ux * 12;
-    edgeSvg += `<text x="${mx + perpX}" y="${my + perpY}" class="graph-weight${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${edge.w}</text>`;
+    const weight = edge.w ? `<text x="${mx + perpX}" y="${my + perpY}" class="graph-weight${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${edge.w}</text>` : "";
+    edgeSvg += weight;
   }
 
   // Draw nodes
@@ -1409,6 +1432,9 @@ function renderGraph(step) {
       const distLabel = node.dist === Infinity ? "∞" : node.dist;
       nodeSvg += `<text x="${p.x}" y="${p.y + r + 14}" class="graph-dist${isHl ? " hl" : ""}" text-anchor="middle">${distLabel}</text>`;
     }
+    if (node.sub !== undefined) {
+      nodeSvg += `<text x="${p.x}" y="${p.y + r + 18}" class="graph-sub" text-anchor="middle">${escapeXml(node.sub)}</text>`;
+    }
     nodeSvg += `</g>`;
   }
 
@@ -1422,8 +1448,12 @@ function renderGraph(step) {
     </marker>
   </defs>`;
 
+  const caption = step.graph.caption
+    ? `<div class="graph-caption">${escapeXml(step.graph.caption)}</div>`
+    : "";
   $("treeView").innerHTML =
-    `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="tree-svg graph-svg">` +
+    caption +
+    `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" class="tree-svg graph-svg${isLinear ? " graph-linear" : ""}">` +
     defs + edgeSvg + nodeSvg +
     `</svg>`;
 }

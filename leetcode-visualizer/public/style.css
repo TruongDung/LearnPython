@@ -3316,6 +3316,19 @@ button:disabled {
   margin: 0 auto;
 }
 
+.graph-caption {
+  color: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.graph-linear {
+  max-width: 100%;
+}
+
 .graph-edge {
   stroke: #475569;
   stroke-width: 2;
@@ -3382,6 +3395,13 @@ button:disabled {
   fill: #fbbf24;
 }
 
+.graph-sub {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 /* Light theme graph overrides */
 [data-theme="light"] .graph-edge {
   stroke: #cbd5e1;
@@ -3392,6 +3412,12 @@ button:disabled {
 }
 
 [data-theme="light"] .graph-weight {
+  fill: #64748b;
+}
+
+[data-theme="light"] .graph-caption,
+[data-theme="light"] .graph-sub {
+  color: #64748b;
   fill: #64748b;
 }
 
