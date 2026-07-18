@@ -28,6 +28,7 @@ const categories = {
   "union-find": require("./union-find"),
   "linked-list": require("./linked-list"),
   "binary-lifting": require("./binary-lifting"),
+  "binary-search": require("./binary-search"),
 };
 
 const SUPPORTED = {};

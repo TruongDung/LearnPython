@@ -730,17 +730,17 @@ function buildSteps1472(input, params) {
   });
 
   snapshot({
-    title: { vi: "self.curr = Node(homepage)", en: "self.curr = Node(homepage)" },
+    title: { vi: "self.curr = DoubleListNode(homepage)", en: "self.curr = DoubleListNode(homepage)" },
     codeLines: [9],
     includeState: false,
-    caption: "calling Node(homepage)",
+    caption: "calling DoubleListNode(homepage)",
     vars: [
       { name: "homepage", value: shortUrl(homepage) },
-      { name: "self.curr", value: "waiting for Node(...)" },
+      { name: "self.curr", value: "waiting for DoubleListNode(...)" },
     ],
     note: {
-      vi: "Python phải chạy xong Node(homepage) trước, sau đó mới gán kết quả vào self.curr.",
-      en: "Python must finish Node(homepage) before assigning its result to self.curr.",
+      vi: "Python phải chạy xong DoubleListNode(homepage) trước, sau đó mới gán kết quả vào self.curr.",
+      en: "Python must finish DoubleListNode(homepage) before assigning its result to self.curr.",
     },
   });
 
@@ -748,45 +748,46 @@ function buildSteps1472(input, params) {
   nodes.push(homepageNode);
 
   snapshot({
-    title: { vi: `Node.__init__("${shortUrl(homepage)}", prev=None)`, en: `Node.__init__("${shortUrl(homepage)}", prev=None)` },
+    title: { vi: `DoubleListNode.__init__("${shortUrl(homepage)}", prev=None, next=None)`, en: `DoubleListNode.__init__("${shortUrl(homepage)}", prev=None, next=None)` },
     codeLines: [2],
     includeState: false,
     showIds: [0],
     mainIds: [0],
-    nodeLabels: { 0: "new Node" },
+    nodeLabels: { 0: "new node" },
     nodeSubs: { 0: "being created" },
     annotations: { 0: "self" },
     hlNodes: [0],
-    caption: "inside Node.__init__",
+    caption: "inside DoubleListNode.__init__",
     vars: [
-      { name: "self", value: "new Node" },
-      { name: "url", value: shortUrl(homepage) },
+      { name: "self", value: "new node" },
+      { name: "val", value: shortUrl(homepage) },
       { name: "prev", value: "None" },
+      { name: "next", value: "None" },
     ],
     note: {
-      vi: "Tạo một object Node mới. self là object đang được khởi tạo; các field chưa được gán lần lượt.",
-      en: "Create a new Node object. self is the object being initialized; its fields have not been assigned line by line yet.",
+      vi: "Tạo một DoubleListNode mới. self là object đang được khởi tạo; val, prev và next sẽ được gán lần lượt.",
+      en: "Create a new DoubleListNode. self is the object being initialized; val, prev, and next will be assigned line by line.",
     },
   });
 
   homepageNode.url = homepage;
   snapshot({
-    title: { vi: "self.url = url", en: "self.url = url" },
+    title: { vi: "self.val = val", en: "self.val = val" },
     codeLines: [3],
     includeState: false,
     showIds: [0],
     mainIds: [0],
-    nodeSubs: { 0: "url assigned" },
+    nodeSubs: { 0: "val assigned" },
     annotations: { 0: "self" },
     hlNodes: [0],
     caption: "building homepage node",
     vars: [
-      { name: "url", value: shortUrl(homepage) },
-      { name: "self.url", value: shortUrl(homepage) },
+      { name: "val", value: shortUrl(homepage) },
+      { name: "self.val", value: shortUrl(homepage) },
     ],
     note: {
-      vi: `Gán địa chỉ "${shortUrl(homepage)}" vào field self.url của node đầu tiên.`,
-      en: `Assign "${shortUrl(homepage)}" to the first node's self.url field.`,
+      vi: `Gán địa chỉ "${shortUrl(homepage)}" vào field self.val của node đầu tiên.`,
+      en: `Assign "${shortUrl(homepage)}" to the first node's self.val field.`,
     },
   });
 
@@ -811,7 +812,7 @@ function buildSteps1472(input, params) {
   });
 
   snapshot({
-    title: { vi: "self.next = None", en: "self.next = None" },
+    title: { vi: "self.next = next", en: "self.next = next" },
     codeLines: [5],
     includeState: false,
     showIds: [0],
@@ -822,11 +823,12 @@ function buildSteps1472(input, params) {
     caption: "homepage node complete",
     vars: [
       { name: "self.prev", value: "None" },
+      { name: "next", value: "None" },
       { name: "self.next", value: "None" },
     ],
     note: {
-      vi: "Homepage chưa có trang phía sau, nên self.next = None. Node đầu tiên đã hoàn chỉnh.",
-      en: "The homepage has no following page, so self.next = None. The first node is now complete.",
+      vi: "Tham số next mặc định là None, nên self.next = next = None. Node đầu tiên đã hoàn chỉnh.",
+      en: "The next parameter defaults to None, so self.next = next = None. The first node is now complete.",
     },
   });
 
@@ -836,8 +838,8 @@ function buildSteps1472(input, params) {
     codeLines: [9],
     vars: [{ name: "output", value: "null" }],
     note: {
-      vi: `Node(homepage) đã trả về. Bây giờ self.curr mới trỏ vào node "${nodeLabel(0)}"; đây cũng là home.`,
-      en: `Node(homepage) has returned. self.curr now points to "${nodeLabel(0)}", which is also home.`,
+      vi: `DoubleListNode(homepage) đã trả về. Bây giờ self.curr mới trỏ vào node "${nodeLabel(0)}"; đây cũng là home.`,
+      en: `DoubleListNode(homepage) has returned. self.curr now points to "${nodeLabel(0)}", which is also home.`,
     },
   });
 
@@ -864,30 +866,51 @@ function buildSteps1472(input, params) {
         },
       });
 
-      const newNode = { id: nextId++, url, prev: null, next: null, alive: true };
+      const newNode = { id: nextId++, url: "", prev: null, next: null, alive: true };
       nodes.push(newNode);
 
       snapshot({
-        title: { vi: `new_node = Node("${shortUrl(url)}", curr)`, en: `new_node = Node("${shortUrl(url)}", curr)` },
+        title: { vi: `new_node = DoubleListNode("${shortUrl(url)}", self.curr)`, en: `new_node = DoubleListNode("${shortUrl(url)}", self.curr)` },
         codeLines: [12],
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
         hlNodes: [newNode.id],
-        annotations: { [newNode.id]: "new_node" },
+        annotations: { [newNode.id]: "new object" },
         vars: [
           { name: "prev argument", value: nodeLabel(currentId) },
-          { name: "new_node.url", value: shortUrl(url) },
+          { name: "val argument", value: shortUrl(url) },
+          { name: "new object.val", value: "unassigned" },
           { name: "new_node.prev", value: "null" },
           { name: "new_node.next", value: "null" },
         ],
         note: {
-          vi: "Gọi constructor Node(url, curr). Ta truyền curr vào tham số prev.",
-          en: "Call the Node(url, curr) constructor. We pass curr into the prev parameter.",
+          vi: "Python bắt đầu tính vế phải DoubleListNode(url, self.curr). Object mới được cấp phát nhưng constructor chưa gán các field.",
+          en: "Python starts evaluating DoubleListNode(url, self.curr). The new object is allocated, but its constructor has not assigned the fields yet.",
         },
       });
 
       snapshot({
-        title: { vi: "self.url = url", en: "self.url = url" },
+        title: { vi: `DoubleListNode.__init__("${shortUrl(url)}", prev=${nodeLabel(currentId)}, next=None)`, en: `DoubleListNode.__init__("${shortUrl(url)}", prev=${nodeLabel(currentId)}, next=None)` },
+        codeLines: [2],
+        showIds: [...discarded, newNode.id],
+        visitedNodes: discarded,
+        hlNodes: [newNode.id],
+        annotations: { [newNode.id]: "self" },
+        vars: [
+          { name: "self", value: "new object" },
+          { name: "val", value: shortUrl(url) },
+          { name: "prev", value: nodeLabel(currentId) },
+          { name: "next", value: "None" },
+        ],
+        note: {
+          vi: `Vào constructor: self là object mới, val="${shortUrl(url)}", prev nhận self.curr hiện tại và next mặc định None.`,
+          en: `Enter the constructor: self is the new object, val="${shortUrl(url)}", prev receives the current self.curr, and next defaults to None.`,
+        },
+      });
+
+      newNode.url = url;
+      snapshot({
+        title: { vi: "self.val = val", en: "self.val = val" },
         codeLines: [3],
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
@@ -895,11 +918,12 @@ function buildSteps1472(input, params) {
         annotations: { [newNode.id]: "self" },
         vars: [
           { name: "self", value: shortUrl(url) },
-          { name: "url", value: shortUrl(url) },
+          { name: "val", value: shortUrl(url) },
+          { name: "self.val", value: shortUrl(url) },
         ],
         note: {
-          vi: "Bên trong Node.__init__, self chính là node mới đang được tạo.",
-          en: "Inside Node.__init__, self is the new node being created.",
+          vi: "Bên trong DoubleListNode.__init__, self chính là node mới đang được tạo.",
+          en: "Inside DoubleListNode.__init__, self is the new node being created.",
         },
       });
 
@@ -924,16 +948,19 @@ function buildSteps1472(input, params) {
       });
 
       snapshot({
-        title: { vi: "self.next = None", en: "self.next = None" },
+        title: { vi: "self.next = next", en: "self.next = next" },
         codeLines: [5],
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
         hlNodes: [newNode.id],
         annotations: { [newNode.id]: "self" },
-        vars: [{ name: "self.next", value: "null" }],
+        vars: [
+          { name: "next", value: "None" },
+          { name: "self.next", value: "null" },
+        ],
         note: {
-          vi: "Node mới chưa có trang forward phía sau, nên next = None.",
-          en: "The new node has no forward page after it yet, so next = None.",
+          vi: "Không truyền đối số next nên next mặc định là None; node mới chưa có trang forward.",
+          en: "No next argument was supplied, so it defaults to None; the new node has no forward page.",
         },
       });
 
@@ -944,7 +971,7 @@ function buildSteps1472(input, params) {
       if (curr) curr.next = newNode.id;
 
       snapshot({
-        title: { vi: "curr.next = new_node", en: "curr.next = new_node" },
+        title: { vi: "self.curr.next = new_node", en: "self.curr.next = new_node" },
         codeLines: [13],
         showIds: [...discarded, newNode.id],
         visitedNodes: discarded,
@@ -968,7 +995,7 @@ function buildSteps1472(input, params) {
       currentId = newNode.id;
       outputs.push(null);
       snapshot({
-        title: { vi: "curr = new_node", en: "curr = new_node" },
+        title: { vi: "self.curr = new_node", en: "self.curr = new_node" },
         codeLines: [14],
         vars: [
           { name: "curr", value: nodeLabel(currentId) },
@@ -1001,7 +1028,7 @@ function buildSteps1472(input, params) {
         currentId = currentNode().prev;
         remaining--;
         snapshot({
-          title: { vi: `curr = curr.prev → "${nodeLabel(currentId)}"`, en: `curr = curr.prev → "${nodeLabel(currentId)}"` },
+          title: { vi: `self.curr = self.curr.prev → "${nodeLabel(currentId)}"`, en: `self.curr = self.curr.prev → "${nodeLabel(currentId)}"` },
           codeLines: [18, 19],
           hlNodes: [from, currentId],
           hlEdges: [[from, currentId, "prev"]],
@@ -1048,7 +1075,7 @@ function buildSteps1472(input, params) {
         currentId = currentNode().next;
         remaining--;
         snapshot({
-          title: { vi: `curr = curr.next → "${nodeLabel(currentId)}"`, en: `curr = curr.next → "${nodeLabel(currentId)}"` },
+          title: { vi: `self.curr = self.curr.next → "${nodeLabel(currentId)}"`, en: `self.curr = self.curr.next → "${nodeLabel(currentId)}"` },
           codeLines: [24, 25],
           hlNodes: [from, currentId],
           hlEdges: [[from, currentId, "next"]],
@@ -1443,7 +1470,7 @@ module.exports = {
     ],
     approach: [
       { vi: "Cách 1: dùng mảng history + index. Dễ code, back/forward chỉ clamp index.", en: "Approach 1: use a history array + index. Easy to code; back/forward only clamp the index." },
-      { vi: "Cách 2: dùng doubly linked list. Mỗi trang là một node có prev/next, curr trỏ tới trang hiện tại.", en: "Approach 2: use a doubly linked list. Each page is a node with prev/next, and curr points to the current page." },
+      { vi: "Cách 2: dùng DoubleListNode. Mỗi trang nằm trong val, có prev/next, và curr trỏ tới trang hiện tại.", en: "Approach 2: use DoubleListNode. Each page is stored in val with prev/next links, and curr points to the current page." },
       { vi: "Visualization đang debug cách 2: visit cắt curr.next, nối node mới sau curr, rồi curr chuyển sang node mới.", en: "The visualization debugs approach 2: visit cuts curr.next, links a new node after curr, then moves curr to that node." },
     ],
     complexity: {
@@ -1455,18 +1482,18 @@ module.exports = {
       },
     },
     code: [
-      "class Node:",
-      "    def __init__(self, url: str, prev=None):",
-      "        self.url = url",
+      "class DoubleListNode:",
+      "    def __init__(self, val=0, prev=None, next=None):",
+      "        self.val = val",
       "        self.prev = prev",
-      "        self.next = None",
+      "        self.next = next",
       "",
       "class BrowserHistory:",
       "    def __init__(self, homepage: str):",
-      "        self.curr = Node(homepage)",
+      "        self.curr = DoubleListNode(homepage)",
       "",
       "    def visit(self, url: str) -> None:",
-      "        new_node = Node(url, self.curr)",
+      "        new_node = DoubleListNode(url, self.curr)",
       "        self.curr.next = new_node",
       "        self.curr = new_node",
       "",
@@ -1474,13 +1501,13 @@ module.exports = {
       "        while self.curr.prev and steps > 0:",
       "            self.curr = self.curr.prev",
       "            steps -= 1",
-      "        return self.curr.url",
+      "        return self.curr.val",
       "",
       "    def forward(self, steps: int) -> str:",
       "        while self.curr.next and steps > 0:",
       "            self.curr = self.curr.next",
       "            steps -= 1",
-      "        return self.curr.url",
+      "        return self.curr.val",
       "",
       "",
       "# Approach 1: Array + index",
