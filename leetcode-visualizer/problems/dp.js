@@ -10254,7 +10254,6 @@ function buildSteps1682(input) {
   const n = s.length;
   const steps = [];
   const memo = new Map();
-  const best = Array.from({ length: n }, () => new Array(n).fill(""));
   const chars = Array.from(new Set(s.split(""))).sort();
   const ROOT = "{none}";
   const MAX_RECORDED_STEPS = 180;
@@ -10263,11 +10262,17 @@ function buildSteps1682(input) {
     return `${i},${j},${prev}`;
   }
 
-  function makeGrid(hl = null, deps = []) {
+  function prevLabelOf(prev) {
+    return prev === ROOT ? "none" : prev;
+  }
+
+  function makeGrid(hl = null, deps = [], prev = ROOT) {
     const display = Array.from({ length: n + 1 }, () => new Array(n + 1).fill(""));
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
-        display[i + 1][j + 1] = i <= j ? best[i][j] : "";
+        display[i + 1][j + 1] = i <= j && memo.has(key(i, j, prev))
+          ? memo.get(key(i, j, prev))
+          : "";
       }
     }
     const shift = (cell) => cell ? [cell[0] + 1, cell[1] + 1] : null;
@@ -10279,19 +10284,24 @@ function buildSteps1682(input) {
       colLabels: Array.from({ length: n }, (_, idx) => ({ index: `j=${idx}`, char: s[idx] })),
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
+      caption: `DP layer: prev = ${prevLabelOf(prev)}`,
     };
   }
 
   function snap(opts) {
     if (steps.length >= MAX_RECORDED_STEPS && !opts.final) return;
+    const prev = opts.prev === undefined ? ROOT : opts.prev;
     steps.push({
       title: opts.title,
       arr: s.split(""),
-      grid: makeGrid(opts.hlCell || null, opts.pathCells || []),
+      grid: makeGrid(opts.hlCell || null, opts.pathCells || [], prev),
       highlight: opts.highlight || [],
       mark: opts.mark || [],
       codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
+      vars: [
+        { name: "layer prev", value: prevLabelOf(prev) },
+        ...(opts.vars || []),
+      ],
       note: opts.note,
       final: Boolean(opts.final),
     });
@@ -10310,27 +10320,14 @@ function buildSteps1682(input) {
     },
   });
 
-  if (n < 2) {
-    snap({
-      title: { vi: "Qua ngan", en: "Too short" },
-      codeLines: [4, 20],
-      vars: [{ name: "answer", value: 0 }],
-      note: {
-        vi: "Good palindrome phai co do dai chan va can it nhat 2 ky tu.",
-        en: "A good palindrome is even-length and needs at least two characters.",
-      },
-      final: true,
-    });
-    return { s, answer: 0, steps };
-  }
-
   function dfs(i, j, prev, depth = 0) {
     const stateKey = key(i, j, prev);
-    const prevLabel = prev === ROOT ? "none" : prev;
+    const prevLabel = prevLabelOf(prev);
 
     snap({
       title: { vi: `dfs(${i}, ${j}, prev=${prevLabel})`, en: `dfs(${i}, ${j}, prev=${prevLabel})` },
       codeLines: [8],
+      prev,
       hlCell: i <= j ? [i, j] : null,
       highlight: Array.from({ length: Math.max(0, j - i + 1) }, (_, idx) => i + idx),
       vars: [
@@ -10347,15 +10344,30 @@ function buildSteps1682(input) {
 
     if (i >= j) {
       snap({
-        title: { vi: "Base case = 0", en: "Base case = 0" },
-        codeLines: [9, 10],
-        vars: [{ name: `dfs(${i},${j},${prevLabel})`, value: 0 }],
+        title: { vi: "if i >= j", en: "if i >= j" },
+        codeLines: [9],
+        prev,
+        vars: [
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "condition", value: true },
+        ],
         note: {
           vi: "Khong con du 2 ky tu de tao cap doi xung.",
           en: "Fewer than two characters remain, so no pair can be added.",
         },
       });
       memo.set(stateKey, 0);
+      snap({
+        title: { vi: "return 0", en: "return 0" },
+        codeLines: [10],
+        prev,
+        vars: [{ name: `dfs(${i},${j},${prevLabel})`, value: 0 }],
+        note: {
+          vi: "State nay tra ve 0 va duoc cache cho layer prev hien tai.",
+          en: "This state returns 0 and is cached for the current prev layer.",
+        },
+      });
       return 0;
     }
 
@@ -10364,6 +10376,7 @@ function buildSteps1682(input) {
       snap({
         title: { vi: `Memo hit = ${cached}`, en: `Memo hit = ${cached}` },
         codeLines: [7],
+        prev,
         hlCell: [i, j],
         vars: [{ name: `memo[${i},${j},${prevLabel}]`, value: cached }],
         note: {
@@ -10376,15 +10389,76 @@ function buildSteps1682(input) {
 
     let ans = 0;
     const candidates = [];
+    snap({
+      title: { vi: "ans = 0", en: "ans = 0" },
+      codeLines: [12],
+      prev,
+      hlCell: [i, j],
+      vars: [{ name: "ans", value: ans }],
+      note: {
+        vi: "Khoi tao dap an tot nhat cho state nay.",
+        en: "Initialize the best answer for this state.",
+      },
+    });
 
     for (const ch of chars) {
+      snap({
+        title: { vi: `for ch = '${ch}'`, en: `for ch = '${ch}'` },
+        codeLines: [13],
+        prev,
+        hlCell: [i, j],
+        vars: [
+          { name: "ch", value: ch },
+          { name: "ans", value: ans },
+        ],
+        note: {
+          vi: `Thu dung '${ch}' lam cap doi xung tiep theo.`,
+          en: `Try using '${ch}' as the next symmetric pair.`,
+        },
+      });
+
       const left = s.indexOf(ch, i);
+      snap({
+        title: { vi: `left = ${left}`, en: `left = ${left}` },
+        codeLines: [14],
+        prev,
+        hlCell: i <= j ? [i, j] : null,
+        highlight: left >= 0 ? [left] : [],
+        vars: [
+          { name: "ch", value: ch },
+          { name: "left", value: left },
+        ],
+        note: {
+          vi: `Tim vi tri dau tien cua '${ch}' trong s[${i}..${j}].`,
+          en: `Find the first '${ch}' inside s[${i}..${j}].`,
+        },
+      });
+
       const right = s.lastIndexOf(ch, j);
+      snap({
+        title: { vi: `right = ${right}`, en: `right = ${right}` },
+        codeLines: [15],
+        prev,
+        hlCell: i <= j ? [i, j] : null,
+        pathCells: left >= 0 && right >= 0 ? [[left, right]] : [],
+        highlight: [left, right].filter((idx) => idx >= 0),
+        vars: [
+          { name: "ch", value: ch },
+          { name: "left", value: left },
+          { name: "right", value: right },
+        ],
+        note: {
+          vi: `Tim vi tri cuoi cung cua '${ch}' trong s[${i}..${j}].`,
+          en: `Find the last '${ch}' inside s[${i}..${j}].`,
+        },
+      });
+
       const usable = ch !== prev && left !== -1 && right !== -1 && left < right;
 
       snap({
-        title: { vi: `Thu ky tu '${ch}'`, en: `Try character '${ch}'` },
-        codeLines: [13, 14, 15, 16],
+        title: { vi: `if '${ch}' usable -> ${usable}`, en: `if '${ch}' usable -> ${usable}` },
+        codeLines: [16],
+        prev,
         hlCell: i <= j ? [i, j] : null,
         pathCells: usable ? [[left, right]] : [],
         highlight: usable ? [left, right] : [],
@@ -10408,10 +10482,12 @@ function buildSteps1682(input) {
       const inner = dfs(left + 1, right - 1, ch, depth + 1);
       const value = inner + 2;
       candidates.push(`${ch}:${value}`);
+      const newAns = Math.max(ans, value);
 
       snap({
-        title: { vi: `'${ch}' tao do dai ${value}`, en: `'${ch}' gives length ${value}` },
+        title: { vi: `ans = max(${ans}, ${value}) = ${newAns}`, en: `ans = max(${ans}, ${value}) = ${newAns}` },
         codeLines: [17],
+        prev,
         hlCell: [i, j],
         pathCells: [[left, right], [left + 1, right - 1]].filter(([r, c]) => r <= c),
         highlight: [left, right],
@@ -10419,7 +10495,7 @@ function buildSteps1682(input) {
         vars: [
           { name: "inner", value: inner },
           { name: "candidate", value: `${inner} + 2 = ${value}` },
-          { name: "best so far", value: Math.max(ans, value) },
+          { name: "ans", value: newAns },
         ],
         note: {
           vi: `Them cap '${ch}' vao hai dau. Ben trong phai tranh lap '${ch}' ngay sat cap nay.`,
@@ -10427,15 +10503,15 @@ function buildSteps1682(input) {
         },
       });
 
-      ans = Math.max(ans, value);
+      ans = newAns;
     }
 
     memo.set(stateKey, ans);
-    if (i <= j) best[i][j] = best[i][j] === "" ? ans : Math.max(Number(best[i][j]), ans);
 
     snap({
-      title: { vi: `Luu memo = ${ans}`, en: `Store memo = ${ans}` },
+      title: { vi: `return ans = ${ans}`, en: `return ans = ${ans}` },
       codeLines: [18],
+      prev,
       hlCell: [i, j],
       vars: [
         { name: `memo[${i},${j},${prevLabel}]`, value: ans },
@@ -10465,6 +10541,7 @@ function buildSteps1682(input) {
   snap({
     title: { vi: `Ket qua: ${answer}`, en: `Result: ${answer}` },
     codeLines: [20],
+    prev: ROOT,
     hlCell: [0, n - 1],
     vars: [{ name: "answer", value: answer }],
     note: {
@@ -11242,6 +11319,31 @@ function buildSteps10(input, params) {
     });
   }
 
+  gridSnap({
+    title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "p", value: `"${p}"` },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: `m là độ dài chuỗi s, n là độ dài pattern p.`,
+      en: `m is the length of s, n is the length of p.`,
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    codeLines: [4],
+    vars: [{ name: "dp size", value: `${m + 1} x ${n + 1}` }],
+    note: {
+      vi: "dp[i][j] cho biết s[:i] có khớp p[:j] hay không. Ban đầu toàn False.",
+      en: "dp[i][j] means whether s[:i] matches p[:j]. Initially every cell is False.",
+    },
+  });
+
   dp[0][0] = true;
   gridSnap({
     title: { vi: "Base: dp[0][0] = True", en: "Base: dp[0][0] = True" },
@@ -11256,11 +11358,45 @@ function buildSteps10(input, params) {
   });
 
   for (let j = 2; j <= n; j++) {
-    if (p[j - 1] !== "*") continue;
+    gridSnap({
+      title: { vi: `for j=${j}`, en: `for j=${j}` },
+      codeLines: [6],
+      hlCell: [0, j],
+      vars: [
+        { name: "j", value: j },
+        { name: "p[:j]", value: `"${p.slice(0, j)}"` },
+      ],
+      note: {
+        vi: `Kiểm tra pattern prefix "${p.slice(0, j)}" có thể match chuỗi rỗng không.`,
+        en: `Check whether pattern prefix "${p.slice(0, j)}" can match the empty string.`,
+      },
+    });
+
+    const emptyStar = p[j - 1] === "*";
+    gridSnap({
+      title: { vi: `if p[${j - 1}] == '*' -> ${emptyStar}`, en: `if p[${j - 1}] == '*' -> ${emptyStar}` },
+      codeLines: [7],
+      hlCell: [0, j],
+      vars: [
+        { name: `p[${j - 1}]`, value: p[j - 1] || "" },
+        { name: "condition", value: emptyStar },
+      ],
+      note: emptyStar
+        ? {
+            vi: `"${p.slice(j - 2, j)}" có thể dùng 0 lần để tiếp tục match chuỗi rỗng.`,
+            en: `"${p.slice(j - 2, j)}" can be used zero times to keep matching the empty string.`,
+          }
+        : {
+            vi: "Không phải '*', nên dp[0][j] giữ False.",
+            en: "This token is not '*', so dp[0][j] stays False.",
+          },
+    });
+
+    if (!emptyStar) continue;
     dp[0][j] = dp[0][j - 2];
     gridSnap({
       title: { vi: `Empty s: dp[0][${j}] = ${dp[0][j]}`, en: `Empty s: dp[0][${j}] = ${dp[0][j]}` },
-      codeLines: [6, 7, 8],
+      codeLines: [8],
       hlCell: [0, j],
       pathCells: [[0, j - 2]],
       cellLabels: { [`0,${j - 2}`]: "drop x*" },
@@ -11279,7 +11415,7 @@ function buildSteps10(input, params) {
   for (let i = 1; i <= m; i++) {
     gridSnap({
       title: { vi: `Outer loop i=${i}`, en: `Outer loop i=${i}` },
-      codeLines: [11],
+      codeLines: [9],
       hlCell: [i, 0],
       vars: [
         { name: `s[${i - 1}]`, value: s[i - 1] },
@@ -11291,7 +11427,7 @@ function buildSteps10(input, params) {
     for (let j = 1; j <= n; j++) {
       gridSnap({
         title: { vi: `Inner loop j=${j}`, en: `Inner loop j=${j}` },
-        codeLines: [12],
+        codeLines: [10],
         hlCell: [i, j],
         vars: [
           { name: `s[${i - 1}]`, value: s[i - 1] },
@@ -11302,12 +11438,33 @@ function buildSteps10(input, params) {
       });
 
       const pc = p[j - 1];
-      if (pc === "." || pc === s[i - 1]) {
+      const directMatch = pc === "." || pc === s[i - 1];
+      gridSnap({
+        title: { vi: `if single token matches -> ${directMatch}`, en: `if single token matches -> ${directMatch}` },
+        codeLines: [11],
+        hlCell: [i, j],
+        vars: [
+          { name: `s[${i - 1}]`, value: s[i - 1] },
+          { name: `p[${j - 1}]`, value: pc },
+          { name: "condition", value: directMatch },
+        ],
+        note: directMatch
+          ? {
+              vi: pc === "." ? "'.' khớp đúng một ký tự." : "Hai ký tự giống nhau.",
+              en: pc === "." ? "'.' matches exactly one character." : "The two characters are equal.",
+            }
+          : {
+              vi: "Không khớp trực tiếp; nếu token là '*' thì xét case '*' ở dòng tiếp theo.",
+              en: "No direct match; if the token is '*', check the star case next.",
+            },
+      });
+
+      if (directMatch) {
         const prev = dp[i - 1][j - 1];
         dp[i][j] = prev;
         gridSnap({
           title: { vi: `Direct match -> ${dp[i][j]}`, en: `Direct match -> ${dp[i][j]}` },
-          codeLines: [13, 14],
+          codeLines: [12],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
           cellLabels: { [`${i - 1},${j - 1}`]: "diag" },
@@ -11321,46 +11478,96 @@ function buildSteps10(input, params) {
             en: pc === "." ? "'.' matches exactly one character, so use dp[i-1][j-1]." : "Characters are equal, so use dp[i-1][j-1].",
           },
         });
-      } else if (pc === "*") {
+        continue;
+      }
+
+      const starCase = pc === "*";
+      gridSnap({
+        title: { vi: `elif p[${j - 1}] == '*' -> ${starCase}`, en: `elif p[${j - 1}] == '*' -> ${starCase}` },
+        codeLines: [13],
+        hlCell: [i, j],
+        vars: [
+          { name: `p[${j - 1}]`, value: pc },
+          { name: "condition", value: starCase },
+        ],
+        note: starCase
+          ? {
+              vi: "'*' có thể match 0 hoặc nhiều lần token đứng trước.",
+              en: "'*' can match zero or more copies of the previous token.",
+            }
+          : {
+              vi: "Không phải '*', nên ô này giữ False.",
+              en: "This token is not '*', so this cell stays False.",
+            },
+      });
+
+      if (starCase) {
         const prevChar = p[j - 2];
         const zero = j >= 2 ? dp[i][j - 2] : false;
-        const canUseStar = j >= 2 && (prevChar === "." || prevChar === s[i - 1]);
-        const oneMore = canUseStar ? dp[i - 1][j] : false;
-        dp[i][j] = Boolean(zero || oneMore);
+        dp[i][j] = Boolean(zero);
         gridSnap({
-          title: { vi: `'*' case -> ${dp[i][j]}`, en: `'*' case -> ${dp[i][j]}` },
-          codeLines: [12, 13, 14, 15],
+          title: { vi: `Zero copies -> ${dp[i][j]}`, en: `Zero copies -> ${dp[i][j]}` },
+          codeLines: [14],
           hlCell: [i, j],
-          pathCells: [[i, Math.max(0, j - 2)], [i - 1, j]],
+          pathCells: j >= 2 ? [[i, j - 2]] : [],
           cellLabels: {
-            [`${i},${Math.max(0, j - 2)}`]: "zero",
-            [`${i - 1},${j}`]: "more",
+            ...(j >= 2 ? { [`${i},${j - 2}`]: "zero" } : {}),
           },
           vars: [
             { name: "previous token", value: prevChar || "" },
             { name: "zero copies", value: `dp[${i}][${j - 2}] = ${zero}` },
-            { name: "can use *", value: canUseStar },
-            { name: "one more char", value: canUseStar ? `dp[${i - 1}][${j}] = ${oneMore}` : false },
             { name: `dp[${i}][${j}]`, value: dp[i][j] },
           ],
           note: {
-            vi: "'*' has two choices: zero copies of previous token, or if it matches s[i-1], consume one more character.",
-            en: "'*' has two choices: zero copies of previous token, or if it matches s[i-1], consume one more character.",
+            vi: "Trước hết thử dùng 0 lần token trước '*': bỏ đoạn x* bằng dp[i][j-2].",
+            en: "First try zero copies of the token before '*': drop x* using dp[i][j-2].",
           },
         });
+
+        const canUseStar = j >= 2 && (prevChar === "." || prevChar === s[i - 1]);
+        gridSnap({
+          title: { vi: `Can consume one more -> ${canUseStar}`, en: `Can consume one more -> ${canUseStar}` },
+          codeLines: [15],
+          hlCell: [i, j],
+          pathCells: [[i - 1, j]],
+          cellLabels: { [`${i - 1},${j}`]: "more" },
+          vars: [
+            { name: "previous token", value: prevChar || "" },
+            { name: `s[${i - 1}]`, value: s[i - 1] },
+            { name: "condition", value: canUseStar },
+          ],
+          note: canUseStar
+            ? {
+                vi: "Token trước '*' khớp s[i-1], nên có thể tiêu thụ thêm một ký tự.",
+                en: "The token before '*' matches s[i-1], so '*' may consume one more character.",
+              }
+            : {
+                vi: "Token trước '*' không khớp s[i-1], nên không thể dùng nhánh tiêu thụ thêm.",
+                en: "The token before '*' does not match s[i-1], so the consume-more branch cannot be used.",
+              },
+        });
+
+        if (canUseStar) {
+          const oneMore = dp[i - 1][j];
+          dp[i][j] = Boolean(dp[i][j] || oneMore);
+          gridSnap({
+            title: { vi: `Consume more -> ${dp[i][j]}`, en: `Consume more -> ${dp[i][j]}` },
+            codeLines: [16],
+            hlCell: [i, j],
+            pathCells: [[i - 1, j]],
+            cellLabels: { [`${i - 1},${j}`]: "more" },
+            vars: [
+              { name: "one more char", value: `dp[${i - 1}][${j}] = ${oneMore}` },
+              { name: `dp[${i}][${j}]`, value: dp[i][j] },
+            ],
+            note: {
+              vi: "Nếu p[:j] đã match s[:i-1], '*' có thể ăn thêm s[i-1].",
+              en: "If p[:j] already matched s[:i-1], '*' can consume s[i-1] too.",
+            },
+          });
+        }
       } else {
         dp[i][j] = false;
-        gridSnap({
-          title: { vi: "No match -> False", en: "No match -> False" },
-          codeLines: [16],
-          hlCell: [i, j],
-          vars: [
-            { name: `s[${i - 1}]`, value: s[i - 1] },
-            { name: `p[${j - 1}]`, value: pc },
-            { name: `dp[${i}][${j}]`, value: false },
-          ],
-          note: { vi: "Characters differ and pattern token is not '.' or '*'.", en: "Characters differ and pattern token is not '.' or '*'." },
-        });
       }
     }
   }
