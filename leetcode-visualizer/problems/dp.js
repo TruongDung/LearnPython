@@ -11633,6 +11633,31 @@ function buildSteps44Table(input, params) {
     });
   }
 
+  gridSnap({
+    title: { vi: `m=${m}, n=${n}`, en: `m=${m}, n=${n}` },
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "p", value: `"${p}"` },
+      { name: "m", value: m },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi: "m là độ dài chuỗi s, n là độ dài pattern p.",
+      en: "m is the length of s, n is the length of p.",
+    },
+  });
+
+  gridSnap({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize dp table" },
+    codeLines: [4],
+    vars: [{ name: "dp size", value: `${m + 1} x ${n + 1}` }],
+    note: {
+      vi: "dp[i][j] cho biết s[:i] có khớp p[:j] hay không. Ban đầu toàn False.",
+      en: "dp[i][j] means whether s[:i] matches p[:j]. Initially every cell is False.",
+    },
+  });
+
   dp[0][0] = true;
   gridSnap({
     title: { vi: "Base: dp[0][0] = True", en: "Base: dp[0][0] = True" },
@@ -11647,11 +11672,58 @@ function buildSteps44Table(input, params) {
   });
 
   for (let j = 1; j <= n; j++) {
-    if (p[j - 1] !== "*") break;
+    gridSnap({
+      title: { vi: `for j=${j}`, en: `for j=${j}` },
+      codeLines: [6],
+      hlCell: [0, j],
+      vars: [
+        { name: "j", value: j },
+        { name: "p[:j]", value: `"${p.slice(0, j)}"` },
+      ],
+      note: {
+        vi: "Khởi tạo hàng chuỗi rỗng: chỉ các '*' liên tiếp ở đầu pattern mới match được rỗng.",
+        en: "Initialize the empty-string row: only leading '*' tokens can match empty.",
+      },
+    });
+
+    const leadingStar = p[j - 1] === "*";
+    gridSnap({
+      title: { vi: `if p[${j - 1}] == '*' -> ${leadingStar}`, en: `if p[${j - 1}] == '*' -> ${leadingStar}` },
+      codeLines: [7],
+      hlCell: [0, j],
+      vars: [
+        { name: `p[${j - 1}]`, value: p[j - 1] || "" },
+        { name: "condition", value: leadingStar },
+      ],
+      note: leadingStar
+        ? {
+            vi: "'*' ở đầu có thể match chuỗi rỗng.",
+            en: "A leading '*' can match the empty string.",
+          }
+        : {
+            vi: "Gặp token không phải '*', phần còn lại của hàng empty sẽ không match.",
+            en: "Once a non-'*' token appears, the rest of the empty row cannot match.",
+          },
+    });
+
+    if (!leadingStar) {
+      gridSnap({
+        title: { vi: "break", en: "break" },
+        codeLines: [10],
+        hlCell: [0, j],
+        vars: [{ name: "stop empty-row init", value: true }],
+        note: {
+          vi: "Dừng khởi tạo hàng empty vì pattern prefix đã cần ít nhất một ký tự thật.",
+          en: "Stop initializing the empty row because this pattern prefix now needs at least one real character.",
+        },
+      });
+      break;
+    }
+
     dp[0][j] = dp[0][j - 1];
     gridSnap({
       title: { vi: `Empty s: leading '*' -> ${dp[0][j]}`, en: `Empty s: leading '*' -> ${dp[0][j]}` },
-      codeLines: [6, 7, 8],
+      codeLines: [8],
       hlCell: [0, j],
       pathCells: [[0, j - 1]],
       cellLabels: { [`0,${j - 1}`]: "empty" },
@@ -11690,12 +11762,33 @@ function buildSteps44Table(input, params) {
       });
 
       const pc = p[j - 1];
-      if (pc === "?" || pc === s[i - 1]) {
+      const singleMatch = pc === "?" || pc === s[i - 1];
+      gridSnap({
+        title: { vi: `if single token matches -> ${singleMatch}`, en: `if single token matches -> ${singleMatch}` },
+        codeLines: [13],
+        hlCell: [i, j],
+        vars: [
+          { name: `s[${i - 1}]`, value: s[i - 1] },
+          { name: `p[${j - 1}]`, value: pc },
+          { name: "condition", value: singleMatch },
+        ],
+        note: singleMatch
+          ? {
+              vi: pc === "?" ? "'?' khớp đúng một ký tự." : "Hai ký tự giống nhau.",
+              en: pc === "?" ? "'?' matches exactly one character." : "The two characters are equal.",
+            }
+          : {
+              vi: "Không khớp dạng một ký tự; nếu token là '*' thì xét nhánh wildcard.",
+              en: "No single-character match; if the token is '*', check the wildcard branch.",
+            },
+      });
+
+      if (singleMatch) {
         const prev = dp[i - 1][j - 1];
         dp[i][j] = prev;
         gridSnap({
           title: { vi: `Single-char match -> ${dp[i][j]}`, en: `Single-char match -> ${dp[i][j]}` },
-          codeLines: [13, 14],
+          codeLines: [14],
           hlCell: [i, j],
           pathCells: [[i - 1, j - 1]],
           cellLabels: { [`${i - 1},${j - 1}`]: "diag" },
@@ -11706,13 +11799,36 @@ function buildSteps44Table(input, params) {
           ],
           note: { vi: pc === "?" ? "'?' matches exactly one character, so use dp[i-1][j-1]." : "Characters are equal, so use dp[i-1][j-1].", en: pc === "?" ? "'?' matches exactly one character, so use dp[i-1][j-1]." : "Characters are equal, so use dp[i-1][j-1]." },
         });
-      } else if (pc === "*") {
+        continue;
+      }
+
+      const starCase = pc === "*";
+      gridSnap({
+        title: { vi: `elif p[${j - 1}] == '*' -> ${starCase}`, en: `elif p[${j - 1}] == '*' -> ${starCase}` },
+        codeLines: [15],
+        hlCell: [i, j],
+        vars: [
+          { name: `p[${j - 1}]`, value: pc },
+          { name: "condition", value: starCase },
+        ],
+        note: starCase
+          ? {
+              vi: "'*' có thể match rỗng hoặc ăn thêm một ký tự của s.",
+              en: "'*' can match empty or consume one more character from s.",
+            }
+          : {
+              vi: "Không phải '*', nên ô này sẽ là False.",
+              en: "This token is not '*', so this cell will be False.",
+            },
+      });
+
+      if (starCase) {
         const empty = dp[i][j - 1];
         const consume = dp[i - 1][j];
         dp[i][j] = Boolean(empty || consume);
         gridSnap({
           title: { vi: `'*' wildcard -> ${dp[i][j]}`, en: `'*' wildcard -> ${dp[i][j]}` },
-          codeLines: [15, 16],
+          codeLines: [16],
           hlCell: [i, j],
           pathCells: [[i, j - 1], [i - 1, j]],
           cellLabels: { [`${i},${j - 1}`]: "empty", [`${i - 1},${j}`]: "consume" },
@@ -11727,7 +11843,7 @@ function buildSteps44Table(input, params) {
         dp[i][j] = false;
         gridSnap({
           title: { vi: "No match -> False", en: "No match -> False" },
-          codeLines: [17, 18],
+          codeLines: [18],
           hlCell: [i, j],
           vars: [
             { name: `s[${i - 1}]`, value: s[i - 1] },
@@ -11809,15 +11925,35 @@ function buildSteps44Greedy(input, params) {
   }
 
   snap({
-    title: { vi: "Khoi tao con tro", en: "Initialize pointers" },
-    codeLines: [3, 4, 5],
+    title: { vi: "i = j = 0", en: "i = j = 0" },
+    codeLines: [3],
     vars: [
       { name: "s", value: s },
       { name: "p", value: p },
+      { name: "i", value: i },
+      { name: "j", value: j },
     ],
     note: {
-      vi: "i doc chuoi s, j doc pattern p. star luu vi tri '*' gan nhat, match luu vi tri s dang thu cho '*'.",
-      en: "i scans s, j scans p. star stores the latest '*', and match stores the s position currently assigned to that '*'.",
+      vi: "i doc chuoi s, j doc pattern p.",
+      en: "i scans s, j scans p.",
+    },
+  });
+  snap({
+    title: { vi: "star = -1", en: "star = -1" },
+    codeLines: [4],
+    vars: [{ name: "star", value: star }],
+    note: {
+      vi: "Chua co checkpoint '*' nao.",
+      en: "No '*' checkpoint has been seen yet.",
+    },
+  });
+  snap({
+    title: { vi: "match = 0", en: "match = 0" },
+    codeLines: [5],
+    vars: [{ name: "match", value: match }],
+    note: {
+      vi: "match luu vi tri s dang thu cho '*' gan nhat.",
+      en: "match stores the s position currently assigned to the latest '*'.",
     },
   });
 
@@ -11835,32 +11971,107 @@ function buildSteps44Greedy(input, params) {
       note: { vi: "So sanh ky tu hien tai cua s voi token hien tai cua p.", en: "Compare the current s character with the current p token." },
     });
 
-    if (j < p.length && (p[j] === s[i] || p[j] === "?")) {
+    const direct = j < p.length && (p[j] === s[i] || p[j] === "?");
+    snap({
+      title: { vi: `if direct match -> ${direct}`, en: `if direct match -> ${direct}` },
+      codeLines: [8],
+      hlCell: pointerCell(0, i),
+      pathCells: j < p.length ? [[1, j]] : [],
+      cellLabels: j < p.length ? { [`0,${i}`]: "i", [`1,${j}`]: "j" } : { [`0,${i}`]: "i" },
+      vars: [
+        { name: `s[${i}]`, value: s[i] },
+        { name: j < p.length ? `p[${j}]` : "p[j]", value: j < p.length ? p[j] : "END" },
+        { name: "condition", value: direct },
+      ],
+      note: direct
+        ? {
+            vi: "Ky tu bang nhau, hoac '?' khop dung mot ky tu.",
+            en: "Characters are equal, or '?' matches exactly one character.",
+          }
+        : {
+            vi: "Khong khop truc tiep; thu xem p[j] co phai '*' khong.",
+            en: "No direct match; next check whether p[j] is '*'.",
+          },
+    });
+
+    if (direct) {
       const oldI = i;
       const oldJ = j;
       i += 1;
-      j += 1;
       snap({
-        title: { vi: "Khop 1 ky tu", en: "Match one character" },
-        codeLines: [8, 9, 10],
+        title: { vi: "i += 1", en: "i += 1" },
+        codeLines: [9],
         hlCell: pointerCell(0, oldI),
         pathCells: [[1, oldJ]],
         cellLabels: { [`0,${oldI}`]: "i", [`1,${oldJ}`]: "j" },
         vars: [
           { name: "match token", value: p[oldJ] },
           { name: "next i", value: i },
-          { name: "next j", value: j },
+          { name: "j", value: j },
         ],
-        note: { vi: "Ky tu bang nhau, hoac '?' khop dung mot ky tu. Tang ca i va j.", en: "Characters are equal, or '?' matches exactly one character. Advance both i and j." },
+        note: { vi: "Da khop s[old i], nen tang i.", en: "s[old i] matched, so advance i." },
       });
-    } else if (j < p.length && p[j] === "*") {
-      const oldJ = j;
-      star = j;
-      match = i;
       j += 1;
       snap({
-        title: { vi: "Gap '*' -> luu checkpoint", en: "See '*' -> save checkpoint" },
-        codeLines: [12, 13, 14, 15],
+        title: { vi: "j += 1", en: "j += 1" },
+        codeLines: [10],
+        hlCell: pointerCell(1, oldJ),
+        pathCells: [[0, oldI]],
+        cellLabels: { [`0,${oldI}`]: "i", [`1,${oldJ}`]: "j" },
+        vars: [
+          { name: "i", value: i },
+          { name: "next j", value: j },
+        ],
+        note: { vi: "Da khop p[old j], nen tang j.", en: "p[old j] matched, so advance j." },
+      });
+    } else {
+      const isStar = j < p.length && p[j] === "*";
+      snap({
+        title: { vi: `elif p[j] == '*' -> ${isStar}`, en: `elif p[j] == '*' -> ${isStar}` },
+        codeLines: [12],
+        hlCell: j < p.length ? pointerCell(1, j) : pointerCell(0, i),
+        pathCells: [[0, i]].filter(Boolean),
+        vars: [
+          { name: j < p.length ? `p[${j}]` : "p[j]", value: j < p.length ? p[j] : "END" },
+          { name: "condition", value: isStar },
+        ],
+        note: isStar
+          ? {
+              vi: "Gap '*', luu checkpoint de co the backtrack.",
+              en: "Found '*', save a checkpoint for possible backtracking.",
+            }
+          : {
+              vi: "Khong phai '*'; neu da co checkpoint thi backtrack, neu khong thi fail.",
+              en: "Not '*'; backtrack if a checkpoint exists, otherwise fail.",
+            },
+      });
+
+      if (isStar) {
+      const oldJ = j;
+      star = j;
+      snap({
+        title: { vi: "star = j", en: "star = j" },
+        codeLines: [13],
+        hlCell: pointerCell(1, oldJ),
+        pathCells: [[0, i]],
+        cellLabels: { [`1,${star}`]: "star" },
+        vars: [{ name: "star", value: star }],
+        note: { vi: "Luu vi tri '*' gan nhat.", en: "Store the latest '*' position." },
+      });
+      match = i;
+      snap({
+        title: { vi: "match = i", en: "match = i" },
+        codeLines: [14],
+        hlCell: pointerCell(0, i),
+        pathCells: [[1, star]],
+        cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "match" },
+        vars: [{ name: "match", value: match }],
+        note: { vi: "Ban dau cho '*' khop chuoi rong tai vi tri i hien tai.", en: "Initially let '*' match empty at the current i position." },
+      });
+      j += 1;
+      snap({
+        title: { vi: "j += 1", en: "j += 1" },
+        codeLines: [15],
         hlCell: pointerCell(1, oldJ),
         pathCells: [[0, match], [1, star]],
         cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "match" },
@@ -11871,15 +12082,59 @@ function buildSteps44Greedy(input, params) {
         ],
         note: { vi: "'*' co the khop chuoi rong truoc; neu sau nay bi mismatch, ta quay lai va cho '*' an them ky tu.", en: "'*' first tries to match empty; if a later mismatch happens, we return here and let '*' consume more characters." },
       });
-    } else if (star !== -1) {
+      } else {
+      const canBacktrack = star !== -1;
+      snap({
+        title: { vi: `elif star != -1 -> ${canBacktrack}`, en: `elif star != -1 -> ${canBacktrack}` },
+        codeLines: [17],
+        hlCell: pointerCell(0, i),
+        pathCells: star >= 0 ? [[1, star]] : [],
+        cellLabels: star >= 0 ? { [`1,${star}`]: "star" } : {},
+        vars: [
+          { name: "star", value: star },
+          { name: "condition", value: canBacktrack },
+        ],
+        note: canBacktrack
+          ? {
+              vi: "Da tung gap '*', cho '*' an them mot ky tu va thu lai.",
+              en: "A previous '*' exists; let it consume one more character and retry.",
+            }
+          : {
+              vi: "Khong co '*' nao de quay lai.",
+              en: "There is no previous '*' to backtrack to.",
+            },
+      });
+
+      if (canBacktrack) {
       const oldI = i;
       const oldJ = j;
       j = star + 1;
+      snap({
+        title: { vi: "j = star + 1", en: "j = star + 1" },
+        codeLines: [18],
+        hlCell: pointerCell(0, oldI),
+        pathCells: [[1, star]],
+        cellLabels: { [`1,${star}`]: "star" },
+        vars: [
+          { name: "old j", value: oldJ },
+          { name: "new j", value: j },
+        ],
+        note: { vi: "Quay pattern ve ngay sau '*'.", en: "Move the pattern pointer back to just after '*'." },
+      });
       match += 1;
+      snap({
+        title: { vi: "match += 1", en: "match += 1" },
+        codeLines: [19],
+        hlCell: pointerCell(0, oldI),
+        pathCells: [[1, star], [0, match]],
+        cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "new match" },
+        vars: [{ name: "match", value: match }],
+        note: { vi: "Cho '*' khop them mot ky tu cua s.", en: "Let '*' consume one more character from s." },
+      });
       i = match;
       snap({
-        title: { vi: "Mismatch -> backtrack ve '*'", en: "Mismatch -> backtrack to '*'" },
-        codeLines: [17, 18, 19, 20],
+        title: { vi: "i = match", en: "i = match" },
+        codeLines: [20],
         hlCell: pointerCell(0, oldI),
         pathCells: [[1, star], [0, match]],
         cellLabels: { [`1,${star}`]: "star", [`0,${match}`]: "new match" },
@@ -11891,10 +12146,18 @@ function buildSteps44Greedy(input, params) {
         ],
         note: { vi: "Da tung gap '*', nen cho '*' khop them mot ky tu cua s va thu lai pattern sau '*'.", en: "Because we have seen a '*', let it consume one more s character and retry the pattern after '*'." },
       });
-    } else {
+      } else {
       snap({
-        title: { vi: "Khong khop va khong co '*'", en: "No match and no previous '*'" },
-        codeLines: [22, 23],
+        title: { vi: "else", en: "else" },
+        codeLines: [22],
+        hlCell: pointerCell(0, i),
+        pathCells: j < p.length ? [[1, j]] : [],
+        vars: [{ name: "no available branch", value: true }],
+        note: { vi: "Khong khop truc tiep, khong phai '*', va khong co checkpoint.", en: "No direct match, no '*', and no checkpoint exists." },
+      });
+      snap({
+        title: { vi: "return False", en: "return False" },
+        codeLines: [23],
         hlCell: pointerCell(0, i),
         pathCells: j < p.length ? [[1, j]] : [],
         vars: [{ name: "return", value: false }],
@@ -11902,6 +12165,8 @@ function buildSteps44Greedy(input, params) {
         final: true,
       });
       return { s, p, answer: false, steps };
+      }
+      }
     }
   }
 
@@ -11914,11 +12179,21 @@ function buildSteps44Greedy(input, params) {
   });
 
   while (j < p.length && p[j] === "*") {
+    snap({
+      title: { vi: `while trailing '*' -> true`, en: `while trailing '*' -> true` },
+      codeLines: [25],
+      hlCell: pointerCell(1, j),
+      vars: [
+        { name: "j", value: j },
+        { name: `p[${j}]`, value: p[j] },
+      ],
+      note: { vi: "Pattern con lai la '*', co the khop rong.", en: "The remaining pattern token is '*', which can match empty." },
+    });
     const oldJ = j;
     j += 1;
     snap({
       title: { vi: "Bo qua trailing '*'", en: "Skip trailing '*'" },
-      codeLines: [25, 26],
+      codeLines: [26],
       hlCell: pointerCell(1, oldJ),
       pathCells: [[1, oldJ]],
       cellLabels: { [`1,${oldJ}`]: "*" },
