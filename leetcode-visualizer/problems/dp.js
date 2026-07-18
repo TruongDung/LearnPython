@@ -9664,7 +9664,15 @@ function buildSteps5DP(input) {
       colLabels: axisLabels.map((char, idx) => ({ index: `j=${idx}`, char })),
       hlCell: shift(hl),
       pathCells: deps.map(shift).filter(Boolean),
+      bestCell: shift([bestStart, bestEnd]),
     };
+  }
+
+  function formatDpMatrix() {
+    // dp[i][j] only meaningful when i <= j; show "·" otherwise.
+    return dp
+      .map((row, i) => `${i}:[${row.map((v, j) => (j < i ? "·" : v ? "T" : "F")).join(",")}]`)
+      .join(" ");
   }
 
   function gridSnap(opts) {
@@ -9678,6 +9686,7 @@ function buildSteps5DP(input) {
       if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
       currentVars.push(item);
     }
+    currentVars.push({ name: "dp", value: n ? formatDpMatrix() : "[]" });
     currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
     steps.push({
       title: opts.title,
