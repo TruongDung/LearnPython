@@ -3679,6 +3679,240 @@ function buildSteps636(input, params) {
 }
 
 /**
+ * LeetCode 1081: Smallest Subsequence of Distinct Characters.
+ * Build the lexicographically smallest valid answer with a monotonic stack.
+ */
+function buildSteps1081(input) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const chars = s.split("");
+  const last = new Map();
+  const stack = [];
+  const used = new Set();
+  const steps = [];
+
+  chars.forEach((ch, index) => last.set(ch, index));
+
+  function stackLabel() {
+    return `[${stack.map((item) => item.ch).join(", ")}]`;
+  }
+
+  function usedLabel() {
+    return `{${[...used].sort().join(", ")}}`;
+  }
+
+  function lastLabel() {
+    return `{${[...last.entries()].map(([ch, index]) => `${ch}: ${index}`).join(", ")}}`;
+  }
+
+  function pushStep(opts) {
+    const current = Number.isInteger(opts.current) ? opts.current : -1;
+    const top = stack.length ? stack[stack.length - 1].ch : null;
+    steps.push({
+      title: opts.title,
+      arr: chars.map((ch) => ch.charCodeAt(0)),
+      sub: chars,
+      highlight: current >= 0 && current < chars.length ? [current] : [],
+      mark: stack.map((item) => item.index),
+      codeLines: opts.codeLines || [opts.codeLine],
+      stackView: {
+        title: "Monotonic stack",
+        emptyLabel: "empty stack",
+        items: stack.map((item) => ({
+          value: item.ch,
+          detail: `picked at ${item.index}, last at ${last.get(item.ch)}`,
+        })),
+        input: chars,
+        inputLabel: "Input s (character / index)",
+        current,
+        status: [
+          { label: "current", value: current >= 0 && current < chars.length ? `'${chars[current]}' @ ${current}` : "-" },
+          { label: "top", value: top === null ? "empty" : `'${top}'` },
+          { label: "used", value: usedLabel() },
+          { label: "answer so far", value: stack.map((item) => item.ch).join("") || "empty" },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "used", value: usedLabel() },
+        { name: "last", value: lastLabel() },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  pushStep({
+    title: { vi: "Tính vị trí cuối của mỗi ký tự", en: "Record each character's last index" },
+    codeLine: 3,
+    vars: [{ name: "s", value: `"${s}"` }],
+    note: {
+      vi: "last[ch] cho biết sau vị trí hiện tại còn cơ hội gặp lại ch hay không. Chỉ được pop một ký tự khi nó vẫn xuất hiện ở phía sau.",
+      en: "last[ch] tells whether ch appears again later. A character may be popped only when another copy remains ahead.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" },
+    codeLine: 4,
+    note: {
+      vi: "Stack sẽ chứa subsequence nhỏ nhất đang xây dựng; thứ tự trong stack luôn giữ đúng thứ tự xuất hiện trong s.",
+      en: "The stack holds the smallest subsequence built so far while preserving the order from s.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo used rỗng", en: "Initialize an empty used set" },
+    codeLine: 5,
+    note: {
+      vi: "used giúp mỗi ký tự chỉ xuất hiện một lần trong stack.",
+      en: "used ensures that every character appears in the stack at most once.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    pushStep({
+      title: { vi: `Đọc s[${i}] = '${ch}'`, en: `Read s[${i}] = '${ch}'` },
+      codeLine: 6,
+      current: i,
+      vars: [
+        { name: "i", value: i },
+        { name: "ch", value: `'${ch}'` },
+        { name: "last[ch]", value: last.get(ch) },
+      ],
+      note: {
+        vi: `Xử lý ký tự '${ch}' tại index ${i}.`,
+        en: `Process character '${ch}' at index ${i}.`,
+      },
+    });
+
+    const alreadyUsed = used.has(ch);
+    pushStep({
+      title: { vi: `'${ch}' ${alreadyUsed ? "đã" : "chưa"} có trong used`, en: `'${ch}' is ${alreadyUsed ? "already" : "not"} in used` },
+      codeLine: 7,
+      current: i,
+      vars: [
+        { name: "ch in used", value: alreadyUsed },
+        { name: "decision", value: alreadyUsed ? "continue" : "check stack" },
+      ],
+      note: {
+        vi: alreadyUsed
+          ? `'${ch}' đã nằm trong subsequence, nên không được thêm lần thứ hai.`
+          : `'${ch}' chưa có trong subsequence; có thể thử loại các ký tự lớn hơn ở stack top.`,
+        en: alreadyUsed
+          ? `'${ch}' is already in the subsequence, so it must not be added again.`
+          : `'${ch}' is not in the subsequence; larger characters at the stack top may be removable.`,
+      },
+    });
+
+    if (alreadyUsed) {
+      pushStep({
+        title: { vi: `Bỏ qua '${ch}'`, en: `Skip '${ch}'` },
+        codeLine: 8,
+        current: i,
+        vars: [{ name: "action", value: "continue" }],
+        note: {
+          vi: `Giữ nguyên stack ${stackLabel()} và chuyển sang ký tự kế tiếp.`,
+          en: `Keep stack ${stackLabel()} unchanged and move to the next character.`,
+        },
+      });
+      continue;
+    }
+
+    while (true) {
+      const topItem = stack.length ? stack[stack.length - 1] : null;
+      const hasTop = topItem !== null;
+      const smaller = hasTop && ch < topItem.ch;
+      const topAppearsAgain = hasTop && i < last.get(topItem.ch);
+      const shouldPop = hasTop && smaller && topAppearsAgain;
+      let failedReason;
+      if (!hasTop) failedReason = "stack is empty";
+      else if (!smaller) failedReason = `'${ch}' >= '${topItem.ch}'`;
+      else failedReason = `'${topItem.ch}' has no copy after index ${i}`;
+
+      pushStep({
+        title: { vi: shouldPop ? `Có thể pop '${topItem.ch}'` : "Dừng vòng while", en: shouldPop ? `Can pop '${topItem.ch}'` : "Stop the while loop" },
+        codeLine: 9,
+        current: i,
+        vars: [
+          { name: "bool(stack)", value: hasTop },
+          { name: "ch < stack[-1]", value: hasTop ? `${ch} < ${topItem.ch} = ${smaller}` : "not evaluated" },
+          { name: "i < last[stack[-1]]", value: hasTop ? `${i} < ${last.get(topItem.ch)} = ${topAppearsAgain}` : "not evaluated" },
+          { name: "while condition", value: shouldPop },
+          ...(!shouldPop ? [{ name: "failed at", value: failedReason }] : []),
+        ],
+        note: {
+          vi: shouldPop
+            ? `'${ch}' nhỏ hơn top '${topItem.ch}', và '${topItem.ch}' còn xuất hiện tại index ${last.get(topItem.ch)}. Pop top sẽ làm đáp án nhỏ hơn mà không làm mất ký tự.`
+            : `Không pop: ${failedReason}.`,
+          en: shouldPop
+            ? `'${ch}' is smaller than top '${topItem.ch}', and '${topItem.ch}' appears again at index ${last.get(topItem.ch)}. Popping improves the answer without losing that character.`
+            : `Do not pop: ${failedReason}.`,
+        },
+      });
+
+      if (!shouldPop) break;
+
+      const removed = stack.pop();
+      used.delete(removed.ch);
+      pushStep({
+        title: { vi: `Pop '${removed.ch}' và xóa khỏi used`, en: `Pop '${removed.ch}' and remove it from used` },
+        codeLine: 10,
+        current: i,
+        vars: [
+          { name: "removed", value: `'${removed.ch}' from index ${removed.index}` },
+          { name: "next copy", value: `index ${last.get(removed.ch)}` },
+        ],
+        note: {
+          vi: `'${removed.ch}' đã rời stack nên cũng phải xóa khỏi used; lần xuất hiện sau của nó có thể được push lại.`,
+          en: `'${removed.ch}' left the stack, so it must also leave used; its later occurrence may be pushed again.`,
+        },
+      });
+    }
+
+    stack.push({ ch, index: i });
+    pushStep({
+      title: { vi: `Push '${ch}' vào stack`, en: `Push '${ch}' onto the stack` },
+      codeLine: 11,
+      current: i,
+      vars: [{ name: "action", value: `stack.append('${ch}')` }],
+      note: {
+        vi: `Thêm '${ch}' sau khi đã loại hết các top lớn hơn nhưng vẫn có thể gặp lại.`,
+        en: `Append '${ch}' after removing every larger top character that can still be found later.`,
+      },
+    });
+
+    used.add(ch);
+    pushStep({
+      title: { vi: `Thêm '${ch}' vào used`, en: `Add '${ch}' to used` },
+      codeLine: 12,
+      current: i,
+      vars: [{ name: "action", value: `used.add('${ch}')` }],
+      note: {
+        vi: `Đánh dấu '${ch}' đã nằm trong stack để các bản sao phía sau được bỏ qua.`,
+        en: `Mark '${ch}' as present in the stack so later duplicates are skipped.`,
+      },
+    });
+  }
+
+  const answer = stack.map((item) => item.ch).join("");
+  pushStep({
+    title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
+    codeLine: 13,
+    current: chars.length,
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: {
+      vi: `Nối stack từ đáy lên đỉnh được "${answer}": đủ mọi ký tự đúng một lần và nhỏ nhất theo thứ tự từ điển.`,
+      en: `Joining the stack from bottom to top gives "${answer}": every distinct character exactly once in lexicographically smallest order.`,
+    },
+    final: true,
+  });
+
+  return { s, answer, steps };
+}
+
+/**
  * LeetCode 20: Valid Parentheses.
  * Use a stack of opening brackets and match every closing bracket with the top.
  */
@@ -3856,6 +4090,52 @@ function buildSteps20(input) {
 }
 
 module.exports = {
+  1081: {
+    id: 1081,
+    difficulty: "medium",
+    slug: "smallest-subsequence-of-distinct-characters",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Smallest Subsequence of Distinct Characters", en: "Smallest Subsequence of Distinct Characters" },
+    titleVi: { vi: "Subsequence phân biệt nhỏ nhất", en: "Lexicographically smallest distinct subsequence" },
+    statement: {
+      vi: "Trả về subsequence nhỏ nhất theo thứ tự từ điển chứa mỗi ký tự khác nhau của s đúng một lần.",
+      en: "Return the lexicographically smallest subsequence that contains every distinct character of s exactly once.",
+    },
+    defaultInput: "cbacdcbc",
+    inputKind: "string",
+    inputLabel: { vi: "String s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Lưu index xuất hiện cuối của mỗi ký tự.", en: "Record the last occurrence index of every character." },
+      { vi: "used đảm bảo mỗi ký tự chỉ có một lần trong monotonic stack.", en: "A used set keeps each character in the monotonic stack at most once." },
+      { vi: "Khi ch nhỏ hơn stack top, chỉ pop top nếu top còn xuất hiện lại phía sau.", en: "When ch is smaller than the stack top, pop the top only if it appears again later." },
+      { vi: "Nối stack để nhận subsequence nhỏ nhất hợp lệ.", en: "Join the stack to obtain the smallest valid subsequence." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(k)",
+      note: {
+        vi: "Mỗi ký tự được push và pop tối đa một lần. k là số ký tự khác nhau.",
+        en: "Each character is pushed and popped at most once. k is the number of distinct characters.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def smallestSubsequence(self, s: str) -> str:",
+      "        last = {ch: i for i, ch in enumerate(s)}",
+      "        stack = []",
+      "        used = set()",
+      "        for i, ch in enumerate(s):",
+      "            if ch in used:",
+      "                continue",
+      "            while stack and ch < stack[-1] and i < last[stack[-1]]:",
+      "                used.remove(stack.pop())",
+      "            stack.append(ch)",
+      "            used.add(ch)",
+      "        return ''.join(stack)",
+    ],
+    builder: buildSteps1081,
+  },
   20: {
     id: 20,
     difficulty: "easy",
