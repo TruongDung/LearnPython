@@ -3646,6 +3646,81 @@ select option {
 .bfs-cell.start { background: #6366f1; color: white; }
 .bfs-cell.end { background: #ec4899; color: white; }
 
+.tic-tac-toe-grid {
+  grid-template-columns: repeat(3, 84px);
+  gap: 4px;
+}
+
+.tic-tac-toe-grid .bfs-cell {
+  box-sizing: border-box;
+  width: 84px;
+  height: 84px;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.tic-tac-toe-grid .bfs-cell-value {
+  min-height: 30px;
+  font-size: 28px;
+  line-height: 30px;
+}
+
+.tic-tac-toe-grid .bfs-cell-meta {
+  color: currentColor;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 12px;
+  opacity: 0.72;
+}
+
+.tic-tac-toe-grid .bfs-cell.tic-a {
+  background: #172554;
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+
+.tic-tac-toe-grid .bfs-cell.tic-b {
+  background: #4c0519;
+  color: #fda4af;
+  border-color: #f43f5e;
+}
+
+.phone-path-grid {
+  gap: 5px;
+}
+
+.phone-path-grid .bfs-cell {
+  box-sizing: border-box;
+  width: 68px;
+  height: 72px;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.phone-path-grid .bfs-cell-value {
+  min-height: 24px;
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.phone-path-grid .bfs-cell-meta {
+  color: currentColor;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 11px;
+  opacity: 0.72;
+}
+
+.phone-path-grid .bfs-cell.phone-selected {
+  background: #172554;
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+
 /* Light theme: BFS grid */
 [data-theme="light"] .bfs-grid-view {
   background: #f8fafc;
@@ -3659,6 +3734,27 @@ select option {
 [data-theme="light"] .bfs-cell.path { background: #86efac; color: #064e3b; }
 [data-theme="light"] .bfs-cell.start { background: #6366f1; color: white; }
 [data-theme="light"] .bfs-cell.end { background: #ec4899; color: white; }
+[data-theme="light"] .tic-tac-toe-grid .bfs-cell {
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .tic-tac-toe-grid .bfs-cell.tic-a {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #60a5fa;
+}
+[data-theme="light"] .tic-tac-toe-grid .bfs-cell.tic-b {
+  background: #ffe4e6;
+  color: #be123c;
+  border-color: #fb7185;
+}
+[data-theme="light"] .phone-path-grid .bfs-cell {
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .phone-path-grid .bfs-cell.phone-selected {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #60a5fa;
+}
 
 /* Light theme: graph SVG */
 [data-theme="light"] .tree-view {

@@ -1175,16 +1175,24 @@ function renderBars(step) {
 
 // ---- BFS Grid renderer (pathfinding) ----
 function renderBfsGrid(step) {
-  const { cells, rows, cols } = step.bfsGrid;
+  const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
   el.style.textAlign = "center";
-  let html = `<div class="bfs-grid" style="grid-template-columns:repeat(${cols},32px)">`;
+  const isTicTacToe = variant === "tic-tac-toe";
+  const isPhonePath = variant === "phone-path";
+  const variantClass = isTicTacToe ? " tic-tac-toe-grid" : isPhonePath ? " phone-path-grid" : "";
+  const gridClass = `bfs-grid${variantClass}`;
+  const gridStyle = isTicTacToe
+    ? ""
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : "32px"})"`;
+  let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const cell = cells[r][c];
       const cls = cell.cls || "empty";
       const label = cell.label || "";
-      html += `<div class="bfs-cell ${cls}">${label}</div>`;
+      const meta = cell.meta || "";
+      html += `<div class="bfs-cell ${cls}"><span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
     }
   }
   html += "</div>";

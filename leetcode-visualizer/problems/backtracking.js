@@ -1214,106 +1214,231 @@ function buildSteps17(input) {
 
   if (digits.length === 0) {
     steps.push({
-      title: { vi: "digits rỗng → []", en: "digits empty → []" },
+      title: { vi: "if not digits → True", en: "if not digits -> True" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [3],
+      vars: [{ name: "digits", value: '""' }, { name: "condition", value: true }],
+      note: { vi: "digits rỗng nên điều kiện đúng.", en: "digits is empty, so the condition is true." },
+    });
+    steps.push({
+      title: { vi: "return []", en: "return []" },
       arr: [],
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [3, 4],
+      codeLines: [4],
       vars: [{ name: "answer", value: "[]" }],
-      note: { vi: "digits rỗng → trả về [].", en: "digits is empty → return []." },
+      note: { vi: "Trả về danh sách rỗng ngay.", en: "Return an empty list immediately." },
     });
     return { digits, answer: 0, steps };
   }
 
   const results = [];
   const current = [];
+  const callStack = [];
+  const digitList = digits.split("");
+  const mapStr = digitList.map((digit) => `${digit}→"${mapping[digit] || "?"}"`).join(", ");
+  const phoneCells = (focusIdx = -1, complete = false) => [digitList.map((digit, index) => {
+    const selected = current[index];
+    let cls = selected ? "phone-selected" : "empty";
+    if (index === focusIdx) cls = "current";
+    if (complete && selected) cls = "path";
+    return {
+      label: selected || mapping[digit] || "?",
+      meta: `idx=${index} · ${digit}`,
+      cls,
+    };
+  })];
+  const pushStep = ({ title, idx = -1, focusIdx = idx, codeLines, vars = [], note, final = false, complete = false }) => {
+    const persistentNames = new Set(["idx", "current", "call stack", "result count", "results so far"]);
+    const extraVars = vars.filter(({ name }) => !persistentNames.has(name));
+    steps.push({
+      title,
+      bfsGrid: {
+        rows: 1,
+        cols: digitList.length,
+        cells: phoneCells(focusIdx, complete),
+        variant: "phone-path",
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: [
+        { name: "idx", value: idx >= 0 ? idx : "-" },
+        { name: "current", value: `"${current.join("")}"` },
+        { name: "call stack", value: callStack.join(" → ") || "empty" },
+        { name: "result count", value: results.length },
+        { name: "results so far", value: results.join(", ") || "none" },
+        ...extraVars,
+      ],
+      note,
+    });
+  };
 
-  // Show digit-to-letters mapping
-  const mapStr = digits.split("").map((d) => `${d}→"${mapping[d] || "?"}"`).join(", ");
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: digits.split("").map(() => 0),
-    sub: digits.split("").map((d) => mapping[d] || "?"),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5, 6, 7, 8],
+  pushStep({
+    title: { vi: "if not digits → False", en: "if not digits -> False" },
+    codeLines: [3],
+    vars: [{ name: "digits", value: `"${digits}"` }, { name: "condition", value: false }],
+    note: { vi: `digits="${digits}" không rỗng nên tiếp tục.`, en: `digits="${digits}" is not empty, so continue.` },
+  });
+  pushStep({
+    title: { vi: "Tạo mapping", en: "Create mapping" },
+    codeLines: [5, 6],
+    vars: [{ name: "digits", value: `"${digits}"` }, { name: "mapping", value: mapStr }],
+    note: { vi: `Ánh xạ cần dùng: ${mapStr}.`, en: `Required mapping: ${mapStr}.` },
+  });
+  pushStep({
+    title: { vi: "result = []", en: "result = []" },
+    codeLines: [7],
+    vars: [{ name: "result", value: "[]" }],
+    note: { vi: "Khởi tạo danh sách chứa các tổ hợp hoàn chỉnh.", en: "Initialize the list of complete combinations." },
+  });
+  pushStep({
+    title: { vi: "current = []", en: "current = []" },
+    codeLines: [8],
+    vars: [{ name: "current", value: "[]" }],
+    note: { vi: "current giữ đường đi đang xây dựng.", en: "current stores the path currently being built." },
+  });
+  pushStep({
+    title: { vi: "Gọi backtrack(0)", en: "Call backtrack(0)" },
+    idx: 0,
+    codeLines: [19],
     vars: [
       { name: "digits", value: digits },
-      { name: "mapping", value: mapStr },
-      { name: "total combos", value: digits.split("").reduce((p, d) => p * (mapping[d] || "").length, 1) },
+      { name: "next call", value: "backtrack(0)" },
     ],
     note: {
-      vi:
-        `digits = "${digits}". Mỗi digit map đến 3-4 chữ cái:\n${mapStr}.\n` +
-        `Mỗi vị trí là 1 level đệ quy. Thử mọi chữ cái rồi đệ quy level tiếp.`,
-      en:
-        `digits = "${digits}". Each digit maps to 3-4 letters:\n${mapStr}.\n` +
-        `Each position is a recursion level. Try every letter then recurse to next level.`,
+      vi: "Bắt đầu cây đệ quy tại digit index 0.",
+      en: "Start the recursion tree at digit index 0.",
     },
   });
 
   function backtrack(idx) {
-    if (idx === digits.length) {
-      results.push(current.join(""));
-      steps.push({
-        title: { vi: `✓ "${current.join("")}"`, en: `✓ "${current.join("")}"` },
-        arr: digits.split("").map(() => 1),
-        sub: [...current],
-        highlight: [],
-        mark: digits.split("").map((_, i) => i),
-        codeLines: [11, 12],
-        vars: [
-          { name: "combo", value: current.join("") },
-          { name: "count", value: results.length },
-        ],
+    callStack.push(`backtrack(${idx})`);
+    pushStep({
+      title: { vi: `Vào backtrack(${idx})`, en: `Enter backtrack(${idx})` },
+      idx,
+      focusIdx: Math.min(idx, digitList.length - 1),
+      codeLines: [10],
+      vars: [{ name: "depth", value: callStack.length - 1 }],
+      note: {
+        vi: `Đẩy backtrack(${idx}) vào call stack.`,
+        en: `Push backtrack(${idx}) onto the call stack.`,
+      },
+    });
+
+    const atEnd = idx === digits.length;
+    pushStep({
+      title: { vi: `idx == len(digits) → ${atEnd}`, en: `idx == len(digits) -> ${atEnd}` },
+      idx,
+      focusIdx: Math.min(idx, digitList.length - 1),
+      codeLines: [11],
+      vars: [
+        { name: "len(digits)", value: digits.length },
+        { name: "condition", value: atEnd },
+      ],
+      note: atEnd
+        ? { vi: "Đã chọn đủ ký tự, current là một kết quả hoàn chỉnh.", en: "All positions are selected; current is a complete result." }
+        : { vi: `Còn digit tại idx=${idx}, tiếp tục tạo nhánh.`, en: `A digit remains at idx=${idx}; continue branching.` },
+    });
+
+    if (atEnd) {
+      const combo = current.join("");
+      results.push(combo);
+      pushStep({
+        title: { vi: `Lưu "${combo}"`, en: `Save "${combo}"` },
+        idx,
+        focusIdx: digitList.length - 1,
+        complete: true,
+        codeLines: [12],
+        vars: [{ name: "new result", value: `"${combo}"` }],
         note: {
-          vi: `Đã chọn đủ ${digits.length} ký tự → lưu "${current.join("")}". Tổng: ${results.length}.`,
-          en: `All ${digits.length} chars chosen → save "${current.join("")}". Total: ${results.length}.`,
+          vi: `Thêm "${combo}" vào result. Hiện có ${results.length} kết quả.`,
+          en: `Append "${combo}" to result. There are now ${results.length} results.`,
         },
       });
+
+      pushStep({
+        title: { vi: `return từ backtrack(${idx})`, en: `Return from backtrack(${idx})` },
+        idx,
+        focusIdx: digitList.length - 1,
+        complete: true,
+        codeLines: [13],
+        vars: [{ name: "return to", value: callStack.at(-2) || "letterCombinations" }],
+        note: {
+          vi: "Kết thúc nhánh hoàn chỉnh và quay lại lời gọi trước.",
+          en: "Finish this complete branch and return to the previous call.",
+        },
+      });
+      callStack.pop();
       return;
     }
 
     const letters = mapping[digits[idx]] || "";
     for (const letter of letters) {
-      current.push(letter);
-
-      steps.push({
-        title: { vi: `Level ${idx}: chọn '${letter}' (digit '${digits[idx]}')`, en: `Level ${idx}: pick '${letter}' (digit '${digits[idx]}')` },
-        arr: digits.split("").map((_, i) => (i <= idx ? 1 : 0)),
-        sub: digits.split("").map((d, i) => (i < idx ? current[i] : i === idx ? letter : mapping[d] || "?")),
-        highlight: [idx],
-        mark: [],
-        codeLines: [14, 15],
+      pushStep({
+        title: { vi: `for letter = '${letter}'`, en: `for letter = '${letter}'` },
+        idx,
+        codeLines: [14],
         vars: [
-          { name: "idx", value: idx },
           { name: "digit", value: digits[idx] },
           { name: "letters", value: `"${letters}"` },
-          { name: "pick", value: letter },
-          { name: "current", value: `"${current.join("")}"` },
+          { name: "letter", value: `'${letter}'` },
         ],
         note: {
-          vi: `digit '${digits[idx]}' → letters "${letters}". Chọn '${letter}' → đệ quy level ${idx + 1}.`,
-          en: `digit '${digits[idx]}' → letters "${letters}". Pick '${letter}' → recurse level ${idx + 1}.`,
+          vi: `Tại idx=${idx}, thử '${letter}' trong mapping['${digits[idx]}']="${letters}".`,
+          en: `At idx=${idx}, try '${letter}' from mapping['${digits[idx]}']="${letters}".`,
         },
       });
 
+      current.push(letter);
+      pushStep({
+        title: { vi: `current.append('${letter}')`, en: `current.append('${letter}')` },
+        idx,
+        codeLines: [15],
+        vars: [{ name: "letter", value: `'${letter}'` }],
+        note: {
+          vi: `Thêm '${letter}': current trở thành "${current.join("")}".`,
+          en: `Append '${letter}': current becomes "${current.join("")}".`,
+        },
+      });
+
+      pushStep({
+        title: { vi: `Gọi backtrack(${idx + 1})`, en: `Call backtrack(${idx + 1})` },
+        idx,
+        codeLines: [16],
+        vars: [{ name: "next call", value: `backtrack(${idx + 1})` }],
+        note: {
+          vi: `Giữ current="${current.join("")}" và đi tới digit kế tiếp.`,
+          en: `Keep current="${current.join("")}" and move to the next digit.`,
+        },
+      });
       backtrack(idx + 1);
-      current.pop();
+
+      const removed = current.pop();
+      pushStep({
+        title: { vi: `current.pop() → '${removed}'`, en: `current.pop() -> '${removed}'` },
+        idx,
+        codeLines: [17],
+        vars: [{ name: "removed", value: `'${removed}'` }, { name: "try next", value: "letter" }],
+        note: {
+          vi: `Quay lui: bỏ '${removed}', current trở lại "${current.join("")}" để thử letter tiếp theo.`,
+          en: `Backtrack: remove '${removed}', restoring current="${current.join("")}" before trying the next letter.`,
+        },
+      });
     }
+    callStack.pop();
   }
 
   backtrack(0);
 
-  steps.push({
+  pushStep({
     title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
-    arr: digits.split("").map(() => 0),
-    sub: digits.split("").map((d) => mapping[d] || "?"),
-    highlight: [],
-    mark: [],
     final: true,
-    codeLines: [19, 20],
+    codeLines: [20],
     vars: [
       { name: "total", value: results.length },
       { name: "all", value: results.join(", ") },

@@ -288,24 +288,6 @@ function buildSteps1275(input) {
 
   const boardStr = () => board.map((r) => r.map((c) => c || ".").join("")).join("|");
 
-  function checkWin(player) {
-    for (let i = 0; i < 3; i++) {
-      if (board[i][0] === player && board[i][1] === player && board[i][2] === player) return true;
-      if (board[0][i] === player && board[1][i] === player && board[2][i] === player) return true;
-    }
-    if (board[0][0] === player && board[1][1] === player && board[2][2] === player) return true;
-    if (board[0][2] === player && board[1][1] === player && board[2][0] === player) return true;
-    return false;
-  }
-
-  // Flatten board to 9-cell array for bar visualization
-  const flatBoard = () => {
-    const flat = [];
-    for (let r = 0; r < 3; r++)
-      for (let c = 0; c < 3; c++)
-        flat.push(board[r][c] === "A" ? 1 : board[r][c] === "B" ? -1 : 0);
-    return flat;
-  };
   const flatLabels = () => {
     const flat = [];
     for (let r = 0; r < 3; r++)
@@ -313,14 +295,41 @@ function buildSteps1275(input) {
         flat.push(board[r][c] || ".");
     return flat;
   };
+  const rowCells = (row) => [row * 3, row * 3 + 1, row * 3 + 2];
+  const colCells = (col) => [col, col + 3, col + 6];
+  const mainDiagonal = [0, 4, 8];
+  const antiDiagonal = [2, 4, 6];
+  const cellsMatch = (cells, player) => cells.every((index) => flatLabels()[index] === player);
+  const boardCells = (highlight, mark) => {
+    const highlightSet = new Set(highlight);
+    const markSet = new Set(mark);
+    return board.map((row, r) => row.map((player, c) => {
+      const index = r * 3 + c;
+      let cls = player === "A" ? "tic-a" : player === "B" ? "tic-b" : "empty";
+      if (highlightSet.has(index)) cls = "current";
+      if (markSet.has(index)) cls = "path";
+      return { label: player, meta: `(${r},${c})`, cls };
+    }));
+  };
+  const pushStep = ({ title, highlight = [], mark = [], codeLines, vars = [], note, final = false }) => {
+    steps.push({
+      title,
+      bfsGrid: {
+        rows: 3,
+        cols: 3,
+        cells: boardCells(highlight, mark),
+        variant: "tic-tac-toe",
+      },
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  };
 
-  steps.push({
+  pushStep({
     title: { vi: "Bàn cờ trống", en: "Empty board" },
-    arr: flatBoard(),
-    sub: flatLabels(),
-    highlight: [],
-    mark: [],
-    codeLines: [2],
+    codeLines: [3],
     vars: [
       { name: "moves", value: movesRaw.join(", ") },
       { name: "board", value: boardStr() },
@@ -331,56 +340,179 @@ function buildSteps1275(input) {
     },
   });
 
-  let winner = null;
   for (let i = 0; i < moves.length; i++) {
     const [r, c] = moves[i];
     const player = i % 2 === 0 ? "A" : "B";
-    board[r][c] = player;
     const cellIdx = r * 3 + c;
 
-    const won = checkWin(player);
-    if (won) winner = player;
-
-    steps.push({
-      title: { vi: `Nước ${i + 1}: ${player} → (${r},${c})${won ? " 🏆" : ""}`, en: `Move ${i + 1}: ${player} → (${r},${c})${won ? " 🏆" : ""}` },
-      arr: flatBoard(),
-      sub: flatLabels(),
+    pushStep({
+      title: { vi: `Vòng for: nước ${i + 1}`, en: `For loop: move ${i + 1}` },
       highlight: [cellIdx],
-      mark: won ? flatBoard().map((v, idx) => (v === (player === "A" ? 1 : -1) ? idx : -1)).filter((x) => x >= 0) : [],
-      final: won,
-      codeLines: [3, 4],
+      codeLines: [4],
       vars: [
-        { name: "move", value: i + 1 },
+        { name: "i", value: i },
+        { name: "r", value: r },
+        { name: "c", value: c },
         { name: "player", value: player },
-        { name: "cell", value: `(${r},${c})` },
-        { name: "board", value: boardStr() },
-        { name: "winner", value: won ? player : "none" },
       ],
       note: {
-        vi: won
-          ? `${player} đánh ô (${r},${c}) và THẮNG! 🏆`
-          : `${player} đánh ô (${r},${c}). Board: ${boardStr()}.`,
-        en: won
-          ? `${player} plays (${r},${c}) and WINS! 🏆`
-          : `${player} plays (${r},${c}). Board: ${boardStr()}.`,
+        vi: `Đọc moves[${i}] = (${r},${c}); ${player} là người chơi của lượt này.`,
+        en: `Read moves[${i}] = (${r},${c}); ${player} is the player for this turn.`,
       },
     });
 
-    if (won) {
-      return { moves: movesRaw, answer: winner, steps };
+    board[r][c] = player;
+    pushStep({
+      title: { vi: `${player} đặt quân tại (${r},${c})`, en: `${player} places at (${r},${c})` },
+      highlight: [cellIdx],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "board[r][c]", value: player },
+        { name: "board", value: boardStr() },
+      ],
+      note: {
+        vi: `Gán board[${r}][${c}] = '${player}'. Chưa kiểm tra thắng cho đến khi đặt xong mọi nước đi.`,
+        en: `Set board[${r}][${c}] = '${player}'. Winner checks begin after all moves are placed.`,
+      },
+    });
+  }
+
+  for (const player of ["A", "B"]) {
+    pushStep({
+      title: { vi: `Kiểm tra người chơi ${player}`, en: `Check player ${player}` },
+      codeLines: [7],
+      vars: [{ name: "player", value: player }, { name: "board", value: boardStr() }],
+      note: {
+        vi: `Bắt đầu kiểm tra các hàng, cột và đường chéo của ${player}.`,
+        en: `Begin checking ${player}'s rows, columns, and diagonals.`,
+      },
+    });
+
+    for (let line = 0; line < 3; line++) {
+      const row = rowCells(line);
+      const rowWin = cellsMatch(row, player);
+      pushStep({
+        title: { vi: `Hàng ${line} của ${player}: ${rowWin}`, en: `Player ${player}, row ${line}: ${rowWin}` },
+        highlight: row,
+        codeLines: [8, 9],
+        vars: [
+          { name: "player", value: player },
+          { name: "i", value: line },
+          { name: "row values", value: row.map((index) => flatLabels()[index]).join(", ") },
+          { name: "row complete", value: rowWin },
+        ],
+        note: {
+          vi: `Kiểm tra board[${line}][0..2] có đều là '${player}' hay không.`,
+          en: `Check whether board[${line}][0..2] are all '${player}'.`,
+        },
+      });
+      if (rowWin) {
+        pushStep({
+          title: { vi: `return '${player}'`, en: `return '${player}'` },
+          mark: row,
+          codeLines: [10],
+          vars: [{ name: "winner", value: player }, { name: "winning row", value: line }],
+          note: { vi: `${player} thắng bằng hàng ${line}.`, en: `${player} wins on row ${line}.` },
+          final: true,
+        });
+        return { moves: movesRaw, answer: player, steps };
+      }
+
+      const col = colCells(line);
+      const colWin = cellsMatch(col, player);
+      pushStep({
+        title: { vi: `Cột ${line} của ${player}: ${colWin}`, en: `Player ${player}, column ${line}: ${colWin}` },
+        highlight: col,
+        codeLines: [11],
+        vars: [
+          { name: "player", value: player },
+          { name: "i", value: line },
+          { name: "column values", value: col.map((index) => flatLabels()[index]).join(", ") },
+          { name: "column complete", value: colWin },
+        ],
+        note: {
+          vi: `Kiểm tra board[0..2][${line}] có đều là '${player}' hay không.`,
+          en: `Check whether board[0..2][${line}] are all '${player}'.`,
+        },
+      });
+      if (colWin) {
+        pushStep({
+          title: { vi: `return '${player}'`, en: `return '${player}'` },
+          mark: col,
+          codeLines: [12],
+          vars: [{ name: "winner", value: player }, { name: "winning column", value: line }],
+          note: { vi: `${player} thắng bằng cột ${line}.`, en: `${player} wins on column ${line}.` },
+          final: true,
+        });
+        return { moves: movesRaw, answer: player, steps };
+      }
+    }
+
+    const mainWin = cellsMatch(mainDiagonal, player);
+    pushStep({
+      title: { vi: `Đường chéo chính của ${player}: ${mainWin}`, en: `Player ${player}, main diagonal: ${mainWin}` },
+      highlight: mainDiagonal,
+      codeLines: [13],
+      vars: [
+        { name: "player", value: player },
+        { name: "diagonal values", value: mainDiagonal.map((index) => flatLabels()[index]).join(", ") },
+        { name: "diagonal complete", value: mainWin },
+      ],
+      note: {
+        vi: `Kiểm tra (0,0), (1,1), (2,2) có đều là '${player}' hay không.`,
+        en: `Check whether (0,0), (1,1), and (2,2) are all '${player}'.`,
+      },
+    });
+    if (mainWin) {
+      pushStep({
+        title: { vi: `return '${player}'`, en: `return '${player}'` },
+        mark: mainDiagonal,
+        codeLines: [14],
+        vars: [{ name: "winner", value: player }, { name: "winning line", value: "main diagonal" }],
+        note: { vi: `${player} thắng bằng đường chéo chính.`, en: `${player} wins on the main diagonal.` },
+        final: true,
+      });
+      return { moves: movesRaw, answer: player, steps };
+    }
+
+    const antiWin = cellsMatch(antiDiagonal, player);
+    pushStep({
+      title: { vi: `Đường chéo phụ của ${player}: ${antiWin}`, en: `Player ${player}, anti-diagonal: ${antiWin}` },
+      highlight: antiDiagonal,
+      codeLines: [15],
+      vars: [
+        { name: "player", value: player },
+        { name: "anti-diagonal values", value: antiDiagonal.map((index) => flatLabels()[index]).join(", ") },
+        { name: "anti-diagonal complete", value: antiWin },
+      ],
+      note: {
+        vi: `Kiểm tra (0,2), (1,1), (2,0) có đều là '${player}' hay không.`,
+        en: `Check whether (0,2), (1,1), and (2,0) are all '${player}'.`,
+      },
+    });
+    if (antiWin) {
+      pushStep({
+        title: { vi: `return '${player}'`, en: `return '${player}'` },
+        mark: antiDiagonal,
+        codeLines: [16],
+        vars: [{ name: "winner", value: player }, { name: "winning line", value: "anti-diagonal" }],
+        note: { vi: `${player} thắng bằng đường chéo phụ.`, en: `${player} wins on the anti-diagonal.` },
+        final: true,
+      });
+      return { moves: movesRaw, answer: player, steps };
     }
   }
 
   const answer = moves.length === 9 ? "Draw" : "Pending";
-  steps.push({
+  pushStep({
     title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: flatBoard(),
-    sub: flatLabels(),
-    highlight: [],
-    mark: [],
     final: true,
-    codeLines: [16],
-    vars: [{ name: "answer", value: answer }],
+    codeLines: [17],
+    vars: [
+      { name: "len(moves)", value: moves.length },
+      { name: "answer", value: answer },
+    ],
     note: {
       vi: answer === "Draw"
         ? "Hết ô mà không ai thắng → Hòa."
