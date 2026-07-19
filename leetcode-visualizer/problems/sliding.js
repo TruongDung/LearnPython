@@ -157,6 +157,9 @@ function buildSteps1100(input, params) {
   const validCells = () => validStarts.flatMap((start) =>
     inWindow(start, start + k - 1).map((idx) => [0, idx + 1])
   );
+  const validWindowsText = () => validStarts
+    .map((start) => `"${s.slice(start, start + k)}"`)
+    .join(", ");
   const setLabel = (labels, idx, label) => {
     if (idx < 0 || idx >= n) return;
     const key = `0,${idx + 1}`;
@@ -191,6 +194,9 @@ function buildSteps1100(input, params) {
       cellLabels: labels,
       largeCells: true,
       caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · count=${countText()} · answer=${answer}`,
+      secondaryCaption: opts.showValid === false
+        ? ""
+        : `valid windows so far (${validStarts.length}): ${validWindowsText() || "none"}`,
     };
   };
 
@@ -410,7 +416,7 @@ function buildSteps1100(input, params) {
     grid: {
       left,
       right: n - 1,
-      caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · answer=${answer}`,
+      caption: `finished · answer=${answer}`,
     },
     vars: [
       { name: "answer", value: answer },
@@ -447,6 +453,9 @@ function buildSteps1100Set(input, params) {
   const validCells = () => validStarts.flatMap((start) =>
     inWindow(start, start + k - 1).map((index) => [0, index + 1])
   );
+  const validWindowsText = () => validStarts
+    .map((start) => `"${s.slice(start, start + k)}"`)
+    .join(", ");
   const setLabel = (labels, index, label) => {
     if (index < 0 || index >= chars.length) return;
     const key = `0,${index + 1}`;
@@ -481,6 +490,9 @@ function buildSteps1100Set(input, params) {
       cellLabels: labels,
       largeCells: true,
       caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · char_set=${setText()} · total=${total}`,
+      secondaryCaption: opts.showValid === false
+        ? ""
+        : `valid windows so far (${validStarts.length}): ${validWindowsText() || "none"}`,
     };
   };
   const snap = (opts) => {
@@ -691,7 +703,7 @@ function buildSteps1100Set(input, params) {
     grid: {
       left,
       right: chars.length - 1,
-      caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · total=${total}`,
+      caption: `finished · total=${total}`,
     },
     vars: [
       { name: "total", value: total },

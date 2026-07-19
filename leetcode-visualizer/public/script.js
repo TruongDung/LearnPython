@@ -1193,7 +1193,7 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, mutedCells } = step.grid;
+  const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, secondaryCaption, mutedCells } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
   const historySet = new Set((historyCells || []).map(([r, c]) => `${r},${c}`));
   const mutedSet = new Set((mutedCells || []).map(([r, c]) => `${r},${c}`));
@@ -1250,8 +1250,11 @@ function renderGrid(step) {
   }
   html += "</tbody></table>";
   const captionHtml = caption ? `<div class="dp-grid-caption">${escapeXml(caption)}</div>` : "";
+  const secondaryCaptionHtml = secondaryCaption
+    ? `<div class="dp-grid-caption-secondary">${escapeXml(secondaryCaption)}</div>`
+    : "";
   const gridView = $("gridView");
-  gridView.innerHTML = captionHtml + html;
+  gridView.innerHTML = captionHtml + secondaryCaptionHtml + html;
 
   if (Array.isArray(autoScrollCell)) {
     const [scrollRow, scrollCol] = autoScrollCell;

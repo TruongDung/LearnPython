@@ -626,7 +626,7 @@ function buildSteps485(nums) {
         arr: [...nums],
         highlight: inRange(curStart, i),
         mark: [],
-        codeLines: [5, 6, 7],
+        codeLines: [5, 6, 7, 8],
         vars: [
           { name: "i", value: i },
           { name: "curr", value: curr },
@@ -643,7 +643,7 @@ function buildSteps485(nums) {
         arr: [...nums],
         highlight: [i],
         mark: [],
-        codeLines: [8, 9],
+        codeLines: [9, 10],
         vars: [
           { name: "i", value: i },
           { name: "curr", value: 0 },
@@ -664,7 +664,7 @@ function buildSteps485(nums) {
     highlight: [],
     mark: bestR >= 0 ? inRange(bestL, bestR) : [],
     final: true,
-    codeLines: [10],
+    codeLines: [11],
     vars: [
       { name: "max", value: maxRun },
       { name: "run", value: bestR >= 0 ? `[${bestL}..${bestR}]` : "none" },

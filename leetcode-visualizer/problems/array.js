@@ -88,7 +88,7 @@ function buildSteps941(nums) {
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [3],
+      codeLines: [4],
       vars: [{ name: "result", value: false }],
       note: { vi: `Mảng cần ít nhất 3 phần tử. Trả về False.`, en: `Array needs at least 3 elements. Return False.` },
     });
@@ -100,7 +100,7 @@ function buildSteps941(nums) {
     arr: [...nums],
     highlight: [0],
     mark: [],
-    codeLines: [4, 5],
+    codeLines: [5, 6],
     vars: [{ name: "i", value: 0 }, { name: "phase", value: "climb" }],
     note: { vi: "Bắt đầu từ trái, đi lên bao lâu nums[i] < nums[i+1].", en: "Start from the left, climb while nums[i] < nums[i+1]." },
   });
@@ -113,7 +113,7 @@ function buildSteps941(nums) {
       arr: [...nums],
       highlight: Array.from({ length: i + 1 }, (_, x) => x),
       mark: [],
-      codeLines: [5, 6],
+      codeLines: [6, 7],
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: nums[i] },
@@ -134,7 +134,7 @@ function buildSteps941(nums) {
       highlight: [peak],
       mark: [],
       final: true,
-      codeLines: [7],
+      codeLines: [8],
       vars: [{ name: "peak", value: peak }, { name: "result", value: false }],
       note: {
         vi: `Đỉnh ở biên (i=${peak}) → không phải núi. Trả về False.`,
@@ -149,7 +149,7 @@ function buildSteps941(nums) {
     arr: [...nums],
     highlight: [peak],
     mark: [peak],
-    codeLines: [7, 8],
+    codeLines: [8, 9],
     vars: [{ name: "peak", value: peak }, { name: "nums[peak]", value: nums[peak] }],
     note: { vi: `Đỉnh = nums[${peak}] = ${nums[peak]}. Bây giờ đi xuống.`, en: `Peak = nums[${peak}] = ${nums[peak]}. Now descend.` },
   });
@@ -161,7 +161,7 @@ function buildSteps941(nums) {
       arr: [...nums],
       highlight: Array.from({ length: i - peak + 1 }, (_, x) => peak + x),
       mark: [peak],
-      codeLines: [8, 9],
+      codeLines: [9, 10],
       vars: [
         { name: "i", value: i },
         { name: "nums[i]", value: nums[i] },
@@ -181,7 +181,7 @@ function buildSteps941(nums) {
     highlight: [],
     mark: valid ? Array.from({ length: n }, (_, x) => x) : [peak],
     final: true,
-    codeLines: [10],
+    codeLines: [11],
     vars: [
       { name: "i", value: i },
       { name: "n-1", value: n - 1 },
