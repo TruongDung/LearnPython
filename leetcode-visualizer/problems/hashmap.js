@@ -945,27 +945,39 @@ function buildSteps1399(input) {
 }
 
 function buildSteps523(nums, params) {
-  const k = Math.max(1, Math.abs(Number.parseInt(params && params.k, 10) || 1));
+  const parsedK = Number.parseInt(params && params.k, 10);
+  const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
   const firstSeen = new Map([[0, -1]]);
   const prefixSums = new Array(nums.length).fill(null);
   const remainders = new Array(nums.length).fill(null);
   const steps = [];
 
   const mapEntries = () => [...firstSeen.entries()].map(([remainder, index]) => ({ remainder, index }));
-  const makeView = ({ current = -1, matchStart = -1, matchEnd = -1, status = [] } = {}) => ({
+  const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const makeView = ({ current = -1, matchStart = -1, matchEnd = -1, matchState = "", status = [] } = {}) => ({
     nums: [...nums],
     prefixSums: [...prefixSums],
     remainders: [...remainders],
     current,
     matchStart,
     matchEnd,
+    matchState,
     entries: mapEntries(),
     status,
   });
-  const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const loopVars = (i, prefixSum, remainder, extras = []) => {
+    const vars = [
+      { name: "i", value: i },
+      { name: "num", value: nums[i] },
+      { name: "prefix_sum", value: prefixSum },
+    ];
+    if (remainder !== undefined) vars.push({ name: "remainder", value: remainder });
+    vars.push({ name: "first_seen", value: mapString() }, ...extras);
+    return vars;
+  };
 
   steps.push({
-    title: { vi: "Khoi tao remainder 0 tai index -1", en: "Seed remainder 0 at index -1" },
+    title: { vi: "Khoi tao first_seen = {0: -1}", en: "Initialize first_seen = {0: -1}" },
     codeLines: [3],
     prefixRemainderView: makeView({
       status: [
@@ -973,16 +985,54 @@ function buildSteps523(nums, params) {
         { label: "first_seen", value: "{0: -1}" },
       ],
     }),
-    vars: [{ name: "k", value: k }, { name: "first_seen", value: "{0: -1}" }, { name: "prefix_sum", value: 0 }],
+    vars: [{ name: "k", value: k }, { name: "first_seen", value: "{0: -1}" }],
     note: {
-      vi: "Remainder 0 o index -1 cho phep mot subarray bat dau tu index 0 co the duoc nhan ra.",
+      vi: "Remainder 0 o index -1 cho phep nhan ra subarray hop le bat dau tu index 0.",
       en: "Remainder 0 at index -1 lets a valid subarray starting at index 0 be detected.",
     },
   });
 
   let prefixSum = 0;
+  steps.push({
+    title: { vi: "Khoi tao prefix_sum = 0", en: "Initialize prefix_sum = 0" },
+    codeLines: [4],
+    prefixRemainderView: makeView({
+      status: [
+        { label: "prefix_sum", value: prefixSum },
+        { label: "first_seen", value: mapString() },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "prefix_sum", value: prefixSum },
+      { name: "first_seen", value: mapString() },
+    ],
+    note: {
+      vi: "Bat dau voi tong tien to bang 0, truoc khi duyet nums.",
+      en: "Start with prefix sum 0 before iterating through nums.",
+    },
+  });
+
   let answer = false;
   for (let i = 0; i < nums.length; i += 1) {
+    steps.push({
+      title: { vi: `Vong lap gan i = ${i}, num = ${nums[i]}`, en: `Loop binds i = ${i}, num = ${nums[i]}` },
+      codeLines: [5],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "i", value: i },
+          { label: "num", value: nums[i] },
+          { label: "prefix_sum before", value: prefixSum },
+        ],
+      }),
+      vars: loopVars(i, prefixSum),
+      note: {
+        vi: `Bat dau lan lap index ${i}; dong 5 chi gan i va num, chua cong num vao prefix_sum.`,
+        en: `Start iteration ${i}; line 5 only binds i and num, before adding num to prefix_sum.`,
+      },
+    });
+
     prefixSum += nums[i];
     prefixSums[i] = prefixSum;
     steps.push({
@@ -996,7 +1046,7 @@ function buildSteps523(nums, params) {
           { label: "k", value: k },
         ],
       }),
-      vars: [{ name: "i", value: i }, { name: "num", value: nums[i] }, { name: "prefix_sum", value: prefixSum }],
+      vars: loopVars(i, prefixSum),
       note: {
         vi: `Prefix sum den index ${i} la ${prefixSum}.`,
         en: `The prefix sum through index ${i} is ${prefixSum}.`,
@@ -1016,38 +1066,75 @@ function buildSteps523(nums, params) {
           { label: "first seen", value: firstSeen.has(remainder) ? firstSeen.get(remainder) : "not stored" },
         ],
       }),
-      vars: [{ name: "i", value: i }, { name: "prefix_sum", value: prefixSum }, { name: "remainder", value: remainder }],
+      vars: loopVars(i, prefixSum, remainder),
       note: {
         vi: `Hai prefix sum co cung remainder thi hieu cua chung chia het cho ${k}.`,
         en: `Two prefix sums with the same remainder differ by a multiple of ${k}.`,
       },
     });
 
-    if (firstSeen.has(remainder)) {
+    const wasSeen = firstSeen.has(remainder);
+    steps.push({
+      title: {
+        vi: `Kiem tra ${remainder} in first_seen: ${wasSeen ? "True" : "False"}`,
+        en: `Check ${remainder} in first_seen: ${wasSeen ? "True" : "False"}`,
+      },
+      codeLines: [8],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "remainder", value: remainder },
+          { label: "in first_seen", value: wasSeen ? "True" : "False" },
+          { label: "earliest index", value: wasSeen ? firstSeen.get(remainder) : "not stored" },
+        ],
+      }),
+      vars: loopVars(i, prefixSum, remainder, [
+        { name: "remainder in first_seen", value: wasSeen },
+      ]),
+      note: {
+        vi: wasSeen
+          ? `Remainder ${remainder} da co trong map, nen tiep tuc kiem tra do dai o dong 9.`
+          : `Remainder ${remainder} chua co trong map, nen di vao else o dong 11.`,
+        en: wasSeen
+          ? `Remainder ${remainder} is already in the map, so evaluate the length on line 9.`
+          : `Remainder ${remainder} is not in the map, so enter the else branch on line 11.`,
+      },
+    });
+
+    if (wasSeen) {
       const previous = firstSeen.get(remainder);
       const length = i - previous;
       const start = previous + 1;
       steps.push({
-        title: { vi: `Remainder ${remainder} da xuat hien`, en: `Remainder ${remainder} was seen before` },
-        codeLines: [8],
+        title: {
+          vi: `${i} - (${previous}) >= 2: ${length >= 2 ? "True" : "False"}`,
+          en: `${i} - (${previous}) >= 2: ${length >= 2 ? "True" : "False"}`,
+        },
+        codeLines: [9],
         prefixRemainderView: makeView({
           current: i,
           matchStart: start,
           matchEnd: i,
+          matchState: length >= 2 ? "valid" : "too-short",
           status: [
             { label: "first index", value: previous },
             { label: "candidate", value: `[${start}..${i}]` },
             { label: "length", value: length },
+            { label: "length >= 2", value: length >= 2 ? "True" : "False" },
           ],
         }),
-        vars: [
-          { name: "remainder", value: remainder },
+        vars: loopVars(i, prefixSum, remainder, [
           { name: `first_seen[${remainder}]`, value: previous },
           { name: "length", value: `${i} - (${previous}) = ${length}` },
-        ],
+          { name: "length >= 2", value: length >= 2 },
+        ]),
         note: {
-          vi: `Cung remainder tai ${previous} va ${i}, nen tong nums[${start}..${i}] chia het cho ${k}. Can length >= 2.`,
-          en: `The same remainder at ${previous} and ${i} means nums[${start}..${i}] sums to a multiple of ${k}. Its length must be at least 2.`,
+          vi: length >= 2
+            ? `Candidate nums[${start}..${i}] co do dai ${length}, dat dieu kien it nhat 2 phan tu.`
+            : `Candidate nums[${start}..${i}] chi dai ${length}, nen chua hop le. Khong ghi de index som ${previous}.`,
+          en: length >= 2
+            ? `Candidate nums[${start}..${i}] has length ${length}, satisfying the minimum length of 2.`
+            : `Candidate nums[${start}..${i}] has length ${length}, so it is too short. Keep the earliest index ${previous}.`,
         },
       });
 
@@ -1060,17 +1147,17 @@ function buildSteps523(nums, params) {
             current: i,
             matchStart: start,
             matchEnd: i,
+            matchState: "valid",
             status: [
               { label: "subarray", value: `[${start}..${i}]` },
               { label: "length", value: length },
               { label: "result", value: "True" },
             ],
           }),
-          vars: [
-            { name: "remainder", value: remainder },
+          vars: loopVars(i, prefixSum, remainder, [
             { name: "length", value: length },
             { name: "result", value: true },
-          ],
+          ]),
           note: {
             vi: `Do dai ${length} >= 2, nen day con lien tiep [${nums.slice(start, i + 1).join(", ")}] hop le.`,
             en: `Length ${length} is at least 2, so contiguous subarray [${nums.slice(start, i + 1).join(", ")}] is valid.`,
@@ -1080,6 +1167,24 @@ function buildSteps523(nums, params) {
         break;
       }
     } else {
+      steps.push({
+        title: { vi: "Di vao nhanh else", en: "Enter the else branch" },
+        codeLines: [11],
+        prefixRemainderView: makeView({
+          current: i,
+          status: [
+            { label: "remainder", value: remainder },
+            { label: "in first_seen", value: "False" },
+            { label: "next action", value: `store ${remainder} -> ${i}` },
+          ],
+        }),
+        vars: loopVars(i, prefixSum, remainder),
+        note: {
+          vi: "Dieu kien dong 8 la False; map van chua thay doi tai dong 11.",
+          en: "The line 8 condition is False; the map has not changed yet on line 11.",
+        },
+      });
+
       firstSeen.set(remainder, i);
       steps.push({
         title: { vi: `Luu remainder ${remainder} tai index ${i}`, en: `Store remainder ${remainder} at index ${i}` },
@@ -1091,7 +1196,7 @@ function buildSteps523(nums, params) {
             { label: "map size", value: firstSeen.size },
           ],
         }),
-        vars: [{ name: "remainder", value: remainder }, { name: "first_seen", value: mapString() }],
+        vars: loopVars(i, prefixSum, remainder),
         note: {
           vi: "Chi luu index dau tien cua moi remainder de tao subarray dai nhat co the.",
           en: "Keep only the earliest index for each remainder to maximize the possible subarray length.",
@@ -1110,7 +1215,11 @@ function buildSteps523(nums, params) {
           { label: "result", value: "False" },
         ],
       }),
-      vars: [{ name: "first_seen", value: mapString() }, { name: "result", value: false }],
+      vars: [
+        { name: "prefix_sum", value: prefixSum },
+        { name: "first_seen", value: mapString() },
+        { name: "result", value: false },
+      ],
       note: {
         vi: "Khong co hai prefix remainder trung nhau cach nhau it nhat 2 index.",
         en: "No matching prefix remainders are at least two indices apart.",
@@ -1120,6 +1229,259 @@ function buildSteps523(nums, params) {
   }
 
   return { steps, answer };
+}
+
+function buildSteps974(nums, params) {
+  const parsedK = Number.parseInt(params && params.k, 10);
+  const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
+  const remainderCount = new Map([[0, 1]]);
+  const remainderPositions = new Map([[0, [-1]]]);
+  const prefixSums = new Array(nums.length).fill(null);
+  const remainders = new Array(nums.length).fill(null);
+  const steps = [];
+  let prefixSum = 0;
+  let total = 0;
+
+  const mapEntries = () => [...remainderCount.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([remainder, count]) => ({ remainder, index: count }));
+  const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const makeView = ({ current = -1, status = [] } = {}) => ({
+    nums: [...nums],
+    prefixSums: [...prefixSums],
+    remainders: [...remainders],
+    current,
+    matchStart: -1,
+    matchEnd: -1,
+    entries: mapEntries(),
+    heading: "Numbers / prefix sum / remainder",
+    prefixLabel: "sum",
+    remainderLabel: "rem",
+    mapTitle: "Prefix remainder frequencies",
+    mapKeyLabel: "remainder",
+    mapValueLabel: "count",
+    status,
+  });
+  const loopVars = (i, remainder, extras = []) => {
+    const vars = [
+      { name: "i", value: i },
+      { name: "num", value: nums[i] },
+      { name: "prefix_sum", value: prefixSum },
+    ];
+    if (remainder !== undefined) vars.push({ name: "remainder", value: remainder });
+    vars.push(
+      { name: "total", value: total },
+      { name: "remainder_count", value: mapString() },
+      ...extras,
+    );
+    return vars;
+  };
+  const formatSubarrays = (positions, end) => {
+    if (!positions.length) return "none";
+    const ranges = positions.map((position) => `[${position + 1}..${end}]`);
+    if (ranges.length <= 6) return ranges.join(", ");
+    return `${ranges.slice(0, 6).join(", ")}, ... +${ranges.length - 6} more`;
+  };
+
+  steps.push({
+    title: { vi: "Khoi tao remainder_count = {0: 1}", en: "Initialize remainder_count = {0: 1}" },
+    codeLines: [3],
+    prefixRemainderView: makeView({
+      status: [
+        { label: "seed remainder", value: 0 },
+        { label: "seed count", value: 1 },
+        { label: "prefix position", value: -1 },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "remainder_count", value: mapString() },
+    ],
+    note: {
+      vi: "Count 1 cho remainder 0 dai dien prefix rong tai vi tri -1; nho vay subarray bat dau tu index 0 duoc dem.",
+      en: "Count 1 for remainder 0 represents the empty prefix at position -1, allowing subarrays that start at index 0 to be counted.",
+    },
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao prefix_sum = 0", en: "Initialize prefix_sum = 0" },
+    codeLines: [4],
+    prefixRemainderView: makeView({
+      status: [
+        { label: "prefix_sum", value: prefixSum },
+        { label: "remainder_count", value: mapString() },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "prefix_sum", value: prefixSum },
+      { name: "remainder_count", value: mapString() },
+    ],
+    note: {
+      vi: "Tong tien to bat dau bang 0 truoc khi doc nums.",
+      en: "The prefix sum starts at 0 before reading nums.",
+    },
+  });
+
+  steps.push({
+    title: { vi: "Khoi tao total = 0", en: "Initialize total = 0" },
+    codeLines: [5],
+    prefixRemainderView: makeView({
+      status: [
+        { label: "total", value: total },
+        { label: "meaning", value: "valid subarrays found" },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "prefix_sum", value: prefixSum },
+      { name: "total", value: total },
+      { name: "remainder_count", value: mapString() },
+    ],
+    note: {
+      vi: "Chua xu ly phan tu nao, nen chua tim thay subarray hop le.",
+      en: "No elements have been processed, so no valid subarrays have been found yet.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i += 1) {
+    steps.push({
+      title: { vi: `Vong lap gan i = ${i}, num = ${nums[i]}`, en: `Loop binds i = ${i}, num = ${nums[i]}` },
+      codeLines: [6],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "i", value: i },
+          { label: "num", value: nums[i] },
+          { label: "prefix_sum before", value: prefixSum },
+        ],
+      }),
+      vars: loopVars(i),
+      note: {
+        vi: `Bat dau xu ly nums[${i}] = ${nums[i]}; prefix_sum chua thay doi tai dong 6.`,
+        en: `Begin processing nums[${i}] = ${nums[i]}; prefix_sum has not changed on line 6.`,
+      },
+    });
+
+    const beforePrefix = prefixSum;
+    prefixSum += nums[i];
+    prefixSums[i] = prefixSum;
+    steps.push({
+      title: { vi: `prefix_sum = ${beforePrefix} + (${nums[i]}) = ${prefixSum}`, en: `prefix_sum = ${beforePrefix} + (${nums[i]}) = ${prefixSum}` },
+      codeLines: [7],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "before", value: beforePrefix },
+          { label: "num", value: nums[i] },
+          { label: "prefix_sum", value: prefixSum },
+        ],
+      }),
+      vars: loopVars(i),
+      note: {
+        vi: `Tong nums[0..${i}] bay gio la ${prefixSum}.`,
+        en: `The sum of nums[0..${i}] is now ${prefixSum}.`,
+      },
+    });
+
+    const remainder = ((prefixSum % k) + k) % k;
+    remainders[i] = remainder;
+    steps.push({
+      title: { vi: `${prefixSum} % ${k} = ${remainder}`, en: `${prefixSum} % ${k} = ${remainder}` },
+      codeLines: [8],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "prefix_sum", value: prefixSum },
+          { label: "k", value: k },
+          { label: "remainder", value: remainder },
+        ],
+      }),
+      vars: loopVars(i, remainder),
+      note: {
+        vi: `Python tra remainder khong am ${remainder}, ke ca khi prefix_sum la so am.`,
+        en: `Python produces non-negative remainder ${remainder}, even when prefix_sum is negative.`,
+      },
+    });
+
+    const priorPositions = [...(remainderPositions.get(remainder) || [])];
+    const contribution = remainderCount.get(remainder) || 0;
+    const beforeTotal = total;
+    total += contribution;
+    steps.push({
+      title: { vi: `total = ${beforeTotal} + ${contribution} = ${total}`, en: `total = ${beforeTotal} + ${contribution} = ${total}` },
+      codeLines: [9],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "matching prefixes", value: priorPositions.length ? `[${priorPositions.join(", ")}]` : "none" },
+          { label: "new subarrays", value: formatSubarrays(priorPositions, i) },
+          { label: "added", value: contribution },
+          { label: "total", value: total },
+        ],
+      }),
+      vars: loopVars(i, remainder, [
+        { name: `remainder_count.get(${remainder}, 0)`, value: contribution },
+      ]),
+      note: {
+        vi: contribution
+          ? `Co ${contribution} prefix truoc do cung remainder ${remainder}, nen co them ${contribution} subarray ket thuc tai index ${i}.`
+          : `Chua co prefix nao cung remainder ${remainder}, nen index ${i} chua tao subarray moi.`,
+        en: contribution
+          ? `${contribution} earlier prefix(es) have remainder ${remainder}, creating ${contribution} new subarray(s) ending at index ${i}.`
+          : `No earlier prefix has remainder ${remainder}, so index ${i} creates no new subarray.`,
+      },
+    });
+
+    remainderCount.set(remainder, contribution + 1);
+    if (!remainderPositions.has(remainder)) remainderPositions.set(remainder, []);
+    remainderPositions.get(remainder).push(i);
+    steps.push({
+      title: {
+        vi: `remainder_count[${remainder}] = ${contribution + 1}`,
+        en: `remainder_count[${remainder}] = ${contribution + 1}`,
+      },
+      codeLines: [10],
+      prefixRemainderView: makeView({
+        current: i,
+        status: [
+          { label: "remainder", value: remainder },
+          { label: "old count", value: contribution },
+          { label: "new count", value: contribution + 1 },
+          { label: "total", value: total },
+        ],
+      }),
+      vars: loopVars(i, remainder),
+      note: {
+        vi: `Luu prefix hien tai de cac index sau co cung remainder ${remainder} co the tao them subarray.`,
+        en: `Store the current prefix so later indices with remainder ${remainder} can form additional subarrays.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Tra ve ${total}`, en: `Return ${total}` },
+    codeLines: [11],
+    prefixRemainderView: makeView({
+      status: [
+        { label: "processed", value: nums.length },
+        { label: "remainder_count", value: mapString() },
+        { label: "answer", value: total },
+      ],
+    }),
+    vars: [
+      { name: "prefix_sum", value: prefixSum },
+      { name: "total", value: total },
+      { name: "remainder_count", value: mapString() },
+    ],
+    note: {
+      vi: `Co tong cong ${total} subarray co tong chia het cho ${k}.`,
+      en: `There are ${total} subarrays whose sums are divisible by ${k}.`,
+    },
+    final: true,
+  });
+
+  return { steps, answer: total };
 }
 
 function buildSteps525(nums) {
@@ -2005,7 +2367,7 @@ module.exports = {
     inputKind: "nonneg",
     inputLabel: { vi: "nums", en: "nums" },
     extraParams: [
-      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 6 },
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 6, min: 1, max: 2147483647 },
     ],
     approach: [
       { vi: "Theo doi prefix sum modulo k thay vi luu toan bo tong.", en: "Track each prefix sum modulo k instead of the full sum." },
@@ -2036,6 +2398,60 @@ module.exports = {
       "        return False",
     ],
     builder: buildSteps523,
+  },
+  974: {
+    id: 974,
+    difficulty: "medium",
+    slug: "subarray-sums-divisible-by-k",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Subarray Sums Divisible by K", en: "Subarray Sums Divisible by K" },
+    titleVi: { vi: "Dem day con co tong chia het cho K", en: "Count subarrays with sums divisible by K" },
+    statement: {
+      vi: "Cho mang so nguyen nums va so nguyen k. Tra ve so day con lien tiep khong rong co tong chia het cho k.",
+      en: "Given an integer array nums and an integer k, return the number of non-empty contiguous subarrays whose sums are divisible by k.",
+    },
+    defaultInput: [4, 5, 0, -2, -3, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 5, min: 2, max: 10000 },
+    ],
+    approach: [
+      {
+        vi: "Neu hai prefix sum co cung remainder modulo k, hieu cua chung chia het cho k.",
+        en: "If two prefix sums have the same remainder modulo k, their difference is divisible by k.",
+      },
+      {
+        vi: "remainder_count[r] dem so prefix truoc do co remainder r.",
+        en: "remainder_count[r] counts earlier prefixes whose remainder is r.",
+      },
+      {
+        vi: "Tai moi index, cong count cua remainder hien tai vao total, sau do tang count.",
+        en: "At each index, add the current remainder frequency to total, then increment that frequency.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(min(n, k))",
+      note: {
+        vi: "Duyet nums mot lan; hash map luu tan suat cac prefix remainder.",
+        en: "Scan nums once; the hash map stores prefix remainder frequencies.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def subarraysDivByK(self, nums: List[int], k: int) -> int:",
+      "        remainder_count = {0: 1}",
+      "        prefix_sum = 0",
+      "        total = 0",
+      "        for i, num in enumerate(nums):",
+      "            prefix_sum += num",
+      "            remainder = prefix_sum % k",
+      "            total += remainder_count.get(remainder, 0)",
+      "            remainder_count[remainder] = remainder_count.get(remainder, 0) + 1",
+      "        return total",
+    ],
+    builder: buildSteps974,
   },
   525: {
     id: 525,

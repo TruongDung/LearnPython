@@ -9684,6 +9684,7 @@ function buildSteps5DP(input) {
   const steps = [];
   let bestStart = 0;
   let bestEnd = 0;
+  let bestInitialized = false;
 
   const axisLabels = Array.from({ length: n }, (_, idx) => s[idx]);
 
@@ -9700,7 +9701,9 @@ function buildSteps5DP(input) {
       }
     }
     const shift = (cell) => (cell ? [cell[0] + 1, cell[1] + 1] : null);
-    const bestShifted = shift([bestStart, bestEnd]);
+    const bestShifted = bestInitialized && n > 0 && dp[bestStart][bestEnd]
+      ? shift([bestStart, bestEnd])
+      : null;
     return {
       dp: display,
       text1: s,
@@ -9718,21 +9721,26 @@ function buildSteps5DP(input) {
     const hasActiveCell = Array.isArray(opts.hlCell);
     const currentVars = [];
     if (hasActiveCell) {
-      currentVars.push({ name: "i", value: opts.hlCell[0] });
-      currentVars.push({ name: "j", value: opts.hlCell[1] });
+      const [i, j] = opts.hlCell;
+      currentVars.push({ name: "i", value: i });
+      currentVars.push({ name: "j", value: j });
+      currentVars.push({ name: "length", value: j - i + 1 });
+      currentVars.push({ name: "substring", value: `"${s.slice(i, j + 1)}"` });
     }
     for (const item of opts.vars || []) {
-      if ((item.name === "i" || item.name === "j") && hasActiveCell) continue;
+      if (["i", "j", "length", "substring"].includes(item.name) && hasActiveCell) continue;
       currentVars.push(item);
     }
-    if (!currentVars.some((item) => item.name === "best")) {
-      currentVars.push({ name: "best", value: n ? `"${s.slice(bestStart, bestEnd + 1)}"` : '""' });
-    }
-    if (!currentVars.some((item) => item.name === "best_start")) {
-      currentVars.push({ name: "best_start", value: n ? bestStart : "" });
-    }
-    if (!currentVars.some((item) => item.name === "best_end")) {
-      currentVars.push({ name: "best_end", value: n ? bestEnd : "" });
+    if (bestInitialized) {
+      if (!currentVars.some((item) => item.name === "best")) {
+        currentVars.push({ name: "best", value: `"${s.slice(bestStart, bestEnd + 1)}"` });
+      }
+      if (!currentVars.some((item) => item.name === "best_start")) {
+        currentVars.push({ name: "best_start", value: bestStart });
+      }
+      if (!currentVars.some((item) => item.name === "best_end")) {
+        currentVars.push({ name: "best_end", value: bestEnd });
+      }
     }
     steps.push({
       title: opts.title,
@@ -9770,27 +9778,33 @@ function buildSteps5DP(input) {
     },
   });
 
-  if (n === 0) {
-    gridSnap({
-      title: { vi: "Chuỗi rỗng", en: "Empty string" },
-      codeLines: [22],
-      vars: [{ name: "return", value: '""' }],
-      note: { vi: "Chuỗi rỗng trả về chuỗi rỗng.", en: "Empty string returns an empty string." },
-      final: true,
-    });
-    return { s, answer: "", steps };
-  }
-
   // Line 5: best_start, best_end = 0, 0
+  bestInitialized = true;
   gridSnap({
     title: { vi: "best_start, best_end = 0, 0", en: "best_start, best_end = 0, 0" },
     codeLines: [5],
     vars: [{ name: "best_start", value: 0 }, { name: "best_end", value: 0 }],
-    note: {
-      vi: `Mặc định palindrome tốt nhất ban đầu là s[0] (độ dài 1).`,
-      en: `Default best palindrome initially is s[0] (length 1).`,
-    },
+    note: n > 0
+      ? {
+          vi: `Mặc định palindrome tốt nhất ban đầu là s[0] (độ dài 1).`,
+          en: `Default best palindrome initially is s[0] (length 1).`,
+        }
+      : {
+          vi: "Hai index vẫn được khởi tạo bằng 0; lát cắt trên chuỗi rỗng sẽ trả về chuỗi rỗng.",
+          en: "Both indices are still initialized to 0; slicing the empty string will return an empty string.",
+        },
   });
+
+  if (n === 0) {
+    gridSnap({
+      title: { vi: "return chuỗi rỗng", en: "return empty string" },
+      codeLines: [22],
+      vars: [{ name: "answer", value: '""' }],
+      note: { vi: "Các vòng lặp không chạy; lát cắt s[0:1] vẫn là chuỗi rỗng.", en: "The loops do not run; the slice s[0:1] is still an empty string." },
+      final: true,
+    });
+    return { s, answer: "", steps };
+  }
 
   // Line 7-8: base case length 1
   for (let i = 0; i < n; i++) {
@@ -9913,7 +9927,6 @@ function buildSteps5DP(input) {
         title: { vi: `j = ${j}`, en: `j = ${j}` },
         codeLines: [17],
         hlCell: [i, j],
-        pathCells: i + 1 <= j - 1 ? [[i + 1, j - 1]] : [],
         vars: [
           { name: "i", value: i },
           { name: "j = i+length-1", value: j },
@@ -9937,12 +9950,13 @@ function buildSteps5DP(input) {
         },
         codeLines: [18],
         hlCell: [i, j],
-        pathCells: [[i + 1, j - 1]],
+        pathCells: endsMatch ? [[i + 1, j - 1]] : [],
         vars: [
           { name: `s[${i}]`, value: s[i] },
           { name: `s[${j}]`, value: s[j] },
           { name: "ends match?", value: endsMatch },
-          { name: `dp[${i + 1}][${j - 1}]`, value: innerOk },
+          { name: `dp[${i + 1}][${j - 1}]`, value: endsMatch ? innerOk : "skipped" },
+          { name: "inner substring", value: endsMatch ? `"${s.slice(i + 1, j)}"` : "not read" },
           { name: "condition", value: isPalin },
         ],
         note: isPalin

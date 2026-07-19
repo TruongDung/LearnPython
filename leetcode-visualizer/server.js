@@ -169,6 +169,13 @@ app.post("/api/problem/:id/solve", (req, res) => {
         error: `Tham số "${p.key}" phải là số nguyên${p.allowNegative ? "" : " không âm"}.`,
       });
     }
+
+    if (typeof v === "number" && p.min !== undefined && v < p.min) {
+      return res.status(400).json({ error: `Tham số "${p.key}" phải lớn hơn hoặc bằng ${p.min}.` });
+    }
+    if (typeof v === "number" && p.max !== undefined && v > p.max) {
+      return res.status(400).json({ error: `Tham số "${p.key}" phải nhỏ hơn hoặc bằng ${p.max}.` });
+    }
   }
 
   // Only some string problems require s and t to have equal length.

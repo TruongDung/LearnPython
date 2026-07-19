@@ -449,6 +449,8 @@ function renderExtraParams() {
       inputEl.dataset.param = p.key;
       inputEl.dataset.type = p.type || "number";
       inputEl.value = existing[p.key] !== undefined ? existing[p.key] : p.default;
+      if (p.min !== undefined) inputEl.min = p.min;
+      if (p.max !== undefined) inputEl.max = p.max;
     }
 
     wrap.appendChild(label);
@@ -1857,6 +1859,7 @@ function renderPrefixRemainderView(step) {
   const current = Number.isInteger(view.current) ? view.current : -1;
   const matchStart = Number.isInteger(view.matchStart) ? view.matchStart : -1;
   const matchEnd = Number.isInteger(view.matchEnd) ? view.matchEnd : -1;
+  const matchState = view.matchState === "too-short" ? "too-short" : "valid";
   const heading = view.heading || "Numbers / prefix / remainder";
   const prefixLabel = view.prefixLabel || "sum";
   const remainderLabel = view.remainderLabel || "rem";
@@ -1869,7 +1872,7 @@ function renderPrefixRemainderView(step) {
     const isMatch = matchStart >= 0 && index >= matchStart && index <= matchEnd;
     const prefix = prefixSums[index];
     const remainder = remainders[index];
-    return `<div class="remainder-cell${isMatch ? " match" : ""}${isCurrent ? " current" : ""}">
+    return `<div class="remainder-cell${isMatch ? ` match ${matchState}` : ""}${isCurrent ? " current" : ""}">
       <span class="remainder-index">[${index}]</span>
       <strong>${escapeHtml(String(num))}</strong>
       <span>${escapeHtml(String(prefixLabel))} ${prefix == null ? "-" : escapeHtml(String(prefix))}</span>
