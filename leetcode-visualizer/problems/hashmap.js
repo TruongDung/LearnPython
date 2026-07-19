@@ -951,6 +951,8 @@ function buildSteps523(nums, params) {
   const prefixSums = new Array(nums.length).fill(null);
   const remainders = new Array(nums.length).fill(null);
   const steps = [];
+  const localized = (vi, en) => ({ vi, en });
+  const booleanText = (value) => localized(value ? "Đúng" : "Sai", value ? "True" : "False");
 
   const mapEntries = () => [...firstSeen.entries()].map(([remainder, index]) => ({ remainder, index }));
   const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
@@ -977,29 +979,29 @@ function buildSteps523(nums, params) {
   };
 
   steps.push({
-    title: { vi: "Khoi tao first_seen = {0: -1}", en: "Initialize first_seen = {0: -1}" },
+    title: { vi: "Khởi tạo first_seen = {0: -1}", en: "Initialize first_seen = {0: -1}" },
     codeLines: [3],
     prefixRemainderView: makeView({
       status: [
         { label: "k", value: k },
-        { label: "first_seen", value: "{0: -1}" },
+        { label: localized("bảng chỉ số đầu tiên", "first_seen"), value: "{0: -1}" },
       ],
     }),
     vars: [{ name: "k", value: k }, { name: "first_seen", value: "{0: -1}" }],
     note: {
-      vi: "Remainder 0 o index -1 cho phep nhan ra subarray hop le bat dau tu index 0.",
+      vi: "Hãy tưởng tượng trước phần tử đầu tiên có một tổng tiền tố bằng 0 tại chỉ số -1. Nhờ mốc giả này, thuật toán có thể nhận ra đoạn con hợp lệ bắt đầu từ chỉ số 0.",
       en: "Remainder 0 at index -1 lets a valid subarray starting at index 0 be detected.",
     },
   });
 
   let prefixSum = 0;
   steps.push({
-    title: { vi: "Khoi tao prefix_sum = 0", en: "Initialize prefix_sum = 0" },
+    title: { vi: "Khởi tạo tổng tiền tố bằng 0", en: "Initialize prefix_sum = 0" },
     codeLines: [4],
     prefixRemainderView: makeView({
       status: [
-        { label: "prefix_sum", value: prefixSum },
-        { label: "first_seen", value: mapString() },
+        { label: localized("tổng tiền tố", "prefix_sum"), value: prefixSum },
+        { label: localized("bảng chỉ số đầu tiên", "first_seen"), value: mapString() },
       ],
     }),
     vars: [
@@ -1008,7 +1010,7 @@ function buildSteps523(nums, params) {
       { name: "first_seen", value: mapString() },
     ],
     note: {
-      vi: "Bat dau voi tong tien to bang 0, truoc khi duyet nums.",
+      vi: "prefix_sum là tổng từ nums[0] đến vị trí hiện tại. Trước khi đọc phần tử nào, tổng này bằng 0.",
       en: "Start with prefix sum 0 before iterating through nums.",
     },
   });
@@ -1016,19 +1018,19 @@ function buildSteps523(nums, params) {
   let answer = false;
   for (let i = 0; i < nums.length; i += 1) {
     steps.push({
-      title: { vi: `Vong lap gan i = ${i}, num = ${nums[i]}`, en: `Loop binds i = ${i}, num = ${nums[i]}` },
+      title: { vi: `Vòng lặp lấy i = ${i}, num = ${nums[i]}`, en: `Loop binds i = ${i}, num = ${nums[i]}` },
       codeLines: [5],
       prefixRemainderView: makeView({
         current: i,
         status: [
-          { label: "i", value: i },
-          { label: "num", value: nums[i] },
-          { label: "prefix_sum before", value: prefixSum },
+          { label: localized("chỉ số i", "i"), value: i },
+          { label: localized("giá trị num", "num"), value: nums[i] },
+          { label: localized("tổng trước khi cộng", "prefix_sum before"), value: prefixSum },
         ],
       }),
       vars: loopVars(i, prefixSum),
       note: {
-        vi: `Bat dau lan lap index ${i}; dong 5 chi gan i va num, chua cong num vao prefix_sum.`,
+        vi: `Bắt đầu xử lý nums[${i}] = ${nums[i]}. Dòng 5 mới chỉ lấy i và num; tổng tiền tố vẫn là ${prefixSum}.`,
         en: `Start iteration ${i}; line 5 only binds i and num, before adding num to prefix_sum.`,
       },
     });
@@ -1036,19 +1038,19 @@ function buildSteps523(nums, params) {
     prefixSum += nums[i];
     prefixSums[i] = prefixSum;
     steps.push({
-      title: { vi: `Cong nums[${i}] = ${nums[i]}`, en: `Add nums[${i}] = ${nums[i]}` },
+      title: { vi: `Cộng nums[${i}] = ${nums[i]} vào tổng tiền tố`, en: `Add nums[${i}] = ${nums[i]}` },
       codeLines: [6],
       prefixRemainderView: makeView({
         current: i,
         status: [
-          { label: "index", value: i },
-          { label: "prefix sum", value: prefixSum },
+          { label: localized("chỉ số", "index"), value: i },
+          { label: localized("tổng nums[0..i]", "prefix sum"), value: prefixSum },
           { label: "k", value: k },
         ],
       }),
       vars: loopVars(i, prefixSum),
       note: {
-        vi: `Prefix sum den index ${i} la ${prefixSum}.`,
+        vi: `Sau phép cộng, tổng của đoạn nums[0..${i}] bằng ${prefixSum}.`,
         en: `The prefix sum through index ${i} is ${prefixSum}.`,
       },
     });
@@ -1061,14 +1063,19 @@ function buildSteps523(nums, params) {
       prefixRemainderView: makeView({
         current: i,
         status: [
-          { label: "prefix sum", value: prefixSum },
-          { label: "remainder", value: remainder },
-          { label: "first seen", value: firstSeen.has(remainder) ? firstSeen.get(remainder) : "not stored" },
+          { label: localized("tổng tiền tố", "prefix sum"), value: prefixSum },
+          { label: localized("phần dư", "remainder"), value: remainder },
+          {
+            label: localized("chỉ số đầu tiên", "first seen"),
+            value: firstSeen.has(remainder)
+              ? firstSeen.get(remainder)
+              : localized("chưa từng xuất hiện", "not stored"),
+          },
         ],
       }),
       vars: loopVars(i, prefixSum, remainder),
       note: {
-        vi: `Hai prefix sum co cung remainder thi hieu cua chung chia het cho ${k}.`,
+        vi: `Tổng tiền tố ${prefixSum} có phần dư ${remainder} khi chia cho ${k}. Nếu phần dư này từng xuất hiện, hiệu của hai tổng tiền tố sẽ chia hết cho ${k}.`,
         en: `Two prefix sums with the same remainder differ by a multiple of ${k}.`,
       },
     });
@@ -1076,16 +1083,19 @@ function buildSteps523(nums, params) {
     const wasSeen = firstSeen.has(remainder);
     steps.push({
       title: {
-        vi: `Kiem tra ${remainder} in first_seen: ${wasSeen ? "True" : "False"}`,
+        vi: `Phần dư ${remainder} đã xuất hiện chưa? ${wasSeen ? "Đúng" : "Sai"}`,
         en: `Check ${remainder} in first_seen: ${wasSeen ? "True" : "False"}`,
       },
       codeLines: [8],
       prefixRemainderView: makeView({
         current: i,
         status: [
-          { label: "remainder", value: remainder },
-          { label: "in first_seen", value: wasSeen ? "True" : "False" },
-          { label: "earliest index", value: wasSeen ? firstSeen.get(remainder) : "not stored" },
+          { label: localized("phần dư hiện tại", "remainder"), value: remainder },
+          { label: localized("đã có trong bảng", "in first_seen"), value: booleanText(wasSeen) },
+          {
+            label: localized("chỉ số sớm nhất", "earliest index"),
+            value: wasSeen ? firstSeen.get(remainder) : localized("chưa có", "not stored"),
+          },
         ],
       }),
       vars: loopVars(i, prefixSum, remainder, [
@@ -1093,8 +1103,8 @@ function buildSteps523(nums, params) {
       ]),
       note: {
         vi: wasSeen
-          ? `Remainder ${remainder} da co trong map, nen tiep tuc kiem tra do dai o dong 9.`
-          : `Remainder ${remainder} chua co trong map, nen di vao else o dong 11.`,
+          ? `Phần dư ${remainder} đã xuất hiện lần đầu tại chỉ số ${firstSeen.get(remainder)}. Vì vậy tổng của đoạn từ chỉ số ${firstSeen.get(remainder) + 1} đến ${i} chia hết cho ${k}; tiếp theo phải kiểm tra đoạn này có ít nhất 2 phần tử hay không.`
+          : `Phần dư ${remainder} chưa từng xuất hiện. Chưa thể tạo đoạn con có tổng chia hết cho ${k}, nên đi vào nhánh else để lưu chỉ số ${i}.`,
         en: wasSeen
           ? `Remainder ${remainder} is already in the map, so evaluate the length on line 9.`
           : `Remainder ${remainder} is not in the map, so enter the else branch on line 11.`,
@@ -1107,7 +1117,7 @@ function buildSteps523(nums, params) {
       const start = previous + 1;
       steps.push({
         title: {
-          vi: `${i} - (${previous}) >= 2: ${length >= 2 ? "True" : "False"}`,
+          vi: `Độ dài = ${i} - (${previous}) = ${length}; có đủ 2 phần tử? ${length >= 2 ? "Đúng" : "Sai"}`,
           en: `${i} - (${previous}) >= 2: ${length >= 2 ? "True" : "False"}`,
         },
         codeLines: [9],
@@ -1117,10 +1127,10 @@ function buildSteps523(nums, params) {
           matchEnd: i,
           matchState: length >= 2 ? "valid" : "too-short",
           status: [
-            { label: "first index", value: previous },
-            { label: "candidate", value: `[${start}..${i}]` },
-            { label: "length", value: length },
-            { label: "length >= 2", value: length >= 2 ? "True" : "False" },
+            { label: localized("chỉ số có cùng phần dư", "first index"), value: previous },
+            { label: localized("đoạn đang kiểm tra", "candidate"), value: `[${start}..${i}]` },
+            { label: localized("độ dài", "length"), value: length },
+            { label: localized("độ dài >= 2", "length >= 2"), value: booleanText(length >= 2) },
           ],
         }),
         vars: loopVars(i, prefixSum, remainder, [
@@ -1130,8 +1140,8 @@ function buildSteps523(nums, params) {
         ]),
         note: {
           vi: length >= 2
-            ? `Candidate nums[${start}..${i}] co do dai ${length}, dat dieu kien it nhat 2 phan tu.`
-            : `Candidate nums[${start}..${i}] chi dai ${length}, nen chua hop le. Khong ghi de index som ${previous}.`,
+            ? `Đoạn nums[${start}..${i}] = [${nums.slice(start, i + 1).join(", ")}] có tổng chia hết cho ${k} và dài ${length}, nên hợp lệ.`
+            : `Đoạn nums[${start}..${i}] chỉ dài ${length}, nên chưa hợp lệ. Vẫn giữ chỉ số sớm nhất ${previous}; không ghi đè bằng ${i}, để lần lặp sau có thể tạo đoạn dài ít nhất 2.`,
           en: length >= 2
             ? `Candidate nums[${start}..${i}] has length ${length}, satisfying the minimum length of 2.`
             : `Candidate nums[${start}..${i}] has length ${length}, so it is too short. Keep the earliest index ${previous}.`,
@@ -1141,7 +1151,7 @@ function buildSteps523(nums, params) {
       if (length >= 2) {
         answer = true;
         steps.push({
-          title: { vi: `Tim thay subarray [${start}..${i}]`, en: `Found subarray [${start}..${i}]` },
+          title: { vi: `Tìm thấy đoạn con hợp lệ [${start}..${i}]`, en: `Found subarray [${start}..${i}]` },
           codeLines: [10],
           prefixRemainderView: makeView({
             current: i,
@@ -1149,9 +1159,9 @@ function buildSteps523(nums, params) {
             matchEnd: i,
             matchState: "valid",
             status: [
-              { label: "subarray", value: `[${start}..${i}]` },
-              { label: "length", value: length },
-              { label: "result", value: "True" },
+              { label: localized("đoạn con", "subarray"), value: `[${start}..${i}]` },
+              { label: localized("độ dài", "length"), value: length },
+              { label: localized("kết quả", "result"), value: localized("Đúng", "True") },
             ],
           }),
           vars: loopVars(i, prefixSum, remainder, [
@@ -1159,7 +1169,7 @@ function buildSteps523(nums, params) {
             { name: "result", value: true },
           ]),
           note: {
-            vi: `Do dai ${length} >= 2, nen day con lien tiep [${nums.slice(start, i + 1).join(", ")}] hop le.`,
+            vi: `Trả về True vì đoạn liên tiếp nums[${start}..${i}] = [${nums.slice(start, i + 1).join(", ")}] có ${length} phần tử và tổng của nó chia hết cho ${k}.`,
             en: `Length ${length} is at least 2, so contiguous subarray [${nums.slice(start, i + 1).join(", ")}] is valid.`,
           },
           final: true,
@@ -1168,37 +1178,37 @@ function buildSteps523(nums, params) {
       }
     } else {
       steps.push({
-        title: { vi: "Di vao nhanh else", en: "Enter the else branch" },
+        title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
         codeLines: [11],
         prefixRemainderView: makeView({
           current: i,
           status: [
-            { label: "remainder", value: remainder },
-            { label: "in first_seen", value: "False" },
-            { label: "next action", value: `store ${remainder} -> ${i}` },
+            { label: localized("phần dư", "remainder"), value: remainder },
+            { label: localized("đã có trong bảng", "in first_seen"), value: booleanText(false) },
+            { label: localized("hành động tiếp theo", "next action"), value: localized(`lưu ${remainder} -> ${i}`, `store ${remainder} -> ${i}`) },
           ],
         }),
         vars: loopVars(i, prefixSum, remainder),
         note: {
-          vi: "Dieu kien dong 8 la False; map van chua thay doi tai dong 11.",
+          vi: `Điều kiện ở dòng 8 là Sai. Tại dòng 11, bảng first_seen vẫn chưa thay đổi; dòng 12 mới thực hiện việc lưu.`,
           en: "The line 8 condition is False; the map has not changed yet on line 11.",
         },
       });
 
       firstSeen.set(remainder, i);
       steps.push({
-        title: { vi: `Luu remainder ${remainder} tai index ${i}`, en: `Store remainder ${remainder} at index ${i}` },
+        title: { vi: `Lưu phần dư ${remainder} lần đầu tại chỉ số ${i}`, en: `Store remainder ${remainder} at index ${i}` },
         codeLines: [12],
         prefixRemainderView: makeView({
           current: i,
           status: [
-            { label: "stored", value: `${remainder} -> ${i}` },
-            { label: "map size", value: firstSeen.size },
+            { label: localized("vừa lưu", "stored"), value: `${remainder} -> ${i}` },
+            { label: localized("số phần dư đã lưu", "map size"), value: firstSeen.size },
           ],
         }),
         vars: loopVars(i, prefixSum, remainder),
         note: {
-          vi: "Chi luu index dau tien cua moi remainder de tao subarray dai nhat co the.",
+          vi: `Ghi first_seen[${remainder}] = ${i}. Mỗi phần dư chỉ được lưu lần đầu; chỉ số càng sớm thì đoạn con tìm được về sau càng dài và dễ đạt điều kiện độ dài >= 2.`,
           en: "Keep only the earliest index for each remainder to maximize the possible subarray length.",
         },
       });
@@ -1207,12 +1217,12 @@ function buildSteps523(nums, params) {
 
   if (!answer) {
     steps.push({
-      title: { vi: "Khong co subarray hop le", en: "No valid subarray" },
+      title: { vi: "Không có đoạn con hợp lệ", en: "No valid subarray" },
       codeLines: [13],
       prefixRemainderView: makeView({
         status: [
-          { label: "checked", value: nums.length },
-          { label: "result", value: "False" },
+          { label: localized("số phần tử đã kiểm tra", "checked"), value: nums.length },
+          { label: localized("kết quả", "result"), value: localized("Sai", "False") },
         ],
       }),
       vars: [
@@ -1221,7 +1231,7 @@ function buildSteps523(nums, params) {
         { name: "result", value: false },
       ],
       note: {
-        vi: "Khong co hai prefix remainder trung nhau cach nhau it nhat 2 index.",
+        vi: "Đã duyệt hết mảng nhưng không tìm được hai tổng tiền tố có cùng phần dư và cách nhau ít nhất 2 vị trí, nên trả về False.",
         en: "No matching prefix remainders are at least two indices apart.",
       },
       final: true,
@@ -2358,9 +2368,9 @@ module.exports = {
     slug: "continuous-subarray-sum",
     category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
     title: { vi: "Continuous Subarray Sum", en: "Continuous Subarray Sum" },
-    titleVi: { vi: "Tong day con lien tiep", en: "Continuous subarray sum" },
+    titleVi: { vi: "Kiểm tra tổng đoạn con là bội của k", en: "Continuous subarray sum" },
     statement: {
-      vi: "Cho mang so nguyen khong am nums va so nguyen k. Tra ve true neu co day con lien tiep dai it nhat 2 co tong la boi cua k.",
+      vi: "Cho mảng số nguyên không âm nums và số nguyên dương k. Trả về True nếu tồn tại một đoạn con liên tiếp có ít nhất 2 phần tử và tổng chia hết cho k.",
       en: "Given a non-negative integer array nums and an integer k, return true if a continuous subarray of length at least 2 has a sum that is a multiple of k.",
     },
     defaultInput: [23, 2, 4, 6, 7],
@@ -2370,15 +2380,24 @@ module.exports = {
       { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 6, min: 1, max: 2147483647 },
     ],
     approach: [
-      { vi: "Theo doi prefix sum modulo k thay vi luu toan bo tong.", en: "Track each prefix sum modulo k instead of the full sum." },
-      { vi: "Neu mot remainder lap lai, tong giua hai prefix chia het cho k.", en: "When a remainder repeats, the sum between those prefixes is divisible by k." },
-      { vi: "Luu index dau tien cua moi remainder va kiem tra khoang cach it nhat 2.", en: "Store the earliest index for each remainder and require a distance of at least 2." },
+      {
+        vi: "Tại mỗi chỉ số i, tính tổng tiền tố prefix_sum = nums[0] + ... + nums[i], rồi lấy phần dư prefix_sum % k.",
+        en: "Track each prefix sum modulo k instead of the full sum.",
+      },
+      {
+        vi: "Nếu cùng một phần dư xuất hiện tại hai tổng tiền tố, hiệu của hai tổng đó chia hết cho k. Hiệu này chính là tổng đoạn con nằm giữa chúng.",
+        en: "When a remainder repeats, the sum between those prefixes is divisible by k.",
+      },
+      {
+        vi: "first_seen lưu chỉ số sớm nhất của từng phần dư. Chỉ trả về True khi khoảng cách giữa hai chỉ số ít nhất là 2.",
+        en: "Store the earliest index for each remainder and require a distance of at least 2.",
+      },
     ],
     complexity: {
       time: "O(n)",
       space: "O(min(n, k))",
       note: {
-        vi: "Duyet mot lan; hash map luu index dau tien cua moi remainder.",
+        vi: "Duyệt mảng một lần. Hash map first_seen lưu chỉ số xuất hiện đầu tiên của mỗi phần dư.",
         en: "One pass; the hash map stores the earliest index for each remainder.",
       },
     },

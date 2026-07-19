@@ -1851,6 +1851,11 @@ function renderPrefix2DView(step) {
 
 function renderPrefixRemainderView(step) {
   const view = step.prefixRemainderView || {};
+  const pickViewText = (value) => {
+    const isLocalized = value && !Array.isArray(value) && typeof value === "object"
+      && (Object.prototype.hasOwnProperty.call(value, "vi") || Object.prototype.hasOwnProperty.call(value, "en"));
+    return isLocalized ? pick(value) : value;
+  };
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const prefixSums = Array.isArray(view.prefixSums) ? view.prefixSums : [];
   const remainders = Array.isArray(view.remainders) ? view.remainders : [];
@@ -1860,12 +1865,12 @@ function renderPrefixRemainderView(step) {
   const matchStart = Number.isInteger(view.matchStart) ? view.matchStart : -1;
   const matchEnd = Number.isInteger(view.matchEnd) ? view.matchEnd : -1;
   const matchState = view.matchState === "too-short" ? "too-short" : "valid";
-  const heading = view.heading || "Numbers / prefix / remainder";
-  const prefixLabel = view.prefixLabel || "sum";
-  const remainderLabel = view.remainderLabel || "rem";
-  const mapTitle = view.mapTitle || "Earliest remainder index";
-  const mapKeyLabel = view.mapKeyLabel || "remainder";
-  const mapValueLabel = view.mapValueLabel || "index";
+  const heading = pickViewText(view.heading) || pick({ vi: "Mảng / tổng tiền tố / phần dư", en: "Numbers / prefix / remainder" });
+  const prefixLabel = pickViewText(view.prefixLabel) || pick({ vi: "tổng", en: "sum" });
+  const remainderLabel = pickViewText(view.remainderLabel) || pick({ vi: "dư", en: "rem" });
+  const mapTitle = pickViewText(view.mapTitle) || pick({ vi: "Chỉ số đầu tiên của mỗi phần dư", en: "Earliest remainder index" });
+  const mapKeyLabel = pickViewText(view.mapKeyLabel) || pick({ vi: "dư", en: "remainder" });
+  const mapValueLabel = pickViewText(view.mapValueLabel) || pick({ vi: "chỉ số", en: "index" });
 
   const cells = nums.map((num, index) => {
     const isCurrent = index === current;
@@ -1886,8 +1891,8 @@ function renderPrefixRemainderView(step) {
   </div>`).join("");
 
   const statusItems = statuses.map((item) => `<div>
-    <span>${escapeHtml(String(item.label ?? ""))}</span>
-    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+    <span>${escapeHtml(String(pickViewText(item.label) ?? ""))}</span>
+    <strong>${escapeHtml(String(pickViewText(item.value) ?? "-"))}</strong>
   </div>`).join("");
 
   $("treeView").innerHTML = `
