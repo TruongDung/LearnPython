@@ -133,6 +133,10 @@ function buildSteps1004(nums, params) {
  *  - Count windows whose length is exactly k.
  */
 function buildSteps1100(input, params) {
+  if (Number(params && params.approach) === 2) {
+    return buildSteps1100Set(input, params);
+  }
+
   const s = typeof input === "string" ? input.trim() : String(input);
   const k = params.k;
   const n = s.length;
@@ -416,6 +420,276 @@ function buildSteps1100(input, params) {
   });
 
   return { s, k, answer, steps };
+}
+
+/**
+ * LeetCode 1100, approach 2: keep a duplicate-free set window.
+ * After counting a length-k window, remove its left edge immediately.
+ */
+function buildSteps1100Set(input, params) {
+  const s = typeof input === "string" ? input.trim() : String(input);
+  const k = Number(params.k);
+  const chars = s.split("");
+  const charSet = new Set();
+  const steps = [];
+  const validStarts = [];
+  let left = 0;
+  let total = 0;
+
+  const inWindow = (lo, hi) => (
+    lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset) : []
+  );
+  const setText = () => `{${[...charSet].join(", ")}}`;
+  const validCells = () => validStarts.flatMap((start) =>
+    inWindow(start, start + k - 1).map((index) => [0, index + 1])
+  );
+  const setLabel = (labels, index, label) => {
+    if (index < 0 || index >= chars.length) return;
+    const key = `0,${index + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const makeGrid = (opts = {}) => {
+    const lo = Number.isInteger(opts.left) ? opts.left : left;
+    const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const labels = {};
+    setLabel(labels, lo, "i");
+    setLabel(labels, hi, hi === lo ? "j" : "j");
+    if (opts.duplicateChar) {
+      for (let index = lo; index <= hi; index++) {
+        if (s[index] === opts.duplicateChar) setLabel(labels, index, "dup");
+      }
+    }
+    if (opts.valid) {
+      for (let index = lo; index <= hi; index++) setLabel(labels, index, "valid");
+    }
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      pathCells: inWindow(lo, hi).map((index) => [0, index + 1]),
+      bestCells: opts.showValid === false ? [] : validCells(),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · char_set=${setText()} · total=${total}`,
+    };
+  };
+  const snap = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.grid || {}),
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars: opts.vars || [],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  };
+
+  snap({
+    title: { vi: "Khởi tạo char_set rỗng", en: "Initialize an empty char_set" },
+    codeLines: [3],
+    grid: { left: 0, right: -1, showValid: false, caption: `s="${s}" · k=${k}` },
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "k", value: k },
+      { name: "char_set", value: setText() },
+    ],
+    note: {
+      vi: "char_set chứa đúng các ký tự trong cửa sổ hiện tại và luôn không có phần tử trùng.",
+      en: "char_set contains exactly the current window's characters and never contains duplicates.",
+    },
+  });
+  snap({
+    title: { vi: "i = 0", en: "i = 0" },
+    codeLines: [4],
+    grid: { left, right: -1, showValid: false },
+    vars: [{ name: "i", value: left }],
+    note: { vi: "i là đầu trái của cửa sổ.", en: "i is the window's left boundary." },
+  });
+  snap({
+    title: { vi: "total = 0", en: "total = 0" },
+    codeLines: [5],
+    grid: { left, right: -1, showValid: false },
+    vars: [{ name: "total", value: total }],
+    note: { vi: "total đếm các substring hợp lệ độ dài k.", en: "total counts valid length-k substrings." },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = s[right];
+    snap({
+      title: { vi: `for j=${right}, s[j]='${ch}'`, en: `for j=${right}, s[j]='${ch}'` },
+      codeLines: [7],
+      grid: { left, right, focus: right, duplicateChar: charSet.has(ch) ? ch : null },
+      vars: [
+        { name: "i", value: left },
+        { name: "j", value: right },
+        { name: "s[j]", value: `'${ch}'` },
+        { name: "char_set", value: setText() },
+      ],
+      note: {
+        vi: `Mở rộng cạnh phải đến index ${right}. Chưa thêm '${ch}' vào set cho tới khi xử lý hết bản sao cũ.`,
+        en: `Move the right edge to index ${right}. Do not add '${ch}' until its old copy has been removed.`,
+      },
+    });
+
+    while (true) {
+      const duplicate = charSet.has(ch);
+      snap({
+        title: { vi: `while '${ch}' in char_set → ${duplicate}`, en: `while '${ch}' in char_set -> ${duplicate}` },
+        codeLines: [8],
+        grid: { left, right, focus: duplicate ? left : right, duplicateChar: duplicate ? ch : null },
+        vars: [
+          { name: "s[j] in char_set", value: duplicate },
+          { name: "char_set", value: setText() },
+          { name: "window", value: `"${s.slice(left, right + 1)}"` },
+        ],
+        note: duplicate
+          ? {
+              vi: `'${ch}' đã có trong cửa sổ. Phải xóa từ bên trái cho đến khi bản sao cũ của '${ch}' biến mất.`,
+              en: `'${ch}' is already in the window. Remove from the left until its old copy disappears.`,
+            }
+          : {
+              vi: `'${ch}' chưa có trong char_set, nên cửa sổ sẽ vẫn không lặp sau khi thêm.`,
+              en: `'${ch}' is not in char_set, so adding it preserves uniqueness.`,
+            },
+      });
+      if (!duplicate) break;
+
+      const removed = s[left];
+      charSet.delete(removed);
+      snap({
+        title: { vi: `char_set.remove('${removed}')`, en: `char_set.remove('${removed}')` },
+        codeLines: [9],
+        grid: { left, right, focus: left, duplicateChar: charSet.has(ch) ? ch : null },
+        vars: [
+          { name: "removed", value: `s[${left}] = '${removed}'` },
+          { name: "char_set", value: setText() },
+        ],
+        note: {
+          vi: `Xóa ký tự trái '${removed}' khỏi set trước khi dời i.`,
+          en: `Remove leftmost character '${removed}' from the set before moving i.`,
+        },
+      });
+
+      left += 1;
+      snap({
+        title: { vi: `i = ${left}`, en: `i = ${left}` },
+        codeLines: [10],
+        grid: { left, right, focus: left, duplicateChar: charSet.has(ch) ? ch : null },
+        vars: [
+          { name: "i", value: left },
+          { name: "window", value: `"${s.slice(left, right + 1)}"` },
+        ],
+        note: { vi: `Dời đầu trái sang index ${left}.`, en: `Move the left boundary to index ${left}.` },
+      });
+    }
+
+    charSet.add(ch);
+    snap({
+      title: { vi: `char_set.add('${ch}')`, en: `char_set.add('${ch}')` },
+      codeLines: [11],
+      grid: { left, right, focus: right },
+      vars: [
+        { name: "char_set", value: setText() },
+        { name: "window", value: `"${s.slice(left, right + 1)}"` },
+      ],
+      note: {
+        vi: `Thêm '${ch}'. Bây giờ char_set khớp chính xác với cửa sổ không lặp hiện tại.`,
+        en: `Add '${ch}'. char_set now exactly matches the current duplicate-free window.`,
+      },
+    });
+
+    const windowLength = right - left + 1;
+    const isValidK = windowLength === k;
+    snap({
+      title: { vi: `if j-i+1 == k → ${isValidK}`, en: `if j-i+1 == k -> ${isValidK}` },
+      codeLines: [13],
+      grid: { left, right, focus: right, valid: isValidK },
+      vars: [
+        { name: "j-i+1", value: `${right}-${left}+1 = ${windowLength}` },
+        { name: "k", value: k },
+        { name: "condition", value: isValidK },
+      ],
+      note: isValidK
+        ? { vi: "Cửa sổ không lặp có đúng độ dài k, nên đây là một đáp án.", en: "The duplicate-free window has length k, so it is a valid answer." }
+        : { vi: "Cửa sổ không lặp chưa đạt độ dài k.", en: "The duplicate-free window has not reached length k." },
+    });
+
+    if (isValidK) {
+      const validStart = left;
+      const validSubstring = s.slice(validStart, right + 1);
+      total += 1;
+      validStarts.push(validStart);
+      snap({
+        title: { vi: `total = ${total}`, en: `total = ${total}` },
+        codeLines: [14],
+        grid: { left, right, focus: right, valid: true },
+        vars: [
+          { name: "valid substring", value: `"${validSubstring}"` },
+          { name: "total", value: total },
+        ],
+        note: { vi: `Đếm substring "${validSubstring}".`, en: `Count substring "${validSubstring}".` },
+      });
+
+      const removed = s[left];
+      charSet.delete(removed);
+      snap({
+        title: { vi: `char_set.remove('${removed}')`, en: `char_set.remove('${removed}')` },
+        codeLines: [15],
+        grid: { left, right, focus: left, valid: true },
+        vars: [
+          { name: "removed", value: `s[${left}] = '${removed}'` },
+          { name: "char_set", value: setText() },
+        ],
+        note: {
+          vi: `Sau khi đếm, xóa cạnh trái '${removed}' ngay. Cửa sổ chuẩn bị cho j tiếp theo sẽ dài tối đa k-1.`,
+          en: `After counting, immediately remove left edge '${removed}'. The next iteration starts with at most k-1 characters.`,
+        },
+      });
+
+      left += 1;
+      snap({
+        title: { vi: `i = ${left}`, en: `i = ${left}` },
+        codeLines: [16],
+        grid: { left, right, focus: left },
+        vars: [
+          { name: "i", value: left },
+          { name: "next window", value: `"${s.slice(left, right + 1)}"` },
+          { name: "char_set", value: setText() },
+        ],
+        note: {
+          vi: `Dời i sang ${left}; không cần điều kiện window > k trong approach này.`,
+          en: `Move i to ${left}; this approach never needs a window > k condition.`,
+        },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `return ${total}`, en: `return ${total}` },
+    codeLines: [18],
+    grid: {
+      left: 0,
+      right: -1,
+      caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · total=${total}`,
+    },
+    vars: [
+      { name: "total", value: total },
+      { name: "valid windows", value: validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none" },
+    ],
+    note: {
+      vi: `Có ${total} substring độ dài ${k} không có ký tự lặp.`,
+      en: `There are ${total} substring(s) of length ${k} with no repeated characters.`,
+    },
+    final: true,
+  });
+
+  return { s, k, answer: total, steps };
 }
 
 /**
@@ -1284,13 +1558,28 @@ module.exports = {
     inputLabel: { vi: "Chuỗi s", en: "String s" },
     extraParams: [
       { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 5 },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Frequency map", en: "Approach 1: Frequency map" } },
+          { value: 2, label: { vi: "Cách 2: Character set", en: "Approach 2: Character set" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 dùng frequency map; co trái khi có duplicate hoặc cửa sổ dài hơn k.", en: "Approach 1 uses a frequency map; shrink on duplicates or when the window exceeds k." },
+      { vi: "Cách 2 dùng set; co trái đến khi s[j] không còn trùng.", en: "Approach 2 uses a set; shrink until s[j] is no longer duplicated." },
+      { vi: "Khi cách 2 đếm được cửa sổ dài k, xóa cạnh trái ngay để cửa sổ kế tiếp không thể dài hơn k.", en: "After approach 2 counts a length-k window, it immediately removes the left edge so the next window cannot exceed k." },
     ],
     complexity: {
       time: "O(n)",
       space: "O(min(n, charset))",
       note: {
-        vi: "Mỗi ký tự vào/ra cửa sổ tối đa một lần. Bảng đếm giữ ký tự trong cửa sổ.",
-        en: "Each character enters and leaves the window at most once. The frequency map stores characters in the window.",
+        vi: "Cả hai cách đều O(n): mỗi ký tự vào/ra cửa sổ tối đa một lần. Map hoặc set giữ các ký tự trong cửa sổ.",
+        en: "Both approaches are O(n): each character enters and leaves the window at most once. A map or set stores the window's characters.",
       },
     },
     code: [
@@ -1309,6 +1598,28 @@ module.exports = {
       "                answer += 1",
       "        return answer",
     ],
+    code2: [
+      "class Solution:",
+      "    def numKLenSubstrNoRepeats(self, s: str, k: int) -> int:",
+      "        char_set = set()",
+      "        i = 0",
+      "        total = 0",
+      "",
+      "        for j in range(len(s)):",
+      "            while s[j] in char_set:",
+      "                char_set.remove(s[i])",
+      "                i += 1",
+      "            char_set.add(s[j])",
+      "",
+      "            if j-i+1 == k:",
+      "                total += 1",
+      "                char_set.remove(s[i])",
+      "                i += 1",
+      "",
+      "        return total",
+    ],
+    codeLabel: { vi: "Cách 1: Frequency map", en: "Approach 1: Frequency map" },
+    code2Label: { vi: "Cách 2: Character set", en: "Approach 2: Character set" },
     builder: buildSteps1100,
   },
   1004: {
