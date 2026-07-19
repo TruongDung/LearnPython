@@ -3682,10 +3682,13 @@ function buildSteps636(input, params) {
  * LeetCode 1081: Smallest Subsequence of Distinct Characters.
  * Build the lexicographically smallest valid answer with a monotonic stack.
  */
-function buildSteps1081(input) {
+function buildSteps1081(input, params) {
   const s = typeof input === "string" ? input.trim() : String(input);
   const chars = s.split("");
+  const approach = Number(params && params.approach) === 2 ? 2 : 1;
+  const usesFrequency = approach === 2;
   const last = new Map();
+  const freq = new Map(chars.map((ch) => [ch, 0]));
   const stack = [];
   const used = new Set();
   const steps = [];
@@ -3704,6 +3707,10 @@ function buildSteps1081(input) {
     return `{${[...last.entries()].map(([ch, index]) => `${ch}: ${index}`).join(", ")}}`;
   }
 
+  function freqLabel() {
+    return `{${[...freq.entries()].map(([ch, count]) => `${ch}: ${count}`).join(", ")}}`;
+  }
+
   function pushStep(opts) {
     const current = Number.isInteger(opts.current) ? opts.current : -1;
     const top = stack.length ? stack[stack.length - 1].ch : null;
@@ -3714,12 +3721,15 @@ function buildSteps1081(input) {
       highlight: current >= 0 && current < chars.length ? [current] : [],
       mark: stack.map((item) => item.index),
       codeLines: opts.codeLines || [opts.codeLine],
+      codeBlock: approach,
       stackView: {
         title: "Monotonic stack",
         emptyLabel: "empty stack",
         items: stack.map((item) => ({
           value: item.ch,
-          detail: `picked at ${item.index}, last at ${last.get(item.ch)}`,
+          detail: usesFrequency
+            ? `picked at ${item.index}, remaining ${freq.get(item.ch)}`
+            : `picked at ${item.index}, last at ${last.get(item.ch)}`,
         })),
         input: chars,
         inputLabel: "Input s (character / index)",
@@ -3727,14 +3737,14 @@ function buildSteps1081(input) {
         status: [
           { label: "current", value: current >= 0 && current < chars.length ? `'${chars[current]}' @ ${current}` : "-" },
           { label: "top", value: top === null ? "empty" : `'${top}'` },
-          { label: "used", value: usedLabel() },
+          { label: usesFrequency ? "vis" : "used", value: usedLabel() },
           { label: "answer so far", value: stack.map((item) => item.ch).join("") || "empty" },
         ],
       },
       vars: [
         { name: "stack", value: stackLabel() },
-        { name: "used", value: usedLabel() },
-        { name: "last", value: lastLabel() },
+        { name: usesFrequency ? "vis" : "used", value: usedLabel() },
+        { name: usesFrequency ? "freq" : "last", value: usesFrequency ? freqLabel() : lastLabel() },
         ...(opts.vars || []),
       ],
       note: opts.note,
@@ -3742,44 +3752,94 @@ function buildSteps1081(input) {
     });
   }
 
-  pushStep({
-    title: { vi: "Tính vị trí cuối của mỗi ký tự", en: "Record each character's last index" },
-    codeLine: 3,
-    vars: [{ name: "s", value: `"${s}"` }],
-    note: {
-      vi: "last[ch] cho biết sau vị trí hiện tại còn cơ hội gặp lại ch hay không. Chỉ được pop một ký tự khi nó vẫn xuất hiện ở phía sau.",
-      en: "last[ch] tells whether ch appears again later. A character may be popped only when another copy remains ahead.",
-    },
-  });
-
-  pushStep({
-    title: { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" },
-    codeLine: 4,
-    note: {
-      vi: "Stack sẽ chứa subsequence nhỏ nhất đang xây dựng; thứ tự trong stack luôn giữ đúng thứ tự xuất hiện trong s.",
-      en: "The stack holds the smallest subsequence built so far while preserving the order from s.",
-    },
-  });
-
-  pushStep({
-    title: { vi: "Khởi tạo used rỗng", en: "Initialize an empty used set" },
-    codeLine: 5,
-    note: {
-      vi: "used giúp mỗi ký tự chỉ xuất hiện một lần trong stack.",
-      en: "used ensures that every character appears in the stack at most once.",
-    },
-  });
+  if (usesFrequency) {
+    pushStep({
+      title: { vi: "Khởi tạo freq bằng 0", en: "Initialize freq with zero counts" },
+      codeLine: 3,
+      vars: [{ name: "s", value: `"${s}"` }],
+      note: {
+        vi: "Tạo một key cho mỗi ký tự khác nhau. Vòng lặp kế tiếp sẽ đếm tổng số lần xuất hiện.",
+        en: "Create one key for every distinct character. The next loop counts all occurrences.",
+      },
+    });
+    pushStep({
+      title: { vi: "Khởi tạo vis rỗng", en: "Initialize an empty vis set" },
+      codeLine: 4,
+      note: {
+        vi: "vis đảm bảo mỗi ký tự chỉ xuất hiện một lần trong stack.",
+        en: "vis ensures that every character appears in the stack at most once.",
+      },
+    });
+    pushStep({
+      title: { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" },
+      codeLine: 5,
+      note: {
+        vi: "Stack sẽ chứa subsequence nhỏ nhất đang xây dựng.",
+        en: "The stack will hold the smallest subsequence built so far.",
+      },
+    });
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      pushStep({
+        title: { vi: `Đếm '${ch}' tại index ${i}`, en: `Count '${ch}' at index ${i}` },
+        codeLine: 7,
+        current: i,
+        vars: [{ name: "ch", value: `'${ch}'` }],
+        note: {
+          vi: `Bắt đầu lượt đếm cho s[${i}] = '${ch}'.`,
+          en: `Begin the counting iteration for s[${i}] = '${ch}'.`,
+        },
+      });
+      freq.set(ch, freq.get(ch) + 1);
+      pushStep({
+        title: { vi: `freq['${ch}'] = ${freq.get(ch)}`, en: `freq['${ch}'] = ${freq.get(ch)}` },
+        codeLine: 8,
+        current: i,
+        vars: [{ name: `freq['${ch}']`, value: freq.get(ch) }],
+        note: {
+          vi: `Đã đếm ${freq.get(ch)} lần xuất hiện của '${ch}'.`,
+          en: `Counted ${freq.get(ch)} occurrence(s) of '${ch}'.`,
+        },
+      });
+    }
+  } else {
+    pushStep({
+      title: { vi: "Tính vị trí cuối của mỗi ký tự", en: "Record each character's last index" },
+      codeLine: 3,
+      vars: [{ name: "s", value: `"${s}"` }],
+      note: {
+        vi: "last[ch] cho biết sau vị trí hiện tại còn cơ hội gặp lại ch hay không. Chỉ được pop một ký tự khi nó vẫn xuất hiện ở phía sau.",
+        en: "last[ch] tells whether ch appears again later. A character may be popped only when another copy remains ahead.",
+      },
+    });
+    pushStep({
+      title: { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" },
+      codeLine: 4,
+      note: {
+        vi: "Stack sẽ chứa subsequence nhỏ nhất đang xây dựng; thứ tự trong stack luôn giữ đúng thứ tự xuất hiện trong s.",
+        en: "The stack holds the smallest subsequence built so far while preserving the order from s.",
+      },
+    });
+    pushStep({
+      title: { vi: "Khởi tạo used rỗng", en: "Initialize an empty used set" },
+      codeLine: 5,
+      note: {
+        vi: "used giúp mỗi ký tự chỉ xuất hiện một lần trong stack.",
+        en: "used ensures that every character appears in the stack at most once.",
+      },
+    });
+  }
 
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
     pushStep({
       title: { vi: `Đọc s[${i}] = '${ch}'`, en: `Read s[${i}] = '${ch}'` },
-      codeLine: 6,
+      codeLine: usesFrequency ? 10 : 6,
       current: i,
       vars: [
         { name: "i", value: i },
         { name: "ch", value: `'${ch}'` },
-        { name: "last[ch]", value: last.get(ch) },
+        { name: usesFrequency ? "freq[ch] before" : "last[ch]", value: usesFrequency ? freq.get(ch) : last.get(ch) },
       ],
       note: {
         vi: `Xử lý ký tự '${ch}' tại index ${i}.`,
@@ -3787,13 +3847,32 @@ function buildSteps1081(input) {
       },
     });
 
+    if (usesFrequency) {
+      const before = freq.get(ch);
+      freq.set(ch, before - 1);
+      pushStep({
+        title: { vi: `freq['${ch}'] giảm còn ${freq.get(ch)}`, en: `Decrease freq['${ch}'] to ${freq.get(ch)}` },
+        codeLine: 11,
+        current: i,
+        vars: [
+          { name: "before", value: before },
+          { name: "after", value: freq.get(ch) },
+          { name: "meaning", value: "copies after current index" },
+        ],
+        note: {
+          vi: `Giảm trước khi xử lý để freq['${ch}'] chỉ còn số bản sao nằm sau index ${i}.`,
+          en: `Decrement before processing so freq['${ch}'] counts only copies after index ${i}.`,
+        },
+      });
+    }
+
     const alreadyUsed = used.has(ch);
     pushStep({
-      title: { vi: `'${ch}' ${alreadyUsed ? "đã" : "chưa"} có trong used`, en: `'${ch}' is ${alreadyUsed ? "already" : "not"} in used` },
-      codeLine: 7,
+      title: { vi: `'${ch}' ${alreadyUsed ? "đã" : "chưa"} có trong ${usesFrequency ? "vis" : "used"}`, en: `'${ch}' is ${alreadyUsed ? "already" : "not"} in ${usesFrequency ? "vis" : "used"}` },
+      codeLine: usesFrequency ? 12 : 7,
       current: i,
       vars: [
-        { name: "ch in used", value: alreadyUsed },
+        { name: usesFrequency ? "ch in vis" : "ch in used", value: alreadyUsed },
         { name: "decision", value: alreadyUsed ? "continue" : "check stack" },
       ],
       note: {
@@ -3809,7 +3888,7 @@ function buildSteps1081(input) {
     if (alreadyUsed) {
       pushStep({
         title: { vi: `Bỏ qua '${ch}'`, en: `Skip '${ch}'` },
-        codeLine: 8,
+        codeLine: usesFrequency ? 13 : 8,
         current: i,
         vars: [{ name: "action", value: "continue" }],
         note: {
@@ -3824,30 +3903,43 @@ function buildSteps1081(input) {
       const topItem = stack.length ? stack[stack.length - 1] : null;
       const hasTop = topItem !== null;
       const smaller = hasTop && ch < topItem.ch;
-      const topAppearsAgain = hasTop && i < last.get(topItem.ch);
+      const topAppearsAgain = hasTop && (usesFrequency ? freq.get(topItem.ch) > 0 : i < last.get(topItem.ch));
       const shouldPop = hasTop && smaller && topAppearsAgain;
       let failedReason;
       if (!hasTop) failedReason = "stack is empty";
       else if (!smaller) failedReason = `'${ch}' >= '${topItem.ch}'`;
-      else failedReason = `'${topItem.ch}' has no copy after index ${i}`;
+      else failedReason = usesFrequency
+        ? `freq['${topItem.ch}'] = 0`
+        : `'${topItem.ch}' has no copy after index ${i}`;
 
       pushStep({
         title: { vi: shouldPop ? `Có thể pop '${topItem.ch}'` : "Dừng vòng while", en: shouldPop ? `Can pop '${topItem.ch}'` : "Stop the while loop" },
-        codeLine: 9,
+        codeLine: usesFrequency ? 14 : 9,
         current: i,
         vars: [
           { name: "bool(stack)", value: hasTop },
           { name: "ch < stack[-1]", value: hasTop ? `${ch} < ${topItem.ch} = ${smaller}` : "not evaluated" },
-          { name: "i < last[stack[-1]]", value: hasTop ? `${i} < ${last.get(topItem.ch)} = ${topAppearsAgain}` : "not evaluated" },
+          {
+            name: usesFrequency ? "freq[stack[-1]] > 0" : "i < last[stack[-1]]",
+            value: hasTop
+              ? usesFrequency
+                ? `${freq.get(topItem.ch)} > 0 = ${topAppearsAgain}`
+                : `${i} < ${last.get(topItem.ch)} = ${topAppearsAgain}`
+              : "not evaluated",
+          },
           { name: "while condition", value: shouldPop },
           ...(!shouldPop ? [{ name: "failed at", value: failedReason }] : []),
         ],
         note: {
           vi: shouldPop
-            ? `'${ch}' nhỏ hơn top '${topItem.ch}', và '${topItem.ch}' còn xuất hiện tại index ${last.get(topItem.ch)}. Pop top sẽ làm đáp án nhỏ hơn mà không làm mất ký tự.`
+            ? usesFrequency
+              ? `'${ch}' nhỏ hơn top '${topItem.ch}', và freq['${topItem.ch}'] = ${freq.get(topItem.ch)} > 0. Pop top sẽ làm đáp án nhỏ hơn mà không làm mất ký tự.`
+              : `'${ch}' nhỏ hơn top '${topItem.ch}', và '${topItem.ch}' còn xuất hiện tại index ${last.get(topItem.ch)}. Pop top sẽ làm đáp án nhỏ hơn mà không làm mất ký tự.`
             : `Không pop: ${failedReason}.`,
           en: shouldPop
-            ? `'${ch}' is smaller than top '${topItem.ch}', and '${topItem.ch}' appears again at index ${last.get(topItem.ch)}. Popping improves the answer without losing that character.`
+            ? usesFrequency
+              ? `'${ch}' is smaller than top '${topItem.ch}', and freq['${topItem.ch}'] = ${freq.get(topItem.ch)} > 0. Popping improves the answer without losing that character.`
+              : `'${ch}' is smaller than top '${topItem.ch}', and '${topItem.ch}' appears again at index ${last.get(topItem.ch)}. Popping improves the answer without losing that character.`
             : `Do not pop: ${failedReason}.`,
         },
       });
@@ -3857,16 +3949,19 @@ function buildSteps1081(input) {
       const removed = stack.pop();
       used.delete(removed.ch);
       pushStep({
-        title: { vi: `Pop '${removed.ch}' và xóa khỏi used`, en: `Pop '${removed.ch}' and remove it from used` },
-        codeLine: 10,
+        title: { vi: `Pop '${removed.ch}' và xóa khỏi ${usesFrequency ? "vis" : "used"}`, en: `Pop '${removed.ch}' and remove it from ${usesFrequency ? "vis" : "used"}` },
+        codeLine: usesFrequency ? 15 : 10,
         current: i,
         vars: [
           { name: "removed", value: `'${removed.ch}' from index ${removed.index}` },
-          { name: "next copy", value: `index ${last.get(removed.ch)}` },
+          {
+            name: "future copy",
+            value: usesFrequency ? `${freq.get(removed.ch)} remaining` : `last index ${last.get(removed.ch)}`,
+          },
         ],
         note: {
-          vi: `'${removed.ch}' đã rời stack nên cũng phải xóa khỏi used; lần xuất hiện sau của nó có thể được push lại.`,
-          en: `'${removed.ch}' left the stack, so it must also leave used; its later occurrence may be pushed again.`,
+          vi: `'${removed.ch}' đã rời stack nên cũng phải xóa khỏi ${usesFrequency ? "vis" : "used"}; lần xuất hiện sau của nó có thể được push lại.`,
+          en: `'${removed.ch}' left the stack, so it must also leave ${usesFrequency ? "vis" : "used"}; its later occurrence may be pushed again.`,
         },
       });
     }
@@ -3874,7 +3969,7 @@ function buildSteps1081(input) {
     stack.push({ ch, index: i });
     pushStep({
       title: { vi: `Push '${ch}' vào stack`, en: `Push '${ch}' onto the stack` },
-      codeLine: 11,
+      codeLine: usesFrequency ? 16 : 11,
       current: i,
       vars: [{ name: "action", value: `stack.append('${ch}')` }],
       note: {
@@ -3885,10 +3980,10 @@ function buildSteps1081(input) {
 
     used.add(ch);
     pushStep({
-      title: { vi: `Thêm '${ch}' vào used`, en: `Add '${ch}' to used` },
-      codeLine: 12,
+      title: { vi: `Thêm '${ch}' vào ${usesFrequency ? "vis" : "used"}`, en: `Add '${ch}' to ${usesFrequency ? "vis" : "used"}` },
+      codeLine: usesFrequency ? 17 : 12,
       current: i,
-      vars: [{ name: "action", value: `used.add('${ch}')` }],
+      vars: [{ name: "action", value: `${usesFrequency ? "vis" : "used"}.add('${ch}')` }],
       note: {
         vi: `Đánh dấu '${ch}' đã nằm trong stack để các bản sao phía sau được bỏ qua.`,
         en: `Mark '${ch}' as present in the stack so later duplicates are skipped.`,
@@ -3899,7 +3994,7 @@ function buildSteps1081(input) {
   const answer = stack.map((item) => item.ch).join("");
   pushStep({
     title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
-    codeLine: 13,
+    codeLine: usesFrequency ? 19 : 13,
     current: chars.length,
     vars: [{ name: "answer", value: `"${answer}"` }],
     note: {
@@ -4104,19 +4199,30 @@ module.exports = {
     defaultInput: "cbacdcbc",
     inputKind: "string",
     inputLabel: { vi: "String s", en: "String s" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Last index + used", en: "Approach 1: Last index + used" } },
+          { value: 2, label: { vi: "Cách 2: Remaining frequency + vis", en: "Approach 2: Remaining frequency + vis" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Lưu index xuất hiện cuối của mỗi ký tự.", en: "Record the last occurrence index of every character." },
-      { vi: "used đảm bảo mỗi ký tự chỉ có một lần trong monotonic stack.", en: "A used set keeps each character in the monotonic stack at most once." },
-      { vi: "Khi ch nhỏ hơn stack top, chỉ pop top nếu top còn xuất hiện lại phía sau.", en: "When ch is smaller than the stack top, pop the top only if it appears again later." },
-      { vi: "Nối stack để nhận subsequence nhỏ nhất hợp lệ.", en: "Join the stack to obtain the smallest valid subsequence." },
+      { vi: "Cách 1 lưu last index; top còn xuất hiện phía sau khi i < last[top].", en: "Approach 1 stores last indices; the top appears later when i < last[top]." },
+      { vi: "Cách 2 đếm freq còn lại; giảm freq[ch] trước, rồi top còn xuất hiện khi freq[top] > 0.", en: "Approach 2 tracks remaining frequencies; decrement freq[ch] first, then the top appears later when freq[top] > 0." },
+      { vi: "used/vis đảm bảo mỗi ký tự chỉ có một lần trong monotonic stack.", en: "used/vis keeps each character in the monotonic stack at most once." },
+      { vi: "Cả hai cách chỉ pop top lớn hơn ch khi top chắc chắn còn một bản sao phía sau.", en: "Both approaches pop a larger top only when another copy is guaranteed to appear later." },
     ],
     complexity: {
       time: "O(n)",
       space: "O(k)",
       note: {
-        vi: "Mỗi ký tự được push và pop tối đa một lần. k là số ký tự khác nhau.",
-        en: "Each character is pushed and popped at most once. k is the number of distinct characters.",
+        vi: "Cả hai cách đều O(n): mỗi ký tự được push và pop tối đa một lần. k là số ký tự khác nhau.",
+        en: "Both approaches are O(n): each character is pushed and popped at most once. k is the number of distinct characters.",
       },
     },
     code: [
@@ -4134,6 +4240,29 @@ module.exports = {
       "            used.add(ch)",
       "        return ''.join(stack)",
     ],
+    code2: [
+      "class Solution:",
+      "    def smallestSubsequence(self, s: str) -> str:",
+      "        freq = {ch: 0 for ch in s}",
+      "        vis = set()",
+      "        stack = []",
+      "",
+      "        for ch in s:",
+      "            freq[ch] += 1",
+      "",
+      "        for ch in s:",
+      "            freq[ch] -= 1",
+      "            if ch in vis:",
+      "                continue",
+      "            while stack and stack[-1] > ch and freq[stack[-1]] > 0:",
+      "                vis.remove(stack.pop())",
+      "            stack.append(ch)",
+      "            vis.add(ch)",
+      "",
+      "        return \"\".join(stack)",
+    ],
+    codeLabel: { vi: "Cách 1: Last index + used", en: "Approach 1: Last index + used" },
+    code2Label: { vi: "Cách 2: Remaining frequency + vis", en: "Approach 2: Remaining frequency + vis" },
     builder: buildSteps1081,
   },
   20: {
