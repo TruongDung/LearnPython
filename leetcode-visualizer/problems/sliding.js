@@ -165,9 +165,10 @@ function buildSteps1100(input, params) {
   const makeGrid = (opts = {}) => {
     const lo = Number.isInteger(opts.left) ? opts.left : left;
     const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const currentIndices = new Set(inWindow(lo, hi));
     const labels = {};
-    setLabel(labels, lo, "L");
-    setLabel(labels, hi, hi === lo ? "R" : "R");
+    setLabel(labels, lo, `left=${lo}`);
+    setLabel(labels, hi, `right=${hi}`);
     if (opts.duplicateChar) {
       for (let idx = lo; idx <= hi; idx++) {
         if (s[idx] === opts.duplicateChar) setLabel(labels, idx, "dup");
@@ -182,8 +183,11 @@ function buildSteps1100(input, params) {
       text2: s,
       colLabels: chars.map((char, idx) => ({ index: `idx=${idx}`, char })),
       hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      autoScrollCell: hi >= 0 ? [0, hi + 1] : null,
       pathCells: inWindow(lo, hi).map((idx) => [0, idx + 1]),
-      bestCells: opts.showValid === false ? [] : validCells(),
+      historyCells: opts.showValid === false
+        ? []
+        : validCells().filter(([, col]) => !currentIndices.has(col - 1)),
       cellLabels: labels,
       largeCells: true,
       caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · count=${countText()} · answer=${answer}`,
@@ -404,8 +408,8 @@ function buildSteps1100(input, params) {
     title: { vi: `return ${answer}`, en: `return ${answer}` },
     codeLines: [14],
     grid: {
-      left: 0,
-      right: -1,
+      left,
+      right: n - 1,
       caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · answer=${answer}`,
     },
     vars: [
@@ -451,9 +455,10 @@ function buildSteps1100Set(input, params) {
   const makeGrid = (opts = {}) => {
     const lo = Number.isInteger(opts.left) ? opts.left : left;
     const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const currentIndices = new Set(inWindow(lo, hi));
     const labels = {};
-    setLabel(labels, lo, "i");
-    setLabel(labels, hi, hi === lo ? "j" : "j");
+    setLabel(labels, lo, `left=${lo}`);
+    setLabel(labels, hi, `right=${hi}`);
     if (opts.duplicateChar) {
       for (let index = lo; index <= hi; index++) {
         if (s[index] === opts.duplicateChar) setLabel(labels, index, "dup");
@@ -468,14 +473,19 @@ function buildSteps1100Set(input, params) {
       text2: s,
       colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
       hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      autoScrollCell: hi >= 0 ? [0, hi + 1] : null,
       pathCells: inWindow(lo, hi).map((index) => [0, index + 1]),
-      bestCells: opts.showValid === false ? [] : validCells(),
+      historyCells: opts.showValid === false
+        ? []
+        : validCells().filter(([, col]) => !currentIndices.has(col - 1)),
       cellLabels: labels,
       largeCells: true,
       caption: opts.caption || `window="${lo <= hi ? s.slice(lo, hi + 1) : ""}" · len=${Math.max(0, hi - lo + 1)}/${k} · char_set=${setText()} · total=${total}`,
     };
   };
   const snap = (opts) => {
+    const persistentVarNames = new Set(["left", "total", "char_set"]);
+    const extraVars = (opts.vars || []).filter(({ name }) => !persistentVarNames.has(name));
     steps.push({
       title: opts.title,
       arr: [],
@@ -484,7 +494,12 @@ function buildSteps1100Set(input, params) {
       mark: [],
       codeLines: opts.codeLines || [],
       codeBlock: 2,
-      vars: opts.vars || [],
+      vars: [
+        { name: "left", value: left },
+        { name: "total", value: total },
+        { name: "char_set", value: setText() },
+        ...extraVars,
+      ],
       note: opts.note,
       final: Boolean(opts.final),
     });
@@ -505,11 +520,11 @@ function buildSteps1100Set(input, params) {
     },
   });
   snap({
-    title: { vi: "i = 0", en: "i = 0" },
+    title: { vi: "left = 0", en: "left = 0" },
     codeLines: [4],
     grid: { left, right: -1, showValid: false },
-    vars: [{ name: "i", value: left }],
-    note: { vi: "i là đầu trái của cửa sổ.", en: "i is the window's left boundary." },
+    vars: [{ name: "left", value: left }],
+    note: { vi: "left là đầu trái của cửa sổ.", en: "left is the window's left boundary." },
   });
   snap({
     title: { vi: "total = 0", en: "total = 0" },
@@ -522,13 +537,13 @@ function buildSteps1100Set(input, params) {
   for (let right = 0; right < chars.length; right++) {
     const ch = s[right];
     snap({
-      title: { vi: `for j=${right}, s[j]='${ch}'`, en: `for j=${right}, s[j]='${ch}'` },
+      title: { vi: `for right=${right}, s[right]='${ch}'`, en: `for right=${right}, s[right]='${ch}'` },
       codeLines: [7],
       grid: { left, right, focus: right, duplicateChar: charSet.has(ch) ? ch : null },
       vars: [
-        { name: "i", value: left },
-        { name: "j", value: right },
-        { name: "s[j]", value: `'${ch}'` },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "s[right]", value: `'${ch}'` },
         { name: "char_set", value: setText() },
       ],
       note: {
@@ -540,11 +555,11 @@ function buildSteps1100Set(input, params) {
     while (true) {
       const duplicate = charSet.has(ch);
       snap({
-        title: { vi: `while '${ch}' in char_set → ${duplicate}`, en: `while '${ch}' in char_set -> ${duplicate}` },
+        title: { vi: `while s[right] in char_set → ${duplicate}`, en: `while s[right] in char_set -> ${duplicate}` },
         codeLines: [8],
         grid: { left, right, focus: duplicate ? left : right, duplicateChar: duplicate ? ch : null },
         vars: [
-          { name: "s[j] in char_set", value: duplicate },
+          { name: "s[right] in char_set", value: duplicate },
           { name: "char_set", value: setText() },
           { name: "window", value: `"${s.slice(left, right + 1)}"` },
         ],
@@ -571,21 +586,21 @@ function buildSteps1100Set(input, params) {
           { name: "char_set", value: setText() },
         ],
         note: {
-          vi: `Xóa ký tự trái '${removed}' khỏi set trước khi dời i.`,
-          en: `Remove leftmost character '${removed}' from the set before moving i.`,
+          vi: `Xóa ký tự trái '${removed}' khỏi set trước khi dời left.`,
+          en: `Remove leftmost character '${removed}' from the set before moving left.`,
         },
       });
 
       left += 1;
       snap({
-        title: { vi: `i = ${left}`, en: `i = ${left}` },
+        title: { vi: `left = ${left}`, en: `left = ${left}` },
         codeLines: [10],
         grid: { left, right, focus: left, duplicateChar: charSet.has(ch) ? ch : null },
         vars: [
-          { name: "i", value: left },
+          { name: "left", value: left },
           { name: "window", value: `"${s.slice(left, right + 1)}"` },
         ],
-        note: { vi: `Dời đầu trái sang index ${left}.`, en: `Move the left boundary to index ${left}.` },
+        note: { vi: `Dời left sang index ${left}.`, en: `Move left to index ${left}.` },
       });
     }
 
@@ -607,11 +622,11 @@ function buildSteps1100Set(input, params) {
     const windowLength = right - left + 1;
     const isValidK = windowLength === k;
     snap({
-      title: { vi: `if j-i+1 == k → ${isValidK}`, en: `if j-i+1 == k -> ${isValidK}` },
+      title: { vi: `if right-left+1 == k → ${isValidK}`, en: `if right-left+1 == k -> ${isValidK}` },
       codeLines: [13],
       grid: { left, right, focus: right, valid: isValidK },
       vars: [
-        { name: "j-i+1", value: `${right}-${left}+1 = ${windowLength}` },
+        { name: "right-left+1", value: `${right}-${left}+1 = ${windowLength}` },
         { name: "k", value: k },
         { name: "condition", value: isValidK },
       ],
@@ -647,24 +662,24 @@ function buildSteps1100Set(input, params) {
           { name: "char_set", value: setText() },
         ],
         note: {
-          vi: `Sau khi đếm, xóa cạnh trái '${removed}' ngay. Cửa sổ chuẩn bị cho j tiếp theo sẽ dài tối đa k-1.`,
+          vi: `Sau khi đếm, xóa cạnh trái '${removed}' ngay. Cửa sổ chuẩn bị cho right tiếp theo sẽ dài tối đa k-1.`,
           en: `After counting, immediately remove left edge '${removed}'. The next iteration starts with at most k-1 characters.`,
         },
       });
 
       left += 1;
       snap({
-        title: { vi: `i = ${left}`, en: `i = ${left}` },
+        title: { vi: `left = ${left}`, en: `left = ${left}` },
         codeLines: [16],
         grid: { left, right, focus: left },
         vars: [
-          { name: "i", value: left },
+          { name: "left", value: left },
           { name: "next window", value: `"${s.slice(left, right + 1)}"` },
           { name: "char_set", value: setText() },
         ],
         note: {
-          vi: `Dời i sang ${left}; không cần điều kiện window > k trong approach này.`,
-          en: `Move i to ${left}; this approach never needs a window > k condition.`,
+          vi: `Dời left sang ${left}; không cần điều kiện window > k trong approach này.`,
+          en: `Move left to ${left}; this approach never needs a window > k condition.`,
         },
       });
     }
@@ -674,8 +689,8 @@ function buildSteps1100Set(input, params) {
     title: { vi: `return ${total}`, en: `return ${total}` },
     codeLines: [18],
     grid: {
-      left: 0,
-      right: -1,
+      left,
+      right: chars.length - 1,
       caption: `valid windows: ${validStarts.map((start) => `"${s.slice(start, start + k)}"`).join(", ") || "none"} · total=${total}`,
     },
     vars: [
@@ -1602,19 +1617,19 @@ module.exports = {
       "class Solution:",
       "    def numKLenSubstrNoRepeats(self, s: str, k: int) -> int:",
       "        char_set = set()",
-      "        i = 0",
+      "        left = 0",
       "        total = 0",
       "",
-      "        for j in range(len(s)):",
-      "            while s[j] in char_set:",
-      "                char_set.remove(s[i])",
-      "                i += 1",
-      "            char_set.add(s[j])",
+      "        for right in range(len(s)):",
+      "            while s[right] in char_set:",
+      "                char_set.remove(s[left])",
+      "                left += 1",
+      "            char_set.add(s[right])",
       "",
-      "            if j-i+1 == k:",
+      "            if right - left + 1 == k:",
       "                total += 1",
-      "                char_set.remove(s[i])",
-      "                i += 1",
+      "                char_set.remove(s[left])",
+      "                left += 1",
       "",
       "        return total",
     ],

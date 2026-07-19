@@ -1193,8 +1193,9 @@ function renderBfsGrid(step) {
 
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
-  const { dp, text1, text2, hlCell, pathCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, mutedCells } = step.grid;
+  const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, mutedCells } = step.grid;
   const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
+  const historySet = new Set((historyCells || []).map(([r, c]) => `${r},${c}`));
   const mutedSet = new Set((mutedCells || []).map(([r, c]) => `${r},${c}`));
   const bestSet = new Set((bestCells || []).map(([r, c]) => `${r},${c}`));
   if (bestCell) bestSet.add(`${bestCell[0]},${bestCell[1]}`);
@@ -1234,6 +1235,7 @@ function renderGrid(step) {
     for (let j = 0; j <= n; j++) {
       let cls = "dp-cell";
       if (hlCell && hlCell[0] === i && hlCell[1] === j) cls += " hl";
+      if (historySet.has(`${i},${j}`)) cls += " history";
       if (pathSet.has(`${i},${j}`)) cls += " path";
       if (bestSet.has(`${i},${j}`)) cls += " best";
       if (mutedSet.has(`${i},${j}`)) cls += " muted";
@@ -1242,13 +1244,43 @@ function renderGrid(step) {
       const label = fullLabel
         ? `<span class="cell-label" title="${escapeXml(fullLabel)}">${escapeXml(fullLabel)}</span>`
         : "";
-      html += `<td class="${cls}">${label}<span class="cell-value">${dp[i][j]}</span></td>`;
+      html += `<td class="${cls}" data-grid-row="${i}" data-grid-col="${j}">${label}<span class="cell-value">${dp[i][j]}</span></td>`;
     }
     html += "</tr>";
   }
   html += "</tbody></table>";
   const captionHtml = caption ? `<div class="dp-grid-caption">${escapeXml(caption)}</div>` : "";
-  $("gridView").innerHTML = captionHtml + html;
+  const gridView = $("gridView");
+  gridView.innerHTML = captionHtml + html;
+
+  if (Array.isArray(autoScrollCell)) {
+    const [scrollRow, scrollCol] = autoScrollCell;
+    const target = gridView.querySelector(
+      `.dp-cell[data-grid-row="${scrollRow}"][data-grid-col="${scrollCol}"]`,
+    );
+    if (target) {
+      if (gridView._autoScrollFrame) cancelAnimationFrame(gridView._autoScrollFrame);
+      gridView._autoScrollFrame = requestAnimationFrame(() => {
+        gridView._autoScrollFrame = null;
+        const viewport = gridView.getBoundingClientRect();
+        const cell = target.getBoundingClientRect();
+        const padding = 20;
+        let delta = 0;
+        if (cell.right > viewport.right - padding) {
+          delta = cell.right - viewport.right + padding;
+        } else if (cell.left < viewport.left + padding) {
+          delta = cell.left - viewport.left - padding;
+        }
+        if (delta !== 0) {
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          gridView.scrollTo({
+            left: Math.max(0, gridView.scrollLeft + delta),
+            behavior: reduceMotion ? "auto" : "smooth",
+          });
+        }
+      });
+    }
+  }
 }
 
 // ---- Tree renderer (Trie) ----
