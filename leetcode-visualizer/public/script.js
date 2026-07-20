@@ -1481,10 +1481,11 @@ function renderGraph(step) {
     const remainingNodes = nodes.filter((node) => !order.includes(node.id));
     const allOrdered = orderedNodes.concat(remainingNodes);
     const hasDiscardedRow = allOrdered.some((node) => node.row === "discarded");
+    const hasCircularEdge = edges.some((edge) => edge.circular);
     const gap = 196;
     const left = 96;
     svgWidth = Math.max(420, left * 2 + Math.max(0, allOrdered.length - 1) * gap);
-    svgHeight = hasDiscardedRow ? 250 : 180;
+    svgHeight = hasDiscardedRow ? 250 : hasCircularEdge ? 260 : 180;
     allOrdered.forEach((node, i) => {
       pos[node.id] = {
         x: left + i * gap,
@@ -1519,7 +1520,7 @@ function renderGraph(step) {
 
     const dx = to.x - from.x;
     const dy = to.y - from.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
     const ux = dx / len;
     const uy = dy / len;
     const x1 = from.x + ux * (r + 2);
@@ -1540,7 +1541,26 @@ function renderGraph(step) {
     let my = (y1 + y2) / 2;
     let labelX = mx - uy * 12;
     let labelY = my + ux * 12;
-    if (isPointerLane) {
+    if (isLinear && edge.circular) {
+      const isSelfLoop = edge.u === edge.v;
+      const isPrev = edge.kind === "prev";
+      if (isSelfLoop) {
+        const side = isPrev ? -1 : 1;
+        const startY = from.y - r;
+        const endY = from.y + r;
+        const controlX = from.x + side * 84;
+        edgeSvg += `<path d="M ${from.x} ${startY} C ${controlX} ${from.y - 74}, ${controlX} ${from.y + 74}, ${from.x} ${endY}" class="${cls}" marker-end="${markerEnd}" />`;
+        labelX = from.x + side * 70;
+        labelY = from.y;
+      } else {
+        const curveY = from.y + (isPrev ? 86 : -66);
+        const startY = from.y + (isPrev ? r + 2 : -r - 2);
+        const endY = to.y + (isPrev ? r + 6 : -r - 6);
+        edgeSvg += `<path d="M ${from.x} ${startY} C ${from.x} ${curveY}, ${to.x} ${curveY}, ${to.x} ${endY}" class="${cls}" marker-end="${markerEnd}" />`;
+        labelX = (from.x + to.x) / 2;
+        labelY = curveY + (isPrev ? 13 : -10);
+      }
+    } else if (isPointerLane) {
       const laneY = from.y + (edge.kind === "prev" ? 13 : -13);
       const direction = Math.sign(dx) || 1;
       const laneX1 = from.x + direction * (r + 2);
@@ -1550,6 +1570,22 @@ function renderGraph(step) {
       my = laneY;
       labelX = mx;
       labelY = laneY + (edge.kind === "prev" ? 15 : -15);
+    } else if (edge.kind === "next" || edge.kind === "prev") {
+      // Offset next/prev perpendicular to the edge line so the two
+      // directions render as parallel lines instead of overlapping.
+      const perpX = -uy;
+      const perpY = ux;
+      const side = edge.kind === "prev" ? -1 : 1;
+      const offset = 6 * side;
+      const ox1 = x1 + perpX * offset;
+      const oy1 = y1 + perpY * offset;
+      const ox2 = x2 + perpX * offset;
+      const oy2 = y2 + perpY * offset;
+      edgeSvg += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" class="${cls}" marker-end="${markerEnd}" />`;
+      mx = (ox1 + ox2) / 2;
+      my = (oy1 + oy2) / 2;
+      labelX = mx + perpX * 12 * side;
+      labelY = my + perpY * 12 * side;
     } else {
       edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
     }
