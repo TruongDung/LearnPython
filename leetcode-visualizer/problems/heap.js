@@ -307,6 +307,18 @@ function buildSteps3092(nums, params) {
 }
 
 // ─── 347: Top K Frequent Elements ───
+// Line-by-line trace of the exact code shown to the user:
+//  1  class Solution:
+//  2      def topKFrequent(self, nums, k):
+//  3          from collections import Counter
+//  4          freq = Counter(nums)
+//  5          import heapq
+//  6          heap = []
+//  7          for v, f in freq.items():
+//  8              heapq.heappush(heap, (f, v))
+//  9              if len(heap) > k:
+// 10                 heapq.heappop(heap)
+// 11         return [v for f, v in heap]
 function buildSteps347(input, params) {
   const nums = String(input).split(",").map((s) => Number(s.trim()));
   const k = params.k !== undefined ? Number(params.k) : 2;
@@ -319,59 +331,70 @@ function buildSteps347(input, params) {
     vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "k", value: k }],
     note: {
       vi:
-        `Ý tưởng:\n` +
-        `• B1: Đếm tần suất mỗi số (hash map).\n` +
-        `• B2: Duy trì MIN-HEAP kích thước k theo tần suất.\n` +
-        `  - Đẩy từng (số, freq) vào heap.\n` +
-        `  - Nếu heap > k phần tử → bỏ gốc (freq NHỎ nhất).\n` +
-        `• Cuối cùng heap chứa đúng k số có tần suất lớn nhất.\n` +
-        `Nhãn nút hiển thị "số·fTầnSuất"; heap sắp theo tần suất.`,
+        `Ý tưởng: đếm tần suất, rồi duy trì MIN-HEAP kích thước k theo tần suất. ` +
+        `Nếu heap vượt k → bỏ gốc (freq NHỎ nhất). Cuối cùng heap chứa đúng k số tần suất lớn nhất.`,
       en:
-        `Idea:\n` +
-        `• Step 1: Count the frequency of each number (hash map).\n` +
-        `• Step 2: Keep a MIN-HEAP of size k by frequency.\n` +
-        `  - Push each (number, freq) into the heap.\n` +
-        `  - If heap > k → pop the root (SMALLEST freq).\n` +
-        `• In the end the heap holds the k most frequent numbers.\n` +
-        `Node label shows "value·fFreq"; the heap is ordered by frequency.`,
+        `Idea: count frequencies, then keep a MIN-HEAP of size k by frequency. ` +
+        `If the heap exceeds k → pop the root (SMALLEST freq). In the end the heap holds the k most frequent numbers.`,
     },
   }));
 
-  // Step 1: frequency map.
+  // Line 3: from collections import Counter
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "from collections import Counter", en: "from collections import Counter" },
+    codeLines: [3],
+    vars: [],
+    note: { vi: "Import Counter để đếm tần suất tiện lợi.", en: "Import Counter for convenient frequency counting." },
+  }));
+
+  // Line 4: freq = Counter(nums)
   const freq = new Map();
   for (const x of nums) freq.set(x, (freq.get(x) || 0) + 1);
   const freqStr = [...freq.entries()].map(([v, f]) => `${v}→${f}`).join(", ");
   steps.push(heapSnapshot([], label, {
-    title: { vi: "Bước 1: Đếm tần suất", en: "Step 1: Count frequencies" },
-    codeLines: [3, 4],
+    title: { vi: `freq = Counter(nums) = {${freqStr}}`, en: `freq = Counter(nums) = {${freqStr}}` },
+    codeLines: [4],
     vars: [{ name: "freq", value: freqStr }],
-    note: { vi: `Tần suất: ${freqStr}. Giờ đẩy lần lượt vào min-heap kích thước ${k}.`, en: `Frequencies: ${freqStr}. Now push them one by one into a min-heap of size ${k}.` },
+    note: { vi: `Tần suất mỗi số: ${freqStr}.`, en: `Frequency of each number: ${freqStr}.` },
   }));
 
-  // Min-heap keyed by frequency, with step recording on every swap.
+  // Line 5: import heapq
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "import heapq", en: "import heapq" },
+    codeLines: [5],
+    vars: [],
+    note: { vi: "Import heapq để dùng min-heap.", en: "Import heapq to use a min-heap." },
+  }));
+
+  // Line 6: heap = []
   const heap = [];
   const less = (a, b) => a.f < b.f; // min-heap on frequency
-
   function heapArrStr() { return `[${heap.map((e) => `${e.v}:${e.f}`).join(", ")}]`; }
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "heap = []", en: "heap = []" },
+    codeLines: [6],
+    vars: [{ name: "heap", value: "[]" }],
+    note: { vi: "Heap rỗng ban đầu.", en: "The heap starts empty." },
+  }));
 
-  function siftUp(i) {
+  function siftUp(i, triggerLine) {
     while (i > 0) {
       const p = Math.floor((i - 1) / 2);
       if (less(heap[i], heap[p])) {
         const a = heap[i], b = heap[p];
         [heap[i], heap[p]] = [heap[p], heap[i]];
         steps.push(heapSnapshot(heap, label, {
-          title: { vi: `Sift-up: ${a.v}(f${a.f}) ↑ đổi với ${b.v}(f${b.f})`, en: `Sift-up: swap ${a.v}(f${a.f}) with ${b.v}(f${b.f})` },
-          hlSet: new Set([i, p]), codeLines: [7],
+          title: { vi: `heapq nội bộ: ${a.v}(f${a.f}) ↑ đổi với ${b.v}(f${b.f})`, en: `heapq internal: swap ${a.v}(f${a.f}) with ${b.v}(f${b.f})` },
+          hlSet: new Set([i, p]), codeLines: [triggerLine],
           vars: [{ name: "heap", value: heapArrStr() }],
-          note: { vi: `freq ${a.f} < freq ${b.f} → con nhỏ hơn cha, đổi chỗ để giữ tính chất min-heap (gốc luôn nhỏ nhất).`, en: `freq ${a.f} < freq ${b.f} → child smaller than parent, swap to keep the min-heap property (root is smallest).` },
+          note: { vi: `freq ${a.f} < freq ${b.f} → con nhỏ hơn cha, đổi chỗ để giữ tính chất min-heap (gốc luôn nhỏ nhất). Đây là việc heapq.heappush tự làm bên trong.`, en: `freq ${a.f} < freq ${b.f} → child smaller than parent, swap to keep the min-heap property. This happens inside heapq.heappush automatically.` },
         }));
         i = p;
       } else break;
     }
   }
 
-  function siftDown(i) {
+  function siftDown(i, triggerLine) {
     const n = heap.length;
     while (true) {
       let s = i; const l = 2 * i + 1, r = 2 * i + 2;
@@ -381,46 +404,68 @@ function buildSteps347(input, params) {
       const a = heap[i], b = heap[s];
       [heap[i], heap[s]] = [heap[s], heap[i]];
       steps.push(heapSnapshot(heap, label, {
-        title: { vi: `Sift-down: ${a.v}(f${a.f}) ↓ đổi với ${b.v}(f${b.f})`, en: `Sift-down: swap ${a.v}(f${a.f}) with ${b.v}(f${b.f})` },
-        hlSet: new Set([i, s]), codeLines: [12],
+        title: { vi: `heapq nội bộ: ${a.v}(f${a.f}) ↓ đổi với ${b.v}(f${b.f})`, en: `heapq internal: swap ${a.v}(f${a.f}) with ${b.v}(f${b.f})` },
+        hlSet: new Set([i, s]), codeLines: [triggerLine],
         vars: [{ name: "heap", value: heapArrStr() }],
-        note: { vi: `Cha lớn hơn con nhỏ nhất → đẩy xuống để khôi phục min-heap.`, en: `Parent larger than smallest child → push it down to restore the min-heap.` },
+        note: { vi: `Cha lớn hơn con nhỏ nhất → đẩy xuống để khôi phục min-heap. Đây là việc heapq.heappop tự làm bên trong.`, en: `Parent larger than smallest child → push it down to restore the min-heap. This happens inside heapq.heappop automatically.` },
       }));
       i = s;
     }
   }
 
-  // Step 2: push each (value, freq) into the size-k min-heap.
+  // Line 7-10: for v, f in freq.items(): push, then pop if over capacity.
   for (const [v, f] of freq.entries()) {
+    // Line 7: for v, f in freq.items()
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `for v, f in freq.items(): v=${v}, f=${f}`, en: `for v, f in freq.items(): v=${v}, f=${f}` },
+      codeLines: [7],
+      vars: [{ name: "v", value: v }, { name: "f", value: f }],
+      note: { vi: `Xét số ${v} với tần suất ${f}.`, en: `Process number ${v} with frequency ${f}.` },
+    }));
+
+    // Line 8: heapq.heappush(heap, (f, v))
     heap.push({ v, f });
     steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Push (${v}, f=${f})`, en: `Push (${v}, f=${f})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [6, 7],
+      title: { vi: `heapq.heappush(heap, (${f}, ${v}))`, en: `heapq.heappush(heap, (${f}, ${v}))` },
+      hlSet: new Set([heap.length - 1]), codeLines: [8],
       vars: [{ name: "heap", value: heapArrStr() }, { name: "size", value: heap.length }],
-      note: { vi: `Thêm ${v} (freq ${f}) vào CUỐI heap, rồi sift-up cho về đúng vị trí.`, en: `Add ${v} (freq ${f}) at the END of the heap, then sift-up into place.` },
+      note: { vi: `Thêm (${v}, freq ${f}) vào heap; heapq tự sift-up để giữ tính chất min-heap.`, en: `Add (${v}, freq ${f}) to the heap; heapq internally sifts up to keep the min-heap property.` },
     }));
-    siftUp(heap.length - 1);
+    siftUp(heap.length - 1, 8);
 
-    if (heap.length > k) {
+    // Line 9: if len(heap) > k
+    const overCapacity = heap.length > k;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `len(heap) > k? ${overCapacity} (${heap.length} vs ${k})`, en: `len(heap) > k? ${overCapacity} (${heap.length} vs ${k})` },
+      codeLines: [9],
+      vars: [{ name: "len(heap)", value: heap.length }, { name: "k", value: k }],
+      note: {
+        vi: overCapacity ? `Heap vượt quá ${k} phần tử → cần bỏ gốc.` : `Heap chưa vượt ${k} phần tử → chưa cần bỏ gì.`,
+        en: overCapacity ? `Heap exceeds ${k} elements → need to pop the root.` : `Heap hasn't exceeded ${k} elements yet → nothing to pop.`,
+      },
+    }));
+
+    if (overCapacity) {
+      // Line 10: heapq.heappop(heap)
       const removed = heap[0];
       const last = heap.pop();
       if (heap.length > 0) heap[0] = last;
       steps.push(heapSnapshot(heap, label, {
-        title: { vi: `Heap > ${k} → pop gốc ${removed.v}(f${removed.f})`, en: `Heap > ${k} → pop root ${removed.v}(f${removed.f})` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [8, 9],
+        title: { vi: `heapq.heappop(heap) → bỏ ${removed.v}(f${removed.f})`, en: `heapq.heappop(heap) → remove ${removed.v}(f${removed.f})` },
+        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [10],
         vars: [{ name: "removed", value: `${removed.v} (f${removed.f})` }, { name: "heap", value: heapArrStr() }],
-        note: { vi: `Heap vượt quá ${k} phần tử → bỏ GỐC (freq nhỏ nhất = ${removed.f}). Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Heap exceeds ${k} → drop the ROOT (smallest freq = ${removed.f}). Move the last element to the root then sift-down.` },
+        note: { vi: `Bỏ GỐC (freq nhỏ nhất = ${removed.f}). heapq đưa phần tử cuối lên gốc rồi tự sift-down.`, en: `Remove the ROOT (smallest freq = ${removed.f}). heapq moves the last element to the root then internally sifts down.` },
       }));
-      if (heap.length > 0) siftDown(0);
+      if (heap.length > 0) siftDown(0, 10);
     }
   }
 
-  // Result: the k elements left in the heap (sorted by freq desc for display).
+  // Line 11: return [v for f, v in heap]
   const result = heap.map((e) => e.v).sort((a, b) => freq.get(b) - freq.get(a));
   const markAll = new Set(heap.map((_, i) => i));
   const fs = heapSnapshot(heap, label, {
-    title: { vi: `Kết quả: [${result.join(", ")}]`, en: `Result: [${result.join(", ")}]` },
-    markSet: markAll, codeLines: [10],
+    title: { vi: `return [v for f, v in heap] = [${result.join(", ")}]`, en: `return [v for f, v in heap] = [${result.join(", ")}]` },
+    markSet: markAll, codeLines: [11],
     vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
     note: { vi: `Heap còn lại đúng ${k} số có tần suất lớn nhất → đáp án [${result.join(", ")}].`, en: `The heap holds exactly the ${k} most frequent numbers → answer [${result.join(", ")}].` },
   });
