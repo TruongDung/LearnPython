@@ -956,7 +956,7 @@ function buildSteps523(nums, params) {
 
   const mapEntries = () => [...firstSeen.entries()].map(([remainder, index]) => ({ remainder, index }));
   const mapString = () => `{${mapEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
-  const makeView = ({ current = -1, matchStart = -1, matchEnd = -1, matchState = "", status = [] } = {}) => ({
+  const makeView = ({ current = -1, matchStart = -1, matchEnd = -1, matchState = "", proof = null, status = [] } = {}) => ({
     nums: [...nums],
     prefixSums: [...prefixSums],
     remainders: [...remainders],
@@ -964,9 +964,29 @@ function buildSteps523(nums, params) {
     matchStart,
     matchEnd,
     matchState,
+    proof,
     entries: mapEntries(),
     status,
   });
+  const makeProof = (previous, current, remainder, state) => {
+    const previousSum = previous === -1 ? 0 : prefixSums[previous];
+    const currentSum = prefixSums[current];
+    const start = previous + 1;
+    return {
+      previousIndex: previous,
+      previousSum,
+      currentIndex: current,
+      currentSum,
+      remainder,
+      k,
+      start,
+      end: current,
+      subarray: nums.slice(start, current + 1),
+      subarraySum: currentSum - previousSum,
+      length: current - previous,
+      state,
+    };
+  };
   const loopVars = (i, prefixSum, remainder, extras = []) => {
     const vars = [
       { name: "i", value: i },
@@ -1081,6 +1101,7 @@ function buildSteps523(nums, params) {
     });
 
     const wasSeen = firstSeen.has(remainder);
+    const previousAtCheck = wasSeen ? firstSeen.get(remainder) : null;
     steps.push({
       title: {
         vi: `Phần dư ${remainder} đã xuất hiện chưa? ${wasSeen ? "Đúng" : "Sai"}`,
@@ -1089,6 +1110,7 @@ function buildSteps523(nums, params) {
       codeLines: [8],
       prefixRemainderView: makeView({
         current: i,
+        proof: wasSeen ? makeProof(previousAtCheck, i, remainder, "candidate") : null,
         status: [
           { label: localized("phần dư hiện tại", "remainder"), value: remainder },
           { label: localized("đã có trong bảng", "in first_seen"), value: booleanText(wasSeen) },
@@ -1126,6 +1148,7 @@ function buildSteps523(nums, params) {
           matchStart: start,
           matchEnd: i,
           matchState: length >= 2 ? "valid" : "too-short",
+          proof: makeProof(previous, i, remainder, length >= 2 ? "valid" : "too-short"),
           status: [
             { label: localized("chỉ số có cùng phần dư", "first index"), value: previous },
             { label: localized("đoạn đang kiểm tra", "candidate"), value: `[${start}..${i}]` },
@@ -1158,6 +1181,7 @@ function buildSteps523(nums, params) {
             matchStart: start,
             matchEnd: i,
             matchState: "valid",
+            proof: makeProof(previous, i, remainder, "valid"),
             status: [
               { label: localized("đoạn con", "subarray"), value: `[${start}..${i}]` },
               { label: localized("độ dài", "length"), value: length },

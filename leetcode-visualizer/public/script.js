@@ -313,9 +313,11 @@ async function loadProblem() {
       return showError("searchError", data.error || t().errLoad);
     }
 
+    const problemChanged = currentProblemId !== data.id;
     currentProblemId = data.id;
     localStorage.setItem("lastProblemId", data.id);
     problemData = data;
+    if (problemChanged) $("extraParams").innerHTML = "";
     renderProblem();
     $("arrInput").value = Array.isArray(data.defaultInput)
       ? (data.inputKind === "stringArray" ? JSON.stringify(data.defaultInput) : data.defaultInput.join(","))
@@ -1201,6 +1203,76 @@ function renderBfsGrid(step) {
   el.innerHTML = html;
 }
 
+// ---- Shift 2D Grid renderer ----
+function renderShiftGridView(step) {
+  const view = step.shiftGridView;
+  const source = view.source || [];
+  const result = view.result || [];
+  const currentKey = view.current ? `${view.current[0]},${view.current[1]}` : "";
+  const targetKey = view.target ? `${view.target[0]},${view.target[1]}` : "";
+  const placedSet = new Set((view.placed || []).map(([r, c]) => `${r},${c}`));
+  const hasGrid = source.length > 0 && source[0] && source[0].length > 0;
+  const cols = hasGrid ? source[0].length : 0;
+
+  const matrixHtml = (matrix, kind) => {
+    if (!matrix.length) return `<div class="shift-empty">${lang === "vi" ? "Không có dữ liệu" : "No data"}</div>`;
+    let cells = "";
+    matrix.forEach((row, r) => {
+      row.forEach((value, c) => {
+        const key = `${r},${c}`;
+        const classes = ["shift-cell"];
+        if (kind === "source" && key === currentKey) classes.push("source-active");
+        if (kind === "source" && view.sourceRow === r && !currentKey) classes.push("row-active");
+        if (kind === "result" && placedSet.has(key)) classes.push("placed");
+        if (kind === "result" && key === targetKey) classes.push("target-active");
+        const display = value === null || value === undefined ? "·" : value;
+        cells += `<div class="${classes.join(" ")}" aria-label="${kind} row ${r} column ${c}, value ${escapeHtml(display)}">
+          <span class="shift-coord">(${r},${c})</span>
+          <strong>${escapeHtml(display)}</strong>
+        </div>`;
+      });
+    });
+    return `<div class="shift-matrix" style="--shift-cols:${cols}">${cells}</div>`;
+  };
+
+  let track = "";
+  if (hasGrid) {
+    const flat = source.flat();
+    track = `<div class="shift-track" aria-label="Flattened grid">${flat.map((value, index) => {
+      const classes = ["shift-track-cell"];
+      if (index === view.oldPos) classes.push("old-index");
+      if (index === view.newPos) classes.push("new-index");
+      return `<div class="${classes.join(" ")}"><span>${index}</span><strong>${escapeHtml(value)}</strong></div>`;
+    }).join("")}</div>`;
+  }
+
+  const formula = view.oldPos === undefined
+    ? `<span>k = <strong>${escapeHtml(view.k)}</strong></span><span>k % cells = <strong>${escapeHtml(view.normalizedK)}</strong></span>`
+    : `<span>old_pos = <strong>${view.oldPos}</strong></span><span>+ k = <strong>${escapeHtml(view.k)}</strong></span>${view.newPos === undefined ? "" : `<span>new_pos = <strong>${view.newPos}</strong></span>`}`;
+
+  $("treeView").innerHTML = `<div class="shift-grid-viz">
+    <div class="shift-phase">${escapeHtml(pick(view.phase) || "")}</div>
+    <div class="shift-formula">${formula}</div>
+    <div class="shift-matrices">
+      <section class="shift-matrix-block">
+        <h4>${lang === "vi" ? "Grid nguồn" : "Source grid"}</h4>
+        ${matrixHtml(source, "source")}
+      </section>
+      <div class="shift-arrow" aria-hidden="true">→</div>
+      <section class="shift-matrix-block">
+        <h4>${lang === "vi" ? "Grid kết quả" : "Result grid"}</h4>
+        ${matrixHtml(result, "result")}
+      </section>
+    </div>
+    ${track}
+    <div class="shift-legend">
+      <span><i class="source-swatch"></i>${lang === "vi" ? "ô nguồn" : "source"}</span>
+      <span><i class="target-swatch"></i>${lang === "vi" ? "ô đích" : "target"}</span>
+      <span><i class="placed-swatch"></i>${lang === "vi" ? "đã đặt" : "placed"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Grid renderer (2D DP) ----
 function renderGrid(step) {
   const { dp, text1, text2, hlCell, autoScrollCell, pathCells, historyCells, cellLabels, showIndices, rowLabels, colLabels, largeCells, bestCell, bestCells, caption, secondaryCaption, mutedCells } = step.grid;
@@ -1895,6 +1967,51 @@ function renderPrefixRemainderView(step) {
     <strong>${escapeHtml(String(pickViewText(item.value) ?? "-"))}</strong>
   </div>`).join("");
 
+  const proof = view.proof && typeof view.proof === "object" ? view.proof : null;
+  let proofHtml = "";
+  if (proof) {
+    const state = ["candidate", "valid", "too-short"].includes(proof.state) ? proof.state : "candidate";
+    const subarray = Array.isArray(proof.subarray) ? proof.subarray : [];
+    const conclusion = state === "valid"
+      ? pick({
+          vi: `Cùng dư ${proof.remainder} nên hiệu chia hết cho ${proof.k}; độ dài ${proof.length} >= 2, đoạn con hợp lệ.`,
+          en: `The equal remainder ${proof.remainder} makes the difference divisible by ${proof.k}; length ${proof.length} >= 2, so the subarray is valid.`,
+        })
+      : state === "too-short"
+        ? pick({
+            vi: `Tổng ${proof.subarraySum} chia hết cho ${proof.k}, nhưng độ dài ${proof.length} < 2 nên đoạn này chưa hợp lệ.`,
+            en: `Sum ${proof.subarraySum} is divisible by ${proof.k}, but length ${proof.length} < 2, so this subarray is too short.`,
+          })
+        : pick({
+            vi: `Hai tổng tiền tố cùng dư ${proof.remainder}; vì vậy hiệu của chúng chia hết cho ${proof.k}. Tiếp theo kiểm tra độ dài.`,
+            en: `Both prefix sums have remainder ${proof.remainder}, so their difference is divisible by ${proof.k}. Next, check the length.`,
+          });
+
+    proofHtml = `<div class="remainder-proof ${state}">
+      <div class="remainder-heading">${escapeHtml(pick({ vi: "Mô phỏng: trừ hai tổng tiền tố", en: "Simulation: subtract two prefix sums" }))}</div>
+      <div class="remainder-proof-flow">
+        <div class="remainder-proof-term">
+          <span>${escapeHtml(pick({ vi: "Tổng đến chỉ số hiện tại", en: "Current prefix" }))}</span>
+          <strong>P[${escapeHtml(String(proof.currentIndex))}] = ${escapeHtml(String(proof.currentSum))}</strong>
+          <small>${escapeHtml(String(proof.currentSum))} % ${escapeHtml(String(proof.k))} = ${escapeHtml(String(proof.remainder))}</small>
+        </div>
+        <strong class="remainder-proof-operator">-</strong>
+        <div class="remainder-proof-term">
+          <span>${escapeHtml(pick({ vi: "Tổng trước đoạn con", en: "Prefix before subarray" }))}</span>
+          <strong>P[${escapeHtml(String(proof.previousIndex))}] = ${escapeHtml(String(proof.previousSum))}</strong>
+          <small>${escapeHtml(String(proof.previousSum))} % ${escapeHtml(String(proof.k))} = ${escapeHtml(String(proof.remainder))}</small>
+        </div>
+        <strong class="remainder-proof-operator">=</strong>
+        <div class="remainder-proof-term result">
+          <span>${escapeHtml(pick({ vi: "Tổng đoạn con", en: "Subarray sum" }))}</span>
+          <strong>${escapeHtml(String(proof.currentSum))} - ${escapeHtml(String(proof.previousSum))} = ${escapeHtml(String(proof.subarraySum))}</strong>
+          <small>nums[${escapeHtml(String(proof.start))}..${escapeHtml(String(proof.end))}] = [${escapeHtml(subarray.join(", "))}]</small>
+        </div>
+      </div>
+      <div class="remainder-proof-conclusion">${escapeHtml(conclusion)}</div>
+    </div>`;
+  }
+
   $("treeView").innerHTML = `
     <div class="remainder-viz">
       <div>
@@ -1905,6 +2022,7 @@ function renderPrefixRemainderView(step) {
         <div class="remainder-heading">${escapeHtml(String(mapTitle))}</div>
         <div class="remainder-map">${mapCells}</div>
       </div>
+      ${proofHtml}
       <div class="remainder-status">${statusItems}</div>
     </div>`;
 }
@@ -2079,6 +2197,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGraph(step);
+  } else if (step.shiftGridView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShiftGridView(step);
   } else if (step.grid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

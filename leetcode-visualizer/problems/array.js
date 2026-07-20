@@ -269,6 +269,236 @@ function buildSteps1299(nums) {
 // 1089 moved to two-pointer.js
 
 /**
+ * Generate steps for LeetCode 1260: Shift 2D Grid.
+ * Map each cell to a flattened index, shift it by k with modulo, then map it
+ * back to a row and column in the result grid.
+ */
+function buildSteps1260(input, params) {
+  const rowStrings = String(input).split(";").map((row) => row.trim()).filter(Boolean);
+  const grid = rowStrings.map((row) => row.split(",").map((value) => Number(value.trim())));
+  const k = params.k;
+  const valid = grid.length > 0
+    && grid[0].length > 0
+    && grid.every((row) => row.length === grid[0].length)
+    && grid.every((row) => row.every(Number.isInteger));
+
+  if (!valid) {
+    return {
+      original: input,
+      answer: null,
+      steps: [{
+        title: { vi: "Grid không hợp lệ", en: "Invalid grid" },
+        codeLines: [3],
+        final: true,
+        vars: [{ name: "error", value: "invalid rectangular grid" }],
+        shiftGridView: { source: [], result: [], k, phase: { vi: "Lỗi input", en: "Input error" } },
+        note: {
+          vi: "Mỗi hàng phải có cùng số cột và chỉ chứa số nguyên. Ví dụ: 1,2,3;4,5,6;7,8,9.",
+          en: "Every row must have the same number of integer cells. Example: 1,2,3;4,5,6;7,8,9.",
+        },
+      }],
+    };
+  }
+
+  const m = grid.length;
+  const n = grid[0].length;
+  const total = m * n;
+  const normalizedK = k % total;
+  const result = Array.from({ length: m }, () => Array(n).fill(null));
+  const steps = [];
+  const placed = [];
+
+  const makeView = (overrides = {}) => ({
+    source: grid.map((row) => [...row]),
+    result: result.map((row) => [...row]),
+    k,
+    normalizedK,
+    placed: placed.map(([r, c]) => [r, c]),
+    ...overrides,
+  });
+
+  steps.push({
+    title: { vi: "Đọc kích thước grid", en: "Read grid dimensions" },
+    codeLines: [3],
+    vars: [
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "k", value: k },
+      { name: "cells", value: total },
+    ],
+    shiftGridView: makeView({ phase: { vi: "Grid ban đầu", en: "Original grid" } }),
+    note: {
+      vi: `Grid có ${m} hàng, ${n} cột, tổng cộng ${total} ô. Shift ${k} lần tương đương dịch ${normalizedK} vị trí sau khi lấy modulo ${total}.`,
+      en: `The grid has ${m} rows, ${n} columns, and ${total} cells. ${k} shifts equal ${normalizedK} positions after modulo ${total}.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Tạo result rỗng", en: "Create an empty result" },
+    codeLines: [4],
+    vars: [
+      { name: "m", value: m },
+      { name: "n", value: n },
+      { name: "result", value: `${m} x ${n} empty` },
+    ],
+    shiftGridView: makeView({ phase: { vi: "Chưa đặt ô nào", en: "No cells placed yet" } }),
+    note: {
+      vi: "Tạo grid kết quả cùng kích thước. Dấu chấm là vị trí chưa được gán.",
+      en: "Create a result grid with the same dimensions. A dot marks an unassigned position.",
+    },
+  });
+
+  for (let r = 0; r < m; r++) {
+    steps.push({
+      title: { vi: `Duyệt hàng r = ${r}`, en: `Visit row r = ${r}` },
+      codeLines: [5],
+      vars: [
+        { name: "r", value: r },
+        { name: "k", value: k },
+        { name: "placed", value: placed.length },
+      ],
+      shiftGridView: makeView({ sourceRow: r, phase: { vi: `Đang duyệt hàng ${r}`, en: `Scanning row ${r}` } }),
+      note: {
+        vi: `Bắt đầu xử lý các ô ở hàng ${r}.`,
+        en: `Begin processing cells in row ${r}.`,
+      },
+    });
+
+    for (let c = 0; c < n; c++) {
+      const value = grid[r][c];
+      const oldPos = r * n + c;
+      const newPos = (oldPos + k) % total;
+      const newR = Math.floor(newPos / n);
+      const newC = newPos % n;
+
+      steps.push({
+        title: { vi: `Chọn grid[${r}][${c}] = ${value}`, en: `Select grid[${r}][${c}] = ${value}` },
+        codeLines: [6],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+          { name: "value", value },
+          { name: "k", value: k },
+        ],
+        shiftGridView: makeView({
+          current: [r, c],
+          phase: { vi: "Chọn ô nguồn", en: "Select source cell" },
+        }),
+        note: {
+          vi: `Ô đang xét chứa ${value} tại tọa độ (${r}, ${c}).`,
+          en: `The current cell contains ${value} at coordinate (${r}, ${c}).`,
+        },
+      });
+
+      steps.push({
+        title: { vi: `Đổi (${r}, ${c}) thành index ${oldPos}`, en: `Flatten (${r}, ${c}) to index ${oldPos}` },
+        codeLines: [7],
+        vars: [
+          { name: "r", value: r },
+          { name: "c", value: c },
+          { name: "old_pos", value: oldPos },
+          { name: "formula", value: `${r} * ${n} + ${c}` },
+        ],
+        shiftGridView: makeView({
+          current: [r, c],
+          oldPos,
+          phase: { vi: "Trải phẳng tọa độ cũ", en: "Flatten the old coordinate" },
+        }),
+        note: {
+          vi: `old_pos = r * n + c = ${r} * ${n} + ${c} = ${oldPos}.`,
+          en: `old_pos = r * n + c = ${r} * ${n} + ${c} = ${oldPos}.`,
+        },
+      });
+
+      steps.push({
+        title: { vi: `Dịch index ${oldPos} thêm ${k}`, en: `Shift index ${oldPos} by ${k}` },
+        codeLines: [8],
+        vars: [
+          { name: "old_pos", value: oldPos },
+          { name: "k", value: k },
+          { name: "m*n", value: total },
+          { name: "new_pos", value: newPos },
+        ],
+        shiftGridView: makeView({
+          current: [r, c],
+          oldPos,
+          newPos,
+          phase: { vi: "Dịch trên dãy 1D", en: "Shift on the 1D sequence" },
+        }),
+        note: {
+          vi: `new_pos = (${oldPos} + ${k}) % ${total} = ${newPos}. Modulo đưa vị trí vượt cuối quay lại đầu grid.`,
+          en: `new_pos = (${oldPos} + ${k}) % ${total} = ${newPos}. Modulo wraps positions past the end back to the start.`,
+        },
+      });
+
+      steps.push({
+        title: { vi: `Index ${newPos} -> (${newR}, ${newC})`, en: `Index ${newPos} -> (${newR}, ${newC})` },
+        codeLines: [9],
+        vars: [
+          { name: "new_pos", value: newPos },
+          { name: "new_r", value: newR },
+          { name: "new_c", value: newC },
+          { name: "n", value: n },
+        ],
+        shiftGridView: makeView({
+          current: [r, c],
+          target: [newR, newC],
+          oldPos,
+          newPos,
+          phase: { vi: "Đổi index mới thành tọa độ", en: "Unflatten the new index" },
+        }),
+        note: {
+          vi: `new_r = ${newPos} // ${n} = ${newR}; new_c = ${newPos} % ${n} = ${newC}.`,
+          en: `new_r = ${newPos} // ${n} = ${newR}; new_c = ${newPos} % ${n} = ${newC}.`,
+        },
+      });
+
+      result[newR][newC] = value;
+      placed.push([newR, newC]);
+      steps.push({
+        title: { vi: `Đặt ${value} vào result[${newR}][${newC}]`, en: `Place ${value} at result[${newR}][${newC}]` },
+        codeLines: [10],
+        vars: [
+          { name: "value", value },
+          { name: "new_r", value: newR },
+          { name: "new_c", value: newC },
+          { name: "placed", value: placed.length },
+        ],
+        shiftGridView: makeView({
+          current: [r, c],
+          target: [newR, newC],
+          oldPos,
+          newPos,
+          phase: { vi: "Gán vào grid kết quả", en: "Write into the result grid" },
+        }),
+        note: {
+          vi: `result[${newR}][${newC}] = grid[${r}][${c}] = ${value}.`,
+          en: `result[${newR}][${newC}] = grid[${r}][${c}] = ${value}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: "Trả về grid đã shift", en: "Return the shifted grid" },
+    codeLines: [11],
+    final: true,
+    vars: [
+      { name: "k", value: k },
+      { name: "normalized_k", value: normalizedK },
+      { name: "placed", value: placed.length },
+    ],
+    shiftGridView: makeView({ phase: { vi: "Kết quả cuối cùng", en: "Final result" } }),
+    note: {
+      vi: `Đã chuyển đủ ${total} ô. Trả về grid sau ${k} lần shift.`,
+      en: `All ${total} cells have been moved. Return the grid after ${k} shifts.`,
+    },
+  });
+
+  return { original: grid.map((row) => [...row]), answer: result.map((row) => [...row]), steps };
+}
+
+/**
  * Generate steps for LeetCode 1275: Find Winner on a Tic Tac Toe Game.
  * Simulate each move on a 3x3 board and check for a winner.
  */
@@ -693,5 +923,60 @@ module.exports = {
       "        return 'Draw' if len(moves)==9 else 'Pending'",
     ],
     builder: buildSteps1275,
+  },
+  1260: {
+    id: 1260,
+    difficulty: "easy",
+    slug: "shift-2d-grid",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Shift 2D Grid", en: "Shift 2D Grid" },
+    titleVi: { vi: "Dịch grid 2 chiều", en: "Shift a 2D grid" },
+    statement: {
+      vi: "Cho grid m x n và số nguyên k. Mỗi lần shift, mọi phần tử dịch sang phải một ô; phần tử cuối hàng sang đầu hàng kế tiếp và phần tử cuối grid quay về ô (0,0). Trả về grid sau k lần shift.",
+      en: "Given an m x n grid and integer k, shift every element right by one per operation. Row endings move to the next row, and the final cell wraps to (0,0). Return the grid after k shifts.",
+    },
+    defaultInput: "1,2,3;4,5,6;7,8,9",
+    inputKind: "string",
+    inputLabel: {
+      vi: "Grid (phẩy ngăn cột, chấm phẩy ngăn hàng)",
+      en: "Grid (commas separate columns, semicolons separate rows)",
+    },
+    extraParams: [{ key: "k", label: { vi: "Số lần shift k", en: "Shift count k" }, default: 1, min: 0 }],
+    complexity: {
+      time: "O(m*n)",
+      space: "O(m*n)",
+      note: {
+        vi: "Mỗi ô được đọc và ghi đúng một lần. Grid kết quả chứa m*n phần tử.",
+        en: "Each cell is read and written exactly once. The result grid stores m*n elements.",
+      },
+    },
+    approach: [
+      {
+        vi: "Trải phẳng tọa độ (r,c) thành old_pos = r*n + c.",
+        en: "Flatten coordinate (r,c) into old_pos = r*n + c.",
+      },
+      {
+        vi: "Dịch bằng new_pos = (old_pos + k) % (m*n); modulo xử lý quay vòng.",
+        en: "Shift with new_pos = (old_pos + k) % (m*n); modulo handles wraparound.",
+      },
+      {
+        vi: "Đổi new_pos về (new_r,new_c) bằng divmod và ghi giá trị vào result.",
+        en: "Convert new_pos back to (new_r,new_c) with divmod and write into result.",
+      },
+    ],
+    code: [
+      "class Solution:",
+      "    def shiftGrid(self, grid: List[List[int]], k: int) -> List[List[int]]:",
+      "        m, n = len(grid), len(grid[0])",
+      "        result = [[0] * n for _ in range(m)]",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                old_pos = r * n + c",
+      "                new_pos = (old_pos + k) % (m * n)",
+      "                new_r, new_c = divmod(new_pos, n)",
+      "                result[new_r][new_c] = grid[r][c]",
+      "        return result",
+    ],
+    builder: buildSteps1260,
   },
 };
