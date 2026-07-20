@@ -274,6 +274,10 @@ function buildSteps1299(nums) {
  * back to a row and column in the result grid.
  */
 function buildSteps1260(input, params) {
+  if (Number(params && params.approach) === 2) {
+    return buildSteps1260Flatten(input, params);
+  }
+
   const rowStrings = String(input).split(";").map((row) => row.trim()).filter(Boolean);
   const grid = rowStrings.map((row) => row.split(",").map((value) => Number(value.trim())));
   const k = params.k;
@@ -496,6 +500,298 @@ function buildSteps1260(input, params) {
   });
 
   return { original: grid.map((row) => [...row]), answer: result.map((row) => [...row]), steps };
+}
+
+function buildSteps1260Flatten(input, params) {
+  const rowStrings = String(input).split(";").map((row) => row.trim()).filter(Boolean);
+  const originalGrid = rowStrings.map((row) => row.split(",").map((value) => Number(value.trim())));
+  const k = params.k;
+  const valid = originalGrid.length > 0
+    && originalGrid[0].length > 0
+    && originalGrid.every((row) => row.length === originalGrid[0].length)
+    && originalGrid.every((row) => row.every(Number.isInteger));
+
+  if (!valid) {
+    return {
+      original: input,
+      answer: null,
+      steps: [{
+        title: { vi: "Grid không hợp lệ", en: "Invalid grid" },
+        codeLines: [3],
+        codeBlock: 2,
+        final: true,
+        vars: [{ name: "error", value: "invalid rectangular grid" }],
+        shiftGridView: { source: [], result: [], k, phase: { vi: "Lỗi input", en: "Input error" } },
+        note: {
+          vi: "Mỗi hàng phải có cùng số cột và chỉ chứa số nguyên. Ví dụ: 1,2,3;4,5,6;7,8,9.",
+          en: "Every row must have the same number of integer cells. Example: 1,2,3;4,5,6;7,8,9.",
+        },
+      }],
+    };
+  }
+
+  const grid = originalGrid.map((row) => [...row]);
+  const nRows = grid.length;
+  const nCols = grid[0].length;
+  const size = nRows * nCols;
+  const oneArr = [];
+  const newArr = Array(size).fill(null);
+  const rebuiltGrid = Array.from({ length: nRows }, () => Array(nCols).fill(null));
+  const steps = [];
+  const placed = [];
+
+  const makeView = (overrides = {}) => ({
+    source: originalGrid.map((row) => [...row]),
+    result: rebuiltGrid.map((row) => [...row]),
+    sourceLabel: "grid",
+    resultLabel: { vi: "grid đang ghi lại", en: "grid being rebuilt" },
+    oneArr: [...oneArr],
+    newArr: [...newArr],
+    k,
+    normalizedK: k % size,
+    placed: placed.map(([r, c]) => [r, c]),
+    ...overrides,
+  });
+  const snap = ({ title, line, vars, note, view = {}, final = false }) => {
+    steps.push({
+      title,
+      codeLines: [line],
+      codeBlock: 2,
+      vars,
+      note,
+      final,
+      shiftGridView: makeView(view),
+    });
+  };
+
+  snap({
+    title: { vi: `n_rows = ${nRows}`, en: `n_rows = ${nRows}` },
+    line: 3,
+    vars: [{ name: "n_rows", value: nRows }],
+    view: { phase: { vi: "Đọc số hàng", en: "Read the row count" } },
+    note: { vi: `Grid có ${nRows} hàng.`, en: `The grid has ${nRows} rows.` },
+  });
+  snap({
+    title: { vi: `n_cols = ${nCols}`, en: `n_cols = ${nCols}` },
+    line: 4,
+    vars: [{ name: "n_rows", value: nRows }, { name: "n_cols", value: nCols }],
+    view: { phase: { vi: "Đọc số cột", en: "Read the column count" } },
+    note: { vi: `Mỗi hàng có ${nCols} cột.`, en: `Each row has ${nCols} columns.` },
+  });
+  snap({
+    title: { vi: `size = ${size}`, en: `size = ${size}` },
+    line: 6,
+    vars: [
+      { name: "n_rows", value: nRows },
+      { name: "n_cols", value: nCols },
+      { name: "size", value: size },
+    ],
+    view: { phase: { vi: "Tính tổng số ô", en: "Compute the total cell count" } },
+    note: { vi: `size = ${nRows} * ${nCols} = ${size}.`, en: `size = ${nRows} * ${nCols} = ${size}.` },
+  });
+  snap({
+    title: { vi: "Tạo one_arr rỗng", en: "Create an empty one_arr" },
+    line: 8,
+    vars: [{ name: "one_arr", value: "[]" }],
+    view: { phase: { vi: "Mảng phẳng chưa có phần tử", en: "The flattened array is empty" } },
+    note: { vi: "one_arr sẽ chứa grid theo thứ tự từ trái sang phải, từ trên xuống dưới.", en: "one_arr will store the grid from left to right, top to bottom." },
+  });
+  snap({
+    title: { vi: `Tạo new_arr gồm ${size} ô`, en: `Create new_arr with ${size} slots` },
+    line: 9,
+    vars: [
+      { name: "size", value: size },
+      { name: "new_arr", value: `[${Array(size).fill("0").join(", ")}]` },
+    ],
+    view: { phase: { vi: "Mảng sau shift chưa được điền", en: "The shifted array has not been filled" } },
+    note: { vi: `Code khởi tạo new_arr với ${size} số 0; visualization dùng dấu chấm để phân biệt các ô chưa được gán.`, en: `The code initializes new_arr with ${size} zeros; the visualization uses dots to distinguish unassigned slots.` },
+  });
+
+  for (let r = 0; r < nRows; r++) {
+    snap({
+      title: { vi: `Lấy hàng ${r}`, en: `Read row ${r}` },
+      line: 11,
+      vars: [
+        { name: "row", value: `[${grid[r].join(", ")}]` },
+        { name: "one_arr.length", value: oneArr.length },
+      ],
+      view: {
+        sourceRow: r,
+        phase: { vi: `Flatten hàng ${r}`, en: `Flatten row ${r}` },
+      },
+      note: { vi: `Vòng ngoài lấy grid[${r}] = [${grid[r].join(", ")}].`, en: `The outer loop reads grid[${r}] = [${grid[r].join(", ")}].` },
+    });
+
+    for (let c = 0; c < nCols; c++) {
+      const value = grid[r][c];
+      snap({
+        title: { vi: `Đọc x = ${value}`, en: `Read x = ${value}` },
+        line: 12,
+        vars: [
+          { name: "row", value: `[${grid[r].join(", ")}]` },
+          { name: "x", value },
+          { name: "source", value: `grid[${r}][${c}]` },
+        ],
+        view: {
+          current: [r, c],
+          activeOneIndex: oneArr.length,
+          phase: { vi: "Chọn phần tử tiếp theo", en: "Select the next value" },
+        },
+        note: { vi: `Vòng trong đọc x = grid[${r}][${c}] = ${value}.`, en: `The inner loop reads x = grid[${r}][${c}] = ${value}.` },
+      });
+
+      oneArr.push(value);
+      snap({
+        title: { vi: `Append ${value} vào one_arr`, en: `Append ${value} to one_arr` },
+        line: 13,
+        vars: [
+          { name: "x", value },
+          { name: "one_arr", value: `[${oneArr.join(", ")}]` },
+          { name: "one_arr.length", value: oneArr.length },
+        ],
+        view: {
+          current: [r, c],
+          activeOneIndex: oneArr.length - 1,
+          phase: { vi: "Ghi vào mảng phẳng", en: "Append to the flattened array" },
+        },
+        note: { vi: `one_arr.append(${value}) -> [${oneArr.join(", ")}].`, en: `one_arr.append(${value}) -> [${oneArr.join(", ")}].` },
+      });
+    }
+  }
+
+  for (let i = 0; i < size; i++) {
+    snap({
+      title: { vi: `Duyệt i = ${i}`, en: `Visit i = ${i}` },
+      line: 15,
+      vars: [
+        { name: "i", value: i },
+        { name: "one_arr[i]", value: oneArr[i] },
+        { name: "k", value: k },
+      ],
+      view: {
+        activeOneIndex: i,
+        oldPos: i,
+        phase: { vi: "Chọn index cũ", en: "Select the old index" },
+      },
+      note: { vi: `Xét one_arr[${i}] = ${oneArr[i]}.`, en: `Inspect one_arr[${i}] = ${oneArr[i]}.` },
+    });
+
+    const newIndex = (i + k) % size;
+    snap({
+      title: { vi: `new_index = ${newIndex}`, en: `new_index = ${newIndex}` },
+      line: 16,
+      vars: [
+        { name: "i", value: i },
+        { name: "k", value: k },
+        { name: "size", value: size },
+        { name: "new_index", value: newIndex },
+      ],
+      view: {
+        activeOneIndex: i,
+        activeNewIndex: newIndex,
+        oldPos: i,
+        newPos: newIndex,
+        phase: { vi: "Tính vị trí sau shift", en: "Compute the shifted index" },
+      },
+      note: { vi: `new_index = (${i} + ${k}) % ${size} = ${newIndex}.`, en: `new_index = (${i} + ${k}) % ${size} = ${newIndex}.` },
+    });
+
+    newArr[newIndex] = oneArr[i];
+    snap({
+      title: { vi: `Đặt ${oneArr[i]} vào new_arr[${newIndex}]`, en: `Place ${oneArr[i]} at new_arr[${newIndex}]` },
+      line: 17,
+      vars: [
+        { name: "i", value: i },
+        { name: "new_index", value: newIndex },
+        { name: "one_arr[i]", value: oneArr[i] },
+        { name: "new_arr", value: `[${newArr.map((value) => value === null ? "." : value).join(", ")}]` },
+      ],
+      view: {
+        activeOneIndex: i,
+        activeNewIndex: newIndex,
+        oldPos: i,
+        newPos: newIndex,
+        phase: { vi: "Ghi vào mảng đã shift", en: "Write into the shifted array" },
+      },
+      note: { vi: `new_arr[${newIndex}] = one_arr[${i}] = ${oneArr[i]}.`, en: `new_arr[${newIndex}] = one_arr[${i}] = ${oneArr[i]}.` },
+    });
+  }
+
+  for (let r = 0; r < nRows; r++) {
+    snap({
+      title: { vi: `Ghi lại hàng i = ${r}`, en: `Rebuild row i = ${r}` },
+      line: 19,
+      vars: [
+        { name: "i", value: r },
+        { name: "n_cols", value: nCols },
+      ],
+      view: {
+        resultRow: r,
+        phase: { vi: `Chuyển new_arr về hàng ${r}`, en: `Map new_arr back to row ${r}` },
+      },
+      note: { vi: `Bắt đầu ghi các giá trị của hàng ${r} trở lại grid.`, en: `Begin writing values for row ${r} back into grid.` },
+    });
+
+    for (let c = 0; c < nCols; c++) {
+      const flatIndex = r * nCols + c;
+      const value = newArr[flatIndex];
+      snap({
+        title: { vi: `Chọn ô (${r}, ${c})`, en: `Select cell (${r}, ${c})` },
+        line: 20,
+        vars: [
+          { name: "i", value: r },
+          { name: "j", value: c },
+          { name: "flat_index", value: flatIndex },
+        ],
+        view: {
+          target: [r, c],
+          activeNewIndex: flatIndex,
+          newPos: flatIndex,
+          phase: { vi: "Chọn tọa độ cần ghi", en: "Select the destination coordinate" },
+        },
+        note: { vi: `Ô grid[${r}][${c}] tương ứng index phẳng ${r} * ${nCols} + ${c} = ${flatIndex}.`, en: `Cell grid[${r}][${c}] corresponds to flat index ${r} * ${nCols} + ${c} = ${flatIndex}.` },
+      });
+
+      rebuiltGrid[r][c] = value;
+      grid[r][c] = value;
+      placed.push([r, c]);
+      snap({
+        title: { vi: `grid[${r}][${c}] = ${value}`, en: `grid[${r}][${c}] = ${value}` },
+        line: 21,
+        vars: [
+          { name: "i", value: r },
+          { name: "j", value: c },
+          { name: "i*n_cols+j", value: flatIndex },
+          { name: "new_arr[index]", value },
+        ],
+        view: {
+          target: [r, c],
+          activeNewIndex: flatIndex,
+          newPos: flatIndex,
+          phase: { vi: "Ghi trở lại grid", en: "Write back into grid" },
+        },
+        note: { vi: `grid[${r}][${c}] = new_arr[${flatIndex}] = ${value}.`, en: `grid[${r}][${c}] = new_arr[${flatIndex}] = ${value}.` },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: "Trả về grid", en: "Return grid" },
+    line: 23,
+    final: true,
+    vars: [
+      { name: "one_arr", value: `[${oneArr.join(", ")}]` },
+      { name: "new_arr", value: `[${newArr.join(", ")}]` },
+      { name: "grid", value: JSON.stringify(grid) },
+    ],
+    view: {
+      resultLabel: { vi: "grid cuối cùng", en: "final grid" },
+      phase: { vi: "Kết quả Approach 2", en: "Approach 2 result" },
+    },
+    note: { vi: `Trả về grid = ${JSON.stringify(grid)}.`, en: `Return grid = ${JSON.stringify(grid)}.` },
+  });
+
+  return { original: originalGrid, answer: grid.map((row) => [...row]), steps };
 }
 
 /**
@@ -941,7 +1237,19 @@ module.exports = {
       vi: "Grid (phẩy ngăn cột, chấm phẩy ngăn hàng)",
       en: "Grid (commas separate columns, semicolons separate rows)",
     },
-    extraParams: [{ key: "k", label: { vi: "Số lần shift k", en: "Shift count k" }, default: 1, min: 0 }],
+    extraParams: [
+      { key: "k", label: { vi: "Số lần shift k", en: "Shift count k" }, default: 1, min: 0 },
+      {
+        key: "approach",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        type: "select",
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Ánh xạ trực tiếp", en: "Approach 1: Direct mapping" } },
+          { value: 2, label: { vi: "Cách 2: Flatten rồi shift", en: "Approach 2: Flatten then shift" } },
+        ],
+      },
+    ],
     complexity: {
       time: "O(m*n)",
       space: "O(m*n)",
@@ -951,18 +1259,9 @@ module.exports = {
       },
     },
     approach: [
-      {
-        vi: "Trải phẳng tọa độ (r,c) thành old_pos = r*n + c.",
-        en: "Flatten coordinate (r,c) into old_pos = r*n + c.",
-      },
-      {
-        vi: "Dịch bằng new_pos = (old_pos + k) % (m*n); modulo xử lý quay vòng.",
-        en: "Shift with new_pos = (old_pos + k) % (m*n); modulo handles wraparound.",
-      },
-      {
-        vi: "Đổi new_pos về (new_r,new_c) bằng divmod và ghi giá trị vào result.",
-        en: "Convert new_pos back to (new_r,new_c) with divmod and write into result.",
-      },
+      { vi: "Cách 1 ánh xạ trực tiếp mỗi tọa độ cũ sang tọa độ mới bằng index phẳng.", en: "Approach 1 maps every old coordinate directly to a new coordinate through a flat index." },
+      { vi: "Cách 2 trải grid thành one_arr, dịch sang new_arr, rồi ghi new_arr trở lại grid.", en: "Approach 2 flattens grid into one_arr, shifts into new_arr, then writes new_arr back to grid." },
+      { vi: "Cả hai cách dùng modulo để phần tử vượt cuối quay lại đầu.", en: "Both approaches use modulo to wrap positions past the end back to the start." },
     ],
     code: [
       "class Solution:",
@@ -977,6 +1276,33 @@ module.exports = {
       "                result[new_r][new_c] = grid[r][c]",
       "        return result",
     ],
+    code2: [
+      "class Solution:",
+      "    def shiftGrid(self, grid: List[List[int]], k: int) -> List[List[int]]:",
+      "        n_rows = len(grid)",
+      "        n_cols = len(grid[0])",
+      "",
+      "        size = n_rows * n_cols",
+      "",
+      "        one_arr = []",
+      "        new_arr = [0] * size",
+      "",
+      "        for row in grid:",
+      "            for x in row:",
+      "                one_arr.append(x)",
+      "",
+      "        for i in range(size):",
+      "            new_index = (i + k) % size",
+      "            new_arr[new_index] = one_arr[i]",
+      "",
+      "        for i in range(n_rows):",
+      "            for j in range(n_cols):",
+      "                grid[i][j] = new_arr[i * n_cols + j]",
+      "",
+      "        return grid",
+    ],
+    codeLabel: { vi: "Cách 1: Ánh xạ trực tiếp", en: "Approach 1: Direct mapping" },
+    code2Label: { vi: "Cách 2: Flatten rồi shift", en: "Approach 2: Flatten then shift" },
     builder: buildSteps1260,
   },
 };

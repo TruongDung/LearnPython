@@ -1223,6 +1223,7 @@ function renderShiftGridView(step) {
         const classes = ["shift-cell"];
         if (kind === "source" && key === currentKey) classes.push("source-active");
         if (kind === "source" && view.sourceRow === r && !currentKey) classes.push("row-active");
+        if (kind === "result" && view.resultRow === r && !targetKey) classes.push("row-active");
         if (kind === "result" && placedSet.has(key)) classes.push("placed");
         if (kind === "result" && key === targetKey) classes.push("target-active");
         const display = value === null || value === undefined ? "·" : value;
@@ -1235,8 +1236,9 @@ function renderShiftGridView(step) {
     return `<div class="shift-matrix" style="--shift-cols:${cols}">${cells}</div>`;
   };
 
+  const hasArrayLanes = Array.isArray(view.oneArr) && Array.isArray(view.newArr);
   let track = "";
-  if (hasGrid) {
+  if (hasGrid && !hasArrayLanes) {
     const flat = source.flat();
     track = `<div class="shift-track" aria-label="Flattened grid">${flat.map((value, index) => {
       const classes = ["shift-track-cell"];
@@ -1246,24 +1248,49 @@ function renderShiftGridView(step) {
     }).join("")}</div>`;
   }
 
+  let arrayLanes = "";
+  if (hasGrid && hasArrayLanes) {
+    const size = source.flat().length;
+    const laneHtml = (label, values, activeIndex, activeClass) => {
+      const cells = Array.from({ length: size }, (_, index) => {
+        const value = values[index];
+        const classes = ["shift-array-cell"];
+        if (value !== null && value !== undefined) classes.push("filled");
+        if (index === activeIndex) classes.push(activeClass);
+        return `<div class="${classes.join(" ")}"><span>${index}</span><strong>${escapeHtml(value === null || value === undefined ? "·" : value)}</strong></div>`;
+      }).join("");
+      return `<div class="shift-array-lane"><strong class="shift-array-name">${label}</strong><div class="shift-array-values">${cells}</div></div>`;
+    };
+    arrayLanes = `<div class="shift-array-lanes">
+      ${laneHtml("one_arr", view.oneArr, view.activeOneIndex, "source-index")}
+      ${laneHtml("new_arr", view.newArr, view.activeNewIndex, "target-index")}
+    </div>`;
+  }
+
   const formula = view.oldPos === undefined
     ? `<span>k = <strong>${escapeHtml(view.k)}</strong></span><span>k % cells = <strong>${escapeHtml(view.normalizedK)}</strong></span>`
-    : `<span>old_pos = <strong>${view.oldPos}</strong></span><span>+ k = <strong>${escapeHtml(view.k)}</strong></span>${view.newPos === undefined ? "" : `<span>new_pos = <strong>${view.newPos}</strong></span>`}`;
+    : hasArrayLanes
+      ? `<span>i = <strong>${view.oldPos}</strong></span><span>+ k = <strong>${escapeHtml(view.k)}</strong></span>${view.newPos === undefined ? "" : `<span>new_index = <strong>${view.newPos}</strong></span>`}`
+      : `<span>old_pos = <strong>${view.oldPos}</strong></span><span>+ k = <strong>${escapeHtml(view.k)}</strong></span>${view.newPos === undefined ? "" : `<span>new_pos = <strong>${view.newPos}</strong></span>`}`;
+
+  const sourceLabel = pick(view.sourceLabel) || (lang === "vi" ? "Grid nguồn" : "Source grid");
+  const resultLabel = pick(view.resultLabel) || (lang === "vi" ? "Grid kết quả" : "Result grid");
 
   $("treeView").innerHTML = `<div class="shift-grid-viz">
     <div class="shift-phase">${escapeHtml(pick(view.phase) || "")}</div>
     <div class="shift-formula">${formula}</div>
     <div class="shift-matrices">
       <section class="shift-matrix-block">
-        <h4>${lang === "vi" ? "Grid nguồn" : "Source grid"}</h4>
+        <h4>${escapeHtml(sourceLabel)}</h4>
         ${matrixHtml(source, "source")}
       </section>
       <div class="shift-arrow" aria-hidden="true">→</div>
       <section class="shift-matrix-block">
-        <h4>${lang === "vi" ? "Grid kết quả" : "Result grid"}</h4>
+        <h4>${escapeHtml(resultLabel)}</h4>
         ${matrixHtml(result, "result")}
       </section>
     </div>
+    ${arrayLanes}
     ${track}
     <div class="shift-legend">
       <span><i class="source-swatch"></i>${lang === "vi" ? "ô nguồn" : "source"}</span>
