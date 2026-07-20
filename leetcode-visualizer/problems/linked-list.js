@@ -1364,8 +1364,8 @@ function buildSteps146(input, params) {
   }
 
   function mapLabel() {
-    return order.length
-      ? order.map((key) => `${key}->node(${nodes.get(key).value})`).join(", ")
+    return nodes.size
+      ? Array.from(nodes.values()).map((node) => `${node.key}->node(${node.value})`).join(", ")
       : "{}";
   }
 
@@ -1392,14 +1392,14 @@ function buildSteps146(input, params) {
       graphEdges.push({ u: keyLabel(order[i + 1]), v: keyLabel(order[i]), w: "prev", kind: "prev" });
     }
 
-    let evictedId = null;
-    if (opts.evicted) {
-      evictedId = `evicted-${opts.evicted.key}`;
+    let transientId = null;
+    if (opts.transient) {
+      transientId = `transient-${opts.transient.key}-${steps.length}`;
       graphNodes.push({
-        id: evictedId,
-        label: `${opts.evicted.key}:${opts.evicted.value}`,
+        id: transientId,
+        label: `${opts.transient.key}:${opts.transient.value}`,
         row: "discarded",
-        sub: "evicted",
+        sub: opts.transient.status,
       });
     }
 
@@ -1413,10 +1413,17 @@ function buildSteps146(input, params) {
         update: "updated MRU",
         insert: "new MRU",
         evict: "new MRU",
+        "select-lru": "LRU candidate",
       }[opts.event];
       if (eventLabel) annotations[activeId] = eventLabel;
     }
-    if (evictedId) annotations[evictedId] = "evicted";
+    if (transientId) annotations[transientId] = opts.transient.status;
+
+    const highlightedNodes = [];
+    if (opts.activeKey != null && nodes.has(opts.activeKey) && order.includes(opts.activeKey)) {
+      highlightedNodes.push(keyLabel(opts.activeKey));
+    }
+    if (transientId && opts.highlightTransient) highlightedNodes.push(transientId);
 
     steps.push({
       title: opts.title,
@@ -1425,12 +1432,12 @@ function buildSteps146(input, params) {
         nodes: graphNodes,
         edges: graphEdges,
         layout: "linear",
-        order: order.map(keyLabel).concat(evictedId ? [evictedId] : []),
+        order: order.map(keyLabel).concat(transientId ? [transientId] : []),
         caption: `${opts.operation || "LRUCache"} | capacity=${capacity} | LRU -> MRU: ${cacheLabel()}`,
         annotations,
-        hlNodes: opts.activeKey != null && nodes.has(opts.activeKey) ? [keyLabel(opts.activeKey)] : [],
+        hlNodes: highlightedNodes,
         hlEdges: [],
-        visitedNodes: evictedId ? [evictedId] : [],
+        visitedNodes: transientId && !opts.highlightTransient ? [transientId] : [],
       },
       highlight: [],
       mark: [],
@@ -1438,18 +1445,13 @@ function buildSteps146(input, params) {
       vars: [
         { name: "cache", value: cacheLabel() },
         { name: "map", value: mapLabel() },
-        { name: "size/capacity", value: `${order.length}/${capacity}` },
+        { name: "size/capacity", value: `${nodes.size}/${capacity}` },
+        ...(nodes.size !== order.length ? [{ name: "linked nodes", value: order.length }] : []),
         ...(opts.vars || []),
       ],
       note: opts.note,
       final: Boolean(opts.final),
     });
-  }
-
-  function moveToMru(key) {
-    const idx = order.indexOf(key);
-    if (idx >= 0) order.splice(idx, 1);
-    order.push(key);
   }
 
   const commands = parseCommands(raw);
@@ -1472,7 +1474,7 @@ function buildSteps146(input, params) {
     title: { vi: `Khởi tạo LRUCache(${capacity})`, en: `Initialize LRUCache(${capacity})` },
     event: "ready",
     operation: `LRUCache(${capacity})`,
-    codeLines: [10],
+    codeLines: [10, 11, 12, 13, 14, 15],
     vars: [{ name: "outputs", value: "[]" }],
     note: {
       vi: "Dùng hash map key->node để tìm O(1), và doubly linked list để biết node nào là LRU/MRU.",
@@ -1513,22 +1515,71 @@ function buildSteps146(input, params) {
       }
 
       const value = nodes.get(command.key).value;
-      outputs.push(value);
-      moveToMru(command.key);
+      snapshot({
+        title: { vi: `node = cache[${command.key}]`, en: `node = cache[${command.key}]` },
+        activeKey: command.key,
+        event: "lookup-hit",
+        operation: `get(${command.key})`,
+        codeLines: [31],
+        vars: [
+          { name: "node", value: `${command.key}:${value}` },
+          { name: "node.prev", value: order.indexOf(command.key) > 0 ? `${order[order.indexOf(command.key) - 1]}` : "left sentinel" },
+          { name: "node.next", value: order.indexOf(command.key) < order.length - 1 ? `${order[order.indexOf(command.key) + 1]}` : "right sentinel" },
+        ],
+        note: {
+          vi: `Lấy trực tiếp node ${command.key}:${value} từ hash map. Thứ tự list chưa đổi.`,
+          en: `Read node ${command.key}:${value} directly from the hash map. The list order is unchanged.`,
+        },
+      });
+
+      const nodeIndex = order.indexOf(command.key);
+      order.splice(nodeIndex, 1);
+      snapshot({
+        title: { vi: `remove(node ${command.key})`, en: `remove(node ${command.key})` },
+        event: "detach",
+        operation: `get(${command.key})`,
+        transient: { key: command.key, value, status: "detached" },
+        highlightTransient: true,
+        codeLines: [32],
+        vars: [{ name: "action", value: "unlink node.prev <-> node.next" }],
+        note: {
+          vi: `Tháo node ${command.key}:${value} khỏi vị trí cũ bằng cách nối node.prev trực tiếp với node.next.`,
+          en: `Detach node ${command.key}:${value} from its old position by linking node.prev directly to node.next.`,
+        },
+      });
+
+      order.push(command.key);
       snapshot({
         title: { vi: `hit ${command.key}:${value} -> đưa lên MRU`, en: `hit ${command.key}:${value} -> move to MRU` },
         activeKey: command.key,
         event: "hit",
         operation: `get(${command.key})`,
         result: value,
-        codeLines: [32, 33],
+        codeLines: [33],
         vars: [
-          { name: "output", value },
-          { name: "action", value: "move_to_front / move_to_mru" },
+          { name: "action", value: "insert before right sentinel" },
         ],
         note: {
           vi: `Đọc key ${command.key}, nên node này vừa được dùng gần nhất và chuyển sang phía MRU.`,
           en: `Reading key ${command.key} makes it most recently used, so move it to the MRU side.`,
+        },
+      });
+
+      outputs.push(value);
+      snapshot({
+        title: { vi: `return ${value}`, en: `return ${value}` },
+        activeKey: command.key,
+        event: "hit",
+        operation: `get(${command.key})`,
+        result: value,
+        codeLines: [34],
+        vars: [
+          { name: "output", value },
+          { name: "outputs", value: `[${outputs.map((item) => item === null ? "null" : item).join(", ")}]` },
+        ],
+        note: {
+          vi: `Trả về value=${value}. Node ${command.key} vẫn ở vị trí MRU.`,
+          en: `Return value=${value}. Node ${command.key} remains at the MRU position.`,
         },
       });
     } else if (command.op === "put") {
@@ -1546,18 +1597,65 @@ function buildSteps146(input, params) {
       });
 
       if (nodes.has(command.key)) {
-        nodes.get(command.key).value = command.value;
-        moveToMru(command.key);
+        const oldValue = nodes.get(command.key).value;
+        const oldIndex = order.indexOf(command.key);
+        order.splice(oldIndex, 1);
+        snapshot({
+          title: { vi: `remove(cache[${command.key}])`, en: `remove(cache[${command.key}])` },
+          event: "detach",
+          operation: `put(${command.key}, ${command.value})`,
+          transient: { key: command.key, value: oldValue, status: "old node detached" },
+          highlightTransient: true,
+          codeLines: [38],
+          vars: [{ name: "old node", value: `${command.key}:${oldValue}` }],
+          note: {
+            vi: `Key ${command.key} đã tồn tại, nên tháo node cũ khỏi doubly linked list trước.`,
+            en: `Key ${command.key} already exists, so detach its old node from the doubly linked list first.`,
+          },
+        });
+
+        nodes.set(command.key, { key: command.key, value: command.value });
+        snapshot({
+          title: { vi: `cache[${command.key}] = Node(${command.key}, ${command.value})`, en: `cache[${command.key}] = Node(${command.key}, ${command.value})` },
+          event: "new-node",
+          operation: `put(${command.key}, ${command.value})`,
+          transient: { key: command.key, value: command.value, status: "new node" },
+          highlightTransient: true,
+          codeLines: [39],
+          vars: [{ name: `cache[${command.key}]`, value: `new Node(${command.key}, ${command.value})` }],
+          note: {
+            vi: `Tạo node mới với value=${command.value} và cập nhật hash map. Node này chưa được nối vào list.`,
+            en: `Create a new node with value=${command.value} and update the hash map. It is not linked into the list yet.`,
+          },
+        });
+
+        order.push(command.key);
         snapshot({
           title: { vi: `update key ${command.key} -> MRU`, en: `update key ${command.key} -> MRU` },
           activeKey: command.key,
           event: "update",
           operation: `put(${command.key}, ${command.value})`,
-          codeLines: [39, 40],
+          codeLines: [40],
           vars: [{ name: "new value", value: command.value }],
           note: {
             vi: "Put trên key đã tồn tại cũng tính là vừa sử dụng, nên đưa node sang MRU.",
             en: "Putting an existing key counts as recent use, so move that node to MRU.",
+          },
+        });
+
+        snapshot({
+          title: { vi: "Kiểm tra capacity", en: "Check capacity" },
+          activeKey: command.key,
+          event: "update",
+          operation: `put(${command.key}, ${command.value})`,
+          codeLines: [41],
+          vars: [
+            { name: "len(cache)", value: nodes.size },
+            { name: "condition", value: `${nodes.size} > ${capacity} = false` },
+          ],
+          note: {
+            vi: "Update key cũ không làm tăng số node, nên cache không vượt capacity.",
+            en: "Updating an existing key does not increase the node count, so capacity is not exceeded.",
           },
         });
         outputs.push(null);
@@ -1565,13 +1663,27 @@ function buildSteps146(input, params) {
       }
 
       nodes.set(command.key, { key: command.key, value: command.value });
+      snapshot({
+        title: { vi: `cache[${command.key}] = Node(${command.key}, ${command.value})`, en: `cache[${command.key}] = Node(${command.key}, ${command.value})` },
+        event: "new-node",
+        operation: `put(${command.key}, ${command.value})`,
+        transient: { key: command.key, value: command.value, status: "new node" },
+        highlightTransient: true,
+        codeLines: [39],
+        vars: [{ name: `cache[${command.key}]`, value: `Node(${command.key}, ${command.value})` }],
+        note: {
+          vi: `Tạo node ${command.key}:${command.value} trong hash map. Node chưa có prev/next trong cache list.`,
+          en: `Create node ${command.key}:${command.value} in the hash map. It is not linked into the cache list yet.`,
+        },
+      });
+
       order.push(command.key);
       snapshot({
         title: { vi: `thêm node ${command.key}:${command.value} vào MRU`, en: `add node ${command.key}:${command.value} as MRU` },
         activeKey: command.key,
         event: "insert",
         operation: `put(${command.key}, ${command.value})`,
-        codeLines: [39, 40],
+        codeLines: [40],
         vars: [{ name: "insert", value: `${command.key}:${command.value}` }],
         note: {
           vi: "Node mới được nối vào phía MRU của doubly linked list và map trỏ tới node đó.",
@@ -1579,17 +1691,72 @@ function buildSteps146(input, params) {
         },
       });
 
+      snapshot({
+        title: { vi: "Kiểm tra capacity", en: "Check capacity" },
+        activeKey: command.key,
+        event: "insert",
+        operation: `put(${command.key}, ${command.value})`,
+        codeLines: [41],
+        vars: [
+          { name: "len(cache)", value: nodes.size },
+          { name: "condition", value: `${nodes.size} > ${capacity} = ${nodes.size > capacity}` },
+        ],
+        note: {
+          vi: nodes.size > capacity
+            ? `Cache có ${nodes.size} node, vượt capacity=${capacity}; cần loại LRU.`
+            : `Cache có ${nodes.size} node, chưa vượt capacity=${capacity}.`,
+          en: nodes.size > capacity
+            ? `The cache has ${nodes.size} nodes, exceeding capacity=${capacity}; evict the LRU node.`
+            : `The cache has ${nodes.size} nodes, within capacity=${capacity}.`,
+        },
+      });
+
       if (order.length > capacity) {
-        const evictedKey = order.shift();
+        const evictedKey = order[0];
         const evictedValue = nodes.get(evictedKey).value;
+
+        snapshot({
+          title: { vi: `lru = left.next -> ${evictedKey}:${evictedValue}`, en: `lru = left.next -> ${evictedKey}:${evictedValue}` },
+          activeKey: evictedKey,
+          event: "select-lru",
+          operation: `put(${command.key}, ${command.value})`,
+          codeLines: [42],
+          vars: [
+            { name: "lru", value: `${evictedKey}:${evictedValue}` },
+            { name: "left.next", value: `${evictedKey}:${evictedValue}` },
+          ],
+          note: {
+            vi: `Node ngay sau left sentinel là ${evictedKey}:${evictedValue}, nên đây là least recently used.`,
+            en: `The node after the left sentinel is ${evictedKey}:${evictedValue}, so it is the least recently used.`,
+          },
+        });
+
+        order.shift();
+        snapshot({
+          title: { vi: `remove(lru ${evictedKey}:${evictedValue})`, en: `remove(lru ${evictedKey}:${evictedValue})` },
+          event: "detach",
+          operation: `put(${command.key}, ${command.value})`,
+          transient: { key: evictedKey, value: evictedValue, status: "LRU unlinked" },
+          highlightTransient: true,
+          codeLines: [43],
+          vars: [
+            { name: "lru", value: `${evictedKey}:${evictedValue}` },
+            { name: "map still contains key", value: nodes.has(evictedKey) },
+          ],
+          note: {
+            vi: `Tháo LRU ${evictedKey}:${evictedValue} khỏi doubly linked list. Hash map vẫn còn key này cho đến dòng kế tiếp.`,
+            en: `Unlink LRU ${evictedKey}:${evictedValue} from the doubly linked list. The hash map still contains its key until the next line.`,
+          },
+        });
+
         nodes.delete(evictedKey);
         snapshot({
           title: { vi: `vượt capacity -> loại LRU ${evictedKey}:${evictedValue}`, en: `over capacity -> evict LRU ${evictedKey}:${evictedValue}` },
           activeKey: command.key,
           event: "evict",
           operation: `put(${command.key}, ${command.value})`,
-          evicted: { key: evictedKey, value: evictedValue },
-          codeLines: [42, 43, 44],
+          transient: { key: evictedKey, value: evictedValue, status: "evicted" },
+          codeLines: [44],
           vars: [
             { name: "evicted", value: `${evictedKey}:${evictedValue}` },
             { name: "reason", value: `${capacity + 1} > ${capacity}` },
@@ -1655,7 +1822,6 @@ module.exports = {
         en: "The map and doubly linked list store at most capacity nodes. Each operation changes only a few pointers and map entries.",
       },
     },
-    debugMode: "semantic",
     code: [
       "class Node:",
       "    def __init__(self, key=0, value=0):",
