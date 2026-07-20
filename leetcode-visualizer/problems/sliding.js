@@ -5,7 +5,11 @@
  * Generate steps for LeetCode 3: Longest Substring Without Repeating Characters.
  * The latest-seen map lets left jump directly past a duplicate in the window.
  */
-function buildSteps3(input) {
+function buildSteps3(input, params) {
+  if (Number(params && params.approach) === 2) {
+    return buildSteps3Set(input);
+  }
+
   const s = typeof input === "string" ? input : String(input ?? "");
   const chars = s.split("");
   const steps = [];
@@ -184,6 +188,199 @@ function buildSteps3(input) {
   });
 
   return { original: s, answer: best, steps };
+}
+
+/**
+ * LeetCode 3, approach 2: maintain the current duplicate-free window in a set.
+ * When the new character is already present, remove characters from the left
+ * one at a time until the duplicate disappears.
+ */
+function buildSteps3Set(input) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const chars = s.split("");
+  const charSet = new Set();
+  const steps = [];
+  let left = 0;
+  let maxLength = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  const indices = (lo, hi) => (
+    lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset) : []
+  );
+  const setLabel = (labels, index, label) => {
+    if (index < 0 || index >= chars.length) return;
+    const key = `0,${index + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const setText = () => {
+    const values = [...charSet].map((char) => JSON.stringify(char));
+    return values.length ? `{${values.join(", ")}}` : "set()";
+  };
+  const makeGrid = (opts = {}) => {
+    const lo = Number.isInteger(opts.left) ? opts.left : left;
+    const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const active = new Set(indices(lo, hi));
+    const labels = {};
+    setLabel(labels, lo, `left=${lo}`);
+    setLabel(labels, hi, `right=${hi}`);
+    if (opts.duplicateChar !== undefined) {
+      for (const index of indices(lo, hi)) {
+        if (s[index] === opts.duplicateChar) setLabel(labels, index, "dup");
+      }
+    }
+    if (Number.isInteger(opts.removing)) setLabel(labels, opts.removing, "remove");
+    if (opts.markBest) {
+      for (const index of indices(bestL, bestR)) setLabel(labels, index, "best");
+    }
+
+    const windowText = lo <= hi ? s.slice(lo, hi + 1) : "";
+    const bestText = bestR >= bestL ? s.slice(bestL, bestR + 1) : "";
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, index) => ({ index: `idx=${index}`, char })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      autoScrollCell: hi >= 0 ? [0, hi + 1] : null,
+      pathCells: indices(lo, hi).map((index) => [0, index + 1]),
+      historyCells: indices(bestL, bestR)
+        .filter((index) => !active.has(index))
+        .map((index) => [0, index + 1]),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || `window=${JSON.stringify(windowText)} · len=${Math.max(0, hi - lo + 1)} · best=${JSON.stringify(bestText)} (${maxLength})`,
+      secondaryCaption: `char_set = ${setText()}`,
+    };
+  };
+  const variables = (right = null) => {
+    const values = [
+      { name: "left", value: left },
+      { name: "max_length", value: maxLength },
+      { name: "char_set", value: setText() },
+    ];
+    if (Number.isInteger(right)) values.splice(1, 0, { name: "right", value: right });
+    return values;
+  };
+  const snap = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.grid || {}),
+      highlight: [],
+      mark: [],
+      codeLines: [opts.codeLine],
+      codeBlock: 2,
+      vars: opts.vars || variables(),
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  };
+
+  snap({
+    title: { vi: "Đặt left = 0", en: "Set left = 0" },
+    codeLine: 3,
+    grid: { left: 0, right: -1, caption: "left = 0 · window is empty" },
+    note: { vi: "left là cạnh trái của cửa sổ.", en: "left is the window's left boundary." },
+  });
+  snap({
+    title: { vi: "Khởi tạo độ dài lớn nhất", en: "Initialize maximum length" },
+    codeLine: 4,
+    grid: { left: 0, right: -1, caption: "max_length = 0" },
+    note: { vi: "Chưa có cửa sổ nào được đo nên max_length bắt đầu bằng 0.", en: "No window has been measured, so max_length starts at 0." },
+  });
+  snap({
+    title: { vi: "Tạo set rỗng", en: "Create an empty set" },
+    codeLine: 5,
+    grid: { left: 0, right: -1, caption: "char_set = set()" },
+    note: { vi: "char_set chứa đúng các ký tự của cửa sổ hợp lệ hiện tại.", en: "char_set contains exactly the current valid window's characters." },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = s[right];
+    snap({
+      title: { vi: `Đọc s[${right}] = ${JSON.stringify(ch)}`, en: `Read s[${right}] = ${JSON.stringify(ch)}` },
+      codeLine: 7,
+      grid: { left, right, focus: right, duplicateChar: charSet.has(ch) ? ch : undefined },
+      vars: [...variables(right), { name: "s[right]", value: JSON.stringify(ch) }],
+      note: { vi: `right mở rộng cạnh phải đến index ${right}.`, en: `right expands the right edge to index ${right}.` },
+    });
+
+    while (true) {
+      const duplicate = charSet.has(ch);
+      snap({
+        title: duplicate
+          ? { vi: "Ký tự mới đang bị trùng", en: "The new character is duplicated" }
+          : { vi: "Cửa sổ không có ký tự trùng", en: "The window has no duplicate" },
+        codeLine: 8,
+        grid: { left, right, focus: right, duplicateChar: duplicate ? ch : undefined },
+        vars: [...variables(right), { name: "s[right] in char_set", value: duplicate }],
+        note: duplicate
+          ? { vi: `${JSON.stringify(ch)} đã có trong char_set, nên phải co cửa sổ từ left.`, en: `${JSON.stringify(ch)} is already in char_set, so shrink the window from left.` }
+          : { vi: `${JSON.stringify(ch)} chưa có trong char_set; có thể thoát vòng while.`, en: `${JSON.stringify(ch)} is not in char_set; the while loop can stop.` },
+      });
+      if (!duplicate) break;
+
+      const removedIndex = left;
+      const removed = s[removedIndex];
+      charSet.delete(removed);
+      snap({
+        title: { vi: `Xóa ${JSON.stringify(removed)} khỏi set`, en: `Remove ${JSON.stringify(removed)} from the set` },
+        codeLine: 9,
+        grid: { left, right, focus: removedIndex, removing: removedIndex, duplicateChar: charSet.has(ch) ? ch : undefined },
+        vars: [...variables(right), { name: "removed", value: `s[${removedIndex}] = ${JSON.stringify(removed)}` }],
+        note: { vi: `char_set.remove(s[left]) xóa ký tự tại index ${removedIndex}.`, en: `char_set.remove(s[left]) removes the character at index ${removedIndex}.` },
+      });
+
+      left += 1;
+      snap({
+        title: { vi: `Tăng left lên ${left}`, en: `Advance left to ${left}` },
+        codeLine: 10,
+        grid: { left, right, focus: left, duplicateChar: charSet.has(ch) ? ch : undefined },
+        vars: variables(right),
+        note: { vi: `Cạnh trái chuyển sang index ${left}; vòng while sẽ kiểm tra lại.`, en: `The left edge moves to index ${left}; the while condition will be checked again.` },
+      });
+    }
+
+    charSet.add(ch);
+    snap({
+      title: { vi: `Thêm ${JSON.stringify(ch)} vào set`, en: `Add ${JSON.stringify(ch)} to the set` },
+      codeLine: 12,
+      grid: { left, right, focus: right },
+      vars: variables(right),
+      note: { vi: `Sau khi thêm, char_set khớp với cửa sổ ${JSON.stringify(s.slice(left, right + 1))}.`, en: `After insertion, char_set matches window ${JSON.stringify(s.slice(left, right + 1))}.` },
+    });
+
+    const windowLength = right - left + 1;
+    const oldMax = maxLength;
+    if (windowLength > maxLength) {
+      maxLength = windowLength;
+      bestL = left;
+      bestR = right;
+    }
+    snap({
+      title: maxLength > oldMax
+        ? { vi: `Kỷ lục mới: ${maxLength}`, en: `New record: ${maxLength}` }
+        : { vi: `Giữ kỷ lục: ${maxLength}`, en: `Keep the record: ${maxLength}` },
+      codeLine: 13,
+      grid: { left, right, focus: right, markBest: maxLength > oldMax },
+      vars: [...variables(right), { name: "right - left + 1", value: windowLength }],
+      note: maxLength > oldMax
+        ? { vi: `Cửa sổ dài ${windowLength}, lớn hơn kỷ lục cũ ${oldMax}.`, en: `The window length ${windowLength} beats the old record ${oldMax}.` }
+        : { vi: `Cửa sổ dài ${windowLength}, không vượt max_length = ${maxLength}.`, en: `The window length ${windowLength} does not beat max_length = ${maxLength}.` },
+    });
+  }
+
+  snap({
+    title: { vi: `Trả về ${maxLength}`, en: `Return ${maxLength}` },
+    codeLine: 15,
+    grid: { left: bestL, right: bestR, focus: bestR, markBest: true, caption: `longest=${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} · length=${maxLength}` },
+    vars: [{ name: "max_length", value: maxLength }],
+    note: { vi: `Substring không lặp dài nhất là ${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} với độ dài ${maxLength}.`, en: `The longest duplicate-free substring is ${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} with length ${maxLength}.` },
+    final: true,
+  });
+
+  return { original: s, answer: maxLength, steps };
 }
 
 /**
@@ -1550,27 +1747,38 @@ module.exports = {
     defaultInput: "abcabcbb",
     inputKind: "string",
     inputLabel: { vi: "Chuỗi s", en: "String s" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Last-seen map", en: "Approach 1: Last-seen map" } },
+          { value: 2, label: { vi: "Cách 2: Character set", en: "Approach 2: Character set" } },
+        ],
+      },
+    ],
     approach: [
       {
-        vi: "Dùng cửa sổ [left..right] luôn không có ký tự trùng và map last_seen lưu vị trí mới nhất của mỗi ký tự.",
-        en: "Keep window [left..right] duplicate-free and use last_seen to store each character's latest index.",
+        vi: "Cách 1 dùng last_seen để nhảy cạnh trái đến ngay sau vị trí trùng cũ.",
+        en: "Approach 1 uses last_seen to jump the left edge just past the old duplicate.",
       },
       {
-        vi: "Nếu ký tự mới đã nằm trong cửa sổ, nhảy left đến ngay sau lần xuất hiện cũ thay vì co từng bước.",
-        en: "If the new character is already in the window, jump left just past its previous occurrence.",
+        vi: "Cách 2 dùng char_set và co cửa sổ từng ký tự cho đến khi ký tự mới không còn trùng.",
+        en: "Approach 2 uses char_set and shrinks one character at a time until the new character is unique.",
       },
       {
-        vi: "Sau mỗi ký tự, cập nhật vị trí mới nhất rồi so sánh độ dài cửa sổ với best.",
-        en: "After each character, update its latest position and compare the window length with best.",
+        vi: "Cả hai cách đều giữ cửa sổ không lặp và cập nhật độ dài lớn nhất sau mỗi cạnh phải.",
+        en: "Both approaches keep a duplicate-free window and update the maximum length at every right edge.",
       },
     ],
     complexity: {
       time: "O(n)",
       space: "O(min(n, charset))",
       note: {
-        vi: "right duyệt chuỗi một lần và left chỉ tiến về trước. Map lưu tối đa một vị trí cho mỗi ký tự khác nhau.",
-        en: "right scans the string once and left only moves forward. The map stores at most one index per distinct character.",
+        vi: "Cạnh phải duyệt chuỗi một lần và cạnh trái chỉ tiến về trước. Map hoặc set lưu tối đa một mục cho mỗi ký tự khác nhau.",
+        en: "The right edge scans once and the left edge only moves forward. The map or set stores at most one entry per distinct character.",
       },
     },
     code: [
@@ -1586,6 +1794,25 @@ module.exports = {
       "            best = max(best, right - left + 1)",
       "        return best",
     ],
+    code2: [
+      "class Solution:",
+      "    def lengthOfLongestSubstring(self, s: str) -> int:",
+      "        left = 0",
+      "        max_length = 0",
+      "        char_set = set()",
+      "",
+      "        for right in range(len(s)):",
+      "            while s[right] in char_set:",
+      "                char_set.remove(s[left])",
+      "                left += 1",
+      "",
+      "            char_set.add(s[right])",
+      "            max_length = max(max_length, right - left + 1)",
+      "",
+      "        return max_length",
+    ],
+    codeLabel: { vi: "Cách 1: Last-seen map", en: "Approach 1: Last-seen map" },
+    code2Label: { vi: "Cách 2: Character set", en: "Approach 2: Character set" },
     builder: buildSteps3,
   },
   1358: {
