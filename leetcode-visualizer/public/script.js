@@ -1573,10 +1573,17 @@ function renderGraph(step) {
     } else if (edge.kind === "next" || edge.kind === "prev") {
       // Offset next/prev perpendicular to the edge line so the two
       // directions render as parallel lines instead of overlapping.
-      const perpX = -uy;
-      const perpY = ux;
+      // Use a canonical (order-independent) direction so the "next" edge
+      // (u->v) and its matching "prev" edge (v->u, i.e. reversed) always
+      // offset to opposite sides — otherwise the reversed direction flips
+      // the perpendicular too and both lines land on the same side.
+      const swap = String(edge.u) > String(edge.v);
+      const canonUx = swap ? -ux : ux;
+      const canonUy = swap ? -uy : uy;
+      const perpX = -canonUy;
+      const perpY = canonUx;
       const side = edge.kind === "prev" ? -1 : 1;
-      const offset = 6 * side;
+      const offset = 8 * side;
       const ox1 = x1 + perpX * offset;
       const oy1 = y1 + perpY * offset;
       const ox2 = x2 + perpX * offset;
@@ -1584,8 +1591,8 @@ function renderGraph(step) {
       edgeSvg += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" class="${cls}" marker-end="${markerEnd}" />`;
       mx = (ox1 + ox2) / 2;
       my = (oy1 + oy2) / 2;
-      labelX = mx + perpX * 12 * side;
-      labelY = my + perpY * 12 * side;
+      labelX = mx + perpX * 14 * side;
+      labelY = my + perpY * 14 * side;
     } else {
       edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
     }
