@@ -3861,6 +3861,7 @@ button:disabled {
 }
 
 .graph-edge {
+  fill: none;
   stroke: #475569;
   stroke-width: 2;
   transition: stroke 0.25s;
