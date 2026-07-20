@@ -88,6 +88,7 @@ app.get("/api/problem/:id", (req, res) => {
     code2Label: problem.code2Label || null,
     code3Label: problem.code3Label || null,
     approach: problem.approach || null,
+    debugMode: problem.debugMode || null,
   });
 });
 

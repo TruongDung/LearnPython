@@ -477,7 +477,7 @@ function escapeHtml(value) {
 }
 
 function shouldUseLineByLineDebug() {
-  return Boolean(problemData);
+  return Boolean(problemData) && problemData.debugMode !== "semantic";
 }
 
 function breakpointKey(codeBlock, line) {
@@ -1459,6 +1459,76 @@ function renderTree(step) {
     `</svg>`;
 }
 
+// ---- LRU cache renderer ----
+function renderLruCache(step) {
+  const view = step.lruView || {};
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const capacity = Math.max(1, Number(view.capacity) || 1);
+  const emptySlots = Math.max(0, capacity - entries.length);
+  const vi = lang === "vi";
+  const eventLabels = {
+    ready: vi ? "Sẵn sàng" : "Ready",
+    "lookup-hit": vi ? "Tìm thấy key" : "Key found",
+    "lookup-miss": vi ? "Không có key" : "Key absent",
+    "lookup-update": vi ? "Cập nhật key cũ" : "Update existing key",
+    "lookup-new": vi ? "Thêm key mới" : "Insert new key",
+    hit: vi ? "Cache hit" : "Cache hit",
+    miss: vi ? "Cache miss" : "Cache miss",
+    update: vi ? "Đã cập nhật" : "Updated",
+    insert: vi ? "Đã thêm vào MRU" : "Inserted at MRU",
+    evict: vi ? "Đã loại LRU" : "LRU evicted",
+    complete: vi ? "Hoàn tất" : "Complete",
+  };
+
+  const nodes = [];
+  entries.forEach((entry, index) => {
+    if (index > 0) {
+      nodes.push(`<div class="lru-links" aria-label="doubly linked pointers">
+        <span>next &rarr;</span><span>&larr; prev</span>
+      </div>`);
+    }
+    const active = String(entry.key) === String(view.activeKey);
+    nodes.push(`<div class="lru-node${active ? " active" : ""}">
+      <span class="lru-node-role">${index === 0 ? "LRU" : index === entries.length - 1 ? "MRU" : `#${index + 1}`}</span>
+      <div><small>key</small><strong>${escapeHtml(entry.key)}</strong></div>
+      <div><small>value</small><strong>${escapeHtml(entry.value)}</strong></div>
+    </div>`);
+  });
+  for (let i = 0; i < emptySlots; i++) {
+    nodes.push(`<div class="lru-slot-empty"><span>${vi ? "Trống" : "Empty"}</span></div>`);
+  }
+
+  const mapItems = entries.length
+    ? entries.map((entry) => `<span class="lru-map-entry"><b>${escapeHtml(entry.key)}</b><span>&rarr;</span> node(${escapeHtml(entry.key)})</span>`).join("")
+    : `<span class="lru-empty-copy">${vi ? "Map rỗng" : "Empty map"}</span>`;
+  const result = view.result !== undefined
+    ? `<span class="lru-result">return <strong>${escapeHtml(view.result)}</strong></span>`
+    : "";
+  const evicted = view.evicted
+    ? `<div class="lru-evicted"><span>${vi ? "Đã xóa" : "Evicted"}</span><strong>${escapeHtml(view.evicted.key)}:${escapeHtml(view.evicted.value)}</strong></div>`
+    : "";
+  const outputs = Array.isArray(view.outputs) && view.outputs.length
+    ? `<div class="lru-outputs"><span>outputs</span><code>[${view.outputs.map(escapeHtml).join(", ")}]</code></div>`
+    : "";
+
+  $("treeView").innerHTML = `<div class="lru-cache-viz" data-event="${escapeHtml(view.event || "ready")}">
+    <div class="lru-status-row">
+      <code>${escapeHtml(view.operation || "LRUCache")}</code>
+      <span class="lru-event">${escapeHtml(eventLabels[view.event] || view.event || eventLabels.ready)}</span>
+      ${result}
+    </div>
+    <div class="lru-capacity"><span>${vi ? "Sức chứa" : "Capacity"}</span><strong>${entries.length} / ${capacity}</strong></div>
+    <div class="lru-order-labels">
+      <div><strong>LRU</strong><span>${vi ? "sẽ bị xóa tiếp" : "next to evict"}</span></div>
+      <div><strong>MRU</strong><span>${vi ? "vừa được dùng" : "just used"}</span></div>
+    </div>
+    <div class="lru-track">${nodes.join("")}</div>
+    ${evicted}
+    <div class="lru-map-row"><span class="lru-section-label">Hash map</span><div>${mapItems}</div></div>
+    ${outputs}
+  </div>`;
+}
+
 // ---- Graph renderer (directed weighted graph) ----
 function renderGraph(step) {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
@@ -2212,7 +2282,13 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.tree) {
+  if (step.lruView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLruCache(step);
+  } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
