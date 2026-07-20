@@ -2,12 +2,193 @@
 // Module of LeetCode Visualizer — category-specific builders and problem entries.
 
 /**
+ * Generate steps for LeetCode 3: Longest Substring Without Repeating Characters.
+ * The latest-seen map lets left jump directly past a duplicate in the window.
+ */
+function buildSteps3(input) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const chars = s.split("");
+  const steps = [];
+  const lastSeen = {};
+  let left = 0;
+  let best = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  const indices = (lo, hi) => (
+    lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset) : []
+  );
+  const setLabel = (labels, idx, label) => {
+    if (idx < 0 || idx >= chars.length) return;
+    const key = `0,${idx + 1}`;
+    labels[key] = labels[key] ? `${labels[key]}\n${label}` : label;
+  };
+  const mapText = () => {
+    const entries = Object.entries(lastSeen);
+    return entries.length
+      ? `{${entries.map(([ch, idx]) => `${JSON.stringify(ch)}:${idx}`).join(", ")}}`
+      : "{}";
+  };
+  const makeGrid = (opts = {}) => {
+    const lo = Number.isInteger(opts.left) ? opts.left : left;
+    const hi = Number.isInteger(opts.right) ? opts.right : left - 1;
+    const active = new Set(indices(lo, hi));
+    const labels = {};
+    setLabel(labels, lo, `left=${lo}`);
+    setLabel(labels, hi, `right=${hi}`);
+    if (Number.isInteger(opts.previousDuplicate)) {
+      setLabel(labels, opts.previousDuplicate, "old");
+      setLabel(labels, hi, "dup");
+    }
+    if (opts.markBest) {
+      for (const idx of indices(bestL, bestR)) setLabel(labels, idx, "best");
+    }
+
+    const windowText = lo <= hi ? s.slice(lo, hi + 1) : "";
+    const bestText = bestR >= bestL ? s.slice(bestL, bestR + 1) : "";
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((char, idx) => ({ index: `idx=${idx}`, char })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      autoScrollCell: hi >= 0 ? [0, hi + 1] : null,
+      pathCells: indices(lo, hi).map((idx) => [0, idx + 1]),
+      historyCells: indices(bestL, bestR)
+        .filter((idx) => !active.has(idx))
+        .map((idx) => [0, idx + 1]),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || `window=${JSON.stringify(windowText)} · len=${Math.max(0, hi - lo + 1)} · best=${JSON.stringify(bestText)} (${best})`,
+      secondaryCaption: `last_seen = ${mapText()}`,
+    };
+  };
+  const variables = (right = null, ch = null) => {
+    const values = [
+      { name: "left", value: left },
+      { name: "best", value: best },
+      { name: "last_seen", value: mapText() },
+    ];
+    if (Number.isInteger(right)) values.splice(1, 0, { name: "right", value: right });
+    if (ch !== null) values.splice(2, 0, { name: "ch", value: JSON.stringify(ch) });
+    return values;
+  };
+  const snap = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.grid),
+      highlight: [],
+      mark: [],
+      codeLines: [opts.codeLine],
+      vars: opts.vars,
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  };
+
+  snap({
+    title: { vi: "Tạo bảng vị trí", en: "Create the position map" },
+    codeLine: 3,
+    grid: { left: 0, right: -1, caption: `s=${JSON.stringify(s)} · last_seen starts empty` },
+    vars: variables(),
+    note: { vi: "last_seen sẽ lưu chỉ số xuất hiện gần nhất của từng ký tự.", en: "last_seen will store the most recent index of every character." },
+  });
+  snap({
+    title: { vi: "Đặt cạnh trái", en: "Set the left edge" },
+    codeLine: 4,
+    grid: { left: 0, right: -1, caption: "left = 0 · window is empty" },
+    vars: variables(),
+    note: { vi: "Cửa sổ hợp lệ tiếp theo sẽ bắt đầu tại left = 0.", en: "The next valid window will begin at left = 0." },
+  });
+  snap({
+    title: { vi: "Khởi tạo kỷ lục", en: "Initialize the record" },
+    codeLine: 5,
+    grid: { left: 0, right: -1, caption: "best = 0 · no window has been measured" },
+    vars: variables(),
+    note: { vi: "best giữ độ dài cửa sổ không lặp dài nhất đã thấy.", en: "best stores the longest duplicate-free window seen so far." },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    const previous = Object.prototype.hasOwnProperty.call(lastSeen, ch) ? lastSeen[ch] : null;
+    const conflicts = Number.isInteger(previous) && previous >= left;
+
+    snap({
+      title: { vi: `Đọc s[${right}] = ${JSON.stringify(ch)}`, en: `Read s[${right}] = ${JSON.stringify(ch)}` },
+      codeLine: 6,
+      grid: { left, right, focus: right },
+      vars: variables(right, ch),
+      note: { vi: `right tiến đến chỉ số ${right}; ký tự mới là ${JSON.stringify(ch)}.`, en: `right advances to index ${right}; the new character is ${JSON.stringify(ch)}.` },
+    });
+    snap({
+      title: conflicts ? { vi: "Tìm thấy ký tự trùng trong cửa sổ", en: "Duplicate found inside the window" } : { vi: "Không có xung đột", en: "No conflict" },
+      codeLine: 7,
+      grid: { left, right, focus: right, previousDuplicate: conflicts ? previous : null },
+      vars: [
+        ...variables(right, ch),
+        { name: "previous", value: previous === null ? "not seen" : previous },
+        { name: "previous >= left", value: conflicts },
+      ],
+      note: conflicts
+        ? { vi: `${JSON.stringify(ch)} đã xuất hiện tại ${previous}, vẫn nằm trong cửa sổ [${left}..${right}].`, en: `${JSON.stringify(ch)} was seen at ${previous}, still inside window [${left}..${right}].` }
+        : { vi: previous === null ? `${JSON.stringify(ch)} chưa từng xuất hiện.` : `Lần xuất hiện cũ ở ${previous} đã nằm bên trái cửa sổ hiện tại.`, en: previous === null ? `${JSON.stringify(ch)} has not appeared before.` : `The previous occurrence at ${previous} is already left of the current window.` },
+    });
+
+    if (conflicts) {
+      const oldLeft = left;
+      left = previous + 1;
+      snap({
+        title: { vi: `Dời left: ${oldLeft} → ${left}`, en: `Move left: ${oldLeft} → ${left}` },
+        codeLine: 8,
+        grid: { left, right, focus: right },
+        vars: variables(right, ch),
+        note: { vi: `Bỏ ký tự trùng cũ tại ${previous}; cửa sổ hợp lệ mới là [${left}..${right}].`, en: `Skip the old duplicate at ${previous}; the new valid window is [${left}..${right}].` },
+      });
+    }
+
+    lastSeen[ch] = right;
+    snap({
+      title: { vi: "Ghi vị trí mới nhất", en: "Record the latest position" },
+      codeLine: 9,
+      grid: { left, right, focus: right },
+      vars: variables(right, ch),
+      note: { vi: `Cập nhật last_seen[${JSON.stringify(ch)}] = ${right}.`, en: `Update last_seen[${JSON.stringify(ch)}] = ${right}.` },
+    });
+
+    const windowLength = right - left + 1;
+    const oldBest = best;
+    if (windowLength > best) {
+      best = windowLength;
+      bestL = left;
+      bestR = right;
+    }
+    snap({
+      title: best > oldBest ? { vi: `Kỷ lục mới: ${best}`, en: `New record: ${best}` } : { vi: `Giữ kỷ lục: ${best}`, en: `Keep the record: ${best}` },
+      codeLine: 10,
+      grid: { left, right, focus: right, markBest: best > oldBest },
+      vars: [...variables(right, ch), { name: "window length", value: windowLength }],
+      note: best > oldBest
+        ? { vi: `Độ dài ${windowLength} lớn hơn ${oldBest}; best = ${best}.`, en: `Length ${windowLength} beats ${oldBest}; best = ${best}.` }
+        : { vi: `Độ dài ${windowLength} không vượt kỷ lục ${best}.`, en: `Length ${windowLength} does not beat the record ${best}.` },
+    });
+  }
+
+  snap({
+    title: { vi: `Trả về ${best}`, en: `Return ${best}` },
+    codeLine: 11,
+    grid: { left: bestL, right: bestR, focus: bestR, markBest: true, caption: `longest=${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} · length=${best}` },
+    vars: [{ name: "best", value: best }],
+    note: { vi: `Substring không lặp dài nhất là ${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} với độ dài ${best}.`, en: `The longest duplicate-free substring is ${JSON.stringify(bestR >= bestL ? s.slice(bestL, bestR + 1) : "")} with length ${best}.` },
+    final: true,
+  });
+
+  return { original: s, answer: best, steps };
+}
+
+/**
  * Generate steps for LeetCode 1004: Max Consecutive Ones III.
- *
- * Sliding window algorithm:
- *  - Expand the window by incrementing j.
- *  - Count zeros in the window. When exceeding k, shrink from the left (increment i).
- *  - The answer is the maximum window length achieved.
+ * Expand right, then shrink left whenever the window contains more than k zeros.
  */
 function buildSteps1004(nums, params) {
   const k = params.k;
@@ -1349,6 +1530,64 @@ function buildSteps1358Last(input) {
 }
 
 module.exports = {
+  3: {
+    id: 3,
+    difficulty: "medium",
+    slug: "longest-substring-without-repeating-characters",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: {
+      vi: "Longest Substring Without Repeating Characters",
+      en: "Longest Substring Without Repeating Characters",
+    },
+    titleVi: {
+      vi: "Substring dài nhất không lặp ký tự",
+      en: "Longest substring without repeating characters",
+    },
+    statement: {
+      vi: "Cho chuỗi s, trả về độ dài substring dài nhất không chứa ký tự lặp lại.",
+      en: "Given a string s, return the length of the longest substring without repeating characters.",
+    },
+    defaultInput: "abcabcbb",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Dùng cửa sổ [left..right] luôn không có ký tự trùng và map last_seen lưu vị trí mới nhất của mỗi ký tự.",
+        en: "Keep window [left..right] duplicate-free and use last_seen to store each character's latest index.",
+      },
+      {
+        vi: "Nếu ký tự mới đã nằm trong cửa sổ, nhảy left đến ngay sau lần xuất hiện cũ thay vì co từng bước.",
+        en: "If the new character is already in the window, jump left just past its previous occurrence.",
+      },
+      {
+        vi: "Sau mỗi ký tự, cập nhật vị trí mới nhất rồi so sánh độ dài cửa sổ với best.",
+        en: "After each character, update its latest position and compare the window length with best.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(min(n, charset))",
+      note: {
+        vi: "right duyệt chuỗi một lần và left chỉ tiến về trước. Map lưu tối đa một vị trí cho mỗi ký tự khác nhau.",
+        en: "right scans the string once and left only moves forward. The map stores at most one index per distinct character.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def lengthOfLongestSubstring(self, s: str) -> int:",
+      "        last_seen = {}",
+      "        left = 0",
+      "        best = 0",
+      "        for right, ch in enumerate(s):",
+      "            if ch in last_seen and last_seen[ch] >= left:",
+      "                left = last_seen[ch] + 1",
+      "            last_seen[ch] = right",
+      "            best = max(best, right - left + 1)",
+      "        return best",
+    ],
+    builder: buildSteps3,
+  },
   1358: {
     id: 1358,
     difficulty: "medium",
