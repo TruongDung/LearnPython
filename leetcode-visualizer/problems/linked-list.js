@@ -1369,19 +1369,68 @@ function buildSteps146(input, params) {
       : "{}";
   }
 
+  function keyLabel(key) {
+    return `key-${key}`;
+  }
+
   function snapshot(opts) {
+    const graphNodes = order.map((key, index) => ({
+      id: keyLabel(key),
+      label: `${key}:${nodes.get(key).value}`,
+      row: "main",
+      sub: order.length === 1
+        ? "LRU | MRU"
+        : index === 0
+          ? "LRU"
+          : index === order.length - 1
+            ? "MRU"
+            : "",
+    }));
+    const graphEdges = [];
+    for (let i = 0; i < order.length - 1; i++) {
+      graphEdges.push({ u: keyLabel(order[i]), v: keyLabel(order[i + 1]), w: "next", kind: "next" });
+      graphEdges.push({ u: keyLabel(order[i + 1]), v: keyLabel(order[i]), w: "prev", kind: "prev" });
+    }
+
+    let evictedId = null;
+    if (opts.evicted) {
+      evictedId = `evicted-${opts.evicted.key}`;
+      graphNodes.push({
+        id: evictedId,
+        label: `${opts.evicted.key}:${opts.evicted.value}`,
+        row: "discarded",
+        sub: "evicted",
+      });
+    }
+
+    const annotations = {};
+    if (opts.activeKey != null && nodes.has(opts.activeKey)) {
+      const activeId = keyLabel(opts.activeKey);
+      const eventLabel = {
+        "lookup-hit": "found",
+        "lookup-update": "update",
+        hit: "hit -> MRU",
+        update: "updated MRU",
+        insert: "new MRU",
+        evict: "new MRU",
+      }[opts.event];
+      if (eventLabel) annotations[activeId] = eventLabel;
+    }
+    if (evictedId) annotations[evictedId] = "evicted";
+
     steps.push({
       title: opts.title,
       arr: [],
-      lruView: {
-        capacity,
-        entries: order.map((key) => ({ key, value: nodes.get(key).value })),
-        activeKey: opts.activeKey,
-        event: opts.event || "ready",
-        operation: opts.operation || "",
-        result: opts.result,
-        evicted: opts.evicted || null,
-        outputs: outputs.map((value) => value === null ? "null" : value),
+      graph: {
+        nodes: graphNodes,
+        edges: graphEdges,
+        layout: "linear",
+        order: order.map(keyLabel).concat(evictedId ? [evictedId] : []),
+        caption: `${opts.operation || "LRUCache"} | capacity=${capacity} | LRU -> MRU: ${cacheLabel()}`,
+        annotations,
+        hlNodes: opts.activeKey != null && nodes.has(opts.activeKey) ? [keyLabel(opts.activeKey)] : [],
+        hlEdges: [],
+        visitedNodes: evictedId ? [evictedId] : [],
       },
       highlight: [],
       mark: [],
@@ -1576,7 +1625,7 @@ module.exports = {
     id: 146,
     difficulty: "medium",
     slug: "lru-cache",
-    category: { key: "linked-list", vi: "Danh sÃ¡ch liÃªn káº¿t", en: "Linked List" },
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
     title: { vi: "LRU Cache", en: "LRU Cache" },
     titleVi: { vi: "Cache loại bỏ phần tử ít dùng gần đây nhất", en: "Least Recently Used cache" },
     statement: {
@@ -1774,7 +1823,7 @@ module.exports = {
     id: 1472,
     difficulty: "medium",
     slug: "design-browser-history",
-    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
     title: { vi: "Design Browser History", en: "Design Browser History" },
     titleVi: { vi: "Thiết kế lịch sử trình duyệt", en: "Design browser history" },
     statement: {
