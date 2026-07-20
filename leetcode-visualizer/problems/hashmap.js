@@ -2235,6 +2235,12 @@ function buildSteps303(nums, params) {
  * Param ttl: timeToLive (default 5).
  */
 function buildSteps1797(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps1797DLL(input, params);
+  return buildSteps1797HashMap(input, params);
+}
+
+function buildSteps1797HashMap(input, params) {
   const ttl = params && params.ttl !== undefined ? Number(params.ttl) : 5;
   const raw = String(input || "").trim();
   const steps = [];
@@ -2511,12 +2517,476 @@ function buildSteps1797(input, params) {
   return { original: raw, answer: outputs, steps };
 }
 
+/**
+ * LeetCode 1797, approach 2: Doubly Linked List + hash map.
+ * Exploits the constraint that currentTime is strictly increasing across
+ * all calls: every newly generated/renewed expiry is larger than all
+ * existing ones, so appending to the TAIL keeps the list sorted by expiry
+ * (HEAD = smallest expiry = next to expire). countUnexpiredTokens then only
+ * needs to evict from the head while expired, instead of scanning everything.
+ * Line-by-line trace of the exact Python code shown to the user:
+ *  1  class Node:
+ *  2      def __init__(self, tokenId, exp):
+ *  3          self.tokenId = tokenId
+ *  4          self.exp = exp
+ *  5          self.prev = None
+ *  6          self.next = None
+ *  7
+ *  8  class AuthenticationManager:
+ *  9      def __init__(self, timeToLive: int):
+ * 10          self.ttl = timeToLive
+ * 11          self.map = {}
+ * 12          self.head = Node(None, 0)
+ * 13          self.tail = Node(None, 0)
+ * 14          self.head.next = self.tail
+ * 15          self.tail.prev = self.head
+ * 16
+ * 17      def _remove(self, node):
+ * 18          node.prev.next = node.next
+ * 19          node.next.prev = node.prev
+ * 20
+ * 21      def _append(self, node):
+ * 22          prev = self.tail.prev
+ * 23          prev.next = node
+ * 24          node.prev = prev
+ * 25          node.next = self.tail
+ * 26          self.tail.prev = node
+ * 27
+ * 28      def generate(self, tokenId: str, currentTime: int) -> None:
+ * 29          if tokenId in self.map:
+ * 30              self._remove(self.map[tokenId])
+ * 31          node = Node(tokenId, currentTime + self.ttl)
+ * 32          self.map[tokenId] = node
+ * 33          self._append(node)
+ * 34
+ * 35      def renew(self, tokenId: str, currentTime: int) -> None:
+ * 36          if tokenId not in self.map:
+ * 37              return
+ * 38          node = self.map[tokenId]
+ * 39          if node.exp <= currentTime:
+ * 40              return
+ * 41          self._remove(node)
+ * 42          node.exp = currentTime + self.ttl
+ * 43          self._append(node)
+ * 44
+ * 45      def countUnexpiredTokens(self, currentTime: int) -> int:
+ * 46          while self.head.next is not self.tail and self.head.next.exp <= currentTime:
+ * 47              expired = self.head.next
+ * 48              self._remove(expired)
+ * 49              del self.map[expired.tokenId]
+ * 50          return len(self.map)
+ */
+function buildSteps1797DLL(input, params) {
+  const ttl = params && params.ttl !== undefined ? Number(params.ttl) : 5;
+  const raw = String(input || "").trim();
+  const steps = [];
+
+  function parseCommands(text) {
+    return text
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const tokens = part.split(/\s+/).filter(Boolean);
+        const op = (tokens[0] || "").toLowerCase();
+        if ((op === "generate" || op === "renew") && tokens.length >= 3) {
+          return { op, tokenId: tokens[1], time: Number(tokens[2]), raw: part };
+        }
+        if (op === "countunexpiredtokens" && tokens.length >= 2) {
+          return { op, time: Number(tokens[1]), raw: part };
+        }
+        return { op: "invalid", raw: part };
+      });
+  }
+
+  const commands = parseCommands(raw);
+  if (!commands.length || commands.some((c) => c.op === "invalid")) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      final: true,
+      codeBlock: 2,
+      codeLines: [1],
+      vars: [{ name: "expected", value: "generate aaa 2 | countUnexpiredTokens 6 | ..." }],
+      note: {
+        vi: "Nhập thao tác dạng: generate tokenId time | renew tokenId time | countUnexpiredTokens time.",
+        en: "Enter operations like: generate tokenId time | renew tokenId time | countUnexpiredTokens time.",
+      },
+    });
+    return { original: raw, answer: [], steps };
+  }
+
+  const HEAD = "head";
+  const TAIL = "tail";
+  const map = new Map(); // tokenId -> exp
+  const nextMap = new Map();
+  const prevMap = new Map();
+  nextMap.set(HEAD, TAIL);
+  prevMap.set(TAIL, HEAD);
+  const outputs = [];
+
+  function order() {
+    const ord = [];
+    let cur = HEAD;
+    while (cur) {
+      ord.push(cur);
+      cur = nextMap.get(cur);
+    }
+    return ord;
+  }
+
+  function push({ title, hlId, activeIds = [], extraStatus, operation, codeLines, vars, note, final = false }) {
+    const ord = order();
+    const nodes = ord.map((id) => {
+      if (id === HEAD) return { id, label: "H", row: "main", sub: "sentinel" };
+      if (id === TAIL) return { id, label: "T", row: "main", sub: "sentinel" };
+      const exp = map.get(id);
+      return { id, label: id, row: "main", sub: id === hlId && extraStatus ? extraStatus : `exp=${exp}` };
+    });
+    const edges = [];
+    for (let i = 0; i < ord.length - 1; i++) {
+      edges.push({ u: ord[i], v: ord[i + 1], w: "next", kind: "next" });
+      edges.push({ u: ord[i + 1], v: ord[i], w: "prev", kind: "prev" });
+    }
+    steps.push({
+      title,
+      arr: [],
+      graph: {
+        nodes,
+        edges,
+        layout: "linear",
+        order: ord,
+        caption: `${operation || ""} | ttl=${ttl} | head→tail: ${ord.map((id) => (id === HEAD ? "H" : id === TAIL ? "T" : `${id}(${map.get(id)})`)).join(" → ")}`,
+        annotations: hlId ? { [hlId]: extraStatus || "checking" } : {},
+        hlNodes: hlId ? [hlId] : [],
+        hlEdges: [],
+        visitedNodes: activeIds,
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
+
+  function removeNode(id) {
+    const p = prevMap.get(id);
+    const n = nextMap.get(id);
+    nextMap.set(p, n);
+    prevMap.set(n, p);
+  }
+  function appendNode(id) {
+    const tailPrev = prevMap.get(TAIL);
+    nextMap.set(tailPrev, id);
+    prevMap.set(id, tailPrev);
+    nextMap.set(id, TAIL);
+    prevMap.set(TAIL, id);
+  }
+
+  push({
+    title: { vi: `Khởi tạo AuthenticationManager(timeToLive=${ttl})`, en: `Initialize AuthenticationManager(timeToLive=${ttl})` },
+    operation: "__init__",
+    codeLines: [9],
+    vars: [{ name: "ttl", value: ttl }, { name: "map", value: "{}" }],
+    note: {
+      vi: `Lưu timeToLive=${ttl}. Doubly linked list chỉ có 2 sentinel head/tail; nhờ currentTime luôn tăng, list sẽ tự sắp theo hạn tăng dần từ head đến tail.`,
+      en: `Store timeToLive=${ttl}. The doubly linked list starts with just head/tail sentinels; since currentTime always increases, the list stays sorted by expiry from head to tail.`,
+    },
+  });
+
+  for (const command of commands) {
+    if (command.op === "generate") {
+      const { tokenId, time } = command;
+      push({
+        title: { vi: `generate("${tokenId}", ${time})`, en: `generate("${tokenId}", ${time})` },
+        hlId: tokenId,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [28],
+        vars: [{ name: "tokenId", value: tokenId }, { name: "currentTime", value: time }],
+        note: { vi: `Tạo (hoặc thay) token "${tokenId}" tại thời điểm ${time}.`, en: `Create (or replace) token "${tokenId}" at time ${time}.` },
+      });
+
+      const existed = map.has(tokenId);
+      push({
+        title: { vi: `"${tokenId}" in map? ${existed}`, en: `"${tokenId}" in map? ${existed}` },
+        hlId: existed ? tokenId : undefined,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [29],
+        vars: [{ name: "in map?", value: existed }],
+        note: { vi: existed ? `"${tokenId}" đã tồn tại → tháo node cũ trước.` : `"${tokenId}" chưa tồn tại → tạo node mới.`, en: existed ? `"${tokenId}" already exists → detach the old node first.` : `"${tokenId}" doesn't exist yet → create a new node.` },
+      });
+      if (existed) {
+        removeNode(tokenId);
+        map.delete(tokenId);
+        push({
+          title: { vi: `_remove(map["${tokenId}"])`, en: `_remove(map["${tokenId}"])` },
+          operation: `generate("${tokenId}", ${time})`,
+          codeLines: [30],
+          vars: [],
+          note: { vi: `Tháo node cũ của "${tokenId}" khỏi vị trí hiện tại trong list.`, en: `Detach "${tokenId}"'s old node from its current spot in the list.` },
+        });
+      }
+
+      const exp = time + ttl;
+      push({
+        title: { vi: `node = Node("${tokenId}", ${time} + ${ttl}) = Node("${tokenId}", ${exp})`, en: `node = Node("${tokenId}", ${time} + ${ttl}) = Node("${tokenId}", ${exp})` },
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [31],
+        vars: [{ name: "node.exp", value: exp }],
+        note: { vi: `Tạo node mới, hết hạn tại ${exp}.`, en: `Create a new node, expiring at ${exp}.` },
+      });
+
+      map.set(tokenId, exp);
+      push({
+        title: { vi: `map["${tokenId}"] = node`, en: `map["${tokenId}"] = node` },
+        hlId: tokenId,
+        extraStatus: `exp=${exp}`,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [32],
+        vars: [{ name: `map["${tokenId}"]`, value: `exp=${exp}` }],
+        note: { vi: `Đăng ký node vào hash map để tra O(1).`, en: `Register the node in the hash map for O(1) lookup.` },
+      });
+
+      appendNode(tokenId);
+      push({
+        title: { vi: `_append(node) → gắn "${tokenId}" vào cuối (tail)`, en: `_append(node) → attach "${tokenId}" at the tail` },
+        hlId: tokenId,
+        extraStatus: `exp=${exp}`,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [33],
+        vars: [{ name: "position", value: "tail (largest expiry so far)" }],
+        note: { vi: `currentTime luôn tăng nên exp mới luôn lớn nhất → gắn vào tail giữ list sắp tăng dần.`, en: `currentTime always increases, so the new exp is always the largest → appending at the tail keeps the list sorted.` },
+      });
+      outputs.push(null);
+    } else if (command.op === "renew") {
+      const { tokenId, time } = command;
+      push({
+        title: { vi: `renew("${tokenId}", ${time})`, en: `renew("${tokenId}", ${time})` },
+        hlId: tokenId,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [35],
+        vars: [{ name: "tokenId", value: tokenId }, { name: "currentTime", value: time }],
+        note: { vi: `Gia hạn "${tokenId}" nếu còn hiệu lực.`, en: `Renew "${tokenId}" if still valid.` },
+      });
+
+      const exists = map.has(tokenId);
+      push({
+        title: { vi: `"${tokenId}" not in map? ${!exists}`, en: `"${tokenId}" not in map? ${!exists}` },
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [36],
+        vars: [{ name: "in map?", value: exists }],
+        note: { vi: exists ? `"${tokenId}" tồn tại, kiểm tra hạn.` : `"${tokenId}" chưa từng tồn tại → bỏ qua.`, en: exists ? `"${tokenId}" exists, check its expiry.` : `"${tokenId}" never existed → skip.` },
+      });
+      if (!exists) {
+        push({
+          title: { vi: "return (bỏ qua)", en: "return (skip)" },
+          operation: `renew("${tokenId}", ${time})`,
+          codeLines: [37],
+          vars: [],
+          note: { vi: "Không có gì để gia hạn.", en: "Nothing to renew." },
+        });
+        outputs.push(null);
+        continue;
+      }
+
+      const exp = map.get(tokenId);
+      push({
+        title: { vi: `node = map["${tokenId}"] (exp=${exp})`, en: `node = map["${tokenId}"] (exp=${exp})` },
+        hlId: tokenId,
+        extraStatus: `exp=${exp}`,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [38],
+        vars: [{ name: "node.exp", value: exp }],
+        note: { vi: `Tra node của "${tokenId}" từ hash map.`, en: `Look up "${tokenId}"'s node from the hash map.` },
+      });
+
+      const isExpired = exp <= time;
+      push({
+        title: { vi: `node.exp <= ${time}? ${isExpired} (${exp} vs ${time})`, en: `node.exp <= ${time}? ${isExpired} (${exp} vs ${time})` },
+        hlId: tokenId,
+        extraStatus: `exp=${exp}`,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [39],
+        vars: [{ name: "node.exp", value: exp }, { name: "currentTime", value: time }],
+        note: { vi: isExpired ? `"${tokenId}" đã hết hạn → bỏ qua.` : `"${tokenId}" còn hiệu lực → gia hạn.`, en: isExpired ? `"${tokenId}" already expired → skip.` : `"${tokenId}" still valid → renew it.` },
+      });
+      if (isExpired) {
+        push({
+          title: { vi: "return (bỏ qua)", en: "return (skip)" },
+          hlId: tokenId,
+          operation: `renew("${tokenId}", ${time})`,
+          codeLines: [40],
+          vars: [],
+          note: { vi: `"${tokenId}" giữ nguyên trạng thái cũ, sẽ bị dọn ở lần countUnexpiredTokens kế tiếp.`, en: `"${tokenId}" keeps its old state; it will be cleaned up on the next countUnexpiredTokens call.` },
+        });
+        outputs.push(null);
+        continue;
+      }
+
+      removeNode(tokenId);
+      push({
+        title: { vi: `_remove(node) → tháo "${tokenId}" khỏi vị trí cũ`, en: `_remove(node) → detach "${tokenId}" from its old spot` },
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [41],
+        vars: [],
+        note: { vi: "Cần tháo ra trước khi gắn lại vào tail với hạn mới.", en: "Must detach before re-attaching at the tail with the new expiry." },
+      });
+
+      const newExp = time + ttl;
+      map.set(tokenId, newExp);
+      push({
+        title: { vi: `node.exp = ${time} + ${ttl} = ${newExp}`, en: `node.exp = ${time} + ${ttl} = ${newExp}` },
+        hlId: tokenId,
+        extraStatus: `exp=${newExp}`,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [42],
+        vars: [{ name: "node.exp", value: newExp }],
+        note: { vi: `Cập nhật hạn mới của "${tokenId}" thành ${newExp}.`, en: `Update "${tokenId}"'s new expiry to ${newExp}.` },
+      });
+
+      appendNode(tokenId);
+      push({
+        title: { vi: `_append(node) → gắn lại "${tokenId}" vào tail`, en: `_append(node) → re-attach "${tokenId}" at the tail` },
+        hlId: tokenId,
+        extraStatus: `exp=${newExp}`,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [43],
+        vars: [{ name: "position", value: "tail (largest expiry so far)" }],
+        note: { vi: `Hạn mới luôn lớn nhất nên gắn vào tail giữ list sắp tăng dần.`, en: `The new expiry is always the largest, so appending at the tail keeps the list sorted.` },
+      });
+      outputs.push(null);
+    } else if (command.op === "countunexpiredtokens") {
+      const { time } = command;
+      push({
+        title: { vi: `countUnexpiredTokens(${time})`, en: `countUnexpiredTokens(${time})` },
+        operation: `countUnexpiredTokens(${time})`,
+        codeLines: [45],
+        vars: [{ name: "currentTime", value: time }],
+        note: { vi: `Dọn hết token đã hết hạn từ head, rồi trả về số token còn lại.`, en: `Evict every expired token starting from head, then return how many remain.` },
+      });
+
+      const removedIds = [];
+      while (true) {
+        const headNext = nextMap.get(HEAD);
+        const isTail = headNext === TAIL;
+        const headExp = isTail ? null : map.get(headNext);
+        const shouldEvict = !isTail && headExp <= time;
+        push({
+          title: {
+            vi: `head.next là tail hoặc đã hết hạn? ${shouldEvict}${isTail ? " (list rỗng)" : ` (exp=${headExp})`}`,
+            en: `head.next is tail or expired? ${shouldEvict}${isTail ? " (empty list)" : ` (exp=${headExp})`}`,
+          },
+          hlId: isTail ? undefined : headNext,
+          extraStatus: isTail ? undefined : `exp=${headExp}`,
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [46],
+          vars: [{ name: "head.next", value: isTail ? "tail" : `${headNext} (exp=${headExp})` }],
+          note: {
+            vi: isTail
+              ? "Danh sách rỗng → dừng vòng lặp."
+              : shouldEvict
+                ? `"${headNext}" là token cũ nhất (hạn nhỏ nhất=${headExp}) và đã hết hạn (${headExp} ≤ ${time}) → cần dọn.`
+                : `"${headNext}" là token cũ nhất nhưng vẫn còn hiệu lực (${headExp} > ${time}) → dừng vòng lặp, các token còn lại đều còn hiệu lực.`,
+            en: isTail
+              ? "The list is empty → stop the loop."
+              : shouldEvict
+                ? `"${headNext}" is the oldest token (smallest expiry=${headExp}) and already expired (${headExp} ≤ ${time}) → evict it.`
+                : `"${headNext}" is the oldest token but still valid (${headExp} > ${time}) → stop the loop, every remaining token is valid.`,
+          },
+        });
+        if (!shouldEvict) break;
+
+        const expired = headNext;
+        push({
+          title: { vi: `expired = head.next = "${expired}"`, en: `expired = head.next = "${expired}"` },
+          hlId: expired,
+          extraStatus: `exp=${headExp}`,
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [47],
+          vars: [{ name: "expired", value: expired }],
+          note: { vi: `Chuẩn bị xóa token hết hạn "${expired}".`, en: `Prepare to remove the expired token "${expired}".` },
+        });
+
+        removeNode(expired);
+        push({
+          title: { vi: `_remove(expired) → tháo "${expired}" khỏi list`, en: `_remove(expired) → detach "${expired}" from the list` },
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [48],
+          vars: [],
+          note: { vi: `Head giờ trỏ tới token cũ nhất kế tiếp.`, en: `Head now points to the next-oldest token.` },
+        });
+
+        map.delete(expired);
+        removedIds.push(expired);
+        push({
+          title: { vi: `del map["${expired}"]`, en: `del map["${expired}"]` },
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [49],
+          vars: [{ name: "removed", value: expired }],
+          note: { vi: `"${expired}" bị loại hoàn toàn khỏi hệ thống.`, en: `"${expired}" is fully gone from the structure.` },
+        });
+      }
+
+      const count = map.size;
+      push({
+        title: { vi: `return len(map) = ${count}`, en: `return len(map) = ${count}` },
+        activeIds: [...map.keys()],
+        operation: `countUnexpiredTokens(${time})`,
+        codeLines: [50],
+        vars: [{ name: "answer", value: count }],
+        note: { vi: `Sau khi dọn xong, còn ${count} token hợp lệ trong map.`, en: `After cleanup, ${count} valid token(s) remain in the map.` },
+      });
+      outputs.push(count);
+    }
+  }
+
+  const ordFinal = order();
+  const fs = {
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [],
+    graph: {
+      nodes: ordFinal.map((id) => (id === HEAD ? { id, label: "H", row: "main", sub: "sentinel" } : id === TAIL ? { id, label: "T", row: "main", sub: "sentinel" } : { id, label: id, row: "main", sub: `exp=${map.get(id)}` })),
+      edges: (() => {
+        const e = [];
+        for (let i = 0; i < ordFinal.length - 1; i++) {
+          e.push({ u: ordFinal[i], v: ordFinal[i + 1], w: "next", kind: "next" });
+          e.push({ u: ordFinal[i + 1], v: ordFinal[i], w: "prev", kind: "prev" });
+        }
+        return e;
+      })(),
+      layout: "linear",
+      order: ordFinal,
+      caption: `head→tail: ${ordFinal.map((id) => (id === HEAD ? "H" : id === TAIL ? "T" : `${id}(${map.get(id)})`)).join(" → ")}`,
+      annotations: {},
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [],
+    vars: [{ name: "outputs", value: `[${outputs.map((v) => (v === null ? "null" : v)).join(", ")}]` }],
+    note: {
+      vi: `Hoàn tất ${commands.length} thao tác.`,
+      en: `Finished ${commands.length} operation(s).`,
+    },
+    final: true,
+  };
+  steps.push(fs);
+
+  return { original: raw, answer: outputs, steps };
+}
+
 module.exports = {
   1797: {
     id: 1797,
     difficulty: "medium",
     slug: "design-authentication-manager",
-    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
     title: { vi: "Design Authentication Manager", en: "Design Authentication Manager" },
     titleVi: { vi: "Thiết kế hệ thống quản lý xác thực", en: "Design an authentication token manager" },
     statement: {
@@ -2536,6 +3006,10 @@ module.exports = {
     inputLabel: { vi: "Thao tác, ngăn cách bằng |", en: "Operations separated by |" },
     extraParams: [
       { key: "ttl", label: { vi: "timeToLive", en: "timeToLive" }, default: 5 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Hash Map thuần", en: "Approach 1: Plain Hash Map" } },
+        { value: "2", label: { vi: "Cách 2: Doubly Linked List + Hash Map", en: "Approach 2: Doubly Linked List + Hash Map" } },
+      ] },
     ],
     approach: [
       { vi: "Hash map tokenId → thời điểm hết hạn (currentTime + ttl).", en: "Hash map tokenId → expiry time (currentTime + ttl)." },
@@ -2569,6 +3043,60 @@ module.exports = {
       "                count += 1",
       "        return count",
     ],
+    code2: [
+      "class Node:",
+      "    def __init__(self, tokenId, exp):",
+      "        self.tokenId = tokenId",
+      "        self.exp = exp",
+      "        self.prev = None",
+      "        self.next = None",
+      "",
+      "class AuthenticationManager:",
+      "    def __init__(self, timeToLive: int):",
+      "        self.ttl = timeToLive",
+      "        self.map = {}",
+      "        self.head = Node(None, 0)",
+      "        self.tail = Node(None, 0)",
+      "        self.head.next = self.tail",
+      "        self.tail.prev = self.head",
+      "",
+      "    def _remove(self, node):",
+      "        node.prev.next = node.next",
+      "        node.next.prev = node.prev",
+      "",
+      "    def _append(self, node):",
+      "        prev = self.tail.prev",
+      "        prev.next = node",
+      "        node.prev = prev",
+      "        node.next = self.tail",
+      "        self.tail.prev = node",
+      "",
+      "    def generate(self, tokenId: str, currentTime: int) -> None:",
+      "        if tokenId in self.map:",
+      "            self._remove(self.map[tokenId])",
+      "        node = Node(tokenId, currentTime + self.ttl)",
+      "        self.map[tokenId] = node",
+      "        self._append(node)",
+      "",
+      "    def renew(self, tokenId: str, currentTime: int) -> None:",
+      "        if tokenId not in self.map:",
+      "            return",
+      "        node = self.map[tokenId]",
+      "        if node.exp <= currentTime:",
+      "            return",
+      "        self._remove(node)",
+      "        node.exp = currentTime + self.ttl",
+      "        self._append(node)",
+      "",
+      "    def countUnexpiredTokens(self, currentTime: int) -> int:",
+      "        while self.head.next is not self.tail and self.head.next.exp <= currentTime:",
+      "            expired = self.head.next",
+      "            self._remove(expired)",
+      "            del self.map[expired.tokenId]",
+      "        return len(self.map)",
+    ],
+    codeLabel: { vi: "Cách 1: Hash Map thuần", en: "Approach 1: Plain Hash Map" },
+    code2Label: { vi: "Cách 2: Doubly Linked List + Hash Map", en: "Approach 2: Doubly Linked List + Hash Map" },
     builder: buildSteps1797,
   },
   3020: {
