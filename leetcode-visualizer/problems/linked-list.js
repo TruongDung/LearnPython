@@ -1788,6 +1788,615 @@ function buildSteps146(input, params) {
 }
 
 /**
+ * LeetCode 432: All O`one Data Structure.
+ * Doubly linked list of "buckets" ordered by increasing count (head = lowest
+ * count, tail = highest count). Each bucket holds the set of keys sharing
+ * that exact count. keyCount maps key->count, keyBucket maps key->bucket.
+ * inc/dec move a key to the neighboring bucket (creating it if missing) and
+ * delete the old bucket if it becomes empty — giving O(1) for all 4 ops.
+ *
+ * Input: pipe-separated commands, e.g. "inc a | inc a | inc b | getMaxKey | dec a | getMinKey".
+ */
+function buildSteps432(input) {
+  const raw = String(input || "").trim();
+  const steps = [];
+
+  function parseCommands(text) {
+    return text
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const tokens = part.replace(/[(),]/g, " ").split(/\s+/).filter(Boolean);
+        const op = (tokens[0] || "").toLowerCase();
+        if ((op === "inc" || op === "dec") && tokens.length >= 2) {
+          return { op, key: tokens[1], raw: part };
+        }
+        if (op === "getmaxkey" || op === "getminkey") {
+          return { op, raw: part };
+        }
+        return { op: "invalid", raw: part };
+      });
+  }
+
+  const commands = parseCommands(raw);
+  if (!commands.length || commands.some((c) => c.op === "invalid")) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "expected", value: "inc a | inc a | inc b | getMaxKey | dec a | getMinKey" }],
+      note: {
+        vi: "Nhập thao tác dạng: inc a | inc a | inc b | getMaxKey | dec a | getMinKey.",
+        en: "Enter operations like: inc a | inc a | inc b | getMaxKey | dec a | getMinKey.",
+      },
+    });
+    return { original: raw, answer: [], steps };
+  }
+
+  // Bucket doubly linked list. HEAD/TAIL are sentinels (count = 0, never hold keys).
+  let idCounter = 0;
+  const HEAD = "head";
+  const TAIL = "tail";
+  const buckets = new Map(); // id -> { id, count, keys: Set, sentinel? }
+  const nextMap = new Map();
+  const prevMap = new Map();
+  buckets.set(HEAD, { id: HEAD, count: 0, keys: new Set(), sentinel: "head" });
+  buckets.set(TAIL, { id: TAIL, count: 0, keys: new Set(), sentinel: "tail" });
+  nextMap.set(HEAD, TAIL);
+  prevMap.set(TAIL, HEAD);
+
+  const keyCount = new Map(); // key -> count
+  const keyBucket = new Map(); // key -> bucket id
+  const outputs = [];
+
+  function bucketLabel(id) {
+    const b = buckets.get(id);
+    if (b.sentinel === "head") return "H";
+    if (b.sentinel === "tail") return "T";
+    return String(b.count);
+  }
+
+  function bucketOrder() {
+    const order = [];
+    let cur = HEAD;
+    while (cur) {
+      order.push(cur);
+      cur = nextMap.get(cur);
+    }
+    return order;
+  }
+
+  function push({ title, hlNodes = [], annotations = {}, codeLines, vars, note, operation, final = false }) {
+    const order = bucketOrder();
+    const nodes = order.map((id) => {
+      const b = buckets.get(id);
+      const label = bucketLabel(id);
+      const sub = b.sentinel ? "sentinel" : ([...b.keys].join(",") || "(empty)");
+      return { id, label, row: "main", sub };
+    });
+    const edges = [];
+    for (let i = 0; i < order.length - 1; i++) {
+      edges.push({ u: order[i], v: order[i + 1], w: "next", kind: "next" });
+      edges.push({ u: order[i + 1], v: order[i], w: "prev", kind: "prev" });
+    }
+    steps.push({
+      title,
+      arr: [],
+      graph: {
+        nodes,
+        edges,
+        layout: "linear",
+        order,
+        caption: `${operation || ""} | buckets head→tail: ${order.map(bucketLabel).join(" → ")}`,
+        annotations,
+        hlNodes,
+        hlEdges: [],
+        visitedNodes: [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: vars || [],
+      note,
+      final,
+    });
+  }
+
+  function insertAfter(bucketId, count) {
+    const id = `b${idCounter++}`;
+    buckets.set(id, { id, count, keys: new Set() });
+    const nextId = nextMap.get(bucketId);
+    nextMap.set(bucketId, id);
+    prevMap.set(id, bucketId);
+    nextMap.set(id, nextId);
+    prevMap.set(nextId, id);
+    return id;
+  }
+
+  function removeBucket(bucketId) {
+    const prevId = prevMap.get(bucketId);
+    const nextId = nextMap.get(bucketId);
+    nextMap.set(prevId, nextId);
+    prevMap.set(nextId, prevId);
+    buckets.delete(bucketId);
+  }
+
+  push({
+    title: { vi: "Khởi tạo AllOne (head/tail sentinel)", en: "Initialize AllOne (head/tail sentinels)" },
+    codeLines: [9],
+    operation: "AllOne()",
+    vars: [{ name: "keyCount", value: "{}" }, { name: "keyBucket", value: "{}" }],
+    note: {
+      vi: "Danh sách bucket rỗng, chỉ có 2 sentinel head/tail. Mỗi bucket chứa các key có cùng count, sắp tăng dần từ head đến tail.",
+      en: "The bucket list is empty, just head/tail sentinels. Each bucket holds keys sharing the same count, increasing from head to tail.",
+    },
+  });
+
+  for (const command of commands) {
+    if (command.op === "inc") {
+      const key = command.key;
+      push({
+        title: { vi: `inc(${key})`, en: `inc(${key})` },
+        operation: `inc(${key})`,
+        codeLines: [28],
+        vars: [{ name: "key", value: key }],
+        note: { vi: `Tăng count của "${key}" lên 1.`, en: `Increase "${key}"'s count by 1.` },
+      });
+
+      const isNew = !keyCount.has(key);
+      push({
+        title: { vi: `key not in keyCount? ${isNew}`, en: `key not in keyCount? ${isNew}` },
+        operation: `inc(${key})`,
+        codeLines: [29],
+        vars: [{ name: "in keyCount?", value: !isNew }],
+        note: {
+          vi: isNew ? `"${key}" chưa tồn tại → count mới = 1.` : `"${key}" đã tồn tại, count hiện tại = ${keyCount.get(key)}.`,
+          en: isNew ? `"${key}" doesn't exist yet → new count = 1.` : `"${key}" already exists, current count = ${keyCount.get(key)}.`,
+        },
+      });
+
+      let target;
+      if (isNew) {
+        keyCount.set(key, 1);
+        push({
+          title: { vi: `keyCount[${key}] = 1`, en: `keyCount[${key}] = 1` },
+          operation: `inc(${key})`,
+          codeLines: [30],
+          vars: [{ name: `keyCount[${key}]`, value: 1 }],
+          note: { vi: `Ghi nhận count của "${key}" là 1.`, en: `Record "${key}"'s count as 1.` },
+        });
+
+        const headNextId = nextMap.get(HEAD);
+        const needNewBucket = buckets.get(headNextId).count !== 1;
+        push({
+          title: { vi: `head.next.count != 1? ${needNewBucket}`, en: `head.next.count != 1? ${needNewBucket}` },
+          hlNodes: [headNextId],
+          operation: `inc(${key})`,
+          codeLines: [31],
+          vars: [{ name: "head.next.count", value: buckets.get(headNextId).count }],
+          note: {
+            vi: needNewBucket ? "Chưa có bucket count=1 ngay sau head → cần tạo mới." : "Đã có bucket count=1 ngay sau head, dùng lại.",
+            en: needNewBucket ? "No count=1 bucket right after head yet → create one." : "A count=1 bucket already sits right after head, reuse it.",
+          },
+        });
+        if (needNewBucket) {
+          const newId = insertAfter(HEAD, 1);
+          push({
+            title: { vi: "insert_after(head, 1)", en: "insert_after(head, 1)" },
+            hlNodes: [newId],
+            operation: `inc(${key})`,
+            codeLines: [32],
+            vars: [{ name: "new bucket", value: "count=1" }],
+            note: { vi: "Chèn bucket mới count=1 ngay sau head.", en: "Insert a new count=1 bucket right after head." },
+          });
+        }
+        target = nextMap.get(HEAD);
+        push({
+          title: { vi: `target = head.next (count=${buckets.get(target).count})`, en: `target = head.next (count=${buckets.get(target).count})` },
+          hlNodes: [target],
+          operation: `inc(${key})`,
+          codeLines: [33],
+          vars: [{ name: "target", value: `bucket count=${buckets.get(target).count}` }],
+          note: { vi: `Bucket đích để thêm "${key}" là bucket count=1 ngay sau head.`, en: `The target bucket to add "${key}" is the count=1 bucket right after head.` },
+        });
+      } else {
+        const oldCount = keyCount.get(key);
+        keyCount.set(key, oldCount + 1);
+        push({
+          title: { vi: `keyCount[${key}] = ${oldCount} + 1 = ${oldCount + 1}`, en: `keyCount[${key}] = ${oldCount} + 1 = ${oldCount + 1}` },
+          operation: `inc(${key})`,
+          codeLines: [36],
+          vars: [{ name: `keyCount[${key}]`, value: oldCount + 1 }],
+          note: { vi: `Count của "${key}" tăng từ ${oldCount} lên ${oldCount + 1}.`, en: `"${key}"'s count increases from ${oldCount} to ${oldCount + 1}.` },
+        });
+
+        const bucketId = keyBucket.get(key);
+        push({
+          title: { vi: `bucket = keyBucket[${key}] (count=${oldCount})`, en: `bucket = keyBucket[${key}] (count=${oldCount})` },
+          hlNodes: [bucketId],
+          operation: `inc(${key})`,
+          codeLines: [37],
+          vars: [{ name: "bucket", value: `count=${oldCount}` }],
+          note: { vi: `Bucket hiện tại của "${key}" có count=${oldCount}.`, en: `"${key}"'s current bucket has count=${oldCount}.` },
+        });
+
+        buckets.get(bucketId).keys.delete(key);
+        push({
+          title: { vi: `bucket.keys.remove(${key})`, en: `bucket.keys.remove(${key})` },
+          hlNodes: [bucketId],
+          operation: `inc(${key})`,
+          codeLines: [38],
+          vars: [{ name: "bucket.keys", value: `{${[...buckets.get(bucketId).keys].join(",")}}` }],
+          note: { vi: `Xóa "${key}" khỏi bucket count=${oldCount}.`, en: `Remove "${key}" from the count=${oldCount} bucket.` },
+        });
+
+        let candidate = nextMap.get(bucketId);
+        push({
+          title: { vi: `target = bucket.next (count=${buckets.get(candidate).count})`, en: `target = bucket.next (count=${buckets.get(candidate).count})` },
+          hlNodes: [candidate],
+          operation: `inc(${key})`,
+          codeLines: [39],
+          vars: [{ name: "target", value: `bucket count=${buckets.get(candidate).count}` }],
+          note: { vi: "Bucket kế tiếp có thể đã đúng count mong muốn.", en: "The next bucket might already have the target count." },
+        });
+
+        const needNew = buckets.get(candidate).count !== oldCount + 1;
+        push({
+          title: { vi: `target.count != ${oldCount + 1}? ${needNew}`, en: `target.count != ${oldCount + 1}? ${needNew}` },
+          hlNodes: [candidate],
+          operation: `inc(${key})`,
+          codeLines: [40],
+          vars: [{ name: "target.count", value: buckets.get(candidate).count }],
+          note: {
+            vi: needNew ? `Chưa có bucket count=${oldCount + 1} → cần tạo mới.` : `Đã có bucket count=${oldCount + 1}, dùng lại.`,
+            en: needNew ? `No count=${oldCount + 1} bucket yet → create one.` : `A count=${oldCount + 1} bucket already exists, reuse it.`,
+          },
+        });
+        if (needNew) {
+          candidate = insertAfter(bucketId, oldCount + 1);
+          push({
+            title: { vi: `target = insert_after(bucket, ${oldCount + 1})`, en: `target = insert_after(bucket, ${oldCount + 1})` },
+            hlNodes: [candidate],
+            operation: `inc(${key})`,
+            codeLines: [41],
+            vars: [{ name: "target", value: `new bucket count=${oldCount + 1}` }],
+            note: { vi: `Chèn bucket mới count=${oldCount + 1} ngay sau bucket cũ.`, en: `Insert a new count=${oldCount + 1} bucket right after the old bucket.` },
+          });
+        }
+        target = candidate;
+
+        const bucketEmptyInc = buckets.get(bucketId).keys.size === 0;
+        push({
+          title: { vi: `not bucket.keys? ${bucketEmptyInc}`, en: `not bucket.keys? ${bucketEmptyInc}` },
+          hlNodes: [bucketId],
+          operation: `inc(${key})`,
+          codeLines: [42],
+          vars: [{ name: "bucket.keys empty?", value: bucketEmptyInc }],
+          note: {
+            vi: bucketEmptyInc ? `Bucket count=${oldCount} rỗng → cần xóa.` : `Bucket count=${oldCount} vẫn còn key khác.`,
+            en: bucketEmptyInc ? `The count=${oldCount} bucket is empty → remove it.` : `The count=${oldCount} bucket still has other keys.`,
+          },
+        });
+        if (bucketEmptyInc) {
+          removeBucket(bucketId);
+          push({
+            title: { vi: `remove_bucket(count=${oldCount})`, en: `remove_bucket(count=${oldCount})` },
+            operation: `inc(${key})`,
+            codeLines: [43],
+            vars: [{ name: "removed", value: `count=${oldCount}` }],
+            note: { vi: `Xóa bucket count=${oldCount} rỗng khỏi danh sách.`, en: `Remove the now-empty count=${oldCount} bucket from the list.` },
+          });
+        }
+      }
+
+      buckets.get(target).keys.add(key);
+      push({
+        title: { vi: `target.keys.add(${key})`, en: `target.keys.add(${key})` },
+        hlNodes: [target],
+        operation: `inc(${key})`,
+        codeLines: [44],
+        vars: [{ name: "target.keys", value: `{${[...buckets.get(target).keys].join(",")}}` }],
+        note: { vi: `Thêm "${key}" vào bucket count=${buckets.get(target).count}.`, en: `Add "${key}" to the count=${buckets.get(target).count} bucket.` },
+      });
+
+      keyBucket.set(key, target);
+      push({
+        title: { vi: `keyBucket[${key}] = target`, en: `keyBucket[${key}] = target` },
+        hlNodes: [target],
+        operation: `inc(${key})`,
+        codeLines: [45],
+        vars: [{ name: `keyBucket[${key}]`, value: `count=${buckets.get(target).count}` }],
+        note: { vi: `Cập nhật "${key}" trỏ tới bucket count=${buckets.get(target).count}.`, en: `Update "${key}" to point to the count=${buckets.get(target).count} bucket.` },
+      });
+
+      outputs.push(null);
+    } else if (command.op === "dec") {
+      const key = command.key;
+      push({
+        title: { vi: `dec(${key})`, en: `dec(${key})` },
+        operation: `dec(${key})`,
+        codeLines: [47],
+        vars: [{ name: "key", value: key }],
+        note: { vi: `Giảm count của "${key}" đi 1 (hoặc xóa nếu count đang là 1).`, en: `Decrease "${key}"'s count by 1 (or remove it if count is 1).` },
+      });
+
+      const exists = keyCount.has(key);
+      push({
+        title: { vi: `key not in keyCount? ${!exists}`, en: `key not in keyCount? ${!exists}` },
+        operation: `dec(${key})`,
+        codeLines: [48],
+        vars: [{ name: "in keyCount?", value: exists }],
+        note: {
+          vi: exists ? `"${key}" tồn tại, count hiện tại = ${keyCount.get(key)}.` : `"${key}" không tồn tại.`,
+          en: exists ? `"${key}" exists, current count = ${keyCount.get(key)}.` : `"${key}" does not exist.`,
+        },
+      });
+      if (!exists) {
+        push({
+          title: { vi: "return (không có gì để làm)", en: "return (nothing to do)" },
+          operation: `dec(${key})`,
+          codeLines: [49],
+          vars: [],
+          note: { vi: `"${key}" không tồn tại nên bỏ qua.`, en: `"${key}" doesn't exist, so skip.` },
+        });
+        outputs.push(null);
+        continue;
+      }
+
+      const oldCount = keyCount.get(key);
+      push({
+        title: { vi: `old_count = keyCount[${key}] = ${oldCount}`, en: `old_count = keyCount[${key}] = ${oldCount}` },
+        operation: `dec(${key})`,
+        codeLines: [50],
+        vars: [{ name: "old_count", value: oldCount }],
+        note: { vi: `Count hiện tại của "${key}" là ${oldCount}.`, en: `"${key}"'s current count is ${oldCount}.` },
+      });
+
+      const bucketId = keyBucket.get(key);
+      push({
+        title: { vi: `bucket = keyBucket[${key}] (count=${oldCount})`, en: `bucket = keyBucket[${key}] (count=${oldCount})` },
+        hlNodes: [bucketId],
+        operation: `dec(${key})`,
+        codeLines: [51],
+        vars: [{ name: "bucket", value: `count=${oldCount}` }],
+        note: { vi: `Bucket hiện tại của "${key}".`, en: `"${key}"'s current bucket.` },
+      });
+
+      buckets.get(bucketId).keys.delete(key);
+      push({
+        title: { vi: `bucket.keys.remove(${key})`, en: `bucket.keys.remove(${key})` },
+        hlNodes: [bucketId],
+        operation: `dec(${key})`,
+        codeLines: [52],
+        vars: [{ name: "bucket.keys", value: `{${[...buckets.get(bucketId).keys].join(",")}}` }],
+        note: { vi: `Xóa "${key}" khỏi bucket count=${oldCount}.`, en: `Remove "${key}" from the count=${oldCount} bucket.` },
+      });
+
+      const becomesZero = oldCount === 1;
+      push({
+        title: { vi: `old_count == 1? ${becomesZero}`, en: `old_count == 1? ${becomesZero}` },
+        operation: `dec(${key})`,
+        codeLines: [53],
+        vars: [{ name: "old_count", value: oldCount }],
+        note: {
+          vi: becomesZero ? `Count sẽ về 0 → xóa "${key}" khỏi hệ thống hoàn toàn.` : `Count mới sẽ là ${oldCount - 1}.`,
+          en: becomesZero ? `Count would drop to 0 → remove "${key}" entirely.` : `New count will be ${oldCount - 1}.`,
+        },
+      });
+
+      if (becomesZero) {
+        keyCount.delete(key);
+        push({
+          title: { vi: `del keyCount[${key}]`, en: `del keyCount[${key}]` },
+          operation: `dec(${key})`,
+          codeLines: [54],
+          vars: [{ name: "keyCount", value: `{${[...keyCount.keys()].join(",")}}` }],
+          note: { vi: `Xóa "${key}" khỏi keyCount.`, en: `Remove "${key}" from keyCount.` },
+        });
+        keyBucket.delete(key);
+        push({
+          title: { vi: `del keyBucket[${key}]`, en: `del keyBucket[${key}]` },
+          operation: `dec(${key})`,
+          codeLines: [55],
+          vars: [{ name: "keyBucket", value: `{${[...keyBucket.keys()].join(",")}}` }],
+          note: { vi: `Xóa "${key}" khỏi keyBucket; "${key}" bị loại hoàn toàn khỏi hệ thống.`, en: `Remove "${key}" from keyBucket; "${key}" is fully gone from the structure.` },
+        });
+      } else {
+        keyCount.set(key, oldCount - 1);
+        push({
+          title: { vi: `keyCount[${key}] = ${oldCount} - 1 = ${oldCount - 1}`, en: `keyCount[${key}] = ${oldCount} - 1 = ${oldCount - 1}` },
+          operation: `dec(${key})`,
+          codeLines: [57],
+          vars: [{ name: `keyCount[${key}]`, value: oldCount - 1 }],
+          note: { vi: `Count của "${key}" giảm xuống ${oldCount - 1}.`, en: `"${key}"'s count decreases to ${oldCount - 1}.` },
+        });
+
+        let candidate = prevMap.get(bucketId);
+        push({
+          title: { vi: `target = bucket.prev (count=${buckets.get(candidate).count})`, en: `target = bucket.prev (count=${buckets.get(candidate).count})` },
+          hlNodes: [candidate],
+          operation: `dec(${key})`,
+          codeLines: [58],
+          vars: [{ name: "target", value: `bucket count=${buckets.get(candidate).count}` }],
+          note: { vi: "Bucket trước đó có thể đã đúng count mong muốn.", en: "The previous bucket might already have the target count." },
+        });
+
+        const needNew = buckets.get(candidate).count !== oldCount - 1;
+        push({
+          title: { vi: `target.count != ${oldCount - 1}? ${needNew}`, en: `target.count != ${oldCount - 1}? ${needNew}` },
+          hlNodes: [candidate],
+          operation: `dec(${key})`,
+          codeLines: [59],
+          vars: [{ name: "target.count", value: buckets.get(candidate).count }],
+          note: {
+            vi: needNew ? `Chưa có bucket count=${oldCount - 1} → cần tạo mới.` : `Đã có bucket count=${oldCount - 1}, dùng lại.`,
+            en: needNew ? `No count=${oldCount - 1} bucket yet → create one.` : `A count=${oldCount - 1} bucket already exists, reuse it.`,
+          },
+        });
+        if (needNew) {
+          candidate = insertAfter(prevMap.get(bucketId), oldCount - 1);
+          push({
+            title: { vi: `target = insert_after(bucket.prev, ${oldCount - 1})`, en: `target = insert_after(bucket.prev, ${oldCount - 1})` },
+            hlNodes: [candidate],
+            operation: `dec(${key})`,
+            codeLines: [60],
+            vars: [{ name: "target", value: `new bucket count=${oldCount - 1}` }],
+            note: { vi: `Chèn bucket mới count=${oldCount - 1} ngay trước bucket cũ.`, en: `Insert a new count=${oldCount - 1} bucket right before the old bucket.` },
+          });
+        }
+
+        buckets.get(candidate).keys.add(key);
+        push({
+          title: { vi: `target.keys.add(${key})`, en: `target.keys.add(${key})` },
+          hlNodes: [candidate],
+          operation: `dec(${key})`,
+          codeLines: [61],
+          vars: [{ name: "target.keys", value: `{${[...buckets.get(candidate).keys].join(",")}}` }],
+          note: { vi: `Thêm "${key}" vào bucket count=${oldCount - 1}.`, en: `Add "${key}" to the count=${oldCount - 1} bucket.` },
+        });
+
+        keyBucket.set(key, candidate);
+        push({
+          title: { vi: `keyBucket[${key}] = target`, en: `keyBucket[${key}] = target` },
+          hlNodes: [candidate],
+          operation: `dec(${key})`,
+          codeLines: [62],
+          vars: [{ name: `keyBucket[${key}]`, value: `count=${oldCount - 1}` }],
+          note: { vi: `Cập nhật "${key}" trỏ tới bucket count=${oldCount - 1}.`, en: `Update "${key}" to point to the count=${oldCount - 1} bucket.` },
+        });
+      }
+
+      const bucketEmptyDec = buckets.get(bucketId).keys.size === 0;
+      push({
+        title: { vi: `not bucket.keys? ${bucketEmptyDec}`, en: `not bucket.keys? ${bucketEmptyDec}` },
+        hlNodes: [bucketId],
+        operation: `dec(${key})`,
+        codeLines: [63],
+        vars: [{ name: "bucket.keys empty?", value: bucketEmptyDec }],
+        note: {
+          vi: bucketEmptyDec ? `Bucket count=${oldCount} rỗng → cần xóa.` : `Bucket count=${oldCount} vẫn còn key khác.`,
+          en: bucketEmptyDec ? `The count=${oldCount} bucket is empty → remove it.` : `The count=${oldCount} bucket still has other keys.`,
+        },
+      });
+      if (bucketEmptyDec) {
+        removeBucket(bucketId);
+        push({
+          title: { vi: `remove_bucket(count=${oldCount})`, en: `remove_bucket(count=${oldCount})` },
+          operation: `dec(${key})`,
+          codeLines: [64],
+          vars: [{ name: "removed", value: `count=${oldCount}` }],
+          note: { vi: `Xóa bucket count=${oldCount} rỗng khỏi danh sách.`, en: `Remove the now-empty count=${oldCount} bucket from the list.` },
+        });
+      }
+
+      outputs.push(null);
+    } else if (command.op === "getmaxkey") {
+      const tailPrev = prevMap.get(TAIL);
+      const isEmptyAll = tailPrev === HEAD;
+      push({
+        title: { vi: `getMaxKey(): tail.prev is head? ${isEmptyAll}`, en: `getMaxKey(): tail.prev is head? ${isEmptyAll}` },
+        hlNodes: isEmptyAll ? [] : [tailPrev],
+        operation: "getMaxKey()",
+        codeLines: [67],
+        vars: [{ name: "tail.prev is head?", value: isEmptyAll }],
+        note: {
+          vi: isEmptyAll ? "Danh sách bucket rỗng → trả về chuỗi rỗng." : `Bucket cuối (count lớn nhất) có count=${buckets.get(tailPrev).count}.`,
+          en: isEmptyAll ? "The bucket list is empty → return an empty string." : `The last bucket (highest count) has count=${buckets.get(tailPrev).count}.`,
+        },
+      });
+      let result;
+      if (isEmptyAll) {
+        result = "";
+        push({
+          title: { vi: 'return ""', en: 'return ""' },
+          operation: "getMaxKey()",
+          codeLines: [68],
+          vars: [{ name: "answer", value: '""' }],
+          note: { vi: "Chưa có key nào trong hệ thống.", en: "No keys exist in the structure yet." },
+          final: true,
+        });
+      } else {
+        result = [...buckets.get(tailPrev).keys][0];
+        push({
+          title: { vi: `return next(iter(tail.prev.keys)) = "${result}"`, en: `return next(iter(tail.prev.keys)) = "${result}"` },
+          hlNodes: [tailPrev],
+          operation: "getMaxKey()",
+          codeLines: [69],
+          vars: [{ name: "answer", value: result }],
+          note: { vi: `"${result}" có count lớn nhất = ${buckets.get(tailPrev).count}.`, en: `"${result}" has the highest count = ${buckets.get(tailPrev).count}.` },
+        });
+      }
+      outputs.push(result);
+    } else if (command.op === "getminkey") {
+      const headNext = nextMap.get(HEAD);
+      const isEmptyAll = headNext === TAIL;
+      push({
+        title: { vi: `getMinKey(): head.next is tail? ${isEmptyAll}`, en: `getMinKey(): head.next is tail? ${isEmptyAll}` },
+        hlNodes: isEmptyAll ? [] : [headNext],
+        operation: "getMinKey()",
+        codeLines: [72],
+        vars: [{ name: "head.next is tail?", value: isEmptyAll }],
+        note: {
+          vi: isEmptyAll ? "Danh sách bucket rỗng → trả về chuỗi rỗng." : `Bucket đầu (count nhỏ nhất) có count=${buckets.get(headNext).count}.`,
+          en: isEmptyAll ? "The bucket list is empty → return an empty string." : `The first bucket (lowest count) has count=${buckets.get(headNext).count}.`,
+        },
+      });
+      let result;
+      if (isEmptyAll) {
+        result = "";
+        push({
+          title: { vi: 'return ""', en: 'return ""' },
+          operation: "getMinKey()",
+          codeLines: [73],
+          vars: [{ name: "answer", value: '""' }],
+          note: { vi: "Chưa có key nào trong hệ thống.", en: "No keys exist in the structure yet." },
+        });
+      } else {
+        result = [...buckets.get(headNext).keys][0];
+        push({
+          title: { vi: `return next(iter(head.next.keys)) = "${result}"`, en: `return next(iter(head.next.keys)) = "${result}"` },
+          hlNodes: [headNext],
+          operation: "getMinKey()",
+          codeLines: [74],
+          vars: [{ name: "answer", value: result }],
+          note: { vi: `"${result}" có count nhỏ nhất = ${buckets.get(headNext).count}.`, en: `"${result}" has the lowest count = ${buckets.get(headNext).count}.` },
+        });
+      }
+      outputs.push(result);
+    }
+  }
+
+  const fs = {
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [],
+    graph: (() => {
+      const order = bucketOrder();
+      const nodes = order.map((id) => ({ id, label: bucketLabel(id), row: "main", sub: buckets.get(id).sentinel ? "sentinel" : ([...buckets.get(id).keys].join(",") || "(empty)") }));
+      const edges = [];
+      for (let i = 0; i < order.length - 1; i++) {
+        edges.push({ u: order[i], v: order[i + 1], w: "next", kind: "next" });
+        edges.push({ u: order[i + 1], v: order[i], w: "prev", kind: "prev" });
+      }
+      return { nodes, edges, layout: "linear", order, caption: `buckets head→tail: ${order.map(bucketLabel).join(" → ")}`, annotations: {}, hlNodes: [], hlEdges: [], visitedNodes: [] };
+    })(),
+    highlight: [],
+    mark: [],
+    codeLines: [],
+    vars: [{ name: "outputs", value: `[${outputs.map((v) => (v === null ? "null" : `"${v}"`)).join(", ")}]` }],
+    note: {
+      vi: `Hoàn tất ${commands.length} thao tác.`,
+      en: `Finished ${commands.length} operation(s).`,
+    },
+    final: true,
+  };
+  steps.push(fs);
+
+  return { original: raw, answer: outputs, steps };
+}
+
+/**
  * LeetCode 430: Flatten a Multilevel Doubly Linked List.
  * Recursive DFS: dfs(node) walks node's own next-chain; whenever a node has
  * a child, splice the child's flattened chain in between node and node.next,
@@ -2333,6 +2942,119 @@ module.exports = {
       "        return head",
     ],
     builder: buildSteps430,
+  },
+  432: {
+    id: 432,
+    difficulty: "hard",
+    slug: "all-oone-data-structure",
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
+    title: { vi: "All O`one Data Structure", en: "All O`one Data Structure" },
+    titleVi: { vi: "Cấu trúc dữ liệu O(1) cho mọi thao tác", en: "O(1) inc/dec/getMax/getMin structure" },
+    statement: {
+      vi:
+        "Thiết kế cấu trúc lưu (key, count), hỗ trợ O(1) cho inc(key), dec(key), getMaxKey(), getMinKey(). " +
+        "inc tăng count của key (tạo mới với count=1 nếu chưa tồn tại). dec giảm count của key (xóa key nếu count về 0). " +
+        "getMaxKey/getMinKey trả về một key bất kỳ có count lớn nhất/nhỏ nhất, hoặc chuỗi rỗng nếu không có key.",
+      en:
+        "Design a structure storing (key, count) pairs supporting O(1) inc(key), dec(key), getMaxKey(), getMinKey(). " +
+        "inc increases key's count (creating it with count=1 if new). dec decreases key's count (removing it if count hits 0). " +
+        "getMaxKey/getMinKey return any key with the highest/lowest count, or an empty string if none exist.",
+    },
+    defaultInput: "inc a | inc a | inc b | getMaxKey | dec a | getMinKey",
+    inputKind: "string",
+    inputLabel: { vi: "Thao tác, ngăn cách bằng |", en: "Operations separated by |" },
+    extraParams: [],
+    approach: [
+      { vi: "Doubly linked list các 'bucket', mỗi bucket giữ mọi key có ĐÚNG 1 count, sắp tăng dần từ head đến tail.", en: "A doubly linked list of 'buckets', each holding every key with the EXACT same count, increasing from head to tail." },
+      { vi: "keyCount[key] = count hiện tại. keyBucket[key] = bucket đang chứa key.", en: "keyCount[key] = current count. keyBucket[key] = the bucket currently holding key." },
+      { vi: "inc/dec: chuyển key sang bucket lân cận (tạo mới nếu chưa có count đó), rồi xóa bucket cũ nếu nó rỗng.", en: "inc/dec: move key to a neighboring bucket (creating it if that count doesn't exist yet), then delete the old bucket if it becomes empty." },
+      { vi: "getMaxKey/getMinKey: lấy 1 key bất kỳ từ bucket ngay trước tail / ngay sau head.", en: "getMaxKey/getMinKey: grab any key from the bucket right before tail / right after head." },
+    ],
+    complexity: {
+      time: "O(1) per operation",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi thao tác chỉ đổi vài pointer/bucket, không phụ thuộc số lượng key.",
+        en: "Each operation only touches a few pointers/buckets, independent of the number of keys.",
+      },
+    },
+    code: [
+      "class Bucket:",                                              //  1
+      "    def __init__(self, count):",                             //  2
+      "        self.count = count",                                 //  3
+      "        self.keys = set()",                                  //  4
+      "        self.prev = None",                                   //  5
+      "        self.next = None",                                   //  6
+      "",                                                            //  7
+      "class AllOne:",                                               //  8
+      "    def __init__(self):",                                    //  9
+      "        self.head = Bucket(0)",                               // 10
+      "        self.tail = Bucket(0)",                               // 11
+      "        self.head.next = self.tail",                         // 12
+      "        self.tail.prev = self.head",                         // 13
+      "        self.keyCount = {}",                                 // 14
+      "        self.keyBucket = {}",                                // 15
+      "",                                                            // 16
+      "    def insert_after(self, bucket, count):",                 // 17
+      "        new_bucket = Bucket(count)",                         // 18
+      "        new_bucket.prev = bucket",                           // 19
+      "        new_bucket.next = bucket.next",                      // 20
+      "        bucket.next.prev = new_bucket",                      // 21
+      "        bucket.next = new_bucket",                           // 22
+      "        return new_bucket",                                  // 23
+      "",                                                            // 24
+      "    def remove_bucket(self, bucket):",                       // 25
+      "        bucket.prev.next = bucket.next",                     // 26
+      "        bucket.next.prev = bucket.prev",                     // 27
+      "    def inc(self, key: str) -> None:",                       // 28
+      "        if key not in self.keyCount:",                       // 29
+      "            self.keyCount[key] = 1",                         // 30
+      "            if self.head.next.count != 1:",                  // 31
+      "                self.insert_after(self.head, 1)",             // 32
+      "            target = self.head.next",                        // 33
+      "        else:",                                               // 34
+      "            old_count = self.keyCount[key]",                 // 35
+      "            self.keyCount[key] = old_count + 1",              // 36
+      "            bucket = self.keyBucket[key]",                    // 37
+      "            bucket.keys.remove(key)",                         // 38
+      "            target = bucket.next",                            // 39
+      "            if target.count != old_count + 1:",               // 40
+      "                target = self.insert_after(bucket, old_count + 1)", // 41
+      "            if not bucket.keys:",                              // 42
+      "                self.remove_bucket(bucket)",                  // 43
+      "        target.keys.add(key)",                                 // 44
+      "        self.keyBucket[key] = target",                         // 45
+      "",                                                              // 46
+      "    def dec(self, key: str) -> None:",                        // 47
+      "        if key not in self.keyCount:",                        // 48
+      "            return",                                           // 49
+      "        old_count = self.keyCount[key]",                       // 50
+      "        bucket = self.keyBucket[key]",                         // 51
+      "        bucket.keys.remove(key)",                              // 52
+      "        if old_count == 1:",                                   // 53
+      "            del self.keyCount[key]",                           // 54
+      "            del self.keyBucket[key]",                          // 55
+      "        else:",                                                // 56
+      "            self.keyCount[key] = old_count - 1",               // 57
+      "            target = bucket.prev",                             // 58
+      "            if target.count != old_count - 1:",                // 59
+      "                target = self.insert_after(bucket.prev, old_count - 1)", // 60
+      "            target.keys.add(key)",                             // 61
+      "            self.keyBucket[key] = target",                     // 62
+      "        if not bucket.keys:",                                  // 63
+      "            self.remove_bucket(bucket)",                       // 64
+      "",                                                              // 65
+      "    def getMaxKey(self) -> str:",                              // 66
+      "        if self.tail.prev is self.head:",                     // 67
+      "            return \"\"",                                       // 68
+      "        return next(iter(self.tail.prev.keys))",               // 69
+      "",                                                              // 70
+      "    def getMinKey(self) -> str:",                              // 71
+      "        if self.head.next is self.tail:",                     // 72
+      "            return \"\"",                                       // 73
+      "        return next(iter(self.head.next.keys))",               // 74
+    ],
+    builder: buildSteps432,
   },
   141: {
     id: 141,
