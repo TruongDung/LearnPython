@@ -1326,7 +1326,347 @@ function buildArrayHistorySteps1472(raw, commands, shortUrl, displayUrl) {
   };
 }
 
+/**
+ * LeetCode 146: LRU Cache.
+ * Hash map gives O(1) key lookup; a doubly linked list stores recency order.
+ * Left side is least recently used, right side is most recently used.
+ */
+function buildSteps146(input, params) {
+  const capacity = Math.max(1, Number.isFinite(Number(params && params.capacity)) ? Number(params.capacity) : 2);
+  const raw = String(input || "").trim();
+  const steps = [];
+  const nodes = new Map(); // key -> { key, value }
+  const order = []; // keys from LRU to MRU
+  const outputs = [];
+
+  function parseCommands(text) {
+    return text
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const tokens = part.replace(/[(),]/g, " ").split(/\s+/).filter(Boolean);
+        const op = (tokens[0] || "").toLowerCase();
+        if (op === "put" && tokens.length >= 3) {
+          return { op, key: Number(tokens[1]), value: Number(tokens[2]), raw: part };
+        }
+        if (op === "get" && tokens.length >= 2) {
+          return { op, key: Number(tokens[1]), raw: part };
+        }
+        return { op: "invalid", raw: part };
+      });
+  }
+
+  function keyLabel(key) {
+    return `k${key}`;
+  }
+
+  function cacheLabel() {
+    return order.length
+      ? order.map((key) => `${key}:${nodes.get(key).value}`).join(" -> ")
+      : "empty";
+  }
+
+  function mapLabel() {
+    return order.length
+      ? order.map((key) => `${key}->node(${nodes.get(key).value})`).join(", ")
+      : "{}";
+  }
+
+  function snapshot(opts) {
+    const graphNodes = order.map((key) => ({
+      id: keyLabel(key),
+      label: `${key}:${nodes.get(key).value}`,
+      sub: key === order[0] ? "LRU" : key === order[order.length - 1] ? "MRU" : "",
+      row: opts.discardedKey === key ? "discarded" : undefined,
+    }));
+    const graphEdges = [];
+    for (let i = 0; i < order.length - 1; i++) {
+      graphEdges.push({ u: keyLabel(order[i]), v: keyLabel(order[i + 1]), w: "next", kind: "next" });
+      graphEdges.push({ u: keyLabel(order[i + 1]), v: keyLabel(order[i]), w: "prev", kind: "prev" });
+    }
+    const annotations = {};
+    if (order.length) {
+      annotations[keyLabel(order[0])] = "LRU";
+      annotations[keyLabel(order[order.length - 1])] =
+        annotations[keyLabel(order[order.length - 1])]
+          ? `${annotations[keyLabel(order[order.length - 1])]} MRU`
+          : "MRU";
+    }
+    if (opts.activeKey != null && nodes.has(opts.activeKey)) {
+      annotations[keyLabel(opts.activeKey)] = opts.activeLabel || "active";
+    }
+
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes: graphNodes,
+        edges: graphEdges,
+        layout: "linear",
+        order: order.map(keyLabel),
+        caption: `capacity=${capacity}; LRU -> MRU: ${cacheLabel()}`,
+        annotations,
+        hlNodes: opts.activeKey != null && nodes.has(opts.activeKey) ? [keyLabel(opts.activeKey)] : [],
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: opts.visitedKeys ? opts.visitedKeys.map(keyLabel) : [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "cache", value: cacheLabel() },
+        { name: "map", value: mapLabel() },
+        { name: "size/capacity", value: `${order.length}/${capacity}` },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  function moveToMru(key) {
+    const idx = order.indexOf(key);
+    if (idx >= 0) order.splice(idx, 1);
+    order.push(key);
+  }
+
+  const commands = parseCommands(raw);
+  if (!commands.length || commands.some((command) => command.op === "invalid" || !Number.isFinite(command.key) || (command.op === "put" && !Number.isFinite(command.value)))) {
+    steps.push({
+      title: { vi: "Input khong hop le", en: "Invalid input" },
+      arr: [],
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "expected", value: "put key value | get key | ..." }],
+      note: {
+        vi: "Nhap thao tac dang: put 1 1 | put 2 2 | get 1 | put 3 3.",
+        en: "Enter operations like: put 1 1 | put 2 2 | get 1 | put 3 3.",
+      },
+    });
+    return { original: raw, answer: [], steps };
+  }
+
+  snapshot({
+    title: { vi: `Khoi tao LRUCache(${capacity})`, en: `Initialize LRUCache(${capacity})` },
+    codeLines: [5, 6, 7, 8],
+    vars: [{ name: "outputs", value: "[]" }],
+    note: {
+      vi: "Dung hash map key->node de tim O(1), va doubly linked list de biet node nao LRU/MRU.",
+      en: "Use a hash map key->node for O(1) lookup, plus a doubly linked list for LRU/MRU order.",
+    },
+  });
+
+  for (const command of commands) {
+    if (command.op === "get") {
+      snapshot({
+        title: { vi: `get(${command.key})`, en: `get(${command.key})` },
+        activeKey: command.key,
+        activeLabel: nodes.has(command.key) ? "hit" : "miss",
+        codeLines: [11, 12],
+        vars: [{ name: "operation", value: command.raw }],
+        note: {
+          vi: `Kiem tra map co key ${command.key} hay khong.`,
+          en: `Check whether key ${command.key} exists in the map.`,
+        },
+      });
+
+      if (!nodes.has(command.key)) {
+        outputs.push(-1);
+        snapshot({
+          title: { vi: `key ${command.key} khong ton tai -> -1`, en: `key ${command.key} missing -> -1` },
+          codeLines: [12],
+          vars: [{ name: "output", value: -1 }],
+          note: {
+            vi: "Cache miss: khong thay key, tra ve -1 va khong doi thu tu recency.",
+            en: "Cache miss: return -1 and leave recency order unchanged.",
+          },
+        });
+        continue;
+      }
+
+      const value = nodes.get(command.key).value;
+      outputs.push(value);
+      moveToMru(command.key);
+      snapshot({
+        title: { vi: `hit ${command.key}:${value} -> dua len MRU`, en: `hit ${command.key}:${value} -> move to MRU` },
+        activeKey: command.key,
+        activeLabel: "MRU",
+        codeLines: [13, 14],
+        vars: [
+          { name: "output", value },
+          { name: "action", value: "move_to_front / move_to_mru" },
+        ],
+        note: {
+          vi: `Doc key ${command.key}, nen node nay vua duoc dung gan nhat va chuyen sang phia MRU.`,
+          en: `Reading key ${command.key} makes it most recently used, so move it to the MRU side.`,
+        },
+      });
+    } else if (command.op === "put") {
+      snapshot({
+        title: { vi: `put(${command.key}, ${command.value})`, en: `put(${command.key}, ${command.value})` },
+        activeKey: command.key,
+        activeLabel: nodes.has(command.key) ? "update" : "new",
+        codeLines: [17, 18],
+        vars: [{ name: "operation", value: command.raw }],
+        note: {
+          vi: `Neu key ${command.key} da co thi update value; neu chua co thi tao node moi.`,
+          en: `If key ${command.key} exists, update it; otherwise create a new node.`,
+        },
+      });
+
+      if (nodes.has(command.key)) {
+        nodes.get(command.key).value = command.value;
+        moveToMru(command.key);
+        snapshot({
+          title: { vi: `update key ${command.key} -> MRU`, en: `update key ${command.key} -> MRU` },
+          activeKey: command.key,
+          activeLabel: "MRU",
+          codeLines: [18, 19, 20],
+          vars: [{ name: "new value", value: command.value }],
+          note: {
+            vi: "Put tren key da ton tai cung tinh la vua su dung, nen dua node sang MRU.",
+            en: "Putting an existing key counts as recent use, so move that node to MRU.",
+          },
+        });
+        outputs.push(null);
+        continue;
+      }
+
+      nodes.set(command.key, { key: command.key, value: command.value });
+      order.push(command.key);
+      snapshot({
+        title: { vi: `them node ${command.key}:${command.value} vao MRU`, en: `add node ${command.key}:${command.value} as MRU` },
+        activeKey: command.key,
+        activeLabel: "new MRU",
+        codeLines: [22, 23, 24],
+        vars: [{ name: "insert", value: `${command.key}:${command.value}` }],
+        note: {
+          vi: "Node moi duoc noi vao phia MRU cua doubly linked list va map tro toi node do.",
+          en: "The new node is linked on the MRU side of the doubly linked list and mapped by key.",
+        },
+      });
+
+      if (order.length > capacity) {
+        const evictedKey = order.shift();
+        const evictedValue = nodes.get(evictedKey).value;
+        nodes.delete(evictedKey);
+        snapshot({
+          title: { vi: `qua capacity -> evict LRU ${evictedKey}:${evictedValue}`, en: `over capacity -> evict LRU ${evictedKey}:${evictedValue}` },
+          activeKey: command.key,
+          activeLabel: "MRU",
+          codeLines: [25, 26, 27],
+          vars: [
+            { name: "evicted", value: `${evictedKey}:${evictedValue}` },
+            { name: "reason", value: `${capacity + 1} > ${capacity}` },
+          ],
+          note: {
+            vi: `Cache vuot capacity, nen xoa node ben trai nhat (least recently used): key ${evictedKey}.`,
+            en: `Cache exceeds capacity, so remove the leftmost least-recently-used node: key ${evictedKey}.`,
+          },
+        });
+      }
+      outputs.push(null);
+    }
+  }
+
+  snapshot({
+    title: { vi: "Ket qua", en: "Result" },
+    codeLines: [28],
+    vars: [{ name: "outputs", value: `[${outputs.map((v) => v === null ? "null" : v).join(", ")}]` }],
+    note: {
+      vi: `Hoan tat ${commands.length} thao tac. Thu tu cuoi: ${cacheLabel()}.`,
+      en: `Finished ${commands.length} operation(s). Final order: ${cacheLabel()}.`,
+    },
+    final: true,
+  });
+
+  return { original: raw, answer: outputs, steps };
+}
+
 module.exports = {
+  146: {
+    id: 146,
+    difficulty: "medium",
+    slug: "lru-cache",
+    category: { key: "linked-list", vi: "Danh sÃ¡ch liÃªn káº¿t", en: "Linked List" },
+    title: { vi: "LRU Cache", en: "LRU Cache" },
+    titleVi: { vi: "Cache loai bo phan tu it dung gan day nhat", en: "Least Recently Used cache" },
+    statement: {
+      vi:
+        "Thiet ke LRUCache voi get(key) va put(key, value). get tra value neu key ton tai, nguoc lai -1. " +
+        "Moi get/put thanh cong lam key do tro thanh most recently used. Khi vuot capacity, xoa key least recently used.",
+      en:
+        "Design an LRUCache with get(key) and put(key, value). get returns the value if the key exists, otherwise -1. " +
+        "Every successful get/put makes that key most recently used. When capacity is exceeded, evict the least recently used key.",
+    },
+    defaultInput: "put 1 1 | put 2 2 | get 1 | put 3 3 | get 2 | put 4 4 | get 1 | get 3 | get 4",
+    inputKind: "string",
+    inputLabel: { vi: "Thao tac LRU, ngan cach bang |", en: "LRU operations separated by |" },
+    extraParams: [
+      { key: "capacity", label: { vi: "capacity", en: "capacity" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Hash map key->node giup get/put tim node O(1).", en: "A hash map key->node gives O(1) lookup for get/put." },
+      { vi: "Doubly linked list giu thu tu recency: trai la LRU, phai la MRU.", en: "A doubly linked list stores recency order: left is LRU, right is MRU." },
+      { vi: "get hit hoac put key cu: update/move node sang MRU. put key moi: append MRU, neu vuot capacity thi xoa LRU.", en: "get hit or put existing key moves the node to MRU. put new key appends MRU, then evicts LRU if over capacity." },
+    ],
+    complexity: {
+      time: "O(1) per operation",
+      space: "O(capacity)",
+      note: {
+        vi: "Map va doubly linked list luu toi da capacity node. Moi thao tac chi doi vai pointer va map entry.",
+        en: "The map and doubly linked list store at most capacity nodes. Each operation changes only a few pointers and map entries.",
+      },
+    },
+    code: [
+      "class Node:",
+      "    def __init__(self, key=0, value=0):",
+      "        self.key = key",
+      "        self.value = value",
+      "        self.prev = None",
+      "        self.next = None",
+      "",
+      "class LRUCache:",
+      "    def __init__(self, capacity: int):",
+      "        self.capacity = capacity",
+      "        self.cache = {}",
+      "        self.left = Node()   # LRU sentinel",
+      "        self.right = Node()  # MRU sentinel",
+      "        self.left.next = self.right",
+      "        self.right.prev = self.left",
+      "",
+      "    def remove(self, node):",
+      "        node.prev.next = node.next",
+      "        node.next.prev = node.prev",
+      "",
+      "    def insert(self, node):",
+      "        prev = self.right.prev",
+      "        prev.next = node",
+      "        node.prev = prev",
+      "        node.next = self.right",
+      "        self.right.prev = node",
+      "",
+      "    def get(self, key: int) -> int:",
+      "        if key not in self.cache:",
+      "            return -1",
+      "        node = self.cache[key]",
+      "        self.remove(node)",
+      "        self.insert(node)",
+      "        return node.value",
+      "",
+      "    def put(self, key: int, value: int) -> None:",
+      "        if key in self.cache:",
+      "            self.remove(self.cache[key])",
+      "        self.cache[key] = Node(key, value)",
+      "        self.insert(self.cache[key])",
+      "        if len(self.cache) > self.capacity:",
+      "            lru = self.left.next",
+      "            self.remove(lru)",
+      "            del self.cache[lru.key]",
+    ],
+    builder: buildSteps146,
+  },
   141: {
     id: 141,
     difficulty: "easy",
