@@ -2222,7 +2222,355 @@ function buildSteps303(nums, params) {
   return { steps, answer };
 }
 
+/**
+ * LeetCode 1797: Design Authentication Manager.
+ * Hash map tokenId -> expiry time (currentTime + ttl). generate always
+ * (re)writes the expiry. renew only refreshes it if the token is still
+ * unexpired at currentTime (map.get(tokenId, 0) > currentTime), otherwise
+ * it's a no-op. countUnexpiredTokens scans every known token and counts
+ * those whose expiry is strictly greater than currentTime.
+ *
+ * Input: pipe-separated commands, e.g.
+ *   "generate aaa 2 | countUnexpiredTokens 6 | generate bbb 7 | renew aaa 8 | renew bbb 10 | countUnexpiredTokens 15"
+ * Param ttl: timeToLive (default 5).
+ */
+function buildSteps1797(input, params) {
+  const ttl = params && params.ttl !== undefined ? Number(params.ttl) : 5;
+  const raw = String(input || "").trim();
+  const steps = [];
+
+  function parseCommands(text) {
+    return text
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const tokens = part.split(/\s+/).filter(Boolean);
+        const op = (tokens[0] || "").toLowerCase();
+        if ((op === "generate" || op === "renew") && tokens.length >= 3) {
+          return { op, tokenId: tokens[1], time: Number(tokens[2]), raw: part };
+        }
+        if (op === "countunexpiredtokens" && tokens.length >= 2) {
+          return { op, time: Number(tokens[1]), raw: part };
+        }
+        return { op: "invalid", raw: part };
+      });
+  }
+
+  const commands = parseCommands(raw);
+  if (!commands.length || commands.some((c) => c.op === "invalid")) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      final: true,
+      codeLines: [1],
+      vars: [{ name: "expected", value: "generate aaa 2 | countUnexpiredTokens 6 | ..." }],
+      note: {
+        vi: "Nhập thao tác dạng: generate tokenId time | renew tokenId time | countUnexpiredTokens time.",
+        en: "Enter operations like: generate tokenId time | renew tokenId time | countUnexpiredTokens time.",
+      },
+    });
+    return { original: raw, answer: [], steps };
+  }
+
+  const tokens = new Map(); // tokenId -> expiry
+  const order = []; // stable display order (insertion order)
+  const outputs = [];
+
+  function nodesFor(hlId, extraStatus) {
+    return order.map((id) => {
+      const exp = tokens.get(id);
+      return {
+        id,
+        label: id,
+        row: "main",
+        sub: id === hlId && extraStatus ? extraStatus : `exp=${exp}`,
+      };
+    });
+  }
+
+  function push({ title, hlId, activeIds = [], extraStatus, operation, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: {
+        nodes: nodesFor(hlId, extraStatus),
+        edges: [],
+        layout: "linear",
+        order: [...order],
+        caption: `${operation || ""} | ttl=${ttl} | tokens: ${order.map((id) => `${id}(${tokens.get(id)})`).join(", ") || "(none)"}`,
+        annotations: hlId ? { [hlId]: extraStatus || "checking" } : {},
+        hlNodes: hlId ? [hlId] : [],
+        hlEdges: [],
+        visitedNodes: activeIds,
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
+
+  push({
+    title: { vi: `Khởi tạo AuthenticationManager(timeToLive=${ttl})`, en: `Initialize AuthenticationManager(timeToLive=${ttl})` },
+    operation: "__init__",
+    codeLines: [3],
+    vars: [{ name: "ttl", value: ttl }, { name: "tokens", value: "{}" }],
+    note: {
+      vi: `Lưu timeToLive=${ttl}. tokens là hash map rỗng: tokenId → thời điểm hết hạn.`,
+      en: `Store timeToLive=${ttl}. tokens is an empty hash map: tokenId → expiry time.`,
+    },
+  });
+
+  for (const command of commands) {
+    if (command.op === "generate") {
+      const { tokenId, time } = command;
+      if (!order.includes(tokenId)) order.push(tokenId);
+
+      push({
+        title: { vi: `generate("${tokenId}", ${time})`, en: `generate("${tokenId}", ${time})` },
+        hlId: tokenId,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [5],
+        vars: [{ name: "tokenId", value: tokenId }, { name: "currentTime", value: time }],
+        note: { vi: `Tạo token mới "${tokenId}" tại thời điểm ${time}.`, en: `Create a new token "${tokenId}" at time ${time}.` },
+      });
+
+      const exp = time + ttl;
+      tokens.set(tokenId, exp);
+      push({
+        title: { vi: `tokens["${tokenId}"] = ${time} + ${ttl} = ${exp}`, en: `tokens["${tokenId}"] = ${time} + ${ttl} = ${exp}` },
+        hlId: tokenId,
+        extraStatus: `exp=${exp}`,
+        operation: `generate("${tokenId}", ${time})`,
+        codeLines: [6],
+        vars: [{ name: `tokens["${tokenId}"]`, value: exp }],
+        note: {
+          vi: `Token "${tokenId}" sẽ hết hạn tại thời điểm ${exp} (= ${time} + ${ttl}).`,
+          en: `Token "${tokenId}" will expire at time ${exp} (= ${time} + ${ttl}).`,
+        },
+      });
+      outputs.push(null);
+    } else if (command.op === "renew") {
+      const { tokenId, time } = command;
+      const known = order.includes(tokenId);
+      if (!known) order.push(tokenId);
+      const currentExp = tokens.has(tokenId) ? tokens.get(tokenId) : 0;
+
+      push({
+        title: { vi: `renew("${tokenId}", ${time})`, en: `renew("${tokenId}", ${time})` },
+        hlId: tokenId,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [7],
+        vars: [{ name: "tokenId", value: tokenId }, { name: "currentTime", value: time }],
+        note: { vi: `Gia hạn token "${tokenId}" tại thời điểm ${time} (chỉ khi chưa hết hạn).`, en: `Renew token "${tokenId}" at time ${time} (only if not yet expired).` },
+      });
+
+      const isExpiredOrMissing = currentExp <= time;
+      push({
+        title: { vi: `tokens.get("${tokenId}", 0) <= ${time}? ${isExpiredOrMissing} (${currentExp} vs ${time})`, en: `tokens.get("${tokenId}", 0) <= ${time}? ${isExpiredOrMissing} (${currentExp} vs ${time})` },
+        hlId: tokenId,
+        extraStatus: `exp=${currentExp || "none"}`,
+        operation: `renew("${tokenId}", ${time})`,
+        codeLines: [8],
+        vars: [{ name: `tokens.get("${tokenId}", 0)`, value: currentExp }, { name: "currentTime", value: time }],
+        note: {
+          vi: isExpiredOrMissing
+            ? (tokens.has(tokenId) ? `Token "${tokenId}" đã hết hạn (${currentExp} ≤ ${time}) → bỏ qua.` : `Token "${tokenId}" chưa từng tồn tại → bỏ qua.`)
+            : `Token "${tokenId}" vẫn còn hiệu lực (${currentExp} > ${time}) → gia hạn.`,
+          en: isExpiredOrMissing
+            ? (tokens.has(tokenId) ? `Token "${tokenId}" already expired (${currentExp} ≤ ${time}) → skip.` : `Token "${tokenId}" never existed → skip.`)
+            : `Token "${tokenId}" is still valid (${currentExp} > ${time}) → renew it.`,
+        },
+      });
+
+      if (isExpiredOrMissing) {
+        push({
+          title: { vi: "return (bỏ qua)", en: "return (skip)" },
+          hlId: tokenId,
+          operation: `renew("${tokenId}", ${time})`,
+          codeLines: [9],
+          vars: [],
+          note: { vi: `Không làm gì cả; "${tokenId}" giữ nguyên trạng thái cũ.`, en: `Nothing happens; "${tokenId}" keeps its old state.` },
+        });
+      } else {
+        const newExp = time + ttl;
+        tokens.set(tokenId, newExp);
+        push({
+          title: { vi: `tokens["${tokenId}"] = ${time} + ${ttl} = ${newExp}`, en: `tokens["${tokenId}"] = ${time} + ${ttl} = ${newExp}` },
+          hlId: tokenId,
+          extraStatus: `exp=${newExp}`,
+          operation: `renew("${tokenId}", ${time})`,
+          codeLines: [10],
+          vars: [{ name: `tokens["${tokenId}"]`, value: newExp }],
+          note: { vi: `Cập nhật hạn mới của "${tokenId}" thành ${newExp}.`, en: `Update "${tokenId}"'s new expiry to ${newExp}.` },
+        });
+      }
+      outputs.push(null);
+    } else if (command.op === "countunexpiredtokens") {
+      const { time } = command;
+      push({
+        title: { vi: `countUnexpiredTokens(${time})`, en: `countUnexpiredTokens(${time})` },
+        operation: `countUnexpiredTokens(${time})`,
+        codeLines: [11],
+        vars: [{ name: "currentTime", value: time }],
+        note: { vi: `Đếm số token còn hiệu lực tại thời điểm ${time}.`, en: `Count tokens still valid at time ${time}.` },
+      });
+
+      let count = 0;
+      push({
+        title: { vi: "count = 0", en: "count = 0" },
+        operation: `countUnexpiredTokens(${time})`,
+        codeLines: [12],
+        vars: [{ name: "count", value: count }],
+        note: { vi: "Bắt đầu đếm từ 0.", en: "Start counting from 0." },
+      });
+
+      const activeSoFar = [];
+      for (const id of order) {
+        const exp = tokens.get(id);
+        push({
+          title: { vi: `for exp in tokens.values(): "${id}" → exp=${exp}`, en: `for exp in tokens.values(): "${id}" → exp=${exp}` },
+          hlId: id,
+          activeIds: [...activeSoFar],
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [13],
+          vars: [{ name: "tokenId", value: id }, { name: "exp", value: exp }],
+          note: { vi: `Xét token "${id}", hết hạn tại ${exp}.`, en: `Check token "${id}", expiring at ${exp}.` },
+        });
+
+        const isActive = exp > time;
+        push({
+          title: { vi: `exp > ${time}? ${isActive}`, en: `exp > ${time}? ${isActive}` },
+          hlId: id,
+          activeIds: [...activeSoFar],
+          operation: `countUnexpiredTokens(${time})`,
+          codeLines: [14],
+          vars: [{ name: "exp", value: exp }, { name: "currentTime", value: time }],
+          note: {
+            vi: isActive ? `"${id}" còn hiệu lực (${exp} > ${time}) → tính vào count.` : `"${id}" đã hết hạn (${exp} ≤ ${time}) → không tính.`,
+            en: isActive ? `"${id}" is still valid (${exp} > ${time}) → count it.` : `"${id}" already expired (${exp} ≤ ${time}) → don't count.`,
+          },
+        });
+
+        if (isActive) {
+          count++;
+          activeSoFar.push(id);
+          push({
+            title: { vi: `count += 1 → ${count}`, en: `count += 1 → ${count}` },
+            hlId: id,
+            activeIds: [...activeSoFar],
+            operation: `countUnexpiredTokens(${time})`,
+            codeLines: [15],
+            vars: [{ name: "count", value: count }],
+            note: { vi: `"${id}" hợp lệ, tăng count lên ${count}.`, en: `"${id}" is valid, increment count to ${count}.` },
+          });
+        }
+      }
+
+      push({
+        title: { vi: `return count = ${count}`, en: `return count = ${count}` },
+        activeIds: [...activeSoFar],
+        operation: `countUnexpiredTokens(${time})`,
+        codeLines: [16],
+        vars: [{ name: "answer", value: count }],
+        note: { vi: `Có ${count} token còn hiệu lực tại thời điểm ${time}.`, en: `There are ${count} unexpired token(s) at time ${time}.` },
+      });
+      outputs.push(count);
+    }
+  }
+
+  const fs = {
+    title: { vi: "Kết quả", en: "Result" },
+    arr: [],
+    graph: {
+      nodes: nodesFor(null),
+      edges: [],
+      layout: "linear",
+      order: [...order],
+      caption: `tokens: ${order.map((id) => `${id}(${tokens.get(id)})`).join(", ") || "(none)"}`,
+      annotations: {},
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [],
+    mark: [],
+    codeLines: [],
+    vars: [{ name: "outputs", value: `[${outputs.map((v) => (v === null ? "null" : v)).join(", ")}]` }],
+    note: {
+      vi: `Hoàn tất ${commands.length} thao tác.`,
+      en: `Finished ${commands.length} operation(s).`,
+    },
+    final: true,
+  };
+  steps.push(fs);
+
+  return { original: raw, answer: outputs, steps };
+}
+
 module.exports = {
+  1797: {
+    id: 1797,
+    difficulty: "medium",
+    slug: "design-authentication-manager",
+    category: { key: "hashmap", vi: "Bảng băm (Hash Map)", en: "Hash Map" },
+    title: { vi: "Design Authentication Manager", en: "Design Authentication Manager" },
+    titleVi: { vi: "Thiết kế hệ thống quản lý xác thực", en: "Design an authentication token manager" },
+    statement: {
+      vi:
+        "Thiết kế AuthenticationManager(timeToLive): generate(tokenId, currentTime) tạo token mới hết hạn sau timeToLive giây. " +
+        "renew(tokenId, currentTime) gia hạn token nếu nó CHƯA hết hạn (nếu đã hết hạn hoặc không tồn tại thì bỏ qua). " +
+        "countUnexpiredTokens(currentTime) trả về số token còn hiệu lực tại thời điểm đó. " +
+        "Nếu token hết hạn đúng lúc t và có hành động khác cũng tại t, coi như hết hạn xảy ra TRƯỚC.",
+      en:
+        "Design AuthenticationManager(timeToLive): generate(tokenId, currentTime) creates a new token expiring timeToLive seconds later. " +
+        "renew(tokenId, currentTime) renews the token only if it is NOT yet expired (ignored if expired or nonexistent). " +
+        "countUnexpiredTokens(currentTime) returns how many tokens are still valid at that time. " +
+        "If a token expires exactly at time t and another action also happens at t, expiration is considered to happen FIRST.",
+    },
+    defaultInput: "generate aaa 2 | countUnexpiredTokens 6 | generate bbb 7 | renew aaa 8 | renew bbb 10 | countUnexpiredTokens 15",
+    inputKind: "string",
+    inputLabel: { vi: "Thao tác, ngăn cách bằng |", en: "Operations separated by |" },
+    extraParams: [
+      { key: "ttl", label: { vi: "timeToLive", en: "timeToLive" }, default: 5 },
+    ],
+    approach: [
+      { vi: "Hash map tokenId → thời điểm hết hạn (currentTime + ttl).", en: "Hash map tokenId → expiry time (currentTime + ttl)." },
+      { vi: "generate luôn ghi đè (tạo mới) thời điểm hết hạn.", en: "generate always overwrites (creates) the expiry time." },
+      { vi: "renew chỉ gia hạn nếu token còn hiệu lực (exp > currentTime); ngược lại bỏ qua.", en: "renew only refreshes if the token is still valid (exp > currentTime); otherwise it's a no-op." },
+      { vi: "countUnexpiredTokens quét toàn bộ map, đếm token có exp > currentTime.", en: "countUnexpiredTokens scans the whole map, counting tokens with exp > currentTime." },
+    ],
+    complexity: {
+      time: "O(1) generate/renew, O(n) countUnexpiredTokens",
+      space: "O(n)",
+      note: {
+        vi: "n = số tokenId đã từng generate. generate/renew là tra map O(1); countUnexpiredTokens phải quét hết map.",
+        en: "n = number of tokenIds ever generated. generate/renew are O(1) map lookups; countUnexpiredTokens must scan the whole map.",
+      },
+    },
+    code: [
+      "class AuthenticationManager:",
+      "    def __init__(self, timeToLive: int):",
+      "        self.ttl = timeToLive",
+      "        self.tokens = {}",
+      "    def generate(self, tokenId: str, currentTime: int) -> None:",
+      "        self.tokens[tokenId] = currentTime + self.ttl",
+      "    def renew(self, tokenId: str, currentTime: int) -> None:",
+      "        if self.tokens.get(tokenId, 0) <= currentTime:",
+      "            return",
+      "        self.tokens[tokenId] = currentTime + self.ttl",
+      "    def countUnexpiredTokens(self, currentTime: int) -> int:",
+      "        count = 0",
+      "        for exp in self.tokens.values():",
+      "            if exp > currentTime:",
+      "                count += 1",
+      "        return count",
+    ],
+    builder: buildSteps1797,
+  },
   3020: {
     id: 3020,
     difficulty: "medium",
