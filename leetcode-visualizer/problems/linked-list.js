@@ -1787,6 +1787,395 @@ function buildSteps146(input, params) {
   return { original: raw, answer: outputs, steps };
 }
 
+/**
+ * LeetCode 430: Flatten a Multilevel Doubly Linked List.
+ * Recursive DFS: dfs(node) walks node's own next-chain; whenever a node has
+ * a child, splice the child's flattened chain in between node and node.next,
+ * then continue. Returns the LAST node of the flattened chain starting at node.
+ *
+ * Input:
+ *  - main input: comma-separated values of the top-level list, e.g. "1,2,3,4,5,6"
+ *  - params.children: "afterVal:c1,c2,...;afterVal2:c1,c2,..." — each entry
+ *    attaches a new child chain under the node whose value is afterVal.
+ *    Order matters: a later entry can attach under a node created by an
+ *    earlier entry (e.g. "3:7,8,9,10;8:11,12" attaches 11-12 under node 8,
+ *    which itself was just created as part of node 3's child chain).
+ * Assumes all node values in the whole structure are unique (as in the
+ * standard LeetCode examples), so nodes can be looked up by value.
+ */
+function parseMultilevelList(mainInput, childSpec) {
+  let idCounter = 0;
+  const nodes = new Map(); // id -> { id, val }
+  const nextMap = new Map();
+  const prevMap = new Map();
+  const childMap = new Map();
+  const valueToId = new Map();
+
+  function makeChain(values) {
+    let firstId = null;
+    let lastId = null;
+    for (const v of values) {
+      const id = `n${idCounter++}`;
+      nodes.set(id, { id, val: v });
+      valueToId.set(v, id);
+      if (lastId !== null) {
+        nextMap.set(lastId, id);
+        prevMap.set(id, lastId);
+      }
+      if (firstId === null) firstId = id;
+      lastId = id;
+    }
+    return firstId;
+  }
+
+  const mainVals = String(mainInput || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map(Number)
+    .filter((v) => !Number.isNaN(v));
+  const headId = mainVals.length ? makeChain(mainVals) : null;
+
+  const specParts = String(childSpec || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const part of specParts) {
+    const [afterStr, childStr] = part.split(":");
+    if (afterStr === undefined || childStr === undefined) continue;
+    const afterVal = Number(afterStr.trim());
+    const childVals = childStr
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((v) => !Number.isNaN(v));
+    const parentId = valueToId.get(afterVal);
+    if (parentId === undefined || childVals.length === 0) continue;
+    const childHeadId = makeChain(childVals);
+    childMap.set(parentId, childHeadId);
+  }
+
+  return { nodes, nextMap, prevMap, childMap, headId };
+}
+
+function buildSteps430(input, params) {
+  const childSpec = params && params.children !== undefined ? params.children : "3:7,8,9,10;8:11,12";
+  const { nodes, nextMap, prevMap, childMap, headId } = parseMultilevelList(input, childSpec);
+  const steps = [];
+
+  const nodeLabel = (id) => (id === null || id === undefined ? "None" : String(nodes.get(id).val));
+
+  function currentEdges() {
+    const edges = [];
+    for (const [u, v] of nextMap) if (v) edges.push({ u, v, w: "next", kind: "next" });
+    for (const [u, v] of prevMap) if (v) edges.push({ u, v, w: "prev", kind: "prev" });
+    for (const [u, v] of childMap) if (v) edges.push({ u, v, w: "child" });
+    return edges;
+  }
+
+  function push({ title, hlNodes = [], annotations = {}, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: {
+        nodes: [...nodes.values()].map((n) => ({ id: n.id, label: String(n.val) })),
+        edges: currentEdges(),
+        hlNodes,
+        hlEdges: [],
+        visitedNodes: [],
+        annotations,
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
+
+  push({
+    title: { vi: "def flatten(self, head)", en: "def flatten(self, head)" },
+    codeLines: [9],
+    vars: [],
+    note: {
+      vi: "Mỗi node có next, prev, và child (trỏ tới một danh sách con riêng). Cần 'làm phẳng' toàn bộ thành 1 danh sách 2 chiều duy nhất.",
+      en: "Each node has next, prev, and child (pointing to its own separate list). We need to flatten everything into a single doubly linked list.",
+    },
+  });
+
+  push({
+    title: { vi: "Định nghĩa dfs(node)", en: "Define dfs(node)" },
+    codeLines: [10],
+    vars: [],
+    note: {
+      vi: "dfs(node) flatten toàn bộ chain bắt đầu từ node, trả về node CUỐI của chain đã flatten.",
+      en: "dfs(node) flattens the whole chain starting at node, returning the LAST node of the flattened chain.",
+    },
+  });
+
+  // Line 29: if not head
+  const isEmpty = headId === null;
+  push({
+    title: { vi: `head is None? ${isEmpty}`, en: `head is None? ${isEmpty}` },
+    hlNodes: isEmpty ? [] : [headId],
+    codeLines: [29],
+    vars: [{ name: "head", value: isEmpty ? "None" : nodeLabel(headId) }],
+    note: {
+      vi: isEmpty ? "Danh sách rỗng." : "head tồn tại, tiếp tục flatten.",
+      en: isEmpty ? "The list is empty." : "head exists, proceed to flatten.",
+    },
+  });
+  if (isEmpty) {
+    push({
+      title: { vi: "return head (None)", en: "return head (None)" },
+      codeLines: [30],
+      final: true,
+      vars: [{ name: "answer", value: "None" }],
+      note: { vi: "Không có node nào để flatten.", en: "There are no nodes to flatten." },
+    });
+    return { input, answer: "None", steps };
+  }
+
+  push({
+    title: { vi: "dfs(head)", en: "dfs(head)" },
+    hlNodes: [headId],
+    codeLines: [31],
+    vars: [{ name: "calling", value: nodeLabel(headId) }],
+    note: { vi: "Gọi DFS để flatten toàn bộ cấu trúc, bắt đầu từ head.", en: "Call DFS to flatten the entire structure, starting at head." },
+  });
+
+  function dfs(nodeId) {
+    let cur = nodeId;
+    push({
+      title: { vi: `dfs(${nodeLabel(nodeId)}): cur = node`, en: `dfs(${nodeLabel(nodeId)}): cur = node` },
+      hlNodes: [cur],
+      annotations: { [cur]: "cur" },
+      codeLines: [11],
+      vars: [{ name: "cur", value: nodeLabel(cur) }],
+      note: { vi: `cur bắt đầu tại ${nodeLabel(cur)}.`, en: `cur starts at ${nodeLabel(cur)}.` },
+    });
+
+    let last = nodeId;
+    push({
+      title: { vi: "last = node", en: "last = node" },
+      hlNodes: [cur],
+      annotations: { [cur]: "cur,last" },
+      codeLines: [12],
+      vars: [{ name: "last", value: nodeLabel(last) }],
+      note: { vi: "last tạm là node hiện tại, sẽ cập nhật khi duyệt tiếp.", en: "last is temporarily the current node, updated as we continue." },
+    });
+
+    while (cur) {
+      const baseAnn = () => {
+        const ann = { [cur]: "cur" };
+        if (last !== cur) ann[last] = "last";
+        else ann[cur] = "cur,last";
+        return ann;
+      };
+
+      push({
+        title: { vi: `while cur: True (cur=${nodeLabel(cur)})`, en: `while cur: True (cur=${nodeLabel(cur)})` },
+        hlNodes: [cur],
+        annotations: baseAnn(),
+        codeLines: [13],
+        vars: [{ name: "cur", value: nodeLabel(cur) }],
+        note: { vi: "cur khác None, tiếp tục vòng lặp.", en: "cur is not None, continue looping." },
+      });
+
+      const child = childMap.get(cur) || null;
+      push({
+        title: { vi: `child = cur.child = ${nodeLabel(child)}`, en: `child = cur.child = ${nodeLabel(child)}` },
+        hlNodes: child ? [cur, child] : [cur],
+        annotations: { ...baseAnn(), ...(child ? { [child]: "child" } : {}) },
+        codeLines: [14],
+        vars: [{ name: "child", value: nodeLabel(child) }],
+        note: { vi: `cur.child = ${nodeLabel(child)}.`, en: `cur.child = ${nodeLabel(child)}.` },
+      });
+
+      const nxt = nextMap.get(cur) || null;
+      push({
+        title: { vi: `nxt = cur.next = ${nodeLabel(nxt)}`, en: `nxt = cur.next = ${nodeLabel(nxt)}` },
+        hlNodes: nxt ? [cur, nxt] : [cur],
+        annotations: { ...baseAnn(), ...(child ? { [child]: "child" } : {}), ...(nxt ? { [nxt]: "nxt" } : {}) },
+        codeLines: [15],
+        vars: [{ name: "nxt", value: nodeLabel(nxt) }],
+        note: { vi: `Lưu cur.next = ${nodeLabel(nxt)} trước khi cur.next có thể bị đổi.`, en: `Save cur.next = ${nodeLabel(nxt)} before cur.next might be overwritten.` },
+      });
+
+      const hasChild = Boolean(child);
+      push({
+        title: { vi: `if child: ${hasChild}`, en: `if child: ${hasChild}` },
+        hlNodes: [cur],
+        annotations: { ...baseAnn(), ...(child ? { [child]: "child" } : {}), ...(nxt ? { [nxt]: "nxt" } : {}) },
+        codeLines: [16],
+        vars: [{ name: "child", value: nodeLabel(child) }],
+        note: {
+          vi: hasChild ? "cur có child → cần chèn chain con vào giữa cur và nxt." : "cur không có child → chỉ cần cập nhật last.",
+          en: hasChild ? "cur has a child → splice the child chain between cur and nxt." : "cur has no child → just update last.",
+        },
+      });
+
+      if (hasChild) {
+        nextMap.set(cur, child);
+        push({
+          title: { vi: `cur.next = child → ${nodeLabel(cur)}.next = ${nodeLabel(child)}`, en: `cur.next = child → ${nodeLabel(cur)}.next = ${nodeLabel(child)}` },
+          hlNodes: [cur, child],
+          annotations: { [cur]: "cur", [child]: "child" },
+          codeLines: [17],
+          vars: [{ name: `${nodeLabel(cur)}.next`, value: nodeLabel(child) }],
+          note: { vi: `Nối ${nodeLabel(cur)} → ${nodeLabel(child)}.`, en: `Link ${nodeLabel(cur)} → ${nodeLabel(child)}.` },
+        });
+
+        prevMap.set(child, cur);
+        push({
+          title: { vi: `child.prev = cur → ${nodeLabel(child)}.prev = ${nodeLabel(cur)}`, en: `child.prev = cur → ${nodeLabel(child)}.prev = ${nodeLabel(cur)}` },
+          hlNodes: [cur, child],
+          annotations: { [cur]: "cur", [child]: "child" },
+          codeLines: [18],
+          vars: [{ name: `${nodeLabel(child)}.prev`, value: nodeLabel(cur) }],
+          note: { vi: `Nối ngược ${nodeLabel(child)} → ${nodeLabel(cur)}; cặp 2 chiều hoàn tất.`, en: `Link back ${nodeLabel(child)} → ${nodeLabel(cur)}; the bidirectional pair is complete.` },
+        });
+
+        push({
+          title: { vi: `tail = dfs(${nodeLabel(child)}) — gọi đệ quy`, en: `tail = dfs(${nodeLabel(child)}) — recursive call` },
+          hlNodes: [child],
+          annotations: { [cur]: "cur", [child]: "child" },
+          codeLines: [19],
+          vars: [{ name: "calling", value: nodeLabel(child) }],
+          note: { vi: `Tạm dừng dfs(${nodeLabel(cur)}), đệ quy vào dfs(${nodeLabel(child)}) để flatten chain con.`, en: `Pause dfs(${nodeLabel(cur)}), recurse into dfs(${nodeLabel(child)}) to flatten the child chain.` },
+        });
+        const tail = dfs(child);
+        push({
+          title: { vi: `dfs(${nodeLabel(child)}) trả về tail = ${nodeLabel(tail)}`, en: `dfs(${nodeLabel(child)}) returned tail = ${nodeLabel(tail)}` },
+          hlNodes: [cur, tail],
+          annotations: { [cur]: "cur", [tail]: "tail" },
+          codeLines: [19],
+          vars: [{ name: "tail", value: nodeLabel(tail) }],
+          note: { vi: `Chain con đã được flatten hoàn toàn, node cuối là ${nodeLabel(tail)}.`, en: `The child chain is fully flattened; its last node is ${nodeLabel(tail)}.` },
+        });
+
+        childMap.set(cur, null);
+        push({
+          title: { vi: "cur.child = None", en: "cur.child = None" },
+          hlNodes: [cur],
+          annotations: { [cur]: "cur", [tail]: "tail" },
+          codeLines: [20],
+          vars: [{ name: `${nodeLabel(cur)}.child`, value: "None" }],
+          note: { vi: "Xóa pointer child vì đã chuyển thành next/prev.", en: "Clear the child pointer since it has become a next/prev link." },
+        });
+
+        nextMap.set(tail, nxt);
+        push({
+          title: { vi: `tail.next = nxt → ${nodeLabel(tail)}.next = ${nodeLabel(nxt)}`, en: `tail.next = nxt → ${nodeLabel(tail)}.next = ${nodeLabel(nxt)}` },
+          hlNodes: nxt ? [tail, nxt] : [tail],
+          annotations: { [tail]: "tail", ...(nxt ? { [nxt]: "nxt" } : {}) },
+          codeLines: [21],
+          vars: [{ name: `${nodeLabel(tail)}.next`, value: nodeLabel(nxt) }],
+          note: { vi: `Nối cuối chain con (${nodeLabel(tail)}) tới phần còn lại (${nodeLabel(nxt)}).`, en: `Link the child chain's tail (${nodeLabel(tail)}) to the rest (${nodeLabel(nxt)}).` },
+        });
+
+        push({
+          title: { vi: `if nxt: ${Boolean(nxt)}`, en: `if nxt: ${Boolean(nxt)}` },
+          hlNodes: nxt ? [nxt] : [],
+          annotations: { [tail]: "tail", ...(nxt ? { [nxt]: "nxt" } : {}) },
+          codeLines: [22],
+          vars: [{ name: "nxt", value: nodeLabel(nxt) }],
+          note: {
+            vi: nxt ? "nxt tồn tại → cần nối prev ngược lại." : "nxt là None → tail chính là cuối danh sách, không cần nối thêm.",
+            en: nxt ? "nxt exists → link its prev back." : "nxt is None → tail is the end of the list, nothing more to link.",
+          },
+        });
+        if (nxt) {
+          prevMap.set(nxt, tail);
+          push({
+            title: { vi: `nxt.prev = tail → ${nodeLabel(nxt)}.prev = ${nodeLabel(tail)}`, en: `nxt.prev = tail → ${nodeLabel(nxt)}.prev = ${nodeLabel(tail)}` },
+            hlNodes: [tail, nxt],
+            annotations: { [tail]: "tail", [nxt]: "nxt" },
+            codeLines: [23],
+            vars: [{ name: `${nodeLabel(nxt)}.prev`, value: nodeLabel(tail) }],
+            note: { vi: `Nối ngược ${nodeLabel(nxt)} → ${nodeLabel(tail)}; cặp 2 chiều hoàn tất.`, en: `Link back ${nodeLabel(nxt)} → ${nodeLabel(tail)}; the bidirectional pair is complete.` },
+          });
+        }
+
+        last = tail;
+        push({
+          title: { vi: `last = tail = ${nodeLabel(tail)}`, en: `last = tail = ${nodeLabel(tail)}` },
+          hlNodes: [tail],
+          annotations: { [tail]: "last" },
+          codeLines: [24],
+          vars: [{ name: "last", value: nodeLabel(last) }],
+          note: { vi: "last theo dõi node cuối của chain đã flatten tính đến hiện tại.", en: "last tracks the final node of the flattened chain so far." },
+        });
+      } else {
+        last = cur;
+        push({
+          title: { vi: `last = cur = ${nodeLabel(cur)}`, en: `last = cur = ${nodeLabel(cur)}` },
+          hlNodes: [cur],
+          annotations: { [cur]: "cur,last" },
+          codeLines: [26],
+          vars: [{ name: "last", value: nodeLabel(last) }],
+          note: { vi: "Không có child, cur chính là last hiện tại.", en: "No child, so cur is the current last." },
+        });
+      }
+
+      cur = nxt;
+      push({
+        title: { vi: `cur = nxt = ${nodeLabel(cur)}`, en: `cur = nxt = ${nodeLabel(cur)}` },
+        hlNodes: cur ? [cur] : [],
+        annotations: cur ? { [cur]: "cur" } : {},
+        codeLines: [27],
+        vars: [{ name: "cur", value: nodeLabel(cur) }],
+        note: { vi: "Tiến tới node tiếp theo trong chain (đã có thể là phần đầu chain con).", en: "Move to the next node in the chain (may now be the start of the child chain)." },
+      });
+    }
+
+    push({
+      title: { vi: "while cur: False", en: "while cur: False" },
+      hlNodes: [],
+      codeLines: [13],
+      vars: [{ name: "cur", value: "None" }],
+      note: { vi: "cur là None → kết thúc chain hiện tại.", en: "cur is None → this chain is finished." },
+    });
+
+    push({
+      title: { vi: `return last = ${nodeLabel(last)}`, en: `return last = ${nodeLabel(last)}` },
+      hlNodes: [last],
+      annotations: { [last]: "last" },
+      codeLines: [28],
+      vars: [{ name: "returns", value: nodeLabel(last) }],
+      note: { vi: `dfs(${nodeLabel(nodeId)}) hoàn tất, trả về node cuối ${nodeLabel(last)}.`, en: `dfs(${nodeLabel(nodeId)}) finishes, returning the last node ${nodeLabel(last)}.` },
+    });
+    return last;
+  }
+
+  dfs(headId);
+
+  // Walk the final next-chain from head to build the flattened answer.
+  const order = [];
+  const seenIds = new Set();
+  let walk = headId;
+  while (walk && !seenIds.has(walk)) {
+    order.push(walk);
+    seenIds.add(walk);
+    walk = nextMap.get(walk) || null;
+  }
+  const answerStr = order.map((id) => nodeLabel(id)).join(", ");
+
+  push({
+    title: { vi: `return head → [${answerStr}]`, en: `return head → [${answerStr}]` },
+    hlNodes: [headId],
+    codeLines: [32],
+    final: true,
+    vars: [{ name: "answer", value: answerStr }],
+    note: {
+      vi: `Toàn bộ cấu trúc đã được flatten thành 1 doubly linked list: ${answerStr}.`,
+      en: `The entire structure is flattened into a single doubly linked list: ${answerStr}.`,
+    },
+  });
+
+  return { input, answer: answerStr, steps };
+}
+
 module.exports = {
   146: {
     id: 146,
@@ -1869,6 +2258,81 @@ module.exports = {
       "            del self.cache[lru.key]",
     ],
     builder: buildSteps146,
+  },
+  430: {
+    id: 430,
+    difficulty: "medium",
+    slug: "flatten-a-multilevel-doubly-linked-list",
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
+    title: { vi: "Flatten a Multilevel Doubly Linked List", en: "Flatten a Multilevel Doubly Linked List" },
+    titleVi: { vi: "Làm phẳng danh sách liên kết đôi đa cấp", en: "Flatten a multilevel doubly linked list" },
+    statement: {
+      vi:
+        "Cho một doubly linked list mà mỗi node ngoài next/prev còn có thể có con trỏ child, trỏ tới một danh sách con riêng (cũng có thể có child lồng nhau). " +
+        "Hãy làm phẳng (flatten) toàn bộ cấu trúc thành 1 doubly linked list duy nhất, theo đúng thứ tự DFS (chain con được chèn ngay sau node cha).",
+      en:
+        "Given a doubly linked list where each node may also have a child pointer to a separate list (which may itself contain nested children), " +
+        "flatten the entire structure into a single doubly linked list, in DFS order (each child chain is spliced right after its parent node).",
+    },
+    defaultInput: "1,2,3,4,5,6",
+    inputKind: "string",
+    inputLabel: { vi: "Danh sách cấp gốc (values, ngăn bởi ,)", en: "Top-level list (values, comma separated)" },
+    extraParams: [
+      {
+        key: "children",
+        type: "string",
+        label: { vi: "child chains: sauGiaTri:c1,c2;...", en: "child chains: afterValue:c1,c2;..." },
+        default: "3:7,8,9,10;8:11,12",
+      },
+    ],
+    approach: [
+      { vi: "DFS đệ quy: dfs(node) duyệt chain next của node, trả về node CUỐI của chain đã flatten.", en: "Recursive DFS: dfs(node) walks node's next-chain, returning the LAST node of the flattened chain." },
+      { vi: "Gặp node có child: nối cur → child, đệ quy dfs(child) để flatten chain con, rồi nối tail của chain con → nxt (phần còn lại sau cur).", en: "When a node has a child: link cur → child, recurse dfs(child) to flatten the child chain, then link the child chain's tail → nxt (the rest after cur)." },
+      { vi: "Xóa pointer child sau khi đã chuyển thành next/prev, để không còn cấu trúc đa cấp.", en: "Clear the child pointer once it's converted into next/prev links, removing the multilevel structure." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(d)",
+      note: {
+        vi: "Mỗi node được xử lý đúng 1 lần → O(n). Độ sâu đệ quy bằng độ sâu lồng child → O(d).",
+        en: "Each node is processed exactly once → O(n). Recursion depth equals the child-nesting depth → O(d).",
+      },
+    },
+    code: [
+      "class Node:",
+      "    def __init__(self, val, prev=None, next=None, child=None):",
+      "        self.val = val",
+      "        self.prev = prev",
+      "        self.next = next",
+      "        self.child = child",
+      "",
+      "class Solution:",
+      "    def flatten(self, head: 'Node') -> 'Node':",
+      "        def dfs(node):",
+      "            cur = node",
+      "            last = node",
+      "            while cur:",
+      "                child = cur.child",
+      "                nxt = cur.next",
+      "                if child:",
+      "                    cur.next = child",
+      "                    child.prev = cur",
+      "                    tail = dfs(child)",
+      "                    cur.child = None",
+      "                    tail.next = nxt",
+      "                    if nxt:",
+      "                        nxt.prev = tail",
+      "                    last = tail",
+      "                else:",
+      "                    last = cur",
+      "                cur = nxt",
+      "            return last",
+      "        if not head:",
+      "            return head",
+      "        dfs(head)",
+      "        return head",
+    ],
+    builder: buildSteps430,
   },
   141: {
     id: 141,
