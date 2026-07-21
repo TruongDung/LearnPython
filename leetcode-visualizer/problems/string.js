@@ -4588,6 +4588,7 @@ function buildSteps3499Sliding(input) {
       mark: [],
       final: true,
       codeLines: [3],
+      codeBlock: 2,
       vars: [{ name: "answer", value: 0 }],
       note: { vi: "Chuỗi rỗng → 0 khu vực hoạt động.", en: "Empty string → 0 active sections." },
     });
@@ -4605,6 +4606,7 @@ function buildSteps3499Sliding(input) {
     highlight: [],
     mark: [],
     codeLines: [3],
+    codeBlock: 2,
     vars: [{ name: "s", value: `"${s}"` }, { name: "n", value: n }],
     note: {
       vi: `s = "${s}". n = ${n}. Bước 1: nén chuỗi thành các đoạn (runs).`,
@@ -4621,6 +4623,7 @@ function buildSteps3499Sliding(input) {
     highlight: [],
     mark: [],
     codeLines: [4],
+    codeBlock: 2,
     vars: [{ name: "runs", value: "[]" }],
     note: {
       vi: "runs sẽ lưu danh sách (ký tự, độ dài) của từng đoạn liên tiếp.",
@@ -4637,6 +4640,7 @@ function buildSteps3499Sliding(input) {
     highlight: [0],
     mark: [],
     codeLines: [5],
+    codeBlock: 2,
     vars: [{ name: "i", value: i }],
     note: { vi: "i là con trỏ bắt đầu đoạn hiện tại.", en: "i is the start pointer of the current run." },
   });
@@ -4650,6 +4654,7 @@ function buildSteps3499Sliding(input) {
       highlight: [i],
       mark: [],
       codeLines: [6],
+      codeBlock: 2,
       vars: [{ name: "i", value: i }],
       note: { vi: "Còn ký tự để nén.", en: "Characters remain to compress." },
     });
@@ -4663,6 +4668,7 @@ function buildSteps3499Sliding(input) {
       highlight: [i],
       mark: [],
       codeLines: [7],
+      codeBlock: 2,
       vars: [{ name: "j", value: j }],
       note: { vi: "j quét về phía trước để tìm cuối đoạn.", en: "j scans forward to find the end of the run." },
     });
@@ -4676,6 +4682,7 @@ function buildSteps3499Sliding(input) {
         highlight: Array.from({ length: j - i + 1 }, (_, k) => i + k),
         mark: [],
         codeLines: [8],
+        codeBlock: 2,
         vars: [{ name: "j", value: j }],
         note: { vi: "Ký tự giống → cùng đoạn, mở rộng j.", en: "Same character → same run, extend j." },
       });
@@ -4687,6 +4694,7 @@ function buildSteps3499Sliding(input) {
         highlight: Array.from({ length: j - i }, (_, k) => i + k),
         mark: [],
         codeLines: [9],
+        codeBlock: 2,
         vars: [{ name: "j", value: j }],
         note: { vi: `j = ${j}.`, en: `j = ${j}.` },
       });
@@ -4701,6 +4709,7 @@ function buildSteps3499Sliding(input) {
       highlight: Array.from({ length: j - i }, (_, k) => i + k),
       mark: [],
       codeLines: [8],
+      codeBlock: 2,
       vars: [{ name: "j", value: j }],
       note: { vi: "Đoạn kết thúc tại đây.", en: "The run ends here." },
     });
@@ -4715,6 +4724,7 @@ function buildSteps3499Sliding(input) {
       highlight: Array.from({ length: runLen }, (_, k) => i + k),
       mark: [],
       codeLines: [10],
+      codeBlock: 2,
       vars: [{ name: "run", value: `('${s[i]}', ${runLen})` }, { name: "runs", value: `[${runs.map((r) => `('${r.ch}',${r.len})`).join(", ")}]` }],
       note: {
         vi: `Đoạn [${i}..${j - 1}] = "${s.slice(i, j)}" → runs += ('${s[i]}', ${runLen}).`,
@@ -4731,6 +4741,7 @@ function buildSteps3499Sliding(input) {
       highlight: i < n ? [i] : [],
       mark: [],
       codeLines: [11],
+      codeBlock: 2,
       vars: [{ name: "i", value: i }],
       note: { vi: `Chuyển sang đoạn kế tiếp: i = ${i}.`, en: `Move to next run: i = ${i}.` },
     });
@@ -4743,6 +4754,7 @@ function buildSteps3499Sliding(input) {
     highlight: [],
     mark: [],
     codeLines: [6],
+    codeBlock: 2,
     vars: [{ name: "i", value: i }],
     note: { vi: "Đã nén hết chuỗi thành runs.", en: "The whole string has been compressed into runs." },
   });
@@ -4766,6 +4778,7 @@ function buildSteps3499Sliding(input) {
     highlight: onesHighlight,
     mark: [],
     codeLines: [13],
+    codeBlock: 2,
     vars: [
       { name: "runs", value: `[${runs.map((r) => `('${r.ch}',${r.len})`).join(", ")}]` },
       { name: "ans", value: ans },
@@ -4785,6 +4798,7 @@ function buildSteps3499Sliding(input) {
     highlight: [],
     mark: [],
     codeLines: [15],
+    codeBlock: 2,
     vars: [{ name: "mx", value: mx }],
     note: { vi: "mx = gain tốt nhất từ sliding window kích thước 3 trên runs.", en: "mx = best gain from the size-3 sliding window over runs." },
   });
@@ -4800,6 +4814,7 @@ function buildSteps3499Sliding(input) {
       highlight: windowHighlight,
       mark: [],
       codeLines: [16],
+      codeBlock: 2,
       vars: [
         { name: "k", value: k },
         { name: "window", value: `[('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len})]` },
@@ -4818,6 +4833,7 @@ function buildSteps3499Sliding(input) {
       highlight: windowHighlight,
       mark: [],
       codeLines: [17],
+      codeBlock: 2,
       vars: [{ name: `runs[${k}][0]`, value: runs[k].ch }, { name: "is '1'?", value: middleIsOne }],
       note: middleIsOne
         ? { vi: "Đoạn giữa là '1' → 2 đoạn '0' hai bên là ứng viên merge.", en: "Middle run is '1' → the two '0' neighbors are merge candidates." }
@@ -4836,6 +4852,7 @@ function buildSteps3499Sliding(input) {
         highlight: windowHighlight,
         mark: updated ? [runRangeAll(k - 1), runRangeAll(k + 1)].flat() : [],
         codeLines: [18],
+        codeBlock: 2,
         vars: [
           { name: "mx (before)", value: oldMx },
           { name: "runs[k-1][1] + runs[k+1][1]", value: candidate },
@@ -4859,6 +4876,7 @@ function buildSteps3499Sliding(input) {
     mark: [],
     final: true,
     codeLines: [20],
+    codeBlock: 2,
     vars: [
       { name: "ans", value: ans },
       { name: "mx", value: mx },
