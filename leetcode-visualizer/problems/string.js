@@ -2746,7 +2746,13 @@ function buildSteps1963(input, params) {
  * LeetCode 394: Decode String.
  * Save the prefix and repeat count for each nested group on a stack.
  */
-function buildSteps394(input) {
+function buildSteps394(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps394CharStack(input);
+  return buildSteps394Main(input);
+}
+
+function buildSteps394Main(input) {
   const s = String(input).trim();
   const chars = s.split("");
   const stack = [];
@@ -2979,6 +2985,206 @@ function buildSteps394(input) {
   });
 
   return { s, answer: current, steps };
+}
+
+/**
+ * LeetCode 394, approach 2: single character stack.
+ * Push every character (digit, '[', or letter) onto the stack one at a
+ * time. At ']': pop characters until '[' is found to collect the nested
+ * substring, discard the '[', pop any digit characters below it to build
+ * the repeat count, then push the expanded (repeated) substring back onto
+ * the stack as one combined item. At the end, join every stack item.
+ */
+function buildSteps394CharStack(input) {
+  const s = String(input).trim();
+  const chars = s.split("");
+  const stack = []; // each entry: a string (may be multi-char once expanded)
+  const steps = [];
+
+  function frameItems() {
+    // Show newest on top, like the reference image (top of stack = last pushed).
+    return stack.map((item) => ({ value: item }));
+  }
+
+  function stackLabel() {
+    return stack.length ? `[${stack.map((v) => `"${v}"`).join(", ")}]` : "[]";
+  }
+
+  function pushStep({ title, codeLines, current, status, vars, note, final = false }) {
+    steps.push({
+      title,
+      codeBlock: 2,
+      codeLines,
+      stackView: {
+        title: "Stack",
+        emptyLabel: "empty stack",
+        items: frameItems(),
+        input: chars,
+        current: Number.isInteger(current) ? current : -1,
+        inputLabel: "Encoded string",
+        status: status || [],
+      },
+      vars: [{ name: "stack", value: stackLabel() }, ...(vars || [])],
+      note,
+      final,
+    });
+  }
+
+  pushStep({
+    title: { vi: "stack = []", en: "stack = []" },
+    codeLines: [3],
+    vars: [{ name: "s", value: `"${s}"` }],
+    note: {
+      vi: "Mỗi ký tự (chữ số, '[', chữ cái) sẽ được đẩy lên stack lần lượt, không xử lý gì thêm cho đến khi gặp ']'.",
+      en: "Every character (digit, '[', or letter) is pushed onto the stack one at a time, with no extra processing until ']' is seen.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    pushStep({
+      title: { vi: `for ch in s: ch = '${ch}'`, en: `for ch in s: ch = '${ch}'` },
+      codeLines: [4],
+      current: i,
+      status: [{ label: "ch", value: `'${ch}'` }],
+      vars: [{ name: "i", value: i }, { name: "ch", value: `'${ch}'` }],
+      note: { vi: `Xét ký tự s[${i}] = '${ch}'.`, en: `Process character s[${i}] = '${ch}'.` },
+    });
+
+    const isClosing = ch === "]";
+    pushStep({
+      title: { vi: `ch != ']'? ${!isClosing}`, en: `ch != ']'? ${!isClosing}` },
+      codeLines: [5],
+      current: i,
+      status: [{ label: "ch", value: `'${ch}'` }, { label: "is ']'?", value: isClosing }],
+      vars: [{ name: "ch != ']'?", value: !isClosing }],
+      note: isClosing
+        ? { vi: "Gặp ']' → cần giải nén nhóm hiện tại, không push trực tiếp.", en: "Found ']' → need to expand the current group instead of pushing directly." }
+        : { vi: "Không phải ']' (chữ số, '[' hoặc chữ cái) → push thẳng vào stack.", en: "Not ']' (digit, '[', or letter) → push it straight onto the stack." },
+    });
+
+    if (!isClosing) {
+      stack.push(ch);
+      pushStep({
+        title: { vi: `Push '${ch}' to stack`, en: `Push '${ch}' to stack` },
+        codeLines: [6],
+        current: i,
+        status: [{ label: "pushed", value: `'${ch}'` }],
+        vars: [{ name: "action", value: `stack.append('${ch}')` }],
+        note: { vi: `Đẩy '${ch}' lên đỉnh stack.`, en: `Push '${ch}' onto the top of the stack.` },
+      });
+      continue;
+    }
+
+    // ch === ']': collect the nested substring by popping until '['.
+    pushStep({
+      title: { vi: "substr = \"\"", en: "substr = \"\"" },
+      codeLines: [8],
+      current: i,
+      vars: [{ name: "substr", value: '""' }],
+      note: { vi: "Chuẩn bị ghép lại chuỗi con nằm trong nhóm [...] vừa đóng.", en: "Prepare to reassemble the nested substring inside the group that just closed." },
+    });
+
+    let substr = "";
+    while (stack.length && stack[stack.length - 1] !== "[") {
+      const top = stack[stack.length - 1];
+      pushStep({
+        title: { vi: `stack[-1] = '${top}' != '['? true`, en: `stack[-1] = '${top}' != '['? true` },
+        codeLines: [9],
+        current: i,
+        status: [{ label: "top", value: `'${top}'` }],
+        note: { vi: `Đỉnh stack '${top}' chưa phải '[' → tiếp tục pop để ghép substr.`, en: `The top of the stack '${top}' isn't '[' yet → keep popping to build substr.` },
+      });
+      stack.pop();
+      substr = top + substr;
+      pushStep({
+        title: { vi: `substr = '${top}' + substr = "${substr}"`, en: `substr = '${top}' + substr = "${substr}"` },
+        codeLines: [10],
+        current: i,
+        status: [{ label: "popped", value: `'${top}'` }, { label: "substr", value: `"${substr}"` }],
+        vars: [{ name: "substr", value: `"${substr}"` }],
+        note: { vi: `Pop '${top}' ra khỏi stack, ghép vào phía trước substr.`, en: `Pop '${top}' off the stack and prepend it to substr.` },
+      });
+    }
+    pushStep({
+      title: { vi: `stack[-1] = '[' → dừng vòng lặp`, en: `stack[-1] = '[' → stop the loop` },
+      codeLines: [9],
+      current: i,
+      status: [{ label: "substr collected", value: `"${substr}"` }],
+      note: { vi: `Đã gặp '[' ở đỉnh stack → đã lấy đủ chuỗi con "${substr}".`, en: `Found '[' at the top of the stack → the nested substring "${substr}" is fully collected.` },
+    });
+
+    stack.pop(); // remove '['
+    pushStep({
+      title: { vi: "stack.pop() — bỏ '['", en: "stack.pop() — discard '['" },
+      codeLines: [11],
+      current: i,
+      vars: [{ name: "action", value: "stack.pop()  # remove '['" }],
+      note: { vi: "Loại bỏ dấu '[' vì đã dùng nó để xác định biên chuỗi con.", en: "Discard the '[' marker since it has served its purpose of bounding the substring." },
+    });
+
+    pushStep({
+      title: { vi: "k = \"\"", en: "k = \"\"" },
+      codeLines: [12],
+      current: i,
+      vars: [{ name: "k", value: '""' }],
+      note: { vi: "Chuẩn bị ghép lại số lần lặp (có thể nhiều chữ số).", en: "Prepare to reassemble the repeat count (which may span multiple digits)." },
+    });
+
+    let k = "";
+    while (stack.length && /\d/.test(stack[stack.length - 1])) {
+      const digit = stack[stack.length - 1];
+      pushStep({
+        title: { vi: `stack[-1] = '${digit}' isdigit()? true`, en: `stack[-1] = '${digit}' isdigit()? true` },
+        codeLines: [13],
+        current: i,
+        status: [{ label: "top", value: `'${digit}'` }],
+        note: { vi: `Đỉnh stack '${digit}' là chữ số → tiếp tục pop để ghép k.`, en: `The top of the stack '${digit}' is a digit → keep popping to build k.` },
+      });
+      stack.pop();
+      k = digit + k;
+      pushStep({
+        title: { vi: `k = '${digit}' + k = "${k}"`, en: `k = '${digit}' + k = "${k}"` },
+        codeLines: [14],
+        current: i,
+        status: [{ label: "popped", value: `'${digit}'` }, { label: "k", value: `"${k}"` }],
+        vars: [{ name: "k", value: `"${k}"` }],
+        note: { vi: `Pop '${digit}' ra khỏi stack, ghép vào phía trước k.`, en: `Pop '${digit}' off the stack and prepend it to k.` },
+      });
+    }
+    pushStep({
+      title: { vi: `stack rỗng hoặc stack[-1] không phải chữ số → dừng`, en: `stack empty or stack[-1] isn't a digit → stop` },
+      codeLines: [13],
+      current: i,
+      status: [{ label: "k collected", value: k || "(none)" }],
+      note: { vi: `Đã lấy đủ số lần lặp k = "${k || 0}".`, en: `The repeat count k = "${k || 0}" is fully collected.` },
+    });
+
+    const repeat = Number(k || 0);
+    const expanded = substr.repeat(repeat);
+    stack.push(expanded);
+    pushStep({
+      title: { vi: `stack.append(int(k) * substr) → push "${expanded}"`, en: `stack.append(int(k) * substr) → push "${expanded}"` },
+      codeLines: [15],
+      current: i,
+      status: [{ label: "k", value: repeat }, { label: "substr", value: `"${substr}"` }, { label: "expanded", value: `"${expanded}"` }],
+      vars: [{ name: "int(k) * substr", value: `${repeat} * "${substr}" = "${expanded}"` }],
+      note: { vi: `Nhân substr "${substr}" lên ${repeat} lần thành "${expanded}", đẩy lại vào stack như 1 phần tử duy nhất.`, en: `Repeat substr "${substr}" ${repeat} time(s) into "${expanded}", pushing it back as a single stack item.` },
+    });
+  }
+
+  const answer = stack.join("");
+  pushStep({
+    title: { vi: `return "".join(stack) = "${answer}"`, en: `return "".join(stack) = "${answer}"` },
+    codeLines: [16],
+    current: chars.length,
+    status: [{ label: "answer", value: `"${answer}"` }],
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: { vi: `Ghép toàn bộ phần tử còn lại trong stack thành chuỗi kết quả "${answer}".`, en: `Join every remaining stack item into the final decoded string "${answer}".` },
+    final: true,
+  });
+
+  return { s, answer, steps };
 }
 
 /**
@@ -5319,7 +5525,12 @@ module.exports = {
     defaultInput: "3[a2[c]]",
     inputKind: "string",
     inputLabel: { vi: "Encoded string s", en: "Encoded string s" },
-    extraParams: [],
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: prefix/repeat frame stack", en: "Approach 1: prefix/repeat frame stack" } },
+        { value: "2", label: { vi: "Cách 2: character stack", en: "Approach 2: character stack" } },
+      ] },
+    ],
     approach: [
       { vi: "Duyet tung ky tu va ghep cac chu so vao bien number.", en: "Scan each character and accumulate digits in number." },
       { vi: "Khi gap '[', push (current, number) vao stack, sau do reset current va number.", en: "At '[', push (current, number) onto the stack, then reset both values." },
@@ -5354,6 +5565,26 @@ module.exports = {
       "                current += ch",
       "        return current",
     ],
+    code2: [
+      "class Solution:",
+      "    def decodeString(self, s: str) -> str:",
+      "        stack = []",
+      "        for ch in s:",
+      "            if ch != ']':",
+      "                stack.append(ch)",
+      "            else:",
+      "                substr = \"\"",
+      "                while stack[-1] != '[':",
+      "                    substr = stack.pop() + substr",
+      "                stack.pop()  # remove '['",
+      "                k = \"\"",
+      "                while stack and stack[-1].isdigit():",
+      "                    k = stack.pop() + k",
+      "                stack.append(int(k) * substr)",
+      "        return \"\".join(stack)",
+    ],
+    codeLabel: { vi: "Cách 1: prefix/repeat frame stack", en: "Approach 1: prefix/repeat frame stack" },
+    code2Label: { vi: "Cách 2: character stack", en: "Approach 2: character stack" },
     builder: buildSteps394,
   },
   636: {
