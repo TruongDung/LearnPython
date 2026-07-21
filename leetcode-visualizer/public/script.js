@@ -1878,6 +1878,67 @@ function renderQueueView(step) {
     </div>`;
 }
 
+function renderCircularDequeView(step) {
+  const view = step.circularDequeView || {};
+  const buffer = Array.isArray(view.buffer) ? view.buffer : [];
+  const capacity = Math.max(Number(view.capacity) || buffer.length, 1);
+  const front = Number.isInteger(view.front) ? view.front : -1;
+  const rear = Number.isInteger(view.rear) ? view.rear : -1;
+  const active = Number.isInteger(view.active) ? view.active : -1;
+  const size = Math.max(Number(view.size) || 0, 0);
+  const cx = 210;
+  const cy = 190;
+  const radius = capacity <= 6 ? 112 : 125;
+  const cellRadius = Math.max(25, Math.min(36, 104 / Math.sqrt(capacity)));
+
+  const point = (idx, extra = 0) => {
+    const angle = -Math.PI / 2 + (idx * Math.PI * 2) / capacity;
+    return { x: cx + Math.cos(angle) * (radius + extra), y: cy + Math.sin(angle) * (radius + extra) };
+  };
+
+  const logicalPosition = (idx) => {
+    if (size === 0 || front < 0) return -1;
+    const offset = (idx - front + capacity) % capacity;
+    return offset < size ? offset : -1;
+  };
+
+  const cells = Array.from({ length: capacity }, (_, idx) => {
+    const p = point(idx);
+    const value = buffer[idx];
+    const occupied = value !== null && value !== undefined;
+    const logical = logicalPosition(idx);
+    const classes = ["cdeque-cell", occupied ? "occupied" : "empty", idx === active ? "active" : ""].filter(Boolean).join(" ");
+    return `<g class="${classes}" transform="translate(${p.x} ${p.y})">
+      <circle r="${cellRadius}"></circle>
+      <text class="cdeque-value" text-anchor="middle" y="5">${occupied ? escapeXml(String(value)) : "∅"}</text>
+      <text class="cdeque-index" text-anchor="middle" y="${cellRadius + 16}">[${idx}]${logical >= 0 ? ` · #${logical}` : ""}</text>
+    </g>`;
+  }).join("");
+
+  const pointer = (idx, label, kind, shift) => {
+    if (idx < 0) return "";
+    const start = point(idx, cellRadius + 48 + shift);
+    const end = point(idx, cellRadius + 8);
+    return `<g class="cdeque-pointer ${kind}">
+      <line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" marker-end="url(#cdeque-arrow)"></line>
+      <text x="${start.x}" y="${start.y - 7}" text-anchor="middle">${label}</text>
+    </g>`;
+  };
+
+  const rearShift = rear === front && size > 0 ? 24 : 0;
+  $("treeView").innerHTML = `<div class="cdeque-viz">
+    <svg viewBox="0 0 420 380" role="img" aria-label="Circular deque with ${size} of ${capacity} slots occupied">
+      <defs><marker id="cdeque-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs>
+      <circle class="cdeque-track" cx="${cx}" cy="${cy}" r="${radius}"></circle>
+      ${cells}
+      ${size > 0 ? pointer(front, "FRONT", "front", 0) : ""}
+      ${size > 0 ? pointer(rear, "REAR", "rear", rearShift) : ""}
+      <text class="cdeque-center-main" x="${cx}" y="${cy - 5}" text-anchor="middle">size ${size} / ${capacity}</text>
+      <text class="cdeque-center-sub" x="${cx}" y="${cy + 20}" text-anchor="middle">clockwise = front → rear</text>
+    </svg>
+  </div>`;
+}
+
 function renderSentenceView(step) {
   const view = step.sentenceView || {};
   const sentence1 = Array.isArray(view.sentence1) ? view.sentence1 : [];
@@ -2303,6 +2364,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderStackView(step);
+  } else if (step.circularDequeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCircularDequeView(step);
   } else if (step.queueView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

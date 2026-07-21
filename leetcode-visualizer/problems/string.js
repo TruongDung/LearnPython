@@ -1030,8 +1030,14 @@ function buildSteps641(input) {
     if (rear >= 0 && !mark.includes(rear)) mark.push(rear);
     steps.push({
       title: opts.title,
-      arr: displayArray(),
-      sub: labels(),
+      circularDequeView: {
+        buffer: buffer.slice(),
+        front,
+        rear,
+        size,
+        capacity: k,
+        active: (opts.highlight || [])[0] ?? -1,
+      },
       highlight: opts.highlight || [],
       mark: opts.mark || mark,
       codeLines: [opts.codeLine],
