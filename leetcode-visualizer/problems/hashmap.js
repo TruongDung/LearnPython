@@ -1597,7 +1597,16 @@ function buildSteps974Alt(nums, params) {
     codeLines: [3],
     status: [{ label: "m", value: "{}" }],
     vars: [{ name: "k", value: k }, { name: "m", value: "{}" }],
-    note: { vi: "Hash map remainder -> số lần gặp; truy cập key chưa có sẽ tự trả 0.", en: "Hash map remainder -> count; accessing a missing key auto-returns 0." },
+    note: {
+      vi:
+        "Tại sao dùng defaultdict? Ý tưởng chính: subarray nums[l+1..r] chia hết cho k " +
+        "⟺ prefix_sum[r] và prefix_sum[l] có CÙNG remainder khi chia k (đây là nguyên lý chuồng bồ câu áp dụng cho phần dư). " +
+        "Nên ta cần đếm: với mỗi remainder, có bao nhiêu prefix_sum trước đó cùng remainder đó. defaultdict(int) giúp tăng count mà không cần kiểm tra key đã tồn tại chưa.",
+      en:
+        "Why defaultdict? Core idea: subarray nums[l+1..r] is divisible by k " +
+        "⟺ prefix_sum[r] and prefix_sum[l] share the SAME remainder mod k (pigeonhole principle applied to remainders). " +
+        "So we need to count, for each remainder, how many earlier prefix sums shared it. defaultdict(int) lets us increment counts without checking key existence first.",
+    },
   });
 
   push({
@@ -1610,8 +1619,14 @@ function buildSteps974Alt(nums, params) {
     ],
     vars: [{ name: "m", value: mString() }],
     note: {
-      vi: "Coi prefix rỗng (trước index 0) có remainder 0, đã xuất hiện 1 lần. Nhờ vậy subarray bắt đầu từ index 0 vẫn được đếm.",
-      en: "Treat the empty prefix (before index 0) as having remainder 0, seen once. This lets subarrays starting at index 0 be counted.",
+      vi:
+        "Tại sao cần dòng này? prefix_sum[-1] (trước khi đọc phần tử nào) = 0, có remainder 0. " +
+        "Nếu không seed sẵn m[0]=1, subarray nums[0..r] tự nó chia hết cho k (remainder[r]=0) sẽ KHÔNG được đếm, vì không có prefix nào 'trước' index 0 để so khớp. " +
+        "Seed này chính là đại diện cho prefix rỗng đó.",
+      en:
+        "Why is this line needed? prefix_sum[-1] (before reading any element) = 0, with remainder 0. " +
+        "Without seeding m[0]=1, a subarray nums[0..r] that itself is divisible by k (remainder[r]=0) would NOT be counted, since there'd be no earlier prefix to match against. " +
+        "This seed represents that empty prefix.",
     },
   });
 
@@ -1620,7 +1635,7 @@ function buildSteps974Alt(nums, params) {
     codeLines: [5],
     status: [{ label: "sum_count", value: sumCount }],
     vars: [{ name: "sum_count", value: sumCount }],
-    note: { vi: "Biến đếm số subarray hợp lệ.", en: "Counter for valid subarrays." },
+    note: { vi: "Biến đếm số subarray hợp lệ tìm được, tăng dần khi duyệt qua mảng.", en: "Counter for valid subarrays found, incremented while scanning the array." },
   });
 
   push({
@@ -1628,7 +1643,10 @@ function buildSteps974Alt(nums, params) {
     codeLines: [6],
     status: [{ label: "prefix_sum", value: prefixSum }],
     vars: [{ name: "prefix_sum", value: prefixSum }],
-    note: { vi: "Tổng tiền tố bắt đầu bằng 0.", en: "The prefix sum starts at 0." },
+    note: {
+      vi: "Tổng tiền tố bắt đầu bằng 0, sẽ cộng dồn từng phần tử nums[i] khi duyệt qua mảng để tính prefix_sum[i] = nums[0]+...+nums[i].",
+      en: "The prefix sum starts at 0, accumulating each nums[i] while scanning so prefix_sum[i] = nums[0]+...+nums[i].",
+    },
   });
 
   for (let i = 0; i < nums.length; i++) {
@@ -1661,7 +1679,14 @@ function buildSteps974Alt(nums, params) {
       current: i,
       status: [{ label: "prefix_sum", value: prefixSum }, { label: "k", value: k }, { label: "remainder", value: remainder }],
       vars: [{ name: "remainder", value: remainder }],
-      note: { vi: "Python trả remainder không âm ngay cả khi prefix_sum âm.", en: "Python produces a non-negative remainder even when prefix_sum is negative." },
+      note: {
+        vi:
+          `Tại sao lấy remainder? Ta không cần biết prefix_sum chính xác, chỉ cần biết phần dư khi chia k, vì hai prefix_sum cùng remainder ⟺ hiệu của chúng chia hết cho k. ` +
+          `Python trả remainder không âm (${remainder}) ngay cả khi prefix_sum âm (${prefixSum}), nên không cần chuẩn hóa thêm.`,
+        en:
+          `Why take the remainder? We don't need the exact prefix_sum, only its remainder mod k, since two prefix sums sharing a remainder ⟺ their difference is divisible by k. ` +
+          `Python produces a non-negative remainder (${remainder}) even when prefix_sum is negative (${prefixSum}), so no extra normalization is needed.`,
+      },
     });
 
     const exists = m.has(remainder);
@@ -1677,8 +1702,12 @@ function buildSteps974Alt(nums, params) {
       ],
       vars: [{ name: "remainder", value: remainder }, { name: "in m?", value: exists }],
       note: {
-        vi: exists ? `Đã từng gặp remainder ${remainder} trước đó → có thêm subarray hợp lệ.` : `Chưa từng gặp remainder ${remainder} → chưa có subarray mới kết thúc tại đây.`,
-        en: exists ? `Remainder ${remainder} was seen before → new valid subarray(s) exist.` : `Remainder ${remainder} hasn't been seen yet → no new subarray ends here.`,
+        vi: exists
+          ? `remainder ${remainder} đã từng xuất hiện tại prefix ${priorPositions.length > 1 ? "các vị trí" : "vị trí"} ${priorPositions.join(", ")} → mỗi prefix đó, kết hợp với prefix hiện tại (i=${i}), tạo thành 1 subarray có tổng chia hết cho ${k}.`
+          : `Chưa có prefix nào trước đó có remainder ${remainder} → không có cặp nào để tạo subarray kết thúc tại i=${i}, nhưng ta vẫn cần lưu remainder này lại cho các index sau.`,
+        en: exists
+          ? `remainder ${remainder} was seen before at prefix position(s) ${priorPositions.join(", ")} → each of those, paired with the current prefix (i=${i}), forms a subarray whose sum is divisible by ${k}.`
+          : `No earlier prefix has remainder ${remainder} → no pair exists to form a subarray ending at i=${i}, but we still need to record this remainder for later indices.`,
       },
     });
 
@@ -1696,7 +1725,14 @@ function buildSteps974Alt(nums, params) {
           { label: "sum_count", value: sumCount },
         ],
         vars: [{ name: "sum_count", value: sumCount }],
-        note: { vi: `Có ${contribution} prefix trước đó cùng remainder ${remainder}, nên thêm ${contribution} subarray kết thúc tại index ${i}.`, en: `${contribution} earlier prefix(es) share remainder ${remainder}, adding ${contribution} subarray(s) ending at index ${i}.` },
+        note: {
+          vi:
+            `Đây chính là bước ĐẾM: mỗi lần trước đó gặp remainder ${remainder} là 1 subarray hợp lệ kết thúc tại i=${i} ` +
+            `(bắt đầu ngay sau vị trí đó). Có ${contribution} lần như vậy → cộng thêm ${contribution} vào sum_count. Cụ thể: ${formatSubarrays(priorPositions, i)}.`,
+          en:
+            `This is the COUNTING step: each earlier occurrence of remainder ${remainder} corresponds to 1 valid subarray ending at i=${i} ` +
+            `(starting right after that position). There are ${contribution} such occurrence(s) → add ${contribution} to sum_count. Specifically: ${formatSubarrays(priorPositions, i)}.`,
+        },
       });
     }
 
@@ -1715,7 +1751,14 @@ function buildSteps974Alt(nums, params) {
         { label: "sum_count", value: sumCount },
       ],
       vars: [{ name: `m[${remainder}]`, value: oldCount + 1 }, { name: "m", value: mString() }],
-      note: { vi: `Lưu lại prefix hiện tại để các index sau cùng remainder ${remainder} có thể tạo thêm subarray.`, en: `Store the current prefix so later indices with remainder ${remainder} can form more subarrays.` },
+      note: {
+        vi:
+          `Tại sao luôn tăng, kể cả khi remainder chưa từng có (defaultdict tự tạo 0 trước, rồi +1 = ${oldCount + 1})? ` +
+          `Vì prefix tại i=${i} cũng SẼ TRỞ THÀNH một "prefix cũ" cho các index j>${i} phía sau so khớp. Bước này đăng ký nó vào m để không bị bỏ sót.`,
+        en:
+          `Why increment even if the remainder never existed before (defaultdict auto-creates 0, then +1 = ${oldCount + 1})? ` +
+          `Because the prefix at i=${i} will itself become an "earlier prefix" for later indices j>${i} to match against. This step registers it in m so it isn't missed.`,
+      },
     });
   }
 
@@ -1729,7 +1772,16 @@ function buildSteps974Alt(nums, params) {
     ],
     vars: [{ name: "answer", value: sumCount }],
     final: true,
-    note: { vi: `Có tổng cộng ${sumCount} subarray có tổng chia hết cho ${k}.`, en: `There are ${sumCount} subarrays whose sums are divisible by ${k}.` },
+    note: {
+      vi:
+        `Có tổng cộng ${sumCount} subarray có tổng chia hết cho ${k}. ` +
+        `Thay vì kiểm tra O(n²) cặp (i, j) và tính lại tổng mỗi lần, thuật toán chỉ duyệt 1 lần O(n), ` +
+        `vì "2 prefix cùng remainder → hiệu chia hết cho k" biến bài toán thành đếm tần suất remainder — đây là lý do cách này nhanh.`,
+      en:
+        `There are ${sumCount} subarrays whose sums are divisible by ${k}. ` +
+        `Instead of checking O(n²) pairs (i, j) and recomputing sums each time, this algorithm scans once in O(n), ` +
+        `because "2 prefixes sharing a remainder → their difference is divisible by k" turns the problem into counting remainder frequencies — that's why this approach is fast.`,
+    },
   });
 
   return { steps, answer: sumCount };
