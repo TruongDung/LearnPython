@@ -4184,6 +4184,161 @@ function buildSteps20(input) {
   return { s, answer, steps };
 }
 
+/**
+ * LeetCode 3499: Maximize Active Section with Trade I.
+ *
+ * The string s is conceptually surrounded by imaginary '1's on both ends.
+ * A "trade" removes one block of '1's (surrounded by '0's) and converts one
+ * block of '0's (surrounded by '1's) into '1's. Since removing a '1'-block
+ * merges its two neighboring '0'-blocks into one, the best possible gain is
+ * simply the largest sum of two ADJACENT '0' segments (separated by exactly
+ * one '1' segment). Answer = (count of existing '1's) + (that best sum).
+ */
+function buildSteps3499(input) {
+  const s = String(input || "").trim();
+  const n = s.length;
+  const steps = [];
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Chuỗi rỗng", en: "Empty string" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Chuỗi rỗng → 0 khu vực hoạt động.", en: "Empty string → 0 active sections." },
+    });
+    return { original: s, answer: 0, steps };
+  }
+
+  const chars = s.split("");
+  const values = chars.map((c) => (c === "1" ? 1 : 0.4));
+
+  let ans = 0;
+  let mx = 0;
+  let pre = -Infinity;
+  let index = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6, 7],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "n", value: n },
+      { name: "ans (đếm số '1')", value: 0 },
+      { name: "pre (đoạn '0' trước)", value: "-inf" },
+      { name: "mx (gain tốt nhất)", value: 0 },
+    ],
+    note: {
+      vi:
+        `s = "${s}". Coi như có '1' ảo ở 2 đầu.\n` +
+        `Duyệt từng đoạn ký tự liên tiếp giống nhau. Đoạn '1' → cộng vào ans.\n` +
+        `Đoạn '0' → so sánh pre + đoạn hiện tại để tìm 2 đoạn '0' liền kề (cách nhau 1 đoạn '1') có tổng lớn nhất.`,
+      en:
+        `s = "${s}". Treated as if surrounded by imaginary '1's.\n` +
+        `Scan consecutive same-character segments. '1' segment → add to ans.\n` +
+        `'0' segment → compare pre + current to find the best pair of adjacent '0' blocks (separated by one '1' block).`,
+    },
+  });
+
+  while (index < n) {
+    let segmentEnd = index + 1;
+    while (segmentEnd < n && s[segmentEnd] === s[index]) segmentEnd++;
+    const curLen = segmentEnd - index;
+    const range = Array.from({ length: curLen }, (_, k) => index + k);
+
+    if (s[index] === "1") {
+      const oldAns = ans;
+      ans += curLen;
+      steps.push({
+        title: { vi: `Đoạn '1' [${index}..${segmentEnd - 1}]: ans += ${curLen}`, en: `'1' segment [${index}..${segmentEnd - 1}]: ans += ${curLen}` },
+        arr: values,
+        sub: chars,
+        highlight: range,
+        mark: [],
+        codeLines: [9, 10, 11, 12, 13, 15, 16],
+        vars: [
+          { name: "segment", value: `s[${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}"` },
+          { name: "length", value: curLen },
+          { name: "ans", value: `${oldAns} + ${curLen} = ${ans}` },
+          { name: "pre", value: pre === -Infinity ? "-inf" : pre },
+          { name: "mx", value: mx },
+        ],
+        note: {
+          vi: `Đoạn '1' dài ${curLen} tại [${index}..${segmentEnd - 1}]. Đây là số '1' đã có sẵn → ans = ${oldAns} + ${curLen} = ${ans}.`,
+          en: `'1' segment of length ${curLen} at [${index}..${segmentEnd - 1}]. These are existing active sections → ans = ${oldAns} + ${curLen} = ${ans}.`,
+        },
+      });
+    } else {
+      const oldMx = mx;
+      const candidate = pre + curLen;
+      mx = Math.max(mx, candidate);
+      const updated = mx !== oldMx;
+
+      steps.push({
+        title: {
+          vi: `Đoạn '0' [${index}..${segmentEnd - 1}]: mx = max(${oldMx}, ${pre === -Infinity ? "-inf" : pre}+${curLen})`,
+          en: `'0' segment [${index}..${segmentEnd - 1}]: mx = max(${oldMx}, ${pre === -Infinity ? "-inf" : pre}+${curLen})`,
+        },
+        arr: values,
+        sub: chars,
+        highlight: range,
+        mark: updated ? range : [],
+        codeLines: [9, 10, 11, 12, 13, 17, 18],
+        vars: [
+          { name: "segment", value: `s[${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}"` },
+          { name: "length (cur)", value: curLen },
+          { name: "pre (đoạn '0' trước)", value: pre === -Infinity ? "-inf" : pre },
+          { name: "candidate = pre + cur", value: pre === -Infinity ? "-inf" : candidate },
+          { name: "mx", value: `${updated ? `cập nhật → ${mx}` : mx}` },
+          { name: "ans", value: ans },
+        ],
+        note: {
+          vi:
+            pre === -Infinity
+              ? `Đoạn '0' đầu tiên, dài ${curLen}. Chưa có đoạn '0' trước nên chưa tính gain. pre = ${curLen}.`
+              : `Đoạn '0' dài ${curLen}. Ghép với đoạn '0' trước (dài ${pre}, cách nhau 1 đoạn '1') → tổng = ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}.`,
+          en:
+            pre === -Infinity
+              ? `First '0' segment, length ${curLen}. No previous '0' segment yet, so no gain computed. pre = ${curLen}.`
+              : `'0' segment of length ${curLen}. Pair with the previous '0' segment (length ${pre}, one '1' block apart) → sum = ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}.`,
+        },
+      });
+      pre = curLen;
+    }
+
+    index = segmentEnd;
+  }
+
+  const answer = ans + mx;
+  steps.push({
+    title: { vi: `Kết quả: ans + mx = ${ans} + ${mx} = ${answer}`, en: `Result: ans + mx = ${ans} + ${mx} = ${answer}` },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [21],
+    vars: [
+      { name: "ans (số '1' gốc)", value: ans },
+      { name: "mx (gain tốt nhất từ trade)", value: mx },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Tổng số '1' gốc = ${ans}. Gain tốt nhất từ 1 lần trade = ${mx}. Kết quả = ${ans} + ${mx} = ${answer}.`,
+      en: `Original '1' count = ${ans}. Best gain from one trade = ${mx}. Result = ${ans} + ${mx} = ${answer}.`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -5187,5 +5342,68 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps1967,
+  },
+  3499: {
+    id: 3499,
+    difficulty: "medium",
+    slug: "maximize-active-section-with-trade-i",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Maximize Active Section with Trade I", en: "Maximize Active Section with Trade I" },
+    titleVi: { vi: "Tối đa hoá khu vực hoạt động sau 1 lần trade", en: "Maximize active sections after one trade" },
+    statement: {
+      vi:
+        "Cho chuỗi nhị phân s ('1'=hoạt động, '0'=không). Coi như có '1' ảo ở 2 đầu chuỗi. " +
+        "Được thực hiện TỐI ĐA 1 lần trade: chọn 1 đoạn '1' liên tiếp bị '0' bao quanh 2 bên, đổi thành '0'; " +
+        "sau đó chọn 1 đoạn '0' liên tiếp bị '1' bao quanh 2 bên, đổi thành '1'. " +
+        "Tìm số lượng '1' tối đa có thể đạt được.",
+      en:
+        "Given a binary string s ('1'=active, '0'=inactive), with imaginary '1's at both ends. " +
+        "You may perform AT MOST one trade: pick a contiguous '1' block surrounded by '0's and flip it to '0', " +
+        "then pick a contiguous '0' block surrounded by '1's and flip it to '1'. " +
+        "Return the maximum possible number of '1's.",
+    },
+    defaultInput: "00111000",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đếm tổng số '1' hiện có trong s → ans.", en: "Count the existing total number of '1's in s → ans." },
+      { vi: "Xoá 1 đoạn '1' bị kẹp giữa 2 đoạn '0' sẽ MERGE 2 đoạn '0' đó thành 1 đoạn lớn, có thể đổi hết thành '1'.", en: "Removing a '1' block sandwiched between two '0' blocks MERGES those '0' blocks, which can then all become '1'." },
+      { vi: "Vậy gain tốt nhất = tổng lớn nhất của 2 đoạn '0' liên tiếp (cách nhau đúng 1 đoạn '1'). Kết quả = ans + mx.", en: "So the best gain = the largest sum of two adjacent '0' segments (separated by exactly one '1' segment). Result = ans + mx." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt chuỗi một lần theo từng đoạn ký tự liên tiếp (two-pointer). O(1) bộ nhớ.",
+        en: "Single pass over the string by consecutive segments (two-pointer). O(1) extra memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxActiveSectionsAfterTrade(self, s: str) -> int:",
+      "        n = len(s)",
+      "        ans = 0",
+      "        index = 0",
+      "        pre = float('-inf')",
+      "        mx = 0",
+      "",
+      "        while index < n:",
+      "            end = index + 1",
+      "            while end < n and s[end] == s[index]:",
+      "                end += 1",
+      "            cur = end - index",
+      "",
+      "            if s[index] == '1':",
+      "                ans += cur",
+      "            else:",
+      "                mx = max(mx, pre + cur)",
+      "                pre = cur",
+      "",
+      "            index = end",
+      "",
+      "        return ans + mx",
+    ],
+    builder: buildSteps3499,
   },
 };
