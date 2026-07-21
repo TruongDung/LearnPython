@@ -731,7 +731,7 @@ function buildSteps34(nums, params) {
           sub: labels(left, right),
           highlight: activeRange(left, right),
           mark: [],
-          codeLines: [9],
+          codeLines: [10],
           vars: [{ name: "right before", value: oldRight }, { name: "right after (R)", value: right }],
           note: { vi: `Vùng tìm kiếm co lại thành [${left}, ${right}) — M vẫn có thể là đáp án nên không bị loại.`, en: `The search range shrinks to [${left}, ${right}) — M might still be the answer, so it's kept.` },
         });
