@@ -3591,11 +3591,11 @@ module.exports = {
     id: 974,
     difficulty: "medium",
     slug: "subarray-sums-divisible-by-k",
-    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    category: { key: "prefix-sum", vi: "Tổng tiền tố", en: "Prefix Sum" },
     title: { vi: "Subarray Sums Divisible by K", en: "Subarray Sums Divisible by K" },
-    titleVi: { vi: "Dem day con co tong chia het cho K", en: "Count subarrays with sums divisible by K" },
+    titleVi: { vi: "Đếm mảng con có tổng chia hết cho K", en: "Count subarrays with sums divisible by K" },
     statement: {
-      vi: "Cho mang so nguyen nums va so nguyen k. Tra ve so day con lien tiep khong rong co tong chia het cho k.",
+      vi: "Cho mảng số nguyên nums và số nguyên k. Hãy trả về số mảng con liên tiếp, không rỗng có tổng chia hết cho k.",
       en: "Given an integer array nums and an integer k, return the number of non-empty contiguous subarrays whose sums are divisible by k.",
     },
     defaultInput: [4, 5, 0, -2, -3, 1],
@@ -3604,21 +3604,21 @@ module.exports = {
     extraParams: [
       { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 5, min: 2, max: 10000 },
       { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
-        { value: "1", label: { vi: "Cách 1: remainder_count.get(...)", en: "Approach 1: remainder_count.get(...)" } },
-        { value: "2", label: { vi: "Cách 2: defaultdict + 'in' check", en: "Approach 2: defaultdict + 'in' check" } },
+        { value: "1", label: { vi: "Cách 1: Đếm tần suất phần dư", en: "Approach 1: remainder_count.get(...)" } },
+        { value: "2", label: { vi: "Cách 2: defaultdict và kiểm tra 'in'", en: "Approach 2: defaultdict + 'in' check" } },
       ] },
     ],
     approach: [
       {
-        vi: "Neu hai prefix sum co cung remainder modulo k, hieu cua chung chia het cho k.",
+        vi: "Nếu hai tổng tiền tố có cùng phần dư khi chia cho k thì hiệu của chúng chia hết cho k.",
         en: "If two prefix sums have the same remainder modulo k, their difference is divisible by k.",
       },
       {
-        vi: "remainder_count[r] dem so prefix truoc do co remainder r.",
+        vi: "remainder_count[r] lưu số tổng tiền tố trước đó có phần dư bằng r.",
         en: "remainder_count[r] counts earlier prefixes whose remainder is r.",
       },
       {
-        vi: "Tai moi index, cong count cua remainder hien tai vao total, sau do tang count.",
+        vi: "Tại mỗi chỉ số, cộng tần suất của phần dư hiện tại vào kết quả, sau đó tăng tần suất ấy lên 1.",
         en: "At each index, add the current remainder frequency to total, then increment that frequency.",
       },
     ],
@@ -3626,7 +3626,7 @@ module.exports = {
       time: "O(n)",
       space: "O(min(n, k))",
       note: {
-        vi: "Duyet nums mot lan; hash map luu tan suat cac prefix remainder.",
+        vi: "Duyệt nums một lần; bảng băm lưu tần suất các phần dư của tổng tiền tố.",
         en: "Scan nums once; the hash map stores prefix remainder frequencies.",
       },
     },
@@ -3658,8 +3658,8 @@ module.exports = {
       "            m[remainder] += 1",
       "        return sum_count",
     ],
-    codeLabel: { vi: "Cách 1: remainder_count.get(...)", en: "Approach 1: remainder_count.get(...)" },
-    code2Label: { vi: "Cách 2: defaultdict + 'in' check", en: "Approach 2: defaultdict + 'in' check" },
+    codeLabel: { vi: "Cách 1: Đếm tần suất phần dư", en: "Approach 1: remainder_count.get(...)" },
+    code2Label: { vi: "Cách 2: defaultdict và kiểm tra 'in'", en: "Approach 2: defaultdict + 'in' check" },
     builder: buildSteps974,
   },
   525: {
