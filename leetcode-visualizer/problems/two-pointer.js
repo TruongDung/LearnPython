@@ -1950,76 +1950,200 @@ function buildSteps206(input) {
 // ─── 21: Merge Two Sorted Lists ───
 function buildSteps21(input) {
   const parts = String(input).split(";");
-  const l1 = parts[0].split(",").map(Number).filter((x) => !isNaN(x));
-  const l2 = parts[1] ? parts[1].split(",").map(Number).filter((x) => !isNaN(x)) : [];
+  const parseList = (s) => (s || "").split(",").map((x) => x.trim()).filter((x) => x !== "").map(Number);
+  const l1 = parseList(parts[0]);
+  const l2 = parseList(parts[1]);
   const steps = [];
-  const result = [];
-  let i = 0, j = 0;
 
-  // Tree view: l1 at y=0, l2 at y=1, result at y=2 (with dummy "D" + annotations)
-  function treeSnap(title, note, curI, curJ, vars, codeLines) {
+  // committed[] = values whose node has been fully linked AND cur has moved
+  // onto it (cur = cur.next already executed). pending = a value attached via
+  // "cur.next = ..." but cur has NOT advanced onto it yet (still mid-statement).
+  const committed = [];
+  let pending = null; // { value, source: 'l1' | 'l2' | 'rest' }
+
+  const l2Off = l1.length;
+  const resOff = l1.length + l2.length;
+
+  // Tree view: l1 at y=0, l2 at y=1, result at y=2 (dummy "D" + annotations)
+  function treeSnap(title, note, curI, curJ, vars, codeLines, opts = {}) {
     const nodes = [];
-    // l1 nodes (y=0)
     l1.forEach((v, idx) => {
       nodes.push({ id: idx, label: String(v), x: idx * 2, y: 0, parentId: idx > 0 ? idx - 1 : null, hl: idx === curI, isWord: false });
     });
-    // l2 nodes (y=1)
-    const l2Off = l1.length;
     l2.forEach((v, idx) => {
       nodes.push({ id: l2Off + idx, label: String(v), x: idx * 2, y: 1, parentId: idx > 0 ? l2Off + idx - 1 : null, hl: idx === curJ, isWord: false });
     });
-    // result nodes (y=2): dummy "D" + values
-    const resOff = l1.length + l2.length;
+
     nodes.push({ id: resOff, label: "D", x: 0, y: 2, parentId: null, hl: false, isWord: false });
-    result.forEach((v, idx) => {
-      const isCur = idx === result.length - 1;
-      nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
+    committed.forEach((v, idx) => {
+      nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: false });
     });
-    // Annotations: "l1" on current l1 pointer, "l2" on current l2 pointer,
-    // "cur" always tracks the last built node (dummy when result is empty).
+    if (pending !== null) {
+      const pendId = resOff + 1 + committed.length;
+      nodes.push({ id: pendId, label: String(pending.value), x: (committed.length + 1) * 2, y: 2, parentId: resOff + committed.length, hl: true, isWord: false });
+    }
+
+    // Annotations: "l1"/"l2" on current source pointers, "cur" on the last
+    // COMMITTED node (dummy if none committed yet, but only once cur has
+    // actually been assigned via "cur = dummy"). "cur.next" on the pending
+    // (attached-but-not-committed) node, if any.
     const annotations = {};
     if (curI >= 0 && curI < l1.length) annotations[curI] = "l1";
     if (curJ >= 0 && curJ < l2.length) annotations[l2Off + curJ] = "l2";
-    annotations[resOff + result.length] = "cur";
-    return { title, arr: [], tree: { nodes, annotations }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
+    if (opts.showCur !== false) annotations[resOff + committed.length] = opts.curLabel || "cur";
+    if (pending !== null) annotations[resOff + 1 + committed.length] = "cur.next";
+
+    return { title, arr: [], tree: { nodes, annotations }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note, final: opts.final || false };
   }
 
+  // Line 3: dummy = ListNode(0)
   steps.push(treeSnap(
-    { vi: `Gộp 2 list sorted`, en: `Merge two sorted lists` },
-    { vi: `Hàng 1: l1 = ${l1.join("→")}\nHàng 2: l2 = ${l2.join("→")}\nHàng 3: result (build dần)\n\nSo sánh đầu l1 vs l2, lấy nhỏ hơn. Lặp tới hết.`, en: `Row 1: l1 = ${l1.join("→")}\nRow 2: l2 = ${l2.join("→")}\nRow 3: result (building)\n\nCompare l1 head vs l2 head, take smaller. Repeat.` },
+    { vi: "dummy = ListNode(0)", en: "dummy = ListNode(0)" },
+    { vi: `Tạo node dummy. cur CHƯA được gán, nên chưa hiện con trỏ cur.`, en: `Create the dummy node. cur is NOT assigned yet, so no cur pointer is shown.` },
     0, 0,
     [{ name: "l1", value: l1.join("→") }, { name: "l2", value: l2.join("→") }],
-    [2, 3, 4, 5]
+    [3],
+    { showCur: false }
   ));
 
-  while (i < l1.length && j < l2.length) {
-    const takeL1 = l1[i] <= l2[j];
-    if (takeL1) { result.push(l1[i]); i++; }
-    else { result.push(l2[j]); j++; }
+  // Line 4: cur = dummy
+  steps.push(treeSnap(
+    { vi: "cur = dummy", en: "cur = dummy" },
+    { vi: `cur bắt đầu tại dummy. Sẽ di chuyển dần khi build result.`, en: `cur starts at dummy. It will advance as the result is built.` },
+    0, 0,
+    [{ name: "cur", value: "dummy" }],
+    [4]
+  ));
 
+  let i = 0, j = 0;
+
+  while (i < l1.length && j < l2.length) {
+    // Line 5: while l1 and l2 -> True
     steps.push(treeSnap(
-      { vi: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"}`, en: `${takeL1 ? l1[i-1] : l2[j-1]} ← ${takeL1 ? "l1" : "l2"}` },
-      { vi: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → lấy ${result[result.length-1]}.`, en: `${takeL1 ? `l1=${l1[i-1]} ≤ l2=${l2[j]}` : `l2=${l2[j-1]} < l1=${l1[i]}`} → take ${result[result.length-1]}.` },
-      i < l1.length ? i : -1, j < l2.length ? j : -1,
-      [{ name: "took", value: `${result[result.length-1]} from ${takeL1 ? "l1" : "l2"}` }, { name: "result", value: result.join("→") }],
-      takeL1 ? [5, 6, 7] : [8, 9, 10]
+      { vi: `while l1 and l2 → True`, en: `while l1 and l2 → True` },
+      { vi: `Cả 2 list còn phần tử: l1[${i}]=${l1[i]}, l2[${j}]=${l2[j]}.`, en: `Both lists still have nodes: l1[${i}]=${l1[i]}, l2[${j}]=${l2[j]}.` },
+      i, j,
+      [{ name: "l1.val", value: l1[i] }, { name: "l2.val", value: l2[j] }],
+      [5]
+    ));
+
+    const takeL1 = l1[i] <= l2[j];
+
+    // Line 6: if l1.val <= l2.val
+    steps.push(treeSnap(
+      { vi: `if l1.val(${l1[i]}) <= l2.val(${l2[j]}) → ${takeL1}`, en: `if l1.val(${l1[i]}) <= l2.val(${l2[j]}) → ${takeL1}` },
+      { vi: takeL1 ? `${l1[i]} ≤ ${l2[j]} → True. Lấy l1.` : `${l1[i]} > ${l2[j]} → False. Lấy l2.`, en: takeL1 ? `${l1[i]} ≤ ${l2[j]} → True. Take l1.` : `${l1[i]} > ${l2[j]} → False. Take l2.` },
+      i, j,
+      [{ name: "l1.val <= l2.val?", value: takeL1 }],
+      [6]
+    ));
+
+    if (takeL1) {
+      // Line 7: cur.next = l1
+      pending = { value: l1[i], source: "l1" };
+      steps.push(treeSnap(
+        { vi: `cur.next = l1  (attach ${l1[i]})`, en: `cur.next = l1  (attach ${l1[i]})` },
+        { vi: `Nối node l1[${i}]=${l1[i]} vào sau cur. cur chưa di chuyển.`, en: `Link node l1[${i}]=${l1[i]} after cur. cur has not moved yet.` },
+        i, j,
+        [{ name: "attached", value: l1[i] }],
+        [7]
+      ));
+
+      // Line 8: l1 = l1.next
+      i++;
+      steps.push(treeSnap(
+        { vi: `l1 = l1.next → l1[${i}]`, en: `l1 = l1.next → l1[${i}]` },
+        { vi: `Con trỏ l1 tiến sang node kế tiếp.`, en: `The l1 pointer moves to the next node.` },
+        i, j,
+        [{ name: "l1 (new head)", value: i < l1.length ? l1[i] : "None" }],
+        [8]
+      ));
+    } else {
+      // Line 9: else
+      steps.push(treeSnap(
+        { vi: `else:`, en: `else:` },
+        { vi: `l1.val > l2.val → vào nhánh else.`, en: `l1.val > l2.val → enter the else branch.` },
+        i, j,
+        [],
+        [9]
+      ));
+
+      // Line 10: cur.next = l2
+      pending = { value: l2[j], source: "l2" };
+      steps.push(treeSnap(
+        { vi: `cur.next = l2  (attach ${l2[j]})`, en: `cur.next = l2  (attach ${l2[j]})` },
+        { vi: `Nối node l2[${j}]=${l2[j]} vào sau cur. cur chưa di chuyển.`, en: `Link node l2[${j}]=${l2[j]} after cur. cur has not moved yet.` },
+        i, j,
+        [{ name: "attached", value: l2[j] }],
+        [10]
+      ));
+
+      // Line 11: l2 = l2.next
+      j++;
+      steps.push(treeSnap(
+        { vi: `l2 = l2.next → l2[${j}]`, en: `l2 = l2.next → l2[${j}]` },
+        { vi: `Con trỏ l2 tiến sang node kế tiếp.`, en: `The l2 pointer moves to the next node.` },
+        i, j,
+        [{ name: "l2 (new head)", value: j < l2.length ? l2[j] : "None" }],
+        [11]
+      ));
+    }
+
+    // Line 12: cur = cur.next  (commit the pending node)
+    committed.push(pending.value);
+    pending = null;
+    steps.push(treeSnap(
+      { vi: `cur = cur.next → cur=${committed[committed.length - 1]}`, en: `cur = cur.next → cur=${committed[committed.length - 1]}` },
+      { vi: `cur di chuyển tới node vừa gắn. Node này chính thức nằm trong result.`, en: `cur advances onto the just-attached node. It is now officially part of the result.` },
+      i, j,
+      [{ name: "result", value: committed.join("→") }],
+      [12]
     ));
   }
 
-  // Append remaining
-  while (i < l1.length) { result.push(l1[i]); i++; }
-  while (j < l2.length) { result.push(l2[j]); j++; }
+  // Final while check → False
+  const reason = i >= l1.length ? "l1 hết" : "l2 hết";
+  const reasonEn = i >= l1.length ? "l1 exhausted" : "l2 exhausted";
+  steps.push(treeSnap(
+    { vi: `while l1 and l2 → False`, en: `while l1 and l2 → False` },
+    { vi: `${reason} → thoát vòng lặp.`, en: `${reasonEn} → exit the loop.` },
+    i < l1.length ? i : -1, j < l2.length ? j : -1,
+    [{ name: "l1 remaining", value: i < l1.length ? l1.slice(i).join(",") : "none" }, { name: "l2 remaining", value: j < l2.length ? l2.slice(j).join(",") : "none" }],
+    [5]
+  ));
 
-  const fs = treeSnap(
-    { vi: `Kết quả: ${result.join("→")}`, en: `Result: ${result.join("→")}` },
-    { vi: `Merged: ${result.join("→")}.`, en: `Merged: ${result.join("→")}.` },
+  // Line 13: cur.next = l1 or l2  (attach the whole remaining chain at once)
+  const remaining = i < l1.length ? l1.slice(i) : l2.slice(j);
+  const remainingSource = i < l1.length ? "l1" : "l2";
+  remaining.forEach((v) => committed.push(v));
+  if (i < l1.length) i = l1.length;
+  if (j < l2.length) j = l2.length;
+
+  steps.push(treeSnap(
+    { vi: `cur.next = ${remainingSource}  (nối phần còn lại: ${remaining.join("→") || "None"})`, en: `cur.next = ${remainingSource}  (attach remaining: ${remaining.join("→") || "None"})` },
+    { vi: remaining.length
+      ? `${remainingSource} còn lại [${remaining.join(", ")}] được nối thẳng vào cur (đã sorted nên không cần so sánh nữa).`
+      : `Cả 2 list đều hết → cur.next = None.`,
+      en: remaining.length
+        ? `The remaining ${remainingSource} [${remaining.join(", ")}] is linked directly after cur (already sorted, no more comparisons needed).`
+        : `Both lists are exhausted → cur.next = None.` },
     -1, -1,
-    [{ name: "answer", value: result.join("→") }],
-    [12, 13, 14]
+    [{ name: "result", value: committed.join("→") }],
+    [13]
+  ));
+
+  // Line 14: return dummy.next
+  const fs = treeSnap(
+    { vi: `return dummy.next → ${committed.join("→")}`, en: `return dummy.next → ${committed.join("→")}` },
+    { vi: `Merged: ${committed.join("→")}.`, en: `Merged: ${committed.join("→")}.` },
+    -1, -1,
+    [{ name: "answer", value: committed.join("→") }],
+    [14],
+    { final: true, curLabel: "cur" }
   );
   fs.final = true;
   steps.push(fs);
-  return { input, answer: `[${result.join(",")}]`, steps };
+  return { input, answer: `[${committed.join(",")}]`, steps };
 }
 
 // ─── 876: Middle of the Linked List ───

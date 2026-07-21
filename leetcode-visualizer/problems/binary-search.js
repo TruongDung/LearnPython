@@ -620,3 +620,205 @@ module.exports = {
     builder: buildSteps911,
   },
 };
+
+/**
+ * LeetCode 35: Search Insert Position.
+ * Classic binary search on a sorted array. If target is found, return its
+ * index. Otherwise return the index where it would be inserted to keep the
+ * array sorted — which is exactly what `left` converges to when the loop
+ * ends (left === right, the first index where nums[i] >= target).
+ */
+function buildSteps35(nums, params) {
+  const target = Number(params && params.target !== undefined ? params.target : nums[0]);
+  const n = nums.length;
+  const steps = [];
+
+  // Line 3: left, right = 0, len(nums)
+  let left = 0;
+  let right = n;
+  steps.push({
+    title: { vi: "left, right = 0, len(nums)", en: "left, right = 0, len(nums)" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "target", value: target },
+      { name: "left", value: left },
+      { name: "right", value: right },
+    ],
+    note: {
+      vi: `Tìm vị trí của target=${target} trong nums (đã sắp xếp). left=0, right=n=${n}.`,
+      en: `Find the position of target=${target} in nums (sorted). left=0, right=n=${n}.`,
+    },
+  });
+
+  while (left < right) {
+    // Line 4: while left < right
+    steps.push({
+      title: { vi: `while left=${left} < right=${right} → True`, en: `while left=${left} < right=${right} → True` },
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: Array.from({ length: right - left }, (_, k) => left + k),
+      mark: [],
+      codeLines: [4],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      note: {
+        vi: `left=${left} < right=${right} → còn khoảng để tìm.`,
+        en: `left=${left} < right=${right} → search range remains.`,
+      },
+    });
+
+    // Line 5: mid = (left + right) // 2
+    const mid = Math.floor((left + right) / 2);
+    steps.push({
+      title: { vi: `mid = (${left}+${right})//2 = ${mid}`, en: `mid = (${left}+${right})//2 = ${mid}` },
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: [mid],
+      mark: [],
+      codeLines: [5],
+      vars: [{ name: "mid", value: mid }, { name: "nums[mid]", value: nums[mid] }],
+      note: {
+        vi: `mid = ${mid}. nums[${mid}] = ${nums[mid]}.`,
+        en: `mid = ${mid}. nums[${mid}] = ${nums[mid]}.`,
+      },
+    });
+
+    // Line 6: if nums[mid] < target
+    const goRight = nums[mid] < target;
+    steps.push({
+      title: { vi: `if nums[${mid}]=${nums[mid]} < target=${target} → ${goRight}`, en: `if nums[${mid}]=${nums[mid]} < target=${target} → ${goRight}` },
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: [mid],
+      mark: [],
+      codeLines: [6],
+      vars: [{ name: "nums[mid] < target?", value: goRight }],
+      note: goRight
+        ? { vi: `${nums[mid]} < ${target} → True. target ở nửa phải → left = mid+1.`, en: `${nums[mid]} < ${target} → True. target is in the right half → left = mid+1.` }
+        : { vi: `${nums[mid]} ≥ ${target} → False. target ở nửa trái (hoặc = mid) → right = mid.`, en: `${nums[mid]} ≥ ${target} → False. target is in the left half (or at mid) → right = mid.` },
+    });
+
+    if (goRight) {
+      // Line 7: left = mid + 1
+      const oldLeft = left;
+      left = mid + 1;
+      steps.push({
+        title: { vi: `left = mid + 1 = ${left}`, en: `left = mid + 1 = ${left}` },
+        arr: [...nums],
+        sub: nums.map((_, i) => `[${i}]`),
+        highlight: Array.from({ length: right - left }, (_, k) => left + k),
+        mark: [],
+        codeLines: [7],
+        vars: [{ name: "left (before)", value: oldLeft }, { name: "left (after)", value: left }],
+        note: {
+          vi: `Loại bỏ nửa trái (bao gồm mid): left = ${left}.`,
+          en: `Discard the left half (including mid): left = ${left}.`,
+        },
+      });
+    } else {
+      // Line 9: right = mid
+      const oldRight = right;
+      right = mid;
+      steps.push({
+        title: { vi: `right = mid = ${right}`, en: `right = mid = ${right}` },
+        arr: [...nums],
+        sub: nums.map((_, i) => `[${i}]`),
+        highlight: Array.from({ length: right - left }, (_, k) => left + k),
+        mark: [],
+        codeLines: [9],
+        vars: [{ name: "right (before)", value: oldRight }, { name: "right (after)", value: right }],
+        note: {
+          vi: `Giữ mid làm ứng viên, loại bỏ nửa phải: right = ${right}.`,
+          en: `Keep mid as a candidate, discard the right half: right = ${right}.`,
+        },
+      });
+    }
+  }
+
+  // Final while check → False
+  steps.push({
+    title: { vi: `while left=${left} < right=${right} → False`, en: `while left=${left} < right=${right} → False` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [left],
+    codeLines: [4],
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    note: {
+      vi: `left = right = ${left} → thoát vòng lặp. Đây là vị trí đầu tiên mà nums[i] ≥ target.`,
+      en: `left = right = ${left} → exit the loop. This is the first index where nums[i] ≥ target.`,
+    },
+  });
+
+  // Line 10: return left
+  steps.push({
+    title: { vi: `return left = ${left}`, en: `return left = ${left}` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [left],
+    final: true,
+    codeLines: [10],
+    vars: [{ name: "answer", value: left }],
+    note: {
+      vi: left < n && nums[left] === target
+        ? `nums[${left}] = ${target} → target đã có trong mảng tại index ${left}.`
+        : `target=${target} không có trong mảng → nếu chèn vào thì đứng ở index ${left}.`,
+      en: left < n && nums[left] === target
+        ? `nums[${left}] = ${target} → target already exists in the array at index ${left}.`
+        : `target=${target} is not in the array → if inserted, it would sit at index ${left}.`,
+    },
+  });
+
+  return { original: [...nums], answer: left, steps };
+}
+
+module.exports = Object.assign(module.exports, {
+  35: {
+    id: 35,
+    difficulty: "easy",
+    slug: "search-insert-position",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Search Insert Position", en: "Search Insert Position" },
+    titleVi: { vi: "Vị trí chèn khi tìm kiếm", en: "Find the insert position" },
+    statement: {
+      vi: "Cho mảng nums đã sắp xếp tăng dần (không trùng) và target. Trả về index của target nếu tồn tại; nếu không, trả về index mà target sẽ được chèn vào để giữ mảng sắp xếp.",
+      en: "Given a sorted array nums of distinct integers and a target, return the index if target is found. If not, return the index where it would be inserted to keep the array sorted.",
+    },
+    defaultInput: [1, 3, 5, 6],
+    inputKind: "integer",
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 5 },
+    ],
+    approach: [
+      { vi: "Binary search chuẩn: left=0, right=len(nums).", en: "Standard binary search: left=0, right=len(nums)." },
+      { vi: "Nếu nums[mid] < target → left = mid+1. Ngược lại → right = mid.", en: "If nums[mid] < target → left = mid+1. Otherwise → right = mid." },
+      { vi: "Khi left == right, đó chính là vị trí đầu tiên mà nums[i] ≥ target — vừa là kết quả tìm thấy, vừa là vị trí chèn.", en: "When left == right, that is the first index where nums[i] ≥ target — both the found index and the insert position." },
+    ],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi bước chia đôi khoảng tìm kiếm → O(log n). Chỉ dùng vài biến → O(1) bộ nhớ.",
+        en: "Each step halves the search range → O(log n). Only a few variables used → O(1) space.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def searchInsert(self, nums, target):",
+      "        left, right = 0, len(nums)",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            if nums[mid] < target:",
+      "                left = mid + 1",
+      "            else:",
+      "                right = mid",
+      "        return left",
+    ],
+    builder: buildSteps35,
+  },
+});
