@@ -633,73 +633,89 @@ function buildSteps35(nums, params) {
   const n = nums.length;
   const steps = [];
 
+  // Build sub-labels: index, plus L/M/R tags for the pointers that land on it.
+  // right can equal n (one past the last bar), so it never gets a tag on a bar.
+  function labels(l, r, m) {
+    return nums.map((_, i) => {
+      const tags = [];
+      if (i === l) tags.push("L");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === r) tags.push("R");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+  // The active search range is [left, right) — everything else is "discarded".
+  function activeRange(l, r) {
+    return Array.from({ length: Math.max(0, r - l) }, (_, k) => l + k);
+  }
+
   // Line 3: left, right = 0, len(nums)
   let left = 0;
   let right = n;
   steps.push({
     title: { vi: "left, right = 0, len(nums)", en: "left, right = 0, len(nums)" },
     arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [],
+    sub: labels(left, right),
+    highlight: activeRange(left, right),
     mark: [],
     codeLines: [3],
     vars: [
       { name: "nums", value: `[${nums.join(", ")}]` },
       { name: "target", value: target },
-      { name: "left", value: left },
-      { name: "right", value: right },
+      { name: "left (L)", value: left },
+      { name: "right (R)", value: right === n ? `${right} (past last index)` : right },
     ],
     note: {
-      vi: `Tìm vị trí của target=${target} trong nums (đã sắp xếp). left=0, right=n=${n}.`,
-      en: `Find the position of target=${target} in nums (sorted). left=0, right=n=${n}.`,
+      vi: `Tìm target=${target} trong nums đã sắp xếp. Vùng tìm kiếm ban đầu là TOÀN BỘ mảng: L=${left}, R=${right} (một bước sau chỉ số cuối). Các cột sáng = vùng đang xét.`,
+      en: `Find target=${target} in the sorted nums. The initial search range is the WHOLE array: L=${left}, R=${right} (one past the last index). Highlighted bars = the active range.`,
     },
   });
 
   while (left < right) {
     // Line 4: while left < right
     steps.push({
-      title: { vi: `while left=${left} < right=${right} → True`, en: `while left=${left} < right=${right} → True` },
+      title: { vi: `while L=${left} < R=${right} → True`, en: `while L=${left} < R=${right} → True` },
       arr: [...nums],
-      sub: nums.map((_, i) => `[${i}]`),
-      highlight: Array.from({ length: right - left }, (_, k) => left + k),
+      sub: labels(left, right),
+      highlight: activeRange(left, right),
       mark: [],
       codeLines: [4],
-      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      vars: [{ name: "left (L)", value: left }, { name: "right (R)", value: right }],
       note: {
-        vi: `left=${left} < right=${right} → còn khoảng để tìm.`,
-        en: `left=${left} < right=${right} → search range remains.`,
+        vi: `L=${left} < R=${right} → vùng tìm kiếm còn hơn 0 phần tử, tiếp tục thu hẹp.`,
+        en: `L=${left} < R=${right} → the range still has elements, keep narrowing it.`,
       },
     });
 
     // Line 5: mid = (left + right) // 2
     const mid = Math.floor((left + right) / 2);
     steps.push({
-      title: { vi: `mid = (${left}+${right})//2 = ${mid}`, en: `mid = (${left}+${right})//2 = ${mid}` },
+      title: { vi: `M = (L+R)//2 = (${left}+${right})//2 = ${mid}`, en: `M = (L+R)//2 = (${left}+${right})//2 = ${mid}` },
       arr: [...nums],
-      sub: nums.map((_, i) => `[${i}]`),
-      highlight: [mid],
-      mark: [],
+      sub: labels(left, right, mid),
+      highlight: activeRange(left, right),
+      mark: [mid],
       codeLines: [5],
-      vars: [{ name: "mid", value: mid }, { name: "nums[mid]", value: nums[mid] }],
+      vars: [{ name: "mid (M)", value: mid }, { name: "nums[M]", value: nums[mid] }],
       note: {
-        vi: `mid = ${mid}. nums[${mid}] = ${nums[mid]}.`,
-        en: `mid = ${mid}. nums[${mid}] = ${nums[mid]}.`,
+        vi: `Điểm giữa của vùng [${left}, ${right}) là M=${mid}. nums[${mid}] = ${nums[mid]} (cột màu xanh).`,
+        en: `The midpoint of range [${left}, ${right}) is M=${mid}. nums[${mid}] = ${nums[mid]} (highlighted in green).`,
       },
     });
 
     // Line 6: if nums[mid] < target
     const goRight = nums[mid] < target;
     steps.push({
-      title: { vi: `if nums[${mid}]=${nums[mid]} < target=${target} → ${goRight}`, en: `if nums[${mid}]=${nums[mid]} < target=${target} → ${goRight}` },
+      title: { vi: `nums[M]=${nums[mid]} < target=${target} → ${goRight}`, en: `nums[M]=${nums[mid]} < target=${target} → ${goRight}` },
       arr: [...nums],
-      sub: nums.map((_, i) => `[${i}]`),
-      highlight: [mid],
-      mark: [],
+      sub: labels(left, right, mid),
+      highlight: activeRange(left, right),
+      mark: [mid],
       codeLines: [6],
-      vars: [{ name: "nums[mid] < target?", value: goRight }],
+      vars: [{ name: "nums[M] < target?", value: goRight }],
       note: goRight
-        ? { vi: `${nums[mid]} < ${target} → True. target ở nửa phải → left = mid+1.`, en: `${nums[mid]} < ${target} → True. target is in the right half → left = mid+1.` }
-        : { vi: `${nums[mid]} ≥ ${target} → False. target ở nửa trái (hoặc = mid) → right = mid.`, en: `${nums[mid]} ≥ ${target} → False. target is in the left half (or at mid) → right = mid.` },
+        ? { vi: `${nums[mid]} < ${target} → M và mọi thứ bên trái M đều quá nhỏ. target chắc chắn nằm bên PHẢI của M → bỏ nửa trái.`, en: `${nums[mid]} < ${target} → M and everything left of M is too small. target must be to the RIGHT of M → discard the left half.` }
+        : { vi: `${nums[mid]} ≥ ${target} → M có thể LÀ vị trí đúng (hoặc vị trí đúng nằm bên trái M) → giữ M lại, bỏ nửa phải.`, en: `${nums[mid]} ≥ ${target} → M could BE the answer (or the answer is left of M) → keep M, discard the right half.` },
     });
 
     if (goRight) {
@@ -707,16 +723,16 @@ function buildSteps35(nums, params) {
       const oldLeft = left;
       left = mid + 1;
       steps.push({
-        title: { vi: `left = mid + 1 = ${left}`, en: `left = mid + 1 = ${left}` },
+        title: { vi: `L = M + 1 = ${left}  (bỏ [${oldLeft}..${mid}])`, en: `L = M + 1 = ${left}  (discard [${oldLeft}..${mid}])` },
         arr: [...nums],
-        sub: nums.map((_, i) => `[${i}]`),
-        highlight: Array.from({ length: right - left }, (_, k) => left + k),
+        sub: labels(left, right),
+        highlight: activeRange(left, right),
         mark: [],
         codeLines: [7],
-        vars: [{ name: "left (before)", value: oldLeft }, { name: "left (after)", value: left }],
+        vars: [{ name: "left before", value: oldLeft }, { name: "left after (L)", value: left }],
         note: {
-          vi: `Loại bỏ nửa trái (bao gồm mid): left = ${left}.`,
-          en: `Discard the left half (including mid): left = ${left}.`,
+          vi: `Vùng tìm kiếm co lại thành [${left}, ${right}) — các cột mờ đã bị loại.`,
+          en: `The search range shrinks to [${left}, ${right}) — dimmed bars have been eliminated.`,
         },
       });
     } else {
@@ -724,16 +740,16 @@ function buildSteps35(nums, params) {
       const oldRight = right;
       right = mid;
       steps.push({
-        title: { vi: `right = mid = ${right}`, en: `right = mid = ${right}` },
+        title: { vi: `R = M = ${right}  (bỏ [${right}..${oldRight - 1}], giữ M làm ứng viên)`, en: `R = M = ${right}  (discard [${right}..${oldRight - 1}], keep M as a candidate)` },
         arr: [...nums],
-        sub: nums.map((_, i) => `[${i}]`),
-        highlight: Array.from({ length: right - left }, (_, k) => left + k),
+        sub: labels(left, right),
+        highlight: activeRange(left, right),
         mark: [],
         codeLines: [9],
-        vars: [{ name: "right (before)", value: oldRight }, { name: "right (after)", value: right }],
+        vars: [{ name: "right before", value: oldRight }, { name: "right after (R)", value: right }],
         note: {
-          vi: `Giữ mid làm ứng viên, loại bỏ nửa phải: right = ${right}.`,
-          en: `Keep mid as a candidate, discard the right half: right = ${right}.`,
+          vi: `Vùng tìm kiếm co lại thành [${left}, ${right}) — M vẫn có thể là đáp án nên KHÔNG bị loại.`,
+          en: `The search range shrinks to [${left}, ${right}) — M might still be the answer, so it is NOT eliminated.`,
         },
       });
     }
@@ -741,16 +757,16 @@ function buildSteps35(nums, params) {
 
   // Final while check → False
   steps.push({
-    title: { vi: `while left=${left} < right=${right} → False`, en: `while left=${left} < right=${right} → False` },
+    title: { vi: `while L=${left} < R=${right} → False`, en: `while L=${left} < R=${right} → False` },
     arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
+    sub: labels(left, right),
     highlight: [],
-    mark: [left],
+    mark: [Math.min(left, n - 1 >= 0 ? left : 0)].filter((i) => i >= 0 && i < n),
     codeLines: [4],
-    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    vars: [{ name: "left (L)", value: left }, { name: "right (R)", value: right }],
     note: {
-      vi: `left = right = ${left} → thoát vòng lặp. Đây là vị trí đầu tiên mà nums[i] ≥ target.`,
-      en: `left = right = ${left} → exit the loop. This is the first index where nums[i] ≥ target.`,
+      vi: `L và R đã gặp nhau tại ${left} → vùng tìm kiếm chỉ còn 0 phần tử. Đây chính là vị trí đầu tiên mà nums[i] ≥ target.`,
+      en: `L and R have met at ${left} → the search range is down to 0 elements. This is the first index where nums[i] ≥ target.`,
     },
   });
 
@@ -758,23 +774,291 @@ function buildSteps35(nums, params) {
   steps.push({
     title: { vi: `return left = ${left}`, en: `return left = ${left}` },
     arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
+    sub: labels(left, right),
     highlight: [],
-    mark: [left],
+    mark: [left].filter((i) => i >= 0 && i < n),
     final: true,
     codeLines: [10],
     vars: [{ name: "answer", value: left }],
-    note: {
-      vi: left < n && nums[left] === target
-        ? `nums[${left}] = ${target} → target đã có trong mảng tại index ${left}.`
-        : `target=${target} không có trong mảng → nếu chèn vào thì đứng ở index ${left}.`,
-      en: left < n && nums[left] === target
-        ? `nums[${left}] = ${target} → target already exists in the array at index ${left}.`
-        : `target=${target} is not in the array → if inserted, it would sit at index ${left}.`,
-    },
+    note: left < n && nums[left] === target
+      ? { vi: `nums[${left}] = ${target} → target đã có sẵn trong mảng, tại index ${left}.`, en: `nums[${left}] = ${target} → target already exists in the array, at index ${left}.` }
+      : { vi: `target=${target} không có trong mảng. Nếu chèn vào để giữ thứ tự tăng, nó sẽ đứng ở index ${left}.`, en: `target=${target} is not in the array. If inserted to keep the array sorted, it would sit at index ${left}.` },
   });
 
   return { original: [...nums], answer: left, steps };
+}
+
+/**
+ * LeetCode 35 — Approach 2: Closed-interval binary search [start, end] with
+ * an early return on exact match, plus a post-loop check.
+ */
+function buildSteps35v2(nums, params) {
+  const target = Number(params && params.target !== undefined ? params.target : nums[0]);
+  const n = nums.length;
+  const steps = [];
+
+  function labels(s, e, m) {
+    return nums.map((_, i) => {
+      const tags = [];
+      if (i === s) tags.push("S");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === e) tags.push("E");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+  function activeRange(s, e) {
+    return Array.from({ length: Math.max(0, e - s + 1) }, (_, k) => s + k);
+  }
+
+  // Line 3: start = 0
+  let start = 0;
+  steps.push({
+    title: { vi: "start = 0", en: "start = 0" },
+    arr: [...nums],
+    sub: labels(start, undefined),
+    highlight: [],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [3],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "target", value: target },
+      { name: "start (S)", value: start },
+    ],
+    note: {
+      vi: `Tìm target=${target}. Đây là closed-interval binary search: cả start và end đều là chỉ số HỢP LỆ (khác với cách 1 dùng right = len(nums)).`,
+      en: `Find target=${target}. This is a closed-interval binary search: both start and end are VALID indices (unlike Approach 1 which uses right = len(nums)).`,
+    },
+  });
+
+  // Line 4: end = len(nums) - 1
+  let end = n - 1;
+  steps.push({
+    title: { vi: `end = len(nums) - 1 = ${end}`, en: `end = len(nums) - 1 = ${end}` },
+    arr: [...nums],
+    sub: labels(start, end),
+    highlight: activeRange(start, end),
+    mark: [],
+    codeBlock: 2,
+    codeLines: [4],
+    vars: [{ name: "end (E)", value: end }],
+    note: {
+      vi: `end = ${end} (chỉ số cuối cùng của mảng). Vùng tìm kiếm ban đầu: [S=${start}, E=${end}] — bao gồm CẢ HAI đầu.`,
+      en: `end = ${end} (the array's last index). Initial search range: [S=${start}, E=${end}] — INCLUDING both ends.`,
+    },
+  });
+
+  while (start < end) {
+    // Line 5: while start < end
+    steps.push({
+      title: { vi: `while S=${start} < E=${end} → True`, en: `while S=${start} < E=${end} → True` },
+      arr: [...nums],
+      sub: labels(start, end),
+      highlight: activeRange(start, end),
+      mark: [],
+      codeBlock: 2,
+      codeLines: [5],
+      vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+      note: {
+        vi: `S=${start} < E=${end} → vùng [${start}, ${end}] có hơn 1 phần tử, tiếp tục.`,
+        en: `S=${start} < E=${end} → range [${start}, ${end}] has more than 1 element, continue.`,
+      },
+    });
+
+    // Line 6: mid = (start + end) // 2
+    const mid = Math.floor((start + end) / 2);
+    steps.push({
+      title: { vi: `M = (S+E)//2 = (${start}+${end})//2 = ${mid}`, en: `M = (S+E)//2 = (${start}+${end})//2 = ${mid}` },
+      arr: [...nums],
+      sub: labels(start, end, mid),
+      highlight: activeRange(start, end),
+      mark: [mid],
+      codeBlock: 2,
+      codeLines: [6],
+      vars: [{ name: "mid (M)", value: mid }, { name: "nums[M]", value: nums[mid] }],
+      note: {
+        vi: `M = ${mid}. nums[${mid}] = ${nums[mid]}.`,
+        en: `M = ${mid}. nums[${mid}] = ${nums[mid]}.`,
+      },
+    });
+
+    // Line 7: if nums[mid] == target
+    const isMatch = nums[mid] === target;
+    steps.push({
+      title: { vi: `if nums[M]=${nums[mid]} == target=${target} → ${isMatch}`, en: `if nums[M]=${nums[mid]} == target=${target} → ${isMatch}` },
+      arr: [...nums],
+      sub: labels(start, end, mid),
+      highlight: activeRange(start, end),
+      mark: [mid],
+      codeBlock: 2,
+      codeLines: [7],
+      vars: [{ name: "nums[M] == target?", value: isMatch }],
+      note: isMatch
+        ? { vi: `${nums[mid]} == ${target} → Tìm thấy chính xác! Return luôn M=${mid}.`, en: `${nums[mid]} == ${target} → Exact match found! Return M=${mid} immediately.` }
+        : { vi: `${nums[mid]} ≠ ${target} → chưa khớp, tiếp tục kiểm tra hướng.`, en: `${nums[mid]} ≠ ${target} → not a match yet, check which direction to go.` },
+    });
+
+    if (isMatch) {
+      // Line 8: return mid
+      steps.push({
+        title: { vi: `return mid = ${mid}`, en: `return mid = ${mid}` },
+        arr: [...nums],
+        sub: labels(start, end, mid),
+        highlight: [],
+        mark: [mid],
+        final: true,
+        codeBlock: 2,
+        codeLines: [8],
+        vars: [{ name: "answer", value: mid }],
+        note: {
+          vi: `Trả về ngay index ${mid} vì nums[${mid}] = ${target} khớp chính xác. (Đây là điểm khác biệt so với Cách 1 — không cần đợi vòng lặp kết thúc.)`,
+          en: `Return index ${mid} immediately since nums[${mid}] = ${target} matches exactly. (This is the key difference from Approach 1 — no need to wait for the loop to end.)`,
+        },
+      });
+      return { original: [...nums], answer: mid, steps };
+    }
+
+    // Line 9: elif nums[mid] > target
+    const goLeft = nums[mid] > target;
+    steps.push({
+      title: { vi: `elif nums[M]=${nums[mid]} > target=${target} → ${goLeft}`, en: `elif nums[M]=${nums[mid]} > target=${target} → ${goLeft}` },
+      arr: [...nums],
+      sub: labels(start, end, mid),
+      highlight: activeRange(start, end),
+      mark: [mid],
+      codeBlock: 2,
+      codeLines: [9],
+      vars: [{ name: "nums[M] > target?", value: goLeft }],
+      note: goLeft
+        ? { vi: `${nums[mid]} > ${target} → M quá lớn, target nằm bên TRÁI của M → end = mid.`, en: `${nums[mid]} > ${target} → M is too large, target is to the LEFT of M → end = mid.` }
+        : { vi: `${nums[mid]} < ${target} → M quá nhỏ, target nằm bên PHẢI của M → vào nhánh else.`, en: `${nums[mid]} < ${target} → M is too small, target is to the RIGHT of M → go to else.` },
+    });
+
+    if (goLeft) {
+      // Line 10: end = mid
+      const oldEnd = end;
+      end = mid;
+      steps.push({
+        title: { vi: `E = M = ${end}  (bỏ [${end + 1}..${oldEnd}], giữ M làm ứng viên)`, en: `E = M = ${end}  (discard [${end + 1}..${oldEnd}], keep M as a candidate)` },
+        arr: [...nums],
+        sub: labels(start, end),
+        highlight: activeRange(start, end),
+        mark: [],
+        codeBlock: 2,
+        codeLines: [10],
+        vars: [{ name: "end before", value: oldEnd }, { name: "end after (E)", value: end }],
+        note: {
+          vi: `Vùng tìm kiếm co lại thành [${start}, ${end}] — M vẫn có thể là đáp án (chèn tại vị trí M) nên giữ lại.`,
+          en: `The search range shrinks to [${start}, ${end}] — M could still be the answer (insert at M), so it's kept.`,
+        },
+      });
+    } else {
+      // Line 11: else
+      steps.push({
+        title: { vi: `else:`, en: `else:` },
+        arr: [...nums],
+        sub: labels(start, end, mid),
+        highlight: activeRange(start, end),
+        mark: [mid],
+        codeBlock: 2,
+        codeLines: [11],
+        vars: [],
+        note: {
+          vi: `nums[M] < target → vào nhánh else.`,
+          en: `nums[M] < target → enter the else branch.`,
+        },
+      });
+
+      // Line 12: start = mid + 1
+      const oldStart = start;
+      start = mid + 1;
+      steps.push({
+        title: { vi: `S = M + 1 = ${start}  (bỏ [${oldStart}..${mid}])`, en: `S = M + 1 = ${start}  (discard [${oldStart}..${mid}])` },
+        arr: [...nums],
+        sub: labels(start, end),
+        highlight: activeRange(start, end),
+        mark: [],
+        codeBlock: 2,
+        codeLines: [12],
+        vars: [{ name: "start before", value: oldStart }, { name: "start after (S)", value: start }],
+        note: {
+          vi: `Vùng tìm kiếm co lại thành [${start}, ${end}] — M và mọi thứ bên trái M đã bị loại.`,
+          en: `The search range shrinks to [${start}, ${end}] — M and everything left of M has been eliminated.`,
+        },
+      });
+    }
+  }
+
+  // Final while check → False
+  steps.push({
+    title: { vi: `while S=${start} < E=${end} → False`, en: `while S=${start} < E=${end} → False` },
+    arr: [...nums],
+    sub: labels(start, end),
+    highlight: activeRange(start, end),
+    mark: [],
+    codeBlock: 2,
+    codeLines: [5],
+    vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+    note: {
+      vi: `S=${start} = E=${end} → chỉ còn 1 phần tử trong vùng tìm kiếm. Thoát vòng lặp, cần kiểm tra hậu kỳ.`,
+      en: `S=${start} = E=${end} → only 1 element remains in the range. Exit the loop, a post-loop check is needed.`,
+    },
+  });
+
+  // Line 13: if nums[start] >= target
+  const found = nums[start] >= target;
+  steps.push({
+    title: { vi: `if nums[S]=${nums[start]} >= target=${target} → ${found}`, en: `if nums[S]=${nums[start]} >= target=${target} → ${found}` },
+    arr: [...nums],
+    sub: labels(start, end),
+    highlight: [start],
+    mark: [],
+    codeBlock: 2,
+    codeLines: [13],
+    vars: [{ name: "nums[S] >= target?", value: found }],
+    note: found
+      ? { vi: `${nums[start]} ≥ ${target} → target thuộc tại hoặc trước vị trí S=${start}. Trả về S.`, en: `${nums[start]} ≥ ${target} → target belongs at or before position S=${start}. Return S.` }
+      : { vi: `${nums[start]} < ${target} → target lớn hơn cả phần tử cuối cùng còn lại → chèn NGAY SAU S.`, en: `${nums[start]} < ${target} → target is larger than the last remaining element → insert RIGHT AFTER S.` },
+  });
+
+  const answer = found ? start : start + 1;
+
+  if (found) {
+    // Line 14: return start
+    steps.push({
+      title: { vi: `return start = ${start}`, en: `return start = ${start}` },
+      arr: [...nums],
+      sub: labels(start, end),
+      highlight: [],
+      mark: [start],
+      final: true,
+      codeBlock: 2,
+      codeLines: [14],
+      vars: [{ name: "answer", value: answer }],
+      note: nums[start] === target
+        ? { vi: `nums[${start}] = ${target} → target có sẵn tại index ${start}.`, en: `nums[${start}] = ${target} → target already exists at index ${start}.` }
+        : { vi: `nums[${start}] > ${target} → chèn target vào index ${start} để giữ thứ tự tăng.`, en: `nums[${start}] > ${target} → insert target at index ${start} to keep the array sorted.` },
+    });
+  } else {
+    // Line 16: return start + 1
+    steps.push({
+      title: { vi: `return start + 1 = ${answer}`, en: `return start + 1 = ${answer}` },
+      arr: [...nums],
+      sub: labels(start, end),
+      highlight: [],
+      mark: [answer].filter((i) => i < n),
+      final: true,
+      codeBlock: 2,
+      codeLines: [16],
+      vars: [{ name: "answer", value: answer }],
+      note: {
+        vi: `target=${target} lớn hơn mọi phần tử → chèn vào cuối mảng, tại index ${answer}.`,
+        en: `target=${target} is larger than every element → insert at the end of the array, at index ${answer}.`,
+      },
+    });
+  }
+
+  return { original: [...nums], answer, steps };
 }
 
 module.exports = Object.assign(module.exports, {
@@ -793,20 +1077,29 @@ module.exports = Object.assign(module.exports, {
     inputKind: "integer",
     extraParams: [
       { key: "target", label: { vi: "target", en: "target" }, default: 5 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Half-open [left, right)", en: "Approach 1: Half-open [left, right)" } },
+          { value: "2", label: { vi: "Cách 2: Closed [start, end] + early return", en: "Approach 2: Closed [start, end] + early return" } },
+        ],
+      },
     ],
     approach: [
-      { vi: "Binary search chuẩn: left=0, right=len(nums).", en: "Standard binary search: left=0, right=len(nums)." },
-      { vi: "Nếu nums[mid] < target → left = mid+1. Ngược lại → right = mid.", en: "If nums[mid] < target → left = mid+1. Otherwise → right = mid." },
-      { vi: "Khi left == right, đó chính là vị trí đầu tiên mà nums[i] ≥ target — vừa là kết quả tìm thấy, vừa là vị trí chèn.", en: "When left == right, that is the first index where nums[i] ≥ target — both the found index and the insert position." },
+      { vi: "Cách 1: Binary search half-open [left, right). Nếu nums[mid] < target → left=mid+1. Ngược lại → right=mid.", en: "Approach 1: Half-open binary search [left, right). If nums[mid] < target → left=mid+1. Otherwise → right=mid." },
+      { vi: "Cách 2: Binary search closed [start, end]. Nếu nums[mid]==target → return luôn. Nếu nums[mid]>target → end=mid. Ngược lại → start=mid+1.", en: "Approach 2: Closed-interval binary search [start, end]. If nums[mid]==target → return immediately. If nums[mid]>target → end=mid. Otherwise → start=mid+1." },
+      { vi: "Cách 2 cần bước hậu kỳ sau vòng lặp: so sánh nums[start] với target để quyết định trả start hay start+1.", en: "Approach 2 needs a post-loop check: compare nums[start] with target to decide whether to return start or start+1." },
     ],
     complexity: {
       time: "O(log n)",
       space: "O(1)",
       note: {
-        vi: "Mỗi bước chia đôi khoảng tìm kiếm → O(log n). Chỉ dùng vài biến → O(1) bộ nhớ.",
-        en: "Each step halves the search range → O(log n). Only a few variables used → O(1) space.",
+        vi: "Cả 2 cách đều O(log n) time, O(1) space. Cách 1 đơn giản hơn (không cần hậu kỳ); cách 2 có thể return sớm khi tìm thấy target chính xác.",
+        en: "Both are O(log n) time, O(1) space. Approach 1 is simpler (no post-loop step); Approach 2 can return early on an exact target match.",
       },
     },
+    codeLabel: { vi: "Cách 1: Half-open [left, right)", en: "Approach 1: Half-open [left, right)" },
+    code2Label: { vi: "Cách 2: Closed [start, end]", en: "Approach 2: Closed [start, end]" },
     code: [
       "class Solution:",
       "    def searchInsert(self, nums, target):",
@@ -819,6 +1112,27 @@ module.exports = Object.assign(module.exports, {
       "                right = mid",
       "        return left",
     ],
-    builder: buildSteps35,
+    code2: [
+      "class Solution:",
+      "    def searchInsert(self, nums, target):",
+      "        start = 0",
+      "        end = len(nums) - 1",
+      "        while start < end:",
+      "            mid = (start + end) // 2",
+      "            if nums[mid] == target:",
+      "                return mid",
+      "            elif nums[mid] > target:",
+      "                end = mid",
+      "            else:",
+      "                start = mid + 1",
+      "        if nums[start] >= target:",
+      "            return start",
+      "        else:",
+      "            return start + 1",
+    ],
+    builder: (nums, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps35v2(nums, params) : buildSteps35(nums, params);
+    },
   },
 });
