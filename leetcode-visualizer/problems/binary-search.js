@@ -545,7 +545,7 @@ function buildSteps911(persons, params) {
 
 module.exports = {
   __meta: {
-    order: [911],
+    order: [34, 911],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   911: {
@@ -620,6 +620,234 @@ module.exports = {
     builder: buildSteps911,
   },
 };
+
+/**
+ * LeetCode 34: Find First and Last Position of Element in Sorted Array.
+ * Two half-open binary searches [left, right):
+ *  - lowerBound(target): first index where nums[i] >= target.
+ *  - lowerBound(target + 1): first index where nums[i] >= target + 1,
+ *    i.e. first index where nums[i] > target. Subtract 1 to get the last
+ *    occurrence of target.
+ * If lowerBound(target) is out of range or doesn't actually equal target,
+ * target isn't present → return [-1, -1].
+ */
+function buildSteps34(nums, params) {
+  const target = Number(params && params.target !== undefined ? params.target : nums[0]);
+  const n = nums.length;
+  const steps = [];
+
+  function labels(l, r, m) {
+    return nums.map((_, i) => {
+      const tags = [];
+      if (i === l) tags.push("L");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === r) tags.push("R");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+  function activeRange(l, r) {
+    return Array.from({ length: Math.max(0, r - l) }, (_, k) => l + k);
+  }
+
+  // lowerBound(x): first index where nums[i] >= x. Emits one step per line,
+  // codeBlock 1 = lowerBound helper, tagged with which call site (first/second).
+  function lowerBound(x, callLabel) {
+    let left = 0;
+    let right = n;
+    steps.push({
+      title: { vi: `lowerBound(${x}): left, right = 0, len(nums)`, en: `lowerBound(${x}): left, right = 0, len(nums)` },
+      arr: [...nums],
+      sub: labels(left, right),
+      highlight: activeRange(left, right),
+      mark: [],
+      codeLines: [4],
+      vars: [{ name: "call", value: callLabel }, { name: "x", value: x }, { name: "left (L)", value: left }, { name: "right (R)", value: right }],
+      note: {
+        vi: `${callLabel}: tìm chỉ số đầu tiên có nums[i] ≥ ${x}. Vùng tìm kiếm ban đầu là toàn bộ mảng.`,
+        en: `${callLabel}: find the first index where nums[i] ≥ ${x}. The initial search range is the whole array.`,
+      },
+    });
+
+    while (left < right) {
+      steps.push({
+        title: { vi: `while L=${left} < R=${right} → True`, en: `while L=${left} < R=${right} → True` },
+        arr: [...nums],
+        sub: labels(left, right),
+        highlight: activeRange(left, right),
+        mark: [],
+        codeLines: [5],
+        vars: [{ name: "left (L)", value: left }, { name: "right (R)", value: right }],
+        note: {
+          vi: `L=${left} < R=${right} → còn vùng để thu hẹp.`,
+          en: `L=${left} < R=${right} → there's still a range to narrow.`,
+        },
+      });
+
+      const mid = Math.floor((left + right) / 2);
+      steps.push({
+        title: { vi: `M = (L+R)//2 = ${mid}`, en: `M = (L+R)//2 = ${mid}` },
+        arr: [...nums],
+        sub: labels(left, right, mid),
+        highlight: activeRange(left, right),
+        mark: [mid],
+        codeLines: [6],
+        vars: [{ name: "mid (M)", value: mid }, { name: "nums[M]", value: nums[mid] }],
+        note: { vi: `Điểm giữa vùng [${left}, ${right}) là M=${mid}. nums[${mid}] = ${nums[mid]}.`, en: `The midpoint of [${left}, ${right}) is M=${mid}. nums[${mid}] = ${nums[mid]}.` },
+      });
+
+      const goRight = nums[mid] < x;
+      steps.push({
+        title: { vi: `nums[M]=${nums[mid]} < x=${x} → ${goRight}`, en: `nums[M]=${nums[mid]} < x=${x} → ${goRight}` },
+        arr: [...nums],
+        sub: labels(left, right, mid),
+        highlight: activeRange(left, right),
+        mark: [mid],
+        codeLines: [7],
+        vars: [{ name: "nums[M] < x?", value: goRight }],
+        note: goRight
+          ? { vi: `${nums[mid]} < ${x} → M quá nhỏ, đáp án nằm bên PHẢI của M → bỏ nửa trái.`, en: `${nums[mid]} < ${x} → M is too small, the answer is to the RIGHT of M → discard the left half.` }
+          : { vi: `${nums[mid]} ≥ ${x} → M có thể là đáp án → giữ M, bỏ nửa phải.`, en: `${nums[mid]} ≥ ${x} → M could be the answer → keep M, discard the right half.` },
+      });
+
+      if (goRight) {
+        const oldLeft = left;
+        left = mid + 1;
+        steps.push({
+          title: { vi: `L = M + 1 = ${left}`, en: `L = M + 1 = ${left}` },
+          arr: [...nums],
+          sub: labels(left, right),
+          highlight: activeRange(left, right),
+          mark: [],
+          codeLines: [8],
+          vars: [{ name: "left before", value: oldLeft }, { name: "left after (L)", value: left }],
+          note: { vi: `Vùng tìm kiếm co lại thành [${left}, ${right}).`, en: `The search range shrinks to [${left}, ${right}).` },
+        });
+      } else {
+        const oldRight = right;
+        right = mid;
+        steps.push({
+          title: { vi: `R = M = ${right}`, en: `R = M = ${right}` },
+          arr: [...nums],
+          sub: labels(left, right),
+          highlight: activeRange(left, right),
+          mark: [],
+          codeLines: [9],
+          vars: [{ name: "right before", value: oldRight }, { name: "right after (R)", value: right }],
+          note: { vi: `Vùng tìm kiếm co lại thành [${left}, ${right}) — M vẫn có thể là đáp án nên không bị loại.`, en: `The search range shrinks to [${left}, ${right}) — M might still be the answer, so it's kept.` },
+        });
+      }
+    }
+
+    steps.push({
+      title: { vi: `while L=${left} < R=${right} → False`, en: `while L=${left} < R=${right} → False` },
+      arr: [...nums],
+      sub: labels(left, right),
+      highlight: [],
+      mark: [left].filter((i) => i >= 0 && i < n),
+      codeLines: [5],
+      vars: [{ name: "left (L)", value: left }, { name: "right (R)", value: right }],
+      note: { vi: `L và R gặp nhau tại ${left} → return ${left}.`, en: `L and R meet at ${left} → return ${left}.` },
+    });
+    steps.push({
+      title: { vi: `lowerBound(${x}) return left = ${left}`, en: `lowerBound(${x}) return left = ${left}` },
+      arr: [...nums],
+      sub: labels(left, right),
+      highlight: [],
+      mark: [left].filter((i) => i >= 0 && i < n),
+      codeLines: [11],
+      vars: [{ name: "returns", value: left }],
+      note: { vi: `${callLabel} trả về ${left}.`, en: `${callLabel} returns ${left}.` },
+    });
+    return left;
+  }
+
+  steps.push({
+    title: { vi: `Bắt đầu findFirstLast(nums, ${target})`, en: `Start findFirstLast(nums, ${target})` },
+    arr: [...nums],
+    sub: labels(0, n),
+    highlight: activeRange(0, n),
+    mark: [],
+    codeLines: [12],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "target", value: target }],
+    note: {
+      vi: `Cần tìm vị trí đầu và cuối của ${target}. Gọi lowerBound(target) để tìm biên trái.`,
+      en: `Need to find the first and last position of ${target}. Call lowerBound(target) to find the left boundary.`,
+    },
+  });
+
+  const first = lowerBound(target, "lowerBound(target) — first call, finds left boundary");
+
+  const notFound = first === n || nums[first] !== target;
+  steps.push({
+    title: { vi: `first==len(nums) or nums[first]!=target? ${notFound}`, en: `first==len(nums) or nums[first]!=target? ${notFound}` },
+    arr: [...nums],
+    sub: labels(first, first),
+    highlight: [],
+    mark: first < n ? [first] : [],
+    codeLines: [13],
+    vars: [{ name: "first", value: first }, { name: "nums[first]", value: first < n ? nums[first] : "out of range" }],
+    note: notFound
+      ? { vi: `first=${first}: ${first === n ? "vượt quá mảng" : `nums[${first}]=${nums[first]} ≠ ${target}`} → target không tồn tại.`, en: `first=${first}: ${first === n ? "out of bounds" : `nums[${first}]=${nums[first]} ≠ ${target}`} → target does not exist.` }
+      : { vi: `first=${first}: nums[${first}]=${target} → target tồn tại, tiếp tục tìm biên phải.`, en: `first=${first}: nums[${first}]=${target} → target exists, proceed to find the right boundary.` },
+  });
+
+  if (notFound) {
+    steps.push({
+      title: { vi: "return [-1, -1]", en: "return [-1, -1]" },
+      arr: [...nums],
+      sub: labels(-1, -1),
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [14],
+      vars: [{ name: "answer", value: "[-1, -1]" }],
+      note: { vi: `${target} không có trong mảng.`, en: `${target} is not in the array.` },
+    });
+    return { original: [...nums], answer: "[-1, -1]", steps };
+  }
+
+  steps.push({
+    title: { vi: `Bắt đầu gọi lowerBound(target + 1) = lowerBound(${target + 1})`, en: `Begin calling lowerBound(target + 1) = lowerBound(${target + 1})` },
+    arr: [...nums],
+    sub: labels(first, first),
+    highlight: [],
+    mark: [first],
+    codeLines: [15],
+    vars: [{ name: "target + 1", value: target + 1 }],
+    note: {
+      vi: `Biên phải = chỉ số đầu tiên có nums[i] > target, trừ 1. Tính bằng lowerBound(target+1) - 1.`,
+      en: `The right boundary = the first index where nums[i] > target, minus 1. Computed as lowerBound(target+1) - 1.`,
+    },
+  });
+
+  const lastBoundStart = lowerBound(target + 1, "lowerBound(target + 1) — second call, finds right boundary");
+  const last = lastBoundStart - 1;
+
+  steps.push({
+    title: { vi: `last = lowerBound(target+1) - 1 = ${lastBoundStart} - 1 = ${last}`, en: `last = lowerBound(target+1) - 1 = ${lastBoundStart} - 1 = ${last}` },
+    arr: [...nums],
+    sub: labels(first, last),
+    highlight: [],
+    mark: [first, last].filter((i, idx, arr) => arr.indexOf(i) === idx),
+    codeLines: [15],
+    vars: [{ name: "last", value: last }],
+    note: { vi: `Chỉ số cuối cùng của ${target} là ${last}.`, en: `The last index of ${target} is ${last}.` },
+  });
+
+  steps.push({
+    title: { vi: `return [first, last] = [${first}, ${last}]`, en: `return [first, last] = [${first}, ${last}]` },
+    arr: [...nums],
+    sub: labels(first, last),
+    highlight: Array.from({ length: last - first + 1 }, (_, i) => first + i),
+    mark: [first, last].filter((i, idx, arr) => arr.indexOf(i) === idx),
+    final: true,
+    codeLines: [16],
+    vars: [{ name: "answer", value: `[${first}, ${last}]` }],
+    note: { vi: `${target} xuất hiện từ index ${first} đến ${last}.`, en: `${target} appears from index ${first} to ${last}.` },
+  });
+
+  return { original: [...nums], answer: `[${first}, ${last}]`, steps };
+}
 
 /**
  * LeetCode 35: Search Insert Position.
@@ -1062,6 +1290,55 @@ function buildSteps35v2(nums, params) {
 }
 
 module.exports = Object.assign(module.exports, {
+  34: {
+    id: 34,
+    difficulty: "medium",
+    slug: "find-first-and-last-position-of-element-in-sorted-array",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Find First and Last Position of Element in Sorted Array", en: "Find First and Last Position of Element in Sorted Array" },
+    titleVi: { vi: "Tìm vị trí đầu và cuối của phần tử", en: "Find first and last position of a target" },
+    statement: {
+      vi: "Cho mảng nums đã sắp xếp tăng dần và target. Trả về [first, last] là chỉ số đầu và cuối của target trong nums, hoặc [-1, -1] nếu target không tồn tại.",
+      en: "Given a sorted array nums and a target, return [first, last], the first and last index of target in nums, or [-1, -1] if target does not exist.",
+    },
+    defaultInput: [5, 7, 7, 8, 8, 10],
+    inputKind: "integer",
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 8 },
+    ],
+    approach: [
+      { vi: "Viết hàm lowerBound(x): binary search half-open [left, right) trả về chỉ số đầu tiên có nums[i] ≥ x.", en: "Write a lowerBound(x) helper: half-open [left, right) binary search returning the first index where nums[i] ≥ x." },
+      { vi: "first = lowerBound(target). Nếu vượt mảng hoặc nums[first] ≠ target → target không tồn tại, trả [-1, -1].", en: "first = lowerBound(target). If out of bounds or nums[first] ≠ target → target doesn't exist, return [-1, -1]." },
+      { vi: "last = lowerBound(target + 1) - 1 (chỉ số đầu tiên có nums[i] > target, rồi trừ 1 để lùi về phần tử cuối bằng target).", en: "last = lowerBound(target + 1) - 1 (the first index where nums[i] > target, then subtract 1 to land on the last element equal to target)." },
+    ],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Hai lần binary search độc lập, mỗi lần O(log n) → tổng O(log n).",
+        en: "Two independent binary searches, each O(log n) → total O(log n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def searchRange(self, nums, target):",
+      "        def lowerBound(x):",
+      "            left, right = 0, len(nums)",
+      "            while left < right:",
+      "                mid = (left + right) // 2",
+      "                if nums[mid] < x:",
+      "                    left = mid + 1",
+      "                else:",
+      "                    right = mid",
+      "            return left",
+      "        first = lowerBound(target)",
+      "        if first == len(nums) or nums[first] != target:",
+      "            return [-1, -1]",
+      "        last = lowerBound(target + 1) - 1",
+      "        return [first, last]",
+    ],
+    builder: buildSteps34,
+  },
   35: {
     id: 35,
     difficulty: "easy",
