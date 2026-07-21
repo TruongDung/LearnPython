@@ -4221,118 +4221,652 @@ function buildSteps3499(input) {
   let pre = -Infinity;
   let index = 0;
 
+  const preStr = () => (pre === -Infinity ? "-inf" : pre);
+
+  // Line 3: n = len(s)
   steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
+    title: { vi: "n = len(s)", en: "n = len(s)" },
     arr: values,
     sub: chars,
     highlight: [],
     mark: [],
-    codeLines: [3, 4, 5, 6, 7],
+    codeLines: [3],
     vars: [
       { name: "s", value: `"${s}"` },
       { name: "n", value: n },
-      { name: "ans (đếm số '1')", value: 0 },
-      { name: "pre (đoạn '0' trước)", value: "-inf" },
-      { name: "mx (gain tốt nhất)", value: 0 },
     ],
     note: {
-      vi:
-        `s = "${s}". Coi như có '1' ảo ở 2 đầu.\n` +
-        `Duyệt từng đoạn ký tự liên tiếp giống nhau. Đoạn '1' → cộng vào ans.\n` +
-        `Đoạn '0' → so sánh pre + đoạn hiện tại để tìm 2 đoạn '0' liền kề (cách nhau 1 đoạn '1') có tổng lớn nhất.`,
-      en:
-        `s = "${s}". Treated as if surrounded by imaginary '1's.\n` +
-        `Scan consecutive same-character segments. '1' segment → add to ans.\n` +
-        `'0' segment → compare pre + current to find the best pair of adjacent '0' blocks (separated by one '1' block).`,
+      vi: `s = "${s}". Coi như có '1' ảo ở 2 đầu. n = ${n}.`,
+      en: `s = "${s}". Treated as if surrounded by imaginary '1's. n = ${n}.`,
+    },
+  });
+
+  // Line 4: ans = 0
+  steps.push({
+    title: { vi: "ans = 0", en: "ans = 0" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [4],
+    vars: [{ name: "ans", value: ans }],
+    note: {
+      vi: "ans sẽ đếm tổng số '1' hiện có trong s.",
+      en: "ans will accumulate the total count of existing '1's in s.",
+    },
+  });
+
+  // Line 5: index = 0
+  steps.push({
+    title: { vi: "index = 0", en: "index = 0" },
+    arr: values,
+    sub: chars,
+    highlight: [0],
+    mark: [],
+    codeLines: [5],
+    vars: [{ name: "index", value: index }],
+    note: {
+      vi: "index là con trỏ bắt đầu của đoạn hiện tại.",
+      en: "index is the start pointer of the current segment.",
+    },
+  });
+
+  // Line 6: pre = float('-inf')
+  steps.push({
+    title: { vi: "pre = -inf", en: "pre = -inf" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [6],
+    vars: [{ name: "pre", value: "-inf" }],
+    note: {
+      vi: "pre = độ dài đoạn '0' liền trước. -inf đảm bảo đoạn '0' đầu tiên không tính gain sai.",
+      en: "pre = length of the previous '0' segment. -inf ensures the first '0' segment doesn't wrongly count a gain.",
+    },
+  });
+
+  // Line 7: mx = 0
+  steps.push({
+    title: { vi: "mx = 0", en: "mx = 0" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [7],
+    vars: [{ name: "mx", value: mx }],
+    note: {
+      vi: "mx = gain tốt nhất có thể đạt được từ 1 lần trade (tổng 2 đoạn '0' liền kề).",
+      en: "mx = best possible gain from one trade (sum of two adjacent '0' segments).",
     },
   });
 
   while (index < n) {
+    // Line 9: while index < n
+    steps.push({
+      title: { vi: `while index=${index} < n=${n} → True`, en: `while index=${index} < n=${n} → True` },
+      arr: values,
+      sub: chars,
+      highlight: [index],
+      mark: [],
+      codeLines: [9],
+      vars: [
+        { name: "index", value: index },
+        { name: "n", value: n },
+      ],
+      note: {
+        vi: `index=${index} < n=${n} → còn ký tự để xét, tiếp tục vòng lặp.`,
+        en: `index=${index} < n=${n} → characters remain, continue looping.`,
+      },
+    });
+
+    // Line 10: end = index + 1
     let segmentEnd = index + 1;
-    while (segmentEnd < n && s[segmentEnd] === s[index]) segmentEnd++;
+    steps.push({
+      title: { vi: `end = index + 1 = ${segmentEnd}`, en: `end = index + 1 = ${segmentEnd}` },
+      arr: values,
+      sub: chars,
+      highlight: [index],
+      mark: [],
+      codeLines: [10],
+      vars: [
+        { name: "index", value: index },
+        { name: "end", value: segmentEnd },
+      ],
+      note: {
+        vi: "end bắt đầu quét từ ký tự kế tiếp để tìm cuối đoạn liên tiếp.",
+        en: "end starts scanning from the next character to find the end of the run.",
+      },
+    });
+
+    // Line 11-12: inner while — scan forward while same char
+    while (segmentEnd < n && s[segmentEnd] === s[index]) {
+      steps.push({
+        title: { vi: `while s[${segmentEnd}]='${s[segmentEnd]}' == s[${index}]='${s[index]}' → True`, en: `while s[${segmentEnd}]='${s[segmentEnd]}' == s[${index}]='${s[index]}' → True` },
+        arr: values,
+        sub: chars,
+        highlight: Array.from({ length: segmentEnd - index + 1 }, (_, k) => index + k),
+        mark: [],
+        codeLines: [11],
+        vars: [
+          { name: "end", value: segmentEnd },
+          { name: `s[${segmentEnd}]`, value: s[segmentEnd] },
+          { name: `s[${index}]`, value: s[index] },
+        ],
+        note: {
+          vi: `s[${segmentEnd}] giống s[${index}] → cùng đoạn, mở rộng end.`,
+          en: `s[${segmentEnd}] matches s[${index}] → same segment, extend end.`,
+        },
+      });
+
+      segmentEnd++;
+      steps.push({
+        title: { vi: `end += 1 → end = ${segmentEnd}`, en: `end += 1 → end = ${segmentEnd}` },
+        arr: values,
+        sub: chars,
+        highlight: Array.from({ length: segmentEnd - index }, (_, k) => index + k),
+        mark: [],
+        codeLines: [12],
+        vars: [{ name: "end", value: segmentEnd }],
+        note: {
+          vi: `end = ${segmentEnd}. Tiếp tục kiểm tra ký tự kế tiếp.`,
+          en: `end = ${segmentEnd}. Continue checking the next character.`,
+        },
+      });
+    }
+
+    // Show the (now False) while check that exits the inner loop, unless we
+    // never entered it (segment of length 1) — still show it once for clarity.
+    steps.push({
+      title: {
+        vi: segmentEnd < n
+          ? `while s[${segmentEnd}]='${s[segmentEnd]}' == s[${index}]='${s[index]}' → False`
+          : `while end=${segmentEnd} < n=${n} → False`,
+        en: segmentEnd < n
+          ? `while s[${segmentEnd}]='${s[segmentEnd]}' == s[${index}]='${s[index]}' → False`
+          : `while end=${segmentEnd} < n=${n} → False`,
+      },
+      arr: values,
+      sub: chars,
+      highlight: Array.from({ length: segmentEnd - index }, (_, k) => index + k),
+      mark: [],
+      codeLines: [11],
+      vars: [{ name: "end", value: segmentEnd }],
+      note: {
+        vi: "Đoạn liên tiếp kết thúc tại đây. Thoát vòng lặp trong.",
+        en: "The consecutive run ends here. Exit the inner loop.",
+      },
+    });
+
+    // Line 13: cur = end - index
     const curLen = segmentEnd - index;
     const range = Array.from({ length: curLen }, (_, k) => index + k);
+    steps.push({
+      title: { vi: `cur = end - index = ${segmentEnd} - ${index} = ${curLen}`, en: `cur = end - index = ${segmentEnd} - ${index} = ${curLen}` },
+      arr: values,
+      sub: chars,
+      highlight: range,
+      mark: [],
+      codeLines: [13],
+      vars: [
+        { name: "end", value: segmentEnd },
+        { name: "index", value: index },
+        { name: "cur", value: curLen },
+      ],
+      note: {
+        vi: `Đoạn [${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}", độ dài cur = ${curLen}.`,
+        en: `Segment [${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}", length cur = ${curLen}.`,
+      },
+    });
 
-    if (s[index] === "1") {
+    // Line 15: if s[index] == '1'
+    const isOne = s[index] === "1";
+    steps.push({
+      title: { vi: `if s[${index}]='${s[index]}' == '1' → ${isOne}`, en: `if s[${index}]='${s[index]}' == '1' → ${isOne}` },
+      arr: values,
+      sub: chars,
+      highlight: range,
+      mark: [],
+      codeLines: [15],
+      vars: [{ name: `s[${index}]`, value: s[index] }, { name: "is '1'?", value: isOne }],
+      note: isOne
+        ? { vi: `s[${index}]='1' → đây là đoạn '1', cộng vào ans.`, en: `s[${index}]='1' → this is a '1' segment, add to ans.` }
+        : { vi: `s[${index}]='0' → đây là đoạn '0', vào nhánh else.`, en: `s[${index}]='0' → this is a '0' segment, go to else branch.` },
+    });
+
+    if (isOne) {
+      // Line 16: ans += cur
       const oldAns = ans;
       ans += curLen;
       steps.push({
-        title: { vi: `Đoạn '1' [${index}..${segmentEnd - 1}]: ans += ${curLen}`, en: `'1' segment [${index}..${segmentEnd - 1}]: ans += ${curLen}` },
+        title: { vi: `ans += cur → ans = ${oldAns} + ${curLen} = ${ans}`, en: `ans += cur → ans = ${oldAns} + ${curLen} = ${ans}` },
         arr: values,
         sub: chars,
         highlight: range,
         mark: [],
-        codeLines: [9, 10, 11, 12, 13, 15, 16],
+        codeLines: [16],
         vars: [
-          { name: "segment", value: `s[${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}"` },
-          { name: "length", value: curLen },
-          { name: "ans", value: `${oldAns} + ${curLen} = ${ans}` },
-          { name: "pre", value: pre === -Infinity ? "-inf" : pre },
-          { name: "mx", value: mx },
+          { name: "ans (before)", value: oldAns },
+          { name: "cur", value: curLen },
+          { name: "ans (after)", value: ans },
         ],
         note: {
-          vi: `Đoạn '1' dài ${curLen} tại [${index}..${segmentEnd - 1}]. Đây là số '1' đã có sẵn → ans = ${oldAns} + ${curLen} = ${ans}.`,
-          en: `'1' segment of length ${curLen} at [${index}..${segmentEnd - 1}]. These are existing active sections → ans = ${oldAns} + ${curLen} = ${ans}.`,
+          vi: `Đoạn '1' dài ${curLen} là số '1' có sẵn → ans = ${oldAns} + ${curLen} = ${ans}.`,
+          en: `The '1' segment of length ${curLen} is existing active sections → ans = ${oldAns} + ${curLen} = ${ans}.`,
         },
       });
     } else {
+      // Line 18: mx = max(mx, pre + cur)
       const oldMx = mx;
+      const preBefore = preStr();
       const candidate = pre + curLen;
       mx = Math.max(mx, candidate);
       const updated = mx !== oldMx;
-
       steps.push({
-        title: {
-          vi: `Đoạn '0' [${index}..${segmentEnd - 1}]: mx = max(${oldMx}, ${pre === -Infinity ? "-inf" : pre}+${curLen})`,
-          en: `'0' segment [${index}..${segmentEnd - 1}]: mx = max(${oldMx}, ${pre === -Infinity ? "-inf" : pre}+${curLen})`,
-        },
+        title: { vi: `mx = max(mx, pre+cur) = max(${oldMx}, ${preBefore}+${curLen}) = ${mx}`, en: `mx = max(mx, pre+cur) = max(${oldMx}, ${preBefore}+${curLen}) = ${mx}` },
         arr: values,
         sub: chars,
         highlight: range,
         mark: updated ? range : [],
-        codeLines: [9, 10, 11, 12, 13, 17, 18],
+        codeLines: [18],
         vars: [
-          { name: "segment", value: `s[${index}..${segmentEnd - 1}] = "${s.slice(index, segmentEnd)}"` },
-          { name: "length (cur)", value: curLen },
-          { name: "pre (đoạn '0' trước)", value: pre === -Infinity ? "-inf" : pre },
-          { name: "candidate = pre + cur", value: pre === -Infinity ? "-inf" : candidate },
-          { name: "mx", value: `${updated ? `cập nhật → ${mx}` : mx}` },
-          { name: "ans", value: ans },
+          { name: "mx (before)", value: oldMx },
+          { name: "pre", value: preBefore },
+          { name: "cur", value: curLen },
+          { name: "pre+cur", value: pre === -Infinity ? "-inf" : candidate },
+          { name: "mx (after)", value: mx },
         ],
         note: {
-          vi:
-            pre === -Infinity
-              ? `Đoạn '0' đầu tiên, dài ${curLen}. Chưa có đoạn '0' trước nên chưa tính gain. pre = ${curLen}.`
-              : `Đoạn '0' dài ${curLen}. Ghép với đoạn '0' trước (dài ${pre}, cách nhau 1 đoạn '1') → tổng = ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}.`,
-          en:
-            pre === -Infinity
-              ? `First '0' segment, length ${curLen}. No previous '0' segment yet, so no gain computed. pre = ${curLen}.`
-              : `'0' segment of length ${curLen}. Pair with the previous '0' segment (length ${pre}, one '1' block apart) → sum = ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}.`,
+          vi: pre === -Infinity
+            ? `pre=-inf nên pre+cur=-inf, mx giữ nguyên = ${mx}.`
+            : `Ghép đoạn '0' này (dài ${curLen}) với đoạn '0' trước (dài ${pre}) → tổng ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (cập nhật!)" : ""}.`,
+          en: pre === -Infinity
+            ? `pre=-inf so pre+cur=-inf, mx stays = ${mx}.`
+            : `Pair this '0' segment (length ${curLen}) with the previous one (length ${pre}) → sum ${candidate}. mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (updated!)" : ""}.`,
         },
       });
+
+      // Line 19: pre = cur
+      const oldPre = preStr();
       pre = curLen;
+      steps.push({
+        title: { vi: `pre = cur → pre = ${pre}`, en: `pre = cur → pre = ${pre}` },
+        arr: values,
+        sub: chars,
+        highlight: range,
+        mark: [],
+        codeLines: [19],
+        vars: [
+          { name: "pre (before)", value: oldPre },
+          { name: "pre (after)", value: pre },
+        ],
+        note: {
+          vi: `pre cập nhật thành độ dài đoạn '0' vừa xét: pre = ${pre}.`,
+          en: `pre updates to the length of this '0' segment: pre = ${pre}.`,
+        },
+      });
     }
 
+    // Line 21: index = end
+    const oldIndex = index;
     index = segmentEnd;
+    steps.push({
+      title: { vi: `index = end → index = ${index}`, en: `index = end → index = ${index}` },
+      arr: values,
+      sub: chars,
+      highlight: index < n ? [index] : [],
+      mark: [],
+      codeLines: [21],
+      vars: [
+        { name: "index (before)", value: oldIndex },
+        { name: "index (after)", value: index },
+      ],
+      note: {
+        vi: `Chuyển sang đoạn kế tiếp: index = ${index}.`,
+        en: `Move to the next segment: index = ${index}.`,
+      },
+    });
   }
 
+  // Final while check → False
+  steps.push({
+    title: { vi: `while index=${index} < n=${n} → False`, en: `while index=${index} < n=${n} → False` },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [9],
+    vars: [{ name: "index", value: index }, { name: "n", value: n }],
+    note: {
+      vi: "Đã xét hết chuỗi. Thoát vòng lặp ngoài.",
+      en: "The whole string has been scanned. Exit the outer loop.",
+    },
+  });
+
+  // Line 23: return ans + mx
   const answer = ans + mx;
   steps.push({
-    title: { vi: `Kết quả: ans + mx = ${ans} + ${mx} = ${answer}`, en: `Result: ans + mx = ${ans} + ${mx} = ${answer}` },
+    title: { vi: `return ans + mx = ${ans} + ${mx} = ${answer}`, en: `return ans + mx = ${ans} + ${mx} = ${answer}` },
     arr: values,
     sub: chars,
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [21],
+    codeLines: [23],
     vars: [
-      { name: "ans (số '1' gốc)", value: ans },
-      { name: "mx (gain tốt nhất từ trade)", value: mx },
+      { name: "ans", value: ans },
+      { name: "mx", value: mx },
       { name: "answer", value: answer },
     ],
     note: {
       vi: `Tổng số '1' gốc = ${ans}. Gain tốt nhất từ 1 lần trade = ${mx}. Kết quả = ${ans} + ${mx} = ${answer}.`,
       en: `Original '1' count = ${ans}. Best gain from one trade = ${mx}. Result = ${ans} + ${mx} = ${answer}.`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
+ * LeetCode 3499 — Approach 2: Sliding Window on runs.
+ * Step 1: compress s into runs (character, length) via run-length encoding.
+ * Step 2: ans = sum of lengths of '1' runs.
+ * Step 3: slide a window of size 3 over the runs array; whenever the middle
+ * run is '1', its two '0' neighbors are merge candidates — mx tracks the
+ * best combined length.
+ */
+function buildSteps3499Sliding(input) {
+  const s = String(input || "").trim();
+  const n = s.length;
+  const steps = [];
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Chuỗi rỗng", en: "Empty string" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Chuỗi rỗng → 0 khu vực hoạt động.", en: "Empty string → 0 active sections." },
+    });
+    return { original: s, answer: 0, steps };
+  }
+
+  const chars = s.split("");
+  const values = chars.map((c) => (c === "1" ? 1 : 0.4));
+
+  // Line 3: n = len(s)
+  steps.push({
+    title: { vi: "n = len(s)", en: "n = len(s)" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "n", value: n }],
+    note: {
+      vi: `s = "${s}". n = ${n}. Bước 1: nén chuỗi thành các đoạn (runs).`,
+      en: `s = "${s}". n = ${n}. Step 1: compress the string into runs.`,
+    },
+  });
+
+  // Line 4: runs = []
+  const runs = []; // [{ch, len, start}]
+  steps.push({
+    title: { vi: "runs = []", en: "runs = []" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [4],
+    vars: [{ name: "runs", value: "[]" }],
+    note: {
+      vi: "runs sẽ lưu danh sách (ký tự, độ dài) của từng đoạn liên tiếp.",
+      en: "runs will store the (character, length) list of each consecutive segment.",
+    },
+  });
+
+  // Line 5: i = 0
+  let i = 0;
+  steps.push({
+    title: { vi: "i = 0", en: "i = 0" },
+    arr: values,
+    sub: chars,
+    highlight: [0],
+    mark: [],
+    codeLines: [5],
+    vars: [{ name: "i", value: i }],
+    note: { vi: "i là con trỏ bắt đầu đoạn hiện tại.", en: "i is the start pointer of the current run." },
+  });
+
+  while (i < n) {
+    // Line 6: while i < n
+    steps.push({
+      title: { vi: `while i=${i} < n=${n} → True`, en: `while i=${i} < n=${n} → True` },
+      arr: values,
+      sub: chars,
+      highlight: [i],
+      mark: [],
+      codeLines: [6],
+      vars: [{ name: "i", value: i }],
+      note: { vi: "Còn ký tự để nén.", en: "Characters remain to compress." },
+    });
+
+    // Line 7: j = i
+    let j = i;
+    steps.push({
+      title: { vi: `j = i = ${j}`, en: `j = i = ${j}` },
+      arr: values,
+      sub: chars,
+      highlight: [i],
+      mark: [],
+      codeLines: [7],
+      vars: [{ name: "j", value: j }],
+      note: { vi: "j quét về phía trước để tìm cuối đoạn.", en: "j scans forward to find the end of the run." },
+    });
+
+    // Line 8-9: inner while
+    while (j < n && s[j] === s[i]) {
+      steps.push({
+        title: { vi: `while s[${j}]='${s[j]}' == s[${i}]='${s[i]}' → True`, en: `while s[${j}]='${s[j]}' == s[${i}]='${s[i]}' → True` },
+        arr: values,
+        sub: chars,
+        highlight: Array.from({ length: j - i + 1 }, (_, k) => i + k),
+        mark: [],
+        codeLines: [8],
+        vars: [{ name: "j", value: j }],
+        note: { vi: "Ký tự giống → cùng đoạn, mở rộng j.", en: "Same character → same run, extend j." },
+      });
+      j++;
+      steps.push({
+        title: { vi: `j += 1 → j = ${j}`, en: `j += 1 → j = ${j}` },
+        arr: values,
+        sub: chars,
+        highlight: Array.from({ length: j - i }, (_, k) => i + k),
+        mark: [],
+        codeLines: [9],
+        vars: [{ name: "j", value: j }],
+        note: { vi: `j = ${j}.`, en: `j = ${j}.` },
+      });
+    }
+    steps.push({
+      title: {
+        vi: j < n ? `while s[${j}]='${s[j]}' == s[${i}]='${s[i]}' → False` : `while j=${j} < n=${n} → False`,
+        en: j < n ? `while s[${j}]='${s[j]}' == s[${i}]='${s[i]}' → False` : `while j=${j} < n=${n} → False`,
+      },
+      arr: values,
+      sub: chars,
+      highlight: Array.from({ length: j - i }, (_, k) => i + k),
+      mark: [],
+      codeLines: [8],
+      vars: [{ name: "j", value: j }],
+      note: { vi: "Đoạn kết thúc tại đây.", en: "The run ends here." },
+    });
+
+    // Line 10: runs.append((s[i], j - i))
+    const runLen = j - i;
+    runs.push({ ch: s[i], len: runLen, start: i });
+    steps.push({
+      title: { vi: `runs.append(('${s[i]}', ${runLen}))`, en: `runs.append(('${s[i]}', ${runLen}))` },
+      arr: values,
+      sub: chars,
+      highlight: Array.from({ length: runLen }, (_, k) => i + k),
+      mark: [],
+      codeLines: [10],
+      vars: [{ name: "run", value: `('${s[i]}', ${runLen})` }, { name: "runs", value: `[${runs.map((r) => `('${r.ch}',${r.len})`).join(", ")}]` }],
+      note: {
+        vi: `Đoạn [${i}..${j - 1}] = "${s.slice(i, j)}" → runs += ('${s[i]}', ${runLen}).`,
+        en: `Segment [${i}..${j - 1}] = "${s.slice(i, j)}" → runs += ('${s[i]}', ${runLen}).`,
+      },
+    });
+
+    // Line 11: i = j
+    i = j;
+    steps.push({
+      title: { vi: `i = j → i = ${i}`, en: `i = j → i = ${i}` },
+      arr: values,
+      sub: chars,
+      highlight: i < n ? [i] : [],
+      mark: [],
+      codeLines: [11],
+      vars: [{ name: "i", value: i }],
+      note: { vi: `Chuyển sang đoạn kế tiếp: i = ${i}.`, en: `Move to next run: i = ${i}.` },
+    });
+  }
+
+  steps.push({
+    title: { vi: `while i=${i} < n=${n} → False`, en: `while i=${i} < n=${n} → False` },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [6],
+    vars: [{ name: "i", value: i }],
+    note: { vi: "Đã nén hết chuỗi thành runs.", en: "The whole string has been compressed into runs." },
+  });
+
+  // Show runs as its own bar chart from here on (run lengths as bars, char as sub-label)
+  const runArr = runs.map((r) => r.len);
+  const runSub = runs.map((r) => r.ch);
+  const runRangeAll = (idx) => {
+    const r = runs[idx];
+    return Array.from({ length: r.len }, (_, k) => r.start + k);
+  };
+
+  // Line 13: ans = sum(length for ch, length in runs if ch == '1')
+  const ans = runs.filter((r) => r.ch === "1").reduce((sum, r) => sum + r.len, 0);
+  const onesIdx = runs.map((r, idx) => (r.ch === "1" ? idx : -1)).filter((x) => x >= 0);
+  const onesHighlight = onesIdx.flatMap((idx) => runRangeAll(idx));
+  steps.push({
+    title: { vi: `ans = sum('1' runs) = ${ans}`, en: `ans = sum('1' runs) = ${ans}` },
+    arr: values,
+    sub: chars,
+    highlight: onesHighlight,
+    mark: [],
+    codeLines: [13],
+    vars: [
+      { name: "runs", value: `[${runs.map((r) => `('${r.ch}',${r.len})`).join(", ")}]` },
+      { name: "ans", value: ans },
+    ],
+    note: {
+      vi: `Cộng độ dài các đoạn '1': ${runs.filter((r) => r.ch === "1").map((r) => r.len).join(" + ") || 0} = ${ans}.`,
+      en: `Sum the lengths of '1' runs: ${runs.filter((r) => r.ch === "1").map((r) => r.len).join(" + ") || 0} = ${ans}.`,
+    },
+  });
+
+  // Line 15: mx = 0
+  let mx = 0;
+  steps.push({
+    title: { vi: "mx = 0", en: "mx = 0" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [15],
+    vars: [{ name: "mx", value: mx }],
+    note: { vi: "mx = gain tốt nhất từ sliding window kích thước 3 trên runs.", en: "mx = best gain from the size-3 sliding window over runs." },
+  });
+
+  // Lines 16-18: for k in range(1, len(runs)-1)
+  for (let k = 1; k <= runs.length - 2; k++) {
+    const windowHighlight = [runRangeAll(k - 1), runRangeAll(k), runRangeAll(k + 1)].flat();
+
+    steps.push({
+      title: { vi: `for k=${k}: window = runs[${k - 1}..${k + 1}]`, en: `for k=${k}: window = runs[${k - 1}..${k + 1}]` },
+      arr: values,
+      sub: chars,
+      highlight: windowHighlight,
+      mark: [],
+      codeLines: [16],
+      vars: [
+        { name: "k", value: k },
+        { name: "window", value: `[('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len})]` },
+      ],
+      note: {
+        vi: `Cửa sổ 3 đoạn tại k=${k}: ('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len}).`,
+        en: `Window of 3 runs at k=${k}: ('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len}).`,
+      },
+    });
+
+    const middleIsOne = runs[k].ch === "1";
+    steps.push({
+      title: { vi: `if runs[${k}][0]=='${runs[k].ch}' == '1' → ${middleIsOne}`, en: `if runs[${k}][0]=='${runs[k].ch}' == '1' → ${middleIsOne}` },
+      arr: values,
+      sub: chars,
+      highlight: windowHighlight,
+      mark: [],
+      codeLines: [17],
+      vars: [{ name: `runs[${k}][0]`, value: runs[k].ch }, { name: "is '1'?", value: middleIsOne }],
+      note: middleIsOne
+        ? { vi: "Đoạn giữa là '1' → 2 đoạn '0' hai bên là ứng viên merge.", en: "Middle run is '1' → the two '0' neighbors are merge candidates." }
+        : { vi: "Đoạn giữa là '0' → không hợp lệ (không thể trade '0' giữa 2 '0').", en: "Middle run is '0' → not valid (cannot trade '0' between two '0's)." },
+    });
+
+    if (middleIsOne) {
+      const oldMx = mx;
+      const candidate = runs[k - 1].len + runs[k + 1].len;
+      mx = Math.max(mx, candidate);
+      const updated = mx !== oldMx;
+      steps.push({
+        title: { vi: `mx = max(${oldMx}, ${runs[k-1].len}+${runs[k+1].len}) = ${mx}`, en: `mx = max(${oldMx}, ${runs[k-1].len}+${runs[k+1].len}) = ${mx}` },
+        arr: values,
+        sub: chars,
+        highlight: windowHighlight,
+        mark: updated ? [runRangeAll(k - 1), runRangeAll(k + 1)].flat() : [],
+        codeLines: [18],
+        vars: [
+          { name: "mx (before)", value: oldMx },
+          { name: "runs[k-1][1] + runs[k+1][1]", value: candidate },
+          { name: "mx (after)", value: mx },
+        ],
+        note: {
+          vi: `Merge 2 đoạn '0' hai bên (${runs[k-1].len} + ${runs[k+1].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (cập nhật!)" : ""}.`,
+          en: `Merge the two '0' neighbors (${runs[k-1].len} + ${runs[k+1].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (updated!)" : ""}.`,
+        },
+      });
+    }
+  }
+
+  // Line 20: return ans + mx
+  const answer = ans + mx;
+  steps.push({
+    title: { vi: `return ans + mx = ${ans} + ${mx} = ${answer}`, en: `return ans + mx = ${ans} + ${mx} = ${answer}` },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [20],
+    vars: [
+      { name: "ans", value: ans },
+      { name: "mx", value: mx },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Tổng số '1' gốc = ${ans}. Gain tốt nhất từ sliding window = ${mx}. Kết quả = ${ans} + ${mx} = ${answer}.`,
+      en: `Original '1' count = ${ans}. Best gain from sliding window = ${mx}. Result = ${ans} + ${mx} = ${answer}.`,
     },
   });
 
@@ -5365,20 +5899,31 @@ module.exports = {
     defaultInput: "00111000",
     inputKind: "string",
     inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Two-pointer segment scan", en: "Approach 1: Two-pointer segment scan" } },
+          { value: "2", label: { vi: "Cách 2: Sliding Window trên runs", en: "Approach 2: Sliding Window on runs" } },
+        ],
+      },
+    ],
     approach: [
       { vi: "Đếm tổng số '1' hiện có trong s → ans.", en: "Count the existing total number of '1's in s → ans." },
       { vi: "Xoá 1 đoạn '1' bị kẹp giữa 2 đoạn '0' sẽ MERGE 2 đoạn '0' đó thành 1 đoạn lớn, có thể đổi hết thành '1'.", en: "Removing a '1' block sandwiched between two '0' blocks MERGES those '0' blocks, which can then all become '1'." },
-      { vi: "Vậy gain tốt nhất = tổng lớn nhất của 2 đoạn '0' liên tiếp (cách nhau đúng 1 đoạn '1'). Kết quả = ans + mx.", en: "So the best gain = the largest sum of two adjacent '0' segments (separated by exactly one '1' segment). Result = ans + mx." },
+      { vi: "Cách 1: quét trực tiếp, tính ans/mx song song trong 1 lần đi qua chuỗi.", en: "Approach 1: scan directly, computing ans/mx together in one pass over the string." },
+      { vi: "Cách 2: nén chuỗi thành các đoạn (run-length encoding), rồi trượt window kích thước 3 qua mảng đoạn — nếu đoạn giữa là '1', 2 đoạn '0' hai bên là ứng viên merge.", en: "Approach 2: compress the string into runs (RLE), then slide a window of size 3 over the runs — if the middle run is '1', its two '0' neighbors are merge candidates." },
     ],
     complexity: {
       time: "O(n)",
-      space: "O(1)",
+      space: "O(1) / O(số đoạn)",
       note: {
-        vi: "Duyệt chuỗi một lần theo từng đoạn ký tự liên tiếp (two-pointer). O(1) bộ nhớ.",
-        en: "Single pass over the string by consecutive segments (two-pointer). O(1) extra memory.",
+        vi: "Cách 1: two-pointer, O(1) bộ nhớ. Cách 2: nén thành runs O(n), rồi sliding window O(số đoạn) ≤ O(n), cần O(số đoạn) bộ nhớ lưu runs.",
+        en: "Approach 1: two-pointer, O(1) memory. Approach 2: compress into runs O(n), then sliding window O(number of runs) ≤ O(n), needs O(number of runs) memory to store runs.",
       },
     },
+    codeLabel: { vi: "Cách 1: Two-pointer scan", en: "Approach 1: Two-pointer scan" },
+    code2Label: { vi: "Cách 2: Sliding Window trên runs", en: "Approach 2: Sliding Window on runs" },
     code: [
       "class Solution:",
       "    def maxActiveSectionsAfterTrade(self, s: str) -> int:",
@@ -5404,6 +5949,31 @@ module.exports = {
       "",
       "        return ans + mx",
     ],
-    builder: buildSteps3499,
+    code2: [
+      "class Solution:",
+      "    def maxActiveSectionsAfterTrade(self, s: str) -> int:",
+      "        n = len(s)",
+      "        runs = []",
+      "        i = 0",
+      "        while i < n:",
+      "            j = i",
+      "            while j < n and s[j] == s[i]:",
+      "                j += 1",
+      "            runs.append((s[i], j - i))",
+      "            i = j",
+      "",
+      "        ans = sum(length for ch, length in runs if ch == '1')",
+      "",
+      "        mx = 0",
+      "        for k in range(1, len(runs) - 1):",
+      "            if runs[k][0] == '1':",
+      "                mx = max(mx, runs[k - 1][1] + runs[k + 1][1])",
+      "",
+      "        return ans + mx",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps3499Sliding(input) : buildSteps3499(input);
+    },
   },
 };
