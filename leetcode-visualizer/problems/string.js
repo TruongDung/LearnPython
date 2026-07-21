@@ -2762,8 +2762,7 @@ function buildSteps394Main(input) {
 
   function frameItems() {
     return stack.map((frame) => ({
-      value: `number=${frame.repeat}`,
-      detail: `current="${frame.prefix}"`,
+      value: `("${frame.prefix}", ${frame.repeat})`,
     }));
   }
 
