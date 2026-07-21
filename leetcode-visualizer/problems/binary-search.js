@@ -632,6 +632,12 @@ module.exports = {
  * target isn't present → return [-1, -1].
  */
 function buildSteps34(nums, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps34Alt(nums, params);
+  return buildSteps34Main(nums, params);
+}
+
+function buildSteps34Main(nums, params) {
   const target = Number(params && params.target !== undefined ? params.target : nums[0]);
   const n = nums.length;
   const steps = [];
@@ -842,6 +848,415 @@ function buildSteps34(nums, params) {
     mark: [first, last].filter((i, idx, arr) => arr.indexOf(i) === idx),
     final: true,
     codeLines: [16],
+    vars: [{ name: "answer", value: `[${first}, ${last}]` }],
+    note: { vi: `${target} xuất hiện từ index ${first} đến ${last}.`, en: `${target} appears from index ${first} to ${last}.` },
+  });
+
+  return { original: [...nums], answer: `[${first}, ${last}]`, steps };
+}
+
+/**
+ * LeetCode 34, approach 2: two closed-interval binary searches with a
+ * left-biased mid, one for the first occurrence (findFirst) and one for the
+ * last occurrence (findLast). findLast needs an extra fix: because mid is
+ * floor-biased, a 2-element window [start, start+1] always computes
+ * mid = start; if nums[mid] == target the loop would set start = mid (no
+ * progress) and spin forever. The fix forces mid = end whenever the window
+ * has shrunk to exactly 2 elements, guaranteeing progress every iteration.
+ * Line-by-line trace of the exact code shown to the user:
+ *  1  class Solution:
+ *  2      def searchRange(self, nums, target):
+ *  3          if len(nums) == 0:
+ *  4              return [-1, -1]
+ *  5          first = self.findFirst(nums, target)
+ *  6          if first == -1:
+ *  7              return [-1, -1]
+ *  8          last = self.findLast(nums, target)
+ *  9          return [first, last]
+ * 10      def findFirst(self, nums, target):
+ * 11          start, end = 0, len(nums) - 1
+ * 12          while start < end:
+ * 13              mid = (start + end) // 2
+ * 14              if nums[mid] == target:
+ * 15                  end = mid
+ * 16              elif nums[mid] > target:
+ * 17                  end = mid - 1
+ * 18              else:
+ * 19                  start = mid + 1
+ * 20          if nums[start] == target:
+ * 21              return start
+ * 22          else:
+ * 23              return -1
+ * 24      def findLast(self, nums, target):
+ * 25          start, end = 0, len(nums) - 1
+ * 26          while start < end:
+ * 27              mid = (start + end) // 2
+ * 28              if start + 1 == end:
+ * 29                  mid = end
+ * 30              if nums[mid] == target:
+ * 31                  start = mid
+ * 32              elif nums[mid] > target:
+ * 33                  end = mid - 1
+ * 34              else:
+ * 35                  start = mid + 1
+ * 36          if nums[start] == target:
+ * 37              return start
+ * 38          else:
+ * 39              return -1
+ */
+function buildSteps34Alt(nums, params) {
+  const target = Number(params && params.target !== undefined ? params.target : nums[0]);
+  const n = nums.length;
+  const steps = [];
+
+  function labels(s, e, m) {
+    return nums.map((_, i) => {
+      const tags = [];
+      if (i === s) tags.push("S");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === e) tags.push("E");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+  function activeRange(s, e) {
+    return s > e ? [] : Array.from({ length: e - s + 1 }, (_, k) => s + k);
+  }
+  function push({ title, s, e, m, highlight, mark, codeLines, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: labels(s, e, m),
+      highlight: highlight !== undefined ? highlight : activeRange(s, e),
+      mark: mark || [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
+  }
+
+  if (n === 0) {
+    push({
+      title: { vi: "len(nums) == 0 → return [-1, -1]", en: "len(nums) == 0 → return [-1, -1]" },
+      s: -1, e: -1,
+      codeLines: [4],
+      final: true,
+      vars: [{ name: "answer", value: "[-1, -1]" }],
+      note: { vi: "Mảng rỗng, không có gì để tìm.", en: "The array is empty, nothing to find." },
+    });
+    return { original: [...nums], answer: "[-1, -1]", steps };
+  }
+
+  push({
+    title: { vi: `Bắt đầu searchRange(nums, ${target})`, en: `Start searchRange(nums, ${target})` },
+    s: 0, e: n - 1,
+    codeLines: [5],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "target", value: target }],
+    note: { vi: `Gọi findFirst để tìm vị trí xuất hiện đầu tiên của ${target}.`, en: `Call findFirst to locate the first occurrence of ${target}.` },
+  });
+
+  // findFirst: closed interval [start, end], mid biased left. No special fix needed
+  // because setting end = mid when start < end always strictly decreases end.
+  function findFirst() {
+    let start = 0;
+    let end = n - 1;
+    push({
+      title: { vi: "findFirst: start, end = 0, len(nums)-1", en: "findFirst: start, end = 0, len(nums)-1" },
+      s: start, e: end,
+      codeLines: [11],
+      vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+      note: { vi: "Vùng tìm kiếm ban đầu là toàn bộ mảng.", en: "The initial search range is the whole array." },
+    });
+
+    while (start < end) {
+      push({
+        title: { vi: `while S=${start} < E=${end} → True`, en: `while S=${start} < E=${end} → True` },
+        s: start, e: end,
+        codeLines: [12],
+        vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+        note: { vi: "Còn hơn 1 phần tử trong vùng, tiếp tục thu hẹp.", en: "More than one element remains in range, keep narrowing." },
+      });
+
+      const mid = Math.floor((start + end) / 2);
+      push({
+        title: { vi: `M = (S+E)//2 = ${mid}`, en: `M = (S+E)//2 = ${mid}` },
+        s: start, e: end, m: mid,
+        codeLines: [13],
+        mark: [mid],
+        vars: [{ name: "mid (M)", value: mid }, { name: "nums[M]", value: nums[mid] }],
+        note: { vi: `nums[${mid}] = ${nums[mid]}.`, en: `nums[${mid}] = ${nums[mid]}.` },
+      });
+
+      if (nums[mid] === target) {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} == target=${target} → True`, en: `nums[M]=${nums[mid]} == target=${target} → True` },
+          s: start, e: end, m: mid,
+          codeLines: [14],
+          mark: [mid],
+          note: { vi: "M chính là target → có thể là đáp án, giữ M, thu hẹp E về M.", en: "M itself equals target → could be the answer, keep M, shrink E to M." },
+        });
+        end = mid;
+        push({
+          title: { vi: `E = M = ${end}`, en: `E = M = ${end}` },
+          s: start, e: end,
+          codeLines: [15],
+          note: { vi: `Vùng co lại thành [${start}, ${end}] — M vẫn có thể là vị trí đầu tiên nên không bị loại.`, en: `Range shrinks to [${start}, ${end}] — M might still be the first occurrence, so it's kept.` },
+        });
+      } else if (nums[mid] > target) {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} > target=${target} → True`, en: `nums[M]=${nums[mid]} > target=${target} → True` },
+          s: start, e: end, m: mid,
+          codeLines: [16],
+          mark: [mid],
+          note: { vi: "M quá lớn → target (nếu có) nằm bên trái M → loại M và mọi thứ bên phải.", en: "M is too large → target (if present) is left of M → discard M and everything to its right." },
+        });
+        end = mid - 1;
+        push({
+          title: { vi: `E = M - 1 = ${end}`, en: `E = M - 1 = ${end}` },
+          s: start, e: end,
+          codeLines: [17],
+          note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
+        });
+      } else {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} < target=${target} → else`, en: `nums[M]=${nums[mid]} < target=${target} → else` },
+          s: start, e: end, m: mid,
+          codeLines: [18],
+          mark: [mid],
+          note: { vi: "M quá nhỏ → target nằm bên phải M → loại M và mọi thứ bên trái.", en: "M is too small → target is right of M → discard M and everything to its left." },
+        });
+        start = mid + 1;
+        push({
+          title: { vi: `S = M + 1 = ${start}`, en: `S = M + 1 = ${start}` },
+          s: start, e: end,
+          codeLines: [19],
+          note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
+        });
+      }
+    }
+
+    push({
+      title: { vi: `while S=${start} < E=${end} → False`, en: `while S=${start} < E=${end} → False` },
+      s: start, e: end,
+      highlight: [],
+      mark: [start],
+      codeLines: [12],
+      vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+      note: { vi: `S và E gặp nhau tại ${start}.`, en: `S and E meet at ${start}.` },
+    });
+
+    const found = nums[start] === target;
+    push({
+      title: { vi: `nums[start]=${nums[start]} == target=${target}? ${found}`, en: `nums[start]=${nums[start]} == target=${target}? ${found}` },
+      s: start, e: end,
+      highlight: [],
+      mark: [start],
+      codeLines: [20],
+      vars: [{ name: "nums[start]", value: nums[start] }],
+      note: { vi: found ? `nums[${start}] = ${target} → tìm thấy.` : `nums[${start}] = ${nums[start]} ≠ ${target} → target không tồn tại.`, en: found ? `nums[${start}] = ${target} → found.` : `nums[${start}] = ${nums[start]} ≠ ${target} → target does not exist.` },
+    });
+    if (found) {
+      push({
+        title: { vi: `findFirst return start = ${start}`, en: `findFirst return start = ${start}` },
+        s: start, e: end, highlight: [], mark: [start],
+        codeLines: [21],
+        vars: [{ name: "returns", value: start }],
+        note: { vi: `findFirst trả về ${start}.`, en: `findFirst returns ${start}.` },
+      });
+      return start;
+    }
+    push({
+      title: { vi: "findFirst return -1", en: "findFirst return -1" },
+      s: start, e: end, highlight: [], mark: [],
+      codeLines: [23],
+      vars: [{ name: "returns", value: -1 }],
+      note: { vi: "target không tồn tại trong mảng.", en: "target does not exist in the array." },
+    });
+    return -1;
+  }
+
+  const first = findFirst();
+
+  const notFound = first === -1;
+  push({
+    title: { vi: `first == -1? ${notFound}`, en: `first == -1? ${notFound}` },
+    s: 0, e: n - 1, highlight: [], mark: notFound ? [] : [first],
+    codeLines: [6],
+    vars: [{ name: "first", value: first }],
+    note: notFound
+      ? { vi: `first=-1 → ${target} không tồn tại, không cần tìm findLast.`, en: `first=-1 → ${target} does not exist, no need to call findLast.` }
+      : { vi: `first=${first} → ${target} tồn tại, tiếp tục gọi findLast.`, en: `first=${first} → ${target} exists, proceed to call findLast.` },
+  });
+  if (notFound) {
+    push({
+      title: { vi: "return [-1, -1]", en: "return [-1, -1]" },
+      s: -1, e: -1, highlight: [], mark: [],
+      final: true,
+      codeLines: [7],
+      vars: [{ name: "answer", value: "[-1, -1]" }],
+      note: { vi: `${target} không có trong mảng.`, en: `${target} is not in the array.` },
+    });
+    return { original: [...nums], answer: "[-1, -1]", steps };
+  }
+
+  push({
+    title: { vi: `last = self.findLast(nums, ${target})`, en: `last = self.findLast(nums, ${target})` },
+    s: 0, e: n - 1, highlight: [], mark: [first],
+    codeLines: [8],
+    vars: [],
+    note: { vi: "Gọi findLast để tìm vị trí xuất hiện cuối cùng.", en: "Call findLast to locate the last occurrence." },
+  });
+
+  // findLast: same closed-interval search, but with a fix to guarantee
+  // progress: when the window has exactly 2 elements (start+1 == end),
+  // force mid = end so a match at mid sets start = end (loop terminates)
+  // instead of start = start (no progress, infinite loop).
+  function findLast() {
+    let start = 0;
+    let end = n - 1;
+    push({
+      title: { vi: "findLast: start, end = 0, len(nums)-1", en: "findLast: start, end = 0, len(nums)-1" },
+      s: start, e: end,
+      codeLines: [25],
+      vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+      note: { vi: "Vùng tìm kiếm ban đầu là toàn bộ mảng.", en: "The initial search range is the whole array." },
+    });
+
+    while (start < end) {
+      push({
+        title: { vi: `while S=${start} < E=${end} → True`, en: `while S=${start} < E=${end} → True` },
+        s: start, e: end,
+        codeLines: [26],
+        vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+        note: { vi: "Còn hơn 1 phần tử trong vùng, tiếp tục thu hẹp.", en: "More than one element remains in range, keep narrowing." },
+      });
+
+      let mid = Math.floor((start + end) / 2);
+      push({
+        title: { vi: `M = (S+E)//2 = ${mid}`, en: `M = (S+E)//2 = ${mid}` },
+        s: start, e: end, m: mid,
+        codeLines: [27],
+        mark: [mid],
+        vars: [{ name: "mid (M)", value: mid }],
+        note: { vi: `M lấy nghiêng về bên trái do chia nguyên.`, en: `M leans left because of integer division.` },
+      });
+
+      const needsFix = start + 1 === end;
+      push({
+        title: { vi: `S+1 == E? ${needsFix} (${start}+1 vs ${end})`, en: `S+1 == E? ${needsFix} (${start}+1 vs ${end})` },
+        s: start, e: end, m: mid,
+        codeLines: [28],
+        mark: [mid],
+        vars: [{ name: "S+1 == E?", value: needsFix }],
+        note: needsFix
+          ? { vi: "Vùng chỉ còn đúng 2 phần tử. Nếu không ép M=E, khi nums[M]==target thì start=M=start (không tiến), gây lặp vô hạn.", en: "The range has exactly 2 elements left. Without forcing M=E, a match at M would set start=M=start (no progress), causing an infinite loop." }
+          : { vi: "Vùng còn hơn 2 phần tử, không cần chỉnh M.", en: "The range has more than 2 elements, no fix needed for M." },
+      });
+      if (needsFix) {
+        mid = end;
+        push({
+          title: { vi: `M = E = ${mid}`, en: `M = E = ${mid}` },
+          s: start, e: end, m: mid,
+          codeLines: [29],
+          mark: [mid],
+          note: { vi: "Ép M về E để đảm bảo mỗi vòng lặp đều tiến triển.", en: "Force M to E to guarantee progress every iteration." },
+        });
+      }
+
+      if (nums[mid] === target) {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} == target=${target} → True`, en: `nums[M]=${nums[mid]} == target=${target} → True` },
+          s: start, e: end, m: mid,
+          codeLines: [30],
+          mark: [mid],
+          note: { vi: "M chính là target → có thể là đáp án (vị trí cuối), giữ M, thu hẹp S về M.", en: "M itself equals target → could be the answer (last position), keep M, shrink S to M." },
+        });
+        start = mid;
+        push({
+          title: { vi: `S = M = ${start}`, en: `S = M = ${start}` },
+          s: start, e: end,
+          codeLines: [31],
+          note: { vi: `Vùng co lại thành [${start}, ${end}] — M vẫn có thể là vị trí cuối nên không bị loại.`, en: `Range shrinks to [${start}, ${end}] — M might still be the last occurrence, so it's kept.` },
+        });
+      } else if (nums[mid] > target) {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} > target=${target} → True`, en: `nums[M]=${nums[mid]} > target=${target} → True` },
+          s: start, e: end, m: mid,
+          codeLines: [32],
+          mark: [mid],
+          note: { vi: "M quá lớn → target (nếu có) nằm bên trái M → loại M và mọi thứ bên phải.", en: "M is too large → target (if present) is left of M → discard M and everything to its right." },
+        });
+        end = mid - 1;
+        push({
+          title: { vi: `E = M - 1 = ${end}`, en: `E = M - 1 = ${end}` },
+          s: start, e: end,
+          codeLines: [33],
+          note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
+        });
+      } else {
+        push({
+          title: { vi: `nums[M]=${nums[mid]} < target=${target} → else`, en: `nums[M]=${nums[mid]} < target=${target} → else` },
+          s: start, e: end, m: mid,
+          codeLines: [34],
+          mark: [mid],
+          note: { vi: "M quá nhỏ → target nằm bên phải M → loại M và mọi thứ bên trái.", en: "M is too small → target is right of M → discard M and everything to its left." },
+        });
+        start = mid + 1;
+        push({
+          title: { vi: `S = M + 1 = ${start}`, en: `S = M + 1 = ${start}` },
+          s: start, e: end,
+          codeLines: [35],
+          note: { vi: `Vùng co lại thành [${start}, ${end}].`, en: `Range shrinks to [${start}, ${end}].` },
+        });
+      }
+    }
+
+    push({
+      title: { vi: `while S=${start} < E=${end} → False`, en: `while S=${start} < E=${end} → False` },
+      s: start, e: end, highlight: [], mark: [start],
+      codeLines: [26],
+      vars: [{ name: "start (S)", value: start }, { name: "end (E)", value: end }],
+      note: { vi: `S và E gặp nhau tại ${start}.`, en: `S and E meet at ${start}.` },
+    });
+
+    const found = nums[start] === target;
+    push({
+      title: { vi: `nums[start]=${nums[start]} == target=${target}? ${found}`, en: `nums[start]=${nums[start]} == target=${target}? ${found}` },
+      s: start, e: end, highlight: [], mark: [start],
+      codeLines: [36],
+      vars: [{ name: "nums[start]", value: nums[start] }],
+      note: { vi: found ? `nums[${start}] = ${target} → tìm thấy.` : `nums[${start}] = ${nums[start]} ≠ ${target} → target không tồn tại.`, en: found ? `nums[${start}] = ${target} → found.` : `nums[${start}] = ${nums[start]} ≠ ${target} → target does not exist.` },
+    });
+    if (found) {
+      push({
+        title: { vi: `findLast return start = ${start}`, en: `findLast return start = ${start}` },
+        s: start, e: end, highlight: [], mark: [start],
+        codeLines: [37],
+        vars: [{ name: "returns", value: start }],
+        note: { vi: `findLast trả về ${start}.`, en: `findLast returns ${start}.` },
+      });
+      return start;
+    }
+    push({
+      title: { vi: "findLast return -1", en: "findLast return -1" },
+      s: start, e: end, highlight: [], mark: [],
+      codeLines: [39],
+      vars: [{ name: "returns", value: -1 }],
+      note: { vi: "target không tồn tại trong mảng.", en: "target does not exist in the array." },
+    });
+    return -1;
+  }
+
+  const last = findLast();
+
+  push({
+    title: { vi: `return [first, last] = [${first}, ${last}]`, en: `return [first, last] = [${first}, ${last}]` },
+    s: first, e: last,
+    highlight: Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => first + i),
+    mark: [first, last].filter((v, idx, arr) => arr.indexOf(v) === idx),
+    final: true,
+    codeLines: [9],
     vars: [{ name: "answer", value: `[${first}, ${last}]` }],
     note: { vi: `${target} xuất hiện từ index ${first} đến ${last}.`, en: `${target} appears from index ${first} to ${last}.` },
   });
@@ -1305,6 +1720,10 @@ module.exports = Object.assign(module.exports, {
     inputKind: "integer",
     extraParams: [
       { key: "target", label: { vi: "target", en: "target" }, default: 8 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: lowerBound(x) half-open", en: "Approach 1: lowerBound(x) half-open" } },
+        { value: "2", label: { vi: "Cách 2: findFirst/findLast closed-interval", en: "Approach 2: findFirst/findLast closed-interval" } },
+      ] },
     ],
     approach: [
       { vi: "Viết hàm lowerBound(x): binary search half-open [left, right) trả về chỉ số đầu tiên có nums[i] ≥ x.", en: "Write a lowerBound(x) helper: half-open [left, right) binary search returning the first index where nums[i] ≥ x." },
@@ -1337,6 +1756,49 @@ module.exports = Object.assign(module.exports, {
       "        last = lowerBound(target + 1) - 1",
       "        return [first, last]",
     ],
+    code2: [
+      "class Solution:",
+      "    def searchRange(self, nums, target):",
+      "        if len(nums) == 0:",
+      "            return [-1, -1]",
+      "        first = self.findFirst(nums, target)",
+      "        if first == -1:",
+      "            return [-1, -1]",
+      "        last = self.findLast(nums, target)",
+      "        return [first, last]",
+      "    def findFirst(self, nums, target):",
+      "        start, end = 0, len(nums) - 1",
+      "        while start < end:",
+      "            mid = (start + end) // 2",
+      "            if nums[mid] == target:",
+      "                end = mid",
+      "            elif nums[mid] > target:",
+      "                end = mid - 1",
+      "            else:",
+      "                start = mid + 1",
+      "        if nums[start] == target:",
+      "            return start",
+      "        else:",
+      "            return -1",
+      "    def findLast(self, nums, target):",
+      "        start, end = 0, len(nums) - 1",
+      "        while start < end:",
+      "            mid = (start + end) // 2",
+      "            if start + 1 == end:",
+      "                mid = end",
+      "            if nums[mid] == target:",
+      "                start = mid",
+      "            elif nums[mid] > target:",
+      "                end = mid - 1",
+      "            else:",
+      "                start = mid + 1",
+      "        if nums[start] == target:",
+      "            return start",
+      "        else:",
+      "            return -1",
+    ],
+    codeLabel: { vi: "Cách 1: lowerBound(x) half-open", en: "Approach 1: lowerBound(x) half-open" },
+    code2Label: { vi: "Cách 2: findFirst/findLast closed-interval", en: "Approach 2: findFirst/findLast closed-interval" },
     builder: buildSteps34,
   },
   35: {
