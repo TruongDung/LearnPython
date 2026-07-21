@@ -1266,6 +1266,12 @@ function buildSteps523(nums, params) {
 }
 
 function buildSteps974(nums, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps974Alt(nums, params);
+  return buildSteps974Main(nums, params);
+}
+
+function buildSteps974Main(nums, params) {
   const parsedK = Number.parseInt(params && params.k, 10);
   const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
   const remainderCount = new Map([[0, 1]]);
@@ -1516,6 +1522,135 @@ function buildSteps974(nums, params) {
   });
 
   return { steps, answer: total };
+}
+
+// ─── 974, approach 2: defaultdict(int) + "in" check (user-provided style) ───
+// Line-by-line trace of the exact code shown to the user:
+//  1  class Solution:
+//  2      def subarraysDivByK(self, nums, k):
+//  3          m = defaultdict(int)
+//  4          m[0] = 1
+//  5          sum_count = 0
+//  6          prefix_sum = 0
+//  7          for i in range(len(nums)):
+//  8              prefix_sum += nums[i]
+//  9              remainder = prefix_sum % k
+// 10             if remainder in m:
+// 11                 sum_count += m[remainder]
+// 12             m[remainder] += 1
+// 13         return sum_count
+function buildSteps974Alt(nums, params) {
+  const parsedK = Number.parseInt(params && params.k, 10);
+  const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
+  const m = new Map([[0, 1]]);
+  const steps = [];
+  let prefixSum = 0;
+  let sumCount = 0;
+
+  const mString = () => `{${[...m.entries()].sort((a, b) => a[0] - b[0]).map(([r, c]) => `${r}: ${c}`).join(", ")}}`;
+
+  function push({ title, codeLines, vars, note, final = false }) {
+    steps.push({ title, arr: [...nums], highlight: [], mark: [], final, codeBlock: 2, codeLines, vars: vars || [], note });
+  }
+
+  push({
+    title: { vi: "m = defaultdict(int)", en: "m = defaultdict(int)" },
+    codeLines: [3],
+    vars: [{ name: "k", value: k }, { name: "m", value: "{}" }],
+    note: { vi: "Hash map remainder -> số lần gặp; truy cập key chưa có sẽ tự trả 0.", en: "Hash map remainder -> count; accessing a missing key auto-returns 0." },
+  });
+
+  push({
+    title: { vi: "m[0] = 1", en: "m[0] = 1" },
+    codeLines: [4],
+    vars: [{ name: "m", value: mString() }],
+    note: {
+      vi: "Coi prefix rỗng (trước index 0) có remainder 0, đã xuất hiện 1 lần. Nhờ vậy subarray bắt đầu từ index 0 vẫn được đếm.",
+      en: "Treat the empty prefix (before index 0) as having remainder 0, seen once. This lets subarrays starting at index 0 be counted.",
+    },
+  });
+
+  push({
+    title: { vi: "sum_count = 0", en: "sum_count = 0" },
+    codeLines: [5],
+    vars: [{ name: "sum_count", value: sumCount }],
+    note: { vi: "Biến đếm số subarray hợp lệ.", en: "Counter for valid subarrays." },
+  });
+
+  push({
+    title: { vi: "prefix_sum = 0", en: "prefix_sum = 0" },
+    codeLines: [6],
+    vars: [{ name: "prefix_sum", value: prefixSum }],
+    note: { vi: "Tổng tiền tố bắt đầu bằng 0.", en: "The prefix sum starts at 0." },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    push({
+      title: { vi: `for i in range(len(nums)): i = ${i}`, en: `for i in range(len(nums)): i = ${i}` },
+      codeLines: [7],
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }],
+      note: { vi: `Xét phần tử nums[${i}] = ${nums[i]}.`, en: `Process element nums[${i}] = ${nums[i]}.` },
+    });
+
+    const before = prefixSum;
+    prefixSum += nums[i];
+    push({
+      title: { vi: `prefix_sum += nums[${i}] → ${before} + (${nums[i]}) = ${prefixSum}`, en: `prefix_sum += nums[${i}] → ${before} + (${nums[i]}) = ${prefixSum}` },
+      codeLines: [8],
+      vars: [{ name: "prefix_sum", value: prefixSum }],
+      note: { vi: `Tổng nums[0..${i}] bây giờ là ${prefixSum}.`, en: `The sum of nums[0..${i}] is now ${prefixSum}.` },
+    });
+
+    const remainder = ((prefixSum % k) + k) % k;
+    push({
+      title: { vi: `remainder = ${prefixSum} % ${k} = ${remainder}`, en: `remainder = ${prefixSum} % ${k} = ${remainder}` },
+      codeLines: [9],
+      vars: [{ name: "remainder", value: remainder }],
+      note: { vi: "Python trả remainder không âm ngay cả khi prefix_sum âm.", en: "Python produces a non-negative remainder even when prefix_sum is negative." },
+    });
+
+    const exists = m.has(remainder);
+    push({
+      title: { vi: `remainder in m? ${exists}`, en: `remainder in m? ${exists}` },
+      codeLines: [10],
+      vars: [{ name: "remainder", value: remainder }, { name: "in m?", value: exists }],
+      note: {
+        vi: exists ? `Đã từng gặp remainder ${remainder} trước đó → có thêm subarray hợp lệ.` : `Chưa từng gặp remainder ${remainder} → chưa có subarray mới kết thúc tại đây.`,
+        en: exists ? `Remainder ${remainder} was seen before → new valid subarray(s) exist.` : `Remainder ${remainder} hasn't been seen yet → no new subarray ends here.`,
+      },
+    });
+
+    if (exists) {
+      const contribution = m.get(remainder);
+      const beforeCount = sumCount;
+      sumCount += contribution;
+      push({
+        title: { vi: `sum_count += m[${remainder}] → ${beforeCount} + ${contribution} = ${sumCount}`, en: `sum_count += m[${remainder}] → ${beforeCount} + ${contribution} = ${sumCount}` },
+        codeLines: [11],
+        vars: [{ name: "sum_count", value: sumCount }],
+        note: { vi: `Có ${contribution} prefix trước đó cùng remainder ${remainder}, nên thêm ${contribution} subarray kết thúc tại index ${i}.`, en: `${contribution} earlier prefix(es) share remainder ${remainder}, adding ${contribution} subarray(s) ending at index ${i}.` },
+      });
+    }
+
+    const oldCount = m.get(remainder) || 0;
+    m.set(remainder, oldCount + 1);
+    push({
+      title: { vi: `m[${remainder}] += 1 → ${oldCount + 1}`, en: `m[${remainder}] += 1 → ${oldCount + 1}` },
+      codeLines: [12],
+      vars: [{ name: `m[${remainder}]`, value: oldCount + 1 }, { name: "m", value: mString() }],
+      note: { vi: `Lưu lại prefix hiện tại để các index sau cùng remainder ${remainder} có thể tạo thêm subarray.`, en: `Store the current prefix so later indices with remainder ${remainder} can form more subarrays.` },
+    });
+  }
+
+  push({
+    title: { vi: `return sum_count = ${sumCount}`, en: `return sum_count = ${sumCount}` },
+    codeLines: [13],
+    vars: [{ name: "answer", value: sumCount }],
+    final: true,
+    note: { vi: `Có tổng cộng ${sumCount} subarray có tổng chia hết cho ${k}.`, en: `There are ${sumCount} subarrays whose sums are divisible by ${k}.` },
+  });
+
+  return { steps, answer: sumCount };
 }
 
 function buildSteps525(nums) {
@@ -3334,6 +3469,10 @@ module.exports = {
     inputLabel: { vi: "nums", en: "nums" },
     extraParams: [
       { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 5, min: 2, max: 10000 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: remainder_count.get(...)", en: "Approach 1: remainder_count.get(...)" } },
+        { value: "2", label: { vi: "Cách 2: defaultdict + 'in' check", en: "Approach 2: defaultdict + 'in' check" } },
+      ] },
     ],
     approach: [
       {
@@ -3370,6 +3509,23 @@ module.exports = {
       "            remainder_count[remainder] = remainder_count.get(remainder, 0) + 1",
       "        return total",
     ],
+    code2: [
+      "class Solution:",
+      "    def subarraysDivByK(self, nums, k):",
+      "        m = defaultdict(int)",
+      "        m[0] = 1",
+      "        sum_count = 0",
+      "        prefix_sum = 0",
+      "        for i in range(len(nums)):",
+      "            prefix_sum += nums[i]",
+      "            remainder = prefix_sum % k",
+      "            if remainder in m:",
+      "                sum_count += m[remainder]",
+      "            m[remainder] += 1",
+      "        return sum_count",
+    ],
+    codeLabel: { vi: "Cách 1: remainder_count.get(...)", en: "Approach 1: remainder_count.get(...)" },
+    code2Label: { vi: "Cách 2: defaultdict + 'in' check", en: "Approach 2: defaultdict + 'in' check" },
     builder: buildSteps974,
   },
   525: {
