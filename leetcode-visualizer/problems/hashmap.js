@@ -1543,19 +1543,59 @@ function buildSteps974Alt(nums, params) {
   const parsedK = Number.parseInt(params && params.k, 10);
   const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
   const m = new Map([[0, 1]]);
+  const mPositions = new Map([[0, [-1]]]);
+  const prefixSums = new Array(nums.length).fill(null);
+  const remainders = new Array(nums.length).fill(null);
   const steps = [];
   let prefixSum = 0;
   let sumCount = 0;
 
-  const mString = () => `{${[...m.entries()].sort((a, b) => a[0] - b[0]).map(([r, c]) => `${r}: ${c}`).join(", ")}}`;
+  const mEntries = () => [...m.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([remainder, count]) => ({ remainder, index: count }));
+  const mString = () => `{${mEntries().map((entry) => `${entry.remainder}: ${entry.index}`).join(", ")}}`;
+  const makeView = ({ current = -1, status = [] } = {}) => ({
+    nums: [...nums],
+    prefixSums: [...prefixSums],
+    remainders: [...remainders],
+    current,
+    matchStart: -1,
+    matchEnd: -1,
+    entries: mEntries(),
+    heading: "Numbers / prefix sum / remainder",
+    prefixLabel: "sum",
+    remainderLabel: "rem",
+    mapTitle: "m (remainder frequencies)",
+    mapKeyLabel: "remainder",
+    mapValueLabel: "count",
+    status,
+  });
+  const formatSubarrays = (positions, end) => {
+    if (!positions.length) return "none";
+    const ranges = positions.map((position) => `[${position + 1}..${end}]`);
+    if (ranges.length <= 6) return ranges.join(", ");
+    return `${ranges.slice(0, 6).join(", ")}, ... +${ranges.length - 6} more`;
+  };
 
-  function push({ title, codeLines, vars, note, final = false }) {
-    steps.push({ title, arr: [...nums], highlight: [], mark: [], final, codeBlock: 2, codeLines, vars: vars || [], note });
+  function push({ title, codeLines, current = -1, status = [], vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      prefixRemainderView: makeView({ current, status }),
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars: vars || [],
+      note,
+    });
   }
 
   push({
     title: { vi: "m = defaultdict(int)", en: "m = defaultdict(int)" },
     codeLines: [3],
+    status: [{ label: "m", value: "{}" }],
     vars: [{ name: "k", value: k }, { name: "m", value: "{}" }],
     note: { vi: "Hash map remainder -> số lần gặp; truy cập key chưa có sẽ tự trả 0.", en: "Hash map remainder -> count; accessing a missing key auto-returns 0." },
   });
@@ -1563,6 +1603,11 @@ function buildSteps974Alt(nums, params) {
   push({
     title: { vi: "m[0] = 1", en: "m[0] = 1" },
     codeLines: [4],
+    status: [
+      { label: "seed remainder", value: 0 },
+      { label: "seed count", value: 1 },
+      { label: "prefix position", value: -1 },
+    ],
     vars: [{ name: "m", value: mString() }],
     note: {
       vi: "Coi prefix rỗng (trước index 0) có remainder 0, đã xuất hiện 1 lần. Nhờ vậy subarray bắt đầu từ index 0 vẫn được đếm.",
@@ -1573,6 +1618,7 @@ function buildSteps974Alt(nums, params) {
   push({
     title: { vi: "sum_count = 0", en: "sum_count = 0" },
     codeLines: [5],
+    status: [{ label: "sum_count", value: sumCount }],
     vars: [{ name: "sum_count", value: sumCount }],
     note: { vi: "Biến đếm số subarray hợp lệ.", en: "Counter for valid subarrays." },
   });
@@ -1580,6 +1626,7 @@ function buildSteps974Alt(nums, params) {
   push({
     title: { vi: "prefix_sum = 0", en: "prefix_sum = 0" },
     codeLines: [6],
+    status: [{ label: "prefix_sum", value: prefixSum }],
     vars: [{ name: "prefix_sum", value: prefixSum }],
     note: { vi: "Tổng tiền tố bắt đầu bằng 0.", en: "The prefix sum starts at 0." },
   });
@@ -1588,31 +1635,46 @@ function buildSteps974Alt(nums, params) {
     push({
       title: { vi: `for i in range(len(nums)): i = ${i}`, en: `for i in range(len(nums)): i = ${i}` },
       codeLines: [7],
+      current: i,
+      status: [{ label: "i", value: i }, { label: "nums[i]", value: nums[i] }],
       vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }],
       note: { vi: `Xét phần tử nums[${i}] = ${nums[i]}.`, en: `Process element nums[${i}] = ${nums[i]}.` },
     });
 
     const before = prefixSum;
     prefixSum += nums[i];
+    prefixSums[i] = prefixSum;
     push({
       title: { vi: `prefix_sum += nums[${i}] → ${before} + (${nums[i]}) = ${prefixSum}`, en: `prefix_sum += nums[${i}] → ${before} + (${nums[i]}) = ${prefixSum}` },
       codeLines: [8],
+      current: i,
+      status: [{ label: "before", value: before }, { label: "num", value: nums[i] }, { label: "prefix_sum", value: prefixSum }],
       vars: [{ name: "prefix_sum", value: prefixSum }],
       note: { vi: `Tổng nums[0..${i}] bây giờ là ${prefixSum}.`, en: `The sum of nums[0..${i}] is now ${prefixSum}.` },
     });
 
     const remainder = ((prefixSum % k) + k) % k;
+    remainders[i] = remainder;
     push({
       title: { vi: `remainder = ${prefixSum} % ${k} = ${remainder}`, en: `remainder = ${prefixSum} % ${k} = ${remainder}` },
       codeLines: [9],
+      current: i,
+      status: [{ label: "prefix_sum", value: prefixSum }, { label: "k", value: k }, { label: "remainder", value: remainder }],
       vars: [{ name: "remainder", value: remainder }],
       note: { vi: "Python trả remainder không âm ngay cả khi prefix_sum âm.", en: "Python produces a non-negative remainder even when prefix_sum is negative." },
     });
 
     const exists = m.has(remainder);
+    const priorPositions = [...(mPositions.get(remainder) || [])];
     push({
       title: { vi: `remainder in m? ${exists}`, en: `remainder in m? ${exists}` },
       codeLines: [10],
+      current: i,
+      status: [
+        { label: "remainder", value: remainder },
+        { label: "in m?", value: exists },
+        { label: "matching prefixes", value: priorPositions.length ? `[${priorPositions.join(", ")}]` : "none" },
+      ],
       vars: [{ name: "remainder", value: remainder }, { name: "in m?", value: exists }],
       note: {
         vi: exists ? `Đã từng gặp remainder ${remainder} trước đó → có thêm subarray hợp lệ.` : `Chưa từng gặp remainder ${remainder} → chưa có subarray mới kết thúc tại đây.`,
@@ -1627,6 +1689,12 @@ function buildSteps974Alt(nums, params) {
       push({
         title: { vi: `sum_count += m[${remainder}] → ${beforeCount} + ${contribution} = ${sumCount}`, en: `sum_count += m[${remainder}] → ${beforeCount} + ${contribution} = ${sumCount}` },
         codeLines: [11],
+        current: i,
+        status: [
+          { label: "new subarrays", value: formatSubarrays(priorPositions, i) },
+          { label: "added", value: contribution },
+          { label: "sum_count", value: sumCount },
+        ],
         vars: [{ name: "sum_count", value: sumCount }],
         note: { vi: `Có ${contribution} prefix trước đó cùng remainder ${remainder}, nên thêm ${contribution} subarray kết thúc tại index ${i}.`, en: `${contribution} earlier prefix(es) share remainder ${remainder}, adding ${contribution} subarray(s) ending at index ${i}.` },
       });
@@ -1634,9 +1702,18 @@ function buildSteps974Alt(nums, params) {
 
     const oldCount = m.get(remainder) || 0;
     m.set(remainder, oldCount + 1);
+    if (!mPositions.has(remainder)) mPositions.set(remainder, []);
+    mPositions.get(remainder).push(i);
     push({
       title: { vi: `m[${remainder}] += 1 → ${oldCount + 1}`, en: `m[${remainder}] += 1 → ${oldCount + 1}` },
       codeLines: [12],
+      current: i,
+      status: [
+        { label: "remainder", value: remainder },
+        { label: "old count", value: oldCount },
+        { label: "new count", value: oldCount + 1 },
+        { label: "sum_count", value: sumCount },
+      ],
       vars: [{ name: `m[${remainder}]`, value: oldCount + 1 }, { name: "m", value: mString() }],
       note: { vi: `Lưu lại prefix hiện tại để các index sau cùng remainder ${remainder} có thể tạo thêm subarray.`, en: `Store the current prefix so later indices with remainder ${remainder} can form more subarrays.` },
     });
@@ -1645,6 +1722,11 @@ function buildSteps974Alt(nums, params) {
   push({
     title: { vi: `return sum_count = ${sumCount}`, en: `return sum_count = ${sumCount}` },
     codeLines: [13],
+    status: [
+      { label: "processed", value: nums.length },
+      { label: "m", value: mString() },
+      { label: "answer", value: sumCount },
+    ],
     vars: [{ name: "answer", value: sumCount }],
     final: true,
     note: { vi: `Có tổng cộng ${sumCount} subarray có tổng chia hết cho ${k}.`, en: `There are ${sumCount} subarrays whose sums are divisible by ${k}.` },
