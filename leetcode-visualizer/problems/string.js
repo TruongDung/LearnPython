@@ -1041,186 +1041,242 @@ function buildSteps641(input) {
     });
   }
 
+  // Line-by-line trace of the exact code shown to the user:
+  //  1  class MyCircularDeque:
+  //  2      def __init__(self, k: int):
+  //  3          self.data = [None] * k
+  //  4          self.k = k
+  //  5          self.front = 0
+  //  6          self.size = 0
+  //  7      def insertFront(self, value: int) -> bool:
+  //  8          if self.isFull(): return False
+  //  9          self.front = (self.front - 1) % self.k
+  // 10          self.data[self.front] = value; self.size += 1; return True
+  // 11      def insertLast(self, value: int) -> bool:
+  // 12          if self.isFull(): return False
+  // 13          idx = (self.front + self.size) % self.k
+  // 14          self.data[idx] = value; self.size += 1; return True
+  // 15      def deleteFront(self) -> bool:
+  // 16          if self.isEmpty(): return False
+  // 17          self.data[self.front] = None
+  // 18          self.front = (self.front + 1) % self.k; self.size -= 1; return True
+  // 19      def deleteLast(self) -> bool:
+  // 20          if self.isEmpty(): return False
+  // 21          idx = (self.front + self.size - 1) % self.k
+  // 22          self.data[idx] = None; self.size -= 1; return True
+  // 23      def getFront(self) -> int:
+  // 24          return -1 if self.isEmpty() else self.data[self.front]
+  // 25      def getRear(self) -> int:
+  // 26          return -1 if self.isEmpty() else self.data[(self.front + self.size - 1) % self.k]
+  // 27      def isEmpty(self) -> bool:
+  // 28          return self.size == 0
+  // 29      def isFull(self) -> bool:
+  // 30          return self.size == self.k
+
   pushStep({
-    title: { vi: `Initialize deque k=${k}`, en: `Initialize deque k=${k}` },
+    title: { vi: "self.data = [None] * k", en: "self.data = [None] * k" },
     codeLine: 3,
     vars: [{ name: "operation", value: `MyCircularDeque(${k})` }],
-    note: {
-      vi: `Create a circular buffer with capacity ${k}. front = 0 and size = 0.`,
-      en: `Create a circular buffer with capacity ${k}. front = 0 and size = 0.`,
-    },
+    note: { vi: `Tạo buffer cố định ${k} ô, ban đầu toàn None.`, en: `Create a fixed buffer of ${k} slots, initially all None.` },
+  });
+  pushStep({
+    title: { vi: `self.k = ${k}`, en: `self.k = ${k}` },
+    codeLine: 4,
+    note: { vi: `Lưu lại kích thước tối đa của deque.`, en: `Store the deque's maximum capacity.` },
+  });
+  pushStep({
+    title: { vi: "self.front = 0", en: "self.front = 0" },
+    codeLine: 5,
+    note: { vi: `front bắt đầu tại chỉ số 0.`, en: `front starts at index 0.` },
+  });
+  pushStep({
+    title: { vi: "self.size = 0", en: "self.size = 0" },
+    codeLine: 6,
+    note: { vi: `Deque rỗng, chưa có phần tử nào.`, en: `The deque is empty, no elements yet.` },
   });
 
   for (let stepIndex = 0; stepIndex < ops.length; stepIndex++) {
     const { name, args } = ops[stepIndex];
     const value = args[0];
 
-    pushStep({
-      title: { vi: `Call ${name}`, en: `Call ${name}` },
-      codeLine: 4,
-      vars: [
-        { name: "step", value: stepIndex + 1 },
-        { name: "operation", value: `${name}(${args.join(",")})` },
-      ],
-      note: {
-        vi: `Process operation ${stepIndex + 1}: ${name}(${args.join(",")}).`,
-        en: `Process operation ${stepIndex + 1}: ${name}(${args.join(",")}).`,
-      },
-    });
-
     if (name === "insertFront") {
-      if (size === k) {
+      const isFull = size === k;
+      pushStep({
+        title: { vi: `insertFront(${value}): isFull()? ${isFull}`, en: `insertFront(${value}): isFull()? ${isFull}` },
+        codeLine: 8,
+        vars: [{ name: "value", value }, { name: "isFull()", value: isFull }],
+        note: {
+          vi: isFull ? "Deque đã đầy → return False, không chèn gì cả." : "Deque chưa đầy → tiếp tục chèn vào đầu.",
+          en: isFull ? "Deque is full → return False, nothing is inserted." : "Deque is not full → proceed to insert at the front.",
+        },
+      });
+      if (isFull) {
         lastResult = false;
-        pushStep({
-          title: { vi: "insertFront fails", en: "insertFront fails" },
-          codeLine: 7,
-          vars: [{ name: "value", value }],
-          note: { vi: "Deque is full, so insertFront returns False.", en: "Deque is full, so insertFront returns False." },
-        });
       } else {
         front = (front - 1 + k) % k;
+        pushStep({
+          title: { vi: `self.front = (front - 1) % k = ${front}`, en: `self.front = (front - 1) % k = ${front}` },
+          codeLine: 9,
+          highlight: [front],
+          note: { vi: `Lùi front 1 ô theo vòng tròn để chuẩn bị chỗ chèn phía trước.`, en: `Move front back one slot circularly to make room at the front.` },
+        });
         buffer[front] = value;
         size++;
         lastResult = true;
         pushStep({
-          title: { vi: `insertFront(${value})`, en: `insertFront(${value})` },
+          title: { vi: `data[front] = ${value}; size = ${size}; return True`, en: `data[front] = ${value}; size = ${size}; return True` },
           codeLine: 10,
           highlight: [front],
           vars: [{ name: "value", value }],
-          note: {
-            vi: `Move front backward circularly, place ${value}, then size becomes ${size}.`,
-            en: `Move front backward circularly, place ${value}, then size becomes ${size}.`,
-          },
+          note: { vi: `Ghi ${value} vào ô front mới, tăng size, trả về True.`, en: `Write ${value} into the new front slot, increment size, return True.` },
         });
       }
     } else if (name === "insertLast") {
-      if (size === k) {
+      const isFull = size === k;
+      pushStep({
+        title: { vi: `insertLast(${value}): isFull()? ${isFull}`, en: `insertLast(${value}): isFull()? ${isFull}` },
+        codeLine: 12,
+        vars: [{ name: "value", value }, { name: "isFull()", value: isFull }],
+        note: {
+          vi: isFull ? "Deque đã đầy → return False, không chèn gì cả." : "Deque chưa đầy → tiếp tục chèn vào cuối.",
+          en: isFull ? "Deque is full → return False, nothing is inserted." : "Deque is not full → proceed to insert at the back.",
+        },
+      });
+      if (isFull) {
         lastResult = false;
-        pushStep({
-          title: { vi: "insertLast fails", en: "insertLast fails" },
-          codeLine: 13,
-          vars: [{ name: "value", value }],
-          note: { vi: "Deque is full, so insertLast returns False.", en: "Deque is full, so insertLast returns False." },
-        });
       } else {
         const idx = (front + size) % k;
+        pushStep({
+          title: { vi: `idx = (front + size) % k = ${idx}`, en: `idx = (front + size) % k = ${idx}` },
+          codeLine: 13,
+          highlight: [idx],
+          note: { vi: `Tính vị trí ô ngay sau phần tử cuối hiện tại (theo vòng tròn).`, en: `Compute the slot right after the current last element (wrapping around).` },
+        });
         buffer[idx] = value;
         size++;
         lastResult = true;
         pushStep({
-          title: { vi: `insertLast(${value})`, en: `insertLast(${value})` },
-          codeLine: 16,
+          title: { vi: `data[${idx}] = ${value}; size = ${size}; return True`, en: `data[${idx}] = ${value}; size = ${size}; return True` },
+          codeLine: 14,
           highlight: [idx],
-          vars: [
-            { name: "value", value },
-            { name: "insert index", value: idx },
-          ],
-          note: {
-            vi: `Insert at (front + size) % k = ${idx}, then size becomes ${size}.`,
-            en: `Insert at (front + size) % k = ${idx}, then size becomes ${size}.`,
-          },
+          vars: [{ name: "value", value }, { name: "insert index", value: idx }],
+          note: { vi: `Ghi ${value} vào ô ${idx}, tăng size, trả về True.`, en: `Write ${value} into slot ${idx}, increment size, return True.` },
         });
       }
     } else if (name === "deleteFront") {
-      if (size === 0) {
+      const isEmptyNow = size === 0;
+      pushStep({
+        title: { vi: `deleteFront(): isEmpty()? ${isEmptyNow}`, en: `deleteFront(): isEmpty()? ${isEmptyNow}` },
+        codeLine: 16,
+        note: {
+          vi: isEmptyNow ? "Deque rỗng → return False, không xóa gì cả." : "Deque còn phần tử → tiếp tục xóa ở đầu.",
+          en: isEmptyNow ? "Deque is empty → return False, nothing is removed." : "Deque has elements → proceed to remove from the front.",
+        },
+      });
+      if (isEmptyNow) {
         lastResult = false;
-        pushStep({
-          title: { vi: "deleteFront fails", en: "deleteFront fails" },
-          codeLine: 19,
-          note: { vi: "Deque is empty, so deleteFront returns False.", en: "Deque is empty, so deleteFront returns False." },
-        });
       } else {
         const oldFront = front;
         const removed = buffer[oldFront];
         buffer[oldFront] = null;
+        pushStep({
+          title: { vi: `data[front] = None (xóa ${removed})`, en: `data[front] = None (removing ${removed})` },
+          codeLine: 17,
+          highlight: [oldFront],
+          vars: [{ name: "removed", value: removed }],
+          note: { vi: `Xóa giá trị ${removed} đang ở ô front.`, en: `Clear the value ${removed} currently at the front slot.` },
+        });
         front = (front + 1) % k;
         size--;
         if (size === 0) front = 0;
         lastResult = true;
         pushStep({
-          title: { vi: "deleteFront", en: "deleteFront" },
-          codeLine: 22,
-          highlight: [oldFront],
-          vars: [{ name: "removed", value: removed }],
-          note: {
-            vi: `Remove front value ${removed} and advance front circularly.`,
-            en: `Remove front value ${removed} and advance front circularly.`,
-          },
+          title: { vi: `front = (front + 1) % k = ${front}; size = ${size}; return True`, en: `front = (front + 1) % k = ${front}; size = ${size}; return True` },
+          codeLine: 18,
+          highlight: size > 0 ? [front] : [],
+          note: { vi: `Tiến front lên 1 ô theo vòng tròn, giảm size, trả về True.`, en: `Advance front one slot circularly, decrement size, return True.` },
         });
       }
     } else if (name === "deleteLast") {
-      if (size === 0) {
+      const isEmptyNow = size === 0;
+      pushStep({
+        title: { vi: `deleteLast(): isEmpty()? ${isEmptyNow}`, en: `deleteLast(): isEmpty()? ${isEmptyNow}` },
+        codeLine: 20,
+        note: {
+          vi: isEmptyNow ? "Deque rỗng → return False, không xóa gì cả." : "Deque còn phần tử → tiếp tục xóa ở cuối.",
+          en: isEmptyNow ? "Deque is empty → return False, nothing is removed." : "Deque has elements → proceed to remove from the back.",
+        },
+      });
+      if (isEmptyNow) {
         lastResult = false;
-        pushStep({
-          title: { vi: "deleteLast fails", en: "deleteLast fails" },
-          codeLine: 25,
-          note: { vi: "Deque is empty, so deleteLast returns False.", en: "Deque is empty, so deleteLast returns False." },
-        });
       } else {
         const idx = rearIndex();
+        pushStep({
+          title: { vi: `idx = (front + size - 1) % k = ${idx}`, en: `idx = (front + size - 1) % k = ${idx}` },
+          codeLine: 21,
+          highlight: [idx],
+          note: { vi: `Tính vị trí phần tử cuối hiện tại (theo vòng tròn).`, en: `Compute the position of the current last element (wrapping around).` },
+        });
         const removed = buffer[idx];
         buffer[idx] = null;
         size--;
         if (size === 0) front = 0;
         lastResult = true;
         pushStep({
-          title: { vi: "deleteLast", en: "deleteLast" },
-          codeLine: 28,
+          title: { vi: `data[${idx}] = None (xóa ${removed}); size = ${size}; return True`, en: `data[${idx}] = None (removing ${removed}); size = ${size}; return True` },
+          codeLine: 22,
           highlight: [idx],
           vars: [{ name: "removed", value: removed }],
-          note: {
-            vi: `Remove rear value ${removed} at index ${idx}.`,
-            en: `Remove rear value ${removed} at index ${idx}.`,
-          },
+          note: { vi: `Xóa giá trị ${removed} ở ô cuối, giảm size, trả về True.`, en: `Clear the value ${removed} at the back slot, decrement size, return True.` },
         });
       }
     } else if (name === "getFront") {
       lastResult = size === 0 ? -1 : buffer[front];
       pushStep({
-        title: { vi: `getFront -> ${lastResult}`, en: `getFront -> ${lastResult}` },
+        title: { vi: `getFront() → ${lastResult}`, en: `getFront() → ${lastResult}` },
         codeLine: 24,
         highlight: size === 0 ? [] : [front],
         note: {
-          vi: size === 0 ? "Deque is empty, return -1." : `Front value is buffer[${front}] = ${lastResult}.`,
-          en: size === 0 ? "Deque is empty, return -1." : `Front value is buffer[${front}] = ${lastResult}.`,
+          vi: size === 0 ? "Deque rỗng, trả về -1." : `Giá trị ở front là data[${front}] = ${lastResult}.`,
+          en: size === 0 ? "Deque is empty, return -1." : `The value at front is data[${front}] = ${lastResult}.`,
         },
       });
     } else if (name === "getRear") {
       const rear = rearIndex();
       lastResult = size === 0 ? -1 : buffer[rear];
       pushStep({
-        title: { vi: `getRear -> ${lastResult}`, en: `getRear -> ${lastResult}` },
+        title: { vi: `getRear() → ${lastResult}`, en: `getRear() → ${lastResult}` },
         codeLine: 26,
         highlight: rear >= 0 ? [rear] : [],
         note: {
-          vi: size === 0 ? "Deque is empty, return -1." : `Rear value is buffer[${rear}] = ${lastResult}.`,
-          en: size === 0 ? "Deque is empty, return -1." : `Rear value is buffer[${rear}] = ${lastResult}.`,
+          vi: size === 0 ? "Deque rỗng, trả về -1." : `Giá trị ở rear là data[${rear}] = ${lastResult}.`,
+          en: size === 0 ? "Deque is empty, return -1." : `The value at rear is data[${rear}] = ${lastResult}.`,
         },
       });
     } else if (name === "isEmpty") {
       lastResult = size === 0;
       pushStep({
-        title: { vi: `isEmpty -> ${lastResult}`, en: `isEmpty -> ${lastResult}` },
+        title: { vi: `isEmpty() → ${lastResult}`, en: `isEmpty() → ${lastResult}` },
         codeLine: 28,
-        note: { vi: `size == 0 is ${lastResult}.`, en: `size == 0 is ${lastResult}.` },
+        note: { vi: `size == 0 là ${lastResult}.`, en: `size == 0 is ${lastResult}.` },
       });
     } else if (name === "isFull") {
       lastResult = size === k;
       pushStep({
-        title: { vi: `isFull -> ${lastResult}`, en: `isFull -> ${lastResult}` },
+        title: { vi: `isFull() → ${lastResult}`, en: `isFull() → ${lastResult}` },
         codeLine: 30,
-        note: { vi: `size == capacity is ${lastResult}.`, en: `size == capacity is ${lastResult}.` },
+        note: { vi: `size == k là ${lastResult}.`, en: `size == k is ${lastResult}.` },
       });
     }
   }
 
   pushStep({
-    title: { vi: "Finished operations", en: "Finished operations" },
+    title: { vi: "Hoàn tất các thao tác", en: "Finished operations" },
     codeLine: 30,
     final: true,
     vars: [{ name: "answer", value: lastResult === null ? "None" : lastResult }],
     note: {
-      vi: `All operations processed. Final deque = [${dequeValues().join(", ")}].`,
+      vi: `Đã xử lý xong. Deque hiện tại = [${dequeValues().join(", ")}].`,
       en: `All operations processed. Final deque = [${dequeValues().join(", ")}].`,
     },
   });
