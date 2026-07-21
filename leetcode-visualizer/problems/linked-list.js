@@ -2785,6 +2785,193 @@ function buildSteps430(input, params) {
   return { input, answer: answerStr, steps };
 }
 
+/**
+ * LeetCode 3507: Minimum Pair Removal to Sort Array I.
+ *
+ * Model nums as a doubly linked list. Repeatedly:
+ *   1. Check if the list is already non-decreasing (no inversions) -> done.
+ *   2. Scan left to right for the adjacent pair with the minimum sum
+ *      (leftmost wins ties).
+ *   3. Merge that pair into a single node holding the sum; relink prev/next.
+ * Count merges until sorted.
+ */
+function buildSteps3507(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : String(input).split(",").map(Number);
+  const steps = [];
+
+  // DLL nodes: { id, val, prev, next } stored in a Map by id. IDs are stable
+  // across merges (never reused) so the visualization can track history.
+  let idCounter = 0;
+  const nodes = new Map();
+  let head = null;
+  let prevId = null;
+  for (const v of nums) {
+    const id = idCounter++;
+    nodes.set(id, { id, val: v, prev: prevId, next: null });
+    if (prevId !== null) nodes.get(prevId).next = id;
+    else head = id;
+    prevId = id;
+  }
+
+  function order() {
+    const out = [];
+    let cur = head;
+    while (cur !== null) {
+      out.push(cur);
+      cur = nodes.get(cur).next;
+    }
+    return out;
+  }
+
+  function graphSnap(opts) {
+    const ord = order();
+    const graphNodes = ord.map((id) => ({ id, label: String(nodes.get(id).val) }));
+    const edges = [];
+    for (let i = 0; i < ord.length - 1; i++) {
+      edges.push({ u: ord[i], v: ord[i + 1], w: "", kind: "next" });
+      edges.push({ u: ord[i + 1], v: ord[i], w: "", kind: "prev" });
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes: graphNodes,
+        edges,
+        layout: "linear",
+        order: ord,
+        caption: opts.caption || `nums: ${ord.map((id) => nodes.get(id).val).join(", ")}`,
+        annotations: opts.annotations || {},
+        hlNodes: opts.hlNodes || [],
+        hlEdges: [],
+        visitedNodes: opts.visitedNodes || [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  function hasInversion() {
+    const ord = order();
+    for (let i = 0; i < ord.length - 1; i++) {
+      if (nodes.get(ord[i]).val > nodes.get(ord[i + 1]).val) return true;
+    }
+    return false;
+  }
+
+  // Lines 14-20: build the doubly linked list from nums
+  graphSnap({
+    title: { vi: "Xây doubly linked list từ nums", en: "Build doubly linked list from nums" },
+    codeLines: [14, 15, 16, 17, 18, 19, 20],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "ops", value: 0 }],
+    note: {
+      vi: `nums = [${nums.join(", ")}]. Mỗi phần tử là 1 node, nối bằng next/prev.`,
+      en: `nums = [${nums.join(", ")}]. Each element becomes a node linked by next/prev.`,
+    },
+  });
+
+  let ops = 0;
+
+  while (true) {
+    // Line 31: while has_inversion()
+    const inv = hasInversion();
+    graphSnap({
+      title: { vi: `has_inversion() → ${inv}`, en: `has_inversion() → ${inv}` },
+      codeLines: [31],
+      vars: [{ name: "ops", value: ops }, { name: "has_inversion?", value: inv }],
+      note: inv
+        ? { vi: "Vẫn còn nghịch thế (a[i] > a[i+1]) → tiếp tục gộp.", en: "Still an inversion (a[i] > a[i+1]) present → keep merging." }
+        : { vi: "Không còn nghịch thế → mảng đã không giảm. Dừng.", en: "No inversion remains → array is non-decreasing. Stop." },
+    });
+    if (!inv) break;
+
+    // Lines 25-32: find leftmost min-sum adjacent pair
+    const ord = order();
+    let bestSum = Infinity;
+    let bestId = null;
+    for (let i = 0; i < ord.length - 1; i++) {
+      const a = nodes.get(ord[i]);
+      const b = nodes.get(ord[i + 1]);
+      const s = a.val + b.val;
+
+      graphSnap({
+        title: { vi: `sum(${a.val}, ${b.val}) = ${s}`, en: `sum(${a.val}, ${b.val}) = ${s}` },
+        codeLines: [36, 37],
+        hlNodes: [a.id, b.id],
+        annotations: bestId !== null ? { [bestId]: "best" } : {},
+        vars: [
+          { name: "pair", value: `(${a.val}, ${b.val})` },
+          { name: "sum", value: s },
+          { name: "best_sum so far", value: bestSum === Infinity ? "inf" : bestSum },
+        ],
+        note: {
+          vi: `Xét cặp liền kề (${a.val}, ${b.val}): tổng = ${s}.`,
+          en: `Consider adjacent pair (${a.val}, ${b.val}): sum = ${s}.`,
+        },
+      });
+
+      if (s < bestSum) {
+        bestSum = s;
+        bestId = a.id;
+        graphSnap({
+          title: { vi: `Cập nhật best: sum=${s} tại node(${a.val})`, en: `Update best: sum=${s} at node(${a.val})` },
+          codeLines: [38, 39],
+          hlNodes: [a.id, b.id],
+          annotations: { [a.id]: "best" },
+          vars: [{ name: "best_sum", value: bestSum }, { name: "best node", value: a.val }],
+          note: {
+            vi: `${s} < best_sum cũ → cập nhật ứng viên tốt nhất = (${a.val}, ${b.val}).`,
+            en: `${s} < previous best_sum → update best candidate = (${a.val}, ${b.val}).`,
+          },
+        });
+      }
+    }
+
+    // Line 34-38: merge best pair
+    const a = nodes.get(bestId);
+    const bId = a.next;
+    const b = nodes.get(bId);
+    const oldAVal = a.val;
+    a.val = a.val + b.val;
+    a.next = b.next;
+    if (b.next !== null) nodes.get(b.next).prev = a.id;
+    nodes.delete(bId);
+    ops++;
+
+    graphSnap({
+      title: { vi: `Merge (${oldAVal}, ${b.val}) → ${a.val}. ops=${ops}`, en: `Merge (${oldAVal}, ${b.val}) → ${a.val}. ops=${ops}` },
+      codeLines: [42, 43, 44, 45, 46, 48],
+      hlNodes: [a.id],
+      visitedNodes: [],
+      vars: [
+        { name: "merged pair", value: `(${oldAVal}, ${b.val})` },
+        { name: "new node value", value: a.val },
+        { name: "ops", value: ops },
+      ],
+      note: {
+        vi: `Gộp node(${oldAVal}) và node(${b.val}) thành 1 node giá trị ${a.val}. Nối lại prev/next. ops = ${ops}.`,
+        en: `Merge node(${oldAVal}) and node(${b.val}) into one node with value ${a.val}. Relink prev/next. ops = ${ops}.`,
+      },
+    });
+  }
+
+  graphSnap({
+    title: { vi: `Kết quả: ${ops} lần gộp`, en: `Result: ${ops} merge(s)` },
+    codeLines: [50],
+    final: true,
+    vars: [{ name: "answer (ops)", value: ops }],
+    note: {
+      vi: `Mảng đã không giảm sau ${ops} lần gộp tối thiểu.`,
+      en: `The array is non-decreasing after a minimum of ${ops} merge(s).`,
+    },
+  });
+
+  return { original: nums, answer: ops, steps };
+}
+
 module.exports = {
   146: {
     id: 146,
@@ -3259,5 +3446,91 @@ module.exports = {
       "        return self.history[self.index]",
     ],
     builder: buildSteps1472,
+  },
+  3507: {
+    id: 3507,
+    difficulty: "easy",
+    slug: "minimum-pair-removal-to-sort-array-i",
+    category: { key: "doubly-linked-list", vi: "Danh sách liên kết đôi", en: "Doubly Linked List" },
+    title: { vi: "Minimum Pair Removal to Sort Array I", en: "Minimum Pair Removal to Sort Array I" },
+    titleVi: { vi: "Số lần gộp cặp tối thiểu để sắp xếp mảng", en: "Minimum pair merges to sort the array" },
+    statement: {
+      vi:
+        "Cho mảng nums. Lặp lại thao tác: chọn cặp liền kề có tổng NHỎ NHẤT (nếu có nhiều, chọn cặp bên trái nhất), " +
+        "gộp 2 phần tử đó thành 1 (giá trị = tổng). Đếm số lần gộp tối thiểu để mảng trở thành không giảm (non-decreasing).",
+      en:
+        "Given nums. Repeatedly: pick the adjacent pair with the MINIMUM sum (leftmost wins ties), " +
+        "merge them into one element equal to their sum. Return the minimum number of merges to make the array non-decreasing.",
+    },
+    defaultInput: [2, 1, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Mô hình hoá nums thành doubly linked list: mỗi node có prev/next.", en: "Model nums as a doubly linked list: each node has prev/next." },
+      { vi: "Lặp: nếu không còn nghịch thế (a[i] > a[i+1]) → dừng.", en: "Loop: if no inversion (a[i] > a[i+1]) remains → stop." },
+      { vi: "Ngược lại, quét tìm cặp liền kề tổng nhỏ nhất (trái nhất khi hoà), gộp thành 1 node, nối lại prev/next.", en: "Otherwise scan for the leftmost minimum-sum adjacent pair, merge into one node, relink prev/next." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi lần gộp giảm 1 node, tối đa n-1 lần gộp; mỗi lần quét toàn bộ list O(n) để tìm min-pair và kiểm tra inversion.",
+        en: "Each merge removes one node, at most n-1 merges; each merge scans the whole list O(n) to find the min-pair and check inversions.",
+      },
+    },
+    code: [
+      "class Node:",
+      "    __slots__ = ('val', 'prev', 'next')",
+      "    def __init__(self, val):",
+      "        self.val = val",
+      "        self.prev = None",
+      "        self.next = None",
+      "",
+      "class Solution:",
+      "    def minimumPairRemoval(self, nums):",
+      "        n = len(nums)",
+      "        if n <= 1:",
+      "            return 0",
+      "",
+      "        head = Node(nums[0])",
+      "        cur = head",
+      "        for v in nums[1:]:",
+      "            node = Node(v)",
+      "            cur.next = node",
+      "            node.prev = cur",
+      "            cur = node",
+      "",
+      "        def has_inversion():",
+      "            node = head",
+      "            while node.next:",
+      "                if node.val > node.next.val:",
+      "                    return True",
+      "                node = node.next",
+      "            return False",
+      "",
+      "        ops = 0",
+      "        while has_inversion():",
+      "            best_sum = float('inf')",
+      "            best_node = None",
+      "            node = head",
+      "            while node.next:",
+      "                s = node.val + node.next.val",
+      "                if s < best_sum:",
+      "                    best_sum = s",
+      "                    best_node = node",
+      "                node = node.next",
+      "",
+      "            nxt = best_node.next",
+      "            best_node.val += nxt.val",
+      "            best_node.next = nxt.next",
+      "            if nxt.next:",
+      "                nxt.next.prev = best_node",
+      "",
+      "            ops += 1",
+      "",
+      "        return ops",
+    ],
+    builder: buildSteps3507,
   },
 };
