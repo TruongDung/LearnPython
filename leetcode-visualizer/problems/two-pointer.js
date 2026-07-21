@@ -1975,11 +1975,12 @@ function buildSteps21(input) {
       const isCur = idx === result.length - 1;
       nodes.push({ id: resOff + 1 + idx, label: String(v), x: (idx + 1) * 2, y: 2, parentId: resOff + idx, hl: false, isWord: isCur });
     });
-    // Annotations: "l1" on current l1 pointer, "l2" on current l2 pointer, "cur" on last result
+    // Annotations: "l1" on current l1 pointer, "l2" on current l2 pointer,
+    // "cur" always tracks the last built node (dummy when result is empty).
     const annotations = {};
     if (curI >= 0 && curI < l1.length) annotations[curI] = "l1";
     if (curJ >= 0 && curJ < l2.length) annotations[l2Off + curJ] = "l2";
-    if (result.length > 0) annotations[resOff + result.length] = "cur";
+    annotations[resOff + result.length] = "cur";
     return { title, arr: [], tree: { nodes, annotations }, highlight: [], mark: [], codeLines: codeLines || [], vars: vars || [], note };
   }
 
