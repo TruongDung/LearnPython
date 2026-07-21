@@ -4803,70 +4803,156 @@ function buildSteps3499Sliding(input) {
     note: { vi: "mx = gain tốt nhất từ sliding window kích thước 3 trên runs.", en: "mx = best gain from the size-3 sliding window over runs." },
   });
 
-  // Lines 16-18: for k in range(1, len(runs)-1)
-  for (let k = 1; k <= runs.length - 2; k++) {
-    const windowHighlight = [runRangeAll(k - 1), runRangeAll(k), runRangeAll(k + 1)].flat();
+  // Line 16: left, right = 0, 2
+  let left = 0;
+  let right = 2;
+  steps.push({
+    title: { vi: `left, right = 0, 2`, en: `left, right = 0, 2` },
+    arr: values,
+    sub: chars,
+    highlight: runs.length >= 3 ? [runRangeAll(left), runRangeAll(right)].flat() : [],
+    mark: [],
+    codeLines: [16],
+    codeBlock: 2,
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    note: {
+      vi: "left và right trượt đồng thời, cách nhau 2 → window luôn có kích thước 3 đoạn (runs[left..right]).",
+      en: "left and right slide together, 2 apart → the window always spans 3 runs (runs[left..right]).",
+    },
+  });
 
+  while (right < runs.length) {
+    // Line 17: while right < len(runs)
+    const windowHighlight = [runRangeAll(left), runRangeAll(left + 1 <= right - 1 ? left + 1 : left), runRangeAll(right)].flat();
+    const fullWindow = Array.from({ length: right - left + 1 }, (_, k) => left + k).flatMap((idx) => runRangeAll(idx));
     steps.push({
-      title: { vi: `for k=${k}: window = runs[${k - 1}..${k + 1}]`, en: `for k=${k}: window = runs[${k - 1}..${k + 1}]` },
+      title: { vi: `while right=${right} < len(runs)=${runs.length} → True`, en: `while right=${right} < len(runs)=${runs.length} → True` },
       arr: values,
       sub: chars,
-      highlight: windowHighlight,
-      mark: [],
-      codeLines: [16],
-      codeBlock: 2,
-      vars: [
-        { name: "k", value: k },
-        { name: "window", value: `[('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len})]` },
-      ],
-      note: {
-        vi: `Cửa sổ 3 đoạn tại k=${k}: ('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len}).`,
-        en: `Window of 3 runs at k=${k}: ('${runs[k-1].ch}',${runs[k-1].len}), ('${runs[k].ch}',${runs[k].len}), ('${runs[k+1].ch}',${runs[k+1].len}).`,
-      },
-    });
-
-    const middleIsOne = runs[k].ch === "1";
-    steps.push({
-      title: { vi: `if runs[${k}][0]=='${runs[k].ch}' == '1' → ${middleIsOne}`, en: `if runs[${k}][0]=='${runs[k].ch}' == '1' → ${middleIsOne}` },
-      arr: values,
-      sub: chars,
-      highlight: windowHighlight,
+      highlight: fullWindow,
       mark: [],
       codeLines: [17],
       codeBlock: 2,
-      vars: [{ name: `runs[${k}][0]`, value: runs[k].ch }, { name: "is '1'?", value: middleIsOne }],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      note: {
+        vi: `right=${right} < ${runs.length} → còn window để xét.`,
+        en: `right=${right} < ${runs.length} → a window remains to check.`,
+      },
+    });
+
+    // Line 18: mid = left + 1
+    const mid = left + 1;
+    steps.push({
+      title: { vi: `mid = left + 1 = ${mid}`, en: `mid = left + 1 = ${mid}` },
+      arr: values,
+      sub: chars,
+      highlight: fullWindow,
+      mark: [],
+      codeLines: [18],
+      codeBlock: 2,
+      vars: [{ name: "left", value: left }, { name: "mid", value: mid }, { name: "right", value: right }],
+      note: {
+        vi: `Đoạn giữa window: mid = ${mid}.`,
+        en: `Middle run of the window: mid = ${mid}.`,
+      },
+    });
+
+    // Line 19: if runs[mid][0] == '1'
+    const middleIsOne = runs[mid].ch === "1";
+    steps.push({
+      title: { vi: `if runs[${mid}][0]=='${runs[mid].ch}' == '1' → ${middleIsOne}`, en: `if runs[${mid}][0]=='${runs[mid].ch}' == '1' → ${middleIsOne}` },
+      arr: values,
+      sub: chars,
+      highlight: fullWindow,
+      mark: [],
+      codeLines: [19],
+      codeBlock: 2,
+      vars: [{ name: `runs[${mid}][0]`, value: runs[mid].ch }, { name: "is '1'?", value: middleIsOne }],
       note: middleIsOne
-        ? { vi: "Đoạn giữa là '1' → 2 đoạn '0' hai bên là ứng viên merge.", en: "Middle run is '1' → the two '0' neighbors are merge candidates." }
+        ? { vi: "Đoạn giữa là '1' → 2 đoạn '0' ở left/right là ứng viên merge.", en: "Middle run is '1' → the '0' runs at left/right are merge candidates." }
         : { vi: "Đoạn giữa là '0' → không hợp lệ (không thể trade '0' giữa 2 '0').", en: "Middle run is '0' → not valid (cannot trade '0' between two '0's)." },
     });
 
     if (middleIsOne) {
+      // Line 20: mx = max(mx, runs[left][1] + runs[right][1])
       const oldMx = mx;
-      const candidate = runs[k - 1].len + runs[k + 1].len;
+      const candidate = runs[left].len + runs[right].len;
       mx = Math.max(mx, candidate);
       const updated = mx !== oldMx;
       steps.push({
-        title: { vi: `mx = max(${oldMx}, ${runs[k-1].len}+${runs[k+1].len}) = ${mx}`, en: `mx = max(${oldMx}, ${runs[k-1].len}+${runs[k+1].len}) = ${mx}` },
+        title: { vi: `mx = max(${oldMx}, ${runs[left].len}+${runs[right].len}) = ${mx}`, en: `mx = max(${oldMx}, ${runs[left].len}+${runs[right].len}) = ${mx}` },
         arr: values,
         sub: chars,
-        highlight: windowHighlight,
-        mark: updated ? [runRangeAll(k - 1), runRangeAll(k + 1)].flat() : [],
-        codeLines: [18],
+        highlight: fullWindow,
+        mark: updated ? [runRangeAll(left), runRangeAll(right)].flat() : [],
+        codeLines: [20],
         codeBlock: 2,
         vars: [
           { name: "mx (before)", value: oldMx },
-          { name: "runs[k-1][1] + runs[k+1][1]", value: candidate },
+          { name: "runs[left][1] + runs[right][1]", value: candidate },
           { name: "mx (after)", value: mx },
         ],
         note: {
-          vi: `Merge 2 đoạn '0' hai bên (${runs[k-1].len} + ${runs[k+1].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (cập nhật!)" : ""}.`,
-          en: `Merge the two '0' neighbors (${runs[k-1].len} + ${runs[k+1].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (updated!)" : ""}.`,
+          vi: `Merge 2 đoạn '0' ở left/right (${runs[left].len} + ${runs[right].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (cập nhật!)" : ""}.`,
+          en: `Merge the two '0' runs at left/right (${runs[left].len} + ${runs[right].len} = ${candidate}). mx = max(${oldMx}, ${candidate}) = ${mx}${updated ? " (updated!)" : ""}.`,
         },
       });
     }
+
+    // Line 21: left += 1
+    const oldLeft = left;
+    left++;
+    steps.push({
+      title: { vi: `left += 1 → left = ${left}`, en: `left += 1 → left = ${left}` },
+      arr: values,
+      sub: chars,
+      highlight: fullWindow,
+      mark: [],
+      codeLines: [21],
+      codeBlock: 2,
+      vars: [{ name: "left (before)", value: oldLeft }, { name: "left (after)", value: left }],
+      note: {
+        vi: `Trượt cửa sổ: left = ${left}.`,
+        en: `Slide the window: left = ${left}.`,
+      },
+    });
+
+    // Line 22: right += 1
+    const oldRight = right;
+    right++;
+    steps.push({
+      title: { vi: `right += 1 → right = ${right}`, en: `right += 1 → right = ${right}` },
+      arr: values,
+      sub: chars,
+      highlight: right < runs.length ? [runRangeAll(left), runRangeAll(right)].flat() : [],
+      mark: [],
+      codeLines: [22],
+      codeBlock: 2,
+      vars: [{ name: "right (before)", value: oldRight }, { name: "right (after)", value: right }],
+      note: {
+        vi: `Trượt cửa sổ: right = ${right}.`,
+        en: `Slide the window: right = ${right}.`,
+      },
+    });
   }
 
-  // Line 20: return ans + mx
+  // Final while check → False
+  steps.push({
+    title: { vi: `while right=${right} < len(runs)=${runs.length} → False`, en: `while right=${right} < len(runs)=${runs.length} → False` },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [17],
+    codeBlock: 2,
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    note: {
+      vi: "Đã xét hết mọi cửa sổ kích thước 3. Thoát vòng lặp.",
+      en: "All size-3 windows have been checked. Exit the loop.",
+    },
+  });
+
+  // Line 24: return ans + mx
   const answer = ans + mx;
   steps.push({
     title: { vi: `return ans + mx = ${ans} + ${mx} = ${answer}`, en: `return ans + mx = ${ans} + ${mx} = ${answer}` },
@@ -4875,7 +4961,7 @@ function buildSteps3499Sliding(input) {
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [20],
+    codeLines: [24],
     codeBlock: 2,
     vars: [
       { name: "ans", value: ans },
@@ -5983,9 +6069,13 @@ module.exports = {
       "        ans = sum(length for ch, length in runs if ch == '1')",
       "",
       "        mx = 0",
-      "        for k in range(1, len(runs) - 1):",
-      "            if runs[k][0] == '1':",
-      "                mx = max(mx, runs[k - 1][1] + runs[k + 1][1])",
+      "        left, right = 0, 2",
+      "        while right < len(runs):",
+      "            mid = left + 1",
+      "            if runs[mid][0] == '1':",
+      "                mx = max(mx, runs[left][1] + runs[right][1])",
+      "            left += 1",
+      "            right += 1",
       "",
       "        return ans + mx",
     ],
