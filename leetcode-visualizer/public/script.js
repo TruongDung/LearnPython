@@ -2584,7 +2584,9 @@ function renderMeetingRoomsTimelineView(step) {
   const top = 42;
   const rowHeight = 58;
   const selectedRoom = Number.isInteger(view.selectedRoom) ? view.selectedRoom : null;
-  const roomCount = Math.max(1, view.roomCount || 0, selectedRoom === null ? 0 : selectedRoom + 1);
+  // Do not draw a room lane before that room actually exists. In Approach 2,
+  // pq is still empty while the first meeting is only being inspected.
+  const roomCount = Math.max(0, view.roomCount || 0, selectedRoom === null ? 0 : selectedRoom + 1);
   const axisY = top + (roomCount + 1) * rowHeight + 4;
   const height = axisY + 42;
   const plotWidth = width - left - right;
