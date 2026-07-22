@@ -6355,6 +6355,297 @@ function buildSteps3501SegmentTree(input, params) {
   return { original: s, answer: `[${answers.join(", ")}]`, steps };
 }
 
+function buildSteps3501RecursiveSegmentTree(input, params) {
+  const s = String(input || "").trim();
+  const n = s.length;
+  const chars = s.split("");
+  const values = chars.map((ch) => (ch === "1" ? 1 : 0.4));
+  const steps = [];
+
+  function range(l, r) {
+    if (l > r) return [];
+    return Array.from({ length: r - l + 1 }, (_, i) => l + i);
+  }
+
+  function parseQueries(raw) {
+    const parsed = String(raw || "")
+      .split(";")
+      .map((query) => query.trim())
+      .filter(Boolean)
+      .map((query) => query.split(/[,\s]+/).map(Number))
+      .filter((query) => query.length >= 2 && query.slice(0, 2).every(Number.isInteger))
+      .map(([l, r]) => [l, r]);
+    return parsed.length ? parsed : [[0, Math.max(0, n - 1)]];
+  }
+
+  function lowerBound(arr, target) {
+    let left = 0;
+    let right = arr.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (arr[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  }
+
+  function upperBound(arr, target) {
+    let left = 0;
+    let right = arr.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (arr[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  }
+
+  function pushStep(line, title, note, options = {}) {
+    steps.push({
+      title,
+      arr: values,
+      sub: chars,
+      highlight: options.highlight || [],
+      mark: options.mark || [],
+      codeLines: [line],
+      codeBlock: 2,
+      vars: options.vars || [],
+      final: Boolean(options.final),
+      note,
+    });
+  }
+
+  if (n === 0 || /[^01]/.test(s)) {
+    pushStep(48, { vi: "Input không hợp lệ", en: "Invalid input" }, { vi: "s phải là chuỗi nhị phân không rỗng.", en: "s must be a non-empty binary string." }, { final: true });
+    return { original: s, answer: "[]", steps };
+  }
+
+  const queries = parseQueries(params && params.queries);
+  const detailed = n <= 80 && queries.length <= 20;
+  const cnt1 = chars.filter((ch) => ch === "1").length;
+  const zeroBlocks = [];
+  const blockLeft = [];
+  const blockRight = [];
+
+  pushStep(49, { vi: `n = ${n}`, en: `n = ${n}` }, { vi: "Lấy độ dài chuỗi.", en: "Read the string length." }, { vars: [{ name: "n", value: n }] });
+  pushStep(50, { vi: `cnt1 = ${cnt1}`, en: `cnt1 = ${cnt1}` }, { vi: "Đếm tổng số '1' trong toàn chuỗi.", en: "Count all '1's in the whole string." }, { highlight: chars.map((ch, i) => (ch === "1" ? i : -1)).filter((i) => i >= 0), vars: [{ name: "cnt1", value: cnt1 }] });
+  if (detailed) {
+    pushStep(52, { vi: "zeroBlocks = []", en: "zeroBlocks = []" }, { vi: "Lưu độ dài từng zero-block.", en: "Store each zero-block length." });
+    pushStep(53, { vi: "blockLeft = []", en: "blockLeft = []" }, { vi: "Lưu biên trái từng zero-block.", en: "Store each zero-block's left boundary." });
+    pushStep(54, { vi: "blockRight = []", en: "blockRight = []" }, { vi: "Lưu biên phải từng zero-block.", en: "Store each zero-block's right boundary." });
+    pushStep(56, { vi: "i = 0", en: "i = 0" }, { vi: "Bắt đầu quét run-length.", en: "Start the run-length scan." }, { vars: [{ name: "i", value: 0 }] });
+  }
+
+  let scan = 0;
+  while (scan < n) {
+    const st = scan;
+    if (detailed) {
+      pushStep(57, { vi: `${scan} < ${n} → true`, en: `${scan} < ${n} → true` }, { vi: "Còn ký tự cần quét.", en: "There are characters left to scan." }, { highlight: [scan], vars: [{ name: "i", value: scan }] });
+      pushStep(58, { vi: `st = ${st}`, en: `st = ${st}` }, { vi: "Ghi lại đầu run hiện tại.", en: "Record the current run start." }, { highlight: [st], vars: [{ name: "st", value: st }] });
+    }
+    while (scan < n && s[scan] === s[st]) {
+      if (detailed) pushStep(59, { vi: `s[${scan}] == '${s[st]}' → true`, en: `s[${scan}] == '${s[st]}' → true` }, { vi: "Ký tự vẫn thuộc run hiện tại.", en: "The character remains in the current run." }, { highlight: range(st, scan), vars: [{ name: "i", value: scan }, { name: "st", value: st }] });
+      scan += 1;
+      if (detailed) pushStep(60, { vi: `i += 1 → ${scan}`, en: `i += 1 → ${scan}` }, { vi: "Mở rộng run sang phải.", en: "Extend the run to the right." }, { highlight: range(st, scan - 1), vars: [{ name: "i", value: scan }] });
+    }
+    const isZeroRun = s[st] === "0";
+    if (detailed) pushStep(61, { vi: `s[st] == '0' → ${isZeroRun}`, en: `s[st] == '0' → ${isZeroRun}` }, { vi: isZeroRun ? "Đây là zero-block, lưu lại." : "Đây là one-block, bỏ qua.", en: isZeroRun ? "This is a zero block, so store it." : "This is a one block, so skip it." }, { highlight: range(st, scan - 1) });
+    if (isZeroRun) {
+      zeroBlocks.push(scan - st);
+      blockLeft.push(st);
+      blockRight.push(scan - 1);
+      const blockId = zeroBlocks.length - 1;
+      if (detailed) {
+        pushStep(62, { vi: `zeroBlocks.append(${scan - st})`, en: `zeroBlocks.append(${scan - st})` }, { vi: `z${blockId} dài ${scan - st}.`, en: `z${blockId} has length ${scan - st}.` }, { mark: range(st, scan - 1), vars: [{ name: "zeroBlocks", value: `[${zeroBlocks.join(", ")}]` }] });
+        pushStep(63, { vi: `blockLeft.append(${st})`, en: `blockLeft.append(${st})` }, { vi: `Biên trái z${blockId}.`, en: `Left boundary of z${blockId}.` }, { mark: range(st, scan - 1), vars: [{ name: "blockLeft", value: `[${blockLeft.join(", ")}]` }] });
+        pushStep(64, { vi: `blockRight.append(${scan - 1})`, en: `blockRight.append(${scan - 1})` }, { vi: `Biên phải z${blockId}.`, en: `Right boundary of z${blockId}.` }, { mark: range(st, scan - 1), vars: [{ name: "blockRight", value: `[${blockRight.join(", ")}]` }] });
+      }
+    }
+  }
+  if (detailed) pushStep(57, { vi: `${scan} < ${n} → false`, en: `${scan} < ${n} → false` }, { vi: "Đã quét hết chuỗi.", en: "The string scan is complete." }, { vars: [{ name: "i", value: scan }] });
+
+  const m = zeroBlocks.length;
+  pushStep(66, { vi: `m = ${m}`, en: `m = ${m}` }, { vi: "Số zero-block đã tìm được.", en: "Number of zero blocks found." }, { vars: [{ name: "m", value: m }] });
+  pushStep(67, { vi: `m < 2 → ${m < 2}`, en: `m < 2 → ${m < 2}` }, { vi: m < 2 ? "Không đủ hai zero-block để trade." : "Có thể tiếp tục build segment tree.", en: m < 2 ? "There are not enough zero blocks for a trade." : "Continue building the segment tree." }, { vars: [{ name: "m", value: m }] });
+  if (m < 2) {
+    const answer = Array(queries.length).fill(cnt1);
+    pushStep(68, { vi: `return [${answer.join(", ")}]`, en: `return [${answer.join(", ")}]` }, { vi: "Mọi query giữ nguyên cnt1.", en: "Every query keeps cnt1 unchanged." }, { final: true, vars: [{ name: "answer", value: `[${answer.join(", ")}]` }] });
+    return { original: s, answer: `[${answer.join(", ")}]`, steps };
+  }
+
+  const tmpSum = Array.from({ length: m - 1 }, (_, i) => zeroBlocks[i] + zeroBlocks[i + 1]);
+  if (detailed) pushStep(70, { vi: `tmpSum = [${tmpSum.join(", ")}]`, en: `tmpSum = [${tmpSum.join(", ")}]` }, { vi: "tmpSum[k] là gain của cặp z[k], z[k+1].", en: "tmpSum[k] is the gain of pair z[k], z[k+1]." }, { vars: [{ name: "tmpSum", value: `[${tmpSum.join(", ")}]` }] });
+
+  const segArray = Array(tmpSum.length << 2).fill(0);
+  const segPair = Array(tmpSum.length << 2).fill(-1);
+  if (detailed) {
+    pushStep(71, { vi: "seg = SegmentTree(tmpSum)", en: "seg = SegmentTree(tmpSum)" }, { vi: "Đi vào constructor của recursive segment tree.", en: "Enter the recursive segment-tree constructor." });
+    pushStep(5, { vi: "Vào SegmentTree.__init__", en: "Enter SegmentTree.__init__" }, { vi: "Khởi tạo cây từ tmpSum.", en: "Initialize the tree from tmpSum." });
+    pushStep(6, { vi: `self.n = ${tmpSum.length}`, en: `self.n = ${tmpSum.length}` }, { vi: "Số phần tử cần build.", en: "Number of values to build." }, { vars: [{ name: "self.n", value: tmpSum.length }] });
+    pushStep(7, { vi: "self.arr = arr", en: "self.arr = arr" }, { vi: "Giữ mảng pair gain gốc.", en: "Keep the original pair-gain array." }, { vars: [{ name: "self.arr", value: `[${tmpSum.join(", ")}]` }] });
+    pushStep(8, { vi: `self.seg = [0] * ${segArray.length}`, en: `self.seg = [0] * ${segArray.length}` }, { vi: "Cấp phát cây.", en: "Allocate the tree." }, { vars: [{ name: "len(self.seg)", value: segArray.length }] });
+    pushStep(10, { vi: "if self.n → true", en: "if self.n → true" }, { vi: "Mảng không rỗng nên gọi build.", en: "The array is non-empty, so call build." });
+    pushStep(11, { vi: `build(1, 0, ${tmpSum.length - 1})`, en: `build(1, 0, ${tmpSum.length - 1})` }, { vi: "Build từ root.", en: "Build from the root." });
+  }
+
+  function buildTree(p, l, r) {
+    if (detailed) pushStep(13, { vi: `build(p=${p}, l=${l}, r=${r})`, en: `build(p=${p}, l=${l}, r=${r})` }, { vi: "Xử lý một node của cây.", en: "Process one tree node." }, { vars: [{ name: "p", value: p }, { name: "l", value: l }, { name: "r", value: r }] });
+    const isLeaf = l === r;
+    if (detailed) pushStep(14, { vi: `l == r → ${isLeaf}`, en: `l == r → ${isLeaf}` }, { vi: isLeaf ? "Node lá." : "Node trong, chia đôi tiếp.", en: isLeaf ? "This is a leaf." : "This is an internal node; split again." });
+    if (isLeaf) {
+      segArray[p] = tmpSum[l];
+      segPair[p] = l;
+      if (detailed) {
+        pushStep(15, { vi: `self.seg[${p}] = ${tmpSum[l]}`, en: `self.seg[${p}] = ${tmpSum[l]}` }, { vi: `Lá lưu gain của pair ${l}.`, en: `The leaf stores gain for pair ${l}.` }, { mark: [...range(blockLeft[l], blockRight[l]), ...range(blockLeft[l + 1], blockRight[l + 1])], vars: [{ name: "self.seg[p]", value: tmpSum[l] }] });
+        pushStep(16, { vi: "return", en: "return" }, { vi: "Hoàn tất node lá.", en: "Finish the leaf node." });
+      }
+      return;
+    }
+    const mid = Math.floor((l + r) / 2);
+    if (detailed) pushStep(18, { vi: `mid = ${mid}`, en: `mid = ${mid}` }, { vi: "Chia interval thành hai nửa.", en: "Split the interval into two halves." }, { vars: [{ name: "mid", value: mid }] });
+    if (detailed) pushStep(20, { vi: `build(${p << 1}, ${l}, ${mid})`, en: `build(${p << 1}, ${l}, ${mid})` }, { vi: "Đệ quy sang con trái.", en: "Recurse into the left child." });
+    buildTree(p << 1, l, mid);
+    if (detailed) pushStep(21, { vi: `build(${p << 1 | 1}, ${mid + 1}, ${r})`, en: `build(${p << 1 | 1}, ${mid + 1}, ${r})` }, { vi: "Đệ quy sang con phải.", en: "Recurse into the right child." });
+    buildTree(p << 1 | 1, mid + 1, r);
+    const leftNode = p << 1;
+    const rightNode = p << 1 | 1;
+    if (segArray[leftNode] >= segArray[rightNode]) {
+      segArray[p] = segArray[leftNode];
+      segPair[p] = segPair[leftNode];
+    } else {
+      segArray[p] = segArray[rightNode];
+      segPair[p] = segPair[rightNode];
+    }
+    if (detailed) pushStep(23, { vi: `self.seg[${p}] = ${segArray[p]}`, en: `self.seg[${p}] = ${segArray[p]}` }, { vi: "Node cha giữ max của hai con.", en: "The parent keeps the maximum of both children." }, { vars: [{ name: "self.seg[p]", value: segArray[p] }] });
+  }
+
+  buildTree(1, 0, tmpSum.length - 1);
+
+  function queryTree(L, R, queryHighlight) {
+    if (detailed) {
+      pushStep(25, { vi: `query(L=${L}, R=${R})`, en: `query(L=${L}, R=${R})` }, { vi: "Bắt đầu range maximum query.", en: "Start the range maximum query." }, { highlight: queryHighlight });
+      pushStep(26, { vi: `L > R → ${L > R}`, en: `L > R → ${L > R}` }, { vi: L > R ? "Range rỗng." : "Range hợp lệ.", en: L > R ? "The range is empty." : "The range is valid." }, { highlight: queryHighlight });
+    }
+    if (L > R) {
+      if (detailed) pushStep(27, { vi: "return 0", en: "return 0" }, { vi: "Không có pair hoàn chỉnh ở giữa.", en: "There is no complete middle pair." }, { highlight: queryHighlight });
+      return { gain: 0, pair: -1 };
+    }
+
+    function visit(p, l, r) {
+      if (detailed) pushStep(29, { vi: `_query(p=${p}, l=${l}, r=${r})`, en: `_query(p=${p}, l=${l}, r=${r})` }, { vi: "Thăm một node query.", en: "Visit one query node." }, { highlight: queryHighlight, vars: [{ name: "p", value: p }, { name: "l", value: l }, { name: "r", value: r }] });
+      const covered = L <= l && r <= R;
+      if (detailed) pushStep(30, { vi: `node nằm trọn range → ${covered}`, en: `node fully covered → ${covered}` }, { vi: covered ? "Dùng trực tiếp max của node." : "Node chỉ giao một phần, cần đi xuống.", en: covered ? "Use this node's maximum directly." : "The node is only partially covered; descend." }, { highlight: queryHighlight });
+      if (covered) {
+        if (detailed) pushStep(31, { vi: `return self.seg[${p}] = ${segArray[p]}`, en: `return self.seg[${p}] = ${segArray[p]}` }, { vi: "Node được range bao phủ hoàn toàn.", en: "The query range fully covers this node." }, { highlight: queryHighlight, vars: [{ name: "gain", value: segArray[p] }, { name: "pair", value: segPair[p] }] });
+        return { gain: segArray[p], pair: segPair[p] };
+      }
+      const mid = Math.floor((l + r) / 2);
+      let best = { gain: 0, pair: -1 };
+      if (detailed) {
+        pushStep(33, { vi: `mid = ${mid}`, en: `mid = ${mid}` }, { vi: "Tính điểm chia node.", en: "Compute the node midpoint." }, { highlight: queryHighlight, vars: [{ name: "mid", value: mid }] });
+        pushStep(34, { vi: "res = 0", en: "res = 0" }, { vi: "Khởi tạo max cục bộ.", en: "Initialize the local maximum." }, { highlight: queryHighlight });
+        pushStep(36, { vi: `L <= mid → ${L <= mid}`, en: `L <= mid → ${L <= mid}` }, { vi: "Kiểm tra giao với con trái.", en: "Check overlap with the left child." }, { highlight: queryHighlight });
+      }
+      if (L <= mid) {
+        if (detailed) pushStep(37, { vi: "Query con trái", en: "Query left child" }, { vi: "Đệ quy sang nửa trái.", en: "Recurse into the left half." }, { highlight: queryHighlight });
+        best = visit(p << 1, l, mid);
+      }
+      if (detailed) pushStep(39, { vi: `R > mid → ${R > mid}`, en: `R > mid → ${R > mid}` }, { vi: "Kiểm tra giao với con phải.", en: "Check overlap with the right child." }, { highlight: queryHighlight });
+      if (R > mid) {
+        if (detailed) pushStep(40, { vi: "Query con phải", en: "Query right child" }, { vi: "Đệ quy sang nửa phải và lấy max.", en: "Recurse into the right half and take the maximum." }, { highlight: queryHighlight });
+        const candidate = visit(p << 1 | 1, mid + 1, r);
+        if (candidate.gain > best.gain) best = candidate;
+      }
+      if (detailed) pushStep(42, { vi: `return res = ${best.gain}`, en: `return res = ${best.gain}` }, { vi: "Trả max của các nhánh đã thăm.", en: "Return the maximum from visited branches." }, { highlight: queryHighlight, vars: [{ name: "res", value: best.gain }] });
+      return best;
+    }
+
+    const result = visit(1, 0, tmpSum.length - 1);
+    if (detailed) pushStep(44, { vi: `return _query(...) = ${result.gain}`, en: `return _query(...) = ${result.gain}` }, { vi: "Hoàn tất recursive RMQ.", en: "Finish the recursive RMQ." }, { highlight: queryHighlight, vars: [{ name: "gain", value: result.gain }] });
+    return result;
+  }
+
+  const answers = [];
+  if (detailed) pushStep(72, { vi: "ans = []", en: "ans = []" }, { vi: "Khởi tạo kết quả.", en: "Initialize the result list." });
+
+  for (let qi = 0; qi < queries.length; qi++) {
+    let [l, r] = queries[qi];
+    l = Math.max(0, Math.min(l, n - 1));
+    r = Math.max(0, Math.min(r, n - 1));
+    if (l > r) [l, r] = [r, l];
+    const queryHighlight = detailed ? range(l, r) : [];
+    const firstBlock = lowerBound(blockRight, l);
+    const lastBlock = upperBound(blockLeft, r) - 1;
+
+    if (detailed) {
+      pushStep(74, { vi: `query ${qi}: [${l}, ${r}]`, en: `query ${qi}: [${l}, ${r}]` }, { vi: "Bắt đầu xử lý query.", en: "Start processing the query." }, { highlight: queryHighlight, vars: [{ name: "l", value: l }, { name: "r", value: r }] });
+      pushStep(75, { vi: `i = bisect_left(...) = ${firstBlock}`, en: `i = bisect_left(...) = ${firstBlock}` }, { vi: "Zero-block đầu tiên có right >= l.", en: "First zero block whose right boundary is at least l." }, { highlight: queryHighlight, vars: [{ name: "i", value: firstBlock }] });
+      pushStep(76, { vi: `j = bisect_right(...) - 1 = ${lastBlock}`, en: `j = bisect_right(...) - 1 = ${lastBlock}` }, { vi: "Zero-block cuối cùng có left <= r.", en: "Last zero block whose left boundary is at most r." }, { highlight: queryHighlight, vars: [{ name: "j", value: lastBlock }] });
+    }
+
+    const fewerThanTwo = firstBlock > m - 1 || lastBlock < 0 || firstBlock >= lastBlock;
+    if (detailed) pushStep(78, { vi: `Có ít hơn 2 zero-block → ${fewerThanTwo}`, en: `Fewer than 2 zero blocks → ${fewerThanTwo}` }, { vi: fewerThanTwo ? "Không thể trade trong substring." : "Substring chứa ít nhất hai zero-block.", en: fewerThanTwo ? "No trade is possible in the substring." : "The substring contains at least two zero blocks." }, { highlight: queryHighlight });
+    if (fewerThanTwo) {
+      answers.push(cnt1);
+      if (detailed) {
+        pushStep(79, { vi: `ans.append(${cnt1})`, en: `ans.append(${cnt1})` }, { vi: "Giữ nguyên số '1'.", en: "Keep the original one count." }, { highlight: queryHighlight, vars: [{ name: "answer", value: cnt1 }] });
+        pushStep(80, { vi: "continue", en: "continue" }, { vi: "Chuyển sang query tiếp theo.", en: "Move to the next query." }, { highlight: queryHighlight });
+      }
+      continue;
+    }
+
+    const firstLen = blockRight[firstBlock] - Math.max(blockLeft[firstBlock], l) + 1;
+    const lastLen = Math.min(blockRight[lastBlock], r) - blockLeft[lastBlock] + 1;
+    if (detailed) {
+      pushStep(82, { vi: `firstLen = ${firstLen}`, en: `firstLen = ${firstLen}` }, { vi: "Độ dài thực của zero-block đầu trong substring.", en: "Actual length of the first zero block inside the substring." }, { highlight: queryHighlight, mark: range(Math.max(blockLeft[firstBlock], l), blockRight[firstBlock]), vars: [{ name: "firstLen", value: firstLen }] });
+      pushStep(83, { vi: `lastLen = ${lastLen}`, en: `lastLen = ${lastLen}` }, { vi: "Độ dài thực của zero-block cuối trong substring.", en: "Actual length of the last zero block inside the substring." }, { highlight: queryHighlight, mark: range(blockLeft[lastBlock], Math.min(blockRight[lastBlock], r)), vars: [{ name: "lastLen", value: lastLen }] });
+      pushStep(85, { vi: `i + 1 == j → ${firstBlock + 1 === lastBlock}`, en: `i + 1 == j → ${firstBlock + 1 === lastBlock}` }, { vi: firstBlock + 1 === lastBlock ? "Substring chứa đúng hai zero-block." : "Có zero-block hoàn chỉnh ở giữa.", en: firstBlock + 1 === lastBlock ? "The substring contains exactly two zero blocks." : "There are complete zero blocks in the middle." }, { highlight: queryHighlight });
+    }
+
+    if (firstBlock + 1 === lastBlock) {
+      const bestGain = firstLen + lastLen;
+      const answer = cnt1 + bestGain;
+      answers.push(answer);
+      if (detailed) {
+        const mark = [...range(Math.max(blockLeft[firstBlock], l), blockRight[firstBlock]), ...range(blockLeft[lastBlock], Math.min(blockRight[lastBlock], r))];
+        pushStep(86, { vi: `bestGain = ${bestGain}`, en: `bestGain = ${bestGain}` }, { vi: "Ghép trực tiếp hai block biên.", en: "Merge the two boundary blocks directly." }, { highlight: queryHighlight, mark, vars: [{ name: "bestGain", value: bestGain }] });
+        pushStep(87, { vi: `ans.append(${answer})`, en: `ans.append(${answer})` }, { vi: "Cộng bestGain vào cnt1.", en: "Add bestGain to cnt1." }, { highlight: queryHighlight, mark, vars: [{ name: "answer", value: answer }] });
+        pushStep(88, { vi: "continue", en: "continue" }, { vi: "Hoàn tất query này.", en: "Finish this query." }, { highlight: queryHighlight });
+      }
+      continue;
+    }
+
+    const val1 = firstLen + zeroBlocks[firstBlock + 1];
+    const val2 = zeroBlocks[lastBlock - 1] + lastLen;
+    if (detailed) {
+      pushStep(90, { vi: `val1 = ${val1}`, en: `val1 = ${val1}` }, { vi: "Block đầu bị cắt + block kế tiếp hoàn chỉnh.", en: "Cut first block plus the next complete block." }, { highlight: queryHighlight, vars: [{ name: "val1", value: val1 }] });
+      pushStep(91, { vi: `val2 = ${val2}`, en: `val2 = ${val2}` }, { vi: "Block áp cuối hoàn chỉnh + block cuối bị cắt.", en: "Complete penultimate block plus the cut last block." }, { highlight: queryHighlight, vars: [{ name: "val2", value: val2 }] });
+      pushStep(92, { vi: `val3 = seg.query(${firstBlock + 1}, ${lastBlock - 2})`, en: `val3 = seg.query(${firstBlock + 1}, ${lastBlock - 2})` }, { vi: "Query các cặp hoàn chỉnh ở giữa.", en: "Query complete pairs in the middle." }, { highlight: queryHighlight });
+    }
+    const middle = queryTree(firstBlock + 1, lastBlock - 2, queryHighlight);
+    const val3 = middle.gain;
+    let bestGain = val1;
+    let bestMark = [...range(Math.max(blockLeft[firstBlock], l), blockRight[firstBlock]), ...range(blockLeft[firstBlock + 1], blockRight[firstBlock + 1])];
+    if (val2 > bestGain) {
+      bestGain = val2;
+      bestMark = [...range(blockLeft[lastBlock - 1], blockRight[lastBlock - 1]), ...range(blockLeft[lastBlock], Math.min(blockRight[lastBlock], r))];
+    }
+    if (val3 > bestGain) {
+      bestGain = val3;
+      bestMark = middle.pair >= 0 ? [...range(blockLeft[middle.pair], blockRight[middle.pair]), ...range(blockLeft[middle.pair + 1], blockRight[middle.pair + 1])] : [];
+    }
+    const answer = cnt1 + bestGain;
+    answers.push(answer);
+    if (detailed) {
+      pushStep(94, { vi: `bestGain = max(${val1}, ${val2}, ${val3}) = ${bestGain}`, en: `bestGain = max(${val1}, ${val2}, ${val3}) = ${bestGain}` }, { vi: "Chọn candidate tốt nhất.", en: "Choose the best candidate." }, { highlight: queryHighlight, mark: bestMark, vars: [{ name: "val1", value: val1 }, { name: "val2", value: val2 }, { name: "val3", value: val3 }, { name: "bestGain", value: bestGain }] });
+      pushStep(95, { vi: `ans.append(${answer})`, en: `ans.append(${answer})` }, { vi: "Cộng gain tốt nhất vào cnt1.", en: "Add the best gain to cnt1." }, { highlight: queryHighlight, mark: bestMark, vars: [{ name: "answer", value: answer }] });
+    }
+  }
+
+  pushStep(97, { vi: `return ans = [${answers.join(", ")}]`, en: `return ans = [${answers.join(", ")}]` }, { vi: "Trả kết quả cho mọi query.", en: "Return all query results." }, { final: true, vars: [{ name: "answer", value: `[${answers.join(", ")}]` }] });
+  return { original: s, answer: `[${answers.join(", ")}]`, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -7509,6 +7800,16 @@ module.exports = {
     inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
     extraParams: [
       {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách giải", en: "Approach" },
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Iterative Segment Tree", en: "Approach 1: Iterative Segment Tree" } },
+          { value: "2", label: { vi: "Cách 2: Recursive Segment Tree + bisect", en: "Approach 2: Recursive Segment Tree + bisect" } },
+        ],
+      },
+      {
         key: "queries",
         type: "string",
         label: { vi: "queries (l,r;l,r;...)", en: "queries (l,r;l,r;...)" },
@@ -7518,7 +7819,8 @@ module.exports = {
     approach: [
       { vi: "Đếm tổng số '1' trong toàn chuỗi một lần: ones.", en: "Count total '1's in the whole string once: ones." },
       { vi: "Nén các đoạn '0' thành zeroGroups; mỗi cặp zᵢ, zᵢ₊₁ có gain = len(zᵢ) + len(zᵢ₊₁).", en: "Compress zero runs into zeroGroups; each pair zᵢ, zᵢ₊₁ has gain = len(zᵢ) + len(zᵢ₊₁)." },
-      { vi: "Build segment tree trên các pair gain để lấy max của mọi cặp hoàn chỉnh trong query bằng O(log n).", en: "Build a segment tree over pair gains to get the best complete pair in O(log n)." },
+      { vi: "Cách 1 map mỗi vị trí sang zeroGroup và dùng iterative segment tree để query pair gain.", en: "Approach 1 maps each position to a zero group and uses an iterative segment tree for pair-gain queries." },
+      { vi: "Cách 2 lưu blockLeft/blockRight, dùng bisect tìm hai block biên và recursive segment tree cho phần giữa.", en: "Approach 2 stores blockLeft/blockRight, uses bisect to locate boundary blocks, and a recursive segment tree for the middle." },
       { vi: "Với query [l,r], hai biên có thể cắt giữa một đoạn '0', nên cần xét left cut và right cut riêng.", en: "For query [l,r], each boundary may cut through a zero run, so left cut and right cut need special handling." },
       { vi: "Gain cuối là max của RMQ ở giữa và tối đa ba candidate đặc biệt chạm biên.", en: "The final gain is the max of the middle RMQ and up to three boundary candidates." },
     ],
@@ -7596,6 +7898,112 @@ module.exports = {
       "            zeroGroupIndex.append(len(zeroGroups) - 1)",
       "        return zeroGroups, zeroGroupIndex",
     ],
-    builder: buildSteps3501SegmentTree,
+    code2: [
+      "from bisect import bisect_left, bisect_right",
+      "from typing import List",
+      "",
+      "class SegmentTree:",
+      "    def __init__(self, arr):",
+      "        self.n = len(arr)",
+      "        self.arr = arr",
+      "        self.seg = [0] * (self.n << 2)",
+      "",
+      "        if self.n:",
+      "            self.build(1, 0, self.n - 1)",
+      "",
+      "    def build(self, p: int, l: int, r: int) -> None:",
+      "        if l == r:",
+      "            self.seg[p] = self.arr[l]",
+      "            return",
+      "",
+      "        mid = (l + r) >> 1",
+      "",
+      "        self.build(p << 1, l, mid)",
+      "        self.build(p << 1 | 1, mid + 1, r)",
+      "",
+      "        self.seg[p] = max(self.seg[p << 1], self.seg[p << 1 | 1])",
+      "",
+      "    def query(self, L: int, R: int) -> int:",
+      "        if L > R:",
+      "            return 0",
+      "",
+      "        def _query(p: int, l: int, r: int) -> int:",
+      "            if L <= l and r <= R:",
+      "                return self.seg[p]",
+      "",
+      "            mid = (l + r) >> 1",
+      "            res = 0",
+      "",
+      "            if L <= mid:",
+      "                res = max(res, _query(p << 1, l, mid))",
+      "",
+      "            if R > mid:",
+      "                res = max(res, _query(p << 1 | 1, mid + 1, r))",
+      "",
+      "            return res",
+      "",
+      "        return _query(1, 0, self.n - 1)",
+      "",
+      "",
+      "class Solution:",
+      "    def maxActiveSectionsAfterTrade(self, s: str, queries: List[List[int]]) -> List[int]:",
+      "        n = len(s)",
+      "        cnt1 = s.count('1')",
+      "",
+      "        zeroBlocks = []",
+      "        blockLeft = []",
+      "        blockRight = []",
+      "",
+      "        i = 0",
+      "        while i < n:",
+      "            st = i",
+      "            while i < n and s[i] == s[st]:",
+      "                i += 1",
+      "            if s[st] == '0':",
+      "                zeroBlocks.append(i - st)",
+      "                blockLeft.append(st)",
+      "                blockRight.append(i - 1)",
+      "",
+      "        m = len(zeroBlocks)",
+      "        if m < 2:",
+      "            return [cnt1] * len(queries)",
+      "",
+      "        tmpSum = [zeroBlocks[i] + zeroBlocks[i + 1] for i in range(m - 1)]",
+      "        seg = SegmentTree(tmpSum)",
+      "        ans = []",
+      "",
+      "        for l, r in queries:",
+      "            i = bisect_left(blockRight, l)",
+      "            j = bisect_right(blockLeft, r) - 1",
+      "",
+      "            if i > m - 1 or j < 0 or i >= j:",
+      "                ans.append(cnt1)",
+      "                continue",
+      "",
+      "            firstLen = blockRight[i] - max(blockLeft[i], l) + 1",
+      "            lastLen = min(blockRight[j], r) - blockLeft[j] + 1",
+      "",
+      "            if i + 1 == j:",
+      "                bestGain = firstLen + lastLen",
+      "                ans.append(cnt1 + bestGain)",
+      "                continue",
+      "",
+      "            val1 = firstLen + zeroBlocks[i + 1]",
+      "            val2 = zeroBlocks[j - 1] + lastLen",
+      "            val3 = seg.query(i + 1, j - 2)",
+      "",
+      "            bestGain = max(val1, val2, val3)",
+      "            ans.append(cnt1 + bestGain)",
+      "",
+      "        return ans",
+    ],
+    codeLabel: { vi: "Cách 1: Iterative Segment Tree", en: "Approach 1: Iterative Segment Tree" },
+    code2Label: { vi: "Cách 2: Recursive Segment Tree + bisect", en: "Approach 2: Recursive Segment Tree + bisect" },
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2
+        ? buildSteps3501RecursiveSegmentTree(input, params)
+        : buildSteps3501SegmentTree(input, params);
+    },
   },
 };
