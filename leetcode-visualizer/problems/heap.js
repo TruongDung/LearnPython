@@ -569,11 +569,10 @@ function buildSteps373(input, params) {
     vars: [{ name: "nums1", value: `[${nums1.join(",")}]` }, { name: "nums2", value: `[${nums2.join(",")}]` }, { name: "k", value: k }],
     note: {
       vi:
-        `Cặp (u, v): u thuộc nums1, v thuộc nums2. Cả 2 mảng đã SẮP XẾP tăng dần.\n` +
-        `Dùng MIN-HEAP theo tổng u+v:\n` +
-        `• Khởi tạo: đẩy (nums1[i], nums2[0]) cho i = 0..min(k,len1)-1 (cặp nhỏ nhất ở mỗi hàng).\n` +
-        `• Lặp k lần: lấy gốc (tổng nhỏ nhất) → thêm vào kết quả; đẩy cặp kế tiếp (cùng u, v lùi sang nums2[j+1]).\n` +
-        `Nhãn nút: "(u,v)·sTổng".`,
+        `Xem mọi cặp như một bảng: hàng i cố định nums1[i], cột j chọn nums2[j], và ô (i,j) có giá trị nums1[i] + nums2[j]. ` +
+        `Vì cả hai mảng tăng dần, tổng trong từng hàng cũng tăng từ trái sang phải.\n` +
+        `Min-heap chỉ giữ "ứng viên đầu hàng" chưa lấy của mỗi hàng. Gốc heap luôn là tổng nhỏ nhất trong frontier này, nên cũng là cặp nhỏ nhất tiếp theo trên toàn bảng.\n` +
+        `Sau khi lấy ô (i,j), ta chỉ cần đưa ô bên phải (i,j+1) của cùng hàng vào heap. Nhờ vậy không phải tạo toàn bộ nums1.length × nums2.length cặp.`,
       en:
         `Pair (u, v): u from nums1, v from nums2. Both arrays are SORTED ascending.\n` +
         `Use a MIN-HEAP on the sum u+v:\n` +
@@ -588,7 +587,7 @@ function buildSteps373(input, params) {
     codeLines: [5],
     vars: [{ name: "heap", value: arrStr() }],
     note: {
-      vi: "Khoi tao heap rong. Chua push cap nao vao heap.",
+      vi: "Khởi tạo min-heap rỗng. Mỗi phần tử heap sẽ có dạng (tổng, i, j), đại diện cho cặp [nums1[i], nums2[j]]. Chưa có hàng nào đưa ứng viên vào frontier.",
       en: "Initialize an empty heap. No pair has been pushed yet.",
     },
   }));
@@ -602,7 +601,10 @@ function buildSteps373(input, params) {
       title: { vi: `Khởi tạo: push (${el.u}, ${el.v}) tổng ${el.sum}`, en: `Init: push (${el.u}, ${el.v}) sum ${el.sum}` },
       hlSet: new Set([heap.length - 1]), codeLines: [7],
       vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
-      note: { vi: `Mỗi phần tử nums1 ghép với phần tử ĐẦU của nums2 (nhỏ nhất). Thêm vào heap rồi sift-up.`, en: `Pair each nums1 element with the FIRST (smallest) of nums2. Add to heap then sift-up.` },
+      note: {
+        vi: `Ở hàng i=${el.i}, cặp nhỏ nhất chắc chắn nằm tại cột j=0 vì nums2 đã tăng dần. Ta đưa (${el.u}, ${el.v}) với tổng ${el.u} + ${el.v} = ${el.sum} vào heap. heapq sẽ sift-up để gốc vẫn là ứng viên có tổng nhỏ nhất. Chỉ cần mở tối đa min(k, len(nums1)) hàng vì kết quả chỉ lấy k cặp.`,
+        en: `Pair each nums1 element with the FIRST (smallest) of nums2. Add to heap then sift-up.`,
+      },
     }));
     siftUp(heap.length - 1);
   }
@@ -612,7 +614,7 @@ function buildSteps373(input, params) {
     codeLines: [8],
     vars: [{ name: "res", value: "[]" }, { name: "heap", value: arrStr() }],
     note: {
-      vi: "Khoi tao danh sach ket qua rong. Heap da co cac ung vien ban dau.",
+      vi: `Khởi tạo res rỗng để lưu các cặp theo đúng thứ tự được lấy khỏi min-heap. Heap hiện có ${heap.length} ứng viên đầu hàng; chưa có cặp nào được xác nhận vào kết quả.`,
       en: "Initialize the empty result list. The heap already has the initial candidates.",
     },
   }));
@@ -628,7 +630,7 @@ function buildSteps373(input, params) {
         { name: "heap", value: arrStr() },
       ],
       note: {
-        vi: "Con ung vien trong heap va chua lay du k cap.",
+        vi: `Kiểm tra hai điều kiện: heap còn ${heap.length} ứng viên và res mới có ${result.length}/${k} cặp. Cả hai đều đúng nên tiếp tục. Gốc hiện tại là (${heap[0].u}, ${heap[0].v}) có tổng ${heap[0].sum}; đây là cặp sẽ được xét kế tiếp.`,
         en: "There are still heap candidates and fewer than k pairs have been collected.",
       },
     }));
@@ -649,7 +651,7 @@ function buildSteps373(input, params) {
         { name: "heap", value: arrStr() },
       ],
       note: {
-        vi: "Pop goc heap: day la cap co tong nho nhat trong frontier hien tai.",
+        vi: `Pop gốc (${root.u}, ${root.v}) với tổng ${root.sum}. Cặp này nhỏ nhất toàn cục trong số các cặp chưa lấy: mỗi hàng chỉ đưa phần tử chưa lấy nhỏ nhất của hàng đó vào frontier, và gốc min-heap nhỏ nhất trong tất cả các ứng viên ấy. Sau pop, heapq tự sift-down để khôi phục thứ tự heap.`,
         en: "Pop the heap root: this is the smallest-sum pair in the current frontier.",
       },
     }));
@@ -668,7 +670,10 @@ function buildSteps373(input, params) {
         { name: "res", value: `[${resStr}]` },
         { name: "heap", value: arrStr() },
       ],
-      note: { vi: "Them cap vua pop vao res.", en: "Append the popped pair to res." },
+      note: {
+        vi: `Thêm [${root.u}, ${root.v}] vào res vì cặp này đã được chứng minh là nhỏ nhất tiếp theo. res hiện có ${result.length}/${k} cặp: [${resStr}]. Ta vẫn phải xem hàng i=${root.i} còn cặp kế tiếp hay không.`,
+        en: "Append the popped pair to res.",
+      },
     }));
 
     // Push the next candidate from the same nums1 element.
@@ -682,7 +687,7 @@ function buildSteps373(input, params) {
           { name: "len(nums2)", value: nums2.length },
         ],
         note: {
-          vi: "Neu hang nay con cot tiep theo, day ung vien tiep theo vao heap.",
+          vi: `Cặp vừa lấy nằm ở cột j=${root.j}. Vì j+1=${root.j + 1} < len(nums2)=${nums2.length}, hàng i=${root.i} vẫn còn ô bên phải. Ô (i=${root.i}, j=${root.j + 1}) là cặp nhỏ nhất chưa xét của hàng này và phải được đưa vào frontier.`,
           en: "If this row has a next column, push the next candidate into the heap.",
         },
       }));
@@ -696,17 +701,59 @@ function buildSteps373(input, params) {
         activePair: [el.i, el.j, "push"],
         hlSet: new Set([heap.findIndex((x) => x.i === el.i && x.j === el.j)]), codeLines: [13],
         vars: [{ name: "heap", value: arrStr() }, { name: "i", value: el.i }, { name: "j", value: el.j }],
-        note: { vi: `Giu u=${el.u}, di sang nums2[j+1] = ${el.v}.`, en: `Keep u=${el.u}, advance to nums2[j+1] = ${el.v}.` },
+        note: {
+          vi: `Giữ nguyên hàng i=${el.i}, dịch sang phải tới j=${el.j}: cặp mới là (${el.u}, ${el.v}), tổng ${el.u} + ${el.v} = ${el.sum}. Push cặp này để thay thế ứng viên vừa pop của cùng hàng; heapq sift-up và frontier lại sẵn sàng cho vòng tiếp theo.`,
+          en: `Keep u=${el.u}, advance to nums2[j+1] = ${el.v}.`,
+        },
+      }));
+    } else {
+      steps.push(pairSnapshot({
+        title: { vi: `Hàng i=${root.i} đã hết phần tử`, en: `Row i=${root.i} has no next element` },
+        activePair: [root.i, root.j, "result"],
+        codeLines: [12],
+        vars: [
+          { name: "j + 1", value: root.j + 1 },
+          { name: "len(nums2)", value: nums2.length },
+          { name: "heap", value: arrStr() },
+        ],
+        note: {
+          vi: `Điều kiện sai vì j+1=${root.j + 1} bằng len(nums2)=${nums2.length}. Cặp vừa lấy đã ở cột cuối của hàng i=${root.i}, nên hàng này không còn ứng viên để push; ta tiếp tục chỉ với các hàng còn lại trong heap.`,
+          en: `The popped pair was the last element in row i=${root.i}, so this row contributes no new heap candidate.`,
+        },
       }));
     }
   }
+
+  steps.push(pairSnapshot({
+    title: {
+      vi: result.length >= k ? `Đã lấy đủ ${k} cặp` : "Heap đã rỗng",
+      en: result.length >= k ? `Collected ${k} pairs` : "The heap is empty",
+    },
+    codeLines: [9],
+    vars: [
+      { name: "len(res)", value: result.length },
+      { name: "k", value: k },
+      { name: "heap size", value: heap.length },
+    ],
+    note: {
+      vi: result.length >= k
+        ? `Kiểm tra lại điều kiện while: len(res)=${result.length} không còn nhỏ hơn k=${k}, nên dừng dù heap vẫn có thể còn ứng viên. Ta chỉ được yêu cầu tối đa k cặp.`
+        : `Kiểm tra lại điều kiện while: heap đã rỗng sau khi duyệt hết mọi hàng, nên không còn cặp nào để lấy. Kết quả có ${result.length} cặp, ít hơn k vì tổng số cặp khả dụng không đủ.`,
+      en: result.length >= k
+        ? `The loop stops because len(res)=${result.length} is no longer less than k=${k}.`
+        : "The loop stops because no heap candidates remain.",
+    },
+  }));
 
   const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
   const fs = pairSnapshot({
     title: { vi: `return res -> [${resStr}]`, en: `return res -> [${resStr}]` },
     codeLines: [14],
     vars: [{ name: "res", value: `[${resStr}]` }, { name: "return", value: `[${resStr}]` }],
-    note: { vi: "Ket thuc ham va tra ve res.", en: "Finish the function and return res." },
+    note: {
+      vi: `Trả về res gồm ${result.length} cặp: [${resStr}]. Thứ tự pop của min-heap bảo đảm tổng các cặp không giảm; thuật toán chỉ giữ tối đa min(k, len(nums1)) ứng viên nên không phải tạo toàn bộ tích Descartes của hai mảng.`,
+      en: "Finish the function and return res.",
+    },
   });
   fs.final = true; steps.push(fs);
 
@@ -1950,7 +1997,7 @@ module.exports = {
     extraParams: [{ key: "nums2", label: { vi: "nums2 (đã sắp xếp)", en: "nums2 (sorted)" }, type: "string", default: "2,4,6" }, { key: "k", label: { vi: "k", en: "k" }, default: 3 }],
     approach: [
       { vi: "Min-heap theo tổng. Khởi tạo với (nums1[i], nums2[0]) cho i đầu.", en: "Min-heap by sum. Initialize with (nums1[i], nums2[0]) for the first i's." },
-      { vi: "Mỗi lần pop cặp nhỏ nhất, đẩy cặp kế tiếp (cùng u, v lùi sang nums2[j+1]).", en: "Each pop of the smallest pair, push the next pair (same u, advance to nums2[j+1])." },
+      { vi: "Mỗi lần pop cặp nhỏ nhất, giữ nguyên u và đẩy cặp kế tiếp ở bên phải: nums2[j+1].", en: "Each pop of the smallest pair, push the next pair (same u, advance to nums2[j+1])." },
     ],
     complexity: { time: "O(k log k)", space: "O(k)", note: { vi: "Mỗi pop/push trên heap kích thước ≤ k.", en: "Each pop/push on a heap of size ≤ k." } },
     code: [
