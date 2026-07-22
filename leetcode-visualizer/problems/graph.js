@@ -5279,11 +5279,284 @@ function buildStepsSurroundedRegions(input, params) {
   return { original: grid, answer: finalGrid, steps };
 }
 
+/**
+ * LeetCode 3977: Minimum Time to Reach Target With Limited Power.
+ * Dijkstra on the expanded state graph (node, remaining power).
+ */
+function buildSteps3977(input, params) {
+  const parsedN = Number(params && params.n);
+  const n = Number.isInteger(parsedN) && parsedN > 0 ? parsedN : 5;
+  const initialPower = Math.max(1, Number(params && params.power) || 4);
+  const source = Math.min(n - 1, Math.max(0, Number(params && params.source) || 0));
+  const targetValue = Number(params && params.target);
+  const target = Math.min(n - 1, Math.max(0, Number.isInteger(targetValue) ? targetValue : n - 1));
+  const parsedCosts = String((params && params.cost) || "")
+    .split(",")
+    .map((value) => Number(value.trim()));
+  const cost = Array.from({ length: n }, (_, index) => (
+    Number.isFinite(parsedCosts[index]) && parsedCosts[index] > 0 ? parsedCosts[index] : 1
+  ));
+  const edges = String(input || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(",").map((value) => Number(value.trim())))
+    .filter(([u, v, time]) => (
+      Number.isInteger(u) && Number.isInteger(v) && Number.isFinite(time)
+      && u >= 0 && u < n && v >= 0 && v < n && time > 0
+    ))
+    .map(([u, v, time]) => ({ u, v, time }));
+
+  const adjacency = Array.from({ length: n }, () => []);
+  edges.forEach(({ u, v, time }) => adjacency[u].push({ v, time }));
+
+  class MinHeap {
+    constructor(compare) {
+      this.data = [];
+      this.compare = compare;
+    }
+    push(value) {
+      this.data.push(value);
+      let index = this.data.length - 1;
+      while (index > 0) {
+        const parent = Math.floor((index - 1) / 2);
+        if (this.compare(this.data[parent], value) <= 0) break;
+        this.data[index] = this.data[parent];
+        index = parent;
+      }
+      this.data[index] = value;
+    }
+    pop() {
+      if (!this.data.length) return null;
+      const root = this.data[0];
+      const last = this.data.pop();
+      if (this.data.length) {
+        let index = 0;
+        while (true) {
+          let child = index * 2 + 1;
+          if (child >= this.data.length) break;
+          if (child + 1 < this.data.length && this.compare(this.data[child + 1], this.data[child]) < 0) child += 1;
+          if (this.compare(last, this.data[child]) <= 0) break;
+          this.data[index] = this.data[child];
+          index = child;
+        }
+        this.data[index] = last;
+      }
+      return root;
+    }
+    get length() { return this.data.length; }
+  }
+
+  const compareStates = (a, b) => a.time - b.time || b.power - a.power || a.node - b.node;
+  const heap = new MinHeap(compareStates);
+  const dist = Array.from({ length: n }, () => new Map());
+  const discovered = new Map();
+  const settled = new Set();
+  const stateEdges = [];
+  const steps = [];
+  const stateId = (node, power) => `${node}|${power}`;
+
+  function rememberState(node, power, time) {
+    const id = stateId(node, power);
+    const previous = discovered.get(id);
+    if (!previous || time < previous.time) discovered.set(id, { id, node, power, time });
+    return id;
+  }
+
+  function heapLabel() {
+    const ordered = heap.data.slice().sort(compareStates);
+    const shown = ordered.slice(0, 8).map((state) => `(t=${state.time}, n=${state.node}, p=${state.power})`);
+    return `[${shown.join(", ")}${ordered.length > 8 ? `, ... +${ordered.length - 8}` : ""}]`;
+  }
+
+  function graphSnapshot(hlNodes = [], hlEdges = []) {
+    const annotations = {};
+    const nodes = [...discovered.values()].map((state) => {
+      annotations[state.id] = `t=${state.time}`;
+      return { id: state.id, label: `${state.node},${state.power}` };
+    });
+    return {
+      nodes,
+      edges: stateEdges.map((edge) => ({ ...edge })),
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...settled],
+      annotations,
+      caption: {
+        vi: "Mỗi nút là một trạng thái (node, điện còn lại); nhãn trên nút là thời gian tốt nhất.",
+        en: "Each node is a (node, remaining power) state; the label above it is the best time.",
+      },
+    };
+  }
+
+  function pushStep({ title, codeLines, hlNodes = [], hlEdges = [], vars = [], note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: graphSnapshot(hlNodes, hlEdges),
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "heap", value: heapLabel() },
+        { name: "states discovered", value: discovered.size },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  }
+
+  dist[source].set(initialPower, 0);
+  heap.push({ time: 0, power: initialPower, node: source });
+  const startId = rememberState(source, initialPower, 0);
+  pushStep({
+    title: { vi: `Khởi tạo trạng thái (${source}, ${initialPower})`, en: `Initialize state (${source}, ${initialPower})` },
+    codeLines: [6, 7, 8, 9, 10, 11, 12],
+    hlNodes: [startId],
+    vars: [
+      { name: "source", value: source },
+      { name: "target", value: target },
+      { name: "initial power", value: initialPower },
+      { name: "cost", value: `[${cost.join(", ")}]` },
+    ],
+    note: {
+      vi: `Bắt đầu tại node ${source}, thời gian 0 và còn ${initialPower} điện. Trạng thái Dijkstra là (node, điện còn lại).`,
+      en: `Start at node ${source}, time 0, with ${initialPower} power. Each Dijkstra state is (node, remaining power).`,
+    },
+  });
+
+  let answer = [-1, -1];
+  while (heap.length) {
+    const current = heap.pop();
+    const { time, power: remaining, node: u } = current;
+    const currentId = stateId(u, remaining);
+    pushStep({
+      title: { vi: `Pop (${u}, ${remaining}) tại t=${time}`, en: `Pop (${u}, ${remaining}) at t=${time}` },
+      codeLines: [13, 14, 15],
+      hlNodes: [currentId],
+      vars: [
+        { name: "u", value: u },
+        { name: "time", value: time },
+        { name: "remaining", value: remaining },
+      ],
+      note: {
+        vi: `Min-heap lấy trạng thái có thời gian nhỏ nhất; nếu cùng thời gian thì ưu tiên trạng thái còn nhiều điện hơn.`,
+        en: `The min-heap pops the smallest time; ties prefer the state with more remaining power.`,
+      },
+    });
+
+    if (dist[u].get(remaining) !== time) {
+      pushStep({
+        title: { vi: "Bỏ qua trạng thái cũ", en: "Skip stale state" },
+        codeLines: [16],
+        hlNodes: [currentId],
+        vars: [{ name: "best time", value: dist[u].get(remaining) }],
+        note: {
+          vi: `Đã có thời gian tốt hơn cho trạng thái (${u}, ${remaining}), nên bản ghi heap này không còn hợp lệ.`,
+          en: `A better time already exists for (${u}, ${remaining}), so this heap entry is stale.`,
+        },
+      });
+      continue;
+    }
+
+    settled.add(currentId);
+    if (u === target) {
+      answer = [time, remaining];
+      pushStep({
+        title: { vi: `Đến target: [${time}, ${remaining}]`, en: `Reached target: [${time}, ${remaining}]` },
+        codeLines: [17],
+        hlNodes: [currentId],
+        vars: [{ name: "answer", value: `[${time}, ${remaining}]` }],
+        note: {
+          vi: `Đây là thời gian nhỏ nhất để đến node ${target}. Cách sắp xếp heap bảo đảm trong các đường có cùng thời gian, trạng thái này còn nhiều điện nhất.`,
+          en: `This is the minimum time to node ${target}. Heap tie-breaking guarantees the most remaining power among equal-time paths.`,
+        },
+        final: true,
+      });
+      break;
+    }
+
+    if (remaining < cost[u]) {
+      pushStep({
+        title: { vi: `${remaining} < cost[${u}]=${cost[u]}: không thể đi tiếp`, en: `${remaining} < cost[${u}]=${cost[u]}: cannot leave` },
+        codeLines: [18],
+        hlNodes: [currentId],
+        vars: [{ name: "required power", value: cost[u] }],
+        note: {
+          vi: `Tín hiệu đã tới node ${u}, nhưng không đủ ${cost[u]} điện để rời node qua một cạnh đi ra.`,
+          en: `The signal reached node ${u}, but lacks the ${cost[u]} power required to leave along an outgoing edge.`,
+        },
+      });
+      continue;
+    }
+
+    const nextPower = remaining - cost[u];
+    for (const edge of adjacency[u]) {
+      const nextTime = time + edge.time;
+      const nextId = stateId(edge.v, nextPower);
+      const oldTime = dist[edge.v].has(nextPower) ? dist[edge.v].get(nextPower) : Infinity;
+      if (nextTime < oldTime) {
+        dist[edge.v].set(nextPower, nextTime);
+        heap.push({ time: nextTime, power: nextPower, node: edge.v });
+        rememberState(edge.v, nextPower, nextTime);
+        stateEdges.push({ u: currentId, v: nextId, w: edge.time });
+        pushStep({
+          title: { vi: `Relax ${currentId} → ${nextId}`, en: `Relax ${currentId} → ${nextId}` },
+          codeLines: [19, 20, 21, 22, 23, 24],
+          hlNodes: [currentId, nextId],
+          hlEdges: [[currentId, nextId]],
+          vars: [
+            { name: "travel time", value: edge.time },
+            { name: "next time", value: `${time} + ${edge.time} = ${nextTime}` },
+            { name: "next power", value: `${remaining} - ${cost[u]} = ${nextPower}` },
+            { name: "old dist", value: oldTime === Infinity ? "∞" : oldTime },
+          ],
+          note: {
+            vi: `Rời node ${u} tốn cost[${u}]=${cost[u]} điện (không phụ thuộc cạnh), rồi đi cạnh ${u}→${edge.v} mất ${edge.time} giây. Thêm trạng thái (${edge.v}, ${nextPower}) vào heap.`,
+            en: `Leaving node ${u} costs cost[${u}]=${cost[u]} power (regardless of edge), then edge ${u}→${edge.v} takes ${edge.time} seconds. Push (${edge.v}, ${nextPower}) into the heap.`,
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: `Không cải thiện trạng thái ${nextId}`, en: `No improvement for state ${nextId}` },
+          codeLines: [20, 21, 22],
+          hlNodes: [currentId, nextId].filter((id) => discovered.has(id)),
+          vars: [
+            { name: "candidate time", value: nextTime },
+            { name: "best time", value: oldTime },
+            { name: "next power", value: nextPower },
+          ],
+          note: {
+            vi: `Trạng thái (${edge.v}, ${nextPower}) đã có thời gian ${oldTime} ≤ ${nextTime}, nên bỏ qua cạnh này.`,
+            en: `State (${edge.v}, ${nextPower}) already has time ${oldTime} ≤ ${nextTime}, so skip this edge.`,
+          },
+        });
+      }
+    }
+  }
+
+  if (answer[0] === -1) {
+    pushStep({
+      title: { vi: "Không thể đến target", en: "Target is unreachable" },
+      codeLines: [25],
+      vars: [{ name: "answer", value: "[-1, -1]" }],
+      note: {
+        vi: `Heap đã rỗng mà chưa đến node ${target}; không tồn tại đường đi hợp lệ với ${initialPower} điện ban đầu.`,
+        en: `The heap is empty without reaching node ${target}; no valid path exists with ${initialPower} initial power.`,
+      },
+      final: true,
+    });
+  }
+
+  return { n, edges, power: initialPower, cost, source, target, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -6475,6 +6748,89 @@ module.exports = {
       "        return ans if ans < float('inf') else -1",
     ],
     builder: buildSteps743,
+  },
+  3977: {
+    id: 3977,
+    difficulty: "hard",
+    slug: "minimum-time-to-reach-target-with-limited-power",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Minimum Time to Reach Target With Limited Power", en: "Minimum Time to Reach Target With Limited Power" },
+    titleVi: { vi: "Thời gian ngắn nhất để đến đích với nguồn điện giới hạn", en: "Shortest time with limited power" },
+    statement: {
+      vi:
+        "Cho đồ thị có hướng gồm n node 0..n-1. Mỗi cạnh [u,v,t] cần t giây để đi qua. " +
+        "Muốn rời node u qua bất kỳ cạnh nào, tín hiệu phải còn ít nhất cost[u] điện và sẽ tiêu thụ đúng cost[u] điện. " +
+        "Từ source với lượng điện ban đầu power, hãy tìm thời gian nhỏ nhất để đến target; nếu có nhiều đường cùng thời gian, chọn đường còn nhiều điện nhất. Không thể đến thì trả về [-1,-1].",
+      en:
+        "Given a directed graph with nodes 0..n-1, each edge [u,v,t] takes t seconds. " +
+        "Leaving node u along any edge requires and consumes cost[u] power. Starting at source with initial power, " +
+        "return [minimum time to target, maximum remaining power among minimum-time paths], or [-1,-1] if unreachable.",
+    },
+    defaultInput: "0,1,1;1,4,1;0,2,1;2,3,1;3,4,1",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u,v,time; cách nhau bởi dấu ;)", en: "Edges (u,v,time; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (number of nodes)" }, default: 5, min: 1, max: 1000 },
+      { key: "power", label: { vi: "Điện ban đầu", en: "Initial power" }, default: 4, min: 1, max: 1000 },
+      { key: "cost", type: "string", label: { vi: "cost của từng node", en: "Cost for each node" }, default: "2,3,1,1,1" },
+      { key: "source", label: { vi: "Node nguồn", en: "Source node" }, default: 0, min: 0 },
+      { key: "target", label: { vi: "Node đích", en: "Target node" }, default: 4, min: 0 },
+    ],
+    approach: [
+      {
+        vi: "Cùng một node nhưng lượng điện còn lại khác nhau là hai trạng thái khác nhau: (node, remaining_power).",
+        en: "The same node with different remaining power represents different states: (node, remaining_power).",
+      },
+      {
+        vi: "Chạy Dijkstra trên đồ thị trạng thái. Min-heap ưu tiên thời gian nhỏ nhất; nếu bằng nhau thì ưu tiên điện còn lại lớn nhất.",
+        en: "Run Dijkstra on the state graph. The min-heap prefers smaller time, then larger remaining power for ties.",
+      },
+      {
+        vi: "Từ (u,p), chỉ được đi nếu p ≥ cost[u]. Trạng thái kế tiếp là (v, p-cost[u]) và thời gian tăng thêm trọng số cạnh.",
+        en: "From (u,p), an edge is usable only when p ≥ cost[u]. The next state is (v, p-cost[u]) with edge time added.",
+      },
+      {
+        vi: "Trạng thái target đầu tiên được pop cho đáp án: thời gian nhỏ nhất và nhiều điện còn lại nhất trong các đường nhanh nhất.",
+        en: "The first popped target state gives the answer: minimum time and maximum power among fastest paths.",
+      },
+    ],
+    complexity: {
+      time: "O((n·P + E·P) log(n·P))",
+      space: "O(n·P + E)",
+      note: {
+        vi: "Có tối đa n·P trạng thái (node, điện). Mỗi cạnh có thể được xét ở nhiều mức điện; dist và heap lưu tối đa O(n·P) trạng thái.",
+        en: "There are at most n·P (node, power) states. Each edge may be considered at many power levels; dist and heap store up to O(n·P) states.",
+      },
+    },
+    code: [
+      "import heapq",
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def minimumTime(self, n, edges, power, cost, source, target):",
+      "        graph = defaultdict(list)",
+      "        for u, v, travel_time in edges:",
+      "            graph[u].append((v, travel_time))",
+      "        INF = float('inf')",
+      "        dist = [[INF] * (power + 1) for _ in range(n)]",
+      "        dist[source][power] = 0",
+      "        heap = [(0, -power, source)]",
+      "        while heap:",
+      "            time, neg_power, u = heapq.heappop(heap)",
+      "            remaining = -neg_power",
+      "            if time != dist[u][remaining]: continue",
+      "            if u == target: return [time, remaining]",
+      "            if remaining < cost[u]: continue",
+      "            next_power = remaining - cost[u]",
+      "            for v, travel_time in graph[u]:",
+      "                next_time = time + travel_time",
+      "                if next_time < dist[v][next_power]:",
+      "                    dist[v][next_power] = next_time",
+      "                    heapq.heappush(heap, (next_time, -next_power, v))",
+      "        return [-1, -1]",
+    ],
+    debugMode: "semantic",
+    builder: buildSteps3977,
   },
   3620: {
     id: 3620,

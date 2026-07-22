@@ -1729,7 +1729,7 @@ function renderGraph(step) {
   </defs>`;
 
   const caption = step.graph.caption
-    ? `<div class="graph-caption">${escapeXml(step.graph.caption)}</div>`
+    ? `<div class="graph-caption">${escapeXml(pick(step.graph.caption))}</div>`
     : "";
   $("treeView").innerHTML =
     caption +
