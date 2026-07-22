@@ -2664,6 +2664,187 @@ button:disabled {
   fill: #fbbf24;
 }
 
+/* ---- Meeting interval timeline (#252) ---- */
+.meeting-timeline-viz {
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.meeting-timeline-status {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meeting-timeline-svg {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+}
+
+.meeting-timeline-grid {
+  stroke: rgba(148, 163, 184, 0.18);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.meeting-timeline-axis {
+  stroke: #64748b;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.meeting-timeline-tick,
+.meeting-row-label,
+.meeting-role-label,
+.meeting-overlap-label {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meeting-interval rect {
+  fill: rgba(99, 102, 241, 0.13);
+  stroke: #64748b;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.meeting-interval.processed rect {
+  fill: rgba(16, 185, 129, 0.17);
+  stroke: #10b981;
+}
+
+.meeting-interval.previous rect {
+  fill: rgba(245, 158, 11, 0.24);
+  stroke: #f59e0b;
+  stroke-width: 2.5;
+}
+
+.meeting-interval.current rect,
+.meeting-interval.active rect {
+  fill: rgba(59, 130, 246, 0.24);
+  stroke: #60a5fa;
+  stroke-width: 2.5;
+}
+
+.meeting-interval.conflict rect {
+  stroke: #f87171;
+}
+
+.meeting-bar-label {
+  fill: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.meeting-role-label {
+  fill: #cbd5e1;
+}
+
+.meeting-boundary {
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.meeting-boundary.previous {
+  stroke: #f59e0b;
+}
+
+.meeting-boundary.current {
+  stroke: #60a5fa;
+}
+
+.meeting-overlap-band {
+  fill: rgba(239, 68, 68, 0.2);
+  stroke: #f87171;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.meeting-overlap-label {
+  fill: #fca5a5;
+}
+
+.meeting-verdict {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.meeting-verdict.conflict {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.meeting-verdict.safe {
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.meeting-timeline-empty {
+  display: grid;
+  min-height: 200px;
+  place-items: center;
+  color: #94a3b8;
+}
+
+[data-theme="light"] .meeting-timeline-status,
+[data-theme="light"] .meeting-timeline-tick,
+[data-theme="light"] .meeting-row-label,
+[data-theme="light"] .meeting-role-label,
+[data-theme="light"] .meeting-timeline-empty {
+  color: #64748b;
+  fill: #64748b;
+}
+
+[data-theme="light"] .meeting-interval rect {
+  fill: rgba(79, 70, 229, 0.1);
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .meeting-interval.processed rect {
+  fill: rgba(5, 150, 105, 0.14);
+  stroke: #059669;
+}
+
+[data-theme="light"] .meeting-interval.previous rect {
+  fill: rgba(217, 119, 6, 0.18);
+  stroke: #d97706;
+}
+
+[data-theme="light"] .meeting-interval.current rect,
+[data-theme="light"] .meeting-interval.active rect {
+  fill: rgba(37, 99, 235, 0.16);
+  stroke: #2563eb;
+}
+
+[data-theme="light"] .meeting-bar-label {
+  fill: #0f172a;
+}
+
+[data-theme="light"] .meeting-verdict.conflict {
+  color: #991b1b;
+}
+
+[data-theme="light"] .meeting-verdict.safe {
+  color: #065f46;
+}
+
 /* ---- Skyline sweep-line view ---- */
 .skyline-viz {
   color: #e2e8f0;

@@ -2564,6 +2564,112 @@ function renderSkylineView(step) {
   </div>`;
 }
 
+// ---- Meeting interval timeline (#252) ----
+function renderMeetingTimelineView(step) {
+  const view = step.meetingTimelineView;
+  const intervals = view.intervals || [];
+  const el = $("treeView");
+  if (!intervals.length) {
+    el.innerHTML = `<div class="meeting-timeline-empty">${lang === "vi" ? "Không có cuộc họp" : "No meetings"}</div>`;
+    return;
+  }
+
+  const minTime = Math.min(...intervals.map((interval) => interval.start));
+  const maxTime = Math.max(...intervals.map((interval) => interval.end));
+  const span = Math.max(1, maxTime - minTime);
+  const width = 820;
+  const left = 112;
+  const right = 24;
+  const top = 50;
+  const rowHeight = 54;
+  const axisY = top + intervals.length * rowHeight + 10;
+  const height = axisY + 48;
+  const plotWidth = width - left - right;
+  const x = (time) => left + ((time - minTime) / span) * plotWidth;
+  const active = new Set(view.active || []);
+  const processed = new Set(view.processed || []);
+  const comparison = view.comparison;
+
+  const tickValues = [...new Set(intervals.flatMap((interval) => [interval.start, interval.end]))].sort((a, b) => a - b);
+  const shownTicks = tickValues.length <= 9
+    ? tickValues
+    : Array.from({ length: 6 }, (_, index) => minTime + (span * index) / 5);
+  const ticks = shownTicks.map((time) => {
+    const px = x(time);
+    const label = Number.isInteger(time) ? time : Number(time.toFixed(1));
+    return `<line class="meeting-timeline-grid" x1="${px}" y1="${top - 18}" x2="${px}" y2="${axisY}"></line>
+      <text class="meeting-timeline-tick" x="${px}" y="${axisY + 24}" text-anchor="middle">${label}</text>`;
+  }).join("");
+
+  let overlapBand = "";
+  if (comparison && comparison.overlap === true) {
+    const overlapStart = comparison.currentStart;
+    const overlapEnd = comparison.previousEnd;
+    const y1 = top + Math.min(comparison.previousIndex, comparison.currentIndex) * rowHeight - 7;
+    const y2 = top + (Math.max(comparison.previousIndex, comparison.currentIndex) + 1) * rowHeight - 11;
+    overlapBand = `<rect class="meeting-overlap-band" x="${x(overlapStart)}" y="${y1}" width="${Math.max(3, x(overlapEnd) - x(overlapStart))}" height="${y2 - y1}"></rect>
+      <text class="meeting-overlap-label" x="${(x(overlapStart) + x(overlapEnd)) / 2}" y="${y1 - 8}" text-anchor="middle">${lang === "vi" ? "TRÙNG GIỜ" : "OVERLAP"}</text>`;
+  }
+
+  const rows = intervals.map((interval, index) => {
+    const y = top + index * rowHeight;
+    const isPrevious = comparison && comparison.previousIndex === index;
+    const isCurrent = comparison && comparison.currentIndex === index;
+    const classes = ["meeting-interval"];
+    if (processed.has(index)) classes.push("processed");
+    if (active.has(index)) classes.push(isPrevious ? "previous" : isCurrent ? "current" : "active");
+    if (comparison && comparison.overlap === true && (isPrevious || isCurrent)) classes.push("conflict");
+    const role = isPrevious
+      ? (lang === "vi" ? "trước" : "previous")
+      : isCurrent ? (lang === "vi" ? "hiện tại" : "current") : "";
+    const label = `M${index + 1} [${interval.start}, ${interval.end}]`;
+    return `<g class="${classes.join(" ")}">
+      <text class="meeting-row-label" x="${left - 12}" y="${y + 23}" text-anchor="end">M${index + 1}</text>
+      <rect x="${x(interval.start)}" y="${y + 5}" width="${Math.max(5, x(interval.end) - x(interval.start))}" height="30" rx="7"></rect>
+      <text class="meeting-bar-label" x="${(x(interval.start) + x(interval.end)) / 2}" y="${y + 25}" text-anchor="middle">[${interval.start}, ${interval.end}]</text>
+      ${role ? `<text class="meeting-role-label" x="${left - 12}" y="${y + 39}" text-anchor="end">${escapeXml(role)}</text>` : ""}
+      <title>${escapeXml(label)}</title>
+    </g>`;
+  }).join("");
+
+  let comparisonLines = "";
+  let verdict = "";
+  if (comparison) {
+    const prevX = x(comparison.previousEnd);
+    const currentX = x(comparison.currentStart);
+    comparisonLines = `<line class="meeting-boundary previous" x1="${prevX}" y1="${top - 20}" x2="${prevX}" y2="${axisY}"></line>
+      <line class="meeting-boundary current" x1="${currentX}" y1="${top - 20}" x2="${currentX}" y2="${axisY}"></line>`;
+    if (comparison.overlap !== null) {
+      const operator = comparison.overlap ? "<" : "≥";
+      const result = comparison.overlap
+        ? (lang === "vi" ? "Xung đột" : "Conflict")
+        : (lang === "vi" ? "Không trùng" : "No conflict");
+      verdict = `<div class="meeting-verdict ${comparison.overlap ? "conflict" : "safe"}">
+        current_start ${comparison.currentStart} ${operator} prev_end ${comparison.previousEnd} → ${result}
+      </div>`;
+    }
+  }
+
+  const orderLabel = view.sorted
+    ? (lang === "vi" ? "Đã sắp xếp theo start" : "Sorted by start")
+    : (lang === "vi" ? "Thứ tự ban đầu" : "Original order");
+  const summary = lang === "vi"
+    ? `Timeline ${intervals.length} cuộc họp. ${orderLabel}.`
+    : `Timeline of ${intervals.length} meetings. ${orderLabel}.`;
+  el.innerHTML = `<div class="meeting-timeline-viz">
+    <div class="meeting-timeline-status">${escapeHtml(orderLabel)}</div>
+    <svg class="meeting-timeline-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
+      <title>${escapeXml(summary)}</title>
+      ${ticks}
+      <line class="meeting-timeline-axis" x1="${left}" y1="${axisY}" x2="${width - right}" y2="${axisY}"></line>
+      ${rows}
+      ${overlapBand}
+      ${comparisonLines}
+    </svg>
+    ${verdict}
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -2575,7 +2681,13 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.skylineView) {
+  if (step.meetingTimelineView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMeetingTimelineView(step);
+  } else if (step.skylineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");

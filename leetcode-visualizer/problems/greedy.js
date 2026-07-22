@@ -1301,6 +1301,13 @@ function buildSteps252(input) {
   const original = valid ? parsed.map((interval) => [...interval]) : [];
   const steps = [];
   const display = (intervals) => intervals.map(([start, end]) => `[${start},${end}]`);
+  const timeline = (intervals, active = [], processed = [], comparison = null, sorted = true) => ({
+    intervals: intervals.map(([start, end], index) => ({ start, end, index })),
+    active,
+    processed,
+    comparison,
+    sorted,
+  });
 
   if (!valid) {
     steps.push({
@@ -1322,6 +1329,7 @@ function buildSteps252(input) {
   steps.push({
     title: { vi: "Danh sách cuộc họp ban đầu", en: "Original meeting schedule" },
     arr: display(original),
+    meetingTimelineView: timeline(original, [], [], null, false),
     highlight: [],
     mark: [],
     codeLines: [2],
@@ -1336,6 +1344,7 @@ function buildSteps252(input) {
   steps.push({
     title: { vi: "Sắp xếp theo thời gian bắt đầu", en: "Sort by start time" },
     arr: display(intervals),
+    meetingTimelineView: timeline(intervals, intervals.map((_, index) => index)),
     highlight: intervals.map((_, index) => index),
     mark: [],
     codeLines: [3],
@@ -1353,6 +1362,9 @@ function buildSteps252(input) {
     steps.push({
       title: { vi: `Xét cặp cuộc họp ${i} và ${i + 1}`, en: `Inspect meetings ${i} and ${i + 1}` },
       arr: display(intervals),
+      meetingTimelineView: timeline(intervals, [i - 1, i], marks, {
+        previousIndex: i - 1, currentIndex: i, previousEnd: previous[1], currentStart: current[0], overlap: null,
+      }),
       highlight: [i - 1, i],
       mark: marks,
       codeLines: [4],
@@ -1365,6 +1377,9 @@ function buildSteps252(input) {
     steps.push({
       title: { vi: `prev_end = ${previous[1]}`, en: `prev_end = ${previous[1]}` },
       arr: display(intervals),
+      meetingTimelineView: timeline(intervals, [i - 1], marks, {
+        previousIndex: i - 1, currentIndex: i, previousEnd: previous[1], currentStart: current[0], overlap: null,
+      }),
       highlight: [i - 1],
       mark: marks,
       codeLines: [5],
@@ -1374,6 +1389,9 @@ function buildSteps252(input) {
     steps.push({
       title: { vi: `current_start = ${current[0]}`, en: `current_start = ${current[0]}` },
       arr: display(intervals),
+      meetingTimelineView: timeline(intervals, [i], marks, {
+        previousIndex: i - 1, currentIndex: i, previousEnd: previous[1], currentStart: current[0], overlap: null,
+      }),
       highlight: [i],
       mark: marks,
       codeLines: [6],
@@ -1388,6 +1406,9 @@ function buildSteps252(input) {
         en: `${current[0]} < ${previous[1]}? ${overlap ? "True — conflict" : "False — no conflict"}`,
       },
       arr: display(intervals),
+      meetingTimelineView: timeline(intervals, [i - 1, i], marks, {
+        previousIndex: i - 1, currentIndex: i, previousEnd: previous[1], currentStart: current[0], overlap,
+      }),
       highlight: [i - 1, i],
       mark: marks,
       codeLines: [7],
@@ -1401,6 +1422,9 @@ function buildSteps252(input) {
       steps.push({
         title: { vi: "Kết quả: false", en: "Result: false" },
         arr: display(intervals),
+        meetingTimelineView: timeline(intervals, [i - 1, i], marks, {
+          previousIndex: i - 1, currentIndex: i, previousEnd: previous[1], currentStart: current[0], overlap: true,
+        }),
         highlight: [i - 1, i],
         mark: marks,
         codeLines: [8],
@@ -1415,6 +1439,7 @@ function buildSteps252(input) {
   steps.push({
     title: { vi: "Kết quả: true", en: "Result: true" },
     arr: display(intervals),
+    meetingTimelineView: timeline(intervals, [], intervals.map((_, index) => index)),
     highlight: [],
     mark: intervals.map((_, index) => index),
     codeLines: [9],
