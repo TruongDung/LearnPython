@@ -5276,18 +5276,42 @@ function buildSteps3501(input, params) {
   function getZeroGroups() {
     const groups = [];
     const indexAt = [];
+    const trace = [];
+    const record = (line, kind, i = -1, extra = {}) => {
+      trace.push({
+        line,
+        kind,
+        i,
+        groups: groups.map((group) => ({ ...group })),
+        indexAt: [...indexAt],
+        ...extra,
+      });
+    };
+
+    record(26, "init-groups");
+    record(27, "init-index");
     for (let i = 0; i < n; i++) {
+      record(28, "loop", i);
+      record(29, "is-zero", i, { result: s[i] === "0" });
       if (s[i] === "0") {
+        const continuesGroup = i > 0 && s[i - 1] === "0";
+        record(30, "continues-group", i, { result: continuesGroup });
         if (i > 0 && s[i - 1] === "0") {
-          groups[groups.length - 1].length += 1;
           groups[groups.length - 1].end = i;
+          record(31, "extend-end", i, { groupId: groups.length - 1 });
+          groups[groups.length - 1].length += 1;
+          record(32, "extend-length", i, { groupId: groups.length - 1 });
         } else {
+          record(33, "new-group-else", i);
           groups.push({ start: i, end: i, length: 1, id: groups.length });
+          record(34, "new-group", i, { groupId: groups.length - 1 });
         }
       }
       indexAt.push(groups.length - 1);
+      record(35, "append-index", i, { groupId: groups.length - 1 });
     }
-    return { groups, indexAt };
+    record(36, "return");
+    return { groups, indexAt, trace };
   }
 
   function groupLabel(groups) {
@@ -5323,38 +5347,174 @@ function buildSteps3501(input, params) {
 
   const queries = parseQueries(params && params.queries);
   const ones = chars.filter((ch) => ch === "1").length;
-  const { groups: zeroGroups, indexAt: zeroGroupIndex } = getZeroGroups();
+  const { groups: zeroGroups, indexAt: zeroGroupIndex, trace: zeroGroupTrace } = getZeroGroups();
   const answers = [];
 
   steps.push({
-    title: { vi: "Tiền xử lý zero groups", en: "Preprocess zero groups" },
+    title: { vi: `ones = s.count('1') = ${ones}`, en: `ones = s.count('1') = ${ones}` },
+    arr: values,
+    sub: chars,
+    highlight: chars.map((ch, i) => (ch === "1" ? i : -1)).filter((i) => i >= 0),
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "ones", value: ones },
+    ],
+    note: {
+      vi: `Đếm tổng số '1' trong toàn chuỗi trước. Mỗi query sẽ trả về ones + gain tốt nhất.`,
+      en: `Count total '1's in the whole string first. Each query returns ones + best gain.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: "Gọi self.getZeroGroups(s)", en: "Call self.getZeroGroups(s)" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "next", value: "getZeroGroups" },
+    ],
+    note: {
+      vi: "Debugger đi vào helper để xem cách chuỗi được nén thành các đoạn '0'.",
+      en: "The debugger enters the helper to show how the string is compressed into zero runs.",
+    },
+  });
+
+  steps.push({
+    title: { vi: "Vào hàm getZeroGroups", en: "Enter getZeroGroups" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [25],
+    vars: [{ name: "s", value: `"${s}"` }],
+    note: {
+      vi: "Helper trả về zeroGroups và zeroGroupIndex. zeroGroupIndex[i] là id đoạn '0' gần nhất tại hoặc bên trái i.",
+      en: "The helper returns zeroGroups and zeroGroupIndex. zeroGroupIndex[i] is the zero-run id at or immediately left of i.",
+    },
+  });
+
+  for (const event of zeroGroupTrace) {
+    const eventGroups = event.groups;
+    const eventMark = eventGroups.flatMap((group) => range(group.start, group.end));
+    const eventHighlight = event.i >= 0 ? [event.i] : [];
+    let title;
+    let note;
+
+    switch (event.kind) {
+      case "init-groups":
+        title = { vi: "zeroGroups = []", en: "zeroGroups = []" };
+        note = { vi: "Khởi tạo danh sách chứa từng đoạn '0' liên tiếp.", en: "Initialize the list of contiguous zero runs." };
+        break;
+      case "init-index":
+        title = { vi: "zeroGroupIndex = []", en: "zeroGroupIndex = []" };
+        note = { vi: "Mảng này ánh xạ mỗi vị trí sang id zeroGroup gần nhất bên trái.", en: "This array maps each position to the nearest zero-run id on its left." };
+        break;
+      case "loop":
+        title = { vi: `for i, ch in enumerate(s): i=${event.i}, ch='${s[event.i]}'`, en: `for i, ch in enumerate(s): i=${event.i}, ch='${s[event.i]}'` };
+        note = { vi: `Xét ký tự s[${event.i}] = '${s[event.i]}'.`, en: `Inspect s[${event.i}] = '${s[event.i]}'.` };
+        break;
+      case "is-zero":
+        title = { vi: `if ch == '0' → ${event.result}`, en: `if ch == '0' → ${event.result}` };
+        note = event.result
+          ? { vi: "Đây là '0', cần tạo đoạn mới hoặc nối vào đoạn hiện tại.", en: "This is '0', so either create a run or extend the current one." }
+          : { vi: "Đây là '1', không thay đổi zeroGroups.", en: "This is '1', so zeroGroups does not change." };
+        break;
+      case "continues-group":
+        title = { vi: `if i > 0 and s[i - 1] == '0' → ${event.result}`, en: `if i > 0 and s[i - 1] == '0' → ${event.result}` };
+        note = event.result
+          ? { vi: "Ký tự trước cũng là '0', nên nối vào zeroGroup cuối.", en: "The previous character is also '0', so extend the last zero run." }
+          : { vi: "Ký tự này bắt đầu một zeroGroup mới.", en: "This character starts a new zero run." };
+        break;
+      case "extend-end":
+        title = { vi: `zeroGroups[-1]['end'] = ${event.i}`, en: `zeroGroups[-1]['end'] = ${event.i}` };
+        note = { vi: `Cập nhật điểm cuối của z${event.groupId} tới index ${event.i}.`, en: `Move the end of z${event.groupId} to index ${event.i}.` };
+        break;
+      case "extend-length":
+        title = { vi: `zeroGroups[-1]['length'] += 1`, en: `zeroGroups[-1]['length'] += 1` };
+        note = { vi: `Độ dài z${event.groupId} tăng thành ${eventGroups[event.groupId].length}.`, en: `The length of z${event.groupId} becomes ${eventGroups[event.groupId].length}.` };
+        break;
+      case "new-group-else":
+        title = { vi: "else: bắt đầu zeroGroup mới", en: "else: start a new zero run" };
+        note = { vi: "Không thể nối với đoạn trước, chuyển sang nhánh tạo group.", en: "It cannot extend the previous run, so take the new-group branch." };
+        break;
+      case "new-group":
+        title = { vi: `zeroGroups.append({start: ${event.i}, end: ${event.i}, length: 1})`, en: `zeroGroups.append({start: ${event.i}, end: ${event.i}, length: 1})` };
+        note = { vi: `Tạo z${event.groupId} bắt đầu tại index ${event.i}.`, en: `Create z${event.groupId} starting at index ${event.i}.` };
+        break;
+      case "append-index":
+        title = { vi: `zeroGroupIndex.append(${event.groupId})`, en: `zeroGroupIndex.append(${event.groupId})` };
+        note = event.groupId >= 0
+          ? { vi: `Vị trí ${event.i} ánh xạ tới z${event.groupId}.`, en: `Position ${event.i} maps to z${event.groupId}.` }
+          : { vi: `Chưa có đoạn '0' nào ở bên trái vị trí ${event.i}, nên lưu -1.`, en: `No zero run exists to the left of position ${event.i}, so store -1.` };
+        break;
+      default:
+        title = { vi: "return zeroGroups, zeroGroupIndex", en: "return zeroGroups, zeroGroupIndex" };
+        note = { vi: "Hoàn tất nén các đoạn '0' và trả kết quả về hàm chính.", en: "Finish compressing zero runs and return both results to the main method." };
+    }
+
+    steps.push({
+      title,
+      arr: values,
+      sub: chars,
+      highlight: eventHighlight,
+      mark: eventMark,
+      codeLines: [event.line],
+      vars: [
+        ...(event.i >= 0 ? [{ name: "i", value: event.i }, { name: "ch", value: `'${s[event.i]}'` }] : []),
+        { name: "zeroGroups", value: groupLabel(eventGroups) },
+        { name: "zeroGroupIndex", value: `[${event.indexAt.join(", ")}]` },
+      ],
+      note,
+    });
+  }
+
+  steps.push({
+    title: { vi: "Nhận kết quả từ getZeroGroups", en: "Receive getZeroGroups result" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: zeroGroups.flatMap((group) => range(group.start, group.end)),
+    codeLines: [4],
+    vars: [
+      { name: "zeroGroups", value: groupLabel(zeroGroups) },
+      { name: "zeroGroupIndex", value: `[${zeroGroupIndex.join(", ")}]` },
+      { name: "queries", value: `[${queries.map(([l, r]) => `[${l},${r}]`).join(", ")}]` },
+    ],
+    note: {
+      vi: "Quay lại hàm chính với đầy đủ các zeroGroup và mảng ánh xạ vị trí.",
+      en: "Return to the main method with all zero runs and the position mapping.",
+    },
+  });
+
+  steps.push({
+    title: { vi: `if not zeroGroups → ${zeroGroups.length === 0}`, en: `if not zeroGroups → ${zeroGroups.length === 0}` },
     arr: values,
     sub: chars,
     highlight: [],
     mark: zeroGroups.flatMap((g) => range(g.start, g.end)),
-    codeLines: [2, 3, 4],
-    vars: [
-      { name: "s", value: `"${s}"` },
-      { name: "ones", value: ones },
-      { name: "zeroGroups", value: groupLabel(zeroGroups) },
-      { name: "queries", value: `[${queries.map(([l, r]) => `[${l},${r}]`).join(", ")}]` },
-    ],
+    codeLines: [5],
+    vars: [{ name: "zeroGroups.length", value: zeroGroups.length }],
     note: {
-      vi: `Đếm tổng số '1' trong toàn chuỗi: ones = ${ones}. Sau đó nén các đoạn '0' để mỗi query chỉ cần xét các cặp đoạn '0'.`,
-      en: `Count total '1's in the whole string: ones = ${ones}. Then compress zero runs so each query only checks zero-run pairs.`,
+      vi: zeroGroups.length === 0 ? "Không có đoạn '0', mọi query giữ nguyên số '1'." : "Có ít nhất một đoạn '0', tiếp tục xử lý từng query.",
+      en: zeroGroups.length === 0 ? "There are no zero runs, so every query keeps the original one count." : "There is at least one zero run, so continue processing each query.",
     },
   });
 
   if (zeroGroups.length === 0) {
     const answer = Array(queries.length).fill(ones);
     steps.push({
-      title: { vi: "Không có đoạn 0", en: "No zero runs" },
+      title: { vi: `return [ones] * len(queries)`, en: `return [ones] * len(queries)` },
       arr: values,
       sub: chars,
       highlight: [],
       mark: [],
       final: true,
-      codeLines: [5, 6],
+      codeLines: [6],
       vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
       note: {
         vi: "Chuỗi toàn '1', không trade nào tăng thêm được. Mọi query trả về ones.",
@@ -5363,6 +5523,20 @@ function buildSteps3501(input, params) {
     });
     return { original: s, answer: `[${answer.join(", ")}]`, steps };
   }
+
+  steps.push({
+    title: { vi: "ans = []", en: "ans = []" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    codeLines: [8],
+    vars: [{ name: "ans", value: "[]" }],
+    note: {
+      vi: "Tạo mảng kết quả, mỗi query sẽ append một đáp án.",
+      en: "Create the result array; each query appends one answer.",
+    },
+  });
 
   for (let qi = 0; qi < queries.length; qi++) {
     let [l, r] = queries[qi];
@@ -5380,26 +5554,109 @@ function buildSteps3501(input, params) {
     const candidates = [];
 
     steps.push({
-      title: { vi: `Query ${qi}: [${l}, ${r}]`, en: `Query ${qi}: [${l}, ${r}]` },
+      title: { vi: `for l, r in queries → query ${qi}: [${l}, ${r}]`, en: `for l, r in queries → query ${qi}: [${l}, ${r}]` },
       arr: values,
       sub: chars,
       highlight: queryRange,
       mark: [],
-      codeLines: [8, 9, 10, 11],
+      codeLines: [9],
       vars: [
+        { name: "query index", value: qi },
         { name: "l", value: l },
         { name: "r", value: r },
-        { name: "left cut", value: left },
-        { name: "right cut", value: right },
-        { name: "inner zero groups", value: innerStart <= innerEnd ? `z${innerStart}..z${innerEnd}` : "none" },
       ],
       note: {
-        vi: `Trong query này, đoạn 0 chạm biên trái đóng góp tối đa ${left}, đoạn 0 chạm biên phải đóng góp tối đa ${right}.`,
-        en: `For this query, the zero run touching the left boundary can contribute ${left}, and the right boundary can contribute ${right}.`,
+        vi: `Bắt đầu xử lý query [${l},${r}]. Trade chỉ được tính trong đoạn đang highlight.`,
+        en: `Start processing query [${l},${r}]. The trade is restricted to the highlighted range.`,
       },
     });
 
-    if (s[l] === "0" && s[r] === "0" && leftGroupIndex + 1 === rightGroupIndex) {
+    steps.push({
+      title: { vi: `left = ${left}`, en: `left = ${left}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: s[l] === "0" ? range(l, zeroGroups[leftGroupIndex].end) : [],
+      codeLines: [10],
+      vars: [
+        { name: "s[l]", value: s[l] },
+        { name: "zeroGroupIndex[l]", value: leftGroupIndex },
+        { name: "left cut", value: left },
+      ],
+      note: {
+        vi: s[l] === "0"
+          ? `l nằm trong z${leftGroupIndex}; phần đoạn '0' còn lại từ l tới cuối z${leftGroupIndex} dài ${left}.`
+          : "s[l] là '1', nên biên trái không cắt qua đoạn '0'. left = 0.",
+        en: s[l] === "0"
+          ? `l is inside z${leftGroupIndex}; the remaining zero piece from l to the end of z${leftGroupIndex} has length ${left}.`
+          : "s[l] is '1', so the left boundary does not cut a zero run. left = 0.",
+      },
+    });
+
+    steps.push({
+      title: { vi: `right = ${right}`, en: `right = ${right}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: s[r] === "0" ? range(zeroGroups[rightGroupIndex].start, r) : [],
+      codeLines: [11],
+      vars: [
+        { name: "s[r]", value: s[r] },
+        { name: "zeroGroupIndex[r]", value: rightGroupIndex },
+        { name: "right cut", value: right },
+      ],
+      note: {
+        vi: s[r] === "0"
+          ? `r nằm trong z${rightGroupIndex}; phần đoạn '0' từ đầu z${rightGroupIndex} tới r dài ${right}.`
+          : "s[r] là '1', nên biên phải không cắt qua đoạn '0'. right = 0.",
+        en: s[r] === "0"
+          ? `r is inside z${rightGroupIndex}; the zero piece from the start of z${rightGroupIndex} to r has length ${right}.`
+          : "s[r] is '1', so the right boundary does not cut a zero run. right = 0.",
+      },
+    });
+
+    steps.push({
+      title: { vi: "candidates = []", en: "candidates = []" },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: [],
+      codeLines: [12],
+      vars: [
+        { name: "candidates", value: "[]" },
+        { name: "inner zero groups", value: innerStart <= innerEnd ? `z${innerStart}..z${innerEnd}` : "none" },
+      ],
+      note: {
+        vi: "Bắt đầu với danh sách candidate rỗng, rồi thử từng loại candidate để cuối cùng lấy max.",
+        en: "Start with an empty candidate list, then test each candidate type and take the max at the end.",
+      },
+    });
+
+    const edgeEdgeOk = s[l] === "0" && s[r] === "0" && leftGroupIndex + 1 === rightGroupIndex;
+    steps.push({
+      title: { vi: `if left cut + right cut → ${edgeEdgeOk}`, en: `if left cut + right cut → ${edgeEdgeOk}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: edgeEdgeOk ? [range(l, zeroGroups[leftGroupIndex].end), range(zeroGroups[rightGroupIndex].start, r)].flat() : [],
+      codeLines: [13],
+      vars: [
+        { name: "s[l]", value: s[l] },
+        { name: "s[r]", value: s[r] },
+        { name: "zeroGroupIndex[l] + 1", value: leftGroupIndex + 1 },
+        { name: "zeroGroupIndex[r]", value: rightGroupIndex },
+      ],
+      note: {
+        vi: edgeEdgeOk
+          ? "Hai biên đều cắt đoạn '0' và chỉ cách nhau đúng một zeroGroup, nên có thể ghép left + right."
+          : "Không rơi vào case hai biên cùng cắt hai zeroGroup kề nhau.",
+        en: edgeEdgeOk
+          ? "Both boundaries cut zero runs that are adjacent through one middle one-run, so left + right is a candidate."
+          : "This is not the case where both boundaries cut two adjacent zero runs.",
+      },
+    });
+
+    if (edgeEdgeOk) {
       addCandidate(
         candidates,
         "edge-edge",
@@ -5407,44 +5664,184 @@ function buildSteps3501(input, params) {
         left + right,
         [[l, zeroGroups[leftGroupIndex].end], [zeroGroups[rightGroupIndex].start, r]],
         [leftGroupIndex, rightGroupIndex],
-        13
+        14
       );
+      steps.push({
+        title: { vi: `candidates.append(left + right) = ${left + right}`, en: `candidates.append(left + right) = ${left + right}` },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: [range(l, zeroGroups[leftGroupIndex].end), range(zeroGroups[rightGroupIndex].start, r)].flat(),
+        codeLines: [14],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "candidate gain", value: left + right },
+        ],
+        note: {
+          vi: `Candidate này thêm được ${left} + ${right} = ${left + right} số '1'.`,
+          en: `This candidate adds ${left} + ${right} = ${left + right} active sections.`,
+        },
+      });
     }
 
+    steps.push({
+      title: { vi: `for g in complete zero pairs`, en: `for g in complete zero pairs` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: innerStart < innerEnd ? range(zeroGroups[innerStart].start, zeroGroups[innerEnd].end) : [],
+      codeLines: [15],
+      vars: [
+        { name: "range start", value: innerStart },
+        { name: "range end exclusive", value: innerEnd },
+        { name: "iterations", value: Math.max(0, innerEnd - innerStart) },
+      ],
+      note: {
+        vi: innerStart < innerEnd
+          ? "Duyệt các cặp zeroGroup hoàn chỉnh nằm bên trong query."
+          : "Không có đủ hai zeroGroup hoàn chỉnh bên trong query để duyệt.",
+        en: innerStart < innerEnd
+          ? "Iterate complete adjacent zero-group pairs fully inside the query."
+          : "There are not enough complete zero groups inside the query to iterate.",
+      },
+    });
+
     for (let g = innerStart; g < innerEnd; g++) {
+      const pairGain = zeroGroups[g].length + zeroGroups[g + 1].length;
       addCandidate(
         candidates,
         `inside-${g}`,
         { vi: `z${g} + z${g + 1} hoàn chỉnh`, en: `complete z${g} + z${g + 1}` },
-        zeroGroups[g].length + zeroGroups[g + 1].length,
+        pairGain,
         [[zeroGroups[g].start, zeroGroups[g].end], [zeroGroups[g + 1].start, zeroGroups[g + 1].end]],
         [g, g + 1],
-        15
+        16
       );
+      steps.push({
+        title: { vi: `g=${g}: candidates.append(...) = ${pairGain}`, en: `g=${g}: candidates.append(...) = ${pairGain}` },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: [range(zeroGroups[g].start, zeroGroups[g].end), range(zeroGroups[g + 1].start, zeroGroups[g + 1].end)].flat(),
+        codeLines: [16],
+        vars: [
+          { name: "g", value: g },
+          { name: `z${g}.length`, value: zeroGroups[g].length },
+          { name: `z${g + 1}.length`, value: zeroGroups[g + 1].length },
+          { name: "candidate gain", value: pairGain },
+        ],
+        note: {
+          vi: `Nếu xoá đoạn '1' giữa z${g} và z${g + 1}, gain = ${zeroGroups[g].length} + ${zeroGroups[g + 1].length} = ${pairGain}.`,
+          en: `If the one-run between z${g} and z${g + 1} is removed, gain = ${zeroGroups[g].length} + ${zeroGroups[g + 1].length} = ${pairGain}.`,
+        },
+      });
     }
 
-    if (s[l] === "0" && leftGroupIndex + 1 <= innerEnd) {
+    const leftInsideOk = s[l] === "0" && leftGroupIndex + 1 <= innerEnd;
+    steps.push({
+      title: { vi: `if left cut + next full run → ${leftInsideOk}`, en: `if left cut + next full run → ${leftInsideOk}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: leftInsideOk ? [range(l, zeroGroups[leftGroupIndex].end), range(zeroGroups[leftGroupIndex + 1].start, zeroGroups[leftGroupIndex + 1].end)].flat() : [],
+      codeLines: [17],
+      vars: [
+        { name: "s[l]", value: s[l] },
+        { name: "zeroGroupIndex[l] + 1", value: leftGroupIndex + 1 },
+        { name: "innerEnd", value: innerEnd },
+      ],
+      note: {
+        vi: leftInsideOk
+          ? "Biên trái cắt một zeroGroup và zeroGroup kế tiếp nằm trọn trong query."
+          : "Không có candidate kiểu left cut + zeroGroup kế tiếp.",
+        en: leftInsideOk
+          ? "The left boundary cuts a zero run and the next zero run is fully inside the query."
+          : "There is no left cut + next full zero run candidate.",
+      },
+    });
+
+    if (leftInsideOk) {
+      const leftInsideGain = left + zeroGroups[leftGroupIndex + 1].length;
       addCandidate(
         candidates,
         "left-inside",
         { vi: "left cut + zero group kế tiếp", en: "left cut + next full zero group" },
-        left + zeroGroups[leftGroupIndex + 1].length,
+        leftInsideGain,
         [[l, zeroGroups[leftGroupIndex].end], [zeroGroups[leftGroupIndex + 1].start, zeroGroups[leftGroupIndex + 1].end]],
         [leftGroupIndex, leftGroupIndex + 1],
-        17
+        18
       );
+      steps.push({
+        title: { vi: `candidates.append(left + next) = ${leftInsideGain}`, en: `candidates.append(left + next) = ${leftInsideGain}` },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: [range(l, zeroGroups[leftGroupIndex].end), range(zeroGroups[leftGroupIndex + 1].start, zeroGroups[leftGroupIndex + 1].end)].flat(),
+        codeLines: [18],
+        vars: [
+          { name: "left", value: left },
+          { name: `z${leftGroupIndex + 1}.length`, value: zeroGroups[leftGroupIndex + 1].length },
+          { name: "candidate gain", value: leftInsideGain },
+        ],
+        note: {
+          vi: `Candidate này thêm ${left} + ${zeroGroups[leftGroupIndex + 1].length} = ${leftInsideGain}.`,
+          en: `This candidate adds ${left} + ${zeroGroups[leftGroupIndex + 1].length} = ${leftInsideGain}.`,
+        },
+      });
     }
 
-    if (s[r] === "0" && leftGroupIndex < rightGroupIndex - 1) {
+    const insideRightOk = s[r] === "0" && leftGroupIndex < rightGroupIndex - 1;
+    steps.push({
+      title: { vi: `if previous full run + right cut → ${insideRightOk}`, en: `if previous full run + right cut → ${insideRightOk}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: insideRightOk ? [range(zeroGroups[rightGroupIndex - 1].start, zeroGroups[rightGroupIndex - 1].end), range(zeroGroups[rightGroupIndex].start, r)].flat() : [],
+      codeLines: [19],
+      vars: [
+        { name: "s[r]", value: s[r] },
+        { name: "zeroGroupIndex[l]", value: leftGroupIndex },
+        { name: "zeroGroupIndex[r] - 1", value: rightGroupIndex - 1 },
+      ],
+      note: {
+        vi: insideRightOk
+          ? "Biên phải cắt một zeroGroup và zeroGroup trước đó nằm trọn trong query."
+          : "Không có candidate kiểu zeroGroup trước + right cut.",
+        en: insideRightOk
+          ? "The right boundary cuts a zero run and the previous zero run is fully inside the query."
+          : "There is no previous full zero run + right cut candidate.",
+      },
+    });
+
+    if (insideRightOk) {
+      const insideRightGain = zeroGroups[rightGroupIndex - 1].length + right;
       addCandidate(
         candidates,
         "inside-right",
         { vi: "zero group trước + right cut", en: "previous full zero group + right cut" },
-        zeroGroups[rightGroupIndex - 1].length + right,
+        insideRightGain,
         [[zeroGroups[rightGroupIndex - 1].start, zeroGroups[rightGroupIndex - 1].end], [zeroGroups[rightGroupIndex].start, r]],
         [rightGroupIndex - 1, rightGroupIndex],
-        19
+        20
       );
+      steps.push({
+        title: { vi: `candidates.append(previous + right) = ${insideRightGain}`, en: `candidates.append(previous + right) = ${insideRightGain}` },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: [range(zeroGroups[rightGroupIndex - 1].start, zeroGroups[rightGroupIndex - 1].end), range(zeroGroups[rightGroupIndex].start, r)].flat(),
+        codeLines: [20],
+        vars: [
+          { name: `z${rightGroupIndex - 1}.length`, value: zeroGroups[rightGroupIndex - 1].length },
+          { name: "right", value: right },
+          { name: "candidate gain", value: insideRightGain },
+        ],
+        note: {
+          vi: `Candidate này thêm ${zeroGroups[rightGroupIndex - 1].length} + ${right} = ${insideRightGain}.`,
+          en: `This candidate adds ${zeroGroups[rightGroupIndex - 1].length} + ${right} = ${insideRightGain}.`,
+        },
+      });
     }
 
     const best = candidates.reduce((winner, candidate) => {
@@ -5455,14 +5852,35 @@ function buildSteps3501(input, params) {
     const answer = ones + gain;
     answers.push(answer);
 
+    steps.push({
+      title: { vi: `best gain = ${gain}`, en: `best gain = ${gain}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: best ? markRanges(best.ranges) : [],
+      codeLines: [21],
+      vars: [
+        { name: "candidates", value: `[${candidates.map((c) => c.gain).join(", ")}]` },
+        { name: "best gain", value: gain },
+      ],
+      note: {
+        vi: best
+          ? `Lấy gain lớn nhất trong các candidate: ${gain}.`
+          : "Không có candidate nào, gain giữ nguyên 0.",
+        en: best
+          ? `Take the largest gain among candidates: ${gain}.`
+          : "There are no candidates, so gain remains 0.",
+      },
+    });
+
     if (candidates.length === 0) {
       steps.push({
-        title: { vi: `Query ${qi}: không có trade hợp lệ`, en: `Query ${qi}: no valid trade` },
+        title: { vi: `ans.append(ones + gain) = ${answer}`, en: `ans.append(ones + gain) = ${answer}` },
         arr: values,
         sub: chars,
         highlight: queryRange,
         mark: [],
-        codeLines: [21],
+        codeLines: [22],
         vars: [
           { name: "ones", value: ones },
           { name: "best gain", value: 0 },
@@ -5476,38 +5894,13 @@ function buildSteps3501(input, params) {
       continue;
     }
 
-    candidates.forEach((candidate) => {
-      const isBest = candidate.key === best.key;
-      steps.push({
-        title: {
-          vi: `Query ${qi}: ${candidate.label.vi} → gain ${candidate.gain}`,
-          en: `Query ${qi}: ${candidate.label.en} → gain ${candidate.gain}`,
-        },
-        arr: values,
-        sub: chars,
-        highlight: queryRange,
-        mark: markRanges(candidate.ranges),
-        codeLines: [candidate.codeLine],
-        vars: [
-          { name: "candidate", value: candidate.label.en },
-          { name: "zero groups", value: candidate.zeroGroupIds.map((g) => `z${g}`).join(" + ") },
-          { name: "gain", value: candidate.gain },
-          { name: "best so far?", value: isBest ? "yes" : "no" },
-        ],
-        note: {
-          vi: `${candidate.label.vi}: nếu xoá đoạn '1' nằm giữa các đoạn 0 này, chúng ghép lại và tăng thêm ${candidate.gain} số '1'.`,
-          en: `${candidate.label.en}: removing the '1' block between these zero sections merges them and adds ${candidate.gain} active sections.`,
-        },
-      });
-    });
-
     steps.push({
-      title: { vi: `Query ${qi}: answer = ${answer}`, en: `Query ${qi}: answer = ${answer}` },
+      title: { vi: `ans.append(ones + gain) = ${answer}`, en: `ans.append(ones + gain) = ${answer}` },
       arr: values,
       sub: chars,
       highlight: queryRange,
       mark: markRanges(best.ranges),
-      codeLines: [21],
+      codeLines: [22],
       vars: [
         { name: "ones", value: ones },
         { name: "best gain", value: gain },
@@ -5521,13 +5914,13 @@ function buildSteps3501(input, params) {
   }
 
   steps.push({
-    title: { vi: "Kết quả tất cả queries", en: "All query results" },
+    title: { vi: `return ans = [${answers.join(", ")}]`, en: `return ans = [${answers.join(", ")}]` },
     arr: values,
     sub: chars,
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [22],
+    codeLines: [23],
     vars: [{ name: "answer", value: `[${answers.join(", ")}]` }],
     note: {
       vi: `Trả về answer = [${answers.join(", ")}].`,
@@ -6722,21 +7115,34 @@ module.exports = {
       "",
       "        ans = []",
       "        for l, r in queries:",
-      "            left = 0 if s[l] == '1' else zeroGroups[zeroGroupIndex[l]].end - l + 1",
-      "            right = 0 if s[r] == '1' else r - zeroGroups[zeroGroupIndex[r]].start + 1",
-      "            gain = 0",
+      "            left = 0 if s[l] == '1' else zeroGroups[zeroGroupIndex[l]]['end'] - l + 1",
+      "            right = 0 if s[r] == '1' else r - zeroGroups[zeroGroupIndex[r]]['start'] + 1",
+      "            candidates = []",
       "            if s[l] == '0' and s[r] == '0' and zeroGroupIndex[l] + 1 == zeroGroupIndex[r]:",
-      "                gain = max(gain, left + right)",
+      "                candidates.append(left + right)",
       "            for g in range(zeroGroupIndex[l] + 1, zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
-      "                gain = max(gain, zeroGroups[g].length + zeroGroups[g + 1].length)",
+      "                candidates.append(zeroGroups[g]['length'] + zeroGroups[g + 1]['length'])",
       "            if s[l] == '0' and zeroGroupIndex[l] + 1 <= (zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
-      "                gain = max(gain, left + zeroGroups[zeroGroupIndex[l] + 1].length)",
+      "                candidates.append(left + zeroGroups[zeroGroupIndex[l] + 1]['length'])",
       "            if s[r] == '0' and zeroGroupIndex[l] < zeroGroupIndex[r] - 1:",
-      "                gain = max(gain, zeroGroups[zeroGroupIndex[r] - 1].length + right)",
+      "                candidates.append(zeroGroups[zeroGroupIndex[r] - 1]['length'] + right)",
+      "            gain = max(candidates, default=0)",
       "            ans.append(ones + gain)",
       "        return ans",
+      "",
+      "    def getZeroGroups(self, s: str):",
+      "        zeroGroups = []",
+      "        zeroGroupIndex = []",
+      "        for i, ch in enumerate(s):",
+      "            if ch == '0':",
+      "                if i > 0 and s[i - 1] == '0':",
+      "                    zeroGroups[-1]['end'] = i",
+      "                    zeroGroups[-1]['length'] += 1",
+      "                else:",
+      "                    zeroGroups.append({'start': i, 'end': i, 'length': 1})",
+      "            zeroGroupIndex.append(len(zeroGroups) - 1)",
+      "        return zeroGroups, zeroGroupIndex",
     ],
-    debugMode: "semantic",
     builder: buildSteps3501,
   },
 };
