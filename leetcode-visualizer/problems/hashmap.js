@@ -1579,6 +1579,9 @@ function buildSteps974Alt(nums, params) {
 
   function push({ title, codeLines, current = -1, status = [], vars, note, final = false }) {
     const debugVars = [...(vars || [])];
+    if (!debugVars.some((variable) => variable.name === "sum_count")) {
+      debugVars.push({ name: "sum_count", value: sumCount });
+    }
     if (!debugVars.some((variable) => variable.name === "m")) {
       debugVars.push({ name: "m", value: mString() });
     }
