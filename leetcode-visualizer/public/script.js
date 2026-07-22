@@ -11,6 +11,8 @@ let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
 let debugBreakpoints = new Set();
 let debugWatches = [];
+const RECENT_PROBLEMS_KEY = "recentProblems";
+const RECENT_PROBLEMS_LIMIT = 10;
 
 // ---- UI strings by language ----
 const I18N = {
@@ -40,6 +42,8 @@ const I18N = {
     errSolve: "Không xử lý được.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
+    recentTitle: "Bài đã xem gần đây",
+    clearRecent: "Xóa lịch sử",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -67,6 +71,8 @@ const I18N = {
     errSolve: "Could not process the request.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "LeetCode description hidden because this is a Premium problem.",
+    recentTitle: "Recently viewed",
+    clearRecent: "Clear history",
   },
 };
 
@@ -85,6 +91,7 @@ function setLang(newLang) {
   });
   applyStaticStrings();
   renderProblem();
+  renderRecentProblems();
   renderCatalog();
   if (steps.length) renderStep();
 }function applyStaticStrings() {
@@ -96,6 +103,79 @@ function setLang(newLang) {
   // Play/Pause button depends on state
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
 }
+
+function readRecentProblems() {
+  try {
+    const value = JSON.parse(localStorage.getItem(RECENT_PROBLEMS_KEY) || "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter((item) => item && Number.isInteger(Number(item.id))).slice(0, RECENT_PROBLEMS_LIMIT);
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveRecentProblem(problem) {
+  const recent = readRecentProblems().filter((item) => Number(item.id) !== Number(problem.id));
+  recent.unshift({
+    id: Number(problem.id),
+    title: problem.title,
+    difficulty: problem.difficulty || null,
+    premium: Boolean(problem.premium),
+    openedAt: Date.now(),
+  });
+  try {
+    localStorage.setItem(RECENT_PROBLEMS_KEY, JSON.stringify(recent.slice(0, RECENT_PROBLEMS_LIMIT)));
+  } catch (err) {
+    // The app still works if storage is unavailable or full.
+  }
+  renderRecentProblems();
+}
+
+function renderRecentProblems() {
+  const section = $("recentProblems");
+  const container = $("recentItems");
+  if (!section || !container) return;
+  const recent = readRecentProblems();
+  section.classList.toggle("hidden", recent.length === 0);
+  container.innerHTML = "";
+
+  recent.forEach((problem) => {
+    const button = document.createElement("button");
+    button.className = "prob-chip recent-chip" + (Number(problem.id) === currentProblemId ? " active" : "");
+    button.type = "button";
+    button.dataset.id = problem.id;
+    if (problem.premium) {
+      button.dataset.premium = "true";
+      button.title = t().premiumLabel;
+    }
+
+    const id = document.createElement("span");
+    id.className = "pid";
+    id.textContent = `#${problem.id}`;
+    const title = document.createElement("span");
+    title.className = "pname";
+    title.textContent = pick(problem.title) || `LeetCode ${problem.id}`;
+    button.append(id, title);
+
+    if (problem.difficulty) {
+      const difficulty = document.createElement("span");
+      difficulty.className = `diff diff-${problem.difficulty}`;
+      difficulty.textContent = problem.difficulty;
+      button.appendChild(difficulty);
+    }
+
+    button.addEventListener("click", () => {
+      $("problemId").value = problem.id;
+      loadProblem();
+    });
+    container.appendChild(button);
+  });
+}
+
+$("clearRecentBtn").addEventListener("click", () => {
+  localStorage.removeItem(RECENT_PROBLEMS_KEY);
+  renderRecentProblems();
+});
 
 // ---- Problem catalog grouped by algorithm ----
 async function loadCatalog() {
@@ -318,6 +398,7 @@ async function loadProblem() {
     currentProblemId = data.id;
     localStorage.setItem("lastProblemId", data.id);
     problemData = data;
+    saveRecentProblem(data);
     if (problemChanged) $("extraParams").innerHTML = "";
     renderProblem();
     $("arrInput").value = Array.isArray(data.defaultInput)
