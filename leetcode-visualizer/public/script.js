@@ -34,7 +34,7 @@ const I18N = {
     spaceLabel: "Bộ nhớ",
     varsLabel: "Biến (debug)",
     approachLabel: "Ý chính",
-    kbdHint: "Phím tắt: ← Lùi · → Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",
+    kbdHint: "Phím tắt: ← Lùi · → hoặc F10 Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",
     errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
     errConn: "Lỗi kết nối tới server.",
@@ -62,7 +62,7 @@ const I18N = {
     spaceLabel: "Space",
     varsLabel: "Variables (debug)",
     approachLabel: "Key Idea",
-    kbdHint: "Shortcuts: ← Prev · → Next · Home First · End Last · Space Play/Pause",
+    kbdHint: "Shortcuts: ← Prev · → or F10 Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
     errConn: "Connection error to server.",
@@ -730,11 +730,18 @@ $("playBtn").addEventListener("click", togglePlay);
 
 // ---- Keyboard navigation ----
 document.addEventListener("keydown", (e) => {
+  const visualizationActive = steps.length && !$("vizPanel").classList.contains("hidden");
+  if (e.key === "F10" && visualizationActive) {
+    e.preventDefault();
+    $("nextBtn").click();
+    return;
+  }
+
   // Skip when typing in input fields
   const tag = (e.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea") return;
   // Only active when visualization is visible
-  if (!steps.length || $("vizPanel").classList.contains("hidden")) return;
+  if (!visualizationActive) return;
 
   switch (e.key) {
     case "ArrowLeft":
