@@ -1,4 +1,5 @@
 const $ = (id) => document.getElementById(id);
+const PLAY_INTERVAL_MS = 1600;
 
 let lang = "en";
 let currentProblemId = null;
@@ -694,12 +695,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function getPlaySpeedMs() {
-  const el = $("playSpeed");
-  const ms = el ? Number(el.value) : 1600;
-  return Number.isFinite(ms) && ms > 0 ? ms : 1600;
-}
-
 function togglePlay() {
   if (playTimer) {
     stopPlay();
@@ -719,7 +714,7 @@ function togglePlay() {
     if (stepHitsBreakpoint(steps[stepIndex]) || stepIndex >= steps.length - 1) {
       stopPlay();
     }
-  }, getPlaySpeedMs());
+  }, PLAY_INTERVAL_MS);
 }
 
 function stopPlay() {
@@ -2459,24 +2454,6 @@ if (savedId) {
   $("problemId").value = savedId;
 }
 loadProblem();
-
-// ---- Playback speed (persisted across sessions) ----
-(function initPlaySpeed() {
-  const select = $("playSpeed");
-  if (!select) return;
-  const saved = localStorage.getItem("playSpeedMs");
-  if (saved && select.querySelector(`option[value="${saved}"]`)) {
-    select.value = saved;
-  }
-  select.addEventListener("change", () => {
-    localStorage.setItem("playSpeedMs", select.value);
-    // If currently playing, restart the timer so the new speed applies immediately.
-    if (playTimer) {
-      stopPlay();
-      togglePlay();
-    }
-  });
-})();
 
 // ---- Theme toggle (dark/light) ----
 (function initTheme() {

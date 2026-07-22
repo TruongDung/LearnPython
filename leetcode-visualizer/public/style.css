@@ -2357,23 +2357,6 @@ button:disabled {
   border-color: rgba(255, 255, 255, 0.04);
 }
 
-.play-speed-select {
-  flex: 0 0 auto;
-  min-width: 96px;
-  background: rgba(255, 255, 255, 0.04);
-  color: #e2e8f0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 0 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.play-speed-select:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
 .kbd-hint {
   margin: 12px 0 0;
   font-size: 12px;
@@ -3788,16 +3771,6 @@ button:disabled {
 [data-theme="light"] .controls button:disabled {
   background: #f8fafc;
   color: #cbd5e1;
-}
-
-[data-theme="light"] .play-speed-select {
-  background: #f1f5f9;
-  color: #334155;
-  border-color: #e2e8f0;
-}
-
-[data-theme="light"] .play-speed-select:hover {
-  background: #e2e8f0;
 }
 
 [data-theme="light"] .answer {
