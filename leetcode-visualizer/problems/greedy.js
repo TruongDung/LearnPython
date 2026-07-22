@@ -1668,6 +1668,7 @@ module.exports = {
   252: {
     id: 252,
     difficulty: "easy",
+    premium: true,
     slug: "meeting-rooms",
     category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
     title: { vi: "Meeting Rooms", en: "Meeting Rooms" },
