@@ -135,7 +135,8 @@ header h1 {
 }
 
 .recent-chip {
-  min-width: 118px;
+  min-width: 0;
+  padding: 8px 12px;
 }
 
 .catalog {

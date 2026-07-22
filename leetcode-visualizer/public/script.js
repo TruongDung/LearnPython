@@ -144,25 +144,13 @@ function renderRecentProblems() {
     button.className = "prob-chip recent-chip" + (Number(problem.id) === currentProblemId ? " active" : "");
     button.type = "button";
     button.dataset.id = problem.id;
-    if (problem.premium) {
-      button.dataset.premium = "true";
-      button.title = t().premiumLabel;
-    }
-
+    const problemTitle = pick(problem.title) || `LeetCode ${problem.id}`;
+    button.setAttribute("aria-label", `#${problem.id} ${problemTitle}`);
+    button.title = problemTitle;
     const id = document.createElement("span");
     id.className = "pid";
     id.textContent = `#${problem.id}`;
-    const title = document.createElement("span");
-    title.className = "pname";
-    title.textContent = pick(problem.title) || `LeetCode ${problem.id}`;
-    button.append(id, title);
-
-    if (problem.difficulty) {
-      const difficulty = document.createElement("span");
-      difficulty.className = `diff diff-${problem.difficulty}`;
-      difficulty.textContent = problem.difficulty;
-      button.appendChild(difficulty);
-    }
+    button.appendChild(id);
 
     button.addEventListener("click", () => {
       $("problemId").value = problem.id;
