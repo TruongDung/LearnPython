@@ -2491,6 +2491,455 @@ function buildSteps303(nums, params) {
   return { steps, answer };
 }
 
+function buildSteps307(input, params) {
+  const nums = [...input];
+  const rawOperations = String((params && params.operations) || "").trim();
+  const commands = rawOperations
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const tokens = part.split(/\s+/);
+      const op = (tokens[0] || "").toLowerCase();
+      const first = Number(tokens[1]);
+      const second = Number(tokens[2]);
+      return { op, first, second, tokenCount: tokens.length };
+    });
+
+  const validCommands = commands.length > 0 && commands.every((command) => {
+    const validName = command.op === "update" || command.op === "sumrange";
+    const validArgs = command.tokenCount === 3
+      && Number.isInteger(command.first)
+      && Number.isInteger(command.second);
+    if (!validName || !validArgs) return false;
+    if (command.op === "update") return command.first >= 0 && command.first < nums.length;
+    return command.first >= 0 && command.first <= command.second && command.second < nums.length;
+  });
+
+  if (!validCommands) {
+    return {
+      original: { nums, operations: rawOperations },
+      answer: null,
+      steps: [{
+        title: { vi: "Thao tác không hợp lệ", en: "Invalid operations" },
+        codeLines: [1],
+        fenwickView: {
+          nums,
+          bit: new Array(nums.length).fill(0),
+          activeNums: [],
+          activeBit: [],
+          visitedBit: [],
+          path: [],
+          mode: "idle",
+          status: [{ label: "operations", value: rawOperations || "-" }],
+        },
+        vars: [{ name: "operations", value: rawOperations || "-" }],
+        note: {
+          vi: "Dùng cú pháp: update index value | sumRange left right.",
+          en: "Use: update index value | sumRange left right.",
+        },
+        final: true,
+      }],
+    };
+  }
+
+  const n = nums.length;
+  const bit = new Array(n + 1).fill(0);
+  const outputs = [null];
+  const steps = [];
+  const detailedTrace = n <= 40 && commands.length <= 40;
+
+  const bitText = () => `[${bit.slice(1).join(", ")}]`;
+  const numsText = () => `[${nums.join(", ")}]`;
+  const outputsText = () => JSON.stringify(outputs);
+
+  function snapshot({
+    title,
+    codeLine,
+    note,
+    mode = "idle",
+    activeNums = [],
+    activeBit = [],
+    visitedBit = [],
+    path = [],
+    status = [],
+    vars = [],
+    final = false,
+    force = false,
+  }) {
+    if (!detailedTrace && !force) return;
+    const step = {
+      title,
+      codeLines: [codeLine],
+      fenwickView: {
+        nums: [...nums],
+        bit: bit.slice(1),
+        activeNums: [...activeNums],
+        activeBit: [...activeBit],
+        visitedBit: [...visitedBit],
+        path: [...path],
+        mode,
+        status,
+      },
+      vars: [
+        { name: "nums", value: numsText() },
+        { name: "bit", value: bitText() },
+        { name: "outputs", value: outputsText() },
+        ...vars,
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  function traceAdd(startIndex, delta, context) {
+    let index = startIndex;
+    const path = [];
+
+    snapshot({
+      title: { vi: `_add(index=${index}, delta=${delta})`, en: `_add(index=${index}, delta=${delta})` },
+      codeLine: 8,
+      mode: context.mode,
+      activeNums: context.activeNums,
+      activeBit: [index],
+      path,
+      status: context.status,
+      vars: [{ name: "index", value: index }, { name: "delta", value: delta }],
+      note: {
+        vi: "Fenwick dùng index 1-based; bắt đầu tại ô tương ứng với phần tử đang cập nhật.",
+        en: "Fenwick uses 1-based indices; start at the cell corresponding to the updated element.",
+      },
+    });
+
+    while (index <= n) {
+      snapshot({
+        title: { vi: `index ${index} còn nằm trong BIT`, en: `index ${index} is inside the BIT` },
+        codeLine: 9,
+        mode: context.mode,
+        activeNums: context.activeNums,
+        activeBit: [index],
+        visitedBit: path,
+        path: [...path, index],
+        status: context.status,
+        vars: [{ name: "index", value: index }, { name: "delta", value: delta }],
+        note: {
+          vi: `BIT[${index}] quản lý đoạn [${index - (index & -index)}, ${index - 1}] của nums.`,
+          en: `BIT[${index}] covers nums[${index - (index & -index)}..${index - 1}].`,
+        },
+      });
+
+      const before = bit[index];
+      bit[index] += delta;
+      path.push(index);
+      snapshot({
+        title: { vi: `BIT[${index}] = ${before} + (${delta}) = ${bit[index]}`, en: `BIT[${index}] = ${before} + (${delta}) = ${bit[index]}` },
+        codeLine: 10,
+        mode: context.mode,
+        activeNums: context.activeNums,
+        activeBit: [index],
+        visitedBit: path,
+        path,
+        status: context.status,
+        vars: [{ name: `bit[${index}]`, value: `${before} + (${delta}) = ${bit[index]}` }],
+        note: {
+          vi: `Cộng delta vào tổng đoạn mà BIT[${index}] đại diện.`,
+          en: `Add delta to the range sum represented by BIT[${index}].`,
+        },
+      });
+
+      const lowbit = index & -index;
+      const next = index + lowbit;
+      snapshot({
+        title: { vi: `Nhảy ${index} + lowbit(${index}) = ${next}`, en: `Jump ${index} + lowbit(${index}) = ${next}` },
+        codeLine: 11,
+        mode: context.mode,
+        activeNums: context.activeNums,
+        activeBit: next <= n ? [next] : [],
+        visitedBit: path,
+        path: next <= n ? [...path, next] : path,
+        status: context.status,
+        vars: [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
+        note: {
+          vi: next <= n ? `Đi tới node cha BIT[${next}], node này quản lý một đoạn lớn hơn.` : `${next} vượt n=${n}, kết thúc đường update.`,
+          en: next <= n ? `Move to parent BIT[${next}], which covers a larger range.` : `${next} exceeds n=${n}, so the update path ends.`,
+        },
+      });
+      index = next;
+    }
+
+    snapshot({
+      title: { vi: "Kết thúc đường cập nhật BIT", en: "Finish the BIT update path" },
+      codeLine: 9,
+      mode: context.mode,
+      activeNums: context.activeNums,
+      visitedBit: path,
+      path,
+      status: context.status,
+      vars: [{ name: "index", value: index }, { name: "n", value: n }],
+      note: { vi: `index=${index} > n=${n}, vòng lặp dừng.`, en: `index=${index} > n=${n}, so the loop stops.` },
+    });
+  }
+
+  function tracePrefix(startIndex, context) {
+    let index = startIndex;
+    let total = 0;
+    const path = [];
+
+    snapshot({
+      title: { vi: `_prefix(index=${index})`, en: `_prefix(index=${index})` },
+      codeLine: 18,
+      mode: "query",
+      activeNums: context.activeNums,
+      activeBit: index > 0 ? [index] : [],
+      path,
+      status: context.status,
+      vars: [{ name: "index", value: index }],
+      note: { vi: `Tính tổng nums[0..${index - 1}] bằng các đoạn rời nhau trong BIT.`, en: `Compute nums[0..${index - 1}] using disjoint ranges stored in the BIT.` },
+    });
+    snapshot({
+      title: { vi: "Khởi tạo total = 0", en: "Initialize total = 0" },
+      codeLine: 19,
+      mode: "query",
+      activeNums: context.activeNums,
+      activeBit: index > 0 ? [index] : [],
+      path,
+      status: context.status,
+      vars: [{ name: "total", value: total }],
+      note: { vi: "Mỗi node trên đường đi sẽ đóng góp đúng một đoạn không chồng lặp.", en: "Each visited node contributes one non-overlapping range." },
+    });
+
+    while (index > 0) {
+      snapshot({
+        title: { vi: `index=${index} > 0`, en: `index=${index} > 0` },
+        codeLine: 20,
+        mode: "query",
+        activeNums: context.activeNums,
+        activeBit: [index],
+        visitedBit: path,
+        path: [...path, index],
+        status: context.status,
+        vars: [{ name: "index", value: index }, { name: "total", value: total }],
+        note: { vi: `Đọc tổng đoạn [${index - (index & -index)}, ${index - 1}] từ BIT[${index}].`, en: `Read range [${index - (index & -index)}, ${index - 1}] from BIT[${index}].` },
+      });
+
+      const before = total;
+      total += bit[index];
+      path.push(index);
+      snapshot({
+        title: { vi: `total = ${before} + ${bit[index]} = ${total}`, en: `total = ${before} + ${bit[index]} = ${total}` },
+        codeLine: 21,
+        mode: "query",
+        activeNums: context.activeNums,
+        activeBit: [index],
+        visitedBit: path,
+        path,
+        status: context.status,
+        vars: [{ name: "total", value: `${before} + ${bit[index]} = ${total}` }, { name: `bit[${index}]`, value: bit[index] }],
+        note: { vi: `Cộng tổng lưu tại BIT[${index}] vào kết quả prefix.`, en: `Add the sum stored at BIT[${index}] to the prefix result.` },
+      });
+
+      const lowbit = index & -index;
+      const next = index - lowbit;
+      snapshot({
+        title: { vi: `Lùi ${index} - lowbit(${index}) = ${next}`, en: `Move ${index} - lowbit(${index}) = ${next}` },
+        codeLine: 22,
+        mode: "query",
+        activeNums: context.activeNums,
+        activeBit: next > 0 ? [next] : [],
+        visitedBit: path,
+        path: next > 0 ? [...path, next] : path,
+        status: context.status,
+        vars: [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
+        note: { vi: next > 0 ? `Bỏ đoạn vừa cộng và đi tới phần prefix còn lại tại BIT[${next}].` : "Đã phủ hết prefix, index trở về 0.", en: next > 0 ? `Remove the covered range and continue with BIT[${next}].` : "The whole prefix is covered, so index reaches 0." },
+      });
+      index = next;
+    }
+
+    snapshot({
+      title: { vi: "index = 0, dừng query", en: "index = 0, stop the query" },
+      codeLine: 20,
+      mode: "query",
+      activeNums: context.activeNums,
+      visitedBit: path,
+      path,
+      status: context.status,
+      vars: [{ name: "index", value: index }, { name: "total", value: total }],
+      note: { vi: "Không còn đoạn prefix nào cần cộng.", en: "No prefix range remains to be added." },
+    });
+    snapshot({
+      title: { vi: `Trả về prefix sum ${total}`, en: `Return prefix sum ${total}` },
+      codeLine: 23,
+      mode: "query",
+      activeNums: context.activeNums,
+      visitedBit: path,
+      path,
+      status: context.status,
+      vars: [{ name: "return", value: total }],
+      note: { vi: `Tổng prefix cần tìm là ${total}.`, en: `The requested prefix sum is ${total}.` },
+    });
+    return total;
+  }
+
+  snapshot({
+    title: { vi: "Sao chép nums để hỗ trợ update", en: "Copy nums for future updates" },
+    codeLine: 3,
+    mode: "build",
+    status: [{ label: "n", value: n }, { label: "phase", value: "build" }],
+    note: { vi: "Cần giữ giá trị hiện tại của nums[index] để tính delta khi update.", en: "Keep each current nums[index] value so update can compute its delta." },
+    force: true,
+  });
+  snapshot({
+    title: { vi: `Tạo BIT gồm ${n} ô 0`, en: `Create ${n} zeroed BIT cells` },
+    codeLine: 4,
+    mode: "build",
+    status: [{ label: "BIT size", value: n }, { label: "indexing", value: "1-based" }],
+    note: { vi: "bit[0] không dùng; hình chỉ hiển thị bit[1..n].", en: "bit[0] is unused; the visual shows bit[1..n]." },
+  });
+
+  for (let index = 0; index < n; index += 1) {
+    snapshot({
+      title: { vi: `Build từ nums[${index}] = ${nums[index]}`, en: `Build from nums[${index}] = ${nums[index]}` },
+      codeLine: 5,
+      mode: "build",
+      activeNums: [index],
+      status: [{ label: "i", value: index }, { label: "value", value: nums[index] }],
+      vars: [{ name: "i", value: index }, { name: "value", value: nums[index] }],
+      note: { vi: "Duyệt từng phần tử để cộng nó vào mọi Fenwick node chứa index này.", en: "Visit each value and add it to every Fenwick node whose range contains this index." },
+    });
+    snapshot({
+      title: { vi: `Gọi _add(${index + 1}, ${nums[index]})`, en: `Call _add(${index + 1}, ${nums[index]})` },
+      codeLine: 6,
+      mode: "build",
+      activeNums: [index],
+      activeBit: [index + 1],
+      status: [{ label: "i", value: index }, { label: "delta", value: nums[index] }],
+      note: { vi: "Đổi index nums 0-based sang index BIT 1-based.", en: "Convert the 0-based nums index to the 1-based BIT index." },
+    });
+    traceAdd(index + 1, nums[index], {
+      mode: "build",
+      activeNums: [index],
+      status: [{ label: "build nums index", value: index }, { label: "value", value: nums[index] }],
+    });
+  }
+
+  for (let commandIndex = 0; commandIndex < commands.length; commandIndex += 1) {
+    const command = commands[commandIndex];
+    const isLast = commandIndex === commands.length - 1;
+
+    if (command.op === "update") {
+      const index = command.first;
+      const value = command.second;
+      snapshot({
+        title: { vi: `update(${index}, ${value})`, en: `update(${index}, ${value})` },
+        codeLine: 13,
+        mode: "update",
+        activeNums: [index],
+        status: [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "update", value: `[${index}] = ${value}` }],
+        vars: [{ name: "index", value: index }, { name: "val", value: value }],
+        note: { vi: `Đổi nums[${index}] từ ${nums[index]} thành ${value}.`, en: `Change nums[${index}] from ${nums[index]} to ${value}.` },
+      });
+      const delta = value - nums[index];
+      snapshot({
+        title: { vi: `delta = ${value} - ${nums[index]} = ${delta}`, en: `delta = ${value} - ${nums[index]} = ${delta}` },
+        codeLine: 14,
+        mode: "update",
+        activeNums: [index],
+        status: [{ label: "old", value: nums[index] }, { label: "new", value }, { label: "delta", value: delta }],
+        vars: [{ name: "delta", value: `${value} - ${nums[index]} = ${delta}` }],
+        note: { vi: "Fenwick chỉ cần cộng phần chênh lệch vào các node liên quan.", en: "Fenwick only needs to add the difference to affected nodes." },
+      });
+      const oldValue = nums[index];
+      nums[index] = value;
+      snapshot({
+        title: { vi: `Ghi nums[${index}] = ${value}`, en: `Write nums[${index}] = ${value}` },
+        codeLine: 15,
+        mode: "update",
+        activeNums: [index],
+        status: [{ label: "old", value: oldValue }, { label: "new", value }, { label: "delta", value: delta }],
+        vars: [{ name: `nums[${index}]`, value }],
+        note: { vi: "Mảng gốc giờ phản ánh giá trị mới.", en: "The source array now reflects the new value." },
+      });
+      snapshot({
+        title: { vi: `Gọi _add(${index + 1}, ${delta})`, en: `Call _add(${index + 1}, ${delta})` },
+        codeLine: 16,
+        mode: "update",
+        activeNums: [index],
+        activeBit: [index + 1],
+        status: [{ label: "update", value: `[${index}]` }, { label: "delta", value: delta }],
+        note: { vi: "Bắt đầu cập nhật các Fenwick range chứa nums[index].", en: "Begin updating Fenwick ranges that contain nums[index]." },
+      });
+      traceAdd(index + 1, delta, {
+        mode: "update",
+        activeNums: [index],
+        status: [{ label: "update index", value: index }, { label: "delta", value: delta }],
+      });
+      outputs.push(null);
+      snapshot({
+        title: { vi: `Hoàn tất update(${index}, ${value})`, en: `Finish update(${index}, ${value})` },
+        codeLine: 16,
+        mode: "update",
+        activeNums: [index],
+        status: [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "output", value: "null" }],
+        vars: [{ name: "delta", value: delta }],
+        note: { vi: "Mảng nums và BIT đã đồng bộ.", en: "nums and the BIT are now synchronized." },
+        final: isLast,
+        force: isLast,
+      });
+    } else {
+      const left = command.first;
+      const right = command.second;
+      const activeNums = Array.from({ length: right - left + 1 }, (_, offset) => left + offset);
+      const status = [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "range", value: `[${left}, ${right}]` }];
+      snapshot({
+        title: { vi: `sumRange(${left}, ${right})`, en: `sumRange(${left}, ${right})` },
+        codeLine: 25,
+        mode: "query",
+        activeNums,
+        status,
+        vars: [{ name: "left", value: left }, { name: "right", value: right }],
+        note: { vi: "Tổng đoạn bằng prefix(right + 1) trừ prefix(left).", en: "The range sum is prefix(right + 1) minus prefix(left)." },
+      });
+      snapshot({
+        title: { vi: `Tính _prefix(${right + 1})`, en: `Compute _prefix(${right + 1})` },
+        codeLine: 26,
+        mode: "query",
+        activeNums,
+        activeBit: [right + 1],
+        status,
+        note: { vi: `Vế phải bao gồm nums[0..${right}].`, en: `The right prefix includes nums[0..${right}].` },
+      });
+      const rightPrefix = tracePrefix(right + 1, { activeNums, status });
+      snapshot({
+        title: { vi: `Tính _prefix(${left})`, en: `Compute _prefix(${left})` },
+        codeLine: 26,
+        mode: "query",
+        activeNums,
+        activeBit: left > 0 ? [left] : [],
+        status,
+        vars: [{ name: "right prefix", value: rightPrefix }],
+        note: { vi: `Vế trái loại phần nums[0..${left - 1}] khỏi tổng.`, en: `The left prefix removes nums[0..${left - 1}] from the total.` },
+      });
+      const leftPrefix = tracePrefix(left, { activeNums, status });
+      const result = rightPrefix - leftPrefix;
+      outputs.push(result);
+      snapshot({
+        title: { vi: `${rightPrefix} - ${leftPrefix} = ${result}`, en: `${rightPrefix} - ${leftPrefix} = ${result}` },
+        codeLine: 26,
+        mode: "query",
+        activeNums,
+        status: [...status, { label: "answer", value: result }],
+        vars: [{ name: "right prefix", value: rightPrefix }, { name: "left prefix", value: leftPrefix }, { name: "return", value: result }],
+        note: { vi: `sumRange(${left}, ${right}) = ${result}.`, en: `sumRange(${left}, ${right}) = ${result}.` },
+        final: isLast,
+        force: isLast,
+      });
+    }
+  }
+
+  return { original: { nums: [...input], operations: rawOperations }, answer: outputs, steps };
+}
+
 /**
  * LeetCode 1797: Design Authentication Manager.
  * Hash map tokenId -> expiry time (currentTime + ttl). generate always
@@ -3785,6 +4234,69 @@ module.exports = {
       "        return self.prefix[right + 1] - self.prefix[left]",
     ],
     builder: buildSteps303,
+  },
+  307: {
+    id: 307,
+    difficulty: "medium",
+    slug: "range-sum-query-mutable",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    title: { vi: "Range Sum Query - Mutable", en: "Range Sum Query - Mutable" },
+    titleVi: { vi: "Truy vấn tổng đoạn có cập nhật", en: "Mutable range sum queries" },
+    statement: {
+      vi: "Thiết kế NumArray hỗ trợ update(index, val) và trả về tổng nums[left..right] bằng sumRange(left, right).",
+      en: "Design NumArray to support update(index, val) and return nums[left..right] with sumRange(left, right).",
+    },
+    defaultInput: [1, 3, 5],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{
+      key: "operations",
+      type: "string",
+      label: { vi: "Thao tác (ngăn bằng |)", en: "Operations (separated by |)" },
+      default: "sumRange 0 2 | update 1 2 | sumRange 0 2",
+    }],
+    approach: [
+      { vi: "Fenwick Tree lưu các tổng đoạn theo lowbit; bit[i] quản lý nums[i-lowbit(i)..i-1].", en: "A Fenwick Tree stores lowbit ranges; bit[i] covers nums[i-lowbit(i)..i-1]." },
+      { vi: "update tính delta rồi đi lên bằng i += lowbit(i), cộng delta vào mọi node cha.", en: "update computes delta, then climbs with i += lowbit(i), adding delta to each parent." },
+      { vi: "Prefix sum đi xuống bằng i -= lowbit(i); sumRange = prefix(right+1) - prefix(left).", en: "A prefix sum descends with i -= lowbit(i); sumRange = prefix(right+1) - prefix(left)." },
+    ],
+    complexity: {
+      time: "O(n log n) build, O(log n) update/query",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi đường update hoặc prefix chỉ đi qua tối đa O(log n) Fenwick node.",
+        en: "Each update or prefix path visits at most O(log n) Fenwick nodes.",
+      },
+    },
+    code: [
+      "class NumArray:",
+      "    def __init__(self, nums: List[int]):",
+      "        self.nums = nums[:]",
+      "        self.bit = [0] * (len(nums) + 1)",
+      "        for i, value in enumerate(nums):",
+      "            self._add(i + 1, value)",
+      "",
+      "    def _add(self, index: int, delta: int) -> None:",
+      "        while index < len(self.bit):",
+      "            self.bit[index] += delta",
+      "            index += index & -index",
+      "",
+      "    def update(self, index: int, val: int) -> None:",
+      "        delta = val - self.nums[index]",
+      "        self.nums[index] = val",
+      "        self._add(index + 1, delta)",
+      "",
+      "    def _prefix(self, index: int) -> int:",
+      "        total = 0",
+      "        while index > 0:",
+      "            total += self.bit[index]",
+      "            index -= index & -index",
+      "        return total",
+      "",
+      "    def sumRange(self, left: int, right: int) -> int:",
+      "        return self._prefix(right + 1) - self._prefix(left)",
+    ],
+    builder: buildSteps307,
   },
   370: {
     id: 370,

@@ -2306,6 +2306,70 @@ function renderPrefix1DView(step) {
     </div>`;
 }
 
+function renderFenwickView(step) {
+  const view = step.fenwickView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const activeNums = new Set(Array.isArray(view.activeNums) ? view.activeNums : []);
+  const activeBit = new Set(Array.isArray(view.activeBit) ? view.activeBit : []);
+  const visitedBit = new Set(Array.isArray(view.visitedBit) ? view.visitedBit : []);
+  const path = Array.isArray(view.path) ? view.path : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const mode = ["build", "update", "query"].includes(view.mode) ? view.mode : "idle";
+  const minWidth = Math.max(0, Math.max(nums.length, bit.length) * 76);
+
+  const numsCells = nums.map((value, index) => `<div class="fenwick-cell nums-cell${activeNums.has(index) ? " active" : ""}">
+    <span>nums[${index}]</span>
+    <strong>${escapeHtml(String(value))}</strong>
+  </div>`).join("");
+
+  const bitCells = bit.map((value, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const rangeLeft = index - lowbit;
+    const rangeRight = index - 1;
+    const classes = [
+      "fenwick-cell",
+      "bit-cell",
+      activeBit.has(index) ? "active" : "",
+      visitedBit.has(index) ? "visited" : "",
+    ].filter(Boolean).join(" ");
+    const label = `BIT ${index}, sum ${value}, covers nums ${rangeLeft} through ${rangeRight}`;
+    return `<div class="${classes}" aria-label="${escapeHtml(label)}">
+      <span>BIT[${index}]</span>
+      <strong>${escapeHtml(String(value))}</strong>
+      <small>[${rangeLeft}..${rangeRight}]</small>
+    </div>`;
+  }).join("");
+
+  const pathText = path.length > 0
+    ? path.map((index) => `BIT[${escapeHtml(String(index))}]`).join(" → ")
+    : (lang === "vi" ? "chưa có node" : "no nodes yet");
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+  const modeLabel = {
+    build: lang === "vi" ? "build" : "build",
+    update: "update",
+    query: lang === "vi" ? "truy vấn" : "query",
+    idle: lang === "vi" ? "chờ" : "idle",
+  }[mode];
+
+  $("treeView").innerHTML = `<div class="fenwick-viz mode-${mode}">
+    <div class="fenwick-mode"><span>${escapeHtml(modeLabel)}</span><strong>${pathText}</strong></div>
+    <div class="fenwick-scroll">
+      <div class="fenwick-content" style="--fenwick-cols:${Math.max(1, Math.max(nums.length, bit.length))};--fenwick-min-width:${minWidth}px">
+        <div class="fenwick-heading">nums (0-based)</div>
+        <div class="fenwick-row nums-row">${numsCells}</div>
+        <div class="fenwick-heading">Fenwick Tree (1-based)</div>
+        <div class="fenwick-row bit-row">${bitCells}</div>
+      </div>
+    </div>
+    <div class="fenwick-status">${statusItems}</div>
+  </div>`;
+}
+
 function renderSkylineView(step) {
   const view = step.skylineView || {};
   const buildings = Array.isArray(view.buildings) ? view.buildings : [];
@@ -2516,6 +2580,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRunningSumView(step);
+  } else if (step.fenwickView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFenwickView(step);
   } else if (step.prefix1DView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
