@@ -1287,6 +1287,144 @@ function buildSteps123(nums) {
 }
 
 /** LeetCode 3947: Maximum Number of Items From Sale II. */
+// LeetCode 252: Meeting Rooms.
+// Sort by start time, then only adjacent meetings can reveal an overlap.
+function buildSteps252(input) {
+  const rawParts = String(input || "").split(";").map((part) => part.trim()).filter(Boolean);
+  const parsed = rawParts.map((part) => part.split(",").map((value) => Number(value.trim())));
+  const valid = parsed.every((interval) => (
+    interval.length === 2
+    && Number.isFinite(interval[0])
+    && Number.isFinite(interval[1])
+    && interval[0] < interval[1]
+  ));
+  const original = valid ? parsed.map((interval) => [...interval]) : [];
+  const steps = [];
+  const display = (intervals) => intervals.map(([start, end]) => `[${start},${end}]`);
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: rawParts,
+      highlight: [],
+      mark: [],
+      codeLines: [2],
+      vars: [{ name: "input", value: String(input || "") }],
+      note: {
+        vi: "Mỗi cuộc họp phải có dạng start,end với start < end; các cuộc họp cách nhau bởi dấu ';'.",
+        en: "Each meeting must be start,end with start < end; separate meetings with ';'.",
+      },
+      final: true,
+    });
+    return { original, answer: null, steps };
+  }
+
+  steps.push({
+    title: { vi: "Danh sách cuộc họp ban đầu", en: "Original meeting schedule" },
+    arr: display(original),
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [{ name: "intervals", value: display(original).join(" ") }, { name: "n", value: original.length }],
+    note: {
+      vi: "Mục tiêu: kiểm tra một người có thể tham dự toàn bộ cuộc họp mà không bị trùng giờ hay không.",
+      en: "Goal: determine whether one person can attend every meeting without a time conflict.",
+    },
+  });
+
+  const intervals = original.map((interval) => [...interval]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  steps.push({
+    title: { vi: "Sắp xếp theo thời gian bắt đầu", en: "Sort by start time" },
+    arr: display(intervals),
+    highlight: intervals.map((_, index) => index),
+    mark: [],
+    codeLines: [3],
+    vars: [{ name: "intervals", value: display(intervals).join(" ") }],
+    note: {
+      vi: "Sau khi sắp xếp, chỉ cần so sánh thời điểm bắt đầu hiện tại với thời điểm kết thúc ngay trước đó.",
+      en: "After sorting, compare each start time only with the immediately preceding end time.",
+    },
+  });
+
+  for (let i = 1; i < intervals.length; i++) {
+    const previous = intervals[i - 1];
+    const current = intervals[i];
+    const marks = Array.from({ length: i - 1 }, (_, index) => index);
+    steps.push({
+      title: { vi: `Xét cặp cuộc họp ${i} và ${i + 1}`, en: `Inspect meetings ${i} and ${i + 1}` },
+      arr: display(intervals),
+      highlight: [i - 1, i],
+      mark: marks,
+      codeLines: [4],
+      vars: [{ name: "i", value: i }, { name: "previous", value: `[${previous}]` }, { name: "current", value: `[${current}]` }],
+      note: {
+        vi: `So sánh [${previous}] với [${current}].`,
+        en: `Compare [${previous}] with [${current}].`,
+      },
+    });
+    steps.push({
+      title: { vi: `prev_end = ${previous[1]}`, en: `prev_end = ${previous[1]}` },
+      arr: display(intervals),
+      highlight: [i - 1],
+      mark: marks,
+      codeLines: [5],
+      vars: [{ name: "prev_end", value: previous[1] }],
+      note: { vi: "Lấy thời điểm kết thúc của cuộc họp trước.", en: "Read the previous meeting's end time." },
+    });
+    steps.push({
+      title: { vi: `current_start = ${current[0]}`, en: `current_start = ${current[0]}` },
+      arr: display(intervals),
+      highlight: [i],
+      mark: marks,
+      codeLines: [6],
+      vars: [{ name: "current_start", value: current[0] }, { name: "prev_end", value: previous[1] }],
+      note: { vi: "Lấy thời điểm bắt đầu của cuộc họp hiện tại.", en: "Read the current meeting's start time." },
+    });
+
+    const overlap = current[0] < previous[1];
+    steps.push({
+      title: {
+        vi: `${current[0]} < ${previous[1]}? ${overlap ? "Đúng — bị trùng" : "Sai — không trùng"}`,
+        en: `${current[0]} < ${previous[1]}? ${overlap ? "True — conflict" : "False — no conflict"}`,
+      },
+      arr: display(intervals),
+      highlight: [i - 1, i],
+      mark: marks,
+      codeLines: [7],
+      vars: [{ name: "overlap", value: overlap }, { name: "current_start", value: current[0] }, { name: "prev_end", value: previous[1] }],
+      note: overlap
+        ? { vi: "Cuộc họp hiện tại bắt đầu trước khi cuộc họp trước kết thúc, nên không thể tham dự cả hai.", en: "The current meeting starts before the previous one ends, so both cannot be attended." }
+        : { vi: "Cuộc họp trước đã kết thúc khi cuộc họp hiện tại bắt đầu; tiếp tục kiểm tra.", en: "The previous meeting has ended by the current start time; continue checking." },
+    });
+
+    if (overlap) {
+      steps.push({
+        title: { vi: "Kết quả: false", en: "Result: false" },
+        arr: display(intervals),
+        highlight: [i - 1, i],
+        mark: marks,
+        codeLines: [8],
+        vars: [{ name: "answer", value: false }, { name: "conflict", value: `[${previous}] ↔ [${current}]` }],
+        note: { vi: "Đã tìm thấy một cặp trùng giờ, có thể dừng ngay.", en: "A conflicting pair was found, so the scan can stop immediately." },
+        final: true,
+      });
+      return { original, answer: false, steps };
+    }
+  }
+
+  steps.push({
+    title: { vi: "Kết quả: true", en: "Result: true" },
+    arr: display(intervals),
+    highlight: [],
+    mark: intervals.map((_, index) => index),
+    codeLines: [9],
+    vars: [{ name: "answer", value: true }],
+    note: { vi: "Không có hai cuộc họp nào chồng nhau, nên có thể tham dự tất cả.", en: "No meetings overlap, so every meeting can be attended." },
+    final: true,
+  });
+  return { original, answer: true, steps };
+}
+
 function buildSteps3947(input, params) {
   const steps = [];
   const initialBudget = Number(params && params.budget);
@@ -1502,6 +1640,52 @@ function buildSteps3947(input, params) {
 }
 
 module.exports = {
+  252: {
+    id: 252,
+    difficulty: "easy",
+    slug: "meeting-rooms",
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
+    title: { vi: "Meeting Rooms", en: "Meeting Rooms" },
+    titleVi: { vi: "Có thể tham dự tất cả cuộc họp không?", en: "Can one person attend every meeting?" },
+    statement: {
+      vi: "Cho mảng intervals, trong đó intervals[i] = [startᵢ, endᵢ]. Trả về true nếu một người có thể tham dự tất cả cuộc họp; ngược lại trả về false.",
+      en: "Given intervals where intervals[i] = [start_i, end_i], return true if one person can attend all meetings; otherwise return false.",
+    },
+    defaultInput: "0,30;5,10;15,20",
+    inputKind: "string",
+    inputLabel: { vi: "Cuộc họp (start,end; ...)", en: "Meetings (start,end; ...)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Sắp xếp các cuộc họp theo thời gian bắt đầu. Nếu start hiện tại < end của cuộc họp trước thì hai cuộc họp bị chồng nhau.",
+        en: "Sort meetings by start time. If the current start is less than the previous end, the two meetings overlap.",
+      },
+      {
+        vi: "Nếu duyệt hết mà không có xung đột, có thể tham dự toàn bộ cuộc họp.",
+        en: "If the scan finishes without a conflict, every meeting can be attended.",
+      },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(1) / O(n)",
+      note: {
+        vi: "Sắp xếp tốn O(n log n); bộ nhớ phụ thuộc vào cách cài đặt sort.",
+        en: "Sorting costs O(n log n); auxiliary space depends on the sorting implementation.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def canAttendMeetings(self, intervals):",
+      "        intervals.sort(key=lambda interval: interval[0])",
+      "        for i in range(1, len(intervals)):",
+      "            prev_end = intervals[i - 1][1]",
+      "            current_start = intervals[i][0]",
+      "            if current_start < prev_end:",
+      "                return False",
+      "        return True",
+    ],
+    builder: buildSteps252,
+  },
   3947: {
     id: 3947,
     difficulty: "medium",
