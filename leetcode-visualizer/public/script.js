@@ -42,8 +42,7 @@ const I18N = {
     errSolve: "Không xử lý được.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
-    recentTitle: "Bài đã xem gần đây",
-    clearRecent: "Xóa lịch sử",
+    clearRecent: "Xóa",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -71,8 +70,7 @@ const I18N = {
     errSolve: "Could not process the request.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "LeetCode description hidden because this is a Premium problem.",
-    recentTitle: "Recently viewed",
-    clearRecent: "Clear history",
+    clearRecent: "Clear",
   },
 };
 

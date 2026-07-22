@@ -106,13 +106,6 @@ header h1 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
-}
-
-.recent-head h2 {
-  margin: 0;
-  color: #a5b4fc;
-  font-size: 14px;
 }
 
 .recent-clear {
@@ -129,6 +122,7 @@ header h1 {
 }
 
 .recent-items {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -3577,10 +3571,6 @@ button:disabled {
 [data-theme="light"] .recent-problems {
   background: #eef2ff;
   border-color: #c7d2fe;
-}
-
-[data-theme="light"] .recent-head h2 {
-  color: #4f46e5;
 }
 
 [data-theme="light"] .recent-clear {
