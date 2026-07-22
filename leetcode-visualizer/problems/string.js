@@ -5931,6 +5931,430 @@ function buildSteps3501(input, params) {
   return { original: s, answer: `[${answers.join(", ")}]`, steps };
 }
 
+function buildSteps3501SegmentTree(input, params) {
+  const s = String(input || "").trim();
+  const n = s.length;
+  const chars = s.split("");
+  const values = chars.map((ch) => (ch === "1" ? 1 : 0.4));
+  const steps = [];
+
+  function range(l, r) {
+    if (l > r) return [];
+    return Array.from({ length: r - l + 1 }, (_, i) => l + i);
+  }
+
+  function parseQueries(raw) {
+    const parsed = String(raw || "")
+      .split(";")
+      .map((query) => query.trim())
+      .filter(Boolean)
+      .map((query) => query.split(/[,\s]+/).map(Number))
+      .filter((query) => query.length >= 2 && query.slice(0, 2).every(Number.isInteger))
+      .map(([l, r]) => [l, r]);
+    return parsed.length ? parsed : [[0, Math.max(0, n - 1)]];
+  }
+
+  function groupLabel(groups) {
+    return `[${groups.map((group, i) => `z${i}:[${group.start},${group.end}] len=${group.length}`).join("; ")}]`;
+  }
+
+  function markPair(groups, pairIndex) {
+    if (pairIndex < 0 || pairIndex + 1 >= groups.length) return [];
+    return [
+      ...range(groups[pairIndex].start, groups[pairIndex].end),
+      ...range(groups[pairIndex + 1].start, groups[pairIndex + 1].end),
+    ];
+  }
+
+  function pushStep(line, title, note, options = {}) {
+    steps.push({
+      title,
+      arr: values,
+      sub: chars,
+      highlight: options.highlight || [],
+      mark: options.mark || [],
+      codeLines: [line],
+      vars: options.vars || [],
+      final: Boolean(options.final),
+    });
+    steps[steps.length - 1].note = note;
+  }
+
+  if (n === 0 || /[^01]/.test(s)) {
+    pushStep(
+      2,
+      { vi: "Input không hợp lệ", en: "Invalid input" },
+      { vi: "s phải là chuỗi nhị phân không rỗng.", en: "s must be a non-empty binary string." },
+      { final: true, vars: [{ name: "s", value: `"${s}"` }] }
+    );
+    return { original: s, answer: "[]", steps };
+  }
+
+  const queries = parseQueries(params && params.queries);
+  const detailed = n <= 80 && queries.length <= 20;
+  const zeroGroups = [];
+  const zeroGroupIndex = [];
+  const zeroTrace = [];
+  const snapshot = (line, kind, i = -1, extra = {}) => {
+    if (!detailed) return;
+    zeroTrace.push({
+      line,
+      kind,
+      i,
+      groups: zeroGroups.map((group) => ({ ...group })),
+      indexAt: [...zeroGroupIndex],
+      ...extra,
+    });
+  };
+
+  snapshot(54, "init-groups");
+  snapshot(55, "init-index");
+  for (let i = 0; i < n; i++) {
+    snapshot(56, "loop", i);
+    snapshot(57, "is-zero", i, { result: s[i] === "0" });
+    if (s[i] === "0") {
+      const extendsRun = i > 0 && s[i - 1] === "0";
+      snapshot(58, "extends-run", i, { result: extendsRun });
+      if (extendsRun) {
+        zeroGroups[zeroGroups.length - 1].end = i;
+        snapshot(59, "extend-end", i, { groupId: zeroGroups.length - 1 });
+        zeroGroups[zeroGroups.length - 1].length += 1;
+        snapshot(60, "extend-length", i, { groupId: zeroGroups.length - 1 });
+      } else {
+        snapshot(61, "new-run-else", i);
+        zeroGroups.push({ start: i, end: i, length: 1 });
+        snapshot(62, "new-run", i, { groupId: zeroGroups.length - 1 });
+      }
+    }
+    zeroGroupIndex.push(zeroGroups.length - 1);
+    snapshot(63, "append-index", i, { groupId: zeroGroups.length - 1 });
+  }
+  snapshot(64, "return-groups");
+
+  const ones = chars.filter((ch) => ch === "1").length;
+  pushStep(
+    3,
+    { vi: `ones = ${ones}`, en: `ones = ${ones}` },
+    { vi: "Đếm số section đang active trong toàn chuỗi.", en: "Count active sections in the whole string." },
+    {
+      highlight: chars.map((ch, i) => (ch === "1" ? i : -1)).filter((i) => i >= 0),
+      vars: [{ name: "ones", value: ones }],
+    }
+  );
+
+  pushStep(
+    4,
+    { vi: "Gọi self.getZeroGroups(s)", en: "Call self.getZeroGroups(s)" },
+    { vi: "Đi vào helper để nén các đoạn '0' liên tiếp.", en: "Enter the helper to compress contiguous zero runs." },
+    { vars: [{ name: "s", value: `"${s}"` }] }
+  );
+
+  if (detailed) {
+    pushStep(
+      53,
+      { vi: "Vào getZeroGroups", en: "Enter getZeroGroups" },
+      { vi: "Mỗi zeroGroup lưu start, end và length.", en: "Each zero group stores start, end, and length." },
+      { vars: [{ name: "s", value: `"${s}"` }] }
+    );
+
+    for (const event of zeroTrace) {
+      let title;
+      let note;
+      switch (event.kind) {
+        case "init-groups":
+          title = { vi: "zeroGroups = []", en: "zeroGroups = []" };
+          note = { vi: "Khởi tạo danh sách zero-run.", en: "Initialize the zero-run list." };
+          break;
+        case "init-index":
+          title = { vi: "zeroGroupIndex = []", en: "zeroGroupIndex = []" };
+          note = { vi: "Khởi tạo mảng ánh xạ vị trí sang zero-run.", en: "Initialize the position-to-zero-run mapping." };
+          break;
+        case "loop":
+          title = { vi: `i=${event.i}, ch='${s[event.i]}'`, en: `i=${event.i}, ch='${s[event.i]}'` };
+          note = { vi: `Xét s[${event.i}].`, en: `Inspect s[${event.i}].` };
+          break;
+        case "is-zero":
+          title = { vi: `ch == '0' → ${event.result}`, en: `ch == '0' → ${event.result}` };
+          note = event.result
+            ? { vi: "Ký tự này thuộc một zero-run.", en: "This character belongs to a zero run." }
+            : { vi: "Ký tự '1' không làm đổi zeroGroups.", en: "A '1' does not change zeroGroups." };
+          break;
+        case "extends-run":
+          title = { vi: `s[i - 1] == '0' → ${event.result}`, en: `s[i - 1] == '0' → ${event.result}` };
+          note = event.result
+            ? { vi: "Nối vào zero-run cuối.", en: "Extend the last zero run." }
+            : { vi: "Bắt đầu một zero-run mới.", en: "Start a new zero run." };
+          break;
+        case "extend-end":
+          title = { vi: `z${event.groupId}.end = ${event.i}`, en: `z${event.groupId}.end = ${event.i}` };
+          note = { vi: "Dời biên phải của run.", en: "Move the run's right boundary." };
+          break;
+        case "extend-length":
+          title = { vi: `z${event.groupId}.length += 1`, en: `z${event.groupId}.length += 1` };
+          note = { vi: "Tăng độ dài run thêm 1.", en: "Increase the run length by 1." };
+          break;
+        case "new-run-else":
+          title = { vi: "else: tạo zero-run mới", en: "else: create a new zero run" };
+          note = { vi: "Zero này không liền với run trước.", en: "This zero is not contiguous with the previous run." };
+          break;
+        case "new-run":
+          title = { vi: `Thêm z${event.groupId} tại ${event.i}`, en: `Append z${event.groupId} at ${event.i}` };
+          note = { vi: "Run mới có length = 1.", en: "The new run starts with length 1." };
+          break;
+        case "append-index":
+          title = { vi: `zeroGroupIndex.append(${event.groupId})`, en: `zeroGroupIndex.append(${event.groupId})` };
+          note = { vi: `Vị trí ${event.i} ánh xạ tới id ${event.groupId}.`, en: `Position ${event.i} maps to id ${event.groupId}.` };
+          break;
+        default:
+          title = { vi: "return zeroGroups, zeroGroupIndex", en: "return zeroGroups, zeroGroupIndex" };
+          note = { vi: "Trả dữ liệu nén về hàm chính.", en: "Return compressed data to the main method." };
+      }
+      pushStep(event.line, title, note, {
+        highlight: event.i >= 0 ? [event.i] : [],
+        mark: event.groups.flatMap((group) => range(group.start, group.end)),
+        vars: [
+          ...(event.i >= 0 ? [{ name: "i", value: event.i }, { name: "ch", value: `'${s[event.i]}'` }] : []),
+          { name: "zeroGroups", value: groupLabel(event.groups) },
+          { name: "zeroGroupIndex", value: `[${event.indexAt.join(", ")}]` },
+        ],
+      });
+    }
+  }
+
+  pushStep(
+    4,
+    { vi: "Nhận zeroGroups và zeroGroupIndex", en: "Receive zeroGroups and zeroGroupIndex" },
+    { vi: "Quay lại hàm chính sau khi nén chuỗi.", en: "Return to the main method after compressing the string." },
+    {
+      mark: zeroGroups.flatMap((group) => range(group.start, group.end)),
+      vars: [
+        { name: "zeroGroups", value: groupLabel(zeroGroups) },
+        { name: "zeroGroupIndex", value: `[${zeroGroupIndex.join(", ")}]` },
+      ],
+    }
+  );
+
+  const tooFewGroups = zeroGroups.length < 2;
+  pushStep(
+    5,
+    { vi: `len(zeroGroups) < 2 → ${tooFewGroups}`, en: `len(zeroGroups) < 2 → ${tooFewGroups}` },
+    tooFewGroups
+      ? { vi: "Cần hai zero-run để trade; không đủ nên trả ones.", en: "A trade needs two zero runs; there are not enough." }
+      : { vi: "Có ít nhất hai zero-run, tiếp tục build segment tree.", en: "There are at least two zero runs, so build the segment tree." },
+    { vars: [{ name: "len(zeroGroups)", value: zeroGroups.length }] }
+  );
+
+  if (tooFewGroups) {
+    const answer = Array(queries.length).fill(ones);
+    pushStep(
+      6,
+      { vi: `return [${answer.join(", ")}]`, en: `return [${answer.join(", ")}]` },
+      { vi: "Không có trade hợp lệ cho bất kỳ query nào.", en: "No query has a valid trade." },
+      { final: true, vars: [{ name: "answer", value: `[${answer.join(", ")}]` }] }
+    );
+    return { original: s, answer: `[${answer.join(", ")}]`, steps };
+  }
+
+  const pairCount = zeroGroups.length - 1;
+  let treeSize = 1;
+  if (detailed) {
+    pushStep(8, { vi: `pairCount = ${pairCount}`, en: `pairCount = ${pairCount}` }, { vi: "Mỗi lá biểu diễn một cặp zero-run kề nhau.", en: "Each leaf represents one adjacent zero-run pair." }, { vars: [{ name: "pairCount", value: pairCount }] });
+    pushStep(9, { vi: "size = 1", en: "size = 1" }, { vi: "Khởi tạo kích thước tầng lá.", en: "Initialize the leaf-layer size." }, { vars: [{ name: "size", value: treeSize }] });
+  }
+  while (treeSize < pairCount) {
+    if (detailed) pushStep(10, { vi: `${treeSize} < ${pairCount} → true`, en: `${treeSize} < ${pairCount} → true` }, { vi: "Chưa đủ lá cho mọi cặp.", en: "There are not enough leaves for every pair." }, { vars: [{ name: "size", value: treeSize }] });
+    treeSize *= 2;
+    if (detailed) pushStep(11, { vi: `size *= 2 → ${treeSize}`, en: `size *= 2 → ${treeSize}` }, { vi: "Tăng size lên lũy thừa của 2 kế tiếp.", en: "Grow size to the next power of two." }, { vars: [{ name: "size", value: treeSize }] });
+  }
+  if (detailed) pushStep(10, { vi: `${treeSize} < ${pairCount} → false`, en: `${treeSize} < ${pairCount} → false` }, { vi: "Đã đủ chỗ cho mọi pair gain.", en: "There is enough room for every pair gain." }, { vars: [{ name: "size", value: treeSize }] });
+
+  const tree = Array(2 * treeSize).fill(0);
+  const treePair = Array(2 * treeSize).fill(-1);
+  if (detailed) pushStep(12, { vi: `tree = [0] * ${2 * treeSize}`, en: `tree = [0] * ${2 * treeSize}` }, { vi: "Tạo segment tree lưu max gain.", en: "Create the max-gain segment tree." }, { vars: [{ name: "tree.length", value: tree.length }] });
+
+  for (let g = 0; g < pairCount; g++) {
+    const pairGain = zeroGroups[g].length + zeroGroups[g + 1].length;
+    if (detailed) pushStep(13, { vi: `g = ${g}`, en: `g = ${g}` }, { vi: `Chuẩn bị lá cho z${g} + z${g + 1}.`, en: `Prepare the leaf for z${g} + z${g + 1}.` }, { mark: markPair(zeroGroups, g), vars: [{ name: "g", value: g }] });
+    tree[treeSize + g] = pairGain;
+    treePair[treeSize + g] = g;
+    if (detailed) pushStep(14, { vi: `tree[${treeSize + g}] = ${pairGain}`, en: `tree[${treeSize + g}] = ${pairGain}` }, { vi: `Gain của pair z${g}, z${g + 1} là ${pairGain}.`, en: `The gain for pair z${g}, z${g + 1} is ${pairGain}.` }, { mark: markPair(zeroGroups, g), vars: [{ name: "pair gain", value: pairGain }, { name: "tree", value: `[${tree.join(", ")}]` }] });
+  }
+
+  for (let node = treeSize - 1; node > 0; node--) {
+    if (detailed) pushStep(15, { vi: `node = ${node}`, en: `node = ${node}` }, { vi: "Gộp hai node con.", en: "Merge the two child nodes." }, { vars: [{ name: "node", value: node }] });
+    const leftNode = node * 2;
+    const rightNode = leftNode + 1;
+    if (tree[leftNode] >= tree[rightNode]) {
+      tree[node] = tree[leftNode];
+      treePair[node] = treePair[leftNode];
+    } else {
+      tree[node] = tree[rightNode];
+      treePair[node] = treePair[rightNode];
+    }
+    if (detailed) pushStep(16, { vi: `tree[${node}] = ${tree[node]}`, en: `tree[${node}] = ${tree[node]}` }, { vi: "Node cha giữ gain lớn hơn.", en: "The parent keeps the larger gain." }, { mark: markPair(zeroGroups, treePair[node]), vars: [{ name: "tree[node]", value: tree[node] }, { name: "pair", value: treePair[node] }] });
+  }
+
+  function rangeMax(left, right) {
+    const trace = [];
+    const record = (line, kind, extra = {}) => {
+      if (detailed) trace.push({ line, kind, left, right, ...extra });
+    };
+    record(36, "enter");
+    record(37, "empty-check", { result: left > right });
+    if (left > right) {
+      record(38, "empty-return", { best: 0, pairIndex: -1 });
+      return { gain: 0, pairIndex: -1, trace };
+    }
+    left += treeSize;
+    record(39, "left-offset");
+    right += treeSize;
+    record(40, "right-offset");
+    let best = 0;
+    let pairIndex = -1;
+    record(41, "best-init", { best, pairIndex });
+    while (left <= right) {
+      record(42, "loop", { best, pairIndex });
+      const takeLeft = left % 2 === 1;
+      record(43, "left-check", { result: takeLeft, best, pairIndex });
+      if (takeLeft) {
+        if (tree[left] > best) {
+          best = tree[left];
+          pairIndex = treePair[left];
+        }
+        record(44, "take-left", { node: left, best, pairIndex });
+        left += 1;
+        record(45, "left-next", { best, pairIndex });
+      }
+      const takeRight = right % 2 === 0;
+      record(46, "right-check", { result: takeRight, best, pairIndex });
+      if (takeRight) {
+        if (tree[right] > best) {
+          best = tree[right];
+          pairIndex = treePair[right];
+        }
+        record(47, "take-right", { node: right, best, pairIndex });
+        right -= 1;
+        record(48, "right-prev", { best, pairIndex });
+      }
+      left = Math.floor(left / 2);
+      record(49, "left-parent", { best, pairIndex });
+      right = Math.floor(right / 2);
+      record(50, "right-parent", { best, pairIndex });
+    }
+    record(51, "return", { best, pairIndex });
+    return { gain: best, pairIndex, trace };
+  }
+
+  const answers = [];
+  if (detailed) pushStep(18, { vi: "ans = []", en: "ans = []" }, { vi: "Khởi tạo kết quả.", en: "Initialize the result list." }, { vars: [{ name: "ans", value: "[]" }] });
+
+  for (let qi = 0; qi < queries.length; qi++) {
+    let [l, r] = queries[qi];
+    l = Math.max(0, Math.min(l, n - 1));
+    r = Math.max(0, Math.min(r, n - 1));
+    if (l > r) [l, r] = [r, l];
+    const queryRange = detailed ? range(l, r) : [];
+    const leftGroup = zeroGroupIndex[l];
+    const rightGroup = zeroGroupIndex[r];
+    const leftPiece = s[l] === "1" ? 0 : zeroGroups[leftGroup].end - l + 1;
+    const rightPiece = s[r] === "1" ? 0 : r - zeroGroups[rightGroup].start + 1;
+    const first = leftGroup + 1;
+    const last = s[r] === "1" ? rightGroup : rightGroup - 1;
+
+    if (detailed) {
+      pushStep(19, { vi: `query ${qi}: [${l}, ${r}]`, en: `query ${qi}: [${l}, ${r}]` }, { vi: "Trade chỉ nằm trong đoạn highlight.", en: "The trade is restricted to the highlighted range." }, { highlight: queryRange, vars: [{ name: "l", value: l }, { name: "r", value: r }] });
+      pushStep(20, { vi: `leftGroup = ${leftGroup}`, en: `leftGroup = ${leftGroup}` }, { vi: "Zero-run tại hoặc ngay trước l.", en: "The zero run at or immediately before l." }, { highlight: [l], vars: [{ name: "leftGroup", value: leftGroup }] });
+      pushStep(21, { vi: `rightGroup = ${rightGroup}`, en: `rightGroup = ${rightGroup}` }, { vi: "Zero-run tại hoặc ngay trước r.", en: "The zero run at or immediately before r." }, { highlight: [r], vars: [{ name: "rightGroup", value: rightGroup }] });
+      pushStep(22, { vi: `left = ${leftPiece}`, en: `left = ${leftPiece}` }, { vi: "Phần zero-run còn lại ở biên trái.", en: "The remaining zero-run piece at the left boundary." }, { highlight: queryRange, mark: s[l] === "0" ? range(l, zeroGroups[leftGroup].end) : [], vars: [{ name: "left", value: leftPiece }] });
+      pushStep(23, { vi: `right = ${rightPiece}`, en: `right = ${rightPiece}` }, { vi: "Phần zero-run ở biên phải.", en: "The zero-run piece at the right boundary." }, { highlight: queryRange, mark: s[r] === "0" ? range(zeroGroups[rightGroup].start, r) : [], vars: [{ name: "right", value: rightPiece }] });
+      pushStep(24, { vi: `first = ${first}`, en: `first = ${first}` }, { vi: "Zero-run hoàn chỉnh đầu tiên có thể nằm trong query.", en: "The first complete zero run that may lie inside the query." }, { highlight: queryRange, vars: [{ name: "first", value: first }] });
+      pushStep(25, { vi: `last = ${last}`, en: `last = ${last}` }, { vi: "Zero-run hoàn chỉnh cuối cùng có thể nằm trong query.", en: "The last complete zero run that may lie inside the query." }, { highlight: queryRange, vars: [{ name: "last", value: last }] });
+      pushStep(26, { vi: `Gọi rangeMax(${first}, ${last - 1})`, en: `Call rangeMax(${first}, ${last - 1})` }, { vi: "Lấy pair gain lớn nhất ở phần giữa bằng segment tree.", en: "Use the segment tree to get the largest middle pair gain." }, { highlight: queryRange, vars: [{ name: "left pair", value: first }, { name: "right pair", value: last - 1 }] });
+    }
+
+    const rmq = rangeMax(first, last - 1);
+    if (detailed) {
+      for (const event of rmq.trace) {
+        const eventBest = event.best === undefined ? 0 : event.best;
+        let title = { vi: `rangeMax: left=${event.left}, right=${event.right}`, en: `rangeMax: left=${event.left}, right=${event.right}` };
+        let note = { vi: "Thu hẹp range trên segment tree.", en: "Narrow the range on the segment tree." };
+        if (event.kind === "empty-check") {
+          title = { vi: `left > right → ${event.result}`, en: `left > right → ${event.result}` };
+          note = { vi: event.result ? "Không có cặp hoàn chỉnh ở giữa." : "Range có ít nhất một pair.", en: event.result ? "There is no complete middle pair." : "The range contains at least one pair." };
+        } else if (event.kind === "empty-return") {
+          title = { vi: "return 0", en: "return 0" };
+        } else if (event.kind === "left-offset" || event.kind === "right-offset") {
+          title = { vi: `Đổi sang leaf index: [${event.left}, ${event.right}]`, en: `Convert to leaf indices: [${event.left}, ${event.right}]` };
+        } else if (event.kind === "best-init") {
+          title = { vi: "best = 0", en: "best = 0" };
+        } else if (event.kind === "left-check") {
+          title = { vi: `left % 2 == 1 → ${event.result}`, en: `left % 2 == 1 → ${event.result}` };
+        } else if (event.kind === "right-check") {
+          title = { vi: `right % 2 == 0 → ${event.result}`, en: `right % 2 == 0 → ${event.result}` };
+        } else if (event.kind === "take-left" || event.kind === "take-right") {
+          title = { vi: `Lấy node ${event.node}, best = ${event.best}`, en: `Take node ${event.node}, best = ${event.best}` };
+          note = { vi: "Node này nằm trọn trong range query.", en: "This node is fully covered by the query range." };
+        } else if (event.kind === "return") {
+          title = { vi: `return best = ${event.best}`, en: `return best = ${event.best}` };
+          note = { vi: "Hoàn tất RMQ trong O(log n).", en: "Finish the RMQ in O(log n)." };
+        }
+        pushStep(event.line, title, note, {
+          highlight: queryRange,
+          mark: markPair(zeroGroups, event.pairIndex === undefined ? -1 : event.pairIndex),
+          vars: [{ name: "left", value: event.left }, { name: "right", value: event.right }, { name: "best", value: eventBest }],
+        });
+      }
+    }
+
+    let gain = rmq.gain;
+    let bestPair = rmq.pairIndex;
+    let bestMark = markPair(zeroGroups, bestPair);
+    if (detailed) {
+      pushStep(26, { vi: `gain = ${gain}`, en: `gain = ${gain}` }, { vi: "Nhận max gain của các cặp hoàn chỉnh ở giữa.", en: "Receive the maximum gain among complete middle pairs." }, { highlight: queryRange, mark: bestMark, vars: [{ name: "gain", value: gain }, { name: "best pair", value: bestPair }] });
+    }
+
+    const leftOk = s[l] === "0" && leftGroup + 1 <= last;
+    if (detailed) pushStep(27, { vi: `left boundary candidate → ${leftOk}`, en: `left boundary candidate → ${leftOk}` }, { vi: leftOk ? "Biên trái ghép được với zero-run kế tiếp." : "Không có candidate ở biên trái.", en: leftOk ? "The left piece can merge with the next zero run." : "There is no left-boundary candidate." }, { highlight: queryRange, vars: [{ name: "condition", value: leftOk }] });
+    if (leftOk) {
+      const candidate = leftPiece + zeroGroups[leftGroup + 1].length;
+      if (candidate > gain) {
+        gain = candidate;
+        bestMark = [...range(l, zeroGroups[leftGroup].end), ...range(zeroGroups[leftGroup + 1].start, zeroGroups[leftGroup + 1].end)];
+      }
+      if (detailed) pushStep(28, { vi: `gain = max(gain, ${candidate}) = ${gain}`, en: `gain = max(gain, ${candidate}) = ${gain}` }, { vi: "So sánh candidate cắt biên trái.", en: "Compare the left-cut candidate." }, { highlight: queryRange, mark: bestMark, vars: [{ name: "candidate", value: candidate }, { name: "gain", value: gain }] });
+    }
+
+    const rightOk = s[r] === "0" && first <= rightGroup - 1;
+    if (detailed) pushStep(29, { vi: `right boundary candidate → ${rightOk}`, en: `right boundary candidate → ${rightOk}` }, { vi: rightOk ? "Zero-run trước ghép được với phần biên phải." : "Không có candidate ở biên phải.", en: rightOk ? "The previous zero run can merge with the right piece." : "There is no right-boundary candidate." }, { highlight: queryRange, vars: [{ name: "condition", value: rightOk }] });
+    if (rightOk) {
+      const candidate = zeroGroups[rightGroup - 1].length + rightPiece;
+      if (candidate > gain) {
+        gain = candidate;
+        bestMark = [...range(zeroGroups[rightGroup - 1].start, zeroGroups[rightGroup - 1].end), ...range(zeroGroups[rightGroup].start, r)];
+      }
+      if (detailed) pushStep(30, { vi: `gain = max(gain, ${candidate}) = ${gain}`, en: `gain = max(gain, ${candidate}) = ${gain}` }, { vi: "So sánh candidate cắt biên phải.", en: "Compare the right-cut candidate." }, { highlight: queryRange, mark: bestMark, vars: [{ name: "candidate", value: candidate }, { name: "gain", value: gain }] });
+    }
+
+    const edgeOk = s[l] === "0" && s[r] === "0" && leftGroup + 1 === rightGroup;
+    if (detailed) pushStep(31, { vi: `two-boundary candidate → ${edgeOk}`, en: `two-boundary candidate → ${edgeOk}` }, { vi: edgeOk ? "Hai phần biên thuộc hai zero-run kề nhau." : "Hai biên không tạo một pair riêng.", en: edgeOk ? "The two boundary pieces belong to adjacent zero runs." : "The two boundaries do not form their own pair." }, { highlight: queryRange, vars: [{ name: "condition", value: edgeOk }] });
+    if (edgeOk) {
+      const candidate = leftPiece + rightPiece;
+      if (candidate > gain) {
+        gain = candidate;
+        bestMark = [...range(l, zeroGroups[leftGroup].end), ...range(zeroGroups[rightGroup].start, r)];
+      }
+      if (detailed) pushStep(32, { vi: `gain = max(gain, ${candidate}) = ${gain}`, en: `gain = max(gain, ${candidate}) = ${gain}` }, { vi: "So sánh candidate gồm cả hai biên.", en: "Compare the two-boundary candidate." }, { highlight: queryRange, mark: bestMark, vars: [{ name: "candidate", value: candidate }, { name: "gain", value: gain }] });
+    }
+
+    const answer = ones + gain;
+    answers.push(answer);
+    if (detailed) pushStep(33, { vi: `ans.append(${ones} + ${gain}) = ${answer}`, en: `ans.append(${ones} + ${gain}) = ${answer}` }, { vi: "Cộng gain tốt nhất vào số '1' ban đầu.", en: "Add the best gain to the original one count." }, { highlight: queryRange, mark: bestMark, vars: [{ name: "ones", value: ones }, { name: "gain", value: gain }, { name: "answer", value: answer }] });
+  }
+
+  pushStep(34, { vi: `return ans = [${answers.join(", ")}]`, en: `return ans = [${answers.join(", ")}]` }, { vi: "Trả kết quả cho mọi query.", en: "Return the result for every query." }, { final: true, vars: [{ name: "answer", value: `[${answers.join(", ")}]` }] });
+  return { original: s, answer: `[${answers.join(", ")}]`, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -7093,16 +7517,17 @@ module.exports = {
     ],
     approach: [
       { vi: "Đếm tổng số '1' trong toàn chuỗi một lần: ones.", en: "Count total '1's in the whole string once: ones." },
-      { vi: "Nén các đoạn '0' thành zeroGroups để mỗi query chỉ xét các cặp đoạn '0' có thể ghép.", en: "Compress zero runs into zeroGroups so each query only checks mergeable zero-run pairs." },
+      { vi: "Nén các đoạn '0' thành zeroGroups; mỗi cặp zᵢ, zᵢ₊₁ có gain = len(zᵢ) + len(zᵢ₊₁).", en: "Compress zero runs into zeroGroups; each pair zᵢ, zᵢ₊₁ has gain = len(zᵢ) + len(zᵢ₊₁)." },
+      { vi: "Build segment tree trên các pair gain để lấy max của mọi cặp hoàn chỉnh trong query bằng O(log n).", en: "Build a segment tree over pair gains to get the best complete pair in O(log n)." },
       { vi: "Với query [l,r], hai biên có thể cắt giữa một đoạn '0', nên cần xét left cut và right cut riêng.", en: "For query [l,r], each boundary may cut through a zero run, so left cut and right cut need special handling." },
-      { vi: "Gain tốt nhất là max của: hai biên bị cắt, hai đoạn '0' hoàn chỉnh liền kề, left cut + đoạn kế tiếp, hoặc đoạn trước + right cut.", en: "The best gain is the max of: both cut boundaries, two complete adjacent zero runs, left cut + next run, or previous run + right cut." },
+      { vi: "Gain cuối là max của RMQ ở giữa và tối đa ba candidate đặc biệt chạm biên.", en: "The final gain is the max of the middle RMQ and up to three boundary candidates." },
     ],
     complexity: {
-      time: "O(n + q * z) visualized / O(n log n + q) optimized",
+      time: "O(n + q log n)",
       space: "O(n)",
       note: {
-        vi: "Visualizer liệt kê candidate để dễ học. Bản tối ưu dùng sparse table/segment tree trên tổng độ dài hai zeroGroups liền kề để query nhanh.",
-        en: "The visualizer enumerates candidates for learning. The optimized solution uses a sparse table/segment tree over adjacent zero-group sums for fast queries.",
+        vi: "Nén runs và build cây O(n). Mỗi query thực hiện một range maximum query O(log n) và xét O(1) case biên.",
+        en: "Run compression and tree construction are O(n). Each query performs one O(log n) range maximum query plus O(1) boundary cases.",
       },
     },
     code: [
@@ -7110,25 +7535,53 @@ module.exports = {
       "    def maxActiveSectionsAfterTrade(self, s: str, queries: List[List[int]]) -> List[int]:",
       "        ones = s.count('1')",
       "        zeroGroups, zeroGroupIndex = self.getZeroGroups(s)",
-      "        if not zeroGroups:",
+      "        if len(zeroGroups) < 2:",
       "            return [ones] * len(queries)",
+      "",
+      "        pairCount = len(zeroGroups) - 1",
+      "        size = 1",
+      "        while size < pairCount:",
+      "            size *= 2",
+      "        tree = [0] * (2 * size)",
+      "        for g in range(pairCount):",
+      "            tree[size + g] = zeroGroups[g][2] + zeroGroups[g + 1][2]",
+      "        for node in range(size - 1, 0, -1):",
+      "            tree[node] = max(tree[node * 2], tree[node * 2 + 1])",
       "",
       "        ans = []",
       "        for l, r in queries:",
-      "            left = 0 if s[l] == '1' else zeroGroups[zeroGroupIndex[l]]['end'] - l + 1",
-      "            right = 0 if s[r] == '1' else r - zeroGroups[zeroGroupIndex[r]]['start'] + 1",
-      "            candidates = []",
-      "            if s[l] == '0' and s[r] == '0' and zeroGroupIndex[l] + 1 == zeroGroupIndex[r]:",
-      "                candidates.append(left + right)",
-      "            for g in range(zeroGroupIndex[l] + 1, zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
-      "                candidates.append(zeroGroups[g]['length'] + zeroGroups[g + 1]['length'])",
-      "            if s[l] == '0' and zeroGroupIndex[l] + 1 <= (zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
-      "                candidates.append(left + zeroGroups[zeroGroupIndex[l] + 1]['length'])",
-      "            if s[r] == '0' and zeroGroupIndex[l] < zeroGroupIndex[r] - 1:",
-      "                candidates.append(zeroGroups[zeroGroupIndex[r] - 1]['length'] + right)",
-      "            gain = max(candidates, default=0)",
+      "            leftGroup = zeroGroupIndex[l]",
+      "            rightGroup = zeroGroupIndex[r]",
+      "            left = 0 if s[l] == '1' else zeroGroups[leftGroup][1] - l + 1",
+      "            right = 0 if s[r] == '1' else r - zeroGroups[rightGroup][0] + 1",
+      "            first = leftGroup + 1",
+      "            last = rightGroup if s[r] == '1' else rightGroup - 1",
+      "            gain = self.rangeMax(tree, size, first, last - 1)",
+      "            if s[l] == '0' and leftGroup + 1 <= last:",
+      "                gain = max(gain, left + zeroGroups[leftGroup + 1][2])",
+      "            if s[r] == '0' and first <= rightGroup - 1:",
+      "                gain = max(gain, zeroGroups[rightGroup - 1][2] + right)",
+      "            if s[l] == '0' and s[r] == '0' and leftGroup + 1 == rightGroup:",
+      "                gain = max(gain, left + right)",
       "            ans.append(ones + gain)",
       "        return ans",
+      "",
+      "    def rangeMax(self, tree, size, left, right):",
+      "        if left > right:",
+      "            return 0",
+      "        left += size",
+      "        right += size",
+      "        best = 0",
+      "        while left <= right:",
+      "            if left % 2 == 1:",
+      "                best = max(best, tree[left])",
+      "                left += 1",
+      "            if right % 2 == 0:",
+      "                best = max(best, tree[right])",
+      "                right -= 1",
+      "            left //= 2",
+      "            right //= 2",
+      "        return best",
       "",
       "    def getZeroGroups(self, s: str):",
       "        zeroGroups = []",
@@ -7136,13 +7589,13 @@ module.exports = {
       "        for i, ch in enumerate(s):",
       "            if ch == '0':",
       "                if i > 0 and s[i - 1] == '0':",
-      "                    zeroGroups[-1]['end'] = i",
-      "                    zeroGroups[-1]['length'] += 1",
+      "                    zeroGroups[-1][1] = i",
+      "                    zeroGroups[-1][2] += 1",
       "                else:",
-      "                    zeroGroups.append({'start': i, 'end': i, 'length': 1})",
+      "                    zeroGroups.append([i, i, 1])",
       "            zeroGroupIndex.append(len(zeroGroups) - 1)",
       "        return zeroGroups, zeroGroupIndex",
     ],
-    builder: buildSteps3501,
+    builder: buildSteps3501SegmentTree,
   },
 };
