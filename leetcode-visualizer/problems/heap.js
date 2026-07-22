@@ -1186,69 +1186,152 @@ function buildSteps215(input, params) {
 
 // ─── 253: Meeting Rooms II ───
 function buildSteps253(input) {
-  const intervals = String(input).split(";").map((p) => p.split(",").map((s) => Number(s.trim())));
-  intervals.sort((a, b) => a[0] - b[0]);
+  const parsed = String(input || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(",").map((value) => Number(value.trim())));
   const steps = [];
-  const label = (e) => `end ${e}`;
-  const heap = [];
-  const less = (a, b) => a < b; // MIN-heap of end times
-  const arrStr = () => `[${heap.join(", ")}]`;
-  const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
-  const ivStr = intervals.map((iv) => `[${iv.join(",")}]`).join(" ");
-
-  steps.push(heapSnapshot([], label, {
-    title: { vi: "Số phòng họp tối thiểu", en: "Minimum meeting rooms" },
-    codeLines: [2, 3],
-    vars: [{ name: "sorted", value: ivStr }],
-    note: {
-      vi:
-        `Sắp các cuộc họp theo thời điểm BẮT ĐẦU.\n` +
-        `Dùng MIN-HEAP chứa thời điểm KẾT THÚC của các phòng đang dùng:\n` +
-        `• Với mỗi cuộc họp [s, e]: nếu phòng kết thúc sớm nhất (gốc heap) ≤ s → tái sử dụng (pop).\n` +
-        `• Luôn push e (phòng cho cuộc họp này).\n` +
-        `• Đáp án = kích thước heap LỚN NHẤT từng đạt = số phòng tối thiểu.`,
-      en:
-        `Sort meetings by START time.\n` +
-        `Use a MIN-HEAP of END times of rooms in use:\n` +
-        `• For each meeting [s, e]: if the earliest-ending room (heap root) ≤ s → reuse it (pop).\n` +
-        `• Always push e (a room for this meeting).\n` +
-        `• Answer = the MAX heap size ever reached = minimum rooms.`,
-    },
-  }));
-
-  let maxRooms = 0;
-  for (const [s, e] of intervals) {
-    if (heap.length > 0 && heap[0] <= s) {
-      const freed = heap[0];
-      const last = heap.pop();
-      if (heap.length > 0) heap[0] = last;
-      steps.push(heapSnapshot(heap, label, {
-        title: { vi: `[${s},${e}]: phòng kết thúc ${freed} ≤ ${s} → tái dùng`, en: `[${s},${e}]: room ending ${freed} ≤ ${s} → reuse` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [5, 6],
-        vars: [{ name: "start", value: s }, { name: "freed end", value: freed }, { name: "heap", value: arrStr() }],
-        note: { vi: `Phòng kết thúc lúc ${freed} đã rảnh trước khi ${s} bắt đầu → dùng lại phòng đó (pop). Sift-down.`, en: `A room freed at ${freed} before ${s} starts → reuse it (pop). Sift-down.` },
-      }));
-      if (heap.length > 0) siftDown(0);
-    }
-    heap.push(e);
-    maxRooms = Math.max(maxRooms, heap.length);
-    steps.push(heapSnapshot(heap, label, {
-      title: { vi: `[${s},${e}]: dùng phòng tới ${e} (đang dùng ${heap.length})`, en: `[${s},${e}]: occupy until ${e} (in use ${heap.length})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [7, 8],
-      vars: [{ name: "meeting", value: `[${s},${e}]` }, { name: "rooms in use", value: heap.length }, { name: "maxRooms", value: maxRooms }],
-      note: { vi: `Push thời điểm kết thúc ${e}. Số phòng đang dùng = ${heap.length}, lớn nhất từng đạt = ${maxRooms}.`, en: `Push end time ${e}. Rooms in use = ${heap.length}, max so far = ${maxRooms}.` },
-    }));
-    siftUp(heap.length - 1);
+  const valid = parsed.length > 0 && parsed.every((interval) => (
+    interval.length === 2
+    && Number.isFinite(interval[0])
+    && Number.isFinite(interval[1])
+    && interval[0] < interval[1]
+  ));
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], codeLines: [3], final: true,
+      vars: [{ name: "answer", value: null }],
+      note: {
+        vi: "Mỗi cuộc họp phải có dạng start,end với start < end; các cuộc họp cách nhau bởi dấu ';'.",
+        en: "Each meeting must be start,end with start < end; separate meetings with ';'.",
+      },
+    });
+    return { input, answer: null, steps };
   }
 
-  const fs = heapSnapshot(heap, label, {
-    title: { vi: `Đáp án: ${maxRooms} phòng`, en: `Answer: ${maxRooms} rooms` },
-    codeLines: [9],
-    vars: [{ name: "answer", value: maxRooms }],
-    note: { vi: `Số phòng tối thiểu = số cuộc họp chồng nhau nhiều nhất = ${maxRooms}.`, en: `Minimum rooms = maximum number of overlapping meetings = ${maxRooms}.` },
+  const intervals = parsed.map(([start, end], index) => ({ start, end, originalIndex: index }))
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const heap = [];
+  const assignments = [];
+  let nextRoom = 0;
+  let currentIndex = null;
+
+  const heapText = () => `[${heap.map((entry) => `(end=${entry.end}, R${entry.room + 1})`).join(", ")}]`;
+  const snapshot = (title, codeLine, vars, note, options = {}) => ({
+    title,
+    arr: [],
+    highlight: [],
+    mark: [],
+    codeLines: [codeLine],
+    vars,
+    note,
+    final: Boolean(options.final),
+    meetingRoomsTimelineView: {
+      intervals: intervals.map((meeting) => ({ ...meeting })),
+      assignments: assignments.map((meeting) => ({ ...meeting })),
+      heap: heap.map((entry) => ({ ...entry })),
+      roomCount: nextRoom,
+      currentIndex,
+      decision: options.decision || null,
+      selectedRoom: Number.isInteger(options.selectedRoom) ? options.selectedRoom : null,
+    },
   });
-  fs.final = true; steps.push(fs);
-  return { input, answer: maxRooms, steps };
+
+  steps.push(snapshot(
+    { vi: "Sắp xếp cuộc họp theo start", en: "Sort meetings by start" }, 4,
+    [{ name: "intervals", value: intervals.map(({ start, end }) => `[${start},${end}]`).join(" ") }],
+    { vi: "Timeline được sắp từ trái sang phải theo thời gian bắt đầu.", en: "The timeline is ordered from left to right by meeting start time." }
+  ));
+  steps.push(snapshot(
+    { vi: "Khởi tạo min-heap rỗng", en: "Initialize an empty min-heap" }, 5,
+    [{ name: "heap", value: "[]" }],
+    { vi: "Heap sẽ lưu (end, room) của từng phòng đang được sử dụng.", en: "The heap stores (end, room) for every room currently in use." }
+  ));
+  steps.push(snapshot(
+    { vi: "Phòng mới tiếp theo là Room 1", en: "The next new room is Room 1" }, 6,
+    [{ name: "next_room", value: nextRoom }],
+    { vi: "Chưa có phòng nào được tạo.", en: "No rooms have been created yet." }
+  ));
+
+  for (let index = 0; index < intervals.length; index++) {
+    const meeting = intervals[index];
+    currentIndex = index;
+    steps.push(snapshot(
+      { vi: `Xét cuộc họp [${meeting.start},${meeting.end}]`, en: `Inspect meeting [${meeting.start},${meeting.end}]` }, 7,
+      [{ name: "meeting", value: `[${meeting.start},${meeting.end}]` }, { name: "heap", value: heapText() }],
+      { vi: "Thanh nét đứt trên hàng Chờ xếp là cuộc họp đang cần phòng.", en: "The dashed bar on the Pending row is the meeting that needs a room." }
+    ));
+
+    const canReuse = heap.length > 0 && heap[0].end <= meeting.start;
+    steps.push(snapshot(
+      {
+        vi: heap.length
+          ? `end sớm nhất ${heap[0].end} ≤ start ${meeting.start}? ${canReuse ? "Đúng" : "Sai"}`
+          : "Heap rỗng — chưa có phòng để tái sử dụng",
+        en: heap.length
+          ? `Earliest end ${heap[0].end} ≤ start ${meeting.start}? ${canReuse ? "True" : "False"}`
+          : "Heap is empty — no room can be reused",
+      }, 8,
+      [{ name: "can_reuse", value: canReuse }, { name: "heap min", value: heap.length ? `(end=${heap[0].end}, R${heap[0].room + 1})` : "none" }],
+      canReuse
+        ? { vi: `Room ${heap[0].room + 1} đã rảnh trước thời điểm ${meeting.start}.`, en: `Room ${heap[0].room + 1} is free by time ${meeting.start}.` }
+        : { vi: "Cuộc họp mới chồng thời gian với tất cả phòng đang dùng, nên cần phòng mới.", en: "The new meeting overlaps every occupied room, so a new room is required." }
+    ));
+
+    let room;
+    if (canReuse) {
+      const freed = heap.shift();
+      room = freed.room;
+      steps.push(snapshot(
+        { vi: `Pop → tái sử dụng Room ${room + 1}`, en: `Pop → reuse Room ${room + 1}` }, 9,
+        [{ name: "freed", value: `(end=${freed.end}, R${room + 1})` }, { name: "room", value: room }],
+        { vi: `Cuộc họp trước trong Room ${room + 1} đã kết thúc lúc ${freed.end}.`, en: `The previous meeting in Room ${room + 1} ended at ${freed.end}.` },
+        { decision: "reuse", selectedRoom: room }
+      ));
+    } else {
+      steps.push(snapshot(
+        { vi: "Đi vào nhánh tạo phòng mới", en: "Enter the new-room branch" }, 10,
+        [{ name: "can_reuse", value: false }],
+        { vi: "Không có phòng nào kết thúc kịp trước cuộc họp hiện tại.", en: "No room finishes in time for the current meeting." },
+        { decision: "new" }
+      ));
+      room = nextRoom;
+      steps.push(snapshot(
+        { vi: `room = ${room} → Room ${room + 1}`, en: `room = ${room} → Room ${room + 1}` }, 11,
+        [{ name: "room", value: room }],
+        { vi: `Gán cuộc họp vào Room ${room + 1} mới.`, en: `Assign the meeting to new Room ${room + 1}.` },
+        { decision: "new", selectedRoom: room }
+      ));
+      nextRoom++;
+      steps.push(snapshot(
+        { vi: `next_room = ${nextRoom}`, en: `next_room = ${nextRoom}` }, 12,
+        [{ name: "rooms created", value: nextRoom }],
+        { vi: `Tổng số phòng đã tạo là ${nextRoom}.`, en: `${nextRoom} room(s) have now been created.` },
+        { decision: "new", selectedRoom: room }
+      ));
+    }
+
+    assignments.push({ ...meeting, room, meetingIndex: index });
+    heap.push({ end: meeting.end, room, meetingIndex: index });
+    heap.sort((a, b) => a.end - b.end || a.room - b.room);
+    steps.push(snapshot(
+      { vi: `Xếp [${meeting.start},${meeting.end}] vào Room ${room + 1}`, en: `Place [${meeting.start},${meeting.end}] in Room ${room + 1}` }, 13,
+      [{ name: "heap", value: heapText() }, { name: "rooms", value: nextRoom }],
+      { vi: `Push (end=${meeting.end}, Room ${room + 1}) vào min-heap. Timeline cho thấy phòng này bận đến ${meeting.end}.`, en: `Push (end=${meeting.end}, Room ${room + 1}) into the min-heap. The timeline shows this room occupied until ${meeting.end}.` },
+      { decision: canReuse ? "reused" : "created", selectedRoom: room }
+    ));
+  }
+
+  currentIndex = null;
+  steps.push(snapshot(
+    { vi: `Kết quả: ${nextRoom} phòng`, en: `Result: ${nextRoom} rooms` }, 14,
+    [{ name: "answer", value: nextRoom }, { name: "heap", value: heapText() }],
+    { vi: `Timeline cần ${nextRoom} hàng phòng để không có hai cuộc họp nào chồng nhau trong cùng một phòng.`, en: `The timeline needs ${nextRoom} room lanes so no two meetings overlap within one room.` },
+    { final: true, decision: "done" }
+  ));
+  return { input, answer: nextRoom, steps };
 }
 
 // ─── 767: Reorganize String ───
@@ -2160,6 +2243,7 @@ module.exports = {
   },
   253: {
     id: 253, difficulty: "medium", slug: "meeting-rooms-ii",
+    premium: true,
     category: HEAP_CAT,
     title: { vi: "Meeting Rooms II", en: "Meeting Rooms II" },
     titleVi: { vi: "Số phòng họp tối thiểu", en: "Minimum meeting rooms" },
@@ -2173,16 +2257,20 @@ module.exports = {
     ],
     complexity: { time: "O(n log n)", space: "O(n)", note: { vi: "Sắp xếp O(n log n) + heap.", en: "Sort O(n log n) + heap." } },
     code: [
+      "import heapq",
       "class Solution:",
       "    def minMeetingRooms(self, intervals):",
       "        intervals.sort(key=lambda x: x[0])",
-      "        import heapq",
-      "        heap = []  # end times",
-      "        for s, e in intervals:",
-      "            if heap and heap[0] <= s:",
-      "                heapq.heappop(heap)",
-      "            heapq.heappush(heap, e)",
-      "        return len(heap)",
+      "        heap = []  # (end, room)",
+      "        next_room = 0",
+      "        for start, end in intervals:",
+      "            if heap and heap[0][0] <= start:",
+      "                _, room = heapq.heappop(heap)",
+      "            else:",
+      "                room = next_room",
+      "                next_room += 1",
+      "            heapq.heappush(heap, (end, room))",
+      "        return next_room",
     ],
     builder: buildSteps253,
   },

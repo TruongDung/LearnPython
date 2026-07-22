@@ -2564,6 +2564,112 @@ function renderSkylineView(step) {
   </div>`;
 }
 
+// ---- Meeting-room allocation timeline (#253) ----
+function renderMeetingRoomsTimelineView(step) {
+  const view = step.meetingRoomsTimelineView;
+  const intervals = view.intervals || [];
+  const assignments = view.assignments || [];
+  const el = $("treeView");
+  if (!intervals.length) {
+    el.innerHTML = `<div class="meeting-timeline-empty">${lang === "vi" ? "Không có cuộc họp" : "No meetings"}</div>`;
+    return;
+  }
+
+  const minTime = Math.min(...intervals.map((meeting) => meeting.start));
+  const maxTime = Math.max(...intervals.map((meeting) => meeting.end));
+  const span = Math.max(1, maxTime - minTime);
+  const width = 820;
+  const left = 105;
+  const right = 24;
+  const top = 42;
+  const rowHeight = 58;
+  const selectedRoom = Number.isInteger(view.selectedRoom) ? view.selectedRoom : null;
+  const roomCount = Math.max(1, view.roomCount || 0, selectedRoom === null ? 0 : selectedRoom + 1);
+  const axisY = top + (roomCount + 1) * rowHeight + 4;
+  const height = axisY + 42;
+  const plotWidth = width - left - right;
+  const x = (time) => left + ((time - minTime) / span) * plotWidth;
+  const current = Number.isInteger(view.currentIndex) ? intervals[view.currentIndex] : null;
+  const currentAssigned = current && assignments.some((meeting) => meeting.meetingIndex === view.currentIndex);
+
+  const tickValues = [...new Set(intervals.flatMap((meeting) => [meeting.start, meeting.end]))].sort((a, b) => a - b);
+  const shownTicks = tickValues.length <= 9
+    ? tickValues
+    : Array.from({ length: 6 }, (_, index) => minTime + (span * index) / 5);
+  const ticks = shownTicks.map((time) => {
+    const px = x(time);
+    const label = Number.isInteger(time) ? time : Number(time.toFixed(1));
+    return `<line class="rooms-timeline-grid" x1="${px}" y1="${top - 18}" x2="${px}" y2="${axisY}"></line>
+      <text class="rooms-timeline-tick" x="${px}" y="${axisY + 23}" text-anchor="middle">${label}</text>`;
+  }).join("");
+
+  const lanes = Array.from({ length: roomCount }, (_, room) => {
+    const y = top + (room + 1) * rowHeight;
+    return `<line class="rooms-lane-line" x1="${left}" y1="${y + 20}" x2="${width - right}" y2="${y + 20}"></line>
+      <text class="rooms-lane-label" x="${left - 12}" y="${y + 24}" text-anchor="end">Room ${room + 1}</text>`;
+  }).join("");
+
+  const meetingBars = assignments.map((meeting) => {
+    const y = top + (meeting.room + 1) * rowHeight;
+    const isSelected = selectedRoom === meeting.room && meeting.meetingIndex === view.currentIndex;
+    return `<g class="rooms-meeting${isSelected ? " selected" : ""}">
+      <rect x="${x(meeting.start)}" y="${y + 5}" width="${Math.max(5, x(meeting.end) - x(meeting.start))}" height="30" rx="7"></rect>
+      <text x="${(x(meeting.start) + x(meeting.end)) / 2}" y="${y + 25}" text-anchor="middle">[${meeting.start}, ${meeting.end}]</text>
+      <title>Room ${meeting.room + 1}: [${meeting.start}, ${meeting.end}]</title>
+    </g>`;
+  }).join("");
+
+  let currentBar = "";
+  if (current && !currentAssigned) {
+    const targetRow = selectedRoom === null ? 0 : selectedRoom + 1;
+    const y = top + targetRow * rowHeight;
+    currentBar = `<g class="rooms-current-meeting">
+      <text class="rooms-lane-label current" x="${left - 12}" y="${y + 24}" text-anchor="end">${targetRow === 0 ? (lang === "vi" ? "Đang xét" : "Inspecting") : `Room ${targetRow}`}</text>
+      <rect x="${x(current.start)}" y="${y + 5}" width="${Math.max(5, x(current.end) - x(current.start))}" height="30" rx="7"></rect>
+      <text x="${(x(current.start) + x(current.end)) / 2}" y="${y + 25}" text-anchor="middle">[${current.start}, ${current.end}]</text>
+    </g>`;
+  }
+
+  const sweepLine = current
+    ? `<line class="rooms-start-line" x1="${x(current.start)}" y1="${top - 18}" x2="${x(current.start)}" y2="${axisY}"></line>
+       <text class="rooms-start-label" x="${x(current.start) + 5}" y="${top - 23}">start=${current.start}</text>`
+    : "";
+  const sortedChips = intervals.map((meeting, index) => {
+    const done = assignments.some((assigned) => assigned.meetingIndex === index);
+    const active = view.currentIndex === index;
+    return `<span class="rooms-sorted-chip${done ? " done" : ""}${active ? " active" : ""}">[${meeting.start},${meeting.end}]</span>`;
+  }).join("");
+  const heapChips = (view.heap || []).length
+    ? view.heap.map((entry, index) => `<span class="rooms-heap-chip${index === 0 ? " root" : ""}">R${entry.room + 1} · end ${entry.end}</span>`).join("")
+    : `<span class="rooms-heap-empty">∅</span>`;
+
+  const decisionText = {
+    reuse: lang === "vi" ? `Tái sử dụng Room ${selectedRoom + 1}` : `Reuse Room ${selectedRoom + 1}`,
+    new: lang === "vi" ? "Cần tạo phòng mới" : "Create a new room",
+    reused: lang === "vi" ? `Đã tái sử dụng Room ${selectedRoom + 1}` : `Reused Room ${selectedRoom + 1}`,
+    created: lang === "vi" ? `Đã tạo Room ${selectedRoom + 1}` : `Created Room ${selectedRoom + 1}`,
+    done: lang === "vi" ? `Tối thiểu ${view.roomCount} phòng` : `Minimum ${view.roomCount} rooms`,
+  }[view.decision] || "";
+  const summary = lang === "vi"
+    ? `Timeline phân bổ ${intervals.length} cuộc họp vào ${view.roomCount} phòng.`
+    : `Timeline allocating ${intervals.length} meetings across ${view.roomCount} rooms.`;
+
+  el.innerHTML = `<div class="rooms-timeline-viz">
+    <div class="rooms-sorted-row"><span>${lang === "vi" ? "Thứ tự:" : "Order:"}</span>${sortedChips}</div>
+    <svg class="rooms-timeline-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
+      <title>${escapeXml(summary)}</title>
+      ${ticks}
+      <line class="rooms-timeline-axis" x1="${left}" y1="${axisY}" x2="${width - right}" y2="${axisY}"></line>
+      ${lanes}
+      ${meetingBars}
+      ${currentBar}
+      ${sweepLine}
+    </svg>
+    ${decisionText ? `<div class="rooms-decision ${view.decision || ""}">${escapeHtml(decisionText)}</div>` : ""}
+    <div class="rooms-heap-row"><span>min-heap</span>${heapChips}</div>
+  </div>`;
+}
+
 // ---- Meeting interval timeline (#252) ----
 function renderMeetingTimelineView(step) {
   const view = step.meetingTimelineView;
@@ -2681,7 +2787,13 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.meetingTimelineView) {
+  if (step.meetingRoomsTimelineView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMeetingRoomsTimelineView(step);
+  } else if (step.meetingTimelineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
