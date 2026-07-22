@@ -1479,10 +1479,11 @@ function renderTree(step) {
   const nodes = step.tree.nodes;
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
-  const colW = 60;
-  const rowH = 78;
-  const pad = 34;
-  const r = 18;
+  const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
+  const colW = hasMultiLineLabels ? 84 : 60;
+  const rowH = hasMultiLineLabels ? 96 : 78;
+  const pad = hasMultiLineLabels ? 44 : 34;
+  const r = hasMultiLineLabels ? 30 : 18;
   const width = pad * 2 + maxX * colW;
   const height = pad * 2 + maxY * rowH;
   const px = (x) => pad + x * colW;
@@ -1516,7 +1517,17 @@ function renderTree(step) {
     circles += `<g class="${cls}">`;
     if (n.isWord) circles += `<circle cx="${c.x}" cy="${c.y}" r="${r + 4}" class="tree-ring" />`;
     circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
-    circles += `<text x="${c.x}" y="${c.y}" dy="0.35em" text-anchor="middle">${escapeXml(n.label)}</text>`;
+    if (Array.isArray(n.labelLines) && n.labelLines.length > 0) {
+      const lineGap = 11;
+      const firstY = c.y - ((n.labelLines.length - 1) * lineGap) / 2;
+      circles += `<text x="${c.x}" y="${firstY}" text-anchor="middle" font-size="9.5">`;
+      n.labelLines.forEach((line, index) => {
+        circles += `<tspan x="${c.x}" dy="${index === 0 ? 0 : lineGap}">${escapeXml(line)}</tspan>`;
+      });
+      circles += `</text>`;
+    } else {
+      circles += `<text x="${c.x}" y="${c.y}" dy="0.35em" text-anchor="middle">${escapeXml(n.label)}</text>`;
+    }
     // Annotation above node (e.g. "l1", "l2", "cur", "slow")
     if (treeAnnotations[n.id] !== undefined) {
       const ann = treeAnnotations[n.id];

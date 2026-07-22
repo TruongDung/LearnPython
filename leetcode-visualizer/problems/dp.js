@@ -12241,11 +12241,225 @@ function buildSteps44(input, params) {
   return buildSteps44Table(input, params);
 }
 
+/** LeetCode 264: Ugly Number II — DP with three monotonic pointers. */
+function buildSteps264(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+
+  if (!Number.isInteger(n) || n < 1 || n > 1690) {
+    steps.push({
+      title: { vi: "n không hợp lệ", en: "Invalid n" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [{ name: "n", value: n }],
+      note: { vi: "n phải nằm trong khoảng 1..1690.", en: "n must be between 1 and 1690." },
+    });
+    return { original: [n], answer: null, steps };
+  }
+
+  const ugly = Array(n).fill(1);
+  let p2 = 0;
+  let p3 = 0;
+  let p5 = 0;
+  let recordSteps = true;
+
+  const pointerLabels = (start, length) => Array.from({ length: length - start }, (_, localIndex) => {
+    const index = start + localIndex;
+    const labels = [];
+    if (index === p2) labels.push("p2");
+    if (index === p3) labels.push("p3");
+    if (index === p5) labels.push("p5");
+    return [`i=${index}`, ...labels].join(" · ");
+  });
+
+  const snapshot = ({ title, codeLine, length, highlight = [], mark = [], vars = [], note, final = false }) => {
+    if (!recordSteps) return;
+    const start = Math.max(0, length - 60);
+    steps.push({
+      title,
+      arr: ugly.slice(start, length),
+      sub: pointerLabels(start, length),
+      highlight: highlight.filter((index) => index >= start && index < length).map((index) => index - start),
+      mark: mark.filter((index) => index >= start && index < length).map((index) => index - start),
+      codeLines: [codeLine],
+      vars,
+      note,
+      final,
+    });
+  };
+
+  snapshot({
+    title: { vi: "Khởi tạo dãy ugly với số 1", en: "Initialize the ugly sequence with 1" },
+    codeLine: 3,
+    length: 1,
+    mark: [0],
+    vars: [{ name: "ugly", value: "[1]" }, { name: "n", value: n }],
+    note: {
+      vi: "1 được quy ước là ugly number đầu tiên. Mảng DP sẽ được xây theo thứ tự tăng dần.",
+      en: "By definition, 1 is the first ugly number. The DP array is built in ascending order.",
+    },
+  });
+
+  snapshot({
+    title: { vi: "Đặt p2 = p3 = p5 = 0", en: "Set p2 = p3 = p5 = 0" },
+    codeLine: 4,
+    length: 1,
+    highlight: [0],
+    vars: [{ name: "p2", value: 0 }, { name: "p3", value: 0 }, { name: "p5", value: 0 }],
+    note: {
+      vi: "Ba con trỏ lần lượt tạo ứng viên tiếp theo bằng cách nhân 2, 3 và 5.",
+      en: "The three pointers generate the next candidates by multiplying by 2, 3, and 5.",
+    },
+  });
+
+  for (let i = 1; i < n; i++) {
+    if (n > 100 && i === 30) recordSteps = false;
+    if (n > 100 && i === n - 1) {
+      recordSteps = true;
+      snapshot({
+        title: { vi: `Tua nhanh đến i = ${i}`, en: `Fast-forward to i = ${i}` },
+        codeLine: 5,
+        length: i,
+        highlight: [...new Set([p2, p3, p5])],
+        vars: [{ name: "iterations summarized", value: `30..${i - 1}` }, { name: "generated", value: i }],
+        note: {
+          vi: "Với n lớn, visualization tóm tắt các vòng giữa để giao diện vẫn nhẹ; thuật toán vẫn tính đầy đủ mọi giá trị.",
+          en: "For large n, middle iterations are summarized to keep the visualization responsive; every value is still computed.",
+        },
+      });
+    }
+    snapshot({
+      title: { vi: `Vòng lặp i = ${i}`, en: `Loop i = ${i}` },
+      codeLine: 5,
+      length: i,
+      highlight: [...new Set([p2, p3, p5])],
+      vars: [{ name: "i", value: i }, { name: "ugly so far", value: `[${ugly.slice(0, i).join(", ")}]` }],
+      note: { vi: `Tìm ugly number thứ ${i + 1}.`, en: `Find ugly number #${i + 1}.` },
+    });
+
+    const next2 = ugly[p2] * 2;
+    snapshot({
+      title: { vi: `next2 = ugly[${p2}] × 2 = ${next2}`, en: `next2 = ugly[${p2}] × 2 = ${next2}` },
+      codeLine: 6,
+      length: i,
+      highlight: [p2],
+      vars: [{ name: "p2", value: p2 }, { name: `ugly[${p2}]`, value: ugly[p2] }, { name: "next2", value: next2 }],
+      note: { vi: `Nhánh ×2 đang đề xuất ${next2}.`, en: `The ×2 stream proposes ${next2}.` },
+    });
+
+    const next3 = ugly[p3] * 3;
+    snapshot({
+      title: { vi: `next3 = ugly[${p3}] × 3 = ${next3}`, en: `next3 = ugly[${p3}] × 3 = ${next3}` },
+      codeLine: 7,
+      length: i,
+      highlight: [p3],
+      vars: [{ name: "next2", value: next2 }, { name: "p3", value: p3 }, { name: "next3", value: next3 }],
+      note: { vi: `Nhánh ×3 đang đề xuất ${next3}.`, en: `The ×3 stream proposes ${next3}.` },
+    });
+
+    const next5 = ugly[p5] * 5;
+    snapshot({
+      title: { vi: `next5 = ugly[${p5}] × 5 = ${next5}`, en: `next5 = ugly[${p5}] × 5 = ${next5}` },
+      codeLine: 8,
+      length: i,
+      highlight: [p5],
+      vars: [{ name: "next2", value: next2 }, { name: "next3", value: next3 }, { name: "next5", value: next5 }],
+      note: { vi: `Nhánh ×5 đang đề xuất ${next5}.`, en: `The ×5 stream proposes ${next5}.` },
+    });
+
+    const next = Math.min(next2, next3, next5);
+    ugly[i] = next;
+    snapshot({
+      title: { vi: `ugly[${i}] = min(${next2}, ${next3}, ${next5}) = ${next}`, en: `ugly[${i}] = min(${next2}, ${next3}, ${next5}) = ${next}` },
+      codeLine: 9,
+      length: i + 1,
+      highlight: [...new Set([p2, p3, p5])],
+      mark: [i],
+      vars: [{ name: "next2", value: next2 }, { name: "next3", value: next3 }, { name: "next5", value: next5 }, { name: `ugly[${i}]`, value: next }],
+      note: {
+        vi: `Chọn ứng viên nhỏ nhất ${next} để giữ dãy tăng dần và không bỏ sót ugly number nào.`,
+        en: `Choose the smallest candidate ${next} to preserve order without skipping any ugly number.`,
+      },
+    });
+
+    const match2 = next === next2;
+    snapshot({
+      title: { vi: `ugly[${i}] == next2? ${match2}`, en: `ugly[${i}] == next2? ${match2}` },
+      codeLine: 10,
+      length: i + 1,
+      highlight: [p2], mark: [i],
+      vars: [{ name: `ugly[${i}]`, value: next }, { name: "next2", value: next2 }, { name: "match", value: match2 }],
+      note: match2
+        ? { vi: "Ứng viên ×2 đã được dùng nên phải tiến p2.", en: "The ×2 candidate was consumed, so advance p2." }
+        : { vi: "Ứng viên ×2 chưa được dùng; giữ nguyên p2.", en: "The ×2 candidate was not consumed; keep p2." },
+    });
+    if (match2) {
+      p2++;
+      snapshot({
+        title: { vi: `p2 → ${p2}`, en: `p2 → ${p2}` }, codeLine: 11, length: i + 1,
+        highlight: [p2], mark: [i], vars: [{ name: "p2", value: p2 }, { name: "next ×2", value: ugly[p2] * 2 }],
+        note: { vi: "p2 chuyển tới ugly number chưa dùng tiếp theo của nhánh ×2.", en: "p2 moves to the next unused value in the ×2 stream." },
+      });
+    }
+
+    const match3 = next === next3;
+    snapshot({
+      title: { vi: `ugly[${i}] == next3? ${match3}`, en: `ugly[${i}] == next3? ${match3}` },
+      codeLine: 12, length: i + 1, highlight: [p3], mark: [i],
+      vars: [{ name: `ugly[${i}]`, value: next }, { name: "next3", value: next3 }, { name: "match", value: match3 }],
+      note: match3
+        ? { vi: "Ứng viên ×3 đã được dùng nên phải tiến p3.", en: "The ×3 candidate was consumed, so advance p3." }
+        : { vi: "Ứng viên ×3 chưa được dùng; giữ nguyên p3.", en: "The ×3 candidate was not consumed; keep p3." },
+    });
+    if (match3) {
+      p3++;
+      snapshot({
+        title: { vi: `p3 → ${p3}`, en: `p3 → ${p3}` }, codeLine: 13, length: i + 1,
+        highlight: [p3], mark: [i], vars: [{ name: "p3", value: p3 }, { name: "next ×3", value: ugly[p3] * 3 }],
+        note: { vi: "p3 chuyển tới giá trị chưa dùng tiếp theo của nhánh ×3.", en: "p3 moves to the next unused value in the ×3 stream." },
+      });
+    }
+
+    const match5 = next === next5;
+    snapshot({
+      title: { vi: `ugly[${i}] == next5? ${match5}`, en: `ugly[${i}] == next5? ${match5}` },
+      codeLine: 14, length: i + 1, highlight: [p5], mark: [i],
+      vars: [{ name: `ugly[${i}]`, value: next }, { name: "next5", value: next5 }, { name: "match", value: match5 }],
+      note: match5
+        ? { vi: "Ứng viên ×5 đã được dùng nên phải tiến p5.", en: "The ×5 candidate was consumed, so advance p5." }
+        : { vi: "Ứng viên ×5 chưa được dùng; giữ nguyên p5.", en: "The ×5 candidate was not consumed; keep p5." },
+    });
+    if (match5) {
+      p5++;
+      snapshot({
+        title: { vi: `p5 → ${p5}`, en: `p5 → ${p5}` }, codeLine: 15, length: i + 1,
+        highlight: [p5], mark: [i], vars: [{ name: "p5", value: p5 }, { name: "next ×5", value: ugly[p5] * 5 }],
+        note: { vi: "p5 chuyển tới giá trị chưa dùng tiếp theo của nhánh ×5.", en: "p5 moves to the next unused value in the ×5 stream." },
+      });
+    }
+  }
+
+  const answer = ugly[n - 1];
+  const uglyText = n <= 50
+    ? `[${ugly.join(", ")}]`
+    : `[${ugly.slice(0, 10).join(", ")}, …, ${ugly.slice(-10).join(", ")}]`;
+  snapshot({
+    title: { vi: `Ugly number thứ ${n} là ${answer}`, en: `Ugly number #${n} is ${answer}` },
+    codeLine: 16,
+    length: n,
+    mark: [n - 1],
+    vars: [{ name: "ugly", value: uglyText }, { name: "answer", value: answer }],
+    note: { vi: `Phần tử cuối ugly[${n - 1}] là đáp án.`, en: `The final element ugly[${n - 1}] is the answer.` },
+    final: true,
+  });
+
+  return { original: [n], answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -12380,6 +12594,66 @@ module.exports = {
           "This is a popular path for tech interviews. After mastering these 20, you'll know the core patterns: Fibonacci, Take/Skip, Kadane, LIS, Knapsack, String DP, Grid DP and 2D DP. Next, advanced patterns: Bitmask DP, Interval DP, Tree DP, Digit DP.",
       },
     },
+  },
+
+  264: {
+    id: 264,
+    difficulty: "medium",
+    slug: "ugly-number-ii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Ugly Number II", en: "Ugly Number II" },
+    titleVi: { vi: "Tìm ugly number thứ n", en: "Find the nth ugly number" },
+    statement: {
+      vi: "Ugly number là số nguyên dương chỉ có các thừa số nguyên tố 2, 3 và 5. Cho n, trả về ugly number thứ n; số 1 được tính là ugly number đầu tiên.",
+      en: "An ugly number is a positive integer whose prime factors are limited to 2, 3, and 5. Given n, return the nth ugly number; 1 is the first ugly number.",
+    },
+    defaultInput: [10],
+    inputKind: "positive",
+    inputLabel: { vi: "n (1..1690)", en: "n (1..1690)" },
+    singleInput: true,
+    maxInput: 1690,
+    extraParams: [],
+    approach: [
+      {
+        vi: "Duy trì dãy ugly tăng dần và ba con trỏ p2, p3, p5 cho ba luồng ứng viên ugly[p] × 2, × 3, × 5.",
+        en: "Maintain the increasing ugly sequence and pointers p2, p3, p5 for the candidate streams ugly[p] × 2, × 3, and × 5.",
+      },
+      {
+        vi: "Mỗi bước chọn ứng viên nhỏ nhất làm ugly number tiếp theo.",
+        en: "At each step, choose the smallest candidate as the next ugly number.",
+      },
+      {
+        vi: "Tăng tất cả con trỏ tạo ra giá trị vừa chọn để loại số trùng, ví dụ 6 = 2×3 = 3×2.",
+        en: "Advance every pointer that produced the chosen value to remove duplicates, such as 6 = 2×3 = 3×2.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Tạo đúng n giá trị; mỗi vòng chỉ so sánh ba ứng viên và cập nhật ba con trỏ.",
+        en: "Generate exactly n values; each iteration compares three candidates and updates three pointers.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def nthUglyNumber(self, n: int) -> int:",
+      "        ugly = [1] * n",
+      "        p2 = p3 = p5 = 0",
+      "        for i in range(1, n):",
+      "            next2 = ugly[p2] * 2",
+      "            next3 = ugly[p3] * 3",
+      "            next5 = ugly[p5] * 5",
+      "            ugly[i] = min(next2, next3, next5)",
+      "            if ugly[i] == next2:",
+      "                p2 += 1",
+      "            if ugly[i] == next3:",
+      "                p3 += 1",
+      "            if ugly[i] == next5:",
+      "                p5 += 1",
+      "        return ugly[-1]",
+    ],
+    builder: buildSteps264,
   },
 
   304: {

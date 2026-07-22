@@ -14,9 +14,11 @@ function heapTree(heap, labelFn, hlSet, markSet) {
     if (i >= heap.length) return;
     dfs(2 * i + 1, depth + 1);
     const x = nextX++;
+    const labelLines = typeof labelFn.lines === "function" ? labelFn.lines(heap[i]) : null;
     nodes.push({
       id: i,
       label: labelFn(heap[i]),
+      labelLines: Array.isArray(labelLines) ? labelLines.map(String) : null,
       x,
       y: depth,
       parentId: i === 0 ? null : Math.floor((i - 1) / 2),
@@ -1342,9 +1344,10 @@ function buildSteps23Heap(input) {
   const k = lists.length;
   const steps = [];
   const label = (e) => `${e.val}`;
+  label.lines = (e) => [`val=${e.val}`, `list=${e.listIdx}`, `pos=${e.nodeIdx}`];
   const heap = [];
-  const less = (a, b) => a.val < b.val;
-  const arrStr = () => `[${heap.map((e) => e.val).join(",")}]`;
+  const less = (a, b) => a.val < b.val || (a.val === b.val && a.listIdx < b.listIdx);
+  const arrStr = () => `[${heap.map((e) => `(${e.val},L${e.listIdx},p${e.nodeIdx})`).join(", ")}]`;
   const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
 
   const result = [];
@@ -1378,7 +1381,7 @@ function buildSteps23Heap(input) {
   // Init: push head of each list
   for (let i = 0; i < k; i++) {
     if (lists[i].length > 0) {
-      heap.push({ val: lists[i][0], listIdx: i });
+      heap.push({ val: lists[i][0], listIdx: i, nodeIdx: 0 });
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Push head L${i}: ${lists[i][0]}`, en: `Push head L${i}: ${lists[i][0]}` },
         hlSet: new Set([heap.length - 1]), codeLines: [6, 7, 8],
@@ -1427,7 +1430,7 @@ function buildSteps23Heap(input) {
     // Sub-step 4: push next from same list (if available)
     if (hasNext) {
       const nextVal = lists[li][ptrs[li]];
-      heap.push({ val: nextVal, listIdx: li });
+      heap.push({ val: nextVal, listIdx: li, nodeIdx: ptrs[li] });
 
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Push L${li}[${ptrs[li]}]=${nextVal} vào heap`, en: `Push L${li}[${ptrs[li]}]=${nextVal} into heap` },
