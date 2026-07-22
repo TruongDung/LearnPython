@@ -5244,6 +5244,300 @@ function buildSteps3499Sliding(input) {
   return { original: s, answer, steps };
 }
 
+/**
+ * LeetCode 3501: Maximize Active Section with Trade II.
+ *
+ * Query version of 3499. For each substring s[l..r], only zero runs fully
+ * inside the query and the cut pieces of zero runs touching l/r can contribute
+ * to the trade gain. The final answer for a query is total ones in the whole
+ * string plus the best available gain inside that query.
+ */
+function buildSteps3501(input, params) {
+  const s = String(input || "").trim();
+  const n = s.length;
+  const chars = s.split("");
+  const values = chars.map((c) => (c === "1" ? 1 : 0.4));
+  const steps = [];
+
+  function range(l, r) {
+    if (l > r) return [];
+    return Array.from({ length: r - l + 1 }, (_, i) => l + i);
+  }
+
+  function parseQueries(raw) {
+    const parts = String(raw || "").split(";").map((q) => q.trim()).filter(Boolean);
+    const queries = parts.map((part) => {
+      const nums = part.split(/[,\s]+/).map(Number).filter((x) => Number.isInteger(x));
+      return nums.length >= 2 ? [nums[0], nums[1]] : null;
+    }).filter(Boolean);
+    return queries.length ? queries : [[0, Math.max(0, n - 1)]];
+  }
+
+  function getZeroGroups() {
+    const groups = [];
+    const indexAt = [];
+    for (let i = 0; i < n; i++) {
+      if (s[i] === "0") {
+        if (i > 0 && s[i - 1] === "0") {
+          groups[groups.length - 1].length += 1;
+          groups[groups.length - 1].end = i;
+        } else {
+          groups.push({ start: i, end: i, length: 1, id: groups.length });
+        }
+      }
+      indexAt.push(groups.length - 1);
+    }
+    return { groups, indexAt };
+  }
+
+  function groupLabel(groups) {
+    return `[${groups.map((g, i) => `z${i}:[${g.start},${g.end}] len=${g.length}`).join("; ")}]`;
+  }
+
+  function addCandidate(candidates, key, label, gain, ranges, zeroGroupIds, codeLine) {
+    if (gain <= 0) return;
+    candidates.push({ key, label, gain, ranges, zeroGroupIds, codeLine });
+  }
+
+  function markRanges(ranges) {
+    return ranges.flatMap(([a, b]) => range(a, b));
+  }
+
+  if (n === 0 || /[^01]/.test(s)) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: values,
+      sub: chars,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "s", value: `"${s}"` }],
+      note: {
+        vi: "s phải là chuỗi nhị phân không rỗng.",
+        en: "s must be a non-empty binary string.",
+      },
+    });
+    return { original: s, answer: "[]", steps };
+  }
+
+  const queries = parseQueries(params && params.queries);
+  const ones = chars.filter((ch) => ch === "1").length;
+  const { groups: zeroGroups, indexAt: zeroGroupIndex } = getZeroGroups();
+  const answers = [];
+
+  steps.push({
+    title: { vi: "Tiền xử lý zero groups", en: "Preprocess zero groups" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: zeroGroups.flatMap((g) => range(g.start, g.end)),
+    codeLines: [2, 3, 4],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "ones", value: ones },
+      { name: "zeroGroups", value: groupLabel(zeroGroups) },
+      { name: "queries", value: `[${queries.map(([l, r]) => `[${l},${r}]`).join(", ")}]` },
+    ],
+    note: {
+      vi: `Đếm tổng số '1' trong toàn chuỗi: ones = ${ones}. Sau đó nén các đoạn '0' để mỗi query chỉ cần xét các cặp đoạn '0'.`,
+      en: `Count total '1's in the whole string: ones = ${ones}. Then compress zero runs so each query only checks zero-run pairs.`,
+    },
+  });
+
+  if (zeroGroups.length === 0) {
+    const answer = Array(queries.length).fill(ones);
+    steps.push({
+      title: { vi: "Không có đoạn 0", en: "No zero runs" },
+      arr: values,
+      sub: chars,
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [5, 6],
+      vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+      note: {
+        vi: "Chuỗi toàn '1', không trade nào tăng thêm được. Mọi query trả về ones.",
+        en: "The string is all '1's, so no trade can add active sections. Every query returns ones.",
+      },
+    });
+    return { original: s, answer: `[${answer.join(", ")}]`, steps };
+  }
+
+  for (let qi = 0; qi < queries.length; qi++) {
+    let [l, r] = queries[qi];
+    l = Math.max(0, Math.min(l, n - 1));
+    r = Math.max(0, Math.min(r, n - 1));
+    if (l > r) [l, r] = [r, l];
+
+    const queryRange = range(l, r);
+    const leftGroupIndex = zeroGroupIndex[l];
+    const rightGroupIndex = zeroGroupIndex[r];
+    const left = s[l] === "0" ? zeroGroups[leftGroupIndex].end - l + 1 : 0;
+    const right = s[r] === "0" ? r - zeroGroups[rightGroupIndex].start + 1 : 0;
+    const innerStart = leftGroupIndex + 1;
+    const innerEnd = s[r] === "1" ? rightGroupIndex : rightGroupIndex - 1;
+    const candidates = [];
+
+    steps.push({
+      title: { vi: `Query ${qi}: [${l}, ${r}]`, en: `Query ${qi}: [${l}, ${r}]` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: [],
+      codeLines: [8, 9, 10, 11],
+      vars: [
+        { name: "l", value: l },
+        { name: "r", value: r },
+        { name: "left cut", value: left },
+        { name: "right cut", value: right },
+        { name: "inner zero groups", value: innerStart <= innerEnd ? `z${innerStart}..z${innerEnd}` : "none" },
+      ],
+      note: {
+        vi: `Trong query này, đoạn 0 chạm biên trái đóng góp tối đa ${left}, đoạn 0 chạm biên phải đóng góp tối đa ${right}.`,
+        en: `For this query, the zero run touching the left boundary can contribute ${left}, and the right boundary can contribute ${right}.`,
+      },
+    });
+
+    if (s[l] === "0" && s[r] === "0" && leftGroupIndex + 1 === rightGroupIndex) {
+      addCandidate(
+        candidates,
+        "edge-edge",
+        { vi: "left cut + right cut", en: "left cut + right cut" },
+        left + right,
+        [[l, zeroGroups[leftGroupIndex].end], [zeroGroups[rightGroupIndex].start, r]],
+        [leftGroupIndex, rightGroupIndex],
+        13
+      );
+    }
+
+    for (let g = innerStart; g < innerEnd; g++) {
+      addCandidate(
+        candidates,
+        `inside-${g}`,
+        { vi: `z${g} + z${g + 1} hoàn chỉnh`, en: `complete z${g} + z${g + 1}` },
+        zeroGroups[g].length + zeroGroups[g + 1].length,
+        [[zeroGroups[g].start, zeroGroups[g].end], [zeroGroups[g + 1].start, zeroGroups[g + 1].end]],
+        [g, g + 1],
+        15
+      );
+    }
+
+    if (s[l] === "0" && leftGroupIndex + 1 <= innerEnd) {
+      addCandidate(
+        candidates,
+        "left-inside",
+        { vi: "left cut + zero group kế tiếp", en: "left cut + next full zero group" },
+        left + zeroGroups[leftGroupIndex + 1].length,
+        [[l, zeroGroups[leftGroupIndex].end], [zeroGroups[leftGroupIndex + 1].start, zeroGroups[leftGroupIndex + 1].end]],
+        [leftGroupIndex, leftGroupIndex + 1],
+        17
+      );
+    }
+
+    if (s[r] === "0" && leftGroupIndex < rightGroupIndex - 1) {
+      addCandidate(
+        candidates,
+        "inside-right",
+        { vi: "zero group trước + right cut", en: "previous full zero group + right cut" },
+        zeroGroups[rightGroupIndex - 1].length + right,
+        [[zeroGroups[rightGroupIndex - 1].start, zeroGroups[rightGroupIndex - 1].end], [zeroGroups[rightGroupIndex].start, r]],
+        [rightGroupIndex - 1, rightGroupIndex],
+        19
+      );
+    }
+
+    const best = candidates.reduce((winner, candidate) => {
+      if (!winner || candidate.gain > winner.gain) return candidate;
+      return winner;
+    }, null);
+    const gain = best ? best.gain : 0;
+    const answer = ones + gain;
+    answers.push(answer);
+
+    if (candidates.length === 0) {
+      steps.push({
+        title: { vi: `Query ${qi}: không có trade hợp lệ`, en: `Query ${qi}: no valid trade` },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: [],
+        codeLines: [21],
+        vars: [
+          { name: "ones", value: ones },
+          { name: "best gain", value: 0 },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `Không có cặp đoạn '0' nào có thể ghép trong [${l},${r}], nên đáp án giữ nguyên = ${ones}.`,
+          en: `No pair of zero runs can be merged inside [${l},${r}], so the answer stays ${ones}.`,
+        },
+      });
+      continue;
+    }
+
+    candidates.forEach((candidate) => {
+      const isBest = candidate.key === best.key;
+      steps.push({
+        title: {
+          vi: `Query ${qi}: ${candidate.label.vi} → gain ${candidate.gain}`,
+          en: `Query ${qi}: ${candidate.label.en} → gain ${candidate.gain}`,
+        },
+        arr: values,
+        sub: chars,
+        highlight: queryRange,
+        mark: markRanges(candidate.ranges),
+        codeLines: [candidate.codeLine],
+        vars: [
+          { name: "candidate", value: candidate.label.en },
+          { name: "zero groups", value: candidate.zeroGroupIds.map((g) => `z${g}`).join(" + ") },
+          { name: "gain", value: candidate.gain },
+          { name: "best so far?", value: isBest ? "yes" : "no" },
+        ],
+        note: {
+          vi: `${candidate.label.vi}: nếu xoá đoạn '1' nằm giữa các đoạn 0 này, chúng ghép lại và tăng thêm ${candidate.gain} số '1'.`,
+          en: `${candidate.label.en}: removing the '1' block between these zero sections merges them and adds ${candidate.gain} active sections.`,
+        },
+      });
+    });
+
+    steps.push({
+      title: { vi: `Query ${qi}: answer = ${answer}`, en: `Query ${qi}: answer = ${answer}` },
+      arr: values,
+      sub: chars,
+      highlight: queryRange,
+      mark: markRanges(best.ranges),
+      codeLines: [21],
+      vars: [
+        { name: "ones", value: ones },
+        { name: "best gain", value: gain },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Chọn gain lớn nhất = ${gain}. Đáp án query [${l},${r}] là ones + gain = ${ones} + ${gain} = ${answer}.`,
+        en: `Choose the largest gain = ${gain}. Query [${l},${r}] answer is ones + gain = ${ones} + ${gain} = ${answer}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Kết quả tất cả queries", en: "All query results" },
+    arr: values,
+    sub: chars,
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [22],
+    vars: [{ name: "answer", value: `[${answers.join(", ")}]` }],
+    note: {
+      vi: `Trả về answer = [${answers.join(", ")}].`,
+      en: `Return answer = [${answers.join(", ")}].`,
+    },
+  });
+
+  return { original: s, answer: `[${answers.join(", ")}]`, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -6375,5 +6669,74 @@ module.exports = {
       const approach = Number(params && params.approach) || 1;
       return approach === 2 ? buildSteps3499Sliding(input) : buildSteps3499(input);
     },
+  },
+  3501: {
+    id: 3501,
+    difficulty: "hard",
+    slug: "maximize-active-section-with-trade-ii",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Maximize Active Section with Trade II", en: "Maximize Active Section with Trade II" },
+    titleVi: { vi: "Tối đa hoá khu vực hoạt động sau trade với nhiều query", en: "Maximize active sections after trade with queries" },
+    statement: {
+      vi:
+        "Cho chuỗi nhị phân s và danh sách queries [l,r]. Với mỗi query, chỉ được trade bên trong substring s[l..r]. " +
+        "Mỗi trade có thể xoá một đoạn '1' bị kẹp bởi '0', làm hai đoạn '0' hai bên ghép lại rồi đổi thành '1'. " +
+        "Trả về số lượng '1' tối đa trong toàn chuỗi sau trade tốt nhất cho từng query.",
+      en:
+        "Given a binary string s and queries [l,r]. For each query, the trade is restricted to substring s[l..r]. " +
+        "A trade removes a '1' block surrounded by '0's, merging the two neighboring zero sections so they can become '1's. " +
+        "Return the maximum number of active sections in the whole string after the best trade for each query.",
+    },
+    defaultInput: "1001000110100101",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
+    extraParams: [
+      {
+        key: "queries",
+        type: "string",
+        label: { vi: "queries (l,r;l,r;...)", en: "queries (l,r;l,r;...)" },
+        default: "2,13;0,7;4,15",
+      },
+    ],
+    approach: [
+      { vi: "Đếm tổng số '1' trong toàn chuỗi một lần: ones.", en: "Count total '1's in the whole string once: ones." },
+      { vi: "Nén các đoạn '0' thành zeroGroups để mỗi query chỉ xét các cặp đoạn '0' có thể ghép.", en: "Compress zero runs into zeroGroups so each query only checks mergeable zero-run pairs." },
+      { vi: "Với query [l,r], hai biên có thể cắt giữa một đoạn '0', nên cần xét left cut và right cut riêng.", en: "For query [l,r], each boundary may cut through a zero run, so left cut and right cut need special handling." },
+      { vi: "Gain tốt nhất là max của: hai biên bị cắt, hai đoạn '0' hoàn chỉnh liền kề, left cut + đoạn kế tiếp, hoặc đoạn trước + right cut.", en: "The best gain is the max of: both cut boundaries, two complete adjacent zero runs, left cut + next run, or previous run + right cut." },
+    ],
+    complexity: {
+      time: "O(n + q * z) visualized / O(n log n + q) optimized",
+      space: "O(n)",
+      note: {
+        vi: "Visualizer liệt kê candidate để dễ học. Bản tối ưu dùng sparse table/segment tree trên tổng độ dài hai zeroGroups liền kề để query nhanh.",
+        en: "The visualizer enumerates candidates for learning. The optimized solution uses a sparse table/segment tree over adjacent zero-group sums for fast queries.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxActiveSectionsAfterTrade(self, s: str, queries: List[List[int]]) -> List[int]:",
+      "        ones = s.count('1')",
+      "        zeroGroups, zeroGroupIndex = self.getZeroGroups(s)",
+      "        if not zeroGroups:",
+      "            return [ones] * len(queries)",
+      "",
+      "        ans = []",
+      "        for l, r in queries:",
+      "            left = 0 if s[l] == '1' else zeroGroups[zeroGroupIndex[l]].end - l + 1",
+      "            right = 0 if s[r] == '1' else r - zeroGroups[zeroGroupIndex[r]].start + 1",
+      "            gain = 0",
+      "            if s[l] == '0' and s[r] == '0' and zeroGroupIndex[l] + 1 == zeroGroupIndex[r]:",
+      "                gain = max(gain, left + right)",
+      "            for g in range(zeroGroupIndex[l] + 1, zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
+      "                gain = max(gain, zeroGroups[g].length + zeroGroups[g + 1].length)",
+      "            if s[l] == '0' and zeroGroupIndex[l] + 1 <= (zeroGroupIndex[r] if s[r] == '1' else zeroGroupIndex[r] - 1):",
+      "                gain = max(gain, left + zeroGroups[zeroGroupIndex[l] + 1].length)",
+      "            if s[r] == '0' and zeroGroupIndex[l] < zeroGroupIndex[r] - 1:",
+      "                gain = max(gain, zeroGroups[zeroGroupIndex[r] - 1].length + right)",
+      "            ans.append(ones + gain)",
+      "        return ans",
+    ],
+    debugMode: "semantic",
+    builder: buildSteps3501,
   },
 };
