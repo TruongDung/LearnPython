@@ -12242,7 +12242,7 @@ function buildSteps44(input, params) {
 }
 
 /** LeetCode 264: Ugly Number II — DP with three monotonic pointers. */
-function buildSteps264(input) {
+function buildSteps264DP(input) {
   const n = Array.isArray(input) ? Number(input[0]) : Number(input);
   const steps = [];
 
@@ -12455,6 +12455,197 @@ function buildSteps264(input) {
   return { original: [n], answer, steps };
 }
 
+function buildSteps264Heap(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+  if (!Number.isInteger(n) || n < 1 || n > 1690) {
+    steps.push({
+      title: { vi: "n không hợp lệ", en: "Invalid n" },
+      tree: { nodes: [] }, final: true, codeLines: [3], codeBlock: 2,
+      vars: [{ name: "n", value: n }],
+      note: { vi: "n phải nằm trong khoảng 1..1690.", en: "n must be between 1 and 1690." },
+    });
+    return { original: [n], answer: null, steps };
+  }
+
+  const heap = [1];
+  const seen = new Set([1]);
+  let ugly = 1;
+  let recordSteps = true;
+
+  const heapNodes = (highlight = new Set(), marked = new Set()) => {
+    const visible = heap.slice(0, 63);
+    const nodes = [];
+    let nextX = 0;
+    function visit(index, depth) {
+      if (index >= visible.length) return;
+      visit(index * 2 + 1, depth + 1);
+      nodes.push({
+        id: index,
+        label: String(visible[index]),
+        x: nextX++,
+        y: depth,
+        parentId: index === 0 ? null : Math.floor((index - 1) / 2),
+        hl: highlight.has(index),
+        isWord: marked.has(index),
+      });
+      visit(index * 2 + 2, depth + 1);
+    }
+    visit(0, 0);
+    return nodes;
+  };
+
+  const heapText = () => {
+    const shown = heap.slice(0, 20).join(", ");
+    return heap.length <= 20 ? `[${shown}]` : `[${shown}, …]`;
+  };
+  const snapshot = ({ title, codeLine, highlight = [], mark = [], vars = [], note, final = false }) => {
+    if (!recordSteps) return;
+    steps.push({
+      title,
+      tree: { nodes: heapNodes(new Set(highlight), new Set(mark)) },
+      codeLines: [codeLine],
+      codeBlock: 2,
+      vars,
+      note,
+      final,
+    });
+  };
+
+  function pushHeap(value) {
+    heap.push(value);
+    let child = heap.length - 1;
+    while (child > 0) {
+      const parent = Math.floor((child - 1) / 2);
+      if (heap[parent] <= heap[child]) break;
+      [heap[parent], heap[child]] = [heap[child], heap[parent]];
+      child = parent;
+    }
+    return child;
+  }
+
+  function popHeap() {
+    const root = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+      heap[0] = last;
+      let parent = 0;
+      while (true) {
+        const left = parent * 2 + 1;
+        const right = left + 1;
+        let smallest = parent;
+        if (left < heap.length && heap[left] < heap[smallest]) smallest = left;
+        if (right < heap.length && heap[right] < heap[smallest]) smallest = right;
+        if (smallest === parent) break;
+        [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];
+        parent = smallest;
+      }
+    }
+    return root;
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo min-heap với 1", en: "Initialize the min-heap with 1" },
+    codeLine: 4, highlight: [0],
+    vars: [{ name: "heap", value: "[1]" }],
+    note: { vi: "Heap luôn đặt ugly number nhỏ nhất chưa xử lý ở node gốc.", en: "The heap keeps the smallest unprocessed ugly number at its root." },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo seen = {1}", en: "Initialize seen = {1}" },
+    codeLine: 5, mark: [0],
+    vars: [{ name: "seen", value: "{1}" }, { name: "seen size", value: 1 }],
+    note: { vi: "Set seen ngăn cùng một số được push nhiều lần.", en: "The seen set prevents the same value from being pushed more than once." },
+  });
+
+  for (let count = 0; count < n; count++) {
+    if (n > 100 && count === 30) recordSteps = false;
+    if (n > 100 && count === n - 1) {
+      recordSteps = true;
+      snapshot({
+        title: { vi: `Tua nhanh đến lần pop ${n}`, en: `Fast-forward to pop #${n}` },
+        codeLine: 6, highlight: heap.length ? [0] : [],
+        vars: [{ name: "pops summarized", value: `31..${n - 1}` }, { name: "heap size", value: heap.length }],
+        note: {
+          vi: "Các lần pop ở giữa được tóm tắt để visualization nhẹ hơn; heap và seen vẫn được cập nhật đầy đủ.",
+          en: "Middle pops are summarized to keep the visualization responsive; heap and seen are still fully updated.",
+        },
+      });
+    }
+
+    snapshot({
+      title: { vi: `Lần lặp ${count + 1}/${n}`, en: `Iteration ${count + 1}/${n}` },
+      codeLine: 6, highlight: heap.length ? [0] : [],
+      vars: [{ name: "iteration", value: `${count + 1}/${n}` }, { name: "heap root", value: heap[0] }, { name: "heap size", value: heap.length }],
+      note: { vi: "Node gốc là ugly number nhỏ nhất tiếp theo.", en: "The root is the next smallest ugly number." },
+    });
+
+    ugly = popHeap();
+    snapshot({
+      title: { vi: `heappop → ${ugly}`, en: `heappop → ${ugly}` },
+      codeLine: 7, highlight: heap.length ? [0] : [],
+      vars: [{ name: "ugly", value: ugly }, { name: "pop number", value: count + 1 }, { name: "heap", value: heapText() }],
+      note: { vi: `${ugly} là ugly number thứ ${count + 1}.`, en: `${ugly} is ugly number #${count + 1}.` },
+    });
+
+    for (const factor of [2, 3, 5]) {
+      snapshot({
+        title: { vi: `Xét factor = ${factor}`, en: `Inspect factor = ${factor}` },
+        codeLine: 8,
+        vars: [{ name: "ugly", value: ugly }, { name: "factor", value: factor }],
+        note: { vi: `Nhân ${ugly} với ${factor}.`, en: `Multiply ${ugly} by ${factor}.` },
+      });
+
+      const candidate = ugly * factor;
+      snapshot({
+        title: { vi: `candidate = ${ugly} × ${factor} = ${candidate}`, en: `candidate = ${ugly} × ${factor} = ${candidate}` },
+        codeLine: 9,
+        vars: [{ name: "ugly", value: ugly }, { name: "factor", value: factor }, { name: "candidate", value: candidate }],
+        note: { vi: `${candidate} chỉ có thêm thừa số 2, 3 hoặc 5 nên vẫn là ugly number.`, en: `${candidate} only gains a factor of 2, 3, or 5, so it remains ugly.` },
+      });
+
+      const duplicate = seen.has(candidate);
+      snapshot({
+        title: { vi: `candidate not in seen? ${!duplicate}`, en: `candidate not in seen? ${!duplicate}` },
+        codeLine: 10,
+        vars: [{ name: "candidate", value: candidate }, { name: "already seen", value: duplicate }, { name: "seen size", value: seen.size }],
+        note: duplicate
+          ? { vi: `${candidate} đã tồn tại nên bỏ qua, không push trùng.`, en: `${candidate} already exists, so skip the duplicate push.` }
+          : { vi: `${candidate} là giá trị mới; thêm vào seen và heap.`, en: `${candidate} is new; add it to seen and the heap.` },
+      });
+      if (duplicate) continue;
+
+      seen.add(candidate);
+      snapshot({
+        title: { vi: `seen.add(${candidate})`, en: `seen.add(${candidate})` },
+        codeLine: 11,
+        vars: [{ name: "candidate", value: candidate }, { name: "seen size", value: seen.size }],
+        note: { vi: "Đánh dấu trước khi push để các đường sinh khác không tạo bản sao.", en: "Mark it before pushing so other generation paths cannot create a duplicate." },
+      });
+
+      const finalIndex = pushHeap(candidate);
+      snapshot({
+        title: { vi: `heappush(${candidate})`, en: `heappush(${candidate})` },
+        codeLine: 12, highlight: [finalIndex],
+        vars: [{ name: "pushed", value: candidate }, { name: "heap", value: heapText() }, { name: "heap size", value: heap.length }],
+        note: { vi: `Push ${candidate} rồi sift-up để khôi phục min-heap.`, en: `Push ${candidate}, then sift up to restore the min-heap.` },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Ugly number thứ ${n} là ${ugly}`, en: `Ugly number #${n} is ${ugly}` },
+    codeLine: 13, final: true,
+    vars: [{ name: "answer", value: ugly }, { name: "seen size", value: seen.size }, { name: "heap size", value: heap.length }],
+    note: { vi: `Giá trị được pop lần thứ ${n} chính là đáp án.`, en: `The value popped for the ${n}th time is the answer.` },
+  });
+  return { original: [n], answer: ugly, steps };
+}
+
+function buildSteps264(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2 ? buildSteps264Heap(input) : buildSteps264DP(input);
+}
+
 module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
@@ -12612,7 +12803,18 @@ module.exports = {
     inputLabel: { vi: "n (1..1690)", en: "n (1..1690)" },
     singleInput: true,
     maxInput: 1690,
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Ba con trỏ O(n)", en: "Approach 1: Three pointers O(n)" } },
+          { value: "2", label: { vi: "Cách 2: Min-Heap + Set", en: "Approach 2: Min-Heap + Set" } },
+        ],
+      },
+    ],
     approach: [
       {
         vi: "Duy trì dãy ugly tăng dần và ba con trỏ p2, p3, p5 cho ba luồng ứng viên ugly[p] × 2, × 3, × 5.",
@@ -12626,13 +12828,17 @@ module.exports = {
         vi: "Tăng tất cả con trỏ tạo ra giá trị vừa chọn để loại số trùng, ví dụ 6 = 2×3 = 3×2.",
         en: "Advance every pointer that produced the chosen value to remove duplicates, such as 6 = 2×3 = 3×2.",
       },
+      {
+        vi: "Cách 2 dùng min-heap lấy số nhỏ nhất, sinh x×2, x×3, x×5 và dùng seen để không push trùng.",
+        en: "Approach 2 pops the smallest value from a min-heap, generates x×2, x×3, x×5, and uses seen to avoid duplicate pushes.",
+      },
     ],
     complexity: {
-      time: "O(n)",
+      time: "O(n) / O(n log n)",
       space: "O(n)",
       note: {
-        vi: "Tạo đúng n giá trị; mỗi vòng chỉ so sánh ba ứng viên và cập nhật ba con trỏ.",
-        en: "Generate exactly n values; each iteration compares three candidates and updates three pointers.",
+        vi: "Cách 1: O(n) với ba con trỏ. Cách 2: O(n log n) do mỗi heappush/heappop tốn O(log n).",
+        en: "Approach 1 is O(n) with three pointers. Approach 2 is O(n log n) because each heap push/pop costs O(log n).",
       },
     },
     code: [
@@ -12653,6 +12859,23 @@ module.exports = {
       "                p5 += 1",
       "        return ugly[-1]",
     ],
+    code2: [
+      "import heapq",
+      "class Solution:",
+      "    def nthUglyNumber(self, n: int) -> int:",
+      "        heap = [1]",
+      "        seen = {1}",
+      "        for _ in range(n):",
+      "            ugly = heapq.heappop(heap)",
+      "            for factor in (2, 3, 5):",
+      "                candidate = ugly * factor",
+      "                if candidate not in seen:",
+      "                    seen.add(candidate)",
+      "                    heapq.heappush(heap, candidate)",
+      "        return ugly",
+    ],
+    codeLabel: { vi: "Cách 1: Ba con trỏ", en: "Approach 1: Three pointers" },
+    code2Label: { vi: "Cách 2: Min-Heap + Set", en: "Approach 2: Min-Heap + Set" },
     builder: buildSteps264,
   },
 
