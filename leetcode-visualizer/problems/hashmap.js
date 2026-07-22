@@ -1542,8 +1542,8 @@ function buildSteps974Main(nums, params) {
 function buildSteps974Alt(nums, params) {
   const parsedK = Number.parseInt(params && params.k, 10);
   const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
-  const m = new Map([[0, 1]]);
-  const mPositions = new Map([[0, [-1]]]);
+  const m = new Map();
+  const mPositions = new Map();
   const prefixSums = new Array(nums.length).fill(null);
   const remainders = new Array(nums.length).fill(null);
   const steps = [];
@@ -1578,6 +1578,10 @@ function buildSteps974Alt(nums, params) {
   };
 
   function push({ title, codeLines, current = -1, status = [], vars, note, final = false }) {
+    const debugVars = [...(vars || [])];
+    if (!debugVars.some((variable) => variable.name === "m")) {
+      debugVars.push({ name: "m", value: mString() });
+    }
     steps.push({
       title,
       arr: [],
@@ -1587,7 +1591,7 @@ function buildSteps974Alt(nums, params) {
       final,
       codeBlock: 2,
       codeLines,
-      vars: vars || [],
+      vars: debugVars,
       note,
     });
   }
@@ -1609,6 +1613,8 @@ function buildSteps974Alt(nums, params) {
     },
   });
 
+  m.set(0, 1);
+  mPositions.set(0, [-1]);
   push({
     title: { vi: "m[0] = 1", en: "m[0] = 1" },
     codeLines: [4],
