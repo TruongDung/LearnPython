@@ -2444,6 +2444,180 @@ button:disabled {
   fill: #fbbf24;
 }
 
+/* ---- Skyline sweep-line view ---- */
+.skyline-viz {
+  color: #e2e8f0;
+}
+
+.skyline-svg {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.skyline-grid {
+  stroke: rgba(148, 163, 184, 0.2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyline-tick {
+  stroke: #64748b;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyline-axis-label,
+.skyline-key-label,
+.skyline-sweep-label {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skyline-building rect {
+  fill: rgba(99, 102, 241, 0.12);
+  stroke: #64748b;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.skyline-building.active rect {
+  fill: rgba(16, 185, 129, 0.2);
+  stroke: #10b981;
+  stroke-width: 2;
+}
+
+.skyline-outline {
+  fill: none;
+  stroke: #f59e0b;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyline-key-point {
+  fill: #fbbf24;
+  stroke: #0c0a1a;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyline-key-label {
+  fill: #fde68a;
+}
+
+.skyline-sweep {
+  stroke: #f87171;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyline-sweep-label {
+  fill: #fca5a5;
+}
+
+.skyline-heap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+}
+
+.skyline-heap-label {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.skyline-heap-entry {
+  padding: 4px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 6px;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.skyline-heap-entry.root {
+  border-color: rgba(245, 158, 11, 0.65);
+  color: #fde68a;
+}
+
+.skyline-heap-entry.stale {
+  color: #94a3b8;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.skyline-heap-empty,
+.skyline-empty {
+  color: #94a3b8;
+}
+
+.skyline-empty {
+  display: grid;
+  min-height: 200px;
+  place-items: center;
+}
+
+[data-theme="light"] .skyline-viz {
+  color: #0f172a;
+}
+
+[data-theme="light"] .skyline-grid {
+  stroke: rgba(100, 116, 139, 0.22);
+}
+
+[data-theme="light"] .skyline-axis-label,
+[data-theme="light"] .skyline-heap-label,
+[data-theme="light"] .skyline-heap-empty,
+[data-theme="light"] .skyline-empty {
+  color: #64748b;
+  fill: #64748b;
+}
+
+[data-theme="light"] .skyline-building rect {
+  fill: rgba(79, 70, 229, 0.1);
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .skyline-building.active rect {
+  fill: rgba(5, 150, 105, 0.16);
+  stroke: #059669;
+}
+
+[data-theme="light"] .skyline-key-point {
+  fill: #d97706;
+  stroke: #ffffff;
+}
+
+[data-theme="light"] .skyline-key-label {
+  fill: #92400e;
+}
+
+[data-theme="light"] .skyline-sweep-label {
+  fill: #b91c1c;
+}
+
+[data-theme="light"] .skyline-heap-entry {
+  color: #334155;
+  background: rgba(15, 23, 42, 0.025);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+
+[data-theme="light"] .skyline-heap-entry.root {
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.65);
+}
+
 /* ---- Grid view (DP 2D) ---- */
 .grid-view {
   margin-top: 4px;

@@ -1524,7 +1524,329 @@ function buildSteps23DC(input) {
   return { input, answer: `[${result.join(",")}]`, steps };
 }
 
+// ─── 218: The Skyline Problem ───
+function buildSteps218(input) {
+  const raw = String(input || "").trim();
+  let buildings;
+
+  try {
+    buildings = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(";").filter(Boolean).map((row) => row.split(",").map((value) => Number(value.trim())));
+  } catch (_) {
+    buildings = [];
+  }
+
+  const valid = Array.isArray(buildings)
+    && buildings.length > 0
+    && buildings.every((building) => Array.isArray(building)
+      && building.length === 3
+      && building.every(Number.isInteger)
+      && building[0] < building[1]
+      && building[2] > 0);
+
+  if (!valid) {
+    const steps = [{
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      skylineView: { buildings: [], skyline: [], heap: [], sweepX: null, currentHeight: 0, activeBuildingIds: [] },
+      codeLines: [4],
+      vars: [{ name: "buildings", value: "[]" }],
+      note: {
+        vi: "Mỗi tòa nhà phải có dạng left,right,height với left < right và height > 0.",
+        en: "Each building must be left,right,height with left < right and height > 0.",
+      },
+      final: true,
+    }];
+    return { original: [], answer: [], steps };
+  }
+
+  buildings = buildings
+    .map((building, id) => [...building, id])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2])
+    .map((building, id) => [building[0], building[1], building[2], id]);
+
+  const plainBuildings = buildings.map(([left, right, height]) => [left, right, height]);
+  const events = [...new Set(buildings.flatMap(([left, right]) => [left, right]))].sort((a, b) => a - b);
+  const heap = [];
+  const answer = [];
+  const steps = [];
+  const detailedTrace = buildings.length <= 60;
+  let i = 0;
+  let sweepX = null;
+  let currentHeight = 0;
+
+  const higherPriority = (a, b) => a.height > b.height
+    || (a.height === b.height && a.right < b.right)
+    || (a.height === b.height && a.right === b.right && a.id < b.id);
+
+  function siftUp(index) {
+    let child = index;
+    while (child > 0) {
+      const parent = Math.floor((child - 1) / 2);
+      if (!higherPriority(heap[child], heap[parent])) break;
+      [heap[child], heap[parent]] = [heap[parent], heap[child]];
+      child = parent;
+    }
+  }
+
+  function siftDown(index) {
+    let parent = index;
+    while (true) {
+      let best = parent;
+      const left = parent * 2 + 1;
+      const right = left + 1;
+      if (left < heap.length && higherPriority(heap[left], heap[best])) best = left;
+      if (right < heap.length && higherPriority(heap[right], heap[best])) best = right;
+      if (best === parent) break;
+      [heap[parent], heap[best]] = [heap[best], heap[parent]];
+      parent = best;
+    }
+  }
+
+  function push(entry) {
+    heap.push(entry);
+    siftUp(heap.length - 1);
+  }
+
+  function popRoot() {
+    const removed = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+      heap[0] = last;
+      siftDown(0);
+    }
+    return removed;
+  }
+
+  const heapText = () => heap.length
+    ? `[${heap.map((entry) => `h${entry.height}→${entry.right}${sweepX !== null && entry.right <= sweepX ? " stale" : ""}`).join(", ")}]`
+    : "[]";
+  const answerText = () => JSON.stringify(answer);
+  const activeIds = () => sweepX === null
+    ? []
+    : buildings.filter(([left, right]) => left <= sweepX && sweepX < right).map((building) => building[3]);
+
+  function snapshot({ title, codeLine, note, extraVars = [], final = false, force = false }) {
+    if (!detailedTrace && !force) return;
+    const step = {
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      skylineView: {
+        buildings: plainBuildings,
+        skyline: answer.map((point) => [...point]),
+        heap: heap.map((entry) => ({ height: entry.height, right: entry.right, id: entry.id })),
+        sweepX,
+        currentHeight,
+        activeBuildingIds: activeIds(),
+      },
+      codeLines: [codeLine],
+      vars: [
+        { name: "x", value: sweepX === null ? "-" : sweepX },
+        { name: "heap (-height, right)", value: heapText() },
+        { name: "answer", value: answerText() },
+        ...extraVars,
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  snapshot({
+    title: { vi: "Lấy tất cả mốc trái/phải và sắp xếp", en: "Collect and sort every left/right edge" },
+    codeLine: 5,
+    extraVars: [{ name: "events", value: `[${events.join(", ")}]` }],
+    note: {
+      vi: "Chỉ tại cạnh trái hoặc phải của một tòa nhà, độ cao skyline mới có thể thay đổi.",
+      en: "The skyline height can change only at a building's left or right edge.",
+    },
+    force: true,
+  });
+  snapshot({
+    title: { vi: "Khởi tạo max-heap rỗng", en: "Initialize an empty max-heap" },
+    codeLine: 6,
+    note: { vi: "Heap lưu (-height, right) trong Python; hình hiển thị height dương cho dễ đọc.", en: "Python stores (-height, right); the visual shows positive heights for readability." },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo danh sách kết quả", en: "Initialize the result list" },
+    codeLine: 7,
+    note: { vi: "answer sẽ chỉ chứa các điểm mà độ cao thực sự thay đổi.", en: "answer will contain only points where the height actually changes." },
+  });
+  snapshot({
+    title: { vi: "Bắt đầu từ tòa nhà đầu tiên", en: "Start at the first building" },
+    codeLine: 8,
+    extraVars: [{ name: "i", value: i }],
+    note: { vi: "i trỏ tới tòa nhà chưa được đưa vào heap.", en: "i points to the next building not yet pushed into the heap." },
+  });
+
+  for (const x of events) {
+    sweepX = x;
+    snapshot({
+      title: { vi: `Đưa đường quét tới x = ${x}`, en: `Move the sweep line to x = ${x}` },
+      codeLine: 10,
+      extraVars: [{ name: "i", value: i }],
+      note: { vi: `Xử lý toàn bộ cạnh bắt đầu và kết thúc tại x = ${x}.`, en: `Process every start and end edge at x = ${x}.` },
+    });
+
+    while (i < buildings.length && buildings[i][0] <= x) {
+      const [left, right, height, id] = buildings[i];
+      snapshot({
+        title: { vi: `Tòa nhà ${i} bắt đầu tại ${left} ≤ ${x}`, en: `Building ${i} starts at ${left} ≤ ${x}` },
+        codeLine: 11,
+        extraVars: [{ name: "i", value: i }, { name: "buildings[i]", value: `[${left}, ${right}, ${height}]` }],
+        note: { vi: "Điều kiện đúng, nên tòa nhà này phải tham gia heap trước khi lấy độ cao lớn nhất.", en: "The condition is true, so this building must enter the heap before reading the maximum height." },
+      });
+      snapshot({
+        title: { vi: `Tách left=${left}, right=${right}, height=${height}`, en: `Unpack left=${left}, right=${right}, height=${height}` },
+        codeLine: 12,
+        extraVars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "height", value: height }],
+        note: { vi: "right dùng để nhận biết entry hết hạn; height quyết định ưu tiên trong max-heap.", en: "right detects expiration; height determines max-heap priority." },
+      });
+      push({ left, right, height, id });
+      snapshot({
+        title: { vi: `Push (-${height}, ${right}) vào heap`, en: `Push (-${height}, ${right}) into the heap` },
+        codeLine: 13,
+        extraVars: [{ name: "root", value: `h${heap[0].height}→${heap[0].right}` }],
+        note: { vi: `Sau sift-up, root là tòa nhà cao nhất đang có trong heap: h=${heap[0].height}.`, en: `After sift-up, the root is the tallest building in the heap: h=${heap[0].height}.` },
+      });
+      i += 1;
+      snapshot({
+        title: { vi: `Tăng i lên ${i}`, en: `Advance i to ${i}` },
+        codeLine: 14,
+        extraVars: [{ name: "i", value: i }],
+        note: { vi: "Chuyển con trỏ sang tòa nhà chưa thêm tiếp theo.", en: "Move the pointer to the next building not yet added." },
+      });
+    }
+
+    snapshot({
+      title: { vi: "Không còn tòa nhà mới tại x này", en: "No more buildings start by this x" },
+      codeLine: 11,
+      extraVars: [{ name: "i", value: i }],
+      note: { vi: i >= buildings.length ? "Đã đưa toàn bộ tòa nhà vào heap." : `Tòa nhà kế tiếp bắt đầu tại ${buildings[i][0]} > ${x}.`, en: i >= buildings.length ? "Every building has been pushed." : `The next building starts at ${buildings[i][0]} > ${x}.` },
+    });
+
+    while (heap.length > 0 && heap[0].right <= x) {
+      const expired = heap[0];
+      snapshot({
+        title: { vi: `Root h${expired.height} hết hạn tại ${expired.right}`, en: `Root h${expired.height} expired at ${expired.right}` },
+        codeLine: 16,
+        extraVars: [{ name: "heap[0].right", value: expired.right }, { name: "expired?", value: `${expired.right} ≤ ${x}` }],
+        note: { vi: "Lazy removal chỉ cần xóa entry hết hạn khi nó lên root; entry hết hạn nằm dưới không thể ảnh hưởng maximum.", en: "Lazy removal deletes an expired entry only when it reaches the root; expired entries below it cannot affect the maximum." },
+      });
+      const removed = popRoot();
+      snapshot({
+        title: { vi: `Pop tòa nhà h${removed.height} khỏi heap`, en: `Pop building h${removed.height} from the heap` },
+        codeLine: 17,
+        extraVars: [{ name: "removed", value: `h${removed.height}→${removed.right}` }, { name: "new root", value: heap.length ? `h${heap[0].height}→${heap[0].right}` : "none" }],
+        note: { vi: heap.length ? "Sift-down đưa entry ưu tiên cao nhất còn lại lên root." : "Heap đã rỗng vì không còn tòa nhà phủ vị trí x này.", en: heap.length ? "Sift-down moves the highest-priority remaining entry to the root." : "The heap is empty because no building covers this x." },
+      });
+    }
+
+    snapshot({
+      title: { vi: heap.length ? "Root hiện tại chưa hết hạn" : "Heap không còn entry", en: heap.length ? "The current root is still active" : "The heap has no entries" },
+      codeLine: 16,
+      extraVars: [{ name: "condition", value: heap.length ? `${heap[0].right} ≤ ${x} is false` : "heap is empty" }],
+      note: { vi: "Vòng xóa lazy dừng; root bây giờ hợp lệ hoặc heap rỗng.", en: "Lazy removal stops; the root is now valid or the heap is empty." },
+    });
+
+    currentHeight = heap.length ? heap[0].height : 0;
+    snapshot({
+      title: { vi: `Độ cao tại x=${x} là ${currentHeight}`, en: `Height at x=${x} is ${currentHeight}` },
+      codeLine: 19,
+      extraVars: [{ name: "height", value: currentHeight }],
+      note: { vi: heap.length ? "Root của max-heap cho độ cao lớn nhất đang phủ x." : "Không có tòa nhà đang hoạt động nên độ cao trở về 0.", en: heap.length ? "The max-heap root gives the tallest height covering x." : "No building is active, so the height returns to 0." },
+    });
+
+    const previousHeight = answer.length ? answer[answer.length - 1][1] : null;
+    const changed = answer.length === 0 || previousHeight !== currentHeight;
+    snapshot({
+      title: { vi: changed ? "Độ cao đã thay đổi" : "Độ cao không đổi", en: changed ? "The height changed" : "The height did not change" },
+      codeLine: 20,
+      extraVars: [{ name: "previous height", value: previousHeight === null ? "none" : previousHeight }, { name: "changed", value: changed }],
+      note: { vi: changed ? "Đây là một điểm ngoặt mới của skyline." : "Không thêm điểm vì skyline vẫn nằm ngang ở cùng độ cao.", en: changed ? "This is a new skyline key point." : "No point is added because the skyline stays at the same height." },
+    });
+
+    if (changed) {
+      answer.push([x, currentHeight]);
+      snapshot({
+        title: { vi: `Thêm điểm [${x}, ${currentHeight}]`, en: `Append point [${x}, ${currentHeight}]` },
+        codeLine: 21,
+        extraVars: [{ name: "new point", value: `[${x}, ${currentHeight}]` }],
+        note: { vi: "Nối điểm mới bằng đoạn ngang rồi đoạn dọc để tạo đường bao skyline.", en: "Connect the new point with horizontal and vertical segments to form the skyline outline." },
+      });
+    }
+  }
+
+  snapshot({
+    title: { vi: `Hoàn tất skyline với ${answer.length} điểm`, en: `Finish the skyline with ${answer.length} points` },
+    codeLine: 23,
+    extraVars: [{ name: "return", value: answerText() }],
+    note: { vi: "Mỗi điểm liên tiếp có độ cao khác nhau; điểm cuối đưa đường bao trở về mặt đất.", en: "Consecutive points have different heights; the final point returns the outline to ground level." },
+    final: true,
+    force: true,
+  });
+
+  return { original: plainBuildings, answer, steps };
+}
+
 module.exports = {
+  218: {
+    id: 218,
+    difficulty: "hard",
+    slug: "the-skyline-problem",
+    category: HEAP_CAT,
+    title: { vi: "The Skyline Problem", en: "The Skyline Problem" },
+    titleVi: { vi: "Đường chân trời của các tòa nhà", en: "The skyline formed by buildings" },
+    statement: {
+      vi: "Cho các tòa nhà [left, right, height], trả về các điểm ngoặt [x, height] mô tả đường chân trời khi nhìn từ xa.",
+      en: "Given buildings [left, right, height], return the key points [x, height] describing their skyline.",
+    },
+    defaultInput: "2,9,10;3,7,15;5,12,12;15,20,10;19,24,8",
+    inputKind: "string",
+    inputLabel: { vi: "Tòa nhà (left,right,height; ...)", en: "Buildings (left,right,height; ...)" },
+    extraParams: [],
+    approach: [
+      { vi: "Sweep line qua mọi cạnh trái/phải theo thứ tự x tăng dần.", en: "Sweep through every left/right edge in increasing x order." },
+      { vi: "Max-heap lưu (height, right). Push tòa nhà đã bắt đầu và lazy-pop root đã kết thúc.", en: "A max-heap stores (height, right). Push started buildings and lazily pop expired roots." },
+      { vi: "Chỉ thêm [x, height] khi maximum hiện tại khác độ cao của điểm gần nhất.", en: "Append [x, height] only when the current maximum differs from the latest point's height." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: { vi: "Sắp xếp 2n cạnh; mỗi tòa nhà được push và pop tối đa một lần.", en: "Sort 2n edges; each building is pushed and popped at most once." },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def getSkyline(self, buildings):",
+      "        events = sorted({x for left, right, height in buildings for x in (left, right)})",
+      "        heap = []",
+      "        answer = []",
+      "        i = 0",
+      "",
+      "        for x in events:",
+      "            while i < len(buildings) and buildings[i][0] <= x:",
+      "                left, right, height = buildings[i]",
+      "                heapq.heappush(heap, (-height, right))",
+      "                i += 1",
+      "",
+      "            while heap and heap[0][1] <= x:",
+      "                heapq.heappop(heap)",
+      "",
+      "            height = -heap[0][0] if heap else 0",
+      "            if not answer or answer[-1][1] != height:",
+      "                answer.append([x, height])",
+      "",
+      "        return answer",
+    ],
+    builder: buildSteps218,
+  },
   3092: {
     id: 3092,
     difficulty: "medium",

@@ -2306,6 +2306,115 @@ function renderPrefix1DView(step) {
     </div>`;
 }
 
+function renderSkylineView(step) {
+  const view = step.skylineView || {};
+  const buildings = Array.isArray(view.buildings) ? view.buildings : [];
+  const skyline = Array.isArray(view.skyline) ? view.skyline : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const activeIds = new Set(Array.isArray(view.activeBuildingIds) ? view.activeBuildingIds : []);
+  const sweepX = Number.isFinite(view.sweepX) ? view.sweepX : null;
+
+  if (buildings.length === 0) {
+    $("treeView").innerHTML = `<div class="skyline-empty">${escapeHtml(lang === "vi" ? "Chưa có tòa nhà hợp lệ." : "No valid buildings.")}</div>`;
+    return;
+  }
+
+  const width = 760;
+  const height = 340;
+  const pad = { left: 48, right: 22, top: 24, bottom: 46 };
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const minX = Math.min(...buildings.map((building) => building[0]));
+  const maxX = Math.max(...buildings.map((building) => building[1]));
+  const maxBuildingHeight = Math.max(1, ...buildings.map((building) => building[2]));
+  const xRange = Math.max(1, maxX - minX);
+  const xScale = (value) => pad.left + ((value - minX) / xRange) * plotWidth;
+  const yScale = (value) => pad.top + plotHeight - (value / maxBuildingHeight) * plotHeight;
+  const groundY = yScale(0);
+
+  const yTicks = [...new Set([0, Math.round(maxBuildingHeight / 2), maxBuildingHeight])].sort((a, b) => a - b);
+  const allXTicks = [...new Set(buildings.flatMap((building) => [building[0], building[1]]))].sort((a, b) => a - b);
+  const tickStride = Math.max(1, Math.ceil(allXTicks.length / 10));
+  const xTicks = allXTicks.filter((_, index) => index % tickStride === 0 || index === allXTicks.length - 1);
+
+  const gridLines = yTicks.map((tick) => {
+    const y = yScale(tick);
+    return `<line class="skyline-grid" x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}"></line>
+      <text class="skyline-axis-label" x="${pad.left - 10}" y="${y + 4}" text-anchor="end">${tick}</text>`;
+  }).join("");
+
+  const xAxisLabels = xTicks.map((tick) => {
+    const x = xScale(tick);
+    return `<line class="skyline-tick" x1="${x}" y1="${groundY}" x2="${x}" y2="${groundY + 5}"></line>
+      <text class="skyline-axis-label" x="${x}" y="${groundY + 22}" text-anchor="middle">${tick}</text>`;
+  }).join("");
+
+  const buildingRects = buildings.map(([left, right, buildingHeight], index) => {
+    const x = xScale(left);
+    const y = yScale(buildingHeight);
+    const rectWidth = Math.max(1, xScale(right) - x);
+    const rectHeight = groundY - y;
+    return `<g class="skyline-building${activeIds.has(index) ? " active" : ""}">
+      <rect x="${x}" y="${y}" width="${rectWidth}" height="${rectHeight}"></rect>
+      <title>[${left}, ${right}, ${buildingHeight}]</title>
+    </g>`;
+  }).join("");
+
+  let skylinePath = "";
+  if (skyline.length > 0) {
+    skylinePath = `M ${xScale(skyline[0][0])} ${groundY} L ${xScale(skyline[0][0])} ${yScale(skyline[0][1])}`;
+    for (let index = 1; index < skyline.length; index++) {
+      const [x, current] = skyline[index];
+      const previous = skyline[index - 1][1];
+      skylinePath += ` L ${xScale(x)} ${yScale(previous)} L ${xScale(x)} ${yScale(current)}`;
+    }
+    const lastPoint = skyline[skyline.length - 1];
+    if (sweepX !== null && sweepX > lastPoint[0]) {
+      skylinePath += ` L ${xScale(sweepX)} ${yScale(lastPoint[1])}`;
+    }
+  }
+
+  const keyPoints = skyline.length <= 14 ? skyline.map(([x, value]) => {
+    const px = xScale(x);
+    const py = yScale(value);
+    const labelY = value === 0 ? py - 9 : Math.max(pad.top + 12, py - 9);
+    return `<circle class="skyline-key-point" cx="${px}" cy="${py}" r="4"></circle>
+      <text class="skyline-key-label" x="${px}" y="${labelY}" text-anchor="middle">${escapeXml(`[${x},${value}]`)}</text>`;
+  }).join("") : "";
+
+  const sweepLine = sweepX === null ? "" : `<line class="skyline-sweep" x1="${xScale(sweepX)}" y1="${pad.top}" x2="${xScale(sweepX)}" y2="${groundY}"></line>
+    <text class="skyline-sweep-label" x="${xScale(sweepX)}" y="${pad.top - 7}" text-anchor="middle">x=${sweepX}</text>`;
+
+  const heapItems = heap.length > 0
+    ? heap.map((entry, index) => {
+      const stale = sweepX !== null && entry.right <= sweepX;
+      return `<span class="skyline-heap-entry${index === 0 ? " root" : ""}${stale ? " stale" : ""}">
+        ${index === 0 ? `<strong>${escapeHtml(lang === "vi" ? "root" : "root")}</strong> ` : ""}h${escapeHtml(entry.height)} → ${escapeHtml(entry.right)}${stale ? ` (${escapeHtml(lang === "vi" ? "hết hạn" : "expired")})` : ""}
+      </span>`;
+    }).join("")
+    : `<span class="skyline-heap-empty">${escapeHtml(lang === "vi" ? "heap rỗng" : "empty heap")}</span>`;
+
+  const summary = lang === "vi"
+    ? `Biểu đồ ${buildings.length} tòa nhà; đường quét ${sweepX === null ? "chưa bắt đầu" : `tại x=${sweepX}`}; skyline hiện có ${skyline.length} điểm.`
+    : `Chart of ${buildings.length} buildings; sweep line ${sweepX === null ? "not started" : `at x=${sweepX}`}; current skyline has ${skyline.length} points.`;
+
+  $("treeView").innerHTML = `<div class="skyline-viz">
+    <svg class="skyline-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
+      <title>${escapeXml(summary)}</title>
+      ${gridLines}
+      ${xAxisLabels}
+      ${buildingRects}
+      ${sweepLine}
+      ${skylinePath ? `<path class="skyline-outline" d="${skylinePath}"></path>` : ""}
+      ${keyPoints}
+    </svg>
+    <div class="skyline-heap" aria-label="${escapeHtml(lang === "vi" ? "Trạng thái max-heap" : "Max-heap state")}">
+      <span class="skyline-heap-label">max-heap</span>
+      ${heapItems}
+    </div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -2317,7 +2426,13 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.tree) {
+  if (step.skylineView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSkylineView(step);
+  } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
