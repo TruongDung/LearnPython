@@ -5283,7 +5283,7 @@ function buildStepsSurroundedRegions(input, params) {
  * LeetCode 3977: Minimum Time to Reach Target With Limited Power.
  * Dijkstra on the expanded state graph (node, remaining power).
  */
-function buildSteps3977(input, params) {
+function buildSteps3977Dijkstra(input, params) {
   const parsedN = Number(params && params.n);
   const n = Number.isInteger(parsedN) && parsedN > 0 ? parsedN : 5;
   const initialPower = Math.max(1, Number(params && params.power) || 4);
@@ -5731,6 +5731,325 @@ function buildSteps3977(input, params) {
   }
 
   return { n, edges, power: initialPower, cost, source, target, answer, steps };
+}
+
+/**
+ * Approach 2 for LeetCode 3977: layered DP by remaining power.
+ * Every transition consumes at least one power, so the expanded state graph is
+ * a DAG when layers are processed from high power to low power.
+ */
+function buildSteps3977PowerDP(input, params) {
+  const parsedN = Number(params && params.n);
+  const n = Number.isInteger(parsedN) && parsedN > 0 ? parsedN : 5;
+  const initialPower = Math.max(1, Number(params && params.power) || 4);
+  const source = Math.min(n - 1, Math.max(0, Number(params && params.source) || 0));
+  const targetValue = Number(params && params.target);
+  const target = Math.min(n - 1, Math.max(0, Number.isInteger(targetValue) ? targetValue : n - 1));
+  const parsedCosts = String((params && params.cost) || "")
+    .split(",")
+    .map((value) => Number(value.trim()));
+  const cost = Array.from({ length: n }, (_, index) => (
+    Number.isFinite(parsedCosts[index]) && parsedCosts[index] > 0 ? parsedCosts[index] : 1
+  ));
+  const edges = String(input || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(",").map((value) => Number(value.trim())))
+    .filter(([u, v, time]) => (
+      Number.isInteger(u) && Number.isInteger(v) && Number.isFinite(time)
+      && u >= 0 && u < n && v >= 0 && v < n && time > 0
+    ))
+    .map(([u, v, time]) => ({ u, v, time }));
+
+  const adjacency = Array.from({ length: n }, () => []);
+  const dp = Array.from({ length: n }, () => Array(initialPower + 1).fill(Infinity));
+  const discovered = new Map();
+  const processed = new Set();
+  const stateEdges = [];
+  const steps = [];
+  const maxDetailedSteps = 500;
+  let summarizedSteps = 0;
+  const stateId = (node, power) => `${node}|${power}`;
+
+  function remember(node, power, time) {
+    const id = stateId(node, power);
+    discovered.set(id, { id, node, power, time });
+    return id;
+  }
+
+  function graphSnapshot(hlNodes = [], hlEdges = []) {
+    const allStates = [...discovered.values()];
+    const chosen = allStates.slice(0, 70);
+    const chosenIds = new Set(chosen.map((state) => state.id));
+    for (const id of hlNodes) {
+      if (!chosenIds.has(id) && discovered.has(id)) {
+        chosen.push(discovered.get(id));
+        chosenIds.add(id);
+      }
+    }
+    const annotations = {};
+    const nodes = chosen.map((state) => {
+      annotations[state.id] = `t=${state.time}`;
+      return { id: state.id, label: `${state.node},${state.power}` };
+    });
+    return {
+      nodes,
+      edges: stateEdges.filter((edge) => chosenIds.has(edge.u) && chosenIds.has(edge.v)).map((edge) => ({ ...edge })),
+      hlNodes: hlNodes.filter((id) => chosenIds.has(id)),
+      hlEdges: hlEdges.filter(([u, v]) => chosenIds.has(u) && chosenIds.has(v)),
+      visitedNodes: [...processed].filter((id) => chosenIds.has(id)),
+      annotations,
+      caption: {
+        vi: "Mỗi node là trạng thái (node, điện còn lại). DP quét từng tầng điện từ cao xuống thấp.",
+        en: "Each node is a (node, remaining power) state. DP scans power layers from high to low.",
+      },
+    };
+  }
+
+  function pushStep({ title, codeLine, hlNodes = [], hlEdges = [], vars = [], note, final = false }) {
+    if (!final && steps.length >= maxDetailedSteps) {
+      summarizedSteps++;
+      return;
+    }
+    steps.push({
+      title,
+      arr: [],
+      graph: graphSnapshot(hlNodes, hlEdges),
+      highlight: [],
+      mark: [],
+      codeLines: [codeLine],
+      codeBlock: 2,
+      vars: [
+        { name: "reachable states", value: discovered.size },
+        ...(summarizedSteps > 0 ? [{ name: "steps summarized", value: summarizedSteps }] : []),
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Tạo adjacency list", en: "Create the adjacency list" },
+    codeLine: 4,
+    vars: [{ name: "graph", value: "{}" }],
+    note: { vi: "graph[u] lưu các cạnh đi ra khỏi u.", en: "graph[u] stores edges leaving u." },
+  });
+
+  const shownAdjacency = Array.from({ length: n }, () => []);
+  for (const edge of edges) {
+    pushStep({
+      title: { vi: `Đọc cạnh ${edge.u}→${edge.v}`, en: `Read edge ${edge.u}→${edge.v}` },
+      codeLine: 5,
+      vars: [{ name: "u", value: edge.u }, { name: "v", value: edge.v }, { name: "travel_time", value: edge.time }],
+      note: { vi: `Cạnh mất ${edge.time} giây.`, en: `The edge takes ${edge.time} seconds.` },
+    });
+    adjacency[edge.u].push({ v: edge.v, time: edge.time });
+    shownAdjacency[edge.u].push(`(${edge.v},${edge.time})`);
+    pushStep({
+      title: { vi: `graph[${edge.u}].append((${edge.v}, ${edge.time}))`, en: `graph[${edge.u}].append((${edge.v}, ${edge.time}))` },
+      codeLine: 6,
+      vars: [{ name: `graph[${edge.u}]`, value: `[${shownAdjacency[edge.u].join(", ")}]` }],
+      note: { vi: "Thêm cạnh vào adjacency list.", en: "Append the edge to the adjacency list." },
+    });
+  }
+
+  pushStep({
+    title: { vi: "INF = ∞", en: "INF = ∞" }, codeLine: 7,
+    vars: [{ name: "INF", value: "∞" }],
+    note: { vi: "∞ biểu diễn trạng thái chưa tới được.", en: "∞ represents an unreachable state." },
+  });
+  pushStep({
+    title: { vi: `Tạo bảng dp ${n} × ${initialPower + 1}`, en: `Create a ${n} × ${initialPower + 1} dp table` },
+    codeLine: 8,
+    vars: [{ name: "dp shape", value: `${n} × ${initialPower + 1}` }],
+    note: {
+      vi: "dp[u][p] là thời gian nhỏ nhất để đến u với đúng p điện còn lại.",
+      en: "dp[u][p] is the minimum time to reach u with exactly p power remaining.",
+    },
+  });
+
+  dp[source][initialPower] = 0;
+  const startId = remember(source, initialPower, 0);
+  pushStep({
+    title: { vi: `dp[${source}][${initialPower}] = 0`, en: `dp[${source}][${initialPower}] = 0` },
+    codeLine: 9, hlNodes: [startId],
+    vars: [{ name: "source", value: source }, { name: "power", value: initialPower }, { name: "cost", value: `[${cost.join(", ")}]` }],
+    note: { vi: "Khởi tạo trạng thái nguồn với toàn bộ điện.", en: "Initialize the source state with full power." },
+  });
+
+  for (let remaining = initialPower; remaining >= 0; remaining--) {
+    const reachableInLayer = Array.from({ length: n }, (_, u) => Number.isFinite(dp[u][remaining]) ? u : -1).filter((u) => u >= 0);
+    pushStep({
+      title: { vi: `Quét tầng điện remaining=${remaining}`, en: `Scan power layer remaining=${remaining}` },
+      codeLine: 10,
+      hlNodes: reachableInLayer.map((u) => stateId(u, remaining)),
+      vars: [{ name: "remaining", value: remaining }, { name: "reachable nodes", value: `[${reachableInLayer.join(", ")}]` }],
+      note: {
+        vi: "Mọi chuyển trạng thái đều sang tầng điện thấp hơn, nên thứ tự giảm dần là thứ tự topo hợp lệ.",
+        en: "Every transition goes to a lower power layer, so descending power is a valid topological order.",
+      },
+    });
+
+    for (let u = 0; u < n; u++) {
+      const currentId = stateId(u, remaining);
+      pushStep({
+        title: { vi: `Xét node u=${u} ở tầng ${remaining}`, en: `Inspect node u=${u} in layer ${remaining}` },
+        codeLine: 11,
+        hlNodes: discovered.has(currentId) ? [currentId] : [],
+        vars: [{ name: "u", value: u }, { name: "remaining", value: remaining }],
+        note: { vi: "Đọc ô DP tương ứng với node và lượng điện này.", en: "Read the DP cell for this node and power level." },
+      });
+
+      const time = dp[u][remaining];
+      pushStep({
+        title: { vi: `time = ${Number.isFinite(time) ? time : "∞"}`, en: `time = ${Number.isFinite(time) ? time : "∞"}` },
+        codeLine: 12,
+        hlNodes: discovered.has(currentId) ? [currentId] : [],
+        vars: [{ name: `dp[${u}][${remaining}]`, value: Number.isFinite(time) ? time : "∞" }],
+        note: Number.isFinite(time)
+          ? { vi: "Trạng thái này tới được, tiếp tục kiểm tra điện.", en: "This state is reachable; continue with the power check." }
+          : { vi: "Trạng thái chưa tới được.", en: "This state is unreachable." },
+      });
+
+      const unreachable = !Number.isFinite(time);
+      pushStep({
+        title: { vi: `time == INF? ${unreachable}`, en: `time == INF? ${unreachable}` },
+        codeLine: 13,
+        hlNodes: discovered.has(currentId) ? [currentId] : [],
+        vars: [{ name: "skip", value: unreachable }],
+        note: unreachable
+          ? { vi: "continue vì không có đường tới trạng thái này.", en: "Continue because no path reaches this state." }
+          : { vi: "Có thời gian hợp lệ nên không bỏ qua.", en: "A valid time exists, so do not skip it." },
+      });
+      if (unreachable) continue;
+
+      processed.add(currentId);
+      const insufficient = remaining < cost[u];
+      pushStep({
+        title: { vi: `remaining < cost[${u}]? ${insufficient}`, en: `remaining < cost[${u}]? ${insufficient}` },
+        codeLine: 14, hlNodes: [currentId],
+        vars: [{ name: "remaining", value: remaining }, { name: `cost[${u}]`, value: cost[u] }, { name: "skip", value: insufficient }],
+        note: insufficient
+          ? { vi: "Không đủ điện rời node, nên continue.", en: "There is not enough power to leave the node, so continue." }
+          : { vi: "Đủ điện để đi qua các cạnh đi ra.", en: "There is enough power to traverse outgoing edges." },
+      });
+      if (insufficient) continue;
+
+      const nextPower = remaining - cost[u];
+      pushStep({
+        title: { vi: `next_power = ${remaining} - ${cost[u]} = ${nextPower}`, en: `next_power = ${remaining} - ${cost[u]} = ${nextPower}` },
+        codeLine: 15, hlNodes: [currentId],
+        vars: [{ name: "next_power", value: nextPower }],
+        note: { vi: "Cạnh tiếp theo luôn đi xuống một tầng điện thấp hơn.", en: "The next edge always moves to a lower power layer." },
+      });
+
+      for (const edge of adjacency[u]) {
+        const nextId = stateId(edge.v, nextPower);
+        pushStep({
+          title: { vi: `Xét cạnh ${u}→${edge.v}`, en: `Inspect edge ${u}→${edge.v}` },
+          codeLine: 16, hlNodes: [currentId],
+          vars: [{ name: "v", value: edge.v }, { name: "travel_time", value: edge.time }],
+          note: { vi: `Ứng viên đi tới trạng thái (${edge.v}, ${nextPower}).`, en: `The candidate reaches state (${edge.v}, ${nextPower}).` },
+        });
+
+        const nextTime = time + edge.time;
+        pushStep({
+          title: { vi: `next_time = ${time} + ${edge.time} = ${nextTime}`, en: `next_time = ${time} + ${edge.time} = ${nextTime}` },
+          codeLine: 17, hlNodes: [currentId],
+          vars: [{ name: "next_time", value: nextTime }],
+          note: { vi: "Cộng thời gian cạnh vào thời gian hiện tại.", en: "Add the edge travel time to the current time." },
+        });
+
+        const oldTime = dp[edge.v][nextPower];
+        const improves = nextTime < oldTime;
+        pushStep({
+          title: { vi: `${nextTime} < ${Number.isFinite(oldTime) ? oldTime : "∞"}? ${improves}`, en: `${nextTime} < ${Number.isFinite(oldTime) ? oldTime : "∞"}? ${improves}` },
+          codeLine: 18,
+          hlNodes: [currentId, nextId].filter((id) => discovered.has(id)),
+          vars: [{ name: "candidate", value: nextTime }, { name: "old time", value: Number.isFinite(oldTime) ? oldTime : "∞" }, { name: "improves", value: improves }],
+          note: improves
+            ? { vi: "Ứng viên tốt hơn nên cập nhật DP.", en: "The candidate is better, so update DP." }
+            : { vi: "Đã có thời gian nhanh bằng hoặc nhanh hơn.", en: "An equal or faster time already exists." },
+        });
+
+        if (improves) {
+          dp[edge.v][nextPower] = nextTime;
+          remember(edge.v, nextPower, nextTime);
+          stateEdges.push({ u: currentId, v: nextId, w: edge.time });
+          pushStep({
+            title: { vi: `dp[${edge.v}][${nextPower}] = ${nextTime}`, en: `dp[${edge.v}][${nextPower}] = ${nextTime}` },
+            codeLine: 19, hlNodes: [currentId, nextId], hlEdges: [[currentId, nextId]],
+            vars: [{ name: "new time", value: nextTime }],
+            note: { vi: "Lưu thời gian mới cho trạng thái ở tầng điện thấp hơn.", en: "Store the new time for the state in the lower power layer." },
+          });
+        }
+      }
+    }
+  }
+
+  let bestTime = Infinity;
+  let bestPower = -1;
+  pushStep({
+    title: { vi: "Khởi tạo đáp án", en: "Initialize the answer" }, codeLine: 20,
+    vars: [{ name: "best_time", value: "∞" }],
+    note: { vi: "Bắt đầu tìm trạng thái tốt nhất tại target.", en: "Begin searching for the best target state." },
+  });
+  pushStep({
+    title: { vi: "best_power = -1", en: "best_power = -1" }, codeLine: 21,
+    vars: [{ name: "best_power", value: -1 }],
+    note: { vi: "-1 biểu thị chưa tìm thấy đường hợp lệ.", en: "-1 means no valid path has been found." },
+  });
+
+  for (let remaining = initialPower; remaining >= 0; remaining--) {
+    const targetId = stateId(target, remaining);
+    const targetTime = dp[target][remaining];
+    pushStep({
+      title: { vi: `Kiểm tra target với power=${remaining}`, en: `Check target with power=${remaining}` },
+      codeLine: 22, hlNodes: discovered.has(targetId) ? [targetId] : [],
+      vars: [{ name: "remaining", value: remaining }, { name: "target time", value: Number.isFinite(targetTime) ? targetTime : "∞" }],
+      note: { vi: "Quét điện từ cao xuống thấp để ưu tiên nhiều điện khi thời gian hòa.", en: "Scan power from high to low to prefer more power on a time tie." },
+    });
+    const improves = targetTime < bestTime;
+    pushStep({
+      title: { vi: `target_time < best_time? ${improves}`, en: `target_time < best_time? ${improves}` },
+      codeLine: 23, hlNodes: discovered.has(targetId) ? [targetId] : [],
+      vars: [{ name: "target time", value: Number.isFinite(targetTime) ? targetTime : "∞" }, { name: "best_time", value: Number.isFinite(bestTime) ? bestTime : "∞" }],
+      note: improves
+        ? { vi: "Tìm thấy thời gian tốt hơn.", en: "A better time was found." }
+        : { vi: "Không cải thiện đáp án hiện tại.", en: "The current answer is not improved." },
+    });
+    if (improves) {
+      bestTime = targetTime;
+      bestPower = remaining;
+      pushStep({
+        title: { vi: `answer = [${bestTime}, ${bestPower}]`, en: `answer = [${bestTime}, ${bestPower}]` },
+        codeLine: 24, hlNodes: [targetId],
+        vars: [{ name: "best_time", value: bestTime }, { name: "best_power", value: bestPower }],
+        note: { vi: "Cập nhật cặp thời gian và điện còn lại tốt nhất.", en: "Update the best time and remaining-power pair." },
+      });
+    }
+  }
+
+  const answer = Number.isFinite(bestTime) ? [bestTime, bestPower] : [-1, -1];
+  pushStep({
+    title: { vi: `Kết quả: [${answer.join(", ")}]`, en: `Result: [${answer.join(", ")}]` },
+    codeLine: 25,
+    hlNodes: answer[0] >= 0 ? [stateId(target, bestPower)] : [],
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+    note: answer[0] >= 0
+      ? { vi: "Đã chọn thời gian nhỏ nhất; khi hòa, giữ lượng điện lớn nhất.", en: "The minimum time is chosen; ties keep the greatest remaining power." }
+      : { vi: "Không có trạng thái target nào tới được.", en: "No target state is reachable." },
+    final: true,
+  });
+
+  return { n, edges, power: initialPower, cost, source, target, answer, steps };
+}
+
+function buildSteps3977(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2 ? buildSteps3977PowerDP(input, params) : buildSteps3977Dijkstra(input, params);
 }
 
 module.exports = {
@@ -6956,31 +7275,41 @@ module.exports = {
       { key: "cost", type: "string", label: { vi: "cost của từng node", en: "Cost for each node" }, default: "2,3,1,1,1" },
       { key: "source", label: { vi: "Node nguồn", en: "Source node" }, default: 0, min: 0 },
       { key: "target", label: { vi: "Node đích", en: "Target node" }, default: 4, min: 0 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Dijkstra + trạng thái", en: "Approach 1: State Dijkstra" } },
+          { value: "2", label: { vi: "Cách 2: DP theo tầng điện", en: "Approach 2: Power-layer DP" } },
+        ],
+      },
     ],
     approach: [
       {
-        vi: "Cùng một node nhưng lượng điện còn lại khác nhau là hai trạng thái khác nhau: (node, remaining_power).",
-        en: "The same node with different remaining power represents different states: (node, remaining_power).",
+        vi: "Cả hai cách đều dùng trạng thái (node, remaining_power), vì cùng node nhưng lượng điện khác nhau có khả năng đi tiếp khác nhau.",
+        en: "Both approaches use state (node, remaining_power), because different power at the same node changes future feasibility.",
       },
       {
-        vi: "Chạy Dijkstra trên đồ thị trạng thái. Min-heap ưu tiên thời gian nhỏ nhất; nếu bằng nhau thì ưu tiên điện còn lại lớn nhất.",
-        en: "Run Dijkstra on the state graph. The min-heap prefers smaller time, then larger remaining power for ties.",
+        vi: "Cách 1 chạy Dijkstra trên đồ thị trạng thái; heap ưu tiên thời gian nhỏ nhất rồi điện còn lại lớn nhất.",
+        en: "Approach 1 runs Dijkstra on the state graph; the heap prefers minimum time, then maximum remaining power.",
       },
       {
-        vi: "Từ (u,p), chỉ được đi nếu p ≥ cost[u]. Trạng thái kế tiếp là (v, p-cost[u]) và thời gian tăng thêm trọng số cạnh.",
-        en: "From (u,p), an edge is usable only when p ≥ cost[u]. The next state is (v, p-cost[u]) with edge time added.",
+        vi: "Cách 2 nhận ra mỗi cạnh luôn làm giảm điện vì cost[u] ≥ 1; do đó đồ thị trạng thái là DAG theo tầng điện.",
+        en: "Approach 2 observes that every edge decreases power because cost[u] ≥ 1, making the state graph a DAG by power layer.",
       },
       {
-        vi: "Trạng thái target đầu tiên được pop cho đáp án: thời gian nhỏ nhất và nhiều điện còn lại nhất trong các đường nhanh nhất.",
-        en: "The first popped target state gives the answer: minimum time and maximum power among fastest paths.",
+        vi: "Quét remaining_power từ cao xuống thấp và relax sang tầng thấp hơn, sau đó chọn thời gian nhỏ nhất tại target; hòa thời gian thì giữ power lớn hơn.",
+        en: "Scan remaining power from high to low, relax into lower layers, then choose the minimum target time and greatest power on a tie.",
       },
     ],
     complexity: {
-      time: "O((n·P + E·P) log(n·P))",
+      time: "O((n·P + E·P) log(n·P)) / O((n+E)·P)",
       space: "O(n·P + E)",
       note: {
-        vi: "Có tối đa n·P trạng thái (node, điện). Mỗi cạnh có thể được xét ở nhiều mức điện; dist và heap lưu tối đa O(n·P) trạng thái.",
-        en: "There are at most n·P (node, power) states. Each edge may be considered at many power levels; dist and heap store up to O(n·P) states.",
+        vi: "Cách 1 có thêm log(n·P) do heap. Cách 2 xử lý DAG theo tầng điện nên không cần priority queue.",
+        en: "Approach 1 pays an extra log(n·P) heap factor. Approach 2 processes the layered DAG without a priority queue.",
       },
     },
     code: [
@@ -7010,6 +7339,35 @@ module.exports = {
       "                    heapq.heappush(heap, (next_time, -next_power, v))",
       "        return [-1, -1]",
     ],
+    code2: [
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def minTimeMaxPowerDP(self, n, edges, power, cost, source, target):",
+      "        graph = defaultdict(list)",
+      "        for u, v, travel_time in edges:",
+      "            graph[u].append((v, travel_time))",
+      "        INF = float('inf')",
+      "        dp = [[INF] * (power + 1) for _ in range(n)]",
+      "        dp[source][power] = 0",
+      "        for remaining in range(power, -1, -1):",
+      "            for u in range(n):",
+      "                time = dp[u][remaining]",
+      "                if time == INF: continue",
+      "                if remaining < cost[u]: continue",
+      "                next_power = remaining - cost[u]",
+      "                for v, travel_time in graph[u]:",
+      "                    next_time = time + travel_time",
+      "                    if next_time < dp[v][next_power]:",
+      "                        dp[v][next_power] = next_time",
+      "        best_time = INF",
+      "        best_power = -1",
+      "        for remaining in range(power, -1, -1):",
+      "            if dp[target][remaining] < best_time:",
+      "                best_time, best_power = dp[target][remaining], remaining",
+      "        return [best_time, best_power] if best_power >= 0 else [-1, -1]",
+    ],
+    codeLabel: { vi: "Cách 1: Dijkstra + trạng thái", en: "Approach 1: State Dijkstra" },
+    code2Label: { vi: "Cách 2: DP theo tầng điện", en: "Approach 2: Power-layer DP" },
     builder: buildSteps3977,
   },
   3620: {
