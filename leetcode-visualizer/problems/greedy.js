@@ -1286,7 +1286,293 @@ function buildSteps123(nums) {
   return { original: [...prices], answer: sell2, steps };
 }
 
+/** LeetCode 3947: Maximum Number of Items From Sale II. */
+function buildSteps3947(input, params) {
+  const steps = [];
+  const initialBudget = Number(params && params.budget);
+  const parsed = String(input || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(",").map((value) => Number(value.trim())));
+  const valid = Number.isInteger(initialBudget) && initialBudget > 0 && parsed.length > 0 &&
+    parsed.every((item) => item.length === 2 && item.every(Number.isInteger) &&
+      item[0] >= 1 && item[0] <= parsed.length && item[1] >= 1);
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Dùng định dạng factor,price;factor,price;... Factor thuộc [1,n], price và budget phải dương.",
+        en: "Use factor,price;factor,price;... Factor must be in [1,n], and price and budget must be positive.",
+      },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  const items = parsed.map(([factor, price], index) => ({ index, factor, price, gain: 0 }));
+  const n = items.length;
+  const maxFactor = Math.max(...items.map((item) => item.factor));
+  const chart = (list, highlight = [], mark = []) => ({
+    arr: list.map((item) => item.price),
+    sub: list.map((item) => `#${item.index} f=${item.factor} · g=${item.gain}`),
+    highlight,
+    mark,
+  });
+  const push = (title, codeLine, list, highlight, mark, vars, note) => steps.push({
+    title, codeLines: [codeLine], ...chart(list, highlight, mark), vars, note,
+  });
+
+  push(
+    { vi: `n = ${n}`, en: `n = ${n}` }, 3, items, [], [],
+    [{ name: "n", value: n }, { name: "budget", value: initialBudget }],
+    { vi: "Mỗi cột là một loại hàng; chiều cao là price, nhãn f là factor.", en: "Each bar is an item type; height is price and f is its factor." }
+  );
+  push(
+    { vi: `max_factor = ${maxFactor}`, en: `max_factor = ${maxFactor}` }, 4, items,
+    items.map((_, i) => i), [], [{ name: "max_factor", value: maxFactor }],
+    { vi: "Ta chỉ cần sàng đến factor lớn nhất.", en: "The sieve only needs to reach the largest factor." }
+  );
+
+  const freq = Array(maxFactor + 1).fill(0);
+  push(
+    { vi: "Tạo bảng tần suất", en: "Create the frequency table" }, 5, items, [], [],
+    [{ name: "freq", value: `[${freq.join(", ")}]` }],
+    { vi: "freq[x] đếm số loại hàng có factor bằng x.", en: "freq[x] counts item types with factor x." }
+  );
+  for (let i = 0; i < n; i++) {
+    const item = items[i];
+    push(
+      { vi: `Đọc item #${i}: factor=${item.factor}`, en: `Read item #${i}: factor=${item.factor}` },
+      6, items, [i], [], [{ name: "factor", value: item.factor }, { name: "price", value: item.price }],
+      { vi: "Lấy factor và price của item hiện tại.", en: "Read the current item's factor and price." }
+    );
+    freq[item.factor]++;
+    push(
+      { vi: `freq[${item.factor}] = ${freq[item.factor]}`, en: `freq[${item.factor}] = ${freq[item.factor]}` },
+      7, items, [i], [], [{ name: "freq", value: `[${freq.join(", ")}]` }],
+      { vi: `Đã thấy ${freq[item.factor]} item có factor ${item.factor}.`, en: `${freq[item.factor]} item type(s) now have factor ${item.factor}.` }
+    );
+  }
+
+  const multiples = Array(maxFactor + 1).fill(0);
+  push(
+    { vi: "Tạo bảng multiples", en: "Create the multiples table" }, 8, items, [], [],
+    [{ name: "multiples", value: `[${multiples.join(", ")}]` }],
+    { vi: "multiples[d] sẽ đếm các item có factor là bội của d.", en: "multiples[d] will count items whose factor is a multiple of d." }
+  );
+  for (let d = 1; d <= maxFactor; d++) {
+    const divisibleIndexes = items.map((item, i) => item.factor % d === 0 ? i : -1).filter((i) => i >= 0);
+    push(
+      { vi: `Xét divisor d=${d}`, en: `Inspect divisor d=${d}` }, 9, items, divisibleIndexes, [],
+      [{ name: "d", value: d }],
+      { vi: `Các cột sáng có factor chia hết cho ${d}.`, en: `Highlighted bars have factors divisible by ${d}.` }
+    );
+    for (let m = d; m <= maxFactor; m += d) {
+      const sameFactor = items.map((item, i) => item.factor === m ? i : -1).filter((i) => i >= 0);
+      push(
+        { vi: `Đọc bội m=${m}`, en: `Read multiple m=${m}` }, 10, items, sameFactor, [],
+        [{ name: "d", value: d }, { name: "m", value: m }, { name: `freq[${m}]`, value: freq[m] }],
+        { vi: `${m} là một bội của ${d}.`, en: `${m} is a multiple of ${d}.` }
+      );
+      multiples[d] += freq[m];
+      push(
+        { vi: `multiples[${d}] = ${multiples[d]}`, en: `multiples[${d}] = ${multiples[d]}` },
+        11, items, sameFactor, [], [{ name: "multiples", value: `[${multiples.join(", ")}]` }],
+        { vi: `Cộng freq[${m}]=${freq[m]} vào bộ đếm của ${d}.`, en: `Add freq[${m}]=${freq[m]} to the count for ${d}.` }
+      );
+    }
+  }
+
+  for (const item of items) item.gain = multiples[item.factor] - 1;
+  push(
+    { vi: "Tính gain của từng item", en: "Compute every item's gain" }, 12, items,
+    items.map((_, i) => i), [], items.map((item) => ({ name: `gain[${item.index}]`, value: item.gain })),
+    {
+      vi: "Trừ chính item i. Mua c bản item i nhận tối đa min(c, gain[i]) bản miễn phí.",
+      en: "Exclude item i itself. Buying c copies of i earns at most min(c, gain[i]) free copies.",
+    }
+  );
+
+  const boosted = items.map((item) => ({ ...item })).sort((a, b) => a.price - b.price || a.index - b.index);
+  push(
+    { vi: "Sắp xếp các lượt nhân đôi theo price", en: "Sort boosted purchases by price" }, 13, boosted,
+    boosted.map((_, i) => i), [], [{ name: "order", value: boosted.map((item) => `#${item.index}`).join(" → ") }],
+    {
+      vi: "Mỗi lượt trong gain cho 1 món mua + 1 món miễn phí, nên ưu tiên price thấp.",
+      en: "Each gain slot yields one purchased plus one free copy, so lower prices come first.",
+    }
+  );
+
+  const cheapest = Math.min(...items.map((item) => item.price));
+  push(
+    { vi: `cheapest = ${cheapest}`, en: `cheapest = ${cheapest}` }, 14, boosted,
+    boosted.map((item, i) => item.price === cheapest ? i : -1).filter((i) => i >= 0), [],
+    [{ name: "cheapest", value: cheapest }, { name: "boost cutoff", value: `< ${2 * cheapest}` }],
+    {
+      vi: `Lượt nhân đôi giá ≥ ${2 * cheapest} không tốt hơn mua 2 món thường giá ${cheapest}.`,
+      en: `A boosted slot costing ≥ ${2 * cheapest} cannot beat two regular copies at ${cheapest}.`,
+    }
+  );
+
+  let budget = initialBudget;
+  let total = 0;
+  let boostedBought = 0;
+  const chosen = new Set();
+  push(
+    { vi: "Khởi tạo total = 0", en: "Initialize total = 0" }, 15, boosted, [], [],
+    [{ name: "total", value: total }, { name: "budget", value: budget }],
+    { vi: "total sẽ đếm cả bản mua và bản miễn phí từ các lượt nhân đôi.", en: "total counts purchased and free copies from boosted slots." }
+  );
+
+  for (let i = 0; i < boosted.length; i++) {
+    const item = boosted[i];
+    const marks = () => [...chosen];
+    push(
+      { vi: `Xét #${item.index}: price=${item.price}, limit=${item.gain}`, en: `Inspect #${item.index}: price=${item.price}, limit=${item.gain}` },
+      16, boosted, [i], marks(),
+      [{ name: "price", value: item.price }, { name: "limit", value: item.gain }, { name: "budget", value: budget }],
+      { vi: `Item này có ${item.gain} lượt mua được nhân đôi.`, en: `This item has ${item.gain} boosted purchase slot(s).` }
+    );
+    const stopByPrice = item.price >= 2 * cheapest;
+    push(
+      { vi: `price >= 2 × cheapest? ${stopByPrice}`, en: `price >= 2 × cheapest? ${stopByPrice}` },
+      17, boosted, [i], marks(),
+      [{ name: "price", value: item.price }, { name: "2 × cheapest", value: 2 * cheapest }, { name: "stop", value: stopByPrice }],
+      stopByPrice
+        ? { vi: "Dừng: các lượt sau không rẻ hơn 2 món thường.", en: "Stop: later slots are no cheaper than two regular copies." }
+        : { vi: "Lượt này có lợi nếu còn budget và gain.", en: "This slot is useful while budget and gain remain." }
+    );
+    if (stopByPrice) break;
+
+    const affordable = Math.floor(budget / item.price);
+    const take = Math.min(item.gain, affordable);
+    push(
+      { vi: `take = min(${item.gain}, ${affordable}) = ${take}`, en: `take = min(${item.gain}, ${affordable}) = ${take}` },
+      18, boosted, [i], marks(),
+      [{ name: "limit", value: item.gain }, { name: "affordable", value: affordable }, { name: "take", value: take }],
+      { vi: `Chọn ${take} lượt nhân đôi từ item #${item.index}.`, en: `Take ${take} boosted slot(s) from item #${item.index}.` }
+    );
+    total += 2 * take;
+    boostedBought += take;
+    if (take > 0) chosen.add(i);
+    push(
+      { vi: `total += 2 × ${take} → ${total}`, en: `total += 2 × ${take} → ${total}` },
+      19, boosted, [i], marks(),
+      [{ name: "purchased", value: boostedBought }, { name: "free", value: boostedBought }, { name: "total", value: total }],
+      { vi: `${take} lượt tạo ${take} món mua và ${take} món miễn phí.`, en: `${take} slots create ${take} purchased and ${take} free copies.` }
+    );
+    const spent = take * item.price;
+    budget -= spent;
+    push(
+      { vi: `budget -= ${spent} → ${budget}`, en: `budget -= ${spent} → ${budget}` },
+      20, boosted, [i], marks(),
+      [{ name: "spent", value: spent }, { name: "budget", value: budget }],
+      { vi: `Còn ${budget} ngân sách.`, en: `${budget} budget remains.` }
+    );
+    const partial = take < item.gain;
+    push(
+      { vi: `take < limit? ${partial}`, en: `take < limit? ${partial}` }, 21, boosted, [i], marks(),
+      [{ name: "take", value: take }, { name: "limit", value: item.gain }, { name: "stop", value: partial }],
+      partial
+        ? { vi: "Không đủ tiền mua hết batch; các batch sau đắt hơn nên dừng.", en: "This batch cannot be completed; later batches cost more, so stop." }
+        : { vi: "Đã dùng hết gain của item này; xét item kế tiếp.", en: "This item's gain is exhausted; inspect the next item." }
+    );
+    if (partial) break;
+  }
+
+  const regular = Math.floor(budget / cheapest);
+  const answer = total + regular;
+  steps.push({
+    title: { vi: `Kết quả: ${total} + ${regular} = ${answer}`, en: `Result: ${total} + ${regular} = ${answer}` },
+    codeLines: [22], ...chart(boosted, [], [...chosen]), final: true,
+    vars: [
+      { name: "boosted copies", value: total },
+      { name: "regular copies", value: `${budget} // ${cheapest} = ${regular}` },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Dùng tiền còn lại mua ${regular} bản của món rẻ nhất. Tổng tối đa là ${answer}.`,
+      en: `Use the remainder for ${regular} copies of the cheapest item. The maximum total is ${answer}.`,
+    },
+  });
+  return { original: parsed.map((item) => [...item]), answer, steps };
+}
+
 module.exports = {
+  3947: {
+    id: 3947,
+    difficulty: "medium",
+    slug: "maximum-number-of-items-from-sale-ii",
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
+    title: { vi: "Maximum Number of Items From Sale II", en: "Maximum Number of Items From Sale II" },
+    titleVi: { vi: "Số lượng món hàng tối đa từ đợt giảm giá II", en: "Maximize purchased and free item copies" },
+    statement: {
+      vi:
+        "Cho items[i] = [factorᵢ, priceᵢ] và budget. Có thể mua không giới hạn mỗi loại trong ngân sách. " +
+        "Mỗi bản đã mua của item i có thể tặng tối đa một bản item j khác nếu factorᵢ là ước của factorⱼ; " +
+        "mỗi cặp có thứ tự (i, j) chỉ được dùng một lần. Trả về tổng số bản mua và miễn phí lớn nhất.",
+      en:
+        "Given items[i] = [factor_i, price_i] and a budget, buy unlimited copies within budget. " +
+        "Each purchased copy of item i may give one free copy of a different item j when factor_i divides factor_j; " +
+        "each ordered pair (i, j) may be used at most once. Return the maximum purchased plus free copies.",
+    },
+    defaultInput: "1,6;2,4;3,5",
+    inputKind: "string",
+    inputLabel: { vi: "items (factor,price; ...)", en: "items (factor,price; ...)" },
+    extraParams: [
+      { key: "budget", label: { vi: "budget (ngân sách)", en: "budget" }, type: "number", min: 1, default: 19 },
+    ],
+    approach: [
+      {
+        vi: "Tính gain[i]: số item j khác có factor là bội của factor[i], bằng bảng tần suất và sàng các bội.",
+        en: "Compute gain[i]: the number of other item types j whose factor is a multiple of factor[i], using frequencies and a multiples sieve.",
+      },
+      {
+        vi: "gain[i] bản mua đầu của item i có giá trị 2 món mỗi bản; các bản sau chỉ có giá trị 1 món.",
+        en: "The first gain[i] purchases of item i are worth two copies each; later purchases are worth one copy each.",
+      },
+      {
+        vi: "Chọn lượt giá trị 2 theo price tăng dần nếu rẻ hơn hai món thường, rồi dùng tiền còn lại mua món rẻ nhất.",
+        en: "Take value-2 slots by ascending price while cheaper than two regular copies, then buy the cheapest item with the remainder.",
+      },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Sàng bội O(M log M), sắp xếp O(n log n), với M = max(factor) ≤ n.",
+        en: "The multiples sieve costs O(M log M) and sorting costs O(n log n), where M = max(factor) ≤ n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maximumSaleItems(self, items, budget):",
+      "        n = len(items)",
+      "        max_factor = max(factor for factor, _ in items)",
+      "        freq = [0] * (max_factor + 1)",
+      "        for factor, price in items:",
+      "            freq[factor] += 1",
+      "        multiples = [0] * (max_factor + 1)",
+      "        for d in range(1, max_factor + 1):",
+      "            for m in range(d, max_factor + 1, d):",
+      "                multiples[d] += freq[m]",
+      "        boosted = [(price, multiples[factor] - 1) for factor, price in items]",
+      "        boosted.sort()",
+      "        cheapest = min(price for _, price in items)",
+      "        total = 0",
+      "        for price, limit in boosted:",
+      "            if price >= 2 * cheapest: break",
+      "            take = min(limit, budget // price)",
+      "            total += 2 * take",
+      "            budget -= take * price",
+      "            if take < limit: break",
+      "        return total + budget // cheapest",
+    ],
+    builder: buildSteps3947,
+  },
   1288: {
     id: 1288,
     difficulty: "medium",

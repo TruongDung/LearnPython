@@ -6988,7 +6988,7 @@ module.exports = {
       "from collections import defaultdict",
       "",
       "class Solution:",
-      "    def minimumTime(self, n, edges, power, cost, source, target):",
+      "    def minTimeMaxPower(self, n, edges, power, cost, source, target):",
       "        graph = defaultdict(list)",
       "        for u, v, travel_time in edges:",
       "            graph[u].append((v, travel_time))",
