@@ -2514,6 +2514,53 @@ function renderDifferenceArrayView(step) {
     </div>`;
 }
 
+// ---- Even/Odd slot fill visualization (LeetCode 767 approach 2) ----
+function renderEvenOddFillView(step) {
+  const view = step.evenOddFillView || {};
+  const res = Array.isArray(view.res) ? view.res : [];
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const i = Number.isInteger(view.i) ? view.i : null;
+  const curCh = view.curCh || null;
+
+  const slots = res.map((ch, index) => {
+    const isEven = index % 2 === 0;
+    const isCursor = index === i;
+    const filled = ch !== null;
+    const classes = ["eof-slot", isEven ? "eof-even" : "eof-odd"];
+    if (isCursor) classes.push("eof-cursor");
+    if (filled) classes.push("eof-filled");
+    return `<div class="${classes.join(" ")}">
+      <span class="eof-slot-index">[${index}]</span>
+      <strong class="eof-slot-char">${filled ? escapeHtml(ch) : "_"}</strong>
+    </div>`;
+  }).join("");
+
+  const heapItems = heap.map((entry, index) => `<span class="eof-heap-entry${index === 0 ? " root" : ""}">
+    ${index === 0 ? `<strong>${lang === "vi" ? "gốc" : "root"}</strong> ` : ""}(-${escapeHtml(String(entry.freq))}, '${escapeHtml(String(entry.ch))}')
+  </span>`).join("");
+
+  const heapBox = heap.length
+    ? `<div class="eof-heap-box"><span class="eof-heap-label">pq (max-heap)</span>${heapItems}</div>`
+    : `<div class="eof-heap-box eof-heap-empty">${lang === "vi" ? "pq rỗng" : "pq empty"}</div>`;
+
+  const curBox = curCh
+    ? `<div class="eof-current"><span class="eof-current-label">${lang === "vi" ? "Đang điền" : "Placing"}</span><strong>'${escapeHtml(curCh)}'</strong></div>`
+    : "";
+
+  const legend = `<div class="eof-legend">
+    <span><i class="eof-swatch eof-swatch-even"></i>${lang === "vi" ? "ô chẵn (0,2,4,...)" : "even slots (0,2,4,...)"}</span>
+    <span><i class="eof-swatch eof-swatch-odd"></i>${lang === "vi" ? "ô lẻ (1,3,5,...)" : "odd slots (1,3,5,...)"}</span>
+    <span><i class="eof-swatch eof-swatch-cursor"></i>${lang === "vi" ? "vị trí i hiện tại" : "current pointer i"}</span>
+  </div>`;
+
+  $("treeView").innerHTML = `<div class="eof-viz">
+    ${heapBox}
+    ${curBox}
+    <div class="eof-slots">${slots}</div>
+    ${legend}
+  </div>`;
+}
+
 function renderRunningSumView(step) {
   const view = step.runningSumView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -3225,6 +3272,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefix1DView(step);
+  } else if (step.evenOddFillView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEvenOddFillView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

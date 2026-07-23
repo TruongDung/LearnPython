@@ -1964,7 +1964,229 @@ function buildSteps253(input, params) {
 }
 
 // ─── 767: Reorganize String ───
-function buildSteps767(input) {
+function buildSteps767(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2 ? buildSteps767EvenOdd(input) : buildSteps767HeapifyPopPush(input);
+}
+
+// Approach 2: max-heap gives characters most-frequent-first; place each run
+// of a character directly into the answer's EVEN slots (0,2,4,...) first,
+// then wrap to ODD slots (1,3,5,...) once even slots run out. Handling the
+// most frequent character first guarantees no two placements of it land
+// adjacent, because it fills every other slot before any repeats are near.
+function buildSteps767EvenOdd(input) {
+  const s = String(input).trim();
+  const n = s.length;
+  const steps = [];
+  const label = (e) => `${e.ch}·${e.freq}`;
+  const heap = [];
+  const less = (a, b) => a.freq > b.freq; // max-heap by freq
+  const arrStr = () => `[${heap.map((e) => `(-${e.freq},'${e.ch}')`).join(", ")}]`;
+  const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
+
+  const freqDict = new Map();
+  for (const ch of s) freqDict.set(ch, (freqDict.get(ch) || 0) + 1);
+  const res = new Array(n).fill(null);
+
+  function snapshot(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: { nodes: [] },
+      highlight: [], mark: [],
+      codeLines: [opts.codeLine],
+      codeBlock: 2,
+      vars: opts.vars,
+      note: opts.note,
+      final: Boolean(opts.final),
+      evenOddFillView: {
+        s, n,
+        res: res.slice(),
+        i: opts.i !== undefined ? opts.i : null,
+        curCh: opts.curCh || null,
+        heap: heap.map((e) => ({ ...e })),
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Sắp lại chuỗi — Cách 2 (điền chẵn/lẻ)", en: "Reorganize string — Approach 2 (even/odd fill)" },
+    codeLine: 2,
+    vars: [{ name: "s", value: s }],
+    note: {
+      vi:
+        `Ý tưởng khác: KHÔNG giữ ký tự 1 lượt như cách 1. Thay vào đó điền ký tự nhiều nhất vào các Ô CHẴN (0,2,4,...) trước.\n` +
+        `Hết ô chẵn thì nhảy sang ô LẺ (1,3,5,...). Vì ký tự nhiều nhất luôn được xử lý trước và chiếm hết ô chẵn, nó không thể kề chính nó.`,
+      en:
+        `Different idea: instead of holding a char for one turn, place the most frequent char into EVEN slots (0,2,4,...) first.\n` +
+        `Once even slots run out, wrap to ODD slots (1,3,5,...). Since the most frequent char always goes first and fills every even slot, it can never end up adjacent to itself.`,
+    },
+  });
+
+  snapshot({
+    title: { vi: "freq_dict = defaultdict(int)", en: "freq_dict = defaultdict(int)" },
+    codeLine: 5,
+    vars: [{ name: "freq_dict", value: "{}" }],
+    note: { vi: "Khởi tạo dict đếm tần suất, mặc định 0.", en: "Initialize a frequency-counting dict, defaulting to 0." },
+  });
+
+  snapshot({
+    title: { vi: `for char in s: freq_dict[char] += 1`, en: `for char in s: freq_dict[char] += 1` },
+    codeLine: 7,
+    vars: [{ name: "freq_dict", value: `{${[...freqDict.entries()].map(([c, f]) => `${c}: ${f}`).join(", ")}}` }],
+    note: { vi: "Duyệt s, tăng đếm cho từng ký tự.", en: "Scan s, incrementing the count for each character." },
+  });
+
+  for (const [ch, freq] of freqDict.entries()) heap.push({ ch, freq });
+  snapshot({
+    title: { vi: "pq = [(-freq, char) for char, freq in freq_dict.items()]", en: "pq = [(-freq, char) for char, freq in freq_dict.items()]" },
+    codeLine: 8,
+    vars: [{ name: "pq", value: arrStr() }],
+    note: { vi: "Xây danh sách (-freq, char) cho mỗi ký tự khác nhau; chưa phải heap hợp lệ.", en: "Build a list of (-freq, char) for every distinct char; not a valid heap yet." },
+  });
+
+  const rawHeap = heap.splice(0, heap.length);
+  for (const el of rawHeap) { heap.push(el); siftUp(heap.length - 1); }
+  snapshot({
+    title: { vi: "heapq.heapify(pq)", en: "heapq.heapify(pq)" },
+    codeLine: 9,
+    vars: [{ name: "pq", value: arrStr() }],
+    note: { vi: "Sắp lại để gốc luôn là ký tự có freq LỚN nhất.", en: "Rearrange so the root is always the char with the HIGHEST freq." },
+  });
+
+  const maxFreq = Math.max(...[...freqDict.values()]);
+  const impossible = maxFreq > Math.floor((n + 1) / 2);
+  snapshot({
+    title: impossible
+      ? { vi: `-pq[0][0] = ${maxFreq} > (n+1)//2 = ${Math.floor((n + 1) / 2)} → không thể`, en: `-pq[0][0] = ${maxFreq} > (n+1)//2 = ${Math.floor((n + 1) / 2)} → impossible` }
+      : { vi: `-pq[0][0] = ${maxFreq} ≤ (n+1)//2 = ${Math.floor((n + 1) / 2)} → khả thi`, en: `-pq[0][0] = ${maxFreq} ≤ (n+1)//2 = ${Math.floor((n + 1) / 2)} → feasible` },
+    codeLine: 10,
+    vars: [{ name: "max freq", value: maxFreq }, { name: "(len(s)+1)//2", value: Math.floor((n + 1) / 2) }],
+    note: impossible
+      ? { vi: `Ký tự nhiều nhất xuất hiện quá thường xuyên để tránh kề nhau → trả "".`, en: `The most frequent char appears too often to avoid being adjacent to itself → return "".` }
+      : { vi: `Ký tự nhiều nhất vẫn có thể xếp không kề nhau → tiếp tục.`, en: `The most frequent char can still be spread out without adjacency → continue.` },
+  });
+  if (impossible) {
+    snapshot({
+      title: { vi: `return ""`, en: `return ""` },
+      codeLine: 11,
+      final: true,
+      vars: [{ name: "answer", value: '""' }],
+      note: { vi: `Không thể sắp xếp → trả chuỗi rỗng.`, en: `Cannot be arranged → return an empty string.` },
+    });
+    return { input, answer: '""', steps };
+  }
+
+  snapshot({
+    title: { vi: `res = [""] * len(s)`, en: `res = [""] * len(s)` },
+    codeLine: 12,
+    vars: [{ name: "res", value: `[${res.map(() => "_").join(",")}]` }],
+    note: { vi: `Mảng kết quả rỗng, kích thước ${n}.`, en: `An empty result array of size ${n}.` },
+  });
+
+  let i = 0;
+  snapshot({
+    title: { vi: "i = 0", en: "i = 0" },
+    codeLine: 13,
+    i,
+    vars: [{ name: "i", value: i }],
+    note: { vi: "Con trỏ i bắt đầu từ ô chẵn đầu tiên.", en: "Pointer i starts at the first even slot." },
+  });
+
+  while (heap.length > 0) {
+    snapshot({
+      title: { vi: `len(pq) > 0? true (${heap.length} còn lại)`, en: `len(pq) > 0? true (${heap.length} left)` },
+      codeLine: 14,
+      i,
+      vars: [{ name: "pq", value: arrStr() }],
+      note: { vi: "pq chưa rỗng, tiếp tục lặp.", en: "pq is not empty, keep looping." },
+    });
+
+    const cur = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) heap[0] = last;
+    if (heap.length > 0) siftDown(0);
+    snapshot({
+      title: { vi: `curr = heapq.heappop(pq) → (-${cur.freq}, '${cur.ch}')`, en: `curr = heapq.heappop(pq) → (-${cur.freq}, '${cur.ch}')` },
+      codeLine: 15,
+      curCh: cur.ch, i,
+      vars: [{ name: "curr", value: `(-${cur.freq}, '${cur.ch}')` }, { name: "pq", value: arrStr() }],
+      note: { vi: `Lấy gốc = ký tự '${cur.ch}' đang có freq LỚN nhất (${cur.freq}).`, en: `Pop the root = char '${cur.ch}' with the HIGHEST current freq (${cur.freq}).` },
+    });
+
+    snapshot({
+      title: { vi: `char, freq = '${cur.ch}', ${cur.freq}`, en: `char, freq = '${cur.ch}', ${cur.freq}` },
+      codeLine: 16,
+      curCh: cur.ch, i,
+      vars: [{ name: "char", value: `'${cur.ch}'` }, { name: "freq", value: cur.freq }],
+      note: { vi: `Đảo dấu lại: freq thật = ${cur.freq}.`, en: `Un-negate: the real freq = ${cur.freq}.` },
+    });
+
+    for (let k = 0; k < cur.freq; k++) {
+      snapshot({
+        title: { vi: `for _ in range(${cur.freq}): lượt ${k + 1}/${cur.freq}`, en: `for _ in range(${cur.freq}): turn ${k + 1}/${cur.freq}` },
+        codeLine: 17,
+        curCh: cur.ch, i,
+        vars: [{ name: "turn", value: `${k + 1}/${cur.freq}` }],
+        note: { vi: `Điền '${cur.ch}' lần thứ ${k + 1} trong tổng ${cur.freq} lần.`, en: `Placing '${cur.ch}' occurrence ${k + 1} of ${cur.freq}.` },
+      });
+
+      res[i] = cur.ch;
+      snapshot({
+        title: { vi: `res[${i}] = '${cur.ch}'`, en: `res[${i}] = '${cur.ch}'` },
+        codeLine: 18,
+        curCh: cur.ch, i,
+        vars: [{ name: "i", value: i }, { name: "res", value: `[${res.map((c) => c === null ? "_" : `'${c}'`).join(",")}]` }],
+        note: { vi: `Đặt '${cur.ch}' vào ô ${i}.`, en: `Place '${cur.ch}' into slot ${i}.` },
+      });
+
+      i += 2;
+      snapshot({
+        title: { vi: `i += 2 → ${i}`, en: `i += 2 → ${i}` },
+        codeLine: 19,
+        curCh: cur.ch, i: i >= n ? null : i,
+        vars: [{ name: "i", value: i }],
+        note: { vi: `Nhảy sang ô cách 2 (${i}).`, en: `Jump to the slot 2 apart (${i}).` },
+      });
+
+      const wrapped = i >= n;
+      snapshot({
+        title: wrapped
+          ? { vi: `i >= len(s)? true (${i} ≥ ${n})`, en: `i >= len(s)? true (${i} ≥ ${n})` }
+          : { vi: `i >= len(s)? false (${i} < ${n})`, en: `i >= len(s)? false (${i} < ${n})` },
+        codeLine: 20,
+        curCh: cur.ch, i: wrapped ? null : i,
+        vars: [{ name: "i", value: i }, { name: "len(s)", value: n }],
+        note: wrapped
+          ? { vi: `Đã hết ô chẵn, cần chuyển sang ô lẻ.`, en: `Even slots are exhausted, need to switch to odd slots.` }
+          : { vi: `Vẫn còn ô chẵn phía trước.`, en: `Even slots remain ahead.` },
+      });
+
+      if (wrapped) {
+        i = 1;
+        snapshot({
+          title: { vi: `i = 1 (chuyển sang ô lẻ)`, en: `i = 1 (switch to odd slots)` },
+          codeLine: 21,
+          curCh: cur.ch, i,
+          vars: [{ name: "i", value: i }],
+          note: { vi: `Bắt đầu điền ô lẻ (1,3,5,...) từ 1.`, en: `Start filling odd slots (1,3,5,...) from 1.` },
+        });
+      }
+    }
+  }
+
+  const result = res.join("");
+  snapshot({
+    title: { vi: `return "".join(res) = "${result}"`, en: `return "".join(res) = "${result}"` },
+    codeLine: 22,
+    final: true,
+    vars: [{ name: "answer", value: `"${result}"` }],
+    note: { vi: `Ghép res thành chuỗi kết quả: "${result}".`, en: `Join res into the result string: "${result}".` },
+  });
+  return { input, answer: result, steps };
+}
+
+function buildSteps767HeapifyPopPush(input) {
   const s = String(input).trim();
   const steps = [];
   const label = (e) => `${e.ch}·${e.cnt}`;
@@ -3091,11 +3313,24 @@ module.exports = {
     statement: { vi: "Sắp xếp lại chuỗi sao cho không có 2 ký tự giống nhau cạnh nhau. Nếu không thể, trả về \"\". Nhập một chuỗi chữ thường.", en: "Rearrange the string so no two adjacent characters are equal. If impossible, return \"\". Enter a lowercase string." },
     defaultInput: "aab",
     inputKind: "string", inputLabel: { vi: "Chuỗi", en: "String" },
-    extraParams: [],
-    approach: [
-      { vi: "Max-heap theo tần suất. Mỗi lượt lấy ký tự nhiều nhất, giữ lại 1 lượt rồi đẩy về.", en: "Max-heap by frequency. Each turn take the most frequent, hold it one turn, then push back." },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Heapify + giữ 1 lượt", en: "Approach 1: Heapify + hold one turn" } },
+          { value: "2", label: { vi: "Cách 2: Điền ô chẵn/lẻ", en: "Approach 2: Even/odd slot fill" } },
+        ],
+      },
     ],
-    complexity: { time: "O(n log k)", space: "O(k)", note: { vi: "k ≤ 26 ký tự.", en: "k ≤ 26 distinct chars." } },
+    approach: [
+      { vi: "Cách 1: Max-heap theo tần suất. Mỗi lượt lấy ký tự nhiều nhất, giữ lại 1 lượt rồi đẩy về.", en: "Approach 1: Max-heap by frequency. Each turn take the most frequent, hold it one turn, then push back." },
+      { vi: "Cách 2: Max-heap lấy ký tự nhiều nhất trước, điền thẳng vào các ô CHẴN (0,2,4,...); hết ô chẵn thì nhảy sang ô LẺ (1,3,5,...).", en: "Approach 2: Max-heap pops the most frequent char first and fills EVEN slots (0,2,4,...) directly; once even slots run out, wrap to ODD slots (1,3,5,...)." },
+      { vi: "Cách 2 không cần giữ ký tự 1 lượt vì ký tự nhiều nhất luôn chiếm hết ô chẵn trước khi có ký tự khác chen vào giữa.", en: "Approach 2 needs no one-turn holding because the most frequent char always claims every even slot before anything else can land between its copies." },
+    ],
+    complexity: { time: "O(n log k)", space: "O(k)", note: { vi: "k ≤ 26 ký tự. Cả hai cách đều O(n log k).", en: "k ≤ 26 distinct chars. Both approaches are O(n log k)." } },
     code: [
       "class Solution:",
       "    def reorganizeString(self, s):",
@@ -3112,6 +3347,32 @@ module.exports = {
       "        out = ''.join(res)",
       "        return out if len(out) == len(s) else ''",
     ],
+    code2: [
+      "class Solution:",
+      "    def reorganizeString(self, s):",
+      "        import heapq",
+      "        from collections import defaultdict",
+      "        freq_dict = defaultdict(int)",
+      "        for char in s:",
+      "            freq_dict[char] += 1",
+      "        pq = [(-freq, char) for char, freq in freq_dict.items()]",
+      "        heapq.heapify(pq)",
+      "        if -pq[0][0] > (len(s)+1) // 2:",
+      "            return \"\"",
+      "        res = [\"\"] * len(s)",
+      "        i = 0",
+      "        while len(pq) > 0:",
+      "            curr = heapq.heappop(pq)",
+      "            char, freq = curr[1], -curr[0]",
+      "            for _ in range(freq):",
+      "                res[i] = char",
+      "                i += 2",
+      "                if i >= len(s):",
+      "                    i = 1",
+      "        return \"\".join(res)",
+    ],
+    codeLabel: { vi: "Cách 1: Heapify + giữ 1 lượt", en: "Approach 1: Heapify + hold one turn" },
+    code2Label: { vi: "Cách 2: Điền ô chẵn/lẻ", en: "Approach 2: Even/odd slot fill" },
     liveArgs: (input) => [String(input).trim()],
     builder: buildSteps767,
   },
