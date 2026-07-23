@@ -365,6 +365,7 @@ function buildSteps9001(input, params) {
   const currentIndices = () => new Set(heap
     .map((entry, index) => isCurrent(entry) ? index : -1)
     .filter((index) => index >= 0));
+  let activeOperation = -1;
 
   function snapshot(opts) {
     const step = heapSnapshot([...heap], label, {
@@ -375,6 +376,29 @@ function buildSteps9001(input, params) {
       vars: opts.vars || [],
       note: opts.note,
     });
+    step.profitTrackerView = {
+      operations: operations.map((op, index) => ({
+        op,
+        name: experiences[index],
+        delta: deltas[index],
+      })),
+      activeIndex: activeOperation,
+      phase: opts.phase || "state",
+      totals: [...totals.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([name, total]) => ({ name, total })),
+      heap: heap.map((entry, index) => ({
+        index,
+        name: entry.name,
+        profit: entry.profit,
+        storedPriority: -entry.profit,
+        current: isCurrent(entry),
+        root: index === 0,
+        focused: Boolean(opts.hlSet && opts.hlSet.has(index)),
+      })),
+      result: [...result],
+      action: opts.action || null,
+    };
     if (opts.final) step.final = true;
     steps.push(step);
   }
@@ -421,6 +445,8 @@ function buildSteps9001(input, params) {
   snapshot({
     title: { vi: "Khởi tạo totals", en: "Initialize totals" },
     codeLines: [5],
+    phase: "init",
+    action: { type: "init", target: "totals" },
     vars: [{ name: "totals", value: "{}" }],
     note: {
       vi: "totals là hash map chứa tổng lợi nhuận đúng hiện tại của mỗi experience. Đây là nguồn dữ liệu chuẩn để nhận biết một entry trong heap còn hợp lệ hay đã cũ.",
@@ -430,6 +456,8 @@ function buildSteps9001(input, params) {
   snapshot({
     title: { vi: "Khởi tạo heap", en: "Initialize heap" },
     codeLines: [6],
+    phase: "init",
+    action: { type: "init", target: "heap" },
     vars: [{ name: "heap", value: "[]" }],
     note: {
       vi: "Python heapq là min-heap, nên ta lưu (-total, name). Total càng lớn thì -total càng nhỏ và càng gần root. Khi bằng total, tuple tự ưu tiên name nhỏ hơn theo thứ tự chữ cái.",
@@ -439,6 +467,8 @@ function buildSteps9001(input, params) {
   snapshot({
     title: { vi: "Khởi tạo res", en: "Initialize res" },
     codeLines: [7],
+    phase: "init",
+    action: { type: "init", target: "res" },
     vars: [{ name: "res", value: "[]" }],
     note: {
       vi: "res chỉ nhận thêm một phần tử khi gặp operation Q. Mỗi phần tử là tên experience đang có total lớn nhất, hoặc None nếu chưa có update nào.",
@@ -447,6 +477,7 @@ function buildSteps9001(input, params) {
   });
 
   for (let index = 0; index < operations.length; index++) {
+    activeOperation = index;
     const op = operations[index];
     const name = experiences[index];
     const delta = deltas[index];
@@ -454,6 +485,8 @@ function buildSteps9001(input, params) {
     snapshot({
       title: { vi: `Operation ${index}: ${op}${op === "U" ? ` ${name} ${delta >= 0 ? "+" : ""}${delta}` : ""}`, en: `Operation ${index}: ${op}${op === "U" ? ` ${name} ${delta >= 0 ? "+" : ""}${delta}` : ""}` },
       codeLines: [9],
+      phase: "read",
+      action: { type: "read", op, name, delta },
       vars: [
         { name: "index", value: index },
         { name: "op", value: op },
@@ -474,6 +507,8 @@ function buildSteps9001(input, params) {
       snapshot({
         title: { vi: "op == 'U' là Đúng", en: "op == 'U' is True" },
         codeLines: [10],
+        phase: "branch",
+        action: { type: "branch", branch: "update" },
         vars: [{ name: "op", value: op }, { name: "branch", value: "update" }],
         note: {
           vi: "Đi vào nhánh update. Ta cập nhật hash map trước, sau đó push một snapshot mới vào heap; snapshot cũ không cần tìm và xóa ngay.",
@@ -487,6 +522,8 @@ function buildSteps9001(input, params) {
       snapshot({
         title: { vi: `totals['${name}'] = ${oldTotal} + (${delta}) = ${newTotal}`, en: `totals['${name}'] = ${oldTotal} + (${delta}) = ${newTotal}` },
         codeLines: [11],
+        phase: "update",
+        action: { type: "update", name, oldTotal, delta, newTotal },
         vars: [
           { name: "old total", value: oldTotal },
           { name: "delta", value: delta },
@@ -505,6 +542,8 @@ function buildSteps9001(input, params) {
       snapshot({
         title: { vi: `Push (${-newTotal}, '${name}')`, en: `Push (${-newTotal}, '${name}')` },
         codeLines: [12],
+        phase: "push",
+        action: { type: "push", name, profit: newTotal, storedPriority: -newTotal },
         hlSet: new Set([Math.max(0, pushedIndex)]),
         vars: [
           { name: "stored tuple", value: `(${-newTotal}, '${name}')` },
@@ -522,6 +561,8 @@ function buildSteps9001(input, params) {
     snapshot({
       title: { vi: "op == 'U' là Sai, vào Query", en: "op == 'U' is False: query" },
       codeLines: [13],
+      phase: "query",
+      action: { type: "branch", branch: "query" },
       hlSet: heap.length ? new Set([0]) : new Set(),
       vars: [
         { name: "op", value: op },
@@ -539,6 +580,8 @@ function buildSteps9001(input, params) {
       snapshot({
         title: { vi: `Root ${stale.name}:${stale.profit} là stale`, en: `Root ${stale.name}:${stale.profit} is stale` },
         codeLines: [14],
+        phase: "compare",
+        action: { type: "compare", name: stale.name, heapProfit: stale.profit, actualProfit: currentTotal, current: false },
         hlSet: new Set([0]),
         vars: [
           { name: "heap root profit", value: stale.profit },
@@ -555,6 +598,8 @@ function buildSteps9001(input, params) {
       snapshot({
         title: { vi: `Pop stale ${removed.name}:${removed.profit}`, en: `Pop stale ${removed.name}:${removed.profit}` },
         codeLines: [15],
+        phase: "pop",
+        action: { type: "pop", name: removed.name, profit: removed.profit },
         hlSet: heap.length ? new Set([0]) : new Set(),
         vars: [
           { name: "removed", value: `${removed.name}: ${removed.profit}` },
@@ -573,6 +618,10 @@ function buildSteps9001(input, params) {
     snapshot({
       title: { vi: heap.length ? `Root ${heap[0].name}:${heap[0].profit} hợp lệ` : "Heap rỗng" , en: heap.length ? `Root ${heap[0].name}:${heap[0].profit} is current` : "Heap is empty" },
       codeLines: [14],
+      phase: "compare",
+      action: heap.length
+        ? { type: "compare", name: heap[0].name, heapProfit: heap[0].profit, actualProfit: totals.get(heap[0].name) || 0, current: true }
+        : { type: "empty" },
       hlSet: heap.length ? new Set([0]) : new Set(),
       vars: heap.length ? [
         { name: "root profit", value: heap[0].profit },
@@ -592,6 +641,8 @@ function buildSteps9001(input, params) {
     snapshot({
       title: { vi: `res.append(${winner === null ? "None" : `'${winner}'`})`, en: `res.append(${winner === null ? "None" : `'${winner}'`})` },
       codeLines: [16],
+      phase: "answer",
+      action: { type: "answer", name: winner, profit: heap.length ? heap[0].profit : null, peek: true },
       hlSet: heap.length ? new Set([0]) : new Set(),
       vars: [
         { name: "winner", value: winner === null ? "None" : winner },
@@ -607,9 +658,12 @@ function buildSteps9001(input, params) {
     });
   }
 
+  activeOperation = operations.length;
   snapshot({
     title: { vi: `return ${resultText()}`, en: `return ${resultText()}` },
     codeLines: [18],
+    phase: "done",
+    action: { type: "return" },
     markSet: currentIndices(),
     vars: [
       { name: "res", value: resultText() },

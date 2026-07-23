@@ -2715,6 +2715,333 @@ button:disabled {
   fill: #fbbf24;
 }
 
+/* ---- Real-time experience profit tracker (#9001) ---- */
+.profit-tracker-viz {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  letter-spacing: 0;
+}
+
+.profit-ops {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.profit-op {
+  position: relative;
+  min-width: 0;
+  min-height: 64px;
+  padding: 9px 8px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.48);
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.profit-op strong {
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.profit-op span:last-child {
+  font-size: 10px;
+}
+
+.profit-op-index {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 9px;
+  color: #64748b;
+}
+
+.profit-op.done {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.profit-op.done strong {
+  color: #6ee7b7;
+}
+
+.profit-op.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+}
+
+.profit-op.active strong,
+.profit-op.active span:last-child {
+  color: #fbbf24;
+}
+
+.profit-action {
+  min-height: 48px;
+  padding: 10px 12px;
+  border-left: 3px solid #818cf8;
+  background: rgba(99, 102, 241, 0.09);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.profit-action strong {
+  color: #c7d2fe;
+}
+
+.profit-action em {
+  color: #94a3b8;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.profit-action .is-current {
+  color: #6ee7b7;
+}
+
+.profit-action .is-stale {
+  color: #fda4af;
+}
+
+.profit-arrow {
+  color: #818cf8;
+  font-weight: 700;
+}
+
+.profit-state-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.72fr) minmax(0, 1.65fr);
+  gap: 14px;
+}
+
+.profit-state-panel {
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.profit-state-panel h4 {
+  margin: 0 0 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.profit-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  font-size: 12px;
+}
+
+.profit-total-row strong {
+  color: #6ee7b7;
+  font-size: 14px;
+}
+
+.profit-heap-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.profit-heap-entry {
+  flex: 1 1 132px;
+  min-width: 0;
+  max-width: 190px;
+  padding: 8px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.profit-heap-entry.current {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.profit-heap-entry.stale {
+  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.07);
+}
+
+.profit-heap-entry.root {
+  box-shadow: inset 0 3px 0 #f59e0b;
+}
+
+.profit-heap-entry.focused {
+  outline: 2px solid rgba(245, 158, 11, 0.6);
+  outline-offset: 2px;
+}
+
+.profit-heap-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 9px;
+}
+
+.profit-heap-entry.current .profit-heap-top strong {
+  color: #6ee7b7;
+}
+
+.profit-heap-entry.stale .profit-heap-top strong {
+  color: #fda4af;
+}
+
+.profit-heap-name {
+  margin-top: 4px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.profit-heap-values {
+  display: grid;
+  gap: 1px;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.profit-result-row,
+.profit-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profit-result-row {
+  padding-top: 9px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 11px;
+}
+
+.profit-result-item {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+}
+
+.profit-legend {
+  color: #94a3b8;
+  font-size: 9px;
+}
+
+.profit-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profit-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #64748b;
+}
+
+.profit-legend i.current { background: #10b981; }
+.profit-legend i.stale { background: #f43f5e; }
+.profit-legend i.root { background: #f59e0b; }
+
+.profit-empty {
+  color: #64748b;
+  font-size: 11px;
+  padding: 8px 0;
+}
+
+[data-theme="light"] .profit-tracker-viz {
+  color: #1e293b;
+}
+
+[data-theme="light"] .profit-op,
+[data-theme="light"] .profit-heap-entry {
+  background: #ffffff;
+}
+
+[data-theme="light"] .profit-op.done {
+  background: #ecfdf5;
+}
+
+[data-theme="light"] .profit-op.active {
+  background: #fffbeb;
+}
+
+[data-theme="light"] .profit-op.done strong,
+[data-theme="light"] .profit-total-row strong,
+[data-theme="light"] .profit-heap-entry.current .profit-heap-top strong {
+  color: #047857;
+}
+
+[data-theme="light"] .profit-op.active strong,
+[data-theme="light"] .profit-op.active span:last-child {
+  color: #b45309;
+}
+
+[data-theme="light"] .profit-action {
+  background: #eef2ff;
+}
+
+[data-theme="light"] .profit-action strong,
+[data-theme="light"] .profit-result-item {
+  color: #4338ca;
+}
+
+[data-theme="light"] .profit-action .is-current { color: #047857; }
+[data-theme="light"] .profit-action .is-stale,
+[data-theme="light"] .profit-heap-entry.stale .profit-heap-top strong { color: #be123c; }
+
+[data-theme="light"] .profit-heap-entry.stale {
+  background: #fff1f2;
+}
+
+[data-theme="light"] .profit-heap-name {
+  color: #0f172a;
+}
+
+[data-theme="light"] .profit-result-item {
+  background: #eef2ff;
+}
+
+@media (max-width: 760px) {
+  .profit-ops {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profit-state-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profit-heap-entry {
+    max-width: none;
+  }
+}
+
 /* ---- Meeting-room allocation timeline (#253) ---- */
 .rooms-timeline-viz {
   color: #e2e8f0;

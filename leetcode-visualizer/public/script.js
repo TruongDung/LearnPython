@@ -2883,6 +2883,105 @@ function renderMeetingTimelineView(step) {
   </div>`;
 }
 
+// ---- Real-time experience profit tracker (#9001) ----
+function renderProfitTrackerView(step) {
+  const view = step.profitTrackerView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+
+  const operationHtml = (view.operations || []).map((operation, index) => {
+    const active = index === view.activeIndex;
+    const done = index < view.activeIndex || view.activeIndex >= view.operations.length;
+    const detail = operation.op === "U"
+      ? `${operation.name} ${operation.delta >= 0 ? "+" : ""}${operation.delta}`
+      : (vi ? "lấy max" : "get max");
+    return `<div class="profit-op${active ? " active" : ""}${done ? " done" : ""}">
+      <span class="profit-op-index">${index}</span>
+      <strong>${escapeHtml(operation.op)}</strong>
+      <span>${escapeHtml(detail)}</span>
+    </div>`;
+  }).join("");
+
+  const totalsHtml = view.totals.length
+    ? view.totals.map((entry) => `<div class="profit-total-row">
+        <span>${escapeHtml(entry.name)}</span><strong>${escapeHtml(entry.total)}</strong>
+      </div>`).join("")
+    : `<div class="profit-empty">${vi ? "Chưa có dữ liệu" : "No data yet"}</div>`;
+
+  const heapHtml = view.heap.length
+    ? view.heap.map((entry) => `<div class="profit-heap-entry${entry.root ? " root" : ""}${entry.current ? " current" : " stale"}${entry.focused ? " focused" : ""}">
+        <div class="profit-heap-top">
+          <span>[${entry.index}]${entry.root ? ` · ${vi ? "ROOT" : "ROOT"}` : ""}</span>
+          <strong>${entry.current ? "CURRENT" : "STALE"}</strong>
+        </div>
+        <div class="profit-heap-name">${escapeHtml(entry.name)}</div>
+        <div class="profit-heap-values">
+          <span>${vi ? "profit" : "profit"} = ${escapeHtml(entry.profit)}</span>
+          <span>${vi ? "lưu" : "stored"} (${escapeHtml(entry.storedPriority)}, '${escapeHtml(entry.name)}')</span>
+        </div>
+      </div>`).join("")
+    : `<div class="profit-empty">heap = []</div>`;
+
+  const resultHtml = view.result.length
+    ? view.result.map((name, index) => `<span class="profit-result-item">Q${index + 1}: ${escapeHtml(name === null ? "None" : name)}</span>`).join("")
+    : `<span class="profit-empty">res = []</span>`;
+
+  const action = view.action || {};
+  let actionHtml = "";
+  if (action.type === "init") {
+    const labels = { totals: "totals = {}", heap: "heap = []", res: "res = []" };
+    actionHtml = `<span>${vi ? "Khởi tạo" : "Initialize"}</span><strong>${escapeHtml(labels[action.target] || action.target)}</strong>`;
+  } else if (action.type === "read") {
+    const detail = action.op === "U"
+      ? `${action.name}, delta ${action.delta >= 0 ? "+" : ""}${action.delta}`
+      : (vi ? "cần đọc winner hiện tại" : "read the current winner");
+    actionHtml = `<span>${vi ? "Đọc operation" : "Read operation"}</span><strong>${escapeHtml(action.op)} · ${escapeHtml(detail)}</strong>`;
+  } else if (action.type === "branch") {
+    actionHtml = `<span>op == 'U'</span><span class="profit-arrow">→</span><strong>${action.branch === "update" ? (vi ? "ĐÚNG: UPDATE" : "TRUE: UPDATE") : (vi ? "SAI: QUERY" : "FALSE: QUERY")}</strong>`;
+  } else if (action.type === "update") {
+    actionHtml = `<span>${escapeHtml(action.name)}: ${escapeHtml(action.oldTotal)}</span><span class="profit-arrow">+</span><span>${escapeHtml(action.delta)}</span><span class="profit-arrow">=</span><strong>${escapeHtml(action.newTotal)}</strong>`;
+  } else if (action.type === "push") {
+    actionHtml = `<span>${vi ? "total thật" : "true total"}: ${escapeHtml(action.profit)}</span><span class="profit-arrow">→</span><span>${vi ? "đổi dấu" : "negate"}: ${escapeHtml(action.storedPriority)}</span><span class="profit-arrow">→</span><strong>heappush</strong>`;
+  } else if (action.type === "compare") {
+    actionHtml = `<span>root ${escapeHtml(action.name)} = ${escapeHtml(action.heapProfit)}</span><span class="profit-arrow">${action.current ? "=" : "≠"}</span><span>totals[${escapeHtml(action.name)}] = ${escapeHtml(action.actualProfit)}</span><span class="profit-arrow">→</span><strong class="${action.current ? "is-current" : "is-stale"}">${action.current ? "CURRENT" : "STALE"}</strong>`;
+  } else if (action.type === "pop") {
+    actionHtml = `<strong class="is-stale">POP STALE</strong><span>${escapeHtml(action.name)} · ${escapeHtml(action.profit)}</span><span class="profit-arrow">→</span><span>${vi ? "kiểm tra root mới" : "check the new root"}</span>`;
+  } else if (action.type === "empty") {
+    actionHtml = `<strong>heap = []</strong><span class="profit-arrow">→</span><span>${vi ? "winner = None" : "winner = None"}</span>`;
+  } else if (action.type === "answer") {
+    actionHtml = action.name === null
+      ? `<span>heap = []</span><span class="profit-arrow">→</span><strong>res.append(None)</strong>`
+      : `<strong>PEEK heap[0]</strong><span class="profit-arrow">→</span><span>${escapeHtml(action.name)} · ${escapeHtml(action.profit)}</span><span class="profit-arrow">→</span><strong>res.append('${escapeHtml(action.name)}')</strong><em>${vi ? "không pop root" : "keep the root"}</em>`;
+  } else if (action.type === "return") {
+    actionHtml = `<strong>${vi ? "Hoàn tất tất cả operation" : "All operations complete"}</strong><span class="profit-arrow">→</span><span>return res</span>`;
+  }
+
+  const summary = vi
+    ? `Profit tracker tại operation ${view.activeIndex}. totals có ${view.totals.length} experience, heap có ${view.heap.length} entry.`
+    : `Profit tracker at operation ${view.activeIndex}. totals has ${view.totals.length} experiences and the heap has ${view.heap.length} entries.`;
+
+  el.innerHTML = `<div class="profit-tracker-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="profit-ops">${operationHtml}</div>
+    <div class="profit-action">${actionHtml}</div>
+    <div class="profit-state-grid">
+      <section class="profit-state-panel">
+        <h4>${vi ? "totals · dữ liệu thật" : "totals · source of truth"}</h4>
+        ${totalsHtml}
+      </section>
+      <section class="profit-state-panel">
+        <h4>heap · ${vi ? "các snapshot" : "snapshots"}</h4>
+        <div class="profit-heap-list">${heapHtml}</div>
+      </section>
+    </div>
+    <div class="profit-result-row"><strong>res</strong>${resultHtml}</div>
+    <div class="profit-legend">
+      <span><i class="current"></i>CURRENT = ${vi ? "khớp totals" : "matches totals"}</span>
+      <span><i class="stale"></i>STALE = ${vi ? "phiên bản cũ" : "old snapshot"}</span>
+      <span><i class="root"></i>ROOT = ${vi ? "ứng viên lớn nhất" : "maximum candidate"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -2894,7 +2993,13 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.meetingRoomsTimelineView) {
+  if (step.profitTrackerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderProfitTrackerView(step);
+  } else if (step.meetingRoomsTimelineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
