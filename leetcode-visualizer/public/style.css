@@ -5122,6 +5122,11 @@ button:disabled {
   max-width: 100%;
 }
 
+.graph-flow {
+  max-width: 100%;
+  height: auto;
+}
+
 .graph-edge {
   fill: none;
   stroke: #475569;
@@ -5132,6 +5137,33 @@ button:disabled {
 .graph-edge.hl {
   stroke: #f59e0b;
   stroke-width: 3;
+}
+
+.graph-edge.dim,
+.graph-weight.dim,
+.graph-weight-bg.dim {
+  opacity: 0.24;
+}
+
+.graph-weight-bg {
+  fill: #151321;
+  stroke: #334155;
+  stroke-width: 1;
+}
+
+.graph-weight-bg.hl {
+  fill: #2a2114;
+  stroke: #f59e0b;
+}
+
+[data-theme="light"] .graph-weight-bg {
+  fill: #ffffff;
+  stroke: #cbd5e1;
+}
+
+[data-theme="light"] .graph-weight-bg.hl {
+  fill: #fffbeb;
+  stroke: #d97706;
 }
 
 .graph-edge.prev {

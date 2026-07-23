@@ -1655,8 +1655,9 @@ function renderGraph(step) {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
   const n = nodes.length;
   const isLinear = step.graph.layout === "linear";
-  const r = isLinear ? 44 : 24;
-  const pad = isLinear ? 64 : 60;
+  const isFlow = step.graph.layout === "flow";
+  const r = isLinear ? 44 : isFlow ? 28 : 24;
+  const pad = isLinear ? 64 : isFlow ? 72 : 60;
   const size = Math.max(280, n * 50);
   const cx = size / 2;
   const cy = size / 2;
@@ -1665,7 +1666,18 @@ function renderGraph(step) {
   const pos = {};
   let svgWidth = size;
   let svgHeight = size;
-  if (isLinear) {
+  if (isFlow && step.graph.positions) {
+    svgWidth = step.graph.width || 660;
+    svgHeight = step.graph.height || 340;
+    nodes.forEach((node) => {
+      const custom = step.graph.positions[node.id];
+      if (!custom) return;
+      pos[node.id] = {
+        x: pad + custom.x * (svgWidth - pad * 2),
+        y: pad + custom.y * (svgHeight - pad * 2),
+      };
+    });
+  } else if (isLinear) {
     const order = step.graph.order || nodes.map((node) => node.id);
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const orderedNodes = order.map((id) => nodeById.get(id)).filter(Boolean);
@@ -1723,15 +1735,17 @@ function renderGraph(step) {
     const typedEdgeKey = `${edgeKey}${edge.kind ? `-${edge.kind}` : ""}`;
     const isHl = hlEdgeSet.has(edgeKey) || hlEdgeSet.has(typedEdgeKey);
     const kindClass = edge.kind ? ` ${edge.kind}` : "";
-    const cls = `graph-edge${kindClass}${isHl ? " hl" : ""}`;
+    const isDimmed = step.graph.dimUnfocused && hlEdgeSet.size > 0 && !isHl;
+    const cls = `graph-edge${kindClass}${isHl ? " hl" : ""}${isDimmed ? " dim" : ""}`;
     const markerId = isHl ? arrowHlId : edge.kind === "prev" ? arrowPrevId : arrowId;
     const markerEnd = `url(#${markerId})`;
     const isPointerLane = isLinear && (edge.kind === "next" || edge.kind === "prev") && Math.abs(dy) < 1;
 
     let mx = (x1 + x2) / 2;
     let my = (y1 + y2) / 2;
-    let labelX = mx - uy * 12;
-    let labelY = my + ux * 12;
+    const labelOffset = isFlow ? 30 : 12;
+    let labelX = mx - uy * labelOffset;
+    let labelY = my + ux * labelOffset;
     if (isLinear && edge.circular) {
       const isSelfLoop = edge.u === edge.v;
       const isPrev = edge.kind === "prev";
@@ -1788,7 +1802,12 @@ function renderGraph(step) {
       edgeSvg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" marker-end="${markerEnd}" />`;
     }
 
-    const weight = edge.w ? `<text x="${labelX}" y="${labelY}" class="graph-weight${kindClass}${isHl ? " hl" : ""}" text-anchor="middle" dy="0.35em">${escapeXml(edge.w)}</text>` : "";
+    const weightText = edge.w === undefined || edge.w === null ? "" : String(edge.w);
+    const weightWidth = Math.max(24, weightText.length * 8 + 10);
+    const weight = weightText
+      ? `<rect x="${labelX - weightWidth / 2}" y="${labelY - 9}" width="${weightWidth}" height="18" rx="4" class="graph-weight-bg${isHl ? " hl" : ""}${isDimmed ? " dim" : ""}" />` +
+        `<text x="${labelX}" y="${labelY}" class="graph-weight${kindClass}${isHl ? " hl" : ""}${isDimmed ? " dim" : ""}" text-anchor="middle" dy="0.35em">${escapeXml(weightText)}</text>`
+      : "";
     edgeSvg += weight;
   }
 
@@ -1849,7 +1868,7 @@ function renderGraph(step) {
     : "";
   $("treeView").innerHTML =
     caption +
-    `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" class="tree-svg graph-svg${isLinear ? " graph-linear" : ""}">` +
+    `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" class="tree-svg graph-svg${isLinear ? " graph-linear" : ""}${isFlow ? " graph-flow" : ""}">` +
     defs + edgeSvg + nodeSvg +
     `</svg>`;
 }

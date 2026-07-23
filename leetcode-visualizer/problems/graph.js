@@ -1584,6 +1584,28 @@ function buildSteps743(input, params) {
  * LeetCode 787: Cheapest Flights Within K Stops.
  * Bounded Bellman-Ford: round r may use at most r + 1 flights.
  */
+function make787FlowLayout(n, src, dst) {
+  const middle = Array.from({ length: n }, (_, id) => id)
+    .filter((id) => id !== src && id !== dst);
+  const positions = {};
+  positions[src] = { x: 0, y: 0.5 };
+  if (dst !== src) positions[dst] = { x: 1, y: 0.5 };
+  middle.forEach((id, index) => {
+    positions[id] = { x: 0.5, y: (index + 1) / (middle.length + 1) };
+  });
+  return {
+    layout: "flow",
+    positions,
+    width: 660,
+    height: Math.max(440, (middle.length + 1) * 116),
+    dimUnfocused: true,
+    caption: {
+      vi: "src (trái) → trung gian → dst (phải) • số dưới node = giá tốt nhất hiện tại",
+      en: "src (left) → intermediate cities → dst (right) • value below node = current best price",
+    },
+  };
+}
+
 function buildSteps787BellmanFord(input, params) {
   const n = Number(params.n);
   const src = Number(params.src);
@@ -1625,6 +1647,7 @@ function buildSteps787BellmanFord(input, params) {
 
   const nodes = Array.from({ length: n }, (_, id) => id);
   const edges = flights.map(([u, v, w]) => ({ u, v, w }));
+  const flowLayout = make787FlowLayout(n, src, dst);
   const formatValue = (value) => value === Infinity ? "∞" : String(value);
   const formatCosts = (costs) => `[${costs.map(formatValue).join(", ")}]`;
   const reachable = (costs) => nodes.filter((id) => costs[id] !== Infinity);
@@ -1639,6 +1662,7 @@ function buildSteps787BellmanFord(input, params) {
       hlEdges,
       visitedNodes: reachable(costs),
       annotations,
+      ...flowLayout,
     };
   }
 
@@ -1917,6 +1941,7 @@ function buildSteps787Dijkstra(input, params) {
   const maxFlights = k + 1;
   const nodes = Array.from({ length: n }, (_, id) => id);
   const edges = flights.map(([u, v, w]) => ({ u, v, w }));
+  const flowLayout = make787FlowLayout(n, src, dst);
   const graph = Array.from({ length: n }, () => []);
   const popped = new Set();
   const formatValue = (value) => value === Infinity ? "∞" : String(value);
@@ -1935,6 +1960,7 @@ function buildSteps787Dijkstra(input, params) {
       hlEdges,
       visitedNodes: [...popped],
       annotations,
+      ...flowLayout,
     };
   }
 
