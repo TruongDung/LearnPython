@@ -308,6 +308,324 @@ function buildSteps3092(nums, params) {
   };
 }
 
+// ─── 9001: Real-Time Experience Profit Tracker ───
+function buildSteps9001(input, params) {
+  const operations = Array.isArray(input) ? input.map((op) => String(op).trim().toUpperCase()) : [];
+  const experiences = String(params.experiences || "").split(",").map((name) => {
+    const trimmed = name.trim();
+    return trimmed === "-" ? "" : trimmed;
+  });
+  const deltaParts = String(params.deltas || "").split(",").map((part) => part.trim());
+  const deltas = deltaParts.map(Number);
+  const steps = [];
+
+  const valid = operations.length > 0
+    && operations.length === experiences.length
+    && operations.length === deltas.length
+    && operations.every((op) => op === "U" || op === "Q")
+    && deltaParts.every((part, index) => part !== "" && Number.isInteger(deltas[index]))
+    && operations.every((op, index) => op === "Q" || experiences[index] !== "");
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines: [9],
+      vars: [
+        { name: "len(operations)", value: operations.length },
+        { name: "len(experiences)", value: experiences.length },
+        { name: "len(deltas)", value: deltas.length },
+      ],
+      note: {
+        vi: "Ba mảng phải có cùng độ dài. operations chỉ chứa U hoặc Q; mỗi U cần tên experience; mọi delta phải là số nguyên. Với Q có thể nhập '-' cho tên vì giá trị này không được dùng.",
+        en: "All three arrays must have equal length. Operations must be U or Q, updates need a name, and every delta must be an integer. Use '-' as the unused query name.",
+      },
+      final: true,
+    });
+    return { original: { operations, experiences, deltas }, answer: null, steps };
+  }
+
+  const totals = new Map();
+  const heap = [];
+  const result = [];
+
+  const isCurrent = (entry) => (totals.get(entry.name) || 0) === entry.profit;
+  const higherPriority = (a, b) => a.profit > b.profit
+    || (a.profit === b.profit && a.name < b.name);
+  const label = (entry) => `${entry.name}·$${entry.profit}${isCurrent(entry) ? "" : " old"}`;
+  label.lines = (entry) => [entry.name, `profit=${entry.profit}`, isCurrent(entry) ? "current" : "stale"];
+  const totalsText = () => {
+    const entries = [...totals.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    return `{${entries.map(([name, total]) => `${name}: ${total}`).join(", ")}}`;
+  };
+  const heapText = () => `[${heap.map((entry) => `(${entry.name},${entry.profit}${isCurrent(entry) ? "" : ",old"})`).join(", ")}]`;
+  const resultText = () => `[${result.map((name) => name === null ? "None" : `'${name}'`).join(", ")}]`;
+  const currentIndices = () => new Set(heap
+    .map((entry, index) => isCurrent(entry) ? index : -1)
+    .filter((index) => index >= 0));
+
+  function snapshot(opts) {
+    const step = heapSnapshot([...heap], label, {
+      title: opts.title,
+      codeLines: opts.codeLines,
+      hlSet: opts.hlSet || new Set(),
+      markSet: opts.markSet || currentIndices(),
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  function siftUp(index) {
+    let child = index;
+    while (child > 0) {
+      const parent = Math.floor((child - 1) / 2);
+      if (!higherPriority(heap[child], heap[parent])) break;
+      [heap[child], heap[parent]] = [heap[parent], heap[child]];
+      child = parent;
+    }
+  }
+
+  function siftDown(index) {
+    let parent = index;
+    while (true) {
+      let best = parent;
+      const left = 2 * parent + 1;
+      const right = left + 1;
+      if (left < heap.length && higherPriority(heap[left], heap[best])) best = left;
+      if (right < heap.length && higherPriority(heap[right], heap[best])) best = right;
+      if (best === parent) break;
+      [heap[parent], heap[best]] = [heap[best], heap[parent]];
+      parent = best;
+    }
+  }
+
+  function push(entry) {
+    heap.push(entry);
+    siftUp(heap.length - 1);
+  }
+
+  function popRoot() {
+    const removed = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+      heap[0] = last;
+      siftDown(0);
+    }
+    return removed;
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo totals", en: "Initialize totals" },
+    codeLines: [5],
+    vars: [{ name: "totals", value: "{}" }],
+    note: {
+      vi: "totals là hash map chứa tổng lợi nhuận đúng hiện tại của mỗi experience. Đây là nguồn dữ liệu chuẩn để nhận biết một entry trong heap còn hợp lệ hay đã cũ.",
+      en: "totals is the source of truth for each experience's current profit and is used to detect stale heap entries.",
+    },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo heap", en: "Initialize heap" },
+    codeLines: [6],
+    vars: [{ name: "heap", value: "[]" }],
+    note: {
+      vi: "Python heapq là min-heap, nên ta lưu (-total, name). Total càng lớn thì -total càng nhỏ và càng gần root. Khi bằng total, tuple tự ưu tiên name nhỏ hơn theo thứ tự chữ cái.",
+      en: "Python heapq is a min-heap, so entries are stored as (-total, name). Larger totals rise to the root, with names breaking ties alphabetically.",
+    },
+  });
+  snapshot({
+    title: { vi: "Khởi tạo res", en: "Initialize res" },
+    codeLines: [7],
+    vars: [{ name: "res", value: "[]" }],
+    note: {
+      vi: "res chỉ nhận thêm một phần tử khi gặp operation Q. Mỗi phần tử là tên experience đang có total lớn nhất, hoặc None nếu chưa có update nào.",
+      en: "res receives one item per query: the current highest earner, or None when no experience has been updated.",
+    },
+  });
+
+  for (let index = 0; index < operations.length; index++) {
+    const op = operations[index];
+    const name = experiences[index];
+    const delta = deltas[index];
+
+    snapshot({
+      title: { vi: `Operation ${index}: ${op}${op === "U" ? ` ${name} ${delta >= 0 ? "+" : ""}${delta}` : ""}`, en: `Operation ${index}: ${op}${op === "U" ? ` ${name} ${delta >= 0 ? "+" : ""}${delta}` : ""}` },
+      codeLines: [9],
+      vars: [
+        { name: "index", value: index },
+        { name: "op", value: op },
+        { name: "name", value: op === "U" ? name : "unused" },
+        { name: "delta", value: op === "U" ? delta : "unused" },
+        { name: "totals", value: totalsText() },
+        { name: "res", value: resultText() },
+      ],
+      note: {
+        vi: op === "U"
+          ? `Đọc update thứ ${index}: thay đổi total của ${name} một lượng ${delta >= 0 ? "+" : ""}${delta}.`
+          : `Đọc query thứ ${index}: cần tìm experience có total lớn nhất ở đúng thời điểm này.`,
+        en: op === "U" ? `Read update ${index} for ${name}.` : `Read query ${index} and find the current highest earner.`,
+      },
+    });
+
+    if (op === "U") {
+      snapshot({
+        title: { vi: "op == 'U' là Đúng", en: "op == 'U' is True" },
+        codeLines: [10],
+        vars: [{ name: "op", value: op }, { name: "branch", value: "update" }],
+        note: {
+          vi: "Đi vào nhánh update. Ta cập nhật hash map trước, sau đó push một snapshot mới vào heap; snapshot cũ không cần tìm và xóa ngay.",
+          en: "Enter the update branch: update the map first, then push a fresh snapshot into the heap.",
+        },
+      });
+
+      const oldTotal = totals.get(name) || 0;
+      const newTotal = oldTotal + delta;
+      totals.set(name, newTotal);
+      snapshot({
+        title: { vi: `totals['${name}'] = ${oldTotal} + (${delta}) = ${newTotal}`, en: `totals['${name}'] = ${oldTotal} + (${delta}) = ${newTotal}` },
+        codeLines: [11],
+        vars: [
+          { name: "old total", value: oldTotal },
+          { name: "delta", value: delta },
+          { name: "new total", value: newTotal },
+          { name: "totals", value: totalsText() },
+        ],
+        note: {
+          vi: `Nguồn dữ liệu chuẩn đã đổi: ${name} hiện có total ${newTotal}. Mọi heap entry cũ của ${name} có profit khác ${newTotal} lập tức trở thành stale, nhưng vẫn nằm trong heap cho tới khi cản đường ở root.`,
+          en: `${name}'s current total is now ${newTotal}. Older heap entries with another value become stale but remain until they reach the root.`,
+        },
+      });
+
+      const pushedEntry = { name, profit: newTotal };
+      push(pushedEntry);
+      const pushedIndex = heap.indexOf(pushedEntry);
+      snapshot({
+        title: { vi: `Push (${-newTotal}, '${name}')`, en: `Push (${-newTotal}, '${name}')` },
+        codeLines: [12],
+        hlSet: new Set([Math.max(0, pushedIndex)]),
+        vars: [
+          { name: "stored tuple", value: `(${-newTotal}, '${name}')` },
+          { name: "heap", value: heapText() },
+          { name: "root", value: `${heap[0].name}: ${heap[0].profit}` },
+        ],
+        note: {
+          vi: `Push phiên bản mới của ${name} vào heap rồi sift-up. Cây hiển thị profit dương cho dễ đọc, dù Python thực tế lưu ${-newTotal}. Update kết thúc tại đây; lazy deletion chỉ chạy khi có query.`,
+          en: `Push ${name}'s fresh snapshot and sift it up. Lazy deletion runs only when a query needs the root.`,
+        },
+      });
+      continue;
+    }
+
+    snapshot({
+      title: { vi: "op == 'U' là Sai, vào Query", en: "op == 'U' is False: query" },
+      codeLines: [13],
+      hlSet: heap.length ? new Set([0]) : new Set(),
+      vars: [
+        { name: "op", value: op },
+        { name: "heap root", value: heap.length ? `${heap[0].name}: ${heap[0].profit}` : "None" },
+      ],
+      note: {
+        vi: "Query không thay đổi totals. Trước khi trả lời, ta chỉ cần làm sạch root cho tới khi root khớp với total hiện tại trong hash map.",
+        en: "A query does not change totals. It only cleans stale roots before reading the answer.",
+      },
+    });
+
+    while (heap.length > 0 && !isCurrent(heap[0])) {
+      const stale = heap[0];
+      const currentTotal = totals.get(stale.name) || 0;
+      snapshot({
+        title: { vi: `Root ${stale.name}:${stale.profit} là stale`, en: `Root ${stale.name}:${stale.profit} is stale` },
+        codeLines: [14],
+        hlSet: new Set([0]),
+        vars: [
+          { name: "heap root profit", value: stale.profit },
+          { name: `totals['${stale.name}']`, value: currentTotal },
+          { name: "comparison", value: `${stale.profit} != ${currentTotal}` },
+        ],
+        note: {
+          vi: `Heap đang nói ${stale.name} có ${stale.profit}, nhưng totals nói giá trị hiện tại là ${currentTotal}. Hai số không bằng nhau nên entry ở root là phiên bản cũ và không thể dùng làm đáp án.`,
+          en: `The heap says ${stale.name} has ${stale.profit}, but totals says ${currentTotal}; the root is stale.`,
+        },
+      });
+
+      const removed = popRoot();
+      snapshot({
+        title: { vi: `Pop stale ${removed.name}:${removed.profit}`, en: `Pop stale ${removed.name}:${removed.profit}` },
+        codeLines: [15],
+        hlSet: heap.length ? new Set([0]) : new Set(),
+        vars: [
+          { name: "removed", value: `${removed.name}: ${removed.profit}` },
+          { name: "heap", value: heapText() },
+          { name: "new root", value: heap.length ? `${heap[0].name}: ${heap[0].profit}` : "None" },
+        ],
+        note: {
+          vi: heap.length
+            ? "Chỉ entry stale bị xóa. Phần tử cuối được đưa lên root và sift-down; vòng while sẽ kiểm tra root mới thêm một lần nữa."
+            : "Entry stale cuối cùng đã bị xóa và heap rỗng; query sẽ trả None.",
+          en: heap.length ? "Remove only the stale entry, restore the heap, and check the new root." : "The heap is now empty, so the query returns None.",
+        },
+      });
+    }
+
+    snapshot({
+      title: { vi: heap.length ? `Root ${heap[0].name}:${heap[0].profit} hợp lệ` : "Heap rỗng" , en: heap.length ? `Root ${heap[0].name}:${heap[0].profit} is current` : "Heap is empty" },
+      codeLines: [14],
+      hlSet: heap.length ? new Set([0]) : new Set(),
+      vars: heap.length ? [
+        { name: "root profit", value: heap[0].profit },
+        { name: `totals['${heap[0].name}']`, value: totals.get(heap[0].name) || 0 },
+        { name: "while condition", value: "False" },
+      ] : [{ name: "heap", value: "[]" }, { name: "while condition", value: "False" }],
+      note: {
+        vi: heap.length
+          ? `Root khớp totals nên vòng while dừng. Vì heap ưu tiên profit lớn nhất, ${heap[0].name} với ${heap[0].profit} là experience kiếm nhiều nhất hiện tại.`
+          : "Heap không có entry nào nên điều kiện while sai ngay; chưa có experience để trả về.",
+        en: heap.length ? `The root matches totals, so ${heap[0].name} is the current highest earner.` : "The heap is empty, so there is no current experience.",
+      },
+    });
+
+    const winner = heap.length ? heap[0].name : null;
+    result.push(winner);
+    snapshot({
+      title: { vi: `res.append(${winner === null ? "None" : `'${winner}'`})`, en: `res.append(${winner === null ? "None" : `'${winner}'`})` },
+      codeLines: [16],
+      hlSet: heap.length ? new Set([0]) : new Set(),
+      vars: [
+        { name: "winner", value: winner === null ? "None" : winner },
+        { name: "res", value: resultText() },
+        { name: "heap after query", value: heapText() },
+      ],
+      note: {
+        vi: winner === null
+          ? "Heap rỗng nên thêm None vào res."
+          : `Thêm ${winner} vào res bằng heap[0][1]. Quan trọng: đây là PEEK, không phải heappop; root hợp lệ phải được giữ lại để một query kế tiếp vẫn trả đúng dù không có update xen giữa.`,
+        en: winner === null ? "Append None because the heap is empty." : `Append ${winner} by peeking at heap[0]. Do not pop the valid winner.`,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: `return ${resultText()}`, en: `return ${resultText()}` },
+    codeLines: [18],
+    markSet: currentIndices(),
+    vars: [
+      { name: "res", value: resultText() },
+      { name: "final totals", value: totalsText() },
+      { name: "heap entries", value: heap.length },
+    ],
+    note: {
+      vi: `Đã xử lý ${operations.length} operations và trả ${result.length} kết quả query. Mỗi update push đúng một entry; mỗi entry stale bị pop nhiều nhất một lần, nên tổng thời gian là O(m log m), không phải mỗi query quét lại toàn bộ experiences.`,
+      en: `Processed ${operations.length} operations and returned ${result.length} query results. Each entry is pushed once and popped at most once, for O(m log m) total time.`,
+    },
+    final: true,
+  });
+
+  return { original: { operations, experiences, deltas }, answer: result, steps };
+}
+
 // ─── 347: Top K Frequent Elements ───
 // Line-by-line trace of the exact code shown to the user:
 //  1  class Solution:
@@ -2214,6 +2532,58 @@ module.exports = {
       "        return answer",
     ],
     builder: buildSteps3092,
+  },
+  9001: {
+    id: 9001,
+    difficulty: "medium",
+    category: HEAP_CAT,
+    title: { vi: "Real-Time Experience Profit Tracker", en: "Real-Time Experience Profit Tracker" },
+    titleVi: { vi: "Theo dõi experience có lợi nhuận cao nhất", en: "Track the highest-earning experience" },
+    statement: {
+      vi: "Xử lý chuỗi thao tác U và Q. U cộng delta vào tổng lợi nhuận của một experience. Q trả về tên experience có tổng lợi nhuận lớn nhất hiện tại, hoặc None nếu chưa có dữ liệu. Khi bằng lợi nhuận, tên nhỏ hơn theo thứ tự chữ cái được ưu tiên.",
+      en: "Process U and Q operations. U adds a delta to an experience's total profit. Q returns the current highest-earning experience, or None if no data exists. Ties are resolved alphabetically.",
+    },
+    defaultInput: ["U", "U", "Q", "U", "Q", "U", "Q"],
+    inputKind: "stringArray",
+    inputLabel: { vi: "operations (JSON hoặc phẩy ngăn cách)", en: "operations (JSON or comma separated)" },
+    extraParams: [
+      { key: "experiences", type: "string", label: { vi: "experiences (dùng '-' cho Q)", en: "experiences (use '-' for Q)" }, default: "GameA,GameB,-,GameB,-,GameA,-" },
+      { key: "deltas", type: "string", label: { vi: "deltas (Q dùng 0)", en: "deltas (use 0 for Q)" }, default: "100,150,0,-60,0,50,0" },
+    ],
+    approach: [
+      { vi: "totals lưu lợi nhuận đúng hiện tại; mỗi update push một snapshot (-total, name) mới vào heap.", en: "totals stores current profits; each update pushes a fresh (-total, name) snapshot into the heap." },
+      { vi: "Entry cũ được giữ lại và chỉ bị pop khi lên root nhưng không còn khớp totals. Đây là lazy deletion.", en: "Old entries remain and are popped only when they reach the root and no longer match totals. This is lazy deletion." },
+      { vi: "Query peek heap[0] sau khi dọn stale root. Không pop winner hợp lệ, vì query kế tiếp vẫn cần nó.", en: "A query peeks at heap[0] after stale cleanup. It never pops the valid winner, which future queries still need." },
+    ],
+    complexity: {
+      time: "O(m log m)",
+      space: "O(m)",
+      note: {
+        vi: "Mỗi update push một entry và mỗi stale entry bị pop tối đa một lần. Query không quét toàn bộ experience.",
+        en: "Each update pushes one entry and each stale entry is popped at most once. Queries do not scan every experience.",
+      },
+    },
+    code: [
+      "import heapq",
+      "from collections import defaultdict",
+      "",
+      "def get_highest_earning_experiences(operations, experiences, deltas):",
+      "    totals = defaultdict(int)",
+      "    heap = []",
+      "    res = []",
+      "",
+      "    for op, name, delta in zip(operations, experiences, deltas):",
+      "        if op == 'U':",
+      "            totals[name] += delta",
+      "            heapq.heappush(heap, (-totals[name], name))",
+      "        else:",
+      "            while heap and -heap[0][0] != totals[heap[0][1]]:",
+      "                heapq.heappop(heap)",
+      "            res.append(heap[0][1] if heap else None)",
+      "",
+      "    return res",
+    ],
+    builder: buildSteps9001,
   },
   347: {
     id: 347, difficulty: "medium", slug: "top-k-frequent-elements",
