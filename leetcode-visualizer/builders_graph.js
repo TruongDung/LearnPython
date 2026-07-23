@@ -1665,7 +1665,7 @@ function buildSteps3341(input) {
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: String(readyAt), meta: `arr ${formatTime(dist[r][c])}${endpoint}`, cls };
+      return { label: formatTime(dist[r][c]), meta: `⏱${readyAt}${endpoint}`, cls };
     }));
   }
 
@@ -1688,8 +1688,8 @@ function buildSteps3341(input) {
     codeLine: 6,
     vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
     note: {
-      vi: `Số lớn trong ô là thời điểm sớm nhất được phép BẮT ĐẦU đi vào phòng đó. meta t:… là thời điểm đến sớm nhất Dijkstra tìm được; đích là (${rows - 1},${cols - 1}).`,
-      en: `A cell's large number is the earliest time movement into that room may START. The t:… metadata is Dijkstra's earliest known arrival; the target is (${rows - 1},${cols - 1}).`,
+      vi: `Số lớn trong ô là thời điểm ĐẾN sớm nhất mà Dijkstra tìm được (cập nhật dần); ⏱ nhỏ là thời điểm phòng SẴN SÀNG cho phép bắt đầu đi vào (cố định, lấy từ input). Đích là (${rows - 1},${cols - 1}).`,
+      en: `The big number is the earliest ARRIVAL time Dijkstra has found so far (it updates as we go); the small ⏱ value is when the room is READY to be entered (fixed, from the input). The target is (${rows - 1},${cols - 1}).`,
     },
   });
 
@@ -1999,17 +1999,17 @@ function buildSteps3342(input) {
     const queued = new Set(heap.map(([, r, c]) => key(r, c)));
     return moveTime.map((row, r) => row.map((readyAt, c) => {
       const cellKey = key(r, c);
-      let cls = "empty";
-      if (finalized.has(cellKey)) cls = "visited";
-      if (queued.has(cellKey)) cls = "queued";
-      if (pathCells.has(cellKey)) cls = "path";
-      if (current && current[0] === r && current[1] === c) cls = "current";
+      let cls = (r + c) % 2 === 0 ? "parity-even" : "parity-odd";
+      if (finalized.has(cellKey)) cls += " visited";
+      if (queued.has(cellKey)) cls += " queued";
+      if (pathCells.has(cellKey)) cls += " path";
+      if (current && current[0] === r && current[1] === c) cls += " current";
       const endpoint = r === 0 && c === 0
         ? " · S"
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: String(readyAt), meta: `arr ${formatTime(dist[r][c])}${endpoint}`, cls };
+      return { label: formatTime(dist[r][c]), meta: `⏱${readyAt}${endpoint}`, cls };
     }));
   }
 
@@ -2017,7 +2017,7 @@ function buildSteps3342(input) {
     steps.push({
       title,
       arr: [],
-      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      bfsGrid: { rows, cols, variant: "effort-grid", parity: true, cells: makeCells(current, pathCells) },
       highlight: [],
       mark: [],
       final,
@@ -2032,8 +2032,8 @@ function buildSteps3342(input) {
     codeLine: 6,
     vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
     note: {
-      vi: `Số lớn trong ô là thời điểm sớm nhất được bắt đầu đi vào phòng; meta t:… là lúc đến sớm nhất. Các lượt di chuyển có thời lượng 1s, 2s, 1s, 2s...`,
-      en: `A cell's large number is the earliest allowed departure into that room; t:… is the earliest arrival. Move durations alternate 1s, 2s, 1s, 2s...`,
+      vi: `Số lớn trong ô là thời điểm ĐẾN sớm nhất Dijkstra tìm được (cập nhật dần); ⏱ nhỏ là thời điểm phòng sẵn sàng (cố định). Màu ô caro theo (r+c)%2: ô sáng hơn tốn 1s để bước tới, ô tối hơn tốn 2s.`,
+      en: `The big number is the earliest ARRIVAL time found so far (updates over time); the small ⏱ is the fixed ready time. The checkerboard tint follows (r+c)%2: lighter cells cost 1s to step into, darker cells cost 2s.`,
     },
   });
 

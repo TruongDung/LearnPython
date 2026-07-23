@@ -1383,11 +1383,19 @@ function renderBfsGrid(step) {
       const cls = cell.cls || "empty";
       const label = cell.label || "";
       const meta = cell.meta || "";
-      const topTag = isEffortGrid ? `<span class="bfs-cell-label-tag">MT</span>` : "";
+      const topTag = isEffortGrid ? `<span class="bfs-cell-label-tag">ARR</span>` : "";
       html += `<div class="bfs-cell ${cls}">${topTag}<span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
     }
   }
   html += "</div>";
+  if (isEffortGrid) {
+    const hasParity = !!step.bfsGrid.parity;
+    html += `<div class="effort-grid-legend">
+      <span><strong class="eg-legend-big">99</strong> ${lang === "vi" ? "= thời điểm ĐẾN sớm nhất (cập nhật)" : "= earliest ARRIVAL time (updates)"}</span>
+      <span><strong class="eg-legend-small">⏱99</strong> ${lang === "vi" ? "= thời điểm phòng sẵn sàng (cố định)" : "= room ready time (fixed)"}</span>
+      ${hasParity ? `<span><i class="eg-swatch eg-swatch-even"></i>${lang === "vi" ? "bước tới tốn 1s" : "step costs 1s"}</span><span><i class="eg-swatch eg-swatch-odd"></i>${lang === "vi" ? "bước tới tốn 2s" : "step costs 2s"}</span>` : ""}
+    </div>`;
+  }
   el.innerHTML = html;
 }
 
