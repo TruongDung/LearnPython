@@ -1383,7 +1383,8 @@ function renderBfsGrid(step) {
       const cls = cell.cls || "empty";
       const label = cell.label || "";
       const meta = cell.meta || "";
-      html += `<div class="bfs-cell ${cls}"><span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
+      const topTag = isEffortGrid ? `<span class="bfs-cell-label-tag">MT</span>` : "";
+      html += `<div class="bfs-cell ${cls}">${topTag}<span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
     }
   }
   html += "</div>";

@@ -1256,7 +1256,7 @@ function buildSteps2577(input) {
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: String(unlockTime), meta: `t:${formatTime(dist[r][c])}${endpoint}`, cls };
+      return { label: String(unlockTime), meta: `arr ${formatTime(dist[r][c])}${endpoint}`, cls };
     }));
   }
 
@@ -1665,7 +1665,7 @@ function buildSteps3341(input) {
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: String(readyAt), meta: `t:${formatTime(dist[r][c])}${endpoint}`, cls };
+      return { label: String(readyAt), meta: `arr ${formatTime(dist[r][c])}${endpoint}`, cls };
     }));
   }
 
@@ -2009,7 +2009,7 @@ function buildSteps3342(input) {
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: String(readyAt), meta: `t:${formatTime(dist[r][c])}${endpoint}`, cls };
+      return { label: String(readyAt), meta: `arr ${formatTime(dist[r][c])}${endpoint}`, cls };
     }));
   }
 
