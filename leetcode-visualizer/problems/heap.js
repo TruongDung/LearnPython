@@ -2751,6 +2751,11 @@ module.exports = {
       "                heapq.heappop(heap)",
       "        return [v for f, v in heap]",
     ],
+    liveArgs: (input, params) => {
+      const nums = String(input).split(",").map((s) => Number(s.trim()));
+      const k = params.k !== undefined ? Number(params.k) : 2;
+      return [nums, k];
+    },
     builder: buildSteps347,
   },
   373: {
@@ -2783,6 +2788,12 @@ module.exports = {
       "                heapq.heappush(heap, (nums1[i]+nums2[j+1], i, j+1))",
       "        return res",
     ],
+    liveArgs: (input, params) => {
+      const nums1 = String(input).split(",").map((s) => Number(s.trim()));
+      const nums2 = String(params.nums2 || "").split(",").map((s) => Number(s.trim()));
+      const k = params.k !== undefined ? Number(params.k) : 3;
+      return [nums1, nums2, k];
+    },
     builder: buildSteps373,
   },
   378: {
@@ -2812,6 +2823,11 @@ module.exports = {
       "                heapq.heappush(heap, (matrix[r][c+1], r, c+1))",
       "        return val",
     ],
+    liveArgs: (input, params) => {
+      const matrix = String(input).split(";").map((row) => row.split(",").map((s) => Number(s.trim())));
+      const k = params.k !== undefined ? Number(params.k) : 8;
+      return [matrix, k];
+    },
     builder: buildSteps378,
   },
   692: {
@@ -2842,6 +2858,11 @@ module.exports = {
       "            result.append(word)",
       "        return result",
     ],
+    liveArgs: (input, params) => {
+      const words = String(input).split(",").map((s) => s.trim()).filter((s) => s.length);
+      const k = params.k !== undefined ? Number(params.k) : 2;
+      return [words, k];
+    },
     builder: buildSteps692,
   },
   973: {
@@ -2868,6 +2889,11 @@ module.exports = {
       "            if len(heap) > k: heapq.heappop(heap)",
       "        return [[x, y] for d, x, y in heap]",
     ],
+    liveArgs: (input, params) => {
+      const points = String(input).split(";").map((p) => p.split(",").map((s) => Number(s.trim())));
+      const k = params.k !== undefined ? Number(params.k) : 2;
+      return [points, k];
+    },
     builder: buildSteps973,
   },
   1046: {
@@ -2896,6 +2922,10 @@ module.exports = {
       "                heapq.heappush(heap, -(x - y))",
       "        return -heap[0] if heap else 0",
     ],
+    liveArgs: (input) => {
+      const stones = String(input).split(",").map((s) => Number(s.trim()));
+      return [stones];
+    },
     builder: buildSteps1046,
   },
   215: {
@@ -2922,6 +2952,11 @@ module.exports = {
       "                heapq.heappop(heap)",
       "        return heap[0]",
     ],
+    liveArgs: (input, params) => {
+      const nums = String(input).split(",").map((s) => Number(s.trim()));
+      const k = params.k !== undefined ? Number(params.k) : 2;
+      return [nums, k];
+    },
     builder: buildSteps215,
   },
   253: {

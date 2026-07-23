@@ -656,6 +656,134 @@ button:disabled {
   overflow: hidden;
 }
 
+.code-mode-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.live-edit-btn,
+.live-exit-btn,
+.live-run-btn,
+.live-reset-btn {
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.live-edit-btn:hover,
+.live-run-btn:hover {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.live-exit-btn,
+.live-reset-btn {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+}
+
+.live-editor-wrap {
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.monaco-editor-host {
+  height: 360px;
+  width: 100%;
+}
+
+.live-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: rgba(99, 102, 241, 0.06);
+  border-top: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.live-status {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.live-vars-view {
+  padding: 16px;
+  background: #0f172a;
+  border-radius: 10px;
+  border: 1px solid #334155;
+}
+
+.live-vars-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #94a3b8;
+  margin-bottom: 10px;
+}
+
+.live-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-var-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 6px;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12.5px;
+}
+
+.live-var-name {
+  color: #a5b4fc;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.live-var-value {
+  color: #e2e8f0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.live-vars-empty {
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+[data-theme="light"] .live-vars-view {
+  background: white;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .live-var-row {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .live-var-value {
+  color: #1e293b;
+}
+
 .viz-right {
   flex: 1;
   min-width: 0;

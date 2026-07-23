@@ -108,13 +108,27 @@
 
         <div class="viz-split">
           <div class="viz-left">
+            <div class="code-mode-bar">
+              <button id="liveEditBtn" type="button" class="live-edit-btn" data-i18n="liveEditBtn">✎ Edit &amp; run code</button>
+              <button id="liveExitBtn" type="button" class="live-exit-btn hidden" data-i18n="liveExitBtn">Exit editor</button>
+            </div>
             <pre id="codePanel" class="code-panel"></pre>
+            <div id="liveEditorWrap" class="live-editor-wrap hidden">
+              <div id="monacoEditor" class="monaco-editor-host"></div>
+              <div class="live-editor-actions">
+                <button id="liveRunBtn" type="button" class="live-run-btn" data-i18n="liveRunBtn">▶ Run my code</button>
+                <button id="liveResetBtn" type="button" class="live-reset-btn" data-i18n="liveResetBtn">↺ Reset to original</button>
+                <span id="liveStatus" class="live-status"></span>
+              </div>
+              <p id="liveError" class="error hidden"></p>
+            </div>
           </div>
           <div class="viz-right">
             <div id="bars" class="bars"></div>
             <div id="treeView" class="tree-view hidden"></div>
             <div id="gridView" class="grid-view hidden"></div>
             <div id="bfsGridView" class="bfs-grid-view hidden"></div>
+            <div id="liveVarsView" class="live-vars-view hidden"></div>
           </div>
         </div>
 
@@ -144,6 +158,7 @@
       </section>
     </div>
 
-    <script src="script.js?v=20260723-tree-pill-nodes"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+    <script src="script.js?v=20260724-live-python-editor"></script>
   </body>
 </html>

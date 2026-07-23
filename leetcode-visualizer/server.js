@@ -89,7 +89,38 @@ app.get("/api/problem/:id", (req, res) => {
     code3Label: problem.code3Label || null,
     approach: problem.approach || null,
     debugMode: problem.debugMode || null,
+    hasLiveArgs: typeof problem.liveArgs === "function",
   });
+});
+
+// Compute ready-to-call Python argument values (JSON-safe) for the live code
+// editor, using the same input/params the canned visualizer already accepts.
+// Falls back to a generic best-effort binding when a problem hasn't opted in
+// with an explicit `liveArgs` converter.
+app.post("/api/problem/:id/live-args", (req, res) => {
+  const id = Number(req.params.id);
+  const problem = SUPPORTED[id];
+  if (!problem) {
+    return res.status(404).json({ error: `Bài ${id} chưa được hỗ trợ.` });
+  }
+  const input = req.body.input;
+  const params = req.body.params || {};
+
+  if (typeof problem.liveArgs === "function") {
+    try {
+      const args = problem.liveArgs(input, params);
+      return res.json({ args });
+    } catch (err) {
+      return res.status(400).json({ error: String((err && err.message) || err) });
+    }
+  }
+
+  // Generic fallback: primary input as-is, then extraParams in declared order.
+  const args = [input];
+  for (const p of problem.extraParams || []) {
+    args.push(params[p.key]);
+  }
+  res.json({ args, generic: true });
 });
 
 app.post("/api/problem/:id/solve", (req, res) => {

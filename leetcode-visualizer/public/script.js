@@ -48,6 +48,10 @@ const I18N = {
     premiumLabel: "LeetCode Premium",
     premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
     clearRecent: "Xóa",
+    liveEditBtn: "✎ Sửa & chạy code",
+    liveExitBtn: "Đóng editor",
+    liveRunBtn: "▶ Chạy code của tôi",
+    liveResetBtn: "↺ Về code gốc",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -80,6 +84,10 @@ const I18N = {
     premiumLabel: "LeetCode Premium",
     premiumHidden: "LeetCode description hidden because this is a Premium problem.",
     clearRecent: "Clear",
+    liveEditBtn: "✎ Edit & run code",
+    liveExitBtn: "Exit editor",
+    liveRunBtn: "▶ Run my code",
+    liveResetBtn: "↺ Reset to original",
   },
 };
 
@@ -3085,7 +3093,19 @@ function renderStep() {
   updateCodeHighlight(step.codeLines || [], step.codeBlock || 1);
   renderVars(step, stepIndex > 0 ? steps[stepIndex - 1] : null);
 
-  if (step.profitTrackerView) {
+  if (!step.__live) {
+    const liveView = $("liveVarsView");
+    if (liveView) liveView.classList.add("hidden");
+  }
+
+  if (step.__live) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.add("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    $("liveVarsView").classList.remove("hidden");
+    renderLiveVarsView(step);
+  } else if (step.profitTrackerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
@@ -3280,3 +3300,387 @@ function applyTheme(theme) {
     sunIcon.classList.add("hidden");
   }
 }
+
+// =====================================================================
+// ---- Live Python editor (Monaco + Pyodide) ----
+// Lets the user freely edit the shown Python code and re-run it for real
+// in the browser (via Pyodide/WebAssembly), tracing every executed line
+// and the local variables at that point (via sys.settrace), independent
+// of the hand-authored step animations above. Both libraries are loaded
+// lazily, only the first time the user opens the editor.
+// =====================================================================
+
+let monacoEditorInstance = null;
+let monacoLoadPromise = null;
+let pyodideInstance = null;
+let pyodideLoadPromise = null;
+let liveMode = false;
+let liveSteps = [];
+
+const LIVE_I18N = {
+  vi: {
+    loading: "Đang tải Python runtime (chỉ lần đầu)...",
+    running: "Đang chạy...",
+    ready: (n) => `Đã chạy xong — ${n} bước.`,
+    doneNoTrace: "Chạy xong nhưng không bắt được dòng nào (code có thể không gọi hàm nào).",
+  },
+  en: {
+    loading: "Loading Python runtime (first time only)...",
+    running: "Running...",
+    ready: (n) => `Finished — ${n} step(s).`,
+    doneNoTrace: "Ran successfully but no traced lines were captured (no function was called).",
+  },
+};
+const lt = () => LIVE_I18N[lang] || LIVE_I18N.en;
+
+function loadMonaco() {
+  if (monacoLoadPromise) return monacoLoadPromise;
+  monacoLoadPromise = new Promise((resolve, reject) => {
+    if (!window.require) {
+      reject(new Error("Monaco loader script not found"));
+      return;
+    }
+    window.require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs" } });
+    window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
+  });
+  return monacoLoadPromise;
+}
+
+function loadPyodideRuntime() {
+  if (pyodideLoadPromise) return pyodideLoadPromise;
+  pyodideLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+    script.onload = async () => {
+      try {
+        const pyodide = await window.loadPyodide({
+          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/",
+        });
+        resolve(pyodide);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    script.onerror = () => reject(new Error("Failed to load Pyodide from CDN"));
+    document.head.appendChild(script);
+  });
+  return pyodideLoadPromise;
+}
+
+function currentPrimaryCode() {
+  const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
+  return (localizedCode || (problemData && problemData.code) || []).join("\n");
+}
+
+async function collectLiveCallArgs() {
+  // Re-use the same input/params the canned visualizer already validated.
+  const isString = problemData && problemData.inputKind === "string";
+  const isStringArray = problemData && problemData.inputKind === "stringArray";
+  let input;
+  if (isString) {
+    input = $("arrInput").value.trim();
+  } else if (isStringArray) {
+    const raw = $("arrInput").value.trim();
+    input = raw.startsWith("[") ? JSON.parse(raw) : raw.split(",").map((s) => s.trim()).filter(Boolean);
+  } else {
+    input = $("arrInput").value.trim().split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number);
+  }
+  const params = {};
+  $("extraParams").querySelectorAll("[data-param]").forEach((inp) => {
+    params[inp.dataset.param] = inp.dataset.type === "string" ? inp.value : Number(inp.value);
+  });
+
+  const res = await fetch(`/api/problem/${currentProblemId}/live-args`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input, params }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Could not prepare arguments");
+  return data.args;
+}
+
+async function ensureMonacoEditor() {
+  if (monacoEditorInstance) return monacoEditorInstance;
+  $("liveStatus").textContent = lt().loading;
+  const monaco = await loadMonaco();
+  const isLight = document.documentElement.dataset.theme !== "dark";
+  monacoEditorInstance = monaco.editor.create($("monacoEditor"), {
+    value: currentPrimaryCode(),
+    language: "python",
+    theme: isLight ? "vs" : "vs-dark",
+    fontSize: 13,
+    minimap: { enabled: false },
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+    renderLineHighlight: "none",
+  });
+  $("liveStatus").textContent = "";
+  return monacoEditorInstance;
+}
+
+async function ensurePyodide() {
+  if (pyodideInstance) return pyodideInstance;
+  $("liveStatus").textContent = lt().loading;
+  pyodideInstance = await loadPyodideRuntime();
+  return pyodideInstance;
+}
+
+// Python-side tracer: wraps the user's Solution class so that calling its
+// public method records (line, locals-snapshot) for every executed line,
+// then returns both the trace and the return value to JS.
+const TRACER_PY = `
+import sys, json, math, heapq
+from collections import Counter, defaultdict, deque
+from typing import List, Optional, Dict, Set, Tuple
+
+def __viz_run_trace(user_code, method_name, call_args):
+    trace = []
+
+    def safe_repr(value, depth=0):
+        try:
+            if depth > 3:
+                return "..."
+            if isinstance(value, (int, float, str, bool)) or value is None:
+                if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
+                    return repr(value)
+                return value
+            if isinstance(value, (list, tuple)):
+                return [safe_repr(v, depth + 1) for v in value[:200]]
+            if isinstance(value, dict):
+                return {str(k): safe_repr(v, depth + 1) for k, v in list(value.items())[:200]}
+            if isinstance(value, set):
+                return [safe_repr(v, depth + 1) for v in list(value)[:200]]
+            return repr(value)
+        except Exception:
+            return "<unrepr>"
+
+    def tracer(frame, event, arg):
+        try:
+            code = frame.f_code
+            if code.co_filename != "<usercode>":
+                return None
+            if event == "line":
+                snapshot = {}
+                for k, v in frame.f_locals.items():
+                    if k == "self":
+                        continue
+                    snapshot[k] = safe_repr(v)
+                trace.append({"line": frame.f_lineno, "vars": snapshot})
+            elif event == "call":
+                return tracer
+        except Exception:
+            pass
+        return tracer
+
+    compiled = compile(user_code, "<usercode>", "exec")
+    # Seed common LeetCode helper names so snippets that omit their own
+    # imports (as shown in the problem's code panel) still run.
+    ns2 = {
+        "heapq": heapq,
+        "Counter": Counter,
+        "defaultdict": defaultdict,
+        "deque": deque,
+        "List": List,
+        "Optional": Optional,
+        "Dict": Dict,
+        "Set": Set,
+        "Tuple": Tuple,
+        "math": math,
+    }
+    exec(compiled, ns2)
+    Solution2 = ns2.get("Solution")
+    if Solution2 is None:
+        raise RuntimeError("No 'class Solution' found in the code.")
+    instance2 = Solution2()
+    method2 = getattr(instance2, method_name, None)
+    if method2 is None:
+        raise RuntimeError(f"Solution has no method '{method_name}'.")
+
+    sys.settrace(tracer)
+    try:
+        result = method2(*call_args)
+    finally:
+        sys.settrace(None)
+
+    return {"trace": trace, "result": safe_repr(result)}
+`;
+
+async function runLiveCode() {
+  hide("liveError");
+  $("liveStatus").textContent = lt().running;
+  try {
+    const editor = await ensureMonacoEditor();
+    const userCode = editor.getValue();
+    const args = await collectLiveCallArgs();
+    const pyodide = await ensurePyodide();
+
+    if (!pyodide.__viz_tracer_loaded) {
+      pyodide.runPython(TRACER_PY);
+      pyodide.__viz_tracer_loaded = true;
+    }
+
+    // Infer the public method name from the code itself (first "def X(self" after "class Solution").
+    const methodMatch = userCode.match(/class\s+Solution\b[\s\S]*?def\s+(\w+)\s*\(\s*self/);
+    if (!methodMatch) {
+      throw new Error(lang === "vi" ? "Không tìm thấy 'class Solution' với 1 phương thức nhận self." : "Could not find a 'class Solution' with a method taking self.");
+    }
+    const methodName = methodMatch[1];
+
+    pyodide.globals.set("__viz_user_code", userCode);
+    pyodide.globals.set("__viz_method_name", methodName);
+    pyodide.globals.set("__viz_call_args", pyodide.toPy(args));
+
+    const runFn = pyodide.globals.get("__viz_run_trace");
+    const resultProxy = runFn(pyodide.globals.get("__viz_user_code"), methodName, pyodide.globals.get("__viz_call_args"));
+    const resultJs = resultProxy.toJs({ dict_converter: Object.fromEntries });
+    resultProxy.destroy && resultProxy.destroy();
+
+    const rawTrace = resultJs.trace || [];
+    liveSteps = rawTrace.map((entry, idx) => ({
+      line: entry.line,
+      vars: entry.vars || {},
+      isLast: idx === rawTrace.length - 1,
+    }));
+    const answer = resultJs.result;
+
+    if (liveSteps.length === 0) {
+      $("liveStatus").textContent = lt().doneNoTrace;
+    } else {
+      $("liveStatus").textContent = lt().ready(liveSteps.length);
+    }
+
+    enterLiveStepMode(userCode, answer);
+  } catch (err) {
+    $("liveStatus").textContent = "";
+    const msg = (err && err.message) || String(err);
+    showError("liveError", msg);
+  }
+}
+
+// Replace the normal canned-animation step list with the real traced run,
+// reusing the existing controls (Prev/Next/Play) and code-highlight logic.
+function enterLiveStepMode(userCode, answer) {
+  const userLines = userCode.split("\n");
+  steps = liveSteps.map((s) => ({
+    title: { vi: `Dòng ${s.line}`, en: `Line ${s.line}` },
+    codeLines: [s.line],
+    vars: Object.entries(s.vars).map(([name, value]) => ({ name, value: formatLiveValue(value) })),
+    note: { vi: "", en: "" },
+    final: s.isLast,
+    __live: true,
+  }));
+  answerValue = formatLiveValue(answer);
+  stepIndex = 0;
+  resetBreakpoints();
+  renderLiveCodePanel(userLines);
+  // Collapse the whole Monaco editor panel and show the read-only
+  // highlighted trace instead, so code + step controls behave like the
+  // canned mode. Re-show "Edit & run code" so the user can hop back into
+  // the editor (with their code preserved) without fully exiting live mode.
+  $("liveEditorWrap").classList.add("hidden");
+  $("codePanel").classList.remove("hidden");
+  $("liveEditBtn").classList.remove("hidden");
+  renderStep();
+}
+
+// Simple, generic right-hand panel for live-run steps: just a clean list of
+// the current local variables (mirrors a real debugger's "locals" view).
+// This intentionally does not try to guess a specialized visualization
+// (heap tree, grid, graph...) since the user's edited code can differ
+// arbitrarily from the shape the canned builders expect.
+function renderLiveVarsView(step) {
+  const el = $("liveVarsView");
+  const entries = step.vars || [];
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="live-vars-empty">${lang === "vi" ? "Chưa có biến local nào tại dòng này." : "No local variables at this line yet."}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="live-vars-title">${lang === "vi" ? "Biến local (thật, từ Python)" : "Local variables (real, from Python)"}</div>` +
+    `<div class="live-vars-list">${entries.map((v) => `
+      <div class="live-var-row">
+        <span class="live-var-name">${escapeHtml(v.name)}</span>
+        <span class="live-var-value">${escapeHtml(v.value)}</span>
+      </div>`).join("")}</div>`;
+}
+
+function formatLiveValue(value) {
+  if (Array.isArray(value)) return `[${value.map(formatLiveValue).join(", ")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value).map(([k, v]) => `${k}: ${formatLiveValue(v)}`).join(", ")}}`;
+  }
+  if (value === null || value === undefined) return "None";
+  return String(value);
+}
+
+// Render the user's edited code (read-only, line-numbered) into the same
+// #codePanel structure that updateCodeHighlight()/renderVars() expect,
+// so stepping through live-run steps highlights lines exactly like the
+// canned animations do.
+function renderLiveCodePanel(userLines) {
+  const panel = $("codePanel");
+  panel.innerHTML = "";
+  panel.classList.remove("hidden");
+  const pyBlock = document.createElement("div");
+  pyBlock.className = "code-lang-block";
+  pyBlock.dataset.codeLang = "python";
+  const section = document.createElement("div");
+  section.className = "code-section";
+  section.dataset.block = "1";
+  userLines.forEach((line, idx) => {
+    const row = document.createElement("div");
+    row.className = "code-line";
+    row.dataset.line = idx + 1;
+    const ln = document.createElement("span");
+    ln.className = "ln";
+    ln.textContent = idx + 1;
+    const txt = document.createElement("span");
+    txt.className = "txt";
+    txt.innerHTML = renderCodeLineHtml(line);
+    row.appendChild(ln);
+    row.appendChild(txt);
+    section.appendChild(row);
+  });
+  pyBlock.appendChild(section);
+  panel.appendChild(pyBlock);
+}
+
+function setLiveMode(on) {
+  liveMode = on;
+  $("liveExitBtn").classList.toggle("hidden", !on);
+  $("liveEditorWrap").classList.toggle("hidden", !on);
+  $("codePanel").classList.toggle("hidden", on);
+  if (!on) {
+    // Restore the canned visualization exactly as it was before entering live mode.
+    renderCode();
+    if (problemData) {
+      // Re-run the last canned solve so the right-hand visualization comes back.
+      runViz();
+    }
+  }
+}
+
+$("liveEditBtn") && $("liveEditBtn").addEventListener("click", async () => {
+  liveMode = true;
+  $("liveExitBtn").classList.remove("hidden");
+  $("liveEditorWrap").classList.remove("hidden");
+  $("codePanel").classList.add("hidden");
+  try {
+    await ensureMonacoEditor();
+  } catch (err) {
+    showError("liveError", (err && err.message) || String(err));
+  }
+});
+
+$("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
+  setLiveMode(false);
+});
+
+$("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
+
+$("liveResetBtn") && $("liveResetBtn").addEventListener("click", async () => {
+  const editor = await ensureMonacoEditor();
+  editor.setValue(currentPrimaryCode());
+  hide("liveError");
+  $("liveStatus").textContent = "";
+});
