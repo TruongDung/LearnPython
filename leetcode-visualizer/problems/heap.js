@@ -1997,48 +1997,107 @@ function buildSteps767(input) {
     },
   }));
 
-  for (const [ch, cnt] of freq.entries()) {
-    heap.push({ ch, cnt });
-    steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Push '${ch}' (${cnt})`, en: `Push '${ch}' (${cnt})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [3, 4],
-      vars: [{ name: "heap", value: arrStr() }],
-      note: { vi: `Thêm '${ch}' tần suất ${cnt} vào max-heap rồi sift-up.`, en: `Add '${ch}' freq ${cnt} to the max-heap then sift-up.` },
-    }));
+  // Line 5: heap = [(-c, ch) for ch, c in Counter(s).items()]  (build the raw list first, unheapified)
+  for (const [ch, cnt] of freq.entries()) heap.push({ ch, cnt });
+  steps.push(heapSnapshot(heap, label, {
+    title: { vi: `heap = [(-c, ch) for ch, c in Counter(s).items()]`, en: `heap = [(-c, ch) for ch, c in Counter(s).items()]` },
+    codeLines: [5],
+    vars: [{ name: "heap", value: arrStr() }],
+    note: { vi: `Xây danh sách (-count, ch) cho mỗi ký tự khác nhau. Chưa phải heap hợp lệ, cần heapify.`, en: `Build a list of (-count, ch) for every distinct char. Not a valid heap yet, needs heapify.` },
+  }));
+
+  // Line 6: heapq.heapify(heap) — bring the list into heap order via sift-up from scratch.
+  const rawHeap = heap.splice(0, heap.length);
+  for (const el of rawHeap) {
+    heap.push(el);
     siftUp(heap.length - 1);
   }
+  steps.push(heapSnapshot(heap, label, {
+    title: { vi: `heapq.heapify(heap)`, en: `heapq.heapify(heap)` },
+    codeLines: [6],
+    vars: [{ name: "heap", value: arrStr() }],
+    note: { vi: `Sắp lại heap để gốc luôn là ký tự có count LỚN nhất (max-heap qua -count).`, en: `Rearrange the heap so the root is always the char with the HIGHEST count (max-heap via -count).` },
+  }));
 
   let result = "";
   let prev = null;
   const n = s.length;
+
+  steps.push(heapSnapshot(heap, label, {
+    title: { vi: `res, prev = [], None`, en: `res, prev = [], None` },
+    codeLines: [7],
+    vars: [{ name: "res", value: "[]" }, { name: "prev", value: "None" }],
+    note: { vi: `res sẽ chứa kết quả; prev giữ ký tự vừa dùng để chờ 1 lượt trước khi đẩy lại.`, en: `res will hold the result; prev holds the just-used char to wait one turn before pushing back.` },
+  }));
+
   while (heap.length > 0) {
+    const notEmpty = heap.length > 0;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `heap còn ${heap.length} phần tử`, en: `heap still has ${heap.length} element(s)` },
+      codeLines: [8],
+      vars: [{ name: "heap", value: arrStr() }, { name: "condition", value: notEmpty }],
+      note: { vi: `heap chưa rỗng, tiếp tục lặp.`, en: `The heap is not empty, keep looping.` },
+    }));
+
     const cur = heap[0];
     const last = heap.pop();
     if (heap.length > 0) heap[0] = last;
-    result += cur.ch;
-    cur.cnt--;
-    const pushedBack = prev && prev.cnt > 0;
-    steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Lấy '${cur.ch}' → result = "${result}"`, en: `Take '${cur.ch}' → result = "${result}"` },
-      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [6, 7, 8],
-      vars: [{ name: "result", value: `"${result}"` }, { name: "'" + cur.ch + "' còn lại", value: cur.cnt }, { name: "giữ lại (prev)", value: pushedBack ? `'${prev.ch}'(${prev.cnt})` : "—" }, { name: "heap", value: arrStr() }],
-      note: { vi: `Lấy ký tự nhiều nhất '${cur.ch}', nối vào kết quả, count còn ${cur.cnt}.` + (pushedBack ? ` Đẩy lại '${prev.ch}'(${prev.cnt}) đã giữ từ lượt trước.` : ``), en: `Take the most frequent '${cur.ch}', append it, count now ${cur.cnt}.` + (pushedBack ? ` Push back held '${prev.ch}'(${prev.cnt}) from last turn.` : ``) },
-    }));
     if (heap.length > 0) siftDown(0);
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `c, ch = heapq.heappop(heap) → ('${cur.ch}', count ${cur.cnt})`, en: `c, ch = heapq.heappop(heap) → ('${cur.ch}', count ${cur.cnt})` },
+      codeLines: [9],
+      vars: [{ name: "c", value: -cur.cnt }, { name: "ch", value: `'${cur.ch}'` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Lấy gốc = ký tự '${cur.ch}' đang có count LỚN nhất (${cur.cnt}).`, en: `Pop the root = char '${cur.ch}' with the HIGHEST current count (${cur.cnt}).` },
+    }));
+
+    result += cur.ch;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `res.append('${cur.ch}') → "${result}"`, en: `res.append('${cur.ch}') → "${result}"` },
+      codeLines: [10],
+      vars: [{ name: "res", value: `"${result}"` }],
+      note: { vi: `Nối '${cur.ch}' vào kết quả.`, en: `Append '${cur.ch}' to the result.` },
+    }));
+
+    const pushedBack = prev && prev.cnt > 0;
     if (pushedBack) {
       heap.push(prev);
       siftUp(heap.length - 1);
     }
+    steps.push(heapSnapshot(heap, label, {
+      title: pushedBack
+        ? { vi: `prev còn count < 0 → đẩy lại '${prev.ch}'`, en: `prev still has count < 0 → push '${prev.ch}' back` }
+        : { vi: `prev = None hoặc đã hết count → không đẩy lại`, en: `prev is None or exhausted → nothing pushed back` },
+      codeLines: [11],
+      vars: [{ name: "prev", value: prev ? `('${prev.ch}', count ${prev.cnt})` : "None" }, { name: "heap", value: arrStr() }],
+      note: pushedBack
+        ? { vi: `Ký tự '${prev.ch}' giữ từ lượt trước vẫn còn count, đẩy lại vào heap.`, en: `Char '${prev.ch}' held from last turn still has count left, push it back into the heap.` }
+        : { vi: `Không có ký tự nào cần đẩy lại lượt này.`, en: `Nothing needs to be pushed back this turn.` },
+    }));
+
+    cur.cnt--;
     prev = cur;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `prev = (${-cur.cnt}, '${cur.ch}')`, en: `prev = (${-cur.cnt}, '${cur.ch}')` },
+      codeLines: [12],
+      vars: [{ name: "prev", value: `(${-cur.cnt}, '${cur.ch}')` }],
+      note: { vi: `Giữ '${cur.ch}' lại (count đã giảm) để chờ đúng 1 lượt trước khi có thể dùng lại.`, en: `Hold '${cur.ch}' aside (count decremented) so it waits exactly one turn before reuse.` },
+    }));
   }
+
+  steps.push(heapSnapshot(heap, label, {
+    title: { vi: `out = ''.join(res) = "${result}"`, en: `out = ''.join(res) = "${result}"` },
+    codeLines: [13],
+    vars: [{ name: "out", value: `"${result}"` }],
+    note: { vi: `Ghép res thành chuỗi kết quả.`, en: `Join res into the result string.` },
+  }));
 
   const ok = result.length === n;
   const answer = ok ? result : '""';
   const fs = heapSnapshot(heap, label, {
     title: { vi: ok ? `Kết quả: "${result}"` : `Không thể → ""`, en: ok ? `Result: "${result}"` : `Impossible → ""` },
-    codeLines: [9],
+    codeLines: [14],
     vars: [{ name: "answer", value: answer }],
-    note: { vi: ok ? `Xếp được chuỗi hợp lệ: "${result}" (không có 2 ký tự kề giống nhau).` : `Có ký tự xuất hiện quá nhiều → không thể sắp xếp.`, en: ok ? `Built a valid arrangement: "${result}" (no two adjacent equal).` : `Some char is too frequent → impossible.` },
+    note: { vi: ok ? `len(out) == len(s) → xếp được chuỗi hợp lệ: "${result}".` : `len(out) != len(s) → có ký tự quá nhiều → trả "".`, en: ok ? `len(out) == len(s) → built a valid arrangement: "${result}".` : `len(out) != len(s) → some char too frequent → return "".` },
   });
   fs.final = true; steps.push(fs);
   return { input, answer, steps };
@@ -3053,6 +3112,7 @@ module.exports = {
       "        out = ''.join(res)",
       "        return out if len(out) == len(s) else ''",
     ],
+    liveArgs: (input) => [String(input).trim()],
     builder: buildSteps767,
   },
   23: {
