@@ -9,6 +9,7 @@ let stepIndex = 0;
 let answerValue = null; // answer from the current run
 let playTimer = null;
 let catalogData = null; // problem list grouped by algorithm
+let problemSearchQuery = "";
 let debugBreakpoints = new Set();
 let debugWatches = [];
 const RECENT_PROBLEMS_KEY = "recentProblems";
@@ -20,6 +21,10 @@ const I18N = {
     subtitle: "Nhập số bài LeetCode để xem thuật toán chạy từng bước",
     problemIdLabel: "Số bài LeetCode",
     loadBtn: "Tải bài",
+    keywordSearchLabel: "Tìm theo từ khóa",
+    keywordSearchPlaceholder: "vd: meet, heap, tree...",
+    searchResults: (count) => `${count} kết quả`,
+    noSearchResults: (query) => `Không tìm thấy bài nào cho “${query}”.`,
     arrLabel: "Mảng đầu vào (cách nhau bởi dấu phẩy)",
     runBtn: "Trực quan hóa",
     first: "⏮",
@@ -48,6 +53,10 @@ const I18N = {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
     problemIdLabel: "LeetCode problem number",
     loadBtn: "Load",
+    keywordSearchLabel: "Search by keyword",
+    keywordSearchPlaceholder: "e.g. meet, heap, tree...",
+    searchResults: (count) => `${count} result${count === 1 ? "" : "s"}`,
+    noSearchResults: (query) => `No problems found for “${query}”.`,
     arrLabel: "Input array (comma separated)",
     runBtn: "Visualize",
     first: "⏮",
@@ -91,8 +100,11 @@ function setLang(newLang) {
   renderProblem();
   renderRecentProblems();
   renderCatalog();
+  renderProblemSearchResults();
   if (steps.length) renderStep();
-}function applyStaticStrings() {
+}
+
+function applyStaticStrings() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     const val = t()[key];
@@ -100,6 +112,8 @@ function setLang(newLang) {
   });
   // Play/Pause button depends on state
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
+  const keywordInput = $("problemKeyword");
+  if (keywordInput) keywordInput.placeholder = t().keywordSearchPlaceholder;
 }
 
 function readRecentProblems() {
@@ -134,7 +148,7 @@ function renderRecentProblems() {
   const container = $("recentItems");
   if (!section || !container) return;
   const recent = readRecentProblems();
-  section.classList.toggle("hidden", recent.length === 0);
+  section.classList.toggle("hidden", recent.length === 0 || Boolean(normalizeProblemSearch(problemSearchQuery)));
   container.innerHTML = "";
 
   recent.forEach((problem) => {
@@ -171,6 +185,7 @@ async function loadCatalog() {
     if (res.ok) {
       catalogData = data.groups;
       renderCatalog();
+      renderProblemSearchResults();
     }
   } catch (err) {
     // ignore error, user can still enter problem number manually
@@ -180,6 +195,7 @@ async function loadCatalog() {
 function renderCatalog() {
   const container = $("catalog");
   if (!catalogData) return;
+  container.classList.toggle("hidden", Boolean(normalizeProblemSearch(problemSearchQuery)));
   container.innerHTML = "";
 
   catalogData.forEach((group) => {
@@ -340,9 +356,98 @@ function renderCatalog() {
   });
 }
 
+function normalizeProblemSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function renderProblemSearchResults() {
+  const section = $("problemSearchResults");
+  const items = $("problemSearchItems");
+  const summary = $("problemSearchSummary");
+  const empty = $("problemSearchEmpty");
+  const catalog = $("catalog");
+  if (!section || !items || !summary || !empty || !catalog) return;
+
+  const normalizedQuery = normalizeProblemSearch(problemSearchQuery);
+  const searching = normalizedQuery.length > 0;
+  section.classList.toggle("hidden", !searching);
+  catalog.classList.toggle("hidden", searching);
+  renderRecentProblems();
+  if (!searching || !catalogData) {
+    items.innerHTML = "";
+    empty.classList.add("hidden");
+    return;
+  }
+
+  const matches = [];
+  catalogData.forEach((group) => {
+    group.problems.forEach((problem) => {
+      const searchable = normalizeProblemSearch([
+        problem.id,
+        problem.title && problem.title.vi,
+        problem.title && problem.title.en,
+        problem.titleVi && problem.titleVi.vi,
+        problem.titleVi && problem.titleVi.en,
+        group.vi,
+        group.en,
+        problem.difficulty,
+      ].filter(Boolean).join(" "));
+      if (searchable.includes(normalizedQuery)) matches.push({ problem, group });
+    });
+  });
+
+  summary.textContent = t().searchResults(matches.length);
+  items.innerHTML = "";
+  empty.classList.toggle("hidden", matches.length > 0);
+  empty.textContent = matches.length ? "" : t().noSearchResults(problemSearchQuery.trim());
+
+  matches.forEach(({ problem, group }) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "prob-chip search-result-chip" + (problem.id === currentProblemId ? " active" : "");
+    chip.dataset.id = problem.id;
+    if (problem.premium) {
+      chip.dataset.premium = "true";
+      chip.title = t().premiumLabel;
+    }
+
+    const pid = document.createElement("span");
+    pid.className = "pid";
+    pid.textContent = `#${problem.id}`;
+    const name = document.createElement("span");
+    name.className = "pname";
+    name.textContent = pick(problem.title);
+    const category = document.createElement("span");
+    category.className = "search-result-category";
+    category.textContent = pick(group);
+    chip.append(pid, name, category);
+
+    if (problem.difficulty) {
+      const difficulty = document.createElement("span");
+      difficulty.className = `diff diff-${problem.difficulty}`;
+      difficulty.textContent = problem.difficulty;
+      chip.appendChild(difficulty);
+    }
+    chip.addEventListener("click", () => {
+      $("problemId").value = problem.id;
+      loadProblem();
+    });
+    items.appendChild(chip);
+  });
+}
+
+$("problemKeyword").addEventListener("input", (event) => {
+  problemSearchQuery = event.target.value;
+  renderProblemSearchResults();
+});
+
 function markActiveChip() {
-  $("catalog")
-    .querySelectorAll(".prob-chip")
+  document
+    .querySelectorAll("#catalog .prob-chip, #problemSearchItems .prob-chip")
     .forEach((chip) => {
       const isActive = Number(chip.dataset.id) === currentProblemId;
       chip.classList.toggle("active", isActive);

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0c0a1a" />
     <title>LeetCode Visualizer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><rect x='5' y='17' width='5' height='10' rx='1.5' fill='%23f8fafc'/><rect x='13' y='10' width='5' height='17' rx='1.5' fill='%23fbbf24'/><rect x='21' y='5' width='5' height='22' rx='1.5' fill='%23f8fafc'/></svg>" />
-    <link rel="stylesheet" href="style.css?v=20260722-meeting-rooms-timeline" />
+    <link rel="stylesheet" href="style.css?v=20260722-keyword-search" />
   </head>
   <body>
     <div class="app">
@@ -38,7 +38,17 @@
           <input id="problemId" type="number" placeholder="vd: 1846" value="1846" />
           <button id="loadBtn" data-i18n="loadBtn">Tải bài</button>
         </div>
+        <div class="keyword-search">
+          <label for="problemKeyword" data-i18n="keywordSearchLabel">Tìm theo từ khóa</label>
+          <input id="problemKeyword" type="search" autocomplete="off" placeholder="vd: meet, heap, tree..." />
+        </div>
         <p id="searchError" class="error hidden"></p>
+      </section>
+
+      <section id="problemSearchResults" class="problem-search-results hidden" aria-live="polite">
+        <div id="problemSearchSummary" class="problem-search-summary"></div>
+        <div id="problemSearchItems" class="problem-search-items"></div>
+        <p id="problemSearchEmpty" class="problem-search-empty hidden"></p>
       </section>
 
       <section id="recentProblems" class="recent-problems hidden" aria-label="Recently viewed problems">
@@ -134,6 +144,6 @@
       </section>
     </div>
 
-    <script src="script.js?v=20260722-meeting-rooms-empty-state"></script>
+    <script src="script.js?v=20260722-keyword-search"></script>
   </body>
 </html>
