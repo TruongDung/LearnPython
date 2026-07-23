@@ -181,242 +181,433 @@ function buildSteps1293(input, params) {
 }
 
 // ─── 1368: Minimum Cost Valid Path in Grid (0-1 BFS) ───
-function buildSteps1368(input, params) {
-  // Parse input: "1,1,3|3,2,2|1,1,4" → [[1,1,3],[3,2,2],[1,1,4]]
-  let grid;
-  if (typeof input === "string") {
-    grid = input.split("|").map((row) => row.trim().split(",").map(Number));
-  } else {
-    const r = params.rows || 3;
-    const c = params.cols || Math.ceil(input.length / r);
-    grid = [];
-    for (let i = 0; i < r; i++) grid.push(input.slice(i * c, (i + 1) * c));
-  }
-  const m = grid.length;
-  const n = grid[0].length;
+function buildSteps1368(input) {
+  const grid = String(input)
+    .split(/[|;]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
   const steps = [];
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+  const valid = rows > 0 && cols > 0 && rows <= 20 && cols <= 20
+    && grid.every((row) => row.length === cols
+      && row.every((value) => Number.isInteger(value) && value >= 1 && value <= 4));
 
-  // direction: 1=right, 2=left, 3=down, 4=up
-  const dirs = { 1: [0, 1], 2: [0, -1], 3: [1, 0], 4: [-1, 0] };
-  const arrowChar = { 1: "→", 2: "←", 3: "↓", 4: "↑" };
-
-  const INF = Infinity;
-  const cost = Array.from({ length: m }, () => new Array(n).fill(INF));
-  cost[0][0] = 0;
-
-  // Build grid display: each cell shows "arrow cost" (e.g., "→0", "↓∞")
-  function makeGrid(hlR, hlC, pathSet) {
-    const dp = [];
-    for (let r = 0; r < m; r++) {
-      const row = [];
-      for (let c = 0; c < n; c++) {
-        const ar = arrowChar[grid[r][c]];
-        const co = cost[r][c] === INF ? "∞" : cost[r][c];
-        row.push(`${ar}${co}`);
-      }
-      dp.push(row);
-    }
-    return {
-      dp,
-      text1: Array.from({ length: m }, (_, i) => `r${i}`),
-      text2: Array.from({ length: n }, (_, i) => `c${i}`),
-      hlCell: hlR !== undefined && hlR !== null ? [hlR, hlC] : null,
-      pathCells: pathSet ? [...pathSet].map((s) => s.split(",").map(Number)) : [],
-    };
+  const arrow = { 1: "→", 2: "←", 3: "↓", 4: "↑" };
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải là ma trận chữ nhật chỉ gồm 1,2,3,4; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ tối đa 20×20.",
+        en: "The grid must be rectangular and contain only 1,2,3,4; separate rows with '|' or ';'. The visualization supports at most 20×20.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
   }
 
-  // Show input grid first
-  const gridStr = grid.map((row) => row.map((v) => arrowChar[v]).join("")).join(" / ");
-  steps.push({
-    title: { vi: "Đề bài", en: "Problem" },
-    arr: [],
-    grid: makeGrid(0, 0, new Set(["0,0"])),
-    highlight: [],
-    mark: [],
-    codeLines: [4, 5],
-    vars: [
-      { name: "size", value: `${m}×${n}` },
-      { name: "grid", value: gridStr },
-      { name: "start", value: "(0,0)" },
-      { name: "target", value: `(${m - 1},${n - 1})` },
-    ],
+  const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const deque = [];
+  const finalized = new Set();
+  const key = (r, c) => `${r},${c}`;
+  const formatCost = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const distStr = () => `[${dist.map((row) => `[${row.map(formatCost).join(", ")}]`).join(", ")}]`;
+  const dequeStr = () => `[${deque.map(([cost, r, c]) => `(${cost}, ${r}, ${c})`).join(", ")}]`;
+
+  function makeCells(current = null, pathCells = new Set()) {
+    const queued = new Set(deque.map(([, r, c]) => key(r, c)));
+    return grid.map((row, r) => row.map((direction, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      if (finalized.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (pathCells.has(cellKey)) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      const endpoint = r === 0 && c === 0
+        ? " · S"
+        : r === rows - 1 && c === cols - 1
+          ? " · T"
+          : "";
+      return { label: arrow[direction], meta: `c:${formatCost(dist[r][c])}${endpoint}`, cls };
+    }));
+  }
+
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
+    codeLine: 5,
+    vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
     note: {
-      vi:
-        `Lưới ${m}×${n}: mỗi ô có 1 mũi tên (→ ← ↓ ↑).\n` +
-        `Bạn đi từ (0,0) đến (${m - 1},${n - 1}). Mỗi ô buộc bạn đi theo mũi tên.\n` +
-        `Bạn có thể "đổi mũi tên" của 1 ô — mỗi lần đổi tốn 1 chi phí.\n` +
-        `→ Tìm số ô cần đổi mũi tên ít nhất để có đường đi hợp lệ.`,
-      en:
-        `Grid ${m}×${n}: each cell has an arrow (→ ← ↓ ↑).\n` +
-        `Travel from (0,0) to (${m - 1},${n - 1}). Each cell forces you to follow its arrow.\n` +
-        `You may "change the arrow" of a cell — each change costs 1.\n` +
-        `→ Find the minimum number of changes to create a valid path.`,
+      vi: `Bắt đầu ở (0,0), cần tới (${rows - 1},${cols - 1}). Mỗi ô cho biết hướng miễn phí hiện tại.`,
+      en: `Start at (0,0) and reach (${rows - 1},${cols - 1}). Each cell gives its current free direction.`,
     },
   });
 
-  steps.push({
-    title: { vi: "Khởi tạo 0-1 BFS", en: "Initialize 0-1 BFS" },
-    arr: [],
-    grid: makeGrid(0, 0),
-    highlight: [],
-    mark: [],
-    codeLines: [7, 8, 9],
-    vars: [
-      { name: "cost[0][0]", value: 0 },
-      { name: "deque", value: "[(0,0)]" },
-      { name: "rules", value: "follow arrow = +0; change = +1" },
-    ],
+  pushStep({
+    title: { vi: "Ánh xạ bốn mã hướng", en: "Map the four direction codes" },
+    codeLine: 6,
+    vars: [{ name: "directions", value: "[(0,1), (0,-1), (1,0), (-1,0)]" }],
     note: {
-      vi:
-        `Mỗi ô hiển thị: mũi tên + chi phí nhỏ nhất tới ô đó.\n` +
-        `(0,0) = 0 (điểm bắt đầu), các ô còn lại = ∞ (chưa tới).\n` +
-        `0-1 BFS: cạnh cost 0 (đi theo mũi tên) → thêm ĐẦU deque.\n` +
-        `Cạnh cost 1 (đổi hướng) → thêm CUỐI deque.`,
-      en:
-        `Each cell shows: arrow + min cost to reach it.\n` +
-        `(0,0) = 0 (start), all others = ∞ (not yet reached).\n` +
-        `0-1 BFS: cost-0 edge (follow arrow) → add to FRONT of deque.\n` +
-        `Cost-1 edge (change direction) → add to BACK.`,
+      vi: "enumerate bắt đầu từ 1 nên direction 1=→, 2=←, 3=↓, 4=↑, đúng với giá trị trong grid.",
+      en: "enumerate starts at 1, so direction 1=→, 2=←, 3=↓, 4=↑, matching the grid values.",
     },
   });
 
-  // 0-1 BFS
-  const deque = [[0, 0]];
-  let processed = 0;
-  const MAX_SHOW = 25;
+  pushStep({
+    title: { vi: "Khởi tạo dist bằng ∞", en: "Initialize dist to ∞" },
+    codeLine: 7,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "dist[r][c] là số mũi tên ít nhất phải đổi để tới ô (r,c). ∞ nghĩa là chưa tìm thấy đường.",
+      en: "dist[r][c] is the fewest arrows that must change to reach (r,c). ∞ means no route is known.",
+    },
+  });
 
-  while (deque.length > 0) {
-    const [r, c] = deque.shift();
-    processed++;
+  dist[0][0] = 0;
+  pushStep({
+    title: { vi: "Ô bắt đầu có cost 0", en: "The start cell has cost 0" },
+    codeLine: 8,
+    current: [0, 0],
+    vars: [{ name: "dist[0][0]", value: 0 }],
+    note: {
+      vi: "Đứng tại ô đầu chưa cần đổi mũi tên nào, nên chi phí bằng 0.",
+      en: "Standing at the start requires no arrow changes, so its cost is 0.",
+    },
+  });
 
-    const curArrow = arrowChar[grid[r][c]];
-    const relaxations = [];
+  deque.push([0, 0, 0]);
+  pushStep({
+    title: { vi: "Đưa start vào deque", en: "Push start into the deque" },
+    codeLine: 9,
+    current: [0, 0],
+    vars: [{ name: "deque", value: dequeStr() }],
+    note: {
+      vi: "Deque lưu (cost,row,col). Đầu deque luôn chứa trạng thái cần ưu tiên xử lý trước.",
+      en: "The deque stores (cost,row,col). Its front contains the state to process first.",
+    },
+  });
 
-    for (const d of [1, 2, 3, 4]) {
-      const [dr, dc] = dirs[d];
-      const nr = r + dr;
-      const nc = c + dc;
-      if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
-      const followArrow = grid[r][c] === d;
-      const wt = followArrow ? 0 : 1;
-      const newCost = cost[r][c] + wt;
-      if (newCost < cost[nr][nc]) {
-        const prevCost = cost[nr][nc];
-        cost[nr][nc] = newCost;
-        relaxations.push({
-          to: `(${nr},${nc})`,
-          dir: arrowChar[d],
-          followArrow,
-          wt,
-          newCost,
-          prevCost: prevCost === INF ? "∞" : prevCost,
-        });
-        if (wt === 0) deque.unshift([nr, nc]);
-        else deque.push([nr, nc]);
-      }
-    }
+  while (deque.length) {
+    pushStep({
+      title: { vi: "Deque chưa rỗng", en: "The deque is not empty" },
+      codeLine: 11,
+      vars: [{ name: "deque", value: dequeStr() }],
+      note: {
+        vi: "Tiếp tục 0-1 BFS bằng cách lấy trạng thái ở đầu deque.",
+        en: "Continue 0-1 BFS by taking the state at the front.",
+      },
+    });
 
-    if (processed <= MAX_SHOW) {
-      const relaxStr = relaxations.length
-        ? relaxations
-            .map((rx) =>
-              `${rx.to} ${rx.dir} ${rx.followArrow ? "theo MT" : "đổi MT"} (+${rx.wt}) → ${rx.newCost}`,
-            )
-            .join("\n")
-        : "(không có ô nào cải thiện)";
+    const [currentCost, r, c] = deque.shift();
+    pushStep({
+      title: { vi: `popleft → (${currentCost}, ${r}, ${c})`, en: `popleft → (${currentCost}, ${r}, ${c})` },
+      codeLine: 12,
+      current: [r, c],
+      vars: [
+        { name: "current_cost", value: currentCost },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "deque còn lại", value: dequeStr() },
+      ],
+      note: {
+        vi: `Lấy ô (${r},${c}) với cost ${currentCost} ra khỏi đầu deque.`,
+        en: `Pop cell (${r},${c}) with cost ${currentCost} from the front.`,
+      },
+    });
 
-      const relaxStrEn = relaxations.length
-        ? relaxations
-            .map((rx) =>
-              `${rx.to} ${rx.dir} ${rx.followArrow ? "follow" : "change"} (+${rx.wt}) → ${rx.newCost}`,
-            )
-            .join("\n")
-        : "(no relaxations)";
+    const stale = currentCost > dist[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `${currentCost} > dist[${r}][${c}]=${dist[r][c]}: stale`, en: `${currentCost} > dist[${r}][${c}]=${dist[r][c]}: stale` }
+        : { vi: `${currentCost} > dist[${r}][${c}]? False`, en: `${currentCost} > dist[${r}][${c}]? False` },
+      codeLine: 13,
+      current: [r, c],
+      vars: [
+        { name: "current_cost", value: currentCost },
+        { name: `dist[${r}][${c}]`, value: dist[r][c] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: "Ô này đã có đường rẻ hơn; bản ghi vừa pop đã cũ và không được relax hàng xóm.",
+            en: "This cell already has a cheaper route; the popped entry is stale and must not relax neighbors.",
+          }
+        : {
+            vi: "Cost vừa pop vẫn bằng dist đang lưu, nên trạng thái hợp lệ.",
+            en: "The popped cost still matches the stored dist, so the state is valid.",
+          },
+    });
 
-      steps.push({
-        title: { vi: `Pop (${r},${c}) [${curArrow}] cost=${cost[r][c]}`, en: `Pop (${r},${c}) [${curArrow}] cost=${cost[r][c]}` },
-        arr: [],
-        grid: makeGrid(r, c),
-        highlight: [],
-        mark: [],
-        codeLines: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-        vars: [
-          { name: "cell", value: `(${r},${c})` },
-          { name: "arrow ở ô", value: curArrow },
-          { name: "cost hiện tại", value: cost[r][c] },
-          { name: "relaxations", value: relaxations.length },
-          { name: "deque size", value: deque.length },
-        ],
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
+        codeLine: 14,
+        current: [r, c],
+        vars: [{ name: "continue", value: true }],
         note: {
-          vi:
-            `Lấy ô (${r},${c}) ra khỏi đầu deque. Mũi tên ô này: ${curArrow}.\n` +
-            `Thử 4 hướng từ ô này:\n${relaxStr}`,
-          en:
-            `Pop cell (${r},${c}) from front of deque. Arrow here: ${curArrow}.\n` +
-            `Try 4 directions from this cell:\n${relaxStrEn}`,
+          vi: "Quay lại đầu vòng while, tránh xử lý một đường đắt hơn.",
+          en: "Return to the while loop and avoid processing a more expensive route.",
         },
       });
+      continue;
     }
-  }
 
-  const answer = cost[m - 1][n - 1];
+    finalized.add(key(r, c));
+    for (let direction = 1; direction <= 4; direction++) {
+      const [dr, dc] = directions[direction - 1];
+      pushStep({
+        title: { vi: `Thử hướng ${direction} = ${arrow[direction]}`, en: `Try direction ${direction} = ${arrow[direction]}` },
+        codeLine: 16,
+        current: [r, c],
+        vars: [
+          { name: "direction", value: direction },
+          { name: "dr, dc", value: `${dr}, ${dc}` },
+          { name: "mũi tên ô hiện tại", value: arrow[grid[r][c]] },
+        ],
+        note: {
+          vi: `Từ (${r},${c}), thử đi ${arrow[direction]}. Mũi tên đang có tại ô là ${arrow[grid[r][c]]}.`,
+          en: `From (${r},${c}), try moving ${arrow[direction]}. The cell currently points ${arrow[grid[r][c]]}.`,
+        },
+      });
 
-  // Trace a path from target back to start (any path with optimal cost)
-  const pathSet = new Set();
-  if (answer !== INF) {
-    let pr = m - 1;
-    let pc = n - 1;
-    pathSet.add(`${pr},${pc}`);
-    while (pr !== 0 || pc !== 0) {
-      // Find a neighbor that could have led here
-      let foundPrev = null;
-      for (const d of [1, 2, 3, 4]) {
-        const [dr, dc] = dirs[d];
-        const prR = pr - dr;
-        const prC = pc - dc;
-        if (prR < 0 || prR >= m || prC < 0 || prC >= n) continue;
-        const followArrow = grid[prR][prC] === d;
-        const wt = followArrow ? 0 : 1;
-        if (cost[prR][prC] + wt === cost[pr][pc]) {
-          foundPrev = [prR, prC];
-          break;
-        }
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Neighbor = (${nr},${nc})`, en: `Neighbor = (${nr},${nc})` },
+        codeLine: 17,
+        current: [r, c],
+        vars: [
+          { name: "nr", value: `${r} + (${dr}) = ${nr}` },
+          { name: "nc", value: `${c} + (${dc}) = ${nc}` },
+        ],
+        note: {
+          vi: "Tính tọa độ hàng xóm bằng r+dr và c+dc.",
+          en: "Compute the neighbor coordinates with r+dr and c+dc.",
+        },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      pushStep({
+        title: inBounds
+          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
+          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
+        codeLine: 18,
+        current: inBounds ? [nr, nc] : [r, c],
+        vars: [
+          { name: "neighbor", value: `(${nr}, ${nc})` },
+          { name: "in bounds", value: inBounds },
+        ],
+        note: inBounds
+          ? {
+              vi: "Tọa độ hợp lệ, tiếp tục tính giá của cạnh.",
+              en: "The coordinates are valid, so compute the edge cost.",
+            }
+          : {
+              vi: "Tọa độ ngoài grid; thân if không chạy và chuyển sang hướng tiếp theo.",
+              en: "The coordinates are outside the grid; skip the if body and try the next direction.",
+            },
+      });
+      if (!inBounds) continue;
+
+      const edgeCost = grid[r][c] === direction ? 0 : 1;
+      pushStep({
+        title: edgeCost === 0
+          ? { vi: `${arrow[grid[r][c]]} == ${arrow[direction]}: edge_cost = 0`, en: `${arrow[grid[r][c]]} == ${arrow[direction]}: edge_cost = 0` }
+          : { vi: `${arrow[grid[r][c]]} != ${arrow[direction]}: edge_cost = 1`, en: `${arrow[grid[r][c]]} != ${arrow[direction]}: edge_cost = 1` },
+        codeLine: 19,
+        current: [nr, nc],
+        vars: [
+          { name: `grid[${r}][${c}]`, value: `${grid[r][c]} (${arrow[grid[r][c]]})` },
+          { name: "direction", value: `${direction} (${arrow[direction]})` },
+          { name: "edge_cost", value: edgeCost },
+        ],
+        note: edgeCost === 0
+          ? {
+              vi: "Đi đúng mũi tên có sẵn nên không cần sửa ô hiện tại: cost +0.",
+              en: "Following the existing arrow requires no change to the current cell: cost +0.",
+            }
+          : {
+              vi: `Muốn đi ${arrow[direction]} phải đổi mũi tên ${arrow[grid[r][c]]} của ô hiện tại: cost +1.`,
+              en: `Moving ${arrow[direction]} requires changing the current ${arrow[grid[r][c]]} arrow: cost +1.`,
+            },
+      });
+
+      const newCost = currentCost + edgeCost;
+      pushStep({
+        title: { vi: `new_cost = ${currentCost} + ${edgeCost} = ${newCost}`, en: `new_cost = ${currentCost} + ${edgeCost} = ${newCost}` },
+        codeLine: 20,
+        current: [nr, nc],
+        vars: [
+          { name: "current_cost", value: currentCost },
+          { name: "edge_cost", value: edgeCost },
+          { name: "new_cost", value: newCost },
+        ],
+        note: {
+          vi: `Tổng số lần đổi mũi tên nếu đi tới (${nr},${nc}) là ${newCost}.`,
+          en: `The total arrow changes required to reach (${nr},${nc}) would be ${newCost}.`,
+        },
+      });
+
+      const oldDist = dist[nr][nc];
+      const improves = newCost < oldDist;
+      pushStep({
+        title: improves
+          ? { vi: `${newCost} < ${formatCost(oldDist)}: cải thiện`, en: `${newCost} < ${formatCost(oldDist)}: improvement` }
+          : { vi: `${newCost} < ${formatCost(oldDist)}? False`, en: `${newCost} < ${formatCost(oldDist)}? False` },
+        codeLine: 21,
+        current: [nr, nc],
+        vars: [
+          { name: "new_cost", value: newCost },
+          { name: `dist[${nr}][${nc}]`, value: formatCost(oldDist) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? {
+              vi: `Tìm thấy đường cần ít lần đổi hơn tới (${nr},${nc}); phải cập nhật dist và deque.`,
+              en: `A route with fewer changes reaches (${nr},${nc}); update dist and the deque.`,
+            }
+          : {
+              vi: `Đường này không rẻ hơn dist hiện có ${formatCost(oldDist)}, nên bỏ qua.`,
+              en: `This route is not cheaper than the stored dist ${formatCost(oldDist)}, so skip it.`,
+            },
+      });
+      if (!improves) continue;
+
+      dist[nr][nc] = newCost;
+      parent[nr][nc] = [r, c];
+      pushStep({
+        title: { vi: `dist[${nr}][${nc}] = ${newCost}`, en: `dist[${nr}][${nc}] = ${newCost}` },
+        codeLine: 22,
+        current: [nr, nc],
+        vars: [{ name: "dist", value: distStr() }],
+        note: {
+          vi: `Lưu cost tốt hơn. Visualization đồng thời nhớ parent=(${r},${c}) để dựng đường tối ưu cuối.`,
+          en: `Store the better cost. The visualization also records parent=(${r},${c}) for the final optimal path.`,
+        },
+      });
+
+      const freeEdge = edgeCost === 0;
+      pushStep({
+        title: freeEdge
+          ? { vi: "edge_cost == 0: True", en: "edge_cost == 0: True" }
+          : { vi: "edge_cost == 0: False", en: "edge_cost == 0: False" },
+        codeLine: 23,
+        current: [nr, nc],
+        vars: [
+          { name: "edge_cost", value: edgeCost },
+          { name: "condition", value: freeEdge },
+        ],
+        note: freeEdge
+          ? {
+              vi: "Cạnh miễn phí phải được ưu tiên xử lý ngay, nên sẽ thêm neighbor vào ĐẦU deque.",
+              en: "A free edge must be processed next, so add the neighbor to the FRONT.",
+            }
+          : {
+              vi: "Cạnh tốn 1 không được vượt trước các trạng thái cùng cost hiện tại, nên đi vào nhánh else.",
+              en: "A cost-1 edge must not jump ahead of current-cost states, so take the else branch.",
+            },
+      });
+
+      if (freeEdge) {
+        deque.unshift([newCost, nr, nc]);
+        pushStep({
+          title: { vi: `appendleft((${newCost}, ${nr}, ${nc}))`, en: `appendleft((${newCost}, ${nr}, ${nc}))` },
+          codeLine: 24,
+          current: [nr, nc],
+          vars: [{ name: "deque", value: dequeStr() }],
+          note: {
+            vi: "Cost +0 được thêm vào đầu deque, vì đường này không đắt hơn trạng thái vừa xử lý.",
+            en: "A +0 edge goes to the front because it is no more expensive than the current state.",
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+          codeLine: 25,
+          current: [nr, nc],
+          vars: [{ name: "edge_cost", value: edgeCost }],
+          note: {
+            vi: "edge_cost = 1, nên neighbor phải chờ ở cuối deque.",
+            en: "edge_cost = 1, so the neighbor must wait at the back.",
+          },
+        });
+
+        deque.push([newCost, nr, nc]);
+        pushStep({
+          title: { vi: `append((${newCost}, ${nr}, ${nc}))`, en: `append((${newCost}, ${nr}, ${nc}))` },
+          codeLine: 26,
+          current: [nr, nc],
+          vars: [{ name: "deque", value: dequeStr() }],
+          note: {
+            vi: "Cost +1 được thêm vào cuối deque; các trạng thái rẻ hơn ở phía trước sẽ chạy trước.",
+            en: "A +1 edge goes to the back; cheaper states already in front run first.",
+          },
+        });
       }
-      if (!foundPrev) break;
-      pr = foundPrev[0];
-      pc = foundPrev[1];
-      pathSet.add(`${pr},${pc}`);
     }
   }
 
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [],
-    grid: makeGrid(m - 1, n - 1, pathSet),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [22],
+  pushStep({
+    title: { vi: "Deque đã rỗng", en: "The deque is empty" },
+    codeLine: 11,
     vars: [
-      { name: "cost[target]", value: answer === INF ? -1 : answer },
-      { name: "answer", value: answer === INF ? -1 : answer },
-      { name: "changes needed", value: answer === INF ? "N/A" : answer },
+      { name: "deque", value: "[]" },
+      { name: "dist", value: distStr() },
     ],
     note: {
-      vi:
-        `Chi phí nhỏ nhất tới (${m - 1},${n - 1}) = ${answer === INF ? -1 : answer}.\n` +
-        `Đây là SỐ LẦN ÍT NHẤT phải đổi mũi tên để tạo đường đi hợp lệ.\n` +
-        `Đường đi được tô xanh trên lưới (truy ngược từ đích về (0,0)).`,
-      en:
-        `Minimum cost to reach (${m - 1},${n - 1}) = ${answer === INF ? -1 : answer}.\n` +
-        `This is the MINIMUM number of arrow changes needed for a valid path.\n` +
-        `Path is highlighted on the grid (traced back from target to (0,0)).`,
+      vi: "Không còn trạng thái cần relax; bảng chi phí nhỏ nhất đã hoàn tất.",
+      en: "No states remain to relax; the minimum-cost table is complete.",
     },
   });
 
-  return { original: grid, answer: answer === INF ? -1 : answer, steps };
-}
+  const answer = dist[rows - 1][cols - 1];
+  const path = [];
+  let current = [rows - 1, cols - 1];
+  while (current) {
+    path.unshift(current);
+    current = parent[current[0]][current[1]];
+  }
+  const pathCells = new Set(path.map(([r, c]) => key(r, c)));
+  const pathText = path.map(([r, c]) => `(${r},${c})`).join(" → ");
+  pushStep({
+    title: { vi: `Chi phí nhỏ nhất = ${answer}`, en: `Minimum cost = ${answer}` },
+    codeLine: 27,
+    pathCells,
+    final: true,
+    vars: [
+      { name: "path", value: pathText },
+      { name: "arrow changes", value: answer },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Đường xanh lá: ${pathText}. Cần đổi đúng ${answer} mũi tên trên đường này; không có đường hợp lệ nào dùng ít lần đổi hơn.`,
+      en: `Green path: ${pathText}. It changes exactly ${answer} arrows; no valid route uses fewer changes.`,
+    },
+  });
 
+  return { original: grid, answer, steps };
+}
 // ─── 1377: Frog Position After T Seconds ───
 function buildSteps1377(input, params) {
   const n = params.n || 5;
