@@ -1584,6 +1584,49 @@ function buildSteps743(input, params) {
  * LeetCode 787: Cheapest Flights Within K Stops.
  * Bounded Bellman-Ford: round r may use at most r + 1 flights.
  */
+function find787CheapestPath(n, flights, src, dst, maxFlights) {
+  if (src === dst) return { nodes: [src], edges: [] };
+
+  const dist = Array.from({ length: maxFlights + 1 }, () => Array(n).fill(Infinity));
+  const parent = Array.from({ length: maxFlights + 1 }, () => Array(n).fill(-1));
+  dist[0][src] = 0;
+
+  for (let used = 1; used <= maxFlights; used++) {
+    for (const [u, v, price] of flights) {
+      if (dist[used - 1][u] === Infinity) continue;
+      const candidate = dist[used - 1][u] + price;
+      if (candidate < dist[used][v]) {
+        dist[used][v] = candidate;
+        parent[used][v] = u;
+      }
+    }
+  }
+
+  let bestUsed = -1;
+  let bestPrice = Infinity;
+  for (let used = 1; used <= maxFlights; used++) {
+    if (dist[used][dst] < bestPrice) {
+      bestPrice = dist[used][dst];
+      bestUsed = used;
+    }
+  }
+  if (bestUsed === -1) return { nodes: [], edges: [] };
+
+  const pathNodes = [dst];
+  const pathEdges = [];
+  let city = dst;
+  for (let used = bestUsed; used > 0; used--) {
+    const previous = parent[used][city];
+    if (previous === -1) return { nodes: [], edges: [] };
+    pathEdges.unshift([previous, city]);
+    pathNodes.unshift(previous);
+    city = previous;
+  }
+  return city === src
+    ? { nodes: pathNodes, edges: pathEdges }
+    : { nodes: [], edges: [] };
+}
+
 function make787FlowLayout(n, src, dst) {
   const middle = Array.from({ length: n }, (_, id) => id)
     .filter((id) => id !== src && id !== dst);
@@ -1870,14 +1913,20 @@ function buildSteps787BellmanFord(input, params) {
   }
 
   const answer = cost[dst] === Infinity ? -1 : cost[dst];
+  const cheapestPath = find787CheapestPath(n, flights, src, dst, k + 1);
+  const pathText = cheapestPath.nodes.join(" → ");
   pushStep({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    title: answer === -1
+      ? { vi: "Không có đường hợp lệ", en: "No valid route" }
+      : { vi: `Đường rẻ nhất: ${pathText}`, en: `Cheapest route: ${pathText}` },
     costs: cost,
-    hlNodes: [dst],
+    hlNodes: cheapestPath.nodes,
+    hlEdges: cheapestPath.edges,
     codeLine: 16,
     vars: [
       { name: `cost[${dst}]`, value: formatValue(cost[dst]) },
       { name: "answer", value: answer },
+      ...(answer === -1 ? [] : [{ name: "path", value: pathText }]),
     ],
     note: cost[dst] === Infinity
       ? {
@@ -1885,8 +1934,8 @@ function buildSteps787BellmanFord(input, params) {
           en: `After ${k + 1} rounds, dst = ${dst} is still unreachable within ${k} stops, so return -1.`,
         }
       : {
-          vi: `Sau tối đa ${k + 1} chuyến bay, giá nhỏ nhất tới dst = ${dst} là ${cost[dst]}.`,
-          en: `Using at most ${k + 1} flights, the cheapest price to dst = ${dst} is ${cost[dst]}.`,
+          vi: `Đường ${pathText} dùng ${cheapestPath.edges.length} chuyến bay và có tổng giá ${cost[dst]}. Các cạnh không thuộc đường này được làm mờ.`,
+          en: `Route ${pathText} uses ${cheapestPath.edges.length} flights and costs ${cost[dst]}. Edges outside this route are dimmed.`,
         },
     final: true,
   });
@@ -2129,19 +2178,23 @@ function buildSteps787Dijkstra(input, params) {
 
     if (u === dst) {
       answer = price;
+      const cheapestPath = find787CheapestPath(n, flights, src, dst, maxFlights);
+      const pathText = cheapestPath.nodes.join(" → ");
       pushStep({
-        title: { vi: `Tới dst = ${dst}: trả ${price}`, en: `Reached dst = ${dst}: return ${price}` },
+        title: { vi: `Đường rẻ nhất: ${pathText}`, en: `Cheapest route: ${pathText}` },
         best,
-        hlNodes: [dst],
+        hlNodes: cheapestPath.nodes,
+        hlEdges: cheapestPath.edges,
         codeLine: 18,
         vars: [
           { name: "u == dst", value: true },
           { name: "used", value: used },
           { name: "answer", value: price },
+          { name: "path", value: pathText },
         ],
         note: {
-          vi: `Có thể trả ngay ${price}: heap đã đảm bảo không còn trạng thái hợp lệ nào có giá nhỏ hơn trạng thái vừa pop.`,
-          en: `We can return ${price} immediately: the heap guarantees that no remaining valid state has a smaller price.`,
+          vi: `Heap xác nhận ${price} là giá nhỏ nhất. Highlight đường ${pathText}; các cạnh không thuộc đường này được làm mờ.`,
+          en: `The heap confirms ${price} is minimal. Route ${pathText} is highlighted; all other edges are dimmed.`,
         },
         final: true,
       });
