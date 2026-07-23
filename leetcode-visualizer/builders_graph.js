@@ -608,6 +608,434 @@ function buildSteps1368(input) {
 
   return { original: grid, answer, steps };
 }
+// ─── 2290: Minimum Obstacle Removal to Reach Corner (0-1 BFS) ───
+function buildSteps2290(input) {
+  const grid = String(input)
+    .split(/[|;]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+  const valid = rows > 0 && cols > 0 && rows <= 20 && cols <= 20
+    && grid.every((row) => row.length === cols
+      && row.every((value) => value === 0 || value === 1))
+    && grid[0][0] === 0 && grid[rows - 1][cols - 1] === 0;
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải là ma trận chữ nhật 0/1, start và target phải là 0; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ tối đa 20×20.",
+        en: "The grid must be rectangular and contain 0/1, with start and target equal to 0; separate rows with '|' or ';'. The visualization supports at most 20×20.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const deque = [];
+  const finalized = new Set();
+  const key = (r, c) => `${r},${c}`;
+  const formatCost = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const distStr = () => `[${dist.map((row) => `[${row.map(formatCost).join(", ")}]`).join(", ")}]`;
+  const dequeStr = () => `[${deque.map(([cost, r, c]) => `(${cost}, ${r}, ${c})`).join(", ")}]`;
+
+  function makeCells(current = null, pathCells = new Set()) {
+    const queued = new Set(deque.map(([, r, c]) => key(r, c)));
+    return grid.map((row, r) => row.map((cell, c) => {
+      const cellKey = key(r, c);
+      let cls = cell === 1 ? "wall" : "empty";
+      if (finalized.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (pathCells.has(cellKey)) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      const endpoint = r === 0 && c === 0
+        ? " · S"
+        : r === rows - 1 && c === cols - 1
+          ? " · T"
+          : "";
+      return { label: cell === 1 ? "■" : "·", meta: `d:${formatCost(dist[r][c])}${endpoint}`, cls };
+    }));
+  }
+
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
+    codeLine: 6,
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: `Ô · là trống, ô ■ là obstacle. Đi từ (0,0) tới (${rows - 1},${cols - 1}) và được phép xóa obstacle.`,
+      en: `A · cell is empty and ■ is an obstacle. Travel from (0,0) to (${rows - 1},${cols - 1}), removing obstacles when needed.`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Chuẩn bị bốn hướng", en: "Prepare four directions" },
+    codeLine: 7,
+    vars: [{ name: "directions", value: "[(0,1), (0,-1), (1,0), (-1,0)]" }],
+    note: {
+      vi: "Có thể đi phải, trái, xuống hoặc lên; không đi chéo.",
+      en: "Movement may go right, left, down, or up, but not diagonally.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo dist bằng ∞", en: "Initialize dist to ∞" },
+    codeLine: 8,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "dist[r][c] là số obstacle ít nhất phải xóa để tới (r,c). ∞ nghĩa là chưa tìm thấy đường.",
+      en: "dist[r][c] is the fewest obstacles that must be removed to reach (r,c). ∞ means no route is known.",
+    },
+  });
+
+  dist[0][0] = 0;
+  pushStep({
+    title: { vi: "Start có dist 0", en: "The start has dist 0" },
+    codeLine: 9,
+    current: [0, 0],
+    vars: [{ name: "dist[0][0]", value: 0 }],
+    note: {
+      vi: "Ô bắt đầu là ô trống, nên chưa cần xóa obstacle nào.",
+      en: "The start is empty, so no obstacle has been removed yet.",
+    },
+  });
+
+  deque.push([0, 0, 0]);
+  pushStep({
+    title: { vi: "Đưa start vào deque", en: "Push start into the deque" },
+    codeLine: 10,
+    current: [0, 0],
+    vars: [{ name: "deque", value: dequeStr() }],
+    note: {
+      vi: "Deque lưu (cost,row,col). Trạng thái rẻ hơn được giữ gần đầu deque.",
+      en: "The deque stores (cost,row,col). Cheaper states stay near the front.",
+    },
+  });
+
+  while (deque.length) {
+    pushStep({
+      title: { vi: "Deque chưa rỗng", en: "The deque is not empty" },
+      codeLine: 12,
+      vars: [{ name: "deque", value: dequeStr() }],
+      note: {
+        vi: "Tiếp tục 0-1 BFS bằng trạng thái ở đầu deque.",
+        en: "Continue 0-1 BFS with the state at the front.",
+      },
+    });
+
+    const [currentCost, r, c] = deque.shift();
+    pushStep({
+      title: { vi: `popleft → (${currentCost}, ${r}, ${c})`, en: `popleft → (${currentCost}, ${r}, ${c})` },
+      codeLine: 13,
+      current: [r, c],
+      vars: [
+        { name: "current_cost", value: currentCost },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "deque còn lại", value: dequeStr() },
+      ],
+      note: {
+        vi: `Lấy ô (${r},${c}) với ${currentCost} obstacle đã xóa ra khỏi đầu deque.`,
+        en: `Pop (${r},${c}) with ${currentCost} removed obstacles from the front.`,
+      },
+    });
+
+    const stale = currentCost > dist[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `${currentCost} > dist[${r}][${c}]=${dist[r][c]}: stale`, en: `${currentCost} > dist[${r}][${c}]=${dist[r][c]}: stale` }
+        : { vi: `${currentCost} > dist[${r}][${c}]? False`, en: `${currentCost} > dist[${r}][${c}]? False` },
+      codeLine: 14,
+      current: [r, c],
+      vars: [
+        { name: "current_cost", value: currentCost },
+        { name: `dist[${r}][${c}]`, value: dist[r][c] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: "Ô này đã có đường xóa ít obstacle hơn; bản ghi vừa pop đã cũ.",
+            en: "This cell already has a route removing fewer obstacles; the popped entry is stale.",
+          }
+        : {
+            vi: "Cost vừa pop vẫn bằng dist tốt nhất, nên được phép relax hàng xóm.",
+            en: "The popped cost still matches the best dist, so neighbors may be relaxed.",
+          },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
+        codeLine: 15,
+        current: [r, c],
+        vars: [{ name: "continue", value: true }],
+        note: {
+          vi: "Quay lại đầu while, không mở rộng một đường đắt hơn.",
+          en: "Return to the while loop without expanding a more expensive route.",
+        },
+      });
+      continue;
+    }
+
+    finalized.add(key(r, c));
+    for (const [dr, dc] of directions) {
+      pushStep({
+        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
+        codeLine: 17,
+        current: [r, c],
+        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
+        note: {
+          vi: `Từ (${r},${c}), thử độ lệch hàng ${dr} và cột ${dc}.`,
+          en: `From (${r},${c}), try row offset ${dr} and column offset ${dc}.`,
+        },
+      });
+
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Neighbor = (${nr},${nc})`, en: `Neighbor = (${nr},${nc})` },
+        codeLine: 18,
+        current: [r, c],
+        vars: [
+          { name: "nr", value: `${r} + (${dr}) = ${nr}` },
+          { name: "nc", value: `${c} + (${dc}) = ${nc}` },
+        ],
+        note: {
+          vi: "Tính tọa độ ô sắp đi vào.",
+          en: "Compute the coordinates of the cell being entered.",
+        },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      pushStep({
+        title: inBounds
+          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
+          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
+        codeLine: 19,
+        current: inBounds ? [nr, nc] : [r, c],
+        vars: [
+          { name: "neighbor", value: `(${nr}, ${nc})` },
+          { name: "in bounds", value: inBounds },
+        ],
+        note: inBounds
+          ? {
+              vi: "Tọa độ hợp lệ, tiếp tục xem ô hàng xóm là trống hay obstacle.",
+              en: "The coordinates are valid; inspect whether the neighbor is empty or an obstacle.",
+            }
+          : {
+              vi: "Tọa độ ngoài grid; bỏ qua và thử hướng tiếp theo.",
+              en: "The coordinates are outside the grid; skip them and try the next direction.",
+            },
+      });
+      if (!inBounds) continue;
+
+      const edgeCost = grid[nr][nc];
+      pushStep({
+        title: edgeCost === 0
+          ? { vi: `grid[${nr}][${nc}] = 0: edge_cost = 0`, en: `grid[${nr}][${nc}] = 0: edge_cost = 0` }
+          : { vi: `grid[${nr}][${nc}] = 1: edge_cost = 1`, en: `grid[${nr}][${nc}] = 1: edge_cost = 1` },
+        codeLine: 20,
+        current: [nr, nc],
+        vars: [
+          { name: `grid[${nr}][${nc}]`, value: edgeCost },
+          { name: "cell type", value: edgeCost === 0 ? "empty" : "obstacle" },
+          { name: "edge_cost", value: edgeCost },
+        ],
+        note: edgeCost === 0
+          ? {
+              vi: "Đang ĐI VÀO ô trống, không cần xóa gì: cost +0.",
+              en: "The move ENTERS an empty cell, so nothing is removed: cost +0.",
+            }
+          : {
+              vi: "Đang ĐI VÀO obstacle ■, phải xóa chính ô hàng xóm này: cost +1.",
+              en: "The move ENTERS obstacle ■, so this neighbor must be removed: cost +1.",
+            },
+      });
+
+      const newCost = currentCost + edgeCost;
+      pushStep({
+        title: { vi: `new_cost = ${currentCost} + ${edgeCost} = ${newCost}`, en: `new_cost = ${currentCost} + ${edgeCost} = ${newCost}` },
+        codeLine: 21,
+        current: [nr, nc],
+        vars: [
+          { name: "current_cost", value: currentCost },
+          { name: "edge_cost", value: edgeCost },
+          { name: "new_cost", value: newCost },
+        ],
+        note: {
+          vi: `Tổng obstacle phải xóa để tới (${nr},${nc}) qua đường này là ${newCost}.`,
+          en: `This route removes ${newCost} total obstacles to reach (${nr},${nc}).`,
+        },
+      });
+
+      const oldDist = dist[nr][nc];
+      const improves = newCost < oldDist;
+      pushStep({
+        title: improves
+          ? { vi: `${newCost} < ${formatCost(oldDist)}: cải thiện`, en: `${newCost} < ${formatCost(oldDist)}: improvement` }
+          : { vi: `${newCost} < ${formatCost(oldDist)}? False`, en: `${newCost} < ${formatCost(oldDist)}? False` },
+        codeLine: 22,
+        current: [nr, nc],
+        vars: [
+          { name: "new_cost", value: newCost },
+          { name: `dist[${nr}][${nc}]`, value: formatCost(oldDist) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? {
+              vi: `Đường mới xóa ít obstacle hơn để tới (${nr},${nc}); cập nhật dist và deque.`,
+              en: `The new route removes fewer obstacles to reach (${nr},${nc}); update dist and deque.`,
+            }
+          : {
+              vi: `Đường này không rẻ hơn dist hiện có ${formatCost(oldDist)}, nên bỏ qua.`,
+              en: `This route is not cheaper than the stored dist ${formatCost(oldDist)}, so skip it.`,
+            },
+      });
+      if (!improves) continue;
+
+      dist[nr][nc] = newCost;
+      parent[nr][nc] = [r, c];
+      pushStep({
+        title: { vi: `dist[${nr}][${nc}] = ${newCost}`, en: `dist[${nr}][${nc}] = ${newCost}` },
+        codeLine: 23,
+        current: [nr, nc],
+        vars: [{ name: "dist", value: distStr() }],
+        note: {
+          vi: `Lưu cost tốt hơn và parent=(${r},${c}) để dựng đường cuối.`,
+          en: `Store the better cost and parent=(${r},${c}) for the final path.`,
+        },
+      });
+
+      const freeEdge = edgeCost === 0;
+      pushStep({
+        title: freeEdge
+          ? { vi: "edge_cost == 0: True", en: "edge_cost == 0: True" }
+          : { vi: "edge_cost == 0: False", en: "edge_cost == 0: False" },
+        codeLine: 24,
+        current: [nr, nc],
+        vars: [
+          { name: "edge_cost", value: edgeCost },
+          { name: "condition", value: freeEdge },
+        ],
+        note: freeEdge
+          ? {
+              vi: "Ô trống cost 0 phải được ưu tiên ở ĐẦU deque.",
+              en: "An empty cost-0 cell is prioritized at the FRONT of the deque.",
+            }
+          : {
+              vi: "Obstacle cost 1 phải chờ ở CUỐI deque.",
+              en: "A cost-1 obstacle must wait at the BACK of the deque.",
+            },
+      });
+
+      if (freeEdge) {
+        deque.unshift([newCost, nr, nc]);
+        pushStep({
+          title: { vi: `appendleft((${newCost}, ${nr}, ${nc}))`, en: `appendleft((${newCost}, ${nr}, ${nc}))` },
+          codeLine: 25,
+          current: [nr, nc],
+          vars: [{ name: "deque", value: dequeStr() }],
+          note: {
+            vi: "Đi vào ô trống không tăng cost, nên xử lý trạng thái này sớm nhất.",
+            en: "Entering an empty cell does not increase cost, so process this state earliest.",
+          },
+        });
+      } else {
+        pushStep({
+          title: { vi: "Đi vào nhánh else", en: "Enter the else branch" },
+          codeLine: 26,
+          current: [nr, nc],
+          vars: [{ name: "edge_cost", value: edgeCost }],
+          note: {
+            vi: "Đây là obstacle cost 1, nên không được vượt trước các trạng thái cost 0.",
+            en: "This is a cost-1 obstacle, so it must not jump ahead of cost-0 states.",
+          },
+        });
+
+        deque.push([newCost, nr, nc]);
+        pushStep({
+          title: { vi: `append((${newCost}, ${nr}, ${nc}))`, en: `append((${newCost}, ${nr}, ${nc}))` },
+          codeLine: 27,
+          current: [nr, nc],
+          vars: [{ name: "deque", value: dequeStr() }],
+          note: {
+            vi: "Thêm obstacle vào cuối deque; các đường chưa phải xóa thêm obstacle chạy trước.",
+            en: "Add the obstacle to the back; routes requiring no extra removal run first.",
+          },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: "Deque đã rỗng", en: "The deque is empty" },
+    codeLine: 12,
+    vars: [
+      { name: "deque", value: "[]" },
+      { name: "dist", value: distStr() },
+    ],
+    note: {
+      vi: "Mọi đường có thể cải thiện đã được relax; bảng dist hoàn tất.",
+      en: "Every improving route has been relaxed; the dist table is complete.",
+    },
+  });
+
+  const answer = dist[rows - 1][cols - 1];
+  const path = [];
+  let current = [rows - 1, cols - 1];
+  while (current) {
+    path.unshift(current);
+    current = parent[current[0]][current[1]];
+  }
+  const pathCells = new Set(path.map(([r, c]) => key(r, c)));
+  const removed = path.filter(([r, c]) => grid[r][c] === 1);
+  const pathText = path.map(([r, c]) => `(${r},${c})`).join(" → ");
+  const removedText = removed.length
+    ? removed.map(([r, c]) => `(${r},${c})`).join(", ")
+    : "none";
+  pushStep({
+    title: { vi: `Cần xóa ít nhất ${answer} obstacle`, en: `Remove at least ${answer} obstacle(s)` },
+    codeLine: 28,
+    pathCells,
+    final: true,
+    vars: [
+      { name: "path", value: pathText },
+      { name: "removed obstacles", value: removedText },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Đường xanh lá: ${pathText}. Các ô obstacle bị xóa: ${removedText}; tổng cộng ${answer}, và không có đường nào xóa ít hơn.`,
+      en: `Green path: ${pathText}. Removed obstacle cells: ${removedText}; ${answer} total, and no route removes fewer.`,
+    },
+  });
+
+  return { original: grid, answer, steps };
+}
+
 // ─── 1377: Frog Position After T Seconds ───
 function buildSteps1377(input, params) {
   const n = params.n || 5;
@@ -922,4 +1350,4 @@ function buildSteps815(input, params) {
   return {original, answer, steps};
 }
 
-module.exports = { buildSteps1293, buildSteps1368, buildSteps1377, buildSteps126, buildSteps815 };
+module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps1377, buildSteps126, buildSteps815 };
