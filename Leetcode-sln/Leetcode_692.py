@@ -17,5 +17,4 @@ class Solution:
 sol = Solution()
 words = ["i", "love", "leetcode", "i", "love", "coding"]
 k = 2
-print(sol.topKFrequent(words, k)) 
-
+print(sol.topKFrequent(words, k))

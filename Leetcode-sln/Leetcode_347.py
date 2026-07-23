@@ -34,4 +34,3 @@ class Solution:
 
 sol = Solution()
 print(sol.topKFrequent([1,2,1,2,1,2,3,1,3,2], 2))
-
