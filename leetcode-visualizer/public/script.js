@@ -1746,6 +1746,19 @@ function renderGraph(step) {
     const labelOffset = isFlow ? 30 : 12;
     let labelX = mx - uy * labelOffset;
     let labelY = my + ux * labelOffset;
+    if (isFlow) {
+      const normalX = -uy;
+      const normalY = ux;
+      const candidateA = { x: mx + normalX * labelOffset, y: my + normalY * labelOffset };
+      const candidateB = { x: mx - normalX * labelOffset, y: my - normalY * labelOffset };
+      const centerX = svgWidth / 2;
+      const centerY = svgHeight / 2;
+      const distanceA = (candidateA.x - centerX) ** 2 + (candidateA.y - centerY) ** 2;
+      const distanceB = (candidateB.x - centerX) ** 2 + (candidateB.y - centerY) ** 2;
+      const outward = distanceA >= distanceB ? candidateA : candidateB;
+      labelX = outward.x;
+      labelY = outward.y;
+    }
     if (isLinear && edge.circular) {
       const isSelfLoop = edge.u === edge.v;
       const isPrev = edge.kind === "prev";
