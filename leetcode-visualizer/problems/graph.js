@@ -1581,6 +1581,296 @@ function buildSteps743(input, params) {
 }
 
 /**
+ * LeetCode 787: Cheapest Flights Within K Stops.
+ * Bounded Bellman-Ford: round r may use at most r + 1 flights.
+ */
+function buildSteps787(input, params) {
+  const n = Number(params.n);
+  const src = Number(params.src);
+  const dst = Number(params.dst);
+  const k = Number(params.k);
+  const flights = String(input)
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => item.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const valid = Number.isInteger(n) && n > 0
+    && Number.isInteger(src) && src >= 0 && src < n
+    && Number.isInteger(dst) && dst >= 0 && dst < n
+    && Number.isInteger(k) && k >= 0
+    && flights.length > 0
+    && flights.every(([u, v, price]) => (
+      Number.isInteger(u) && u >= 0 && u < n
+      && Number.isInteger(v) && v >= 0 && v < n
+      && Number.isFinite(price) && price >= 0
+    ));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Nhập mỗi chuyến bay theo dạng u,v,price và ngăn cách bằng dấu ';'. n, src, dst, k phải là số nguyên hợp lệ.",
+        en: "Enter each flight as u,v,price separated by ';'. n, src, dst, and k must be valid integers.",
+      },
+    });
+    return { n, flights, src, dst, k, answer: -1, steps };
+  }
+
+  const nodes = Array.from({ length: n }, (_, id) => id);
+  const edges = flights.map(([u, v, w]) => ({ u, v, w }));
+  const formatValue = (value) => value === Infinity ? "∞" : String(value);
+  const formatCosts = (costs) => `[${costs.map(formatValue).join(", ")}]`;
+  const reachable = (costs) => nodes.filter((id) => costs[id] !== Infinity);
+
+  function makeGraph(costs, hlNodes = [], hlEdges = []) {
+    const annotations = { [src]: "src", [dst]: "dst" };
+    if (src === dst) annotations[src] = "src = dst";
+    return {
+      nodes: nodes.map((id) => ({ id, label: String(id), dist: costs[id] === Infinity ? "∞" : costs[id] })),
+      edges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: reachable(costs),
+      annotations,
+    };
+  }
+
+  function pushStep({ title, costs, hlNodes = [], hlEdges = [], codeLine, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(costs, hlNodes, hlEdges),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  let cost = new Array(n).fill(Infinity);
+
+  pushStep({
+    title: { vi: "Giới hạn số chuyến bay", en: "Translate the stop limit" },
+    costs: cost,
+    hlNodes: [src, dst],
+    codeLine: 4,
+    vars: [
+      { name: "src", value: src },
+      { name: "dst", value: dst },
+      { name: "k stops", value: k },
+      { name: "max flights", value: k + 1 },
+    ],
+    note: {
+      vi: `Có tối đa ${k} điểm dừng ở giữa nên đường đi được dùng tối đa ${k + 1} chuyến bay (cạnh). Ta sẽ chạy đúng ${k + 1} vòng Bellman-Ford.`,
+      en: `At most ${k} intermediate stops means at most ${k + 1} flights (edges). We run exactly ${k + 1} Bellman-Ford rounds.`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Đặt giá trị vô cực", en: "Define infinity" },
+    costs: cost,
+    codeLine: 5,
+    vars: [{ name: "INF", value: "∞" }],
+    note: {
+      vi: "INF biểu diễn một thành phố chưa thể tới được với số chuyến bay đang cho phép.",
+      en: "INF represents a city that is not reachable with the currently allowed number of flights.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo cost", en: "Initialize cost" },
+    costs: cost,
+    codeLine: 6,
+    vars: [{ name: "cost", value: formatCosts(cost) }],
+    note: {
+      vi: "Ban đầu chưa biết cách tới thành phố nào, nên mọi chi phí đều là ∞.",
+      en: "Initially no city is known to be reachable, so every cost is ∞.",
+    },
+  });
+
+  cost[src] = 0;
+  pushStep({
+    title: { vi: `cost[${src}] = 0`, en: `cost[${src}] = 0` },
+    costs: cost,
+    hlNodes: [src],
+    codeLine: 7,
+    vars: [{ name: "cost", value: formatCosts(cost) }],
+    note: {
+      vi: `Đang đứng tại src = ${src}, chưa mua vé nào nên chi phí là 0.`,
+      en: `We start at src = ${src} without taking a flight, so its cost is 0.`,
+    },
+  });
+
+  for (let used = 0; used <= k; used++) {
+    const allowedFlights = used + 1;
+    pushStep({
+      title: { vi: `Vòng ${allowedFlights}: cho phép tối đa ${allowedFlights} chuyến`, en: `Round ${allowedFlights}: allow at most ${allowedFlights} flights` },
+      costs: cost,
+      codeLine: 9,
+      vars: [
+        { name: "used", value: used },
+        { name: "allowed flights", value: allowedFlights },
+        { name: "cost (vòng trước)", value: formatCosts(cost) },
+      ],
+      note: {
+        vi: `Bắt đầu vòng ${allowedFlights}. Mọi đường mới tạo trong vòng này chỉ được nối thêm đúng một cạnh từ kết quả của vòng trước.`,
+        en: `Start round ${allowedFlights}. Every new route in this round extends a previous-round route by exactly one edge.`,
+      },
+    });
+
+    const nextCost = cost.slice();
+    pushStep({
+      title: { vi: "Sao chép cost sang next_cost", en: "Copy cost into next_cost" },
+      costs: nextCost,
+      codeLine: 10,
+      vars: [
+        { name: "cost (chỉ đọc)", value: formatCosts(cost) },
+        { name: "next_cost (sẽ ghi)", value: formatCosts(nextCost) },
+      ],
+      note: {
+        vi: "Đây là dòng quan trọng nhất: cost được giữ nguyên suốt vòng; chỉ next_cost được cập nhật. Vì vậy một vòng không thể vô tình đi qua nhiều cạnh.",
+        en: "This is the key line: cost stays frozen throughout the round; only next_cost changes. One round therefore cannot accidentally traverse multiple edges.",
+      },
+    });
+
+    for (const [u, v, price] of flights) {
+      pushStep({
+        title: { vi: `Xét chuyến bay ${u} → ${v}, giá ${price}`, en: `Inspect flight ${u} → ${v}, price ${price}` },
+        costs: nextCost,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 11,
+        vars: [
+          { name: "flight", value: `[${u}, ${v}, ${price}]` },
+          { name: `cost[${u}] (vòng trước)`, value: formatValue(cost[u]) },
+          { name: `next_cost[${v}]`, value: formatValue(nextCost[v]) },
+        ],
+        note: {
+          vi: `Đọc cạnh ${u} → ${v}. Muốn dùng cạnh này, thành phố ${u} phải tới được bằng kết quả đã chốt từ vòng trước.`,
+          en: `Read edge ${u} → ${v}. To use it, city ${u} must be reachable in the finalized previous-round result.`,
+        },
+      });
+
+      if (cost[u] === Infinity) {
+        pushStep({
+          title: { vi: `Bỏ qua: cost[${u}] = ∞`, en: `Skip: cost[${u}] = ∞` },
+          costs: nextCost,
+          hlNodes: [u, v],
+          hlEdges: [[u, v]],
+          codeLine: 12,
+          vars: [
+            { name: `cost[${u}]`, value: "∞" },
+            { name: "condition", value: "False" },
+            { name: "next_cost", value: formatCosts(nextCost) },
+          ],
+          note: {
+            vi: `Ở đầu vòng này chưa có đường hợp lệ tới ${u}, nên không thể bay tiếp từ ${u} sang ${v}. next_cost không đổi.`,
+            en: `At the start of this round there is no valid route to ${u}, so the flight to ${v} cannot be used. next_cost is unchanged.`,
+          },
+        });
+        continue;
+      }
+
+      const candidate = cost[u] + price;
+      pushStep({
+        title: { vi: `Có thể bay từ ${u}: tính giá ứng viên`, en: `City ${u} is reachable: compute candidate` },
+        costs: nextCost,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 12,
+        vars: [
+          { name: `cost[${u}]`, value: cost[u] },
+          { name: "price", value: price },
+          { name: "candidate", value: `${cost[u]} + ${price} = ${candidate}` },
+          { name: `next_cost[${v}]`, value: formatValue(nextCost[v]) },
+        ],
+        note: {
+          vi: `cost[${u}] hữu hạn, nên đường tới ${v} qua cạnh này hợp lệ. Giá ứng viên = ${cost[u]} + ${price} = ${candidate}.`,
+          en: `cost[${u}] is finite, so this edge forms a valid route to ${v}. Candidate = ${cost[u]} + ${price} = ${candidate}.`,
+        },
+      });
+
+      const oldValue = nextCost[v];
+      const improved = candidate < oldValue;
+      if (improved) nextCost[v] = candidate;
+      pushStep({
+        title: improved
+          ? { vi: `Cập nhật next_cost[${v}]: ${formatValue(oldValue)} → ${candidate}`, en: `Update next_cost[${v}]: ${formatValue(oldValue)} → ${candidate}` }
+          : { vi: `Không cập nhật next_cost[${v}]`, en: `Do not update next_cost[${v}]` },
+        costs: nextCost,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 13,
+        vars: [
+          { name: "candidate", value: candidate },
+          { name: `next_cost[${v}] (cũ)`, value: formatValue(oldValue) },
+          { name: "min", value: formatValue(nextCost[v]) },
+          { name: "next_cost", value: formatCosts(nextCost) },
+        ],
+        note: improved
+          ? {
+              vi: `${candidate} nhỏ hơn ${formatValue(oldValue)}, nên ghi ${candidate} vào next_cost[${v}]. cost vẫn chưa đổi trong vòng này.`,
+              en: `${candidate} is smaller than ${formatValue(oldValue)}, so write it to next_cost[${v}]. cost remains unchanged during this round.`,
+            }
+          : {
+              vi: `${candidate} không nhỏ hơn ${formatValue(oldValue)}, nên giữ next_cost[${v}] = ${formatValue(oldValue)}.`,
+              en: `${candidate} is not smaller than ${formatValue(oldValue)}, so keep next_cost[${v}] = ${formatValue(oldValue)}.`,
+            },
+      });
+    }
+
+    cost = nextCost;
+    pushStep({
+      title: { vi: `Chốt vòng ${allowedFlights}`, en: `Commit round ${allowedFlights}` },
+      costs: cost,
+      codeLine: 14,
+      vars: [
+        { name: "max flights", value: allowedFlights },
+        { name: "cost", value: formatCosts(cost) },
+        { name: `cost[${dst}]`, value: formatValue(cost[dst]) },
+      ],
+      note: {
+        vi: `Gán cost = next_cost. Từ đây cost[v] là giá thấp nhất để tới v bằng không quá ${allowedFlights} chuyến bay.`,
+        en: `Assign cost = next_cost. Now cost[v] is the cheapest price to v using at most ${allowedFlights} flights.`,
+      },
+    });
+  }
+
+  const answer = cost[dst] === Infinity ? -1 : cost[dst];
+  pushStep({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    costs: cost,
+    hlNodes: [dst],
+    codeLine: 16,
+    vars: [
+      { name: `cost[${dst}]`, value: formatValue(cost[dst]) },
+      { name: "answer", value: answer },
+    ],
+    note: cost[dst] === Infinity
+      ? {
+          vi: `Sau ${k + 1} vòng, dst = ${dst} vẫn chưa tới được trong giới hạn ${k} điểm dừng, nên trả -1.`,
+          en: `After ${k + 1} rounds, dst = ${dst} is still unreachable within ${k} stops, so return -1.`,
+        }
+      : {
+          vi: `Sau tối đa ${k + 1} chuyến bay, giá nhỏ nhất tới dst = ${dst} là ${cost[dst]}.`,
+          en: `Using at most ${k + 1} flights, the cheapest price to dst = ${dst} is ${cost[dst]}.`,
+        },
+    final: true,
+  });
+
+  return { n, flights, src, dst, k, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 851: Loud and Rich.
  * DFS on reversed richer graph: for each node, find the quietest person among all richer people.
  */
@@ -6056,7 +6346,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -7248,6 +7538,61 @@ module.exports = {
       "        return ans if ans < float('inf') else -1",
     ],
     builder: buildSteps743,
+  },
+  787: {
+    id: 787,
+    difficulty: "medium",
+    slug: "cheapest-flights-within-k-stops",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Cheapest Flights Within K Stops", en: "Cheapest Flights Within K Stops" },
+    titleVi: { vi: "Chuyến bay rẻ nhất trong K điểm dừng", en: "Cheapest flight within K stops" },
+    statement: {
+      vi: "Cho n thành phố và các chuyến bay có hướng [from, to, price]. Tìm giá rẻ nhất từ src tới dst với tối đa k điểm dừng ở giữa. Nếu không có đường hợp lệ, trả -1. Nhập chuyến bay dạng 'u,v,price', ngăn cách bằng dấu ';'.",
+      en: "Given n cities and directed flights [from, to, price], find the cheapest price from src to dst with at most k intermediate stops. Return -1 if no valid route exists. Enter flights as 'u,v,price' separated by ';'.",
+    },
+    defaultInput: "0,1,100;1,2,100;2,0,100;1,3,600;2,3,200",
+    inputKind: "string",
+    inputLabel: { vi: "flights (u,v,price; ...)", en: "flights (u,v,price; ...)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số thành phố)", en: "n (cities)" }, default: 4 },
+      { key: "src", label: { vi: "src (điểm đi)", en: "src (source)" }, default: 0 },
+      { key: "dst", label: { vi: "dst (điểm đến)", en: "dst (destination)" }, default: 3 },
+      { key: "k", label: { vi: "k (tối đa điểm dừng)", en: "k (maximum stops)" }, default: 1 },
+    ],
+    approach: [
+      { vi: "Đổi giới hạn: tối đa k điểm dừng ở giữa nghĩa là tối đa k + 1 chuyến bay (cạnh).", en: "Translate the limit: at most k intermediate stops means at most k + 1 flights (edges)." },
+      { vi: "cost[v] là giá thấp nhất tới v bằng số chuyến đã được phép ở vòng trước. Khởi tạo cost[src] = 0, các thành phố khác = ∞.", en: "cost[v] is the cheapest price to v using the flights allowed in the previous round. Initialize cost[src] = 0 and all other cities to ∞." },
+      { vi: "Mỗi vòng tạo next_cost = cost[:]. Khi duyệt cạnh u → v, chỉ đọc cost[u] cũ và ghi kết quả tốt hơn vào next_cost[v].", en: "Each round creates next_cost = cost[:]. For edge u → v, read only the old cost[u] and write an improvement to next_cost[v]." },
+      { vi: "Không cập nhật trực tiếp cost trong cùng vòng: nếu làm vậy, một vòng có thể nối nhiều cạnh và vi phạm giới hạn số điểm dừng.", en: "Do not update cost in place during a round: doing so could chain multiple edges in one round and violate the stop limit." },
+      { vi: "Sau k + 1 vòng, cost[dst] là đáp án; nếu vẫn là ∞ thì trả -1.", en: "After k + 1 rounds, cost[dst] is the answer; return -1 if it is still ∞." },
+    ],
+    complexity: {
+      time: "O((k + 1) · E)",
+      space: "O(n)",
+      note: {
+        vi: "Có k + 1 vòng và mỗi vòng duyệt E chuyến bay. Hai mảng cost và next_cost cùng có n phần tử.",
+        en: "There are k + 1 rounds and each scans E flights. cost and next_cost each contain n entries.",
+      },
+    },
+    code: [
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def findCheapestPrice(self, n: int, flights: List[List[int]], src: int, dst: int, k: int) -> int:",
+      "        INF = float('inf')",
+      "        cost = [INF] * n",
+      "        cost[src] = 0",
+      "",
+      "        for used in range(k + 1):",
+      "            next_cost = cost[:]",
+      "            for u, v, price in flights:",
+      "                if cost[u] != INF:",
+      "                    next_cost[v] = min(next_cost[v], cost[u] + price)",
+      "            cost = next_cost",
+      "",
+      "        return -1 if cost[dst] == INF else cost[dst]",
+    ],
+    builder: buildSteps787,
   },
   3977: {
     id: 3977,
