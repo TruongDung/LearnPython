@@ -1601,12 +1601,13 @@ function renderTree(step) {
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
+  const hasSubLabels = nodes.some((n) => n.sub !== undefined && n.sub !== null);
   const colW = hasMultiLineLabels ? 84 : 60;
-  const rowH = hasMultiLineLabels ? 96 : 78;
+  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
   const pad = hasMultiLineLabels ? 44 : 34;
   const r = hasMultiLineLabels ? 30 : 18;
   const width = pad * 2 + maxX * colW;
-  const height = pad * 2 + maxY * rowH;
+  const height = pad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
   const px = (x) => pad + x * colW;
   const py = (y) => pad + y * rowH;
 
@@ -1654,6 +1655,10 @@ function renderTree(step) {
       const ann = treeAnnotations[n.id];
       const color = n.hl ? "#f59e0b" : n.isWord ? "#22c55e" : "#6366f1";
       circles += `<text x="${c.x}" y="${c.y - r - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${escapeXml(ann)}</text>`;
+    }
+    // Sub-label below node (e.g. heap array index)
+    if (n.sub !== undefined && n.sub !== null) {
+      circles += `<text x="${c.x}" y="${c.y + r + 14}" text-anchor="middle" class="tree-sub">${escapeXml(n.sub)}</text>`;
     }
     circles += `</g>`;
   });

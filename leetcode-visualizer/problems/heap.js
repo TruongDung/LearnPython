@@ -19,6 +19,7 @@ function heapTree(heap, labelFn, hlSet, markSet) {
       id: i,
       label: labelFn(heap[i]),
       labelLines: Array.isArray(labelLines) ? labelLines.map(String) : null,
+      sub: `index ${i}`,
       x,
       y: depth,
       parentId: i === 0 ? null : Math.floor((i - 1) / 2),

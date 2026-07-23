@@ -2715,6 +2715,13 @@ button:disabled {
   fill: #fbbf24;
 }
 
+.tree-sub {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+
 /* ---- Real-time experience profit tracker (#9001) ---- */
 .profit-tracker-viz {
   display: grid;
@@ -5000,6 +5007,10 @@ button:disabled {
 
 [data-theme="light"] .tree-node.hl text {
   fill: #b45309;
+}
+
+[data-theme="light"] .tree-sub {
+  fill: #64748b;
 }
 
 [data-theme="light"] .grid-view {
