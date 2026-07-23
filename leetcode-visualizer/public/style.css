@@ -2679,7 +2679,8 @@ button:disabled {
   stroke-width: 2;
 }
 
-.tree-node circle {
+.tree-node circle,
+.tree-node rect {
   fill: rgba(30, 20, 50, 0.8);
   stroke: #64748b;
   stroke-width: 2;
@@ -2693,7 +2694,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.tree-node.word circle {
+.tree-node.word circle,
+.tree-node.word rect {
   fill: rgba(16, 185, 129, 0.15);
   stroke: #10b981;
 }
@@ -2705,7 +2707,8 @@ button:disabled {
   opacity: 0.55;
 }
 
-.tree-node.hl circle {
+.tree-node.hl circle,
+.tree-node.hl rect {
   stroke: #f59e0b;
   stroke-width: 3;
   fill: rgba(245, 158, 11, 0.1);
@@ -4986,7 +4989,8 @@ button:disabled {
   stroke: #cbd5e1;
 }
 
-[data-theme="light"] .tree-node circle {
+[data-theme="light"] .tree-node circle,
+[data-theme="light"] .tree-node rect {
   fill: white;
   stroke: #94a3b8;
 }
@@ -4995,12 +4999,14 @@ button:disabled {
   fill: #1e293b;
 }
 
-[data-theme="light"] .tree-node.word circle {
+[data-theme="light"] .tree-node.word circle,
+[data-theme="light"] .tree-node.word rect {
   fill: #ecfdf5;
   stroke: #10b981;
 }
 
-[data-theme="light"] .tree-node.hl circle {
+[data-theme="light"] .tree-node.hl circle,
+[data-theme="light"] .tree-node.hl rect {
   fill: #fffbeb;
   stroke: #f59e0b;
 }

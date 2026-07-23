@@ -1602,10 +1602,18 @@ function renderTree(step) {
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
   const hasSubLabels = nodes.some((n) => n.sub !== undefined && n.sub !== null);
-  const colW = hasMultiLineLabels ? 84 : 60;
-  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
-  const pad = hasMultiLineLabels ? 44 : 34;
   const r = hasMultiLineLabels ? 30 : 18;
+  // For single-line labels, widen the node into a pill shape when the text
+  // wouldn't fit in a plain circle (e.g. "-1, leetcode"), instead of shrinking
+  // the font until it's unreadable.
+  const charW = 7.6;
+  const hPad = 14;
+  const maxHalfWidth = hasMultiLineLabels
+    ? r
+    : Math.max(r, ...nodes.map((n) => (String(n.label || "").length * charW) / 2 + hPad));
+  const colW = hasMultiLineLabels ? 84 : Math.max(60, maxHalfWidth * 2 + 14);
+  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
+  const pad = hasMultiLineLabels ? 44 : Math.max(34, maxHalfWidth + 4);
   const width = pad * 2 + maxX * colW;
   const height = pad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
   const px = (x) => pad + x * colW;
@@ -1616,13 +1624,19 @@ function renderTree(step) {
     pos[n.id] = { x: px(n.x), y: py(n.y) };
   });
 
+  // Per-node horizontal half-width (pill radius); vertical stays r.
+  const hw = {};
+  nodes.forEach((n) => {
+    hw[n.id] = hasMultiLineLabels ? r : Math.max(r, (String(n.label || "").length * charW) / 2 + hPad);
+  });
+
   let edges = "";
   nodes.forEach((n) => {
     if (n.parentId === null || n.parentId === undefined) return;
     const p = pos[n.parentId];
     const c = pos[n.id];
     if (!p) return;
-    // Shorten line so arrowhead doesn't overlap the circle
+    // Shorten line so arrowhead doesn't overlap the node shape
     const dx = c.x - p.x, dy = c.y - p.y;
     const len = Math.sqrt(dx*dx + dy*dy) || 1;
     const ux = dx/len, uy = dy/len;
@@ -1635,10 +1649,17 @@ function renderTree(step) {
   const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" }
   nodes.forEach((n) => {
     const c = pos[n.id];
+    const nodeHw = hw[n.id];
+    const isPill = nodeHw > r + 0.5;
     const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "");
     circles += `<g class="${cls}">`;
-    if (n.isWord) circles += `<circle cx="${c.x}" cy="${c.y}" r="${r + 4}" class="tree-ring" />`;
-    circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
+    if (isPill) {
+      if (n.isWord) circles += `<rect x="${c.x - nodeHw - 4}" y="${c.y - r - 4}" width="${(nodeHw + 4) * 2}" height="${(r + 4) * 2}" rx="${r + 4}" class="tree-ring" />`;
+      circles += `<rect x="${c.x - nodeHw}" y="${c.y - r}" width="${nodeHw * 2}" height="${r * 2}" rx="${r}" />`;
+    } else {
+      if (n.isWord) circles += `<circle cx="${c.x}" cy="${c.y}" r="${r + 4}" class="tree-ring" />`;
+      circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
+    }
     if (Array.isArray(n.labelLines) && n.labelLines.length > 0) {
       const lineGap = 11;
       const firstY = c.y - ((n.labelLines.length - 1) * lineGap) / 2;
