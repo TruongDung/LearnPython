@@ -5193,6 +5193,27 @@ button:disabled {
   fill: #fbbf24;
 }
 
+.graph-column-divider {
+  stroke: #334155;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.graph-column-label {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+[data-theme="light"] .graph-column-divider {
+  stroke: #cbd5e1;
+}
+
+[data-theme="light"] .graph-column-label {
+  fill: #64748b;
+}
+
 .graph-node circle {
   fill: rgba(30, 20, 50, 0.8);
   stroke: #64748b;

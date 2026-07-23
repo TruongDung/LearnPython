@@ -1726,6 +1726,21 @@ function renderGraph(step) {
   const visitedSet = new Set(visitedNodes || []);
   const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}${e[2] ? `-${e[2]}` : ""}`));
 
+  // Optional column dividers + labels (used by "semester"/level layouts to show
+  // that nodes in the same column are grouped together, e.g. LeetCode 1136).
+  let columnSvg = "";
+  if (isFlow && step.graph.columnLabels) {
+    for (const col of step.graph.columnLabels) {
+      const colX = pad + col.x * (svgWidth - pad * 2);
+      if (col.divider) {
+        columnSvg += `<line x1="${colX}" y1="${pad * 0.35}" x2="${colX}" y2="${svgHeight - pad * 0.35}" class="graph-column-divider" />`;
+      }
+      if (col.label) {
+        columnSvg += `<text x="${colX}" y="${pad * 0.55}" text-anchor="middle" class="graph-column-label">${escapeXml(col.label)}</text>`;
+      }
+    }
+  }
+
   // Draw edges (with arrowheads and weight labels)
   let edgeSvg = "";
   const arrowId = "graph-arrow";
@@ -1901,7 +1916,7 @@ function renderGraph(step) {
   $("treeView").innerHTML =
     caption +
     `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" class="tree-svg graph-svg${isLinear ? " graph-linear" : ""}${isFlow ? " graph-flow" : ""}">` +
-    defs + edgeSvg + nodeSvg +
+    defs + columnSvg + edgeSvg + nodeSvg +
     `</svg>`;
 }
 

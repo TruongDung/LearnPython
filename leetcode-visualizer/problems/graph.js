@@ -5591,6 +5591,68 @@ function buildSteps207(input, params) {
 }
 
 /**
+ * Layout helper for LeetCode 1136: places each course in the column of the
+ * semester it WOULD be taken in (simulated once upfront via Kahn's algorithm),
+ * so the visualization directly shows "these courses are grouped together"
+ * instead of a circle with only in-degree numbers to infer that from.
+ * Courses stuck in a cycle (never reach in-degree 0) get their own trailing
+ * "stuck" column.
+ */
+function make1136FlowLayout(n, courses, adj, inDegInit) {
+  const inDeg = { ...inDegInit };
+  const levelOf = {};
+  let level = 0;
+  let remaining = courses.filter((c) => !(c in levelOf));
+  while (remaining.length) {
+    const available = remaining.filter((c) => inDeg[c] === 0);
+    if (available.length === 0) break;
+    for (const c of available) {
+      levelOf[c] = level;
+      for (const next of adj[c]) inDeg[next]--;
+    }
+    level++;
+    remaining = remaining.filter((c) => !(c in levelOf));
+  }
+  const stuckLevel = level; // courses still unassigned (cycle) share the last column
+  const groups = new Map();
+  for (const c of courses) {
+    const lv = c in levelOf ? levelOf[c] : stuckLevel;
+    if (!groups.has(lv)) groups.set(lv, []);
+    groups.get(lv).push(c);
+  }
+  const levelCount = Math.max(1, groups.size);
+  const positions = {};
+  const columnLabels = [];
+  [...groups.entries()].sort(([a], [b]) => a - b).forEach(([lv, ids], column) => {
+    const x = levelCount === 1 ? 0.5 : column / (levelCount - 1);
+    ids.forEach((id, row) => {
+      positions[id] = {
+        x,
+        y: ids.length === 1 ? 0.5 : 0.14 + (0.72 * row) / (ids.length - 1),
+      };
+    });
+    const isStuck = lv === stuckLevel && remaining.length > 0 && lv >= level;
+    columnLabels.push({
+      x,
+      divider: column > 0,
+      label: isStuck ? "⛔" : `S${lv + 1}`,
+    });
+  });
+  return {
+    layout: "flow",
+    positions,
+    columnLabels,
+    width: Math.max(560, levelCount * 150 + 260),
+    height: Math.max(280, 90 * Math.max(...[...groups.values()].map((g) => g.length))),
+    dimUnfocused: true,
+    caption: {
+      vi: "Mỗi cột = một học kỳ (môn ở cùng cột được học cùng lúc) • số dưới node = in-degree còn lại",
+      en: "Each column = one semester (courses in the same column are taken together) • number below node = remaining in-degree",
+    },
+  };
+}
+
+/**
  * Generate steps for LeetCode 1136: Parallel Courses.
  * Topological sort (Kahn's algorithm / BFS):
  *  - Find all courses with in-degree 0 → take them this semester.
@@ -5616,11 +5678,13 @@ function buildSteps1136(input, params) {
     inDeg[v] = (inDeg[v] || 0) + 1;
   }
 
+  const layout = make1136FlowLayout(n, courses, adj, inDeg);
   const taken = new Set();
 
   // Graph snapshot helper
   function makeGraph(hlNodes, hlEdges) {
     return {
+      ...layout,
       nodes: courses.map((id) => ({ id, dist: inDeg[id] })),
       edges: edges.map(([u, v]) => ({ u, v, w: "" })),
       hlNodes: hlNodes || [],
@@ -5630,122 +5694,205 @@ function buildSteps1136(input, params) {
   }
 
   steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
+    title: { vi: "Xây dựng adjacency và in-degree", en: "Build adjacency and in-degree" },
     arr: [],
     graph: makeGraph([], []),
     highlight: [],
     mark: [],
-    codeLines: [3, 4, 5, 6, 7],
+    codeLines: [9],
     vars: [
       { name: "n", value: n },
-      { name: "prerequisites", value: edges.map(([u, v]) => `${u}→${v}`).join(", ") || "none" },
+      { name: "relations", value: edges.map(([u, v]) => `${u}→${v}`).join(", ") || "none" },
       { name: "in-degree", value: courses.map((c) => `${c}:${inDeg[c]}`).join(", ") },
     ],
     note: {
       vi:
-        `Có ${n} môn (1..${n}), ${edges.length} điều kiện tiên quyết.\n` +
-        `Số bên dưới mỗi nút = in-degree (số môn phải học trước môn đó).\n` +
-        `Mỗi học kỳ học MỌI môn có in-degree = 0. Sau đó giảm in-degree các môn phụ thuộc.\n` +
-        `Lặp đến khi hết hoặc còn nút mà mọi cái đều có in-degree > 0 (có chu trình → -1).`,
+        `Với mỗi (u, v) trong relations: thêm cạnh u→v vào adj, tăng in_deg[v] lên 1 (dòng 7-9).\n` +
+        `Sau khi xét hết ${edges.length} cạnh, in-degree mỗi môn là số tiên quyết còn thiếu. Cột trong hình sẽ = học kỳ mà môn đó SẼ được học.`,
       en:
-        `${n} courses (1..${n}), ${edges.length} prerequisites.\n` +
-        `Number below each node = in-degree (number of prerequisites).\n` +
-        `Each semester, take EVERY course with in-degree = 0. Then decrement in-degree of dependents.\n` +
-        `Repeat until done, or stuck (cycle → -1).`,
+        `For each (u, v) in relations: add edge u→v to adj, increment in_deg[v] (lines 7-9).\n` +
+        `After processing all ${edges.length} edges, each course's in-degree is its number of prerequisites. Columns in the diagram show the semester each course will be taken in.`,
     },
   });
 
-  let semester = 0;
-  let answer = -1;
+  let queue = courses.filter((c) => inDeg[c] === 0);
+  steps.push({
+    title: { vi: `queue khởi tạo: ${queue.length} môn không tiên quyết`, en: `queue starts with ${queue.length} course(s) with no prerequisite` },
+    arr: [],
+    graph: makeGraph(queue, []),
+    highlight: [],
+    mark: [],
+    codeLines: [10],
+    vars: [{ name: "queue", value: `[${queue.join(", ")}]` }],
+    note: {
+      vi: `queue chứa mọi môn có in-degree = 0: [${queue.join(", ") || "—"}]. Đây là các môn sẽ học ở học kỳ 1 (cột S1).`,
+      en: `queue holds every course with in-degree = 0: [${queue.join(", ") || "—"}]. These will be taken in semester 1 (column S1).`,
+    },
+  });
 
-  while (taken.size < n) {
-    // Find courses with in-degree 0 and not yet taken
-    const available = courses.filter((c) => !taken.has(c) && inDeg[c] === 0);
+  let semesters = 0;
+  steps.push({
+    title: { vi: "taken = 0", en: "taken = 0" },
+    arr: [],
+    graph: makeGraph(queue, []),
+    highlight: [],
+    mark: [],
+    codeLines: [11],
+    vars: [{ name: "taken", value: 0 }],
+    note: {
+      vi: "taken đếm số môn đã học tính đến giờ.",
+      en: "taken counts how many courses have been completed so far.",
+    },
+  });
+  steps.push({
+    title: { vi: "semesters = 0", en: "semesters = 0" },
+    arr: [],
+    graph: makeGraph(queue, []),
+    highlight: [],
+    mark: [],
+    codeLines: [12],
+    vars: [{ name: "semesters", value: 0 }],
+    note: {
+      vi: "semesters đếm số học kỳ đã trải qua.",
+      en: "semesters counts how many semesters have elapsed.",
+    },
+  });
 
-    if (available.length === 0) {
-      // Stuck → cycle detected
-      steps.push({
-        title: { vi: "Bế tắc → có chu trình", en: "Stuck → cycle detected" },
-        arr: [],
-        graph: makeGraph(courses.filter((c) => !taken.has(c)), []),
-        highlight: [],
-        mark: [],
-        final: true,
-        codeLines: [14, 15],
-        vars: [
-          { name: "semester", value: semester },
-          { name: "taken", value: `${taken.size}/${n}` },
-          { name: "remaining in-degrees", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") },
-          { name: "answer", value: -1 },
-        ],
-        note: {
-          vi:
-            `Không còn môn nào có in-degree = 0, nhưng vẫn còn ${n - taken.size} môn chưa học.\n` +
-            `Đồ thị có chu trình → không thể hoàn thành → trả về -1.`,
-          en:
-            `No course has in-degree = 0, but ${n - taken.size} courses remain.\n` +
-            `Graph has a cycle → impossible → return -1.`,
-        },
-      });
-      return { n, edges: edgesRaw, answer: -1, steps };
-    }
-
-    semester++;
-    // Take all available courses this semester
-    for (const c of available) taken.add(c);
-
-    // Decrement in-degree of their dependents
-    const hlEdges = [];
-    for (const c of available) {
-      for (const next of adj[c]) {
-        inDeg[next]--;
-        hlEdges.push([c, next]);
-      }
-    }
-
+  while (true) {
+    const notEmpty = queue.length > 0;
     steps.push({
-      title: { vi: `Học kỳ ${semester}: học ${available.length} môn`, en: `Semester ${semester}: take ${available.length} course(s)` },
+      title: notEmpty
+        ? { vi: `queue còn ${queue.length} môn`, en: `queue still has ${queue.length} course(s)` }
+        : { vi: "queue rỗng → dừng lặp", en: "queue is empty → stop looping" },
       arr: [],
-      graph: makeGraph(available, hlEdges),
+      graph: makeGraph(queue, []),
       highlight: [],
       mark: [],
-      codeLines: [9, 10, 11, 12, 13],
-      vars: [
-        { name: "semester", value: semester },
-        { name: "take this term", value: `[${available.join(", ")}]` },
-        { name: "after decrement", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") || "(all taken)" },
-        { name: "total taken", value: `${taken.size}/${n}` },
-      ],
+      codeLines: [13],
+      vars: [{ name: "queue", value: `[${queue.join(", ")}]` }, { name: "condition", value: notEmpty }],
+      note: notEmpty
+        ? { vi: "queue chưa rỗng, tiếp tục học kỳ mới.", en: "The queue is not empty, so a new semester starts." }
+        : { vi: "Không còn môn nào trong queue, thoát while.", en: "No courses remain in the queue, exit the while loop." },
+    });
+    if (!notEmpty) break;
+
+    semesters++;
+    steps.push({
+      title: { vi: `Học kỳ ${semesters} bắt đầu`, en: `Semester ${semesters} begins` },
+      arr: [],
+      graph: makeGraph(queue, []),
+      highlight: [],
+      mark: [],
+      codeLines: [14],
+      vars: [{ name: "semesters", value: semesters }],
+      note: { vi: `Bắt đầu học kỳ ${semesters}.`, en: `Starting semester ${semesters}.` },
+    });
+
+    const batch = [...queue];
+    steps.push({
+      title: { vi: `size = ${batch.length} (số môn học kỳ này)`, en: `size = ${batch.length} (courses this semester)` },
+      arr: [],
+      graph: makeGraph(batch, []),
+      highlight: [],
+      mark: [],
+      codeLines: [15],
+      vars: [{ name: "size", value: batch.length }, { name: "batch", value: `[${batch.join(", ")}]` }],
       note: {
-        vi:
-          `Học kỳ ${semester}: lấy mọi môn có in-degree = 0 → [${available.join(", ")}].\n` +
-          `Giảm in-degree các môn phụ thuộc qua ${hlEdges.length} cạnh.\n` +
-          `Đã học ${taken.size}/${n} môn.`,
-        en:
-          `Semester ${semester}: take all courses with in-degree = 0 → [${available.join(", ")}].\n` +
-          `Decrement in-degree of dependents through ${hlEdges.length} edges.\n` +
-          `Total taken: ${taken.size}/${n}.`,
+        vi: `size chốt lại đúng ${batch.length} môn hiện có trong queue — chính là mọi môn học kỳ ${semesters} (cột S${semesters}); môn mới được đưa vào queue giữa lúc xử lý sẽ KHÔNG tính vào batch này.`,
+        en: `size locks in exactly the ${batch.length} courses currently queued — all of semester ${semesters}'s courses (column S${semesters}); courses newly queued mid-batch are excluded.`,
       },
     });
+
+    queue = [];
+    for (const u of batch) {
+      steps.push({
+        title: { vi: `Pop u = ${u}`, en: `Pop u = ${u}` },
+        arr: [],
+        graph: makeGraph([u], []),
+        highlight: [],
+        mark: [],
+        codeLines: [17],
+        vars: [{ name: "u", value: u }],
+        note: { vi: `Lấy môn ${u} ra khỏi queue để học ở học kỳ ${semesters}.`, en: `Remove course ${u} from the queue to take it in semester ${semesters}.` },
+      });
+
+      taken.add(u);
+      steps.push({
+        title: { vi: `taken += 1 → ${taken.size}`, en: `taken += 1 → ${taken.size}` },
+        arr: [],
+        graph: makeGraph([u], []),
+        highlight: [],
+        mark: [],
+        codeLines: [18],
+        vars: [{ name: "taken", value: `${taken.size}/${n}` }],
+        note: { vi: `Đã học môn ${u}. Tổng cộng đã học ${taken.size}/${n} môn.`, en: `Course ${u} is now taken. Total taken: ${taken.size}/${n}.` },
+      });
+
+      for (const v of adj[u]) {
+        inDeg[v]--;
+        steps.push({
+          title: { vi: `in_deg[${v}] -= 1 → ${inDeg[v]}`, en: `in_deg[${v}] -= 1 → ${inDeg[v]}` },
+          arr: [],
+          graph: makeGraph([v], [[u, v]]),
+          highlight: [],
+          mark: [],
+          codeLines: [20],
+          vars: [{ name: `in_deg[${v}]`, value: inDeg[v] }],
+          note: { vi: `Môn ${u} là tiên quyết của môn ${v}, nên in-degree của ${v} giảm 1 vì ${u} vừa học xong.`, en: `Course ${u} is a prerequisite of ${v}, so ${v}'s in-degree drops by one now that ${u} is done.` },
+        });
+
+        const ready = inDeg[v] === 0;
+        steps.push({
+          title: ready
+            ? { vi: `in_deg[${v}] == 0 → sẵn sàng`, en: `in_deg[${v}] == 0 → ready` }
+            : { vi: `in_deg[${v}] == 0? False (còn ${inDeg[v]})`, en: `in_deg[${v}] == 0? False (${inDeg[v]} left)` },
+          arr: [],
+          graph: makeGraph([v], []),
+          highlight: [],
+          mark: [],
+          codeLines: [21],
+          vars: [{ name: `in_deg[${v}]`, value: inDeg[v] }, { name: "condition", value: ready }],
+          note: ready
+            ? { vi: `Môn ${v} đã hết tiên quyết, có thể học ở học kỳ sau.`, en: `Course ${v} has no prerequisites left, so it can be taken next semester.` }
+            : { vi: `Môn ${v} còn ${inDeg[v]} tiên quyết chưa xong, chưa thể học.`, en: `Course ${v} still has ${inDeg[v]} unmet prerequisite(s), not ready yet.` },
+        });
+
+        if (ready) {
+          queue.push(v);
+          steps.push({
+            title: { vi: `queue.append(${v})`, en: `queue.append(${v})` },
+            arr: [],
+            graph: makeGraph(queue, []),
+            highlight: [],
+            mark: [],
+            codeLines: [22],
+            vars: [{ name: "queue", value: `[${queue.join(", ")}]` }],
+            note: { vi: `Đưa môn ${v} vào queue — sẽ được học ở học kỳ ${semesters + 1} (cột S${semesters + 1}).`, en: `Push course ${v} into the queue — it will be taken in semester ${semesters + 1} (column S${semesters + 1}).` },
+          });
+        }
+      }
+    }
   }
 
-  answer = semester;
+  const answer = taken.size === n ? semesters : -1;
   steps.push({
-    title: { vi: `Kết quả: ${answer} học kỳ`, en: `Result: ${answer} semesters` },
+    title: answer === -1
+      ? { vi: `return -1 (chỉ học được ${taken.size}/${n})`, en: `return -1 (only ${taken.size}/${n} taken)` }
+      : { vi: `return ${answer} (học hết ${n} môn)`, en: `return ${answer} (all ${n} courses taken)` },
     arr: [],
     graph: makeGraph([], []),
     highlight: [],
     mark: [],
     final: true,
-    codeLines: [16],
+    codeLines: [23],
     vars: [
-      { name: "semesters", value: answer },
+      { name: "taken", value: `${taken.size}/${n}` },
+      { name: "semesters", value: semesters },
       { name: "answer", value: answer },
     ],
-    note: {
-      vi: `Hoàn thành tất cả ${n} môn trong ${answer} học kỳ.`,
-      en: `Completed all ${n} courses in ${answer} semesters.`,
-    },
+    note: answer === -1
+      ? { vi: `queue rỗng nhưng chỉ học được ${taken.size}/${n} môn → phần còn lại bị kẹt trong chu trình (cột ⛔) → trả -1.`, en: `The queue is empty but only ${taken.size}/${n} courses were taken → the rest are stuck in a cycle (column ⛔) → return -1.` }
+      : { vi: `Học hết ${n} môn trong ${answer} học kỳ.`, en: `All ${n} courses completed in ${answer} semesters.` },
   });
 
   return { n, edges: edgesRaw, answer, steps };
