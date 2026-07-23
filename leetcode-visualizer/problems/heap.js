@@ -1261,7 +1261,10 @@ function buildSteps692(input, params) {
   const words = String(input).split(",").map((s) => s.trim()).filter((s) => s.length);
   const k = params.k !== undefined ? Number(params.k) : 2;
   const steps = [];
-  const label = (e) => `${e.w}·${e.count}`;
+  const label = (e) => `(-${e.count}, '${e.w}')`;
+  // Multi-line node label (bigger circle + smaller per-line font) so long words
+  // like "leetcode" stay crisp instead of being squeezed into a tiny circle.
+  label.lines = (e) => [`(-${e.count},`, `'${e.w}')`];
 
   steps.push(heapSnapshot([], label, {
     title: { vi: `Top ${k} từ xuất hiện nhiều nhất`, en: `Top ${k} frequent words` },
