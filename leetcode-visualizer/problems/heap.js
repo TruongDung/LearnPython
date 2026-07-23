@@ -726,10 +726,11 @@ function buildSteps347(input, params) {
   const freq = new Map();
   for (const x of nums) freq.set(x, (freq.get(x) || 0) + 1);
   const freqStr = [...freq.entries()].map(([v, f]) => `${v}→${f}`).join(", ");
+  const freqCounterStr = `Counter({${[...freq.entries()].map(([v, f]) => `${v}: ${f}`).join(", ")}})`;
   steps.push(heapSnapshot([], label, {
-    title: { vi: `freq = Counter(nums) = {${freqStr}}`, en: `freq = Counter(nums) = {${freqStr}}` },
+    title: { vi: `freq = ${freqCounterStr}`, en: `freq = ${freqCounterStr}` },
     codeLines: [4],
-    vars: [{ name: "freq", value: freqStr }],
+    vars: [{ name: "freq", value: freqCounterStr }],
     note: { vi: `Tần suất mỗi số: ${freqStr}.`, en: `Frequency of each number: ${freqStr}.` },
   }));
 
@@ -845,6 +846,14 @@ function buildSteps347(input, params) {
     note: { vi: `Heap còn lại đúng ${k} số có tần suất lớn nhất → đáp án [${result.join(", ")}].`, en: `The heap holds exactly the ${k} most frequent numbers → answer [${result.join(", ")}].` },
   });
   fs.final = true; steps.push(fs);
+
+  // Keep "freq" visible in every step's debug panel, not just the counting step.
+  steps.forEach((step) => {
+    if (!step.vars) step.vars = [];
+    if (!step.vars.some((v) => v.name === "freq")) {
+      step.vars.unshift({ name: "freq", value: freqCounterStr });
+    }
+  });
 
   return { input, answer: `[${result.join(", ")}]`, steps };
 }
