@@ -1406,175 +1406,375 @@ function buildSteps1197(input, params) {
  * Dijkstra's algorithm: process closest unvisited node, relax neighbors.
  */
 function buildSteps743(input, params) {
-  const edgesRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
-  const n = params.n || 4;
-  const k = params.k || 1;
+  const edgesRaw = String(input).split(",").map((edge) => edge.trim()).filter(Boolean);
+  const n = Number(params.n);
+  const k = Number(params.k);
   const steps = [];
-
-  // Parse edges
   const edgeList = edgesRaw.map((e) => {
     const parts = e.split("-").map(Number);
     return { u: parts[0], v: parts[1], w: parts[2] };
   });
+  const valid = Number.isInteger(n) && n > 0
+    && Number.isInteger(k) && k >= 1 && k <= n
+    && edgeList.length > 0
+    && edgeList.every(({ u, v, w }) => (
+      Number.isInteger(u) && u >= 1 && u <= n
+      && Number.isInteger(v) && v >= 1 && v <= n
+      && u !== v && Number.isFinite(w) && w >= 0
+    ));
 
-  // Build adjacency list
-  const adjList = {};
-  for (let i = 1; i <= n; i++) adjList[i] = [];
-  for (const { u, v, w } of edgeList) {
-    adjList[u].push({ v, w });
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Nhập cạnh theo dạng u-v-w, ngăn cách bằng dấu phẩy. Mỗi node phải nằm trong 1..n, trọng số không âm và k là node nguồn hợp lệ.",
+        en: "Enter edges as u-v-w separated by commas. Every node must be in 1..n, weights must be non-negative, and k must be a valid source.",
+      },
+    });
+    return { edges: edgesRaw, n, k, answer: -1, steps };
   }
 
-  // Initialize distances
-  const dist = {};
-  for (let i = 1; i <= n; i++) dist[i] = Infinity;
-  dist[k] = 0;
-
-  const visited = new Set();
   const nodes = Array.from({ length: n }, (_, i) => i + 1);
+  const graph = Object.fromEntries(nodes.map((node) => [node, []]));
+  const dist = Object.fromEntries(nodes.map((node) => [node, Infinity]));
+  const parent = Object.fromEntries(nodes.map((node) => [node, null]));
+  const finalized = new Set();
+  const formatValue = (value) => value === Infinity ? "∞" : String(value);
+  const distStr = () => `{${nodes.map((node) => `${node}:${formatValue(dist[node])}`).join(", ")}}`;
+  const heapStr = (heap) => `[${heap.map(([d, node]) => `(${d}, ${node})`).join(", ")}]`;
 
-  // Helper: build graph data for a step
-  function makeGraph(hlNodes, hlEdges) {
+  function makeGraph(hlNodes = [], hlEdges = [], annotations = {}) {
     return {
-      nodes: nodes.map((id) => ({ id, dist: dist[id] })),
+      nodes: nodes.map((id) => ({ id, label: String(id), dist: formatValue(dist[id]) })),
       edges: edgeList,
-      hlNodes: hlNodes || [],
-      hlEdges: hlEdges || [],
-      visitedNodes: [...visited],
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...finalized],
+      annotations: { [k]: "source", ...annotations },
+      dimUnfocused: true,
     };
   }
+  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, annotations),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
 
-  const distStr = () => nodes.map((id) => `${id}:${dist[id] === Infinity ? "∞" : dist[id]}`).join(", ");
-
-  steps.push({
-    title: { vi: "Khởi tạo Dijkstra", en: "Initialize Dijkstra" },
-    arr: [],
-    graph: makeGraph([k], []),
-    highlight: [],
-    mark: [],
-    codeLines: [4, 5, 6, 7, 8, 9],
-    vars: [
-      { name: "source", value: k },
-      { name: "n", value: n },
-      { name: "edges", value: edgeList.length },
-      { name: "dist", value: `{${distStr()}}` },
-    ],
+  pushStep({
+    title: { vi: "Tạo adjacency list", en: "Create the adjacency list" },
+    codeLine: 6,
+    vars: [{ name: "graph", value: "defaultdict(list)" }],
     note: {
-      vi: `Dijkstra từ nút ${k}. dist[${k}]=0, còn lại = ∞. Đồ thị có ${n} nút, ${edgeList.length} cạnh.`,
-      en: `Dijkstra from node ${k}. dist[${k}]=0, others = ∞. Graph has ${n} nodes, ${edgeList.length} edges.`,
+      vi: "graph[u] sẽ lưu các cạnh có hướng đi ra từ u dưới dạng (v, w).",
+      en: "graph[u] stores every directed outgoing edge as (v, w).",
     },
   });
 
-  // Dijkstra main loop
-  for (let iter = 0; iter < n; iter++) {
-    let u = -1;
-    let minDist = Infinity;
-    for (let i = 1; i <= n; i++) {
-      if (!visited.has(i) && dist[i] < minDist) {
-        minDist = dist[i];
-        u = i;
-      }
-    }
-
-    if (u === -1) break;
-
-    visited.add(u);
-
-    steps.push({
-      title: { vi: `Pop nút ${u} (dist=${minDist})`, en: `Pop node ${u} (dist=${minDist})` },
-      arr: [],
-      graph: makeGraph([u], []),
-      highlight: [],
-      mark: [],
-      codeLines: [10, 11, 12],
-      vars: [
-        { name: "u", value: u },
-        { name: "dist[u]", value: minDist },
-        { name: "visited", value: `{${[...visited].join(", ")}}` },
-        { name: "dist", value: `{${distStr()}}` },
-      ],
+  for (const { u, v, w } of edgeList) {
+    pushStep({
+      title: { vi: `Đọc cạnh ${u} → ${v}`, en: `Read edge ${u} → ${v}` },
+      codeLine: 7,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      vars: [{ name: "u, v, w", value: `${u}, ${v}, ${w}` }],
       note: {
-        vi: `Chọn nút chưa thăm có dist nhỏ nhất: nút ${u} (dist=${minDist}). Đánh dấu đã thăm.`,
-        en: `Pick unvisited node with smallest dist: node ${u} (dist=${minDist}). Mark as visited.`,
+        vi: `Tách cạnh thành u = ${u}, v = ${v}, thời gian w = ${w}.`,
+        en: `Unpack the edge into u = ${u}, v = ${v}, and travel time w = ${w}.`,
+      },
+    });
+    graph[u].push([v, w]);
+    pushStep({
+      title: { vi: `graph[${u}].append((${v}, ${w}))`, en: `graph[${u}].append((${v}, ${w}))` },
+      codeLine: 8,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      vars: [{ name: `graph[${u}]`, value: `[${graph[u].map(([to, weight]) => `(${to}, ${weight})`).join(", ")}]` }],
+      note: {
+        vi: `Thêm chuyến truyền tín hiệu ${u} → ${v} mất ${w} đơn vị thời gian vào adjacency list.`,
+        en: `Add the ${u} → ${v} signal route taking ${w} time units to the adjacency list.`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo mọi khoảng cách bằng ∞", en: "Initialize every distance to ∞" },
+    codeLine: 9,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "Chưa có node nào nhận được tín hiệu, nên thời gian ngắn nhất tới mọi node ban đầu là ∞.",
+      en: "No node has received the signal yet, so every shortest arrival time starts at ∞.",
+    },
+  });
+
+  dist[k] = 0;
+  pushStep({
+    title: { vi: `dist[${k}] = 0`, en: `dist[${k}] = 0` },
+    codeLine: 10,
+    hlNodes: [k],
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: `Node nguồn k = ${k} nhận tín hiệu tại thời điểm 0.`,
+      en: `Source node k = ${k} receives the signal at time 0.`,
+    },
+  });
+
+  const heap = [[0, k]];
+  pushStep({
+    title: { vi: "Đưa nguồn vào min-heap", en: "Push the source into the min-heap" },
+    codeLine: 11,
+    hlNodes: [k],
+    vars: [{ name: "heap", value: heapStr(heap) }],
+    note: {
+      vi: `Heap chứa (distance, node). Bắt đầu với (0, ${k}); phần tử có distance nhỏ nhất luôn được pop trước.`,
+      en: `The heap stores (distance, node). It starts with (0, ${k}); the smallest distance is always popped first.`,
+    },
+  });
+
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 12,
+      vars: [{ name: "heap", value: heapStr(heap) }],
+      note: {
+        vi: "Còn trạng thái cần xử lý; tiếp tục lấy trạng thái có thời gian nhỏ nhất.",
+        en: "States remain to process; continue with the smallest arrival time.",
       },
     });
 
-    // Relax neighbors
-    for (const { v, w } of adjList[u]) {
-      const newDist = dist[u] + w;
-      if (newDist < dist[v]) {
-        const oldDist = dist[v];
-        dist[v] = newDist;
+    const [d, u] = heap.shift();
+    pushStep({
+      title: { vi: `heappop → (${d}, ${u})`, en: `heappop → (${d}, ${u})` },
+      codeLine: 13,
+      hlNodes: [u],
+      vars: [
+        { name: "d", value: d },
+        { name: "u", value: u },
+        { name: "heap còn lại", value: heapStr(heap) },
+      ],
+      note: {
+        vi: `Lấy (d=${d}, u=${u}) vì đây là trạng thái có thời gian nhỏ nhất trong heap.`,
+        en: `Pop (d=${d}, u=${u}) because it has the smallest time in the heap.`,
+      },
+    });
 
-        steps.push({
-          title: { vi: `Relax ${u}→${v}: ${oldDist === Infinity ? "∞" : oldDist} → ${newDist}`, en: `Relax ${u}→${v}: ${oldDist === Infinity ? "∞" : oldDist} → ${newDist}` },
-          arr: [],
-          graph: makeGraph([u, v], [[u, v]]),
-          highlight: [],
-          mark: [],
-          codeLines: [13, 14, 15, 16, 17],
-          vars: [
-            { name: "u", value: u },
-            { name: "v", value: v },
-            { name: "w", value: w },
-            { name: "dist[u]+w", value: newDist },
-            { name: "dist[v] (old)", value: oldDist === Infinity ? "∞" : oldDist },
-            { name: "dist[v] (new)", value: newDist },
-            { name: "dist", value: `{${distStr()}}` },
-          ],
-          note: {
-            vi: `Cạnh ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} < ${oldDist === Infinity ? "∞" : oldDist} → cập nhật dist[${v}]=${newDist}.`,
-            en: `Edge ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} < ${oldDist === Infinity ? "∞" : oldDist} → update dist[${v}]=${newDist}.`,
+    const stale = d > dist[u];
+    pushStep({
+      title: stale
+        ? { vi: `${d} > dist[${u}]=${dist[u]}: bản ghi cũ`, en: `${d} > dist[${u}]=${dist[u]}: stale entry` }
+        : { vi: `${d} > dist[${u}]=${dist[u]}? False`, en: `${d} > dist[${u}]=${dist[u]}? False` },
+      codeLine: 14,
+      hlNodes: [u],
+      vars: [
+        { name: "d", value: d },
+        { name: `dist[${u}]`, value: dist[u] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: `Đã tìm thấy đường tốt hơn tới ${u} trước đó. Bản ghi ${d} trong heap đã cũ nên không được relax cạnh từ nó.`,
+            en: `A better route to ${u} was found earlier. Heap entry ${d} is stale and must not relax outgoing edges.`,
+          }
+        : {
+            vi: `d = ${d} vẫn khớp dist[${u}], nên đây là trạng thái tốt nhất hiện tại và được phép mở rộng.`,
+            en: `d = ${d} still matches dist[${u}], so this is the current best state and may expand.`,
           },
-        });
-      } else {
-        steps.push({
-          title: { vi: `Cạnh ${u}→${v}: không cải thiện`, en: `Edge ${u}→${v}: no improvement` },
-          arr: [],
-          graph: makeGraph([u, v], [[u, v]]),
-          highlight: [],
-          mark: [],
-          codeLines: [13, 14, 15],
-          vars: [
-            { name: "u", value: u },
-            { name: "v", value: v },
-            { name: "w", value: w },
-            { name: "dist[u]+w", value: newDist },
-            { name: "dist[v]", value: dist[v] === Infinity ? "∞" : dist[v] },
-          ],
-          note: {
-            vi: `Cạnh ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} ≥ dist[${v}]=${dist[v] === Infinity ? "∞" : dist[v]} → bỏ qua.`,
-            en: `Edge ${u}→${v} (w=${w}): dist[${u}]+${w}=${newDist} ≥ dist[${v}]=${dist[v] === Infinity ? "∞" : dist[v]} → skip.`,
-          },
-        });
-      }
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua bản ghi cũ", en: "Skip the stale entry" },
+        codeLine: 15,
+        hlNodes: [u],
+        vars: [{ name: "continue", value: true }],
+        note: {
+          vi: "continue quay lại đầu vòng while; không duyệt hàng xóm của bản ghi cũ này.",
+          en: "continue returns to the while loop without exploring this stale entry's neighbors.",
+        },
+      });
+      continue;
+    }
+
+    finalized.add(u);
+    for (const [v, w] of graph[u]) {
+      pushStep({
+        title: { vi: `Xét cạnh ${u} → ${v}`, en: `Inspect edge ${u} → ${v}` },
+        codeLine: 16,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "u", value: u },
+          { name: "v", value: v },
+          { name: "w", value: w },
+        ],
+        note: {
+          vi: `Từ node ${u}, thử truyền tín hiệu qua cạnh tới ${v}, mất thêm ${w} thời gian.`,
+          en: `From node ${u}, try sending the signal to ${v}, adding ${w} time.`,
+        },
+      });
+
+      const newDist = d + w;
+      pushStep({
+        title: { vi: `new_dist = ${d} + ${w} = ${newDist}`, en: `new_dist = ${d} + ${w} = ${newDist}` },
+        codeLine: 17,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "d", value: d },
+          { name: "w", value: w },
+          { name: "new_dist", value: newDist },
+        ],
+        note: {
+          vi: `Nếu đi qua ${u} → ${v}, tín hiệu sẽ tới ${v} tại thời điểm ${newDist}.`,
+          en: `Taking ${u} → ${v} would deliver the signal to ${v} at time ${newDist}.`,
+        },
+      });
+
+      const improves = newDist < dist[v];
+      const oldDist = dist[v];
+      pushStep({
+        title: improves
+          ? { vi: `${newDist} < ${formatValue(oldDist)}: có cải thiện`, en: `${newDist} < ${formatValue(oldDist)}: improvement` }
+          : { vi: `${newDist} < ${formatValue(oldDist)}? False`, en: `${newDist} < ${formatValue(oldDist)}? False` },
+        codeLine: 18,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "new_dist", value: newDist },
+          { name: `dist[${v}]`, value: formatValue(oldDist) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? {
+              vi: `${newDist} nhỏ hơn thời gian đang lưu ${formatValue(oldDist)}, nên phải cập nhật đường ngắn nhất tới ${v}.`,
+              en: `${newDist} is smaller than the stored time ${formatValue(oldDist)}, so the shortest route to ${v} must be updated.`,
+            }
+          : {
+              vi: `${newDist} không nhỏ hơn ${formatValue(oldDist)}; đường qua ${u} không tốt hơn nên giữ nguyên dist[${v}].`,
+              en: `${newDist} is not smaller than ${formatValue(oldDist)}; the route through ${u} is not better, so keep dist[${v}].`,
+            },
+      });
+
+      if (!improves) continue;
+
+      dist[v] = newDist;
+      parent[v] = u;
+      pushStep({
+        title: { vi: `dist[${v}] = ${newDist}`, en: `dist[${v}] = ${newDist}` },
+        codeLine: 19,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: `dist[${v}]`, value: newDist },
+          { name: "dist", value: distStr() },
+        ],
+        note: {
+          vi: `Ghi thời gian tốt nhất mới của ${v} là ${newDist}. Visualization ghi nhớ cạnh này riêng để có thể tô đường đi ở bước cuối.`,
+          en: `Store ${newDist} as ${v}'s new best time. The visualization separately remembers this edge for the final highlighted route.`,
+        },
+      });
+
+      heap.push([newDist, v]);
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      pushStep({
+        title: { vi: `heappush((${newDist}, ${v}))`, en: `heappush((${newDist}, ${v}))` },
+        codeLine: 20,
+        hlNodes: [v],
+        vars: [
+          { name: "pushed", value: `(${newDist}, ${v})` },
+          { name: "heap", value: heapStr(heap) },
+        ],
+        note: {
+          vi: `Đưa trạng thái mới của node ${v} vào heap. Heap sẽ tự ưu tiên distance nhỏ nhất ở lần pop tiếp theo.`,
+          en: `Push node ${v}'s new state into the heap. The next pop will prioritize the smallest distance.`,
+        },
+      });
     }
   }
 
-  // Final result
-  const maxDist = Math.max(...nodes.map((node) => dist[node]));
-  const answer = maxDist === Infinity ? -1 : maxDist;
-
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [],
-    graph: makeGraph(maxDist !== Infinity ? nodes.filter((id) => dist[id] === maxDist) : [], []),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [18, 19],
+  pushStep({
+    title: { vi: "Heap đã rỗng", en: "The heap is empty" },
+    codeLine: 12,
     vars: [
-      { name: "dist", value: `{${distStr()}}` },
-      { name: "max(dist)", value: maxDist === Infinity ? "∞" : maxDist },
-      { name: "answer", value: answer },
+      { name: "heap", value: "[]" },
+      { name: "dist", value: distStr() },
     ],
     note: {
-      vi: answer === -1
-        ? `Có nút không thể đạt tới từ nút ${k} → trả về -1.`
-        : `Thời gian tối đa = max(dist) = ${answer}. Tất cả ${n} nút đều nhận tín hiệu trong ${answer} đơn vị thời gian.`,
-      en: answer === -1
-        ? `Some nodes are unreachable from node ${k} → return -1.`
-        : `Maximum time = max(dist) = ${answer}. All ${n} nodes receive the signal within ${answer} time units.`,
+      vi: "Không còn trạng thái nào để xử lý; mọi khoảng cách ngắn nhất có thể tìm được đã được chốt.",
+      en: "No states remain; every reachable shortest distance has been finalized.",
     },
+  });
+
+  const maxDist = Math.max(...nodes.map((node) => dist[node]));
+  const answer = maxDist === Infinity ? -1 : maxDist;
+  pushStep({
+    title: { vi: `ans = ${formatValue(maxDist)}`, en: `ans = ${formatValue(maxDist)}` },
+    codeLine: 21,
+    hlNodes: maxDist === Infinity ? nodes.filter((node) => dist[node] === Infinity) : nodes.filter((node) => dist[node] === maxDist),
+    vars: [
+      { name: "dist", value: distStr() },
+      { name: "ans", value: formatValue(maxDist) },
+    ],
+    note: {
+      vi: maxDist === Infinity
+        ? "Ít nhất một node có dist = ∞, nên max(dist) cũng là ∞."
+        : `Node nhận tín hiệu muộn nhất có thời gian ${maxDist}; đây là thời gian chờ để toàn mạng nhận tín hiệu.`,
+      en: maxDist === Infinity
+        ? "At least one node has dist = ∞, so max(dist) is also ∞."
+        : `The last node receives the signal at time ${maxDist}; this is the total network delay.`,
+    },
+  });
+
+  let pathNodes = [];
+  let pathEdges = [];
+  if (answer !== -1) {
+    const slowest = nodes.find((node) => dist[node] === maxDist);
+    let current = slowest;
+    pathNodes = [current];
+    while (current !== k && parent[current] !== null) {
+      pathEdges.unshift([parent[current], current]);
+      current = parent[current];
+      pathNodes.unshift(current);
+    }
+  }
+  const pathText = pathNodes.join(" → ");
+  pushStep({
+    title: answer === -1
+      ? { vi: "Có node không nhận được tín hiệu", en: "Some node cannot receive the signal" }
+      : { vi: `Kết quả ${answer}: ${pathText}`, en: `Result ${answer}: ${pathText}` },
+    codeLine: 22,
+    hlNodes: answer === -1 ? nodes.filter((node) => dist[node] === Infinity) : pathNodes,
+    hlEdges: pathEdges,
+    annotations: answer === -1 ? {} : { [pathNodes.at(-1)]: "last" },
+    final: true,
+    vars: [
+      { name: "ans", value: formatValue(maxDist) },
+      { name: "answer", value: answer },
+      ...(answer === -1 ? [] : [{ name: "slowest path", value: pathText }]),
+    ],
+    note: answer === -1
+      ? {
+          vi: "ans = ∞ nghĩa là còn node không thể tới từ nguồn, nên biểu thức trả về -1.",
+          en: "ans = ∞ means at least one node is unreachable from the source, so the expression returns -1.",
+        }
+      : {
+          vi: `ans = ${answer} hữu hạn nên trả ${answer}. Đường ${pathText} là đường ngắn nhất tới node nhận tín hiệu muộn nhất.`,
+          en: `ans = ${answer} is finite, so return ${answer}. Route ${pathText} is the shortest path to the last node reached.`,
+        },
   });
 
   return { edges: edgesRaw, n, k, answer, steps };
@@ -8074,16 +8274,24 @@ module.exports = {
         default: 2,
       },
     ],
+    approach: [
+      { vi: "Xây adjacency list graph[u] = [(v, w), ...] cho đồ thị có hướng.", en: "Build the directed adjacency list graph[u] = [(v, w), ...]." },
+      { vi: "dist[x] là thời gian ngắn nhất đã biết để tín hiệu tới x. Khởi tạo dist[k] = 0, các node khác = ∞.", en: "dist[x] is the shortest known signal arrival time at x. Initialize dist[k] = 0 and all other nodes to ∞." },
+      { vi: "Min-heap lưu (distance, node). Mỗi lần pop trạng thái có distance nhỏ nhất; bỏ qua nếu d > dist[u] vì đó là bản ghi cũ.", en: "The min-heap stores (distance, node). Pop the smallest distance and skip it when d > dist[u] because it is stale." },
+      { vi: "Relax cạnh u → v bằng new_dist = d + w. Nếu nhỏ hơn dist[v], cập nhật dist[v] và push trạng thái mới.", en: "Relax edge u → v with new_dist = d + w. If it improves dist[v], update it and push the new state." },
+      { vi: "Sau khi heap rỗng, đáp án là max(dist). Nếu max là ∞ thì có node không tới được và trả -1.", en: "After the heap empties, the answer is max(dist). If it is ∞, some node is unreachable, so return -1." },
+    ],
     complexity: {
       time: "O((V+E) log V)",
       space: "O(V + E)",
       note: {
-        vi: "Dijkstra với min-heap: mỗi nút pop 1 lần O(V log V), mỗi cạnh relax O(E log V). Bộ nhớ O(V+E) cho adjacency list + dist array.",
-        en: "Dijkstra with min-heap: each node popped once O(V log V), each edge relaxed O(E log V). Memory O(V+E) for adjacency list + dist array.",
+        vi: "Mỗi lần relax thành công sẽ push một heap entry; bản ghi cũ được bỏ qua khi pop. Tổng thời gian O((V+E) log V), bộ nhớ O(V+E).",
+        en: "Each successful relaxation pushes a heap entry; stale entries are skipped when popped. Total time is O((V+E) log V), with O(V+E) space.",
       },
     },
     code: [
       "import heapq",
+      "from collections import defaultdict",
       "",
       "class Solution:",
       "    def networkDelayTime(self, times, n, k):",
@@ -8098,8 +8306,9 @@ module.exports = {
       "            if d > dist[u]:",
       "                continue",
       "            for v, w in graph[u]:",
-      "                if dist[u] + w < dist[v]:",
-      "                    dist[v] = dist[u] + w",
+      "                new_dist = d + w",
+      "                if new_dist < dist[v]:",
+      "                    dist[v] = new_dist",
       "                    heapq.heappush(heap, (dist[v], v))",
       "        ans = max(dist.values())",
       "        return ans if ans < float('inf') else -1",
