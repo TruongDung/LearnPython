@@ -1439,6 +1439,213 @@ function buildSteps3312(input, params) {
 }
 
 /**
+ * LeetCode 3513: Number of Unique XOR Triplets I.
+ * The permutation property makes the answer depend only on n.
+ */
+function buildSteps3513(input) {
+  const nums = Array.isArray(input) ? [...input] : [input];
+  const n = nums.length;
+  const steps = [];
+  const bitWidth = Math.max(1, n.toString(2).length);
+  const binaryLabels = nums.map((value) => value.toString(2).padStart(bitWidth, "0"));
+  const indexOfValue = (value) => nums.indexOf(value);
+  const positionsOf = (values) => [...new Set(values.map(indexOfValue).filter((index) => index >= 0))];
+  const snapshot = (overrides = {}) => ({
+    arr: [...nums],
+    sub: [...binaryLabels],
+    highlight: [],
+    mark: [],
+    ...overrides,
+  });
+
+  steps.push(snapshot({
+    title: { vi: "Đọc nums là hoán vị của 1..n", en: "Read nums as a permutation of 1..n" },
+    codeLines: [2],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "values", value: `{1, 2, ..., ${n}}` },
+    ],
+    note: {
+      vi: `Đề bài bảo đảm nums là một hoán vị của các số từ 1 đến n. Thứ tự không làm thay đổi tập kết quả XOR: với ba giá trị đã chọn, ta luôn sắp ba chỉ số thành i <= j <= k, còn phép XOR có tính giao hoán. Vì vậy đáp án chỉ phụ thuộc vào n, không phụ thuộc vị trí các phần tử trong nums.`,
+      en: `nums is a permutation of 1 through n. XOR is commutative, so the answer depends only on n, not on the permutation order.`,
+    },
+  }));
+
+  steps.push(snapshot({
+    title: { vi: `n = len(nums) = ${n}`, en: `n = len(nums) = ${n}` },
+    codeLines: [3],
+    vars: [
+      { name: "n", value: n },
+      { name: "n (binary)", value: n.toString(2) },
+    ],
+    note: {
+      vi: `Lấy độ dài mảng: n = ${n}. Do nums chứa đúng các giá trị 1..${n}, ta không cần duyệt mọi bộ ba chỉ số, vốn có thể lên tới O(n^3).`,
+      en: `The array length is n = ${n}. Since nums contains exactly 1 through n, enumerating O(n^3) index triplets is unnecessary.`,
+    },
+  }));
+
+  if (n <= 2) {
+    steps.push(snapshot({
+      title: { vi: `n <= 2 là Đúng`, en: `n <= 2 is True` },
+      codeLines: [4],
+      vars: [
+        { name: "n", value: n },
+        { name: "n <= 2", value: true },
+      ],
+      note: {
+        vi: `Với n = ${n}, chưa thể chọn ba giá trị phân biệt. Nếu một chỉ số xuất hiện hai lần thì hai số bằng nhau triệt tiêu vì x XOR x = 0; kết quả còn lại chỉ là một phần tử của nums. Do đó có đúng ${n} giá trị XOR khác nhau.`,
+        en: `For n = ${n}, three distinct values cannot be selected. Equal values cancel in pairs, leaving exactly the ${n} values in nums.`,
+      },
+    }));
+
+    steps.push(snapshot({
+      title: { vi: `return n = ${n}`, en: `return n = ${n}` },
+      codeLines: [5],
+      mark: nums.map((_, index) => index),
+      final: true,
+      vars: [{ name: "answer", value: n }],
+      note: {
+        vi: `Trả về ${n}. Các kết quả duy nhất chính là {${nums.slice().sort((a, b) => a - b).join(", ")}}.`,
+        en: `Return ${n}. The unique results are exactly the values already in nums.`,
+      },
+    }));
+    return { original: nums, answer: n, steps };
+  }
+
+  steps.push(snapshot({
+    title: { vi: "n <= 2 là Sai", en: "n <= 2 is False" },
+    codeLines: [4],
+    vars: [
+      { name: "n", value: n },
+      { name: "n <= 2", value: false },
+    ],
+    note: {
+      vi: `n = ${n} > 2 nên nums chắc chắn chứa 1, 2 và 3. Ba giá trị phân biệt này cho phép tạo 0, đồng thời mở ra toàn bộ miền kết quả có cùng số bit với n. Ta đi tiếp tới công thức ở dòng 6.`,
+      en: `Since n = ${n} > 2, nums contains 1, 2, and 3. These distinct values make zero and unlock the full bit range.`,
+    },
+  }));
+
+  const limit = 1 << bitWidth;
+  const maxResult = limit - 1;
+  const highestBit = limit >> 1;
+
+  steps.push(snapshot({
+    title: { vi: `n.bit_length() = ${bitWidth}`, en: `n.bit_length() = ${bitWidth}` },
+    codeLines: [6],
+    vars: [
+      { name: "n", value: `${n} = ${n.toString(2)}₂` },
+      { name: "n.bit_length()", value: bitWidth },
+      { name: "1 << bit_length", value: `${limit} = ${limit.toString(2)}₂` },
+    ],
+    note: {
+      vi: `${n} viết ở hệ nhị phân là ${n.toString(2)}₂ và cần ${bitWidth} bit. Dịch bit 1 sang trái ${bitWidth} vị trí tạo ${limit} = ${limit.toString(2)}₂, tức lũy thừa 2 nhỏ nhất lớn hơn n. Đây sẽ là số lượng kết quả khác nhau.`,
+      en: `${n} needs ${bitWidth} binary bits. Shifting 1 left by ${bitWidth} produces ${limit}, the next power of two above n.`,
+    },
+  }));
+
+  steps.push(snapshot({
+    title: { vi: `Cận trên: kết quả chỉ nằm trong 0..${maxResult}`, en: `Upper bound: results lie in 0..${maxResult}` },
+    codeLines: [6],
+    vars: [
+      { name: "largest input", value: `${n} = ${n.toString(2).padStart(bitWidth, "0")}₂` },
+      { name: "largest possible XOR", value: `${maxResult} = ${maxResult.toString(2)}₂` },
+      { name: "range size", value: limit },
+    ],
+    note: {
+      vi: `Mọi nums[i] dùng tối đa ${bitWidth} bit, nên XOR của ba phần tử cũng không thể bật bit thứ ${bitWidth + 1}. Giá trị lớn nhất có thể là ${maxResult.toString(2)}₂ = ${maxResult}. Vì thế nhiều nhất chỉ có ${limit} kết quả trong đoạn [0, ${maxResult}].`,
+      en: `Every value uses at most ${bitWidth} bits, so a triplet XOR is at most ${maxResult}. There are at most ${limit} possible results.`,
+    },
+  }));
+
+  const sampleValue = Math.min(n, 3);
+  const sampleIndex = indexOfValue(sampleValue);
+  steps.push(snapshot({
+    title: { vi: `Tạo mọi x trong 1..${n}`, en: `Build every x in 1..${n}` },
+    codeLines: [6],
+    highlight: sampleIndex >= 0 ? [sampleIndex] : [],
+    vars: [
+      { name: "x (ví dụ)", value: sampleValue },
+      { name: "x XOR x XOR x", value: `${sampleValue} XOR ${sampleValue} XOR ${sampleValue} = ${sampleValue}` },
+    ],
+    note: {
+      vi: `Với bất kỳ x thuộc [1, ${n}], chọn cùng một chỉ số ba lần, tức i = j = k tại vị trí chứa x. Khi đó x XOR x XOR x = 0 XOR x = x. Ví dụ ${sampleValue} XOR ${sampleValue} XOR ${sampleValue} = ${sampleValue}. Vậy toàn bộ ${n} giá trị từ 1 đến n đều đạt được.`,
+      en: `For any x in [1, ${n}], choose the same index three times: x XOR x XOR x = x. Thus every value from 1 through n is reachable.`,
+    },
+  }));
+
+  steps.push(snapshot({
+    title: { vi: "Tạo giá trị 0 bằng 1 XOR 2 XOR 3", en: "Build 0 with 1 XOR 2 XOR 3" },
+    codeLines: [6],
+    highlight: positionsOf([1, 2, 3]),
+    vars: [
+      { name: "triplet", value: "1 XOR 2 XOR 3" },
+      { name: "binary", value: `${(1).toString(2).padStart(bitWidth, "0")} XOR ${(2).toString(2).padStart(bitWidth, "0")} XOR ${(3).toString(2).padStart(bitWidth, "0")}` },
+      { name: "result", value: 0 },
+    ],
+    note: {
+      vi: `nums chứa đủ 1, 2, 3 và 1 XOR 2 = 3, nên 1 XOR 2 XOR 3 = 3 XOR 3 = 0. Dù ba giá trị nằm ở thứ tự nào trong nums, ta sắp các vị trí của chúng thành i <= j <= k; kết quả XOR vẫn giữ nguyên.`,
+      en: `nums contains 1, 2, and 3. Since 1 XOR 2 = 3, their triplet XOR is 0; their indices can always be sorted.`,
+    },
+  }));
+
+  if (n < maxResult) {
+    const target = n + 1;
+    const lowBits = target ^ highestBit;
+    let a;
+    let b;
+    if (lowBits === 1) [a, b] = [2, 3];
+    else if (lowBits === 2) [a, b] = [1, 3];
+    else [a, b] = [1, lowBits ^ 1];
+
+    steps.push(snapshot({
+      title: { vi: `Tạo các giá trị còn thiếu ${n + 1}..${maxResult}`, en: `Build the remaining values ${n + 1}..${maxResult}` },
+      codeLines: [6],
+      highlight: positionsOf([highestBit, a, b]),
+      vars: [
+        { name: "H", value: highestBit },
+        { name: "target (ví dụ)", value: target },
+        { name: "target XOR H", value: lowBits },
+        { name: "witness", value: `${highestBit} XOR ${a} XOR ${b} = ${target}` },
+      ],
+      note: {
+        vi: `Đặt H = ${highestBit}, là bit cao nhất và H <= n. Với mỗi target trong [${n + 1}, ${maxResult}], phần thấp y = target XOR H nằm trong [1, H-1]. Ta luôn chọn được hai số phân biệt a,b < H sao cho a XOR b = y: dùng (2,3) nếu y=1, (1,3) nếu y=2, còn lại dùng (1, y XOR 1). Khi đó H XOR a XOR b = target. Ví dụ ${highestBit} XOR ${a} XOR ${b} = ${target}.`,
+        en: `Let H = ${highestBit}. For each missing target, y = target XOR H can be formed by two distinct values below H, so H XOR a XOR b reaches the target. Example: ${highestBit} XOR ${a} XOR ${b} = ${target}.`,
+      },
+    }));
+  } else {
+    steps.push(snapshot({
+      title: { vi: `Không còn khoảng trống sau ${n}`, en: `No values are missing above ${n}` },
+      codeLines: [6],
+      vars: [
+        { name: "n", value: n },
+        { name: "maximum XOR", value: maxResult },
+      ],
+      note: {
+        vi: `Ở trường hợp này n = ${n} đã bằng cận trên ${maxResult}. Các bước trước đã tạo được 0 và mọi giá trị 1..n, nên toàn bộ đoạn [0, ${maxResult}] đã đầy đủ, không cần dựng thêm giá trị nào.`,
+        en: `Here n already equals the upper bound ${maxResult}. Zero and every value from 1 through n cover the whole range.`,
+      },
+    }));
+  }
+
+  steps.push(snapshot({
+    title: { vi: `return ${limit}`, en: `return ${limit}` },
+    codeLines: [6],
+    mark: nums.map((_, index) => index),
+    final: true,
+    vars: [
+      { name: "reachable range", value: `[0, ${maxResult}]` },
+      { name: "answer", value: limit },
+    ],
+    note: {
+      vi: `Ta vừa chứng minh cả cận trên lẫn khả năng tạo đủ mọi giá trị từ 0 đến ${maxResult}. Đoạn này có ${maxResult} - 0 + 1 = ${limit} số, nên trả về 1 << ${bitWidth} = ${limit}.`,
+      en: `Every value from 0 through ${maxResult} is reachable, and no larger value is possible. Return ${limit}.`,
+    },
+  }));
+
+  return { original: nums, answer: limit, steps };
+}
+
+/**
  * LeetCode 1979: Find Greatest Common Divisor of Array.
  * Line-by-line: find min, find max, then Euclid's GCD step by step.
  */
@@ -1595,6 +1802,44 @@ function buildSteps1979(input) {
 }
 
 module.exports = {
+  3513: {
+    id: 3513,
+    difficulty: "medium",
+    slug: "number-of-unique-xor-triplets-i",
+    category: { key: "math", vi: "Toán / Bit Manipulation", en: "Math / Bit Manipulation" },
+    title: { vi: "Number of Unique XOR Triplets I", en: "Number of Unique XOR Triplets I" },
+    titleVi: { vi: "Số lượng giá trị XOR bộ ba khác nhau I", en: "Number of unique XOR triplet values I" },
+    statement: {
+      vi: "Cho mảng nums dài n, là một hoán vị của các số trong đoạn [1, n]. Một XOR triplet có giá trị nums[i] XOR nums[j] XOR nums[k] với i <= j <= k. Trả về số lượng giá trị XOR triplet khác nhau.",
+      en: "Given nums, a permutation of [1, n], return the number of distinct values nums[i] XOR nums[j] XOR nums[k] over all i <= j <= k.",
+    },
+    defaultInput: [3, 1, 2],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (hoán vị của 1..n)", en: "nums (permutation of 1..n)" },
+    extraParams: [],
+    approach: [
+      { vi: "Vì nums là hoán vị của 1..n và XOR có tính giao hoán, thứ tự phần tử không ảnh hưởng đáp án.", en: "Because nums is a permutation of 1..n and XOR is commutative, the order does not affect the answer." },
+      { vi: "Nếu n <= 2, chỉ tạo được các giá trị đang có trong nums nên đáp án là n.", en: "If n <= 2, only the values already in nums are reachable, so the answer is n." },
+      { vi: "Nếu n >= 3, mọi giá trị từ 0 đến 2^bit_length(n)-1 đều tạo được; đáp án là 2^bit_length(n).", en: "If n >= 3, every value from 0 through 2^bit_length(n)-1 is reachable." },
+    ],
+    complexity: {
+      time: "O(1)",
+      space: "O(1)",
+      note: {
+        vi: "Chỉ đọc len(nums), kiểm tra n và tính bit_length; không duyệt các bộ ba.",
+        en: "Only read len(nums), test n, and compute bit_length; no triplets are enumerated.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def uniqueXorTriplets(self, nums: List[int]) -> int:",
+      "        n = len(nums)",
+      "        if n <= 2:",
+      "            return n",
+      "        return 1 << n.bit_length()",
+    ],
+    builder: buildSteps3513,
+  },
   3312: {
     id: 3312,
     difficulty: "hard",
