@@ -1,6 +1,6 @@
 /**
  * Graph / BFS builder functions for LeetCode Visualizer.
- * Problems: 1293, 1368, 2290, 2577, 1377, 126, 815
+ * Problems: 1293, 1368, 2290, 2577, 3341, 1377, 126, 815
  */
 
 // ─── 1293: Shortest Path in Grid with Obstacles Elimination ───
@@ -1446,6 +1446,350 @@ function buildSteps2577(input) {
   return { original: grid, answer, steps };
 }
 
+// ─── 3341: Find Minimum Time to Reach Last Room I (Dijkstra) ───
+function buildSteps3341(input) {
+  const moveTime = String(input)
+    .split(/[|;]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const rows = moveTime.length;
+  const cols = rows > 0 ? moveTime[0].length : 0;
+  const valid = rows >= 2 && cols >= 2 && rows <= 20 && cols <= 20
+    && moveTime.every((row) => row.length === cols
+      && row.every((value) => Number.isInteger(value) && value >= 0));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "moveTime phải là ma trận chữ nhật ít nhất 2×2, chứa số nguyên không âm; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ tối đa 20×20.",
+        en: "moveTime must be a rectangular matrix of at least 2×2 non-negative integers; separate rows with '|' or ';'. The visualization supports at most 20×20.",
+      },
+    });
+    return { original: moveTime, answer: -1, steps };
+  }
+
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const heap = [];
+  const finalized = new Set();
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (r, c) => `${r},${c}`;
+  const formatTime = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const distStr = () => `[${dist.map((row) => `[${row.map(formatTime).join(", ")}]`).join(", ")}]`;
+  const heapStr = () => `[${heap.map(([time, r, c]) => `(${time}, ${r}, ${c})`).join(", ")}]`;
+
+  function makeCells(current = null, pathCells = new Set()) {
+    const queued = new Set(heap.map(([, r, c]) => key(r, c)));
+    return moveTime.map((row, r) => row.map((readyAt, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      if (finalized.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (pathCells.has(cellKey)) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      const endpoint = r === 0 && c === 0
+        ? " · S"
+        : r === rows - 1 && c === cols - 1
+          ? " · T"
+          : "";
+      return { label: String(readyAt), meta: `t:${formatTime(dist[r][c])}${endpoint}`, cls };
+    }));
+  }
+
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kích thước moveTime: ${rows} × ${cols}`, en: `moveTime size: ${rows} × ${cols}` },
+    codeLine: 6,
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: `Số lớn trong ô là thời điểm sớm nhất được phép BẮT ĐẦU đi vào phòng đó. meta t:… là thời điểm đến sớm nhất Dijkstra tìm được; đích là (${rows - 1},${cols - 1}).`,
+      en: `A cell's large number is the earliest time movement into that room may START. The t:… metadata is Dijkstra's earliest known arrival; the target is (${rows - 1},${cols - 1}).`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo dist bằng ∞", en: "Initialize dist to ∞" },
+    codeLine: 7,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "dist[r][c] là thời điểm sớm nhất đã biết ta ĐẾN phòng (r,c). ∞ nghĩa là chưa tìm thấy đường.",
+      en: "dist[r][c] is the earliest known time we ARRIVE at room (r,c). ∞ means no route is known.",
+    },
+  });
+
+  dist[0][0] = 0;
+  pushStep({
+    title: { vi: "Bắt đầu tại t=0", en: "Start at t=0" },
+    codeLine: 8,
+    current: [0, 0],
+    vars: [{ name: "dist[0][0]", value: 0 }],
+    note: { vi: "Ta đã ở phòng (0,0) tại thời điểm 0, nên không cộng thời gian của moveTime[0][0].", en: "We are already in room (0,0) at time 0, so moveTime[0][0] is not added." },
+  });
+
+  heap.push([0, 0, 0]);
+  pushStep({
+    title: { vi: "Đưa start vào min-heap", en: "Push the start into the min-heap" },
+    codeLine: 9,
+    current: [0, 0],
+    vars: [{ name: "heap", value: heapStr() }],
+    note: { vi: "Heap lưu (time,row,col) và ưu tiên phòng có thời điểm đến nhỏ nhất.", en: "The heap stores (time,row,col) and prioritizes the room with the earliest arrival." },
+  });
+
+  pushStep({
+    title: { vi: "Chuẩn bị bốn hướng", en: "Prepare four directions" },
+    codeLine: 10,
+    vars: [{ name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
+    note: { vi: "Mỗi lần di chuyển sang một phòng chung tường mất đúng 1 giây.", en: "Each move to a room sharing a wall takes exactly one second." },
+  });
+
+  let answer = -1;
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 12,
+      vars: [{ name: "heap", value: heapStr() }],
+      note: { vi: "Tiếp tục Dijkstra bằng phòng có thời điểm đến nhỏ nhất.", en: "Continue Dijkstra with the room having the earliest arrival time." },
+    });
+
+    const [time, r, c] = heap.shift();
+    pushStep({
+      title: { vi: `Pop (${time}, ${r}, ${c})`, en: `Pop (${time}, ${r}, ${c})` },
+      codeLine: 13,
+      current: [r, c],
+      vars: [
+        { name: "time", value: time },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "heap còn lại", value: heapStr() },
+      ],
+      note: { vi: `Chọn phòng (${r},${c}) vì t=${time} là thời điểm đến nhỏ nhất trong heap.`, en: `Choose room (${r},${c}) because t=${time} is the smallest arrival time in the heap.` },
+    });
+
+    const stale = time > dist[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `${time} > dist[${r}][${c}]=${dist[r][c]}: stale`, en: `${time} > dist[${r}][${c}]=${dist[r][c]}: stale` }
+        : { vi: `${time} > dist[${r}][${c}]? False`, en: `${time} > dist[${r}][${c}]? False` },
+      codeLine: 14,
+      current: [r, c],
+      vars: [
+        { name: "time", value: time },
+        { name: `dist[${r}][${c}]`, value: dist[r][c] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? { vi: "Một đường nhanh hơn đã cập nhật phòng này; entry vừa pop đã cũ.", en: "A faster route already updated this room; the popped entry is stale." }
+        : { vi: "Entry vẫn khớp dist tốt nhất, nên được phép mở rộng hàng xóm.", en: "The entry still matches the best dist, so its neighbors may be expanded." },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
+        codeLine: 15,
+        current: [r, c],
+        vars: [{ name: "continue", value: true }],
+        note: { vi: "Không xét hàng xóm từ một đường tới chậm hơn.", en: "Do not inspect neighbors from a slower route." },
+      });
+      continue;
+    }
+
+    finalized.add(key(r, c));
+    const reachedTarget = r === rows - 1 && c === cols - 1;
+    pushStep({
+      title: reachedTarget
+        ? { vi: `(${r},${c}) là phòng cuối`, en: `(${r},${c}) is the last room` }
+        : { vi: `(${r},${c}) chưa phải phòng cuối`, en: `(${r},${c}) is not the last room` },
+      codeLine: 16,
+      current: [r, c],
+      vars: [
+        { name: "current", value: `(${r}, ${c})` },
+        { name: "target", value: `(${rows - 1}, ${cols - 1})` },
+        { name: "condition", value: reachedTarget },
+      ],
+      note: reachedTarget
+        ? { vi: "Phòng cuối được pop với time nhỏ nhất toàn heap, nên kết quả đã tối ưu.", en: "The last room was popped with the heap's smallest time, so the result is optimal." }
+        : { vi: "Chưa tới phòng cuối; tiếp tục thử bốn phòng chung tường.", en: "The last room has not been reached; try the four rooms sharing a wall." },
+    });
+
+    if (reachedTarget) {
+      answer = time;
+      const path = [];
+      let current = [r, c];
+      while (current) {
+        path.unshift(current);
+        current = parent[current[0]][current[1]];
+      }
+      const pathCells = new Set(path.map(([pr, pc]) => key(pr, pc)));
+      const pathText = path.map(([pr, pc]) => `(${pr},${pc})@t${dist[pr][pc]}`).join(" → ");
+      const waits = [];
+      for (let i = 1; i < path.length; i += 1) {
+        const [pr, pc] = path[i - 1];
+        const [cr, cc] = path[i];
+        const wait = dist[cr][cc] - dist[pr][pc] - 1;
+        if (wait > 0) waits.push(`tại (${pr},${pc}): ${wait}s`);
+      }
+      const waitsText = waits.length ? waits.join(", ") : "không cần chờ";
+      pushStep({
+        title: { vi: `Thời gian nhỏ nhất = ${answer}`, en: `Minimum time = ${answer}` },
+        codeLine: 17,
+        pathCells,
+        final: true,
+        vars: [
+          { name: "path + arrival time", value: pathText },
+          { name: "waiting", value: waitsText },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `Đường xanh lá ghi thời điểm ĐẾN từng phòng: ${pathText}. ${waits.length ? `Thời gian đứng chờ: ${waitsText}.` : "Không phải đứng chờ trên đường này."}`,
+          en: `The green path labels ARRIVAL time at each room: ${pathText}. ${waits.length ? `Standing wait time: ${waitsText}.` : "No standing wait is needed on this route."}`,
+        },
+      });
+      break;
+    }
+
+    for (const [dr, dc] of directions) {
+      pushStep({
+        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
+        codeLine: 19,
+        current: [r, c],
+        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
+        note: { vi: `Từ (${r},${c}), thử phòng theo độ lệch (${dr},${dc}).`, en: `From (${r},${c}), try the room at offset (${dr},${dc}).` },
+      });
+
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Neighbor = (${nr},${nc})`, en: `Neighbor = (${nr},${nc})` },
+        codeLine: 20,
+        current: [r, c],
+        vars: [{ name: "nr", value: nr }, { name: "nc", value: nc }],
+        note: { vi: "Tính tọa độ phòng sẽ thử đi vào.", en: "Compute the coordinates of the room to enter." },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      pushStep({
+        title: inBounds
+          ? { vi: `(${nr},${nc}) nằm trong dungeon`, en: `(${nr},${nc}) is inside the dungeon` }
+          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
+        codeLine: 21,
+        current: inBounds ? [nr, nc] : [r, c],
+        vars: [{ name: "neighbor", value: `(${nr}, ${nc})` }, { name: "in bounds", value: inBounds }],
+        note: inBounds
+          ? { vi: "Tọa độ hợp lệ; tính lúc được phép xuất phát và lúc đến.", en: "The coordinates are valid; compute the allowed departure and arrival times." }
+          : { vi: "Tọa độ ngoài dungeon nên bỏ qua hướng này.", en: "The coordinates are outside the dungeon, so skip this direction." },
+      });
+      if (!inBounds) continue;
+
+      const readyAt = moveTime[nr][nc];
+      const departAt = Math.max(time, readyAt);
+      const nextTime = departAt + 1;
+      pushStep({
+        title: { vi: `depart = max(${time}, ${readyAt}) = ${departAt}`, en: `depart = max(${time}, ${readyAt}) = ${departAt}` },
+        codeLine: 22,
+        current: [nr, nc],
+        vars: [
+          { name: "current time", value: time },
+          { name: `moveTime[${nr}][${nc}]`, value: readyAt },
+          { name: "depart time", value: departAt },
+          { name: "standing wait", value: departAt - time },
+        ],
+        note: departAt > time
+          ? { vi: `Đang ở (${r},${c}) lúc t=${time}, nhưng chỉ được bắt đầu đi vào (${nr},${nc}) từ t=${readyAt}. Đứng chờ ${departAt - time} giây rồi xuất phát.`, en: `We are at (${r},${c}) at t=${time}, but movement into (${nr},${nc}) may start only at t=${readyAt}. Stand and wait ${departAt - time} second(s), then depart.` }
+          : { vi: `Phòng (${nr},${nc}) đã sẵn sàng, nên xuất phát ngay tại t=${time}.`, en: `Room (${nr},${nc}) is already available, so depart immediately at t=${time}.` },
+      });
+
+      pushStep({
+        title: { vi: `next_time = ${departAt} + 1 = ${nextTime}`, en: `next_time = ${departAt} + 1 = ${nextTime}` },
+        codeLine: 22,
+        current: [nr, nc],
+        vars: [
+          { name: "depart time", value: departAt },
+          { name: "move duration", value: 1 },
+          { name: "next_time (arrival)", value: nextTime },
+        ],
+        note: {
+          vi: `Sau khi được phép xuất phát tại t=${departAt}, di chuyển mất đúng 1 giây nên ĐẾN (${nr},${nc}) tại t=${nextTime}. Đây là lý do +1 nằm ngoài max().`,
+          en: `After departure is allowed at t=${departAt}, movement takes exactly one second, so ARRIVAL at (${nr},${nc}) is t=${nextTime}. This is why +1 sits outside max().`,
+        },
+      });
+
+      const oldDist = dist[nr][nc];
+      const improves = nextTime < oldDist;
+      pushStep({
+        title: improves
+          ? { vi: `${nextTime} < ${formatTime(oldDist)}: tới sớm hơn`, en: `${nextTime} < ${formatTime(oldDist)}: earlier arrival` }
+          : { vi: `${nextTime} < ${formatTime(oldDist)}? False`, en: `${nextTime} < ${formatTime(oldDist)}? False` },
+        codeLine: 23,
+        current: [nr, nc],
+        vars: [
+          { name: "next_time", value: nextTime },
+          { name: `dist[${nr}][${nc}]`, value: formatTime(oldDist) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? { vi: `Đường mới đến (${nr},${nc}) sớm hơn; cập nhật dist và parent.`, en: `The new route reaches (${nr},${nc}) earlier; update dist and parent.` }
+          : { vi: `Phòng (${nr},${nc}) đã có đường đến không chậm hơn ${nextTime}; giữ nguyên.`, en: `Room (${nr},${nc}) already has a route arriving no later than ${nextTime}; keep it.` },
+      });
+      if (!improves) continue;
+
+      dist[nr][nc] = nextTime;
+      parent[nr][nc] = [r, c];
+      pushStep({
+        title: { vi: `dist[${nr}][${nc}] = ${nextTime}`, en: `dist[${nr}][${nc}] = ${nextTime}` },
+        codeLine: 24,
+        current: [nr, nc],
+        vars: [{ name: "dist", value: distStr() }, { name: "parent", value: `(${r}, ${c})` }],
+        note: { vi: "Lưu thời điểm đến tốt hơn; parent dùng để dựng đường xanh ở bước cuối.", en: "Store the better arrival time; parent reconstructs the final green path." },
+      });
+
+      heap.push([nextTime, nr, nc]);
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+      pushStep({
+        title: { vi: `Push (${nextTime}, ${nr}, ${nc})`, en: `Push (${nextTime}, ${nr}, ${nc})` },
+        codeLine: 25,
+        current: [nr, nc],
+        vars: [{ name: "heap", value: heapStr() }],
+        note: { vi: "Đưa trạng thái mới vào min-heap để Dijkstra tiếp tục chọn thời gian nhỏ nhất.", en: "Push the new state into the min-heap so Dijkstra keeps choosing the smallest time." },
+      });
+    }
+  }
+
+  if (!steps.at(-1).final) {
+    pushStep({
+      title: { vi: "Không thể tới phòng cuối", en: "Cannot reach the last room" },
+      codeLine: 26,
+      final: true,
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Heap đã rỗng mà phòng cuối chưa được pop, nên trả -1.", en: "The heap is empty without popping the last room, so return -1." },
+    });
+  }
+
+  return { original: moveTime, answer, steps };
+}
+
 // ─── 1377: Frog Position After T Seconds ───
 function buildSteps1377(input, params) {
   const n = params.n || 5;
@@ -1760,4 +2104,4 @@ function buildSteps815(input, params) {
   return {original, answer, steps};
 }
 
-module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps1377, buildSteps126, buildSteps815 };
+module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps3341, buildSteps1377, buildSteps126, buildSteps815 };
