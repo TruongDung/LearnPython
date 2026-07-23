@@ -5443,6 +5443,33 @@ select option {
 .bfs-cell.start { background: #6366f1; color: white; }
 .bfs-cell.end { background: #ec4899; color: white; }
 
+.effort-grid {
+  gap: 5px;
+}
+
+.effort-grid .bfs-cell {
+  box-sizing: border-box;
+  width: 64px;
+  height: 64px;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.effort-grid .bfs-cell-value {
+  font-size: 19px;
+  line-height: 22px;
+}
+
+.effort-grid .bfs-cell-meta {
+  color: currentColor;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 12px;
+  opacity: 0.82;
+}
+
 .tic-tac-toe-grid {
   grid-template-columns: repeat(3, 84px);
   gap: 4px;
@@ -5531,6 +5558,9 @@ select option {
 [data-theme="light"] .bfs-cell.path { background: #86efac; color: #064e3b; }
 [data-theme="light"] .bfs-cell.start { background: #6366f1; color: white; }
 [data-theme="light"] .bfs-cell.end { background: #ec4899; color: white; }
+[data-theme="light"] .effort-grid .bfs-cell {
+  border-color: #cbd5e1;
+}
 [data-theme="light"] .tic-tac-toe-grid .bfs-cell {
   border-color: #cbd5e1;
 }

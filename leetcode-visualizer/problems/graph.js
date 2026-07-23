@@ -3073,6 +3073,408 @@ function buildSteps1514(input, params) {
 }
 
 /**
+ * LeetCode 1631: Path With Minimum Effort.
+ * Dijkstra on a grid where a path's cost is its largest edge difference.
+ */
+function buildSteps1631(input) {
+  const heights = String(input)
+    .split(/[|;]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const valid = heights.length > 0
+    && heights[0].length > 0
+    && heights.length <= 100
+    && heights[0].length <= 100
+    && heights.every((row) => row.length === heights[0].length
+      && row.every((value) => Number.isInteger(value) && value >= 1));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeBlock: 2,
+      codeLines: [6],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Nhập ma trận số nguyên dương hình chữ nhật; các hàng cách nhau bởi '|', các số cách nhau bởi dấu phẩy. Ví dụ: 1,2,2|3,8,2|5,3,5.",
+        en: "Enter a rectangular matrix of positive integers; separate rows with '|' and values with commas. Example: 1,2,2|3,8,2|5,3,5.",
+      },
+    });
+    return { heights, answer: 0, steps };
+  }
+
+  const rows = heights.length;
+  const cols = heights[0].length;
+  const effort = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const finalized = new Set();
+  const heap = [];
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (r, c) => `${r},${c}`;
+  const formatEffort = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const effortStr = () => `[${effort.map((row) => `[${row.map(formatEffort).join(", ")}]`).join(", ")}]`;
+  const heapStr = () => `[${heap.map(([value, r, c]) => `(${value}, ${r}, ${c})`).join(", ")}]`;
+
+  function makeCells(current = null, pathCells = new Set()) {
+    const queued = new Set(heap.map(([, r, c]) => key(r, c)));
+    return heights.map((row, r) => row.map((height, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      if (finalized.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (pathCells.has(cellKey)) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      const endpoint = r === 0 && c === 0
+        ? " · S"
+        : r === rows - 1 && c === cols - 1
+          ? " · T"
+          : "";
+      return { label: String(height), meta: `e:${formatEffort(effort[r][c])}${endpoint}`, cls };
+    }));
+  }
+
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
+    codeLine: 6,
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: "Mỗi ô là một node. Từ một ô có thể đi sang tối đa 4 node kề: dưới, trên, phải và trái.",
+      en: "Each cell is a node. A cell can move to up to four adjacent nodes: down, up, right, and left.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo mọi effort bằng ∞", en: "Initialize every effort to ∞" },
+    codeLine: 7,
+    vars: [{ name: "effort", value: effortStr() }],
+    note: {
+      vi: "effort[r][c] là effort nhỏ nhất đã biết để tới ô (r,c). ∞ nghĩa là chưa tìm thấy đường tới ô đó.",
+      en: "effort[r][c] is the smallest known effort to reach (r,c). ∞ means no route has reached it yet.",
+    },
+  });
+
+  effort[0][0] = 0;
+  pushStep({
+    title: { vi: "Ô bắt đầu có effort = 0", en: "The start cell has effort 0" },
+    codeLine: 8,
+    current: [0, 0],
+    vars: [{ name: "effort[0][0]", value: 0 }],
+    note: {
+      vi: "Đứng tại ô bắt đầu và chưa đi qua cạnh nào, nên chênh lệch lớn nhất hiện tại bằng 0.",
+      en: "At the start no edge has been traversed, so the current maximum difference is 0.",
+    },
+  });
+
+  heap.push([0, 0, 0]);
+  pushStep({
+    title: { vi: "Đưa ô bắt đầu vào min-heap", en: "Push the start into the min-heap" },
+    codeLine: 9,
+    current: [0, 0],
+    vars: [{ name: "heap", value: heapStr() }],
+    note: {
+      vi: "Heap lưu (effort, row, col) và luôn pop trạng thái có effort nhỏ nhất trước.",
+      en: "The heap stores (effort, row, col) and always pops the smallest effort first.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Chuẩn bị 4 hướng di chuyển", en: "Prepare four movement directions" },
+    codeLine: 10,
+    vars: [{ name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
+    note: {
+      vi: "Mỗi cặp (dr, dc) thay đổi hàng và cột để lần lượt thử xuống, lên, phải, trái.",
+      en: "Each (dr, dc) changes row and column to try down, up, right, and left.",
+    },
+  });
+
+  let answer = 0;
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 12,
+      vars: [{ name: "heap", value: heapStr() }],
+      note: {
+        vi: "Vẫn còn trạng thái cần xử lý; phần tử đầu heap có effort nhỏ nhất.",
+        en: "States remain to process; the first heap entry has the smallest effort.",
+      },
+    });
+
+    const [curEffort, r, c] = heap.shift();
+    pushStep({
+      title: { vi: `Pop ô (${r},${c}) với effort ${curEffort}`, en: `Pop cell (${r},${c}) with effort ${curEffort}` },
+      codeLine: 13,
+      current: [r, c],
+      vars: [
+        { name: "cur_effort", value: curEffort },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "heap còn lại", value: heapStr() },
+      ],
+      note: {
+        vi: `Dijkstra chọn ô (${r},${c}) vì trạng thái này đang có effort nhỏ nhất trong heap.`,
+        en: `Dijkstra selects (${r},${c}) because this state has the smallest effort in the heap.`,
+      },
+    });
+
+    const stale = curEffort > effort[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `${curEffort} > effort[${r}][${c}]=${effort[r][c]}: bản ghi cũ`, en: `${curEffort} > effort[${r}][${c}]=${effort[r][c]}: stale entry` }
+        : { vi: `${curEffort} > effort[${r}][${c}]? False`, en: `${curEffort} > effort[${r}][${c}]? False` },
+      codeLine: 14,
+      current: [r, c],
+      vars: [
+        { name: "cur_effort", value: curEffort },
+        { name: `effort[${r}][${c}]`, value: effort[r][c] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: "Một đường tốt hơn đã cập nhật ô này sau khi bản ghi hiện tại được push, nên bản ghi vừa pop đã cũ.",
+            en: "A better route updated this cell after this entry was pushed, so the popped entry is stale.",
+          }
+        : {
+            vi: "Giá trị vừa pop vẫn bằng effort tốt nhất đang lưu, nên trạng thái còn hợp lệ.",
+            en: "The popped value still matches the stored best effort, so the state is valid.",
+          },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua bản ghi cũ", en: "Skip the stale entry" },
+        codeLine: 15,
+        current: [r, c],
+        vars: [{ name: "continue", value: true }],
+        note: {
+          vi: "Không mở rộng hàng xóm từ một đường kém hơn; quay lại đầu vòng while.",
+          en: "Do not expand neighbors from a worse route; return to the while loop.",
+        },
+      });
+      continue;
+    }
+
+    finalized.add(key(r, c));
+    const reachedTarget = r === rows - 1 && c === cols - 1;
+    pushStep({
+      title: reachedTarget
+        ? { vi: `(${r},${c}) là ô đích`, en: `(${r},${c}) is the target` }
+        : { vi: `(${r},${c}) chưa phải ô đích`, en: `(${r},${c}) is not the target` },
+      codeLine: 16,
+      current: [r, c],
+      vars: [
+        { name: "current", value: `(${r}, ${c})` },
+        { name: "target", value: `(${rows - 1}, ${cols - 1})` },
+        { name: "condition", value: reachedTarget },
+      ],
+      note: reachedTarget
+        ? {
+            vi: "Đích được pop với effort nhỏ nhất trong toàn bộ heap, vì vậy giá trị này đã tối ưu và có thể trả ngay.",
+            en: "The target was popped with the smallest effort in the heap, so this value is optimal and can be returned immediately.",
+          }
+        : {
+            vi: "Chưa tới đích; tiếp tục thử bốn ô kề để tìm các đường tốt hơn.",
+            en: "The target has not been reached; inspect four neighbors for better routes.",
+          },
+    });
+
+    if (reachedTarget) {
+      answer = curEffort;
+      const path = [];
+      let current = [r, c];
+      while (current) {
+        path.unshift(current);
+        current = parent[current[0]][current[1]];
+      }
+      const pathCells = new Set(path.map(([pr, pc]) => key(pr, pc)));
+      const pathText = path.map(([pr, pc]) => `(${pr},${pc})`).join(" → ");
+      pushStep({
+        title: { vi: `Effort nhỏ nhất = ${answer}`, en: `Minimum effort = ${answer}` },
+        codeLine: 17,
+        pathCells,
+        final: true,
+        vars: [{ name: "path", value: pathText }, { name: "answer", value: answer }],
+        note: {
+          vi: `Đường màu xanh lá: ${pathText}. Chênh lệch lớn nhất trên đường này là ${answer}; không đường nào có thể đạt effort nhỏ hơn. parent chỉ được visualization ghi lại để tô đường cuối, không làm thay đổi thuật toán.`,
+          en: `Green path: ${pathText}. Its largest edge difference is ${answer}, and no route can have a smaller effort. The visualization records parent only to highlight the final path; it does not change the algorithm.`,
+        },
+      });
+      break;
+    }
+
+    for (const [dr, dc] of directions) {
+      pushStep({
+        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
+        codeLine: 19,
+        current: [r, c],
+        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
+        note: {
+          vi: `Từ ô (${r},${c}), áp dụng độ lệch hàng ${dr} và cột ${dc}.`,
+          en: `From (${r},${c}), apply row offset ${dr} and column offset ${dc}.`,
+        },
+      });
+
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Ô kế tiếp = (${nr},${nc})`, en: `Next cell = (${nr},${nc})` },
+        codeLine: 20,
+        current: [r, c],
+        vars: [
+          { name: "nr", value: `${r} + (${dr}) = ${nr}` },
+          { name: "nc", value: `${c} + (${dc}) = ${nc}` },
+        ],
+        note: {
+          vi: `Tính tọa độ hàng xóm: nr = r + dr và nc = c + dc.`,
+          en: "Compute the neighbor coordinates with nr = r + dr and nc = c + dc.",
+        },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      pushStep({
+        title: inBounds
+          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
+          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
+        codeLine: 21,
+        current: inBounds ? [nr, nc] : [r, c],
+        vars: [
+          { name: "neighbor", value: `(${nr}, ${nc})` },
+          { name: "in bounds", value: inBounds },
+        ],
+        note: inBounds
+          ? {
+              vi: "Tọa độ hợp lệ, nên có thể tính effort của cạnh nối hai ô.",
+              en: "The coordinates are valid, so the connecting edge effort can be computed.",
+            }
+          : {
+              vi: "Tọa độ nằm ngoài ma trận; khối if không chạy và vòng for chuyển sang hướng tiếp theo.",
+              en: "The coordinates are outside the matrix; the if body is skipped and the loop tries the next direction.",
+            },
+      });
+      if (!inBounds) continue;
+
+      const edgeEffort = Math.abs(heights[r][c] - heights[nr][nc]);
+      pushStep({
+        title: { vi: `Chênh lệch cạnh = |${heights[r][c]} - ${heights[nr][nc]}| = ${edgeEffort}`, en: `Edge difference = |${heights[r][c]} - ${heights[nr][nc]}| = ${edgeEffort}` },
+        codeLine: 22,
+        current: [nr, nc],
+        vars: [
+          { name: `heights[${r}][${c}]`, value: heights[r][c] },
+          { name: `heights[${nr}][${nc}]`, value: heights[nr][nc] },
+          { name: "edge_effort", value: edgeEffort },
+        ],
+        note: {
+          vi: "Chi phí riêng của bước đi này là trị tuyệt đối chênh lệch độ cao giữa hai ô kề.",
+          en: "The cost of this move is the absolute height difference between the adjacent cells.",
+        },
+      });
+
+      const newEffort = Math.max(curEffort, edgeEffort);
+      pushStep({
+        title: { vi: `new_effort = max(${curEffort}, ${edgeEffort}) = ${newEffort}`, en: `new_effort = max(${curEffort}, ${edgeEffort}) = ${newEffort}` },
+        codeLine: 23,
+        current: [nr, nc],
+        vars: [
+          { name: "cur_effort", value: curEffort },
+          { name: "edge_effort", value: edgeEffort },
+          { name: "new_effort", value: newEffort },
+        ],
+        note: {
+          vi: `Effort của cả đường không phải tổng. Nó là cạnh chênh lệch lớn nhất đã gặp, nên lấy max(${curEffort}, ${edgeEffort}) = ${newEffort}.`,
+          en: `A path's effort is not a sum. It is the largest edge difference seen, so take max(${curEffort}, ${edgeEffort}) = ${newEffort}.`,
+        },
+      });
+
+      const oldEffort = effort[nr][nc];
+      const improves = newEffort < oldEffort;
+      pushStep({
+        title: improves
+          ? { vi: `${newEffort} < ${formatEffort(oldEffort)}: tìm thấy đường tốt hơn`, en: `${newEffort} < ${formatEffort(oldEffort)}: found a better route` }
+          : { vi: `${newEffort} < ${formatEffort(oldEffort)}? False`, en: `${newEffort} < ${formatEffort(oldEffort)}? False` },
+        codeLine: 24,
+        current: [nr, nc],
+        vars: [
+          { name: "new_effort", value: newEffort },
+          { name: `effort[${nr}][${nc}]`, value: formatEffort(oldEffort) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? {
+              vi: `Đường mới giảm effort tốt nhất của ô (${nr},${nc}) từ ${formatEffort(oldEffort)} xuống ${newEffort}.`,
+              en: `The new route lowers the best effort for (${nr},${nc}) from ${formatEffort(oldEffort)} to ${newEffort}.`,
+            }
+          : {
+              vi: `Ô (${nr},${nc}) đã có đường với effort ${formatEffort(oldEffort)}, không tệ hơn ${newEffort}; không cập nhật.`,
+              en: `Cell (${nr},${nc}) already has effort ${formatEffort(oldEffort)}, no worse than ${newEffort}; do not update.`,
+            },
+      });
+      if (!improves) continue;
+
+      effort[nr][nc] = newEffort;
+      parent[nr][nc] = [r, c];
+      pushStep({
+        title: { vi: `Cập nhật effort[${nr}][${nc}] = ${newEffort}`, en: `Set effort[${nr}][${nc}] = ${newEffort}` },
+        codeLine: 25,
+        current: [nr, nc],
+        vars: [{ name: "effort", value: effortStr() }],
+        note: {
+          vi: `Lưu effort tốt hơn cho ô (${nr},${nc}). Visualization đồng thời nhớ parent = (${r},${c}) để dựng đường cuối.`,
+          en: `Store the better effort for (${nr},${nc}). The visualization also records parent = (${r},${c}) to reconstruct the final route.`,
+        },
+      });
+
+      heap.push([newEffort, nr, nc]);
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+      pushStep({
+        title: { vi: `Push (${newEffort}, ${nr}, ${nc}) vào heap`, en: `Push (${newEffort}, ${nr}, ${nc}) into the heap` },
+        codeLine: 26,
+        current: [nr, nc],
+        vars: [{ name: "heap", value: heapStr() }],
+        note: {
+          vi: "Heap sẽ sắp xếp để trạng thái có effort nhỏ nhất được xử lý trước ở vòng lặp tiếp theo.",
+          en: "The heap orders states so the smallest effort is processed first in a later iteration.",
+        },
+      });
+    }
+  }
+
+  if (!steps.at(-1).final) {
+    pushStep({
+      title: { vi: "Grid không có ô để xử lý", en: "No grid cell to process" },
+      codeLine: 27,
+      final: true,
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Dòng fallback trả 0; với grid hợp lệ, mọi ô luôn nối được bằng bốn hướng nên thuật toán sẽ trả ở dòng 17.",
+        en: "The fallback returns 0; in a valid grid every cell is connected by four-direction moves, so line 17 returns first.",
+      },
+    });
+  }
+
+  return { heights, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 851: Loud and Rich.
  * DFS on reversed richer graph: for each node, find the quietest person among all richer people.
  */
@@ -7548,7 +7950,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 1631, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -9719,3 +10121,7 @@ module.exports = {
     builder: buildSteps2492,
   },
 };
+
+Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
+  value: buildSteps1631,
+});

@@ -720,11 +720,11 @@ function buildSteps1258(input, params) {
 }
 
 // ─── 1631: Path With Minimum Effort ───
-function buildSteps1631(input) {
+function buildSteps1631Kruskal(input) {
   // Input: grid rows separated by ';', values by ','
   // e.g. "1,2,2;3,8,2;5,3,5"
   const grid = String(input)
-    .split(";")
+    .split(/[;|]/)
     .map((row) => row.split(",").map((s) => Number(s.trim())));
   const rows = grid.length, cols = grid[0].length;
   const n = rows * cols;
@@ -892,6 +892,13 @@ function buildSteps1631(input) {
   steps.push(fs);
 
   return { input, answer, steps };
+}
+
+function buildSteps1631(input, params = {}) {
+  if (String(params.approach || "1") === "2") {
+    return require("./graph").__buildSteps1631Dijkstra(input, params);
+  }
+  return buildSteps1631Kruskal(input);
 }
 
 // ─── 1101: The Earliest Moment When Everyone Become Friends ───
@@ -2049,29 +2056,41 @@ module.exports = {
     id: 1631,
     difficulty: "medium",
     slug: "path-with-minimum-effort",
-    category: UF_CAT,
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "Path With Minimum Effort", en: "Path With Minimum Effort" },
-    titleVi: { vi: "Đường đi với effort tối thiểu (Union-Find)", en: "Minimum effort path (Union-Find / Kruskal)" },
+    titleVi: { vi: "Đường đi với effort nhỏ nhất", en: "Path with minimum effort" },
     statement: {
-      vi: "Cho grid m×n. Effort của 1 đường đi = |diff| LỚN NHẤT giữa 2 ô liền kề trên đường. Tìm đường từ (0,0) đến (m-1,n-1) có effort nhỏ nhất. Nhập grid: hàng cách bởi ';', giá trị cách bởi ','.",
-      en: "Given an m×n grid. Effort of a path = the MAXIMUM absolute difference between adjacent cells on the path. Find the path from (0,0) to (m-1,n-1) with minimum effort. Enter grid rows by ';', values by ','.",
+      vi: "Cho grid m×n. Effort của một đường là |diff| lớn nhất giữa hai ô liên tiếp. Tìm đường từ (0,0) đến (m-1,n-1) có effort nhỏ nhất. Nhập hàng cách bởi ';' hoặc '|', giá trị cách bởi ','.",
+      en: "Given an m×n grid, a path's effort is the maximum absolute difference between consecutive cells. Find the minimum-effort path from (0,0) to (m-1,n-1). Separate rows with ';' or '|' and values with ','.",
     },
     defaultInput: "1,2,2;3,8,2;5,3,5",
     inputKind: "string",
-    inputLabel: { vi: "Grid (hàng cách ';')", en: "Grid (rows by ';')" },
-    extraParams: [],
+    inputLabel: { vi: "Grid (hàng cách ';' hoặc '|')", en: "Grid (rows by ';' or '|')" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Union-Find / Kruskal", en: "Approach 1: Union-Find / Kruskal" } },
+          { value: "2", label: { vi: "Cách 2: Dijkstra minimax", en: "Approach 2: Minimax Dijkstra" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Tạo tất cả cạnh giữa các ô kề (ngang/dọc), gán trọng số = |diff| giữa 2 ô.", en: "Build all edges between adjacent cells (horizontal/vertical), weight = |diff|." },
-      { vi: "Sắp cạnh theo |diff| tăng dần (Kruskal-style).", en: "Sort edges by |diff| ascending (Kruskal-style)." },
-      { vi: "Lần lượt Union từng cạnh. Dừng ngay khi (0,0) và (m-1,n-1) cùng nhóm → |diff| của cạnh đó là đáp án (bottleneck edge).", en: "Union edges one by one. Stop as soon as (0,0) and (m-1,n-1) are in the same group → that edge's |diff| is the answer (bottleneck edge)." },
-      { vi: "Correct vì: cạnh cuối cùng thêm vào luôn là cạnh \"nút thắt cổ chai\" quyết định effort của đường đi tốt nhất.", en: "Correct because: the last added edge is always the bottleneck that determines the effort of the optimal path." },
+      { vi: "Cách 1 — Kruskal: tạo các cạnh giữa ô kề, sắp theo |diff| tăng dần rồi Union cho tới khi start và target nối nhau.", en: "Approach 1 — Kruskal: build adjacent-cell edges, sort by |diff|, then union until start and target connect." },
+      { vi: "Cạnh Kruskal cuối cùng vừa thêm là bottleneck, nên trọng số của nó chính là effort tối thiểu.", en: "The last Kruskal edge added is the bottleneck, so its weight is the minimum effort." },
+      { vi: "Cách 2 — Dijkstra: effort[r][c] là effort nhỏ nhất đã biết; min-heap luôn pop trạng thái nhỏ nhất trước.", en: "Approach 2 — Dijkstra: effort[r][c] is the smallest known effort; the min-heap pops the smallest state first." },
+      { vi: "Dijkstra minimax relax bằng new_effort = max(cur_effort, abs(height hiện tại - height hàng xóm)), không cộng trọng số.", en: "Minimax Dijkstra relaxes with new_effort = max(cur_effort, abs(current height - neighbor height)); weights are not added." },
+      { vi: "Khi target được pop khỏi heap, effort đã tối ưu. Visualization Cách 2 debug đúng một dòng code mỗi step và tô xanh đường cuối.", en: "When the target is popped, its effort is optimal. Approach 2 debugs exactly one code line per step and highlights the final path." },
     ],
     complexity: {
-      time: "O(m·n · log(m·n))",
-      space: "O(m·n)",
+      time: "O(R·C log(R·C))",
+      space: "O(R·C)",
       note: {
-        vi: "Sắp xếp O(E log E), E = O(m·n). Mỗi union/find gần O(1).",
-        en: "Sorting O(E log E), E = O(m·n). Each union/find near O(1).",
+        vi: "Cách 1 sắp E = O(R·C) cạnh; Cách 2 dùng heap trên R·C ô. Cả hai dùng O(R·C) bộ nhớ.",
+        en: "Approach 1 sorts E = O(R·C) edges; Approach 2 uses a heap over R·C cells. Both use O(R·C) space.",
       },
     },
     code: [
@@ -2100,6 +2119,37 @@ module.exports = {
       "                return diff",
       "        return 0",
     ],
+    code2: [
+      "import heapq",
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def minimumEffortPath(self, heights: List[List[int]]) -> int:",
+      "        rows, cols = len(heights), len(heights[0])",
+      "        effort = [[float('inf')] * cols for _ in range(rows)]",
+      "        effort[0][0] = 0",
+      "        heap = [(0, 0, 0)]  # effort, row, col",
+      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
+      "        while heap:",
+      "            cur_effort, r, c = heapq.heappop(heap)",
+      "            if cur_effort > effort[r][c]:",
+      "                continue",
+      "            if r == rows - 1 and c == cols - 1:",
+      "                return cur_effort",
+      "",
+      "            for dr, dc in directions:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols:",
+      "                    edge_effort = abs(heights[r][c] - heights[nr][nc])",
+      "                    new_effort = max(cur_effort, edge_effort)",
+      "                    if new_effort < effort[nr][nc]:",
+      "                        effort[nr][nc] = new_effort",
+      "                        heapq.heappush(heap, (new_effort, nr, nc))",
+      "        return 0",
+    ],
+    codeLabel: { vi: "Cách 1: Union-Find / Kruskal", en: "Approach 1: Union-Find / Kruskal" },
+    code2Label: { vi: "Cách 2: Dijkstra minimax", en: "Approach 2: Minimax Dijkstra" },
     builder: buildSteps1631,
   },
   1101: {

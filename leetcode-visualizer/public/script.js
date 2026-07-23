@@ -1364,11 +1364,18 @@ function renderBfsGrid(step) {
   el.style.textAlign = "center";
   const isTicTacToe = variant === "tic-tac-toe";
   const isPhonePath = variant === "phone-path";
-  const variantClass = isTicTacToe ? " tic-tac-toe-grid" : isPhonePath ? " phone-path-grid" : "";
+  const isEffortGrid = variant === "effort-grid";
+  const variantClass = isTicTacToe
+    ? " tic-tac-toe-grid"
+    : isPhonePath
+      ? " phone-path-grid"
+      : isEffortGrid
+        ? " effort-grid"
+        : "";
   const gridClass = `bfs-grid${variantClass}`;
   const gridStyle = isTicTacToe
     ? ""
-    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : "32px"})"`;
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? "64px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
