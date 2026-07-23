@@ -1282,10 +1282,11 @@ function buildSteps692(input, params) {
   const freq = new Map();
   for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
   const freqStr = [...freq.entries()].map(([w, f]) => `${w}→${f}`).join(", ");
+  const freqCounterStr = `Counter({${[...freq.entries()].map(([w, f]) => `'${w}': ${f}`).join(", ")}})`;
   steps.push(heapSnapshot([], label, {
-    title: { vi: "Đếm tần suất", en: "Count frequencies" },
+    title: { vi: `freq = ${freqCounterStr}`, en: `freq = ${freqCounterStr}` },
     codeLines: [3],
-    vars: [{ name: "freq", value: freqStr }],
+    vars: [{ name: "freq", value: freqCounterStr }],
     note: { vi: `Tần suất: ${freqStr}.`, en: `Frequencies: ${freqStr}.` },
   }));
 
@@ -1367,7 +1368,7 @@ function buildSteps692(input, params) {
   steps.forEach((step) => {
     if (!step.vars) step.vars = [];
     if (!step.vars.some((v) => v.name === "freq")) {
-      step.vars.unshift({ name: "freq", value: freqStr });
+      step.vars.unshift({ name: "freq", value: freqCounterStr });
     }
   });
 
