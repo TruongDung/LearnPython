@@ -1260,7 +1260,7 @@ function buildSteps692(input, params) {
   const words = String(input).split(",").map((s) => s.trim()).filter((s) => s.length);
   const k = params.k !== undefined ? Number(params.k) : 2;
   const steps = [];
-  const label = (e) => `${e.w}·f${e.f}`;
+  const label = (e) => `${e.w}·${e.count}`;
 
   steps.push(heapSnapshot([], label, {
     title: { vi: `Top ${k} từ xuất hiện nhiều nhất`, en: `Top ${k} frequent words` },
@@ -1269,16 +1269,12 @@ function buildSteps692(input, params) {
     note: {
       vi:
         `Trả về k từ xuất hiện NHIỀU nhất. Nếu BẰNG tần suất → từ NHỎ hơn theo bảng chữ cái xếp trước.\n` +
-        `Dùng MIN-HEAP kích thước k với thứ tự "tệ nhất ở gốc":\n` +
-        `• "Tệ hơn" = freq nhỏ hơn, hoặc cùng freq nhưng từ LỚN hơn (z > a).\n` +
-        `• Khi heap > k → bỏ gốc (từ tệ nhất).\n` +
-        `• Cuối cùng sắp k từ còn lại theo freq giảm dần, rồi chữ cái tăng dần.`,
+        `Đẩy (-count, word) vào MIN-HEAP: vì count bị đảo dấu, gốc heap luôn là cặp NHỎ nhất về (-count, word) = count LỚN nhất, hòa thì word NHỎ nhất — đúng thứ tự cần lấy.\n` +
+        `Lấy ra (pop) k lần liên tiếp là có ngay k từ đúng thứ tự yêu cầu, KHÔNG cần sắp lại ở cuối.`,
       en:
         `Return the k MOST frequent words. On a tie → the lexicographically SMALLER word comes first.\n` +
-        `Use a size-k MIN-HEAP with "worst at the root":\n` +
-        `• "Worse" = lower freq, or same freq but LARGER word (z > a).\n` +
-        `• When heap > k → drop the root (worst word).\n` +
-        `• Finally sort the k survivors by freq desc, then word asc.`,
+        `Push (-count, word) into a MIN-HEAP: negating count means the root is always the SMALLEST (-count, word) pair = HIGHEST count, and on ties the SMALLEST word — exactly the order needed.\n` +
+        `Popping k times in a row already yields the k words in the required order, with NO final sort needed.`,
     },
   }));
 
@@ -1287,65 +1283,83 @@ function buildSteps692(input, params) {
   for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
   const freqStr = [...freq.entries()].map(([w, f]) => `${w}→${f}`).join(", ");
   steps.push(heapSnapshot([], label, {
-    title: { vi: "Bước 1: Đếm tần suất", en: "Step 1: Count frequencies" },
-    codeLines: [3, 4],
+    title: { vi: "Đếm tần suất", en: "Count frequencies" },
+    codeLines: [3],
     vars: [{ name: "freq", value: freqStr }],
-    note: { vi: `Tần suất: ${freqStr}. Giờ đẩy vào min-heap kích thước ${k}.`, en: `Frequencies: ${freqStr}. Now push into a size-${k} min-heap.` },
+    note: { vi: `Tần suất: ${freqStr}.`, en: `Frequencies: ${freqStr}.` },
   }));
 
   const heap = [];
-  // Root = worst (lowest freq; tie → lexicographically larger word).
-  const less = (a, b) => (a.f < b.f) || (a.f === b.f && a.w > b.w);
-  const arrStr = () => `[${heap.map((e) => `${e.w}:${e.f}`).join(", ")}]`;
+  // Min-heap on (-count, word) ⇔ root = highest count, tie-break smallest word.
+  const less = (a, b) => (a.count > b.count) || (a.count === b.count && a.w < b.w);
+  const arrStr = () => `[${heap.map((e) => `(-${e.count},"${e.w}")`).join(", ")}]`;
   const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
 
   steps.push(heapSnapshot([], label, {
-    title: { vi: "Khởi tạo min-heap rỗng", en: "Initialize an empty min-heap" },
-    codeLines: [5, 6],
+    title: { vi: "Khởi tạo heap rỗng", en: "Initialize an empty heap" },
+    codeLines: [4],
     vars: [{ name: "heap", value: "[]" }],
-    note: { vi: "heap bắt đầu rỗng, kích thước sẽ được giữ ≤ k khi duyệt từng từ.", en: "heap starts empty; its size will be kept ≤ k while scanning each word." },
+    note: { vi: "heap sẽ chứa mọi từ khác nhau, mỗi từ dạng (-count, word).", en: "heap will hold every distinct word, each as (-count, word)." },
   }));
 
-  for (const [w, f] of freq.entries()) {
+  for (const [w, count] of freq.entries()) {
     steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Xét "${w}" (f=${f})`, en: `Consider "${w}" (f=${f})` },
-      codeLines: [7],
-      vars: [{ name: "w, f", value: `"${w}", ${f}` }, { name: "heap", value: arrStr() }],
-      note: { vi: `Duyệt tới "${w}" (freq ${f}); heap CHƯA thay đổi, bước sau mới push.`, en: `Now visiting "${w}" (freq ${f}); the heap is unchanged so far, the next step pushes it.` },
+      title: { vi: `Xét "${w}" (count=${count})`, en: `Consider "${w}" (count=${count})` },
+      codeLines: [5],
+      vars: [{ name: "word, count", value: `"${w}", ${count}` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Duyệt tới "${w}" (count ${count}); heap CHƯA đổi, bước sau mới push.`, en: `Now visiting "${w}" (count ${count}); the heap is unchanged, the next step pushes it.` },
     }));
-    heap.push({ w, f });
+    heap.push({ w, count });
     steps.push(heapSnapshot(heap, label, {
-      title: { vi: `Push "${w}" (f=${f})`, en: `Push "${w}" (f=${f})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [8],
+      title: { vi: `Push (-${count}, "${w}")`, en: `Push (-${count}, "${w}")` },
+      hlSet: new Set([heap.length - 1]), codeLines: [6],
       vars: [{ name: "heap", value: arrStr() }, { name: "size", value: heap.length }],
-      note: { vi: `Thêm "${w}" (freq ${f}) vào cuối heap rồi sift-up.`, en: `Add "${w}" (freq ${f}) at the end then sift-up.` },
+      note: { vi: `Đẩy (-${count}, "${w}") vào cuối heap rồi sift-up để giữ tính chất heap.`, en: `Push (-${count}, "${w}") to the end then sift-up to keep the heap property.` },
     }));
     siftUp(heap.length - 1);
-    if (heap.length > k) {
-      const removed = heap[0];
-      const last = heap.pop();
-      if (heap.length > 0) heap[0] = last;
-      steps.push(heapSnapshot(heap, label, {
-        title: { vi: `Heap > ${k} → bỏ "${removed.w}" (f${removed.f})`, en: `Heap > ${k} → drop "${removed.w}" (f${removed.f})` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [9],
-        vars: [{ name: "bỏ", value: `"${removed.w}" (f${removed.f})` }, { name: "heap", value: arrStr() }],
-        note: { vi: `Gốc = từ "tệ nhất" (freq nhỏ nhất, hoặc cùng freq nhưng chữ lớn hơn) → loại bỏ. Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Root = "worst" word (lowest freq, or same freq but larger spelling) → remove. Move last to root then sift-down.` },
-      }));
-      if (heap.length > 0) siftDown(0);
-    }
   }
 
-  const result = heap.map((e) => e.w).sort((x, y) => {
-    const fx = freq.get(x), fy = freq.get(y);
-    if (fx !== fy) return fy - fx;
-    return x < y ? -1 : 1;
-  });
-  const markAll = new Set(heap.map((_, i) => i));
+  const result = [];
+  steps.push(heapSnapshot(heap, label, {
+    title: { vi: "Khởi tạo result rỗng", en: "Initialize an empty result" },
+    codeLines: [7],
+    vars: [{ name: "result", value: "[]" }, { name: "heap", value: arrStr() }],
+    note: { vi: `Heap đã có đủ ${freq.size} từ khác nhau. Giờ lấy ra ${k} lần.`, en: `The heap now holds all ${freq.size} distinct words. Now pop ${k} times.` },
+  }));
+
+  for (let i = 0; i < k; i++) {
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Lượt lấy ${i + 1}/${k}`, en: `Pop ${i + 1}/${k}` },
+      codeLines: [8],
+      vars: [{ name: "vòng", value: `${i + 1}/${k}` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Bắt đầu lượt lấy thứ ${i + 1}.`, en: `Starting pop #${i + 1}.` },
+    }));
+
+    const root = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) heap[0] = last;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Pop gốc: (-${root.count}, "${root.w}")`, en: `Pop root: (-${root.count}, "${root.w}")` },
+      hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [9],
+      vars: [{ name: "count, word", value: `${root.count}, "${root.w}"` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Gốc là (-${root.count}, "${root.w}") = từ có count LỚN nhất hiện tại (hòa thì chữ nhỏ hơn). Đưa phần tử cuối lên gốc rồi sift-down.`, en: `The root is (-${root.count}, "${root.w}") = the current word with the HIGHEST count (ties → smaller word). Move the last element to the root then sift-down.` },
+    }));
+    if (heap.length > 0) siftDown(0);
+
+    result.push(root.w);
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `result.append("${root.w}") → [${result.join(", ")}]`, en: `result.append("${root.w}") → [${result.join(", ")}]` },
+      codeLines: [10],
+      vars: [{ name: "result", value: `[${result.join(", ")}]` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Thêm "${root.w}" vào result. Vì heap đã pop đúng thứ tự, KHÔNG cần sắp lại.`, en: `Add "${root.w}" to result. Since the heap already pops in the correct order, no final sort is needed.` },
+    }));
+  }
+
   const fs = heapSnapshot(heap, label, {
     title: { vi: `Kết quả: [${result.map((w) => `"${w}"`).join(", ")}]`, en: `Result: [${result.map((w) => `"${w}"`).join(", ")}]` },
-    markSet: markAll, codeLines: [10],
+    codeLines: [11],
     vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
-    note: { vi: `Heap còn ${k} từ tốt nhất. Sắp theo freq giảm dần, rồi chữ cái tăng dần → [${result.join(", ")}].`, en: `The heap keeps the ${k} best words. Sort by freq desc, then word asc → [${result.join(", ")}].` },
+    note: { vi: `return result → [${result.join(", ")}].`, en: `return result → [${result.join(", ")}].` },
   });
   fs.final = true; steps.push(fs);
 
@@ -2774,21 +2788,23 @@ module.exports = {
     inputKind: "string", inputLabel: { vi: "Danh sách từ (dấu phẩy)", en: "Words (comma-separated)" },
     extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 2 }],
     approach: [
-      { vi: "Đếm tần suất. Min-heap kích thước k với gốc = từ 'tệ nhất' (freq nhỏ / chữ lớn).", en: "Count frequencies. Size-k min-heap with the root being the 'worst' word (low freq / larger spelling)." },
-      { vi: "Khi heap > k thì bỏ gốc. Cuối cùng sắp theo freq giảm, chữ tăng.", en: "When heap > k, drop the root. Finally sort by freq desc, word asc." },
+      { vi: "Đếm tần suất bằng Counter.", en: "Count frequencies with Counter." },
+      { vi: "Đẩy (-count, word) vào heap cho mỗi từ. Đảo dấu count nên gốc heap = count LỚN nhất, hòa thì word NHỎ nhất.", en: "Push (-count, word) for every word. Negating count means the root is the HIGHEST count, ties broken by the SMALLEST word." },
+      { vi: "Pop k lần liên tiếp là ra ngay k từ đúng thứ tự, không cần sort lại.", en: "Popping k times in a row already yields the k words in order, no extra sort needed." },
     ],
-    complexity: { time: "O(n log k)", space: "O(n)", note: { vi: "n từ, heap kích thước k.", en: "n words, heap of size k." } },
+    complexity: { time: "O(n log n)", space: "O(n)", note: { vi: "Heap chứa tất cả n từ khác nhau (không giới hạn kích thước k).", en: "The heap holds all n distinct words (not capped at size k)." } },
     code: [
       "class Solution:",
       "    def topKFrequent(self, words, k):",
-      "        from collections import Counter",
       "        freq = Counter(words)",
-      "        import heapq",
       "        heap = []",
-      "        for w, f in freq.items():",
-      "            heapq.heappush(heap, (f, [-ord(c) for c in w]))",
-      "            if len(heap) > k: heapq.heappop(heap)",
-      "        return sorted(freq, key=lambda w: (-freq[w], w))[:k]",
+      "        for word, count in freq.items():",
+      "            heapq.heappush(heap, (-count, word))",
+      "        result = []",
+      "        for _ in range(k):",
+      "            count, word = heapq.heappop(heap)",
+      "            result.append(word)",
+      "        return result",
     ],
     builder: buildSteps692,
   },
