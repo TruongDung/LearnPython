@@ -1447,6 +1447,7 @@ function buildSteps3513(input) {
   const n = nums.length;
   const steps = [];
   const bitWidth = Math.max(1, n.toString(2).length);
+  const binary = (value) => value.toString(2).padStart(bitWidth, "0");
   const binaryLabels = nums.map((value) => value.toString(2).padStart(bitWidth, "0"));
   const indexOfValue = (value) => nums.indexOf(value);
   const positionsOf = (values) => [...new Set(values.map(indexOfValue).filter((index) => index >= 0))];
@@ -1468,6 +1469,20 @@ function buildSteps3513(input) {
     note: {
       vi: `Đề bài bảo đảm nums là một hoán vị của các số từ 1 đến n. Thứ tự không làm thay đổi tập kết quả XOR: với ba giá trị đã chọn, ta luôn sắp ba chỉ số thành i <= j <= k, còn phép XOR có tính giao hoán. Vì vậy đáp án chỉ phụ thuộc vào n, không phụ thuộc vị trí các phần tử trong nums.`,
       en: `nums is a permutation of 1 through n. XOR is commutative, so the answer depends only on n, not on the permutation order.`,
+    },
+  }));
+
+  steps.push(snapshot({
+    title: { vi: "Nhắc lại 3 quy tắc XOR", en: "Review three XOR rules" },
+    codeLines: [2],
+    vars: [
+      { name: "cùng bit", value: "0 XOR 0 = 0; 1 XOR 1 = 0" },
+      { name: "khác bit", value: "0 XOR 1 = 1; 1 XOR 0 = 1" },
+      { name: "hệ quả", value: "x XOR x = 0; x XOR 0 = x" },
+    ],
+    note: {
+      vi: "XOR xử lý độc lập từng cột bit: hai bit giống nhau cho 0, hai bit khác nhau cho 1. Vì vậy một số XOR với chính nó sẽ triệt tiêu thành 0, còn XOR với 0 giữ nguyên số đó. Hai tính chất này giải thích cả trường hợp lặp chỉ số và cách ghép ba giá trị ở các bước sau.",
+      en: "XOR works independently in each bit column. Equal bits produce 0 and different bits produce 1, so x XOR x = 0 and x XOR 0 = x.",
     },
   }));
 
@@ -1533,13 +1548,26 @@ function buildSteps3513(input) {
     title: { vi: `n.bit_length() = ${bitWidth}`, en: `n.bit_length() = ${bitWidth}` },
     codeLines: [6],
     vars: [
-      { name: "n", value: `${n} = ${n.toString(2)}₂` },
+      { name: "n", value: `${n} = ${binary(n)}₂` },
       { name: "n.bit_length()", value: bitWidth },
-      { name: "1 << bit_length", value: `${limit} = ${limit.toString(2)}₂` },
     ],
     note: {
-      vi: `${n} viết ở hệ nhị phân là ${n.toString(2)}₂ và cần ${bitWidth} bit. Dịch bit 1 sang trái ${bitWidth} vị trí tạo ${limit} = ${limit.toString(2)}₂, tức lũy thừa 2 nhỏ nhất lớn hơn n. Đây sẽ là số lượng kết quả khác nhau.`,
-      en: `${n} needs ${bitWidth} binary bits. Shifting 1 left by ${bitWidth} produces ${limit}, the next power of two above n.`,
+      vi: `${n} viết ở hệ nhị phân là ${binary(n)}₂. Bỏ các số 0 ở đầu, biểu diễn này có ${bitWidth} chữ số, nên n.bit_length() = ${bitWidth}. Đây là số vị trí bit mà mọi phần tử từ 1 đến n có thể sử dụng.`,
+      en: `${n} is ${binary(n)} in binary and needs ${bitWidth} bit positions, so n.bit_length() = ${bitWidth}.`,
+    },
+  }));
+
+  steps.push(snapshot({
+    title: { vi: `Dịch trái: 1 << ${bitWidth} = ${limit}`, en: `Left shift: 1 << ${bitWidth} = ${limit}` },
+    codeLines: [6],
+    vars: [
+      { name: "1 (binary)", value: "1" },
+      { name: `1 << ${bitWidth}`, value: `${limit} = ${limit.toString(2)}₂` },
+      { name: "meaning", value: `2^${bitWidth} = ${limit}` },
+    ],
+    note: {
+      vi: `Toán tử << dịch bit 1 sang trái ${bitWidth} vị trí: 1₂ thành ${limit.toString(2)}₂, tức 2^${bitWidth} = ${limit}. Số này không phải giá trị XOR lớn nhất; nó là số lượng phần tử trong miền từ 0 đến ${limit - 1}.`,
+      en: `Shifting binary 1 left ${bitWidth} places gives ${limit}. This is the count of values from 0 through ${limit - 1}, not the largest XOR itself.`,
     },
   }));
 
@@ -1565,7 +1593,9 @@ function buildSteps3513(input) {
     highlight: sampleIndex >= 0 ? [sampleIndex] : [],
     vars: [
       { name: "x (ví dụ)", value: sampleValue },
-      { name: "x XOR x XOR x", value: `${sampleValue} XOR ${sampleValue} XOR ${sampleValue} = ${sampleValue}` },
+      { name: "decimal", value: `${sampleValue} XOR ${sampleValue} XOR ${sampleValue} = ${sampleValue}` },
+      { name: "binary", value: `${binary(sampleValue)} XOR ${binary(sampleValue)} XOR ${binary(sampleValue)} = ${binary(sampleValue)}` },
+      { name: "đã tạo được", value: `{1, 2, ..., ${n}}` },
     ],
     note: {
       vi: `Với bất kỳ x thuộc [1, ${n}], chọn cùng một chỉ số ba lần, tức i = j = k tại vị trí chứa x. Khi đó x XOR x XOR x = 0 XOR x = x. Ví dụ ${sampleValue} XOR ${sampleValue} XOR ${sampleValue} = ${sampleValue}. Vậy toàn bộ ${n} giá trị từ 1 đến n đều đạt được.`,
@@ -1579,8 +1609,9 @@ function buildSteps3513(input) {
     highlight: positionsOf([1, 2, 3]),
     vars: [
       { name: "triplet", value: "1 XOR 2 XOR 3" },
-      { name: "binary", value: `${(1).toString(2).padStart(bitWidth, "0")} XOR ${(2).toString(2).padStart(bitWidth, "0")} XOR ${(3).toString(2).padStart(bitWidth, "0")}` },
+      { name: "binary", value: `${binary(1)} XOR ${binary(2)} XOR ${binary(3)} = ${binary(0)}` },
       { name: "result", value: 0 },
+      { name: "đã tạo được", value: `{0, 1, 2, ..., ${n}}` },
     ],
     note: {
       vi: `nums chứa đủ 1, 2, 3 và 1 XOR 2 = 3, nên 1 XOR 2 XOR 3 = 3 XOR 3 = 0. Dù ba giá trị nằm ở thứ tự nào trong nums, ta sắp các vị trí của chúng thành i <= j <= k; kết quả XOR vẫn giữ nguyên.`,
@@ -1589,27 +1620,112 @@ function buildSteps3513(input) {
   }));
 
   if (n < maxResult) {
-    const target = n + 1;
-    const lowBits = target ^ highestBit;
-    let a;
-    let b;
-    if (lowBits === 1) [a, b] = [2, 3];
-    else if (lowBits === 2) [a, b] = [1, 3];
-    else [a, b] = [1, lowBits ^ 1];
-
     steps.push(snapshot({
-      title: { vi: `Tạo các giá trị còn thiếu ${n + 1}..${maxResult}`, en: `Build the remaining values ${n + 1}..${maxResult}` },
+      title: { vi: `Chọn H = ${highestBit}, bit cao nhất`, en: `Choose H = ${highestBit}, the highest bit` },
       codeLines: [6],
-      highlight: positionsOf([highestBit, a, b]),
+      highlight: positionsOf([highestBit]),
       vars: [
-        { name: "H", value: highestBit },
-        { name: "target (ví dụ)", value: target },
-        { name: "target XOR H", value: lowBits },
-        { name: "witness", value: `${highestBit} XOR ${a} XOR ${b} = ${target}` },
+        { name: "H", value: `${highestBit} = ${binary(highestBit)}₂` },
+        { name: "missing targets", value: `[${n + 1}, ${maxResult}]` },
       ],
       note: {
-        vi: `Đặt H = ${highestBit}, là bit cao nhất và H <= n. Với mỗi target trong [${n + 1}, ${maxResult}], phần thấp y = target XOR H nằm trong [1, H-1]. Ta luôn chọn được hai số phân biệt a,b < H sao cho a XOR b = y: dùng (2,3) nếu y=1, (1,3) nếu y=2, còn lại dùng (1, y XOR 1). Khi đó H XOR a XOR b = target. Ví dụ ${highestBit} XOR ${a} XOR ${b} = ${target}.`,
-        en: `Let H = ${highestBit}. For each missing target, y = target XOR H can be formed by two distinct values below H, so H XOR a XOR b reaches the target. Example: ${highestBit} XOR ${a} XOR ${b} = ${target}.`,
+        vi: `H = ${highestBit} = ${binary(highestBit)}₂ là lũy thừa 2 lớn nhất không vượt quá n, nên H chắc chắn có trong nums. H chỉ bật bit cao nhất. Mọi target còn thiếu từ ${n + 1} đến ${maxResult} cũng bật bit này; ta sẽ dùng H để tạo bit cao, rồi dùng hai số nhỏ hơn H để ghép các bit thấp.`,
+        en: `H = ${highestBit} is the largest power of two not exceeding n, so it is in nums. It supplies the highest bit for every missing target.`,
+      },
+    }));
+
+    steps.push(snapshot({
+      title: { vi: "Công thức dựng hai số cho phần bit thấp", en: "Construct two values for the low bits" },
+      codeLines: [6],
+      vars: [
+        { name: "y = 1", value: "2 XOR 3 = 1" },
+        { name: "y = 2", value: "1 XOR 3 = 2" },
+        { name: "y >= 3", value: "1 XOR (y XOR 1) = y" },
+      ],
+      note: {
+        vi: `Với target, bỏ bit cao bằng y = target XOR H. Cần tìm a,b sao cho a XOR b = y. Nếu y=1 dùng 2 và 3; nếu y=2 dùng 1 và 3; nếu y>=3 dùng a=1, b=y XOR 1. Cả a,b đều khác nhau, nhỏ hơn H và thuộc nums. Khi ghép lại: H XOR a XOR b = H XOR y = target.`,
+        en: `Remove the high bit with y = target XOR H. Build y as a XOR b using one of three cases, then H XOR a XOR b equals the target.`,
+      },
+    }));
+
+    const allMissingTargets = Array.from({ length: maxResult - n }, (_, index) => n + 1 + index);
+    const shownTargets = allMissingTargets.length <= 8
+      ? allMissingTargets
+      : [...new Set([...allMissingTargets.slice(0, 3), allMissingTargets.at(-1)])];
+
+    for (const target of shownTargets) {
+      const lowBits = target ^ highestBit;
+      let a;
+      let b;
+      let pairReason;
+      if (lowBits === 1) {
+        [a, b] = [2, 3];
+        pairReason = "y = 1 nên chọn 2 XOR 3 = 1";
+      } else if (lowBits === 2) {
+        [a, b] = [1, 3];
+        pairReason = "y = 2 nên chọn 1 XOR 3 = 2";
+      } else {
+        [a, b] = [1, lowBits ^ 1];
+        pairReason = `y >= 3 nên chọn 1 XOR (y XOR 1) = 1 XOR ${b} = ${lowBits}`;
+      }
+
+      steps.push(snapshot({
+        title: { vi: `Target ${target}: tách bit cao và bit thấp`, en: `Target ${target}: split high and low bits` },
+        codeLines: [6],
+        highlight: positionsOf([highestBit]),
+        vars: [
+          { name: "target", value: `${target} = ${binary(target)}₂` },
+          { name: "H", value: `${highestBit} = ${binary(highestBit)}₂` },
+          { name: "y = target XOR H", value: `${lowBits} = ${binary(lowBits)}₂` },
+        ],
+        note: {
+          vi: `Mục tiêu là ${target} = ${binary(target)}₂. XOR với H=${binary(highestBit)}₂ sẽ tắt đúng bit cao nhất và giữ các bit thấp: ${binary(target)} XOR ${binary(highestBit)} = ${binary(lowBits)}, nên y=${lowBits}. Bây giờ chỉ cần tạo y từ hai số nhỏ hơn H.`,
+          en: `XOR target ${binary(target)} with H ${binary(highestBit)} to remove the highest bit, leaving y = ${binary(lowBits)}.`,
+        },
+      }));
+
+      steps.push(snapshot({
+        title: { vi: `Target ${target}: chọn a=${a}, b=${b}`, en: `Target ${target}: choose a=${a}, b=${b}` },
+        codeLines: [6],
+        highlight: positionsOf([a, b]),
+        vars: [
+          { name: "y", value: `${lowBits} = ${binary(lowBits)}₂` },
+          { name: "a XOR b", value: `${a} XOR ${b} = ${lowBits}` },
+          { name: "binary", value: `${binary(a)} XOR ${binary(b)} = ${binary(lowBits)}` },
+        ],
+        note: {
+          vi: `${pairReason}. Kiểm tra theo bit: ${binary(a)} XOR ${binary(b)} = ${binary(lowBits)}. Hai số ${a} và ${b} đều thuộc đoạn 1..n, khác nhau và cũng khác H=${highestBit}, nên chúng tương ứng với ba chỉ số hợp lệ trong nums.`,
+          en: `Choose a=${a} and b=${b}. Their XOR is y=${lowBits}, and both are valid distinct values below H.`,
+        },
+      }));
+
+      steps.push(snapshot({
+        title: { vi: `Target ${target}: ghép H XOR a XOR b`, en: `Target ${target}: combine H XOR a XOR b` },
+        codeLines: [6],
+        highlight: positionsOf([highestBit, a, b]),
+        vars: [
+          { name: "decimal", value: `${highestBit} XOR ${a} XOR ${b} = ${target}` },
+          { name: "binary", value: `${binary(highestBit)} XOR ${binary(a)} XOR ${binary(b)} = ${binary(target)}` },
+          { name: "new reachable", value: target },
+        ],
+        note: {
+          vi: `Ghép ba số: ${highestBit} XOR ${a} XOR ${b} = ${highestBit} XOR (${a} XOR ${b}) = ${highestBit} XOR ${lowBits} = ${target}. Theo từng cột bit: ${binary(highestBit)} XOR ${binary(a)} XOR ${binary(b)} = ${binary(target)}. Vì XOR giao hoán, ta sắp vị trí của ba số thành i <= j <= k mà không đổi kết quả.`,
+          en: `Combine the three values: ${highestBit} XOR ${a} XOR ${b} = ${target}. Sorting their indices preserves the XOR result.`,
+        },
+      }));
+    }
+
+    steps.push(snapshot({
+      title: { vi: `Suy ra toàn bộ ${n + 1}..${maxResult} đều tạo được`, en: `Therefore every value ${n + 1}..${maxResult} is reachable` },
+      codeLines: [6],
+      vars: [
+        { name: "đã có", value: `{0, 1, ..., ${n}}` },
+        { name: "vừa chứng minh", value: `{${n + 1}, ..., ${maxResult}}` },
+        { name: "toàn bộ", value: `{0, 1, ..., ${maxResult}}` },
+      ],
+      note: {
+        vi: `Các ví dụ trên dùng đúng một công thức áp dụng cho mọi target trong [${n + 1}, ${maxResult}], không chỉ các target đang hiển thị. Kết hợp với 0 và đoạn 1..n đã tạo trước đó, tập kết quả không còn lỗ hổng: chính xác là {0, 1, ..., ${maxResult}}.`,
+        en: `The same construction works for every missing target. Together with 0 through n, the reachable set is exactly 0 through ${maxResult}.`,
       },
     }));
   } else {
@@ -1813,14 +1929,15 @@ module.exports = {
       vi: "Cho mảng nums dài n, là một hoán vị của các số trong đoạn [1, n]. Một XOR triplet có giá trị nums[i] XOR nums[j] XOR nums[k] với i <= j <= k. Trả về số lượng giá trị XOR triplet khác nhau.",
       en: "Given nums, a permutation of [1, n], return the number of distinct values nums[i] XOR nums[j] XOR nums[k] over all i <= j <= k.",
     },
-    defaultInput: [3, 1, 2],
+    defaultInput: [4, 1, 3, 2],
     inputKind: "positive",
     inputLabel: { vi: "nums (hoán vị của 1..n)", en: "nums (permutation of 1..n)" },
     extraParams: [],
     approach: [
       { vi: "Vì nums là hoán vị của 1..n và XOR có tính giao hoán, thứ tự phần tử không ảnh hưởng đáp án.", en: "Because nums is a permutation of 1..n and XOR is commutative, the order does not affect the answer." },
       { vi: "Nếu n <= 2, chỉ tạo được các giá trị đang có trong nums nên đáp án là n.", en: "If n <= 2, only the values already in nums are reachable, so the answer is n." },
-      { vi: "Nếu n >= 3, mọi giá trị từ 0 đến 2^bit_length(n)-1 đều tạo được; đáp án là 2^bit_length(n).", en: "If n >= 3, every value from 0 through 2^bit_length(n)-1 is reachable." },
+      { vi: "Nếu n >= 3: tạo 1..n bằng x XOR x XOR x, tạo 0 bằng 1 XOR 2 XOR 3, rồi dựng từng giá trị còn thiếu bằng H XOR a XOR b.", en: "If n >= 3, build 1..n with x XOR x XOR x, build 0 with 1 XOR 2 XOR 3, then construct every missing value as H XOR a XOR b." },
+      { vi: "Mọi kết quả dùng tối đa bit_length(n) bit, nên đáp án là 2^bit_length(n).", en: "Every result uses at most bit_length(n) bits, so the answer is 2^bit_length(n)." },
     ],
     complexity: {
       time: "O(1)",
