@@ -1581,22 +1581,47 @@ function buildSteps215(input, params) {
     },
   }));
 
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "Khởi tạo min-heap rỗng", en: "Initialize an empty min-heap" },
+    codeLines: [4],
+    vars: [{ name: "heap", value: "[]" }],
+    note: { vi: "heap sẽ giữ tối đa k số lớn nhất đã thấy.", en: "heap will hold at most the k largest numbers seen so far." },
+  }));
+
   for (const x of nums) {
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Xét ${x}`, en: `Consider ${x}` },
+      codeLines: [5],
+      vars: [{ name: "x", value: x }, { name: "heap", value: arrStr() }],
+      note: { vi: `Duyệt tới ${x}; heap CHƯA đổi, bước sau mới push.`, en: `Now visiting ${x}; the heap is unchanged, the next step pushes it.` },
+    }));
     heap.push(x);
     steps.push(heapSnapshot(heap, label, {
       title: { vi: `Push ${x}`, en: `Push ${x}` },
-      hlSet: new Set([heap.length - 1]), codeLines: [4, 5],
+      hlSet: new Set([heap.length - 1]), codeLines: [6],
       vars: [{ name: "heap", value: arrStr() }, { name: "size", value: heap.length }],
       note: { vi: `Thêm ${x} vào min-heap rồi sift-up.`, en: `Add ${x} to the min-heap then sift-up.` },
     }));
     siftUp(heap.length - 1);
-    if (heap.length > k) {
+
+    const overCapacity = heap.length > k;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `len(heap) > k? ${overCapacity} (${heap.length} vs ${k})`, en: `len(heap) > k? ${overCapacity} (${heap.length} vs ${k})` },
+      codeLines: [7],
+      vars: [{ name: "len(heap)", value: heap.length }, { name: "k", value: k }],
+      note: {
+        vi: overCapacity ? `Heap vượt quá ${k} phần tử → cần bỏ gốc.` : `Heap chưa vượt ${k} phần tử → chưa cần bỏ gì.`,
+        en: overCapacity ? `Heap exceeds ${k} elements → need to pop the root.` : `Heap hasn't exceeded ${k} elements yet → nothing to pop.`,
+      },
+    }));
+
+    if (overCapacity) {
       const removed = heap[0];
       const last = heap.pop();
       if (heap.length > 0) heap[0] = last;
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Heap > ${k} → bỏ nhỏ nhất ${removed}`, en: `Heap > ${k} → drop smallest ${removed}` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [6, 7],
+        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [8],
         vars: [{ name: "bỏ", value: removed }, { name: "heap", value: arrStr() }],
         note: { vi: `Gốc min-heap = ${removed} là nhỏ nhất → loại (không nằm trong top ${k}). Sift-down.`, en: `Min-heap root = ${removed} is smallest → drop (not in the top ${k}). Sift-down.` },
       }));
@@ -1607,7 +1632,7 @@ function buildSteps215(input, params) {
   const answer = heap[0];
   const fs = heapSnapshot(heap, label, {
     title: { vi: `Đáp án: lớn thứ ${k} = ${answer}`, en: `Answer: ${k}th largest = ${answer}` },
-    markSet: new Set([0]), codeLines: [8],
+    markSet: new Set([0]), codeLines: [9],
     vars: [{ name: "answer", value: answer }],
     note: { vi: `Gốc heap = ${answer} là phần tử lớn thứ ${k}.`, en: `The heap root = ${answer} is the ${k}th largest element.` },
   });
