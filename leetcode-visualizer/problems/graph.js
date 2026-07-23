@@ -2637,6 +2637,441 @@ function buildSteps787(input, params) {
     : buildSteps787BellmanFord(input, params);
 }
 
+function make1514FlowLayout(n, startNode, endNode) {
+  const middle = Array.from({ length: n }, (_, id) => id)
+    .filter((id) => id !== startNode && id !== endNode);
+  const positions = {
+    [startNode]: { x: 0, y: 0.78 },
+    [endNode]: { x: 1, y: 0.78 },
+  };
+  middle.forEach((id, index) => {
+    positions[id] = {
+      x: middle.length === 1 ? 0.5 : 0.18 + (0.64 * index) / (middle.length - 1),
+      y: 0.18 + 0.12 * (index % 2),
+    };
+  });
+  return {
+    layout: "flow",
+    positions,
+    width: Math.max(660, n * 105),
+    height: 440,
+    dimUnfocused: true,
+    caption: {
+      vi: "Cạnh vô hướng • số dưới node = xác suất tốt nhất hiện tại",
+      en: "Undirected edges • value below node = current best probability",
+    },
+  };
+}
+
+/**
+ * LeetCode 1514: Path with Maximum Probability.
+ * Dijkstra with a max-heap, where path weights are multiplied.
+ */
+function buildSteps1514(input, params) {
+  const n = Number(params.n);
+  const startNode = Number(params.start_node);
+  const endNode = Number(params.end_node);
+  const rawEdges = String(input).split(",").map((item) => item.trim()).filter(Boolean);
+  const parsed = rawEdges.map((item) => item.split("-").map(Number));
+  const valid = Number.isInteger(n) && n >= 2
+    && Number.isInteger(startNode) && startNode >= 0 && startNode < n
+    && Number.isInteger(endNode) && endNode >= 0 && endNode < n
+    && parsed.length > 0
+    && parsed.every(([a, b, probability]) => (
+      Number.isInteger(a) && a >= 0 && a < n
+      && Number.isInteger(b) && b >= 0 && b < n && a !== b
+      && Number.isFinite(probability) && probability >= 0 && probability <= 1
+    ));
+  const steps = [];
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Nhập cạnh theo dạng a-b-probability, ngăn cách bằng dấu phẩy. Node phải nằm trong 0..n-1 và probability trong [0, 1].",
+        en: "Enter edges as a-b-probability separated by commas. Nodes must be in 0..n-1 and probability in [0, 1].",
+      },
+    });
+    return { n, edges: parsed, startNode, endNode, answer: 0, steps };
+  }
+
+  const nodes = Array.from({ length: n }, (_, id) => id);
+  const edges = parsed.map(([u, v, w]) => ({ u, v, w, undirected: true }));
+  const graph = Array.from({ length: n }, () => []);
+  const best = new Array(n).fill(0);
+  const parent = new Array(n).fill(-1);
+  const finalized = new Set();
+  const layout = make1514FlowLayout(n, startNode, endNode);
+  const formatProb = (value) => {
+    if (value === 0 || value === 1) return String(value);
+    return String(Number(value.toFixed(5)));
+  };
+  const bestStr = () => `[${best.map(formatProb).join(", ")}]`;
+  const heapStr = (heap) => `[${heap.map(([probability, node]) => `(-${formatProb(probability)}, ${node})`).join(", ")}]`;
+
+  function makeGraph(hlNodes = [], hlEdges = [], annotations = {}) {
+    return {
+      nodes: nodes.map((id) => ({ id, label: String(id), dist: formatProb(best[id]) })),
+      edges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...finalized],
+      annotations: { [startNode]: "start", [endNode]: "end", ...annotations },
+      ...layout,
+    };
+  }
+
+  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, annotations),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Tạo adjacency list vô hướng", en: "Create the undirected adjacency list" },
+    codeLine: 7,
+    vars: [{ name: "graph", value: "defaultdict(list)" }],
+    note: {
+      vi: "Mỗi cạnh [a, b] dùng được theo cả hai chiều, nên graph sẽ lưu b trong graph[a] và a trong graph[b].",
+      en: "Each [a, b] edge works in both directions, so graph stores b under a and a under b.",
+    },
+  });
+
+  for (const [a, b, probability] of parsed) {
+    pushStep({
+      title: { vi: `Đọc cạnh ${a} — ${b}`, en: `Read edge ${a} — ${b}` },
+      codeLine: 8,
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      vars: [
+        { name: "a, b", value: `${a}, ${b}` },
+        { name: "probability", value: formatProb(probability) },
+      ],
+      note: {
+        vi: `Cạnh vô hướng nối ${a} và ${b}, xác suất đi qua thành công là ${formatProb(probability)}.`,
+        en: `The undirected edge connects ${a} and ${b} with success probability ${formatProb(probability)}.`,
+      },
+    });
+
+    graph[a].push([b, probability]);
+    pushStep({
+      title: { vi: `Thêm ${a} → ${b}`, en: `Add ${a} → ${b}` },
+      codeLine: 9,
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      vars: [{ name: `graph[${a}]`, value: `[${graph[a].map(([v, p]) => `(${v}, ${formatProb(p)})`).join(", ")}]` }],
+      note: {
+        vi: `Thêm (${b}, ${formatProb(probability)}) vào graph[${a}] cho chiều ${a} → ${b}.`,
+        en: `Append (${b}, ${formatProb(probability)}) to graph[${a}] for direction ${a} → ${b}.`,
+      },
+    });
+
+    graph[b].push([a, probability]);
+    pushStep({
+      title: { vi: `Thêm ${b} → ${a}`, en: `Add ${b} → ${a}` },
+      codeLine: 10,
+      hlNodes: [a, b],
+      hlEdges: [[b, a]],
+      vars: [{ name: `graph[${b}]`, value: `[${graph[b].map(([v, p]) => `(${v}, ${formatProb(p)})`).join(", ")}]` }],
+      note: {
+        vi: `Vì cạnh vô hướng, thêm chiều ngược (${a}, ${formatProb(probability)}) vào graph[${b}].`,
+        en: `Because the edge is undirected, append reverse direction (${a}, ${formatProb(probability)}) to graph[${b}].`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo best bằng 0", en: "Initialize best to 0" },
+    codeLine: 12,
+    vars: [{ name: "best", value: bestStr() }],
+    note: {
+      vi: "best[x] là xác suất lớn nhất đã biết để tới x. Giá trị 0 nghĩa là chưa tìm thấy đường nào.",
+      en: "best[x] is the largest known probability of reaching x. Zero means no route has been found yet.",
+    },
+  });
+
+  best[startNode] = 1;
+  pushStep({
+    title: { vi: `best[${startNode}] = 1`, en: `best[${startNode}] = 1` },
+    codeLine: 13,
+    hlNodes: [startNode],
+    vars: [{ name: "best", value: bestStr() }],
+    note: {
+      vi: `Bắt đầu tại node ${startNode}; chưa đi qua cạnh nào nên xác suất vẫn là 1 (100%).`,
+      en: `Start at node ${startNode}; no edge has been traversed, so probability is 1 (100%).`,
+    },
+  });
+
+  const heap = [[1, startNode]];
+  pushStep({
+    title: { vi: "Đưa start vào max-heap", en: "Push start into the max-heap" },
+    codeLine: 14,
+    hlNodes: [startNode],
+    vars: [{ name: "heap", value: heapStr(heap) }],
+    note: {
+      vi: "Python chỉ có min-heap, nên lưu xác suất âm. Giá trị -1 nhỏ nhất tương ứng xác suất thật 1 lớn nhất.",
+      en: "Python has a min-heap, so probabilities are negated. The smallest value -1 represents the largest real probability 1.",
+    },
+  });
+
+  let answer = 0;
+  while (heap.length) {
+    heap.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 16,
+      vars: [{ name: "heap", value: heapStr(heap) }],
+      note: {
+        vi: "Tiếp tục Dijkstra; trạng thái có xác suất thật lớn nhất sẽ được pop trước.",
+        en: "Continue Dijkstra; the state with the largest real probability is popped first.",
+      },
+    });
+
+    const [probability, u] = heap.shift();
+    pushStep({
+      title: { vi: `heappop → (-${formatProb(probability)}, ${u})`, en: `heappop → (-${formatProb(probability)}, ${u})` },
+      codeLine: 17,
+      hlNodes: [u],
+      vars: [
+        { name: "neg_prob", value: `-${formatProb(probability)}` },
+        { name: "u", value: u },
+        { name: "heap còn lại", value: heapStr(heap) },
+      ],
+      note: {
+        vi: `Pop node ${u} với neg_prob = -${formatProb(probability)} từ heap.`,
+        en: `Pop node ${u} with neg_prob = -${formatProb(probability)} from the heap.`,
+      },
+    });
+
+    pushStep({
+      title: { vi: `prob = ${formatProb(probability)}`, en: `prob = ${formatProb(probability)}` },
+      codeLine: 18,
+      hlNodes: [u],
+      vars: [
+        { name: "neg_prob", value: `-${formatProb(probability)}` },
+        { name: "prob", value: formatProb(probability) },
+      ],
+      note: {
+        vi: `Đổi dấu lại để lấy xác suất thật: -(-${formatProb(probability)}) = ${formatProb(probability)}.`,
+        en: `Negate again to recover the real probability: -(-${formatProb(probability)}) = ${formatProb(probability)}.`,
+      },
+    });
+
+    const stale = probability < best[u];
+    pushStep({
+      title: stale
+        ? { vi: `${formatProb(probability)} < best[${u}]=${formatProb(best[u])}: bản ghi cũ`, en: `${formatProb(probability)} < best[${u}]=${formatProb(best[u])}: stale entry` }
+        : { vi: `${formatProb(probability)} < best[${u}]? False`, en: `${formatProb(probability)} < best[${u}]? False` },
+      codeLine: 19,
+      hlNodes: [u],
+      vars: [
+        { name: "prob", value: formatProb(probability) },
+        { name: `best[${u}]`, value: formatProb(best[u]) },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: `Đã có đường xác suất ${formatProb(best[u])} tốt hơn tới ${u}; bản ghi ${formatProb(probability)} đã cũ.`,
+            en: `A better probability ${formatProb(best[u])} to ${u} already exists; ${formatProb(probability)} is stale.`,
+          }
+        : {
+            vi: `Xác suất ${formatProb(probability)} vẫn khớp best[${u}], nên trạng thái này còn hợp lệ.`,
+            en: `Probability ${formatProb(probability)} still matches best[${u}], so this state is valid.`,
+          },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua bản ghi cũ", en: "Skip the stale entry" },
+        codeLine: 20,
+        hlNodes: [u],
+        vars: [{ name: "continue", value: true }],
+        note: {
+          vi: "Không mở rộng hàng xóm từ xác suất kém hơn; quay lại đầu vòng while.",
+          en: "Do not expand neighbors from a worse probability; return to the while loop.",
+        },
+      });
+      continue;
+    }
+
+    const reachedEnd = u === endNode;
+    pushStep({
+      title: reachedEnd
+        ? { vi: `u == end_node (${endNode}): True`, en: `u == end_node (${endNode}): True` }
+        : { vi: `${u} chưa phải end_node ${endNode}`, en: `${u} is not end_node ${endNode}` },
+      codeLine: 21,
+      hlNodes: [u, endNode],
+      vars: [
+        { name: "u", value: u },
+        { name: "end_node", value: endNode },
+        { name: "condition", value: reachedEnd },
+      ],
+      note: reachedEnd
+        ? {
+            vi: "Đã pop được đích từ max-heap. Vì heap luôn ưu tiên xác suất lớn nhất, đây là đáp án tối ưu.",
+            en: "The destination was popped from the max-heap. Since the heap prioritizes maximum probability, this is optimal.",
+          }
+        : {
+            vi: `Node ${u} chưa phải đích; tiếp tục relax các cạnh kề.`,
+            en: `Node ${u} is not the destination; continue relaxing adjacent edges.`,
+          },
+    });
+
+    if (reachedEnd) {
+      answer = probability;
+      const pathNodes = [endNode];
+      const pathEdges = [];
+      let current = endNode;
+      while (current !== startNode && parent[current] !== -1) {
+        pathEdges.unshift([parent[current], current]);
+        current = parent[current];
+        pathNodes.unshift(current);
+      }
+      const pathText = pathNodes.join(" → ");
+      pushStep({
+        title: { vi: `Đường tốt nhất: ${pathText}`, en: `Best path: ${pathText}` },
+        codeLine: 22,
+        hlNodes: pathNodes,
+        hlEdges: pathEdges,
+        final: true,
+        vars: [
+          { name: "path", value: pathText },
+          { name: "probability", value: formatProb(answer) },
+        ],
+        note: {
+          vi: `Đường ${pathText} có xác suất ${formatProb(answer)}. Các cạnh không thuộc đường tối ưu được làm mờ.`,
+          en: `Path ${pathText} has probability ${formatProb(answer)}. Edges outside the optimal path are dimmed.`,
+        },
+      });
+      break;
+    }
+
+    finalized.add(u);
+    for (const [v, edgeProb] of graph[u]) {
+      pushStep({
+        title: { vi: `Xét cạnh ${u} — ${v}`, en: `Inspect edge ${u} — ${v}` },
+        codeLine: 24,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "v", value: v },
+          { name: "edge_prob", value: formatProb(edgeProb) },
+        ],
+        note: {
+          vi: `Thử đi từ ${u} sang ${v} qua cạnh có xác suất ${formatProb(edgeProb)}.`,
+          en: `Try moving from ${u} to ${v} across an edge with probability ${formatProb(edgeProb)}.`,
+        },
+      });
+
+      const newProb = probability * edgeProb;
+      pushStep({
+        title: { vi: `new_prob = ${formatProb(probability)} × ${formatProb(edgeProb)}`, en: `new_prob = ${formatProb(probability)} × ${formatProb(edgeProb)}` },
+        codeLine: 25,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "prob", value: formatProb(probability) },
+          { name: "edge_prob", value: formatProb(edgeProb) },
+          { name: "new_prob", value: formatProb(newProb) },
+        ],
+        note: {
+          vi: `Xác suất cả đường = xác suất tới ${u} × xác suất cạnh = ${formatProb(probability)} × ${formatProb(edgeProb)} = ${formatProb(newProb)}.`,
+          en: `Whole-path probability = probability to ${u} × edge probability = ${formatProb(probability)} × ${formatProb(edgeProb)} = ${formatProb(newProb)}.`,
+        },
+      });
+
+      const improves = newProb > best[v];
+      pushStep({
+        title: improves
+          ? { vi: `${formatProb(newProb)} > best[${v}]=${formatProb(best[v])}`, en: `${formatProb(newProb)} > best[${v}]=${formatProb(best[v])}` }
+          : { vi: `${formatProb(newProb)} > best[${v}]? False`, en: `${formatProb(newProb)} > best[${v}]? False` },
+        codeLine: 26,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "new_prob", value: formatProb(newProb) },
+          { name: `best[${v}]`, value: formatProb(best[v]) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? {
+              vi: `${formatProb(newProb)} lớn hơn xác suất đang lưu, nên tìm được đường tốt hơn tới ${v}.`,
+              en: `${formatProb(newProb)} is larger than the stored probability, so a better route to ${v} was found.`,
+            }
+          : {
+              vi: `${formatProb(newProb)} không lớn hơn ${formatProb(best[v])}; đường này không cải thiện best[${v}].`,
+              en: `${formatProb(newProb)} is not larger than ${formatProb(best[v])}; this route does not improve best[${v}].`,
+            },
+      });
+
+      if (!improves) continue;
+
+      best[v] = newProb;
+      parent[v] = u;
+      pushStep({
+        title: { vi: `best[${v}] = ${formatProb(newProb)}`, en: `best[${v}] = ${formatProb(newProb)}` },
+        codeLine: 27,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [{ name: "best", value: bestStr() }],
+        note: {
+          vi: `Cập nhật xác suất tốt nhất tới node ${v} thành ${formatProb(newProb)}.`,
+          en: `Update the best probability to node ${v} to ${formatProb(newProb)}.`,
+        },
+      });
+
+      heap.push([newProb, v]);
+      heap.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+      pushStep({
+        title: { vi: `heappush((-${formatProb(newProb)}, ${v}))`, en: `heappush((-${formatProb(newProb)}, ${v}))` },
+        codeLine: 28,
+        hlNodes: [v],
+        vars: [
+          { name: "pushed", value: `(-${formatProb(newProb)}, ${v})` },
+          { name: "heap", value: heapStr(heap) },
+        ],
+        note: {
+          vi: `Push xác suất âm -${formatProb(newProb)} để min-heap hoạt động như max-heap.`,
+          en: `Push negative probability -${formatProb(newProb)} so the min-heap behaves as a max-heap.`,
+        },
+      });
+    }
+  }
+
+  if (!steps.at(-1).final) {
+    pushStep({
+      title: { vi: "Heap rỗng: không thể tới đích", en: "Heap empty: destination unreachable" },
+      codeLine: 29,
+      hlNodes: [endNode],
+      final: true,
+      vars: [
+        { name: "heap", value: "[]" },
+        { name: "answer", value: 0 },
+      ],
+      note: {
+        vi: `Không có đường từ ${startNode} tới ${endNode}, nên trả 0.0.`,
+        en: `There is no path from ${startNode} to ${endNode}, so return 0.0.`,
+      },
+    });
+  }
+
+  return { n, edges: parsed, startNode, endNode, answer, steps };
+}
+
 /**
  * Generate steps for LeetCode 851: Loud and Rich.
  * DFS on reversed richer graph: for each node, find the quietest person among all richer people.
@@ -7113,7 +7548,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -8411,6 +8846,73 @@ module.exports = {
     codeLabel: { vi: "Cách 1: Bellman-Ford giới hạn", en: "Approach 1: Bounded Bellman-Ford" },
     code2Label: { vi: "Cách 2: Dijkstra + trạng thái", en: "Approach 2: State Dijkstra" },
     builder: buildSteps787,
+  },
+  1514: {
+    id: 1514,
+    difficulty: "medium",
+    slug: "path-with-maximum-probability",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Path with Maximum Probability", en: "Path with Maximum Probability" },
+    titleVi: { vi: "Đường đi có xác suất lớn nhất", en: "Path with maximum probability" },
+    statement: {
+      vi: "Cho đồ thị vô hướng gồm n node 0..n-1. Mỗi cạnh [a,b] có xác suất đi qua thành công succProb tương ứng. Tìm đường từ start_node tới end_node có tích xác suất lớn nhất; không có đường thì trả 0. Nhập mỗi cạnh dạng 'a-b-probability', ngăn cách bằng dấu phẩy.",
+      en: "Given an undirected graph with nodes 0..n-1, each edge [a,b] has a corresponding success probability. Find the path from start_node to end_node with the maximum product of probabilities; return 0 if unreachable. Enter each edge as 'a-b-probability', separated by commas.",
+    },
+    defaultInput: "0-1-0.5,1-2-0.5,0-2-0.2",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (a-b-probability, cách bởi dấu phẩy)", en: "Edges (a-b-probability, comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 3 },
+      { key: "start_node", label: { vi: "start_node", en: "start_node" }, default: 0 },
+      { key: "end_node", label: { vi: "end_node", en: "end_node" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Đồ thị vô hướng: với mỗi cạnh [a,b], thêm cả a → b và b → a vào adjacency list.", en: "The graph is undirected: for every [a,b], add both a → b and b → a to the adjacency list." },
+      { vi: "best[x] là xác suất lớn nhất đã biết để tới x. Khởi tạo best[start_node] = 1.", en: "best[x] is the largest known probability of reaching x. Initialize best[start_node] = 1." },
+      { vi: "Dùng max-heap để luôn xử lý đường có xác suất lớn nhất trước. Python mô phỏng max-heap bằng cách lưu xác suất âm.", en: "Use a max-heap to process the highest-probability path first. Python simulates it by storing negative probabilities." },
+      { vi: "Relax cạnh bằng phép nhân: new_prob = prob × edge_prob. Cập nhật khi new_prob > best[v].", en: "Relax an edge by multiplication: new_prob = prob × edge_prob. Update when new_prob > best[v]." },
+      { vi: "Khi end_node được pop khỏi heap, có thể trả ngay vì không còn trạng thái nào có xác suất lớn hơn.", en: "When end_node is popped from the heap, return immediately because no remaining state has a larger probability." },
+    ],
+    complexity: {
+      time: "O((V + E) log V)",
+      space: "O(V + E)",
+      note: {
+        vi: "Mỗi lần cải thiện xác suất sẽ push một heap entry; stale entry được bỏ qua khi pop. Adjacency list của đồ thị vô hướng chứa 2E hướng.",
+        en: "Each probability improvement pushes a heap entry; stale entries are skipped when popped. The undirected adjacency list stores 2E directions.",
+      },
+    },
+    code: [
+      "import heapq",
+      "from collections import defaultdict",
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def maxProbability(self, n: int, edges: List[List[int]], succProb: List[float], start_node: int, end_node: int) -> float:",
+      "        graph = defaultdict(list)",
+      "        for (a, b), probability in zip(edges, succProb):",
+      "            graph[a].append((b, probability))",
+      "            graph[b].append((a, probability))",
+      "",
+      "        best = [0.0] * n",
+      "        best[start_node] = 1.0",
+      "        heap = [(-1.0, start_node)]",
+      "",
+      "        while heap:",
+      "            neg_prob, u = heapq.heappop(heap)",
+      "            prob = -neg_prob",
+      "            if prob < best[u]:",
+      "                continue",
+      "            if u == end_node:",
+      "                return prob",
+      "",
+      "            for v, edge_prob in graph[u]:",
+      "                new_prob = prob * edge_prob",
+      "                if new_prob > best[v]:",
+      "                    best[v] = new_prob",
+      "                    heapq.heappush(heap, (-new_prob, v))",
+      "        return 0.0",
+    ],
+    builder: buildSteps1514,
   },
   3977: {
     id: 3977,

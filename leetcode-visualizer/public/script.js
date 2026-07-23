@@ -1732,13 +1732,16 @@ function renderGraph(step) {
     const y2 = to.y - uy * (r + 6);
 
     const edgeKey = `${edge.u}-${edge.v}`;
+    const reverseEdgeKey = `${edge.v}-${edge.u}`;
     const typedEdgeKey = `${edgeKey}${edge.kind ? `-${edge.kind}` : ""}`;
-    const isHl = hlEdgeSet.has(edgeKey) || hlEdgeSet.has(typedEdgeKey);
+    const isHl = hlEdgeSet.has(edgeKey)
+      || hlEdgeSet.has(typedEdgeKey)
+      || (edge.undirected && hlEdgeSet.has(reverseEdgeKey));
     const kindClass = edge.kind ? ` ${edge.kind}` : "";
     const isDimmed = step.graph.dimUnfocused && hlEdgeSet.size > 0 && !isHl;
     const cls = `graph-edge${kindClass}${isHl ? " hl" : ""}${isDimmed ? " dim" : ""}`;
     const markerId = isHl ? arrowHlId : edge.kind === "prev" ? arrowPrevId : arrowId;
-    const markerEnd = `url(#${markerId})`;
+    const markerEnd = edge.undirected ? "" : `url(#${markerId})`;
     const isPointerLane = isLinear && (edge.kind === "next" || edge.kind === "prev") && Math.abs(dy) < 1;
 
     let mx = (x1 + x2) / 2;
