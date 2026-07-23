@@ -1343,6 +1343,14 @@ function buildSteps692(input, params) {
   });
   fs.final = true; steps.push(fs);
 
+  // Keep "freq" visible in every step's debug panel, not just the counting step.
+  steps.forEach((step) => {
+    if (!step.vars) step.vars = [];
+    if (!step.vars.some((v) => v.name === "freq")) {
+      step.vars.unshift({ name: "freq", value: freqStr });
+    }
+  });
+
   return { input, answer: `[${result.join(", ")}]`, steps };
 }
 
