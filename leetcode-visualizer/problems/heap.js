@@ -1299,11 +1299,18 @@ function buildSteps692(input, params) {
   const arrStr = () => `[${heap.map((e) => `${e.w}:${e.f}`).join(", ")}]`;
   const { siftUp, siftDown } = makeSifters(steps, heap, label, less, arrStr);
 
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "Khởi tạo min-heap rỗng", en: "Initialize an empty min-heap" },
+    codeLines: [5, 6],
+    vars: [{ name: "heap", value: "[]" }],
+    note: { vi: "heap bắt đầu rỗng, kích thước sẽ được giữ ≤ k khi duyệt từng từ.", en: "heap starts empty; its size will be kept ≤ k while scanning each word." },
+  }));
+
   for (const [w, f] of freq.entries()) {
     heap.push({ w, f });
     steps.push(heapSnapshot(heap, label, {
       title: { vi: `Push "${w}" (f=${f})`, en: `Push "${w}" (f=${f})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [5, 6],
+      hlSet: new Set([heap.length - 1]), codeLines: [7, 8],
       vars: [{ name: "heap", value: arrStr() }, { name: "size", value: heap.length }],
       note: { vi: `Thêm "${w}" (freq ${f}) vào cuối heap rồi sift-up.`, en: `Add "${w}" (freq ${f}) at the end then sift-up.` },
     }));
@@ -1314,7 +1321,7 @@ function buildSteps692(input, params) {
       if (heap.length > 0) heap[0] = last;
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Heap > ${k} → bỏ "${removed.w}" (f${removed.f})`, en: `Heap > ${k} → drop "${removed.w}" (f${removed.f})` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [7, 8],
+        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [9],
         vars: [{ name: "bỏ", value: `"${removed.w}" (f${removed.f})` }, { name: "heap", value: arrStr() }],
         note: { vi: `Gốc = từ "tệ nhất" (freq nhỏ nhất, hoặc cùng freq nhưng chữ lớn hơn) → loại bỏ. Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Root = "worst" word (lowest freq, or same freq but larger spelling) → remove. Move last to root then sift-down.` },
       }));
@@ -1330,7 +1337,7 @@ function buildSteps692(input, params) {
   const markAll = new Set(heap.map((_, i) => i));
   const fs = heapSnapshot(heap, label, {
     title: { vi: `Kết quả: [${result.map((w) => `"${w}"`).join(", ")}]`, en: `Result: [${result.map((w) => `"${w}"`).join(", ")}]` },
-    markSet: markAll, codeLines: [9],
+    markSet: markAll, codeLines: [10],
     vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
     note: { vi: `Heap còn ${k} từ tốt nhất. Sắp theo freq giảm dần, rồi chữ cái tăng dần → [${result.join(", ")}].`, en: `The heap keeps the ${k} best words. Sort by freq desc, then word asc → [${result.join(", ")}].` },
   });
@@ -1370,14 +1377,27 @@ function buildSteps973(input, params) {
     },
   }));
 
+  steps.push(heapSnapshot([], label, {
+    title: { vi: "Khởi tạo max-heap rỗng", en: "Initialize an empty max-heap" },
+    codeLines: [3, 4],
+    vars: [{ name: "heap", value: "[]" }],
+    note: { vi: "heap bắt đầu rỗng, kích thước sẽ được giữ ≤ k khi duyệt từng điểm.", en: "heap starts empty; its size will be kept ≤ k while scanning each point." },
+  }));
+
   for (const [x, y] of pts) {
     const d = x * x + y * y;
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `d = ${x}² + ${y}² = ${d}`, en: `d = ${x}² + ${y}² = ${d}` },
+      codeLines: [6],
+      vars: [{ name: "x, y", value: `${x}, ${y}` }, { name: "d", value: d }],
+      note: { vi: `Tính khoảng cách bình phương tới gốc cho điểm (${x},${y}).`, en: `Compute the squared distance to the origin for point (${x},${y}).` },
+    }));
     heap.push({ x, y, d });
     steps.push(heapSnapshot(heap, label, {
       title: { vi: `Push (${x},${y}) d=${d}`, en: `Push (${x},${y}) d=${d}` },
-      hlSet: new Set([heap.length - 1]), codeLines: [4, 5],
+      hlSet: new Set([heap.length - 1]), codeLines: [7],
       vars: [{ name: "heap", value: arrStr() }, { name: "size", value: heap.length }],
-      note: { vi: `d = ${x}² + ${y}² = ${d}. Thêm vào max-heap rồi sift-up.`, en: `d = ${x}² + ${y}² = ${d}. Add to the max-heap then sift-up.` },
+      note: { vi: `Thêm vào max-heap rồi sift-up.`, en: `Add to the max-heap then sift-up.` },
     }));
     siftUp(heap.length - 1);
     if (heap.length > k) {
@@ -1386,7 +1406,7 @@ function buildSteps973(input, params) {
       if (heap.length > 0) heap[0] = last;
       steps.push(heapSnapshot(heap, label, {
         title: { vi: `Heap > ${k} → bỏ điểm xa nhất (${removed.x},${removed.y}) d${removed.d}`, en: `Heap > ${k} → drop farthest (${removed.x},${removed.y}) d${removed.d}` },
-        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [6, 7],
+        hlSet: heap.length > 0 ? new Set([0]) : new Set(), codeLines: [8],
         vars: [{ name: "bỏ", value: `(${removed.x},${removed.y}) d${removed.d}` }, { name: "heap", value: arrStr() }],
         note: { vi: `Gốc max-heap = điểm xa nhất (d=${removed.d}) → loại. Đưa phần tử cuối lên gốc rồi sift-down.`, en: `Max-heap root = farthest point (d=${removed.d}) → remove. Move last to root then sift-down.` },
       }));
@@ -1398,7 +1418,7 @@ function buildSteps973(input, params) {
   const resStr = result.map((p) => `[${p.join(",")}]`).join(", ");
   const fs = heapSnapshot(heap, label, {
     title: { vi: `Kết quả: [${resStr}]`, en: `Result: [${resStr}]` },
-    markSet: new Set(heap.map((_, i) => i)), codeLines: [8],
+    markSet: new Set(heap.map((_, i) => i)), codeLines: [9],
     vars: [{ name: "answer", value: `[${resStr}]` }],
     note: { vi: `Heap giữ lại đúng ${k} điểm gần gốc nhất.`, en: `The heap keeps exactly the ${k} closest points.` },
   });
