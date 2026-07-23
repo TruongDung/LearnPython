@@ -1,6 +1,6 @@
 /**
  * Graph / BFS builder functions for LeetCode Visualizer.
- * Problems: 1293, 1368, 1377, 126, 815
+ * Problems: 1293, 1368, 2290, 2577, 1377, 126, 815
  */
 
 // ─── 1293: Shortest Path in Grid with Obstacles Elimination ───
@@ -1036,6 +1036,416 @@ function buildSteps2290(input) {
   return { original: grid, answer, steps };
 }
 
+// ─── 2577: Minimum Time to Visit a Cell In a Grid (Dijkstra + parity) ───
+function buildSteps2577(input) {
+  const grid = String(input)
+    .split(/[|;]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+  const valid = rows >= 2 && cols >= 2 && rows <= 20 && cols <= 20
+    && grid.every((row) => row.length === cols
+      && row.every((value) => Number.isInteger(value) && value >= 0))
+    && grid[0][0] === 0;
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, variant: "effort-grid", cells: [[{ label: "!", meta: "invalid", cls: "current" }]] },
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải là ma trận chữ nhật ít nhất 2×2, chứa số nguyên không âm, grid[0][0] = 0; hàng cách bởi '|' hoặc ';'. Visualization hỗ trợ tối đa 20×20.",
+        en: "The grid must be a rectangular matrix of at least 2×2 non-negative integers with grid[0][0] = 0; separate rows with '|' or ';'. The visualization supports at most 20×20.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const heap = [];
+  const finalized = new Set();
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (r, c) => `${r},${c}`;
+  const formatTime = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const distStr = () => `[${dist.map((row) => `[${row.map(formatTime).join(", ")}]`).join(", ")}]`;
+  const heapStr = () => `[${heap.map(([time, r, c]) => `(${time}, ${r}, ${c})`).join(", ")}]`;
+
+  function makeCells(current = null, pathCells = new Set()) {
+    const queued = new Set(heap.map(([, r, c]) => key(r, c)));
+    return grid.map((row, r) => row.map((unlockTime, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      if (finalized.has(cellKey)) cls = "visited";
+      if (queued.has(cellKey)) cls = "queued";
+      if (pathCells.has(cellKey)) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      const endpoint = r === 0 && c === 0
+        ? " · S"
+        : r === rows - 1 && c === cols - 1
+          ? " · T"
+          : "";
+      return { label: String(unlockTime), meta: `t:${formatTime(dist[r][c])}${endpoint}`, cls };
+    }));
+  }
+
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
+    codeLine: 6,
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: `Số trong ô là thời điểm sớm nhất ô đó mở. meta t:… bên dưới là thời gian Dijkstra tìm được để tới ô; đi từ (0,0) tới (${rows - 1},${cols - 1}).`,
+      en: `A cell's number is its unlock time. The t:… metadata below it is Dijkstra's earliest known arrival; travel from (0,0) to (${rows - 1},${cols - 1}).`,
+    },
+  });
+
+  const blockedAtStart = grid[0][1] > 1 && grid[1][0] > 1;
+  pushStep({
+    title: blockedAtStart
+      ? { vi: `${grid[0][1]} > 1 và ${grid[1][0]} > 1: bị kẹt`, en: `${grid[0][1]} > 1 and ${grid[1][0]} > 1: trapped` }
+      : { vi: "Có ít nhất một ô đi được tại t=1", en: "At least one cell is available at t=1" },
+    codeLine: 7,
+    current: [0, 0],
+    vars: [
+      { name: "grid[0][1]", value: grid[0][1] },
+      { name: "grid[1][0]", value: grid[1][0] },
+      { name: "both > 1", value: blockedAtStart },
+    ],
+    note: blockedAtStart
+      ? {
+          vi: "Ở t=0 đang tại start và t=1 bắt buộc phải rời đi. Cả hai hàng xóm đều chưa mở, trong khi không được đứng yên, nên không thể bắt đầu.",
+          en: "At t=0 we are at the start and must leave at t=1. Both neighbors are still locked and waiting in place is forbidden, so movement cannot begin.",
+        }
+      : {
+          vi: "Ít nhất một hàng xóm mở không muộn hơn t=1, nên có thể rời start và về sau dùng việc đi qua lại để chờ.",
+          en: "At least one neighbor unlocks by t=1, so we can leave the start and later wait by moving back and forth.",
+        },
+  });
+
+  if (blockedAtStart) {
+    pushStep({
+      title: { vi: "Không thể rời ô bắt đầu", en: "Cannot leave the start" },
+      codeLine: 8,
+      current: [0, 0],
+      final: true,
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Trả -1 ngay. Đây là trường hợp đặc biệt cần kiểm tra trước Dijkstra vì chưa có cạnh nào để đi qua lại trong lúc chờ.",
+        en: "Return -1 immediately. This special case precedes Dijkstra because no edge is available for back-and-forth waiting.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo dist bằng ∞", en: "Initialize dist to ∞" },
+    codeLine: 10,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "dist[r][c] là thời điểm sớm nhất đã biết có thể bước vào (r,c). ∞ nghĩa là chưa tìm thấy đường.",
+      en: "dist[r][c] is the earliest known time at which (r,c) can be entered. ∞ means no route is known.",
+    },
+  });
+
+  dist[0][0] = 0;
+  pushStep({
+    title: { vi: "Start có thời gian 0", en: "The start time is 0" },
+    codeLine: 11,
+    current: [0, 0],
+    vars: [{ name: "dist[0][0]", value: 0 }],
+    note: { vi: "Ta bắt đầu tại (0,0) đúng thời điểm t=0.", en: "We begin at (0,0) exactly at t=0." },
+  });
+
+  heap.push([0, 0, 0]);
+  pushStep({
+    title: { vi: "Đưa start vào min-heap", en: "Push the start into the min-heap" },
+    codeLine: 12,
+    current: [0, 0],
+    vars: [{ name: "heap", value: heapStr() }],
+    note: { vi: "Heap lưu (time,row,col) và luôn ưu tiên thời gian nhỏ nhất.", en: "The heap stores (time,row,col) and always prioritizes the smallest time." },
+  });
+
+  pushStep({
+    title: { vi: "Chuẩn bị bốn hướng", en: "Prepare four directions" },
+    codeLine: 13,
+    vars: [{ name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
+    note: { vi: "Mỗi giây phải di chuyển đúng một ô theo bốn hướng; không được đứng yên.", en: "Every second must move exactly one cell in four directions; staying still is forbidden." },
+  });
+
+  let answer = -1;
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 15,
+      vars: [{ name: "heap", value: heapStr() }],
+      note: { vi: "Tiếp tục Dijkstra với trạng thái có thời gian tới nhỏ nhất.", en: "Continue Dijkstra with the state having the earliest arrival time." },
+    });
+
+    const [time, r, c] = heap.shift();
+    pushStep({
+      title: { vi: `Pop (${time}, ${r}, ${c})`, en: `Pop (${time}, ${r}, ${c})` },
+      codeLine: 16,
+      current: [r, c],
+      vars: [
+        { name: "time", value: time },
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "heap còn lại", value: heapStr() },
+      ],
+      note: { vi: `Chọn ô (${r},${c}) vì t=${time} là thời gian nhỏ nhất trong heap.`, en: `Choose (${r},${c}) because t=${time} is the smallest time in the heap.` },
+    });
+
+    const stale = time > dist[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `${time} > dist[${r}][${c}]=${dist[r][c]}: stale`, en: `${time} > dist[${r}][${c}]=${dist[r][c]}: stale` }
+        : { vi: `${time} > dist[${r}][${c}]? False`, en: `${time} > dist[${r}][${c}]? False` },
+      codeLine: 17,
+      current: [r, c],
+      vars: [
+        { name: "time", value: time },
+        { name: `dist[${r}][${c}]`, value: dist[r][c] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? { vi: "Một đường nhanh hơn đã cập nhật ô này; entry vừa pop đã cũ.", en: "A faster route already updated this cell; the popped entry is stale." }
+        : { vi: "Entry vẫn khớp thời gian tốt nhất, nên có thể tiếp tục.", en: "The entry still matches the best time, so processing may continue." },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
+        codeLine: 18,
+        current: [r, c],
+        vars: [{ name: "continue", value: true }],
+        note: { vi: "Không mở rộng hàng xóm từ một đường tới chậm hơn.", en: "Do not expand neighbors from a slower route." },
+      });
+      continue;
+    }
+
+    finalized.add(key(r, c));
+    const reachedTarget = r === rows - 1 && c === cols - 1;
+    pushStep({
+      title: reachedTarget
+        ? { vi: `(${r},${c}) là đích`, en: `(${r},${c}) is the target` }
+        : { vi: `(${r},${c}) chưa phải đích`, en: `(${r},${c}) is not the target` },
+      codeLine: 19,
+      current: [r, c],
+      vars: [
+        { name: "current", value: `(${r}, ${c})` },
+        { name: "target", value: `(${rows - 1}, ${cols - 1})` },
+        { name: "condition", value: reachedTarget },
+      ],
+      note: reachedTarget
+        ? { vi: "Đích được pop với time nhỏ nhất toàn heap, nên kết quả đã tối ưu.", en: "The target was popped with the heap's smallest time, so the result is optimal." }
+        : { vi: "Chưa tới đích; tiếp tục relax bốn hàng xóm.", en: "The target has not been reached; relax the four neighbors." },
+    });
+
+    if (reachedTarget) {
+      answer = time;
+      const path = [];
+      let current = [r, c];
+      while (current) {
+        path.unshift(current);
+        current = parent[current[0]][current[1]];
+      }
+      const pathCells = new Set(path.map(([pr, pc]) => key(pr, pc)));
+      const pathText = path.map(([pr, pc]) => `(${pr},${pc})@t${dist[pr][pc]}`).join(" → ");
+      const waits = [];
+      for (let i = 1; i < path.length; i += 1) {
+        const [pr, pc] = path[i - 1];
+        const [cr, cc] = path[i];
+        const delay = dist[cr][cc] - dist[pr][pc] - 1;
+        if (delay > 0) waits.push(`trước (${cr},${cc}): ${delay}s`);
+      }
+      const waitsText = waits.length ? waits.join(", ") : "không cần chờ";
+      pushStep({
+        title: { vi: `Thời gian nhỏ nhất = ${answer}`, en: `Minimum time = ${answer}` },
+        codeLine: 20,
+        pathCells,
+        final: true,
+        vars: [
+          { name: "path + arrival time", value: pathText },
+          { name: "waiting", value: waitsText },
+          { name: "answer", value: answer },
+        ],
+        note: {
+          vi: `Đường xanh lá ghi kèm thời điểm tới: ${pathText}. ${waits.length ? `Thời gian đi qua lại để chờ: ${waitsText}.` : "Mỗi bước đi ngay 1 giây, không cần đi qua lại để chờ."}`,
+          en: `The green path includes arrival times: ${pathText}. ${waits.length ? `Back-and-forth waiting: ${waitsText}.` : "Every move takes one immediate second; no back-and-forth waiting is needed."}`,
+        },
+      });
+      break;
+    }
+
+    for (const [dr, dc] of directions) {
+      pushStep({
+        title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
+        codeLine: 22,
+        current: [r, c],
+        vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
+        note: { vi: `Từ (${r},${c}), thử đi theo độ lệch (${dr},${dc}).`, en: `From (${r},${c}), try offset (${dr},${dc}).` },
+      });
+
+      const nr = r + dr;
+      const nc = c + dc;
+      pushStep({
+        title: { vi: `Neighbor = (${nr},${nc})`, en: `Neighbor = (${nr},${nc})` },
+        codeLine: 23,
+        current: [r, c],
+        vars: [{ name: "nr", value: nr }, { name: "nc", value: nc }],
+        note: { vi: "Tính tọa độ ô sẽ thử bước vào.", en: "Compute the coordinates of the cell to enter." },
+      });
+
+      const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+      pushStep({
+        title: inBounds
+          ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
+          : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
+        codeLine: 24,
+        current: inBounds ? [nr, nc] : [r, c],
+        vars: [{ name: "neighbor", value: `(${nr}, ${nc})` }, { name: "in bounds", value: inBounds }],
+        note: inBounds
+          ? { vi: "Tọa độ hợp lệ; bắt đầu tính thời điểm tới sớm nhất.", en: "The coordinates are valid; compute the earliest arrival." }
+          : { vi: "Tọa độ ngoài grid nên bỏ qua hướng này.", en: "The coordinates are outside the grid, so skip this direction." },
+      });
+      if (!inBounds) continue;
+
+      let nextTime = time + 1;
+      pushStep({
+        title: { vi: `next_time = ${time} + 1 = ${nextTime}`, en: `next_time = ${time} + 1 = ${nextTime}` },
+        codeLine: 25,
+        current: [nr, nc],
+        vars: [{ name: "time", value: time }, { name: "next_time", value: nextTime }],
+        note: { vi: `Nếu đi ngay từ (${r},${c}), sớm nhất sẽ tới (${nr},${nc}) ở t=${nextTime}.`, en: `Leaving (${r},${c}) immediately reaches (${nr},${nc}) no earlier than t=${nextTime}.` },
+      });
+
+      const locked = nextTime < grid[nr][nc];
+      pushStep({
+        title: locked
+          ? { vi: `${nextTime} < grid[${nr}][${nc}]=${grid[nr][nc]}: chưa mở`, en: `${nextTime} < grid[${nr}][${nc}]=${grid[nr][nc]}: locked` }
+          : { vi: `${nextTime} < grid[${nr}][${nc}]=${grid[nr][nc]}? False`, en: `${nextTime} < grid[${nr}][${nc}]=${grid[nr][nc]}? False` },
+        codeLine: 26,
+        current: [nr, nc],
+        vars: [
+          { name: "next_time", value: nextTime },
+          { name: `grid[${nr}][${nc}]`, value: grid[nr][nc] },
+          { name: "locked", value: locked },
+        ],
+        note: locked
+          ? { vi: "Ô chưa mở ở lần tới đầu tiên. Không được đứng yên, nên phải đi qua lại theo chu kỳ 2 giây.", en: "The cell is locked at the first attempted arrival. Standing still is forbidden, so wait by moving back and forth in two-second cycles." }
+          : { vi: `Ô đã mở tại t=${nextTime}; có thể bước vào ngay, không cần chờ.`, en: `The cell is open at t=${nextTime}; enter immediately without waiting.` },
+      });
+
+      if (locked) {
+        const gap = grid[nr][nc] - nextTime;
+        pushStep({
+          title: { vi: `wait = ${grid[nr][nc]} - ${nextTime} = ${gap}`, en: `wait = ${grid[nr][nc]} - ${nextTime} = ${gap}` },
+          codeLine: 27,
+          current: [nr, nc],
+          vars: [
+            { name: "unlock time", value: grid[nr][nc] },
+            { name: "first attempt", value: nextTime },
+            { name: "wait", value: gap },
+          ],
+          note: {
+            vi: `Còn thiếu ${gap} giây so với lúc ô mở. Ta chỉ có thể cộng thời gian theo bội số 2 bằng cách đi sang ô kề rồi quay lại.`,
+            en: `The cell opens ${gap} seconds after the first attempt. Time can only be added in multiples of two by moving to an adjacent cell and back.`,
+          },
+        });
+
+        const adjustedTime = grid[nr][nc] + (gap % 2);
+        pushStep({
+          title: { vi: `next_time = ${grid[nr][nc]} + (${gap} % 2) = ${adjustedTime}`, en: `next_time = ${grid[nr][nc]} + (${gap} % 2) = ${adjustedTime}` },
+          codeLine: 28,
+          current: [nr, nc],
+          vars: [
+            { name: "grid[nr][nc]", value: grid[nr][nc] },
+            { name: "wait % 2", value: gap % 2 },
+            { name: "next_time", value: adjustedTime },
+          ],
+          note: gap % 2 === 0
+            ? { vi: `Khoảng thiếu ${gap} là chẵn, nên có thể đến đúng lúc ô mở: t=${adjustedTime}.`, en: `The gap ${gap} is even, so arrival can match the unlock time exactly: t=${adjustedTime}.` }
+            : { vi: `Khoảng thiếu ${gap} là lẻ nhưng mỗi vòng chờ tốn 2 giây, nên phải tới muộn hơn giờ mở 1 giây: t=${adjustedTime}.`, en: `The gap ${gap} is odd but each waiting cycle takes two seconds, so arrival must be one second after unlock: t=${adjustedTime}.` },
+        });
+        nextTime = adjustedTime;
+      }
+
+      const oldDist = dist[nr][nc];
+      const improves = nextTime < oldDist;
+      pushStep({
+        title: improves
+          ? { vi: `${nextTime} < ${formatTime(oldDist)}: tới sớm hơn`, en: `${nextTime} < ${formatTime(oldDist)}: earlier arrival` }
+          : { vi: `${nextTime} < ${formatTime(oldDist)}? False`, en: `${nextTime} < ${formatTime(oldDist)}? False` },
+        codeLine: 29,
+        current: [nr, nc],
+        vars: [
+          { name: "next_time", value: nextTime },
+          { name: `dist[${nr}][${nc}]`, value: formatTime(oldDist) },
+          { name: "condition", value: improves },
+        ],
+        note: improves
+          ? { vi: `Đường mới tới (${nr},${nc}) sớm hơn, nên cập nhật dist và parent.`, en: `The new route reaches (${nr},${nc}) earlier, so update dist and parent.` }
+          : { vi: `Ô (${nr},${nc}) đã có thời gian không lớn hơn ${nextTime}; giữ nguyên.`, en: `Cell (${nr},${nc}) already has an arrival time no greater than ${nextTime}; keep it.` },
+      });
+      if (!improves) continue;
+
+      dist[nr][nc] = nextTime;
+      parent[nr][nc] = [r, c];
+      pushStep({
+        title: { vi: `dist[${nr}][${nc}] = ${nextTime}`, en: `dist[${nr}][${nc}] = ${nextTime}` },
+        codeLine: 30,
+        current: [nr, nc],
+        vars: [{ name: "dist", value: distStr() }, { name: "parent", value: `(${r}, ${c})` }],
+        note: { vi: "Lưu thời gian tốt hơn; parent chỉ phục vụ dựng đường xanh ở bước cuối.", en: "Store the better time; parent is used only to reconstruct the final green path." },
+      });
+
+      heap.push([nextTime, nr, nc]);
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+      pushStep({
+        title: { vi: `Push (${nextTime}, ${nr}, ${nc})`, en: `Push (${nextTime}, ${nr}, ${nc})` },
+        codeLine: 31,
+        current: [nr, nc],
+        vars: [{ name: "heap", value: heapStr() }],
+        note: { vi: "Đưa trạng thái mới vào min-heap để tiếp tục ưu tiên thời gian nhỏ nhất.", en: "Push the new state into the min-heap to keep prioritizing the smallest time." },
+      });
+    }
+  }
+
+  if (!steps.at(-1).final) {
+    pushStep({
+      title: { vi: "Không thể tới đích", en: "The target is unreachable" },
+      codeLine: 32,
+      final: true,
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Heap đã rỗng mà đích chưa được pop, nên trả -1.", en: "The heap is empty without popping the target, so return -1." },
+    });
+  }
+
+  return { original: grid, answer, steps };
+}
+
 // ─── 1377: Frog Position After T Seconds ───
 function buildSteps1377(input, params) {
   const n = params.n || 5;
@@ -1350,4 +1760,4 @@ function buildSteps815(input, params) {
   return {original, answer, steps};
 }
 
-module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps1377, buildSteps126, buildSteps815 };
+module.exports = { buildSteps1293, buildSteps1368, buildSteps2290, buildSteps2577, buildSteps1377, buildSteps126, buildSteps815 };
