@@ -2663,6 +2663,525 @@ function make1514FlowLayout(n, startNode, endNode) {
   };
 }
 
+function make1976FlowLayout(n, roads) {
+  const target = n - 1;
+  const adjacency = Array.from({ length: n }, () => []);
+  roads.forEach(([u, v, w]) => {
+    adjacency[u].push([v, w]);
+    adjacency[v].push([u, w]);
+  });
+  const layoutDist = new Array(n).fill(Infinity);
+  const queue = [[0, 0]];
+  layoutDist[0] = 0;
+  while (queue.length) {
+    queue.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const [time, u] = queue.shift();
+    if (time !== layoutDist[u]) continue;
+    for (const [v, w] of adjacency[u]) {
+      const next = time + w;
+      if (next < layoutDist[v]) {
+        layoutDist[v] = next;
+        queue.push([next, v]);
+      }
+    }
+  }
+
+  const positions = { 0: { x: 0, y: 0.12 } };
+  if (target !== 0) positions[target] = { x: 1, y: 0.12 };
+  const middle = Array.from({ length: n }, (_, id) => id)
+    .filter((id) => id !== 0 && id !== target);
+  const finiteLevels = [...new Set(middle.map((id) => layoutDist[id]).filter(Number.isFinite))]
+    .sort((a, b) => a - b);
+  const unreachableLevel = finiteLevels.length;
+  const groups = new Map();
+  middle.forEach((id) => {
+    const level = Number.isFinite(layoutDist[id]) ? finiteLevels.indexOf(layoutDist[id]) : unreachableLevel;
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level).push(id);
+  });
+  const levelCount = Math.max(1, groups.size);
+  [...groups.entries()].sort(([a], [b]) => a - b).forEach(([level, ids], column) => {
+    ids.forEach((id, row) => {
+      positions[id] = {
+        x: 0.12 + (0.76 * (column + 1)) / (levelCount + 1),
+        y: ids.length === 1 ? 0.62 : 0.34 + (0.54 * row) / (ids.length - 1),
+      };
+    });
+  });
+  return {
+    layout: "flow",
+    positions,
+    width: Math.max(760, levelCount * 170 + 360),
+    height: 500,
+    dimUnfocused: true,
+    caption: {
+      vi: "Cạnh vô hướng • dưới node: d = thời gian ngắn nhất, w = số cách",
+      en: "Undirected edges • below each node: d = shortest time, w = number of ways",
+    },
+  };
+}
+
+/**
+ * LeetCode 1976: Number of Ways to Arrive at Destination.
+ * Dijkstra tracks both the shortest distance and how many paths attain it.
+ */
+function buildSteps1976(input, params) {
+  const n = Number(params.n);
+  const roads = String(input)
+    .split(";")
+    .map((road) => road.trim())
+    .filter(Boolean)
+    .map((road) => road.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const valid = Number.isInteger(n) && n >= 1 && n <= 30
+    && (roads.length > 0 || n === 1)
+    && roads.every((road) => road.length === 3
+      && Number.isInteger(road[0]) && road[0] >= 0 && road[0] < n
+      && Number.isInteger(road[1]) && road[1] >= 0 && road[1] < n
+      && road[0] !== road[1]
+      && Number.isInteger(road[2]) && road[2] > 0);
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [7],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Nhập mỗi đường theo dạng u,v,time và ngăn cách bằng ';'. Node phải thuộc 0..n-1, time là số nguyên dương; visualization hỗ trợ tối đa 30 node.",
+        en: "Enter each road as u,v,time separated by ';'. Nodes must be in 0..n-1 and time must be a positive integer; the visualization supports up to 30 nodes.",
+      },
+    });
+    return { n, roads, answer: 0, steps };
+  }
+
+  const MOD = 1000000007;
+  const nodes = Array.from({ length: n }, (_, id) => id);
+  const graph = Array.from({ length: n }, () => []);
+  const dist = new Array(n).fill(Infinity);
+  const ways = new Array(n).fill(0);
+  const predecessors = Array.from({ length: n }, () => new Set());
+  const finalized = new Set();
+  const heap = [];
+  const edges = roads.map(([u, v, w]) => ({ u, v, w, undirected: true }));
+  const layout = make1976FlowLayout(n, roads);
+  const formatDist = (value) => Number.isFinite(value) ? String(value) : "∞";
+  const distStr = () => `[${dist.map(formatDist).join(", ")}]`;
+  const waysStr = () => `[${ways.join(", ")}]`;
+  const heapStr = () => `[${heap.map(([time, node]) => `(${time}, ${node})`).join(", ")}]`;
+
+  function makeGraph(hlNodes = [], hlEdges = [], annotations = {}) {
+    return {
+      nodes: nodes.map((id) => ({
+        id,
+        label: String(id),
+        dist: `d:${formatDist(dist[id])} · w:${ways[id]}`,
+      })),
+      edges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...finalized],
+      annotations: { 0: "src", [n - 1]: "dst", ...annotations },
+      ...layout,
+    };
+  }
+
+  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges, annotations),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Đặt modulo = 1,000,000,007", en: "Set modulo to 1,000,000,007" },
+    codeLine: 6,
+    vars: [{ name: "MOD", value: MOD }],
+    note: {
+      vi: "Số đường có thể rất lớn. Chỉ mảng ways cần lấy modulo; dist luôn giữ thời gian thật để so sánh chính xác.",
+      en: "The number of paths can be huge. Only ways is reduced modulo MOD; dist keeps exact travel times for comparisons.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo adjacency list", en: "Initialize the adjacency list" },
+    codeLine: 7,
+    vars: [{ name: "graph", value: `[${nodes.map(() => "[]").join(", ")}]` }],
+    note: {
+      vi: "graph[u] sẽ chứa các cặp (v, time) của những đường nối trực tiếp với u.",
+      en: "graph[u] will contain (v, time) pairs for roads directly connected to u.",
+    },
+  });
+
+  for (const [u, v, travelTime] of roads) {
+    pushStep({
+      title: { vi: `Đọc road [${u}, ${v}, ${travelTime}]`, en: `Read road [${u}, ${v}, ${travelTime}]` },
+      codeLine: 8,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      vars: [{ name: "u, v, time", value: `${u}, ${v}, ${travelTime}` }],
+      note: {
+        vi: `Đường nối node ${u} và ${v}, cần ${travelTime} đơn vị thời gian. Road là vô hướng nên phải lưu cả hai chiều.`,
+        en: `The road connects ${u} and ${v} in ${travelTime} time units. Roads are undirected, so both directions must be stored.`,
+      },
+    });
+
+    graph[u].push([v, travelTime]);
+    pushStep({
+      title: { vi: `Thêm ${u} → ${v}`, en: `Add ${u} → ${v}` },
+      codeLine: 9,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      vars: [{ name: `graph[${u}]`, value: `[${graph[u].map(([to, w]) => `(${to}, ${w})`).join(", ")}]` }],
+      note: {
+        vi: `Thêm (${v}, ${travelTime}) vào graph[${u}] cho chiều đi từ ${u} sang ${v}.`,
+        en: `Append (${v}, ${travelTime}) to graph[${u}] for travel from ${u} to ${v}.`,
+      },
+    });
+
+    graph[v].push([u, travelTime]);
+    pushStep({
+      title: { vi: `Thêm chiều ngược ${v} → ${u}`, en: `Add reverse direction ${v} → ${u}` },
+      codeLine: 10,
+      hlNodes: [u, v],
+      hlEdges: [[v, u]],
+      vars: [{ name: `graph[${v}]`, value: `[${graph[v].map(([to, w]) => `(${to}, ${w})`).join(", ")}]` }],
+      note: {
+        vi: `Vì road vô hướng, thêm (${u}, ${travelTime}) vào graph[${v}].`,
+        en: `Because the road is undirected, append (${u}, ${travelTime}) to graph[${v}].`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo dist bằng ∞", en: "Initialize dist to ∞" },
+    codeLine: 12,
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "dist[x] là thời gian ngắn nhất đã biết từ node 0 tới x. ∞ nghĩa là chưa tìm thấy đường.",
+      en: "dist[x] is the shortest known time from node 0 to x. ∞ means no route has been found.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo ways bằng 0", en: "Initialize ways to 0" },
+    codeLine: 13,
+    vars: [{ name: "ways", value: waysStr() }],
+    note: {
+      vi: "ways[x] đếm số đường đạt đúng dist[x]. Ban đầu chưa có đường nào tới các node.",
+      en: "ways[x] counts routes that attain exactly dist[x]. Initially no node has a known route.",
+    },
+  });
+
+  dist[0] = 0;
+  pushStep({
+    title: { vi: "dist[0] = 0", en: "dist[0] = 0" },
+    codeLine: 14,
+    hlNodes: [0],
+    vars: [{ name: "dist", value: distStr() }],
+    note: {
+      vi: "Đang đứng tại node nguồn 0 nên thời gian để tới chính nó bằng 0.",
+      en: "We start at source node 0, so reaching it takes zero time.",
+    },
+  });
+
+  ways[0] = 1;
+  pushStep({
+    title: { vi: "ways[0] = 1", en: "ways[0] = 1" },
+    codeLine: 15,
+    hlNodes: [0],
+    vars: [{ name: "ways", value: waysStr() }],
+    note: {
+      vi: "Có đúng một cách khởi đầu tại node 0: đường rỗng chưa đi qua road nào.",
+      en: "There is exactly one way to start at node 0: the empty route using no road.",
+    },
+  });
+
+  heap.push([0, 0]);
+  pushStep({
+    title: { vi: "Đưa nguồn vào min-heap", en: "Push the source into the min-heap" },
+    codeLine: 16,
+    hlNodes: [0],
+    vars: [{ name: "heap", value: heapStr() }],
+    note: {
+      vi: "Heap lưu (time, node) và luôn pop trạng thái có time nhỏ nhất trước.",
+      en: "The heap stores (time, node) and always pops the smallest time first.",
+    },
+  });
+
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    pushStep({
+      title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
+      codeLine: 18,
+      vars: [{ name: "heap", value: heapStr() }],
+      note: {
+        vi: "Tiếp tục Dijkstra với trạng thái có thời gian nhỏ nhất ở đầu heap.",
+        en: "Continue Dijkstra with the smallest-time state at the front of the heap.",
+      },
+    });
+
+    const [time, u] = heap.shift();
+    pushStep({
+      title: { vi: `Pop (${time}, ${u})`, en: `Pop (${time}, ${u})` },
+      codeLine: 19,
+      hlNodes: [u],
+      vars: [
+        { name: "time", value: time },
+        { name: "u", value: u },
+        { name: "heap còn lại", value: heapStr() },
+      ],
+      note: {
+        vi: `Lấy node ${u} với thời gian ${time}, là trạng thái nhỏ nhất hiện có trong heap.`,
+        en: `Pop node ${u} at time ${time}, currently the smallest state in the heap.`,
+      },
+    });
+
+    const stale = time > dist[u];
+    pushStep({
+      title: stale
+        ? { vi: `${time} > dist[${u}]=${dist[u]}: stale`, en: `${time} > dist[${u}]=${dist[u]}: stale` }
+        : { vi: `${time} > dist[${u}]? False`, en: `${time} > dist[${u}]? False` },
+      codeLine: 20,
+      hlNodes: [u],
+      vars: [
+        { name: "time", value: time },
+        { name: `dist[${u}]`, value: dist[u] },
+        { name: "condition", value: stale },
+      ],
+      note: stale
+        ? {
+            vi: `Node ${u} đã có đường ngắn hơn ${dist[u]}; bản ghi ${time} đã cũ và không được dùng để đếm thêm đường.`,
+            en: `Node ${u} already has a shorter time ${dist[u]}; entry ${time} is stale and must not count more paths.`,
+          }
+        : {
+            vi: `time vẫn bằng dist[${u}], nên có thể relax các road kề từ trạng thái hợp lệ này.`,
+            en: `time still matches dist[${u}], so adjacent roads may be relaxed from this valid state.`,
+          },
+    });
+
+    if (stale) {
+      pushStep({
+        title: { vi: "Bỏ qua stale entry", en: "Skip the stale entry" },
+        codeLine: 21,
+        hlNodes: [u],
+        vars: [{ name: "continue", value: true }],
+        note: {
+          vi: "Quay lại đầu vòng while mà không duyệt hàng xóm, tránh dùng một đường dài hơn để cập nhật dist hoặc ways.",
+          en: "Return to the while loop without exploring neighbors, preventing a longer route from updating dist or ways.",
+        },
+      });
+      continue;
+    }
+
+    finalized.add(u);
+    for (const [v, travelTime] of graph[u]) {
+      pushStep({
+        title: { vi: `Xét road ${u} — ${v}`, en: `Inspect road ${u} — ${v}` },
+        codeLine: 22,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "v", value: v },
+          { name: "travel_time", value: travelTime },
+          { name: `ways[${u}]`, value: ways[u] },
+        ],
+        note: {
+          vi: `Thử nối mỗi đường ngắn nhất tới ${u} với road ${u} — ${v} mất ${travelTime} thời gian.`,
+          en: `Extend every shortest route to ${u} across road ${u} — ${v}, which takes ${travelTime}.`,
+        },
+      });
+
+      const newTime = time + travelTime;
+      pushStep({
+        title: { vi: `new_time = ${time} + ${travelTime} = ${newTime}`, en: `new_time = ${time} + ${travelTime} = ${newTime}` },
+        codeLine: 23,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "time", value: time },
+          { name: "travel_time", value: travelTime },
+          { name: "new_time", value: newTime },
+        ],
+        note: {
+          vi: `Nếu đi qua ${u}, ta tới ${v} tại thời điểm ${newTime}. Bây giờ so sánh với dist[${v}].`,
+          en: `Going through ${u} reaches ${v} at time ${newTime}. Now compare it with dist[${v}].`,
+        },
+      });
+
+      const oldDist = dist[v];
+      const shorter = newTime < oldDist;
+      pushStep({
+        title: shorter
+          ? { vi: `${newTime} < ${formatDist(oldDist)}: ngắn hơn`, en: `${newTime} < ${formatDist(oldDist)}: shorter` }
+          : { vi: `${newTime} < ${formatDist(oldDist)}? False`, en: `${newTime} < ${formatDist(oldDist)}? False` },
+        codeLine: 24,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "new_time", value: newTime },
+          { name: `dist[${v}]`, value: formatDist(oldDist) },
+          { name: "condition", value: shorter },
+        ],
+        note: shorter
+          ? {
+              vi: `Tìm thấy thời gian nhỏ hơn tới ${v}. Mọi đường cũ dài hơn không còn được tính; phải thay dist và ways.`,
+              en: `A smaller time to ${v} was found. All older longer routes stop counting; replace both dist and ways.`,
+            }
+          : {
+              vi: `new_time không nhỏ hơn dist[${v}]. Chưa kết luận bỏ qua: vẫn phải kiểm tra trường hợp BẰNG NHAU ở dòng 28.`,
+              en: `new_time is not smaller than dist[${v}]. Do not discard it yet: line 28 must still check for EQUALITY.`,
+            },
+      });
+
+      if (shorter) {
+        dist[v] = newTime;
+        predecessors[v] = new Set([u]);
+        pushStep({
+          title: { vi: `dist[${v}] = ${newTime}`, en: `dist[${v}] = ${newTime}` },
+          codeLine: 25,
+          hlNodes: [u, v],
+          hlEdges: [[u, v]],
+          vars: [{ name: "dist", value: distStr() }],
+          note: {
+            vi: `Ghi ${newTime} là thời gian ngắn nhất mới tới ${v}. Visualization thay predecessor của ${v} bằng ${u}.`,
+            en: `Store ${newTime} as the new shortest time to ${v}. The visualization replaces ${v}'s predecessor with ${u}.`,
+          },
+        });
+
+        ways[v] = ways[u];
+        pushStep({
+          title: { vi: `ways[${v}] = ways[${u}] = ${ways[u]}`, en: `ways[${v}] = ways[${u}] = ${ways[u]}` },
+          codeLine: 26,
+          hlNodes: [u, v],
+          hlEdges: [[u, v]],
+          vars: [{ name: "ways", value: waysStr() }],
+          note: {
+            vi: `Vì đường mới NGẮN HƠN, xóa ảnh hưởng của mọi cách cũ tới ${v}. Số cách mới đúng bằng ${ways[u]} cách ngắn nhất tới ${u}.`,
+            en: `Because the new route is SHORTER, discard all old ways to ${v}. The new count equals the ${ways[u]} shortest ways to ${u}.`,
+          },
+        });
+
+        heap.push([newTime, v]);
+        heap.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        pushStep({
+          title: { vi: `Push (${newTime}, ${v})`, en: `Push (${newTime}, ${v})` },
+          codeLine: 27,
+          hlNodes: [v],
+          vars: [{ name: "heap", value: heapStr() }],
+          note: {
+            vi: `dist[${v}] đã giảm nên push trạng thái mới. Chỉ nhánh ngắn hơn cần push heap.`,
+            en: `dist[${v}] decreased, so push its new state. Only the shorter branch needs a heap push.`,
+          },
+        });
+        continue;
+      }
+
+      const equal = newTime === dist[v];
+      pushStep({
+        title: equal
+          ? { vi: `${newTime} == dist[${v}]: thêm số cách`, en: `${newTime} == dist[${v}]: add path counts` }
+          : { vi: `${newTime} == dist[${v}]? False`, en: `${newTime} == dist[${v}]? False` },
+        codeLine: 28,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        vars: [
+          { name: "new_time", value: newTime },
+          { name: `dist[${v}]`, value: formatDist(dist[v]) },
+          { name: "condition", value: equal },
+        ],
+        note: equal
+          ? {
+              vi: `Đường qua ${u} cũng tới ${v} với đúng thời gian tối ưu ${dist[v]}. Đây là các cách mới, không thay dist.`,
+              en: `Routes through ${u} also reach ${v} at the optimal time ${dist[v]}. They add new ways without changing dist.`,
+            }
+          : {
+              vi: `${newTime} lớn hơn dist[${v}] = ${formatDist(dist[v])}; đường này dài hơn nên không ảnh hưởng dist hoặc ways.`,
+              en: `${newTime} is greater than dist[${v}] = ${formatDist(dist[v])}; this longer route changes neither dist nor ways.`,
+            },
+      });
+
+      if (equal) {
+        const oldWays = ways[v];
+        ways[v] = (ways[v] + ways[u]) % MOD;
+        predecessors[v].add(u);
+        pushStep({
+          title: { vi: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}`, en: `ways[${v}] = (${oldWays} + ${ways[u]}) % MOD = ${ways[v]}` },
+          codeLine: 29,
+          hlNodes: [u, v],
+          hlEdges: [[u, v]],
+          vars: [
+            { name: "ways cũ", value: oldWays },
+            { name: `ways[${u}]`, value: ways[u] },
+            { name: "ways", value: waysStr() },
+          ],
+          note: {
+            vi: `Hai nhóm đường khác nhau nhưng cùng ngắn nhất, nên cộng ${ways[u]} vào ${oldWays}. Không push heap vì dist[${v}] không đổi.`,
+            en: `The route groups differ but are equally short, so add ${ways[u]} to ${oldWays}. Do not push because dist[${v}] did not change.`,
+          },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: "Heap đã rỗng", en: "The heap is empty" },
+    codeLine: 18,
+    vars: [
+      { name: "dist", value: distStr() },
+      { name: "ways", value: waysStr() },
+    ],
+    note: {
+      vi: "Mọi shortest distance và số cách tương ứng đã được xử lý xong.",
+      en: "All shortest distances and their corresponding path counts are complete.",
+    },
+  });
+
+  const target = n - 1;
+  const shortestNodes = new Set([target]);
+  const shortestEdges = [];
+  const stack = [target];
+  while (stack.length) {
+    const v = stack.pop();
+    for (const u of predecessors[v]) {
+      shortestEdges.push([u, v]);
+      if (!shortestNodes.has(u)) {
+        shortestNodes.add(u);
+        stack.push(u);
+      }
+    }
+  }
+  const answer = ways[target] % MOD;
+  pushStep({
+    title: { vi: `Có ${answer} đường ngắn nhất tới node ${target}`, en: `${answer} shortest routes reach node ${target}` },
+    codeLine: 30,
+    hlNodes: [...shortestNodes],
+    hlEdges: shortestEdges,
+    final: true,
+    vars: [
+      { name: `dist[${target}]`, value: formatDist(dist[target]) },
+      { name: `ways[${target}]`, value: ways[target] },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Trả ways[${target}] = ${answer}. Các cạnh màu nổi tạo thành toàn bộ DAG đường ngắn nhất; cạnh không thuộc bất kỳ đường ngắn nhất nào được làm mờ.`,
+      en: `Return ways[${target}] = ${answer}. Highlighted edges form the full shortest-path DAG; every edge outside all shortest paths is dimmed.`,
+    },
+  });
+
+  return { n, roads, answer, steps };
+}
+
 /**
  * LeetCode 1514: Path with Maximum Probability.
  * Dijkstra with a max-heap, where path weights are multiplied.
@@ -7950,7 +8469,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 1631, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 1631, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -9315,6 +9834,72 @@ module.exports = {
       "        return 0.0",
     ],
     builder: buildSteps1514,
+  },
+  1976: {
+    id: 1976,
+    difficulty: "medium",
+    slug: "number-of-ways-to-arrive-at-destination",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Number of Ways to Arrive at Destination", en: "Number of Ways to Arrive at Destination" },
+    titleVi: { vi: "Số cách đến đích trong thời gian ngắn nhất", en: "Count shortest ways to the destination" },
+    statement: {
+      vi: "Có n giao lộ đánh số 0..n-1 và các road vô hướng [u,v,time]. Hãy đếm số cách đi từ 0 tới n-1 trong thời gian ngắn nhất, trả kết quả modulo 10^9+7. Nhập road dạng 'u,v,time', ngăn cách bằng dấu ';'.",
+      en: "There are n intersections numbered 0..n-1 and undirected roads [u,v,time]. Count the ways to travel from 0 to n-1 in the shortest time, modulo 10^9+7. Enter roads as 'u,v,time' separated by ';'.",
+    },
+    defaultInput: "0,6,7;0,1,2;1,2,3;1,3,3;6,3,3;3,5,1;6,5,1;2,5,1;0,4,5;4,6,2",
+    inputKind: "string",
+    inputLabel: { vi: "roads (u,v,time; ...)", en: "roads (u,v,time; ...)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số giao lộ)", en: "n (intersections)" }, default: 7, min: 1, max: 30 },
+    ],
+    approach: [
+      { vi: "Xây adjacency list hai chiều vì mỗi road là vô hướng.", en: "Build a bidirectional adjacency list because every road is undirected." },
+      { vi: "Chạy Dijkstra từ node 0. dist[x] lưu thời gian nhỏ nhất; ways[x] lưu số đường đạt đúng dist[x].", en: "Run Dijkstra from node 0. dist[x] stores the shortest time; ways[x] counts routes attaining exactly dist[x]." },
+      { vi: "Nếu new_time < dist[v], tìm được mốc ngắn hơn: thay dist[v] và gán ways[v] = ways[u].", en: "If new_time < dist[v], a shorter time was found: replace dist[v] and set ways[v] = ways[u]." },
+      { vi: "Nếu new_time == dist[v], tìm thêm các đường cùng ngắn nhất: ways[v] = (ways[v] + ways[u]) % MOD; không push heap vì dist không đổi.", en: "If new_time == dist[v], more equally short routes were found: ways[v] = (ways[v] + ways[u]) % MOD; do not push because dist is unchanged." },
+      { vi: "Bỏ qua heap entry khi time > dist[u]. Sau khi heap rỗng, trả ways[n-1].", en: "Skip a heap entry when time > dist[u]. After the heap empties, return ways[n-1]." },
+    ],
+    complexity: {
+      time: "O((V + E) log V)",
+      space: "O(V + E)",
+      note: {
+        vi: "Adjacency list chứa 2E hướng. Mỗi lần dist giảm sẽ push heap; mảng dist, ways và predecessor dùng O(V+E) bộ nhớ trong visualization.",
+        en: "The adjacency list stores 2E directions. Each distance improvement pushes the heap; dist, ways, and visualization predecessors use O(V+E) space.",
+      },
+    },
+    code: [
+      "import heapq",
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def countPaths(self, n: int, roads: List[List[int]]) -> int:",
+      "        MOD = 10**9 + 7",
+      "        graph = [[] for _ in range(n)]",
+      "        for u, v, travel_time in roads:",
+      "            graph[u].append((v, travel_time))",
+      "            graph[v].append((u, travel_time))",
+      "",
+      "        dist = [float('inf')] * n",
+      "        ways = [0] * n",
+      "        dist[0] = 0",
+      "        ways[0] = 1",
+      "        heap = [(0, 0)]  # time, node",
+      "",
+      "        while heap:",
+      "            time, u = heapq.heappop(heap)",
+      "            if time > dist[u]:",
+      "                continue",
+      "            for v, travel_time in graph[u]:",
+      "                new_time = time + travel_time",
+      "                if new_time < dist[v]:",
+      "                    dist[v] = new_time",
+      "                    ways[v] = ways[u]",
+      "                    heapq.heappush(heap, (new_time, v))",
+      "                elif new_time == dist[v]:",
+      "                    ways[v] = (ways[v] + ways[u]) % MOD",
+      "        return ways[n - 1]",
+    ],
+    builder: buildSteps1976,
   },
   3977: {
     id: 3977,
