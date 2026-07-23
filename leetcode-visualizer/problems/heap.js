@@ -1307,10 +1307,16 @@ function buildSteps692(input, params) {
   }));
 
   for (const [w, f] of freq.entries()) {
+    steps.push(heapSnapshot(heap, label, {
+      title: { vi: `Xét "${w}" (f=${f})`, en: `Consider "${w}" (f=${f})` },
+      codeLines: [7],
+      vars: [{ name: "w, f", value: `"${w}", ${f}` }, { name: "heap", value: arrStr() }],
+      note: { vi: `Duyệt tới "${w}" (freq ${f}); heap CHƯA thay đổi, bước sau mới push.`, en: `Now visiting "${w}" (freq ${f}); the heap is unchanged so far, the next step pushes it.` },
+    }));
     heap.push({ w, f });
     steps.push(heapSnapshot(heap, label, {
       title: { vi: `Push "${w}" (f=${f})`, en: `Push "${w}" (f=${f})` },
-      hlSet: new Set([heap.length - 1]), codeLines: [7, 8],
+      hlSet: new Set([heap.length - 1]), codeLines: [8],
       vars: [{ name: "heap", value: arrStr() }, { name: "size", value: heap.length }],
       note: { vi: `Thêm "${w}" (freq ${f}) vào cuối heap rồi sift-up.`, en: `Add "${w}" (freq ${f}) at the end then sift-up.` },
     }));
