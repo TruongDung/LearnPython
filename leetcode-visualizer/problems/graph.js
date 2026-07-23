@@ -1584,7 +1584,7 @@ function buildSteps743(input, params) {
  * LeetCode 787: Cheapest Flights Within K Stops.
  * Bounded Bellman-Ford: round r may use at most r + 1 flights.
  */
-function buildSteps787(input, params) {
+function buildSteps787BellmanFord(input, params) {
   const n = Number(params.n);
   const src = Number(params.src);
   const dst = Number(params.dst);
@@ -1868,6 +1868,494 @@ function buildSteps787(input, params) {
   });
 
   return { n, flights, src, dst, k, answer, steps };
+}
+
+/**
+ * State Dijkstra for LeetCode 787.
+ * A state is (city, flightsUsed), not just city.
+ */
+function buildSteps787Dijkstra(input, params) {
+  const n = Number(params.n);
+  const src = Number(params.src);
+  const dst = Number(params.dst);
+  const k = Number(params.k);
+  const flights = String(input)
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => item.split(",").map((value) => Number(value.trim())));
+  const steps = [];
+  const valid = Number.isInteger(n) && n > 0
+    && Number.isInteger(src) && src >= 0 && src < n
+    && Number.isInteger(dst) && dst >= 0 && dst < n
+    && Number.isInteger(k) && k >= 0
+    && flights.length > 0
+    && flights.every(([u, v, price]) => (
+      Number.isInteger(u) && u >= 0 && u < n
+      && Number.isInteger(v) && v >= 0 && v < n
+      && Number.isFinite(price) && price >= 0
+    ));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [6],
+      codeBlock: 2,
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Nhập mỗi chuyến bay theo dạng u,v,price và ngăn cách bằng dấu ';'. n, src, dst, k phải là số nguyên hợp lệ.",
+        en: "Enter each flight as u,v,price separated by ';'. n, src, dst, and k must be valid integers.",
+      },
+    });
+    return { n, flights, src, dst, k, answer: -1, steps };
+  }
+
+  const maxFlights = k + 1;
+  const nodes = Array.from({ length: n }, (_, id) => id);
+  const edges = flights.map(([u, v, w]) => ({ u, v, w }));
+  const graph = Array.from({ length: n }, () => []);
+  const popped = new Set();
+  const formatValue = (value) => value === Infinity ? "∞" : String(value);
+  const formatState = ([price, city, used]) => `(${price}, ${city}, ${used})`;
+
+  function makeGraph(best, hlNodes = [], hlEdges = []) {
+    const annotations = { [src]: "src", [dst]: "dst" };
+    if (src === dst) annotations[src] = "src = dst";
+    return {
+      nodes: nodes.map((id) => {
+        const cheapest = Math.min(...best[id]);
+        return { id, label: String(id), dist: cheapest === Infinity ? "∞" : cheapest };
+      }),
+      edges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...popped],
+      annotations,
+    };
+  }
+
+  function formatBest(best) {
+    return best.map((row, city) => `${city}:[${row.map(formatValue).join(",")}]`).join("  ");
+  }
+
+  function pushStep({ title, best, hlNodes = [], hlEdges = [], codeLine, vars, note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(best, hlNodes, hlEdges),
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      vars,
+      note,
+    });
+  }
+
+  const emptyBest = Array.from({ length: n }, () => Array(maxFlights + 1).fill(Infinity));
+  pushStep({
+    title: { vi: "Dijkstra cần thêm số chuyến vào trạng thái", en: "Dijkstra needs flights used in its state" },
+    best: emptyBest,
+    hlNodes: [src, dst],
+    codeLine: 6,
+    vars: [
+      { name: "state", value: "(price, city, flights_used)" },
+      { name: "k stops", value: k },
+      { name: "max_flights", value: maxFlights },
+    ],
+    note: {
+      vi: `Đây là Dijkstra trên đồ thị trạng thái. Một trạng thái phải chứa cả city và flights_used; ${k} điểm dừng cho phép tối đa ${maxFlights} chuyến bay.`,
+      en: `This is Dijkstra on a state graph. A state must include both city and flights_used; ${k} stops allow at most ${maxFlights} flights.`,
+    },
+  });
+
+  pushStep({
+    title: { vi: "Tạo adjacency list", en: "Create the adjacency list" },
+    best: emptyBest,
+    codeLine: 7,
+    vars: [{ name: "graph", value: "[[], ..., []]" }],
+    note: {
+      vi: "graph[u] sẽ chứa các cặp (v, ticket) có thể bay trực tiếp từ u.",
+      en: "graph[u] will contain each direct (v, ticket) flight from u.",
+    },
+  });
+
+  for (const [u, v, ticket] of flights) {
+    pushStep({
+      title: { vi: `Đọc chuyến bay ${u} → ${v}`, en: `Read flight ${u} → ${v}` },
+      best: emptyBest,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      codeLine: 8,
+      vars: [{ name: "flight", value: `[${u}, ${v}, ${ticket}]` }],
+      note: {
+        vi: `Tách chuyến bay thành u = ${u}, v = ${v}, ticket = ${ticket}.`,
+        en: `Unpack the flight into u = ${u}, v = ${v}, ticket = ${ticket}.`,
+      },
+    });
+    graph[u].push([v, ticket]);
+    pushStep({
+      title: { vi: `Thêm (${v}, ${ticket}) vào graph[${u}]`, en: `Append (${v}, ${ticket}) to graph[${u}]` },
+      best: emptyBest,
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      codeLine: 9,
+      vars: [{ name: `graph[${u}]`, value: `[${graph[u].map(([to, price]) => `(${to},${price})`).join(", ")}]` }],
+      note: {
+        vi: `Từ thành phố ${u}, Dijkstra có thể duyệt cạnh tới ${v} với giá vé ${ticket}.`,
+        en: `From city ${u}, Dijkstra can traverse the edge to ${v} with ticket price ${ticket}.`,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `max_flights = ${maxFlights}`, en: `max_flights = ${maxFlights}` },
+    best: emptyBest,
+    codeLine: 11,
+    vars: [
+      { name: "k", value: k },
+      { name: "max_flights", value: `${k} + 1 = ${maxFlights}` },
+    ],
+    note: {
+      vi: `${k} điểm dừng ở giữa tương ứng tối đa ${maxFlights} cạnh/chuyến bay.`,
+      en: `${k} intermediate stops correspond to at most ${maxFlights} edges/flights.`,
+    },
+  });
+
+  const best = emptyBest.map((row) => row.slice());
+  pushStep({
+    title: { vi: "Khởi tạo bảng best", en: "Initialize the best table" },
+    best,
+    codeLine: 12,
+    vars: [
+      { name: "best[city][used]", value: "minimum price" },
+      { name: "best", value: formatBest(best) },
+    ],
+    note: {
+      vi: `best[city][used] lưu giá nhỏ nhất tới city khi dùng đúng used chuyến. Có ${maxFlights + 1} cột, từ 0 tới ${maxFlights} chuyến.`,
+      en: `best[city][used] stores the cheapest price to city using exactly used flights. It has ${maxFlights + 1} columns, from 0 to ${maxFlights} flights.`,
+    },
+  });
+
+  best[src][0] = 0;
+  pushStep({
+    title: { vi: `best[${src}][0] = 0`, en: `best[${src}][0] = 0` },
+    best,
+    hlNodes: [src],
+    codeLine: 13,
+    vars: [{ name: "best", value: formatBest(best) }],
+    note: {
+      vi: `Bắt đầu tại src = ${src}, giá 0 và chưa dùng chuyến bay nào.`,
+      en: `Start at src = ${src} with price 0 and no flights used.`,
+    },
+  });
+
+  const heap = [[0, src, 0]];
+  pushStep({
+    title: { vi: "Đưa trạng thái đầu vào min-heap", en: "Push the initial state into the min-heap" },
+    best,
+    hlNodes: [src],
+    codeLine: 14,
+    vars: [{ name: "heap", value: `[${formatState(heap[0])}]` }],
+    note: {
+      vi: "Heap sắp xếp theo price trước tiên, nên trạng thái có tổng giá nhỏ nhất luôn được lấy ra trước.",
+      en: "The heap orders by price first, so the state with the smallest total price is always popped first.",
+    },
+  });
+
+  let answer = -1;
+  while (heap.length) {
+    heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    pushStep({
+      title: { vi: "Heap còn trạng thái", en: "The heap still has states" },
+      best,
+      codeLine: 16,
+      vars: [{ name: "heap", value: `[${heap.map(formatState).join(", ")}]` }],
+      note: {
+        vi: "Tiếp tục Dijkstra vì heap chưa rỗng. Phần tử đầu có price nhỏ nhất.",
+        en: "Continue Dijkstra because the heap is not empty. Its first item has the smallest price.",
+      },
+    });
+
+    const [price, u, used] = heap.shift();
+    popped.add(u);
+    pushStep({
+      title: { vi: `Pop (${price}, ${u}, ${used})`, en: `Pop (${price}, ${u}, ${used})` },
+      best,
+      hlNodes: [u],
+      codeLine: 17,
+      vars: [
+        { name: "price", value: price },
+        { name: "u", value: u },
+        { name: "used", value: used },
+        { name: "heap còn lại", value: `[${heap.map(formatState).join(", ")}]` },
+      ],
+      note: {
+        vi: `Lấy trạng thái rẻ nhất: đang ở thành phố ${u}, tổng giá ${price}, đã dùng ${used} chuyến.`,
+        en: `Pop the cheapest state: city ${u}, total price ${price}, with ${used} flights used.`,
+      },
+    });
+
+    if (u === dst) {
+      answer = price;
+      pushStep({
+        title: { vi: `Tới dst = ${dst}: trả ${price}`, en: `Reached dst = ${dst}: return ${price}` },
+        best,
+        hlNodes: [dst],
+        codeLine: 18,
+        vars: [
+          { name: "u == dst", value: true },
+          { name: "used", value: used },
+          { name: "answer", value: price },
+        ],
+        note: {
+          vi: `Có thể trả ngay ${price}: heap đã đảm bảo không còn trạng thái hợp lệ nào có giá nhỏ hơn trạng thái vừa pop.`,
+          en: `We can return ${price} immediately: the heap guarantees that no remaining valid state has a smaller price.`,
+        },
+        final: true,
+      });
+      break;
+    }
+
+    pushStep({
+      title: { vi: `${u} chưa phải dst`, en: `${u} is not dst` },
+      best,
+      hlNodes: [u, dst],
+      codeLine: 18,
+      vars: [
+        { name: "u", value: u },
+        { name: "dst", value: dst },
+        { name: "u == dst", value: false },
+      ],
+      note: {
+        vi: `Thành phố ${u} chưa phải đích ${dst}, nên cần kiểm tra trạng thái rồi mới mở rộng các chuyến bay tiếp theo.`,
+        en: `City ${u} is not destination ${dst}, so validate the state before expanding outgoing flights.`,
+      },
+    });
+
+    if (price !== best[u][used]) {
+      pushStep({
+        title: { vi: "Bỏ trạng thái cũ", en: "Discard stale state" },
+        best,
+        hlNodes: [u],
+        codeLine: 19,
+        vars: [
+          { name: "price", value: price },
+          { name: `best[${u}][${used}]`, value: formatValue(best[u][used]) },
+        ],
+        note: {
+          vi: `Heap chứa bản ghi cũ giá ${price}, nhưng best hiện là ${best[u][used]}; không mở rộng bản ghi kém hơn này.`,
+          en: `The heap entry costs ${price}, but the current best is ${best[u][used]}; do not expand this stale state.`,
+        },
+      });
+      continue;
+    }
+
+    pushStep({
+      title: { vi: "Trạng thái vẫn là tốt nhất", en: "The state is still optimal" },
+      best,
+      hlNodes: [u],
+      codeLine: 19,
+      vars: [
+        { name: "price", value: price },
+        { name: `best[${u}][${used}]`, value: best[u][used] },
+        { name: "stale", value: false },
+      ],
+      note: {
+        vi: `price = best[${u}][${used}] = ${price}, nên đây không phải bản ghi cũ và có thể tiếp tục.`,
+        en: `price = best[${u}][${used}] = ${price}, so this is not stale and may continue.`,
+      },
+    });
+
+    if (used === maxFlights) {
+      pushStep({
+        title: { vi: `Đã dùng đủ ${maxFlights} chuyến: không bay tiếp`, en: `Already used ${maxFlights} flights: stop expanding` },
+        best,
+        hlNodes: [u],
+        codeLine: 20,
+        vars: [
+          { name: "used", value: used },
+          { name: "max_flights", value: maxFlights },
+        ],
+        note: {
+          vi: `Trạng thái ở ${u} đã dùng tối đa ${maxFlights} chuyến. Bay thêm sẽ vượt giới hạn k = ${k} điểm dừng.`,
+          en: `The state at ${u} has used all ${maxFlights} flights. Another flight would exceed k = ${k} stops.`,
+        },
+      });
+      continue;
+    }
+
+    pushStep({
+      title: { vi: `Còn lượt bay từ thành phố ${u}`, en: `Flights remain available from city ${u}` },
+      best,
+      hlNodes: [u],
+      codeLine: 20,
+      vars: [
+        { name: "used", value: used },
+        { name: "max_flights", value: maxFlights },
+        { name: "remaining", value: maxFlights - used },
+      ],
+      note: {
+        vi: `${used} < ${maxFlights}, nên trạng thái này còn ${maxFlights - used} chuyến bay và được phép mở rộng.`,
+        en: `${used} < ${maxFlights}, so this state has ${maxFlights - used} flights remaining and may expand.`,
+      },
+    });
+
+    for (const [v, ticket] of graph[u]) {
+      pushStep({
+        title: { vi: `Xét cạnh ${u} → ${v}`, en: `Inspect edge ${u} → ${v}` },
+        best,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 22,
+        vars: [
+          { name: "v", value: v },
+          { name: "ticket", value: ticket },
+        ],
+        note: {
+          vi: `Duyệt chuyến bay trực tiếp từ ${u} tới ${v}, giá vé ${ticket}.`,
+          en: `Inspect the direct flight from ${u} to ${v} with ticket price ${ticket}.`,
+        },
+      });
+
+      const newPrice = price + ticket;
+      pushStep({
+        title: { vi: `new_price = ${price} + ${ticket} = ${newPrice}`, en: `new_price = ${price} + ${ticket} = ${newPrice}` },
+        best,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 23,
+        vars: [
+          { name: "price", value: price },
+          { name: "ticket", value: ticket },
+          { name: "new_price", value: newPrice },
+        ],
+        note: {
+          vi: `Nếu chọn chuyến bay này, tổng giá mới là ${price} + ${ticket} = ${newPrice}.`,
+          en: `Taking this flight produces a new total price of ${price} + ${ticket} = ${newPrice}.`,
+        },
+      });
+
+      const nextUsed = used + 1;
+      pushStep({
+        title: { vi: `next_used = ${used} + 1 = ${nextUsed}`, en: `next_used = ${used} + 1 = ${nextUsed}` },
+        best,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 24,
+        vars: [
+          { name: "used", value: used },
+          { name: "next_used", value: nextUsed },
+          { name: `best[${v}][${nextUsed}]`, value: formatValue(best[v][nextUsed]) },
+        ],
+        note: {
+          vi: `Đi qua một cạnh làm số chuyến đã dùng tăng từ ${used} lên ${nextUsed}. Đây là một trạng thái riêng tại thành phố ${v}.`,
+          en: `Traversing one edge increases flights used from ${used} to ${nextUsed}. This is a distinct state at city ${v}.`,
+        },
+      });
+
+      const oldPrice = best[v][nextUsed];
+      if (newPrice >= oldPrice) {
+        pushStep({
+          title: { vi: "Không cải thiện trạng thái", en: "The state is not improved" },
+          best,
+          hlNodes: [u, v],
+          hlEdges: [[u, v]],
+          codeLine: 25,
+          vars: [
+            { name: "new_price", value: newPrice },
+            { name: `best[${v}][${nextUsed}]`, value: formatValue(oldPrice) },
+            { name: "condition", value: false },
+          ],
+          note: {
+            vi: `${newPrice} không nhỏ hơn ${formatValue(oldPrice)}, nên không cập nhật và không push thêm vào heap.`,
+            en: `${newPrice} is not smaller than ${formatValue(oldPrice)}, so do not update or push another heap state.`,
+          },
+        });
+        continue;
+      }
+
+      pushStep({
+        title: { vi: "Tìm thấy giá tốt hơn", en: "Found a better price" },
+        best,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 25,
+        vars: [
+          { name: "new_price", value: newPrice },
+          { name: `best[${v}][${nextUsed}]`, value: formatValue(oldPrice) },
+          { name: "condition", value: true },
+        ],
+        note: {
+          vi: `${newPrice} < ${formatValue(oldPrice)}, nên trạng thái (city=${v}, used=${nextUsed}) được cải thiện.`,
+          en: `${newPrice} < ${formatValue(oldPrice)}, so state (city=${v}, used=${nextUsed}) is improved.`,
+        },
+      });
+
+      best[v][nextUsed] = newPrice;
+      pushStep({
+        title: { vi: `Cập nhật best[${v}][${nextUsed}] = ${newPrice}`, en: `Update best[${v}][${nextUsed}] = ${newPrice}` },
+        best,
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        codeLine: 26,
+        vars: [{ name: "best", value: formatBest(best) }],
+        note: {
+          vi: `Ghi giá nhỏ nhất ${newPrice} cho trạng thái tới thành phố ${v} bằng đúng ${nextUsed} chuyến.`,
+          en: `Store ${newPrice} as the cheapest price to city ${v} using exactly ${nextUsed} flights.`,
+        },
+      });
+
+      heap.push([newPrice, v, nextUsed]);
+      heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+      pushStep({
+        title: { vi: "Push trạng thái mới vào heap", en: "Push the new state into the heap" },
+        best,
+        hlNodes: [v],
+        codeLine: 27,
+        vars: [
+          { name: "pushed", value: formatState([newPrice, v, nextUsed]) },
+          { name: "heap", value: `[${heap.map(formatState).join(", ")}]` },
+        ],
+        note: {
+          vi: `Đưa (${newPrice}, ${v}, ${nextUsed}) vào min-heap. Heap sẽ quyết định trạng thái rẻ nhất tiếp theo, không phải số cạnh ít nhất.`,
+          en: `Push (${newPrice}, ${v}, ${nextUsed}) into the min-heap. The heap chooses the cheapest next state, not the one with the fewest edges.`,
+        },
+      });
+    }
+  }
+
+  if (answer === -1) {
+    pushStep({
+      title: { vi: "Heap rỗng: không có đường hợp lệ", en: "Heap empty: no valid route" },
+      best,
+      hlNodes: [dst],
+      codeLine: 28,
+      vars: [
+        { name: "heap", value: "[]" },
+        { name: "answer", value: -1 },
+      ],
+      note: {
+        vi: `Đã duyệt hết mọi trạng thái dùng không quá ${maxFlights} chuyến mà không tới dst = ${dst}, nên trả -1.`,
+        en: `All states using at most ${maxFlights} flights were explored without reaching dst = ${dst}, so return -1.`,
+      },
+      final: true,
+    });
+  }
+
+  return { n, flights, src, dst, k, answer, steps };
+}
+
+function buildSteps787(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2
+    ? buildSteps787Dijkstra(input, params)
+    : buildSteps787BellmanFord(input, params);
 }
 
 /**
@@ -7558,20 +8046,30 @@ module.exports = {
       { key: "src", label: { vi: "src (điểm đi)", en: "src (source)" }, default: 0 },
       { key: "dst", label: { vi: "dst (điểm đến)", en: "dst (destination)" }, default: 3 },
       { key: "k", label: { vi: "k (tối đa điểm dừng)", en: "k (maximum stops)" }, default: 1 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Bellman-Ford giới hạn", en: "Approach 1: Bounded Bellman-Ford" } },
+          { value: "2", label: { vi: "Cách 2: Dijkstra + trạng thái", en: "Approach 2: State Dijkstra" } },
+        ],
+      },
     ],
     approach: [
-      { vi: "Đổi giới hạn: tối đa k điểm dừng ở giữa nghĩa là tối đa k + 1 chuyến bay (cạnh).", en: "Translate the limit: at most k intermediate stops means at most k + 1 flights (edges)." },
-      { vi: "cost[v] là giá thấp nhất tới v bằng số chuyến đã được phép ở vòng trước. Khởi tạo cost[src] = 0, các thành phố khác = ∞.", en: "cost[v] is the cheapest price to v using the flights allowed in the previous round. Initialize cost[src] = 0 and all other cities to ∞." },
-      { vi: "Mỗi vòng tạo next_cost = cost[:]. Khi duyệt cạnh u → v, chỉ đọc cost[u] cũ và ghi kết quả tốt hơn vào next_cost[v].", en: "Each round creates next_cost = cost[:]. For edge u → v, read only the old cost[u] and write an improvement to next_cost[v]." },
-      { vi: "Không cập nhật trực tiếp cost trong cùng vòng: nếu làm vậy, một vòng có thể nối nhiều cạnh và vi phạm giới hạn số điểm dừng.", en: "Do not update cost in place during a round: doing so could chain multiple edges in one round and violate the stop limit." },
-      { vi: "Sau k + 1 vòng, cost[dst] là đáp án; nếu vẫn là ∞ thì trả -1.", en: "After k + 1 rounds, cost[dst] is the answer; return -1 if it is still ∞." },
+      { vi: "Cả hai cách đều đổi giới hạn: tối đa k điểm dừng ở giữa nghĩa là tối đa k + 1 chuyến bay (cạnh).", en: "Both approaches translate the limit: at most k intermediate stops means at most k + 1 flights (edges)." },
+      { vi: "Cách 1 — Bellman-Ford giới hạn: chạy k + 1 vòng; mỗi vòng chỉ đọc cost cũ và ghi sang next_cost.", en: "Approach 1 — Bounded Bellman-Ford: run k + 1 rounds; each round reads old cost and writes to next_cost." },
+      { vi: "Cách 2 — Dijkstra trạng thái: min-heap chứa (price, city, flights_used), ưu tiên tổng giá nhỏ nhất.", en: "Approach 2 — State Dijkstra: the min-heap stores (price, city, flights_used), prioritizing the smallest total price." },
+      { vi: "Dijkstra phải lưu best[city][flights_used]. Chỉ lưu best[city] sẽ trộn các đường có số chuyến khác nhau và có thể loại nhầm đường hợp lệ.", en: "Dijkstra must store best[city][flights_used]. Keeping only best[city] mixes routes with different flight counts and can discard a valid route." },
+      { vi: "Khi Dijkstra pop dst khỏi heap, có thể trả ngay vì đó là trạng thái hợp lệ có tổng giá nhỏ nhất.", en: "When Dijkstra pops dst from the heap, it can return immediately because this is the cheapest valid state." },
     ],
     complexity: {
-      time: "O((k + 1) · E)",
-      space: "O(n)",
+      time: "O((k + 1)·E) / O(k·E log(nk))",
+      space: "O(n) / O(nk + E)",
       note: {
-        vi: "Có k + 1 vòng và mỗi vòng duyệt E chuyến bay. Hai mảng cost và next_cost cùng có n phần tử.",
-        en: "There are k + 1 rounds and each scans E flights. cost and next_cost each contain n entries.",
+        vi: "Cách 1 dùng hai mảng n phần tử. Cách 2 có tối đa n·(k+2) trạng thái trong bảng best/heap và adjacency list E cạnh.",
+        en: "Approach 1 uses two n-entry arrays. Approach 2 has at most n·(k+2) states in best/heap plus an E-edge adjacency list.",
       },
     },
     code: [
@@ -7592,6 +8090,38 @@ module.exports = {
       "",
       "        return -1 if cost[dst] == INF else cost[dst]",
     ],
+    code2: [
+      "import heapq",
+      "from collections import defaultdict",
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def findCheapestPrice(self, n: int, flights: List[List[int]], src: int, dst: int, k: int) -> int:",
+      "        graph = defaultdict(list)",
+      "        for u, v, ticket in flights:",
+      "            graph[u].append((v, ticket))",
+      "",
+      "        max_flights = k + 1",
+      "        best = [[float('inf')] * (max_flights + 1) for _ in range(n)]",
+      "        best[src][0] = 0",
+      "        heap = [(0, src, 0)]  # price, city, flights_used",
+      "",
+      "        while heap:",
+      "            price, u, used = heapq.heappop(heap)",
+      "            if u == dst: return price",
+      "            if price != best[u][used]: continue",
+      "            if used == max_flights: continue",
+      "",
+      "            for v, ticket in graph[u]:",
+      "                new_price = price + ticket",
+      "                next_used = used + 1",
+      "                if new_price < best[v][next_used]:",
+      "                    best[v][next_used] = new_price",
+      "                    heapq.heappush(heap, (new_price, v, next_used))",
+      "        return -1",
+    ],
+    codeLabel: { vi: "Cách 1: Bellman-Ford giới hạn", en: "Approach 1: Bounded Bellman-Ford" },
+    code2Label: { vi: "Cách 2: Dijkstra + trạng thái", en: "Approach 2: State Dijkstra" },
     builder: buildSteps787,
   },
   3977: {
