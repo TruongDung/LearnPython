@@ -3030,6 +3030,103 @@ function renderMeetingTimelineView(step) {
   </div>`;
 }
 
+// ---- Twitter Design (#355) ----
+function renderTwitterView(step) {
+  const view = step.twitterView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+
+  // Operations list on left sidebar
+  const opsHtml = (view.operations || []).map((op, i) => {
+    const active = i === view.activeIndex;
+    const done = i < view.activeIndex;
+    return `<div class="profit-op${active ? " active" : ""}${done ? " done" : ""}">
+      <span class="profit-op-index">${i}</span>
+      <span>${escapeHtml(op.label)}</span>
+    </div>`;
+  }).join("");
+
+  // Tweets per user
+  const userIds = [...new Set([
+    ...Object.keys(view.tweets),
+    ...Object.keys(view.following),
+  ])].map(Number).sort((a, b) => a - b);
+
+  const tweetsHtml = userIds.map((uid) => {
+    const list = (view.tweets[uid] || []);
+    const items = list.length ? list.map((t) => `<span class="twitter-tweet-chip">t${t.tweetId}</span>`).join("") : `<em>—</em>`;
+    return `<div class="twitter-state-row">
+      <span class="twitter-label">user ${uid}</span>
+      <span class="twitter-chips">${items}</span>
+    </div>`;
+  }).join("") || `<div class="profit-empty">${vi ? "Chưa có tweet" : "No tweets yet"}</div>`;
+
+  // Following per user
+  const followHtml = userIds.map((uid) => {
+    const set = view.following[uid] || [];
+    const items = set.length ? set.map((f) => `<span class="twitter-follow-chip">→${f}</span>`).join("") : `<em>—</em>`;
+    return `<div class="twitter-state-row">
+      <span class="twitter-label">user ${uid}</span>
+      <span class="twitter-chips">${items}</span>
+    </div>`;
+  }).join("") || `<div class="profit-empty">${vi ? "Chưa follow ai" : "No follows yet"}</div>`;
+
+  // Heap for current getNewsFeed call
+  const heapHtml = view.heap.length
+    ? view.heap.map((entry, idx) => {
+        const rootBadge = idx === 0 ? `<em class="twitter-root">${vi ? "ROOT" : "ROOT"}</em>` : "";
+        const focused = entry.focused ? " focused" : "";
+        return `<div class="profit-heap-entry current${focused}">
+          <div class="profit-heap-top"><span>[${idx}]</span>${rootBadge}</div>
+          <div class="profit-heap-name">ts=${escapeHtml(String(entry.ts))} &nbsp;·&nbsp; <strong>t${escapeHtml(String(entry.tweetId))}</strong> &nbsp;·&nbsp; user ${escapeHtml(String(entry.userId))}</div>
+        </div>`;
+      }).join("")
+    : `<div class="profit-empty">heap = []</div>`;
+
+  // Feed results
+  const feedsHtml = view.feeds.length
+    ? view.feeds.map((feed) =>
+        `<div class="twitter-feed-row">
+          <strong>getNewsFeed(${escapeHtml(String(feed.userId))})</strong>
+          &nbsp;→&nbsp;
+          [${feed.result.map((t) => `t${t}`).join(", ")}]
+        </div>`
+      ).join("")
+    : `<div class="profit-empty">${vi ? "Chưa có getNewsFeed" : "No getNewsFeed yet"}</div>`;
+
+  el.innerHTML = `<div class="profit-tracker-viz" role="img" aria-label="Twitter Design 355">
+    <div class="profit-ops">${opsHtml}</div>
+    <div class="profit-state-grid">
+      <section class="profit-state-panel">
+        <h4>${vi ? "tweets (mới nhất ở cuối)" : "tweets (most recent last)"}</h4>
+        ${tweetsHtml}
+      </section>
+      <section class="profit-state-panel">
+        <h4>${vi ? "following" : "following"}</h4>
+        ${followHtml}
+      </section>
+    </div>
+    <section class="profit-state-panel" style="margin:6px 0">
+      <h4>heap &nbsp;·&nbsp; getNewsFeed &nbsp;<small style="font-weight:400;opacity:.75">${vi ? "(ts nhỏ hơn = mới hơn)" : "(smaller ts = more recent)"}</small></h4>
+      <div class="profit-heap-list">${heapHtml}</div>
+    </section>
+    <div class="profit-result-row">
+      <strong>${vi ? "Kết quả" : "Results"}</strong>
+      ${feedsHtml}
+    </div>
+  </div>
+
+  <style>
+    .twitter-state-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:.82rem}
+    .twitter-label{min-width:52px;color:var(--text-muted,#888);font-weight:600}
+    .twitter-chips{display:flex;flex-wrap:wrap;gap:4px}
+    .twitter-tweet-chip{background:var(--hl-amber,#f59e0b22);border:1px solid var(--hl-amber,#f59e0b55);border-radius:4px;padding:1px 5px;font-size:.78rem;color:var(--hl-amber,#f59e0b)}
+    .twitter-follow-chip{background:var(--hl-blue,#3b82f622);border:1px solid var(--hl-blue,#3b82f655);border-radius:4px;padding:1px 5px;font-size:.78rem;color:var(--hl-blue,#3b82f6)}
+    .twitter-feed-row{font-size:.82rem;padding:2px 0}
+    .twitter-root{font-size:.7rem;background:var(--hl-green,#22c55e33);color:var(--hl-green,#22c55e);border-radius:3px;padding:1px 4px;margin-left:4px}
+  </style>`;
+}
+
 // ---- Real-time experience profit tracker (#9001) ----
 function renderProfitTrackerView(step) {
   const view = step.profitTrackerView;
@@ -3152,6 +3249,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.twitterView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwitterView(step);
   } else if (step.profitTrackerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

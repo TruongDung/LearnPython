@@ -2837,6 +2837,428 @@ function buildSteps218(input) {
   return { original: plainBuildings, answer, steps };
 }
 
+/**
+ * LeetCode 355: Design Twitter.
+ *
+ * Data model:
+ *   count   — global timestamp, starts at 0 and decrements each postTweet.
+ *             Smaller value = more recent tweet → treated as min-heap key.
+ *   tweets  — Map: userId → [(ts, tweetId), ...]  (chronological order)
+ *   following — Map: userId → Set{followeeId}
+ *
+ * getNewsFeed(userId):
+ *   1. followees = following[userId] ∪ {userId}
+ *   2. For each user in followees push their most-recent tweet (last element)
+ *      into a min-heap as (ts, tweetId, uid, idx).
+ *   3. Pop up to 10 times; after each pop push that user's next older tweet.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  from collections import defaultdict
+ *  3  class Twitter:
+ *  4      def __init__(self):
+ *  5          self.count = 0
+ *  6          self.tweets = defaultdict(list)
+ *  7          self.following = defaultdict(set)
+ *  8      def postTweet(self, userId, tweetId):
+ *  9          self.tweets[userId].append((self.count, tweetId))
+ * 10          self.count -= 1
+ * 11      def getNewsFeed(self, userId):
+ * 12          heap = []
+ * 13          followees = self.following[userId] | {userId}
+ * 14          for uid in followees:
+ * 15              if self.tweets[uid]:
+ * 16                  idx = len(self.tweets[uid]) - 1
+ * 17                  ts, tweetId = self.tweets[uid][idx]
+ * 18                  heapq.heappush(heap, (ts, tweetId, uid, idx))
+ * 19          result = []
+ * 20          while heap and len(result) < 10:
+ * 21              ts, tweetId, uid, idx = heapq.heappop(heap)
+ * 22              result.append(tweetId)
+ * 23              if idx > 0:
+ * 24                  idx -= 1
+ * 25                  next_ts, next_tid = self.tweets[uid][idx]
+ * 26                  heapq.heappush(heap, (next_ts, next_tid, uid, idx))
+ * 27          return result
+ * 28      def follow(self, followerId, followeeId):
+ * 29          self.following[followerId].add(followeeId)
+ * 30      def unfollow(self, followerId, followeeId):
+ * 31          self.following[followerId].discard(followeeId)
+ */
+function buildSteps355(rawInput, params) {
+  // ── Parse operations from input ──────────────────────────────────────────
+  // Input format: each operation on its own line or separated by semicolons.
+  // Supported:
+  //   postTweet(userId, tweetId)
+  //   follow(followerId, followeeId)
+  //   unfollow(followerId, followeeId)
+  //   getNewsFeed(userId)
+  const lines = String(rawInput)
+    .split(/[\n;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const operations = [];
+  for (const line of lines) {
+    const m = line.match(/^(\w+)\(([^)]*)\)$/);
+    if (!m) continue;
+    const name = m[1];
+    const args = m[2].split(",").map((s) => Number(s.trim()));
+    if (name === "postTweet" && args.length === 2)
+      operations.push({ type: "postTweet", userId: args[0], tweetId: args[1], label: `postTweet(${args[0]}, ${args[1]})` });
+    else if (name === "follow" && args.length === 2)
+      operations.push({ type: "follow", followerId: args[0], followeeId: args[1], label: `follow(${args[0]}, ${args[1]})` });
+    else if (name === "unfollow" && args.length === 2)
+      operations.push({ type: "unfollow", followerId: args[0], followeeId: args[1], label: `unfollow(${args[0]}, ${args[1]})` });
+    else if (name === "getNewsFeed" && args.length === 1)
+      operations.push({ type: "getNewsFeed", userId: args[0], label: `getNewsFeed(${args[0]})` });
+  }
+
+  const steps = [];
+
+  if (operations.length === 0) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [],
+      note: {
+        vi: "Nhập các operation mỗi dòng. Ví dụ:\npostTweet(1,5)\npostTweet(1,3)\nfollow(1,2)\ngetNewsFeed(1)",
+        en: "Enter operations one per line. Example:\npostTweet(1,5)\npostTweet(1,3)\nfollow(1,2)\ngetNewsFeed(1)",
+      },
+      twitterView: { operations: [], activeIndex: -1, tweets: {}, following: {}, heap: [], feeds: [] },
+    });
+    return { answer: "[]", steps };
+  }
+
+  // ── Simulation state ──────────────────────────────────────────────────────
+  let globalTs = 0;                    // decrements on each postTweet
+  const tweets = {};                   // uid → [{ts, tweetId}]  (insertion order = chrono)
+  const following = {};                // uid → [followeeId, ...]
+  const feeds = [];                    // accumulated getNewsFeed results
+
+  function getTweets(uid) { return tweets[uid] || []; }
+  function getFollowing(uid) { return following[uid] || []; }
+
+  // Snapshot helpers
+  function snapTweets() {
+    const out = {};
+    for (const [uid, list] of Object.entries(tweets))
+      out[uid] = list.map((t) => ({ ts: t.ts, tweetId: t.tweetId }));
+    return out;
+  }
+  function snapFollowing() {
+    const out = {};
+    for (const [uid, list] of Object.entries(following))
+      out[uid] = [...list];
+    return out;
+  }
+  function makeStep(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [], highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      twitterView: {
+        operations,
+        activeIndex: opts.activeIndex,
+        tweets: snapTweets(),
+        following: snapFollowing(),
+        heap: opts.heap || [],
+        feeds: [...feeds],
+      },
+    });
+  }
+
+  // ── Intro step ────────────────────────────────────────────────────────────
+  makeStep({
+    title: { vi: "Khởi tạo Twitter", en: "Initialize Twitter" },
+    activeIndex: -1,
+    codeLines: [4, 5, 6, 7],
+    vars: [
+      { name: "count", value: 0 },
+      { name: "tweets", value: "{}" },
+      { name: "following", value: "{}" },
+    ],
+    note: {
+      vi:
+        "count = 0 — mỗi lần postTweet sẽ giảm đi 1, nên tweet mới nhất có ts nhỏ nhất.\n" +
+        "tweets: userId → danh sách (ts, tweetId).\n" +
+        "following: userId → tập followee.",
+      en:
+        "count = 0 — decremented each postTweet, so the newest tweet has the smallest ts.\n" +
+        "tweets: userId → list of (ts, tweetId).\n" +
+        "following: userId → set of followees.",
+    },
+  });
+
+  // ── Execute operations ────────────────────────────────────────────────────
+  for (let opIdx = 0; opIdx < operations.length; opIdx++) {
+    const op = operations[opIdx];
+
+    if (op.type === "postTweet") {
+      const ts = globalTs;
+      globalTs -= 1;
+      if (!tweets[op.userId]) tweets[op.userId] = [];
+      tweets[op.userId].push({ ts, tweetId: op.tweetId });
+
+      makeStep({
+        title: { vi: `postTweet(${op.userId}, ${op.tweetId})`, en: `postTweet(${op.userId}, ${op.tweetId})` },
+        activeIndex: opIdx,
+        codeLines: [8, 9, 10],
+        vars: [
+          { name: "userId", value: op.userId },
+          { name: "tweetId", value: op.tweetId },
+          { name: "ts (count)", value: ts },
+          { name: "count after", value: globalTs },
+          { name: `tweets[${op.userId}]`, value: `[${getTweets(op.userId).map((t) => `(${t.ts},t${t.tweetId})`).join(", ")}]` },
+        ],
+        note: {
+          vi: `Thêm tweet t${op.tweetId} vào tweets[${op.userId}] với timestamp ${ts}. count giảm xuống ${globalTs} — tweet tiếp theo sẽ có ts nhỏ hơn (mới hơn).`,
+          en: `Append tweet t${op.tweetId} to tweets[${op.userId}] with timestamp ${ts}. count decrements to ${globalTs} — the next tweet will have a smaller (more recent) ts.`,
+        },
+      });
+    } else if (op.type === "follow") {
+      if (!following[op.followerId]) following[op.followerId] = [];
+      if (!following[op.followerId].includes(op.followeeId)) {
+        following[op.followerId].push(op.followeeId);
+        following[op.followerId].sort((a, b) => a - b);
+      }
+
+      makeStep({
+        title: { vi: `follow(${op.followerId}, ${op.followeeId})`, en: `follow(${op.followerId}, ${op.followeeId})` },
+        activeIndex: opIdx,
+        codeLines: [28, 29],
+        vars: [
+          { name: "followerId", value: op.followerId },
+          { name: "followeeId", value: op.followeeId },
+          { name: `following[${op.followerId}]`, value: `{${getFollowing(op.followerId).join(", ")}}` },
+        ],
+        note: {
+          vi: `User ${op.followerId} bây giờ theo dõi user ${op.followeeId}. getNewsFeed(${op.followerId}) sẽ bao gồm cả tweet của ${op.followeeId}.`,
+          en: `User ${op.followerId} now follows user ${op.followeeId}. getNewsFeed(${op.followerId}) will include tweets from ${op.followeeId}.`,
+        },
+      });
+    } else if (op.type === "unfollow") {
+      if (following[op.followerId]) {
+        following[op.followerId] = following[op.followerId].filter((id) => id !== op.followeeId);
+      }
+
+      makeStep({
+        title: { vi: `unfollow(${op.followerId}, ${op.followeeId})`, en: `unfollow(${op.followerId}, ${op.followeeId})` },
+        activeIndex: opIdx,
+        codeLines: [30, 31],
+        vars: [
+          { name: "followerId", value: op.followerId },
+          { name: "followeeId", value: op.followeeId },
+          { name: `following[${op.followerId}]`, value: `{${getFollowing(op.followerId).join(", ")}}` },
+        ],
+        note: {
+          vi: `User ${op.followerId} bỏ theo dõi user ${op.followeeId}. Dùng discard() nên không lỗi nếu chưa follow.`,
+          en: `User ${op.followerId} unfollows user ${op.followeeId}. Uses discard() so no error if not following.`,
+        },
+      });
+    } else if (op.type === "getNewsFeed") {
+      const uid = op.userId;
+      const followeeSet = new Set([uid, ...(following[uid] || [])]);
+
+      // Step 1: show followees + init heap
+      makeStep({
+        title: { vi: `getNewsFeed(${uid}): tập followees`, en: `getNewsFeed(${uid}): build followees set` },
+        activeIndex: opIdx,
+        codeLines: [11, 12, 13],
+        vars: [
+          { name: "userId", value: uid },
+          { name: "followees", value: `{${[...followeeSet].sort().join(", ")}}` },
+          { name: "heap", value: "[]" },
+        ],
+        note: {
+          vi: `followees = following[${uid}] ∪ {${uid}} = {${[...followeeSet].sort().join(", ")}}.\nMỗi user trong tập này sẽ đóng góp tweet mới nhất vào min-heap.`,
+          en: `followees = following[${uid}] ∪ {${uid}} = {${[...followeeSet].sort().join(", ")}}.\nEach user's most-recent tweet is pushed into the min-heap.`,
+        },
+      });
+
+      // Build initial heap (min-heap on ts; smaller ts = more recent)
+      const heap = []; // [{ts, tweetId, userId, idx}]
+
+      function heapPush(item) {
+        heap.push(item);
+        let i = heap.length - 1;
+        while (i > 0) {
+          const p = Math.floor((i - 1) / 2);
+          if (heap[p].ts <= heap[i].ts) break;
+          [heap[p], heap[i]] = [heap[i], heap[p]];
+          i = p;
+        }
+      }
+      function heapPop() {
+        const top = heap[0];
+        const last = heap.pop();
+        if (heap.length > 0) {
+          heap[0] = last;
+          let i = 0;
+          while (true) {
+            let s = i;
+            const l = 2 * i + 1, r = 2 * i + 2;
+            if (l < heap.length && heap[l].ts < heap[s].ts) s = l;
+            if (r < heap.length && heap[r].ts < heap[s].ts) s = r;
+            if (s === i) break;
+            [heap[i], heap[s]] = [heap[s], heap[i]];
+            i = s;
+          }
+        }
+        return top;
+      }
+      function heapSnap() {
+        return heap.map((e, i) => ({ ts: e.ts, tweetId: e.tweetId, userId: e.userId, focused: i === 0 }));
+      }
+
+      // Push each followee's most-recent tweet
+      for (const fuid of [...followeeSet].sort((a, b) => a - b)) {
+        const userTweets = tweets[fuid] || [];
+        if (userTweets.length === 0) continue;
+        const idx = userTweets.length - 1;
+        const { ts, tweetId } = userTweets[idx];
+        heapPush({ ts, tweetId, userId: fuid, idx });
+
+        makeStep({
+          title: { vi: `heappush: t${tweetId} của user ${fuid} (ts=${ts})`, en: `heappush: t${tweetId} from user ${fuid} (ts=${ts})` },
+          activeIndex: opIdx,
+          heap: heapSnap(),
+          codeLines: [14, 15, 16, 17, 18],
+          vars: [
+            { name: "uid (inner loop)", value: fuid },
+            { name: "idx", value: idx },
+            { name: "ts", value: ts },
+            { name: "tweetId", value: tweetId },
+            { name: "heap size", value: heap.length },
+          ],
+          note: {
+            vi: `Tweet mới nhất của user ${fuid} là t${tweetId} (ts=${ts}). Push (${ts}, t${tweetId}, uid=${fuid}, idx=${idx}) vào heap. Root là tweet có ts nhỏ nhất = mới nhất.`,
+            en: `User ${fuid}'s most-recent tweet is t${tweetId} (ts=${ts}). Push (${ts}, t${tweetId}, uid=${fuid}, idx=${idx}) into heap. Root = smallest ts = most recent.`,
+          },
+        });
+      }
+
+      // Pop up to 10
+      const result = [];
+      makeStep({
+        title: { vi: `result = []; bắt đầu pop tối đa 10`, en: `result = []; start popping up to 10` },
+        activeIndex: opIdx,
+        heap: heapSnap(),
+        codeLines: [19, 20],
+        vars: [
+          { name: "result", value: "[]" },
+          { name: "heap size", value: heap.length },
+        ],
+        note: {
+          vi: "Vòng while: mỗi lần pop root (tweet mới nhất), thêm vào result, rồi push tweet cũ hơn của cùng user nếu còn.",
+          en: "While loop: each pop takes the root (most-recent tweet), appends to result, then pushes the same user's next-older tweet if any.",
+        },
+      });
+
+      while (heap.length > 0 && result.length < 10) {
+        const top = heapPop();
+
+        makeStep({
+          title: { vi: `heappop → t${top.tweetId} (user ${top.userId}, ts=${top.ts})`, en: `heappop → t${top.tweetId} (user ${top.userId}, ts=${top.ts})` },
+          activeIndex: opIdx,
+          heap: heapSnap(),
+          codeLines: [20, 21, 22],
+          vars: [
+            { name: "ts", value: top.ts },
+            { name: "tweetId", value: top.tweetId },
+            { name: "uid", value: top.userId },
+            { name: "idx", value: top.idx },
+            { name: "result", value: `[${[...result, top.tweetId].join(", ")}]` },
+          ],
+          note: {
+            vi: `Pop root: t${top.tweetId} từ user ${top.userId} (ts=${top.ts}) — tweet mới nhất còn trong heap. Thêm vào result.`,
+            en: `Pop root: t${top.tweetId} from user ${top.userId} (ts=${top.ts}) — the most-recent remaining tweet. Append to result.`,
+          },
+        });
+
+        result.push(top.tweetId);
+
+        // Push this user's next older tweet
+        if (top.idx > 0) {
+          const nextIdx = top.idx - 1;
+          const { ts: nts, tweetId: ntid } = tweets[top.userId][nextIdx];
+          heapPush({ ts: nts, tweetId: ntid, userId: top.userId, idx: nextIdx });
+
+          makeStep({
+            title: { vi: `Push tweet cũ hơn của user ${top.userId}: t${ntid} (ts=${nts})`, en: `Push next-older tweet from user ${top.userId}: t${ntid} (ts=${nts})` },
+            activeIndex: opIdx,
+            heap: heapSnap(),
+            codeLines: [23, 24, 25, 26],
+            vars: [
+              { name: "idx - 1", value: nextIdx },
+              { name: "next_ts", value: nts },
+              { name: "next_tid", value: ntid },
+              { name: "heap size", value: heap.length },
+            ],
+            note: {
+              vi: `idx=${top.idx} > 0, nên còn tweet cũ hơn. Push (${nts}, t${ntid}, uid=${top.userId}) vào heap để lần pop tiếp theo vẫn xét được tweet của user này.`,
+              en: `idx=${top.idx} > 0 so an older tweet exists. Push (${nts}, t${ntid}, uid=${top.userId}) so this user's older tweet stays in contention.`,
+            },
+          });
+        } else {
+          makeStep({
+            title: { vi: `User ${top.userId} không còn tweet nào cũ hơn`, en: `User ${top.userId} has no older tweets` },
+            activeIndex: opIdx,
+            heap: heapSnap(),
+            codeLines: [23],
+            vars: [
+              { name: "idx", value: top.idx },
+              { name: "condition idx > 0", value: false },
+            ],
+            note: {
+              vi: `idx=${top.idx} = 0, không còn tweet nào cũ hơn của user ${top.userId}. Không push thêm gì.`,
+              en: `idx=${top.idx} = 0, user ${top.userId} has no more older tweets. Nothing pushed.`,
+            },
+          });
+        }
+      }
+
+      // Record this feed result
+      feeds.push({ userId: uid, result: [...result] });
+
+      makeStep({
+        title: { vi: `getNewsFeed(${uid}) → [${result.join(", ")}]`, en: `getNewsFeed(${uid}) → [${result.join(", ")}]` },
+        activeIndex: opIdx,
+        heap: [],
+        codeLines: [27],
+        vars: [
+          { name: "result", value: `[${result.join(", ")}]` },
+        ],
+        note: {
+          vi: `Trả về [${result.join(", ")}] — tối đa 10 tweet mới nhất từ user ${uid} và những người họ theo dõi.`,
+          en: `Return [${result.join(", ")}] — the up to 10 most-recent tweets from user ${uid} and their followees.`,
+        },
+      });
+    }
+  }
+
+  // Final step
+  const lastFeeds = feeds.map((f) => `getNewsFeed(${f.userId})=[${f.result.join(",")}]`).join("; ");
+  makeStep({
+    title: { vi: "Hoàn tất tất cả operations", en: "All operations completed" },
+    activeIndex: operations.length,
+    heap: [],
+    codeLines: [],
+    final: true,
+    vars: [],
+    note: {
+      vi: `Đã thực thi ${operations.length} operation. Kết quả getNewsFeed: ${lastFeeds || "(none)"}`,
+      en: `Executed ${operations.length} operations. Feed results: ${lastFeeds || "(none)"}`,
+    },
+  });
+
+  const answer = feeds.length ? `[${feeds[feeds.length - 1].result.join(",")}]` : "[]";
+  return { answer, steps };
+}
+
 module.exports = {
   218: {
     id: 218,
@@ -3456,5 +3878,82 @@ module.exports = {
     codeLabel: { vi: "Cách 1: Min-Heap", en: "Approach 1: Min-Heap" },
     code2Label: { vi: "Cách 2: Divide & Conquer", en: "Approach 2: Divide & Conquer" },
     builder: buildSteps23,
+  },
+  355: {
+    id: 355,
+    difficulty: "medium",
+    slug: "design-twitter",
+    category: HEAP_CAT,
+    title: { vi: "Design Twitter", en: "Design Twitter" },
+    titleVi: { vi: "Thiết kế mạng xã hội Twitter (Heap + HashMap)", en: "Design a mini Twitter (Heap + HashMap)" },
+    statement: {
+      vi:
+        "Thiết kế một phiên bản đơn giản của Twitter hỗ trợ các thao tác:\n" +
+        "• postTweet(userId, tweetId) — đăng tweet.\n" +
+        "• getNewsFeed(userId) — lấy 10 tweet mới nhất từ user và những người họ follow.\n" +
+        "• follow(followerId, followeeId) — follow user.\n" +
+        "• unfollow(followerId, followeeId) — unfollow user.\n" +
+        "Nhập mỗi operation trên một dòng (hoặc ngăn bởi ;). Ví dụ:\n" +
+        "postTweet(1,5);postTweet(1,3);postTweet(2,6);follow(1,2);getNewsFeed(1);unfollow(1,2);getNewsFeed(1)",
+      en:
+        "Design a simplified version of Twitter supporting:\n" +
+        "• postTweet(userId, tweetId) — post a tweet.\n" +
+        "• getNewsFeed(userId) — get 10 most-recent tweets from user and followees.\n" +
+        "• follow(followerId, followeeId) — follow a user.\n" +
+        "• unfollow(followerId, followeeId) — unfollow a user.\n" +
+        "Enter one operation per line (or separate with ;). Example:\n" +
+        "postTweet(1,5);postTweet(1,3);postTweet(2,6);follow(1,2);getNewsFeed(1);unfollow(1,2);getNewsFeed(1)",
+    },
+    defaultInput: "postTweet(1,5);postTweet(1,3);postTweet(2,6);follow(1,2);getNewsFeed(1);unfollow(1,2);getNewsFeed(1)",
+    inputKind: "string",
+    inputLabel: { vi: "Operations (mỗi dòng hoặc ngăn bởi ;)", en: "Operations (one per line or separated by ;)" },
+    approach: [
+      { vi: "count toàn cục giảm dần mỗi postTweet → tweet mới nhất có ts nhỏ nhất → dùng min-heap.", en: "A global count decrements on each postTweet → newest tweet has the smallest ts → use a min-heap." },
+      { vi: "tweets[userId] lưu danh sách (ts, tweetId) theo thứ tự thời gian; idx trỏ từ cuối về đầu.", en: "tweets[userId] stores (ts, tweetId) in chronological order; idx walks backward from the end." },
+      { vi: "getNewsFeed: push tweet MỚI NHẤT của mỗi followee vào min-heap, rồi pop tối đa 10 lần.", en: "getNewsFeed: push each followee's MOST-RECENT tweet into the min-heap, then pop up to 10 times." },
+      { vi: "Sau mỗi pop, nếu user đó còn tweet cũ hơn thì push tweet tiếp theo vào heap.", en: "After each pop, if the user has an older tweet push it to keep that user in contention." },
+    ],
+    complexity: {
+      time: "O(n log n) getNewsFeed (n followees); O(1) postTweet / follow / unfollow",
+      space: "O(T + F) — T tweets, F follow pairs",
+      note: {
+        vi: "n = số followee. getNewsFeed duy trì heap kích thước ≤ n, pop tối đa 10 lần → O(n + 10 log n).",
+        en: "n = number of followees. getNewsFeed maintains a heap of size ≤ n and pops at most 10 times → O(n + 10 log n).",
+      },
+    },
+    code: [
+      "import heapq",
+      "from collections import defaultdict",
+      "class Twitter:",
+      "    def __init__(self):",
+      "        self.count = 0",
+      "        self.tweets = defaultdict(list)",
+      "        self.following = defaultdict(set)",
+      "    def postTweet(self, userId, tweetId):",
+      "        self.tweets[userId].append((self.count, tweetId))",
+      "        self.count -= 1",
+      "    def getNewsFeed(self, userId):",
+      "        heap = []",
+      "        followees = self.following[userId] | {userId}",
+      "        for uid in followees:",
+      "            if self.tweets[uid]:",
+      "                idx = len(self.tweets[uid]) - 1",
+      "                ts, tweetId = self.tweets[uid][idx]",
+      "                heapq.heappush(heap, (ts, tweetId, uid, idx))",
+      "        result = []",
+      "        while heap and len(result) < 10:",
+      "            ts, tweetId, uid, idx = heapq.heappop(heap)",
+      "            result.append(tweetId)",
+      "            if idx > 0:",
+      "                idx -= 1",
+      "                next_ts, next_tid = self.tweets[uid][idx]",
+      "                heapq.heappush(heap, (next_ts, next_tid, uid, idx))",
+      "        return result",
+      "    def follow(self, followerId, followeeId):",
+      "        self.following[followerId].add(followeeId)",
+      "    def unfollow(self, followerId, followeeId):",
+      "        self.following[followerId].discard(followeeId)",
+    ],
+    builder: buildSteps355,
   },
 };
