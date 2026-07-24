@@ -9357,7 +9357,7 @@ function buildSteps332Approach2(input) {
   if (tickets.length === 0 || tickets.some(([s, d]) => !s || !d || s === d)) {
     steps.push({
       title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
-      arr: [], highlight: [], mark: [], final: true, codeLines: [4],
+      arr: [], highlight: [], mark: [], final: true, codeBlock: 2, codeLines: [4],
       vars: [{ name: "tickets", value: "[]" }],
       note: {
         vi: "Nhập các vé dạng SRC-DST, ngăn bởi dấu phẩy. Ví dụ: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
@@ -9433,6 +9433,7 @@ function buildSteps332Approach2(input) {
       visitedNodes: [],
     },
     highlight: [], mark: [],
+    codeBlock: 2,
     codeLines: [5, 6, 7],
     vars: [{ name: "tickets", value: `[${tickets.map(([s, d]) => `(${s},${d})`).join(", ")}]` }],
     note: {
@@ -9459,6 +9460,7 @@ function buildSteps332Approach2(input) {
         visitedNodes: [],
       },
       highlight: [], mark: [],
+      codeBlock: 2,
       codeLines: [6, 7],
       vars: [
         { name: "src", value: src },
@@ -9485,6 +9487,7 @@ function buildSteps332Approach2(input) {
       visitedNodes: [],
     },
     highlight: [], mark: [],
+    codeBlock: 2,
     codeLines: [8, 14],
     vars: [
       { name: "graph", value: `{${graphStr()}}` },
@@ -9527,6 +9530,7 @@ function buildSteps332Approach2(input) {
         visitedNodes: [...visited],
       },
       highlight: [], mark: [],
+      codeBlock: 2,
       codeLines: [9, 10],
       vars: [
         { name: "airport", value: airport },
@@ -9558,6 +9562,7 @@ function buildSteps332Approach2(input) {
           visitedNodes: [...visited],
         },
         highlight: [], mark: [],
+        codeBlock: 2,
         codeLines: [11, 12],
         vars: [
           { name: "airport", value: airport },
@@ -9593,6 +9598,7 @@ function buildSteps332Approach2(input) {
         visitedNodes: [...visited],
       },
       highlight: [], mark: [],
+      codeBlock: 2,
       codeLines: [10, 13],
       vars: [
         { name: "airport", value: airport },
@@ -9626,6 +9632,7 @@ function buildSteps332Approach2(input) {
     },
     highlight: [], mark: [],
     final: true,
+    codeBlock: 2,
     codeLines: [15],
     vars: [
       { name: "result (before reverse)", value: `[${result.join(", ")}]` },
@@ -9780,7 +9787,6 @@ module.exports = {
       },
     },
     code: [
-      "# Approach 1: Sort reverse + pop()",
       "from collections import defaultdict",
       "class Solution:",
       "    def findItinerary(self, tickets):",
@@ -9795,8 +9801,8 @@ module.exports = {
       "            result.append(airport)",
       "        dfs('JFK')",
       "        return result[::-1]",
-      "",
-      "# Approach 2: Priority Queue (min-heap)",
+    ],
+    code2: [
       "import heapq",
       "from collections import defaultdict",
       "class Solution:",
@@ -9813,6 +9819,8 @@ module.exports = {
       "        dfs('JFK')",
       "        return result[::-1]",
     ],
+    codeLabel: { vi: "Cách 1: Sort reverse + pop()", en: "Approach 1: Sort reverse + pop()" },
+    code2Label: { vi: "Cách 2: Priority Queue (min-heap)", en: "Approach 2: Priority Queue (min-heap)" },
     builder: buildSteps332,
   },
   133: {
