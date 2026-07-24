@@ -9005,11 +9005,329 @@ function buildSteps3977(input, params) {
   return approach === 2 ? buildSteps3977PowerDP(input, params) : buildSteps3977Dijkstra(input, params);
 }
 
+/**
+ * LeetCode 332: Reconstruct Itinerary.
+ * Sort adjacency list in reverse order so .pop() gives lexicographic order.
+ * Post-order DFS (Hierholzer's algorithm): airport is appended to result
+ * only after all its outgoing edges are exhausted. Reverse at the end.
+ *
+ * Code lines (1-indexed):
+ *  1  from collections import defaultdict
+ *  2  class Solution:
+ *  3      def findItinerary(self, tickets):
+ *  4          graph = defaultdict(list)
+ *  5          for src, dst in sorted(tickets, reverse=True):
+ *  6              graph[src].append(dst)
+ *  7          result = []
+ *  8          def dfs(airport):
+ *  9              while graph[airport]:
+ * 10                  next_dest = graph[airport].pop()
+ * 11                  dfs(next_dest)
+ * 12              result.append(airport)
+ * 13          dfs("JFK")
+ * 14          return result[::-1]
+ */
+function buildSteps332(input) {
+  // Parse "SRC-DST" pairs separated by commas or semicolons
+  const raw = String(input).split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  const tickets = raw.map((pair) => {
+    const parts = pair.split("-").map((s) => s.trim());
+    return [parts[0], parts[1]];
+  });
+
+  const steps = [];
+
+  // Validation
+  if (
+    tickets.length === 0
+    || tickets.some(([s, d]) => !s || !d || s === d)
+  ) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "tickets", value: "[]" }],
+      note: {
+        vi: "Nhập các vé dạng SRC-DST, ngăn bởi dấu phẩy. Ví dụ: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+        en: "Enter tickets as SRC-DST separated by commas. Example: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+      },
+    });
+    return { tickets: raw, answer: [], steps };
+  }
+
+  // All unique airports
+  const allAirports = [...new Set(tickets.flatMap(([s, d]) => [s, d]))].sort();
+
+  // Build graph as in the Python code: sort tickets reverse → pop gives lex order
+  const graph = {};
+  allAirports.forEach((a) => { graph[a] = []; });
+  const sorted = [...tickets].sort((a, b) => {
+    const ka = `${a[0]}-${a[1]}`;
+    const kb = `${b[0]}-${b[1]}`;
+    return kb.localeCompare(ka); // reverse
+  });
+
+  // Helper: make graph snapshot for step rendering
+  const graphEdgesFromGraph = () => {
+    const edgeList = [];
+    for (const [src, dsts] of Object.entries(graph)) {
+      for (const dst of dsts) {
+        edgeList.push({ u: src, v: dst });
+      }
+    }
+    return edgeList;
+  };
+
+  const graphStr = (g) => {
+    return Object.entries(g)
+      .filter(([, v]) => v.length > 0)
+      .map(([k, v]) => `${k}: [${v.join(", ")}]`)
+      .join(", ");
+  };
+
+  // Step: Initialize graph
+  steps.push({
+    title: { vi: "Khởi tạo graph và sắp xếp vé", en: "Build graph & sort tickets" },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+      edges: [],
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "tickets", value: `[${tickets.map(([s, d]) => `(${s},${d})`).join(", ")}]` },
+    ],
+    note: {
+      vi:
+        "Sắp xếp vé theo thứ tự đảo ngược (reverse=True) để có thể dùng pop() lấy điểm đến nhỏ nhất theo thứ tự từ điển.\n" +
+        "Vì pop() lấy phần tử cuối mảng, nên lưu theo thứ tự ngược là mẹo để lấy phần tử nhỏ nhất trước.",
+      en:
+        "Sort tickets in reverse order so .pop() returns destinations in lexicographic order.\n" +
+        "Since .pop() takes the last element, storing in reverse means the smallest destination is always at the back.",
+    },
+  });
+
+  // Fill graph from sorted tickets
+  for (const [src, dst] of sorted) {
+    graph[src].push(dst);
+    steps.push({
+      title: { vi: `graph[${src}].append(${dst})`, en: `graph[${src}].append(${dst})` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [src, dst],
+        hlEdges: [[src, dst]],
+        visitedNodes: [],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: [5, 6],
+      vars: [
+        { name: "src", value: src },
+        { name: "dst", value: dst },
+        { name: "graph", value: `{${graphStr(graph)}}` },
+      ],
+      note: {
+        vi: `Thêm cạnh ${src} → ${dst} vào adjacency list của ${src}.`,
+        en: `Append destination ${dst} to ${src}'s adjacency list.`,
+      },
+    });
+  }
+
+  // Show initial adjacency list — all edges loaded
+  const allEdgesSnapshot = graphEdgesFromGraph();
+  steps.push({
+    title: { vi: "Graph đã xây dựng xong — bắt đầu DFS từ JFK", en: "Graph built — start DFS from JFK" },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+      edges: allEdgesSnapshot,
+      hlNodes: ["JFK"],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [],
+    mark: [],
+    codeLines: [7, 13],
+    vars: [
+      { name: "graph", value: `{${graphStr(graph)}}` },
+      { name: "result", value: "[]" },
+      { name: "start", value: "JFK" },
+    ],
+    note: {
+      vi:
+        "result = []; gọi dfs('JFK').\n" +
+        "DFS theo Hierholzer: chỉ append airport vào result SAU KHI tất cả cạnh đi ra đã được dùng.\n" +
+        "Đảo ngược result ở cuối để có hành trình.",
+      en:
+        "result = []; call dfs('JFK').\n" +
+        "Hierholzer's DFS: only append an airport AFTER all its outgoing edges are exhausted.\n" +
+        "Reverse result at the end to get the itinerary.",
+    },
+  });
+
+  // Run DFS with step recording
+  const result = [];
+  const visited = new Set(); // airports fully processed
+  const callStack = []; // track DFS call depth for display
+
+  function dfs(airport) {
+    callStack.push(airport);
+    const stackStr = callStack.join(" → ");
+
+    steps.push({
+      title: { vi: `dfs(${airport}) gọi`, en: `dfs(${airport}) called` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({
+          id: a,
+          label: a,
+          dist: result.includes(a) ? "✓" : "",
+        })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [airport],
+        hlEdges: [],
+        visitedNodes: [...visited],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: [8, 9],
+      vars: [
+        { name: "airport", value: airport },
+        { name: "graph[airport]", value: `[${graph[airport].join(", ")}]` },
+        { name: "call stack", value: stackStr },
+        { name: "result", value: `[${result.join(", ")}]` },
+      ],
+      note: {
+        vi: `Vào dfs(${airport}). Adjacency list: [${graph[airport].join(", ")}]. Khi còn vé, pop điểm đến nhỏ nhất và đệ quy.`,
+        en: `Enter dfs(${airport}). Adjacency list: [${graph[airport].join(", ")}]. While tickets exist, pop the smallest dest and recurse.`,
+      },
+    });
+
+    while (graph[airport].length > 0) {
+      const next = graph[airport].pop();
+
+      steps.push({
+        title: { vi: `pop ${next} từ graph[${airport}] → dfs(${next})`, en: `pop ${next} from graph[${airport}] → dfs(${next})` },
+        arr: [],
+        graph: {
+          nodes: allAirports.map((a) => ({
+            id: a,
+            label: a,
+            dist: result.includes(a) ? "✓" : "",
+          })),
+          edges: graphEdgesFromGraph(),
+          hlNodes: [airport, next],
+          hlEdges: [[airport, next]],
+          visitedNodes: [...visited],
+        },
+        highlight: [],
+        mark: [],
+        codeLines: [10, 11],
+        vars: [
+          { name: "airport", value: airport },
+          { name: "next_dest", value: next },
+          { name: "graph[airport] after pop", value: `[${graph[airport].join(", ")}]` },
+          { name: "call stack", value: stackStr + ` → ${next}` },
+        ],
+        note: {
+          vi: `graph[${airport}].pop() = ${next}. Cạnh ${airport} → ${next} được dùng và xóa khỏi graph. Gọi đệ quy dfs(${next}).`,
+          en: `graph[${airport}].pop() = ${next}. Edge ${airport} → ${next} is used and removed. Recurse into dfs(${next}).`,
+        },
+      });
+
+      dfs(next);
+    }
+
+    // All edges exhausted — append to result (post-order)
+    result.push(airport);
+    visited.add(airport);
+    callStack.pop();
+
+    steps.push({
+      title: { vi: `graph[${airport}] rỗng → result.append(${airport})`, en: `graph[${airport}] empty → result.append(${airport})` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({
+          id: a,
+          label: a,
+          dist: result.includes(a) ? "✓" : "",
+        })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [airport],
+        hlEdges: [],
+        visitedNodes: [...visited],
+      },
+      highlight: [],
+      mark: [],
+      codeLines: [9, 12],
+      vars: [
+        { name: "airport", value: airport },
+        { name: "result (before reverse)", value: `[${result.join(", ")}]` },
+        { name: "call stack", value: callStack.length > 0 ? callStack.join(" → ") : "(empty)" },
+      ],
+      note: {
+        vi: `graph[${airport}] đã rỗng (hết cạnh). Thêm "${airport}" vào result theo thứ tự post-order. Quay về hàm gọi trước.`,
+        en: `graph[${airport}] is empty (all edges used). Append "${airport}" to result in post-order. Return to caller.`,
+      },
+    });
+  }
+
+  dfs("JFK");
+
+  const answer = [...result].reverse();
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer.join(" → ")}`, en: `Result: ${answer.join(" → ")}` },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({
+        id: a,
+        label: a,
+        dist: answer.indexOf(a) >= 0 ? String(answer.indexOf(a) + 1) : "",
+      })),
+      edges: tickets.map(([s, d]) => ({ u: s, v: d })),
+      hlNodes: answer,
+      hlEdges: answer.slice(0, -1).map((a, i) => [a, answer[i + 1]]),
+      visitedNodes: allAirports,
+    },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [14],
+    vars: [
+      { name: "result (before reverse)", value: `[${result.join(", ")}]` },
+      { name: "answer", value: answer.join(" → ") },
+    ],
+    note: {
+      vi:
+        `Đảo ngược result để có hành trình đúng thứ tự.\n` +
+        `Hành trình: ${answer.join(" → ")}.\n` +
+        `Mỗi con số trên node là vị trí trong hành trình.`,
+      en:
+        `Reverse result to get the final itinerary.\n` +
+        `Itinerary: ${answer.join(" → ")}.\n` +
+        `Each number on a node is its position in the itinerary.`,
+    },
+  });
+
+  return { tickets: raw, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    order: [200, 994, 1091, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -9081,6 +9399,60 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps200,
+  },
+  332: {
+    id: 332,
+    difficulty: "hard",
+    slug: "reconstruct-itinerary",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Reconstruct Itinerary", en: "Reconstruct Itinerary" },
+    titleVi: { vi: "Dựng lại hành trình bay (Hierholzer DFS)", en: "Rebuild a flight itinerary (Hierholzer DFS)" },
+    statement: {
+      vi:
+        "Cho danh sách vé bay dạng [from, to]. Tất cả vé xuất phát từ 'JFK'. " +
+        "Dựng lại hành trình dùng hết tất cả vé, bắt đầu từ 'JFK'. " +
+        "Nếu có nhiều hành trình hợp lệ, chọn hành trình có thứ tự từ điển nhỏ nhất. " +
+        "Nhập vé dạng SRC-DST, ngăn bởi dấu phẩy. Ví dụ: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+      en:
+        "Given a list of airline tickets [from, to]. All tickets depart from 'JFK'. " +
+        "Reconstruct the itinerary that uses all tickets, starting from 'JFK'. " +
+        "If multiple valid itineraries exist, return the one with the smallest lexicographic order. " +
+        "Enter tickets as SRC-DST separated by commas. Example: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+    },
+    defaultInput: "JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+    inputKind: "string",
+    inputLabel: { vi: "Vé bay (SRC-DST, cách bởi ,)", en: "Tickets (SRC-DST, comma separated)" },
+    approach: [
+      { vi: "Sắp xếp vé theo thứ tự đảo ngược (reverse=True) để pop() luôn trả điểm đến nhỏ nhất theo thứ tự từ điển.", en: "Sort tickets in reverse order so .pop() always returns the lexicographically smallest destination." },
+      { vi: "Xây dựng adjacency list: graph[src].append(dst) cho từng vé sau khi sắp xếp.", en: "Build adjacency list: graph[src].append(dst) for each ticket after sorting." },
+      { vi: "DFS theo thuật toán Hierholzer: khi còn vé ở graph[airport], pop điểm tiếp theo và đệ quy.", en: "DFS with Hierholzer's algorithm: while graph[airport] has edges, pop the next dest and recurse." },
+      { vi: "Append airport vào result SAU KHI tất cả cạnh đi ra từ đó đã hết (post-order). Đảo ngược result để ra hành trình.", en: "Append airport to result AFTER all its outgoing edges are exhausted (post-order). Reverse result for the final itinerary." },
+    ],
+    complexity: {
+      time: "O(E log E)",
+      space: "O(E)",
+      note: {
+        vi: "E là số vé. Sắp xếp O(E log E). DFS thăm mỗi cạnh đúng 1 lần O(E). Bộ nhớ cho graph + call stack là O(E).",
+        en: "E is the number of tickets. Sorting is O(E log E). DFS visits each edge exactly once O(E). Memory for graph + call stack is O(E).",
+      },
+    },
+    code: [
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def findItinerary(self, tickets):",
+      "        graph = defaultdict(list)",
+      "        for src, dst in sorted(tickets, reverse=True):",
+      "            graph[src].append(dst)",
+      "        result = []",
+      "        def dfs(airport):",
+      "            while graph[airport]:",
+      "                next_dest = graph[airport].pop()",
+      "                dfs(next_dest)",
+      "            result.append(airport)",
+      "        dfs('JFK')",
+      "        return result[::-1]",
+    ],
+    builder: buildSteps332,
   },
   133: {
     id: 133,
