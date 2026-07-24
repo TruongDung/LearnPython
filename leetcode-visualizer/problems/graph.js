@@ -9027,7 +9027,7 @@ function buildSteps3977(input, params) {
  * 13          dfs("JFK")
  * 14          return result[::-1]
  */
-function buildSteps332(input) {
+function buildSteps332Approach1(input) {
   // Parse "SRC-DST" pairs separated by commas or semicolons
   const raw = String(input).split(/[,;]/).map((s) => s.trim()).filter(Boolean);
   const tickets = raw.map((pair) => {
@@ -9323,6 +9323,336 @@ function buildSteps332(input) {
   return { tickets: raw, answer, steps };
 }
 
+/**
+ * LeetCode 332 — Approach 2: Priority Queue (min-heap per node).
+ * Instead of sorting in reverse + pop(), we push each destination into a
+ * min-heap so heappop() always gives the lex-smallest next airport.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  from collections import defaultdict
+ *  3  class Solution:
+ *  4      def findItinerary(self, tickets):
+ *  5          graph = defaultdict(list)
+ *  6          for src, dst in tickets:
+ *  7              heapq.heappush(graph[src], dst)
+ *  8          result = []
+ *  9          def dfs(airport):
+ * 10              while graph[airport]:
+ * 11                  next_dest = heapq.heappop(graph[airport])
+ * 12                  dfs(next_dest)
+ * 13              result.append(airport)
+ * 14          dfs("JFK")
+ * 15          return result[::-1]
+ */
+function buildSteps332Approach2(input) {
+  const raw = String(input).split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+  const tickets = raw.map((pair) => {
+    const parts = pair.split("-").map((s) => s.trim());
+    return [parts[0], parts[1]];
+  });
+
+  const steps = [];
+
+  if (tickets.length === 0 || tickets.some(([s, d]) => !s || !d || s === d)) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [4],
+      vars: [{ name: "tickets", value: "[]" }],
+      note: {
+        vi: "Nhập các vé dạng SRC-DST, ngăn bởi dấu phẩy. Ví dụ: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+        en: "Enter tickets as SRC-DST separated by commas. Example: JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
+      },
+    });
+    return { tickets: raw, answer: [], steps };
+  }
+
+  const allAirports = [...new Set(tickets.flatMap(([s, d]) => [s, d]))].sort();
+
+  // Min-heap per airport (JS array sorted ascending = smallest at index 0)
+  const graph = {};
+  allAirports.forEach((a) => { graph[a] = []; });
+
+  // Min-heap helpers
+  function heapPush(heap, val) {
+    heap.push(val);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const parent = Math.floor((i - 1) / 2);
+      if (heap[parent] <= heap[i]) break;
+      [heap[parent], heap[i]] = [heap[i], heap[parent]];
+      i = parent;
+    }
+  }
+  function heapPop(heap) {
+    const top = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0) {
+      heap[0] = last;
+      let i = 0;
+      while (true) {
+        let smallest = i;
+        const l = 2 * i + 1, r = 2 * i + 2;
+        if (l < heap.length && heap[l] < heap[smallest]) smallest = l;
+        if (r < heap.length && heap[r] < heap[smallest]) smallest = r;
+        if (smallest === i) break;
+        [heap[i], heap[smallest]] = [heap[smallest], heap[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+
+  // Helper: current graph edges for display
+  const graphEdgesFromGraph = () => {
+    const edgeList = [];
+    for (const [src, dsts] of Object.entries(graph)) {
+      for (const dst of dsts) {
+        edgeList.push({ u: src, v: dst });
+      }
+    }
+    return edgeList;
+  };
+
+  const heapStr = (h) => `[${[...h].sort().join(", ")}]`;
+  const graphStr = () =>
+    Object.entries(graph)
+      .filter(([, v]) => v.length > 0)
+      .map(([k, v]) => `${k}: ${heapStr(v)}`)
+      .join(", ");
+
+  // ── Step: initialize ──
+  steps.push({
+    title: { vi: "Khởi tạo graph (min-heap mỗi node)", en: "Initialize graph (min-heap per node)" },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+      edges: [],
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [], mark: [],
+    codeLines: [5, 6, 7],
+    vars: [{ name: "tickets", value: `[${tickets.map(([s, d]) => `(${s},${d})`).join(", ")}]` }],
+    note: {
+      vi:
+        "Với mỗi vé (src, dst), gọi heapq.heappush(graph[src], dst).\n" +
+        "Min-heap đảm bảo heappop() luôn trả điểm đến nhỏ nhất theo thứ tự từ điển — không cần sort ngược như Cách 1.",
+      en:
+        "For each ticket (src, dst) call heapq.heappush(graph[src], dst).\n" +
+        "The min-heap guarantees heappop() always returns the lex-smallest destination — no reverse sort needed.",
+    },
+  });
+
+  // ── Push each ticket into its heap ──
+  for (const [src, dst] of tickets) {
+    heapPush(graph[src], dst);
+    steps.push({
+      title: { vi: `heappush(graph[${src}], "${dst}")`, en: `heappush(graph[${src}], "${dst}")` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [src, dst],
+        hlEdges: [[src, dst]],
+        visitedNodes: [],
+      },
+      highlight: [], mark: [],
+      codeLines: [6, 7],
+      vars: [
+        { name: "src", value: src },
+        { name: "dst", value: dst },
+        { name: `graph[${src}] (heap)`, value: heapStr(graph[src]) },
+        { name: "graph", value: `{${graphStr()}}` },
+      ],
+      note: {
+        vi: `Đẩy "${dst}" vào min-heap của ${src}. Heap tự sắp xếp để phần tử nhỏ nhất luôn ở đầu.`,
+        en: `Push "${dst}" into ${src}'s min-heap. The heap self-orders so the smallest element is always at the front.`,
+      },
+    });
+  }
+
+  // ── All heaps loaded ──
+  steps.push({
+    title: { vi: "Graph (min-heap) đã xây xong — bắt đầu DFS từ JFK", en: "Graph (min-heap) built — start DFS from JFK" },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({ id: a, label: a, dist: "" })),
+      edges: graphEdgesFromGraph(),
+      hlNodes: ["JFK"],
+      hlEdges: [],
+      visitedNodes: [],
+    },
+    highlight: [], mark: [],
+    codeLines: [8, 14],
+    vars: [
+      { name: "graph", value: `{${graphStr()}}` },
+      { name: "result", value: "[]" },
+      { name: "start", value: "JFK" },
+    ],
+    note: {
+      vi:
+        "result = []; gọi dfs('JFK').\n" +
+        "Mỗi node lưu min-heap — heappop() luôn lấy đích nhỏ nhất theo thứ tự từ điển.\n" +
+        "Sau khi DFS hết, đảo ngược result là xong.",
+      en:
+        "result = []; call dfs('JFK').\n" +
+        "Each node has a min-heap — heappop() always picks the lex-smallest destination.\n" +
+        "Reverse result at the end.",
+    },
+  });
+
+  // ── DFS ──
+  const result = [];
+  const visited = new Set();
+  const callStack = [];
+
+  function dfs(airport) {
+    callStack.push(airport);
+    const stackStr = callStack.join(" → ");
+
+    steps.push({
+      title: { vi: `dfs(${airport}) gọi`, en: `dfs(${airport}) called` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({
+          id: a,
+          label: a,
+          dist: result.includes(a) ? "✓" : "",
+        })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [airport],
+        hlEdges: [],
+        visitedNodes: [...visited],
+      },
+      highlight: [], mark: [],
+      codeLines: [9, 10],
+      vars: [
+        { name: "airport", value: airport },
+        { name: `graph[${airport}] (heap)`, value: heapStr(graph[airport]) },
+        { name: "call stack", value: stackStr },
+        { name: "result", value: `[${result.join(", ")}]` },
+      ],
+      note: {
+        vi: `Vào dfs(${airport}). Min-heap: ${heapStr(graph[airport])}. Khi còn vé, heappop để lấy điểm nhỏ nhất và đệ quy.`,
+        en: `Enter dfs(${airport}). Min-heap: ${heapStr(graph[airport])}. While tickets exist, heappop the smallest dest and recurse.`,
+      },
+    });
+
+    while (graph[airport].length > 0) {
+      const next = heapPop(graph[airport]);
+
+      steps.push({
+        title: { vi: `heappop(graph[${airport}]) = ${next} → dfs(${next})`, en: `heappop(graph[${airport}]) = ${next} → dfs(${next})` },
+        arr: [],
+        graph: {
+          nodes: allAirports.map((a) => ({
+            id: a,
+            label: a,
+            dist: result.includes(a) ? "✓" : "",
+          })),
+          edges: graphEdgesFromGraph(),
+          hlNodes: [airport, next],
+          hlEdges: [[airport, next]],
+          visitedNodes: [...visited],
+        },
+        highlight: [], mark: [],
+        codeLines: [11, 12],
+        vars: [
+          { name: "airport", value: airport },
+          { name: "next_dest", value: next },
+          { name: `graph[${airport}] after pop`, value: heapStr(graph[airport]) },
+          { name: "call stack", value: stackStr + ` → ${next}` },
+        ],
+        note: {
+          vi: `heappop lấy "${next}" — nhỏ nhất hiện có trong heap. Cạnh ${airport} → ${next} được dùng và xóa. Gọi đệ quy dfs(${next}).`,
+          en: `heappop returns "${next}" — the current lex-smallest in the heap. Edge ${airport} → ${next} consumed. Recurse into dfs(${next}).`,
+        },
+      });
+
+      dfs(next);
+    }
+
+    result.push(airport);
+    visited.add(airport);
+    callStack.pop();
+
+    steps.push({
+      title: { vi: `graph[${airport}] rỗng → result.append(${airport})`, en: `graph[${airport}] empty → result.append(${airport})` },
+      arr: [],
+      graph: {
+        nodes: allAirports.map((a) => ({
+          id: a,
+          label: a,
+          dist: result.includes(a) ? "✓" : "",
+        })),
+        edges: graphEdgesFromGraph(),
+        hlNodes: [airport],
+        hlEdges: [],
+        visitedNodes: [...visited],
+      },
+      highlight: [], mark: [],
+      codeLines: [10, 13],
+      vars: [
+        { name: "airport", value: airport },
+        { name: "result (before reverse)", value: `[${result.join(", ")}]` },
+        { name: "call stack", value: callStack.length > 0 ? callStack.join(" → ") : "(empty)" },
+      ],
+      note: {
+        vi: `Heap của ${airport} đã rỗng (hết cạnh). Append "${airport}" vào result (post-order). Quay về caller.`,
+        en: `${airport}'s heap is empty (all edges used). Append "${airport}" to result (post-order). Return to caller.`,
+      },
+    });
+  }
+
+  dfs("JFK");
+
+  const answer = [...result].reverse();
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer.join(" → ")}`, en: `Result: ${answer.join(" → ")}` },
+    arr: [],
+    graph: {
+      nodes: allAirports.map((a) => ({
+        id: a,
+        label: a,
+        dist: answer.indexOf(a) >= 0 ? String(answer.indexOf(a) + 1) : "",
+      })),
+      edges: tickets.map(([s, d]) => ({ u: s, v: d })),
+      hlNodes: answer,
+      hlEdges: answer.slice(0, -1).map((a, i) => [a, answer[i + 1]]),
+      visitedNodes: allAirports,
+    },
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [15],
+    vars: [
+      { name: "result (before reverse)", value: `[${result.join(", ")}]` },
+      { name: "answer", value: answer.join(" → ") },
+    ],
+    note: {
+      vi:
+        `Đảo ngược result để có hành trình đúng thứ tự.\n` +
+        `Hành trình: ${answer.join(" → ")}.\n` +
+        `Mỗi con số trên node là vị trí trong hành trình.`,
+      en:
+        `Reverse result to get the final itinerary.\n` +
+        `Itinerary: ${answer.join(" → ")}.\n` +
+        `Each number on a node is its position in the itinerary.`,
+    },
+  });
+
+  return { tickets: raw, answer, steps };
+}
+
+function buildSteps332(input, params) {
+  const approach = Number(params && params.approach) || 1;
+  return approach === 2
+    ? buildSteps332Approach2(input)
+    : buildSteps332Approach1(input);
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
@@ -9422,21 +9752,35 @@ module.exports = {
     defaultInput: "JFK-MUC,MUC-LHR,LHR-SFO,SFO-SJC",
     inputKind: "string",
     inputLabel: { vi: "Vé bay (SRC-DST, cách bởi ,)", en: "Tickets (SRC-DST, comma separated)" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Sort reverse + pop()", en: "Approach 1: Sort reverse + pop()" } },
+          { value: "2", label: { vi: "Cách 2: Priority Queue (min-heap)", en: "Approach 2: Priority Queue (min-heap)" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Sắp xếp vé theo thứ tự đảo ngược (reverse=True) để pop() luôn trả điểm đến nhỏ nhất theo thứ tự từ điển.", en: "Sort tickets in reverse order so .pop() always returns the lexicographically smallest destination." },
-      { vi: "Xây dựng adjacency list: graph[src].append(dst) cho từng vé sau khi sắp xếp.", en: "Build adjacency list: graph[src].append(dst) for each ticket after sorting." },
-      { vi: "DFS theo thuật toán Hierholzer: khi còn vé ở graph[airport], pop điểm tiếp theo và đệ quy.", en: "DFS with Hierholzer's algorithm: while graph[airport] has edges, pop the next dest and recurse." },
-      { vi: "Append airport vào result SAU KHI tất cả cạnh đi ra từ đó đã hết (post-order). Đảo ngược result để ra hành trình.", en: "Append airport to result AFTER all its outgoing edges are exhausted (post-order). Reverse result for the final itinerary." },
+      { vi: "[C1] Sắp xếp vé theo thứ tự đảo ngược (reverse=True) để pop() luôn trả điểm đến nhỏ nhất theo thứ tự từ điển.", en: "[A1] Sort tickets in reverse order so .pop() always returns the lex-smallest destination." },
+      { vi: "[C1] Xây dựng adjacency list: graph[src].append(dst) cho từng vé sau khi sắp xếp.", en: "[A1] Build adjacency list: graph[src].append(dst) for each ticket after sorting." },
+      { vi: "[C2] Dùng min-heap mỗi node: heappush(graph[src], dst) cho từng vé — không cần sort trước.", en: "[A2] Use a min-heap per node: heappush(graph[src], dst) for each ticket — no pre-sort needed." },
+      { vi: "[C1&C2] DFS Hierholzer: khi còn vé ở graph[airport], lấy điểm đến nhỏ nhất và đệ quy.", en: "[A1&A2] Hierholzer DFS: while graph[airport] has edges, get the smallest dest and recurse." },
+      { vi: "[C1&C2] Append airport vào result SAU KHI tất cả cạnh đi ra từ đó đã hết (post-order). Đảo ngược result để ra hành trình.", en: "[A1&A2] Append airport to result AFTER all outgoing edges are exhausted (post-order). Reverse result for the final itinerary." },
     ],
     complexity: {
       time: "O(E log E)",
       space: "O(E)",
       note: {
-        vi: "E là số vé. Sắp xếp O(E log E). DFS thăm mỗi cạnh đúng 1 lần O(E). Bộ nhớ cho graph + call stack là O(E).",
-        en: "E is the number of tickets. Sorting is O(E log E). DFS visits each edge exactly once O(E). Memory for graph + call stack is O(E).",
+        vi: "E là số vé. C1: sort O(E log E) + DFS O(E). C2: mỗi heappush/heappop O(log E) × E lần = O(E log E). Bộ nhớ cho graph + call stack là O(E).",
+        en: "E is the number of tickets. A1: sort O(E log E) + DFS O(E). A2: each heappush/heappop O(log E) × E times = O(E log E). Memory for graph + call stack is O(E).",
       },
     },
     code: [
+      "# Approach 1: Sort reverse + pop()",
       "from collections import defaultdict",
       "class Solution:",
       "    def findItinerary(self, tickets):",
@@ -9447,6 +9791,23 @@ module.exports = {
       "        def dfs(airport):",
       "            while graph[airport]:",
       "                next_dest = graph[airport].pop()",
+      "                dfs(next_dest)",
+      "            result.append(airport)",
+      "        dfs('JFK')",
+      "        return result[::-1]",
+      "",
+      "# Approach 2: Priority Queue (min-heap)",
+      "import heapq",
+      "from collections import defaultdict",
+      "class Solution:",
+      "    def findItinerary(self, tickets):",
+      "        graph = defaultdict(list)",
+      "        for src, dst in tickets:",
+      "            heapq.heappush(graph[src], dst)",
+      "        result = []",
+      "        def dfs(airport):",
+      "            while graph[airport]:",
+      "                next_dest = heapq.heappop(graph[airport])",
       "                dfs(next_dest)",
       "            result.append(airport)",
       "        dfs('JFK')",
