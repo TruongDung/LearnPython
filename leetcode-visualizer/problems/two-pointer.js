@@ -2206,6 +2206,341 @@ function buildSteps876(input) {
   return { input, answer: vals[slow], steps };
 }
 
+/**
+ * LeetCode 475: Heaters.
+ * Algorithm: sort heaters, then for each house do binary search (bisect_left)
+ * to find the nearest heater. Answer = max over all houses of min_dist.
+ *
+ * Code lines (1-indexed):
+ *  1  import bisect
+ *  2  class Solution:
+ *  3      def findRadius(self, houses, heaters):
+ *  4          heaters.sort()
+ *  5          res = 0
+ *  6          for h in houses:
+ *  7              pos = bisect.bisect_left(heaters, h)
+ *  8              if pos > 0:
+ *  9                  left_dist = abs(heaters[pos-1] - h)
+ * 10              else:
+ * 11                  left_dist = float('inf')
+ * 12              if pos < len(heaters):
+ * 13                  right_dist = abs(heaters[pos] - h)
+ * 14              else:
+ * 15                  right_dist = float('inf')
+ * 16              min_dist = min(left_dist, right_dist)
+ * 17              res = max(res, min_dist)
+ * 18          return res
+ */
+function buildSteps475(inputHouses, params) {
+  const houses = Array.isArray(inputHouses)
+    ? [...inputHouses]
+    : String(inputHouses).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+
+  const heatersRaw = String(params && params.heaters || "2,9");
+  const heatersSorted = heatersRaw.split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  heatersSorted.sort((a, b) => a - b);
+
+  const steps = [];
+  const INF = Infinity;
+  const fmt = (v) => v === INF ? "∞" : String(v);
+
+  if (houses.length === 0 || heatersSorted.length === 0) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [],
+      note: { vi: "Cần ít nhất 1 nhà và 1 lò sưởi.", en: "Need at least one house and one heater." },
+    });
+    return { original: { houses, heaters: heatersSorted }, answer: 0, steps };
+  }
+
+  // Display heaters array throughout; houses shown in sub row
+  const n = heatersSorted.length;
+
+  // ── Step 1: sort heaters ──────────────────────────────────────────────────
+  steps.push({
+    title: { vi: "heaters.sort()", en: "heaters.sort()" },
+    arr: [...heatersSorted],
+    sub: heatersSorted.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "houses", value: `[${houses.join(", ")}]` },
+      { name: "heaters (sorted)", value: `[${heatersSorted.join(", ")}]` },
+    ],
+    note: {
+      vi: "Sắp xếp heaters để binary search hoạt động đúng. Mảng hiển thị là heaters đã sort; nhà sẽ được xử lý từng cái.",
+      en: "Sort heaters so binary search works correctly. The displayed array is the sorted heaters; each house is processed one by one.",
+    },
+  });
+
+  // ── Step 2: res = 0 ───────────────────────────────────────────────────────
+  let res = 0;
+  steps.push({
+    title: { vi: "res = 0", en: "res = 0" },
+    arr: [...heatersSorted],
+    sub: heatersSorted.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "res", value: 0 },
+      { name: "houses", value: `[${houses.join(", ")}]` },
+    ],
+    note: {
+      vi: "res = bán kính nhỏ nhất cần dùng. Bắt đầu từ 0 và tăng lên bằng max(res, min_dist) sau mỗi nhà.",
+      en: "res = minimum required radius. Starts at 0 and grows by max(res, min_dist) after each house.",
+    },
+  });
+
+  // ── Process each house ────────────────────────────────────────────────────
+  for (let hi = 0; hi < houses.length; hi++) {
+    const h = houses[hi];
+
+    // ── for h in houses ────────────────────────────────────────────────────
+    steps.push({
+      title: { vi: `for h in houses: h = ${h}`, en: `for h in houses: h = ${h}` },
+      arr: [...heatersSorted],
+      sub: heatersSorted.map((_, i) => `[${i}]`),
+      highlight: [],
+      mark: [],
+      codeLines: [6],
+      vars: [
+        { name: "h", value: h },
+        { name: "house index", value: hi },
+        { name: "res (so far)", value: res },
+      ],
+      note: {
+        vi: `Xét nhà h = ${h}. Cần tìm lò sưởi gần nhất trong heaters bằng binary search.`,
+        en: `Processing house h = ${h}. Use binary search to find the nearest heater.`,
+      },
+    });
+
+    // ── Binary search: bisect_left ─────────────────────────────────────────
+    // Simulate bisect_left with annotated steps
+    let lo = 0, bhi = n;
+    while (lo < bhi) {
+      const mid = (lo + bhi) >> 1;
+      const condition = heatersSorted[mid] < h;
+      steps.push({
+        title: { vi: `bisect_left: mid=${mid}, heaters[${mid}]=${heatersSorted[mid]} ${condition ? "<" : "≥"} h=${h}`, en: `bisect_left: mid=${mid}, heaters[${mid}]=${heatersSorted[mid]} ${condition ? "<" : "≥"} h=${h}` },
+        arr: [...heatersSorted],
+        sub: heatersSorted.map((_, i) => {
+          if (i >= lo && i < bhi) return `[${i}]`;
+          return "·";
+        }),
+        highlight: [mid],
+        mark: Array.from({ length: n }, (_, i) => (i >= lo && i < bhi ? i : -1)).filter((x) => x >= 0),
+        codeLines: [7],
+        vars: [
+          { name: "h", value: h },
+          { name: "lo", value: lo },
+          { name: "hi (bhi)", value: bhi },
+          { name: "mid", value: mid },
+          { name: `heaters[${mid}]`, value: heatersSorted[mid] },
+          { name: "condition heaters[mid] < h", value: condition },
+        ],
+        note: {
+          vi: condition
+            ? `heaters[${mid}]=${heatersSorted[mid]} < h=${h} → lo = mid+1 = ${mid + 1}. Thu hẹp vùng tìm về bên phải.`
+            : `heaters[${mid}]=${heatersSorted[mid]} ≥ h=${h} → hi = mid = ${mid}. Thu hẹp vùng tìm về bên trái.`,
+          en: condition
+            ? `heaters[${mid}]=${heatersSorted[mid]} < h=${h} → lo = mid+1 = ${mid + 1}. Narrow search to the right.`
+            : `heaters[${mid}]=${heatersSorted[mid]} ≥ h=${h} → hi = mid = ${mid}. Narrow search to the left.`,
+        },
+      });
+      if (condition) lo = mid + 1;
+      else bhi = mid;
+    }
+    const pos = lo; // bisect_left result
+
+    steps.push({
+      title: { vi: `bisect_left xong: pos = ${pos}`, en: `bisect_left done: pos = ${pos}` },
+      arr: [...heatersSorted],
+      sub: heatersSorted.map((_, i) => `[${i}]`),
+      highlight: pos < n ? [pos] : [],
+      mark: pos > 0 ? [pos - 1] : [],
+      codeLines: [7],
+      vars: [
+        { name: "h", value: h },
+        { name: "pos", value: pos },
+        { name: "heaters[pos-1]", value: pos > 0 ? heatersSorted[pos - 1] : "N/A" },
+        { name: "heaters[pos]", value: pos < n ? heatersSorted[pos] : "N/A" },
+      ],
+      note: {
+        vi: `pos = ${pos} = vị trí chèn của h=${h} trong heaters.\n` +
+            (pos > 0 ? `heaters[pos-1]=${heatersSorted[pos - 1]} là lò sưởi bên TRÁI.\n` : "Không có lò sưởi bên trái (pos=0).\n") +
+            (pos < n ? `heaters[pos]=${heatersSorted[pos]} là lò sưởi bên PHẢI.` : "Không có lò sưởi bên phải (pos=n)."),
+        en: `pos = ${pos} = insertion point of h=${h} in heaters.\n` +
+            (pos > 0 ? `heaters[pos-1]=${heatersSorted[pos - 1]} is the LEFT neighbor.\n` : "No left neighbor (pos=0).\n") +
+            (pos < n ? `heaters[pos]=${heatersSorted[pos]} is the RIGHT neighbor.` : "No right neighbor (pos=n)."),
+      },
+    });
+
+    // ── left_dist ─────────────────────────────────────────────────────────
+    let leftDist;
+    if (pos > 0) {
+      leftDist = Math.abs(heatersSorted[pos - 1] - h);
+      steps.push({
+        title: { vi: `pos > 0 → left_dist = |heaters[${pos - 1}] - h| = |${heatersSorted[pos - 1]} - ${h}| = ${leftDist}`, en: `pos > 0 → left_dist = |heaters[${pos - 1}] - h| = |${heatersSorted[pos - 1]} - ${h}| = ${leftDist}` },
+        arr: [...heatersSorted],
+        sub: heatersSorted.map((_, i) => `[${i}]`),
+        highlight: [pos - 1],
+        mark: [],
+        codeLines: [8, 9],
+        vars: [
+          { name: "h", value: h },
+          { name: "pos", value: pos },
+          { name: `heaters[${pos - 1}]`, value: heatersSorted[pos - 1] },
+          { name: "left_dist", value: leftDist },
+        ],
+        note: {
+          vi: `pos=${pos} > 0 nên có lò sưởi bên trái tại index ${pos - 1}.\nleft_dist = |${heatersSorted[pos - 1]} - ${h}| = ${leftDist}.`,
+          en: `pos=${pos} > 0 so there is a left heater at index ${pos - 1}.\nleft_dist = |${heatersSorted[pos - 1]} - ${h}| = ${leftDist}.`,
+        },
+      });
+    } else {
+      leftDist = INF;
+      steps.push({
+        title: { vi: `pos = 0 → left_dist = ∞ (không có lò sưởi bên trái)`, en: `pos = 0 → left_dist = ∞ (no left heater)` },
+        arr: [...heatersSorted],
+        sub: heatersSorted.map((_, i) => `[${i}]`),
+        highlight: [],
+        mark: [],
+        codeLines: [10, 11],
+        vars: [
+          { name: "h", value: h },
+          { name: "pos", value: pos },
+          { name: "left_dist", value: "∞" },
+        ],
+        note: {
+          vi: `pos=${pos} = 0, nhà h=${h} nằm bên trái TẤT CẢ lò sưởi → left_dist = ∞.`,
+          en: `pos=${pos} = 0, house h=${h} is to the left of ALL heaters → left_dist = ∞.`,
+        },
+      });
+    }
+
+    // ── right_dist ────────────────────────────────────────────────────────
+    let rightDist;
+    if (pos < n) {
+      rightDist = Math.abs(heatersSorted[pos] - h);
+      steps.push({
+        title: { vi: `pos < len(heaters) → right_dist = |heaters[${pos}] - h| = |${heatersSorted[pos]} - ${h}| = ${rightDist}`, en: `pos < len(heaters) → right_dist = |heaters[${pos}] - h| = |${heatersSorted[pos]} - ${h}| = ${rightDist}` },
+        arr: [...heatersSorted],
+        sub: heatersSorted.map((_, i) => `[${i}]`),
+        highlight: [pos],
+        mark: [],
+        codeLines: [12, 13],
+        vars: [
+          { name: "h", value: h },
+          { name: "pos", value: pos },
+          { name: `heaters[${pos}]`, value: heatersSorted[pos] },
+          { name: "right_dist", value: rightDist },
+        ],
+        note: {
+          vi: `pos=${pos} < len(heaters)=${n} nên có lò sưởi bên phải tại index ${pos}.\nright_dist = |${heatersSorted[pos]} - ${h}| = ${rightDist}.`,
+          en: `pos=${pos} < len(heaters)=${n} so there is a right heater at index ${pos}.\nright_dist = |${heatersSorted[pos]} - ${h}| = ${rightDist}.`,
+        },
+      });
+    } else {
+      rightDist = INF;
+      steps.push({
+        title: { vi: `pos = len(heaters) → right_dist = ∞ (không có lò sưởi bên phải)`, en: `pos = len(heaters) → right_dist = ∞ (no right heater)` },
+        arr: [...heatersSorted],
+        sub: heatersSorted.map((_, i) => `[${i}]`),
+        highlight: [],
+        mark: [],
+        codeLines: [14, 15],
+        vars: [
+          { name: "h", value: h },
+          { name: "pos", value: pos },
+          { name: "right_dist", value: "∞" },
+        ],
+        note: {
+          vi: `pos=${pos} = len(heaters)=${n}, nhà h=${h} nằm bên phải TẤT CẢ lò sưởi → right_dist = ∞.`,
+          en: `pos=${pos} = len(heaters)=${n}, house h=${h} is to the right of ALL heaters → right_dist = ∞.`,
+        },
+      });
+    }
+
+    // ── min_dist ──────────────────────────────────────────────────────────
+    const minDist = Math.min(leftDist === INF ? Infinity : leftDist, rightDist === INF ? Infinity : rightDist);
+    const nearestIdx = (leftDist <= rightDist) ? (pos > 0 ? pos - 1 : -1) : (pos < n ? pos : -1);
+
+    steps.push({
+      title: { vi: `min_dist = min(${fmt(leftDist)}, ${fmt(rightDist)}) = ${fmt(minDist)}`, en: `min_dist = min(${fmt(leftDist)}, ${fmt(rightDist)}) = ${fmt(minDist)}` },
+      arr: [...heatersSorted],
+      sub: heatersSorted.map((_, i) => `[${i}]`),
+      highlight: nearestIdx >= 0 ? [nearestIdx] : [],
+      mark: nearestIdx >= 0 ? [nearestIdx] : [],
+      codeLines: [16],
+      vars: [
+        { name: "h", value: h },
+        { name: "left_dist", value: fmt(leftDist) },
+        { name: "right_dist", value: fmt(rightDist) },
+        { name: "min_dist", value: fmt(minDist) },
+        { name: "nearest heater", value: nearestIdx >= 0 ? `heaters[${nearestIdx}]=${heatersSorted[nearestIdx]}` : "none" },
+      ],
+      note: {
+        vi: `Khoảng cách tới lò sưởi gần nhất = min(${fmt(leftDist)}, ${fmt(rightDist)}) = ${fmt(minDist)}. Lò sưởi phủ nhà này là ${nearestIdx >= 0 ? `heaters[${nearestIdx}]=${heatersSorted[nearestIdx]}` : "(không có)"}.`,
+        en: `Distance to nearest heater = min(${fmt(leftDist)}, ${fmt(rightDist)}) = ${fmt(minDist)}. Covering heater: ${nearestIdx >= 0 ? `heaters[${nearestIdx}]=${heatersSorted[nearestIdx]}` : "(none)"}.`,
+      },
+    });
+
+    // ── res update ─────────────────────────────────────────────────────────
+    const oldRes = res;
+    res = Math.max(res, minDist);
+    const updated = res > oldRes;
+
+    steps.push({
+      title: { vi: `res = max(${oldRes}, ${fmt(minDist)}) = ${fmt(res)}`, en: `res = max(${oldRes}, ${fmt(minDist)}) = ${fmt(res)}` },
+      arr: [...heatersSorted],
+      sub: heatersSorted.map((_, i) => `[${i}]`),
+      highlight: updated && nearestIdx >= 0 ? [nearestIdx] : [],
+      mark: updated && nearestIdx >= 0 ? [nearestIdx] : [],
+      codeLines: [17],
+      vars: [
+        { name: "h", value: h },
+        { name: "min_dist", value: fmt(minDist) },
+        { name: "old res", value: oldRes },
+        { name: "res", value: fmt(res) },
+        { name: "updated?", value: updated },
+      ],
+      note: {
+        vi: updated
+          ? `min_dist=${fmt(minDist)} > res=${oldRes} → cập nhật res = ${fmt(res)}. Bán kính cần tăng lên để phủ nhà h=${h}.`
+          : `min_dist=${fmt(minDist)} ≤ res=${oldRes} → res không đổi = ${fmt(res)}.`,
+        en: updated
+          ? `min_dist=${fmt(minDist)} > res=${oldRes} → update res = ${fmt(res)}. Radius must grow to cover house h=${h}.`
+          : `min_dist=${fmt(minDist)} ≤ res=${oldRes} → res stays at ${fmt(res)}.`,
+      },
+    });
+  }
+
+  // ── Final ──────────────────────────────────────────────────────────────────
+  steps.push({
+    title: { vi: `return res = ${res}`, en: `return res = ${res}` },
+    arr: [...heatersSorted],
+    sub: heatersSorted.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: Array.from({ length: n }, (_, i) => i),
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "answer (res)", value: res },
+      { name: "houses covered", value: houses.length },
+      { name: "heaters used", value: n },
+    ],
+    note: {
+      vi: `Bán kính nhỏ nhất cần thiết = ${res}. Mọi nhà trong [${houses.join(", ")}] đều được phủ bởi ít nhất 1 lò sưởi trong [${heatersSorted.join(", ")}].`,
+      en: `Minimum radius required = ${res}. Every house in [${houses.join(", ")}] is covered by at least one heater in [${heatersSorted.join(", ")}].`,
+    },
+  });
+
+  return { original: { houses, heaters: heatersSorted }, answer: res, steps };
+}
+
 module.exports = {
   26: {
     id: 26,
@@ -2893,5 +3228,65 @@ module.exports = {
       "        return slow",
     ],
     builder: buildSteps876,
+  },
+  475: {
+    id: 475,
+    difficulty: "medium",
+    slug: "heaters",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Heaters", en: "Heaters" },
+    titleVi: { vi: "Bán kính sưởi ấm nhỏ nhất (Binary Search)", en: "Minimum heater radius to cover all houses (Binary Search)" },
+    statement: {
+      vi:
+        "Cho danh sách vị trí nhà (houses) và lò sưởi (heaters) trên trục số. " +
+        "Tìm bán kính tối thiểu r sao cho mỗi nhà đều được ít nhất 1 lò sưởi phủ. " +
+        "Nhập houses và heaters là hai chuỗi số cách nhau dấu phẩy.",
+      en:
+        "Given positions of houses and heaters on a number line, find the minimum radius r " +
+        "such that every house is covered by at least one heater. " +
+        "Enter houses and heaters as comma-separated numbers.",
+    },
+    defaultInput: [1, 2, 3, 5, 15],
+    inputKind: "integer",
+    inputLabel: { vi: "Nhà (houses)", en: "Houses" },
+    extraParams: [
+      { key: "heaters", label: { vi: "Lò sưởi (heaters)", en: "Heaters" }, default: "2,9" },
+    ],
+    approach: [
+      { vi: "Sắp xếp heaters. Với mỗi nhà h, dùng binary search (bisect_left) tìm vị trí chèn pos trong heaters.", en: "Sort heaters. For each house h, use binary search (bisect_left) to find insertion point pos in heaters." },
+      { vi: "left_dist = |heaters[pos-1] - h| nếu pos > 0, ngược lại ∞.", en: "left_dist = |heaters[pos-1] - h| if pos > 0, else ∞." },
+      { vi: "right_dist = |heaters[pos] - h| nếu pos < len(heaters), ngược lại ∞.", en: "right_dist = |heaters[pos] - h| if pos < len(heaters), else ∞." },
+      { vi: "min_dist = min(left_dist, right_dist) = khoảng cách tới lò sưởi gần nhất.", en: "min_dist = min(left_dist, right_dist) = distance to the nearest heater." },
+      { vi: "res = max(res, min_dist). Kết quả là bán kính lớn nhất cần thiết.", en: "res = max(res, min_dist). Result is the maximum min_dist across all houses." },
+    ],
+    complexity: {
+      time: "O((m+n) log n)",
+      space: "O(1)",
+      note: {
+        vi: "n = số lò sưởi, m = số nhà. Sort O(n log n) + binary search O(log n) × m nhà.",
+        en: "n = heaters, m = houses. Sort O(n log n) + binary search O(log n) per house.",
+      },
+    },
+    code: [
+      "import bisect",
+      "class Solution:",
+      "    def findRadius(self, houses, heaters):",
+      "        heaters.sort()",
+      "        res = 0",
+      "        for h in houses:",
+      "            pos = bisect.bisect_left(heaters, h)",
+      "            if pos > 0:",
+      "                left_dist = abs(heaters[pos-1] - h)",
+      "            else:",
+      "                left_dist = float('inf')",
+      "            if pos < len(heaters):",
+      "                right_dist = abs(heaters[pos] - h)",
+      "            else:",
+      "                right_dist = float('inf')",
+      "            min_dist = min(left_dist, right_dist)",
+      "            res = max(res, min_dist)",
+      "        return res",
+    ],
+    builder: buildSteps475,
   },
 };
