@@ -1726,6 +1726,303 @@ function buildSteps1358Last(input) {
   return { original: s, answer: res, steps };
 }
 
+/**
+ * LeetCode 2444: Count Subarrays With Fixed Bounds.
+ * Single pass O(n): track three moving indices:
+ *   bad     — last index where nums[i] is outside [minK, maxK]
+ *   min_pos — last index where nums[i] == minK
+ *   max_pos — last index where nums[i] == maxK
+ *
+ * For each i, the number of valid subarrays ending at i is:
+ *   max(0, min(min_pos, max_pos) - bad)
+ * because the left boundary of any valid subarray must be:
+ *   > bad (cannot include an out-of-bound value)
+ *   ≤ min(min_pos, max_pos) (must include the latest minK AND maxK)
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def countSubarrays(self, nums, minK, maxK):
+ *  3          res = 0
+ *  4          bad = -1
+ *  5          min_pos = -1
+ *  6          max_pos = -1
+ *  7          for i, num in enumerate(nums):
+ *  8              if num < minK or num > maxK:
+ *  9                  bad = i
+ * 10              if num == minK:
+ * 11                  min_pos = i
+ * 12              if num == maxK:
+ * 13                  max_pos = i
+ * 14              count = max(0, min(min_pos, max_pos) - bad)
+ * 15              res += count
+ * 16          return res
+ */
+function buildSteps2444(inputNums, params) {
+  const nums = Array.isArray(inputNums)
+    ? [...inputNums]
+    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const minK = params && params.minK !== undefined ? Number(params.minK) : 1;
+  const maxK = params && params.maxK !== undefined ? Number(params.maxK) : 5;
+  const n = nums.length;
+  const steps = [];
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Mảng rỗng", en: "Empty array" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Mảng rỗng → 0.", en: "Empty array → 0." },
+    });
+    return { original: nums, minK, maxK, answer: 0, steps };
+  }
+
+  // Helper: sub-row labels
+  const makeSub = (bad, minPos, maxPos) =>
+    nums.map((_, i) => {
+      if (i === bad && i === minPos && i === maxPos) return "bad+min+max";
+      if (i === bad && i === minPos) return "bad+min";
+      if (i === bad && i === maxPos) return "bad+max";
+      if (i === minPos && i === maxPos) return "min+max";
+      if (i === bad) return "bad";
+      if (i === minPos) return "min_pos";
+      if (i === maxPos) return "max_pos";
+      return "";
+    });
+
+  // ── Init steps ────────────────────────────────────────────────────────────
+  steps.push({
+    title: { vi: "res = 0, bad = -1, min_pos = -1, max_pos = -1", en: "res = 0, bad = -1, min_pos = -1, max_pos = -1" },
+    arr: [...nums],
+    sub: nums.map(() => ""),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "minK", value: minK },
+      { name: "maxK", value: maxK },
+      { name: "res", value: 0 },
+      { name: "bad", value: -1 },
+      { name: "min_pos", value: -1 },
+      { name: "max_pos", value: -1 },
+    ],
+    note: {
+      vi:
+        `Ý tưởng: với mỗi i, đếm số subarray kết thúc tại i có min=minK=${minK} và max=maxK=${maxK}.\n` +
+        `• bad: chỉ số ngoài [${minK},${maxK}] gần nhất — mọi subarray hợp lệ phải bắt đầu SAU bad.\n` +
+        `• min_pos: chỉ số xuất hiện minK=${minK} gần nhất.\n` +
+        `• max_pos: chỉ số xuất hiện maxK=${maxK} gần nhất.\n` +
+        `count = max(0, min(min_pos, max_pos) - bad) = số vị trí left hợp lệ.`,
+      en:
+        `Idea: for each i, count subarrays ending at i with min=minK=${minK} and max=maxK=${maxK}.\n` +
+        `• bad: last index outside [${minK},${maxK}] — every valid subarray must start AFTER bad.\n` +
+        `• min_pos: last index where minK=${minK} appeared.\n` +
+        `• max_pos: last index where maxK=${maxK} appeared.\n` +
+        `count = max(0, min(min_pos, max_pos) - bad) = number of valid left boundaries.`,
+    },
+  });
+
+  // ── Main loop ─────────────────────────────────────────────────────────────
+  let res = 0;
+  let bad = -1;
+  let minPos = -1;
+  let maxPos = -1;
+
+  for (let i = 0; i < n; i++) {
+    const num = nums[i];
+
+    // ── for i, num ─────────────────────────────────────────────────────────
+    steps.push({
+      title: { vi: `for i=${i}, num=${num}`, en: `for i=${i}, num=${num}` },
+      arr: [...nums],
+      sub: makeSub(bad, minPos, maxPos),
+      highlight: [i],
+      mark: [],
+      codeLines: [7],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+        { name: "res", value: res },
+        { name: "bad", value: bad },
+        { name: "min_pos", value: minPos },
+        { name: "max_pos", value: maxPos },
+      ],
+      note: {
+        vi: `Xét nums[${i}]=${num}. minK=${minK}, maxK=${maxK}.`,
+        en: `Inspect nums[${i}]=${num}. minK=${minK}, maxK=${maxK}.`,
+      },
+    });
+
+    // ── bad check ──────────────────────────────────────────────────────────
+    const isOutOfBound = num < minK || num > maxK;
+    if (isOutOfBound) {
+      bad = i;
+      steps.push({
+        title: { vi: `num=${num} nằm ngoài [${minK},${maxK}] → bad = ${i}`, en: `num=${num} is outside [${minK},${maxK}] → bad = ${i}` },
+        arr: [...nums],
+        sub: makeSub(bad, minPos, maxPos),
+        highlight: [i],
+        mark: [],
+        codeLines: [8, 9],
+        vars: [
+          { name: "i", value: i },
+          { name: "num", value: num },
+          { name: "condition", value: `${num} < ${minK} || ${num} > ${maxK}` },
+          { name: "bad", value: bad },
+          { name: "min_pos", value: minPos },
+          { name: "max_pos", value: maxPos },
+        ],
+        note: {
+          vi: `nums[${i}]=${num} nằm ngoài [${minK}, ${maxK}] → cập nhật bad = ${i}.\nMọi subarray hợp lệ kết thúc ở đây (hoặc xa hơn) phải bắt đầu sau index ${i}.`,
+          en: `nums[${i}]=${num} is outside [${minK}, ${maxK}] → update bad = ${i}.\nEvery valid subarray ending here (or later) must start after index ${i}.`,
+        },
+      });
+    } else {
+      steps.push({
+        title: { vi: `num=${num} trong [${minK},${maxK}] → bad không đổi (${bad})`, en: `num=${num} is within [${minK},${maxK}] → bad unchanged (${bad})` },
+        arr: [...nums],
+        sub: makeSub(bad, minPos, maxPos),
+        highlight: [i],
+        mark: [],
+        codeLines: [8],
+        vars: [
+          { name: "i", value: i },
+          { name: "num", value: num },
+          { name: "condition", value: false },
+          { name: "bad", value: bad },
+        ],
+        note: {
+          vi: `nums[${i}]=${num} nằm trong [${minK}, ${maxK}] → bad giữ nguyên = ${bad}.`,
+          en: `nums[${i}]=${num} is within [${minK}, ${maxK}] → bad stays at ${bad}.`,
+        },
+      });
+    }
+
+    // ── min_pos update ─────────────────────────────────────────────────────
+    if (num === minK) {
+      minPos = i;
+      steps.push({
+        title: { vi: `num == minK (${minK}) → min_pos = ${i}`, en: `num == minK (${minK}) → min_pos = ${i}` },
+        arr: [...nums],
+        sub: makeSub(bad, minPos, maxPos),
+        highlight: [i],
+        mark: [],
+        codeLines: [10, 11],
+        vars: [
+          { name: "i", value: i },
+          { name: "num", value: num },
+          { name: "min_pos", value: minPos },
+          { name: "max_pos", value: maxPos },
+          { name: "bad", value: bad },
+        ],
+        note: {
+          vi: `nums[${i}]=${num} == minK=${minK} → cập nhật min_pos = ${i}.`,
+          en: `nums[${i}]=${num} == minK=${minK} → update min_pos = ${i}.`,
+        },
+      });
+    }
+
+    // ── max_pos update ─────────────────────────────────────────────────────
+    if (num === maxK) {
+      maxPos = i;
+      steps.push({
+        title: { vi: `num == maxK (${maxK}) → max_pos = ${i}`, en: `num == maxK (${maxK}) → max_pos = ${i}` },
+        arr: [...nums],
+        sub: makeSub(bad, minPos, maxPos),
+        highlight: [i],
+        mark: [],
+        codeLines: [12, 13],
+        vars: [
+          { name: "i", value: i },
+          { name: "num", value: num },
+          { name: "min_pos", value: minPos },
+          { name: "max_pos", value: maxPos },
+          { name: "bad", value: bad },
+        ],
+        note: {
+          vi: `nums[${i}]=${num} == maxK=${maxK} → cập nhật max_pos = ${i}.`,
+          en: `nums[${i}]=${num} == maxK=${maxK} → update max_pos = ${i}.`,
+        },
+      });
+    }
+
+    // ── count = max(0, min(min_pos, max_pos) - bad) ────────────────────────
+    const smaller = Math.min(minPos, maxPos);
+    const count = Math.max(0, smaller - bad);
+    const validLeft = smaller > bad ? Array.from({ length: smaller - bad }, (_, x) => bad + 1 + x) : [];
+
+    steps.push({
+      title: { vi: `count = max(0, min(${minPos}, ${maxPos}) - ${bad}) = max(0, ${smaller} - ${bad}) = ${count}`, en: `count = max(0, min(${minPos}, ${maxPos}) - ${bad}) = max(0, ${smaller} - ${bad}) = ${count}` },
+      arr: [...nums],
+      sub: makeSub(bad, minPos, maxPos),
+      highlight: [i],
+      mark: validLeft,
+      codeLines: [14],
+      vars: [
+        { name: "i", value: i },
+        { name: "min_pos", value: minPos },
+        { name: "max_pos", value: maxPos },
+        { name: "min(min_pos, max_pos)", value: smaller },
+        { name: "bad", value: bad },
+        { name: "count", value: count },
+      ],
+      note: {
+        vi: count > 0
+          ? `min(min_pos=${minPos}, max_pos=${maxPos}) = ${smaller}.\n` +
+            `Valid left boundaries = indices (${bad}, ${smaller}] = ${count} vị trí (tô xanh).\n` +
+            `Mỗi vị trí left đó cho 1 subarray hợp lệ kết thúc tại i=${i}.`
+          : `min(min_pos=${minPos}, max_pos=${maxPos}) = ${smaller} ≤ bad=${bad} → chưa đủ minK VÀ maxK trong window → count = 0.`,
+        en: count > 0
+          ? `min(min_pos=${minPos}, max_pos=${maxPos}) = ${smaller}.\n` +
+            `Valid left boundaries = indices (${bad}, ${smaller}] = ${count} positions (highlighted green).\n` +
+            `Each gives one valid subarray ending at i=${i}.`
+          : `min(min_pos=${minPos}, max_pos=${maxPos}) = ${smaller} ≤ bad=${bad} → minK AND maxK not both in window → count = 0.`,
+      },
+    });
+
+    // ── res += count ───────────────────────────────────────────────────────
+    res += count;
+    steps.push({
+      title: { vi: `res += ${count} → res = ${res}`, en: `res += ${count} → res = ${res}` },
+      arr: [...nums],
+      sub: makeSub(bad, minPos, maxPos),
+      highlight: [i],
+      mark: validLeft,
+      codeLines: [15],
+      vars: [
+        { name: "i", value: i },
+        { name: "count", value: count },
+        { name: "res", value: res },
+      ],
+      note: {
+        vi: `Cộng thêm ${count} subarray hợp lệ kết thúc tại i=${i}. Tổng cộng đến giờ: res = ${res}.`,
+        en: `Add ${count} valid subarrays ending at i=${i}. Running total: res = ${res}.`,
+      },
+    });
+  }
+
+  // ── Final ──────────────────────────────────────────────────────────────────
+  steps.push({
+    title: { vi: `return res = ${res}`, en: `return res = ${res}` },
+    arr: [...nums],
+    sub: makeSub(bad, minPos, maxPos),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [16],
+    vars: [
+      { name: "answer (res)", value: res },
+      { name: "minK", value: minK },
+      { name: "maxK", value: maxK },
+    ],
+    note: {
+      vi: `Tổng số subarray có min=minK=${minK} và max=maxK=${maxK} là ${res}.`,
+      en: `Total subarrays with min=minK=${minK} and max=maxK=${maxK} is ${res}.`,
+    },
+  });
+
+  return { original: nums, minK, maxK, answer: res, steps };
+}
+
 module.exports = {
   3: {
     id: 3,
@@ -2160,5 +2457,62 @@ module.exports = {
       "        return max_length",
     ],
     builder: buildSteps1004,
+  },
+  2444: {
+    id: 2444,
+    difficulty: "hard",
+    slug: "count-subarrays-with-fixed-bounds",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Count Subarrays With Fixed Bounds", en: "Count Subarrays With Fixed Bounds" },
+    titleVi: { vi: "Đếm subarray có min=minK và max=maxK (O(n))", en: "Count subarrays whose min=minK and max=maxK (O(n))" },
+    statement: {
+      vi:
+        "Cho mảng nums và hai số nguyên minK, maxK. " +
+        "Đếm số subarray (liên tiếp) có min = minK VÀ max = maxK. " +
+        "Nhập nums là dãy số nguyên cách nhau bởi dấu phẩy.",
+      en:
+        "Given an integer array nums and two integers minK and maxK, " +
+        "count subarrays (contiguous) whose minimum equals minK AND maximum equals maxK. " +
+        "Enter nums as comma-separated integers.",
+    },
+    defaultInput: [1, 3, 5, 2, 7, 5],
+    inputKind: "integer",
+    extraParams: [
+      { key: "minK", label: { vi: "minK", en: "minK" }, default: 1 },
+      { key: "maxK", label: { vi: "maxK", en: "maxK" }, default: 5 },
+    ],
+    approach: [
+      { vi: "Duyệt một lần O(n): duy trì 3 biến bad, min_pos, max_pos.", en: "Single pass O(n): maintain 3 variables bad, min_pos, max_pos." },
+      { vi: "bad = chỉ số ngoài [minK, maxK] gần nhất. Mọi subarray hợp lệ phải bắt đầu SAU bad.", en: "bad = last index outside [minK, maxK]. Every valid subarray must start AFTER bad." },
+      { vi: "min_pos = chỉ số xuất hiện minK gần nhất; max_pos = chỉ số xuất hiện maxK gần nhất.", en: "min_pos = last index of minK; max_pos = last index of maxK." },
+      { vi: "Số subarray hợp lệ kết thúc tại i = max(0, min(min_pos, max_pos) - bad). Vì left phải > bad VÀ ≤ min(min_pos, max_pos).", en: "Valid subarrays ending at i = max(0, min(min_pos, max_pos) - bad). Because left must be > bad AND ≤ min(min_pos, max_pos)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt mảng đúng 1 lần. Chỉ dùng 3 biến ngoài result.",
+        en: "Single pass through the array. Only 3 extra variables besides result.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countSubarrays(self, nums, minK, maxK):",
+      "        res = 0",
+      "        bad = -1",
+      "        min_pos = -1",
+      "        max_pos = -1",
+      "        for i, num in enumerate(nums):",
+      "            if num < minK or num > maxK:",
+      "                bad = i",
+      "            if num == minK:",
+      "                min_pos = i",
+      "            if num == maxK:",
+      "                max_pos = i",
+      "            count = max(0, min(min_pos, max_pos) - bad)",
+      "            res += count",
+      "        return res",
+    ],
+    builder: buildSteps2444,
   },
 };
