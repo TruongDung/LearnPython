@@ -843,11 +843,38 @@ function buildSteps103v2(input) {
     steps.push(snapshot(root, opts));
   }
 
-  // Line 3: queue = collections.deque()
+  // Line 3: if not root:
+  const hasRoot = !!root;
+  snap({
+    title: { vi: `if not root → ${!hasRoot}`, en: `if not root → ${!hasRoot}` },
+    codeLines: [3],
+    vars: [{ name: "root", value: hasRoot ? root.val : "None" }],
+    note: hasRoot
+      ? { vi: "root tồn tại → not root = False, bỏ qua return sớm.", en: "root exists → not root = False, skip the early return." }
+      : { vi: "root = None → not root = True, sẽ return [] ngay.", en: "root = None → not root = True, will return [] immediately." },
+  });
+
+  if (!hasRoot) {
+    // Line 4: return []
+    const fs0 = snapshot(root, {
+      title: { vi: "return []", en: "return []" },
+      codeLines: [4],
+      vars: [{ name: "answer", value: "[]" }],
+      note: {
+        vi: "Cây rỗng → trả về [] ngay, không cần BFS.",
+        en: "Empty tree → return [] immediately, no BFS needed.",
+      },
+    });
+    fs0.final = true;
+    steps.push(fs0);
+    return { input, answer: "[]", steps };
+  }
+
+  // Line 5: queue = collections.deque()
   const queue = [];
   snap({
     title: { vi: "queue = collections.deque()", en: "queue = collections.deque()" },
-    codeLines: [3],
+    codeLines: [5],
     vars: [{ name: "queue", value: "[]" }],
     note: {
       vi: "Tạo queue rỗng để BFS theo tầng.",
@@ -855,38 +882,25 @@ function buildSteps103v2(input) {
     },
   });
 
-  // Line 4: if root:
-  const hasRoot = !!root;
+  // Line 6: queue.append(root)
+  queue.push(root);
   snap({
-    title: { vi: `if root → ${hasRoot}`, en: `if root → ${hasRoot}` },
-    codeLines: [4],
-    vars: [{ name: "root", value: hasRoot ? root.val : "None" }],
-    note: hasRoot
-      ? { vi: "root tồn tại → cần đẩy vào queue để bắt đầu BFS.", en: "root exists → push it into the queue to start BFS." }
-      : { vi: "root = None → không có gì để duyệt, queue vẫn rỗng.", en: "root = None → nothing to traverse, queue stays empty." },
+    title: { vi: `queue.append(root) → queue=[${root.val}]`, en: `queue.append(root) → queue=[${root.val}]` },
+    hlSet: new Set([root.id]),
+    codeLines: [6],
+    vars: [{ name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
+    note: {
+      vi: `Đẩy root=${root.val} vào queue. queue = [${queue.map((n) => n.val).join(", ")}].`,
+      en: `Push root=${root.val} into the queue. queue = [${queue.map((n) => n.val).join(", ")}].`,
+    },
   });
 
-  if (hasRoot) {
-    // Line 5: queue.append(root)
-    queue.push(root);
-    snap({
-      title: { vi: `queue.append(root) → queue=[${root.val}]`, en: `queue.append(root) → queue=[${root.val}]` },
-      hlSet: new Set([root.id]),
-      codeLines: [5],
-      vars: [{ name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
-      note: {
-        vi: `Đẩy root=${root.val} vào queue. queue = [${queue.map((n) => n.val).join(", ")}].`,
-        en: `Push root=${root.val} into the queue. queue = [${queue.map((n) => n.val).join(", ")}].`,
-      },
-    });
-  }
-
-  // Line 6: level = 0
+  // Line 7: level = 0
   let level = 0;
   snap({
     title: { vi: "level = 0", en: "level = 0" },
     hlSet: new Set(queue.map((n) => n.id)),
-    codeLines: [6],
+    codeLines: [7],
     vars: [{ name: "level", value: level }, { name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
     note: {
       vi: "level đếm số tầng đã xử lý — dùng để quyết định chiều đọc (chẵn: trái→phải, lẻ: phải→trái).",
@@ -894,11 +908,11 @@ function buildSteps103v2(input) {
     },
   });
 
-  // Line 7: result = []
+  // Line 8: result = []
   snap({
     title: { vi: "result = []", en: "result = []" },
     hlSet: new Set(queue.map((n) => n.id)),
-    codeLines: [7],
+    codeLines: [8],
     vars: [{ name: "result", value: "[]" }],
     note: {
       vi: "result sẽ chứa danh sách các tầng, mỗi tầng là 1 list giá trị.",
@@ -909,12 +923,12 @@ function buildSteps103v2(input) {
   const visited = new Set();
 
   while (queue.length > 0) {
-    // Line 8: while queue:
+    // Line 9: while queue:
     snap({
       title: { vi: `while queue → True (queue=[${queue.map((n) => n.val).join(", ")}])`, en: `while queue → True (queue=[${queue.map((n) => n.val).join(", ")}])` },
       hlSet: new Set(queue.map((n) => n.id)),
       wordSet: new Set(visited),
-      codeLines: [8],
+      codeLines: [9],
       vars: [{ name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }, { name: "level", value: level }],
       note: {
         vi: "queue không rỗng → còn tầng để xử lý.",
@@ -922,13 +936,13 @@ function buildSteps103v2(input) {
       },
     });
 
-    // Line 9: size = len(queue)
+    // Line 10: size = len(queue)
     const size = queue.length;
     snap({
       title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
       hlSet: new Set(queue.map((n) => n.id)),
       wordSet: new Set(visited),
-      codeLines: [9],
+      codeLines: [10],
       vars: [{ name: "size", value: size }],
       note: {
         vi: `size = ${size} — chốt số node CỦA TẦNG NÀY trước khi bắt đầu thêm node tầng sau vào queue.`,
@@ -936,13 +950,13 @@ function buildSteps103v2(input) {
       },
     });
 
-    // Line 10: lst = []
+    // Line 11: lst = []
     const lst = [];
     snap({
       title: { vi: "lst = []", en: "lst = []" },
       hlSet: new Set(queue.map((n) => n.id)),
       wordSet: new Set(visited),
-      codeLines: [10],
+      codeLines: [11],
       vars: [{ name: "lst", value: "[]" }],
       note: {
         vi: "lst sẽ chứa giá trị các node của tầng hiện tại, theo thứ tự trái→phải (chưa đảo).",
@@ -951,27 +965,27 @@ function buildSteps103v2(input) {
     });
 
     for (let i = 0; i < size; i++) {
-      // Line 11: for i in range(size):
+      // Line 12: for _ in range(size):
       snap({
-        title: { vi: `for i=${i} (range(${size}))`, en: `for i=${i} (range(${size}))` },
+        title: { vi: `for _=${i} (range(${size}))`, en: `for _=${i} (range(${size}))` },
         hlSet: new Set(queue.map((n) => n.id)),
         wordSet: new Set(visited),
-        codeLines: [11],
-        vars: [{ name: "i", value: i }, { name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
+        codeLines: [12],
+        vars: [{ name: "iteration", value: `${i + 1}/${size}` }, { name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
         note: {
           vi: `Vòng lặp thứ ${i + 1}/${size} để xử lý đúng ${size} node của tầng này.`,
           en: `Iteration ${i + 1}/${size} to process exactly ${size} nodes of this level.`,
         },
       });
 
-      // Line 12: node = queue.popleft()
+      // Line 13: node = queue.popleft()
       const node = queue.shift();
       visited.add(node.id);
       snap({
         title: { vi: `node = queue.popleft() → node=${node.val}`, en: `node = queue.popleft() → node=${node.val}` },
         hlSet: new Set([node.id]),
         wordSet: new Set(visited),
-        codeLines: [12],
+        codeLines: [13],
         vars: [{ name: "node", value: node.val }, { name: "queue (after pop)", value: `[${queue.map((n) => n.val).join(", ")}]` }],
         note: {
           vi: `Lấy node đầu queue: ${node.val}. queue còn lại = [${queue.map((n) => n.val).join(", ")}].`,
@@ -979,13 +993,13 @@ function buildSteps103v2(input) {
         },
       });
 
-      // Line 13: lst.append(node.val)
+      // Line 14: lst.append(node.val)
       lst.push(node.val);
       snap({
         title: { vi: `lst.append(${node.val}) → lst=[${lst.join(", ")}]`, en: `lst.append(${node.val}) → lst=[${lst.join(", ")}]` },
         hlSet: new Set([node.id]),
         wordSet: new Set(visited),
-        codeLines: [13],
+        codeLines: [14],
         vars: [{ name: "lst", value: `[${lst.join(", ")}]` }],
         note: {
           vi: `Thêm giá trị ${node.val} vào lst. lst = [${lst.join(", ")}].`,
@@ -993,13 +1007,13 @@ function buildSteps103v2(input) {
         },
       });
 
-      // Line 14: if node.left:
+      // Line 15: if node.left:
       const hasLeft = !!node.left;
       snap({
         title: { vi: `if node.left → ${hasLeft}`, en: `if node.left → ${hasLeft}` },
         hlSet: new Set([node.id]),
         wordSet: new Set(visited),
-        codeLines: [14],
+        codeLines: [15],
         vars: [{ name: "node.left", value: hasLeft ? node.left.val : "None" }],
         note: hasLeft
           ? { vi: `node.left = ${node.left.val} → sẽ thêm vào queue.`, en: `node.left = ${node.left.val} → will be added to the queue.` }
@@ -1007,13 +1021,13 @@ function buildSteps103v2(input) {
       });
 
       if (hasLeft) {
-        // Line 15: queue.append(node.left)
+        // Line 16: queue.append(node.left)
         queue.push(node.left);
         snap({
           title: { vi: `queue.append(node.left) → queue=[${queue.map((n) => n.val).join(", ")}]`, en: `queue.append(node.left) → queue=[${queue.map((n) => n.val).join(", ")}]` },
           hlSet: new Set([node.left.id]),
           wordSet: new Set(visited),
-          codeLines: [15],
+          codeLines: [16],
           vars: [{ name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
           note: {
             vi: `Đẩy con trái (${node.left.val}) vào queue cho tầng kế tiếp.`,
@@ -1022,13 +1036,13 @@ function buildSteps103v2(input) {
         });
       }
 
-      // Line 16: if node.right:
+      // Line 17: if node.right:
       const hasRight = !!node.right;
       snap({
         title: { vi: `if node.right → ${hasRight}`, en: `if node.right → ${hasRight}` },
         hlSet: new Set([node.id]),
         wordSet: new Set(visited),
-        codeLines: [16],
+        codeLines: [17],
         vars: [{ name: "node.right", value: hasRight ? node.right.val : "None" }],
         note: hasRight
           ? { vi: `node.right = ${node.right.val} → sẽ thêm vào queue.`, en: `node.right = ${node.right.val} → will be added to the queue.` }
@@ -1036,13 +1050,13 @@ function buildSteps103v2(input) {
       });
 
       if (hasRight) {
-        // Line 17: queue.append(node.right)
+        // Line 18: queue.append(node.right)
         queue.push(node.right);
         snap({
           title: { vi: `queue.append(node.right) → queue=[${queue.map((n) => n.val).join(", ")}]`, en: `queue.append(node.right) → queue=[${queue.map((n) => n.val).join(", ")}]` },
           hlSet: new Set([node.right.id]),
           wordSet: new Set(visited),
-          codeLines: [17],
+          codeLines: [18],
           vars: [{ name: "queue", value: `[${queue.map((n) => n.val).join(", ")}]` }],
           note: {
             vi: `Đẩy con phải (${node.right.val}) vào queue cho tầng kế tiếp.`,
@@ -1052,13 +1066,13 @@ function buildSteps103v2(input) {
       }
     }
 
-    // Line 18: if level % 2 == 0:
+    // Line 19: if level % 2 == 0:
     const evenLevel = level % 2 === 0;
     snap({
       title: { vi: `if level % 2 == 0 → ${evenLevel} (level=${level})`, en: `if level % 2 == 0 → ${evenLevel} (level=${level})` },
       hlSet: new Set(queue.map((n) => n.id)),
       wordSet: new Set(visited),
-      codeLines: [18],
+      codeLines: [19],
       vars: [{ name: "level", value: level }, { name: "level % 2", value: level % 2 }, { name: "lst", value: `[${lst.join(", ")}]` }],
       note: evenLevel
         ? { vi: `level=${level} chẵn → giữ nguyên thứ tự trái→phải.`, en: `level=${level} is even → keep left→right order.` }
@@ -1066,13 +1080,13 @@ function buildSteps103v2(input) {
     });
 
     if (evenLevel) {
-      // Line 19: result.append(lst)
+      // Line 20: result.append(lst)
       result.push([...lst]);
       snap({
         title: { vi: `result.append(lst) → +[${lst.join(", ")}]`, en: `result.append(lst) → +[${lst.join(", ")}]` },
         hlSet: new Set(queue.map((n) => n.id)),
         wordSet: new Set(visited),
-        codeLines: [19],
+        codeLines: [20],
         vars: [{ name: "result", value: JSON.stringify(result) }],
         note: {
           vi: `Thêm lst (giữ nguyên chiều) vào result. result = ${JSON.stringify(result)}.`,
@@ -1080,14 +1094,14 @@ function buildSteps103v2(input) {
         },
       });
     } else {
-      // Line 21: result.append(lst[::-1])
+      // Line 22: result.append(lst[::-1])
       const reversed = [...lst].reverse();
       result.push(reversed);
       snap({
         title: { vi: `result.append(lst[::-1]) → +[${reversed.join(", ")}]`, en: `result.append(lst[::-1]) → +[${reversed.join(", ")}]` },
         hlSet: new Set(queue.map((n) => n.id)),
         wordSet: new Set(visited),
-        codeLines: [21],
+        codeLines: [22],
         vars: [{ name: "lst[::-1]", value: `[${reversed.join(", ")}]` }, { name: "result", value: JSON.stringify(result) }],
         note: {
           vi: `Đảo ngược lst thành [${reversed.join(", ")}] rồi thêm vào result. result = ${JSON.stringify(result)}.`,
@@ -1096,14 +1110,14 @@ function buildSteps103v2(input) {
       });
     }
 
-    // Line 22: level += 1
+    // Line 23: level += 1
     const oldLevel = level;
     level++;
     snap({
       title: { vi: `level += 1 → level=${level}`, en: `level += 1 → level=${level}` },
       hlSet: new Set(queue.map((n) => n.id)),
       wordSet: new Set(visited),
-      codeLines: [22],
+      codeLines: [23],
       vars: [{ name: "level (before)", value: oldLevel }, { name: "level (after)", value: level }],
       note: {
         vi: `Chuyển sang tầng kế tiếp: level = ${level}.`,
@@ -1116,7 +1130,7 @@ function buildSteps103v2(input) {
   snap({
     title: { vi: "while queue → False", en: "while queue → False" },
     wordSet: new Set(visited),
-    codeLines: [8],
+    codeLines: [9],
     vars: [{ name: "queue", value: "[]" }],
     note: {
       vi: "queue rỗng → đã xử lý hết mọi tầng. Thoát vòng lặp.",
@@ -1124,12 +1138,12 @@ function buildSteps103v2(input) {
     },
   });
 
-  // Line 23: return result
+  // Line 24: return result
   const answer = JSON.stringify(result);
   const fs = snapshot(root, {
     title: { vi: `return result = ${answer}`, en: `return result = ${answer}` },
     wordSet: new Set(visited),
-    codeLines: [23],
+    codeLines: [24],
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Kết quả zigzag cuối cùng: ${answer}.`,
@@ -1617,15 +1631,16 @@ module.exports = {
     code2: [
       "class Solution:",
       "    def zigzagLevelOrder(self, root):",
+      "        if not root:",
+      "            return []",
       "        queue = collections.deque()",
-      "        if root:",
-      "            queue.append(root)",
+      "        queue.append(root)",
       "        level = 0",
       "        result = []",
       "        while queue:",
       "            size = len(queue)",
       "            lst = []",
-      "            for i in range(size):",
+      "            for _ in range(size):",
       "                node = queue.popleft()",
       "                lst.append(node.val)",
       "                if node.left:",
