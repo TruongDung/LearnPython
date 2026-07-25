@@ -366,28 +366,72 @@ function buildSteps52(input) {
 /**
  * Generate steps for LeetCode 77: Combinations.
  * Backtracking: build current array incrementally, only pick numbers >= start.
- * Visualization: bar chart shows numbers 1..n, bars marked when in current.
+ * Visualization: decision tree — each edge is a pick, each node is a partial
+ * combination (∅ at the root); leaves at depth k that get saved are marked
+ * as a full "word" (green ring), matching how other tree/trie problems mark
+ * completed paths. The tree only grows (nodes are never removed on
+ * backtrack), so by the end you see the entire explored search space.
  */
 function buildSteps77(input, params) {
   const n = input[0];
   const k = params.k || 2;
   const steps = [];
 
-  const numbers = Array.from({ length: n }, (_, i) => i + 1);
   const current = [];
   const results = [];
 
-  // Helper: bar array — 1 if number is in current, 0 otherwise
-  const barState = () => numbers.map((num) => (current.includes(num) ? 1 : 0));
-  const numberLabels = () => numbers.map(String);
-  const currentIdx = () => current.map((num) => num - 1);
+  // ─── Persistent decision-tree structure ───
+  // root = empty combination (∅). Each child edge = "pick this number next".
+  // Nodes are added the first time a path is explored and are NEVER removed,
+  // so backtracking (pop) just moves the "active" pointer back to the parent
+  // while the node itself stays in the tree (dimmed once no longer active).
+  let idCounter = 0;
+  const rootNode = { id: idCounter++, val: null, parentId: null, children: {}, complete: false };
+  let currentNode = rootNode;
 
-  steps.push({
+  function snapshotTree(hlId) {
+    const vizNodes = [];
+    let nextX = 0;
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort((a, b) => Number(a) - Number(b));
+      let x;
+      if (keys.length === 0) {
+        x = nextX++;
+      } else {
+        const xs = keys.map((key) => dfs(node.children[key], depth + 1));
+        x = (xs[0] + xs[xs.length - 1]) / 2;
+      }
+      vizNodes.push({
+        id: node.id,
+        label: node.val === null ? "\u2205" : String(node.val),
+        x,
+        y: depth,
+        parentId: node.parentId,
+        isWord: node.complete,
+        hl: node.id === hlId,
+      });
+      return x;
+    }
+    dfs(rootNode, 0);
+    return vizNodes;
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: { nodes: snapshotTree(opts.hlId !== undefined ? opts.hlId : currentNode.id) },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  snap({
     title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: barState(),
-    sub: numberLabels(),
-    highlight: [],
-    mark: [],
     codeLines: [3, 4],
     vars: [
       { name: "n", value: n },
@@ -396,20 +440,17 @@ function buildSteps77(input, params) {
       { name: "result", value: "[]" },
     ],
     note: {
-      vi: `Tìm tất cả tổ hợp ${k} số chọn từ [1..${n}].\nBacktracking: thêm 1 số → đệ quy → quay lui (pop).\nĐể tránh trùng: chỉ chọn số > số cuối trong current.`,
-      en: `Find all combinations of ${k} numbers from [1..${n}].\nBacktracking: add one → recurse → backtrack (pop).\nTo avoid duplicates: only pick numbers > last in current.`,
+      vi: `Tìm tất cả tổ hợp ${k} số chọn từ [1..${n}].\nCây quyết định: gốc (∅) là chưa chọn số nào. Mỗi cạnh xuống là 1 lần chọn số → thêm vào current → đệ quy.\nĐể tránh trùng: chỉ chọn số > số cuối trong current (mỗi nhánh chỉ đi 1 chiều tăng dần).`,
+      en: `Find all combinations of ${k} numbers from [1..${n}].\nDecision tree: the root (∅) has nothing picked yet. Each edge going down is one pick → add to current → recurse.\nTo avoid duplicates: only pick numbers > last in current (each branch only moves forward).`,
     },
   });
 
   function backtrack(start, depth) {
     if (current.length === k) {
       results.push([...current]);
-      steps.push({
+      currentNode.complete = true;
+      snap({
         title: { vi: `✓ Tìm thấy: [${current.join(", ")}]`, en: `✓ Found: [${current.join(", ")}]` },
-        arr: barState(),
-        sub: numberLabels(),
-        highlight: [],
-        mark: currentIdx(),
         codeLines: [7, 8, 9],
         vars: [
           { name: "current", value: `[${current.join(", ")}]` },
@@ -418,8 +459,8 @@ function buildSteps77(input, params) {
           { name: "all results", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
         ],
         note: {
-          vi: `len(current) == k → lưu [${current.join(", ")}] vào result. Tổng cộng: ${results.length} tổ hợp.`,
-          en: `len(current) == k → save [${current.join(", ")}] to result. Total so far: ${results.length} combinations.`,
+          vi: `len(current) == k → lưu [${current.join(", ")}] vào result. Nút lá này được khoanh viền xanh (đã hoàn tất). Tổng cộng: ${results.length} tổ hợp.`,
+          en: `len(current) == k → save [${current.join(", ")}] to result. This leaf gets a green ring (completed). Total so far: ${results.length} combinations.`,
         },
       });
       return;
@@ -432,12 +473,16 @@ function buildSteps77(input, params) {
       if (remaining < needed) break;
 
       current.push(i);
-      steps.push({
+      const parentNode = currentNode;
+      let childNode = parentNode.children[i];
+      if (!childNode) {
+        childNode = { id: idCounter++, val: i, parentId: parentNode.id, children: {}, complete: false };
+        parentNode.children[i] = childNode;
+      }
+      currentNode = childNode;
+
+      snap({
         title: { vi: `Thêm ${i}: current = [${current.join(", ")}]`, en: `Add ${i}: current = [${current.join(", ")}]` },
-        arr: barState(),
-        sub: numberLabels(),
-        highlight: [i - 1],
-        mark: currentIdx().slice(0, -1),
         codeLines: [10, 11, 12],
         vars: [
           { name: "i (pick)", value: i },
@@ -446,28 +491,25 @@ function buildSteps77(input, params) {
           { name: "depth", value: depth + 1 },
         ],
         note: {
-          vi: `Chọn ${i} ∈ [${start}..${n}], thêm vào current → đệ quy với start = ${i + 1}.`,
-          en: `Pick ${i} from [${start}..${n}], add to current → recurse with start = ${i + 1}.`,
+          vi: `Chọn ${i} ∈ [${start}..${n}], thêm vào current → tạo/đi tới nhánh con "${i}" trong cây, đệ quy với start = ${i + 1}.`,
+          en: `Pick ${i} from [${start}..${n}], add to current → move into the "${i}" child branch of the tree, recurse with start = ${i + 1}.`,
         },
       });
 
       backtrack(i + 1, depth + 1);
 
       const popped = current.pop();
-      steps.push({
+      currentNode = parentNode;
+      snap({
         title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
-        arr: barState(),
-        sub: numberLabels(),
-        highlight: [],
-        mark: currentIdx(),
         codeLines: [13],
         vars: [
           { name: "popped", value: popped },
           { name: "current", value: `[${current.join(", ")}]` },
         ],
         note: {
-          vi: `Quay lui: bỏ ${popped} khỏi current. Thử số tiếp theo trong vòng for.`,
-          en: `Backtrack: remove ${popped} from current. Try next number in the for-loop.`,
+          vi: `Quay lui: bỏ ${popped} khỏi current, quay lại nút cha trong cây. Thử số tiếp theo trong vòng for.`,
+          en: `Backtrack: remove ${popped} from current, move back up to the parent node in the tree. Try the next number in the for-loop.`,
         },
       });
     }
@@ -475,13 +517,10 @@ function buildSteps77(input, params) {
 
   backtrack(1, 0);
 
-  // Final summary
-  steps.push({
+  // Final summary — highlight nothing in particular, show the whole explored tree.
+  snap({
     title: { vi: `Kết quả: ${results.length} tổ hợp`, en: `Result: ${results.length} combinations` },
-    arr: numbers.map(() => 0),
-    sub: numberLabels(),
-    highlight: [],
-    mark: [],
+    hlId: -1,
     final: true,
     codeLines: [15, 16],
     vars: [
@@ -489,8 +528,8 @@ function buildSteps77(input, params) {
       { name: "all results", value: results.map((r) => `[${r.join(",")}]`).join(", ") },
     ],
     note: {
-      vi: `Tổng cộng ${results.length} tổ hợp = C(${n},${k}).\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
-      en: `Total ${results.length} combinations = C(${n},${k}).\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      vi: `Tổng cộng ${results.length} tổ hợp = C(${n},${k}). Toàn bộ cây quyết định đã được duyệt; các lá viền xanh là tổ hợp hợp lệ.\nDanh sách: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
+      en: `Total ${results.length} combinations = C(${n},${k}). The whole decision tree has been explored; green-ringed leaves are the valid combinations.\nList: ${results.map((r) => `[${r.join(",")}]`).join(", ")}.`,
     },
   });
 
