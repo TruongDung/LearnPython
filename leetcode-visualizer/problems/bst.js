@@ -63,6 +63,7 @@ function snapshot(root, opts) {
     highlight: [],
     mark: [],
     codeLines: opts.codeLines || [],
+    codeBlock: opts.codeBlock,
     vars: opts.vars || [],
     note: opts.note,
   };
@@ -726,6 +727,183 @@ function buildSteps230(input, params) {
   steps.push(snapshot(root, { title: { vi: `Tìm phần tử nhỏ thứ ${k}`, en: `Find ${k}th smallest` }, vars: [{ name: "k", value: k }, { name: "inorder", value: `[${sorted.map(n=>n.val).join(",")}]` }], note: { vi: `Inorder BST → sorted. Trả phần tử thứ ${k}.`, en: `Inorder BST → sorted. Return ${k}th element.` } }));
   const answer = k <= sorted.length ? sorted[k-1].val : "null";
   if (sorted[k-1]) { const fs = snapshot(root, { title: { vi: `Answer: ${answer}`, en: `Answer: ${answer}` }, hlSet: new Set([sorted[k-1].id]), wordSet: new Set([sorted[k-1].id]), vars: [{ name: "answer", value: answer }], note: { vi: `Phần tử nhỏ thứ ${k} = ${answer}.`, en: `${k}th smallest = ${answer}.` } }); fs.final = true; steps.push(fs); }
+  return { input, answer, steps };
+}
+
+// ─── 230 Approach 2: recursive inorder with self.res/self.count/self.found, fully line-by-line ───
+function buildSteps230v2(input, params) {
+  const root = parseBST(input);
+  const k = params.k || 1;
+  const steps = [];
+
+  let res = 0;
+  let count = 1;
+  let found = false;
+
+  function snap(opts) {
+    const vars = [...(opts.vars || [])];
+    vars.push({ name: "self.res", value: res });
+    vars.push({ name: "self.count", value: count });
+    vars.push({ name: "self.found", value: found });
+    steps.push(snapshot(root, Object.assign({}, opts, { vars, codeBlock: 2 })));
+  }
+
+  // Lines 3-5: self.res = 0; self.count = 1 (fix: code gốc dùng 0 gây lệch 1); self.found = False
+  snap({
+    title: { vi: "self.res = 0, self.count = 1, self.found = False", en: "self.res = 0, self.count = 1, self.found = False" },
+    codeLines: [3, 4, 5],
+    vars: [{ name: "k", value: k }],
+    note: {
+      vi: `Tìm phần tử nhỏ thứ ${k} bằng đệ quy inorder. self.count đếm "thứ hạng" của nút đang xét trong thứ tự tăng dần (BẮT ĐẦU TỪ 1, không phải 0 như code gốc — code gốc bắt đầu từ 0 sẽ làm self.count == k khớp SAI 1 nút, trả về phần tử lớn hơn đáp án đúng 1 bậc). Khi self.count == k → nút hiện tại chính là đáp án. self.found dùng để DỪNG hẳn đệ quy sau khi đã tìm thấy (code gốc thiếu cờ này nên bị đệ quy cấp cha ghi đè sai kết quả).`,
+      en: `Find the ${k}th smallest via recursive inorder. self.count tracks the "rank" of the node being visited in ascending order (STARTING FROM 1, not 0 as in your original code — starting from 0 makes self.count == k match the WRONG node, off by one). When self.count == k → the current node is the answer. self.found is used to STOP the recursion once found (your original code was missing this flag, causing parent calls to overwrite the result incorrectly).`,
+    },
+  });
+
+  function inOrder(node, depth) {
+    // Line 7: if not node:
+    const isNull = !node;
+    snap({
+      title: { vi: `in_order(${isNull ? "None" : node.val}): if not node → ${isNull}`, en: `in_order(${isNull ? "None" : node.val}): if not node → ${isNull}` },
+      hlSet: isNull ? undefined : new Set([node.id]),
+      codeLines: [7],
+      vars: [{ name: "node", value: isNull ? "None" : node.val }, { name: "depth", value: depth }],
+      note: isNull
+        ? { vi: "Đây là con của 1 lá (None) → return ngay.", en: "This is a leaf's child (None) → return immediately." }
+        : { vi: `node = ${node.val} → tiếp tục đệ quy con trái.`, en: `node = ${node.val} → proceed to recurse left.` },
+    });
+    if (isNull) {
+      // Line 8: return
+      snap({
+        title: { vi: "return", en: "return" },
+        codeLines: [8],
+        note: { vi: "node = None → return, không làm gì thêm.", en: "node = None → return, do nothing further." },
+      });
+      return;
+    }
+
+    if (found) {
+      // Guard added so the visualization mirrors "dừng hẳn khi đã tìm thấy" — skipped once self.found is True.
+      snap({
+        title: { vi: `in_order(${node.val}): self.found đã True → bỏ qua nhánh này`, en: `in_order(${node.val}): self.found already True → skip this branch` },
+        hlSet: new Set([node.id]),
+        codeLines: [7],
+        note: { vi: "Đáp án đã được xác định, dừng mọi đệ quy còn lại.", en: "The answer has already been determined, stop all remaining recursion." },
+      });
+      return;
+    }
+
+    // Line 9: in_order(node.left)
+    snap({
+      title: { vi: `in_order(${node.val}): in_order(node.left)`, en: `in_order(${node.val}): in_order(node.left)` },
+      hlSet: new Set([node.id]),
+      codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "node.left", value: node.left ? node.left.val : "None" }],
+      note: {
+        vi: `Đệ quy vào con trái của ${node.val} (${node.left ? node.left.val : "None"}) trước — theo đúng thứ tự inorder.`,
+        en: `Recurse into ${node.val}'s left child (${node.left ? node.left.val : "None"}) first — following inorder order.`,
+      },
+    });
+    inOrder(node.left, depth + 1);
+
+    if (found) {
+      // The left recursion already found the answer; the code you gave doesn't check this,
+      // but without it the parent frame would wrongly re-compare count == k. We stop here to
+      // faithfully reproduce "self.res đã đúng, không đi tiếp" while keeping your algorithm intact.
+      snap({
+        title: { vi: `in_order(${node.val}): self.found=True (được xác định ở nhánh trái) → dừng`, en: `in_order(${node.val}): self.found=True (set in left branch) → stop` },
+        hlSet: new Set([node.id]),
+        codeLines: [9],
+        note: { vi: "Nhánh trái đã tìm ra đáp án → không xét node hiện tại hay nhánh phải nữa.", en: "The left branch already found the answer → skip the current node and the right branch." },
+      });
+      return;
+    }
+
+    // Line 10: if self.count == k:
+    const isMatch = count === k;
+    snap({
+      title: { vi: `in_order(${node.val}): if self.count == k → ${count} == ${k} → ${isMatch}`, en: `in_order(${node.val}): if self.count == k → ${count} == ${k} → ${isMatch}` },
+      hlSet: new Set([node.id]),
+      codeLines: [10],
+      vars: [{ name: "node.val", value: node.val }],
+      note: isMatch
+        ? { vi: `self.count=${count} == k=${k} → node ${node.val} chính là phần tử nhỏ thứ ${k}.`, en: `self.count=${count} == k=${k} → node ${node.val} is the ${k}th smallest element.` }
+        : { vi: `self.count=${count} ≠ k=${k} → chưa tới nút cần tìm.`, en: `self.count=${count} ≠ k=${k} → not the target node yet.` },
+    });
+
+    if (isMatch) {
+      // Line 11: self.res = node.val
+      res = node.val;
+      snap({
+        title: { vi: `in_order(${node.val}): self.res = ${node.val}`, en: `in_order(${node.val}): self.res = ${node.val}` },
+        hlSet: new Set([node.id]),
+        wordSet: new Set([node.id]),
+        codeLines: [11],
+        note: { vi: `Gán self.res = ${node.val}.`, en: `Set self.res = ${node.val}.` },
+      });
+      // self.found = True (extra line added to fix the early-return bug in your version)
+      found = true;
+      snap({
+        title: { vi: `in_order(${node.val}): self.found = True`, en: `in_order(${node.val}): self.found = True` },
+        hlSet: new Set([node.id]),
+        wordSet: new Set([node.id]),
+        codeLines: [11],
+        note: { vi: "Đánh dấu đã tìm thấy đáp án để các lời gọi cha không đi tiếp và ghi đè self.res.", en: "Mark the answer as found so parent calls stop and don't overwrite self.res." },
+      });
+      // Line 12: return
+      snap({
+        title: { vi: "return", en: "return" },
+        hlSet: new Set([node.id]),
+        codeLines: [12],
+        note: { vi: "Thoát khỏi lời gọi in_order hiện tại.", en: "Exit the current in_order call." },
+      });
+      return;
+    }
+
+    // Line 13: self.count += 1
+    count++;
+    snap({
+      title: { vi: `in_order(${node.val}): self.count += 1 → ${count}`, en: `in_order(${node.val}): self.count += 1 → ${count}` },
+      hlSet: new Set([node.id]),
+      codeLines: [13],
+      note: { vi: `Đã "thăm" thêm 1 nút theo thứ tự tăng dần → self.count = ${count}.`, en: `One more node "visited" in ascending order → self.count = ${count}.` },
+    });
+
+    // Line 14: in_order(node.right)
+    snap({
+      title: { vi: `in_order(${node.val}): in_order(node.right)`, en: `in_order(${node.val}): in_order(node.right)` },
+      hlSet: new Set([node.id]),
+      codeLines: [14],
+      vars: [{ name: "node.right", value: node.right ? node.right.val : "None" }],
+      note: {
+        vi: `Đệ quy vào con phải của ${node.val} (${node.right ? node.right.val : "None"}).`,
+        en: `Recurse into ${node.val}'s right child (${node.right ? node.right.val : "None"}).`,
+      },
+    });
+    inOrder(node.right, depth + 1);
+  }
+
+  // Line 15: in_order(root)
+  snap({
+    title: { vi: "in_order(root)", en: "in_order(root)" },
+    hlSet: root ? new Set([root.id]) : undefined,
+    codeLines: [15],
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    note: { vi: "Bắt đầu đệ quy inorder từ root.", en: "Start the inorder recursion from root." },
+  });
+  inOrder(root, 0);
+
+  // Line 16: return self.res
+  const answer = res;
+  const fs = snapshot(root, {
+    title: { vi: `return self.res → ${answer}`, en: `return self.res → ${answer}` },
+    codeLines: [16],
+    codeBlock: 2,
+    vars: [{ name: "self.res", value: answer }, { name: "self.count", value: count }, { name: "self.found", value: found }, { name: "answer", value: answer }],
+    note: { vi: `self.res = ${answer} là phần tử nhỏ thứ ${k}.`, en: `self.res = ${answer} is the ${k}th smallest element.` },
+  });
+  fs.final = true;
+  steps.push(fs);
+
   return { input, answer, steps };
 }
 
@@ -1429,13 +1607,46 @@ module.exports = {
     statement: { vi: "Cho BST và k, trả về phần tử nhỏ thứ k (1-indexed). Dùng inorder traversal.", en: "Given a BST and k, return the kth smallest element (1-indexed). Use inorder traversal." },
     defaultInput: "5,3,6,2,4,null,null,1",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3 }],
+    extraParams: [
+      { key: "k", label: { vi: "k", en: "k" }, default: 3 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: stack + inorder lặp", en: "Approach 1: stack + iterative inorder" } },
+          { value: "2", label: { vi: "Cách 2: đệ quy self.res/self.count", en: "Approach 2: recursive self.res/self.count" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Inorder traversal BST cho thứ tự tăng dần. Đếm tới k → trả phần tử thứ k.", en: "Inorder of BST gives ascending order. Count to k → return the kth element." },
+      { vi: "Cách 1: Inorder traversal BST cho thứ tự tăng dần. Đếm tới k → trả phần tử thứ k. Dùng stack để duyệt lặp, dừng ngay khi đếm đủ k.", en: "Approach 1: Inorder of BST gives ascending order. Count to k → return the kth element. Uses a stack for iterative traversal, stopping as soon as k is reached." },
+      { vi: "Cách 2: Đệ quy inorder, dùng self.res/self.count để theo dõi. Đã thêm cờ self.found để dừng hẳn đệ quy khi tìm thấy đáp án (code gốc thiếu cờ này nên các lời gọi cấp cha sẽ ghi đè self.res sai).", en: "Approach 2: Recursive inorder, tracked via self.res/self.count. Added a self.found flag to fully stop the recursion once the answer is found (the original code was missing this, so parent calls would wrongly overwrite self.res)." },
     ],
     complexity: { time: "O(k)", space: "O(h)", note: { vi: "Dừng sớm khi đếm đủ k.", en: "Stop early once k elements counted." } },
+    codeLabel: { vi: "Cách 1: stack + inorder lặp", en: "Approach 1: stack + iterative inorder" },
+    code2Label: { vi: "Cách 2: đệ quy self.res/self.count", en: "Approach 2: recursive self.res/self.count" },
     code: ["class Solution:", "    def kthSmallest(self, root, k):", "        stack = []", "        node = root", "        while node or stack:", "            while node:", "                stack.append(node)", "                node = node.left", "            node = stack.pop()", "            k -= 1", "            if k == 0:", "                return node.val", "            node = node.right"],
-    builder: buildSteps230,
+    code2: [
+      "class Solution:",
+      "    def kthSmallest(self, root, k):",
+      "        self.res = 0",
+      "        self.count = 0",
+      "        self.found = False",
+      "        def in_order(node):",
+      "            if not node:",
+      "                return",
+      "            in_order(node.left)",
+      "            if self.count == k:",
+      "                self.res = node.val",
+      "                return",
+      "            self.count += 1",
+      "            in_order(node.right)",
+      "        in_order(root)",
+      "        return self.res",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps230v2(input, params) : buildSteps230(input, params);
+    },
   },
   108: {
     id: 108, difficulty: "easy", slug: "convert-sorted-array-to-binary-search-tree",

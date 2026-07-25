@@ -791,6 +791,316 @@ function buildSteps1644(input, params) {
   return { input, answer: valid ? ans.val : "null", steps };
 }
 
+// ─── 1644 Approach 2: post-order traversal with self.findP / self.findQ flags, fully line-by-line ───
+function buildSteps1644v2(input, params) {
+  const root = parseTree(input);
+  const pv = Number(params.p);
+  const qv = Number(params.q);
+  const steps = [];
+
+  let findP = false;
+  let findQ = false;
+
+  function nv(node) { return node ? node.val : "None"; }
+
+  function snap(opts) {
+    const vars = [...(opts.vars || [])];
+    vars.push({ name: "self.findP", value: findP });
+    vars.push({ name: "self.findQ", value: findQ });
+    steps.push(snapshot(root, Object.assign({}, opts, { vars, codeBlock: 2 })));
+  }
+
+  // Lines 3-4: self.findP = False; self.findQ = False
+  snap({
+    title: { vi: "self.findP = False, self.findQ = False", en: "self.findP = False, self.findQ = False" },
+    codeLines: [3, 4],
+    vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
+    note: {
+      vi: `Tìm LCA của p=${pv} và q=${qv} bằng duyệt post-order. self.findP/self.findQ sẽ đánh dấu khi thực sự gặp p, q trong cây.`,
+      en: `Find the LCA of p=${pv} and q=${qv} via a post-order traversal. self.findP/self.findQ will flag when p, q are actually seen in the tree.`,
+    },
+  });
+
+  function postOrder(node, depth) {
+    // Line 6: if not node:
+    const isNull = !node;
+    snap({
+      title: { vi: `post_order(${isNull ? "None" : node.val}): if not node → ${isNull}`, en: `post_order(${isNull ? "None" : node.val}): if not node → ${isNull}` },
+      hlSet: isNull ? undefined : new Set([node.id]),
+      codeLines: [6],
+      vars: [{ name: "node", value: isNull ? "None" : node.val }, { name: "depth", value: depth }],
+      note: isNull
+        ? { vi: "Đây là con của 1 lá (None) → sẽ return None ngay.", en: "This is a leaf's child (None) → will return None immediately." }
+        : { vi: `node = ${node.val} → tiếp tục đệ quy con trái rồi con phải.`, en: `node = ${node.val} → proceed to recurse left then right.` },
+    });
+
+    if (isNull) {
+      // Line 7: return node   (node is None here)
+      snap({
+        title: { vi: "return node → None", en: "return node → None" },
+        codeLines: [7],
+        note: {
+          vi: "node = None → return None.",
+          en: "node = None → return None.",
+        },
+      });
+      return null;
+    }
+
+    // Line 8: left = post_order(node.left)
+    snap({
+      title: { vi: `post_order(${node.val}): left = post_order(node.left)`, en: `post_order(${node.val}): left = post_order(node.left)` },
+      hlSet: new Set([node.id]),
+      codeLines: [8],
+      vars: [{ name: "node", value: node.val }, { name: "node.left", value: nv(node.left) }],
+      note: {
+        vi: `Gọi đệ quy vào con trái của ${node.val} (${nv(node.left)}) trước.`,
+        en: `Recurse into ${node.val}'s left child (${nv(node.left)}) first.`,
+      },
+    });
+    const left = postOrder(node.left, depth + 1);
+    snap({
+      title: { vi: `post_order(${node.val}): left = ${nv(left)}`, en: `post_order(${node.val}): left = ${nv(left)}` },
+      hlSet: new Set([node.id]),
+      codeLines: [8],
+      vars: [{ name: "node", value: node.val }, { name: "left (result)", value: nv(left) }],
+      note: {
+        vi: `Đệ quy con trái của ${node.val} trả về left = ${nv(left)}.`,
+        en: `The left recursion for ${node.val} returned left = ${nv(left)}.`,
+      },
+    });
+
+    // Line 9: right = post_order(node.right)
+    snap({
+      title: { vi: `post_order(${node.val}): right = post_order(node.right)`, en: `post_order(${node.val}): right = post_order(node.right)` },
+      hlSet: new Set([node.id]),
+      codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "node.right", value: nv(node.right) }],
+      note: {
+        vi: `Gọi đệ quy vào con phải của ${node.val} (${nv(node.right)}).`,
+        en: `Recurse into ${node.val}'s right child (${nv(node.right)}).`,
+      },
+    });
+    const right = postOrder(node.right, depth + 1);
+    snap({
+      title: { vi: `post_order(${node.val}): right = ${nv(right)}`, en: `post_order(${node.val}): right = ${nv(right)}` },
+      hlSet: new Set([node.id]),
+      codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "right (result)", value: nv(right) }],
+      note: {
+        vi: `Đệ quy con phải của ${node.val} trả về right = ${nv(right)}.`,
+        en: `The right recursion for ${node.val} returned right = ${nv(right)}.`,
+      },
+    });
+
+    // Line 10: if node == p:
+    const isP = node.val === pv;
+    snap({
+      title: { vi: `post_order(${node.val}): if node == p → ${isP}`, en: `post_order(${node.val}): if node == p → ${isP}` },
+      hlSet: new Set([node.id]),
+      codeLines: [10],
+      vars: [{ name: "node.val", value: node.val }, { name: "p", value: pv }],
+      note: isP
+        ? { vi: `node.val=${node.val} == p=${pv} → đây chính là p.`, en: `node.val=${node.val} == p=${pv} → this is p.` }
+        : { vi: `node.val=${node.val} ≠ p=${pv} → chưa phải p.`, en: `node.val=${node.val} ≠ p=${pv} → not p.` },
+    });
+
+    if (isP) {
+      // Line 11: self.findP = True
+      findP = true;
+      snap({
+        title: { vi: `post_order(${node.val}): self.findP = True`, en: `post_order(${node.val}): self.findP = True` },
+        hlSet: new Set([node.id]),
+        codeLines: [11],
+        note: {
+          vi: `Đánh dấu đã tìm thấy p=${pv} trong cây.`,
+          en: `Mark that p=${pv} was found in the tree.`,
+        },
+      });
+      // Line 12: return node
+      snap({
+        title: { vi: `post_order(${node.val}): return node → ${node.val}`, en: `post_order(${node.val}): return node → ${node.val}` },
+        hlSet: new Set([node.id]),
+        codeLines: [12],
+        note: {
+          vi: `Trả về node ${node.val} (chính là p) lên lời gọi cha.`,
+          en: `Return node ${node.val} (which is p) to the caller.`,
+        },
+      });
+      return node;
+    }
+
+    // Line 13: if node == q:
+    const isQ = node.val === qv;
+    snap({
+      title: { vi: `post_order(${node.val}): if node == q → ${isQ}`, en: `post_order(${node.val}): if node == q → ${isQ}` },
+      hlSet: new Set([node.id]),
+      codeLines: [13],
+      vars: [{ name: "node.val", value: node.val }, { name: "q", value: qv }],
+      note: isQ
+        ? { vi: `node.val=${node.val} == q=${qv} → đây chính là q.`, en: `node.val=${node.val} == q=${qv} → this is q.` }
+        : { vi: `node.val=${node.val} ≠ q=${qv} → chưa phải q.`, en: `node.val=${node.val} ≠ q=${qv} → not q.` },
+    });
+
+    if (isQ) {
+      // Line 14: self.findQ = True
+      findQ = true;
+      snap({
+        title: { vi: `post_order(${node.val}): self.findQ = True`, en: `post_order(${node.val}): self.findQ = True` },
+        hlSet: new Set([node.id]),
+        codeLines: [14],
+        note: {
+          vi: `Đánh dấu đã tìm thấy q=${qv} trong cây.`,
+          en: `Mark that q=${qv} was found in the tree.`,
+        },
+      });
+      // Line 15: return node
+      snap({
+        title: { vi: `post_order(${node.val}): return node → ${node.val}`, en: `post_order(${node.val}): return node → ${node.val}` },
+        hlSet: new Set([node.id]),
+        codeLines: [15],
+        note: {
+          vi: `Trả về node ${node.val} (chính là q) lên lời gọi cha.`,
+          en: `Return node ${node.val} (which is q) to the caller.`,
+        },
+      });
+      return node;
+    }
+
+    // Line 16: if not left:
+    const noLeft = !left;
+    snap({
+      title: { vi: `post_order(${node.val}): if not left → ${noLeft}`, en: `post_order(${node.val}): if not left → ${noLeft}` },
+      hlSet: new Set([node.id]),
+      codeLines: [16],
+      vars: [{ name: "left", value: nv(left) }],
+      note: noLeft
+        ? { vi: "left = None → nhánh trái không chứa p, q → sẽ trả về right.", en: "left = None → left subtree has neither p nor q → will return right." }
+        : { vi: `left = ${nv(left)} → nhánh trái có chứa ứng viên, kiểm tiếp right.`, en: `left = ${nv(left)} → left subtree has a candidate, check right next.` },
+    });
+
+    if (noLeft) {
+      // Line 17: return right
+      snap({
+        title: { vi: `post_order(${node.val}): return right → ${nv(right)}`, en: `post_order(${node.val}): return right → ${nv(right)}` },
+        hlSet: new Set([node.id]),
+        codeLines: [17],
+        note: {
+          vi: `Trả về right = ${nv(right)} lên lời gọi cha (bỏ qua nhánh trái vì trống).`,
+          en: `Return right = ${nv(right)} to the caller (left branch is empty, so it's ignored).`,
+        },
+      });
+      return right;
+    }
+
+    // Line 18: elif not right:
+    const noRight = !right;
+    snap({
+      title: { vi: `post_order(${node.val}): elif not right → ${noRight}`, en: `post_order(${node.val}): elif not right → ${noRight}` },
+      hlSet: new Set([node.id]),
+      codeLines: [18],
+      vars: [{ name: "right", value: nv(right) }],
+      note: noRight
+        ? { vi: "right = None → nhánh phải không chứa p, q → sẽ trả về left.", en: "right = None → right subtree has neither p nor q → will return left." }
+        : { vi: `right = ${nv(right)} → cả 2 nhánh đều có ứng viên → node ${node.val} chính là LCA.`, en: `right = ${nv(right)} → both branches have a candidate → node ${node.val} is the LCA.` },
+    });
+
+    if (noRight) {
+      // Line 19: return left
+      snap({
+        title: { vi: `post_order(${node.val}): return left → ${nv(left)}`, en: `post_order(${node.val}): return left → ${nv(left)}` },
+        hlSet: new Set([node.id]),
+        codeLines: [19],
+        note: {
+          vi: `Trả về left = ${nv(left)} lên lời gọi cha (bỏ qua nhánh phải vì trống).`,
+          en: `Return left = ${nv(left)} to the caller (right branch is empty, so it's ignored).`,
+        },
+      });
+      return left;
+    }
+
+    // Lines 20-21: else: return node
+    snap({
+      title: { vi: `post_order(${node.val}): else → return node → ${node.val}`, en: `post_order(${node.val}): else → return node → ${node.val}` },
+      hlSet: new Set([node.id]),
+      codeLines: [20, 21],
+      note: {
+        vi: `Cả left và right đều không rỗng → node ${node.val} là tổ tiên chung thấp nhất (LCA) của 2 ứng viên.`,
+        en: `Both left and right are non-empty → node ${node.val} is the lowest common ancestor of the two candidates.`,
+      },
+    });
+    return node;
+  }
+
+  // Line 22: res = post_order(root)
+  snap({
+    title: { vi: "res = post_order(root)", en: "res = post_order(root)" },
+    hlSet: root ? new Set([root.id]) : undefined,
+    codeLines: [22],
+    vars: [{ name: "root", value: nv(root) }],
+    note: {
+      vi: "Bắt đầu đệ quy post-order từ root.",
+      en: "Start the post-order recursion from root.",
+    },
+  });
+  const res = postOrder(root, 0);
+  snap({
+    title: { vi: `res = post_order(root) → ${nv(res)}`, en: `res = post_order(root) → ${nv(res)}` },
+    hlSet: res ? new Set([res.id]) : undefined,
+    codeLines: [22],
+    vars: [{ name: "res", value: nv(res) }],
+    note: {
+      vi: `post_order(root) trả về res = ${nv(res)}.`,
+      en: `post_order(root) returned res = ${nv(res)}.`,
+    },
+  });
+
+  // Line 23: if self.findP and self.findQ:
+  const valid = findP && findQ;
+  snap({
+    title: { vi: `if self.findP and self.findQ → ${valid}`, en: `if self.findP and self.findQ → ${valid}` },
+    codeLines: [23],
+    vars: [{ name: "res", value: nv(res) }],
+    note: valid
+      ? { vi: "Cả p và q đều tồn tại trong cây → sẽ trả về res.", en: "Both p and q exist in the tree → will return res." }
+      : { vi: "Thiếu p hoặc q trong cây → sẽ trả về None.", en: "p or q is missing from the tree → will return None." },
+  });
+
+  let fs;
+  if (valid) {
+    // Line 24: return res
+    fs = snapshot(root, {
+      title: { vi: `return res → ${nv(res)}`, en: `return res → ${nv(res)}` },
+      wordSet: res ? new Set([res.id]) : undefined,
+      codeLines: [24],
+      codeBlock: 2,
+      vars: [
+        { name: "self.findP", value: findP },
+        { name: "self.findQ", value: findQ },
+        { name: "answer", value: nv(res) },
+      ],
+      note: { vi: `self.findP và self.findQ đều True → trả về res = ${nv(res)}.`, en: `self.findP and self.findQ are both True → return res = ${nv(res)}.` },
+    });
+  } else {
+    // Lines 25-26: else: return None
+    fs = snapshot(root, {
+      title: { vi: "else: return None", en: "else: return None" },
+      codeLines: [25, 26],
+      codeBlock: 2,
+      vars: [
+        { name: "self.findP", value: findP },
+        { name: "self.findQ", value: findQ },
+        { name: "answer", value: "None" },
+      ],
+      note: { vi: "Thiếu p hoặc q → trả về None.", en: "p or q is missing → return None." },
+    });
+  }
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer: valid ? nv(res) : "null", steps };
+}
+
 // ─── 1650: LCA of a Binary Tree III (parent pointers) ───
 function buildSteps1650(input, params) {
   const root = parseTree(input); const parent = buildParents(root); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
@@ -1652,14 +1962,57 @@ module.exports = {
     statement: { vi: "Như bài 236 nhưng p hoặc q CÓ THỂ không tồn tại trong cây. Nếu thiếu một trong hai → trả null. Nhập level-order.", en: "Like 236 but p or q MAY not exist in the tree. If either is missing → return null. Enter as level-order." },
     defaultInput: "3,5,1,6,2,0,8",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [{ key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 5 }, { key: "q", label: { vi: "q (thử 9 = vắng)", en: "q (try 9 = absent)" }, allowNegative: true, default: 1 }],
+    extraParams: [
+      { key: "p", label: { vi: "p", en: "p" }, allowNegative: true, default: 5 },
+      { key: "q", label: { vi: "q (thử 9 = vắng)", en: "q (try 9 = absent)" }, allowNegative: true, default: 1 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: đếm mid+l+r", en: "Approach 1: count mid+l+r" } },
+          { value: "2", label: { vi: "Cách 2: post-order + findP/findQ", en: "Approach 2: post-order + findP/findQ" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Phải duyệt HẾT cây để xác nhận cả p và q tồn tại. Đếm số phía khớp (con trái, con phải, chính nút).", en: "Must traverse the WHOLE tree to confirm both p and q exist. Count matched sides (left, right, self)." },
-      { vi: "Nút đầu tiên có ≥2 phía khớp là ứng viên LCA; chỉ hợp lệ nếu cả p và q đều được tìm thấy.", en: "First node with ≥2 matched sides is the LCA candidate; valid only if both p and q were found." },
+      { vi: "Cách 1: Phải duyệt HẾT cây để xác nhận cả p và q tồn tại. Đếm số phía khớp (con trái, con phải, chính nút). Nút đầu tiên có ≥2 phía khớp là ứng viên LCA; chỉ hợp lệ nếu cả p và q đều được tìm thấy.", en: "Approach 1: Must traverse the WHOLE tree to confirm both p and q exist. Count matched sides (left, right, self). First node with ≥2 matched sides is the LCA candidate; valid only if both p and q were found." },
+      { vi: "Cách 2: Duyệt post-order (giống bài 236) nhưng dùng self.findP/self.findQ để tự xác nhận p, q có thực sự tồn tại trong cây hay không, thay vì đếm số lần khớp.", en: "Approach 2: Post-order traversal (like problem 236) but uses self.findP/self.findQ to confirm p, q actually exist in the tree, instead of counting matches." },
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt toàn bộ cây 1 lần.", en: "Full traversal once." } },
+    codeLabel: { vi: "Cách 1: đếm mid+l+r", en: "Approach 1: count mid+l+r" },
+    code2Label: { vi: "Cách 2: post-order + findP/findQ", en: "Approach 2: post-order + findP/findQ" },
     code: ["class Solution:", "    def lowestCommonAncestor(self, root, p, q):", "        self.ans = None", "        self.count = 0", "        def dfs(node):", "            if not node: return False", "            l = dfs(node.left)", "            r = dfs(node.right)", "            mid = node == p or node == q", "            if mid + l + r >= 2 and not self.ans:", "                self.ans = node", "            if mid: self.count += 1", "            return l or r or mid", "        dfs(root)", "        return self.ans if self.count == 2 else None"],
-    builder: buildSteps1644,
+    code2: [
+      "class Solution:",
+      "    def lowestCommonAncestor(self, root, p, q):",
+      "        self.findP = False",
+      "        self.findQ = False",
+      "        def post_order(node):",
+      "            if not node:",
+      "                return node",
+      "            left = post_order(node.left)",
+      "            right = post_order(node.right)",
+      "            if node == p:",
+      "                self.findP = True",
+      "                return node",
+      "            if node == q:",
+      "                self.findQ = True",
+      "                return node",
+      "            if not left:",
+      "                return right",
+      "            elif not right:",
+      "                return left",
+      "            else:",
+      "                return node",
+      "        res = post_order(root)",
+      "        if self.findP and self.findQ:",
+      "            return res",
+      "        else:",
+      "            return None",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps1644v2(input, params) : buildSteps1644(input, params);
+    },
   },
   1650: {
     id: 1650, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree-iii",
