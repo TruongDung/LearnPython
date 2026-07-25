@@ -1040,6 +1040,347 @@ function buildSteps1730(input) {
 }
 
 /**
+ * LeetCode 1730 Approach 2: level-based BFS.
+ * Queue only stores (r, c) — no distance tag per element. Instead, all cells
+ * currently in the queue belong to the same "level" (distance), snapshotted
+ * via size = len(queue) before the inner loop mutates the queue. distance is
+ * a single shared counter incremented once per fully-processed level.
+ * Food is detected when checking a NEIGHBOR (before enqueueing it), not when
+ * popping it — unlike Approach 1 which checks the popped cell itself.
+ */
+function buildSteps1730v2(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  const rows = grid.length;
+  const cols = rows ? grid[0].length : 0;
+  const validCell = (v) => v === "*" || v === "#" || v === "O" || v === "X";
+  const invalid = !rows || !cols || grid.some((row) => row.length !== cols || row.some((v) => !validCell(v)));
+
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeBlock: 2,
+      codeLines: [5, 6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid chỉ được gồm '*' (vị trí bắt đầu, đúng 1 ô), '#' (thức ăn), 'O' (đi được), 'X' (vật cản). Ví dụ: XXXXXX|X*OOOX|XOO#OX|XXXXXX.",
+        en: "Grid may only contain '*' (start, exactly one cell), '#' (food), 'O' (free space), 'X' (obstacle). Example: XXXXXX|X*OOOX|XOO#OX|XXXXXX.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  let start = null;
+  for (let r = 0; r < rows && !start; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === "*") { start = [r, c]; break; }
+    }
+  }
+
+  if (!start) {
+    steps.push({
+      title: { vi: "Không có ô '*' → không hợp lệ", en: "No '*' cell → invalid" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeBlock: 2,
+      codeLines: [5, 6],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải có đúng 1 ô '*' làm vị trí bắt đầu.",
+        en: "The grid must contain exactly one '*' start cell.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  // level[r][c] = distance (in moves) at which the cell was reached, or -1 if unvisited.
+  const level = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const key = (r, c) => `${r},${c}`;
+  const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+  function makeCells(currentSet, foundCellNow) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const isCurrent = currentSet && currentSet.has(key(r, c));
+        const isFound = foundCellNow && foundCellNow[0] === r && foundCellNow[1] === c;
+        let cls = "empty";
+        let label = ".";
+        if (cell === "X") { cls = "wall"; label = "X"; }
+        else if (cell === "*") { cls = level[r][c] >= 0 ? "visited" : "start"; label = "*"; }
+        else if (cell === "#") { cls = "end"; label = "#"; }
+        if (level[r][c] >= 0 && cell !== "*") { cls = "visited"; label = String(level[r][c]); }
+        if (isCurrent) cls = "queued";
+        if (isFound) cls = cell === "#" ? "end" : "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, currentSet, foundCellNow, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(currentSet, foundCellNow) },
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 2,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "for i,j: tìm ô '*' → queue, visited", en: "for i,j: find '*' cell → queue, visited" },
+    currentSet: new Set([key(start[0], start[1])]),
+    codeLines: [7, 8, 9, 10, 11, 12],
+    vars: [{ name: "start", value: `(${start[0]}, ${start[1]})` }],
+    note: {
+      vi: "Quét grid tìm ô '*', đưa vào queue và visited. Chỉ lưu (i,j), KHÔNG kèm khoảng cách — khác Cách 1 vốn lưu (r,c,dist) trong mỗi phần tử queue.",
+      en: "Scan the grid for the '*' cell, add it to queue and visited. Only (i,j) is stored — NO distance tag — unlike Approach 1 which stores (r,c,dist) per element.",
+    },
+  });
+
+  level[start[0]][start[1]] = 0;
+  let queue = [start];
+  const visited = new Set([key(start[0], start[1])]);
+  let distance = 1;
+  let foundCell = null;
+  let foundDist = -1;
+
+  pushStep({
+    title: { vi: "directions = [...]; distance = 1", en: "directions = [...]; distance = 1" },
+    currentSet: new Set([key(start[0], start[1])]),
+    codeLines: [13, 14],
+    vars: [
+      { name: "directions", value: "[(0,1),(1,0),(0,-1),(-1,0)]" },
+      { name: "distance", value: distance },
+    ],
+    note: {
+      vi: "distance là biến ĐẾM CHUNG cho cả level hiện tại (khác Cách 1, nơi mỗi phần tử trong queue tự mang dist riêng). distance bắt đầu từ 1 vì đây là khoảng cách của LEVEL KẾ TIẾP (các hàng xóm của '*').",
+      en: "distance is a SHARED counter for the whole current level (unlike Approach 1, where each queue element carries its own dist). distance starts at 1 because it represents the NEXT level's distance (the neighbors of '*').",
+    },
+  });
+
+  while (queue.length && !foundCell) {
+    // Line 21: while queue:
+    pushStep({
+      title: { vi: `while queue → True (size=${queue.length}, distance=${distance})`, en: `while queue → True (size=${queue.length}, distance=${distance})` },
+      currentSet: new Set(queue.map(([r, c]) => key(r, c))),
+      codeLines: [15],
+      vars: [{ name: "queue", value: `[${queue.map(([r, c]) => `(${r},${c})`).join(", ")}]` }, { name: "distance", value: distance }],
+      note: {
+        vi: `queue không rỗng → còn 1 level cần xử lý. Tất cả ${queue.length} ô trong queue hiện tại đều ở cùng khoảng cách distance-1 = ${distance - 1} (đã thăm ở lượt trước).`,
+        en: `queue is not empty → there is still a level to process. All ${queue.length} cells in the current queue share the same distance-1 = ${distance - 1} (visited on the previous round).`,
+      },
+    });
+
+    // Line 22: size = len(queue)
+    const size = queue.length;
+    pushStep({
+      title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
+      currentSet: new Set(queue.map(([r, c]) => key(r, c))),
+      codeLines: [16],
+      vars: [{ name: "size", value: size }],
+      note: {
+        vi: `size = ${size} — CHỐT số ô của level này TRƯỚC KHI vòng lặp for thêm ô của level kế tiếp vào queue. Đây là kỹ thuật kinh điển để BFS theo từng "lớp".`,
+        en: `size = ${size} — LOCK IN the number of cells in this level BEFORE the for-loop appends next-level cells into the queue. This is the classic technique for level-by-level BFS.`,
+      },
+    });
+
+    for (let k = 0; k < size && !foundCell; k++) {
+      // Line 23: for _ in range(size):
+      pushStep({
+        title: { vi: `for _=${k} (range(${size}))`, en: `for _=${k} (range(${size}))` },
+        currentSet: new Set(queue.map(([r, c]) => key(r, c))),
+        codeLines: [17],
+        vars: [{ name: "iteration", value: `${k + 1}/${size}` }],
+        note: {
+          vi: `Vòng lặp thứ ${k + 1}/${size} để xử lý đúng ${size} ô của level này.`,
+          en: `Iteration ${k + 1}/${size} to process exactly ${size} cells of this level.`,
+        },
+      });
+
+      // Line 24: i, j = queue.popleft()
+      const [i, j] = queue.shift();
+      pushStep({
+        title: { vi: `i, j = queue.popleft() → (${i},${j})`, en: `i, j = queue.popleft() → (${i},${j})` },
+        currentSet: new Set([key(i, j)]),
+        codeLines: [18],
+        vars: [{ name: "i,j", value: `(${i}, ${j})` }],
+        note: {
+          vi: `Lấy (${i},${j}) ra khỏi đầu queue để xét 4 hàng xóm.`,
+          en: `Pop (${i},${j}) from the front of the queue to check its 4 neighbors.`,
+        },
+      });
+
+      for (const [dx, dy] of dirs) {
+        // Line 25: for dx, dy in directions:
+        pushStep({
+          title: { vi: `for dx,dy in directions → (${dx},${dy})`, en: `for dx,dy in directions → (${dx},${dy})` },
+          currentSet: new Set([key(i, j)]),
+          codeLines: [19],
+          vars: [{ name: "dx,dy", value: `(${dx}, ${dy})` }],
+          note: {
+            vi: `Thử hướng (${dx},${dy}) từ (${i},${j}).`,
+            en: `Try direction (${dx},${dy}) from (${i},${j}).`,
+          },
+        });
+
+        // Lines 26-27: x = i+dx; y = j+dy
+        const x = i + dx, y = j + dy;
+        pushStep({
+          title: { vi: `x, y = ${i}+${dx}, ${j}+${dy} = (${x},${y})`, en: `x, y = ${i}+${dx}, ${j}+${dy} = (${x},${y})` },
+          currentSet: new Set([key(i, j)]),
+          codeLines: [20, 21],
+          vars: [{ name: "x,y", value: `(${x}, ${y})` }],
+          note: {
+            vi: `Tọa độ hàng xóm cần xét: (${x},${y}).`,
+            en: `Neighbor coordinate to check: (${x},${y}).`,
+          },
+        });
+
+        // Line 28: out of bounds or 'X' -> continue
+        const outOrWall = x < 0 || x >= rows || y < 0 || y >= cols || grid[x][y] === "X";
+        pushStep({
+          title: { vi: `if out-of-bounds or grid=='X' → ${outOrWall}`, en: `if out-of-bounds or grid=='X' → ${outOrWall}` },
+          currentSet: new Set([key(i, j)]),
+          codeLines: [22, 23],
+          note: outOrWall
+            ? { vi: `(${x},${y}) ngoài biên hoặc là 'X' → continue, bỏ qua hướng này.`, en: `(${x},${y}) is out of bounds or is 'X' → continue, skip this direction.` }
+            : { vi: `(${x},${y}) hợp lệ, không phải 'X' → tiếp tục kiểm tra.`, en: `(${x},${y}) is valid and not 'X' → keep checking.` },
+        });
+        if (outOrWall) continue;
+
+        // Line 29: if grid[x][y] == '#': return distance
+        const isFood = grid[x][y] === "#";
+        pushStep({
+          title: { vi: `if grid[${x}][${y}] == '#' → ${isFood}`, en: `if grid[${x}][${y}] == '#' → ${isFood}` },
+          currentSet: new Set([key(i, j), key(x, y)]),
+          codeLines: [24],
+          vars: [{ name: "grid[x][y]", value: grid[x][y] }],
+          note: isFood
+            ? { vi: `(${x},${y}) là ô '#' → TÌM THẤY thức ăn! distance = ${distance} chính là đáp án ngắn nhất.`, en: `(${x},${y}) is a '#' cell → FOOD FOUND! distance = ${distance} is the shortest answer.` }
+            : { vi: `(${x},${y}) chưa phải ô '#'.`, en: `(${x},${y}) is not a '#' cell yet.` },
+        });
+
+        if (isFood) {
+          parent[x][y] = [i, j];
+          foundCell = [x, y];
+          foundDist = distance;
+          pushStep({
+            title: { vi: `return distance → ${distance}`, en: `return distance → ${distance}` },
+            currentSet: new Set([key(x, y)]),
+            foundCellNow: [x, y],
+            codeLines: [25],
+            vars: [{ name: "answer", value: distance }],
+            note: {
+              vi: `Trả về distance = ${distance} ngay lập tức — đây là khoảng cách ngắn nhất tới thức ăn.`,
+              en: `Return distance = ${distance} immediately — this is the shortest distance to food.`,
+            },
+          });
+          break;
+        }
+
+        // Line 31: if (x, y) not in visited:
+        const notVisited = !visited.has(key(x, y));
+        pushStep({
+          title: { vi: `if (${x},${y}) not in visited → ${notVisited}`, en: `if (${x},${y}) not in visited → ${notVisited}` },
+          currentSet: new Set([key(i, j), key(x, y)]),
+          codeLines: [26],
+          note: notVisited
+            ? { vi: `(${x},${y}) chưa thăm → sẽ thêm vào visited và queue.`, en: `(${x},${y}) not visited yet → will be added to visited and queue.` }
+            : { vi: `(${x},${y}) đã thăm rồi → bỏ qua.`, en: `(${x},${y}) already visited → skip.` },
+        });
+
+        if (notVisited) {
+          // Lines 32-33: visited.add((x,y)); queue.append((x,y))
+          visited.add(key(x, y));
+          level[x][y] = distance;
+          parent[x][y] = [i, j];
+          queue.push([x, y]);
+          pushStep({
+            title: { vi: `visited.add((${x},${y})); queue.append((${x},${y}))`, en: `visited.add((${x},${y})); queue.append((${x},${y}))` },
+            currentSet: new Set([key(x, y)]),
+            codeLines: [27, 28],
+            vars: [{ name: "queue", value: `[${queue.map(([r, c]) => `(${r},${c})`).join(", ")}]` }],
+            note: {
+              vi: `Đánh dấu (${x},${y}) đã thăm và thêm vào queue. Ô này sẽ được xử lý ở level distance=${distance}.`,
+              en: `Mark (${x},${y}) visited and add it to the queue. This cell will be processed at level distance=${distance}.`,
+            },
+          });
+        }
+      }
+      if (foundCell) break;
+    }
+
+    if (!foundCell) {
+      // Line 34: distance += 1
+      distance++;
+      pushStep({
+        title: { vi: `distance += 1 → ${distance}`, en: `distance += 1 → ${distance}` },
+        currentSet: new Set(queue.map(([r, c]) => key(r, c))),
+        codeLines: [29],
+        vars: [{ name: "distance", value: distance }],
+        note: {
+          vi: `Đã xử lý xong toàn bộ level trước. Level kế tiếp (các ô mới trong queue) sẽ có khoảng cách distance = ${distance}.`,
+          en: `Finished processing the previous level entirely. The next level (new cells in the queue) will have distance = ${distance}.`,
+        },
+      });
+    }
+  }
+
+  const answer = foundCell ? foundDist : -1;
+  const pathCells = new Set();
+  if (foundCell) {
+    let cur = foundCell;
+    while (cur) {
+      pathCells.add(key(cur[0], cur[1]));
+      cur = parent[cur[0]][cur[1]];
+    }
+  }
+
+  const fs = {
+    title: answer === -1
+      ? { vi: "return -1 (hết queue, không tới được thức ăn)", en: "return -1 (queue empty, food unreachable)" }
+      : { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    bfsGrid: {
+      rows, cols,
+      cells: grid.map((row, r) => row.map((cell, c) => {
+        let cls = "empty";
+        let label = ".";
+        if (cell === "X") { cls = "wall"; label = "X"; }
+        else if (cell === "*") { cls = "start"; label = "*"; }
+        else if (cell === "#") { cls = "end"; label = "#"; }
+        if (level[r][c] >= 0 && cell !== "*") { cls = "visited"; label = String(level[r][c]); }
+        if (pathCells.has(key(r, c))) cls = cell === "#" ? "end" : cell === "*" ? "start" : "path";
+        return { label, cls };
+      })),
+    },
+    highlight: [],
+    mark: [],
+    codeBlock: 2,
+    codeLines: answer === -1 ? [30] : [25],
+    vars: [{ name: "answer", value: answer }],
+    note: answer === -1
+      ? { vi: "BFS đã hết queue mà chưa gặp ô '#' nào → không có đường tới thức ăn.", en: "BFS exhausted the queue without meeting any '#' cell → no path to food." }
+      : { vi: `BFS theo level tới thức ăn với distance = ${answer}. Đường đi được tô xanh.`, en: `Level-based BFS reached food with distance = ${answer}. The path is highlighted.` },
+  };
+  fs.final = true;
+  steps.push(fs);
+
+  return { original: grid, answer, steps };
+}
+
+/**
  * LeetCode 1091: Shortest Path in Binary Matrix.
  * BFS in 8 directions. Path length counts cells, so the start cell has distance 1.
  */
@@ -10543,11 +10884,19 @@ module.exports = {
     defaultInput: "XXXXXX|X*OOOX|XOOOOX|XOO#OX|XXXXXX",
     inputKind: "string",
     inputLabel: { vi: "Grid ('*','#','O','X', hàng cách '|')", en: "Grid ('*','#','O','X', rows separated by '|')" },
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: queue lưu (r,c,dist)", en: "Approach 1: queue stores (r,c,dist)" } },
+          { value: "2", label: { vi: "Cách 2: BFS theo level, size=len(queue)", en: "Approach 2: level-based BFS, size=len(queue)" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Quét grid tìm ô '*' làm điểm bắt đầu BFS.", en: "Scan the grid to find the '*' cell as the BFS starting point." },
-      { vi: "BFS 4 hướng từ '*', không đi qua 'X'. Khác bài 1091: khoảng cách tính theo SỐ BƯỚC (start = 0), không theo số ô.", en: "4-direction BFS from '*', never through 'X'. Unlike problem 1091: distance is counted by NUMBER OF MOVES (start = 0), not number of cells." },
-      { vi: "Vì BFS mở rộng theo từng level, ô '#' đầu tiên chạm tới chính là đáp án ngắn nhất.", en: "Because BFS expands level by level, the first '#' cell reached is the shortest answer." },
-      { vi: "Nếu BFS hết queue mà chưa gặp '#' nào → trả -1.", en: "If BFS exhausts the queue without meeting any '#' → return -1." },
+      { vi: "Cách 1: Quét grid tìm ô '*' làm điểm bắt đầu BFS. Queue lưu (r,c,dist) — mỗi phần tử tự mang khoảng cách riêng. Kiểm tra '#' ngay khi POP ra khỏi queue. Khác bài 1091: khoảng cách tính theo SỐ BƯỚC (start = 0), không theo số ô.", en: "Approach 1: Scan the grid to find the '*' cell as the BFS starting point. The queue stores (r,c,dist) — each element carries its own distance. '#' is checked right when POPPING from the queue. Unlike problem 1091: distance is counted by NUMBER OF MOVES (start = 0), not number of cells." },
+      { vi: "Cách 2: Queue chỉ lưu (r,c). Dùng size = len(queue) để chốt số ô của level hiện tại trước khi vòng for thêm ô mới, distance là biến đếm CHUNG tăng dần sau mỗi level. Kiểm tra '#' ngay khi xét HÀNG XÓM (trước khi enqueue), không phải khi pop.", en: "Approach 2: The queue only stores (r,c). Uses size = len(queue) to lock in the current level's cell count before the for-loop adds new cells; distance is a SHARED counter incremented once per level. '#' is checked when examining a NEIGHBOR (before enqueueing), not when popping." },
+      { vi: "Cả 2 cách đều là BFS chuẩn theo từng lớp (level-order) và luôn cho cùng đáp án ngắn nhất.", en: "Both approaches are standard level-order BFS and always produce the same shortest answer." },
     ],
     complexity: {
       time: "O(rows·cols)",
@@ -10557,6 +10906,8 @@ module.exports = {
         en: "Each cell enters the queue at most once, each cell checks 4 directions.",
       },
     },
+    codeLabel: { vi: "Cách 1: queue lưu (r,c,dist)", en: "Approach 1: queue stores (r,c,dist)" },
+    code2Label: { vi: "Cách 2: BFS theo level, size=len(queue)", en: "Approach 2: level-based BFS, size=len(queue)" },
     code: [
       "from collections import deque",
       "",
@@ -10584,7 +10935,42 @@ module.exports = {
       "                    queue.append((nr, nc, dist + 1))",
       "        return -1",
     ],
-    builder: buildSteps1730,
+    code2: [
+      "class Solution:",
+      "    def getFood(self, grid):",
+      "        m = len(grid)",
+      "        n = len(grid[0])",
+      "        queue = collections.deque()",
+      "        visited = set()",
+      "        for i in range(m):",
+      "            for j in range(n):",
+      "                if grid[i][j] == '*':",
+      "                    queue.append((i, j))",
+      "                    visited.add((i, j))",
+      "                    break",
+      "        directions = [[0, 1], [1, 0], [0, -1], [-1, 0]]",
+      "        distance = 1",
+      "        while queue:",
+      "            size = len(queue)",
+      "            for _ in range(size):",
+      "                i, j = queue.popleft()",
+      "                for dx, dy in directions:",
+      "                    x = i + dx",
+      "                    y = j + dy",
+      "                    if x < 0 or x >= m or y < 0 or y >= n or grid[x][y] == 'X':",
+      "                        continue",
+      "                    if grid[x][y] == '#':",
+      "                        return distance",
+      "                    if (x, y) not in visited:",
+      "                        visited.add((x, y))",
+      "                        queue.append((x, y))",
+      "            distance += 1",
+      "        return -1",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps1730v2(input) : buildSteps1730(input);
+    },
   },
   1091: {
     id: 1091,
