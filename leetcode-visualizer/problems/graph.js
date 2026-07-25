@@ -829,6 +829,217 @@ function buildSteps994(input) {
 }
 
 /**
+ * LeetCode 1730: Shortest Path to Get Food.
+ * Single-source BFS (4 directions) from the '*' cell to the nearest '#' cell.
+ * 'X' blocks movement, 'O' is free space. Path length counts MOVES (edges),
+ * unlike 1091 where the start cell itself counts as distance 1.
+ */
+function buildSteps1730(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  const rows = grid.length;
+  const cols = rows ? grid[0].length : 0;
+  const validCell = (v) => v === "*" || v === "#" || v === "O" || v === "X";
+  const invalid = !rows || !cols || grid.some((row) => row.length !== cols || row.some((v) => !validCell(v)));
+
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid chỉ được gồm '*' (vị trí bắt đầu, đúng 1 ô), '#' (thức ăn), 'O' (đi được), 'X' (vật cản). Ví dụ: XXXXXX|X*OOOX|XOO#OX|XXXXXX.",
+        en: "Grid may only contain '*' (start, exactly one cell), '#' (food), 'O' (free space), 'X' (obstacle). Example: XXXXXX|X*OOOX|XOO#OX|XXXXXX.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  let start = null;
+  const foodCells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === "*") start = [r, c];
+      if (grid[r][c] === "#") foodCells.push([r, c]);
+    }
+  }
+
+  if (!start) {
+    steps.push({
+      title: { vi: "Không có ô '*' → không hợp lệ", en: "No '*' cell → invalid" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4, 5],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid phải có đúng 1 ô '*' làm vị trí bắt đầu.",
+        en: "The grid must contain exactly one '*' start cell.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const dist = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const parent = Array.from({ length: rows }, () => Array(cols).fill(null));
+  const queued = new Set();
+  const key = (r, c) => `${r},${c}`;
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  function makeCells(current = null, pathCells = new Set()) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const cellKey = key(r, c);
+        let cls = "empty";
+        let label = ".";
+        if (cell === "X") { cls = "wall"; label = "X"; }
+        else if (cell === "*" && !(current && current[0] === r && current[1] === c)) { cls = dist[r][c] >= 0 ? "visited" : "start"; label = "*"; }
+        else if (cell === "#") { cls = "end"; label = "#"; }
+        if (dist[r][c] >= 0 && cell !== "#" && cell !== "*") { cls = "visited"; label = String(dist[r][c]); }
+        if (queued.has(cellKey)) cls = "queued";
+        if (pathCells.has(cellKey)) cls = cell === "#" ? "end" : cell === "*" ? "start" : "path";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current = null, pathCells, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, pathCells) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Tìm ô '*' bằng cách quét grid", en: "Find the '*' cell by scanning the grid" },
+    current: start,
+    codeLines: [6, 7, 8, 9, 10],
+    vars: [
+      { name: "start", value: `(${start[0]}, ${start[1]})` },
+      { name: "food cells", value: foodCells.map(([r, c]) => `(${r},${c})`).join(", ") || "none" },
+    ],
+    note: {
+      vi: "Quét toàn bộ grid để tìm ô '*' — vị trí bắt đầu. BFS sẽ mở rộng từ đây theo 4 hướng (lên/xuống/trái/phải), chỉ đi qua ô 'O' hoặc '#', không qua 'X'.",
+      en: "Scan the whole grid to find the '*' cell — the starting position. BFS will expand from here in 4 directions (up/down/left/right), moving only through 'O' or '#' cells, never 'X'.",
+    },
+  });
+
+  pushStep({
+    title: { vi: "dirs, visited, queue = deque([(start, 0)])", en: "dirs, visited, queue = deque([(start, 0)])" },
+    current: start,
+    codeLines: [13, 14, 15],
+    vars: [
+      { name: "dirs", value: "[(-1,0), (1,0), (0,-1), (0,1)]" },
+      { name: "visited", value: `{(${start[0]},${start[1]})}` },
+      { name: "queue", value: `[(${start[0]}, ${start[1]}, 0)]` },
+    ],
+    note: {
+      vi: `Khởi tạo BFS: dist(start) = 0 vì khoảng cách tính theo SỐ BƯỚC DI CHUYỂN, không phải số ô (khác bài 1091).`,
+      en: `Initialize BFS: dist(start) = 0 because distance is counted by NUMBER OF MOVES, not number of cells (unlike problem 1091).`,
+    },
+  });
+
+  dist[start[0]][start[1]] = 0;
+  queued.add(key(start[0], start[1]));
+  let queue = [start];
+  let foundCell = null;
+
+  while (queue.length && !foundCell) {
+    const next = [];
+    for (const [r, c] of queue) {
+      queued.delete(key(r, c));
+
+      const isFoodHere = grid[r][c] === "#";
+      pushStep({
+        title: { vi: `popleft() → (${r},${c},${dist[r][c]}); if grid[r][c]=='#' → ${isFoodHere}`, en: `popleft() → (${r},${c},${dist[r][c]}); if grid[r][c]=='#' → ${isFoodHere}` },
+        current: [r, c],
+        codeLines: [17, 18],
+        vars: [
+          { name: "cell", value: `(${r}, ${c})` },
+          { name: "dist", value: dist[r][c] },
+        ],
+        note: isFoodHere
+          ? { vi: `(${r},${c}) là ô '#' → tìm thấy thức ăn! Đây chính là dist = ${dist[r][c]} ngắn nhất.`, en: `(${r},${c}) is a '#' cell → food found! This is the shortest dist = ${dist[r][c]}.` }
+          : { vi: `(${r},${c}) chưa phải ô '#'. Thử 4 hướng xung quanh: ô hợp lệ phải trong biên, không phải 'X', và chưa thăm.`, en: `(${r},${c}) is not a '#' cell yet. Try the 4 surrounding directions: a valid neighbor must be in bounds, not 'X', and unvisited.` },
+      });
+
+      if (isFoodHere) {
+        foundCell = [r, c];
+        break;
+      }
+
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        if (grid[nr][nc] === "X" || dist[nr][nc] !== -1) continue;
+
+        dist[nr][nc] = dist[r][c] + 1;
+        parent[nr][nc] = [r, c];
+        next.push([nr, nc]);
+        queued.add(key(nr, nc));
+
+        pushStep({
+          title: { vi: `visited.add((${nr},${nc})); queue.append((${nr},${nc},${dist[nr][nc]}))`, en: `visited.add((${nr},${nc})); queue.append((${nr},${nc},${dist[nr][nc]}))` },
+          current: [nr, nc],
+          codeLines: [20, 21, 22, 23, 24],
+          vars: [
+            { name: "from", value: `(${r}, ${c})` },
+            { name: "neighbor", value: `(${nr}, ${nc})` },
+            { name: "dist[neighbor]", value: dist[nr][nc] },
+          ],
+          note: {
+            vi: `(${nr},${nc}) chưa thăm và không phải 'X' → thêm vào visited và queue với dist = ${dist[r][c]} + 1 = ${dist[nr][nc]}.`,
+            en: `(${nr},${nc}) is unvisited and not 'X' → add to visited and queue with dist = ${dist[r][c]} + 1 = ${dist[nr][nc]}.`,
+          },
+        });
+      }
+    }
+    queue = next;
+  }
+
+  const answer = foundCell ? dist[foundCell[0]][foundCell[1]] : -1;
+  const pathCells = new Set();
+  if (foundCell) {
+    let cur = foundCell;
+    while (cur) {
+      pathCells.add(key(cur[0], cur[1]));
+      cur = parent[cur[0]][cur[1]];
+    }
+  }
+
+  pushStep({
+    title: answer === -1
+      ? { vi: "return -1 (hết queue, không tới được thức ăn)", en: "return -1 (queue empty, food unreachable)" }
+      : { vi: `return dist → ${answer}`, en: `return dist → ${answer}` },
+    current: foundCell,
+    pathCells,
+    final: true,
+    codeLines: answer === -1 ? [25] : [19],
+    vars: [
+      { name: "answer", value: answer },
+    ],
+    note: answer === -1
+      ? { vi: "BFS đã hết queue nhưng không chạm được ô '#' nào, nên không có đường tới thức ăn.", en: "BFS exhausted the queue without reaching any '#' cell, so there is no path to food." }
+      : { vi: `BFS chạm tới ô thức ăn lần đầu với dist = ${answer} bước di chuyển. Vì BFS mở rộng theo từng level, đây là kết quả ngắn nhất. Đường đi được tô xanh.`, en: `BFS first reached a food cell with dist = ${answer} moves. Because BFS expands level by level, this is the shortest result. The path is highlighted.` },
+  });
+
+  return { original: grid, answer, steps };
+}
+
+/**
  * LeetCode 1091: Shortest Path in Binary Matrix.
  * BFS in 8 directions. Path length counts cells, so the start cell has distance 1.
  */
@@ -10309,6 +10520,71 @@ module.exports = {
       "        return minutes if fresh == 0 else -1",
     ],
     builder: buildSteps994,
+  },
+  1730: {
+    id: 1730,
+    difficulty: "medium",
+    slug: "shortest-path-to-get-food",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Shortest Path to Get Food", en: "Shortest Path to Get Food" },
+    titleVi: { vi: "Đường đi ngắn nhất đến thức ăn", en: "Shortest path to a food cell" },
+    statement: {
+      vi:
+        "Cho ma trận ký tự grid gồm: '*' vị trí bắt đầu (đúng 1 ô), '#' ô thức ăn (có thể nhiều ô), " +
+        "'O' ô trống đi được, 'X' vật cản. Mỗi bước chỉ đi 4 hướng (lên/xuống/trái/phải) và không qua ô 'X'. " +
+        "Trả về độ dài đường đi ngắn nhất tới BẤT KỲ ô thức ăn nào, hoặc -1 nếu không có đường. " +
+        "Nhập grid: mỗi hàng cách nhau bởi '|', các ký tự viết liền nhau.",
+      en:
+        "Given a character grid with: '*' your starting location (exactly one cell), '#' food cells (there may be several), " +
+        "'O' free space, 'X' obstacles. You may only move in 4 directions (up/down/left/right) and never through 'X'. " +
+        "Return the length of the shortest path to reach ANY food cell, or -1 if unreachable. " +
+        "Enter the grid: rows separated by '|', characters written consecutively.",
+    },
+    defaultInput: "XXXXXX|X*OOOX|XOOOOX|XOO#OX|XXXXXX",
+    inputKind: "string",
+    inputLabel: { vi: "Grid ('*','#','O','X', hàng cách '|')", en: "Grid ('*','#','O','X', rows separated by '|')" },
+    approach: [
+      { vi: "Quét grid tìm ô '*' làm điểm bắt đầu BFS.", en: "Scan the grid to find the '*' cell as the BFS starting point." },
+      { vi: "BFS 4 hướng từ '*', không đi qua 'X'. Khác bài 1091: khoảng cách tính theo SỐ BƯỚC (start = 0), không theo số ô.", en: "4-direction BFS from '*', never through 'X'. Unlike problem 1091: distance is counted by NUMBER OF MOVES (start = 0), not number of cells." },
+      { vi: "Vì BFS mở rộng theo từng level, ô '#' đầu tiên chạm tới chính là đáp án ngắn nhất.", en: "Because BFS expands level by level, the first '#' cell reached is the shortest answer." },
+      { vi: "Nếu BFS hết queue mà chưa gặp '#' nào → trả -1.", en: "If BFS exhausts the queue without meeting any '#' → return -1." },
+    ],
+    complexity: {
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
+      note: {
+        vi: "Mỗi ô vào queue tối đa 1 lần, mỗi ô xét 4 hướng.",
+        en: "Each cell enters the queue at most once, each cell checks 4 directions.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def getFood(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        start = None",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == '*':",
+      "                    start = (r, c)",
+      "",
+      "",
+      "        dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]",
+      "        visited = {start}",
+      "        queue = deque([(start[0], start[1], 0)])",
+      "        while queue:",
+      "            r, c, dist = queue.popleft()",
+      "            if grid[r][c] == '#':",
+      "                return dist",
+      "            for dr, dc in dirs:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] != 'X' and (nr, nc) not in visited:",
+      "                    visited.add((nr, nc))",
+      "                    queue.append((nr, nc, dist + 1))",
+      "        return -1",
+    ],
+    builder: buildSteps1730,
   },
   1091: {
     id: 1091,
