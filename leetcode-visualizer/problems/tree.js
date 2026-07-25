@@ -55,6 +55,7 @@ function snapshot(root, opts) {
     highlight: [],
     mark: [],
     codeLines: opts.codeLines || [],
+    codeBlock: opts.codeBlock,
     vars: opts.vars || [],
     note: opts.note,
   };
@@ -840,7 +841,7 @@ function buildSteps103v2(input) {
   const result = [];
 
   function snap(opts) {
-    steps.push(snapshot(root, opts));
+    steps.push(snapshot(root, Object.assign({}, opts, { codeBlock: 2 })));
   }
 
   // Line 3: if not root:
@@ -859,6 +860,7 @@ function buildSteps103v2(input) {
     const fs0 = snapshot(root, {
       title: { vi: "return []", en: "return []" },
       codeLines: [4],
+      codeBlock: 2,
       vars: [{ name: "answer", value: "[]" }],
       note: {
         vi: "Cây rỗng → trả về [] ngay, không cần BFS.",
@@ -1144,6 +1146,7 @@ function buildSteps103v2(input) {
     title: { vi: `return result = ${answer}`, en: `return result = ${answer}` },
     wordSet: new Set(visited),
     codeLines: [24],
+    codeBlock: 2,
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `Kết quả zigzag cuối cùng: ${answer}.`,
