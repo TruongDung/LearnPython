@@ -1751,6 +1751,255 @@ function buildSteps323(input, params) {
   return { input, answer: components, steps };
 }
 
+// ─── 323 Approach 2: build adjacency list + recursive DFS, fully line-by-line ───
+function buildSteps323DFS(input, params) {
+  const n = params.n !== undefined ? Number(params.n) : 5;
+  const edgeList = String(input).split(";").map((s) => {
+    const [a, b] = s.trim().split(",").map(Number);
+    return { a, b };
+  }).filter((e) => !isNaN(e.a) && !isNaN(e.b));
+
+  const steps = [];
+  const graph = Array.from({ length: n }, () => []);
+  const visited = new Array(n).fill(false);
+  let count = 0;
+
+  const allEdges = edgeList.map(({ a, b }) => ({ u: a, v: b, w: "" }));
+
+  function edgeKeys(node) {
+    return graph[node].map((nb) => `${Math.min(node, nb)}-${Math.max(node, nb)}`);
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...visited].map((v) => (v ? 1 : 0)),
+      sub: Array.from({ length: n }, (_, i) => String(i)),
+      graph: {
+        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+        edges: allEdges,
+        hlNodes: opts.hlNodes || [],
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: Array.from({ length: n }, (_, i) => i).filter((i) => visited[i]),
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      codeBlock: 2,
+      vars: [...(opts.vars || []), { name: "visited", value: `[${visited.map((v) => (v ? "T" : "F")).join(",")}]` }, { name: "count", value: count }],
+      note: opts.note,
+      final: opts.final || false,
+    });
+  }
+
+  const edgesStr = edgeList.map((e) => `(${e.a},${e.b})`).join(", ");
+
+  // Line 3: graph = [[] for _ in range(n)]
+  snap({
+    title: { vi: "graph = [[] for _ in range(n)]", en: "graph = [[] for _ in range(n)]" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edgesStr }],
+    note: {
+      vi: `Tạo adjacency list rỗng cho ${n} nút. Sẽ chuyển danh sách cạnh thành đồ thị kề để DFS dễ hơn.`,
+      en: `Create an empty adjacency list for ${n} nodes. The edge list will be converted into a graph for easier DFS.`,
+    },
+  });
+
+  // Lines 4-6: for u, v in edges: graph[u].append(v); graph[v].append(u)
+  for (const { a, b } of edgeList) {
+    snap({
+      title: { vi: `for u,v in edges: (${a},${b})`, en: `for u,v in edges: (${a},${b})` },
+      hlNodes: [a, b],
+      codeLines: [4],
+      vars: [{ name: "u", value: a }, { name: "v", value: b }],
+      note: {
+        vi: `Xét cạnh (${a},${b}) tiếp theo trong danh sách edges.`,
+        en: `Process the next edge (${a},${b}) from the edges list.`,
+      },
+    });
+    graph[a].push(b);
+    snap({
+      title: { vi: `graph[${a}].append(${b})`, en: `graph[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [`${Math.min(a, b)}-${Math.max(a, b)}`],
+      codeLines: [5],
+      vars: [{ name: `graph[${a}]`, value: `[${graph[a].join(",")}]` }],
+      note: {
+        vi: `Thêm ${b} vào danh sách kề của ${a}.`,
+        en: `Add ${b} to node ${a}'s adjacency list.`,
+      },
+    });
+    graph[b].push(a);
+    snap({
+      title: { vi: `graph[${b}].append(${a})`, en: `graph[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [`${Math.min(a, b)}-${Math.max(a, b)}`],
+      codeLines: [6],
+      vars: [{ name: `graph[${b}]`, value: `[${graph[b].join(",")}]` }],
+      note: {
+        vi: `Thêm ${a} vào danh sách kề của ${b} (đồ thị vô hướng → thêm cả 2 chiều).`,
+        en: `Add ${a} to node ${b}'s adjacency list (undirected graph → add both directions).`,
+      },
+    });
+  }
+
+  // Line 12: count = 0
+  snap({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [12],
+    note: {
+      vi: "count sẽ đếm số nhóm kết nối (connected components).",
+      en: "count will tally the number of connected components.",
+    },
+  });
+
+  // Line 13: visited = [False for _ in range(n)]
+  snap({
+    title: { vi: "visited = [False for _ in range(n)]", en: "visited = [False for _ in range(n)]" },
+    codeLines: [13],
+    note: {
+      vi: `Khởi tạo visited toàn False cho ${n} nút.`,
+      en: `Initialize visited to all False for ${n} nodes.`,
+    },
+  });
+
+  function dfs(node, depth) {
+    // Line 8: visited[node] = True
+    visited[node] = true;
+    snap({
+      title: { vi: `dfs(${node}): visited[${node}] = True`, en: `dfs(${node}): visited[${node}] = True` },
+      hlNodes: [node],
+      codeLines: [8],
+      vars: [{ name: "node", value: node }, { name: "depth", value: depth }],
+      note: {
+        vi: `Đánh dấu ${node} đã thăm.`,
+        en: `Mark ${node} as visited.`,
+      },
+    });
+
+    // Line 9: for neighbor in graph[node]:
+    for (const neighbor of graph[node]) {
+      snap({
+        title: { vi: `dfs(${node}): for neighbor in graph[${node}] → xét ${neighbor}`, en: `dfs(${node}): for neighbor in graph[${node}] → check ${neighbor}` },
+        hlNodes: [node, neighbor],
+        hlEdges: [`${Math.min(node, neighbor)}-${Math.max(node, neighbor)}`],
+        codeLines: [9],
+        vars: [{ name: "node", value: node }, { name: "graph[node]", value: `[${graph[node].join(",")}]` }, { name: "neighbor", value: neighbor }],
+        note: {
+          vi: `Xét hàng xóm ${neighbor} của ${node}.`,
+          en: `Check neighbor ${neighbor} of ${node}.`,
+        },
+      });
+
+      // Line 10: if not visited[neighbor]:
+      const notVisited = !visited[neighbor];
+      snap({
+        title: { vi: `dfs(${node}): if not visited[${neighbor}] → ${notVisited}`, en: `dfs(${node}): if not visited[${neighbor}] → ${notVisited}` },
+        hlNodes: [node, neighbor],
+        hlEdges: [`${Math.min(node, neighbor)}-${Math.max(node, neighbor)}`],
+        codeLines: [10],
+        vars: [{ name: "neighbor", value: neighbor }],
+        note: notVisited
+          ? { vi: `${neighbor} chưa thăm → sẽ đệ quy dfs(${neighbor}).`, en: `${neighbor} not visited yet → will recurse dfs(${neighbor}).` }
+          : { vi: `${neighbor} đã thăm rồi → bỏ qua.`, en: `${neighbor} already visited → skip.` },
+      });
+
+      if (notVisited) {
+        // Line 11: dfs(neighbor)
+        snap({
+          title: { vi: `dfs(${node}): dfs(${neighbor})`, en: `dfs(${node}): dfs(${neighbor})` },
+          hlNodes: [node, neighbor],
+          hlEdges: [`${Math.min(node, neighbor)}-${Math.max(node, neighbor)}`],
+          codeLines: [11],
+          vars: [{ name: "call", value: `dfs(${neighbor})` }],
+          note: {
+            vi: `Gọi đệ quy dfs(${neighbor}) để tiếp tục khám phá nhóm này.`,
+            en: `Recurse into dfs(${neighbor}) to keep exploring this component.`,
+          },
+        });
+        dfs(neighbor, depth + 1);
+      }
+    }
+  }
+
+  // Line 14: for node in range(n):
+  for (let node = 0; node < n; node++) {
+    snap({
+      title: { vi: `for node in range(n) → node=${node}`, en: `for node in range(n) → node=${node}` },
+      hlNodes: [node],
+      codeLines: [14],
+      vars: [{ name: "node", value: node }],
+      note: {
+        vi: `Xét nút ${node} trong vòng lặp chính.`,
+        en: `Consider node ${node} in the main loop.`,
+      },
+    });
+
+    // Line 15: if not visited[node]:
+    const notVisited = !visited[node];
+    snap({
+      title: { vi: `if not visited[${node}] → ${notVisited}`, en: `if not visited[${node}] → ${notVisited}` },
+      hlNodes: [node],
+      codeLines: [15],
+      note: notVisited
+        ? { vi: `${node} chưa thăm → đây là gốc của 1 nhóm kết nối MỚI.`, en: `${node} not visited yet → this is the root of a NEW connected component.` }
+        : { vi: `${node} đã thăm rồi (thuộc nhóm đã đếm) → bỏ qua.`, en: `${node} already visited (belongs to an already-counted component) → skip.` },
+    });
+
+    if (notVisited) {
+      // Line 16: dfs(node)
+      snap({
+        title: { vi: `dfs(${node})`, en: `dfs(${node})` },
+        hlNodes: [node],
+        codeLines: [16],
+        note: {
+          vi: `Gọi dfs(${node}) để đánh dấu thăm toàn bộ nhóm chứa ${node}.`,
+          en: `Call dfs(${node}) to mark the whole component containing ${node} as visited.`,
+        },
+      });
+      dfs(node, 0);
+
+      // Line 17: count += 1
+      count++;
+      snap({
+        title: { vi: `count += 1 → ${count}`, en: `count += 1 → ${count}` },
+        codeLines: [17],
+        note: {
+          vi: `Vừa khám phá xong 1 nhóm kết nối → count = ${count}.`,
+          en: `Just finished discovering one connected component → count = ${count}.`,
+        },
+      });
+    }
+  }
+
+  // Line 18: return count
+  const fs = {
+    title: { vi: `return count → ${count}`, en: `return count → ${count}` },
+    arr: [...visited].map((v) => (v ? 1 : 0)),
+    sub: Array.from({ length: n }, (_, i) => String(i)),
+    graph: {
+      nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+      edges: allEdges,
+      hlNodes: [],
+      hlEdges: [],
+      visitedNodes: Array.from({ length: n }, (_, i) => i),
+    },
+    highlight: [],
+    mark: [],
+    codeLines: [18],
+    codeBlock: 2,
+    vars: [{ name: "answer", value: count }, { name: "visited", value: `[${visited.map((v) => (v ? "T" : "F")).join(",")}]` }],
+    note: {
+      vi: `Đã xử lý hết ${n} nút. Số nhóm kết nối = ${count}.`,
+      en: `Processed all ${n} nodes. Number of connected components = ${count}.`,
+    },
+  };
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer: count, steps };
+}
+
 // ─── 3532: Path Existence Queries in a Graph I ───
 function buildSteps3532(input, params) {
   const approach = Number(params && params.approach) || 1;
@@ -2305,13 +2554,23 @@ module.exports = {
     defaultInput: "0,1;1,2;3,4",
     inputKind: "string",
     inputLabel: { vi: "Cạnh (a,b cách bởi ';')", en: "Edges (a,b separated by ';')" },
-    extraParams: [{ key: "n", label: { vi: "n (số nút)", en: "n (number of nodes)" }, default: 5 }],
-    approach: [
-      { vi: "Khởi tạo parent[i]=i, components=n.", en: "Initialize parent[i]=i, components=n." },
-      { vi: "Với mỗi cạnh (a,b): nếu khác nhóm → union, components--.", en: "For each edge (a,b): if different groups → union, components--." },
-      { vi: "Kết quả = components sau khi xử lý hết cạnh.", en: "Result = components after processing all edges." },
+    extraParams: [
+      { key: "n", label: { vi: "n (số nút)", en: "n (number of nodes)" }, default: 5 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" } },
+          { value: "2", label: { vi: "Cách 2: adjacency list + DFS", en: "Approach 2: adjacency list + DFS" } },
+        ],
+      },
     ],
-    complexity: { time: "O((n+e)·α(n))", space: "O(n)", note: { vi: "e = số cạnh.", en: "e = number of edges." } },
+    approach: [
+      { vi: "Cách 1 (Union-Find): Khởi tạo parent[i]=i, components=n. Với mỗi cạnh (a,b): nếu khác nhóm → union, components--. Kết quả = components sau khi xử lý hết cạnh.", en: "Approach 1 (Union-Find): Initialize parent[i]=i, components=n. For each edge (a,b): if different groups → union, components--. Result = components after processing all edges." },
+      { vi: "Cách 2 (DFS): Chuyển edges thành adjacency list. Với mỗi nút chưa thăm, DFS đánh dấu thăm toàn bộ nhóm chứa nó và tăng count. Kết quả = count sau khi xét hết n nút.", en: "Approach 2 (DFS): Convert edges into an adjacency list. For each unvisited node, DFS marks its whole component as visited and increments count. Result = count after checking all n nodes." },
+    ],
+    complexity: { time: "O((n+e)·α(n)) hoặc O(n+e)", space: "O(n+e)", note: { vi: "e = số cạnh. Union-Find gần O(n+e); DFS đúng O(n+e).", en: "e = number of edges. Union-Find is near O(n+e); DFS is exactly O(n+e)." } },
+    codeLabel: { vi: "Cách 1: Union-Find", en: "Approach 1: Union-Find" },
+    code2Label: { vi: "Cách 2: adjacency list + DFS", en: "Approach 2: adjacency list + DFS" },
     code: [
       "class Solution:",
       "    def countComponents(self, n, edges):",
@@ -2329,7 +2588,30 @@ module.exports = {
       "                components -= 1",
       "        return components",
     ],
-    builder: buildSteps323,
+    code2: [
+      "class Solution:",
+      "    def countComponents(self, n, edges):",
+      "        graph = [[] for _ in range(n)]",
+      "        for u, v in edges:",
+      "            graph[u].append(v)",
+      "            graph[v].append(u)",
+      "        def dfs(node):",
+      "            visited[node] = True",
+      "            for neighbor in graph[node]:",
+      "                if not visited[neighbor]:",
+      "                    dfs(neighbor)",
+      "        count = 0",
+      "        visited = [False for _ in range(n)]",
+      "        for node in range(n):",
+      "            if not visited[node]:",
+      "                dfs(node)",
+      "                count += 1",
+      "        return count",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps323DFS(input, params) : buildSteps323(input, params);
+    },
   },
   3532: {
     id: 3532,
