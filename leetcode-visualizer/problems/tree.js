@@ -587,39 +587,207 @@ function buildSteps236(input, params) {
   return { input, answer: answer ? answer.val : "null", steps };
 }
 
-// ─── 1644: LCA of a Binary Tree II (p or q may be absent) ───
+// ─── 1644: LCA of a Binary Tree II (p or q may be absent), fully line-by-line ───
 function buildSteps1644(input, params) {
-  const root = parseTree(input); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: `LCA II của ${pv} và ${qv}`, en: `LCA II of ${pv} and ${qv}` },
-    codeLines: [2, 3], vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
-    note: { vi: `Giống bài 236 nhưng p hoặc q CÓ THỂ KHÔNG tồn tại. Phải duyệt HẾT cây để đếm, chỉ trả LCA nếu tìm thấy CẢ p và q.`, en: `Like 236 but p or q MAY be absent. Must traverse the WHOLE tree to count; only return LCA if BOTH p and q exist.` },
-  }));
-  let pFound = false, qFound = false, ans = null;
-  function dfs(node) {
-    if (!node) return null;
-    const L = dfs(node.left), R = dfs(node.right);
-    let mid = null;
-    let matchesP = false, matchesQ = false;
-    if (node.val === pv) { pFound = true; mid = node; matchesP = true; }
-    if (node.val === qv) { qFound = true; mid = node; matchesQ = true; }
-    // Special case: p and q are the same node/value. That node IS the LCA as
-    // soon as both flags become true here, even though only one side (mid)
-    // matched — cnt>=2 would never trigger in this case.
-    if (pv === qv && matchesP && !ans) {
-      ans = node;
-      steps.push(snapshot(root, { title: { vi: `p == q, gặp tại: ${node.val}`, en: `p == q, found at: ${node.val}` }, hlSet: new Set([node.id]), codeLines: [9, 10], vars: [{ name: "node", value: node.val }], note: { vi: `p và q là cùng 1 giá trị (${pv}). Gặp node này → chính nó là LCA.`, en: `p and q are the same value (${pv}). Found this node → it is the LCA.` } }));
-    }
-    const cnt = [L, R, mid].filter(Boolean).length;
-    if (cnt >= 2 && !ans) {
-      ans = node;
-      steps.push(snapshot(root, { title: { vi: `Ứng viên LCA: ${node.val}`, en: `LCA candidate: ${node.val}` }, hlSet: new Set([node.id]), codeLines: [6, 7], vars: [{ name: "node", value: node.val }], note: { vi: `Tại ${node.val} gặp đủ 2 phía → ứng viên LCA (vẫn duyệt tiếp để xác nhận tồn tại).`, en: `At ${node.val} two sides matched → LCA candidate (keep traversing to confirm existence).` } }));
-    }
-    return L || R || mid;
+  const root = parseTree(input);
+  const pv = Number(params.p);
+  const qv = Number(params.q);
+  const steps = [];
+
+  let ans = null;
+  let count = 0;
+
+  function snap(opts) {
+    const vars = [...(opts.vars || [])];
+    vars.push({ name: "self.ans", value: ans === null ? "None" : ans.val });
+    vars.push({ name: "self.count", value: count });
+    steps.push(snapshot(root, Object.assign({}, opts, { vars })));
   }
-  dfs(root);
-  const valid = pFound && qFound && ans !== null;
-  const fs = snapshot(root, { title: { vi: valid ? `LCA = ${ans.val}` : `null (thiếu p hoặc q)`, en: valid ? `LCA = ${ans.val}` : `null (p or q missing)` }, wordSet: valid ? new Set([ans.id]) : undefined, vars: [{ name: "pFound", value: pFound }, { name: "qFound", value: qFound }, { name: "answer", value: valid ? ans.val : "null" }], note: { vi: valid ? `Cả p và q đều tồn tại → LCA = ${ans.val}.` : `Thiếu ${!pFound ? pv : qv} → trả về null.`, en: valid ? `Both p and q exist → LCA = ${ans.val}.` : `Missing ${!pFound ? pv : qv} → return null.` } }); fs.final = true; steps.push(fs);
+
+  // Lines 3-4: self.ans = None; self.count = 0
+  snap({
+    title: { vi: "self.ans = None, self.count = 0", en: "self.ans = None, self.count = 0" },
+    codeLines: [3, 4],
+    vars: [{ name: "p", value: pv }, { name: "q", value: qv }],
+    note: {
+      vi: `Tìm LCA của p=${pv} và q=${qv}, nhưng KHÔNG chắc cả hai có tồn tại trong cây. self.count sẽ đếm số lần gặp p hoặc q trong lúc duyệt toàn bộ cây.`,
+      en: `Find the LCA of p=${pv} and q=${qv}, but they might NOT both exist in the tree. self.count will tally how many times p or q is seen during a full traversal.`,
+    },
+  });
+
+  function dfs(node, depth) {
+    // Line 6: if not node: return False
+    const isNull = !node;
+    snap({
+      title: { vi: `dfs(${isNull ? "None" : node.val}): if not node → ${isNull}`, en: `dfs(${isNull ? "None" : node.val}): if not node → ${isNull}` },
+      hlSet: isNull ? undefined : new Set([node.id]),
+      codeLines: [6],
+      vars: [{ name: "node", value: isNull ? "None" : node.val }, { name: "depth", value: depth }],
+      note: isNull
+        ? { vi: "Đây là con của 1 lá (None) → return False ngay, không đi sâu hơn.", en: "This is a leaf's child (None) → return False immediately, no deeper recursion." }
+        : { vi: `node = ${node.val} → tiếp tục đệ quy con trái rồi con phải.`, en: `node = ${node.val} → proceed to recurse left then right.` },
+    });
+    if (isNull) return false;
+
+    // Line 7: l = dfs(node.left)
+    snap({
+      title: { vi: `dfs(${node.val}): l = dfs(node.left)`, en: `dfs(${node.val}): l = dfs(node.left)` },
+      hlSet: new Set([node.id]),
+      codeLines: [7],
+      vars: [{ name: "node", value: node.val }, { name: "node.left", value: node.left ? node.left.val : "None" }],
+      note: {
+        vi: `Gọi đệ quy vào con trái của ${node.val} (${node.left ? node.left.val : "None"}) trước.`,
+        en: `Recurse into ${node.val}'s left child (${node.left ? node.left.val : "None"}) first.`,
+      },
+    });
+    const l = dfs(node.left, depth + 1);
+    snap({
+      title: { vi: `dfs(${node.val}): l = ${l}`, en: `dfs(${node.val}): l = ${l}` },
+      hlSet: new Set([node.id]),
+      codeLines: [7],
+      vars: [{ name: "node", value: node.val }, { name: "l (result)", value: l }],
+      note: {
+        vi: `Đệ quy con trái của ${node.val} trả về l = ${l}.`,
+        en: `The left recursion for ${node.val} returned l = ${l}.`,
+      },
+    });
+
+    // Line 8: r = dfs(node.right)
+    snap({
+      title: { vi: `dfs(${node.val}): r = dfs(node.right)`, en: `dfs(${node.val}): r = dfs(node.right)` },
+      hlSet: new Set([node.id]),
+      codeLines: [8],
+      vars: [{ name: "node", value: node.val }, { name: "node.right", value: node.right ? node.right.val : "None" }],
+      note: {
+        vi: `Gọi đệ quy vào con phải của ${node.val} (${node.right ? node.right.val : "None"}).`,
+        en: `Recurse into ${node.val}'s right child (${node.right ? node.right.val : "None"}).`,
+      },
+    });
+    const r = dfs(node.right, depth + 1);
+    snap({
+      title: { vi: `dfs(${node.val}): r = ${r}`, en: `dfs(${node.val}): r = ${r}` },
+      hlSet: new Set([node.id]),
+      codeLines: [8],
+      vars: [{ name: "node", value: node.val }, { name: "r (result)", value: r }],
+      note: {
+        vi: `Đệ quy con phải của ${node.val} trả về r = ${r}.`,
+        en: `The right recursion for ${node.val} returned r = ${r}.`,
+      },
+    });
+
+    // Line 9: mid = node == p or node == q
+    const mid = node.val === pv || node.val === qv;
+    snap({
+      title: { vi: `dfs(${node.val}): mid = (node==p or node==q) → ${mid}`, en: `dfs(${node.val}): mid = (node==p or node==q) → ${mid}` },
+      hlSet: new Set([node.id]),
+      codeLines: [9],
+      vars: [{ name: "node.val", value: node.val }, { name: "mid", value: mid }],
+      note: mid
+        ? { vi: `node.val=${node.val} khớp với p hoặc q → mid=True.`, en: `node.val=${node.val} matches p or q → mid=True.` }
+        : { vi: `node.val=${node.val} không khớp p hay q → mid=False.`, en: `node.val=${node.val} matches neither p nor q → mid=False.` },
+    });
+
+    // Line 10: if mid + l + r >= 2 and not self.ans
+    const cnt = Number(mid) + Number(l) + Number(r);
+    const willSetAns = cnt >= 2 && ans === null;
+    snap({
+      title: { vi: `dfs(${node.val}): mid+l+r=${cnt} >= 2 and not self.ans → ${willSetAns}`, en: `dfs(${node.val}): mid+l+r=${cnt} >= 2 and not self.ans → ${willSetAns}` },
+      hlSet: new Set([node.id]),
+      codeLines: [10],
+      vars: [{ name: "mid+l+r", value: `${Number(mid)}+${Number(l)}+${Number(r)} = ${cnt}` }],
+      note: willSetAns
+        ? { vi: `${cnt} ≥ 2 và self.ans chưa gán → node ${node.val} là ứng viên LCA.`, en: `${cnt} ≥ 2 and self.ans is not set yet → node ${node.val} becomes the LCA candidate.` }
+        : { vi: `Điều kiện không đủ (cnt=${cnt}, self.ans=${ans === null ? "None" : ans.val}) → không cập nhật self.ans.`, en: `Condition not met (cnt=${cnt}, self.ans=${ans === null ? "None" : ans.val}) → self.ans unchanged.` },
+    });
+
+    if (willSetAns) {
+      // Line 11: self.ans = node
+      ans = node;
+      snap({
+        title: { vi: `dfs(${node.val}): self.ans = ${node.val}`, en: `dfs(${node.val}): self.ans = ${node.val}` },
+        hlSet: new Set([node.id]),
+        codeLines: [11],
+        vars: [{ name: "node", value: node.val }],
+        note: {
+          vi: `Gán self.ans = ${node.val}. Đây là ứng viên LCA — vẫn cần duyệt hết cây để xác nhận p và q đều tồn tại.`,
+          en: `Set self.ans = ${node.val}. This is the LCA candidate — still need to finish the traversal to confirm both p and q exist.`,
+        },
+      });
+    }
+
+    // Line 12: if mid: self.count += 1
+    snap({
+      title: { vi: `dfs(${node.val}): if mid → ${mid}`, en: `dfs(${node.val}): if mid → ${mid}` },
+      hlSet: new Set([node.id]),
+      codeLines: [12],
+      vars: [{ name: "mid", value: mid }],
+      note: mid
+        ? { vi: `mid=True → sẽ tăng self.count.`, en: `mid=True → self.count will increase.` }
+        : { vi: `mid=False → không tăng self.count.`, en: `mid=False → self.count stays the same.` },
+    });
+    if (mid) {
+      count++;
+      snap({
+        title: { vi: `dfs(${node.val}): self.count += 1 → ${count}`, en: `dfs(${node.val}): self.count += 1 → ${count}` },
+        hlSet: new Set([node.id]),
+        codeLines: [12],
+        vars: [{ name: "self.count", value: count }],
+        note: {
+          vi: `self.count = ${count} (đã gặp ${count}/2 trong p, q).`,
+          en: `self.count = ${count} (found ${count}/2 of p, q so far).`,
+        },
+      });
+    }
+
+    // Line 13: return l or r or mid
+    const ret = l || r || mid;
+    snap({
+      title: { vi: `dfs(${node.val}): return l or r or mid → ${ret}`, en: `dfs(${node.val}): return l or r or mid → ${ret}` },
+      hlSet: new Set([node.id]),
+      codeLines: [13],
+      vars: [{ name: "l", value: l }, { name: "r", value: r }, { name: "mid", value: mid }, { name: "return", value: ret }],
+      note: {
+        vi: `Trả về ${ret} lên lời gọi cha — báo rằng nhánh dưới ${node.val} có chứa p hoặc q.`,
+        en: `Return ${ret} to the caller — reporting whether the subtree under ${node.val} contains p or q.`,
+      },
+    });
+    return ret;
+  }
+
+  // Line 14: dfs(root)
+  snap({
+    title: { vi: "dfs(root)", en: "dfs(root)" },
+    hlSet: root ? new Set([root.id]) : undefined,
+    codeLines: [14],
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    note: {
+      vi: "Bắt đầu đệ quy từ root.",
+      en: "Start the recursion from root.",
+    },
+  });
+  dfs(root, 0);
+
+  // Line 15: return self.ans if self.count == 2 else None
+  const valid = count === 2 && ans !== null;
+  const fs = snapshot(root, {
+    title: {
+      vi: `return self.ans if self.count==2 else None → ${valid ? `LCA=${ans.val}` : "None"}`,
+      en: `return self.ans if self.count==2 else None → ${valid ? `LCA=${ans.val}` : "None"}`,
+    },
+    wordSet: valid ? new Set([ans.id]) : undefined,
+    codeLines: [15],
+    vars: [
+      { name: "self.count", value: count },
+      { name: "self.ans", value: ans === null ? "None" : ans.val },
+      { name: "answer", value: valid ? ans.val : "None" },
+    ],
+    note: valid
+      ? { vi: `self.count == 2 → cả p và q đều tồn tại → trả về self.ans = ${ans.val}.`, en: `self.count == 2 → both p and q exist → return self.ans = ${ans.val}.` }
+      : { vi: `self.count = ${count} ≠ 2 → thiếu p hoặc q trong cây → trả về None.`, en: `self.count = ${count} ≠ 2 → p or q is missing from the tree → return None.` },
+  });
+  fs.final = true;
+  steps.push(fs);
+
   return { input, answer: valid ? ans.val : "null", steps };
 }
 
@@ -847,9 +1015,17 @@ function buildSteps103v2(input) {
   const root = parseTree(input);
   const steps = [];
   const result = [];
+  // Declared early so snap() can always report the queue, even for the
+  // very first steps (before "queue = deque()" has run, it's just "n/a").
+  let queue = null;
 
   function snap(opts) {
-    steps.push(snapshot(root, Object.assign({}, opts, { codeBlock: 2 })));
+    const vars = [...(opts.vars || [])];
+    const hasQueueVar = vars.some((v) => v.name === "queue");
+    if (!hasQueueVar) {
+      vars.push({ name: "queue", value: queue === null ? "n/a (not created yet)" : `[${queue.map((n) => n.val).join(", ")}]` });
+    }
+    steps.push(snapshot(root, Object.assign({}, opts, { vars, codeBlock: 2 })));
   }
 
   // Line 3: if not root:
@@ -869,7 +1045,7 @@ function buildSteps103v2(input) {
       title: { vi: "return []", en: "return []" },
       codeLines: [4],
       codeBlock: 2,
-      vars: [{ name: "answer", value: "[]" }],
+      vars: [{ name: "answer", value: "[]" }, { name: "queue", value: "n/a (not created yet)" }],
       note: {
         vi: "Cây rỗng → trả về [] ngay, không cần BFS.",
         en: "Empty tree → return [] immediately, no BFS needed.",
@@ -881,7 +1057,7 @@ function buildSteps103v2(input) {
   }
 
   // Line 5: queue = collections.deque()
-  const queue = [];
+  queue = [];
   snap({
     title: { vi: "queue = collections.deque()", en: "queue = collections.deque()" },
     codeLines: [5],
