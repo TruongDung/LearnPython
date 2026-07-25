@@ -1621,11 +1621,13 @@ function renderTree(step) {
     : Math.max(r, ...nodes.map((n) => (String(n.label || "").length * charW) / 2 + hPad));
   const colW = hasMultiLineLabels ? 84 : Math.max(60, maxHalfWidth * 2 + 14);
   const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
-  const pad = hasMultiLineLabels ? 44 : Math.max(34, maxHalfWidth + 4);
-  const width = pad * 2 + maxX * colW;
-  const height = pad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
-  const px = (x) => pad + x * colW;
-  const py = (y) => pad + y * rowH;
+  const basePad = hasMultiLineLabels ? 44 : Math.max(34, maxHalfWidth + 4);
+  const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
+  const leftGutter = showLevelLabels ? 52 : 0;
+  const width = basePad * 2 + leftGutter + maxX * colW;
+  const height = basePad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
+  const px = (x) => basePad + leftGutter + x * colW;
+  const py = (y) => basePad + y * rowH;
 
   const pos = {};
   nodes.forEach((n) => {
@@ -1692,11 +1694,23 @@ function renderTree(step) {
     circles += `</g>`;
   });
 
+  // Level labels ("Level 0", "Level 1", ...) on the left edge of each row,
+  // only rendered when the tree has more than one row (skip trivial trees).
+  let levelLabels = "";
+  if (showLevelLabels) {
+    const rowsPresent = [...new Set(nodes.map((n) => n.y))].sort((a, b) => a - b);
+    rowsPresent.forEach((y) => {
+      const labelY = py(y);
+      levelLabels += `<text x="6" y="${labelY}" dy="0.35em" text-anchor="start" class="tree-level-label">Level ${y}</text>`;
+    });
+  }
+
   $("treeView").innerHTML =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
     `<defs><marker id="tree-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +
+    levelLabels +
     `</svg>`;
 }
 

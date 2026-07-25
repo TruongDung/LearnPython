@@ -600,8 +600,16 @@ function buildSteps1644(input, params) {
     if (!node) return null;
     const L = dfs(node.left), R = dfs(node.right);
     let mid = null;
-    if (node.val === pv) { pFound = true; mid = node; }
-    if (node.val === qv) { qFound = true; mid = node; }
+    let matchesP = false, matchesQ = false;
+    if (node.val === pv) { pFound = true; mid = node; matchesP = true; }
+    if (node.val === qv) { qFound = true; mid = node; matchesQ = true; }
+    // Special case: p and q are the same node/value. That node IS the LCA as
+    // soon as both flags become true here, even though only one side (mid)
+    // matched — cnt>=2 would never trigger in this case.
+    if (pv === qv && matchesP && !ans) {
+      ans = node;
+      steps.push(snapshot(root, { title: { vi: `p == q, gặp tại: ${node.val}`, en: `p == q, found at: ${node.val}` }, hlSet: new Set([node.id]), codeLines: [9, 10], vars: [{ name: "node", value: node.val }], note: { vi: `p và q là cùng 1 giá trị (${pv}). Gặp node này → chính nó là LCA.`, en: `p and q are the same value (${pv}). Found this node → it is the LCA.` } }));
+    }
     const cnt = [L, R, mid].filter(Boolean).length;
     if (cnt >= 2 && !ans) {
       ans = node;
@@ -610,7 +618,7 @@ function buildSteps1644(input, params) {
     return L || R || mid;
   }
   dfs(root);
-  const valid = pFound && qFound;
+  const valid = pFound && qFound && ans !== null;
   const fs = snapshot(root, { title: { vi: valid ? `LCA = ${ans.val}` : `null (thiếu p hoặc q)`, en: valid ? `LCA = ${ans.val}` : `null (p or q missing)` }, wordSet: valid ? new Set([ans.id]) : undefined, vars: [{ name: "pFound", value: pFound }, { name: "qFound", value: qFound }, { name: "answer", value: valid ? ans.val : "null" }], note: { vi: valid ? `Cả p và q đều tồn tại → LCA = ${ans.val}.` : `Thiếu ${!pFound ? pv : qv} → trả về null.`, en: valid ? `Both p and q exist → LCA = ${ans.val}.` : `Missing ${!pFound ? pv : qv} → return null.` } }); fs.final = true; steps.push(fs);
   return { input, answer: valid ? ans.val : "null", steps };
 }
