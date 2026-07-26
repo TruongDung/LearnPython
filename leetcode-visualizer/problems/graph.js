@@ -10817,11 +10817,254 @@ function buildSteps1334Dijkstra(input, params) {
   return { edges: edgesRaw, n, threshold, answer: best, steps };
 }
 
+/**
+ * LeetCode 505: The Maze II.
+ *
+ * A ball in a maze rolls in one direction (up/down/left/right) until it
+ * hits a wall or the boundary — it does NOT stop at every empty cell along
+ * the way. Find the shortest distance (number of empty cells traveled) for
+ * the ball to STOP exactly at the destination. Return -1 if impossible.
+ *
+ * Since each "roll" (edge) has a different cost (the number of cells rolled
+ * through), this is NOT plain BFS — it's Dijkstra's algorithm on the graph
+ * where nodes are STOPPING positions and edges are full rolls in one of the
+ * 4 directions.
+ */
+function buildSteps505(input, params) {
+  const grid = parseIslandGrid(input).map((row) => row.map((v) => Number(v)));
+  const steps = [];
+
+  const rows = grid.length;
+  const cols = rows ? grid[0].length : 0;
+  const validGrid = rows > 0 && cols > 0 && grid.every((row) => row.length === cols && row.every((v) => v === 0 || v === 1));
+
+  const startR = Number(params.startR);
+  const startC = Number(params.startC);
+  const destR = Number(params.destR);
+  const destC = Number(params.destC);
+
+  const inBounds = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols;
+  const validPositions = validGrid
+    && inBounds(startR, startC) && grid[startR][startC] === 0
+    && inBounds(destR, destC) && grid[destR][destC] === 0;
+
+  if (!validGrid || !validPositions) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Grid chỉ gồm 0 (trống)/1 (tường); start và destination phải là ô trống hợp lệ trong grid.",
+        en: "Grid must contain only 0 (empty)/1 (wall); start and destination must be valid empty cells within the grid.",
+      },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const INF = Infinity;
+  const dist = Array.from({ length: rows }, () => new Array(cols).fill(INF));
+  const parent = Array.from({ length: rows }, () => new Array(cols).fill(null));
+  const visited = Array.from({ length: rows }, () => new Array(cols).fill(false));
+  const key = (r, c) => `${r},${c}`;
+  const dirs = [[-1, 0, "up"], [1, 0, "down"], [0, -1, "left"], [0, 1, "right"]];
+
+  function makeCells(current, rollPath, queuedSet) {
+    const rollSet = new Set((rollPath || []).map(([r, c]) => key(r, c)));
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        const cellKey = key(r, c);
+        let cls = "empty";
+        let label = ".";
+        if (cell === 1) { cls = "wall"; label = "X"; }
+        else if (r === startR && c === startC) { cls = "start"; label = "*"; }
+        else if (r === destR && c === destC) { cls = "end"; label = "#"; }
+        if (dist[r][c] < INF && cell === 0 && !(r === startR && c === startC)) { cls = "visited"; label = String(dist[r][c]); }
+        if (rollSet.has(cellKey)) cls = "queued";
+        if (queuedSet && queuedSet.has(cellKey) && cell === 0) cls = "queued";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep({ title, current, rollPath, queuedSet, final = false, codeLines, vars, note }) {
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, rollPath, queuedSet) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo Dijkstra", en: "Initialize Dijkstra" },
+    current: [startR, startC],
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "start", value: `(${startR}, ${startC})` },
+      { name: "destination", value: `(${destR}, ${destC})` },
+    ],
+    note: {
+      vi: `Bóng CHỈ dừng khi va tường hoặc ra biên — không dừng ở mọi ô trống. Vì mỗi "lăn" (cạnh) có chi phí khác nhau (số ô đi qua), dùng DIJKSTRA (không phải BFS thường) trên đồ thị: nút = vị trí DỪNG, cạnh = 1 lần lăn theo 1 trong 4 hướng.`,
+      en: `The ball only stops when it hits a wall or the boundary — not at every empty cell. Since each "roll" (edge) has a different cost (cells traveled), use DIJKSTRA (not plain BFS) on a graph where nodes = STOPPING positions, edges = one roll in one of the 4 directions.`,
+    },
+  });
+
+  dist[startR][startC] = 0;
+  visited[startR][startC] = false; // will be marked visited when popped
+  // Priority queue simulated as an array, sorted before each pop (grids are small).
+  let queue = [[0, startR, startC]];
+
+  pushStep({
+    title: { vi: `Đưa start (${startR},${startC}) vào priority queue với dist=0`, en: `Push start (${startR},${startC}) into the priority queue with dist=0` },
+    current: [startR, startC],
+    codeLines: [4, 5],
+    vars: [{ name: "queue", value: `[(0, ${startR}, ${startC})]` }],
+    note: {
+      vi: "dist[start] = 0 vì chưa lăn bước nào.",
+      en: "dist[start] = 0 since no rolling has happened yet.",
+    },
+  });
+
+  let found = false;
+  let iterGuard = 0;
+
+  while (queue.length && !found && iterGuard < 500) {
+    iterGuard++;
+    queue.sort((a, b) => a[0] - b[0]);
+    const [d, r, c] = queue.shift();
+
+    const stale = d > dist[r][c] || visited[r][c];
+    pushStep({
+      title: stale
+        ? { vi: `Pop (d=${d}, ${r},${c}) → bản ghi CŨ, bỏ qua`, en: `Pop (d=${d}, ${r},${c}) → STALE entry, skip` }
+        : { vi: `Pop (d=${d}, ${r},${c}) → xử lý`, en: `Pop (d=${d}, ${r},${c}) → process` },
+      current: [r, c],
+      codeLines: [6, 7],
+      vars: [{ name: "d", value: d }, { name: "(r,c)", value: `(${r},${c})` }, { name: `dist[${r}][${c}]`, value: fmtD(dist[r][c]) }],
+      note: stale
+        ? { vi: `Đã có đường tốt hơn hoặc đã thăm (${r},${c}) trước đó → bỏ qua bản ghi cũ này.`, en: `A better route to (${r},${c}) was already found or it's already visited → skip this stale entry.` }
+        : { vi: `(${r},${c}) chưa thăm và d=${d} là khoảng cách tốt nhất hiện tại → mở rộng từ đây.`, en: `(${r},${c}) is unvisited and d=${d} is the current best distance → expand from here.` },
+    });
+
+    if (stale) continue;
+    visited[r][c] = true;
+
+    if (r === destR && c === destC) {
+      found = true;
+      break;
+    }
+
+    for (const [dr, dc, dirName] of dirs) {
+      // Roll in this direction until hitting a wall or the boundary.
+      let nr = r, nc = c, steps_ = 0;
+      const rollPath = [[r, c]];
+      while (inBounds(nr + dr, nc + dc) && grid[nr + dr][nc + dc] === 0) {
+        nr += dr; nc += dc; steps_++;
+        rollPath.push([nr, nc]);
+      }
+
+      pushStep({
+        title: { vi: `Lăn hướng ${dirName} từ (${r},${c}) → dừng tại (${nr},${nc}), ${steps_} bước`, en: `Roll ${dirName} from (${r},${c}) → stops at (${nr},${nc}), ${steps_} steps` },
+        current: [r, c],
+        rollPath,
+        codeLines: [8, 9, 10, 11],
+        vars: [{ name: "direction", value: dirName }, { name: "stop at", value: `(${nr},${nc})` }, { name: "steps rolled", value: steps_ }],
+        note: steps_ === 0
+          ? { vi: `Hướng ${dirName} bị chặn ngay (tường/biên sát cạnh) → không di chuyển được.`, en: `Direction ${dirName} is blocked immediately (wall/boundary right next to it) → can't move.` }
+          : { vi: `Bóng lăn liên tục theo hướng ${dirName} qua ${steps_} ô trống, dừng lại tại (${nr},${nc}) vì gặp tường/biên.`, en: `The ball keeps rolling ${dirName} through ${steps_} empty cells, stopping at (${nr},${nc}) because of a wall/boundary.` },
+      });
+
+      if (steps_ === 0) continue;
+
+      const newDist = d + steps_;
+      const improves = newDist < dist[nr][nc];
+
+      pushStep({
+        title: { vi: `if newDist < dist[${nr}][${nc}] → ${newDist} < ${fmtD(dist[nr][nc])} → ${improves}`, en: `if newDist < dist[${nr}][${nc}] → ${newDist} < ${fmtD(dist[nr][nc])} → ${improves}` },
+        current: [nr, nc],
+        codeLines: [12],
+        vars: [{ name: "newDist", value: newDist }, { name: `dist[${nr}][${nc}]`, value: fmtD(dist[nr][nc]) }],
+        note: improves
+          ? { vi: `${newDist} < ${fmtD(dist[nr][nc])} → tìm được đường ngắn hơn tới (${nr},${nc}), cập nhật và đưa vào queue.`, en: `${newDist} < ${fmtD(dist[nr][nc])} → found a shorter route to (${nr},${nc}), update and push into the queue.` }
+          : { vi: `Không cải thiện → giữ nguyên dist[${nr}][${nc}] = ${fmtD(dist[nr][nc])}.`, en: `No improvement → keep dist[${nr}][${nc}] = ${fmtD(dist[nr][nc])}.` },
+      });
+
+      if (improves) {
+        dist[nr][nc] = newDist;
+        parent[nr][nc] = [r, c];
+        queue.push([newDist, nr, nc]);
+        pushStep({
+          title: { vi: `dist[${nr}][${nc}] = ${newDist}; push vào queue`, en: `dist[${nr}][${nc}] = ${newDist}; push into queue` },
+          current: [nr, nc],
+          codeLines: [13, 14],
+          vars: [{ name: `dist[${nr}][${nc}]`, value: newDist }, { name: "queue size", value: queue.length }],
+          note: {
+            vi: `Cập nhật dist[${nr}][${nc}] = ${newDist} và đưa (${newDist}, ${nr}, ${nc}) vào priority queue.`,
+            en: `Update dist[${nr}][${nc}] = ${newDist} and push (${newDist}, ${nr}, ${nc}) into the priority queue.`,
+          },
+        });
+      }
+    }
+  }
+
+  const answer = found ? dist[destR][destC] : -1;
+  const pathCells = new Set();
+  if (found) {
+    let cur = [destR, destC];
+    while (cur) {
+      pathCells.add(key(cur[0], cur[1]));
+      cur = parent[cur[0]][cur[1]];
+    }
+  }
+
+  const finalCells = grid.map((row, r) =>
+    row.map((cell, c) => {
+      const cellKey = key(r, c);
+      let cls = "empty";
+      let label = ".";
+      if (cell === 1) { cls = "wall"; label = "X"; }
+      else if (dist[r][c] < INF) { cls = "visited"; label = String(dist[r][c]); }
+      if (pathCells.has(cellKey)) cls = cell === 1 ? "wall" : (r === destR && c === destC) ? "end" : (r === startR && c === startC) ? "start" : "path";
+      if (r === startR && c === startC) { cls = pathCells.has(cellKey) ? "start" : "start"; label = "*"; }
+      if (r === destR && c === destC) { cls = "end"; label = "#"; }
+      return { label, cls };
+    })
+  );
+
+  const fs = {
+    title: answer === -1
+      ? { vi: "Không thể dừng ở destination → -1", en: "Cannot stop at destination → -1" }
+      : { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    bfsGrid: { rows, cols, cells: finalCells },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [15, 16],
+    vars: [{ name: "answer", value: answer }],
+    note: answer === -1
+      ? { vi: "Dijkstra kết thúc mà chưa từng DỪNG (không chỉ đi qua) tại destination → không có đường, trả -1.", en: "Dijkstra finished without ever STOPPING (not just passing through) at the destination → no path exists, return -1." }
+      : { vi: `Bóng dừng tại destination lần đầu với dist=${answer} (số ô trống đã lăn qua). Đường đi được tô xanh.`, en: `The ball first stops at the destination with dist=${answer} (empty cells traveled). The path is highlighted.` },
+  };
+  steps.push(fs);
+
+  return { original: grid, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    order: [200, 994, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11576,6 +11819,74 @@ module.exports = {
       const approach = Number(params && params.approach) || 1;
       return approach === 2 ? buildSteps1730v2(input) : buildSteps1730(input);
     },
+  },
+  505: {
+    id: 505,
+    difficulty: "medium",
+    slug: "the-maze-ii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "The Maze II", en: "The Maze II" },
+    titleVi: { vi: "Bóng lăn trong ma trận II", en: "Rolling ball in a maze II" },
+    statement: {
+      vi:
+        "Một quả bóng trong ma trận với ô trống (0) và tường (1). Bóng lăn theo 1 hướng (lên/xuống/trái/phải) " +
+        "và KHÔNG DỪNG cho tới khi va tường hoặc ra biên — khi đó mới có thể chọn hướng khác. " +
+        "Tìm khoảng cách ngắn nhất (số ô trống đã lăn qua) để bóng DỪNG ĐÚNG tại destination. Trả -1 nếu không thể. " +
+        "Nhập grid: hàng cách bởi '|', giá trị 0/1 viết liền hoặc cách bằng dấu phẩy.",
+      en:
+        "A ball in a maze with empty spaces (0) and walls (1). The ball rolls in one direction " +
+        "(up/down/left/right) and does NOT stop until it hits a wall or the boundary — only then can it choose a new direction. " +
+        "Find the shortest distance (number of empty cells traveled) for the ball to STOP exactly at the destination. Return -1 if impossible. " +
+        "Enter the grid: rows separated by '|', 0/1 values either compact or comma-separated.",
+    },
+    defaultInput: "0,0,1,0,0|0,0,0,0,0|0,0,0,1,0|1,1,0,1,1|0,0,0,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    extraParams: [
+      { key: "startR", label: { vi: "start row", en: "start row" }, default: 0 },
+      { key: "startC", label: { vi: "start col", en: "start col" }, default: 4 },
+      { key: "destR", label: { vi: "dest row", en: "dest row" }, default: 4 },
+      { key: "destC", label: { vi: "dest col", en: "dest col" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Bóng chỉ DỪNG khi va tường/biên — mỗi lần lăn (1 cạnh trong đồ thị) có chi phí = số ô trống đã đi qua, KHÁC NHAU giữa các cạnh.", en: "The ball only STOPS when hitting a wall/boundary — each roll (an edge in the graph) costs the number of empty cells traveled, which DIFFERS between edges." },
+      { vi: "Vì trọng số cạnh không đều nhau, dùng DIJKSTRA (không phải BFS thường) — nút = vị trí DỪNG, không phải mọi ô.", en: "Since edge weights are unequal, use DIJKSTRA (not plain BFS) — nodes = STOPPING positions, not every cell." },
+      { vi: "Với mỗi nút, thử lăn 4 hướng tới khi va tường/biên, rồi relax khoảng cách tới điểm dừng đó.", en: "From each node, try rolling in 4 directions until hitting a wall/boundary, then relax the distance to that stopping point." },
+    ],
+    complexity: {
+      time: "O(mn·log(mn))",
+      space: "O(mn)",
+      note: {
+        vi: "Mỗi ô có thể vào priority queue nhiều lần; mỗi lần xét tối đa 4 hướng, mỗi hướng tốn O(max(m,n)) để lăn.",
+        en: "Each cell may enter the priority queue multiple times; each expansion checks up to 4 directions, each costing O(max(m,n)) to roll.",
+      },
+    },
+    code: [
+      "import heapq",
+      "class Solution:",
+      "    def shortestDistance(self, maze, start, destination):",
+      "        m, n = len(maze), len(maze[0])",
+      "        dist = [[float('inf')] * n for _ in range(m)]",
+      "        dist[start[0]][start[1]] = 0",
+      "        pq = [(0, start[0], start[1])]",
+      "        dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]",
+      "        while pq:",
+      "            d, r, c = heapq.heappop(pq)",
+      "            if d > dist[r][c]:",
+      "                continue",
+      "            for dr, dc in dirs:",
+      "                nr, nc, steps = r, c, 0",
+      "                while 0 <= nr + dr < m and 0 <= nc + dc < n and maze[nr + dr][nc + dc] == 0:",
+      "                    nr += dr",
+      "                    nc += dc",
+      "                    steps += 1",
+      "                if d + steps < dist[nr][nc]:",
+      "                    dist[nr][nc] = d + steps",
+      "                    heapq.heappush(pq, (dist[nr][nc], nr, nc))",
+      "        ans = dist[destination[0]][destination[1]]",
+      "        return ans if ans != float('inf') else -1",
+    ],
+    builder: buildSteps505,
   },
   1091: {
     id: 1091,
