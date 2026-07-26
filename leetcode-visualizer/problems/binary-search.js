@@ -592,6 +592,9 @@ function buildSteps4(input, params) {
   if (A.length > B.length) { A = B0; B = A0; swapped = true; }
   const m = A.length, n = B.length;
 
+  const labelA = swapped ? "nums2" : "nums1";
+  const labelB = swapped ? "nums1" : "nums2";
+
   function snap(opts) {
     steps.push({
       title: opts.title,
@@ -599,6 +602,8 @@ function buildSteps4(input, params) {
       partitionView: {
         rowA: A,
         rowB: B,
+        labelA,
+        labelB,
         cutA: opts.i !== undefined ? opts.i : 0,
         cutB: opts.j !== undefined ? opts.j : 0,
         highlight: opts.highlight || {},
@@ -833,7 +838,7 @@ function buildSteps4(input, params) {
         title: { vi: `return left_part → ${median}`, en: `return left_part → ${median}` },
         arr: [],
         partitionView: {
-          rowA: A, rowB: B, cutA: i, cutB: j,
+          rowA: A, rowB: B, labelA, labelB, cutA: i, cutB: j,
           highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
           status: [{ label: "answer", value: median }],
         },
@@ -866,7 +871,7 @@ function buildSteps4(input, params) {
       title: { vi: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}`, en: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}` },
       arr: [],
       partitionView: {
-        rowA: A, rowB: B, cutA: i, cutB: j,
+        rowA: A, rowB: B, labelA, labelB, cutA: i, cutB: j,
         highlight: { rowA: [i > 0 ? i - 1 : -1, i < m ? i : -1].filter((x) => x >= 0), rowB: [j > 0 ? j - 1 : -1, j < n ? j : -1].filter((x) => x >= 0) },
         status: [{ label: "answer", value: median }],
       },

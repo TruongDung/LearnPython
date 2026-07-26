@@ -927,7 +927,13 @@ function highlightPython(line) {
     { type: "num", re: /^-?\d+\.?\d*/ },
     { type: "ident", re: /^\w+/ },
     { type: "space", re: /^\s+/ },
-    { type: "op", re: /^[^\w\s]+/ },
+    // NOTE: excludes quote chars so a run of operators (e.g. "('-") never
+    // swallows the opening quote of a string literal. Without this, a
+    // pattern like float('-inf') would have its leading "'" eaten by "op",
+    // causing the str pattern to re-sync on the WRONG quote later in the
+    // line and highlight a huge unrelated span as a string (the reported
+    // "green font" bug).
+    { type: "op", re: /^[^\w\s'"]+/ },
   ];
 
   while (remaining.length > 0) {
@@ -2620,6 +2626,11 @@ function renderPartitionView(step) {
   const cutB = Number.isInteger(view.cutB) ? view.cutB : 0;
   const statuses = Array.isArray(view.status) ? view.status : [];
   const highlightIdx = view.highlight || {}; // { rowA: [i,...], rowB: [i,...] }
+  // labelA/labelB reflect which ORIGINAL array (nums1 or nums2) rowA/rowB
+  // actually is, since the algorithm may swap roles internally so binary
+  // search always runs on the shorter array.
+  const labelA = view.labelA || "nums1";
+  const labelB = view.labelB || "nums2";
 
   function renderRow(rowLabel, values, cut, hlSet) {
     const cells = values.map((v, i) => {
@@ -2653,8 +2664,8 @@ function renderPartitionView(step) {
 
   $("treeView").innerHTML = `
     <div class="partition-viz">
-      ${renderRow("nums1", rowA, cutA, hlA)}
-      ${renderRow("nums2", rowB, cutB, hlB)}
+      ${renderRow(labelA, rowA, cutA, hlA)}
+      ${renderRow(labelB, rowB, cutB, hlB)}
       ${legend}
       <div class="partition-status">${statusItems}</div>
     </div>`;

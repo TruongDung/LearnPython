@@ -10212,6 +10212,574 @@ function buildSteps332(input, params) {
     : buildSteps332Approach1(input);
 }
 
+/**
+ * LeetCode 1334: Find the City With the Smallest Number of Neighbors at a
+ * Threshold Distance.
+ *
+ * Given n cities (0..n-1) connected by weighted edges, and a distance
+ * threshold, find the city that has the SMALLEST number of OTHER cities
+ * reachable within `threshold` distance. If tied, return the city with the
+ * LARGEST index.
+ *
+ * Algorithm: Floyd-Warshall computes dist[i][j] = shortest path between
+ * every pair of cities in O(n³). Then for each city, count how many other
+ * cities have dist[city][other] <= threshold, and pick the city with the
+ * fewest such neighbors (largest index breaks ties).
+ */
+function buildSteps1334(input, params) {
+  const edgesRaw = String(input).split(",").map((edge) => edge.trim()).filter(Boolean);
+  const n = Number(params.n);
+  const threshold = Number(params.threshold);
+  const steps = [];
+
+  const edgeList = edgesRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return { u: parts[0], v: parts[1], w: parts[2] };
+  });
+  const valid = Number.isInteger(n) && n > 0
+    && Number.isFinite(threshold) && threshold >= 0
+    && edgeList.length > 0
+    && edgeList.every(({ u, v, w }) => (
+      Number.isInteger(u) && u >= 0 && u < n
+      && Number.isInteger(v) && v >= 0 && v < n
+      && u !== v && Number.isFinite(w) && w > 0
+    ));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Nhập cạnh theo dạng u-v-w, ngăn cách bằng dấu phẩy. Mỗi thành phố phải nằm trong 0..n-1, trọng số dương.",
+        en: "Enter edges as u-v-w separated by commas. Every city must be in 0..n-1, weights must be positive.",
+      },
+    });
+    return { edges: edgesRaw, n, threshold, answer: -1, steps };
+  }
+
+  const INF = Infinity;
+  const dist = Array.from({ length: n }, () => new Array(n).fill(INF));
+  for (let i = 0; i < n; i++) dist[i][i] = 0;
+  for (const { u, v, w } of edgeList) {
+    dist[u][v] = Math.min(dist[u][v], w);
+    dist[v][u] = Math.min(dist[v][u], w);
+  }
+
+  function gridDisplay(hlCell) {
+    return {
+      dp: dist.map((row) => row.map((v) => (v === INF ? "\u221E" : String(v)))),
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: hlCell || null,
+      pathCells: [],
+    };
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: gridDisplay(opts.hlCell),
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  const edgesStr = edgeList.map((e) => `(${e.u},${e.v},${e.w})`).join(", ");
+
+  // Line 3: dist = [[inf]*n for _ in range(n)]
+  snap({
+    title: { vi: "dist = ma trận n×n toàn ∞", en: "dist = n×n matrix, all ∞" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }, { name: "threshold", value: threshold }, { name: "edges", value: edgesStr }],
+    note: {
+      vi: `n=${n} thành phố, threshold=${threshold}. Khởi tạo ma trận dist toàn ∞ — sẽ dùng Floyd-Warshall để tính khoảng cách ngắn nhất giữa MỌI cặp thành phố.`,
+      en: `n=${n} cities, threshold=${threshold}. Initialize the dist matrix to all ∞ — will use Floyd-Warshall to compute shortest paths between EVERY pair of cities.`,
+    },
+  });
+
+  // Line 4: for i in range(n): dist[i][i] = 0
+  snap({
+    title: { vi: "for i in range(n): dist[i][i] = 0", en: "for i in range(n): dist[i][i] = 0" },
+    codeLines: [4],
+    note: {
+      vi: "Khoảng cách từ 1 thành phố tới chính nó luôn = 0.",
+      en: "Distance from a city to itself is always 0.",
+    },
+  });
+
+  // Line 5-6: for u,v,w in edges: dist[u][v]=dist[v][u]=w
+  for (const { u, v, w } of edgeList) {
+    snap({
+      title: { vi: `dist[${u}][${v}] = dist[${v}][${u}] = ${w}`, en: `dist[${u}][${v}] = dist[${v}][${u}] = ${w}` },
+      hlCell: [u, v],
+      codeLines: [5, 6],
+      vars: [{ name: "edge", value: `(${u},${v},${w})` }],
+      note: {
+        vi: `Cạnh (${u},${v},${w}) là 2 chiều → gán dist[${u}][${v}] = dist[${v}][${u}] = ${w}.`,
+        en: `Edge (${u},${v},${w}) is bidirectional → set dist[${u}][${v}] = dist[${v}][${u}] = ${w}.`,
+      },
+    });
+  }
+
+  // Floyd-Warshall: for k, for i, for j
+  for (let k = 0; k < n; k++) {
+    // Line 7: for k in range(n):
+    snap({
+      title: { vi: `for k in range(n) → k=${k}`, en: `for k in range(n) → k=${k}` },
+      hlCell: [k, k],
+      codeLines: [7],
+      vars: [{ name: "k (intermediate)", value: k }],
+      note: {
+        vi: `Xét k=${k} làm điểm TRUNG GIAN. Kiểm tra: đi từ i đến j qua k có ngắn hơn đường hiện tại không?`,
+        en: `Consider k=${k} as the INTERMEDIATE point. Check: does going from i to j through k give a shorter path than the current one?`,
+      },
+    });
+
+    for (let i = 0; i < n; i++) {
+      // Line 8: for i in range(n):
+      snap({
+        title: { vi: `for i in range(n) → i=${i} (k=${k})`, en: `for i in range(n) → i=${i} (k=${k})` },
+        hlCell: [i, k],
+        codeLines: [8],
+        vars: [{ name: "i", value: i }, { name: "k", value: k }],
+        note: {
+          vi: `Xét i=${i}. Sẽ thử mọi j để xem đường i→k→j có cải thiện dist[i][j] không.`,
+          en: `Consider i=${i}. Will try every j to see if the i→k→j path improves dist[i][j].`,
+        },
+      });
+
+      for (let j = 0; j < n; j++) {
+        const via = dist[i][k] + dist[k][j];
+        const improves = via < dist[i][j];
+
+        // Line 9: for j in range(n):
+        snap({
+          title: { vi: `for j in range(n) → j=${j}`, en: `for j in range(n) → j=${j}` },
+          hlCell: [i, j],
+          codeLines: [9],
+          vars: [{ name: "j", value: j }],
+          note: {
+            vi: `Xét j=${j}. So sánh dist[${i}][${k}]+dist[${k}][${j}] với dist[${i}][${j}] hiện tại.`,
+            en: `Consider j=${j}. Compare dist[${i}][${k}]+dist[${k}][${j}] with the current dist[${i}][${j}].`,
+          },
+        });
+
+        // Line 10: if dist[i][k] + dist[k][j] < dist[i][j]:
+        snap({
+          title: { vi: `if dist[i][k]+dist[k][j] < dist[i][j] → ${fmtD(via)} < ${fmtD(dist[i][j])} → ${improves}`, en: `if dist[i][k]+dist[k][j] < dist[i][j] → ${fmtD(via)} < ${fmtD(dist[i][j])} → ${improves}` },
+          hlCell: [i, j],
+          codeLines: [10],
+          vars: [{ name: "via k", value: fmtD(via) }, { name: "dist[i][j]", value: fmtD(dist[i][j]) }],
+          note: improves
+            ? { vi: `Đi qua k=${k} NGẮN HƠN: ${fmtD(via)} < ${fmtD(dist[i][j])} → sẽ cập nhật dist[${i}][${j}].`, en: `Going through k=${k} is SHORTER: ${fmtD(via)} < ${fmtD(dist[i][j])} → will update dist[${i}][${j}].` }
+            : { vi: `Đi qua k=${k} không ngắn hơn → giữ nguyên dist[${i}][${j}] = ${fmtD(dist[i][j])}.`, en: `Going through k=${k} isn't shorter → keep dist[${i}][${j}] = ${fmtD(dist[i][j])}.` },
+        });
+
+        if (improves) {
+          // Line 11: dist[i][j] = dist[i][k] + dist[k][j]
+          dist[i][j] = via;
+          snap({
+            title: { vi: `dist[${i}][${j}] = ${via}`, en: `dist[${i}][${j}] = ${via}` },
+            hlCell: [i, j],
+            codeLines: [11],
+            vars: [{ name: `dist[${i}][${j}]`, value: via }],
+            note: {
+              vi: `Cập nhật dist[${i}][${j}] = ${via} (đi qua k=${k}).`,
+              en: `Update dist[${i}][${j}] = ${via} (via k=${k}).`,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // Count neighbors within threshold for each city.
+  const counts = dist.map((row, i) => row.filter((d, j) => j !== i && d <= threshold).length);
+
+  // Line 12: best = min(range(n), key=lambda i: (count[i], -i))
+  let best = 0;
+  for (let i = 1; i < n; i++) {
+    if (counts[i] <= counts[best]) best = i;
+  }
+
+  const countsStr = counts.map((c, i) => `city ${i}: ${c}`).join(", ");
+  snap({
+    title: { vi: `Đếm số láng giềng ≤ threshold cho mỗi thành phố`, en: `Count neighbors ≤ threshold for each city` },
+    codeLines: [12, 13],
+    vars: [{ name: "counts", value: countsStr }],
+    note: {
+      vi: `Với mỗi thành phố i, đếm số j≠i có dist[i][j] ≤ ${threshold}. Kết quả: ${countsStr}.`,
+      en: `For each city i, count j≠i where dist[i][j] ≤ ${threshold}. Result: ${countsStr}.`,
+    },
+  });
+
+  const fs = {
+    title: { vi: `Kết quả: thành phố ${best} (${counts[best]} láng giềng)`, en: `Result: city ${best} (${counts[best]} neighbors)` },
+    arr: [],
+    grid: gridDisplay([best, best]),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [14],
+    vars: [{ name: "answer", value: best }, { name: "counts", value: countsStr }],
+    note: {
+      vi: `Thành phố ${best} có ÍT nhất láng giềng trong ngưỡng ${threshold} (${counts[best]} láng giềng). Nếu có nhiều thành phố hòa, chọn INDEX LỚN NHẤT.`,
+      en: `City ${best} has the FEWEST neighbors within threshold ${threshold} (${counts[best]} neighbors). Ties are broken by picking the LARGEST index.`,
+    },
+  };
+  steps.push(fs);
+
+  return { edges: edgesRaw, n, threshold, answer: best, steps };
+}
+
+function fmtD(v) {
+  return v === Infinity ? "\u221E" : String(v);
+}
+
+/**
+ * LeetCode 1334 Approach 2: Dijkstra from every city.
+ *
+ * Instead of Floyd-Warshall O(n³), run Dijkstra's algorithm N times — once
+ * per source city — each in O(n² ) with a simple array-based "find min"
+ * (no heap needed since n is small in this problem). Total: O(n³) worst
+ * case too, but in practice much faster on sparse graphs since Dijkstra
+ * only explores actual edges instead of blindly trying every (i,k,j) triple.
+ * Same final answer as Floyd-Warshall — just a different way to fill the
+ * same dist[][] matrix, one ROW at a time instead of all at once.
+ */
+function buildSteps1334Dijkstra(input, params) {
+  const edgesRaw = String(input).split(",").map((edge) => edge.trim()).filter(Boolean);
+  const n = Number(params.n);
+  const threshold = Number(params.threshold);
+  const steps = [];
+
+  const edgeList = edgesRaw.map((e) => {
+    const parts = e.split("-").map(Number);
+    return { u: parts[0], v: parts[1], w: parts[2] };
+  });
+  const valid = Number.isInteger(n) && n > 0
+    && Number.isFinite(threshold) && threshold >= 0
+    && edgeList.length > 0
+    && edgeList.every(({ u, v, w }) => (
+      Number.isInteger(u) && u >= 0 && u < n
+      && Number.isInteger(v) && v >= 0 && v < n
+      && u !== v && Number.isFinite(w) && w > 0
+    ));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeBlock: 2,
+      codeLines: [3],
+      vars: [{ name: "answer", value: -1 }],
+      note: {
+        vi: "Nhập cạnh theo dạng u-v-w, ngăn cách bằng dấu phẩy. Mỗi thành phố phải nằm trong 0..n-1, trọng số dương.",
+        en: "Enter edges as u-v-w separated by commas. Every city must be in 0..n-1, weights must be positive.",
+      },
+    });
+    return { edges: edgesRaw, n, threshold, answer: -1, steps };
+  }
+
+  const INF = Infinity;
+  const adj = Array.from({ length: n }, () => []);
+  for (const { u, v, w } of edgeList) {
+    adj[u].push([v, w]);
+    adj[v].push([u, w]);
+  }
+
+  const dist = Array.from({ length: n }, () => new Array(n).fill(INF));
+  for (let i = 0; i < n; i++) dist[i][i] = 0;
+
+  function gridDisplay(hlCell) {
+    return {
+      dp: dist.map((row) => row.map((v) => (v === INF ? "\u221E" : String(v)))),
+      text1: Array.from({ length: n }, (_, i) => String(i)),
+      text2: Array.from({ length: n }, (_, i) => String(i)),
+      hlCell: hlCell || null,
+      pathCells: [],
+    };
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: gridDisplay(opts.hlCell),
+      graph: opts.graph,
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeBlock: 2,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  const edgesStr = edgeList.map((e) => `(${e.u},${e.v},${e.w})`).join(", ");
+  const allEdgesForGraph = edgeList.map((e) => ({ u: e.u, v: e.v, w: e.w }));
+  const graphNodes = Array.from({ length: n }, (_, id) => ({ id, label: String(id) }));
+
+  function makeGraph(hlNodes, hlEdges, visitedNodes) {
+    return {
+      nodes: graphNodes,
+      edges: allEdgesForGraph,
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedNodes || [],
+    };
+  }
+
+  // Line 3: dist = [[inf]*n for _ in range(n)]
+  snap({
+    title: { vi: "dist = ma trận n×n toàn ∞", en: "dist = n×n matrix, all ∞" },
+    codeLines: [3],
+    graph: makeGraph([], []),
+    vars: [{ name: "n", value: n }, { name: "threshold", value: threshold }, { name: "edges", value: edgesStr }],
+    note: {
+      vi: `n=${n} thành phố, threshold=${threshold}. Thay vì Floyd-Warshall, sẽ chạy Dijkstra ${n} LẦN — mỗi lần từ 1 thành phố nguồn — để lấp đầy ma trận dist theo từng HÀNG.`,
+      en: `n=${n} cities, threshold=${threshold}. Instead of Floyd-Warshall, will run Dijkstra ${n} TIMES — once per source city — filling the dist matrix one ROW at a time.`,
+    },
+  });
+
+  // Line 4: adj = build adjacency list
+  snap({
+    title: { vi: "Xây adjacency list từ edges", en: "Build adjacency list from edges" },
+    codeLines: [4],
+    graph: makeGraph([], []),
+    vars: [{ name: "adj", value: adj.map((nbrs, i) => `${i}:[${nbrs.map(([v, w]) => `(${v},${w})`).join(",")}]`).join(" ") }],
+    note: {
+      vi: "Chuyển danh sách cạnh thành adjacency list 2 chiều để Dijkstra duyệt hàng xóm nhanh hơn.",
+      en: "Convert the edge list into a bidirectional adjacency list so Dijkstra can scan neighbors quickly.",
+    },
+  });
+
+  for (let src = 0; src < n; src++) {
+    // Line 5: for src in range(n):
+    snap({
+      title: { vi: `for src in range(n) → src=${src}`, en: `for src in range(n) → src=${src}` },
+      hlCell: [src, src],
+      graph: makeGraph([src], []),
+      codeLines: [5],
+      vars: [{ name: "src", value: src }],
+      note: {
+        vi: `Chạy Dijkstra từ nguồn src=${src} để lấp đầy hàng dist[${src}][*].`,
+        en: `Run Dijkstra from source src=${src} to fill row dist[${src}][*].`,
+      },
+    });
+
+    // Line 6: dist[src][src] = 0
+    dist[src][src] = 0;
+    snap({
+      title: { vi: `dist[${src}][${src}] = 0`, en: `dist[${src}][${src}] = 0` },
+      hlCell: [src, src],
+      graph: makeGraph([src], [], []),
+      codeLines: [6],
+      vars: [{ name: `dist[${src}][${src}]`, value: 0 }],
+      note: {
+        vi: `Khoảng cách từ ${src} tới chính nó = 0.`,
+        en: `Distance from ${src} to itself is 0.`,
+      },
+    });
+
+    // Line 7: visited = [False] * n
+    const visited = new Array(n).fill(false);
+    snap({
+      title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+      hlCell: [src, src],
+      graph: makeGraph([src], [], []),
+      codeLines: [7],
+      note: {
+        vi: `Khởi tạo visited toàn False cho lần chạy Dijkstra từ src=${src}.`,
+        en: `Initialize visited to all False for this Dijkstra run from src=${src}.`,
+      },
+    });
+
+    for (let iter = 0; iter < n; iter++) {
+      // Line 8: while True:
+      snap({
+        title: { vi: "while True:", en: "while True:" },
+        hlCell: [src, src],
+        graph: makeGraph([], [], [...Array(n).keys()].filter((x) => visited[x])),
+        codeLines: [8],
+        note: {
+          vi: "Lặp mãi cho tới khi hết thành phố chưa thăm có thể đến được (thoát bằng break bên trong).",
+          en: "Loop forever until there's no more reachable unvisited city (exits via break inside).",
+        },
+      });
+
+      // Line 9: u = min(...)
+      let u = -1;
+      let best = INF;
+      for (let cand = 0; cand < n; cand++) {
+        if (!visited[cand] && dist[src][cand] < best) { best = dist[src][cand]; u = cand; }
+      }
+      snap({
+        title: { vi: `u = min(chưa thăm, key=dist[src][c]) → u=${u === -1 ? "none" : u} (${fmtD(best)})`, en: `u = min(unvisited, key=dist[src][c]) → u=${u === -1 ? "none" : u} (${fmtD(best)})` },
+        hlCell: u >= 0 ? [src, u] : null,
+        graph: makeGraph(u >= 0 ? [u] : [], [], [...Array(n).keys()].filter((x) => visited[x])),
+        codeLines: [9],
+        vars: [{ name: "u", value: u === -1 ? "None" : u }, { name: "dist[src][u]", value: fmtD(best) }],
+        note: {
+          vi: `Tìm thành phố CHƯA THĂM có dist[src][c] nhỏ nhất → u=${u === -1 ? "None" : u}.`,
+          en: `Find the UNVISITED city with the smallest dist[src][c] → u=${u === -1 ? "None" : u}.`,
+        },
+      });
+
+      // Line 10-11: if u == -1 or dist[src][u] == inf: break
+      const shouldBreak = u === -1 || best === INF;
+      snap({
+        title: { vi: `if u==-1 or dist[src][u]==∞ → ${shouldBreak}`, en: `if u==-1 or dist[src][u]==∞ → ${shouldBreak}` },
+        hlCell: u >= 0 ? [src, u] : null,
+        graph: makeGraph(u >= 0 ? [u] : [], [], [...Array(n).keys()].filter((x) => visited[x])),
+        codeLines: [10],
+        note: shouldBreak
+          ? { vi: "Không còn thành phố chưa thăm nào có thể đến được → sẽ break, dừng Dijkstra cho nguồn này.", en: "No reachable unvisited city remains → will break, stopping Dijkstra for this source." }
+          : { vi: `u=${u} vẫn đến được (dist=${fmtD(best)}) → tiếp tục xử lý, không break.`, en: `u=${u} is still reachable (dist=${fmtD(best)}) → continue processing, no break.` },
+      });
+
+      if (shouldBreak) {
+        snap({
+          title: { vi: "break", en: "break" },
+          graph: makeGraph([], [], [...Array(n).keys()].filter((x) => visited[x])),
+          codeLines: [11],
+          note: {
+            vi: "Thoát vòng while — đã xử lý xong mọi thành phố đến được từ src.",
+            en: "Exit the while loop — every reachable city from src has been processed.",
+          },
+        });
+        break;
+      }
+
+      // Line 12: visited[u] = True
+      visited[u] = true;
+      snap({
+        title: { vi: `visited[${u}] = True`, en: `visited[${u}] = True` },
+        hlCell: [src, u],
+        graph: makeGraph([u], [], [...Array(n).keys()].filter((x) => visited[x])),
+        codeLines: [12],
+        note: {
+          vi: `Đánh dấu ${u} đã thăm — dist[${src}][${u}]=${fmtD(dist[src][u])} đã CHỐT, không thể tốt hơn nữa.`,
+          en: `Mark ${u} as visited — dist[${src}][${u}]=${fmtD(dist[src][u])} is now FINAL, cannot improve further.`,
+        },
+      });
+
+      for (const [v, w] of adj[u]) {
+        // Line 13: for v, w in adj[u]:
+        snap({
+          title: { vi: `for v,w in adj[${u}] → v=${v}, w=${w}`, en: `for v,w in adj[${u}] → v=${v}, w=${w}` },
+          hlCell: [src, v],
+          graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
+          codeLines: [13],
+          vars: [{ name: "v", value: v }, { name: "w", value: w }],
+          note: {
+            vi: `Xét hàng xóm v=${v} của u=${u}, cạnh nặng w=${w}.`,
+            en: `Consider neighbor v=${v} of u=${u}, edge weight w=${w}.`,
+          },
+        });
+
+        const via = dist[src][u] + w;
+        const improves = via < dist[src][v];
+
+        // Line 14: if dist[src][u] + w < dist[src][v]:
+        snap({
+          title: { vi: `if dist[src][u]+w < dist[src][v] → ${fmtD(via)} < ${fmtD(dist[src][v])} → ${improves}`, en: `if dist[src][u]+w < dist[src][v] → ${fmtD(via)} < ${fmtD(dist[src][v])} → ${improves}` },
+          hlCell: [src, v],
+          graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
+          codeLines: [14],
+          vars: [{ name: "via u", value: fmtD(via) }, { name: `dist[src][${v}]`, value: fmtD(dist[src][v]) }],
+          note: improves
+            ? { vi: `Đi qua u=${u} NGẮN HƠN: ${fmtD(via)} < ${fmtD(dist[src][v])} → cập nhật dist[${src}][${v}].`, en: `Going through u=${u} is SHORTER: ${fmtD(via)} < ${fmtD(dist[src][v])} → update dist[${src}][${v}].` }
+            : { vi: `Không cải thiện → giữ nguyên dist[${src}][${v}] = ${fmtD(dist[src][v])}.`, en: `No improvement → keep dist[${src}][${v}] = ${fmtD(dist[src][v])}.` },
+        });
+
+        if (improves) {
+          // Line 15: dist[src][v] = dist[src][u] + w
+          dist[src][v] = via;
+          snap({
+            title: { vi: `dist[${src}][${v}] = ${via}`, en: `dist[${src}][${v}] = ${via}` },
+            hlCell: [src, v],
+            graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
+            codeLines: [15],
+            vars: [{ name: `dist[${src}][${v}]`, value: via }],
+            note: {
+              vi: `Cập nhật dist[${src}][${v}] = ${via} (đi qua ${u}).`,
+              en: `Update dist[${src}][${v}] = ${via} (via ${u}).`,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // Count neighbors within threshold for each city.
+  const counts = dist.map((row, i) => row.filter((d, j) => j !== i && d <= threshold).length);
+
+  let best = 0;
+  for (let i = 1; i < n; i++) {
+    if (counts[i] <= counts[best]) best = i;
+  }
+
+  const countsStr = counts.map((c, i) => `city ${i}: ${c}`).join(", ");
+  // Line 16: counts = [...]
+  snap({
+    title: { vi: `Đếm số láng giềng ≤ threshold cho mỗi thành phố`, en: `Count neighbors ≤ threshold for each city` },
+    codeLines: [16],
+    graph: makeGraph([], []),
+    vars: [{ name: "counts", value: countsStr }],
+    note: {
+      vi: `Với mỗi thành phố i, đếm số j≠i có dist[i][j] ≤ ${threshold}. Kết quả: ${countsStr}.`,
+      en: `For each city i, count j≠i where dist[i][j] ≤ ${threshold}. Result: ${countsStr}.`,
+    },
+  });
+
+  // Lines 17-19: best = 0; for i in range(1,n): if counts[i]<=counts[best]: best=i
+  snap({
+    title: { vi: `best = argmin(counts) (hòa → index lớn hơn) → ${best}`, en: `best = argmin(counts) (ties → larger index) → ${best}` },
+    codeLines: [17, 18, 19],
+    graph: makeGraph([best], []),
+    vars: [{ name: "best", value: best }],
+    note: {
+      vi: `Duyệt counts từ i=1, mỗi khi gặp counts[i] ≤ counts[best] thì cập nhật best=i (dùng ≤ để ưu tiên index lớn hơn khi hòa) → best=${best}.`,
+      en: `Scan counts from i=1, whenever counts[i] ≤ counts[best] update best=i (using ≤ favors the larger index on ties) → best=${best}.`,
+    },
+  });
+
+  const fs = {
+    title: { vi: `return best → ${best}`, en: `return best → ${best}` },
+    arr: [],
+    grid: gridDisplay([best, best]),
+    graph: makeGraph([best], []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeBlock: 2,
+    codeLines: [20],
+    vars: [{ name: "answer", value: best }, { name: "counts", value: countsStr }],
+    note: {
+      vi: `Thành phố ${best} có ÍT nhất láng giềng trong ngưỡng ${threshold} (${counts[best]} láng giềng). Kết quả GIỐNG Floyd-Warshall — chỉ khác cách lấp đầy ma trận dist.`,
+      en: `City ${best} has the FEWEST neighbors within threshold ${threshold} (${counts[best]} neighbors). SAME result as Floyd-Warshall — just a different way to fill the dist matrix.`,
+    },
+  };
+  steps.push(fs);
+
+  return { edges: edgesRaw, n, threshold, answer: best, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
@@ -11799,6 +12367,99 @@ module.exports = {
     codeLabel:  { vi: "Cách 1: BFS một chiều", en: "Approach 1: One-way BFS" },
     code2Label: { vi: "Cách 2: Bidirectional BFS", en: "Approach 2: Bidirectional BFS" },
     builder: buildSteps127,
+  },
+  1334: {
+    id: 1334,
+    difficulty: "medium",
+    slug: "find-the-city-with-the-smallest-number-of-neighbors-at-a-threshold-distance",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Find the City With the Smallest Number of Neighbors at a Threshold Distance", en: "Find the City With the Smallest Number of Neighbors at a Threshold Distance" },
+    titleVi: { vi: "Thành phố có ít láng giềng nhất trong ngưỡng", en: "City with fewest neighbors within threshold" },
+    statement: {
+      vi:
+        "Cho n thành phố (0..n-1) nối bởi các cạnh 2 chiều có trọng số, và một ngưỡng khoảng cách threshold. " +
+        "Với mỗi thành phố, đếm số thành phố KHÁC có thể đến được trong khoảng cách ≤ threshold (đường ngắn nhất). " +
+        "Trả về thành phố có SỐ LƯỢNG ÍT NHẤT; nếu hòa, trả về thành phố có INDEX LỚN NHẤT.",
+      en:
+        "Given n cities (0..n-1) connected by weighted bidirectional edges, and a distance threshold. " +
+        "For each city, count how many OTHER cities are reachable within distance ≤ threshold (shortest path). " +
+        "Return the city with the FEWEST such neighbors; if tied, return the city with the LARGEST index.",
+    },
+    defaultInput: "0-1-3,1-2-1,1-3-4,2-3-1",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u-v-w, cách bởi dấu phẩy)", en: "Edges (u-v-w, comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số thành phố)", en: "n (number of cities)" }, default: 4 },
+      { key: "threshold", label: { vi: "threshold (ngưỡng)", en: "threshold" }, default: 4 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Floyd-Warshall", en: "Approach 1: Floyd-Warshall" } },
+          { value: "2", label: { vi: "Cách 2: Dijkstra từ mỗi thành phố", en: "Approach 2: Dijkstra from every city" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 (Floyd-Warshall): tính dist[i][j] = khoảng cách ngắn nhất giữa MỌI cặp thành phố, O(n³). Với mỗi thành phố i, đếm số j≠i có dist[i][j] ≤ threshold. Chọn thành phố có số đếm NHỎ NHẤT; nếu hòa, ưu tiên INDEX LỚN HƠN.", en: "Approach 1 (Floyd-Warshall): compute dist[i][j] = shortest path between EVERY pair of cities, O(n³). For each city i, count j≠i where dist[i][j] ≤ threshold. Pick the city with the SMALLEST count; ties favor the LARGER index." },
+      { vi: "Cách 2 (Dijkstra): chạy Dijkstra n LẦN — mỗi lần từ 1 thành phố nguồn — lấp đầy ma trận dist theo từng HÀNG. Kết quả giống Floyd-Warshall nhưng thường nhanh hơn trên đồ thị thưa vì chỉ duyệt cạnh thật, không thử mọi (i,k,j).", en: "Approach 2 (Dijkstra): run Dijkstra n TIMES — once per source city — filling the dist matrix one ROW at a time. Same result as Floyd-Warshall but usually faster on sparse graphs since it only explores actual edges instead of trying every (i,k,j)." },
+    ],
+    complexity: {
+      time: "O(n³) cả 2 cách",
+      space: "O(n²)",
+      note: {
+        vi: "Floyd-Warshall và Dijkstra×n đều O(n³) trong trường hợp xấu nhất; ma trận dist tốn O(n²).",
+        en: "Both Floyd-Warshall and Dijkstra×n are O(n³) worst case; the dist matrix uses O(n²) space.",
+      },
+    },
+    codeLabel: { vi: "Cách 1: Floyd-Warshall", en: "Approach 1: Floyd-Warshall" },
+    code2Label: { vi: "Cách 2: Dijkstra từ mỗi thành phố", en: "Approach 2: Dijkstra from every city" },
+    code: [
+      "class Solution:",
+      "    def findTheCity(self, n, edges, threshold):",
+      "        dist = [[float('inf')] * n for _ in range(n)]",
+      "        for i in range(n):",
+      "            dist[i][i] = 0",
+      "        for u, v, w in edges:",
+      "            dist[u][v] = dist[v][u] = w",
+      "        for k in range(n):",
+      "            for i in range(n):",
+      "                for j in range(n):",
+      "                    if dist[i][k] + dist[k][j] < dist[i][j]:",
+      "                        dist[i][j] = dist[i][k] + dist[k][j]",
+      "        counts = [sum(1 for j in range(n) if j != i and dist[i][j] <= threshold) for i in range(n)]",
+      "        best = 0",
+      "        for i in range(1, n):",
+      "            if counts[i] <= counts[best]:",
+      "                best = i",
+      "        return best",
+    ],
+    code2: [
+      "class Solution:",
+      "    def findTheCity(self, n, edges, threshold):",
+      "        dist = [[float('inf')] * n for _ in range(n)]",
+      "        adj = [[] for _ in range(n)]",
+      "        for src in range(n):",
+      "            dist[src][src] = 0",
+      "            visited = [False] * n",
+      "            while True:",
+      "                u = min((c for c in range(n) if not visited[c]), key=lambda c: dist[src][c], default=-1)",
+      "                if u == -1 or dist[src][u] == float('inf'):",
+      "                    break",
+      "                visited[u] = True",
+      "                for v, w in adj[u]:",
+      "                    if dist[src][u] + w < dist[src][v]:",
+      "                        dist[src][v] = dist[src][u] + w",
+      "        counts = [sum(1 for j in range(n) if j != i and dist[i][j] <= threshold) for i in range(n)]",
+      "        best = 0",
+      "        for i in range(1, n):",
+      "            if counts[i] <= counts[best]:",
+      "                best = i",
+      "        return best",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps1334Dijkstra(input, params) : buildSteps1334(input, params);
+    },
   },
   743: {
     id: 743,
