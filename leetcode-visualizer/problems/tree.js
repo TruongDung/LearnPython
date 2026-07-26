@@ -51,7 +51,7 @@ function snapshot(root, opts) {
   return {
     title: opts.title,
     arr: [],
-    tree: { nodes: treeToVizNodes(root, opts.hlSet, opts.wordSet) },
+    tree: { nodes: treeToVizNodes(root, opts.hlSet, opts.wordSet), annotations: opts.annotations },
     highlight: [],
     mark: [],
     codeLines: opts.codeLines || [],
@@ -803,11 +803,30 @@ function buildSteps1644v2(input, params) {
 
   function nv(node) { return node ? node.val : "None"; }
 
+  const pNode = findNode(root, pv);
+  const qNode = findNode(root, qv);
+
+  // Always label the p/q nodes on the tree so the viewer can see WHERE they
+  // are without reading the note text; the label turns green (✓) once that
+  // node's self.findP / self.findQ flag has actually been set to True.
+  function baseAnnotations() {
+    const ann = {};
+    if (pNode) ann[pNode.id] = findP ? "p ✓" : "p";
+    if (qNode) ann[qNode.id] = findQ ? "q ✓" : "q";
+    return ann;
+  }
+
   function snap(opts) {
     const vars = [...(opts.vars || [])];
     vars.push({ name: "self.findP", value: findP });
     vars.push({ name: "self.findQ", value: findQ });
-    steps.push(snapshot(root, Object.assign({}, opts, { vars, codeBlock: 2 })));
+    const annotations = Object.assign({}, baseAnnotations(), opts.annotations || {});
+    // Give confirmed p/q nodes a green ring (isWord) in addition to the "p ✓"/"q ✓"
+    // text annotation, so it's visually obvious the moment each one is found.
+    const confirmedWordSet = new Set(opts.wordSet || []);
+    if (findP && pNode) confirmedWordSet.add(pNode.id);
+    if (findQ && qNode) confirmedWordSet.add(qNode.id);
+    steps.push(snapshot(root, Object.assign({}, opts, { vars, codeBlock: 2, annotations, wordSet: confirmedWordSet })));
   }
 
   // Lines 3-4: self.findP = False; self.findQ = False
@@ -1066,12 +1085,18 @@ function buildSteps1644v2(input, params) {
       : { vi: "Thiếu p hoặc q trong cây → sẽ trả về None.", en: "p or q is missing from the tree → will return None." },
   });
 
+  const finalWordSet = new Set();
+  if (findP && pNode) finalWordSet.add(pNode.id);
+  if (findQ && qNode) finalWordSet.add(qNode.id);
+
   let fs;
   if (valid) {
     // Line 24: return res
+    if (res) finalWordSet.add(res.id);
     fs = snapshot(root, {
       title: { vi: `return res → ${nv(res)}`, en: `return res → ${nv(res)}` },
-      wordSet: res ? new Set([res.id]) : undefined,
+      wordSet: finalWordSet,
+      annotations: baseAnnotations(),
       codeLines: [24],
       codeBlock: 2,
       vars: [
@@ -1085,6 +1110,8 @@ function buildSteps1644v2(input, params) {
     // Lines 25-26: else: return None
     fs = snapshot(root, {
       title: { vi: "else: return None", en: "else: return None" },
+      wordSet: finalWordSet,
+      annotations: baseAnnotations(),
       codeLines: [25, 26],
       codeBlock: 2,
       vars: [
