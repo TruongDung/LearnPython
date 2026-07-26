@@ -314,6 +314,268 @@ function buildSteps88(input, params) {
 }
 
 /**
+ * LeetCode 88 Approach 2: same three-pointer merge, different variable names
+ * (i/j/k instead of p1/p2/write) and the trailing copy is an explicit
+ * `while j >= 0` loop instead of a slice assignment. Same algorithm, same
+ * O(m+n) time / O(1) space — just a different way to write the leftover-copy
+ * step, and the comparison is written as nums1[i] < nums2[j] (place nums2's
+ * value when nums1's is smaller) instead of nums1[p1] > nums2[p2].
+ */
+function buildSteps88v2(input, params) {
+  const m = params.m;
+  const n = params.n;
+  const nums2Str = String(params.nums2 || "");
+  const nums2 = nums2Str.split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const nums1 = [...input];
+
+  const steps = [];
+  const written = new Array(nums1.length).fill(false);
+  for (let idx = 0; idx < m; idx++) written[idx] = true;
+
+  function subLabels(i, k) {
+    return nums1.map((_, idx) => {
+      const tags = [];
+      if (idx === i) tags.push("i");
+      if (idx === k) tags.push("k");
+      return tags.length ? `[${idx}] ${tags.join("/")}` : `[${idx}]`;
+    });
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...nums1],
+      sub: subLabels(opts.i, opts.k),
+      highlight: opts.highlight || [],
+      mark: nums1.map((_, idx) => (written[idx] ? idx : -1)).filter((idx) => idx >= 0),
+      final: opts.final || false,
+      codeBlock: 2,
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "i", value: opts.i },
+        { name: "j", value: opts.j },
+        { name: "k", value: opts.k },
+        { name: "nums2 (j=" + opts.j + ")", value: `[${nums2.map((v, idx) => (idx === opts.j ? `[${v}]` : v)).join(",")}]` },
+      ],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: i = m - 1
+  let i = m - 1;
+  snap({
+    title: { vi: "i = m - 1", en: "i = m - 1" },
+    i, j: undefined, k: undefined,
+    codeLines: [3],
+    note: {
+      vi: `nums1 = [${nums1.join(",")}] (m=${m} phần tử thực + ${n} chỗ trống 0). i chỉ vào phần tử THỰC cuối cùng của nums1: i=${i}.`,
+      en: `nums1 = [${nums1.join(",")}] (m=${m} real elements + ${n} placeholder zeros). i points at nums1's last REAL element: i=${i}.`,
+    },
+  });
+
+  // Line 4: j = n - 1
+  let j = n - 1;
+  snap({
+    title: { vi: "j = n - 1", en: "j = n - 1" },
+    i, j, k: undefined,
+    codeLines: [4],
+    note: {
+      vi: `nums2 = [${nums2.join(",")}]. j chỉ vào phần tử cuối cùng của nums2: j=${j}.`,
+      en: `nums2 = [${nums2.join(",")}]. j points at nums2's last element: j=${j}.`,
+    },
+  });
+
+  // Line 5: k = m + n - 1
+  let k = m + n - 1;
+  snap({
+    title: { vi: "k = m + n - 1", en: "k = m + n - 1" },
+    i, j, k,
+    codeLines: [5],
+    note: {
+      vi: `k chỉ vào Ô CUỐI CÙNG của nums1: k=${k}. Điền nums1 từ PHẢI sang TRÁI, luôn đặt số LỚN HƠN vào cuối trước.`,
+      en: `k points at nums1's VERY LAST slot: k=${k}. Fill nums1 from RIGHT to LEFT, always placing the LARGER number last first.`,
+    },
+  });
+
+  while (true) {
+    // Line 6: while i >= 0 and j >= 0:
+    const loopContinues = i >= 0 && j >= 0;
+    snap({
+      title: { vi: `while i≥0 and j≥0 → ${i}≥0 and ${j}≥0 → ${loopContinues}`, en: `while i≥0 and j≥0 → ${i}≥0 and ${j}≥0 → ${loopContinues}` },
+      i, j, k,
+      highlight: [i, j].filter((x) => x >= 0),
+      codeLines: [6],
+      note: loopContinues
+        ? { vi: "Cả 2 mảng đều còn phần tử chưa xét → tiếp tục so sánh.", en: "Both arrays still have unprocessed elements → keep comparing." }
+        : { vi: "Một trong hai con trỏ đã âm → dừng vòng lặp chính.", en: "One pointer has gone negative → exit the main loop." },
+    });
+
+    if (!loopContinues) break;
+
+    const v1 = nums1[i];
+    const v2 = nums2[j];
+    const v1Smaller = v1 < v2;
+
+    // Line 7: if nums1[i] < nums2[j]:
+    snap({
+      title: { vi: `if nums1[i] < nums2[j] → ${v1} < ${v2} → ${v1Smaller}`, en: `if nums1[i] < nums2[j] → ${v1} < ${v2} → ${v1Smaller}` },
+      i, j, k,
+      highlight: [i, j],
+      codeLines: [7],
+      note: v1Smaller
+        ? { vi: `nums1[${i}]=${v1} nhỏ hơn → nums2 đang giữ số LỚN HƠN, nên số này (${v2}) được đặt vào cuối (k=${k}).`, en: `nums1[${i}]=${v1} is smaller → nums2 currently holds the BIGGER number, so it (${v2}) gets placed at the end (k=${k}).` }
+        : { vi: `nums1[${i}]=${v1} lớn hơn hoặc bằng → nums1 sẽ được đặt vào cuối.`, en: `nums1[${i}]=${v1} is larger or equal → nums1 gets placed at the end.` },
+    });
+
+    if (v1Smaller) {
+      // Line 8: nums1[k] = nums2[j]
+      nums1[k] = v2;
+      written[k] = true;
+      snap({
+        title: { vi: `nums1[k] = nums2[j] → nums1[${k}] = ${v2}`, en: `nums1[k] = nums2[j] → nums1[${k}] = ${v2}` },
+        i, j, k,
+        highlight: [k],
+        codeLines: [8],
+        note: {
+          vi: `Đặt ${v2} (từ nums2) vào vị trí k=${k}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
+          en: `Place ${v2} (from nums2) at position k=${k}. This slot is now FINALIZED (shown in green).`,
+        },
+      });
+
+      // Line 9: j -= 1
+      j--;
+      snap({
+        title: { vi: `j -= 1 → j = ${j}`, en: `j -= 1 → j = ${j}` },
+        i, j, k,
+        codeLines: [9],
+        note: {
+          vi: `Đã dùng xong nums2[${j + 1}], lùi j sang trái: j=${j}.`,
+          en: `Finished using nums2[${j + 1}], move j left: j=${j}.`,
+        },
+      });
+
+      // Line 10: k -= 1
+      k--;
+      snap({
+        title: { vi: `k -= 1 → k = ${k}`, en: `k -= 1 → k = ${k}` },
+        i, j, k,
+        codeLines: [10],
+        note: {
+          vi: `Ô cuối đã điền xong, lùi k sang trái: k=${k}.`,
+          en: `The last slot is filled, move k left: k=${k}.`,
+        },
+      });
+    } else {
+      // Line 12: nums1[k] = nums1[i]
+      nums1[k] = v1;
+      written[k] = true;
+      snap({
+        title: { vi: `nums1[k] = nums1[i] → nums1[${k}] = ${v1}`, en: `nums1[k] = nums1[i] → nums1[${k}] = ${v1}` },
+        i, j, k,
+        highlight: [k],
+        codeLines: [12],
+        note: {
+          vi: `Đặt ${v1} vào vị trí k=${k}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
+          en: `Place ${v1} at position k=${k}. This slot is now FINALIZED (shown in green).`,
+        },
+      });
+
+      // Line 13: i -= 1
+      i--;
+      snap({
+        title: { vi: `i -= 1 → i = ${i}`, en: `i -= 1 → i = ${i}` },
+        i, j, k,
+        codeLines: [13],
+        note: {
+          vi: `Đã dùng xong nums1[${i + 1}], lùi i sang trái: i=${i}.`,
+          en: `Finished using nums1[${i + 1}], move i left: i=${i}.`,
+        },
+      });
+
+      // Line 14: k -= 1
+      k--;
+      snap({
+        title: { vi: `k -= 1 → k = ${k}`, en: `k -= 1 → k = ${k}` },
+        i, j, k,
+        codeLines: [14],
+        note: {
+          vi: `Ô cuối đã điền xong, lùi k sang trái: k=${k}.`,
+          en: `The last slot is filled, move k left: k=${k}.`,
+        },
+      });
+    }
+  }
+
+  while (true) {
+    // Line 15: while j >= 0:
+    const copyContinues = j >= 0;
+    snap({
+      title: { vi: `while j≥0 → ${j}≥0 → ${copyContinues}`, en: `while j≥0 → ${j}≥0 → ${copyContinues}` },
+      i, j, k,
+      highlight: j >= 0 ? [j] : [],
+      codeLines: [15],
+      note: copyContinues
+        ? { vi: `i đã hết trước. Mọi phần tử còn lại của nums2 (0..${j}) đều NHỎ HƠN mọi phần tử đã đặt, nên copy thẳng vào đầu nums1.`, en: `i ran out first. Every remaining nums2 element (0..${j}) is SMALLER than everything already placed, so copy it straight into the front of nums1.` }
+        : { vi: "j đã hết — không còn phần tử nums2 nào cần copy thêm.", en: "j is exhausted — no leftover nums2 elements to copy." },
+    });
+
+    if (!copyContinues) break;
+
+    // Line 16: nums1[k] = nums2[j]
+    nums1[k] = nums2[j];
+    written[k] = true;
+    snap({
+      title: { vi: `nums1[k] = nums2[j] → nums1[${k}] = ${nums2[j]}`, en: `nums1[k] = nums2[j] → nums1[${k}] = ${nums2[j]}` },
+      i, j, k,
+      highlight: [k],
+      codeLines: [16],
+      note: {
+        vi: `Copy nums2[${j}]=${nums2[j]} vào vị trí k=${k}.`,
+        en: `Copy nums2[${j}]=${nums2[j]} into position k=${k}.`,
+      },
+    });
+
+    // Line 17: j -= 1
+    j--;
+    snap({
+      title: { vi: `j -= 1 → j = ${j}`, en: `j -= 1 → j = ${j}` },
+      i, j, k,
+      codeLines: [17],
+      note: {
+        vi: `j=${j}.`,
+        en: `j=${j}.`,
+      },
+    });
+
+    // Line 18: k -= 1
+    k--;
+    snap({
+      title: { vi: `k -= 1 → k = ${k}`, en: `k -= 1 → k = ${k}` },
+      i, j, k,
+      codeLines: [18],
+      note: {
+        vi: `k=${k}.`,
+        en: `k=${k}.`,
+      },
+    });
+  }
+
+  // Line 19: return
+  snap({
+    title: { vi: "return", en: "return" },
+    i, j, k,
+    final: true,
+    codeLines: [19],
+    note: {
+      vi: `Đã gộp xong, kết quả nằm trong nums1 (sửa tại chỗ, không trả về giá trị).`,
+      en: `Merge complete, the result lives in nums1 (modified in-place, no return value).`,
+    },
+  });
+
+  return { original: input, answer: nums1, steps };
+}
+
+/**
  * LeetCode 27: Remove Element.
  * Two-pointer in-place: write pointer k, read pointer i.
  * If nums[i] != val, copy to nums[k] and advance k.
@@ -2821,6 +3083,13 @@ module.exports = {
       { key: "nums2", type: "string", label: { vi: "nums2 (phẩy ngăn cách)", en: "nums2 (comma separated)" }, default: "2,5,6" },
       { key: "m", type: "number", label: { vi: "m (phần tử thực của nums1)", en: "m (real elements in nums1)" }, default: 3 },
       { key: "n", type: "number", label: { vi: "n (phần tử của nums2)", en: "n (elements in nums2)" }, default: 3 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: p1/p2/write, slice copy", en: "Approach 1: p1/p2/write, slice copy" } },
+          { value: "2", label: { vi: "Cách 2: i/j/k, while copy", en: "Approach 2: i/j/k, while copy" } },
+        ],
+      },
     ],
     complexity: {
       time: "O(m+n)",
@@ -2830,6 +3099,8 @@ module.exports = {
         en: "Three pointers traverse m+n times total. In-place merge uses O(1) extra memory.",
       },
     },
+    codeLabel: { vi: "Cách 1: p1/p2/write, slice copy", en: "Approach 1: p1/p2/write, slice copy" },
+    code2Label: { vi: "Cách 2: i/j/k, while copy", en: "Approach 2: i/j/k, while copy" },
     code: [
       "class Solution:",
       "    def merge(self, nums1, m, nums2, n):",
@@ -2846,7 +3117,31 @@ module.exports = {
       "            write -= 1",
       "        nums1[:p2+1] = nums2[:p2+1]",
     ],
-    builder: buildSteps88,
+    code2: [
+      "class Solution:",
+      "    def merge(self, nums1, m, nums2, n):",
+      "        i = m - 1",
+      "        j = n - 1",
+      "        k = m + n - 1",
+      "        while i >= 0 and j >= 0:",
+      "            if nums1[i] < nums2[j]:",
+      "                nums1[k] = nums2[j]",
+      "                j -= 1",
+      "                k -= 1",
+      "            else:",
+      "                nums1[k] = nums1[i]",
+      "                i -= 1",
+      "                k -= 1",
+      "        while j >= 0:",
+      "            nums1[k] = nums2[j]",
+      "            j -= 1",
+      "            k -= 1",
+      "        return",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps88v2(input, params) : buildSteps88(input, params);
+    },
   },
   977: {
     id: 977,
