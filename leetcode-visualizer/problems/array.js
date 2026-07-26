@@ -1052,7 +1052,295 @@ function buildSteps1275(input) {
   return { moves: movesRaw, answer, steps };
 }
 
+/**
+ * LeetCode 628: Maximum Product of Three Numbers.
+ *
+ * Given nums (may include negatives), return the max product of any 3 numbers.
+ *
+ * One-pass greedy: track the top 3 largest (first ≥ second ≥ third) AND the
+ * bottom 2 smallest (minFirst ≤ minSecond) while scanning. The answer is:
+ *   max(first * second * third, minFirst * minSecond * first)
+ * because two very negative numbers multiplied together become a large
+ * POSITIVE number, which combined with the largest positive can beat the
+ * naive "top 3" product (e.g. nums=[-10,-10,1,3,2] → (-10)*(-10)*3 = 300,
+ * way bigger than 3*2*1=6).
+ */
+function buildSteps628(nums) {
+  const steps = [];
+
+  let first = -Infinity, second = -Infinity, third = -Infinity;
+  let minFirst = Infinity, minSecond = Infinity;
+  const visited = new Array(nums.length).fill(false);
+
+  function slots(bumpKey) {
+    return [
+      { key: "first", label: { vi: "first (lớn 1)", en: "first (top 1)" }, value: first, group: "top", bump: bumpKey === "first" },
+      { key: "second", label: { vi: "second (lớn 2)", en: "second (top 2)" }, value: second, group: "top", bump: bumpKey === "second" },
+      { key: "third", label: { vi: "third (lớn 3)", en: "third (top 3)" }, value: third, group: "top", bump: bumpKey === "third" },
+      { key: "minFirst", label: { vi: "minFirst (nhỏ 1)", en: "minFirst (bottom 1)" }, value: minFirst, group: "bottom", bump: bumpKey === "minFirst" },
+      { key: "minSecond", label: { vi: "minSecond (nhỏ 2)", en: "minSecond (bottom 2)" }, value: minSecond, group: "bottom", bump: bumpKey === "minSecond" },
+    ];
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      multiSlotPodiumView: {
+        values: nums,
+        visited: opts.visited || [...visited],
+        current: opts.current !== undefined ? opts.current : -1,
+        slots: slots(opts.bumpKey),
+        formula: opts.formula,
+      },
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: first = second = third = float('-inf')
+  snap({
+    title: { vi: "first = second = third = -∞", en: "first = second = third = -∞" },
+    codeLines: [3],
+    vars: [{ name: "nums", value: `[${nums.join(",")}]` }],
+    note: {
+      vi: `nums = [${nums.join(",")}]. Sẽ theo dõi 3 số LỚN NHẤT (first≥second≥third) VÀ 2 số NHỎ NHẤT (minFirst≤minSecond) trong 1 lần quét, vì 2 số âm rất nhỏ nhân lại có thể ra số dương rất lớn.`,
+      en: `nums = [${nums.join(",")}]. Will track the 3 LARGEST numbers (first≥second≥third) AND the 2 SMALLEST (minFirst≤minSecond) in one pass, since two very negative numbers multiplied can produce a very large positive number.`,
+    },
+  });
+
+  // Line 4: minFirst = minSecond = float('inf')
+  snap({
+    title: { vi: "minFirst = minSecond = +∞", en: "minFirst = minSecond = +∞" },
+    codeLines: [4],
+    note: {
+      vi: "minFirst/minSecond khởi tạo +∞ để bất kỳ số nào gặp đầu tiên cũng nhỏ hơn.",
+      en: "minFirst/minSecond start at +∞ so any encountered number will be smaller.",
+    },
+  });
+
+  for (let idx = 0; idx < nums.length; idx++) {
+    const digit = nums[idx];
+
+    // Line 5: for digit in nums:
+    snap({
+      title: { vi: `for digit in nums → digit = ${digit}`, en: `for digit in nums → digit = ${digit}` },
+      current: idx,
+      codeLines: [5],
+      vars: [{ name: "digit", value: digit }],
+      note: {
+        vi: `Xét số tiếp theo: digit = nums[${idx}] = ${digit}.`,
+        en: `Consider the next number: digit = nums[${idx}] = ${digit}.`,
+      },
+    });
+
+    // Line 6: if digit > first:
+    const beatsFirst = digit > first;
+    snap({
+      title: { vi: `if digit > first → ${digit} > ${fmtInf(first)} → ${beatsFirst}`, en: `if digit > first → ${digit} > ${fmtInf(first)} → ${beatsFirst}` },
+      current: idx,
+      codeLines: [6],
+      note: beatsFirst
+        ? { vi: `${digit} > first=${fmtInf(first)} → digit sẽ chiếm bệ FIRST (lớn nhất); first/second cũ dồn xuống.`, en: `${digit} > first=${fmtInf(first)} → digit will take the FIRST slot; the old first/second shift down.` }
+        : { vi: `${digit} không lớn hơn first=${fmtInf(first)} → kiểm tiếp second.`, en: `${digit} is not larger than first=${fmtInf(first)} → check second next.` },
+    });
+
+    if (beatsFirst) {
+      // Line 7: third = second
+      const oldSecond = second;
+      third = second;
+      snap({ title: { vi: `third = second → third = ${fmtInf(third)}`, en: `third = second → third = ${fmtInf(third)}` }, current: idx, bumpKey: "third", codeLines: [7], note: { vi: `Dồn second cũ (${fmtInf(oldSecond)}) xuống bệ third.`, en: `Push old second (${fmtInf(oldSecond)}) down into the third slot.` } });
+
+      // Line 8: second = first
+      const oldFirst = first;
+      second = first;
+      snap({ title: { vi: `second = first → second = ${fmtInf(second)}`, en: `second = first → second = ${fmtInf(second)}` }, current: idx, bumpKey: "second", codeLines: [8], note: { vi: `Dồn first cũ (${fmtInf(oldFirst)}) xuống bệ second.`, en: `Push old first (${fmtInf(oldFirst)}) down into the second slot.` } });
+
+      // Line 9: first = digit
+      first = digit;
+      snap({ title: { vi: `first = digit → first = ${first}`, en: `first = digit → first = ${first}` }, current: idx, bumpKey: "first", codeLines: [9], note: { vi: `digit=${digit} chiếm bệ first.`, en: `digit=${digit} takes the first slot.` } });
+    } else {
+      // Line 10: elif digit > second:
+      const beatsSecond = digit > second;
+      snap({
+        title: { vi: `elif digit > second → ${digit} > ${fmtInf(second)} → ${beatsSecond}`, en: `elif digit > second → ${digit} > ${fmtInf(second)} → ${beatsSecond}` },
+        current: idx,
+        codeLines: [10],
+        note: beatsSecond
+          ? { vi: `${digit} > second=${fmtInf(second)} → digit sẽ chiếm bệ SECOND; second cũ dồn xuống third.`, en: `${digit} > second=${fmtInf(second)} → digit will take the SECOND slot; old second shifts to third.` }
+          : { vi: `${digit} không lớn hơn second=${fmtInf(second)} → kiểm tiếp third.`, en: `${digit} is not larger than second=${fmtInf(second)} → check third next.` },
+      });
+
+      if (beatsSecond) {
+        // Line 11: third = second
+        const oldSecond = second;
+        third = second;
+        snap({ title: { vi: `third = second → third = ${fmtInf(third)}`, en: `third = second → third = ${fmtInf(third)}` }, current: idx, bumpKey: "third", codeLines: [11], note: { vi: `Dồn second cũ (${fmtInf(oldSecond)}) xuống bệ third.`, en: `Push old second (${fmtInf(oldSecond)}) down into the third slot.` } });
+
+        // Line 12: second = digit
+        second = digit;
+        snap({ title: { vi: `second = digit → second = ${second}`, en: `second = digit → second = ${second}` }, current: idx, bumpKey: "second", codeLines: [12], note: { vi: `digit=${digit} chiếm bệ second.`, en: `digit=${digit} takes the second slot.` } });
+      } else {
+        // Line 13: elif digit > third:
+        const beatsThird = digit > third;
+        snap({
+          title: { vi: `elif digit > third → ${digit} > ${fmtInf(third)} → ${beatsThird}`, en: `elif digit > third → ${digit} > ${fmtInf(third)} → ${beatsThird}` },
+          current: idx,
+          codeLines: [13],
+          note: beatsThird
+            ? { vi: `${digit} > third=${fmtInf(third)} → digit sẽ chiếm bệ THIRD.`, en: `${digit} > third=${fmtInf(third)} → digit will take the THIRD slot.` }
+            : { vi: `${digit} không đủ lớn để vào top-3 → không cập nhật top.`, en: `${digit} isn't large enough for the top-3 → no top update.` },
+        });
+
+        if (beatsThird) {
+          // Line 14: third = digit
+          third = digit;
+          snap({ title: { vi: `third = digit → third = ${third}`, en: `third = digit → third = ${third}` }, current: idx, bumpKey: "third", codeLines: [14], note: { vi: `digit=${digit} chiếm bệ third.`, en: `digit=${digit} takes the third slot.` } });
+        }
+      }
+    }
+
+    // Line 15: if digit < minFirst:
+    const beatsMinFirst = digit < minFirst;
+    snap({
+      title: { vi: `if digit < minFirst → ${digit} < ${fmtInf(minFirst)} → ${beatsMinFirst}`, en: `if digit < minFirst → ${digit} < ${fmtInf(minFirst)} → ${beatsMinFirst}` },
+      current: idx,
+      codeLines: [15],
+      note: beatsMinFirst
+        ? { vi: `${digit} < minFirst=${fmtInf(minFirst)} → digit sẽ chiếm bệ MINFIRST (nhỏ nhất); minFirst cũ dồn xuống minSecond.`, en: `${digit} < minFirst=${fmtInf(minFirst)} → digit will take the MINFIRST slot; old minFirst shifts to minSecond.` }
+        : { vi: `${digit} không nhỏ hơn minFirst=${fmtInf(minFirst)} → kiểm tiếp minSecond.`, en: `${digit} is not smaller than minFirst=${fmtInf(minFirst)} → check minSecond next.` },
+    });
+
+    if (beatsMinFirst) {
+      // Line 16: minSecond = minFirst
+      const oldMinFirst = minFirst;
+      minSecond = minFirst;
+      snap({ title: { vi: `minSecond = minFirst → minSecond = ${fmtInf(minSecond)}`, en: `minSecond = minFirst → minSecond = ${fmtInf(minSecond)}` }, current: idx, bumpKey: "minSecond", codeLines: [16], note: { vi: `Dồn minFirst cũ (${fmtInf(oldMinFirst)}) xuống bệ minSecond.`, en: `Push old minFirst (${fmtInf(oldMinFirst)}) down into the minSecond slot.` } });
+
+      // Line 17: minFirst = digit
+      minFirst = digit;
+      snap({ title: { vi: `minFirst = digit → minFirst = ${minFirst}`, en: `minFirst = digit → minFirst = ${minFirst}` }, current: idx, bumpKey: "minFirst", codeLines: [17], note: { vi: `digit=${digit} chiếm bệ minFirst.`, en: `digit=${digit} takes the minFirst slot.` } });
+    } else {
+      // Line 18: elif digit < minSecond:
+      const beatsMinSecond = digit < minSecond;
+      snap({
+        title: { vi: `elif digit < minSecond → ${digit} < ${fmtInf(minSecond)} → ${beatsMinSecond}`, en: `elif digit < minSecond → ${digit} < ${fmtInf(minSecond)} → ${beatsMinSecond}` },
+        current: idx,
+        codeLines: [18],
+        note: beatsMinSecond
+          ? { vi: `${digit} < minSecond=${fmtInf(minSecond)} → digit sẽ chiếm bệ MINSECOND.`, en: `${digit} < minSecond=${fmtInf(minSecond)} → digit will take the MINSECOND slot.` }
+          : { vi: `${digit} không đủ nhỏ để vào bottom-2 → không cập nhật.`, en: `${digit} isn't small enough for the bottom-2 → no update.` },
+      });
+
+      if (beatsMinSecond) {
+        // Line 19: minSecond = digit
+        minSecond = digit;
+        snap({ title: { vi: `minSecond = digit → minSecond = ${minSecond}`, en: `minSecond = digit → minSecond = ${minSecond}` }, current: idx, bumpKey: "minSecond", codeLines: [19], note: { vi: `digit=${digit} chiếm bệ minSecond.`, en: `digit=${digit} takes the minSecond slot.` } });
+      }
+    }
+
+    visited[idx] = true;
+  }
+
+  // Line 20: return max(first * second * third, minFirst * minSecond * first)
+  const top3 = first * second * third;
+  const bottom2top1 = minFirst * minSecond * first;
+  const answer = Math.max(top3, bottom2top1);
+  const usedBottom = bottom2top1 > top3;
+
+  const fs = {
+    title: { vi: `Kết quả: max(${top3}, ${bottom2top1}) = ${answer}`, en: `Result: max(${top3}, ${bottom2top1}) = ${answer}` },
+    arr: [],
+    multiSlotPodiumView: {
+      values: nums,
+      visited: [...visited],
+      current: -1,
+      slots: slots(null),
+      formula: { label: { vi: "tích lớn nhất", en: "max product" }, value: answer },
+    },
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [20],
+    vars: [
+      { name: "first*second*third", value: top3 },
+      { name: "minFirst*minSecond*first", value: bottom2top1 },
+      { name: "answer", value: answer },
+    ],
+    note: usedBottom
+      ? { vi: `minFirst×minSecond×first = ${bottom2top1} LỚN HƠN first×second×third = ${top3} (2 số âm nhỏ nhân lại thành số dương lớn) → answer = ${answer}.`, en: `minFirst×minSecond×first = ${bottom2top1} is LARGER than first×second×third = ${top3} (two very negative numbers multiply into a large positive) → answer = ${answer}.` }
+      : { vi: `first×second×third = ${top3} ≥ minFirst×minSecond×first = ${bottom2top1} → answer = ${answer}.`, en: `first×second×third = ${top3} ≥ minFirst×minSecond×first = ${bottom2top1} → answer = ${answer}.` },
+  };
+  steps.push(fs);
+
+  return { original: nums, answer, steps };
+}
+
+function fmtInf(v) {
+  if (v === Infinity) return "+\u221E";
+  if (v === -Infinity) return "-\u221E";
+  return String(v);
+}
+
 module.exports = {
+  628: {
+    id: 628,
+    difficulty: "easy",
+    slug: "maximum-product-of-three-numbers",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Maximum Product of Three Numbers", en: "Maximum Product of Three Numbers" },
+    titleVi: { vi: "Tích lớn nhất của 3 số", en: "Max product of three numbers" },
+    statement: {
+      vi:
+        "Cho mảng nums (CÓ THỂ chứa số âm), tìm tích lớn nhất có thể tạo được từ BẤT KỲ 3 số trong mảng.",
+      en:
+        "Given an array nums (MAY contain negative numbers), find the maximum product obtainable from ANY three numbers in the array.",
+    },
+    defaultInput: [-10, -10, 1, 3, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Theo dõi 3 số LỚN NHẤT (first≥second≥third) trong 1 lần quét, giống bài 3536 nhưng có 3 bệ.", en: "Track the 3 LARGEST numbers (first≥second≥third) in one pass, like problem 3536 but with 3 slots." },
+      { vi: "Đồng thời theo dõi 2 số NHỎ NHẤT (minFirst≤minSecond), vì 2 số âm rất nhỏ nhân lại có thể ra số dương rất lớn.", en: "Simultaneously track the 2 SMALLEST numbers (minFirst≤minSecond), because two very negative numbers multiplied can produce a very large positive." },
+      { vi: "Kết quả = max(first×second×third, minFirst×minSecond×first).", en: "Result = max(first×second×third, minFirst×minSecond×first)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Chỉ 1 lần quét qua mảng, dùng 5 biến phụ.",
+        en: "Only one pass through the array, using 5 auxiliary variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maximumProduct(self, nums: List[int]) -> int:",
+      "        first = second = third = float('-inf')",
+      "        minFirst = minSecond = float('inf')",
+      "        for digit in nums:",
+      "            if digit > first:",
+      "                third = second",
+      "                second = first",
+      "                first = digit",
+      "            elif digit > second:",
+      "                third = second",
+      "                second = digit",
+      "            elif digit > third:",
+      "                third = digit",
+      "            if digit < minFirst:",
+      "                minSecond = minFirst",
+      "                minFirst = digit",
+      "            elif digit < minSecond:",
+      "                minSecond = digit",
+      "        return max(first * second * third, minFirst * minSecond * first)",
+    ],
+    builder: buildSteps628,
+  },
   1299: {
     id: 1299,
     difficulty: "easy",

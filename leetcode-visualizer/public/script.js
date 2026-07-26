@@ -2660,6 +2660,46 @@ function renderPartitionView(step) {
     </div>`;
 }
 
+// ---- Multi-slot podium visualization (e.g. bai 628: track top-3 & bottom-2) ----
+function renderMultiSlotPodiumView(step) {
+  const view = step.multiSlotPodiumView || {};
+  const values = Array.isArray(view.values) ? view.values : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const slots = Array.isArray(view.slots) ? view.slots : []; // [{ key, label, value, group, bump }]
+  const formula = view.formula || null; // { expr: "a × b × c", value: 42 }
+
+  const valueCells = values.map((v, i) => {
+    const isCurrent = i === current;
+    const isDone = visited[i];
+    return `<div class="digit-cell${isCurrent ? " current" : ""}${isDone && !isCurrent ? " done" : ""}">
+      <span class="digit-cell-idx">[${i}]</span>
+      <strong>${escapeHtml(String(v))}</strong>
+    </div>`;
+  }).join("");
+
+  const groupClass = { top: "digit-slot-first", bottom: "digit-slot-second" };
+  const slotCells = slots.map((slot) => {
+    const cls = groupClass[slot.group] || "digit-slot-answer";
+    const bump = slot.bump ? " bump" : "";
+    const val = slot.value === Infinity ? "+\u221E" : slot.value === -Infinity ? "-\u221E" : slot.value;
+    return `<div class="digit-slot ${cls}${bump}">
+      <span class="digit-slot-label">${escapeHtml(pick(slot.label) || slot.key)}</span>
+      <strong>${escapeHtml(String(val))}</strong>
+    </div>`;
+  }).join("");
+
+  const formulaHtml = formula
+    ? `<div class="digit-slot digit-slot-answer"><span class="digit-slot-label">${escapeHtml(pick(formula.label) || (lang === "vi" ? "kết quả" : "result"))}</span><strong>${escapeHtml(String(formula.value))}</strong></div>`
+    : "";
+
+  $("treeView").innerHTML = `
+    <div class="digit-podium-viz">
+      <div class="digit-strip">${valueCells}</div>
+      <div class="digit-podium multi-slot-podium">${slotCells}${formulaHtml}</div>
+    </div>`;
+}
+
 function renderDigitPodiumView(step) {
   const view = step.digitPodiumView || {};
   const digits = Array.isArray(view.digits) ? view.digits : [];
@@ -3506,6 +3546,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPartitionView(step);
+  } else if (step.multiSlotPodiumView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMultiSlotPodiumView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

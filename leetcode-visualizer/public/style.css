@@ -2348,6 +2348,15 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.28);
 }
 
+.multi-slot-podium {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.multi-slot-podium .digit-slot {
+  width: 88px;
+}
+
 /* ---- Partition visualization (bai 4: Median of Two Sorted Arrays) ---- */
 .partition-viz {
   min-height: 250px;
