@@ -2157,7 +2157,263 @@ function buildSteps3536(input) {
   return { original: rawN, answer, steps };
 }
 
+/**
+ * LeetCode 9: Palindrome Number.
+ *
+ * Given an integer x, return true if x is a palindrome, false otherwise.
+ *
+ * Simple approach: fully reverse the number into `res` (via y = x, then
+ * peeling digits with y%10 / y//10), then compare res == x directly.
+ * Note: if x is negative, y = x <= 0 so the while loop never runs, res stays
+ * 0, and 0 == x is only true when x == 0 — so negative numbers correctly
+ * fall through to False without needing a separate sign check.
+ */
+function buildSteps9(input) {
+  const rawX = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+
+  if (!Number.isFinite(rawX) || !Number.isInteger(rawX)) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: false }],
+      note: { vi: "x phải là số nguyên.", en: "x must be an integer." },
+    });
+    return { original: rawX, answer: false, steps };
+  }
+
+  const digits = String(Math.abs(rawX)).split("").map(Number);
+  const D = digits.length;
+  const visited = new Array(D).fill(false);
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      digitPodiumView: {
+        digits,
+        visited: opts.visited || [...visited],
+        current: opts.current !== undefined ? opts.current : -1,
+        first: opts.y !== undefined ? opts.y : rawX,
+        second: opts.res !== undefined ? opts.res : 0,
+        firstLabel: { vi: "y (còn lại)", en: "y (remaining)" },
+        secondLabel: { vi: "res (đảo ngược)", en: "res (reversed)" },
+        op: "vs",
+        resultLabel: { vi: "palindrome?", en: "palindrome?" },
+        updateKind: opts.updateKind || null,
+        answer: opts.answer,
+      },
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: y = x
+  let y = rawX;
+  snap({
+    title: { vi: `y = x → y = ${y}`, en: `y = x → y = ${y}` },
+    y,
+    res: 0,
+    codeLines: [3],
+    vars: [{ name: "x", value: rawX }, { name: "y", value: y }],
+    note: {
+      vi: `Sao chép x=${rawX} vào y để có thể sửa đổi mà không ảnh hưởng x gốc (vẫn cần x để so sánh ở cuối).`,
+      en: `Copy x=${rawX} into y so it can be modified without affecting the original x (still needed for the final comparison).`,
+    },
+  });
+
+  // Line 4: res = 0
+  let res = 0;
+  snap({
+    title: { vi: "res = 0", en: "res = 0" },
+    y,
+    res: 0,
+    codeLines: [4],
+    vars: [{ name: "y", value: y }, { name: "res", value: 0 }],
+    note: {
+      vi: "res sẽ chứa số y sau khi đảo ngược hoàn toàn từng chữ số.",
+      en: "res will hold y with all its digits fully reversed.",
+    },
+  });
+
+  let iterCount = 0;
+  while (y > 0) {
+    // Line 5: while y > 0:
+    snap({
+      title: { vi: `while y > 0 → ${y} > 0 → True`, en: `while y > 0 → ${y} > 0 → True` },
+      y,
+      res,
+      codeLines: [5],
+      vars: [{ name: "y", value: y }, { name: "res", value: res }],
+      note: {
+        vi: `y=${y} > 0 → còn chữ số để đảo, tiếp tục vòng lặp.`,
+        en: `y=${y} > 0 → there are still digits to reverse, continue the loop.`,
+      },
+    });
+
+    // Line 6: res = res * 10 + y % 10
+    const digit = y % 10;
+    const oldRes = res;
+    res = res * 10 + digit;
+    const idxLTR = D - 1 - iterCount;
+    if (idxLTR >= 0 && idxLTR < D) visited[idxLTR] = true;
+    iterCount++;
+
+    snap({
+      title: { vi: `res = res*10 + y%10 = ${oldRes}*10 + ${digit} = ${res}`, en: `res = res*10 + y%10 = ${oldRes}*10 + ${digit} = ${res}` },
+      y,
+      res,
+      current: idxLTR,
+      visited: [...visited],
+      updateKind: "second",
+      codeLines: [6],
+      vars: [{ name: "digit (y%10)", value: digit }, { name: "res", value: res }],
+      note: {
+        vi: `Lấy chữ số cuối của y: ${digit}. res = ${oldRes}×10 + ${digit} = ${res}.`,
+        en: `Take the last digit of y: ${digit}. res = ${oldRes}×10 + ${digit} = ${res}.`,
+      },
+    });
+
+    // Line 7: y //= 10
+    const oldY = y;
+    y = Math.floor(y / 10);
+    snap({
+      title: { vi: `y //= 10 → y = ${oldY} // 10 = ${y}`, en: `y //= 10 → y = ${oldY} // 10 = ${y}` },
+      y,
+      res,
+      visited: [...visited],
+      updateKind: "first",
+      codeLines: [7],
+      vars: [{ name: "y", value: y }, { name: "res", value: res }],
+      note: {
+        vi: `Bỏ chữ số cuối vừa xét khỏi y: y = ${y}.`,
+        en: `Drop the digit just processed from y: y = ${y}.`,
+      },
+    });
+  }
+
+  // Line 5 (final check): while y > 0 → False
+  snap({
+    title: { vi: `while y > 0 → ${y} > 0 → False`, en: `while y > 0 → ${y} > 0 → False` },
+    y,
+    res,
+    visited: [...visited],
+    codeLines: [5],
+    vars: [{ name: "y", value: y }, { name: "res", value: res }],
+    note: {
+      vi: `y=${y} → đã đảo ngược xong toàn bộ, thoát vòng lặp.`,
+      en: `y=${y} → the number has been fully reversed, exit the loop.`,
+    },
+  });
+
+  // Line 8: if res == x:
+  const answer = res === rawX;
+  snap({
+    title: { vi: `if res == x → ${res} == ${rawX} → ${answer}`, en: `if res == x → ${res} == ${rawX} → ${answer}` },
+    y,
+    res,
+    visited: [...visited],
+    codeLines: [8],
+    vars: [{ name: "res", value: res }, { name: "x", value: rawX }],
+    note: answer
+      ? { vi: `res=${res} == x=${rawX} → đảo ngược ra chính nó → sẽ trả True.`, en: `res=${res} == x=${rawX} → reversing gives back the same number → will return True.` }
+      : { vi: `res=${res} ≠ x=${rawX} → đảo ngược ra khác → sẽ trả False.`, en: `res=${res} ≠ x=${rawX} → reversing gives a different number → will return False.` },
+  });
+
+  if (answer) {
+    // Line 9: return True
+    snap({
+      title: { vi: "return True", en: "return True" },
+      y,
+      res,
+      visited: [...visited],
+      final: true,
+      codeLines: [9],
+      answer: true,
+      vars: [{ name: "answer", value: true }],
+      note: {
+        vi: `${rawX} LÀ palindrome.`,
+        en: `${rawX} IS a palindrome.`,
+      },
+    });
+  } else {
+    // Line 10: return False
+    snap({
+      title: { vi: "return False", en: "return False" },
+      y,
+      res,
+      visited: [...visited],
+      final: true,
+      codeLines: [10],
+      answer: false,
+      vars: [{ name: "answer", value: false }],
+      note: {
+        vi: `${rawX} KHÔNG phải palindrome.`,
+        en: `${rawX} is NOT a palindrome.`,
+      },
+    });
+  }
+
+  return { original: rawX, answer, steps };
+}
+
 module.exports = {
+  9: {
+    id: 9,
+    difficulty: "easy",
+    slug: "palindrome-number",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Palindrome Number", en: "Palindrome Number" },
+    titleVi: { vi: "Số đối xứng (Palindrome)", en: "Palindrome number" },
+    statement: {
+      vi:
+        "Cho số nguyên x, trả về True nếu x là số đối xứng (palindrome), False nếu không, " +
+        "KHÔNG được chuyển x thành chuỗi.",
+      en:
+        "Given an integer x, return true if x is a palindrome, and false otherwise, " +
+        "WITHOUT converting the integer to a string.",
+    },
+    defaultInput: [121],
+    inputKind: "integer",
+    inputLabel: { vi: "x", en: "x" },
+    singleInput: true,
+    maxInput: 1000000000,
+    extraParams: [],
+    approach: [
+      { vi: "Sao chép y = x, rồi đảo ngược TOÀN BỘ y bằng cách lặp lấy chữ số cuối (y%10) và dồn vào res, sau đó bỏ chữ số đó khỏi y (y//=10).", en: "Copy y = x, then fully reverse y by repeatedly taking its last digit (y%10) and appending it to res, then dropping that digit from y (y//=10)." },
+      { vi: "So sánh res với x ban đầu. Nếu x âm, y=x ≤ 0 nên vòng lặp không chạy, res=0 → chỉ res==x khi x=0, mọi số âm khác đều trả False tự nhiên (không cần kiểm tra dấu riêng).", en: "Compare res with the original x. If x is negative, y=x ≤ 0 so the loop never runs and res stays 0 → res==x is only true when x=0, so every other negative number naturally returns False (no separate sign check needed)." },
+      { vi: "res == x → x là palindrome (True); ngược lại → False.", en: "res == x → x is a palindrome (True); otherwise → False." },
+    ],
+    complexity: {
+      time: "O(log₁₀ x)",
+      space: "O(1)",
+      note: {
+        vi: "Đảo ngược toàn bộ chữ số của x (không tối ưu nửa số), không cần chuyển thành chuỗi.",
+        en: "Reverses all of x's digits (not optimized to half), no string conversion needed.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isPalindrome(self, x: int) -> bool:",
+      "        y = x",
+      "        res = 0",
+      "        while y > 0:",
+      "            res = res * 10 + y % 10",
+      "            y //= 10",
+      "        if res == x:",
+      "            return True",
+      "        return False",
+    ],
+    builder: buildSteps9,
+  },
   3536: {
     id: 3536,
     difficulty: "easy",

@@ -2348,6 +2348,145 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.28);
 }
 
+/* ---- Partition visualization (bai 4: Median of Two Sorted Arrays) ---- */
+.partition-viz {
+  min-height: 250px;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.07), transparent 35%),
+    rgba(15, 23, 42, 0.28);
+}
+
+.partition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.partition-row-label {
+  min-width: 48px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.partition-row-cells {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.partition-cell {
+  width: 46px;
+  padding: 7px 0;
+  display: grid;
+  gap: 3px;
+  place-items: center;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.32);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.partition-cell-idx {
+  color: #94a3b8;
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.partition-cell strong {
+  color: #f8fafc;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.partition-cell.left-half {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.partition-cell.right-half {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.partition-cell.hl {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
+  border-color: rgba(245, 158, 11, 0.8) !important;
+}
+
+.partition-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.partition-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.partition-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.partition-swatch-left {
+  background: rgba(34, 197, 94, 0.6);
+  border: 1px solid rgba(34, 197, 94, 0.8);
+}
+
+.partition-swatch-right {
+  background: rgba(99, 102, 241, 0.5);
+  border: 1px solid rgba(99, 102, 241, 0.7);
+}
+
+.partition-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.partition-status div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.partition-status span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.partition-status strong {
+  display: block;
+  margin-top: 3px;
+  color: #f8fafc;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 /* ---- 1D prefix sum visualization ---- */
 .prefix1d-viz {
   min-height: 260px;
@@ -5326,6 +5465,48 @@ button:disabled {
 [data-theme="light"] .digit-slot-answer {
   background: #fffbeb;
   border-color: #fbbf24;
+}
+
+[data-theme="light"] .partition-viz {
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent 36%),
+    #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .partition-cell {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .partition-cell strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .partition-cell-idx,
+[data-theme="light"] .partition-row-label,
+[data-theme="light"] .partition-legend,
+[data-theme="light"] .partition-status span {
+  color: #475569;
+}
+
+[data-theme="light"] .partition-cell.left-half {
+  background: #ecfdf5;
+  border-color: #34d399;
+}
+
+[data-theme="light"] .partition-cell.right-half {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+[data-theme="light"] .partition-status div {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .partition-status strong {
+  color: #0f172a;
 }
 
 [data-theme="light"] .running-arrow {

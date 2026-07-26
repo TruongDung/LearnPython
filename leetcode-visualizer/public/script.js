@@ -2611,6 +2611,55 @@ function renderRunningSumView(step) {
     </div>`;
 }
 
+// ---- Partition visualization (LeetCode 4: Median of Two Sorted Arrays) ----
+function renderPartitionView(step) {
+  const view = step.partitionView || {};
+  const rowA = Array.isArray(view.rowA) ? view.rowA : [];
+  const rowB = Array.isArray(view.rowB) ? view.rowB : [];
+  const cutA = Number.isInteger(view.cutA) ? view.cutA : 0;
+  const cutB = Number.isInteger(view.cutB) ? view.cutB : 0;
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const highlightIdx = view.highlight || {}; // { rowA: [i,...], rowB: [i,...] }
+
+  function renderRow(rowLabel, values, cut, hlSet) {
+    const cells = values.map((v, i) => {
+      const inLeft = i < cut;
+      const isHl = hlSet && hlSet.has(i);
+      const isInf = v === Infinity || v === -Infinity;
+      const label = isInf ? (v > 0 ? "+\u221E" : "-\u221E") : String(v);
+      return `<div class="partition-cell${inLeft ? " left-half" : " right-half"}${isHl ? " hl" : ""}">
+        <span class="partition-cell-idx">[${i}]</span>
+        <strong>${escapeHtml(label)}</strong>
+      </div>`;
+    }).join("");
+    return `<div class="partition-row">
+      <span class="partition-row-label">${escapeHtml(rowLabel)}</span>
+      <div class="partition-row-cells">${cells}</div>
+    </div>`;
+  }
+
+  const hlA = new Set(highlightIdx.rowA || []);
+  const hlB = new Set(highlightIdx.rowB || []);
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const legend = `<div class="partition-legend">
+    <span><i class="partition-swatch partition-swatch-left"></i>${lang === "vi" ? "nửa TRÁI (đã chọn)" : "LEFT half (chosen)"}</span>
+    <span><i class="partition-swatch partition-swatch-right"></i>${lang === "vi" ? "nửa PHẢI" : "RIGHT half"}</span>
+  </div>`;
+
+  $("treeView").innerHTML = `
+    <div class="partition-viz">
+      ${renderRow("nums1", rowA, cutA, hlA)}
+      ${renderRow("nums2", rowB, cutB, hlB)}
+      ${legend}
+      <div class="partition-status">${statusItems}</div>
+    </div>`;
+}
+
 function renderDigitPodiumView(step) {
   const view = step.digitPodiumView || {};
   const digits = Array.isArray(view.digits) ? view.digits : [];
@@ -2620,6 +2669,12 @@ function renderDigitPodiumView(step) {
   const second = view.second ?? 0;
   const updateKind = view.updateKind || null; // "first" | "second" | "none" | null
   const answer = view.answer;
+  const op = view.op === "vs" ? (lang === "vi" ? "so với" : "vs") : (view.op || "×");
+  const resultLabel = view.resultLabel ? pick(view.resultLabel) : (lang === "vi" ? "tích" : "product");
+  const defaultFirstLabel = { vi: "first (lớn nhất)", en: "first (largest)" };
+  const defaultSecondLabel = { vi: "second (lớn nhì)", en: "second (2nd largest)" };
+  const firstLabel = view.firstLabel ? pick(view.firstLabel) : defaultFirstLabel[lang === "vi" ? "vi" : "en"];
+  const secondLabel = view.secondLabel ? pick(view.secondLabel) : defaultSecondLabel[lang === "vi" ? "vi" : "en"];
 
   const digitCells = digits.map((d, i) => {
     const isCurrent = i === current;
@@ -2633,17 +2688,19 @@ function renderDigitPodiumView(step) {
   const firstBump = updateKind === "first" ? " bump" : "";
   const secondBump = updateKind === "second" ? " bump" : "";
 
+  const answerDisplay = typeof answer === "boolean" ? (answer ? (lang === "vi" ? "True" : "True") : "False") : answer;
+
   const podium = `<div class="digit-podium">
     <div class="digit-slot digit-slot-first${firstBump}">
-      <span class="digit-slot-label">${lang === "vi" ? "first (lớn nhất)" : "first (largest)"}</span>
+      <span class="digit-slot-label">${escapeHtml(firstLabel)}</span>
       <strong>${escapeHtml(String(first))}</strong>
     </div>
-    <div class="digit-podium-op">×</div>
+    <div class="digit-podium-op">${escapeHtml(op)}</div>
     <div class="digit-slot digit-slot-second${secondBump}">
-      <span class="digit-slot-label">${lang === "vi" ? "second (lớn nhì)" : "second (2nd largest)"}</span>
+      <span class="digit-slot-label">${escapeHtml(secondLabel)}</span>
       <strong>${escapeHtml(String(second))}</strong>
     </div>
-    ${answer !== undefined ? `<div class="digit-podium-op">=</div><div class="digit-slot digit-slot-answer"><span class="digit-slot-label">${lang === "vi" ? "tích" : "product"}</span><strong>${escapeHtml(String(answer))}</strong></div>` : ""}
+    ${answer !== undefined ? `<div class="digit-podium-op">=</div><div class="digit-slot digit-slot-answer"><span class="digit-slot-label">${escapeHtml(resultLabel)}</span><strong>${escapeHtml(String(answerDisplay))}</strong></div>` : ""}
   </div>`;
 
   $("treeView").innerHTML = `
@@ -3443,6 +3500,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitPodiumView(step);
+  } else if (step.partitionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPartitionView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

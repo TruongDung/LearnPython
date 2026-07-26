@@ -543,10 +543,412 @@ function buildSteps911(persons, params) {
   };
 }
 
+/**
+ * LeetCode 4: Median of Two Sorted Arrays.
+ *
+ * Given two sorted arrays nums1 (size m) and nums2 (size n), find the median
+ * of the merged sorted array in O(log(min(m,n))) time — WITHOUT merging.
+ *
+ * Key idea: binary search a "partition" of the SHORTER array (A). For a
+ * candidate cut i in A (0..m), the corresponding cut in B is forced:
+ *   j = (m + n + 1) // 2 - i
+ * so that the LEFT side (A[0..i) + B[0..j)) always has exactly
+ * ceil((m+n)/2) elements. The partition is valid once:
+ *   A[i-1] <= B[j]  and  B[j-1] <= A[i]
+ * (using -Infinity/+Infinity as sentinels at the array edges).
+ * Once valid, the median is derived from maxLeft/minRight directly.
+ */
+function parseNumList(raw) {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed === "") return [];
+  return trimmed.split(",").map((s) => Number(s.trim()));
+}
+
+function buildSteps4(input, params) {
+  const A0 = Array.isArray(input) ? input.map(Number) : parseNumList(input);
+  const B0 = parseNumList(params.nums2);
+  const steps = [];
+
+  const validA = A0.every((v) => Number.isFinite(v));
+  const validB = B0.every((v) => Number.isFinite(v));
+
+  if (!validA || !validB || (A0.length === 0 && B0.length === 0)) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "nums1 và nums2 phải là mảng số, không cùng rỗng.", en: "nums1 and nums2 must be numeric arrays, not both empty." },
+    });
+    return { original: A0, answer: 0, steps };
+  }
+
+  // Ensure A is the SHORTER array (binary search runs on A).
+  let swapped = false;
+  let A = A0, B = B0;
+  if (A.length > B.length) { A = B0; B = A0; swapped = true; }
+  const m = A.length, n = B.length;
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      partitionView: {
+        rowA: A,
+        rowB: B,
+        cutA: opts.i !== undefined ? opts.i : 0,
+        cutB: opts.j !== undefined ? opts.j : 0,
+        highlight: opts.highlight || {},
+        status: opts.status || [],
+      },
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: m, n = len(nums1), len(nums2)
+  snap({
+    title: { vi: `m, n = len(nums1), len(nums2) → m=${A0.length}, n=${B0.length}`, en: `m, n = len(nums1), len(nums2) → m=${A0.length}, n=${B0.length}` },
+    i: 0, j: 0,
+    codeLines: [3],
+    vars: [{ name: "m", value: A0.length }, { name: "n", value: B0.length }],
+    note: {
+      vi: `m = len(nums1) = ${A0.length}, n = len(nums2) = ${B0.length}.`,
+      en: `m = len(nums1) = ${A0.length}, n = len(nums2) = ${B0.length}.`,
+    },
+  });
+
+  // Line 4: if m > n:
+  snap({
+    title: { vi: `if m > n → ${A0.length} > ${B0.length} → ${swapped}`, en: `if m > n → ${A0.length} > ${B0.length} → ${swapped}` },
+    i: 0, j: 0,
+    codeLines: [4],
+    vars: [{ name: "m > n", value: swapped }],
+    note: swapped
+      ? { vi: `nums1 dài hơn nums2 → cần đổi vai trò để binary search luôn chạy trên mảng NGẮN HƠN.`, en: `nums1 is longer than nums2 → need to swap roles so binary search always runs on the SHORTER array.` }
+      : { vi: `nums1 không dài hơn nums2 → giữ nguyên, A=nums1 (ngắn hơn hoặc bằng), B=nums2.`, en: `nums1 is not longer than nums2 → keep as is, A=nums1 (shorter or equal), B=nums2.` },
+  });
+
+  if (swapped) {
+    // Line 5: nums1, nums2, m, n = nums2, nums1, n, m
+    snap({
+      title: { vi: `nums1, nums2, m, n = nums2, nums1, n, m`, en: `nums1, nums2, m, n = nums2, nums1, n, m` },
+      i: 0, j: 0,
+      codeLines: [5],
+      vars: [{ name: "A (shorter)", value: `[${A.join(",")}]` }, { name: "B (longer)", value: `[${B.join(",")}]` }],
+      note: {
+        vi: `Đổi vai trò: giờ A=[${A.join(",")}] (m=${m}) là mảng ngắn hơn, B=[${B.join(",")}] (n=${n}).`,
+        en: `Roles swapped: now A=[${A.join(",")}] (m=${m}) is the shorter array, B=[${B.join(",")}] (n=${n}).`,
+      },
+    });
+  }
+
+  // Line 6: left, right = 0, m
+  let left = 0, right = m;
+  snap({
+    title: { vi: `left, right = 0, m → left=0, right=${m}`, en: `left, right = 0, m → left=0, right=${m}` },
+    i: 0,
+    j: Math.ceil((m + n) / 2),
+    codeLines: [6],
+    vars: [{ name: "left", value: 0 }, { name: "right", value: m }],
+    note: {
+      vi: `Binary search giá trị i (số phần tử của A ở nửa TRÁI), i ∈ [0, ${m}].`,
+      en: `Binary search the value i (how many elements of A go in the LEFT half), i ∈ [0, ${m}].`,
+    },
+  });
+
+  const half = Math.floor((m + n + 1) / 2);
+  let result = null;
+  let iterGuard = 0;
+
+  while (left <= right && iterGuard < 200) {
+    iterGuard++;
+    // Line 7: while left <= right:
+    snap({
+      title: { vi: `while left ≤ right → ${left} ≤ ${right} → True`, en: `while left ≤ right → ${left} ≤ ${right} → True` },
+      i: left,
+      j: half - left,
+      codeLines: [7],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      note: {
+        vi: `left=${left} ≤ right=${right} → còn khoảng để tìm i hợp lệ, tiếp tục.`,
+        en: `left=${left} ≤ right=${right} → there's still a range to search for a valid i, continue.`,
+      },
+    });
+
+    // Line 8: i = (left + right) // 2
+    const i = Math.floor((left + right) / 2);
+    // Line 9: j = (m + n + 1) // 2 - i
+    const j = half - i;
+
+    snap({
+      title: { vi: `i = (left+right)//2 = (${left}+${right})//2 = ${i}`, en: `i = (left+right)//2 = (${left}+${right})//2 = ${i}` },
+      i,
+      j: half - i,
+      codeLines: [8],
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Thử cắt A tại i=${i}: nửa trái của A lấy ${i} phần tử đầu, nửa phải lấy ${m - i} phần tử còn lại.`,
+        en: `Try cutting A at i=${i}: A's left half takes the first ${i} elements, right half takes the remaining ${m - i}.`,
+      },
+    });
+
+    snap({
+      title: { vi: `j = (m+n+1)//2 - i = ${half} - ${i} = ${j}`, en: `j = (m+n+1)//2 - i = ${half} - ${i} = ${j}` },
+      i,
+      j,
+      codeLines: [9],
+      vars: [{ name: "j", value: j }, { name: "half = (m+n+1)//2", value: half }],
+      note: {
+        vi: `j buộc phải bằng ${j} để tổng số phần tử ở nửa trái (i+j) luôn = ⌈(m+n)/2⌉ = ${half}, bất kể i là bao nhiêu.`,
+        en: `j is forced to be ${j} so the total left-half size (i+j) is always ⌈(m+n)/2⌉ = ${half}, regardless of i.`,
+      },
+    });
+
+    if (j < 0 || j > n) {
+      if (j < 0) { right = i - 1; } else { left = i + 1; }
+      continue;
+    }
+
+    // Sentinels
+    const Aleft = i === 0 ? -Infinity : A[i - 1];
+    const Aright = i === m ? Infinity : A[i];
+    const Bleft = j === 0 ? -Infinity : B[j - 1];
+    const Bright = j === n ? Infinity : B[j];
+
+    // Line 10: if i > 0 and A[i-1] > B[j]:
+    const aLeftTooBig = Aleft > Bright;
+    snap({
+      title: { vi: `if i>0 and A[i-1] > B[j] → ${fmt(Aleft)} > ${fmt(Bright)} → ${aLeftTooBig}`, en: `if i>0 and A[i-1] > B[j] → ${fmt(Aleft)} > ${fmt(Bright)} → ${aLeftTooBig}` },
+      i, j,
+      highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j < n ? [j] : [] },
+      codeLines: [10],
+      vars: [{ name: "A[i-1]", value: fmt(Aleft) }, { name: "B[j]", value: fmt(Bright) }],
+      note: aLeftTooBig
+        ? { vi: `A[i-1]=${fmt(Aleft)} > B[j]=${fmt(Bright)} → nửa trái của A đang LỚN HƠN nửa phải của B → i quá lớn, cần giảm i.`, en: `A[i-1]=${fmt(Aleft)} > B[j]=${fmt(Bright)} → A's left half is TOO BIG compared to B's right half → i is too large, need to decrease it.` }
+        : { vi: `A[i-1]=${fmt(Aleft)} ≤ B[j]=${fmt(Bright)} → điều kiện này ổn, kiểm tiếp điều kiện kia.`, en: `A[i-1]=${fmt(Aleft)} ≤ B[j]=${fmt(Bright)} → this condition is fine, check the other one next.` },
+    });
+
+    if (aLeftTooBig) {
+      // Line 11: right = i - 1
+      const oldRight = right;
+      right = i - 1;
+      snap({
+        title: { vi: `right = i - 1 = ${i} - 1 = ${right}`, en: `right = i - 1 = ${i} - 1 = ${right}` },
+        i, j,
+        codeLines: [11],
+        vars: [{ name: "right", value: right }],
+        note: {
+          vi: `Thu hẹp phạm vi tìm i: right = ${oldRight} → ${right}. Lần sau i sẽ nhỏ hơn.`,
+          en: `Shrink the search range for i: right = ${oldRight} → ${right}. Next i will be smaller.`,
+        },
+      });
+      continue;
+    }
+
+    // Line 12: elif j > 0 and B[j-1] > A[i]:
+    const bLeftTooBig = Bleft > Aright;
+    snap({
+      title: { vi: `elif j>0 and B[j-1] > A[i] → ${fmt(Bleft)} > ${fmt(Aright)} → ${bLeftTooBig}`, en: `elif j>0 and B[j-1] > A[i] → ${fmt(Bleft)} > ${fmt(Aright)} → ${bLeftTooBig}` },
+      i, j,
+      highlight: { rowA: i < m ? [i] : [], rowB: j > 0 ? [j - 1] : [] },
+      codeLines: [12],
+      vars: [{ name: "B[j-1]", value: fmt(Bleft) }, { name: "A[i]", value: fmt(Aright) }],
+      note: bLeftTooBig
+        ? { vi: `B[j-1]=${fmt(Bleft)} > A[i]=${fmt(Aright)} → nửa trái của B đang LỚN HƠN nửa phải của A → i quá nhỏ, cần tăng i.`, en: `B[j-1]=${fmt(Bleft)} > A[i]=${fmt(Aright)} → B's left half is TOO BIG compared to A's right half → i is too small, need to increase it.` }
+        : { vi: `B[j-1]=${fmt(Bleft)} ≤ A[i]=${fmt(Aright)} → cả 2 điều kiện đều ổn → partition HỢP LỆ!`, en: `B[j-1]=${fmt(Bleft)} ≤ A[i]=${fmt(Aright)} → both conditions hold → partition is VALID!` },
+    });
+
+    if (bLeftTooBig) {
+      // Line 13: left = i + 1
+      const oldLeft = left;
+      left = i + 1;
+      snap({
+        title: { vi: `left = i + 1 = ${i} + 1 = ${left}`, en: `left = i + 1 = ${i} + 1 = ${left}` },
+        i, j,
+        codeLines: [13],
+        vars: [{ name: "left", value: left }],
+        note: {
+          vi: `Thu hẹp phạm vi tìm i: left = ${oldLeft} → ${left}. Lần sau i sẽ lớn hơn.`,
+          en: `Shrink the search range for i: left = ${oldLeft} → ${left}. Next i will be larger.`,
+        },
+      });
+      continue;
+    }
+
+    // Valid partition found.
+    const maxLeft = Math.max(Aleft, Bleft);
+    const minRight = Math.min(Aright, Bright);
+    const totalLen = m + n;
+    const isOdd = totalLen % 2 === 1;
+    const median = isOdd ? maxLeft : (maxLeft + minRight) / 2;
+
+    // Line 14: else:
+    snap({
+      title: { vi: `else: (partition hợp lệ, tính maxLeft)`, en: `else: (valid partition, compute maxLeft)` },
+      i, j,
+      highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
+      codeLines: [14],
+      vars: [{ name: "i", value: i }, { name: "j", value: j }],
+      note: {
+        vi: `Cả 2 điều kiện đều không đúng → partition (i=${i}, j=${j}) hợp lệ. Chuyển sang tính median.`,
+        en: `Neither condition holds → partition (i=${i}, j=${j}) is valid. Move on to computing the median.`,
+      },
+    });
+
+    // Line 15: left_part = max(A[i-1] if i>0 else -inf, B[j-1] if j>0 else -inf)
+    snap({
+      title: { vi: `left_part = max(A[i-1], B[j-1]) = max(${fmt(Aleft)}, ${fmt(Bleft)}) = ${maxLeft}`, en: `left_part = max(A[i-1], B[j-1]) = max(${fmt(Aleft)}, ${fmt(Bleft)}) = ${maxLeft}` },
+      i, j,
+      highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
+      codeLines: [15],
+      vars: [{ name: "left_part", value: maxLeft }],
+      note: {
+        vi: `left_part = phần tử LỚN NHẤT ở toàn bộ nửa trái = max(A[i-1], B[j-1]) = ${maxLeft}.`,
+        en: `left_part = the LARGEST element across the whole left half = max(A[i-1], B[j-1]) = ${maxLeft}.`,
+      },
+    });
+
+    // Line 16: if (m + n) % 2 == 1:
+    snap({
+      title: { vi: `if (m+n)%2==1 → ${isOdd}`, en: `if (m+n)%2==1 → ${isOdd}` },
+      i, j,
+      codeLines: [16],
+      vars: [{ name: "m+n", value: totalLen }, { name: "(m+n)%2", value: totalLen % 2 }],
+      note: isOdd
+        ? { vi: `Tổng số phần tử LẺ (${totalLen}) → phần tử giữa chính là left_part, không cần xét nửa phải.`, en: `Total count is ODD (${totalLen}) → the middle element is exactly left_part, no need to look at the right half.` }
+        : { vi: `Tổng số phần tử CHẴN (${totalLen}) → median là trung bình của 2 phần tử giữa, cần thêm right_part.`, en: `Total count is EVEN (${totalLen}) → the median is the average of the two middle elements, also need right_part.` },
+    });
+
+    if (isOdd) {
+      // Line 17: return left_part
+      const fs = {
+        title: { vi: `return left_part → ${median}`, en: `return left_part → ${median}` },
+        arr: [],
+        partitionView: {
+          rowA: A, rowB: B, cutA: i, cutB: j,
+          highlight: { rowA: i > 0 ? [i - 1] : [], rowB: j > 0 ? [j - 1] : [] },
+          status: [{ label: "answer", value: median }],
+        },
+        highlight: [], mark: [],
+        final: true,
+        codeLines: [17],
+        vars: [{ name: "answer", value: median }],
+        note: { vi: `Median = ${median}.`, en: `Median = ${median}.` },
+      };
+      steps.push(fs);
+      result = median;
+      break;
+    }
+
+    // Line 18: right_part = min(A[i] if i<m else inf, B[j] if j<n else inf)
+    snap({
+      title: { vi: `right_part = min(A[i], B[j]) = min(${fmt(Aright)}, ${fmt(Bright)}) = ${minRight}`, en: `right_part = min(A[i], B[j]) = min(${fmt(Aright)}, ${fmt(Bright)}) = ${minRight}` },
+      i, j,
+      highlight: { rowA: i < m ? [i] : [], rowB: j < n ? [j] : [] },
+      codeLines: [18],
+      vars: [{ name: "right_part", value: minRight }],
+      note: {
+        vi: `right_part = phần tử NHỎ NHẤT ở toàn bộ nửa phải = min(A[i], B[j]) = ${minRight}.`,
+        en: `right_part = the SMALLEST element across the whole right half = min(A[i], B[j]) = ${minRight}.`,
+      },
+    });
+
+    // Line 19: return (left_part + right_part) / 2
+    const fs = {
+      title: { vi: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}`, en: `return (left_part+right_part)/2 → (${maxLeft}+${minRight})/2 = ${median}` },
+      arr: [],
+      partitionView: {
+        rowA: A, rowB: B, cutA: i, cutB: j,
+        highlight: { rowA: [i > 0 ? i - 1 : -1, i < m ? i : -1].filter((x) => x >= 0), rowB: [j > 0 ? j - 1 : -1, j < n ? j : -1].filter((x) => x >= 0) },
+        status: [{ label: "answer", value: median }],
+      },
+      highlight: [], mark: [],
+      final: true,
+      codeLines: [19],
+      vars: [{ name: "left_part", value: maxLeft }, { name: "right_part", value: minRight }, { name: "answer", value: median }],
+      note: { vi: `Median = (${maxLeft} + ${minRight}) / 2 = ${median}.`, en: `Median = (${maxLeft} + ${minRight}) / 2 = ${median}.` },
+    };
+    steps.push(fs);
+    result = median;
+    break;
+  }
+
+  return { original: A0, nums2: B0, answer: result, steps };
+}
+
+function fmt(v) {
+  if (v === Infinity) return "+\u221E";
+  if (v === -Infinity) return "-\u221E";
+  return String(v);
+}
+
 module.exports = {
   __meta: {
-    order: [34, 911],
+    order: [4, 34, 911],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
+  },
+  4: {
+    id: 4,
+    difficulty: "hard",
+    slug: "median-of-two-sorted-arrays",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Median of Two Sorted Arrays", en: "Median of Two Sorted Arrays" },
+    titleVi: { vi: "Trung vị của 2 mảng đã sắp xếp", en: "Median of two sorted arrays" },
+    statement: {
+      vi:
+        "Cho 2 mảng đã sắp xếp tăng dần nums1 (kích thước m) và nums2 (kích thước n). " +
+        "Trả về trung vị (median) của mảng hợp nhất, với độ phức tạp O(log(m+n)).",
+      en:
+        "Given two sorted arrays nums1 (size m) and nums2 (size n), return the median of the two " +
+        "combined sorted arrays, with time complexity O(log(m+n)).",
+    },
+    defaultInput: [1, 3],
+    inputKind: "integer",
+    inputLabel: { vi: "nums1 (đã sắp xếp)", en: "nums1 (sorted)" },
+    extraParams: [{ key: "nums2", label: { vi: "nums2 (đã sắp xếp)", en: "nums2 (sorted)" }, type: "string", default: "2" }],
+    approach: [
+      { vi: "Binary search trên mảng NGẮN HƠN (A). Với mỗi i (số phần tử A ở nửa trái), j bị buộc = ⌈(m+n)/2⌉ - i để nửa trái luôn đủ ⌈(m+n)/2⌉ phần tử.", en: "Binary search on the SHORTER array (A). For each i (how many A elements go left), j is forced = ⌈(m+n)/2⌉ - i so the left half always has exactly ⌈(m+n)/2⌉ elements." },
+      { vi: "Partition hợp lệ khi A[i-1] ≤ B[j] và B[j-1] ≤ A[i] (dùng ±∞ ở biên mảng).", en: "The partition is valid when A[i-1] ≤ B[j] and B[j-1] ≤ A[i] (using ±∞ at array edges)." },
+      { vi: "Tổng lẻ → median = max(A[i-1], B[j-1]). Tổng chẵn → trung bình của maxLeft và minRight.", en: "Odd total → median = max(A[i-1], B[j-1]). Even total → average of maxLeft and minRight." },
+    ],
+    complexity: {
+      time: "O(log(min(m,n)))",
+      space: "O(1)",
+      note: {
+        vi: "Binary search chỉ chạy trên mảng ngắn hơn.",
+        en: "Binary search only runs on the shorter array.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMedianSortedArrays(self, nums1, nums2):",
+      "        m, n = len(nums1), len(nums2)",
+      "        if m > n:",
+      "            nums1, nums2, m, n = nums2, nums1, n, m",
+      "        left, right = 0, m",
+      "        while left <= right:",
+      "            i = (left + right) // 2",
+      "            j = (m + n + 1) // 2 - i",
+      "            if i > 0 and nums1[i-1] > (nums2[j] if j < n else float('inf')):",
+      "                right = i - 1",
+      "            elif j > 0 and nums2[j-1] > (nums1[i] if i < m else float('inf')):",
+      "                left = i + 1",
+      "            else:",
+      "                left_part = max(nums1[i-1] if i > 0 else float('-inf'), nums2[j-1] if j > 0 else float('-inf'))",
+      "                if (m + n) % 2 == 1:",
+      "                    return left_part",
+      "                right_part = min(nums1[i] if i < m else float('inf'), nums2[j] if j < n else float('inf'))",
+      "                return (left_part + right_part) / 2",
+    ],
+    builder: buildSteps4,
   },
   911: {
     id: 911,
