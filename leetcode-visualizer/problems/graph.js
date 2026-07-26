@@ -10496,11 +10496,6 @@ function buildSteps1334Dijkstra(input, params) {
 
   const INF = Infinity;
   const adj = Array.from({ length: n }, () => []);
-  for (const { u, v, w } of edgeList) {
-    adj[u].push([v, w]);
-    adj[v].push([u, w]);
-  }
-
   const dist = Array.from({ length: n }, () => new Array(n).fill(INF));
   for (let i = 0; i < n; i++) dist[i][i] = 0;
 
@@ -10556,25 +10551,67 @@ function buildSteps1334Dijkstra(input, params) {
     },
   });
 
-  // Line 4: adj = build adjacency list
+  // Line 4: adj = [[] for _ in range(n)]
   snap({
-    title: { vi: "Xây adjacency list từ edges", en: "Build adjacency list from edges" },
+    title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
     codeLines: [4],
     graph: makeGraph([], []),
-    vars: [{ name: "adj", value: adj.map((nbrs, i) => `${i}:[${nbrs.map(([v, w]) => `(${v},${w})`).join(",")}]`).join(" ") }],
     note: {
-      vi: "Chuyển danh sách cạnh thành adjacency list 2 chiều để Dijkstra duyệt hàng xóm nhanh hơn.",
-      en: "Convert the edge list into a bidirectional adjacency list so Dijkstra can scan neighbors quickly.",
+      vi: "Khởi tạo adjacency list rỗng cho mỗi thành phố — sẽ xây dựng bằng cách đọc từng cạnh trong edges.",
+      en: "Initialize an empty adjacency list for every city — will build it by reading each edge in edges.",
     },
   });
 
+  for (const { u, v, w } of edgeList) {
+    // Line 5: for u, v, w in edges:
+    snap({
+      title: { vi: `for u,v,w in edges → (${u},${v},${w})`, en: `for u,v,w in edges → (${u},${v},${w})` },
+      hlCell: [u, v],
+      graph: makeGraph([u, v], [[u, v]]),
+      codeLines: [5],
+      vars: [{ name: "u,v,w", value: `${u},${v},${w}` }],
+      note: {
+        vi: `Đọc cạnh tiếp theo (${u},${v},${w}) từ danh sách edges.`,
+        en: `Read the next edge (${u},${v},${w}) from the edges list.`,
+      },
+    });
+
+    // Line 6: adj[u].append((v, w))
+    adj[u].push([v, w]);
+    snap({
+      title: { vi: `adj[${u}].append((${v}, ${w}))`, en: `adj[${u}].append((${v}, ${w}))` },
+      hlCell: [u, v],
+      graph: makeGraph([u, v], [[u, v]]),
+      codeLines: [6],
+      vars: [{ name: `adj[${u}]`, value: `[${adj[u].map(([to, weight]) => `(${to},${weight})`).join(",")}]` }],
+      note: {
+        vi: `Thêm hàng xóm (${v}, ${w}) vào adj[${u}] — từ ${u} có thể đi tới ${v} với chi phí ${w}.`,
+        en: `Add neighbor (${v}, ${w}) to adj[${u}] — from ${u} you can reach ${v} with cost ${w}.`,
+      },
+    });
+
+    // Line 7: adj[v].append((u, w))
+    adj[v].push([u, w]);
+    snap({
+      title: { vi: `adj[${v}].append((${u}, ${w}))`, en: `adj[${v}].append((${u}, ${w}))` },
+      hlCell: [u, v],
+      graph: makeGraph([u, v], [[u, v]]),
+      codeLines: [7],
+      vars: [{ name: `adj[${v}]`, value: `[${adj[v].map(([to, weight]) => `(${to},${weight})`).join(",")}]` }],
+      note: {
+        vi: `Cạnh 2 chiều nên cũng thêm (${u}, ${w}) vào adj[${v}] — từ ${v} có thể đi ngược lại tới ${u}.`,
+        en: `Since the edge is bidirectional, also add (${u}, ${w}) to adj[${v}] — from ${v} you can go back to ${u}.`,
+      },
+    });
+  }
+
   for (let src = 0; src < n; src++) {
-    // Line 5: for src in range(n):
+    // Line 8: for src in range(n):
     snap({
       title: { vi: `for src in range(n) → src=${src}`, en: `for src in range(n) → src=${src}` },
       hlCell: [src, src],
       graph: makeGraph([src], []),
-      codeLines: [5],
+      codeLines: [8],
       vars: [{ name: "src", value: src }],
       note: {
         vi: `Chạy Dijkstra từ nguồn src=${src} để lấp đầy hàng dist[${src}][*].`,
@@ -10582,13 +10619,13 @@ function buildSteps1334Dijkstra(input, params) {
       },
     });
 
-    // Line 6: dist[src][src] = 0
+    // Line 9: dist[src][src] = 0
     dist[src][src] = 0;
     snap({
       title: { vi: `dist[${src}][${src}] = 0`, en: `dist[${src}][${src}] = 0` },
       hlCell: [src, src],
       graph: makeGraph([src], [], []),
-      codeLines: [6],
+      codeLines: [9],
       vars: [{ name: `dist[${src}][${src}]`, value: 0 }],
       note: {
         vi: `Khoảng cách từ ${src} tới chính nó = 0.`,
@@ -10596,13 +10633,13 @@ function buildSteps1334Dijkstra(input, params) {
       },
     });
 
-    // Line 7: visited = [False] * n
+    // Line 10: visited = [False] * n
     const visited = new Array(n).fill(false);
     snap({
       title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
       hlCell: [src, src],
       graph: makeGraph([src], [], []),
-      codeLines: [7],
+      codeLines: [10],
       note: {
         vi: `Khởi tạo visited toàn False cho lần chạy Dijkstra từ src=${src}.`,
         en: `Initialize visited to all False for this Dijkstra run from src=${src}.`,
@@ -10610,19 +10647,19 @@ function buildSteps1334Dijkstra(input, params) {
     });
 
     for (let iter = 0; iter < n; iter++) {
-      // Line 8: while True:
+      // Line 11: while True:
       snap({
         title: { vi: "while True:", en: "while True:" },
         hlCell: [src, src],
         graph: makeGraph([], [], [...Array(n).keys()].filter((x) => visited[x])),
-        codeLines: [8],
+        codeLines: [11],
         note: {
           vi: "Lặp mãi cho tới khi hết thành phố chưa thăm có thể đến được (thoát bằng break bên trong).",
           en: "Loop forever until there's no more reachable unvisited city (exits via break inside).",
         },
       });
 
-      // Line 9: u = min(...)
+      // Line 12: u = min(...)
       let u = -1;
       let best = INF;
       for (let cand = 0; cand < n; cand++) {
@@ -10632,7 +10669,7 @@ function buildSteps1334Dijkstra(input, params) {
         title: { vi: `u = min(chưa thăm, key=dist[src][c]) → u=${u === -1 ? "none" : u} (${fmtD(best)})`, en: `u = min(unvisited, key=dist[src][c]) → u=${u === -1 ? "none" : u} (${fmtD(best)})` },
         hlCell: u >= 0 ? [src, u] : null,
         graph: makeGraph(u >= 0 ? [u] : [], [], [...Array(n).keys()].filter((x) => visited[x])),
-        codeLines: [9],
+        codeLines: [12],
         vars: [{ name: "u", value: u === -1 ? "None" : u }, { name: "dist[src][u]", value: fmtD(best) }],
         note: {
           vi: `Tìm thành phố CHƯA THĂM có dist[src][c] nhỏ nhất → u=${u === -1 ? "None" : u}.`,
@@ -10640,13 +10677,13 @@ function buildSteps1334Dijkstra(input, params) {
         },
       });
 
-      // Line 10-11: if u == -1 or dist[src][u] == inf: break
+      // Line 13-14: if u == -1 or dist[src][u] == inf: break
       const shouldBreak = u === -1 || best === INF;
       snap({
         title: { vi: `if u==-1 or dist[src][u]==∞ → ${shouldBreak}`, en: `if u==-1 or dist[src][u]==∞ → ${shouldBreak}` },
         hlCell: u >= 0 ? [src, u] : null,
         graph: makeGraph(u >= 0 ? [u] : [], [], [...Array(n).keys()].filter((x) => visited[x])),
-        codeLines: [10],
+        codeLines: [13],
         note: shouldBreak
           ? { vi: "Không còn thành phố chưa thăm nào có thể đến được → sẽ break, dừng Dijkstra cho nguồn này.", en: "No reachable unvisited city remains → will break, stopping Dijkstra for this source." }
           : { vi: `u=${u} vẫn đến được (dist=${fmtD(best)}) → tiếp tục xử lý, không break.`, en: `u=${u} is still reachable (dist=${fmtD(best)}) → continue processing, no break.` },
@@ -10656,7 +10693,7 @@ function buildSteps1334Dijkstra(input, params) {
         snap({
           title: { vi: "break", en: "break" },
           graph: makeGraph([], [], [...Array(n).keys()].filter((x) => visited[x])),
-          codeLines: [11],
+          codeLines: [14],
           note: {
             vi: "Thoát vòng while — đã xử lý xong mọi thành phố đến được từ src.",
             en: "Exit the while loop — every reachable city from src has been processed.",
@@ -10665,13 +10702,13 @@ function buildSteps1334Dijkstra(input, params) {
         break;
       }
 
-      // Line 12: visited[u] = True
+      // Line 15: visited[u] = True
       visited[u] = true;
       snap({
         title: { vi: `visited[${u}] = True`, en: `visited[${u}] = True` },
         hlCell: [src, u],
         graph: makeGraph([u], [], [...Array(n).keys()].filter((x) => visited[x])),
-        codeLines: [12],
+        codeLines: [15],
         note: {
           vi: `Đánh dấu ${u} đã thăm — dist[${src}][${u}]=${fmtD(dist[src][u])} đã CHỐT, không thể tốt hơn nữa.`,
           en: `Mark ${u} as visited — dist[${src}][${u}]=${fmtD(dist[src][u])} is now FINAL, cannot improve further.`,
@@ -10679,12 +10716,12 @@ function buildSteps1334Dijkstra(input, params) {
       });
 
       for (const [v, w] of adj[u]) {
-        // Line 13: for v, w in adj[u]:
+        // Line 16: for v, w in adj[u]:
         snap({
           title: { vi: `for v,w in adj[${u}] → v=${v}, w=${w}`, en: `for v,w in adj[${u}] → v=${v}, w=${w}` },
           hlCell: [src, v],
           graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
-          codeLines: [13],
+          codeLines: [16],
           vars: [{ name: "v", value: v }, { name: "w", value: w }],
           note: {
             vi: `Xét hàng xóm v=${v} của u=${u}, cạnh nặng w=${w}.`,
@@ -10695,12 +10732,12 @@ function buildSteps1334Dijkstra(input, params) {
         const via = dist[src][u] + w;
         const improves = via < dist[src][v];
 
-        // Line 14: if dist[src][u] + w < dist[src][v]:
+        // Line 17: if dist[src][u] + w < dist[src][v]:
         snap({
           title: { vi: `if dist[src][u]+w < dist[src][v] → ${fmtD(via)} < ${fmtD(dist[src][v])} → ${improves}`, en: `if dist[src][u]+w < dist[src][v] → ${fmtD(via)} < ${fmtD(dist[src][v])} → ${improves}` },
           hlCell: [src, v],
           graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
-          codeLines: [14],
+          codeLines: [17],
           vars: [{ name: "via u", value: fmtD(via) }, { name: `dist[src][${v}]`, value: fmtD(dist[src][v]) }],
           note: improves
             ? { vi: `Đi qua u=${u} NGẮN HƠN: ${fmtD(via)} < ${fmtD(dist[src][v])} → cập nhật dist[${src}][${v}].`, en: `Going through u=${u} is SHORTER: ${fmtD(via)} < ${fmtD(dist[src][v])} → update dist[${src}][${v}].` }
@@ -10708,13 +10745,13 @@ function buildSteps1334Dijkstra(input, params) {
         });
 
         if (improves) {
-          // Line 15: dist[src][v] = dist[src][u] + w
+          // Line 18: dist[src][v] = dist[src][u] + w
           dist[src][v] = via;
           snap({
             title: { vi: `dist[${src}][${v}] = ${via}`, en: `dist[${src}][${v}] = ${via}` },
             hlCell: [src, v],
             graph: makeGraph([u, v], [[u, v]], [...Array(n).keys()].filter((x) => visited[x])),
-            codeLines: [15],
+            codeLines: [18],
             vars: [{ name: `dist[${src}][${v}]`, value: via }],
             note: {
               vi: `Cập nhật dist[${src}][${v}] = ${via} (đi qua ${u}).`,
@@ -10735,10 +10772,10 @@ function buildSteps1334Dijkstra(input, params) {
   }
 
   const countsStr = counts.map((c, i) => `city ${i}: ${c}`).join(", ");
-  // Line 16: counts = [...]
+  // Line 19: counts = [...]
   snap({
     title: { vi: `Đếm số láng giềng ≤ threshold cho mỗi thành phố`, en: `Count neighbors ≤ threshold for each city` },
-    codeLines: [16],
+    codeLines: [19],
     graph: makeGraph([], []),
     vars: [{ name: "counts", value: countsStr }],
     note: {
@@ -10747,10 +10784,10 @@ function buildSteps1334Dijkstra(input, params) {
     },
   });
 
-  // Lines 17-19: best = 0; for i in range(1,n): if counts[i]<=counts[best]: best=i
+  // Lines 20-23: best = 0; for i in range(1,n): if counts[i]<=counts[best]: best=i
   snap({
     title: { vi: `best = argmin(counts) (hòa → index lớn hơn) → ${best}`, en: `best = argmin(counts) (ties → larger index) → ${best}` },
-    codeLines: [17, 18, 19],
+    codeLines: [20, 21, 22, 23],
     graph: makeGraph([best], []),
     vars: [{ name: "best", value: best }],
     note: {
@@ -10768,7 +10805,7 @@ function buildSteps1334Dijkstra(input, params) {
     mark: [],
     final: true,
     codeBlock: 2,
-    codeLines: [20],
+    codeLines: [24],
     vars: [{ name: "answer", value: best }, { name: "counts", value: countsStr }],
     note: {
       vi: `Thành phố ${best} có ÍT nhất láng giềng trong ngưỡng ${threshold} (${counts[best]} láng giềng). Kết quả GIỐNG Floyd-Warshall — chỉ khác cách lấp đầy ma trận dist.`,
@@ -12438,6 +12475,9 @@ module.exports = {
       "    def findTheCity(self, n, edges, threshold):",
       "        dist = [[float('inf')] * n for _ in range(n)]",
       "        adj = [[] for _ in range(n)]",
+      "        for u, v, w in edges:",
+      "            adj[u].append((v, w))",
+      "            adj[v].append((u, w))",
       "        for src in range(n):",
       "            dist[src][src] = 0",
       "            visited = [False] * n",
