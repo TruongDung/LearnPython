@@ -1917,7 +1917,223 @@ function buildSteps1979(input) {
   return { original: nums, answer, steps };
 }
 
+/**
+ * LeetCode 3536: Maximum Product of Two Digits.
+ *
+ * Given a positive integer n, extract its digits and return the maximum
+ * product obtainable by multiplying any two of them (a digit may be reused
+ * if it appears more than once, e.g. n=22 → 2*2=4).
+ *
+ * Greedy approach: track the two LARGEST digits seen so far (first, second)
+ * while scanning n from right to left with n%10 / n//10. The answer is
+ * first * second once all digits have been scanned.
+ */
+function buildSteps3536(input) {
+  const rawN = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+
+  if (!Number.isFinite(rawN) || rawN <= 0 || !Number.isInteger(rawN)) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "n phải là số nguyên dương.",
+        en: "n must be a positive integer.",
+      },
+    });
+    return { original: rawN, answer: 0, steps };
+  }
+
+  // Digits left-to-right (for display); the algorithm itself scans n%10
+  // right-to-left, so we track which display index is being visited.
+  const digits = String(rawN).split("").map(Number);
+  const D = digits.length;
+  const visited = new Array(D).fill(false);
+
+  let first = 0;  // largest digit seen so far
+  let second = 0; // second-largest digit seen so far
+
+  function pushStep(opts) {
+    const arr = digits.map((d) => (d === 0 ? 0.5 : d));
+    const sub = digits.map((d, i) => (visited[i] ? "·" : String(d)));
+    steps.push({
+      title: opts.title,
+      arr,
+      sub,
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "digit", value: opts.digit !== undefined ? opts.digit : "-" },
+        { name: "first (largest)", value: first },
+        { name: "second (2nd largest)", value: second },
+        ...(opts.extra || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  // ── Intro ───────────────────────────────────────────────
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+    sub: digits.map(String),
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "n", value: rawN },
+      { name: "digits", value: `[${digits.join(",")}]` },
+      { name: "first", value: 0 },
+      { name: "second", value: 0 },
+    ],
+    note: {
+      vi:
+        `n = ${rawN}. Ý tưởng: tích lớn nhất luôn là (chữ số lớn nhất) × (chữ số lớn nhì).\n` +
+        `Quét từng chữ số bằng n%10 / n//10, luôn giữ 2 biến: first = lớn nhất đã thấy, second = lớn nhì đã thấy.`,
+      en:
+        `n = ${rawN}. Key idea: the max product is always (largest digit) × (second-largest digit).\n` +
+        `Scan digits with n%10 / n//10, maintaining two variables: first = largest seen so far, second = second-largest seen so far.`,
+    },
+  });
+
+  // ── Scan digits right-to-left (matches n%10 loop) ───────
+  let m = rawN;
+  for (let posFromRight = 0; posFromRight < D; posFromRight++) {
+    const idxLTR = D - 1 - posFromRight;
+    const digit = m % 10;
+    const nextN = Math.floor(m / 10);
+
+    let updateKind;
+    if (digit > first) {
+      second = first;
+      first = digit;
+      updateKind = "first";
+    } else if (digit > second) {
+      second = digit;
+      updateKind = "second";
+    } else {
+      updateKind = "none";
+    }
+    visited[idxLTR] = true;
+
+    let note;
+    if (updateKind === "first") {
+      note = {
+        vi: `digit = ${digit} > first (cũ) → second = first (cũ), first = ${digit}. Giờ first=${first}, second=${second}.`,
+        en: `digit = ${digit} > old first → second = old first, first = ${digit}. Now first=${first}, second=${second}.`,
+      };
+    } else if (updateKind === "second") {
+      note = {
+        vi: `digit = ${digit} ≤ first=${first} nhưng > second (cũ) → second = ${digit}. Giờ first=${first}, second=${second}.`,
+        en: `digit = ${digit} ≤ first=${first} but > old second → second = ${digit}. Now first=${first}, second=${second}.`,
+      };
+    } else {
+      note = {
+        vi: `digit = ${digit} không lớn hơn first=${first} hay second=${second} → không cập nhật.`,
+        en: `digit = ${digit} is not larger than first=${first} or second=${second} → no update.`,
+      };
+    }
+
+    pushStep({
+      title: updateKind === "none"
+        ? { vi: `digit = ${digit} (không cập nhật)`, en: `digit = ${digit} (no update)` }
+        : { vi: `digit = ${digit} → cập nhật ${updateKind}`, en: `digit = ${digit} → update ${updateKind}` },
+      digit,
+      highlight: [idxLTR],
+      codeLines: updateKind === "first" ? [5, 6, 7, 8] : updateKind === "second" ? [5, 6, 9, 10] : [5, 6, 9],
+      note,
+    });
+
+    m = nextN;
+  }
+
+  // ── Final ───────────────────────────────────────────────
+  const answer = first * second;
+  const firstIdx = digits.indexOf(first);
+  const secondIdxCandidates = digits.map((d, i) => (i !== firstIdx && d === second ? i : -1)).filter((i) => i >= 0);
+  const secondIdx = secondIdxCandidates.length > 0 ? secondIdxCandidates[0] : firstIdx;
+
+  const fs = {
+    title: { vi: `Kết quả: ${first} × ${second} = ${answer}`, en: `Result: ${first} × ${second} = ${answer}` },
+    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
+    sub: digits.map(String),
+    highlight: [],
+    mark: [firstIdx, secondIdx].filter((i) => i >= 0),
+    final: true,
+    codeLines: [11],
+    vars: [
+      { name: "first (largest)", value: first },
+      { name: "second (2nd largest)", value: second },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Đã quét hết các chữ số. Tích lớn nhất = first × second = ${first} × ${second} = ${answer}.`,
+      en: `All digits scanned. Maximum product = first × second = ${first} × ${second} = ${answer}.`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: rawN, answer, steps };
+}
+
 module.exports = {
+  3536: {
+    id: 3536,
+    difficulty: "easy",
+    slug: "maximum-product-of-two-digits",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Maximum Product of Two Digits", en: "Maximum Product of Two Digits" },
+    titleVi: { vi: "Tích lớn nhất của 2 chữ số", en: "Max product of two digits" },
+    statement: {
+      vi:
+        "Cho số nguyên dương n. Trả về tích lớn nhất có thể tạo được bằng cách nhân 2 chữ số bất kỳ của n " +
+        "(1 chữ số có thể dùng lại nếu nó xuất hiện nhiều lần trong n).",
+      en:
+        "Given a positive integer n, return the maximum product obtainable by multiplying any two of its digits " +
+        "(a digit can be reused if it appears multiple times in n).",
+    },
+    defaultInput: [124],
+    inputKind: "positive",
+    inputLabel: { vi: "n", en: "n" },
+    singleInput: true,
+    maxInput: 1000000000,
+    extraParams: [],
+    approach: [
+      { vi: "Tích lớn nhất luôn là (chữ số lớn nhất) × (chữ số lớn nhì).", en: "The max product is always (largest digit) × (second-largest digit)." },
+      { vi: "Quét từng chữ số bằng n%10 / n//10, luôn giữ 2 biến first/second là 2 chữ số lớn nhất đã thấy.", en: "Scan digits with n%10 / n//10, maintaining first/second as the two largest digits seen so far." },
+      { vi: "Kết quả = first × second sau khi quét hết chữ số.", en: "Result = first × second after scanning all digits." },
+    ],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Quét ~log₁₀(n) chữ số, mỗi bước O(1).",
+        en: "About log₁₀(n) digits, each processed in O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxProduct(self, n: int) -> int:",
+      "        first = second = 0",
+      "        while n > 0:",
+      "            digit = n % 10",
+      "            if digit > first:",
+      "                second = first",
+      "                first = digit",
+      "            elif digit > second:",
+      "                second = digit",
+      "            n //= 10",
+      "        return first * second",
+    ],
+    builder: buildSteps3536,
+  },
   3513: {
     id: 3513,
     difficulty: "medium",
