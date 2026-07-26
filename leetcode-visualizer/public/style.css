@@ -2221,6 +2221,133 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+/* ---- Digit podium visualization (e.g. bai 3536: max product of two digits) ---- */
+.digit-podium-viz {
+  min-height: 250px;
+  padding: 20px;
+  display: grid;
+  gap: 22px;
+  align-content: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.08), transparent 35%),
+    rgba(15, 23, 42, 0.28);
+}
+
+.digit-strip {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.digit-cell {
+  width: 46px;
+  padding: 8px 0;
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.digit-cell-idx {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.digit-cell strong {
+  color: #f8fafc;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.digit-cell.current {
+  border-color: rgba(245, 158, 11, 0.8);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14);
+  transform: translateY(-3px);
+}
+
+.digit-cell.done:not(.current) {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.digit-cell.done:not(.current) strong {
+  color: #64748b;
+}
+
+.digit-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+}
+
+.digit-podium-op {
+  align-self: center;
+  color: #94a3b8;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.digit-slot {
+  width: 96px;
+  padding: 12px 8px;
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.34);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.digit-slot-label {
+  color: #94a3b8;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.digit-slot strong {
+  color: #f8fafc;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.digit-slot-first {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.digit-slot-second {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.digit-slot-answer {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.digit-slot.bump {
+  transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.28);
+}
+
 /* ---- 1D prefix sum visualization ---- */
 .prefix1d-viz {
   min-height: 260px;
@@ -5146,6 +5273,59 @@ button:disabled {
 [data-theme="light"] .running-output strong,
 [data-theme="light"] .running-status strong {
   color: #0f172a;
+}
+
+[data-theme="light"] .digit-podium-viz {
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent 36%),
+    #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .digit-cell,
+[data-theme="light"] .digit-slot {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .digit-cell strong,
+[data-theme="light"] .digit-slot strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .digit-cell-idx,
+[data-theme="light"] .digit-slot-label,
+[data-theme="light"] .digit-podium-op {
+  color: #475569;
+}
+
+[data-theme="light"] .digit-cell.current {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+[data-theme="light"] .digit-cell.done:not(.current) {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .digit-cell.done:not(.current) strong {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .digit-slot-first {
+  background: #ecfdf5;
+  border-color: #34d399;
+}
+
+[data-theme="light"] .digit-slot-second {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+[data-theme="light"] .digit-slot-answer {
+  background: #fffbeb;
+  border-color: #fbbf24;
 }
 
 [data-theme="light"] .running-arrow {

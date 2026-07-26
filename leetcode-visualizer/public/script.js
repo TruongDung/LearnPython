@@ -2611,6 +2611,48 @@ function renderRunningSumView(step) {
     </div>`;
 }
 
+function renderDigitPodiumView(step) {
+  const view = step.digitPodiumView || {};
+  const digits = Array.isArray(view.digits) ? view.digits : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const first = view.first ?? 0;
+  const second = view.second ?? 0;
+  const updateKind = view.updateKind || null; // "first" | "second" | "none" | null
+  const answer = view.answer;
+
+  const digitCells = digits.map((d, i) => {
+    const isCurrent = i === current;
+    const isDone = visited[i];
+    return `<div class="digit-cell${isCurrent ? " current" : ""}${isDone && !isCurrent ? " done" : ""}">
+      <span class="digit-cell-idx">[${i}]</span>
+      <strong>${escapeHtml(String(d))}</strong>
+    </div>`;
+  }).join("");
+
+  const firstBump = updateKind === "first" ? " bump" : "";
+  const secondBump = updateKind === "second" ? " bump" : "";
+
+  const podium = `<div class="digit-podium">
+    <div class="digit-slot digit-slot-first${firstBump}">
+      <span class="digit-slot-label">${lang === "vi" ? "first (lớn nhất)" : "first (largest)"}</span>
+      <strong>${escapeHtml(String(first))}</strong>
+    </div>
+    <div class="digit-podium-op">×</div>
+    <div class="digit-slot digit-slot-second${secondBump}">
+      <span class="digit-slot-label">${lang === "vi" ? "second (lớn nhì)" : "second (2nd largest)"}</span>
+      <strong>${escapeHtml(String(second))}</strong>
+    </div>
+    ${answer !== undefined ? `<div class="digit-podium-op">=</div><div class="digit-slot digit-slot-answer"><span class="digit-slot-label">${lang === "vi" ? "tích" : "product"}</span><strong>${escapeHtml(String(answer))}</strong></div>` : ""}
+  </div>`;
+
+  $("treeView").innerHTML = `
+    <div class="digit-podium-viz">
+      <div class="digit-strip">${digitCells}</div>
+      ${podium}
+    </div>`;
+}
+
 function renderPrefix1DView(step) {
   const view = step.prefix1DView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -3395,6 +3437,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEvenOddFillView(step);
+  } else if (step.digitPodiumView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDigitPodiumView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

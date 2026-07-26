@@ -1958,127 +1958,201 @@ function buildSteps3536(input) {
   let first = 0;  // largest digit seen so far
   let second = 0; // second-largest digit seen so far
 
-  function pushStep(opts) {
-    const arr = digits.map((d) => (d === 0 ? 0.5 : d));
-    const sub = digits.map((d, i) => (visited[i] ? "·" : String(d)));
+  function snap(opts) {
     steps.push({
       title: opts.title,
-      arr,
-      sub,
-      highlight: opts.highlight || [],
-      mark: opts.mark || [],
+      arr: [],
+      digitPodiumView: {
+        digits,
+        visited: [...visited],
+        current: opts.current !== undefined ? opts.current : -1,
+        first,
+        second,
+        updateKind: opts.updateKind || null,
+        answer: opts.answer,
+      },
+      highlight: [],
+      mark: [],
       final: opts.final || false,
       codeLines: opts.codeLines || [],
       vars: [
+        { name: "n (remaining)", value: opts.remaining !== undefined ? opts.remaining : "-" },
         { name: "digit", value: opts.digit !== undefined ? opts.digit : "-" },
         { name: "first (largest)", value: first },
         { name: "second (2nd largest)", value: second },
-        ...(opts.extra || []),
       ],
       note: opts.note,
     });
   }
 
-  // ── Intro ───────────────────────────────────────────────
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
-    sub: digits.map(String),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4],
-    vars: [
-      { name: "n", value: rawN },
-      { name: "digits", value: `[${digits.join(",")}]` },
-      { name: "first", value: 0 },
-      { name: "second", value: 0 },
-    ],
+  // Line 3: first = second = 0
+  snap({
+    title: { vi: "first = second = 0", en: "first = second = 0" },
+    current: -1,
+    remaining: rawN,
+    codeLines: [3],
     note: {
-      vi:
-        `n = ${rawN}. Ý tưởng: tích lớn nhất luôn là (chữ số lớn nhất) × (chữ số lớn nhì).\n` +
-        `Quét từng chữ số bằng n%10 / n//10, luôn giữ 2 biến: first = lớn nhất đã thấy, second = lớn nhì đã thấy.`,
-      en:
-        `n = ${rawN}. Key idea: the max product is always (largest digit) × (second-largest digit).\n` +
-        `Scan digits with n%10 / n//10, maintaining two variables: first = largest seen so far, second = second-largest seen so far.`,
+      vi: `n = ${rawN}. Khởi tạo 2 "bệ" (podium): first = second = 0. first sẽ giữ chữ số lớn nhất đã thấy, second giữ chữ số lớn nhì.`,
+      en: `n = ${rawN}. Initialize two "podium slots": first = second = 0. first will hold the largest digit seen so far, second the second-largest.`,
     },
   });
 
-  // ── Scan digits right-to-left (matches n%10 loop) ───────
+  // Scan digits right-to-left (matches n%10 loop)
   let m = rawN;
   for (let posFromRight = 0; posFromRight < D; posFromRight++) {
     const idxLTR = D - 1 - posFromRight;
-    const digit = m % 10;
-    const nextN = Math.floor(m / 10);
 
-    let updateKind;
-    if (digit > first) {
-      second = first;
-      first = digit;
-      updateKind = "first";
-    } else if (digit > second) {
-      second = digit;
-      updateKind = "second";
-    } else {
-      updateKind = "none";
-    }
-    visited[idxLTR] = true;
-
-    let note;
-    if (updateKind === "first") {
-      note = {
-        vi: `digit = ${digit} > first (cũ) → second = first (cũ), first = ${digit}. Giờ first=${first}, second=${second}.`,
-        en: `digit = ${digit} > old first → second = old first, first = ${digit}. Now first=${first}, second=${second}.`,
-      };
-    } else if (updateKind === "second") {
-      note = {
-        vi: `digit = ${digit} ≤ first=${first} nhưng > second (cũ) → second = ${digit}. Giờ first=${first}, second=${second}.`,
-        en: `digit = ${digit} ≤ first=${first} but > old second → second = ${digit}. Now first=${first}, second=${second}.`,
-      };
-    } else {
-      note = {
-        vi: `digit = ${digit} không lớn hơn first=${first} hay second=${second} → không cập nhật.`,
-        en: `digit = ${digit} is not larger than first=${first} or second=${second} → no update.`,
-      };
-    }
-
-    pushStep({
-      title: updateKind === "none"
-        ? { vi: `digit = ${digit} (không cập nhật)`, en: `digit = ${digit} (no update)` }
-        : { vi: `digit = ${digit} → cập nhật ${updateKind}`, en: `digit = ${digit} → update ${updateKind}` },
-      digit,
-      highlight: [idxLTR],
-      codeLines: updateKind === "first" ? [5, 6, 7, 8] : updateKind === "second" ? [5, 6, 9, 10] : [5, 6, 9],
-      note,
+    // Line 4: while n > 0:
+    snap({
+      title: { vi: `while n > 0 → True (n=${m})`, en: `while n > 0 → True (n=${m})` },
+      current: -1,
+      remaining: m,
+      codeLines: [4],
+      note: {
+        vi: `n = ${m} > 0 → còn chữ số cần xét, tiếp tục vòng lặp.`,
+        en: `n = ${m} > 0 → there are still digits to check, continue the loop.`,
+      },
     });
 
+    // Line 5: digit = n % 10
+    const digit = m % 10;
+    snap({
+      title: { vi: `digit = n % 10 = ${digit}`, en: `digit = n % 10 = ${digit}` },
+      current: idxLTR,
+      remaining: m,
+      digit,
+      codeLines: [5],
+      note: {
+        vi: `Lấy chữ số cuối của n=${m}: digit = ${m} % 10 = ${digit}.`,
+        en: `Take the last digit of n=${m}: digit = ${m} % 10 = ${digit}.`,
+      },
+    });
+
+    // Line 6: if digit > first:
+    const beatsFirst = digit > first;
+    snap({
+      title: { vi: `if digit > first → ${digit} > ${first} → ${beatsFirst}`, en: `if digit > first → ${digit} > ${first} → ${beatsFirst}` },
+      current: idxLTR,
+      remaining: m,
+      digit,
+      codeLines: [6],
+      note: beatsFirst
+        ? { vi: `${digit} > first=${first} → digit sẽ chiếm bệ FIRST, còn first cũ bị đẩy xuống bệ SECOND.`, en: `${digit} > first=${first} → digit will take the FIRST slot, and the old first gets pushed down into the SECOND slot.` }
+        : { vi: `${digit} không lớn hơn first=${first} → kiểm tra tiếp với second.`, en: `${digit} is not larger than first=${first} → check against second next.` },
+    });
+
+    let updateKind;
+    if (beatsFirst) {
+      // Line 7: second = first
+      const oldFirst = first;
+      second = first;
+      snap({
+        title: { vi: `second = first → second = ${second}`, en: `second = first → second = ${second}` },
+        current: idxLTR,
+        remaining: m,
+        digit,
+        updateKind: "second",
+        codeLines: [7],
+        note: {
+          vi: `Trước khi ghi đè first, "đẩy" giá trị first cũ (${oldFirst}) xuống bệ second. second = ${second}.`,
+          en: `Before overwriting first, push the old first value (${oldFirst}) down into the second slot. second = ${second}.`,
+        },
+      });
+
+      // Line 8: first = digit
+      first = digit;
+      updateKind = "first";
+      snap({
+        title: { vi: `first = digit → first = ${first}`, en: `first = digit → first = ${first}` },
+        current: idxLTR,
+        remaining: m,
+        digit,
+        updateKind: "first",
+        codeLines: [8],
+        note: {
+          vi: `digit=${digit} chiếm bệ first. Giờ first=${first}, second=${second}.`,
+          en: `digit=${digit} takes the first slot. Now first=${first}, second=${second}.`,
+        },
+      });
+    } else {
+      // Line 9: elif digit > second:
+      const beatsSecond = digit > second;
+      snap({
+        title: { vi: `elif digit > second → ${digit} > ${second} → ${beatsSecond}`, en: `elif digit > second → ${digit} > ${second} → ${beatsSecond}` },
+        current: idxLTR,
+        remaining: m,
+        digit,
+        codeLines: [9],
+        note: beatsSecond
+          ? { vi: `${digit} > second=${second} → digit sẽ chiếm bệ SECOND.`, en: `${digit} > second=${second} → digit will take the SECOND slot.` }
+          : { vi: `${digit} cũng không lớn hơn second=${second} → không đủ mạnh để chiếm bệ nào, giữ nguyên first/second.`, en: `${digit} is not larger than second=${second} either → not strong enough to take a slot, first/second stay unchanged.` },
+      });
+
+      if (beatsSecond) {
+        // Line 10: second = digit
+        second = digit;
+        updateKind = "second";
+        snap({
+          title: { vi: `second = digit → second = ${second}`, en: `second = digit → second = ${second}` },
+          current: idxLTR,
+          remaining: m,
+          digit,
+          updateKind: "second",
+          codeLines: [10],
+          note: {
+            vi: `digit=${digit} chiếm bệ second. Giờ first=${first}, second=${second}.`,
+            en: `digit=${digit} takes the second slot. Now first=${first}, second=${second}.`,
+          },
+        });
+      } else {
+        updateKind = "none";
+      }
+    }
+
+    visited[idxLTR] = true;
+
+    // Line 11: n //= 10
+    const nextN = Math.floor(m / 10);
     m = nextN;
+    snap({
+      title: { vi: `n //= 10 → n = ${m}`, en: `n //= 10 → n = ${m}` },
+      current: -1,
+      remaining: m,
+      updateKind: updateKind === "none" ? null : updateKind,
+      codeLines: [11],
+      note: {
+        vi: `Bỏ chữ số cuối đã xét: n = ${m}.`,
+        en: `Drop the digit just processed: n = ${m}.`,
+      },
+    });
   }
 
-  // ── Final ───────────────────────────────────────────────
-  const answer = first * second;
-  const firstIdx = digits.indexOf(first);
-  const secondIdxCandidates = digits.map((d, i) => (i !== firstIdx && d === second ? i : -1)).filter((i) => i >= 0);
-  const secondIdx = secondIdxCandidates.length > 0 ? secondIdxCandidates[0] : firstIdx;
-
-  const fs = {
-    title: { vi: `Kết quả: ${first} × ${second} = ${answer}`, en: `Result: ${first} × ${second} = ${answer}` },
-    arr: digits.map((d) => (d === 0 ? 0.5 : d)),
-    sub: digits.map(String),
-    highlight: [],
-    mark: [firstIdx, secondIdx].filter((i) => i >= 0),
-    final: true,
-    codeLines: [11],
-    vars: [
-      { name: "first (largest)", value: first },
-      { name: "second (2nd largest)", value: second },
-      { name: "answer", value: answer },
-    ],
+  // Line 4 (final check): while n > 0 → False
+  snap({
+    title: { vi: `while n > 0 → False (n=0)`, en: `while n > 0 → False (n=0)` },
+    current: -1,
+    remaining: 0,
+    codeLines: [4],
     note: {
-      vi: `Đã quét hết các chữ số. Tích lớn nhất = first × second = ${first} × ${second} = ${answer}.`,
-      en: `All digits scanned. Maximum product = first × second = ${first} × ${second} = ${answer}.`,
+      vi: `n = 0 → đã quét hết mọi chữ số, thoát vòng lặp.`,
+      en: `n = 0 → all digits have been scanned, exit the loop.`,
     },
-  };
-  steps.push(fs);
+  });
+
+  // Line 12: return first * second
+  const answer = first * second;
+  snap({
+    title: { vi: `return first * second → ${first} × ${second} = ${answer}`, en: `return first * second → ${first} × ${second} = ${answer}` },
+    current: -1,
+    remaining: 0,
+    final: true,
+    codeLines: [12],
+    answer,
+    note: {
+      vi: `Tích lớn nhất = first × second = ${first} × ${second} = ${answer}.`,
+      en: `Maximum product = first × second = ${first} × ${second} = ${answer}.`,
+    },
+  });
 
   return { original: rawN, answer, steps };
 }
