@@ -895,9 +895,254 @@ function fmt(v) {
   return String(v);
 }
 
+/**
+ * LeetCode 410: Split Array Largest Sum.
+ *
+ * Given an integer array nums and an integer k, split nums into k
+ * non-empty contiguous subarrays to MINIMIZE the LARGEST subarray sum.
+ *
+ * Binary search on the ANSWER: the answer (the minimized largest sum) lies
+ * somewhere in [max(nums), sum(nums)]. For a candidate `mid`, greedily count
+ * how many groups are needed if no group's sum may exceed `mid`:
+ *   - if that count <= k, mid is FEASIBLE (maybe can go smaller) → right = mid
+ *   - if that count > k, mid is TOO SMALL (needs more groups than allowed) → left = mid + 1
+ * The smallest feasible mid is the answer.
+ */
+function buildSteps410(nums, params) {
+  const k = Number(params && params.k !== undefined ? params.k : 2);
+  const steps = [];
+  const n = nums.length;
+
+  function groupsFor(mid) {
+    // Greedily pack nums into the fewest groups possible where each group's
+    // sum never exceeds `mid`. Returns [groupId per index], groupCount.
+    const groupOf = new Array(n).fill(0);
+    let groups = 1;
+    let curSum = 0;
+    for (let i = 0; i < n; i++) {
+      if (curSum + nums[i] > mid) {
+        groups++;
+        curSum = 0;
+      }
+      groupOf[i] = groups - 1;
+      curSum += nums[i];
+    }
+    return { groupOf, groups };
+  }
+
+  function subLabels(l, r, m) {
+    return nums.map((_, i) => {
+      const tags = [];
+      if (i === l) tags.push("L");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === r) tags.push("R");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+
+  function snap(opts) {
+    const groupInfo = opts.mid !== undefined ? groupsFor(opts.mid) : null;
+    steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: opts.sub || nums.map((_, i) => `[${i}]`),
+      highlight: opts.highlight || [],
+      mark: groupInfo ? groupInfo.groupOf.filter((_, i) => groupInfo.groupOf[i] % 2 === 1) : [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  const sum = nums.reduce((a, b) => a + b, 0);
+  const maxVal = Math.max(...nums);
+
+  // Line 3: left, right = max(nums), sum(nums)
+  let left = maxVal;
+  let right = sum;
+  snap({
+    title: { vi: `left, right = max(nums), sum(nums) → left=${left}, right=${right}`, en: `left, right = max(nums), sum(nums) → left=${left}, right=${right}` },
+    sub: subLabels(undefined, undefined),
+    codeLines: [3],
+    vars: [
+      { name: "nums", value: `[${nums.join(",")}]` },
+      { name: "k", value: k },
+      { name: "left (max element)", value: left },
+      { name: "right (total sum)", value: right },
+    ],
+    note: {
+      vi: `nums=[${nums.join(",")}], k=${k}. Đáp án (largest sum nhỏ nhất có thể) chắc chắn nằm trong [max(nums), sum(nums)] = [${left}, ${right}]: không thể nhỏ hơn phần tử lớn nhất (1 nhóm phải chứa nó), và không cần lớn hơn tổng cả mảng (dùng đúng 1 nhóm).`,
+      en: `nums=[${nums.join(",")}], k=${k}. The answer (the minimized largest sum) is guaranteed to lie in [max(nums), sum(nums)] = [${left}, ${right}]: it can't be smaller than the largest element (some group must contain it), and never needs to exceed the total sum (using just 1 group).`,
+    },
+  });
+
+  let answer = right;
+  let iterGuard = 0;
+
+  while (left < right && iterGuard < 100) {
+    iterGuard++;
+    // Line 4: while left < right:
+    snap({
+      title: { vi: `while left < right → ${left} < ${right} → True`, en: `while left < right → ${left} < ${right} → True` },
+      sub: subLabels(undefined, undefined),
+      codeLines: [4],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      note: {
+        vi: `left=${left} < right=${right} → còn khoảng để tìm đáp án nhỏ nhất, tiếp tục.`,
+        en: `left=${left} < right=${right} → there's still a range to search for the minimum answer, continue.`,
+      },
+    });
+
+    // Line 5: mid = (left + right) // 2
+    const mid = Math.floor((left + right) / 2);
+    snap({
+      title: { vi: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}`, en: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}` },
+      sub: subLabels(undefined, undefined),
+      codeLines: [5],
+      vars: [{ name: "mid", value: mid }],
+      note: {
+        vi: `Thử mid=${mid}: nếu giới hạn mỗi nhóm ≤ ${mid} thì cần bao nhiêu nhóm?`,
+        en: `Try mid=${mid}: if each group is capped at ≤ ${mid}, how many groups are needed?`,
+      },
+    });
+
+    // Line 6: groups = count_groups(nums, mid)
+    const { groupOf, groups } = groupsFor(mid);
+    const groupsStr = groupOf.map((g, i) => `${nums[i]}→G${g}`).join(", ");
+    snap({
+      title: { vi: `groups = count_groups(nums, mid) → ${groups} nhóm`, en: `groups = count_groups(nums, mid) → ${groups} groups` },
+      sub: nums.map((v, i) => `[${i}] G${groupOf[i]}`),
+      mid,
+      codeLines: [6],
+      vars: [{ name: "groups needed", value: groups }, { name: "grouping", value: groupsStr }],
+      note: {
+        vi: `Đi từ trái sang phải, cộng dồn vào nhóm hiện tại; khi cộng thêm sẽ VƯỢT mid=${mid} thì mở nhóm mới. Kết quả cần ${groups} nhóm (màu xen kẽ = nhóm khác nhau).`,
+        en: `Scan left to right, accumulate into the current group; when adding the next element would EXCEED mid=${mid}, start a new group. Needs ${groups} groups (alternating colors = different groups).`,
+      },
+    });
+
+    const feasible = groups <= k;
+    // Line 7: if groups <= k:
+    snap({
+      title: { vi: `if groups <= k → ${groups} <= ${k} → ${feasible}`, en: `if groups <= k → ${groups} <= ${k} → ${feasible}` },
+      sub: nums.map((v, i) => `[${i}] G${groupOf[i]}`),
+      mid,
+      codeLines: [7],
+      vars: [{ name: "groups", value: groups }, { name: "k", value: k }],
+      note: feasible
+        ? { vi: `${groups} ≤ k=${k} → mid=${mid} KHẢ THI (đủ ít nhóm), có thể thử giá trị NHỎ HƠN → right=mid.`, en: `${groups} ≤ k=${k} → mid=${mid} is FEASIBLE (few enough groups), maybe can go SMALLER → right=mid.` }
+        : { vi: `${groups} > k=${k} → mid=${mid} QUÁ NHỎ (cần nhiều nhóm hơn cho phép) → left=mid+1.`, en: `${groups} > k=${k} → mid=${mid} is TOO SMALL (needs more groups than allowed) → left=mid+1.` },
+    });
+
+    if (feasible) {
+      // Line 8: right = mid
+      right = mid;
+      snap({
+        title: { vi: `right = mid → right = ${right}`, en: `right = mid → right = ${right}` },
+        sub: subLabels(undefined, undefined),
+        codeLines: [8],
+        vars: [{ name: "right", value: right }],
+        note: {
+          vi: `right = ${right}. Thu hẹp phạm vi tìm kiếm về phía nhỏ hơn.`,
+          en: `right = ${right}. Shrink the search range toward smaller values.`,
+        },
+      });
+    } else {
+      // Line 10: left = mid + 1
+      left = mid + 1;
+      snap({
+        title: { vi: `left = mid + 1 → left = ${left}`, en: `left = mid + 1 → left = ${left}` },
+        sub: subLabels(undefined, undefined),
+        codeLines: [10],
+        vars: [{ name: "left", value: left }],
+        note: {
+          vi: `left = ${left}. Thu hẹp phạm vi tìm kiếm về phía lớn hơn.`,
+          en: `left = ${left}. Shrink the search range toward larger values.`,
+        },
+      });
+    }
+  }
+
+  answer = left;
+  const { groupOf: finalGroupOf } = groupsFor(answer);
+  const fs = {
+    title: { vi: `return left → ${answer}`, en: `return left → ${answer}` },
+    arr: [...nums],
+    sub: nums.map((v, i) => `[${i}] G${finalGroupOf[i]}`),
+    highlight: [],
+    mark: finalGroupOf.filter((_, i) => finalGroupOf[i] % 2 === 1),
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `left == right == ${answer} → đây là giá trị NHỎ NHẤT sao cho nums chia được thành ≤ k=${k} nhóm liên tiếp mà tổng mỗi nhóm ≤ ${answer}.`,
+      en: `left == right == ${answer} → this is the SMALLEST value such that nums can be split into ≤ k=${k} contiguous groups each summing to ≤ ${answer}.`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: nums, answer, steps };
+}
+
 module.exports = {
+  410: {
+    id: 410,
+    difficulty: "hard",
+    slug: "split-array-largest-sum",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Split Array Largest Sum", en: "Split Array Largest Sum" },
+    titleVi: { vi: "Chia mảng để tổng lớn nhất nhỏ nhất", en: "Split array to minimize the largest sum" },
+    statement: {
+      vi:
+        "Cho mảng nums và số nguyên k. Chia nums thành k mảng con LIÊN TIẾP, không rỗng, sao cho TỔNG LỚN NHẤT " +
+        "trong các mảng con là NHỎ NHẤT có thể. Trả về giá trị tổng lớn nhất đó.",
+      en:
+        "Given an array nums and an integer k, split nums into k non-empty CONTIGUOUS subarrays such that the " +
+        "LARGEST sum among the subarrays is MINIMIZED. Return that minimized largest sum.",
+    },
+    defaultInput: [7, 2, 5, 10, 8],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (dương)", en: "nums (positive)" },
+    extraParams: [{ key: "k", label: { vi: "k (số nhóm)", en: "k (number of groups)" }, default: 2 }],
+    approach: [
+      { vi: "Binary search trên ĐÁP ÁN: giá trị cần tìm nằm trong [max(nums), sum(nums)].", en: "Binary search on the ANSWER: the value we want lies in [max(nums), sum(nums)]." },
+      { vi: "Với mid, đếm SỐ NHÓM cần dùng nếu mỗi nhóm bị giới hạn tổng ≤ mid (đi tham lam từ trái sang phải).", en: "For a given mid, count the NUMBER OF GROUPS needed if each group's sum is capped at ≤ mid (greedy left to right)." },
+      { vi: "Nếu số nhóm ≤ k → mid khả thi, thử nhỏ hơn (right=mid). Nếu > k → mid quá nhỏ (left=mid+1).", en: "If the group count ≤ k → mid is feasible, try smaller (right=mid). If > k → mid is too small (left=mid+1)." },
+    ],
+    complexity: {
+      time: "O(n·log(sum(nums)))",
+      space: "O(1)",
+      note: {
+        vi: "Binary search O(log(sum)) lần, mỗi lần đếm nhóm tốn O(n).",
+        en: "O(log(sum)) binary search iterations, each counting groups in O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def splitArray(self, nums, k):",
+      "        left, right = max(nums), sum(nums)",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            groups = self.count_groups(nums, mid)",
+      "            if groups <= k:",
+      "                right = mid",
+      "            else:",
+      "                left = mid + 1",
+      "        return left",
+      "    def count_groups(self, nums, mid):",
+      "        groups, cur_sum = 1, 0",
+      "        for num in nums:",
+      "            if cur_sum + num > mid:",
+      "                groups += 1",
+      "                cur_sum = 0",
+      "            cur_sum += num",
+      "        return groups",
+    ],
+    builder: buildSteps410,
+  },
   __meta: {
-    order: [4, 34, 911],
+    order: [410, 4, 34, 911],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {
