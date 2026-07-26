@@ -117,113 +117,197 @@ function buildSteps88(input, params) {
   const nums1 = [...input]; // already has trailing zeros
 
   const steps = [];
-  let p1 = m - 1;
-  let p2 = n - 1;
-  let write = m + n - 1;
+  // "written" tracks which nums1 slots hold their FINAL merged value, so the
+  // bar chart can visually distinguish "already merged" (green, via mark)
+  // from "still a placeholder / not yet overwritten" (plain).
+  const written = new Array(nums1.length).fill(false);
+  for (let i = 0; i < m; i++) written[i] = true; // the initial m real elements count as written
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [...nums1],
-    sub: [...nums2, ...new Array(m).fill("")],
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5],
-    vars: [
-      { name: "m", value: m },
-      { name: "n", value: n },
-      { name: "p1", value: p1 },
-      { name: "p2", value: p2 },
-      { name: "write", value: write },
-      { name: "nums2", value: `[${nums2.join(",")}]` },
-    ],
+  // Sub-labels show index PLUS which pointer(s) currently point at that slot,
+  // e.g. "[2] p1" or "[5] write" — this is the main thing that was missing
+  // before: you had to read the note text to know where p1/p2/write were.
+  function subLabels(p1, p2, write) {
+    return nums1.map((_, i) => {
+      const tags = [];
+      if (i === p1) tags.push("p1");
+      if (i === write) tags.push("write");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+  // nums2's own mini pointer row (p2), shown as its own array/sub pair so it
+  // doesn't get confused with nums1's indices.
+  function nums2SubLabels(p2) {
+    return nums2.map((_, i) => (i === p2 ? `[${i}] p2` : `[${i}]`));
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...nums1],
+      sub: subLabels(opts.p1, opts.p2, opts.write),
+      highlight: opts.highlight || [],
+      mark: nums1.map((_, i) => (written[i] ? i : -1)).filter((i) => i >= 0),
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "p1", value: opts.p1 },
+        { name: "p2", value: opts.p2 },
+        { name: "write", value: opts.write },
+        { name: "nums2 (p2=" + opts.p2 + ")", value: `[${nums2.map((v, i) => (i === opts.p2 ? `[${v}]` : v)).join(",")}]` },
+        ...(opts.extra || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: p1 = m - 1
+  let p1 = m - 1;
+  snap({
+    title: { vi: "p1 = m - 1", en: "p1 = m - 1" },
+    p1, p2: undefined, write: undefined,
+    codeLines: [3],
     note: {
-      vi: `nums1 = [${nums1.join(",")}] (m=${m} phần tử + ${n} chỗ trống). nums2 = [${nums2.join(",")}]. Điền từ cuối.`,
-      en: `nums1 = [${nums1.join(",")}] (m=${m} elements + ${n} slots). nums2 = [${nums2.join(",")}]. Fill from end.`,
+      vi: `nums1 = [${nums1.join(",")}] (m=${m} phần tử thực + ${n} chỗ trống 0). p1 chỉ vào phần tử THỰC cuối cùng của nums1: p1=${p1}.`,
+      en: `nums1 = [${nums1.join(",")}] (m=${m} real elements + ${n} placeholder zeros). p1 points at nums1's last REAL element: p1=${p1}.`,
     },
   });
 
-  while (p1 >= 0 && p2 >= 0) {
+  // Line 4: p2 = n - 1
+  let p2 = n - 1;
+  snap({
+    title: { vi: "p2 = n - 1", en: "p2 = n - 1" },
+    p1, p2, write: undefined,
+    codeLines: [4],
+    note: {
+      vi: `nums2 = [${nums2.join(",")}]. p2 chỉ vào phần tử cuối cùng của nums2: p2=${p2}.`,
+      en: `nums2 = [${nums2.join(",")}]. p2 points at nums2's last element: p2=${p2}.`,
+    },
+  });
+
+  // Line 5: write = m + n - 1
+  let write = m + n - 1;
+  snap({
+    title: { vi: "write = m + n - 1", en: "write = m + n - 1" },
+    p1, p2, write,
+    codeLines: [5],
+    note: {
+      vi: `write chỉ vào Ô CUỐI CÙNG của nums1 (chỗ trống): write=${write}. Ý tưởng: điền nums1 từ PHẢI sang TRÁI, luôn đặt số LỚN HƠN vào cuối trước — nhờ vậy không cần mảng phụ.`,
+      en: `write points at nums1's VERY LAST slot (a placeholder): write=${write}. Idea: fill nums1 from RIGHT to LEFT, always placing the LARGER number last first — so no extra array is needed.`,
+    },
+  });
+
+  while (true) {
+    // Line 6: while p1 >= 0 and p2 >= 0:
+    const loopContinues = p1 >= 0 && p2 >= 0;
+    snap({
+      title: { vi: `while p1≥0 and p2≥0 → ${p1}≥0 and ${p2}≥0 → ${loopContinues}`, en: `while p1≥0 and p2≥0 → ${p1}≥0 and ${p2}≥0 → ${loopContinues}` },
+      p1, p2, write,
+      highlight: [p1, p2].filter((x) => x >= 0),
+      codeLines: [6],
+      note: loopContinues
+        ? { vi: "Cả 2 mảng đều còn phần tử chưa xét → tiếp tục so sánh.", en: "Both arrays still have unprocessed elements → keep comparing." }
+        : { vi: "Một trong hai con trỏ đã âm → dừng vòng lặp chính (một mảng đã hết).", en: "One pointer has gone negative → exit the main loop (one array is exhausted)." },
+    });
+
+    if (!loopContinues) break;
+
     const v1 = nums1[p1];
     const v2 = nums2[p2];
-    if (v1 > v2) {
-      nums1[write] = v1;
-      steps.push({
-        title: { vi: `nums1[${p1}]=${v1} > nums2[${p2}]=${v2}`, en: `nums1[${p1}]=${v1} > nums2[${p2}]=${v2}` },
-        arr: [...nums1],
-        highlight: [p1, write],
-        mark: [],
-        codeLines: [6, 7, 8],
-        vars: [
-          { name: "p1", value: p1 },
-          { name: "p2", value: p2 },
-          { name: "write", value: write },
-          { name: "placed", value: v1 },
-        ],
-        note: {
-          vi: `${v1} > ${v2} → đặt ${v1} tại vị trí ${write}. p1--.`,
-          en: `${v1} > ${v2} → place ${v1} at position ${write}. p1--.`,
-        },
-      });
-      p1--;
-    } else {
-      nums1[write] = v2;
-      steps.push({
-        title: { vi: `nums2[${p2}]=${v2} ≥ nums1[${p1}]=${v1}`, en: `nums2[${p2}]=${v2} ≥ nums1[${p1}]=${v1}` },
-        arr: [...nums1],
-        highlight: [write],
-        mark: [],
-        codeLines: [9, 10, 11],
-        vars: [
-          { name: "p1", value: p1 },
-          { name: "p2", value: p2 },
-          { name: "write", value: write },
-          { name: "placed", value: v2 },
-        ],
-        note: {
-          vi: `${v2} ≥ ${v1} → đặt ${v2} (từ nums2) tại vị trí ${write}. p2--.`,
-          en: `${v2} ≥ ${v1} → place ${v2} (from nums2) at position ${write}. p2--.`,
-        },
-      });
-      p2--;
-    }
-    write--;
-  }
+    const v1Bigger = v1 > v2;
 
-  // Copy remaining nums2 elements
-  while (p2 >= 0) {
-    nums1[write] = nums2[p2];
-    steps.push({
-      title: { vi: `Copy nums2[${p2}]=${nums2[p2]}`, en: `Copy nums2[${p2}]=${nums2[p2]}` },
-      arr: [...nums1],
-      highlight: [write],
-      mark: [],
-      codeLines: [12, 13],
-      vars: [
-        { name: "p2", value: p2 },
-        { name: "write", value: write },
-        { name: "placed", value: nums2[p2] },
-      ],
+    // Line 7: if nums1[p1] > nums2[p2]:
+    snap({
+      title: { vi: `if nums1[p1] > nums2[p2] → ${v1} > ${v2} → ${v1Bigger}`, en: `if nums1[p1] > nums2[p2] → ${v1} > ${v2} → ${v1Bigger}` },
+      p1, p2, write,
+      highlight: [p1, p2],
+      codeLines: [7],
+      note: v1Bigger
+        ? { vi: `nums1[${p1}]=${v1} lớn hơn → nums1 đang giữ số LỚN HƠN, nên số này sẽ được đặt vào cuối (write=${write}).`, en: `nums1[${p1}]=${v1} is larger → nums1 currently holds the BIGGER number, so it gets placed at the end (write=${write}).` }
+        : { vi: `nums2[${p2}]=${v2} lớn hơn hoặc bằng → nums2 sẽ được đặt vào cuối.`, en: `nums2[${p2}]=${v2} is larger or equal → nums2 gets placed at the end.` },
+    });
+
+    if (v1Bigger) {
+      // Line 8: nums1[write] = nums1[p1]
+      nums1[write] = v1;
+      written[write] = true;
+      snap({
+        title: { vi: `nums1[write] = nums1[p1] → nums1[${write}] = ${v1}`, en: `nums1[write] = nums1[p1] → nums1[${write}] = ${v1}` },
+        p1, p2, write,
+        highlight: [write],
+        codeLines: [8],
+        note: {
+          vi: `Đặt ${v1} vào vị trí write=${write}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
+          en: `Place ${v1} at position write=${write}. This slot is now FINALIZED (shown in green).`,
+        },
+      });
+
+      // Line 9: p1 -= 1
+      p1--;
+      snap({
+        title: { vi: `p1 -= 1 → p1 = ${p1}`, en: `p1 -= 1 → p1 = ${p1}` },
+        p1, p2, write,
+        codeLines: [9],
+        note: {
+          vi: `Đã dùng xong nums1[${p1 + 1}], lùi p1 sang trái: p1=${p1}.`,
+          en: `Finished using nums1[${p1 + 1}], move p1 left: p1=${p1}.`,
+        },
+      });
+    } else {
+      // Line 11: nums1[write] = nums2[p2]
+      nums1[write] = v2;
+      written[write] = true;
+      snap({
+        title: { vi: `nums1[write] = nums2[p2] → nums1[${write}] = ${v2}`, en: `nums1[write] = nums2[p2] → nums1[${write}] = ${v2}` },
+        p1, p2, write,
+        highlight: [write],
+        codeLines: [11],
+        note: {
+          vi: `Đặt ${v2} (từ nums2) vào vị trí write=${write}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
+          en: `Place ${v2} (from nums2) at position write=${write}. This slot is now FINALIZED (shown in green).`,
+        },
+      });
+
+      // Line 12: p2 -= 1
+      p2--;
+      snap({
+        title: { vi: `p2 -= 1 → p2 = ${p2}`, en: `p2 -= 1 → p2 = ${p2}` },
+        p1, p2, write,
+        codeLines: [12],
+        note: {
+          vi: `Đã dùng xong nums2[${p2 + 1}], lùi p2 sang trái: p2=${p2}.`,
+          en: `Finished using nums2[${p2 + 1}], move p2 left: p2=${p2}.`,
+        },
+      });
+    }
+
+    // Line 13: write -= 1
+    write--;
+    snap({
+      title: { vi: `write -= 1 → write = ${write}`, en: `write -= 1 → write = ${write}` },
+      p1, p2, write,
+      codeLines: [13],
       note: {
-        vi: `p1 hết. Copy nums2[${p2}]=${nums2[p2]} vào vị trí ${write}.`,
-        en: `p1 exhausted. Copy nums2[${p2}]=${nums2[p2]} into position ${write}.`,
+        vi: `Ô cuối đã điền xong, lùi write sang trái để chuẩn bị điền ô kế tiếp: write=${write}.`,
+        en: `The last slot is filled, move write left to prepare for the next slot: write=${write}.`,
       },
     });
-    p2--;
-    write--;
   }
 
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums1],
-    highlight: [],
-    mark: [],
+  // Line 14: nums1[:p2+1] = nums2[:p2+1]
+  if (p2 >= 0) {
+    for (let i = p2; i >= 0; i--) written[i] = true;
+    for (let i = 0; i <= p2; i++) nums1[i] = nums2[i];
+  }
+  snap({
+    title: p2 >= 0
+      ? { vi: `nums1[:p2+1] = nums2[:p2+1] → copy nums2[0..${p2}]`, en: `nums1[:p2+1] = nums2[:p2+1] → copy nums2[0..${p2}]` }
+      : { vi: `nums1[:p2+1] = nums2[:p2+1] → p2=-1, không copy gì thêm`, en: `nums1[:p2+1] = nums2[:p2+1] → p2=-1, nothing left to copy` },
+    p1, p2, write,
     final: true,
     codeLines: [14],
-    vars: [{ name: "nums1", value: [...nums1] }],
-    note: {
-      vi: `Mảng đã gộp: [${nums1.join(", ")}].`,
-      en: `Merged array: [${nums1.join(", ")}].`,
-    },
+    note: p2 >= 0
+      ? { vi: `p1 đã hết trước — nghĩa là mọi phần tử còn lại của nums2 (0..${p2}) đều NHỎ HƠN mọi phần tử đã đặt, nên chỉ cần copy thẳng chúng vào đầu nums1.`, en: `p1 ran out first — meaning every remaining nums2 element (0..${p2}) is SMALLER than everything already placed, so they can be copied straight into the front of nums1.` }
+      : { vi: "p2 đã hết trước (hoặc cùng lúc) — không còn phần tử nums2 nào cần copy thêm.", en: "p2 ran out first (or at the same time) — no leftover nums2 elements to copy." },
   });
 
   return { original: input, answer: nums1, steps };
