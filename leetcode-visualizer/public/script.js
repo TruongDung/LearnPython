@@ -2671,6 +2671,66 @@ function renderPartitionView(step) {
     </div>`;
 }
 
+// ---- Two-pointer merge visualization (e.g. bai 88: Merge Sorted Array) ----
+// Dedicated view showing nums1 and nums2 as separate rows, with a colored
+// down-arrow + label above each pointer's current cell (instead of tiny text
+// tags like "[i] p1" crammed into the sub-label, which is hard to scan when
+// multiple pointers land near each other).
+function renderTwoPointerMergeView(step) {
+  const view = step.twoPointerMergeView || {};
+  const nums1 = Array.isArray(view.nums1) ? view.nums1 : [];
+  const nums2 = Array.isArray(view.nums2) ? view.nums2 : [];
+  const written = Array.isArray(view.written) ? view.written : [];
+  const pointers1 = view.pointers1 || {}; // { i: idx, k: idx } -> pointer name -> index into nums1
+  const pointers2 = view.pointers2 || {}; // { j: idx } -> pointer name -> index into nums2
+  const highlight1 = new Set(view.highlight1 || []);
+  const highlight2 = new Set(view.highlight2 || []);
+
+  // Fixed color per pointer name so it's visually consistent across every step.
+  const pointerColor = { i: "tp-ptr-a", p1: "tp-ptr-a", j: "tp-ptr-b", p2: "tp-ptr-b", k: "tp-ptr-c", write: "tp-ptr-c" };
+
+  function pointersAt(pointerMap, idx) {
+    return Object.entries(pointerMap).filter(([, v]) => v === idx).map(([name]) => name);
+  }
+
+  function renderRow(rowLabel, values, pointerMap, hlSet, rowClass) {
+    const cells = values.map((v, i) => {
+      const names = pointersAt(pointerMap, i);
+      const arrowsHtml = names.map((name) => {
+        const cls = pointerColor[name] || "tp-ptr-a";
+        return `<div class="tp-pointer-arrow ${cls}"><span class="tp-pointer-name">${escapeHtml(name)}</span><span class="tp-pointer-caret">\u25BC</span></div>`;
+      }).join("");
+      const isWritten = written[i];
+      const isHl = hlSet.has(i);
+      return `<div class="tp-cell-wrap">
+        <div class="tp-pointer-stack">${arrowsHtml}</div>
+        <div class="tp-cell${isWritten ? " tp-cell-written" : ""}${isHl ? " tp-cell-hl" : ""}">
+          <span class="tp-cell-idx">[${i}]</span>
+          <strong>${escapeHtml(String(v))}</strong>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="tp-row ${rowClass}">
+      <span class="tp-row-label">${escapeHtml(rowLabel)}</span>
+      <div class="tp-row-cells">${cells}</div>
+    </div>`;
+  }
+
+  const legendItems = [
+    { name: view.legend1Name || "i", cls: pointerColor[view.legend1Name || "i"] || "tp-ptr-a", text: pick(view.legend1Text) },
+    { name: view.legend2Name || "j", cls: pointerColor[view.legend2Name || "j"] || "tp-ptr-b", text: pick(view.legend2Text) },
+    { name: view.legend3Name || "k", cls: pointerColor[view.legend3Name || "k"] || "tp-ptr-c", text: pick(view.legend3Text) },
+  ].filter((item) => item.text);
+  const legendHtml = legendItems.map((item) => `<span><i class="tp-legend-swatch ${item.cls}"></i>${escapeHtml(item.name)} = ${escapeHtml(item.text)}</span>`).join("");
+
+  $("treeView").innerHTML = `
+    <div class="tp-merge-viz">
+      ${renderRow(view.label1 || "nums1", nums1, pointers1, highlight1, "tp-row-nums1")}
+      ${renderRow(view.label2 || "nums2", nums2, pointers2, highlight2, "tp-row-nums2")}
+      <div class="tp-legend">${legendHtml}</div>
+    </div>`;
+}
+
 // ---- Multi-slot podium visualization (e.g. bai 628: track top-3 & bottom-2) ----
 function renderMultiSlotPodiumView(step) {
   const view = step.multiSlotPodiumView || {};
@@ -3581,6 +3641,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPartitionView(step);
+  } else if (step.twoPointerMergeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTwoPointerMergeView(step);
   } else if (step.multiSlotPodiumView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

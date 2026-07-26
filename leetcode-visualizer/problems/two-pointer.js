@@ -123,30 +123,35 @@ function buildSteps88(input, params) {
   const written = new Array(nums1.length).fill(false);
   for (let i = 0; i < m; i++) written[i] = true; // the initial m real elements count as written
 
-  // Sub-labels show index PLUS which pointer(s) currently point at that slot,
-  // e.g. "[2] p1" or "[5] write" — this is the main thing that was missing
-  // before: you had to read the note text to know where p1/p2/write were.
-  function subLabels(p1, p2, write) {
-    return nums1.map((_, i) => {
-      const tags = [];
-      if (i === p1) tags.push("p1");
-      if (i === write) tags.push("write");
-      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
-    });
-  }
-  // nums2's own mini pointer row (p2), shown as its own array/sub pair so it
-  // doesn't get confused with nums1's indices.
-  function nums2SubLabels(p2) {
-    return nums2.map((_, i) => (i === p2 ? `[${i}] p2` : `[${i}]`));
-  }
-
   function snap(opts) {
+    const pointers1 = {};
+    if (opts.p1 !== undefined && opts.p1 >= 0) pointers1.p1 = opts.p1;
+    if (opts.write !== undefined && opts.write >= 0) pointers1.write = opts.write;
+    const pointers2 = {};
+    if (opts.p2 !== undefined && opts.p2 >= 0) pointers2.p2 = opts.p2;
+
     steps.push({
       title: opts.title,
-      arr: [...nums1],
-      sub: subLabels(opts.p1, opts.p2, opts.write),
-      highlight: opts.highlight || [],
-      mark: nums1.map((_, i) => (written[i] ? i : -1)).filter((i) => i >= 0),
+      arr: [],
+      twoPointerMergeView: {
+        nums1: [...nums1],
+        nums2,
+        written: [...written],
+        pointers1,
+        pointers2,
+        highlight1: opts.highlight1 || [],
+        highlight2: opts.highlight2 || [],
+        label1: "nums1",
+        label2: "nums2",
+        legend1Name: "p1",
+        legend1Text: { vi: "phần tử thực còn lại của nums1", en: "remaining real element of nums1" },
+        legend2Name: "p2",
+        legend2Text: { vi: "phần tử còn lại của nums2", en: "remaining element of nums2" },
+        legend3Name: "write",
+        legend3Text: { vi: "vị trí đang ghi", en: "position being written" },
+      },
+      highlight: [],
+      mark: [],
       final: opts.final || false,
       codeLines: opts.codeLines || [],
       vars: [
@@ -202,7 +207,8 @@ function buildSteps88(input, params) {
     snap({
       title: { vi: `while p1≥0 and p2≥0 → ${p1}≥0 and ${p2}≥0 → ${loopContinues}`, en: `while p1≥0 and p2≥0 → ${p1}≥0 and ${p2}≥0 → ${loopContinues}` },
       p1, p2, write,
-      highlight: [p1, p2].filter((x) => x >= 0),
+      highlight1: p1 >= 0 ? [p1] : [],
+      highlight2: p2 >= 0 ? [p2] : [],
       codeLines: [6],
       note: loopContinues
         ? { vi: "Cả 2 mảng đều còn phần tử chưa xét → tiếp tục so sánh.", en: "Both arrays still have unprocessed elements → keep comparing." }
@@ -219,7 +225,8 @@ function buildSteps88(input, params) {
     snap({
       title: { vi: `if nums1[p1] > nums2[p2] → ${v1} > ${v2} → ${v1Bigger}`, en: `if nums1[p1] > nums2[p2] → ${v1} > ${v2} → ${v1Bigger}` },
       p1, p2, write,
-      highlight: [p1, p2],
+      highlight1: [p1],
+      highlight2: [p2],
       codeLines: [7],
       note: v1Bigger
         ? { vi: `nums1[${p1}]=${v1} lớn hơn → nums1 đang giữ số LỚN HƠN, nên số này sẽ được đặt vào cuối (write=${write}).`, en: `nums1[${p1}]=${v1} is larger → nums1 currently holds the BIGGER number, so it gets placed at the end (write=${write}).` }
@@ -233,7 +240,7 @@ function buildSteps88(input, params) {
       snap({
         title: { vi: `nums1[write] = nums1[p1] → nums1[${write}] = ${v1}`, en: `nums1[write] = nums1[p1] → nums1[${write}] = ${v1}` },
         p1, p2, write,
-        highlight: [write],
+        highlight1: [write],
         codeLines: [8],
         note: {
           vi: `Đặt ${v1} vào vị trí write=${write}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
@@ -259,7 +266,7 @@ function buildSteps88(input, params) {
       snap({
         title: { vi: `nums1[write] = nums2[p2] → nums1[${write}] = ${v2}`, en: `nums1[write] = nums2[p2] → nums1[${write}] = ${v2}` },
         p1, p2, write,
-        highlight: [write],
+        highlight1: [write],
         codeLines: [11],
         note: {
           vi: `Đặt ${v2} (từ nums2) vào vị trí write=${write}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
@@ -332,22 +339,35 @@ function buildSteps88v2(input, params) {
   const written = new Array(nums1.length).fill(false);
   for (let idx = 0; idx < m; idx++) written[idx] = true;
 
-  function subLabels(i, k) {
-    return nums1.map((_, idx) => {
-      const tags = [];
-      if (idx === i) tags.push("i");
-      if (idx === k) tags.push("k");
-      return tags.length ? `[${idx}] ${tags.join("/")}` : `[${idx}]`;
-    });
-  }
-
   function snap(opts) {
+    const pointers1 = {};
+    if (opts.i !== undefined && opts.i >= 0) pointers1.i = opts.i;
+    if (opts.k !== undefined && opts.k >= 0) pointers1.k = opts.k;
+    const pointers2 = {};
+    if (opts.j !== undefined && opts.j >= 0) pointers2.j = opts.j;
+
     steps.push({
       title: opts.title,
-      arr: [...nums1],
-      sub: subLabels(opts.i, opts.k),
-      highlight: opts.highlight || [],
-      mark: nums1.map((_, idx) => (written[idx] ? idx : -1)).filter((idx) => idx >= 0),
+      arr: [],
+      twoPointerMergeView: {
+        nums1: [...nums1],
+        nums2,
+        written: [...written],
+        pointers1,
+        pointers2,
+        highlight1: opts.highlight1 || [],
+        highlight2: opts.highlight2 || [],
+        label1: "nums1",
+        label2: "nums2",
+        legend1Name: "i",
+        legend1Text: { vi: "phần tử thực còn lại của nums1", en: "remaining real element of nums1" },
+        legend2Name: "j",
+        legend2Text: { vi: "phần tử còn lại của nums2", en: "remaining element of nums2" },
+        legend3Name: "k",
+        legend3Text: { vi: "vị trí đang ghi", en: "position being written" },
+      },
+      highlight: [],
+      mark: [],
       final: opts.final || false,
       codeBlock: 2,
       codeLines: opts.codeLines || [],
@@ -403,7 +423,8 @@ function buildSteps88v2(input, params) {
     snap({
       title: { vi: `while i≥0 and j≥0 → ${i}≥0 and ${j}≥0 → ${loopContinues}`, en: `while i≥0 and j≥0 → ${i}≥0 and ${j}≥0 → ${loopContinues}` },
       i, j, k,
-      highlight: [i, j].filter((x) => x >= 0),
+      highlight1: i >= 0 ? [i] : [],
+      highlight2: j >= 0 ? [j] : [],
       codeLines: [6],
       note: loopContinues
         ? { vi: "Cả 2 mảng đều còn phần tử chưa xét → tiếp tục so sánh.", en: "Both arrays still have unprocessed elements → keep comparing." }
@@ -420,7 +441,8 @@ function buildSteps88v2(input, params) {
     snap({
       title: { vi: `if nums1[i] < nums2[j] → ${v1} < ${v2} → ${v1Smaller}`, en: `if nums1[i] < nums2[j] → ${v1} < ${v2} → ${v1Smaller}` },
       i, j, k,
-      highlight: [i, j],
+      highlight1: [i],
+      highlight2: [j],
       codeLines: [7],
       note: v1Smaller
         ? { vi: `nums1[${i}]=${v1} nhỏ hơn → nums2 đang giữ số LỚN HƠN, nên số này (${v2}) được đặt vào cuối (k=${k}).`, en: `nums1[${i}]=${v1} is smaller → nums2 currently holds the BIGGER number, so it (${v2}) gets placed at the end (k=${k}).` }
@@ -434,7 +456,7 @@ function buildSteps88v2(input, params) {
       snap({
         title: { vi: `nums1[k] = nums2[j] → nums1[${k}] = ${v2}`, en: `nums1[k] = nums2[j] → nums1[${k}] = ${v2}` },
         i, j, k,
-        highlight: [k],
+        highlight1: [k],
         codeLines: [8],
         note: {
           vi: `Đặt ${v2} (từ nums2) vào vị trí k=${k}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
@@ -472,7 +494,7 @@ function buildSteps88v2(input, params) {
       snap({
         title: { vi: `nums1[k] = nums1[i] → nums1[${k}] = ${v1}`, en: `nums1[k] = nums1[i] → nums1[${k}] = ${v1}` },
         i, j, k,
-        highlight: [k],
+        highlight1: [k],
         codeLines: [12],
         note: {
           vi: `Đặt ${v1} vào vị trí k=${k}. Ô này giờ đã HOÀN TẤT (tô xanh).`,
@@ -512,7 +534,7 @@ function buildSteps88v2(input, params) {
     snap({
       title: { vi: `while j≥0 → ${j}≥0 → ${copyContinues}`, en: `while j≥0 → ${j}≥0 → ${copyContinues}` },
       i, j, k,
-      highlight: j >= 0 ? [j] : [],
+      highlight2: j >= 0 ? [j] : [],
       codeLines: [15],
       note: copyContinues
         ? { vi: `i đã hết trước. Mọi phần tử còn lại của nums2 (0..${j}) đều NHỎ HƠN mọi phần tử đã đặt, nên copy thẳng vào đầu nums1.`, en: `i ran out first. Every remaining nums2 element (0..${j}) is SMALLER than everything already placed, so copy it straight into the front of nums1.` }
@@ -527,7 +549,7 @@ function buildSteps88v2(input, params) {
     snap({
       title: { vi: `nums1[k] = nums2[j] → nums1[${k}] = ${nums2[j]}`, en: `nums1[k] = nums2[j] → nums1[${k}] = ${nums2[j]}` },
       i, j, k,
-      highlight: [k],
+      highlight1: [k],
       codeLines: [16],
       note: {
         vi: `Copy nums2[${j}]=${nums2[j]} vào vị trí k=${k}.`,

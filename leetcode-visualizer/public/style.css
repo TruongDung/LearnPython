@@ -2548,6 +2548,151 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+/* ---- Two-pointer merge visualization (e.g. bai 88) ---- */
+.tp-merge-viz {
+  min-height: 250px;
+  padding: 24px 20px 20px;
+  display: grid;
+  gap: 28px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent 35%),
+    rgba(15, 23, 42, 0.28);
+}
+
+.tp-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.tp-row-label {
+  min-width: 46px;
+  padding-bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tp-row-cells {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tp-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tp-pointer-stack {
+  min-height: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.tp-pointer-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  animation: tp-bounce 0.5s ease;
+}
+
+.tp-pointer-name {
+  font-size: 10px;
+  font-weight: 800;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+.tp-pointer-caret {
+  font-size: 11px;
+  margin-top: -2px;
+}
+
+@keyframes tp-bounce {
+  0% { transform: translateY(-4px); opacity: 0.4; }
+  60% { transform: translateY(1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.tp-ptr-a { color: #f59e0b; }
+.tp-ptr-b { color: #a78bfa; }
+.tp-ptr-c { color: #34d399; }
+
+.tp-cell {
+  width: 46px;
+  padding: 8px 0;
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.tp-cell-idx {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tp-cell strong {
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tp-cell-hl {
+  border-color: rgba(245, 158, 11, 0.8);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.16);
+  transform: translateY(-2px);
+}
+
+.tp-cell-written {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.tp-cell-written strong {
+  color: #86efac;
+}
+
+.tp-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #94a3b8;
+  justify-content: center;
+}
+
+.tp-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tp-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+  background: currentColor;
+  opacity: 0.85;
+}
+
 /* ---- 1D prefix sum visualization ---- */
 .prefix1d-viz {
   min-height: 260px;
@@ -5569,6 +5714,46 @@ button:disabled {
 [data-theme="light"] .partition-status strong {
   color: #0f172a;
 }
+
+[data-theme="light"] .tp-merge-viz {
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.05), transparent 36%),
+    #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .tp-cell {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .tp-cell strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .tp-cell-idx,
+[data-theme="light"] .tp-row-label,
+[data-theme="light"] .tp-legend {
+  color: #475569;
+}
+
+[data-theme="light"] .tp-cell-hl {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+[data-theme="light"] .tp-cell-written {
+  background: #ecfdf5;
+  border-color: #34d399;
+}
+
+[data-theme="light"] .tp-cell-written strong {
+  color: #047857;
+}
+
+[data-theme="light"] .tp-ptr-a { color: #d97706; }
+[data-theme="light"] .tp-ptr-b { color: #7c3aed; }
+[data-theme="light"] .tp-ptr-c { color: #059669; }
 
 [data-theme="light"] .multi-slot-group {
   border-color: #cbd5e1;
