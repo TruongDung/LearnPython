@@ -7,17 +7,13 @@ class Solution:
         minFirst = minSecond = float('inf')
         for digit in nums:
             if digit > first:
-                third = second
-                second = first
-                first = digit
+                third, second, first = second, first, digit
             elif digit > second:
-                third = second
-                second = digit
+                third, second = second, digit
             elif digit > third:
                 third = digit
             if digit < minFirst:
-                minSecond = minFirst
-                minFirst = digit
+                minSecond, minFirst = minFirst, digit
             elif digit < minSecond:
                 minSecond = digit
         return max(first * second * third, minFirst * minSecond * first)

@@ -2357,6 +2357,58 @@ button:disabled {
   width: 88px;
 }
 
+.multi-slot-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.multi-slot-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(148, 163, 184, 0.22);
+}
+
+.multi-slot-group-heading {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.multi-slot-group-cells {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.multi-slot-group-cells .digit-slot {
+  width: 108px;
+  position: relative;
+}
+
+.digit-slot-transition {
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.multi-slot-mirror-hint {
+  text-align: center;
+  color: #818cf8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  justify-self: center;
+}
+
 /* ---- Partition visualization (bai 4: Median of Two Sorted Arrays) ---- */
 .partition-viz {
   min-height: 250px;
@@ -5516,6 +5568,24 @@ button:disabled {
 
 [data-theme="light"] .partition-status strong {
   color: #0f172a;
+}
+
+[data-theme="light"] .multi-slot-group {
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .multi-slot-group-heading {
+  color: #475569;
+}
+
+[data-theme="light"] .digit-slot-transition {
+  color: #b45309;
+}
+
+[data-theme="light"] .multi-slot-mirror-hint {
+  color: #4f46e5;
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 [data-theme="light"] .running-arrow {
