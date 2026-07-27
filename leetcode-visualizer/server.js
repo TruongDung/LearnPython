@@ -67,7 +67,9 @@ app.get("/api/problem/:id", (req, res) => {
   const problem = SUPPORTED[id];
   if (!problem) {
     return res.status(404).json({
-      error: `Bài ${id} chưa được hỗ trợ. Hiện hỗ trợ: ${Object.keys(SUPPORTED).join(", ")}.`,
+      code: "UNSUPPORTED_PROBLEM",
+      problemId: id,
+      error: `Problem ${id} is not supported yet.`,
     });
   }
   res.json({

@@ -12,6 +12,7 @@ let catalogData = null; // problem list grouped by algorithm
 let problemSearchQuery = "";
 let debugBreakpoints = new Set();
 let debugWatches = [];
+let searchErrorState = null;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 
@@ -42,6 +43,7 @@ const I18N = {
     kbdHint: "Phím tắt: ← Lùi · → hoặc F10 Tiến · Home Về đầu · End Đến cuối · Space Chạy/Dừng",
     errEmptyId: "Vui lòng nhập số bài.",
     errLoad: "Không tải được bài.",
+    unsupportedProblem: (id) => `Bài ${id} chưa được hỗ trợ.`,
     errConn: "Lỗi kết nối tới server.",
     errArr: "Nhập các số nguyên dương, cách nhau bởi dấu phẩy. VD: 2,2,1,2,1",
     errSolve: "Không xử lý được.",
@@ -78,6 +80,7 @@ const I18N = {
     kbdHint: "Shortcuts: ← Prev · → or F10 Next · Home First · End Last · Space Play/Pause",
     errEmptyId: "Please enter a problem number.",
     errLoad: "Could not load the problem.",
+    unsupportedProblem: (id) => `Problem ${id} is not supported yet.`,
     errConn: "Connection error to server.",
     errArr: "Enter positive integers separated by commas. E.g. 2,2,1,2,1",
     errSolve: "Could not process the request.",
@@ -109,7 +112,15 @@ function setLang(newLang) {
   renderRecentProblems();
   renderCatalog();
   renderProblemSearchResults();
+  renderSearchError();
   if (steps.length) renderStep();
+}
+
+function renderSearchError() {
+  if (!searchErrorState) return;
+  if (searchErrorState.type === "unsupported") {
+    showError("searchError", t().unsupportedProblem(searchErrorState.id));
+  }
 }
 
 function applyStaticStrings() {
@@ -481,6 +492,7 @@ $("loadBtn").addEventListener("click", loadProblem);$("problemId").addEventListe
 
 async function loadProblem() {
   const id = $("problemId").value.trim();
+  searchErrorState = null;
   hide("searchError");
   if (!id) {
     return showError("searchError", t().errEmptyId);
@@ -490,6 +502,11 @@ async function loadProblem() {
     const res = await fetch(`/api/problem/${id}`);
     const data = await res.json();
     if (!res.ok) {
+      if (data.code === "UNSUPPORTED_PROBLEM") {
+        searchErrorState = { type: "unsupported", id: data.problemId ?? id };
+        renderSearchError();
+        return;
+      }
       return showError("searchError", data.error || t().errLoad);
     }
 
