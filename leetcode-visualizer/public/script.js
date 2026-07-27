@@ -3981,6 +3981,9 @@ $("themeToggle").addEventListener("click", () => {
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
+  if (window.monaco && window.monaco.editor) {
+    window.monaco.editor.setTheme(theme === "dark" ? "leetcode-python-dark" : "leetcode-python-light");
+  }
   const moonIcon = $("themeIconMoon");
   const sunIcon = $("themeIconSun");
   if (theme === "dark") {
@@ -4005,6 +4008,7 @@ let monacoEditorInstance = null;
 let monacoLoadPromise = null;
 let monacoSourceKey = null;
 let pythonCompletionsRegistered = false;
+let monacoThemesRegistered = false;
 let pyodideInstance = null;
 let pyodideLoadPromise = null;
 let liveMode = false;
@@ -4037,6 +4041,96 @@ function loadMonaco() {
     window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
   });
   return monacoLoadPromise;
+}
+
+function registerMonacoThemes(monaco) {
+  if (monacoThemesRegistered) return;
+  monacoThemesRegistered = true;
+
+  monaco.editor.defineTheme("leetcode-python-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "comment", foreground: "6A9955", fontStyle: "italic" },
+      { token: "keyword", foreground: "C586C0" },
+      { token: "keyword.control", foreground: "C586C0" },
+      { token: "keyword.flow", foreground: "C586C0" },
+      { token: "keyword.operator", foreground: "D4D4D4" },
+      { token: "string", foreground: "CE9178" },
+      { token: "string.escape", foreground: "D7BA7D" },
+      { token: "number", foreground: "B5CEA8" },
+      { token: "type", foreground: "4EC9B0" },
+      { token: "type.identifier", foreground: "4EC9B0" },
+      { token: "identifier", foreground: "9CDCFE" },
+      { token: "function", foreground: "DCDCAA" },
+      { token: "delimiter", foreground: "D4D4D4" },
+      { token: "operator", foreground: "D4D4D4" },
+    ],
+    colors: {
+      "editor.background": "#1E1E1E",
+      "editor.foreground": "#D4D4D4",
+      "editorLineNumber.foreground": "#858585",
+      "editorLineNumber.activeForeground": "#C6C6C6",
+      "editor.lineHighlightBackground": "#2A2D2E",
+      "editor.lineHighlightBorder": "#00000000",
+      "editorCursor.foreground": "#AEAFAD",
+      "editor.selectionBackground": "#264F78",
+      "editor.inactiveSelectionBackground": "#3A3D41",
+      "editorIndentGuide.background1": "#404040",
+      "editorIndentGuide.activeBackground1": "#707070",
+      "editorBracketHighlight.foreground1": "#FFD700",
+      "editorBracketHighlight.foreground2": "#DA70D6",
+      "editorBracketHighlight.foreground3": "#179FFF",
+      "editorBracketHighlight.foreground4": "#FFD700",
+      "editorBracketHighlight.foreground5": "#DA70D6",
+      "editorBracketHighlight.foreground6": "#179FFF",
+      "editorSuggestWidget.background": "#252526",
+      "editorSuggestWidget.border": "#454545",
+      "editorSuggestWidget.selectedBackground": "#04395E",
+      "editorWidget.background": "#252526",
+      "editorHoverWidget.background": "#252526",
+    },
+  });
+
+  monaco.editor.defineTheme("leetcode-python-light", {
+    base: "vs",
+    inherit: true,
+    rules: [
+      { token: "comment", foreground: "008000", fontStyle: "italic" },
+      { token: "keyword", foreground: "AF00DB" },
+      { token: "keyword.control", foreground: "AF00DB" },
+      { token: "keyword.flow", foreground: "AF00DB" },
+      { token: "keyword.operator", foreground: "000000" },
+      { token: "string", foreground: "A31515" },
+      { token: "string.escape", foreground: "EE0000" },
+      { token: "number", foreground: "098658" },
+      { token: "type", foreground: "267F99" },
+      { token: "type.identifier", foreground: "267F99" },
+      { token: "identifier", foreground: "001080" },
+      { token: "function", foreground: "795E26" },
+      { token: "delimiter", foreground: "000000" },
+      { token: "operator", foreground: "000000" },
+    ],
+    colors: {
+      "editor.background": "#FFFFFF",
+      "editor.foreground": "#000000",
+      "editorLineNumber.foreground": "#237893",
+      "editorLineNumber.activeForeground": "#0B216F",
+      "editor.lineHighlightBackground": "#F3F3F3",
+      "editor.lineHighlightBorder": "#00000000",
+      "editorCursor.foreground": "#000000",
+      "editor.selectionBackground": "#ADD6FF",
+      "editor.inactiveSelectionBackground": "#E5EBF1",
+      "editorIndentGuide.background1": "#D3D3D3",
+      "editorIndentGuide.activeBackground1": "#939393",
+      "editorBracketHighlight.foreground1": "#0431FA",
+      "editorBracketHighlight.foreground2": "#319331",
+      "editorBracketHighlight.foreground3": "#7B3814",
+      "editorSuggestWidget.background": "#F3F3F3",
+      "editorSuggestWidget.border": "#C8C8C8",
+      "editorSuggestWidget.selectedBackground": "#D6EBFF",
+    },
+  });
 }
 
 function registerPythonCompletions(monaco) {
@@ -4210,17 +4304,32 @@ async function ensureMonacoEditor() {
   }
   $("liveStatus").textContent = lt().loading;
   const monaco = await loadMonaco();
+  registerMonacoThemes(monaco);
   registerPythonCompletions(monaco);
   const isLight = document.documentElement.dataset.theme !== "dark";
   monacoEditorInstance = monaco.editor.create($("monacoEditor"), {
     value: currentPrimaryCode(),
     language: "python",
-    theme: isLight ? "vs" : "vs-dark",
-    fontSize: 13,
+    theme: isLight ? "leetcode-python-light" : "leetcode-python-dark",
+    fontFamily: '"Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, Menlo, monospace',
+    fontLigatures: true,
+    fontSize: 14,
+    lineHeight: 21,
     minimap: { enabled: false },
     automaticLayout: true,
     scrollBeyondLastLine: false,
-    renderLineHighlight: "none",
+    renderLineHighlight: "all",
+    renderWhitespace: "selection",
+    cursorBlinking: "smooth",
+    cursorSmoothCaretAnimation: "on",
+    smoothScrolling: true,
+    matchBrackets: "always",
+    bracketPairColorization: { enabled: true, independentColorPoolPerBracketType: true },
+    guides: { indentation: true, highlightActiveIndentation: true, bracketPairs: true },
+    padding: { top: 10, bottom: 10 },
+    autoIndent: "full",
+    formatOnPaste: true,
+    formatOnType: true,
     quickSuggestions: { other: true, comments: false, strings: false },
     quickSuggestionsDelay: 80,
     suggestOnTriggerCharacters: true,
