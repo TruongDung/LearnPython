@@ -3976,6 +3976,7 @@ function applyTheme(theme) {
 
 let monacoEditorInstance = null;
 let monacoLoadPromise = null;
+let monacoSourceKey = null;
 let pyodideInstance = null;
 let pyodideLoadPromise = null;
 let liveMode = false;
@@ -4031,7 +4032,22 @@ function loadPyodideRuntime() {
   return pyodideLoadPromise;
 }
 
+function selectedLiveCodeBlock() {
+  const approachInput = $("extraParams") && $("extraParams").querySelector('[data-param="approach"]');
+  const selected = approachInput ? Number(approachInput.value) : 1;
+  if (selected === 3 && problemData && problemData.code3) return 3;
+  if (selected === 2 && problemData && problemData.code2) return 2;
+  return 1;
+}
+
+function currentLiveSourceKey() {
+  return `${currentProblemId || "none"}:${selectedLiveCodeBlock()}`;
+}
+
 function currentPrimaryCode() {
+  const codeBlock = selectedLiveCodeBlock();
+  if (codeBlock === 3) return (problemData.code3 || []).join("\n");
+  if (codeBlock === 2) return (problemData.code2 || []).join("\n");
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   return (localizedCode || (problemData && problemData.code) || []).join("\n");
 }
@@ -4065,7 +4081,14 @@ async function collectLiveCallArgs() {
 }
 
 async function ensureMonacoEditor() {
-  if (monacoEditorInstance) return monacoEditorInstance;
+  const sourceKey = currentLiveSourceKey();
+  if (monacoEditorInstance) {
+    if (monacoSourceKey !== sourceKey) {
+      monacoEditorInstance.setValue(currentPrimaryCode());
+      monacoSourceKey = sourceKey;
+    }
+    return monacoEditorInstance;
+  }
   $("liveStatus").textContent = lt().loading;
   const monaco = await loadMonaco();
   const isLight = document.documentElement.dataset.theme !== "dark";
@@ -4079,6 +4102,7 @@ async function ensureMonacoEditor() {
     scrollBeyondLastLine: false,
     renderLineHighlight: "none",
   });
+  monacoSourceKey = sourceKey;
   $("liveStatus").textContent = "";
   return monacoEditorInstance;
 }
@@ -4403,6 +4427,7 @@ $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
 $("liveResetBtn") && $("liveResetBtn").addEventListener("click", async () => {
   const editor = await ensureMonacoEditor();
   editor.setValue(currentPrimaryCode());
+  monacoSourceKey = currentLiveSourceKey();
   hide("liveError");
   $("liveStatus").textContent = "";
 });

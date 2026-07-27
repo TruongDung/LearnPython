@@ -1120,9 +1120,17 @@ function buildSteps530(input) {
 }
 
 // ─── 99: Recover Binary Search Tree ───
-function buildSteps99(input) {
+function buildSteps99(input, params = {}) {
   const root = parseBST(input);
   const steps = [];
+  const useInstanceState = Number(params.approach) === 2;
+  const codeBlock = useInstanceState ? 2 : 1;
+  const lines = useInstanceState
+    ? { entry: 2, initFirst: 3, initSecond: 4, initPrev: 5, helper: 9, nullCheck: 10, nullReturn: 11, left: 12, compare: 13, checkFirst: 14, setFirst: 15, setSecond: 16, setPrev: 17, right: 18, callRoot: 6, swap: 7 }
+    : { entry: 2, initAll: 3, helper: 4, shared: 5, nullCheck: 6, left: 7, compare: 8, checkFirst: 9, setFirst: 10, setSecond: 11, setPrev: 12, right: 13, callRoot: 14, swap: 15 };
+  const names = useInstanceState
+    ? { first: "self.first_wrong", second: "self.second_wrong", prev: "self.prev" }
+    : { first: "first", second: "second", prev: "prev" };
   let first = null;
   let second = null;
   let prev = null;
@@ -1131,14 +1139,18 @@ function buildSteps99(input) {
   const callStack = [];
   const inorderSeen = [];
 
-  const pointer = (node) => (node ? `${node.val} (node #${node.id})` : "None");
+  const pointer = (node) => {
+    if (!node) return "None";
+    if (node.isSentinel) return "-∞ (sentinel)";
+    return `${node.val} (node #${node.id})`;
+  };
   const stackText = () => (callStack.length ? callStack.map((node) => (node ? node.val : "None")).join(" → ") : "∅");
   const commonVars = (extra = []) => [
     { name: "call stack", value: stackText() },
     { name: "current node", value: pointer(current) },
-    { name: "prev", value: pointer(prev) },
-    { name: "first", value: pointer(first) },
-    { name: "second", value: pointer(second) },
+    { name: names.prev, value: pointer(prev) },
+    { name: names.first, value: pointer(first) },
+    { name: names.second, value: pointer(second) },
     { name: "inorder so far", value: `[${inorderSeen.join(", ")}]` },
     { name: "inversions", value: inversionCount },
     ...extra,
@@ -1151,52 +1163,68 @@ function buildSteps99(input) {
       hlSet: new Set(activeIds),
       wordSet: options.wordSet || foundSet(),
       codeLines: [line],
+      codeBlock,
       vars: commonVars(options.extraVars || []),
       note,
     }));
   };
 
   current = root;
-  addStep(2,
+  addStep(lines.entry,
     { vi: "Bắt đầu recoverTree(root)", en: "Start recoverTree(root)" },
     {
       vi: "Ta không đổi cấu trúc cây. Mục tiêu là tìm đúng hai node bị đổi giá trị rồi swap lại.",
       en: "We do not change the tree structure. The goal is to find the two nodes whose values were swapped, then swap them back.",
     });
 
-  addStep(3,
-    { vi: "Khởi tạo ba con trỏ", en: "Initialize three pointers" },
-    {
-      vi: "prev theo dõi node vừa thăm trong inorder; first và second sẽ giữ hai node sai.",
-      en: "prev tracks the previously visited inorder node; first and second will hold the two incorrect nodes.",
-    });
+  if (useInstanceState) {
+    addStep(lines.initFirst,
+      { vi: "Khởi tạo self.first_wrong", en: "Initialize self.first_wrong" },
+      { vi: "Node sai thứ nhất chưa được tìm thấy nên bắt đầu bằng None.", en: "The first incorrect node has not been found, so start with None." });
+    addStep(lines.initSecond,
+      { vi: "Khởi tạo self.second_wrong", en: "Initialize self.second_wrong" },
+      { vi: "Node sai thứ hai cũng bắt đầu bằng None.", en: "The second incorrect node also starts as None." });
+    prev = { id: null, val: -Infinity, left: null, right: null, isSentinel: true };
+    addStep(lines.initPrev,
+      { vi: "Khởi tạo self.prev = -∞", en: "Initialize self.prev = -∞" },
+      { vi: "Sentinel -∞ giúp node inorder đầu tiên luôn vượt qua phép so sánh mà không cần kiểm tra prev là None.", en: "The -∞ sentinel lets the first inorder node pass the comparison without a separate prev-is-None check." });
+  } else {
+    addStep(lines.initAll,
+      { vi: "Khởi tạo ba con trỏ", en: "Initialize three pointers" },
+      {
+        vi: "prev theo dõi node vừa thăm trong inorder; first và second sẽ giữ hai node sai.",
+        en: "prev tracks the previously visited inorder node; first and second will hold the two incorrect nodes.",
+      });
 
-  addStep(4,
-    { vi: "Định nghĩa inorder(node)", en: "Define inorder(node)" },
-    {
-      vi: "Inorder đi trái → node → phải. Với BST đúng, các giá trị phải tăng dần.",
-      en: "Inorder visits left → node → right. In a valid BST, values must be ascending.",
-    });
+    addStep(lines.helper,
+      { vi: "Định nghĩa inorder(node)", en: "Define inorder(node)" },
+      {
+        vi: "Inorder đi trái → node → phải. Với BST đúng, các giá trị phải tăng dần.",
+        en: "Inorder visits left → node → right. In a valid BST, values must be ascending.",
+      });
+  }
 
   function inorder(node) {
     callStack.push(node);
     current = node;
-    addStep(4,
+    addStep(lines.helper,
       { vi: `Gọi inorder(${node ? node.val : "None"})`, en: `Call inorder(${node ? node.val : "None"})` },
       {
         vi: `Đẩy ${node ? node.val : "None"} vào call stack. Mỗi frame xử lý đúng một subtree.`,
         en: `Push ${node ? node.val : "None"} onto the call stack. Each frame handles one subtree.`,
       });
 
-    addStep(5,
-      { vi: "Dùng chung first, second, prev", en: "Share first, second, prev" },
-      {
-        vi: "nonlocal cho phép mọi lời gọi đệ quy cùng đọc và cập nhật ba con trỏ này.",
-        en: "nonlocal lets every recursive call read and update the same three pointers.",
-      });
+    if (!useInstanceState) {
+      addStep(lines.shared,
+        { vi: "Dùng chung first, second, prev", en: "Share first, second, prev" },
+        {
+          vi: "nonlocal cho phép mọi lời gọi đệ quy cùng đọc và cập nhật ba con trỏ này.",
+          en: "nonlocal lets every recursive call read and update the same three pointers.",
+        });
+    }
 
     const isNull = !node;
-    addStep(6,
+    addStep(lines.nullCheck,
       { vi: isNull ? "node là None → return" : `node ${node.val} khác None → tiếp tục`, en: isNull ? "node is None → return" : `node ${node.val} is not None → continue` },
       {
         vi: isNull ? "Đã đi qua lá cây; kết thúc frame này." : "Node tồn tại nên tiếp tục đi xuống nhánh trái.",
@@ -1204,12 +1232,17 @@ function buildSteps99(input) {
       },
       { extraVars: [{ name: "not node", value: isNull }] });
     if (isNull) {
+      if (useInstanceState) {
+        addStep(lines.nullReturn,
+          { vi: "return khỏi self.inorder", en: "Return from self.inorder" },
+          { vi: "curr là None nên kết thúc frame đệ quy hiện tại.", en: "curr is None, so finish the current recursive frame." });
+      }
       callStack.pop();
       return;
     }
 
     current = node;
-    addStep(7,
+    addStep(lines.left,
       { vi: `Đi trái từ ${node.val}`, en: `Go left from ${node.val}` },
       {
         vi: `Chưa xử lý ${node.val}; inorder phải duyệt toàn bộ subtree trái trước.`,
@@ -1219,8 +1252,12 @@ function buildSteps99(input) {
 
     current = node;
     const hasInversion = Boolean(prev && prev.val > node.val);
-    const comparison = prev ? `${prev.val} > ${node.val} → ${hasInversion}` : "prev is None → false";
-    addStep(8,
+    const comparison = prev
+      ? useInstanceState
+        ? `${node.val} < ${prev.val} → ${hasInversion}`
+        : `${prev.val} > ${node.val} → ${hasInversion}`
+      : "prev is None → false";
+    addStep(lines.compare,
       { vi: hasInversion ? `⚠ Phát hiện ${prev.val} > ${node.val}` : `Kiểm tra tại node ${node.val}: hợp lệ`, en: hasInversion ? `⚠ Detect ${prev.val} > ${node.val}` : `Check at node ${node.val}: valid` },
       {
         vi: hasInversion
@@ -1230,12 +1267,12 @@ function buildSteps99(input) {
           ? `${prev.val} immediately precedes ${node.val} in inorder but is larger → this is an inversion.`
           : prev ? `${prev.val} ≤ ${node.val}, so inorder remains ascending.` : `${node.val} is the first inorder node, so there is no prev to compare.`,
       },
-      { activeNodes: [prev, node].filter(Boolean).map((item) => item.id), extraVars: [{ name: "prev.val > node.val", value: comparison }] });
+      { activeNodes: [prev, node].filter((item) => item && item.id !== null).map((item) => item.id), extraVars: [{ name: useInstanceState ? "curr.val < self.prev.val" : "prev.val > node.val", value: comparison }] });
 
     if (hasInversion) {
       inversionCount += 1;
-      addStep(9,
-        { vi: first ? "first đã được chọn" : "first chưa được chọn", en: first ? "first is already selected" : "first is not selected yet" },
+      addStep(lines.checkFirst,
+        { vi: first ? `${names.first} đã được chọn` : `${names.first} chưa được chọn`, en: first ? `${names.first} is already selected` : `${names.first} is not selected yet` },
         {
           vi: first
             ? "Đây là inversion thứ hai: giữ nguyên first từ inversion đầu tiên."
@@ -1248,8 +1285,8 @@ function buildSteps99(input) {
 
       if (!first) {
         first = prev;
-        addStep(10,
-          { vi: `Gán first = ${first.val}`, en: `Set first = ${first.val}` },
+        addStep(lines.setFirst,
+          { vi: `Gán ${names.first} = ${first.val}`, en: `Set ${names.first} = ${first.val}` },
           {
             vi: `Luôn chọn prev = ${first.val} của inversion đầu tiên làm node sai thứ nhất.`,
             en: `Always choose prev = ${first.val} from the first inversion as the first incorrect node.`,
@@ -1258,8 +1295,8 @@ function buildSteps99(input) {
       }
 
       second = node;
-      addStep(11,
-        { vi: `Gán second = ${second.val}`, en: `Set second = ${second.val}` },
+      addStep(lines.setSecond,
+        { vi: `Gán ${names.second} = ${second.val}`, en: `Set ${names.second} = ${second.val}` },
         {
           vi: inversionCount === 1
             ? `Tạm chọn ${second.val}. Nếu hai node sai nằm liền nhau trong inorder, đây là đáp án cuối.`
@@ -1273,15 +1310,15 @@ function buildSteps99(input) {
 
     prev = node;
     inorderSeen.push(node.val);
-    addStep(12,
-      { vi: `Cập nhật prev = ${node.val}`, en: `Update prev = ${node.val}` },
+    addStep(lines.setPrev,
+      { vi: `Cập nhật ${names.prev} = ${node.val}`, en: `Update ${names.prev} = ${node.val}` },
       {
         vi: `Đã thăm ${node.val}. Lần xử lý node kế tiếp sẽ so sánh với prev này.`,
         en: `Visited ${node.val}. The next processed node will be compared with this prev.`,
       });
 
     current = node;
-    addStep(13,
+    addStep(lines.right,
       { vi: `Đi phải từ ${node.val}`, en: `Go right from ${node.val}` },
       {
         vi: `Subtree trái và node ${node.val} đã xong; tiếp tục với subtree phải.`,
@@ -1293,7 +1330,7 @@ function buildSteps99(input) {
   }
 
   current = root;
-  addStep(14,
+  addStep(lines.callRoot,
     { vi: "Chạy inorder từ root", en: "Run inorder from root" },
     {
       vi: "Bắt đầu một lượt inorder duy nhất; mỗi node được xử lý đúng một lần.",
@@ -1335,7 +1372,8 @@ function buildSteps99(input) {
       title: { vi: `Swap ${firstBefore} ↔ ${secondBefore} → BST đã phục hồi`, en: `Swap ${firstBefore} ↔ ${secondBefore} → BST recovered` },
       hlSet: new Set([first.id, second.id]),
       wordSet: new Set([first.id, second.id]),
-      codeLines: [15],
+      codeLines: [lines.swap],
+      codeBlock,
       vars: commonVars([
         { name: "swap", value: `${firstBefore} ↔ ${secondBefore}` },
         { name: "inorder after swap", value: `[${recoveredInorder.join(", ")}]` },
@@ -1351,7 +1389,8 @@ function buildSteps99(input) {
   } else {
     const finalStep = snapshot(root, {
       title: { vi: "Không tìm thấy inversion", en: "No inversion found" },
-      codeLines: [15],
+      codeLines: [lines.swap],
+      codeBlock,
       vars: commonVars([{ name: "result", value: "already valid" }]),
       note: {
         vi: "Input này đã có inorder tăng dần nên không có hai node để swap (ngoài ràng buộc chính của đề).",
@@ -1943,13 +1982,42 @@ module.exports = {
     statement: { vi: "Có đúng 2 nút trong BST bị hoán đổi giá trị nhầm. Khôi phục lại BST mà không đổi cấu trúc. Nhập level-order.", en: "Exactly two nodes of a BST were swapped by mistake. Recover the BST without changing its structure. Enter as level-order." },
     defaultInput: "3,1,4,null,null,2",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [],
+    extraParams: [{
+      key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+      options: [
+        { value: "1", label: { vi: "Cách 1: biến nonlocal", en: "Approach 1: nonlocal variables" } },
+        { value: "2", label: { vi: "Cách 2: biến instance self.*", en: "Approach 2: self.* instance variables" } },
+      ],
+    }],
     approach: [
       { vi: "Inorder BST phải tăng dần. Duyệt inorder, tìm các vị trí prev > curr → xác định 2 nút bị hoán đổi.", en: "Inorder of BST must be ascending. Traverse inorder, find positions where prev > curr → identify the 2 swapped nodes." },
       { vi: "1 vi phạm → 2 nút liền kề. 2 vi phạm → nút đầu của vi phạm 1 và nút sau của vi phạm 2. Swap giá trị.", en: "1 violation → adjacent nodes. 2 violations → first node of violation 1 and second node of violation 2. Swap values." },
+      { vi: "Cách 2 giữ first_wrong, second_wrong và prev trên self. Sentinel TreeNode(-∞) loại bỏ bước kiểm tra prev là None; logic tìm inversion vẫn giống Cách 1.", en: "Approach 2 stores first_wrong, second_wrong, and prev on self. A TreeNode(-∞) sentinel removes the prev-is-None check; the inversion logic is otherwise identical to Approach 1." },
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần inorder. Stack O(h).", en: "One inorder pass. Stack O(h)." } },
+    codeLabel: { vi: "Cách 1: biến nonlocal", en: "Approach 1: nonlocal variables" },
+    code2Label: { vi: "Cách 2: biến instance self.*", en: "Approach 2: self.* instance variables" },
     code: ["class Solution:", "    def recoverTree(self, root):", "        first = second = prev = None", "        def inorder(node):", "            nonlocal first, second, prev", "            if not node: return", "            inorder(node.left)", "            if prev and prev.val > node.val:", "                if not first:", "                    first = prev", "                second = node", "            prev = node", "            inorder(node.right)", "        inorder(root)", "        first.val, second.val = second.val, first.val"],
+    code2: [
+      "class Solution:",
+      "    def recoverTree(self, root: Optional[TreeNode]) -> None:",
+      "        self.first_wrong = None",
+      "        self.second_wrong = None",
+      "        self.prev = TreeNode(float('-inf'))",
+      "        self.inorder(root)",
+      "        self.first_wrong.val, self.second_wrong.val = self.second_wrong.val, self.first_wrong.val",
+      "",
+      "    def inorder(self, curr):",
+      "        if not curr:",
+      "            return",
+      "        self.inorder(curr.left)",
+      "        if curr.val < self.prev.val:",
+      "            if not self.first_wrong:",
+      "                self.first_wrong = self.prev",
+      "            self.second_wrong = curr",
+      "        self.prev = curr",
+      "        self.inorder(curr.right)",
+    ],
     liveArgs: (input) => [{
       __viz_type: "binary_tree",
       values: String(input).split(",").map((value) => {
