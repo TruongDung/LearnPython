@@ -2340,6 +2340,12 @@ module.exports = {
       "        backtrack(1)",
       "        return result",
     ],
+    // The positive-number input control is serialized as [n]. The live
+    // Python method expects two scalar arguments: combine(n, k).
+    liveArgs: (input, params) => [
+      Number(Array.isArray(input) ? input[0] : input),
+      Number(params.k),
+    ],
     builder: buildSteps77,
   },
   78: {
