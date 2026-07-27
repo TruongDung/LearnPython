@@ -1121,25 +1121,248 @@ function buildSteps530(input) {
 
 // ─── 99: Recover Binary Search Tree ───
 function buildSteps99(input) {
-  const root = parseBST(input); const steps = [];
-  const sorted = []; function io(n){ if(!n) return; io(n.left); sorted.push(n); io(n.right); } io(root);
-  const vals = sorted.map(n=>n.val);
-  let first = null, second = null;
-  for (let i=0;i<sorted.length-1;i++){
-    if (sorted[i].val > sorted[i+1].val){
-      if (!first){ first = sorted[i]; second = sorted[i+1]; }
-      else { second = sorted[i+1]; }
+  const root = parseBST(input);
+  const steps = [];
+  let first = null;
+  let second = null;
+  let prev = null;
+  let current = null;
+  let inversionCount = 0;
+  const callStack = [];
+  const inorderSeen = [];
+
+  const pointer = (node) => (node ? `${node.val} (node #${node.id})` : "None");
+  const stackText = () => (callStack.length ? callStack.map((node) => (node ? node.val : "None")).join(" → ") : "∅");
+  const commonVars = (extra = []) => [
+    { name: "call stack", value: stackText() },
+    { name: "current node", value: pointer(current) },
+    { name: "prev", value: pointer(prev) },
+    { name: "first", value: pointer(first) },
+    { name: "second", value: pointer(second) },
+    { name: "inorder so far", value: `[${inorderSeen.join(", ")}]` },
+    { name: "inversions", value: inversionCount },
+    ...extra,
+  ];
+  const foundSet = () => new Set([first, second].filter(Boolean).map((node) => node.id));
+  const addStep = (line, title, note, options = {}) => {
+    const activeIds = options.activeNodes || (current ? [current.id] : []);
+    steps.push(snapshot(root, {
+      title,
+      hlSet: new Set(activeIds),
+      wordSet: options.wordSet || foundSet(),
+      codeLines: [line],
+      vars: commonVars(options.extraVars || []),
+      note,
+    }));
+  };
+
+  current = root;
+  addStep(2,
+    { vi: "Bắt đầu recoverTree(root)", en: "Start recoverTree(root)" },
+    {
+      vi: "Ta không đổi cấu trúc cây. Mục tiêu là tìm đúng hai node bị đổi giá trị rồi swap lại.",
+      en: "We do not change the tree structure. The goal is to find the two nodes whose values were swapped, then swap them back.",
+    });
+
+  addStep(3,
+    { vi: "Khởi tạo ba con trỏ", en: "Initialize three pointers" },
+    {
+      vi: "prev theo dõi node vừa thăm trong inorder; first và second sẽ giữ hai node sai.",
+      en: "prev tracks the previously visited inorder node; first and second will hold the two incorrect nodes.",
+    });
+
+  addStep(4,
+    { vi: "Định nghĩa inorder(node)", en: "Define inorder(node)" },
+    {
+      vi: "Inorder đi trái → node → phải. Với BST đúng, các giá trị phải tăng dần.",
+      en: "Inorder visits left → node → right. In a valid BST, values must be ascending.",
+    });
+
+  function inorder(node) {
+    callStack.push(node);
+    current = node;
+    addStep(4,
+      { vi: `Gọi inorder(${node ? node.val : "None"})`, en: `Call inorder(${node ? node.val : "None"})` },
+      {
+        vi: `Đẩy ${node ? node.val : "None"} vào call stack. Mỗi frame xử lý đúng một subtree.`,
+        en: `Push ${node ? node.val : "None"} onto the call stack. Each frame handles one subtree.`,
+      });
+
+    addStep(5,
+      { vi: "Dùng chung first, second, prev", en: "Share first, second, prev" },
+      {
+        vi: "nonlocal cho phép mọi lời gọi đệ quy cùng đọc và cập nhật ba con trỏ này.",
+        en: "nonlocal lets every recursive call read and update the same three pointers.",
+      });
+
+    const isNull = !node;
+    addStep(6,
+      { vi: isNull ? "node là None → return" : `node ${node.val} khác None → tiếp tục`, en: isNull ? "node is None → return" : `node ${node.val} is not None → continue` },
+      {
+        vi: isNull ? "Đã đi qua lá cây; kết thúc frame này." : "Node tồn tại nên tiếp tục đi xuống nhánh trái.",
+        en: isNull ? "We went past a leaf; finish this frame." : "The node exists, so continue into its left subtree.",
+      },
+      { extraVars: [{ name: "not node", value: isNull }] });
+    if (isNull) {
+      callStack.pop();
+      return;
     }
+
+    current = node;
+    addStep(7,
+      { vi: `Đi trái từ ${node.val}`, en: `Go left from ${node.val}` },
+      {
+        vi: `Chưa xử lý ${node.val}; inorder phải duyệt toàn bộ subtree trái trước.`,
+        en: `Do not process ${node.val} yet; inorder must finish the entire left subtree first.`,
+      });
+    inorder(node.left);
+
+    current = node;
+    const hasInversion = Boolean(prev && prev.val > node.val);
+    const comparison = prev ? `${prev.val} > ${node.val} → ${hasInversion}` : "prev is None → false";
+    addStep(8,
+      { vi: hasInversion ? `⚠ Phát hiện ${prev.val} > ${node.val}` : `Kiểm tra tại node ${node.val}: hợp lệ`, en: hasInversion ? `⚠ Detect ${prev.val} > ${node.val}` : `Check at node ${node.val}: valid` },
+      {
+        vi: hasInversion
+          ? `${prev.val} đứng ngay trước ${node.val} trong inorder nhưng lại lớn hơn → đây là một inversion.`
+          : prev ? `${prev.val} ≤ ${node.val}, thứ tự inorder vẫn tăng.` : `${node.val} là node đầu tiên trong inorder nên chưa có prev để so sánh.`,
+        en: hasInversion
+          ? `${prev.val} immediately precedes ${node.val} in inorder but is larger → this is an inversion.`
+          : prev ? `${prev.val} ≤ ${node.val}, so inorder remains ascending.` : `${node.val} is the first inorder node, so there is no prev to compare.`,
+      },
+      { activeNodes: [prev, node].filter(Boolean).map((item) => item.id), extraVars: [{ name: "prev.val > node.val", value: comparison }] });
+
+    if (hasInversion) {
+      inversionCount += 1;
+      addStep(9,
+        { vi: first ? "first đã được chọn" : "first chưa được chọn", en: first ? "first is already selected" : "first is not selected yet" },
+        {
+          vi: first
+            ? "Đây là inversion thứ hai: giữ nguyên first từ inversion đầu tiên."
+            : "Đây là inversion đầu tiên: node lớn ở bên trái (prev) chính là ứng viên first.",
+          en: first
+            ? "This is the second inversion: keep first from the first inversion."
+            : "This is the first inversion: the larger left-side node (prev) is first.",
+        },
+        { activeNodes: [prev.id, node.id], extraVars: [{ name: "not first", value: !first }] });
+
+      if (!first) {
+        first = prev;
+        addStep(10,
+          { vi: `Gán first = ${first.val}`, en: `Set first = ${first.val}` },
+          {
+            vi: `Luôn chọn prev = ${first.val} của inversion đầu tiên làm node sai thứ nhất.`,
+            en: `Always choose prev = ${first.val} from the first inversion as the first incorrect node.`,
+          },
+          { activeNodes: [first.id, node.id] });
+      }
+
+      second = node;
+      addStep(11,
+        { vi: `Gán second = ${second.val}`, en: `Set second = ${second.val}` },
+        {
+          vi: inversionCount === 1
+            ? `Tạm chọn ${second.val}. Nếu hai node sai nằm liền nhau trong inorder, đây là đáp án cuối.`
+            : `Cập nhật second thành ${second.val} ở inversion thứ hai. first giữ nguyên ${first.val}.`,
+          en: inversionCount === 1
+            ? `Temporarily choose ${second.val}. If the swapped nodes are adjacent in inorder, this is the final choice.`
+            : `Update second to ${second.val} at the second inversion. first stays ${first.val}.`,
+        },
+        { activeNodes: [first.id, second.id] });
+    }
+
+    prev = node;
+    inorderSeen.push(node.val);
+    addStep(12,
+      { vi: `Cập nhật prev = ${node.val}`, en: `Update prev = ${node.val}` },
+      {
+        vi: `Đã thăm ${node.val}. Lần xử lý node kế tiếp sẽ so sánh với prev này.`,
+        en: `Visited ${node.val}. The next processed node will be compared with this prev.`,
+      });
+
+    current = node;
+    addStep(13,
+      { vi: `Đi phải từ ${node.val}`, en: `Go right from ${node.val}` },
+      {
+        vi: `Subtree trái và node ${node.val} đã xong; tiếp tục với subtree phải.`,
+        en: `The left subtree and node ${node.val} are done; continue with the right subtree.`,
+      });
+    inorder(node.right);
+    callStack.pop();
+    current = callStack.length ? callStack[callStack.length - 1] : null;
   }
-  steps.push(snapshot(root, { title: { vi: "Recover BST", en: "Recover BST" }, vars: [{ name: "inorder", value: `[${vals.join(",")}]` }], note: { vi: `Inorder của BST hợp lệ phải TĂNG DẦN. Đúng 2 nút bị hoán đổi → tìm chúng rồi swap lại.`, en: `Inorder of a valid BST must be ASCENDING. Exactly 2 nodes were swapped → find them then swap back.` } }));
-  if (first && second){
-    steps.push(snapshot(root, { title: { vi: `Tìm thấy 2 nút sai: ${first.val}, ${second.val}`, en: `Found 2 wrong nodes: ${first.val}, ${second.val}` }, hlSet: new Set([first.id, second.id]), vars: [{ name: "first", value: first.val }, { name: "second", value: second.val }], note: { vi: `Inorder bị vi phạm. Hoán đổi giá trị của 2 nút này.`, en: `Inorder violated. Swap the values of these two nodes.` } }));
-    const a = first.val, b = second.val; first.val = b; second.val = a;
-    const fs = snapshot(root, { title: { vi: `Đã swap → BST hợp lệ`, en: `Swapped → valid BST` }, wordSet: new Set([first.id, second.id]), vars: [{ name: "answer", value: "recovered" }], note: { vi: `Sau khi swap, inorder lại tăng dần → BST đã được khôi phục.`, en: `After swap, inorder is ascending again → BST recovered.` } }); fs.final = true; steps.push(fs);
+
+  current = root;
+  addStep(14,
+    { vi: "Chạy inorder từ root", en: "Run inorder from root" },
+    {
+      vi: "Bắt đầu một lượt inorder duy nhất; mỗi node được xử lý đúng một lần.",
+      en: "Start one inorder traversal; every node is processed exactly once.",
+    });
+  inorder(root);
+
+  function levelOrderValues(node) {
+    if (!node) return [];
+    const result = [];
+    const queue = [node];
+    for (let head = 0; head < queue.length; head += 1) {
+      const item = queue[head];
+      if (!item) {
+        result.push(null);
+        continue;
+      }
+      result.push(item.val);
+      queue.push(item.left, item.right);
+    }
+    while (result[result.length - 1] === null) result.pop();
+    return result;
+  }
+
+  current = null;
+  if (first && second) {
+    const firstBefore = first.val;
+    const secondBefore = second.val;
+    first.val = secondBefore;
+    second.val = firstBefore;
+    const recoveredInorder = [];
+    (function collect(node) {
+      if (!node) return;
+      collect(node.left);
+      recoveredInorder.push(node.val);
+      collect(node.right);
+    }(root));
+    const finalStep = snapshot(root, {
+      title: { vi: `Swap ${firstBefore} ↔ ${secondBefore} → BST đã phục hồi`, en: `Swap ${firstBefore} ↔ ${secondBefore} → BST recovered` },
+      hlSet: new Set([first.id, second.id]),
+      wordSet: new Set([first.id, second.id]),
+      codeLines: [15],
+      vars: commonVars([
+        { name: "swap", value: `${firstBefore} ↔ ${secondBefore}` },
+        { name: "inorder after swap", value: `[${recoveredInorder.join(", ")}]` },
+        { name: "level-order answer", value: `[${levelOrderValues(root).map((value) => value === null ? "null" : value).join(", ")}]` },
+      ]),
+      note: {
+        vi: `Chỉ đổi hai giá trị, không đổi cạnh nào. Inorder sau swap tăng dần nên cây đã là BST hợp lệ.`,
+        en: `Only the two values change; no edge changes. Inorder is ascending after the swap, so the tree is a valid BST again.`,
+      },
+    });
+    finalStep.final = true;
+    steps.push(finalStep);
   } else {
-    const fs = snapshot(root, { title: { vi: "Đã là BST hợp lệ", en: "Already valid" }, vars: [{ name: "answer", value: "no swap" }], note: { vi: "Không có vi phạm.", en: "No violation found." } }); fs.final = true; steps.push(fs);
+    const finalStep = snapshot(root, {
+      title: { vi: "Không tìm thấy inversion", en: "No inversion found" },
+      codeLines: [15],
+      vars: commonVars([{ name: "result", value: "already valid" }]),
+      note: {
+        vi: "Input này đã có inorder tăng dần nên không có hai node để swap (ngoài ràng buộc chính của đề).",
+        en: "This input already has ascending inorder, so there are no two nodes to swap (outside the problem's main constraint).",
+      },
+    });
+    finalStep.final = true;
+    steps.push(finalStep);
   }
-  return { input, answer: "recovered", steps };
+
+  return { input, answer: levelOrderValues(root), steps };
 }
 
 // ─── 109: Convert Sorted List to BST ───
