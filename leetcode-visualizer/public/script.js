@@ -2895,17 +2895,17 @@ function renderDuplicateZerosView(step) {
     const isOverflow = type === "virtual" && index >= visibleLength;
     const display = value === null || value === undefined ? "·" : String(value);
     const pointer = isRead ? "i" : (type === "virtual" && index === write ? "j" : "");
-    return `<div class="dz-cell${isRead ? " read" : ""}${isWrite ? " write" : ""}${isFinal ? " final" : ""}${isOverflow ? " overflow" : ""}">
+    return `<div class="dz-cell${isRead ? " read" : ""}${isWrite ? " write" : ""}${isFinal ? " final" : ""}${isOverflow ? " overflow" : ""}${pointer ? " pointer-cell" : ""}">
       ${pointer ? `<b class="dz-pointer ${pointer}">${pointer}</b>` : ""}
       <span>[${index}]</span><strong>${escapeHtml(display)}</strong>
     </div>`;
   }).join("");
 
   const writeLabel = write >= visibleLength
-    ? (vi ? `WRITE = ${write} (ô tràn)` : `WRITE = ${write} (overflow slot)`)
+    ? (vi ? `j = ${write} (ngoài mảng)` : `j = ${write} (outside array)`)
     : write >= 0
-      ? `WRITE = ${write}`
-      : (vi ? "WRITE hoàn tất" : "WRITE complete");
+      ? `j = ${write}`
+      : (vi ? "j = -1 (hoàn tất)" : "j = -1 (complete)");
   const summary = vi
     ? `Đọc source[${read}] và ghi ngược trong không gian ${virtual.length} ô; chỉ giữ các ô 0 đến ${visibleLength - 1}.`
     : `Read source[${read}] and write backwards in ${virtual.length} slots; keep only slots 0 through ${visibleLength - 1}.`;

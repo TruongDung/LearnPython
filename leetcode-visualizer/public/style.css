@@ -7544,6 +7544,7 @@ html, body {
 .dz-cell.write { border-color: #a78bfa; background: rgba(139, 92, 246, 0.2); }
 .dz-cell.final { border-color: rgba(52, 211, 153, 0.65); }
 .dz-cell.overflow { opacity: 0.5; border-style: dashed; }
+.dz-cell.overflow.pointer-cell { opacity: 1; border-color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
 .dz-cell.overflow.write { opacity: 1; border-color: #f59e0b; background: rgba(245, 158, 11, 0.16); }
 .dz-arrow { color: #94a3b8; font-size: 11px; text-align: center; }
 
@@ -7563,6 +7564,7 @@ html, body {
 [data-theme="light"] .dz-pointer.j { background: #a78bfa; }
 [data-theme="light"] .dz-cell.final { border-color: #059669; }
 [data-theme="light"] .dz-cell.overflow.write { background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .dz-cell.overflow.pointer-cell { background: #fffbeb; border-color: #d97706; }
 
 /* ---- LeetCode 3312: sorted GCD pair queries ---- */
 .gcd-pairs-viz {
