@@ -11633,6 +11633,12 @@ module.exports = {
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
     order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    extraCategories: {
+      "multi-source-bfs": {
+        order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
+        label: { vi: "Lộ trình Multi-source BFS", en: "Multi-source BFS learning path" },
+      },
+    },
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11709,6 +11715,7 @@ module.exports = {
     id: 542,
     difficulty: "medium",
     slug: "01-matrix",
+    tags: [{ key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" }],
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "01 Matrix", en: "01 Matrix" },
     titleVi: { vi: "Khoảng cách đến số 0 gần nhất", en: "Distance to the nearest zero" },
@@ -12288,6 +12295,7 @@ module.exports = {
     id: 994,
     difficulty: "medium",
     slug: "rotting-oranges",
+    tags: [{ key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" }],
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
     title: { vi: "Rotting Oranges", en: "Rotting Oranges" },
     titleVi: { vi: "Cam thối lan theo từng phút", en: "Minute-by-minute rotting BFS" },

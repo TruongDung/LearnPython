@@ -698,12 +698,14 @@ function buildSteps1020(input) {
 }
 
 const graphCategory = { key: "graph", vi: "Đồ thị", en: "Graph" };
+const multiSourceTag = { key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" };
 
 const problems = {
   1162: {
     id: 1162,
     difficulty: "medium",
     slug: "as-far-from-land-as-possible",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("As Far from Land as Possible", "As Far from Land as Possible"),
     titleVi: text("Ô biển xa đất nhất", "Farthest water cell from land"),
@@ -751,6 +753,7 @@ const problems = {
     id: 1765,
     difficulty: "medium",
     slug: "map-of-highest-peak",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("Map of Highest Peak", "Map of Highest Peak"),
     titleVi: text("Xây bản đồ độ cao từ mặt nước", "Build a height map from water"),
@@ -799,6 +802,7 @@ const problems = {
     difficulty: "medium",
     premium: true,
     slug: "walls-and-gates",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("Walls and Gates", "Walls and Gates"),
     titleVi: text("Khoảng cách phòng tới gate gần nhất", "Distance from rooms to nearest gates"),
@@ -846,6 +850,7 @@ const problems = {
     id: 934,
     difficulty: "medium",
     slug: "shortest-bridge",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("Shortest Bridge", "Shortest Bridge"),
     titleVi: text("Cây cầu ngắn nhất giữa hai đảo", "Shortest bridge between two islands"),
@@ -900,6 +905,7 @@ const problems = {
     id: 417,
     difficulty: "medium",
     slug: "pacific-atlantic-water-flow",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("Pacific Atlantic Water Flow", "Pacific Atlantic Water Flow"),
     titleVi: text("Nước chảy tới cả hai đại dương", "Water flow to both oceans"),
@@ -947,7 +953,8 @@ const problems = {
     id: 130,
     difficulty: "medium",
     slug: "surrounded-regions",
-    category: graphCategory,
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    tags: [multiSourceTag],
     title: text("Surrounded Regions", "Surrounded Regions"),
     titleVi: text("Multi-source BFS từ các vùng ở biên", "Multi-source BFS from border regions"),
     statement: text("Đổi mọi O bị X bao quanh thành X; các O nối bốn hướng tới biên được giữ lại.", "Flip every O surrounded by X; O cells connected in four directions to the border remain unchanged."),
@@ -990,6 +997,7 @@ const problems = {
     id: 1020,
     difficulty: "medium",
     slug: "number-of-enclaves",
+    tags: [multiSourceTag],
     category: graphCategory,
     title: text("Number of Enclaves", "Number of Enclaves"),
     titleVi: text("Đếm đất không thể đi ra biên", "Count land that cannot reach the border"),

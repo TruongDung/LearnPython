@@ -37,7 +37,12 @@ const CATEGORY_ORDER = {};
 for (const [catKey, mod] of Object.entries(categories)) {
   const { __meta, ...problems } = mod;
   Object.assign(SUPPORTED, problems);
-  if (__meta) CATEGORY_ORDER[catKey] = __meta;
+  if (__meta) {
+    CATEGORY_ORDER[catKey] = __meta;
+    if (__meta.extraCategories) {
+      Object.assign(CATEGORY_ORDER, __meta.extraCategories);
+    }
+  }
 }
 
 module.exports = { SUPPORTED, CATEGORY_ORDER };

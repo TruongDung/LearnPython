@@ -23,17 +23,23 @@ app.get("/api/problems", (req, res) => {
   const groupsMap = {};
   for (const key of Object.keys(SUPPORTED)) {
     const p = SUPPORTED[key];
-    const cat = p.category || { key: "other", vi: "Khác", en: "Other" };
-    if (!groupsMap[cat.key]) {
-      groupsMap[cat.key] = { key: cat.key, vi: cat.vi, en: cat.en, problems: [] };
+    const primary = p.category || { key: "other", vi: "Khác", en: "Other" };
+    const categories = [primary, ...(Array.isArray(p.tags) ? p.tags : [])];
+    const seenCategoryKeys = new Set();
+    for (const cat of categories) {
+      if (!cat || !cat.key || seenCategoryKeys.has(cat.key)) continue;
+      seenCategoryKeys.add(cat.key);
+      if (!groupsMap[cat.key]) {
+        groupsMap[cat.key] = { key: cat.key, vi: cat.vi, en: cat.en, problems: [] };
+      }
+      groupsMap[cat.key].problems.push({
+        id: p.id,
+        title: p.title,
+        titleVi: p.titleVi,
+        difficulty: p.difficulty || null,
+        premium: isPremium(p),
+      });
     }
-    groupsMap[cat.key].problems.push({
-      id: p.id,
-      title: p.title,
-      titleVi: p.titleVi,
-      difficulty: p.difficulty || null,
-      premium: isPremium(p),
-    });
   }
   const groups = Object.values(groupsMap);
   groups.forEach((g) => {
@@ -70,6 +76,7 @@ app.get("/api/problem/:id", (req, res) => {
     premium: isPremium(problem),
     slug: problem.slug || null,
     category: problem.category || null,
+    tags: problem.tags || [],
     title: problem.title,
     titleVi: problem.titleVi,
     statement: problem.statement,
