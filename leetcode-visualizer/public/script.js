@@ -2681,10 +2681,15 @@ function renderTwoPointerMergeView(step) {
   const nums1 = Array.isArray(view.nums1) ? view.nums1 : [];
   const nums2 = Array.isArray(view.nums2) ? view.nums2 : [];
   const written = Array.isArray(view.written) ? view.written : [];
+  const result = Array.isArray(view.result) ? view.result : null;
+  const resultLength = Number.isInteger(view.resultLength) ? view.resultLength : (result ? result.length : 0);
+  const writtenResult = Array.isArray(view.writtenResult) ? view.writtenResult : [];
   const pointers1 = view.pointers1 || {}; // { i: idx, k: idx } -> pointer name -> index into nums1
   const pointers2 = view.pointers2 || {}; // { j: idx } -> pointer name -> index into nums2
+  const pointersResult = view.pointersResult || {};
   const highlight1 = new Set(view.highlight1 || []);
   const highlight2 = new Set(view.highlight2 || []);
+  const highlightResult = new Set(view.highlightResult || []);
 
   // Fixed color per pointer name so it's visually consistent across every step.
   const pointerColor = { i: "tp-ptr-a", p1: "tp-ptr-a", j: "tp-ptr-b", p2: "tp-ptr-b", k: "tp-ptr-c", write: "tp-ptr-c" };
@@ -2693,14 +2698,14 @@ function renderTwoPointerMergeView(step) {
     return Object.entries(pointerMap).filter(([, v]) => v === idx).map(([name]) => name);
   }
 
-  function renderRow(rowLabel, values, pointerMap, hlSet, rowClass) {
+  function renderRow(rowLabel, values, pointerMap, hlSet, rowClass, writtenCells = []) {
     const cells = values.map((v, i) => {
       const names = pointersAt(pointerMap, i);
       const arrowsHtml = names.map((name) => {
         const cls = pointerColor[name] || "tp-ptr-a";
         return `<div class="tp-pointer-arrow ${cls}"><span class="tp-pointer-name">${escapeHtml(name)}</span><span class="tp-pointer-caret">\u25BC</span></div>`;
       }).join("");
-      const isWritten = written[i];
+      const isWritten = writtenCells[i];
       const isHl = hlSet.has(i);
       return `<div class="tp-cell-wrap">
         <div class="tp-pointer-stack">${arrowsHtml}</div>
@@ -2725,10 +2730,99 @@ function renderTwoPointerMergeView(step) {
 
   $("treeView").innerHTML = `
     <div class="tp-merge-viz">
-      ${renderRow(view.label1 || "nums1", nums1, pointers1, highlight1, "tp-row-nums1")}
+      ${renderRow(view.label1 || "nums1", nums1, pointers1, highlight1, "tp-row-nums1", written)}
       ${renderRow(view.label2 || "nums2", nums2, pointers2, highlight2, "tp-row-nums2")}
+      ${result ? renderRow(
+        view.resultLabel || "result",
+        Array.from({ length: resultLength }, (_, idx) => result[idx] ?? "·"),
+        pointersResult,
+        highlightResult,
+        "tp-row-result",
+        writtenResult,
+      ) : ""}
       <div class="tp-legend">${legendHtml}</div>
     </div>`;
+}
+
+// ---- Rotated-array binary search visualization (LeetCode 33) ----
+function renderRotatedSearchView(step) {
+  const view = step.rotatedSearchView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const mid = Number.isInteger(view.mid) ? view.mid : -1;
+  const eliminated = new Set(Array.isArray(view.eliminated) ? view.eliminated : []);
+  const comparison = pick(view.comparison) || "";
+  const vi = lang === "vi";
+
+  function pointerLabels(index) {
+    const labels = [];
+    if (index === left) labels.push("L");
+    if (index === mid) labels.push("M");
+    if (index === right) labels.push("R");
+    return labels;
+  }
+
+  function isInSortedHalf(index) {
+    if (mid < 0) return false;
+    if (view.sortedHalf === "left") return index >= left && index <= mid;
+    if (view.sortedHalf === "right") return index >= mid && index <= right;
+    return false;
+  }
+
+  const cells = nums.map((value, index) => {
+    const pointers = pointerLabels(index);
+    const active = index >= left && index <= right;
+    const found = view.phase === "found" && index === mid;
+    const classes = [
+      "rotated-cell",
+      active ? "active" : "discarded",
+      eliminated.has(index) ? "just-eliminated" : "",
+      isInSortedHalf(index) ? "sorted-half" : "",
+      view.phase === "narrow" && active ? "kept" : "",
+      index === mid && view.phase !== "found" ? "mid" : "",
+      found ? "found" : "",
+    ].filter(Boolean).join(" ");
+    const pointerHtml = pointers.length
+      ? pointers.map((label) => `<span class="rotated-pointer pointer-${label.toLowerCase()}">${label}<i></i></span>`).join("")
+      : `<span class="rotated-pointer-spacer"></span>`;
+
+    return `<div class="rotated-cell-wrap">
+      <div class="rotated-pointers">${pointerHtml}</div>
+      <div class="${classes}">
+        <strong>${escapeHtml(String(value))}</strong>
+        <span>[${index}]</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const stateLabel = ({
+    range: vi ? "Vùng đang tìm" : "Search range",
+    mid: vi ? "Kiểm tra điểm giữa" : "Check midpoint",
+    sorted: vi ? "Xác định nửa tăng dần" : "Identify sorted half",
+    narrow: vi ? `Giữ nửa ${view.keptHalf === "left" ? "TRÁI" : "PHẢI"}` : `Keep the ${view.keptHalf === "left" ? "LEFT" : "RIGHT"} half`,
+    found: vi ? "Đã tìm thấy" : "Found",
+    "not-found": vi ? "Không tìm thấy" : "Not found",
+  })[view.phase] || (vi ? "Vùng đang tìm" : "Search range");
+
+  const summary = vi
+    ? `Tìm ${view.target} trong mảng xoay. ${stateLabel}. ${comparison}`
+    : `Searching for ${view.target} in a rotated array. ${stateLabel}. ${comparison}`;
+
+  $("treeView").innerHTML = `<div class="rotated-search-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rotated-search-head">
+      <span class="rotated-target">target <strong>${escapeHtml(String(view.target))}</strong></span>
+      <span class="rotated-phase">${escapeHtml(stateLabel)}</span>
+    </div>
+    <div class="rotated-cells">${cells}</div>
+    <div class="rotated-decision">${escapeHtml(comparison)}</div>
+    <div class="rotated-legend">
+      <span><i class="legend-active"></i>${vi ? "còn xét" : "candidate"}</span>
+      <span><i class="legend-sorted"></i>${vi ? "nửa tăng dần" : "sorted half"}</span>
+      <span><i class="legend-mid"></i>mid</span>
+      <span><i class="legend-discarded"></i>${vi ? "đã loại" : "discarded"}</span>
+    </div>
+  </div>`;
 }
 
 // ---- Multi-slot podium visualization (e.g. bai 628: track top-3 & bottom-2) ----
@@ -3497,6 +3591,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.rotatedSearchView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRotatedSearchView(step);
   } else if (step.twitterView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -1325,7 +1325,411 @@ function fmtInf(v) {
   return String(v);
 }
 
+/**
+ * LeetCode 1464: Maximum Product of Two Elements in an Array.
+ *
+ * Track the largest and second-largest numbers in one pass. The answer uses
+ * (first - 1) * (second - 1), so the visualization keeps the two chosen bars
+ * marked as the scan updates them.
+ */
+function buildSteps1464(nums) {
+  const steps = [];
+
+  if (nums.length < 2) {
+    steps.push({
+      title: { vi: "Cần ít nhất 2 phần tử", en: "Need at least 2 elements" },
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "n", value: nums.length }],
+      note: {
+        vi: "Bài 1464 yêu cầu chọn 2 phần tử khác nhau, nên mảng phải có ít nhất 2 phần tử.",
+        en: "Problem 1464 must choose 2 different elements, so the array needs at least 2 elements.",
+      },
+    });
+    return { original: [...nums], answer: null, steps };
+  }
+
+  let first = 0;
+  let second = 0;
+  let firstIdx = -1;
+  let secondIdx = -1;
+
+  function selectedMarks() {
+    return [firstIdx, secondIdx].filter((idx) => idx >= 0);
+  }
+
+  steps.push({
+    title: { vi: "Khởi tạo 2 biến lớn nhất", en: "Initialize top two values" },
+    arr: [...nums],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "first", value: first },
+      { name: "second", value: second },
+    ],
+    note: {
+      vi: "Vì nums[i] là số dương, bắt đầu first = second = 0 rồi quét mảng một lần.",
+      en: "Because nums[i] is positive, start first = second = 0 and scan the array once.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    const num = nums[i];
+
+    steps.push({
+      title: { vi: `Xét nums[${i}] = ${num}`, en: `Check nums[${i}] = ${num}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: selectedMarks(),
+      codeLines: [4],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+        { name: "first", value: first },
+        { name: "second", value: second },
+      ],
+      note: {
+        vi: `So sánh num=${num} với first=${first} trước, rồi mới tới second=${second}.`,
+        en: `Compare num=${num} with first=${first} first, then second=${second}.`,
+      },
+    });
+
+    if (num > first) {
+      const oldFirst = first;
+      const oldFirstIdx = firstIdx;
+      second = first;
+      secondIdx = firstIdx;
+      first = num;
+      firstIdx = i;
+
+      steps.push({
+        title: { vi: `${num} trở thành first`, en: `${num} becomes first` },
+        arr: [...nums],
+        highlight: [i],
+        mark: selectedMarks(),
+        codeLines: [5, 6, 7],
+        vars: [
+          { name: "num", value: num },
+          { name: "old first", value: oldFirst },
+          { name: "first", value: first },
+          { name: "second", value: second },
+        ],
+        note: {
+          vi: `${num} > first cũ (${oldFirst}) → đẩy first cũ xuống second${oldFirstIdx >= 0 ? ` ở index ${oldFirstIdx}` : ""}, rồi first = ${num}.`,
+          en: `${num} > old first (${oldFirst}) → move old first down to second${oldFirstIdx >= 0 ? ` at index ${oldFirstIdx}` : ""}, then first = ${num}.`,
+        },
+      });
+    } else if (num > second) {
+      second = num;
+      secondIdx = i;
+
+      steps.push({
+        title: { vi: `${num} trở thành second`, en: `${num} becomes second` },
+        arr: [...nums],
+        highlight: [i],
+        mark: selectedMarks(),
+        codeLines: [8, 9],
+        vars: [
+          { name: "num", value: num },
+          { name: "first", value: first },
+          { name: "second", value: second },
+        ],
+        note: {
+          vi: `${num} không vượt first=${first}, nhưng ${num} > second cũ → cập nhật second = ${num}.`,
+          en: `${num} does not beat first=${first}, but ${num} > old second → update second = ${num}.`,
+        },
+      });
+    } else {
+      steps.push({
+        title: { vi: `${num} không vào top 2`, en: `${num} stays outside top 2` },
+        arr: [...nums],
+        highlight: [i],
+        mark: selectedMarks(),
+        codeLines: [5, 8],
+        vars: [
+          { name: "num", value: num },
+          { name: "first", value: first },
+          { name: "second", value: second },
+        ],
+        note: {
+          vi: `${num} <= first=${first} và ${num} <= second=${second}, nên top 2 không đổi.`,
+          en: `${num} <= first=${first} and ${num} <= second=${second}, so the top two values stay unchanged.`,
+        },
+      });
+    }
+  }
+
+  const answer = (first - 1) * (second - 1);
+  steps.push({
+    title: { vi: `Kết quả: (${first}-1)×(${second}-1) = ${answer}`, en: `Result: (${first}-1)×(${second}-1) = ${answer}` },
+    arr: [...nums],
+    highlight: [],
+    mark: selectedMarks(),
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "first", value: first },
+      { name: "second", value: second },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Hai số lớn nhất là ${first} và ${second}. Trả về (${first}-1)×(${second}-1) = ${answer}.`,
+      en: `The two largest values are ${first} and ${second}. Return (${first}-1)×(${second}-1) = ${answer}.`,
+    },
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 84: Largest Rectangle in Histogram.
+ *
+ * Given heights of bars in a histogram, find the area of the largest
+ * rectangle that fits entirely within the histogram.
+ *
+ * Monotonic increasing stack of INDICES: as we scan left to right, whenever
+ * the current bar is shorter than the bar at the top of the stack, that top
+ * bar can never extend further right (it's "blocked" by the current shorter
+ * bar), so we POP it and compute the rectangle it forms — its height times
+ * the width between the new stack top (exclusive) and the current index
+ * (exclusive). A sentinel height of 0 appended at the end forces every
+ * remaining bar in the stack to be popped and evaluated.
+ */
+function buildSteps84(heights) {
+  const steps = [];
+  const n = heights.length;
+  const bars = [...heights, 0]; // sentinel to flush the stack at the end
+  const stack = []; // indices into `bars`, heights strictly increasing
+  let maxArea = 0;
+  let bestLeft = -1, bestRight = -1, bestHeight = 0;
+
+  function stackLabel() {
+    return `[${stack.map((idx) => `${idx}:${bars[idx]}`).join(", ")}]`;
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: heights,
+      sub: heights.map((_, i) => `[${i}]`),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      stackView: {
+        title: "Monotonic stack (indices, increasing height)",
+        emptyLabel: "empty stack",
+        items: stack.map((idx) => ({ value: String(idx), detail: `height=${bars[idx]}` })),
+        input: bars.map((h) => String(h)),
+        inputLabel: "bars (heights + sentinel 0)",
+        current: opts.current,
+        status: [
+          { label: "i", value: opts.i !== undefined ? opts.i : "-" },
+          { label: "bars[i]", value: opts.i !== undefined ? bars[opts.i] : "-" },
+          { label: "stack", value: stackLabel() },
+          { label: "maxArea", value: maxArea },
+        ],
+      },
+      vars: [
+        { name: "stack", value: stackLabel() },
+        { name: "maxArea", value: maxArea },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: stack = []
+  snap({
+    title: { vi: "stack = []", en: "stack = []" },
+    codeLines: [3],
+    vars: [{ name: "heights", value: `[${heights.join(",")}]` }],
+    note: {
+      vi: `heights=[${heights.join(",")}]. stack lưu INDEX của các cột theo thứ tự CHIỀU CAO TĂNG DẦN. Thêm cột "lính canh" cao 0 vào cuối để đảm bảo mọi cột trong stack đều được xử lý.`,
+      en: `heights=[${heights.join(",")}]. stack holds bar INDICES in strictly INCREASING height order. A sentinel bar of height 0 is appended at the end to flush every remaining bar in the stack.`,
+    },
+  });
+
+  // Line 4: max_area = 0
+  snap({
+    title: { vi: "max_area = 0", en: "max_area = 0" },
+    codeLines: [4],
+    note: {
+      vi: "max_area sẽ giữ diện tích hình chữ nhật lớn nhất tìm được.",
+      en: "max_area will hold the largest rectangle area found so far.",
+    },
+  });
+
+  for (let i = 0; i < bars.length; i++) {
+    // Line 5: for i in range(len(bars)):
+    snap({
+      title: { vi: `for i in range(len(bars)) → i=${i}`, en: `for i in range(len(bars)) → i=${i}` },
+      i, current: i < n ? i : undefined,
+      highlight: i < n ? [i] : [],
+      codeLines: [5],
+      vars: [{ name: "i", value: i }, { name: "bars[i]", value: bars[i] }],
+      note: {
+        vi: i < n ? `Xét cột i=${i}, chiều cao = ${bars[i]}.` : `i=${i} là cột LÍNH CANH (height=0) — sẽ buộc mọi cột còn lại trong stack bị pop.`,
+        en: i < n ? `Consider bar i=${i}, height = ${bars[i]}.` : `i=${i} is the SENTINEL bar (height=0) — will force every remaining stack bar to be popped.`,
+      },
+    });
+
+    while (true) {
+      const topIdx = stack.length ? stack[stack.length - 1] : -1;
+      const shouldPop = stack.length > 0 && bars[topIdx] >= bars[i];
+
+      // Line 6: while stack and bars[stack[-1]] >= bars[i]:
+      snap({
+        title: { vi: `while stack and bars[stack[-1]] >= bars[i] → ${shouldPop}`, en: `while stack and bars[stack[-1]] >= bars[i] → ${shouldPop}` },
+        i, current: i < n ? i : undefined,
+        highlight: [...(i < n ? [i] : []), ...(topIdx >= 0 && topIdx < n ? [topIdx] : [])],
+        codeLines: [6],
+        vars: topIdx >= 0 ? [{ name: "stack top", value: `${topIdx}:${bars[topIdx]}` }] : [],
+        note: shouldPop
+          ? { vi: `bars[top]=${bars[topIdx]} ≥ bars[i]=${bars[i]} → cột top KHÔNG THỂ mở rộng qua phải nữa (bị chặn bởi cột thấp hơn tại i) → sẽ pop.`, en: `bars[top]=${bars[topIdx]} ≥ bars[i]=${bars[i]} → the top bar CANNOT extend further right (blocked by the shorter bar at i) → will pop.` }
+          : { vi: stack.length === 0 ? "Stack rỗng → không pop, đẩy i vào stack." : `bars[top]=${bars[topIdx]} < bars[i]=${bars[i]} → cột top vẫn có thể mở rộng qua phải → dừng pop, đẩy i vào stack.`, en: stack.length === 0 ? "Stack is empty → no pop, push i." : `bars[top]=${bars[topIdx]} < bars[i]=${bars[i]} → the top bar can still extend right → stop popping, push i.` },
+      });
+
+      if (!shouldPop) break;
+
+      // Line 7: top = stack.pop()
+      const top = stack.pop();
+      snap({
+        title: { vi: `top = stack.pop() → top=${top} (height=${bars[top]})`, en: `top = stack.pop() → top=${top} (height=${bars[top]})` },
+        i, current: i < n ? i : undefined,
+        highlight: [top, ...(i < n ? [i] : [])],
+        codeLines: [7],
+        vars: [{ name: "top", value: top }, { name: "height[top]", value: bars[top] }],
+        note: {
+          vi: `Lấy cột top=${top} (cao ${bars[top]}) ra khỏi stack để tính hình chữ nhật mà nó làm chiều cao.`,
+          en: `Pop bar top=${top} (height ${bars[top]}) to compute the rectangle where it serves as the height.`,
+        },
+      });
+
+      // Line 8: width = i - stack[-1] - 1 if stack else i
+      const newTop = stack.length ? stack[stack.length - 1] : -1;
+      const width = stack.length ? i - newTop - 1 : i;
+      snap({
+        title: { vi: `width = i-stack[-1]-1 if stack else i → ${width}`, en: `width = i-stack[-1]-1 if stack else i → ${width}` },
+        i, current: i < n ? i : undefined,
+        highlight: [top, ...(i < n ? [i] : []), ...(newTop >= 0 ? [newTop] : [])],
+        codeLines: [8],
+        vars: [{ name: "new stack top", value: newTop >= 0 ? `${newTop}:${bars[newTop]}` : "empty" }, { name: "width", value: width }],
+        note: stack.length
+          ? { vi: `Còn cột newTop=${newTop} trong stack (cao ${bars[newTop]} < ${bars[top]}) → chiều rộng = i - newTop - 1 = ${i} - ${newTop} - 1 = ${width} (khoảng giữa 2 cột, không tính chính chúng).`, en: `Bar newTop=${newTop} remains in the stack (height ${bars[newTop]} < ${bars[top]}) → width = i - newTop - 1 = ${i} - ${newTop} - 1 = ${width} (the gap between the two bars, excluding them).` }
+          : { vi: `Stack rỗng sau khi pop → cột top=${top} là cột THẤP NHẤT tính từ đầu mảng tới i, nên chiều rộng = i = ${width}.`, en: `Stack is empty after popping → bar top=${top} is the SHORTEST bar from the start of the array up to i, so width = i = ${width}.` },
+      });
+
+      // Line 9: max_area = max(max_area, height[top] * width)
+      const area = bars[top] * width;
+      const oldMax = maxArea;
+      const improves = area > maxArea;
+      if (improves) { maxArea = area; bestHeight = bars[top]; bestRight = i; bestLeft = newTop; }
+      snap({
+        title: { vi: `max_area = max(max_area, height[top]*width) = max(${oldMax}, ${bars[top]}×${width}=${area}) → ${maxArea}`, en: `max_area = max(max_area, height[top]*width) = max(${oldMax}, ${bars[top]}×${width}=${area}) → ${maxArea}` },
+        i, current: i < n ? i : undefined,
+        highlight: [top, ...(i < n ? [i] : [])],
+        codeLines: [9],
+        vars: [{ name: "area", value: `${bars[top]}×${width} = ${area}` }, { name: "max_area", value: maxArea }],
+        note: improves
+          ? { vi: `Diện tích ${bars[top]}×${width}=${area} LỚN HƠN max_area cũ (${oldMax}) → cập nhật max_area=${maxArea}.`, en: `Area ${bars[top]}×${width}=${area} is LARGER than the old max_area (${oldMax}) → update max_area=${maxArea}.` }
+          : { vi: `Diện tích ${bars[top]}×${width}=${area} không lớn hơn max_area=${oldMax} → giữ nguyên.`, en: `Area ${bars[top]}×${width}=${area} isn't larger than max_area=${oldMax} → unchanged.` },
+      });
+    }
+
+    // Line 10: stack.append(i)
+    stack.push(i);
+    snap({
+      title: { vi: `stack.append(i) → stack=${stackLabel()}`, en: `stack.append(i) → stack=${stackLabel()}` },
+      i, current: i < n ? i : undefined,
+      highlight: i < n ? [i] : [],
+      codeLines: [10],
+      note: i < n
+        ? { vi: `Đẩy i=${i} vào stack. Vì mọi cột cao hơn hoặc bằng đã bị pop ở trên, stack luôn giữ thứ tự chiều cao TĂNG DẦN.`, en: `Push i=${i} onto the stack. Since every taller-or-equal bar was popped above, the stack always stays in INCREASING height order.` }
+        : { vi: `Đẩy cột lính canh (i=${i}) vào stack — vô hại vì vòng lặp kết thúc ngay sau bước này.`, en: `Push the sentinel bar (i=${i}) onto the stack — harmless since the loop ends right after this step.` },
+    });
+  }
+
+  const fs = {
+    title: { vi: `return max_area → ${maxArea}`, en: `return max_area → ${maxArea}` },
+    arr: heights,
+    sub: heights.map((_, i) => `[${i}]`),
+    highlight: bestLeft >= 0 || bestRight >= 0 ? Array.from({ length: (bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0) }, (_, k) => (bestLeft >= 0 ? bestLeft + 1 : 0) + k) : [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    stackView: {
+      title: "Monotonic stack (indices, increasing height)",
+      emptyLabel: "empty stack",
+      items: [],
+      input: bars.map((h) => String(h)),
+      inputLabel: "bars (heights + sentinel 0)",
+      status: [{ label: "maxArea", value: maxArea }],
+    },
+    vars: [{ name: "answer", value: maxArea }, { name: "best height", value: bestHeight }, { name: "best width", value: (bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0) }],
+    note: {
+      vi: `Diện tích hình chữ nhật lớn nhất = ${maxArea}${bestHeight ? ` (chiều cao ${bestHeight}, chiều rộng ${(bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0)}).` : "."}`,
+      en: `The largest rectangle area = ${maxArea}${bestHeight ? ` (height ${bestHeight}, width ${(bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0)}).` : "."}`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: heights, answer: maxArea, steps };
+}
+
 module.exports = {
+  84: {
+    id: 84,
+    difficulty: "hard",
+    slug: "largest-rectangle-in-histogram",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Largest Rectangle in Histogram", en: "Largest Rectangle in Histogram" },
+    titleVi: { vi: "Hình chữ nhật lớn nhất trong biểu đồ cột", en: "Largest rectangle in a histogram" },
+    statement: {
+      vi:
+        "Cho mảng heights biểu diễn chiều cao các cột liên tiếp trong 1 biểu đồ cột (mỗi cột rộng 1). " +
+        "Tìm diện tích hình chữ nhật LỚN NHẤT nằm hoàn toàn trong biểu đồ.",
+      en:
+        "Given an array heights representing the heights of contiguous bars in a histogram (each bar has width 1), " +
+        "find the area of the LARGEST rectangle that fits entirely within the histogram.",
+    },
+    defaultInput: [2, 1, 5, 6, 2, 3],
+    inputKind: "nonneg",
+    inputLabel: { vi: "heights", en: "heights" },
+    extraParams: [],
+    approach: [
+      { vi: "Dùng stack lưu INDEX theo thứ tự CHIỀU CAO TĂNG DẦN. Thêm cột lính canh cao 0 vào cuối để buộc xả hết stack.", en: "Use a stack of INDICES in strictly INCREASING height order. Append a sentinel bar of height 0 to force-flush the stack at the end." },
+      { vi: "Khi cột hiện tại THẤP HƠN đỉnh stack → đỉnh không thể mở rộng qua phải → pop và tính diện tích (chiều cao = cột vừa pop, chiều rộng = khoảng giữa 2 cột lân cận trong stack).", en: "When the current bar is SHORTER than the stack top → the top can't extend right anymore → pop it and compute its area (height = popped bar, width = the gap between its neighboring bars in the stack)." },
+      { vi: "Sau khi pop hết cột cao hơn/bằng, đẩy cột hiện tại vào stack.", en: "After popping every taller-or-equal bar, push the current bar's index onto the stack." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi cột được push và pop tối đa 1 lần → tổng O(n).",
+        en: "Each bar is pushed and popped at most once → total O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def largestRectangleArea(self, heights):",
+      "        stack = []",
+      "        max_area = 0",
+      "        bars = heights + [0]",
+      "        for i in range(len(bars)):",
+      "            while stack and bars[stack[-1]] >= bars[i]:",
+      "                top = stack.pop()",
+      "                width = i - stack[-1] - 1 if stack else i",
+      "                max_area = max(max_area, bars[top] * width)",
+      "            stack.append(i)",
+      "        return max_area",
+    ],
+    builder: buildSteps84,
+  },
   628: {
     id: 628,
     difficulty: "easy",
@@ -1375,6 +1779,48 @@ module.exports = {
       "        return max(first * second * third, minFirst * minSecond * first)",
     ],
     builder: buildSteps628,
+  },
+  1464: {
+    id: 1464,
+    difficulty: "easy",
+    slug: "maximum-product-of-two-elements-in-an-array",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Maximum Product of Two Elements in an Array", en: "Maximum Product of Two Elements in an Array" },
+    titleVi: { vi: "Tích lớn nhất của 2 phần tử", en: "Maximum product of two elements" },
+    statement: {
+      vi: "Cho mảng nums gồm các số nguyên dương. Chọn hai index khác nhau i và j sao cho (nums[i]-1) * (nums[j]-1) là lớn nhất.",
+      en: "Given an array nums of positive integers, choose two different indices i and j to maximize (nums[i]-1) * (nums[j]-1).",
+    },
+    defaultInput: [3, 4, 5, 2],
+    inputKind: "positive",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Chỉ cần 2 số lớn nhất trong mảng; các số nhỏ hơn không thể tạo tích tốt hơn.", en: "Only the two largest numbers are needed; smaller values cannot form a better product." },
+      { vi: "Quét một lần, giữ first là lớn nhất và second là lớn nhì. Khi có số mới vượt first, đẩy first cũ xuống second.", en: "Scan once, keeping first as the largest and second as the runner-up. When a new value beats first, push the old first down to second." },
+      { vi: "Kết quả là (first - 1) * (second - 1).", en: "The result is (first - 1) * (second - 1)." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Quét mảng đúng một lần và chỉ giữ 2 biến.",
+        en: "Scan the array once and keep only 2 variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxProduct(self, nums: List[int]) -> int:",
+      "        first = second = 0",
+      "        for num in nums:",
+      "            if num > first:",
+      "                second = first",
+      "                first = num",
+      "            elif num > second:",
+      "                second = num",
+      "        return (first - 1) * (second - 1)",
+    ],
+    builder: buildSteps1464,
   },
   1299: {
     id: 1299,

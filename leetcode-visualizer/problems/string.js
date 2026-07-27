@@ -2,6 +2,121 @@
 // Module of LeetCode Visualizer — category-specific builders and problem entries.
 
 /**
+ * LeetCode 1768: Merge Strings Alternately.
+ * Walk both strings by index and append one available character from each.
+ */
+function buildSteps1768(input, params) {
+  const word1 = String(input || "");
+  const word2 = String((params && params.word2) || "");
+  const result = [];
+  const steps = [];
+  const limit = Math.max(word1.length, word2.length);
+
+  function snapshot({ title, note, i = 0, j = 0, write = -1, source = null, codeLines = [], final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      twoPointerMergeView: {
+        nums1: [...word1],
+        nums2: [...word2],
+        result: [...result],
+        resultLength: word1.length + word2.length,
+        writtenResult: Array.from({ length: word1.length + word2.length }, (_, idx) => idx < result.length),
+        pointers1: i < word1.length ? { i } : {},
+        pointers2: j < word2.length ? { j } : {},
+        pointersResult: write >= 0 ? { write } : {},
+        highlight1: source === "word1" && i > 0 ? [i - 1] : [],
+        highlight2: source === "word2" && j > 0 ? [j - 1] : [],
+        highlightResult: write >= 0 ? [write] : [],
+        label1: "word1",
+        label2: "word2",
+        resultLabel: "merged",
+        legend1Name: "i",
+        legend1Text: { vi: "ký tự tiếp theo của word1", en: "next character in word1" },
+        legend2Name: "j",
+        legend2Text: { vi: "ký tự tiếp theo của word2", en: "next character in word2" },
+        legend3Name: "write",
+        legend3Text: { vi: "vị trí vừa thêm vào kết quả", en: "position just appended to the result" },
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: [
+        { name: "i", value: i },
+        { name: "j", value: j },
+        { name: "result", value: result.join("") || '""' },
+      ],
+      note,
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo kết quả", en: "Initialize the result" },
+    note: {
+      vi: "Hai con trỏ bắt đầu ở đầu word1 và word2; kết quả ban đầu rỗng.",
+      en: "Both pointers start at the beginning of their strings; the result is initially empty.",
+    },
+    codeLines: [3, 4],
+  });
+
+  let i = 0;
+  let j = 0;
+  for (let index = 0; index < limit; index++) {
+    if (i < word1.length) {
+      const ch = word1[i];
+      result.push(ch);
+      i++;
+      snapshot({
+        title: { vi: `Thêm '${ch}' từ word1`, en: `Append '${ch}' from word1` },
+        note: {
+          vi: `Lấy word1[${i - 1}] rồi dịch i sang vị trí ${i}.`,
+          en: `Take word1[${i - 1}], then advance i to ${i}.`,
+        },
+        i,
+        j,
+        write: result.length - 1,
+        source: "word1",
+        codeLines: [5, 6],
+      });
+    }
+
+    if (j < word2.length) {
+      const ch = word2[j];
+      result.push(ch);
+      j++;
+      snapshot({
+        title: { vi: `Thêm '${ch}' từ word2`, en: `Append '${ch}' from word2` },
+        note: {
+          vi: `Lấy word2[${j - 1}] rồi dịch j sang vị trí ${j}.`,
+          en: `Take word2[${j - 1}], then advance j to ${j}.`,
+        },
+        i,
+        j,
+        write: result.length - 1,
+        source: "word2",
+        codeLines: [7, 8],
+      });
+    }
+  }
+
+  const answer = result.join("");
+  snapshot({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    note: {
+      vi: "Hai chuỗi đã được xen kẽ; phần dư của chuỗi dài hơn cũng đã được thêm vào cuối.",
+      en: "The strings are interleaved, including any remaining characters from the longer string.",
+    },
+    i,
+    j,
+    codeLines: [9],
+    final: true,
+  });
+
+  return { word1, word2, answer, steps };
+}
+
+/**
  * Generate steps for LeetCode 1967: Number of Strings That Appear as Substrings in Word.
  * Simple iteration: check if each pattern is a substring of word.
  */
@@ -7674,6 +7789,54 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps1967,
+  },
+  1768: {
+    id: 1768,
+    difficulty: "easy",
+    slug: "merge-strings-alternately",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Merge Strings Alternately", en: "Merge Strings Alternately" },
+    titleVi: { vi: "Trộn hai chuỗi xen kẽ", en: "Merge two strings alternately" },
+    statement: {
+      vi: "Cho hai chuỗi word1 và word2. Trộn chúng bằng cách lấy luân phiên một ký tự từ word1 rồi một ký tự từ word2; thêm phần còn lại của chuỗi dài hơn vào cuối.",
+      en: "Given word1 and word2, merge them by alternating characters starting with word1, then append any remainder from the longer string.",
+    },
+    defaultInput: "abc",
+    inputKind: "string",
+    inputLabel: { vi: "word1", en: "word1" },
+    extraParams: [
+      {
+        key: "word2",
+        type: "string",
+        label: { vi: "word2", en: "word2" },
+        default: "pqr",
+      },
+    ],
+    approach: [
+      { vi: "Duyệt đến độ dài của chuỗi dài hơn.", en: "Iterate up to the length of the longer string." },
+      { vi: "Ở mỗi vị trí, thêm ký tự từ word1 nếu còn, rồi thêm ký tự từ word2 nếu còn.", en: "At each index, append from word1 if available, then from word2 if available." },
+      { vi: "Ghép danh sách ký tự để tạo chuỗi kết quả.", en: "Join the collected characters into the result string." },
+    ],
+    complexity: {
+      time: "O(n + m)",
+      space: "O(n + m)",
+      note: {
+        vi: "Mỗi ký tự của hai chuỗi được đọc và thêm đúng một lần; kết quả chứa n + m ký tự.",
+        en: "Every character is read and appended once; the result contains n + m characters.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def mergeAlternately(self, word1: str, word2: str) -> str:",
+      "        result = []",
+      "        for i in range(max(len(word1), len(word2))):",
+      "            if i < len(word1):",
+      "                result.append(word1[i])",
+      "            if i < len(word2):",
+      "                result.append(word2[i])",
+      "        return ''.join(result)",
+    ],
+    builder: buildSteps1768,
   },
   3499: {
     id: 3499,
