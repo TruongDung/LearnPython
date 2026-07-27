@@ -2754,6 +2754,13 @@ function renderRotatedSearchView(step) {
   const eliminated = new Set(Array.isArray(view.eliminated) ? view.eliminated : []);
   const comparison = pick(view.comparison) || "";
   const vi = lang === "vi";
+  const minValue = nums.length ? Math.min(...nums) : 0;
+  const maxValue = nums.length ? Math.max(...nums) : 0;
+
+  function columnHeight(value) {
+    if (maxValue === minValue) return 64;
+    return 44 + Math.round(((value - minValue) / (maxValue - minValue)) * 42);
+  }
 
   function pointerLabels(index) {
     const labels = [];
@@ -2789,7 +2796,7 @@ function renderRotatedSearchView(step) {
 
     return `<div class="rotated-cell-wrap">
       <div class="rotated-pointers">${pointerHtml}</div>
-      <div class="${classes}">
+      <div class="${classes}" style="--rotated-height: ${columnHeight(value)}px">
         <strong>${escapeHtml(String(value))}</strong>
         <span>[${index}]</span>
       </div>
@@ -2822,6 +2829,95 @@ function renderRotatedSearchView(step) {
       <span><i class="legend-mid"></i>mid</span>
       <span><i class="legend-discarded"></i>${vi ? "đã loại" : "discarded"}</span>
     </div>
+  </div>`;
+}
+
+// ---- Sorted GCD pair queries visualization (LeetCode 3312) ----
+function renderGcdPairsView(step) {
+  const view = step.gcdPairsView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const sorted = Array.isArray(view.sorted) ? view.sorted : [];
+  const pair = view.pair || null;
+  const buckets = Array.isArray(view.buckets) ? view.buckets : [];
+  const query = view.query || null;
+  const activeG = Number.isInteger(view.activeG) ? view.activeG : null;
+  const vi = lang === "vi";
+
+  const numsHtml = nums.map((value, index) => {
+    const selected = pair && (index === pair.i || index === pair.j);
+    return `<div class="gcd-num${selected ? " selected" : ""}"><strong>${escapeHtml(String(value))}</strong><span>[${index}]</span></div>`;
+  }).join("");
+  const pairHtml = pair
+    ? `<div class="gcd-pair-formula"><span>nums[${pair.i}] = ${pair.vi}</span><b>gcd</b><span>nums[${pair.j}] = ${pair.vj}</span><strong>= ${pair.g}</strong></div>`
+    : `<div class="gcd-pair-formula muted">${vi ? "Chọn mọi cặp i < j" : "Consider every pair i < j"}</div>`;
+  const sortedHtml = sorted.map((value, index) => {
+    const selected = query && index === query.index;
+    const sameG = activeG !== null && value === activeG;
+    return `<div class="gcd-sorted-chip${selected ? " query" : ""}${sameG ? " same-gcd" : ""}"><span>[${index}]</span><strong>${escapeHtml(String(value))}</strong></div>`;
+  }).join("");
+  const bucketHtml = buckets.length
+    ? `<div class="gcd-buckets">${buckets.map((bucket) => `<div class="gcd-bucket${activeG === bucket.g ? " active" : ""}"><span>g = ${bucket.g}</span><strong>${bucket.count}</strong><small>${vi ? `tích lũy ${bucket.prefix}` : `prefix ${bucket.prefix}`}</small></div>`).join("")}</div>`
+    : "";
+  const queryHtml = query
+    ? `<div class="gcd-query-result"><span>q=${query.index}</span><strong>gcdPairs[${query.index}] = ${query.answer}</strong></div>`
+    : "";
+  const summary = vi
+    ? `Tạo GCD cho từng cặp rồi sắp xếp. ${query ? `Query ${query.index} chọn ${query.answer}.` : ""}`
+    : `Form GCDs for every pair, then sort them. ${query ? `Query ${query.index} selects ${query.answer}.` : ""}`;
+
+  $("treeView").innerHTML = `<div class="gcd-pairs-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="gcd-source-row"><span class="gcd-row-label">nums</span><div class="gcd-num-list">${numsHtml}</div></div>
+    ${pairHtml}
+    <div class="gcd-row-label">gcdPairs ${vi ? "(đã sắp xếp)" : "(sorted)"}</div>
+    <div class="gcd-sorted-list">${sortedHtml}</div>
+    ${bucketHtml}
+    ${queryHtml}
+  </div>`;
+}
+
+// ---- Duplicate zeros visualization (LeetCode 1089) ----
+function renderDuplicateZerosView(step) {
+  const view = step.duplicateZerosView || {};
+  const source = Array.isArray(view.source) ? view.source : [];
+  const output = Array.isArray(view.output) ? view.output : [];
+  const virtual = Array.isArray(view.virtual) ? view.virtual : output;
+  const visibleLength = Number.isInteger(view.visibleLength) ? view.visibleLength : output.length;
+  const read = Number.isInteger(view.read) ? view.read : -1;
+  const write = Number.isInteger(view.write) ? view.write : -1;
+  const writes = new Set((Array.isArray(view.writes) ? view.writes : []).filter((index) => index >= 0 && index < virtual.length));
+  const finalized = new Set(Array.isArray(view.finalized) ? view.finalized : []);
+  const vi = lang === "vi";
+
+  const row = (values, type) => values.map((value, index) => {
+    const isRead = type === "source" && index === read;
+    const isWrite = type === "virtual" && writes.has(index);
+    const isFinal = type === "virtual" && finalized.has(index);
+    const isOverflow = type === "virtual" && index >= visibleLength;
+    const display = value === null || value === undefined ? "·" : String(value);
+    const pointer = isRead ? "i" : (type === "virtual" && index === write ? "j" : "");
+    return `<div class="dz-cell${isRead ? " read" : ""}${isWrite ? " write" : ""}${isFinal ? " final" : ""}${isOverflow ? " overflow" : ""}">
+      ${pointer ? `<b class="dz-pointer ${pointer}">${pointer}</b>` : ""}
+      <span>[${index}]</span><strong>${escapeHtml(display)}</strong>
+    </div>`;
+  }).join("");
+
+  const writeLabel = write >= visibleLength
+    ? (vi ? `WRITE = ${write} (ô tràn)` : `WRITE = ${write} (overflow slot)`)
+    : write >= 0
+      ? `WRITE = ${write}`
+      : (vi ? "WRITE hoàn tất" : "WRITE complete");
+  const summary = vi
+    ? `Đọc source[${read}] và ghi ngược trong không gian ${virtual.length} ô; chỉ giữ các ô 0 đến ${visibleLength - 1}.`
+    : `Read source[${read}] and write backwards in ${virtual.length} slots; keep only slots 0 through ${visibleLength - 1}.`;
+  const keptRange = visibleLength ? `[0..${visibleLength - 1}]` : "-";
+  const overflowRange = virtual.length > visibleLength ? `[${visibleLength}..${virtual.length - 1}]` : "-";
+
+  $("treeView").innerHTML = `<div class="duplicate-zeros-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="dz-head"><span class="dz-badge read-badge">READ = ${read >= 0 ? read : "-"}</span><span class="dz-badge write-badge">${escapeHtml(writeLabel)}</span></div>
+    <div class="dz-row"><span class="dz-label">${vi ? "nguồn" : "source"}</span><div class="dz-cells">${row(source, "source")}</div></div>
+    <div class="dz-arrow">${vi ? "ghi từ phải sang trái" : "write from right to left"}</div>
+    <div class="dz-range"><span class="dz-keep">${vi ? `GIỮ ${keptRange}` : `KEEP ${keptRange}`}</span><span class="dz-drop">${vi ? `BỎ ${overflowRange}` : `DROP ${overflowRange}`}</span></div>
+    <div class="dz-row"><span class="dz-label">${vi ? "vùng ghi" : "write space"}</span><div class="dz-cells">${row(virtual, "virtual")}</div></div>
   </div>`;
 }
 
@@ -3591,6 +3687,18 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.duplicateZerosView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDuplicateZerosView(step);
+  } else if (step.gcdPairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGcdPairsView(step);
   } else if (step.rotatedSearchView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -1053,90 +1053,113 @@ function buildSteps1089(nums) {
   const n = nums.length;
   const arr = [...nums];
   const steps = [];
+  let zeros = 0;
+  for (let i = 0; i < n; i++) { if (nums[i] === 0) zeros++; }
+  // This is only for the visualization: it exposes the extra slots that the
+  // real in-place array cannot keep after all zeros are duplicated.
+  const virtual = new Array(n + zeros).fill(null);
+  const zeroView = (read, write, writes = [], finalized = []) => ({
+    source: [...nums],
+    output: [...arr],
+    virtual: [...virtual],
+    visibleLength: n,
+    read,
+    write,
+    writes,
+    finalized,
+  });
 
   // Pass 1: count zeros.
-  let zeros = 0;
-  for (let left = 0; left < n; left++) { if (arr[left] === 0) zeros++; }
-
   steps.push({
-    title: { vi: "Bước 1: Đếm số 0, đặt con trỏ right", en: "Step 1: Count zeros, set right pointer" },
+    title: { vi: "Khởi tạo i và j", en: "Initialize i and j" },
     arr: [...arr], sub: null,
+    duplicateZerosView: zeroView(n - 1, n + zeros - 1),
     highlight: arr.map((v, i) => v === 0 ? i : -1).filter((x) => x >= 0),
-    mark: [], codeLines: [3, 4, 5],
+    mark: [], codeLines: [3, 4, 5, 6],
     vars: [
       { name: "zeros", value: zeros },
-      { name: "left", value: n - 1 },
-      { name: "right", value: n + zeros - 1 },
+      { name: "i (read)", value: n - 1 },
+      { name: "j (write)", value: n + zeros - 1 },
     ],
     note: {
       vi:
         `Có ${zeros} số 0 → mỗi cái chiếm thêm 1 ô.\n` +
-        `• left  bắt đầu từ CUỐI mảng gốc (index ${n - 1}) — con trỏ ĐỌC.\n` +
-        `• right bắt đầu tại n + zeros - 1 = ${n + zeros - 1} — con trỏ GHI (chỉ ghi khi right < n).`,
+        `• i bắt đầu từ CUỐI mảng gốc (index ${n - 1}) — con trỏ ĐỌC.\n` +
+        `• j bắt đầu tại n + zeros - 1 = ${n + zeros - 1} — con trỏ GHI (chỉ ghi khi j < n).`,
       en:
         `${zeros} zeros → each takes one extra slot.\n` +
-        `• left  starts at the END of the original array (index ${n - 1}) — READ pointer.\n` +
-        `• right starts at n + zeros - 1 = ${n + zeros - 1} — WRITE pointer (only write when right < n).`,
+        `• i starts at the END of the original array (index ${n - 1}) — READ pointer.\n` +
+        `• j starts at n + zeros - 1 = ${n + zeros - 1} — WRITE pointer (only write when j < n).`,
     },
   });
 
   // Pass 2: fill right-to-left.
   let right = n + zeros - 1;
   for (let left = n - 1; left >= 0; left--) {
-    if (arr[left] === 0) {
-      // Write two zeros.
+    const value = nums[left];
+    if (value === 0) {
+      virtual[right] = 0;
       if (right < n) { arr[right] = 0; }
-      right--;
-      if (right < n) { arr[right] = 0; }
-      const wa = right + 1, wb = right;
       steps.push({
-        title: { vi: `left=${left}: gặp 0 → ghi 0 hai lần tại right=${wa}, ${wb}`, en: `left=${left}: zero → write 0 twice at right=${wa}, ${wb}` },
-        arr: [...arr],
-        highlight: [wa, wb].filter((x) => x >= 0 && x < n),
-        mark: arr.map((_, k) => k <= left ? -1 : k).filter((x) => x >= 0),
-        codeLines: [8, 9, 10, 11],
-        vars: [
-          { name: "left  (read)", value: left },
-          { name: "right (write)", value: right },
-          { name: "arr[left]", value: 0 },
-          { name: "action", value: "write 0 × 2" },
-          { name: "arr", value: `[${arr.join(",")}]` },
-        ],
-        note: {
-          vi: `arr[left=${left}] = 0 → nhân đôi: ghi 0 tại right=${wa} và right=${wb}. Cả 2 con trỏ đều lùi.`,
-          en: `arr[left=${left}] = 0 → duplicate: write 0 at right=${wa} and right=${wb}. Both pointers step back.`,
-        },
+        title: { vi: `i=${left}: arr[i] = 0, ghi số 0 đầu tiên tại j=${right}`, en: `i=${left}: arr[i] = 0, write the first zero at j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right, [right]),
+        highlight: right < n ? [right] : [], mark: [], codeLines: [7, 8, 9],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: "write first 0" }],
+        note: { vi: `Ghi số 0 đầu tiên.`, en: `Write the first zero.` },
+      });
+      right--;
+
+      steps.push({
+        title: { vi: `j -= 1 → j=${right}`, en: `j -= 1 → j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right),
+        highlight: [], mark: [], codeLines: [10],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: "j -= 1" }],
+        note: { vi: `Con trỏ j lùi sang trái một ô.`, en: `Pointer j moves one slot left.` },
+      });
+
+      virtual[right] = 0;
+      if (right < n) { arr[right] = 0; }
+      steps.push({
+        title: { vi: `Ghi số 0 thứ hai tại j=${right}`, en: `Write the second zero at j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right, [right]),
+        highlight: right < n ? [right] : [], mark: [], codeLines: [11, 12],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: "write second 0" }],
+        note: { vi: `Ghi số 0 thứ hai để hoàn thành việc nhân đôi.`, en: `Write the second zero to complete the duplication.` },
+      });
+      right--;
+      steps.push({
+        title: { vi: `j -= 1 → j=${right}`, en: `j -= 1 → j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right),
+        highlight: [], mark: [], codeLines: [13],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: "j -= 1" }],
+        note: { vi: `j lùi thêm một ô sau lần ghi thứ hai.`, en: `j moves one more slot left after the second write.` },
       });
     } else {
-      // Write once.
-      if (right < n) { arr[right] = arr[left]; }
-      const w = right;
+      virtual[right] = value;
+      if (right < n) { arr[right] = value; }
       steps.push({
-        title: { vi: `left=${left}: arr[left]=${nums[left]} → copy sang right=${w}`, en: `left=${left}: arr[left]=${nums[left]} → copy to right=${w}` },
-        arr: [...arr],
-        highlight: w < n ? [w] : [],
-        mark: arr.map((_, k) => k <= left ? -1 : k).filter((x) => x >= 0),
-        codeLines: [6, 7],
-        vars: [
-          { name: "left  (read)", value: left },
-          { name: "right (write)", value: w },
-          { name: "arr[left]", value: nums[left] },
-          { name: "action", value: w >= n ? "dropped (out of bounds)" : `write ${nums[left]}` },
-          { name: "arr", value: `[${arr.join(",")}]` },
-        ],
-        note: {
-          vi: `arr[left=${left}] = ${nums[left]} (khác 0) → copy sang right=${w}${w >= n ? " (bị bỏ, ngoài mảng)" : ""}. right lùi 1.`,
-          en: `arr[left=${left}] = ${nums[left]} (non-zero) → copy to right=${w}${w >= n ? " (dropped)" : ""}. right steps back.`,
-        },
+        title: { vi: `i=${left}: copy ${value} sang j=${right}`, en: `i=${left}: copy ${value} to j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right, [right]),
+        highlight: right < n ? [right] : [], mark: [], codeLines: [15, 16, 17],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: `write ${value}` }],
+        note: { vi: `Ghi một lần vì arr[i] khác 0.`, en: `Write once because arr[i] is non-zero.` },
+      });
+      right--;
+      steps.push({
+        title: { vi: `j -= 1 → j=${right}`, en: `j -= 1 → j=${right}` },
+        arr: [...arr], duplicateZerosView: zeroView(left, right),
+        highlight: [], mark: [], codeLines: [18],
+        vars: [{ name: "i (read)", value: left }, { name: "j (write)", value: right }, { name: "action", value: "j -= 1" }],
+        note: { vi: `Con trỏ j lùi sang trái một ô.`, en: `Pointer j moves one slot left.` },
       });
     }
-    right--;
   }
 
   const fs = {
     title: { vi: `Kết quả: [${arr.join(",")}]`, en: `Result: [${arr.join(",")}]` },
     arr: [...arr], highlight: [], mark: arr.map((_, i) => i),
-    final: true, codeLines: [12],
+    duplicateZerosView: zeroView(-1, -1, [], arr.map((_, i) => i)),
+    final: true, codeLines: [20],
     vars: [{ name: "result", value: `[${arr.join(",")}]` }],
     note: { vi: `Hoàn tất. left và right đều về 0. Mọi số 0 đã được nhân đôi tại chỗ.`, en: `Done. left and right both reached 0. Every zero duplicated in-place.` },
   };
@@ -3228,16 +3251,23 @@ module.exports = {
       "class Solution:",
       "    def duplicateZeros(self, arr):",
       "        n = len(arr)",
-      "        zeros = arr.count(0)",
-      "        right = n + zeros - 1",
-      "        for left in range(n - 1, -1, -1):",
-      "            if right < n:",
-      "                arr[right] = arr[left]",
-      "            if arr[left] == 0:",
-      "                right -= 1",
-      "                if right < n:",
-      "                    arr[right] = 0",
-      "            right -= 1",
+      "        i = n - 1",
+      "        j = n + arr.count(0) - 1",
+      "        while i >= 0:",
+      "            if arr[i] == 0:",
+      "                if j <= n - 1:",
+      "                    arr[j] = 0",
+      "                j -= 1",
+      "                if j <= n - 1:",
+      "                    arr[j] = 0",
+      "                j -= 1",
+      "                i -= 1",
+      "            else:",
+      "                if j <= n - 1:",
+      "                    arr[j] = arr[i]",
+      "                j -= 1",
+      "                i -= 1",
+      "        return",
     ],
     builder: buildSteps1089,
   },

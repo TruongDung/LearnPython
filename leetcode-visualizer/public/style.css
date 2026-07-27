@@ -7472,10 +7472,189 @@ html, body {
 
 /* ---- Prevent mobile scroll jumping during step navigation ---- */
 
+/* ---- LeetCode 1089: duplicate zeros ---- */
+.duplicate-zeros-viz {
+  min-height: 230px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.dz-head,
+.dz-row,
+.dz-cells,
+.dz-range {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.dz-head { justify-content: space-between; }
+.dz-range { padding-left: 51px; font: 700 10px/1 "SFMono-Regular", Consolas, monospace; }
+.dz-keep { color: #6ee7b7; }
+.dz-drop { color: #fbbf24; }
+.dz-badge { padding: 6px 9px; border-radius: 6px; font: 700 11px/1 "SFMono-Regular", Consolas, monospace; }
+.read-badge { color: #67e8f9; background: rgba(34, 211, 238, 0.12); }
+.write-badge { color: #c4b5fd; background: rgba(139, 92, 246, 0.14); }
+.dz-label { min-width: 44px; color: #94a3b8; font: 700 11px/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+.dz-cell {
+  min-width: 42px;
+  min-height: 48px;
+  margin-top: 18px;
+  padding: 5px 7px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.72);
+}
+.dz-cell span { color: #94a3b8; font: 700 9px/1 "SFMono-Regular", Consolas, monospace; }
+.dz-cell strong { color: #f8fafc; font-size: 17px; line-height: 1; }
+.dz-pointer {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: #0f172a;
+  font: 800 11px/1 "SFMono-Regular", Consolas, monospace;
+  text-transform: uppercase;
+}
+.dz-pointer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 7px;
+  height: 7px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.dz-pointer.i { background: #67e8f9; }
+.dz-pointer.j { background: #c4b5fd; }
+.dz-cell.read { border-color: #22d3ee; background: rgba(34, 211, 238, 0.16); box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.12); }
+.dz-cell.write { border-color: #a78bfa; background: rgba(139, 92, 246, 0.2); }
+.dz-cell.final { border-color: rgba(52, 211, 153, 0.65); }
+.dz-cell.overflow { opacity: 0.5; border-style: dashed; }
+.dz-cell.overflow.write { opacity: 1; border-color: #f59e0b; background: rgba(245, 158, 11, 0.16); }
+.dz-arrow { color: #94a3b8; font-size: 11px; text-align: center; }
+
+[data-theme="light"] .duplicate-zeros-viz { border-color: #cbd5e1; background: #ffffff; }
+[data-theme="light"] .dz-label,
+[data-theme="light"] .dz-cell span,
+[data-theme="light"] .dz-arrow { color: #64748b; }
+[data-theme="light"] .dz-keep { color: #047857; }
+[data-theme="light"] .dz-drop { color: #b45309; }
+[data-theme="light"] .dz-cell { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .dz-cell strong { color: #0f172a; }
+[data-theme="light"] .read-badge { color: #0e7490; background: #ecfeff; }
+[data-theme="light"] .write-badge { color: #6d28d9; background: #f5f3ff; }
+[data-theme="light"] .dz-cell.read { background: #ecfeff; border-color: #0891b2; }
+[data-theme="light"] .dz-cell.write { background: #f5f3ff; border-color: #7c3aed; }
+[data-theme="light"] .dz-pointer.i { background: #22d3ee; }
+[data-theme="light"] .dz-pointer.j { background: #a78bfa; }
+[data-theme="light"] .dz-cell.final { border-color: #059669; }
+[data-theme="light"] .dz-cell.overflow.write { background: #fffbeb; border-color: #d97706; }
+
+/* ---- LeetCode 3312: sorted GCD pair queries ---- */
+.gcd-pairs-viz {
+  min-height: 240px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.gcd-source-row,
+.gcd-num-list,
+.gcd-sorted-list,
+.gcd-buckets,
+.gcd-pair-formula,
+.gcd-query-result {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.gcd-row-label { color: #94a3b8; font: 700 11px/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+
+.gcd-num,
+.gcd-sorted-chip,
+.gcd-bucket {
+  min-width: 42px;
+  min-height: 44px;
+  padding: 5px 7px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.gcd-num strong,
+.gcd-sorted-chip strong { color: #f8fafc; font-size: 17px; line-height: 1; }
+.gcd-num span,
+.gcd-sorted-chip span { color: #94a3b8; font: 700 9px/1 "SFMono-Regular", Consolas, monospace; }
+.gcd-num.selected { border-color: #22d3ee; background: rgba(34, 211, 238, 0.14); }
+
+.gcd-pair-formula {
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  border-left: 3px solid #818cf8;
+  background: rgba(99, 102, 241, 0.08);
+  color: #c7d2fe;
+  font-size: 13px;
+}
+
+.gcd-pair-formula b { color: #fbbf24; }
+.gcd-pair-formula strong { color: #6ee7b7; }
+.gcd-pair-formula.muted { color: #94a3b8; }
+.gcd-sorted-list { min-height: 48px; }
+.gcd-sorted-chip.same-gcd { border-color: rgba(167, 139, 250, 0.86); background: rgba(139, 92, 246, 0.18); }
+.gcd-sorted-chip.query { border-color: #34d399; background: rgba(16, 185, 129, 0.2); box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.16); }
+.gcd-bucket { flex: 1 1 86px; min-height: 56px; color: #cbd5e1; }
+.gcd-bucket strong { color: #f8fafc; font-size: 18px; line-height: 1; }
+.gcd-bucket small { color: #94a3b8; font-size: 10px; }
+.gcd-bucket.active { border-color: #a78bfa; background: rgba(139, 92, 246, 0.18); }
+.gcd-query-result { justify-content: center; color: #a7f3d0; font-size: 13px; }
+.gcd-query-result strong { color: #6ee7b7; }
+
+[data-theme="light"] .gcd-pairs-viz { border-color: #cbd5e1; background: #ffffff; }
+[data-theme="light"] .gcd-row-label { color: #64748b; }
+[data-theme="light"] .gcd-num,
+[data-theme="light"] .gcd-sorted-chip,
+[data-theme="light"] .gcd-bucket { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .gcd-num strong,
+[data-theme="light"] .gcd-sorted-chip strong,
+[data-theme="light"] .gcd-bucket strong { color: #0f172a; }
+[data-theme="light"] .gcd-num span,
+[data-theme="light"] .gcd-sorted-chip span,
+[data-theme="light"] .gcd-bucket small { color: #64748b; }
+[data-theme="light"] .gcd-pair-formula { background: #eef2ff; color: #3730a3; }
+[data-theme="light"] .gcd-pair-formula.muted { color: #64748b; }
+[data-theme="light"] .gcd-sorted-chip.same-gcd { background: #f5f3ff; border-color: #8b5cf6; }
+[data-theme="light"] .gcd-sorted-chip.query { background: #ecfdf5; border-color: #059669; }
+[data-theme="light"] .gcd-bucket.active { background: #f5f3ff; border-color: #8b5cf6; }
+[data-theme="light"] .gcd-query-result { color: #047857; }
+
 /* ---- LeetCode 33: rotated-array search ---- */
 .rotated-search-viz {
-  min-height: 260px;
-  padding: 22px 18px 18px;
+  min-height: 220px;
+  padding: 18px;
   display: grid;
   gap: 18px;
   align-content: center;
@@ -7517,13 +7696,16 @@ html, body {
 .rotated-cells {
   display: flex;
   justify-content: center;
+  align-items: flex-end;
   gap: 7px;
   flex-wrap: wrap;
 }
 
 .rotated-cell-wrap {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   justify-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
 
@@ -7558,7 +7740,8 @@ html, body {
 
 .rotated-cell {
   width: 58px;
-  min-height: 64px;
+  height: var(--rotated-height, 54px);
+  min-height: 46px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -7571,7 +7754,7 @@ html, body {
 
 .rotated-cell strong {
   color: #f8fafc;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -7678,8 +7861,8 @@ html, body {
 @media (max-width: 560px) {
   .rotated-search-viz { padding: 16px 10px; gap: 14px; }
   .rotated-cells { gap: 4px; }
-  .rotated-cell { width: 44px; min-height: 56px; }
-  .rotated-cell strong { font-size: 17px; }
+  .rotated-cell { width: 44px; min-height: 48px; }
+  .rotated-cell strong { font-size: 16px; }
 }
 
 @media (max-width: 768px) {

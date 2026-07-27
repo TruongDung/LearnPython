@@ -1230,11 +1230,21 @@ function buildSteps3312(input, params) {
   const gcdPairsSorted = allPairs.map(p => p.g);
   const totalPairs = allPairs.length;
   const showPairs = Math.min(allPairs.length, 20);
+  const gcdView = (overrides = {}) => ({
+    nums: [...nums],
+    sorted: gcdPairsSorted.slice(0, 40),
+    pair: null,
+    activeG: null,
+    buckets: [],
+    query: null,
+    ...overrides,
+  });
 
   // ── Step 0: intro — show nums ──────────────────────────────────────
   steps.push({
     title: { en: "Input: nums array", vi: "Đầu vào: mảng nums" },
     arr: [...nums],
+    gcdPairsView: gcdView(),
     sub: nums.map((_, i) => `[${i}]`),
     highlight: [],
     mark: [],
@@ -1256,6 +1266,7 @@ function buildSteps3312(input, params) {
       steps.push({
         title: { en: `gcd(nums[${i}], nums[${j}]) = gcd(${vi}, ${vj}) = ${g}`, vi: `gcd(nums[${i}], nums[${j}]) = gcd(${vi}, ${vj}) = ${g}` },
         arr: [...nums],
+        gcdPairsView: gcdView({ pair: { i, j, vi, vj, g }, activeG: g }),
         sub: nums.map((_, idx) => idx === i ? `[${idx}]` : idx === j ? `[${idx}]` : `[${idx}]`),
         highlight: [i, j],
         mark: [],
@@ -1277,6 +1288,7 @@ function buildSteps3312(input, params) {
   steps.push({
     title: { en: "Sorted gcdPairs array", vi: "Mảng gcdPairs đã sắp xếp" },
     arr: gcdPairsSorted.slice(0, 40),
+    gcdPairsView: gcdView(),
     sub: gcdPairsSorted.slice(0, 40).map((_, i) => `[${i}]`),
     highlight: [],
     mark: [],
@@ -1304,6 +1316,12 @@ function buildSteps3312(input, params) {
     for (let mul = 2 * g; mul <= maxVal; mul += g) s -= exact[mul];
     exact[g] = s;
   }
+  let bucketPrefix = 0;
+  const bucketSnapshot = exact.map((count, g) => {
+    if (g === 0 || count === 0) return null;
+    bucketPrefix += count;
+    return { g, count, prefix: bucketPrefix };
+  }).filter(Boolean);
 
   // Show sieve steps for all g values up to maxVal (keep it manageable)
   const sieveLimit = Math.min(maxVal, 10);
@@ -1320,6 +1338,7 @@ function buildSteps3312(input, params) {
     steps.push({
       title: { en: `Sieve g=${g}: exact[${g}] = ${exact[g]} pairs`, vi: `Sieve g=${g}: exact[${g}] = ${exact[g]} cặp` },
       arr: gcdPairsSorted.slice(0, 40),
+      gcdPairsView: gcdView({ activeG: g, buckets: bucketSnapshot }),
       sub: gcdPairsSorted.slice(0, 40).map((v, i) => v === g ? `g=${g}` : `[${i}]`),
       highlight: gPositions,
       mark: [],
@@ -1343,6 +1362,7 @@ function buildSteps3312(input, params) {
     steps.push({
       title: { en: `Sieve complete for all g ≤ ${maxVal}`, vi: `Sieve hoàn tất cho g ≤ ${maxVal}` },
       arr: gcdPairsSorted.slice(0, 40),
+      gcdPairsView: gcdView({ buckets: bucketSnapshot }),
       sub: gcdPairsSorted.slice(0, 40).map((_, i) => `[${i}]`),
       highlight: [],
       mark: [],
@@ -1366,6 +1386,7 @@ function buildSteps3312(input, params) {
   steps.push({
     title: { en: "Build prefix sum for O(log V) queries", vi: "Xây prefix sum để query O(log V)" },
     arr: gcdEntries.map(e => e.prefix),
+    gcdPairsView: gcdView({ buckets: bucketSnapshot }),
     sub: gcdEntries.map(e => `g≤${e.g}`),
     highlight: [],
     mark: [],
@@ -1399,6 +1420,7 @@ function buildSteps3312(input, params) {
     steps.push({
       title: { en: `Query queries[${qi}]=${q} → gcdPairs[${q}] = ${ans}`, vi: `Query queries[${qi}]=${q} → gcdPairs[${q}] = ${ans}` },
       arr: gcdPairsSorted.slice(0, 40),
+      gcdPairsView: gcdView({ activeG: ans, buckets: bucketSnapshot, query: { index: q, answer: ans } }),
       sub: gcdPairsSorted.slice(0, 40).map((v, i) => i === q ? `◄[${i}]` : `[${i}]`),
       highlight: [q],
       mark: markPos,
@@ -1420,6 +1442,7 @@ function buildSteps3312(input, params) {
   steps.push({
     title: { en: "Result", vi: "Kết quả" },
     arr: gcdPairsSorted.slice(0, 40),
+    gcdPairsView: gcdView({ buckets: bucketSnapshot, query: queriesRaw.length ? { index: queriesRaw[queriesRaw.length - 1], answer: answers[answers.length - 1] } : null }),
     sub: gcdPairsSorted.slice(0, 40).map((_, i) => queriesRaw.includes(i) ? `q=${i}` : `[${i}]`),
     highlight: queriesRaw.filter(q => q < 40),
     mark: answers.map(a => gcdPairsSorted.slice(0, 40).indexOf(a)).filter(x => x >= 0),
@@ -1436,6 +1459,30 @@ function buildSteps3312(input, params) {
   });
 
   return { original: nums, answer: answers, steps };
+}
+
+function buildSteps3312Approach2(input, params) {
+  const result = buildSteps3312(input, params);
+  const lineMap = {
+    4: [3, 4],
+    5: [],
+    8: [7, 8, 9],
+    9: [10, 11],
+    10: [12, 13, 14],
+    11: [12, 13, 14],
+    13: [15, 16],
+    14: [15, 16],
+    16: [17, 18, 19, 20, 21],
+    17: [17, 18, 19, 20, 21],
+    18: [22],
+  };
+
+  result.steps.forEach((step) => {
+    const mapped = [...new Set((step.codeLines || []).flatMap((line) => lineMap[line] || []))];
+    step.codeBlock = 2;
+    step.codeLines = mapped;
+  });
+  return result;
 }
 
 /**
@@ -2168,6 +2215,154 @@ function buildSteps3536(input) {
  * 0, and 0 == x is only true when x == 0 — so negative numbers correctly
  * fall through to False without needing a separate sign check.
  */
+/**
+ * LeetCode 7: Reverse Integer.
+ * Extract digits from the right, append them to rev, then restore the sign.
+ */
+function buildSteps7(input) {
+  const original = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+  const LIMIT = 2147483647;
+  const MIN_LIMIT = -2147483648;
+  const sign = original < 0 ? -1 : 1;
+  let x = Math.abs(original);
+  let rev = 0;
+  const digits = String(x).split("").map(Number);
+  const visited = new Array(digits.length).fill(false);
+
+  function snap({ title, note, current = -1, digit, codeLines, final = false, answer, updateKind = null }) {
+    steps.push({
+      title,
+      arr: [],
+      digitPodiumView: {
+        digits,
+        visited: [...visited],
+        current,
+        first: rev,
+        second: x,
+        updateKind,
+        op: "←",
+        firstLabel: { vi: "rev (đảo ngược)", en: "rev (reversed)" },
+        secondLabel: { vi: "x (còn lại)", en: "x (remaining)" },
+        resultLabel: { vi: "kết quả", en: "result" },
+        answer,
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines,
+      vars: [
+        { name: "sign", value: sign },
+        { name: "x", value: x },
+        { name: "digit", value: digit === undefined ? "-" : digit },
+        { name: "rev", value: rev },
+      ],
+      note,
+    });
+  }
+
+  snap({
+    title: { vi: `sign = ${sign}`, en: `sign = ${sign}` },
+    note: {
+      vi: original < 0 ? "x âm, lưu sign = -1 để khôi phục dấu sau khi đảo." : "x không âm, dùng sign = 1.",
+      en: original < 0 ? "x is negative, so save sign = -1 to restore it after reversing." : "x is non-negative, so use sign = 1.",
+    },
+    codeLines: [3],
+  });
+
+  snap({
+    title: { vi: `x = abs(x) = ${x}`, en: `x = abs(x) = ${x}` },
+    note: {
+      vi: "Đảo phần trị tuyệt đối; dấu sẽ được gắn lại ở cuối.",
+      en: "Reverse the absolute value; restore the sign at the end.",
+    },
+    codeLines: [4],
+  });
+
+  snap({
+    title: { vi: "rev = 0", en: "rev = 0" },
+    note: { vi: "Khởi tạo số đảo ngược rỗng.", en: "Initialize the reversed number as empty." },
+    codeLines: [5],
+  });
+
+  let position = digits.length - 1;
+  while (x > 0) {
+    snap({
+      title: { vi: `while x > 0 → ${x} > 0 → True`, en: `while x > 0 → ${x} > 0 → True` },
+      note: { vi: "Vẫn còn chữ số chưa lấy từ bên phải.", en: "There are still digits to take from the right." },
+      codeLines: [6],
+    });
+
+    const digit = x % 10;
+    snap({
+      title: { vi: `digit = x % 10 = ${digit}`, en: `digit = x % 10 = ${digit}` },
+      note: { vi: `Lấy chữ số cuối ${digit} của x=${x}.`, en: `Take the last digit ${digit} from x=${x}.` },
+      current: position,
+      digit,
+      codeLines: [7],
+    });
+
+    const previousRev = rev;
+    rev = rev * 10 + digit;
+    visited[position] = true;
+    snap({
+      title: { vi: `rev = ${previousRev} × 10 + ${digit} = ${rev}`, en: `rev = ${previousRev} × 10 + ${digit} = ${rev}` },
+      note: { vi: `Dồn ${digit} vào cuối rev để xây số đảo ngược.`, en: `Append ${digit} to rev to build the reversed number.` },
+      current: position,
+      digit,
+      updateKind: "first",
+      codeLines: [8],
+    });
+
+    const previousX = x;
+    x = Math.floor(x / 10);
+    snap({
+      title: { vi: `x //= 10 → ${previousX} // 10 = ${x}`, en: `x //= 10 → ${previousX} // 10 = ${x}` },
+      note: { vi: "Bỏ chữ số cuối vừa xử lý khỏi x.", en: "Drop the digit that was just processed from x." },
+      digit,
+      updateKind: "first",
+      codeLines: [9],
+    });
+    position--;
+  }
+
+  snap({
+    title: { vi: `while x > 0 → ${x} > 0 → False`, en: `while x > 0 → ${x} > 0 → False` },
+    note: { vi: "Đã xử lý hết các chữ số.", en: "All digits have been processed." },
+    codeLines: [6],
+  });
+
+  rev *= sign;
+  snap({
+    title: { vi: `rev *= sign → ${rev}`, en: `rev *= sign → ${rev}` },
+    note: { vi: "Khôi phục dấu ban đầu cho số đã đảo.", en: "Restore the original sign to the reversed number." },
+    updateKind: "first",
+    codeLines: [10],
+  });
+
+  const inRange = MIN_LIMIT <= rev && rev <= LIMIT;
+  snap({
+    title: { vi: `Kiểm tra 32-bit → ${inRange}`, en: `Check 32-bit range → ${inRange}` },
+    note: inRange
+      ? { vi: `${rev} nằm trong miền số nguyên 32-bit có dấu.`, en: `${rev} fits in the signed 32-bit integer range.` }
+      : { vi: `${rev} vượt miền số nguyên 32-bit có dấu.`, en: `${rev} overflows the signed 32-bit integer range.` },
+    codeLines: [11],
+  });
+
+  const answer = inRange ? rev : 0;
+  snap({
+    title: { vi: `return ${answer}`, en: `return ${answer}` },
+    note: inRange
+      ? { vi: `Trả về số đã đảo: ${answer}.`, en: `Return the reversed integer: ${answer}.` }
+      : { vi: "Theo yêu cầu đề bài, tràn 32-bit phải trả về 0.", en: "The problem requires returning 0 on 32-bit overflow." },
+    final: true,
+    answer,
+    codeLines: [inRange ? 12 : 13],
+  });
+
+  return { original, answer, steps };
+}
+
 function buildSteps9(input) {
   const rawX = Array.isArray(input) ? Number(input[0]) : Number(input);
   const steps = [];
@@ -2366,6 +2561,52 @@ function buildSteps9(input) {
 }
 
 module.exports = {
+  7: {
+    id: 7,
+    difficulty: "medium",
+    slug: "reverse-integer",
+    category: { key: "math", vi: "Toán / Đệ quy", en: "Math / Recursion" },
+    title: { vi: "Reverse Integer", en: "Reverse Integer" },
+    titleVi: { vi: "Đảo ngược số nguyên", en: "Reverse an integer" },
+    statement: {
+      vi: "Cho số nguyên có dấu 32-bit x. Trả về x với các chữ số đảo ngược; nếu kết quả vượt miền số nguyên có dấu 32-bit thì trả về 0.",
+      en: "Given a signed 32-bit integer x, return x with its digits reversed. Return 0 if the result overflows the signed 32-bit range.",
+    },
+    defaultInput: [123],
+    inputKind: "integer",
+    inputLabel: { vi: "x", en: "x" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Lưu dấu, rồi làm việc với trị tuyệt đối của x.", en: "Save the sign, then work with the absolute value of x." },
+      { vi: "Lặp lấy chữ số cuối bằng x % 10 và thêm vào rev bằng rev = rev × 10 + digit.", en: "Repeatedly take the last digit with x % 10 and append it with rev = rev × 10 + digit." },
+      { vi: "Bỏ chữ số vừa xử lý bằng x //= 10, khôi phục dấu, rồi kiểm tra miền 32-bit.", en: "Drop the processed digit with x //= 10, restore the sign, then check the 32-bit range." },
+    ],
+    complexity: {
+      time: "O(log |x|)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi chữ số được xử lý đúng một lần và chỉ dùng số lượng biến cố định.",
+        en: "Each digit is processed once and only a constant number of variables is used.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def reverse(self, x: int) -> int:",
+      "        sign = -1 if x < 0 else 1",
+      "        x = abs(x)",
+      "        rev = 0",
+      "        while x > 0:",
+      "            digit = x % 10",
+      "            rev = rev * 10 + digit",
+      "            x //= 10",
+      "        rev *= sign",
+      "        if -2**31 <= rev <= 2**31 - 1:",
+      "            return rev",
+      "        return 0",
+    ],
+    builder: buildSteps7,
+  },
   9: {
     id: 9,
     difficulty: "easy",
@@ -2518,7 +2759,17 @@ module.exports = {
     inputKind: "positive",
     inputLabel: { vi: "nums", en: "nums" },
     extraParams: [
-      { key: "queries", label: { vi: "queries (cách nhau ;)", en: "queries (semicolon-separated)" }, default: "0;2;2", type: "text" },
+      { key: "queries", label: { vi: "queries (cách nhau ;)", en: "queries (semicolon-separated)" }, default: "0;2;2", type: "string" },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: freq + exact riêng", en: "Approach 1: separate freq + exact" } },
+          { value: "2", label: { vi: "Cách 2: tái dùng mảng cnt", en: "Approach 2: reuse the cnt array" } },
+        ],
+      },
     ],
     approach: [
       { vi: "Đếm freq[v] = số lần v xuất hiện trong nums.", en: "Count freq[v] = occurrences of v in nums." },
@@ -2549,7 +2800,36 @@ module.exports = {
       "        prefix = list(accumulate(exact))",
       "        return [bisect_left(prefix, q + 1) for q in queries]",
     ],
-    builder: buildSteps3312,
+    code2Label: { vi: "Cách 2: tái dùng mảng cnt", en: "Approach 2: reuse the cnt array" },
+    code2: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def gcdValues(self, nums: List[int], queries: List[int]) -> List[int]:",
+      "        m = max(nums)",
+      "        cnt = [0] * (m + 1)",
+      "        for num in nums:",
+      "            cnt[num] += 1",
+      "        for i in range(1, m + 1):",
+      "            for j in range(i * 2, m + 1, i):",
+      "                cnt[i] += cnt[j]",
+      "        for i in range(1, m + 1):",
+      "            cnt[i] = cnt[i] * (cnt[i] - 1) // 2",
+      "        for i in range(m, 0, -1):",
+      "            for j in range(i * 2, m + 1, i):",
+      "                cnt[i] -= cnt[j]",
+      "        for i in range(1, m + 1):",
+      "            cnt[i] += cnt[i - 1]",
+      "        ans = []",
+      "        for q in queries:",
+      "            q += 1",
+      "            pos = bisect_left(cnt, q)",
+      "            ans.append(pos)",
+      "        return ans",
+    ],
+    builder: (input, params) => (Number(params && params.approach) === 2
+      ? buildSteps3312Approach2(input, params)
+      : buildSteps3312(input, params)),
   },
   3867: {
     id: 3867,
