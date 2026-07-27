@@ -240,15 +240,15 @@ function buildSteps200(input) {
 
   pushStep({
     title: { vi: "Quét grid từ trái sang phải", en: "Scan the grid left to right" },
-    codeLines: [4, 5, 6],
+    codeLines: [4, 5, 6, 7],
     vars: [
       { name: "rows", value: rows },
       { name: "cols", value: cols },
       { name: "count", value: 0 },
     ],
     note: {
-      vi: "Ta duyệt từng ô. Gặp đất '1' chưa thăm thì gọi dfs(i, j) để đánh dấu toàn bộ đảo trong visited.",
-      en: "Scan every cell. An unvisited '1' triggers dfs(i, j), marking the whole island in visited.",
+      vi: "Ta duyệt từng ô bằng row và col. Gặp đất '1' chưa thăm thì gọi dfs(row, col) để đánh dấu toàn bộ đảo trong visited.",
+      en: "Scan every cell with row and col. An unvisited '1' triggers dfs(row, col), marking the whole island in visited.",
     },
   });
 
@@ -268,11 +268,12 @@ function buildSteps200(input) {
       pushStep({
         title: { vi: `Gọi dfs(${r},${c}) cho đảo #${islands}`, en: `Call dfs(${r},${c}) for island #${islands}` },
         current: [r, c],
-        codeLines: [5, 6, 7, 8],
+        codeLines: [24, 25, 26, 9, 10],
         vars: [
-          { name: "cell", value: `(${r}, ${c})` },
+          { name: "row", value: r },
+          { name: "col", value: c },
           { name: "count before dfs", value: islands - 1 },
-          { name: "visited[i][j]", value: true },
+          { name: "visited[row][col]", value: true },
         ],
         note: {
           vi: `Ô (${r},${c}) là đất chưa thăm. DFS bắt đầu bằng visited[${r}][${c}] = True, rồi lan 4 hướng.`,
@@ -287,9 +288,10 @@ function buildSteps200(input) {
         pushStep({
           title: { vi: `DFS đang ở (${cr},${cc})`, en: `DFS at (${cr},${cc})` },
           current: [cr, cc],
-          codeLines: [9, 10, 11, 12, 13, 14],
+          codeLines: [12, 13, 14, 16],
           vars: [
-            { name: "current", value: `(${cr}, ${cc})` },
+            { name: "row", value: cr },
+            { name: "col", value: cc },
             { name: "island", value: islands },
             { name: "pending recursive calls", value: stack.length },
           ],
@@ -313,12 +315,14 @@ function buildSteps200(input) {
           pushStep({
             title: { vi: `dfs(${nr},${nc}) vì đất chưa visited`, en: `dfs(${nr},${nc}) because land is unvisited` },
             current: [nr, nc],
-            codeLines: [15, 16, 17],
+            codeLines: [18, 19],
             vars: [
-              { name: "from", value: `(${cr}, ${cc})` },
-              { name: "neighbor", value: `(${nr}, ${nc})` },
+              { name: "row", value: cr },
+              { name: "col", value: cc },
+              { name: "next_row", value: nr },
+              { name: "next_col", value: nc },
               { name: "island", value: islands },
-              { name: "visited[x][y]", value: true },
+              { name: "visited[next_row][next_col]", value: true },
             ],
             note: {
               vi: `(${nr},${nc}) là đất kề 4 hướng và chưa visited, nên DFS đánh dấu nó thuộc cùng đảo #${islands}.`,
@@ -330,7 +334,7 @@ function buildSteps200(input) {
 
       pushStep({
         title: { vi: `DFS xong → count = ${islands}`, en: `DFS done → count = ${islands}` },
-        codeLines: [23, 24],
+        codeLines: [27],
         vars: [
           { name: "finished island", value: islands },
           { name: "count", value: islands },
@@ -346,7 +350,7 @@ function buildSteps200(input) {
   pushStep({
     title: { vi: `Kết quả: ${islands} đảo`, en: `Result: ${islands} islands` },
     final: true,
-    codeLines: [26],
+    codeLines: [29],
     vars: [
       { name: "answer", value: islands },
       { name: "visited land cells", value: islandId.flat().filter(Boolean).length },
@@ -11079,11 +11083,11 @@ module.exports = {
     titleVi: { vi: "Đếm số đảo trong lưới", en: "Count islands in a grid" },
     statement: {
       vi:
-        "Cho grid m×n gồm '1' = đất và '0' = nước. Một đảo là nhóm các ô đất nối nhau theo 4 hướng " +
+        "Cho grid rows×cols gồm '1' = đất và '0' = nước. Một đảo là nhóm các ô đất nối nhau theo 4 hướng " +
         "(trên, dưới, trái, phải), được bao quanh bởi nước hoặc biên grid. Hãy đếm số đảo. " +
         "Nhập grid: hàng cách bởi '|', có thể viết liền ký tự hoặc cách bằng dấu phẩy.",
       en:
-        "Given an m×n grid of '1' land and '0' water. An island is a group of land cells connected in 4 directions " +
+        "Given a rows×cols grid of '1' land and '0' water. An island is a group of land cells connected in 4 directions " +
         "(up, down, left, right), surrounded by water or grid boundaries. Count the islands. " +
         "Enter rows separated by '|', either as compact characters or comma-separated values.",
     },
@@ -11092,16 +11096,16 @@ module.exports = {
     inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
     approach: [
       { vi: "Duyệt từng ô trong grid. Nếu ô là nước hoặc đã thăm thì bỏ qua.", en: "Scan every cell. Skip water and already visited cells." },
-      { vi: "Khi gặp đất chưa thăm, gọi dfs(i, j) để đánh dấu toàn bộ đảo trong mảng visited.", en: "When unvisited land is found, call dfs(i, j) to mark the whole island in visited." },
+      { vi: "Khi gặp đất chưa thăm tại (row, col), gọi dfs(row, col) để đánh dấu toàn bộ đảo trong visited.", en: "When unvisited land is found at (row, col), call dfs(row, col) to mark the whole island in visited." },
       { vi: "DFS thử 4 hướng; bỏ qua nếu ra ngoài biên hoặc gặp nước '0'.", en: "DFS tries 4 directions; skip out-of-bounds cells and water '0'." },
       { vi: "Sau khi dfs quay về, tăng count thêm 1 vì vừa xử lý xong một đảo.", en: "After dfs returns, increment count by 1 because one island has been fully processed." },
     ],
     complexity: {
-      time: "O(m·n)",
-      space: "O(m·n)",
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
       note: {
-        vi: "Mỗi ô được thăm tối đa một lần. Bộ nhớ cho visited/stack trong trường hợp xấu nhất là O(m·n).",
-        en: "Each cell is visited at most once. Visited/stack memory is O(m·n) in the worst case.",
+        vi: "Mỗi ô được thăm tối đa một lần. Bộ nhớ cho visited/stack trong trường hợp xấu nhất là O(rows·cols).",
+        en: "Each cell is visited at most once. Visited/stack memory is O(rows·cols) in the worst case.",
       },
     },
     code: [
@@ -11109,28 +11113,28 @@ module.exports = {
       "",
       "class Solution:",
       "    def numIslands(self, grid: List[List[str]]) -> int:",
-      "        m, n = len(grid), len(grid[0])",
-      "        visited = [[False for j in range(n)] for i in range(m)]",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        visited = [[False for col in range(cols)] for row in range(rows)]",
       "        directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]",
       "",
-      "        def dfs(i, j):",
-      "            visited[i][j] = True",
+      "        def dfs(row, col):",
+      "            visited[row][col] = True",
       "",
       "            for direction in directions:",
-      "                x = i + direction[0]",
-      "                y = j + direction[1]",
+      "                next_row = row + direction[0]",
+      "                next_col = col + direction[1]",
       "",
-      "                if x < 0 or x >= m or y < 0 or y >= n or grid[x][y] == '0':",
+      "                if next_row < 0 or next_row >= rows or next_col < 0 or next_col >= cols or grid[next_row][next_col] == '0':",
       "                    continue",
-      "                if not visited[x][y]:",
-      "                    dfs(x, y)",
+      "                if not visited[next_row][next_col]:",
+      "                    dfs(next_row, next_col)",
       "        ",
       "        count = 0",
-      "        for i in range(m):",
-      "            for j in range(n):",
-      "                if grid[i][j] == '1':",
-      "                    if not visited[i][j]:",
-      "                        dfs(i, j)",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid[row][col] == '1':",
+      "                    if not visited[row][col]:",
+      "                        dfs(row, col)",
       "                        count += 1",
       "",
       "        return count",
