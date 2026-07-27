@@ -4286,11 +4286,11 @@ async function collectLiveCallArgs() {
   const res = await fetch(`/api/problem/${currentProblemId}/live-args`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input, params }),
+    body: JSON.stringify({ input, params, codeBlock: selectedLiveCodeBlock() }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Could not prepare arguments");
-  return data.args;
+  return data;
 }
 
 async function ensureMonacoEditor() {
@@ -4354,9 +4354,13 @@ async function ensurePyodide() {
 // public method records (line, locals-snapshot) for every executed line,
 // then returns both the trace and the return value to JS.
 const TRACER_PY = `
-import sys, json, math, heapq, io, contextlib
+import sys, json, math, heapq, io, contextlib, collections, bisect, functools, itertools
 from collections import Counter, defaultdict, deque
 from typing import List, Optional, Dict, Set, Tuple
+from functools import cache, lru_cache
+from bisect import bisect_left, bisect_right
+from itertools import accumulate
+from math import gcd
 
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
@@ -4367,32 +4371,183 @@ class TreeNode:
     def __repr__(self):
         return f"TreeNode(val={self.val})"
 
-def __viz_materialize(value):
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+    def __repr__(self):
+        return f"ListNode(val={self.val})"
+
+class Node:
+    def __init__(self, val=0, next=None, random=None, child=None, neighbors=None, left=None, right=None, parent=None):
+        self.val = val
+        self.next = next
+        self.random = random
+        self.child = child
+        self.neighbors = neighbors if neighbors is not None else []
+        self.left = left
+        self.right = right
+        self.parent = parent
+
+    def __repr__(self):
+        return f"Node(val={self.val})"
+
+class HtmlParser:
+    def __init__(self, edges):
+        self.graph = defaultdict(list)
+        for source, target in edges:
+            self.graph[source].append(target)
+
+    def getUrls(self, url):
+        return self.graph.get(url, [])
+
+def __viz_build_list(values):
+    dummy = ListNode()
+    tail = dummy
+    for item in values:
+        tail.next = ListNode(item)
+        tail = tail.next
+    return dummy.next
+
+def __viz_build_tree(values):
+    if not values or values[0] is None:
+        return None, []
+    root = TreeNode(values[0])
+    nodes = [root]
+    queue = deque([root])
+    index = 1
+    while queue and index < len(values):
+        parent = queue.popleft()
+        if index < len(values) and values[index] is not None:
+            parent.left = TreeNode(values[index])
+            nodes.append(parent.left)
+            queue.append(parent.left)
+        index += 1
+        if index < len(values) and values[index] is not None:
+            parent.right = TreeNode(values[index])
+            nodes.append(parent.right)
+            queue.append(parent.right)
+        index += 1
+    return root, nodes
+
+def __viz_build_node_tree(values, with_parent=False):
+    if not values or values[0] is None:
+        return None, []
+    root = Node(values[0])
+    nodes = [root]
+    queue = deque([root])
+    index = 1
+    while queue and index < len(values):
+        parent = queue.popleft()
+        if index < len(values) and values[index] is not None:
+            parent.left = Node(values[index], parent=parent if with_parent else None)
+            nodes.append(parent.left)
+            queue.append(parent.left)
+        index += 1
+        if index < len(values) and values[index] is not None:
+            parent.right = Node(values[index], parent=parent if with_parent else None)
+            nodes.append(parent.right)
+            queue.append(parent.right)
+        index += 1
+    return root, nodes
+
+def __viz_materialize(value, context=None):
     """Convert JSON-safe live arguments into LeetCode helper objects."""
+    if context is None:
+        context = {}
     if isinstance(value, dict) and value.get("__viz_type") == "binary_tree":
         values = value.get("values", [])
-        if not values or values[0] is None:
-            return None
-        nodes = [None if item is None else TreeNode(item) for item in values]
+        root, nodes = __viz_build_tree(values)
+        context["tree:" + value.get("tree_id", "root")] = (root, nodes)
+        return root
+    if isinstance(value, dict) and value.get("__viz_type") == "binary_tree_next":
+        root, nodes = __viz_build_node_tree(value.get("values", []))
+        context["tree:" + value.get("tree_id", "root")] = (root, nodes)
+        return root
+    if isinstance(value, dict) and value.get("__viz_type") in ("binary_tree_ref", "binary_tree_refs"):
+        _root, nodes = context.get("tree:" + value.get("tree_id", "root"), (None, []))
+        wanted = value.get("values", []) if value.get("__viz_type") == "binary_tree_refs" else [value.get("value")]
+        matches = []
+        for target in wanted:
+            matches.append(next((node for node in nodes if node.val == target), None))
+        return matches if value.get("__viz_type") == "binary_tree_refs" else matches[0]
+    if isinstance(value, dict) and value.get("__viz_type") == "linked_list":
+        return __viz_build_list(value.get("values", []))
+    if isinstance(value, dict) and value.get("__viz_type") == "graph_node":
+        nodes = {index: Node(index) for index in range(1, value.get("n", 0) + 1)}
+        for left, right in value.get("edges", []):
+            nodes[left].neighbors.append(nodes[right])
+            nodes[right].neighbors.append(nodes[left])
+        return nodes.get(value.get("start"))
+    if isinstance(value, dict) and value.get("__viz_type") == "random_list":
+        entries = value.get("entries", [])
+        nodes = [Node(entry[0]) for entry in entries]
         for index, node in enumerate(nodes):
-            if node is None:
+            node.next = nodes[index + 1] if index + 1 < len(nodes) else None
+            random_index = entries[index][1]
+            node.random = nodes[random_index] if 0 <= random_index < len(nodes) else None
+        return nodes[0] if nodes else None
+    if isinstance(value, dict) and value.get("__viz_type") == "multilevel_list":
+        def make_chain(values):
+            nodes = [Node(item) for item in values]
+            for index, node in enumerate(nodes):
+                node.prev = nodes[index - 1] if index else None
+                node.next = nodes[index + 1] if index + 1 < len(nodes) else None
+            return nodes
+        top = make_chain(value.get("values", []))
+        by_value = {node.val: node for node in top}
+        for group in str(value.get("children", "")).split(";"):
+            if not group or ":" not in group:
                 continue
-            left_index = 2 * index + 1
-            right_index = 2 * index + 2
-            if left_index < len(nodes):
-                node.left = nodes[left_index]
-            if right_index < len(nodes):
-                node.right = nodes[right_index]
-        return nodes[0]
+            parent_value, children_text = group.split(":", 1)
+            children = make_chain([int(item) for item in children_text.split(",") if item])
+            if children and int(parent_value) in by_value:
+                by_value[int(parent_value)].child = children[0]
+                by_value.update({node.val: node for node in children})
+        return top[0] if top else None
+    if isinstance(value, dict) and value.get("__viz_type") == "html_parser":
+        return HtmlParser(value.get("edges", []))
+    if isinstance(value, dict) and value.get("__viz_type") == "parent_tree_ref":
+        root, nodes = __viz_build_node_tree(value.get("values", []), True)
+        context["tree:" + value.get("tree_id", "parent_tree")] = (root, nodes)
+        return next((node for node in nodes if node.val == value.get("value")), None)
+    if isinstance(value, dict) and value.get("__viz_type") == "parent_tree_existing_ref":
+        _root, nodes = context.get("tree:" + value.get("tree_id", "parent_tree"), (None, []))
+        return next((node for node in nodes if node.val == value.get("value")), None)
+    if isinstance(value, dict) and value.get("__viz_type") == "previous_result":
+        return context.get("previous_result")
+    if isinstance(value, dict) and value.get("__viz_type") == "intersecting_lists":
+        values_a = value.get("head_a", [])
+        values_b = value.get("head_b", [])
+        intersection = value.get("intersection")
+        index_a = next((i for i, item in enumerate(values_a) if item == intersection), len(values_a))
+        index_b = next((i for i, item in enumerate(values_b) if item == intersection), len(values_b))
+        shared = __viz_build_list(values_a[index_a:])
+        def with_shared(prefix):
+            head = __viz_build_list(prefix)
+            if head is None:
+                return shared
+            tail = head
+            while tail.next:
+                tail = tail.next
+            tail.next = shared
+            return head
+        heads = (with_shared(values_a[:index_a]), with_shared(values_b[:index_b]))
+        context["intersecting_lists"] = heads
+        return heads[0]
+    if isinstance(value, dict) and value.get("__viz_type") == "intersecting_lists_ref":
+        heads = context.get("intersecting_lists", (None, None))
+        return heads[1] if value.get("head") == "b" else heads[0]
     if isinstance(value, list):
-        return [__viz_materialize(item) for item in value]
+        return [__viz_materialize(item, context) for item in value]
     if isinstance(value, tuple):
-        return tuple(__viz_materialize(item) for item in value)
+        return tuple(__viz_materialize(item, context) for item in value)
     if isinstance(value, dict):
-        return {key: __viz_materialize(item) for key, item in value.items()}
+        return {key: __viz_materialize(item, context) for key, item in value.items()}
     return value
 
-def __viz_run_trace(user_code, method_name, call_args):
+def __viz_run_trace(user_code, method_name, call_args, design_config=None):
     trace = []
     stdout_buffer = io.StringIO()
 
@@ -4442,6 +4597,7 @@ def __viz_run_trace(user_code, method_name, call_args):
             pass
         return tracer
 
+    user_code = user_code.encode("utf-8", "replace").decode("utf-8")
     compiled = compile(user_code, "<usercode>", "exec")
     # Seed common LeetCode helper names so snippets that omit their own
     # imports (as shown in the problem's code panel) still run.
@@ -4456,22 +4612,55 @@ def __viz_run_trace(user_code, method_name, call_args):
         "Set": Set,
         "Tuple": Tuple,
         "math": math,
+        "collections": collections,
+        "bisect": bisect,
+        "functools": functools,
+        "itertools": itertools,
+        "cache": cache,
+        "lru_cache": lru_cache,
+        "bisect_left": bisect_left,
+        "bisect_right": bisect_right,
+        "accumulate": accumulate,
+        "gcd": gcd,
         "TreeNode": TreeNode,
+        "ListNode": ListNode,
+        "Node": Node,
+        "HtmlParser": HtmlParser,
     }
     exec(compiled, ns2)
-    Solution2 = ns2.get("Solution")
-    if Solution2 is None:
-        raise RuntimeError("No 'class Solution' found in the code.")
-    instance2 = Solution2()
-    method2 = getattr(instance2, method_name, None)
-    if method2 is None:
-        raise RuntimeError(f"Solution has no method '{method_name}'.")
-
     sys.settrace(tracer)
     try:
-        materialized_args = [__viz_materialize(value) for value in call_args]
+        materialize_context = {}
         with contextlib.redirect_stdout(stdout_buffer):
-            result = method2(*materialized_args)
+            if design_config:
+                if design_config.get("functionName"):
+                    function2 = ns2.get(design_config["functionName"])
+                    if function2 is None:
+                        raise RuntimeError(f"Function '{design_config['functionName']}' was not found.")
+                    materialized_args = [__viz_materialize(value, materialize_context) for value in design_config.get("args", [])]
+                    result = function2(*materialized_args)
+                else:
+                    class2 = ns2.get(design_config.get("className"))
+                    if class2 is None:
+                        raise RuntimeError(f"Class '{design_config.get('className')}' was not found.")
+                    constructor_args = [__viz_materialize(value, materialize_context) for value in design_config.get("constructorArgs", [])]
+                    instance2 = class2(*constructor_args)
+                    result = []
+                    for operation in design_config.get("operations", []):
+                        operation_args = [__viz_materialize(value, materialize_context) for value in operation.get("args", [])]
+                        operation_result = getattr(instance2, operation["name"])(*operation_args)
+                        materialize_context["previous_result"] = operation_result
+                        result.append(operation_result)
+            else:
+                Solution2 = ns2.get("Solution")
+                if Solution2 is None:
+                    raise RuntimeError("No 'class Solution' found in the code.")
+                instance2 = Solution2()
+                method2 = getattr(instance2, method_name, None)
+                if method2 is None:
+                    raise RuntimeError(f"Solution has no method '{method_name}'.")
+                materialized_args = [__viz_materialize(value, materialize_context) for value in call_args]
+                result = method2(*materialized_args)
     finally:
         sys.settrace(None)
 
@@ -4484,7 +4673,9 @@ async function runLiveCode() {
   try {
     const editor = await ensureMonacoEditor();
     const userCode = editor.getValue();
-    const args = await collectLiveCallArgs();
+    const liveCall = await collectLiveCallArgs();
+    const args = liveCall.args || [];
+    const design = liveCall.design || null;
     const pyodide = await ensurePyodide();
 
     if (!pyodide.__viz_tracer_loaded) {
@@ -4494,17 +4685,23 @@ async function runLiveCode() {
 
     // Infer the public method name from the code itself (first "def X(self" after "class Solution").
     const methodMatch = userCode.match(/class\s+Solution\b[\s\S]*?def\s+(\w+)\s*\(\s*self/);
-    if (!methodMatch) {
+    if (!methodMatch && !design) {
       throw new Error(lang === "vi" ? "Không tìm thấy 'class Solution' với 1 phương thức nhận self." : "Could not find a 'class Solution' with a method taking self.");
     }
-    const methodName = methodMatch[1];
+    const methodName = methodMatch ? methodMatch[1] : (design.functionName || design.className || "design");
 
     pyodide.globals.set("__viz_user_code", userCode);
     pyodide.globals.set("__viz_method_name", methodName);
     pyodide.globals.set("__viz_call_args", pyodide.toPy(args));
+    pyodide.globals.set("__viz_design", design ? pyodide.toPy(design) : null);
 
     const runFn = pyodide.globals.get("__viz_run_trace");
-    const resultProxy = runFn(pyodide.globals.get("__viz_user_code"), methodName, pyodide.globals.get("__viz_call_args"));
+    const resultProxy = runFn(
+      pyodide.globals.get("__viz_user_code"),
+      methodName,
+      pyodide.globals.get("__viz_call_args"),
+      pyodide.globals.get("__viz_design"),
+    );
     const resultJs = resultProxy.toJs({ dict_converter: Object.fromEntries });
     resultProxy.destroy && resultProxy.destroy();
 

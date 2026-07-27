@@ -4,7 +4,8 @@
   "description": "Web app trực quan hóa thuật toán LeetCode theo từng bước",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "audit:live": "node tests/build-live-audit-cases.js | python tests/audit_live_runner.py"
   },
   "dependencies": {
     "express": "^4.19.2"

@@ -8,6 +8,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 const { SUPPORTED, CATEGORY_ORDER } = require("./problems");
+const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
 const PREMIUM_PROBLEM_IDS = new Set([
   156, 246, 253, 270, 276, 285, 314, 323, 366, 370, 426, 487, 588, 734, 760, 1101,
@@ -124,12 +125,14 @@ app.post("/api/problem/:id/live-args", (req, res) => {
     }
   }
 
-  // Generic fallback: primary input as-is, then extraParams in declared order.
-  const args = [input];
-  for (const p of problem.extraParams || []) {
-    args.push(params[p.key]);
+  try {
+    const design = prepareDesignLiveRun(problem, input, params, req.body.codeBlock || 1);
+    if (design) return res.json({ args: [], design });
+    const args = prepareGenericLiveArgs(problem, input, params, req.body.codeBlock || 1);
+    res.json({ args, generic: true });
+  } catch (err) {
+    res.status(400).json({ error: String((err && err.message) || err) });
   }
-  res.json({ args, generic: true });
 });
 
 app.post("/api/problem/:id/solve", (req, res) => {
