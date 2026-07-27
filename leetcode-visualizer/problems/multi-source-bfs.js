@@ -699,6 +699,7 @@ function buildSteps1020(input) {
 
 const graphCategory = { key: "graph", vi: "Đồ thị", en: "Graph" };
 const multiSourceTag = { key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" };
+const floodFillTag = { key: "flood-fill", vi: "Flood Fill", en: "Flood Fill" };
 
 const problems = {
   1162: {
@@ -954,7 +955,7 @@ const problems = {
     difficulty: "medium",
     slug: "surrounded-regions",
     category: { key: "dfs", vi: "DFS", en: "DFS" },
-    tags: [multiSourceTag],
+    tags: [multiSourceTag, floodFillTag],
     title: text("Surrounded Regions", "Surrounded Regions"),
     titleVi: text("Multi-source BFS từ các vùng ở biên", "Multi-source BFS from border regions"),
     statement: text("Đổi mọi O bị X bao quanh thành X; các O nối bốn hướng tới biên được giữ lại.", "Flip every O surrounded by X; O cells connected in four directions to the border remain unchanged."),
@@ -997,7 +998,7 @@ const problems = {
     id: 1020,
     difficulty: "medium",
     slug: "number-of-enclaves",
-    tags: [multiSourceTag],
+    tags: [multiSourceTag, floodFillTag],
     category: graphCategory,
     title: text("Number of Enclaves", "Number of Enclaves"),
     titleVi: text("Đếm đất không thể đi ra biên", "Count land that cannot reach the border"),

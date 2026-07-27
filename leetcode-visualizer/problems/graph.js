@@ -13,6 +13,7 @@ const {
   buildSteps815,
 } = require("../builders_graph");
 const multiSourceBfsProblems = require("./multi-source-bfs");
+const floodFillProblems = require("./flood-fill");
 
 /**
  * LeetCode 127: Word Ladder I.
@@ -11638,6 +11639,10 @@ module.exports = {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
         label: { vi: "Lộ trình Multi-source BFS", en: "Multi-source BFS learning path" },
       },
+      "flood-fill": {
+        order: [733, 200, 695, 1020, 130, 1905],
+        label: { vi: "Lộ trình Flood Fill", en: "Flood Fill learning path" },
+      },
     },
     label: {
       vi: "Thứ tự học được khuyến nghị",
@@ -14625,6 +14630,7 @@ module.exports = {
     builder: buildSteps2492,
   },
   ...multiSourceBfsProblems,
+  ...floodFillProblems,
 };
 
 Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
