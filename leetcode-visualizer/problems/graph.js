@@ -833,6 +833,315 @@ function buildSteps994(input) {
 }
 
 /**
+ * LeetCode 994: exact line-by-line multi-source BFS trace.
+ * This detailed builder mirrors every executable line in the displayed Python.
+ */
+function buildSteps994LineByLine(input) {
+  const parsed = parseIslandGrid(input);
+  const original = parsed.map((row) => [...row]);
+  const grid = parsed.map((row) => [...row]);
+  const steps = [];
+
+  const invalid = !grid.length || !grid[0].length || grid.some((row) =>
+    row.length !== grid[0].length || row.some((value) => value !== "0" && value !== "1" && value !== "2")
+  );
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Grid phải là ma trận chữ nhật chỉ gồm 0, 1, 2.", en: "The grid must be rectangular and contain only 0, 1, and 2." },
+    });
+    return { original, answer: -1, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const rottenAt = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (row, col) => `${row},${col}`;
+  let queue = null;
+  let fresh = null;
+  let minutes = null;
+
+  function queueLabel() {
+    if (queue === null) return "not initialized";
+    return `[${queue.map(([row, col]) => `(${row},${col})`).join(", ")}]`;
+  }
+
+  function makeCells(current = null, newlyRotten = new Set()) {
+    const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
+    return grid.map((gridRow, row) => gridRow.map((cell, col) => {
+      const cellKey = key(row, col);
+      let cls = cell === "0" ? "wall" : cell === "1" ? "empty" : "visited";
+      let label = cell === "0" ? "" : cell;
+      if (cell === "2" && rottenAt[row][col] > 0) label = String(rottenAt[row][col]);
+      if (queued.has(cellKey)) cls = "queued";
+      if (newlyRotten.has(cellKey)) cls = "path";
+      if (current && current[0] === row && current[1] === col) cls = "current";
+      return { label, cls };
+    }));
+  }
+
+  function pushStep(opts) {
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "queue")) vars.push({ name: "queue", value: queueLabel() });
+    if (!vars.some((item) => item.name === "fresh")) vars.push({ name: "fresh", value: fresh === null ? "not initialized" : fresh });
+    if (!vars.some((item) => item.name === "minutes")) vars.push({ name: "minutes", value: minutes === null ? "not initialized" : minutes });
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.current, opts.newlyRotten) },
+      highlight: [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeLines: [opts.codeLine],
+      vars,
+      note: opts.note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Bắt đầu orangesRotting", en: "Enter orangesRotting" },
+    codeLine: 4,
+    vars: [{ name: "grid size", value: `${rows}×${cols}` }],
+    note: { vi: "Bắt đầu hàm với grid đầu vào.", en: "Enter the function with the input grid." },
+  });
+
+  pushStep({
+    title: { vi: `rows=${rows}, cols=${cols}`, en: `rows=${rows}, cols=${cols}` },
+    codeLine: 5,
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: { vi: "Lưu số hàng và số cột bằng tên rõ nghĩa.", en: "Store the row and column counts with descriptive names." },
+  });
+
+  queue = [];
+  pushStep({
+    title: { vi: "queue = deque()", en: "queue = deque()" },
+    codeLine: 6,
+    note: { vi: "Tạo queue cho multi-source BFS.", en: "Create the queue for multi-source BFS." },
+  });
+
+  fresh = 0;
+  pushStep({
+    title: { vi: "fresh = 0", en: "fresh = 0" },
+    codeLine: 7,
+    note: { vi: "Bắt đầu đếm số cam tươi.", en: "Start counting fresh oranges." },
+  });
+
+  for (let row = 0; row < rows; row++) {
+    pushStep({
+      title: { vi: `Quét row = ${row}`, en: `Scan row = ${row}` },
+      codeLine: 8,
+      vars: [{ name: "row", value: row }],
+      note: { vi: `Bắt đầu quét hàng ${row}.`, en: `Begin scanning row ${row}.` },
+    });
+
+    for (let col = 0; col < cols; col++) {
+      const cell = grid[row][col];
+      pushStep({
+        title: { vi: `Quét ô (${row},${col})`, en: `Scan cell (${row},${col})` },
+        current: [row, col], codeLine: 9,
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "grid[row][col]", value: cell }],
+        note: { vi: `Xét ô (${row},${col}) có giá trị ${cell}.`, en: `Inspect cell (${row},${col}) with value ${cell}.` },
+      });
+
+      const isFresh = cell === "1";
+      pushStep({
+        title: { vi: `grid[${row}][${col}] == 1 → ${isFresh}`, en: `grid[${row}][${col}] == 1 → ${isFresh}` },
+        current: [row, col], codeLine: 10,
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "is fresh?", value: isFresh }],
+        note: isFresh
+          ? { vi: "Đây là cam tươi nên tăng fresh.", en: "This is a fresh orange, so increment fresh." }
+          : { vi: "Không phải cam tươi; tiếp tục kiểm tra cam thối.", en: "It is not fresh; continue to the rotten-orange check." },
+      });
+
+      if (isFresh) {
+        fresh++;
+        pushStep({
+          title: { vi: `fresh += 1 → ${fresh}`, en: `fresh += 1 → ${fresh}` },
+          current: [row, col], codeLine: 11,
+          vars: [{ name: "row", value: row }, { name: "col", value: col }],
+          note: { vi: `Đã đếm ${fresh} cam tươi.`, en: `${fresh} fresh orange(s) counted so far.` },
+        });
+        continue;
+      }
+
+      const isRotten = cell === "2";
+      pushStep({
+        title: { vi: `grid[${row}][${col}] == 2 → ${isRotten}`, en: `grid[${row}][${col}] == 2 → ${isRotten}` },
+        current: [row, col], codeLine: 12,
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "is rotten?", value: isRotten }],
+        note: isRotten
+          ? { vi: "Đây là cam thối ban đầu; thêm vào queue.", en: "This is an initially rotten orange; append it to the queue." }
+          : { vi: "Đây là ô trống; không làm gì.", en: "This is an empty cell; do nothing." },
+      });
+
+      if (isRotten) {
+        rottenAt[row][col] = 0;
+        queue.push([row, col]);
+        pushStep({
+          title: { vi: `queue.append((${row},${col}))`, en: `queue.append((${row},${col}))` },
+          current: [row, col], codeLine: 13,
+          vars: [{ name: "row", value: row }, { name: "col", value: col }],
+          note: { vi: `Queue nguồn BFS hiện là ${queueLabel()}.`, en: `The BFS source queue is now ${queueLabel()}.` },
+        });
+      }
+    }
+  }
+
+  pushStep({
+    title: { vi: `fresh == 0 → ${fresh === 0}`, en: `fresh == 0 → ${fresh === 0}` },
+    codeLine: 14,
+    vars: [{ name: "fresh == 0", value: fresh === 0 }],
+    note: fresh === 0
+      ? { vi: "Không có cam tươi; kết quả là 0 phút.", en: "There are no fresh oranges; the answer is 0 minutes." }
+      : { vi: "Còn cam tươi nên cần chạy BFS.", en: "Fresh oranges remain, so BFS is required." },
+  });
+
+  if (fresh === 0) {
+    pushStep({
+      title: { vi: "return 0", en: "return 0" },
+      codeLine: 15, final: true,
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Trả về 0 ngay.", en: "Return 0 immediately." },
+    });
+    return { original, answer: 0, steps };
+  }
+
+  minutes = 0;
+  pushStep({
+    title: { vi: "minutes = 0", en: "minutes = 0" },
+    codeLine: 16,
+    note: { vi: "Chưa có phút lan thối nào trôi qua.", en: "No spreading minute has elapsed yet." },
+  });
+
+  pushStep({
+    title: { vi: "Khai báo 4 hướng", en: "Define four directions" },
+    codeLine: 17,
+    vars: [{ name: "directions", value: "down, up, right, left" }],
+    note: { vi: "Mỗi cam thối chỉ lan theo 4 hướng.", en: "Rot spreads only in four directions." },
+  });
+
+  while (queue.length && fresh > 0) {
+    pushStep({
+      title: { vi: `while queue and fresh > 0 → True`, en: `while queue and fresh > 0 → True` },
+      codeLine: 18,
+      vars: [{ name: "condition", value: true }],
+      note: { vi: "Queue còn nguồn lây và vẫn còn cam tươi.", en: "The queue has spreading sources and fresh oranges remain." },
+    });
+
+    const levelSize = queue.length;
+    const rottedThisMinute = [];
+    for (let index = 0; index < levelSize; index++) {
+      pushStep({
+        title: { vi: `Xử lý node ${index + 1}/${levelSize} của phút ${minutes + 1}`, en: `Process node ${index + 1}/${levelSize} for minute ${minutes + 1}` },
+        codeLine: 19,
+        vars: [{ name: "index", value: index }, { name: "level_size", value: levelSize }],
+        note: { vi: "range(len(queue)) được chốt trước, nên chỉ xử lý frontier hiện tại.", en: "range(len(queue)) is fixed up front, so only the current frontier is processed." },
+      });
+
+      const [row, col] = queue.shift();
+      pushStep({
+        title: { vi: `popleft → (${row},${col})`, en: `popleft → (${row},${col})` },
+        current: [row, col], codeLine: 20,
+        vars: [{ name: "row", value: row }, { name: "col", value: col }],
+        note: { vi: `Lấy cam thối (${row},${col}) khỏi đầu queue.`, en: `Remove rotten orange (${row},${col}) from the queue front.` },
+      });
+
+      for (const [deltaRow, deltaCol] of directions) {
+        pushStep({
+          title: { vi: `Thử hướng (${deltaRow},${deltaCol})`, en: `Try direction (${deltaRow},${deltaCol})` },
+          current: [row, col], codeLine: 21,
+          vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }, { name: "row", value: row }, { name: "col", value: col }],
+          note: { vi: "Xét một trong bốn ô lân cận.", en: "Inspect one of the four neighboring cells." },
+        });
+
+        const nextRow = row + deltaRow;
+        const nextCol = col + deltaCol;
+        pushStep({
+          title: { vi: `next = (${nextRow},${nextCol})`, en: `next = (${nextRow},${nextCol})` },
+          current: [row, col], codeLine: 22,
+          vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+          note: { vi: "Tính tọa độ ô kế tiếp.", en: "Compute the neighboring coordinates." },
+        });
+
+        const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+        const isFreshNeighbor = inBounds && grid[nextRow][nextCol] === "1";
+        pushStep({
+          title: { vi: `Ô (${nextRow},${nextCol}) hợp lệ và tươi → ${isFreshNeighbor}`, en: `Cell (${nextRow},${nextCol}) is valid and fresh → ${isFreshNeighbor}` },
+          current: inBounds ? [nextRow, nextCol] : [row, col], codeLine: 23,
+          vars: [{ name: "in bounds?", value: inBounds }, { name: "fresh neighbor?", value: isFreshNeighbor }],
+          note: isFreshNeighbor
+            ? { vi: "Điều kiện True; cam này sẽ bị thối.", en: "The condition is true; this orange will rot." }
+            : { vi: "Điều kiện False; bỏ qua hướng này.", en: "The condition is false; skip this direction." },
+        });
+        if (!isFreshNeighbor) continue;
+
+        grid[nextRow][nextCol] = "2";
+        rottenAt[nextRow][nextCol] = minutes + 1;
+        const newlyRotten = new Set([key(nextRow, nextCol)]);
+        pushStep({
+          title: { vi: `grid[${nextRow}][${nextCol}] = 2`, en: `grid[${nextRow}][${nextCol}] = 2` },
+          current: [nextRow, nextCol], newlyRotten, codeLine: 24,
+          vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+          note: { vi: `Đánh dấu cam tại (${nextRow},${nextCol}) là thối ở phút ${minutes + 1}.`, en: `Mark orange (${nextRow},${nextCol}) rotten at minute ${minutes + 1}.` },
+        });
+
+        fresh--;
+        pushStep({
+          title: { vi: `fresh -= 1 → ${fresh}`, en: `fresh -= 1 → ${fresh}` },
+          current: [nextRow, nextCol], newlyRotten, codeLine: 25,
+          vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+          note: { vi: `Còn ${fresh} cam tươi.`, en: `${fresh} fresh orange(s) remain.` },
+        });
+
+        queue.push([nextRow, nextCol]);
+        rottedThisMinute.push([nextRow, nextCol]);
+        pushStep({
+          title: { vi: `queue.append((${nextRow},${nextCol}))`, en: `queue.append((${nextRow},${nextCol}))` },
+          current: [nextRow, nextCol], newlyRotten, codeLine: 26,
+          vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+          note: { vi: "Thêm cam vừa thối vào frontier của phút kế tiếp.", en: "Append the newly rotten orange to the next minute's frontier." },
+        });
+      }
+    }
+
+    minutes++;
+    pushStep({
+      title: { vi: `minutes += 1 → ${minutes}`, en: `minutes += 1 → ${minutes}` },
+      codeLine: 27,
+      vars: [{ name: "rotted this minute", value: rottedThisMinute.map(([row, col]) => `(${row},${col})`).join(", ") || "none" }],
+      note: { vi: `Hoàn tất toàn bộ frontier của phút ${minutes}.`, en: `Finished processing the entire frontier for minute ${minutes}.` },
+    });
+  }
+
+  pushStep({
+    title: { vi: "Thoát vòng while", en: "Exit the while loop" },
+    codeLine: 18,
+    vars: [{ name: "condition", value: Boolean(queue.length && fresh > 0) }],
+    note: fresh === 0
+      ? { vi: "fresh = 0 nên BFS hoàn tất.", en: "fresh = 0, so BFS is complete." }
+      : { vi: "Queue đã rỗng nhưng vẫn còn cam tươi.", en: "The queue is empty while fresh oranges remain." },
+  });
+
+  const answer = fresh === 0 ? minutes : -1;
+  pushStep({
+    title: answer === -1 ? { vi: "return -1", en: "return -1" } : { vi: `return ${minutes}`, en: `return ${minutes}` },
+    codeLine: 28, final: true,
+    vars: [{ name: "answer", value: answer }],
+    note: answer === -1
+      ? { vi: "Vẫn còn cam tươi không thể tiếp cận nên trả -1.", en: "Unreachable fresh oranges remain, so return -1." }
+      : { vi: `Tất cả cam đã thối sau ${minutes} phút.`, en: `All oranges are rotten after ${minutes} minute(s).` },
+  });
+
+  return { original, answer, steps };
+}
+
+/**
  * LeetCode 1730: Shortest Path to Get Food.
  * Single-source BFS (4 directions) from the '*' cell to the nearest '#' cell.
  * 'X' blocks movement, 'O' is free space. Path length counts MOVES (edges),
@@ -11659,10 +11968,10 @@ module.exports = {
     titleVi: { vi: "Cam thối lan theo từng phút", en: "Minute-by-minute rotting BFS" },
     statement: {
       vi:
-        "Cho grid m×n: 0 = ô trống, 1 = cam tươi, 2 = cam thối. Mỗi phút, cam thối làm thối các cam tươi kề 4 hướng. " +
+        "Cho grid rows×cols: 0 = ô trống, 1 = cam tươi, 2 = cam thối. Mỗi phút, cam thối làm thối các cam tươi kề 4 hướng. " +
         "Trả về số phút tối thiểu để không còn cam tươi, hoặc -1 nếu không thể. Nhập grid: hàng cách bởi '|', giá trị có thể cách bằng dấu phẩy hoặc viết liền.",
       en:
-        "Given an m×n grid: 0 = empty, 1 = fresh orange, 2 = rotten orange. Each minute, rotten oranges rot adjacent fresh oranges in 4 directions. " +
+        "Given a rows×cols grid: 0 = empty, 1 = fresh orange, 2 = rotten orange. Each minute, rotten oranges rot adjacent fresh oranges in 4 directions. " +
         "Return the minimum minutes until no fresh oranges remain, or -1 if impossible. Enter rows separated by '|', comma-separated or compact.",
     },
     defaultInput: "2,1,1|1,1,0|0,1,1",
@@ -11675,11 +11984,11 @@ module.exports = {
       { vi: "Nếu fresh = 0 thì trả số phút. Nếu queue hết mà vẫn còn fresh thì trả -1.", en: "If fresh reaches 0, return minutes. If the queue empties while fresh remains, return -1." },
     ],
     complexity: {
-      time: "O(m·n)",
-      space: "O(m·n)",
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
       note: {
-        vi: "Mỗi ô được đưa vào queue tối đa một lần. Queue trong trường hợp xấu nhất chứa O(m·n) ô.",
-        en: "Each cell enters the queue at most once. In the worst case, the queue stores O(m·n) cells.",
+        vi: "Mỗi ô được đưa vào queue tối đa một lần. Queue trong trường hợp xấu nhất chứa O(rows·cols) ô.",
+        en: "Each cell enters the queue at most once. In the worst case, the queue stores O(rows·cols) cells.",
       },
     },
     code: [
@@ -11687,32 +11996,32 @@ module.exports = {
       "",
       "class Solution:",
       "    def orangesRotting(self, grid):",
-      "        m, n = len(grid), len(grid[0])",
-      "        q = deque()",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        queue = deque()",
       "        fresh = 0",
-      "        for r in range(m):",
-      "            for c in range(n):",
-      "                if grid[r][c] == 1:",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid[row][col] == 1:",
       "                    fresh += 1",
-      "                elif grid[r][c] == 2:",
-      "                    q.append((r, c))",
+      "                elif grid[row][col] == 2:",
+      "                    queue.append((row, col))",
       "        if fresh == 0:",
       "            return 0",
       "        minutes = 0",
-      "        dirs = [(1,0), (-1,0), (0,1), (0,-1)]",
-      "        while q and fresh > 0:",
-      "            for _ in range(len(q)):",
-      "                r, c = q.popleft()",
-      "                for dr, dc in dirs:",
-      "                    nr, nc = r + dr, c + dc",
-      "                    if 0 <= nr < m and 0 <= nc < n and grid[nr][nc] == 1:",
-      "                        grid[nr][nc] = 2",
+      "        directions = [(1,0), (-1,0), (0,1), (0,-1)]",
+      "        while queue and fresh > 0:",
+      "            for index in range(len(queue)):",
+      "                row, col = queue.popleft()",
+      "                for delta_row, delta_col in directions:",
+      "                    next_row, next_col = row + delta_row, col + delta_col",
+      "                    if 0 <= next_row < rows and 0 <= next_col < cols and grid[next_row][next_col] == 1:",
+      "                        grid[next_row][next_col] = 2",
       "                        fresh -= 1",
-      "                        q.append((nr, nc))",
+      "                        queue.append((next_row, next_col))",
       "            minutes += 1",
       "        return minutes if fresh == 0 else -1",
     ],
-    builder: buildSteps994,
+    builder: buildSteps994LineByLine,
   },
   1730: {
     id: 1730,
