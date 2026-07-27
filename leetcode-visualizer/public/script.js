@@ -1711,13 +1711,20 @@ function renderTree(step) {
     });
   }
 
-  $("treeView").innerHTML =
+  const treeHtml =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
     `<defs><marker id="tree-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +
     levelLabels +
     `</svg>`;
+
+  $("treeView").innerHTML = step.queueView
+    ? `<div class="tree-queue-layout">
+        <div class="tree-queue-tree">${treeHtml}</div>
+        <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
+      </div>`
+    : treeHtml;
 }
 
 // ---- Graph renderer (directed weighted graph) ----
@@ -2140,8 +2147,7 @@ function renderStackView(step) {
     </div>`;
 }
 
-function renderQueueView(step) {
-  const view = step.queueView || {};
+function queueViewHtml(view, compact = false) {
   const items = Array.isArray(view.items) ? view.items : [];
   const capacity = Math.max(Number(view.capacity) || 0, items.length, 1);
   const stream = Array.isArray(view.stream) ? view.stream : [];
@@ -2171,16 +2177,21 @@ function renderQueueView(step) {
     return `<div class="stack-input-token${cls}"><span>${escapeHtml(String(value))}</span><small>${idx}</small></div>`;
   }).join("");
 
-  $("treeView").innerHTML = `
-    <div class="queue-viz">
+  const streamHtml = stream.length ? `<div>
+    <div class="stack-input-label">Incoming stream</div>
+    <div class="stack-input-row">${streamItems}</div>
+  </div>` : "";
+
+  return `<div class="queue-viz${compact ? " queue-viz-compact" : ""}">
       <div class="queue-heading">${escapeHtml(String(view.title || "Queue"))}</div>
       <div class="queue-cells">${cells}</div>
       <div class="queue-status">${statusItems}</div>
-      <div>
-        <div class="stack-input-label">Incoming stream</div>
-        <div class="stack-input-row">${streamItems}</div>
-      </div>
+      ${streamHtml}
     </div>`;
+}
+
+function renderQueueView(step) {
+  $("treeView").innerHTML = queueViewHtml(step.queueView || {});
 }
 
 function renderCircularDequeView(step) {

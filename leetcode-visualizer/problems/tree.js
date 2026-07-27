@@ -56,6 +56,7 @@ function snapshot(root, opts) {
     mark: [],
     codeLines: opts.codeLines || [],
     codeBlock: opts.codeBlock,
+    queueView: opts.queueView,
     vars: opts.vars || [],
     note: opts.note,
   };
@@ -708,6 +709,22 @@ function buildSteps199v2(input) {
   let queue = null;
   const formatNodes = (nodes) => nodes === null ? "not initialized" : `[${nodes.map((node) => node.val).join(",")}]`;
 
+  function makeQueueView(opts = {}) {
+    const items = queue === null ? [] : queue.map((node) => node.val);
+    return {
+      title: "Queue / Deque",
+      items,
+      capacity: Math.max(4, items.length),
+      active: Number.isInteger(opts.queueActive) ? opts.queueActive : -1,
+      status: [
+        { label: "operation", value: opts.queueOperation || "—" },
+        { label: "popped", value: opts.popped ?? "—" },
+        { label: "appended", value: opts.appended ?? "—" },
+        { label: "level size", value: opts.levelSize ?? "—" },
+      ],
+    };
+  }
+
   function snap(opts) {
     const vars = [...(opts.vars || [])];
     if (!vars.some((item) => item.name === "res")) vars.push({ name: "res", value: `[${res.join(",")}]` });
@@ -716,12 +733,14 @@ function buildSteps199v2(input) {
       vars,
       codeBlock: 2,
       wordSet: opts.wordSet || new Set(visible),
+      queueView: makeQueueView(opts),
     })));
   }
 
   snap({
     title: { vi: "Bắt đầu rightSideView", en: "Enter rightSideView" },
     codeLines: [2],
+    queueOperation: "enter function",
     vars: [{ name: "root", value: root ? root.val : "None" }],
     note: { vi: "Bắt đầu cách 2: deque và số node cố định của từng tầng.", en: "Start approach 2: deque with a fixed node count for each level." },
   });
@@ -729,12 +748,14 @@ function buildSteps199v2(input) {
   snap({
     title: { vi: "res = []", en: "res = []" },
     codeLines: [3],
+    queueOperation: "initialize res",
     note: { vi: "res sẽ lưu node ngoài cùng bên phải của mỗi tầng.", en: "res will store the rightmost node from each level." },
   });
 
   snap({
     title: { vi: root ? "root is None → False" : "root is None → True", en: root ? "root is None → False" : "root is None → True" },
     codeLines: [4],
+    queueOperation: root ? "check root" : "empty tree",
     vars: [{ name: "root", value: root ? root.val : "None" }],
     note: root
       ? { vi: "Cây không rỗng nên tiếp tục tạo queue.", en: "The tree is not empty, so continue to create the queue." }
@@ -745,6 +766,7 @@ function buildSteps199v2(input) {
     const emptyStep = snapshot(root, {
       title: { vi: "return res → []", en: "return res → []" },
       codeLines: [5], codeBlock: 2,
+      queueView: makeQueueView({ queueOperation: "early return" }),
       vars: [{ name: "res", value: "[]" }, { name: "queue", value: "not initialized" }, { name: "answer", value: "[]" }],
       note: { vi: "Trả về [] ngay vì root là None.", en: "Return [] immediately because root is None." },
     });
@@ -757,6 +779,7 @@ function buildSteps199v2(input) {
   snap({
     title: { vi: "Tạo collections.deque()", en: "Create collections.deque()" },
     codeLines: [6],
+    queueOperation: "create deque",
     vars: [{ name: "queue", value: "[]" }],
     note: { vi: "Tạo deque rỗng để BFS.", en: "Create an empty deque for BFS." },
   });
@@ -765,6 +788,7 @@ function buildSteps199v2(input) {
   snap({
     title: { vi: `queue.append(root) → [${root.val}]`, en: `queue.append(root) → [${root.val}]` },
     hlSet: new Set([root.id]), codeLines: [7],
+    queueOperation: `append ${root.val}`, queueActive: 0, appended: root.val,
     note: { vi: `Đưa root ${root.val} vào queue.`, en: `Append root ${root.val} to the queue.` },
   });
 
@@ -773,6 +797,7 @@ function buildSteps199v2(input) {
     snap({
       title: { vi: `Tầng ${level}: queue không rỗng`, en: `Level ${level}: queue is not empty` },
       hlSet: new Set(queue.map((node) => node.id)), codeLines: [8],
+      queueOperation: "while queue", queueActive: 0,
       vars: [{ name: "level", value: level }],
       note: { vi: `Bắt đầu xử lý tầng ${level}.`, en: `Begin processing level ${level}.` },
     });
@@ -781,6 +806,7 @@ function buildSteps199v2(input) {
     snap({
       title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
       hlSet: new Set(queue.slice(0, size).map((node) => node.id)), codeLines: [9],
+      queueOperation: "read level size", levelSize: size,
       vars: [{ name: "level", value: level }, { name: "size", value: size }],
       note: { vi: `Chốt ${size} node thuộc tầng hiện tại trước khi thêm node con.`, en: `Lock in the ${size} nodes belonging to this level before appending children.` },
     });
@@ -789,6 +815,7 @@ function buildSteps199v2(input) {
     snap({
       title: { vi: "current_level_list = []", en: "current_level_list = []" },
       codeLines: [10],
+      queueOperation: "initialize level list", levelSize: size,
       vars: [{ name: "level", value: level }, { name: "size", value: size }, { name: "current_level_list", value: "[]" }],
       note: { vi: "Danh sách này ghi lại toàn bộ giá trị của tầng hiện tại.", en: "This list records every value in the current level." },
     });
@@ -797,6 +824,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: `for i=${i} trong range(${size})`, en: `for i=${i} in range(${size})` },
         codeLines: [11],
+        queueOperation: "next popleft", queueActive: 0, levelSize: size,
         vars: [{ name: "level", value: level }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: { vi: `Xử lý node thứ ${i + 1}/${size} của tầng ${level}.`, en: `Process node ${i + 1}/${size} from level ${level}.` },
       });
@@ -805,6 +833,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: `curr = queue.popleft() → ${curr.val}`, en: `curr = queue.popleft() → ${curr.val}` },
         hlSet: new Set([curr.id]), codeLines: [12],
+        queueOperation: `popleft ${curr.val}`, popped: curr.val, levelSize: size,
         vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "queue", value: formatNodes(queue) }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: { vi: `Lấy ${curr.val} ở đầu deque; queue còn ${formatNodes(queue)}.`, en: `Pop ${curr.val} from the deque front; remaining queue is ${formatNodes(queue)}.` },
       });
@@ -813,6 +842,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: `Thêm ${curr.val} vào current_level_list`, en: `Append ${curr.val} to current_level_list` },
         hlSet: new Set([curr.id]), codeLines: [13],
+        queueOperation: "record current value", popped: curr.val, levelSize: size,
         vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: { vi: `current_level_list = [${currentLevelList.join(",")}].`, en: `current_level_list = [${currentLevelList.join(",")}].` },
       });
@@ -820,6 +850,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None", en: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None" },
         hlSet: new Set([curr.id]), codeLines: [14],
+        queueOperation: "check left child", popped: curr.val, levelSize: size,
         vars: [{ name: "curr", value: curr.val }, { name: "curr.left", value: curr.left ? curr.left.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: curr.left
           ? { vi: "Điều kiện True nên sẽ append con trái.", en: "The condition is true, so append the left child." }
@@ -830,6 +861,7 @@ function buildSteps199v2(input) {
         snap({
           title: { vi: `queue.append(${curr.left.val})`, en: `queue.append(${curr.left.val})` },
           hlSet: new Set([curr.left.id]), codeLines: [15],
+          queueOperation: `append ${curr.left.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.left.val, levelSize: size,
           vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
           note: { vi: `Thêm con trái; queue = ${formatNodes(queue)}.`, en: `Append the left child; queue = ${formatNodes(queue)}.` },
         });
@@ -838,6 +870,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None", en: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None" },
         hlSet: new Set([curr.id]), codeLines: [16],
+        queueOperation: "check right child", popped: curr.val, levelSize: size,
         vars: [{ name: "curr", value: curr.val }, { name: "curr.right", value: curr.right ? curr.right.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: curr.right
           ? { vi: "Điều kiện True nên sẽ append con phải.", en: "The condition is true, so append the right child." }
@@ -848,6 +881,7 @@ function buildSteps199v2(input) {
         snap({
           title: { vi: `queue.append(${curr.right.val})`, en: `queue.append(${curr.right.val})` },
           hlSet: new Set([curr.right.id]), codeLines: [17],
+          queueOperation: `append ${curr.right.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.right.val, levelSize: size,
           vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
           note: { vi: `Thêm con phải; queue = ${formatNodes(queue)}.`, en: `Append the right child; queue = ${formatNodes(queue)}.` },
         });
@@ -857,6 +891,7 @@ function buildSteps199v2(input) {
       snap({
         title: { vi: `i == size - 1 → ${isRightmost}`, en: `i == size - 1 → ${isRightmost}` },
         hlSet: new Set([curr.id]), codeLines: [18],
+        queueOperation: "check rightmost", popped: curr.val, levelSize: size,
         vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "is rightmost", value: isRightmost }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
         note: isRightmost
           ? { vi: `${curr.val} là node cuối của tầng nên nhìn thấy từ bên phải.`, en: `${curr.val} is the level's last node, so it is visible from the right.` }
@@ -868,6 +903,7 @@ function buildSteps199v2(input) {
         snap({
           title: { vi: `res.append(${curr.val})`, en: `res.append(${curr.val})` },
           hlSet: new Set([curr.id]), codeLines: [19],
+          queueOperation: `save rightmost ${curr.val}`, popped: curr.val, levelSize: size,
           vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
           note: { vi: `res = [${res.join(",")}].`, en: `res = [${res.join(",")}].` },
         });
@@ -879,6 +915,7 @@ function buildSteps199v2(input) {
   snap({
     title: { vi: "queue rỗng → thoát while", en: "queue is empty → exit while" },
     codeLines: [8],
+    queueOperation: "queue empty",
     vars: [{ name: "level", value: level }, { name: "queue", value: "[]" }],
     note: { vi: "Đã xử lý hết các tầng.", en: "All levels have been processed." },
   });
@@ -886,6 +923,7 @@ function buildSteps199v2(input) {
   const finalStep = snapshot(root, {
     title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
     wordSet: new Set(visible), codeLines: [20], codeBlock: 2,
+    queueView: makeQueueView({ queueOperation: "done" }),
     vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }, { name: "answer", value: `[${res.join(",")}]` }],
     note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
   });

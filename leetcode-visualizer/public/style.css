@@ -3433,6 +3433,56 @@ button:disabled {
   min-height: 240px;
 }
 
+.tree-queue-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.35fr) minmax(220px, 0.85fr);
+  gap: 14px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.tree-queue-tree {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.tree-queue-panel {
+  min-width: 0;
+}
+
+.queue-viz-compact {
+  min-height: 100%;
+  padding: 14px;
+  gap: 12px;
+}
+
+.queue-viz-compact .queue-cells {
+  grid-template-columns: repeat(2, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.queue-viz-compact .queue-cell {
+  min-height: 76px;
+}
+
+.queue-viz-compact .queue-status {
+  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .tree-queue-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-viz-compact .queue-cells {
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  }
+}
+
 .tree-svg {
   display: block;
   margin: 0 auto;
