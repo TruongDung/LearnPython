@@ -12,6 +12,7 @@ const {
   buildSteps126,
   buildSteps815,
 } = require("../builders_graph");
+const multiSourceBfsProblems = require("./multi-source-bfs");
 
 /**
  * LeetCode 127: Word Ladder I.
@@ -11631,7 +11632,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -14615,6 +14616,7 @@ module.exports = {
     ],
     builder: buildSteps2492,
   },
+  ...multiSourceBfsProblems,
 };
 
 Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
