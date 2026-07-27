@@ -584,32 +584,119 @@ function buildSteps637(input) {
 
 // ─── 199: Binary Tree Right Side View ───
 function buildSteps199(input) {
-  const root = parseTree(input); const steps = []; const view = [];
+  const root = parseTree(input);
+  const steps = [];
+  const res = [];
+  const visible = new Set();
+  const values = (nodes) => `[${nodes.map((node) => node.val).join(",")}]`;
+
   steps.push(snapshot(root, {
-    title: { vi: "Góc nhìn bên phải", en: "Right side view" },
-    codeLines: [2, 3], vars: [{ name: "view", value: "[]" }],
-    note: { vi: `BFS theo tầng. Nút CUỐI CÙNG (phải nhất) của mỗi tầng chính là nút nhìn thấy từ bên phải.`, en: `BFS by level. The LAST (rightmost) node of each level is what you see from the right side.` },
+    title: { vi: "Bắt đầu rightSideView", en: "Enter rightSideView" },
+    codeLines: [2],
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "res", value: "not initialized" }, { name: "queue", value: "not initialized" }],
+    note: { vi: "Nhận root và bắt đầu hàm.", en: "Receive root and enter the function." },
   }));
-  if (root) {
-    let queue = [root]; const visited = new Set(); let lvl = 0;
-    while (queue.length) {
-      const rightmost = queue[queue.length - 1]; view.push(rightmost.val);
-      queue.forEach((n) => visited.add(n.id));
-      steps.push(snapshot(root, {
-        title: { vi: `Tầng ${lvl}: thấy ${rightmost.val}`, en: `Level ${lvl}: see ${rightmost.val}` },
-        hlSet: new Set([rightmost.id]), wordSet: new Set(visited), codeLines: [4, 5, 6],
-        vars: [{ name: "level", value: lvl }, { name: "nodes", value: `[${queue.map((n) => n.val).join(",")}]` }, { name: "rightmost", value: rightmost.val }, { name: "view", value: `[${view.join(",")}]` }],
-        note: { vi: `Nút phải nhất tầng ${lvl} = ${rightmost.val} → thêm vào view.`, en: `Rightmost node of level ${lvl} = ${rightmost.val} → add to view.` },
-      }));
-      const next = []; for (const n of queue) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } queue = next; lvl++;
-    }
+
+  steps.push(snapshot(root, {
+    title: { vi: root ? "root khác None" : "Cây rỗng → trả []", en: root ? "root is not None" : "Empty tree → return []" },
+    codeLines: [3],
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "res", value: "[]" }, { name: "queue", value: "[]" }],
+    note: root
+      ? { vi: "Điều kiện `not root` là False nên tiếp tục BFS.", en: "The `not root` condition is false, so continue with BFS." }
+      : { vi: "Điều kiện `not root` là True; hàm kết thúc ngay với [].", en: "The `not root` condition is true; return [] immediately." },
+  }));
+
+  if (!root) {
+    steps[steps.length - 1].final = true;
+    return { input, answer: "[]", steps };
   }
+
+  let queue = [root];
+  let level = 0;
+  steps.push(snapshot(root, {
+    title: { vi: "Khởi tạo res và queue", en: "Initialize res and queue" },
+    hlSet: new Set([root.id]), wordSet: new Set(visible), codeLines: [4],
+    vars: [{ name: "res", value: "[]" }, { name: "queue", value: values(queue) }, { name: "nxt", value: "not initialized" }],
+    note: { vi: `res = []; queue = [${root.val}].`, en: `res = []; queue = [${root.val}].` },
+  }));
+
+  while (queue.length) {
+    steps.push(snapshot(root, {
+      title: { vi: `Tầng ${level}: queue còn phần tử`, en: `Level ${level}: queue is not empty` },
+      wordSet: new Set(visible), codeLines: [5],
+      vars: [{ name: "level", value: level }, { name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: values(queue) }, { name: "nxt", value: "not initialized" }],
+      note: { vi: `queue = ${values(queue)} nên tiếp tục vòng while.`, en: `queue = ${values(queue)}, so enter the while loop.` },
+    }));
+
+    const rightmost = queue[queue.length - 1];
+    res.push(rightmost.val);
+    visible.add(rightmost.id);
+    steps.push(snapshot(root, {
+      title: { vi: `Tầng ${level}: nhìn thấy ${rightmost.val}`, en: `Level ${level}: see ${rightmost.val}` },
+      hlSet: new Set([rightmost.id]), wordSet: new Set(visible), codeLines: [6],
+      vars: [{ name: "level", value: level }, { name: "queue[-1]", value: rightmost.val }, { name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: values(queue) }],
+      note: { vi: `Node cuối queue là ${rightmost.val}; thêm nó vào res.`, en: `The last queue node is ${rightmost.val}; append it to res.` },
+    }));
+
+    const nxt = [];
+    steps.push(snapshot(root, {
+      title: { vi: `Tạo nxt cho tầng ${level + 1}`, en: `Create nxt for level ${level + 1}` },
+      wordSet: new Set(visible), codeLines: [7],
+      vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: values(queue) }, { name: "nxt", value: "[]" }],
+      note: { vi: "nxt bắt đầu rỗng và sẽ nhận các node con.", en: "nxt starts empty and will collect child nodes." },
+    }));
+
+    for (const n of queue) {
+      steps.push(snapshot(root, {
+        title: { vi: `Xử lý node ${n.val}`, en: `Process node ${n.val}` },
+        hlSet: new Set([n.id]), wordSet: new Set(visible), codeLines: [8],
+        vars: [{ name: "n", value: n.val }, { name: "queue", value: values(queue) }, { name: "nxt", value: values(nxt) }, { name: "res", value: `[${res.join(",")}]` }],
+        note: { vi: `Lấy node ${n.val} từ queue của tầng hiện tại.`, en: `Take node ${n.val} from the current level queue.` },
+      }));
+
+      if (n.left) nxt.push(n.left);
+      steps.push(snapshot(root, {
+        title: { vi: n.left ? `Thêm con trái ${n.left.val}` : `${n.val} không có con trái`, en: n.left ? `Append left child ${n.left.val}` : `${n.val} has no left child` },
+        hlSet: new Set([n.id]), wordSet: new Set(visible), codeLines: [9],
+        vars: [{ name: "n", value: n.val }, { name: "n.left", value: n.left ? n.left.val : "None" }, { name: "nxt", value: values(nxt) }, { name: "res", value: `[${res.join(",")}]` }],
+        note: n.left ? { vi: `nxt = ${values(nxt)}.`, en: `nxt = ${values(nxt)}.` } : { vi: "Điều kiện False; nxt không đổi.", en: "The condition is false; nxt is unchanged." },
+      }));
+
+      if (n.right) nxt.push(n.right);
+      steps.push(snapshot(root, {
+        title: { vi: n.right ? `Thêm con phải ${n.right.val}` : `${n.val} không có con phải`, en: n.right ? `Append right child ${n.right.val}` : `${n.val} has no right child` },
+        hlSet: new Set([n.id]), wordSet: new Set(visible), codeLines: [10],
+        vars: [{ name: "n", value: n.val }, { name: "n.right", value: n.right ? n.right.val : "None" }, { name: "nxt", value: values(nxt) }, { name: "res", value: `[${res.join(",")}]` }],
+        note: n.right ? { vi: `nxt = ${values(nxt)}.`, en: `nxt = ${values(nxt)}.` } : { vi: "Điều kiện False; nxt không đổi.", en: "The condition is false; nxt is unchanged." },
+      }));
+    }
+
+    queue = nxt;
+    level++;
+    steps.push(snapshot(root, {
+      title: { vi: `Chuyển sang tầng ${level}`, en: `Move to level ${level}` },
+      wordSet: new Set(visible), codeLines: [11],
+      vars: [{ name: "level", value: level }, { name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: values(queue) }, { name: "nxt", value: values(nxt) }],
+      note: { vi: `Gán queue = nxt = ${values(queue)}.`, en: `Assign queue = nxt = ${values(queue)}.` },
+    }));
+  }
+
+  steps.push(snapshot(root, {
+    title: { vi: "queue rỗng → thoát while", en: "queue is empty → exit while" },
+    wordSet: new Set(visible), codeLines: [5],
+    vars: [{ name: "level", value: level }, { name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }],
+    note: { vi: "Điều kiện while là False; BFS hoàn tất.", en: "The while condition is false; BFS is complete." },
+  }));
+
   const fs = snapshot(root, {
-    title: { vi: `Kết quả: [${view.join(",")}]`, en: `Result: [${view.join(",")}]` },
-    vars: [{ name: "answer", value: `[${view.join(",")}]` }],
-    note: { vi: `Right side view = [${view.join(",")}].`, en: `Right side view = [${view.join(",")}].` },
-  }); fs.final = true; steps.push(fs);
-  return { input, answer: `[${view.join(",")}]`, steps };
+    title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
+    wordSet: new Set(visible), codeLines: [12],
+    vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "answer", value: `[${res.join(",")}]` }],
+    note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
+  });
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer: `[${res.join(",")}]`, steps };
 }
 
 // ─── 236: Lowest Common Ancestor of a Binary Tree ───
