@@ -266,27 +266,79 @@ function buildSteps543(input) {
   const root = parseTree(input); const steps = [];
   steps.push(snapshot(root, {
     title: { vi: "Đường kính của cây", en: "Diameter of tree" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "diameter = max(leftDepth + rightDepth)" }],
+    codeLines: [2], vars: [{ name: "root", value: root ? root.val : "None" }],
     note: { vi: `Đường kính = số CẠNH trên đường dài nhất giữa 2 nút bất kỳ. Tại mỗi nút: leftDepth + rightDepth. Lấy max toàn cây.`, en: `Diameter = number of EDGES on the longest path between any two nodes. At each node: leftDepth + rightDepth. Take the max over the whole tree.` },
   }));
   let best = 0, bestId = null;
+  steps.push(snapshot(root, {
+    title: { vi: "Khởi tạo đường kính tốt nhất", en: "Initialize the best diameter" },
+    codeLines: [3],
+    vars: [{ name: "self.best", value: best }],
+    note: { vi: "Chưa xét nút nào nên self.best bắt đầu bằng 0 cạnh.", en: "No node has been processed, so self.best starts at 0 edges." },
+  }));
+  steps.push(snapshot(root, {
+    title: { vi: "Định nghĩa hàm depth", en: "Define the depth function" },
+    codeLines: [4],
+    vars: [{ name: "self.best", value: best }],
+    note: { vi: "depth(node) trả về chiều cao của nhánh dài nhất bắt đầu tại node.", en: "depth(node) returns the height of the longest downward branch from node." },
+  }));
   function depth(node) {
-    if (!node) return 0;
-    const l = depth(node.left), r = depth(node.right);
+    if (!node) {
+      steps.push(snapshot(root, {
+        title: { vi: "depth(None) trả về 0", en: "depth(None) returns 0" },
+        codeLines: [5],
+        vars: [{ name: "node", value: "None" }, { name: "return", value: 0 }, { name: "self.best", value: best }],
+        note: { vi: "Đây là điều kiện dừng của đệ quy; cây rỗng có chiều cao 0.", en: "This is the recursion base case; an empty tree has height 0." },
+      }));
+      return 0;
+    }
+    steps.push(snapshot(root, {
+      title: { vi: `Kiểm tra nút ${node.val}`, en: `Check node ${node.val}` },
+      hlSet: new Set([node.id]), codeLines: [5],
+      vars: [{ name: "node", value: node.val }, { name: "self.best", value: best }],
+      note: { vi: `Nút ${node.val} khác None nên tiếp tục tính độ sâu hai nhánh.`, en: `Node ${node.val} is not None, so compute both subtree depths.` },
+    }));
+    steps.push(snapshot(root, {
+      title: { vi: `Gọi depth bên trái của ${node.val}`, en: `Call the left depth of ${node.val}` },
+      hlSet: new Set([node.id]), codeLines: [6],
+      vars: [{ name: "node", value: node.val }, { name: "left child", value: node.left ? node.left.val : "None" }, { name: "self.best", value: best }],
+      note: { vi: `Dòng 6 gọi đệ quy cho node.left của ${node.val}.`, en: `Line 6 recursively evaluates node.left of ${node.val}.` },
+    }));
+    const l = depth(node.left);
+    steps.push(snapshot(root, {
+      title: { vi: `Nhánh trái của ${node.val} có depth = ${l}`, en: `Left depth of ${node.val} is ${l}` },
+      hlSet: new Set([node.id]), codeLines: [7],
+      vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "right child", value: node.right ? node.right.val : "None" }, { name: "self.best", value: best }],
+      note: { vi: `Đã nhận l = ${l}; dòng 7 tiếp tục gọi đệ quy cho node.right.`, en: `Received l = ${l}; line 7 now recursively evaluates node.right.` },
+    }));
+    const r = depth(node.right);
     const through = l + r;
     if (through > best) { best = through; bestId = node.id; }
     steps.push(snapshot(root, {
       title: { vi: `Nút ${node.val}: qua đây = ${through}`, en: `Node ${node.val}: through = ${through}` },
-      hlSet: new Set([node.id]), codeLines: [4, 5, 6],
+      hlSet: new Set([node.id]), codeLines: [8],
       vars: [{ name: "node", value: node.val }, { name: "leftDepth", value: l }, { name: "rightDepth", value: r }, { name: "path through", value: through }, { name: "best", value: best }],
       note: { vi: `Đường đi qua ${node.val} = ${l} + ${r} = ${through} cạnh. best = ${best}.`, en: `Path through ${node.val} = ${l} + ${r} = ${through} edges. best = ${best}.` },
     }));
-    return 1 + Math.max(l, r);
+    const height = 1 + Math.max(l, r);
+    steps.push(snapshot(root, {
+      title: { vi: `depth(${node.val}) trả về ${height}`, en: `depth(${node.val}) returns ${height}` },
+      hlSet: new Set([node.id]), codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: r }, { name: "return", value: height }, { name: "self.best", value: best }],
+      note: { vi: `Chiều cao trả về = 1 + max(${l}, ${r}) = ${height}.`, en: `Returned height = 1 + max(${l}, ${r}) = ${height}.` },
+    }));
+    return height;
   }
+  steps.push(snapshot(root, {
+    title: { vi: "Bắt đầu DFS từ root", en: "Start DFS from root" },
+    codeLines: [10],
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "self.best", value: best }],
+    note: { vi: "Gọi depth(root) để duyệt cây theo thứ tự hậu tự.", en: "Call depth(root) to traverse the tree in postorder." },
+  }));
   depth(root);
   const fs = snapshot(root, {
     title: { vi: `Đường kính = ${best}`, en: `Diameter = ${best}` },
-    wordSet: bestId !== null ? new Set([bestId]) : undefined, vars: [{ name: "answer", value: best }],
+    wordSet: bestId !== null ? new Set([bestId]) : undefined, codeLines: [11], vars: [{ name: "answer", value: best }],
     note: { vi: `Đường kính lớn nhất = ${best} cạnh.`, en: `Maximum diameter = ${best} edges.` },
   }); fs.final = true; steps.push(fs);
   return { input, answer: best, steps };
