@@ -658,6 +658,260 @@ function buildSteps695(input) {
 }
 
 /**
+ * LeetCode 542: 01 Matrix.
+ * Multi-source BFS starts from every zero and assigns each one its shortest
+ * distance to a zero. Every trace step maps to exactly one displayed line.
+ */
+function buildSteps542(input) {
+  const parsed = parseIslandGrid(input);
+  const original = parsed.map((row) => row.map(Number));
+  const steps = [];
+  const invalid = !parsed.length || !parsed[0].length ||
+    !parsed.some((row) => row.includes("0")) || parsed.some((row) =>
+      row.length !== parsed[0].length || row.some((value) => value !== "0" && value !== "1")
+    );
+
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true,
+      codeLines: [5],
+      vars: [{ name: "answer", value: "invalid grid" }],
+      note: {
+        vi: "Matrix phải là ma trận chữ nhật chỉ gồm 0 và 1, đồng thời có ít nhất một ô 0.",
+        en: "The matrix must be rectangular, contain only 0 and 1, and include at least one zero.",
+      },
+    });
+    return { original, answer: [], steps };
+  }
+
+  const rows = parsed.length;
+  const cols = parsed[0].length;
+  let distances = null;
+  let queue = null;
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const key = (row, col) => `${row},${col}`;
+
+  function queueLabel() {
+    if (queue === null) return "not initialized";
+    return `[${queue.map(([row, col]) => `(${row},${col})`).join(", ")}]`;
+  }
+
+  function makeCells(current = null, discovered = null) {
+    const queued = new Set((queue || []).map(([row, col]) => key(row, col)));
+    return parsed.map((matrixRow, row) => matrixRow.map((value, col) => {
+      const distance = distances === null ? null : distances[row][col];
+      let label = distance === null ? value : distance === -1 ? "∞" : String(distance);
+      let cls = distance === null || distance === -1 ? "empty" : "visited";
+      if (queued.has(key(row, col))) cls = "queued";
+      if (discovered && discovered[0] === row && discovered[1] === col) cls = "path";
+      if (current && current[0] === row && current[1] === col) cls = "current";
+      return { label, cls };
+    }));
+  }
+
+  function pushStep({ codeLine, title, note, current = null, discovered = null, vars = [], final = false }) {
+    const debugVars = [...vars];
+    if (!debugVars.some((item) => item.name === "queue")) {
+      debugVars.push({ name: "queue", value: queueLabel() });
+    }
+    steps.push({
+      title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(current, discovered) },
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars: debugVars,
+      note,
+    });
+  }
+
+  pushStep({
+    codeLine: 5,
+    title: { vi: "Bắt đầu updateMatrix", en: "Enter updateMatrix" },
+    vars: [{ name: "matrix size", value: `${rows}×${cols}` }],
+    note: { vi: "Bắt đầu hàm với matrix đầu vào.", en: "Enter the function with the input matrix." },
+  });
+
+  pushStep({
+    codeLine: 6,
+    title: { vi: `rows=${rows}, cols=${cols}`, en: `rows=${rows}, cols=${cols}` },
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: { vi: "Lưu số hàng và số cột.", en: "Store the row and column counts." },
+  });
+
+  distances = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  pushStep({
+    codeLine: 7,
+    title: { vi: "Khởi tạo distances = -1", en: "Initialize distances to -1" },
+    vars: [{ name: "unvisited", value: "-1 (shown as ∞)" }],
+    note: {
+      vi: "-1 nghĩa là ô chưa có khoảng cách; grid hiển thị ký hiệu ∞ cho dễ nhìn.",
+      en: "-1 means the cell has no distance yet; the grid displays it as ∞.",
+    },
+  });
+
+  queue = [];
+  pushStep({
+    codeLine: 8,
+    title: { vi: "queue = deque()", en: "queue = deque()" },
+    note: { vi: "Tạo queue rỗng cho multi-source BFS.", en: "Create an empty queue for multi-source BFS." },
+  });
+
+  for (let row = 0; row < rows; row++) {
+    pushStep({
+      codeLine: 9,
+      title: { vi: `Quét row = ${row}`, en: `Scan row = ${row}` },
+      vars: [{ name: "row", value: row }],
+      note: { vi: `Bắt đầu quét hàng ${row}.`, en: `Begin scanning row ${row}.` },
+    });
+
+    for (let col = 0; col < cols; col++) {
+      pushStep({
+        codeLine: 10,
+        title: { vi: `Quét ô (${row},${col})`, en: `Scan cell (${row},${col})` },
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "mat[row][col]", value: parsed[row][col] }],
+        note: { vi: `Xét ô (${row},${col}).`, en: `Inspect cell (${row},${col}).` },
+      });
+
+      const isZero = parsed[row][col] === "0";
+      pushStep({
+        codeLine: 11,
+        title: { vi: `mat[${row}][${col}] == 0 → ${isZero}`, en: `mat[${row}][${col}] == 0 → ${isZero}` },
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "is zero?", value: isZero }],
+        note: isZero
+          ? { vi: "Đây là một nguồn BFS có khoảng cách bằng 0.", en: "This is a BFS source with distance zero." }
+          : { vi: "Ô 1 chưa biết khoảng cách; giữ nguyên -1.", en: "This 1-cell has no known distance yet; leave it at -1." },
+      });
+
+      if (!isZero) continue;
+      distances[row][col] = 0;
+      pushStep({
+        codeLine: 12,
+        title: { vi: `distances[${row}][${col}] = 0`, en: `distances[${row}][${col}] = 0` },
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }],
+        note: { vi: "Khoảng cách từ ô 0 đến chính nó là 0.", en: "A zero's distance to itself is 0." },
+      });
+
+      queue.push([row, col]);
+      pushStep({
+        codeLine: 13,
+        title: { vi: `queue.append((${row},${col}))`, en: `queue.append((${row},${col}))` },
+        current: [row, col],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }],
+        note: { vi: "Thêm nguồn 0 vào queue.", en: "Append this zero source to the queue." },
+      });
+    }
+  }
+
+  pushStep({
+    codeLine: 14,
+    title: { vi: "Khai báo 4 hướng", en: "Define four directions" },
+    vars: [{ name: "directions", value: "down, up, right, left" }],
+    note: { vi: "BFS di chuyển theo bốn hướng.", en: "BFS moves in four directions." },
+  });
+
+  while (queue.length) {
+    pushStep({
+      codeLine: 15,
+      title: { vi: "while queue → True", en: "while queue → True" },
+      vars: [{ name: "condition", value: true }],
+      note: { vi: "Queue còn ô cần mở rộng.", en: "The queue still has a cell to expand." },
+    });
+
+    const [row, col] = queue.shift();
+    pushStep({
+      codeLine: 16,
+      title: { vi: `popleft → (${row},${col})`, en: `popleft → (${row},${col})` },
+      current: [row, col],
+      vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "distance", value: distances[row][col] }],
+      note: { vi: `Lấy ô (${row},${col}) khỏi đầu queue.`, en: `Remove cell (${row},${col}) from the queue front.` },
+    });
+
+    for (const [deltaRow, deltaCol] of directions) {
+      pushStep({
+        codeLine: 17,
+        title: { vi: `Thử hướng (${deltaRow},${deltaCol})`, en: `Try direction (${deltaRow},${deltaCol})` },
+        current: [row, col],
+        vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }],
+        note: { vi: "Xét một ô lân cận.", en: "Inspect one neighboring cell." },
+      });
+
+      const nextRow = row + deltaRow;
+      const nextCol = col + deltaCol;
+      pushStep({
+        codeLine: 18,
+        title: { vi: `next = (${nextRow},${nextCol})`, en: `next = (${nextRow},${nextCol})` },
+        current: [row, col],
+        vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+        note: { vi: "Tính tọa độ ô kế tiếp.", en: "Compute the neighboring coordinates." },
+      });
+
+      const inBounds = nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols;
+      const unvisited = inBounds && distances[nextRow][nextCol] === -1;
+      pushStep({
+        codeLine: 19,
+        title: { vi: `Ô (${nextRow},${nextCol}) hợp lệ và chưa thăm → ${unvisited}`, en: `Cell (${nextRow},${nextCol}) is valid and unvisited → ${unvisited}` },
+        current: inBounds ? [nextRow, nextCol] : [row, col],
+        vars: [{ name: "in bounds?", value: inBounds }, { name: "unvisited?", value: unvisited }],
+        note: unvisited
+          ? { vi: "Đây là lần đầu BFS tới ô này, nên khoảng cách tìm được là ngắn nhất.", en: "This is the first BFS visit, so the discovered distance is shortest." }
+          : { vi: "Ô ngoài biên hoặc đã có khoảng cách; bỏ qua.", en: "The cell is out of bounds or already has a distance; skip it." },
+      });
+      if (!unvisited) continue;
+
+      distances[nextRow][nextCol] = distances[row][col] + 1;
+      pushStep({
+        codeLine: 20,
+        title: { vi: `distance(${nextRow},${nextCol}) = ${distances[nextRow][nextCol]}`, en: `distance(${nextRow},${nextCol}) = ${distances[nextRow][nextCol]}` },
+        current: [nextRow, nextCol],
+        discovered: [nextRow, nextCol],
+        vars: [
+          { name: "distances[row][col]", value: distances[row][col] },
+          { name: "distances[next_row][next_col]", value: distances[nextRow][nextCol] },
+        ],
+        note: { vi: "Khoảng cách ô mới bằng khoảng cách ô hiện tại cộng 1.", en: "The new distance is the current cell's distance plus 1." },
+      });
+
+      queue.push([nextRow, nextCol]);
+      pushStep({
+        codeLine: 21,
+        title: { vi: `queue.append((${nextRow},${nextCol}))`, en: `queue.append((${nextRow},${nextCol}))` },
+        current: [nextRow, nextCol],
+        discovered: [nextRow, nextCol],
+        vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+        note: { vi: "Thêm ô vừa khám phá để tiếp tục mở rộng BFS.", en: "Append the discovered cell so BFS can expand from it." },
+      });
+    }
+  }
+
+  pushStep({
+    codeLine: 15,
+    title: { vi: "while queue → False", en: "while queue → False" },
+    vars: [{ name: "condition", value: false }],
+    note: { vi: "Queue rỗng; mọi ô đã có khoảng cách gần nhất.", en: "The queue is empty; every cell has its nearest-zero distance." },
+  });
+
+  const answer = distances.map((row) => [...row]);
+  pushStep({
+    codeLine: 22,
+    title: { vi: "return distances", en: "return distances" },
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(answer) }],
+    note: { vi: "Trả về ma trận khoảng cách hoàn chỉnh.", en: "Return the completed distance matrix." },
+  });
+
+  return { original, answer, steps };
+}
+
+/**
  * LeetCode 994: Rotting Oranges.
  * Multi-source BFS: all initially rotten oranges spread rot at the same time.
  */
@@ -11377,7 +11631,7 @@ module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    order: [200, 994, 542, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -11449,6 +11703,76 @@ module.exports = {
       "        return count",
     ],
     builder: buildSteps200,
+  },
+  542: {
+    id: 542,
+    difficulty: "medium",
+    slug: "01-matrix",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "01 Matrix", en: "01 Matrix" },
+    titleVi: { vi: "Khoảng cách đến số 0 gần nhất", en: "Distance to the nearest zero" },
+    statement: {
+      vi:
+        "Cho matrix rows×cols chỉ gồm 0 và 1, trong đó có ít nhất một ô 0. Với mỗi ô, hãy trả về khoảng cách đến ô 0 gần nhất. " +
+        "Khoảng cách giữa hai ô kề cạnh là 1. Nhập các hàng cách nhau bởi '|'.",
+      en:
+        "Given a rows×cols binary matrix containing at least one zero, return the distance from every cell to its nearest zero. " +
+        "The distance between edge-adjacent cells is 1. Enter rows separated by '|'.",
+    },
+    defaultInput: "0,0,0|0,1,0|1,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Matrix 0/1 (hàng cách '|')", en: "0/1 matrix (rows separated by '|')" },
+    approach: [
+      {
+        vi: "Khởi tạo distances = -1. Đưa tất cả ô 0 vào queue với distance = 0.",
+        en: "Initialize distances to -1. Put every zero in the queue with distance 0.",
+      },
+      {
+        vi: "Chạy một lần multi-source BFS từ toàn bộ ô 0 cùng lúc.",
+        en: "Run one multi-source BFS from all zero cells simultaneously.",
+      },
+      {
+        vi: "Lần đầu tới một ô chưa thăm, gán distance của nó bằng distance ô hiện tại + 1 rồi enqueue.",
+        en: "On the first visit to a cell, assign current distance + 1 and enqueue it.",
+      },
+      {
+        vi: "BFS thăm theo khoảng cách tăng dần, nên lần đầu tìm thấy một ô chính là khoảng cách ngắn nhất tới số 0.",
+        en: "BFS visits in increasing distance order, so a cell's first discovered distance is its shortest distance to zero.",
+      },
+    ],
+    complexity: {
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
+      note: {
+        vi: "Mỗi ô được enqueue tối đa một lần. Matrix kết quả và queue dùng O(rows·cols) bộ nhớ.",
+        en: "Each cell is enqueued at most once. The result matrix and queue use O(rows·cols) memory.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def updateMatrix(self, mat: List[List[int]]) -> List[List[int]]:",
+      "        rows, cols = len(mat), len(mat[0])",
+      "        distances = [[-1 for col in range(cols)] for row in range(rows)]",
+      "        queue = deque()",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if mat[row][col] == 0:",
+      "                    distances[row][col] = 0",
+      "                    queue.append((row, col))",
+      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "        while queue:",
+      "            row, col = queue.popleft()",
+      "            for delta_row, delta_col in directions:",
+      "                next_row, next_col = row + delta_row, col + delta_col",
+      "                if 0 <= next_row < rows and 0 <= next_col < cols and distances[next_row][next_col] == -1:",
+      "                    distances[next_row][next_col] = distances[row][col] + 1",
+      "                    queue.append((next_row, next_col))",
+      "        return distances",
+    ],
+    builder: buildSteps542,
   },
   332: {
     id: 332,
