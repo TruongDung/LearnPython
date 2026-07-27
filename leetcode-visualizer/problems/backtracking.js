@@ -1,6 +1,171 @@
 // Auto-generated: do not edit headers manually.
 // Module of LeetCode Visualizer — category-specific builders and problem entries.
 
+// Add a persistent decision tree to a backtracking trace without replacing its
+// existing board/array/grid visualization. Each choice creates a child, a
+// backtrack moves the active pointer to the parent, valid answers stay green,
+// and rejected/pruned branches stay red. Problem 77 already builds its own
+// decision tree, so the decorator is used by the other ten problems.
+function addBacktrackingDecisionTree(result, problemId) {
+  if (!result || !Array.isArray(result.steps) || problemId === 77) return result;
+
+  const NODE_LIMIT = 140;
+  let nextId = 1;
+  let truncated = false;
+  const root = {
+    id: 0, label: "∅", parentId: null, parent: null, depth: 0,
+    children: [], childMap: new Map(), complete: false, pruned: false,
+  };
+  let active = root;
+  const depthNodes = [root];
+
+  const titleEn = (step) => String((step.title && (step.title.en || step.title.vi)) || "");
+  const varMap = (step) => new Map((step.vars || []).map((item) => [String(item.name).toLowerCase(), item.value]));
+  const getVar = (vars, ...names) => {
+    for (const name of names) {
+      const exact = vars.get(name.toLowerCase());
+      if (exact !== undefined) return exact;
+    }
+    return undefined;
+  };
+  const compact = (value) => {
+    let text = String(value === undefined || value === null ? "?" : value).trim();
+    text = text.replace(/^['"]|['"]$/g, "");
+    const quoted = text.match(/['"]([^'"]+)['"]/);
+    if (quoted && /lowercase|uppercase|letter/i.test(text)) text = quoted[1];
+    return text.length > 14 ? `${text.slice(0, 12)}…` : text;
+  };
+  const choiceFrom = (step, vars) => {
+    if (problemId === 51 || problemId === 52) {
+      const row = getVar(vars, "row");
+      const col = getVar(vars, "col");
+      if (row !== undefined && col !== undefined) return `(${row},${col})`;
+    }
+    if (problemId === 980) return compact(getVar(vars, "at", "backtrack"));
+    if (problemId === 17) return compact(getVar(vars, "letter", "removed"));
+    if (problemId === 784) return compact(getVar(vars, "branch", "char"));
+    return compact(getVar(vars, "nums[i]", "candidate", "sorted[i]", "i (pick)", "popped"));
+  };
+  const childKey = (choice, vars) => {
+    const index = getVar(vars, "i", "idx", "row", "col");
+    return `${choice}|${index === undefined ? "" : index}`;
+  };
+  const makeChild = (parent, choice, vars) => {
+    const label = compact(choice);
+    const key = childKey(label, vars);
+    if (parent.childMap.has(key)) return parent.childMap.get(key);
+    if (nextId >= NODE_LIMIT) {
+      truncated = true;
+      return parent;
+    }
+    const node = {
+      id: nextId++, label, parentId: parent.id, parent, depth: parent.depth + 1,
+      children: [], childMap: new Map(), complete: false, pruned: false,
+    };
+    parent.children.push(node);
+    parent.childMap.set(key, node);
+    return node;
+  };
+  const ancestorAtDepth = (depth) => {
+    const wanted = Math.max(0, Number(depth) || 0);
+    if (depthNodes[wanted]) return depthNodes[wanted];
+    let node = active;
+    while (node.parent && node.depth > wanted) node = node.parent;
+    return node.depth === wanted ? node : root;
+  };
+  const snapshotNodes = (highlightId) => {
+    const nodes = [];
+    let xCursor = 0;
+    function layout(node) {
+      let x;
+      if (node.children.length === 0) {
+        x = xCursor++;
+      } else {
+        const childXs = node.children.map(layout);
+        x = (childXs[0] + childXs[childXs.length - 1]) / 2;
+      }
+      nodes.push({
+        id: node.id,
+        label: node.label,
+        x,
+        y: node.depth,
+        parentId: node.parentId,
+        hl: node.id === highlightId,
+        isWord: node.complete,
+        isPruned: node.pruned,
+      });
+      return x;
+    }
+    layout(root);
+    return nodes;
+  };
+
+  for (const step of result.steps) {
+    const title = titleEn(step);
+    const vars = varMap(step);
+    const isFinal = Boolean(step.final) || /^Result\b/i.test(title);
+    const isBacktrack = /^(Backtrack:|Backtrack from)|current\.pop\(\)/i.test(title);
+    const isComplete = /^✓|^Save\b|^Permutation\b|^Solution #|Found valid path/i.test(title);
+    const isPruned = /not safe|blocked|^Skip\b|too early|Overshoot|invalid/i.test(title);
+    const isChoice = /place queen|✓ place|^Pick\b|^Add\b|current\.append|try '.+'|is digit → keep|Enter cell/i.test(title);
+
+    let highlight = active;
+    let activeAfter = active;
+
+    if (isBacktrack) {
+      if (active.parent) active = active.parent;
+      highlight = active;
+      activeAfter = active;
+    } else if (isPruned) {
+      if (/Overshoot/i.test(title)) {
+        active.pruned = true;
+        highlight = active;
+      } else {
+        let parent = active;
+        if (problemId === 51 || problemId === 52) parent = ancestorAtDepth(getVar(vars, "row"));
+        const rejected = makeChild(parent, choiceFrom(step, vars), vars);
+        rejected.pruned = true;
+        highlight = rejected;
+        activeAfter = parent;
+      }
+    } else if (isComplete) {
+      if (problemId === 980) {
+        const endpoint = makeChild(active, choiceFrom(step, vars), vars);
+        endpoint.complete = /Found valid path/i.test(title);
+        endpoint.pruned = !endpoint.complete;
+        highlight = endpoint;
+        activeAfter = active;
+      } else {
+        active.complete = true;
+        highlight = active;
+      }
+    } else if (isChoice) {
+      let parent = active;
+      if (problemId === 784) parent = ancestorAtDepth(getVar(vars, "idx"));
+      if (problemId === 980) {
+        const pathLength = Number(getVar(vars, "path length"));
+        if (Number.isFinite(pathLength)) parent = ancestorAtDepth(pathLength - 1);
+      }
+      active = makeChild(parent, choiceFrom(step, vars), vars);
+      highlight = active;
+      activeAfter = active;
+      depthNodes[active.depth] = active;
+      depthNodes.length = active.depth + 1;
+    } else if (isFinal) {
+      highlight = null;
+    }
+
+    step.decisionTree = {
+      nodes: snapshotNodes(highlight ? highlight.id : -1),
+      showLevels: true,
+      truncated,
+    };
+    active = activeAfter;
+  }
+
+  return result;
+}
+
 /**
  * Generate steps for LeetCode 51: N-Queens.
  * Backtracking: place queens row by row, checking safety at each position.
@@ -420,7 +585,7 @@ function buildSteps77(input, params) {
     steps.push({
       title: opts.title,
       arr: [],
-      tree: { nodes: snapshotTree(opts.hlId !== undefined ? opts.hlId : currentNode.id) },
+      tree: { nodes: snapshotTree(opts.hlId !== undefined ? opts.hlId : currentNode.id), decisionTree: true },
       highlight: [],
       mark: [],
       codeLines: opts.codeLines || [],
@@ -1952,7 +2117,7 @@ module.exports = {
       "        dfs(start[0], start[1], empty)",
       "        return self.ans",
     ],
-    builder: buildSteps980,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps980(input, params), 980),
   },
   51: {
     id: 51,
@@ -2012,7 +2177,7 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: buildSteps51,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps51(input, params), 51),
   },
   52: {
     id: 52,
@@ -2068,7 +2233,7 @@ module.exports = {
       "        backtrack(0)",
       "        return count",
     ],
-    builder: buildSteps52,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps52(input, params), 52),
   },
   46: {
     id: 46,
@@ -2118,7 +2283,7 @@ module.exports = {
       "        backtrack()",
       "        return result",
     ],
-    builder: buildSteps46,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps46(input, params), 46),
   },
   77: {
     id: 77,
@@ -2225,7 +2390,7 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: buildSteps78,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps78(input, params), 78),
   },
   90: {
     id: 90,
@@ -2278,7 +2443,7 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: buildSteps90,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps90(input, params), 90),
   },
   39: {
     id: 39,
@@ -2337,7 +2502,7 @@ module.exports = {
       "        backtrack(0, target)",
       "        return result",
     ],
-    builder: buildSteps39,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps39(input, params), 39),
   },
   40: {
     id: 40,
@@ -2388,7 +2553,7 @@ module.exports = {
       "        backtrack(0, target)",
       "        return result",
     ],
-    builder: buildSteps40,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps40(input, params), 40),
   },
   17: {
     id: 17,
@@ -2437,7 +2602,7 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: buildSteps17,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps17(input, params), 17),
   },
   784: {
     id: 784,
@@ -2485,6 +2650,6 @@ module.exports = {
       "        backtrack(0)",
       "        return result",
     ],
-    builder: buildSteps784,
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps784(input, params), 784),
   },
 };

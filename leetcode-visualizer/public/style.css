@@ -3467,6 +3467,59 @@ button:disabled {
   min-height: 240px;
 }
 
+.decision-tree-view {
+  margin-top: 12px;
+  padding: 12px 14px 16px;
+  max-height: 420px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.decision-tree-header {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.decision-tree-header strong {
+  color: #cbd5e1;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.decision-tree-header small {
+  color: #f59e0b;
+}
+
+.decision-tree-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.decision-tree-legend i {
+  width: 9px;
+  height: 9px;
+  margin-left: 5px;
+  border: 2px solid #64748b;
+  border-radius: 50%;
+}
+
+.decision-tree-legend i.dt-current { border-color: #f59e0b; }
+.decision-tree-legend i.dt-answer { border-color: #10b981; }
+.decision-tree-legend i.dt-pruned { border-color: #ef4444; border-style: dashed; }
+
 .tree-queue-layout {
   display: grid;
   grid-template-columns: minmax(320px, 1.35fr) minmax(220px, 0.85fr);
@@ -3564,6 +3617,17 @@ button:disabled {
 
 .tree-node.hl text {
   fill: #fbbf24;
+}
+
+.tree-node.pruned circle,
+.tree-node.pruned rect {
+  fill: rgba(239, 68, 68, 0.1);
+  stroke: #ef4444;
+  stroke-dasharray: 4 3;
+}
+
+.tree-node.pruned text {
+  fill: #fca5a5;
 }
 
 .tree-sub {
@@ -5994,6 +6058,15 @@ button:disabled {
   border-color: #e2e8f0;
 }
 
+[data-theme="light"] .decision-tree-view {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .decision-tree-header strong {
+  color: #334155;
+}
+
 [data-theme="light"] .tree-edge {
   stroke: #cbd5e1;
 }
@@ -6022,6 +6095,16 @@ button:disabled {
 
 [data-theme="light"] .tree-node.hl text {
   fill: #b45309;
+}
+
+[data-theme="light"] .tree-node.pruned circle,
+[data-theme="light"] .tree-node.pruned rect {
+  fill: #fef2f2;
+  stroke: #dc2626;
+}
+
+[data-theme="light"] .tree-node.pruned text {
+  fill: #b91c1c;
 }
 
 [data-theme="light"] .tree-sub {

@@ -1629,7 +1629,7 @@ function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
-function renderTree(step) {
+function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
@@ -1686,7 +1686,7 @@ function renderTree(step) {
     const c = pos[n.id];
     const nodeHw = hw[n.id];
     const isPill = nodeHw > r + 0.5;
-    const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "");
+    const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "") + (n.isPruned ? " pruned" : "");
     circles += `<g class="${cls}">`;
     if (isPill) {
       if (n.isWord) circles += `<rect x="${c.x - nodeHw - 4}" y="${c.y - r - 4}" width="${(nodeHw + 4) * 2}" height="${(r + 4) * 2}" rx="${r + 4}" class="tree-ring" />`;
@@ -1738,12 +1738,27 @@ function renderTree(step) {
     levelLabels +
     `</svg>`;
 
-  $("treeView").innerHTML = step.queueView
+  const decisionHeader = step.tree.decisionTree || targetId === "decisionTreeView"
+    ? `<div class="decision-tree-header">
+        <strong>${lang === "vi" ? "Cây quyết định" : "Decision tree"}</strong>
+        <span class="decision-tree-legend">
+          <i class="dt-current"></i>${lang === "vi" ? "đang chạy" : "current"}
+          <i class="dt-answer"></i>${lang === "vi" ? "đáp án" : "answer"}
+          <i class="dt-pruned"></i>${lang === "vi" ? "prune / không hợp lệ" : "pruned / invalid"}
+        </span>
+        ${step.tree.truncated ? `<small>${lang === "vi" ? "Hiển thị 140 node đầu" : "Showing first 140 nodes"}</small>` : ""}
+      </div>`
+    : "";
+  $(targetId).innerHTML = decisionHeader + (step.queueView
     ? `<div class="tree-queue-layout">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
       </div>`
-    : treeHtml;
+    : treeHtml);
+}
+
+function renderDecisionTree(step) {
+  renderTree({ tree: step.decisionTree }, "decisionTreeView");
 }
 
 // ---- Graph renderer (directed weighted graph) ----
@@ -3897,6 +3912,16 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("bars").classList.remove("hidden");
     renderBars(step);
+  }
+
+  // Backtracking problems keep their original board/array/grid above and show
+  // the persistent decision tree in parallel underneath. Problem 77 already
+  // uses the main tree view as its decision tree, so it does not need this pane.
+  if (step.decisionTree && !step.__live) {
+    $("decisionTreeView").classList.remove("hidden");
+    renderDecisionTree(step);
+  } else {
+    $("decisionTreeView").classList.add("hidden");
   }
 
   // navigation buttons
