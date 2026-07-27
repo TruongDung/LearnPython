@@ -699,6 +699,201 @@ function buildSteps199(input) {
   return { input, answer: `[${res.join(",")}]`, steps };
 }
 
+// ─── 199 Approach 2: deque + fixed level size, fully line-by-line ───
+function buildSteps199v2(input) {
+  const root = parseTree(input);
+  const steps = [];
+  const res = [];
+  const visible = new Set();
+  let queue = null;
+  const formatNodes = (nodes) => nodes === null ? "not initialized" : `[${nodes.map((node) => node.val).join(",")}]`;
+
+  function snap(opts) {
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "res")) vars.push({ name: "res", value: `[${res.join(",")}]` });
+    if (!vars.some((item) => item.name === "queue")) vars.push({ name: "queue", value: formatNodes(queue) });
+    steps.push(snapshot(root, Object.assign({}, opts, {
+      vars,
+      codeBlock: 2,
+      wordSet: opts.wordSet || new Set(visible),
+    })));
+  }
+
+  snap({
+    title: { vi: "Bắt đầu rightSideView", en: "Enter rightSideView" },
+    codeLines: [2],
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    note: { vi: "Bắt đầu cách 2: deque và số node cố định của từng tầng.", en: "Start approach 2: deque with a fixed node count for each level." },
+  });
+
+  snap({
+    title: { vi: "res = []", en: "res = []" },
+    codeLines: [3],
+    note: { vi: "res sẽ lưu node ngoài cùng bên phải của mỗi tầng.", en: "res will store the rightmost node from each level." },
+  });
+
+  snap({
+    title: { vi: root ? "root is None → False" : "root is None → True", en: root ? "root is None → False" : "root is None → True" },
+    codeLines: [4],
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    note: root
+      ? { vi: "Cây không rỗng nên tiếp tục tạo queue.", en: "The tree is not empty, so continue to create the queue." }
+      : { vi: "Cây rỗng nên thực hiện return sớm.", en: "The tree is empty, so take the early return." },
+  });
+
+  if (!root) {
+    const emptyStep = snapshot(root, {
+      title: { vi: "return res → []", en: "return res → []" },
+      codeLines: [5], codeBlock: 2,
+      vars: [{ name: "res", value: "[]" }, { name: "queue", value: "not initialized" }, { name: "answer", value: "[]" }],
+      note: { vi: "Trả về [] ngay vì root là None.", en: "Return [] immediately because root is None." },
+    });
+    emptyStep.final = true;
+    steps.push(emptyStep);
+    return { input, answer: "[]", steps };
+  }
+
+  queue = [];
+  snap({
+    title: { vi: "Tạo collections.deque()", en: "Create collections.deque()" },
+    codeLines: [6],
+    vars: [{ name: "queue", value: "[]" }],
+    note: { vi: "Tạo deque rỗng để BFS.", en: "Create an empty deque for BFS." },
+  });
+
+  queue.push(root);
+  snap({
+    title: { vi: `queue.append(root) → [${root.val}]`, en: `queue.append(root) → [${root.val}]` },
+    hlSet: new Set([root.id]), codeLines: [7],
+    note: { vi: `Đưa root ${root.val} vào queue.`, en: `Append root ${root.val} to the queue.` },
+  });
+
+  let level = 0;
+  while (queue.length) {
+    snap({
+      title: { vi: `Tầng ${level}: queue không rỗng`, en: `Level ${level}: queue is not empty` },
+      hlSet: new Set(queue.map((node) => node.id)), codeLines: [8],
+      vars: [{ name: "level", value: level }],
+      note: { vi: `Bắt đầu xử lý tầng ${level}.`, en: `Begin processing level ${level}.` },
+    });
+
+    const size = queue.length;
+    snap({
+      title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
+      hlSet: new Set(queue.slice(0, size).map((node) => node.id)), codeLines: [9],
+      vars: [{ name: "level", value: level }, { name: "size", value: size }],
+      note: { vi: `Chốt ${size} node thuộc tầng hiện tại trước khi thêm node con.`, en: `Lock in the ${size} nodes belonging to this level before appending children.` },
+    });
+
+    const currentLevelList = [];
+    snap({
+      title: { vi: "current_level_list = []", en: "current_level_list = []" },
+      codeLines: [10],
+      vars: [{ name: "level", value: level }, { name: "size", value: size }, { name: "current_level_list", value: "[]" }],
+      note: { vi: "Danh sách này ghi lại toàn bộ giá trị của tầng hiện tại.", en: "This list records every value in the current level." },
+    });
+
+    for (let i = 0; i < size; i++) {
+      snap({
+        title: { vi: `for i=${i} trong range(${size})`, en: `for i=${i} in range(${size})` },
+        codeLines: [11],
+        vars: [{ name: "level", value: level }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: { vi: `Xử lý node thứ ${i + 1}/${size} của tầng ${level}.`, en: `Process node ${i + 1}/${size} from level ${level}.` },
+      });
+
+      const curr = queue.shift();
+      snap({
+        title: { vi: `curr = queue.popleft() → ${curr.val}`, en: `curr = queue.popleft() → ${curr.val}` },
+        hlSet: new Set([curr.id]), codeLines: [12],
+        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "queue", value: formatNodes(queue) }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: { vi: `Lấy ${curr.val} ở đầu deque; queue còn ${formatNodes(queue)}.`, en: `Pop ${curr.val} from the deque front; remaining queue is ${formatNodes(queue)}.` },
+      });
+
+      currentLevelList.push(curr.val);
+      snap({
+        title: { vi: `Thêm ${curr.val} vào current_level_list`, en: `Append ${curr.val} to current_level_list` },
+        hlSet: new Set([curr.id]), codeLines: [13],
+        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: { vi: `current_level_list = [${currentLevelList.join(",")}].`, en: `current_level_list = [${currentLevelList.join(",")}].` },
+      });
+
+      snap({
+        title: { vi: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None", en: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None" },
+        hlSet: new Set([curr.id]), codeLines: [14],
+        vars: [{ name: "curr", value: curr.val }, { name: "curr.left", value: curr.left ? curr.left.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: curr.left
+          ? { vi: "Điều kiện True nên sẽ append con trái.", en: "The condition is true, so append the left child." }
+          : { vi: "Điều kiện False; queue không đổi.", en: "The condition is false; queue is unchanged." },
+      });
+      if (curr.left) {
+        queue.push(curr.left);
+        snap({
+          title: { vi: `queue.append(${curr.left.val})`, en: `queue.append(${curr.left.val})` },
+          hlSet: new Set([curr.left.id]), codeLines: [15],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          note: { vi: `Thêm con trái; queue = ${formatNodes(queue)}.`, en: `Append the left child; queue = ${formatNodes(queue)}.` },
+        });
+      }
+
+      snap({
+        title: { vi: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None", en: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None" },
+        hlSet: new Set([curr.id]), codeLines: [16],
+        vars: [{ name: "curr", value: curr.val }, { name: "curr.right", value: curr.right ? curr.right.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: curr.right
+          ? { vi: "Điều kiện True nên sẽ append con phải.", en: "The condition is true, so append the right child." }
+          : { vi: "Điều kiện False; queue không đổi.", en: "The condition is false; queue is unchanged." },
+      });
+      if (curr.right) {
+        queue.push(curr.right);
+        snap({
+          title: { vi: `queue.append(${curr.right.val})`, en: `queue.append(${curr.right.val})` },
+          hlSet: new Set([curr.right.id]), codeLines: [17],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          note: { vi: `Thêm con phải; queue = ${formatNodes(queue)}.`, en: `Append the right child; queue = ${formatNodes(queue)}.` },
+        });
+      }
+
+      const isRightmost = i === size - 1;
+      snap({
+        title: { vi: `i == size - 1 → ${isRightmost}`, en: `i == size - 1 → ${isRightmost}` },
+        hlSet: new Set([curr.id]), codeLines: [18],
+        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "is rightmost", value: isRightmost }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        note: isRightmost
+          ? { vi: `${curr.val} là node cuối của tầng nên nhìn thấy từ bên phải.`, en: `${curr.val} is the level's last node, so it is visible from the right.` }
+          : { vi: `${curr.val} chưa phải node cuối của tầng.`, en: `${curr.val} is not the level's last node.` },
+      });
+      if (isRightmost) {
+        res.push(curr.val);
+        visible.add(curr.id);
+        snap({
+          title: { vi: `res.append(${curr.val})`, en: `res.append(${curr.val})` },
+          hlSet: new Set([curr.id]), codeLines: [19],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          note: { vi: `res = [${res.join(",")}].`, en: `res = [${res.join(",")}].` },
+        });
+      }
+    }
+    level++;
+  }
+
+  snap({
+    title: { vi: "queue rỗng → thoát while", en: "queue is empty → exit while" },
+    codeLines: [8],
+    vars: [{ name: "level", value: level }, { name: "queue", value: "[]" }],
+    note: { vi: "Đã xử lý hết các tầng.", en: "All levels have been processed." },
+  });
+
+  const finalStep = snapshot(root, {
+    title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
+    wordSet: new Set(visible), codeLines: [20], codeBlock: 2,
+    vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }, { name: "answer", value: `[${res.join(",")}]` }],
+    note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
+  });
+  finalStep.final = true;
+  steps.push(finalStep);
+  return { input, answer: `[${res.join(",")}]`, steps };
+}
+
 // ─── 236: Lowest Common Ancestor of a Binary Tree ───
 function buildSteps236(input, params) {
   const root = parseTree(input); const pv = Number(params.p); const qv = Number(params.q); const steps = [];
@@ -2097,13 +2292,49 @@ module.exports = {
     statement: { vi: "Cho root, tưởng tượng đứng bên PHẢI cây, trả về các nút nhìn thấy từ trên xuống dưới (nút phải nhất mỗi tầng). Nhập level-order.", en: "Given root, imagine standing on the RIGHT side, return the nodes you can see top to bottom (rightmost node of each level). Enter as level-order." },
     defaultInput: "1,2,3,null,5,null,4",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: queue theo từng tầng", en: "Approach 1: queue by level" } },
+          { value: "2", label: { vi: "Cách 2: deque + size", en: "Approach 2: deque + size" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "BFS theo tầng. Lấy nút CUỐI CÙNG (phải nhất) của mỗi tầng.", en: "BFS by level. Take the LAST (rightmost) node of each level." },
+      { vi: "Cách 1: BFS theo tầng, lấy node cuối của queue hiện tại trước khi tạo queue tầng kế tiếp.", en: "Approach 1: BFS by level, taking the current queue's last node before building the next level." },
+      { vi: "Cách 2: Dùng deque, chốt size của tầng rồi popleft đúng size node; node có i == size - 1 là node nhìn thấy bên phải.", en: "Approach 2: Use a deque, lock in the level size, then popleft exactly that many nodes; the node with i == size - 1 is visible from the right." },
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng.", en: "Queue holds at most one level." } },
+    codeLabel: { vi: "Cách 1: queue theo từng tầng", en: "Approach 1: queue by level" },
+    code2Label: { vi: "Cách 2: deque + size", en: "Approach 2: deque + size" },
     code: ["class Solution:", "    def rightSideView(self, root):", "        if not root: return []", "        res, queue = [], [root]", "        while queue:", "            res.append(queue[-1].val)   # rightmost", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
-    builder: buildSteps199,
+    code2: [
+      "class Solution:",
+      "    def rightSideView(self, root):",
+      "        res = []",
+      "        if root is None:",
+      "            return res",
+      "        queue = collections.deque()",
+      "        queue.append(root)",
+      "        while queue:",
+      "            size = len(queue)",
+      "            current_level_list = []",
+      "            for i in range(size):",
+      "                curr = queue.popleft()",
+      "                current_level_list.append(curr.val)",
+      "                if curr.left:",
+      "                    queue.append(curr.left)",
+      "                if curr.right:",
+      "                    queue.append(curr.right)",
+      "                if i == size - 1:",
+      "                    res.append(curr.val)",
+      "        return res",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps199v2(input) : buildSteps199(input);
+    },
   },
   236: {
     id: 236, difficulty: "medium", slug: "lowest-common-ancestor-of-a-binary-tree",
