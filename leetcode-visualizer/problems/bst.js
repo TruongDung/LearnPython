@@ -1950,6 +1950,15 @@ module.exports = {
     ],
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần inorder. Stack O(h).", en: "One inorder pass. Stack O(h)." } },
     code: ["class Solution:", "    def recoverTree(self, root):", "        first = second = prev = None", "        def inorder(node):", "            nonlocal first, second, prev", "            if not node: return", "            inorder(node.left)", "            if prev and prev.val > node.val:", "                if not first:", "                    first = prev", "                second = node", "            prev = node", "            inorder(node.right)", "        inorder(root)", "        first.val, second.val = second.val, first.val"],
+    liveArgs: (input) => [{
+      __viz_type: "binary_tree",
+      values: String(input).split(",").map((value) => {
+        const token = value.trim();
+        return token === "" || token.toLowerCase() === "null" || token.toLowerCase() === "none"
+          ? null
+          : Number(token);
+      }),
+    }],
     builder: buildSteps99,
   },
   109: {

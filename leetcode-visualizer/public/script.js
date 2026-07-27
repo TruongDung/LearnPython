@@ -4098,6 +4098,40 @@ import sys, json, math, heapq
 from collections import Counter, defaultdict, deque
 from typing import List, Optional, Dict, Set, Tuple
 
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+    def __repr__(self):
+        return f"TreeNode(val={self.val})"
+
+def __viz_materialize(value):
+    """Convert JSON-safe live arguments into LeetCode helper objects."""
+    if isinstance(value, dict) and value.get("__viz_type") == "binary_tree":
+        values = value.get("values", [])
+        if not values or values[0] is None:
+            return None
+        nodes = [None if item is None else TreeNode(item) for item in values]
+        for index, node in enumerate(nodes):
+            if node is None:
+                continue
+            left_index = 2 * index + 1
+            right_index = 2 * index + 2
+            if left_index < len(nodes):
+                node.left = nodes[left_index]
+            if right_index < len(nodes):
+                node.right = nodes[right_index]
+        return nodes[0]
+    if isinstance(value, list):
+        return [__viz_materialize(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(__viz_materialize(item) for item in value)
+    if isinstance(value, dict):
+        return {key: __viz_materialize(item) for key, item in value.items()}
+    return value
+
 def __viz_run_trace(user_code, method_name, call_args):
     trace = []
 
@@ -4131,6 +4165,16 @@ def __viz_run_trace(user_code, method_name, call_args):
                         continue
                     snapshot[k] = safe_repr(v)
                 trace.append({"line": frame.f_lineno, "vars": snapshot})
+            elif event == "return" and code.co_name == method_name:
+                # A line event fires before that line executes. Capture the
+                # public method's return as well so the final step shows
+                # mutations made by its last line (for example, a tree swap).
+                snapshot = {}
+                for k, v in frame.f_locals.items():
+                    if k == "self":
+                        continue
+                    snapshot[k] = safe_repr(v)
+                trace.append({"line": frame.f_lineno, "vars": snapshot})
             elif event == "call":
                 return tracer
         except Exception:
@@ -4151,6 +4195,7 @@ def __viz_run_trace(user_code, method_name, call_args):
         "Set": Set,
         "Tuple": Tuple,
         "math": math,
+        "TreeNode": TreeNode,
     }
     exec(compiled, ns2)
     Solution2 = ns2.get("Solution")
@@ -4163,7 +4208,8 @@ def __viz_run_trace(user_code, method_name, call_args):
 
     sys.settrace(tracer)
     try:
-        result = method2(*call_args)
+        materialized_args = [__viz_materialize(value) for value in call_args]
+        result = method2(*materialized_args)
     finally:
         sys.settrace(None)
 
