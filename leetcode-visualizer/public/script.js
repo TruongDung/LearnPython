@@ -4094,7 +4094,7 @@ async function ensurePyodide() {
 // public method records (line, locals-snapshot) for every executed line,
 // then returns both the trace and the return value to JS.
 const TRACER_PY = `
-import sys, json, math, heapq
+import sys, json, math, heapq, io, contextlib
 from collections import Counter, defaultdict, deque
 from typing import List, Optional, Dict, Set, Tuple
 
@@ -4134,6 +4134,7 @@ def __viz_materialize(value):
 
 def __viz_run_trace(user_code, method_name, call_args):
     trace = []
+    stdout_buffer = io.StringIO()
 
     def safe_repr(value, depth=0):
         try:
@@ -4164,7 +4165,7 @@ def __viz_run_trace(user_code, method_name, call_args):
                     if k == "self":
                         continue
                     snapshot[k] = safe_repr(v)
-                trace.append({"line": frame.f_lineno, "vars": snapshot})
+                trace.append({"line": frame.f_lineno, "vars": snapshot, "stdout": stdout_buffer.getvalue()})
             elif event == "return" and code.co_name == method_name:
                 # A line event fires before that line executes. Capture the
                 # public method's return as well so the final step shows
@@ -4174,7 +4175,7 @@ def __viz_run_trace(user_code, method_name, call_args):
                     if k == "self":
                         continue
                     snapshot[k] = safe_repr(v)
-                trace.append({"line": frame.f_lineno, "vars": snapshot})
+                trace.append({"line": frame.f_lineno, "vars": snapshot, "stdout": stdout_buffer.getvalue()})
             elif event == "call":
                 return tracer
         except Exception:
@@ -4209,11 +4210,12 @@ def __viz_run_trace(user_code, method_name, call_args):
     sys.settrace(tracer)
     try:
         materialized_args = [__viz_materialize(value) for value in call_args]
-        result = method2(*materialized_args)
+        with contextlib.redirect_stdout(stdout_buffer):
+            result = method2(*materialized_args)
     finally:
         sys.settrace(None)
 
-    return {"trace": trace, "result": safe_repr(result)}
+    return {"trace": trace, "result": safe_repr(result), "stdout": stdout_buffer.getvalue()}
 `;
 
 async function runLiveCode() {
@@ -4250,6 +4252,7 @@ async function runLiveCode() {
     liveSteps = rawTrace.map((entry, idx) => ({
       line: entry.line,
       vars: entry.vars || {},
+      stdout: entry.stdout || "",
       isLast: idx === rawTrace.length - 1,
     }));
     const answer = resultJs.result;
@@ -4276,6 +4279,7 @@ function enterLiveStepMode(userCode, answer) {
     title: { vi: `Dòng ${s.line}`, en: `Line ${s.line}` },
     codeLines: [s.line],
     vars: Object.entries(s.vars).map(([name, value]) => ({ name, value: formatLiveValue(value) })),
+    stdout: s.stdout,
     note: { vi: "", en: "" },
     final: s.isLast,
     __live: true,
@@ -4302,16 +4306,24 @@ function enterLiveStepMode(userCode, answer) {
 function renderLiveVarsView(step) {
   const el = $("liveVarsView");
   const entries = step.vars || [];
-  if (entries.length === 0) {
-    el.innerHTML = `<div class="live-vars-empty">${lang === "vi" ? "Chưa có biến local nào tại dòng này." : "No local variables at this line yet."}</div>`;
-    return;
-  }
-  el.innerHTML = `<div class="live-vars-title">${lang === "vi" ? "Biến local (thật, từ Python)" : "Local variables (real, from Python)"}</div>` +
-    `<div class="live-vars-list">${entries.map((v) => `
+  const varsHtml = entries.length === 0
+    ? `<div class="live-vars-empty">${lang === "vi" ? "Chưa có biến local nào tại dòng này." : "No local variables at this line yet."}</div>`
+    : `<div class="live-vars-list">${entries.map((v) => `
       <div class="live-var-row">
         <span class="live-var-name">${escapeHtml(v.name)}</span>
         <span class="live-var-value">${escapeHtml(v.value)}</span>
       </div>`).join("")}</div>`;
+  const stdout = step.stdout || "";
+  const stdoutHtml = stdout
+    ? `<pre class="live-console-output">${escapeHtml(stdout)}</pre>`
+    : `<div class="live-console-empty">${lang === "vi" ? "Chưa có output ở step này." : "No output at this step yet."}</div>`;
+  el.innerHTML = `
+    <div class="live-vars-title">${lang === "vi" ? "Biến local (thật, từ Python)" : "Local variables (real, from Python)"}</div>
+    ${varsHtml}
+    <div class="live-console-panel">
+      <div class="live-vars-title">${lang === "vi" ? "Kết quả print()" : "Console output (print)"}</div>
+      ${stdoutHtml}
+    </div>`;
 }
 
 function formatLiveValue(value) {
