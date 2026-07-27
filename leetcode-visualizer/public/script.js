@@ -3979,6 +3979,7 @@ function applyTheme(theme) {
 let monacoEditorInstance = null;
 let monacoLoadPromise = null;
 let monacoSourceKey = null;
+let pythonCompletionsRegistered = false;
 let pyodideInstance = null;
 let pyodideLoadPromise = null;
 let liveMode = false;
@@ -4011,6 +4012,97 @@ function loadMonaco() {
     window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
   });
   return monacoLoadPromise;
+}
+
+function registerPythonCompletions(monaco) {
+  if (pythonCompletionsRegistered) return;
+  pythonCompletionsRegistered = true;
+
+  const keywords = [
+    "and", "as", "assert", "async", "await", "break", "class", "continue",
+    "def", "del", "elif", "else", "except", "False", "finally", "for",
+    "from", "global", "if", "import", "in", "is", "lambda", "None",
+    "nonlocal", "not", "or", "pass", "raise", "return", "True", "try",
+    "while", "with", "yield",
+  ];
+  const builtins = [
+    ["abs", "abs(${1:value})"],
+    ["all", "all(${1:iterable})"],
+    ["any", "any(${1:iterable})"],
+    ["bool", "bool(${1:value})"],
+    ["dict", "dict(${1})"],
+    ["enumerate", "enumerate(${1:iterable})"],
+    ["filter", "filter(${1:function}, ${2:iterable})"],
+    ["float", "float(${1:value})"],
+    ["int", "int(${1:value})"],
+    ["len", "len(${1:collection})"],
+    ["list", "list(${1:iterable})"],
+    ["map", "map(${1:function}, ${2:iterable})"],
+    ["max", "max(${1:iterable})"],
+    ["min", "min(${1:iterable})"],
+    ["next", "next(${1:iterator})"],
+    ["print", "print(${1:value})"],
+    ["range", "range(${1:stop})"],
+    ["reversed", "reversed(${1:sequence})"],
+    ["set", "set(${1:iterable})"],
+    ["sorted", "sorted(${1:iterable})"],
+    ["str", "str(${1:value})"],
+    ["sum", "sum(${1:iterable})"],
+    ["tuple", "tuple(${1:iterable})"],
+    ["zip", "zip(${1:iterables})"],
+  ];
+  const snippets = [
+    ["def function", "def ${1:function_name}(${2:args}):\n\t${0:pass}", "Function definition"],
+    ["class definition", "class ${1:ClassName}:\n\tdef __init__(self, ${2:args}):\n\t\t${0:pass}", "Class definition"],
+    ["if statement", "if ${1:condition}:\n\t${0:pass}", "If statement"],
+    ["if / else", "if ${1:condition}:\n\t${2:pass}\nelse:\n\t${0:pass}", "If / else statement"],
+    ["for loop", "for ${1:item} in ${2:iterable}:\n\t${0:pass}", "For loop"],
+    ["for range loop", "for ${1:i} in range(${2:n}):\n\t${0:pass}", "For loop with range"],
+    ["while loop", "while ${1:condition}:\n\t${0:pass}", "While loop"],
+    ["try / except", "try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:error}:\n\t${0:pass}", "Try / except block"],
+    ["list comprehension", "[${1:expression} for ${2:item} in ${3:iterable}]", "List comprehension"],
+    ["LeetCode Solution", "class Solution:\n\tdef ${1:method}(self, ${2:args}):\n\t\t${0:pass}", "LeetCode Solution class"],
+  ];
+
+  monaco.languages.registerCompletionItemProvider("python", {
+    triggerCharacters: ["."],
+    provideCompletionItems(model, position) {
+      const word = model.getWordUntilPosition(position);
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn,
+      };
+      const suggestions = keywords.map((keyword) => ({
+        label: keyword,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        insertText: keyword,
+        range,
+        detail: lang === "vi" ? "Từ khóa Python" : "Python keyword",
+        sortText: `2-${keyword}`,
+      }));
+      builtins.forEach(([name, insertText]) => suggestions.push({
+        label: name,
+        kind: monaco.languages.CompletionItemKind.Function,
+        insertText,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        detail: lang === "vi" ? "Hàm dựng sẵn Python" : "Python built-in function",
+        sortText: `1-${name}`,
+      }));
+      snippets.forEach(([label, insertText, detail]) => suggestions.push({
+        label,
+        kind: monaco.languages.CompletionItemKind.Snippet,
+        insertText,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        detail,
+        sortText: `0-${label}`,
+      }));
+      return { suggestions };
+    },
+  });
 }
 
 function loadPyodideRuntime() {
@@ -4093,6 +4185,7 @@ async function ensureMonacoEditor() {
   }
   $("liveStatus").textContent = lt().loading;
   const monaco = await loadMonaco();
+  registerPythonCompletions(monaco);
   const isLight = document.documentElement.dataset.theme !== "dark";
   monacoEditorInstance = monaco.editor.create($("monacoEditor"), {
     value: currentPrimaryCode(),
@@ -4103,6 +4196,13 @@ async function ensureMonacoEditor() {
     automaticLayout: true,
     scrollBeyondLastLine: false,
     renderLineHighlight: "none",
+    quickSuggestions: { other: true, comments: false, strings: false },
+    quickSuggestionsDelay: 80,
+    suggestOnTriggerCharacters: true,
+    snippetSuggestions: "top",
+    tabCompletion: "on",
+    wordBasedSuggestions: "currentDocument",
+    parameterHints: { enabled: true },
   });
   monacoSourceKey = sourceKey;
   $("liveStatus").textContent = "";
