@@ -514,6 +514,7 @@ async function loadProblem() {
     currentProblemId = data.id;
     localStorage.setItem("lastProblemId", data.id);
     problemData = data;
+    resetLiveEditorState();
     saveRecentProblem(data);
     if (problemChanged) $("extraParams").innerHTML = "";
     renderProblem();
@@ -822,6 +823,7 @@ async function runViz() {
     answerValue = data.answer;
     stepIndex = 0;
     resetBreakpoints();
+    resetLiveEditorState();
     show("vizPanel");
     renderCode();
     renderStep();
@@ -4389,6 +4391,21 @@ function renderLiveCodePanel(userLines) {
   });
   pyBlock.appendChild(section);
   panel.appendChild(pyBlock);
+}
+
+// The live editor is opt-in. Loading another problem or starting the normal
+// visualization must return to the regular code panel instead of leaving a
+// stale Monaco editor (and stale Solution class) visible from the last run.
+function resetLiveEditorState() {
+  liveMode = false;
+  liveSteps = [];
+  $("liveExitBtn").classList.add("hidden");
+  $("liveEditorWrap").classList.add("hidden");
+  $("codePanel").classList.remove("hidden");
+  $("liveEditBtn").classList.remove("hidden");
+  $("liveVarsView").classList.add("hidden");
+  hide("liveError");
+  $("liveStatus").textContent = "";
 }
 
 function setLiveMode(on) {
