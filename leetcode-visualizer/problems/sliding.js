@@ -1727,6 +1727,371 @@ function buildSteps1358Last(input) {
 }
 
 /**
+ * LeetCode 239: Sliding Window Maximum — monotonic decreasing deque of indices.
+ * dq front always holds the index of the current window maximum.
+ *
+ * Code lines (1-indexed):
+ *  1  from collections import deque
+ *  2  class Solution:
+ *  3      def maxSlidingWindow(self, nums, k):
+ *  4          dq = deque()
+ *  5          result = []
+ *  6          for i, num in enumerate(nums):
+ *  7              while dq and nums[dq[-1]] < num:
+ *  8                  dq.pop()
+ *  9              dq.append(i)
+ * 10              if dq[0] <= i - k:
+ * 11                  dq.popleft()
+ * 12              if i >= k - 1:
+ * 13                  result.append(nums[dq[0]])
+ * 14          return result
+ */
+function buildSteps239(inputNums, params) {
+  const nums = Array.isArray(inputNums)
+    ? [...inputNums]
+    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const k = params && params.k !== undefined ? Number(params.k) : 3;
+  const n = nums.length;
+  const steps = [];
+  const dq = [];       // indices, values decreasing
+  const result = [];
+
+  const dqStr = () => `[${dq.map((idx) => `${idx}:${nums[idx]}`).join(", ")}]`;
+  const windowCells = (i) => {
+    const lo = Math.max(0, i - k + 1);
+    return Array.from({ length: i - lo + 1 }, (_, x) => lo + x);
+  };
+
+  if (n === 0 || k <= 0) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [], note: { vi: "Cần mảng không rỗng và k > 0.", en: "Need a non-empty array and k > 0." },
+    });
+    return { original: nums, k, answer: [], steps };
+  }
+
+  steps.push({
+    title: { vi: "dq = deque(), result = []", en: "dq = deque(), result = []" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5],
+    vars: [
+      { name: "k", value: k },
+      { name: "dq (indices)", value: "[]" },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi:
+        `dq lưu INDEX của các phần tử theo giá trị GIẢM DẦN. Front dq[0] luôn là index của MAX trong cửa sổ.\n` +
+        `Mỗi lần cửa sổ đủ k=${k} phần tử thì ghi nums[dq[0]] vào result.`,
+      en:
+        `dq holds element INDICES in DECREASING value order. Front dq[0] is always the index of the window MAX.\n` +
+        `Whenever the window reaches k=${k} elements, append nums[dq[0]] to result.`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    const num = nums[i];
+    steps.push({
+      title: { vi: `for i=${i}, num=${num}`, en: `for i=${i}, num=${num}` },
+      arr: [...nums],
+      sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i],
+      mark: dq.length ? [...dq] : [],
+      codeLines: [6],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+        { name: "dq", value: dqStr() },
+      ],
+      note: {
+        vi: `Xét phần tử nums[${i}]=${num}. Các index trong dq được tô đậm.`,
+        en: `Inspect nums[${i}]=${num}. Indices currently in dq are marked.`,
+      },
+    });
+
+    // Pop smaller values from the back
+    while (dq.length && nums[dq[dq.length - 1]] < num) {
+      const popped = dq.pop();
+      steps.push({
+        title: { vi: `nums[${popped}]=${nums[popped]} < ${num} → pop khỏi đuôi dq`, en: `nums[${popped}]=${nums[popped]} < ${num} → pop from dq back` },
+        arr: [...nums],
+        sub: nums.map((_, x) => `[${x}]`),
+        highlight: [i],
+        mark: dq.length ? [...dq] : [],
+        codeLines: [7, 8],
+        vars: [
+          { name: "i", value: i },
+          { name: "num", value: num },
+          { name: "popped index", value: popped },
+          { name: "dq", value: dqStr() },
+        ],
+        note: {
+          vi: `nums[${popped}]=${nums[popped]} < num=${num} nên index ${popped} không bao giờ là max nữa (bị ${num} "che"). Pop khỏi đuôi dq.`,
+          en: `nums[${popped}]=${nums[popped]} < num=${num}, so index ${popped} can never be the max again (dominated by ${num}). Pop it from the back.`,
+        },
+      });
+    }
+
+    dq.push(i);
+    steps.push({
+      title: { vi: `dq.append(${i})`, en: `dq.append(${i})` },
+      arr: [...nums],
+      sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i],
+      mark: [...dq],
+      codeLines: [9],
+      vars: [
+        { name: "i", value: i },
+        { name: "dq", value: dqStr() },
+      ],
+      note: {
+        vi: `Thêm index ${i} vào đuôi dq. Giá trị trong dq vẫn giảm dần: ${dqStr()}.`,
+        en: `Append index ${i} to dq's back. Values in dq stay decreasing: ${dqStr()}.`,
+      },
+    });
+
+    // Remove front if outside window
+    if (dq[0] <= i - k) {
+      const removed = dq.shift();
+      steps.push({
+        title: { vi: `dq[0]=${removed} ≤ i-k=${i - k} → popleft (ra khỏi cửa sổ)`, en: `dq[0]=${removed} ≤ i-k=${i - k} → popleft (out of window)` },
+        arr: [...nums],
+        sub: nums.map((_, x) => `[${x}]`),
+        highlight: windowCells(i),
+        mark: [...dq],
+        codeLines: [10, 11],
+        vars: [
+          { name: "i", value: i },
+          { name: "i - k", value: i - k },
+          { name: "removed front", value: removed },
+          { name: "dq", value: dqStr() },
+        ],
+        note: {
+          vi: `Front dq[0]=${removed} đã nằm ngoài cửa sổ [${i - k + 1}..${i}] → popleft.`,
+          en: `Front dq[0]=${removed} is now outside window [${i - k + 1}..${i}] → popleft.`,
+        },
+      });
+    }
+
+    // Record window max
+    if (i >= k - 1) {
+      result.push(nums[dq[0]]);
+      steps.push({
+        title: { vi: `Cửa sổ [${i - k + 1}..${i}] đủ k → result.append(${nums[dq[0]]})`, en: `Window [${i - k + 1}..${i}] full → result.append(${nums[dq[0]]})` },
+        arr: [...nums],
+        sub: nums.map((_, x) => `[${x}]`),
+        highlight: windowCells(i),
+        mark: [dq[0]],
+        codeLines: [12, 13],
+        vars: [
+          { name: "i", value: i },
+          { name: "window", value: `[${i - k + 1}..${i}]` },
+          { name: "max (nums[dq[0]])", value: nums[dq[0]] },
+          { name: "result", value: `[${result.join(", ")}]` },
+        ],
+        note: {
+          vi: `Cửa sổ đủ ${k} phần tử. Max = nums[dq[0]] = nums[${dq[0]}] = ${nums[dq[0]]}. result = [${result.join(", ")}].`,
+          en: `Window has ${k} elements. Max = nums[dq[0]] = nums[${dq[0]}] = ${nums[dq[0]]}. result = [${result.join(", ")}].`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `return result = [${result.join(", ")}]`, en: `return result = [${result.join(", ")}]` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [14],
+    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
+    note: {
+      vi: `Max của mỗi cửa sổ trượt kích thước ${k}: [${result.join(", ")}].`,
+      en: `Maximum of each sliding window of size ${k}: [${result.join(", ")}].`,
+    },
+  });
+
+  return { original: nums, k, answer: result, steps };
+}
+
+/**
+ * LeetCode 76: Minimum Window Substring — sliding window with a need-counter.
+ *
+ * Code lines (1-indexed):
+ *  1  from collections import Counter
+ *  2  class Solution:
+ *  3      def minWindow(self, s, t):
+ *  4          if not s or not t: return ""
+ *  5          need = Counter(t)
+ *  6          missing = len(t)
+ *  7          left = 0
+ *  8          start, end = 0, 0
+ *  9          for right, char in enumerate(s):
+ * 10              if need[char] > 0: missing -= 1
+ * 11              need[char] -= 1
+ * 12              while missing == 0:
+ * 13                  if end == 0 or right - left + 1 < end - start:
+ * 14                      start, end = left, right + 1
+ * 15                  need[s[left]] += 1
+ * 16                  if need[s[left]] > 0: missing += 1
+ * 17                  left += 1
+ * 18          return s[start:end]
+ */
+function buildSteps76(input, params) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const t = params && params.t !== undefined ? String(params.t) : "ABC";
+  const chars = s.split("");
+  const steps = [];
+
+  const need = {};
+  for (const c of t) need[c] = (need[c] || 0) + 1;
+  const needStr = () => `{${Object.entries(need).map(([c, v]) => `${c}:${v}`).join(", ")}}`;
+
+  if (!s || !t) {
+    steps.push({
+      title: { vi: "s hoặc t rỗng → \"\"", en: "s or t empty → \"\"" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [4],
+      vars: [{ name: "answer", value: '""' }],
+      note: { vi: "Không có window hợp lệ.", en: "No valid window." },
+    });
+    return { original: s, answer: "", steps };
+  }
+
+  let missing = t.length;
+  let left = 0;
+  let start = 0, end = 0;
+
+  const inWin = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
+
+  steps.push({
+    title: { vi: "need = Counter(t), missing = len(t)", en: "need = Counter(t), missing = len(t)" },
+    arr: chars,
+    sub: chars.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: [],
+    codeLines: [5, 6, 7, 8],
+    vars: [
+      { name: "t", value: `"${t}"` },
+      { name: "need", value: needStr() },
+      { name: "missing", value: missing },
+      { name: "left", value: left },
+    ],
+    note: {
+      vi:
+        `need đếm số ký tự cần: ${needStr()}. missing = ${missing} = tổng ký tự còn thiếu.\n` +
+        `Mở rộng right; khi missing==0 thì window đã chứa đủ t → co left để rút gọn.`,
+      en:
+        `need counts required chars: ${needStr()}. missing = ${missing} = total chars still needed.\n` +
+        `Expand right; when missing==0 the window covers t → shrink left to minimize.`,
+    },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    const wasNeeded = (need[ch] || 0) > 0;
+    if (wasNeeded) missing -= 1;
+    need[ch] = (need[ch] || 0) - 1;
+
+    steps.push({
+      title: { vi: `right=${right}, char='${ch}': need['${ch}']→${need[ch]}, missing=${missing}`, en: `right=${right}, char='${ch}': need['${ch}']→${need[ch]}, missing=${missing}` },
+      arr: chars,
+      sub: chars.map((_, i) => `[${i}]`),
+      highlight: inWin(left, right),
+      mark: [right],
+      codeLines: [9, 10, 11],
+      vars: [
+        { name: "right", value: right },
+        { name: "char", value: `'${ch}'` },
+        { name: "need", value: needStr() },
+        { name: "missing", value: missing },
+      ],
+      note: {
+        vi: `Thêm '${ch}' vào window. ${wasNeeded ? `'${ch}' là ký tự cần → missing giảm còn ${missing}.` : `'${ch}' không cần thiết (need đã ≤ 0) → missing giữ nguyen.`}`,
+        en: `Add '${ch}' to the window. ${wasNeeded ? `'${ch}' was needed → missing drops to ${missing}.` : `'${ch}' not needed (need ≤ 0) → missing unchanged.`}`,
+      },
+    });
+
+    while (missing === 0) {
+      const curLen = right - left + 1;
+      const better = end === 0 || curLen < end - start;
+      if (better) {
+        start = left;
+        end = right + 1;
+      }
+      steps.push({
+        title: { vi: `missing==0: window [${left}..${right}] hợp lệ${better ? " → cập nhật best" : ""}`, en: `missing==0: window [${left}..${right}] valid${better ? " → update best" : ""}` },
+        arr: chars,
+        sub: chars.map((_, i) => `[${i}]`),
+        highlight: inWin(left, right),
+        mark: inWin(start, end - 1),
+        codeLines: [12, 13, 14],
+        vars: [
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "window len", value: curLen },
+          { name: "best window", value: end > 0 ? `"${s.slice(start, end)}" (len ${end - start})` : "none" },
+        ],
+        note: {
+          vi: better
+            ? `Window "${s.slice(left, right + 1)}" (len ${curLen}) ngắn hơn best cũ → lưu start=${start}, end=${end}.`
+            : `Window "${s.slice(left, right + 1)}" (len ${curLen}) không ngắn hơn best hiện tại.`,
+          en: better
+            ? `Window "${s.slice(left, right + 1)}" (len ${curLen}) beats the old best → store start=${start}, end=${end}.`
+            : `Window "${s.slice(left, right + 1)}" (len ${curLen}) is not shorter than the current best.`,
+        },
+      });
+
+      const lch = chars[left];
+      need[lch] = (need[lch] || 0) + 1;
+      const nowMissing = need[lch] > 0;
+      if (nowMissing) missing += 1;
+      left += 1;
+      steps.push({
+        title: { vi: `Co left: bỏ '${lch}', left→${left}${nowMissing ? `, missing=${missing}` : ""}`, en: `Shrink left: drop '${lch}', left→${left}${nowMissing ? `, missing=${missing}` : ""}` },
+        arr: chars,
+        sub: chars.map((_, i) => `[${i}]`),
+        highlight: inWin(left, right),
+        mark: inWin(start, end - 1),
+        codeLines: [15, 16, 17],
+        vars: [
+          { name: "removed", value: `'${lch}'` },
+          { name: "need", value: needStr() },
+          { name: "missing", value: missing },
+          { name: "left", value: left },
+        ],
+        note: {
+          vi: `Trả '${lch}' về need. ${nowMissing ? `Giờ need['${lch}']=${need[lch]} > 0 → window thiếu '${lch}', missing=${missing}, thoát while.` : `need['${lch}']=${need[lch]} ≤ 0 → window vẫn đủ, tiếp tục co.`}`,
+          en: `Return '${lch}' to need. ${nowMissing ? `Now need['${lch}']=${need[lch]} > 0 → window misses '${lch}', missing=${missing}, exit while.` : `need['${lch}']=${need[lch]} ≤ 0 → window still valid, keep shrinking.`}`,
+        },
+      });
+    }
+  }
+
+  const answer = s.slice(start, end);
+  steps.push({
+    title: { vi: `return s[${start}:${end}] = "${answer}"`, en: `return s[${start}:${end}] = "${answer}"` },
+    arr: chars,
+    sub: chars.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: inWin(start, end - 1),
+    final: true,
+    codeLines: [18],
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: {
+      vi: answer ? `Substring nhỏ nhất chứa mọi ký tự của "${t}" là "${answer}".` : `Không tồn tại window hợp lệ → "".`,
+      en: answer ? `The smallest substring containing all of "${t}" is "${answer}".` : `No valid window exists → "".`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
  * LeetCode 2444: Count Subarrays With Fixed Bounds.
  * Single pass O(n): track three moving indices:
  *   bad     — last index where nums[i] is outside [minK, maxK]
@@ -2457,6 +2822,115 @@ module.exports = {
       "        return max_length",
     ],
     builder: buildSteps1004,
+  },
+  239: {
+    id: 239,
+    difficulty: "hard",
+    slug: "sliding-window-maximum",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Sliding Window Maximum", en: "Sliding Window Maximum" },
+    titleVi: { vi: "Giá trị lớn nhất mỗi cửa sổ trượt (monotonic deque)", en: "Maximum of each sliding window (monotonic deque)" },
+    statement: {
+      vi:
+        "Cho mảng nums và số k. Cửa sổ kích thước k trượt từ trái sang phải. " +
+        "Trả về mảng giá trị lớn nhất của mỗi cửa sổ. Nhập nums cách nhau dấu phẩy.",
+      en:
+        "Given an array nums and integer k, a window of size k slides from left to right. " +
+        "Return the maximum of each window. Enter nums as comma-separated numbers.",
+    },
+    defaultInput: [1, 3, -1, -3, 5, 3, 6, 7],
+    inputKind: "integer",
+    extraParams: [
+      { key: "k", label: { vi: "k (kích thước cửa sổ)", en: "k (window size)" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Dùng deque lưu INDEX theo giá trị GIẢM DẦN. Front dq[0] luôn là index của max cửa sổ.", en: "Use a deque of INDICES in DECREASING value order. Front dq[0] is always the window max index." },
+      { vi: "Trước khi thêm i: pop khỏi đuôi mọi index có giá trị < nums[i] (chúng không bao giờ là max nữa).", en: "Before adding i: pop from the back every index whose value < nums[i] (they can never be max again)." },
+      { vi: "Pop front nếu nó ra khỏi cửa sổ (dq[0] ≤ i-k).", en: "Pop the front if it left the window (dq[0] ≤ i-k)." },
+      { vi: "Khi i ≥ k-1, ghi nums[dq[0]] (max cửa sổ hiện tại) vào result.", en: "When i ≥ k-1, append nums[dq[0]] (current window max) to result." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(k)",
+      note: {
+        vi: "Mỗi index được push và pop tối đa 1 lần → O(n). Deque chứa tối đa k phần tử.",
+        en: "Each index is pushed and popped at most once → O(n). The deque holds at most k elements.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def maxSlidingWindow(self, nums, k):",
+      "        dq = deque()",
+      "        result = []",
+      "        for i, num in enumerate(nums):",
+      "            while dq and nums[dq[-1]] < num:",
+      "                dq.pop()",
+      "            dq.append(i)",
+      "            if dq[0] <= i - k:",
+      "                dq.popleft()",
+      "            if i >= k - 1:",
+      "                result.append(nums[dq[0]])",
+      "        return result",
+    ],
+    builder: buildSteps239,
+  },
+  76: {
+    id: 76,
+    difficulty: "hard",
+    slug: "minimum-window-substring",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Minimum Window Substring", en: "Minimum Window Substring" },
+    titleVi: { vi: "Substring nhỏ nhất chứa mọi ký tự của t", en: "Smallest substring covering all of t" },
+    statement: {
+      vi:
+        "Cho chuỗi s và chuỗi t. Tìm substring NHỎ NHẤT của s chứa TẤT CẢ ký tự của t " +
+        "(kể cả số lần lặp). Nếu không có, trả về \"\".",
+      en:
+        "Given strings s and t, find the SMALLEST substring of s that contains ALL characters of t " +
+        "(including duplicates). If none, return \"\".",
+    },
+    defaultInput: "ADOBECODEBANC",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "t", label: { vi: "t (ký tự cần)", en: "t (required chars)" }, default: "ABC" },
+    ],
+    approach: [
+      { vi: "need = Counter(t) đếm ký tự cần. missing = tổng ký tự còn thiếu.", en: "need = Counter(t) counts required chars. missing = total chars still needed." },
+      { vi: "Mở rộng right, giảm need[char]; nếu char thực sự cần thì missing giảm.", en: "Expand right, decrement need[char]; if char was actually needed, missing decreases." },
+      { vi: "Khi missing==0 (đủ t) → co left để rút gọn window, cập nhật best.", en: "When missing==0 (t is covered) → shrink left to minimize, update best." },
+      { vi: "Khi bỏ ký tự cần khỏi window, missing tăng lại → thoát vòng co.", en: "When a needed char leaves the window, missing goes back up → stop shrinking." },
+    ],
+    complexity: {
+      time: "O(|s| + |t|)",
+      space: "O(|t|)",
+      note: {
+        vi: "Mỗi ký tự của s được right thêm và left bỏ tối đa 1 lần.",
+        en: "Each char of s is added by right and removed by left at most once.",
+      },
+    },
+    code: [
+      "from collections import Counter",
+      "class Solution:",
+      "    def minWindow(self, s, t):",
+      "        if not s or not t: return \"\"",
+      "        need = Counter(t)",
+      "        missing = len(t)",
+      "        left = 0",
+      "        start, end = 0, 0",
+      "        for right, char in enumerate(s):",
+      "            if need[char] > 0: missing -= 1",
+      "            need[char] -= 1",
+      "            while missing == 0:",
+      "                if end == 0 or right-left+1 < end-start:",
+      "                    start, end = left, right + 1",
+      "                need[s[left]] += 1",
+      "                if need[s[left]] > 0: missing += 1",
+      "                left += 1",
+      "        return s[start:end]",
+    ],
+    builder: buildSteps76,
   },
   2444: {
     id: 2444,

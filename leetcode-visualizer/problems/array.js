@@ -1681,7 +1681,232 @@ function buildSteps84(heights) {
   return { original: heights, answer: maxArea, steps };
 }
 
+/**
+ * LeetCode 42: Trapping Rain Water — two pointer approach.
+ * left/right pointers move inward; left_max/right_max track the tallest wall
+ * seen from each side. Water above a bar = (side max) - height[bar].
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def trap(self, height):
+ *  3          if not height: return 0
+ *  4          left, right = 0, len(height) - 1
+ *  5          left_max, right_max = height[left], height[right]
+ *  6          water = 0
+ *  7          while left < right:
+ *  8              if left_max < right_max:
+ *  9                  left += 1
+ * 10                  left_max = max(left_max, height[left])
+ * 11                  water += left_max - height[left]
+ * 12              else:
+ * 13                  right -= 1
+ * 14                  right_max = max(right_max, height[right])
+ * 15                  water += right_max - height[right]
+ * 16          return water
+ */
+function buildSteps42(input) {
+  const height = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const n = height.length;
+  const steps = [];
+  const water = new Array(n).fill(0); // water[i] = units trapped above bar i
+
+  if (n === 0) {
+    steps.push({
+      title: { vi: "Mảng rỗng → 0", en: "Empty array → 0" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Không có cột nào.", en: "No bars." },
+    });
+    return { original: height, answer: 0, steps };
+  }
+
+  // sub row shows how much water sits above each bar so far
+  const makeSub = () => height.map((h, i) => (water[i] > 0 ? `💧${water[i]}` : ""));
+
+  let left = 0;
+  let right = n - 1;
+  let leftMax = height[left];
+  let rightMax = height[right];
+  let total = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo hai con trỏ", en: "Initialize two pointers" },
+    arr: [...height],
+    sub: makeSub(),
+    highlight: [left, right],
+    mark: [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "left", value: left },
+      { name: "right", value: right },
+      { name: "left_max", value: leftMax },
+      { name: "right_max", value: rightMax },
+      { name: "water", value: total },
+    ],
+    note: {
+      vi:
+        `left=0, right=${right}. left_max=${leftMax}, right_max=${rightMax}.\n` +
+        "Ý tưởng: nước trên 1 cột = min(tường cao nhất bên trái, bên phải) - chiều cao cột.\n" +
+        "Di chuyển con trỏ ở phía có tường THẤP HƠN vì phía đó quyết định mức nước.",
+      en:
+        `left=0, right=${right}. left_max=${leftMax}, right_max=${rightMax}.\n` +
+        "Idea: water above a bar = min(tallest left wall, tallest right wall) - bar height.\n" +
+        "Move the pointer on the SHORTER wall side because that side limits the water level.",
+    },
+  });
+
+  while (left < right) {
+    const useLeft = leftMax < rightMax;
+    steps.push({
+      title: { vi: `left_max=${leftMax} ${useLeft ? "<" : "≥"} right_max=${rightMax}`, en: `left_max=${leftMax} ${useLeft ? "<" : "≥"} right_max=${rightMax}` },
+      arr: [...height],
+      sub: makeSub(),
+      highlight: [left, right],
+      mark: [],
+      codeLines: [7, 8],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "left_max", value: leftMax },
+        { name: "right_max", value: rightMax },
+        { name: "condition left_max < right_max", value: useLeft },
+      ],
+      note: {
+        vi: useLeft
+          ? `Tường trái (${leftMax}) thấp hơn tường phải (${rightMax}) → xử lý bên TRÁI, dời left.`
+          : `Tường phải (${rightMax}) ≤ tường trái (${leftMax}) → xử lý bên PHẢI, dời right.`,
+        en: useLeft
+          ? `Left wall (${leftMax}) is shorter than right wall (${rightMax}) → process LEFT side, move left.`
+          : `Right wall (${rightMax}) ≤ left wall (${leftMax}) → process RIGHT side, move right.`,
+      },
+    });
+
+    if (useLeft) {
+      left += 1;
+      leftMax = Math.max(leftMax, height[left]);
+      const add = leftMax - height[left];
+      water[left] = add;
+      total += add;
+      steps.push({
+        title: { vi: `left→${left}: left_max=${leftMax}, +${add} nước`, en: `left→${left}: left_max=${leftMax}, +${add} water` },
+        arr: [...height],
+        sub: makeSub(),
+        highlight: [left, right],
+        mark: add > 0 ? [left] : [],
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "left", value: left },
+          { name: "height[left]", value: height[left] },
+          { name: "left_max", value: leftMax },
+          { name: "water added", value: add },
+          { name: "water", value: total },
+        ],
+        note: {
+          vi: `left tiến tới ${left}. left_max = max(${leftMax}) . Nước trên cột ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Tổng nước = ${total}.`,
+          en: `left advances to ${left}. left_max = ${leftMax}. Water above bar ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Total = ${total}.`,
+        },
+      });
+    } else {
+      right -= 1;
+      rightMax = Math.max(rightMax, height[right]);
+      const add = rightMax - height[right];
+      water[right] = add;
+      total += add;
+      steps.push({
+        title: { vi: `right→${right}: right_max=${rightMax}, +${add} nước`, en: `right→${right}: right_max=${rightMax}, +${add} water` },
+        arr: [...height],
+        sub: makeSub(),
+        highlight: [left, right],
+        mark: add > 0 ? [right] : [],
+        codeLines: [12, 13, 14, 15],
+        vars: [
+          { name: "right", value: right },
+          { name: "height[right]", value: height[right] },
+          { name: "right_max", value: rightMax },
+          { name: "water added", value: add },
+          { name: "water", value: total },
+        ],
+        note: {
+          vi: `right lùi tới ${right}. right_max = ${rightMax}. Nước trên cột ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Tổng nước = ${total}.`,
+          en: `right retreats to ${right}. right_max = ${rightMax}. Water above bar ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Total = ${total}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `return water = ${total}`, en: `return water = ${total}` },
+    arr: [...height],
+    sub: makeSub(),
+    highlight: [],
+    mark: water.map((w, i) => (w > 0 ? i : -1)).filter((x) => x >= 0),
+    final: true,
+    codeLines: [16],
+    vars: [{ name: "answer (water)", value: total }],
+    note: {
+      vi: `Tổng lượng nước mưa giữ được = ${total} đơn vị. Các cột có nước được tô xanh.`,
+      en: `Total trapped rain water = ${total} units. Bars holding water are highlighted.`,
+    },
+  });
+
+  return { original: height, answer: total, steps };
+}
+
 module.exports = {
+  42: {
+    id: 42,
+    difficulty: "hard",
+    slug: "trapping-rain-water",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Trapping Rain Water", en: "Trapping Rain Water" },
+    titleVi: { vi: "Hứng nước mưa (hai con trỏ)", en: "Trap rain water (two pointers)" },
+    statement: {
+      vi:
+        "Cho mảng height biểu diễn độ cao các cột (rộng 1). Tính tổng lượng nước mưa " +
+        "giữ được giữa các cột sau khi mưa. Nhập height là dãy số cách nhau dấu phẩy.",
+      en:
+        "Given an array height of bar heights (each width 1), compute how much rain water " +
+        "can be trapped between the bars. Enter height as comma-separated numbers.",
+    },
+    defaultInput: [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1],
+    inputKind: "nonneg",
+    inputLabel: { vi: "height", en: "height" },
+    extraParams: [],
+    approach: [
+      { vi: "Hai con trỏ left, right từ hai đầu. left_max, right_max lưu tường cao nhất mỗi bên.", en: "Two pointers left, right from both ends. left_max, right_max track the tallest wall on each side." },
+      { vi: "Luôn xử lý phía có tường THẤP HƠN vì phía đó quyết định mức nước tại cột đang xét.", en: "Always process the side with the SHORTER wall, since it caps the water level at the current bar." },
+      { vi: "Nước trên cột = (max phía đó) - chiều cao cột. Cộng dồn vào tổng.", en: "Water above a bar = (that side's max) - bar height. Accumulate into the total." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt 1 lần với 2 con trỏ, bộ nhớ hằng số.",
+        en: "Single pass with two pointers, constant memory.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def trap(self, height):",
+      "        if not height: return 0",
+      "        left, right = 0, len(height) - 1",
+      "        left_max, right_max = height[left], height[right]",
+      "        water = 0",
+      "        while left < right:",
+      "            if left_max < right_max:",
+      "                left += 1",
+      "                left_max = max(left_max, height[left])",
+      "                water += left_max - height[left]",
+      "            else:",
+      "                right -= 1",
+      "                right_max = max(right_max, height[right])",
+      "                water += right_max - height[right]",
+      "        return water",
+    ],
+    builder: buildSteps42,
+  },
   84: {
     id: 84,
     difficulty: "hard",
