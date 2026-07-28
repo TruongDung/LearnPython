@@ -1543,7 +1543,126 @@ function buildSteps1044(input) {
   return { original: s, answer, steps };
 }
 
+/**
+ * LeetCode 875: Koko Eating Bananas — binary search on the answer (speed).
+ * hours(speed) is monotu decreasing in speed; find the smallest speed with
+ * hours(speed) <= h.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def minEatingSpeed(self, piles, h):
+ *  3          def hours(speed): return sum(ceil(p/speed) for p in piles)
+ *  4          lo, hi = 1, max(piles)
+ *  5          while lo < hi:
+ *  6              mid = (lo + hi) // 2
+ *  7              if hours(mid) <= h: hi = mid
+ *  8              else: lo = mid + 1
+ *  9          return lo
+ */
+function buildSteps875(input, params) {
+  const piles = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const h = params && params.h !== undefined ? Number(params.h) : 8;
+  const steps = [];
+  const hoursNeeded = (speed) => piles.reduce((acc, p) => acc + Math.ceil(p / speed), 0);
+
+  let lo = 1, hi = Math.max(...piles);
+
+  steps.push({
+    title: { vi: `Binary search trên TỐC ĐỘ ăn: [1, ${hi}]`, en: `Binary search on EATING SPEED: [1, ${hi}]` },
+    arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "piles", value: `[${piles.join(", ")}]` },
+      { name: "h (hours limit)", value: h },
+      { name: "lo", value: lo }, { name: "hi", value: hi },
+    ],
+    note: {
+      vi:
+        `Tốc độ càng lớn → càng ít giờ. Ta tìm tốc độ NHỎ NHẤT mà tổng giờ ≤ h=${h}.\n` +
+        `Khoảng tìm: [1, max(piles)=${hi}]. Với tốc độ v, giờ ăn = Σ ceil(pile/v).`,
+      en:
+        `Faster speed → fewer hours. Find the SMALLEST speed with total hours ≤ h=${h}.\n` +
+        `Search range: [1, max(piles)=${hi}]. At speed v, hours = Σ ceil(pile/v).`,
+    },
+  });
+
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const need = hoursNeeded(mid);
+    const ok = need <= h;
+    steps.push({
+      title: { vi: `mid=${mid}: hours=${need} ${ok ? "≤" : ">"} h=${h}`, en: `mid=${mid}: hours=${need} ${ok ? "≤" : ">"} h=${h}` },
+      arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
+      highlight: [], mark: [],
+      codeLines: ok ? [5, 6, 7] : [5, 6, 8],
+      vars: [
+        { name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid (speed)", value: mid },
+        { name: "hours(mid)", value: need }, { name: "h", value: h }, { name: "ok?", value: ok },
+      ],
+      note: {
+        vi: ok
+          ? `Với tốc độ ${mid}, cần ${need} giờ ≤ ${h} → đủ chậm vẫn kịp → thử CHẬM HƠN: hi = ${mid}.`
+          : `Với tốc độ ${mid}, cần ${need} giờ > ${h} → quá chậm → phải NHANH HƠN: lo = ${mid + 1}.`,
+        en: ok
+          ? `At speed ${mid}, need ${need} hours ≤ ${h} → still on time → try SLOWER: hi = ${mid}.`
+          : `At speed ${mid}, need ${need} hours > ${h} → too slow → must be FASTER: lo = ${mid + 1}.`,
+      },
+    });
+    if (ok) hi = mid;
+    else lo = mid + 1;
+  }
+
+  steps.push({
+    title: { vi: `Đáp án: tốc độ tối thiểu = ${lo}`, en: `Answer: minimum speed = ${lo}` },
+    arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
+    highlight: [], mark: [], final: true,
+    codeLines: [9],
+    vars: [{ name: "answer", value: lo }, { name: "hours at answer", value: hoursNeeded(lo) }],
+    note: { vi: `Tốc độ nhỏ nhất để ăn hết trong ${h} giờ = ${lo} (cần ${hoursNeeded(lo)} giờ).`, en: `Smallest speed to finish within ${h} hours = ${lo} (takes ${hoursNeeded(lo)} hours).` },
+  });
+
+  return { original: piles, answer: lo, steps };
+}
+
 module.exports = {
+  875: {
+    id: 875,
+    difficulty: "medium",
+    slug: "koko-eating-bananas",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Koko Eating Bananas", en: "Koko Eating Bananas" },
+    titleVi: { vi: "Koko ăn chuối (binary search trên đáp án)", en: "Koko eating bananas (binary search on answer)" },
+    statement: {
+      vi: "Cho các đống chuối piles và số giờ h. Koko ăn với tốc độ v quả/giờ, mỗi giờ ăn 1 đống (dư thì bỏ). Tìm tốc độ v NHỎ NHẤT để ăn hết trong h giờ. Nhập piles; h trong tham số.",
+      en: "Given banana piles and h hours, Koko eats at speed v per hour, one pile per hour (leftover wasted). Find the SMALLEST speed v to finish within h hours. Enter piles; h as a parameter.",
+    },
+    defaultInput: [3, 6, 7, 11],
+    inputKind: "integer",
+    inputLabel: { vi: "piles", en: "piles" },
+    extraParams: [
+      { key: "h", label: { vi: "h (số giờ)", en: "h (hours)" }, default: 8 },
+    ],
+    approach: [
+      { vi: "Số giờ cần giảm dần khi tốc độ tăng → tính đơn điệu → binary search trên tốc độ.", en: "Hours needed decrease as speed increases → monotonic → binary search on speed." },
+      { vi: "Khoảng tìm: [1, max(piles)]. hours(v) = Σ ceil(pile/v).", en: "Range: [1, max(piles)]. hours(v) = Σ ceil(pile/v)." },
+      { vi: "hours(mid) ≤ h → thử chậm hơn (hi=mid); ngược lại nhanh hơn (lo=mid+1).", en: "hours(mid) ≤ h → try slower (hi=mid); else faster (lo=mid+1)." },
+      { vi: "Kết quả là lo — tốc độ nhỏ nhất khả thi.", en: "Answer is lo — the smallest feasible speed." },
+    ],
+    complexity: { time: "O(n log(max pile))", space: "O(1)", note: { vi: "Mỗi lần thử tốc độ tính giờ O(n).", en: "Each speed check computes hours in O(n)." } },
+    code: [
+      "class Solution:",
+      "    def minEatingSpeed(self, piles, h):",
+      "        def hours(speed): return sum(ceil(p/speed) for p in piles)",
+      "        lo, hi = 1, max(piles)",
+      "        while lo < hi:",
+      "            mid = (lo + hi) // 2",
+      "            if hours(mid) <= h: hi = mid",
+      "            else: lo = mid + 1",
+      "        return lo",
+    ],
+    builder: buildSteps875,
+  },
   1044: {
     id: 1044,
     difficulty: "hard",
@@ -1651,7 +1770,7 @@ module.exports = {
     builder: buildSteps410,
   },
   __meta: {
-    order: [410, 4, 33, 34, 911, 1044],
+    order: [410, 4, 33, 34, 911, 875, 1044],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {

@@ -1727,6 +1727,110 @@ function buildSteps1358Last(input) {
 }
 
 /**
+ * LeetCode 424: Longest Repeating Character Replacement — sliding window.
+ * Window is valid while (window length - max single-char freq) <= k, i.e. we
+ * can replace the other chars. Shrink from left when invalid.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def characterReplacement(self, s, k):
+ *  3          count = defaultdict(int); left = 0; max_freq = 0; result = 0
+ *  4          for right, ch in enumerate(s):
+ *  5              count[ch] += 1
+ *  6              max_freq = max(max_freq, count[ch])
+ *  7              while (right - left + 1) - max_freq > k:
+ *  8                  count[s[left]] -= 1; left += 1
+ *  9              result = max(result, right - left + 1)
+ * 10          return result
+ */
+function buildSteps424(input, params) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const k = params && params.k !== undefined ? Number(params.k) : 2;
+  const chars = s.split("");
+  const steps = [];
+  const count = {};
+  let left = 0, maxFreq = 0, result = 0;
+  let bestL = 0, bestR = -1;
+
+  const countStr = () => `{${Object.entries(count).filter(([, v]) => v > 0).map(([c, v]) => `${c}:${v}`).join(", ")}}`;
+  const inWin = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: chars, sub: chars.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "k", value: k }, { name: "left", value: 0 }, { name: "max_freq", value: 0 }, { name: "result", value: 0 }],
+    note: {
+      vi:
+        `Cửa sổ hợp lệ khi (độ dài) - (tần suất ký tự nhiều nhất) ≤ k, tức số ký tự cần THAY ≤ k.\n` +
+        `Mở rộng right; khi cửa sổ không hợp lệ thì co left.`,
+      en:
+        `A window is valid when (length) - (max single-char freq) ≤ k, i.e. chars to REPLACE ≤ k.\n` +
+        `Expand right; shrink left when the window becomes invalid.`,
+    },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    count[ch] = (count[ch] || 0) + 1;
+    maxFreq = Math.max(maxFreq, count[ch]);
+    steps.push({
+      title: { vi: `right=${right} '${ch}': count[${ch}]=${count[ch]}, max_freq=${maxFreq}`, en: `right=${right} '${ch}': count[${ch}]=${count[ch]}, max_freq=${maxFreq}` },
+      arr: chars, sub: chars.map((_, x) => `[${x}]`),
+      highlight: inWin(left, right), mark: [right],
+      codeLines: [4, 5, 6],
+      vars: [
+        { name: "right", value: right }, { name: "char", value: `'${ch}'` },
+        { name: "count", value: countStr() }, { name: "max_freq", value: maxFreq },
+      ],
+      note: { vi: `Thêm '${ch}'. max_freq = ký tự xuất hiện nhiều nhất trong cửa sổ = ${maxFreq}.`, en: `Add '${ch}'. max_freq = most frequent char count in window = ${maxFreq}.` },
+    });
+
+    while ((right - left + 1) - maxFreq > k) {
+      const lch = chars[left];
+      count[lch] -= 1;
+      left++;
+      steps.push({
+        title: { vi: `Cửa sổ không hợp lệ → co: bỏ '${lch}', left=${left}`, en: `Window invalid → shrink: drop '${lch}', left=${left}` },
+        arr: chars, sub: chars.map((_, x) => `[${x}]`),
+        highlight: inWin(left, right), mark: [],
+        codeLines: [7, 8],
+        vars: [
+          { name: "window len", value: right - left + 2 },
+          { name: "max_freq", value: maxFreq },
+          { name: "need replace", value: (right - left + 2) - maxFreq },
+          { name: "left", value: left },
+        ],
+        note: { vi: `(độ dài - max_freq) > k=${k} → phải thay quá ${k} ký tự → bỏ '${lch}' bên trái, left tiến.`, en: `(length - max_freq) > k=${k} → would replace more than ${k} chars → drop '${lch}' on the left, advance left.` },
+      });
+    }
+
+    const len = right - left + 1;
+    if (len > result) { result = len; bestL = left; bestR = right; }
+    steps.push({
+      title: { vi: `result = max(result, ${len}) = ${result}`, en: `result = max(result, ${len}) = ${result}` },
+      arr: chars, sub: chars.map((_, x) => `[${x}]`),
+      highlight: inWin(left, right), mark: inWin(bestL, bestR),
+      codeLines: [9],
+      vars: [{ name: "window len", value: len }, { name: "result", value: result }],
+      note: { vi: `Cửa sổ [${left}..${right}] hợp lệ, dài ${len}. result = ${result}.`, en: `Window [${left}..${right}] valid, length ${len}. result = ${result}.` },
+    });
+  }
+
+  steps.push({
+    title: { vi: `return ${result}`, en: `return ${result}` },
+    arr: chars, sub: chars.map((_, i) => `[${i}]`),
+    highlight: [], mark: inWin(bestL, bestR), final: true,
+    codeLines: [10],
+    vars: [{ name: "answer", value: result }],
+    note: { vi: `Chuỗi con dài nhất có thể biến thành 1 ký tự lặp bằng ≤ k lần thay = ${result}.`, en: `Longest substring turnable into one repeating char with ≤ k replacements = ${result}.` },
+  });
+
+  return { original: s, k, answer: result, steps };
+}
+
+/**
  * LeetCode 480: Sliding Window Median — keep the window sorted, read the middle.
  * (Visualization uses a sorted-window model; the O(log n) two-heap version has
  * identical outputs.)
@@ -3029,6 +3133,44 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps239,
+  },
+  424: {
+    id: 424,
+    difficulty: "medium",
+    slug: "longest-repeating-character-replacement",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Longest Repeating Character Replacement", en: "Longest Repeating Character Replacement" },
+    titleVi: { vi: "Chuỗi lặp dài nhất sau ≤ k lần thay", en: "Longest repeating substring after ≤ k replacements" },
+    statement: {
+      vi: "Cho chuỗi s và số k. Được thay tối đa k ký tự bất kỳ. Tìm độ dài chuỗi con dài nhất chỉ gồm 1 ký tự lặp. Nhập s; k trong tham số.",
+      en: "Given string s and integer k, you may replace at most k characters. Find the length of the longest substring of a single repeating char. Enter s; k as a parameter.",
+    },
+    defaultInput: "AABABBA",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "k", label: { vi: "k (số lần thay)", en: "k (replacements)" }, default: 1 },
+    ],
+    approach: [
+      { vi: "Cửa sổ trượt; count đếm tần suất từng ký tự trong cửa sổ.", en: "Sliding window; count tracks each char's frequency in the window." },
+      { vi: "max_freq = tần suất ký tự nhiều nhất. Cần thay = (độ dài) - max_freq.", en: "max_freq = highest char frequency. Replacements needed = (length) - max_freq." },
+      { vi: "Nếu cần thay > k → cửa sổ không hợp lệ → co left.", en: "If replacements needed > k → window invalid → shrink left." },
+      { vi: "result = độ dài cửa sổ hợp lệ dài nhất.", en: "result = length of the longest valid window." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi ký tự vào/ra cửa sổ 1 lần; bảng đếm ≤ 26.", en: "Each char enters/leaves once; count table ≤ 26." } },
+    code: [
+      "class Solution:",
+      "    def characterReplacement(self, s, k):",
+      "        count = defaultdict(int); left = 0; max_freq = 0; result = 0",
+      "        for right, ch in enumerate(s):",
+      "            count[ch] += 1",
+      "            max_freq = max(max_freq, count[ch])",
+      "            while (right - left + 1) - max_freq > k:",
+      "                count[s[left]] -= 1; left += 1",
+      "            result = max(result, right - left + 1)",
+      "        return result",
+    ],
+    builder: buildSteps424,
   },
   480: {
     id: 480,
