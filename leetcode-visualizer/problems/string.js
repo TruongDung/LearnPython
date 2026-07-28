@@ -7290,7 +7290,220 @@ function buildSteps3458(input, params) {
   return { original: s, answer, steps };
 }
 
+/**
+ * LeetCode 65: Valid Number — deterministic finite automaton (DFA).
+ * Walk the string one char at a time following the state transition table.
+ * Valid iff we end in an accepting state.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def isNumber(self, s):
+ *  3          states = [ ... transition table ... ]
+ *  4          accepting = {2, 4, 7, 8}
+ *  5          state = 0
+ *  6          for ch in s:
+ *  7              g = group(ch)   # space/sign/digit/dot/e/invalid
+ *  8              if g invalid or g not in states[state]: return False
+ *  9              state = states[state][g]
+ * 10          return state in accepting
+ */
+function buildSteps65(input) {
+  const s = String(input);
+  const chars = s.split("");
+  const steps = [];
+
+  const states = [
+    { space: 0, sign: 1, digit: 2, dot: 3 }, // 0 start
+    { digit: 2, dot: 3 },                     // 1 after sign
+    { digit: 2, dot: 4, e: 5, space: 8 },     // 2 int digits
+    { digit: 4 },                             // 3 dot (no int yet)
+    { digit: 4, e: 5, space: 8 },             // 4 digits after dot
+    { sign: 6, digit: 7 },                    // 5 after e
+    { digit: 7 },                             // 6 sign in exponent
+    { digit: 7, space: 8 },                   // 7 exponent digits
+    { space: 8 },                             // 8 trailing spaces
+  ];
+  const accepting = new Set([2, 4, 7, 8]);
+  const stateName = [
+    "start", "after sign", "int digits", "dot", "frac digits",
+    "after e", "exp sign", "exp digits", "trailing space",
+  ];
+  const group = (ch) => {
+    if (ch === " ") return "space";
+    if (ch === "+" || ch === "-") return "sign";
+    if (ch >= "0" && ch <= "9") return "digit";
+    if (ch === ".") return "dot";
+    if (ch === "e" || ch === "E") return "e";
+    return "invalid";
+  };
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: [["", ...chars]],
+        text1: "", text2: s,
+        colLabels: chars.map((ch, i) => ({ index: `${i}`, char: ch })),
+        hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+        pathCells: opts.done ? opts.done.map((i) => [0, i + 1]) : [],
+        largeCells: true,
+        caption: opts.caption || "",
+      },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "state = 0 (start)", en: "state = 0 (start)" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "state", value: "0 (start)" },
+      { name: "accepting", value: "{2,4,7,8}" },
+    ],
+    note: {
+      vi:
+        "Dùng máy trạng thái hữu hạn (DFA). Mỗi ký tự được phân nhóm: space/sign/digit/dot/e.\n" +
+        "Trạng thái chấp nhận: 2 (số nguyên), 4 (số thập phân), 7 (số mũ), 8 (khoảng trắng cuối).\n" +
+        "Nếu không có chuyển tiếp hợp lệ → số không hợp lệ.",
+      en:
+        "Use a deterministic finite automaton (DFA). Each char is grouped: space/sign/digit/dot/e.\n" +
+        "Accepting states: 2 (integer), 4 (decimal), 7 (exponent), 8 (trailing space).\n" +
+        "If no valid transition exists → not a valid number.",
+    },
+  });
+
+  let state = 0;
+  let ok = true;
+  const done = [];
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    const g = group(ch);
+    const canMove = g !== "invalid" && (g in states[state]);
+    if (!canMove) {
+      snap({
+        title: { vi: `'${ch}' (${g}) không hợp lệ ở state ${state} → False`, en: `'${ch}' (${g}) invalid at state ${state} → False` },
+        focus: i,
+        done: [...done],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "i", value: i },
+          { name: "char", value: `'${ch}'` },
+          { name: "group", value: g },
+          { name: "state", value: `${state} (${stateName[state]})` },
+          { name: "allowed", value: Object.keys(states[state]).join(", ") || "none" },
+        ],
+        note: {
+          vi: `Ký tự '${ch}' thuộc nhóm '${g}'. Từ state ${state} (${stateName[state]}) không có chuyển tiếp cho '${g}' (chỉ cho phép: ${Object.keys(states[state]).join(", ") || "không có"}) → trả về False.`,
+          en: `Char '${ch}' is group '${g}'. From state ${state} (${stateName[state]}) there is no transition for '${g}' (allowed: ${Object.keys(states[state]).join(", ") || "none"}) → return False.`,
+        },
+      });
+      ok = false;
+      break;
+    }
+    const prev = state;
+    state = states[state][g];
+    done.push(i);
+    snap({
+      title: { vi: `'${ch}' (${g}): state ${prev} → ${state}`, en: `'${ch}' (${g}): state ${prev} → ${state}` },
+      focus: i,
+      done: [...done],
+      codeLines: [6, 7, 9],
+      vars: [
+        { name: "i", value: i },
+        { name: "char", value: `'${ch}'` },
+        { name: "group", value: g },
+        { name: "state", value: `${state} (${stateName[state]})` },
+      ],
+      note: {
+        vi: `'${ch}' nhóm '${g}' → chuyển từ state ${prev} (${stateName[prev]}) sang state ${state} (${stateName[state]}).`,
+        en: `'${ch}' group '${g}' → move from state ${prev} (${stateName[prev]}) to state ${state} (${stateName[state]}).`,
+      },
+    });
+  }
+
+  const answer = ok && accepting.has(state);
+  if (ok) {
+    snap({
+      title: { vi: `Hết chuỗi ở state ${state} → ${answer}`, en: `End at state ${state} → ${answer}` },
+      done: [...done],
+      final: true,
+      codeLines: [10],
+      vars: [
+        { name: "final state", value: `${state} (${stateName[state]})` },
+        { name: "in accepting?", value: accepting.has(state) },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: accepting.has(state)
+          ? `Kết thúc ở state ${state} (${stateName[state]}) ∈ {2,4,7,8} → là SỐ HỢP LỆ.`
+          : `Kết thúc ở state ${state} (${stateName[state]}) ∉ {2,4,7,8} → KHÔNG hợp lệ.`,
+        en: accepting.has(state)
+          ? `Ended at state ${state} (${stateName[state]}) ∈ {2,4,7,8} → VALID number.`
+          : `Ended at state ${state} (${stateName[state]}) ∉ {2,4,7,8} → NOT valid.`,
+      },
+    });
+  } else {
+    // add final answer step
+    steps[steps.length - 1].final = true;
+  }
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  65: {
+    id: 65,
+    difficulty: "hard",
+    slug: "valid-number",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Valid Number", en: "Valid Number" },
+    titleVi: { vi: "Kiểm tra số hợp lệ (máy trạng thái)", en: "Validate a number (state machine)" },
+    statement: {
+      vi:
+        "Cho chuỗi s. Kiểm tra s có phải một SỐ hợp lệ không (số nguyên, thập phân, có thể kèm dấu và số mũ e/E). " +
+        "Dùng máy trạng thái hữu hạn (DFA). Nhập chuỗi s.",
+      en:
+        "Given a string s, decide if it is a valid NUMBER (integer, decimal, optional sign and exponent e/E). " +
+        "Uses a deterministic finite automaton (DFA). Enter the string s.",
+    },
+    defaultInput: "-90E3",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "Xây bảng chuyển trạng thái: 9 state, mỗi state map nhóm ký tự → state kế.", en: "Build a transition table: 9 states, each mapping a char group → next state." },
+      { vi: "Nhóm ký tự: space, sign(+/-), digit, dot(.), e(e/E). Ký tự khác → invalid.", en: "Char groups: space, sign(+/-), digit, dot(.), e(e/E). Anything else → invalid." },
+      { vi: "Duyệt từng ký tự; nếu không có chuyển tiếp hợp lệ → False.", en: "Walk each char; if no valid transition → False." },
+      { vi: "Hợp lệ nếu kết thúc ở state chấp nhận {2,4,7,8}.", en: "Valid iff ending in an accepting state {2,4,7,8}." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt 1 lần; bảng trạng thái cố định.",
+        en: "Single pass; fixed-size transition table.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isNumber(self, s):",
+      "        states = [ ...transition table (9 states)... ]",
+      "        accepting = {2, 4, 7, 8}",
+      "        state = 0",
+      "        for ch in s:",
+      "            g = group(ch)  # space/sign/digit/dot/e/invalid",
+      "            if g == 'invalid' or g not in states[state]: return False",
+      "            state = states[state][g]",
+      "        return state in accepting",
+    ],
+    builder: buildSteps65,
+  },
   3458: {
     id: 3458,
     difficulty: "hard",

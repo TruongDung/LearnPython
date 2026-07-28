@@ -13173,7 +13173,183 @@ function buildSteps188(inputPrices, params) {
   return { original: prices, answer: sell[k], steps };
 }
 
+/**
+ * LeetCode 1216: Valid Palindrome III — longest palindromic subsequence DP.
+ * s can become a palindrome by deleting at most k chars iff
+ * n - LPS(s) <= k, where LPS = longest palindromic subsequence length.
+ * dp[i][j] = LPS of s[i..j].
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def isValidPalindrome(self, s, k):
+ *  3          n = len(s); dp = [[0]*n for _ in range(n)]
+ *  4          for i in range(n-1, -1, -1):
+ *  5              dp[i][i] = 1
+ *  6              for j in range(i+1, n):
+ *  7                  if s[i] == s[j]: dp[i][j] = dp[i+1][j-1] + 2
+ *  8                  else: dp[i][j] = max(dp[i+1][j], dp[i][j-1])
+ *  9          return n - dp[0][n-1] <= k
+ */
+function buildSteps1216(input, params) {
+  const s = String(input);
+  const n = s.length;
+  const k = params && params.k !== undefined ? Number(params.k) : 2;
+  const chars = s.split("");
+  const steps = [];
+  const dp = Array.from({ length: n }, () => Array(n).fill(0));
+
+  function gridSnap(opts) {
+    // display: header row = chars, header col = chars
+    const display = [["i\\j", ...chars.map((c, j) => `${j}:${c}`)]];
+    for (let i = 0; i < n; i++) {
+      const row = [`${i}:${chars[i]}`];
+      for (let j = 0; j < n; j++) {
+        row.push(j < i ? "" : String(dp[i][j]));
+      }
+      display.push(row);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display,
+        text1: "", text2: "",
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+      },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  if (n === 0) {
+    gridSnap({ title: { vi: "Chuỗi rỗng → true", en: "Empty → true" }, final: true, codeLines: [3], vars: [{ name: "answer", value: true }], note: { vi: "", en: "" } });
+    return { original: s, answer: true, steps };
+  }
+
+  gridSnap({
+    title: { vi: "Khởi tạo dp; dp[i][i]=1", en: "Initialize dp; dp[i][i]=1" },
+    codeLines: [3, 4, 5],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "n", value: n }, { name: "k", value: k }],
+    note: {
+      vi:
+        `dp[i][j] = độ dài DÃY CON ĐỐI XỨNG dài nhất (LPS) trong s[i..j]. Mỗi ký tự đơn là palindrome độ dài 1.\n` +
+        `s biến thành palindrome bằng cách xóa ≤ k ký tự ⟺ n - LPS(s) ≤ k.\n` +
+        `Điền bảng từ dưới lên (i giảm), trái sang phải (j tăng).`,
+      en:
+        `dp[i][j] = length of the LONGEST PALINDROMIC SUBSEQUENCE (LPS) in s[i..j]. Each single char is a palindrome of length 1.\n` +
+        `s becomes a palindrome by deleting ≤ k chars ⟺ n - LPS(s) ≤ k.\n` +
+        `Fill the table bottom-up (i decreasing), left to right (j increasing).`,
+    },
+  });
+
+  for (let i = n - 1; i >= 0; i--) {
+    dp[i][i] = 1;
+    for (let j = i + 1; j < n; j++) {
+      const match = chars[i] === chars[j];
+      if (match) dp[i][j] = dp[i + 1][j - 1] + 2;
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j - 1]);
+
+      gridSnap({
+        title: { vi: `dp[${i}][${j}] ('${chars[i]}','${chars[j]}') = ${dp[i][j]}`, en: `dp[${i}][${j}] ('${chars[i]}','${chars[j]}') = ${dp[i][j]}` },
+        hlCell: [i + 1, j + 1],
+        pathCells: match ? [[i + 2, j]] : [[i + 2, j + 1], [i + 1, j]],
+        codeLines: match ? [6, 7] : [6, 8],
+        vars: [
+          { name: "i,j", value: `${i},${j}` },
+          { name: "s[i],s[j]", value: `'${chars[i]}','${chars[j]}'` },
+          { name: "match?", value: match },
+          { name: "dp[i][j]", value: dp[i][j] },
+        ],
+        note: {
+          vi: match
+            ? `s[${i}]='${chars[i]}' == s[${j}]='${chars[j]}' → dp[${i}][${j}] = dp[${i + 1}][${j - 1}] + 2 = ${dp[i][j]}.`
+            : `s[${i}]='${chars[i]}' ≠ s[${j}]='${chars[j]}' → dp[${i}][${j}] = max(dp[${i + 1}][${j}]=${dp[i + 1][j]}, dp[${i}][${j - 1}]=${dp[i][j - 1]}) = ${dp[i][j]}.`,
+          en: match
+            ? `s[${i}]='${chars[i]}' == s[${j}]='${chars[j]}' → dp[${i}][${j}] = dp[${i + 1}][${j - 1}] + 2 = ${dp[i][j]}.`
+            : `s[${i}]='${chars[i]}' ≠ s[${j}]='${chars[j]}' → dp[${i}][${j}] = max(dp[${i + 1}][${j}]=${dp[i + 1][j]}, dp[${i}][${j - 1}]=${dp[i][j - 1]}) = ${dp[i][j]}.`,
+        },
+      });
+    }
+  }
+
+  const lps = dp[0][n - 1];
+  const deletions = n - lps;
+  const answer = deletions <= k;
+
+  gridSnap({
+    title: { vi: `n - LPS = ${n} - ${lps} = ${deletions} ${answer ? "≤" : ">"} k=${k} → ${answer}`, en: `n - LPS = ${n} - ${lps} = ${deletions} ${answer ? "≤" : ">"} k=${k} → ${answer}` },
+    hlCell: [1, n],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "LPS = dp[0][n-1]", value: lps },
+      { name: "deletions = n - LPS", value: deletions },
+      { name: "k", value: k },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `LPS dài nhất = ${lps}. Cần xóa n - LPS = ${deletions} ký tự để còn lại palindrome. ${answer ? `${deletions} ≤ k=${k} → true.` : `${deletions} > k=${k} → false.`}`,
+      en: `Longest LPS = ${lps}. Need to delete n - LPS = ${deletions} chars to leave a palindrome. ${answer ? `${deletions} ≤ k=${k} → true.` : `${deletions} > k=${k} → false.`}`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  1216: {
+    id: 1216,
+    difficulty: "hard",
+    slug: "valid-palindrome-iii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Valid Palindrome III", en: "Valid Palindrome III" },
+    titleVi: { vi: "Palindrome hợp lệ III (LPS DP)", en: "Valid Palindrome III (LPS DP)" },
+    statement: {
+      vi:
+        "Cho chuỗi s và số k. Hỏi s có thể trở thành palindrome bằng cách XÓA tối đa k ký tự hay không. " +
+        "Nhập s; k trong tham số.",
+      en:
+        "Given a string s and integer k, decide whether s can become a palindrome by DELETING at most k characters. " +
+        "Enter s; k as a parameter.",
+    },
+    defaultInput: "abcdeca",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "k", label: { vi: "k (số ký tự được xóa)", en: "k (deletions allowed)" }, default: 2 },
+    ],
+    approach: [
+      { vi: "dp[i][j] = độ dài dãy con đối xứng dài nhất (LPS) của s[i..j].", en: "dp[i][j] = length of the longest palindromic subsequence (LPS) of s[i..j]." },
+      { vi: "Nếu s[i]==s[j]: dp = dp[i+1][j-1] + 2; ngược lại dp = max(dp[i+1][j], dp[i][j-1]).", en: "If s[i]==s[j]: dp = dp[i+1][j-1] + 2; else dp = max(dp[i+1][j], dp[i][j-1])." },
+      { vi: "Số ký tự cần xóa = n - LPS. Điền bảng từ dưới lên.", en: "Deletions needed = n - LPS. Fill the table bottom-up." },
+      { vi: "Hợp lệ ⟺ n - LPS(toàn chuỗi) ≤ k.", en: "Valid ⟺ n - LPS(whole string) ≤ k." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Bảng dp n×n; mỗi ô tính O(1).",
+        en: "An n×n dp table; each cell is O(1).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def isValidPalindrome(self, s, k):",
+      "        n = len(s); dp = [[0]*n for _ in range(n)]",
+      "        for i in range(n-1, -1, -1):",
+      "            dp[i][i] = 1",
+      "            for j in range(i+1, n):",
+      "                if s[i] == s[j]: dp[i][j] = dp[i+1][j-1] + 2",
+      "                else: dp[i][j] = max(dp[i+1][j], dp[i][j-1])",
+      "        return n - dp[0][n-1] <= k",
+    ],
+    builder: buildSteps1216,
+  },
   188: {
     id: 188,
     difficulty: "hard",
@@ -13334,7 +13510,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1473],
+    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",

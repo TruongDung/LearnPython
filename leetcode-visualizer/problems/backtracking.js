@@ -2224,7 +2224,220 @@ function buildSteps301(input) {
   return { original: s, answer, steps };
 }
 
+/**
+ * LeetCode 282: Expression Add Operators — backtracking with +, -, *.
+ * Track cur_val (running value) and last (last operand, signed) so that '*'
+ * can undo the previous term and reapply: cur - last + last*operand.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def addOperators(self, num, target):
+ *  3          def bt(i, expr, cur, last):
+ *  4              if i == len(num):
+ *  5                  if cur == target: result.append(expr)
+ *  6                  return
+ *  7              for j in range(i, len(num)):
+ *  8                  if j > i and num[i] == '0': break   # no leading zero
+ *  9                  operand = int(num[i:j+1])
+ * 10                  if i == 0: bt(j+1, operand_str, operand, operand)
+ * 11                  else:
+ * 12                      bt(j+1, expr+'+'+s, cur+operand, operand)
+ * 13                      bt(j+1, expr+'-'+s, cur-operand, -operand)
+ * 14                      bt(j+1, expr+'*'+s, cur-last+last*operand, last*operand)
+ * 15          return result
+ */
+function buildSteps282(input, params) {
+  const num = String(input);
+  const target = params && params.target !== undefined ? Number(params.target) : 6;
+  const n = num.length;
+  const steps = [];
+  const result = [];
+  let guard = 0;
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: `Tìm biểu thức từ "${num}" = ${target}`, en: `Find expressions from "${num}" = ${target}` },
+    codeLines: [2, 3],
+    vars: [
+      { name: "num", value: `"${num}"` },
+      { name: "target", value: target },
+    ],
+    note: {
+      vi:
+        `Chèn +, -, * giữa các chữ số của "${num}" để biểu thức bằng ${target}.\n` +
+        `Theo dõi cur (giá trị hiện tại) và last (số hạng cuối, có dấu).\n` +
+        `Mẹo cho '*': cur - last + last*operand (hoàn tác số hạng cuối rồi nhân).\n` +
+        `Không cho số nhiều chữ số bắt đầu bằng '0'.`,
+      en:
+        `Insert +, -, * between digits of "${num}" so the expression equals ${target}.\n` +
+        `Track cur (running value) and last (last operand, signed).\n` +
+        `Trick for '*': cur - last + last*operand (undo the last term, then multiply).\n` +
+        `No multi-digit operand may start with '0'.`,
+    },
+  });
+
+  function bt(i, expr, cur, last, depth) {
+    if (guard > 300) return;
+    guard += 1;
+
+    if (i === n) {
+      const hit = cur === target;
+      if (hit) result.push(expr);
+      if (guard <= 80) {
+        snap({
+          title: { vi: `"${expr}" = ${cur} ${hit ? `== ${target} ✓` : `≠ ${target}`}`, en: `"${expr}" = ${cur} ${hit ? `== ${target} ✓` : `≠ ${target}`}` },
+          codeLines: [4, 5, 6],
+          vars: [
+            { name: "expr", value: `"${expr}"` },
+            { name: "cur", value: cur },
+            { name: "target", value: target },
+            { name: "match?", value: hit },
+            { name: "result", value: `[${result.map((x) => `"${x}"`).join(", ")}]` },
+          ],
+          note: {
+            vi: hit
+              ? `Hết chữ số và cur=${cur} == target → thêm "${expr}" vào kết quả.`
+              : `Hết chữ số nhưng cur=${cur} ≠ target=${target} → bỏ nhánh này.`,
+            en: hit
+              ? `All digits used and cur=${cur} == target → add "${expr}" to result.`
+              : `All digits used but cur=${cur} ≠ target=${target} → discard this branch.`,
+          },
+        });
+      }
+      return;
+    }
+
+    for (let j = i; j < n; j++) {
+      if (j > i && num[i] === "0") break;
+      const operandStr = num.slice(i, j + 1);
+      const operand = Number(operandStr);
+
+      if (i === 0) {
+        if (guard <= 80) {
+          snap({
+            title: { vi: `Số hạng đầu: ${operandStr}`, en: `First operand: ${operandStr}` },
+            codeLines: [7, 8, 9, 10],
+            vars: [
+              { name: "operand", value: operandStr },
+              { name: "cur", value: operand },
+              { name: "last", value: operand },
+            ],
+            note: {
+              vi: `Số hạng đầu tiên không có toán tử phía trước. expr="${operandStr}", cur=${operand}, last=${operand}.`,
+              en: `The first operand has no leading operator. expr="${operandStr}", cur=${operand}, last=${operand}.`,
+            },
+          });
+        }
+        bt(j + 1, operandStr, operand, operand, depth + 1);
+      } else {
+        if (guard <= 80) {
+          snap({
+            title: { vi: `Thử toán tử trước "${operandStr}" (cur=${cur}, last=${last})`, en: `Try operators before "${operandStr}" (cur=${cur}, last=${last})` },
+            codeLines: [11, 12, 13, 14],
+            vars: [
+              { name: "expr so far", value: `"${expr}"` },
+              { name: "operand", value: operandStr },
+              { name: "cur", value: cur },
+              { name: "last", value: last },
+              { name: "+", value: cur + operand },
+              { name: "-", value: cur - operand },
+              { name: "*", value: cur - last + last * operand },
+            ],
+            note: {
+              vi: `Với số hạng "${operandStr}": thử 3 toán tử.\n+ → cur+${operand}=${cur + operand}\n- → cur-${operand}=${cur - operand}\n* → cur - last + last*${operand} = ${cur} - ${last} + ${last * operand} = ${cur - last + last * operand}.`,
+              en: `For operand "${operandStr}": try 3 operators.\n+ → cur+${operand}=${cur + operand}\n- → cur-${operand}=${cur - operand}\n* → cur - last + last*${operand} = ${cur} - ${last} + ${last * operand} = ${cur - last + last * operand}.`,
+            },
+          });
+        }
+        bt(j + 1, expr + "+" + operandStr, cur + operand, operand, depth + 1);
+        bt(j + 1, expr + "-" + operandStr, cur - operand, -operand, depth + 1);
+        bt(j + 1, expr + "*" + operandStr, cur - last + last * operand, last * operand, depth + 1);
+      }
+    }
+  }
+
+  bt(0, "", 0, 0, 0);
+
+  snap({
+    title: { vi: `Kết quả: [${result.map((x) => `"${x}"`).join(", ")}]`, en: `Result: [${result.map((x) => `"${x}"`).join(", ")}]` },
+    final: true,
+    codeLines: [15],
+    vars: [{ name: "answer", value: `[${result.map((x) => `"${x}"`).join(", ")}]` }],
+    note: {
+      vi: `Các biểu thức bằng ${target}: [${result.map((x) => `"${x}"`).join(", ")}].`,
+      en: `Expressions equal to ${target}: [${result.map((x) => `"${x}"`).join(", ")}].`,
+    },
+  });
+
+  return { original: num, answer: result, steps };
+}
+
 module.exports = {
+  282: {
+    id: 282,
+    difficulty: "hard",
+    slug: "expression-add-operators",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    title: { vi: "Expression Add Operators", en: "Expression Add Operators" },
+    titleVi: { vi: "Chèn toán tử để đạt target (backtracking)", en: "Insert operators to reach target (backtracking)" },
+    statement: {
+      vi:
+        "Cho chuỗi số num và target. Chèn +, -, * giữa các chữ số để biểu thức bằng target. " +
+        "Trả về TẤT CẢ biểu thức hợp lệ (không cho số nhiều chữ số bắt đầu bằng 0). Nhập num; target trong tham số.",
+      en:
+        "Given a digit string num and a target, insert +, -, * between digits so the expression equals target. " +
+        "Return ALL valid expressions (no multi-digit operand starting with 0). Enter num; target as a parameter.",
+    },
+    defaultInput: "123",
+    inputKind: "string",
+    inputLabel: { vi: "num", en: "num" },
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 6 },
+    ],
+    approach: [
+      { vi: "Backtracking: tại mỗi vị trí, chọn số hạng (1..nhiều chữ số) rồi thử +, -, *.", en: "Backtracking: at each position, choose an operand (1..many digits), then try +, -, *." },
+      { vi: "Theo dõi cur (giá trị hiện tại) và last (số hạng cuối, có dấu).", en: "Track cur (running value) and last (last operand, signed)." },
+      { vi: "Mẹo cho '*': cur - last + last*operand (hoàn tác số hạng cuối rồi nhân).", en: "Trick for '*': cur - last + last*operand (undo the last term, then multiply)." },
+      { vi: "Không cho số nhiều chữ số bắt đầu bằng '0'. Cuối cùng nếu cur == target → lưu biểu thức.", en: "No multi-digit operand starting with '0'. At the end, if cur == target → save the expression." },
+    ],
+    complexity: {
+      time: "O(4^n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi khe giữa chữ số có ~4 lựa chọn (nối/+/-/*).",
+        en: "Each gap between digits has ~4 choices (concat/+/-/*).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def addOperators(self, num, target):",
+      "        def bt(i, expr, cur, last):",
+      "            if i == len(num):",
+      "                if cur == target: result.append(expr)",
+      "                return",
+      "            for j in range(i, len(num)):",
+      "                if j > i and num[i] == '0': break",
+      "                operand = int(num[i:j+1])",
+      "                if i == 0: bt(j+1, num[i:j+1], operand, operand)",
+      "                else:",
+      "                    bt(j+1, expr+'+'+num[i:j+1], cur+operand, operand)",
+      "                    bt(j+1, expr+'-'+num[i:j+1], cur-operand, -operand)",
+      "                    bt(j+1, expr+'*'+num[i:j+1], cur-last+last*operand, last*operand)",
+      "        return result",
+    ],
+    builder: buildSteps282,
+  },
   301: {
     id: 301,
     difficulty: "hard",
