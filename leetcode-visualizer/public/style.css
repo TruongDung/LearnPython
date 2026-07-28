@@ -1446,6 +1446,408 @@ button:disabled {
   background: rgba(148, 163, 184, 0.06);
 }
 
+/* ---- Synonymous Sentences (#1258) ---- */
+.synonym-sentence-viz {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+  color: #e2e8f0;
+  letter-spacing: 0;
+}
+
+.synonym-phases {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.synonym-phase {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 9px;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.22);
+  color: #64748b;
+}
+
+.synonym-phase span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.synonym-phase strong {
+  min-width: 0;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-phase.active {
+  border-bottom-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+.synonym-phase.active span {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+}
+
+.synonym-phase.done {
+  border-bottom-color: #10b981;
+  color: #a7f3d0;
+}
+
+.synonym-phase.done span {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.13);
+  color: #6ee7b7;
+}
+
+.synonym-action {
+  padding: 10px 12px;
+  border-left: 4px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  color: #bae6fd;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.synonym-pair-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  gap: 7px;
+}
+
+.synonym-pair-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.34);
+  color: #94a3b8;
+  font-size: 11px;
+  text-align: center;
+}
+
+.synonym-pair-step small {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.synonym-pair-step span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.synonym-pair-step b { color: #64748b; }
+
+.synonym-pair-step.current {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  color: #fde68a;
+}
+
+.synonym-pair-step.current b { color: #fbbf24; }
+
+.synonym-pair-step.done {
+  border-color: rgba(16, 185, 129, 0.38);
+  background: rgba(16, 185, 129, 0.08);
+  color: #a7f3d0;
+}
+
+.synonym-pair-step.done b { color: #34d399; }
+
+.synonym-groups-section,
+.synonym-sentence-section,
+.synonym-results-section {
+  min-width: 0;
+  padding-top: 11px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.synonym-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.synonym-section-heading strong {
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.synonym-section-heading span { text-align: right; }
+
+.synonym-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.synonym-group {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  min-width: 0;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.synonym-group.active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
+}
+
+.synonym-group-root {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 8px 9px;
+  background: rgba(99, 102, 241, 0.13);
+  border-right: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.synonym-group-root small {
+  color: #818cf8;
+  font-size: 9px;
+}
+
+.synonym-group-root strong {
+  color: #c7d2fe;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-group-words {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 8px;
+}
+
+.synonym-group-words span {
+  padding: 4px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-group-words span.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+}
+
+.synonym-groups-empty {
+  grid-column: 1 / -1;
+  padding: 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.synonym-sentence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 7px;
+}
+
+.synonym-word-slot {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 7px;
+  min-width: 0;
+  min-height: 104px;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.3);
+  text-align: center;
+}
+
+.synonym-word-slot.branch {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.synonym-word-slot.active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+}
+
+.synonym-word-slot.chosen {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.synonym-word-slot.pending {
+  opacity: 0.46;
+}
+
+.synonym-word-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  color: #64748b;
+  font-size: 9px;
+}
+
+.synonym-word-head span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.synonym-word-slot > strong {
+  color: #f8fafc;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-word-options {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.synonym-word-options span {
+  padding: 2px 5px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-word-options span.selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.13);
+  color: #bae6fd;
+}
+
+.synonym-results-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 6px;
+}
+
+.synonym-result-item {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  padding: 7px 3px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.synonym-result-item small {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.synonym-result-item span { overflow-wrap: anywhere; }
+
+.synonym-result-item.newest {
+  color: #a7f3d0;
+  border-bottom-color: rgba(16, 185, 129, 0.45);
+}
+
+.synonym-results-empty {
+  grid-column: 1 / -1;
+  padding: 10px;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+}
+
+[data-theme="light"] .synonym-sentence-viz { color: #1e293b; }
+[data-theme="light"] .synonym-phase { color: #94a3b8; }
+[data-theme="light"] .synonym-phase.active { color: #0369a1; }
+[data-theme="light"] .synonym-phase.done { color: #047857; }
+[data-theme="light"] .synonym-action {
+  background: #f0f9ff;
+  color: #075985;
+}
+[data-theme="light"] .synonym-pair-step,
+[data-theme="light"] .synonym-word-slot {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .synonym-pair-step.current {
+  background: #fffbeb;
+  color: #92400e;
+}
+[data-theme="light"] .synonym-pair-step.done {
+  background: #ecfdf5;
+  color: #047857;
+}
+[data-theme="light"] .synonym-groups-section,
+[data-theme="light"] .synonym-sentence-section,
+[data-theme="light"] .synonym-results-section,
+[data-theme="light"] .synonym-result-item { border-color: #e2e8f0; }
+[data-theme="light"] .synonym-section-heading strong { color: #334155; }
+[data-theme="light"] .synonym-group { border-color: #a5b4fc; }
+[data-theme="light"] .synonym-group-root {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+[data-theme="light"] .synonym-group-root strong { color: #3730a3; }
+[data-theme="light"] .synonym-group-words span { color: #334155; border-color: #cbd5e1; }
+[data-theme="light"] .synonym-group-words span.active { background: #fffbeb; color: #92400e; }
+[data-theme="light"] .synonym-word-slot.branch { background: #ecfdf5; border-color: #6ee7b7; }
+[data-theme="light"] .synonym-word-slot.chosen { background: #f0f9ff; }
+[data-theme="light"] .synonym-word-slot > strong { color: #0f172a; }
+[data-theme="light"] .synonym-word-options span.selected { background: #e0f2fe; color: #075985; }
+[data-theme="light"] .synonym-result-item { color: #334155; }
+[data-theme="light"] .synonym-result-item.newest { color: #047857; border-color: #6ee7b7; }
+
+@media (max-width: 640px) {
+  .synonym-phases {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .synonym-pair-flow,
+  .synonym-groups,
+  .synonym-results-list {
+    grid-template-columns: 1fr;
+  }
+
+  .synonym-sentence-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .synonym-section-heading {
+    align-items: flex-start;
+  }
+}
+
 /* ---- 2D prefix sum visualization ---- */
 .prefix2d-viz {
   min-height: 300px;

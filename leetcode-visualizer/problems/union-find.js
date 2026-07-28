@@ -533,188 +533,278 @@ function buildSteps547DFS(input) {
 
 // ─── 1258: Synonymous Sentences ───
 function buildSteps1258(input, params) {
-  // input format: "synonyms" (comma-sep pairs "w1:w2"), sentence in params.sentence
-  const sentence = String(params.sentence || "I am happy today but was sad yesterday");
-  const words = sentence.split(" ");
-
-  // Parse synonym pairs from input: "happy:joy,happy:cheerful,sad:sorrow"
-  const pairs = String(input).split(",").map((s) => {
-    const [a, b] = s.trim().split(":");
-    return [a.trim(), b.trim()];
-  });
-
+  const sentence = String((params && params.sentence) || "I am happy today but was sad yesterday").trim();
+  const words = sentence.split(/\s+/).filter(Boolean);
+  const pairs = String(input)
+    .split(",")
+    .map((raw) => raw.trim().split(":").map((word) => word.trim()))
+    .filter((pair) => pair.length === 2 && pair[0] && pair[1]);
+  const synonymWords = [...new Set(pairs.flat())].sort();
+  const parent = new Map();
+  const builtGroups = new Map();
+  const results = [];
   const steps = [];
 
-  // ── Collect all unique words ──
-  const wordSet = new Set();
-  for (const [a, b] of pairs) { wordSet.add(a); wordSet.add(b); }
-  for (const w of words) wordSet.add(w);
-  const vocab = [...wordSet].sort();
-  const idx = new Map(vocab.map((w, i) => [w, i]));
-  const n = vocab.length;
-
-  // ── Union-Find ──
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const rank = new Array(n).fill(0);
-  function find(x) {
-    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-    return x;
-  }
-  function union(x, y) {
-    let rx = find(x), ry = find(y);
-    if (rx === ry) return false;
-    if (rank[rx] < rank[ry]) [rx, ry] = [ry, rx];
-    parent[ry] = rx;
-    if (rank[rx] === rank[ry]) rank[rx]++;
-    return true;
-  }
-  function groupOf(w) {
-    const r = find(idx.get(w));
-    return vocab.filter((v) => find(idx.get(v)) === r).sort();
+  function find(word) {
+    if (!parent.has(word)) parent.set(word, word);
+    if (parent.get(word) !== word) parent.set(word, find(parent.get(word)));
+    return parent.get(word);
   }
 
-  // Helper: bar snapshot showing parent[] and rank[]
-  function ufSnap(title, note, hlWords, codeLines, extraVars) {
-    const hlIdxs = new Set((hlWords || []).map((w) => idx.get(w)).filter((x) => x !== undefined));
-    const rootIdxs = new Set(vocab.map((_, i) => find(i)));
-    return {
+  function rootForView(word) {
+    let root = word;
+    const seen = new Set();
+    while (parent.has(root) && parent.get(root) !== root && !seen.has(root)) {
+      seen.add(root);
+      root = parent.get(root);
+    }
+    return root;
+  }
+
+  function union(a, b) {
+    const rootA = find(a);
+    const rootB = find(b);
+    parent.set(rootA, rootB);
+    return { rootA, rootB };
+  }
+
+  function unionGroups() {
+    const grouped = new Map();
+    for (const word of synonymWords) {
+      const root = rootForView(word);
+      if (!grouped.has(root)) grouped.set(root, []);
+      grouped.get(root).push(word);
+    }
+    return [...grouped.entries()]
+      .map(([root, members]) => ({ root, words: [...members].sort() }))
+      .sort((a, b) => a.words[0].localeCompare(b.words[0]));
+  }
+
+  function builtGroupSnapshot() {
+    return [...builtGroups.entries()]
+      .map(([root, members]) => ({ root, words: [...members] }))
+      .sort((a, b) => (a.words[0] || a.root).localeCompare(b.words[0] || b.root));
+  }
+
+  function optionsFor(word) {
+    if (!synonymWords.includes(word)) return [word];
+    const root = rootForView(word);
+    return synonymWords.filter((candidate) => rootForView(candidate) === root).sort();
+  }
+
+  function optionsSnapshot() {
+    return words.map((word) => optionsFor(word));
+  }
+
+  function parentSnapshot() {
+    return [...parent.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }
+
+  function pushStep({
+    title, note, codeLines, phaseIndex, mode, action, activePair = -1,
+    processedPairs = 0, groups, activeWords = [], activeWord = -1,
+    prefix = [], currentChoice = null, vars = [], final = false,
+  }) {
+    const step = {
       title,
-      arr: [...parent],
-      sub: [...rank],
-      highlight: [...hlIdxs],
-      mark: [...Array(n).keys()].filter((i) => rootIdxs.has(i) && parent[i] === i),
+      arr: [],
+      highlight: [],
+      mark: [],
       codeLines: codeLines || [],
-      vars: [
-        { name: "words (vocab)", value: vocab.join(", ") },
-        ...(extraVars || []),
-      ],
+      synonymSentenceView: {
+        phaseIndex,
+        mode,
+        action,
+        pairs: pairs.map(([a, b], index) => ({
+          a,
+          b,
+          state: index < processedPairs ? "done" : index === activePair ? "current" : "pending",
+        })),
+        groups: (groups || unionGroups()).map((group) => ({ root: group.root, words: [...group.words] })),
+        activeWords: [...activeWords],
+        sentence: [...words],
+        options: optionsSnapshot().map((choices) => [...choices]),
+        activeWord,
+        prefix: [...prefix],
+        currentChoice,
+        completed: [...results],
+        expected: optionsSnapshot().reduce((count, choices) => count * choices.length, 1),
+        parentLinks: parentSnapshot(),
+      },
+      vars,
       note,
     };
+    if (final) step.final = true;
+    steps.push(step);
   }
 
-  // ── Step 0: intro ──
-  steps.push(ufSnap(
-    { vi: "Bài toán: Synonymous Sentences", en: "Problem: Synonymous Sentences" },
-    {
-      vi:
-        `Câu: "${sentence}"\n` +
-        `Pairs synonym: ${pairs.map(([a, b]) => `(${a}, ${b})`).join(", ")}\n` +
-        `Vocab: [${vocab.join(", ")}]\n\n` +
-        `Dùng Union-Find để gộp các từ đồng nghĩa vào cùng 1 nhóm.\n` +
-        `Thanh bar[i] = parent[i]; nút XANH = root của nhóm.`,
-      en:
-        `Sentence: "${sentence}"\n` +
-        `Synonym pairs: ${pairs.map(([a, b]) => `(${a}, ${b})`).join(", ")}\n` +
-        `Vocab: [${vocab.join(", ")}]\n\n` +
-        `Use Union-Find to group synonyms together.\n` +
-        `Bar[i] = parent[i]; GREEN node = group root.`,
+  pushStep({
+    title: { vi: "Nhận danh sách synonym và câu ban đầu", en: "Read synonym pairs and the original sentence" },
+    note: {
+      vi: `Có ${pairs.length} cặp synonym. Trước tiên nối các từ thành nhóm, sau đó mỗi vị trí trong câu lấy lựa chọn từ nhóm của nó.`,
+      en: `There are ${pairs.length} synonym pairs. First connect words into groups, then give each sentence position the choices from its group.`,
     },
-    [],
-    [2, 3],
-    [{ name: "parent", value: `[${parent.join(",")}]` }]
-  ));
+    codeLines: [2], phaseIndex: 0, mode: "union",
+    action: { vi: `${pairs.length} cặp → Union-Find`, en: `${pairs.length} pairs → Union-Find` },
+    vars: [{ name: "synonyms", value: pairs.map(([a, b]) => `[${a}, ${b}]`).join(", ") }, { name: "text", value: sentence }],
+  });
 
-  // ── Phase 1: union each synonym pair ──
-  for (const [a, b] of pairs) {
-    const ia = idx.get(a), ib = idx.get(b);
-    const ra = find(ia), rb = find(ib);
-    if (ra === rb) {
-      steps.push(ufSnap(
-        { vi: `Union("${a}", "${b}"): đã cùng nhóm`, en: `Union("${a}", "${b}"): already same group` },
-        {
-          vi: `find("${a}") = ${ra} = find("${b}") → đã cùng nhóm, bỏ qua.`,
-          en: `find("${a}") = ${ra} = find("${b}") → same group already, skip.`,
-        },
-        [a, b], [5, 6],
-        [{ name: "find(a)", value: ra }, { name: "find(b)", value: rb }]
-      ));
-      continue;
-    }
-    union(ia, ib);
-    const newRoot = find(ia);
-    steps.push(ufSnap(
-      { vi: `Union("${a}", "${b}") → nhóm {${groupOf(a).join(", ")}}`, en: `Union("${a}", "${b}") → group {${groupOf(a).join(", ")}}` },
-      {
-        vi:
-          `Gộp "${a}" và "${b}" vào cùng nhóm. Gốc mới = vocab[${newRoot}] = "${vocab[newRoot]}".\n` +
-          `parent = [${parent.join(",")}],  rank = [${rank.join(",")}].`,
-        en:
-          `Merged "${a}" and "${b}" into one group. New root = vocab[${newRoot}] = "${vocab[newRoot]}".\n` +
-          `parent = [${parent.join(",")}],  rank = [${rank.join(",")}].`,
+  pushStep({
+    title: { vi: "Khởi tạo parent rỗng", en: "Initialize an empty parent map" },
+    note: { vi: "parent = {}. Hàm find sẽ tự thêm một từ khi gặp nó lần đầu.", en: "parent = {}. find inserts a word when it is first encountered." },
+    codeLines: [3], phaseIndex: 0, mode: "union",
+    action: { vi: "parent = {}", en: "parent = {}" },
+    vars: [{ name: "parent", value: "{}" }],
+  });
+
+  pairs.forEach(([a, b], pairIndex) => {
+    pushStep({
+      title: { vi: `Đọc cặp ${pairIndex + 1}: ${a} ↔ ${b}`, en: `Read pair ${pairIndex + 1}: ${a} ↔ ${b}` },
+      note: { vi: `Vòng for lấy a = "${a}", b = "${b}". Hai từ đang ở các nhóm được tô sáng.`, en: `The loop reads a = "${a}" and b = "${b}". Their current groups are highlighted.` },
+      codeLines: [10], phaseIndex: 0, mode: "union", activePair: pairIndex,
+      processedPairs: pairIndex, activeWords: [a, b],
+      action: { vi: `Cặp đang xét: ${a} ↔ ${b}`, en: `Current pair: ${a} ↔ ${b}` },
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+    });
+
+    const beforeRootA = rootForView(a);
+    const beforeRootB = rootForView(b);
+    pushStep({
+      title: { vi: `Gọi union("${a}", "${b}")`, en: `Call union("${a}", "${b}")` },
+      note: { vi: `Đi vào hàm union. Root hiện tại: ${a} → ${beforeRootA}, ${b} → ${beforeRootB}.`, en: `Enter union. Current roots: ${a} → ${beforeRootA}, ${b} → ${beforeRootB}.` },
+      codeLines: [11, 8], phaseIndex: 0, mode: "union", activePair: pairIndex,
+      processedPairs: pairIndex, activeWords: [a, b],
+      action: { vi: `find(${a}) và find(${b})`, en: `find(${a}) and find(${b})` },
+      vars: [{ name: `find(${a})`, value: beforeRootA }, { name: `find(${b})`, value: beforeRootB }],
+    });
+
+    const { rootA, rootB } = union(a, b);
+    pushStep({
+      title: { vi: `Nối root "${rootA}" → "${rootB}"`, en: `Link root "${rootA}" → "${rootB}"` },
+      note: {
+        vi: `Dòng 9 gán parent["${rootA}"] = "${rootB}". Vì vậy mọi từ trong hai nhóm giờ là synonym gián tiếp của nhau.`,
+        en: `Line 9 sets parent["${rootA}"] = "${rootB}". Every word in the two groups is now transitively synonymous.`,
       },
-      [a, b], [7, 8, 9],
-      [{ name: "group", value: `{${groupOf(a).join(", ")}}` }, { name: "parent", value: `[${parent.join(",")}]` }]
-    ));
+      codeLines: [9], phaseIndex: 0, mode: "union", activePair: pairIndex,
+      processedPairs: pairIndex + 1, activeWords: [a, b],
+      action: { vi: `${rootA} → ${rootB} · đã gộp nhóm`, en: `${rootA} → ${rootB} · groups merged` },
+      vars: [{ name: `parent[${rootA}]`, value: rootB }, { name: "parent", value: `{${parentSnapshot().map(([word, root]) => `${word}:${root}`).join(", ")}}` }],
+    });
+  });
+
+  pushStep({
+    title: { vi: "Tạo dictionary groups", en: "Create the groups dictionary" },
+    note: { vi: "Union đã xong. Bây giờ tạo groups[root] để chứa danh sách từ của từng nhóm.", en: "Union is complete. Now create groups[root] to hold each component's words." },
+    codeLines: [13, 14], phaseIndex: 1, mode: "groups", processedPairs: pairs.length,
+    groups: [], action: { vi: "groups = {}", en: "groups = {}" },
+    vars: [{ name: "groups", value: "{}" }],
+  });
+
+  pushStep({
+    title: { vi: `Thu thập ${synonymWords.length} từ có trong các cặp`, en: `Collect ${synonymWords.length} words from all pairs` },
+    note: { vi: `all_words = {${synonymWords.join(", ")}}. Những từ không xuất hiện trong synonym pairs sẽ giữ nguyên trong câu.`, en: `all_words = {${synonymWords.join(", ")}}. Words absent from synonym pairs stay unchanged in the sentence.` },
+    codeLines: [15], phaseIndex: 1, mode: "groups", processedPairs: pairs.length,
+    groups: [], action: { vi: `all_words: ${synonymWords.length} từ`, en: `all_words: ${synonymWords.length} words` },
+    vars: [{ name: "all_words", value: `{${synonymWords.join(", ")}}` }],
+  });
+
+  for (const word of synonymWords) {
+    const root = find(word);
+    pushStep({
+      title: { vi: `Lấy w = "${word}"; find(w) = "${root}"`, en: `Take w = "${word}"; find(w) = "${root}"` },
+      note: { vi: `Dòng 16 chọn từ "${word}". Root "${root}" quyết định bucket mà từ này sẽ đi vào.`, en: `Line 16 selects "${word}". Root "${root}" determines its bucket.` },
+      codeLines: [16], phaseIndex: 1, mode: "groups", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWords: [word],
+      action: { vi: `${word} → groups[${root}]`, en: `${word} → groups[${root}]` },
+      vars: [{ name: "w", value: word }, { name: "find(w)", value: root }],
+    });
+
+    if (!builtGroups.has(root)) builtGroups.set(root, []);
+    builtGroups.get(root).push(word);
+    pushStep({
+      title: { vi: `Thêm "${word}" vào nhóm root "${root}"`, en: `Append "${word}" to root "${root}"` },
+      note: { vi: `groups["${root}"].append("${word}"). Bucket được cập nhật ngay trên hình.`, en: `groups["${root}"].append("${word}"). The bucket is updated immediately.` },
+      codeLines: [17], phaseIndex: 1, mode: "groups", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWords: [word],
+      action: { vi: `groups[${root}] += ${word}`, en: `groups[${root}] += ${word}` },
+      vars: [{ name: `groups[${root}]`, value: `[${builtGroups.get(root).join(", ")}]` }],
+    });
   }
 
-  // ── Phase 2: show synonym group for each word in sentence ──
-  steps.push(ufSnap(
-    { vi: "Phase 2: Xác định nhóm cho từng từ trong câu", en: "Phase 2: Determine synonym group for each word" },
-    {
-      vi:
-        `Union-Find hoàn tất. Giờ xét từng từ trong câu:\n` +
-        words.map((w) => {
-          const g = groupOf(w);
-          return `  "${w}" → {${g.join(", ")}}`;
-        }).join("\n"),
-      en:
-        `Union-Find done. Now check each word in the sentence:\n` +
-        words.map((w) => {
-          const g = groupOf(w);
-          return `  "${w}" → {${g.join(", ")}}`;
-        }).join("\n"),
+  for (const members of builtGroups.values()) members.sort();
+  pushStep({
+    title: { vi: "Sort từng nhóm theo thứ tự từ điển", en: "Sort every group lexicographically" },
+    note: { vi: "Mỗi bucket được sort. Backtracking sẽ thử từ trái sang phải nên kết quả sinh ra đúng thứ tự từ điển.", en: "Each bucket is sorted. Backtracking tries choices left to right, producing lexicographic order." },
+    codeLines: [18], phaseIndex: 1, mode: "groups", processedPairs: pairs.length,
+    groups: builtGroupSnapshot(), action: { vi: "Mỗi nhóm đã được sort", en: "Every group is sorted" },
+    vars: [...builtGroups.entries()].map(([root, members]) => ({ name: `groups[${root}]`, value: `[${members.join(", ")}]` })),
+  });
+
+  const sentenceOptions = optionsSnapshot();
+  const expected = sentenceOptions.reduce((count, choices) => count * choices.length, 1);
+  pushStep({
+    title: { vi: "Gắn lựa chọn cho từng vị trí trong câu", en: "Map choices to every sentence position" },
+    note: {
+      vi: `Từ không có synonym chỉ có 1 lựa chọn. Các vị trí phân nhánh có ${sentenceOptions.filter((choices) => choices.length > 1).map((choices) => choices.length).join(" × ")} lựa chọn → tổng ${expected} câu.`,
+      en: `A word without synonyms has one choice. Branching positions have ${sentenceOptions.filter((choices) => choices.length > 1).map((choices) => choices.length).join(" × ")} choices → ${expected} total sentences.`,
     },
-    words, [11, 12],
-    words.map((w, i) => ({ name: `word[${i}] "${w}"`, value: `{${groupOf(w).join(", ")}}` }))
-  ));
+    codeLines: [20], phaseIndex: 2, mode: "choices", processedPairs: pairs.length,
+    groups: builtGroupSnapshot(), action: { vi: `Số câu = ${sentenceOptions.map((choices) => choices.length).join(" × ")} = ${expected}`, en: `Sentence count = ${sentenceOptions.map((choices) => choices.length).join(" × ")} = ${expected}` },
+    vars: [{ name: "words", value: `[${words.join(", ")}]` }, { name: "res", value: "[]" }, { name: "total combinations", value: expected }],
+  });
 
-  // ── Phase 3: generate all sentences ──
-  const groups = words.map((w) => groupOf(w));
-  const results = [];
-  function gen(i, cur) {
-    if (i === words.length) { results.push(cur.join(" ")); return; }
-    for (const syn of groups[i]) { cur.push(syn); gen(i + 1, cur); cur.pop(); }
-  }
-  gen(0, []);
+  pushStep({
+    title: { vi: "Bắt đầu backtrack từ vị trí 0", en: "Start backtracking at position 0" },
+    note: { vi: "backtrack(0, []). Các từ chỉ có một lựa chọn được điền thẳng; hình dừng lại ở mỗi vị trí thật sự phân nhánh.", en: "backtrack(0, []). Single-choice words are filled directly; the visual pauses at each real branching position." },
+    codeLines: [26], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+    groups: builtGroupSnapshot(), activeWord: 0, prefix: [],
+    action: { vi: "backtrack(0, [])", en: "backtrack(0, [])" },
+    vars: [{ name: "i", value: 0 }, { name: "cur", value: "[]" }, { name: "res", value: "[]" }],
+  });
 
-  // Show generation step by step (one per word position)
-  for (let i = 0; i < words.length; i++) {
-    const g = groups[i];
-    if (g.length > 1) {
-      steps.push(ufSnap(
-        { vi: `Từ[${i}] "${words[i]}" có ${g.length} lựa chọn`, en: `Word[${i}] "${words[i]}" has ${g.length} choices` },
-        {
-          vi:
-            `Vị trí ${i}: "${words[i]}" thuộc nhóm {${g.join(", ")}}\n` +
-            `Thay bằng bất kỳ từ nào → nhân số câu lên ${g.length} lần.\n` +
-            `Sau vị trí này: ${results.filter((r) => r.split(" ").slice(0, i + 1).join(" ") === g.map((_, k) => k === 0 ? g[0] : "").join("") || true).length} câu tạm.`,
-          en:
-            `Position ${i}: "${words[i]}" belongs to group {${g.join(", ")}}\n` +
-            `Substituting any member → multiplies sentence count by ${g.length}.\n` +
-            `Each choice: ${g.map((syn) => `"${syn}"`).join(" or ")}.`,
-        },
-        [words[i]], [13, 14],
-        [{ name: `group[${i}]`, value: `[${g.join(", ")}]` }, { name: "choices", value: g.length }]
-      ));
+  function generate(i, current) {
+    if (i === words.length) {
+      const completedSentence = current.join(" ");
+      results.push(completedSentence);
+      pushStep({
+        title: { vi: `Hoàn thành câu #${results.length}`, en: `Complete sentence #${results.length}` },
+        note: { vi: `i == len(words), nên ghép cur và append vào res. Đã có ${results.length}/${expected} câu.`, en: `i == len(words), so join cur and append it to res. ${results.length}/${expected} sentences are complete.` },
+        codeLines: [22, 23], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: -1, prefix: current,
+        action: { vi: `res.append câu #${results.length}`, en: `res.append sentence #${results.length}` },
+        vars: [{ name: "i", value: i }, { name: "sentence", value: completedSentence }, { name: "len(res)", value: results.length }],
+      });
+      return;
+    }
+
+    const choices = sentenceOptions[i];
+    for (const choice of choices) {
+      const next = [...current, choice];
+      if (choices.length > 1) {
+        pushStep({
+          title: { vi: `Vị trí ${i}: thử "${choice}"`, en: `Position ${i}: try "${choice}"` },
+          note: { vi: `Dòng 24 lấy "${choice}" trong nhóm [${choices.join(", ")}], rồi dòng 25 gọi đệ quy với prefix mới.`, en: `Line 24 takes "${choice}" from [${choices.join(", ")}], then line 25 recurses with the new prefix.` },
+          codeLines: [24, 25], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+          groups: builtGroupSnapshot(), activeWord: i, prefix: next, currentChoice: choice,
+          action: { vi: `Chọn ${choice} tại [${i}] → đi sâu`, en: `Choose ${choice} at [${i}] → recurse` },
+          vars: [{ name: "i", value: i }, { name: "syn", value: choice }, { name: "cur", value: `[${next.join(", ")}]` }],
+        });
+      }
+      generate(i + 1, next);
     }
   }
 
-  // ── Final: show all results ──
-  const fs = ufSnap(
-    { vi: `Kết quả: ${results.length} câu`, en: `Result: ${results.length} sentences` },
-    {
-      vi:
-        `Tất cả ${results.length} câu theo thứ tự từ điển:\n` +
-        results.map((s, i) => `  ${i + 1}. "${s}"`).join("\n"),
-      en:
-        `All ${results.length} sentences in lexicographic order:\n` +
-        results.map((s, i) => `  ${i + 1}. "${s}"`).join("\n"),
-    },
-    [], [15],
-    [{ name: "total", value: results.length }, { name: "sentences", value: results.join(" | ") }]
-  );
-  fs.final = true;
-  steps.push(fs);
+  generate(0, []);
+  results.sort();
+  pushStep({
+    title: { vi: `Trả về ${results.length} câu theo thứ tự từ điển`, en: `Return ${results.length} sentences in lexicographic order` },
+    note: { vi: `Có ${expected} tổ hợp và đã sinh đủ ${results.length} câu. Các nhóm được sort nên danh sách cuối cũng theo thứ tự từ điển.`, en: `There are ${expected} combinations and all ${results.length} sentences were generated. Sorted groups keep the final list lexicographic.` },
+    codeLines: [27], phaseIndex: 3, mode: "result", processedPairs: pairs.length,
+    groups: builtGroupSnapshot(), activeWord: -1, prefix: [],
+    action: { vi: `return sorted(res) · ${results.length} câu`, en: `return sorted(res) · ${results.length} sentences` },
+    vars: [{ name: "answer count", value: results.length }, { name: "res", value: results.join(" | ") }],
+    final: true,
+  });
 
   return { input, answer: results.join(" | "), steps };
 }
@@ -2257,17 +2347,17 @@ module.exports = {
       },
     ],
     approach: [
-      { vi: "Gán mỗi từ 1 index. Union-Find gộp các từ đồng nghĩa vào cùng nhóm.", en: "Assign each word an index. Union-Find groups synonyms together." },
-      { vi: "Union by rank: gốc rank lớn hơn hấp thụ gốc nhỏ hơn → cây thấp.", en: "Union by rank: larger-rank root absorbs smaller → keeps tree shallow." },
-      { vi: "Với mỗi từ trong câu, lấy nhóm synonym (sort). Dùng backtracking sinh mọi tổ hợp.", en: "For each word, get its synonym group (sorted). Backtrack to generate all combinations." },
-      { vi: "Kết quả tự nhiên theo thứ tự từ điển vì nhóm đã được sort.", en: "Result is lexicographic since each group is pre-sorted." },
+      { vi: "Union-Find dùng chính từ làm key trong parent. union(a, b) nối root của a sang root của b.", en: "Union-Find uses each word directly as a key in parent. union(a, b) links a's root to b's root." },
+      { vi: "Duyệt mọi từ synonym, gom các từ có cùng find(word) vào một bucket rồi sort bucket.", en: "Scan every synonym word, bucket words sharing the same find(word), then sort each bucket." },
+      { vi: "Mỗi vị trí trong câu nhận một danh sách lựa chọn; từ thường chỉ có chính nó. Backtracking thử tích Descartes của các danh sách này.", en: "Each sentence position receives a choice list; an ordinary word only has itself. Backtracking explores the Cartesian product of these lists." },
+      { vi: "Các bucket đã sort nên backtracking sinh câu theo thứ tự từ điển.", en: "Sorted buckets make backtracking generate sentences in lexicographic order." },
     ],
     complexity: {
-      time: "O(p·α(v) + w·g^w)",
-      space: "O(v)",
+      time: "O(p·α(v) + C·w)",
+      space: "O(v + C·w)",
       note: {
-        vi: "p = số cặp, v = vocab size, w = số từ trong câu, g = kích thước nhóm lớn nhất.",
-        en: "p = pair count, v = vocab size, w = sentence words, g = max group size.",
+        vi: "p = số cặp, v = số từ synonym, w = số từ trong câu, C = số câu kết quả. C·w là chi phí bắt buộc để tạo output.",
+        en: "p = pair count, v = synonym-word count, w = sentence length, and C = output sentence count. C·w is required to materialize the output.",
       },
     },
     code: [

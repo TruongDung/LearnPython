@@ -2398,6 +2398,120 @@ function renderSentenceView(step) {
     </div>`;
 }
 
+function renderSynonymSentenceView(step) {
+  const view = step.synonymSentenceView || {};
+  const vi = lang === "vi";
+  const phases = vi
+    ? ["Nối cặp", "Tạo nhóm", "Gắn lựa chọn", "Sinh câu"]
+    : ["Union pairs", "Build groups", "Map choices", "Generate"];
+  const phaseIndex = Number.isInteger(view.phaseIndex) ? view.phaseIndex : 0;
+  const pairs = Array.isArray(view.pairs) ? view.pairs : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const sentence = Array.isArray(view.sentence) ? view.sentence : [];
+  const options = Array.isArray(view.options) ? view.options : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const completed = Array.isArray(view.completed) ? view.completed : [];
+  const activeWords = new Set(Array.isArray(view.activeWords) ? view.activeWords : []);
+  const activeWord = Number.isInteger(view.activeWord) ? view.activeWord : -1;
+  const expected = Number.isFinite(view.expected) ? view.expected : 0;
+
+  const phaseHtml = phases.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<div class="synonym-phase ${state}">
+      <span>${index < phaseIndex ? "✓" : index + 1}</span>
+      <strong>${escapeHtml(label)}</strong>
+    </div>`;
+  }).join("");
+
+  const pairHtml = pairs.map((pair, index) => `<div class="synonym-pair-step ${escapeHtml(pair.state || "pending")}">
+    <small>#${index + 1}</small>
+    <span>${escapeHtml(pair.a)}</span>
+    <b>↔</b>
+    <span>${escapeHtml(pair.b)}</span>
+  </div>`).join("");
+
+  const groupsHtml = groups.length
+    ? groups.map((group) => {
+      const words = Array.isArray(group.words) ? group.words : [];
+      const isActive = words.some((word) => activeWords.has(word));
+      return `<div class="synonym-group${isActive ? " active" : ""}">
+        <div class="synonym-group-root"><small>root</small><strong>${escapeHtml(group.root)}</strong></div>
+        <div class="synonym-group-words">${words.map((word) => `<span class="${activeWords.has(word) ? "active" : ""}">${escapeHtml(word)}</span>`).join("")}</div>
+      </div>`;
+    }).join("")
+    : `<div class="synonym-groups-empty"><code>groups = {}</code></div>`;
+
+  const sentenceHtml = sentence.map((word, index) => {
+    const choices = Array.isArray(options[index]) && options[index].length ? options[index] : [word];
+    const hasChoice = choices.length > 1;
+    const isChosen = index < prefix.length;
+    const isActive = index === activeWord;
+    const isPending = view.mode === "backtrack" && index >= prefix.length && !isActive;
+    const shownWord = isChosen ? prefix[index] : word;
+    const tileClass = [
+      "synonym-word-slot",
+      hasChoice ? "branch" : "fixed",
+      isChosen ? "chosen" : "",
+      isActive ? "active" : "",
+      isPending ? "pending" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="${tileClass}">
+      <div class="synonym-word-head"><small>[${index}]</small><span>${escapeHtml(word)}</span></div>
+      <strong>${escapeHtml(shownWord)}</strong>
+      <div class="synonym-word-options">${choices.map((choice) => {
+        const selected = isChosen && prefix[index] === choice;
+        const current = isActive && view.currentChoice === choice;
+        return `<span class="${selected || current ? "selected" : ""}">${escapeHtml(choice)}</span>`;
+      }).join("")}</div>
+    </div>`;
+  }).join("");
+
+  const resultsHtml = completed.length
+    ? completed.map((result, index) => `<div class="synonym-result-item${index === completed.length - 1 && view.mode !== "result" ? " newest" : ""}">
+      <small>${index + 1}</small><span>${escapeHtml(result)}</span>
+    </div>`).join("")
+    : `<div class="synonym-results-empty">${vi ? "Chưa có câu hoàn chỉnh" : "No completed sentence yet"}</div>`;
+
+  const sentenceSection = phaseIndex >= 2
+    ? `<section class="synonym-sentence-section">
+        <div class="synonym-section-heading">
+          <strong>${vi ? "CÂU VÀ LỰA CHỌN" : "SENTENCE CHOICES"}</strong>
+          <span>${vi ? "ô xanh = có thể thay thế" : "green = replaceable"}</span>
+        </div>
+        <div class="synonym-sentence-grid">${sentenceHtml}</div>
+      </section>`
+    : "";
+
+  const resultsSection = phaseIndex >= 3
+    ? `<section class="synonym-results-section">
+        <div class="synonym-section-heading">
+          <strong>res</strong>
+          <span>${completed.length} / ${expected} ${vi ? "câu" : "sentences"}</span>
+        </div>
+        <div class="synonym-results-list">${resultsHtml}</div>
+      </section>`
+    : "";
+
+  const summary = vi
+    ? `Bước ${phases[phaseIndex]}. Có ${groups.length} nhóm synonym và ${completed.length} trên ${expected} câu đã hoàn thành.`
+    : `${phases[phaseIndex]} phase. ${groups.length} synonym groups and ${completed.length} of ${expected} sentences completed.`;
+
+  $("treeView").innerHTML = `<div class="synonym-sentence-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="synonym-phases">${phaseHtml}</div>
+    <div class="synonym-action">${escapeHtml(pick(view.action) || "")}</div>
+    <div class="synonym-pair-flow">${pairHtml}</div>
+    <section class="synonym-groups-section">
+      <div class="synonym-section-heading">
+        <strong>${vi ? "NHÓM SYNONYM" : "SYNONYM GROUPS"}</strong>
+        <span>${groups.length} ${vi ? "nhóm" : "groups"}</span>
+      </div>
+      <div class="synonym-groups">${groupsHtml}</div>
+    </section>
+    ${sentenceSection}
+    ${resultsSection}
+  </div>`;
+}
+
 function renderPrefix2DView(step) {
   const view = step.prefix2DView || {};
   const matrix = Array.isArray(view.matrix) ? view.matrix : [];
@@ -3969,6 +4083,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSentenceView(step);
+  } else if (step.synonymSentenceView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSynonymSentenceView(step);
   } else if (step.prefix2DView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
