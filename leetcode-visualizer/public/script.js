@@ -1633,6 +1633,7 @@ function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" | { label, kind } }
+  const minX = Math.min(0, ...nodes.map((n) => n.x));
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
@@ -1658,9 +1659,9 @@ function renderTree(step, targetId = "treeView") {
     : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
   const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
   const leftGutter = showLevelLabels ? 52 : 0;
-  const width = basePad * 2 + leftGutter + maxX * colW;
+  const width = basePad * 2 + leftGutter + (maxX - minX) * colW;
   const height = basePad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
-  const px = (x) => basePad + leftGutter + x * colW;
+  const px = (x) => basePad + leftGutter + (x - minX) * colW;
   const py = (y) => basePad + y * rowH;
 
   const pos = {};
@@ -1686,7 +1687,7 @@ function renderTree(step, targetId = "treeView") {
     const ux = dx/len, uy = dy/len;
     const x1 = p.x + ux * (r + 2), y1 = p.y + uy * (r + 2);
     const x2 = c.x - ux * (r + 4), y2 = c.y - uy * (r + 4);
-    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="tree-edge" marker-end="url(#${arrowId})" />`;
+    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="tree-edge${n.isNull ? " null-edge" : ""}" marker-end="url(#${arrowId})" />`;
   });
 
   let circles = "";
@@ -1694,7 +1695,7 @@ function renderTree(step, targetId = "treeView") {
     const c = pos[n.id];
     const nodeHw = hw[n.id];
     const isPill = nodeHw > r + 0.5;
-    const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "") + (n.isPruned ? " pruned" : "");
+    const cls = "tree-node" + (n.hl ? " hl" : "") + (n.isWord ? " word" : "") + (n.isPruned ? " pruned" : "") + (n.isNull ? " null" : "");
     circles += `<g class="${cls}">`;
     if (isPill) {
       if (n.isWord) circles += `<rect x="${c.x - nodeHw - 4}" y="${c.y - r - 4}" width="${(nodeHw + 4) * 2}" height="${(r + 4) * 2}" rx="${r + 4}" class="tree-ring" />`;
@@ -1746,7 +1747,7 @@ function renderTree(step, targetId = "treeView") {
   }
 
   const treeHtml =
-    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 420 ? " tree-svg-fit" : ""}">` +
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}">` +
     `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +

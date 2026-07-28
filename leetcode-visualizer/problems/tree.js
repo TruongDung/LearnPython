@@ -48,10 +48,25 @@ function treeToVizNodes(root, hlSet, wordSet) {
 }
 
 function snapshot(root, opts) {
+  const nodes = treeToVizNodes(root, opts.hlSet, opts.wordSet);
+  (opts.nullChildren || []).forEach((child) => {
+    const parent = nodes.find((node) => node.id === child.parentId);
+    if (!parent) return;
+    nodes.push({
+      id: child.id,
+      label: "null",
+      x: parent.x + (child.side === "left" ? -0.82 : 0.82),
+      y: parent.y + 1,
+      parentId: parent.id,
+      isNull: true,
+      hl: false,
+      isWord: false,
+    });
+  });
   return {
     title: opts.title,
     arr: [],
-    tree: { nodes: treeToVizNodes(root, opts.hlSet, opts.wordSet), annotations: opts.annotations },
+    tree: { nodes, annotations: opts.annotations },
     highlight: [],
     mark: [],
     codeLines: opts.codeLines || [],
@@ -267,11 +282,18 @@ function buildSteps543(input) {
   const root = parseTree(input); const steps = [];
   const marker = (label, kind) => ({ label, kind });
   const sideName = (side) => (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "ROOT");
+  const nullId = (node, side) => `null-${node.id}-${side}`;
+  function missingNullChildren(node, onlySide = null) {
+    if (!node) return [];
+    return ["left", "right"]
+      .filter((side) => (!onlySide || side === onlySide) && !node[side])
+      .map((side) => ({ id: nullId(node, side), parentId: node.id, side }));
+  }
   function relationAnnotations(node, side, parentNode) {
     const annotations = {};
     if (parentNode) annotations[parentNode.id] = marker("PARENT", "parent");
     if (node) annotations[node.id] = marker(sideName(side), side);
-    else if (parentNode && side !== "root") annotations[parentNode.id] = marker(`${sideName(side)} = None`, side);
+    else if (parentNode && side !== "root") annotations[nullId(parentNode, side)] = marker(sideName(side), side);
     return annotations;
   }
   function branchAnnotations(node, { activeSide = null, leftDepth, rightDepth } = {}) {
@@ -282,8 +304,10 @@ function buildSteps543(input) {
         : `LEFT · d=${leftDepth}`;
       const kind = activeSide === "left" ? "left" : leftDepth === undefined ? "pending" : "left-done";
       annotations[node.left.id] = marker(label, kind);
-    } else if (activeSide === "left") {
-      annotations[node.id] = marker("NODE · LEFT=None", "left");
+    } else {
+      const label = leftDepth === undefined ? "LEFT" : `LEFT · d=${leftDepth}`;
+      const kind = activeSide === "left" ? "left" : leftDepth === undefined ? "pending" : "left-done";
+      annotations[nullId(node, "left")] = marker(label, kind);
     }
     if (node.right) {
       const label = rightDepth === undefined
@@ -291,8 +315,10 @@ function buildSteps543(input) {
         : `RIGHT · d=${rightDepth}`;
       const kind = activeSide === "right" ? "right" : rightDepth === undefined ? "pending" : "right-done";
       annotations[node.right.id] = marker(label, kind);
-    } else if (activeSide === "right") {
-      annotations[node.id] = marker("NODE · RIGHT=None", "right");
+    } else {
+      const label = rightDepth === undefined ? "RIGHT" : `RIGHT · d=${rightDepth}`;
+      const kind = activeSide === "right" ? "right" : rightDepth === undefined ? "pending" : "right-done";
+      annotations[nullId(node, "right")] = marker(label, kind);
     }
     return annotations;
   }
@@ -323,6 +349,7 @@ function buildSteps543(input) {
         },
         hlSet: parentNode ? new Set([parentNode.id]) : undefined,
         annotations: relationAnnotations(node, side, parentNode),
+        nullChildren: parentNode ? missingNullChildren(parentNode, side) : undefined,
         codeLines: [5],
         vars: [{ name: "side", value: sideName(side) }, { name: "node", value: "None" }, { name: "l", value: "—" }, { name: "r", value: "—" }, { name: "return", value: 0 }, { name: "self.best", value: best }],
         note: {
@@ -347,6 +374,7 @@ function buildSteps543(input) {
     steps.push(snapshot(root, {
       title: { vi: `Gọi depth bên trái của ${node.val}`, en: `Call the left depth of ${node.val}` },
       hlSet: new Set([node.left ? node.left.id : node.id]), annotations: branchAnnotations(node, { activeSide: "left" }), codeLines: [6],
+      nullChildren: missingNullChildren(node),
       vars: [{ name: "node", value: node.val }, { name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "left child", value: node.left ? node.left.val : "None" }, { name: "self.best", value: best }],
       note: { vi: `Dòng 6 gọi depth(node.left). Node sắp quét được gắn nhãn LEFT.`, en: `Line 6 calls depth(node.left). The next node is marked LEFT.` },
     }));
@@ -354,6 +382,7 @@ function buildSteps543(input) {
     steps.push(snapshot(root, {
       title: { vi: `Nhánh trái của ${node.val} có depth = ${l}`, en: `Left depth of ${node.val} is ${l}` },
       hlSet: new Set([node.right ? node.right.id : node.id]), annotations: branchAnnotations(node, { activeSide: "right", leftDepth: l }), codeLines: [7],
+      nullChildren: missingNullChildren(node),
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: "pending" }, { name: "right child", value: node.right ? node.right.val : "None" }, { name: "self.best", value: best }],
       note: { vi: `LEFT đã trả l = ${l}. Dòng 7 chuyển sang node.right và gắn node sắp quét là RIGHT.`, en: `LEFT returned l = ${l}. Line 7 moves to node.right and marks the next node RIGHT.` },
     }));
@@ -364,6 +393,7 @@ function buildSteps543(input) {
     steps.push(snapshot(root, {
       title: { vi: `Nút ${node.val}: qua đây = ${through}`, en: `Node ${node.val}: through = ${through}` },
       hlSet: new Set([node.id]), annotations: branchAnnotations(node, { leftDepth: l, rightDepth: r }), codeLines: [8],
+      nullChildren: missingNullChildren(node),
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: r }, { name: "path through", value: through }, { name: "self.best", value: best }],
       note: { vi: `Đường đi qua ${node.val} = ${l} + ${r} = ${through} cạnh. best = ${best}.`, en: `Path through ${node.val} = ${l} + ${r} = ${through} edges. best = ${best}.` },
     }));
@@ -371,6 +401,7 @@ function buildSteps543(input) {
     steps.push(snapshot(root, {
       title: { vi: `depth(${node.val}) trả về ${height}`, en: `depth(${node.val}) returns ${height}` },
       hlSet: new Set([node.id]), annotations: branchAnnotations(node, { leftDepth: l, rightDepth: r }), codeLines: [9],
+      nullChildren: missingNullChildren(node),
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: r }, { name: "return", value: height }, { name: "self.best", value: best }],
       note: { vi: `Chiều cao trả về = 1 + max(${l}, ${r}) = ${height}.`, en: `Returned height = 1 + max(${l}, ${r}) = ${height}.` },
     }));
