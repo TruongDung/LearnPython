@@ -7079,7 +7079,274 @@ function buildSteps3517HalfBucket(input) {
   return { original: s, answer, steps };
 }
 
+/**
+ * LeetCode 3458: Select K Disjoint Special Substrings.
+ * A substring is "special" if no character inside it appears outside it, and it
+ * is NOT the whole string. Build the minimal special interval starting at each
+ * char's first occurrence (like Partition Labels), then greedily pick the max
+ * number of non-overlapping ones and check if it reaches k.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def maxSubstringLength(self, s, k):
+ *  3          if k == 0: return True
+ *  4          first, last = first/last occurrence of each char
+ *  5          intervals = []
+ *  6          for i in range(n):
+ *  7              if first[s[i]] != i: continue
+ *  8              j = last[s[i]]; t = i; valid = True
+ *  9              while t <= j:
+ * 10                  if first[s[t]] < i: valid = False; break
+ * 11                  j = max(j, last[s[t]]); t += 1
+ * 12              if valid and not (i==0 and j==n-1): intervals.append((j, i))
+ * 13          intervals.sort()
+ * 14          count = 0; prev_end = -1
+ * 15          for end, start in intervals:
+ * 16              if start > prev_end: count += 1; prev_end = end
+ * 17          return count >= k
+ */
+function buildSteps3458(input, params) {
+  const s = String(input);
+  const n = s.length;
+  const k = params && params.k !== undefined ? Number(params.k) : 2;
+  const chars = s.split("");
+  const steps = [];
+
+  const first = {};
+  const last = {};
+  for (let i = 0; i < n; i++) {
+    if (!(s[i] in first)) first[s[i]] = i;
+    last[s[i]] = i;
+  }
+
+  const inRange = (lo, hi) => (lo <= hi ? Array.from({ length: hi - lo + 1 }, (_, x) => lo + x) : []);
+  function makeGrid(opts) {
+    const labels = {};
+    const setLabel = (idx, lb) => {
+      if (idx < 0 || idx >= n) return;
+      const key = `0,${idx + 1}`;
+      labels[key] = labels[key] ? `${labels[key]}\n${lb}` : lb;
+    };
+    (opts.selected || []).forEach(([st, en], gi) => {
+      for (const idx of inRange(st, en)) setLabel(idx, `S${gi + 1}`);
+    });
+    if (opts.window) { setLabel(opts.window[0], "i"); setLabel(opts.window[1], "j"); }
+    return {
+      dp: [["", ...chars]],
+      text1: "",
+      text2: s,
+      colLabels: chars.map((ch, i) => ({ index: `${i}`, char: ch })),
+      hlCell: Number.isInteger(opts.focus) ? [0, opts.focus + 1] : null,
+      pathCells: opts.window ? inRange(opts.window[0], opts.window[1]).map((i) => [0, i + 1]) : [],
+      historyCells: (opts.selected || []).flatMap(([st, en]) => inRange(st, en).map((i) => [0, i + 1])),
+      cellLabels: labels,
+      largeCells: true,
+      caption: opts.caption || "",
+    };
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts),
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  const firstStr = `{${Object.keys(first).map((c) => `${c}:${first[c]}`).join(", ")}}`;
+  const lastStr = `{${Object.keys(last).map((c) => `${c}:${last[c]}`).join(", ")}}`;
+
+  snap({
+    title: { vi: "Tính first/last mỗi ký tự", en: "Compute first/last of each char" },
+    codeLines: [4, 5],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "k", value: k },
+      { name: "first", value: firstStr },
+      { name: "last", value: lastStr },
+    ],
+    note: {
+      vi:
+        `Chuỗi con "đặc biệt" = mọi ký tự bên trong KHÔNG xuất hiện bên ngoài, và KHÔNG phải cả chuỗi.\n` +
+        `Ý tưởng: từ mỗi vị trí xuất hiện ĐẦU của một ký tự, mở rộng đoạn tới khi "đóng kín" (giống Partition Labels).\n` +
+        `Sau đó chọn tối đa số đoạn RỜI NHAU và kiểm tra ≥ k.`,
+      en:
+        `A "special" substring = every inside char does NOT appear outside, and it is NOT the whole string.\n` +
+        `Idea: from each char's FIRST occurrence, expand the segment until "closed" (like Partition Labels).\n` +
+        `Then pick the max number of DISJOINT segments and check ≥ k.`,
+    },
+  });
+
+  // Build minimal special intervals
+  const intervals = [];
+  for (let i = 0; i < n; i++) {
+    if (first[s[i]] !== i) continue;
+    let j = last[s[i]];
+    let t = i;
+    let valid = true;
+    while (t <= j) {
+      if (first[s[t]] < i) { valid = false; break; }
+      j = Math.max(j, last[s[t]]);
+      t += 1;
+    }
+    const isWhole = (i === 0 && j === n - 1);
+    if (valid && !isWhole) intervals.push([j, i]); // (end, start)
+
+    snap({
+      title: { vi: `Start i=${i} ('${s[i]}'): đoạn [${i}, ${valid ? j : "?"}] ${valid ? (isWhole ? "= cả chuỗi → loại" : "→ hợp lệ") : "→ không đóng kín"}`, en: `Start i=${i} ('${s[i]}'): segment [${i}, ${valid ? j : "?"}] ${valid ? (isWhole ? "= whole string → reject" : "→ valid") : "→ not closed"}` },
+      focus: i,
+      window: valid ? [i, j] : [i, Math.min(j, n - 1)],
+      codeLines: [6, 7, 8, 9, 10, 11, 12],
+      vars: [
+        { name: "i", value: i },
+        { name: "char", value: `'${s[i]}'` },
+        { name: "end j", value: valid ? j : "broke" },
+        { name: "valid", value: valid && !isWhole },
+        { name: "intervals", value: intervals.map(([e, st]) => `[${st},${e}]`).join(", ") || "none" },
+      ],
+      note: {
+        vi: valid
+          ? (isWhole
+            ? `Đoạn [${i},${j}] phủ cả chuỗi → không được tính là special.`
+            : `Mở rộng: j = max(last của mọi ký tự trong đoạn) = ${j}. Mọi ký tự trong [${i},${j}] không xuất hiện ngoài → đoạn ĐÓNG KÍN, hợp lệ.`)
+          : `Có ký tự trong đoạn xuất hiện TRƯỚC i (first < ${i}) → đoạn không thể bắt đầu ở ${i} → bỏ.`,
+        en: valid
+          ? (isWhole
+            ? `Segment [${i},${j}] covers the whole string → not counted as special.`
+            : `Expand: j = max(last of every char inside) = ${j}. All chars in [${i},${j}] don't appear outside → CLOSED, valid.`)
+          : `A char inside appears BEFORE i (first < ${i}) → cannot start at ${i} → skip.`,
+      },
+    });
+  }
+
+  // Greedy select
+  intervals.sort((a, b) => a[0] - b[0]);
+  let count = 0;
+  let prevEnd = -1;
+  const selected = [];
+
+  snap({
+    title: { vi: `Sắp ${intervals.length} đoạn theo end; greedy chọn rời nhau`, en: `Sort ${intervals.length} segments by end; greedily pick disjoint` },
+    codeLines: [13, 14],
+    vars: [
+      { name: "intervals (by end)", value: intervals.map(([e, st]) => `[${st},${e}]`).join(", ") || "none" },
+      { name: "count", value: 0 },
+      { name: "prev_end", value: -1 },
+    ],
+    note: {
+      vi: "Sắp các đoạn theo END tăng dần. Duyệt và chọn đoạn nếu start > prev_end (không chồng lấn) — chiến lược tham lam tối đa số đoạn rời nhau.",
+      en: "Sort segments by END ascending. Pick a segment if start > prev_end (non-overlapping) — greedy strategy maximizing disjoint count.",
+    },
+  });
+
+  for (const [end, start] of intervals) {
+    const pick = start > prevEnd;
+    if (pick) { count += 1; prevEnd = end; selected.push([start, end]); }
+    snap({
+      title: { vi: `Đoạn [${start},${end}]: ${pick ? `CHỌN → count=${count}` : "bỏ (chồng lấn)"}`, en: `Segment [${start},${end}]: ${pick ? `PICK → count=${count}` : "skip (overlaps)"}` },
+      focus: start,
+      window: [start, end],
+      selected: [...selected],
+      codeLines: [15, 16],
+      vars: [
+        { name: "segment", value: `[${start},${end}]` },
+        { name: "start > prev_end?", value: `${start} > ${pick ? prevEnd === end ? "prev" : prevEnd : prevEnd}` },
+        { name: "count", value: count },
+        { name: "prev_end", value: prevEnd },
+      ],
+      note: {
+        vi: pick
+          ? `start=${start} > prev_end → không chồng đoạn đã chọn → CHỌN. count=${count}, prev_end=${end}.`
+          : `start=${start} ≤ prev_end=${prevEnd} → chồng lấn đoạn đã chọn → bỏ qua.`,
+        en: pick
+          ? `start=${start} > prev_end → doesn't overlap chosen → PICK. count=${count}, prev_end=${end}.`
+          : `start=${start} ≤ prev_end=${prevEnd} → overlaps a chosen segment → skip.`,
+      },
+    });
+  }
+
+  const answer = count >= k;
+  snap({
+    title: { vi: `count=${count} ${answer ? "≥" : "<"} k=${k} → ${answer}`, en: `count=${count} ${answer ? "≥" : "<"} k=${k} → ${answer}` },
+    selected: [...selected],
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "count", value: count },
+      { name: "k", value: k },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Số đoạn special rời nhau tối đa = ${count}. ${answer ? `≥ k=${k} → chọn được k đoạn → true.` : `< k=${k} → không đủ → false.`}`,
+      en: `Max disjoint special segments = ${count}. ${answer ? `≥ k=${k} → can select k → true.` : `< k=${k} → not enough → false.`}`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  3458: {
+    id: 3458,
+    difficulty: "hard",
+    slug: "select-k-disjoint-special-substrings",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Select K Disjoint Special Substrings", en: "Select K Disjoint Special Substrings" },
+    titleVi: { vi: "Chọn k chuỗi con đặc biệt rời nhau", en: "Select k disjoint special substrings" },
+    statement: {
+      vi:
+        "Chuỗi con 'đặc biệt' = mọi ký tự bên trong KHÔNG xuất hiện bên ngoài nó, và KHÔNG phải toàn bộ chuỗi. " +
+        "Hỏi có thể chọn k chuỗi con đặc biệt RỜI NHAU (không chồng lấn) hay không. Nhập s; k trong tham số.",
+      en:
+        "A 'special' substring = every character inside does NOT appear outside it, and it is NOT the whole string. " +
+        "Decide whether k DISJOINT (non-overlapping) special substrings can be selected. Enter s; k as a parameter.",
+    },
+    defaultInput: "abcdbaefab",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "k", label: { vi: "k", en: "k" }, default: 2 },
+    ],
+    approach: [
+      { vi: "Tính first/last occurrence của mỗi ký tự.", en: "Compute first/last occurrence of each character." },
+      { vi: "Từ mỗi first[c]==i, mở rộng j = max(last của các ký tự trong đoạn) — giống Partition Labels.", en: "From each first[c]==i, expand j = max(last of chars inside) — like Partition Labels." },
+      { vi: "Nếu có ký tự trong đoạn xuất hiện trước i → không đóng kín, bỏ. Loại đoạn = cả chuỗi.", en: "If a char inside appears before i → not closed, skip. Reject the whole-string segment." },
+      { vi: "Greedy chọn tối đa đoạn rời nhau (sắp theo end). count ≥ k → true.", en: "Greedily pick max disjoint segments (sort by end). count ≥ k → true." },
+    ],
+    complexity: {
+      time: "O(n·Σ) ~ O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Σ ≤ 26. Mở rộng đoạn + greedy đều tuyến tính theo n.",
+        en: "Σ ≤ 26. Segment expansion + greedy are both linear in n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSubstringLength(self, s, k):",
+      "        if k == 0: return True",
+      "        first = {c: i for i, c in enumerate(s) if c not in ...}; last = {...}",
+      "        intervals = []",
+      "        for i in range(n):",
+      "            if first[s[i]] != i: continue",
+      "            j = last[s[i]]; t = i; valid = True",
+      "            while t <= j:",
+      "                if first[s[t]] < i: valid = False; break",
+      "                j = max(j, last[s[t]]); t += 1",
+      "            if valid and not (i==0 and j==n-1): intervals.append((j, i))",
+      "        intervals.sort()",
+      "        count = 0; prev_end = -1",
+      "        for end, start in intervals:",
+      "            if start > prev_end: count += 1; prev_end = end",
+      "        return count >= k",
+    ],
+    builder: buildSteps3458,
+  },
   1081: {
     id: 1081,
     difficulty: "medium",

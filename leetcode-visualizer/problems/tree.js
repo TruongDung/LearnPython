@@ -2360,9 +2360,110 @@ function buildSteps297(input) {
   return { input, answer: serialized, steps };
 }
 
+// ─── 987: Vertical Order Traversal of a Binary Tree ───
+// Difference from 314: within the same (col, row), nodes are ordered by VALUE.
+function buildSteps987(input) {
+  const root = parseTree(input);
+  const steps = [];
+  // gather (col, row, val, id)
+  const entries = [];
+  (function dfs(node, row, col) {
+    if (!node) return;
+    entries.push({ row, col, val: node.val, id: node.id });
+    dfs(node.left, row + 1, col - 1);
+    dfs(node.right, row + 1, col + 1);
+  })(root, 0, 0);
+
+  const colsMap = () => {
+    const m = {};
+    for (const e of entries) {
+      if (!(e.col in m)) m[e.col] = [];
+      m[e.col].push(e);
+    }
+    return m;
+  };
+  const summaryStr = () => {
+    const m = colsMap();
+    return Object.keys(m).map(Number).sort((a, b) => a - b)
+      .map((c) => `col${c}:[${m[c].map((e) => e.val).join(",")}]`).join("  ");
+  };
+
+  steps.push(snapshot(root, {
+    title: { vi: "Gán (hàng, cột) cho mỗi nút", en: "Assign (row, col) to each node" },
+    codeLines: [3, 4],
+    vars: [{ name: "root col", value: 0 }],
+    note: {
+      vi:
+        "Gốc ở cột 0, con trái cột-1, con phải cột+1; hàng tăng dần khi xuống.\n" +
+        "Gom theo cột (trái→phải). Trong cùng cột: sắp theo HÀNG, và nếu CÙNG hàng thì theo GIÁ TRỊ tăng dần (đây là điểm khác 314).",
+      en:
+        "Root at col 0, left child col-1, right child col+1; row increases going down.\n" +
+        "Group by column (left→right). Within a column: sort by ROW, and if SAME row, by VALUE ascending (this is the difference from 314).",
+    },
+  }));
+
+  // Show assignment per node in DFS order
+  const assigned = [];
+  for (const e of entries) {
+    assigned.push(e);
+    steps.push(snapshot(root, {
+      title: { vi: `Nút ${e.val}: (hàng ${e.row}, cột ${e.col})`, en: `Node ${e.val}: (row ${e.row}, col ${e.col})` },
+      hlSet: new Set([e.id]),
+      codeLines: [5, 6, 7],
+      vars: [
+        { name: "node", value: e.val },
+        { name: "row", value: e.row },
+        { name: "col", value: e.col },
+      ],
+      note: {
+        vi: `Nút ${e.val} có vị trí (hàng=${e.row}, cột=${e.col}). Lưu vào nhóm cột ${e.col}.`,
+        en: `Node ${e.val} is at (row=${e.row}, col=${e.col}). Add it to column ${e.col}'s group.`,
+      },
+    }));
+  }
+
+  // Sort within columns and build result
+  const m = colsMap();
+  const sortedCols = Object.keys(m).map(Number).sort((a, b) => a - b);
+  const result = [];
+  for (const c of sortedCols) {
+    const group = [...m[c]].sort((a, b) => (a.row - b.row) || (a.val - b.val));
+    const vals = group.map((e) => e.val);
+    result.push(vals);
+    steps.push(snapshot(root, {
+      title: { vi: `Cột ${c} → [${vals.join(", ")}]`, en: `Column ${c} → [${vals.join(", ")}]` },
+      hlSet: new Set(group.map((e) => e.id)),
+      codeLines: [8, 9],
+      vars: [
+        { name: "column", value: c },
+        { name: "sorted (row, value)", value: `[${vals.join(", ")}]` },
+        { name: "result so far", value: JSON.stringify(result) },
+      ],
+      note: {
+        vi: `Sắp các nút cột ${c} theo (hàng, giá trị): [${vals.join(", ")}].`,
+        en: `Sort column ${c}'s nodes by (row, value): [${vals.join(", ")}].`,
+      },
+    }));
+  }
+
+  const fs = snapshot(root, {
+    title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` },
+    codeLines: [10],
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    note: {
+      vi: `Duyệt theo cột dọc (tie-break bằng giá trị): ${JSON.stringify(result)}. Tổng cột: ${summaryStr()}.`,
+      en: `Vertical order traversal (value tie-break): ${JSON.stringify(result)}. Columns: ${summaryStr()}.`,
+    },
+  });
+  fs.final = true;
+  steps.push(fs);
+
+  return { input, answer: result, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [144, 94, 145, 104, 102, 543, 124, 226, 100, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 297],
+    order: [144, 94, 145, 104, 102, 543, 124, 226, 100, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -2935,6 +3036,39 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS + gom theo cột.", en: "BFS + group by column." } },
     code: ["class Solution:", "    def verticalOrder(self, root):", "        if not root: return []", "        from collections import defaultdict, deque", "        cols = defaultdict(list)", "        q = deque([(root, 0)])", "        while q:", "            node, c = q.popleft()", "            cols[c].append(node.val)", "            if node.left: q.append((node.left, c - 1))", "            if node.right: q.append((node.right, c + 1))", "        return [cols[c] for c in sorted(cols)]"],
     builder: buildSteps314,
+  },
+  987: {
+    id: 987, difficulty: "hard", slug: "vertical-order-traversal-of-a-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Vertical Order Traversal of a Binary Tree", en: "Vertical Order Traversal of a Binary Tree" },
+    titleVi: { vi: "Duyệt theo cột dọc (tie-break bằng giá trị)", en: "Vertical order traversal (value tie-break)" },
+    statement: {
+      vi: "Cho root, trả về duyệt theo CỘT (trái→phải). Trong cùng cột: theo HÀNG (trên→dưới); nếu CÙNG hàng thì theo GIÁ TRỊ tăng dần. Đây là điểm khác bài 314. Nhập level-order.",
+      en: "Given root, return the VERTICAL order (columns left→right). Within a column: by ROW (top→bottom); if SAME row, by VALUE ascending. This is the difference from 314. Enter as level-order.",
+    },
+    defaultInput: "3,9,20,null,null,15,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "DFS gán (hàng, cột): gốc (0,0), trái (row+1, col-1), phải (row+1, col+1).", en: "DFS assign (row, col): root (0,0), left (row+1, col-1), right (row+1, col+1)." },
+      { vi: "Gom các nút theo cột.", en: "Group nodes by column." },
+      { vi: "Sắp mỗi cột theo (hàng, GIÁ TRỊ) — khác 314 ở việc tie-break bằng giá trị.", en: "Sort each column by (row, VALUE) — differs from 314 by breaking ties with value." },
+      { vi: "Ghép các cột từ trái sang phải.", en: "Concatenate columns left to right." },
+    ],
+    complexity: { time: "O(n log n)", space: "O(n)", note: { vi: "Sắp xếp trong từng cột tốn n log n.", en: "Sorting within columns costs n log n." } },
+    code: [
+      "class Solution:",
+      "    def verticalTraversal(self, root):",
+      "        cols = defaultdict(list)",
+      "        def dfs(node, row, col):",
+      "            if not node: return",
+      "            cols[col].append((row, node.val))",
+      "            dfs(node.left, row+1, col-1)",
+      "            dfs(node.right, row+1, col+1)",
+      "        dfs(root, 0, 0)",
+      "        return [[v for _, v in sorted(cols[c])] for c in sorted(cols)]",
+    ],
+    builder: buildSteps987,
   },
   297: {
     id: 297, difficulty: "hard", slug: "serialize-and-deserialize-binary-tree",

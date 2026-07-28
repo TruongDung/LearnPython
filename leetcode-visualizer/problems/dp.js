@@ -13023,7 +13023,205 @@ function buildSteps1473(inputHouses, params) {
   return { original: houses, answer: final, steps };
 }
 
+/**
+ * LeetCode 188: Best Time to Buy and Sell Stock IV — DP with k transactions.
+ * buy[j]  = max profit having made at most j buys and currently HOLDING.
+ * sell[j] = max profit having made at most j completed sells (not holding).
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def maxProfit(self, k, prices):
+ *  3          if k >= n // 2: return sum of all upward diffs   (unlimited)
+ *  4          buy = [-inf]*(k+1); sell = [0]*(k+1)
+ *  5          for price in prices:
+ *  6              for j in range(1, k+1):
+ *  7                  buy[j] = max(buy[j], sell[j-1] - price)
+ *  8                  sell[j] = max(sell[j], buy[j] + price)
+ *  9          return sell[k]
+ */
+function buildSteps188(inputPrices, params) {
+  const prices = Array.isArray(inputPrices)
+    ? [...inputPrices]
+    : String(inputPrices).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const k = params && params.k !== undefined ? Number(params.k) : 2;
+  const n = prices.length;
+  const steps = [];
+  const fmt = (v) => (v === -Infinity ? "-∞" : String(v));
+
+  if (n === 0 || k === 0) {
+    steps.push({
+      title: { vi: "Không giao dịch được → 0", en: "No transactions possible → 0" },
+      arr: [...prices], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Mảng rỗng hoặc k=0.", en: "Empty array or k=0." },
+    });
+    return { original: prices, answer: 0, steps };
+  }
+
+  // Unlimited case
+  if (k >= Math.floor(n / 2)) {
+    let profit = 0;
+    const gains = [];
+    for (let i = 1; i < n; i++) {
+      if (prices[i] > prices[i - 1]) { profit += prices[i] - prices[i - 1]; gains.push(i); }
+    }
+    steps.push({
+      title: { vi: `k ≥ n/2 → giao dịch không giới hạn`, en: `k ≥ n/2 → unlimited transactions` },
+      arr: [...prices],
+      sub: prices.map((_, i) => `[${i}]`),
+      highlight: gains,
+      mark: gains,
+      final: true,
+      codeLines: [3],
+      vars: [{ name: "k", value: k }, { name: "n", value: n }, { name: "answer", value: profit }],
+      note: {
+        vi: `k=${k} ≥ n/2=${Math.floor(n / 2)} → có thể giao dịch bao nhiêu lần tùy ý. Cộng mọi đoạn tăng giá: tổng lời = ${profit}.`,
+        en: `k=${k} ≥ n/2=${Math.floor(n / 2)} → effectively unlimited trades. Sum every upward move: total profit = ${profit}.`,
+      },
+    });
+    return { original: prices, answer: profit, steps };
+  }
+
+  const buy = new Array(k + 1).fill(-Infinity);
+  const sell = new Array(k + 1).fill(0);
+  const buyStr = () => `[${buy.map(fmt).join(", ")}]`;
+  const sellStr = () => `[${sell.map((v) => String(v)).join(", ")}]`;
+
+  steps.push({
+    title: { vi: "buy = [-∞]·(k+1), sell = [0]·(k+1)", en: "buy = [-∞]·(k+1), sell = [0]·(k+1)" },
+    arr: [...prices],
+    sub: prices.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [4],
+    vars: [
+      { name: "k", value: k },
+      { name: "prices", value: `[${prices.join(", ")}]` },
+      { name: "buy", value: buyStr() },
+      { name: "sell", value: sellStr() },
+    ],
+    note: {
+      vi:
+        `buy[j] = lời tối đa khi đã MUA tối đa j lần và ĐANG GIỮ cổ phiếu.\n` +
+        `sell[j] = lời tối đa khi đã BÁN xong tối đa j lần (không giữ).\n` +
+        `buy khởi tạo -∞ (chưa thể giữ khi chưa mua); sell = 0 (chưa giao dịch).`,
+      en:
+        `buy[j] = max profit having BOUGHT at most j times and currently HOLDING.\n` +
+        `sell[j] = max profit having completed at most j SELLS (not holding).\n` +
+        `buy starts at -∞ (can't hold before buying); sell = 0 (no trades yet).`,
+    },
+  });
+
+  for (let p = 0; p < n; p++) {
+    const price = prices[p];
+    for (let j = 1; j <= k; j++) {
+      const oldBuy = buy[j];
+      buy[j] = Math.max(buy[j], sell[j - 1] - price);
+      const oldSell = sell[j];
+      sell[j] = Math.max(sell[j], buy[j] + price);
+
+      // Only emit a step per (price) for j==k progression to limit volume, but
+      // to be thorough, emit for each j when array is small.
+      if (n * k <= 40 || j === k) {
+        steps.push({
+          title: { vi: `giá[${p}]=${price}, j=${j}: buy[${j}]=${fmt(buy[j])}, sell[${j}]=${sell[j]}`, en: `price[${p}]=${price}, j=${j}: buy[${j}]=${fmt(buy[j])}, sell[${j}]=${sell[j]}` },
+          arr: [...prices],
+          sub: prices.map((_, i) => `[${i}]`),
+          highlight: [p],
+          mark: [],
+          codeLines: [5, 6, 7, 8],
+          vars: [
+            { name: "price", value: `prices[${p}]=${price}` },
+            { name: "j", value: j },
+            { name: `buy[${j}]`, value: `${fmt(oldBuy)} → ${fmt(buy[j])}` },
+            { name: `sell[${j}]`, value: `${oldSell} → ${sell[j]}` },
+            { name: "buy", value: buyStr() },
+            { name: "sell", value: sellStr() },
+          ],
+          note: {
+            vi:
+              `Tại giá ${price}, giao dịch thứ ${j}:\n` +
+              `buy[${j}] = max(giữ cũ ${fmt(oldBuy)}, mua bây giờ: sell[${j - 1}]-${price}=${fmt(sell[j - 1] - price)}) = ${fmt(buy[j])}.\n` +
+              `sell[${j}] = max(giữ cũ ${oldSell}, bán bây giờ: buy[${j}]+${price}=${fmt(buy[j] + price)}) = ${sell[j]}.`,
+            en:
+              `At price ${price}, transaction #${j}:\n` +
+              `buy[${j}] = max(keep ${fmt(oldBuy)}, buy now: sell[${j - 1}]-${price}=${fmt(sell[j - 1] - price)}) = ${fmt(buy[j])}.\n` +
+              `sell[${j}] = max(keep ${oldSell}, sell now: buy[${j}]+${price}=${fmt(buy[j] + price)}) = ${sell[j]}.`,
+          },
+        });
+      }
+    }
+  }
+
+  steps.push({
+    title: { vi: `return sell[${k}] = ${sell[k]}`, en: `return sell[${k}] = ${sell[k]}` },
+    arr: [...prices],
+    sub: prices.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [9],
+    vars: [
+      { name: "buy", value: buyStr() },
+      { name: "sell", value: sellStr() },
+      { name: "answer", value: sell[k] },
+    ],
+    note: {
+      vi: `Lời lớn nhất với tối đa ${k} giao dịch = sell[${k}] = ${sell[k]}.`,
+      en: `Maximum profit with at most ${k} transactions = sell[${k}] = ${sell[k]}.`,
+    },
+  });
+
+  return { original: prices, answer: sell[k], steps };
+}
+
 module.exports = {
+  188: {
+    id: 188,
+    difficulty: "hard",
+    slug: "best-time-to-buy-and-sell-stock-iv",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Best Time to Buy and Sell Stock IV", en: "Best Time to Buy and Sell Stock IV" },
+    titleVi: { vi: "Mua bán cổ phiếu IV (tối đa k giao dịch)", en: "Stock trading IV (at most k transactions)" },
+    statement: {
+      vi:
+        "Cho mảng prices và số k. Tìm lợi nhuận LỚN NHẤT với tối đa k giao dịch (mua rồi bán là 1 giao dịch, " +
+        "không được giữ >1 cổ phiếu cùng lúc). Nhập prices cách nhau dấu phẩy; k trong tham số.",
+      en:
+        "Given prices and integer k, find the MAX profit with at most k transactions (a buy then sell is one, " +
+        "you can't hold more than one share at a time). Enter prices comma-separated; k as a parameter.",
+    },
+    defaultInput: [3, 2, 6, 5, 0, 3],
+    inputKind: "integer",
+    inputLabel: { vi: "prices", en: "prices" },
+    extraParams: [
+      { key: "k", label: { vi: "k (số giao dịch tối đa)", en: "k (max transactions)" }, default: 2 },
+    ],
+    approach: [
+      { vi: "buy[j] = lời tối đa khi đã mua ≤ j lần và đang giữ; sell[j] = đã bán ≤ j lần, không giữ.", en: "buy[j] = max profit with ≤ j buys while holding; sell[j] = with ≤ j sells while not holding." },
+      { vi: "Với mỗi giá: buy[j] = max(buy[j], sell[j-1] - price); sell[j] = max(sell[j], buy[j] + price).", en: "For each price: buy[j] = max(buy[j], sell[j-1] - price); sell[j] = max(sell[j], buy[j] + price)." },
+      { vi: "Nếu k ≥ n/2 → giao dịch không giới hạn: cộng mọi đoạn tăng giá.", en: "If k ≥ n/2 → unlimited transactions: sum every upward move." },
+      { vi: "Đáp án = sell[k].", en: "Answer = sell[k]." },
+    ],
+    complexity: {
+      time: "O(n·k)",
+      space: "O(k)",
+      note: {
+        vi: "Hai mảng buy/sell kích thước k+1, cập nhật cho từng giá.",
+        en: "Two arrays buy/sell of size k+1, updated for each price.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxProfit(self, k, prices):",
+      "        if k >= len(prices)//2: return sum(max(0, prices[i]-prices[i-1]) for i in range(1,len(prices)))",
+      "        buy = [-inf]*(k+1); sell = [0]*(k+1)",
+      "        for price in prices:",
+      "            for j in range(1, k+1):",
+      "                buy[j] = max(buy[j], sell[j-1] - price)",
+      "                sell[j] = max(sell[j], buy[j] + price)",
+      "        return sell[k]",
+    ],
+    builder: buildSteps188,
+  },
   1473: {
     id: 1473,
     difficulty: "hard",
@@ -13136,7 +13334,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 312, 1473],
+    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",

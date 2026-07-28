@@ -1854,7 +1854,199 @@ function buildSteps42(input) {
   return { original: height, answer: total, steps };
 }
 
+/**
+ * LeetCode 41: First Missing Positive — cyclic sort in place.
+ * Put each value v in 1..n at index v-1. Then the first index i where
+ * nums[i] != i+1 gives the answer i+1.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def firstMissingPositive(self, nums):
+ *  3          n = len(nums)
+ *  4          for i in range(n):
+ *  5              while 1 <= nums[i] <= n and nums[nums[i]-1] != nums[i]:
+ *  6                  swap nums[i], nums[nums[i]-1]
+ *  7          for i in range(n):
+ *  8              if nums[i] != i + 1: return i + 1
+ *  9          return n + 1
+ */
+function buildSteps41(input) {
+  const nums = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const n = nums.length;
+  const steps = [];
+  const arr = [...nums];
+
+  const sub = () => arr.map((_, i) => `[${i}]→${i + 1}`);
+
+  steps.push({
+    title: { vi: "Ý tưởng: cyclic sort", en: "Idea: cyclic sort" },
+    arr: [...arr],
+    sub: sub(),
+    highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "n", value: n }, { name: "nums", value: `[${arr.join(", ")}]` }],
+    note: {
+      vi:
+        `Đáp án nằm trong [1, n+1] với n=${n}. Đặt mỗi giá trị v (1..n) về đúng chỗ index v-1.\n` +
+        `Nhãn dưới ô = "[index]→giá trị mong đợi". Sau khi sắp, ô đầu tiên sai chỗ cho ra đáp án.`,
+      en:
+        `The answer is in [1, n+1] with n=${n}. Place each value v (1..n) at its correct index v-1.\n` +
+        `Sub-label = "[index]→expected value". After sorting, the first misplaced cell gives the answer.`,
+    },
+  });
+
+  // Cyclic sort
+  for (let i = 0; i < n; i++) {
+    let guard = 0;
+    while (arr[i] >= 1 && arr[i] <= n && arr[arr[i] - 1] !== arr[i] && guard < 2 * n) {
+      guard += 1;
+      const target = arr[i] - 1;
+      const a = arr[i], b = arr[target];
+      [arr[i], arr[target]] = [arr[target], arr[i]];
+      steps.push({
+        title: { vi: `Đưa ${a} về index ${target} (đổi với ${b})`, en: `Place ${a} at index ${target} (swap with ${b})` },
+        arr: [...arr],
+        sub: sub(),
+        highlight: [i, target],
+        mark: [target],
+        codeLines: [4, 5, 6],
+        vars: [
+          { name: "i", value: i },
+          { name: "value", value: a },
+          { name: "target index (value-1)", value: target },
+          { name: "nums", value: `[${arr.join(", ")}]` },
+        ],
+        note: {
+          vi: `nums[${i}]=${a} thuộc [1,${n}] và chưa ở đúng chỗ (index ${target} đang là ${b}). Đổi chỗ để ${a} về index ${target}. Lặp lại cho giá trị mới ở nums[${i}].`,
+          en: `nums[${i}]=${a} is in [1,${n}] and misplaced (index ${target} holds ${b}). Swap so ${a} lands at index ${target}. Repeat for the new value now at nums[${i}].`,
+        },
+      });
+    }
+    // show settle step when nothing to swap (only if value out of range or already placed)
+    if (arr[i] < 1 || arr[i] > n || arr[arr[i] - 1] === arr[i]) {
+      steps.push({
+        title: { vi: `Index ${i}: nums[${i}]=${arr[i]} — dừng đổi`, en: `Index ${i}: nums[${i}]=${arr[i]} — stop swapping` },
+        arr: [...arr],
+        sub: sub(),
+        highlight: [i], mark: [],
+        codeLines: [4, 5],
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: arr[i] },
+        ],
+        note: {
+          vi: (arr[i] < 1 || arr[i] > n)
+            ? `nums[${i}]=${arr[i]} nằm ngoài [1,${n}] → bỏ qua, không đổi.`
+            : `nums[${i}]=${arr[i]} đã ở đúng chỗ (hoặc chỗ đích đã có giá trị này) → dừng.`,
+          en: (arr[i] < 1 || arr[i] > n)
+            ? `nums[${i}]=${arr[i]} is outside [1,${n}] → skip, no swap.`
+            : `nums[${i}]=${arr[i]} is already in place (or its target already holds this value) → stop.`,
+        },
+      });
+    }
+  }
+
+  // Scan for answer
+  let answer = n + 1;
+  let answerIdx = -1;
+  for (let i = 0; i < n; i++) {
+    const ok = arr[i] === i + 1;
+    steps.push({
+      title: { vi: `Quét: nums[${i}]=${arr[i]} ${ok ? "==" : "≠"} ${i + 1}`, en: `Scan: nums[${i}]=${arr[i]} ${ok ? "==" : "≠"} ${i + 1}` },
+      arr: [...arr],
+      sub: sub(),
+      highlight: [i],
+      mark: ok ? [] : [i],
+      codeLines: [7, 8],
+      vars: [
+        { name: "i", value: i },
+        { name: "nums[i]", value: arr[i] },
+        { name: "expected (i+1)", value: i + 1 },
+        { name: "match?", value: ok },
+      ],
+      note: {
+        vi: ok
+          ? `nums[${i}]=${arr[i]} đúng bằng ${i + 1} → tiếp tục quét.`
+          : `nums[${i}]=${arr[i]} ≠ ${i + 1} → số dương nhỏ nhất bị thiếu là ${i + 1}!`,
+        en: ok
+          ? `nums[${i}]=${arr[i]} equals ${i + 1} → keep scanning.`
+          : `nums[${i}]=${arr[i]} ≠ ${i + 1} → the smallest missing positive is ${i + 1}!`,
+      },
+    });
+    if (!ok) { answer = i + 1; answerIdx = i; break; }
+  }
+
+  steps.push({
+    title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
+    arr: [...arr],
+    sub: sub(),
+    highlight: [],
+    mark: answerIdx >= 0 ? [answerIdx] : [],
+    final: true,
+    codeLines: answerIdx >= 0 ? [8] : [9],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: answerIdx >= 0
+        ? `Ô đầu tiên sai chỗ là index ${answerIdx} → số dương nhỏ nhất bị thiếu = ${answer}.`
+        : `Mọi ô đều đúng chỗ (1..${n}) → số dương nhỏ nhất bị thiếu = ${n + 1}.`,
+      en: answerIdx >= 0
+        ? `The first misplaced cell is index ${answerIdx} → smallest missing positive = ${answer}.`
+        : `Every cell is in place (1..${n}) → smallest missing positive = ${n + 1}.`,
+    },
+  });
+
+  return { original: nums, answer, steps };
+}
+
 module.exports = {
+  41: {
+    id: 41,
+    difficulty: "hard",
+    slug: "first-missing-positive",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "First Missing Positive", en: "First Missing Positive" },
+    titleVi: { vi: "Số dương nhỏ nhất bị thiếu (cyclic sort)", en: "Smallest missing positive (cyclic sort)" },
+    statement: {
+      vi:
+        "Cho mảng nums. Tìm số nguyên DƯƠNG nhỏ nhất KHÔNG có trong mảng, dùng O(n) thời gian và O(1) bộ nhớ phụ. " +
+        "Nhập nums cách nhau dấu phẩy.",
+      en:
+        "Given nums, find the smallest POSITIVE integer NOT present, in O(n) time and O(1) extra space. " +
+        "Enter nums as comma-separated numbers.",
+    },
+    defaultInput: [3, 4, -1, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Đáp án chắc chắn trong [1, n+1]. Chỉ quan tâm giá trị 1..n.", en: "The answer is always in [1, n+1]. Only values 1..n matter." },
+      { vi: "Cyclic sort: đưa mỗi giá trị v về đúng index v-1 bằng cách đổi chỗ.", en: "Cyclic sort: place each value v at its correct index v-1 via swaps." },
+      { vi: "Bỏ qua giá trị ≤ 0 hoặc > n, và khi đích đã có đúng giá trị.", en: "Skip values ≤ 0 or > n, and when the target already holds the right value." },
+      { vi: "Quét lại: ô đầu tiên có nums[i] ≠ i+1 → đáp án i+1; nếu không có → n+1.", en: "Re-scan: the first cell with nums[i] ≠ i+1 → answer i+1; if none → n+1." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi lần đổi chỗ đưa 1 giá trị về đúng chỗ vĩnh viễn → tổng số swap ≤ n.",
+        en: "Each swap places one value permanently → total swaps ≤ n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def firstMissingPositive(self, nums):",
+      "        n = len(nums)",
+      "        for i in range(n):",
+      "            while 1 <= nums[i] <= n and nums[nums[i]-1] != nums[i]:",
+      "                nums[nums[i]-1], nums[i] = nums[i], nums[nums[i]-1]",
+      "        for i in range(n):",
+      "            if nums[i] != i + 1: return i + 1",
+      "        return n + 1",
+    ],
+    builder: buildSteps41,
+  },
   42: {
     id: 42,
     difficulty: "hard",
