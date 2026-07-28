@@ -1779,7 +1779,7 @@ function renderTree(step, targetId = "treeView") {
 
   const treeHtml =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}">` +
-    `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
+    `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" class="tree-arrow"/></marker></defs>` +
     edges +
     circles +
     levelLabels +
