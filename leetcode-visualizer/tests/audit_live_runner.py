@@ -15,7 +15,10 @@ import sys
 import traceback
 from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict, deque
-from functools import cache, lru_cache
+from functools import lru_cache
+
+# functools.cache was added in 3.9; alias it so older interpreters work too.
+cache = lru_cache(maxsize=None)
 from itertools import accumulate
 from math import gcd
 from typing import Dict, List, Optional, Set, Tuple
@@ -36,8 +39,8 @@ class ListNode:
 
 class Node:
     # One compatibility type covers the different Node shapes used by LeetCode.
-    def __init__(  # pylint: disable=too-many-positional-arguments
-        self, val=0, next=None, random=None, child=None, neighbors=None,
+    def __init__(
+        self, val=0, *, next=None, random=None, child=None, neighbors=None,
         left=None, right=None, parent=None,
     ):
         self.val = val
