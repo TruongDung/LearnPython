@@ -7291,6 +7291,150 @@ function buildSteps3458(input, params) {
 }
 
 /**
+ * LeetCode 49: Group Anagrams — hash map keyed by sorted letters.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def groupAnagrams(self, strs):
+ *  3          groups = defaultdict(list)
+ *  4          for word in strs:
+ *  5              key = "".join(sorted(word))
+ *  6              groups[key].append(word)
+ *  7          return list(groups.values())
+ */
+function buildSteps49(input) {
+  const strs = String(input).split(",").map((w) => w.trim()).filter((w) => w.length >= 0);
+  const steps = [];
+  const groups = {};
+
+  const groupsStr = () => `{${Object.entries(groups).map(([k, v]) => `"${k}":[${v.join(",")}]`).join(", ")}}`;
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title, arr: [], highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "groups = {} (hash map)", en: "groups = {} (hash map)" },
+    codeLines: [3],
+    vars: [{ name: "strs", value: `[${strs.join(", ")}]` }, { name: "groups", value: "{}" }],
+    note: {
+      vi: "Hai từ là anagram ⟺ khi sắp xếp chữ cái thì giống nhau. Dùng chuỗi đã sắp làm KHÓA gom nhóm.",
+      en: "Two words are anagrams ⟺ their sorted letters match. Use the sorted string as the grouping KEY.",
+    },
+  });
+
+  for (const word of strs) {
+    const key = word.split("").sort().join("");
+    (groups[key] = groups[key] || []).push(word);
+    snap({
+      title: { vi: `"${word}" → key="${key}"`, en: `"${word}" → key="${key}"` },
+      codeLines: [4, 5, 6],
+      vars: [
+        { name: "word", value: `"${word}"` },
+        { name: "sorted key", value: `"${key}"` },
+        { name: "groups", value: groupsStr() },
+      ],
+      note: { vi: `Sắp chữ cái của "${word}" → "${key}". Thêm "${word}" vào nhóm có khóa "${key}".`, en: `Sort letters of "${word}" → "${key}". Append "${word}" to the group keyed "${key}".` },
+    });
+  }
+
+  const result = Object.values(groups);
+  snap({
+    title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` },
+    final: true, codeLines: [7],
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    note: { vi: `Các nhóm anagram: ${JSON.stringify(result)}.`, en: `Anagram groups: ${JSON.stringify(result)}.` },
+  });
+
+  return { original: strs, answer: result, steps };
+}
+
+/**
+ * LeetCode 43: Multiply Strings — grade-school multiplication into a digit array.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def multiply(self, num1, num2):
+ *  3          if num1=="0" or num2=="0": return "0"
+ *  4          result = [0]*(m+n)
+ *  5          for i in range(m-1, -1, -1):
+ *  6              for j in range(n-1, -1, -1):
+ *  7                  mul = d1*d2
+ *  8                  total = mul + result[i+j+1]
+ *  9                  result[i+j+1] = total % 10
+ * 10                  result[i+j]  += total // 10
+ * 11          strip leading zeros; return "".join(result)
+ */
+function buildSteps43(input, params) {
+  const num1 = String(input);
+  const num2 = String(params && params.num2 !== undefined ? params.num2 : "456");
+  const steps = [];
+  const m = num1.length, n = num2.length;
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title, arr: [], highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  if (num1 === "0" || num2 === "0") {
+    snap({ title: { vi: 'Có thừa số 0 → "0"', en: 'A factor is 0 → "0"' }, final: true, codeLines: [3], vars: [{ name: "answer", value: '"0"' }], note: { vi: "", en: "" } });
+    return { original: num1, answer: "0", steps };
+  }
+
+  const result = new Array(m + n).fill(0);
+  snap({
+    title: { vi: `result = [0]*${m + n}`, en: `result = [0]*${m + n}` },
+    codeLines: [3, 4],
+    vars: [{ name: "num1", value: `"${num1}"` }, { name: "num2", value: `"${num2}"` }, { name: "result", value: `[${result.join(",")}]` }],
+    note: {
+      vi: `Nhân như tay: tích chữ số num1[i]·num2[j] đặt vào result[i+j+1], nhớ sang result[i+j]. Mảng result có ${m + n} ô.`,
+      en: `Grade-school multiply: digit product num1[i]·num2[j] goes to result[i+j+1], carry to result[i+j]. The result array has ${m + n} slots.`,
+    },
+  });
+
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      const mul = (num1.charCodeAt(i) - 48) * (num2.charCodeAt(j) - 48);
+      const low = i + j + 1, high = i + j;
+      const total = mul + result[low];
+      result[low] = total % 10;
+      result[high] += Math.floor(total / 10);
+      snap({
+        title: { vi: `${num1[i]}×${num2[j]}=${mul}; result[${low}]=${result[low]}, nhớ ${Math.floor(total / 10)}`, en: `${num1[i]}×${num2[j]}=${mul}; result[${low}]=${result[low]}, carry ${Math.floor(total / 10)}` },
+        codeLines: [5, 6, 7, 8, 9, 10],
+        vars: [
+          { name: "i,j", value: `${i},${j}` },
+          { name: "mul", value: mul },
+          { name: "total", value: total },
+          { name: `result[${low}]`, value: result[low] },
+          { name: `result[${high}]`, value: result[high] },
+          { name: "result", value: `[${result.join(",")}]` },
+        ],
+        note: {
+          vi: `num1[${i}]='${num1[i]}' × num2[${j}]='${num2[j]}' = ${mul}. total = ${mul} + result[${low}] = ${total}. Ghi ${total % 10} tại ${low}, cộng nhớ ${Math.floor(total / 10)} vào ${high}.`,
+          en: `num1[${i}]='${num1[i]}' × num2[${j}]='${num2[j]}' = ${mul}. total = ${mul} + result[${low}] = ${total}. Write ${total % 10} at ${low}, add carry ${Math.floor(total / 10)} to ${high}.`,
+        },
+      });
+    }
+  }
+
+  let start = 0;
+  while (start < result.length - 1 && result[start] === 0) start++;
+  const answer = result.slice(start).join("");
+  snap({
+    title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
+    final: true, codeLines: [11],
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: { vi: `Bỏ số 0 ở đầu → "${answer}" = ${num1} × ${num2}.`, en: `Strip leading zeros → "${answer}" = ${num1} × ${num2}.` },
+  });
+
+  return { original: num1, answer, steps };
+}
+
+/**
  * LeetCode 65: Valid Number — deterministic finite automaton (DFA).
  * Walk the string one char at a time following the state transition table.
  * Valid iff we end in an accepting state.
@@ -7457,6 +7601,77 @@ function buildSteps65(input) {
 }
 
 module.exports = {
+  49: {
+    id: 49,
+    difficulty: "medium",
+    slug: "group-anagrams",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Group Anagrams", en: "Group Anagrams" },
+    titleVi: { vi: "Gom nhóm anagram (hash map)", en: "Group anagrams (hash map)" },
+    statement: {
+      vi: "Cho danh sách chuỗi. Gom các anagram (cùng tập chữ cái) vào một nhóm. Nhập các từ cách nhau dấu phẩy.",
+      en: "Given a list of strings, group the anagrams (same multiset of letters) together. Enter words comma-separated.",
+    },
+    defaultInput: "eat,tea,tan,ate,nat,bat",
+    inputKind: "string",
+    inputLabel: { vi: "strs (cách bởi ,)", en: "strs (comma separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Anagram ⟺ chuỗi chữ cái sắp xếp giống nhau.", en: "Anagrams ⟺ equal sorted-letter strings." },
+      { vi: "Dùng chuỗi đã sắp làm khóa của hash map.", en: "Use the sorted string as the hash-map key." },
+      { vi: "Thêm mỗi từ vào nhóm ứng với khóa của nó.", en: "Append each word to the group of its key." },
+    ],
+    complexity: { time: "O(n·k log k)", space: "O(n·k)", note: { vi: "n từ, mỗi từ dài k; sắp k log k.", en: "n words of length k; sorting is k log k." } },
+    code: [
+      "class Solution:",
+      "    def groupAnagrams(self, strs):",
+      "        groups = defaultdict(list)",
+      "        for word in strs:",
+      "            key = ''.join(sorted(word))",
+      "            groups[key].append(word)",
+      "        return list(groups.values())",
+    ],
+    builder: buildSteps49,
+  },
+  43: {
+    id: 43,
+    difficulty: "medium",
+    slug: "multiply-strings",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Multiply Strings", en: "Multiply Strings" },
+    titleVi: { vi: "Nhân hai số dạng chuỗi", en: "Multiply two numeric strings" },
+    statement: {
+      vi: "Cho hai số không âm dạng chuỗi num1, num2. Trả về tích cũng dạng chuỗi (không dùng BigInteger). Nhập num1; num2 trong tham số.",
+      en: "Given two non-negative integers as strings num1, num2, return their product as a string (no BigInteger). Enter num1; num2 as a parameter.",
+    },
+    defaultInput: "123",
+    inputKind: "string",
+    inputLabel: { vi: "num1", en: "num1" },
+    extraParams: [
+      { key: "num2", label: { vi: "num2", en: "num2" }, default: "456" },
+    ],
+    approach: [
+      { vi: "Mảng result kích thước m+n chứa từng chữ số của tích.", en: "A result array of size m+n holds each digit of the product." },
+      { vi: "Tích num1[i]·num2[j] cộng vào result[i+j+1], nhớ sang result[i+j].", en: "The product num1[i]·num2[j] adds to result[i+j+1], carrying to result[i+j]." },
+      { vi: "Xử lý phần nhớ ngay khi cộng (total%10 và total//10).", en: "Handle the carry immediately (total%10 and total//10)." },
+      { vi: "Bỏ số 0 ở đầu rồi nối thành chuỗi kết quả.", en: "Strip leading zeros then join into the result string." },
+    ],
+    complexity: { time: "O(m·n)", space: "O(m+n)", note: { vi: "Nhân từng cặp chữ số.", en: "Multiply every digit pair." } },
+    code: [
+      "class Solution:",
+      "    def multiply(self, num1, num2):",
+      "        if num1=='0' or num2=='0': return '0'",
+      "        m, n = len(num1), len(num2); result = [0]*(m+n)",
+      "        for i in range(m-1, -1, -1):",
+      "            for j in range(n-1, -1, -1):",
+      "                mul = int(num1[i])*int(num2[j])",
+      "                total = mul + result[i+j+1]",
+      "                result[i+j+1] = total % 10",
+      "                result[i+j] += total // 10",
+      "        # strip leading zeros; return ''.join(map(str, result))",
+    ],
+    builder: buildSteps43,
+  },
   65: {
     id: 65,
     difficulty: "hard",
