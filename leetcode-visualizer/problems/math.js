@@ -2618,7 +2618,160 @@ function buildSteps29(input, params) {
   return { original: dividend, answer, steps };
 }
 
+/** LeetCode 258: Add Digits — repeated digit sum (digital root). */
+function buildSteps258(input) {
+  const start = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+  const digitsOf = (x) => String(x).split("").map(Number);
+  let num = start;
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: digitsOf(num), sub: digitsOf(num).map(String), highlight: [], mark: [], codeLines: [2, 3],
+    vars: [{ name: "num", value: num }],
+    note: { vi: `Cộng dồn các chữ số của num = ${num} cho tới khi chỉ còn 1 chữ số (digital root).`, en: `Repeatedly sum the digits of num = ${num} until a single digit remains (digital root).` },
+  });
+  if (num < 10) {
+    steps.push({
+      title: { vi: `${num} đã là 1 chữ số`, en: `${num} is already a single digit` },
+      arr: digitsOf(num), sub: digitsOf(num).map(String), highlight: [0], mark: [0], final: true, codeLines: [3, 9],
+      vars: [{ name: "answer", value: num }],
+      note: { vi: `num=${num} < 10 → bỏ qua vòng lặp, trả về ${num}.`, en: `num=${num} < 10 → skip the loop, return ${num}.` },
+    });
+    return { original: start, answer: num, steps };
+  }
+  let round = 0;
+  while (num >= 10) {
+    round++;
+    const digs = digitsOf(num);
+    let total = 0;
+    let m = num;
+    const consumed = [];
+    steps.push({
+      title: { vi: `Vòng ${round}: num = ${num} (≥ 10)`, en: `Round ${round}: num = ${num} (≥ 10)` },
+      arr: digs, sub: digs.map(String), highlight: [], mark: [], codeLines: [3, 4],
+      vars: [{ name: "num", value: num }, { name: "total", value: 0 }],
+      note: { vi: `num=${num} ≥ 10 → cộng từng chữ số. Đặt total = 0.`, en: `num=${num} ≥ 10 → sum its digits. Set total = 0.` },
+    });
+    let pos = digs.length - 1;
+    while (m > 0) {
+      const d = m % 10;
+      total += d;
+      consumed.push(pos);
+      m = Math.floor(m / 10);
+      steps.push({
+        title: { vi: `+ chữ số ${d}`, en: `+ digit ${d}` },
+        arr: digs, sub: digs.map((x, i) => (consumed.includes(i) ? `(${x})` : String(x))), highlight: [pos], mark: [...consumed], codeLines: [5, 6, 7],
+        vars: [{ name: "digit = num%10", value: d }, { name: "total", value: total }, { name: "num (còn lại)", value: m }],
+        note: { vi: `total += ${d} → ${total}. num //= 10 → ${m}.`, en: `total += ${d} → ${total}. num //= 10 → ${m}.` },
+      });
+      pos--;
+    }
+    num = total;
+    steps.push({
+      title: { vi: `num = total = ${num}`, en: `num = total = ${num}` },
+      arr: digitsOf(num), sub: digitsOf(num).map(String), highlight: [], mark: [], codeLines: [8],
+      vars: [{ name: "num", value: num }],
+      note: { vi: `Kết thúc vòng ${round}: num = ${num}. ${num >= 10 ? "Vẫn ≥ 10 → lặp tiếp." : "< 10 → dừng."}`, en: `End of round ${round}: num = ${num}. ${num >= 10 ? "Still ≥ 10 → loop again." : "< 10 → stop."}` },
+    });
+  }
+  steps.push({
+    title: { vi: `Kết quả: ${num}`, en: `Result: ${num}` },
+    arr: digitsOf(num), sub: digitsOf(num).map(String), highlight: [0], mark: [0], final: true, codeLines: [9],
+    vars: [{ name: "answer", value: num }],
+    note: { vi: `Digital root của ${start} = ${num}.`, en: `Digital root of ${start} = ${num}.` },
+  });
+  return { original: start, answer: num, steps };
+}
+
+/** LeetCode 319: Bulb Switcher — simulate toggles; ON bulbs are perfect squares. */
+function buildSteps319(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const steps = [];
+  const bulbs = new Array(n + 1).fill(0); // index 0 unused (bulbs are 1-indexed)
+  const barArr = () => bulbs.slice(1);
+  const subLabels = Array.from({ length: n }, (_, i) => String(i + 1));
+  const onMarks = () => barArr().map((v, idx) => (v ? idx : -1)).filter((x) => x >= 0);
+  steps.push({
+    title: { vi: "Tất cả bóng đèn đều TẮT", en: "All bulbs start OFF" },
+    arr: barArr(), sub: subLabels, highlight: [], mark: [], codeLines: [2, 3],
+    vars: [{ name: "n", value: n }],
+    note: { vi: `${n} bóng đèn, ban đầu đều TẮT (0). Ở vòng i ta bật/tắt mọi bóng là bội của i.`, en: `${n} bulbs, all OFF (0). In round i we toggle every bulb that is a multiple of i.` },
+  });
+  for (let i = 1; i <= n; i++) {
+    const toggled = [];
+    for (let j = i; j <= n; j += i) {
+      bulbs[j] ^= 1;
+      toggled.push(j - 1);
+    }
+    steps.push({
+      title: { vi: `Vòng i=${i}: đảo các bội của ${i}`, en: `Round i=${i}: toggle multiples of ${i}` },
+      arr: barArr(), sub: subLabels, highlight: toggled, mark: onMarks(), codeLines: [4, 5, 6],
+      vars: [{ name: "i", value: i }, { name: "đảo (toggled)", value: toggled.map((x) => x + 1).join(", ") }, { name: "đang BẬT", value: barArr().reduce((a, b) => a + b, 0) }],
+      note: { vi: `Đảo trạng thái các bóng ${toggled.map((x) => x + 1).join(", ")}. Các bóng đang BẬT được tô đậm.`, en: `Toggle bulbs ${toggled.map((x) => x + 1).join(", ")}. Bulbs currently ON are marked.` },
+    });
+  }
+  const on = barArr().reduce((a, b) => a + b, 0);
+  const onList = barArr().map((v, idx) => (v ? idx + 1 : null)).filter((x) => x !== null);
+  steps.push({
+    title: { vi: `Kết quả: ${on} bóng còn sáng`, en: `Result: ${on} bulbs ON` },
+    arr: barArr(), sub: subLabels, highlight: [], mark: onMarks(), final: true, codeLines: [7],
+    vars: [{ name: "answer", value: on }, { name: "bóng BẬT", value: onList.join(", ") }, { name: "⌊√n⌋", value: Math.floor(Math.sqrt(n)) }],
+    note: { vi: `Còn ${on} bóng sáng: [${onList.join(", ")}] — đúng là các số chính phương ≤ ${n} (chỉ số chính phương mới có số ước LẺ nên bị đảo số lẻ lần). Vì vậy đáp án nhanh = ⌊√${n}⌋ = ${Math.floor(Math.sqrt(n))}.`, en: `${on} bulbs stay ON: [${onList.join(", ")}] — exactly the perfect squares ≤ ${n} (only squares have an ODD divisor count, so they are toggled an odd number of times). Hence the O(1) answer = ⌊√${n}⌋ = ${Math.floor(Math.sqrt(n))}.` },
+  });
+  return { original: n, answer: on, steps };
+}
+
 module.exports = {
+  258: {
+    id: 258, difficulty: "easy", slug: "add-digits",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    title: { vi: "Add Digits", en: "Add Digits" },
+    titleVi: { vi: "Cộng chữ số tới khi còn 1 chữ số (digital root)", en: "Add digits until single (digital root)" },
+    statement: { vi: "Lặp cộng các chữ số của num tới khi kết quả chỉ còn 1 chữ số. Nhập num.", en: "Repeatedly add the digits of num until the result has a single digit. Enter num." },
+    defaultInput: [38], inputKind: "integer", inputLabel: { vi: "num", en: "num" }, singleInput: true, extraParams: [],
+    approach: [
+      { vi: "Vòng ngoài: khi num ≥ 10, cộng các chữ số của num.", en: "Outer loop: while num ≥ 10, sum its digits." },
+      { vi: "Vòng trong: total += num%10; num //= 10.", en: "Inner loop: total += num%10; num //= 10." },
+      { vi: "Gán num = total và lặp lại tới khi < 10.", en: "Set num = total and repeat until < 10." },
+    ],
+    complexity: { time: "O(log n) mỗi vòng", space: "O(1)", note: { vi: "Số chữ số giảm nhanh nên rất ít vòng.", en: "The digit count shrinks fast, so very few rounds." } },
+    code: [
+      "class Solution:",
+      "    def addDigits(self, num):",
+      "        while num >= 10:",
+      "            total = 0",
+      "            while num > 0:",
+      "                total += num % 10",
+      "                num //= 10",
+      "            num = total",
+      "        return num",
+    ],
+    builder: buildSteps258,
+  },
+  319: {
+    id: 319, difficulty: "medium", slug: "bulb-switcher",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    title: { vi: "Bulb Switcher", en: "Bulb Switcher" },
+    titleVi: { vi: "Công tắc bóng đèn (số chính phương)", en: "Bulb switcher (perfect squares)" },
+    statement: { vi: "n bóng đèn ban đầu tắt. Vòng i đảo mọi bóng là bội của i. Đếm số bóng còn sáng sau n vòng. Nhập n.", en: "n bulbs start off. In round i, toggle every bulb that is a multiple of i. Count bulbs ON after n rounds. Enter n." },
+    defaultInput: [6], inputKind: "positive", inputLabel: { vi: "n", en: "n" }, singleInput: true, maxInput: 20, extraParams: [],
+    approach: [
+      { vi: "Bóng i bị đảo một lần cho mỗi ước của i.", en: "Bulb i is toggled once per divisor of i." },
+      { vi: "Chỉ số chính phương có số ước LẺ → còn sáng.", en: "Only perfect squares have an ODD divisor count → stay ON." },
+      { vi: "Số bóng sáng = số chính phương ≤ n = ⌊√n⌋ (đáp án O(1)).", en: "Bulbs ON = perfect squares ≤ n = ⌊√n⌋ (the O(1) answer)." },
+    ],
+    complexity: { time: "O(n log n) khi mô phỏng / O(1) công thức", space: "O(n) / O(1)", note: { vi: "Mô phỏng để thấy trực giác; công thức là ⌊√n⌋.", en: "Simulated for intuition; the formula is ⌊√n⌋." } },
+    code: [
+      "class Solution:",
+      "    def bulbSwitch(self, n):",
+      "        bulbs = [False] * (n + 1)   # 1-indexed",
+      "        for i in range(1, n + 1):",
+      "            for j in range(i, n + 1, i):",
+      "                bulbs[j] = not bulbs[j]",
+      "        return sum(bulbs)",
+    ],
+    builder: buildSteps319,
+  },
   29: {
     id: 29, difficulty: "medium", slug: "divide-two-integers",
     category: { key: "math", vi: "Toán học", en: "Math" },

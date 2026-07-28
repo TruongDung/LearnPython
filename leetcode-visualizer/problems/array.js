@@ -2426,7 +2426,200 @@ function buildSteps128(input) {
   return { original: nums, answer: best, steps };
 }
 
+/** LeetCode 240: Search a 2D Matrix II — staircase search from the top-right. */
+function buildSteps240(input, params) {
+  const m = parseMatrix(input);
+  const R = m.length, C = m[0].length;
+  const target = Number(params && params.target !== undefined ? params.target : 5);
+  const steps = [];
+  const visited = new Set();
+  function gsnap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      grid: {
+        dp: m.map((r) => [...r]),
+        text1: Array.from({ length: R }, (_, i) => String(i)).join(""),
+        text2: Array.from({ length: C }, (_, i) => String(i)).join(""),
+        hlCell: o.hlCell || null,
+        pathCells: [...visited].map((k) => k.split(",").map(Number)),
+        largeCells: true,
+      },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+  gsnap({
+    title: { vi: "Bắt đầu từ góc trên-phải", en: "Start at the top-right corner" },
+    codeLines: [5],
+    vars: [{ name: "target", value: target }, { name: "row", value: 0 }, { name: "col", value: C - 1 }],
+    note: {
+      vi: `Ma trận ${R}×${C}: mỗi hàng tăng dần trái→phải, mỗi cột tăng dần trên→dưới. Bắt đầu ở góc trên-phải (0, ${C - 1}): đi TRÁI nếu giá trị > target, đi XUỐNG nếu < target.`,
+      en: `${R}×${C} matrix: rows increase left→right, cols increase top→bottom. Start at top-right (0, ${C - 1}): go LEFT if value > target, go DOWN if value < target.`,
+    },
+  });
+  let row = 0, col = C - 1;
+  while (row < R && col >= 0) {
+    const value = m[row][col];
+    visited.add(`${row},${col}`);
+    if (value === target) {
+      gsnap({
+        title: { vi: `matrix[${row}][${col}] = ${value} = target ✓`, en: `matrix[${row}][${col}] = ${value} = target ✓` },
+        hlCell: [row, col], final: true, codeLines: [7, 8, 9],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }, { name: "found", value: true }],
+        note: { vi: `Tìm thấy target=${target} tại ô (${row}, ${col}) → trả về True.`, en: `Found target=${target} at cell (${row}, ${col}) → return True.` },
+      });
+      return { original: m, answer: true, steps };
+    }
+    if (value > target) {
+      gsnap({
+        title: { vi: `${value} > ${target} → sang trái (col--)`, en: `${value} > ${target} → go left (col--)` },
+        hlCell: [row, col], codeLines: [7, 10, 11],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }],
+        note: { vi: `matrix[${row}][${col}]=${value} > target. Mọi ô còn lại của cột ${col} còn lớn hơn → loại cột này, col = ${col - 1}.`, en: `matrix[${row}][${col}]=${value} > target. The rest of column ${col} is even larger → drop it, col = ${col - 1}.` },
+      });
+      col -= 1;
+    } else {
+      gsnap({
+        title: { vi: `${value} < ${target} → xuống dưới (row++)`, en: `${value} < ${target} → go down (row++)` },
+        hlCell: [row, col], codeLines: [7, 10, 12, 13],
+        vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "value", value }],
+        note: { vi: `matrix[${row}][${col}]=${value} < target. Mọi ô còn lại bên trái của hàng ${row} còn nhỏ hơn → loại hàng này, row = ${row + 1}.`, en: `matrix[${row}][${col}]=${value} < target. The rest of row ${row} to the left is even smaller → drop it, row = ${row + 1}.` },
+      });
+      row += 1;
+    }
+  }
+  gsnap({
+    title: { vi: `Không tìm thấy ${target}`, en: `${target} not found` },
+    final: true, codeLines: [6, 14], vars: [{ name: "found", value: false }],
+    note: { vi: `Đã ra khỏi ma trận mà chưa gặp target → trả về False.`, en: `Walked off the matrix without meeting target → return False.` },
+  });
+  return { original: m, answer: false, steps };
+}
+
+/** LeetCode 287: Find the Duplicate Number — Floyd's tortoise & hare. */
+function buildSteps287(input) {
+  const nums = Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const n = nums.length;
+  const sub = nums.map((_, i) => `[${i}]`);
+  const steps = [];
+  let slow = nums[0], fast = nums[0];
+  steps.push({
+    title: { vi: "slow = fast = nums[0]", en: "slow = fast = nums[0]" },
+    arr: [...nums], sub, highlight: [0], mark: [], codeLines: [3],
+    vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }],
+    note: { vi: `Coi mỗi giá trị là con trỏ i→nums[i]. Số bị lặp tạo ra một CHU TRÌNH. slow=fast=nums[0]=${slow}.`, en: `Treat each value as a pointer i→nums[i]. The duplicate creates a CYCLE. slow=fast=nums[0]=${slow}.` },
+  });
+  let guard = 0;
+  while (guard++ < n * 4) {
+    slow = nums[slow];
+    fast = nums[nums[fast]];
+    const met = slow === fast;
+    steps.push({
+      title: { vi: `Pha 1: slow=${slow}, fast=${fast}`, en: `Phase 1: slow=${slow}, fast=${fast}` },
+      arr: [...nums], sub, highlight: [slow, fast], mark: [], codeLines: met ? [4, 5, 6, 7, 8] : [4, 5, 6, 7],
+      vars: [{ name: "slow (1 bước)", value: slow }, { name: "fast (2 bước)", value: fast }, { name: "slow == fast?", value: met }],
+      note: {
+        vi: met
+          ? `slow đi 1 bước → ${slow}; fast đi 2 bước → ${fast}. slow == fast → gặp nhau trong chu trình, break.`
+          : `slow = nums[slow] = ${slow} (1 bước); fast = nums[nums[fast]] = ${fast} (2 bước). Chưa gặp nhau.`,
+        en: met
+          ? `slow moves 1 → ${slow}; fast moves 2 → ${fast}. slow == fast → they meet inside the cycle, break.`
+          : `slow = nums[slow] = ${slow} (1 step); fast = nums[nums[fast]] = ${fast} (2 steps). Not met yet.`,
+      },
+    });
+    if (met) break;
+  }
+  slow = nums[0];
+  steps.push({
+    title: { vi: "Pha 2: đặt lại slow = nums[0]", en: "Phase 2: reset slow to nums[0]" },
+    arr: [...nums], sub, highlight: [slow, fast], mark: [], codeLines: [9],
+    vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }],
+    note: { vi: `Đặt lại slow = nums[0] = ${slow}. Cho slow và fast cùng đi 1 bước tới khi gặp nhau → đó là cửa vào chu trình = số bị lặp.`, en: `Reset slow = nums[0] = ${slow}. Advance slow and fast one step each until they meet → the cycle entrance = the duplicate.` },
+  });
+  guard = 0;
+  while (slow !== fast && guard++ < n * 4) {
+    slow = nums[slow];
+    fast = nums[fast];
+    steps.push({
+      title: { vi: `slow=${slow}, fast=${fast}`, en: `slow=${slow}, fast=${fast}` },
+      arr: [...nums], sub, highlight: [slow, fast], mark: [], codeLines: [10, 11, 12],
+      vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }, { name: "slow == fast?", value: slow === fast }],
+      note: { vi: `slow = nums[slow] = ${slow}; fast = nums[fast] = ${fast} (mỗi bên 1 bước).`, en: `slow = nums[slow] = ${slow}; fast = nums[fast] = ${fast} (one step each).` },
+    });
+  }
+  steps.push({
+    title: { vi: `Số bị lặp = ${slow}`, en: `Duplicate = ${slow}` },
+    arr: [...nums], sub, highlight: [slow], mark: [slow], final: true, codeLines: [13],
+    vars: [{ name: "answer", value: slow }],
+    note: { vi: `slow và fast gặp nhau tại cửa vào chu trình = ${slow} → đó là số bị lặp.`, en: `slow and fast meet at the cycle entrance = ${slow} → the duplicated number.` },
+  });
+  return { original: nums, answer: slow, steps };
+}
+
 module.exports = {
+  240: {
+    id: 240, difficulty: "medium", slug: "search-a-2d-matrix-ii",
+    category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },
+    title: { vi: "Search a 2D Matrix II", en: "Search a 2D Matrix II" },
+    titleVi: { vi: "Tìm kiếm trong ma trận 2D II (đi kiểu cầu thang)", en: "Search a 2D matrix II (staircase)" },
+    statement: { vi: "Ma trận mỗi hàng tăng dần trái→phải, mỗi cột tăng dần trên→dưới. Kiểm tra target có tồn tại. Nhập ma trận (hàng cách ';'), target trong tham số.", en: "Each row increases left→right and each column top→bottom. Check whether target exists. Enter matrix (rows separated by ';'); target as a parameter." },
+    defaultInput: "1,4,7,11,15;2,5,8,12,19;3,6,9,16,22;10,13,14,17,24;18,21,23,26,30",
+    inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 5 }],
+    approach: [
+      { vi: "Bắt đầu ở góc trên-phải (row=0, col=cuối).", en: "Start at the top-right corner (row=0, col=last)." },
+      { vi: "Nếu ô > target → bỏ cả cột (col--); nếu < target → bỏ cả hàng (row++).", en: "If cell > target → drop the column (col--); if < target → drop the row (row++)." },
+      { vi: "Dừng khi tìm thấy hoặc đi ra ngoài ma trận.", en: "Stop when found or when walking off the matrix." },
+    ],
+    complexity: { time: "O(R + C)", space: "O(1)", note: { vi: "Mỗi bước loại bỏ hẳn một hàng hoặc một cột.", en: "Each step eliminates a whole row or column." } },
+    code: [
+      "class Solution:",
+      "    def searchMatrix(self, matrix, target):",
+      "        if not matrix or not matrix[0]:",
+      "            return False",
+      "        row, col = 0, len(matrix[0]) - 1",
+      "        while row < len(matrix) and col >= 0:",
+      "            value = matrix[row][col]",
+      "            if value == target:",
+      "                return True",
+      "            if value > target:",
+      "                col -= 1",
+      "            else:",
+      "                row += 1",
+      "        return False",
+    ],
+    builder: buildSteps240,
+  },
+  287: {
+    id: 287, difficulty: "medium", slug: "find-the-duplicate-number",
+    category: { key: "array", vi: "Mảng / Hai con trỏ", en: "Array / Two Pointers" },
+    title: { vi: "Find the Duplicate Number", en: "Find the Duplicate Number" },
+    titleVi: { vi: "Tìm số bị lặp (Floyd tortoise & hare)", en: "Find the duplicate (Floyd's cycle)" },
+    statement: { vi: "Mảng n+1 số trong [1, n], có đúng một số bị lặp. Tìm số đó, không sửa mảng và dùng O(1) bộ nhớ. Nhập nums.", en: "An array of n+1 integers in [1, n] with exactly one repeated number. Find it without modifying the array and using O(1) space. Enter nums." },
+    defaultInput: [1, 3, 4, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [
+      { vi: "Coi mỗi giá trị là con trỏ i→nums[i]; số bị lặp tạo ra một chu trình.", en: "Treat each value as a pointer i→nums[i]; the duplicate forms a cycle." },
+      { vi: "Pha 1: slow đi 1 bước, fast đi 2 bước cho đến khi gặp nhau trong chu trình.", en: "Phase 1: slow moves 1 step, fast 2 steps until they meet inside the cycle." },
+      { vi: "Pha 2: đặt lại slow về nums[0], cùng đi 1 bước; điểm gặp là cửa vào chu trình = số bị lặp.", en: "Phase 2: reset slow to nums[0], move both 1 step; the meeting point is the cycle entrance = the duplicate." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Không sửa mảng, không dùng bộ nhớ phụ.", en: "No array modification, no extra memory." } },
+    code: [
+      "class Solution:",
+      "    def findDuplicate(self, nums):",
+      "        slow = fast = nums[0]",
+      "        while True:",
+      "            slow = nums[slow]",
+      "            fast = nums[nums[fast]]",
+      "            if slow == fast:",
+      "                break",
+      "        slow = nums[0]",
+      "        while slow != fast:",
+      "            slow = nums[slow]",
+      "            fast = nums[fast]",
+      "        return slow",
+    ],
+    builder: buildSteps287,
+  },
   48: {
     id: 48, difficulty: "medium", slug: "rotate-image",
     category: { key: "array", vi: "Mảng", en: "Array" },

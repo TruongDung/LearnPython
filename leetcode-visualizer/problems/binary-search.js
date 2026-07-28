@@ -1651,7 +1651,83 @@ function buildSteps69(input) {
   return { original: x, answer: hi, steps };
 }
 
+/** LeetCode 278: First Bad Version — binary search for the leftmost bad. */
+function buildSteps278(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const firstBad = 4; // must match FIRST_BAD baked into the executed code
+  const steps = [];
+  const versions = Array.from({ length: n }, (_, i) => i + 1);
+  const sub = versions.map((v) => (v >= firstBad ? "bad" : "ok"));
+  const barArr = () => versions.map((v) => (v >= firstBad ? 2 : 1)); // bad bars are taller
+  const idx = (v) => v - 1;
+  let low = 1, high = n;
+  steps.push({
+    title: { vi: "low = 1, high = n", en: "low = 1, high = n" },
+    arr: barArr(), sub, highlight: [], mark: [], codeLines: [3, 4, 8],
+    vars: [{ name: "n", value: n }, { name: "low", value: low }, { name: "high", value: high }, { name: "(ẩn) first bad", value: firstBad }],
+    note: { vi: `Có n=${n} phiên bản; từ phiên bản xấu ĐẦU TIÊN trở đi đều xấu. Dùng nhị phân tìm phiên bản xấu đầu tiên. (Ngưỡng ẩn = ${firstBad}, cột "bad" cao hơn.)`, en: `n=${n} versions; every version from the FIRST bad one onward is bad. Binary search for that first bad version. (Hidden threshold = ${firstBad}; "bad" bars are taller.)` },
+  });
+  let guard = 0;
+  while (low < high && guard++ < n + 2) {
+    const mid = low + Math.floor((high - low) / 2);
+    const bad = mid >= firstBad;
+    steps.push({
+      title: { vi: `mid=${mid}, isBadVersion=${bad}`, en: `mid=${mid}, isBadVersion=${bad}` },
+      arr: barArr(), sub, highlight: [idx(mid)], mark: [idx(low), idx(high)], codeLines: bad ? [9, 10, 11, 12] : [9, 10, 11, 13, 14],
+      vars: [{ name: "low", value: low }, { name: "high", value: high }, { name: "mid", value: mid }, { name: "isBadVersion(mid)", value: bad }],
+      note: {
+        vi: bad
+          ? `mid=${mid} là XẤU → phiên bản xấu đầu tiên là ${mid} hoặc ở bên trái. high = mid = ${mid}.`
+          : `mid=${mid} là TỐT → phiên bản xấu đầu tiên nằm bên phải. low = mid+1 = ${mid + 1}.`,
+        en: bad
+          ? `mid=${mid} is BAD → the first bad version is ${mid} or to its left. high = mid = ${mid}.`
+          : `mid=${mid} is GOOD → the first bad version is to the right. low = mid+1 = ${mid + 1}.`,
+      },
+    });
+    if (bad) high = mid; else low = mid + 1;
+  }
+  steps.push({
+    title: { vi: `Phiên bản xấu đầu tiên = ${low}`, en: `First bad version = ${low}` },
+    arr: barArr(), sub, highlight: [idx(low)], mark: [idx(low)], final: true, codeLines: [9, 15],
+    vars: [{ name: "answer", value: low }],
+    note: { vi: `low == high == ${low} → phiên bản xấu đầu tiên là ${low}.`, en: `low == high == ${low} → the first bad version is ${low}.` },
+  });
+  return { original: n, answer: low, steps };
+}
+
 module.exports = {
+  278: {
+    id: 278, difficulty: "easy", slug: "first-bad-version",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "First Bad Version", en: "First Bad Version" },
+    titleVi: { vi: "Phiên bản lỗi đầu tiên", en: "First bad version" },
+    statement: { vi: "Các phiên bản 1..n; từ phiên bản xấu đầu tiên trở đi đều xấu. Dùng API isBadVersion để tìm phiên bản xấu đầu tiên với ít lần gọi nhất. Nhập n. (Ngưỡng lỗi ẩn cố định = 4.)", en: "Versions 1..n; every version from the first bad one onward is bad. Use the isBadVersion API to find the first bad version with the fewest calls. Enter n. (Hidden bad threshold fixed at 4.)" },
+    defaultInput: [5], inputKind: "positive", inputLabel: { vi: "n", en: "n" }, singleInput: true, maxInput: 40, extraParams: [],
+    approach: [
+      { vi: "Nhị phân trên khoảng [1, n], tìm biên trái của vùng 'xấu'.", en: "Binary search over [1, n] for the left boundary of the 'bad' region." },
+      { vi: "Nếu mid xấu → thu hẹp về trái (high = mid).", en: "If mid is bad → shrink left (high = mid)." },
+      { vi: "Nếu mid tốt → tìm bên phải (low = mid + 1).", en: "If mid is good → search right (low = mid + 1)." },
+    ],
+    complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Chỉ O(log n) lần gọi isBadVersion.", en: "Only O(log n) isBadVersion calls." } },
+    code: [
+      "FIRST_BAD = 4",
+      "",
+      "def isBadVersion(version):",
+      "    return version >= FIRST_BAD",
+      "",
+      "class Solution:",
+      "    def firstBadVersion(self, n):",
+      "        low, high = 1, n",
+      "        while low < high:",
+      "            mid = low + (high - low) // 2",
+      "            if isBadVersion(mid):",
+      "                high = mid",
+      "            else:",
+      "                low = mid + 1",
+      "        return low",
+    ],
+    builder: buildSteps278,
+  },
   69: {
     id: 69,
     difficulty: "easy",
