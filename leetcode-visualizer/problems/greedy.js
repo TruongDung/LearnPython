@@ -1664,6 +1664,161 @@ function buildSteps3947(input, params) {
   return { original: parsed.map((item) => [...item]), answer, steps };
 }
 
+/** LeetCode 4000: Largest Integer With Given Digit Sum. */
+function buildSteps4000(input, params) {
+  const n = Number(Array.isArray(input) ? input[0] : input);
+  const targetSum = Number(params.s);
+  const steps = [];
+  const emptyDigits = Array(n).fill("·");
+
+  steps.push({
+    title: { vi: "Kiểm tra giới hạn tổng chữ số", en: "Check the digit-sum limit" },
+    arr: [...emptyDigits],
+    highlight: [],
+    codeLines: [3],
+    vars: [
+      { name: "n", value: n },
+      { name: "s", value: targetSum },
+      { name: "maximum sum = 9 * n", value: 9 * n },
+    ],
+    note: {
+      vi: `Mỗi chữ số lớn nhất là 9, nên ${n} chữ số có tổng tối đa ${9 * n}. Trước tiên kiểm tra s=${targetSum} có khả thi không.`,
+      en: `Each digit is at most 9, so ${n} digits can sum to at most ${9 * n}. First check whether s=${targetSum} is feasible.`,
+    },
+  });
+
+  if (targetSum > 9 * n) {
+    steps.push({
+      title: { vi: "Không thể tạo số hợp lệ", en: "No valid integer exists" },
+      arr: [...emptyDigits],
+      highlight: [],
+      codeLines: [4],
+      final: true,
+      vars: [
+        { name: "s", value: targetSum },
+        { name: "9 * n", value: 9 * n },
+        { name: "answer", value: -1 },
+      ],
+      note: {
+        vi: `${targetSum} > ${9 * n}, vì vậy không có số gồm tối đa ${n} chữ số nào đạt tổng này. Trả về -1.`,
+        en: `${targetSum} > ${9 * n}, so no integer with at most ${n} digits can have this digit sum. Return -1.`,
+      },
+    });
+    return { original: { n, s: targetSum }, answer: -1, steps };
+  }
+
+  let remaining = targetSum;
+  let answer = 0;
+  const digits = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo kết quả", en: "Initialize the result" },
+    arr: [...emptyDigits],
+    highlight: [],
+    codeLines: [5],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "remaining sum", value: remaining },
+      { name: "digits", value: [] },
+    ],
+    note: {
+      vi: "Xây số từ trái sang phải. Chữ số bên trái có trọng số lớn hơn, nên luôn lấy chữ số lớn nhất có thể trước.",
+      en: "Build the number from left to right. Earlier digits have greater place value, so always take the largest possible digit first.",
+    },
+  });
+
+  for (let position = 0; position < n; position++) {
+    steps.push({
+      title: { vi: `Vị trí ${position}: bắt đầu vòng lặp`, en: `Position ${position}: enter the loop` },
+      arr: [...digits, ...Array(n - digits.length).fill("·")],
+      highlight: [position],
+      codeLines: [6],
+      vars: [
+        { name: "position", value: position },
+        { name: "answer", value: answer },
+        { name: "remaining sum", value: remaining },
+      ],
+      note: {
+        vi: `Đang chọn chữ số cho vị trí ${position} từ trái sang phải.`,
+        en: `Choose the digit for position ${position}, scanning from left to right.`,
+      },
+    });
+
+    const digit = Math.min(9, remaining);
+    steps.push({
+      title: { vi: `Chọn digit = ${digit}`, en: `Choose digit = ${digit}` },
+      arr: [...digits, digit, ...Array(n - digits.length - 1).fill("·")],
+      highlight: [position],
+      codeLines: [7],
+      vars: [
+        { name: "remaining sum", value: remaining },
+        { name: "digit = min(9, s)", value: digit },
+      ],
+      note: {
+        vi: `Lấy min(9, ${remaining}) = ${digit}. Đây là chữ số lớn nhất có thể đặt ở vị trí quan trọng nhất còn lại.`,
+        en: `Take min(9, ${remaining}) = ${digit}. This is the largest possible digit for the most significant remaining position.`,
+      },
+    });
+
+    const answerBefore = answer;
+    answer = answer * 10 + digit;
+    digits.push(digit);
+    steps.push({
+      title: { vi: `Ghép ${digit} vào answer`, en: `Append ${digit} to answer` },
+      arr: [...digits, ...Array(n - digits.length).fill("·")],
+      highlight: [position],
+      codeLines: [8],
+      vars: [
+        { name: "answer before", value: answerBefore },
+        { name: "digit", value: digit },
+        { name: "answer = answer * 10 + digit", value: answer },
+      ],
+      note: {
+        vi: `${answerBefore} × 10 + ${digit} = ${answer}.`,
+        en: `${answerBefore} × 10 + ${digit} = ${answer}.`,
+      },
+    });
+
+    const remainingBefore = remaining;
+    remaining -= digit;
+    steps.push({
+      title: { vi: "Trừ phần tổng đã sử dụng", en: "Subtract the used digit sum" },
+      arr: [...digits, ...Array(n - digits.length).fill("·")],
+      highlight: [position],
+      codeLines: [9],
+      vars: [
+        { name: "s before", value: remainingBefore },
+        { name: "digit", value: digit },
+        { name: "s after", value: remaining },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Tổng còn lại: ${remainingBefore} - ${digit} = ${remaining}.`,
+        en: `Remaining sum: ${remainingBefore} - ${digit} = ${remaining}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả lớn nhất: ${answer}`, en: `Largest result: ${answer}` },
+    arr: [...digits],
+    highlight: digits.map((_, index) => index),
+    codeLines: [10],
+    final: true,
+    vars: [
+      { name: "digits", value: [...digits] },
+      { name: "remaining sum", value: remaining },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Các chữ số lớn nhất đã được dồn về bên trái: [${digits.join(", ")}]. Tổng chữ số là ${targetSum}, đáp án là ${answer}.`,
+      en: `The largest digits are packed to the left: [${digits.join(", ")}]. Their sum is ${targetSum}, so the answer is ${answer}.`,
+    },
+  });
+
+  return { original: { n, s: targetSum }, answer, steps };
+}
+
 module.exports = {
   252: {
     id: 252,
@@ -1782,6 +1937,61 @@ module.exports = {
       "        return total + budget // cheapest",
     ],
     builder: buildSteps3947,
+  },
+  4000: {
+    id: 4000,
+    difficulty: "easy",
+    slug: "largest-integer-with-given-digit-sum",
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
+    title: { vi: "Largest Integer With Given Digit Sum", en: "Largest Integer With Given Digit Sum" },
+    titleVi: { vi: "Số lớn nhất có tổng chữ số cho trước", en: "Largest integer with a given digit sum" },
+    statement: {
+      vi: "Cho hai số nguyên không âm n và s. Trả về số nguyên lớn nhất có tối đa n chữ số và có tổng các chữ số bằng s. Nếu không tồn tại, trả về -1.",
+      en: "Given two non-negative integers n and s, return the largest integer with at most n digits whose digit sum is s. If no such integer exists, return -1.",
+    },
+    defaultInput: [2],
+    inputKind: "positive",
+    inputLabel: { vi: "n (số chữ số tối đa)", en: "n (maximum digits)" },
+    singleInput: true,
+    maxInput: 5,
+    extraParams: [
+      { key: "s", label: { vi: "s (tổng chữ số)", en: "s (digit sum)" }, type: "number", min: 0, max: 100, default: 9 },
+    ],
+    approach: [
+      {
+        vi: "Nếu s > 9 × n thì không thể tạo số hợp lệ, vì mỗi chữ số chỉ tối đa bằng 9.",
+        en: "If s > 9 × n, no valid integer exists because every digit is at most 9.",
+      },
+      {
+        vi: "Để số lớn nhất, ưu tiên giá trị hàng cao: tại mỗi vị trí từ trái sang phải, chọn digit = min(9, s còn lại).",
+        en: "To maximize the integer, prioritize higher place values: at each position from left to right, choose digit = min(9, remaining sum).",
+      },
+      {
+        vi: "Ghép digit vào answer rồi trừ digit khỏi tổng còn lại. Với s = 0, kết quả tự nhiên là 0.",
+        en: "Append the digit to answer, then subtract it from the remaining sum. When s = 0, the result is naturally 0.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt tối đa n vị trí chữ số và chỉ dùng vài biến. Mảng digits chỉ phục vụ visualization.",
+        en: "Scan at most n digit positions and use only a few variables. The digits array exists only for visualization.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def largestInteger(self, n: int, s: int) -> int:",
+      "        if s > 9 * n:",
+      "            return -1",
+      "        answer = 0",
+      "        for position in range(n):",
+      "            digit = min(9, s)",
+      "            answer = answer * 10 + digit",
+      "            s -= digit",
+      "        return answer",
+    ],
+    builder: buildSteps4000,
   },
   1288: {
     id: 1288,
