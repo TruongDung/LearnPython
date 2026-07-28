@@ -2560,7 +2560,102 @@ function buildSteps9(input) {
   return { original: rawX, answer, steps };
 }
 
+/** LeetCode 231: Power of Two — n & (n-1) == 0. */
+function buildSteps231(input) {
+  const n = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const steps = [];
+  const bin = (v) => (v < 0 ? "-" : "") + Math.abs(v).toString(2);
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `n = ${n}`, en: `n = ${n}` }, codeLines: [3], vars: [{ name: "n", value: n }, { name: "n (binary)", value: bin(n) }], note: { vi: "Lũy thừa của 2 có ĐÚNG 1 bit 1. Khi đó n & (n-1) xóa bit đó → 0.", en: "A power of two has EXACTLY one set bit. Then n & (n-1) clears it → 0." } });
+  if (n <= 0) { snap({ title: { vi: `n ≤ 0 → False`, en: `n ≤ 0 → False` }, final: true, codeLines: [4], vars: [{ name: "answer", value: false }], note: { vi: "Số ≤ 0 không phải lũy thừa của 2.", en: "Non-positive is not a power of two." } }); return { original: n, answer: false, steps }; }
+  const andVal = n & (n - 1);
+  const answer = andVal === 0;
+  snap({ title: { vi: `n & (n-1) = ${bin(n)} & ${bin(n - 1)} = ${andVal}`, en: `n & (n-1) = ${bin(n)} & ${bin(n - 1)} = ${andVal}` }, final: true, codeLines: [4], vars: [{ name: "n", value: `${n} (${bin(n)})` }, { name: "n-1", value: `${n - 1} (${bin(n - 1)})` }, { name: "n & (n-1)", value: andVal }, { name: "answer", value: answer }], note: { vi: answer ? `Kết quả = 0 → n có 1 bit duy nhất → là lũy thừa của 2.` : `Kết quả ≠ 0 → n có nhiều bit → KHÔNG phải lũy thừa của 2.`, en: answer ? `Result = 0 → n has a single bit → it IS a power of two.` : `Result ≠ 0 → n has multiple bits → NOT a power of two.` } });
+  return { original: n, answer, steps };
+}
+
+/** LeetCode 204: Count Primes — Sieve of Eratosthenes. */
+function buildSteps204(input) {
+  const n = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const steps = [];
+  if (n < 3) { steps.push({ title: { vi: `n=${n} < 3 → 0`, en: `n=${n} < 3 → 0` }, arr: [], highlight: [], mark: [], final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }], note: { vi: "Không có số nguyên tố < 2.", en: "No primes below 2." } }); return { original: n, answer: 0, steps }; }
+  const isPrime = new Array(n).fill(true);
+  isPrime[0] = isPrime[1] = false;
+  const arrView = () => isPrime.map((p, i) => (i < 2 ? 0 : p ? 1 : 0));
+  function snap(o) { steps.push({ title: o.title, arr: arrView(), sub: isPrime.map((_, i) => `${i}`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "is_prime = [True]*n; 0,1 = False", en: "is_prime = [True]*n; 0,1 = False" }, codeLines: [3, 4], vars: [{ name: "n", value: n }], note: { vi: "Sàng Eratosthenes: đánh dấu bội của mỗi số nguyên tố là hợp số (0). Ô = 1 nếu là nguyên tố.", en: "Sieve of Eratosthenes: mark multiples of each prime as composite (0). Cell = 1 if prime." } });
+  for (let p = 2; p * p < n; p++) {
+    if (isPrime[p]) {
+      for (let mult = p * p; mult < n; mult += p) isPrime[mult] = false;
+      snap({ title: { vi: `p=${p} nguyên tố → xóa bội từ ${p * p}`, en: `p=${p} prime → cross out multiples from ${p * p}` }, highlight: [p], mark: [], codeLines: [5, 6, 7, 8], vars: [{ name: "p", value: p }, { name: "primes so far", value: isPrime.filter(Boolean).length }], note: { vi: `${p} là nguyên tố. Đánh dấu ${p * p}, ${p * (p + 1)}, ... là hợp số.`, en: `${p} is prime. Mark ${p * p}, ${p * (p + 1)}, ... as composite.` } });
+    }
+  }
+  const count = isPrime.filter(Boolean).length;
+  snap({ title: { vi: `Đếm nguyên tố: ${count}`, en: `Count primes: ${count}` }, highlight: [], mark: isPrime.map((p, i) => (p ? i : -1)).filter((x) => x >= 0), final: true, codeLines: [9], vars: [{ name: "answer", value: count }], note: { vi: `Có ${count} số nguyên tố < ${n}.`, en: `There are ${count} primes below ${n}.` } });
+  return { original: n, answer: count, steps };
+}
+
+/** LeetCode 29: Divide Two Integers — repeated doubling subtraction. */
+function buildSteps29(input, params) {
+  const dividend = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const divisor = params && params.divisor !== undefined ? Number(params.divisor) : 3;
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  const INT_MAX = 2 ** 31 - 1, INT_MIN = -(2 ** 31);
+  snap({ title: { vi: `${dividend} ÷ ${divisor}`, en: `${dividend} ÷ ${divisor}` }, codeLines: [3], vars: [{ name: "dividend", value: dividend }, { name: "divisor", value: divisor }], note: { vi: "Không dùng phép chia/nhân/mod. Trừ dần bội GẤP ĐÔI của divisor.", en: "No division/multiplication/mod. Subtract doubling multiples of the divisor." } });
+  if (dividend === INT_MIN && divisor === -1) { snap({ title: { vi: "Tràn số → INT_MAX", en: "Overflow → INT_MAX" }, final: true, codeLines: [4], vars: [{ name: "answer", value: INT_MAX }], note: { vi: "Trường hợp tràn 32-bit.", en: "32-bit overflow case." } }); return { original: dividend, answer: INT_MAX, steps }; }
+  const negative = (dividend < 0) !== (divisor < 0);
+  let a = Math.abs(dividend), b = Math.abs(divisor), q = 0;
+  snap({ title: { vi: `|a|=${a}, |b|=${b}, âm=${negative}`, en: `|a|=${a}, |b|=${b}, negative=${negative}` }, codeLines: [5, 6], vars: [{ name: "a", value: a }, { name: "b", value: b }, { name: "negative", value: negative }], note: { vi: "Lấy trị tuyệt đối, ghi nhớ dấu.", en: "Take absolute values, remember the sign." } });
+  while (a >= b) {
+    let temp = b, mult = 1;
+    while (a >= (temp << 1)) { temp <<= 1; mult <<= 1; }
+    a -= temp; q += mult;
+    snap({ title: { vi: `Trừ ${temp} (=${b}×${mult}) → q=${q}, a=${a}`, en: `Subtract ${temp} (=${b}×${mult}) → q=${q}, a=${a}` }, codeLines: [7, 8, 9, 10, 11], vars: [{ name: "subtract", value: temp }, { name: "multiple", value: mult }, { name: "quotient", value: q }, { name: "remaining a", value: a }], note: { vi: `Nhân đôi divisor tới ${temp} (${b}×${mult}) ≤ a. Trừ ra, cộng ${mult} vào thương.`, en: `Double the divisor to ${temp} (${b}×${mult}) ≤ a. Subtract it, add ${mult} to the quotient.` } });
+  }
+  const answer = negative ? -q : q;
+  snap({ title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` }, final: true, codeLines: [12], vars: [{ name: "answer", value: answer }], note: { vi: `${dividend} ÷ ${divisor} = ${answer} (làm tròn về 0).`, en: `${dividend} ÷ ${divisor} = ${answer} (truncated toward zero).` } });
+  return { original: dividend, answer, steps };
+}
+
 module.exports = {
+  29: {
+    id: 29, difficulty: "medium", slug: "divide-two-integers",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    title: { vi: "Divide Two Integers", en: "Divide Two Integers" },
+    titleVi: { vi: "Chia hai số nguyên (không dùng /)", en: "Divide two integers (no /)" },
+    statement: { vi: "Chia dividend cho divisor không dùng phép nhân/chia/mod. Làm tròn về 0. Nhập dividend; divisor trong tham số.", en: "Divide dividend by divisor without *, /, %. Truncate toward zero. Enter dividend; divisor as a parameter." },
+    defaultInput: [10], inputKind: "integer", inputLabel: { vi: "dividend", en: "dividend" },
+    extraParams: [{ key: "divisor", label: { vi: "divisor", en: "divisor" }, default: 3 }],
+    approach: [{ vi: "Lấy trị tuyệt đối, ghi nhớ dấu.", en: "Take absolute values, remember the sign." }, { vi: "Nhân đôi divisor tới khi vừa ≤ phần còn lại, trừ ra, cộng bội vào thương.", en: "Double the divisor until it fits, subtract it, add the multiple to the quotient." }, { vi: "Xử lý tràn INT_MIN / -1.", en: "Handle the INT_MIN / -1 overflow case." }],
+    complexity: { time: "O(log²n)", space: "O(1)", note: { vi: "Mỗi vòng ngoài giảm a ít nhất một nửa.", en: "Each outer loop reduces a by at least half." } },
+    code: ["class Solution:", "    def divide(self, dividend, divisor):", "        if dividend==-2**31 and divisor==-1: return 2**31-1", "        neg = (dividend<0) != (divisor<0)", "        a, b, q = abs(dividend), abs(divisor), 0", "        while a >= b:", "            temp, mult = b, 1", "            while a >= (temp<<1): temp<<=1; mult<<=1", "            a -= temp; q += mult", "        return -q if neg else q"],
+    builder: buildSteps29,
+  },
+  204: {
+    id: 204, difficulty: "medium", slug: "count-primes",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    title: { vi: "Count Primes", en: "Count Primes" },
+    titleVi: { vi: "Đếm số nguyên tố (sàng Eratosthenes)", en: "Count primes (Sieve of Eratosthenes)" },
+    statement: { vi: "Đếm số nguyên tố nhỏ hơn n. Nhập n.", en: "Count the primes strictly less than n. Enter n." },
+    defaultInput: [10], inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    approach: [{ vi: "Khởi tạo mọi số là nguyên tố; 0,1 không phải.", en: "Mark all as prime; 0,1 are not." }, { vi: "Với mỗi p nguyên tố, xóa bội p·p, p·(p+1), ...", en: "For each prime p, cross out multiples p·p, p·(p+1), ..." }, { vi: "Đếm các ô còn lại.", en: "Count the remaining primes." }],
+    complexity: { time: "O(n log log n)", space: "O(n)", note: { vi: "Sàng chuẩn.", en: "Classic sieve." } },
+    code: ["class Solution:", "    def countPrimes(self, n):", "        if n < 3: return 0", "        is_prime = [True]*n; is_prime[0]=is_prime[1]=False", "        p = 2", "        while p*p < n:", "            if is_prime[p]:", "                for m in range(p*p, n, p): is_prime[m] = False", "            p += 1", "        return sum(is_prime)"],
+    builder: buildSteps204,
+  },
+  231: {
+    id: 231, difficulty: "easy", slug: "power-of-two",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    title: { vi: "Power of Two", en: "Power of Two" },
+    titleVi: { vi: "Lũy thừa của 2 (bit trick)", en: "Power of two (bit trick)" },
+    statement: { vi: "Kiểm tra n có phải lũy thừa của 2. Nhập n.", en: "Check whether n is a power of two. Enter n." },
+    defaultInput: [16], inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    approach: [{ vi: "Lũy thừa của 2 có đúng 1 bit 1.", en: "A power of two has exactly one set bit." }, { vi: "n & (n-1) xóa bit thấp nhất → 0 nếu chỉ có 1 bit.", en: "n & (n-1) clears the lowest set bit → 0 if only one bit." }, { vi: "Kèm điều kiện n > 0.", en: "Also require n > 0." }],
+    complexity: { time: "O(1)", space: "O(1)", note: { vi: "Một phép bit.", en: "A single bitwise op." } },
+    code: ["class Solution:", "    def isPowerOfTwo(self, n):", "        # exactly one set bit", "        return n > 0 and (n & (n-1)) == 0"],
+    builder: buildSteps231,
+  },
   7: {
     id: 7,
     difficulty: "medium",

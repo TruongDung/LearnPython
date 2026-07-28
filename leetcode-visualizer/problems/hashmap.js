@@ -3793,7 +3793,100 @@ function buildSteps359(input) {
   return { original: calls, answer: results, steps };
 }
 
+/** LeetCode 217: Contains Duplicate. */
+function buildSteps217(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  const seen = new Set();
+  function snap(o) { steps.push({ title: o.title, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "seen = set()", en: "seen = set()" }, codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }], note: { vi: "Duyệt mảng, nếu gặp lại số đã thấy → có trùng.", en: "Scan the array; if a number was already seen → duplicate exists." } });
+  let answer = false;
+  for (let i = 0; i < nums.length; i++) {
+    if (seen.has(nums[i])) { answer = true; snap({ title: { vi: `nums[${i}]=${nums[i]} đã có → True`, en: `nums[${i}]=${nums[i]} already seen → True` }, highlight: [i], mark: [nums.indexOf(nums[i])], final: true, codeLines: [4, 5], vars: [{ name: "num", value: nums[i] }, { name: "answer", value: true }], note: { vi: `${nums[i]} đã xuất hiện trước đó → có phần tử trùng.`, en: `${nums[i]} appeared before → a duplicate exists.` } }); break; }
+    seen.add(nums[i]);
+    snap({ title: { vi: `nums[${i}]=${nums[i]} mới → thêm vào seen`, en: `nums[${i}]=${nums[i]} new → add to seen` }, highlight: [i], mark: [], codeLines: [4, 6], vars: [{ name: "num", value: nums[i] }, { name: "seen", value: `{${[...seen].join(",")}}` }], note: { vi: `Chưa thấy → thêm vào seen.`, en: `Not seen → add to seen.` } });
+  }
+  if (!answer) snap({ title: { vi: "Không có trùng → False", en: "No duplicate → False" }, final: true, codeLines: [7], vars: [{ name: "answer", value: false }], note: { vi: "Mọi phần tử khác nhau.", en: "All elements are distinct." } });
+  return { original: nums, answer, steps };
+}
+
+/** LeetCode 219: Contains Duplicate II. */
+function buildSteps219(input, params) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const k = params && params.k !== undefined ? Number(params.k) : 3;
+  const steps = [];
+  const last = {};
+  function snap(o) { steps.push({ title: o.title, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `last = {}, k=${k}`, en: `last = {}, k=${k}` }, codeLines: [3], vars: [{ name: "k", value: k }], note: { vi: "Lưu chỉ số gần nhất của mỗi giá trị. Nếu gặp lại trong khoảng ≤ k → True.", en: "Store the last index of each value. If a repeat occurs within ≤ k → True." } });
+  let answer = false;
+  for (let i = 0; i < nums.length; i++) {
+    if (nums[i] in last && i - last[nums[i]] <= k) { answer = true; snap({ title: { vi: `nums[${i}]=${nums[i]}, |${i}-${last[nums[i]]}|≤${k} → True`, en: `nums[${i}]=${nums[i]}, |${i}-${last[nums[i]]}|≤${k} → True` }, highlight: [i, last[nums[i]]], mark: [i, last[nums[i]]], final: true, codeLines: [4, 5], vars: [{ name: "num", value: nums[i] }, { name: "prev index", value: last[nums[i]] }, { name: "distance", value: i - last[nums[i]] }], note: { vi: `${nums[i]} lặp lại cách ${i - last[nums[i]]} ≤ k=${k} → True.`, en: `${nums[i]} repeats within distance ${i - last[nums[i]]} ≤ k=${k} → True.` } }); break; }
+    last[nums[i]] = i;
+    snap({ title: { vi: `last[${nums[i]}] = ${i}`, en: `last[${nums[i]}] = ${i}` }, highlight: [i], mark: [], codeLines: [4, 6], vars: [{ name: "num", value: nums[i] }, { name: "last", value: `{${Object.entries(last).map(([kk, v]) => `${kk}:${v}`).join(",")}}` }], note: { vi: `Cập nhật chỉ số gần nhất của ${nums[i]} = ${i}.`, en: `Update last index of ${nums[i]} = ${i}.` } });
+  }
+  if (!answer) snap({ title: { vi: "Không có → False", en: "None → False" }, final: true, codeLines: [7], vars: [{ name: "answer", value: false }], note: { vi: "Không có cặp trùng trong khoảng k.", en: "No duplicate pair within distance k." } });
+  return { original: nums, answer, steps };
+}
+
+/** LeetCode 202: Happy Number — Floyd cycle detection on digit-square sums. */
+function buildSteps202(input) {
+  const n0 = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const steps = [];
+  const next = (x) => { let t = 0; while (x > 0) { const d = x % 10; t += d * d; x = Math.floor(x / 10); } return t; };
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `n = ${n0}`, en: `n = ${n0}` }, codeLines: [3], vars: [{ name: "n", value: n0 }], note: { vi: "Thay n bằng tổng bình phương các chữ số. Nếu về 1 → happy. Dùng slow/fast phát hiện chu trình.", en: "Replace n with the sum of squares of its digits. If it reaches 1 → happy. Use slow/fast to detect a cycle." } });
+  let slow = n0, fast = next(n0);
+  snap({ title: { vi: `slow=${slow}, fast=${fast}`, en: `slow=${slow}, fast=${fast}` }, codeLines: [4, 5], vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }], note: { vi: `next(${n0}) = tổng bình phương chữ số.`, en: `next(${n0}) = sum of squared digits.` } });
+  let guard = 0;
+  while (fast !== 1 && slow !== fast && guard < 100) {
+    guard++;
+    slow = next(slow);
+    fast = next(next(fast));
+    snap({ title: { vi: `slow=${slow}, fast=${fast}`, en: `slow=${slow}, fast=${fast}` }, codeLines: [6, 7, 8], vars: [{ name: "slow", value: slow }, { name: "fast", value: fast }], note: { vi: `slow đi 1 bước, fast đi 2 bước. ${fast === 1 ? "fast=1 → happy!" : slow === fast ? "gặp nhau → có chu trình → không happy" : "tiếp tục"}.`, en: `slow moves 1, fast moves 2. ${fast === 1 ? "fast=1 → happy!" : slow === fast ? "they meet → cycle → not happy" : "continue"}.` } });
+  }
+  const answer = fast === 1;
+  snap({ title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` }, final: true, codeLines: [9], vars: [{ name: "answer", value: answer }], note: { vi: answer ? `Về được 1 → là số hạnh phúc.` : `Rơi vào chu trình không chứa 1 → không hạnh phúc.`, en: answer ? `Reached 1 → happy number.` : `Fell into a cycle without 1 → not happy.` } });
+  return { original: n0, answer, steps };
+}
+
 module.exports = {
+  202: {
+    id: 202, difficulty: "easy", slug: "happy-number",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Happy Number", en: "Happy Number" },
+    titleVi: { vi: "Số hạnh phúc (phát hiện chu trình)", en: "Happy number (cycle detection)" },
+    statement: { vi: "Lặp thay n bằng tổng bình phương các chữ số. Nếu về 1 → hạnh phúc. Nhập n.", en: "Repeatedly replace n with the sum of squares of its digits. If it reaches 1 → happy. Enter n." },
+    defaultInput: [19], inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    approach: [{ vi: "next(x) = tổng bình phương các chữ số.", en: "next(x) = sum of squared digits." }, { vi: "Dùng slow/fast (Floyd) phát hiện chu trình.", en: "Use slow/fast (Floyd) to detect a cycle." }, { vi: "fast==1 → happy; slow==fast → chu trình → không happy.", en: "fast==1 → happy; slow==fast → cycle → not happy." }],
+    complexity: { time: "O(log n)", space: "O(1)", note: { vi: "Không cần set nhờ Floyd.", en: "No set needed thanks to Floyd." } },
+    code: ["class Solution:", "    def isHappy(self, n):", "        def nxt(x): return sum(int(d)**2 for d in str(x))", "        slow = n", "        fast = nxt(n)", "        while fast != 1 and slow != fast:", "            slow = nxt(slow)", "            fast = nxt(nxt(fast))", "        return fast == 1"],
+    builder: buildSteps202,
+  },
+  217: {
+    id: 217, difficulty: "easy", slug: "contains-duplicate",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Contains Duplicate", en: "Contains Duplicate" },
+    titleVi: { vi: "Có phần tử trùng không (hash set)", en: "Any duplicate? (hash set)" },
+    statement: { vi: "Kiểm tra mảng có phần tử nào lặp lại không. Nhập nums cách nhau dấu phẩy.", en: "Check whether any value appears more than once. Enter nums comma-separated." },
+    defaultInput: [1, 2, 3, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [{ vi: "Duyệt và lưu các số đã thấy vào set.", en: "Scan and store seen numbers in a set." }, { vi: "Gặp lại → True.", en: "See a repeat → True." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Một lượt với set.", en: "Single pass with a set." } },
+    code: ["class Solution:", "    def containsDuplicate(self, nums):", "        seen = set()", "        for num in nums:", "            if num in seen: return True", "            seen.add(num)", "        return False"],
+    builder: buildSteps217,
+  },
+  219: {
+    id: 219, difficulty: "easy", slug: "contains-duplicate-ii",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Contains Duplicate II", en: "Contains Duplicate II" },
+    titleVi: { vi: "Trùng trong khoảng k (hash map)", en: "Duplicate within distance k (hash map)" },
+    statement: { vi: "Có tồn tại i≠j với nums[i]==nums[j] và |i-j|≤k không? Nhập nums; k trong tham số.", en: "Does there exist i≠j with nums[i]==nums[j] and |i-j|≤k? Enter nums; k as a parameter." },
+    defaultInput: [1, 2, 3, 1], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3 }],
+    approach: [{ vi: "Lưu chỉ số gần nhất của mỗi giá trị.", en: "Store the last index of each value." }, { vi: "Gặp lại trong khoảng ≤ k → True.", en: "See a repeat within ≤ k → True." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Một lượt với hash map.", en: "Single pass with a hash map." } },
+    code: ["class Solution:", "    def containsNearbyDuplicate(self, nums, k):", "        last = {}", "        for i, num in enumerate(nums):", "            if num in last and i - last[num] <= k: return True", "            last[num] = i", "        return False"],
+    builder: buildSteps219,
+  },
   1346: {
     id: 1346,
     difficulty: "easy",
