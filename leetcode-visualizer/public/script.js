@@ -2920,6 +2920,53 @@ function renderGcdPairsView(step) {
   </div>`;
 }
 
+// ---- Smallest palindromic rearrangement visualization (LeetCode 3517) ----
+function renderPalindromeBuildView(step) {
+  const view = step.palindromeBuildView || {};
+  const source = Array.isArray(view.source) ? view.source : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const preview = Array.isArray(view.preview) ? view.preview : [];
+  const placements = new Set(Array.isArray(view.placements) ? view.placements : []);
+  const processed = new Set(Array.isArray(view.processed) ? view.processed : []);
+  const activeChar = view.activeChar;
+  const halfLength = Number.isInteger(view.halfLength) ? view.halfLength : Math.floor(source.length / 2);
+  const vi = lang === "vi";
+
+  const sourceHtml = source.map((ch, index) => `<div class="sp-source-cell${ch === activeChar ? " active" : ""}">
+    <span>[${index}]</span><strong>${escapeHtml(ch)}</strong>
+  </div>`).join("");
+
+  const countsHtml = counts.map((item) => `<div class="sp-count${item.ch === activeChar ? " active" : ""}${processed.has(item.ch) ? " processed" : ""}">
+    <strong>${escapeHtml(item.ch)}</strong>
+    <span>${vi ? "đếm" : "count"} ${item.count}</span>
+    <small>${item.pairs} ${vi ? "cặp" : item.pairs === 1 ? "pair" : "pairs"}${item.odd ? ` + 1 ${vi ? "dư" : "odd"}` : ""}</small>
+  </div>`).join("");
+
+  const previewHtml = preview.map((ch, index) => {
+    const center = source.length % 2 === 1 && index === halfLength;
+    const side = center ? " center" : index < halfLength ? " left" : " right";
+    return `<div class="sp-result-cell${side}${placements.has(index) ? " placed" : ""}${view.final ? " final" : ""}">
+      <span>[${index}]</span><strong>${escapeHtml(ch == null ? "·" : String(ch))}</strong>
+    </div>`;
+  }).join("");
+
+  const leftText = Array.isArray(view.left) && view.left.length ? view.left.join("") : "∅";
+  const middleText = view.middle || "∅";
+  const formula = view.formula ? `<div class="sp-formula">${escapeHtml(view.formula)}</div>` : "";
+  const summary = vi
+    ? `Xây palindrome nhỏ nhất từ ${source.length} ký tự; nửa trái hiện là ${leftText}, ký tự giữa là ${middleText}.`
+    : `Build the smallest palindrome from ${source.length} characters; current left half is ${leftText}, middle is ${middleText}.`;
+
+  $("treeView").innerHTML = `<div class="smallest-palindrome-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sp-row"><span class="sp-label">s</span><div class="sp-source">${sourceHtml}</div></div>
+    ${counts.length ? `<div class="sp-row"><span class="sp-label">count</span><div class="sp-counts">${countsHtml}</div></div>` : ""}
+    <div class="sp-state"><span>${vi ? "nửa trái" : "left half"}: <strong>${escapeHtml(leftText)}</strong></span><span>middle: <strong>${escapeHtml(middleText)}</strong></span></div>
+    ${formula}
+    <div class="sp-half-guide"><span>${vi ? "NỬA TRÁI tăng dần" : "SORTED LEFT HALF"}</span><span>${source.length % 2 ? "CENTER" : ""}</span><span>${vi ? "NỬA PHẢI đối xứng" : "MIRRORED RIGHT HALF"}</span></div>
+    <div class="sp-row"><span class="sp-label">${view.final ? (vi ? "kết quả" : "result") : (vi ? "bố cục" : "layout")}</span><div class="sp-result">${previewHtml}</div></div>
+  </div>`;
+}
+
 // ---- Duplicate zeros visualization (LeetCode 1089) ----
 function renderDuplicateZerosView(step) {
   const view = step.duplicateZerosView || {};
@@ -3732,6 +3779,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.palindromeBuildView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPalindromeBuildView(step);
   } else if (step.duplicateZerosView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

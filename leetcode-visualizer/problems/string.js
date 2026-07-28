@@ -6761,6 +6761,144 @@ function buildSteps3501RecursiveSegmentTree(input, params) {
   return { original: s, answer: `[${answers.join(", ")}]`, steps };
 }
 
+/**
+ * LeetCode 3517: Smallest Palindromic Rearrangement I.
+ * Count each character, build the left half in sorted order, then mirror it.
+ */
+function buildSteps3517(input) {
+  const s = String(input || "");
+  const source = [...s];
+  const freq = {};
+  for (const ch of source) freq[ch] = (freq[ch] || 0) + 1;
+
+  const chars = Object.keys(freq).sort();
+  const halfLength = Math.floor(source.length / 2);
+  const leftParts = [];
+  const processed = new Set();
+  const steps = [];
+  let middle = "";
+
+  function view(activeChar = null, placements = [], formula = "", final = false, showCounts = true) {
+    const left = [...leftParts.join("")];
+    const preview = new Array(source.length).fill(null);
+    for (let i = 0; i < left.length; i++) {
+      preview[i] = left[i];
+      preview[source.length - 1 - i] = left[i];
+    }
+    if (middle && source.length % 2 === 1) preview[halfLength] = middle;
+
+    return {
+      source: [...source],
+      counts: showCounts ? chars.map((ch) => ({ ch, count: freq[ch], pairs: Math.floor(freq[ch] / 2), odd: freq[ch] % 2 })) : [],
+      activeChar,
+      processed: [...processed],
+      left,
+      halfLength,
+      middle,
+      preview,
+      placements,
+      formula,
+      final,
+    };
+  }
+
+  steps.push({
+    title: { vi: `Nhận chuỗi palindrome s = "${s}"`, en: `Read palindromic string s = "${s}"` },
+    arr: [], palindromeBuildView: view(null, [], "", false, false),
+    codeLines: [3], vars: [{ name: "s", value: `"${s}"` }],
+    note: { vi: "Ta sẽ dùng mỗi cặp ký tự cho hai vị trí đối xứng.", en: "Each character pair will occupy two mirrored positions." },
+  });
+
+  steps.push({
+    title: { vi: "Đếm tần suất từng ký tự", en: "Count every character" },
+    arr: [], palindromeBuildView: view(null, [], `Counter(s) = {${chars.map((ch) => `'${ch}': ${freq[ch]}`).join(", ")}}`),
+    codeLines: [4], vars: chars.map((ch) => ({ name: `count['${ch}']`, value: freq[ch] })),
+    note: { vi: "Mỗi cặp đi vào hai nửa; ký tự có số lượng lẻ sẽ nằm ở giữa.", en: "Each pair goes into both halves; an odd leftover character occupies the center." },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo nửa trái", en: "Initialize the left half" },
+    arr: [], palindromeBuildView: view(), codeLines: [5],
+    vars: [{ name: "left", value: "[]" }],
+    note: { vi: "Nửa trái được xây theo thứ tự alphabet để kết quả nhỏ nhất.", en: "The left half is built alphabetically to make the result lexicographically smallest." },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo ký tự giữa", en: "Initialize the middle character" },
+    arr: [], palindromeBuildView: view(), codeLines: [6],
+    vars: [{ name: "middle", value: '""' }],
+    note: { vi: "Chuỗi độ dài chẵn sẽ giữ middle rỗng.", en: "For an even-length string, middle remains empty." },
+  });
+
+  for (const ch of chars) {
+    const count = freq[ch];
+    const pairs = Math.floor(count / 2);
+    const remainder = count % 2;
+
+    steps.push({
+      title: { vi: `Xét ký tự '${ch}'`, en: `Process character '${ch}'` },
+      arr: [], palindromeBuildView: view(ch, [], `count['${ch}'] = ${count}`),
+      codeLines: [7], vars: [{ name: "ch", value: `'${ch}'` }, { name: "count", value: count }],
+      note: { vi: "Các ký tự được xét theo thứ tự tăng dần.", en: "Characters are processed in ascending order." },
+    });
+
+    steps.push({
+      title: { vi: `Số cặp '${ch}' = ${pairs}`, en: `Number of '${ch}' pairs = ${pairs}` },
+      arr: [], palindromeBuildView: view(ch, [], `${count} // 2 = ${pairs} pair${pairs === 1 ? "" : "s"}`),
+      codeLines: [8], vars: [{ name: "pairs", value: pairs }],
+      note: { vi: `Dùng ${pairs} ký tự '${ch}' cho nửa trái và ${pairs} ký tự đối xứng ở nửa phải.`, en: `Use ${pairs} '${ch}' character(s) in the left half and ${pairs} mirrored in the right half.` },
+    });
+
+    const before = leftParts.join("").length;
+    leftParts.push(ch.repeat(pairs));
+    const placements = [];
+    for (let i = before; i < before + pairs; i++) placements.push(i, source.length - 1 - i);
+    steps.push({
+      title: { vi: `Thêm '${ch.repeat(pairs)}' vào nửa trái`, en: `Append '${ch.repeat(pairs)}' to the left half` },
+      arr: [], palindromeBuildView: view(ch, placements, `left += '${ch}' × ${pairs}`),
+      codeLines: [9], vars: [{ name: "left", value: `"${leftParts.join("")}"` }],
+      note: { vi: "Visualization đồng thời cho thấy vị trí đối xứng tương ứng ở nửa phải.", en: "The visualization also shows the corresponding mirrored positions in the right half." },
+    });
+
+    steps.push({
+      title: { vi: `Kiểm tra ${count} % 2 != 0`, en: `Check ${count} % 2 != 0` },
+      arr: [], palindromeBuildView: view(ch, [], `${count} % 2 = ${remainder}`),
+      codeLines: [10], vars: [{ name: "condition", value: remainder ? "True" : "False" }],
+      note: { vi: remainder ? `Còn dư một '${ch}', nên đặt nó ở giữa.` : `Không còn ký tự '${ch}' dư.`, en: remainder ? `One '${ch}' remains, so place it in the center.` : `No '${ch}' character remains.` },
+    });
+
+    if (remainder) {
+      middle = ch;
+      steps.push({
+        title: { vi: `Gán middle = '${ch}'`, en: `Assign middle = '${ch}'` },
+        arr: [], palindromeBuildView: view(ch, [halfLength], `middle = '${ch}'`),
+        codeLines: [11], vars: [{ name: "middle", value: `'${ch}'` }],
+        note: { vi: "Palindrome chỉ có tối đa một ký tự không ghép cặp.", en: "A palindrome has at most one unpaired character." },
+      });
+    }
+
+    processed.add(ch);
+  }
+
+  const half = leftParts.join("");
+  steps.push({
+    title: { vi: `Ghép nửa trái: half = "${half}"`, en: `Join the left half: half = "${half}"` },
+    arr: [], palindromeBuildView: view(null, [], `half = "${half}"`),
+    codeLines: [12], vars: [{ name: "half", value: `"${half}"` }],
+    note: { vi: "Nửa trái đã tăng dần; nửa phải bắt buộc là bản đảo của nó.", en: "The left half is sorted; the right half must be its reverse." },
+  });
+
+  const answer = half + middle + [...half].reverse().join("");
+  steps.push({
+    title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
+    arr: [], palindromeBuildView: view(null, source.map((_, i) => i), `${half} + ${middle || "∅"} + ${[...half].reverse().join("")}`, true),
+    final: true, codeLines: [13], vars: [{ name: "answer", value: `"${answer}"` }],
+    note: { vi: "Nửa phải là reverse của nửa trái, nên kết quả vừa palindrome vừa nhỏ nhất theo thứ tự từ điển.", en: "The right half is the reverse of the left, so the result is both palindromic and lexicographically smallest." },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -7837,6 +7975,51 @@ module.exports = {
       "        return ''.join(result)",
     ],
     builder: buildSteps1768,
+  },
+  3517: {
+    id: 3517,
+    difficulty: "medium",
+    slug: "smallest-palindromic-rearrangement-i",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Smallest Palindromic Rearrangement I", en: "Smallest Palindromic Rearrangement I" },
+    titleVi: { vi: "Sắp xếp palindrome nhỏ nhất", en: "Smallest palindromic rearrangement" },
+    statement: {
+      vi: "Cho chuỗi palindrome s gồm chữ cái thường. Hãy sắp xếp lại các ký tự để tạo palindrome nhỏ nhất theo thứ tự từ điển.",
+      en: "Given a palindromic lowercase string s, rearrange its characters into the lexicographically smallest palindrome.",
+    },
+    defaultInput: "babab",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi palindrome)", en: "s (palindromic string)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đếm tần suất từng ký tự bằng Counter.", en: "Count every character with Counter." },
+      { vi: "Duyệt ký tự theo alphabet; đưa count[ch] // 2 bản sao vào nửa trái.", en: "Process characters alphabetically and put count[ch] // 2 copies into the left half." },
+      { vi: "Nếu có ký tự dư, đặt nó ở giữa; nửa phải là reverse của nửa trái.", en: "Put the odd leftover character in the center; the right half is the reverse of the left half." },
+    ],
+    complexity: {
+      time: "O(n + k log k)",
+      space: "O(n + k)",
+      note: {
+        vi: "n là độ dài chuỗi, k là số ký tự khác nhau (k <= 26). Với alphabet cố định, thời gian là O(n).",
+        en: "n is the string length and k is the number of distinct characters (k <= 26). With a fixed alphabet, this is O(n).",
+      },
+    },
+    code: [
+      "from collections import Counter",
+      "class Solution:",
+      "    def smallestPalindrome(self, s: str) -> str:",
+      "        count = Counter(s)",
+      "        left = []",
+      "        middle = ''",
+      "        for ch in sorted(count):",
+      "            pairs = count[ch] // 2",
+      "            left.append(ch * pairs)",
+      "            if count[ch] % 2 != 0:",
+      "                middle = ch",
+      "        half = ''.join(left)",
+      "        return half + middle + half[::-1]",
+    ],
+    builder: buildSteps3517,
   },
   3499: {
     id: 3499,
