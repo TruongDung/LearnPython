@@ -3985,6 +3985,31 @@ button:disabled {
   min-width: 0;
 }
 
+.tree-queue-layout.tree-queue-stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tree-queue-stacked .tree-queue-tree {
+  min-height: 340px;
+  justify-content: flex-start;
+}
+
+.tree-queue-stacked .tree-svg {
+  flex: 0 0 auto;
+}
+
+.tree-queue-stacked .queue-viz-compact {
+  min-height: auto;
+}
+
+.tree-queue-stacked .queue-viz-compact .queue-cells {
+  grid-template-columns: repeat(5, minmax(72px, 1fr));
+}
+
+.tree-queue-stacked .queue-viz-compact .queue-status {
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+}
+
 .queue-viz-compact {
   min-height: 100%;
   padding: 14px;
@@ -4012,6 +4037,11 @@ button:disabled {
 
   .queue-viz-compact .queue-cells {
     grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  }
+
+  .tree-queue-stacked .queue-viz-compact .queue-cells,
+  .tree-queue-stacked .queue-viz-compact .queue-status {
+    grid-template-columns: repeat(2, minmax(90px, 1fr));
   }
 }
 

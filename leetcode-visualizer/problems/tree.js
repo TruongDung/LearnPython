@@ -1890,6 +1890,7 @@ function buildSteps863(input, params) {
     const items = queue === null ? [] : queue.map(({ node, distance }) => `${node.val}@${distance}`);
     return {
       title: "BFS Queue (node@distance)",
+      layout: "stacked",
       items,
       capacity: Math.max(5, items.length),
       active: items.length ? 0 : -1,

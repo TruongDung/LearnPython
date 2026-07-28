@@ -1797,7 +1797,7 @@ function renderTree(step, targetId = "treeView") {
       </div>`
     : "";
   $(targetId).innerHTML = decisionHeader + (step.queueView
-    ? `<div class="tree-queue-layout">
+    ? `<div class="tree-queue-layout${step.queueView.layout === "stacked" ? " tree-queue-stacked" : ""}">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
       </div>`
