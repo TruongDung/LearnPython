@@ -3708,7 +3708,150 @@ function buildSteps1797DLL(input, params) {
   return { original: raw, answer: outputs, steps };
 }
 
+/** LeetCode 1346: Check If N and Its Double Exist — hash set. */
+function buildSteps1346(input) {
+  const arr = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  const seen = new Set();
+  function snap(o) { steps.push({ title: o.title, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "seen = set()", en: "seen = set()" }, codeLines: [3], vars: [{ name: "arr", value: `[${arr.join(", ")}]` }], note: { vi: "Với mỗi số, kiểm tra 2×num hoặc num/2 (nếu chẵn) đã thấy chưa. Nếu có → tồn tại cặp N và 2N.", en: "For each num, check if 2×num or num/2 (if even) was already seen. If so → a pair N and 2N exists." } });
+  let answer = false;
+  for (let i = 0; i < arr.length; i++) {
+    const num = arr[i];
+    const hitDouble = seen.has(num * 2);
+    const hitHalf = num % 2 === 0 && seen.has(num / 2);
+    if (hitDouble || hitHalf) {
+      answer = true;
+      const other = hitDouble ? num * 2 : num / 2;
+      const otherIdx = arr.indexOf(other);
+      snap({ title: { vi: `num=${num}: thấy ${other} → True`, en: `num=${num}: found ${other} → True` }, highlight: [i], mark: otherIdx >= 0 ? [otherIdx] : [], final: true, codeLines: [4, 5, 6], vars: [{ name: "num", value: num }, { name: "match", value: `${other} (=${hitDouble ? "2×num" : "num/2"})` }, { name: "answer", value: true }], note: { vi: `${num} và ${other} tạo thành cặp N/2N → trả về True.`, en: `${num} and ${other} form an N/2N pair → return True.` } });
+      break;
+    }
+    seen.add(num);
+    snap({ title: { vi: `num=${num}: chưa có cặp → thêm vào seen`, en: `num=${num}: no pair yet → add to seen` }, highlight: [i], mark: [], codeLines: [4, 5, 7], vars: [{ name: "num", value: num }, { name: "seen", value: `{${[...seen].join(", ")}}` }], note: { vi: `Chưa thấy 2×${num}=${num * 2}${num % 2 === 0 ? ` hay ${num}/2=${num / 2}` : ""}. Thêm ${num} vào seen.`, en: `Haven't seen 2×${num}=${num * 2}${num % 2 === 0 ? ` or ${num}/2=${num / 2}` : ""}. Add ${num} to seen.` } });
+  }
+  if (!answer) snap({ title: { vi: "Không có cặp → False", en: "No pair → False" }, final: true, codeLines: [8], vars: [{ name: "answer", value: false }], note: { vi: "Duyệt hết mà không tìm được cặp N/2N.", en: "Scanned all without finding an N/2N pair." } });
+  return { original: arr, answer, steps };
+}
+
+/** LeetCode 383: Ransom Note — frequency counter. */
+function buildSteps383(input, params) {
+  const ransom = String(input);
+  const magazine = String(params && params.magazine !== undefined ? params.magazine : "aab");
+  const steps = [];
+  const avail = {};
+  for (const c of magazine) avail[c] = (avail[c] || 0) + 1;
+  const availStr = () => `{${Object.entries(avail).map(([k, v]) => `${k}:${v}`).join(", ")}}`;
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "Đếm tần suất chữ trong magazine", en: "Count letter frequencies in magazine" }, codeLines: [3], vars: [{ name: "ransomNote", value: `"${ransom}"` }, { name: "magazine", value: `"${magazine}"` }, { name: "available", value: availStr() }], note: { vi: "Đếm số lần mỗi chữ có trong magazine. Mỗi chữ của ransomNote 'tiêu thụ' 1 chữ tương ứng.", en: "Count each letter available in magazine. Each ransomNote char 'consumes' one matching letter." } });
+  let answer = true;
+  for (const ch of ransom) {
+    if ((avail[ch] || 0) <= 0) {
+      answer = false;
+      snap({ title: { vi: `'${ch}' hết trong magazine → False`, en: `'${ch}' exhausted in magazine → False` }, final: true, codeLines: [4, 5], vars: [{ name: "char", value: `'${ch}'` }, { name: `available['${ch}']`, value: avail[ch] || 0 }, { name: "answer", value: false } ], note: { vi: `Cần '${ch}' nhưng magazine không còn → không ghép được.`, en: `Need '${ch}' but magazine has none left → cannot construct.` } });
+      break;
+    }
+    avail[ch] -= 1;
+    snap({ title: { vi: `Dùng '${ch}' → available['${ch}']=${avail[ch]}`, en: `Use '${ch}' → available['${ch}']=${avail[ch]}` }, codeLines: [4, 6], vars: [{ name: "char", value: `'${ch}'` }, { name: "available", value: availStr() }], note: { vi: `'${ch}' còn trong magazine → dùng 1, giảm số lượng.`, en: `'${ch}' available → use one, decrement its count.` } });
+  }
+  if (answer) snap({ title: { vi: "Ghép được → True", en: "Constructible → True" }, final: true, codeLines: [7], vars: [{ name: "answer", value: true }], note: { vi: "Mọi chữ của ransomNote đều đủ trong magazine.", en: "Every ransomNote letter is covered by magazine." } });
+  return { original: ransom, answer, steps };
+}
+
+/** LeetCode 359: Logger Rate Limiter — hash map of next-allowed timestamps. */
+function buildSteps359(input) {
+  // input: "ts,message; ts,message; ..."
+  const calls = String(input).split(";").map((c) => c.trim()).filter(Boolean).map((c) => {
+    const idx = c.indexOf(",");
+    return [Number(c.slice(0, idx).trim()), c.slice(idx + 1).trim()];
+  });
+  const steps = [];
+  const lastPrinted = {};
+  const mapStr = () => `{${Object.entries(lastPrinted).map(([k, v]) => `${k}:${v}`).join(", ")}}`;
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "last_printed = {}", en: "last_printed = {}" }, codeLines: [3], vars: [{ name: "calls", value: calls.length }], note: { vi: "Mỗi message lưu thời điểm SỚM NHẤT được in lại (= ts+10). In nếu chưa từng in hoặc ts ≥ mốc đó.", en: "Each message stores the EARLIEST timestamp it may reprint (= ts+10). Print if never printed or ts ≥ that mark." } });
+  const results = [];
+  for (const [ts, msg] of calls) {
+    const ok = !(msg in lastPrinted) || ts >= lastPrinted[msg];
+    if (ok) lastPrinted[msg] = ts + 10;
+    results.push(ok);
+    snap({
+      title: { vi: `t=${ts} "${msg}" → ${ok}`, en: `t=${ts} "${msg}" → ${ok}` },
+      codeLines: ok ? [4, 5, 6] : [4, 7],
+      vars: [{ name: "timestamp", value: ts }, { name: "message", value: `"${msg}"` }, { name: "last_printed", value: mapStr() }, { name: "result", value: ok }],
+      note: {
+        vi: ok
+          ? `"${msg}" chưa in hoặc đã qua 10s → IN. Đặt mốc kế = ${ts + 10}.`
+          : `"${msg}" mới in gần đây (mốc ${lastPrinted[msg]} > ${ts}) → KHÔNG in.`,
+        en: ok
+          ? `"${msg}" never printed or 10s passed → PRINT. Set next mark = ${ts + 10}.`
+          : `"${msg}" printed recently (mark ${lastPrinted[msg]} > ${ts}) → do NOT print.`,
+      },
+    });
+  }
+  snap({ title: { vi: `Kết quả: [${results.join(", ")}]`, en: `Result: [${results.join(", ")}]` }, final: true, codeLines: [7], vars: [{ name: "answers", value: `[${results.join(", ")}]` }], note: { vi: "Kết quả in/không-in cho từng message.", en: "Print/no-print result for each message." } });
+  return { original: calls, answer: results, steps };
+}
+
 module.exports = {
+  1346: {
+    id: 1346,
+    difficulty: "easy",
+    slug: "check-if-n-and-its-double-exist",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Check If N and Its Double Exist", en: "Check If N and Its Double Exist" },
+    titleVi: { vi: "Kiểm tra tồn tại N và 2N (hash set)", en: "Check if N and 2N exist (hash set)" },
+    statement: { vi: "Cho mảng arr. Có tồn tại i ≠ j sao cho arr[i] == 2*arr[j] không? Nhập cách nhau dấu phẩy.", en: "Given arr, does there exist i ≠ j with arr[i] == 2*arr[j]? Enter comma-separated." },
+    defaultInput: [10, 2, 5, 3],
+    inputKind: "integer", inputLabel: { vi: "arr", en: "arr" }, extraParams: [],
+    approach: [
+      { vi: "Duyệt mảng, giữ tập seen các số đã gặp.", en: "Scan the array, keep a set of seen numbers." },
+      { vi: "Với mỗi num: kiểm tra 2×num hoặc num/2 (nếu chẵn) có trong seen.", en: "For each num: check if 2×num or num/2 (if even) is in seen." },
+      { vi: "Nếu có → True. Ngược lại thêm num vào seen.", en: "If yes → True. Otherwise add num to seen." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Một lượt với hash set.", en: "Single pass with a hash set." } },
+    code: ["class Solution:", "    def checkIfExist(self, arr):", "        seen = set()", "        for num in arr:", "            if num*2 in seen or (num%2==0 and num//2 in seen):", "                return True", "            seen.add(num)", "        return False"],
+    builder: buildSteps1346,
+  },
+  383: {
+    id: 383,
+    difficulty: "easy",
+    slug: "ransom-note",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Ransom Note", en: "Ransom Note" },
+    titleVi: { vi: "Thư tống tiền (đếm tần suất)", en: "Ransom note (frequency counter)" },
+    statement: { vi: "Có thể tạo ransomNote từ các chữ trong magazine (mỗi chữ dùng 1 lần)? Nhập ransomNote; magazine trong tham số.", en: "Can ransomNote be built from magazine's letters (each used once)? Enter ransomNote; magazine as a parameter." },
+    defaultInput: "aa",
+    inputKind: "string", inputLabel: { vi: "ransomNote", en: "ransomNote" },
+    extraParams: [{ key: "magazine", label: { vi: "magazine", en: "magazine" }, default: "aab" }],
+    approach: [
+      { vi: "Đếm tần suất chữ trong magazine.", en: "Count letter frequencies in magazine." },
+      { vi: "Với mỗi chữ của ransomNote, giảm số lượng tương ứng.", en: "For each ransomNote char, decrement its available count." },
+      { vi: "Nếu hết chữ nào đó → không tạo được → False.", en: "If a needed letter runs out → cannot build → False." },
+    ],
+    complexity: { time: "O(m+n)", space: "O(1)", note: { vi: "Đếm ≤ 26 chữ.", en: "Count over ≤ 26 letters." } },
+    code: ["class Solution:", "    def canConstruct(self, ransomNote, magazine):", "        available = Counter(magazine)", "        for ch in ransomNote:", "            if available[ch] <= 0: return False", "            available[ch] -= 1", "        return True"],
+    builder: buildSteps383,
+  },
+  359: {
+    id: 359,
+    difficulty: "easy",
+    slug: "logger-rate-limiter",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    title: { vi: "Logger Rate Limiter", en: "Logger Rate Limiter" },
+    titleVi: { vi: "Giới hạn tần suất log (hash map + timestamp)", en: "Logger rate limiter (hash map + timestamp)" },
+    statement: { vi: "Mỗi message chỉ được in nếu chưa in trong 10 giây gần nhất. Nhập các lời gọi dạng ts,message ngăn bởi ';'.", en: "A message may print only if not printed in the last 10 seconds. Enter calls as ts,message separated by ';'." },
+    defaultInput: "1,foo;2,bar;3,foo;8,bar;10,foo;11,foo",
+    inputKind: "string", inputLabel: { vi: "Lời gọi (ts,message; ...)", en: "Calls (ts,message; ...)" }, extraParams: [],
+    approach: [
+      { vi: "last_printed[message] = thời điểm sớm nhất được in lại (= ts+10).", en: "last_printed[message] = earliest timestamp allowed to reprint (= ts+10)." },
+      { vi: "In nếu message chưa từng in HOẶC ts ≥ mốc đã lưu.", en: "Print if the message is new OR ts ≥ the stored mark." },
+      { vi: "Khi in, cập nhật mốc = ts + 10.", en: "When printing, update the mark = ts + 10." },
+    ],
+    complexity: { time: "O(1)/call", space: "O(unique messages)", note: { vi: "Tra cứu hash map O(1).", en: "O(1) hash-map lookups." } },
+    code: ["class Logger:", "    def __init__(self): self.last_printed = {}", "    def shouldPrintMessage(self, timestamp, message):", "        if message not in self.last_printed or timestamp >= self.last_printed[message]:", "            self.last_printed[message] = timestamp + 10", "            return True", "        return False"],
+    builder: buildSteps359,
+  },
   1797: {
     id: 1797,
     difficulty: "medium",

@@ -2838,6 +2838,72 @@ function buildSteps218(input) {
 }
 
 /**
+ * LeetCode 2558: Take Gifts From the Richest Pile — max-heap, k rounds.
+ * Each round: pop the largest pile, leave floor(sqrt(pile)) behind, push it back.
+ */
+function buildSteps2558(input, params) {
+  const gifts = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const k = params && params.k !== undefined ? Number(params.k) : 4;
+  const label = (v) => `${v}`;
+  const steps = [];
+
+  // max-heap via array; we render with heapSnapshot (min-heap tree of negatives shown positive)
+  const heap = gifts.map((g) => -g); // store negatives → min-heap = max by magnitude
+  // build heap
+  for (let i = Math.floor(heap.length / 2) - 1; i >= 0; i--) siftDownLocal(i);
+  function siftDownLocal(i) {
+    const n = heap.length;
+    while (true) { let s = i, l = 2 * i + 1, r = 2 * i + 2; if (l < n && heap[l] < heap[s]) s = l; if (r < n && heap[r] < heap[s]) s = r; if (s === i) break; [heap[i], heap[s]] = [heap[s], heap[i]]; i = s; }
+  }
+  function siftUpLocal(i) { while (i > 0) { const p = Math.floor((i - 1) / 2); if (heap[p] <= heap[i]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } }
+  function pop() { const top = heap[0]; const last = heap.pop(); if (heap.length) { heap[0] = last; siftDownLocal(0); } return top; }
+  function push(v) { heap.push(v); siftUpLocal(heap.length - 1); }
+  const sumStr = () => heap.reduce((a, b) => a - b, 0);
+  const posHeap = () => heap.map((v) => -v);
+
+  function snap(o) {
+    const step = heapSnapshot(posHeap(), label, {
+      title: o.title, codeLines: o.codeLines || [], hlSet: o.hlSet || new Set(), vars: o.vars || [], note: o.note,
+    });
+    if (o.final) step.final = true;
+    steps.push(step);
+  }
+
+  snap({
+    title: { vi: `Max-heap từ gifts, k=${k}`, en: `Max-heap from gifts, k=${k}` },
+    codeLines: [2, 3],
+    vars: [{ name: "gifts", value: `[${gifts.join(", ")}]` }, { name: "k", value: k }, { name: "sum", value: sumStr() }],
+    note: {
+      vi: `Mỗi vòng: lấy đống LỚN NHẤT, để lại floor(sqrt(đống)) rồi đẩy lại. Sau ${k} vòng, trả tổng còn lại.\nDùng max-heap (Python lưu số âm). Cây hiển thị giá trị dương.`,
+      en: `Each round: take the LARGEST pile, leave floor(sqrt(pile)) and push it back. After ${k} rounds, return the remaining sum.\nUse a max-heap (Python stores negatives). The tree shows positive values.`,
+    },
+  });
+
+  for (let round = 1; round <= k; round++) {
+    const largest = -pop();
+    const left = Math.floor(Math.sqrt(largest));
+    push(-left);
+    snap({
+      title: { vi: `Vòng ${round}: lấy ${largest} → để lại √=${left}`, en: `Round ${round}: take ${largest} → leave √=${left}` },
+      codeLines: [4, 5, 6],
+      hlSet: new Set([0]),
+      vars: [{ name: "round", value: `${round}/${k}` }, { name: "largest", value: largest }, { name: "floor(sqrt)", value: left }, { name: "sum", value: sumStr() }],
+      note: { vi: `Đống lớn nhất = ${largest}. Để lại floor(√${largest})=${left}, đẩy lại heap. Tổng hiện tại = ${sumStr()}.`, en: `Largest pile = ${largest}. Leave floor(√${largest})=${left}, push it back. Current sum = ${sumStr()}.` },
+    });
+  }
+
+  const answer = sumStr();
+  snap({
+    title: { vi: `Tổng còn lại: ${answer}`, en: `Remaining sum: ${answer}` },
+    codeLines: [7], final: true,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Sau ${k} vòng, tổng quà còn lại = ${answer}.`, en: `After ${k} rounds, the remaining total = ${answer}.` },
+  });
+
+  return { original: gifts, answer, steps };
+}
+
+/**
  * LeetCode 295: Find Median from Data Stream — two heaps.
  * small = max-heap (lower half), large = min-heap (upper half).
  * Invariant: every element in small ≤ every element in large, and
@@ -4220,5 +4286,37 @@ module.exports = {
       "        return (-self.small[0] + self.large[0]) / 2",
     ],
     builder: buildSteps295,
+  },
+  2558: {
+    id: 2558,
+    difficulty: "easy",
+    slug: "take-gifts-from-the-richest-pile",
+    category: HEAP_CAT,
+    title: { vi: "Take Gifts From the Richest Pile", en: "Take Gifts From the Richest Pile" },
+    titleVi: { vi: "Lấy quà từ đống nhiều nhất (max-heap)", en: "Take gifts from the richest pile (max-heap)" },
+    statement: {
+      vi: "Cho mảng gifts và số k. Mỗi giây: chọn đống NHIỀU NHẤT, để lại floor(sqrt) số quà, phần dư biến mất. Sau k giây trả về tổng quà còn lại. Nhập gifts; k trong tham số.",
+      en: "Given gifts and k. Each second: pick the RICHEST pile, leave floor(sqrt) gifts, the rest vanish. After k seconds return the remaining total. Enter gifts; k as a parameter.",
+    },
+    defaultInput: [25, 64, 9, 4, 100],
+    inputKind: "integer", inputLabel: { vi: "gifts", en: "gifts" },
+    extraParams: [{ key: "k", label: { vi: "k (số giây)", en: "k (seconds)" }, default: 4 }],
+    approach: [
+      { vi: "Dùng max-heap (Python: lưu số âm để dùng heapq).", en: "Use a max-heap (Python: store negatives with heapq)." },
+      { vi: "Mỗi vòng: pop đống lớn nhất, để lại floor(sqrt(đống)), push lại.", en: "Each round: pop the largest pile, leave floor(sqrt(pile)), push it back." },
+      { vi: "Lặp k lần rồi trả về tổng các đống còn lại.", en: "Repeat k times then return the sum of remaining piles." },
+    ],
+    complexity: { time: "O(k log n)", space: "O(n)", note: { vi: "Mỗi vòng 1 pop + 1 push O(log n).", en: "Each round is one pop + one push, O(log n)." } },
+    code: [
+      "import heapq, math",
+      "class Solution:",
+      "    def pickGifts(self, gifts, k):",
+      "        heap = [-g for g in gifts]; heapq.heapify(heap)",
+      "        for _ in range(k):",
+      "            largest = -heapq.heappop(heap)",
+      "            heapq.heappush(heap, -math.isqrt(largest))",
+      "        return -sum(heap)",
+    ],
+    builder: buildSteps2558,
   },
 };
