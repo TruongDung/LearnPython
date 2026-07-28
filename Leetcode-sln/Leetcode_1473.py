@@ -1,9 +1,6 @@
 from functools import lru_cache
 from typing import List
 
-# LeetCode defines minCost with five inputs in addition to self.
-# pylint: disable=too-many-positional-arguments
-
 
 class Solution:
     def minCost(self, houses: List[int], cost: List[List[int]],
