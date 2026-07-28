@@ -49,6 +49,8 @@ const I18N = {
     errSolve: "Không xử lý được.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "Mô tả LeetCode bị ẩn vì đây là bài Premium.",
+    premiumLockTitle: "Bài LeetCode Premium",
+    premiumLockText: "Mô phỏng bị khóa vì đây là bài Premium của LeetCode.",
     clearRecent: "Xóa",
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
@@ -86,6 +88,8 @@ const I18N = {
     errSolve: "Could not process the request.",
     premiumLabel: "LeetCode Premium",
     premiumHidden: "LeetCode description hidden because this is a Premium problem.",
+    premiumLockTitle: "LeetCode Premium problem",
+    premiumLockText: "The simulation is locked because this is a LeetCode Premium problem.",
     clearRecent: "Clear",
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
@@ -756,8 +760,35 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Show the premium lock card and hide the simulation body for Premium problems.
+function showPremiumLock() {
+  const lock = $("premiumLock");
+  const body = $("vizBody");
+  if ($("premiumLockTitle")) $("premiumLockTitle").textContent = t().premiumLockTitle;
+  if ($("premiumLockText")) $("premiumLockText").textContent = t().premiumLockText;
+  if (lock) lock.classList.remove("hidden");
+  if (body) body.classList.add("hidden");
+  $("stepTitle").textContent = t().premiumLockTitle;
+  $("stepCounter").textContent = "🔑";
+  show("vizPanel");
+  $("vizPanel").scrollIntoView({ behavior: "smooth" });
+}
+
+// Hide the premium lock card and restore the simulation body (non-premium).
+function hidePremiumLock() {
+  if ($("premiumLock")) $("premiumLock").classList.add("hidden");
+  if ($("vizBody")) $("vizBody").classList.remove("hidden");
+}
+
 async function runViz() {
   hide("runError");
+
+  // Premium problems: lock the simulation behind a key placeholder.
+  if (problemData && problemData.premium) {
+    showPremiumLock();
+    return;
+  }
+  hidePremiumLock();
 
   const isString = problemData && problemData.inputKind === "string";
   const isStringArray = problemData && problemData.inputKind === "stringArray";
