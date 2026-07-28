@@ -12036,11 +12036,588 @@ function buildSteps269(input) {
   return { original: words, answer, steps };
 }
 
+/**
+ * LeetCode 1192: Critical Connections in a Network — Tarjan's bridge finding.
+ * disc[u] = DFS discovery time; low[u] = lowest disc reachable from u's subtree.
+ * Edge (u, v) is a BRIDGE iff low[v] > disc[u] (v's subtree can't reach u or above
+ * except through this edge).
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def criticalConnections(self, n, connections):
+ *  3          graph = defaultdict(list)
+ *  4          for u, v in connections: graph[u].append(v); graph[v].append(u)
+ *  5          disc = [-1]*n; low = [0]*n; bridges = []; timer = [0]
+ *  6          def dfs(node, parent):
+ *  7              disc[node] = low[node] = timer[0]; timer[0] += 1
+ *  8              for nxt in graph[node]:
+ *  9                  if nxt == parent: continue
+ * 10                  if disc[nxt] == -1:
+ * 11                      dfs(nxt, node)
+ * 12                      low[node] = min(low[node], low[nxt])
+ * 13                      if low[nxt] > disc[node]: bridges.append([node, nxt])
+ * 14                  else:
+ * 15                      low[node] = min(low[node], disc[nxt])
+ * 16          for i in range(n):
+ * 17              if disc[i] == -1: dfs(i, -1)
+ * 18          return bridges
+ */
+function buildSteps1192(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 4;
+  // connections: "u-v,u-v,..."
+  const conns = String(input).split(",").map((s) => s.trim()).filter(Boolean).map((pair) => {
+    const [u, v] = pair.split("-").map((x) => Number(x.trim()));
+    return [u, v];
+  });
+
+  const steps = [];
+  const graph = Array.from({ length: n }, () => []);
+  for (const [u, v] of conns) {
+    graph[u].push(v);
+    graph[v].push(u);
+  }
+
+  const disc = new Array(n).fill(-1);
+  const low = new Array(n).fill(-1);
+  const bridges = [];
+  let timer = 0;
+
+  const nodes = () => Array.from({ length: n }, (_, id) => ({ id, label: String(id), dist: disc[id] >= 0 ? `d${disc[id]}/l${low[id]}` : "" }));
+  const edges = conns.map(([u, v]) => ({ u, v, undirected: true }));
+  const annotStr = () => {
+    const a = {};
+    for (let i = 0; i < n; i++) if (disc[i] >= 0) a[i] = `${disc[i]}/${low[i]}`;
+    return a;
+  };
+
+  function gsnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes: nodes(),
+        edges,
+        hlNodes: opts.hlNodes || [],
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: opts.visited || [],
+        annotations: annotStr(),
+        dimUnfocused: false,
+      },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  gsnap({
+    title: { vi: "Xây graph vô hướng, disc/low = -1", en: "Build undirected graph, disc/low = -1" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "n", value: n },
+      { name: "connections", value: conns.map(([u, v]) => `${u}-${v}`).join(", ") },
+    ],
+    note: {
+      vi:
+        `Thuật toán Tarjan tìm CẦU (bridge): cạnh mà xóa đi sẽ làm đồ thị mất liên thông.\n` +
+        `disc[u] = thời điểm DFS thăm u. low[u] = disc nhỏ nhất mà u (và con cháu) có thể quay ngược tới.\n` +
+        `Nhãn node hiển thị "disc/low".`,
+      en:
+        `Tarjan's algorithm finds BRIDGES: edges whose removal disconnects the graph.\n` +
+        `disc[u] = DFS discovery time of u. low[u] = smallest disc reachable from u's subtree (via back edges).\n` +
+        `Node labels show "disc/low".`,
+    },
+  });
+
+  function dfs(node, parent) {
+    disc[node] = low[node] = timer;
+    timer += 1;
+
+    gsnap({
+      title: { vi: `dfs(${node}): disc=low=${disc[node]}`, en: `dfs(${node}): disc=low=${disc[node]}` },
+      hlNodes: [node],
+      visited: disc.map((d, i) => (d >= 0 ? i : -1)).filter((x) => x >= 0),
+      codeLines: [6, 7],
+      vars: [
+        { name: "node", value: node },
+        { name: "parent", value: parent },
+        { name: `disc[${node}]`, value: disc[node] },
+        { name: `low[${node}]`, value: low[node] },
+        { name: "timer", value: timer },
+      ],
+      note: {
+        vi: `Thăm node ${node}: gán disc[${node}] = low[${node}] = ${disc[node]}. Duyệt các hàng xóm (trừ parent=${parent}).`,
+        en: `Visit node ${node}: set disc[${node}] = low[${node}] = ${disc[node]}. Explore neighbors (except parent=${parent}).`,
+      },
+    });
+
+    for (const nxt of graph[node]) {
+      if (nxt === parent) continue;
+      if (disc[nxt] === -1) {
+        gsnap({
+          title: { vi: `Cạnh cây ${node}→${nxt} (chưa thăm) → đệ quy`, en: `Tree edge ${node}→${nxt} (unvisited) → recurse` },
+          hlNodes: [node, nxt],
+          hlEdges: [[node, nxt]],
+          visited: disc.map((d, i) => (d >= 0 ? i : -1)).filter((x) => x >= 0),
+          codeLines: [8, 9, 10, 11],
+          vars: [{ name: "node", value: node }, { name: "nxt", value: nxt }],
+          note: {
+            vi: `${nxt} chưa được thăm (disc=-1) → đây là cạnh cây. Đệ quy dfs(${nxt}, ${node}).`,
+            en: `${nxt} is unvisited (disc=-1) → tree edge. Recurse dfs(${nxt}, ${node}).`,
+          },
+        });
+        dfs(nxt, node);
+        low[node] = Math.min(low[node], low[nxt]);
+
+        const isBridge = low[nxt] > disc[node];
+        if (isBridge) bridges.push([node, nxt]);
+        gsnap({
+          title: { vi: `low[${node}] = min → ${low[node]}${isBridge ? ` · CẦU ${node}-${nxt}!` : ""}`, en: `low[${node}] = min → ${low[node]}${isBridge ? ` · BRIDGE ${node}-${nxt}!` : ""}` },
+          hlNodes: [node, nxt],
+          hlEdges: [[node, nxt]],
+          visited: disc.map((d, i) => (d >= 0 ? i : -1)).filter((x) => x >= 0),
+          codeLines: [12, 13],
+          vars: [
+            { name: `low[${node}]`, value: low[node] },
+            { name: `low[${nxt}]`, value: low[nxt] },
+            { name: `disc[${node}]`, value: disc[node] },
+            { name: "low[nxt] > disc[node]?", value: isBridge },
+          ],
+          note: {
+            vi: isBridge
+              ? `low[${nxt}]=${low[nxt]} > disc[${node}]=${disc[node]} → từ ${nxt} KHÔNG có đường vòng nào quay về ${node} hay tổ tiên → cạnh ${node}-${nxt} là CẦU.`
+              : `low[${nxt}]=${low[nxt]} ≤ disc[${node}]=${disc[node]} → ${nxt} có đường vòng khác quay về ${node} hoặc trên nữa → KHÔNG phải cầu. Cập nhật low[${node}]=${low[node]}.`,
+            en: isBridge
+              ? `low[${nxt}]=${low[nxt]} > disc[${node}]=${disc[node]} → ${nxt} has NO back route to ${node} or above → edge ${node}-${nxt} is a BRIDGE.`
+              : `low[${nxt}]=${low[nxt]} ≤ disc[${node}]=${disc[node]} → ${nxt} can reach ${node} or higher another way → NOT a bridge. Update low[${node}]=${low[node]}.`,
+          },
+        });
+      } else {
+        low[node] = Math.min(low[node], disc[nxt]);
+        gsnap({
+          title: { vi: `Cạnh ngược ${node}→${nxt}: low[${node}]=${low[node]}`, en: `Back edge ${node}→${nxt}: low[${node}]=${low[node]}` },
+          hlNodes: [node, nxt],
+          hlEdges: [[node, nxt]],
+          visited: disc.map((d, i) => (d >= 0 ? i : -1)).filter((x) => x >= 0),
+          codeLines: [14, 15],
+          vars: [
+            { name: "node", value: node },
+            { name: "nxt (visited)", value: nxt },
+            { name: `disc[${nxt}]`, value: disc[nxt] },
+            { name: `low[${node}]`, value: low[node] },
+          ],
+          note: {
+            vi: `${nxt} đã thăm → cạnh ngược. low[${node}] = min(low[${node}], disc[${nxt}]=${disc[nxt]}) = ${low[node]}. Đây là đường vòng giúp node quay lại sớm hơn.`,
+            en: `${nxt} already visited → back edge. low[${node}] = min(low[${node}], disc[${nxt}]=${disc[nxt]}) = ${low[node]}. This back route lets node reach earlier.`,
+          },
+        });
+      }
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    if (disc[i] === -1) dfs(i, -1);
+  }
+
+  gsnap({
+    title: { vi: `Kết quả: ${bridges.length} cầu`, en: `Result: ${bridges.length} bridge(s)` },
+    hlEdges: bridges.map(([u, v]) => [u, v]),
+    visited: Array.from({ length: n }, (_, i) => i),
+    final: true,
+    codeLines: [18],
+    vars: [
+      { name: "bridges", value: bridges.map(([u, v]) => `[${u},${v}]`).join(", ") || "none" },
+    ],
+    note: {
+      vi: `Các cầu (critical connections): ${bridges.map(([u, v]) => `${u}-${v}`).join(", ") || "không có"}. Xóa bất kỳ cầu nào sẽ làm mạng mất liên thông.`,
+      en: `Bridges (critical connections): ${bridges.map(([u, v]) => `${u}-${v}`).join(", ") || "none"}. Removing any bridge disconnects the network.`,
+    },
+  });
+
+  return { original: conns, answer: bridges, steps };
+}
+
+/**
+ * LeetCode 317: Shortest Distance from All Buildings — multi-source BFS.
+ * From EACH building run a BFS; accumulate total_dist[cell] and reach[cell].
+ * Answer = min total_dist over empty cells reachable by ALL buildings.
+ *
+ * grid: 0 = empty land, 1 = building, 2 = obstacle.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def shortestDistance(self, grid):
+ *  3          rows, cols = len(grid), len(grid[0])
+ *  4          total = [[0]*cols for _ in range(rows)]
+ *  5          reach = [[0]*cols for _ in range(rows)]
+ *  6          buildings = 0
+ *  7          for r in range(rows):
+ *  8              for c in range(cols):
+ *  9                  if grid[r][c] == 1:
+ * 10                      buildings += 1
+ * 11                      bfs(r, c)   # accumulate distances & reach
+ * 12          best = inf
+ * 13          for r in range(rows):
+ * 14              for c in range(cols):
+ * 15                  if grid[r][c] == 0 and reach[r][c] == buildings:
+ * 16                      best = min(best, total[r][c])
+ * 17          return best if best != inf else -1
+ */
+function buildSteps317(input) {
+  const grid = String(input)
+    .split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+
+  const steps = [];
+  if (!grid.length || !grid[0].length) {
+    steps.push({
+      title: { vi: "Lưới rỗng → -1", en: "Empty grid → -1" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Nhập lưới dạng 1,0,2,0,1;0,0,0,0,0;0,0,1,0,0", en: "Enter grid like 1,0,2,0,1;0,0,0,0,0;0,0,1,0,0" },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const total = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const reach = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  function makeCells(highlightCell, bestCell) {
+    return grid.map((row, r) =>
+      row.map((v, c) => {
+        let cls, label;
+        if (v === 1) { cls = "start"; label = "🏢"; }
+        else if (v === 2) { cls = "wall"; label = "▧"; }
+        else {
+          // empty
+          cls = reach[r][c] > 0 ? "visited" : "empty";
+          label = reach[r][c] > 0 ? `${total[r][c]}` : "·";
+        }
+        if (bestCell && bestCell[0] === r && bestCell[1] === c) cls = "path";
+        if (highlightCell && highlightCell[0] === r && highlightCell[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.best) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Count buildings
+  const buildingList = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c] === 1) buildingList.push([r, c]);
+  const buildings = buildingList.length;
+
+  snap({
+    title: { vi: "Khởi tạo total, reach = 0", en: "Initialize total, reach = 0" },
+    codeLines: [3, 4, 5, 6],
+    vars: [
+      { name: "rows,cols", value: `${rows},${cols}` },
+      { name: "buildings", value: buildings },
+    ],
+    note: {
+      vi:
+        `🏢 = tòa nhà (1), ▧ = chướng ngại (2), số = tổng khoảng cách tới các tòa nhà.\n` +
+        `Chạy BFS từ MỖI tòa nhà, cộng dồn total[ô] và reach[ô] (số tòa nhà tới được ô đó).\n` +
+        `Đáp án = min total[ô] trong các ô trống được TẤT CẢ ${buildings} tòa nhà tới được.`,
+      en:
+        `🏢 = building (1), ▧ = obstacle (2), number = total distance to all buildings.\n` +
+        `Run BFS from EACH building, accumulating total[cell] and reach[cell] (how many buildings reach it).\n` +
+        `Answer = min total[cell] among empty cells reached by ALL ${buildings} buildings.`,
+    },
+  });
+
+  // BFS from each building
+  for (let b = 0; b < buildingList.length; b++) {
+    const [sr, sc] = buildingList[b];
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const queue = [[sr, sc, 0]];
+    visited[sr][sc] = true;
+    let head = 0;
+    while (head < queue.length) {
+      const [r, c, d] = queue[head++];
+      for (const [dr, dc] of dirs) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc] && grid[nr][nc] === 0) {
+          visited[nr][nc] = true;
+          total[nr][nc] += d + 1;
+          reach[nr][nc] += 1;
+          queue.push([nr, nc, d + 1]);
+        }
+      }
+    }
+
+    snap({
+      title: { vi: `BFS từ tòa nhà #${b + 1} tại (${sr},${sc})`, en: `BFS from building #${b + 1} at (${sr},${sc})` },
+      cur: [sr, sc],
+      codeLines: [7, 8, 9, 10, 11],
+      vars: [
+        { name: "building", value: `#${b + 1} (${sr},${sc})` },
+        { name: "buildings done", value: b + 1 },
+      ],
+      note: {
+        vi: `Chạy BFS từ tòa nhà (${sr},${sc}). Mỗi ô trống tới được: total += khoảng cách, reach += 1. Số trong ô = tổng khoảng cách tích lũy tới giờ.`,
+        en: `Run BFS from building (${sr},${sc}). Each reachable empty cell: total += distance, reach += 1. The number in each cell = accumulated total so far.`,
+      },
+    });
+  }
+
+  // Find minimum
+  let best = Infinity;
+  let bestCell = null;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === 0 && reach[r][c] === buildings) {
+        if (total[r][c] < best) { best = total[r][c]; bestCell = [r, c]; }
+      }
+    }
+  }
+
+  const answer = best === Infinity ? -1 : best;
+  snap({
+    title: answer === -1
+      ? { vi: "Không ô nào tới được mọi tòa nhà → -1", en: "No cell reaches all buildings → -1" }
+      : { vi: `Đáp án: ${answer} tại ô ${bestCell ? `(${bestCell[0]},${bestCell[1]})` : ""}`, en: `Answer: ${answer} at cell ${bestCell ? `(${bestCell[0]},${bestCell[1]})` : ""}` },
+    best: bestCell,
+    final: true,
+    codeLines: [12, 13, 14, 15, 16, 17],
+    vars: [
+      { name: "buildings", value: buildings },
+      { name: "best cell", value: bestCell ? `(${bestCell[0]},${bestCell[1]})` : "none" },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: answer === -1
+        ? `Không có ô trống nào được cả ${buildings} tòa nhà tới được → -1.`
+        : `Quét các ô trống có reach == ${buildings} (được mọi tòa nhà tới). Ô có total nhỏ nhất là (${bestCell[0]},${bestCell[1]}) với tổng khoảng cách ${answer}.`,
+      en: answer === -1
+        ? `No empty cell is reachable by all ${buildings} buildings → -1.`
+        : `Scan empty cells with reach == ${buildings} (reached by every building). The one with the smallest total is (${bestCell[0]},${bestCell[1]}) with total distance ${answer}.`,
+    },
+  });
+
+  return { original: grid, answer, steps };
+}
+
+/**
+ * LeetCode 489: Robot Room Cleaner — backtracking DFS with relative turns.
+ * The robot only knows move()/turnLeft()/turnRight()/clean(). We track absolute
+ * (row, col, facing) ourselves and backtrack ("go back") after exploring.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def cleanRoom(self, robot):
+ *  3          visited = set()
+ *  4          def go_back():
+ *  5              robot.turnRight(); robot.turnRight()
+ *  6              robot.move()
+ *  7              robot.turnRight(); robot.turnRight()
+ *  8          def dfs(r, c, d):
+ *  9              visited.add((r, c)); robot.clean()
+ * 10              for i in range(4):
+ * 11                  nd = (d + i) % 4
+ * 12                  nr, nc = r + dir[nd]
+ * 13                  if (nr, nc) not in visited and robot.move():
+ * 14                      dfs(nr, nc, nd)
+ * 15                      go_back()
+ * 16                  robot.turnRight()
+ * 17          dfs(0, 0, 0)
+ */
+function buildSteps489(input) {
+  // grid: rows of 0/1 (1 = accessible, 0 = wall). Robot starts at first 1 (top-left area).
+  const grid = String(input)
+    .split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+
+  const steps = [];
+  if (!grid.length || !grid[0].length) {
+    steps.push({
+      title: { vi: "Lưới rỗng", en: "Empty grid" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [], note: { vi: "Nhập lưới 0/1.", en: "Enter a 0/1 grid." },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  // Robot starts at param or default (0,0) — but must be on a 1.
+  let start = [0, 0];
+  outer: for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (grid[r][c] === 1) { start = [r, c]; break outer; }
+
+  const dirs = [[-1, 0], [0, 1], [1, 0], [0, -1]]; // up, right, down, left
+  const dirName = ["↑", "→", "↓", "←"];
+  const visited = new Set();
+  const cleaned = new Set();
+
+  function makeCells(cur, facing) {
+    return grid.map((row, r) =>
+      row.map((v, c) => {
+        let cls, label;
+        if (v === 0) { cls = "wall"; label = "▧"; }
+        else if (cur && cur[0] === r && cur[1] === c) { cls = "current"; label = dirName[facing]; }
+        else if (cleaned.has(`${r},${c}`)) { cls = "visited"; label = "✓"; }
+        else { cls = "empty"; label = "·"; }
+        return { label, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.facing || 0) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: `Bắt đầu dfs tại (${start[0]},${start[1]})`, en: `Start dfs at (${start[0]},${start[1]})` },
+    cur: start,
+    facing: 0,
+    codeLines: [3, 8, 17],
+    vars: [
+      { name: "start", value: `(${start[0]},${start[1]})` },
+      { name: "facing", value: "↑ (up)" },
+    ],
+    note: {
+      vi:
+        `Robot chỉ biết move()/turnLeft()/turnRight()/clean() — KHÔNG biết tọa độ. Ta tự theo dõi (r,c,hướng).\n` +
+        `✓ = ô đã lau, ▧ = tường, mũi tên = vị trí + hướng robot.\n` +
+        `DFS: lau ô hiện tại, thử 4 hướng; đi được thì đệ quy rồi "go_back" quay lại.`,
+      en:
+        `The robot only knows move()/turnLeft()/turnRight()/clean() — NOT coordinates. We track (r,c,facing) ourselves.\n` +
+        `✓ = cleaned, ▧ = wall, arrow = robot position + facing.\n` +
+        `DFS: clean current cell, try 4 directions; if it can move, recurse then "go_back".`,
+    },
+  });
+
+  let guard = 0;
+  function dfs(r, c, d) {
+    if (guard > 400) return;
+    guard += 1;
+    visited.add(`${r},${c}`);
+    cleaned.add(`${r},${c}`);
+
+    snap({
+      title: { vi: `clean (${r},${c})`, en: `clean (${r},${c})` },
+      cur: [r, c],
+      facing: d,
+      codeLines: [9],
+      vars: [
+        { name: "position", value: `(${r},${c})` },
+        { name: "facing", value: `${dirName[d]}` },
+        { name: "cleaned", value: cleaned.size },
+      ],
+      note: {
+        vi: `Lau ô (${r},${c}) và đánh dấu visited. Giờ thử lần lượt 4 hướng (bắt đầu từ hướng hiện tại ${dirName[d]}).`,
+        en: `Clean cell (${r},${c}) and mark visited. Now try all 4 directions (starting from current facing ${dirName[d]}).`,
+      },
+    });
+
+    for (let i = 0; i < 4; i++) {
+      const nd = (d + i) % 4;
+      const nr = r + dirs[nd][0];
+      const nc = c + dirs[nd][1];
+      const canMove = nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc] === 1;
+      const notVisited = !visited.has(`${nr},${nc}`);
+
+      if (notVisited && canMove) {
+        snap({
+          title: { vi: `Hướng ${dirName[nd]}: move() tới (${nr},${nc}) ✓`, en: `Direction ${dirName[nd]}: move() to (${nr},${nc}) ✓` },
+          cur: [r, c],
+          facing: nd,
+          codeLines: [10, 11, 12, 13, 14],
+          vars: [
+            { name: "trying dir", value: dirName[nd] },
+            { name: "next cell", value: `(${nr},${nc})` },
+            { name: "can move", value: true },
+          ],
+          note: {
+            vi: `Hướng ${dirName[nd]} tới (${nr},${nc}): chưa thăm và move() thành công → đệ quy dfs(${nr},${nc},${nd}).`,
+            en: `Direction ${dirName[nd]} to (${nr},${nc}): unvisited and move() succeeds → recurse dfs(${nr},${nc},${nd}).`,
+          },
+        });
+        dfs(nr, nc, nd);
+        // go_back
+        snap({
+          title: { vi: `go_back → quay lại (${r},${c})`, en: `go_back → return to (${r},${c})` },
+          cur: [r, c],
+          facing: nd,
+          codeLines: [4, 5, 6, 7, 15],
+          vars: [
+            { name: "back at", value: `(${r},${c})` },
+          ],
+          note: {
+            vi: `Đã lau xong nhánh (${nr},${nc}). go_back: quay 180°, move() về ô cũ, quay 180° lại để giữ đúng hướng đang xét.`,
+            en: `Finished the (${nr},${nc}) branch. go_back: turn 180°, move() back, turn 180° again to restore the scanning direction.`,
+          },
+        });
+      } else {
+        snap({
+          title: { vi: `Hướng ${dirName[nd]}: ${!canMove ? "tường/biên" : "đã thăm"} → bỏ qua`, en: `Direction ${dirName[nd]}: ${!canMove ? "wall/edge" : "visited"} → skip` },
+          cur: [r, c],
+          facing: nd,
+          codeLines: [13, 16],
+          vars: [
+            { name: "trying dir", value: dirName[nd] },
+            { name: "next cell", value: `(${nr},${nc})` },
+            { name: "reason", value: !canMove ? "wall/out of bounds" : "already visited" },
+          ],
+          note: {
+            vi: `Hướng ${dirName[nd]} tới (${nr},${nc}): ${!canMove ? "là tường hoặc ngoài phòng" : "đã lau rồi"} → không đi. turnRight() để thử hướng kế tiếp.`,
+            en: `Direction ${dirName[nd]} to (${nr},${nc}): ${!canMove ? "wall or out of room" : "already cleaned"} → don't move. turnRight() to try the next direction.`,
+          },
+        });
+      }
+    }
+  }
+
+  dfs(start[0], start[1], 0);
+
+  const totalFree = grid.flat().filter((v) => v === 1).length;
+  snap({
+    title: { vi: `Hoàn tất: lau ${cleaned.size}/${totalFree} ô`, en: `Done: cleaned ${cleaned.size}/${totalFree} cells` },
+    cur: null,
+    final: true,
+    codeLines: [17],
+    vars: [
+      { name: "cleaned", value: cleaned.size },
+      { name: "total accessible", value: totalFree },
+    ],
+    note: {
+      vi: `DFS backtracking đã lau toàn bộ ${cleaned.size} ô tới được. Robot quay về đúng vị trí/hướng ban đầu sau mỗi nhánh nhờ go_back.`,
+      en: `Backtracking DFS cleaned all ${cleaned.size} reachable cells. The robot restores its position/facing after each branch via go_back.`,
+    },
+  });
+
+  return { original: grid, answer: cleaned.size, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 329],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 489],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -12166,6 +12743,175 @@ module.exports = {
       "        return ''.join(result)",
     ],
     builder: buildSteps269,
+  },
+  1192: {
+    id: 1192,
+    difficulty: "hard",
+    slug: "critical-connections-in-a-network",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Critical Connections in a Network", en: "Critical Connections in a Network" },
+    titleVi: { vi: "Tìm cầu trong đồ thị (Tarjan)", en: "Find bridges in a graph (Tarjan)" },
+    statement: {
+      vi:
+        "Cho n server (0..n-1) và các kết nối vô hướng. Tìm mọi 'critical connection' (cầu) — " +
+        "cạnh mà nếu xóa đi sẽ làm mạng mất liên thông. Nhập cạnh dạng u-v cách nhau dấu phẩy.",
+      en:
+        "Given n servers (0..n-1) and undirected connections, find all 'critical connections' (bridges) — " +
+        "edges whose removal disconnects the network. Enter edges as u-v separated by commas.",
+    },
+    defaultInput: "0-1,1-2,2-0,1-3",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u-v, cách bởi ,)", en: "Edges (u-v, comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số server)", en: "n (servers)" }, default: 4 },
+    ],
+    approach: [
+      { vi: "DFS gán disc[u] (thời điểm thăm) và low[u] (disc nhỏ nhất quay ngược tới được).", en: "DFS assigns disc[u] (discovery time) and low[u] (smallest disc reachable back)." },
+      { vi: "Cạnh cây (u→v chưa thăm): sau đệ quy, low[u] = min(low[u], low[v]).", en: "Tree edge (u→v unvisited): after recursion, low[u] = min(low[u], low[v])." },
+      { vi: "Cạnh ngược (v đã thăm, ≠ parent): low[u] = min(low[u], disc[v]).", en: "Back edge (v visited, ≠ parent): low[u] = min(low[u], disc[v])." },
+      { vi: "Nếu low[v] > disc[u] thì cạnh (u,v) là CẦU — v không có đường vòng nào khác về u.", en: "If low[v] > disc[u] then edge (u,v) is a BRIDGE — v has no alternate route back to u." },
+    ],
+    complexity: {
+      time: "O(V + E)",
+      space: "O(V + E)",
+      note: {
+        vi: "Một lần DFS duyệt mỗi đỉnh và cạnh đúng 1 lần.",
+        en: "A single DFS visits each vertex and edge once.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def criticalConnections(self, n, connections):",
+      "        graph = defaultdict(list)",
+      "        for u, v in connections: graph[u].append(v); graph[v].append(u)",
+      "        disc = [-1]*n; low = [0]*n; bridges = []; timer = [0]",
+      "        def dfs(node, parent):",
+      "            disc[node] = low[node] = timer[0]; timer[0] += 1",
+      "            for nxt in graph[node]:",
+      "                if nxt == parent: continue",
+      "                if disc[nxt] == -1:",
+      "                    dfs(nxt, node)",
+      "                    low[node] = min(low[node], low[nxt])",
+      "                    if low[nxt] > disc[node]: bridges.append([node, nxt])",
+      "                else:",
+      "                    low[node] = min(low[node], disc[nxt])",
+      "        for i in range(n):",
+      "            if disc[i] == -1: dfs(i, -1)",
+      "        return bridges",
+    ],
+    builder: buildSteps1192,
+  },
+  317: {
+    id: 317,
+    difficulty: "hard",
+    slug: "shortest-distance-from-all-buildings",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Shortest Distance from All Buildings", en: "Shortest Distance from All Buildings" },
+    titleVi: { vi: "Khoảng cách ngắn nhất tới mọi tòa nhà (multi-BFS)", en: "Shortest total distance to all buildings (multi-BFS)" },
+    statement: {
+      vi:
+        "Cho lưới: 0 = đất trống, 1 = tòa nhà, 2 = chướng ngại. Tìm ô đất trống sao cho tổng khoảng cách " +
+        "(đường đi 4 hướng) tới TẤT CẢ tòa nhà là NHỎ NHẤT. Trả về tổng đó, hoặc -1 nếu không có. " +
+        "Nhập lưới: hàng cách bởi ';', giá trị cách bởi ','.",
+      en:
+        "Given a grid: 0 = empty land, 1 = building, 2 = obstacle. Find an empty cell minimizing the total " +
+        "travel distance (4-directional) to ALL buildings. Return that total, or -1 if impossible. " +
+        "Enter grid: rows separated by ';', values by ','.",
+    },
+    defaultInput: "1,0,2,0,1;0,0,0,0,0;0,0,1,0,0",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới (0/1/2, hàng cách ;)", en: "Grid (0/1/2, rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Chạy BFS từ MỖI tòa nhà (giá trị 1) qua các ô trống (giá trị 0).", en: "Run BFS from EACH building (value 1) across empty cells (value 0)." },
+      { vi: "total[ô] += khoảng cách từ tòa nhà; reach[ô] += 1 (đếm số tòa nhà tới được ô).", en: "total[cell] += distance from that building; reach[cell] += 1 (count buildings reaching it)." },
+      { vi: "Ô hợp lệ phải được TẤT CẢ tòa nhà tới được (reach == số tòa nhà).", en: "A valid cell must be reachable by ALL buildings (reach == building count)." },
+      { vi: "Đáp án = min total trong các ô hợp lệ, hoặc -1.", en: "Answer = min total among valid cells, or -1." },
+    ],
+    complexity: {
+      time: "O(k·rows·cols)",
+      space: "O(rows·cols)",
+      note: {
+        vi: "k = số tòa nhà. Mỗi BFS là O(rows·cols).",
+        en: "k = number of buildings. Each BFS is O(rows·cols).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def shortestDistance(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        total = [[0]*cols for _ in range(rows)]",
+      "        reach = [[0]*cols for _ in range(rows)]",
+      "        buildings = 0",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == 1:",
+      "                    buildings += 1",
+      "                    bfs(r, c)   # accumulate distances & reach",
+      "        best = float('inf')",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == 0 and reach[r][c] == buildings:",
+      "                    best = min(best, total[r][c])",
+      "        return best if best != float('inf') else -1",
+    ],
+    builder: buildSteps317,
+  },
+  489: {
+    id: 489,
+    difficulty: "hard",
+    slug: "robot-room-cleaner",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Robot Room Cleaner", en: "Robot Room Cleaner" },
+    titleVi: { vi: "Robot lau phòng (backtracking DFS)", en: "Robot room cleaner (backtracking DFS)" },
+    statement: {
+      vi:
+        "Robot chỉ biết move()/turnLeft()/turnRight()/clean() và KHÔNG biết bản đồ hay tọa độ. " +
+        "Lau sạch mọi ô tới được. Ta tự theo dõi (r,c,hướng) và backtrack. " +
+        "Nhập lưới 0/1 (1 = đi được, 0 = tường): hàng cách ';', giá trị cách ','.",
+      en:
+        "The robot only knows move()/turnLeft()/turnRight()/clean() and does NOT know the map or coordinates. " +
+        "Clean every reachable cell. We track (r,c,facing) ourselves and backtrack. " +
+        "Enter a 0/1 grid (1 = accessible, 0 = wall): rows separated by ';', values by ','.",
+    },
+    defaultInput: "1,1,1,1,1,0,1,1;1,1,1,1,1,0,1,1;1,0,1,1,1,1,1,1;0,0,0,1,0,0,0,0;1,1,1,1,1,1,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới 0/1 (hàng cách ;)", en: "0/1 grid (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Backtracking DFS: lau ô hiện tại, đánh dấu visited, thử 4 hướng theo thứ tự xoay phải.", en: "Backtracking DFS: clean current cell, mark visited, try 4 directions in right-turn order." },
+      { vi: "Nếu ô kế chưa thăm và move() thành công → đệ quy vào ô đó.", en: "If the next cell is unvisited and move() succeeds → recurse into it." },
+      { vi: "Sau khi xong nhánh, 'go_back': xoay 180°, move về, xoay 180° lại để giữ hướng.", en: "After a branch, 'go_back': turn 180°, move back, turn 180° again to keep facing." },
+      { vi: "Mỗi vòng lặp turnRight() để thử hướng kế tiếp. Ta theo dõi tọa độ tuyệt đối để biết visited.", en: "Each loop turnRight() to try the next direction. We track absolute coordinates to know visited." },
+    ],
+    complexity: {
+      time: "O(N)",
+      space: "O(N)",
+      note: {
+        vi: "N = số ô tới được. Mỗi ô thăm 1 lần; mỗi cạnh xét hằng số lần.",
+        en: "N = reachable cells. Each cell visited once; each edge examined a constant number of times.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def cleanRoom(self, robot):",
+      "        visited = set()",
+      "        def go_back():",
+      "            robot.turnRight(); robot.turnRight()",
+      "            robot.move()",
+      "            robot.turnRight(); robot.turnRight()",
+      "        def dfs(r, c, d):",
+      "            visited.add((r, c)); robot.clean()",
+      "            for i in range(4):",
+      "                nd = (d + i) % 4",
+      "                nr, nc = r + dir[nd][0], c + dir[nd][1]",
+      "                if (nr, nc) not in visited and robot.move():",
+      "                    dfs(nr, nc, nd)",
+      "                    go_back()",
+      "                robot.turnRight()",
+      "        dfs(0, 0, 0)",
+    ],
+    builder: buildSteps489,
   },
   200: {
     id: 200,
