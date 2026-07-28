@@ -142,6 +142,10 @@ function convertEdgeObjects(value) {
 }
 
 function coerceParamValue(problem, paramName, value, context) {
+  if (problem.id === 100 && (paramName === "p" || paramName === "q")) {
+    return { ...treeMarker(value), tree_id: paramName };
+  }
+
   if (paramName === "root") {
     if (problem.id === 116) return { ...treeMarker(value), __viz_type: "binary_tree_next" };
     return treeMarker(value);
