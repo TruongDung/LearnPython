@@ -12613,11 +12613,387 @@ function buildSteps489(input) {
   return { original: grid, answer: cleaned.size, steps };
 }
 
+/**
+ * LeetCode 864: Shortest Path to Get All Keys — BFS over (row, col, keys) states.
+ * keys is a bitmask; state is visited-tracked so we don't revisit the same
+ * (cell, keys) combination.
+ *
+ * grid chars: '@' start, '.' empty, '#' wall, 'a'-'f' keys, 'A'-'F' locks.
+ *
+ * Code lines (1-indexed):
+ *  1  from collections import deque
+ *  2  class Solution:
+ *  3      def shortestPathAllKeys(self, grid):
+ *  4          find start, count all_keys bitmask
+ *  5          queue = deque([(sr, sc, 0, 0)])   # r, c, keys, steps
+ *  6          visited = {(sr, sc, 0)}
+ *  7          while queue:
+ *  8              r, c, keys, steps = queue.popleft()
+ *  9              if keys == all_keys: return steps
+ * 10              for dr, dc in dirs:
+ * 11                  nr, nc = r+dr, c+dc
+ * 12                  if out of bounds or wall: continue
+ * 13                  if locked door without key: continue
+ * 14                  new_keys = keys | key_bit if lowercase
+ * 15                  if (nr, nc, new_keys) not seen: enqueue
+ * 16          return -1
+ */
+function buildSteps864(input) {
+  const grid = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean);
+  const steps = [];
+  if (!grid.length) {
+    steps.push({
+      title: { vi: "Lưới rỗng → -1", en: "Empty grid → -1" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Nhập lưới dạng @.a..;###.#;b.A.B", en: "Enter grid like @.a..;###.#;b.A.B" },
+    });
+    return { original: grid, answer: -1, steps };
+  }
+
+  const rows = grid.length;
+  const cols = Math.max(...grid.map((r) => r.length));
+  const cell = (r, c) => (grid[r][c] || "#");
+
+  let start = [0, 0];
+  let allKeys = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      const ch = grid[r][c];
+      if (ch === "@") start = [r, c];
+      else if (ch >= "a" && ch <= "f") allKeys |= (1 << (ch.charCodeAt(0) - 97));
+    }
+  }
+
+  const keysStr = (k) => {
+    const s = [];
+    for (let i = 0; i < 6; i++) if (k & (1 << i)) s.push(String.fromCharCode(97 + i));
+    return s.length ? s.join("") : "∅";
+  };
+
+  function makeCells(cur, curKeys) {
+    return grid.map((row, r) =>
+      Array.from({ length: cols }, (_, c) => {
+        const ch = cell(r, c);
+        let cls, label = ch;
+        if (ch === "#") cls = "wall";
+        else if (ch === "@") { cls = "start"; }
+        else if (ch >= "a" && ch <= "f") { cls = (curKeys & (1 << (ch.charCodeAt(0) - 97))) ? "visited" : "path"; }
+        else if (ch >= "A" && ch <= "F") { cls = "queued"; }
+        else { cls = "empty"; label = "·"; }
+        if (cur && cur[0] === r && cur[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.keys || 0) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: `Khởi tạo BFS: start=(${start[0]},${start[1]})`, en: `Initialize BFS: start=(${start[0]},${start[1]})` },
+    cur: start,
+    keys: 0,
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "start", value: `(${start[0]},${start[1]})` },
+      { name: "all_keys", value: `${keysStr(allKeys)} (${allKeys})` },
+      { name: "keys", value: "∅" },
+    ],
+    note: {
+      vi:
+        `@ = xuất phát, chữ thường a-f = chìa khóa, chữ HOA A-F = cửa khóa, # = tường.\n` +
+        `Trạng thái BFS = (hàng, cột, tập chìa khóa dạng bitmask). Cần thu đủ ${keysStr(allKeys)}.\n` +
+        `visited theo dõi (ô, keys) để không lặp cùng một trạng thái.`,
+      en:
+        `@ = start, lowercase a-f = keys, UPPERCASE A-F = locks, # = wall.\n` +
+        `BFS state = (row, col, keys bitmask). We must collect all keys ${keysStr(allKeys)}.\n` +
+        `visited tracks (cell, keys) so the same state isn't repeated.`,
+    },
+  });
+
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const queue = [[start[0], start[1], 0, 0]];
+  const visited = new Set([`${start[0]},${start[1]},0`]);
+  let head = 0;
+  let answer = -1;
+  let guard = 0;
+
+  while (head < queue.length && guard < 140) {
+    guard += 1;
+    const [r, c, keys, dist] = queue[head++];
+
+    if (keys === allKeys) {
+      answer = dist;
+      snap({
+        title: { vi: `✓ Đủ chìa khóa tại (${r},${c}) — ${dist} bước`, en: `✓ All keys at (${r},${c}) — ${dist} steps` },
+        cur: [r, c],
+        keys,
+        final: true,
+        codeLines: [8, 9],
+        vars: [
+          { name: "position", value: `(${r},${c})` },
+          { name: "keys", value: keysStr(keys) },
+          { name: "steps", value: dist },
+        ],
+        note: {
+          vi: `Thu đủ tất cả chìa khóa (${keysStr(keys)}) sau ${dist} bước. Vì BFS theo lớp, đây là đường NGẮN NHẤT.`,
+          en: `Collected all keys (${keysStr(keys)}) after ${dist} steps. Since BFS expands by layers, this is the SHORTEST path.`,
+        },
+      });
+      return { original: grid, answer, steps };
+    }
+
+    const popStep = guard <= 60; // limit verbose steps
+    if (popStep) {
+      snap({
+        title: { vi: `Pop (${r},${c}) keys=${keysStr(keys)} bước=${dist}`, en: `Pop (${r},${c}) keys=${keysStr(keys)} steps=${dist}` },
+        cur: [r, c],
+        keys,
+        codeLines: [7, 8, 10],
+        vars: [
+          { name: "position", value: `(${r},${c})` },
+          { name: "keys", value: keysStr(keys) },
+          { name: "steps", value: dist },
+          { name: "queue size", value: queue.length - head },
+        ],
+        note: {
+          vi: `Lấy trạng thái (${r},${c}) với chìa ${keysStr(keys)}. Thử 4 hướng.`,
+          en: `Process state (${r},${c}) with keys ${keysStr(keys)}. Try 4 directions.`,
+        },
+      });
+    }
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= (grid[nr] ? grid[nr].length : 0)) continue;
+      const ch = cell(nr, nc);
+      if (ch === "#") continue;
+      if (ch >= "A" && ch <= "F" && !(keys & (1 << (ch.charCodeAt(0) - 65)))) continue;
+
+      let nk = keys;
+      if (ch >= "a" && ch <= "f") nk |= (1 << (ch.charCodeAt(0) - 97));
+
+      const stateKey = `${nr},${nc},${nk}`;
+      if (visited.has(stateKey)) continue;
+      visited.add(stateKey);
+      queue.push([nr, nc, nk, dist + 1]);
+
+      if (popStep && ch >= "a" && ch <= "f" && nk !== keys) {
+        snap({
+          title: { vi: `Nhặt chìa '${ch}' tại (${nr},${nc}) → keys=${keysStr(nk)}`, en: `Pick key '${ch}' at (${nr},${nc}) → keys=${keysStr(nk)}` },
+          cur: [nr, nc],
+          keys: nk,
+          codeLines: [14, 15],
+          vars: [
+            { name: "to", value: `(${nr},${nc})` },
+            { name: "key found", value: ch },
+            { name: "new keys", value: keysStr(nk) },
+          ],
+          note: {
+            vi: `Đi tới (${nr},${nc}) nhặt chìa '${ch}'. Bitmask keys cập nhật thành ${keysStr(nk)}. Thêm trạng thái mới vào queue.`,
+            en: `Move to (${nr},${nc}) and pick key '${ch}'. Keys bitmask becomes ${keysStr(nk)}. Enqueue the new state.`,
+          },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: "Không thu đủ chìa khóa → -1", en: "Cannot collect all keys → -1" },
+    cur: null,
+    final: true,
+    codeLines: [16],
+    vars: [{ name: "answer", value: -1 }],
+    note: {
+      vi: "BFS hết trạng thái mà chưa thu đủ chìa khóa → không thể → -1.",
+      en: "BFS exhausted all states without collecting every key → impossible → -1.",
+    },
+  });
+
+  return { original: grid, answer, steps };
+}
+
+/**
+ * LeetCode 407: Trapping Rain Water II — min-heap BFS inward from the border.
+ * The water level at a cell is bounded by the lowest surrounding wall. Process
+ * cells from the lowest boundary height inward.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  class Solution:
+ *  3      def trapRainWater(self, heightMap):
+ *  4          push all border cells into a min-heap; mark visited
+ *  5          water = 0
+ *  6          while heap:
+ *  7              height, r, c = heappop(heap)
+ *  8              for each unvisited neighbor (nr, nc):
+ *  9                  water += max(0, height - heightMap[nr][nc])
+ * 10                  push (max(height, heightMap[nr][nc]), nr, nc)
+ * 11          return water
+ */
+function buildSteps407(input) {
+  const heightMap = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+  const steps = [];
+
+  if (heightMap.length < 3 || heightMap[0].length < 3) {
+    steps.push({
+      title: { vi: "Lưới < 3×3 → không giữ được nước → 0", en: "Grid < 3×3 → no water → 0" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "0", cls: "empty" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Cần ít nhất 3×3. Nhập dạng 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1", en: "Need at least 3×3. Enter like 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1" },
+    });
+    return { original: heightMap, answer: 0, steps };
+  }
+
+  const rows = heightMap.length;
+  const cols = heightMap[0].length;
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const waterAt = Array.from({ length: rows }, () => Array(cols).fill(0));
+
+  function makeCells(cur) {
+    return heightMap.map((row, r) =>
+      row.map((h, c) => {
+        let cls = visited[r][c] ? "visited" : "empty";
+        if (cur && cur[0] === r && cur[1] === c) cls = "current";
+        const label = waterAt[r][c] > 0 ? `${h}+${waterAt[r][c]}💧` : `${h}`;
+        return { label, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Min-heap
+  const heap = [];
+  const hpush = (item) => {
+    heap.push(item);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (heap[p][0] <= heap[i][0]) break;
+      [heap[p], heap[i]] = [heap[i], heap[p]]; i = p;
+    }
+  };
+  const hpop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) { heap[0] = last; let i = 0;
+      while (true) { let s = i, l = 2 * i + 1, r = 2 * i + 2;
+        if (l < heap.length && heap[l][0] < heap[s][0]) s = l;
+        if (r < heap.length && heap[r][0] < heap[s][0]) s = r;
+        if (s === i) break; [heap[i], heap[s]] = [heap[s], heap[i]]; i = s; } }
+    return top;
+  };
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) {
+        hpush([heightMap[r][c], r, c]);
+        visited[r][c] = true;
+      }
+    }
+  }
+
+  snap({
+    title: { vi: "Đẩy toàn bộ ô biên vào min-heap", en: "Push all border cells into the min-heap" },
+    codeLines: [4, 5],
+    vars: [
+      { name: "rows,cols", value: `${rows},${cols}` },
+      { name: "border cells", value: heap.length },
+      { name: "water", value: 0 },
+    ],
+    note: {
+      vi:
+        `Nước bị giới hạn bởi TƯỜNG THẤP NHẤT xung quanh. Bắt đầu từ biên (không giữ được nước) và tiến vào trong.\n` +
+        `Min-heap luôn lấy ô có "mức tường" thấp nhất trước. Nhãn ô = "cao độ+nước💧".`,
+      en:
+        `Water is bounded by the LOWEST surrounding wall. Start from the border (holds no water) and move inward.\n` +
+        `The min-heap always pops the lowest boundary height first. Cell label = "height+water💧".`,
+    },
+  });
+
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  let water = 0;
+  let guard = 0;
+
+  while (heap.length && guard < 200) {
+    guard += 1;
+    const [height, r, c] = hpop();
+    const verbose = guard <= 80;
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || visited[nr][nc]) continue;
+      visited[nr][nc] = true;
+      const trapped = Math.max(0, height - heightMap[nr][nc]);
+      water += trapped;
+      waterAt[nr][nc] = trapped;
+      const newHeight = Math.max(height, heightMap[nr][nc]);
+      hpush([newHeight, nr, nc]);
+
+      if (verbose) {
+        snap({
+          title: { vi: `Từ tường ${height} → ô (${nr},${nc}) cao ${heightMap[nr][nc]}: +${trapped}💧`, en: `From wall ${height} → cell (${nr},${nc}) height ${heightMap[nr][nc]}: +${trapped}💧` },
+          cur: [nr, nc],
+          codeLines: [6, 7, 8, 9, 10],
+          vars: [
+            { name: "boundary height", value: height },
+            { name: "cell height", value: heightMap[nr][nc] },
+            { name: "trapped here", value: trapped },
+            { name: "new boundary", value: newHeight },
+            { name: "total water", value: water },
+          ],
+          note: {
+            vi: `Ô (${nr},${nc}) cao ${heightMap[nr][nc]}. Tường bao quanh thấp nhất = ${height}. Nước giữ = max(0, ${height}-${heightMap[nr][nc]}) = ${trapped}. Đẩy ô với mức tường mới = max(${height},${heightMap[nr][nc]}) = ${newHeight}.`,
+            en: `Cell (${nr},${nc}) height ${heightMap[nr][nc]}. Lowest surrounding wall = ${height}. Trapped = max(0, ${height}-${heightMap[nr][nc]}) = ${trapped}. Push with new boundary = max(${height},${heightMap[nr][nc]}) = ${newHeight}.`,
+          },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: `return water = ${water}`, en: `return water = ${water}` },
+    cur: null,
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "answer (water)", value: water }],
+    note: {
+      vi: `Tổng lượng nước giữ được trên bản đồ 2D = ${water}. Các ô có nước hiển thị "+n💧".`,
+      en: `Total 2D trapped rain water = ${water}. Cells with water show "+n💧".`,
+    },
+  });
+
+  return { original: heightMap, answer: water, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 489],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -12912,6 +13288,107 @@ module.exports = {
       "        dfs(0, 0, 0)",
     ],
     builder: buildSteps489,
+  },
+  864: {
+    id: 864,
+    difficulty: "hard",
+    slug: "shortest-path-to-get-all-keys",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Shortest Path to Get All Keys", en: "Shortest Path to Get All Keys" },
+    titleVi: { vi: "Đường ngắn nhất thu hết chìa khóa (BFS + bitmask)", en: "Shortest path to collect all keys (BFS + bitmask)" },
+    statement: {
+      vi:
+        "Cho lưới: '@' xuất phát, '.' ô trống, '#' tường, chữ thường a-f là chìa khóa, chữ HOA A-F là cửa khóa " +
+        "(chỉ mở khi có chìa cùng chữ). Tìm số bước ít nhất để thu HẾT chìa khóa. Nhập lưới: hàng cách bởi ';'.",
+      en:
+        "Given a grid: '@' start, '.' empty, '#' wall, lowercase a-f are keys, UPPERCASE A-F are locks " +
+        "(open only with the matching key). Find the fewest steps to collect ALL keys. Enter grid: rows separated by ';'.",
+    },
+    defaultInput: "@.a..;###.#;b.A.B",
+    inputKind: "string",
+    inputLabel: { vi: "Lưới (hàng cách ;)", en: "Grid (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Trạng thái BFS = (hàng, cột, tập chìa khóa dạng bitmask). Mỗi chìa a-f là 1 bit.", en: "BFS state = (row, col, keys bitmask). Each key a-f is one bit." },
+      { vi: "Không đi vào tường '#'; cửa 'A'-'F' chỉ qua được nếu bitmask đã có chìa tương ứng.", en: "Cannot enter walls '#'; a door 'A'-'F' is passable only if the bitmask has its matching key." },
+      { vi: "Khi vào ô chìa khóa, bật bit tương ứng trong bitmask.", en: "When entering a key cell, set the corresponding bit in the bitmask." },
+      { vi: "visited theo (ô, keys). Đích đạt được khi keys == all_keys → trả về số bước.", en: "visited tracks (cell, keys). Goal reached when keys == all_keys → return steps." },
+    ],
+    complexity: {
+      time: "O(rows·cols·2^k)",
+      space: "O(rows·cols·2^k)",
+      note: {
+        vi: "k = số chìa khóa (≤ 6). Mỗi ô nhân với 2^k trạng thái bitmask.",
+        en: "k = number of keys (≤ 6). Each cell times 2^k bitmask states.",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "class Solution:",
+      "    def shortestPathAllKeys(self, grid):",
+      "        # find start, count all_keys bitmask",
+      "        queue = deque([(sr, sc, 0, 0)])  # r, c, keys, steps",
+      "        visited = {(sr, sc, 0)}",
+      "        while queue:",
+      "            r, c, keys, steps = queue.popleft()",
+      "            if keys == all_keys: return steps",
+      "            for dr, dc in dirs:",
+      "                nr, nc = r + dr, c + dc",
+      "                if out_of_bounds or grid[nr][nc] == '#': continue",
+      "                if is_lock and not (keys >> (ord-'A') & 1): continue",
+      "                new_keys = keys | key_bit if is_key else keys",
+      "                if (nr, nc, new_keys) not in visited: enqueue",
+      "        return -1",
+    ],
+    builder: buildSteps864,
+  },
+  407: {
+    id: 407,
+    difficulty: "hard",
+    slug: "trapping-rain-water-ii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Trapping Rain Water II", en: "Trapping Rain Water II" },
+    titleVi: { vi: "Hứng nước mưa 2D (min-heap từ biên)", en: "2D trapped rain water (min-heap from border)" },
+    statement: {
+      vi:
+        "Cho bản đồ độ cao 2D. Tính tổng lượng nước mưa giữ được sau khi mưa. " +
+        "Nhập lưới: hàng cách bởi ';', giá trị cách bởi ','. VD: 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1",
+      en:
+        "Given a 2D elevation map, compute the total trapped rain water after raining. " +
+        "Enter grid: rows separated by ';', values by ','. e.g. 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1",
+    },
+    defaultInput: "1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1",
+    inputKind: "string",
+    inputLabel: { vi: "Bản đồ độ cao (hàng cách ;)", en: "Elevation map (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mức nước tại một ô bị chặn bởi TƯỜNG THẤP NHẤT bao quanh. Bắt đầu từ biên (không giữ nước).", en: "Water level at a cell is bounded by the LOWEST surrounding wall. Start from the border (holds no water)." },
+      { vi: "Min-heap chứa (mức tường, r, c). Luôn xử lý ô có mức tường thấp nhất trước.", en: "Min-heap holds (boundary height, r, c). Always process the lowest boundary first." },
+      { vi: "Với ô hàng xóm chưa thăm: nước giữ = max(0, mức tường - độ cao ô).", en: "For an unvisited neighbor: trapped water = max(0, boundary height - cell height)." },
+      { vi: "Đẩy hàng xóm vào heap với mức tường mới = max(mức tường, độ cao ô).", en: "Push the neighbor with a new boundary = max(boundary, cell height)." },
+    ],
+    complexity: {
+      time: "O(rows·cols·log(rows·cols))",
+      space: "O(rows·cols)",
+      note: {
+        vi: "Mỗi ô được đẩy/lấy khỏi heap tối đa 1 lần.",
+        en: "Each cell is pushed/popped from the heap at most once.",
+      },
+    },
+    code: [
+      "import heapq",
+      "class Solution:",
+      "    def trapRainWater(self, heightMap):",
+      "        # push all border cells into a min-heap; mark visited",
+      "        water = 0",
+      "        while heap:",
+      "            height, r, c = heapq.heappop(heap)",
+      "            for nr, nc in neighbors(r, c):",
+      "                water += max(0, height - heightMap[nr][nc])",
+      "                heapq.heappush(heap, (max(height, heightMap[nr][nc]), nr, nc))",
+      "        return water",
+    ],
+    builder: buildSteps407,
   },
   200: {
     id: 200,

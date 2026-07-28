@@ -1228,6 +1228,189 @@ function buildSteps588(input, params) {
 }
 
 /**
+ * LeetCode 212: Word Search II — build a Trie of words, then DFS the board.
+ * The Trie lets us prune: from a cell we only continue if the current letter
+ * is a child of the current Trie node.
+ *
+ * board input: rows separated by ';', letters by ','. words via param.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def findWords(self, board, words):
+ *  3          trie = {}; build trie of words (leaf marks '$' = word)
+ *  4          result = []
+ *  5          def dfs(r, c, node):
+ *  6              ch = board[r][c]
+ *  7              if ch not in node: return
+ *  8              nxt = node[ch]
+ *  9              if '$' in nxt: result.append(word); del nxt['$']
+ * 10              board[r][c] = '#'
+ * 11              for (nr, nc) in neighbors: if not visited: dfs(nr, nc, nxt)
+ * 12              board[r][c] = ch
+ * 13          for r in range(rows):
+ * 14              for c in range(cols): dfs(r, c, trie)
+ * 15          return result
+ */
+function buildSteps212(input, params) {
+  const board = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+    .map((row) => row.split(",").map((v) => v.trim()));
+  const words = String(params && params.words || "oath,pea,eat,rain").split(",").map((w) => w.trim()).filter(Boolean);
+  const steps = [];
+
+  if (!board.length || !board[0].length) {
+    steps.push({
+      title: { vi: "Bảng rỗng → []", en: "Empty board → []" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [2], vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "Nhập bảng dạng o,a,a,n;e,t,a,e;i,h,k,r;i,f,l,v", en: "Enter board like o,a,a,n;e,t,a,e;i,h,k,r;i,f,l,v" },
+    });
+    return { original: board, answer: [], steps };
+  }
+
+  const rows = board.length;
+  const cols = Math.max(...board.map((r) => r.length));
+
+  // Build trie
+  const trie = {};
+  for (const word of words) {
+    let node = trie;
+    for (const ch of word) node = (node[ch] = node[ch] || {});
+    node.$ = word;
+  }
+
+  const found = [];
+  const work = board.map((r) => [...r]); // mutable board copy for '#'
+
+  function makeCells(cur, pathCells) {
+    const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
+    return work.map((row, r) =>
+      Array.from({ length: cols }, (_, c) => {
+        const ch = row[c] !== undefined ? row[c] : "";
+        let cls = "empty";
+        if (ch === "#") cls = "visited";
+        if (pathSet.has(`${r},${c}`)) cls = "path";
+        if (cur && cur[0] === r && cur[1] === c) cls = "current";
+        return { label: ch === "#" ? "·" : ch, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.path) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Xây Trie từ words", en: "Build Trie from words" },
+    codeLines: [3, 4],
+    vars: [
+      { name: "words", value: words.map((w) => `"${w}"`).join(", ") },
+      { name: "result", value: "[]" },
+    ],
+    note: {
+      vi:
+        `Đưa mọi từ vào Trie (cây tiền tố). Lá đánh dấu '$' = từ hoàn chỉnh.\n` +
+        `DFS từng ô của bảng; chỉ đi tiếp nếu chữ cái là con của node Trie hiện tại → CẮT TỈA mạnh.\n` +
+        `Ô đang thăm tô '#' để tránh dùng lại; khôi phục khi quay lui.`,
+      en:
+        `Insert every word into a Trie (prefix tree). A leaf marks '$' = a complete word.\n` +
+        `DFS each board cell; continue only if the letter is a child of the current Trie node → strong PRUNING.\n` +
+        `Mark the current cell '#' to avoid reuse; restore on backtrack.`,
+    },
+  });
+
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  let guard = 0;
+  const pathStack = [];
+
+  function dfs(r, c, node) {
+    if (guard > 150) return;
+    const ch = work[r][c];
+    if (ch === "#" || !(ch in node)) return;
+    guard += 1;
+
+    const nxt = node[ch];
+    pathStack.push([r, c]);
+
+    const isWord = nxt.$ !== undefined;
+    if (isWord) {
+      found.push(nxt.$);
+      const w = nxt.$;
+      delete nxt.$;
+      snap({
+        title: { vi: `Tìm thấy từ "${w}" tại (${r},${c})`, en: `Found word "${w}" at (${r},${c})` },
+        cur: [r, c],
+        path: [...pathStack],
+        codeLines: [8, 9],
+        vars: [
+          { name: "path", value: pathStack.map(([pr, pc]) => work[pr][pc] === "#" ? "?" : work[pr][pc]).join("") },
+          { name: "word found", value: w },
+          { name: "result", value: `[${found.map((x) => `"${x}"`).join(", ")}]` },
+        ],
+        note: {
+          vi: `Node Trie có '$' → đường đi (tô xanh) tạo thành từ "${w}". Thêm vào result và xóa '$' để không trùng.`,
+          en: `The Trie node has '$' → the highlighted path spells "${w}". Add to result and delete '$' to avoid duplicates.`,
+        },
+      });
+    } else if (guard <= 40) {
+      snap({
+        title: { vi: `dfs(${r},${c})='${ch}' khớp Trie → đi tiếp`, en: `dfs(${r},${c})='${ch}' matches Trie → continue` },
+        cur: [r, c],
+        path: [...pathStack],
+        codeLines: [5, 6, 7, 8],
+        vars: [
+          { name: "cell", value: `(${r},${c})='${ch}'` },
+          { name: "trie children", value: Object.keys(nxt).filter((x) => x !== "$").join(", ") || "none" },
+        ],
+        note: {
+          vi: `'${ch}' là con hợp lệ trong Trie → prefix hiện tại "${pathStack.map(([pr, pc]) => board[pr][pc]).join("")}" còn triển vọng. Thử 4 hướng.`,
+          en: `'${ch}' is a valid Trie child → current prefix "${pathStack.map(([pr, pc]) => board[pr][pc]).join("")}" is promising. Try 4 directions.`,
+        },
+      });
+    }
+
+    work[r][c] = "#";
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < (board[nr] ? board[nr].length : 0) && work[nr][nc] !== "#") {
+        dfs(nr, nc, nxt);
+      }
+    }
+    work[r][c] = ch; // restore
+    pathStack.pop();
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < board[r].length; c++) {
+      dfs(r, c, trie);
+    }
+  }
+
+  const answer = [...new Set(found)];
+  snap({
+    title: { vi: `Kết quả: [${answer.map((w) => `"${w}"`).join(", ")}]`, en: `Result: [${answer.map((w) => `"${w}"`).join(", ")}]` },
+    cur: null,
+    final: true,
+    codeLines: [13, 14, 15],
+    vars: [{ name: "answer", value: `[${answer.map((w) => `"${w}"`).join(", ")}]` }],
+    note: {
+      vi: `Các từ tìm được trên bảng: [${answer.map((w) => `"${w}"`).join(", ")}]. Trie giúp cắt tỉa những nhánh không dẫn tới từ nào.`,
+      en: `Words found on the board: [${answer.map((w) => `"${w}"`).join(", ")}]. The Trie prunes branches that lead to no word.`,
+    },
+  });
+
+  return { original: board, answer, steps };
+}
+
+/**
  * LeetCode 642: Design Search Autocomplete System.
  * Keep a counter of historical sentences. As the user types, build a prefix
  * and return the top 3 matching sentences ranked by (count desc, lexicographic
@@ -1417,6 +1600,67 @@ module.exports = {
       "        return [s for s, _ in matches[:3]]",
     ],
     builder: buildSteps642,
+  },
+  212: {
+    id: 212,
+    difficulty: "hard",
+    slug: "word-search-ii",
+    category: { key: "trie", vi: "Trie", en: "Trie" },
+    title: { vi: "Word Search II", en: "Word Search II" },
+    titleVi: { vi: "Tìm nhiều từ trên bảng (Trie + DFS)", en: "Find many words on a board (Trie + DFS)" },
+    statement: {
+      vi:
+        "Cho bảng ký tự và danh sách words. Tìm mọi từ có thể ghép từ các ô kề nhau (4 hướng), " +
+        "mỗi ô dùng 1 lần trong một từ. Dùng Trie để cắt tỉa. " +
+        "Nhập bảng: hàng cách bởi ';', ký tự cách bởi ','; words trong tham số.",
+      en:
+        "Given a board of letters and a list of words, find all words formable from adjacent cells (4 directions), " +
+        "each cell used once per word. Use a Trie to prune. " +
+        "Enter board: rows separated by ';', letters by ','; words as a parameter.",
+    },
+    defaultInput: "o,a,a,n;e,t,a,e;i,h,k,r;i,f,l,v",
+    inputKind: "string",
+    inputLabel: { vi: "Bảng (hàng cách ;)", en: "Board (rows separated by ;)" },
+    extraParams: [
+      { key: "words", label: { vi: "words (cách bởi ,)", en: "words (comma separated)" }, default: "oath,pea,eat,rain" },
+    ],
+    approach: [
+      { vi: "Xây Trie chứa mọi từ; lá đánh dấu '$' (từ hoàn chỉnh).", en: "Build a Trie of all words; a leaf marks '$' (a complete word)." },
+      { vi: "DFS từng ô; chỉ đi tiếp nếu chữ cái là con của node Trie hiện tại (cắt tỉa mạnh).", en: "DFS each cell; continue only if the letter is a child of the current Trie node (strong pruning)." },
+      { vi: "Đánh dấu ô đang thăm '#' để không dùng lại; khôi phục khi quay lui.", en: "Mark the current cell '#' so it isn't reused; restore on backtrack." },
+      { vi: "Khi gặp '$' trong node → thêm từ vào kết quả, xóa '$' để tránh trùng.", en: "When a node has '$' → add the word to the result and delete '$' to avoid duplicates." },
+    ],
+    complexity: {
+      time: "O(rows·cols·4^L)",
+      space: "O(total word length)",
+      note: {
+        vi: "L = độ dài từ dài nhất. Trie giúp cắt tỉa sớm nên thực tế nhanh hơn nhiều.",
+        en: "L = longest word length. The Trie prunes early, so it's much faster in practice.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findWords(self, board, words):",
+      "        trie = {}",
+      "        for w in words:",
+      "            node = trie",
+      "            for ch in w: node = node.setdefault(ch, {})",
+      "            node['$'] = w",
+      "        result = []",
+      "        def dfs(r, c, node):",
+      "            ch = board[r][c]",
+      "            if ch not in node: return",
+      "            nxt = node[ch]",
+      "            if '$' in nxt: result.append(nxt['$']); del nxt['$']",
+      "            board[r][c] = '#'",
+      "            for nr, nc in neighbors(r, c):",
+      "                if board[nr][nc] != '#': dfs(nr, nc, nxt)",
+      "            board[r][c] = ch",
+      "        for r in range(rows):",
+      "            for c in range(cols): dfs(r, c, trie)",
+      "        return result",
+    ],
+    builder: buildSteps212,
   },
   676: {
     id: 676,

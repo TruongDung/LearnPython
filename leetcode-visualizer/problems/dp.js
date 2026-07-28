@@ -12809,7 +12809,280 @@ function buildSteps312(inputNums) {
   return { original: nums, answer: dp[0][n - 1], steps };
 }
 
+/**
+ * LeetCode 1473: Paint House III — DP over (house i, color, neighborhoods).
+ * dp(i, prev_color, groups) = min cost to paint houses i..m-1 forming exactly
+ * `target` neighborhoods total, given the previous house's color.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def minCost(self, houses, cost, m, n, target):
+ *  3          @lru_cache(None)
+ *  4          def dp(i, prev, groups):
+ *  5              if groups > target: return INF
+ *  6              if i == m: return 0 if groups == target else INF
+ *  7              if houses[i] != 0:
+ *  8                  g = groups + (1 if houses[i] != prev else 0)
+ *  9                  return dp(i+1, houses[i], g)
+ * 10              best = INF
+ * 11              for color in 1..n:
+ * 12                  g = groups + (1 if color != prev else 0)
+ * 13                  best = min(best, cost[i][color-1] + dp(i+1, color, g))
+ * 14              return best
+ * 15          ans = dp(0, 0, 0)
+ * 16          return ans if ans != INF else -1
+ */
+function buildSteps1473(inputHouses, params) {
+  const houses = Array.isArray(inputHouses)
+    ? [...inputHouses]
+    : String(inputHouses).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const m = houses.length;
+  const n = params && params.n !== undefined ? Number(params.n) : 2;
+  const target = params && params.target !== undefined ? Number(params.target) : 3;
+  // cost: "c11 c12;c21 c22;..." rows separated by ';', colors by ','
+  const costRaw = String(params && params.cost || "1,10;10,1;10,1;1,10;5,1");
+  const cost = costRaw.split(";").map((row) => row.split(",").map((v) => Number(v.trim())));
+
+  const steps = [];
+  const INF = Infinity;
+  const fmt = (v) => (v === INF ? "∞" : String(v));
+
+  // Grid display: rows = houses, cols = colors; show cost or fixed color
+  function makeGrid(curHouse, chosen) {
+    const display = [["house\\color", ...Array.from({ length: n }, (_, c) => `c${c + 1}`)]];
+    for (let i = 0; i < m; i++) {
+      const row = [`h${i}${houses[i] ? `=c${houses[i]}` : ""}`];
+      for (let c = 0; c < n; c++) {
+        if (houses[i] !== 0) row.push(houses[i] === c + 1 ? "FIX" : "·");
+        else row.push(String(cost[i][c]));
+      }
+      display.push(row);
+    }
+    const pathCells = [];
+    (chosen || []).forEach(([hi, col]) => pathCells.push([hi + 1, col]));
+    return {
+      dp: display,
+      text1: "", text2: "",
+      hlCell: curHouse != null ? [curHouse + 1, 0] : null,
+      pathCells,
+      largeCells: true,
+    };
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: makeGrid(opts.curHouse, opts.chosen),
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo DP đệ quy có nhớ", en: "Initialize memoized DP" },
+    codeLines: [2, 3, 4],
+    vars: [
+      { name: "m (houses)", value: m },
+      { name: "n (colors)", value: n },
+      { name: "target", value: target },
+      { name: "houses", value: `[${houses.join(", ")}]` },
+    ],
+    note: {
+      vi:
+        `dp(i, prev, groups) = chi phí NHỎ NHẤT sơn nhà i..m-1 để tạo đúng target=${target} khu phố, biết nhà trước màu prev.\n` +
+        `Khu phố = dãy nhà liền nhau CÙNG MÀU. Nhà đã sơn (houses[i]≠0) thì màu cố định (FIX), miễn phí.\n` +
+        `Bảng: hàng = nhà, cột = màu; ô = chi phí sơn (hoặc FIX nếu đã sơn).`,
+      en:
+        `dp(i, prev, groups) = MIN cost to paint houses i..m-1 forming exactly target=${target} neighborhoods, given the previous color prev.\n` +
+        `A neighborhood = a maximal run of adjacent SAME-colored houses. Already-painted houses (houses[i]≠0) are FIXed and free.\n` +
+        `Table: rows = houses, cols = colors; cell = paint cost (or FIX if already painted).`,
+    },
+  });
+
+  const memo = new Map();
+  let calls = 0;
+  const chosenPath = [];
+
+  function dp(i, prev, groups, depth) {
+    calls += 1;
+    const key = `${i},${prev},${groups}`;
+
+    if (groups > target) {
+      if (calls <= 60) {
+        snap({
+          title: { vi: `dp(${i},${prev},${groups}): groups>${target} → ∞`, en: `dp(${i},${prev},${groups}): groups>${target} → ∞` },
+          curHouse: i < m ? i : null,
+          codeLines: [5],
+          vars: [{ name: "i", value: i }, { name: "prev", value: prev }, { name: "groups", value: groups }, { name: "target", value: target }],
+          note: { vi: `Đã có ${groups} khu phố > target=${target} → không hợp lệ → trả ∞.`, en: `Already ${groups} neighborhoods > target=${target} → invalid → return ∞.` },
+        });
+      }
+      return INF;
+    }
+
+    if (i === m) {
+      const res = groups === target ? 0 : INF;
+      snap({
+        title: { vi: `dp(${m},…,${groups}): hết nhà → ${fmt(res)}`, en: `dp(${m},…,${groups}): no more houses → ${fmt(res)}` },
+        curHouse: null,
+        codeLines: [6],
+        vars: [{ name: "groups", value: groups }, { name: "target", value: target }, { name: "returns", value: fmt(res) }],
+        note: {
+          vi: groups === target
+            ? `Sơn hết ${m} nhà và tạo đúng ${target} khu phố → chi phí thêm 0.`
+            : `Sơn hết nhà nhưng có ${groups}≠${target} khu phố → không hợp lệ → ∞.`,
+          en: groups === target
+            ? `Painted all ${m} houses with exactly ${target} neighborhoods → 0 extra cost.`
+            : `All houses painted but ${groups}≠${target} neighborhoods → invalid → ∞.`,
+        },
+      });
+      return res;
+    }
+
+    if (memo.has(key)) return memo.get(key);
+
+    let result;
+    if (houses[i] !== 0) {
+      const g = groups + (houses[i] !== prev ? 1 : 0);
+      if (calls <= 60) {
+        snap({
+          title: { vi: `Nhà ${i} đã sơn màu ${houses[i]} (cố định)`, en: `House ${i} already color ${houses[i]} (fixed)` },
+          curHouse: i,
+          chosen: [[i, houses[i]]],
+          codeLines: [7, 8, 9],
+          vars: [
+            { name: "i", value: i }, { name: "houses[i]", value: houses[i] }, { name: "prev", value: prev },
+            { name: "new groups", value: g },
+          ],
+          note: {
+            vi: `Nhà ${i} đã sơn màu ${houses[i]} → không tốn tiền. ${houses[i] !== prev ? `Khác màu nhà trước (${prev}) → khu phố mới, groups=${g}.` : `Cùng màu nhà trước → groups giữ = ${g}.`} Đệ quy dp(${i + 1}, ${houses[i]}, ${g}).`,
+            en: `House ${i} is fixed to color ${houses[i]} → no cost. ${houses[i] !== prev ? `Different from prev (${prev}) → new neighborhood, groups=${g}.` : `Same as prev → groups stays ${g}.`} Recurse dp(${i + 1}, ${houses[i]}, ${g}).`,
+          },
+        });
+      }
+      result = dp(i + 1, houses[i], g, depth + 1);
+    } else {
+      let best = INF;
+      let bestColor = -1;
+      for (let color = 1; color <= n; color++) {
+        const g = groups + (color !== prev ? 1 : 0);
+        const sub = dp(i + 1, color, g, depth + 1);
+        const totalCost = sub === INF ? INF : cost[i][color - 1] + sub;
+        if (totalCost < best) { best = totalCost; bestColor = color; }
+      }
+      if (calls <= 60) {
+        snap({
+          title: { vi: `Nhà ${i} chưa sơn → thử ${n} màu, tốt nhất=${fmt(best)}`, en: `House ${i} unpainted → try ${n} colors, best=${fmt(best)}` },
+          curHouse: i,
+          chosen: bestColor > 0 ? [[i, bestColor]] : [],
+          codeLines: [10, 11, 12, 13, 14],
+          vars: [
+            { name: "i", value: i }, { name: "prev", value: prev }, { name: "groups", value: groups },
+            { name: "best color", value: bestColor > 0 ? bestColor : "none" },
+            { name: "best cost", value: fmt(best) },
+          ],
+          note: {
+            vi: `Nhà ${i} chưa sơn: thử từng màu 1..${n}. Với mỗi màu: chi phí = cost[${i}][màu] + dp(nhà kế). Chọn nhỏ nhất = ${fmt(best)} (màu ${bestColor > 0 ? bestColor : "-"}).`,
+            en: `House ${i} unpainted: try each color 1..${n}. For each: cost = cost[${i}][color] + dp(next). Take the minimum = ${fmt(best)} (color ${bestColor > 0 ? bestColor : "-"}).`,
+          },
+        });
+      }
+      result = best;
+    }
+
+    memo.set(key, result);
+    return result;
+  }
+
+  const answer = dp(0, 0, 0, 0);
+  const final = answer === INF ? -1 : answer;
+
+  snap({
+    title: { vi: `Kết quả: ${final}`, en: `Result: ${final}` },
+    curHouse: null,
+    final: true,
+    codeLines: [15, 16],
+    vars: [
+      { name: "dp(0,0,0)", value: fmt(answer) },
+      { name: "answer", value: final },
+    ],
+    note: {
+      vi: final === -1
+        ? `Không thể sơn để tạo đúng ${target} khu phố → -1.`
+        : `Chi phí nhỏ nhất để sơn hết nhà tạo đúng ${target} khu phố = ${final}.`,
+      en: final === -1
+        ? `Impossible to form exactly ${target} neighborhoods → -1.`
+        : `Minimum cost to paint all houses forming exactly ${target} neighborhoods = ${final}.`,
+    },
+  });
+
+  return { original: houses, answer: final, steps };
+}
+
 module.exports = {
+  1473: {
+    id: 1473,
+    difficulty: "hard",
+    slug: "paint-house-iii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Paint House III", en: "Paint House III" },
+    titleVi: { vi: "Sơn nhà III (DP 3 chiều)", en: "Paint House III (3D DP)" },
+    statement: {
+      vi:
+        "Có m nhà, n màu. houses[i]=0 nghĩa là chưa sơn; ≠0 là đã sơn màu đó. cost[i][c] là chi phí sơn nhà i màu c+1. " +
+        "Một 'khu phố' là dãy nhà liền nhau cùng màu. Sơn các nhà chưa sơn sao cho có ĐÚNG target khu phố với chi phí NHỎ NHẤT (hoặc -1). " +
+        "Nhập houses cách nhau dấu phẩy; cost/n/target trong tham số.",
+      en:
+        "There are m houses, n colors. houses[i]=0 means unpainted; ≠0 means already that color. cost[i][c] is the cost to paint house i color c+1. " +
+        "A 'neighborhood' is a maximal run of adjacent same-color houses. Paint the unpainted houses to form EXACTLY target neighborhoods at MINIMUM cost (or -1). " +
+        "Enter houses comma-separated; cost/n/target as parameters.",
+    },
+    defaultInput: [0, 0, 0, 0, 0],
+    inputKind: "integer",
+    inputLabel: { vi: "houses (0 = chưa sơn)", en: "houses (0 = unpainted)" },
+    extraParams: [
+      { key: "cost", label: { vi: "cost (hàng cách ;, màu cách ,)", en: "cost (rows ;, colors ,)" }, default: "1,10;10,1;10,1;1,10;5,1" },
+      { key: "n", label: { vi: "n (số màu)", en: "n (colors)" }, default: 2 },
+      { key: "target", label: { vi: "target (số khu phố)", en: "target (neighborhoods)" }, default: 3 },
+    ],
+    approach: [
+      { vi: "dp(i, prev, groups) = chi phí nhỏ nhất sơn nhà i..m-1 tạo đúng target khu phố.", en: "dp(i, prev, groups) = min cost to paint houses i..m-1 forming exactly target neighborhoods." },
+      { vi: "Nếu nhà đã sơn: màu cố định, chỉ cập nhật groups.", en: "If a house is already painted: color is fixed, just update groups." },
+      { vi: "Nếu chưa sơn: thử mọi màu, cộng cost[i][màu] + dp(nhà kế).", en: "If unpainted: try every color, add cost[i][color] + dp(next house)." },
+      { vi: "groups tăng khi màu khác nhà trước. Cắt tỉa khi groups > target.", en: "groups increases when color differs from the previous. Prune when groups > target." },
+    ],
+    complexity: {
+      time: "O(m·target·n²)",
+      space: "O(m·target·n)",
+      note: {
+        vi: "Trạng thái (i, prev, groups) = m·n·target; mỗi trạng thái thử n màu.",
+        en: "States (i, prev, groups) = m·n·target; each tries n colors.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def minCost(self, houses, cost, m, n, target):",
+      "        @lru_cache(None)",
+      "        def dp(i, prev, groups):",
+      "            if groups > target: return INF",
+      "            if i == m: return 0 if groups == target else INF",
+      "            if houses[i] != 0:",
+      "                g = groups + (1 if houses[i] != prev else 0)",
+      "                return dp(i+1, houses[i], g)",
+      "            best = INF",
+      "            for color in range(1, n+1):",
+      "                g = groups + (1 if color != prev else 0)",
+      "                best = min(best, cost[i][color-1] + dp(i+1, color, g))",
+      "            return best",
+      "        ans = dp(0, 0, 0)",
+      "        return ans if ans != INF else -1",
+    ],
+    builder: buildSteps1473,
+  },
   312: {
     id: 312,
     difficulty: "hard",
@@ -12863,7 +13136,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 312],
+    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 312, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",

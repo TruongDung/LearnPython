@@ -1397,7 +1397,204 @@ function buildSteps410(nums, params) {
   return { original: nums, answer, steps };
 }
 
+/**
+ * LeetCode 1044: Longest Duplicate Substring — binary search on length +
+ * Rabin-Karp rolling hash. search(L) checks if some substring of length L
+ * appears twice; the answer length is monotonic so we binary search it.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def longestDupSubstring(self, s):
+ *  3          def search(L):  # returns start index of a dup of length L, or -1
+ *  4              compute rolling hash of first L chars; seen = {hash}
+ *  5              for i in 1..n-L: roll hash; if in seen: return i; seen.add
+ *  6              return -1
+ *  7          lo, hi = 1, n - 1; start, best = -1, 0
+ *  8          while lo <= hi:
+ *  9              mid = (lo + hi) // 2
+ * 10              idx = search(mid)
+ * 11              if idx != -1: start, best = idx, mid; lo = mid + 1
+ * 12              else: hi = mid - 1
+ * 13          return s[start:start+best]
+ */
+function buildSteps1044(input) {
+  const s = String(input);
+  const n = s.length;
+  const steps = [];
+  const chars = s.split("");
+
+  if (n < 2) {
+    steps.push({
+      title: { vi: 'Chuỗi quá ngắn → ""', en: 'String too short → ""' },
+      arr: chars, sub: chars.map((_, i) => `[${i}]`), highlight: [], mark: [],
+      final: true, codeLines: [2], vars: [{ name: "answer", value: '""' }],
+      note: { vi: "Cần ít nhất 2 ký tự để có lặp.", en: "Need at least 2 characters to have a duplicate." },
+    });
+    return { original: s, answer: "", steps };
+  }
+
+  // search(L): return start index of a duplicated substring of length L, or -1
+  function search(L) {
+    if (L === 0) return 0;
+    const seen = new Map(); // hash -> list of start indices
+    const base = 26n;
+    const mod = 1152921504606846883n; // large prime
+    let cur = 0n;
+    const nums = chars.map((c) => BigInt(c.charCodeAt(0) - 97));
+    for (let i = 0; i < L; i++) cur = (cur * base + nums[i]) % mod;
+    let baseL = 1n;
+    for (let i = 0; i < L; i++) baseL = (baseL * base) % mod;
+    const put = (h, idx) => { if (!seen.has(h)) seen.set(h, []); seen.get(h).push(idx); };
+    put(cur, 0);
+    for (let i = 1; i + L <= n; i++) {
+      cur = (cur * base - nums[i - 1] * baseL % mod + mod * base) % mod;
+      cur = (cur + nums[i + L - 1]) % mod;
+      if (seen.has(cur)) {
+        // verify (avoid rare collision)
+        for (const j of seen.get(cur)) {
+          if (s.slice(j, j + L) === s.slice(i, i + L)) return i;
+        }
+      }
+      put(cur, i);
+    }
+    return -1;
+  }
+
+  steps.push({
+    title: { vi: "Binary search trên ĐỘ DÀI của chuỗi lặp", en: "Binary search on the LENGTH of the duplicate" },
+    arr: chars,
+    sub: chars.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [7],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "n", value: n },
+      { name: "lo", value: 1 },
+      { name: "hi", value: n - 1 },
+    ],
+    note: {
+      vi:
+        `Nếu tồn tại chuỗi lặp độ dài L thì cũng tồn tại độ dài L-1 → tính đơn điệu → BINARY SEARCH trên L.\n` +
+        `search(L) dùng rolling hash (Rabin-Karp) kiểm tra có 2 vị trí trùng chuỗi độ dài L không, trong O(n).`,
+      en:
+        `If a duplicate of length L exists, one of length L-1 exists too → monotonic → BINARY SEARCH on L.\n` +
+        `search(L) uses a rolling hash (Rabin-Karp) to check if two positions share a length-L substring, in O(n).`,
+    },
+  });
+
+  let lo = 1, hi = n - 1;
+  let start = -1, best = 0;
+
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const idx = search(mid);
+    const dupHit = idx !== -1;
+
+    const hlCells = dupHit
+      ? Array.from({ length: mid }, (_, x) => idx + x)
+      : [];
+
+    if (dupHit) { start = idx; best = mid; }
+
+    steps.push({
+      title: { vi: `mid=${mid}: search(${mid}) = ${dupHit ? `tìm thấy tại ${idx}` : "-1"}`, en: `mid=${mid}: search(${mid}) = ${dupHit ? `found at ${idx}` : "-1"}` },
+      arr: chars,
+      sub: chars.map((_, i) => `[${i}]`),
+      highlight: hlCells,
+      mark: dupHit ? Array.from({ length: best }, (_, x) => start + x) : [],
+      codeLines: dupHit ? [8, 9, 10, 11] : [8, 9, 10, 12],
+      vars: [
+        { name: "lo", value: lo },
+        { name: "hi", value: hi },
+        { name: "mid", value: mid },
+        { name: "search(mid)", value: dupHit ? idx : -1 },
+        { name: "best so far", value: best > 0 ? `"${s.slice(start, start + best)}" (len ${best})` : "none" },
+      ],
+      note: {
+        vi: dupHit
+          ? `Có chuỗi lặp độ dài ${mid} tại index ${idx}: "${s.slice(idx, idx + mid)}" (tô vàng). Lưu best và thử DÀI HƠN → lo = ${mid + 1}.`
+          : `Không có chuỗi lặp độ dài ${mid} → thử NGẮN HƠN → hi = ${mid - 1}.`,
+        en: dupHit
+          ? `A length-${mid} duplicate exists at index ${idx}: "${s.slice(idx, idx + mid)}" (highlighted). Save best and try LONGER → lo = ${mid + 1}.`
+          : `No length-${mid} duplicate → try SHORTER → hi = ${mid - 1}.`,
+      },
+    });
+
+    if (dupHit) lo = mid + 1;
+    else hi = mid - 1;
+  }
+
+  const answer = start !== -1 ? s.slice(start, start + best) : "";
+  steps.push({
+    title: { vi: `return "${answer}"`, en: `return "${answer}"` },
+    arr: chars,
+    sub: chars.map((_, i) => `[${i}]`),
+    highlight: [],
+    mark: answer ? Array.from({ length: best }, (_, x) => start + x) : [],
+    final: true,
+    codeLines: [13],
+    vars: [{ name: "answer", value: `"${answer}"` }, { name: "length", value: best }],
+    note: {
+      vi: answer ? `Chuỗi con lặp DÀI NHẤT là "${answer}" (độ dài ${best}).` : `Không có chuỗi con nào lặp → "".`,
+      en: answer ? `The LONGEST duplicated substring is "${answer}" (length ${best}).` : `No duplicated substring → "".`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  1044: {
+    id: 1044,
+    difficulty: "hard",
+    slug: "longest-duplicate-substring",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Longest Duplicate Substring", en: "Longest Duplicate Substring" },
+    titleVi: { vi: "Chuỗi con lặp dài nhất (Binary Search + Rolling Hash)", en: "Longest duplicated substring (Binary Search + Rolling Hash)" },
+    statement: {
+      vi:
+        "Cho chuỗi s. Tìm chuỗi con DÀI NHẤT xuất hiện ít nhất 2 lần (có thể chồng lấn). " +
+        "Nếu không có, trả về \"\". Nhập chuỗi s.",
+      en:
+        "Given a string s, find the LONGEST substring that appears at least twice (occurrences may overlap). " +
+        "If none, return \"\". Enter the string s.",
+    },
+    defaultInput: "banana",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "Độ dài chuỗi lặp có tính ĐƠN ĐIỆU → binary search trên độ dài L.", en: "The duplicate length is MONOTONIC → binary search on the length L." },
+      { vi: "search(L): dùng rolling hash (Rabin-Karp) kiểm tra có 2 chuỗi con độ dài L trùng nhau không, O(n).", en: "search(L): use a rolling hash (Rabin-Karp) to test whether two length-L substrings match, in O(n)." },
+      { vi: "Nếu search(mid) tìm thấy → lưu kết quả, thử dài hơn (lo = mid+1).", en: "If search(mid) finds one → save it, try longer (lo = mid+1)." },
+      { vi: "Nếu không → thử ngắn hơn (hi = mid-1). Kết quả là chuỗi dài nhất tìm được.", en: "Otherwise → try shorter (hi = mid-1). The answer is the longest found." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Binary search O(log n) lần × mỗi lần rolling hash O(n).",
+        en: "Binary search O(log n) iterations × O(n) rolling hash each.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestDupSubstring(self, s):",
+      "        def search(L):",
+      "            # rolling hash of window length L; seen = set of hashes",
+      "            # for each window: if hash seen -> return start, else add",
+      "            return -1",
+      "        lo, hi = 1, n - 1",
+      "        start, best = -1, 0",
+      "        while lo <= hi:",
+      "            mid = (lo + hi) // 2",
+      "            idx = search(mid)",
+      "            if idx != -1: start, best = idx, mid; lo = mid + 1",
+      "            else: hi = mid - 1",
+      "        return s[start:start+best]",
+    ],
+    builder: buildSteps1044,
+  },
   410: {
     id: 410,
     difficulty: "hard",
@@ -1454,7 +1651,7 @@ module.exports = {
     builder: buildSteps410,
   },
   __meta: {
-    order: [410, 4, 33, 34, 911],
+    order: [410, 4, 33, 34, 911, 1044],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {

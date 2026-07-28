@@ -1727,6 +1727,161 @@ function buildSteps1358Last(input) {
 }
 
 /**
+ * LeetCode 480: Sliding Window Median — keep the window sorted, read the middle.
+ * (Visualization uses a sorted-window model; the O(log n) two-heap version has
+ * identical outputs.)
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def medianSlidingWindow(self, nums, k):
+ *  3          window = SortedList()
+ *  4          result = []
+ *  5          for i, num in enumerate(nums):
+ *  6              window.add(num)
+ *  7              if i >= k:
+ *  8                  window.remove(nums[i-k])
+ *  9              if i >= k - 1:
+ * 10                  if k % 2 == 1: result.append(window[k//2])
+ * 11                  else: result.append((window[k//2-1]+window[k//2])/2)
+ * 12          return result
+ */
+function buildSteps480(inputNums, params) {
+  const nums = Array.isArray(inputNums)
+    ? [...inputNums]
+    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const k = params && params.k !== undefined ? Number(params.k) : 3;
+  const n = nums.length;
+  const steps = [];
+
+  if (n === 0 || k <= 0 || k > n) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [], note: { vi: "Cần 0 < k ≤ len(nums).", en: "Need 0 < k ≤ len(nums)." },
+    });
+    return { original: nums, k, answer: [], steps };
+  }
+
+  const win = [];  // sorted window
+  const result = [];
+  const median = () => (k % 2 === 1 ? win[(k - 1) / 2] : (win[k / 2 - 1] + win[k / 2]) / 2);
+  const winStr = () => `[${win.join(", ")}]`;
+  const windowCells = (i) => {
+    const lo = Math.max(0, i - k + 1);
+    return Array.from({ length: i - lo + 1 }, (_, x) => lo + x);
+  };
+
+  steps.push({
+    title: { vi: "window = SortedList(), result = []", en: "window = SortedList(), result = []" },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "k", value: k }, { name: "window", value: "[]" }, { name: "result", value: "[]" }],
+    note: {
+      vi:
+        `Giữ cửa sổ hiện tại LUÔN ĐƯỢC SẮP XẾP. Trung vị = phần tử giữa (k lẻ) hoặc trung bình 2 phần tử giữa (k chẵn).\n` +
+        `Mỗi bước: thêm nums[i], nếu vượt kích thước thì bỏ nums[i-k], rồi đọc trung vị.`,
+      en:
+        `Keep the current window ALWAYS SORTED. Median = middle element (odd k) or average of the two middle (even k).\n` +
+        `Each step: add nums[i], if over size remove nums[i-k], then read the median.`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    // add nums[i] in sorted position
+    let pos = 0;
+    while (pos < win.length && win[pos] < nums[i]) pos++;
+    win.splice(pos, 0, nums[i]);
+
+    steps.push({
+      title: { vi: `window.add(${nums[i]}) → ${winStr()}`, en: `window.add(${nums[i]}) → ${winStr()}` },
+      arr: [...nums],
+      sub: nums.map((_, x) => `[${x}]`),
+      highlight: windowCells(i),
+      mark: [i],
+      codeLines: [5, 6],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+        { name: "window (sorted)", value: winStr() },
+      ],
+      note: {
+        vi: `Chèn ${nums[i]} vào vị trí đúng để cửa sổ vẫn được sắp xếp: ${winStr()}.`,
+        en: `Insert ${nums[i]} at the right position to keep the window sorted: ${winStr()}.`,
+      },
+    });
+
+    if (i >= k) {
+      const out = nums[i - k];
+      win.splice(win.indexOf(out), 1);
+      steps.push({
+        title: { vi: `window.remove(${out}) (ra khỏi cửa sổ) → ${winStr()}`, en: `window.remove(${out}) (left window) → ${winStr()}` },
+        arr: [...nums],
+        sub: nums.map((_, x) => `[${x}]`),
+        highlight: windowCells(i),
+        mark: [i - k],
+        codeLines: [7, 8],
+        vars: [
+          { name: "leaving", value: `nums[${i - k}] = ${out}` },
+          { name: "window (sorted)", value: winStr() },
+        ],
+        note: {
+          vi: `Phần tử nums[${i - k}]=${out} rời cửa sổ → xóa khỏi window: ${winStr()}.`,
+          en: `Element nums[${i - k}]=${out} leaves the window → remove from window: ${winStr()}.`,
+        },
+      });
+    }
+
+    if (i >= k - 1) {
+      const med = median();
+      result.push(med);
+      const midCells = k % 2 === 1
+        ? [(k - 1) / 2]
+        : [k / 2 - 1, k / 2];
+      steps.push({
+        title: { vi: `Trung vị = ${med} → result = [${result.join(", ")}]`, en: `Median = ${med} → result = [${result.join(", ")}]` },
+        arr: [...nums],
+        sub: nums.map((_, x) => `[${x}]`),
+        highlight: windowCells(i),
+        mark: [],
+        codeLines: k % 2 === 1 ? [9, 10] : [9, 11],
+        vars: [
+          { name: "window (sorted)", value: winStr() },
+          { name: "middle idx", value: midCells.join(", ") },
+          { name: "median", value: med },
+          { name: "result", value: `[${result.join(", ")}]` },
+        ],
+        note: {
+          vi: k % 2 === 1
+            ? `k=${k} lẻ → trung vị = window[${(k - 1) / 2}] = ${med}.`
+            : `k=${k} chẵn → trung vị = (window[${k / 2 - 1}] + window[${k / 2}]) / 2 = ${med}.`,
+          en: k % 2 === 1
+            ? `k=${k} odd → median = window[${(k - 1) / 2}] = ${med}.`
+            : `k=${k} even → median = (window[${k / 2 - 1}] + window[${k / 2}]) / 2 = ${med}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    final: true,
+    codeLines: [12],
+    vars: [{ name: "answer", value: `[${result.join(", ")}]` }],
+    note: {
+      vi: `Trung vị của mỗi cửa sổ trượt kích thước ${k}: [${result.join(", ")}].`,
+      en: `Median of each sliding window of size ${k}: [${result.join(", ")}].`,
+    },
+  });
+
+  return { original: nums, k, answer: result, steps };
+}
+
+/**
  * LeetCode 239: Sliding Window Maximum — monotonic decreasing deque of indices.
  * dq front always holds the index of the current window maximum.
  *
@@ -2874,6 +3029,56 @@ module.exports = {
       "        return result",
     ],
     builder: buildSteps239,
+  },
+  480: {
+    id: 480,
+    difficulty: "hard",
+    slug: "sliding-window-median",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Sliding Window Median", en: "Sliding Window Median" },
+    titleVi: { vi: "Trung vị của cửa sổ trượt", en: "Median of each sliding window" },
+    statement: {
+      vi:
+        "Cho mảng nums và số k. Cửa sổ kích thước k trượt từ trái sang phải. " +
+        "Trả về TRUNG VỊ của mỗi cửa sổ. Nhập nums cách nhau dấu phẩy.",
+      en:
+        "Given an array nums and integer k, a window of size k slides left to right. " +
+        "Return the MEDIAN of each window. Enter nums as comma-separated numbers.",
+    },
+    defaultInput: [1, 3, -1, -3, 5, 3, 6, 7],
+    inputKind: "integer",
+    extraParams: [
+      { key: "k", label: { vi: "k (kích thước cửa sổ)", en: "k (window size)" }, default: 3 },
+    ],
+    approach: [
+      { vi: "Giữ cửa sổ luôn được sắp xếp; trung vị là phần tử giữa.", en: "Keep the window sorted; the median is the middle element." },
+      { vi: "k lẻ → phần tử window[k//2]. k chẵn → trung bình 2 phần tử giữa.", en: "Odd k → element window[k//2]. Even k → average of the two middle elements." },
+      { vi: "Mỗi bước: thêm phần tử mới, bỏ phần tử rời cửa sổ, đọc trung vị.", en: "Each step: add the new element, remove the leaving one, read the median." },
+      { vi: "Bản tối ưu O(log n) dùng hai heap + lazy deletion; kết quả giống nhau.", en: "The optimal O(log n) version uses two heaps + lazy deletion; results are identical." },
+    ],
+    complexity: {
+      time: "O(n·k) sorted-window / O(n·log k) two-heap",
+      space: "O(k)",
+      note: {
+        vi: "Bản Python đi kèm dùng hai heap + lazy deletion cho O(n log k).",
+        en: "The accompanying Python uses two heaps + lazy deletion for O(n log k).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def medianSlidingWindow(self, nums, k):",
+      "        window = SortedList()",
+      "        result = []",
+      "        for i, num in enumerate(nums):",
+      "            window.add(num)",
+      "            if i >= k:",
+      "                window.remove(nums[i-k])",
+      "            if i >= k - 1:",
+      "                if k % 2 == 1: result.append(window[k//2])",
+      "                else: result.append((window[k//2-1]+window[k//2])/2)",
+      "        return result",
+    ],
+    builder: buildSteps480,
   },
   76: {
     id: 76,
