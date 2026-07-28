@@ -3292,7 +3292,230 @@ function buildSteps443(input, params) {
   return { original: chars, answer: write, steps };
 }
 
+/** LeetCode 11: Container With Most Water — move the shorter wall inward. */
+function buildSteps11(input) {
+  const h = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let left = 0, right = h.length - 1, best = 0, bl = 0, br = h.length - 1;
+  steps.push({ title: { vi: "left=0, right=n-1", en: "left=0, right=n-1" }, arr: [...h], sub: h.map((_, i) => `[${i}]`), highlight: [left, right], mark: [], codeLines: [3], vars: [{ name: "left", value: left }, { name: "right", value: right }], note: { vi: "Diện tích = min(2 cột) × khoảng cách. Dời con trỏ ở cột THẤP hơn vào trong vì nó giới hạn chiều cao.", en: "Area = min(two walls) × distance. Move the pointer at the SHORTER wall inward since it limits the height." } });
+  while (left < right) {
+    const area = (right - left) * Math.min(h[left], h[right]);
+    if (area > best) { best = area; bl = left; br = right; }
+    const moveLeft = h[left] < h[right];
+    steps.push({
+      title: { vi: `area=(${right}-${left})×min(${h[left]},${h[right]})=${area}`, en: `area=(${right}-${left})×min(${h[left]},${h[right]})=${area}` },
+      arr: [...h], sub: h.map((_, i) => `[${i}]`), highlight: [left, right], mark: [bl, br],
+      codeLines: moveLeft ? [4, 5, 6] : [4, 5, 7],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "area", value: area }, { name: "best", value: best }],
+      note: { vi: `Diện tích hiện tại ${area}, best=${best}. Cột ${moveLeft ? `trái (${h[left]})` : `phải (${h[right]})`} thấp hơn → dời ${moveLeft ? "left++" : "right--"}.`, en: `Current area ${area}, best=${best}. The ${moveLeft ? `left wall (${h[left]})` : `right wall (${h[right]})`} is shorter → move ${moveLeft ? "left++" : "right--"}.` },
+    });
+    if (moveLeft) left++; else right--;
+  }
+  steps.push({ title: { vi: `Đáp án: ${best}`, en: `Answer: ${best}` }, arr: [...h], sub: h.map((_, i) => `[${i}]`), highlight: [], mark: [bl, br], final: true, codeLines: [8], vars: [{ name: "answer", value: best }], note: { vi: `Diện tích chứa nước lớn nhất = ${best} (cột ${bl} và ${br}).`, en: `Maximum water area = ${best} (walls ${bl} and ${br}).` } });
+  return { original: h, answer: best, steps };
+}
+
+/** LeetCode 167: Two Sum II — sorted two pointers. */
+function buildSteps167(input, params) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const target = params && params.target !== undefined ? Number(params.target) : 9;
+  const steps = [];
+  let left = 0, right = nums.length - 1;
+  steps.push({ title: { vi: `left=0, right=n-1, target=${target}`, en: `left=0, right=n-1, target=${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [], codeLines: [3], vars: [{ name: "target", value: target }, { name: "left", value: left }, { name: "right", value: right }], note: { vi: "Mảng đã sắp xếp. Tổng nhỏ → left++; tổng lớn → right--; bằng → tìm thấy.", en: "Array is sorted. Sum too small → left++; too big → right--; equal → found." } });
+  let answer = [];
+  while (left < right) {
+    const total = nums[left] + nums[right];
+    if (total === target) {
+      answer = [left + 1, right + 1];
+      steps.push({ title: { vi: `${nums[left]}+${nums[right]}=${target} ✓ → [${left + 1},${right + 1}]`, en: `${nums[left]}+${nums[right]}=${target} ✓ → [${left + 1},${right + 1}]` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [left, right], final: true, codeLines: [4, 5], vars: [{ name: "answer (1-indexed)", value: `[${left + 1},${right + 1}]` }], note: { vi: `Tìm thấy cặp tổng = ${target}. Trả về chỉ số 1-based.`, en: `Found the pair summing to ${target}. Return 1-based indices.` } });
+      break;
+    }
+    const less = total < target;
+    steps.push({ title: { vi: `${nums[left]}+${nums[right]}=${total} ${less ? "<" : ">"} ${target}`, en: `${nums[left]}+${nums[right]}=${total} ${less ? "<" : ">"} ${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [left, right], mark: [], codeLines: less ? [6, 7] : [8, 9], vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "sum", value: total }], note: { vi: less ? `Tổng ${total} < ${target} → cần lớn hơn → left++.` : `Tổng ${total} > ${target} → cần nhỏ hơn → right--.`, en: less ? `Sum ${total} < ${target} → need larger → left++.` : `Sum ${total} > ${target} → need smaller → right--.` } });
+    if (less) left++; else right--;
+  }
+  return { original: nums, answer, steps };
+}
+
+/** LeetCode 125: Valid Palindrome — skip non-alnum, compare. */
+function buildSteps125(input) {
+  const s = String(input);
+  const chars = s.split("");
+  const steps = [];
+  let left = 0, right = s.length - 1;
+  const clean = (c) => /[a-z0-9]/i.test(c);
+  steps.push({ title: { vi: "left=0, right=n-1", en: "left=0, right=n-1" }, arr: [], grid: { dp: [["", ...chars]], text1: "", text2: s, colLabels: chars.map((c, i) => ({ index: `${i}`, char: c })), largeCells: true }, highlight: [], mark: [], codeLines: [3], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "Bỏ qua ký tự không phải chữ/số, so sánh không phân biệt hoa thường từ hai đầu vào giữa.", en: "Skip non-alphanumeric chars, compare case-insensitively from both ends inward." } });
+  function snap(o) { steps.push({ title: o.title, arr: [], grid: { dp: [["", ...chars]], text1: "", text2: s, colLabels: chars.map((c, i) => ({ index: `${i}`, char: c })), hlCell: null, pathCells: [[0, left + 1], [0, right + 1]], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  let answer = true;
+  while (left < right) {
+    if (!clean(s[left])) { snap({ title: { vi: `s[${left}]='${s[left]}' không phải chữ/số → left++`, en: `s[${left}]='${s[left]}' non-alnum → left++` }, codeLines: [4, 5], vars: [{ name: "left", value: left }], note: { vi: "Bỏ qua ký tự bên trái.", en: "Skip the left char." } }); left++; continue; }
+    if (!clean(s[right])) { snap({ title: { vi: `s[${right}]='${s[right]}' không phải chữ/số → right--`, en: `s[${right}]='${s[right]}' non-alnum → right--` }, codeLines: [6, 7], vars: [{ name: "right", value: right }], note: { vi: "Bỏ qua ký tự bên phải.", en: "Skip the right char." } }); right--; continue; }
+    const eq = s[left].toLowerCase() === s[right].toLowerCase();
+    snap({ title: { vi: `'${s[left]}' ${eq ? "==" : "≠"} '${s[right]}'`, en: `'${s[left]}' ${eq ? "==" : "≠"} '${s[right]}'` }, codeLines: [8, 9], final: !eq, vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "match?", value: eq }], note: { vi: eq ? `Khớp → dời cả hai con trỏ.` : `Không khớp → KHÔNG phải palindrome → False.`, en: eq ? `Match → move both pointers.` : `Mismatch → NOT a palindrome → False.` } });
+    if (!eq) { answer = false; break; }
+    left++; right--;
+  }
+  if (answer) snap({ title: { vi: "Là palindrome → True", en: "Is a palindrome → True" }, final: true, codeLines: [10], vars: [{ name: "answer", value: true }], note: { vi: "Mọi cặp đều khớp.", en: "All pairs matched." } });
+  return { original: s, answer, steps };
+}
+
+/** LeetCode 16: 3Sum Closest. */
+function buildSteps16(input, params) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  nums.sort((a, b) => a - b);
+  const target = params && params.target !== undefined ? Number(params.target) : 1;
+  const n = nums.length;
+  const steps = [];
+  let closest = nums[0] + nums[1] + nums[2];
+  steps.push({ title: { vi: `Sắp xếp; target=${target}`, en: `Sort; target=${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "target", value: target }, { name: "closest", value: closest }], note: { vi: "Cố định nums[i], hai con trỏ tìm tổng gần target nhất.", en: "Fix nums[i], two pointers find the sum closest to target." } });
+  for (let i = 0; i < n - 2; i++) {
+    let left = i + 1, right = n - 1;
+    while (left < right) {
+      const total = nums[i] + nums[left] + nums[right];
+      if (Math.abs(total - target) < Math.abs(closest - target)) closest = total;
+      const less = total < target, eq = total === target;
+      steps.push({ title: { vi: `i=${i}: ${nums[i]}+${nums[left]}+${nums[right]}=${total}, closest=${closest}`, en: `i=${i}: ${nums[i]}+${nums[left]}+${nums[right]}=${total}, closest=${closest}` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i, left, right], mark: [i], codeLines: eq ? [4, 5, 6] : (less ? [4, 5, 7] : [4, 5, 8]), vars: [{ name: "sum", value: total }, { name: "closest", value: closest }, { name: "|sum-target|", value: Math.abs(total - target) }], note: { vi: eq ? `Trùng target → trả về ngay.` : (less ? `Tổng < target → left++.` : `Tổng > target → right--.`), en: eq ? `Equals target → return immediately.` : (less ? `Sum < target → left++.` : `Sum > target → right--.`) } });
+      if (eq) return { original: nums, answer: total, steps: (steps[steps.length - 1].final = true, steps) };
+      if (less) left++; else right--;
+    }
+  }
+  steps.push({ title: { vi: `Đáp án: ${closest}`, en: `Answer: ${closest}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true, codeLines: [9], vars: [{ name: "answer", value: closest }], note: { vi: `Tổng ba số gần target nhất = ${closest}.`, en: `Closest three-sum to target = ${closest}.` } });
+  return { original: nums, answer: closest, steps };
+}
+
+/** LeetCode 18: 4Sum. */
+function buildSteps18(input, params) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  nums.sort((a, b) => a - b);
+  const target = params && params.target !== undefined ? Number(params.target) : 0;
+  const n = nums.length;
+  const steps = [];
+  const res = [];
+  steps.push({ title: { vi: `Sắp xếp; target=${target}`, en: `Sort; target=${target}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "target", value: target }], note: { vi: "Cố định 2 số (i,j), hai con trỏ tìm cặp còn lại. Bỏ qua trùng.", en: "Fix two numbers (i,j), two pointers find the remaining pair. Skip duplicates." } });
+  for (let i = 0; i < n - 3; i++) {
+    if (i > 0 && nums[i] === nums[i - 1]) continue;
+    for (let j = i + 1; j < n - 2; j++) {
+      if (j > i + 1 && nums[j] === nums[j - 1]) continue;
+      let left = j + 1, right = n - 1;
+      while (left < right) {
+        const total = nums[i] + nums[j] + nums[left] + nums[right];
+        if (total === target) {
+          res.push([nums[i], nums[j], nums[left], nums[right]]);
+          steps.push({ title: { vi: `[${nums[i]},${nums[j]},${nums[left]},${nums[right]}] = ${target} ✓`, en: `[${nums[i]},${nums[j]},${nums[left]},${nums[right]}] = ${target} ✓` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i, j, left, right], mark: [i, j, left, right], codeLines: [6], vars: [{ name: "quad", value: `[${nums[i]},${nums[j]},${nums[left]},${nums[right]}]` }, { name: "res", value: JSON.stringify(res) }], note: { vi: "Tìm thấy bộ 4. Dời hai con trỏ, bỏ trùng.", en: "Found a quadruplet. Move both pointers, skip duplicates." } });
+          left++; right--;
+          while (left < right && nums[left] === nums[left - 1]) left++;
+          while (left < right && nums[right] === nums[right + 1]) right--;
+        } else if (total < target) {
+          steps.push({ title: { vi: `tổng=${total} < ${target} → left++`, en: `sum=${total} < ${target} → left++` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i, j, left, right], mark: [i, j], codeLines: [7], vars: [{ name: "sum", value: total }], note: { vi: `Cần lớn hơn → left++.`, en: `Need larger → left++.` } });
+          left++;
+        } else {
+          steps.push({ title: { vi: `tổng=${total} > ${target} → right--`, en: `sum=${total} > ${target} → right--` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i, j, left, right], mark: [i, j], codeLines: [8], vars: [{ name: "sum", value: total }], note: { vi: `Cần nhỏ hơn → right--.`, en: `Need smaller → right--.` } });
+          right--;
+        }
+      }
+    }
+  }
+  steps.push({ title: { vi: `Kết quả: ${JSON.stringify(res)}`, en: `Result: ${JSON.stringify(res)}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true, codeLines: [9], vars: [{ name: "answer", value: JSON.stringify(res) }], note: { vi: `Mọi bộ 4 khác nhau tổng = ${target}.`, en: `All unique quadruplets summing to ${target}.` } });
+  return { original: nums, answer: res, steps };
+}
+
+/** LeetCode 80: Remove Duplicates from Sorted Array II (at most twice). */
+function buildSteps80(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const arr = [...nums];
+  const steps = [];
+  let write = 0;
+  steps.push({ title: { vi: "write = 0", en: "write = 0" }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${arr.join(",")}]` }, { name: "write", value: 0 }], note: { vi: "Mỗi giá trị được giữ tối đa 2 lần. Ghi nums[i] nếu write<2 hoặc khác nums[write-2].", en: "Each value kept at most twice. Write nums[i] if write<2 or it differs from nums[write-2]." } });
+  for (let i = 0; i < arr.length; i++) {
+    const keep = write < 2 || arr[i] !== arr[write - 2];
+    if (keep) {
+      arr[write] = arr[i];
+      steps.push({ title: { vi: `nums[${i}]=${nums[i]} giữ → nums[${write}]`, en: `nums[${i}]=${nums[i]} keep → nums[${write}]` }, arr: [...arr], sub: arr.map((_, x) => `[${x}]`), highlight: [i], mark: Array.from({ length: write + 1 }, (_, x) => x), codeLines: [4, 5, 6], vars: [{ name: "i", value: i }, { name: "write", value: write + 1 }], note: { vi: `${write < 2 ? `write<2` : `khác nums[write-2]=${arr[write - 2]}`} → giữ. write++.`, en: `${write < 2 ? `write<2` : `differs from nums[write-2]=${arr[write - 2]}`} → keep. write++.` } });
+      write++;
+    } else {
+      steps.push({ title: { vi: `nums[${i}]=${nums[i]} trùng lần 3 → bỏ`, en: `nums[${i}]=${nums[i]} 3rd copy → skip` }, arr: [...arr], sub: arr.map((_, x) => `[${x}]`), highlight: [i], mark: Array.from({ length: write }, (_, x) => x), codeLines: [4], vars: [{ name: "i", value: i }, { name: "write", value: write }], note: { vi: `Bằng nums[write-2]=${arr[write - 2]} → đã có 2 bản → bỏ.`, en: `Equals nums[write-2]=${arr[write - 2]} → already twice → skip.` } });
+    }
+  }
+  steps.push({ title: { vi: `return ${write} → [${arr.slice(0, write).join(",")}]`, en: `return ${write} → [${arr.slice(0, write).join(",")}]` }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: Array.from({ length: write }, (_, x) => x), final: true, codeLines: [7], vars: [{ name: "k", value: write }], note: { vi: `Còn ${write} phần tử.`, en: `${write} elements remain.` } });
+  return { original: nums, answer: write, steps };
+}
+
 module.exports = {
+  11: {
+    id: 11, difficulty: "medium", slug: "container-with-most-water",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Container With Most Water", en: "Container With Most Water" },
+    titleVi: { vi: "Chứa nhiều nước nhất (hai con trỏ)", en: "Most water container (two pointers)" },
+    statement: { vi: "Cho mảng chiều cao các cột. Chọn 2 cột tạo thùng chứa nhiều nước nhất. Nhập cách nhau dấu phẩy.", en: "Given wall heights, pick 2 walls forming the container holding the most water. Enter comma-separated." },
+    defaultInput: [1, 8, 6, 2, 5, 4, 8, 3, 7], inputKind: "nonneg", inputLabel: { vi: "height", en: "height" }, extraParams: [],
+    approach: [{ vi: "Hai con trỏ từ hai đầu; diện tích = min(2 cột)×khoảng cách.", en: "Two pointers from both ends; area = min(walls)×distance." }, { vi: "Luôn dời con trỏ ở cột THẤP hơn vào trong.", en: "Always move the pointer at the SHORTER wall inward." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt hai con trỏ.", en: "Single two-pointer pass." } },
+    code: ["class Solution:", "    def maxArea(self, height):", "        left, right = 0, len(height)-1; best = 0", "        while left < right:", "            best = max(best, (right-left)*min(height[left], height[right]))", "            if height[left] < height[right]: left += 1", "            else: right -= 1", "        return best"],
+    builder: buildSteps11,
+  },
+  16: {
+    id: 16, difficulty: "medium", slug: "3sum-closest",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "3Sum Closest", en: "3Sum Closest" },
+    titleVi: { vi: "Bộ ba tổng gần target nhất", en: "Three-sum closest to target" },
+    statement: { vi: "Tìm 3 số có tổng GẦN target nhất. Nhập nums cách nhau dấu phẩy; target trong tham số.", en: "Find 3 numbers whose sum is CLOSEST to target. Enter nums comma-separated; target as a parameter." },
+    defaultInput: [-1, 2, 1, -4], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 1 }],
+    approach: [{ vi: "Sắp xếp; cố định nums[i], hai con trỏ.", en: "Sort; fix nums[i], two pointers." }, { vi: "Cập nhật closest nếu |sum-target| nhỏ hơn.", en: "Update closest if |sum-target| is smaller." }, { vi: "sum<target → left++; sum>target → right--.", en: "sum<target → left++; sum>target → right--." }],
+    complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Sort + hai con trỏ.", en: "Sort + two pointers." } },
+    code: ["class Solution:", "    def threeSumClosest(self, nums, target):", "        nums.sort(); closest = nums[0]+nums[1]+nums[2]", "        for i in range(len(nums)-2):", "            l, r = i+1, len(nums)-1", "            while l < r:", "                s = nums[i]+nums[l]+nums[r]", "                if abs(s-target) < abs(closest-target): closest = s", "                if s < target: l += 1", "                elif s > target: r -= 1", "                else: return s", "        return closest"],
+    builder: buildSteps16,
+  },
+  18: {
+    id: 18, difficulty: "medium", slug: "4sum",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "4Sum", en: "4Sum" },
+    titleVi: { vi: "Bộ bốn tổng bằng target", en: "Quadruplets summing to target" },
+    statement: { vi: "Tìm mọi bộ 4 KHÁC NHAU tổng = target. Nhập nums cách nhau dấu phẩy; target trong tham số.", en: "Find all UNIQUE quadruplets summing to target. Enter nums comma-separated; target as a parameter." },
+    defaultInput: [1, 0, -1, 0, -2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 0 }],
+    approach: [{ vi: "Sắp xếp; cố định 2 số (i,j), hai con trỏ tìm cặp còn lại.", en: "Sort; fix two numbers (i,j), two pointers find the remaining pair." }, { vi: "Bỏ qua giá trị trùng ở mọi tầng.", en: "Skip duplicate values at every level." }],
+    complexity: { time: "O(n³)", space: "O(1)", note: { vi: "Hai vòng + hai con trỏ.", en: "Two loops + two pointers." } },
+    code: ["class Solution:", "    def fourSum(self, nums, target):", "        nums.sort(); res = []; n = len(nums)", "        for i in range(n-3):", "            for j in range(i+1, n-2):", "                l, r = j+1, n-1", "                while l < r:", "                    s = nums[i]+nums[j]+nums[l]+nums[r]", "                    if s < target: l += 1", "                    elif s > target: r -= 1", "                    else: res.append([nums[i],nums[j],nums[l],nums[r]]); l+=1; r-=1", "        return res"],
+    builder: buildSteps18,
+  },
+  80: {
+    id: 80, difficulty: "medium", slug: "remove-duplicates-from-sorted-array-ii",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Remove Duplicates from Sorted Array II", en: "Remove Duplicates from Sorted Array II" },
+    titleVi: { vi: "Xóa trùng (giữ tối đa 2 bản)", en: "Remove duplicates (keep at most two)" },
+    statement: { vi: "Xóa trùng tại chỗ sao cho mỗi giá trị xuất hiện tối đa 2 lần. Trả về độ dài mới. Nhập mảng đã sắp xếp.", en: "Remove duplicates in-place so each value appears at most twice. Return the new length. Enter a sorted array." },
+    defaultInput: [1, 1, 1, 2, 2, 3], inputKind: "integer", inputLabel: { vi: "nums (đã sắp)", en: "nums (sorted)" }, extraParams: [],
+    approach: [{ vi: "Con trỏ write ghi phần tử được giữ.", en: "A write pointer places kept elements." }, { vi: "Giữ nums[i] nếu write<2 hoặc nums[i]≠nums[write-2].", en: "Keep nums[i] if write<2 or nums[i]≠nums[write-2]." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt tại chỗ.", en: "Single in-place pass." } },
+    code: ["class Solution:", "    def removeDuplicates(self, nums):", "        write = 0", "        for num in nums:", "            if write < 2 or num != nums[write-2]:", "                nums[write] = num; write += 1", "        return write"],
+    builder: buildSteps80,
+  },
+  125: {
+    id: 125, difficulty: "easy", slug: "valid-palindrome",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Valid Palindrome", en: "Valid Palindrome" },
+    titleVi: { vi: "Kiểm tra palindrome (bỏ ký tự đặc biệt)", en: "Valid palindrome (ignore non-alnum)" },
+    statement: { vi: "Chỉ xét chữ và số, không phân biệt hoa thường. Chuỗi có phải palindrome không? Nhập chuỗi s.", en: "Consider only alphanumeric chars, case-insensitive. Is the string a palindrome? Enter the string s." },
+    defaultInput: "A man, a plan, a canal: Panama", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [{ vi: "Hai con trỏ từ hai đầu.", en: "Two pointers from both ends." }, { vi: "Bỏ qua ký tự không phải chữ/số.", en: "Skip non-alphanumeric chars." }, { vi: "So sánh không phân biệt hoa thường.", en: "Compare case-insensitively." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt hai con trỏ.", en: "Single two-pointer pass." } },
+    code: ["class Solution:", "    def isPalindrome(self, s):", "        l, r = 0, len(s)-1", "        while l < r:", "            while l < r and not s[l].isalnum(): l += 1", "            while l < r and not s[r].isalnum(): r -= 1", "            if s[l].lower() != s[r].lower(): return False", "            l += 1; r -= 1", "        return True"],
+    builder: buildSteps125,
+  },
+  167: {
+    id: 167, difficulty: "medium", slug: "two-sum-ii-input-array-is-sorted",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Two Sum II - Input Array Is Sorted", en: "Two Sum II - Input Array Is Sorted" },
+    titleVi: { vi: "Two Sum trên mảng đã sắp (hai con trỏ)", en: "Two Sum on a sorted array (two pointers)" },
+    statement: { vi: "Mảng đã sắp tăng dần. Tìm 2 số tổng = target, trả về chỉ số 1-based. Nhập numbers; target trong tham số.", en: "Sorted ascending array. Find 2 numbers summing to target, return 1-based indices. Enter numbers; target as a parameter." },
+    defaultInput: [2, 7, 11, 15], inputKind: "integer", inputLabel: { vi: "numbers (đã sắp)", en: "numbers (sorted)" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 9 }],
+    approach: [{ vi: "Hai con trỏ từ hai đầu.", en: "Two pointers from both ends." }, { vi: "sum<target → left++; sum>target → right--.", en: "sum<target → left++; sum>target → right--." }, { vi: "sum==target → trả về [left+1, right+1].", en: "sum==target → return [left+1, right+1]." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt hai con trỏ.", en: "Single two-pointer pass." } },
+    code: ["class Solution:", "    def twoSum(self, numbers, target):", "        l, r = 0, len(numbers)-1", "        while l < r:", "            s = numbers[l] + numbers[r]", "            if s == target: return [l+1, r+1]", "            if s < target: l += 1", "            else: r -= 1", "        return []"],
+    builder: buildSteps167,
+  },
   15: {
     id: 15,
     difficulty: "medium",
