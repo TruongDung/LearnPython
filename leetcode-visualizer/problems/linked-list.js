@@ -2972,7 +2972,279 @@ function buildSteps3507(input) {
   return { original: nums, answer: ops, steps };
 }
 
+/**
+ * LeetCode 460: LFU Cache — hashmap + frequency buckets (each an LRU order).
+ * Evict the least-frequently-used key; ties broken by least-recently-used.
+ *
+ * Input: capacity via param + a sequence of operations:
+ *   put(key,value) / get(key)
+ *
+ * Code lines (1-indexed):
+ *  1  class LFUCache:
+ *  2      def __init__(self, capacity):
+ *  3          self.cap = capacity; self.min_freq = 0
+ *  4          self.val = {}; self.freq = {}
+ *  5          self.buckets = defaultdict(OrderedDict)
+ *  6      def _touch(self, key):
+ *  7          f = self.freq[key]; del self.buckets[f][key]
+ *  8          if not self.buckets[f]:
+ *  9              del self.buckets[f]
+ * 10              if self.min_freq == f: self.min_freq += 1
+ * 11          self.freq[key] = f + 1; self.buckets[f+1][key] = None
+ * 12      def get(self, key):
+ * 13          if key not in self.val: return -1
+ * 14          self._touch(key); return self.val[key]
+ * 15      def put(self, key, value):
+ * 16          if self.cap == 0: return
+ * 17          if key in self.val:
+ * 18              self.val[key] = value; self._touch(key); return
+ * 19          if len(self.val) >= self.cap:
+ * 20              k,_ = self.buckets[self.min_freq].popitem(last=False)
+ * 21              del self.val[k]; del self.freq[k]
+ * 22          self.val[key] = value; self.freq[key] = 1
+ * 23          self.buckets[1][key] = None; self.min_freq = 1
+ */
+function buildSteps460(input, params) {
+  const capacity = params && params.capacity !== undefined ? Number(params.capacity) : 2;
+  const lines = String(input).split(/[\n;]+/).map((x) => x.trim()).filter(Boolean);
+
+  const ops = [];
+  for (const line of lines) {
+    const m = line.match(/^(\w+)\(([^)]*)\)$/);
+    if (!m) continue;
+    const name = m[1];
+    const args = m[2] === "" ? [] : m[2].split(",").map((x) => Number(x.trim()));
+    if (name === "put" && args.length === 2) ops.push({ type: "put", key: args[0], value: args[1], label: `put(${args[0]}, ${args[1]})` });
+    else if (name === "get" && args.length === 1) ops.push({ type: "get", key: args[0], label: `get(${args[0]})` });
+  }
+
+  const steps = [];
+  const val = new Map();     // key -> value
+  const freq = new Map();    // key -> frequency
+  const buckets = new Map(); // freq -> array of keys (LRU: front = oldest)
+  let minFreq = 0;
+
+  const valStr = () => `{${[...val.entries()].map(([k, v]) => `${k}:${v}`).join(", ")}}`;
+  const freqStr = () => `{${[...freq.entries()].map(([k, f]) => `${k}:${f}`).join(", ")}}`;
+  const bucketsStr = () => {
+    const fs = [...buckets.keys()].sort((a, b) => a - b);
+    return `{${fs.map((f) => `f${f}:[${buckets.get(f).join(",")}]`).join(", ")}}`;
+  };
+
+  function touch(key) {
+    const f = freq.get(key);
+    const arr = buckets.get(f);
+    arr.splice(arr.indexOf(key), 1);
+    if (arr.length === 0) {
+      buckets.delete(f);
+      if (minFreq === f) minFreq += 1;
+    }
+    freq.set(key, f + 1);
+    if (!buckets.has(f + 1)) buckets.set(f + 1, []);
+    buckets.get(f + 1).push(key);
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "capacity", value: capacity },
+        { name: "min_freq", value: minFreq },
+        { name: "val", value: valStr() },
+        { name: "freq", value: freqStr() },
+        { name: "buckets", value: bucketsStr() },
+        ...(opts.extraVars || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: `Khởi tạo LFUCache(${capacity})`, en: `Initialize LFUCache(${capacity})` },
+    codeLines: [3, 4, 5],
+    note: {
+      vi:
+        `LFU = xóa key ÍT DÙNG NHẤT; nếu hòa tần suất thì xóa key CŨ NHẤT (LRU).\n` +
+        `val: key→value. freq: key→số lần dùng. buckets[f]: các key có tần suất f, theo thứ tự LRU (đầu = cũ nhất).\n` +
+        `min_freq: tần suất nhỏ nhất hiện có (để biết bucket nào chứa key sẽ bị evict).`,
+      en:
+        `LFU = evict the LEAST-FREQUENTLY-used key; ties broken by LEAST-RECENTLY-used (LRU).\n` +
+        `val: key→value. freq: key→use count. buckets[f]: keys with frequency f in LRU order (front = oldest).\n` +
+        `min_freq: current smallest frequency (identifies the bucket to evict from).`,
+    },
+  });
+
+  for (let oi = 0; oi < ops.length; oi++) {
+    const op = ops[oi];
+
+    if (op.type === "get") {
+      const hit = val.has(op.key);
+      if (!hit) {
+        snap({
+          title: { vi: `get(${op.key}) → -1 (miss)`, en: `get(${op.key}) → -1 (miss)` },
+          codeLines: [12, 13],
+          extraVars: [{ name: "operation", value: op.label }, { name: "result", value: -1 }],
+          note: { vi: `key ${op.key} không có trong cache → trả về -1.`, en: `key ${op.key} not in cache → return -1.` },
+        });
+      } else {
+        const before = freq.get(op.key);
+        touch(op.key);
+        snap({
+          title: { vi: `get(${op.key}) → ${val.get(op.key)} (freq ${before}→${freq.get(op.key)})`, en: `get(${op.key}) → ${val.get(op.key)} (freq ${before}→${freq.get(op.key)})` },
+          codeLines: [12, 14, 6, 7, 8, 9, 10, 11],
+          extraVars: [{ name: "operation", value: op.label }, { name: "result", value: val.get(op.key) }],
+          note: {
+            vi: `key ${op.key} tồn tại → trả ${val.get(op.key)}. _touch tăng tần suất ${before}→${freq.get(op.key)}, chuyển key sang bucket f${freq.get(op.key)} (mới nhất).`,
+            en: `key ${op.key} exists → return ${val.get(op.key)}. _touch bumps freq ${before}→${freq.get(op.key)}, moving the key to bucket f${freq.get(op.key)} (most recent).`,
+          },
+        });
+      }
+    } else {
+      // put
+      if (capacity === 0) {
+        snap({
+          title: { vi: `put(${op.key}, ${op.value}): capacity=0 → bỏ qua`, en: `put(${op.key}, ${op.value}): capacity=0 → skip` },
+          codeLines: [15, 16],
+          extraVars: [{ name: "operation", value: op.label }],
+          note: { vi: "Cache dung lượng 0, không lưu gì.", en: "Zero-capacity cache stores nothing." },
+        });
+        continue;
+      }
+
+      if (val.has(op.key)) {
+        const before = freq.get(op.key);
+        val.set(op.key, op.value);
+        touch(op.key);
+        snap({
+          title: { vi: `put(${op.key}, ${op.value}): cập nhật (freq ${before}→${freq.get(op.key)})`, en: `put(${op.key}, ${op.value}): update (freq ${before}→${freq.get(op.key)})` },
+          codeLines: [17, 18],
+          extraVars: [{ name: "operation", value: op.label }],
+          note: {
+            vi: `key ${op.key} đã có → cập nhật value=${op.value} và _touch tăng tần suất ${before}→${freq.get(op.key)}.`,
+            en: `key ${op.key} exists → update value=${op.value} and _touch bumps freq ${before}→${freq.get(op.key)}.`,
+          },
+        });
+        continue;
+      }
+
+      // Evict if full
+      if (val.size >= capacity) {
+        const bucket = buckets.get(minFreq);
+        const evictKey = bucket.shift();
+        if (bucket.length === 0) buckets.delete(minFreq);
+        val.delete(evictKey);
+        freq.delete(evictKey);
+        snap({
+          title: { vi: `Cache đầy → evict key ${evictKey} (freq nhỏ nhất=${minFreq}, cũ nhất)`, en: `Cache full → evict key ${evictKey} (min freq=${minFreq}, oldest)` },
+          codeLines: [19, 20, 21],
+          extraVars: [{ name: "operation", value: op.label }, { name: "evicted key", value: evictKey }],
+          note: {
+            vi: `len(val)=${capacity} ≥ capacity. Lấy key ĐẦU bucket f${minFreq} (ít dùng nhất + cũ nhất) = ${evictKey} và xóa.`,
+            en: `len(val)=${capacity} ≥ capacity. Take the FRONT key of bucket f${minFreq} (least-frequent + oldest) = ${evictKey} and remove it.`,
+          },
+        });
+      }
+
+      // Insert new key
+      val.set(op.key, op.value);
+      freq.set(op.key, 1);
+      if (!buckets.has(1)) buckets.set(1, []);
+      buckets.get(1).push(op.key);
+      minFreq = 1;
+      snap({
+        title: { vi: `put(${op.key}, ${op.value}): thêm mới, freq=1, min_freq=1`, en: `put(${op.key}, ${op.value}): insert new, freq=1, min_freq=1` },
+        codeLines: [22, 23],
+        extraVars: [{ name: "operation", value: op.label }],
+        note: {
+          vi: `Thêm key ${op.key}=${op.value} với freq=1 vào bucket f1. Key mới luôn có tần suất 1 → min_freq=1.`,
+          en: `Insert key ${op.key}=${op.value} with freq=1 into bucket f1. A new key always has frequency 1 → min_freq=1.`,
+        },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: "Hoàn tất tất cả operations", en: "All operations completed" },
+    final: true,
+    codeLines: [],
+    note: {
+      vi: `Đã xử lý ${ops.length} operation. Trạng thái cuối: val=${valStr()}, freq=${freqStr()}.`,
+      en: `Processed ${ops.length} operations. Final state: val=${valStr()}, freq=${freqStr()}.`,
+    },
+  });
+
+  return { original: input, answer: valStr(), steps };
+}
+
 module.exports = {
+  460: {
+    id: 460,
+    difficulty: "hard",
+    slug: "lfu-cache",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "LFU Cache", en: "LFU Cache" },
+    titleVi: { vi: "Bộ nhớ đệm LFU (hash map + bucket tần suất)", en: "LFU cache (hash map + frequency buckets)" },
+    statement: {
+      vi:
+        "Thiết kế LFU Cache với get(key) và put(key, value) O(1). Khi đầy, xóa key ÍT DÙNG NHẤT; " +
+        "nếu hòa tần suất thì xóa key CŨ NHẤT. Nhập capacity và dãy operations (mỗi dòng), " +
+        "vd: put(1,1); put(2,2); get(1); put(3,3); get(2)",
+      en:
+        "Design an LFU Cache with O(1) get(key) and put(key, value). When full, evict the LEAST-FREQUENTLY-used key; " +
+        "ties broken by LEAST-RECENTLY-used. Enter capacity and a sequence of operations (one per line), " +
+        "e.g. put(1,1); put(2,2); get(1); put(3,3); get(2)",
+    },
+    defaultInput: "put(1,1); put(2,2); get(1); put(3,3); get(2); get(3); put(4,4); get(1); get(3); get(4)",
+    inputKind: "string",
+    inputLabel: { vi: "Operations (ngăn bởi ;)", en: "Operations (separated by ;)" },
+    extraParams: [
+      { key: "capacity", label: { vi: "capacity", en: "capacity" }, default: 2 },
+    ],
+    approach: [
+      { vi: "val: key→value; freq: key→tần suất; buckets[f]: các key tần suất f theo thứ tự LRU.", en: "val: key→value; freq: key→frequency; buckets[f]: keys of frequency f in LRU order." },
+      { vi: "min_freq theo dõi bucket có tần suất nhỏ nhất — nơi chứa key sẽ bị evict.", en: "min_freq tracks the smallest-frequency bucket — where the eviction victim lives." },
+      { vi: "get/put trên key có sẵn → _touch: tăng tần suất, chuyển key sang bucket kế tiếp.", en: "get/put on an existing key → _touch: bump frequency, move the key to the next bucket." },
+      { vi: "Khi đầy: xóa key ĐẦU bucket min_freq (ít dùng + cũ nhất). Key mới có freq=1, min_freq=1.", en: "When full: evict the FRONT key of the min_freq bucket (least-frequent + oldest). New keys get freq=1, min_freq=1." },
+    ],
+    complexity: {
+      time: "O(1) get & put",
+      space: "O(capacity)",
+      note: {
+        vi: "Mọi thao tác dùng hash map + OrderedDict nên trung bình O(1).",
+        en: "All operations use hash maps + OrderedDict, so O(1) on average.",
+      },
+    },
+    code: [
+      "class LFUCache:",
+      "    def __init__(self, capacity):",
+      "        self.cap = capacity; self.min_freq = 0",
+      "        self.val = {}; self.freq = {}",
+      "        self.buckets = defaultdict(OrderedDict)",
+      "    def _touch(self, key):",
+      "        f = self.freq[key]; del self.buckets[f][key]",
+      "        if not self.buckets[f]:",
+      "            del self.buckets[f]",
+      "            if self.min_freq == f: self.min_freq += 1",
+      "        self.freq[key] = f + 1; self.buckets[f+1][key] = None",
+      "    def get(self, key):",
+      "        if key not in self.val: return -1",
+      "        self._touch(key); return self.val[key]",
+      "    def put(self, key, value):",
+      "        if self.cap == 0: return",
+      "        if key in self.val:",
+      "            self.val[key] = value; self._touch(key); return",
+      "        if len(self.val) >= self.cap:",
+      "            k,_ = self.buckets[self.min_freq].popitem(last=False)",
+      "            del self.val[k]; del self.freq[k]",
+      "        self.val[key] = value; self.freq[key] = 1",
+      "        self.buckets[1][key] = None; self.min_freq = 1",
+    ],
+    builder: buildSteps460,
+  },
   146: {
     id: 146,
     difficulty: "medium",

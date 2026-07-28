@@ -1227,7 +1227,197 @@ function buildSteps588(input, params) {
   return { ops, answer: results.join(" | "), steps };
 }
 
+/**
+ * LeetCode 642: Design Search Autocomplete System.
+ * Keep a counter of historical sentences. As the user types, build a prefix
+ * and return the top 3 matching sentences ranked by (count desc, lexicographic
+ * asc). '#' ends a sentence: store it (+1) and reset the prefix.
+ *
+ * Input: the typed characters as a string (each char is one input() call).
+ * Params: sentences (|-separated) and times (comma-separated).
+ *
+ * Code lines (1-indexed):
+ *  1  class AutocompleteSystem:
+ *  2      def __init__(self, sentences, times):
+ *  3          self.counts = defaultdict(int)
+ *  4          for s, t in zip(sentences, times): self.counts[s] += t
+ *  5          self.prefix = ""
+ *  6      def input(self, c):
+ *  7          if c == '#':
+ *  8              self.counts[self.prefix] += 1
+ *  9              self.prefix = ""
+ * 10              return []
+ * 11          self.prefix += c
+ * 12          matches = [(s, cnt) for s, cnt in self.counts.items()
+ * 13                     if s.startswith(self.prefix)]
+ * 14          matches.sort(key=lambda x: (-x[1], x[0]))
+ * 15          return [s for s, _ in matches[:3]]
+ */
+function buildSteps642(input, params) {
+  const sentences = String(params && params.sentences || "i love you|island|iroman|i love leetcode").split("|").map((s) => s.trim()).filter(Boolean);
+  const times = String(params && params.times || "5,3,2,2").split(",").map((x) => Number(x.trim()));
+  const typed = String(input || "i ");
+
+  const steps = [];
+  const counts = new Map();
+  sentences.forEach((s, i) => counts.set(s, (counts.get(s) || 0) + (times[i] || 0)));
+  let prefix = "";
+
+  const countsStr = () => `{${[...counts.entries()].map(([s, c]) => `"${s}":${c}`).join(", ")}}`;
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo counts từ lịch sử", en: "Initialize counts from history" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "sentences", value: sentences.map((s) => `"${s}"`).join(", ") },
+      { name: "times", value: `[${times.join(", ")}]` },
+      { name: "counts", value: countsStr() },
+      { name: "prefix", value: '""' },
+    ],
+    note: {
+      vi:
+        `counts đếm số lần mỗi câu đã được gõ trước đây.\n` +
+        `Khi người dùng gõ, ta ghép prefix và trả về TOP 3 câu khớp prefix, xếp theo (count giảm, rồi thứ tự từ điển tăng).\n` +
+        `Ký tự '#' kết thúc câu: lưu câu (+1) và reset prefix.`,
+      en:
+        `counts stores how many times each sentence was typed historically.\n` +
+        `As the user types, we build a prefix and return the TOP 3 matching sentences ranked by (count desc, then lexicographic asc).\n` +
+        `'#' ends a sentence: store it (+1) and reset the prefix.`,
+    },
+  });
+
+  for (const c of typed) {
+    if (c === "#") {
+      counts.set(prefix, (counts.get(prefix) || 0) + 1);
+      snap({
+        title: { vi: `input('#'): lưu "${prefix}", reset prefix`, en: `input('#'): store "${prefix}", reset prefix` },
+        codeLines: [7, 8, 9, 10],
+        vars: [
+          { name: "saved sentence", value: `"${prefix}"` },
+          { name: "counts", value: countsStr() },
+          { name: "prefix", value: '""' },
+        ],
+        note: {
+          vi: `'#' báo hết câu. counts["${prefix}"] += 1. Reset prefix = "". Trả về [].`,
+          en: `'#' ends the sentence. counts["${prefix}"] += 1. Reset prefix = "". Return [].`,
+        },
+      });
+      prefix = "";
+      continue;
+    }
+
+    prefix += c;
+    const matches = [...counts.entries()].filter(([s]) => s.startsWith(prefix));
+    matches.sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const top3 = matches.slice(0, 3).map(([s]) => s);
+
+    snap({
+      title: { vi: `input('${c}'): prefix="${prefix}" → top 3`, en: `input('${c}'): prefix="${prefix}" → top 3` },
+      codeLines: [6, 11, 12, 13, 14, 15],
+      vars: [
+        { name: "c", value: `'${c}'` },
+        { name: "prefix", value: `"${prefix}"` },
+        { name: "matches", value: matches.map(([s, cnt]) => `("${s}",${cnt})`).join(", ") || "none" },
+        { name: "top 3", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
+      ],
+      note: {
+        vi:
+          `Ghép '${c}' → prefix = "${prefix}". Lọc các câu bắt đầu bằng prefix: ${matches.length} câu.\n` +
+          `Sắp theo (count giảm, chữ cái tăng), lấy 3 câu đầu: [${top3.map((s) => `"${s}"`).join(", ")}].`,
+        en:
+          `Append '${c}' → prefix = "${prefix}". Filter sentences starting with the prefix: ${matches.length} matches.\n` +
+          `Sort by (count desc, lexicographic asc), take the first 3: [${top3.map((s) => `"${s}"`).join(", ")}].`,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: "Hoàn tất chuỗi ký tự", en: "Finished the input sequence" },
+    final: true,
+    codeLines: [15],
+    vars: [
+      { name: "prefix", value: `"${prefix}"` },
+      { name: "counts", value: countsStr() },
+    ],
+    note: {
+      vi: `Đã xử lý toàn bộ chuỗi gõ "${typed}". Hệ thống luôn gợi ý top 3 câu theo tần suất và thứ tự từ điển.`,
+      en: `Processed the whole typed sequence "${typed}". The system always suggests the top 3 sentences by frequency and lexicographic order.`,
+    },
+  });
+
+  return { original: typed, answer: `prefix="${prefix}"`, steps };
+}
+
 module.exports = {
+  642: {
+    id: 642,
+    difficulty: "hard",
+    slug: "design-search-autocomplete-system",
+    category: { key: "trie", vi: "Trie", en: "Trie" },
+    title: { vi: "Design Search Autocomplete System", en: "Design Search Autocomplete System" },
+    titleVi: { vi: "Hệ thống gợi ý tìm kiếm (Trie + đếm tần suất)", en: "Search autocomplete (Trie + frequency ranking)" },
+    statement: {
+      vi:
+        "Thiết kế hệ thống autocomplete. Khi người dùng gõ từng ký tự, trả về TOP 3 câu lịch sử " +
+        "khớp với prefix, xếp theo (số lần dùng giảm dần, rồi thứ tự từ điển tăng). '#' kết thúc câu. " +
+        "Nhập chuỗi ký tự người dùng gõ; câu lịch sử và số lần trong tham số.",
+      en:
+        "Design an autocomplete system. As the user types each character, return the TOP 3 historical sentences " +
+        "matching the prefix, ranked by (usage count desc, then lexicographic asc). '#' ends a sentence. " +
+        "Enter the typed characters; historical sentences and times are parameters.",
+    },
+    defaultInput: "i ",
+    inputKind: "string",
+    inputLabel: { vi: "Ký tự gõ vào", en: "Typed characters" },
+    extraParams: [
+      { key: "sentences", label: { vi: "Câu lịch sử (cách bởi |)", en: "History sentences (| separated)" }, default: "i love you|island|iroman|i love leetcode" },
+      { key: "times", label: { vi: "Số lần (cách bởi ,)", en: "Times (comma separated)" }, default: "5,3,2,2" },
+    ],
+    approach: [
+      { vi: "counts: câu → số lần đã gõ. Khởi tạo từ lịch sử (sentences, times).", en: "counts: sentence → usage count. Initialize from history (sentences, times)." },
+      { vi: "Mỗi input(c) ghép c vào prefix, lọc câu bắt đầu bằng prefix.", en: "Each input(c) appends c to the prefix, then filters sentences starting with the prefix." },
+      { vi: "Sắp theo (count giảm, chữ cái tăng), trả về 3 câu đầu.", en: "Sort by (count desc, lexicographic asc), return the first 3." },
+      { vi: "'#' lưu prefix hiện tại (+1) vào counts và reset prefix.", en: "'#' stores the current prefix (+1) into counts and resets the prefix." },
+    ],
+    complexity: {
+      time: "O(n·L) mỗi ký tự",
+      space: "O(n·L)",
+      note: {
+        vi: "n = số câu, L = độ dài câu. Bản Trie tối ưu hơn nhưng ý tưởng xếp hạng giống nhau.",
+        en: "n = sentences, L = length. A Trie version is faster but the ranking idea is identical.",
+      },
+    },
+    code: [
+      "class AutocompleteSystem:",
+      "    def __init__(self, sentences, times):",
+      "        self.counts = defaultdict(int)",
+      "        for s, t in zip(sentences, times): self.counts[s] += t",
+      "        self.prefix = ''",
+      "    def input(self, c):",
+      "        if c == '#':",
+      "            self.counts[self.prefix] += 1",
+      "            self.prefix = ''",
+      "            return []",
+      "        self.prefix += c",
+      "        matches = [(s, cnt) for s, cnt in self.counts.items()",
+      "                   if s.startswith(self.prefix)]",
+      "        matches.sort(key=lambda x: (-x[1], x[0]))",
+      "        return [s for s, _ in matches[:3]]",
+    ],
+    builder: buildSteps642,
+  },
   676: {
     id: 676,
     difficulty: "medium",

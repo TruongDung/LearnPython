@@ -2838,6 +2838,216 @@ function buildSteps218(input) {
 }
 
 /**
+ * LeetCode 295: Find Median from Data Stream — two heaps.
+ * small = max-heap (lower half), large = min-heap (upper half).
+ * Invariant: every element in small ≤ every element in large, and
+ * len(small) == len(large) or len(small) == len(large)+1.
+ *
+ * Input: a comma-separated list of numbers to addNum; median is reported
+ * after each insertion.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  class MedianFinder:
+ *  3      def __init__(self):
+ *  4          self.small = []   # max-heap (negatives)
+ *  5          self.large = []   # min-heap
+ *  6      def addNum(self, num):
+ *  7          heapq.heappush(self.small, -num)
+ *  8          if small and large and -small[0] > large[0]:
+ *  9              heapq.heappush(large, -heapq.heappop(small))
+ * 10          if len(small) > len(large) + 1:
+ * 11              heapq.heappush(large, -heapq.heappop(small))
+ * 12          if len(large) > len(small):
+ * 13              heapq.heappush(small, -heapq.heappop(large))
+ * 14      def findMedian(self):
+ * 15          if len(small) > len(large): return -small[0]
+ * 16          return (-small[0] + large[0]) / 2
+ */
+function buildSteps295(input) {
+  const nums = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const steps = [];
+
+  // small = max-heap (store as sorted array, max at index 0 conceptually)
+  // large = min-heap
+  const small = []; // we keep as array; smallTop() = max
+  const large = []; // largeTop() = min
+  const smallTop = () => Math.max(...small);
+  const largeTop = () => Math.min(...large);
+
+  const sortedAll = () => [...small, ...large].sort((a, b) => a - b);
+  const smallStr = () => `[${[...small].sort((a, b) => b - a).join(", ")}]`;
+  const largeStr = () => `[${[...large].sort((a, b) => a - b).join(", ")}]`;
+
+  function snap(opts) {
+    const all = sortedAll();
+    // highlight median position(s)
+    const hl = [];
+    if (all.length) {
+      if (all.length % 2 === 1) hl.push((all.length - 1) / 2);
+      else { hl.push(all.length / 2 - 1); hl.push(all.length / 2); }
+    }
+    steps.push({
+      title: opts.title,
+      arr: all,
+      sub: all.map((v) => (small.includes(v) && (!large.includes(v) || [...small, ...large].filter(x => x === v).length) ? "" : "")),
+      highlight: opts.showMedian ? hl : [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo hai heap rỗng", en: "Initialize two empty heaps" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "small (max-heap)", value: "[]" },
+      { name: "large (min-heap)", value: "[]" },
+    ],
+    note: {
+      vi:
+        "small = nửa NHỎ (max-heap, đỉnh là số lớn nhất của nửa dưới).\n" +
+        "large = nửa LỚN (min-heap, đỉnh là số nhỏ nhất của nửa trên).\n" +
+        "Bất biến: mọi phần tử small ≤ mọi phần tử large; |small| = |large| hoặc |small| = |large|+1.\n" +
+        "Median = đỉnh small (lẻ) hoặc trung bình 2 đỉnh (chẵn). Mảng dưới là toàn bộ số đã thêm (đã sort); median được tô đậm.",
+      en:
+        "small = LOWER half (max-heap, top = largest of lower half).\n" +
+        "large = UPPER half (min-heap, top = smallest of upper half).\n" +
+        "Invariant: every small ≤ every large; |small| = |large| or |small| = |large|+1.\n" +
+        "Median = small's top (odd) or average of both tops (even). The array below shows all numbers added (sorted); the median is highlighted.",
+    },
+  });
+
+  for (const num of nums) {
+    // Line 7: push to small
+    small.push(num);
+    snap({
+      title: { vi: `addNum(${num}): push ${num} vào small`, en: `addNum(${num}): push ${num} into small` },
+      codeLines: [6, 7],
+      vars: [
+        { name: "num", value: num },
+        { name: "small", value: smallStr() },
+        { name: "large", value: largeStr() },
+      ],
+      note: {
+        vi: `Luôn đẩy số mới vào small (max-heap) trước. small = ${smallStr()}.`,
+        en: `Always push the new number into small (max-heap) first. small = ${smallStr()}.`,
+      },
+    });
+
+    // Line 8-9: if small top > large top, move it over
+    if (small.length && large.length && smallTop() > largeTop()) {
+      const moved = smallTop();
+      small.splice(small.indexOf(moved), 1);
+      large.push(moved);
+      snap({
+        title: { vi: `small đỉnh ${moved} > large đỉnh → chuyển sang large`, en: `small top ${moved} > large top → move to large` },
+        codeLines: [8, 9],
+        vars: [
+          { name: "moved", value: moved },
+          { name: "small", value: smallStr() },
+          { name: "large", value: largeStr() },
+        ],
+        note: {
+          vi: `Đỉnh small (${moved}) lớn hơn đỉnh large → vi phạm "mọi small ≤ mọi large". Chuyển ${moved} sang large.`,
+          en: `small's top (${moved}) exceeds large's top → violates "every small ≤ every large". Move ${moved} to large.`,
+        },
+      });
+    }
+
+    // Line 10-11: rebalance if small too big
+    if (small.length > large.length + 1) {
+      const moved = smallTop();
+      small.splice(small.indexOf(moved), 1);
+      large.push(moved);
+      snap({
+        title: { vi: `|small| > |large|+1 → chuyển ${moved} sang large`, en: `|small| > |large|+1 → move ${moved} to large` },
+        codeLines: [10, 11],
+        vars: [
+          { name: "len(small)", value: small.length + 1 },
+          { name: "len(large)", value: large.length - 1 },
+          { name: "small", value: smallStr() },
+          { name: "large", value: largeStr() },
+        ],
+        note: {
+          vi: `small nhiều hơn large quá 1 phần tử → cân bằng: chuyển đỉnh small (${moved}) sang large.`,
+          en: `small has more than one extra element → rebalance: move small's top (${moved}) to large.`,
+        },
+      });
+    }
+
+    // Line 12-13: rebalance if large too big
+    if (large.length > small.length) {
+      const moved = largeTop();
+      large.splice(large.indexOf(moved), 1);
+      small.push(moved);
+      snap({
+        title: { vi: `|large| > |small| → chuyển ${moved} sang small`, en: `|large| > |small| → move ${moved} to small` },
+        codeLines: [12, 13],
+        vars: [
+          { name: "len(large)", value: large.length + 1 },
+          { name: "len(small)", value: small.length - 1 },
+          { name: "small", value: smallStr() },
+          { name: "large", value: largeStr() },
+        ],
+        note: {
+          vi: `large nhiều hơn small → cân bằng: chuyển đỉnh large (${moved}) về small.`,
+          en: `large has more than small → rebalance: move large's top (${moved}) back to small.`,
+        },
+      });
+    }
+
+    // findMedian
+    const median = small.length > large.length ? smallTop() : (smallTop() + largeTop()) / 2;
+    snap({
+      title: { vi: `findMedian() = ${median}`, en: `findMedian() = ${median}` },
+      showMedian: true,
+      codeLines: small.length > large.length ? [14, 15] : [14, 16],
+      vars: [
+        { name: "small", value: smallStr() },
+        { name: "large", value: largeStr() },
+        { name: "median", value: median },
+      ],
+      note: {
+        vi: small.length > large.length
+          ? `|small| > |large| → tổng số phần tử LẺ → median = đỉnh small = ${smallTop()}.`
+          : `|small| == |large| → tổng số phần tử CHẴN → median = (đỉnh small + đỉnh large) / 2 = (${smallTop()} + ${largeTop()}) / 2 = ${median}.`,
+        en: small.length > large.length
+          ? `|small| > |large| → ODD count → median = small's top = ${smallTop()}.`
+          : `|small| == |large| → EVEN count → median = (small top + large top) / 2 = (${smallTop()} + ${largeTop()}) / 2 = ${median}.`,
+      },
+    });
+  }
+
+  const finalMedian = small.length
+    ? (small.length > large.length ? smallTop() : (smallTop() + largeTop()) / 2)
+    : 0;
+
+  snap({
+    title: { vi: `Median cuối = ${finalMedian}`, en: `Final median = ${finalMedian}` },
+    showMedian: true,
+    final: true,
+    codeLines: [14, 15, 16],
+    vars: [
+      { name: "small", value: smallStr() },
+      { name: "large", value: largeStr() },
+      { name: "median", value: finalMedian },
+    ],
+    note: {
+      vi: `Sau khi thêm tất cả ${nums.length} số, median hiện tại = ${finalMedian}. Mỗi lần thêm số, median lấy được trong O(1).`,
+      en: `After adding all ${nums.length} numbers, the current median = ${finalMedian}. Each query is O(1).`,
+    },
+  });
+
+  return { original: nums, answer: finalMedian, steps };
+}
+
+/**
  * LeetCode 355: Design Twitter.
  *
  * Data model:
@@ -3955,5 +4165,60 @@ module.exports = {
       "        self.following[followerId].discard(followeeId)",
     ],
     builder: buildSteps355,
+  },
+  295: {
+    id: 295,
+    difficulty: "hard",
+    slug: "find-median-from-data-stream",
+    category: HEAP_CAT,
+    title: { vi: "Find Median from Data Stream", en: "Find Median from Data Stream" },
+    titleVi: { vi: "Tìm trung vị từ luồng dữ liệu (hai heap)", en: "Find median from a data stream (two heaps)" },
+    statement: {
+      vi:
+        "Thiết kế cấu trúc hỗ trợ addNum(num) và findMedian(). " +
+        "Dùng hai heap: small (max-heap, nửa dưới) và large (min-heap, nửa trên). " +
+        "Nhập dãy số cần thêm, cách nhau dấu phẩy; median được báo sau mỗi lần thêm.",
+      en:
+        "Design a structure supporting addNum(num) and findMedian(). " +
+        "Use two heaps: small (max-heap, lower half) and large (min-heap, upper half). " +
+        "Enter numbers to add, comma-separated; the median is reported after each insertion.",
+    },
+    defaultInput: [5, 15, 1, 3, 8, 7, 9, 10, 20, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "Dãy addNum", en: "addNum sequence" },
+    extraParams: [],
+    approach: [
+      { vi: "small là max-heap giữ nửa NHỎ; large là min-heap giữ nửa LỚN.", en: "small is a max-heap holding the LOWER half; large is a min-heap holding the UPPER half." },
+      { vi: "Luôn push vào small trước, rồi chuyển đỉnh small sang large nếu sai thứ tự.", en: "Always push into small first, then move small's top to large if out of order." },
+      { vi: "Cân bằng để |small| = |large| hoặc |small| = |large|+1.", en: "Rebalance so |small| = |large| or |small| = |large|+1." },
+      { vi: "Median = đỉnh small (lẻ) hoặc trung bình 2 đỉnh (chẵn), lấy trong O(1).", en: "Median = small's top (odd) or average of the two tops (even), in O(1)." },
+    ],
+    complexity: {
+      time: "O(log n) addNum, O(1) findMedian",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi addNum thực hiện vài thao tác heap O(log n). findMedian chỉ đọc đỉnh.",
+        en: "Each addNum does a few O(log n) heap operations. findMedian just reads the tops.",
+      },
+    },
+    code: [
+      "import heapq",
+      "class MedianFinder:",
+      "    def __init__(self):",
+      "        self.small = []   # max-heap (negatives)",
+      "        self.large = []   # min-heap",
+      "    def addNum(self, num):",
+      "        heapq.heappush(self.small, -num)",
+      "        if self.small and self.large and -self.small[0] > self.large[0]:",
+      "            heapq.heappush(self.large, -heapq.heappop(self.small))",
+      "        if len(self.small) > len(self.large) + 1:",
+      "            heapq.heappush(self.large, -heapq.heappop(self.small))",
+      "        if len(self.large) > len(self.small):",
+      "            heapq.heappush(self.small, -heapq.heappop(self.large))",
+      "    def findMedian(self):",
+      "        if len(self.small) > len(self.large): return -self.small[0]",
+      "        return (-self.small[0] + self.large[0]) / 2",
+    ],
+    builder: buildSteps295,
   },
 };

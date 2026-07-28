@@ -2059,7 +2059,229 @@ function buildSteps980(input) {
   return { original: grid, answer: pathCount, steps };
 }
 
+/**
+ * LeetCode 301: Remove Invalid Parentheses — BFS by removal count.
+ * Process the string set level by level. The FIRST level containing any valid
+ * string is the answer (fewest removals). Generate the next level by removing
+ * one parenthesis at each position.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def removeInvalidParentheses(self, s):
+ *  3          def is_valid(string):
+ *  4              count = 0
+ *  5              for ch in string:
+ *  6                  if ch == '(': count += 1
+ *  7                  elif ch == ')':
+ *  8                      count -= 1
+ *  9                      if count < 0: return False
+ * 10              return count == 0
+ * 11          level = {s}
+ * 12          while level:
+ * 13              valid = [x for x in level if is_valid(x)]
+ * 14              if valid: return valid
+ * 15              next_level = set()
+ * 16              for string in level:
+ * 17                  for i in range(len(string)):
+ * 18                      if string[i] in '()':
+ * 19                          next_level.add(string[:i] + string[i+1:])
+ * 20              level = next_level
+ * 21          return [""]
+ */
+function buildSteps301(input) {
+  const s = String(input);
+  const steps = [];
+
+  function isValid(str) {
+    let count = 0;
+    for (const ch of str) {
+      if (ch === "(") count += 1;
+      else if (ch === ")") {
+        count -= 1;
+        if (count < 0) return false;
+      }
+    }
+    return count === 0;
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "level = {s}", en: "level = {s}" },
+    codeLines: [11],
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "level", value: `{"${s}"}` },
+      { name: "removals", value: 0 },
+    ],
+    note: {
+      vi:
+        `BFS theo SỐ LẦN XÓA. Bắt đầu với chuỗi gốc (0 lần xóa).\n` +
+        `Level đầu tiên chứa chuỗi HỢP LỆ chính là đáp án (xóa ít nhất).`,
+      en:
+        `BFS by NUMBER OF REMOVALS. Start with the original string (0 removals).\n` +
+        `The first level containing any VALID string is the answer (fewest removals).`,
+    },
+  });
+
+  let level = new Set([s]);
+  let removals = 0;
+  const seenLevels = [];
+  let answer = [""];
+  let guard = 0;
+
+  while (level.size > 0 && guard < 200) {
+    guard += 1;
+    const levelArr = [...level];
+    seenLevels.push({ removals, size: level.size });
+
+    // Check validity of each string in the level
+    const valid = levelArr.filter(isValid);
+
+    snap({
+      title: { vi: `Level ${removals} (xóa ${removals} ký tự): ${level.size} chuỗi`, en: `Level ${removals} (${removals} removed): ${level.size} strings` },
+      codeLines: [12, 13],
+      vars: [
+        { name: "removals", value: removals },
+        { name: "level size", value: level.size },
+        { name: "level", value: `{${levelArr.slice(0, 8).map((x) => `"${x}"`).join(", ")}${levelArr.length > 8 ? ", ..." : ""}}` },
+        { name: "valid found", value: valid.length },
+      ],
+      note: {
+        vi: `Kiểm tra is_valid cho từng chuỗi trong level (đã xóa ${removals} ký tự). Tìm thấy ${valid.length} chuỗi hợp lệ.`,
+        en: `Check is_valid for each string in this level (${removals} chars removed). Found ${valid.length} valid strings.`,
+      },
+    });
+
+    if (valid.length > 0) {
+      // dedupe + sort for stable answer
+      answer = [...new Set(valid)].sort();
+      snap({
+        title: { vi: `Có chuỗi hợp lệ → return [${answer.map((x) => `"${x}"`).join(", ")}]`, en: `Valid found → return [${answer.map((x) => `"${x}"`).join(", ")}]` },
+        final: true,
+        codeLines: [14],
+        vars: [
+          { name: "removals (min)", value: removals },
+          { name: "answer", value: `[${answer.map((x) => `"${x}"`).join(", ")}]` },
+        ],
+        note: {
+          vi: `Level ${removals} là level ĐẦU TIÊN có chuỗi hợp lệ → đây là số lần xóa NHỎ NHẤT. Trả về mọi chuỗi hợp lệ (không trùng): [${answer.map((x) => `"${x}"`).join(", ")}].`,
+          en: `Level ${removals} is the FIRST level with a valid string → this is the MINIMUM number of removals. Return all distinct valid strings: [${answer.map((x) => `"${x}"`).join(", ")}].`,
+        },
+      });
+      return { original: s, answer, steps };
+    }
+
+    // Build next level
+    const nextLevel = new Set();
+    for (const str of levelArr) {
+      for (let i = 0; i < str.length; i++) {
+        if (str[i] === "(" || str[i] === ")") {
+          nextLevel.add(str.slice(0, i) + str.slice(i + 1));
+        }
+      }
+    }
+
+    snap({
+      title: { vi: `Tạo level ${removals + 1}: xóa 1 dấu ngoặc mỗi vị trí → ${nextLevel.size} chuỗi`, en: `Build level ${removals + 1}: remove 1 paren per position → ${nextLevel.size} strings` },
+      codeLines: [15, 16, 17, 18, 19, 20],
+      vars: [
+        { name: "current level", value: removals },
+        { name: "next_level size", value: nextLevel.size },
+        { name: "next_level", value: `{${[...nextLevel].slice(0, 8).map((x) => `"${x}"`).join(", ")}${nextLevel.size > 8 ? ", ..." : ""}}` },
+      ],
+      note: {
+        vi: `Không có chuỗi hợp lệ ở level ${removals}. Sinh level tiếp theo: với mỗi chuỗi, xóa 1 dấu '(' hoặc ')' tại từng vị trí. Set tự loại trùng → ${nextLevel.size} chuỗi.`,
+        en: `No valid string at level ${removals}. Generate the next level: for each string, remove one '(' or ')' at every position. The set dedupes → ${nextLevel.size} strings.`,
+      },
+    });
+
+    level = nextLevel;
+    removals += 1;
+  }
+
+  snap({
+    title: { vi: `return [""]`, en: `return [""]` },
+    final: true,
+    codeLines: [21],
+    vars: [{ name: "answer", value: '[""]' }],
+    note: {
+      vi: `Đã xóa hết ký tự mà không tìm được chuỗi hợp lệ nào khác → trả về [""].`,
+      en: `Removed all characters without finding any other valid string → return [""].`,
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  301: {
+    id: 301,
+    difficulty: "hard",
+    slug: "remove-invalid-parentheses",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    title: { vi: "Remove Invalid Parentheses", en: "Remove Invalid Parentheses" },
+    titleVi: { vi: "Xóa dấu ngoặc không hợp lệ (BFS theo số lần xóa)", en: "Remove invalid parentheses (BFS by removal count)" },
+    statement: {
+      vi:
+        "Cho chuỗi s gồm chữ cái và '(' ')'. Xóa SỐ ÍT NHẤT dấu ngoặc để s hợp lệ. " +
+        "Trả về TẤT CẢ kết quả khác nhau. Nhập chuỗi s.",
+      en:
+        "Given a string s of letters and '(' ')'. Remove the MINIMUM number of parentheses to make s valid. " +
+        "Return ALL distinct results. Enter the string s.",
+    },
+    defaultInput: "()())()",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    approach: [
+      { vi: "BFS theo SỐ LẦN XÓA: level 0 là chuỗi gốc, mỗi level xóa thêm 1 dấu ngoặc.", en: "BFS by REMOVAL COUNT: level 0 is the original, each level removes one more parenthesis." },
+      { vi: "Kiểm tra is_valid mọi chuỗi trong level. Level đầu tiên có chuỗi hợp lệ = đáp án (xóa ít nhất).", en: "Check is_valid for every string in the level. The first level with a valid string = answer (fewest removals)." },
+      { vi: "Sinh level tiếp theo bằng cách xóa 1 dấu '(' hoặc ')' tại từng vị trí; dùng set để loại trùng.", en: "Generate the next level by removing one '(' or ')' at every position; use a set to dedupe." },
+    ],
+    complexity: {
+      time: "O(2^n · n)",
+      space: "O(2^n)",
+      note: {
+        vi: "Worst-case mỗi ký tự có thể bị xóa hoặc giữ. BFS dừng ngay ở level hợp lệ đầu tiên.",
+        en: "Worst-case each char may be removed or kept. BFS stops at the first valid level.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def removeInvalidParentheses(self, s):",
+      "        def is_valid(string):",
+      "            count = 0",
+      "            for ch in string:",
+      "                if ch == '(': count += 1",
+      "                elif ch == ')':",
+      "                    count -= 1",
+      "                    if count < 0: return False",
+      "            return count == 0",
+      "        level = {s}",
+      "        while level:",
+      "            valid = [x for x in level if is_valid(x)]",
+      "            if valid: return valid",
+      "            next_level = set()",
+      "            for string in level:",
+      "                for i in range(len(string)):",
+      "                    if string[i] in '()':",
+      "                        next_level.add(string[:i] + string[i+1:])",
+      "            level = next_level",
+      "        return ['']",
+    ],
+    builder: buildSteps301,
+  },
   980: {
     id: 980,
     difficulty: "hard",
