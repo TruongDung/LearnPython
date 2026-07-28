@@ -1625,7 +1625,53 @@ function buildSteps875(input, params) {
   return { original: piles, answer: lo, steps };
 }
 
+/** LeetCode 69: Sqrt(x) — binary search for floor(sqrt(x)). */
+function buildSteps69(input) {
+  const x = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  if (x < 2) { snap({ title: { vi: `x=${x} < 2 → ${x}`, en: `x=${x} < 2 → ${x}` }, final: true, codeLines: [3], vars: [{ name: "answer", value: x }], note: { vi: "sqrt(0)=0, sqrt(1)=1.", en: "sqrt(0)=0, sqrt(1)=1." } }); return { original: x, answer: x, steps }; }
+  let lo = 1, hi = Math.floor(x / 2);
+  snap({ title: { vi: `Binary search trong [1, ${hi}]`, en: `Binary search in [1, ${hi}]` }, codeLines: [4], vars: [{ name: "x", value: x }, { name: "lo", value: lo }, { name: "hi", value: hi }], note: { vi: `Tìm m lớn nhất mà m² ≤ ${x}. Khoảng [1, x/2=${hi}].`, en: `Find the largest m with m² ≤ ${x}. Range [1, x/2=${hi}].` } });
+  let answer = 1;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const sq = mid * mid;
+    if (sq === x) { snap({ title: { vi: `mid=${mid}: ${mid}²=${sq} == ${x} → ${mid}`, en: `mid=${mid}: ${mid}²=${sq} == ${x} → ${mid}` }, final: true, codeLines: [5, 6, 7], vars: [{ name: "mid", value: mid }, { name: "mid²", value: sq }], note: { vi: `Bình phương đúng bằng x → sqrt = ${mid}.`, en: `Perfect square → sqrt = ${mid}.` } }); return { original: x, answer: mid, steps }; }
+    const less = sq < x;
+    snap({
+      title: { vi: `mid=${mid}: ${mid}²=${sq} ${less ? "<" : ">"} ${x}`, en: `mid=${mid}: ${mid}²=${sq} ${less ? "<" : ">"} ${x}` },
+      codeLines: less ? [5, 8, 9] : [5, 10, 11],
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }, { name: "mid²", value: sq }],
+      note: { vi: less ? `${sq} < ${x} → tìm lớn hơn → lo=${mid + 1}. (mid=${mid} là ứng viên floor)` : `${sq} > ${x} → tìm nhỏ hơn → hi=${mid - 1}.`, en: less ? `${sq} < ${x} → go larger → lo=${mid + 1}. (mid=${mid} is a floor candidate)` : `${sq} > ${x} → go smaller → hi=${mid - 1}.` },
+    });
+    if (less) { lo = mid + 1; answer = mid; } else hi = mid - 1;
+  }
+  snap({ title: { vi: `Đáp án: ${hi}`, en: `Answer: ${hi}` }, final: true, codeLines: [12], vars: [{ name: "answer", value: hi }], note: { vi: `hi là floor(sqrt(${x})) = ${hi}.`, en: `hi is floor(sqrt(${x})) = ${hi}.` } });
+  return { original: x, answer: hi, steps };
+}
+
 module.exports = {
+  69: {
+    id: 69,
+    difficulty: "easy",
+    slug: "sqrtx",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Sqrt(x)", en: "Sqrt(x)" },
+    titleVi: { vi: "Căn bậc hai nguyên (binary search)", en: "Integer square root (binary search)" },
+    statement: { vi: "Tính floor(sqrt(x)) không dùng hàm căn có sẵn. Nhập x.", en: "Compute floor(sqrt(x)) without built-in sqrt. Enter x." },
+    defaultInput: [8],
+    inputKind: "integer", inputLabel: { vi: "x", en: "x" }, extraParams: [],
+    approach: [
+      { vi: "Tìm m lớn nhất mà m² ≤ x — tính đơn điệu → binary search.", en: "Find the largest m with m² ≤ x — monotonic → binary search." },
+      { vi: "mid² == x → trả về mid.", en: "mid² == x → return mid." },
+      { vi: "mid² < x → lo=mid+1 (giữ mid làm ứng viên); mid² > x → hi=mid-1.", en: "mid² < x → lo=mid+1 (keep mid as candidate); mid² > x → hi=mid-1." },
+      { vi: "Kết quả là hi (floor).", en: "Answer is hi (floor)." },
+    ],
+    complexity: { time: "O(log x)", space: "O(1)", note: { vi: "Chia đôi khoảng mỗi bước.", en: "Halve the range each step." } },
+    code: ["class Solution:", "    def mySqrt(self, x):", "        if x < 2: return x", "        lo, hi = 1, x // 2", "        while lo <= hi:", "            mid = (lo + hi) // 2", "            if mid*mid == x: return mid", "            if mid*mid < x: lo = mid + 1", "            else: hi = mid - 1", "        return hi"],
+    builder: buildSteps69,
+  },
   875: {
     id: 875,
     difficulty: "medium",
@@ -1770,7 +1816,7 @@ module.exports = {
     builder: buildSteps410,
   },
   __meta: {
-    order: [410, 4, 33, 34, 911, 875, 1044],
+    order: [69, 410, 4, 33, 34, 911, 875, 1044],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {

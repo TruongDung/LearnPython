@@ -7600,7 +7600,159 @@ function buildSteps65(input) {
   return { original: s, answer, steps };
 }
 
+/** LeetCode 14: Longest Common Prefix — shrink the prefix against each word. */
+function buildSteps14(input) {
+  const strs = String(input).split(",").map((w) => w.trim()).filter((w) => w.length >= 0);
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  if (!strs.length) { snap({ title: { vi: 'Rỗng → ""', en: 'Empty → ""' }, final: true, codeLines: [3], vars: [{ name: "answer", value: '""' }], note: { vi: "", en: "" } }); return { original: strs, answer: "", steps }; }
+  let prefix = strs[0];
+  snap({
+    title: { vi: `prefix = "${prefix}" (từ đầu tiên)`, en: `prefix = "${prefix}" (first word)` },
+    codeLines: [3, 4], vars: [{ name: "strs", value: `[${strs.join(", ")}]` }, { name: "prefix", value: `"${prefix}"` }],
+    note: { vi: "Lấy từ đầu làm prefix ban đầu, rồi rút ngắn dần cho khớp mọi từ.", en: "Take the first word as the initial prefix, then shrink it to match every word." },
+  });
+  for (let w = 1; w < strs.length; w++) {
+    const word = strs[w];
+    while (!word.startsWith(prefix)) {
+      const old = prefix;
+      prefix = prefix.slice(0, -1);
+      snap({
+        title: { vi: `"${word}" không bắt đầu bằng "${old}" → cắt → "${prefix}"`, en: `"${word}" doesn't start with "${old}" → trim → "${prefix}"` },
+        codeLines: [5, 6, 7], vars: [{ name: "word", value: `"${word}"` }, { name: "prefix", value: `"${prefix}"` }],
+        note: { vi: `Rút ngắn prefix 1 ký tự cho tới khi "${word}" bắt đầu bằng nó.`, en: `Shrink prefix by one char until "${word}" starts with it.` },
+      });
+      if (!prefix) { snap({ title: { vi: 'prefix rỗng → ""', en: 'prefix empty → ""' }, final: true, codeLines: [7], vars: [{ name: "answer", value: '""' }], note: { vi: "Không có tiền tố chung.", en: "No common prefix." } }); return { original: strs, answer: "", steps }; }
+    }
+    snap({
+      title: { vi: `"${word}" bắt đầu bằng "${prefix}" ✓`, en: `"${word}" starts with "${prefix}" ✓` },
+      codeLines: [4, 5], vars: [{ name: "word", value: `"${word}"` }, { name: "prefix", value: `"${prefix}"` }],
+      note: { vi: `prefix "${prefix}" khớp "${word}".`, en: `prefix "${prefix}" matches "${word}".` },
+    });
+  }
+  snap({ title: { vi: `Đáp án: "${prefix}"`, en: `Answer: "${prefix}"` }, final: true, codeLines: [8], vars: [{ name: "answer", value: `"${prefix}"` }], note: { vi: `Tiền tố chung dài nhất = "${prefix}".`, en: `Longest common prefix = "${prefix}".` } });
+  return { original: strs, answer: prefix, steps };
+}
+
+/** LeetCode 28: Find the Index of the First Occurrence. */
+function buildSteps28(input, params) {
+  const haystack = String(input);
+  const needle = String(params && params.needle !== undefined ? params.needle : "sad");
+  const chars = haystack.split("");
+  const n = haystack.length, m = needle.length;
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      grid: { dp: [["", ...chars]], text1: "", text2: haystack, colLabels: chars.map((ch, i) => ({ index: `${i}`, char: ch })), hlCell: Number.isInteger(o.focus) ? [0, o.focus + 1] : null, pathCells: o.win ? o.win.map((i) => [0, i + 1]) : [], largeCells: true },
+      highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+  snap({ title: { vi: `Tìm "${needle}" trong "${haystack}"`, en: `Find "${needle}" in "${haystack}"` }, codeLines: [3], vars: [{ name: "haystack", value: `"${haystack}"` }, { name: "needle", value: `"${needle}"` }], note: { vi: `Thử từng vị trí bắt đầu i; so sánh cửa sổ haystack[i:i+${m}] với needle.`, en: `Try each start i; compare window haystack[i:i+${m}] with needle.` } });
+  let answer = -1;
+  for (let i = 0; i + m <= n; i++) {
+    const window = haystack.slice(i, i + m);
+    const match = window === needle;
+    const win = Array.from({ length: m }, (_, x) => i + x);
+    snap({
+      title: { vi: `i=${i}: "${window}" ${match ? "==" : "≠"} "${needle}"`, en: `i=${i}: "${window}" ${match ? "==" : "≠"} "${needle}"` },
+      focus: i, win, codeLines: match ? [4, 5] : [4], final: match,
+      vars: [{ name: "i", value: i }, { name: "window", value: `"${window}"` }, { name: "match?", value: match }],
+      note: { vi: match ? `Khớp tại i=${i} → trả về ${i}.` : `Không khớp → thử i tiếp theo.`, en: match ? `Match at i=${i} → return ${i}.` : `No match → try the next i.` },
+    });
+    if (match) { answer = i; break; }
+  }
+  if (answer === -1) snap({ title: { vi: "Không tìm thấy → -1", en: "Not found → -1" }, final: true, codeLines: [6], vars: [{ name: "answer", value: -1 }], note: { vi: "Không có vị trí nào khớp.", en: "No position matches." } });
+  return { original: haystack, answer, steps };
+}
+
+/** LeetCode 58: Length of Last Word — scan from the end. */
+function buildSteps58(input) {
+  const s = String(input);
+  const chars = s.split("");
+  const steps = [];
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      grid: { dp: [["", ...chars.map((c) => c === " " ? "␣" : c)]], text1: "", text2: s, colLabels: chars.map((ch, i) => ({ index: `${i}`, char: ch === " " ? "␣" : ch })), hlCell: Number.isInteger(o.focus) ? [0, o.focus + 1] : null, pathCells: o.mark ? o.mark.map((i) => [0, i + 1]) : [], largeCells: true },
+      highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+  let i = s.length - 1, length = 0;
+  snap({ title: { vi: "Bắt đầu từ cuối chuỗi", en: "Start from the end" }, focus: i, codeLines: [3], vars: [{ name: "s", value: `"${s}"` }, { name: "i", value: i }], note: { vi: "Duyệt từ phải: bỏ khoảng trắng cuối, rồi đếm ký tự của từ cuối.", en: "Scan from the right: skip trailing spaces, then count the last word's chars." } });
+  while (i >= 0 && s[i] === " ") {
+    snap({ title: { vi: `s[${i}]=' ' → bỏ`, en: `s[${i}]=' ' → skip` }, focus: i, codeLines: [4, 5], vars: [{ name: "i", value: i }], note: { vi: "Khoảng trắng cuối → bỏ qua.", en: "Trailing space → skip." } });
+    i--;
+  }
+  const marks = [];
+  while (i >= 0 && s[i] !== " ") {
+    length++; marks.push(i);
+    snap({ title: { vi: `s[${i}]='${s[i]}' → length=${length}`, en: `s[${i}]='${s[i]}' → length=${length}` }, focus: i, mark: [...marks], codeLines: [6, 7], vars: [{ name: "i", value: i }, { name: "length", value: length }], note: { vi: `Ký tự của từ cuối → length tăng lên ${length}.`, en: `A char of the last word → length becomes ${length}.` } });
+    i--;
+  }
+  snap({ title: { vi: `Đáp án: ${length}`, en: `Answer: ${length}` }, mark: [...marks], final: true, codeLines: [8], vars: [{ name: "answer", value: length }], note: { vi: `Độ dài từ cuối = ${length}.`, en: `Length of the last word = ${length}.` } });
+  return { original: s, answer: length, steps };
+}
+
 module.exports = {
+  14: {
+    id: 14,
+    difficulty: "easy",
+    slug: "longest-common-prefix",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Longest Common Prefix", en: "Longest Common Prefix" },
+    titleVi: { vi: "Tiền tố chung dài nhất", en: "Longest common prefix" },
+    statement: { vi: "Tìm tiền tố chung dài nhất của một danh sách chuỗi. Nhập các từ cách nhau dấu phẩy.", en: "Find the longest common prefix of a list of strings. Enter words comma-separated." },
+    defaultInput: "flower,flow,flight",
+    inputKind: "string", inputLabel: { vi: "strs", en: "strs" }, extraParams: [],
+    approach: [
+      { vi: "Lấy từ đầu làm prefix.", en: "Take the first word as the prefix." },
+      { vi: "Với mỗi từ, rút ngắn prefix tới khi từ bắt đầu bằng nó.", en: "For each word, shrink the prefix until the word starts with it." },
+      { vi: "Nếu prefix rỗng → không có tiền tố chung.", en: "If the prefix becomes empty → no common prefix." },
+    ],
+    complexity: { time: "O(S)", space: "O(1)", note: { vi: "S = tổng số ký tự.", en: "S = total characters." } },
+    code: ["class Solution:", "    def longestCommonPrefix(self, strs):", "        if not strs: return ''", "        prefix = strs[0]", "        for word in strs[1:]:", "            while not word.startswith(prefix):", "                prefix = prefix[:-1]", "        return prefix"],
+    builder: buildSteps14,
+  },
+  28: {
+    id: 28,
+    difficulty: "easy",
+    slug: "find-the-index-of-the-first-occurrence-in-a-string",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Find the Index of the First Occurrence", en: "Find the Index of the First Occurrence" },
+    titleVi: { vi: "Vị trí xuất hiện đầu tiên của chuỗi con", en: "First occurrence index of a substring" },
+    statement: { vi: "Tìm chỉ số xuất hiện đầu tiên của needle trong haystack, hoặc -1. Nhập haystack; needle trong tham số.", en: "Find the first index of needle in haystack, or -1. Enter haystack; needle as a parameter." },
+    defaultInput: "sadbutsad",
+    inputKind: "string", inputLabel: { vi: "haystack", en: "haystack" },
+    extraParams: [{ key: "needle", label: { vi: "needle", en: "needle" }, default: "sad" }],
+    approach: [
+      { vi: "Thử từng vị trí bắt đầu i trong haystack.", en: "Try each start position i in haystack." },
+      { vi: "So sánh cửa sổ haystack[i:i+m] với needle.", en: "Compare the window haystack[i:i+m] with needle." },
+      { vi: "Khớp → trả về i; hết vòng lặp → -1.", en: "Match → return i; loop ends → -1." },
+    ],
+    complexity: { time: "O(n·m)", space: "O(1)", note: { vi: "So khớp thô; KMP tối ưu O(n+m).", en: "Naive matching; KMP optimizes to O(n+m)." } },
+    code: ["class Solution:", "    def strStr(self, haystack, needle):", "        n, m = len(haystack), len(needle)", "        for i in range(n - m + 1):", "            if haystack[i:i+m] == needle:", "                return i", "        return -1"],
+    builder: buildSteps28,
+  },
+  58: {
+    id: 58,
+    difficulty: "easy",
+    slug: "length-of-last-word",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Length of Last Word", en: "Length of Last Word" },
+    titleVi: { vi: "Độ dài từ cuối cùng", en: "Length of the last word" },
+    statement: { vi: "Trả về độ dài từ cuối cùng trong chuỗi (các từ cách nhau bởi khoảng trắng). Nhập chuỗi s.", en: "Return the length of the last word in the string (words separated by spaces). Enter the string s." },
+    defaultInput: "   fly me   to   the moon  ",
+    inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [
+      { vi: "Duyệt từ cuối chuỗi.", en: "Scan from the end of the string." },
+      { vi: "Bỏ qua các khoảng trắng cuối.", en: "Skip trailing spaces." },
+      { vi: "Đếm ký tự cho tới khi gặp khoảng trắng hoặc hết chuỗi.", en: "Count chars until a space or the start." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt từ phải.", en: "Single right-to-left pass." } },
+    code: ["class Solution:", "    def lengthOfLastWord(self, s):", "        i = len(s) - 1; length = 0", "        while i >= 0 and s[i] == ' ':", "            i -= 1", "        while i >= 0 and s[i] != ' ':", "            length += 1; i -= 1", "        return length"],
+    builder: buildSteps58,
+  },
   49: {
     id: 49,
     difficulty: "medium",

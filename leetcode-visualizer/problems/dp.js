@@ -13301,7 +13301,112 @@ function buildSteps1216(input, params) {
   return { original: s, answer, steps };
 }
 
+/** LeetCode 118: Pascal's Triangle. */
+function buildSteps118(input) {
+  const numRows = Number(Array.isArray(input) ? input[0] : String(input).trim()) || 5;
+  const steps = [];
+  const triangle = [];
+
+  function gridSnap(o) {
+    const width = numRows;
+    const display = triangle.map((row) => {
+      const padded = [...row.map(String)];
+      while (padded.length < width) padded.push("");
+      return padded;
+    });
+    steps.push({
+      title: o.title, arr: [],
+      grid: { dp: display.length ? display : [[""]], text1: "", text2: "", hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true },
+      highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+
+  gridSnap({ title: { vi: "Bắt đầu", en: "Start" }, codeLines: [3], vars: [{ name: "numRows", value: numRows }], note: { vi: "Mỗi hàng bắt đầu và kết thúc bằng 1. Ô trong = tổng 2 ô ngay trên nó.", en: "Each row starts and ends with 1. Interior cell = sum of the two cells above it." } });
+
+  for (let row = 0; row < numRows; row++) {
+    const current = new Array(row + 1).fill(1);
+    for (let col = 1; col < row; col++) current[col] = triangle[row - 1][col - 1] + triangle[row - 1][col];
+    triangle.push(current);
+    gridSnap({
+      title: { vi: `Hàng ${row}: [${current.join(", ")}]`, en: `Row ${row}: [${current.join(", ")}]` },
+      hlCell: [row, 0],
+      codeLines: row < 2 ? [4, 5] : [4, 5, 6, 7],
+      vars: [{ name: "row", value: row }, { name: "current", value: `[${current.join(", ")}]` }],
+      note: { vi: row < 2 ? `Hàng ${row} toàn 1.` : `Ô trong = tổng 2 ô hàng ${row - 1}. Hai đầu vẫn là 1.`, en: row < 2 ? `Row ${row} is all 1s.` : `Interior = sum of two cells from row ${row - 1}. Ends stay 1.` },
+    });
+  }
+  gridSnap({ title: { vi: `Kết quả: ${numRows} hàng`, en: `Result: ${numRows} rows` }, final: true, codeLines: [8], vars: [{ name: "answer", value: JSON.stringify(triangle) }], note: { vi: `Tam giác Pascal ${numRows} hàng.`, en: `Pascal's triangle with ${numRows} rows.` } });
+  return { original: numRows, answer: triangle, steps };
+}
+
+/** LeetCode 338: Counting Bits — dp[i] = dp[i>>1] + (i&1). */
+function buildSteps338(input) {
+  const n = Number(Array.isArray(input) ? input[0] : String(input).trim()) || 5;
+  const steps = [];
+  const dp = new Array(n + 1).fill(0);
+  const bin = (v) => v.toString(2);
+  steps.push({
+    title: { vi: "dp[0] = 0", en: "dp[0] = 0" },
+    arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [0], mark: [],
+    codeLines: [3],
+    vars: [{ name: "n", value: n }, { name: "dp", value: `[${dp.join(", ")}]` }],
+    note: {
+      vi: `dp[i] = số bit 1 của i. Công thức: dp[i] = dp[i>>1] + (i&1) — bỏ bit cuối (i>>1) rồi cộng lại nếu bit cuối là 1.`,
+      en: `dp[i] = number of 1-bits in i. Formula: dp[i] = dp[i>>1] + (i&1) — drop the last bit (i>>1) then add it back if it was 1.`,
+    },
+  });
+  for (let i = 1; i <= n; i++) {
+    dp[i] = dp[i >> 1] + (i & 1);
+    steps.push({
+      title: { vi: `dp[${i}] = dp[${i >> 1}] + ${i & 1} = ${dp[i]}`, en: `dp[${i}] = dp[${i >> 1}] + ${i & 1} = ${dp[i]}` },
+      arr: [...dp], sub: dp.map((_, x) => `${x}=${bin(x)}`), highlight: [i], mark: [i >> 1],
+      codeLines: [4, 5],
+      vars: [{ name: "i", value: `${i} (${bin(i)})` }, { name: "i>>1", value: `${i >> 1} (${bin(i >> 1)})` }, { name: "i&1", value: i & 1 }, { name: `dp[${i}]`, value: dp[i] }],
+      note: { vi: `${i} = ${bin(i)}. Bỏ bit cuối → ${i >> 1} = ${bin(i >> 1)} có dp=${dp[i >> 1]} bit. Bit cuối = ${i & 1}. Tổng = ${dp[i]}.`, en: `${i} = ${bin(i)}. Drop last bit → ${i >> 1} = ${bin(i >> 1)} with dp=${dp[i >> 1]} bits. Last bit = ${i & 1}. Total = ${dp[i]}.` },
+    });
+  }
+  steps.push({ title: { vi: `Kết quả: [${dp.join(", ")}]`, en: `Result: [${dp.join(", ")}]` }, arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [], mark: [], final: true, codeLines: [6], vars: [{ name: "answer", value: `[${dp.join(", ")}]` }], note: { vi: `Số bit 1 của 0..${n}.`, en: `1-bit counts for 0..${n}.` } });
+  return { original: n, answer: dp, steps };
+}
+
 module.exports = {
+  118: {
+    id: 118,
+    difficulty: "easy",
+    slug: "pascals-triangle",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Pascal's Triangle", en: "Pascal's Triangle" },
+    titleVi: { vi: "Tam giác Pascal", en: "Pascal's triangle" },
+    statement: { vi: "Sinh numRows hàng đầu của tam giác Pascal. Nhập numRows.", en: "Generate the first numRows of Pascal's triangle. Enter numRows." },
+    defaultInput: [5],
+    inputKind: "integer", inputLabel: { vi: "numRows", en: "numRows" }, extraParams: [],
+    approach: [
+      { vi: "Mỗi hàng bắt đầu và kết thúc bằng 1.", en: "Each row starts and ends with 1." },
+      { vi: "Ô trong = tổng 2 ô ngay trên nó (hàng trước).", en: "Interior cell = sum of the two cells directly above (previous row)." },
+    ],
+    complexity: { time: "O(numRows²)", space: "O(numRows²)", note: { vi: "Sinh từng ô một lần.", en: "Generate each cell once." } },
+    code: ["class Solution:", "    def generate(self, numRows):", "        triangle = []", "        for row in range(numRows):", "            current = [1]*(row+1)", "            for col in range(1, row):", "                current[col] = triangle[row-1][col-1] + triangle[row-1][col]", "            triangle.append(current)", "        return triangle"],
+    builder: buildSteps118,
+  },
+  338: {
+    id: 338,
+    difficulty: "easy",
+    slug: "counting-bits",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Counting Bits", en: "Counting Bits" },
+    titleVi: { vi: "Đếm bit 1 (Bit DP)", en: "Count 1-bits (Bit DP)" },
+    statement: { vi: "Cho n, trả về mảng ans độ dài n+1 với ans[i] = số bit 1 của i. Nhập n.", en: "Given n, return an array ans of length n+1 where ans[i] = number of 1-bits in i. Enter n." },
+    defaultInput: [5],
+    inputKind: "integer", inputLabel: { vi: "n", en: "n" }, extraParams: [],
+    approach: [
+      { vi: "dp[i] = dp[i>>1] + (i&1).", en: "dp[i] = dp[i>>1] + (i&1)." },
+      { vi: "i>>1 bỏ bit cuối; (i&1) là bit cuối.", en: "i>>1 drops the last bit; (i&1) is the last bit." },
+      { vi: "dp[i>>1] đã tính trước → O(1) mỗi số.", en: "dp[i>>1] is already computed → O(1) per number." },
+    ],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi số tính từ số nhỏ hơn.", en: "Each number derived from a smaller one." } },
+    code: ["class Solution:", "    def countBits(self, n):", "        dp = [0]*(n+1)", "        for i in range(1, n+1):", "            dp[i] = dp[i >> 1] + (i & 1)", "        return dp"],
+    builder: buildSteps338,
+  },
   1216: {
     id: 1216,
     difficulty: "hard",
@@ -13510,7 +13615,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
