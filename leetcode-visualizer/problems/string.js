@@ -6899,6 +6899,186 @@ function buildSteps3517(input) {
   return { original: s, answer, steps };
 }
 
+/**
+ * Approach 2 for LeetCode 3517: because s is already a palindrome, its first
+ * half contains exactly one character from every mirrored pair.
+ */
+function buildSteps3517HalfBucket(input) {
+  const s = String(input || "");
+  const source = [...s];
+  const n = source.length;
+  const partition = Math.floor(n / 2);
+  const bucket = new Array(26).fill(0);
+  const steps = [];
+  let left = "";
+  let mid = "";
+  let right = "";
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    vars = [],
+    scanIndex = -1,
+    activeBucket = -1,
+    placements = [],
+    formula = "",
+    showBucket = true,
+    final = false,
+  }) {
+    const preview = new Array(n).fill(null);
+    for (let i = 0; i < left.length; i++) preview[i] = left[i];
+    if (mid) preview[partition] = mid;
+    const rightStart = partition + (n % 2);
+    for (let i = 0; i < right.length; i++) preview[rightStart + i] = right[i];
+
+    steps.push({
+      title,
+      arr: [],
+      palindromeBuildView: {
+        source: [...source],
+        counts: [],
+        bucket: showBucket ? [...bucket] : [],
+        partition,
+        scanIndex,
+        activeBucket,
+        left: [...left],
+        middle: mid,
+        right,
+        halfLength: partition,
+        preview,
+        placements,
+        formula,
+        final,
+        bucketApproach: true,
+      },
+      codeBlock: 2,
+      codeLines,
+      vars,
+      note,
+      final,
+    });
+  }
+
+  snapshot({
+    title: { vi: `partition = len(s) // 2 = ${partition}`, en: `partition = len(s) // 2 = ${partition}` },
+    note: { vi: `Chỉ cần đếm s[0..${Math.max(0, partition - 1)}] vì s đã là palindrome: nửa đầu chứa đúng một ký tự của mỗi cặp đối xứng.`, en: `Only s[0..${Math.max(0, partition - 1)}] must be counted because s is already palindromic: the first half contains one character from each mirrored pair.` },
+    codeLines: [3],
+    vars: [{ name: "len(s)", value: n }, { name: "partition", value: partition }],
+    formula: `${n} // 2 = ${partition}`,
+    showBucket: false,
+  });
+
+  snapshot({
+    title: { vi: "Khởi tạo bucket gồm 26 số 0", en: "Initialize a bucket of 26 zeros" },
+    note: { vi: "Mỗi index 0..25 tương ứng với ký tự a..z.", en: "Each index 0..25 corresponds to a character a..z." },
+    codeLines: [4],
+    vars: [{ name: "bucket", value: `[${bucket.join(",")}]` }],
+    formula: "bucket[0..25] = 0",
+  });
+
+  for (let i = 0; i < partition; i++) {
+    const ch = source[i];
+    const bucketIndex = ch.charCodeAt(0) - 97;
+    snapshot({
+      title: { vi: `Vòng lặp: i = ${i}`, en: `Loop: i = ${i}` },
+      note: { vi: `i=${i} còn nằm trong range(${partition}), đọc s[${i}] = '${ch}'.`, en: `i=${i} is still in range(${partition}); read s[${i}] = '${ch}'.` },
+      codeLines: [6],
+      vars: [{ name: "i", value: i }, { name: "s[i]", value: `'${ch}'` }],
+      scanIndex: i,
+      activeBucket: bucketIndex,
+      formula: `ord('${ch}') - 97 = ${bucketIndex}`,
+    });
+
+    bucket[bucketIndex] += 1;
+    snapshot({
+      title: { vi: `bucket[${bucketIndex}] += 1`, en: `bucket[${bucketIndex}] += 1` },
+      note: { vi: `Đã đếm thêm một '${ch}': bucket[${bucketIndex}] = ${bucket[bucketIndex]}.`, en: `Count one more '${ch}': bucket[${bucketIndex}] = ${bucket[bucketIndex]}.` },
+      codeLines: [7],
+      vars: [{ name: "i", value: i }, { name: "bucket index", value: bucketIndex }, { name: `bucket[${bucketIndex}]`, value: bucket[bucketIndex] }],
+      scanIndex: i,
+      activeBucket: bucketIndex,
+      formula: `bucket[ord('${ch}') - 97] = ${bucket[bucketIndex]}`,
+    });
+  }
+
+  snapshot({
+    title: { vi: `Kết thúc vòng lặp tại i = ${partition}`, en: `Finish the loop at i = ${partition}` },
+    note: { vi: `Đã duyệt đủ ${partition} ký tự của nửa đầu.`, en: `All ${partition} characters in the first half have been counted.` },
+    codeLines: [6],
+    vars: [{ name: "i", value: partition }, { name: "condition", value: "False" }],
+    formula: `${partition} ∉ range(${partition})`,
+  });
+
+  snapshot({
+    title: { vi: "Bắt đầu tạo left", en: "Start building left" },
+    note: { vi: "left chưa được gán; Python bắt đầu đánh giá biểu thức join.", en: "left is not assigned yet; Python starts evaluating the join expression." },
+    codeLines: [9],
+    vars: [{ name: "left", value: "unassigned" }],
+    formula: 'left = "".join(...)',
+  });
+
+  const pieces = [];
+  for (let index = 0; index < 26; index++) {
+    if (bucket[index] <= 0) continue;
+    const ch = String.fromCharCode(index + 97);
+    const piece = ch.repeat(bucket[index]);
+    pieces.push(piece);
+    snapshot({
+      title: { vi: `Comprehension lấy '${piece}' từ bucket[${index}]`, en: `Comprehension takes '${piece}' from bucket[${index}]` },
+      note: { vi: `bucket[${index}] > 0 nên tạo chr(${index} + 97) × ${bucket[index]} = '${piece}'. left vẫn chưa được gán cho đến khi join hoàn tất.`, en: `bucket[${index}] > 0, so create chr(${index} + 97) × ${bucket[index]} = '${piece}'. left remains unassigned until join finishes.` },
+      codeLines: [10],
+      vars: [{ name: "bucket index", value: index }, { name: "character", value: `'${ch}'` }, { name: "piece", value: `'${piece}'` }],
+      activeBucket: index,
+      formula: `chr(${index} + 97) × ${bucket[index]} = '${piece}'`,
+    });
+  }
+
+  left = pieces.join("");
+  snapshot({
+    title: { vi: `Hoàn tất join: left = "${left}"`, en: `Finish join: left = "${left}"` },
+    note: { vi: "Các bucket được đọc từ a đến z, nên left tự động tăng dần.", en: "Buckets are read from a to z, so left is automatically sorted." },
+    codeLines: [11],
+    vars: [{ name: "left", value: `"${left}"` }],
+    placements: [...left].map((_, i) => i),
+    formula: `"".join([${pieces.map((piece) => `'${piece}'`).join(", ")}]) = "${left}"`,
+  });
+
+  mid = n % 2 !== 0 ? source[partition] : "";
+  snapshot({
+    title: { vi: `mid = ${mid ? `'${mid}'` : "''"}`, en: `mid = ${mid ? `'${mid}'` : "''"}` },
+    note: { vi: n % 2 ? `Độ dài lẻ nên lấy s[partition] = s[${partition}] = '${mid}'.` : "Độ dài chẵn nên mid là chuỗi rỗng.", en: n % 2 ? `The length is odd, so take s[partition] = s[${partition}] = '${mid}'.` : "The length is even, so mid is empty." },
+    codeLines: [13],
+    vars: [{ name: "len(s) % 2", value: n % 2 }, { name: "mid", value: `"${mid}"` }],
+    placements: mid ? [partition] : [],
+    formula: n % 2 ? `s[${partition}] = '${mid}'` : 'mid = ""',
+  });
+
+  right = [...left].reverse().join("");
+  const rightStart = partition + (n % 2);
+  snapshot({
+    title: { vi: `right = left[::-1] = "${right}"`, en: `right = left[::-1] = "${right}"` },
+    note: { vi: "Đảo nửa trái để tạo đúng các vị trí đối xứng của palindrome.", en: "Reverse the left half to create the mirrored positions of the palindrome." },
+    codeLines: [14],
+    vars: [{ name: "left", value: `"${left}"` }, { name: "right", value: `"${right}"` }],
+    placements: [...right].map((_, i) => rightStart + i),
+    formula: `"${left}"[::-1] = "${right}"`,
+  });
+
+  const answer = left + mid + right;
+  snapshot({
+    title: { vi: `Trả về "${answer}"`, en: `Return "${answer}"` },
+    note: { vi: "Ghép left + mid + right để nhận palindrome nhỏ nhất theo thứ tự từ điển.", en: "Concatenate left + mid + right to get the lexicographically smallest palindrome." },
+    codeLines: [16],
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    placements: source.map((_, i) => i),
+    formula: `${left} + ${mid || "∅"} + ${right} = ${answer}`,
+    final: true,
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
   1081: {
     id: 1081,
@@ -7990,11 +8170,22 @@ module.exports = {
     defaultInput: "babab",
     inputKind: "string",
     inputLabel: { vi: "s (chuỗi palindrome)", en: "s (palindromic string)" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        default: "1",
+        label: { vi: "Cách giải", en: "Approach" },
+        options: [
+          { value: "1", label: { vi: "Cách 1: Counter toàn chuỗi", en: "Approach 1: Counter over the full string" } },
+          { value: "2", label: { vi: "Cách 2: Nửa đầu + bucket[26]", en: "Approach 2: First half + bucket[26]" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Đếm tần suất từng ký tự bằng Counter.", en: "Count every character with Counter." },
-      { vi: "Duyệt ký tự theo alphabet; đưa count[ch] // 2 bản sao vào nửa trái.", en: "Process characters alphabetically and put count[ch] // 2 copies into the left half." },
-      { vi: "Nếu có ký tự dư, đặt nó ở giữa; nửa phải là reverse của nửa trái.", en: "Put the odd leftover character in the center; the right half is the reverse of the left half." },
+      { vi: "Cách 1 đếm toàn bộ chuỗi bằng Counter rồi lấy một nửa số lượng của mỗi ký tự.", en: "Approach 1 counts the full string with Counter, then takes half of every character count." },
+      { vi: "Cách 2 tận dụng s đã là palindrome: nửa đầu chứa đúng một ký tự của mỗi cặp đối xứng, nên chỉ cần đếm s[:n//2] vào bucket[26].", en: "Approach 2 uses the fact that s is already palindromic: its first half contains one character from every mirrored pair, so only s[:n//2] is counted into bucket[26]." },
+      { vi: "Cả hai cách tạo left theo alphabet, chọn mid nếu độ dài lẻ, rồi đặt right = left[::-1].", en: "Both approaches build left alphabetically, select mid for odd length, then set right = left[::-1]." },
     ],
     complexity: {
       time: "O(n + k log k)",
@@ -8019,7 +8210,29 @@ module.exports = {
       "        half = ''.join(left)",
       "        return half + middle + half[::-1]",
     ],
-    builder: buildSteps3517,
+    code2: [
+      "class Solution:",
+      "    def smallestPalindrome(self, s: str) -> str:",
+      "        partition = len(s) // 2",
+      "        bucket = [0] * 26",
+      "",
+      "        for i in range(partition):",
+      "            bucket[ord(s[i]) - 97] += 1",
+      "",
+      "        left = \"\".join(",
+      "            [chr(i + 97) * bucket[i] for i in range(26) if bucket[i] > 0]",
+      "        )",
+      "",
+      "        mid = s[partition] if len(s) % 2 != 0 else \"\"",
+      "        right = left[::-1]",
+      "",
+      "        return left + mid + right",
+    ],
+    codeLabel: { vi: "Cách 1: Counter toàn chuỗi", en: "Approach 1: Full-string Counter" },
+    code2Label: { vi: "Cách 2: Nửa đầu + bucket[26]", en: "Approach 2: First half + bucket[26]" },
+    builder: (input, params) => Number(params && params.approach) === 2
+      ? buildSteps3517HalfBucket(input)
+      : buildSteps3517(input),
   },
   3499: {
     id: 3499,

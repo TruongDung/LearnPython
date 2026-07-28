@@ -2926,13 +2926,18 @@ function renderPalindromeBuildView(step) {
   const source = Array.isArray(view.source) ? view.source : [];
   const counts = Array.isArray(view.counts) ? view.counts : [];
   const preview = Array.isArray(view.preview) ? view.preview : [];
+  const bucket = Array.isArray(view.bucket) ? view.bucket : [];
   const placements = new Set(Array.isArray(view.placements) ? view.placements : []);
   const processed = new Set(Array.isArray(view.processed) ? view.processed : []);
   const activeChar = view.activeChar;
+  const scanIndex = Number.isInteger(view.scanIndex) ? view.scanIndex : -1;
+  const activeBucket = Number.isInteger(view.activeBucket) ? view.activeBucket : -1;
+  const partition = Number.isInteger(view.partition) ? view.partition : Math.floor(source.length / 2);
   const halfLength = Number.isInteger(view.halfLength) ? view.halfLength : Math.floor(source.length / 2);
   const vi = lang === "vi";
 
-  const sourceHtml = source.map((ch, index) => `<div class="sp-source-cell${ch === activeChar ? " active" : ""}">
+  const sourceHtml = source.map((ch, index) => `<div class="sp-source-cell${ch === activeChar || index === scanIndex ? " active" : ""}${view.bucketApproach && index < partition ? " first-half" : ""}${view.bucketApproach && source.length % 2 && index === partition ? " source-center" : ""}">
+    ${index === scanIndex ? '<b class="sp-source-pointer">i</b>' : ""}
     <span>[${index}]</span><strong>${escapeHtml(ch)}</strong>
   </div>`).join("");
 
@@ -2940,6 +2945,10 @@ function renderPalindromeBuildView(step) {
     <strong>${escapeHtml(item.ch)}</strong>
     <span>${vi ? "đếm" : "count"} ${item.count}</span>
     <small>${item.pairs} ${vi ? "cặp" : item.pairs === 1 ? "pair" : "pairs"}${item.odd ? ` + 1 ${vi ? "dư" : "odd"}` : ""}</small>
+  </div>`).join("");
+
+  const bucketHtml = bucket.map((value, index) => `<div class="sp-bucket${index === activeBucket ? " active" : ""}${value > 0 ? " filled" : ""}">
+    <span>${String.fromCharCode(index + 97)}</span><strong>${value}</strong><small>[${index}]</small>
   </div>`).join("");
 
   const previewHtml = preview.map((ch, index) => {
@@ -2952,6 +2961,7 @@ function renderPalindromeBuildView(step) {
 
   const leftText = Array.isArray(view.left) && view.left.length ? view.left.join("") : "∅";
   const middleText = view.middle || "∅";
+  const rightText = view.right || "∅";
   const formula = view.formula ? `<div class="sp-formula">${escapeHtml(view.formula)}</div>` : "";
   const summary = vi
     ? `Xây palindrome nhỏ nhất từ ${source.length} ký tự; nửa trái hiện là ${leftText}, ký tự giữa là ${middleText}.`
@@ -2960,7 +2970,8 @@ function renderPalindromeBuildView(step) {
   $("treeView").innerHTML = `<div class="smallest-palindrome-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="sp-row"><span class="sp-label">s</span><div class="sp-source">${sourceHtml}</div></div>
     ${counts.length ? `<div class="sp-row"><span class="sp-label">count</span><div class="sp-counts">${countsHtml}</div></div>` : ""}
-    <div class="sp-state"><span>${vi ? "nửa trái" : "left half"}: <strong>${escapeHtml(leftText)}</strong></span><span>middle: <strong>${escapeHtml(middleText)}</strong></span></div>
+    ${bucket.length ? `<div class="sp-row sp-bucket-row"><span class="sp-label">bucket</span><div class="sp-bucket-grid">${bucketHtml}</div></div>` : ""}
+    <div class="sp-state"><span>${vi ? "nửa trái" : "left half"}: <strong>${escapeHtml(leftText)}</strong></span><span>middle: <strong>${escapeHtml(middleText)}</strong></span>${view.bucketApproach ? `<span>right: <strong>${escapeHtml(rightText)}</strong></span>` : ""}</div>
     ${formula}
     <div class="sp-half-guide"><span>${vi ? "NỬA TRÁI tăng dần" : "SORTED LEFT HALF"}</span><span>${source.length % 2 ? "CENTER" : ""}</span><span>${vi ? "NỬA PHẢI đối xứng" : "MIRRORED RIGHT HALF"}</span></div>
     <div class="sp-row"><span class="sp-label">${view.final ? (vi ? "kết quả" : "result") : (vi ? "bố cục" : "layout")}</span><div class="sp-result">${previewHtml}</div></div>
