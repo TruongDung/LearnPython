@@ -2683,42 +2683,78 @@ function buildSteps258(input) {
   return { original: start, answer: num, steps };
 }
 
-/** LeetCode 319: Bulb Switcher — simulate toggles; ON bulbs are perfect squares. */
+/** LeetCode 319: Bulb Switcher — divisor parity proof and O(1) solution. */
 function buildSteps319(input) {
-  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
-  const steps = [];
-  const bulbs = new Array(n + 1).fill(0); // index 0 unused (bulbs are 1-indexed)
-  const barArr = () => bulbs.slice(1);
-  const subLabels = Array.from({ length: n }, (_, i) => String(i + 1));
-  const onMarks = () => barArr().map((v, idx) => (v ? idx : -1)).filter((x) => x >= 0);
-  steps.push({
-    title: { vi: "Tất cả bóng đèn đều TẮT", en: "All bulbs start OFF" },
-    arr: barArr(), sub: subLabels, highlight: [], mark: [], codeLines: [2, 3],
-    vars: [{ name: "n", value: n }],
-    note: { vi: `${n} bóng đèn, ban đầu đều TẮT (0). Ở vòng i ta bật/tắt mọi bóng là bội của i.`, en: `${n} bulbs, all OFF (0). In round i we toggle every bulb that is a multiple of i.` },
-  });
-  for (let i = 1; i <= n; i++) {
-    const toggled = [];
-    for (let j = i; j <= n; j += i) {
-      bulbs[j] ^= 1;
-      toggled.push(j - 1);
+  const raw = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const n = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
+  const answer = Math.floor(Math.sqrt(n));
+  const bulbs = new Array(n).fill(0);
+  const labels = Array.from({ length: n }, (_, index) => String(index + 1));
+  const squareIndexes = [];
+  const steps = [{
+    title: { vi: "Mỗi bóng bắt đầu ở trạng thái TẮT", en: "Every bulb starts OFF" },
+    arr: [...bulbs], sub: labels, highlight: [], mark: [], codeLines: [4],
+    vars: [{ name: "n", value: n }, { name: "trạng thái ban đầu", value: "OFF" }],
+    note: {
+      vi: `Bóng số x bị đảo ở vòng d khi d là một ước của x. Vì vậy số lần bóng x bị đảo chính là số lượng ước của x.`,
+      en: `Bulb x is toggled in round d exactly when d divides x. Therefore its toggle count equals its number of divisors.`,
+    },
+  }];
+
+  for (let bulb = 1; bulb <= n; bulb++) {
+    const divisors = [];
+    for (let divisor = 1; divisor <= bulb; divisor++) {
+      if (bulb % divisor === 0) divisors.push(divisor);
+    }
+    const isSquare = Number.isInteger(Math.sqrt(bulb));
+    if (isSquare) {
+      bulbs[bulb - 1] = 1;
+      squareIndexes.push(bulb - 1);
+    }
+    const pairText = [];
+    for (let left = 0, right = divisors.length - 1; left <= right; left++, right--) {
+      pairText.push(left === right ? `${divisors[left]}×${divisors[right]}` : `(${divisors[left]}, ${divisors[right]})`);
     }
     steps.push({
-      title: { vi: `Vòng i=${i}: đảo các bội của ${i}`, en: `Round i=${i}: toggle multiples of ${i}` },
-      arr: barArr(), sub: subLabels, highlight: toggled, mark: onMarks(), codeLines: [4, 5, 6],
-      vars: [{ name: "i", value: i }, { name: "đảo (toggled)", value: toggled.map((x) => x + 1).join(", ") }, { name: "đang BẬT", value: barArr().reduce((a, b) => a + b, 0) }],
-      note: { vi: `Đảo trạng thái các bóng ${toggled.map((x) => x + 1).join(", ")}. Các bóng đang BẬT được tô đậm.`, en: `Toggle bulbs ${toggled.map((x) => x + 1).join(", ")}. Bulbs currently ON are marked.` },
+      title: {
+        vi: `Bóng ${bulb}: ${divisors.length} lần đảo → ${isSquare ? "BẬT" : "TẮT"}`,
+        en: `Bulb ${bulb}: ${divisors.length} toggles → ${isSquare ? "ON" : "OFF"}`,
+      },
+      arr: [...bulbs], sub: labels, highlight: [bulb - 1], mark: [...squareIndexes], codeLines: [5],
+      vars: [
+        { name: "bulb", value: bulb },
+        { name: "divisors", value: `[${divisors.join(", ")}]` },
+        { name: "toggle_count", value: divisors.length },
+        { name: "perfect_square", value: isSquare },
+      ],
+      note: isSquare ? {
+        vi: `Các ước ghép thành ${pairText.join(", ")}. Riêng √${bulb} ghép với chính nó nên tổng số ước là LẺ; bóng còn BẬT.`,
+        en: `The divisors pair as ${pairText.join(", ")}. Since √${bulb} pairs with itself, the divisor count is ODD and the bulb stays ON.`,
+      } : {
+        vi: `Các ước ghép thành từng cặp ${pairText.join(", ")}; tổng số ước là CHẴN nên bóng trở lại TẮT.`,
+        en: `The divisors form pairs ${pairText.join(", ")}; the count is EVEN, so the bulb returns to OFF.`,
+      },
     });
   }
-  const on = barArr().reduce((a, b) => a + b, 0);
-  const onList = barArr().map((v, idx) => (v ? idx + 1 : null)).filter((x) => x !== null);
+
+  const onBulbs = squareIndexes.map((index) => index + 1);
   steps.push({
-    title: { vi: `Kết quả: ${on} bóng còn sáng`, en: `Result: ${on} bulbs ON` },
-    arr: barArr(), sub: subLabels, highlight: [], mark: onMarks(), final: true, codeLines: [7],
-    vars: [{ name: "answer", value: on }, { name: "bóng BẬT", value: onList.join(", ") }, { name: "⌊√n⌋", value: Math.floor(Math.sqrt(n)) }],
-    note: { vi: `Còn ${on} bóng sáng: [${onList.join(", ")}] — đúng là các số chính phương ≤ ${n} (chỉ số chính phương mới có số ước LẺ nên bị đảo số lẻ lần). Vì vậy đáp án nhanh = ⌊√${n}⌋ = ${Math.floor(Math.sqrt(n))}.`, en: `${on} bulbs stay ON: [${onList.join(", ")}] — exactly the perfect squares ≤ ${n} (only squares have an ODD divisor count, so they are toggled an odd number of times). Hence the O(1) answer = ⌊√${n}⌋ = ${Math.floor(Math.sqrt(n))}.` },
+    title: { vi: `⌊√${n}⌋ = ${answer}`, en: `⌊√${n}⌋ = ${answer}` },
+    arr: [...bulbs], sub: labels, highlight: [...squareIndexes], mark: [...squareIndexes], final: true, codeLines: [5],
+    vars: [
+      { name: "n", value: n },
+      { name: "bóng còn BẬT", value: `[${onBulbs.join(", ")}]` },
+      { name: "answer", value: answer },
+    ],
+    note: answer === 0 ? {
+      vi: "Không có bóng nào nên đáp án là 0.",
+      en: "There are no bulbs, so the answer is 0.",
+    } : {
+      vi: `Các bóng còn sáng là 1², 2², ..., ${answer}². Có đúng ${answer} số chính phương không vượt quá ${n}, nên trả về isqrt(${n}) = ${answer}.`,
+      en: `The bulbs left ON are 1², 2², ..., ${answer}². Exactly ${answer} perfect squares do not exceed ${n}, so return isqrt(${n}) = ${answer}.`,
+    },
   });
-  return { original: n, answer: on, steps };
+  return { original: n, answer, steps };
 }
 
 module.exports = {
@@ -2754,21 +2790,19 @@ module.exports = {
     title: { vi: "Bulb Switcher", en: "Bulb Switcher" },
     titleVi: { vi: "Công tắc bóng đèn (số chính phương)", en: "Bulb switcher (perfect squares)" },
     statement: { vi: "n bóng đèn ban đầu tắt. Vòng i đảo mọi bóng là bội của i. Đếm số bóng còn sáng sau n vòng. Nhập n.", en: "n bulbs start off. In round i, toggle every bulb that is a multiple of i. Count bulbs ON after n rounds. Enter n." },
-    defaultInput: [6], inputKind: "positive", inputLabel: { vi: "n", en: "n" }, singleInput: true, maxInput: 20, extraParams: [],
+    defaultInput: [6], inputKind: "nonneg", inputLabel: { vi: "n (0 đến 20 để mô phỏng)", en: "n (0 to 20 for visualization)" }, singleInput: true, maxInput: 20, extraParams: [],
     approach: [
       { vi: "Bóng i bị đảo một lần cho mỗi ước của i.", en: "Bulb i is toggled once per divisor of i." },
       { vi: "Chỉ số chính phương có số ước LẺ → còn sáng.", en: "Only perfect squares have an ODD divisor count → stay ON." },
       { vi: "Số bóng sáng = số chính phương ≤ n = ⌊√n⌋ (đáp án O(1)).", en: "Bulbs ON = perfect squares ≤ n = ⌊√n⌋ (the O(1) answer)." },
     ],
-    complexity: { time: "O(n log n) khi mô phỏng / O(1) công thức", space: "O(n) / O(1)", note: { vi: "Mô phỏng để thấy trực giác; công thức là ⌊√n⌋.", en: "Simulated for intuition; the formula is ⌊√n⌋." } },
+    complexity: { time: "O(1)", space: "O(1)", note: { vi: "Lời giải chỉ tính căn bậc hai; visualization liệt kê ước để chứng minh công thức.", en: "The solution only computes a square root; the visualization lists divisors to prove the formula." } },
     code: [
+      "import math",
+      "",
       "class Solution:",
-      "    def bulbSwitch(self, n):",
-      "        bulbs = [False] * (n + 1)   # 1-indexed",
-      "        for i in range(1, n + 1):",
-      "            for j in range(i, n + 1, i):",
-      "                bulbs[j] = not bulbs[j]",
-      "        return sum(bulbs)",
+      "    def bulbSwitch(self, n: int) -> int:",
+      "        return math.isqrt(n)",
     ],
     builder: buildSteps319,
   },
