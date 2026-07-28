@@ -2000,7 +2000,248 @@ function buildSteps41(input) {
   return { original: nums, answer, steps };
 }
 
+/**
+ * LeetCode 31: Next Permutation — find pivot, swap, reverse suffix.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def nextPermutation(self, nums):
+ *  3          i = n - 2
+ *  4          while i >= 0 and nums[i] >= nums[i+1]: i -= 1
+ *  5          if i >= 0:
+ *  6              j = n - 1
+ *  7              while nums[j] <= nums[i]: j -= 1
+ *  8              nums[i], nums[j] = nums[j], nums[i]
+ *  9          reverse(nums[i+1:])
+ */
+function buildSteps31(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = nums.length;
+  const steps = [];
+
+  steps.push({
+    title: { vi: "Tìm pivot từ phải sang", en: "Find the pivot from the right" },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
+    note: {
+      vi:
+        "Hoán vị kế tiếp: tìm i lớn nhất mà nums[i] < nums[i+1] (điểm 'giảm' đầu tiên từ phải).\n" +
+        "Nếu không có → mảng đang giảm dần → hoán vị lớn nhất → đảo ngược thành nhỏ nhất.",
+      en:
+        "Next permutation: find the largest i with nums[i] < nums[i+1] (first 'ascent' from the right).\n" +
+        "If none → array is descending → the largest permutation → reverse to the smallest.",
+    },
+  });
+
+  let i = n - 2;
+  while (i >= 0 && nums[i] >= nums[i + 1]) i--;
+
+  steps.push({
+    title: { vi: i >= 0 ? `Pivot tại i=${i} (nums[i]=${nums[i]})` : "Không có pivot (mảng giảm dần)", en: i >= 0 ? `Pivot at i=${i} (nums[i]=${nums[i]})` : "No pivot (descending array)" },
+    arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+    highlight: i >= 0 ? [i, i + 1] : [], mark: i >= 0 ? [i] : [],
+    codeLines: [4, 5],
+    vars: [{ name: "i", value: i }],
+    note: {
+      vi: i >= 0
+        ? `Tìm thấy pivot: nums[${i}]=${nums[i]} < nums[${i + 1}]=${nums[i + 1]}. Phần sau i đang giảm dần.`
+        : `Không tìm thấy pivot → mảng đã là hoán vị lớn nhất. Đảo ngược toàn bộ.`,
+      en: i >= 0
+        ? `Pivot found: nums[${i}]=${nums[i]} < nums[${i + 1}]=${nums[i + 1]}. The suffix after i is descending.`
+        : `No pivot found → the array is the largest permutation. Reverse everything.`,
+    },
+  });
+
+  if (i >= 0) {
+    let j = n - 1;
+    while (nums[j] <= nums[i]) j--;
+    steps.push({
+      title: { vi: `Tìm j=${j}: nums[j]=${nums[j]} là số nhỏ nhất > nums[i]`, en: `Find j=${j}: nums[j]=${nums[j]} is the smallest > nums[i]` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i, j], mark: [j],
+      codeLines: [6, 7],
+      vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "nums[j]", value: nums[j] }],
+      note: { vi: `Từ phải, tìm số đầu tiên > nums[${i}]=${nums[i]} → nums[${j}]=${nums[j]}.`, en: `From the right, find the first value > nums[${i}]=${nums[i]} → nums[${j}]=${nums[j]}.` },
+    });
+    [nums[i], nums[j]] = [nums[j], nums[i]];
+    steps.push({
+      title: { vi: `Swap nums[${i}] ↔ nums[${j}]`, en: `Swap nums[${i}] ↔ nums[${j}]` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i, j], mark: [i],
+      codeLines: [8],
+      vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
+      note: { vi: `Đổi chỗ để tăng vị trí i lên giá trị nhỏ nhất có thể lớn hơn.`, en: `Swap so position i increases to the smallest possible larger value.` },
+    });
+  }
+
+  // reverse suffix
+  let left = i + 1, right = n - 1;
+  const suffix = [...Array(Math.max(0, n - (i + 1)))].map((_, k) => i + 1 + k);
+  while (left < right) { [nums[left], nums[right]] = [nums[right], nums[left]]; left++; right--; }
+
+  steps.push({
+    title: { vi: `Đảo ngược phần sau i (từ ${i + 1})`, en: `Reverse the suffix after i (from ${i + 1})` },
+    arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+    highlight: suffix, mark: suffix,
+    final: true,
+    codeLines: [9],
+    vars: [{ name: "answer", value: `[${nums.join(", ")}]` }],
+    note: {
+      vi: `Đảo ngược đoạn sau i để nó tăng dần (nhỏ nhất). Kết quả: [${nums.join(", ")}].`,
+      en: `Reverse the suffix so it becomes ascending (smallest). Result: [${nums.join(", ")}].`,
+    },
+  });
+
+  return { original: input, answer: nums, steps };
+}
+
+/**
+ * LeetCode 56: Merge Intervals — sort by start, merge overlaps.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def merge(self, intervals):
+ *  3          intervals.sort(key=lambda x: x[0])
+ *  4          merged = []
+ *  5          for start, end in intervals:
+ *  6              if not merged or start > merged[-1][1]: merged.append([start, end])
+ *  7              else: merged[-1][1] = max(merged[-1][1], end)
+ *  8          return merged
+ */
+function buildSteps56(input, params) {
+  // intervals: "1-3,2-6,8-10,15-18"
+  const raw = params && params.intervals !== undefined ? String(params.intervals) : String(input);
+  const intervals = raw.split(",").map((p) => p.trim()).filter(Boolean).map((p) => p.split("-").map((x) => Number(x.trim())));
+  intervals.sort((a, b) => a[0] - b[0]);
+  const steps = [];
+  const merged = [];
+
+  const fmt = (arr) => `[${arr.map(([s, e]) => `[${s},${e}]`).join(", ")}]`;
+
+  steps.push({
+    title: { vi: "Sắp xếp theo điểm bắt đầu", en: "Sort by start" },
+    arr: [], highlight: [], mark: [],
+    codeLines: [3, 4],
+    vars: [{ name: "intervals (sorted)", value: fmt(intervals) }, { name: "merged", value: "[]" }],
+    note: {
+      vi: "Sắp các đoạn theo điểm bắt đầu tăng dần. Duyệt và gộp nếu chồng lấn với đoạn cuối trong merged.",
+      en: "Sort intervals by start ascending. Scan and merge if overlapping the last interval in merged.",
+    },
+  });
+
+  for (const [start, end] of intervals) {
+    if (!merged.length || start > merged[merged.length - 1][1]) {
+      merged.push([start, end]);
+      steps.push({
+        title: { vi: `[${start},${end}] không chồng → thêm mới`, en: `[${start},${end}] no overlap → append` },
+        arr: [], highlight: [], mark: [],
+        codeLines: [5, 6],
+        vars: [{ name: "current", value: `[${start},${end}]` }, { name: "merged", value: fmt(merged) }],
+        note: {
+          vi: merged.length === 1
+            ? `Đoạn đầu tiên → thêm [${start},${end}] vào merged.`
+            : `start=${start} > end đoạn cuối=${merged[merged.length - 2] ? merged[merged.length - 2][1] : ""} → không chồng lấn → thêm đoạn mới.`,
+          en: merged.length === 1
+            ? `First interval → append [${start},${end}] to merged.`
+            : `start=${start} > previous end → no overlap → append a new interval.`,
+        },
+      });
+    } else {
+      const old = merged[merged.length - 1][1];
+      merged[merged.length - 1][1] = Math.max(old, end);
+      steps.push({
+        title: { vi: `[${start},${end}] chồng → mở rộng end → ${merged[merged.length - 1][1]}`, en: `[${start},${end}] overlaps → extend end → ${merged[merged.length - 1][1]}` },
+        arr: [], highlight: [], mark: [],
+        codeLines: [5, 7],
+        vars: [{ name: "current", value: `[${start},${end}]` }, { name: "merged", value: fmt(merged) }],
+        note: {
+          vi: `start=${start} ≤ end đoạn cuối=${old} → chồng lấn → mở rộng end = max(${old}, ${end}) = ${merged[merged.length - 1][1]}.`,
+          en: `start=${start} ≤ last end=${old} → overlap → extend end = max(${old}, ${end}) = ${merged[merged.length - 1][1]}.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${fmt(merged)}`, en: `Result: ${fmt(merged)}` },
+    arr: [], highlight: [], mark: [], final: true,
+    codeLines: [8],
+    vars: [{ name: "answer", value: fmt(merged) }],
+    note: { vi: `Các đoạn sau khi gộp: ${fmt(merged)}.`, en: `Intervals after merging: ${fmt(merged)}.` },
+  });
+
+  return { original: intervals, answer: merged, steps };
+}
+
 module.exports = {
+  31: {
+    id: 31,
+    difficulty: "medium",
+    slug: "next-permutation",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Next Permutation", en: "Next Permutation" },
+    titleVi: { vi: "Hoán vị kế tiếp (pivot + swap + reverse)", en: "Next permutation (pivot + swap + reverse)" },
+    statement: {
+      vi: "Cho mảng số. Biến nó thành hoán vị KẾ TIẾP theo thứ tự từ điển (tại chỗ). Nếu là lớn nhất → về nhỏ nhất. Nhập cách nhau dấu phẩy.",
+      en: "Given an array, rearrange it into the NEXT lexicographic permutation (in place). If it's the largest → wrap to the smallest. Enter comma-separated.",
+    },
+    defaultInput: [1, 2, 3],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Tìm i lớn nhất với nums[i] < nums[i+1] (pivot).", en: "Find the largest i with nums[i] < nums[i+1] (pivot)." },
+      { vi: "Nếu có pivot: tìm j từ phải với nums[j] > nums[i], swap i↔j.", en: "If a pivot exists: find j from the right with nums[j] > nums[i], swap i↔j." },
+      { vi: "Đảo ngược đoạn sau i để nó nhỏ nhất.", en: "Reverse the suffix after i to make it smallest." },
+      { vi: "Nếu không có pivot → đảo ngược toàn bộ (về hoán vị nhỏ nhất).", en: "If no pivot → reverse the whole array (to the smallest permutation)." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Vài lượt tuyến tính, tại chỗ.", en: "A few linear passes, in place." } },
+    code: [
+      "class Solution:",
+      "    def nextPermutation(self, nums):",
+      "        i = len(nums) - 2",
+      "        while i >= 0 and nums[i] >= nums[i+1]: i -= 1",
+      "        if i >= 0:",
+      "            j = len(nums) - 1",
+      "            while nums[j] <= nums[i]: j -= 1",
+      "            nums[i], nums[j] = nums[j], nums[i]",
+      "        nums[i+1:] = reversed(nums[i+1:])",
+    ],
+    builder: buildSteps31,
+  },
+  56: {
+    id: 56,
+    difficulty: "medium",
+    slug: "merge-intervals",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Merge Intervals", en: "Merge Intervals" },
+    titleVi: { vi: "Gộp đoạn chồng lấn (sort + merge)", en: "Merge overlapping intervals (sort + merge)" },
+    statement: {
+      vi: "Cho danh sách đoạn [start,end]. Gộp mọi đoạn chồng lấn. Nhập các đoạn dạng start-end, cách nhau dấu phẩy.",
+      en: "Given intervals [start,end], merge all overlapping ones. Enter intervals as start-end separated by commas.",
+    },
+    defaultInput: "1-3,2-6,8-10,15-18",
+    inputKind: "string",
+    inputLabel: { vi: "Đoạn (start-end, cách bởi ,)", en: "Intervals (start-end, comma separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Sắp các đoạn theo điểm bắt đầu.", en: "Sort intervals by start." },
+      { vi: "Duyệt: nếu start > end của đoạn cuối trong merged → thêm đoạn mới.", en: "Scan: if start > last merged end → append a new interval." },
+      { vi: "Ngược lại (chồng lấn) → mở rộng end = max(end cũ, end mới).", en: "Otherwise (overlap) → extend end = max(old end, new end)." },
+    ],
+    complexity: { time: "O(n log n)", space: "O(n)", note: { vi: "Chi phí chính là sắp xếp.", en: "Dominated by the sort." } },
+    code: [
+      "class Solution:",
+      "    def merge(self, intervals):",
+      "        intervals.sort(key=lambda x: x[0])",
+      "        merged = []",
+      "        for start, end in intervals:",
+      "            if not merged or start > merged[-1][1]: merged.append([start, end])",
+      "            else: merged[-1][1] = max(merged[-1][1], end)",
+      "        return merged",
+    ],
+    builder: buildSteps56,
+  },
   41: {
     id: 41,
     difficulty: "hard",

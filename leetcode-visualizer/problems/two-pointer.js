@@ -3007,7 +3007,399 @@ function buildSteps475(inputHouses, params) {
   return { original: { houses, heaters: heatersSorted }, answer: res, steps };
 }
 
+/**
+ * LeetCode 15: 3Sum — sort then two pointers per anchor.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def threeSum(self, nums):
+ *  3          nums.sort(); res = []
+ *  4          for i in range(n-2):
+ *  5              if i>0 and nums[i]==nums[i-1]: continue
+ *  6              left, right = i+1, n-1
+ *  7              while left < right:
+ *  8                  total = nums[i]+nums[left]+nums[right]
+ *  9                  if total < 0: left += 1
+ * 10                  elif total > 0: right -= 1
+ * 11                  else: res.append(...); move both + skip dups
+ * 12          return res
+ */
+function buildSteps15(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  nums.sort((a, b) => a - b);
+  const n = nums.length;
+  const steps = [];
+  const res = [];
+
+  steps.push({
+    title: { vi: "Sắp xếp mảng", en: "Sort the array" },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "nums (sorted)", value: `[${nums.join(", ")}]` }],
+    note: {
+      vi: "Sắp xếp tăng dần để dùng hai con trỏ. Cố định nums[i] rồi tìm cặp (left,right) sao cho tổng = 0.",
+      en: "Sort ascending to use two pointers. Fix nums[i], then find a pair (left,right) with total = 0.",
+    },
+  });
+
+  for (let i = 0; i < n - 2; i++) {
+    if (i > 0 && nums[i] === nums[i - 1]) {
+      steps.push({
+        title: { vi: `i=${i}: nums[i]=${nums[i]} trùng nums[i-1] → bỏ`, en: `i=${i}: nums[i]=${nums[i]} same as nums[i-1] → skip` },
+        arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+        highlight: [i], mark: [],
+        codeLines: [4, 5],
+        vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }],
+        note: { vi: `Bỏ anchor trùng để tránh bộ ba lặp.`, en: `Skip a duplicate anchor to avoid repeated triplets.` },
+      });
+      continue;
+    }
+    let left = i + 1, right = n - 1;
+    steps.push({
+      title: { vi: `Anchor i=${i} (nums[i]=${nums[i]}); left=${left}, right=${right}`, en: `Anchor i=${i} (nums[i]=${nums[i]}); left=${left}, right=${right}` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+      highlight: [i, left, right], mark: [i],
+      codeLines: [4, 6],
+      vars: [{ name: "i", value: i }, { name: "left", value: left }, { name: "right", value: right }],
+      note: { vi: `Cố định nums[${i}]=${nums[i]}. Tìm cặp sao cho tổng ba số = 0.`, en: `Fix nums[${i}]=${nums[i]}. Find a pair summing to -nums[i].` },
+    });
+
+    while (left < right) {
+      const total = nums[i] + nums[left] + nums[right];
+      if (total < 0) {
+        steps.push({
+          title: { vi: `tổng=${total} < 0 → left++`, en: `total=${total} < 0 → left++` },
+          arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+          highlight: [i, left, right], mark: [i],
+          codeLines: [7, 8, 9],
+          vars: [{ name: "total", value: total }, { name: "left", value: left }, { name: "right", value: right }],
+          note: { vi: `${nums[i]}+${nums[left]}+${nums[right]}=${total} < 0 → cần lớn hơn → left tiến.`, en: `${nums[i]}+${nums[left]}+${nums[right]}=${total} < 0 → need larger → move left.` },
+        });
+        left++;
+      } else if (total > 0) {
+        steps.push({
+          title: { vi: `tổng=${total} > 0 → right--`, en: `total=${total} > 0 → right--` },
+          arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+          highlight: [i, left, right], mark: [i],
+          codeLines: [7, 8, 10],
+          vars: [{ name: "total", value: total }, { name: "left", value: left }, { name: "right", value: right }],
+          note: { vi: `${nums[i]}+${nums[left]}+${nums[right]}=${total} > 0 → cần nhỏ hơn → right lùi.`, en: `${nums[i]}+${nums[left]}+${nums[right]}=${total} > 0 → need smaller → move right.` },
+        });
+        right--;
+      } else {
+        res.push([nums[i], nums[left], nums[right]]);
+        steps.push({
+          title: { vi: `tổng=0 → [${nums[i]},${nums[left]},${nums[right]}] ✓`, en: `total=0 → [${nums[i]},${nums[left]},${nums[right]}] ✓` },
+          arr: [...nums], sub: nums.map((_, x) => `[${x}]`),
+          highlight: [i, left, right], mark: [i, left, right],
+          codeLines: [11],
+          vars: [{ name: "triplet", value: `[${nums[i]},${nums[left]},${nums[right]}]` }, { name: "res", value: JSON.stringify(res) }],
+          note: { vi: `Tìm thấy bộ ba tổng 0. Dời cả hai con trỏ và bỏ qua giá trị trùng.`, en: `Found a zero-sum triplet. Move both pointers and skip duplicates.` },
+        });
+        left++; right--;
+        while (left < right && nums[left] === nums[left - 1]) left++;
+        while (left < right && nums[right] === nums[right + 1]) right--;
+      }
+    }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${JSON.stringify(res)}`, en: `Result: ${JSON.stringify(res)}` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [], final: true,
+    codeLines: [12],
+    vars: [{ name: "answer", value: JSON.stringify(res) }],
+    note: { vi: `Tất cả bộ ba khác nhau có tổng 0: ${JSON.stringify(res)}.`, en: `All distinct zero-sum triplets: ${JSON.stringify(res)}.` },
+  });
+
+  return { original: nums, answer: res, steps };
+}
+
+/**
+ * LeetCode 75: Sort Colors — Dutch National Flag (low, mid, high).
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def sortColors(self, nums):
+ *  3          low, mid, high = 0, 0, len(nums)-1
+ *  4          while mid <= high:
+ *  5              if nums[mid] == 0: swap(low, mid); low++; mid++
+ *  6              elif nums[mid] == 1: mid++
+ *  7              else: swap(mid, high); high--
+ */
+function buildSteps75(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let low = 0, mid = 0, high = nums.length - 1;
+
+  const sub = () => nums.map((_, i) => {
+    if (i === low && i === mid && i === high) return "low/mid/high";
+    if (i === low && i === mid) return "low/mid";
+    if (i === mid && i === high) return "mid/high";
+    if (i === low) return "low";
+    if (i === mid) return "mid";
+    if (i === high) return "high";
+    return "";
+  });
+
+  steps.push({
+    title: { vi: "low=0, mid=0, high=n-1", en: "low=0, mid=0, high=n-1" },
+    arr: [...nums], sub: sub(),
+    highlight: [low, mid, high], mark: [],
+    codeLines: [3],
+    vars: [{ name: "low", value: low }, { name: "mid", value: mid }, { name: "high", value: high }],
+    note: {
+      vi:
+        "Dutch National Flag: 3 vùng — [0..low-1]=0, [low..mid-1]=1, [high+1..]=2.\n" +
+        "mid quét; 0 đẩy về trái (low), 2 đẩy về phải (high), 1 giữ nguyên.",
+      en:
+        "Dutch National Flag: 3 regions — [0..low-1]=0, [low..mid-1]=1, [high+1..]=2.\n" +
+        "mid scans; 0 goes left (low), 2 goes right (high), 1 stays.",
+    },
+  });
+
+  while (mid <= high) {
+    if (nums[mid] === 0) {
+      [nums[low], nums[mid]] = [nums[mid], nums[low]];
+      steps.push({
+        title: { vi: `nums[mid]=0 → swap(low=${low}, mid=${mid}); low++, mid++`, en: `nums[mid]=0 → swap(low=${low}, mid=${mid}); low++, mid++` },
+        arr: [...nums], sub: sub(),
+        highlight: [low, mid, high], mark: [low],
+        codeLines: [4, 5],
+        vars: [{ name: "low", value: low + 1 }, { name: "mid", value: mid + 1 }, { name: "high", value: high }],
+        note: { vi: `Gặp 0 → đổi về vùng 0 (low). Cả low và mid tiến.`, en: `Found 0 → move to the 0-region (low). Advance both low and mid.` },
+      });
+      low++; mid++;
+    } else if (nums[mid] === 1) {
+      steps.push({
+        title: { vi: `nums[mid]=1 → mid++`, en: `nums[mid]=1 → mid++` },
+        arr: [...nums], sub: sub(),
+        highlight: [low, mid, high], mark: [],
+        codeLines: [4, 6],
+        vars: [{ name: "low", value: low }, { name: "mid", value: mid + 1 }, { name: "high", value: high }],
+        note: { vi: `1 đã ở đúng vùng giữa → chỉ tiến mid.`, en: `1 is already in the middle region → just advance mid.` },
+      });
+      mid++;
+    } else {
+      [nums[mid], nums[high]] = [nums[high], nums[mid]];
+      steps.push({
+        title: { vi: `nums[mid]=2 → swap(mid=${mid}, high=${high}); high--`, en: `nums[mid]=2 → swap(mid=${mid}, high=${high}); high--` },
+        arr: [...nums], sub: sub(),
+        highlight: [low, mid, high], mark: [high],
+        codeLines: [4, 7],
+        vars: [{ name: "low", value: low }, { name: "mid", value: mid }, { name: "high", value: high - 1 }],
+        note: { vi: `Gặp 2 → đổi về vùng 2 (high). high lùi; KHÔNG tiến mid (giá trị mới chưa xét).`, en: `Found 2 → move to the 2-region (high). high retreats; do NOT advance mid (new value unexamined).` },
+      });
+      high--;
+    }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: [${nums.join(", ")}]`, en: `Result: [${nums.join(", ")}]` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`),
+    highlight: [], mark: [], final: true,
+    codeLines: [4],
+    vars: [{ name: "answer", value: `[${nums.join(", ")}]` }],
+    note: { vi: `Mảng đã sắp: các 0, rồi 1, rồi 2.`, en: `Sorted: all 0s, then 1s, then 2s.` },
+  });
+
+  return { original: input, answer: nums, steps };
+}
+
+/**
+ * LeetCode 443: String Compression — read/write two pointers in place.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def compress(self, chars):
+ *  3          write = read = 0
+ *  4          while read < n:
+ *  5              ch = chars[read]; count = 0
+ *  6              while read < n and chars[read] == ch: read++; count++
+ *  7              chars[write] = ch; write++
+ *  8              if count > 1: for d in str(count): chars[write]=d; write++
+ *  9          return write
+ */
+function buildSteps443(input, params) {
+  const raw = params && params.chars !== undefined ? String(params.chars) : String(input);
+  const chars = raw.split(",").map((c) => c.trim()).filter((c) => c.length);
+  const n = chars.length;
+  const work = [...chars];
+  const steps = [];
+  let write = 0, read = 0;
+
+  const sub = () => work.map((_, i) => {
+    if (i === read && i === write) return "r/w";
+    if (i === read) return "read";
+    if (i === write) return "write";
+    return "";
+  });
+
+  steps.push({
+    title: { vi: "write = read = 0", en: "write = read = 0" },
+    arr: [], sub: null,
+    highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "chars", value: `[${work.join(",")}]` }, { name: "read", value: 0 }, { name: "write", value: 0 }],
+    note: {
+      vi: "Nén tại chỗ: read đọc, write ghi. Với mỗi đoạn ký tự giống nhau, ghi ký tự rồi ghi số lượng (nếu > 1).",
+      en: "Compress in place: read reads, write writes. For each run of equal chars, write the char then the count (if > 1).",
+    },
+  });
+
+  while (read < n) {
+    const ch = work[read];
+    let count = 0;
+    const runStart = read;
+    while (read < n && work[read] === ch) { read++; count++; }
+    steps.push({
+      title: { vi: `Đoạn '${ch}' dài ${count} (từ ${runStart})`, en: `Run '${ch}' of length ${count} (from ${runStart})` },
+      arr: [], sub: null,
+      highlight: [], mark: [],
+      codeLines: [4, 5, 6],
+      vars: [{ name: "ch", value: `'${ch}'` }, { name: "count", value: count }, { name: "read", value: read }, { name: "write", value: write }],
+      note: { vi: `Đếm đoạn liên tiếp '${ch}': ${count} ký tự. read nhảy tới ${read}.`, en: `Count the run of '${ch}': ${count} chars. read jumps to ${read}.` },
+    });
+
+    work[write] = ch; write++;
+    if (count > 1) {
+      for (const d of String(count)) { work[write] = d; write++; }
+    }
+    steps.push({
+      title: { vi: `Ghi '${ch}'${count > 1 ? ` + "${count}"` : ""} → write=${write}`, en: `Write '${ch}'${count > 1 ? ` + "${count}"` : ""} → write=${write}` },
+      arr: [], sub: null,
+      highlight: [], mark: [],
+      codeLines: count > 1 ? [7, 8] : [7],
+      vars: [{ name: "chars", value: `[${work.slice(0, write).join(",")}]` }, { name: "write", value: write }],
+      note: {
+        vi: count > 1
+          ? `Ghi ký tự '${ch}' rồi ghi số lượng "${count}". Kết quả tới giờ: [${work.slice(0, write).join(",")}].`
+          : `count=1 nên chỉ ghi '${ch}' (không ghi số). Kết quả tới giờ: [${work.slice(0, write).join(",")}].`,
+        en: count > 1
+          ? `Write char '${ch}' then the count "${count}". Result so far: [${work.slice(0, write).join(",")}].`
+          : `count=1 so write only '${ch}' (no digit). Result so far: [${work.slice(0, write).join(",")}].`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `return ${write} → [${work.slice(0, write).join(",")}]`, en: `return ${write} → [${work.slice(0, write).join(",")}]` },
+    arr: [], sub: null,
+    highlight: [], mark: [], final: true,
+    codeLines: [9],
+    vars: [{ name: "new length", value: write }, { name: "compressed", value: `[${work.slice(0, write).join(",")}]` }],
+    note: { vi: `Độ dài sau nén = ${write}. Mảng đầu: [${work.slice(0, write).join(",")}].`, en: `Compressed length = ${write}. Front of array: [${work.slice(0, write).join(",")}].` },
+  });
+
+  return { original: chars, answer: write, steps };
+}
+
 module.exports = {
+  15: {
+    id: 15,
+    difficulty: "medium",
+    slug: "3sum",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "3Sum", en: "3Sum" },
+    titleVi: { vi: "Bộ ba tổng 0 (sort + hai con trỏ)", en: "Zero-sum triplets (sort + two pointers)" },
+    statement: {
+      vi: "Cho mảng nums. Tìm mọi bộ ba KHÁC NHAU [a,b,c] có a+b+c=0. Nhập nums cách nhau dấu phẩy.",
+      en: "Given nums, find all UNIQUE triplets [a,b,c] with a+b+c=0. Enter nums comma-separated.",
+    },
+    defaultInput: [-1, 0, 1, 2, -1, -4],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Sắp xếp mảng tăng dần.", en: "Sort the array ascending." },
+      { vi: "Cố định nums[i], dùng hai con trỏ left/right tìm cặp tổng = -nums[i].", en: "Fix nums[i], use two pointers left/right to find a pair summing to -nums[i]." },
+      { vi: "tổng < 0 → left++; tổng > 0 → right--; tổng = 0 → lưu bộ ba.", en: "sum < 0 → left++; sum > 0 → right--; sum = 0 → record the triplet." },
+      { vi: "Bỏ qua giá trị trùng ở anchor và hai con trỏ để tránh lặp.", en: "Skip duplicate values at the anchor and both pointers to avoid repeats." },
+    ],
+    complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Sort O(n log n) + hai con trỏ O(n²).", en: "Sort O(n log n) + two pointers O(n²)." } },
+    code: [
+      "class Solution:",
+      "    def threeSum(self, nums):",
+      "        nums.sort(); res = []; n = len(nums)",
+      "        for i in range(n-2):",
+      "            if i>0 and nums[i]==nums[i-1]: continue",
+      "            left, right = i+1, n-1",
+      "            while left < right:",
+      "                total = nums[i]+nums[left]+nums[right]",
+      "                if total < 0: left += 1",
+      "                elif total > 0: right -= 1",
+      "                else: res.append([nums[i],nums[left],nums[right]]); left+=1; right-=1; skip dups",
+      "        return res",
+    ],
+    builder: buildSteps15,
+  },
+  75: {
+    id: 75,
+    difficulty: "medium",
+    slug: "sort-colors",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "Sort Colors", en: "Sort Colors" },
+    titleVi: { vi: "Sắp màu (Dutch National Flag)", en: "Sort colors (Dutch National Flag)" },
+    statement: {
+      vi: "Cho mảng gồm 0, 1, 2 (đỏ, trắng, xanh). Sắp xếp tại chỗ trong 1 lượt. Nhập cách nhau dấu phẩy.",
+      en: "Given an array of 0, 1, 2 (red, white, blue), sort in-place in one pass. Enter comma-separated.",
+    },
+    defaultInput: [2, 0, 2, 1, 1, 0],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (0/1/2)", en: "nums (0/1/2)" },
+    extraParams: [],
+    approach: [
+      { vi: "3 con trỏ: low (biên vùng 0), mid (đang xét), high (biên vùng 2).", en: "3 pointers: low (0-region edge), mid (scanner), high (2-region edge)." },
+      { vi: "nums[mid]=0 → swap với low, low++ mid++.", en: "nums[mid]=0 → swap with low, low++ mid++." },
+      { vi: "nums[mid]=1 → mid++.", en: "nums[mid]=1 → mid++." },
+      { vi: "nums[mid]=2 → swap với high, high-- (không tiến mid).", en: "nums[mid]=2 → swap with high, high-- (do not advance mid)." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt, 3 con trỏ.", en: "Single pass, 3 pointers." } },
+    code: [
+      "class Solution:",
+      "    def sortColors(self, nums):",
+      "        low, mid, high = 0, 0, len(nums)-1",
+      "        while mid <= high:",
+      "            if nums[mid] == 0: nums[low],nums[mid]=nums[mid],nums[low]; low+=1; mid+=1",
+      "            elif nums[mid] == 1: mid += 1",
+      "            else: nums[mid],nums[high]=nums[high],nums[mid]; high -= 1",
+    ],
+    builder: buildSteps75,
+  },
+  443: {
+    id: 443,
+    difficulty: "medium",
+    slug: "string-compression",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    title: { vi: "String Compression", en: "String Compression" },
+    titleVi: { vi: "Nén chuỗi tại chỗ (read/write)", en: "In-place string compression (read/write)" },
+    statement: {
+      vi: "Nén mảng ký tự tại chỗ: mỗi đoạn ký tự giống nhau → ký tự + số lượng (nếu > 1). Trả về độ dài mới. Nhập các ký tự cách nhau dấu phẩy.",
+      en: "Compress a char array in place: each run of equal chars → char + count (if > 1). Return the new length. Enter chars comma-separated.",
+    },
+    defaultInput: "a,a,b,b,c,c,c",
+    inputKind: "string",
+    inputLabel: { vi: "chars (cách bởi ,)", en: "chars (comma separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Hai con trỏ: read đọc, write ghi.", en: "Two pointers: read reads, write writes." },
+      { vi: "Đếm đoạn ký tự giống nhau bằng read.", en: "Count a run of equal chars with read." },
+      { vi: "Ghi ký tự; nếu count > 1 ghi thêm các chữ số của count.", en: "Write the char; if count > 1 append the digits of count." },
+      { vi: "Trả về vị trí write cuối cùng = độ dài sau nén.", en: "Return the final write position = compressed length." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt tại chỗ.", en: "Single in-place pass." } },
+    code: [
+      "class Solution:",
+      "    def compress(self, chars):",
+      "        write = read = 0; n = len(chars)",
+      "        while read < n:",
+      "            ch = chars[read]; count = 0",
+      "            while read < n and chars[read] == ch: read += 1; count += 1",
+      "            chars[write] = ch; write += 1",
+      "            if count > 1:",
+      "                for d in str(count): chars[write] = d; write += 1",
+      "        return write",
+    ],
+    builder: buildSteps443,
+  },
   26: {
     id: 26,
     difficulty: "easy",
