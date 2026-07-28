@@ -2383,7 +2383,101 @@ function buildSteps282(input, params) {
   return { original: num, answer: result, steps };
 }
 
+/** LeetCode 79: Word Search — DFS backtracking on a grid. */
+function buildSteps79(input, params) {
+  const board = String(input).split(/[;|]/).map((r) => r.trim()).filter(Boolean).map((r) => r.split(",").map((c) => c.trim()));
+  const word = String(params && params.word !== undefined ? params.word : "ABCCED");
+  const R = board.length, C = board[0].length;
+  const work = board.map((r) => [...r]);
+  const steps = [];
+  const path = [];
+  let guard = 0, found = false;
+  function makeCells(cur) {
+    const pathSet = new Set(path.map(([r, c]) => `${r},${c}`));
+    return work.map((row, r) => row.map((ch, c) => {
+      let cls = "empty";
+      if (ch === "#") cls = "visited";
+      if (pathSet.has(`${r},${c}`)) cls = "path";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: ch === "#" ? "·" : ch, cls };
+    }));
+  }
+  function snap(o) { steps.push({ title: o.title, arr: [], bfsGrid: { rows: R, cols: C, cells: makeCells(o.cur) }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `Tìm "${word}" trên bảng`, en: `Search "${word}" on the board` }, codeLines: [3], vars: [{ name: "word", value: `"${word}"` }], note: { vi: "DFS từ mỗi ô; chỉ đi tiếp nếu ký tự khớp word[i]. Đánh dấu '#' để tránh dùng lại, khôi phục khi quay lui.", en: "DFS from each cell; continue only if the char matches word[i]. Mark '#' to avoid reuse, restore on backtrack." } });
+  function dfs(r, c, i) {
+    if (guard > 160 || found) return found;
+    guard++;
+    if (i === word.length) { found = true; return true; }
+    if (r < 0 || r >= R || c < 0 || c >= C || work[r][c] !== word[i]) return false;
+    const tmp = work[r][c];
+    path.push([r, c]);
+    work[r][c] = "#";
+    if (guard <= 50) snap({ title: { vi: `(${r},${c})='${tmp}' khớp word[${i}]`, en: `(${r},${c})='${tmp}' matches word[${i}]` }, cur: [r, c], codeLines: [4, 5, 6, 7], vars: [{ name: "cell", value: `(${r},${c})='${tmp}'` }, { name: "matched", value: word.slice(0, i + 1) }], note: { vi: `Khớp ký tự thứ ${i}. Đánh dấu '#', thử 4 hướng cho word[${i + 1}].`, en: `Matched char ${i}. Mark '#', try 4 directions for word[${i + 1}].` } });
+    const ok = dfs(r + 1, c, i + 1) || dfs(r - 1, c, i + 1) || dfs(r, c + 1, i + 1) || dfs(r, c - 1, i + 1);
+    work[r][c] = tmp;
+    if (!ok) path.pop();
+    return ok;
+  }
+  outer: for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { if (dfs(r, c, 0)) break outer; }
+  snap({ title: found ? { vi: "Tìm thấy → True", en: "Found → True" } : { vi: "Không tìm thấy → False", en: "Not found → False" }, cur: null, final: true, codeLines: [8], vars: [{ name: "answer", value: found }], note: { vi: found ? `Ghép được "${word}" từ các ô kề nhau.` : `Không có đường nào ghép thành "${word}".`, en: found ? `"${word}" can be formed from adjacent cells.` : `No path forms "${word}".` } });
+  return { original: board, answer: found, steps };
+}
+
+/** LeetCode 131: Palindrome Partitioning. */
+function buildSteps131(input) {
+  const s = String(input);
+  const n = s.length;
+  const steps = [];
+  const result = [];
+  const isPal = (sub) => sub === sub.split("").reverse().join("");
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `Chia "${s}" thành các palindrome`, en: `Partition "${s}" into palindromes` }, codeLines: [3], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "Backtracking: thử mọi đoạn s[start:end]; nếu là palindrome thì chọn và đệ quy tiếp.", en: "Backtracking: try each piece s[start:end]; if palindrome, choose it and recurse." } });
+  let guard = 0;
+  function bt(start, pathArr) {
+    if (guard > 200) return;
+    guard++;
+    if (start === n) { result.push([...pathArr]); snap({ title: { vi: `Hết chuỗi → lưu [${pathArr.map((x) => `"${x}"`).join(",")}]`, en: `End of string → save [${pathArr.map((x) => `"${x}"`).join(",")}]` }, codeLines: [4, 5], vars: [{ name: "partition", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }, { name: "result", value: JSON.stringify(result) }], note: { vi: `Chia hết chuỗi thành palindrome → một cách phân hoạch hợp lệ.`, en: `Split the whole string into palindromes → a valid partition.` } }); return; }
+    for (let end = start + 1; end <= n; end++) {
+      const piece = s.slice(start, end);
+      if (isPal(piece)) {
+        pathArr.push(piece);
+        if (guard <= 60) snap({ title: { vi: `"${piece}" là palindrome → chọn`, en: `"${piece}" is a palindrome → choose` }, codeLines: [6, 7, 8], vars: [{ name: "piece", value: `"${piece}"` }, { name: "path", value: `[${pathArr.map((x) => `"${x}"`).join(",")}]` }], note: { vi: `s[${start}:${end}]="${piece}" đối xứng → thêm vào phân hoạch, đệ quy từ ${end}.`, en: `s[${start}:${end}]="${piece}" is a palindrome → add to partition, recurse from ${end}.` } });
+        bt(end, pathArr);
+        pathArr.pop();
+      }
+    }
+  }
+  bt(0, []);
+  snap({ title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, final: true, codeLines: [9], vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Mọi cách chia "${s}" thành các palindrome.`, en: `All ways to split "${s}" into palindromes.` } });
+  return { original: s, answer: result, steps };
+}
+
 module.exports = {
+  79: {
+    id: 79, difficulty: "medium", slug: "word-search",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    title: { vi: "Word Search", en: "Word Search" },
+    titleVi: { vi: "Tìm từ trên bảng (DFS backtracking)", en: "Search a word on a grid (DFS backtracking)" },
+    statement: { vi: "Cho bảng ký tự và word. Word có thể ghép từ các ô kề nhau (4 hướng), mỗi ô dùng 1 lần? Nhập bảng: hàng cách ';', ký tự cách ','; word trong tham số.", en: "Given a board and a word, can the word be formed from adjacent cells (4 directions), each used once? Enter board: rows separated by ';', chars by ','; word as a parameter." },
+    defaultInput: "A,B,C,E;S,F,C,S;A,D,E,E", inputKind: "string", inputLabel: { vi: "Bảng (hàng cách ;)", en: "Board (rows separated by ;)" },
+    extraParams: [{ key: "word", label: { vi: "word", en: "word" }, default: "ABCCED" }],
+    approach: [{ vi: "DFS từ mỗi ô; khớp word[i] mới đi tiếp.", en: "DFS from each cell; continue only if word[i] matches." }, { vi: "Đánh dấu '#' ô đang dùng để không dùng lại.", en: "Mark the current cell '#' so it isn't reused." }, { vi: "Khôi phục ô khi quay lui.", en: "Restore the cell on backtrack." }, { vi: "Tìm thấy khi i == len(word).", en: "Found when i == len(word)." }],
+    complexity: { time: "O(R·C·4^L)", space: "O(L)", note: { vi: "L = độ dài word.", en: "L = word length." } },
+    code: ["class Solution:", "    def exist(self, board, word):", "        R, C = len(board), len(board[0])", "        def dfs(r, c, i):", "            if i == len(word): return True", "            if not (0<=r<R and 0<=c<C) or board[r][c] != word[i]: return False", "            board[r][c] = '#'", "            found = dfs(r+1,c,i+1) or dfs(r-1,c,i+1) or dfs(r,c+1,i+1) or dfs(r,c-1,i+1)", "            board[r][c] = word[i]; return found", "        return any(dfs(r,c,0) for r in range(R) for c in range(C))"],
+    builder: buildSteps79,
+  },
+  131: {
+    id: 131, difficulty: "medium", slug: "palindrome-partitioning",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    title: { vi: "Palindrome Partitioning", en: "Palindrome Partitioning" },
+    titleVi: { vi: "Chia chuỗi thành các palindrome", en: "Partition a string into palindromes" },
+    statement: { vi: "Trả về MỌI cách chia chuỗi s sao cho mỗi đoạn là palindrome. Nhập chuỗi s.", en: "Return ALL ways to partition s so each piece is a palindrome. Enter the string s." },
+    defaultInput: "aab", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [{ vi: "Backtracking: tại start, thử mọi đoạn s[start:end].", en: "Backtracking: at start, try each piece s[start:end]." }, { vi: "Nếu đoạn là palindrome → chọn và đệ quy từ end.", en: "If the piece is a palindrome → choose it and recurse from end." }, { vi: "start == len(s) → lưu phân hoạch.", en: "start == len(s) → save the partition." }],
+    complexity: { time: "O(n·2^n)", space: "O(n)", note: { vi: "2^n cách chia, kiểm tra palindrome O(n).", en: "2^n partitions, O(n) palindrome checks." } },
+    code: ["class Solution:", "    def partition(self, s):", "        res = []", "        def bt(start, path):", "            if start == len(s): res.append(list(path)); return", "            for end in range(start+1, len(s)+1):", "                piece = s[start:end]", "                if piece == piece[::-1]:", "                    path.append(piece); bt(end, path); path.pop()", "        bt(0, []); return res"],
+    builder: buildSteps131,
+  },
   282: {
     id: 282,
     difficulty: "hard",
