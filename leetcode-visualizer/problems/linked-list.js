@@ -3180,7 +3180,108 @@ function buildSteps460(input, params) {
   return { original: input, answer: valStr(), steps };
 }
 
+/** LeetCode 61: Rotate List right by k. */
+function buildSteps61(input, params) {
+  const vals = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const k0 = params && params.k !== undefined ? Number(params.k) : 2;
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: o.arr, sub: o.sub || o.arr.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  const n = vals.length;
+  if (n === 0) { snap({ title: { vi: "List rỗng", en: "Empty list" }, arr: [], final: true, codeLines: [3], vars: [], note: { vi: "", en: "" } }); return { original: vals, answer: [], steps }; }
+  snap({ title: { vi: `List = [${vals.join("→")}], k=${k0}`, en: `List = [${vals.join("→")}], k=${k0}` }, arr: [...vals], codeLines: [3, 4], vars: [{ name: "length", value: n }, { name: "k", value: k0 }], note: { vi: "Xoay phải k = k phần tử cuối chuyển lên đầu. Tìm điểm cắt = length - (k%length).", en: "Right rotate by k = move the last k nodes to the front. Cut point = length - (k%length)." } });
+  const k = k0 % n;
+  if (k === 0) { snap({ title: { vi: "k%n=0 → không đổi", en: "k%n=0 → unchanged" }, arr: [...vals], final: true, codeLines: [5], vars: [{ name: "k%n", value: 0 }], note: { vi: "Xoay bội của độ dài → giữ nguyên.", en: "Rotating by a multiple of the length → unchanged." } }); return { original: vals, answer: vals, steps }; }
+  const cut = n - k;
+  snap({ title: { vi: `Điểm cắt sau vị trí ${cut - 1}`, en: `Cut after index ${cut - 1}` }, arr: [...vals], highlight: [cut - 1, cut], codeLines: [6, 7], vars: [{ name: "k%n", value: k }, { name: "cut index", value: cut }], note: { vi: `Nối đuôi vào đầu (vòng tròn), rồi cắt sau phần tử ${cut - 1}. ${k} phần tử cuối thành đầu.`, en: `Link tail to head (circular), then cut after index ${cut - 1}. The last ${k} nodes become the front.` } });
+  const answer = [...vals.slice(cut), ...vals.slice(0, cut)];
+  snap({ title: { vi: `Kết quả: [${answer.join("→")}]`, en: `Result: [${answer.join("→")}]` }, arr: [...answer], mark: Array.from({ length: k }, (_, i) => i), final: true, codeLines: [8], vars: [{ name: "answer", value: `[${answer.join(",")}]` }], note: { vi: `${k} phần tử cuối (tô xanh) đã chuyển lên đầu.`, en: `The last ${k} nodes (highlighted) moved to the front.` } });
+  return { original: vals, answer, steps };
+}
+
+/** LeetCode 82: Remove Duplicates from Sorted List II (remove all dups). */
+function buildSteps82(input) {
+  const vals = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: o.arr, sub: o.arr.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `List = [${vals.join("→")}]`, en: `List = [${vals.join("→")}]` }, arr: [...vals], codeLines: [3], vars: [{ name: "list", value: `[${vals.join(",")}]` }], note: { vi: "Xóa MỌI phần tử có giá trị lặp (không giữ lại bản nào). Dùng dummy + prev.", en: "Remove EVERY node whose value appears more than once (keep none). Use dummy + prev." } });
+  // simulate removal by value counts
+  const count = {};
+  for (const v of vals) count[v] = (count[v] || 0) + 1;
+  const answer = [];
+  for (let i = 0; i < vals.length; i++) {
+    const dup = count[vals[i]] > 1;
+    snap({ title: { vi: `Node ${vals[i]}: ${dup ? "trùng → xóa" : "duy nhất → giữ"}`, en: `Node ${vals[i]}: ${dup ? "duplicate → remove" : "unique → keep"}` }, arr: [...vals], highlight: [i], mark: answer.map((v) => vals.indexOf(v)).filter((x) => x >= 0), codeLines: dup ? [4, 5, 6] : [7, 8], vars: [{ name: "node", value: vals[i] }, { name: `count[${vals[i]}]`, value: count[vals[i]] }, { name: "kept", value: `[${answer.join(",")}]` }], note: { vi: dup ? `Giá trị ${vals[i]} xuất hiện ${count[vals[i]]} lần → bỏ toàn bộ.` : `Giá trị ${vals[i]} duy nhất → giữ lại.`, en: dup ? `Value ${vals[i]} appears ${count[vals[i]]} times → drop all.` : `Value ${vals[i]} is unique → keep.` } });
+    if (!dup) answer.push(vals[i]);
+  }
+  snap({ title: { vi: `Kết quả: [${answer.join("→")}]`, en: `Result: [${answer.join("→")}]` }, arr: [...answer], final: true, codeLines: [9], vars: [{ name: "answer", value: `[${answer.join(",")}]` }], note: { vi: "Chỉ giữ các giá trị xuất hiện đúng 1 lần.", en: "Keep only values that appear exactly once." } });
+  return { original: vals, answer, steps };
+}
+
+/** LeetCode 148: Sort List — merge sort. */
+function buildSteps148(input) {
+  const vals = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let depth = 0;
+  function snap(o) { steps.push({ title: o.title, arr: o.arr, sub: o.arr.map((_, i) => `[${i}]`), highlight: o.highlight || [], mark: o.mark || [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `List = [${vals.join("→")}]`, en: `List = [${vals.join("→")}]` }, arr: [...vals], codeLines: [3], vars: [{ name: "list", value: `[${vals.join(",")}]` }], note: { vi: "Merge sort trên linked list: chia đôi bằng slow/fast, sắp mỗi nửa, rồi trộn.", en: "Merge sort on a linked list: split via slow/fast, sort each half, then merge." } });
+  function sort(a) {
+    if (a.length <= 1) return a;
+    const mid = Math.floor(a.length / 2);
+    const left = a.slice(0, mid), right = a.slice(mid);
+    snap({ title: { vi: `Chia: [${left.join(",")}] | [${right.join(",")}]`, en: `Split: [${left.join(",")}] | [${right.join(",")}]` }, arr: [...a], highlight: Array.from({ length: mid }, (_, i) => i), codeLines: [4, 5, 6, 7], vars: [{ name: "left", value: `[${left.join(",")}]` }, { name: "right", value: `[${right.join(",")}]` }], note: { vi: `Dùng slow/fast tìm giữa, cắt thành hai nửa.`, en: `Use slow/fast to find the middle, split into two halves.` } });
+    const sl = sort(left), sr = sort(right);
+    // merge
+    const merged = [];
+    let x = 0, y = 0;
+    while (x < sl.length && y < sr.length) { if (sl[x] <= sr[y]) merged.push(sl[x++]); else merged.push(sr[y++]); }
+    while (x < sl.length) merged.push(sl[x++]);
+    while (y < sr.length) merged.push(sr[y++]);
+    snap({ title: { vi: `Trộn → [${merged.join(",")}]`, en: `Merge → [${merged.join(",")}]` }, arr: [...merged], mark: Array.from({ length: merged.length }, (_, i) => i), codeLines: [8, 9, 10, 11], vars: [{ name: "merged", value: `[${merged.join(",")}]` }], note: { vi: `Trộn hai nửa đã sắp [${sl.join(",")}] và [${sr.join(",")}].`, en: `Merge the two sorted halves [${sl.join(",")}] and [${sr.join(",")}].` } });
+    return merged;
+  }
+  const answer = sort(vals);
+  snap({ title: { vi: `Kết quả: [${answer.join("→")}]`, en: `Result: [${answer.join("→")}]` }, arr: [...answer], final: true, codeLines: [12], vars: [{ name: "answer", value: `[${answer.join(",")}]` }], note: { vi: "Danh sách đã sắp xếp tăng dần.", en: "The list is sorted ascending." } });
+  return { original: vals, answer, steps };
+}
+
 module.exports = {
+  61: {
+    id: 61, difficulty: "medium", slug: "rotate-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Rotate List", en: "Rotate List" },
+    titleVi: { vi: "Xoay linked list phải k bước", en: "Rotate a linked list right by k" },
+    statement: { vi: "Xoay linked list sang phải k vị trí. Nhập giá trị cách nhau dấu phẩy; k trong tham số.", en: "Rotate a linked list right by k places. Enter values comma-separated; k as a parameter." },
+    defaultInput: [1, 2, 3, 4, 5], inputKind: "integer", inputLabel: { vi: "Linked list", en: "Linked list" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 2 }],
+    approach: [{ vi: "Tính độ dài, nối đuôi vào đầu (vòng tròn).", en: "Compute the length, link the tail to the head (circular)." }, { vi: "k %= length; điểm cắt = length - k.", en: "k %= length; cut point = length - k." }, { vi: "Cắt sau điểm cắt, đầu mới là node kế.", en: "Break after the cut point; the new head is the next node." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Vài lượt tuyến tính.", en: "A few linear passes." } },
+    code: ["class Solution:", "    def rotateRight(self, head, k):", "        if not head or not head.next or k == 0: return head", "        length, tail = 1, head", "        while tail.next: tail = tail.next; length += 1", "        k %= length", "        if k == 0: return head", "        tail.next = head; new_tail = head", "        for _ in range(length - k - 1): new_tail = new_tail.next", "        new_head = new_tail.next; new_tail.next = None; return new_head"],
+    builder: buildSteps61,
+  },
+  82: {
+    id: 82, difficulty: "medium", slug: "remove-duplicates-from-sorted-list-ii",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Remove Duplicates from Sorted List II", en: "Remove Duplicates from Sorted List II" },
+    titleVi: { vi: "Xóa mọi node trùng (không giữ bản nào)", en: "Remove all duplicate nodes (keep none)" },
+    statement: { vi: "Từ list đã sắp, xóa TẤT CẢ node có giá trị lặp lại (không giữ bản nào). Nhập giá trị đã sắp cách nhau dấu phẩy.", en: "From a sorted list, remove ALL nodes with duplicate values (keep none). Enter sorted values comma-separated." },
+    defaultInput: [1, 2, 3, 3, 4, 4, 5], inputKind: "integer", inputLabel: { vi: "Linked list (đã sắp)", en: "Linked list (sorted)" }, extraParams: [],
+    approach: [{ vi: "Dùng dummy node + con trỏ prev (node cuối chắc chắn giữ).", en: "Use a dummy node + prev pointer (last guaranteed-kept node)." }, { vi: "Nếu gặp run trùng, bỏ toàn bộ run.", en: "On a run of duplicates, skip the entire run." }, { vi: "Node duy nhất → prev tiến tới nó.", en: "A unique node → advance prev to it." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt.", en: "Single pass." } },
+    code: ["class Solution:", "    def deleteDuplicates(self, head):", "        dummy = ListNode(0, head); prev = dummy", "        while head:", "            if head.next and head.val == head.next.val:", "                while head.next and head.val == head.next.val: head = head.next", "                prev.next = head.next", "            else: prev = prev.next", "            head = head.next", "        return dummy.next"],
+    builder: buildSteps82,
+  },
+  148: {
+    id: 148, difficulty: "medium", slug: "sort-list",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Sort List", en: "Sort List" },
+    titleVi: { vi: "Sắp xếp linked list (merge sort)", en: "Sort a linked list (merge sort)" },
+    statement: { vi: "Sắp xếp linked list tăng dần trong O(n log n). Nhập giá trị cách nhau dấu phẩy.", en: "Sort a linked list ascending in O(n log n). Enter values comma-separated." },
+    defaultInput: [4, 2, 1, 3], inputKind: "integer", inputLabel: { vi: "Linked list", en: "Linked list" }, extraParams: [],
+    approach: [{ vi: "Chia đôi bằng slow/fast pointer.", en: "Split in half via slow/fast pointers." }, { vi: "Đệ quy sắp mỗi nửa.", en: "Recursively sort each half." }, { vi: "Trộn hai nửa đã sắp.", en: "Merge the two sorted halves." }],
+    complexity: { time: "O(n log n)", space: "O(log n)", note: { vi: "Merge sort, stack đệ quy O(log n).", en: "Merge sort, O(log n) recursion stack." } },
+    code: ["class Solution:", "    def sortList(self, head):", "        if not head or not head.next: return head", "        slow, fast = head, head.next", "        while fast and fast.next: slow = slow.next; fast = fast.next.next", "        mid = slow.next; slow.next = None", "        left = self.sortList(head)", "        right = self.sortList(mid)", "        dummy = tail = ListNode()", "        while left and right:", "            if left.val <= right.val: tail.next, left = left, left.next", "            else: tail.next, right = right, right.next", "            tail = tail.next", "        tail.next = left or right; return dummy.next"],
+    builder: buildSteps148,
+  },
   460: {
     id: 460,
     difficulty: "hard",
