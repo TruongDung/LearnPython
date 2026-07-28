@@ -14,6 +14,13 @@ function buildSteps13(input) {
   const steps = [];
   const chars = s.split("");
   const values = chars.map((ch) => roman[ch] || 0);
+  const contributions = values.map((value, index) => (
+    index + 1 < values.length && value < values[index + 1] ? -value : value
+  ));
+  const processedIndexes = (end) => Array.from({ length: end + 1 }, (_, index) => index);
+  const visibleContributions = (end) => values.map((value, index) => (
+    index <= end ? contributions[index] : value
+  ));
 
   let result = 0;
 
@@ -23,7 +30,7 @@ function buildSteps13(input) {
     sub: chars,
     highlight: [],
     mark: [],
-    codeLines: [2, 3, 4],
+    codeLines: [2, 3, 4, 5],
     vars: [
       { name: "s", value: s },
       { name: "result", value: 0 },
@@ -38,21 +45,23 @@ function buildSteps13(input) {
     const cur = values[i];
     const next = i + 1 < s.length ? values[i + 1] : 0;
     const subtract = cur < next;
+    const before = result;
 
     if (subtract) {
       result -= cur;
       steps.push({
-        title: { vi: `i=${i}: ${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → trừ`, en: `i=${i}: ${chars[i]}(${cur}) < ${chars[i + 1]}(${next}) → subtract` },
-        arr: values,
+        title: { vi: `${before} - ${cur} = ${result}`, en: `${before} - ${cur} = ${result}` },
+        arr: visibleContributions(i),
         sub: chars,
         highlight: [i, i + 1],
-        mark: [],
-        codeLines: [5, 6, 7],
+        mark: processedIndexes(i - 1),
+        codeLines: [6, 7, 8],
         vars: [
           { name: "i", value: i },
           { name: "s[i]", value: `${chars[i]} = ${cur}` },
           { name: "s[i+1]", value: `${chars[i + 1]} = ${next}` },
-          { name: "action", value: `subtract ${cur}` },
+          { name: "before", value: before },
+          { name: "contribution", value: -cur },
           { name: "result", value: result },
         ],
         note: {
@@ -63,17 +72,18 @@ function buildSteps13(input) {
     } else {
       result += cur;
       steps.push({
-        title: { vi: `i=${i}: ${chars[i]}(${cur}) → cộng`, en: `i=${i}: ${chars[i]}(${cur}) → add` },
-        arr: values,
+        title: { vi: `${before} + ${cur} = ${result}`, en: `${before} + ${cur} = ${result}` },
+        arr: visibleContributions(i),
         sub: chars,
         highlight: [i],
-        mark: [],
-        codeLines: [5, 6, 8, 9],
+        mark: processedIndexes(i - 1),
+        codeLines: [6, 7, 9, 10],
         vars: [
           { name: "i", value: i },
           { name: "s[i]", value: `${chars[i]} = ${cur}` },
           { name: "s[i+1]", value: i + 1 < s.length ? `${chars[i + 1]} = ${next}` : "end" },
-          { name: "action", value: `add ${cur}` },
+          { name: "before", value: before },
+          { name: "contribution", value: cur },
           { name: "result", value: result },
         ],
         note: {
@@ -89,17 +99,20 @@ function buildSteps13(input) {
   }
 
   steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: values,
+    title: { vi: `Tổng = ${result}`, en: `Total = ${result}` },
+    arr: contributions,
     sub: chars,
     highlight: [],
-    mark: [],
+    mark: processedIndexes(s.length - 1),
     final: true,
-    codeLines: [10],
-    vars: [{ name: "answer", value: result }],
+    codeLines: [11],
+    vars: [
+      { name: "expression", value: contributions.map((value) => (value >= 0 ? `+${value}` : String(value))).join(" ").replace(/^\+/, "") },
+      { name: "answer", value: result },
+    ],
     note: {
-      vi: `"${s}" = ${result}.`,
-      en: `"${s}" = ${result}.`,
+      vi: `"${s}" = ${contributions.join(" + ").replace(/\+ -/g, "- ")} = ${result}. Cột âm là ký tự đứng trước giá trị lớn hơn nên phải trừ.`,
+      en: `"${s}" = ${contributions.join(" + ").replace(/\+ -/g, "- ")} = ${result}. A negative bar is a symbol before a larger value, so it is subtracted.`,
     },
   });
 
