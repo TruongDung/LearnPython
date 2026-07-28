@@ -2461,9 +2461,64 @@ function buildSteps987(input) {
   return { input, answer: result, steps };
 }
 
+// ─── 110: Balanced Binary Tree ───
+function buildSteps110(input) {
+  const root = parseTree(input);
+  const steps = [];
+  let answer = true;
+  function height(node) {
+    if (!node) return 0;
+    const lh = height(node.left);
+    if (lh === -1) return -1;
+    const rh = height(node.right);
+    if (rh === -1) return -1;
+    const bal = Math.abs(lh - rh) <= 1;
+    if (!bal) {
+      answer = false;
+      steps.push(snapshot(root, { title: { vi: `Node ${node.val}: |${lh}-${rh}|>1 → mất cân bằng`, en: `Node ${node.val}: |${lh}-${rh}|>1 → unbalanced` }, hlSet: new Set([node.id]), codeLines: [8, 9], vars: [{ name: "node", value: node.val }, { name: "leftH", value: lh }, { name: "rightH", value: rh }], note: { vi: `Chênh lệch chiều cao 2 cây con > 1 → cây KHÔNG cân bằng.`, en: `Height difference of the two subtrees > 1 → tree is NOT balanced.` } }));
+      return -1;
+    }
+    steps.push(snapshot(root, { title: { vi: `Node ${node.val}: height=${1 + Math.max(lh, rh)} (|${lh}-${rh}|≤1)`, en: `Node ${node.val}: height=${1 + Math.max(lh, rh)} (|${lh}-${rh}|≤1)` }, hlSet: new Set([node.id]), codeLines: [4, 5, 6, 7, 10], vars: [{ name: "node", value: node.val }, { name: "leftH", value: lh }, { name: "rightH", value: rh }, { name: "height", value: 1 + Math.max(lh, rh) }], note: { vi: `Cây con cân bằng. Chiều cao = 1 + max(${lh},${rh}) = ${1 + Math.max(lh, rh)}.`, en: `Subtree balanced. Height = 1 + max(${lh},${rh}) = ${1 + Math.max(lh, rh)}.` } }));
+    return 1 + Math.max(lh, rh);
+  }
+  steps.push(snapshot(root, { title: { vi: "Kiểm tra cân bằng (post-order)", en: "Check balance (post-order)" }, codeLines: [3], vars: [], note: { vi: "Tính chiều cao mỗi cây con; trả -1 nếu mất cân bằng. |leftH - rightH| ≤ 1 tại mọi node.", en: "Compute each subtree height; return -1 if unbalanced. |leftH - rightH| ≤ 1 at every node." } }));
+  height(root);
+  const fs = snapshot(root, { title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` }, codeLines: [11], vars: [{ name: "answer", value: answer }], note: { vi: answer ? "Mọi node đều cân bằng → True." : "Có node mất cân bằng → False.", en: answer ? "Every node is balanced → True." : "A node is unbalanced → False." } });
+  fs.final = true; steps.push(fs);
+  return { input, answer, steps };
+}
+
+// ─── 113: Path Sum II ───
+function buildSteps113(input, params) {
+  const root = parseTree(input);
+  const target = params && params.target !== undefined ? Number(params.target) : 22;
+  const steps = [];
+  const result = [];
+  function dfs(node, remaining, path) {
+    if (!node) return;
+    path.push(node.val);
+    remaining -= node.val;
+    const leaf = !node.left && !node.right;
+    if (leaf && remaining === 0) {
+      result.push([...path]);
+      steps.push(snapshot(root, { title: { vi: `Lá ${node.val}, tổng khớp → lưu [${path.join(",")}]`, en: `Leaf ${node.val}, sum matches → save [${path.join(",")}]` }, hlSet: new Set([node.id]), codeLines: [6, 7], vars: [{ name: "path", value: `[${path.join(",")}]` }, { name: "result", value: JSON.stringify(result) }], note: { vi: `Đến lá và tổng còn lại = 0 → đường đi hợp lệ.`, en: `Reached a leaf with remaining sum 0 → valid path.` } }));
+    } else {
+      steps.push(snapshot(root, { title: { vi: `Node ${node.val}: còn thiếu ${remaining}`, en: `Node ${node.val}: remaining ${remaining}` }, hlSet: new Set([node.id]), codeLines: [4, 5, 8, 9], vars: [{ name: "node", value: node.val }, { name: "remaining", value: remaining }, { name: "path", value: `[${path.join(",")}]` }], note: { vi: `Trừ ${node.val} khỏi target. Đệ quy con trái/phải.`, en: `Subtract ${node.val} from target. Recurse left/right.` } }));
+      dfs(node.left, remaining, path);
+      dfs(node.right, remaining, path);
+    }
+    path.pop();
+  }
+  steps.push(snapshot(root, { title: { vi: `Tìm đường root→lá có tổng = ${target}`, en: `Find root→leaf paths summing to ${target}` }, codeLines: [3], vars: [{ name: "target", value: target }], note: { vi: "DFS backtracking: cộng dồn giá trị, khi tới lá và tổng khớp thì lưu đường đi.", en: "Backtracking DFS: accumulate values; at a leaf whose sum matches, save the path." } }));
+  dfs(root, target, []);
+  const fs = snapshot(root, { title: { vi: `Kết quả: ${JSON.stringify(result)}`, en: `Result: ${JSON.stringify(result)}` }, codeLines: [10], vars: [{ name: "answer", value: JSON.stringify(result) }], note: { vi: `Mọi đường root→lá có tổng = ${target}.`, en: `All root→leaf paths summing to ${target}.` } });
+  fs.final = true; steps.push(fs);
+  return { input, answer: result, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [144, 94, 145, 104, 102, 543, 124, 226, 100, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
+    order: [144, 94, 145, 104, 102, 543, 110, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -2583,6 +2638,31 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder. Stack O(h).", en: "One postorder pass. Stack O(h)." } },
     code: ["class Solution:", "    def diameterOfBinaryTree(self, root):", "        self.best = 0", "        def depth(node):", "            if not node: return 0", "            l = depth(node.left)", "            r = depth(node.right)", "            self.best = max(self.best, l + r)", "            return 1 + max(l, r)", "        depth(root)", "        return self.best"],
     builder: buildSteps543,
+  },
+  110: {
+    id: 110, difficulty: "easy", slug: "balanced-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Balanced Binary Tree", en: "Balanced Binary Tree" },
+    titleVi: { vi: "Cây nhị phân cân bằng (post-order)", en: "Height-balanced binary tree (post-order)" },
+    statement: { vi: "Cây có cân bằng chiều cao không (|leftH-rightH|≤1 tại mọi node)? Nhập level-order.", en: "Is the tree height-balanced (|leftH-rightH|≤1 at every node)? Enter level-order." },
+    defaultInput: "3,9,20,null,null,15,7", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" }, extraParams: [],
+    approach: [{ vi: "Đệ quy post-order tính chiều cao.", en: "Post-order recursion computing height." }, { vi: "Trả -1 nếu cây con mất cân bằng (lan lên trên).", en: "Return -1 if a subtree is unbalanced (propagate up)." }, { vi: "Cân bằng ⟺ height(root) ≠ -1.", en: "Balanced ⟺ height(root) ≠ -1." }],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node thăm 1 lần.", en: "Each node visited once." } },
+    code: ["class Solution:", "    def isBalanced(self, root):", "        def height(node):", "            if not node: return 0", "            lh = height(node.left)", "            if lh == -1: return -1", "            rh = height(node.right)", "            if rh == -1: return -1", "            if abs(lh - rh) > 1: return -1", "            return 1 + max(lh, rh)", "        return height(root) != -1"],
+    builder: buildSteps110,
+  },
+  113: {
+    id: 113, difficulty: "medium", slug: "path-sum-ii",
+    category: TREE_CAT,
+    title: { vi: "Path Sum II", en: "Path Sum II" },
+    titleVi: { vi: "Mọi đường root→lá có tổng = target", en: "All root→leaf paths summing to target" },
+    statement: { vi: "Tìm mọi đường từ gốc đến lá có tổng giá trị = target. Nhập level-order; target trong tham số.", en: "Find all root-to-leaf paths whose values sum to target. Enter level-order; target as a parameter." },
+    defaultInput: "5,4,8,11,null,13,4,7,2,null,null,5,1", inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, default: 22 }],
+    approach: [{ vi: "DFS backtracking, giữ đường đi hiện tại.", en: "Backtracking DFS keeping the current path." }, { vi: "Trừ giá trị node khỏi remaining.", en: "Subtract the node value from remaining." }, { vi: "Tại lá và remaining==0 → lưu bản sao đường đi.", en: "At a leaf with remaining==0 → save a copy of the path." }, { vi: "Quay lui: pop node khỏi đường đi.", en: "Backtrack: pop the node from the path." }],
+    complexity: { time: "O(n²)", space: "O(h)", note: { vi: "Sao chép đường đi khi tìm thấy.", en: "Copy the path when found." } },
+    code: ["class Solution:", "    def pathSum(self, root, targetSum):", "        res = []", "        def dfs(node, rem, path):", "            if not node: return", "            path.append(node.val); rem -= node.val", "            if not node.left and not node.right and rem == 0: res.append(list(path))", "            else:", "                dfs(node.left, rem, path); dfs(node.right, rem, path)", "            path.pop()", "        dfs(root, targetSum, []); return res"],
+    builder: buildSteps113,
   },
   124: {
     id: 124, difficulty: "hard", slug: "binary-tree-maximum-path-sum",
