@@ -13178,11 +13178,227 @@ function buildSteps827(input) {
   return { original: grid, answer: best, steps };
 }
 
+/**
+ * LeetCode 210: Course Schedule II — Kahn's topological sort, return an order.
+ * Code lines (1-indexed):
+ *  1  from collections import defaultdict, deque
+ *  2  class Solution:
+ *  3      def findOrder(self, numCourses, prerequisites):
+ *  4          graph = defaultdict(list); indegree = [0]*numCourses
+ *  5          for course, prereq in prerequisites: graph[prereq].append(course); indegree[course]+=1
+ *  6          queue = deque([c for c in range(numCourses) if indegree[c]==0])
+ *  7          order = []
+ *  8          while queue:
+ *  9              course = queue.popleft(); order.append(course)
+ * 10              for nxt in graph[course]:
+ * 11                  indegree[nxt]-=1
+ * 12                  if indegree[nxt]==0: queue.append(nxt)
+ * 13          return order if len(order)==numCourses else []
+ */
+function buildSteps210(input, params) {
+  const numCourses = params && params.n !== undefined ? Number(params.n) : 4;
+  const prereqs = String(input).split(",").map((p) => p.trim()).filter(Boolean).map((p) => p.split("-").map(Number));
+
+  const steps = [];
+  const graph = Array.from({ length: numCourses }, () => []);
+  const indegree = new Array(numCourses).fill(0);
+  for (const [course, prereq] of prereqs) {
+    graph[prereq].push(course);
+    indegree[course] += 1;
+  }
+
+  const nodes = () => Array.from({ length: numCourses }, (_, id) => ({ id, label: String(id), dist: `in:${indegree[id]}` }));
+  const edges = prereqs.map(([course, prereq]) => ({ u: prereq, v: course }));
+  const indStr = () => `[${indegree.join(", ")}]`;
+
+  function gsnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: { nodes: nodes(), edges, hlNodes: opts.hlNodes || [], hlEdges: opts.hlEdges || [], visitedNodes: opts.visited || [], annotations: {} },
+      highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  gsnap({
+    title: { vi: "Xây graph & indegree", en: "Build graph & indegree" },
+    codeLines: [4, 5],
+    vars: [{ name: "numCourses", value: numCourses }, { name: "indegree", value: indStr() }],
+    note: {
+      vi: `Cạnh prereq → course (phải học prereq trước). indegree[c] = số môn phải học trước c. Nhãn node = "in:indegree".\nTopo sort Kahn: lấy dần các môn indegree=0.`,
+      en: `Edge prereq → course (prereq must come first). indegree[c] = number of prerequisites of c. Node label = "in:indegree".\nKahn's topo sort: repeatedly take courses with indegree=0.`,
+    },
+  });
+
+  const queue = [];
+  for (let c = 0; c < numCourses; c++) if (indegree[c] === 0) queue.push(c);
+  const order = [];
+  const visited = [];
+
+  gsnap({
+    title: { vi: `queue ban đầu = [${queue.join(", ")}]`, en: `initial queue = [${queue.join(", ")}]` },
+    hlNodes: [...queue],
+    codeLines: [6, 7],
+    vars: [{ name: "queue", value: `[${queue.join(", ")}]` }, { name: "indegree", value: indStr() }],
+    note: { vi: `Đưa mọi môn có indegree=0 (không cần học trước) vào queue.`, en: `Enqueue all courses with indegree=0 (no prerequisites).` },
+  });
+
+  let head = 0;
+  while (head < queue.length) {
+    const course = queue[head++];
+    order.push(course);
+    visited.push(course);
+    gsnap({
+      title: { vi: `Học môn ${course} → order=[${order.join(", ")}]`, en: `Take course ${course} → order=[${order.join(", ")}]` },
+      hlNodes: [course], visited: [...visited],
+      codeLines: [8, 9],
+      vars: [{ name: "course", value: course }, { name: "order", value: `[${order.join(", ")}]` } ],
+      note: { vi: `Lấy môn ${course} khỏi queue, thêm vào order. Giảm indegree các môn phụ thuộc.`, en: `Pop course ${course}, append to order. Decrement indegree of dependents.` },
+    });
+    for (const nxt of graph[course]) {
+      indegree[nxt] -= 1;
+      const ready = indegree[nxt] === 0;
+      if (ready) queue.push(nxt);
+      gsnap({
+        title: { vi: `indegree[${nxt}] → ${indegree[nxt]}${ready ? " → vào queue" : ""}`, en: `indegree[${nxt}] → ${indegree[nxt]}${ready ? " → enqueue" : ""}` },
+        hlNodes: [course, nxt], hlEdges: [[course, nxt]], visited: [...visited],
+        codeLines: [10, 11, 12],
+        vars: [{ name: `indegree[${nxt}]`, value: indegree[nxt] }, { name: "queue", value: `[${queue.slice(head).join(", ")}]` }],
+        note: {
+          vi: ready ? `Học xong ${course} → indegree[${nxt}]=0 → sẵn sàng, thêm vào queue.` : `indegree[${nxt}]=${indegree[nxt]} (còn môn phải học trước).`,
+          en: ready ? `After ${course}, indegree[${nxt}]=0 → ready, enqueue.` : `indegree[${nxt}]=${indegree[nxt]} (still has prerequisites).`,
+        },
+      });
+    }
+  }
+
+  const answer = order.length === numCourses ? order : [];
+  gsnap({
+    title: answer.length ? { vi: `Kết quả: [${order.join(", ")}]`, en: `Result: [${order.join(", ")}]` } : { vi: "Có chu trình → []", en: "Cycle → []" },
+    visited: [...visited], final: true,
+    codeLines: [13],
+    vars: [{ name: "order length", value: order.length }, { name: "answer", value: `[${answer.join(", ")}]` }],
+    note: {
+      vi: answer.length ? `Học đủ ${numCourses} môn theo thứ tự [${order.join(", ")}].` : `Chỉ xếp được ${order.length}/${numCourses} môn → tồn tại chu trình → [].`,
+      en: answer.length ? `All ${numCourses} courses ordered as [${order.join(", ")}].` : `Only ${order.length}/${numCourses} courses ordered → a cycle exists → [].`,
+    },
+  });
+
+  return { original: prereqs, answer, steps };
+}
+
+/**
+ * LeetCode 399: Evaluate Division — weighted graph, DFS per query.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def calcEquation(self, equations, values, queries):
+ *  3          graph[a][b] = v; graph[b][a] = 1/v
+ *  4          def dfs(src, dst, visited):
+ *  5              if src or dst not in graph: return -1
+ *  6              if src == dst: return 1
+ *  7              visited.add(src)
+ *  8              for nei, w in graph[src].items():
+ *  9                  if nei not in visited:
+ * 10                      r = dfs(nei, dst, visited)
+ * 11                      if r != -1: return w * r
+ * 12              return -1
+ * 13          return [dfs(a, b, set()) for a, b in queries]
+ */
+function buildSteps399(input, params) {
+  // equations: "a/b,b/c" ; values: "2,3" ; queries: "a/c,b/a,a/e,x/x"
+  const equations = String(input).split(",").map((e) => e.trim()).filter(Boolean).map((e) => e.split("/"));
+  const values = String(params && params.values || "2,3").split(",").map((v) => Number(v.trim()));
+  const queries = String(params && params.queries || "a/c,b/a,a/e,x/x").split(",").map((q) => q.trim()).filter(Boolean).map((q) => q.split("/"));
+
+  const steps = [];
+  const graph = {};
+  const addEdge = (a, b, w) => { (graph[a] = graph[a] || {})[b] = w; };
+  equations.forEach(([a, b], i) => { addEdge(a, b, values[i]); addEdge(b, a, 1 / values[i]); });
+
+  const allVars = [...new Set(equations.flat())].sort();
+  const nodes = () => allVars.map((v) => ({ id: v, label: v, dist: "" }));
+  const edgeList = [];
+  equations.forEach(([a, b], i) => edgeList.push({ u: a, v: b, w: String(values[i]) }));
+
+  function gsnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: { nodes: nodes(), edges: edgeList, hlNodes: opts.hlNodes || [], hlEdges: opts.hlEdges || [], visitedNodes: opts.visited || [], annotations: {} },
+      highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  gsnap({
+    title: { vi: "Xây đồ thị có trọng số", en: "Build the weighted graph" },
+    codeLines: [3],
+    vars: [{ name: "equations", value: equations.map(([a, b], i) => `${a}/${b}=${values[i]}`).join(", ") }],
+    note: {
+      vi: `Cạnh a → b trọng số a/b; b → a trọng số 1/(a/b). Nhân trọng số dọc đường đi = tỉ số cần tính.\nMỗi query a/b: DFS từ a tới b, nhân các cạnh.`,
+      en: `Edge a → b with weight a/b; b → a with weight 1/(a/b). Multiplying weights along a path = the ratio.\nEach query a/b: DFS from a to b, multiplying edges.`,
+    },
+  });
+
+  const answers = [];
+  for (const [a, b] of queries) {
+    const visited = new Set();
+    let result = -1;
+    const pathEdges = [];
+
+    function dfs(src, dst) {
+      if (!(src in graph) || !(dst in graph)) return -1;
+      if (src === dst) return 1;
+      visited.add(src);
+      for (const [nei, w] of Object.entries(graph[src])) {
+        if (!visited.has(nei)) {
+          const r = dfs(nei, dst);
+          if (r !== -1) { pathEdges.push([src, nei]); return w * r; }
+        }
+      }
+      return -1;
+    }
+    result = dfs(a, b);
+    answers.push(result);
+
+    gsnap({
+      title: { vi: `Query ${a}/${b} = ${result === -1 ? "-1" : +result.toFixed(4)}`, en: `Query ${a}/${b} = ${result === -1 ? "-1" : +result.toFixed(4)}` },
+      hlNodes: (a in graph && b in graph) ? [a, b] : [],
+      hlEdges: pathEdges.map(([u, v]) => [u, v]),
+      visited: [...visited],
+      codeLines: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      vars: [
+        { name: "query", value: `${a}/${b}` },
+        { name: "result", value: result === -1 ? -1 : +result.toFixed(4) },
+        { name: "answers", value: `[${answers.map((x) => x === -1 ? -1 : +x.toFixed(2)).join(", ")}]` },
+      ],
+      note: {
+        vi: result === -1
+          ? ((a in graph && b in graph) ? `Không có đường từ ${a} tới ${b} → -1.` : `${!(a in graph) ? a : b} không có trong đồ thị → -1.`)
+          : `DFS từ ${a} tới ${b}, nhân trọng số các cạnh trên đường đi = ${+result.toFixed(4)}.`,
+        en: result === -1
+          ? ((a in graph && b in graph) ? `No path from ${a} to ${b} → -1.` : `${!(a in graph) ? a : b} is not in the graph → -1.`)
+          : `DFS from ${a} to ${b}, multiply edge weights along the path = ${+result.toFixed(4)}.`,
+      },
+    });
+  }
+
+  gsnap({
+    title: { vi: `Kết quả: [${answers.map((x) => x === -1 ? -1 : +x.toFixed(2)).join(", ")}]`, en: `Result: [${answers.map((x) => x === -1 ? -1 : +x.toFixed(2)).join(", ")}]` },
+    final: true, codeLines: [13],
+    vars: [{ name: "answer", value: `[${answers.map((x) => x === -1 ? -1 : +x.toFixed(2)).join(", ")}]` }],
+    note: { vi: `Trả lời từng query bằng cách nhân trọng số dọc đường đi trong đồ thị.`, en: `Answer each query by multiplying edge weights along the graph path.` },
+  });
+
+  return { original: equations, answer: answers, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 210, 269, 399, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -16394,6 +16610,89 @@ module.exports = {
       "        return taken == numCourses",
     ],
     builder: buildSteps207,
+  },
+  210: {
+    id: 210,
+    difficulty: "medium",
+    slug: "course-schedule-ii",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Course Schedule II", en: "Course Schedule II" },
+    titleVi: { vi: "Lịch học II (topological sort)", en: "Course schedule II (topological sort)" },
+    statement: {
+      vi: "Cho numCourses môn và các cặp prereq. Trả về MỘT thứ tự học hợp lệ (hoặc [] nếu có chu trình). Nhập cặp dạng course-prereq, cách nhau dấu phẩy; n trong tham số.",
+      en: "Given numCourses and prerequisite pairs, return ONE valid order (or [] if a cycle exists). Enter pairs as course-prereq comma-separated; n as a parameter.",
+    },
+    defaultInput: "1-0,2-0,3-1,3-2",
+    inputKind: "string",
+    inputLabel: { vi: "Cặp course-prereq (cách bởi ,)", en: "course-prereq pairs (comma separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "numCourses", en: "numCourses" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Cạnh prereq → course. indegree[c] = số môn phải học trước c.", en: "Edge prereq → course. indegree[c] = number of prerequisites of c." },
+      { vi: "Kahn: đưa mọi môn indegree=0 vào queue.", en: "Kahn: enqueue all courses with indegree=0." },
+      { vi: "Pop dần, thêm vào order, giảm indegree hàng xóm; indegree=0 → enqueue.", en: "Pop repeatedly, append to order, decrement neighbors; indegree=0 → enqueue." },
+      { vi: "Nếu order thiếu môn → có chu trình → [].", en: "If order misses courses → a cycle exists → []." },
+    ],
+    complexity: { time: "O(V+E)", space: "O(V+E)", note: { vi: "Mỗi đỉnh và cạnh xử lý 1 lần.", en: "Each vertex and edge processed once." } },
+    code: [
+      "from collections import defaultdict, deque",
+      "class Solution:",
+      "    def findOrder(self, numCourses, prerequisites):",
+      "        graph = defaultdict(list); indegree = [0]*numCourses",
+      "        for course, prereq in prerequisites: graph[prereq].append(course); indegree[course]+=1",
+      "        queue = deque([c for c in range(numCourses) if indegree[c]==0])",
+      "        order = []",
+      "        while queue:",
+      "            course = queue.popleft(); order.append(course)",
+      "            for nxt in graph[course]:",
+      "                indegree[nxt]-=1",
+      "                if indegree[nxt]==0: queue.append(nxt)",
+      "        return order if len(order)==numCourses else []",
+    ],
+    builder: buildSteps210,
+  },
+  399: {
+    id: 399,
+    difficulty: "medium",
+    slug: "evaluate-division",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Evaluate Division", en: "Evaluate Division" },
+    titleVi: { vi: "Tính phép chia (đồ thị có trọng số)", en: "Evaluate division (weighted graph)" },
+    statement: {
+      vi: "Cho các phương trình a/b = giá trị và các truy vấn. Tính kết quả mỗi truy vấn (hoặc -1 nếu không xác định). Nhập equations dạng a/b cách nhau dấu phẩy; values, queries trong tham số.",
+      en: "Given equations a/b = value and queries, evaluate each query (or -1 if undetermined). Enter equations as a/b comma-separated; values, queries as parameters.",
+    },
+    defaultInput: "a/b,b/c",
+    inputKind: "string",
+    inputLabel: { vi: "equations (a/b, cách bởi ,)", en: "equations (a/b, comma separated)" },
+    extraParams: [
+      { key: "values", label: { vi: "values (cách bởi ,)", en: "values (comma separated)" }, default: "2,3" },
+      { key: "queries", label: { vi: "queries (a/b, cách bởi ,)", en: "queries (a/b, comma separated)" }, default: "a/c,b/a,a/e,x/x" },
+    ],
+    approach: [
+      { vi: "Xây đồ thị có hướng có trọng số: a→b = a/b, b→a = 1/(a/b).", en: "Build a weighted directed graph: a→b = a/b, b→a = 1/(a/b)." },
+      { vi: "Mỗi query a/b: DFS từ a tới b, nhân trọng số các cạnh trên đường đi.", en: "Each query a/b: DFS from a to b, multiply edge weights along the path." },
+      { vi: "Nếu a hoặc b không có trong đồ thị, hoặc không có đường đi → -1.", en: "If a or b is missing, or no path exists → -1." },
+    ],
+    complexity: { time: "O(Q·(V+E))", space: "O(V+E)", note: { vi: "Q truy vấn, mỗi lần DFS O(V+E).", en: "Q queries, each DFS is O(V+E)." } },
+    code: [
+      "class Solution:",
+      "    def calcEquation(self, equations, values, queries):",
+      "        graph = defaultdict(dict)",
+      "        for (a,b),v in zip(equations, values): graph[a][b]=v; graph[b][a]=1/v",
+      "        def dfs(src, dst, visited):",
+      "            if src not in graph or dst not in graph: return -1.0",
+      "            if src == dst: return 1.0",
+      "            visited.add(src)",
+      "            for nei, w in graph[src].items():",
+      "                if nei not in visited:",
+      "                    r = dfs(nei, dst, visited)",
+      "                    if r != -1.0: return w * r",
+      "            return -1.0",
+      "        return [dfs(a, b, set()) for a, b in queries]",
+    ],
+    builder: buildSteps399,
   },
   847: {
     id: 847,

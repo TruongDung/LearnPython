@@ -2239,7 +2239,209 @@ function buildSteps3532Prefix(input, params) {
   return { input, answer: `[${answers.join(",")}]`, steps };
 }
 
+// ─── 684: Redundant Connection ───
+// Add edges one by one; the first edge connecting two already-connected nodes is redundant.
+function buildSteps684(input) {
+  const edges = String(input).split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map((x) => Number(x.trim())));
+  const n = edges.length; // nodes are 1..n
+  const parent = Array.from({ length: n + 1 }, (_, i) => i);
+  const steps = [];
+  const added = [];
+
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+
+  function gsnap(opts) {
+    const gNodes = Array.from({ length: n }, (_, i) => ({ id: i + 1, label: String(i + 1) }));
+    const gEdges = added.map(([u, v]) => ({ u, v, w: "" }));
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: { nodes: gNodes, edges: gEdges, hlNodes: opts.hlNodes || [], hlEdges: opts.hlEdges || [], visitedNodes: [] },
+      highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  const parentStr = () => `[${parent.slice(1).map((p, i) => `${i + 1}→${p}`).join(", ")}]`;
+
+  gsnap({
+    title: { vi: "Union-Find: parent[i]=i", en: "Union-Find: parent[i]=i" },
+    codeLines: [1, 2],
+    vars: [{ name: "n nodes", value: n }, { name: "parent", value: parentStr() }],
+    note: {
+      vi: `Đồ thị có ${n} đỉnh và ${n} cạnh (thừa 1 cạnh tạo chu trình). Thêm từng cạnh; cạnh đầu tiên nối 2 đỉnh ĐÃ cùng nhóm chính là cạnh thừa.`,
+      en: `The graph has ${n} nodes and ${n} edges (one extra creating a cycle). Add edges one by one; the first edge joining two ALREADY-connected nodes is redundant.`,
+    },
+  });
+
+  let answer = [];
+  for (const [u, v] of edges) {
+    const ru = find(u), rv = find(v);
+    if (ru === rv) {
+      answer = [u, v];
+      gsnap({
+        title: { vi: `Cạnh ${u}-${v}: ${u},${v} đã cùng nhóm → THỪA!`, en: `Edge ${u}-${v}: ${u},${v} already connected → REDUNDANT!` },
+        hlNodes: [u, v], hlEdges: [[u, v]],
+        final: true, codeLines: [3, 4],
+        vars: [{ name: "edge", value: `${u}-${v}` }, { name: `find(${u})`, value: ru }, { name: `find(${v})`, value: rv }, { name: "answer", value: `[${u}, ${v}]` }],
+        note: { vi: `find(${u})=${ru} == find(${v})=${rv} → ${u} và ${v} đã liên thông → thêm cạnh này tạo CHU TRÌNH → đây là cạnh thừa.`, en: `find(${u})=${ru} == find(${v})=${rv} → ${u} and ${v} are already connected → this edge forms a CYCLE → it's the redundant one.` },
+      });
+      break;
+    }
+    parent[ru] = rv;
+    added.push([u, v]);
+    gsnap({
+      title: { vi: `Cạnh ${u}-${v}: union (nhóm khác nhau)`, en: `Edge ${u}-${v}: union (different groups)` },
+      hlNodes: [u, v], hlEdges: [[u, v]],
+      codeLines: [3],
+      vars: [{ name: "edge", value: `${u}-${v}` }, { name: "parent", value: parentStr() }],
+      note: { vi: `find(${u})=${ru} ≠ find(${v})=${rv} → hợp nhất hai nhóm (parent[${ru}]=${rv}). Cạnh này không thừa.`, en: `find(${u})=${ru} ≠ find(${v})=${rv} → union the two groups (parent[${ru}]=${rv}). Not redundant.` },
+    });
+  }
+
+  return { original: edges, answer, steps };
+}
+
+// ─── 721: Accounts Merge ───
+function buildSteps721(input, params) {
+  // input: accounts as "Name:email1,email2;Name:email3" or via params.accounts
+  const raw = params && params.accounts !== undefined ? String(params.accounts) : String(input);
+  const accounts = raw.split(";").map((a) => a.trim()).filter(Boolean).map((a) => {
+    const [name, emailsStr] = a.split(":");
+    return [name.trim(), ...emailsStr.split(",").map((e) => e.trim())];
+  });
+
+  const steps = [];
+  const parent = {};
+  const emailName = {};
+  const find = (x) => { parent[x] = parent[x] === undefined ? x : parent[x]; while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { parent[find(a)] = find(b); };
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title, arr: [], highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Union-Find trên các email", en: "Union-Find over emails" },
+    codeLines: [1, 2],
+    vars: [{ name: "accounts", value: accounts.length }],
+    note: {
+      vi: `Mỗi email là 1 node. Trong cùng 1 account, union mọi email với email đầu tiên. Các account chia sẻ email → gộp chung.\nCuối cùng gom email theo root, sắp xếp, gắn tên.`,
+      en: `Each email is a node. Within an account, union all emails with the first. Accounts sharing an email get merged.\nFinally group emails by root, sort, and attach the owner's name.`,
+    },
+  });
+
+  for (const acc of accounts) {
+    const name = acc[0];
+    const emails = acc.slice(1);
+    for (const e of emails) { emailName[e] = name; find(e); }
+    for (let i = 1; i < emails.length; i++) union(emails[i], emails[0]);
+    snap({
+      title: { vi: `Account "${name}": union ${emails.length} email`, en: `Account "${name}": union ${emails.length} emails` },
+      codeLines: [3, 4, 5],
+      vars: [
+        { name: "name", value: name },
+        { name: "emails", value: emails.join(", ") },
+      ],
+      note: { vi: `Nối tất cả email của "${name}" về cùng nhóm (union với email đầu). Nếu email đã thuộc account khác → 2 account tự động gộp.`, en: `Union all of "${name}"'s emails into one group (with the first). If an email belongs to another account → those accounts merge automatically.` },
+    });
+  }
+
+  // Group by root
+  const groups = {};
+  for (const e of Object.keys(emailName)) {
+    const r = find(e);
+    (groups[r] = groups[r] || []).push(e);
+  }
+  const result = Object.values(groups).map((emails) => [emailName[emails[0]], ...emails.sort()]);
+
+  snap({
+    title: { vi: `Gom nhóm: ${result.length} account sau khi gộp`, en: `Group: ${result.length} accounts after merge` },
+    final: true, codeLines: [6, 7],
+    vars: [{ name: "answer", value: JSON.stringify(result) }],
+    note: {
+      vi: `Gom email theo root, sắp xếp mỗi nhóm, gắn tên chủ. Kết quả ${result.length} account:\n${result.map((g) => `${g[0]}: ${g.slice(1).join(", ")}`).join("\n")}`,
+      en: `Group emails by root, sort each group, attach the owner. ${result.length} merged accounts:\n${result.map((g) => `${g[0]}: ${g.slice(1).join(", ")}`).join("\n")}`,
+    },
+  });
+
+  return { original: accounts, answer: result, steps };
+}
+
 module.exports = {
+  684: {
+    id: 684,
+    difficulty: "medium",
+    slug: "redundant-connection",
+    category: { key: "union-find", vi: "Union Find", en: "Union Find" },
+    title: { vi: "Redundant Connection", en: "Redundant Connection" },
+    titleVi: { vi: "Cạnh thừa tạo chu trình (Union-Find)", en: "Redundant edge forming a cycle (Union-Find)" },
+    statement: {
+      vi: "Cho đồ thị n đỉnh và n cạnh (thừa 1 cạnh so với cây). Tìm cạnh thừa (xuất hiện sau cùng) mà bỏ đi được cây. Nhập cạnh dạng u,v cách nhau ';'.",
+      en: "Given a graph with n nodes and n edges (one extra vs a tree), find the redundant edge (the last one) whose removal yields a tree. Enter edges as u,v separated by ';'.",
+    },
+    defaultInput: "1,2;1,3;2,3",
+    inputKind: "string",
+    inputLabel: { vi: "Cạnh (u,v; cách bởi ;)", en: "Edges (u,v; separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Union-Find: mỗi đỉnh có parent, ban đầu là chính nó.", en: "Union-Find: each node has a parent, initially itself." },
+      { vi: "Thêm từng cạnh: nếu 2 đầu KHÁC nhóm → union.", en: "Add each edge: if endpoints are in DIFFERENT groups → union." },
+      { vi: "Nếu 2 đầu ĐÃ cùng nhóm → cạnh này tạo chu trình → cạnh thừa.", en: "If endpoints are ALREADY in the same group → this edge forms a cycle → redundant." },
+    ],
+    complexity: { time: "O(n·α(n))", space: "O(n)", note: { vi: "Union-Find với nén đường đi gần như O(1)/thao tác.", en: "Union-Find with path compression is near O(1)/op." } },
+    code: [
+      "class Solution:",
+      "    def findRedundantConnection(self, edges):",
+      "        parent = list(range(len(edges)+1))",
+      "        def find(x):",
+      "            while parent[x] != x: parent[x]=parent[parent[x]]; x=parent[x]",
+      "            return x",
+      "        for u, v in edges:",
+      "            if find(u) == find(v): return [u, v]",
+      "            parent[find(u)] = find(v)",
+      "        return []",
+    ],
+    builder: buildSteps684,
+  },
+  721: {
+    id: 721,
+    difficulty: "medium",
+    slug: "accounts-merge",
+    category: { key: "union-find", vi: "Union Find", en: "Union Find" },
+    title: { vi: "Accounts Merge", en: "Accounts Merge" },
+    titleVi: { vi: "Gộp tài khoản theo email chung (Union-Find)", en: "Merge accounts by shared emails (Union-Find)" },
+    statement: {
+      vi: "Cho danh sách account [tên, email...]. Hai account cùng người nếu chia sẻ ít nhất 1 email. Gộp và trả về [tên, email đã sắp xếp]. Nhập dạng Tên:email1,email2;Tên:email3 (hoặc dùng tham số accounts).",
+      en: "Given accounts [name, emails...]. Two accounts are the same person if they share any email. Merge and return [name, sorted emails]. Enter as Name:email1,email2;Name:email3 (or use the accounts param).",
+    },
+    defaultInput: "John:johnsmith@mail.com,john_newyork@mail.com;John:johnsmith@mail.com,john00@mail.com;Mary:mary@mail.com;John:johnnybravo@mail.com",
+    inputKind: "string",
+    inputLabel: { vi: "Accounts (Tên:emails; ...)", en: "Accounts (Name:emails; ...)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi email là 1 node Union-Find. Trong 1 account, union mọi email với email đầu.", en: "Each email is a Union-Find node. Within an account, union all emails with the first." },
+      { vi: "Account chia sẻ email → cùng root → tự động gộp.", en: "Accounts sharing an email → same root → merged automatically." },
+      { vi: "Gom email theo root, sắp xếp, gắn tên chủ tài khoản.", en: "Group emails by root, sort, attach the owner's name." },
+    ],
+    complexity: { time: "O(N·α + sort)", space: "O(N)", note: { vi: "N = tổng số email. Chi phí chính là sắp xếp email mỗi nhóm.", en: "N = total emails. Dominated by sorting emails per group." } },
+    code: [
+      "class Solution:",
+      "    def accountsMerge(self, accounts):",
+      "        parent = {}; email_name = {}",
+      "        # find/union with path compression",
+      "        for acc in accounts:",
+      "            for email in acc[1:]: email_name[email]=acc[0]; union(email, acc[1])",
+      "        groups = defaultdict(list)",
+      "        for email in email_name: groups[find(email)].append(email)",
+      "        return [[email_name[g[0]]] + sorted(g) for g in groups.values()]",
+    ],
+    builder: buildSteps721,
+  },
   547: {
     id: 547,
     difficulty: "medium",
