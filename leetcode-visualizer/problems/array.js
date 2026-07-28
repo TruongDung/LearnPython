@@ -2332,7 +2332,162 @@ function buildSteps268(input) {
   return { original: nums, answer: result, steps };
 }
 
+function parseMatrix(input) {
+  return String(input).split(/[;|]/).map((r) => r.trim()).filter(Boolean).map((r) => r.split(",").map((v) => Number(v.trim())));
+}
+
+/** LeetCode 48: Rotate Image — transpose then reverse rows. */
+function buildSteps48(input) {
+  const m = parseMatrix(input);
+  const n = m.length;
+  const steps = [];
+  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: n }, (_, i) => String(i)).join(""), text2: Array.from({ length: n }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  gsnap({ title: { vi: "Xoay 90° = transpose + đảo mỗi hàng", en: "Rotate 90° = transpose + reverse rows" }, codeLines: [3], vars: [{ name: "n", value: n }], note: { vi: "Bước 1: hoán vị qua đường chéo chính (transpose). Bước 2: đảo ngược từng hàng.", en: "Step 1: swap across the main diagonal (transpose). Step 2: reverse each row." } });
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { [m[i][j], m[j][i]] = [m[j][i], m[i][j]]; gsnap({ title: { vi: `Transpose: swap (${i},${j}) ↔ (${j},${i})`, en: `Transpose: swap (${i},${j}) ↔ (${j},${i})` }, hlCell: [i, j], pathCells: [[j, i]], codeLines: [4, 5, 6], vars: [{ name: "i,j", value: `${i},${j}` }], note: { vi: `Đổi phần tử đối xứng qua đường chéo.`, en: `Swap the elements symmetric about the diagonal.` } }); }
+  for (let i = 0; i < n; i++) { m[i].reverse(); gsnap({ title: { vi: `Đảo hàng ${i}`, en: `Reverse row ${i}` }, hlCell: [i, 0], codeLines: [7, 8], vars: [{ name: "row", value: i }], note: { vi: `Đảo ngược hàng ${i} → hoàn tất xoay hàng này.`, en: `Reverse row ${i} → this row is rotated.` } }); }
+  gsnap({ title: { vi: "Hoàn tất xoay 90°", en: "Rotation 90° complete" }, final: true, codeLines: [8], vars: [{ name: "matrix", value: JSON.stringify(m) }], note: { vi: `Ma trận đã xoay 90° theo chiều kim đồng hồ.`, en: `Matrix rotated 90° clockwise.` } });
+  return { original: m, answer: m, steps };
+}
+
+/** LeetCode 54: Spiral Matrix. */
+function buildSteps54(input) {
+  const m = parseMatrix(input);
+  const R = m.length, C = m[0].length;
+  const steps = [];
+  const result = [];
+  const visited = new Set();
+  function gsnap(o) { steps.push({ title: o.title, arr: [], grid: { dp: m.map((r) => [...r]), text1: Array.from({ length: R }, (_, i) => String(i)).join(""), text2: Array.from({ length: C }, (_, i) => String(i)).join(""), hlCell: o.hlCell || null, pathCells: [...visited].map((k) => k.split(",").map(Number)), largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  let top = 0, bottom = R - 1, left = 0, right = C - 1;
+  gsnap({ title: { vi: "4 biên: top,bottom,left,right", en: "4 bounds: top,bottom,left,right" }, codeLines: [3, 4], vars: [{ name: "R,C", value: `${R},${C}` }], note: { vi: "Đi theo vòng xoắn: →, ↓, ←, ↑, thu hẹp biên sau mỗi cạnh.", en: "Traverse in a spiral: →, ↓, ←, ↑, shrinking the bounds after each edge." } });
+  while (top <= bottom && left <= right) {
+    for (let c = left; c <= right; c++) { result.push(m[top][c]); visited.add(`${top},${c}`); }
+    gsnap({ title: { vi: `Hàng trên ${top}: →`, en: `Top row ${top}: →` }, hlCell: [top, right], codeLines: [5, 6, 7], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi trái→phải hàng ${top}. top++.`, en: `Go left→right on row ${top}. top++.` } });
+    top++;
+    for (let r = top; r <= bottom; r++) { result.push(m[r][right]); visited.add(`${r},${right}`); }
+    gsnap({ title: { vi: `Cột phải ${right}: ↓`, en: `Right col ${right}: ↓` }, hlCell: [bottom, right], codeLines: [8, 9, 10], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi trên→dưới cột ${right}. right--.`, en: `Go top→bottom on col ${right}. right--.` } });
+    right--;
+    if (top <= bottom) { for (let c = right; c >= left; c--) { result.push(m[bottom][c]); visited.add(`${bottom},${c}`); } gsnap({ title: { vi: `Hàng dưới ${bottom}: ←`, en: `Bottom row ${bottom}: ←` }, hlCell: [bottom, left], codeLines: [11, 12, 13], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi phải→trái hàng ${bottom}. bottom--.`, en: `Go right→left on row ${bottom}. bottom--.` } }); bottom--; }
+    if (left <= right) { for (let r = bottom; r >= top; r--) { result.push(m[r][left]); visited.add(`${r},${left}`); } gsnap({ title: { vi: `Cột trái ${left}: ↑`, en: `Left col ${left}: ↑` }, hlCell: [top, left], codeLines: [14, 15, 16], vars: [{ name: "result", value: `[${result.join(",")}]` }], note: { vi: `Đi dưới→trên cột ${left}. left++.`, en: `Go bottom→top on col ${left}. left++.` } }); left++; }
+  }
+  gsnap({ title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, final: true, codeLines: [17], vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Thứ tự xoắn ốc.`, en: `Spiral order.` } });
+  return { original: m, answer: result, steps };
+}
+
+/** LeetCode 189: Rotate Array — reverse trick. */
+function buildSteps189(input, params) {
+  const arr = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = arr.length;
+  let k = (params && params.k !== undefined ? Number(params.k) : 3) % n;
+  const steps = [];
+  const rev = (lo, hi) => { while (lo < hi) { [arr[lo], arr[hi]] = [arr[hi], arr[lo]]; lo++; hi--; } };
+  steps.push({ title: { vi: `k = ${k}`, en: `k = ${k}` }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "n", value: n }, { name: "k", value: k }], note: { vi: "Xoay phải k = đảo toàn bộ, rồi đảo k phần tử đầu, rồi đảo phần còn lại.", en: "Right rotate by k = reverse whole, reverse first k, reverse the rest." } });
+  rev(0, n - 1);
+  steps.push({ title: { vi: "Đảo toàn bộ mảng", en: "Reverse the whole array" }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: Array.from({ length: n }, (_, i) => i), codeLines: [4], vars: [{ name: "arr", value: `[${arr.join(",")}]` }], note: { vi: "Bước 1: đảo ngược toàn bộ.", en: "Step 1: reverse everything." } });
+  rev(0, k - 1);
+  steps.push({ title: { vi: `Đảo ${k} phần tử đầu`, en: `Reverse first ${k}` }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: Array.from({ length: k }, (_, i) => i), codeLines: [5], vars: [{ name: "arr", value: `[${arr.join(",")}]` }], note: { vi: "Bước 2: đảo k phần tử đầu để đúng thứ tự.", en: "Step 2: reverse the first k to fix order." } });
+  rev(k, n - 1);
+  steps.push({ title: { vi: `Đảo phần còn lại`, en: `Reverse the rest` }, arr: [...arr], sub: arr.map((_, i) => `[${i}]`), highlight: [], mark: Array.from({ length: n - k }, (_, i) => k + i), final: true, codeLines: [6], vars: [{ name: "answer", value: `[${arr.join(",")}]` }], note: { vi: `Bước 3: đảo phần còn lại → mảng đã xoay phải ${k}.`, en: `Step 3: reverse the rest → array rotated right by ${k}.` } });
+  return { original: input, answer: arr, steps };
+}
+
+/** LeetCode 238: Product of Array Except Self — prefix × suffix. */
+function buildSteps238(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = nums.length;
+  const ans = new Array(n).fill(1);
+  const steps = [];
+  steps.push({ title: { vi: "answer = [1,...]", en: "answer = [1,...]" }, arr: [...nums], sub: ans.map(String), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }], note: { vi: "answer[i] = tích prefix (bên trái) × tích suffix (bên phải), không dùng phép chia.", en: "answer[i] = prefix product (left) × suffix product (right), without division." } });
+  let prefix = 1;
+  for (let i = 0; i < n; i++) { ans[i] = prefix; prefix *= nums[i]; steps.push({ title: { vi: `prefix pass i=${i}: answer[${i}]=${ans[i]}`, en: `prefix pass i=${i}: answer[${i}]=${ans[i]}` }, arr: [...nums], sub: ans.map(String), highlight: [i], mark: [], codeLines: [4, 5, 6], vars: [{ name: "i", value: i }, { name: "prefix (after)", value: prefix }, { name: "answer", value: `[${ans.join(",")}]` }], note: { vi: `answer[${i}] = tích các phần tử bên TRÁI = ${ans[i]}. prefix nhân nums[${i}] → ${prefix}.`, en: `answer[${i}] = product of elements to the LEFT = ${ans[i]}. prefix ×= nums[${i}] → ${prefix}.` } }); }
+  let suffix = 1;
+  for (let i = n - 1; i >= 0; i--) { ans[i] *= suffix; suffix *= nums[i]; steps.push({ title: { vi: `suffix pass i=${i}: answer[${i}]=${ans[i]}`, en: `suffix pass i=${i}: answer[${i}]=${ans[i]}` }, arr: [...nums], sub: ans.map(String), highlight: [i], mark: [], codeLines: [7, 8, 9], vars: [{ name: "i", value: i }, { name: "suffix (after)", value: suffix }, { name: "answer", value: `[${ans.join(",")}]` }], note: { vi: `answer[${i}] ×= tích bên PHẢI → ${ans[i]}. suffix nhân nums[${i}] → ${suffix}.`, en: `answer[${i}] ×= product to the RIGHT → ${ans[i]}. suffix ×= nums[${i}] → ${suffix}.` } }); }
+  steps.push({ title: { vi: `Kết quả: [${ans.join(",")}]`, en: `Result: [${ans.join(",")}]` }, arr: [...nums], sub: ans.map(String), highlight: [], mark: Array.from({ length: n }, (_, i) => i), final: true, codeLines: [10], vars: [{ name: "answer", value: `[${ans.join(",")}]` }], note: { vi: "Tích mọi phần tử trừ chính nó.", en: "Product of all elements except self." } });
+  return { original: nums, answer: ans, steps };
+}
+
+/** LeetCode 128: Longest Consecutive Sequence — hash set, only start at run heads. */
+function buildSteps128(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const set = new Set(nums);
+  const steps = [];
+  let best = 0;
+  steps.push({ title: { vi: "num_set = set(nums)", en: "num_set = set(nums)" }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "num_set", value: `{${[...set].join(",")}}` }], note: { vi: "Với mỗi số là ĐẦU dãy (num-1 không có trong set), đếm độ dài dãy liên tiếp.", en: "For each number that STARTS a run (num-1 not in set), count the consecutive run length." } });
+  for (const num of set) {
+    if (!set.has(num - 1)) {
+      let len = 1;
+      while (set.has(num + len)) len++;
+      best = Math.max(best, len);
+      steps.push({ title: { vi: `${num} là đầu dãy → dài ${len}`, en: `${num} starts a run → length ${len}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: nums.map((v, i) => (v >= num && v < num + len ? i : -1)).filter((x) => x >= 0), mark: [], codeLines: [4, 5, 6, 7, 8], vars: [{ name: "num", value: num }, { name: "run length", value: len }, { name: "best", value: best }], note: { vi: `${num - 1} không có trong set → ${num} là đầu dãy. Đếm ${num}..${num + len - 1} → độ dài ${len}. best=${best}.`, en: `${num - 1} not in set → ${num} is a run head. Count ${num}..${num + len - 1} → length ${len}. best=${best}.` } });
+    } else {
+      steps.push({ title: { vi: `${num} không phải đầu dãy → bỏ`, en: `${num} not a run head → skip` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [4], vars: [{ name: "num", value: num }], note: { vi: `${num - 1} có trong set → ${num} nằm giữa dãy → bỏ để tránh đếm lại.`, en: `${num - 1} in set → ${num} is mid-run → skip to avoid recount.` } });
+    }
+  }
+  steps.push({ title: { vi: `Đáp án: ${best}`, en: `Answer: ${best}` }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true, codeLines: [9], vars: [{ name: "answer", value: best }], note: { vi: `Dãy liên tiếp dài nhất = ${best}.`, en: `Longest consecutive run = ${best}.` } });
+  return { original: nums, answer: best, steps };
+}
+
 module.exports = {
+  48: {
+    id: 48, difficulty: "medium", slug: "rotate-image",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Rotate Image", en: "Rotate Image" },
+    titleVi: { vi: "Xoay ma trận 90° (transpose + reverse)", en: "Rotate matrix 90° (transpose + reverse)" },
+    statement: { vi: "Xoay ma trận n×n 90° theo chiều kim đồng hồ, tại chỗ. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Rotate an n×n matrix 90° clockwise, in place. Enter matrix: rows separated by ';', values by ','." },
+    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Transpose: đổi phần tử qua đường chéo chính.", en: "Transpose: swap elements across the main diagonal." }, { vi: "Đảo ngược từng hàng → xoay 90° clockwise.", en: "Reverse each row → 90° clockwise rotation." }],
+    complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Tại chỗ.", en: "In-place." } },
+    code: ["class Solution:", "    def rotate(self, matrix):", "        n = len(matrix)", "        for i in range(n):", "            for j in range(i+1, n):", "                matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]", "        for row in matrix:", "            row.reverse()"],
+    builder: buildSteps48,
+  },
+  54: {
+    id: 54, difficulty: "medium", slug: "spiral-matrix",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Spiral Matrix", en: "Spiral Matrix" },
+    titleVi: { vi: "Duyệt ma trận theo xoắn ốc", en: "Traverse matrix in spiral order" },
+    statement: { vi: "Trả về mọi phần tử theo thứ tự xoắn ốc. Nhập ma trận: hàng cách ';', giá trị cách ','.", en: "Return all elements in spiral order. Enter matrix: rows separated by ';', values by ','." },
+    defaultInput: "1,2,3;4,5,6;7,8,9", inputKind: "string", inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" }, extraParams: [],
+    approach: [{ vi: "Giữ 4 biên top/bottom/left/right.", en: "Keep 4 bounds top/bottom/left/right." }, { vi: "Đi →, ↓, ←, ↑ và thu hẹp biên sau mỗi cạnh.", en: "Go →, ↓, ←, ↑ and shrink a bound after each edge." }],
+    complexity: { time: "O(R·C)", space: "O(1)", note: { vi: "Mỗi ô thăm 1 lần.", en: "Each cell visited once." } },
+    code: ["class Solution:", "    def spiralOrder(self, matrix):", "        res = []; top, bottom = 0, len(matrix)-1", "        left, right = 0, len(matrix[0])-1", "        while top <= bottom and left <= right:", "            for c in range(left, right+1): res.append(matrix[top][c])", "            top += 1", "            for r in range(top, bottom+1): res.append(matrix[r][right])", "            right -= 1", "            if top <= bottom:", "                for c in range(right, left-1, -1): res.append(matrix[bottom][c])", "                bottom -= 1", "            if left <= right:", "                for r in range(bottom, top-1, -1): res.append(matrix[r][left])", "                left += 1", "        return res"],
+    builder: buildSteps54,
+  },
+  189: {
+    id: 189, difficulty: "medium", slug: "rotate-array",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Rotate Array", en: "Rotate Array" },
+    titleVi: { vi: "Xoay mảng phải k bước (mẹo đảo ngược)", en: "Rotate array right by k (reverse trick)" },
+    statement: { vi: "Xoay mảng sang phải k bước, tại chỗ. Nhập nums; k trong tham số.", en: "Rotate the array right by k steps, in place. Enter nums; k as a parameter." },
+    defaultInput: [1, 2, 3, 4, 5, 6, 7], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "k", label: { vi: "k", en: "k" }, default: 3 }],
+    approach: [{ vi: "k %= n.", en: "k %= n." }, { vi: "Đảo toàn bộ mảng.", en: "Reverse the whole array." }, { vi: "Đảo k phần tử đầu.", en: "Reverse the first k." }, { vi: "Đảo phần còn lại.", en: "Reverse the rest." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "3 lần đảo, tại chỗ.", en: "Three reversals, in-place." } },
+    code: ["class Solution:", "    def rotate(self, nums, k):", "        n = len(nums); k %= n", "        nums.reverse()", "        nums[:k] = reversed(nums[:k])", "        nums[k:] = reversed(nums[k:])"],
+    builder: buildSteps189,
+  },
+  238: {
+    id: 238, difficulty: "medium", slug: "product-of-array-except-self",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Product of Array Except Self", en: "Product of Array Except Self" },
+    titleVi: { vi: "Tích trừ chính nó (prefix × suffix)", en: "Product except self (prefix × suffix)" },
+    statement: { vi: "answer[i] = tích mọi phần tử trừ nums[i], KHÔNG dùng phép chia. Nhập nums cách nhau dấu phẩy.", en: "answer[i] = product of all elements except nums[i], WITHOUT division. Enter nums comma-separated." },
+    defaultInput: [1, 2, 3, 4], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [{ vi: "Lượt 1: answer[i] = tích các phần tử bên trái (prefix).", en: "Pass 1: answer[i] = product of elements to the left (prefix)." }, { vi: "Lượt 2: nhân thêm tích các phần tử bên phải (suffix).", en: "Pass 2: multiply by the product of elements to the right (suffix)." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Không tính mảng output.", en: "Excluding the output array." } },
+    code: ["class Solution:", "    def productExceptSelf(self, nums):", "        n = len(nums); answer = [1]*n", "        prefix = 1", "        for i in range(n):", "            answer[i] = prefix; prefix *= nums[i]", "        suffix = 1", "        for i in range(n-1, -1, -1):", "            answer[i] *= suffix; suffix *= nums[i]", "        return answer"],
+    builder: buildSteps238,
+  },
+  128: {
+    id: 128, difficulty: "medium", slug: "longest-consecutive-sequence",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Longest Consecutive Sequence", en: "Longest Consecutive Sequence" },
+    titleVi: { vi: "Dãy liên tiếp dài nhất (hash set)", en: "Longest consecutive run (hash set)" },
+    statement: { vi: "Tìm độ dài dãy số liên tiếp dài nhất, O(n). Nhập nums cách nhau dấu phẩy.", en: "Find the length of the longest run of consecutive integers, O(n). Enter nums comma-separated." },
+    defaultInput: [100, 4, 200, 1, 3, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [{ vi: "Đưa vào set để tra cứu O(1).", en: "Put into a set for O(1) lookups." }, { vi: "Chỉ bắt đầu đếm tại ĐẦU dãy (num-1 không có trong set).", en: "Only count from a run HEAD (num-1 not in set)." }, { vi: "Đếm num, num+1, num+2, ... trong set.", en: "Count num, num+1, num+2, ... in the set." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi số được thăm tối đa 2 lần.", en: "Each number is visited at most twice." } },
+    code: ["class Solution:", "    def longestConsecutive(self, nums):", "        num_set = set(nums); best = 0", "        for num in num_set:", "            if num - 1 not in num_set:", "                length = 1", "                while num + length in num_set: length += 1", "                best = max(best, length)", "        return best"],
+    builder: buildSteps128,
+  },
   66: {
     id: 66,
     difficulty: "easy",
