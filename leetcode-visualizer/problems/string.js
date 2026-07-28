@@ -7694,7 +7694,105 @@ function buildSteps58(input) {
   return { original: s, answer: length, steps };
 }
 
+/** LeetCode 8: String to Integer (atoi). */
+function buildSteps8(input) {
+  const s = String(input);
+  const chars = s.split("");
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], grid: { dp: [["", ...chars.map((c) => c === " " ? "␣" : c)]], text1: "", text2: s, colLabels: chars.map((c, i) => ({ index: `${i}`, char: c === " " ? "␣" : c })), hlCell: Number.isInteger(o.focus) ? [0, o.focus + 1] : null, largeCells: true }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  let i = 0, n = s.length;
+  snap({ title: { vi: "Bỏ khoảng trắng đầu", en: "Skip leading spaces" }, focus: 0, codeLines: [3, 4], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "1) bỏ khoảng trắng, 2) đọc dấu, 3) đọc chữ số, 4) chặn trong [-2³¹, 2³¹-1].", en: "1) skip spaces, 2) read sign, 3) read digits, 4) clamp to [-2³¹, 2³¹-1]." } });
+  while (i < n && s[i] === ' ') i++;
+  let sign = 1;
+  if (i < n && (s[i] === '+' || s[i] === '-')) { if (s[i] === '-') sign = -1; snap({ title: { vi: `Dấu '${s[i]}' → sign=${sign}`, en: `Sign '${s[i]}' → sign=${sign}` }, focus: i, codeLines: [5, 6, 7], vars: [{ name: "sign", value: sign }, { name: "i", value: i } ], note: { vi: `Đọc dấu.`, en: `Read the sign.` } }); i++; }
+  let num = 0;
+  while (i < n && s[i] >= '0' && s[i] <= '9') { num = num * 10 + (s.charCodeAt(i) - 48); snap({ title: { vi: `Chữ số '${s[i]}' → num=${num}`, en: `Digit '${s[i]}' → num=${num}` }, focus: i, codeLines: [8, 9], vars: [{ name: "digit", value: s[i] }, { name: "num", value: num }], note: { vi: `num = num*10 + ${s[i]} = ${num}.`, en: `num = num*10 + ${s[i]} = ${num}.` } }); i++; }
+  num *= sign;
+  const clamped = Math.max(-(2 ** 31), Math.min(2 ** 31 - 1, num));
+  snap({ title: { vi: `Chặn phạm vi → ${clamped}`, en: `Clamp to range → ${clamped}` }, final: true, codeLines: [10, 11], vars: [{ name: "num*sign", value: num }, { name: "answer", value: clamped }], note: { vi: `Áp dấu ${sign} và chặn trong [-2³¹, 2³¹-1] → ${clamped}.`, en: `Apply sign ${sign} and clamp to [-2³¹, 2³¹-1] → ${clamped}.` } });
+  return { original: s, answer: clamped, steps };
+}
+
+/** LeetCode 67: Add Binary. */
+function buildSteps67(input, params) {
+  const a = String(input);
+  const b = String(params && params.b !== undefined ? params.b : "1");
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: `a="${a}", b="${b}"`, en: `a="${a}", b="${b}"` }, codeLines: [3], vars: [{ name: "a", value: a }, { name: "b", value: b }], note: { vi: "Cộng nhị phân từ phải sang, giữ carry.", en: "Add binary from the right, carrying." } });
+  let i = a.length - 1, j = b.length - 1, carry = 0;
+  const res = [];
+  while (i >= 0 || j >= 0 || carry) {
+    let total = carry;
+    if (i >= 0) total += a.charCodeAt(i) - 48;
+    if (j >= 0) total += b.charCodeAt(j) - 48;
+    res.push(total % 2);
+    carry = Math.floor(total / 2);
+    snap({ title: { vi: `bit: a[${i}]+b[${j}]+carry → ghi ${total % 2}, carry=${carry}`, en: `bit: a[${i}]+b[${j}]+carry → write ${total % 2}, carry=${carry}` }, codeLines: [4, 5, 6, 7, 8], vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "total", value: total }, { name: "result", value: [...res].reverse().join("") }, { name: "carry", value: carry }], note: { vi: `Tổng ${total} → bit ${total % 2}, nhớ ${carry}.`, en: `Sum ${total} → bit ${total % 2}, carry ${carry}.` } });
+    i--; j--;
+  }
+  const answer = res.reverse().join("");
+  snap({ title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` }, final: true, codeLines: [9], vars: [{ name: "answer", value: `"${answer}"` }], note: { vi: `Tổng nhị phân = ${answer}.`, en: `Binary sum = ${answer}.` } });
+  return { original: a, answer, steps };
+}
+
+/** LeetCode 224: Basic Calculator — stack for parentheses. */
+function buildSteps224(input) {
+  const s = String(input);
+  const steps = [];
+  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
+  snap({ title: { vi: "Khởi tạo result=0, sign=+1, stack=[]", en: "Init result=0, sign=+1, stack=[]" }, codeLines: [3], vars: [{ name: "s", value: `"${s}"` }], note: { vi: "Duyệt ký tự: gộp số; +/- cập nhật result; '(' đẩy ngữ cảnh; ')' gộp lại.", en: "Scan chars: build numbers; +/- update result; '(' pushes context; ')' merges back." } });
+  let result = 0, sign = 1, num = 0;
+  const stack = [];
+  for (const ch of s) {
+    if (ch >= '0' && ch <= '9') { num = num * 10 + (ch.charCodeAt(0) - 48); }
+    else if (ch === '+' || ch === '-') { result += sign * num; num = 0; sign = ch === '+' ? 1 : -1; snap({ title: { vi: `'${ch}' → result=${result}, sign=${sign}`, en: `'${ch}' → result=${result}, sign=${sign}` }, codeLines: [4, 5, 6], vars: [{ name: "result", value: result }, { name: "sign", value: sign }], note: { vi: `Cộng số trước vào result, đặt dấu mới.`, en: `Add the previous number to result, set the new sign.` } }); }
+    else if (ch === '(') { stack.push(result); stack.push(sign); result = 0; sign = 1; snap({ title: { vi: `'(' → đẩy (result, sign) vào stack`, en: `'(' → push (result, sign) onto stack` }, codeLines: [7, 8, 9], vars: [{ name: "stack", value: `[${stack.join(",")}]` }], note: { vi: `Lưu ngữ cảnh, bắt đầu tính trong ngoặc.`, en: `Save context, start evaluating inside the parentheses.` } }); }
+    else if (ch === ')') { result += sign * num; num = 0; result *= stack.pop(); result += stack.pop(); snap({ title: { vi: `')' → gộp: result=${result}`, en: `')' → merge: result=${result}` }, codeLines: [10, 11, 12], vars: [{ name: "result", value: result }, { name: "stack", value: `[${stack.join(",")}]` }], note: { vi: `Kết thúc ngoặc: nhân dấu trước '(' rồi cộng result trước '('.`, en: `Close the group: multiply by the sign before '(' then add the result before '('.` } }); }
+  }
+  const answer = result + sign * num;
+  snap({ title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` }, final: true, codeLines: [13], vars: [{ name: "answer", value: answer }], note: { vi: `Cộng nốt số cuối → ${answer}.`, en: `Add the final number → ${answer}.` } });
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  8: {
+    id: 8, difficulty: "medium", slug: "string-to-integer-atoi",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "String to Integer (atoi)", en: "String to Integer (atoi)" },
+    titleVi: { vi: "Chuyển chuỗi thành số nguyên", en: "Parse a string into an integer" },
+    statement: { vi: "Chuyển chuỗi thành số nguyên 32-bit theo luật atoi (bỏ khoảng trắng, dấu, chữ số, chặn phạm vi). Nhập chuỗi s.", en: "Convert a string to a 32-bit integer per atoi rules (skip spaces, sign, digits, clamp range). Enter the string s." },
+    defaultInput: "   -042", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [{ vi: "Bỏ khoảng trắng đầu.", en: "Skip leading spaces." }, { vi: "Đọc dấu +/- nếu có.", en: "Read an optional +/- sign." }, { vi: "Đọc các chữ số liên tiếp.", en: "Read consecutive digits." }, { vi: "Chặn trong [-2³¹, 2³¹-1].", en: "Clamp to [-2³¹, 2³¹-1]." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt.", en: "Single pass." } },
+    code: ["class Solution:", "    def myAtoi(self, s):", "        i, n = 0, len(s)", "        while i < n and s[i] == ' ': i += 1", "        sign = 1", "        if i < n and s[i] in '+-':", "            sign = -1 if s[i]=='-' else 1; i += 1", "        num = 0", "        while i < n and s[i].isdigit():", "            num = num*10 + int(s[i]); i += 1", "        num *= sign", "        return max(-2**31, min(2**31-1, num))"],
+    builder: buildSteps8,
+  },
+  67: {
+    id: 67, difficulty: "easy", slug: "add-binary",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Add Binary", en: "Add Binary" },
+    titleVi: { vi: "Cộng hai số nhị phân dạng chuỗi", en: "Add two binary strings" },
+    statement: { vi: "Cộng hai chuỗi nhị phân, trả về chuỗi nhị phân. Nhập a; b trong tham số.", en: "Add two binary strings, return a binary string. Enter a; b as a parameter." },
+    defaultInput: "1010", inputKind: "string", inputLabel: { vi: "a", en: "a" },
+    extraParams: [{ key: "b", label: { vi: "b", en: "b" }, default: "1011" }],
+    approach: [{ vi: "Cộng từ phải sang trái, giữ carry.", en: "Add from right to left, carrying." }, { vi: "Mỗi vị trí: total = bit a + bit b + carry.", en: "Each position: total = bit a + bit b + carry." }, { vi: "Ghi total%2, carry = total//2.", en: "Write total%2, carry = total//2." }],
+    complexity: { time: "O(max(m,n))", space: "O(max(m,n))", note: { vi: "Duyệt song song hai chuỗi.", en: "Walk both strings in parallel." } },
+    code: ["class Solution:", "    def addBinary(self, a, b):", "        i, j, carry, res = len(a)-1, len(b)-1, 0, []", "        while i >= 0 or j >= 0 or carry:", "            total = carry", "            if i >= 0: total += int(a[i]); i -= 1", "            if j >= 0: total += int(b[j]); j -= 1", "            res.append(str(total % 2)); carry = total // 2", "        return ''.join(reversed(res))"],
+    builder: buildSteps67,
+  },
+  224: {
+    id: 224, difficulty: "hard", slug: "basic-calculator",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Basic Calculator", en: "Basic Calculator" },
+    titleVi: { vi: "Máy tính cơ bản (+, -, ngoặc) dùng stack", en: "Basic calculator (+, -, parentheses) using a stack" },
+    statement: { vi: "Tính biểu thức gồm +, -, ( ) và số. Nhập biểu thức s.", en: "Evaluate an expression with +, -, ( ) and integers. Enter the expression s." },
+    defaultInput: "(1+(4+5+2)-3)+(6+8)", inputKind: "string", inputLabel: { vi: "s", en: "s" }, extraParams: [],
+    approach: [{ vi: "Giữ result, sign, num khi duyệt.", en: "Track result, sign, num while scanning." }, { vi: "+/-: cộng num vào result, cập nhật sign.", en: "+/-: add num to result, update sign." }, { vi: "'(': đẩy (result, sign) vào stack, reset.", en: "'(': push (result, sign) onto the stack, reset." }, { vi: "')': gộp result với ngữ cảnh trên stack.", en: "')': merge result with the context on the stack." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Stack cho các ngoặc lồng nhau.", en: "Stack for nested parentheses." } },
+    code: ["class Solution:", "    def calculate(self, s):", "        result, sign, num, stack = 0, 1, 0, []", "        for ch in s:", "            if ch.isdigit(): num = num*10 + int(ch)", "            elif ch in '+-':", "                result += sign*num; num = 0; sign = 1 if ch=='+' else -1", "            elif ch == '(':", "                stack.append(result); stack.append(sign); result, sign = 0, 1", "            elif ch == ')':", "                result += sign*num; num = 0", "                result *= stack.pop(); result += stack.pop()", "        return result + sign*num"],
+    builder: buildSteps224,
+  },
   14: {
     id: 14,
     difficulty: "easy",
