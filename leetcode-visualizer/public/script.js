@@ -1631,6 +1631,7 @@ function escapeXml(s) {
 
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
+  const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
@@ -1677,7 +1678,7 @@ function renderTree(step, targetId = "treeView") {
     const ux = dx/len, uy = dy/len;
     const x1 = p.x + ux * (r + 2), y1 = p.y + uy * (r + 2);
     const x2 = c.x - ux * (r + 4), y2 = c.y - uy * (r + 4);
-    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="tree-edge" marker-end="url(#tree-arrow)" />`;
+    edges += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="tree-edge" marker-end="url(#${arrowId})" />`;
   });
 
   let circles = "";
@@ -1732,7 +1733,7 @@ function renderTree(step, targetId = "treeView") {
 
   const treeHtml =
     `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
-    `<defs><marker id="tree-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
+    `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +
     levelLabels +
@@ -1755,6 +1756,64 @@ function renderTree(step, targetId = "treeView") {
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
       </div>`
     : treeHtml);
+}
+
+function renderSameTreeView(step) {
+  const view = step.sameTreeView;
+  const treeView = $("treeView");
+  const pValue = pick(view.pValue);
+  const qValue = pick(view.qValue);
+  const statusClass = view.status === "match"
+    ? "is-match"
+    : view.status === "mismatch"
+      ? "is-mismatch"
+      : "is-checking";
+  const resultLabel = view.result === true
+    ? (lang === "vi" ? "True · giống" : "True · same")
+    : view.result === false
+      ? (lang === "vi" ? "False · khác" : "False · different")
+      : pick(view.statusText);
+  const pathLabel = view.path === "done" ? (lang === "vi" ? "hoàn tất" : "complete") : view.path;
+  const summary = lang === "vi"
+    ? `So sánh cây p và q tại ${pathLabel}: ${pValue} ${view.relation} ${qValue}. ${pick(view.statusText)}.`
+    : `Comparing trees p and q at ${pathLabel}: ${pValue} ${view.relation} ${qValue}. ${pick(view.statusText)}.`;
+
+  treeView.innerHTML = `<div class="same-tree-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="same-tree-compare">
+      <span class="same-tree-path"><small>${lang === "vi" ? "VỊ TRÍ" : "PATH"}</small><code>${escapeHtml(pathLabel)}</code></span>
+      <div class="same-tree-pair" aria-hidden="true">
+        <span class="same-tree-value"><small>p</small><strong>${escapeHtml(pValue)}</strong></span>
+        <span class="same-tree-relation">${escapeHtml(view.relation)}</span>
+        <span class="same-tree-value"><small>q</small><strong>${escapeHtml(qValue)}</strong></span>
+      </div>
+      <span class="same-tree-status ${statusClass}">${escapeHtml(resultLabel)}</span>
+    </div>
+    <div class="same-tree-columns">
+      <section class="same-tree-column" aria-label="${lang === "vi" ? "Cây p" : "Tree p"}">
+        <h4><code>p</code><span>${lang === "vi" ? "cây thứ nhất" : "first tree"}</span></h4>
+        <div id="sameTreeP" class="same-tree-canvas"></div>
+      </section>
+      <section class="same-tree-column" aria-label="${lang === "vi" ? "Cây q" : "Tree q"}">
+        <h4><code>q</code><span>${lang === "vi" ? "cây thứ hai" : "second tree"}</span></h4>
+        <div id="sameTreeQ" class="same-tree-canvas"></div>
+      </section>
+    </div>
+    <div class="same-tree-legend" aria-hidden="true">
+      <span><i class="current"></i>${lang === "vi" ? "đang so sánh" : "current pair"}</span>
+      <span><i class="matched"></i>${lang === "vi" ? "đã khớp" : "matched"}</span>
+      <span><i class="unchecked"></i>${lang === "vi" ? "chưa kiểm tra" : "unchecked"}</span>
+    </div>
+  </div>`;
+
+  const renderSide = (tree, targetId) => {
+    if (tree.nodes.length === 0) {
+      $(targetId).innerHTML = `<span class="same-tree-empty">∅</span>`;
+      return;
+    }
+    renderTree({ tree }, targetId);
+  };
+  renderSide(view.pTree, "sameTreeP");
+  renderSide(view.qTree, "sameTreeQ");
 }
 
 function renderDecisionTree(step) {
@@ -3844,6 +3903,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSkylineView(step);
+  } else if (step.sameTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSameTreeView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

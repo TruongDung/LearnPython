@@ -553,6 +553,187 @@ function buildSteps101(input) {
   return { input, answer, steps };
 }
 
+// ─── 100: Same Tree ───
+function buildSteps100(input, params) {
+  const pRoot = parseTree(input);
+  const qInput = params && typeof params.q === "string" ? params.q : input;
+  const qRoot = parseTree(qInput);
+  const steps = [];
+  const matchedP = new Set();
+  const matchedQ = new Set();
+
+  const nodeValue = (node) => (node ? node.val : "None");
+  const pythonBool = (value) => (value ? "True" : "False");
+  const treeState = (root, current, matched, pointer) => ({
+    nodes: treeToVizNodes(root, current ? new Set([current.id]) : null, matched),
+    annotations: current ? { [current.id]: pointer } : {},
+    showLevels: false,
+  });
+
+  function addStep({
+    title, p, q, pDisplay, qDisplay, path, status, statusText, relation = "↔", codeLines, vars, note, result,
+  }) {
+    steps.push({
+      title,
+      arr: [],
+      sameTreeView: {
+        pTree: treeState(pRoot, p, matchedP, "p"),
+        qTree: treeState(qRoot, q, matchedQ, "q"),
+        pValue: pDisplay !== undefined ? pDisplay : nodeValue(p),
+        qValue: qDisplay !== undefined ? qDisplay : nodeValue(q),
+        path,
+        status,
+        statusText,
+        relation,
+        result,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: codeLines || [],
+      vars: vars || [],
+      note,
+    });
+  }
+
+  function compare(p, q, path) {
+    addStep({
+      title: { vi: `Gọi isSameTree tại ${path}`, en: `Call isSameTree at ${path}` },
+      p, q, path, status: "checking", statusText: { vi: "Bắt đầu so sánh", en: "Start comparison" },
+      codeLines: [2],
+      vars: [{ name: "p", value: nodeValue(p) }, { name: "q", value: nodeValue(q) }, { name: "path", value: path }],
+      note: { vi: `Đặt p và q vào đúng vị trí ${path} của hai cây.`, en: `Place p and q at the same ${path} position in both trees.` },
+    });
+
+    const bothNone = !p && !q;
+    addStep({
+      title: { vi: `Kiểm tra: p và q đều None? → ${pythonBool(bothNone)}`, en: `Check: are p and q both None? → ${pythonBool(bothNone)}` },
+      p, q, path, status: bothNone ? "match" : "checking",
+      statusText: bothNone ? { vi: "Cùng rỗng", en: "Both empty" } : { vi: "Không cùng rỗng", en: "Not both empty" },
+      relation: bothNone ? "=" : "↔", codeLines: [3],
+      vars: [{ name: "not p and not q", value: bothNone }],
+      note: bothNone
+        ? { vi: "Hai vị trí đều không có node nên cấu trúc tại đây giống nhau.", en: "Both positions have no node, so their structure matches here." }
+        : { vi: "Ít nhất một bên còn node, tiếp tục điều kiện kế tiếp.", en: "At least one side has a node, so continue to the next condition." },
+    });
+    if (bothNone) {
+      addStep({
+        title: { vi: `return True cho ${path}`, en: `return True for ${path}` },
+        p, q, path, status: "match", statusText: { vi: "Trả về True", en: "Return True" },
+        relation: "=", codeLines: [4], result: true,
+        vars: [{ name: "return", value: true }, { name: "path", value: path }],
+        note: { vi: "Dòng 4 trả True cho cặp None, None này.", en: "Line 4 returns True for this None, None pair." },
+      });
+      return true;
+    }
+
+    const oneNone = !p || !q;
+    addStep({
+      title: { vi: `Kiểm tra: chỉ một bên là None? → ${pythonBool(oneNone)}`, en: `Check: is exactly one side None? → ${pythonBool(oneNone)}` },
+      p, q, path, status: oneNone ? "mismatch" : "checking",
+      statusText: oneNone ? { vi: "Khác cấu trúc", en: "Different structure" } : { vi: "Cả hai đều có node", en: "Both nodes exist" },
+      relation: oneNone ? "≠" : "↔", codeLines: [5],
+      vars: [{ name: "not p or not q", value: oneNone }],
+      note: oneNone
+        ? { vi: "Một cây có node nhưng cây kia không có node ở cùng vị trí.", en: "One tree has a node while the other does not at the same position." }
+        : { vi: "Cả p và q đều tồn tại, bây giờ mới an toàn đọc .val.", en: "Both p and q exist, so it is now safe to read .val." },
+    });
+    if (oneNone) {
+      addStep({
+        title: { vi: `return False: cấu trúc khác tại ${path}`, en: `return False: structure differs at ${path}` },
+        p, q, path, status: "mismatch", statusText: { vi: "Trả về False", en: "Return False" },
+        relation: "≠", codeLines: [6], result: false,
+        vars: [{ name: "return", value: false }, { name: "path", value: path }],
+        note: { vi: "Dòng 6 trả False ngay vì cấu trúc hai cây không giống nhau.", en: "Line 6 returns False immediately because the tree structures differ." },
+      });
+      return false;
+    }
+
+    const sameValue = p.val === q.val;
+    if (sameValue) {
+      matchedP.add(p.id);
+      matchedQ.add(q.id);
+    }
+    addStep({
+      title: { vi: `So sánh giá trị: ${p.val} != ${q.val} → ${pythonBool(!sameValue)}`, en: `Compare values: ${p.val} != ${q.val} → ${pythonBool(!sameValue)}` },
+      p, q, path, status: sameValue ? "match" : "mismatch",
+      statusText: sameValue ? { vi: "Giá trị khớp", en: "Values match" } : { vi: "Giá trị khác nhau", en: "Values differ" },
+      relation: sameValue ? "=" : "≠", codeLines: [7],
+      vars: [{ name: "p.val", value: p.val }, { name: "q.val", value: q.val }, { name: "p.val != q.val", value: !sameValue }],
+      note: sameValue
+        ? { vi: `Hai node tại ${path} cùng giá trị ${p.val}; đánh dấu cặp này đã khớp.`, en: `Both nodes at ${path} have value ${p.val}; mark this pair as matched.` }
+        : { vi: `Hai node cùng vị trí nhưng ${p.val} khác ${q.val}.`, en: `The nodes share a position, but ${p.val} differs from ${q.val}.` },
+    });
+    if (!sameValue) {
+      addStep({
+        title: { vi: `return False: giá trị khác tại ${path}`, en: `return False: values differ at ${path}` },
+        p, q, path, status: "mismatch", statusText: { vi: "Trả về False", en: "Return False" },
+        relation: "≠", codeLines: [8], result: false,
+        vars: [{ name: "return", value: false }, { name: "path", value: path }],
+        note: { vi: "Dòng 8 trả False ngay; không cần kiểm tra các node con.", en: "Line 8 returns False immediately; child nodes do not need to be checked." },
+      });
+      return false;
+    }
+
+    addStep({
+      title: { vi: `So sánh hai node con trái của ${path}`, en: `Compare the left children of ${path}` },
+      p, q, path, status: "checking", statusText: { vi: "Đi vào nhánh trái", en: "Descend left" },
+      relation: "=", codeLines: [9],
+      vars: [{ name: "next p", value: nodeValue(p.left) }, { name: "next q", value: nodeValue(q.left) }],
+      note: { vi: "Dòng 9 gọi đệ quy với p.left và q.left.", en: "Line 9 recursively calls p.left and q.left." },
+    });
+    const leftSame = compare(p.left, q.left, `${path}.left`);
+    if (!leftSame) {
+      addStep({
+        title: { vi: `Nhánh trái False → bỏ qua nhánh phải`, en: `Left branch is False → skip the right branch` },
+        p, q, path, status: "mismatch", statusText: { vi: "and dừng sớm", en: "and short-circuits" },
+        relation: "≠", codeLines: [9], result: false,
+        vars: [{ name: "left result", value: false }, { name: "right call", value: "skipped" }],
+        note: { vi: "Toán tử and dừng ngay khi vế trái False, nên dòng 10 không được gọi tại cặp này.", en: "The and operator stops when its left side is False, so line 10 is not called for this pair." },
+      });
+      return false;
+    }
+
+    addStep({
+      title: { vi: `Nhánh trái True → so sánh hai node con phải`, en: `Left branch is True → compare the right children` },
+      p, q, path, status: "checking", statusText: { vi: "Đi vào nhánh phải", en: "Descend right" },
+      relation: "=", codeLines: [10],
+      vars: [{ name: "left result", value: true }, { name: "next p", value: nodeValue(p.right) }, { name: "next q", value: nodeValue(q.right) }],
+      note: { vi: "Vế trái của and là True, nên dòng 10 tiếp tục gọi p.right và q.right.", en: "The left side of and is True, so line 10 continues with p.right and q.right." },
+    });
+    const rightSame = compare(p.right, q.right, `${path}.right`);
+
+    addStep({
+      title: {
+        vi: `Hai nhánh tại ${path}: True and ${pythonBool(rightSame)} → ${pythonBool(rightSame)}`,
+        en: `Both branches at ${path}: True and ${pythonBool(rightSame)} → ${pythonBool(rightSame)}`,
+      },
+      p, q, path, status: rightSame ? "match" : "mismatch",
+      statusText: rightSame ? { vi: "Cây con giống nhau", en: "Subtrees match" } : { vi: "Cây con khác nhau", en: "Subtrees differ" },
+      relation: rightSame ? "=" : "≠", codeLines: [9, 10], result: rightSame,
+      vars: [{ name: "left result", value: true }, { name: "right result", value: rightSame }, { name: "return", value: rightSame }],
+      note: rightSame
+        ? { vi: `Cả nhánh trái và phải của ${path} đều True, trả True lên lời gọi cha.`, en: `Both branches of ${path} are True, so return True to the parent call.` }
+        : { vi: `Nhánh phải của ${path} là False, nên cây con này trả False.`, en: `The right branch of ${path} is False, so this subtree returns False.` },
+    });
+    return rightSame;
+  }
+
+  const answer = compare(pRoot, qRoot, "root");
+  addStep({
+    title: { vi: answer ? "Hai cây giống hệt nhau" : "Hai cây không giống nhau", en: answer ? "The two trees are identical" : "The two trees are different" },
+    p: null, q: null, pDisplay: { vi: "cây", en: "tree" }, qDisplay: { vi: "cây", en: "tree" },
+    path: "done", status: answer ? "match" : "mismatch",
+    statusText: answer ? { vi: "Kết quả: True", en: "Result: True" } : { vi: "Kết quả: False", en: "Result: False" },
+    relation: answer ? "=" : "≠", result: answer,
+    vars: [{ name: "answer", value: answer }],
+    note: answer
+      ? { vi: "Mọi cặp vị trí đều có cùng cấu trúc và cùng giá trị.", en: "Every corresponding position has the same structure and value." }
+      : { vi: "Đã tìm thấy ít nhất một vị trí khác cấu trúc hoặc khác giá trị.", en: "At least one position differs in structure or value." },
+  });
+  steps[steps.length - 1].final = true;
+  return { input, answer, steps };
+}
+
 // ─── 637: Average of Levels in Binary Tree ───
 function buildSteps637(input) {
   const root = parseTree(input); const steps = []; const averages = [];
@@ -2105,7 +2286,7 @@ function buildSteps297(input) {
 
 module.exports = {
   __meta: {
-    order: [144, 94, 145, 104, 102, 543, 124, 226, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 297],
+    order: [144, 94, 145, 104, 102, 543, 124, 226, 100, 101, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 297],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -2288,6 +2469,34 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần. Stack O(h).", en: "Visit each node once. Stack O(h)." } },
     code: ["class Solution:", "    def invertTree(self, root):", "        if not root:", "            return None", "        root.left, root.right = root.right, root.left", "        self.invertTree(root.left)", "        self.invertTree(root.right)", "        return root"],
     builder: buildSteps226,
+  },
+  100: {
+    id: 100, difficulty: "easy", slug: "same-tree",
+    category: TREE_CAT,
+    title: { vi: "Same Tree", en: "Same Tree" },
+    titleVi: { vi: "Hai cây có giống nhau không", en: "Are the two trees identical" },
+    statement: { vi: "Cho hai cây nhị phân p và q. Trả về True khi chúng có cùng cấu trúc và các node tương ứng có cùng giá trị. Nhập mỗi cây theo level-order, dùng null cho vị trí rỗng.", en: "Given two binary trees p and q, return True when they have the same structure and every corresponding node has the same value. Enter each tree in level order, using null for empty positions." },
+    defaultInput: "1,2,3,null,4",
+    inputKind: "string", inputLabel: { vi: "Cây p (level-order)", en: "Tree p (level-order)" },
+    extraParams: [{ key: "q", label: { vi: "Cây q (level-order)", en: "Tree q (level-order)" }, type: "string", default: "1,2,3,null,4" }],
+    approach: [
+      { vi: "So sánh đúng cùng một vị trí của p và q: cả hai None thì True; chỉ một bên None thì False.", en: "Compare the same position in p and q: both None is True; exactly one None is False." },
+      { vi: "Nếu cả hai node tồn tại, giá trị phải bằng nhau; sau đó so sánh cặp con trái và cặp con phải.", en: "If both nodes exist, their values must match; then compare the left-child pair and the right-child pair." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi cặp node tương ứng được kiểm tra tối đa một lần; stack đệ quy cao h.", en: "Each corresponding node pair is checked at most once; the recursion stack has height h." } },
+    code: [
+      "class Solution:",
+      "    def isSameTree(self, p, q):",
+      "        if not p and not q:",
+      "            return True",
+      "        if not p or not q:",
+      "            return False",
+      "        if p.val != q.val:",
+      "            return False",
+      "        return (self.isSameTree(p.left, q.left) and",
+      "                self.isSameTree(p.right, q.right))",
+    ],
+    builder: buildSteps100,
   },
   101: {
     id: 101, difficulty: "easy", slug: "symmetric-tree",
