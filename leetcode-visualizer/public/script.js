@@ -1632,6 +1632,7 @@ function escapeXml(s) {
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" | { label, kind } }
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
@@ -1645,9 +1646,16 @@ function renderTree(step, targetId = "treeView") {
   const maxHalfWidth = hasMultiLineLabels
     ? r
     : Math.max(r, ...nodes.map((n) => (String(n.label || "").length * charW) / 2 + hPad));
+  const maxAnnotationHalfWidth = Math.max(0, ...nodes.map((n) => {
+    const annotation = treeAnnotations[n.id];
+    const label = annotation && typeof annotation === "object" ? annotation.label : annotation;
+    return label === undefined ? 0 : String(label).length * 6.6 / 2;
+  }));
   const colW = hasMultiLineLabels ? 84 : Math.max(60, maxHalfWidth * 2 + 14);
   const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
-  const basePad = hasMultiLineLabels ? 44 : Math.max(34, maxHalfWidth + 4);
+  const basePad = hasMultiLineLabels
+    ? Math.max(44, maxAnnotationHalfWidth + 6)
+    : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
   const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
   const leftGutter = showLevelLabels ? 52 : 0;
   const width = basePad * 2 + leftGutter + maxX * colW;
@@ -1682,7 +1690,6 @@ function renderTree(step, targetId = "treeView") {
   });
 
   let circles = "";
-  const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" }
   nodes.forEach((n) => {
     const c = pos[n.id];
     const nodeHw = hw[n.id];
@@ -1709,9 +1716,16 @@ function renderTree(step, targetId = "treeView") {
     }
     // Annotation above node (e.g. "l1", "l2", "cur", "slow")
     if (treeAnnotations[n.id] !== undefined) {
-      const ann = treeAnnotations[n.id];
+      const annotation = treeAnnotations[n.id];
+      const isRichAnnotation = annotation && typeof annotation === "object";
+      const ann = isRichAnnotation ? annotation.label : annotation;
+      const annotationKind = isRichAnnotation
+        ? String(annotation.kind || "").replace(/[^a-zA-Z0-9_-]/g, "")
+        : "";
       const color = n.hl ? "#f59e0b" : n.isWord ? "#22c55e" : "#6366f1";
-      circles += `<text x="${c.x}" y="${c.y - r - 6}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${escapeXml(ann)}</text>`;
+      const annotationClass = `tree-annotation${annotationKind ? ` ${annotationKind}` : ""}`;
+      const fill = isRichAnnotation ? "" : ` fill="${color}"`;
+      circles += `<text x="${c.x}" y="${c.y - r - 6}" text-anchor="middle" class="${annotationClass}"${fill}>${escapeXml(ann)}</text>`;
     }
     // Sub-label below node (e.g. heap array index)
     if (n.sub !== undefined && n.sub !== null) {
@@ -1732,7 +1746,7 @@ function renderTree(step, targetId = "treeView") {
   }
 
   const treeHtml =
-    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg">` +
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 420 ? " tree-svg-fit" : ""}">` +
     `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>` +
     edges +
     circles +

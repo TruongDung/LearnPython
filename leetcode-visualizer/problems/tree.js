@@ -265,6 +265,37 @@ function buildSteps112(input, params) {
 // ─── 543: Diameter of Binary Tree ───
 function buildSteps543(input) {
   const root = parseTree(input); const steps = [];
+  const marker = (label, kind) => ({ label, kind });
+  const sideName = (side) => (side === "left" ? "LEFT" : side === "right" ? "RIGHT" : "ROOT");
+  function relationAnnotations(node, side, parentNode) {
+    const annotations = {};
+    if (parentNode) annotations[parentNode.id] = marker("PARENT", "parent");
+    if (node) annotations[node.id] = marker(sideName(side), side);
+    else if (parentNode && side !== "root") annotations[parentNode.id] = marker(`${sideName(side)} = None`, side);
+    return annotations;
+  }
+  function branchAnnotations(node, { activeSide = null, leftDepth, rightDepth } = {}) {
+    const annotations = { [node.id]: marker("NODE", "node") };
+    if (node.left) {
+      const label = leftDepth === undefined
+        ? (activeSide === "left" ? "LEFT" : "LEFT · pending")
+        : `LEFT · d=${leftDepth}`;
+      const kind = activeSide === "left" ? "left" : leftDepth === undefined ? "pending" : "left-done";
+      annotations[node.left.id] = marker(label, kind);
+    } else if (activeSide === "left") {
+      annotations[node.id] = marker("NODE · LEFT=None", "left");
+    }
+    if (node.right) {
+      const label = rightDepth === undefined
+        ? (activeSide === "right" ? "RIGHT" : "RIGHT · pending")
+        : `RIGHT · d=${rightDepth}`;
+      const kind = activeSide === "right" ? "right" : rightDepth === undefined ? "pending" : "right-done";
+      annotations[node.right.id] = marker(label, kind);
+    } else if (activeSide === "right") {
+      annotations[node.id] = marker("NODE · RIGHT=None", "right");
+    }
+    return annotations;
+  }
   steps.push(snapshot(root, {
     title: { vi: "Đường kính của cây", en: "Diameter of tree" },
     codeLines: [2], vars: [{ name: "root", value: root ? root.val : "None" }, { name: "l", value: "pending" }, { name: "r", value: "pending" }],
@@ -283,49 +314,63 @@ function buildSteps543(input) {
     vars: [{ name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "self.best", value: best }],
     note: { vi: "depth(node) trả về chiều cao của nhánh dài nhất bắt đầu tại node.", en: "depth(node) returns the height of the longest downward branch from node." },
   }));
-  function depth(node) {
+  function depth(node, side = "root", parentNode = null) {
     if (!node) {
       steps.push(snapshot(root, {
-        title: { vi: "depth(None) trả về 0", en: "depth(None) returns 0" },
+        title: {
+          vi: parentNode ? `${sideName(side)} của ${parentNode.val} là None → depth = 0` : "depth(None) trả về 0",
+          en: parentNode ? `${sideName(side)} of ${parentNode.val} is None → depth = 0` : "depth(None) returns 0",
+        },
+        hlSet: parentNode ? new Set([parentNode.id]) : undefined,
+        annotations: relationAnnotations(node, side, parentNode),
         codeLines: [5],
-        vars: [{ name: "node", value: "None" }, { name: "l", value: "—" }, { name: "r", value: "—" }, { name: "return", value: 0 }, { name: "self.best", value: best }],
-        note: { vi: "Đây là điều kiện dừng của đệ quy; cây rỗng có chiều cao 0.", en: "This is the recursion base case; an empty tree has height 0." },
+        vars: [{ name: "side", value: sideName(side) }, { name: "node", value: "None" }, { name: "l", value: "—" }, { name: "r", value: "—" }, { name: "return", value: 0 }, { name: "self.best", value: best }],
+        note: {
+          vi: parentNode ? `Con ${side === "left" ? "trái" : "phải"} của ${parentNode.val} không tồn tại, nên lời gọi này trả 0.` : "Đây là điều kiện dừng của đệ quy; cây rỗng có chiều cao 0.",
+          en: parentNode ? `The ${side} child of ${parentNode.val} does not exist, so this call returns 0.` : "This is the recursion base case; an empty tree has height 0.",
+        },
       }));
       return 0;
     }
     steps.push(snapshot(root, {
-      title: { vi: `Kiểm tra nút ${node.val}`, en: `Check node ${node.val}` },
-      hlSet: new Set([node.id]), codeLines: [5],
-      vars: [{ name: "node", value: node.val }, { name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "self.best", value: best }],
-      note: { vi: `Nút ${node.val} khác None nên tiếp tục tính độ sâu hai nhánh.`, en: `Node ${node.val} is not None, so compute both subtree depths.` },
+      title: {
+        vi: side === "root" ? `Quét ROOT ${node.val}` : `Quét node ${sideName(side)} ${node.val} của ${parentNode.val}`,
+        en: side === "root" ? `Scan ROOT ${node.val}` : `Scan ${sideName(side)} node ${node.val} of ${parentNode.val}`,
+      },
+      hlSet: new Set([node.id]), annotations: relationAnnotations(node, side, parentNode), codeLines: [5],
+      vars: [{ name: "side", value: sideName(side) }, { name: "node", value: node.val }, { name: "parent", value: parentNode ? parentNode.val : "None" }, { name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "self.best", value: best }],
+      note: {
+        vi: side === "root" ? `Bắt đầu tại root ${node.val}.` : `Node ${node.val} được đánh dấu ${sideName(side)} vì nó là con ${side === "left" ? "trái" : "phải"} của ${parentNode.val}.`,
+        en: side === "root" ? `Start at root ${node.val}.` : `Node ${node.val} is marked ${sideName(side)} because it is the ${side} child of ${parentNode.val}.`,
+      },
     }));
     steps.push(snapshot(root, {
       title: { vi: `Gọi depth bên trái của ${node.val}`, en: `Call the left depth of ${node.val}` },
-      hlSet: new Set([node.id]), codeLines: [6],
+      hlSet: new Set([node.left ? node.left.id : node.id]), annotations: branchAnnotations(node, { activeSide: "left" }), codeLines: [6],
       vars: [{ name: "node", value: node.val }, { name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "left child", value: node.left ? node.left.val : "None" }, { name: "self.best", value: best }],
-      note: { vi: `Dòng 6 gọi đệ quy cho node.left của ${node.val}.`, en: `Line 6 recursively evaluates node.left of ${node.val}.` },
+      note: { vi: `Dòng 6 gọi depth(node.left). Node sắp quét được gắn nhãn LEFT.`, en: `Line 6 calls depth(node.left). The next node is marked LEFT.` },
     }));
-    const l = depth(node.left);
+    const l = depth(node.left, "left", node);
     steps.push(snapshot(root, {
       title: { vi: `Nhánh trái của ${node.val} có depth = ${l}`, en: `Left depth of ${node.val} is ${l}` },
-      hlSet: new Set([node.id]), codeLines: [7],
+      hlSet: new Set([node.right ? node.right.id : node.id]), annotations: branchAnnotations(node, { activeSide: "right", leftDepth: l }), codeLines: [7],
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: "pending" }, { name: "right child", value: node.right ? node.right.val : "None" }, { name: "self.best", value: best }],
-      note: { vi: `Đã nhận l = ${l}; dòng 7 tiếp tục gọi đệ quy cho node.right.`, en: `Received l = ${l}; line 7 now recursively evaluates node.right.` },
+      note: { vi: `LEFT đã trả l = ${l}. Dòng 7 chuyển sang node.right và gắn node sắp quét là RIGHT.`, en: `LEFT returned l = ${l}. Line 7 moves to node.right and marks the next node RIGHT.` },
     }));
-    const r = depth(node.right);
+    const r = depth(node.right, "right", node);
     if (node === root) { rootL = l; rootR = r; }
     const through = l + r;
     if (through > best) { best = through; bestId = node.id; }
     steps.push(snapshot(root, {
       title: { vi: `Nút ${node.val}: qua đây = ${through}`, en: `Node ${node.val}: through = ${through}` },
-      hlSet: new Set([node.id]), codeLines: [8],
+      hlSet: new Set([node.id]), annotations: branchAnnotations(node, { leftDepth: l, rightDepth: r }), codeLines: [8],
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: r }, { name: "path through", value: through }, { name: "self.best", value: best }],
       note: { vi: `Đường đi qua ${node.val} = ${l} + ${r} = ${through} cạnh. best = ${best}.`, en: `Path through ${node.val} = ${l} + ${r} = ${through} edges. best = ${best}.` },
     }));
     const height = 1 + Math.max(l, r);
     steps.push(snapshot(root, {
       title: { vi: `depth(${node.val}) trả về ${height}`, en: `depth(${node.val}) returns ${height}` },
-      hlSet: new Set([node.id]), codeLines: [9],
+      hlSet: new Set([node.id]), annotations: branchAnnotations(node, { leftDepth: l, rightDepth: r }), codeLines: [9],
       vars: [{ name: "node", value: node.val }, { name: "l", value: l }, { name: "r", value: r }, { name: "return", value: height }, { name: "self.best", value: best }],
       note: { vi: `Chiều cao trả về = 1 + max(${l}, ${r}) = ${height}.`, en: `Returned height = 1 + max(${l}, ${r}) = ${height}.` },
     }));
@@ -337,7 +382,7 @@ function buildSteps543(input) {
     vars: [{ name: "root", value: root ? root.val : "None" }, { name: "l", value: "pending" }, { name: "r", value: "pending" }, { name: "self.best", value: best }],
     note: { vi: "Gọi depth(root) để duyệt cây theo thứ tự hậu tự.", en: "Call depth(root) to traverse the tree in postorder." },
   }));
-  depth(root);
+  depth(root, "root", null);
   const fs = snapshot(root, {
     title: { vi: `Đường kính = ${best}`, en: `Diameter = ${best}` },
     wordSet: bestId !== null ? new Set([bestId]) : undefined, codeLines: [11], vars: [{ name: "l", value: rootL }, { name: "r", value: rootR }, { name: "answer", value: best }],

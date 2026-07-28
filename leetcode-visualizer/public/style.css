@@ -3977,6 +3977,11 @@ button:disabled {
   margin: 0 auto;
 }
 
+.tree-svg.tree-svg-fit {
+  max-width: 100%;
+  height: auto;
+}
+
 .tree-edge {
   stroke: #475569;
   stroke-width: 2;
@@ -4046,6 +4051,31 @@ button:disabled {
   font-weight: 700;
   opacity: 0.75;
 }
+
+.tree-annotation {
+  fill: #818cf8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tree-annotation.left { fill: #38bdf8; }
+.tree-annotation.right { fill: #c084fc; }
+.tree-annotation.left-done { fill: #22d3ee; }
+.tree-annotation.right-done { fill: #a78bfa; }
+.tree-annotation.pending { fill: #64748b; }
+.tree-annotation.parent { fill: #94a3b8; }
+.tree-annotation.root,
+.tree-annotation.node { fill: #fbbf24; }
+
+[data-theme="light"] .tree-annotation.left { fill: #0369a1; }
+[data-theme="light"] .tree-annotation.right { fill: #7e22ce; }
+[data-theme="light"] .tree-annotation.left-done { fill: #0e7490; }
+[data-theme="light"] .tree-annotation.right-done { fill: #6d28d9; }
+[data-theme="light"] .tree-annotation.pending { fill: #94a3b8; }
+[data-theme="light"] .tree-annotation.parent { fill: #64748b; }
+[data-theme="light"] .tree-annotation.root,
+[data-theme="light"] .tree-annotation.node { fill: #b45309; }
 
 /* ---- Same Tree (#100): compare corresponding nodes in two trees ---- */
 .same-tree-viz {
