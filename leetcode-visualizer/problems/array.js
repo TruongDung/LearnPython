@@ -2173,7 +2173,274 @@ function buildSteps56(input, params) {
   return { original: intervals, answer: merged, steps };
 }
 
+/** LeetCode 66: Plus One — add 1 with carry from the least significant digit. */
+function buildSteps66(input) {
+  const digits = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  steps.push({
+    title: { vi: "Cộng 1 từ hàng đơn vị", en: "Add 1 from the least significant digit" },
+    arr: [...digits], sub: digits.map((_, i) => `[${i}]`), highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "digits", value: `[${digits.join(", ")}]` }],
+    note: { vi: "Duyệt từ phải sang. Nếu chữ số < 9 → +1 và xong. Nếu = 9 → thành 0 và nhớ tiếp.", en: "Scan right to left. If a digit < 9 → +1 and done. If = 9 → becomes 0 and carry continues." },
+  });
+  let i = digits.length - 1;
+  let done = false;
+  while (i >= 0) {
+    if (digits[i] < 9) {
+      digits[i] += 1;
+      steps.push({
+        title: { vi: `digits[${i}]=${digits[i] - 1} < 9 → +1 = ${digits[i]}, xong`, en: `digits[${i}]=${digits[i] - 1} < 9 → +1 = ${digits[i]}, done` },
+        arr: [...digits], sub: digits.map((_, x) => `[${x}]`), highlight: [i], mark: [i], final: true,
+        codeLines: [4, 5],
+        vars: [{ name: "i", value: i }, { name: "digits", value: `[${digits.join(", ")}]` }],
+        note: { vi: `Chữ số này < 9 nên +1 và không còn nhớ → trả về ngay.`, en: `This digit < 9 so +1 with no carry → return immediately.` },
+      });
+      done = true;
+      break;
+    }
+    digits[i] = 0;
+    steps.push({
+      title: { vi: `digits[${i}]=9 → 0, nhớ 1`, en: `digits[${i}]=9 → 0, carry 1` },
+      arr: [...digits], sub: digits.map((_, x) => `[${x}]`), highlight: [i], mark: [],
+      codeLines: [6],
+      vars: [{ name: "i", value: i }, { name: "digits", value: `[${digits.join(", ")}]` }],
+      note: { vi: `9 + 1 = 10 → đặt 0, nhớ 1 sang trái.`, en: `9 + 1 = 10 → set 0, carry 1 to the left.` },
+    });
+    i--;
+  }
+  let answer = digits;
+  if (!done) {
+    answer = [1, ...digits];
+    steps.push({
+      title: { vi: `Tất cả là 9 → thêm 1 ở đầu`, en: `All were 9 → prepend 1` },
+      arr: [...answer], sub: answer.map((_, x) => `[${x}]`), highlight: [0], mark: [0], final: true,
+      codeLines: [7],
+      vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+      note: { vi: `Nhớ vượt ra ngoài → thêm 1 vào đầu (vd 999 → 1000).`, en: `Carry overflows → prepend 1 (e.g. 999 → 1000).` },
+    });
+  }
+  return { original: input, answer, steps };
+}
+
+/** LeetCode 136: Single Number — XOR cancels pairs. */
+function buildSteps136(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let result = 0;
+  steps.push({
+    title: { vi: "result = 0", en: "result = 0" },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "result", value: 0 }],
+    note: { vi: "XOR có tính: a^a=0 và a^0=a. Nên XOR mọi phần tử → các cặp triệt tiêu, còn lại số xuất hiện 1 lần.", en: "XOR properties: a^a=0 and a^0=a. XOR all elements → pairs cancel, leaving the single number." },
+  });
+  for (let i = 0; i < nums.length; i++) {
+    const prev = result;
+    result ^= nums[i];
+    steps.push({
+      title: { vi: `result ^= ${nums[i]} → ${result}`, en: `result ^= ${nums[i]} → ${result}` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [],
+      codeLines: [4, 5],
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "result", value: result }],
+      note: { vi: `${prev} XOR ${nums[i]} = ${result}.`, en: `${prev} XOR ${nums[i]} = ${result}.` },
+    });
+  }
+  steps.push({
+    title: { vi: `Đáp án: ${result}`, en: `Answer: ${result}` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true,
+    codeLines: [6],
+    vars: [{ name: "answer", value: result }],
+    note: { vi: `Số xuất hiện đúng 1 lần = ${result}.`, en: `The number appearing once = ${result}.` },
+  });
+  return { original: nums, answer: result, steps };
+}
+
+/** LeetCode 169: Majority Element — Boyer-Moore voting. */
+function buildSteps169(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let count = 0, candidate = null;
+  steps.push({
+    title: { vi: "count = 0, candidate = None", en: "count = 0, candidate = None" },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "count", value: 0 }],
+    note: { vi: "Boyer-Moore: ứng viên 'sống sót' nếu count > 0. Khi count=0 chọn ứng viên mới. Phần tử đa số (> n/2) luôn thắng.", en: "Boyer-Moore: a candidate survives while count > 0. When count=0, pick a new candidate. The majority element (> n/2) always wins." },
+  });
+  for (let i = 0; i < nums.length; i++) {
+    if (count === 0) {
+      candidate = nums[i];
+      steps.push({
+        title: { vi: `count=0 → candidate = ${candidate}`, en: `count=0 → candidate = ${candidate}` },
+        arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [i],
+        codeLines: [4, 5],
+        vars: [{ name: "i", value: i }, { name: "candidate", value: candidate }, { name: "count", value: 1 }],
+        note: { vi: `count về 0 → chọn nums[${i}]=${candidate} làm ứng viên mới.`, en: `count hit 0 → pick nums[${i}]=${candidate} as the new candidate.` },
+      });
+    }
+    count += nums[i] === candidate ? 1 : -1;
+    steps.push({
+      title: { vi: `nums[${i}]=${nums[i]} ${nums[i] === candidate ? "==" : "≠"} candidate → count=${count}`, en: `nums[${i}]=${nums[i]} ${nums[i] === candidate ? "==" : "≠"} candidate → count=${count}` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [],
+      codeLines: [6],
+      vars: [{ name: "i", value: i }, { name: "candidate", value: candidate }, { name: "count", value: count }],
+      note: { vi: `${nums[i] === candidate ? `Cùng ứng viên → count+1` : `Khác ứng viên → count-1`} = ${count}.`, en: `${nums[i] === candidate ? `Same as candidate → count+1` : `Different → count-1`} = ${count}.` },
+    });
+  }
+  steps.push({
+    title: { vi: `Đáp án: ${candidate}`, en: `Answer: ${candidate}` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true,
+    codeLines: [7],
+    vars: [{ name: "answer", value: candidate }],
+    note: { vi: `Phần tử đa số = ${candidate}.`, en: `Majority element = ${candidate}.` },
+  });
+  return { original: nums, answer: candidate, steps };
+}
+
+/** LeetCode 268: Missing Number — XOR of indices and values. */
+function buildSteps268(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = nums.length;
+  const steps = [];
+  let result = n;
+  steps.push({
+    title: { vi: `result = n = ${n}`, en: `result = n = ${n}` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [],
+    codeLines: [3],
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "n", value: n }, { name: "result", value: result }],
+    note: { vi: `Số thiếu ∈ [0, n]. XOR mọi index (0..n) và mọi giá trị → cặp trùng triệt tiêu, còn lại số thiếu. Bắt đầu result = n (vì index chạy 0..n-1).`, en: `The missing number ∈ [0, n]. XOR all indices (0..n) and all values → matching pairs cancel, leaving the missing one. Start result = n (indices only go 0..n-1).` },
+  });
+  for (let i = 0; i < n; i++) {
+    const prev = result;
+    result ^= i ^ nums[i];
+    steps.push({
+      title: { vi: `result ^= ${i} ^ ${nums[i]} → ${result}`, en: `result ^= ${i} ^ ${nums[i]} → ${result}` },
+      arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [],
+      codeLines: [4, 5],
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "result", value: result }],
+      note: { vi: `${prev} XOR index ${i} XOR giá trị ${nums[i]} = ${result}.`, en: `${prev} XOR index ${i} XOR value ${nums[i]} = ${result}.` },
+    });
+  }
+  steps.push({
+    title: { vi: `Đáp án: ${result}`, en: `Answer: ${result}` },
+    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true,
+    codeLines: [6],
+    vars: [{ name: "answer", value: result }],
+    note: { vi: `Số bị thiếu = ${result}.`, en: `Missing number = ${result}.` },
+  });
+  return { original: nums, answer: result, steps };
+}
+
 module.exports = {
+  66: {
+    id: 66,
+    difficulty: "easy",
+    slug: "plus-one",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Plus One", en: "Plus One" },
+    titleVi: { vi: "Cộng 1 vào số dạng mảng", en: "Add one to an array-form number" },
+    statement: { vi: "Cho số nguyên biểu diễn bằng mảng chữ số (đầu là hàng cao nhất). Cộng 1 và trả về mảng kết quả. Nhập các chữ số cách nhau dấu phẩy.", en: "Given a number as an array of digits (most significant first), add 1 and return the result array. Enter digits comma-separated." },
+    defaultInput: [1, 2, 3],
+    inputKind: "integer", inputLabel: { vi: "digits", en: "digits" }, extraParams: [],
+    approach: [
+      { vi: "Duyệt từ chữ số cuối (hàng đơn vị).", en: "Scan from the last digit (units place)." },
+      { vi: "Nếu < 9 → +1 và trả về ngay (không nhớ).", en: "If < 9 → +1 and return immediately (no carry)." },
+      { vi: "Nếu = 9 → đặt 0, nhớ sang trái.", en: "If = 9 → set 0, carry to the left." },
+      { vi: "Nếu nhớ vượt ra ngoài → thêm 1 ở đầu.", en: "If the carry overflows → prepend 1." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt từ phải sang.", en: "Single right-to-left pass." } },
+    code: [
+      "class Solution:",
+      "    def plusOne(self, digits):",
+      "        for i in range(len(digits)-1, -1, -1):",
+      "            if digits[i] < 9:",
+      "                digits[i] += 1; return digits",
+      "            digits[i] = 0",
+      "        return [1] + digits",
+    ],
+    builder: buildSteps66,
+  },
+  136: {
+    id: 136,
+    difficulty: "easy",
+    slug: "single-number",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Single Number", en: "Single Number" },
+    titleVi: { vi: "Số xuất hiện một lần (XOR)", en: "The number appearing once (XOR)" },
+    statement: { vi: "Mọi phần tử xuất hiện 2 lần trừ 1 phần tử. Tìm phần tử đó, O(n) thời gian O(1) bộ nhớ. Nhập cách nhau dấu phẩy.", en: "Every element appears twice except one. Find it in O(n) time O(1) space. Enter comma-separated." },
+    defaultInput: [4, 1, 2, 1, 2],
+    inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [
+      { vi: "XOR có tính a^a=0 và a^0=a.", en: "XOR: a^a=0 and a^0=a." },
+      { vi: "XOR toàn bộ mảng → các cặp triệt tiêu.", en: "XOR the whole array → pairs cancel." },
+      { vi: "Kết quả là số xuất hiện đúng 1 lần.", en: "The result is the number appearing once." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt XOR.", en: "Single XOR pass." } },
+    code: [
+      "class Solution:",
+      "    def singleNumber(self, nums):",
+      "        result = 0",
+      "        for num in nums:",
+      "            result ^= num",
+      "        return result",
+    ],
+    builder: buildSteps136,
+  },
+  169: {
+    id: 169,
+    difficulty: "easy",
+    slug: "majority-element",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Majority Element", en: "Majority Element" },
+    titleVi: { vi: "Phần tử đa số (Boyer-Moore)", en: "Majority element (Boyer-Moore)" },
+    statement: { vi: "Tìm phần tử xuất hiện > n/2 lần. Dùng bỏ phiếu Boyer-Moore, O(n)/O(1). Nhập cách nhau dấu phẩy.", en: "Find the element appearing > n/2 times. Use Boyer-Moore voting, O(n)/O(1). Enter comma-separated." },
+    defaultInput: [2, 2, 1, 1, 1, 2, 2],
+    inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [
+      { vi: "Giữ candidate và count.", en: "Keep a candidate and a count." },
+      { vi: "count=0 → chọn phần tử hiện tại làm candidate.", en: "count=0 → pick the current element as candidate." },
+      { vi: "Cùng candidate → count+1; khác → count-1.", en: "Same as candidate → count+1; different → count-1." },
+      { vi: "Phần tử đa số luôn còn lại làm candidate cuối cùng.", en: "The majority element always remains the final candidate." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt, hai biến.", en: "Single pass, two variables." } },
+    code: [
+      "class Solution:",
+      "    def majorityElement(self, nums):",
+      "        count = 0; candidate = None",
+      "        for num in nums:",
+      "            if count == 0: candidate = num",
+      "            count += 1 if num == candidate else -1",
+      "        return candidate",
+    ],
+    builder: buildSteps169,
+  },
+  268: {
+    id: 268,
+    difficulty: "easy",
+    slug: "missing-number",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Missing Number", en: "Missing Number" },
+    titleVi: { vi: "Số bị thiếu (XOR)", en: "The missing number (XOR)" },
+    statement: { vi: "Cho mảng chứa n số phân biệt trong [0, n], tìm số bị thiếu. Dùng XOR. Nhập cách nhau dấu phẩy.", en: "Given an array of n distinct numbers in [0, n], find the missing one. Use XOR. Enter comma-separated." },
+    defaultInput: [3, 0, 1],
+    inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [
+      { vi: "XOR mọi index 0..n và mọi giá trị.", en: "XOR all indices 0..n and all values." },
+      { vi: "Cặp (index, giá trị) trùng nhau triệt tiêu.", en: "Matching (index, value) pairs cancel." },
+      { vi: "Còn lại là số bị thiếu.", en: "What remains is the missing number." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt XOR.", en: "Single XOR pass." } },
+    code: [
+      "class Solution:",
+      "    def missingNumber(self, nums):",
+      "        result = len(nums)",
+      "        for i, num in enumerate(nums):",
+      "            result ^= i ^ num",
+      "        return result",
+    ],
+    builder: buildSteps268,
+  },
   31: {
     id: 31,
     difficulty: "medium",
