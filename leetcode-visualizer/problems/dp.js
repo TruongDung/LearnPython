@@ -12646,11 +12646,224 @@ function buildSteps264(input, params) {
   return approach === 2 ? buildSteps264Heap(input) : buildSteps264DP(input);
 }
 
+/**
+ * LeetCode 312: Burst Balloons — interval DP.
+ * balloons = [1] + nums + [1]. dp[left][right] = max coins from bursting all
+ * balloons strictly inside the open interval (left, right). k = the LAST
+ * balloon burst in that interval.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def maxCoins(self, nums):
+ *  3          balloons = [1] + nums + [1]
+ *  4          n = len(balloons)
+ *  5          dp = [[0]*n for _ in range(n)]
+ *  6          for length in range(2, n):
+ *  7              for left in range(n - length):
+ *  8                  right = left + length
+ *  9                  for k in range(left + 1, right):
+ * 10                      coins = balloons[left]*balloons[k]*balloons[right]
+ * 11                      coins += dp[left][k] + dp[k][right]
+ * 12                      dp[left][right] = max(dp[left][right], coins)
+ * 13          return dp[0][n-1]
+ */
+function buildSteps312(inputNums) {
+  const nums = Array.isArray(inputNums)
+    ? [...inputNums]
+    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const balloons = [1, ...nums, 1];
+  const n = balloons.length;
+  const dp = Array.from({ length: n }, () => Array(n).fill(0));
+  const steps = [];
+
+  // Column/row headers show the padded balloon values
+  const headers = balloons.map((b, i) => `${i}:${b}`);
+
+  function gridSnap(opts) {
+    // Build display grid with header row + header col
+    const display = [["", ...headers]];
+    for (let r = 0; r < n; r++) {
+      display.push([headers[r], ...dp[r].map((v) => (v === 0 ? "·" : String(v)))]);
+    }
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: display,
+        text1: "",
+        text2: "",
+        hlCell: opts.hlCell || null,      // [row+1, col+1] in display coords
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+      },
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  if (nums.length === 0) {
+    gridSnap({
+      title: { vi: "Mảng rỗng → 0", en: "Empty array → 0" },
+      final: true, codeLines: [13], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Không có bóng.", en: "No balloons." },
+    });
+    return { original: nums, answer: 0, steps };
+  }
+
+  gridSnap({
+    title: { vi: "balloons = [1] + nums + [1]", en: "balloons = [1] + nums + [1]" },
+    codeLines: [3, 4, 5],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "balloons", value: `[${balloons.join(", ")}]` },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi:
+        `Đệm 1 vào hai đầu: balloons = [${balloons.join(", ")}].\n` +
+        `dp[left][right] = số coin tối đa khi làm nổ hết bóng NẰM GIỮA khoảng mở (left, right).\n` +
+        `Đường chéo (khoảng không có bóng bên trong) = 0.`,
+      en:
+        `Pad with 1 on both ends: balloons = [${balloons.join(", ")}].\n` +
+        `dp[left][right] = max coins from bursting every balloon strictly inside open interval (left, right).\n` +
+        `The diagonal (empty interior) is 0.`,
+    },
+  });
+
+  // Interval DP
+  for (let length = 2; length < n; length++) {
+    for (let left = 0; left + length < n; left++) {
+      const right = left + length;
+      let best = 0;
+      let bestK = -1;
+
+      gridSnap({
+        title: { vi: `Khoảng (left=${left}, right=${right}), length=${length}`, en: `Interval (left=${left}, right=${right}), length=${length}` },
+        codeLines: [6, 7, 8],
+        hlCell: [left + 1, right + 1],
+        vars: [
+          { name: "length", value: length },
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "balloons[left]", value: balloons[left] },
+          { name: "balloons[right]", value: balloons[right] },
+        ],
+        note: {
+          vi: `Xét khoảng mở (${left}, ${right}). Thử từng bóng k giữa hai đầu làm bóng nổ CUỐI CÙNG.`,
+          en: `Consider open interval (${left}, ${right}). Try each balloon k inside as the LAST to burst.`,
+        },
+      });
+
+      for (let k = left + 1; k < right; k++) {
+        const gain = balloons[left] * balloons[k] * balloons[right];
+        const coins = gain + dp[left][k] + dp[k][right];
+        const improved = coins > best;
+        if (improved) { best = coins; bestK = k; }
+        dp[left][right] = best;
+
+        gridSnap({
+          title: { vi: `k=${k}: coins = ${balloons[left]}·${balloons[k]}·${balloons[right]} + dp[${left}][${k}] + dp[${k}][${right}] = ${coins}`, en: `k=${k}: coins = ${balloons[left]}·${balloons[k]}·${balloons[right]} + dp[${left}][${k}] + dp[${k}][${right}] = ${coins}` },
+          codeLines: [9, 10, 11, 12],
+          hlCell: [left + 1, right + 1],
+          pathCells: [[left + 1, k + 1], [k + 1, right + 1]],
+          vars: [
+            { name: "left, right", value: `${left}, ${right}` },
+            { name: "k (last burst)", value: k },
+            { name: "gain (l·k·r)", value: gain },
+            { name: `dp[${left}][${k}]`, value: dp[left][k] },
+            { name: `dp[${k}][${right}]`, value: dp[k][right] },
+            { name: "coins", value: coins },
+            { name: `dp[${left}][${right}]`, value: dp[left][right] },
+          ],
+          note: {
+            vi:
+              `Nếu k=${k} nổ CUỐI trong (${left}, ${right}): lúc đó chỉ còn bóng ${left} và ${right} bên cạnh k.\n` +
+              `coins = balloons[${left}]·balloons[${k}]·balloons[${right}] + dp[${left}][${k}] + dp[${k}][${right}] = ${gain} + ${dp[left][k]} + ${dp[k][right]} = ${coins}.\n` +
+              (improved ? `Tốt hơn → dp[${left}][${right}] = ${best}.` : `Không tốt hơn ${best}.`),
+            en:
+              `If k=${k} bursts LAST in (${left}, ${right}): only balloons ${left} and ${right} remain beside k.\n` +
+              `coins = balloons[${left}]·balloons[${k}]·balloons[${right}] + dp[${left}][${k}] + dp[${k}][${right}] = ${gain} + ${dp[left][k]} + ${dp[k][right]} = ${coins}.\n` +
+              (improved ? `Better → dp[${left}][${right}] = ${best}.` : `Not better than ${best}.`),
+          },
+        });
+      }
+    }
+  }
+
+  gridSnap({
+    title: { vi: `return dp[0][${n - 1}] = ${dp[0][n - 1]}`, en: `return dp[0][${n - 1}] = ${dp[0][n - 1]}` },
+    final: true,
+    codeLines: [13],
+    hlCell: [1, n],
+    vars: [{ name: "answer", value: dp[0][n - 1] }],
+    note: {
+      vi: `Đáp án = dp[0][${n - 1}] = ${dp[0][n - 1]} coin — làm nổ mọi bóng thật trong khoảng (0, ${n - 1}).`,
+      en: `Answer = dp[0][${n - 1}] = ${dp[0][n - 1]} coins — bursting every real balloon inside (0, ${n - 1}).`,
+    },
+  });
+
+  return { original: nums, answer: dp[0][n - 1], steps };
+}
+
 module.exports = {
+  312: {
+    id: 312,
+    difficulty: "hard",
+    slug: "burst-balloons",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Burst Balloons", en: "Burst Balloons" },
+    titleVi: { vi: "Làm nổ bóng bay (Interval DP)", en: "Burst balloons (Interval DP)" },
+    statement: {
+      vi:
+        "Cho mảng nums là giá trị các quả bóng. Làm nổ từng quả để được nums[i-1]·nums[i]·nums[i+1] coin " +
+        "(bóng ngoài biên coi như 1). Tìm số coin TỐI ĐA. Nhập nums cách nhau dấu phẩy.",
+      en:
+        "Given nums representing balloon values, bursting balloon i earns nums[i-1]·nums[i]·nums[i+1] coins " +
+        "(out-of-bound balloons count as 1). Find the MAXIMUM coins. Enter nums comma-separated.",
+    },
+    defaultInput: [3, 1, 5, 8],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (bóng)", en: "nums (balloons)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đệm 1 vào hai đầu để tránh xử lý biên. dp[left][right] = coin tối đa trong khoảng mở (left, right).", en: "Pad with 1 on both ends to avoid boundary cases. dp[left][right] = max coins in open interval (left, right)." },
+      { vi: "Chọn k là bóng nổ CUỐI CÙNG trong khoảng → khi đó nó chỉ còn cạnh balloons[left] và balloons[right].", en: "Pick k as the LAST balloon to burst in the interval → then it only touches balloons[left] and balloons[right]." },
+      { vi: "coins = balloons[left]·balloons[k]·balloons[right] + dp[left][k] + dp[k][right].", en: "coins = balloons[left]·balloons[k]·balloons[right] + dp[left][k] + dp[k][right]." },
+      { vi: "Duyệt theo độ dài khoảng tăng dần để dp con luôn sẵn sàng.", en: "Iterate by increasing interval length so sub-intervals are ready." },
+    ],
+    complexity: {
+      time: "O(n³)",
+      space: "O(n²)",
+      note: {
+        vi: "n² khoảng, mỗi khoảng thử n điểm k → O(n³).",
+        en: "n² intervals, each trying n choices of k → O(n³).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxCoins(self, nums):",
+      "        balloons = [1] + nums + [1]",
+      "        n = len(balloons)",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        for length in range(2, n):",
+      "            for left in range(n - length):",
+      "                right = left + length",
+      "                for k in range(left + 1, right):",
+      "                    coins = balloons[left]*balloons[k]*balloons[right]",
+      "                    coins += dp[left][k] + dp[k][right]",
+      "                    dp[left][right] = max(dp[left][right], coins)",
+      "        return dp[0][n-1]",
+    ],
+    builder: buildSteps312,
+  },
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336],
+    order: [509, 70, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 312],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",

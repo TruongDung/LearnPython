@@ -11629,11 +11629,418 @@ function buildSteps505(input, params) {
   return { original: grid, answer, steps };
 }
 
+/**
+ * LeetCode 329: Longest Increasing Path in a Matrix — DFS + memoization.
+ * dfs(r,c) = length of the longest strictly increasing path starting at (r,c).
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def longestIncreasingPath(self, matrix):
+ *  3          rows, cols = len(matrix), len(matrix[0])
+ *  4          memo = [[0]*cols for _ in range(rows)]
+ *  5          def dfs(r, c):
+ *  6              if memo[r][c]: return memo[r][c]
+ *  7              best = 1
+ *  8              for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+ *  9                  nr, nc = r+dr, c+dc
+ * 10                  if 0<=nr<rows and 0<=nc<cols and matrix[nr][nc] > matrix[r][c]:
+ * 11                      best = max(best, 1 + dfs(nr, nc))
+ * 12              memo[r][c] = best
+ * 13              return best
+ * 14          return max(dfs(r,c) for r in range(rows) for c in range(cols))
+ */
+function buildSteps329(input) {
+  // Parse matrix: rows separated by ';' or '|', values by ','
+  const matrix = String(input)
+    .split(/[;|]/)
+    .map((row) => row.trim())
+    .filter(Boolean)
+    .map((row) => row.split(",").map((v) => Number(v.trim())));
+
+  const steps = [];
+  if (!matrix.length || !matrix[0].length) {
+    steps.push({
+      title: { vi: "Ma trận rỗng → 0", en: "Empty matrix → 0" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Nhập ma trận dạng 9,9,4;6,6,8;2,1,1", en: "Enter matrix like 9,9,4;6,6,8;2,1,1" },
+    });
+    return { original: matrix, answer: 0, steps };
+  }
+
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  const memo = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  function makeCells(cur, path) {
+    const pathSet = new Set((path || []).map(([r, c]) => `${r},${c}`));
+    return matrix.map((row, r) =>
+      row.map((val, c) => {
+        let cls = "empty";
+        if (memo[r][c] > 0) cls = "visited";
+        if (pathSet.has(`${r},${c}`)) cls = "path";
+        if (cur && cur[0] === r && cur[1] === c) cls = "current";
+        const label = memo[r][c] > 0 ? `${val}·${memo[r][c]}` : String(val);
+        return { label, cls };
+      })
+    );
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.path) },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  snap({
+    title: { vi: "Khởi tạo memo = 0", en: "Initialize memo = 0" },
+    codeLines: [3, 4],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi:
+        `Ma trận ${rows}×${cols}. memo[r][c] = độ dài đường tăng dài nhất BẮT ĐẦU từ (r,c).\n` +
+        `Nhãn ô hiển thị "giá trị·memo". DFS + ghi nhớ để mỗi ô chỉ tính 1 lần.`,
+      en:
+        `Matrix ${rows}×${cols}. memo[r][c] = length of the longest increasing path STARTING at (r,c).\n` +
+        `Cell label shows "value·memo". DFS + memoization so each cell is computed once.`,
+    },
+  });
+
+  let overallBest = 0;
+  let bestStart = null;
+
+  function dfs(r, c, depth) {
+    if (memo[r][c]) {
+      snap({
+        title: { vi: `dfs(${r},${c}): memo đã có = ${memo[r][c]}`, en: `dfs(${r},${c}): memo hit = ${memo[r][c]}` },
+        cur: [r, c],
+        codeLines: [6],
+        vars: [{ name: "r,c", value: `${r},${c}` }, { name: "memo[r][c]", value: memo[r][c] }],
+        note: {
+          vi: `Ô (${r},${c}) đã được tính trước đó = ${memo[r][c]}. Trả về ngay, không tính lại.`,
+          en: `Cell (${r},${c}) was computed before = ${memo[r][c]}. Return immediately, no recomputation.`,
+        },
+      });
+      return memo[r][c];
+    }
+
+    snap({
+      title: { vi: `dfs(${r},${c}) = ? (giá trị ${matrix[r][c]})`, en: `dfs(${r},${c}) = ? (value ${matrix[r][c]})` },
+      cur: [r, c],
+      codeLines: [5, 7],
+      vars: [{ name: "r,c", value: `${r},${c}` }, { name: "matrix[r][c]", value: matrix[r][c] }, { name: "best", value: 1 }],
+      note: {
+        vi: `Bắt đầu dfs tại (${r},${c}), giá trị ${matrix[r][c]}. best = 1 (ít nhất chính ô này). Thử 4 hướng đi tới ô LỚN HƠN.`,
+        en: `Start dfs at (${r},${c}), value ${matrix[r][c]}. best = 1 (at least this cell). Try 4 directions to a LARGER cell.`,
+      },
+    });
+
+    let best = 1;
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && matrix[nr][nc] > matrix[r][c]) {
+        snap({
+          title: { vi: `(${r},${c})→(${nr},${nc}): ${matrix[nr][nc]} > ${matrix[r][c]} ✓`, en: `(${r},${c})→(${nr},${nc}): ${matrix[nr][nc]} > ${matrix[r][c]} ✓` },
+          cur: [nr, nc],
+          path: [[r, c], [nr, nc]],
+          codeLines: [8, 9, 10, 11],
+          vars: [
+            { name: "from", value: `(${r},${c})=${matrix[r][c]}` },
+            { name: "to", value: `(${nr},${nc})=${matrix[nr][nc]}` },
+            { name: "best so far", value: best },
+          ],
+          note: {
+            vi: `Ô kề (${nr},${nc})=${matrix[nr][nc]} > ${matrix[r][c]} nên đi tiếp được. Đệ quy dfs(${nr},${nc}), rồi best = max(best, 1 + kết quả).`,
+            en: `Neighbor (${nr},${nc})=${matrix[nr][nc]} > ${matrix[r][c]}, so we can extend. Recurse dfs(${nr},${nc}), then best = max(best, 1 + result).`,
+          },
+        });
+        best = Math.max(best, 1 + dfs(nr, nc, depth + 1));
+      }
+    }
+
+    memo[r][c] = best;
+    snap({
+      title: { vi: `memo[${r}][${c}] = ${best}`, en: `memo[${r}][${c}] = ${best}` },
+      cur: [r, c],
+      codeLines: [12, 13],
+      vars: [{ name: "r,c", value: `${r},${c}` }, { name: "memo[r][c]", value: best }],
+      note: {
+        vi: `Đường tăng dài nhất bắt đầu từ (${r},${c}) = ${best}. Ghi vào memo để tái sử dụng.`,
+        en: `Longest increasing path starting at (${r},${c}) = ${best}. Store in memo for reuse.`,
+      },
+    });
+    return best;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const val = dfs(r, c, 0);
+      if (val > overallBest) {
+        overallBest = val;
+        bestStart = [r, c];
+      }
+    }
+  }
+
+  snap({
+    title: { vi: `Kết quả: ${overallBest}`, en: `Result: ${overallBest}` },
+    cur: bestStart,
+    final: true,
+    codeLines: [14],
+    vars: [{ name: "answer", value: overallBest }],
+    note: {
+      vi: `Đường tăng dài nhất trong ma trận có độ dài ${overallBest} (bắt đầu từ ô ${bestStart ? `(${bestStart[0]},${bestStart[1]})` : "-"}).`,
+      en: `The longest increasing path in the matrix has length ${overallBest} (starting at ${bestStart ? `(${bestStart[0]},${bestStart[1]})` : "-"}).`,
+    },
+  });
+
+  return { original: matrix, answer: overallBest, steps };
+}
+
+/**
+ * LeetCode 269: Alien Dictionary — build graph from adjacent word pairs,
+ * then Kahn's topological sort (BFS on indegrees).
+ *
+ * Code lines (1-indexed):
+ *  1  from collections import defaultdict, deque
+ *  2  class Solution:
+ *  3      def alienOrder(self, words):
+ *  4          graph = defaultdict(set)
+ *  5          indegree = {c: 0 for w in words for c in w}
+ *  6          for w1, w2 in zip(words, words[1:]):
+ *  7              for a, b in zip(w1, w2):
+ *  8                  if a != b:
+ *  9                      if b not in graph[a]:
+ * 10                          graph[a].add(b); indegree[b] += 1
+ * 11                      break
+ * 12              else:
+ * 13                  if len(w1) > len(w2): return ""
+ * 14          queue = deque([c for c in indegree if indegree[c]==0])
+ * 15          result = []
+ * 16          while queue:
+ * 17              c = queue.popleft(); result.append(c)
+ * 18              for nxt in graph[c]:
+ * 19                  indegree[nxt] -= 1
+ * 20                  if indegree[nxt]==0: queue.append(nxt)
+ * 21          if len(result) < len(indegree): return ""
+ * 22          return "".join(result)
+ */
+function buildSteps269(input) {
+  const words = String(input).split(/[,\s]+/).map((w) => w.trim()).filter(Boolean);
+  const steps = [];
+
+  // Collect all unique chars
+  const allChars = [...new Set(words.join("").split(""))].sort();
+  const graph = {};       // char -> Set of chars
+  const indegree = {};
+  allChars.forEach((c) => { graph[c] = new Set(); indegree[c] = 0; });
+
+  const nodesArr = () => allChars.map((c) => ({ id: c, label: c, dist: String(indegree[c]) }));
+  const edgesArr = () => {
+    const e = [];
+    for (const [u, set] of Object.entries(graph)) for (const v of set) e.push({ u, v });
+    return e;
+  };
+  const indegStr = () => `{${allChars.map((c) => `${c}:${indegree[c]}`).join(", ")}}`;
+
+  function gsnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      graph: {
+        nodes: nodesArr(),
+        edges: edgesArr(),
+        hlNodes: opts.hlNodes || [],
+        hlEdges: opts.hlEdges || [],
+        visitedNodes: opts.visited || [],
+      },
+      highlight: [], mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  gsnap({
+    title: { vi: "Khởi tạo graph & indegree", en: "Initialize graph & indegree" },
+    codeLines: [4, 5],
+    vars: [
+      { name: "words", value: `[${words.join(", ")}]` },
+      { name: "chars", value: `{${allChars.join(", ")}}` },
+      { name: "indegree", value: indegStr() },
+    ],
+    note: {
+      vi:
+        `Các ký tự: {${allChars.join(", ")}}. Mỗi node hiển thị indegree (số cạnh đi vào).\n` +
+        `So sánh từng cặp từ liền nhau để suy ra thứ tự: ký tự KHÁC NHAU đầu tiên cho biết a đứng trước b.`,
+      en:
+        `Characters: {${allChars.join(", ")}}. Each node shows its indegree (incoming edges).\n` +
+        `Compare adjacent word pairs: the FIRST differing char tells us a comes before b.`,
+    },
+  });
+
+  // Build edges from adjacent pairs
+  let invalid = false;
+  for (let i = 0; i < words.length - 1 && !invalid; i++) {
+    const w1 = words[i];
+    const w2 = words[i + 1];
+    const minLen = Math.min(w1.length, w2.length);
+    let found = false;
+    for (let j = 0; j < minLen; j++) {
+      if (w1[j] !== w2[j]) {
+        found = true;
+        const a = w1[j], b = w2[j];
+        if (!graph[a].has(b)) {
+          graph[a].add(b);
+          indegree[b] += 1;
+        }
+        gsnap({
+          title: { vi: `"${w1}" vs "${w2}" → ${a} trước ${b}`, en: `"${w1}" vs "${w2}" → ${a} before ${b}` },
+          hlNodes: [a, b],
+          hlEdges: [[a, b]],
+          codeLines: [6, 7, 8, 9, 10, 11],
+          vars: [
+            { name: "w1, w2", value: `"${w1}", "${w2}"` },
+            { name: "first diff", value: `${a} ≠ ${b}` },
+            { name: "edge", value: `${a} → ${b}` },
+            { name: "indegree", value: indegStr() },
+          ],
+          note: {
+            vi: `Ký tự khác nhau đầu tiên: '${a}' vs '${b}' → thêm cạnh ${a} → ${b}, indegree[${b}] = ${indegree[b]}. Dừng so sánh cặp này.`,
+            en: `First differing char: '${a}' vs '${b}' → add edge ${a} → ${b}, indegree[${b}] = ${indegree[b]}. Stop comparing this pair.`,
+          },
+        });
+        break;
+      }
+    }
+    if (!found && w1.length > w2.length) {
+      invalid = true;
+      gsnap({
+        title: { vi: `"${w1}" dài hơn "${w2}" nhưng là tiền tố → không hợp lệ`, en: `"${w1}" longer than "${w2}" but is a prefix → invalid` },
+        codeLines: [12, 13],
+        vars: [{ name: "w1, w2", value: `"${w1}", "${w2}"` }, { name: "answer", value: '""' }],
+        final: true,
+        note: {
+          vi: `"${w1}" là tiền tố của "${w2}" nhưng dài hơn → thứ tự không hợp lệ → trả về "".`,
+          en: `"${w1}" is a prefix of "${w2}" but longer → invalid ordering → return "".`,
+        },
+      });
+    }
+  }
+
+  if (invalid) return { original: words, answer: "", steps };
+
+  // Kahn's algorithm
+  const queue = allChars.filter((c) => indegree[c] === 0);
+  const result = [];
+  const visited = [];
+
+  gsnap({
+    title: { vi: `queue = [${queue.join(", ")}] (indegree 0)`, en: `queue = [${queue.join(", ")}] (indegree 0)` },
+    hlNodes: [...queue],
+    codeLines: [14, 15],
+    vars: [
+      { name: "queue", value: `[${queue.join(", ")}]` },
+      { name: "indegree", value: indegStr() },
+    ],
+    note: {
+      vi: `Bắt đầu topo sort: đưa mọi ký tự có indegree = 0 vào queue: [${queue.join(", ")}]. Đây là các ký tự không có gì đứng trước.`,
+      en: `Start topo sort: enqueue every char with indegree = 0: [${queue.join(", ")}]. These have nothing before them.`,
+    },
+  });
+
+  while (queue.length) {
+    const c = queue.shift();
+    result.push(c);
+    visited.push(c);
+
+    gsnap({
+      title: { vi: `Pop '${c}' → result = "${result.join("")}"`, en: `Pop '${c}' → result = "${result.join("")}"` },
+      hlNodes: [c],
+      visited: [...visited],
+      codeLines: [16, 17],
+      vars: [
+        { name: "c", value: c },
+        { name: "result", value: `"${result.join("")}"` },
+        { name: "queue", value: `[${queue.join(", ")}]` },
+      ],
+      note: {
+        vi: `Lấy '${c}' khỏi queue, thêm vào result. Giờ giảm indegree các ký tự mà '${c}' trỏ tới.`,
+        en: `Pop '${c}' from queue, append to result. Now decrement indegree of chars '${c}' points to.`,
+      },
+    });
+
+    for (const nxt of [...graph[c]].sort()) {
+      indegree[nxt] -= 1;
+      const ready = indegree[nxt] === 0;
+      if (ready) queue.push(nxt);
+      gsnap({
+        title: { vi: `indegree[${nxt}] → ${indegree[nxt]}${ready ? ` → thêm vào queue` : ""}`, en: `indegree[${nxt}] → ${indegree[nxt]}${ready ? ` → enqueue` : ""}` },
+        hlNodes: [c, nxt],
+        hlEdges: [[c, nxt]],
+        visited: [...visited],
+        codeLines: [18, 19, 20],
+        vars: [
+          { name: "c → nxt", value: `${c} → ${nxt}` },
+          { name: `indegree[${nxt}]`, value: indegree[nxt] },
+          { name: "queue", value: `[${queue.join(", ")}]` },
+        ],
+        note: {
+          vi: ready
+            ? `Bỏ cạnh ${c} → ${nxt}: indegree[${nxt}] = 0 → mọi ký tự trước '${nxt}' đã xử lý → thêm '${nxt}' vào queue.`
+            : `Bỏ cạnh ${c} → ${nxt}: indegree[${nxt}] = ${indegree[nxt]} (còn > 0, chưa sẵn sàng).`,
+          en: ready
+            ? `Remove edge ${c} → ${nxt}: indegree[${nxt}] = 0 → all predecessors of '${nxt}' done → enqueue '${nxt}'.`
+            : `Remove edge ${c} → ${nxt}: indegree[${nxt}] = ${indegree[nxt]} (still > 0, not ready).`,
+        },
+      });
+    }
+  }
+
+  const cycle = result.length < allChars.length;
+  const answer = cycle ? "" : result.join("");
+
+  gsnap({
+    title: cycle
+      ? { vi: `Còn ký tự chưa xử lý → có chu trình → ""`, en: `Unprocessed chars remain → cycle → ""` }
+      : { vi: `return "${answer}"`, en: `return "${answer}"` },
+    visited: [...visited],
+    final: true,
+    codeLines: cycle ? [21] : [22],
+    vars: [
+      { name: "result", value: `"${result.join("")}"` },
+      { name: "total chars", value: allChars.length },
+      { name: "answer", value: `"${answer}"` },
+    ],
+    note: cycle
+      ? {
+          vi: `Chỉ xử lý được ${result.length}/${allChars.length} ký tự → tồn tại chu trình → không có thứ tự hợp lệ → "".`,
+          en: `Only ${result.length}/${allChars.length} chars processed → a cycle exists → no valid order → "".`,
+        }
+      : {
+          vi: `Thứ tự bảng chữ cái người ngoài hành tinh: "${answer}".`,
+          en: `Alien alphabet order: "${answer}".`,
+        },
+  });
+
+  return { original: words, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 269, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 847, 851, 1136, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 329],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -11648,6 +12055,117 @@ module.exports = {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
     },
+  },
+  329: {
+    id: 329,
+    difficulty: "hard",
+    slug: "longest-increasing-path-in-a-matrix",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Longest Increasing Path in a Matrix", en: "Longest Increasing Path in a Matrix" },
+    titleVi: { vi: "Đường tăng dài nhất trong ma trận (DFS + memo)", en: "Longest increasing path (DFS + memo)" },
+    statement: {
+      vi:
+        "Cho ma trận số nguyên. Tìm độ dài đường đi TĂNG DẦN dài nhất (đi 4 hướng, mỗi bước tới ô LỚN HƠN). " +
+        "Nhập ma trận: hàng cách bởi ';', giá trị cách bởi ','. VD: 9,9,4;6,6,8;2,1,1",
+      en:
+        "Given an integer matrix, find the length of the longest strictly INCREASING path (move 4-directionally to a LARGER cell). " +
+        "Enter matrix: rows separated by ';', values by ','. e.g. 9,9,4;6,6,8;2,1,1",
+    },
+    defaultInput: "9,9,4;6,6,8;2,1,1",
+    inputKind: "string",
+    inputLabel: { vi: "Ma trận (hàng cách ;)", en: "Matrix (rows separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "dfs(r,c) = độ dài đường tăng dài nhất bắt đầu tại (r,c).", en: "dfs(r,c) = length of the longest increasing path starting at (r,c)." },
+      { vi: "Từ mỗi ô, thử 4 hướng; chỉ đi tới ô có giá trị LỚN HƠN.", en: "From each cell, try 4 directions; move only to a strictly LARGER cell." },
+      { vi: "Ghi nhớ memo[r][c] để mỗi ô chỉ tính 1 lần → tránh lặp.", en: "Memoize memo[r][c] so each cell is computed once → avoids recomputation." },
+      { vi: "Đáp án = max của dfs trên mọi ô. Nhãn ô là 'giá trị·memo'.", en: "Answer = max of dfs over all cells. Cell label is 'value·memo'." },
+    ],
+    complexity: {
+      time: "O(m·n)",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô được tính đúng 1 lần nhờ memo → O(m·n).",
+        en: "Each cell is computed exactly once thanks to memo → O(m·n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestIncreasingPath(self, matrix):",
+      "        rows, cols = len(matrix), len(matrix[0])",
+      "        memo = [[0]*cols for _ in range(rows)]",
+      "        def dfs(r, c):",
+      "            if memo[r][c]: return memo[r][c]",
+      "            best = 1",
+      "            for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:",
+      "                nr, nc = r+dr, c+dc",
+      "                if 0<=nr<rows and 0<=nc<cols and matrix[nr][nc] > matrix[r][c]:",
+      "                    best = max(best, 1 + dfs(nr, nc))",
+      "            memo[r][c] = best",
+      "            return best",
+      "        return max(dfs(r,c) for r in range(rows) for c in range(cols))",
+    ],
+    builder: buildSteps329,
+  },
+  269: {
+    id: 269,
+    difficulty: "hard",
+    slug: "alien-dictionary",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Alien Dictionary", en: "Alien Dictionary" },
+    titleVi: { vi: "Từ điển người ngoài hành tinh (Topological Sort)", en: "Alien Dictionary (Topological Sort)" },
+    statement: {
+      vi:
+        "Cho danh sách từ đã sắp xếp theo thứ tự bảng chữ cái của một ngôn ngữ lạ. " +
+        "Suy ra thứ tự các ký tự. Nếu không hợp lệ, trả về \"\". " +
+        "Nhập các từ cách nhau bởi dấu phẩy hoặc khoảng trắng.",
+      en:
+        "Given a list of words sorted in an alien language's alphabet order, derive the character order. " +
+        "If invalid, return \"\". Enter words separated by commas or spaces.",
+    },
+    defaultInput: "wrt,wrf,er,ett,rftt",
+    inputKind: "string",
+    inputLabel: { vi: "Từ (cách bởi , hoặc khoảng trắng)", en: "Words (comma/space separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "So sánh từng cặp từ liền nhau; ký tự KHÁC NHAU đầu tiên cho cạnh a → b (a đứng trước b).", en: "Compare adjacent word pairs; the FIRST differing char gives edge a → b (a before b)." },
+      { vi: "Nếu w1 dài hơn w2 nhưng là tiền tố của w2 → không hợp lệ → \"\".", en: "If w1 is longer than w2 but a prefix of it → invalid → \"\"." },
+      { vi: "Topological sort (Kahn): đưa mọi ký tự indegree=0 vào queue, pop dần và giảm indegree hàng xóm.", en: "Topological sort (Kahn): enqueue all indegree-0 chars, pop and decrement neighbors' indegree." },
+      { vi: "Nếu result thiếu ký tự → có chu trình → \"\".", en: "If result misses characters → a cycle exists → \"\"." },
+    ],
+    complexity: {
+      time: "O(C)",
+      space: "O(1) + O(unique chars)",
+      note: {
+        vi: "C = tổng số ký tự trong tất cả các từ. Đồ thị tối đa 26 node.",
+        en: "C = total characters across all words. Graph has at most 26 nodes.",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "class Solution:",
+      "    def alienOrder(self, words):",
+      "        graph = defaultdict(set)",
+      "        indegree = {c: 0 for w in words for c in w}",
+      "        for w1, w2 in zip(words, words[1:]):",
+      "            for a, b in zip(w1, w2):",
+      "                if a != b:",
+      "                    if b not in graph[a]:",
+      "                        graph[a].add(b); indegree[b] += 1",
+      "                    break",
+      "            else:",
+      "                if len(w1) > len(w2): return ''",
+      "        queue = deque([c for c in indegree if indegree[c]==0])",
+      "        result = []",
+      "        while queue:",
+      "            c = queue.popleft(); result.append(c)",
+      "            for nxt in graph[c]:",
+      "                indegree[nxt] -= 1",
+      "                if indegree[nxt]==0: queue.append(nxt)",
+      "        if len(result) < len(indegree): return ''",
+      "        return ''.join(result)",
+    ],
+    builder: buildSteps269,
   },
   200: {
     id: 200,
