@@ -1819,7 +1819,96 @@ function buildSteps4000(input, params) {
   return { original: { n, s: targetSum }, answer, steps };
 }
 
+/** LeetCode 55: Jump Game — track the farthest reachable index. */
+function buildSteps55(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const steps = [];
+  let farthest = 0;
+  steps.push({ title: { vi: "farthest = 0", en: "farthest = 0" }, arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "farthest", value: 0 }], note: { vi: "Duyệt; farthest = chỉ số xa nhất có thể tới. Nếu i > farthest → kẹt.", en: "Scan; farthest = the farthest reachable index. If i > farthest → stuck." } });
+  let answer = true;
+  for (let i = 0; i < nums.length; i++) {
+    if (i > farthest) { answer = false; steps.push({ title: { vi: `i=${i} > farthest=${farthest} → kẹt → False`, en: `i=${i} > farthest=${farthest} → stuck → False` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [], final: true, codeLines: [4, 5], vars: [{ name: "i", value: i }, { name: "farthest", value: farthest }], note: { vi: `Không thể tới i=${i} → không thể tới cuối.`, en: `Cannot reach i=${i} → cannot reach the end.` } }); break; }
+    farthest = Math.max(farthest, i + nums[i]);
+    const done = farthest >= nums.length - 1;
+    steps.push({ title: { vi: `i=${i}: farthest = max(${farthest}, ${i}+${nums[i]}) = ${farthest}`, en: `i=${i}: farthest = max → ${farthest}` }, arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: Array.from({ length: Math.min(farthest, nums.length - 1) - i + (i <= farthest ? 1 : 0) }, (_, x) => i + x), codeLines: done ? [6, 7, 8] : [6, 7], vars: [{ name: "i", value: i }, { name: "farthest", value: farthest }], note: { vi: done ? `farthest ≥ ${nums.length - 1} → tới được cuối → True!` : `Cập nhật farthest = ${farthest}.`, en: done ? `farthest ≥ ${nums.length - 1} → can reach the end → True!` : `Update farthest = ${farthest}.` } });
+    if (done) { answer = true; steps[steps.length - 1].final = true; break; }
+  }
+  if (answer && !steps[steps.length - 1].final) steps[steps.length - 1].final = true;
+  return { original: nums, answer, steps };
+}
+
+/** LeetCode 134: Gas Station. */
+function buildSteps134(input, params) {
+  const gas = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const cost = String(params && params.cost || "3,4,5,1,2").split(",").map((s) => Number(s.trim()));
+  const n = gas.length;
+  const steps = [];
+  steps.push({ title: { vi: "So tổng gas và tổng cost", en: "Compare total gas and total cost" }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "gas", value: `[${gas.join(",")}]` }, { name: "cost", value: `[${cost.join(",")}]` }, { name: "sum(gas)", value: gas.reduce((a, b) => a + b, 0) }, { name: "sum(cost)", value: cost.reduce((a, b) => a + b, 0) }], note: { vi: "Nếu tổng gas < tổng cost → -1. Ngược lại tồn tại 1 điểm xuất phát duy nhất.", en: "If total gas < total cost → -1. Otherwise a unique start exists." } });
+  if (gas.reduce((a, b) => a + b, 0) < cost.reduce((a, b) => a + b, 0)) { steps.push({ title: { vi: "Tổng gas < tổng cost → -1", en: "total gas < total cost → -1" }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [], final: true, codeLines: [4], vars: [{ name: "answer", value: -1 }], note: { vi: "Không đủ xăng để đi hết vòng.", en: "Not enough gas to complete the loop." } }); return { original: gas, answer: -1, steps }; }
+  let start = 0, tank = 0;
+  for (let i = 0; i < n; i++) {
+    tank += gas[i] - cost[i];
+    if (tank < 0) { steps.push({ title: { vi: `i=${i}: tank<0 → start=${i + 1}, reset tank`, en: `i=${i}: tank<0 → start=${i + 1}, reset tank` }, arr: [...gas], sub: gas.map((g, x) => `-${cost[x]}`), highlight: [i], mark: [], codeLines: [5, 6, 7, 8], vars: [{ name: "i", value: i }, { name: "tank", value: tank }, { name: "new start", value: i + 1 }], note: { vi: `Xăng âm tại ${i} → không station nào trong [${start}..${i}] làm điểm xuất phát được → start=${i + 1}.`, en: `Tank negative at ${i} → no station in [${start}..${i}] can be the start → start=${i + 1}.` } }); start = i + 1; tank = 0; }
+    else { steps.push({ title: { vi: `i=${i}: tank += ${gas[i]}-${cost[i]} = ${tank}`, en: `i=${i}: tank += ${gas[i]}-${cost[i]} = ${tank}` }, arr: [...gas], sub: gas.map((g, x) => `-${cost[x]}`), highlight: [i], mark: [start], codeLines: [5, 6], vars: [{ name: "i", value: i }, { name: "tank", value: tank }, { name: "start", value: start }], note: { vi: `Còn xăng (tank=${tank}) → tiếp tục với start=${start}.`, en: `Still have gas (tank=${tank}) → continue with start=${start}.` } }); }
+  }
+  steps.push({ title: { vi: `Đáp án: ${start}`, en: `Answer: ${start}` }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [start], final: true, codeLines: [9], vars: [{ name: "answer", value: start }], note: { vi: `Điểm xuất phát duy nhất = station ${start}.`, en: `The unique valid start = station ${start}.` } });
+  return { original: gas, answer: start, steps };
+}
+
+/** LeetCode 179: Largest Number — custom comparator a+b vs b+a. */
+function buildSteps179(input) {
+  const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const strs = nums.map(String);
+  const steps = [];
+  steps.push({ title: { vi: "Chuyển thành chuỗi", en: "Convert to strings" }, arr: [...nums], sub: strs, highlight: [], mark: [], codeLines: [3], vars: [{ name: "strs", value: `[${strs.join(",")}]` }], note: { vi: "So sánh a,b bằng a+b so với b+a. Nếu a+b > b+a thì a đứng trước.", en: "Compare a,b by a+b versus b+a. If a+b > b+a, a comes first." } });
+  // insertion-sort-like to show comparisons succinctly; just show sorted result via comparator
+  const sorted = [...strs].sort((a, b) => (a + b > b + a ? -1 : a + b < b + a ? 1 : 0));
+  // show a few key comparison steps
+  steps.push({ title: { vi: `Sắp xếp: [${sorted.join(",")}]`, en: `Sort: [${sorted.join(",")}]` }, arr: sorted.map(Number), sub: sorted, highlight: [], mark: [], codeLines: [4, 5, 6], vars: [{ name: "sorted", value: `[${sorted.join(",")}]` }], note: { vi: `Sắp theo comparator: chuỗi ghép lớn hơn đứng trước. Vd "9">"5">"34">"3">"30".`, en: `Sort by the comparator: the concatenation that is larger comes first. e.g. "9">"5">"34">"3">"30".` } });
+  const joined = sorted.join("");
+  const answer = joined[0] === "0" ? "0" : joined;
+  steps.push({ title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` }, arr: sorted.map(Number), sub: sorted, highlight: [], mark: [], final: true, codeLines: [7, 8], vars: [{ name: "answer", value: `"${answer}"` }], note: { vi: joined[0] === "0" ? `Toàn số 0 → "0".` : `Ghép các chuỗi đã sắp → "${answer}".`, en: joined[0] === "0" ? `All zeros → "0".` : `Concatenate the sorted strings → "${answer}".` } });
+  return { original: nums, answer, steps };
+}
+
 module.exports = {
+  55: {
+    id: 55, difficulty: "medium", slug: "jump-game",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Jump Game", en: "Jump Game" },
+    titleVi: { vi: "Trò nhảy (greedy farthest)", en: "Jump game (greedy farthest)" },
+    statement: { vi: "Mỗi phần tử là bước nhảy tối đa từ vị trí đó. Có thể tới ô cuối không? Nhập cách nhau dấu phẩy.", en: "Each element is the max jump length from that index. Can you reach the last index? Enter comma-separated." },
+    defaultInput: [2, 3, 1, 1, 4], inputKind: "nonneg", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [{ vi: "Giữ farthest = chỉ số xa nhất có thể tới.", en: "Track farthest = the farthest reachable index." }, { vi: "Nếu i vượt farthest → kẹt → False.", en: "If i exceeds farthest → stuck → False." }, { vi: "Nếu farthest ≥ cuối → True.", en: "If farthest ≥ last → True." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt greedy.", en: "Single greedy pass." } },
+    code: ["class Solution:", "    def canJump(self, nums):", "        farthest = 0", "        for i, jump in enumerate(nums):", "            if i > farthest: return False", "            farthest = max(farthest, i + jump)", "            if farthest >= len(nums)-1: return True", "        return True"],
+    builder: buildSteps55,
+  },
+  134: {
+    id: 134, difficulty: "medium", slug: "gas-station",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Gas Station", en: "Gas Station" },
+    titleVi: { vi: "Trạm xăng (greedy)", en: "Gas station (greedy)" },
+    statement: { vi: "gas[i] xăng nhận, cost[i] xăng đi tới trạm kế. Tìm điểm xuất phát để đi hết vòng, hoặc -1. Nhập gas; cost trong tham số.", en: "gas[i] fuel gained, cost[i] to reach the next station. Find the start to complete the loop, or -1. Enter gas; cost as a parameter." },
+    defaultInput: [1, 2, 3, 4, 5], inputKind: "nonneg", inputLabel: { vi: "gas", en: "gas" },
+    extraParams: [{ key: "cost", label: { vi: "cost (cách bởi ,)", en: "cost (comma separated)" }, default: "3,4,5,1,2" }],
+    approach: [{ vi: "Nếu tổng gas < tổng cost → -1.", en: "If total gas < total cost → -1." }, { vi: "Cộng dồn tank = gas[i]-cost[i].", en: "Accumulate tank = gas[i]-cost[i]." }, { vi: "Khi tank < 0, không station nào trong đoạn vừa qua là start → start = i+1, reset tank.", en: "When tank < 0, no station in that stretch can be the start → start = i+1, reset tank." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt greedy.", en: "Single greedy pass." } },
+    code: ["class Solution:", "    def canCompleteCircuit(self, gas, cost):", "        if sum(gas) < sum(cost): return -1", "        start = tank = 0", "        for i in range(len(gas)):", "            tank += gas[i] - cost[i]", "            if tank < 0:", "                start = i + 1; tank = 0", "        return start"],
+    builder: buildSteps134,
+  },
+  179: {
+    id: 179, difficulty: "medium", slug: "largest-number",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Largest Number", en: "Largest Number" },
+    titleVi: { vi: "Ghép số lớn nhất (comparator tùy chỉnh)", en: "Largest number (custom comparator)" },
+    statement: { vi: "Sắp xếp các số để ghép thành số LỚN NHẤT. Nhập cách nhau dấu phẩy.", en: "Arrange numbers to form the LARGEST concatenated number. Enter comma-separated." },
+    defaultInput: [3, 30, 34, 5, 9], inputKind: "nonneg", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    approach: [{ vi: "Chuyển các số thành chuỗi.", en: "Convert numbers to strings." }, { vi: "So sánh a,b: a trước b nếu a+b > b+a.", en: "Compare a,b: a before b if a+b > b+a." }, { vi: "Ghép lại; xử lý trường hợp toàn số 0.", en: "Concatenate; handle the all-zeros case." }],
+    complexity: { time: "O(n log n)", space: "O(n)", note: { vi: "Sắp xếp với comparator tùy chỉnh.", en: "Sort with a custom comparator." } },
+    code: ["from functools import cmp_to_key", "class Solution:", "    def largestNumber(self, nums):", "        strs = list(map(str, nums))", "        strs.sort(key=cmp_to_key(lambda a,b: (a+b < b+a) - (a+b > b+a)))", "        res = ''.join(strs)", "        return '0' if res[0]=='0' else res"],
+    builder: buildSteps179,
+  },
   252: {
     id: 252,
     difficulty: "easy",
