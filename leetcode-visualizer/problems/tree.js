@@ -1867,29 +1867,220 @@ function buildSteps366(input) {
 
 // ─── 863: All Nodes Distance K in Binary Tree ───
 function buildSteps863(input, params) {
-  const root = parseTree(input); const tv = Number(params.target); const k = Number(params.k); const steps = [];
-  const parent = buildParents(root); const target = findNode(root, tv);
-  steps.push(snapshot(root, {
-    title: { vi: `Các nút cách ${tv} đúng ${k} bước`, en: `Nodes at distance ${k} from ${tv}` },
-    codeLines: [2, 3], vars: [{ name: "target", value: tv }, { name: "k", value: k }],
-    note: { vi: `Coi cây như ĐỒ THỊ (thêm cạnh con→cha qua parent map). BFS từ target, lấy tất cả nút ở lớp thứ k.`, en: `Treat the tree as a GRAPH (add child→parent edges via a parent map). BFS from target, take all nodes at layer k.` },
-  }));
+  const root = parseTree(input);
+  const targetValue = Number(params.target);
+  const k = Number(params.k);
+  const target = findNode(root, targetValue);
+  const parent = new Map();
+  const parentEntries = [];
+  const seen = new Set();
   const result = [];
-  if (target) {
-    let queue = [target]; const visited = new Set([target.id]); let dist = 0;
-    while (queue.length) {
-      if (dist === k) { result.push(...queue.map((n) => n.val)); steps.push(snapshot(root, { title: { vi: `Khoảng cách ${dist}: [${queue.map((n) => n.val).join(",")}]`, en: `Distance ${dist}: [${queue.map((n) => n.val).join(",")}]` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [6, 7], vars: [{ name: "dist", value: dist }, { name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Đạt khoảng cách ${k} → đây là kết quả.`, en: `Reached distance ${k} → these are the answer.` } })); break; }
-      steps.push(snapshot(root, { title: { vi: `Khoảng cách ${dist}: [${queue.map((n) => n.val).join(",")}]`, en: `Distance ${dist}: [${queue.map((n) => n.val).join(",")}]` }, hlSet: new Set(queue.map((n) => n.id)), wordSet: new Set(visited), codeLines: [4, 5], vars: [{ name: "dist", value: dist }, { name: "frontier", value: `[${queue.map((n) => n.val).join(",")}]` }], note: { vi: `Mở rộng sang hàng xóm (trái, phải, cha) chưa thăm.`, en: `Expand to unvisited neighbors (left, right, parent).` } }));
-      const next = [];
-      for (const n of queue) {
-        for (const nb of [n.left, n.right, parent.get(n.id)]) {
-          if (nb && !visited.has(nb.id)) { visited.add(nb.id); next.push(nb); }
-        }
-      }
-      queue = next; dist++;
+  const steps = [];
+  let queue = null;
+
+  const formatQueue = () => queue === null
+    ? "not initialized"
+    : `[${queue.map(({ node, distance }) => `(${node.val},${distance})`).join(", ")}]`;
+  const formatSeen = () => `[${[...seen].map((id) => {
+    const value = findNodeById(root, id);
+    return value !== null ? value : id;
+  }).join(", ")}]`;
+  const formatParents = () => `{${parentEntries.map(([child, par]) => `${child}:${par}`).join(", ")}}`;
+  const queueView = (operation = "—", popped = "—", appended = "—") => {
+    const items = queue === null ? [] : queue.map(({ node, distance }) => `${node.val}@${distance}`);
+    return {
+      title: "BFS Queue (node@distance)",
+      items,
+      capacity: Math.max(5, items.length),
+      active: items.length ? 0 : -1,
+      status: [
+        { label: "operation", value: operation },
+        { label: "popped", value: popped },
+        { label: "appended", value: appended },
+        { label: "target distance", value: k },
+      ],
+    };
+  };
+  const addStep = (opts) => {
+    steps.push(snapshot(root, Object.assign({}, opts, {
+      queueView: queueView(opts.queueOperation, opts.popped, opts.appended),
+    })));
+  };
+
+  addStep({
+    title: { vi: `Tìm các nút cách target=${targetValue} đúng k=${k}`, en: `Find nodes exactly k=${k} from target=${targetValue}` },
+    hlSet: target ? new Set([target.id]) : new Set(), codeLines: [4],
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "target", value: target ? `TreeNode(${target.val})` : "not found" }, { name: "k", value: k }],
+    queueOperation: "enter function",
+    note: { vi: "Pha 1 tạo parent map để có thể đi từ con lên cha. Pha 2 BFS từ target theo ba hướng: trái, phải, cha.", en: "Phase 1 builds a parent map so traversal can move from child to parent. Phase 2 runs BFS from target in three directions: left, right, parent." },
+  });
+
+  addStep({
+    title: { vi: "parent = {}", en: "parent = {}" }, codeLines: [5],
+    vars: [{ name: "parent", value: "{}" }], queueOperation: "parent map phase",
+    note: { vi: "Map parent[node] lưu cha của mỗi node; root sẽ có cha là None.", en: "parent[node] stores each node's parent; the root's parent is None." },
+  });
+
+  function buildParent(node, par) {
+    if (!node) return;
+    addStep({
+      title: { vi: `build_parent(node=${node.val})`, en: `build_parent(node=${node.val})` },
+      hlSet: new Set([node.id]), codeLines: [6, 7],
+      vars: [{ name: "node", value: node.val }, { name: "par", value: par ? par.val : "None" }], queueOperation: "DFS visit",
+      note: { vi: `node=${node.val} khác None nên tiếp tục ghi parent.`, en: `node=${node.val} is not None, so record its parent.` },
+    });
+    parent.set(node.id, par);
+    parentEntries.push([node.val, par ? par.val : "None"]);
+    addStep({
+      title: { vi: `parent[${node.val}] = ${par ? par.val : "None"}`, en: `parent[${node.val}] = ${par ? par.val : "None"}` },
+      hlSet: new Set([node.id]), wordSet: new Set(parent.keys()), codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "parent", value: formatParents() }], queueOperation: "record parent",
+      note: { vi: `Đã thêm cạnh ngược ${node.val} → ${par ? par.val : "None"}.`, en: `Recorded reverse edge ${node.val} → ${par ? par.val : "None"}.` },
+    });
+    if (node.left) {
+      addStep({
+        title: { vi: `Đi xuống con trái ${node.left.val}`, en: `Descend to left child ${node.left.val}` },
+        hlSet: new Set([node.id, node.left.id]), wordSet: new Set(parent.keys()), codeLines: [10],
+        vars: [{ name: "node", value: node.val }, { name: "node.left", value: node.left.val }], queueOperation: "DFS left",
+        note: { vi: `Gọi build_parent(${node.left.val}, ${node.val}).`, en: `Call build_parent(${node.left.val}, ${node.val}).` },
+      });
+      buildParent(node.left, node);
+    }
+    if (node.right) {
+      addStep({
+        title: { vi: `Đi xuống con phải ${node.right.val}`, en: `Descend to right child ${node.right.val}` },
+        hlSet: new Set([node.id, node.right.id]), wordSet: new Set(parent.keys()), codeLines: [11],
+        vars: [{ name: "node", value: node.val }, { name: "node.right", value: node.right.val }], queueOperation: "DFS right",
+        note: { vi: `Gọi build_parent(${node.right.val}, ${node.val}).`, en: `Call build_parent(${node.right.val}, ${node.val}).` },
+      });
+      buildParent(node.right, node);
     }
   }
-  const fs = snapshot(root, { title: { vi: `Kết quả: [${result.join(",")}]`, en: `Result: [${result.join(",")}]` }, vars: [{ name: "answer", value: `[${result.join(",")}]` }], note: { vi: `Các nút cách ${tv} đúng ${k} bước = [${result.join(",")}].`, en: `Nodes exactly ${k} away from ${tv} = [${result.join(",")}].` } }); fs.final = true; steps.push(fs);
+
+  if (root) buildParent(root, null);
+  addStep({
+    title: { vi: "Hoàn tất parent map", en: "Parent map complete" },
+    hlSet: target ? new Set([target.id]) : new Set(), wordSet: new Set(parent.keys()), codeLines: [12],
+    vars: [{ name: "parent", value: formatParents() }], queueOperation: "finish parent map",
+    note: { vi: "Bây giờ mỗi node có tối đa ba hàng xóm: left, right và parent.", en: "Each node now has up to three neighbors: left, right, and parent." },
+  });
+
+  if (!target) {
+    const missing = snapshot(root, {
+      title: { vi: `Không tìm thấy target=${targetValue}`, en: `target=${targetValue} was not found` },
+      codeLines: [26], queueView: queueView("stop: missing target"),
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "Input không hợp lệ: target phải là một node trong cây.", en: "Invalid input: target must be a node in the tree." },
+    });
+    missing.final = true;
+    steps.push(missing);
+    return { input, answer: "[]", steps };
+  }
+
+  queue = [{ node: target, distance: 0 }];
+  addStep({
+    title: { vi: `queue = [(${target.val}, 0)]`, en: `queue = [(${target.val}, 0)]` },
+    hlSet: new Set([target.id]), codeLines: [14],
+    vars: [{ name: "queue", value: formatQueue() }], queueOperation: "enqueue target", appended: `${target.val}@0`,
+    note: { vi: "BFS bắt đầu tại target với khoảng cách 0.", en: "BFS starts at target with distance 0." },
+  });
+  seen.add(target.id);
+  addStep({
+    title: { vi: `seen = {${target.val}}`, en: `seen = {${target.val}}` },
+    hlSet: new Set([target.id]), wordSet: new Set(seen), codeLines: [15],
+    vars: [{ name: "seen", value: formatSeen() }, { name: "queue", value: formatQueue() }], queueOperation: "mark target seen",
+    note: { vi: "Đánh dấu target ngay khi enqueue để không quay lại node này qua cạnh parent/con.", en: "Mark target when it is enqueued so no parent/child edge can add it again." },
+  });
+  addStep({
+    title: { vi: "result = []", en: "result = []" }, wordSet: new Set(seen), codeLines: [16],
+    vars: [{ name: "result", value: "[]" }, { name: "queue", value: formatQueue() }], queueOperation: "initialize result",
+    note: { vi: `result chỉ nhận node khi distance == ${k}.`, en: `A node enters result only when distance == ${k}.` },
+  });
+
+  while (queue.length) {
+    addStep({
+      title: { vi: `while queue → True`, en: `while queue → True` },
+      hlSet: new Set(queue.map(({ node }) => node.id)), wordSet: new Set(seen), codeLines: [17],
+      vars: [{ name: "queue", value: formatQueue() }, { name: "seen", value: formatSeen() }], queueOperation: "check queue",
+      note: { vi: "Queue còn phần tử nên tiếp tục BFS.", en: "The queue is not empty, so BFS continues." },
+    });
+    const { node, distance } = queue.shift();
+    addStep({
+      title: { vi: `popleft() → (${node.val}, ${distance})`, en: `popleft() → (${node.val}, ${distance})` },
+      hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [18],
+      vars: [{ name: "node", value: node.val }, { name: "distance", value: distance }, { name: "queue", value: formatQueue() }],
+      queueOperation: "popleft", popped: `${node.val}@${distance}`,
+      note: { vi: `Lấy node ${node.val} ở khoảng cách ${distance} khỏi đầu queue.`, en: `Remove node ${node.val} at distance ${distance} from the front of the queue.` },
+    });
+
+    if (distance === k) {
+      addStep({
+        title: { vi: `${distance} == k (${k}) → True`, en: `${distance} == k (${k}) → True` },
+        hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [19],
+        vars: [{ name: "distance", value: distance }, { name: "k", value: k }, { name: "result", value: `[${result.join(", ")}]` }], queueOperation: "target distance reached",
+        note: { vi: `Node ${node.val} cách target đúng ${k} cạnh nên thuộc đáp án.`, en: `Node ${node.val} is exactly ${k} edges from target, so it belongs in the answer.` },
+      });
+      result.push(node.val);
+      addStep({
+        title: { vi: `result.append(${node.val})`, en: `result.append(${node.val})` },
+        hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [20, 21],
+        vars: [{ name: "result", value: `[${result.join(", ")}]` }, { name: "queue", value: formatQueue() }], queueOperation: "append result; continue",
+        note: { vi: `result = [${result.join(", ")}]. continue ngăn BFS đi xa hơn k từ node này.`, en: `result = [${result.join(", ")}]. continue prevents BFS from expanding beyond distance k from this node.` },
+      });
+      continue;
+    }
+
+    const neighbors = [
+      { label: "left", node: node.left },
+      { label: "right", node: node.right },
+      { label: "parent", node: parent.get(node.id) },
+    ];
+    addStep({
+      title: { vi: `Hàng xóm của ${node.val}: trái, phải, cha`, en: `Neighbors of ${node.val}: left, right, parent` },
+      hlSet: new Set([node.id, ...neighbors.filter(({ node: nb }) => nb).map(({ node: nb }) => nb.id)]), wordSet: new Set(seen), codeLines: [22],
+      vars: neighbors.map(({ label, node: nb }) => ({ name: label, value: nb ? nb.val : "None" })), queueOperation: "inspect neighbors",
+      note: { vi: "parent map biến cạnh cha→con thành đường đi hai chiều mà không sửa cấu trúc cây.", en: "The parent map makes parent-child edges traversable in both directions without changing the tree." },
+    });
+
+    for (const { label, node: neighbor } of neighbors) {
+      const eligible = !!neighbor && !seen.has(neighbor.id);
+      addStep({
+        title: { vi: `${label}: ${neighbor ? neighbor.val : "None"} → ${eligible ? "thêm" : "bỏ qua"}`, en: `${label}: ${neighbor ? neighbor.val : "None"} → ${eligible ? "enqueue" : "skip"}` },
+        hlSet: new Set([node.id].concat(neighbor ? [neighbor.id] : [])), wordSet: new Set(seen), codeLines: [23],
+        vars: [{ name: "neighbor", value: neighbor ? neighbor.val : "None" }, { name: "in seen", value: neighbor ? seen.has(neighbor.id) : "N/A" }],
+        queueOperation: eligible ? "eligible neighbor" : "skip neighbor",
+        note: eligible
+          ? { vi: `${neighbor.val} tồn tại và chưa thăm.`, en: `${neighbor.val} exists and has not been visited.` }
+          : { vi: neighbor ? `${neighbor.val} đã có trong seen nên không enqueue lại.` : "Hàng xóm là None nên bỏ qua.", en: neighbor ? `${neighbor.val} is already in seen, so do not enqueue it again.` : "The neighbor is None, so skip it." },
+      });
+      if (!eligible) continue;
+      seen.add(neighbor.id);
+      addStep({
+        title: { vi: `seen.add(${neighbor.val})`, en: `seen.add(${neighbor.val})` },
+        hlSet: new Set([neighbor.id]), wordSet: new Set(seen), codeLines: [24],
+        vars: [{ name: "seen", value: formatSeen() }], queueOperation: "mark seen",
+        note: { vi: `Đánh dấu ${neighbor.val} trước khi enqueue để mỗi node chỉ vào queue một lần.`, en: `Mark ${neighbor.val} before enqueueing so each node enters the queue only once.` },
+      });
+      queue.push({ node: neighbor, distance: distance + 1 });
+      addStep({
+        title: { vi: `enqueue (${neighbor.val}, ${distance + 1})`, en: `enqueue (${neighbor.val}, ${distance + 1})` },
+        hlSet: new Set([neighbor.id]), wordSet: new Set(seen), codeLines: [25],
+        vars: [{ name: "queue", value: formatQueue() }, { name: "distance + 1", value: distance + 1 }],
+        queueOperation: "append", appended: `${neighbor.val}@${distance + 1}`,
+        note: { vi: `Queue mới = ${formatQueue()}.`, en: `Updated queue = ${formatQueue()}.` },
+      });
+    }
+  }
+
+  const finalStep = snapshot(root, {
+    title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
+    hlSet: new Set(result.map((value) => findNode(root, value)).filter(Boolean).map((node) => node.id)),
+    wordSet: new Set(seen), codeLines: [26], queueView: queueView("done"),
+    vars: [{ name: "result", value: `[${result.join(", ")}]` }, { name: "answer", value: `[${result.join(", ")}]` }],
+    note: { vi: `Các node cách target=${targetValue} đúng ${k} cạnh là [${result.join(", ")}].`, en: `Nodes exactly ${k} edges from target=${targetValue} are [${result.join(", ")}].` },
+  });
+  finalStep.final = true;
+  steps.push(finalStep);
   return { input, answer: `[${result.join(",")}]`, steps };
 }
 
@@ -2987,14 +3178,41 @@ module.exports = {
     title: { vi: "All Nodes Distance K in Binary Tree", en: "All Nodes Distance K in Binary Tree" },
     titleVi: { vi: "Các nút cách target K bước", en: "Nodes at distance K from target" },
     statement: { vi: "Cho root, một nút target và số k, trả về giá trị tất cả nút cách target đúng k cạnh. Nhập level-order.", en: "Given root, a target node, and k, return values of all nodes exactly k edges from target. Enter as level-order." },
-    defaultInput: "3,5,1,6,2,0,8,7,4",
+    defaultInput: "3,5,1,6,2,0,8,null,null,7,4",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [{ key: "target", label: { vi: "target", en: "target" }, allowNegative: true, default: 5 }, { key: "k", label: { vi: "k", en: "k" }, default: 2 }],
     approach: [
       { vi: "Xây map con→cha để biến cây thành đồ thị vô hướng. BFS từ target, lấy lớp thứ k.", en: "Build a child→parent map to turn the tree into an undirected graph. BFS from target, take layer k." },
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Map cha + BFS đều O(n).", en: "Parent map + BFS both O(n)." } },
-    code: ["class Solution:", "    def distanceK(self, root, target, k):", "        parent = {}", "        def dfs(node, par):", "            if not node: return", "            parent[node] = par", "            dfs(node.left, node); dfs(node.right, node)", "        dfs(root, None)", "        from collections import deque", "        q = deque([(target, 0)])", "        seen = {target}", "        res = []", "        while q:", "            node, d = q.popleft()", "            if d == k:", "                res.append(node.val); continue", "            for nb in (node.left, node.right, parent[node]):", "                if nb and nb not in seen:", "                    seen.add(nb); q.append((nb, d + 1))", "        return res"],
+    code: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def distanceK(self, root, target, k):",
+      "        parent = {}",
+      "        def build_parent(node, par):",
+      "            if not node:",
+      "                return",
+      "            parent[node] = par",
+      "            build_parent(node.left, node)",
+      "            build_parent(node.right, node)",
+      "        build_parent(root, None)",
+      "",
+      "        queue = deque([(target, 0)])",
+      "        seen = {target}",
+      "        result = []",
+      "        while queue:",
+      "            node, distance = queue.popleft()",
+      "            if distance == k:",
+      "                result.append(node.val)",
+      "                continue",
+      "            for neighbor in (node.left, node.right, parent[node]):",
+      "                if neighbor and neighbor not in seen:",
+      "                    seen.add(neighbor)",
+      "                    queue.append((neighbor, distance + 1))",
+      "        return result",
+    ],
     builder: buildSteps863,
   },
   156: {
