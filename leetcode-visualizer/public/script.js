@@ -2939,6 +2939,8 @@ function renderSynonymSentenceView(step) {
   const activeWords = new Set(Array.isArray(view.activeWords) ? view.activeWords : []);
   const activeWord = Number.isInteger(view.activeWord) ? view.activeWord : -1;
   const expected = Number.isFinite(view.expected) ? view.expected : 0;
+  const originalWordLabel = vi ? "từ gốc" : "original word";
+  const replacedWordLabel = vi ? "từ đã thay" : "replaced word";
 
   const phaseHtml = phases.map((label, index) => {
     const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
@@ -2991,9 +2993,23 @@ function renderSynonymSentenceView(step) {
     </div>`;
   }).join("");
 
+  const replaceablePositions = new Set(options
+    .map((choices, index) => (Array.isArray(choices) && choices.length > 1 ? index : -1))
+    .filter((index) => index >= 0));
+
+  const renderResultSentence = (result) => String(result).split(/\s+/).filter(Boolean).map((word, index) => {
+    if (!replaceablePositions.has(index)) {
+      return `<span class="synonym-result-word">${escapeHtml(word)}</span>`;
+    }
+    const isOriginal = word === sentence[index];
+    const state = isOriginal ? "original" : "replaced";
+    const stateLabel = isOriginal ? originalWordLabel : replacedWordLabel;
+    return `<span class="synonym-result-word replaceable ${state}" title="${escapeHtml(stateLabel)}" aria-label="${escapeHtml(`${word}: ${stateLabel}`)}">${escapeHtml(word)}</span>`;
+  }).join(" ");
+
   const resultsHtml = completed.length
     ? completed.map((result, index) => `<div class="synonym-result-item${index === completed.length - 1 && view.mode !== "result" ? " newest" : ""}">
-      <small>${index + 1}</small><span>${escapeHtml(result)}</span>
+      <small class="synonym-result-index">${index + 1}</small><span class="synonym-result-sentence">${renderResultSentence(result)}</span>
     </div>`).join("")
     : `<div class="synonym-results-empty">${vi ? "Chưa có câu hoàn chỉnh" : "No completed sentence yet"}</div>`;
 
@@ -3012,6 +3028,10 @@ function renderSynonymSentenceView(step) {
         <div class="synonym-section-heading">
           <strong>res</strong>
           <span>${completed.length} / ${expected} ${vi ? "câu" : "sentences"}</span>
+        </div>
+        <div class="synonym-result-legend" aria-label="${vi ? "Chú thích từ trong kết quả" : "Result word legend"}">
+          <span><i class="original"></i>${originalWordLabel}</span>
+          <span><i class="replaced"></i>${replacedWordLabel}</span>
         </div>
         <div class="synonym-results-list">${resultsHtml}</div>
       </section>`

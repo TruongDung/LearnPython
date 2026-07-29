@@ -2383,6 +2383,37 @@ button:disabled {
   gap: 6px;
 }
 
+.synonym-result-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 5px;
+  color: #94a3b8;
+  font-size: 9px;
+}
+
+.synonym-result-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.synonym-result-legend i {
+  width: 14px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.synonym-result-legend i.original {
+  border: 1px dashed #818cf8;
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.synonym-result-legend i.replaced {
+  border: 1px solid #34d399;
+  background: rgba(16, 185, 129, 0.18);
+}
+
 .synonym-result-item {
   display: grid;
   grid-template-columns: 25px minmax(0, 1fr);
@@ -2394,12 +2425,36 @@ button:disabled {
   font-size: 11px;
 }
 
-.synonym-result-item small {
+.synonym-result-index {
   color: #64748b;
   font-size: 9px;
 }
 
-.synonym-result-item span { overflow-wrap: anywhere; }
+.synonym-result-sentence {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+.synonym-result-word.replaceable {
+  display: inline-block;
+  margin: 1px 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.synonym-result-word.original {
+  border: 1px dashed #818cf8;
+  background: rgba(99, 102, 241, 0.1);
+  color: #c7d2fe;
+}
+
+.synonym-result-word.replaced {
+  border: 1px solid #34d399;
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+}
 
 .synonym-result-item.newest {
   color: #a7f3d0;
@@ -2454,6 +2509,16 @@ button:disabled {
 [data-theme="light"] .synonym-word-options span.selected { background: #e0f2fe; color: #075985; }
 [data-theme="light"] .synonym-result-item { color: #334155; }
 [data-theme="light"] .synonym-result-item.newest { color: #047857; border-color: #6ee7b7; }
+[data-theme="light"] .synonym-result-word.original {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #3730a3;
+}
+[data-theme="light"] .synonym-result-word.replaced {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
 
 @media (max-width: 640px) {
   .synonym-phases {
