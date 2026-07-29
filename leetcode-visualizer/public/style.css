@@ -453,49 +453,6 @@ button:disabled {
   font-size: 14px;
 }
 
-/* ---- Premium lock (hides the simulation for Premium problems) ---- */
-.premium-lock {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-align: center;
-  margin: 24px auto;
-  padding: 48px 32px;
-  max-width: 520px;
-  border-radius: 16px;
-  background: rgba(251, 191, 36, 0.08);
-  border: 1px dashed rgba(251, 191, 36, 0.4);
-}
-
-.premium-lock-key {
-  font-size: 56px;
-  line-height: 1;
-  filter: drop-shadow(0 4px 10px rgba(251, 191, 36, 0.35));
-}
-
-.premium-lock-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #fde68a;
-}
-
-.premium-lock-text {
-  font-size: 0.95rem;
-  color: var(--text-muted, #94a3b8);
-  max-width: 380px;
-}
-
-[data-theme="light"] .premium-lock {
-  background: #fffbeb;
-  border-color: #fcd34d;
-}
-
-[data-theme="light"] .premium-lock-title {
-  color: #b45309;
-}
-
 /* ---- Complexity ---- */
 .complexity {
   margin-top: 14px;
