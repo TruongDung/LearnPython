@@ -1127,7 +1127,7 @@ function buildSteps99(input, params = {}) {
   const useInstanceState = Number(params.approach) === 2;
   const codeBlock = useInstanceState ? 2 : 1;
   const lines = useInstanceState
-    ? { entry: 2, initFirst: 3, initSecond: 4, initPrev: 5, helper: 9, nullCheck: 10, nullReturn: 11, left: 12, compare: 13, checkFirst: 14, setFirst: 15, setSecond: 16, setPrev: 17, right: 18, callRoot: 6, swap: 7 }
+    ? { entry: 2, initFirst: 6, initSecond: 7, initPrev: 8, helper: 14, nullCheck: 15, nullReturn: 16, left: 18, compare: 19, checkFirst: 20, setFirst: 21, setSecond: 22, setPrev: 23, right: 25, callRoot: 10, swap: 11 }
     : { entry: 2, initAll: 3, helper: 4, shared: 5, nullCheck: 6, left: 7, compare: 8, checkFirst: 9, setFirst: 10, setSecond: 11, setPrev: 12, right: 13, callRoot: 14, swap: 15 };
   const names = useInstanceState
     ? { first: "self.first_wrong", second: "self.second_wrong", prev: "self.prev" }
@@ -2406,21 +2406,28 @@ module.exports = {
     code2: [
       "class Solution:",
       "    def recoverTree(self, root: Optional[TreeNode]) -> None:",
+      "        \"\"\"",
+      "        Do not return anything, modify root in-place instead.",
+      "        \"\"\"",
       "        self.first_wrong = None",
       "        self.second_wrong = None",
       "        self.prev = TreeNode(float('-inf'))",
+      "",
       "        self.inorder(root)",
       "        self.first_wrong.val, self.second_wrong.val = self.second_wrong.val, self.first_wrong.val",
+      "",
       "",
       "    def inorder(self, curr):",
       "        if not curr:",
       "            return",
+      "",
       "        self.inorder(curr.left)",
       "        if curr.val < self.prev.val:",
       "            if not self.first_wrong:",
       "                self.first_wrong = self.prev",
       "            self.second_wrong = curr",
       "        self.prev = curr",
+      "",
       "        self.inorder(curr.right)",
     ],
     liveArgs: (input) => [{
