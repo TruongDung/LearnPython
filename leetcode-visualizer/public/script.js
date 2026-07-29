@@ -5171,7 +5171,18 @@ function renderLoudRichView(step) {
     const isActive = (edge.from === activeFrom && edge.to === activeTo) || edge.key === currentBuildKey;
     const classes = ["loud-rich-edge", builtKeys.has(edge.key) ? "built" : "unbuilt"];
     if (isActive) classes.push("active");
-    return `<line class="${classes.join(" ")}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" marker-end="url(#${isActive ? "loud-rich-arrow-active" : "loud-rich-arrow"})"></line>`;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const startPadding = 33;
+    const endPadding = isActive ? 38 : 36;
+    const x1 = from.x + unitX * startPadding;
+    const y1 = from.y + unitY * startPadding;
+    const x2 = to.x - unitX * endPadding;
+    const y2 = to.y - unitY * endPadding;
+    return `<line class="${classes.join(" ")}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#${isActive ? "loud-rich-arrow-active" : "loud-rich-arrow"})"></line>`;
   }).join("");
 
   const stackSet = new Set(view.callStack || []);
@@ -5198,8 +5209,8 @@ function renderLoudRichView(step) {
     : "DFS graph with arrows from a poorer person to a richer person.";
   const graphSvg = `<svg class="loud-rich-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(graphSummary)}">
     <defs>
-      <marker id="loud-rich-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
-      <marker id="loud-rich-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+      <marker id="loud-rich-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+      <marker id="loud-rich-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
     </defs>
     ${graphEdges}${graphNodes}
   </svg>`;

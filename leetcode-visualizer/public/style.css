@@ -9242,7 +9242,7 @@ select option {
 }
 
 .loud-rich-svg marker path {
-  fill: #64748b;
+  fill: #94a3b8;
 }
 
 .loud-rich-svg marker#loud-rich-arrow-active path {
@@ -9255,21 +9255,21 @@ select option {
 }
 
 .loud-rich-edge.unbuilt {
-  stroke: #475569;
-  stroke-width: 1.5;
+  stroke: #64748b;
+  stroke-width: 1.8;
   stroke-dasharray: 5 5;
-  opacity: 0.16;
+  opacity: 0.44;
 }
 
 .loud-rich-edge.built {
-  stroke: #64748b;
-  stroke-width: 2.5;
-  opacity: 0.72;
+  stroke: #94a3b8;
+  stroke-width: 2.8;
+  opacity: 0.94;
 }
 
 .loud-rich-edge.active {
   stroke: #f59e0b;
-  stroke-width: 5;
+  stroke-width: 4.5;
   opacity: 1;
 }
 
@@ -9643,6 +9643,10 @@ select option {
 [data-theme="light"] .loud-rich-node text.person { fill: #0f172a; }
 [data-theme="light"] .loud-rich-node text.quiet,
 [data-theme="light"] .loud-rich-node text.memo { fill: #475569; }
+[data-theme="light"] .loud-rich-svg marker path { fill: #334155; }
+[data-theme="light"] .loud-rich-svg marker#loud-rich-arrow-active path { fill: #d97706; }
+[data-theme="light"] .loud-rich-edge.unbuilt { stroke: #64748b; opacity: 0.58; }
+[data-theme="light"] .loud-rich-edge.built { stroke: #475569; opacity: 0.96; }
 [data-theme="light"] .loud-rich-frame,
 [data-theme="light"] .loud-rich-rule { background: #f0f9ff; }
 [data-theme="light"] .loud-rich-frame span,
