@@ -1137,6 +1137,7 @@ function buildSteps99(input, params = {}) {
   let prev = null;
   let current = null;
   let inversionCount = 0;
+  let comparisonState = null;
   const callStack = [];
   const inorderSeen = [];
 
@@ -1157,9 +1158,45 @@ function buildSteps99(input, params = {}) {
     ...extra,
   ];
   const foundSet = () => new Set([first, second].filter(Boolean).map((node) => node.id));
+  const nodeState = (node) => {
+    if (!node) return { state: "none", id: null, value: null, text: "None" };
+    if (node.isSentinel) return { state: "sentinel", id: null, value: "-∞", text: "-∞ (sentinel)" };
+    return { state: "node", id: node.id, value: node.val, text: `node ${node.val}` };
+  };
+  const pointerAnnotations = () => {
+    const annotations = {};
+    const add = (node, label, kind) => {
+      if (!node || node.id === null || node.isSentinel) return;
+      if (!annotations[node.id]) annotations[node.id] = { labels: [] };
+      annotations[node.id].labels.push({ label, kind });
+    };
+    add(current, "curr", "recover-current");
+    add(prev, "prev", "recover-prev");
+    add(first, "first", "recover-first");
+    add(second, "second", "recover-second");
+    return annotations;
+  };
+  const decorateRecoveryStep = (step, options = {}) => {
+    step.tree.annotations = pointerAnnotations();
+    step.tree.levelLabelGutter = 72;
+    step.recoverBstView = {
+      stage: options.stage || "traverse",
+      current: nodeState(current),
+      prev: nodeState(prev),
+      first: nodeState(first),
+      second: nodeState(second),
+      inorder: [...(options.inorder || inorderSeen)],
+      callStack: callStack.map((node) => node ? node.val : "None"),
+      inversionCount,
+      condition: useInstanceState ? "curr.val < self.prev.val" : "prev.val > node.val",
+      comparison: options.comparison || comparisonState,
+      swapped: options.swapped || null,
+    };
+    return step;
+  };
   const addStep = (line, title, note, options = {}) => {
     const activeIds = options.activeNodes || (current ? [current.id] : []);
-    steps.push(snapshot(root, {
+    const step = snapshot(root, {
       title,
       hlSet: new Set(activeIds),
       wordSet: options.wordSet || foundSet(),
@@ -1167,7 +1204,8 @@ function buildSteps99(input, params = {}) {
       codeBlock,
       vars: commonVars(options.extraVars || []),
       note,
-    }));
+    });
+    steps.push(decorateRecoveryStep(step, options));
   };
 
   current = root;
@@ -1206,6 +1244,7 @@ function buildSteps99(input, params = {}) {
   }
 
   function inorder(node) {
+    comparisonState = null;
     callStack.push(node);
     current = node;
     addStep(lines.helper,
@@ -1258,6 +1297,13 @@ function buildSteps99(input, params = {}) {
         ? `${node.val} < ${prev.val} → ${hasInversion}`
         : `${prev.val} > ${node.val} → ${hasInversion}`
       : "prev is None → false";
+    comparisonState = {
+      left: prev ? (prev.isSentinel ? "-∞" : prev.val) : "None",
+      right: node.val,
+      operator: useInstanceState ? "<" : ">",
+      expression: useInstanceState ? `${node.val} < ${prev ? (prev.isSentinel ? "-∞" : prev.val) : "None"}` : `${prev ? (prev.isSentinel ? "-∞" : prev.val) : "None"} > ${node.val}`,
+      inversion: hasInversion,
+    };
     addStep(lines.compare,
       { vi: hasInversion ? `⚠ Phát hiện ${prev.val} > ${node.val}` : `Kiểm tra tại node ${node.val}: hợp lệ`, en: hasInversion ? `⚠ Detect ${prev.val} > ${node.val}` : `Check at node ${node.val}: valid` },
       {
@@ -1268,7 +1314,12 @@ function buildSteps99(input, params = {}) {
           ? `${prev.val} immediately precedes ${node.val} in inorder but is larger → this is an inversion.`
           : prev ? `${prev.val} ≤ ${node.val}, so inorder remains ascending.` : `${node.val} is the first inorder node, so there is no prev to compare.`,
       },
-      { activeNodes: [prev, node].filter((item) => item && item.id !== null).map((item) => item.id), extraVars: [{ name: useInstanceState ? "curr.val < self.prev.val" : "prev.val > node.val", value: comparison }] });
+      {
+        stage: "compare",
+        comparison: comparisonState,
+        activeNodes: [prev, node].filter((item) => item && item.id !== null).map((item) => item.id),
+        extraVars: [{ name: useInstanceState ? "curr.val < self.prev.val" : "prev.val > node.val", value: comparison }],
+      });
 
     if (hasInversion) {
       inversionCount += 1;
@@ -1309,6 +1360,7 @@ function buildSteps99(input, params = {}) {
         { activeNodes: [first.id, second.id] });
     }
 
+    comparisonState = null;
     prev = node;
     inorderSeen.push(node.val);
     addStep(lines.setPrev,
@@ -1385,6 +1437,11 @@ function buildSteps99(input, params = {}) {
         en: `Only the two values change; no edge changes. Inorder is ascending after the swap, so the tree is a valid BST again.`,
       },
     });
+    decorateRecoveryStep(finalStep, {
+      stage: "swap",
+      inorder: recoveredInorder,
+      swapped: { firstBefore, secondBefore },
+    });
     finalStep.final = true;
     steps.push(finalStep);
   } else {
@@ -1398,6 +1455,7 @@ function buildSteps99(input, params = {}) {
         en: "This input already has ascending inorder, so there are no two nodes to swap (outside the problem's main constraint).",
       },
     });
+    decorateRecoveryStep(finalStep, { stage: "done" });
     finalStep.final = true;
     steps.push(finalStep);
   }

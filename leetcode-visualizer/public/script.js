@@ -1633,6 +1633,19 @@ function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" | { label, kind } }
+  const annotationItems = (annotation) => {
+    if (annotation && typeof annotation === "object" && Array.isArray(annotation.labels)) {
+      return annotation.labels.map((item) => (
+        item && typeof item === "object"
+          ? { label: item.label, kind: item.kind || "" }
+          : { label: item, kind: "" }
+      ));
+    }
+    if (annotation && typeof annotation === "object") {
+      return [{ label: annotation.label, kind: annotation.kind || "" }];
+    }
+    return annotation === undefined ? [] : [{ label: annotation, kind: "" }];
+  };
   const minX = Math.min(0, ...nodes.map((n) => n.x));
   const maxX = Math.max(0, ...nodes.map((n) => n.x));
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
@@ -1647,16 +1660,17 @@ function renderTree(step, targetId = "treeView") {
   const maxHalfWidth = hasMultiLineLabels
     ? r
     : Math.max(r, ...nodes.map((n) => (String(n.label || "").length * charW) / 2 + hPad));
-  const maxAnnotationHalfWidth = Math.max(0, ...nodes.map((n) => {
-    const annotation = treeAnnotations[n.id];
-    const label = annotation && typeof annotation === "object" ? annotation.label : annotation;
-    return label === undefined ? 0 : String(label).length * 6.6 / 2;
-  }));
+  const maxAnnotationLines = Math.max(0, ...nodes.map((n) => annotationItems(treeAnnotations[n.id]).length));
+  const maxAnnotationHalfWidth = Math.max(0, ...nodes.flatMap((n) => (
+    annotationItems(treeAnnotations[n.id]).map((item) => String(item.label ?? "").length * 6.6 / 2)
+  )));
   const colW = hasMultiLineLabels ? 84 : Math.max(60, maxHalfWidth * 2 + 14);
-  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0);
-  const basePad = hasMultiLineLabels
+  const annotationExtra = Math.max(0, maxAnnotationLines - 1) * 14;
+  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0) + annotationExtra;
+  const naturalBasePad = hasMultiLineLabels
     ? Math.max(44, maxAnnotationHalfWidth + 6)
     : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
+  const basePad = Math.max(naturalBasePad, maxAnnotationLines ? r + 18 + annotationExtra : 0);
   const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
   const configuredLevelGutter = Number(step.tree.levelLabelGutter);
   const leftGutter = showLevelLabels
@@ -1721,15 +1735,16 @@ function renderTree(step, targetId = "treeView") {
     // Annotation above node (e.g. "l1", "l2", "cur", "slow")
     if (treeAnnotations[n.id] !== undefined) {
       const annotation = treeAnnotations[n.id];
+      const items = annotationItems(annotation);
       const isRichAnnotation = annotation && typeof annotation === "object";
-      const ann = isRichAnnotation ? annotation.label : annotation;
-      const annotationKind = isRichAnnotation
-        ? String(annotation.kind || "").replace(/[^a-zA-Z0-9_-]/g, "")
-        : "";
       const color = n.hl ? "#f59e0b" : n.isWord ? "#22c55e" : "#6366f1";
-      const annotationClass = `tree-annotation${annotationKind ? ` ${annotationKind}` : ""}`;
-      const fill = isRichAnnotation ? "" : ` fill="${color}"`;
-      circles += `<text x="${c.x}" y="${c.y - r - 6}" text-anchor="middle" class="${annotationClass}"${fill}>${escapeXml(ann)}</text>`;
+      const firstY = c.y - r - 7 - Math.max(0, items.length - 1) * 14;
+      items.forEach((item, index) => {
+        const annotationKind = String(item.kind || "").replace(/[^a-zA-Z0-9_-]/g, "");
+        const annotationClass = `tree-annotation${annotationKind ? ` ${annotationKind}` : ""}`;
+        const fill = isRichAnnotation ? "" : ` fill="${color}"`;
+        circles += `<text x="${c.x}" y="${firstY + index * 14}" text-anchor="middle" class="${annotationClass}"${fill}>${escapeXml(item.label)}</text>`;
+      });
     }
     // Sub-label below node (e.g. heap array index)
     if (n.sub !== undefined && n.sub !== null) {
@@ -1774,6 +1789,66 @@ function renderTree(step, targetId = "treeView") {
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
       </div>`
     : treeHtml);
+}
+
+function renderRecoverBstView(step) {
+  const view = step.recoverBstView;
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const pointerSpecs = [
+    { key: "current", label: "curr", roleVi: "node đang xử lý", roleEn: "node being processed" },
+    { key: "prev", label: "prev", roleVi: "node vừa thăm trước đó", roleEn: "previous inorder node" },
+    { key: "first", label: "first", roleVi: "node lớn của inversion đầu", roleEn: "larger node in first inversion" },
+    { key: "second", label: "second", roleVi: "node nhỏ của inversion mới nhất", roleEn: "smaller node in latest inversion" },
+  ];
+  const pointerHtml = pointerSpecs.map((spec) => {
+    const pointer = view[spec.key] || { state: "none", text: "None" };
+    const stateClass = pointer.state === "node" ? "has-node" : pointer.state === "sentinel" ? "sentinel" : "is-none";
+    const beforeValue = view.swapped && spec.key === "first"
+      ? view.swapped.firstBefore
+      : view.swapped && spec.key === "second"
+        ? view.swapped.secondBefore
+        : null;
+    const pointerText = beforeValue === null
+      ? pointer.text
+      : `${pointer.text} · ${vi ? "trước" : "was"} ${beforeValue}`;
+    return `<div class="recover-pointer ${spec.key} ${stateClass}">
+      <span>${spec.label}</span>
+      <strong>${escapeHtml(pointerText)}</strong>
+      <small>${escapeHtml(vi ? spec.roleVi : spec.roleEn)}</small>
+    </div>`;
+  }).join("");
+
+  let comparisonHtml;
+  if (view.swapped) {
+    comparisonHtml = `<strong>${vi ? "Phục hồi" : "Recover"}</strong><code>${escapeHtml(view.swapped.firstBefore)} ↔ ${escapeHtml(view.swapped.secondBefore)}</code><span>→ ${vi ? "inorder tăng dần" : "ascending inorder"}</span>`;
+  } else if (view.comparison) {
+    comparisonHtml = `<strong>${vi ? "Kiểm tra inversion" : "Check inversion"}</strong><code>${escapeHtml(view.comparison.expression)}</code><span class="${view.comparison.inversion ? "is-inversion" : "is-valid"}">${view.comparison.inversion ? (vi ? "ĐÚNG → phát hiện inversion" : "TRUE → inversion found") : (vi ? "SAI → thứ tự hợp lệ" : "FALSE → valid order")}</span>`;
+  } else {
+    comparisonHtml = `<strong>${vi ? "Quy tắc" : "Rule"}</strong><code>${escapeHtml(view.condition || "prev.val > curr.val")}</code><span>${vi ? "thì thứ tự inorder bị giảm" : "means inorder decreases"}</span>`;
+  }
+
+  const inorderHtml = view.inorder.length
+    ? view.inorder.map((value, index) => `<span class="recover-inorder-value${index === view.inorder.length - 1 ? " latest" : ""}">${escapeHtml(value)}</span>`).join(`<i>→</i>`)
+    : `<span class="recover-empty">∅</span>`;
+  const stackHtml = view.callStack.length
+    ? view.callStack.map((value) => `<span>${escapeHtml(value)}</span>`).join(`<i>→</i>`)
+    : `<span class="recover-empty">∅</span>`;
+  const summary = vi
+    ? `Khôi phục BST: curr ${view.current.text}, prev ${view.prev.text}, first ${view.first.text}, second ${view.second.text}.`
+    : `Recover BST: curr ${view.current.text}, prev ${view.prev.text}, first ${view.first.text}, second ${view.second.text}.`;
+
+  treeView.innerHTML = `<div class="recover-bst-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="recover-pointer-row">${pointerHtml}</div>
+    <div class="recover-comparison">${comparisonHtml}</div>
+    <div id="recoverBstTree" class="recover-tree"></div>
+    <div class="recover-traversal-row">
+      <div><b>${vi ? "Inorder đã thăm" : "Visited inorder"}</b><span class="recover-sequence">${inorderHtml}</span></div>
+      <div><b>Call stack</b><span class="recover-sequence">${stackHtml}</span></div>
+      <em>${vi ? "inversion" : "inversions"}: ${escapeHtml(view.inversionCount)}</em>
+    </div>
+  </div>`;
+  renderTree(step, "recoverBstTree");
 }
 
 function renderSameTreeView(step) {
@@ -4378,6 +4453,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSortedListBstView(step);
+  } else if (step.recoverBstView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRecoverBstView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
