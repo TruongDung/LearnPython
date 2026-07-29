@@ -1658,7 +1658,10 @@ function renderTree(step, targetId = "treeView") {
     ? Math.max(44, maxAnnotationHalfWidth + 6)
     : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
   const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
-  const leftGutter = showLevelLabels ? 52 : 0;
+  const configuredLevelGutter = Number(step.tree.levelLabelGutter);
+  const leftGutter = showLevelLabels
+    ? Math.max(52, Number.isFinite(configuredLevelGutter) ? configuredLevelGutter : 52)
+    : 0;
   const width = basePad * 2 + leftGutter + (maxX - minX) * colW;
   const height = basePad * 2 + maxY * rowH + (hasSubLabels ? 12 : 0);
   const px = (x) => basePad + leftGutter + (x - minX) * colW;
@@ -1829,6 +1832,108 @@ function renderSameTreeView(step) {
   };
   renderSide(view.pTree, "sameTreeP");
   renderSide(view.qTree, "sameTreeQ");
+}
+
+function renderSortedListBstView(step) {
+  const view = step.sortedListBstView;
+  const treeView = $("treeView");
+  const activeRange = Array.isArray(view.activeRange) ? view.activeRange : null;
+  const cuts = new Set(view.cuts || []);
+  const picked = new Set(view.picked || []);
+  const pointers = view.pointers || {};
+  const pointerNames = ["head", "prev", "slow", "fast"];
+  const pointerClasses = { head: "head", prev: "prev", slow: "slow", fast: "fast" };
+  const pointerMap = new Map();
+
+  pointerNames.forEach((name) => {
+    const pointer = pointers[name];
+    if (!pointer || pointer.state !== "index") return;
+    if (!pointerMap.has(pointer.index)) pointerMap.set(pointer.index, []);
+    pointerMap.get(pointer.index).push(name);
+  });
+
+  const pointerValue = (name) => {
+    const pointer = pointers[name] || { state: "unset" };
+    if (pointer.state === "unset") return lang === "vi" ? "chưa gán" : "unset";
+    if (pointer.state === "null") return "null";
+    const value = view.values[pointer.index];
+    return `${value} [${pointer.index}]`;
+  };
+
+  const listHtml = view.values.map((value, index) => {
+    const inRange = activeRange && index >= activeRange[0] && index <= activeRange[1];
+    const labels = pointerMap.get(index) || [];
+    const nodeClasses = ["slb-node"];
+    if (activeRange && !inRange) nodeClasses.push("outside");
+    if (picked.has(index)) nodeClasses.push("picked");
+    if (labels.length) nodeClasses.push("pointed");
+    const tags = labels.map((name) => `<span class="slb-pointer ${pointerClasses[name]}">${name}</span>`).join("");
+    const connector = index < view.values.length - 1
+      ? `<span class="slb-link${cuts.has(index) ? " is-cut" : ""}">
+          <strong>${cuts.has(index) ? "×" : "→"}</strong>
+          ${cuts.has(index) ? `<small>${lang === "vi" ? "đã cắt" : "cut"}</small>` : ""}
+        </span>`
+      : "";
+    return `<div class="slb-list-item">
+      <div class="slb-pointer-stack">${tags}</div>
+      <div class="${nodeClasses.join(" ")}">
+        <strong>${escapeHtml(value)}</strong>
+        <small>[${index}]</small>
+      </div>
+    </div>${connector}`;
+  }).join("");
+
+  const statusHtml = pointerNames.map((name) => `<span class="slb-status ${pointerClasses[name]}">
+    <code>${name}</code><strong>${escapeHtml(pointerValue(name))}</strong>
+  </span>`).join("");
+
+  const stackHtml = (view.callStack || []).length
+    ? view.callStack.map((frame, index) => {
+        const range = frame.lo <= frame.hi ? `[${frame.lo}..${frame.hi}]` : "∅";
+        const active = index === view.callStack.length - 1 ? " active" : "";
+        return `<span class="slb-frame${active}"><small>${escapeHtml(frame.side)}</small><code>${range}</code></span>`;
+      }).join('<span class="slb-stack-arrow">›</span>')
+    : `<span class="slb-frame active"><small>${lang === "vi" ? "xong" : "done"}</small><code>root</code></span>`;
+
+  const activeLabel = activeRange
+    ? `[${activeRange[0]}..${activeRange[1]}]`
+    : "∅";
+  const summary = lang === "vi"
+    ? `Đoạn list hiện tại ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`
+    : `Current list segment ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`;
+
+  treeView.innerHTML = `<div class="sorted-list-bst-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="slb-call-stack">
+      <strong>${lang === "vi" ? "STACK ĐỆ QUY" : "RECURSION STACK"}</strong>
+      <div>${stackHtml}</div>
+    </div>
+    <div class="slb-status-row">${statusHtml}</div>
+    <section class="slb-list-panel">
+      <div class="slb-section-title">
+        <strong>Linked list</strong>
+        <span>${lang === "vi" ? "đoạn đang xử lý" : "active segment"} <code>${activeLabel}</code></span>
+      </div>
+      <div class="slb-list-scroll"><div class="slb-list-row">${listHtml}</div></div>
+    </section>
+    <section class="slb-tree-panel">
+      <div class="slb-section-title">
+        <strong>${lang === "vi" ? "BST đang dựng" : "BST under construction"}</strong>
+        <span>${picked.size}/${view.values.length} ${lang === "vi" ? "node đã chọn làm root" : "nodes selected as roots"}</span>
+      </div>
+      <div id="sortedListBstTree" class="slb-tree-canvas"></div>
+    </section>
+    <div class="slb-legend" aria-hidden="true">
+      <span><i class="active-range"></i>${lang === "vi" ? "đoạn hiện tại" : "active segment"}</span>
+      <span><i class="picked-node"></i>${lang === "vi" ? "đã đưa vào BST" : "moved to BST"}</span>
+      <span><i class="cut-link"></i>${lang === "vi" ? "prev.next = None" : "prev.next = None"}</span>
+    </div>
+  </div>`;
+
+  if (view.tree && view.tree.nodes && view.tree.nodes.length) {
+    renderTree({ tree: view.tree }, "sortedListBstTree");
+  } else {
+    $("sortedListBstTree").innerHTML = `<span class="slb-tree-empty">∅</span>`;
+  }
 }
 
 function renderDecisionTree(step) {
@@ -4144,6 +4249,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSameTreeView(step);
+  } else if (step.sortedListBstView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSortedListBstView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

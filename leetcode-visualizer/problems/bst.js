@@ -59,6 +59,7 @@ function snapshot(root, opts) {
     tree: {
       nodes: treeToVizNodes(root, opts.hlSet, opts.wordSet),
       annotations: opts.annotations || {},
+      levelLabelGutter: opts.levelLabelGutter,
     },
     highlight: [],
     mark: [],
@@ -1412,6 +1413,7 @@ function buildSteps109(input) {
   const listStr = nums.join(" → ") + " → null";
   steps.push(snapshot(null, {
     title: { vi: "Linked list sorted → BST cân bằng", en: "Sorted linked list → Balanced BST" },
+    levelLabelGutter: 84,
     codeLines: [2],
     vars: [{ name: "list", value: listStr }, { name: "n", value: nums.length }],
     note: {
@@ -1442,6 +1444,7 @@ function buildSteps109(input) {
     const rightArr = nums.slice(mid + 1, hi + 1).join(",") || "∅";
     steps.push(snapshot(builtRoot, {
       title: { vi: `Giữa của [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}`, en: `Mid of [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}` },
+      levelLabelGutter: 84,
       hlSet: new Set([node.id]), codeLines: [3, 4, 5, 6, 7],
       vars: [
         { name: "đoạn / range", value: `[${nums.slice(lo, hi + 1).join(",")}]` },
@@ -1459,11 +1462,355 @@ function buildSteps109(input) {
 
   const fs = snapshot(builtRoot, {
     title: { vi: "Hoàn tất: BST cân bằng", en: "Done: balanced BST" },
+    levelLabelGutter: 84,
     wordSet: new Set(Array.from({ length: nums.length }, (_, i) => i)), codeLines: [8],
     vars: [{ name: "root", value: builtRoot ? builtRoot.val : "null" }, { name: "chiều cao", value: `≈ log₂(${nums.length}) = ${Math.ceil(Math.log2(nums.length + 1))}` }],
     note: { vi: `Mọi đoạn đều chọn phần tử giữa làm gốc → 2 cây con lệch nhau ≤ 1 nút → cây cân bằng chiều cao tối thiểu.`, en: `Every range picks its middle as root → subtrees differ by ≤ 1 node → minimum-height balanced tree.` },
   });
   fs.final = true; steps.push(fs);
+
+  return { input, answer: builtRoot ? builtRoot.val : "null", steps };
+}
+
+function buildSteps109SlowFast(input) {
+  const nums = String(input)
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isFinite(value));
+  const steps = [];
+  const cuts = new Set();
+  const picked = new Set();
+  const completed = new Set();
+  const callStack = [];
+  let builtRoot = null;
+
+  const pointer = (index, assigned = true) => {
+    if (!assigned) return { state: "unset" };
+    if (index === null || index === undefined) return { state: "null" };
+    return { state: "index", index };
+  };
+
+  const rangeText = (lo, hi) => (lo > hi ? "∅" : `[${nums.slice(lo, hi + 1).join(", ")}]`);
+  const nodeText = (index) => (index === null || index === undefined
+    ? "null"
+    : `${nums[index]} [${index}]`);
+
+  function addStep({
+    title,
+    note,
+    codeLines,
+    lo,
+    hi,
+    side,
+    phase,
+    head,
+    prev,
+    slow,
+    fast,
+    prevAssigned = true,
+    slowAssigned = true,
+    fastAssigned = true,
+    activeTreeId = null,
+    vars = [],
+    final = false,
+  }) {
+    const tree = {
+      nodes: treeToVizNodes(
+        builtRoot,
+        activeTreeId === null ? new Set() : new Set([activeTreeId]),
+        new Set(completed),
+      ),
+      annotations: {},
+      levelLabelGutter: 84,
+    };
+    const step = {
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      codeBlock: 2,
+      vars,
+      note,
+      sortedListBstView: {
+        values: [...nums],
+        activeRange: lo <= hi ? [lo, hi] : null,
+        pointers: {
+          head: pointer(head),
+          prev: pointer(prev, prevAssigned),
+          slow: pointer(slow, slowAssigned),
+          fast: pointer(fast, fastAssigned),
+        },
+        cuts: [...cuts],
+        picked: [...picked],
+        callStack: callStack.map((frame) => ({ ...frame })),
+        phase,
+        side,
+        tree,
+      },
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  function build(lo, hi, attach, side, depth) {
+    callStack.push({ lo, hi, side, depth });
+    const head = lo <= hi ? lo : null;
+
+    addStep({
+      title: {
+        vi: `Gọi đệ quy cho ${side}: ${rangeText(lo, hi)}`,
+        en: `Recursive call for ${side}: ${rangeText(lo, hi)}`,
+      },
+      note: {
+        vi: `Frame mới ở độ sâu ${depth}. head ${head === null ? "= null" : `trỏ vào ${nodeText(head)}`}.`,
+        en: `New frame at depth ${depth}. head ${head === null ? "= null" : `points to ${nodeText(head)}`}.`,
+      },
+      codeLines: [2], lo, hi, side, phase: "call", head,
+      prev: null, slow: null, fast: null,
+      prevAssigned: false, slowAssigned: false, fastAssigned: false,
+      vars: [
+        { name: "depth", value: depth },
+        { name: "segment", value: rangeText(lo, hi) },
+        { name: "head", value: nodeText(head) },
+      ],
+    });
+
+    addStep({
+      title: {
+        vi: `Kiểm tra if not head → ${head === null}`,
+        en: `Check if not head → ${head === null}`,
+      },
+      note: head === null
+        ? { vi: "Đoạn rỗng nên điều kiện đúng; trả None cho nhánh này.", en: "The segment is empty, so the condition is true; return None for this branch." }
+        : { vi: "head đang trỏ vào một node nên tiếp tục.", en: "head points to a node, so continue." },
+      codeLines: [3], lo, hi, side, phase: "empty-check", head,
+      prev: null, slow: null, fast: null,
+      prevAssigned: false, slowAssigned: false, fastAssigned: false,
+      vars: [{ name: "not head", value: head === null }],
+    });
+
+    if (head === null) {
+      attach(null);
+      addStep({
+        title: { vi: "Trả None", en: "Return None" },
+        note: { vi: `Nhánh ${side} không có node. Quay lại frame trước.`, en: `The ${side} branch has no node. Return to the previous frame.` },
+        codeLines: [4], lo, hi, side, phase: "return-null", head,
+        prev: null, slow: null, fast: null,
+        prevAssigned: false, slowAssigned: false, fastAssigned: false,
+        vars: [{ name: "return", value: "None" }],
+      });
+      callStack.pop();
+      return null;
+    }
+
+    const singleton = lo === hi;
+    addStep({
+      title: {
+        vi: `Kiểm tra if not head.next → ${singleton}`,
+        en: `Check if not head.next → ${singleton}`,
+      },
+      note: singleton
+        ? { vi: `Chỉ còn node ${nums[lo]}; đây là trường hợp cơ sở.`, en: `Only node ${nums[lo]} remains; this is the base case.` }
+        : { vi: "head.next còn tồn tại, cần tìm middle bằng slow/fast.", en: "head.next exists, so find the middle with slow/fast." },
+      codeLines: [7], lo, hi, side, phase: "single-check", head,
+      prev: null, slow: null, fast: null,
+      prevAssigned: false, slowAssigned: false, fastAssigned: false,
+      vars: [
+        { name: "head.next", value: singleton ? "None" : nodeText(lo + 1) },
+        { name: "single node", value: singleton },
+      ],
+    });
+
+    if (singleton) {
+      const leaf = { id: lo, val: nums[lo], left: null, right: null };
+      attach(leaf);
+      picked.add(lo);
+      completed.add(lo);
+      addStep({
+        title: { vi: `Tạo leaf TreeNode(${nums[lo]})`, en: `Create leaf TreeNode(${nums[lo]})` },
+        note: { vi: `Một node tạo thành BST cân bằng có đúng một leaf ${nums[lo]}.`, en: `A one-node segment becomes the balanced BST leaf ${nums[lo]}.` },
+        codeLines: [8], lo, hi, side, phase: "single-return", head,
+        prev: null, slow: null, fast: null,
+        prevAssigned: false, slowAssigned: false, fastAssigned: false,
+        activeTreeId: lo,
+        vars: [{ name: "return", value: `TreeNode(${nums[lo]})` }],
+      });
+      callStack.pop();
+      return leaf;
+    }
+
+    let prev = null;
+    let slow = null;
+    let fast = null;
+
+    addStep({
+      title: { vi: "Gán prev = None", en: "Assign prev = None" },
+      note: { vi: "prev sẽ đứng ngay trước slow để lát nữa cắt nửa trái.", en: "prev will stay immediately before slow so the left half can be cut later." },
+      codeLines: [10], lo, hi, side, phase: "init-prev", head,
+      prev, slow, fast, slowAssigned: false, fastAssigned: false,
+      vars: [{ name: "prev", value: "None" }],
+    });
+
+    slow = head;
+    addStep({
+      title: { vi: `Gán slow = head → ${nodeText(slow)}`, en: `Assign slow = head → ${nodeText(slow)}` },
+      note: { vi: "slow đi mỗi vòng một node.", en: "slow advances one node per loop." },
+      codeLines: [11], lo, hi, side, phase: "init-slow", head,
+      prev, slow, fast, fastAssigned: false,
+      vars: [{ name: "slow", value: nodeText(slow) }],
+    });
+
+    fast = head;
+    addStep({
+      title: { vi: `Gán fast = head → ${nodeText(fast)}`, en: `Assign fast = head → ${nodeText(fast)}` },
+      note: { vi: "fast đi mỗi vòng hai node; khi fast tới cuối thì slow ở middle.", en: "fast advances two nodes per loop; when fast reaches the end, slow is at the middle." },
+      codeLines: [12], lo, hi, side, phase: "init-fast", head,
+      prev, slow, fast,
+      vars: [{ name: "fast", value: nodeText(fast) }],
+    });
+
+    while (true) {
+      const hasFast = fast !== null;
+      const hasFastNext = hasFast && fast < hi;
+      const condition = hasFast && hasFastNext;
+      addStep({
+        title: {
+          vi: `while fast and fast.next → ${condition}`,
+          en: `while fast and fast.next → ${condition}`,
+        },
+        note: condition
+          ? { vi: `fast=${nodeText(fast)} và fast.next=${nodeText(fast + 1)} đều tồn tại; chạy một vòng.`, en: `fast=${nodeText(fast)} and fast.next=${nodeText(fast + 1)} both exist; run one iteration.` }
+          : { vi: `Điều kiện sai (${fast === null ? "fast = null" : "fast.next = null"}); slow đang ở middle ${nodeText(slow)}.`, en: `The condition is false (${fast === null ? "fast = null" : "fast.next = null"}); slow is at middle ${nodeText(slow)}.` },
+        codeLines: [15], lo, hi, side, phase: condition ? "while-true" : "while-false", head,
+        prev, slow, fast,
+        vars: [
+          { name: "fast", value: nodeText(fast) },
+          { name: "fast.next", value: hasFastNext ? nodeText(fast + 1) : "null" },
+          { name: "condition", value: condition },
+        ],
+      });
+      if (!condition) break;
+
+      prev = slow;
+      addStep({
+        title: { vi: `prev = slow → ${nodeText(prev)}`, en: `prev = slow → ${nodeText(prev)}` },
+        note: { vi: `prev ghi nhớ vị trí cũ của slow: index ${prev}.`, en: `prev remembers slow's old position: index ${prev}.` },
+        codeLines: [16], lo, hi, side, phase: "move-prev", head,
+        prev, slow, fast,
+        vars: [{ name: "prev", value: nodeText(prev) }],
+      });
+
+      slow += 1;
+      addStep({
+        title: { vi: `slow = slow.next → ${nodeText(slow)}`, en: `slow = slow.next → ${nodeText(slow)}` },
+        note: { vi: `slow tiến một node đến index ${slow}.`, en: `slow advances one node to index ${slow}.` },
+        codeLines: [17], lo, hi, side, phase: "move-slow", head,
+        prev, slow, fast,
+        vars: [{ name: "slow", value: nodeText(slow) }],
+      });
+
+      fast = fast + 2 <= hi ? fast + 2 : null;
+      addStep({
+        title: { vi: `fast = fast.next.next → ${nodeText(fast)}`, en: `fast = fast.next.next → ${nodeText(fast)}` },
+        note: fast === null
+          ? { vi: "fast nhảy hai bước ra khỏi đoạn và trở thành null.", en: "fast jumps two positions past the segment and becomes null." }
+          : { vi: `fast nhảy hai node đến index ${fast}.`, en: `fast jumps two nodes to index ${fast}.` },
+        codeLines: [18], lo, hi, side, phase: "move-fast", head,
+        prev, slow, fast,
+        vars: [{ name: "fast", value: nodeText(fast) }],
+      });
+    }
+
+    cuts.add(prev);
+    addStep({
+      title: { vi: `prev.next = None: cắt sau ${nodeText(prev)}`, en: `prev.next = None: cut after ${nodeText(prev)}` },
+      note: {
+        vi: `Link ${nums[prev]} → ${nums[slow]} bị cắt. Nửa trái là ${rangeText(lo, prev)}; slow=${nums[slow]} là root của đoạn.`,
+        en: `The ${nums[prev]} → ${nums[slow]} link is cut. The left half is ${rangeText(lo, prev)}; slow=${nums[slow]} is this segment's root.`,
+      },
+      codeLines: [21], lo, hi, side, phase: "cut", head,
+      prev, slow, fast,
+      vars: [
+        { name: "prev.next", value: "None" },
+        { name: "left segment", value: rangeText(lo, prev) },
+        { name: "middle", value: nodeText(slow) },
+      ],
+    });
+
+    const root = { id: slow, val: nums[slow], left: null, right: null };
+    attach(root);
+    picked.add(slow);
+    addStep({
+      title: { vi: `root = TreeNode(${nums[slow]})`, en: `root = TreeNode(${nums[slow]})` },
+      note: { vi: `slow xác định middle, nên tạo node BST ${nums[slow]} cho frame ${side}.`, en: `slow identifies the middle, so create BST node ${nums[slow]} for the ${side} frame.` },
+      codeLines: [23], lo, hi, side, phase: "create-root", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "root.val", value: nums[slow] }],
+    });
+
+    addStep({
+      title: { vi: `Gọi đệ quy trái với ${rangeText(lo, prev)}`, en: `Recurse left with ${rangeText(lo, prev)}` },
+      note: { vi: `head vẫn là ${nodeText(head)}; sau lệnh cắt, đoạn này kết thúc tại prev=${nodeText(prev)}.`, en: `head is still ${nodeText(head)}; after the cut, this segment ends at prev=${nodeText(prev)}.` },
+      codeLines: [26], lo, hi, side, phase: "left-call", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "left input", value: rangeText(lo, prev) }],
+    });
+    build(lo, prev, (child) => { root.left = child; }, "left", depth + 1);
+    addStep({
+      title: { vi: `Gán kết quả vào root.left của ${nums[slow]}`, en: `Assign the result to root.left of ${nums[slow]}` },
+      note: { vi: `Nhánh trái của ${nums[slow]} đã hoàn tất.`, en: `The left branch of ${nums[slow]} is complete.` },
+      codeLines: [26], lo, hi, side, phase: "left-return", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "root.left", value: root.left ? root.left.val : "None" }],
+    });
+
+    const rightLo = slow + 1;
+    addStep({
+      title: { vi: `Gọi đệ quy phải với ${rangeText(rightLo, hi)}`, en: `Recurse right with ${rangeText(rightLo, hi)}` },
+      note: { vi: `slow.next bắt đầu nửa phải tại ${rightLo <= hi ? nodeText(rightLo) : "null"}.`, en: `slow.next starts the right half at ${rightLo <= hi ? nodeText(rightLo) : "null"}.` },
+      codeLines: [29], lo, hi, side, phase: "right-call", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "right input", value: rangeText(rightLo, hi) }],
+    });
+    build(rightLo, hi, (child) => { root.right = child; }, "right", depth + 1);
+    addStep({
+      title: { vi: `Gán kết quả vào root.right của ${nums[slow]}`, en: `Assign the result to root.right of ${nums[slow]}` },
+      note: { vi: `Nhánh phải của ${nums[slow]} đã hoàn tất.`, en: `The right branch of ${nums[slow]} is complete.` },
+      codeLines: [29], lo, hi, side, phase: "right-return", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "root.right", value: root.right ? root.right.val : "None" }],
+    });
+
+    completed.add(slow);
+    addStep({
+      title: { vi: `return root ${nums[slow]}`, en: `return root ${nums[slow]}` },
+      note: { vi: `BST của đoạn ${rangeText(lo, hi)} đã xong; trả root ${nums[slow]} về frame trước.`, en: `The BST for ${rangeText(lo, hi)} is complete; return root ${nums[slow]} to the previous frame.` },
+      codeLines: [31], lo, hi, side, phase: "return-root", head,
+      prev, slow, fast, activeTreeId: slow,
+      vars: [{ name: "return", value: `TreeNode(${nums[slow]})` }],
+    });
+    callStack.pop();
+    return root;
+  }
+
+  build(0, nums.length - 1, (node) => { builtRoot = node; }, "root", 0);
+  addStep({
+    title: { vi: "Hoàn tất BST cân bằng", en: "Balanced BST complete" },
+    note: {
+      vi: "Mỗi frame chọn middle bằng slow/fast, nên số node ở hai nhánh chênh lệch không quá một.",
+      en: "Every frame selects its middle with slow/fast, so the two branches differ by at most one node.",
+    },
+    codeLines: [31], lo: 0, hi: nums.length - 1, side: "root", phase: "done",
+    head: nums.length ? 0 : null, prev: null, slow: null, fast: null,
+    prevAssigned: false, slowAssigned: false, fastAssigned: false,
+    activeTreeId: null,
+    vars: [
+      { name: "root", value: builtRoot ? builtRoot.val : "None" },
+      { name: "nodes", value: nums.length },
+    ],
+    final: true,
+  });
 
   return { input, answer: builtRoot ? builtRoot.val : "null", steps };
 }
@@ -2037,14 +2384,70 @@ module.exports = {
     statement: { vi: "Cho linked list đã sắp xếp tăng dần, chuyển thành BST cân bằng chiều cao. Nhập các giá trị cách bởi dấu phẩy.", en: "Given a sorted (ascending) linked list, convert it to a height-balanced BST. Enter values comma-separated." },
     defaultInput: "-10,-3,0,5,9",
     inputKind: "string", inputLabel: { vi: "Sorted list (dấu phẩy)", en: "Sorted list (comma-sep)" },
-    extraParams: [],
-    approach: [
-      { vi: "Phần tử giữa = root → cây cân bằng. Đệ quy nửa trái → subtree trái, nửa phải → subtree phải.", en: "Middle element = root → balanced tree. Recurse left half → left subtree, right half → right subtree." },
-      { vi: "Có thể đổi list thành mảng trước (O(n) bộ nhớ) hoặc dùng kỹ thuật slow/fast pointer tìm mid.", en: "Can convert list to array first (O(n) memory) or use slow/fast pointers to find the middle." },
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        default: "1",
+        label: { vi: "Cách giải", en: "Approach" },
+        options: [
+          { value: "1", label: { vi: "Cách 1: đổi list thành mảng", en: "Approach 1: copy list to array" } },
+          { value: "2", label: { vi: "Cách 2: slow/fast + cắt list", en: "Approach 2: slow/fast + split list" } },
+        ],
+      },
     ],
-    complexity: { time: "O(n)", space: "O(log n)", note: { vi: "Mỗi phần tử xử lý 1 lần. Stack O(log n).", en: "Each element processed once. Stack O(log n)." } },
+    approach: [
+      { vi: "Cách 1 chép linked list sang mảng, chọn index giữa rồi đệ quy hai nửa.", en: "Approach 1 copies the linked list to an array, picks the middle index, then recurses on both halves." },
+      { vi: "Cách 2 dùng slow đi 1 bước và fast đi 2 bước để tìm middle trực tiếp trên từng đoạn list.", en: "Approach 2 moves slow by one and fast by two to find the middle directly in each list segment." },
+      { vi: "prev đứng trước slow; prev.next = None cắt nửa trái. slow tạo root, head tạo subtree trái và slow.next tạo subtree phải.", en: "prev stays before slow; prev.next = None cuts the left half. slow creates the root, head creates the left subtree, and slow.next creates the right subtree." },
+    ],
+    complexity: {
+      time: "O(n) / O(n log n)",
+      space: "O(n) / O(log n)",
+      note: {
+        vi: "Cách 1: O(n) time và O(n) mảng. Cách 2: mỗi tầng quét tổng O(n), có O(log n) tầng; chỉ dùng stack đệ quy O(log n) nhưng làm thay đổi các link next.",
+        en: "Approach 1: O(n) time and O(n) array space. Approach 2: each level scans O(n) total across O(log n) levels; only O(log n) recursion space, but it mutates next links.",
+      },
+    },
+    codeLabel: { vi: "Cách 1: đổi list thành mảng", en: "Approach 1: copy list to array" },
     code: ["class Solution:", "    def sortedListToBST(self, head):", "        vals = []", "        while head:", "            vals.append(head.val)", "            head = head.next", "        def build(lo, hi):", "            if lo > hi: return None", "            mid = (lo + hi) // 2", "            node = TreeNode(vals[mid])", "            node.left = build(lo, mid - 1)", "            node.right = build(mid + 1, hi)", "            return node", "        return build(0, len(vals) - 1)"],
-    builder: buildSteps109,
+    code2Label: { vi: "Cách 2: slow/fast + cắt list", en: "Approach 2: slow/fast + split list" },
+    code2: [
+      "class Solution:",
+      "    def sortedListToBST(self, head):",
+      "        if not head:",
+      "            return None",
+      "",
+      "        # Chỉ có một node",
+      "        if not head.next:",
+      "            return TreeNode(head.val)",
+      "",
+      "        prev = None",
+      "        slow = head",
+      "        fast = head",
+      "",
+      "        # Tìm middle node",
+      "        while fast and fast.next:",
+      "            prev = slow",
+      "            slow = slow.next",
+      "            fast = fast.next.next",
+      "",
+      "        # Cắt list bên trái khỏi middle",
+      "        prev.next = None",
+      "",
+      "        root = TreeNode(slow.val)",
+      "",
+      "        # head ... prev là nửa trái",
+      "        root.left = self.sortedListToBST(head)",
+      "",
+      "        # slow.next ... end là nửa phải",
+      "        root.right = self.sortedListToBST(slow.next)",
+      "",
+      "        return root",
+    ],
+    builder: (input, params) => Number(params && params.approach) === 2
+      ? buildSteps109SlowFast(input)
+      : buildSteps109(input),
   },
   270: {
     id: 270, difficulty: "easy", slug: "closest-binary-search-tree-value",
