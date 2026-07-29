@@ -4160,6 +4160,123 @@ function renderProfitTrackerView(step) {
   </div>`;
 }
 
+// ---- Cyclic-sort slot map (#41) ----
+function renderCyclicSortView(step) {
+  const view = step.cyclicSortView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const values = Array.isArray(view.values) ? view.values : [];
+  const correct = new Set(view.correctIndices || []);
+  const ignored = new Set(view.ignoredIndices || []);
+  const duplicates = new Set(view.duplicateIndices || []);
+
+  const phaseNumber = view.phase === "place" ? 1 : 2;
+  const actionByReason = {
+    "outside-range": vi
+      ? `${values[view.currentIndex]} nằm ngoài 1..${values.length} → bỏ qua`
+      : `${values[view.currentIndex]} is outside 1..${values.length} → ignore`,
+    "already-correct": vi
+      ? `${values[view.currentIndex]} đã ở đúng nhà → không swap`
+      : `${values[view.currentIndex]} is already home → no swap`,
+    duplicate: vi
+      ? `Ô đích đã có ${values[view.currentIndex]} → đây là bản trùng, không swap`
+      : `The target already has ${values[view.currentIndex]} → duplicate, do not swap`,
+    swap: vi
+      ? `Nhà của ${values[view.currentIndex]}: index ${view.targetIndex}`
+      : `Home of ${values[view.currentIndex]}: index ${view.targetIndex}`,
+    swapped: vi
+      ? `Swap xong: giá trị đã được đặt vào đúng nhà`
+      : `Swap complete: the value is now in its home slot`,
+    match: vi
+      ? `Giá trị thực tế khớp giá trị cần có → quét tiếp`
+      : `Actual value matches the expected value → continue`,
+    missing: vi
+      ? `Giá trị thực tế khác giá trị cần có → tìm thấy số bị thiếu`
+      : `Actual value differs from expected → missing value found`,
+  };
+  let actionText = actionByReason[view.reason] || view.action || "";
+  if (!view.reason && view.phase === "place") {
+    actionText = view.currentIndex >= 0
+      ? (vi
+        ? `Đang xét index ${view.currentIndex}, giá trị ${values[view.currentIndex]}`
+        : `Processing index ${view.currentIndex}, value ${values[view.currentIndex]}`)
+      : (vi
+        ? `Các giá trị 1..${values.length} có nhà từ index 0..${Math.max(0, values.length - 1)}`
+        : `Values 1..${values.length} have homes at indices 0..${Math.max(0, values.length - 1)}`);
+  } else if (!view.reason && view.phase === "scan") {
+    actionText = vi ? "Quét từ trái sang phải để tìm ô sai đầu tiên" : "Scan left to right for the first mismatched slot";
+  } else if (!view.reason && view.phase === "answer") {
+    actionText = vi ? `Tất cả ô đều khớp → đáp án = ${view.answer}` : `Every slot matches → answer = ${view.answer}`;
+  }
+
+  const slotsHtml = values.map((value, index) => {
+    const classes = ["cyclic-slot"];
+    const labels = [];
+    if (index === view.currentIndex) {
+      classes.push("current");
+      labels.push(view.phase === "scan" ? (vi ? "ĐANG KIỂM TRA" : "CHECKING") : "i");
+    }
+    if (index === view.targetIndex && view.targetIndex !== view.currentIndex) {
+      classes.push("target");
+      labels.push(vi ? "Ô ĐÍCH" : "TARGET");
+    }
+    if (index === view.placedIndex) {
+      classes.push("placed");
+      labels.push(vi ? "VỪA ĐẶT ĐÚNG" : "JUST PLACED");
+    } else if (correct.has(index)) {
+      classes.push("correct");
+      labels.push(vi ? "ĐÚNG NHÀ" : "HOME");
+    }
+    if (ignored.has(index) && index !== view.targetIndex) {
+      classes.push("ignored");
+      labels.push(vi ? "BỎ QUA" : "IGNORE");
+    } else if (duplicates.has(index)) {
+      classes.push("duplicate");
+      labels.push(vi ? "TRÙNG" : "DUPLICATE");
+    }
+    if ((view.phase === "scan" || view.phase === "answer") && index < view.scanIndex) {
+      classes.push("scanned");
+    }
+    if (index === view.missingIndex) {
+      classes.push("missing");
+      labels.length = 0;
+      labels.push(vi ? "THIẾU Ở ĐÂY" : "MISSING HERE");
+    }
+
+    return `<div class="${classes.join(" ")}">
+      <div class="cyclic-slot-index">index ${index}</div>
+      <div class="cyclic-slot-value">${escapeHtml(value)}</div>
+      <div class="cyclic-slot-expected">${vi ? "cần" : "expects"} <strong>${index + 1}</strong></div>
+      <div class="cyclic-slot-state">${escapeHtml(labels.join(" · ") || (vi ? "chưa xử lý" : "unresolved"))}</div>
+    </div>`;
+  }).join("");
+
+  const answerHtml = view.answer !== undefined
+    ? `<div class="cyclic-answer"><span>${vi ? "Số dương nhỏ nhất bị thiếu" : "Smallest missing positive"}</span><strong>${escapeHtml(view.answer)}</strong></div>`
+    : "";
+  const summary = vi
+    ? `Mô phỏng cyclic sort gồm ${values.length} ô, đang ở pha ${phaseNumber}.`
+    : `Cyclic-sort simulation with ${values.length} slots, currently in phase ${phaseNumber}.`;
+
+  el.innerHTML = `<div class="cyclic-sort-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="cyclic-sort-phases">
+      <div class="cyclic-phase ${phaseNumber === 1 ? "active" : "done"}"><b>1</b><span>${vi ? "Đặt x về index x − 1" : "Place x at index x − 1"}</span></div>
+      <div class="cyclic-phase ${phaseNumber === 2 ? "active" : ""}"><b>2</b><span>${vi ? "Tìm ô sai đầu tiên" : "Find first mismatch"}</span></div>
+    </div>
+    <div class="cyclic-sort-rule"><strong>${vi ? "Quy tắc" : "Rule"}:</strong> value <b>x</b> → ${vi ? "nhà" : "home"} index <b>x − 1</b></div>
+    <div class="cyclic-sort-action">${escapeHtml(actionText)}</div>
+    <div class="cyclic-sort-grid">${slotsHtml}</div>
+    ${answerHtml}
+    <div class="cyclic-sort-legend">
+      <span><i class="current"></i>${vi ? "đang xử lý" : "current i"}</span>
+      <span><i class="target"></i>${vi ? "ô sẽ swap tới" : "swap target"}</span>
+      <span><i class="correct"></i>${vi ? "đúng nhà" : "correct home"}</span>
+      <span><i class="ignored"></i>${vi ? "ngoài 1..n" : "outside 1..n"}</span>
+      <span><i class="missing"></i>${vi ? "số bị thiếu" : "missing value"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -4225,6 +4342,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderProfitTrackerView(step);
+  } else if (step.cyclicSortView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCyclicSortView(step);
   } else if (step.meetingRoomsTimelineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

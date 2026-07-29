@@ -1865,10 +1865,12 @@ function buildSteps42(input) {
  *  3          n = len(nums)
  *  4          for i in range(n):
  *  5              while 1 <= nums[i] <= n and nums[nums[i]-1] != nums[i]:
- *  6                  swap nums[i], nums[nums[i]-1]
- *  7          for i in range(n):
- *  8              if nums[i] != i + 1: return i + 1
- *  9          return n + 1
+ *  6                  target_index = nums[i] - 1
+ *  7                  swap nums[i], nums[target_index]
+ *  8          for i in range(n):
+ *  9              if nums[i] != i + 1:
+ * 10                  return i + 1
+ * 11          return n + 1
  */
 function buildSteps41(input) {
   const nums = Array.isArray(input)
@@ -1877,127 +1879,171 @@ function buildSteps41(input) {
   const n = nums.length;
   const steps = [];
   const arr = [...nums];
+  let answer = n + 1;
 
-  const sub = () => arr.map((_, i) => `[${i}]→${i + 1}`);
+  const makeView = (opts = {}) => ({
+    phase: opts.phase || "place",
+    values: [...arr],
+    expected: arr.map((_, index) => index + 1),
+    currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : -1,
+    targetIndex: Number.isInteger(opts.targetIndex) ? opts.targetIndex : -1,
+    placedIndex: Number.isInteger(opts.placedIndex) ? opts.placedIndex : -1,
+    scanIndex: Number.isInteger(opts.scanIndex) ? opts.scanIndex : -1,
+    missingIndex: Number.isInteger(opts.missingIndex) ? opts.missingIndex : -1,
+    correctIndices: arr.map((value, index) => value === index + 1 ? index : -1).filter((index) => index >= 0),
+    ignoredIndices: arr.map((value, index) => value < 1 || value > n ? index : -1).filter((index) => index >= 0),
+    duplicateIndices: arr.map((value, index) => (
+      value >= 1 && value <= n && index !== value - 1 && arr[value - 1] === value ? index : -1
+    )).filter((index) => index >= 0),
+    action: opts.action || "",
+    reason: opts.reason || "",
+    answer: opts.answer,
+  });
 
-  steps.push({
-    title: { vi: "Ý tưởng: cyclic sort", en: "Idea: cyclic sort" },
-    arr: [...arr],
-    sub: sub(),
-    highlight: [], mark: [],
-    codeLines: [3],
-    vars: [{ name: "n", value: n }, { name: "nums", value: `[${arr.join(", ")}]` }],
+  const addStep = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [...arr],
+      sub: arr.map((_, index) => `index ${index} wants ${index + 1}`),
+      highlight: Number.isInteger(opts.currentIndex) ? [opts.currentIndex] : [],
+      mark: arr.map((value, index) => value === index + 1 ? index : -1).filter((index) => index >= 0),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      cyclicSortView: makeView(opts),
+      final: !!opts.final,
+    });
+  };
+
+  addStep({
+    title: { vi: "Mỗi số x có một 'nhà' tại index x - 1", en: "Every value x has a home at index x - 1" },
+    phase: "place", codeLines: [3],
+    action: `valid homes: 1→index 0, 2→index 1, ..., ${n}→index ${Math.max(0, n - 1)}`,
+    vars: [{ name: "n", value: n }, { name: "useful values", value: n ? `1..${n}` : "none" }, { name: "nums", value: `[${arr.join(", ")}]` }],
     note: {
-      vi:
-        `Đáp án nằm trong [1, n+1] với n=${n}. Đặt mỗi giá trị v (1..n) về đúng chỗ index v-1.\n` +
-        `Nhãn dưới ô = "[index]→giá trị mong đợi". Sau khi sắp, ô đầu tiên sai chỗ cho ra đáp án.`,
-      en:
-        `The answer is in [1, n+1] with n=${n}. Place each value v (1..n) at its correct index v-1.\n` +
-        `Sub-label = "[index]→expected value". After sorting, the first misplaced cell gives the answer.`,
+      vi: `Với n=${n}, chỉ các số 1..${n} có ô riêng trong mảng. Số x phải nằm tại index x-1. Số ≤0 hoặc >n không thể ảnh hưởng đáp án nên sẽ bị bỏ qua.`,
+      en: `With n=${n}, only values 1..${n} have a slot in the array. Value x belongs at index x-1. Values ≤0 or >n cannot affect the answer and are ignored.`,
     },
   });
 
-  // Cyclic sort
   for (let i = 0; i < n; i++) {
-    let guard = 0;
-    while (arr[i] >= 1 && arr[i] <= n && arr[arr[i] - 1] !== arr[i] && guard < 2 * n) {
-      guard += 1;
-      const target = arr[i] - 1;
-      const a = arr[i], b = arr[target];
-      [arr[i], arr[target]] = [arr[target], arr[i]];
-      steps.push({
-        title: { vi: `Đưa ${a} về index ${target} (đổi với ${b})`, en: `Place ${a} at index ${target} (swap with ${b})` },
-        arr: [...arr],
-        sub: sub(),
-        highlight: [i, target],
-        mark: [target],
-        codeLines: [4, 5, 6],
+    addStep({
+      title: { vi: `for i=${i}: xử lý nums[${i}]`, en: `for i=${i}: process nums[${i}]` },
+      phase: "place", currentIndex: i, codeLines: [4],
+      action: `current index = ${i}, value = ${arr[i]}`,
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: arr[i] }],
+      note: { vi: `Giữ i=${i} cố định. while sẽ tiếp tục đổi cho đến khi giá trị mới tại nums[${i}] không cần hoặc không thể đổi nữa.`, en: `Keep i=${i} fixed. The while loop keeps swapping until the new value at nums[${i}] no longer needs or cannot be moved.` },
+    });
+
+    while (true) {
+      const value = arr[i];
+      const inRange = value >= 1 && value <= n;
+      const targetIndex = inRange ? value - 1 : -1;
+      const alreadyAtHome = inRange && targetIndex === i;
+      const targetHasSameValue = inRange && arr[targetIndex] === value;
+      const canSwap = inRange && !targetHasSameValue;
+      let reason;
+      if (!inRange) reason = "outside-range";
+      else if (alreadyAtHome) reason = "already-correct";
+      else if (targetHasSameValue) reason = "duplicate";
+      else reason = "swap";
+
+      addStep({
+        title: canSwap
+          ? { vi: `${value} phải về index ${targetIndex}`, en: `${value} belongs at index ${targetIndex}` }
+          : { vi: `while dừng: ${reason}`, en: `while stops: ${reason}` },
+        phase: "place", currentIndex: i, targetIndex, codeLines: canSwap ? [5, 6] : [5], reason,
+        action: canSwap
+          ? `target_index = ${value} - 1 = ${targetIndex}; nums[${targetIndex}] = ${arr[targetIndex]}`
+          : reason === "outside-range"
+            ? `${value} is outside 1..${n}`
+            : reason === "already-correct"
+              ? `${value} is already at index ${i}`
+              : `index ${targetIndex} already contains ${value}`,
         vars: [
           { name: "i", value: i },
-          { name: "value", value: a },
-          { name: "target index (value-1)", value: target },
+          { name: "nums[i]", value },
+          { name: "in 1..n?", value: inRange },
+          { name: "target_index", value: targetIndex >= 0 ? targetIndex : "N/A" },
+          { name: "can swap?", value: canSwap },
+        ],
+        note: canSwap ? {
+          vi: `Điều kiện while đúng: ${value} thuộc 1..${n} và ô đích index ${targetIndex} chưa chứa ${value}. Chuẩn bị đổi nums[${i}] với nums[${targetIndex}].`,
+          en: `The while condition is true: ${value} is in 1..${n}, and target index ${targetIndex} does not yet contain ${value}. Prepare to swap nums[${i}] with nums[${targetIndex}].`,
+        } : reason === "outside-range" ? {
+          vi: `${value} không có 'nhà' trong mảng kích thước ${n}, nên bỏ qua.`,
+          en: `${value} has no home in an array of length ${n}, so ignore it.`,
+        } : reason === "already-correct" ? {
+          vi: `${value} đã ở đúng index ${value - 1}; không cần đổi.`,
+          en: `${value} is already at its home index ${value - 1}; no swap is needed.`,
+        } : {
+          vi: `Ô đích index ${targetIndex} đã có ${value}. Đây là bản sao dư nên không đổi, tránh vòng lặp vô hạn.`,
+          en: `Target index ${targetIndex} already contains ${value}. This extra duplicate is not swapped, preventing an infinite loop.`,
+        },
+      });
+
+      if (!canSwap) break;
+      const displaced = arr[targetIndex];
+      arr[targetIndex] = value;
+      arr[i] = displaced;
+      addStep({
+        title: { vi: `Đổi ${value} ↔ ${displaced}`, en: `Swap ${value} ↔ ${displaced}` },
+        phase: "place", currentIndex: i, targetIndex, placedIndex: targetIndex, codeLines: [7], reason: "swapped",
+        action: `swap index ${i} and ${targetIndex} → ${value} is now home`,
+        vars: [
+          { name: "i", value: i },
+          { name: "target_index", value: targetIndex },
+          { name: "placed value", value },
+          { name: "new nums[i]", value: arr[i] },
           { name: "nums", value: `[${arr.join(", ")}]` },
         ],
         note: {
-          vi: `nums[${i}]=${a} thuộc [1,${n}] và chưa ở đúng chỗ (index ${target} đang là ${b}). Đổi chỗ để ${a} về index ${target}. Lặp lại cho giá trị mới ở nums[${i}].`,
-          en: `nums[${i}]=${a} is in [1,${n}] and misplaced (index ${target} holds ${b}). Swap so ${a} lands at index ${target}. Repeat for the new value now at nums[${i}].`,
-        },
-      });
-    }
-    // show settle step when nothing to swap (only if value out of range or already placed)
-    if (arr[i] < 1 || arr[i] > n || arr[arr[i] - 1] === arr[i]) {
-      steps.push({
-        title: { vi: `Index ${i}: nums[${i}]=${arr[i]} — dừng đổi`, en: `Index ${i}: nums[${i}]=${arr[i]} — stop swapping` },
-        arr: [...arr],
-        sub: sub(),
-        highlight: [i], mark: [],
-        codeLines: [4, 5],
-        vars: [
-          { name: "i", value: i },
-          { name: "nums[i]", value: arr[i] },
-        ],
-        note: {
-          vi: (arr[i] < 1 || arr[i] > n)
-            ? `nums[${i}]=${arr[i]} nằm ngoài [1,${n}] → bỏ qua, không đổi.`
-            : `nums[${i}]=${arr[i]} đã ở đúng chỗ (hoặc chỗ đích đã có giá trị này) → dừng.`,
-          en: (arr[i] < 1 || arr[i] > n)
-            ? `nums[${i}]=${arr[i]} is outside [1,${n}] → skip, no swap.`
-            : `nums[${i}]=${arr[i]} is already in place (or its target already holds this value) → stop.`,
+          vi: `${value} đã về đúng 'nhà' index ${targetIndex}. i vẫn là ${i}; vòng while kiểm tra tiếp giá trị mới ${arr[i]} vừa bị đổi về đây.`,
+          en: `${value} is now at its home index ${targetIndex}. i stays ${i}; the while loop next checks the displaced value ${arr[i]} now at this position.`,
         },
       });
     }
   }
 
-  // Scan for answer
-  let answer = n + 1;
-  let answerIdx = -1;
-  for (let i = 0; i < n; i++) {
-    const ok = arr[i] === i + 1;
-    steps.push({
-      title: { vi: `Quét: nums[${i}]=${arr[i]} ${ok ? "==" : "≠"} ${i + 1}`, en: `Scan: nums[${i}]=${arr[i]} ${ok ? "==" : "≠"} ${i + 1}` },
-      arr: [...arr],
-      sub: sub(),
-      highlight: [i],
-      mark: ok ? [] : [i],
-      codeLines: [7, 8],
-      vars: [
-        { name: "i", value: i },
-        { name: "nums[i]", value: arr[i] },
-        { name: "expected (i+1)", value: i + 1 },
-        { name: "match?", value: ok },
-      ],
-      note: {
-        vi: ok
-          ? `nums[${i}]=${arr[i]} đúng bằng ${i + 1} → tiếp tục quét.`
-          : `nums[${i}]=${arr[i]} ≠ ${i + 1} → số dương nhỏ nhất bị thiếu là ${i + 1}!`,
-        en: ok
-          ? `nums[${i}]=${arr[i]} equals ${i + 1} → keep scanning.`
-          : `nums[${i}]=${arr[i]} ≠ ${i + 1} → the smallest missing positive is ${i + 1}!`,
-      },
-    });
-    if (!ok) { answer = i + 1; answerIdx = i; break; }
-  }
-
-  steps.push({
-    title: { vi: `Đáp án: ${answer}`, en: `Answer: ${answer}` },
-    arr: [...arr],
-    sub: sub(),
-    highlight: [],
-    mark: answerIdx >= 0 ? [answerIdx] : [],
-    final: true,
-    codeLines: answerIdx >= 0 ? [8] : [9],
-    vars: [{ name: "answer", value: answer }],
-    note: {
-      vi: answerIdx >= 0
-        ? `Ô đầu tiên sai chỗ là index ${answerIdx} → số dương nhỏ nhất bị thiếu = ${answer}.`
-        : `Mọi ô đều đúng chỗ (1..${n}) → số dương nhỏ nhất bị thiếu = ${n + 1}.`,
-      en: answerIdx >= 0
-        ? `The first misplaced cell is index ${answerIdx} → smallest missing positive = ${answer}.`
-        : `Every cell is in place (1..${n}) → smallest missing positive = ${n + 1}.`,
-    },
+  addStep({
+    title: { vi: "Pha 2: quét từ trái sang phải", en: "Phase 2: scan from left to right" },
+    phase: "scan", codeLines: [8], action: "find the first slot whose value does not match its expected value",
+    vars: [{ name: "nums after placement", value: `[${arr.join(", ")}]` }],
+    note: { vi: "Sau pha đặt chỗ, index i phải chứa i+1. Ô sai đầu tiên chính là số dương nhỏ nhất đang bị thiếu.", en: "After placement, index i should contain i+1. The first mismatched slot is exactly the smallest missing positive." },
   });
 
-  return { original: nums, answer, steps };
+  for (let i = 0; i < n; i++) {
+    const matches = arr[i] === i + 1;
+    addStep({
+      title: { vi: `index ${i}: ${arr[i]} ${matches ? "==" : "≠"} ${i + 1}`, en: `index ${i}: ${arr[i]} ${matches ? "==" : "≠"} ${i + 1}` },
+      phase: "scan", currentIndex: i, scanIndex: i, missingIndex: matches ? -1 : i, codeLines: [8, 9], reason: matches ? "match" : "missing",
+      action: `actual ${arr[i]} ${matches ? "==" : "!="} expected ${i + 1}`,
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: arr[i] }, { name: "expected", value: i + 1 }, { name: "match?", value: matches }],
+      note: matches
+        ? { vi: `Số ${i + 1} có mặt đúng tại index ${i}; tiếp tục sang ô kế tiếp.`, en: `Value ${i + 1} is present at index ${i}; continue to the next slot.` }
+        : { vi: `Index ${i} lẽ ra phải chứa ${i + 1}, nhưng đang chứa ${arr[i]}. Vậy ${i + 1} là số dương nhỏ nhất bị thiếu.`, en: `Index ${i} should contain ${i + 1}, but it contains ${arr[i]}. Therefore ${i + 1} is the smallest missing positive.` },
+    });
+    if (!matches) {
+      answer = i + 1;
+      addStep({
+        title: { vi: `return ${answer}`, en: `return ${answer}` },
+        phase: "answer", currentIndex: i, missingIndex: i, codeLines: [10], answer, final: true,
+        action: `first mismatched slot → answer = ${answer}`,
+        vars: [{ name: "answer", value: answer }, { name: "missing slot", value: i }],
+        note: { vi: `${answer} là đáp án vì mọi số dương nhỏ hơn nó đã nằm đúng chỗ, còn ô dành cho ${answer} bị sai.`, en: `${answer} is the answer because every smaller positive is correctly placed, while the slot reserved for ${answer} is mismatched.` },
+      });
+      return { original: nums, answer, steps };
+    }
+  }
+
+  addStep({
+    title: { vi: `return n + 1 = ${n + 1}`, en: `return n + 1 = ${n + 1}` },
+    phase: "answer", codeLines: [11], answer: n + 1, final: true,
+    action: `all slots 1..${n} match → answer = ${n + 1}`,
+    vars: [{ name: "n", value: n }, { name: "answer", value: n + 1 }],
+    note: { vi: `Mọi số 1..${n} đều có mặt, nên số dương nhỏ nhất bị thiếu tiếp theo là ${n + 1}.`, en: `Every value 1..${n} is present, so the next smallest missing positive is ${n + 1}.` },
+  });
+  return { original: nums, answer: n + 1, steps };
 }
 
 /**
@@ -2895,10 +2941,12 @@ module.exports = {
       "    def firstMissingPositive(self, nums):",
       "        n = len(nums)",
       "        for i in range(n):",
-      "            while 1 <= nums[i] <= n and nums[nums[i]-1] != nums[i]:",
-      "                nums[nums[i]-1], nums[i] = nums[i], nums[nums[i]-1]",
+      "            while 1 <= nums[i] <= n and nums[nums[i] - 1] != nums[i]:",
+      "                target_index = nums[i] - 1",
+      "                nums[i], nums[target_index] = nums[target_index], nums[i]",
       "        for i in range(n):",
-      "            if nums[i] != i + 1: return i + 1",
+      "            if nums[i] != i + 1:",
+      "                return i + 1",
       "        return n + 1",
     ],
     builder: buildSteps41,

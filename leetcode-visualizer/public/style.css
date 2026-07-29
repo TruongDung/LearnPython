@@ -836,6 +836,189 @@ button:disabled {
   }
 }
 
+/* LeetCode #41 — cyclic sort shown as value-to-home slots. */
+.cyclic-sort-viz {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  padding: 18px;
+  color: #e2e8f0;
+}
+
+.cyclic-sort-phases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cyclic-phase {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.38);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.cyclic-phase b {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.28);
+}
+
+.cyclic-phase.active {
+  border-color: #818cf8;
+  color: #e0e7ff;
+  background: rgba(99, 102, 241, 0.18);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.cyclic-phase.active b { background: #6366f1; color: #fff; }
+.cyclic-phase.done { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+.cyclic-phase.done b { background: rgba(16, 185, 129, 0.3); }
+
+.cyclic-sort-rule,
+.cyclic-sort-action {
+  padding: 9px 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.cyclic-sort-rule {
+  border: 1px dashed rgba(129, 140, 248, 0.5);
+  background: rgba(99, 102, 241, 0.08);
+  color: #c7d2fe;
+}
+
+.cyclic-sort-action {
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  border-left: 4px solid #22d3ee;
+  background: rgba(34, 211, 238, 0.08);
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.cyclic-sort-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 10px;
+}
+
+.cyclic-slot {
+  position: relative;
+  display: grid;
+  min-height: 118px;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 12px 8px 9px;
+  border: 2px solid #475569;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.76);
+  transition: border-color .15s ease, transform .15s ease, background .15s ease;
+}
+
+.cyclic-slot-index {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  color: #94a3b8;
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.cyclic-slot-value { color: #f8fafc; font-size: 29px; font-weight: 800; line-height: 1; }
+.cyclic-slot-expected { color: #94a3b8; font-size: 11px; }
+.cyclic-slot-expected strong { color: #cbd5e1; }
+.cyclic-slot-state {
+  min-height: 15px;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-align: center;
+}
+
+.cyclic-slot.current {
+  z-index: 2;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.13);
+  transform: translateY(-4px);
+}
+.cyclic-slot.current .cyclic-slot-state { color: #fbbf24; }
+.cyclic-slot.target { border-color: #22d3ee; background: rgba(34, 211, 238, 0.14); }
+.cyclic-slot.target .cyclic-slot-state { color: #67e8f9; }
+.cyclic-slot.correct { border-color: #10b981; background: rgba(16, 185, 129, 0.13); }
+.cyclic-slot.correct .cyclic-slot-state { color: #6ee7b7; }
+.cyclic-slot.placed { border-color: #34d399; background: rgba(16, 185, 129, 0.24); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15); }
+.cyclic-slot.ignored { border-style: dashed; opacity: .64; }
+.cyclic-slot.ignored .cyclic-slot-state { color: #cbd5e1; }
+.cyclic-slot.duplicate { border-color: #c084fc; background: rgba(168, 85, 247, 0.13); }
+.cyclic-slot.duplicate .cyclic-slot-state { color: #d8b4fe; }
+.cyclic-slot.scanned:not(.current) { opacity: .62; }
+.cyclic-slot.missing {
+  border-color: #fb7185;
+  background: rgba(244, 63, 94, 0.18);
+  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.13);
+  opacity: 1;
+  transform: translateY(-4px);
+}
+.cyclic-slot.missing .cyclic-slot-state { color: #fda4af; }
+
+.cyclic-answer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+}
+.cyclic-answer strong { font-size: 25px; color: #34d399; }
+
+.cyclic-sort-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; color: #94a3b8; font-size: 10px; }
+.cyclic-sort-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.cyclic-sort-legend i { width: 10px; height: 10px; border: 2px solid #64748b; border-radius: 3px; }
+.cyclic-sort-legend i.current { border-color: #f59e0b; background: rgba(245, 158, 11, .2); }
+.cyclic-sort-legend i.target { border-color: #22d3ee; background: rgba(34, 211, 238, .2); }
+.cyclic-sort-legend i.correct { border-color: #10b981; background: rgba(16, 185, 129, .2); }
+.cyclic-sort-legend i.ignored { border-style: dashed; }
+.cyclic-sort-legend i.missing { border-color: #fb7185; background: rgba(244, 63, 94, .2); }
+
+[data-theme="light"] .cyclic-sort-viz { color: #0f172a; }
+[data-theme="light"] .cyclic-phase { border-color: #cbd5e1; background: #f8fafc; color: #64748b; }
+[data-theme="light"] .cyclic-phase.active { border-color: #6366f1; background: #eef2ff; color: #3730a3; }
+[data-theme="light"] .cyclic-phase.done { border-color: #10b981; background: #ecfdf5; color: #047857; }
+[data-theme="light"] .cyclic-sort-rule { background: #eef2ff; color: #3730a3; }
+[data-theme="light"] .cyclic-sort-action { background: #ecfeff; color: #164e63; }
+[data-theme="light"] .cyclic-slot { border-color: #94a3b8; background: #fff; }
+[data-theme="light"] .cyclic-slot-value { color: #0f172a; }
+[data-theme="light"] .cyclic-slot.correct { border-color: #059669; background: #ecfdf5; }
+[data-theme="light"] .cyclic-slot.current { border-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .cyclic-slot.target { border-color: #0891b2; background: #ecfeff; }
+[data-theme="light"] .cyclic-slot.duplicate { border-color: #9333ea; background: #faf5ff; }
+[data-theme="light"] .cyclic-slot.missing { border-color: #e11d48; background: #fff1f2; }
+[data-theme="light"] .cyclic-answer { border-color: #10b981; background: #ecfdf5; color: #047857; }
+[data-theme="light"] .cyclic-sort-legend { color: #475569; }
+
+@media (max-width: 560px) {
+  .cyclic-sort-viz { padding: 12px 8px; }
+  .cyclic-sort-phases { grid-template-columns: 1fr; }
+  .cyclic-sort-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .viz-head h3 {
   margin: 0;
   font-size: 18px;
