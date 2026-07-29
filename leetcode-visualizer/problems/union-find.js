@@ -953,7 +953,7 @@ function buildSteps1258(input, params) {
 }
 
 // ─── 1631: Path With Minimum Effort ───
-function buildSteps1631Kruskal(input) {
+function buildSteps1631KruskalLegacy(input) {
   // Input: grid rows separated by ';', values by ','
   // e.g. "1,2,2;3,8,2;5,3,5"
   const grid = String(input)
@@ -1123,6 +1123,382 @@ function buildSteps1631Kruskal(input) {
   );
   fs.final = true;
   steps.push(fs);
+
+  return { input, answer, steps };
+}
+
+function buildSteps1631Kruskal(input) {
+  const heights = String(input)
+    .split(/[;|]/)
+    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const rows = heights.length;
+  const cols = heights[0].length;
+  const cellCount = rows * cols;
+  const start = 0;
+  const target = cellCount - 1;
+  const steps = [];
+  const edges = [];
+  const parent = Array.from({ length: cellCount }, (_, index) => index);
+  const acceptedEdges = [];
+  const skippedEdgeKeys = new Set();
+
+  const id = (row, col) => row * cols + col;
+  const coordinate = (cellId) => [Math.floor(cellId / cols), cellId % cols];
+  const label = (cellId) => {
+    const [row, col] = coordinate(cellId);
+    return `(${row},${col})`;
+  };
+  const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+  const copyEdge = (edge) => edge ? {
+    key: edge.key,
+    u: edge.u,
+    v: edge.v,
+    from: coordinate(edge.u),
+    to: coordinate(edge.v),
+    diff: edge.diff,
+  } : null;
+
+  function rootWithoutCompression(cellId) {
+    let root = cellId;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  }
+
+  function find(cellId) {
+    let node = cellId;
+    while (parent[node] !== node) {
+      parent[node] = parent[parent[node]];
+      node = parent[node];
+    }
+    return node;
+  }
+
+  function union(u, v) {
+    const rootU = find(u);
+    const rootV = find(v);
+    parent[rootU] = rootV;
+    return { rootU, rootV, merged: rootU !== rootV };
+  }
+
+  function connected() {
+    return find(start) === find(target);
+  }
+
+  function componentSnapshot() {
+    const roots = parent.map((_, cellId) => rootWithoutCompression(cellId));
+    const groups = new Map();
+    roots.forEach((root, cellId) => {
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(coordinate(cellId));
+    });
+    return {
+      roots,
+      groups: [...groups.entries()].map(([root, cells]) => ({ root, cells })),
+    };
+  }
+
+  function finalPathEdges() {
+    if (start === target) return [];
+    const adjacency = Array.from({ length: cellCount }, () => []);
+    for (const edge of acceptedEdges) {
+      adjacency[edge.u].push({ next: edge.v, edge });
+      adjacency[edge.v].push({ next: edge.u, edge });
+    }
+    const previous = new Array(cellCount).fill(null);
+    const queue = [start];
+    previous[start] = { node: -1, edge: null };
+    for (let head = 0; head < queue.length && previous[target] === null; head++) {
+      const node = queue[head];
+      for (const item of adjacency[node]) {
+        if (previous[item.next] !== null) continue;
+        previous[item.next] = { node, edge: item.edge };
+        queue.push(item.next);
+      }
+    }
+    if (previous[target] === null) return [];
+    const path = [];
+    let node = target;
+    while (node !== start) {
+      path.push(copyEdge(previous[node].edge));
+      node = previous[node].node;
+    }
+    return path.reverse();
+  }
+
+  function pushStep({
+    title,
+    note,
+    codeLines,
+    event,
+    phase,
+    currentCell = null,
+    currentEdge = null,
+    edgeIndex = -1,
+    processedCount = 0,
+    rootsBefore = null,
+    unionChanged = null,
+    isConnected = null,
+    answer = null,
+    final = false,
+    vars = [],
+    edgeList = edges,
+    sorted = false,
+  }) {
+    const components = componentSnapshot();
+    const startRoot = rootWithoutCompression(start);
+    const targetRoot = rootWithoutCompression(target);
+    steps.push({
+      title,
+      note,
+      codeLines,
+      arr: [],
+      highlight: [],
+      mark: [],
+      vars,
+      final,
+      kruskalEffortView: {
+        event,
+        phase,
+        heights: heights.map((row) => [...row]),
+        rows,
+        cols,
+        edges: edgeList.map(copyEdge),
+        sorted,
+        currentCell: currentCell ? [...currentCell] : null,
+        currentEdge: copyEdge(currentEdge),
+        edgeIndex,
+        processedCount,
+        acceptedEdges: acceptedEdges.map(copyEdge),
+        skippedEdgeKeys: [...skippedEdgeKeys],
+        parent: [...parent],
+        roots: components.roots,
+        groups: components.groups,
+        rootsBefore: rootsBefore ? { ...rootsBefore } : null,
+        unionChanged,
+        start: coordinate(start),
+        target: coordinate(target),
+        startRoot,
+        targetRoot,
+        connected: isConnected === null ? startRoot === targetRoot : isConnected,
+        threshold: currentEdge ? currentEdge.diff : null,
+        pathEdges: final ? finalPathEdges() : [],
+        answer,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Grid ${rows} × ${cols}: mỗi ô ban đầu là một component`, en: `Grid ${rows} × ${cols}: every cell starts as its own component` },
+    note: {
+      vi: "Kruskal tăng dần ngưỡng effort. Một cạnh có trọng số |heightA-heightB| và chỉ nối hai ô kề nhau.",
+      en: "Kruskal gradually raises the effort threshold. An edge weighs |heightA-heightB| and only joins adjacent cells.",
+    },
+    codeLines: [3],
+    event: "init",
+    phase: "build",
+    vars: [{ name: "rows, cols", value: `${rows}, ${cols}` }, { name: "cells", value: cellCount }],
+  });
+
+  pushStep({
+    title: { vi: "Khởi tạo danh sách edges rỗng", en: "Initialize an empty edge list" },
+    note: { vi: "Ta sẽ thêm đúng một cạnh cho mỗi cặp ô kề ngang hoặc dọc.", en: "We add exactly one edge for every horizontal or vertical adjacent pair." },
+    codeLines: [4],
+    event: "init-edges",
+    phase: "build",
+    vars: [{ name: "edges", value: "[]" }],
+  });
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      pushStep({
+        title: { vi: `Xét ô (${row},${col}), height = ${heights[row][col]}`, en: `Scan cell (${row},${col}), height = ${heights[row][col]}` },
+        note: { vi: "Chỉ tạo cạnh xuống dưới và sang phải để không tạo trùng cạnh.", en: "Only create downward and rightward edges so no edge is duplicated." },
+        codeLines: [5, 6],
+        event: "scan-cell",
+        phase: "build",
+        currentCell: [row, col],
+        vars: [{ name: "r, c", value: `${row}, ${col}` }],
+      });
+
+      if (row + 1 < rows) {
+        const u = id(row, col);
+        const v = id(row + 1, col);
+        const edge = { key: edgeKey(u, v), u, v, diff: Math.abs(heights[row][col] - heights[row + 1][col]) };
+        edges.push(edge);
+        pushStep({
+          title: { vi: `Thêm cạnh dọc ${label(u)} ↔ ${label(v)}, |diff| = ${edge.diff}`, en: `Add vertical edge ${label(u)} ↔ ${label(v)}, |diff| = ${edge.diff}` },
+          note: { vi: `|${heights[row][col]} - ${heights[row + 1][col]}| = ${edge.diff}.`, en: `|${heights[row][col]} - ${heights[row + 1][col]}| = ${edge.diff}.` },
+          codeLines: [7, 8],
+          event: "build-edge",
+          phase: "build",
+          currentCell: [row, col],
+          currentEdge: edge,
+          edgeIndex: edges.length - 1,
+          vars: [{ name: "edge", value: `${label(u)} ↔ ${label(v)}` }, { name: "diff", value: edge.diff }, { name: "len(edges)", value: edges.length }],
+        });
+      }
+
+      if (col + 1 < cols) {
+        const u = id(row, col);
+        const v = id(row, col + 1);
+        const edge = { key: edgeKey(u, v), u, v, diff: Math.abs(heights[row][col] - heights[row][col + 1]) };
+        edges.push(edge);
+        pushStep({
+          title: { vi: `Thêm cạnh ngang ${label(u)} ↔ ${label(v)}, |diff| = ${edge.diff}`, en: `Add horizontal edge ${label(u)} ↔ ${label(v)}, |diff| = ${edge.diff}` },
+          note: { vi: `|${heights[row][col]} - ${heights[row][col + 1]}| = ${edge.diff}.`, en: `|${heights[row][col]} - ${heights[row][col + 1]}| = ${edge.diff}.` },
+          codeLines: [9, 10],
+          event: "build-edge",
+          phase: "build",
+          currentCell: [row, col],
+          currentEdge: edge,
+          edgeIndex: edges.length - 1,
+          vars: [{ name: "edge", value: `${label(u)} ↔ ${label(v)}` }, { name: "diff", value: edge.diff }, { name: "len(edges)", value: edges.length }],
+        });
+      }
+    }
+  }
+
+  edges.sort((left, right) => left.diff - right.diff || left.u - right.u || left.v - right.v);
+  pushStep({
+    title: { vi: `Sắp xếp ${edges.length} cạnh theo |diff| tăng dần`, en: `Sort ${edges.length} edges by ascending |diff|` },
+    note: {
+      vi: "Từ đây, mỗi cạnh lấy ra là ngưỡng nhỏ nhất chưa thử. Ta không thể kết nối S với T ở một ngưỡng nhỏ hơn cạnh hiện tại.",
+      en: "From now on, each selected edge is the smallest untried threshold. S and T cannot connect at a threshold below the current edge.",
+    },
+    codeLines: [11],
+    event: "sort",
+    phase: "sort",
+    sorted: true,
+    vars: [{ name: "sorted diffs", value: `[${edges.map((edge) => edge.diff).join(", ")}]` }],
+  });
+
+  pushStep({
+    title: { vi: `Khởi tạo ${cellCount} component riêng biệt`, en: `Initialize ${cellCount} separate components` },
+    note: { vi: "parent[i] = i nghĩa là mỗi ô đang là root của chính nó.", en: "parent[i] = i means every cell is currently its own root." },
+    codeLines: [12],
+    event: "init-dsu",
+    phase: "sort",
+    sorted: true,
+    vars: [{ name: "parent", value: `[${parent.join(", ")}]` }, { name: "components", value: cellCount }],
+  });
+
+  if (start === target) {
+    pushStep({
+      title: { vi: "Start cũng chính là target → effort = 0", en: "Start is also the target → effort = 0" },
+      note: { vi: "Không đi qua cạnh nào nên chênh lệch lớn nhất bằng 0.", en: "No edge is traversed, so the maximum difference is 0." },
+      codeLines: [24],
+      event: "done",
+      phase: "done",
+      sorted: true,
+      isConnected: true,
+      answer: 0,
+      final: true,
+      vars: [{ name: "answer", value: 0 }],
+    });
+    return { input, answer: 0, steps };
+  }
+
+  let answer = 0;
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex++) {
+    const edge = edges[edgeIndex];
+    pushStep({
+      title: { vi: `Lấy cạnh #${edgeIndex + 1}: ${label(edge.u)} ↔ ${label(edge.v)}, diff = ${edge.diff}`, en: `Take edge #${edgeIndex + 1}: ${label(edge.u)} ↔ ${label(edge.v)}, diff = ${edge.diff}` },
+      note: { vi: `Ngưỡng hiện tại là ${edge.diff}. Mọi cạnh đã xử lý đều có diff ≤ ${edge.diff}.`, en: `The current threshold is ${edge.diff}. Every processed edge has diff ≤ ${edge.diff}.` },
+      codeLines: [20],
+      event: "choose-edge",
+      phase: "find",
+      currentEdge: edge,
+      edgeIndex,
+      processedCount: edgeIndex,
+      sorted: true,
+      vars: [{ name: "diff", value: edge.diff }, { name: "u, v", value: `${edge.u}, ${edge.v}` }],
+    });
+
+    const rootU = find(edge.u);
+    const rootV = find(edge.v);
+    pushStep({
+      title: { vi: `find(${edge.u}) = ${rootU}, find(${edge.v}) = ${rootV}`, en: `find(${edge.u}) = ${rootU}, find(${edge.v}) = ${rootV}` },
+      note: rootU === rootV
+        ? { vi: "Hai đầu cạnh đã thuộc cùng component; cạnh này tạo chu trình và không giúp nối thêm ô.", en: "Both endpoints already belong to the same component; this edge creates a cycle and connects nothing new." }
+        : { vi: `Hai root khác nhau, vì vậy Union sẽ gộp R${rootU} vào R${rootV}.`, en: `The roots differ, so Union will merge R${rootU} into R${rootV}.` },
+      codeLines: [13, 14, 15, 16, 17],
+      event: "find-roots",
+      phase: "find",
+      currentEdge: edge,
+      edgeIndex,
+      processedCount: edgeIndex,
+      rootsBefore: { u: rootU, v: rootV },
+      sorted: true,
+      vars: [{ name: `find(${edge.u})`, value: rootU }, { name: `find(${edge.v})`, value: rootV }, { name: "same root?", value: rootU === rootV }],
+    });
+
+    const unionResult = union(edge.u, edge.v);
+    if (unionResult.merged) acceptedEdges.push(edge);
+    else skippedEdgeKeys.add(edge.key);
+    pushStep({
+      title: unionResult.merged
+        ? { vi: `Union: R${unionResult.rootU} → R${unionResult.rootV}`, en: `Union: R${unionResult.rootU} → R${unionResult.rootV}` }
+        : { vi: "Bỏ qua cạnh tạo chu trình", en: "Skip the cycle-forming edge" },
+      note: unionResult.merged
+        ? { vi: `parent[${unionResult.rootU}] = ${unionResult.rootV}; hai component trở thành một.`, en: `parent[${unionResult.rootU}] = ${unionResult.rootV}; the two components become one.` }
+        : { vi: "Hai root giống nhau nên parent không thay đổi.", en: "The roots are identical, so parent does not change." },
+      codeLines: [18, 19, 21],
+      event: "union",
+      phase: "union",
+      currentEdge: edge,
+      edgeIndex,
+      processedCount: edgeIndex + 1,
+      rootsBefore: { u: unionResult.rootU, v: unionResult.rootV },
+      unionChanged: unionResult.merged,
+      sorted: true,
+      vars: [{ name: "merged?", value: unionResult.merged }, { name: "parent", value: `[${parent.join(", ")}]` }],
+    });
+
+    const isConnected = connected();
+    pushStep({
+      title: isConnected
+        ? { vi: `S và T đã cùng root ${find(start)}`, en: `S and T now share root ${find(start)}` }
+        : { vi: `S root=${find(start)}, T root=${find(target)} → chưa nối`, en: `S root=${find(start)}, T root=${find(target)} → not connected` },
+      note: isConnected
+        ? { vi: `Kết nối lần đầu xảy ra ở ngưỡng ${edge.diff}; đây là effort nhỏ nhất có thể.`, en: `The first connection happens at threshold ${edge.diff}; this is the minimum possible effort.` }
+        : { vi: "Hai root còn khác nhau nên tiếp tục lấy cạnh nhỏ nhất kế tiếp.", en: "The roots still differ, so continue with the next-smallest edge." },
+      codeLines: [22],
+      event: "check",
+      phase: "check",
+      currentEdge: edge,
+      edgeIndex,
+      processedCount: edgeIndex + 1,
+      unionChanged: unionResult.merged,
+      isConnected,
+      sorted: true,
+      vars: [{ name: "start root", value: find(start) }, { name: "target root", value: find(target) }, { name: "connected?", value: isConnected }],
+    });
+
+    if (isConnected) {
+      answer = edge.diff;
+      pushStep({
+        title: { vi: `Return ${answer}: bottleneck nhỏ nhất`, en: `Return ${answer}: the minimum bottleneck` },
+        note: {
+          vi: `Các cạnh xanh tạo một đường từ S đến T. Chênh lệch lớn nhất trên đường là ${answer}; cạnh màu cam là bottleneck quyết định đáp án.`,
+          en: `The green edges form a path from S to T. Its largest difference is ${answer}; the orange edge is the bottleneck that determines the answer.`,
+        },
+        codeLines: [23],
+        event: "done",
+        phase: "done",
+        currentEdge: edge,
+        edgeIndex,
+        processedCount: edgeIndex + 1,
+        rootsBefore: { u: unionResult.rootU, v: unionResult.rootV },
+        unionChanged: unionResult.merged,
+        isConnected: true,
+        answer,
+        final: true,
+        sorted: true,
+        vars: [{ name: "answer", value: answer }, { name: "bottleneck", value: `${label(edge.u)} ↔ ${label(edge.v)}, diff=${edge.diff}` }],
+      });
+      break;
+    }
+  }
 
   return { input, answer, steps };
 }

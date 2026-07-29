@@ -4947,6 +4947,170 @@ function renderCyclicSortView(step) {
   </div>`;
 }
 
+function renderKruskalEffortView(step) {
+  const view = step.kruskalEffortView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { build: 0, sort: 1, find: 2, union: 3, check: 4, done: 5 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Tạo cạnh", "2 · Sort ↑", "3 · Find root", "4 · Union", "5 · Kiểm tra S↔T"]
+    : ["1 · Build edges", "2 · Sort ↑", "3 · Find roots", "4 · Union", "5 · Check S↔T"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    const icon = state === "done" ? "✓" : state === "active" ? "▶" : "○";
+    return `<span class="${state}">${icon} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const accepted = new Set((view.acceptedEdges || []).map((edge) => edge.key));
+  const skipped = new Set(view.skippedEdgeKeys || []);
+  const currentKey = view.currentEdge ? view.currentEdge.key : null;
+  const maxVisibleEdges = 18;
+  let edgeWindowStart = 0;
+  if (edges.length > maxVisibleEdges && view.edgeIndex >= 0) {
+    edgeWindowStart = Math.max(0, Math.min(view.edgeIndex - 5, edges.length - maxVisibleEdges));
+  }
+  const visibleEdges = edges.slice(edgeWindowStart, edgeWindowStart + maxVisibleEdges);
+  const edgeChips = visibleEdges.map((edge, offset) => {
+    const index = edgeWindowStart + offset;
+    const classes = [];
+    if (accepted.has(edge.key)) classes.push("accepted");
+    if (skipped.has(edge.key)) classes.push("skipped");
+    if (edge.key === currentKey && index === view.edgeIndex) classes.push("current");
+    const [fromRow, fromCol] = edge.from;
+    const [toRow, toCol] = edge.to;
+    return `<span class="${classes.join(" ")}"><small>#${index + 1}</small><b>(${fromRow},${fromCol})↔(${toRow},${toCol})</b><strong>Δ=${edge.diff}</strong></span>`;
+  }).join("");
+  const hiddenBefore = edgeWindowStart > 0 ? `<em>… ${edgeWindowStart} ${vi ? "cạnh trước" : "earlier edges"}</em>` : "";
+  const hiddenAfterCount = edges.length - edgeWindowStart - visibleEdges.length;
+  const hiddenAfter = hiddenAfterCount > 0 ? `<em>+${hiddenAfterCount} ${vi ? "cạnh" : "edges"}</em>` : "";
+  const edgeLaneTitle = view.sorted
+    ? (vi ? "CẠNH ĐÃ SORT — nhỏ nhất ở bên trái" : "SORTED EDGES — smallest first")
+    : (vi ? "CẠNH ĐANG ĐƯỢC TẠO — chưa sort" : "EDGES BEING BUILT — unsorted");
+
+  const width = 104 + Math.max(0, view.cols - 1) * 96;
+  const height = 100 + Math.max(0, view.rows - 1) * 92;
+  const center = (cell) => ({ x: 52 + cell[1] * 96, y: 50 + cell[0] * 92 });
+  const pathKeys = new Set((view.pathEdges || []).map((edge) => edge.key));
+  const pathCells = new Set();
+  for (const edge of view.pathEdges || []) {
+    pathCells.add(`${edge.from[0]},${edge.from[1]}`);
+    pathCells.add(`${edge.to[0]},${edge.to[1]}`);
+  }
+
+  const acceptedLines = (view.acceptedEdges || []).map((edge) => {
+    const from = center(edge.from);
+    const to = center(edge.to);
+    const classes = ["kruskal-link", "accepted"];
+    if (pathKeys.has(edge.key)) classes.push("path");
+    if (pathKeys.has(edge.key) && edge.diff === view.answer) classes.push("bottleneck");
+    return `<line class="${classes.join(" ")}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"></line>`;
+  }).join("");
+  let currentLine = "";
+  if (view.currentEdge && view.event !== "done") {
+    const from = center(view.currentEdge.from);
+    const to = center(view.currentEdge.to);
+    currentLine = `<line class="kruskal-link current" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"></line>`;
+  }
+
+  const nodes = view.heights.map((row, rowIndex) => row.map((cellHeight, colIndex) => {
+    const cell = [rowIndex, colIndex];
+    const cellId = rowIndex * view.cols + colIndex;
+    const point = center(cell);
+    const root = view.roots[cellId];
+    const cellKey = `${rowIndex},${colIndex}`;
+    const isStart = rowIndex === view.start[0] && colIndex === view.start[1];
+    const isTarget = rowIndex === view.target[0] && colIndex === view.target[1];
+    const isCurrentCell = view.currentCell && rowIndex === view.currentCell[0] && colIndex === view.currentCell[1];
+    const isEdgeEnd = view.currentEdge && (
+      (rowIndex === view.currentEdge.from[0] && colIndex === view.currentEdge.from[1]) ||
+      (rowIndex === view.currentEdge.to[0] && colIndex === view.currentEdge.to[1])
+    );
+    const classes = ["kruskal-cell", `component-${Math.abs(root) % 6}`];
+    if (isCurrentCell) classes.push("scan");
+    if (isEdgeEnd) classes.push("edge-end");
+    if (pathCells.has(cellKey)) classes.push("path");
+    const endpoint = isStart ? "S" : isTarget ? "T" : "";
+    return `<g class="${classes.join(" ")}" aria-label="cell (${rowIndex},${colIndex}), height ${cellHeight}, root ${root}">
+      <rect x="${point.x - 34}" y="${point.y - 31}" width="68" height="62" rx="9"></rect>
+      <text class="coord" x="${point.x - 29}" y="${point.y - 16}">${rowIndex},${colIndex}</text>
+      ${endpoint ? `<text class="endpoint" x="${point.x + 26}" y="${point.y - 16}">${endpoint}</text>` : ""}
+      <text class="height" x="${point.x}" y="${point.y + 5}">${escapeHtml(cellHeight)}</text>
+      <text class="root" x="${point.x}" y="${point.y + 22}">root R${root}</text>
+    </g>`;
+  }).join("")).join("");
+  const gridSummary = vi
+    ? `Grid ${view.rows} × ${view.cols}; màu ô biểu diễn component DSU hiện tại.`
+    : `${view.rows} × ${view.cols} grid; cell color represents its current DSU component.`;
+  const gridSvg = `<svg class="kruskal-grid-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(gridSummary)}">
+    ${acceptedLines}${currentLine}${nodes}
+  </svg>`;
+
+  let edgeDetail;
+  if (view.currentEdge) {
+    const edge = view.currentEdge;
+    const heightA = view.heights[edge.from[0]][edge.from[1]];
+    const heightB = view.heights[edge.to[0]][edge.to[1]];
+    const roots = view.rootsBefore;
+    let decision = vi ? "Chưa Union" : "Not unioned yet";
+    let decisionClass = "waiting";
+    if (view.unionChanged === true) {
+      decision = roots
+        ? (vi ? `Gộp R${roots.u} → R${roots.v}` : `Merge R${roots.u} → R${roots.v}`)
+        : (vi ? "Đã gộp hai component" : "Merged two components");
+      decisionClass = "merged";
+    } else if (view.unionChanged === false) {
+      decision = vi ? "Cùng root → bỏ qua chu trình" : "Same root → skip cycle";
+      decisionClass = "skipped";
+    } else if (roots) {
+      decision = roots.u === roots.v
+        ? (vi ? "Cùng root → sẽ bỏ qua" : "Same root → will skip")
+        : (vi ? "Khác root → có thể gộp" : "Different roots → can merge");
+      decisionClass = roots.u === roots.v ? "skipped" : "waiting";
+    }
+    edgeDetail = `<div class="kruskal-edge-detail">
+      <div><small>${vi ? "CẠNH HIỆN TẠI" : "CURRENT EDGE"}</small><strong>(${edge.from[0]},${edge.from[1]}) ↔ (${edge.to[0]},${edge.to[1]})</strong></div>
+      <div class="kruskal-diff"><small>|${heightA} − ${heightB}|</small><strong>${edge.diff}</strong></div>
+      ${roots ? `<div class="kruskal-roots-before"><span>find(u) = <b>R${roots.u}</b></span><span>find(v) = <b>R${roots.v}</b></span></div>` : ""}
+      <div class="kruskal-union-decision ${decisionClass}">${escapeHtml(decision)}</div>
+    </div>`;
+  } else {
+    edgeDetail = `<div class="kruskal-threshold-rule"><code>${vi ? "Mở các cạnh theo diff tăng dần" : "Open edges by ascending diff"}</code><span>${vi ? "Lần đầu S nối T ⇒ ngưỡng nhỏ nhất" : "First time S reaches T ⇒ minimum threshold"}</span></div>`;
+  }
+
+  const componentChips = (view.groups || []).map((group) => {
+    const cells = group.cells.map(([row, col]) => `(${row},${col})`).join(" ");
+    return `<span class="component-chip component-${Math.abs(group.root) % 6}"><b>R${group.root}</b><small>${escapeHtml(cells)}</small></span>`;
+  }).join("");
+  const connectionClass = view.connected ? "connected" : "separate";
+  const connectionText = view.connected
+    ? (vi ? "✓ CÙNG COMPONENT" : "✓ SAME COMPONENT")
+    : (vi ? "CHƯA KẾT NỐI" : "NOT CONNECTED");
+  const connectionHtml = `<div class="kruskal-connection ${connectionClass}">
+    <span><small>START</small><b>S · R${view.startRoot}</b></span>
+    <strong>${view.connected ? "═" : "≠"}</strong>
+    <span><small>TARGET</small><b>T · R${view.targetRoot}</b></span>
+    <em>${connectionText}</em>
+  </div>`;
+
+  const pathHtml = view.pathEdges && view.pathEdges.length
+    ? `<div class="kruskal-final-path"><strong>${vi ? `ĐƯỜNG KẾT NỐI · effort = ${view.answer}` : `CONNECTED PATH · effort = ${view.answer}`}</strong><div>${view.pathEdges.map((edge) => {
+      const bottleneck = edge.diff === view.answer;
+      return `<span class="${bottleneck ? "bottleneck" : ""}">(${edge.from[0]},${edge.from[1]})→(${edge.to[0]},${edge.to[1]}) <b>Δ=${edge.diff}</b></span>`;
+    }).join("")}</div></div>`
+    : "";
+
+  el.innerHTML = `<div class="kruskal-effort-viz">
+    <div class="kruskal-phases">${phases}</div>
+    <div class="kruskal-edge-lane"><div><strong>${edgeLaneTitle}</strong><small>${edges.length} ${vi ? "cạnh" : "edges"}</small></div><div>${hiddenBefore}${edgeChips}${hiddenAfter}</div></div>
+    <div class="kruskal-main">
+      <div class="kruskal-grid-wrap">${gridSvg}<div class="kruskal-grid-legend"><span><i class="accepted"></i>${vi ? "cạnh đã Union" : "unioned edge"}</span><span><i class="current"></i>${vi ? "cạnh đang xét" : "current edge"}</span><span><i class="bottleneck"></i>bottleneck</span></div></div>
+      <div class="kruskal-state">${edgeDetail}${connectionHtml}<div class="kruskal-components"><strong>DSU COMPONENTS · ${view.groups.length}</strong><div>${componentChips}</div></div></div>
+    </div>
+    ${pathHtml}
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -4970,6 +5134,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.kruskalEffortView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderKruskalEffortView(step);
   } else if (step.kthPalindromeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
