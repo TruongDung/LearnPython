@@ -2993,6 +2993,77 @@ function renderSynonymSentenceView(step) {
     </div>`;
   }).join("");
 
+  const dfsState = view.dfsState && typeof view.dfsState === "object" ? view.dfsState : null;
+  const dfsEventLabels = vi
+    ? {
+      ready: "Sẵn sàng gọi dfs(0)", enter: "Vào hàm dfs", checkBase: "Kiểm tra base case",
+      checkSynonym: "Kiểm tra từ có synonym", fixed: "Giữ nguyên từ cố định",
+      choices: "Lấy danh sách synonym", iterate: "Vòng for chọn một nhánh",
+      assign: "Gán từ vào câu", recurse: "Gọi dfs sâu hơn", append: "Thêm câu vào ans",
+      return: "Return và backtrack", done: "DFS hoàn tất",
+    }
+    : {
+      ready: "Ready to call dfs(0)", enter: "Enter dfs", checkBase: "Check base case",
+      checkSynonym: "Check whether the word has synonyms", fixed: "Keep a fixed word",
+      choices: "Read synonym choices", iterate: "For-loop selects a branch",
+      assign: "Assign the word", recurse: "Recurse to the next index", append: "Append sentence to ans",
+      return: "Return and backtrack", done: "DFS complete",
+    };
+
+  const dfsSection = phaseIndex >= 3 && dfsState
+    ? (() => {
+      const stack = Array.isArray(dfsState.callStack) ? dfsState.callStack : [];
+      const workingWords = Array.isArray(dfsState.workingWords) ? dfsState.workingWords : sentence;
+      const choices = Array.isArray(dfsState.choices) ? dfsState.choices : [];
+      const exploredChoices = new Set(Array.isArray(dfsState.exploredChoices) ? dfsState.exploredChoices : []);
+      const currentIndex = Number.isInteger(dfsState.currentIndex) ? dfsState.currentIndex : -1;
+      const event = dfsState.event || "ready";
+      const eventLabel = dfsEventLabels[event] || event;
+      const stackHtml = stack.length
+        ? stack.map((index, stackIndex) => `${stackIndex ? '<b aria-hidden="true">→</b>' : ""}<span class="${stackIndex === stack.length - 1 ? "active" : ""}">dfs(${index})</span>`).join("")
+        : `<span class="empty">∅</span>`;
+      const workingHtml = workingWords.map((word, index) => {
+        const state = index === currentIndex ? "active" : index < currentIndex ? "processed" : "pending";
+        const changed = sentence[index] !== word ? " changed" : "";
+        return `<span class="synonym-dfs-word ${state}${changed}" aria-label="${escapeHtml(`[${index}] ${word}`)}"><small>[${index}]</small>${escapeHtml(word)}</span>`;
+      }).join("");
+      const choicesHtml = choices.length
+        ? choices.map((choice) => {
+          const isCurrent = dfsState.currentChoice === choice;
+          const isExplored = exploredChoices.has(choice);
+          const state = isCurrent ? "current" : isExplored ? "explored" : "pending";
+          const marker = isCurrent ? "▶" : isExplored ? "✓" : "○";
+          return `<span class="synonym-dfs-choice ${state}">${marker} ${escapeHtml(choice)}</span>`;
+        }).join("")
+        : `<span class="synonym-dfs-no-choices">${vi ? "Chưa đọc choices ở dòng 43–44" : "Choices are read at lines 43–44"}</span>`;
+
+      return `<section class="synonym-dfs-section">
+        <div class="synonym-section-heading">
+          <strong>${vi ? "MÔ PHỎNG DFS / BACKTRACKING" : "DFS / BACKTRACKING SIMULATION"}</strong>
+          <span>ind = ${currentIndex} / n = ${sentence.length}</span>
+        </div>
+        <div class="synonym-dfs-status">
+          <div class="synonym-dfs-stack-block">
+            <small>CALL STACK</small>
+            <div class="synonym-dfs-stack">${stackHtml}</div>
+          </div>
+          <div class="synonym-dfs-event">
+            <small>${vi ? "THAO TÁC HIỆN TẠI" : "CURRENT ACTION"}</small>
+            <strong>${escapeHtml(eventLabel)}</strong>
+          </div>
+        </div>
+        <div class="synonym-dfs-working">
+          <small>${vi ? "WORDS ĐANG ĐƯỢC THAY ĐỔI TRỰC TIẾP" : "WORDS MUTATED IN PLACE"}</small>
+          <div>${workingHtml}</div>
+        </div>
+        <div class="synonym-dfs-choices">
+          <small>${vi ? "CÁC NHÁNH TẠI VỊ TRÍ HIỆN TẠI" : "BRANCHES AT THE CURRENT POSITION"}</small>
+          <div>${choicesHtml}</div>
+        </div>
+      </section>`;
+    })()
+    : "";
+
   const replaceablePositions = new Set(options
     .map((choices, index) => (Array.isArray(choices) && choices.length > 1 ? index : -1))
     .filter((index) => index >= 0));
@@ -3026,7 +3097,7 @@ function renderSynonymSentenceView(step) {
   const resultsSection = phaseIndex >= 3
     ? `<section class="synonym-results-section">
         <div class="synonym-section-heading">
-          <strong>res</strong>
+          <strong>ans</strong>
           <span>${completed.length} / ${expected} ${vi ? "câu" : "sentences"}</span>
         </div>
         <div class="synonym-result-legend" aria-label="${vi ? "Chú thích từ trong kết quả" : "Result word legend"}">
@@ -3052,6 +3123,7 @@ function renderSynonymSentenceView(step) {
       </div>
       <div class="synonym-groups">${groupsHtml}</div>
     </section>
+    ${dfsSection}
     ${sentenceSection}
     ${resultsSection}
   </div>`;

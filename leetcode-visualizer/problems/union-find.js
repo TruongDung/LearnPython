@@ -603,7 +603,7 @@ function buildSteps1258(input, params) {
   function pushStep({
     title, note, codeLines, phaseIndex, mode, action, activePair = -1,
     processedPairs = 0, groups, activeWords = [], activeWord = -1,
-    prefix = [], currentChoice = null, vars = [], final = false,
+    prefix = [], currentChoice = null, dfsState = null, vars = [], final = false,
   }) {
     const step = {
       title,
@@ -630,6 +630,13 @@ function buildSteps1258(input, params) {
         completed: [...results],
         expected: optionsSnapshot().reduce((count, choices) => count * choices.length, 1),
         parentLinks: parentSnapshot(),
+        dfsState: dfsState ? {
+          ...dfsState,
+          callStack: [...dfsState.callStack],
+          workingWords: [...dfsState.workingWords],
+          choices: [...dfsState.choices],
+          exploredChoices: [...dfsState.exploredChoices],
+        } : null,
       },
       vars,
       note,
@@ -742,6 +749,23 @@ function buildSteps1258(input, params) {
 
   const sentenceOptions = optionsSnapshot();
   const expected = sentenceOptions.reduce((count, choices) => count * choices.length, 1);
+  const makeDfsState = (
+    event,
+    callStack,
+    workingWords,
+    currentIndex,
+    choices = [],
+    currentChoice = null,
+    exploredChoices = [],
+  ) => ({
+    event,
+    callStack,
+    workingWords,
+    currentIndex,
+    choices,
+    currentChoice,
+    exploredChoices,
+  });
   pushStep({
     title: { vi: "Gắn lựa chọn cho từng vị trí trong câu", en: "Map choices to every sentence position" },
     note: {
@@ -759,42 +783,160 @@ function buildSteps1258(input, params) {
     codeLines: [50, 38], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
     groups: builtGroupSnapshot(), activeWord: 0, prefix: [],
     action: { vi: "dfs(0)", en: "dfs(0)" },
+    dfsState: makeDfsState("ready", [], words, 0),
     vars: [{ name: "ind", value: 0 }, { name: "words", value: `[${words.join(", ")}]` }, { name: "ans", value: "[]" }],
   });
 
-  function generate(i, current) {
+  function generate(i, workingWords, stack) {
+    const callStack = [...stack, i];
+    const prefixBeforeIndex = workingWords.slice(0, Math.min(i, words.length));
+    pushStep({
+      title: { vi: `Vào dfs(${i})`, en: `Enter dfs(${i})` },
+      note: { vi: `Tạo frame dfs(${i}) trên call stack. Hiện có ${callStack.length} frame đang hoạt động.`, en: `Push the dfs(${i}) frame onto the call stack. ${callStack.length} frames are now active.` },
+      codeLines: [38], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWord: i < words.length ? i : -1, prefix: prefixBeforeIndex,
+      action: { vi: `Call stack + dfs(${i})`, en: `Call stack + dfs(${i})` },
+      dfsState: makeDfsState("enter", callStack, workingWords, i),
+      vars: [{ name: "ind", value: i }, { name: "call stack", value: callStack.map((value) => `dfs(${value})`).join(" → ") }],
+    });
+
+    pushStep({
+      title: { vi: i === words.length ? `ind == n (${i}) → True` : `ind == n? ${i} == ${words.length} → False`, en: i === words.length ? `ind == n (${i}) → True` : `ind == n? ${i} == ${words.length} → False` },
+      note: i === words.length
+        ? { vi: "Đã chọn xong mọi vị trí, nên câu hiện tại là một kết quả hoàn chỉnh.", en: "Every position has been chosen, so the working sentence is complete." }
+        : { vi: `Vẫn còn vị trí [${i}] cần xử lý, nên tiếp tục xuống dòng 42.`, en: `Position [${i}] still needs processing, so continue to line 42.` },
+      codeLines: [39], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWord: i < words.length ? i : -1, prefix: prefixBeforeIndex,
+      action: { vi: `Kiểm tra base case: ${i === words.length}`, en: `Base-case check: ${i === words.length}` },
+      dfsState: makeDfsState("checkBase", callStack, workingWords, i),
+      vars: [{ name: "ind", value: i }, { name: "n", value: words.length }, { name: "ind == n", value: i === words.length }],
+    });
+
     if (i === words.length) {
-      const completedSentence = current.join(" ");
+      const completedSentence = workingWords.join(" ");
       results.push(completedSentence);
       pushStep({
         title: { vi: `Hoàn thành câu #${results.length}`, en: `Complete sentence #${results.length}` },
-        note: { vi: `ind == n, nên ghép words và append vào ans. Đã có ${results.length}/${expected} câu.`, en: `ind == n, so join words and append to ans. ${results.length}/${expected} sentences are complete.` },
-        codeLines: [39, 40, 41], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
-        groups: builtGroupSnapshot(), activeWord: -1, prefix: current,
+        note: { vi: `Ghép words bằng khoảng trắng và append vào ans. Đã có ${results.length}/${expected} câu.`, en: `Join words with spaces and append the sentence to ans. ${results.length}/${expected} sentences are complete.` },
+        codeLines: [40], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: -1, prefix: workingWords,
         action: { vi: `ans.append câu #${results.length}`, en: `ans.append sentence #${results.length}` },
+        dfsState: makeDfsState("append", callStack, workingWords, i),
         vars: [{ name: "ind", value: i }, { name: "sentence", value: completedSentence }, { name: "len(ans)", value: results.length }],
+      });
+      pushStep({
+        title: { vi: `return khỏi dfs(${i})`, en: `Return from dfs(${i})` },
+        note: { vi: `Frame dfs(${i}) kết thúc và được pop khỏi call stack. Quay lại dfs(${i - 1}).`, en: `The dfs(${i}) frame finishes and is popped. Control returns to dfs(${i - 1}).` },
+        codeLines: [41], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: -1, prefix: workingWords,
+        action: { vi: `Pop dfs(${i}) → dfs(${i - 1})`, en: `Pop dfs(${i}) → dfs(${i - 1})` },
+        dfsState: makeDfsState("return", callStack, workingWords, i),
+        vars: [{ name: "return to", value: `dfs(${i - 1})` }, { name: "len(ans)", value: results.length }],
       });
       return;
     }
 
-    const choices = sentenceOptions[i];
+    const currentWord = workingWords[i];
+    const isSynonym = parent.has(currentWord);
+    const choices = isSynonym ? optionsFor(currentWord) : [currentWord];
+    pushStep({
+      title: {
+        vi: `words[${i}] = "${currentWord}" ${isSynonym ? "có" : "không có"} trong parent`,
+        en: `words[${i}] = "${currentWord}" is ${isSynonym ? "in" : "not in"} parent`,
+      },
+      note: isSynonym
+        ? { vi: "Đi vào nhánh if để tìm nhóm synonym và thử từng lựa chọn.", en: "Take the if branch to find the synonym group and try each choice." }
+        : { vi: "Không có synonym, nên đi vào else và giữ nguyên từ này.", en: "There is no synonym, so take the else branch and keep this word." },
+      codeLines: [42], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWord: i, prefix: prefixBeforeIndex,
+      action: { vi: `Kiểm tra "${currentWord}" trong parent → ${isSynonym}`, en: `Check "${currentWord}" in parent → ${isSynonym}` },
+      dfsState: makeDfsState("checkSynonym", callStack, workingWords, i, choices),
+      vars: [{ name: "ind", value: i }, { name: `words[${i}]`, value: currentWord }, { name: "in parent", value: isSynonym }],
+    });
+
+    if (!isSynonym) {
+      pushStep({
+        title: { vi: `Giữ nguyên "${currentWord}" rồi gọi dfs(${i + 1})`, en: `Keep "${currentWord}" and call dfs(${i + 1})` },
+        note: { vi: `Nhánh else không thay words[${i}]. Dòng 48 chuyển sang vị trí kế tiếp.`, en: `The else branch does not change words[${i}]. Line 48 advances to the next position.` },
+        codeLines: [47, 48], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: workingWords.slice(0, i + 1), currentChoice: currentWord,
+        action: { vi: `Từ cố định: ${currentWord} → dfs(${i + 1})`, en: `Fixed word: ${currentWord} → dfs(${i + 1})` },
+        dfsState: makeDfsState("fixed", callStack, workingWords, i, choices, currentWord),
+        vars: [{ name: "ind", value: i }, { name: `words[${i}]`, value: currentWord }, { name: "next call", value: `dfs(${i + 1})` }],
+      });
+      generate(i + 1, workingWords, callStack);
+      pushStep({
+        title: { vi: `Quay lại dfs(${i}) sau dfs(${i + 1})`, en: `Resume dfs(${i}) after dfs(${i + 1})` },
+        note: { vi: `Frame dfs(${i + 1}) đã được pop. dfs(${i}) không còn lệnh nào nên tiếp tục return.`, en: `The dfs(${i + 1}) frame has been popped. dfs(${i}) has no more statements and now returns.` },
+        codeLines: [48], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: workingWords.slice(0, i + 1),
+        action: { vi: `Backtrack → dfs(${i})`, en: `Backtrack → dfs(${i})` },
+        dfsState: makeDfsState("return", callStack, workingWords, i, choices),
+        vars: [{ name: "active frame", value: `dfs(${i})` }, { name: "len(ans)", value: results.length }],
+      });
+      return;
+    }
+
+    const root = find(currentWord);
+    pushStep({
+      title: { vi: `Tìm các lựa chọn của "${currentWord}"`, en: `Find choices for "${currentWord}"` },
+      note: { vi: `find("${currentWord}") = "${root}". syn_map["${root}"] có ${choices.length} lựa chọn theo thứ tự: ${choices.join(", ")}.`, en: `find("${currentWord}") = "${root}". syn_map["${root}"] has ${choices.length} sorted choices: ${choices.join(", ")}.` },
+      codeLines: [43, 44], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+      groups: builtGroupSnapshot(), activeWord: i, prefix: prefixBeforeIndex,
+      action: { vi: `for syn in [${choices.join(", ")}]`, en: `for syn in [${choices.join(", ")}]` },
+      dfsState: makeDfsState("choices", callStack, workingWords, i, choices),
+      vars: [{ name: "par_word", value: root }, { name: `syn_map[${root}]`, value: `[${choices.join(", ")}]` }],
+    });
+
+    const exploredChoices = [];
     for (const choice of choices) {
-      const next = [...current, choice];
-      if (choices.length > 1) {
-        pushStep({
-          title: { vi: `Vị trí ${i}: thử "${choice}"`, en: `Position ${i}: try "${choice}"` },
-          note: { vi: `Dòng 44-46 lấy "${choice}" từ syn_map, gán words[${i}] rồi gọi dfs(${i + 1}).`, en: `Lines 44-46 take "${choice}" from syn_map, assign words[${i}], then call dfs(${i + 1}).` },
-          codeLines: [42, 43, 44, 45, 46], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
-          groups: builtGroupSnapshot(), activeWord: i, prefix: next, currentChoice: choice,
-          action: { vi: `Chọn ${choice} tại [${i}] → đi sâu`, en: `Choose ${choice} at [${i}] → recurse` },
-          vars: [{ name: "ind", value: i }, { name: "syn", value: choice }, { name: "words", value: `[${next.join(", ")}]` }],
-        });
-      }
-      generate(i + 1, next);
+      pushStep({
+        title: { vi: `for chọn syn = "${choice}"`, en: `for selects syn = "${choice}"` },
+        note: { vi: `Các lựa chọn đã chạy: ${exploredChoices.length ? exploredChoices.join(", ") : "chưa có"}. Bây giờ vòng for lấy "${choice}".`, en: `Already explored: ${exploredChoices.length ? exploredChoices.join(", ") : "none"}. The loop now selects "${choice}".` },
+        codeLines: [44], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: prefixBeforeIndex, currentChoice: choice,
+        action: { vi: `Nhánh hiện tại: ${choice}`, en: `Current branch: ${choice}` },
+        dfsState: makeDfsState("iterate", callStack, workingWords, i, choices, choice, exploredChoices),
+        vars: [{ name: "ind", value: i }, { name: "syn", value: choice }, { name: "đã duyệt / explored", value: `[${exploredChoices.join(", ")}]` }],
+      });
+
+      workingWords[i] = choice;
+      pushStep({
+        title: { vi: `Gán words[${i}] = "${choice}"`, en: `Assign words[${i}] = "${choice}"` },
+        note: { vi: `Câu đang dựng được cập nhật tại vị trí [${i}]. Chưa thêm vào ans vì vẫn còn vị trí phía sau.`, en: `The working sentence changes at [${i}]. It is not appended yet because later positions remain.` },
+        codeLines: [45], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: workingWords.slice(0, i + 1), currentChoice: choice,
+        action: { vi: `words[${i}] ← ${choice}`, en: `words[${i}] ← ${choice}` },
+        dfsState: makeDfsState("assign", callStack, workingWords, i, choices, choice, exploredChoices),
+        vars: [{ name: `words[${i}]`, value: choice }, { name: "words", value: `[${workingWords.join(", ")}]` }],
+      });
+
+      pushStep({
+        title: { vi: `Gọi dfs(${i + 1})`, en: `Call dfs(${i + 1})` },
+        note: { vi: `Tạm dừng dfs(${i}) tại nhánh "${choice}" và đẩy dfs(${i + 1}) lên call stack.`, en: `Pause dfs(${i}) on branch "${choice}" and push dfs(${i + 1}) onto the call stack.` },
+        codeLines: [46], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: workingWords.slice(0, i + 1), currentChoice: choice,
+        action: { vi: `dfs(${i}) → dfs(${i + 1})`, en: `dfs(${i}) → dfs(${i + 1})` },
+        dfsState: makeDfsState("recurse", callStack, workingWords, i, choices, choice, exploredChoices),
+        vars: [{ name: "current call", value: `dfs(${i})` }, { name: "next call", value: `dfs(${i + 1})` }],
+      });
+
+      generate(i + 1, workingWords, callStack);
+      exploredChoices.push(choice);
+      pushStep({
+        title: { vi: `Backtrack về vị trí ${i}`, en: `Backtrack to position ${i}` },
+        note: { vi: `dfs(${i + 1}) đã return. Nhánh "${choice}" hoàn tất; vòng for tại dfs(${i}) sẽ thử lựa chọn kế tiếp nếu còn.`, en: `dfs(${i + 1}) returned. Branch "${choice}" is complete; the loop in dfs(${i}) will try the next choice if one remains.` },
+        codeLines: [44, 46], phaseIndex: 3, mode: "backtrack", processedPairs: pairs.length,
+        groups: builtGroupSnapshot(), activeWord: i, prefix: workingWords.slice(0, i + 1), currentChoice: choice,
+        action: { vi: `Hoàn tất ${choice} → quay lại for`, en: `Finish ${choice} → resume for loop` },
+        dfsState: makeDfsState("return", callStack, workingWords, i, choices, choice, exploredChoices),
+        vars: [{ name: "active frame", value: `dfs(${i})` }, { name: "đã duyệt / explored", value: `[${exploredChoices.join(", ")}]` }, { name: "len(ans)", value: results.length }],
+      });
     }
   }
 
-  generate(0, []);
+  const workingWords = [...words];
+  generate(0, workingWords, []);
   results.sort();
   pushStep({
     title: { vi: `Trả về ${results.length} câu theo thứ tự từ điển`, en: `Return ${results.length} sentences in lexicographic order` },
@@ -802,6 +944,7 @@ function buildSteps1258(input, params) {
     codeLines: [51], phaseIndex: 3, mode: "result", processedPairs: pairs.length,
     groups: builtGroupSnapshot(), activeWord: -1, prefix: [],
     action: { vi: `return ans · ${results.length} câu`, en: `return ans · ${results.length} sentences` },
+    dfsState: makeDfsState("done", [], workingWords, words.length),
     vars: [{ name: "answer count", value: results.length }, { name: "ans", value: results.join(" | ") }],
     final: true,
   });

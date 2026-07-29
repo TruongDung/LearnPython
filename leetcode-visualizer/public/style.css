@@ -2201,6 +2201,7 @@ button:disabled {
 .synonym-pair-step.done b { color: #34d399; }
 
 .synonym-groups-section,
+.synonym-dfs-section,
 .synonym-sentence-section,
 .synonym-results-section {
   min-width: 0;
@@ -2224,6 +2225,134 @@ button:disabled {
 }
 
 .synonym-section-heading span { text-align: right; }
+
+.synonym-dfs-section {
+  display: grid;
+  gap: 9px;
+}
+
+.synonym-dfs-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(150px, 0.75fr);
+  gap: 8px;
+}
+
+.synonym-dfs-stack-block,
+.synonym-dfs-event,
+.synonym-dfs-working,
+.synonym-dfs-choices {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.synonym-dfs-stack-block > small,
+.synonym-dfs-event > small,
+.synonym-dfs-working > small,
+.synonym-dfs-choices > small {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.synonym-dfs-stack {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.synonym-dfs-stack span {
+  padding: 4px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  color: #cbd5e1;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+}
+
+.synonym-dfs-stack span.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+}
+
+.synonym-dfs-stack span.empty { color: #64748b; }
+.synonym-dfs-stack b { color: #64748b; font-size: 9px; }
+
+.synonym-dfs-event strong {
+  display: block;
+  color: #bae6fd;
+  font-size: 12px;
+}
+
+.synonym-dfs-working > div,
+.synonym-dfs-choices > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.synonym-dfs-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 5px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.synonym-dfs-word small { color: inherit; font-size: 10px; }
+
+.synonym-dfs-word.processed {
+  border-color: rgba(56, 189, 248, 0.42);
+  background: rgba(56, 189, 248, 0.08);
+  color: #bae6fd;
+}
+
+.synonym-dfs-word.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.13);
+  color: #fde68a;
+}
+
+.synonym-dfs-word.changed::after {
+  content: "↺";
+  color: #34d399;
+  font-size: 9px;
+}
+
+.synonym-dfs-choice {
+  padding: 4px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 5px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.synonym-dfs-choice.current {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+}
+
+.synonym-dfs-choice.explored {
+  border-color: rgba(16, 185, 129, 0.48);
+  background: rgba(16, 185, 129, 0.08);
+  color: #a7f3d0;
+}
+
+.synonym-dfs-no-choices {
+  color: #64748b;
+  font-size: 11px;
+}
 
 .synonym-groups {
   display: grid;
@@ -2491,6 +2620,7 @@ button:disabled {
   color: #047857;
 }
 [data-theme="light"] .synonym-groups-section,
+[data-theme="light"] .synonym-dfs-section,
 [data-theme="light"] .synonym-sentence-section,
 [data-theme="light"] .synonym-results-section,
 [data-theme="light"] .synonym-result-item { border-color: #e2e8f0; }
@@ -2519,6 +2649,33 @@ button:disabled {
   border-color: #10b981;
   color: #047857;
 }
+[data-theme="light"] .synonym-dfs-stack-block,
+[data-theme="light"] .synonym-dfs-event,
+[data-theme="light"] .synonym-dfs-working,
+[data-theme="light"] .synonym-dfs-choices {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .synonym-dfs-stack span { color: #475569; border-color: #cbd5e1; }
+[data-theme="light"] .synonym-dfs-stack span.active,
+[data-theme="light"] .synonym-dfs-word.active,
+[data-theme="light"] .synonym-dfs-choice.current {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+[data-theme="light"] .synonym-dfs-event strong { color: #075985; }
+[data-theme="light"] .synonym-dfs-word { color: #64748b; border-color: #cbd5e1; }
+[data-theme="light"] .synonym-dfs-word.processed {
+  background: #f0f9ff;
+  border-color: #38bdf8;
+  color: #075985;
+}
+[data-theme="light"] .synonym-dfs-choice.explored {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
 
 @media (max-width: 640px) {
   .synonym-phases {
@@ -2533,6 +2690,10 @@ button:disabled {
 
   .synonym-sentence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .synonym-dfs-status {
+    grid-template-columns: 1fr;
   }
 
   .synonym-section-heading {
