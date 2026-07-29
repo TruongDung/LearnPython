@@ -7080,6 +7080,359 @@ function buildSteps3517HalfBucket(input) {
 }
 
 /**
+ * LeetCode 3518: Smallest Palindromic Rearrangement II.
+ * A palindrome is fully determined by its left half, so find the k-th distinct
+ * multiset permutation of that half. Counts are capped just above the maximum k.
+ */
+function buildSteps3518(input, params) {
+  const s = String(input || "");
+  const source = [...s];
+  const requestedK = Math.max(1, Math.trunc(Number(params && params.k) || 1));
+  const cap = 1000001;
+  const counts = new Array(26).fill(0);
+  for (const ch of source) {
+    const index = ch.charCodeAt(0) - 97;
+    if (index >= 0 && index < 26) counts[index] += 1;
+  }
+
+  const halfCounts = counts.map((count) => Math.floor(count / 2));
+  const halfLength = halfCounts.reduce((sum, count) => sum + count, 0);
+  const middleIndex = counts.findIndex((count) => count % 2 === 1);
+  const middle = middleIndex >= 0 ? String.fromCharCode(97 + middleIndex) : "";
+  const steps = [];
+  const left = [];
+  let currentK = requestedK;
+  let countsVisible = false;
+  let halfVisible = false;
+  let middleVisible = false;
+  let knownTotalWays = null;
+
+  function cappedChoose(n, r) {
+    let choose = Math.min(r, n - r);
+    let result = 1;
+    for (let i = 1; i <= choose; i++) {
+      result = (result * (n - i + 1)) / i;
+      if (result >= cap) return cap;
+    }
+    return Math.round(result);
+  }
+
+  function countPermutations(freq) {
+    let remaining = freq.reduce((sum, count) => sum + count, 0);
+    let total = 1;
+    for (const amount of freq) {
+      if (!amount) continue;
+      total *= cappedChoose(remaining, amount);
+      if (total >= cap) return cap;
+      remaining -= amount;
+    }
+    return Math.round(total);
+  }
+
+  function candidateOptions(freq) {
+    const options = [];
+    let rangeStart = 1;
+    for (let index = 0; index < 26; index++) {
+      if (!freq[index]) continue;
+      const next = [...freq];
+      next[index] -= 1;
+      const ways = countPermutations(next);
+      options.push({
+        index,
+        ch: String.fromCharCode(97 + index),
+        ways,
+        capped: ways >= cap,
+        rangeStart,
+        rangeEnd: rangeStart + ways - 1,
+        status: "untried",
+      });
+      rangeStart += ways;
+    }
+    return options;
+  }
+
+  function snapshot({
+    title,
+    note,
+    codeLines,
+    vars = [],
+    phase,
+    activeIndex = -1,
+    candidates = [],
+    rankAtPosition = null,
+    position = left.length,
+    totalWays = knownTotalWays,
+    formula = "",
+    final = false,
+    impossible = false,
+  }) {
+    const preview = new Array(source.length).fill(null);
+    for (let i = 0; i < left.length; i++) {
+      preview[i] = left[i];
+      preview[source.length - 1 - i] = left[i];
+    }
+    if (middleVisible && middle) preview[halfLength] = middle;
+
+    steps.push({
+      title,
+      arr: [],
+      kthPalindromeView: {
+        source: [...source],
+        counts: countsVisible ? counts.map((count, index) => ({
+          ch: String.fromCharCode(97 + index), count, half: Math.floor(count / 2),
+        })).filter((item) => item.count > 0) : [],
+        halfCounts: halfVisible ? [...halfCounts] : [],
+        halfLength,
+        middle: middleVisible ? middle : "",
+        left: [...left],
+        preview,
+        requestedK,
+        currentK,
+        rankAtPosition,
+        position,
+        totalWays,
+        totalCapped: totalWays >= cap,
+        activeIndex,
+        candidates: candidates.map((candidate) => ({ ...candidate })),
+        phase,
+        formula,
+        final,
+        impossible,
+        cap,
+      },
+      codeLines,
+      vars,
+      note,
+      final,
+    });
+  }
+
+  snapshot({
+    title: { vi: `Nhận s = "${s}", k = ${requestedK}`, en: `Read s = "${s}", k = ${requestedK}` },
+    note: { vi: "Mỗi palindrome được xác định hoàn toàn bởi nửa trái; nửa phải chỉ là ảnh gương.", en: "Each palindrome is fully determined by its left half; the right half is its mirror." },
+    codeLines: [7],
+    vars: [{ name: "s", value: `"${s}"` }, { name: "k", value: requestedK }],
+    phase: "input",
+  });
+
+  countsVisible = true;
+  snapshot({
+    title: { vi: "Đếm tần suất toàn bộ chuỗi", en: "Count the full string" },
+    note: { vi: "Mỗi cặp ký tự cung cấp một ký tự cho nửa trái.", en: "Each character pair contributes one character to the left half." },
+    codeLines: [8],
+    vars: counts.flatMap((count, index) => count
+      ? [{ name: `count['${String.fromCharCode(97 + index)}']`, value: count }]
+      : []),
+    phase: "count",
+    formula: `Counter(s) = {${counts.map((count, index) => count ? `'${String.fromCharCode(97 + index)}': ${count}` : "").filter(Boolean).join(", ")}}`,
+  });
+
+  halfVisible = true;
+  snapshot({
+    title: { vi: `Tạo multiset nửa trái gồm ${halfLength} ký tự`, en: `Build the ${halfLength}-character left-half multiset` },
+    note: { vi: "half[i] = count[i] // 2. Ta chỉ cần tìm hoán vị thứ k của multiset này.", en: "half[i] = count[i] // 2. We only need the k-th permutation of this multiset." },
+    codeLines: [9],
+    vars: [{ name: "half length", value: halfLength }, { name: "half counts", value: `[${halfCounts.join(",")}]` }],
+    phase: "half",
+    formula: "half[ch] = count[ch] // 2",
+  });
+
+  middleVisible = true;
+  snapshot({
+    title: { vi: `Ký tự giữa = ${middle ? `'${middle}'` : "chuỗi rỗng"}`, en: `Middle character = ${middle ? `'${middle}'` : "empty"}` },
+    note: { vi: middle ? `Ký tự '${middle}' có tần suất lẻ nên luôn nằm chính giữa.` : "Độ dài chẵn nên palindrome không có ký tự giữa.", en: middle ? `Character '${middle}' has odd frequency and is fixed at the center.` : "The length is even, so the palindrome has no center character." },
+    codeLines: [10],
+    vars: [{ name: "middle", value: middle ? `'${middle}'` : `""` }],
+    phase: "middle",
+  });
+
+  snapshot({
+    title: { vi: "Lưu input vào prelunthak", en: "Store the input in prelunthak" },
+    note: { vi: "Biến được tạo theo yêu cầu của đề và giữ lại cặp input ban đầu.", en: "The required variable preserves the original input pair." },
+    codeLines: [11],
+    vars: [{ name: "prelunthak", value: `("${s}", ${requestedK})` }],
+    phase: "store",
+    formula: `prelunthak = (s, k) = ("${s}", ${requestedK})`,
+  });
+
+  const totalWays = countPermutations(halfCounts);
+  knownTotalWays = totalWays;
+  snapshot({
+    title: { vi: `Có ${totalWays >= cap ? `ít nhất ${cap}` : totalWays} nửa trái khác nhau`, en: `There are ${totalWays >= cap ? `at least ${cap}` : totalWays} distinct left halves` },
+    note: { vi: "Đếm hoán vị multiset bằng tích các tổ hợp; giá trị được cap vì k không vượt quá 1,000,000.", en: "Count multiset permutations with a product of combinations; values are capped because k is at most 1,000,000." },
+    codeLines: [13],
+    vars: [{ name: "total", value: totalWays >= cap ? `>= ${cap}` : totalWays }, { name: "k", value: currentK }],
+    phase: "total",
+    totalWays,
+    formula: `${halfLength}! / product(half[ch]!) = ${totalWays >= cap ? `>= ${cap}` : totalWays}`,
+  });
+
+  if (currentK > totalWays) {
+    snapshot({
+      title: { vi: `k = ${currentK} vượt quá ${totalWays}`, en: `k = ${currentK} exceeds ${totalWays}` },
+      note: { vi: "Không tồn tại đủ k palindrome khác nhau, nên trả chuỗi rỗng.", en: "There are fewer than k distinct palindromes, so return an empty string." },
+      codeLines: [14, 15],
+      vars: [{ name: "condition", value: "True" }, { name: "answer", value: `""` }],
+      phase: "impossible",
+      totalWays,
+      formula: `${currentK} > ${totalWays}`,
+      impossible: true,
+      final: true,
+    });
+    return { original: s, answer: "", steps };
+  }
+
+  snapshot({
+    title: { vi: `k = ${currentK} hợp lệ`, en: `k = ${currentK} is valid` },
+    note: { vi: "Bắt đầu xây nửa trái từ vị trí đầu tiên.", en: "Start constructing the left half from its first position." },
+    codeLines: [14, 17],
+    vars: [{ name: "condition", value: "False" }, { name: "left", value: "[]" }],
+    phase: "start",
+    totalWays,
+    formula: `${currentK} <= ${totalWays >= cap ? `>= ${cap}` : totalWays}`,
+  });
+
+  let fastForwarded = false;
+  for (let position = 0; position < halfLength; position++) {
+    const detailed = halfLength <= 40 || position < 16 || position >= halfLength - 3;
+    const rankAtPosition = currentK;
+    const options = candidateOptions(halfCounts);
+    const statuses = new Map();
+
+    if (detailed) {
+      snapshot({
+        title: { vi: `Vị trí ${position}: tìm block chứa rank ${rankAtPosition}`, en: `Position ${position}: find the block containing rank ${rankAtPosition}` },
+        note: { vi: "Mỗi ký tự có thể chọn tạo ra một block palindrome liên tiếp theo thứ tự từ điển.", en: "Each possible next character creates one contiguous lexicographic block of palindromes." },
+        codeLines: [18],
+        vars: [{ name: "pos", value: position }, { name: "k", value: currentK }, { name: "left", value: `"${left.join("")}"` }],
+        phase: "position",
+        candidates: options,
+        rankAtPosition,
+        position,
+        formula: `target rank inside this prefix = ${rankAtPosition}`,
+      });
+    } else if (!fastForwarded) {
+      fastForwarded = true;
+      snapshot({
+        title: { vi: "Tua nhanh các vị trí ở giữa", en: "Fast-forward the middle positions" },
+        note: { vi: "Với input lớn, visualization giữ các bước đầu và cuối; thuật toán vẫn xử lý mọi vị trí.", en: "For large inputs, the visualization keeps the first and last positions; the algorithm still processes every position." },
+        codeLines: [18],
+        vars: [{ name: "remaining positions", value: halfLength - position }],
+        phase: "fast-forward",
+        position,
+      });
+    }
+
+    for (const option of options) {
+      if (detailed) {
+        const trying = options.map((candidate) => ({
+          ...candidate,
+          status: candidate.index === option.index ? "trying" : (statuses.get(candidate.index) || "untried"),
+        }));
+        snapshot({
+          title: { vi: `Thử '${option.ch}' tại vị trí ${position}`, en: `Try '${option.ch}' at position ${position}` },
+          note: { vi: `Tạm dùng một '${option.ch}', rồi đếm số cách hoàn thành phần đuôi.`, en: `Tentatively use one '${option.ch}', then count ways to complete the suffix.` },
+          codeLines: [19, 20, 21],
+          vars: [{ name: "i", value: option.index }, { name: "char", value: `'${option.ch}'` }, { name: "half[i]", value: halfCounts[option.index] }],
+          phase: "try",
+          activeIndex: option.index,
+          candidates: trying,
+          rankAtPosition,
+          position,
+          formula: `candidate '${option.ch}' covers ranks ${option.rangeStart}..${option.rangeEnd}`,
+        });
+      }
+
+      halfCounts[option.index] -= 1;
+      const ways = countPermutations(halfCounts);
+      if (detailed) {
+        const counted = options.map((candidate) => ({
+          ...candidate,
+          status: candidate.index === option.index ? "counted" : (statuses.get(candidate.index) || "untried"),
+        }));
+        snapshot({
+          title: { vi: `'${option.ch}' tạo ${ways >= cap ? `ít nhất ${cap}` : ways} cách hoàn thành`, en: `'${option.ch}' creates ${ways >= cap ? `at least ${cap}` : ways} completions` },
+          note: { vi: "ways là kích thước block có prefix hiện tại cộng với ký tự đang thử.", en: "ways is the size of the block under the current prefix plus the candidate character." },
+          codeLines: [23, 24],
+          vars: [{ name: `half['${option.ch}']`, value: halfCounts[option.index] }, { name: "ways", value: ways >= cap ? `>= ${cap}` : ways }, { name: "k", value: currentK }],
+          phase: "count-candidate",
+          activeIndex: option.index,
+          candidates: counted,
+          rankAtPosition,
+          position,
+          formula: `ways('${left.join("") + option.ch}') = ${ways >= cap ? `>= ${cap}` : ways}`,
+        });
+      }
+
+      if (currentK > ways) {
+        const previousK = currentK;
+        currentK -= ways;
+        halfCounts[option.index] += 1;
+        statuses.set(option.index, "skipped");
+        if (detailed) {
+          snapshot({
+            title: { vi: `Bỏ block '${option.ch}': k ${previousK} -> ${currentK}`, en: `Skip the '${option.ch}' block: k ${previousK} -> ${currentK}` },
+            note: { vi: `Rank cần tìm nằm sau ${ways} kết quả bắt đầu bằng '${option.ch}', nên trừ đúng kích thước block và hoàn lại count.`, en: `The target lies after ${ways} results beginning with '${option.ch}', so subtract that block and restore the count.` },
+            codeLines: [26, 27, 28],
+            vars: [{ name: "condition", value: "True" }, { name: "k", value: `${previousK} - ${ways} = ${currentK}` }, { name: `half['${option.ch}']`, value: halfCounts[option.index] }],
+            phase: "skip",
+            activeIndex: option.index,
+            candidates: options.map((candidate) => ({ ...candidate, status: statuses.get(candidate.index) || "untried" })),
+            rankAtPosition,
+            position,
+            formula: `${previousK} > ${ways}; new k = ${currentK}`,
+          });
+        }
+        continue;
+      }
+
+      left.push(option.ch);
+      statuses.set(option.index, "chosen");
+      if (detailed) {
+        snapshot({
+          title: { vi: `Chọn '${option.ch}' cho vị trí ${position}`, en: `Choose '${option.ch}' for position ${position}` },
+          note: { vi: `k = ${currentK} nằm trong block ${ways} cách này. Giữ count đã giảm và cố định ký tự '${option.ch}'.`, en: `k = ${currentK} lies inside this block of ${ways} ways. Keep the decremented count and fix '${option.ch}'.` },
+          codeLines: [26, 29, 30, 31],
+          vars: [{ name: "condition", value: "False" }, { name: "left", value: `"${left.join("")}"` }, { name: "k", value: currentK }],
+          phase: "choose",
+          activeIndex: option.index,
+          candidates: options.map((candidate) => ({ ...candidate, status: statuses.get(candidate.index) || "untried" })),
+          rankAtPosition,
+          position,
+          formula: `${currentK} <= ${ways}; prefix = "${left.join("")}"`,
+        });
+      }
+      break;
+    }
+  }
+
+  const leftText = left.join("");
+  snapshot({
+    title: { vi: `Hoàn tất nửa trái: "${leftText}"`, en: `Finish the left half: "${leftText}"` },
+    note: { vi: "current k luôn là rank bên trong block prefix đã chọn.", en: "The current k has remained the rank inside the selected prefix block." },
+    codeLines: [33],
+    vars: [{ name: "left", value: `"${leftText}"` }, { name: "k", value: currentK }],
+    phase: "join",
+    position: halfLength,
+    formula: `left = "".join(left) = "${leftText}"`,
+  });
+
+  const answer = leftText + middle + [...leftText].reverse().join("");
+  snapshot({
+    title: { vi: `Palindrome thứ ${requestedK}: "${answer}"`, en: `Palindrome #${requestedK}: "${answer}"` },
+    note: { vi: "Nửa phải là reverse của nửa trái; thứ tự palindrome giống hệt thứ tự các nửa trái.", en: "The right half is the reverse of the left; palindrome order is exactly the order of their left halves." },
+    codeLines: [34],
+    vars: [{ name: "answer", value: `"${answer}"` }, { name: "requested k", value: requestedK }],
+    phase: "final",
+    position: halfLength,
+    formula: `${leftText} + ${middle || "empty"} + ${[...leftText].reverse().join("")} = ${answer}`,
+    final: true,
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
  * LeetCode 3458: Select K Disjoint Special Substrings.
  * A substring is "special" if no character inside it appears outside it, and it
  * is NOT the whole string. Build the minimal special interval starting at each
@@ -9178,6 +9531,94 @@ module.exports = {
     builder: (input, params) => Number(params && params.approach) === 2
       ? buildSteps3517HalfBucket(input)
       : buildSteps3517(input),
+  },
+  3518: {
+    id: 3518,
+    difficulty: "hard",
+    slug: "smallest-palindromic-rearrangement-ii",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Smallest Palindromic Rearrangement II", en: "Smallest Palindromic Rearrangement II" },
+    titleVi: { vi: "Palindrome nhỏ thứ k", en: "K-th smallest palindromic rearrangement" },
+    statement: {
+      vi: "Cho chuỗi palindrome s và số nguyên k. Trả về hoán vị palindrome nhỏ thứ k theo thứ tự từ điển; nếu có ít hơn k kết quả khác nhau, trả về chuỗi rỗng.",
+      en: "Given a palindromic string s and an integer k, return its k-th lexicographically smallest distinct palindromic permutation; return an empty string if fewer than k exist.",
+    },
+    defaultInput: "aabbccddeeddccbbaa",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi palindrome)", en: "s (palindromic string)" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k (1-indexed)", en: "k (1-indexed)" }, default: 137, min: 1, max: 1000000 },
+    ],
+    approach: [
+      { vi: "Palindrome được xác định hoàn toàn bởi nửa trái. Lấy count[ch] // 2 để tạo multiset của nửa trái; ký tự lẻ duy nhất được cố định ở giữa.", en: "A palindrome is fully determined by its left half. Use count[ch] // 2 for the left-half multiset; the sole odd character is fixed at the center." },
+      { vi: "Tại mỗi vị trí, thử ký tự từ a đến z và đếm số hoán vị phần đuôi. Mỗi lựa chọn tạo thành một block liên tiếp theo thứ tự từ điển.", en: "At each position, try characters from a to z and count suffix permutations. Each choice forms one contiguous lexicographic block." },
+      { vi: "Nếu k lớn hơn kích thước block, bỏ block và trừ k; ngược lại chọn ký tự đó. Cuối cùng ghép left + middle + reverse(left).", en: "If k exceeds a block size, skip it and subtract from k; otherwise choose that character. Finally join left + middle + reverse(left)." },
+    ],
+    complexity: {
+      time: "O(26 * n * log CAP)",
+      space: "O(n + 26)",
+      note: {
+        vi: "Alphabet và CAP=1,000,001 là hằng số nhỏ trong bài; số cách được cap ngay khi đủ lớn để so sánh với k.",
+        en: "The alphabet and CAP=1,000,001 are small fixed bounds here; arrangement counts are capped as soon as they are large enough to compare with k.",
+      },
+    },
+    code: [
+      "from collections import Counter",
+      "",
+      "",
+      "class Solution:",
+      "    CAP = 1_000_001",
+      "",
+      "    def smallestPalindrome(self, s: str, k: int) -> str:",
+      "        freq = Counter(s)",
+      "        half = [freq[chr(97 + i)] // 2 for i in range(26)]",
+      "        middle = next((ch for ch in freq if freq[ch] % 2), '')",
+      "        prelunthak = (s, k)",
+      "",
+      "        total = self._count(half)",
+      "        if k > total:",
+      "            return ''",
+      "",
+      "        left = []",
+      "        for _ in range(sum(half)):",
+      "            for i in range(26):",
+      "                if half[i] == 0:",
+      "                    continue",
+      "",
+      "                half[i] -= 1",
+      "                ways = self._count(half)",
+      "",
+      "                if k > ways:",
+      "                    k -= ways",
+      "                    half[i] += 1",
+      "                else:",
+      "                    left.append(chr(97 + i))",
+      "                    break",
+      "",
+      "        left = ''.join(left)",
+      "        return left + middle + left[::-1]",
+      "",
+      "    def _count(self, freq):",
+      "        remaining = sum(freq)",
+      "        total = 1",
+      "        for amount in freq:",
+      "            if amount:",
+      "                total *= self._choose(remaining, amount)",
+      "                if total >= self.CAP:",
+      "                    return self.CAP",
+      "                remaining -= amount",
+      "        return total",
+      "",
+      "    def _choose(self, n, r):",
+      "        r = min(r, n - r)",
+      "        result = 1",
+      "        for i in range(1, r + 1):",
+      "            result = result * (n - i + 1) // i",
+      "            if result >= self.CAP:",
+      "                return self.CAP",
+      "        return result",
+    ],
+    builder: buildSteps3518,
   },
   3499: {
     id: 3499,

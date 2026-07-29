@@ -3139,6 +3139,106 @@ function renderGcdPairsView(step) {
   </div>`;
 }
 
+// ---- K-th palindromic rearrangement visualization (LeetCode 3518) ----
+function renderKthPalindromeView(step) {
+  const view = step.kthPalindromeView || {};
+  const source = Array.isArray(view.source) ? view.source : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const halfCounts = Array.isArray(view.halfCounts) ? view.halfCounts : [];
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const preview = Array.isArray(view.preview) ? view.preview : [];
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const position = Number.isInteger(view.position) ? view.position : -1;
+  const halfLength = Number.isInteger(view.halfLength) ? view.halfLength : Math.floor(source.length / 2);
+  const vi = lang === "vi";
+  const showsActivePosition = ["position", "try", "count-candidate", "skip", "choose"].includes(view.phase);
+
+  const formatNumber = (value, capped = false) => {
+    if (value === null || value === undefined) return "-";
+    const formatted = Number(value).toLocaleString("en-US");
+    return capped ? `${formatted}+` : formatted;
+  };
+
+  const visibleIndexes = (length, limit = 24) => {
+    if (length <= limit) return Array.from({ length }, (_, index) => index);
+    const side = Math.floor(limit / 2);
+    return [
+      ...Array.from({ length: side }, (_, index) => index),
+      -1,
+      ...Array.from({ length: side }, (_, index) => length - side + index),
+    ];
+  };
+
+  const sourceHtml = visibleIndexes(source.length).map((index) => index < 0
+    ? '<span class="kp-ellipsis">...</span>'
+    : `<div class="kp-char"><span>[${index}]</span><strong>${escapeHtml(source[index])}</strong></div>`).join("");
+
+  const countsHtml = counts.map((item) => {
+    const index = item.ch.charCodeAt(0) - 97;
+    const remaining = halfCounts.length ? halfCounts[index] : item.half;
+    return `<div class="kp-count${index === activeIndex ? " active" : ""}${remaining === 0 ? " empty" : ""}">
+      <strong>${escapeHtml(item.ch)}</strong>
+      <span>${vi ? "toàn bộ" : "full"} ${item.count}</span>
+      <small>${vi ? "còn lại" : "left"} ${remaining}</small>
+    </div>`;
+  }).join("");
+
+  const statusLabel = {
+    untried: vi ? "CHƯA THỬ" : "UNTRIED",
+    trying: vi ? "ĐANG THỬ" : "TRY",
+    counted: vi ? "ĐÃ ĐẾM" : "COUNTED",
+    skipped: vi ? "BỎ BLOCK" : "SKIP BLOCK",
+    chosen: vi ? "CHỌN" : "CHOOSE",
+  };
+  const candidatesHtml = candidates.map((candidate) => {
+    const containsTarget = Number.isFinite(view.rankAtPosition)
+      && view.rankAtPosition >= candidate.rangeStart
+      && view.rankAtPosition <= candidate.rangeEnd;
+    const rangeEnd = candidate.capped ? `${formatNumber(candidate.rangeEnd)}+` : formatNumber(candidate.rangeEnd);
+    return `<div class="kp-candidate ${candidate.status || "untried"}${containsTarget ? " contains-target" : ""}">
+      <div class="kp-candidate-head"><strong>${escapeHtml(candidate.ch)}</strong><span>${statusLabel[candidate.status] || statusLabel.untried}</span></div>
+      <div><small>${vi ? "số cách" : "ways"}</small><b>${formatNumber(candidate.ways, candidate.capped)}</b></div>
+      <div><small>rank</small><b>${formatNumber(candidate.rangeStart)}-${rangeEnd}</b></div>
+    </div>`;
+  }).join("");
+
+  const previewHtml = visibleIndexes(preview.length).map((index) => {
+    if (index < 0) return '<span class="kp-ellipsis">...</span>';
+    const center = source.length % 2 === 1 && index === halfLength;
+    const side = center ? "center" : index < halfLength ? "left" : "right";
+    const active = showsActivePosition && (index === position || index === source.length - 1 - position);
+    const value = preview[index];
+    return `<div class="kp-result-cell ${side}${value != null ? " filled" : ""}${active ? " active" : ""}${view.final ? " final" : ""}">
+      <span>[${index}]</span><strong>${escapeHtml(value == null ? "·" : String(value))}</strong>
+    </div>`;
+  }).join("");
+
+  const emptyText = vi ? "rỗng" : "empty";
+  const leftText = Array.isArray(view.left) && view.left.length ? view.left.join("") : emptyText;
+  const middleText = view.middle || emptyText;
+  const totalText = view.totalWays == null ? "-" : formatNumber(view.totalWays, view.totalCapped);
+  const formula = view.formula ? `<div class="kp-formula">${escapeHtml(view.formula)}</div>` : "";
+  const summary = vi
+    ? `Đang tìm palindrome thứ ${view.requestedK}; prefix hiện tại là ${leftText}, k cục bộ là ${view.currentK}.`
+    : `Finding palindrome ${view.requestedK}; the current prefix is ${leftText} and local k is ${view.currentK}.`;
+
+  $("treeView").innerHTML = `<div class="kth-palindrome-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="kp-row"><span class="kp-label">input s</span><div class="kp-chars">${sourceHtml}</div></div>
+    <div class="kp-rank-strip">
+      <span>${vi ? "k yêu cầu" : "requested k"}<strong>${formatNumber(view.requestedK)}</strong></span>
+      <span>${vi ? "k cục bộ" : "local k"}<strong>${formatNumber(view.currentK)}</strong></span>
+      <span>${vi ? "tổng cách" : "total ways"}<strong>${totalText}</strong></span>
+      <span>prefix<strong>${escapeHtml(leftText)}</strong></span>
+      <span>middle<strong>${escapeHtml(middleText)}</strong></span>
+    </div>
+    ${counts.length ? `<div class="kp-row"><span class="kp-label">half count</span><div class="kp-counts">${countsHtml}</div></div>` : ""}
+    ${candidates.length ? `<div class="kp-candidate-section"><div class="kp-candidate-title"><span>${vi ? `Lựa chọn cho vị trí ${position}` : `Choices for position ${position}`}</span><b>${vi ? `rank mục tiêu ${formatNumber(view.rankAtPosition)}` : `target rank ${formatNumber(view.rankAtPosition)}`}</b></div><div class="kp-candidates">${candidatesHtml}</div></div>` : ""}
+    ${formula}
+    <div class="kp-half-guide"><span>${vi ? "NỬA TRÁI = QUYẾT ĐỊNH THỨ TỰ" : "LEFT HALF = LEXICOGRAPHIC ORDER"}</span><span>${source.length % 2 ? "CENTER" : ""}</span><span>${vi ? "NỬA PHẢI = ĐẢO NGƯỢC" : "RIGHT HALF = REVERSE"}</span></div>
+    <div class="kp-row"><span class="kp-label">${view.final ? (vi ? "kết quả" : "result") : "palindrome"}</span><div class="kp-result">${previewHtml}</div></div>
+  </div>`;
+}
+
 // ---- Smallest palindromic rearrangement visualization (LeetCode 3517) ----
 function renderPalindromeBuildView(step) {
   const view = step.palindromeBuildView || {};
@@ -4009,6 +4109,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.kthPalindromeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderKthPalindromeView(step);
   } else if (step.palindromeBuildView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
