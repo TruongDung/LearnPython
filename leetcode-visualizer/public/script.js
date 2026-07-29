@@ -5151,14 +5151,16 @@ function renderLoudRichView(step) {
   const layers = Array.from({ length: maxRank + 1 }, () => []);
   rankMemo.forEach((rank, node) => layers[rank].push(node));
   const maxLayerSize = Math.max(1, ...layers.map((layer) => layer.length));
+  const nodeRadius = 38;
+  const layerGap = 108;
   const graphWidth = Math.max(440, 90 + maxLayerSize * 92);
-  const graphHeight = 92 + maxRank * 90;
+  const graphHeight = 100 + maxRank * layerGap;
   const positions = new Map();
   layers.forEach((layer, rank) => {
     layer.forEach((node, index) => {
       positions.set(node, {
         x: ((index + 1) * graphWidth) / (layer.length + 1),
-        y: 45 + rank * 90,
+        y: 48 + rank * layerGap,
       });
     });
   });
@@ -5176,8 +5178,8 @@ function renderLoudRichView(step) {
     const distance = Math.hypot(dx, dy) || 1;
     const unitX = dx / distance;
     const unitY = dy / distance;
-    const startPadding = 33;
-    const endPadding = isActive ? 38 : 36;
+    const startPadding = nodeRadius + 2;
+    const endPadding = nodeRadius + (isActive ? 7 : 5);
     const x1 = from.x + unitX * startPadding;
     const y1 = from.y + unitY * startPadding;
     const x2 = to.x - unitX * endPadding;
@@ -5198,10 +5200,10 @@ function renderLoudRichView(step) {
     const memo = view.answer[person];
     const memoText = memo === -1 ? "ans —" : `ans P${memo} · q${view.quiet[memo]}`;
     return `<g class="${classes.join(" ")}" aria-label="person ${person}, quiet ${view.quiet[person]}, ${memoText}">
-      <circle cx="${point.x}" cy="${point.y}" r="31"></circle>
-      <text class="quiet" x="${point.x}" y="${point.y - 13}">quiet ${view.quiet[person]}</text>
-      <text class="person" x="${point.x}" y="${point.y + 6}">P${person}</text>
-      <text class="memo" x="${point.x}" y="${point.y + 22}">${memoText}</text>
+      <circle cx="${point.x}" cy="${point.y}" r="${nodeRadius}"></circle>
+      <text class="quiet" x="${point.x}" y="${point.y - 17}">quiet ${view.quiet[person]}</text>
+      <text class="person" x="${point.x}" y="${point.y + 7}">P${person}</text>
+      <text class="memo" x="${point.x}" y="${point.y + 26}">${memoText}</text>
     </g>`;
   }).join("");
   const graphSummary = vi

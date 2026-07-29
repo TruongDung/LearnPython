@@ -9237,7 +9237,7 @@ select option {
 .loud-rich-svg {
   display: block;
   width: 100%;
-  max-height: 350px;
+  max-height: 390px;
   overflow: visible;
 }
 
@@ -9315,19 +9315,19 @@ select option {
 
 .loud-rich-node text.quiet {
   fill: #94a3b8;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .loud-rich-node text.person {
   fill: #f8fafc;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 850;
 }
 
 .loud-rich-node text.memo {
   fill: #cbd5e1;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -9668,7 +9668,7 @@ select option {
   .loud-rich-phases span { white-space: normal; }
   .loud-rich-relations,
   .loud-rich-main { grid-template-columns: 1fr; }
-  .loud-rich-svg { max-height: 320px; }
+  .loud-rich-svg { max-height: 380px; }
 }
 
 .kruskal-effort-viz {
