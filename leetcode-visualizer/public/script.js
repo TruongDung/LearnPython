@@ -1629,6 +1629,115 @@ function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
+function distanceKGuideHtml(view) {
+  const vi = lang === "vi";
+  const phaseOrder = { parent: 0, bfs: 1, collect: 2, done: 3 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phases = [
+    { vi: "Nối node với cha", en: "Build parent links" },
+    { vi: "BFS từ target", en: "BFS from target" },
+    { vi: `Lấy lớp d = ${view.k}`, en: `Collect layer d = ${view.k}` },
+  ];
+  const phaseHtml = phases.map((item, index) => {
+    const state = activePhase > index ? "is-done" : activePhase === index ? "is-active" : "";
+    const marker = activePhase > index ? "✓" : String(index + 1);
+    return `<div class="distance-k-phase ${state}"><span>${marker}</span>${escapeHtml(vi ? item.vi : item.en)}</div>`;
+  }).join("");
+
+  const relationNames = {
+    left: vi ? "con trái" : "left child",
+    right: vi ? "con phải" : "right child",
+    parent: vi ? "cha" : "parent",
+  };
+  let actionText;
+  if (view.phase === "parent") {
+    actionText = vi
+      ? `Đang tạo đường đi ngược con → cha. Đã ghi ${view.parentCount} liên kết.`
+      : `Building reverse child → parent links. ${view.parentCount} links recorded.`;
+  } else if (view.phase === "done") {
+    actionText = vi
+      ? `Hoàn tất: các node ở đúng lớp d=${view.k} là [${view.result.join(", ")}].`
+      : `Done: nodes on layer d=${view.k} are [${view.result.join(", ")}].`;
+  } else if (view.inspecting) {
+    const relation = relationNames[view.inspecting.relation] || view.inspecting.relation;
+    if (view.inspecting.reason === "none") {
+      actionText = vi
+        ? `Từ node ${view.current.value}, hướng ${relation} là None → bỏ qua.`
+        : `From node ${view.current.value}, ${relation} is None → skip.`;
+    } else if (view.inspecting.eligible) {
+      actionText = vi
+        ? `${view.current.value} → ${relation} ${view.inspecting.value}: chưa visited → đưa vào queue với d=${view.current.distance + 1}.`
+        : `${view.current.value} → ${relation} ${view.inspecting.value}: not visited → enqueue with d=${view.current.distance + 1}.`;
+    } else {
+      actionText = vi
+        ? `${view.current.value} → ${relation} ${view.inspecting.value}: đã có trong visited → bỏ qua để tránh quay vòng.`
+        : `${view.current.value} → ${relation} ${view.inspecting.value}: already in visited → skip to prevent a cycle.`;
+    }
+  } else if (view.current) {
+    actionText = view.current.distance === view.k
+      ? (vi
+          ? `Node ${view.current.value} có d=${view.current.distance}=k → thêm vào result và không mở rộng xa hơn.`
+          : `Node ${view.current.value} has d=${view.current.distance}=k → add it to result and do not expand farther.`)
+      : (vi
+          ? `Đang xử lý node ${view.current.value} tại d=${view.current.distance}; kiểm tra lần lượt left, right, parent.`
+          : `Processing node ${view.current.value} at d=${view.current.distance}; inspect left, right, then parent.`);
+  } else {
+    actionText = vi
+      ? `Target ${view.target} bắt đầu ở d=0. Queue luôn lấy node có khoảng cách nhỏ nhất trước.`
+      : `Target ${view.target} starts at d=0. The queue always processes the smallest distance first.`;
+  }
+
+  const layerMap = new Map((view.layers || []).map((layer) => [Number(layer.distance), layer.nodes || []]));
+  if (!layerMap.has(Number(view.k))) layerMap.set(Number(view.k), []);
+  const layerHtml = [...layerMap.entries()].sort(([a], [b]) => a - b).map(([distance, nodes]) => {
+    const isGoal = distance === Number(view.k);
+    const nodesHtml = nodes.length
+      ? nodes.map((node) => {
+          const stateClass = node.isAnswer
+            ? "is-answer"
+            : node.isCurrent
+              ? "is-current"
+              : node.isQueued
+                ? "is-queued"
+                : node.isTarget
+                  ? "is-target"
+                  : "is-visited";
+          const stateLabel = node.isAnswer
+            ? (vi ? "đáp án" : "answer")
+            : node.isCurrent
+              ? (vi ? "đang xử lý" : "current")
+              : node.isQueued
+                ? "queue"
+                : node.isTarget
+                  ? "target"
+                  : "visited";
+          return `<span class="distance-k-node ${stateClass}"><b>${escapeHtml(node.value)}</b><small>${stateLabel}</small></span>`;
+        }).join("")
+      : `<span class="distance-k-empty">${vi ? "chưa tới lớp này" : "layer not reached yet"}</span>`;
+    return `<div class="distance-k-layer${isGoal ? " is-goal" : ""}">
+      <div class="distance-k-layer-label"><strong>d=${distance}</strong>${isGoal ? `<small>${vi ? "CẦN LẤY" : "COLLECT"}</small>` : ""}</div>
+      <div class="distance-k-layer-nodes">${nodesHtml}</div>
+    </div>`;
+  }).join("");
+
+  const summary = vi
+    ? `Mô phỏng BFS từ target ${view.target}; lớp khoảng cách cần tìm là ${view.k}.`
+    : `BFS simulation from target ${view.target}; requested distance layer is ${view.k}.`;
+  return `<section class="distance-k-guide" aria-label="${escapeHtml(summary)}">
+    <div class="distance-k-phases">${phaseHtml}</div>
+    <div class="distance-k-rule"><strong>${vi ? "Quy tắc:" : "Rule:"}</strong> ${vi ? "mỗi cạnh đi qua làm distance tăng 1; visited ngăn quay lại node cũ." : "each traversed edge adds 1 to distance; visited prevents returning to an old node."}</div>
+    <div class="distance-k-action">${escapeHtml(actionText)}</div>
+    <div class="distance-k-layers">${layerHtml}</div>
+    <div class="distance-k-legend">
+      <span><i class="target"></i>target</span>
+      <span><i class="current"></i>${vi ? "đang xử lý" : "current"}</span>
+      <span><i class="queued"></i>queue</span>
+      <span><i class="visited"></i>visited</span>
+      <span><i class="answer"></i>${vi ? "đáp án" : "answer"}</span>
+    </div>
+  </section>`;
+}
+
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -1783,7 +1892,8 @@ function renderTree(step, targetId = "treeView") {
         ${step.tree.truncated ? `<small>${lang === "vi" ? "Hiển thị 140 node đầu" : "Showing first 140 nodes"}</small>` : ""}
       </div>`
     : "";
-  $(targetId).innerHTML = decisionHeader + (step.queueView
+  const distanceKGuide = step.distanceKView ? distanceKGuideHtml(step.distanceKView) : "";
+  $(targetId).innerHTML = decisionHeader + distanceKGuide + (step.queueView
     ? `<div class="tree-queue-layout${step.queueView.layout === "stacked" ? " tree-queue-stacked" : ""}">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>

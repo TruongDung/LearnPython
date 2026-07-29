@@ -1873,19 +1873,96 @@ function buildSteps863(input, params) {
   const target = findNode(root, targetValue);
   const parent = new Map();
   const parentEntries = [];
-  const seen = new Set();
+  const visited = new Set();
   const result = [];
+  const resultIds = new Set();
+  const distanceById = new Map();
   const steps = [];
   let queue = null;
+  let phase = "parent";
+  let currentNode = null;
+  let currentDistance = null;
+  let inspectedNeighbor = null;
 
   const formatQueue = () => queue === null
     ? "not initialized"
     : `[${queue.map(({ node, distance }) => `(${node.val},${distance})`).join(", ")}]`;
-  const formatSeen = () => `[${[...seen].map((id) => {
+  const formatVisited = () => `[${[...visited].map((id) => {
     const value = findNodeById(root, id);
     return value !== null ? value : id;
   }).join(", ")}]`;
   const formatParents = () => `{${parentEntries.map(([child, par]) => `${child}:${par}`).join(", ")}}`;
+  const addAnnotation = (annotations, nodeId, label, kind) => {
+    if (nodeId === null || nodeId === undefined) return;
+    if (!annotations[nodeId]) annotations[nodeId] = { labels: [] };
+    annotations[nodeId].labels.push({ label, kind });
+  };
+  const distanceAnnotations = () => {
+    const annotations = {};
+    if (target) addAnnotation(annotations, target.id, "TARGET · d=0", "distance-target");
+    if (queue) {
+      queue.forEach(({ node, distance }) => {
+        addAnnotation(annotations, node.id, `QUEUE · d=${distance}`, "distance-queue");
+      });
+    }
+    resultIds.forEach((id) => addAnnotation(annotations, id, `ANSWER · d=${k}`, "distance-answer"));
+    if (currentNode) {
+      addAnnotation(annotations, currentNode.id, `CURRENT · d=${currentDistance}`, "distance-current");
+    }
+    if (inspectedNeighbor && inspectedNeighbor.node) {
+      addAnnotation(
+        annotations,
+        inspectedNeighbor.node.id,
+        `${inspectedNeighbor.relation.toUpperCase()} · ${inspectedNeighbor.eligible ? "NEW" : "VISITED"}`,
+        inspectedNeighbor.eligible ? "distance-candidate" : "distance-rejected",
+      );
+    }
+    return annotations;
+  };
+  const distanceKView = () => {
+    const layers = new Map();
+    distanceById.forEach((distance, id) => {
+      if (!layers.has(distance)) layers.set(distance, []);
+      const nodeValue = findNodeById(root, id);
+      layers.get(distance).push({
+        id,
+        value: nodeValue === null ? id : nodeValue,
+        isTarget: !!target && id === target.id,
+        isCurrent: !!currentNode && id === currentNode.id,
+        isQueued: !!queue && queue.some(({ node }) => node.id === id),
+        isAnswer: resultIds.has(id),
+      });
+    });
+    if (target && !distanceById.has(target.id)) {
+      layers.set(0, [{
+        id: target.id,
+        value: target.val,
+        isTarget: true,
+        isCurrent: false,
+        isQueued: false,
+        isAnswer: false,
+      }]);
+    }
+    return {
+      phase,
+      target: target ? target.val : targetValue,
+      k,
+      current: currentNode ? { value: currentNode.val, distance: currentDistance } : null,
+      inspecting: inspectedNeighbor
+        ? {
+            relation: inspectedNeighbor.relation,
+            value: inspectedNeighbor.node ? inspectedNeighbor.node.val : "None",
+            eligible: inspectedNeighbor.eligible,
+            reason: inspectedNeighbor.reason,
+          }
+        : null,
+      layers: [...layers.entries()].sort(([a], [b]) => a - b).map(([distance, nodes]) => ({ distance, nodes })),
+      queue: queue ? queue.map(({ node, distance }) => ({ value: node.val, distance })) : [],
+      visited: [...visited].map((id) => findNodeById(root, id)),
+      result: [...result],
+      parentCount: parentEntries.length,
+    };
+  };
   const queueView = (operation = "—", popped = "—", appended = "—") => {
     const items = queue === null ? [] : queue.map(({ node, distance }) => `${node.val}@${distance}`);
     return {
@@ -1903,9 +1980,12 @@ function buildSteps863(input, params) {
     };
   };
   const addStep = (opts) => {
-    steps.push(snapshot(root, Object.assign({}, opts, {
+    const frame = snapshot(root, Object.assign({}, opts, {
+      annotations: opts.annotations || distanceAnnotations(),
       queueView: queueView(opts.queueOperation, opts.popped, opts.appended),
-    })));
+    }));
+    frame.distanceKView = distanceKView();
+    steps.push(frame);
   };
 
   addStep({
@@ -1924,109 +2004,89 @@ function buildSteps863(input, params) {
 
   function buildParent(node, par) {
     if (!node) return;
-    addStep({
-      title: { vi: `build_parent(node=${node.val})`, en: `build_parent(node=${node.val})` },
-      hlSet: new Set([node.id]), codeLines: [6, 7],
-      vars: [{ name: "node", value: node.val }, { name: "par", value: par ? par.val : "None" }], queueOperation: "DFS visit",
-      note: { vi: `node=${node.val} khác None nên tiếp tục ghi parent.`, en: `node=${node.val} is not None, so record its parent.` },
-    });
     parent.set(node.id, par);
     parentEntries.push([node.val, par ? par.val : "None"]);
     addStep({
       title: { vi: `parent[${node.val}] = ${par ? par.val : "None"}`, en: `parent[${node.val}] = ${par ? par.val : "None"}` },
-      hlSet: new Set([node.id]), wordSet: new Set(parent.keys()), codeLines: [9],
-      vars: [{ name: "node", value: node.val }, { name: "parent", value: formatParents() }], queueOperation: "record parent",
-      note: { vi: `Đã thêm cạnh ngược ${node.val} → ${par ? par.val : "None"}.`, en: `Recorded reverse edge ${node.val} → ${par ? par.val : "None"}.` },
+      hlSet: new Set([node.id]), codeLines: [9],
+      vars: [{ name: "node", value: node.val }, { name: "par", value: par ? par.val : "None" }, { name: "parent", value: formatParents() }], queueOperation: "record parent",
+      note: par
+        ? { vi: `Ghi cạnh ngược ${node.val} → ${par.val}; từ ${node.val} ta có thể đi ngược lên cha.`, en: `Record reverse edge ${node.val} → ${par.val}; BFS can now move from ${node.val} back to its parent.` }
+        : { vi: `${node.val} là root nên parent[${node.val}] = None.`, en: `${node.val} is the root, so parent[${node.val}] = None.` },
     });
-    if (node.left) {
-      addStep({
-        title: { vi: `Đi xuống con trái ${node.left.val}`, en: `Descend to left child ${node.left.val}` },
-        hlSet: new Set([node.id, node.left.id]), wordSet: new Set(parent.keys()), codeLines: [10],
-        vars: [{ name: "node", value: node.val }, { name: "node.left", value: node.left.val }], queueOperation: "DFS left",
-        note: { vi: `Gọi build_parent(${node.left.val}, ${node.val}).`, en: `Call build_parent(${node.left.val}, ${node.val}).` },
-      });
-      buildParent(node.left, node);
-    }
-    if (node.right) {
-      addStep({
-        title: { vi: `Đi xuống con phải ${node.right.val}`, en: `Descend to right child ${node.right.val}` },
-        hlSet: new Set([node.id, node.right.id]), wordSet: new Set(parent.keys()), codeLines: [11],
-        vars: [{ name: "node", value: node.val }, { name: "node.right", value: node.right.val }], queueOperation: "DFS right",
-        note: { vi: `Gọi build_parent(${node.right.val}, ${node.val}).`, en: `Call build_parent(${node.right.val}, ${node.val}).` },
-      });
-      buildParent(node.right, node);
-    }
+    buildParent(node.left, node);
+    buildParent(node.right, node);
   }
 
   if (root) buildParent(root, null);
   addStep({
     title: { vi: "Hoàn tất parent map", en: "Parent map complete" },
-    hlSet: target ? new Set([target.id]) : new Set(), wordSet: new Set(parent.keys()), codeLines: [12],
+    hlSet: target ? new Set([target.id]) : new Set(), codeLines: [12],
     vars: [{ name: "parent", value: formatParents() }], queueOperation: "finish parent map",
     note: { vi: "Bây giờ mỗi node có tối đa ba hàng xóm: left, right và parent.", en: "Each node now has up to three neighbors: left, right, and parent." },
   });
 
   if (!target) {
+    phase = "done";
     const missing = snapshot(root, {
       title: { vi: `Không tìm thấy target=${targetValue}`, en: `target=${targetValue} was not found` },
+      annotations: distanceAnnotations(),
       codeLines: [26], queueView: queueView("stop: missing target"),
       vars: [{ name: "answer", value: "[]" }],
       note: { vi: "Input không hợp lệ: target phải là một node trong cây.", en: "Invalid input: target must be a node in the tree." },
     });
+    missing.distanceKView = distanceKView();
     missing.final = true;
     steps.push(missing);
     return { input, answer: "[]", steps };
   }
 
+  phase = "bfs";
   queue = [{ node: target, distance: 0 }];
+  distanceById.set(target.id, 0);
   addStep({
     title: { vi: `queue = [(${target.val}, 0)]`, en: `queue = [(${target.val}, 0)]` },
     hlSet: new Set([target.id]), codeLines: [14],
     vars: [{ name: "queue", value: formatQueue() }], queueOperation: "enqueue target", appended: `${target.val}@0`,
     note: { vi: "BFS bắt đầu tại target với khoảng cách 0.", en: "BFS starts at target with distance 0." },
   });
-  seen.add(target.id);
+  visited.add(target.id);
   addStep({
-    title: { vi: `seen = {${target.val}}`, en: `seen = {${target.val}}` },
-    hlSet: new Set([target.id]), wordSet: new Set(seen), codeLines: [15],
-    vars: [{ name: "seen", value: formatSeen() }, { name: "queue", value: formatQueue() }], queueOperation: "mark target seen",
+    title: { vi: `visited = {${target.val}}`, en: `visited = {${target.val}}` },
+    hlSet: new Set([target.id]), wordSet: new Set(visited), codeLines: [15],
+    vars: [{ name: "visited", value: formatVisited() }, { name: "queue", value: formatQueue() }], queueOperation: "mark target visited",
     note: { vi: "Đánh dấu target ngay khi enqueue để không quay lại node này qua cạnh parent/con.", en: "Mark target when it is enqueued so no parent/child edge can add it again." },
   });
   addStep({
-    title: { vi: "result = []", en: "result = []" }, wordSet: new Set(seen), codeLines: [16],
+    title: { vi: "result = []", en: "result = []" }, wordSet: new Set(visited), codeLines: [16],
     vars: [{ name: "result", value: "[]" }, { name: "queue", value: formatQueue() }], queueOperation: "initialize result",
     note: { vi: `result chỉ nhận node khi distance == ${k}.`, en: `A node enters result only when distance == ${k}.` },
   });
 
   while (queue.length) {
-    addStep({
-      title: { vi: `while queue → True`, en: `while queue → True` },
-      hlSet: new Set(queue.map(({ node }) => node.id)), wordSet: new Set(seen), codeLines: [17],
-      vars: [{ name: "queue", value: formatQueue() }, { name: "seen", value: formatSeen() }], queueOperation: "check queue",
-      note: { vi: "Queue còn phần tử nên tiếp tục BFS.", en: "The queue is not empty, so BFS continues." },
-    });
+    currentNode = null;
+    currentDistance = null;
+    inspectedNeighbor = null;
     const { node, distance } = queue.shift();
+    currentNode = node;
+    currentDistance = distance;
     addStep({
       title: { vi: `popleft() → (${node.val}, ${distance})`, en: `popleft() → (${node.val}, ${distance})` },
-      hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [18],
-      vars: [{ name: "node", value: node.val }, { name: "distance", value: distance }, { name: "queue", value: formatQueue() }],
+      hlSet: new Set([node.id]), wordSet: new Set(visited), codeLines: [17, 18],
+      vars: [{ name: "node", value: node.val }, { name: "distance", value: distance }, { name: "queue", value: formatQueue() }, { name: "visited", value: formatVisited() }],
       queueOperation: "popleft", popped: `${node.val}@${distance}`,
       note: { vi: `Lấy node ${node.val} ở khoảng cách ${distance} khỏi đầu queue.`, en: `Remove node ${node.val} at distance ${distance} from the front of the queue.` },
     });
 
     if (distance === k) {
-      addStep({
-        title: { vi: `${distance} == k (${k}) → True`, en: `${distance} == k (${k}) → True` },
-        hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [19],
-        vars: [{ name: "distance", value: distance }, { name: "k", value: k }, { name: "result", value: `[${result.join(", ")}]` }], queueOperation: "target distance reached",
-        note: { vi: `Node ${node.val} cách target đúng ${k} cạnh nên thuộc đáp án.`, en: `Node ${node.val} is exactly ${k} edges from target, so it belongs in the answer.` },
-      });
+      phase = "collect";
       result.push(node.val);
+      resultIds.add(node.id);
       addStep({
-        title: { vi: `result.append(${node.val})`, en: `result.append(${node.val})` },
-        hlSet: new Set([node.id]), wordSet: new Set(seen), codeLines: [20, 21],
+        title: { vi: `distance=${distance}=k → result.append(${node.val})`, en: `distance=${distance}=k → result.append(${node.val})` },
+        hlSet: new Set([node.id]), wordSet: new Set(visited), codeLines: [19, 20, 21],
         vars: [{ name: "result", value: `[${result.join(", ")}]` }, { name: "queue", value: formatQueue() }], queueOperation: "append result; continue",
-        note: { vi: `result = [${result.join(", ")}]. continue ngăn BFS đi xa hơn k từ node này.`, en: `result = [${result.join(", ")}]. continue prevents BFS from expanding beyond distance k from this node.` },
+        note: { vi: `${node.val} nằm đúng lớp d=${k}, nên thêm vào result. continue ngăn BFS đi xa hơn k.`, en: `${node.val} is on layer d=${k}, so add it to result. continue prevents BFS from going farther than k.` },
       });
       continue;
     }
@@ -2036,50 +2096,57 @@ function buildSteps863(input, params) {
       { label: "right", node: node.right },
       { label: "parent", node: parent.get(node.id) },
     ];
+    inspectedNeighbor = null;
     addStep({
       title: { vi: `Hàng xóm của ${node.val}: trái, phải, cha`, en: `Neighbors of ${node.val}: left, right, parent` },
-      hlSet: new Set([node.id, ...neighbors.filter(({ node: nb }) => nb).map(({ node: nb }) => nb.id)]), wordSet: new Set(seen), codeLines: [22],
+      hlSet: new Set([node.id, ...neighbors.filter(({ node: nb }) => nb).map(({ node: nb }) => nb.id)]), wordSet: new Set(visited), codeLines: [22],
       vars: neighbors.map(({ label, node: nb }) => ({ name: label, value: nb ? nb.val : "None" })), queueOperation: "inspect neighbors",
       note: { vi: "parent map biến cạnh cha→con thành đường đi hai chiều mà không sửa cấu trúc cây.", en: "The parent map makes parent-child edges traversable in both directions without changing the tree." },
     });
 
     for (const { label, node: neighbor } of neighbors) {
-      const eligible = !!neighbor && !seen.has(neighbor.id);
-      addStep({
-        title: { vi: `${label}: ${neighbor ? neighbor.val : "None"} → ${eligible ? "thêm" : "bỏ qua"}`, en: `${label}: ${neighbor ? neighbor.val : "None"} → ${eligible ? "enqueue" : "skip"}` },
-        hlSet: new Set([node.id].concat(neighbor ? [neighbor.id] : [])), wordSet: new Set(seen), codeLines: [23],
-        vars: [{ name: "neighbor", value: neighbor ? neighbor.val : "None" }, { name: "in seen", value: neighbor ? seen.has(neighbor.id) : "N/A" }],
-        queueOperation: eligible ? "eligible neighbor" : "skip neighbor",
-        note: eligible
-          ? { vi: `${neighbor.val} tồn tại và chưa thăm.`, en: `${neighbor.val} exists and has not been visited.` }
-          : { vi: neighbor ? `${neighbor.val} đã có trong seen nên không enqueue lại.` : "Hàng xóm là None nên bỏ qua.", en: neighbor ? `${neighbor.val} is already in seen, so do not enqueue it again.` : "The neighbor is None, so skip it." },
-      });
-      if (!eligible) continue;
-      seen.add(neighbor.id);
-      addStep({
-        title: { vi: `seen.add(${neighbor.val})`, en: `seen.add(${neighbor.val})` },
-        hlSet: new Set([neighbor.id]), wordSet: new Set(seen), codeLines: [24],
-        vars: [{ name: "seen", value: formatSeen() }], queueOperation: "mark seen",
-        note: { vi: `Đánh dấu ${neighbor.val} trước khi enqueue để mỗi node chỉ vào queue một lần.`, en: `Mark ${neighbor.val} before enqueueing so each node enters the queue only once.` },
-      });
+      const eligible = !!neighbor && !visited.has(neighbor.id);
+      inspectedNeighbor = {
+        relation: label,
+        node: neighbor,
+        eligible,
+        reason: !neighbor ? "none" : eligible ? "new" : "visited",
+      };
+      if (!eligible) {
+        addStep({
+          title: { vi: `${label}: ${neighbor ? neighbor.val : "None"} → bỏ qua`, en: `${label}: ${neighbor ? neighbor.val : "None"} → skip` },
+          hlSet: new Set([node.id].concat(neighbor ? [neighbor.id] : [])), wordSet: new Set(visited), codeLines: [23],
+          vars: [{ name: "neighbor", value: neighbor ? neighbor.val : "None" }, { name: "in visited", value: neighbor ? visited.has(neighbor.id) : "N/A" }],
+          queueOperation: "skip neighbor",
+          note: { vi: neighbor ? `${neighbor.val} đã có trong visited nên không enqueue lại.` : "Hàng xóm là None nên bỏ qua.", en: neighbor ? `${neighbor.val} is already in visited, so do not enqueue it again.` : "The neighbor is None, so skip it." },
+        });
+        continue;
+      }
+      visited.add(neighbor.id);
+      distanceById.set(neighbor.id, distance + 1);
       queue.push({ node: neighbor, distance: distance + 1 });
       addStep({
-        title: { vi: `enqueue (${neighbor.val}, ${distance + 1})`, en: `enqueue (${neighbor.val}, ${distance + 1})` },
-        hlSet: new Set([neighbor.id]), wordSet: new Set(seen), codeLines: [25],
-        vars: [{ name: "queue", value: formatQueue() }, { name: "distance + 1", value: distance + 1 }],
+        title: { vi: `${neighbor.val} chưa visited → đánh dấu và enqueue`, en: `${neighbor.val} not visited → mark and enqueue` },
+        hlSet: new Set([node.id, neighbor.id]), wordSet: new Set(visited), codeLines: [23, 24, 25],
+        vars: [{ name: "visited", value: formatVisited() }, { name: "queue", value: formatQueue() }, { name: "distance + 1", value: distance + 1 }],
         queueOperation: "append", appended: `${neighbor.val}@${distance + 1}`,
-        note: { vi: `Queue mới = ${formatQueue()}.`, en: `Updated queue = ${formatQueue()}.` },
+        note: { vi: `Đánh dấu trước khi enqueue để mỗi node chỉ vào queue một lần. Queue mới = ${formatQueue()}.`, en: `Mark before enqueueing so each node enters the queue once. Updated queue = ${formatQueue()}.` },
       });
     }
   }
 
+  phase = "done";
+  currentNode = null;
+  currentDistance = null;
+  inspectedNeighbor = null;
   const finalStep = snapshot(root, {
     title: { vi: `return [${result.join(", ")}]`, en: `return [${result.join(", ")}]` },
-    hlSet: new Set(result.map((value) => findNode(root, value)).filter(Boolean).map((node) => node.id)),
-    wordSet: new Set(seen), codeLines: [26], queueView: queueView("done"),
+    hlSet: new Set(resultIds),
+    wordSet: new Set(visited), annotations: distanceAnnotations(), codeLines: [26], queueView: queueView("done"),
     vars: [{ name: "result", value: `[${result.join(", ")}]` }, { name: "answer", value: `[${result.join(", ")}]` }],
     note: { vi: `Các node cách target=${targetValue} đúng ${k} cạnh là [${result.join(", ")}].`, en: `Nodes exactly ${k} edges from target=${targetValue} are [${result.join(", ")}].` },
   });
+  finalStep.distanceKView = distanceKView();
   finalStep.final = true;
   steps.push(finalStep);
   return { input, answer: `[${result.join(",")}]`, steps };
@@ -3201,7 +3268,7 @@ module.exports = {
       "        build_parent(root, None)",
       "",
       "        queue = deque([(target, 0)])",
-      "        seen = {target}",
+      "        visited = {target}",
       "        result = []",
       "        while queue:",
       "            node, distance = queue.popleft()",
@@ -3209,8 +3276,8 @@ module.exports = {
       "                result.append(node.val)",
       "                continue",
       "            for neighbor in (node.left, node.right, parent[node]):",
-      "                if neighbor and neighbor not in seen:",
-      "                    seen.add(neighbor)",
+      "                if neighbor and neighbor not in visited:",
+      "                    visited.add(neighbor)",
       "                    queue.append((neighbor, distance + 1))",
       "        return result",
     ],

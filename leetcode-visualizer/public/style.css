@@ -4549,6 +4549,236 @@ button:disabled {
 .decision-tree-legend i.dt-answer { border-color: #10b981; }
 .decision-tree-legend i.dt-pruned { border-color: #ef4444; border-style: dashed; }
 
+/* ---- All Nodes Distance K (#863): parent-map + BFS explainer ---- */
+.distance-k-guide {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #e2e8f0;
+}
+
+.distance-k-phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.distance-k-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.distance-k-phase span {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.18);
+  color: #cbd5e1;
+}
+
+.distance-k-phase.is-active {
+  border-color: rgba(245, 158, 11, 0.68);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+}
+
+.distance-k-phase.is-active span {
+  background: #f59e0b;
+  color: #111827;
+}
+
+.distance-k-phase.is-done {
+  border-color: rgba(16, 185, 129, 0.42);
+  color: #6ee7b7;
+}
+
+.distance-k-phase.is-done span {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.distance-k-rule,
+.distance-k-action {
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.distance-k-rule {
+  background: rgba(99, 102, 241, 0.09);
+  color: #c7d2fe;
+}
+
+.distance-k-action {
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  color: #f8fafc;
+  font-weight: 650;
+}
+
+.distance-k-layers {
+  display: grid;
+  gap: 7px;
+}
+
+.distance-k-layer {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 58px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.distance-k-layer.is-goal {
+  border-color: rgba(16, 185, 129, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+}
+
+.distance-k-layer-label {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px;
+  background: rgba(100, 116, 139, 0.1);
+  color: #cbd5e1;
+}
+
+.distance-k-layer-label strong {
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 15px;
+}
+
+.distance-k-layer-label small {
+  color: #6ee7b7;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.distance-k-layer-nodes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  flex-wrap: wrap;
+}
+
+.distance-k-node {
+  display: inline-grid;
+  min-width: 56px;
+  min-height: 40px;
+  place-content: center;
+  padding: 4px 9px;
+  border: 2px solid #64748b;
+  border-radius: 9px;
+  background: rgba(100, 116, 139, 0.1);
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.distance-k-node b {
+  font-size: 14px;
+  line-height: 1.05;
+}
+
+.distance-k-node small {
+  margin-top: 3px;
+  color: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+}
+
+.distance-k-node.is-target { border-color: #a78bfa; background: rgba(167, 139, 250, 0.14); color: #ddd6fe; }
+.distance-k-node.is-current { border-color: #f59e0b; background: rgba(245, 158, 11, 0.17); color: #fde68a; }
+.distance-k-node.is-queued { border-color: #38bdf8; background: rgba(56, 189, 248, 0.14); color: #bae6fd; }
+.distance-k-node.is-visited { border-color: #64748b; background: rgba(100, 116, 139, 0.14); color: #cbd5e1; }
+.distance-k-node.is-answer { border-color: #10b981; background: rgba(16, 185, 129, 0.18); color: #a7f3d0; }
+
+.distance-k-empty {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.distance-k-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.distance-k-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.distance-k-legend i {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #64748b;
+  border-radius: 3px;
+}
+
+.distance-k-legend i.target { border-color: #a78bfa; }
+.distance-k-legend i.current { border-color: #f59e0b; }
+.distance-k-legend i.queued { border-color: #38bdf8; }
+.distance-k-legend i.visited { border-color: #64748b; }
+.distance-k-legend i.answer { border-color: #10b981; }
+
+.tree-annotation.distance-target { fill: #a78bfa; }
+.tree-annotation.distance-current { fill: #f59e0b; }
+.tree-annotation.distance-queue { fill: #38bdf8; }
+.tree-annotation.distance-answer { fill: #10b981; }
+.tree-annotation.distance-candidate { fill: #22d3ee; }
+.tree-annotation.distance-rejected { fill: #f87171; }
+
+[data-theme="light"] .distance-k-guide { color: #1e293b; }
+[data-theme="light"] .distance-k-phase { border-color: #cbd5e1; color: #64748b; }
+[data-theme="light"] .distance-k-phase span { background: #e2e8f0; color: #475569; }
+[data-theme="light"] .distance-k-phase.is-active { border-color: #d97706; background: #fffbeb; color: #92400e; }
+[data-theme="light"] .distance-k-phase.is-active span { background: #f59e0b; color: #fff; }
+[data-theme="light"] .distance-k-phase.is-done { border-color: #6ee7b7; color: #047857; }
+[data-theme="light"] .distance-k-phase.is-done span { background: #d1fae5; color: #047857; }
+[data-theme="light"] .distance-k-rule { background: #eef2ff; color: #3730a3; }
+[data-theme="light"] .distance-k-action { background: #fffbeb; color: #78350f; }
+[data-theme="light"] .distance-k-layer { border-color: #dbe3ef; background: rgba(255, 255, 255, 0.55); }
+[data-theme="light"] .distance-k-layer.is-goal { border-color: #34d399; }
+[data-theme="light"] .distance-k-layer-label { background: #f1f5f9; color: #334155; }
+[data-theme="light"] .distance-k-layer-label small { color: #047857; }
+[data-theme="light"] .distance-k-node.is-target { color: #6d28d9; background: #f5f3ff; }
+[data-theme="light"] .distance-k-node.is-current { color: #92400e; background: #fffbeb; }
+[data-theme="light"] .distance-k-node.is-queued { color: #075985; background: #f0f9ff; }
+[data-theme="light"] .distance-k-node.is-visited { color: #475569; background: #f8fafc; }
+[data-theme="light"] .distance-k-node.is-answer { color: #047857; background: #ecfdf5; }
+[data-theme="light"] .distance-k-empty,
+[data-theme="light"] .distance-k-legend { color: #64748b; }
+[data-theme="light"] .tree-annotation.distance-target { fill: #7c3aed; }
+[data-theme="light"] .tree-annotation.distance-current { fill: #b45309; }
+[data-theme="light"] .tree-annotation.distance-queue { fill: #0369a1; }
+[data-theme="light"] .tree-annotation.distance-answer { fill: #047857; }
+[data-theme="light"] .tree-annotation.distance-candidate { fill: #0e7490; }
+[data-theme="light"] .tree-annotation.distance-rejected { fill: #b91c1c; }
+
 .tree-queue-layout {
   display: grid;
   grid-template-columns: minmax(320px, 1.35fr) minmax(220px, 0.85fr);
@@ -4626,6 +4856,16 @@ button:disabled {
   .tree-queue-stacked .queue-viz-compact .queue-cells,
   .tree-queue-stacked .queue-viz-compact .queue-status {
     grid-template-columns: repeat(2, minmax(90px, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .distance-k-phases {
+    grid-template-columns: 1fr;
+  }
+
+  .distance-k-layer {
+    grid-template-columns: 72px minmax(0, 1fr);
   }
 }
 
