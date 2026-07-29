@@ -5620,7 +5620,7 @@ function buildSteps1631(input) {
  * Generate steps for LeetCode 851: Loud and Rich.
  * DFS on reversed richer graph: for each node, find the quietest person among all richer people.
  */
-function buildSteps851(input, params) {
+function buildSteps851Legacy(input, params) {
   const richerRaw = String(input).split(",").map((e) => e.trim()).filter((e) => e.length > 0);
   const quietArr = String(params.quiet || "").split(",").map((s) => parseInt(s.trim(), 10));
   const n = quietArr.length;
@@ -5751,6 +5751,363 @@ function buildSteps851(input, params) {
   });
 
   return { richer: richerRaw, quiet: quietArr, answer: `[${answer.join(", ")}]`, steps };
+}
+
+function buildSteps851(input, params = {}) {
+  const richerRaw = String(input).split(",").map((edge) => edge.trim()).filter(Boolean);
+  const quiet = String(params.quiet || "")
+    .split(",")
+    .map((value) => Number.parseInt(value.trim(), 10))
+    .filter(Number.isFinite);
+  const n = quiet.length;
+  const steps = [];
+  const answer = new Array(n).fill(-1);
+  const graph = Array.from({ length: n }, () => []);
+  const doneNodes = new Set();
+  const builtEdgeKeys = new Set();
+  const richerEdges = richerRaw.map((edge, index) => {
+    const [richer, poorer] = edge.split("-").map(Number);
+    return {
+      key: `${index}:${richer}-${poorer}`,
+      richer,
+      poorer,
+      from: poorer,
+      to: richer,
+    };
+  }).filter((edge) => Number.isInteger(edge.richer) && Number.isInteger(edge.poorer) && edge.richer >= 0 && edge.richer < n && edge.poorer >= 0 && edge.poorer < n);
+
+  const copyEdge = (edge) => edge ? { ...edge } : null;
+  const answerText = () => `[${answer.join(", ")}]`;
+
+  function pushStep({
+    title,
+    note,
+    codeLines,
+    event,
+    phase,
+    callStack = [],
+    currentNode = null,
+    neighbor = null,
+    currentBuildEdge = null,
+    activeEdge = null,
+    currentBestPerson = null,
+    candidatePerson = null,
+    willUpdate = null,
+    changedPerson = null,
+    outerIndex = null,
+    final = false,
+    vars = [],
+  }) {
+    steps.push({
+      title,
+      note,
+      codeLines,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      vars,
+      loudRichView: {
+        event,
+        phase,
+        n,
+        quiet: [...quiet],
+        richerEdges: richerEdges.map(copyEdge),
+        builtEdgeKeys: [...builtEdgeKeys],
+        graph: graph.map((neighbors) => [...neighbors]),
+        answer: [...answer],
+        doneNodes: [...doneNodes],
+        callStack: [...callStack],
+        currentNode,
+        neighbor,
+        currentBuildEdge: copyEdge(currentBuildEdge),
+        activeEdge: activeEdge ? [...activeEdge] : null,
+        currentBestPerson,
+        candidatePerson,
+        currentBestQuiet: currentBestPerson === null ? null : quiet[currentBestPerson],
+        candidateQuiet: candidatePerson === null ? null : quiet[candidatePerson],
+        willUpdate,
+        changedPerson,
+        outerIndex,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `Có ${n} người, đọc quiet[]`, en: `Read quiet[] for ${n} people` },
+    note: {
+      vi: "quiet[i] càng nhỏ thì người i càng ít ồn. Mỗi người ban đầu chưa có kết quả nên answer[i] = -1.",
+      en: "A smaller quiet[i] means person i is quieter. Every answer starts unknown at -1.",
+    },
+    codeLines: [3],
+    event: "init",
+    phase: "build",
+    vars: [{ name: "n", value: n }, { name: "quiet", value: `[${quiet.join(", ")}]` }],
+  });
+
+  pushStep({
+    title: { vi: "Tạo reversed graph rỗng", en: "Create an empty reversed graph" },
+    note: {
+      vi: "Ta lưu cạnh poorer → richer để từ một người có thể DFS trực tiếp tới tất cả người giàu hơn.",
+      en: "Store poorer → richer edges so DFS can move directly from a person to everyone richer.",
+    },
+    codeLines: [4],
+    event: "init-graph",
+    phase: "build",
+    vars: [{ name: "graph", value: `{${graph.map((_, index) => `${index}:[]`).join(", ")}}` }],
+  });
+
+  for (let edgeIndex = 0; edgeIndex < richerEdges.length; edgeIndex++) {
+    const edge = richerEdges[edgeIndex];
+    pushStep({
+      title: { vi: `Đọc richer[${edgeIndex}] = [${edge.richer}, ${edge.poorer}]`, en: `Read richer[${edgeIndex}] = [${edge.richer}, ${edge.poorer}]` },
+      note: {
+        vi: `Người ${edge.richer} giàu hơn người ${edge.poorer}. Ta sẽ đảo hướng lưu thành ${edge.poorer} → ${edge.richer}.`,
+        en: `Person ${edge.richer} is richer than person ${edge.poorer}. Store the reversed direction ${edge.poorer} → ${edge.richer}.`,
+      },
+      codeLines: [5],
+      event: "read-edge",
+      phase: "build",
+      currentBuildEdge: edge,
+      vars: [{ name: "a, b", value: `${edge.richer}, ${edge.poorer}` }],
+    });
+
+    graph[edge.poorer].push(edge.richer);
+    builtEdgeKeys.add(edge.key);
+    pushStep({
+      title: { vi: `graph[${edge.poorer}].append(${edge.richer})`, en: `graph[${edge.poorer}].append(${edge.richer})` },
+      note: {
+        vi: `DFS(${edge.poorer}) giờ có thể đi tới người giàu hơn ${edge.richer}.`,
+        en: `DFS(${edge.poorer}) can now move to richer person ${edge.richer}.`,
+      },
+      codeLines: [6],
+      event: "add-edge",
+      phase: "build",
+      currentBuildEdge: edge,
+      vars: [{ name: `graph[${edge.poorer}]`, value: `[${graph[edge.poorer].join(", ")}]` }, { name: "built edges", value: builtEdgeKeys.size }],
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo answer = -1", en: "Initialize answer with -1" },
+    note: {
+      vi: "answer[node] = -1 nghĩa là DFS(node) chưa được tính. Giá trị khác -1 sẽ đóng vai trò memo.",
+      en: "answer[node] = -1 means DFS(node) has not been computed. Any other value acts as memoization.",
+    },
+    codeLines: [7],
+    event: "init-answer",
+    phase: "build",
+    vars: [{ name: "answer", value: answerText() }],
+  });
+
+  function dfs(node, parentStack = [], fromNode = null) {
+    const callStack = [...parentStack, node];
+    pushStep({
+      title: { vi: `Gọi dfs(${node})`, en: `Call dfs(${node})` },
+      note: {
+        vi: `Call stack thêm người ${node}. Mục tiêu: tìm người ít ồn nhất trong tập {${node}} và mọi người giàu hơn ${node}.`,
+        en: `Push person ${node} onto the call stack. Goal: find the quietest among {${node}} and everyone richer than ${node}.`,
+      },
+      codeLines: [9],
+      event: "call",
+      phase: "dfs",
+      callStack,
+      currentNode: node,
+      activeEdge: fromNode === null ? null : [fromNode, node],
+      vars: [{ name: "node", value: node }, { name: "call stack", value: `[${callStack.join(", ")}]` }],
+    });
+
+    const memoized = answer[node] !== -1;
+    pushStep({
+      title: memoized
+        ? { vi: `answer[${node}] = ${answer[node]} → memo hit`, en: `answer[${node}] = ${answer[node]} → memo hit` }
+        : { vi: `answer[${node}] == -1 → cần tính`, en: `answer[${node}] == -1 → compute it` },
+      note: memoized
+        ? { vi: `Kết quả dfs(${node}) đã có: người ${answer[node]} với quiet=${quiet[answer[node]]}. Không DFS lại.`, en: `dfs(${node}) is cached: person ${answer[node]} with quiet=${quiet[answer[node]]}. Do not recompute it.` }
+        : { vi: "Chưa có memo, tiếp tục khởi tạo ứng viên là chính node.", en: "No memo yet; initialize the candidate with the node itself." },
+      codeLines: [10],
+      event: memoized ? "memo-hit" : "memo-miss",
+      phase: memoized ? "memo" : "dfs",
+      callStack,
+      currentNode: node,
+      activeEdge: fromNode === null ? null : [fromNode, node],
+      currentBestPerson: memoized ? answer[node] : null,
+      vars: [{ name: `answer[${node}]`, value: answer[node] }, { name: "memoized?", value: memoized }],
+    });
+
+    if (memoized) {
+      pushStep({
+        title: { vi: `Return memo của dfs(${node})`, en: `Return cached dfs(${node})` },
+        note: { vi: `Quay về caller với answer[${node}] = ${answer[node]}.`, en: `Return to the caller with answer[${node}] = ${answer[node]}.` },
+        codeLines: [11],
+        event: "memo-return",
+        phase: "memo",
+        callStack,
+        currentNode: node,
+        activeEdge: fromNode === null ? null : [fromNode, node],
+        currentBestPerson: answer[node],
+        vars: [{ name: "cached person", value: answer[node] }, { name: "cached quiet", value: quiet[answer[node]] }],
+      });
+      return answer[node];
+    }
+
+    answer[node] = node;
+    pushStep({
+      title: { vi: `answer[${node}] = ${node}: chọn chính mình trước`, en: `answer[${node}] = ${node}: start with itself` },
+      note: {
+        vi: `Ứng viên hiện tại là người ${node}, quiet=${quiet[node]}. Các người giàu hơn có thể thay thế ứng viên này.`,
+        en: `The current candidate is person ${node}, quiet=${quiet[node]}. Richer people may replace this candidate.`,
+      },
+      codeLines: [12],
+      event: "seed",
+      phase: "dfs",
+      callStack,
+      currentNode: node,
+      currentBestPerson: node,
+      vars: [{ name: `answer[${node}]`, value: node }, { name: `quiet[${node}]`, value: quiet[node] }, { name: "answer", value: answerText() }],
+    });
+
+    for (const neighbor of graph[node]) {
+      pushStep({
+        title: { vi: `Xét richer neighbor ${neighbor} của ${node}`, en: `Explore richer neighbor ${neighbor} of ${node}` },
+        note: {
+          vi: `Cạnh ${node} → ${neighbor} nghĩa là ${neighbor} giàu hơn ${node}. Trước tiên phải biết đáp án tốt nhất của ${neighbor}.`,
+          en: `Edge ${node} → ${neighbor} means ${neighbor} is richer than ${node}. First obtain ${neighbor}'s best answer.`,
+        },
+        codeLines: [13],
+        event: "choose-neighbor",
+        phase: "explore",
+        callStack,
+        currentNode: node,
+        neighbor,
+        activeEdge: [node, neighbor],
+        currentBestPerson: answer[node],
+        vars: [{ name: "node", value: node }, { name: "neighbor", value: neighbor }, { name: `graph[${node}]`, value: `[${graph[node].join(", ")}]` }],
+      });
+
+      pushStep({
+        title: { vi: `Đi sâu vào dfs(${neighbor})`, en: `Recurse into dfs(${neighbor})` },
+        note: { vi: `Tạm dừng dfs(${node}); gọi dfs(${neighbor}) trước.`, en: `Pause dfs(${node}) and evaluate dfs(${neighbor}) first.` },
+        codeLines: [14],
+        event: "recurse",
+        phase: "explore",
+        callStack,
+        currentNode: node,
+        neighbor,
+        activeEdge: [node, neighbor],
+        currentBestPerson: answer[node],
+        vars: [{ name: "caller", value: `dfs(${node})` }, { name: "callee", value: `dfs(${neighbor})` }],
+      });
+      dfs(neighbor, callStack, node);
+
+      const currentBestPerson = answer[node];
+      const candidatePerson = answer[neighbor];
+      const willUpdate = quiet[candidatePerson] < quiet[currentBestPerson];
+      pushStep({
+        title: willUpdate
+          ? { vi: `${quiet[candidatePerson]} < ${quiet[currentBestPerson]} → cập nhật`, en: `${quiet[candidatePerson]} < ${quiet[currentBestPerson]} → update` }
+          : { vi: `${quiet[candidatePerson]} < ${quiet[currentBestPerson]}? False → giữ nguyên`, en: `${quiet[candidatePerson]} < ${quiet[currentBestPerson]}? False → keep current` },
+        note: {
+          vi: `So sánh quiet[answer[${neighbor}]] = quiet[${candidatePerson}] = ${quiet[candidatePerson]} với quiet[answer[${node}]] = quiet[${currentBestPerson}] = ${quiet[currentBestPerson]}.`,
+          en: `Compare quiet[answer[${neighbor}]] = quiet[${candidatePerson}] = ${quiet[candidatePerson]} with quiet[answer[${node}]] = quiet[${currentBestPerson}] = ${quiet[currentBestPerson]}.`,
+        },
+        codeLines: [15],
+        event: "compare",
+        phase: "compare",
+        callStack,
+        currentNode: node,
+        neighbor,
+        activeEdge: [node, neighbor],
+        currentBestPerson,
+        candidatePerson,
+        willUpdate,
+        vars: [{ name: "current best", value: `${currentBestPerson} (quiet=${quiet[currentBestPerson]})` }, { name: "candidate", value: `${candidatePerson} (quiet=${quiet[candidatePerson]})` }, { name: "update?", value: willUpdate }],
+      });
+
+      if (willUpdate) {
+        answer[node] = candidatePerson;
+        pushStep({
+          title: { vi: `answer[${node}] = ${candidatePerson}`, en: `answer[${node}] = ${candidatePerson}` },
+          note: {
+            vi: `Người ${candidatePerson} giàu hơn hoặc bằng ${node} và quiet=${quiet[candidatePerson]} nhỏ hơn ứng viên cũ.`,
+            en: `Person ${candidatePerson} is richer than or equal to ${node} and quiet=${quiet[candidatePerson]} beats the previous candidate.`,
+          },
+          codeLines: [16],
+          event: "update",
+          phase: "compare",
+          callStack,
+          currentNode: node,
+          neighbor,
+          activeEdge: [node, neighbor],
+          currentBestPerson,
+          candidatePerson,
+          willUpdate: true,
+          changedPerson: node,
+          vars: [{ name: `answer[${node}]`, value: candidatePerson }, { name: "answer", value: answerText() }],
+        });
+      }
+    }
+
+    doneNodes.add(node);
+    pushStep({
+      title: { vi: `Hoàn tất dfs(${node}) → người ${answer[node]}`, en: `Finish dfs(${node}) → person ${answer[node]}` },
+      note: {
+        vi: `Memo answer[${node}] = ${answer[node]} (quiet=${quiet[answer[node]]}) đã hoàn tất và có thể tái sử dụng.`,
+        en: `Memo answer[${node}] = ${answer[node]} (quiet=${quiet[answer[node]]}) is complete and reusable.`,
+      },
+      codeLines: [13],
+      event: "finish-node",
+      phase: "memo",
+      callStack,
+      currentNode: node,
+      currentBestPerson: answer[node],
+      vars: [{ name: `answer[${node}]`, value: answer[node] }, { name: "quiet winner", value: quiet[answer[node]] }, { name: "memoized nodes", value: `[${[...doneNodes].join(", ")}]` }],
+    });
+    return answer[node];
+  }
+
+  for (let index = 0; index < n; index++) {
+    pushStep({
+      title: { vi: `Vòng ngoài i = ${index}`, en: `Outer loop i = ${index}` },
+      note: answer[index] === -1
+        ? { vi: `Chưa có answer[${index}], bắt đầu DFS mới.`, en: `answer[${index}] is unknown, so start a new DFS.` }
+        : { vi: `answer[${index}] đã có memo; dfs(${index}) sẽ trả ngay.`, en: `answer[${index}] is memoized; dfs(${index}) will return immediately.` },
+      codeLines: [18],
+      event: "outer-loop",
+      phase: "dfs",
+      outerIndex: index,
+      currentNode: index,
+      currentBestPerson: answer[index] === -1 ? null : answer[index],
+      vars: [{ name: "i", value: index }, { name: `answer[${index}]`, value: answer[index] }],
+    });
+    pushStep({
+      title: { vi: `Thực thi dfs(${index})`, en: `Execute dfs(${index})` },
+      note: { vi: "Memoization bảo đảm mỗi node chỉ được tính đầy đủ một lần.", en: "Memoization ensures each node is fully computed only once." },
+      codeLines: [19],
+      event: "outer-call",
+      phase: "dfs",
+      outerIndex: index,
+      currentNode: index,
+      currentBestPerson: answer[index] === -1 ? null : answer[index],
+      vars: [{ name: "i", value: index }],
+    });
+    dfs(index);
+  }
+
+  pushStep({
+    title: { vi: `Return answer = ${answerText()}`, en: `Return answer = ${answerText()}` },
+    note: {
+      vi: "Mỗi answer[i] là người có quiet nhỏ nhất trong chính i và toàn bộ người giàu hơn i theo quan hệ bắc cầu.",
+      en: "Each answer[i] is the quietest person among i and everyone transitively richer than i.",
+    },
+    codeLines: [20],
+    event: "done",
+    phase: "done",
+    final: true,
+    vars: [{ name: "answer", value: answerText() }],
+  });
+
+  return { richer: richerRaw, quiet, answer: answerText(), steps };
 }
 
 /**

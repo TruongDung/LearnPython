@@ -5111,6 +5111,152 @@ function renderKruskalEffortView(step) {
   </div>`;
 }
 
+function renderLoudRichView(step) {
+  const view = step.loudRichView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { build: 0, dfs: 1, explore: 2, compare: 3, memo: 4, done: 5 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Đảo cạnh", "2 · Gọi DFS", "3 · Đi tới richer", "4 · So quiet", "5 · Memo"]
+    : ["1 · Reverse edges", "2 · Call DFS", "3 · Visit richer", "4 · Compare quiet", "5 · Memoize"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const builtKeys = new Set(view.builtEdgeKeys || []);
+  const currentBuildKey = view.currentBuildEdge ? view.currentBuildEdge.key : null;
+  const relationChips = (view.richerEdges || []).map((edge, index) => {
+    const classes = [];
+    if (builtKeys.has(edge.key)) classes.push("built");
+    if (edge.key === currentBuildKey) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>#${index + 1} · INPUT</small><b>P${edge.richer} &gt; P${edge.poorer}</b><em>DFS ${edge.poorer}→${edge.richer}</em></span>`;
+  }).join("");
+
+  const adjacency = Array.from({ length: view.n }, () => []);
+  for (const edge of view.richerEdges || []) adjacency[edge.from].push(edge.to);
+  const rankMemo = new Array(view.n).fill(null);
+  const visiting = new Set();
+  function rankOf(node) {
+    if (rankMemo[node] !== null) return rankMemo[node];
+    if (visiting.has(node)) return 0;
+    visiting.add(node);
+    const rank = adjacency[node].length ? 1 + Math.max(...adjacency[node].map(rankOf)) : 0;
+    visiting.delete(node);
+    rankMemo[node] = rank;
+    return rank;
+  }
+  for (let node = 0; node < view.n; node++) rankOf(node);
+  const maxRank = Math.max(0, ...rankMemo);
+  const layers = Array.from({ length: maxRank + 1 }, () => []);
+  rankMemo.forEach((rank, node) => layers[rank].push(node));
+  const maxLayerSize = Math.max(1, ...layers.map((layer) => layer.length));
+  const graphWidth = Math.max(440, 90 + maxLayerSize * 92);
+  const graphHeight = 92 + maxRank * 90;
+  const positions = new Map();
+  layers.forEach((layer, rank) => {
+    layer.forEach((node, index) => {
+      positions.set(node, {
+        x: ((index + 1) * graphWidth) / (layer.length + 1),
+        y: 45 + rank * 90,
+      });
+    });
+  });
+
+  const activeFrom = view.activeEdge ? view.activeEdge[0] : null;
+  const activeTo = view.activeEdge ? view.activeEdge[1] : null;
+  const graphEdges = (view.richerEdges || []).map((edge) => {
+    const from = positions.get(edge.from);
+    const to = positions.get(edge.to);
+    const isActive = (edge.from === activeFrom && edge.to === activeTo) || edge.key === currentBuildKey;
+    const classes = ["loud-rich-edge", builtKeys.has(edge.key) ? "built" : "unbuilt"];
+    if (isActive) classes.push("active");
+    return `<line class="${classes.join(" ")}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" marker-end="url(#${isActive ? "loud-rich-arrow-active" : "loud-rich-arrow"})"></line>`;
+  }).join("");
+
+  const stackSet = new Set(view.callStack || []);
+  const doneSet = new Set(view.doneNodes || []);
+  const graphNodes = Array.from({ length: view.n }, (_, person) => {
+    const point = positions.get(person);
+    const classes = ["loud-rich-node"];
+    if (doneSet.has(person)) classes.push("done");
+    if (stackSet.has(person)) classes.push("in-stack");
+    if (person === view.currentNode) classes.push("current");
+    if (person === view.neighbor) classes.push("neighbor");
+    if (person === view.candidatePerson) classes.push("candidate");
+    const memo = view.answer[person];
+    const memoText = memo === -1 ? "ans —" : `ans P${memo} · q${view.quiet[memo]}`;
+    return `<g class="${classes.join(" ")}" aria-label="person ${person}, quiet ${view.quiet[person]}, ${memoText}">
+      <circle cx="${point.x}" cy="${point.y}" r="31"></circle>
+      <text class="quiet" x="${point.x}" y="${point.y - 13}">quiet ${view.quiet[person]}</text>
+      <text class="person" x="${point.x}" y="${point.y + 6}">P${person}</text>
+      <text class="memo" x="${point.x}" y="${point.y + 22}">${memoText}</text>
+    </g>`;
+  }).join("");
+  const graphSummary = vi
+    ? "Đồ thị DFS có mũi tên từ người nghèo hơn tới người giàu hơn."
+    : "DFS graph with arrows from a poorer person to a richer person.";
+  const graphSvg = `<svg class="loud-rich-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(graphSummary)}">
+    <defs>
+      <marker id="loud-rich-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+      <marker id="loud-rich-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+    </defs>
+    ${graphEdges}${graphNodes}
+  </svg>`;
+
+  const stackHtml = (view.callStack || []).length
+    ? view.callStack.map((person, index) => `<span class="${index === view.callStack.length - 1 ? "top" : ""}"><small>${index === 0 ? "ROOT" : `#${index + 1}`}</small><b>dfs(${person})</b></span>`).join("<i>→</i>")
+    : `<em>∅</em>`;
+
+  let detailHtml;
+  if (view.candidatePerson !== null && view.candidatePerson !== undefined) {
+    const operator = view.willUpdate === null ? "?" : view.willUpdate ? "<" : "≥";
+    const decision = view.willUpdate === null
+      ? (vi ? "Đang chuẩn bị so sánh" : "Preparing comparison")
+      : view.willUpdate
+        ? (vi ? `UPDATE answer[${view.currentNode}] = ${view.candidatePerson}` : `UPDATE answer[${view.currentNode}] = ${view.candidatePerson}`)
+        : (vi ? `KEEP answer[${view.currentNode}] = ${view.currentBestPerson}` : `KEEP answer[${view.currentNode}] = ${view.currentBestPerson}`);
+    detailHtml = `<div class="loud-rich-compare">
+      <span class="candidate"><small>${vi ? `TỪ answer[${view.neighbor}]` : `FROM answer[${view.neighbor}]`}</small><b>P${view.candidatePerson}</b><strong>quiet ${view.candidateQuiet}</strong></span>
+      <i>${escapeHtml(operator)}</i>
+      <span><small>${vi ? "BEST HIỆN TẠI" : "CURRENT BEST"}</small><b>P${view.currentBestPerson}</b><strong>quiet ${view.currentBestQuiet}</strong></span>
+      <em class="${view.willUpdate ? "update" : "keep"}">${escapeHtml(decision)}</em>
+    </div>`;
+  } else if (["memo-hit", "memo-return"].includes(view.event) && view.currentBestPerson !== null) {
+    detailHtml = `<div class="loud-rich-memo-hit"><small>MEMO HIT</small><strong>dfs(${view.currentNode}) → P${view.currentBestPerson}</strong><span>quiet ${view.currentBestQuiet} · ${vi ? "không DFS lại" : "no recomputation"}</span></div>`;
+  } else if (view.currentNode !== null && view.currentNode !== undefined) {
+    const neighbors = (view.graph[view.currentNode] || []).map((person) => `P${person}`).join(", ") || "∅";
+    const best = view.answer[view.currentNode];
+    detailHtml = `<div class="loud-rich-frame"><small>${vi ? "FRAME HIỆN TẠI" : "CURRENT FRAME"}</small><strong>dfs(${view.currentNode})</strong><span>${vi ? "richer neighbors" : "richer neighbors"}: ${neighbors}</span><span>${vi ? "best" : "best"}: ${best === -1 ? "—" : `P${best} · quiet ${view.quiet[best]}`}</span></div>`;
+  } else {
+    detailHtml = `<div class="loud-rich-rule"><code>answer[x] = argmin quiet[y]</code><span>${vi ? "với y = x hoặc y giàu hơn x" : "where y = x or y is richer than x"}</span></div>`;
+  }
+
+  const memoCells = Array.from({ length: view.n }, (_, person) => {
+    const winner = view.answer[person];
+    const classes = [];
+    if (doneSet.has(person)) classes.push("done");
+    if (person === view.currentNode) classes.push("current");
+    if (person === view.changedPerson) classes.push("changed");
+    return `<span class="${classes.join(" ")}"><small>P${person} · quiet ${view.quiet[person]}</small><b>${winner === -1 ? "answer —" : `answer P${winner}`}</b><em>${winner === -1 ? "" : `quiet ${view.quiet[winner]}`}</em></span>`;
+  }).join("");
+
+  const finalHtml = view.event === "done"
+    ? `<div class="loud-rich-final"><strong>${vi ? "KẾT QUẢ" : "RESULT"}</strong><div>${view.answer.map((winner, person) => `<span>P${person} → <b>P${winner}</b><small>quiet ${view.quiet[winner]}</small></span>`).join("")}</div></div>`
+    : "";
+
+  el.innerHTML = `<div class="loud-rich-viz">
+    <div class="loud-rich-phases">${phases}</div>
+    <div class="loud-rich-relations"><div><strong>RICHER INPUT</strong><small>${vi ? "Pa > Pb · lưu DFS b→a" : "Pa > Pb · store DFS b→a"}</small></div><div>${relationChips || "∅"}</div></div>
+    <div class="loud-rich-main">
+      <div class="loud-rich-graph">${graphSvg}<div class="loud-rich-legend"><span><i class="current"></i>${vi ? "đang chạy" : "current"}</span><span><i class="neighbor"></i>richer neighbor</span><span><i class="done"></i>memo done</span></div></div>
+      <div class="loud-rich-debug"><div class="loud-rich-stack"><strong>CALL STACK</strong><div>${stackHtml}</div></div>${detailHtml}</div>
+    </div>
+    <div class="loud-rich-memo-table"><strong>MEMO · answer[i]</strong><div>${memoCells}</div></div>
+    ${finalHtml}
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -5140,6 +5286,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKruskalEffortView(step);
+  } else if (step.loudRichView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLoudRichView(step);
   } else if (step.kthPalindromeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
