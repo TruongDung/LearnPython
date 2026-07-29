@@ -8839,31 +8839,79 @@ function buildStepsDistinctIslands(input) {
 
   const rows = grid.length;
   const cols = grid[0].length;
-  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const visitedCells = Array.from({ length: rows }, () => Array(cols).fill(false));
   const shapeIdOf = Array.from({ length: rows }, () => Array(cols).fill(0)); // distinct shape id, 0 = none
   const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const key = (r, c) => `${r},${c}`;
+  const visited = new Set();
+  const signatureRecords = [];
+  let islandCount = 0;
+  let distinctCount = 0;
 
-  function makeCells(current, buildingCells) {
+  function makeCells(current, buildingCells, origin) {
     const bset = buildingCells ? new Set(buildingCells.map(([r, c]) => key(r, c))) : null;
     return grid.map((row, r) =>
       row.map((v, c) => {
         let cls, label;
         if (v === "0") { cls = "wall"; label = "0"; }
-        else if (shapeIdOf[r][c] > 0) { cls = "visited"; label = String(shapeIdOf[r][c]); } // finished island: label = distinct shape #
+        else if (shapeIdOf[r][c] > 0) { cls = "visited"; label = `S${shapeIdOf[r][c]}`; }
         else { cls = "empty"; label = "1"; }
-        if (bset && bset.has(key(r, c))) cls = "queued";
+        if (bset && bset.has(key(r, c))) {
+          cls = "queued";
+          if (origin) label = `${r - origin[0]},${c - origin[1]}`;
+        }
         if (current && current[0] === r && current[1] === c) cls = "current";
-        return { label, cls };
+        return { label, cls, meta: `(${r},${c})` };
       })
     );
   }
 
-  function pushStep({ title, current = null, buildingCells = null, final = false, codeLines, vars, note }) {
+  function pushStep({
+    title,
+    current = null,
+    buildingCells = null,
+    origin = null,
+    shape = [],
+    stack = [],
+    phase = "scan",
+    event = "scan",
+    signature = "",
+    candidateState = "",
+    matchId = null,
+    final = false,
+    codeLines,
+    vars,
+    note,
+  }) {
+    const shapeCells = shape.map(([dr, dc]) => ({
+      row: origin ? origin[0] + dr : dr,
+      col: origin ? origin[1] + dc : dc,
+      dr,
+      dc,
+    }));
     steps.push({
       title,
       arr: [],
-      bfsGrid: { rows, cols, cells: makeCells(current, buildingCells) },
+      bfsGrid: { rows, cols, variant: "distinct-islands", cells: makeCells(current, buildingCells, origin) },
+      distinctIslandView: {
+        phase,
+        event,
+        islandNumber: islandCount,
+        distinctCount,
+        current: current ? [...current] : null,
+        origin: origin ? [...origin] : null,
+        shape: shapeCells,
+        stack: stack.map(([r, c]) => ({ row: r, col: c, dr: origin ? r - origin[0] : r, dc: origin ? c - origin[1] : c })),
+        signature,
+        candidateState,
+        matchId,
+        knownSignatures: signatureRecords.map((record) => ({
+          id: record.id,
+          signature: record.signature,
+          shape: record.shape.map(([dr, dc]) => ({ dr, dc })),
+        })),
+        visitedSize: visited.size,
+      },
       highlight: [],
       mark: [],
       final,
@@ -8895,10 +8943,6 @@ function buildStepsDistinctIslands(input) {
     },
   });
 
-  const seen = new Set();
-  let islandCount = 0;
-  let distinctCount = 0;
-
   // Line 3: m, n = len(grid), len(grid[0])
   pushStep({
     title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
@@ -8907,11 +8951,11 @@ function buildStepsDistinctIslands(input) {
     note: { vi: `Kích thước lưới: m=${rows} hàng, n=${cols} cột.`, en: `Grid size: m=${rows} rows, n=${cols} cols.` },
   });
 
-  // Line 4: seen = set()
+  // Line 4: visited = set()
   pushStep({
-    title: { vi: "seen = set() (tập chữ ký)", en: "seen = set() (signature set)" },
+    title: { vi: "visited = set() (tập chữ ký)", en: "visited = set() (signature set)" },
     codeLines: [4],
-    vars: [{ name: "seen", value: "{}" }],
+    vars: [{ name: "visited", value: "{}" }],
     note: { vi: `Tạo set rỗng để lưu các chữ ký hình dạng khác nhau.`, en: `Create an empty set to store distinct shape signatures.` },
   });
 
@@ -8925,7 +8969,7 @@ function buildStepsDistinctIslands(input) {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (grid[r][c] !== "1" || visited[r][c]) continue;
+      if (grid[r][c] !== "1" || visitedCells[r][c]) continue;
 
       islandCount++;
       const r0 = r, c0 = c;
@@ -8934,6 +8978,9 @@ function buildStepsDistinctIslands(input) {
       pushStep({
         title: { vi: `Tìm thấy đất mới tại (${r},${c})`, en: `New land found at (${r},${c})` },
         current: [r, c],
+        origin: [r0, c0],
+        phase: "scan",
+        event: "found",
         codeLines: [16],
         vars: [
           { name: "start", value: `(${r}, ${c})` },
@@ -8950,6 +8997,9 @@ function buildStepsDistinctIslands(input) {
       pushStep({
         title: { vi: "shape = [] (khởi tạo chữ ký)", en: "shape = [] (init signature)" },
         current: [r, c],
+        origin: [r0, c0],
+        phase: "dfs",
+        event: "init-shape",
         codeLines: [17],
         vars: [{ name: "shape", value: "[]" }],
         note: {
@@ -8962,6 +9012,10 @@ function buildStepsDistinctIslands(input) {
       pushStep({
         title: { vi: `Gọi dfs(${r},${c})`, en: `Call dfs(${r},${c})` },
         current: [r, c],
+        origin: [r0, c0],
+        stack: [[r, c]],
+        phase: "dfs",
+        event: "start-dfs",
         codeLines: [18],
         vars: [{ name: "origin", value: `(${r0}, ${c0})` }],
         note: {
@@ -8972,7 +9026,7 @@ function buildStepsDistinctIslands(input) {
 
       // DFS traversal — one step per cell (line-by-line)
       const stack = [[r, c]];
-      visited[r][c] = true;
+      visitedCells[r][c] = true;
       const buildingCells = [];
       while (stack.length) {
         const [cr, cc] = stack.pop();
@@ -8985,16 +9039,22 @@ function buildStepsDistinctIslands(input) {
         for (const [dr, dc] of dirs) {
           const nr = cr + dr, nc = cc + dc;
           if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-          if (grid[nr][nc] !== "1" || visited[nr][nc]) continue;
-          visited[nr][nc] = true;
+          if (grid[nr][nc] !== "1" || visitedCells[nr][nc]) continue;
+          visitedCells[nr][nc] = true;
           queuedNb.push([nr, nc]);
         }
+        const frontier = stack.concat(queuedNb);
 
         // Step: grid[r][c] = 0 — mark visited (line 8)
         pushStep({
           title: { vi: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (đánh dấu)`, en: `dfs(${cr},${cc}): grid[${cr}][${cc}] = 0 (mark visited)` },
           current: [cr, cc],
           buildingCells: buildingCells.slice(),
+          origin: [r0, c0],
+          shape: shape.slice(),
+          stack: frontier,
+          phase: "dfs",
+          event: "mark-cell",
           codeLines: [8],
           vars: [
             { name: "cell", value: `(${cr}, ${cc})` },
@@ -9011,6 +9071,11 @@ function buildStepsDistinctIslands(input) {
           title: { vi: `shape.append((${rel[0]},${rel[1]}))`, en: `shape.append((${rel[0]},${rel[1]}))` },
           current: [cr, cc],
           buildingCells: buildingCells.slice(),
+          origin: [r0, c0],
+          shape: shape.slice(),
+          stack: frontier,
+          phase: "dfs",
+          event: "append-relative",
           codeLines: [9],
           vars: [
             { name: "relative", value: `(${cr}-${r0}, ${cc}-${c0}) = (${rel[0]}, ${rel[1]})` },
@@ -9026,26 +9091,33 @@ function buildStepsDistinctIslands(input) {
       }
 
       // Canonical signature: sort relative coords so traversal order doesn't matter
-      const sig = shape
-        .map(([a, b]) => `${a},${b}`)
-        .sort()
-        .join("|");
-      const isNew = !seen.has(sig);
+      const canonicalShape = shape.slice().sort(([ar, ac], [br, bc]) => ar - br || ac - bc);
+      const sig = canonicalShape.map(([a, b]) => `${a},${b}`).join("|");
+      const existingRecord = signatureRecords.find((record) => record.signature === sig) || null;
+      const isNew = !visited.has(sig);
       if (isNew) {
-        seen.add(sig);
+        visited.add(sig);
         distinctCount++;
+        signatureRecords.push({ id: distinctCount, signature: sig, shape: canonicalShape });
       }
-      const thisShapeId = isNew ? distinctCount : [...seen].indexOf(sig) + 1;
+      const thisShapeId = isNew ? distinctCount : existingRecord.id;
       // Assign shape id for coloring the finished island cells
       for (const [cr, cc] of buildingCells) shapeIdOf[cr][cc] = thisShapeId;
 
-      // Step: seen.add(tuple(shape)) (line 19)
+      // Step: visited.add(tuple(sorted(shape))) (line 19)
       pushStep({
         title: {
           vi: isNew ? `Chữ ký MỚI → distinct = ${distinctCount}` : `Chữ ký TRÙNG (đã có) → không tăng`,
           en: isNew ? `NEW signature → distinct = ${distinctCount}` : `DUPLICATE signature → no increment`,
         },
         buildingCells: buildingCells.slice(),
+        origin: [r0, c0],
+        shape: canonicalShape,
+        phase: "compare",
+        event: "compare-signature",
+        signature: sig,
+        candidateState: isNew ? "new" : "duplicate",
+        matchId: thisShapeId,
         codeLines: [19],
         vars: [
           { name: "signature", value: `{${sig}}` },
@@ -9054,23 +9126,21 @@ function buildStepsDistinctIslands(input) {
         ],
         note: {
           vi: isNew
-            ? `Chữ ký {${sig}} chưa có trong seen → thêm vào. Số đảo khác hình = ${distinctCount}.`
-            : `Chữ ký {${sig}} đã tồn tại trong seen → đảo này TRÙNG hình với đảo trước. Không tăng.`,
+            ? `Chữ ký {${sig}} chưa có trong visited → thêm vào. Số đảo khác hình = ${distinctCount}.`
+            : `Chữ ký {${sig}} đã tồn tại trong visited → đảo này TRÙNG hình với đảo trước. Không tăng.`,
           en: isNew
-            ? `Signature {${sig}} not in seen → add it. Distinct islands = ${distinctCount}.`
-            : `Signature {${sig}} already in seen → this island is a DUPLICATE shape. No increment.`,
+            ? `Signature {${sig}} not in visited → add it. Distinct islands = ${distinctCount}.`
+            : `Signature {${sig}} already in visited → this island is a DUPLICATE shape. No increment.`,
         },
       });
     }
   }
 
   // Final (line 20)
-  steps.push({
+  pushStep({
     title: { vi: `Kết quả: ${distinctCount} đảo khác hình`, en: `Result: ${distinctCount} distinct islands` },
-    arr: [],
-    bfsGrid: { rows, cols, cells: makeCells(null, null) },
-    highlight: [],
-    mark: [],
+    phase: "done",
+    event: "done",
     final: true,
     codeLines: [20],
     vars: [
@@ -14258,7 +14328,7 @@ module.exports = {
       "class Solution:",
       "    def numDistinctIslands(self, grid):",
       "        m, n = len(grid), len(grid[0])",
-      "        seen = set()",
+      "        visited = set()",
       "        def dfs(r, c, r0, c0, shape):",
       "            if r < 0 or r >= m or c < 0 or c >= n or grid[r][c] == 0:",
       "                return",
@@ -14273,8 +14343,8 @@ module.exports = {
       "                if grid[i][j] == 1:",
       "                    shape = []",
       "                    dfs(i, j, i, j, shape)",
-      "                    seen.add(tuple(shape))",
-      "        return len(seen)",
+      "                    visited.add(tuple(sorted(shape)))",
+      "        return len(visited)",
     ],
     builder: buildStepsDistinctIslands,
   },

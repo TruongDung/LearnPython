@@ -225,6 +225,10 @@ function specialLiveArgs(problem, input, params, primary, sources) {
     }
     case 505:
       return [primary, [params.startR, params.startC], [params.destR, params.destC]];
+    case 694:
+      return [Array.isArray(primary)
+        ? primary.map((row) => row.map((cell) => Number(cell)))
+        : parseMatrix(input).map((row) => row.map((cell) => Number(cell)))];
     case 734:
       return [sources.s1, sources.s2, sources.pairs];
     case 1258:

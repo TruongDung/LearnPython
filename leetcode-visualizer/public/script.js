@@ -1391,6 +1391,107 @@ function renderBars(step) {
 }
 
 // ---- BFS Grid renderer (pathfinding) ----
+function distinctIslandGuideHtml(view) {
+  const vi = lang === "vi";
+  const phaseOrder = { scan: 0, dfs: 1, compare: 2, done: 3 };
+  const activePhase = phaseOrder[view.phase] ?? 0;
+  const phaseLabels = [
+    { vi: "Tìm một đảo", en: "Find an island" },
+    { vi: "Tạo chữ ký", en: "Build signature" },
+    { vi: "So sánh trong visited", en: "Compare in visited" },
+  ];
+  const phases = phaseLabels.map((label, index) => {
+    const state = activePhase > index ? "is-done" : activePhase === index ? "is-active" : "";
+    return `<div class="distinct-island-phase ${state}"><span>${activePhase > index ? "✓" : index + 1}</span>${escapeHtml(vi ? label.vi : label.en)}</div>`;
+  }).join("");
+
+  let action;
+  if (view.phase === "done") {
+    action = vi
+      ? `Hoàn tất: ${view.islandNumber} đảo tạo ra ${view.distinctCount} chữ ký khác nhau.`
+      : `Done: ${view.islandNumber} islands produced ${view.distinctCount} distinct signatures.`;
+  } else if (view.event === "compare-signature") {
+    action = view.candidateState === "new"
+      ? (vi
+          ? `Chữ ký chưa có trong visited → lưu thành shape S${view.matchId}; distinct tăng lên ${view.distinctCount}.`
+          : `Signature is not in visited → store it as shape S${view.matchId}; distinct becomes ${view.distinctCount}.`)
+      : (vi
+          ? `Chữ ký trùng hoàn toàn với S${view.matchId} trong visited → đây là cùng hình dạng, không tăng distinct.`
+          : `Signature exactly matches S${view.matchId} in visited → same shape, so distinct does not increase.`);
+  } else if (view.current && view.origin && view.phase === "dfs") {
+    const dr = view.current[0] - view.origin[0];
+    const dc = view.current[1] - view.origin[1];
+    action = vi
+      ? `Ô tuyệt đối (${view.current[0]},${view.current[1]}) − gốc (${view.origin[0]},${view.origin[1]}) = tọa độ tương đối (${dr},${dc}).`
+      : `Absolute cell (${view.current[0]},${view.current[1]}) − origin (${view.origin[0]},${view.origin[1]}) = relative coordinate (${dr},${dc}).`;
+  } else if (view.event === "found" && view.origin) {
+    action = vi
+      ? `Gặp đất mới tại (${view.origin[0]},${view.origin[1]}): chọn làm gốc, nên ô đầu tiên luôn có tọa độ tương đối (0,0).`
+      : `New land at (${view.origin[0]},${view.origin[1]}): choose it as origin, so the first relative coordinate is always (0,0).`;
+  } else {
+    action = vi
+      ? "Quét từ trái sang phải, trên xuống dưới; mỗi ô đất chưa thăm bắt đầu một đảo mới."
+      : "Scan left-to-right, top-to-bottom; each unvisited land cell starts a new island.";
+  }
+
+  const shapeHtml = view.shape.length
+    ? view.shape.map((cell, index) => `<span class="distinct-shape-cell${index === view.shape.length - 1 && view.phase === "dfs" ? " is-latest" : ""}">
+        <b>(${cell.row},${cell.col})</b><small>→ (${cell.dr},${cell.dc})</small>
+      </span>`).join("")
+    : `<span class="distinct-island-empty">${vi ? "shape đang rỗng" : "shape is empty"}</span>`;
+
+  const frontierHtml = view.stack.length
+    ? view.stack.map((cell) => `<span>(${cell.row},${cell.col})<small>rel (${cell.dr},${cell.dc})</small></span>`).join("")
+    : `<em>${vi ? "rỗng" : "empty"}</em>`;
+
+  const knownHtml = view.knownSignatures.length
+    ? view.knownSignatures.map((record) => {
+        const coords = record.shape.map((cell) => `(${cell.dr},${cell.dc})`).join(" ");
+        const matched = view.phase === "compare" && record.id === view.matchId;
+        return `<div class="distinct-known-shape${matched ? " is-match" : ""}">
+          <strong>S${record.id}</strong><code>${escapeHtml(coords)}</code>${matched ? `<small>${view.candidateState === "new" ? (vi ? "MỚI" : "NEW") : (vi ? "TRÙNG" : "MATCH")}</small>` : ""}
+        </div>`;
+      }).join("")
+    : `<span class="distinct-island-empty">${vi ? "visited chưa có chữ ký" : "visited has no signatures yet"}</span>`;
+
+  const candidateCoords = view.shape.map((cell) => `(${cell.dr},${cell.dc})`).join(" ");
+  const candidateHtml = view.signature
+    ? `<div class="distinct-candidate ${view.candidateState === "duplicate" ? "is-duplicate" : "is-new"}">
+        <span>${vi ? "Chữ ký đang so sánh" : "Candidate signature"}</span>
+        <code>${escapeHtml(candidateCoords)}</code>
+      </div>`
+    : "";
+
+  const summary = vi
+    ? `Mô phỏng tạo chữ ký hình dạng cho đảo số ${view.islandNumber || 1}.`
+    : `Shape-signature simulation for island ${view.islandNumber || 1}.`;
+  return `<section class="distinct-island-guide" aria-label="${escapeHtml(summary)}">
+    <div class="distinct-island-phases">${phases}</div>
+    <div class="distinct-island-action">${escapeHtml(action)}</div>
+    <div class="distinct-island-summary">
+      <span>${vi ? "Đảo hiện tại" : "Current island"}<strong>${view.islandNumber || "—"}</strong></span>
+      <span>${vi ? "Chữ ký trong visited" : "Signatures in visited"}<strong>${view.visitedSize}</strong></span>
+      <span>${vi ? "Số hình khác nhau" : "Distinct shapes"}<strong>${view.distinctCount}</strong></span>
+    </div>
+    <div class="distinct-island-section">
+      <div class="distinct-island-section-title"><strong>${vi ? "Shape đang xây" : "Shape being built"}</strong><small>${vi ? "tọa độ tuyệt đối → tương đối" : "absolute → relative coordinates"}</small></div>
+      <div class="distinct-shape-cells">${shapeHtml}</div>
+    </div>
+    <div class="distinct-island-frontier"><strong>${vi ? "DFS frontier" : "DFS frontier"}</strong>${frontierHtml}</div>
+    ${candidateHtml}
+    <div class="distinct-island-section">
+      <div class="distinct-island-section-title"><strong>visited</strong><small>${vi ? "mỗi chữ ký duy nhất được lưu một lần" : "each unique signature is stored once"}</small></div>
+      <div class="distinct-known-shapes">${knownHtml}</div>
+    </div>
+    <div class="distinct-island-legend">
+      <span><i class="land"></i>${vi ? "đất chưa thăm" : "unvisited land"}</span>
+      <span><i class="current"></i>${vi ? "ô hiện tại" : "current cell"}</span>
+      <span><i class="shape"></i>${vi ? "đang tạo shape" : "building shape"}</span>
+      <span><i class="finished"></i>${vi ? "đảo đã phân loại" : "classified island"}</span>
+    </div>
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -1398,17 +1499,20 @@ function renderBfsGrid(step) {
   const isTicTacToe = variant === "tic-tac-toe";
   const isPhonePath = variant === "phone-path";
   const isEffortGrid = variant === "effort-grid";
+  const isDistinctIslands = variant === "distinct-islands";
   const variantClass = isTicTacToe
     ? " tic-tac-toe-grid"
     : isPhonePath
       ? " phone-path-grid"
       : isEffortGrid
         ? " effort-grid"
+        : isDistinctIslands
+          ? " distinct-islands-grid"
         : "";
   const gridClass = `bfs-grid${variantClass}`;
   const gridStyle = isTicTacToe
     ? ""
-    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? "64px" : "32px"})"`;
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? "64px" : isDistinctIslands ? "58px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -1429,7 +1533,8 @@ function renderBfsGrid(step) {
       ${hasParity ? `<span><i class="eg-swatch eg-swatch-even"></i>${lang === "vi" ? "bước tới tốn 1s" : "step costs 1s"}</span><span><i class="eg-swatch eg-swatch-odd"></i>${lang === "vi" ? "bước tới tốn 2s" : "step costs 2s"}</span>` : ""}
     </div>`;
   }
-  el.innerHTML = html;
+  const guideHtml = step.distinctIslandView ? distinctIslandGuideHtml(step.distinctIslandView) : "";
+  el.innerHTML = guideHtml + html;
 }
 
 // ---- Shift 2D Grid renderer ----
