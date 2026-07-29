@@ -5154,29 +5154,60 @@ function buildSteps1631(input) {
   const effortStr = () => `[${effort.map((row) => `[${row.map(formatEffort).join(", ")}]`).join(", ")}]`;
   const heapStr = () => `[${heap.map(([value, r, c]) => `(${value}, ${r}, ${c})`).join(", ")}]`;
 
-  function makeCells(current = null, pathCells = new Set()) {
+  function makeCells(current = null, pathCells = new Set(), neighbor = null) {
     const queued = new Set(heap.map(([, r, c]) => key(r, c)));
     return heights.map((row, r) => row.map((height, c) => {
       const cellKey = key(r, c);
       let cls = "empty";
       if (finalized.has(cellKey)) cls = "visited";
       if (queued.has(cellKey)) cls = "queued";
-      if (pathCells.has(cellKey)) cls = "path";
+      if (neighbor && neighbor[0] === r && neighbor[1] === c) cls = "neighbor";
       if (current && current[0] === r && current[1] === c) cls = "current";
+      if (pathCells.has(cellKey)) cls = "path";
       const endpoint = r === 0 && c === 0
-        ? " · S"
+        ? "S"
         : r === rows - 1 && c === cols - 1
-          ? " · T"
+          ? "T"
           : "";
-      return { label: String(height), meta: `e:${formatEffort(effort[r][c])}${endpoint}`, cls };
+      return {
+        label: String(height),
+        meta: `best:${formatEffort(effort[r][c])}`,
+        coord: `${r},${c}`,
+        endpoint,
+        cls,
+      };
     }));
   }
 
-  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+  function pushStep({
+    title, codeLine, vars, note, current = null, neighbor = null, pathCells,
+    event = "init", direction = null, curEffort = null, edgeEffort = null,
+    newEffort = null, oldEffort = null, improves = null, path = [], pathEdges = [],
+    answerValue = null, final = false,
+  }) {
     steps.push({
       title,
       arr: [],
-      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells, neighbor) },
+      effortView: {
+        event,
+        heights: heights.map((row) => [...row]),
+        best: effort.map((row) => row.map(formatEffort)),
+        heap: heap.map(([value, hr, hc]) => [value, hr, hc]),
+        finalized: [...finalized].map((cellKey) => cellKey.split(",").map(Number)),
+        current: current ? [...current] : null,
+        neighbor: neighbor ? [...neighbor] : null,
+        target: [rows - 1, cols - 1],
+        direction: direction ? [...direction] : null,
+        curEffort,
+        edgeEffort,
+        newEffort,
+        oldEffort: oldEffort === null ? null : formatEffort(oldEffort),
+        improves,
+        path: path.map((cell) => [...cell]),
+        pathEdges: pathEdges.map((edge) => ({ from: [...edge.from], to: [...edge.to], diff: edge.diff })),
+        answer: answerValue,
+      },
       highlight: [],
       mark: [],
       final,
@@ -5190,6 +5221,7 @@ function buildSteps1631(input) {
   pushStep({
     title: { vi: `Kích thước grid: ${rows} × ${cols}`, en: `Grid size: ${rows} × ${cols}` },
     codeLine: 6,
+    event: "init",
     vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
     note: {
       vi: "Mỗi ô là một node. Từ một ô có thể đi sang tối đa 4 node kề: dưới, trên, phải và trái.",
@@ -5200,6 +5232,7 @@ function buildSteps1631(input) {
   pushStep({
     title: { vi: "Khởi tạo mọi effort bằng ∞", en: "Initialize every effort to ∞" },
     codeLine: 7,
+    event: "init",
     vars: [{ name: "effort", value: effortStr() }],
     note: {
       vi: "effort[r][c] là effort nhỏ nhất đã biết để tới ô (r,c). ∞ nghĩa là chưa tìm thấy đường tới ô đó.",
@@ -5212,6 +5245,8 @@ function buildSteps1631(input) {
     title: { vi: "Ô bắt đầu có effort = 0", en: "The start cell has effort 0" },
     codeLine: 8,
     current: [0, 0],
+    event: "start",
+    curEffort: 0,
     vars: [{ name: "effort[0][0]", value: 0 }],
     note: {
       vi: "Đứng tại ô bắt đầu và chưa đi qua cạnh nào, nên chênh lệch lớn nhất hiện tại bằng 0.",
@@ -5224,6 +5259,8 @@ function buildSteps1631(input) {
     title: { vi: "Đưa ô bắt đầu vào min-heap", en: "Push the start into the min-heap" },
     codeLine: 9,
     current: [0, 0],
+    event: "push",
+    curEffort: 0,
     vars: [{ name: "heap", value: heapStr() }],
     note: {
       vi: "Heap lưu (effort, row, col) và luôn pop trạng thái có effort nhỏ nhất trước.",
@@ -5234,6 +5271,7 @@ function buildSteps1631(input) {
   pushStep({
     title: { vi: "Chuẩn bị 4 hướng di chuyển", en: "Prepare four movement directions" },
     codeLine: 10,
+    event: "init",
     vars: [{ name: "directions", value: "[(1,0), (-1,0), (0,1), (0,-1)]" }],
     note: {
       vi: "Mỗi cặp (dr, dc) thay đổi hàng và cột để lần lượt thử xuống, lên, phải, trái.",
@@ -5247,6 +5285,7 @@ function buildSteps1631(input) {
     pushStep({
       title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
       codeLine: 12,
+      event: "heap",
       vars: [{ name: "heap", value: heapStr() }],
       note: {
         vi: "Vẫn còn trạng thái cần xử lý; phần tử đầu heap có effort nhỏ nhất.",
@@ -5259,6 +5298,8 @@ function buildSteps1631(input) {
       title: { vi: `Pop ô (${r},${c}) với effort ${curEffort}`, en: `Pop cell (${r},${c}) with effort ${curEffort}` },
       codeLine: 13,
       current: [r, c],
+      event: "pop",
+      curEffort,
       vars: [
         { name: "cur_effort", value: curEffort },
         { name: "r, c", value: `${r}, ${c}` },
@@ -5277,6 +5318,8 @@ function buildSteps1631(input) {
         : { vi: `${curEffort} > effort[${r}][${c}]? False`, en: `${curEffort} > effort[${r}][${c}]? False` },
       codeLine: 14,
       current: [r, c],
+      event: "stale",
+      curEffort,
       vars: [
         { name: "cur_effort", value: curEffort },
         { name: `effort[${r}][${c}]`, value: effort[r][c] },
@@ -5298,6 +5341,8 @@ function buildSteps1631(input) {
         title: { vi: "Bỏ qua bản ghi cũ", en: "Skip the stale entry" },
         codeLine: 15,
         current: [r, c],
+        event: "stale",
+        curEffort,
         vars: [{ name: "continue", value: true }],
         note: {
           vi: "Không mở rộng hàng xóm từ một đường kém hơn; quay lại đầu vòng while.",
@@ -5315,6 +5360,8 @@ function buildSteps1631(input) {
         : { vi: `(${r},${c}) chưa phải ô đích`, en: `(${r},${c}) is not the target` },
       codeLine: 16,
       current: [r, c],
+      event: "target",
+      curEffort,
       vars: [
         { name: "current", value: `(${r}, ${c})` },
         { name: "target", value: `(${rows - 1}, ${cols - 1})` },
@@ -5340,11 +5387,25 @@ function buildSteps1631(input) {
         current = parent[current[0]][current[1]];
       }
       const pathCells = new Set(path.map(([pr, pc]) => key(pr, pc)));
+      const pathEdges = path.slice(1).map(([toR, toC], index) => {
+        const [fromR, fromC] = path[index];
+        return {
+          from: [fromR, fromC],
+          to: [toR, toC],
+          diff: Math.abs(heights[fromR][fromC] - heights[toR][toC]),
+        };
+      });
       const pathText = path.map(([pr, pc]) => `(${pr},${pc})`).join(" → ");
       pushStep({
         title: { vi: `Effort nhỏ nhất = ${answer}`, en: `Minimum effort = ${answer}` },
         codeLine: 17,
+        event: "done",
+        current: [r, c],
+        curEffort,
         pathCells,
+        path,
+        pathEdges,
+        answerValue: answer,
         final: true,
         vars: [{ name: "path", value: pathText }, { name: "answer", value: answer }],
         note: {
@@ -5360,6 +5421,9 @@ function buildSteps1631(input) {
         title: { vi: `Lấy hướng (${dr},${dc})`, en: `Take direction (${dr},${dc})` },
         codeLine: 19,
         current: [r, c],
+        event: "direction",
+        direction: [dr, dc],
+        curEffort,
         vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }],
         note: {
           vi: `Từ ô (${r},${c}), áp dụng độ lệch hàng ${dr} và cột ${dc}.`,
@@ -5373,6 +5437,10 @@ function buildSteps1631(input) {
         title: { vi: `Ô kế tiếp = (${nr},${nc})`, en: `Next cell = (${nr},${nc})` },
         codeLine: 20,
         current: [r, c],
+        neighbor: [nr, nc],
+        event: "neighbor",
+        direction: [dr, dc],
+        curEffort,
         vars: [
           { name: "nr", value: `${r} + (${dr}) = ${nr}` },
           { name: "nc", value: `${c} + (${dc}) = ${nc}` },
@@ -5389,7 +5457,11 @@ function buildSteps1631(input) {
           ? { vi: `(${nr},${nc}) nằm trong grid`, en: `(${nr},${nc}) is inside the grid` }
           : { vi: `(${nr},${nc}) vượt biên`, en: `(${nr},${nc}) is out of bounds` },
         codeLine: 21,
-        current: inBounds ? [nr, nc] : [r, c],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "bounds",
+        direction: [dr, dc],
+        curEffort,
         vars: [
           { name: "neighbor", value: `(${nr}, ${nc})` },
           { name: "in bounds", value: inBounds },
@@ -5410,7 +5482,12 @@ function buildSteps1631(input) {
       pushStep({
         title: { vi: `Chênh lệch cạnh = |${heights[r][c]} - ${heights[nr][nc]}| = ${edgeEffort}`, en: `Edge difference = |${heights[r][c]} - ${heights[nr][nc]}| = ${edgeEffort}` },
         codeLine: 22,
-        current: [nr, nc],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "edge",
+        direction: [dr, dc],
+        curEffort,
+        edgeEffort,
         vars: [
           { name: `heights[${r}][${c}]`, value: heights[r][c] },
           { name: `heights[${nr}][${nc}]`, value: heights[nr][nc] },
@@ -5426,7 +5503,13 @@ function buildSteps1631(input) {
       pushStep({
         title: { vi: `new_effort = max(${curEffort}, ${edgeEffort}) = ${newEffort}`, en: `new_effort = max(${curEffort}, ${edgeEffort}) = ${newEffort}` },
         codeLine: 23,
-        current: [nr, nc],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "relax",
+        direction: [dr, dc],
+        curEffort,
+        edgeEffort,
+        newEffort,
         vars: [
           { name: "cur_effort", value: curEffort },
           { name: "edge_effort", value: edgeEffort },
@@ -5445,7 +5528,15 @@ function buildSteps1631(input) {
           ? { vi: `${newEffort} < ${formatEffort(oldEffort)}: tìm thấy đường tốt hơn`, en: `${newEffort} < ${formatEffort(oldEffort)}: found a better route` }
           : { vi: `${newEffort} < ${formatEffort(oldEffort)}? False`, en: `${newEffort} < ${formatEffort(oldEffort)}? False` },
         codeLine: 24,
-        current: [nr, nc],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "compare",
+        direction: [dr, dc],
+        curEffort,
+        edgeEffort,
+        newEffort,
+        oldEffort,
+        improves,
         vars: [
           { name: "new_effort", value: newEffort },
           { name: `effort[${nr}][${nc}]`, value: formatEffort(oldEffort) },
@@ -5468,7 +5559,15 @@ function buildSteps1631(input) {
       pushStep({
         title: { vi: `Cập nhật effort[${nr}][${nc}] = ${newEffort}`, en: `Set effort[${nr}][${nc}] = ${newEffort}` },
         codeLine: 25,
-        current: [nr, nc],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "update",
+        direction: [dr, dc],
+        curEffort,
+        edgeEffort,
+        newEffort,
+        oldEffort,
+        improves,
         vars: [{ name: "effort", value: effortStr() }],
         note: {
           vi: `Lưu effort tốt hơn cho ô (${nr},${nc}). Visualization đồng thời nhớ parent = (${r},${c}) để dựng đường cuối.`,
@@ -5481,7 +5580,15 @@ function buildSteps1631(input) {
       pushStep({
         title: { vi: `Push (${newEffort}, ${nr}, ${nc}) vào heap`, en: `Push (${newEffort}, ${nr}, ${nc}) into the heap` },
         codeLine: 26,
-        current: [nr, nc],
+        current: [r, c],
+        neighbor: [nr, nc],
+        event: "push",
+        direction: [dr, dc],
+        curEffort,
+        edgeEffort,
+        newEffort,
+        oldEffort,
+        improves,
         vars: [{ name: "heap", value: heapStr() }],
         note: {
           vi: "Heap sẽ sắp xếp để trạng thái có effort nhỏ nhất được xử lý trước ở vòng lặp tiếp theo.",
@@ -5495,6 +5602,8 @@ function buildSteps1631(input) {
     pushStep({
       title: { vi: "Grid không có ô để xử lý", en: "No grid cell to process" },
       codeLine: 27,
+      event: "done",
+      answerValue: 0,
       final: true,
       vars: [{ name: "answer", value: 0 }],
       note: {

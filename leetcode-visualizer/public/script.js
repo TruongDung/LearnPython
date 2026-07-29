@@ -1492,6 +1492,78 @@ function distinctIslandGuideHtml(view) {
   </section>`;
 }
 
+function effortGuideHtml(view) {
+  const vi = lang === "vi";
+  const event = view.event || "init";
+  const current = Array.isArray(view.current) ? view.current : null;
+  const neighbor = Array.isArray(view.neighbor) ? view.neighbor : null;
+  const heights = Array.isArray(view.heights) ? view.heights : [];
+  const heap = Array.isArray(view.heap) ? [...view.heap] : [];
+  const pathEdges = Array.isArray(view.pathEdges) ? view.pathEdges : [];
+  const valueAt = (cell) => cell && heights[cell[0]] ? heights[cell[0]][cell[1]] : null;
+  const coord = (cell) => cell ? `(${cell[0]},${cell[1]})` : "—";
+  const hasValue = (value) => value !== null && value !== undefined;
+  const activePhase = event === "done"
+    ? 3
+    : ["direction", "neighbor", "bounds", "edge"].includes(event)
+      ? 1
+      : ["relax", "compare"].includes(event)
+        ? 2
+        : ["update"].includes(event) || (event === "push" && neighbor)
+          ? 3
+          : 0;
+  const phaseLabels = vi
+    ? ["1 · Pop heap", "2 · Đo cạnh", "3 · Lấy max", "4 · Relax"]
+    : ["1 · Pop heap", "2 · Measure edge", "3 · Take max", "4 · Relax"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = event === "done" || index < activePhase ? "done" : index === activePhase ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : index === activePhase ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  heap.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  const heapHtml = heap.length
+    ? heap.slice(0, 8).map(([effort, row, col], index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? "TOP" : `#${index + 1}`}</small><strong>${effort}</strong>· (${row},${col})</span>`).join("")
+    : `<span class="effort-heap-empty">∅</span>`;
+  const moreHeap = heap.length > 8 ? `<small class="effort-heap-more">+${heap.length - 8}</small>` : "";
+
+  const currentHeight = valueAt(current);
+  const neighborHeight = valueAt(neighbor);
+  const routeHtml = current
+    ? `<div class="effort-route-row">
+        <span class="current-cell"><small>${vi ? "Ô ĐANG POP" : "POPPED CELL"}</small><strong>${coord(current)}</strong><em>height ${currentHeight}</em></span>
+        ${neighbor ? `<b aria-hidden="true">→</b><span class="neighbor-cell"><small>${vi ? "HÀNG XÓM" : "NEIGHBOR"}</small><strong>${coord(neighbor)}</strong><em>${hasValue(neighborHeight) ? `height ${neighborHeight}` : (vi ? "ngoài grid" : "outside grid")}</em></span>` : ""}
+      </div>`
+    : `<div class="effort-key-idea"><code>effort(path) = max(|Δheight|)</code><span>${vi ? "không cộng các cạnh" : "never sum the edges"}</span></div>`;
+
+  const formulaHtml = hasValue(view.edgeEffort)
+    ? `<div class="effort-formula-row">
+        <span><small>${vi ? "ĐƯỜNG ĐẾN CURRENT" : "PATH TO CURRENT"}</small><strong>${view.curEffort}</strong></span>
+        <b>max</b>
+        <span><small>|${currentHeight} − ${neighborHeight}|</small><strong>${view.edgeEffort}</strong></span>
+        <b>=</b>
+        <span class="new-effort"><small>new_effort</small><strong>${hasValue(view.newEffort) ? view.newEffort : "?"}</strong></span>
+        ${hasValue(view.improves) ? `<span class="effort-decision ${view.improves ? "update" : "skip"}">${view.improves ? "✓ UPDATE" : "✕ SKIP"}<small>${hasValue(view.newEffort) ? view.newEffort : "?"} &lt; ${escapeHtml(String(view.oldEffort))}</small></span>` : ""}
+      </div>`
+    : `<div class="effort-key-idea"><code>new_effort = max(cur_effort, edge_effort)</code></div>`;
+
+  const pathHtml = pathEdges.length
+    ? `<div class="effort-path-row"><strong>${vi ? "ĐƯỜNG CUỐI · bottleneck được tô đậm" : "FINAL PATH · bottleneck is emphasized"}</strong><div>${pathEdges.map((edge) => {
+      const bottleneck = edge.diff === view.answer;
+      return `<span class="${bottleneck ? "bottleneck" : ""}">${coord(edge.from)}→${coord(edge.to)} <b>|Δ|=${edge.diff}</b></span>`;
+    }).join("")}</div></div>`
+    : "";
+
+  return `<section class="effort-dijkstra-guide" aria-label="${vi ? "Mô phỏng Dijkstra minimax" : "Minimax Dijkstra simulation"}">
+    <div class="effort-phases">${phases}</div>
+    <div class="effort-guide-main">
+      <div class="effort-heap-lane"><div><strong>MIN-HEAP</strong><small>${vi ? "effort nhỏ nhất đứng đầu" : "smallest effort first"}</small></div><div>${heapHtml}${moreHeap}</div></div>
+      ${routeHtml}
+      ${formulaHtml}
+    </div>
+    ${pathHtml}
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -1509,10 +1581,10 @@ function renderBfsGrid(step) {
         : isDistinctIslands
           ? " distinct-islands-grid"
         : "";
-  const gridClass = `bfs-grid${variantClass}`;
+  const gridClass = `bfs-grid${variantClass}${isEffortGrid && step.effortView ? " minimax-effort-grid" : ""}`;
   const gridStyle = isTicTacToe
     ? ""
-    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? "64px" : isDistinctIslands ? "58px" : "32px"})"`;
+    : ` style="grid-template-columns:repeat(${cols},${isPhonePath ? "68px" : isEffortGrid ? (step.effortView ? "78px" : "64px") : isDistinctIslands ? "58px" : "32px"})"`;
   let html = `<div class="${gridClass}"${gridStyle}>`;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -1520,21 +1592,33 @@ function renderBfsGrid(step) {
       const cls = cell.cls || "empty";
       const label = cell.label || "";
       const meta = cell.meta || "";
-      const topTag = isEffortGrid ? `<span class="bfs-cell-label-tag">ARR</span>` : "";
-      html += `<div class="bfs-cell ${cls}">${topTag}<span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
+      const topTag = isEffortGrid ? `<span class="bfs-cell-label-tag">${step.effortView ? "HEIGHT" : "ARR"}</span>` : "";
+      const coordTag = step.effortView && cell.coord ? `<span class="bfs-cell-coord">${escapeXml(cell.coord)}</span>` : "";
+      const endpointTag = step.effortView && cell.endpoint ? `<span class="bfs-cell-endpoint">${escapeXml(cell.endpoint)}</span>` : "";
+      const ariaLabel = step.effortView ? ` aria-label="cell ${escapeXml(cell.coord || `${r},${c}`)}, height ${escapeXml(label)}, ${escapeXml(meta)}"` : "";
+      html += `<div class="bfs-cell ${cls}"${ariaLabel}>${topTag}${coordTag}${endpointTag}<span class="bfs-cell-value">${escapeXml(label)}</span>${meta ? `<span class="bfs-cell-meta">${escapeXml(meta)}</span>` : ""}</div>`;
     }
   }
   html += "</div>";
   if (isEffortGrid) {
     const hasParity = !!step.bfsGrid.parity;
-    html += `<div class="effort-grid-legend">
-      <span><strong class="eg-legend-big">99</strong> ${lang === "vi" ? "= thời điểm ĐẾN sớm nhất (cập nhật)" : "= earliest ARRIVAL time (updates)"}</span>
-      <span><strong class="eg-legend-small">⏱99</strong> ${lang === "vi" ? "= thời điểm phòng sẵn sàng (cố định)" : "= room ready time (fixed)"}</span>
-      ${hasParity ? `<span><i class="eg-swatch eg-swatch-even"></i>${lang === "vi" ? "bước tới tốn 1s" : "step costs 1s"}</span><span><i class="eg-swatch eg-swatch-odd"></i>${lang === "vi" ? "bước tới tốn 2s" : "step costs 2s"}</span>` : ""}
-    </div>`;
+    html += step.effortView
+      ? `<div class="effort-grid-legend minimax">
+          <span><strong class="eg-legend-big">8</strong>${lang === "vi" ? "height của ô" : "cell height"}</span>
+          <span><strong class="eg-legend-small">best:2</strong>${lang === "vi" ? "effort tốt nhất tới ô" : "best effort to cell"}</span>
+          <span><i class="eg-swatch eg-current"></i>${lang === "vi" ? "current" : "current"}</span>
+          <span><i class="eg-swatch eg-neighbor"></i>${lang === "vi" ? "hàng xóm" : "neighbor"}</span>
+          <span><i class="eg-swatch eg-path"></i>${lang === "vi" ? "đường cuối" : "final path"}</span>
+        </div>`
+      : `<div class="effort-grid-legend">
+          <span><strong class="eg-legend-big">99</strong> ${lang === "vi" ? "= thời điểm ĐẾN sớm nhất (cập nhật)" : "= earliest ARRIVAL time (updates)"}</span>
+          <span><strong class="eg-legend-small">⏱99</strong> ${lang === "vi" ? "= thời điểm phòng sẵn sàng (cố định)" : "= room ready time (fixed)"}</span>
+          ${hasParity ? `<span><i class="eg-swatch eg-swatch-even"></i>${lang === "vi" ? "bước tới tốn 1s" : "step costs 1s"}</span><span><i class="eg-swatch eg-swatch-odd"></i>${lang === "vi" ? "bước tới tốn 2s" : "step costs 2s"}</span>` : ""}
+        </div>`;
   }
   const guideHtml = step.distinctIslandView ? distinctIslandGuideHtml(step.distinctIslandView) : "";
-  el.innerHTML = guideHtml + html;
+  const effortGuide = step.effortView ? effortGuideHtml(step.effortView) : "";
+  el.innerHTML = guideHtml + effortGuide + html;
 }
 
 // ---- Shift 2D Grid renderer ----
