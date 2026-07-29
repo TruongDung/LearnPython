@@ -42,6 +42,7 @@ function addBacktrackingDecisionTree(result, problemId) {
       if (row !== undefined && col !== undefined) return `(${row},${col})`;
     }
     if (problemId === 980) return compact(getVar(vars, "at", "backtrack"));
+    if (problemId === 79) return compact(getVar(vars, "at", "cell", "next cell"));
     if (problemId === 17) return compact(getVar(vars, "letter", "removed"));
     if (problemId === 784) return compact(getVar(vars, "branch", "char"));
     return compact(getVar(vars, "nums[i]", "candidate", "sorted[i]", "i (pick)", "popped"));
@@ -2385,41 +2386,216 @@ function buildSteps282(input, params) {
 
 /** LeetCode 79: Word Search — DFS backtracking on a grid. */
 function buildSteps79(input, params) {
-  const board = String(input).split(/[;|]/).map((r) => r.trim()).filter(Boolean).map((r) => r.split(",").map((c) => c.trim()));
+  const board = String(input).split(/[;|]/).map((rawRow) => rawRow.trim()).filter(Boolean).map((rawRow) => (
+    rawRow.includes(",")
+      ? rawRow.split(",").map((cell) => cell.trim())
+      : [...rawRow.replace(/\s+/g, "")]
+  ));
   const word = String(params && params.word !== undefined ? params.word : "ABCCED");
-  const R = board.length, C = board[0].length;
+  const R = board.length;
+  const C = R ? board[0].length : 0;
   const work = board.map((r) => [...r]);
   const steps = [];
   const path = [];
-  let guard = 0, found = false;
-  function makeCells(cur) {
-    const pathSet = new Set(path.map(([r, c]) => `${r},${c}`));
-    return work.map((row, r) => row.map((ch, c) => {
-      let cls = "empty";
-      if (ch === "#") cls = "visited";
-      if (pathSet.has(`${r},${c}`)) cls = "path";
-      if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label: ch === "#" ? "·" : ch, cls };
-    }));
+  const callStack = [];
+  const triedStarts = new Set();
+  const directions = [
+    { dr: 1, dc: 0, key: "down", vi: "xuống", en: "down", symbol: "↓" },
+    { dr: -1, dc: 0, key: "up", vi: "lên", en: "up", symbol: "↑" },
+    { dr: 0, dc: 1, key: "right", vi: "phải", en: "right", symbol: "→" },
+    { dr: 0, dc: -1, key: "left", vi: "trái", en: "left", symbol: "←" },
+  ];
+  const STEP_LIMIT = 280;
+  const CALL_LIMIT = 6000;
+  let calls = 0;
+  let found = false;
+  let foundPath = [];
+
+  const coord = (r, c) => `(${r},${c})`;
+  const inBounds = (r, c) => r >= 0 && r < R && c >= 0 && c < C;
+  const pathSnapshot = () => path.map((item) => ({ ...item }));
+  const stackSnapshot = () => callStack.map((item) => ({ ...item }));
+  const boardCells = () => board.map((row) => [...row]);
+  const currentChar = (r, c) => inBounds(r, c) ? board[r][c] : null;
+
+  function snap(options) {
+    if (steps.length >= STEP_LIMIT) {
+      if (!options.final) return;
+      steps.pop();
+    }
+    const current = options.current || null;
+    const target = options.target || null;
+    const rejected = options.rejected || null;
+    const restored = options.restored || null;
+    const activePath = options.foundPath || pathSnapshot();
+    steps.push({
+      title: options.title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: !!options.final,
+      codeLines: options.codeLines || [],
+      vars: options.vars || [],
+      note: options.note,
+      wordSearchView: {
+        board: boardCells(),
+        rows: R,
+        cols: C,
+        word,
+        path: activePath,
+        current,
+        target,
+        rejected,
+        restored,
+        triedStarts: [...triedStarts].map((key) => key.split(",").map(Number)),
+        stack: stackSnapshot(),
+        index: Number.isInteger(options.index) ? options.index : activePath.length,
+        action: options.action || "init",
+        reason: options.reason || "",
+        direction: options.direction || null,
+        directionIndex: Number.isInteger(options.directionIndex) ? options.directionIndex : -1,
+        result: options.result,
+      },
+    });
   }
-  function snap(o) { steps.push({ title: o.title, arr: [], bfsGrid: { rows: R, cols: C, cells: makeCells(o.cur) }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  snap({ title: { vi: `Tìm "${word}" trên bảng`, en: `Search "${word}" on the board` }, codeLines: [3], vars: [{ name: "word", value: `"${word}"` }], note: { vi: "DFS từ mỗi ô; chỉ đi tiếp nếu ký tự khớp word[i]. Đánh dấu '#' để tránh dùng lại, khôi phục khi quay lui.", en: "DFS from each cell; continue only if the char matches word[i]. Mark '#' to avoid reuse, restore on backtrack." } });
+
+  snap({
+    title: { vi: `Tìm "${word}" trên bảng`, en: `Search "${word}" on the board` },
+    codeLines: [3], index: 0, action: "init",
+    vars: [{ name: "rows × cols", value: `${R} × ${C}` }, { name: "word", value: `"${word}"` }, { name: "word length", value: word.length }],
+    note: {
+      vi: "Thử mỗi ô làm điểm bắt đầu. Trong DFS: khớp ký tự hiện tại, đánh dấu ô đã dùng, thử lần lượt ↓ ↑ → ←; nếu bế tắc thì khôi phục ô và quay lui.",
+      en: "Try every cell as a start. In DFS: match the current letter, mark the cell used, try ↓ ↑ → ← in order; restore and backtrack on a dead end.",
+    },
+  });
+
   function dfs(r, c, i) {
-    if (guard > 160 || found) return found;
-    guard++;
-    if (i === word.length) { found = true; return true; }
-    if (r < 0 || r >= R || c < 0 || c >= C || work[r][c] !== word[i]) return false;
-    const tmp = work[r][c];
-    path.push([r, c]);
+    if (calls >= CALL_LIMIT) return false;
+    calls += 1;
+    callStack.push({ r, c, i });
+
+    snap({
+      title: { vi: `Gọi dfs${coord(r, c)}, i=${i}`, en: `Call dfs${coord(r, c)}, i=${i}` },
+      current: inBounds(r, c) ? { r, c } : null,
+      target: { r, c }, index: i, action: "call", codeLines: [5],
+      vars: [{ name: "at", value: coord(r, c) }, { name: "i", value: i }, { name: "need", value: i < word.length ? `word[${i}]='${word[i]}'` : "all matched" }, { name: "stack depth", value: callStack.length }],
+      note: { vi: `Frame mới cần khớp word[${i}]${i < word.length ? `='${word[i]}'` : " (đã hết từ)"}.`, en: `The new frame must match word[${i}]${i < word.length ? `='${word[i]}'` : " (the word is complete)"}.` },
+    });
+
+    if (i === word.length) {
+      found = true;
+      foundPath = pathSnapshot();
+      snap({
+        title: { vi: `✓ Đã khớp đủ "${word}"`, en: `✓ Matched all of "${word}"` },
+        index: i, action: "found", result: true, foundPath, codeLines: [6, 7],
+        vars: [{ name: "i", value: i }, { name: "len(word)", value: word.length }, { name: "path", value: foundPath.map((item) => coord(item.r, item.c)).join(" → ") }],
+        note: { vi: "i == len(word): mọi ký tự đã khớp theo các ô kề nhau, trả về True ngay.", en: "i == len(word): every character matched through adjacent cells, so return True immediately." },
+      });
+      callStack.pop();
+      return true;
+    }
+
+    if (!inBounds(r, c)) {
+      snap({
+        title: { vi: `Invalid ${coord(r, c)}: ngoài bảng`, en: `Invalid ${coord(r, c)}: outside board` },
+        target: { r, c }, rejected: { r, c }, index: i, action: "reject", reason: "outside", codeLines: [8, 9, 12],
+        vars: [{ name: "at", value: coord(r, c) }, { name: "valid rows", value: `0..${R - 1}` }, { name: "valid cols", value: `0..${C - 1}` }, { name: "return", value: false }],
+        note: { vi: `${coord(r, c)} vượt biên nên nhánh này dừng, không truy cập board[row][col].`, en: `${coord(r, c)} is out of bounds, so this branch stops without reading board[row][col].` },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    const actual = work[r][c];
+    const expected = word[i];
+    if (actual === "#" || actual !== expected) {
+      const reused = actual === "#";
+      snap({
+        title: reused
+          ? { vi: `Invalid ${coord(r, c)}: ô đang được dùng`, en: `Invalid ${coord(r, c)}: cell already used` }
+          : { vi: `Invalid ${coord(r, c)}: '${actual}' ≠ '${expected}'`, en: `Invalid ${coord(r, c)}: '${actual}' ≠ '${expected}'` },
+        current: { r, c }, rejected: { r, c }, index: i, action: "reject", reason: reused ? "reused" : "mismatch", codeLines: [10, 11, 12],
+        vars: [{ name: "at", value: coord(r, c) }, { name: "board[row][col]", value: reused ? "# (used)" : `'${actual}'` }, { name: `word[${i}]`, value: `'${expected}'` }, { name: "return", value: false }],
+        note: reused
+          ? { vi: "Ô này đã thuộc đường đi hiện tại (#), nên không được dùng lần thứ hai.", en: "This cell is already in the current path (#), so it cannot be reused." }
+          : { vi: `Cần '${expected}' nhưng ô chứa '${actual}', nên nhánh này sai và trả về False.`, en: `Expected '${expected}' but found '${actual}', so this branch fails and returns False.` },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    const tmp = actual;
+    path.push({ r, c, char: tmp, index: i });
     work[r][c] = "#";
-    if (guard <= 50) snap({ title: { vi: `(${r},${c})='${tmp}' khớp word[${i}]`, en: `(${r},${c})='${tmp}' matches word[${i}]` }, cur: [r, c], codeLines: [4, 5, 6, 7], vars: [{ name: "cell", value: `(${r},${c})='${tmp}'` }, { name: "matched", value: word.slice(0, i + 1) }], note: { vi: `Khớp ký tự thứ ${i}. Đánh dấu '#', thử 4 hướng cho word[${i + 1}].`, en: `Matched char ${i}. Mark '#', try 4 directions for word[${i + 1}].` } });
-    const ok = dfs(r + 1, c, i + 1) || dfs(r - 1, c, i + 1) || dfs(r, c + 1, i + 1) || dfs(r, c - 1, i + 1);
+    snap({
+      title: { vi: `Enter cell ${coord(r, c)}: '${tmp}' khớp`, en: `Enter cell ${coord(r, c)}: '${tmp}' matches` },
+      current: { r, c }, index: i, action: "match", codeLines: [13, 14],
+      vars: [{ name: "at", value: coord(r, c) }, { name: "i", value: i }, { name: "matched char", value: `'${tmp}'` }, { name: "matched prefix", value: `"${word.slice(0, i + 1)}"` }, { name: "path length", value: path.length }],
+      note: { vi: `Khớp word[${i}]='${tmp}'. Đánh dấu ô là '#': ô này thuộc đường đi và không thể được dùng lại trong nhánh hiện tại.`, en: `Matched word[${i}]='${tmp}'. Mark the cell '#': it now belongs to the path and cannot be reused in this branch.` },
+    });
+
+    for (let directionIndex = 0; directionIndex < directions.length; directionIndex += 1) {
+      const direction = directions[directionIndex];
+      const nr = r + direction.dr;
+      const nc = c + direction.dc;
+      snap({
+        title: { vi: `Thử ${direction.symbol} ${direction.vi}: ${coord(r, c)} → ${coord(nr, nc)}`, en: `Try ${direction.symbol} ${direction.en}: ${coord(r, c)} → ${coord(nr, nc)}` },
+        current: { r, c }, target: { r: nr, c: nc }, index: i + 1, action: "explore", direction, directionIndex, codeLines: [16, 17],
+        vars: [{ name: "at", value: coord(r, c) }, { name: "direction", value: `${direction.symbol} ${direction.en}` }, { name: "next cell", value: coord(nr, nc) }, { name: "next i", value: i + 1 }, { name: "next char", value: i + 1 < word.length ? `'${word[i + 1]}'` : "complete" }],
+        note: { vi: `Thứ tự thử cố định: ↓, ↑, →, ←. Bây giờ gọi dfs${coord(nr, nc)}, i=${i + 1}. Nếu True, OR short-circuit và không thử các hướng còn lại.`, en: `The fixed order is ↓, ↑, →, ←. Now call dfs${coord(nr, nc)}, i=${i + 1}. If it returns True, OR short-circuits and later directions are skipped.` },
+      });
+      if (dfs(nr, nc, i + 1)) {
+        work[r][c] = tmp;
+        snap({
+          title: { vi: `${direction.symbol} trả về True → truyền True lên`, en: `${direction.symbol} returns True → propagate True` },
+          current: { r, c }, index: i, action: "return-true", direction, directionIndex, result: true, foundPath, codeLines: [17, 18, 19],
+          vars: [{ name: "at", value: coord(r, c) }, { name: "successful direction", value: `${direction.symbol} ${direction.en}` }, { name: "restore", value: `${coord(r, c)}='${tmp}'` }, { name: "return", value: true }],
+          note: { vi: `Nhánh ${direction.symbol} đã ghép hết từ. Khôi phục ký tự '${tmp}' trước khi trả True; các hướng sau không chạy vì short-circuit.`, en: `The ${direction.symbol} branch completed the word. Restore '${tmp}' before returning True; later directions do not run because of short-circuiting.` },
+        });
+        callStack.pop();
+        return true;
+      }
+    }
+
     work[r][c] = tmp;
-    if (!ok) path.pop();
-    return ok;
+    path.pop();
+    snap({
+      title: { vi: `Backtrack from ${coord(r, c)}: khôi phục '${tmp}'`, en: `Backtrack from ${coord(r, c)}: restore '${tmp}'` },
+      current: { r, c }, restored: { r, c }, index: i, action: "backtrack", codeLines: [21, 22],
+      vars: [{ name: "backtrack", value: coord(r, c) }, { name: "restore char", value: `'${tmp}'` }, { name: "remaining path", value: path.length ? path.map((item) => coord(item.r, item.c)).join(" → ") : "∅" }, { name: "return", value: false }],
+      note: { vi: `Cả 4 hướng đều False. Bỏ ${coord(r, c)} khỏi path, trả ô về '${tmp}', rồi quay lại frame cha để thử hướng khác.`, en: `All four directions returned False. Remove ${coord(r, c)} from the path, restore '${tmp}', then return to the parent frame to try another direction.` },
+    });
+    callStack.pop();
+    return false;
   }
-  outer: for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { if (dfs(r, c, 0)) break outer; }
-  snap({ title: found ? { vi: "Tìm thấy → True", en: "Found → True" } : { vi: "Không tìm thấy → False", en: "Not found → False" }, cur: null, final: true, codeLines: [8], vars: [{ name: "answer", value: found }], note: { vi: found ? `Ghép được "${word}" từ các ô kề nhau.` : `Không có đường nào ghép thành "${word}".`, en: found ? `"${word}" can be formed from adjacent cells.` : `No path forms "${word}".` } });
+
+  outer: for (let r = 0; r < R; r += 1) {
+    for (let c = 0; c < C; c += 1) {
+      triedStarts.add(`${r},${c}`);
+      snap({
+        title: { vi: `Thử điểm bắt đầu ${coord(r, c)}`, en: `Try start ${coord(r, c)}` },
+        current: { r, c }, target: { r, c }, index: 0, action: "start", codeLines: [24, 25, 26],
+        vars: [{ name: "start", value: coord(r, c) }, { name: "cell char", value: `'${currentChar(r, c)}'` }, { name: "need", value: word.length ? `'${word[0]}'` : "empty word" }, { name: "starts tried", value: triedStarts.size }],
+        note: { vi: `Gọi dfs${coord(r, c)}, i=0. Nếu ô này không mở được đường hợp lệ, vòng lặp chuyển sang ô kế tiếp.`, en: `Call dfs${coord(r, c)}, i=0. If this cell cannot start a valid path, the loops move to the next cell.` },
+      });
+      if (dfs(r, c, 0)) break outer;
+    }
+  }
+
+  snap({
+    title: found ? { vi: `Tìm thấy "${word}" → True`, en: `Found "${word}" → True` } : { vi: `Không tìm thấy "${word}" → False`, en: `Did not find "${word}" → False` },
+    final: true, index: found ? word.length : 0, action: found ? "result-true" : "result-false", result: found,
+    foundPath: found ? foundPath : [], codeLines: found ? [27] : [28],
+    vars: [
+      { name: "answer", value: found },
+      { name: "DFS calls", value: calls },
+      { name: "starts tried", value: triedStarts.size },
+      { name: "path", value: found ? foundPath.map((item) => `${coord(item.r, item.c)}='${item.char}'`).join(" → ") : "∅" },
+    ],
+    note: found
+      ? { vi: `Đường màu xanh ghép đúng "${word}". Mỗi ô xuất hiện đúng một lần và các bước liên tiếp kề nhau theo 4 hướng.`, en: `The green path spells "${word}". Every cell is used once, and consecutive cells are 4-directionally adjacent.` }
+      : { vi: `Đã thử mọi ô làm điểm đầu nhưng mọi nhánh đều mismatch, vượt biên, dùng lại ô hoặc bế tắc.`, en: `Every cell was tried as a start, but every branch mismatched, left the board, reused a cell, or reached a dead end.` },
+  });
   return { original: board, answer: found, steps };
 }
 
@@ -2460,11 +2636,40 @@ module.exports = {
     titleVi: { vi: "Tìm từ trên bảng (DFS backtracking)", en: "Search a word on a grid (DFS backtracking)" },
     statement: { vi: "Cho bảng ký tự và word. Word có thể ghép từ các ô kề nhau (4 hướng), mỗi ô dùng 1 lần? Nhập bảng: hàng cách ';', ký tự cách ','; word trong tham số.", en: "Given a board and a word, can the word be formed from adjacent cells (4 directions), each used once? Enter board: rows separated by ';', chars by ','; word as a parameter." },
     defaultInput: "A,B,C,E;S,F,C,S;A,D,E,E", inputKind: "string", inputLabel: { vi: "Bảng (hàng cách ;)", en: "Board (rows separated by ;)" },
-    extraParams: [{ key: "word", label: { vi: "word", en: "word" }, default: "ABCCED" }],
+    extraParams: [{ key: "word", type: "string", label: { vi: "word", en: "word" }, default: "ABCCED" }],
     approach: [{ vi: "DFS từ mỗi ô; khớp word[i] mới đi tiếp.", en: "DFS from each cell; continue only if word[i] matches." }, { vi: "Đánh dấu '#' ô đang dùng để không dùng lại.", en: "Mark the current cell '#' so it isn't reused." }, { vi: "Khôi phục ô khi quay lui.", en: "Restore the cell on backtrack." }, { vi: "Tìm thấy khi i == len(word).", en: "Found when i == len(word)." }],
     complexity: { time: "O(R·C·4^L)", space: "O(L)", note: { vi: "L = độ dài word.", en: "L = word length." } },
-    code: ["class Solution:", "    def exist(self, board, word):", "        R, C = len(board), len(board[0])", "        def dfs(r, c, i):", "            if i == len(word): return True", "            if not (0<=r<R and 0<=c<C) or board[r][c] != word[i]: return False", "            board[r][c] = '#'", "            found = dfs(r+1,c,i+1) or dfs(r-1,c,i+1) or dfs(r,c+1,i+1) or dfs(r,c-1,i+1)", "            board[r][c] = word[i]; return found", "        return any(dfs(r,c,0) for r in range(R) for c in range(C))"],
-    builder: buildSteps79,
+    code: [
+      "class Solution:",
+      "    def exist(self, board, word):",
+      "        rows, cols = len(board), len(board[0])",
+      "",
+      "        def dfs(row, col, index):",
+      "            if index == len(word):",
+      "                return True",
+      "            if (row < 0 or row >= rows or",
+      "                col < 0 or col >= cols or",
+      "                board[row][col] == '#' or",
+      "                board[row][col] != word[index]):",
+      "                return False",
+      "            char = board[row][col]",
+      "            board[row][col] = '#'",
+      "",
+      "            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):",
+      "                if dfs(row + dr, col + dc, index + 1):",
+      "                    board[row][col] = char",
+      "                    return True",
+      "",
+      "            board[row][col] = char",
+      "            return False",
+      "",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if dfs(row, col, 0):",
+      "                    return True",
+      "        return False",
+    ],
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps79(input, params), 79),
   },
   131: {
     id: 131, difficulty: "medium", slug: "palindrome-partitioning",

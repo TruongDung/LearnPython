@@ -1851,6 +1851,121 @@ function renderRecoverBstView(step) {
   renderTree(step, "recoverBstTree");
 }
 
+function renderWordSearchView(step) {
+  const view = step.wordSearchView;
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const pathMap = new Map((view.path || []).map((item, index) => [`${item.r},${item.c}`, { ...item, order: index + 1 }]));
+  const triedStarts = new Set((view.triedStarts || []).map(([r, c]) => `${r},${c}`));
+  const sameCell = (cell, r, c) => cell && cell.r === r && cell.c === c;
+  const isInside = (cell) => cell && cell.r >= 0 && cell.r < view.rows && cell.c >= 0 && cell.c < view.cols;
+  const focus = view.target || view.current;
+  const actionLabels = {
+    init: vi ? "Chuẩn bị DFS từ từng ô" : "Prepare DFS from every cell",
+    start: vi ? "Thử một điểm bắt đầu mới" : "Try a new start cell",
+    call: vi ? "Tạo một frame DFS mới" : "Create a new DFS frame",
+    match: vi ? "Ký tự khớp → thêm ô vào path" : "Character matches → add cell to path",
+    explore: vi ? "Thử ô kề theo thứ tự ↓ ↑ → ←" : "Try a neighbor in ↓ ↑ → ← order",
+    reject: view.reason === "outside"
+      ? (vi ? "Nhánh sai: tọa độ vượt biên" : "Reject: coordinate is outside the board")
+      : view.reason === "reused"
+        ? (vi ? "Nhánh sai: ô đã có trong path" : "Reject: cell is already in the path")
+        : (vi ? "Nhánh sai: ký tự không khớp" : "Reject: character mismatch"),
+    backtrack: vi ? "Bế tắc → khôi phục ô và lùi lại" : "Dead end → restore the cell and backtrack",
+    found: vi ? "Đã khớp đủ mọi ký tự" : "Every character has been matched",
+    "return-true": vi ? "Nhánh con thành công → truyền True lên" : "Child succeeded → propagate True",
+    "result-true": vi ? "Tìm thấy đường đi hợp lệ" : "A valid path was found",
+    "result-false": vi ? "Đã thử hết nhưng không có đường hợp lệ" : "All starts exhausted; no valid path",
+  };
+
+  const completed = view.result === true || view.action === "found" || view.action === "result-true";
+  const matchedCount = completed ? view.word.length : Math.min(view.word.length, (view.path || []).length);
+  const wordHtml = [...view.word].map((letter, index) => {
+    const classes = ["word-search-letter"];
+    if (index < matchedCount) classes.push("matched");
+    else if (index === view.index) classes.push(view.action === "reject" ? "rejected" : "needed");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(letter)}</strong></span>`;
+  }).join('<i class="word-search-word-arrow">→</i>');
+
+  const cellsHtml = (view.board || []).flatMap((row, r) => row.map((letter, c) => {
+    const key = `${r},${c}`;
+    const pathItem = pathMap.get(key);
+    const classes = ["word-search-cell"];
+    let state = "";
+    if (triedStarts.has(key)) classes.push("tried-start");
+    if (pathItem) {
+      classes.push(completed ? "found-path" : "in-path");
+      state = `${vi ? "bước" : "step"} ${pathItem.order}`;
+    }
+    if (sameCell(view.target, r, c) && !sameCell(view.current, r, c)) {
+      classes.push("target");
+      state = vi ? "sắp thử" : "next";
+    }
+    if (sameCell(view.current, r, c)) {
+      classes.push(view.action === "reject" ? "rejected" : "current");
+      state = view.action === "reject" ? (vi ? "không hợp lệ" : "invalid") : (vi ? "đang xét" : "current");
+    }
+    if (sameCell(view.restored, r, c)) {
+      classes.push("restored");
+      state = vi ? "đã khôi phục" : "restored";
+    }
+    return `<div class="${classes.join(" ")}">
+      <small>(${r},${c})</small>
+      <strong>${escapeHtml(letter)}</strong>
+      <span>${escapeHtml(state)}</span>
+      ${pathItem ? `<b>${pathItem.order}</b>` : ""}
+    </div>`;
+  })).join("");
+
+  const actual = isInside(focus) ? view.board[focus.r][focus.c] : (focus ? (vi ? "ngoài bảng" : "outside") : "—");
+  const expected = view.index >= view.word.length ? "✓" : (view.word[view.index] || "—");
+  const comparisonClass = view.action === "reject" ? "is-rejected" : view.action === "match" || completed ? "is-matched" : "";
+  const focusText = focus ? `(${focus.r},${focus.c})` : "—";
+
+  const directionOrder = [
+    { key: "down", symbol: "↓", label: vi ? "xuống" : "down" },
+    { key: "up", symbol: "↑", label: vi ? "lên" : "up" },
+    { key: "right", symbol: "→", label: vi ? "phải" : "right" },
+    { key: "left", symbol: "←", label: vi ? "trái" : "left" },
+  ];
+  const directionsHtml = directionOrder.map((direction, index) => {
+    const classes = ["word-search-direction"];
+    if (index < view.directionIndex) classes.push("tried");
+    if (index === view.directionIndex) classes.push(view.result === true ? "success" : "active");
+    return `<span class="${classes.join(" ")}"><b>${direction.symbol}</b><small>${direction.label}</small></span>`;
+  }).join("");
+
+  const stackHtml = (view.stack || []).length
+    ? view.stack.map((frame, index) => `<span class="word-search-frame${index === view.stack.length - 1 ? " active" : ""}"><small>i=${frame.i}</small><strong>(${frame.r},${frame.c})</strong></span>`).join('<i class="word-search-stack-arrow">→</i>')
+    : `<span class="word-search-empty">∅</span>`;
+  const pathHtml = (view.path || []).length
+    ? view.path.map((item) => `<span><small>${item.index}</small><strong>${escapeHtml(item.char)}</strong><em>(${item.r},${item.c})</em></span>`).join('<i>→</i>')
+    : `<span class="word-search-empty">∅</span>`;
+  const summary = vi
+    ? `Tìm từ ${view.word}. Đã khớp ${matchedCount} trên ${view.word.length} ký tự; đang xét ${focusText}.`
+    : `Searching for ${view.word}. Matched ${matchedCount} of ${view.word.length} characters; inspecting ${focusText}.`;
+
+  treeView.innerHTML = `<div class="word-search-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="word-search-word"><span>${vi ? "Từ cần tìm" : "Target word"}</span><div>${wordHtml || '<span class="word-search-empty">empty</span>'}</div><em>${matchedCount}/${view.word.length}</em></div>
+    <div class="word-search-action ${comparisonClass}"><strong>${escapeHtml(actionLabels[view.action] || pick(step.title))}</strong><span>${escapeHtml(focusText)}</span><code>${escapeHtml(actual)} ${view.action === "reject" ? "≠" : "→"} ${escapeHtml(expected)}</code></div>
+    <div class="word-search-main">
+      <div class="word-search-board" style="grid-template-columns: repeat(${Math.max(1, view.cols)}, minmax(48px, 62px))">${cellsHtml}</div>
+      <div class="word-search-trace">
+        <div><b>${vi ? "Thứ tự thử hướng" : "Direction order"}</b><span class="word-search-directions">${directionsHtml}</span></div>
+        <div><b>Call stack</b><span class="word-search-stack">${stackHtml}</span></div>
+      </div>
+    </div>
+    <div class="word-search-path"><b>path</b><span>${pathHtml}</span></div>
+    <div class="word-search-legend">
+      <span><i class="current"></i>${vi ? "đang xét" : "current"}</span>
+      <span><i class="target"></i>${vi ? "ô kế tiếp" : "next cell"}</span>
+      <span><i class="path"></i>${vi ? "đường hiện tại" : "current path"}</span>
+      <span><i class="rejected"></i>${vi ? "nhánh sai" : "rejected"}</span>
+      <span><i class="restored"></i>backtrack</span>
+    </div>
+  </div>`;
+}
+
 function renderSameTreeView(step) {
   const view = step.sameTreeView;
   const treeView = $("treeView");
@@ -4459,6 +4574,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRecoverBstView(step);
+  } else if (step.wordSearchView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordSearchView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
