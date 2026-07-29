@@ -5111,6 +5111,237 @@ function renderKruskalEffortView(step) {
   </div>`;
 }
 
+function renderParallelCoursesView(step) {
+  const view = step.parallelCoursesView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { build: 0, seed: 1, semester: 2, relax: 3, check: 4, done: 5 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Xây graph", "2 · Tìm in-degree 0", "3 · Học song song", "4 · Gỡ cạnh", "5 · Kiểm tra cycle"]
+    : ["1 · Build graph", "2 · Find in-degree 0", "3 · Parallel semester", "4 · Remove edges", "5 · Check cycle"];
+  const phaseHtml = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    const icon = state === "done" ? "✓" : state === "active" ? "▶" : "○";
+    return `<span class="${state}">${icon} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const columns = view.planColumns || [];
+  const maxRows = Math.max(1, ...columns.map((column) => column.courses.length));
+  const graphWidth = Math.max(600, columns.length * 210);
+  const graphHeight = Math.max(280, 115 + maxRows * 92);
+  const columnWidth = graphWidth / Math.max(1, columns.length);
+  const positions = new Map();
+  let columnSvg = "";
+  columns.forEach((column, columnIndex) => {
+    const centerX = columnWidth * (columnIndex + 0.5);
+    const revealCycle = column.kind === "cycle" && view.event === "cycle";
+    const columnLabel = column.kind === "cycle"
+      ? (revealCycle ? (vi ? "⛔ CHU TRÌNH" : "⛔ CYCLE") : (vi ? "CHƯA GIẢI QUYẾT" : "UNRESOLVED"))
+      : (vi ? `HỌC KỲ ${column.semester}` : `SEMESTER ${column.semester}`);
+    if (columnIndex > 0) {
+      const dividerX = columnWidth * columnIndex;
+      columnSvg += `<line class="pc-column-divider" x1="${dividerX}" y1="34" x2="${dividerX}" y2="${graphHeight - 14}"></line>`;
+    }
+    columnSvg += `<text class="pc-column-label${revealCycle ? " cycle" : ""}" x="${centerX}" y="24" text-anchor="middle">${escapeXml(columnLabel)}</text>`;
+
+    if (column.kind === "cycle" && column.courses.length > 1) {
+      const radius = Math.min(68, columnWidth * 0.28);
+      const centerY = graphHeight / 2 + 10;
+      column.courses.forEach((course, index) => {
+        const angle = (2 * Math.PI * index) / column.courses.length - Math.PI / 2;
+        positions.set(course, {
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle),
+        });
+      });
+    } else {
+      const usableHeight = graphHeight - 72;
+      column.courses.forEach((course, row) => {
+        positions.set(course, {
+          x: centerX,
+          y: 48 + ((row + 1) * usableHeight) / (column.courses.length + 1),
+        });
+      });
+    }
+  });
+
+  const builtEdges = new Set(view.builtEdgeKeys || []);
+  const processedEdges = new Set(view.processedEdgeKeys || []);
+  const activeEdgeKey = view.activeEdge ? view.activeEdge.key : null;
+  const nodeRadius = 36;
+  const edgeSvg = (view.relations || []).map((edge) => {
+    const from = positions.get(edge.from);
+    const to = positions.get(edge.to);
+    if (!from || !to) return "";
+    const active = edge.key === activeEdgeKey;
+    const processed = processedEdges.has(edge.key);
+    const built = builtEdges.has(edge.key);
+    const state = active ? "active" : processed ? "processed" : built ? "built" : "unbuilt";
+    const marker = active ? "pc-arrow-active" : processed ? "pc-arrow-processed" : "pc-arrow";
+    if (edge.from === edge.to) {
+      return `<path class="pc-edge ${state}" d="M ${from.x} ${from.y - nodeRadius} C ${from.x + 82} ${from.y - 78}, ${from.x + 82} ${from.y + 78}, ${from.x} ${from.y + nodeRadius}" marker-end="url(#${marker})"></path>`;
+    }
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const unitX = dx / distance;
+    const unitY = dy / distance;
+    const x1 = from.x + unitX * (nodeRadius + 2);
+    const y1 = from.y + unitY * (nodeRadius + 2);
+    const x2 = to.x - unitX * (nodeRadius + (active ? 8 : 6));
+    const y2 = to.y - unitY * (nodeRadius + (active ? 8 : 6));
+    return `<line class="pc-edge ${state}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#${marker})"></line>`;
+  }).join("");
+
+  const completedSet = new Set(view.completed || []);
+  const betweenSemesters = view.semester > 0
+    && (view.event === "semester-complete" || (view.event === "while-check" && (view.queue || []).length > 0));
+  const currentQueue = betweenSemesters
+    ? []
+    : (view.currentBatch || []).length
+      ? view.currentBatch
+      : view.queue || [];
+  const displayedNextQueue = betweenSemesters ? view.queue || [] : view.nextQueue || [];
+  const currentQueueSet = new Set(currentQueue);
+  const nextQueueSet = new Set(displayedNextQueue);
+  const stuckSet = new Set(view.event === "cycle" ? view.stuckCourses || [] : []);
+  const nodeSvg = (view.courses || []).map((course) => {
+    const point = positions.get(course);
+    if (!point) return "";
+    const indegree = view.indegree[course - 1];
+    const classes = ["pc-node"];
+    let stateLabel = indegree === 0 ? (vi ? "sẵn sàng" : "ready") : (vi ? "đang chờ" : "waiting");
+    if (completedSet.has(course)) {
+      classes.push("completed");
+      stateLabel = vi ? "đã học" : "done";
+    }
+    if (currentQueueSet.has(course)) {
+      classes.push("queued");
+      stateLabel = vi ? "queue hiện tại" : "current queue";
+    }
+    if (nextQueueSet.has(course)) {
+      classes.push("next-queued");
+      stateLabel = vi ? "queue kế tiếp" : "next queue";
+    }
+    if (course === view.currentNeighbor) classes.push("neighbor");
+    if (course === view.currentCourse) {
+      classes.push("current");
+      stateLabel = vi ? "đang xử lý" : "processing";
+    }
+    if (stuckSet.has(course)) {
+      classes.push("stuck");
+      stateLabel = vi ? "kẹt cycle" : "cycle stuck";
+    }
+    return `<g class="${classes.join(" ")}" aria-label="course ${course}, in-degree ${indegree}, ${escapeHtml(stateLabel)}">
+      <circle cx="${point.x}" cy="${point.y}" r="${nodeRadius}"></circle>
+      <text class="course" x="${point.x}" y="${point.y - 7}">C${course}</text>
+      <text class="degree" x="${point.x}" y="${point.y + 10}">in = ${indegree}</text>
+      <text class="state" x="${point.x}" y="${point.y + 25}">${escapeXml(stateLabel)}</text>
+    </g>`;
+  }).join("");
+
+  const graphSummary = vi
+    ? "Đồ thị môn học được chia theo học kỳ, với mũi tên từ tiên quyết tới môn phụ thuộc."
+    : "Course graph grouped by semester, with arrows from prerequisites to dependent courses.";
+  const graphHtml = `<svg class="pc-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(graphSummary)}">
+    <defs>
+      <marker id="pc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+      <marker id="pc-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+      <marker id="pc-arrow-processed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker>
+    </defs>
+    ${columnSvg}${edgeSvg}${nodeSvg}
+  </svg>`;
+
+  function queueChips(items, className) {
+    return items.length
+      ? items.map((course) => `<span class="${className}">C${course}</span>`).join("")
+      : `<em>∅</em>`;
+  }
+
+  let actionHtml;
+  if (view.event === "cycle") {
+    actionHtml = `<div class="pc-action cycle"><small>${vi ? "BỊ KẸT" : "STUCK"}</small><strong>${(view.stuckCourses || []).map((course) => `C${course}`).join(", ")}</strong><span>${vi ? "queue rỗng nhưng in-degree vẫn > 0" : "queue is empty but in-degree remains > 0"}</span></div>`;
+  } else if (view.event === "done") {
+    actionHtml = `<div class="pc-action success"><small>${vi ? "HOÀN THÀNH" : "COMPLETE"}</small><strong>${view.answer} ${vi ? "học kỳ" : "semester(s)"}</strong><span>${vi ? "Mọi môn đã được xử lý" : "Every course was processed"}</span></div>`;
+  } else if (view.event === "capture-size") {
+    const batchText = (view.currentBatch || []).map((course) => `C${course}`).join(" + ") || "∅";
+    actionHtml = `<div class="pc-action course"><small>${vi ? "KHÓA BATCH HIỆN TẠI" : "LOCK CURRENT BATCH"}</small><strong>size = ${view.loopSize}</strong><b>${batchText}</b><span>${vi ? "Môn vừa được mở khóa phải vào queue của học kỳ sau" : "A newly unlocked course must enter next semester's queue"}</span></div>`;
+  } else if (view.event === "semester-complete") {
+    const readyText = (view.queue || []).map((course) => `C${course}`).join(" + ") || "∅";
+    actionHtml = `<div class="pc-action success"><small>${vi ? `XONG HỌC KỲ ${view.semester}` : `SEMESTER ${view.semester} COMPLETE`}</small><strong>${readyText}</strong><span>${vi ? `Trở thành queue đầu học kỳ ${view.semester + 1}` : `Becomes the starting queue for semester ${view.semester + 1}`}</span></div>`;
+  } else if (["seed-ready", "seed-blocked"].includes(view.event)) {
+    const degree = view.indegree[view.currentCourse - 1];
+    const decision = view.event === "seed-ready"
+      ? (vi ? "in-degree = 0 → thêm vào queue học kỳ 1" : "in-degree = 0 → enqueue for semester 1")
+      : (vi ? `còn ${degree} prerequisite → tiếp tục chờ` : `${degree} prerequisite(s) remain → keep waiting`);
+    actionHtml = `<div class="pc-action ${view.event === "seed-ready" ? "success" : "rule"}"><small>${vi ? "KIỂM TRA IN-DEGREE" : "CHECK IN-DEGREE"}</small><strong>C${view.currentCourse}</strong><b>in[C${view.currentCourse}] = ${degree}</b><span>${escapeHtml(decision)}</span></div>`;
+  } else if (view.phase === "build" && view.activeEdge) {
+    const buildValue = view.event === "increment-indegree"
+      ? `in[C${view.activeEdge.to}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
+      : view.event === "add-edge"
+        ? `adj[C${view.activeEdge.from}].append(C${view.activeEdge.to})`
+        : (vi ? "Đọc cặp prerequisite" : "Read prerequisite pair");
+    actionHtml = `<div class="pc-action edge"><small>${vi ? "XÂY ĐỒ THỊ" : "BUILD GRAPH"}</small><strong>C${view.activeEdge.from} → C${view.activeEdge.to}</strong><b>${escapeHtml(buildValue)}</b><span>${vi ? "Mũi tên đi từ prerequisite tới môn phụ thuộc" : "The arrow goes from prerequisite to dependent course"}</span></div>`;
+  } else if (view.activeEdge) {
+    const degreeText = view.indegreeBefore !== undefined
+      ? `in[C${view.activeEdge.to}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
+      : `in[C${view.activeEdge.to}] = ${view.indegree[view.activeEdge.to - 1]}`;
+    const decisionText = view.readyDecision === true
+      ? (vi ? `C${view.activeEdge.to} đã sẵn sàng cho học kỳ sau` : `C${view.activeEdge.to} is ready for next semester`)
+      : view.readyDecision === false
+        ? (vi ? `C${view.activeEdge.to} vẫn phải chờ` : `C${view.activeEdge.to} is still blocked`)
+        : (vi ? "Gỡ một prerequisite đã hoàn thành" : "Remove one completed prerequisite");
+    actionHtml = `<div class="pc-action edge"><small>${vi ? "CẠNH ĐANG XỬ LÝ" : "ACTIVE EDGE"}</small><strong>C${view.activeEdge.from} → C${view.activeEdge.to}</strong><b>${escapeHtml(degreeText)}</b><span>${escapeHtml(decisionText)}</span></div>`;
+  } else if (view.currentCourse !== null && view.currentCourse !== undefined) {
+    actionHtml = `<div class="pc-action course"><small>${vi ? "MÔN HIỆN TẠI" : "CURRENT COURSE"}</small><strong>C${view.currentCourse}</strong><span>${vi ? `Học kỳ ${view.semester} · gỡ tất cả cạnh đi ra` : `Semester ${view.semester} · remove every outgoing edge`}</span></div>`;
+  } else {
+    actionHtml = `<div class="pc-action rule"><code>queue = all courses with in-degree 0</code><span>${vi ? "Mỗi BFS level = một học kỳ" : "Each BFS level = one semester"}</span></div>`;
+  }
+
+  const indegreeHtml = (view.courses || []).map((course) => {
+    const degree = view.indegree[course - 1];
+    const classes = [];
+    if (course === view.currentNeighbor) classes.push("active");
+    if (degree === 0) classes.push("ready");
+    if (completedSet.has(course)) classes.push("completed");
+    if (stuckSet.has(course)) classes.push("stuck");
+    return `<span class="${classes.join(" ")}"><small>C${course}</small><strong>${degree}</strong><em>${degree === 0 ? (vi ? "ready" : "ready") : `${degree} ${vi ? "còn lại" : "left"}`}</em></span>`;
+  }).join("");
+
+  const historyHtml = (view.semesterHistory || []).length
+    ? view.semesterHistory.map((item) => `<span><small>S${item.semester}</small><strong>${item.courses.map((course) => `C${course}`).join(" + ")}</strong></span>`).join("")
+    : `<em>${vi ? "Chưa hoàn thành học kỳ nào" : "No completed semester yet"}</em>`;
+
+  const currentQueueTitle = view.semester > 0
+    ? (vi ? `HỌC KỲ ${view.semester} · CÒN LẠI` : `SEMESTER ${view.semester} · REMAINING`)
+    : (vi ? "QUEUE SẴN SÀNG BAN ĐẦU" : "INITIAL READY QUEUE");
+  const nextQueueTitle = view.semester > 0
+    ? (vi ? `QUEUE HỌC KỲ ${view.semester + 1}` : `SEMESTER ${view.semester + 1} QUEUE`)
+    : (vi ? "QUEUE HỌC KỲ 1" : "SEMESTER 1 QUEUE");
+
+  el.innerHTML = `<div class="pc-viz">
+    <div class="pc-phases">${phaseHtml}</div>
+    <div class="pc-summary">
+      <span><small>${vi ? "HỌC KỲ" : "SEMESTER"}</small><strong>${view.semester || "—"}</strong></span>
+      <span><small>${vi ? "ĐÃ HỌC" : "TAKEN"}</small><strong>${view.taken}/${view.n}</strong></span>
+      <span><small>${vi ? "QUEUE READY" : "READY QUEUE"}</small><strong>${currentQueue.length + displayedNextQueue.length}</strong></span>
+    </div>
+    <div class="pc-queues">
+      <div><small>${currentQueueTitle}</small><section>${queueChips(currentQueue, "current")}</section></div>
+      <i>→</i>
+      <div><small>${nextQueueTitle}</small><section>${queueChips(displayedNextQueue, "next")}</section></div>
+    </div>
+    <div class="pc-main">
+      <div class="pc-graph">${graphHtml}<div class="pc-legend"><span><i class="ready"></i>${vi ? "ready" : "ready"}</span><span><i class="current"></i>${vi ? "đang xử lý" : "processing"}</span><span><i class="completed"></i>${vi ? "đã học" : "done"}</span><span><i class="next"></i>${vi ? "queue sau" : "next queue"}</span></div></div>
+      <div class="pc-debug">
+        ${actionHtml}
+        <div class="pc-indegree"><strong>IN-DEGREE</strong><div>${indegreeHtml}</div></div>
+        <div class="pc-history"><strong>${vi ? "CÁC HỌC KỲ ĐÃ XONG" : "COMPLETED SEMESTERS"}</strong><div>${historyHtml}</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderLoudRichView(step) {
   const view = step.loudRichView;
   const el = $("treeView");
@@ -5299,6 +5530,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKruskalEffortView(step);
+  } else if (step.parallelCoursesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderParallelCoursesView(step);
   } else if (step.loudRichView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
