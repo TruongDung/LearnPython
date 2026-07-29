@@ -2993,6 +2993,10 @@ function renderSynonymSentenceView(step) {
     </div>`;
   }).join("");
 
+  const branchPositions = options
+    .map((choices, index) => (Array.isArray(choices) && choices.length > 1 ? index : -1))
+    .filter((index) => index >= 0);
+
   const dfsState = view.dfsState && typeof view.dfsState === "object" ? view.dfsState : null;
   const dfsEventLabels = vi
     ? {
@@ -3064,9 +3068,93 @@ function renderSynonymSentenceView(step) {
     })()
     : "";
 
-  const replaceablePositions = new Set(options
-    .map((choices, index) => (Array.isArray(choices) && choices.length > 1 ? index : -1))
-    .filter((index) => index >= 0));
+  const decisionTreeSection = phaseIndex >= 3 && dfsState && branchPositions.length
+    ? (() => {
+      const completedEntries = completed.map((result, index) => {
+        const resultWords = String(result).split(/\s+/).filter(Boolean);
+        return { index, result, path: branchPositions.map((position) => resultWords[position]) };
+      });
+      const workingWords = Array.isArray(dfsState.workingWords) ? dfsState.workingWords : sentence;
+      const currentIndex = Number.isInteger(dfsState.currentIndex) ? dfsState.currentIndex : -1;
+      const eventUsesCurrentChoice = new Set(["iterate", "assign", "recurse", "return"]);
+      const activePath = [];
+      if (dfsState.event !== "done") {
+        for (const position of branchPositions) {
+          if (position < currentIndex) {
+            activePath.push(workingWords[position]);
+          } else if (position === currentIndex && dfsState.currentChoice && eventUsesCurrentChoice.has(dfsState.event)) {
+            activePath.push(dfsState.currentChoice);
+          } else {
+            break;
+          }
+        }
+      }
+
+      const treePositions = [];
+      let renderedLeafCount = 1;
+      for (const position of branchPositions) {
+        const nextLeafCount = renderedLeafCount * options[position].length;
+        if (treePositions.length >= 3 || nextLeafCount > 24) break;
+        treePositions.push(position);
+        renderedLeafCount = nextLeafCount;
+      }
+      const truncated = treePositions.length < branchPositions.length;
+      const pathStartsWith = (path, pathPrefix) => pathPrefix.every((choice, index) => path[index] === choice);
+      const nodeHtml = (depth, pathPrefix) => {
+        if (depth >= treePositions.length) return "";
+        const position = treePositions[depth];
+        const choices = Array.isArray(options[position]) ? options[position] : [];
+        return `<ul>${choices.map((choice) => {
+          const nextPrefix = [...pathPrefix, choice];
+          const isCurrent = activePath.length >= nextPrefix.length && pathStartsWith(activePath, nextPrefix);
+          const matchingCompleted = completedEntries.filter((entry) => pathStartsWith(entry.path, nextPrefix));
+          const isExplored = matchingCompleted.length > 0;
+          const state = isCurrent ? "current" : isExplored ? "explored" : "pending";
+          const marker = isCurrent ? "▶" : isExplored ? "✓" : "○";
+          const isLeaf = depth === treePositions.length - 1;
+          const exactCompleted = !truncated && isLeaf
+            ? matchingCompleted.find((entry) => entry.path.length === nextPrefix.length)
+            : null;
+          const leafLabel = exactCompleted
+            ? `ans #${exactCompleted.index + 1}`
+            : isLeaf ? (truncated ? (vi ? "còn nhánh…" : "more branches…") : (vi ? "câu" : "sentence")) : `[${position}]`;
+          const accessibleLabel = exactCompleted
+            ? `${choice}, ans ${exactCompleted.index + 1}: ${exactCompleted.result}`
+            : `${choice}, ${state}`;
+          return `<li>
+            <div class="synonym-decision-node ${state}${isLeaf ? " leaf" : ""}" aria-label="${escapeHtml(accessibleLabel)}">
+              <span aria-hidden="true">${marker}</span><strong>${escapeHtml(choice)}</strong><small>${escapeHtml(leafLabel)}</small>
+            </div>
+            ${nodeHtml(depth + 1, nextPrefix)}
+          </li>`;
+        }).join("")}</ul>`;
+      };
+      const branchLabels = treePositions.map((position, depth) => `${vi ? "Mức" : "Level"} ${depth + 1}: words[${position}]`).join(" · ");
+      const rootState = dfsState.event === "done" ? "explored" : "current";
+      const rootMarker = dfsState.event === "done" ? "✓" : "▶";
+
+      return `<section class="synonym-decision-section">
+        <div class="synonym-section-heading">
+          <strong>DECISION TREE</strong>
+          <span>${escapeHtml(branchLabels)}</span>
+        </div>
+        <div class="synonym-decision-legend">
+          <span>▶ ${vi ? "đường đang duyệt" : "current path"}</span>
+          <span>✓ ${vi ? "đã hoàn tất" : "completed"}</span>
+          <span>○ ${vi ? "chưa duyệt" : "pending"}</span>
+        </div>
+        <div class="synonym-decision-tree" role="tree" aria-label="${vi ? "Cây quyết định sinh câu đồng nghĩa" : "Decision tree for synonym sentence generation"}">
+          <ul><li>
+            <div class="synonym-decision-node root ${rootState}"><span aria-hidden="true">${rootMarker}</span><strong>∅</strong><small>dfs(0)</small></div>
+            ${nodeHtml(0, [])}
+          </li></ul>
+        </div>
+        ${truncated ? `<div class="synonym-decision-note">${vi ? "Cây lớn: chỉ hiển thị 3 mức đầu, trace DFS vẫn mô phỏng đầy đủ." : "Large tree: showing the first 3 levels; the DFS trace remains complete."}</div>` : ""}
+      </section>`;
+    })()
+    : "";
+
+  const replaceablePositions = new Set(branchPositions);
 
   const renderResultSentence = (result) => String(result).split(/\s+/).filter(Boolean).map((word, index) => {
     if (!replaceablePositions.has(index)) {
@@ -3124,6 +3212,7 @@ function renderSynonymSentenceView(step) {
       <div class="synonym-groups">${groupsHtml}</div>
     </section>
     ${dfsSection}
+    ${decisionTreeSection}
     ${sentenceSection}
     ${resultsSection}
   </div>`;

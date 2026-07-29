@@ -2202,6 +2202,7 @@ button:disabled {
 
 .synonym-groups-section,
 .synonym-dfs-section,
+.synonym-decision-section,
 .synonym-sentence-section,
 .synonym-results-section {
   min-width: 0;
@@ -2352,6 +2353,143 @@ button:disabled {
 .synonym-dfs-no-choices {
   color: #64748b;
   font-size: 11px;
+}
+
+.synonym-decision-section {
+  min-width: 0;
+}
+
+.synonym-decision-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.synonym-decision-tree {
+  min-width: 0;
+  padding: 2px 4px 0;
+}
+
+.synonym-decision-tree ul {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 18px 0 0;
+}
+
+.synonym-decision-tree > ul { padding-top: 0; }
+
+.synonym-decision-tree li {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 18px 2px 0;
+  list-style: none;
+  text-align: center;
+}
+
+.synonym-decision-tree > ul > li { padding-top: 0; }
+
+.synonym-decision-tree li::before,
+.synonym-decision-tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.synonym-decision-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.synonym-decision-tree li:only-child::before,
+.synonym-decision-tree li:only-child::after { display: none; }
+.synonym-decision-tree li:only-child { padding-top: 0; }
+.synonym-decision-tree li:first-child::before,
+.synonym-decision-tree li:last-child::after { border: 0; }
+.synonym-decision-tree li:last-child::before {
+  border-right: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 0 5px 0 0;
+}
+.synonym-decision-tree li:first-child::after { border-radius: 5px 0 0 0; }
+
+.synonym-decision-tree ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 18px;
+  border-left: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.synonym-decision-node {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 4px;
+  align-items: center;
+  min-width: 60px;
+  max-width: 108px;
+  padding: 5px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.26);
+  color: #94a3b8;
+}
+
+.synonym-decision-node > span {
+  grid-row: 1 / span 2;
+  font-size: 9px;
+}
+
+.synonym-decision-node strong {
+  min-width: 0;
+  color: inherit;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.synonym-decision-node small {
+  color: inherit;
+  font-size: 9px;
+  opacity: 0.82;
+}
+
+.synonym-decision-node.current {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.13);
+  color: #fde68a;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
+}
+
+.synonym-decision-node.explored {
+  border-color: rgba(16, 185, 129, 0.52);
+  background: rgba(16, 185, 129, 0.08);
+  color: #a7f3d0;
+}
+
+.synonym-decision-node.root {
+  min-width: 70px;
+  border-color: #818cf8;
+}
+
+.synonym-decision-node.leaf { border-radius: 999px; }
+
+.synonym-decision-note {
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
 }
 
 .synonym-groups {
@@ -2621,6 +2759,7 @@ button:disabled {
 }
 [data-theme="light"] .synonym-groups-section,
 [data-theme="light"] .synonym-dfs-section,
+[data-theme="light"] .synonym-decision-section,
 [data-theme="light"] .synonym-sentence-section,
 [data-theme="light"] .synonym-results-section,
 [data-theme="light"] .synonym-result-item { border-color: #e2e8f0; }
@@ -2676,6 +2815,22 @@ button:disabled {
   border-color: #10b981;
   color: #047857;
 }
+[data-theme="light"] .synonym-decision-node {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+[data-theme="light"] .synonym-decision-node.current {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+[data-theme="light"] .synonym-decision-node.explored {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
+[data-theme="light"] .synonym-decision-node.root { border-color: #6366f1; }
 
 @media (max-width: 640px) {
   .synonym-phases {
@@ -2695,6 +2850,17 @@ button:disabled {
   .synonym-dfs-status {
     grid-template-columns: 1fr;
   }
+
+  .synonym-decision-tree { padding-inline: 0; }
+  .synonym-decision-tree li { padding-inline: 1px; }
+  .synonym-decision-node {
+    min-width: 42px;
+    max-width: 62px;
+    padding: 4px 3px;
+  }
+  .synonym-decision-node.root { min-width: 56px; }
+  .synonym-decision-node strong { font-size: 10px; }
+  .synonym-decision-node small { font-size: 8px; }
 
   .synonym-section-heading {
     align-items: flex-start;
