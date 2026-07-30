@@ -2049,9 +2049,18 @@ button:disabled {
 .koko-speed-cell.works { border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
 .koko-speed-cell.mid { border-color: #f59e0b; background: rgba(245, 158, 11, 0.18); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25); }
 .koko-speed-cell.answer { border-color: #10b981; background: rgba(16, 185, 129, 0.25); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.28); }
+.koko-speed-line .koko-speed-cell.answer {
+  margin-top: 0;
+  padding: 5px 3px;
+  border-radius: 8px;
+  font-size: inherit;
+  font-weight: inherit;
+}
 .koko-speed-gap { align-self: center; color: #94a3b8; font-size: 18px; font-weight: 800; }
 
 .koko-speed-viz:not(.ship-capacity-viz) .koko-speed-cell {
+  grid-template-rows: 28px 22px 14px;
+  align-content: center;
   flex-basis: 50px;
   min-width: 44px;
   min-height: 82px;
