@@ -1547,8 +1547,8 @@ function buildSteps109(input) {
   addStep({
     title: { vi: "Bắt đầu với linked list đã sắp xếp", en: "Start with the sorted linked list" },
     note: {
-      vi: "Cách 1 gồm hai pha: copy từng node vào vals, sau đó build(lo, hi) chọn phần tử giữa của từng đoạn làm root.",
-      en: "Approach 1 has two phases: copy every node into vals, then build(lo, hi) picks each range's middle element as its root.",
+      vi: "Cách 1 gồm hai pha: copy từng node vào vals, sau đó preorder(lo, hi) chọn phần tử giữa của từng đoạn làm root.",
+      en: "Approach 1 has two phases: copy every node into vals, then preorder(lo, hi) picks each range's middle element as its root.",
     },
     codeLines: [2], phase: "method-call",
     vars: [
@@ -1608,18 +1608,18 @@ function buildSteps109(input) {
   });
 
   addStep({
-    title: { vi: "Định nghĩa helper build(lo, hi)", en: "Define helper build(lo, hi)" },
-    note: { vi: "Mỗi lời gọi build dựng đúng một subtree từ đoạn vals[lo..hi].", en: "Each build call constructs exactly one subtree from vals[lo..hi]." },
-    codeLines: [7], phase: "define-build",
-    vars: [{ name: "helper", value: "build(lo, hi)" }],
+    title: { vi: "Định nghĩa helper preorder(lo, hi)", en: "Define helper preorder(lo, hi)" },
+    note: { vi: "Mỗi lời gọi preorder dựng root trước, rồi lần lượt dựng subtree trái và phải từ vals[lo..hi].", en: "Each preorder call creates the root first, then builds the left and right subtrees from vals[lo..hi]." },
+    codeLines: [7], phase: "define-preorder",
+    vars: [{ name: "helper", value: "preorder(lo, hi)" }],
   });
 
-  function build(lo, hi, attach, side, depth) {
+  function preorder(lo, hi, attach, side, depth) {
     callStack.push({ lo, hi, side, depth });
     const isEmpty = lo > hi;
 
     addStep({
-      title: { vi: `build(${lo}, ${hi}): lo > hi → ${isEmpty}`, en: `build(${lo}, ${hi}): lo > hi → ${isEmpty}` },
+      title: { vi: `preorder(${lo}, ${hi}): lo > hi → ${isEmpty}`, en: `preorder(${lo}, ${hi}): lo > hi → ${isEmpty}` },
       note: isEmpty
         ? { vi: `Đoạn ${side} rỗng, nên dòng này trả None ngay cho parent.`, en: `The ${side} range is empty, so this line immediately returns None to its parent.` }
         : { vi: `Đoạn ${rangeText(lo, hi)} còn phần tử, tiếp tục tính mid.`, en: `Range ${rangeText(lo, hi)} still has elements, so continue to compute mid.` },
@@ -1668,15 +1668,15 @@ function buildSteps109(input) {
     const leftLo = lo;
     const leftHi = mid - 1;
     addStep({
-      title: { vi: `Gọi build(${leftLo}, ${leftHi}) cho node.left`, en: `Call build(${leftLo}, ${leftHi}) for node.left` },
+      title: { vi: `Gọi preorder(${leftLo}, ${leftHi}) cho node.left`, en: `Call preorder(${leftLo}, ${leftHi}) for node.left` },
       note: { vi: `Tạm dừng frame của node ${vals[mid]}; đi xuống dựng subtree trái từ ${rangeText(leftLo, leftHi)}.`, en: `Pause node ${vals[mid]}'s frame; descend to build its left subtree from ${rangeText(leftLo, leftHi)}.` },
       codeLines: [11], phase: "left-call", lo, hi, mid, midAssigned: true, activeTreeId: mid,
       vars: [{ name: "left range", value: rangeText(leftLo, leftHi) }],
     });
-    build(leftLo, leftHi, (child) => { node.left = child; }, "left", depth + 1);
+    preorder(leftLo, leftHi, (child) => { node.left = child; }, "left", depth + 1);
     addStep({
       title: { vi: `Gắn kết quả vào node.left của ${vals[mid]}`, en: `Attach the result to node.left of ${vals[mid]}` },
-      note: { vi: `build(${leftLo}, ${leftHi}) đã trả về ${node.left ? `TreeNode(${node.left.val})` : "None"}.`, en: `build(${leftLo}, ${leftHi}) returned ${node.left ? `TreeNode(${node.left.val})` : "None"}.` },
+      note: { vi: `preorder(${leftLo}, ${leftHi}) đã trả về ${node.left ? `TreeNode(${node.left.val})` : "None"}.`, en: `preorder(${leftLo}, ${leftHi}) returned ${node.left ? `TreeNode(${node.left.val})` : "None"}.` },
       codeLines: [11], phase: "left-return", lo, hi, mid, midAssigned: true, activeTreeId: mid,
       vars: [{ name: "node.left", value: node.left ? node.left.val : "None" }],
     });
@@ -1684,15 +1684,15 @@ function buildSteps109(input) {
     const rightLo = mid + 1;
     const rightHi = hi;
     addStep({
-      title: { vi: `Gọi build(${rightLo}, ${rightHi}) cho node.right`, en: `Call build(${rightLo}, ${rightHi}) for node.right` },
+      title: { vi: `Gọi preorder(${rightLo}, ${rightHi}) cho node.right`, en: `Call preorder(${rightLo}, ${rightHi}) for node.right` },
       note: { vi: `Tiếp tục dựng subtree phải của ${vals[mid]} từ ${rangeText(rightLo, rightHi)}.`, en: `Continue by building ${vals[mid]}'s right subtree from ${rangeText(rightLo, rightHi)}.` },
       codeLines: [12], phase: "right-call", lo, hi, mid, midAssigned: true, activeTreeId: mid,
       vars: [{ name: "right range", value: rangeText(rightLo, rightHi) }],
     });
-    build(rightLo, rightHi, (child) => { node.right = child; }, "right", depth + 1);
+    preorder(rightLo, rightHi, (child) => { node.right = child; }, "right", depth + 1);
     addStep({
       title: { vi: `Gắn kết quả vào node.right của ${vals[mid]}`, en: `Attach the result to node.right of ${vals[mid]}` },
-      note: { vi: `build(${rightLo}, ${rightHi}) đã trả về ${node.right ? `TreeNode(${node.right.val})` : "None"}.`, en: `build(${rightLo}, ${rightHi}) returned ${node.right ? `TreeNode(${node.right.val})` : "None"}.` },
+      note: { vi: `preorder(${rightLo}, ${rightHi}) đã trả về ${node.right ? `TreeNode(${node.right.val})` : "None"}.`, en: `preorder(${rightLo}, ${rightHi}) returned ${node.right ? `TreeNode(${node.right.val})` : "None"}.` },
       codeLines: [12], phase: "right-return", lo, hi, mid, midAssigned: true, activeTreeId: mid,
       vars: [{ name: "node.right", value: node.right ? node.right.val : "None" }],
     });
@@ -1709,12 +1709,12 @@ function buildSteps109(input) {
   }
 
   addStep({
-    title: { vi: `Gọi build(0, ${vals.length - 1}) cho toàn bộ vals`, en: `Call build(0, ${vals.length - 1}) for all of vals` },
+    title: { vi: `Gọi preorder(0, ${vals.length - 1}) cho toàn bộ vals`, en: `Call preorder(0, ${vals.length - 1}) for all of vals` },
     note: { vi: "Lời gọi ngoài cùng sẽ trả root của toàn bộ BST.", en: "The outermost call will return the root of the entire BST." },
     codeLines: [14], phase: "root-call", lo: 0, hi: vals.length - 1,
     vars: [{ name: "root range", value: rangeText(0, vals.length - 1) }],
   });
-  build(0, vals.length - 1, (node) => { builtRoot = node; }, "root", 0);
+  preorder(0, vals.length - 1, (node) => { builtRoot = node; }, "root", 0);
 
   addStep({
     title: { vi: `Trả root ${builtRoot ? builtRoot.val : "None"}`, en: `Return root ${builtRoot ? builtRoot.val : "None"}` },
@@ -2672,7 +2672,7 @@ module.exports = {
       },
     },
     codeLabel: { vi: "Cách 1: đổi list thành mảng", en: "Approach 1: copy list to array" },
-    code: ["class Solution:", "    def sortedListToBST(self, head):", "        vals = []", "        while head:", "            vals.append(head.val)", "            head = head.next", "        def build(lo, hi):", "            if lo > hi: return None", "            mid = (lo + hi) // 2", "            node = TreeNode(vals[mid])", "            node.left = build(lo, mid - 1)", "            node.right = build(mid + 1, hi)", "            return node", "        return build(0, len(vals) - 1)"],
+    code: ["class Solution:", "    def sortedListToBST(self, head):", "        vals = []", "        while head:", "            vals.append(head.val)", "            head = head.next", "        def preorder(lo, hi):", "            if lo > hi: return None", "            mid = (lo + hi) // 2", "            node = TreeNode(vals[mid])", "            node.left = preorder(lo, mid - 1)", "            node.right = preorder(mid + 1, hi)", "            return node", "        return preorder(0, len(vals) - 1)"],
     code2Label: { vi: "Cách 2: slow/fast + cắt list", en: "Approach 2: slow/fast + split list" },
     code2: [
       "class Solution:",

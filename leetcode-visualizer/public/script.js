@@ -2406,8 +2406,8 @@ function renderSortedListBstView(step) {
   const arrayRangeLabel = arrayRange ? `[${arrayRange[0]}..${arrayRange[1]}]` : "∅";
   const summary = isArrayMode
     ? lang === "vi"
-      ? `Đã copy ${view.copiedCount || 0} trên ${view.values.length} node vào vals. Đoạn build hiện tại ${arrayRangeLabel}.`
-      : `Copied ${view.copiedCount || 0} of ${view.values.length} nodes into vals. Current build range ${arrayRangeLabel}.`
+      ? `Đã copy ${view.copiedCount || 0} trên ${view.values.length} node vào vals. Đoạn preorder hiện tại ${arrayRangeLabel}.`
+      : `Copied ${view.copiedCount || 0} of ${view.values.length} nodes into vals. Current preorder range ${arrayRangeLabel}.`
     : lang === "vi"
       ? `Đoạn list hiện tại ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`
       : `Current list segment ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`;
@@ -2432,7 +2432,7 @@ function renderSortedListBstView(step) {
     ? `<section class="slb-array-panel">
         <div class="slb-section-title">
           <strong><code>vals</code></strong>
-          <span>${arrayValues.length}/${view.values.length} ${lang === "vi" ? "phần tử đã copy" : "values copied"} · ${lang === "vi" ? "đoạn build" : "build range"} <code>${arrayRangeLabel}</code></span>
+          <span>${arrayValues.length}/${view.values.length} ${lang === "vi" ? "phần tử đã copy" : "values copied"} · ${lang === "vi" ? "đoạn preorder" : "preorder range"} <code>${arrayRangeLabel}</code></span>
         </div>
         <div class="slb-array-scroll"><div class="slb-array-row">${arrayCells}</div></div>
       </section>`
