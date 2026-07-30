@@ -3223,11 +3223,20 @@ function renderShipCapacityView(step) {
     const tested = (view.tested || []).find((item) => item.capacity === capacity);
     const gapBefore = index > 0 && capacity - capacities[index - 1] > 1;
     const labels = [
-      isAnswer ? (vi ? "đáp án" : "answer") : "",
-      isMid ? "mid" : "",
-      capacity === view.lo && capacity === view.hi ? "lo = hi" : capacity === view.lo ? "lo" : capacity === view.hi ? "hi" : "",
-    ].filter(Boolean).join(" · ");
-    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small>${escapeHtml(labels || " ")}</small><strong>${capacity}</strong><em>${tested ? `${tested.neededDays}d` : ""}</em></span>`;
+      isAnswer ? { text: vi ? "đáp án" : "answer", type: "is-answer" } : null,
+      isMid ? { text: "mid", type: "is-mid" } : null,
+      capacity === view.lo && capacity === view.hi
+        ? { text: "lo = hi", type: "is-boundary" }
+        : capacity === view.lo
+          ? { text: "lo", type: "is-boundary" }
+          : capacity === view.hi
+            ? { text: "hi", type: "is-boundary" }
+            : null,
+    ].filter(Boolean);
+    const labelHtml = labels.length
+      ? labels.map((label) => `<span class="${label.type}">${escapeHtml(label.text)}</span>`).join("")
+      : '<span aria-hidden="true">&nbsp;</span>';
+    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small class="ship-capacity-labels">${labelHtml}</small><strong>${capacity}</strong><em>${tested ? `${tested.neededDays}d` : ""}</em></span>`;
   }).join("");
 
   const waitingPackages = `<div class="ship-package-queue">${view.weights.map((weight, index) => `<span><small>#${index}</small><strong>${weight}</strong></span>`).join("")}</div>`;

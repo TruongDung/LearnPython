@@ -1901,6 +1901,36 @@ button:disabled {
 .ship-days-equation b.works { background: rgba(16, 185, 129, 0.17); color: #6ee7b7; }
 .ship-days-equation b.slow { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
 
+.ship-capacity-viz .koko-speed-cell {
+  flex-basis: 52px;
+  min-width: 46px;
+  min-height: 82px;
+}
+
+.ship-capacity-viz .ship-capacity-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 28px;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.05;
+  white-space: normal;
+}
+
+.ship-capacity-labels > span {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.ship-capacity-labels > span.is-answer { color: #6ee7b7; }
+.ship-capacity-labels > span.is-mid { color: #fbbf24; }
+.ship-capacity-labels > span.is-boundary { color: #bae6fd; }
+
 [data-theme="light"] .ship-days-title strong,
 [data-theme="light"] .ship-package strong,
 [data-theme="light"] .ship-package-queue strong,
@@ -1915,6 +1945,9 @@ button:disabled {
 [data-theme="light"] .ship-day-label { color: #0369a1; }
 [data-theme="light"] .ship-load > div { border-color: #94a3b8; background: #e2e8f0; }
 [data-theme="light"] .ship-load > div > span { background: #0284c7; }
+[data-theme="light"] .ship-capacity-labels > span.is-answer { color: #047857; }
+[data-theme="light"] .ship-capacity-labels > span.is-mid { color: #92400e; }
+[data-theme="light"] .ship-capacity-labels > span.is-boundary { color: #0369a1; }
 
 @media (max-width: 700px) {
   .ship-days-title { align-items: flex-start; flex-direction: column; gap: 3px; }
