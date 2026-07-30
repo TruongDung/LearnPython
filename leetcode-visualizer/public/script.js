@@ -3051,6 +3051,119 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderShipCapacityView(step) {
+  const view = step.shipCapacityView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { setup: 0, range: 1, simulate: 2, decision: 3, shrink: 3, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Chọn khoảng capacity", "2 · Thử capacity giữa", "3 · Xếp hàng theo từng ngày", "4 · Giữ nửa đúng"]
+    : ["1 · Set capacity range", "2 · Try middle capacity", "3 · Load packages by day", "4 · Keep the correct half"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const chosenCapacity = Number.isInteger(view.answer) ? view.answer : view.mid;
+  const domainCount = view.initialHi - view.initialLo + 1;
+  let capacities;
+  if (domainCount <= 24) {
+    capacities = Array.from({ length: domainCount }, (_, index) => view.initialLo + index);
+  } else {
+    capacities = [...new Set([
+      view.initialLo,
+      view.lo - 1,
+      view.lo,
+      view.mid,
+      view.hi,
+      view.hi + 1,
+      view.initialHi,
+      ...(view.tested || []).map((item) => item.capacity),
+    ].filter((capacity) => Number.isInteger(capacity) && capacity >= view.initialLo && capacity <= view.initialHi))].sort((a, b) => a - b);
+  }
+
+  const capacityCells = capacities.map((capacity, index) => {
+    const isAnswer = capacity === view.answer;
+    const isMid = capacity === view.mid && !isAnswer;
+    let zone = "active";
+    if (view.event === "done") zone = capacity < view.answer ? "slow" : capacity > view.answer ? "works" : "answer";
+    else if (capacity < view.lo) zone = "slow";
+    else if (capacity > view.hi) zone = "works";
+    const tested = (view.tested || []).find((item) => item.capacity === capacity);
+    const gapBefore = index > 0 && capacity - capacities[index - 1] > 1;
+    const labels = [
+      isAnswer ? (vi ? "đáp án" : "answer") : "",
+      isMid ? "mid" : "",
+      capacity === view.lo && capacity === view.hi ? "lo = hi" : capacity === view.lo ? "lo" : capacity === view.hi ? "hi" : "",
+    ].filter(Boolean).join(" · ");
+    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small>${escapeHtml(labels || " ")}</small><strong>${capacity}</strong><em>${tested ? `${tested.neededDays}d` : ""}</em></span>`;
+  }).join("");
+
+  const waitingPackages = `<div class="ship-package-queue">${view.weights.map((weight, index) => `<span><small>#${index}</small><strong>${weight}</strong></span>`).join("")}</div>`;
+  const scheduleRows = (view.schedule || []).map((day) => {
+    const percentage = Math.min(100, (day.load / chosenCapacity) * 100);
+    const packages = day.packages.map((pkg) => `<span class="ship-package" style="flex-grow:${Math.max(1, pkg.weight)}"><small>#${pkg.index}</small><strong>${pkg.weight}</strong></span>`).join("");
+    return `<div class="ship-day-row">
+      <span class="ship-day-label">${vi ? "Ngày" : "Day"} ${day.day}</span>
+      <div class="ship-day-packages">${packages}</div>
+      <div class="ship-load"><div><span style="width:${percentage}%"></span></div><strong>${day.load} / ${chosenCapacity}</strong></div>
+    </div>`;
+  }).join("");
+  const scheduleHtml = Number.isInteger(chosenCapacity)
+    ? `<div class="ship-days"><div class="ship-days-title"><strong>${vi ? "Xếp liên tiếp, giữ nguyên thứ tự" : "Load consecutively, preserving order"}</strong><span>capacity = ${chosenCapacity}</span></div>${scheduleRows}</div>`
+    : `<div class="ship-days pending"><div class="ship-days-title"><strong>${vi ? "Hàng đợi kiện hàng" : "Package queue"}</strong><span>${vi ? "chưa chọn capacity" : "capacity not chosen"}</span></div>${waitingPackages}</div>`;
+
+  const dayEquation = Number.isInteger(view.neededDays)
+    ? `<div class="ship-days-equation"><span>${vi ? "Cần" : "Needs"}</span><strong>${view.neededDays} ${vi ? "ngày" : "days"}</strong><i>${view.neededDays <= view.days ? "≤" : ">"}</i><strong>${view.days} ${vi ? "ngày cho phép" : "allowed"}</strong><b class="${view.neededDays <= view.days ? "works" : "slow"}">${view.neededDays <= view.days ? (vi ? "CHỞ KỊP" : "FITS") : (vi ? "TÀU QUÁ NHỎ" : "TOO SMALL")}</b></div>`
+    : "";
+
+  let actionHtml;
+  if (view.event === "init-range") {
+    actionHtml = `<div class="koko-action setup"><small>${vi ? "CẬN AN TOÀN" : "SAFE BOUNDS"}</small><strong>max(weights) = ${view.initialLo} · sum(weights) = ${view.initialHi}</strong><span>${vi ? "Nhỏ hơn max: kiện nặng nhất không lên tàu · sum: chở tất cả trong 1 ngày" : "Below max: the heaviest package cannot fit · sum: ship everything in one day"}</span></div>`;
+  } else if (view.event === "while-check") {
+    actionHtml = `<div class="koko-action condition ${view.whileResult ? "yes" : "no"}"><small>WHILE lo &lt; hi</small><strong>${view.lo} &lt; ${view.hi} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? "Vẫn còn nhiều capacity cần phân biệt" : "Multiple capacities remain") : (vi ? "lo gặp hi: đã tìm biên khả thi đầu tiên" : "lo meets hi: first feasible capacity found")}</span></div>`;
+  } else if (view.event === "compute-mid") {
+    actionHtml = `<div class="koko-action mid"><small>COMPUTE MID</small><strong>(${view.lo} + ${view.hi}) // 2 = ${view.mid}</strong><span>${vi ? `Thử tàu có sức chứa ${view.mid}` : `Try a ship with capacity ${view.mid}`}</span></div>`;
+  } else if (view.event === "calculate-days") {
+    actionHtml = `<div class="koko-action count"><small>${vi ? "MÔ PHỎNG CHẤT HÀNG" : "SIMULATE LOADING"}</small><strong>needed_days = ${view.neededDays}</strong><span>${vi ? "Kiện tiếp theo không vừa thì bắt đầu ngày mới" : "Start a new day when the next package does not fit"}</span></div>`;
+  } else if (view.event === "feasible-check") {
+    actionHtml = `<div class="koko-action decision ${view.feasible ? "works" : "slow"}"><small>IF needed_days &lt;= days</small><strong>${view.neededDays} ${view.feasible ? "≤" : ">"} ${view.days} → ${view.feasible}</strong><span>${view.feasible ? (vi ? "capacity đủ; giữ mid và thử tàu nhỏ hơn" : "capacity works; keep mid and try smaller") : (vi ? "capacity quá nhỏ; mọi giá trị ≤ mid đều bị loại" : "capacity is too small; remove every value ≤ mid")}</span></div>`;
+  } else if (view.event === "move-hi") {
+    actionHtml = `<div class="koko-action move works"><small>${vi ? "GIỮ NỬA TRÁI" : "KEEP LEFT HALF"}</small><strong>hi = mid = ${view.mid}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? "giữ mid vì mid đang chở kịp" : "keep mid because it currently works"}</span></div>`;
+  } else if (view.event === "else-branch") {
+    actionHtml = `<div class="koko-action decision slow"><small>ELSE</small><strong>${view.neededDays} &gt; ${view.days}</strong><span>${vi ? "Điều kiện if sai; bước tiếp theo tăng lo" : "The if condition is false; increase lo next"}</span></div>`;
+  } else if (view.event === "move-lo") {
+    actionHtml = `<div class="koko-action move slow"><small>${vi ? "BỎ NỬA TRÁI" : "REMOVE LEFT HALF"}</small><strong>lo = mid + 1 = ${view.lo}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? `loại mọi capacity ≤ ${view.mid}` : `remove every capacity ≤ ${view.mid}`}</span></div>`;
+  } else {
+    const proof = view.smallerDays === null
+      ? (vi ? `${view.answer}=max(weights), không thể dùng tàu nhỏ hơn` : `${view.answer}=max(weights), so no smaller ship can work`)
+      : vi
+        ? `C=${view.answer}: ${view.neededDays} ngày ≤ ${view.days} · C=${view.answer - 1}: ${view.smallerDays} ngày > ${view.days}`
+        : `C=${view.answer}: ${view.neededDays}d ≤ ${view.days}d · C=${view.answer - 1}: ${view.smallerDays}d > ${view.days}d`;
+    actionHtml = `<div class="koko-action result"><small>${vi ? "CHỨNG MINH NHỎ NHẤT" : "MINIMUM PROOF"}</small><strong>return ${view.answer}</strong><span>${proof}</span></div>`;
+  }
+
+  const testedHtml = (view.tested || []).length
+    ? `<div class="koko-tested"><small>${vi ? "ĐÃ THỬ" : "TESTED"}</small>${view.tested.map((item) => `<span class="${item.feasible ? "works" : "slow"}">C=${item.capacity} → ${item.neededDays}d ${item.feasible ? "✓" : "✕"}</span>`).join("")}</div>`
+    : "";
+  const totalWeight = view.weights.reduce((sum, weight) => sum + weight, 0);
+
+  el.innerHTML = `<div class="koko-speed-viz ship-capacity-viz">
+    <div class="koko-phases">${phases}</div>
+    <div class="koko-summary">
+      <span><small>${vi ? "GIỚI HẠN" : "DEADLINE"}</small><strong>${view.days}d</strong></span>
+      <span><small>${vi ? "KHOẢNG CAPACITY" : "CAPACITY RANGE"}</small><strong>[${view.lo}, ${view.hi}]</strong></span>
+      <span><small>${vi ? "TỔNG KHỐI LƯỢNG" : "TOTAL WEIGHT"}</small><strong>${totalWeight}</strong></span>
+    </div>
+    <div class="koko-speed-line" role="img" aria-label="${escapeHtml(vi ? `Khoảng capacity đang tìm [${view.lo}, ${view.hi}]` : `Active capacity range [${view.lo}, ${view.hi}]`)}">${capacityCells}</div>
+    <div class="koko-speed-legend"><span><i class="slow"></i>${vi ? "quá nhỏ / đã loại" : "too small / removed"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active range"}</span><span><i class="works"></i>${vi ? "chở kịp" : "fits deadline"}</span></div>
+    ${scheduleHtml}
+    ${dayEquation}
+    ${actionHtml}
+    ${testedHtml}
+  </div>`;
+}
+
 function renderKokoSpeedView(step) {
   const view = step.kokoSpeedView;
   const el = $("treeView");
@@ -6370,6 +6483,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.shipCapacityView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderShipCapacityView(step);
   } else if (step.kokoSpeedView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

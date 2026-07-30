@@ -1563,6 +1563,126 @@ button:disabled {
   text-align: center;
 }
 
+/* ---- LeetCode 1011: Capacity To Ship Packages Within D Days ---- */
+.ship-days {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.ship-days-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ship-days-title strong { color: #f8fafc; font-size: 14px; }
+.ship-days-title span { color: #94a3b8; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; }
+
+.ship-day-row {
+  display: grid;
+  grid-template-columns: 62px minmax(180px, 1fr) 142px;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.ship-day-label { color: #7dd3fc; font-size: 12px; font-weight: 850; }
+
+.ship-day-packages,
+.ship-package-queue {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ship-package,
+.ship-package-queue > span {
+  display: grid;
+  flex-basis: 38px;
+  place-items: center;
+  min-width: 32px;
+  min-height: 38px;
+  padding: 4px 5px;
+  border: 1px solid #38bdf8;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.ship-package small,
+.ship-package-queue small { color: #7dd3fc; font-size: 8px; font-weight: 750; }
+.ship-package strong,
+.ship-package-queue strong { color: #f8fafc; font-size: 14px; }
+.ship-package-queue { flex-wrap: wrap; padding: 7px 0; }
+.ship-package-queue > span { flex: 1 1 42px; max-width: 72px; }
+
+.ship-load {
+  display: grid;
+  grid-template-columns: minmax(54px, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.ship-load > div {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid #475569;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.ship-load > div > span { display: block; height: 100%; border-radius: inherit; background: #38bdf8; }
+.ship-load > strong { min-width: 54px; color: #f8fafc; font-size: 11px; text-align: right; }
+
+.ship-days-equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.ship-days-equation span { color: #94a3b8; font-size: 12px; font-weight: 750; }
+.ship-days-equation strong { color: #f8fafc; font-size: 17px; }
+.ship-days-equation i { color: #94a3b8; font-size: 18px; font-style: normal; font-weight: 900; }
+.ship-days-equation b { padding: 3px 8px; border-radius: 999px; font-size: 11px; }
+.ship-days-equation b.works { background: rgba(16, 185, 129, 0.17); color: #6ee7b7; }
+.ship-days-equation b.slow { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+
+[data-theme="light"] .ship-days-title strong,
+[data-theme="light"] .ship-package strong,
+[data-theme="light"] .ship-package-queue strong,
+[data-theme="light"] .ship-load > strong,
+[data-theme="light"] .ship-days-equation strong { color: #0f172a; }
+[data-theme="light"] .ship-day-row,
+[data-theme="light"] .ship-days-equation { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .ship-package,
+[data-theme="light"] .ship-package-queue > span { border-color: #0284c7; background: #f0f9ff; }
+[data-theme="light"] .ship-package small,
+[data-theme="light"] .ship-package-queue small,
+[data-theme="light"] .ship-day-label { color: #0369a1; }
+[data-theme="light"] .ship-load > div { border-color: #94a3b8; background: #e2e8f0; }
+[data-theme="light"] .ship-load > div > span { background: #0284c7; }
+
+@media (max-width: 700px) {
+  .ship-days-title { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .ship-day-row { grid-template-columns: 58px minmax(0, 1fr); }
+  .ship-load { grid-column: 1 / -1; }
+  .ship-day-packages { flex-wrap: wrap; }
+  .ship-package { flex: 1 1 42px !important; max-width: 70px; }
+}
+
 /* ---- LeetCode 875: Koko Eating Bananas — first feasible speed ---- */
 .koko-speed-viz {
   display: grid;

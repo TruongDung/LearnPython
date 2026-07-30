@@ -1792,6 +1792,264 @@ function buildSteps875(input, params) {
   return { original: piles, answer, steps };
 }
 
+/** LeetCode 1011: Capacity To Ship Packages Within D Days. */
+function buildSteps1011(input, params) {
+  const parsedWeights = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
+  const weights = parsedWeights.map((weight) => Math.max(1, Math.trunc(weight)));
+  if (!weights.length) weights.push(1);
+  const parsedDays = params && params.days !== undefined ? Number(params.days) : 5;
+  const days = Number.isFinite(parsedDays)
+    ? Math.min(weights.length, Math.max(1, Math.trunc(parsedDays)))
+    : Math.min(weights.length, 5);
+  const steps = [];
+  const initialLo = Math.max(...weights);
+  const initialHi = weights.reduce((sum, weight) => sum + weight, 0);
+  const tested = [];
+  let lo = initialLo;
+  let hi = initialHi;
+
+  function buildSchedule(capacity) {
+    const schedule = [{ day: 1, load: 0, packages: [] }];
+    for (let index = 0; index < weights.length; index += 1) {
+      const weight = weights[index];
+      let currentDay = schedule[schedule.length - 1];
+      if (currentDay.load + weight > capacity) {
+        currentDay = { day: schedule.length + 1, load: 0, packages: [] };
+        schedule.push(currentDay);
+      }
+      currentDay.packages.push({ index, weight });
+      currentDay.load += weight;
+    }
+    return schedule;
+  }
+
+  function addStep({
+    event,
+    phase,
+    title,
+    codeLine,
+    note,
+    mid = null,
+    schedule = [],
+    neededDays = null,
+    feasible = null,
+    whileResult = null,
+    previousLo = null,
+    previousHi = null,
+    answer = null,
+    smallerDays = null,
+    vars = [],
+    final = false,
+  }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      shipCapacityView: {
+        event,
+        phase,
+        weights: [...weights],
+        days,
+        initialLo,
+        initialHi,
+        lo,
+        hi,
+        mid,
+        schedule: schedule.map((day) => ({
+          ...day,
+          packages: day.packages.map((pkg) => ({ ...pkg })),
+        })),
+        neededDays,
+        feasible,
+        whileResult,
+        previousLo,
+        previousHi,
+        answer,
+        smallerDays,
+        tested: tested.map((item) => ({ ...item })),
+      },
+    });
+  }
+
+  addStep({
+    event: "init-range",
+    phase: "setup",
+    title: { vi: `Khoảng sức chứa: [${lo}, ${hi}]`, en: `Capacity range: [${lo}, ${hi}]` },
+    codeLine: 11,
+    vars: [
+      { name: "weights", value: `[${weights.join(", ")}]` },
+      { name: "days", value: days },
+      { name: "lo = max(weights)", value: lo },
+      { name: "hi = sum(weights)", value: hi },
+    ],
+    note: {
+      vi: `Tàu phải chở được kiện nặng nhất nên lo=${lo}. Nếu sức chứa hi=${hi}, tàu chở tất cả trong đúng 1 ngày.`,
+      en: `The ship must hold the heaviest package, so lo=${lo}. With capacity hi=${hi}, every package ships in one day.`,
+    },
+  });
+
+  while (true) {
+    const canContinue = lo < hi;
+    addStep({
+      event: "while-check",
+      phase: "range",
+      title: canContinue
+        ? { vi: `${lo} < ${hi} → tiếp tục tìm`, en: `${lo} < ${hi} → continue searching` }
+        : { vi: `${lo} = ${hi} → còn đúng một sức chứa`, en: `${lo} = ${hi} → one capacity remains` },
+      codeLine: 12,
+      whileResult: canContinue,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "lo < hi", value: canContinue }],
+      note: canContinue
+        ? { vi: `Đáp án nằm trong khoảng đóng [${lo}, ${hi}].`, en: `The answer lies in the closed interval [${lo}, ${hi}].` }
+        : { vi: `lo gặp hi tại ${lo}; vòng lặp kết thúc.`, en: `lo meets hi at ${lo}; the loop stops.` },
+    });
+    if (!canContinue) break;
+
+    const mid = Math.floor((lo + hi) / 2);
+    addStep({
+      event: "compute-mid",
+      phase: "range",
+      title: { vi: `Thử capacity = (${lo} + ${hi}) // 2 = ${mid}`, en: `Try capacity = (${lo} + ${hi}) // 2 = ${mid}` },
+      codeLine: 13,
+      mid,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }],
+      note: { vi: `Mô phỏng chất hàng theo đúng thứ tự với sức chứa ${mid}.`, en: `Simulate loading packages in order with capacity ${mid}.` },
+    });
+
+    const schedule = buildSchedule(mid);
+    const neededDays = schedule.length;
+    const feasible = neededDays <= days;
+    addStep({
+      event: "calculate-days",
+      phase: "simulate",
+      title: { vi: `Capacity ${mid} cần ${neededDays} ngày`, en: `Capacity ${mid} needs ${neededDays} days` },
+      codeLine: 14,
+      mid,
+      schedule,
+      neededDays,
+      feasible,
+      vars: [
+        { name: "mid", value: mid },
+        ...schedule.map((day) => ({ name: `day ${day.day} load`, value: day.load })),
+        { name: "needed_days", value: neededDays },
+      ],
+      note: {
+        vi: `Duyệt từ trái sang phải. Khi kiện tiếp theo làm tải vượt ${mid}, đóng ngày hiện tại và bắt đầu ngày mới; không được đổi thứ tự hay tách kiện.`,
+        en: `Scan left to right. If the next package would exceed ${mid}, close the current day and start a new one; order cannot change and packages cannot split.`,
+      },
+    });
+
+    addStep({
+      event: "feasible-check",
+      phase: "decision",
+      title: { vi: `${neededDays} ${feasible ? "≤" : ">"} ${days} ngày → ${feasible ? "chở kịp" : "không kịp"}`, en: `${neededDays} ${feasible ? "≤" : ">"} ${days} days → ${feasible ? "fits" : "too small"}` },
+      codeLine: 15,
+      mid,
+      schedule,
+      neededDays,
+      feasible,
+      vars: [
+        { name: "needed_days", value: neededDays },
+        { name: "days", value: days },
+        { name: "needed_days <= days", value: feasible },
+      ],
+      note: feasible
+        ? { vi: `Sức chứa ${mid} đủ, nhưng có thể chưa nhỏ nhất. Giữ mid và thử tàu nhỏ hơn.`, en: `Capacity ${mid} works, but may not be minimal. Keep mid and try a smaller ship.` }
+        : { vi: `Sức chứa ${mid} quá nhỏ. Mọi sức chứa nhỏ hơn cũng cần ít nhất ${neededDays} ngày nên đều bị loại.`, en: `Capacity ${mid} is too small. Every smaller capacity needs at least ${neededDays} days, so all are removed.` },
+    });
+
+    tested.push({ capacity: mid, neededDays, feasible });
+    const previousLo = lo;
+    const previousHi = hi;
+    if (feasible) {
+      hi = mid;
+      addStep({
+        event: "move-hi",
+        phase: "shrink",
+        title: { vi: `Chở kịp → hi = mid = ${mid}`, en: `Fits → hi = mid = ${mid}` },
+        codeLine: 16,
+        mid,
+        schedule,
+        neededDays,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "old hi", value: previousHi }, { name: "hi", value: hi }, { name: "lo", value: lo }],
+        note: { vi: `Giữ ${mid} vì nó có thể là đáp án. Khoảng mới: [${lo}, ${hi}].`, en: `Keep ${mid} because it may be the answer. New interval: [${lo}, ${hi}].` },
+      });
+    } else {
+      addStep({
+        event: "else-branch",
+        phase: "shrink",
+        title: { vi: `${neededDays} > ${days} → vào nhánh else`, en: `${neededDays} > ${days} → enter else` },
+        codeLine: 17,
+        mid,
+        schedule,
+        neededDays,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "needed_days <= days", value: false }, { name: "mid", value: mid }],
+        note: { vi: `Điều kiện if sai nên tăng sức chứa tối thiểu ở dòng 18.`, en: `The if condition is false, so line 18 raises the minimum capacity.` },
+      });
+      lo = mid + 1;
+      addStep({
+        event: "move-lo",
+        phase: "shrink",
+        title: { vi: `Tàu quá nhỏ → lo = mid + 1 = ${lo}`, en: `Ship too small → lo = mid + 1 = ${lo}` },
+        codeLine: 18,
+        mid,
+        schedule,
+        neededDays,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "old lo", value: previousLo }, { name: "lo", value: lo }, { name: "hi", value: hi }],
+        note: { vi: `Loại [${previousLo}, ${mid}]. Khoảng mới: [${lo}, ${hi}].`, en: `Remove [${previousLo}, ${mid}]. New interval: [${lo}, ${hi}].` },
+      });
+    }
+  }
+
+  const answer = lo;
+  const finalSchedule = buildSchedule(answer);
+  const smallerDays = answer > initialLo ? buildSchedule(answer - 1).length : null;
+  addStep({
+    event: "done",
+    phase: "done",
+    title: { vi: `return ${answer} — sức chứa nhỏ nhất`, en: `return ${answer} — minimum capacity` },
+    codeLine: 19,
+    schedule: finalSchedule,
+    neededDays: finalSchedule.length,
+    feasible: true,
+    answer,
+    smallerDays,
+    final: true,
+    vars: [
+      { name: "lo", value: answer },
+      { name: "days_needed(lo)", value: finalSchedule.length },
+      ...(smallerDays === null ? [] : [{ name: `days_needed(${answer - 1})`, value: smallerDays }]),
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: smallerDays === null
+        ? `${answer}=max(weights) là sức chứa nhỏ nhất có thể và chở xong trong ${finalSchedule.length} ngày ≤ ${days}.`
+        : `Sức chứa ${answer} cần ${finalSchedule.length} ngày ≤ ${days}, còn ${answer - 1} cần ${smallerDays} ngày > ${days}. Vì vậy ${answer} là nhỏ nhất.`,
+      en: smallerDays === null
+        ? `${answer}=max(weights) is the smallest possible capacity and finishes in ${finalSchedule.length} days ≤ ${days}.`
+        : `Capacity ${answer} needs ${finalSchedule.length} days ≤ ${days}, while ${answer - 1} needs ${smallerDays} days > ${days}. Therefore ${answer} is minimal.`,
+    },
+  });
+
+  return { original: weights, answer, steps };
+}
+
 /** LeetCode 69: Sqrt(x) — binary search for floor(sqrt(x)). */
 function buildSteps69(input) {
   const parsed = Number(Array.isArray(input) ? input[0] : String(input).trim());
@@ -2156,6 +2414,57 @@ module.exports = {
     ],
     builder: buildSteps875,
   },
+  1011: {
+    id: 1011,
+    difficulty: "medium",
+    slug: "capacity-to-ship-packages-within-d-days",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Capacity To Ship Packages Within D Days", en: "Capacity To Ship Packages Within D Days" },
+    titleVi: { vi: "Sức chứa nhỏ nhất để chở hàng trong D ngày", en: "Minimum ship capacity within D days" },
+    statement: {
+      vi: "Các kiện hàng phải được chở theo đúng thứ tự trong weights. Mỗi ngày chất liên tiếp các kiện mà tổng không vượt sức chứa tàu. Tìm sức chứa nhỏ nhất để chở hết trong số ngày cho trước.",
+      en: "Packages must be shipped in the given weights order. Each day loads consecutive packages without exceeding the ship capacity. Find the minimum capacity that ships everything within the given days.",
+    },
+    defaultInput: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    inputKind: "positive",
+    inputLabel: { vi: "weights", en: "weights" },
+    extraParams: [
+      { key: "days", label: { vi: "days (số ngày)", en: "days" }, default: 5 },
+    ],
+    approach: [
+      { vi: "Binary search trên sức chứa. Cận dưới là max(weights); cận trên là sum(weights).", en: "Binary search the capacity. The lower bound is max(weights); the upper bound is sum(weights)." },
+      { vi: "Với một capacity, duyệt kiện hàng theo thứ tự và bắt đầu ngày mới khi kiện tiếp theo làm vượt capacity.", en: "For a capacity, scan packages in order and start a new day when the next package would exceed it." },
+      { vi: "needed_days ≤ days: capacity đủ, giữ mid bằng hi=mid để thử nhỏ hơn.", en: "needed_days ≤ days: the capacity works, keep mid with hi=mid and try smaller." },
+      { vi: "needed_days > days: tàu quá nhỏ, loại mọi capacity ≤ mid bằng lo=mid+1.", en: "needed_days > days: the ship is too small, remove every capacity ≤ mid with lo=mid+1." },
+    ],
+    complexity: {
+      time: "O(n log(sum(weights)))",
+      space: "O(1)",
+      note: { vi: "Mỗi lần thử capacity cần một lượt O(n) để đếm số ngày.", en: "Each capacity check scans all packages in O(n) to count days." },
+    },
+    code: [
+      "class Solution:",
+      "    def shipWithinDays(self, weights, days):",
+      "        def count_days(capacity):",
+      "            used_days, load = 1, 0",
+      "            for weight in weights:",
+      "                if load + weight > capacity:",
+      "                    used_days += 1",
+      "                    load = 0",
+      "                load += weight",
+      "            return used_days",
+      "        lo, hi = max(weights), sum(weights)",
+      "        while lo < hi:",
+      "            mid = (lo + hi) // 2",
+      "            needed_days = count_days(mid)",
+      "            if needed_days <= days:",
+      "                hi = mid",
+      "            else:",
+      "                lo = mid + 1",
+      "        return lo",
+    ],
+    builder: buildSteps1011,
+  },
   1044: {
     id: 1044,
     difficulty: "hard",
@@ -2263,7 +2572,7 @@ module.exports = {
     builder: buildSteps410,
   },
   __meta: {
-    order: [69, 410, 4, 33, 34, 911, 875, 1044],
+    order: [69, 410, 4, 33, 34, 911, 875, 1011, 1044],
     label: { vi: "Thứ tự học Binary Search", en: "Binary Search learning order" },
   },
   4: {
