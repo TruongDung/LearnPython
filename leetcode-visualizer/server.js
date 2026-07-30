@@ -228,7 +228,11 @@ app.post("/api/problem/:id/solve", (req, res) => {
     return res.status(400).json({ error: "Chuỗi s và t phải có cùng độ dài." });
   }
 
-  res.json(problem.builder(input, params));
+  res.json(
+    (params.approach === 2 || params.approach === "2") && typeof problem.builder2 === "function"
+      ? problem.builder2(input, params)
+      : problem.builder(input, params)
+  );
 });
 
 app.listen(PORT, () => {

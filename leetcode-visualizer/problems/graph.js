@@ -14337,6 +14337,154 @@ function buildSteps399(input, params) {
   return { original: equations, answer: answers, steps };
 }
 
+/**
+ * LeetCode 851 — Loud and Rich, Approach 2: Kahn's BFS (topological sort).
+ * Build the ORIGINAL richer graph (a → b means a is richer than b).
+ * Nodes with in-degree 0 have no one richer than them → start the queue.
+ * Propagate the quietest known person DOWN the richer-than edges.
+ */
+function buildSteps851v2(input, params = {}) {
+  const richerRaw = String(input).split(",").map((e) => e.trim()).filter(Boolean);
+  const quiet = String(params.quiet || "")
+    .split(",")
+    .map((v) => parseInt(v.trim(), 10))
+    .filter(Number.isFinite);
+  const n = quiet.length;
+  const steps = [];
+
+  // Build forward graph  a → b (a richer than b)  +  track in-degree
+  const graph = Array.from({ length: n }, () => []);  // graph[a] = [list of poorer people]
+  const indegree = new Array(n).fill(0);
+  const richerEdges = richerRaw.map((e) => {
+    const [a, b] = e.split("-").map(Number);
+    return { a, b };
+  }).filter((e) => Number.isInteger(e.a) && Number.isInteger(e.b) && e.a >= 0 && e.a < n && e.b >= 0 && e.b < n);
+
+  for (const { a, b } of richerEdges) {
+    graph[a].push(b);
+    indegree[b]++;
+  }
+
+  const answer = Array.from({ length: n }, (_, i) => i);  // answer[i] = i initially
+  const inQueue = new Set();
+  const processed = new Set();
+
+  function snap(title, note, codeLines, hl = [], mk = [], extra = {}, final = false) {
+    steps.push({
+      title, note, codeLines, arr: [], highlight: hl, mark: mk, final,
+      vars: [
+        { name: "answer", value: `[${answer.join(", ")}]` },
+        { name: "indegree", value: `[${indegree.join(", ")}]` },
+        ...(extra.vars || []),
+      ],
+      loudRichV2: {
+        n, quiet: [...quiet],
+        richerEdges,
+        graph: graph.map((nb) => [...nb]),
+        answer: [...answer],
+        indegree: [...indegree],
+        inQueue: [...inQueue],
+        processed: [...processed],
+        ...(extra.view || {}),
+      },
+    });
+  }
+
+  snap(
+    { vi: "Khởi tạo đồ thị + indegree", en: "Build graph + indegree" },
+    { vi: `Dựng đồ thị hướng a→b (a giàu hơn b) và mảng indegree. indegree[i] = số người giàu hơn i trực tiếp. answer[i] = i ban đầu (mỗi người tự đại diện cho chính mình).`, en: `Build directed graph a→b (a richer than b) and the indegree array. indegree[i] = number of people directly richer than i. answer[i] = i initially (each person represents themselves).` },
+    [3, 4, 5, 6, 7],
+  );
+
+  // Fill queue with in-degree 0 nodes
+  const queue = [];
+  for (let i = 0; i < n; i++) {
+    if (indegree[i] === 0) { queue.push(i); inQueue.add(i); }
+  }
+  snap(
+    { vi: "Nạp các nút có indegree = 0 vào queue", en: "Enqueue all nodes with indegree = 0" },
+    { vi: `Các nút indegree=0 là những người KHÔNG có ai giàu hơn trực tiếp → xuất phát điểm của BFS. Queue = [${queue.join(", ")}].`, en: `Nodes with indegree=0 have no one directly richer than them → BFS starting points. Queue = [${queue.join(", ")}].` },
+    [8, 9, 10],
+    [], [], { vars: [{ name: "queue", value: `[${queue.join(", ")}]` }] },
+  );
+
+  let head = 0;  // queue pointer (simulate deque.popleft)
+  while (head < queue.length) {
+    const u = queue[head++];
+    inQueue.delete(u);
+    processed.add(u);
+
+    snap(
+      { vi: `Lấy u = ${u} từ queue`, en: `Dequeue u = ${u}` },
+      { vi: `u=${u}: answer[${u}]=${answer[u]} (người ít ồn nhất trong nhóm giàu hơn hoặc bằng ${u} đã biết). Xét tất cả v mà ${u} giàu hơn.`, en: `u=${u}: answer[${u}]=${answer[u]} (the quietest person at least as rich as ${u} known so far). Process every v poorer than ${u}.` },
+      [11, 12],
+      [u], [],
+      { vars: [{ name: "u", value: u }, { name: "answer[u]", value: answer[u] }, { name: "quiet[answer[u]]", value: quiet[answer[u]] }], view: { activeU: u } },
+    );
+
+    for (const v of graph[u]) {
+      const oldBest = answer[v];
+      const candidateBest = answer[u];
+      const update = quiet[candidateBest] < quiet[oldBest];
+
+      snap(
+        {
+          vi: update
+            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → cập nhật answer[${v}]`
+            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → giữ nguyên`,
+          en: update
+            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → update answer[${v}]`
+            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → keep`,
+        },
+        {
+          vi: update
+            ? `Người ít ồn nhất bên phía giàu hơn của ${u} (= người ${candidateBest}, quiet=${quiet[candidateBest]}) ít ồn hơn best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
+            : `Best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) ít ồn bằng hoặc hơn candidate từ ${u} → giữ answer[${v}] = ${oldBest}.`,
+          en: update
+            ? `The quietest person at least as rich as ${u} (person ${candidateBest}, quiet=${quiet[candidateBest]}) is quieter than ${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
+            : `${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) is equal or quieter than the candidate from ${u} → keep answer[${v}] = ${oldBest}.`,
+        },
+        update ? [13, 14, 15] : [13, 14],
+        [u, v], [],
+        { vars: [{ name: "u", value: u }, { name: "v", value: v }, { name: "answer[u]", value: candidateBest }, { name: "quiet[answer[u]]", value: quiet[candidateBest] }, { name: "answer[v] (before)", value: oldBest }, { name: "update?", value: update }], view: { activeU: u, activeV: v } },
+      );
+
+      if (update) answer[v] = answer[u];
+
+      indegree[v]--;
+      const enqueue = indegree[v] === 0;
+      if (enqueue) { queue.push(v); inQueue.add(v); }
+
+      snap(
+        {
+          vi: enqueue ? `indegree[${v}]-- = 0 → enqueue ${v}` : `indegree[${v}]-- = ${indegree[v]}`,
+          en: enqueue ? `indegree[${v}]-- = 0 → enqueue ${v}` : `indegree[${v}]-- = ${indegree[v]}`,
+        },
+        {
+          vi: enqueue
+            ? `Giảm indegree[${v}] về 0 → mọi người giàu hơn ${v} đã được xử lý → đẩy ${v} vào queue. Queue = [${queue.slice(head).join(", ")}].`
+            : `Giảm indegree[${v}] về ${indegree[v]} → còn ${indegree[v]} người giàu hơn ${v} chưa xử lý.`,
+          en: enqueue
+            ? `Decrement indegree[${v}] to 0 → all people richer than ${v} have been processed → enqueue ${v}. Queue = [${queue.slice(head).join(", ")}].`
+            : `Decrement indegree[${v}] to ${indegree[v]} → still ${indegree[v]} people richer than ${v} unprocessed.`,
+        },
+        [16, 17, 18],
+        [v], [],
+        { vars: [{ name: "v", value: v }, { name: "answer[v]", value: answer[v] }, { name: "indegree[v]", value: indegree[v] }, { name: "enqueue?", value: enqueue }], view: { activeU: u, activeV: v } },
+      );
+    }
+  }
+
+  snap(
+    { vi: "Kết quả", en: "Result" },
+    { vi: `answer = [${answer.join(", ")}]. Với mỗi người i, answer[i] là người ít ồn nhất giàu hơn hoặc bằng i.`, en: `answer = [${answer.join(", ")}]. For each person i, answer[i] is the least quiet person at least as rich as i.` },
+    [19],
+    [], [], {}, true,
+  );
+
+  return { original: { richer: richerEdges, quiet }, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
@@ -17209,15 +17357,30 @@ module.exports = {
         label: { vi: "quiet[] (cách bởi dấu phẩy)", en: "quiet[] (comma separated)" },
         default: "3,2,5,4,6,1,7,0",
       },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DFS + memoization (reversed graph)", en: "Approach 1: DFS + memoization (reversed graph)" } },
+          { value: "2", label: { vi: "Cách 2: BFS Kahn (topological sort)", en: "Approach 2: BFS Kahn (topological sort)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 (DFS): đảo chiều đồ thị (b→a), DFS từ từng nút. Khi answer[node] != -1 → đã tính → trả luôn (memoization).", en: "Approach 1 (DFS): reverse the graph (b→a), DFS from each node. If answer[node] != -1 → already computed → return (memoization)." },
+      { vi: "Cách 2 (BFS Kahn): giữ đồ thị gốc (a→b), tính indegree. Nút indegree=0 vào queue. Khi lấy u, truyền answer[u] xuống mọi v mà u giàu hơn; giảm indegree[v], nếu = 0 thì enqueue.", en: "Approach 2 (BFS Kahn): keep the original graph (a→b), compute indegree. Nodes with indegree=0 enter the queue. When dequeuing u, propagate answer[u] to every v poorer than u; decrement indegree[v] and enqueue when it hits 0." },
     ],
     complexity: {
       time: "O(V + E)",
       space: "O(V + E)",
       note: {
-        vi: "DFS/BFS trên đồ thị: mỗi nút thăm 1 lần O(V+E). Bộ nhớ O(V+E) cho adjacency list + answer array.",
-        en: "DFS on the graph: each node visited once O(V+E). Memory O(V+E) for adjacency list + answer array.",
+        vi: "Cả hai cách đều O(V+E). DFS: mỗi nút tính 1 lần nhờ memo. BFS: mỗi nút/cạnh xử lý đúng 1 lần.",
+        en: "Both are O(V+E). DFS: each node computed once via memo. BFS: each node/edge processed exactly once.",
       },
     },
+    codeLabel: { vi: "Cách 1: DFS + memoization", en: "Approach 1: DFS + memoization" },
     code: [
       "class Solution:",
       "    def loudAndRich(self, richer, quiet):",
@@ -17240,7 +17403,33 @@ module.exports = {
       "            dfs(i)",
       "        return answer",
     ],
+    code2Label: { vi: "Cách 2: BFS Kahn (topological sort)", en: "Approach 2: BFS Kahn (topological sort)" },
+    code2: [
+      "class Solution:",
+      "    def loudAndRich(self, richer, quiet):",
+      "        n = len(quiet)",
+      "        graph = defaultdict(list)  # a -> [b] (a richer than b)",
+      "        indegree = [0] * n",
+      "        for a, b in richer:",
+      "            graph[a].append(b)",
+      "            indegree[b] += 1",
+      "        answer = list(range(n))",
+      "        q = collections.deque()",
+      "        for i in range(n):",
+      "            if indegree[i] == 0:",
+      "                q.append(i)",
+      "        while q:",
+      "            u = q.popleft()",
+      "            for v in graph[u]:",
+      "                if quiet[answer[u]] < quiet[answer[v]]:",
+      "                    answer[v] = answer[u]",
+      "                indegree[v] -= 1",
+      "                if indegree[v] == 0:",
+      "                    q.append(v)",
+      "        return answer",
+    ],
     builder: buildSteps851,
+    builder2: buildSteps851v2,
   },
   1136: {
     id: 1136,
