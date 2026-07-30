@@ -848,6 +848,139 @@ function buildSteps911(persons, params) {
     },
   });
 
+  const eventByLine = {
+    2: "constructor-call",
+    3: "store-times",
+    4: "init-leaders",
+    5: "init-votes",
+    6: "init-leader",
+    7: "read-vote",
+    8: "count-vote",
+    9: "compare-leader",
+    10: "set-leader",
+    11: "store-leader",
+    13: "query-call",
+    14: "query-range",
+    15: "while-check",
+    16: "compute-mid",
+    17: "compare-time",
+    18: "move-left",
+    19: "else-branch",
+    20: "move-right",
+    21: "return-query",
+  };
+
+  function readVar(step, name) {
+    const item = (step.vars || []).find((entry) => entry.name === name);
+    return item ? item.value : null;
+  }
+
+  function parseStoredLeaders(value) {
+    const text = String(value ?? "").trim();
+    if (text === "[]" || !text.startsWith("[") || !text.endsWith("]")) return [];
+    return text.slice(1, -1).split(",").map((item) => Number(item.trim())).filter(Number.isFinite);
+  }
+
+  function scoreSnapshot(lastVoteIndex) {
+    const score = new Map();
+    for (let index = 0; index <= lastVoteIndex; index += 1) {
+      score.set(persons[index], (score.get(persons[index]) || 0) + 1);
+    }
+    return [...new Set(persons)].sort((a, b) => a - b).map((person) => ({
+      person,
+      votes: score.get(person) || 0,
+    }));
+  }
+
+  let activeQueryIndex = -1;
+  for (const step of steps) {
+    const codeLine = step.codeLines && step.codeLines.length ? step.codeLines[0] : null;
+    if (codeLine === 13) activeQueryIndex += 1;
+    const isQuery = activeQueryIndex >= 0 && (codeLine === null || codeLine >= 13);
+    const isFinal = Boolean(step.final);
+    const isPreprocessComplete = !isFinal && !codeLine && activeQueryIndex < 0;
+    const event = isFinal
+      ? "all-results"
+      : isPreprocessComplete
+        ? "preprocess-complete"
+        : eventByLine[codeLine] || "setup";
+    const voteIndex = !isQuery && Number.isInteger(step.highlight && step.highlight[0])
+      ? step.highlight[0]
+      : null;
+    let countedThrough = -1;
+    let processedCount = 0;
+    if (Number.isInteger(voteIndex)) {
+      countedThrough = codeLine === 7 ? voteIndex - 1 : voteIndex;
+      processedCount = codeLine === 11 ? voteIndex + 1 : voteIndex;
+    } else if (isPreprocessComplete || isQuery || isFinal) {
+      countedThrough = persons.length - 1;
+      processedCount = persons.length;
+    }
+    const storedFromVars = parseStoredLeaders(readVar(step, "self.leaders"));
+    const storedLeaders = storedFromVars.length ? storedFromVars : leaders.slice(0, processedCount);
+    const currentLeaderRaw = readVar(step, "leader");
+    const currentLeader = currentLeaderRaw !== null && Number.isFinite(Number(currentLeaderRaw))
+      ? Number(currentLeaderRaw)
+      : processedCount > 0
+        ? leaders[processedCount - 1]
+        : null;
+    const currentPerson = Number.isInteger(voteIndex) ? persons[voteIndex] : null;
+    const previousLeader = Number.isInteger(voteIndex) && voteIndex > 0 ? leaders[voteIndex - 1] : null;
+    const scores = scoreSnapshot(countedThrough);
+    const currentScore = currentPerson === null ? null : (scores.find((item) => item.person === currentPerson)?.votes || 0);
+    const previousLeaderScore = previousLeader === null ? null : (scores.find((item) => item.person === previousLeader)?.votes || 0);
+    const tieBreak = [9, 10].includes(codeLine)
+      && currentPerson !== previousLeader
+      && previousLeader !== null
+      && currentScore === previousLeaderScore;
+
+    const tRaw = readVar(step, "t");
+    const queryTime = tRaw !== null && Number.isFinite(Number(tRaw)) ? Number(tRaw) : null;
+    const leftRaw = readVar(step, "left");
+    const rightRaw = readVar(step, "right");
+    const midRaw = readVar(step, "mid");
+    const left = leftRaw !== null && Number.isFinite(Number(leftRaw)) ? Number(leftRaw) : null;
+    let right = rightRaw !== null && Number.isFinite(Number(rightRaw)) ? Number(rightRaw) : null;
+    const mid = midRaw !== null && Number.isFinite(Number(midRaw)) ? Number(midRaw) : null;
+    if (codeLine === 21 && right === null && left !== null) right = left;
+    const answerIndex = codeLine === 21 ? Number(readVar(step, "left - 1")) : null;
+    const targetIndex = queryTime === null ? null : times.findIndex((time) => time > queryTime);
+    const firstGreaterIndex = targetIndex === -1 ? times.length : targetIndex;
+    const completedQueries = isFinal
+      ? answers.length
+      : Math.max(0, activeQueryIndex + (codeLine === 21 ? 1 : 0));
+
+    step.onlineElectionView = {
+      event,
+      phase: isFinal ? "done" : isQuery ? "query" : isPreprocessComplete ? "ready" : "preprocess",
+      persons: [...persons],
+      times: [...times],
+      leaders: [...leaders],
+      storedLeaders: [...storedLeaders],
+      scores,
+      voteIndex,
+      countedThrough,
+      processedCount,
+      currentPerson,
+      currentLeader,
+      previousLeader,
+      currentScore,
+      previousLeaderScore,
+      tieBreak,
+      queries: [...queries],
+      answers: [...answers],
+      completedQueries,
+      queryIndex: isQuery && !isFinal ? activeQueryIndex : null,
+      queryTime,
+      left,
+      right,
+      mid,
+      answerIndex: Number.isInteger(answerIndex) ? answerIndex : null,
+      firstGreaterIndex,
+      whileResult: codeLine === 15 ? String(readVar(step, "condition")) === "True" : null,
+    };
+  }
+
   return {
     original: { persons: [...persons], times, queries },
     answer: answers,

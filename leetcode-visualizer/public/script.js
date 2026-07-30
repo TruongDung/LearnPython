@@ -3051,6 +3051,137 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderOnlineElectionView(step) {
+  const view = step.onlineElectionView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const queryAnswerStep = view.event === "return-query";
+  const phaseIndex = view.phase === "done"
+    ? 4
+    : view.phase === "query"
+      ? queryAnswerStep ? 3 : 2
+      : ["store-leader", "preprocess-complete"].includes(view.event) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1 · Đếm phiếu", "2 · Lưu leader theo time", "3 · Binary search q(t)", "4 · Trả leader gần nhất"]
+    : ["1 · Count votes", "2 · Save leader by time", "3 · Binary-search q(t)", "4 · Return latest leader"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const queryMode = view.phase === "query";
+  const finalMode = view.phase === "done";
+  const timeline = view.times.map((time, index) => {
+    const tags = [];
+    if (queryMode && index === view.left) tags.push("L");
+    if (queryMode && view.right !== null && index === view.right - 1) tags.push("R−1");
+    if (queryMode && index === view.mid) tags.push("M");
+    if (index === view.answerIndex) tags.push(vi ? "đáp án" : "answer");
+    let state = "future";
+    if (finalMode) state = "processed";
+    else if (!queryMode) {
+      if (index < view.processedCount) state = "processed";
+      if (index === view.voteIndex) state = "current";
+    } else if (view.left === null || view.right === null) {
+      state = "active";
+    } else if (index < view.left) {
+      state = "before";
+    } else if (index >= view.right) {
+      state = "after";
+    } else {
+      state = "active";
+    }
+    if (index === view.mid) state += " mid";
+    if (index === view.answerIndex) state += " answer";
+    const storedLeader = queryMode || finalMode
+      ? view.leaders[index]
+      : index < view.storedLeaders.length ? view.storedLeaders[index] : null;
+    return `<div class="election-point ${state}">
+      <small>${escapeHtml(tags.join(" · ") || `i=${index}`)}</small>
+      <strong>t=${time}</strong>
+      <span>${vi ? "phiếu" : "vote"}: P${view.persons[index]}</span>
+      <b>${storedLeader === null || storedLeader === undefined ? "leader: ?" : `leader: P${storedLeader}`}</b>
+    </div>`;
+  }).join("");
+  const sentinel = queryMode
+    ? `<div class="election-sentinel${view.left === view.times.length ? " pointer" : ""}"><small>${view.left === view.times.length ? "L" : ""}</small><strong>n=${view.times.length}</strong><span>${vi ? "biên phải" : "right edge"}</span></div>`
+    : "";
+
+  const scoreCards = view.scores.map((item) => {
+    const isLeader = item.person === view.currentLeader;
+    const isCurrent = item.person === view.currentPerson;
+    return `<span class="election-score${isLeader ? " leader" : ""}${isCurrent ? " current" : ""}"><small>P${item.person}${isLeader ? ` · ${vi ? "leader" : "leader"}` : ""}</small><strong>${item.votes}</strong><i>${vi ? "phiếu" : "votes"}</i></span>`;
+  }).join("");
+
+  const results = view.queries.map((query, index) => {
+    const completed = index < view.completedQueries || finalMode;
+    const active = index === view.queryIndex && !finalMode;
+    return `<span class="election-query-chip${completed ? " done" : ""}${active ? " active" : ""}"><small>q(${query})</small><strong>${completed ? `P${view.answers[index]}` : active ? "…" : "?"}</strong></span>`;
+  }).join("");
+
+  let actionHtml;
+  if (view.event === "constructor-call") {
+    actionHtml = `<div class="election-action setup"><small>CONSTRUCTOR</small><strong>${vi ? "Duyệt phiếu theo thứ tự thời gian" : "Process votes chronologically"}</strong><span>${vi ? "Mỗi vị trí i sẽ lưu leader ngay sau phiếu tại times[i]" : "Each index i stores the leader immediately after the vote at times[i]"}</span></div>`;
+  } else if (["store-times", "init-leaders", "init-votes", "init-leader"].includes(view.event)) {
+    actionHtml = `<div class="election-action setup"><small>${vi ? "KHỞI TẠO" : "INITIALIZE"}</small><strong>${escapeHtml(step.title[lang] || step.title.en)}</strong><span>${vi ? "Chuẩn bị timeline, bảng đếm và leader hiện tại" : "Prepare the timeline, vote counts, and current leader"}</span></div>`;
+  } else if (view.event === "read-vote") {
+    actionHtml = `<div class="election-action vote"><small>${vi ? "ĐỌC PHIẾU" : "READ VOTE"}</small><strong>t=${view.times[view.voteIndex]} → P${view.currentPerson}</strong><span>${vi ? "Phiếu chưa được cộng ở bước này" : "The vote has not been counted yet"}</span></div>`;
+  } else if (view.event === "count-vote") {
+    actionHtml = `<div class="election-action vote"><small>${vi ? "CỘNG PHIẾU" : "COUNT VOTE"}</small><strong>P${view.currentPerson}: ${view.currentScore} ${vi ? "phiếu" : "vote(s)"}</strong><span>votes[P${view.currentPerson}] += 1</span></div>`;
+  } else if (view.event === "compare-leader") {
+    const relation = view.currentScore >= view.previousLeaderScore ? "≥" : "<";
+    actionHtml = `<div class="election-action compare${view.tieBreak ? " tie" : ""}"><small>${view.tieBreak ? (vi ? "HÒA → PHIẾU MỚI NHẤT THẮNG" : "TIE → MOST RECENT WINS") : (vi ? "SO PHIẾU" : "COMPARE COUNTS")}</small><strong>${view.currentScore} ${relation} ${view.previousLeaderScore ?? 0}</strong><span>${view.tieBreak ? `P${view.currentPerson} ${vi ? "trở thành leader vì vừa nhận phiếu" : "becomes leader because this vote is most recent"}` : (vi ? "Dùng >= để xử lý trường hợp hòa" : "Use >= to handle ties")}</span></div>`;
+  } else if (view.event === "set-leader") {
+    actionHtml = `<div class="election-action leader"><small>${vi ? "CẬP NHẬT LEADER" : "UPDATE LEADER"}</small><strong>leader = P${view.currentLeader}</strong><span>${view.tieBreak ? (vi ? "Hòa phiếu; người vừa nhận phiếu thắng" : "Tied count; the latest vote wins") : (vi ? "Ứng viên này đang có số phiếu cao nhất" : "This candidate now has the highest count")}</span></div>`;
+  } else if (view.event === "store-leader") {
+    actionHtml = `<div class="election-action leader"><small>${vi ? "LƯU SNAPSHOT" : "SAVE SNAPSHOT"}</small><strong>leaders[${view.voteIndex}] = P${view.currentLeader}</strong><span>time ${view.times[view.voteIndex]} → leader P${view.currentLeader}</span></div>`;
+  } else if (view.event === "preprocess-complete") {
+    actionHtml = `<div class="election-action ready"><small>${vi ? "TIỀN XỬ LÝ XONG" : "PREPROCESSING COMPLETE"}</small><strong>leaders = [${view.leaders.map((leader) => `P${leader}`).join(", ")}]</strong><span>${vi ? "Mỗi q(t) giờ chỉ cần tìm vị trí trên times" : "Each q(t) now only searches for a position in times"}</span></div>`;
+  } else if (view.event === "query-call") {
+    actionHtml = `<div class="election-action query"><small>${vi ? "TRUY VẤN" : "QUERY"}</small><strong>q(${view.queryTime})</strong><span>${vi ? `Tìm time đầu tiên > ${view.queryTime}, rồi lùi 1 vị trí` : `Find the first time > ${view.queryTime}, then step back once`}</span></div>`;
+  } else if (view.event === "query-range") {
+    actionHtml = `<div class="election-action query"><small>${vi ? "KHOẢNG NỬA MỞ" : "HALF-OPEN RANGE"}</small><strong>[L, R) = [${view.left}, ${view.right})</strong><span>${vi ? "R có thể bằng n và không phải index của phiếu" : "R may equal n and is not a vote index"}</span></div>`;
+  } else if (view.event === "while-check") {
+    actionHtml = `<div class="election-action condition ${view.whileResult ? "yes" : "no"}"><small>WHILE L &lt; R</small><strong>${view.left} &lt; ${view.right} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? "Khoảng vẫn còn vị trí cần kiểm tra" : "The range still has positions to inspect") : (vi ? "L là index đầu tiên có time > t" : "L is the first index with time > t")}</span></div>`;
+  } else if (view.event === "compute-mid") {
+    actionHtml = `<div class="election-action mid"><small>COMPUTE MID</small><strong>M=${view.mid} → times[M]=${view.times[view.mid]}</strong><span>${view.times[view.mid]} ${view.times[view.mid] <= view.queryTime ? "≤" : ">"} q=${view.queryTime}</span></div>`;
+  } else if (view.event === "compare-time") {
+    const moveLeft = view.times[view.mid] <= view.queryTime;
+    actionHtml = `<div class="election-action compare ${moveLeft ? "past" : "future"}"><small>times[M] &lt;= t</small><strong>${view.times[view.mid]} ${moveLeft ? "≤" : ">"} ${view.queryTime}</strong><span>${moveLeft ? (vi ? "Phiếu này đã xảy ra; tìm time muộn hơn" : "This vote has happened; search later") : (vi ? "Phiếu này ở tương lai; giữ M và tìm bên trái" : "This vote is in the future; keep M and search left")}</span></div>`;
+  } else if (view.event === "move-left") {
+    actionHtml = `<div class="election-action move past"><small>${vi ? "BỎ PHẦN ĐÃ XẢY RA" : "REMOVE PAST PREFIX"}</small><strong>L = M + 1 = ${view.left}</strong><span>${vi ? "Mọi index ≤ M đều có time ≤ t" : "Every index ≤ M has time ≤ t"}</span></div>`;
+  } else if (view.event === "else-branch") {
+    actionHtml = `<div class="election-action compare future"><small>ELSE</small><strong>times[M] &gt; t</strong><span>${vi ? "Tiếp theo đặt R=M; không bỏ M" : "Next set R=M; do not remove M"}</span></div>`;
+  } else if (view.event === "move-right") {
+    actionHtml = `<div class="election-action move future"><small>${vi ? "GIỮ M, THU HẸP BÊN TRÁI" : "KEEP M, SHRINK LEFT"}</small><strong>R = M = ${view.right}</strong><span>${vi ? "M vẫn có thể là time đầu tiên > t" : "M may still be the first time > t"}</span></div>`;
+  } else if (view.event === "return-query") {
+    actionHtml = `<div class="election-action result"><small>${vi ? "LÙI MỘT VỊ TRÍ" : "STEP BACK ONCE"}</small><strong>L=${view.left} → L−1=${view.answerIndex}</strong><span>leaders[${view.answerIndex}] = P${view.leaders[view.answerIndex]}</span></div>`;
+  } else {
+    actionHtml = `<div class="election-action result"><small>${vi ? "HOÀN TẤT" : "COMPLETE"}</small><strong>[${view.answers.map((answer) => `P${answer}`).join(", ")}]</strong><span>${vi ? "Mỗi truy vấn dùng O(log n) sau O(n) tiền xử lý" : "Each query takes O(log n) after O(n) preprocessing"}</span></div>`;
+  }
+
+  const queryGuide = queryMode
+    ? `<div class="election-query-guide"><span><small>${vi ? "MỤC TIÊU" : "GOAL"}</small><strong>${vi ? `time đầu tiên > ${view.queryTime}` : `first time > ${view.queryTime}`}</strong></span><i>→</i><span><small>${vi ? "LEADER CẦN TRẢ" : "LEADER TO RETURN"}</small><strong>${view.answerIndex === null ? `leaders[L−1]` : `leaders[${view.answerIndex}] = P${view.leaders[view.answerIndex]}`}</strong></span></div>`
+    : "";
+  const legendHtml = queryMode
+    ? `<span><i class="before"></i>${vi ? "time ≤ query / đã bỏ" : "time ≤ query / removed"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active"}</span><span><i class="after"></i>${vi ? "time > query" : "time > query"}</span><span><i class="answer"></i>${vi ? "leader được trả" : "returned leader"}</span>`
+    : `<span><i class="before"></i>${vi ? "đã lưu leader" : "leader saved"}</span><span><i class="current"></i>${vi ? "phiếu hiện tại" : "current vote"}</span><span><i class="future"></i>${vi ? "chưa xử lý" : "not processed"}</span>`;
+
+  el.innerHTML = `<div class="election-viz">
+    <div class="election-phases">${phases}</div>
+    <div class="election-summary">
+      <span><small>${vi ? "PHIẾU ĐÃ LƯU" : "STORED VOTES"}</small><strong>${queryMode || finalMode ? view.times.length : view.processedCount} / ${view.times.length}</strong></span>
+      <span><small>${vi ? "TRUY VẤN HIỆN TẠI" : "CURRENT QUERY"}</small><strong>${view.queryTime === null ? "—" : `q(${view.queryTime})`}</strong></span>
+      <span><small>${vi ? "KHOẢNG [L,R)" : "RANGE [L,R)"}</small><strong>${view.left === null ? "—" : `[${view.left}, ${view.right})`}</strong></span>
+    </div>
+    <div class="election-timeline" role="img" aria-label="${escapeHtml(vi ? "Timeline phiếu và leader sau từng phiếu" : "Vote timeline and leader after each vote")}">${timeline}${sentinel}</div>
+    <div class="election-legend">${legendHtml}</div>
+    ${queryMode ? queryGuide : `<div class="election-scores"><small>${vi ? "BẢNG ĐẾM PHIẾU" : "VOTE COUNTS"}</small>${scoreCards}</div>`}
+    ${actionHtml}
+    <div class="election-queries"><small>${vi ? "KẾT QUẢ q(t)" : "q(t) RESULTS"}</small>${results}</div>
+  </div>`;
+}
+
 function renderShipCapacityView(step) {
   const view = step.shipCapacityView;
   const el = $("treeView");
@@ -6483,6 +6614,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.onlineElectionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderOnlineElectionView(step);
   } else if (step.shipCapacityView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
