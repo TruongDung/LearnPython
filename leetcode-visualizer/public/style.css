@@ -2051,6 +2051,36 @@ button:disabled {
 .koko-speed-cell.answer { border-color: #10b981; background: rgba(16, 185, 129, 0.25); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.28); }
 .koko-speed-gap { align-self: center; color: #94a3b8; font-size: 18px; font-weight: 800; }
 
+.koko-speed-viz:not(.ship-capacity-viz) .koko-speed-cell {
+  flex-basis: 50px;
+  min-width: 44px;
+  min-height: 82px;
+}
+
+.koko-speed-viz:not(.ship-capacity-viz) .koko-speed-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 28px;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.05;
+  white-space: normal;
+}
+
+.koko-speed-labels > span {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.koko-speed-labels > span.is-answer { color: #6ee7b7; }
+.koko-speed-labels > span.is-mid { color: #fbbf24; }
+.koko-speed-labels > span.is-boundary { color: #bae6fd; }
+
 .koko-speed-legend {
   display: flex;
   align-items: center;
@@ -2197,6 +2227,9 @@ button:disabled {
 [data-theme="light"] .koko-speed-cell strong { color: #0f172a; }
 [data-theme="light"] .koko-speed-cell small { color: #0369a1; }
 [data-theme="light"] .koko-speed-cell em { color: #475569; }
+[data-theme="light"] .koko-speed-labels > span.is-answer { color: #047857; }
+[data-theme="light"] .koko-speed-labels > span.is-mid { color: #92400e; }
+[data-theme="light"] .koko-speed-labels > span.is-boundary { color: #0369a1; }
 [data-theme="light"] .koko-pile-row code { color: #92400e; }
 [data-theme="light"] .koko-hour-chips > span { background: #fffbeb; color: #78350f; }
 [data-theme="light"] .koko-hour-chips small { color: #92400e; }

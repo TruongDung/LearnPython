@@ -3350,12 +3350,21 @@ function renderKokoSpeedView(step) {
     const tested = (view.tested || []).find((item) => item.speed === speed);
     const gapBefore = index > 0 && speed - speedValues[index - 1] > 1;
     const labels = [
-      isAnswer ? (vi ? "đáp án" : "answer") : "",
-      isMid ? "mid" : "",
-      speed === view.lo && speed === view.hi ? "lo = hi" : speed === view.lo ? "lo" : speed === view.hi ? "hi" : "",
-    ].filter(Boolean).join(" · ");
+      isAnswer ? { text: vi ? "đáp án" : "answer", type: "is-answer" } : null,
+      isMid ? { text: "mid", type: "is-mid" } : null,
+      speed === view.lo && speed === view.hi
+        ? { text: "lo = hi", type: "is-boundary" }
+        : speed === view.lo
+          ? { text: "lo", type: "is-boundary" }
+          : speed === view.hi
+            ? { text: "hi", type: "is-boundary" }
+            : null,
+    ].filter(Boolean);
+    const labelHtml = labels.length
+      ? labels.map((label) => `<span class="${label.type}">${escapeHtml(label.text)}</span>`).join("")
+      : '<span aria-hidden="true">&nbsp;</span>';
     const hours = tested ? `${tested.hours}h` : "";
-    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small>${escapeHtml(labels || " ")}</small><strong>${speed}</strong><em>${hours}</em></span>`;
+    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small class="koko-speed-labels">${labelHtml}</small><strong>${speed}</strong><em>${hours}</em></span>`;
   }).join("");
 
   const perPile = view.perPile || [];
