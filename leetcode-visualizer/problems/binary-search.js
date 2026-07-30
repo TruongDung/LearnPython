@@ -1685,6 +1685,13 @@ function buildSteps875(input, params) {
   if (!piles.length) piles.push(1);
   const parsedHours = params && params.h !== undefined ? Number(params.h) : 8;
   const h = Number.isFinite(parsedHours) ? Math.max(piles.length, Math.trunc(parsedHours)) : 8;
+  const approach = Number(params && params.approach) === 2 ? 2 : 1;
+  const manualCeil = approach === 2;
+  const lowerName = manualCeil ? "start" : "lo";
+  const upperName = manualCeil ? "end" : "hi";
+  const line = manualCeil
+    ? { init: [3, 4], while: 6, mid: 7, resetHours: 9, loopPile: 11, remainder: 12, exactAdd: 13, elseBranch: 14, roundedAdd: 15, feasible: 17, moveLo: 18, decisionElse: 19, moveHi: 20, done: 22 }
+    : { init: [5], while: 6, mid: 7, aggregateHours: 8, feasible: 9, moveHi: 10, decisionElse: 11, moveLo: 12, done: 13 };
   const steps = [];
   const initialLo = 1;
   const initialHi = Math.max(...piles);
@@ -1707,6 +1714,7 @@ function buildSteps875(input, params) {
     phase,
     title,
     codeLine,
+    codeLines = null,
     note,
     mid = null,
     perPile = [],
@@ -1726,11 +1734,13 @@ function buildSteps875(input, params) {
       highlight: [],
       mark: [],
       final,
-      codeLines: [codeLine],
+      codeBlock: approach,
+      codeLines: codeLines || [codeLine],
       vars,
       note,
       kokoSpeedView: {
         event,
+        approach,
         phase,
         piles: [...piles],
         h,
@@ -1756,12 +1766,12 @@ function buildSteps875(input, params) {
     event: "init-range",
     phase: "setup",
     title: { vi: `Tìm tốc độ nhỏ nhất trong [1, ${hi}]`, en: `Find the minimum speed in [1, ${hi}]` },
-    codeLine: 5,
+    codeLines: line.init,
     vars: [
       { name: "piles", value: `[${piles.join(", ")}]` },
       { name: "h", value: h },
-      { name: "lo", value: lo },
-      { name: "hi", value: hi },
+      { name: lowerName, value: lo },
+      { name: upperName, value: hi },
     ],
     note: {
       vi: `Tốc độ tối thiểu là 1. Tốc độ max(piles)=${hi} chắc chắn đủ vì mỗi đống mất đúng 1 giờ. Ta tìm tốc độ khả thi đầu tiên.`,
@@ -1777,9 +1787,9 @@ function buildSteps875(input, params) {
       title: canContinue
         ? { vi: `${lo} < ${hi} → còn nhiều hơn 1 ứng viên`, en: `${lo} < ${hi} → more than one candidate remains` }
         : { vi: `${lo} = ${hi} → đã tìm thấy tốc độ đầu tiên khả thi`, en: `${lo} = ${hi} → first feasible speed found` },
-      codeLine: 6,
+      codeLine: line.while,
       whileResult: canContinue,
-      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "lo < hi", value: canContinue }],
+      vars: [{ name: lowerName, value: lo }, { name: upperName, value: hi }, { name: `${lowerName} < ${upperName}`, value: canContinue }],
       note: canContinue
         ? { vi: `Đáp án vẫn nằm trong khoảng đóng [${lo}, ${hi}].`, en: `The answer is still inside the closed interval [${lo}, ${hi}].` }
         : { vi: `Khoảng chỉ còn một tốc độ: ${lo}. Vòng lặp kết thúc.`, en: `Only one speed remains: ${lo}. The loop stops.` },
@@ -1791,40 +1801,129 @@ function buildSteps875(input, params) {
       event: "compute-mid",
       phase: "range",
       title: { vi: `Thử tốc độ mid = (${lo} + ${hi}) // 2 = ${mid}`, en: `Try speed mid = (${lo} + ${hi}) // 2 = ${mid}` },
-      codeLine: 7,
+      codeLine: line.mid,
       mid,
-      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }],
+      vars: [{ name: lowerName, value: lo }, { name: upperName, value: hi }, { name: "mid", value: mid }],
       note: { vi: `Koko thử ăn ${mid} quả mỗi giờ.`, en: `Koko tries eating ${mid} bananas per hour.` },
     });
 
-    const perPile = breakdown(mid);
-    const totalHours = perPile.reduce((total, item) => total + item.hours, 0);
-    const feasible = totalHours <= h;
-    addStep({
-      event: "calculate-hours",
-      phase: "hours",
-      title: { vi: `Cộng giờ từng đống: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}`, en: `Add hours per pile: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}` },
-      codeLine: 8,
-      mid,
-      perPile,
-      totalHours,
-      feasible,
-      vars: [
-        { name: "mid", value: mid },
-        ...perPile.map((item) => ({ name: `ceil(${item.pile}/${mid})`, value: item.hours })),
-        { name: "hours", value: totalHours },
-      ],
-      note: {
-        vi: `Mỗi đống phải làm tròn lên vì Koko không chuyển phần thời gian còn dư sang đống kế tiếp. Tổng cộng cần ${totalHours} giờ.`,
-        en: `Each pile rounds up because Koko cannot use leftover time on another pile. The total is ${totalHours} hours.`,
-      },
-    });
+    const fullBreakdown = breakdown(mid);
+    let perPile = [];
+    let totalHours = 0;
 
+    if (manualCeil) {
+      addStep({
+        event: "calculate-hours",
+        phase: "hours",
+        title: { vi: "Đặt hours = 0", en: "Reset hours = 0" },
+        codeLine: line.resetHours,
+        mid,
+        perPile,
+        totalHours,
+        vars: [{ name: "mid", value: mid }, { name: "hours", value: totalHours }],
+        note: { vi: "Mỗi lần thử một tốc độ mid mới, tính lại tổng số giờ từ 0.", en: "For each new trial speed, count the total hours again from zero." },
+      });
+
+      for (const item of fullBreakdown) {
+        addStep({
+          event: "calculate-hours",
+          phase: "hours",
+          title: { vi: `Duyệt pile = ${item.pile}`, en: `Visit pile = ${item.pile}` },
+          codeLine: line.loopPile,
+          mid,
+          perPile,
+          totalHours,
+          vars: [{ name: "pile", value: item.pile }, { name: "mid", value: mid }, { name: "hours", value: totalHours }],
+          note: { vi: `Kiểm tra đống ${item.pile} có chia hết cho tốc độ ${mid} hay không.`, en: `Check whether pile ${item.pile} is divisible by speed ${mid}.` },
+        });
+
+        const dividesEvenly = item.remainder === 0;
+        addStep({
+          event: "calculate-hours",
+          phase: "hours",
+          title: { vi: `${item.pile} % ${mid} = ${item.remainder} → ${dividesEvenly}`, en: `${item.pile} % ${mid} = ${item.remainder} → ${dividesEvenly}` },
+          codeLine: line.remainder,
+          mid,
+          perPile,
+          totalHours,
+          vars: [
+            { name: "pile", value: item.pile },
+            { name: "pile % mid", value: item.remainder },
+            { name: "pile % mid == 0", value: dividesEvenly },
+            { name: "hours", value: totalHours },
+          ],
+          note: dividesEvenly
+            ? { vi: `${item.pile} chia hết cho ${mid}, không cần làm tròn lên.`, en: `${item.pile} divides evenly by ${mid}, so no extra hour is needed.` }
+            : { vi: `${item.pile} còn dư ${item.remainder}, cần thêm 1 giờ.`, en: `${item.pile} leaves remainder ${item.remainder}, so one extra hour is required.` },
+        });
+
+        if (!dividesEvenly) {
+          addStep({
+            event: "calculate-hours",
+            phase: "hours",
+            title: { vi: "Không chia hết → vào nhánh else", en: "Not divisible → enter else" },
+            codeLine: line.elseBranch,
+            mid,
+            perPile,
+            totalHours,
+            vars: [{ name: "pile", value: item.pile }, { name: "remainder", value: item.remainder }],
+            note: { vi: "Dùng thương nguyên rồi cộng thêm 1 giờ cho phần dư.", en: "Use the integer quotient, then add one hour for the remainder." },
+          });
+        }
+
+        totalHours += item.hours;
+        perPile = [...perPile, item];
+        addStep({
+          event: "calculate-hours",
+          phase: "hours",
+          title: dividesEvenly
+            ? { vi: `hours += ${item.pile} // ${mid} = ${item.hours}`, en: `hours += ${item.pile} // ${mid} = ${item.hours}` }
+            : { vi: `hours += ${item.pile} // ${mid} + 1 = ${item.hours}`, en: `hours += ${item.pile} // ${mid} + 1 = ${item.hours}` },
+          codeLine: dividesEvenly ? line.exactAdd : line.roundedAdd,
+          mid,
+          perPile,
+          totalHours,
+          vars: [
+            { name: "pile", value: item.pile },
+            { name: "pile // mid", value: item.fullHours },
+            { name: "hours added", value: item.hours },
+            { name: "hours", value: totalHours },
+          ],
+          note: { vi: `Sau đống ${item.pile}, tổng tạm thời là ${totalHours} giờ.`, en: `After pile ${item.pile}, the running total is ${totalHours} hours.` },
+        });
+      }
+    } else {
+      perPile = fullBreakdown;
+      totalHours = perPile.reduce((total, item) => total + item.hours, 0);
+      addStep({
+        event: "calculate-hours",
+        phase: "hours",
+        title: { vi: `Cộng giờ từng đống: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}`, en: `Add hours per pile: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}` },
+        codeLine: line.aggregateHours,
+        mid,
+        perPile,
+        totalHours,
+        feasible: totalHours <= h,
+        vars: [
+          { name: "mid", value: mid },
+          ...perPile.map((item) => ({ name: `ceil(${item.pile}/${mid})`, value: item.hours })),
+          { name: "hours", value: totalHours },
+        ],
+        note: {
+          vi: `Mỗi đống phải làm tròn lên vì Koko không chuyển phần thời gian còn dư sang đống kế tiếp. Tổng cộng cần ${totalHours} giờ.`,
+          en: `Each pile rounds up because Koko cannot use leftover time on another pile. The total is ${totalHours} hours.`,
+        },
+      });
+    }
+
+    const feasible = totalHours <= h;
     addStep({
       event: "feasible-check",
       phase: "decision",
-      title: { vi: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "kịp giờ" : "không kịp"}`, en: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "on time" : "too slow"}` },
-      codeLine: 9,
+      title: manualCeil
+        ? { vi: `${totalHours} > ${h} → ${!feasible}`, en: `${totalHours} > ${h} → ${!feasible}` }
+        : { vi: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "kịp giờ" : "không kịp"}`, en: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "on time" : "too slow"}` },
+      codeLine: line.feasible,
       mid,
       perPile,
       totalHours,
@@ -1832,7 +1931,7 @@ function buildSteps875(input, params) {
       vars: [
         { name: "hours", value: totalHours },
         { name: "h", value: h },
-        { name: "hours <= h", value: feasible },
+        { name: manualCeil ? "hours > h" : "hours <= h", value: manualCeil ? !feasible : feasible },
       ],
       note: feasible
         ? { vi: `Tốc độ ${mid} khả thi, nhưng có thể chưa nhỏ nhất. Giữ mid và thử các tốc độ chậm hơn.`, en: `Speed ${mid} is feasible, but it may not be minimal. Keep mid and try slower speeds.` }
@@ -1843,49 +1942,67 @@ function buildSteps875(input, params) {
     const previousLo = lo;
     const previousHi = hi;
     if (feasible) {
+      if (manualCeil) {
+        addStep({
+          event: "else-branch",
+          phase: "shrink",
+          title: { vi: `${totalHours} ≤ ${h} → vào nhánh else`, en: `${totalHours} ≤ ${h} → enter else` },
+          codeLine: line.decisionElse,
+          mid,
+          perPile,
+          totalHours,
+          feasible,
+          previousLo,
+          previousHi,
+          vars: [{ name: "hours > h", value: false }, { name: "mid", value: mid }],
+          note: { vi: `Tốc độ ${mid} kịp giờ, nên giữ mid bằng end = mid.`, en: `Speed ${mid} finishes on time, so keep it with end = mid.` },
+        });
+      }
       hi = mid;
       addStep({
         event: "move-hi",
         phase: "shrink",
-        title: { vi: `Khả thi → hi = mid = ${mid}`, en: `Feasible → hi = mid = ${mid}` },
-        codeLine: 10,
+        title: { vi: `Khả thi → ${upperName} = mid = ${mid}`, en: `Feasible → ${upperName} = mid = ${mid}` },
+        codeLine: line.moveHi,
         mid,
         perPile,
         totalHours,
         feasible,
         previousLo,
         previousHi,
-        vars: [{ name: "old hi", value: previousHi }, { name: "hi", value: hi }, { name: "lo", value: lo }],
+        vars: [{ name: `old ${upperName}`, value: previousHi }, { name: upperName, value: hi }, { name: lowerName, value: lo }],
         note: { vi: `Giữ ${mid} vì nó vẫn có thể là đáp án. Khoảng mới: [${lo}, ${hi}].`, en: `Keep ${mid} because it may be the answer. New interval: [${lo}, ${hi}].` },
       });
     } else {
-      addStep({
-        event: "else-branch",
-        phase: "shrink",
-        title: { vi: `${totalHours} > ${h} → đi vào nhánh else`, en: `${totalHours} > ${h} → enter the else branch` },
-        codeLine: 11,
-        mid,
-        perPile,
-        totalHours,
-        feasible,
-        previousLo,
-        previousHi,
-        vars: [{ name: "hours <= h", value: false }, { name: "mid", value: mid }],
-        note: { vi: `Điều kiện if sai nên thực hiện dòng 12.`, en: `The if condition is false, so line 12 runs next.` },
-      });
+      if (!manualCeil) {
+        addStep({
+          event: "else-branch",
+          phase: "shrink",
+          title: { vi: `${totalHours} > ${h} → đi vào nhánh else`, en: `${totalHours} > ${h} → enter the else branch` },
+          codeLine: line.decisionElse,
+          mid,
+          perPile,
+          totalHours,
+          feasible,
+          previousLo,
+          previousHi,
+          vars: [{ name: "hours <= h", value: false }, { name: "mid", value: mid }],
+          note: { vi: `Điều kiện if sai nên thực hiện dòng 12.`, en: `The if condition is false, so line 12 runs next.` },
+        });
+      }
       lo = mid + 1;
       addStep({
         event: "move-lo",
         phase: "shrink",
-        title: { vi: `Quá chậm → lo = mid + 1 = ${lo}`, en: `Too slow → lo = mid + 1 = ${lo}` },
-        codeLine: 12,
+        title: { vi: `Quá chậm → ${lowerName} = mid + 1 = ${lo}`, en: `Too slow → ${lowerName} = mid + 1 = ${lo}` },
+        codeLine: line.moveLo,
         mid,
         perPile,
         totalHours,
         feasible,
         previousLo,
         previousHi,
-        vars: [{ name: "old lo", value: previousLo }, { name: "lo", value: lo }, { name: "hi", value: hi }],
+        vars: [{ name: `old ${lowerName}`, value: previousLo }, { name: lowerName, value: lo }, { name: upperName, value: hi }],
         note: { vi: `Loại [${previousLo}, ${mid}]. Khoảng mới: [${lo}, ${hi}].`, en: `Remove [${previousLo}, ${mid}]. New interval: [${lo}, ${hi}].` },
       });
     }
@@ -1899,7 +2016,7 @@ function buildSteps875(input, params) {
     event: "done",
     phase: "done",
     title: { vi: `return ${answer} — tốc độ nhỏ nhất khả thi`, en: `return ${answer} — minimum feasible speed` },
-    codeLine: 13,
+    codeLine: line.done,
     perPile: answerBreakdown,
     totalHours: answerHours,
     feasible: true,
@@ -1907,8 +2024,8 @@ function buildSteps875(input, params) {
     slowerHours,
     final: true,
     vars: [
-      { name: "lo", value: answer },
-      { name: "hours(lo)", value: answerHours },
+      { name: lowerName, value: answer },
+      { name: `hours(${lowerName})`, value: answerHours },
       ...(slowerHours === null ? [] : [{ name: `hours(${answer - 1})`, value: slowerHours }]),
       { name: "answer", value: answer },
     ],
@@ -2522,14 +2639,24 @@ module.exports = {
     inputLabel: { vi: "piles", en: "piles" },
     extraParams: [
       { key: "h", label: { vi: "h (số giờ)", en: "h (hours)" }, default: 8 },
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: math.ceil", en: "Approach 1: math.ceil" } },
+          { value: "2", label: { vi: "Cách 2: % và //", en: "Approach 2: % and //" } },
+        ],
+      },
     ],
     approach: [
       { vi: "Số giờ cần giảm dần khi tốc độ tăng → tính đơn điệu → binary search trên tốc độ.", en: "Hours needed decrease as speed increases → monotonic → binary search on speed." },
       { vi: "Khoảng tìm: [1, max(piles)]. hours(v) = Σ ceil(pile/v).", en: "Range: [1, max(piles)]. hours(v) = Σ ceil(pile/v)." },
-      { vi: "hours(mid) ≤ h → thử chậm hơn (hi=mid); ngược lại nhanh hơn (lo=mid+1).", en: "hours(mid) ≤ h → try slower (hi=mid); else faster (lo=mid+1)." },
-      { vi: "Kết quả là lo — tốc độ nhỏ nhất khả thi.", en: "Answer is lo — the smallest feasible speed." },
+      { vi: "Cách 1 dùng math.ceil. Cách 2 tự làm tròn lên: chia hết thì pile // mid, có dư thì pile // mid + 1.", en: "Approach 1 uses math.ceil. Approach 2 rounds up manually: pile // mid when divisible, otherwise pile // mid + 1." },
+      { vi: "Cách 1: hours ≤ h thì hi=mid, ngược lại lo=mid+1. Cách 2: hours > h thì start=mid+1, ngược lại end=mid.", en: "Approach 1: hours ≤ h sets hi=mid, otherwise lo=mid+1. Approach 2: hours > h sets start=mid+1, otherwise end=mid." },
+      { vi: "Kết quả là lo (Cách 1) hoặc start (Cách 2) — tốc độ nhỏ nhất khả thi.", en: "The answer is lo (Approach 1) or start (Approach 2) — the smallest feasible speed." },
     ],
     complexity: { time: "O(n log(max pile))", space: "O(1)", note: { vi: "Mỗi lần thử tốc độ tính giờ O(n).", en: "Each speed check computes hours in O(n)." } },
+    codeLabel: { vi: "Cách 1: math.ceil", en: "Approach 1: math.ceil" },
+    code2Label: { vi: "Cách 2: % và //", en: "Approach 2: % and //" },
     code: [
       "import math",
       "",
@@ -2544,6 +2671,30 @@ module.exports = {
       "            else:",
       "                lo = mid + 1",
       "        return lo",
+    ],
+    code2: [
+      "class Solution:",
+      "    def minEatingSpeed(self, piles, h):",
+      "        start = 1",
+      "        end = max(piles)",
+      "",
+      "        while start < end:",
+      "            mid = (start + end) // 2",
+      "",
+      "            hours = 0",
+      "",
+      "            for pile in piles:",
+      "                if pile % mid == 0:",
+      "                    hours += pile // mid",
+      "                else:",
+      "                    hours += pile // mid + 1",
+      "",
+      "            if hours > h:",
+      "                start = mid + 1",
+      "            else:",
+      "                end = mid",
+      "",
+      "        return start",
     ],
     builder: buildSteps875,
   },
