@@ -3434,11 +3434,11 @@ function renderSqrtBinaryView(step) {
   const domainLo = baseCase ? 0 : view.initialLo;
   const domainHi = Math.max(baseCase ? 1 : view.initialHi, domainLo);
   const candidateCount = domainHi - domainLo + 1;
-  const graphWidth = 760;
-  const graphHeight = 230;
-  const plotLeft = 62;
-  const plotRight = graphWidth - 48;
-  const axisY = 108;
+  const graphWidth = 680;
+  const graphHeight = 285;
+  const plotLeft = 70;
+  const plotRight = graphWidth - 60;
+  const axisY = 105;
   const bucketWidth = (plotRight - plotLeft) / Math.max(1, candidateCount);
 
   function centerX(value) {
@@ -3479,22 +3479,22 @@ function renderSqrtBinaryView(step) {
   }
   const ticks = tickValues.map((value) => `<g class="sqrt-tick${value === view.answer ? " answer" : ""}">
     <line x1="${centerX(value)}" y1="${axisY - 23}" x2="${centerX(value)}" y2="${axisY + 23}"></line>
-    <text class="value" x="${centerX(value)}" y="${axisY + 40}">${value}</text>
-    ${candidateCount <= 12 ? `<text class="square" x="${centerX(value)}" y="${axisY + 57}">${value}²=${value * value}</text>` : ""}
+    <text class="value" x="${centerX(value)}" y="${axisY + 43}">${value}</text>
+    ${candidateCount <= 12 ? `<text class="square" x="${centerX(value)}" y="${axisY + 68}">${value}²=${value * value}</text>` : ""}
   </g>`).join("");
 
   let markers = "";
   if (!baseCase) {
     if (view.lo === view.hi && view.lo >= domainLo && view.lo <= domainHi) {
-      markers += `<g class="sqrt-pointer both"><line x1="${centerX(view.lo)}" y1="${axisY + 20}" x2="${centerX(view.lo)}" y2="${axisY + 78}"></line><text x="${centerX(view.lo)}" y="${axisY + 94}">lo = hi = ${view.lo}</text></g>`;
+      markers += `<g class="sqrt-pointer both"><line x1="${centerX(view.lo)}" y1="${axisY + 20}" x2="${centerX(view.lo)}" y2="${axisY + 27}"></line><line x1="${centerX(view.lo)}" y1="${axisY + 79}" x2="${centerX(view.lo)}" y2="${axisY + 116}"></line><text x="${centerX(view.lo)}" y="${axisY + 140}">lo = hi = ${view.lo}</text></g>`;
     } else {
       if (view.lo >= domainLo && view.lo <= domainHi + 1) {
         const loX = view.lo > domainHi ? plotRight + 12 : centerX(view.lo);
-        markers += `<g class="sqrt-pointer lo"><line x1="${loX}" y1="${axisY + 20}" x2="${loX}" y2="${axisY + 68}"></line><text x="${loX}" y="${axisY + 84}">lo=${view.lo}</text></g>`;
+        markers += `<g class="sqrt-pointer lo"><line x1="${loX}" y1="${axisY + 20}" x2="${loX}" y2="${axisY + 27}"></line><line x1="${loX}" y1="${axisY + 79}" x2="${loX}" y2="${axisY + 88}"></line><text x="${loX}" y="${axisY + 110}">lo=${view.lo}</text></g>`;
       }
       if (view.hi >= domainLo - 1 && view.hi <= domainHi) {
         const hiX = view.hi < domainLo ? plotLeft - 12 : centerX(view.hi);
-        markers += `<g class="sqrt-pointer hi"><line x1="${hiX}" y1="${axisY + 20}" x2="${hiX}" y2="${axisY + 45}"></line><text x="${hiX}" y="${axisY + 61}">hi=${view.hi}</text></g>`;
+        markers += `<g class="sqrt-pointer hi"><line x1="${hiX}" y1="${axisY + 20}" x2="${hiX}" y2="${axisY + 27}"></line><line x1="${hiX}" y1="${axisY + 79}" x2="${hiX}" y2="${axisY + 118}"></line><text x="${hiX}" y="${axisY + 142}">hi=${view.hi}</text></g>`;
       }
     }
   }

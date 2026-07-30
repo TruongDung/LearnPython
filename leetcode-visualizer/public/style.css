@@ -2248,7 +2248,7 @@ button:disabled {
 .sqrt-range-svg {
   display: block;
   width: 100%;
-  max-height: 285px;
+  max-height: 320px;
   overflow: visible;
 }
 
@@ -2261,13 +2261,21 @@ button:disabled {
 
 .sqrt-tick line { stroke: #64748b; stroke-width: 1.5; }
 .sqrt-tick text { text-anchor: middle; pointer-events: none; }
-.sqrt-tick text.value { fill: #f8fafc; font-size: 14px; font-weight: 850; }
-.sqrt-tick text.square { fill: #94a3b8; font-size: 10px; font-weight: 650; }
+.sqrt-tick text.value { fill: #f8fafc; font-size: 19px; font-weight: 850; }
+.sqrt-tick text.square { fill: #cbd5e1; font-size: 14px; font-weight: 750; }
 .sqrt-tick.answer line { stroke: #10b981; stroke-width: 4; }
 .sqrt-tick.answer text.value { fill: #6ee7b7; }
 
 .sqrt-pointer line { stroke-width: 2.5; stroke-dasharray: 4 3; }
-.sqrt-pointer text { text-anchor: middle; font-size: 12px; font-weight: 850; }
+.sqrt-pointer text {
+  text-anchor: middle;
+  font-size: 16px;
+  font-weight: 850;
+  paint-order: stroke fill;
+  stroke: #0f172a;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
 .sqrt-pointer.lo line { stroke: #38bdf8; }
 .sqrt-pointer.lo text { fill: #7dd3fc; }
 .sqrt-pointer.hi line { stroke: #a78bfa; }
@@ -2276,7 +2284,7 @@ button:disabled {
 .sqrt-pointer.both text { fill: #bae6fd; }
 .sqrt-pointer.mid line { stroke: #f59e0b; }
 .sqrt-pointer.mid path { fill: #f59e0b; }
-.sqrt-pointer.mid text { fill: #fbbf24; font-size: 13px; }
+.sqrt-pointer.mid text { fill: #fbbf24; font-size: 17px; }
 
 .sqrt-legend {
   display: flex;
@@ -2369,6 +2377,7 @@ button:disabled {
 [data-theme="light"] .sqrt-pointer.hi text { fill: #6d28d9; }
 [data-theme="light"] .sqrt-pointer.mid text { fill: #92400e; }
 [data-theme="light"] .sqrt-pointer.mid path { fill: #d97706; }
+[data-theme="light"] .sqrt-pointer text { stroke: #ffffff; }
 [data-theme="light"] .sqrt-action { background: #f0f9ff; }
 [data-theme="light"] .sqrt-action.condition.no { background: #f5f3ff; }
 [data-theme="light"] .sqrt-action.compare { background: #fffbeb; }
@@ -2381,7 +2390,7 @@ button:disabled {
 @media (max-width: 700px) {
   .sqrt-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sqrt-summary { grid-template-columns: 1fr; }
-  .sqrt-range-svg { max-height: 260px; }
+  .sqrt-range-svg { max-height: 305px; }
   .sqrt-equation { grid-template-columns: 1fr; }
   .sqrt-equation > i { transform: rotate(90deg); font-size: 18px; }
 }
