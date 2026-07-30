@@ -2326,11 +2326,14 @@ function renderSameTreeView(step) {
 function renderSortedListBstView(step) {
   const view = step.sortedListBstView;
   const treeView = $("treeView");
+  const isArrayMode = view.mode === "array";
   const activeRange = Array.isArray(view.activeRange) ? view.activeRange : null;
+  const arrayRange = Array.isArray(view.arrayRange) ? view.arrayRange : null;
+  const arrayValues = Array.isArray(view.arrayValues) ? view.arrayValues : [];
   const cuts = new Set(view.cuts || []);
   const picked = new Set(view.picked || []);
   const pointers = view.pointers || {};
-  const pointerNames = ["head", "prev", "slow", "fast"];
+  const pointerNames = isArrayMode ? ["head"] : ["head", "prev", "slow", "fast"];
   const pointerClasses = { head: "head", prev: "prev", slow: "slow", fast: "fast" };
   const pointerMap = new Map();
 
@@ -2354,7 +2357,8 @@ function renderSortedListBstView(step) {
     const labels = pointerMap.get(index) || [];
     const nodeClasses = ["slb-node"];
     if (activeRange && !inRange) nodeClasses.push("outside");
-    if (picked.has(index)) nodeClasses.push("picked");
+    if (isArrayMode && index < (view.copiedCount || 0)) nodeClasses.push("copied");
+    if (!isArrayMode && picked.has(index)) nodeClasses.push("picked");
     if (labels.length) nodeClasses.push("pointed");
     const tags = labels.map((name) => `<span class="slb-pointer ${pointerClasses[name]}">${name}</span>`).join("");
     const connector = index < view.values.length - 1
@@ -2372,9 +2376,19 @@ function renderSortedListBstView(step) {
     </div>${connector}`;
   }).join("");
 
-  const statusHtml = pointerNames.map((name) => `<span class="slb-status ${pointerClasses[name]}">
-    <code>${name}</code><strong>${escapeHtml(pointerValue(name))}</strong>
-  </span>`).join("");
+  const statusItem = (name, value, className = "") => `<span class="slb-status ${className}">
+    <code>${name}</code><strong>${escapeHtml(value)}</strong>
+  </span>`;
+  const unsetLabel = lang === "vi" ? "chưa gán" : "unset";
+  const statusHtml = isArrayMode
+    ? [
+        statusItem("head", pointerValue("head"), "head"),
+        statusItem("vals", `[${arrayValues.join(", ")}]`, "array"),
+        statusItem("lo", view.lo === null || view.lo === undefined ? unsetLabel : view.lo, "range"),
+        statusItem("hi", view.hi === null || view.hi === undefined ? unsetLabel : view.hi, "range"),
+        statusItem("mid", view.midAssigned ? `${view.mid} → ${view.values[view.mid]}` : unsetLabel, "mid"),
+      ].join("")
+    : pointerNames.map((name) => statusItem(name, pointerValue(name), pointerClasses[name])).join("");
 
   const stackHtml = (view.callStack || []).length
     ? view.callStack.map((frame, index) => {
@@ -2382,28 +2396,72 @@ function renderSortedListBstView(step) {
         const active = index === view.callStack.length - 1 ? " active" : "";
         return `<span class="slb-frame${active}"><small>${escapeHtml(frame.side)}</small><code>${range}</code></span>`;
       }).join('<span class="slb-stack-arrow">›</span>')
-    : `<span class="slb-frame active"><small>${lang === "vi" ? "xong" : "done"}</small><code>root</code></span>`;
+    : isArrayMode && view.phase !== "done"
+      ? `<span class="slb-frame active"><small>${lang === "vi" ? "hàm chính" : "main"}</small><code>sortedListToBST</code></span>`
+      : `<span class="slb-frame active"><small>${lang === "vi" ? "xong" : "done"}</small><code>root</code></span>`;
 
   const activeLabel = activeRange
     ? `[${activeRange[0]}..${activeRange[1]}]`
     : "∅";
-  const summary = lang === "vi"
-    ? `Đoạn list hiện tại ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`
-    : `Current list segment ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`;
+  const arrayRangeLabel = arrayRange ? `[${arrayRange[0]}..${arrayRange[1]}]` : "∅";
+  const summary = isArrayMode
+    ? lang === "vi"
+      ? `Đã copy ${view.copiedCount || 0} trên ${view.values.length} node vào vals. Đoạn build hiện tại ${arrayRangeLabel}.`
+      : `Copied ${view.copiedCount || 0} of ${view.values.length} nodes into vals. Current build range ${arrayRangeLabel}.`
+    : lang === "vi"
+      ? `Đoạn list hiện tại ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`
+      : `Current list segment ${activeLabel}. head ${pointerValue("head")}, prev ${pointerValue("prev")}, slow ${pointerValue("slow")}, fast ${pointerValue("fast")}.`;
+
+  const arrayCells = isArrayMode
+    ? view.values.map((_, index) => {
+        const classes = ["slb-array-cell"];
+        const filled = index < arrayValues.length;
+        if (filled) classes.push("filled");
+        if (arrayRange && index >= arrayRange[0] && index <= arrayRange[1]) classes.push("in-range");
+        if (picked.has(index)) classes.push("picked");
+        if (view.midAssigned && index === view.mid) classes.push("mid");
+        return `<div class="${classes.join(" ")}">
+          <span>${index}</span>
+          <strong>${filled ? escapeHtml(arrayValues[index]) : "·"}</strong>
+          ${view.midAssigned && index === view.mid ? "<small>mid</small>" : ""}
+        </div>`;
+      }).join("")
+    : "";
+
+  const arrayPanel = isArrayMode
+    ? `<section class="slb-array-panel">
+        <div class="slb-section-title">
+          <strong><code>vals</code></strong>
+          <span>${arrayValues.length}/${view.values.length} ${lang === "vi" ? "phần tử đã copy" : "values copied"} · ${lang === "vi" ? "đoạn build" : "build range"} <code>${arrayRangeLabel}</code></span>
+        </div>
+        <div class="slb-array-scroll"><div class="slb-array-row">${arrayCells}</div></div>
+      </section>`
+    : "";
+
+  const legendHtml = isArrayMode
+    ? `<span><i class="copied-node"></i>${lang === "vi" ? "đã copy vào vals" : "copied into vals"}</span>
+       <span><i class="active-range"></i>${lang === "vi" ? "vals[lo..hi]" : "vals[lo..hi]"}</span>
+       <span><i class="mid-node"></i>${lang === "vi" ? "mid / root mới" : "mid / new root"}</span>`
+    : `<span><i class="active-range"></i>${lang === "vi" ? "đoạn hiện tại" : "active segment"}</span>
+       <span><i class="picked-node"></i>${lang === "vi" ? "đã đưa vào BST" : "moved to BST"}</span>
+       <span><i class="cut-link"></i>prev.next = None</span>`;
 
   treeView.innerHTML = `<div class="sorted-list-bst-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="slb-call-stack">
       <strong>${lang === "vi" ? "STACK ĐỆ QUY" : "RECURSION STACK"}</strong>
       <div>${stackHtml}</div>
     </div>
-    <div class="slb-status-row">${statusHtml}</div>
+    <div class="slb-status-row${isArrayMode ? " array-mode" : ""}">${statusHtml}</div>
     <section class="slb-list-panel">
       <div class="slb-section-title">
-        <strong>Linked list</strong>
-        <span>${lang === "vi" ? "đoạn đang xử lý" : "active segment"} <code>${activeLabel}</code></span>
+        <strong>${isArrayMode ? (lang === "vi" ? "Linked list nguồn" : "Source linked list") : "Linked list"}</strong>
+        <span>${isArrayMode
+          ? `${view.copiedCount || 0}/${view.values.length} ${lang === "vi" ? "node đã đọc" : "nodes read"}`
+          : `${lang === "vi" ? "đoạn đang xử lý" : "active segment"} <code>${activeLabel}</code>`}</span>
       </div>
       <div class="slb-list-scroll"><div class="slb-list-row">${listHtml}</div></div>
     </section>
+    ${arrayPanel}
     <section class="slb-tree-panel">
       <div class="slb-section-title">
         <strong>${lang === "vi" ? "BST đang dựng" : "BST under construction"}</strong>
@@ -2412,9 +2470,7 @@ function renderSortedListBstView(step) {
       <div id="sortedListBstTree" class="slb-tree-canvas"></div>
     </section>
     <div class="slb-legend" aria-hidden="true">
-      <span><i class="active-range"></i>${lang === "vi" ? "đoạn hiện tại" : "active segment"}</span>
-      <span><i class="picked-node"></i>${lang === "vi" ? "đã đưa vào BST" : "moved to BST"}</span>
-      <span><i class="cut-link"></i>${lang === "vi" ? "prev.next = None" : "prev.next = None"}</span>
+      ${legendHtml}
     </div>
   </div>`;
 
@@ -2423,6 +2479,106 @@ function renderSortedListBstView(step) {
   } else {
     $("sortedListBstTree").innerHTML = `<span class="slb-tree-empty">∅</span>`;
   }
+}
+
+function renderKeypadPushView(step) {
+  const view = step.keypadPushView;
+  const treeView = $("treeView");
+  const assignments = Array.isArray(view.assignments) ? view.assignments : [];
+  const assignmentBySlot = new Map(assignments.map((item) => [`${item.key}:${item.cost}`, item]));
+  const currentAssignment = assignments.find((item) => item.index === view.currentIndex);
+  const unset = lang === "vi" ? "chưa gán" : "unset";
+  const pushLabel = (count) => lang === "vi" ? `${count} lần` : `${count} push${count === 1 ? "" : "es"}`;
+
+  const wordHtml = view.word.map((ch, index) => {
+    const assignment = assignments.find((item) => item.index === index);
+    const classes = ["kp-word-cell"];
+    if (index < view.processedCount) classes.push("done");
+    if (index === view.currentIndex) classes.push("current");
+    const detail = assignment
+      ? `${lang === "vi" ? "phím" : "key"} ${assignment.key} · ${pushLabel(assignment.cost)}`
+      : index === view.currentIndex
+        ? (lang === "vi" ? "đang xử lý" : "processing")
+        : "—";
+    return `<div class="${classes.join(" ")}">
+      <small>[${index}]</small>
+      <strong>${escapeHtml(ch)}</strong>
+      <span>${escapeHtml(detail)}</span>
+    </div>`;
+  }).join("");
+
+  const headerHtml = Array.from({ length: 8 }, (_, offset) => {
+    const key = offset + 2;
+    const active = key === view.key ? " active" : "";
+    return `<div class="kp-key-head${active}"><small>${lang === "vi" ? "PHÍM" : "KEY"}</small><strong>${key}</strong></div>`;
+  }).join("");
+
+  const layerRows = Array.from({ length: 4 }, (_, layerIndex) => {
+    const cost = layerIndex + 1;
+    const slots = Array.from({ length: 8 }, (_, offset) => {
+      const key = offset + 2;
+      const assigned = assignmentBySlot.get(`${key}:${cost}`);
+      const isTarget = key === view.key && cost === view.cost;
+      const isPending = isTarget && !assigned && view.currentIndex !== null;
+      const classes = ["kp-slot"];
+      if (assigned) classes.push("filled");
+      if (isTarget) classes.push("active");
+      if (isPending) classes.push("pending");
+      const letter = assigned ? assigned.ch : isPending ? view.word[view.currentIndex] : "·";
+      const slotState = assigned
+        ? `${lang === "vi" ? "đã gán" : "assigned"} ${assigned.ch}`
+        : isPending
+          ? `${lang === "vi" ? "sắp gán" : "pending"} ${view.word[view.currentIndex]}`
+          : (lang === "vi" ? "trống" : "empty");
+      return `<div class="${classes.join(" ")}" aria-label="${lang === "vi" ? "Phím" : "Key"} ${key}, ${pushLabel(cost)}, ${escapeHtml(slotState)}">
+        <strong>${escapeHtml(letter)}</strong>
+      </div>`;
+    }).join("");
+    const activeLayer = cost === view.cost ? " active" : "";
+    return `<div class="kp-layer-label${activeLayer}"><strong>${cost}×</strong></div>${slots}`;
+  }).join("");
+
+  const iValue = view.currentIndex === null ? unset : view.currentIndex;
+  const chValue = view.currentIndex === null ? unset : `'${view.word[view.currentIndex]}'`;
+  const keyValue = view.key === null ? unset : `2 + ${view.currentIndex} % 8 = ${view.key}`;
+  const costValue = view.cost === null ? unset : `${view.currentIndex} // 8 + 1 = ${view.cost}`;
+  const summary = lang === "vi"
+    ? `Đã gán ${assignments.length} trên ${view.word.length} chữ. Tổng hiện tại ${view.pushes} lần nhấn.`
+    : `Assigned ${assignments.length} of ${view.word.length} letters. Current total: ${view.pushes} pushes.`;
+
+  treeView.innerHTML = `<div class="keypad-push-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="kp-status-row">
+      <span><small>i / ch</small><strong>${escapeHtml(iValue)} / ${escapeHtml(chValue)}</strong></span>
+      <span class="${view.key !== null ? "active" : ""}"><small>key = 2 + i % 8</small><strong>${escapeHtml(keyValue)}</strong></span>
+      <span class="${view.cost !== null ? "active" : ""}"><small>cost = i // 8 + 1</small><strong>${escapeHtml(costValue)}</strong></span>
+      <span class="total"><small>pushes</small><strong>${escapeHtml(view.pushes)}</strong></span>
+    </div>
+    <section class="kp-word-section">
+      <div class="kp-section-title"><strong>word</strong><span>${assignments.length}/${view.word.length} ${lang === "vi" ? "chữ đã gán" : "letters assigned"}</span></div>
+      <div class="kp-word-scroll"><div class="kp-word-row">${wordHtml}</div></div>
+    </section>
+    <section class="kp-board-section">
+      <div class="kp-section-title"><strong>${lang === "vi" ? "Bản đồ phím 2–9" : "Key map 2–9"}</strong><span>${lang === "vi" ? "tầng càng sâu → nhấn càng nhiều" : "deeper layer → more pushes"}</span></div>
+      <div class="kp-board-scroll">
+        <div class="kp-board-grid">
+          <div class="kp-board-corner">${lang === "vi" ? "CHI PHÍ" : "COST"}</div>
+          ${headerHtml}
+          ${layerRows}
+        </div>
+      </div>
+    </section>
+    <div class="kp-current-action">
+      ${currentAssignment
+        ? `<strong>'${escapeHtml(currentAssignment.ch)}'</strong><span>→ ${lang === "vi" ? "phím" : "key"} ${currentAssignment.key}, ${pushLabel(currentAssignment.cost)}</span>`
+        : view.currentIndex !== null
+          ? `<strong>'${escapeHtml(view.word[view.currentIndex])}'</strong><span>${view.cost !== null
+              ? `→ ${lang === "vi" ? "phím" : "key"} ${view.key}, ${pushLabel(view.cost)}`
+              : view.key !== null
+                ? `→ ${lang === "vi" ? "phím" : "key"} ${view.key}`
+                : `→ ${lang === "vi" ? "đang đọc word[i]" : "reading word[i]"}`}</span>`
+          : `<strong>${view.phase === "done" ? (lang === "vi" ? "HOÀN TẤT" : "COMPLETE") : "word"}</strong><span>${view.phase === "done" ? `${view.pushes} ${lang === "vi" ? "lần nhấn" : "pushes"}` : (lang === "vi" ? "chưa gán chữ nào" : "no letters assigned yet")}</span>`}
+    </div>
+  </div>`;
 }
 
 function renderDecisionTree(step) {
@@ -5632,6 +5788,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderWordSearchView(step);
+  } else if (step.keypadPushView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderKeypadPushView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

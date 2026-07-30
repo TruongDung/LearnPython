@@ -1465,67 +1465,267 @@ function buildSteps99(input, params = {}) {
 
 // ─── 109: Convert Sorted List to BST ───
 function buildSteps109(input) {
-  const nums = String(input).split(",").map(Number);
+  const nums = String(input)
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isFinite(value));
   const steps = [];
-
-  const listStr = nums.join(" → ") + " → null";
-  steps.push(snapshot(null, {
-    title: { vi: "Linked list sorted → BST cân bằng", en: "Sorted linked list → Balanced BST" },
-    levelLabelGutter: 84,
-    codeLines: [2],
-    vars: [{ name: "list", value: listStr }, { name: "n", value: nums.length }],
-    note: {
-      vi:
-        `Danh sách liên kết đã sắp xếp tăng dần.\n` +
-        `Cách đơn giản: đọc list ra MẢNG, rồi giống hệt bài 108:\n` +
-        `• Chọn phần tử GIỮA làm gốc → 2 nửa gần bằng nhau.\n` +
-        `• Đệ quy: nửa trái → con trái, nửa phải → con phải.\n` +
-        `(Cách tối ưu O(1) bộ nhớ: dùng slow/fast pointer tìm giữa trực tiếp trên list.)`,
-      en:
-        `The linked list is sorted ascending.\n` +
-        `Simple approach: read the list into an ARRAY, then exactly like 108:\n` +
-        `• Pick the MIDDLE element as the root → halves nearly equal.\n` +
-        `• Recurse: left half → left child, right half → right child.\n` +
-        `(Optimal O(1) space: use slow/fast pointers to find the middle on the list directly.)`,
-    },
-  }));
-
-  // Build top-down, snapshotting each node as it is attached.
-  let idCounter = 0;
+  const vals = [];
+  const picked = new Set();
+  const completed = new Set();
+  const callStack = [];
   let builtRoot = null;
-  function build(lo, hi, attach, sideLabel) {
-    if (lo > hi) { attach(null); return; }
-    const mid = Math.floor((lo + hi) / 2);
-    const node = { id: idCounter++, val: nums[mid], left: null, right: null };
-    attach(node);
-    const leftArr = nums.slice(lo, mid).join(",") || "∅";
-    const rightArr = nums.slice(mid + 1, hi + 1).join(",") || "∅";
-    steps.push(snapshot(builtRoot, {
-      title: { vi: `Giữa của [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}`, en: `Mid of [${nums.slice(lo, hi + 1).join(",")}] = ${nums[mid]}` },
-      levelLabelGutter: 84,
-      hlSet: new Set([node.id]), codeLines: [3, 4, 5, 6, 7],
-      vars: [
-        { name: "đoạn / range", value: `[${nums.slice(lo, hi + 1).join(",")}]` },
-        { name: "mid", value: `index ${mid} → ${nums[mid]}` },
-        { name: "→ vị trí", value: sideLabel },
-        { name: "nửa trái", value: `[${leftArr}]` },
-        { name: "nửa phải", value: `[${rightArr}]` },
-      ],
-      note: { vi: `Lấy phần tử GIỮA ${nums[mid]} làm gốc đoạn này (${sideLabel}). Đệ quy: nửa trái [${leftArr}] → con trái, nửa phải [${rightArr}] → con phải.`, en: `Take the MIDDLE element ${nums[mid]} as the root of this range (${sideLabel}). Recurse: left half [${leftArr}] → left child, right half [${rightArr}] → right child.` },
-    }));
-    build(lo, mid - 1, (c) => { node.left = c; }, "con trái / left");
-    build(mid + 1, hi, (c) => { node.right = c; }, "con phải / right");
-  }
-  build(0, nums.length - 1, (c) => { builtRoot = c; }, "gốc / root");
+  let headIndex = nums.length ? 0 : null;
 
-  const fs = snapshot(builtRoot, {
-    title: { vi: "Hoàn tất: BST cân bằng", en: "Done: balanced BST" },
-    levelLabelGutter: 84,
-    wordSet: new Set(Array.from({ length: nums.length }, (_, i) => i)), codeLines: [8],
-    vars: [{ name: "root", value: builtRoot ? builtRoot.val : "null" }, { name: "chiều cao", value: `≈ log₂(${nums.length}) = ${Math.ceil(Math.log2(nums.length + 1))}` }],
-    note: { vi: `Mọi đoạn đều chọn phần tử giữa làm gốc → 2 cây con lệch nhau ≤ 1 nút → cây cân bằng chiều cao tối thiểu.`, en: `Every range picks its middle as root → subtrees differ by ≤ 1 node → minimum-height balanced tree.` },
+  const pointer = (index) => (index === null || index === undefined
+    ? { state: "null" }
+    : { state: "index", index });
+  const rangeText = (lo, hi) => (lo > hi ? "∅" : `[${vals.slice(lo, hi + 1).join(", ")}]`);
+  const nodeText = (index) => (index === null || index === undefined
+    ? "null"
+    : `${nums[index]} [${index}]`);
+
+  function addStep({
+    title,
+    note,
+    codeLines,
+    phase,
+    lo = null,
+    hi = null,
+    mid = null,
+    midAssigned = false,
+    activeTreeId = null,
+    vars = [],
+    final = false,
+  }) {
+    const tree = {
+      nodes: treeToVizNodes(
+        builtRoot,
+        activeTreeId === null ? new Set() : new Set([activeTreeId]),
+        new Set(completed),
+      ),
+      annotations: {},
+      levelLabelGutter: 84,
+    };
+    const step = {
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      codeLines,
+      codeBlock: 1,
+      vars,
+      note,
+      sortedListBstView: {
+        mode: "array",
+        values: [...nums],
+        arrayValues: [...vals],
+        arrayRange: lo !== null && hi !== null && lo <= hi ? [lo, hi] : null,
+        lo,
+        hi,
+        mid: midAssigned ? mid : null,
+        midAssigned,
+        copiedCount: vals.length,
+        activeRange: null,
+        pointers: {
+          head: pointer(headIndex),
+          prev: { state: "unset" },
+          slow: { state: "unset" },
+          fast: { state: "unset" },
+        },
+        cuts: [],
+        picked: [...picked],
+        callStack: callStack.map((frame) => ({ ...frame })),
+        phase,
+        tree,
+      },
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  addStep({
+    title: { vi: "Bắt đầu với linked list đã sắp xếp", en: "Start with the sorted linked list" },
+    note: {
+      vi: "Cách 1 gồm hai pha: copy từng node vào vals, sau đó build(lo, hi) chọn phần tử giữa của từng đoạn làm root.",
+      en: "Approach 1 has two phases: copy every node into vals, then build(lo, hi) picks each range's middle element as its root.",
+    },
+    codeLines: [2], phase: "method-call",
+    vars: [
+      { name: "head", value: nodeText(headIndex) },
+      { name: "input", value: `[${nums.join(", ")}]` },
+    ],
   });
-  fs.final = true; steps.push(fs);
+
+  addStep({
+    title: { vi: "Khởi tạo vals = []", en: "Initialize vals = []" },
+    note: { vi: "vals sẽ cho phép truy cập phần tử giữa theo index trong O(1).", en: "vals will provide O(1) access to each range's middle element." },
+    codeLines: [3], phase: "init-array",
+    vars: [{ name: "vals", value: "[]" }],
+  });
+
+  while (headIndex !== null) {
+    addStep({
+      title: { vi: `while head → true tại ${nodeText(headIndex)}`, en: `while head → true at ${nodeText(headIndex)}` },
+      note: { vi: `head chưa null nên xử lý node index ${headIndex}.`, en: `head is not null, so process node at index ${headIndex}.` },
+      codeLines: [4], phase: "copy-check",
+      vars: [
+        { name: "head", value: nodeText(headIndex) },
+        { name: "bool(head)", value: true },
+      ],
+    });
+
+    vals.push(nums[headIndex]);
+    addStep({
+      title: { vi: `vals.append(${nums[headIndex]})`, en: `vals.append(${nums[headIndex]})` },
+      note: { vi: `Copy head.val=${nums[headIndex]} vào vals[${vals.length - 1}].`, en: `Copy head.val=${nums[headIndex]} into vals[${vals.length - 1}].` },
+      codeLines: [5], phase: "copy-append",
+      vars: [
+        { name: "head.val", value: nums[headIndex] },
+        { name: "vals", value: `[${vals.join(", ")}]` },
+      ],
+    });
+
+    headIndex = headIndex + 1 < nums.length ? headIndex + 1 : null;
+    addStep({
+      title: { vi: `head = head.next → ${nodeText(headIndex)}`, en: `head = head.next → ${nodeText(headIndex)}` },
+      note: headIndex === null
+        ? { vi: "Đã đi qua node cuối; head trở thành null.", en: "The last node has been passed; head becomes null." }
+        : { vi: `Di chuyển head sang node kế tiếp tại index ${headIndex}.`, en: `Move head to the next node at index ${headIndex}.` },
+      codeLines: [6], phase: "copy-next",
+      vars: [{ name: "head", value: nodeText(headIndex) }],
+    });
+  }
+
+  addStep({
+    title: { vi: "while head → false", en: "while head → false" },
+    note: { vi: `head = null nên dừng copy. vals đã hoàn chỉnh: [${vals.join(", ")}].`, en: `head = null, so copying stops. vals is complete: [${vals.join(", ")}].` },
+    codeLines: [4], phase: "copy-done",
+    vars: [
+      { name: "head", value: "null" },
+      { name: "vals", value: `[${vals.join(", ")}]` },
+    ],
+  });
+
+  addStep({
+    title: { vi: "Định nghĩa helper build(lo, hi)", en: "Define helper build(lo, hi)" },
+    note: { vi: "Mỗi lời gọi build dựng đúng một subtree từ đoạn vals[lo..hi].", en: "Each build call constructs exactly one subtree from vals[lo..hi]." },
+    codeLines: [7], phase: "define-build",
+    vars: [{ name: "helper", value: "build(lo, hi)" }],
+  });
+
+  function build(lo, hi, attach, side, depth) {
+    callStack.push({ lo, hi, side, depth });
+    const isEmpty = lo > hi;
+
+    addStep({
+      title: { vi: `build(${lo}, ${hi}): lo > hi → ${isEmpty}`, en: `build(${lo}, ${hi}): lo > hi → ${isEmpty}` },
+      note: isEmpty
+        ? { vi: `Đoạn ${side} rỗng, nên dòng này trả None ngay cho parent.`, en: `The ${side} range is empty, so this line immediately returns None to its parent.` }
+        : { vi: `Đoạn ${rangeText(lo, hi)} còn phần tử, tiếp tục tính mid.`, en: `Range ${rangeText(lo, hi)} still has elements, so continue to compute mid.` },
+      codeLines: [8], phase: isEmpty ? "base-true" : "base-false", lo, hi,
+      vars: [
+        { name: "lo", value: lo },
+        { name: "hi", value: hi },
+        { name: "lo > hi", value: isEmpty },
+        { name: "return", value: isEmpty ? "None" : "continue" },
+      ],
+    });
+
+    if (isEmpty) {
+      attach(null);
+      callStack.pop();
+      return null;
+    }
+
+    const mid = Math.floor((lo + hi) / 2);
+    addStep({
+      title: { vi: `mid = (${lo} + ${hi}) // 2 = ${mid}`, en: `mid = (${lo} + ${hi}) // 2 = ${mid}` },
+      note: { vi: `vals[${mid}] = ${vals[mid]} chia đoạn ${rangeText(lo, hi)} thành hai nửa gần bằng nhau.`, en: `vals[${mid}] = ${vals[mid]} splits ${rangeText(lo, hi)} into nearly equal halves.` },
+      codeLines: [9], phase: "set-mid", lo, hi, mid, midAssigned: true,
+      vars: [
+        { name: "lo", value: lo },
+        { name: "hi", value: hi },
+        { name: "mid", value: mid },
+        { name: "vals[mid]", value: vals[mid] },
+      ],
+    });
+
+    const node = { id: mid, val: vals[mid], left: null, right: null };
+    attach(node);
+    picked.add(mid);
+    addStep({
+      title: { vi: `node = TreeNode(vals[${mid}]) = ${vals[mid]}`, en: `node = TreeNode(vals[${mid}]) = ${vals[mid]}` },
+      note: { vi: `Tạo node ${vals[mid]} làm root của subtree ${side}; hai con hiện vẫn là None.`, en: `Create node ${vals[mid]} as the ${side} subtree root; both children are still None.` },
+      codeLines: [10], phase: "create-node", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [
+        { name: "node.val", value: vals[mid] },
+        { name: "node.left", value: "None" },
+        { name: "node.right", value: "None" },
+      ],
+    });
+
+    const leftLo = lo;
+    const leftHi = mid - 1;
+    addStep({
+      title: { vi: `Gọi build(${leftLo}, ${leftHi}) cho node.left`, en: `Call build(${leftLo}, ${leftHi}) for node.left` },
+      note: { vi: `Tạm dừng frame của node ${vals[mid]}; đi xuống dựng subtree trái từ ${rangeText(leftLo, leftHi)}.`, en: `Pause node ${vals[mid]}'s frame; descend to build its left subtree from ${rangeText(leftLo, leftHi)}.` },
+      codeLines: [11], phase: "left-call", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [{ name: "left range", value: rangeText(leftLo, leftHi) }],
+    });
+    build(leftLo, leftHi, (child) => { node.left = child; }, "left", depth + 1);
+    addStep({
+      title: { vi: `Gắn kết quả vào node.left của ${vals[mid]}`, en: `Attach the result to node.left of ${vals[mid]}` },
+      note: { vi: `build(${leftLo}, ${leftHi}) đã trả về ${node.left ? `TreeNode(${node.left.val})` : "None"}.`, en: `build(${leftLo}, ${leftHi}) returned ${node.left ? `TreeNode(${node.left.val})` : "None"}.` },
+      codeLines: [11], phase: "left-return", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [{ name: "node.left", value: node.left ? node.left.val : "None" }],
+    });
+
+    const rightLo = mid + 1;
+    const rightHi = hi;
+    addStep({
+      title: { vi: `Gọi build(${rightLo}, ${rightHi}) cho node.right`, en: `Call build(${rightLo}, ${rightHi}) for node.right` },
+      note: { vi: `Tiếp tục dựng subtree phải của ${vals[mid]} từ ${rangeText(rightLo, rightHi)}.`, en: `Continue by building ${vals[mid]}'s right subtree from ${rangeText(rightLo, rightHi)}.` },
+      codeLines: [12], phase: "right-call", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [{ name: "right range", value: rangeText(rightLo, rightHi) }],
+    });
+    build(rightLo, rightHi, (child) => { node.right = child; }, "right", depth + 1);
+    addStep({
+      title: { vi: `Gắn kết quả vào node.right của ${vals[mid]}`, en: `Attach the result to node.right of ${vals[mid]}` },
+      note: { vi: `build(${rightLo}, ${rightHi}) đã trả về ${node.right ? `TreeNode(${node.right.val})` : "None"}.`, en: `build(${rightLo}, ${rightHi}) returned ${node.right ? `TreeNode(${node.right.val})` : "None"}.` },
+      codeLines: [12], phase: "right-return", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [{ name: "node.right", value: node.right ? node.right.val : "None" }],
+    });
+
+    completed.add(mid);
+    addStep({
+      title: { vi: `return node ${vals[mid]}`, en: `return node ${vals[mid]}` },
+      note: { vi: `Subtree ${side} cho đoạn ${rangeText(lo, hi)} đã hoàn tất; trả node ${vals[mid]} về frame trước.`, en: `The ${side} subtree for ${rangeText(lo, hi)} is complete; return node ${vals[mid]} to the previous frame.` },
+      codeLines: [13], phase: "return-node", lo, hi, mid, midAssigned: true, activeTreeId: mid,
+      vars: [{ name: "return", value: `TreeNode(${vals[mid]})` }],
+    });
+    callStack.pop();
+    return node;
+  }
+
+  addStep({
+    title: { vi: `Gọi build(0, ${vals.length - 1}) cho toàn bộ vals`, en: `Call build(0, ${vals.length - 1}) for all of vals` },
+    note: { vi: "Lời gọi ngoài cùng sẽ trả root của toàn bộ BST.", en: "The outermost call will return the root of the entire BST." },
+    codeLines: [14], phase: "root-call", lo: 0, hi: vals.length - 1,
+    vars: [{ name: "root range", value: rangeText(0, vals.length - 1) }],
+  });
+  build(0, vals.length - 1, (node) => { builtRoot = node; }, "root", 0);
+
+  addStep({
+    title: { vi: `Trả root ${builtRoot ? builtRoot.val : "None"}`, en: `Return root ${builtRoot ? builtRoot.val : "None"}` },
+    note: { vi: "Mỗi frame chọn index giữa và hoàn tất cả hai con trước khi return, nên BST cuối cùng cân bằng chiều cao.", en: "Every frame selects its middle index and completes both children before returning, producing a height-balanced BST." },
+    codeLines: [14], phase: "done", lo: 0, hi: vals.length - 1,
+    vars: [
+      { name: "return", value: builtRoot ? `TreeNode(${builtRoot.val})` : "None" },
+      { name: "nodes", value: vals.length },
+    ],
+    final: true,
+  });
 
   return { input, answer: builtRoot ? builtRoot.val : "null", steps };
 }

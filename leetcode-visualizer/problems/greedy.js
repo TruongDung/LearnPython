@@ -1819,6 +1819,135 @@ function buildSteps4000(input, params) {
   return { original: { n, s: targetSum }, answer, steps };
 }
 
+/** LeetCode 3014: assign distinct letters to the shallowest available key slots. */
+function buildSteps3014(input) {
+  const word = String(input || "").trim().toLowerCase().replace(/[^a-z]/g, "").slice(0, 26);
+  const chars = [...word];
+  const steps = [];
+  const assignments = [];
+  let pushes = 0;
+
+  const makeView = ({ phase, currentIndex = null, key = null, cost = null, total = pushes }) => ({
+    word: chars,
+    phase,
+    currentIndex,
+    processedCount: assignments.length,
+    key,
+    cost,
+    pushes: total,
+    assignments: assignments.map((item) => ({ ...item })),
+  });
+
+  steps.push({
+    title: { vi: `Nhập word = "${word}"`, en: `Input word = "${word}"` },
+    arr: [...chars],
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [{ name: "word", value: `"${word}"` }],
+    keypadPushView: makeView({ phase: "input" }),
+    note: {
+      vi: "Có 8 phím từ 2 đến 9. Mỗi phím có các tầng 1, 2, 3, 4 lần nhấn; ta luôn dùng tầng nông nhất còn trống.",
+      en: "There are eight keys from 2 to 9. Every key has 1-, 2-, 3-, and 4-push slots; always use the shallowest free layer.",
+    },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo pushes = 0", en: "Initialize pushes = 0" },
+    arr: [...chars],
+    highlight: [],
+    mark: [],
+    codeLines: [3],
+    vars: [{ name: "pushes", value: 0 }],
+    keypadPushView: makeView({ phase: "init" }),
+    note: { vi: "Chưa gõ chữ nào nên tổng số lần nhấn bằng 0.", en: "No letter has been typed, so the running total is 0." },
+  });
+
+  chars.forEach((ch, i) => {
+    steps.push({
+      title: { vi: `Vòng lặp: i = ${i}, ch = '${ch}'`, en: `Loop: i = ${i}, ch = '${ch}'` },
+      arr: [...chars],
+      highlight: [i],
+      mark: assignments.map((item) => item.index),
+      codeLines: [4],
+      vars: [
+        { name: "i", value: i },
+        { name: "ch", value: `'${ch}'` },
+        { name: "pushes", value: pushes },
+      ],
+      keypadPushView: makeView({ phase: "loop", currentIndex: i }),
+      note: { vi: `Bắt đầu xử lý ký tự thứ ${i + 1}: '${ch}'.`, en: `Start processing letter ${i + 1}: '${ch}'.` },
+    });
+
+    const key = 2 + (i % 8);
+    steps.push({
+      title: { vi: `Chọn phím ${key} cho '${ch}'`, en: `Choose key ${key} for '${ch}'` },
+      arr: [...chars],
+      highlight: [i],
+      mark: assignments.map((item) => item.index),
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: "ch", value: `'${ch}'` },
+        { name: "key = 2 + i % 8", value: key },
+      ],
+      keypadPushView: makeView({ phase: "key", currentIndex: i, key }),
+      note: { vi: `2 + (${i} mod 8) = ${key}. Sau phím 9, phép mod đưa ta quay lại phím 2.`, en: `2 + (${i} mod 8) = ${key}. After key 9, modulo wraps back to key 2.` },
+    });
+
+    const cost = Math.floor(i / 8) + 1;
+    steps.push({
+      title: { vi: `'${ch}' cần ${cost} lần nhấn`, en: `'${ch}' needs ${cost} push${cost === 1 ? "" : "es"}` },
+      arr: [...chars],
+      highlight: [i],
+      mark: assignments.map((item) => item.index),
+      codeLines: [6],
+      vars: [
+        { name: "i", value: i },
+        { name: "key", value: key },
+        { name: "cost = i // 8 + 1", value: cost },
+      ],
+      keypadPushView: makeView({ phase: "cost", currentIndex: i, key, cost }),
+      note: { vi: `${i} // 8 + 1 = ${cost}. Ký tự nằm ở tầng ${cost} của phím ${key}.`, en: `${i} // 8 + 1 = ${cost}. The letter occupies layer ${cost} on key ${key}.` },
+    });
+
+    const before = pushes;
+    pushes += cost;
+    assignments.push({ ch, index: i, key, cost });
+    steps.push({
+      title: { vi: `Cộng ${cost}: pushes = ${pushes}`, en: `Add ${cost}: pushes = ${pushes}` },
+      arr: [...chars],
+      highlight: [i],
+      mark: assignments.map((item) => item.index),
+      codeLines: [7],
+      vars: [
+        { name: "pushes before", value: before },
+        { name: "cost", value: cost },
+        { name: "pushes after", value: pushes },
+      ],
+      keypadPushView: makeView({ phase: "add", currentIndex: i, key, cost }),
+      note: { vi: `${before} + ${cost} = ${pushes}. Đã đặt '${ch}' vào phím ${key}, tầng ${cost}.`, en: `${before} + ${cost} = ${pushes}. '${ch}' is now assigned to key ${key}, layer ${cost}.` },
+    });
+  });
+
+  steps.push({
+    title: { vi: `Trả về ${pushes}`, en: `Return ${pushes}` },
+    arr: [...chars],
+    highlight: [],
+    mark: chars.map((_, index) => index),
+    codeLines: [8],
+    final: true,
+    vars: [
+      { name: "word", value: `"${word}"` },
+      { name: "pushes", value: pushes },
+    ],
+    keypadPushView: makeView({ phase: "done", total: pushes }),
+    note: { vi: `Tổng nhỏ nhất để gõ "${word}" là ${pushes} lần nhấn.`, en: `The minimum total for typing "${word}" is ${pushes} pushes.` },
+  });
+
+  return { original: word, answer: pushes, steps };
+}
+
 /** LeetCode 55: Jump Game — track the farthest reachable index. */
 function buildSteps55(input) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
@@ -1955,6 +2084,43 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps252,
+  },
+  3014: {
+    id: 3014,
+    difficulty: "easy",
+    slug: "minimum-number-of-pushes-to-type-word-i",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Minimum Number of Pushes to Type Word I", en: "Minimum Number of Pushes to Type Word I" },
+    titleVi: { vi: "Số lần nhấn ít nhất để gõ từ I", en: "Minimum pushes to type a word I" },
+    statement: {
+      vi: "Cho word gồm các chữ cái thường khác nhau. Có thể gán lại các chữ cái vào 8 phím từ 2 đến 9. Trả về số lần nhấn ít nhất để gõ word.",
+      en: "Given a word of distinct lowercase letters, remap letters onto the eight keys from 2 to 9. Return the minimum pushes needed to type word.",
+    },
+    defaultInput: "xycdefghij",
+    inputKind: "string",
+    inputLabel: { vi: "word (các chữ khác nhau)", en: "word (distinct letters)" },
+    extraParams: [],
+    approach: [
+      { vi: "Có 8 phím, nên 8 chữ đầu tiên đều được đặt ở tầng 1 và chỉ tốn 1 lần nhấn.", en: "There are eight keys, so the first eight letters all occupy layer 1 and cost one push each." },
+      { vi: "Chữ thứ 9 đến 16 nằm ở tầng 2; tổng quát cost = i // 8 + 1.", en: "Letters 9 through 16 occupy layer 2; in general, cost = i // 8 + 1." },
+      { vi: "Vì mọi chữ trong word khác nhau, thứ tự gán phím không làm thay đổi tổng chi phí.", en: "Because every letter in word is distinct, the key assignment order does not change the total cost." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: { vi: "Duyệt word một lần và chỉ dùng vài biến. Bảng gán phím chỉ phục vụ visualization.", en: "Scan word once and use only a few variables. The key map exists only for visualization." },
+    },
+    code: [
+      "class Solution:",
+      "    def minimumPushes(self, word: str) -> int:",
+      "        pushes = 0",
+      "        for i, ch in enumerate(word):",
+      "            key = 2 + i % 8",
+      "            cost = i // 8 + 1",
+      "            pushes += cost",
+      "        return pushes",
+    ],
+    builder: buildSteps3014,
   },
   3947: {
     id: 3947,
