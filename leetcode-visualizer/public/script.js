@@ -2540,7 +2540,9 @@ function renderKeypadPushView(step) {
 
   const iValue = view.currentIndex === null ? unset : view.currentIndex;
   const chValue = view.currentIndex === null ? unset : `'${view.word[view.currentIndex]}'`;
-  const keyValue = view.key === null ? unset : `2 + ${view.currentIndex} % 8 = ${view.key}`;
+  const groupValue = view.currentIndex === null
+    ? unset
+    : `[${Math.floor(view.currentIndex / 8) * 8}..${Math.min(Math.floor(view.currentIndex / 8) * 8 + 7, view.word.length - 1)}]`;
   const costValue = view.cost === null ? unset : `${view.currentIndex} // 8 + 1 = ${view.cost}`;
   const summary = lang === "vi"
     ? `Đã gán ${assignments.length} trên ${view.word.length} chữ. Tổng hiện tại ${view.pushes} lần nhấn.`
@@ -2548,9 +2550,9 @@ function renderKeypadPushView(step) {
 
   treeView.innerHTML = `<div class="keypad-push-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="kp-status-row">
-      <span><small>i / ch</small><strong>${escapeHtml(iValue)} / ${escapeHtml(chValue)}</strong></span>
-      <span class="${view.key !== null ? "active" : ""}"><small>key = 2 + i % 8</small><strong>${escapeHtml(keyValue)}</strong></span>
-      <span class="${view.cost !== null ? "active" : ""}"><small>cost = i // 8 + 1</small><strong>${escapeHtml(costValue)}</strong></span>
+      <span><small>i / word[i]</small><strong>${escapeHtml(iValue)} / ${escapeHtml(chValue)}</strong></span>
+      <span class="${view.currentIndex !== null ? "active" : ""}"><small>${lang === "vi" ? "nhóm 8 ký tự" : "group of 8"}</small><strong>${escapeHtml(groupValue)}</strong></span>
+      <span class="${view.cost !== null ? "active" : ""}"><small>i // 8 + 1</small><strong>${escapeHtml(costValue)}</strong></span>
       <span class="total"><small>pushes</small><strong>${escapeHtml(view.pushes)}</strong></span>
     </div>
     <section class="kp-word-section">
@@ -2569,7 +2571,7 @@ function renderKeypadPushView(step) {
     </section>
     <div class="kp-current-action">
       ${currentAssignment
-        ? `<strong>'${escapeHtml(currentAssignment.ch)}'</strong><span>→ ${lang === "vi" ? "phím" : "key"} ${currentAssignment.key}, ${pushLabel(currentAssignment.cost)}</span>`
+        ? `<strong>pushes += ${currentAssignment.cost}</strong><span>${lang === "vi" ? `cho word[${currentAssignment.index}] = '${escapeHtml(currentAssignment.ch)}'` : `for word[${currentAssignment.index}] = '${escapeHtml(currentAssignment.ch)}'`}</span>`
         : view.currentIndex !== null
           ? `<strong>'${escapeHtml(view.word[view.currentIndex])}'</strong><span>${view.cost !== null
               ? `→ ${lang === "vi" ? "phím" : "key"} ${view.key}, ${pushLabel(view.cost)}`
@@ -2578,6 +2580,131 @@ function renderKeypadPushView(step) {
                 : `→ ${lang === "vi" ? "đang đọc word[i]" : "reading word[i]"}`}</span>`
           : `<strong>${view.phase === "done" ? (lang === "vi" ? "HOÀN TẤT" : "COMPLETE") : "word"}</strong><span>${view.phase === "done" ? `${view.pushes} ${lang === "vi" ? "lần nhấn" : "pushes"}` : (lang === "vi" ? "chưa gán chữ nào" : "no letters assigned yet")}</span>`}
     </div>
+  </div>`;
+}
+
+function renderKeypadHeapView(step) {
+  const view = step.keypadHeapView;
+  const treeView = $("treeView");
+  const isVi = lang === "vi";
+  const unset = isVi ? "chưa gán" : "unset";
+  const assignments = Array.isArray(view.assignments) ? view.assignments : [];
+  const assignmentBySlot = new Map(assignments.map((item) => [`${item.key}:${item.cost}`, item]));
+  const phaseStages = {
+    input: 0, count: 0,
+    "heap-init": 1, "heap-loop": 1, "heap-push": 1,
+    "ans-init": 2, "index-init": 2, while: 2, pop: 2, presses: 2, add: 2, increment: 2, "while-done": 2,
+    done: 3,
+  };
+  const activeStage = phaseStages[view.phase] ?? 0;
+  const stageLabels = isVi
+    ? ["1 · Đếm tần suất", "2 · Tạo max heap", "3 · Lấy lớn nhất trước", "4 · Trả kết quả"]
+    : ["1 · Count frequencies", "2 · Build max heap", "3 · Process largest first", "4 · Return result"];
+  const stagesHtml = stageLabels.map((label, index) => {
+    const state = index < activeStage ? "done" : index === activeStage ? "active" : "pending";
+    return `<span class="${state}">${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const frequencyHtml = view.freqEntries.map((entry, index) => {
+    const visible = index < view.visibleFreqCount;
+    const active = index === view.activeFreqIndex ? " active" : "";
+    return `<span class="kph-frequency${visible ? " visible" : " hidden-value"}${active}">
+      <strong>${visible ? escapeHtml(entry.ch) : "·"}</strong>
+      <small>${visible ? `f=${escapeHtml(entry.count)}` : "?"}</small>
+    </span>`;
+  }).join("");
+
+  const heapHtml = view.heap.length
+    ? view.heap.map((stored, index) => `<span class="kph-heap-item${index === 0 ? " root" : ""}">
+        <small>${index === 0 ? "ROOT" : `[${index}]`}</small>
+        <strong>${escapeHtml(stored)}</strong>
+        <em>f=${escapeHtml(-stored)}</em>
+      </span>`).join("")
+    : `<span class="kph-empty">[]</span>`;
+
+  const headerHtml = Array.from({ length: 8 }, (_, offset) => {
+    const key = offset + 2;
+    const activeIndex = view.activeAssignmentIndex;
+    const activeKey = activeIndex === null ? null : 2 + (activeIndex % 8);
+    return `<div class="kp-key-head${key === activeKey ? " active" : ""}"><small>${isVi ? "PHÍM" : "KEY"}</small><strong>${key}</strong></div>`;
+  }).join("");
+
+  const layerRows = Array.from({ length: 4 }, (_, layerIndex) => {
+    const cost = layerIndex + 1;
+    const slots = Array.from({ length: 8 }, (_, offset) => {
+      const key = offset + 2;
+      const assigned = assignmentBySlot.get(`${key}:${cost}`);
+      const isActive = assigned && assigned.index === view.activeAssignmentIndex;
+      const pendingIndex = view.activeAssignmentIndex;
+      const pendingKey = pendingIndex === null ? null : 2 + (pendingIndex % 8);
+      const isPending = !assigned && view.presses !== null && key === pendingKey && cost === view.presses;
+      const classes = ["kp-slot", "kph-slot"];
+      if (assigned) classes.push("filled");
+      if (isActive || isPending) classes.push("active");
+      if (isPending) classes.push("pending");
+      const frequency = assigned ? assigned.frequency : isPending ? view.frequency : null;
+      const contribution = assigned ? assigned.contribution : isPending ? view.frequency * view.presses : null;
+      const slotLabel = frequency === null
+        ? (isVi ? "trống" : "empty")
+        : `frequency ${frequency}, ${cost} ${isVi ? "lần nhấn" : (cost === 1 ? "push" : "pushes")}, +${contribution}`;
+      return `<div class="${classes.join(" ")}" aria-label="${isVi ? "Phím" : "Key"} ${key}, ${cost}×, ${escapeHtml(slotLabel)}">
+        <strong>${frequency === null ? "·" : `f${escapeHtml(frequency)}`}</strong>
+        ${frequency === null ? "" : `<small>+${escapeHtml(contribution)}</small>`}
+      </div>`;
+    }).join("");
+    return `<div class="kp-layer-label${cost === view.presses ? " active" : ""}"><strong>${cost}×</strong></div>${slots}`;
+  }).join("");
+
+  const actionByPhase = {
+    input: ["word", isVi ? "chờ Counter(word)" : "waiting for Counter(word)"],
+    count: ["Counter(word)", `${view.freqEntries.length} ${isVi ? "tần suất" : "frequencies"}`],
+    "heap-init": ["max_heap = []", isVi ? "heap đang rỗng" : "the heap is empty"],
+    "heap-loop": [`f = ${view.frequency}`, "freq.values()"],
+    "heap-push": [`heappush(-${view.frequency})`, isVi ? "số âm nhỏ nhất ở root" : "smallest negative value at root"],
+    "ans-init": ["ans = 0", isVi ? "bắt đầu cộng kết quả" : "start accumulating"],
+    "index-init": ["index = 0", isVi ? "ô rẻ nhất đầu tiên" : "first cheapest slot"],
+    while: ["while max_heap", `${view.heap.length} ${isVi ? "phần tử còn lại" : "items remain"}`],
+    pop: [`frequency = ${view.frequency}`, "-heappop(max_heap)"],
+    presses: [`presses = ${view.presses}`, `${view.index} // 8 + 1`],
+    add: [`ans += ${view.frequency} × ${view.presses}`, `ans = ${view.ans}`],
+    increment: [`index += 1`, `index = ${view.index}`],
+    "while-done": ["max_heap = []", isVi ? "thoát vòng while" : "exit the while loop"],
+    done: [`return ${view.ans}`, isVi ? "hoàn tất" : "complete"],
+  };
+  const [actionMain, actionDetail] = actionByPhase[view.phase] || ["", ""];
+  const summary = isVi
+    ? `Heap có ${view.heap.length} phần tử, index ${view.index ?? "chưa gán"}, ans ${view.ans ?? "chưa gán"}.`
+    : `The heap has ${view.heap.length} items, index ${view.index ?? "unset"}, ans ${view.ans ?? "unset"}.`;
+
+  treeView.innerHTML = `<div class="keypad-heap-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="kph-phases">${stagesHtml}</div>
+    <div class="kp-status-row">
+      <span><small>frequency</small><strong>${view.frequency === null ? unset : escapeHtml(view.frequency)}</strong></span>
+      <span class="${view.presses !== null ? "active" : ""}"><small>presses</small><strong>${view.presses === null ? unset : escapeHtml(view.presses)}</strong></span>
+      <span class="${view.index !== null ? "active" : ""}"><small>index</small><strong>${view.index === null ? unset : escapeHtml(view.index)}</strong></span>
+      <span class="total"><small>ans</small><strong>${view.ans === null ? unset : escapeHtml(view.ans)}</strong></span>
+    </div>
+    <div class="kph-data-grid">
+      <section class="kph-data-section">
+        <div class="kp-section-title"><strong>freq = Counter(word)</strong><span>${view.visibleFreqCount}/${view.freqEntries.length}</span></div>
+        <div class="kph-frequency-row">${frequencyHtml}</div>
+      </section>
+      <section class="kph-data-section">
+        <div class="kp-section-title"><strong>max_heap</strong><span>${isVi ? "lưu -f" : "stores -f"}</span></div>
+        <div class="kph-heap-row">${heapHtml}</div>
+      </section>
+    </div>
+    <section class="kp-board-section">
+      <div class="kp-section-title"><strong>${isVi ? "Gán tần suất vào phím 2–9" : "Assign frequencies to keys 2–9"}</strong><span>f × presses → ans</span></div>
+      <div class="kp-board-scroll">
+        <div class="kp-board-grid">
+          <div class="kp-board-corner">${isVi ? "CHI PHÍ" : "COST"}</div>
+          ${headerHtml}
+          ${layerRows}
+        </div>
+      </div>
+    </section>
+    <div class="kp-current-action"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
   </div>`;
 }
 
@@ -5794,6 +5921,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKeypadPushView(step);
+  } else if (step.keypadHeapView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderKeypadHeapView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

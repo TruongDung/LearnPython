@@ -1820,7 +1820,7 @@ function buildSteps4000(input, params) {
 }
 
 /** LeetCode 3014: assign distinct letters to the shallowest available key slots. */
-function buildSteps3014(input) {
+function buildSteps3014Simple(input) {
   const word = String(input || "").trim().toLowerCase().replace(/[^a-z]/g, "").slice(0, 26);
   const chars = [...word];
   const steps = [];
@@ -1865,68 +1865,48 @@ function buildSteps3014(input) {
 
   chars.forEach((ch, i) => {
     steps.push({
-      title: { vi: `Vòng lặp: i = ${i}, ch = '${ch}'`, en: `Loop: i = ${i}, ch = '${ch}'` },
-      arr: [...chars],
-      highlight: [i],
-      mark: assignments.map((item) => item.index),
-      codeLines: [4],
-      vars: [
-        { name: "i", value: i },
-        { name: "ch", value: `'${ch}'` },
-        { name: "pushes", value: pushes },
-      ],
-      keypadPushView: makeView({ phase: "loop", currentIndex: i }),
-      note: { vi: `Bắt đầu xử lý ký tự thứ ${i + 1}: '${ch}'.`, en: `Start processing letter ${i + 1}: '${ch}'.` },
-    });
-
-    const key = 2 + (i % 8);
-    steps.push({
-      title: { vi: `Chọn phím ${key} cho '${ch}'`, en: `Choose key ${key} for '${ch}'` },
+      title: { vi: `Vòng lặp gán i = ${i}`, en: `Loop assigns i = ${i}` },
       arr: [...chars],
       highlight: [i],
       mark: assignments.map((item) => item.index),
       codeLines: [5],
       vars: [
         { name: "i", value: i },
-        { name: "ch", value: `'${ch}'` },
-        { name: "key = 2 + i % 8", value: key },
+        { name: "word[i]", value: `'${ch}'` },
+        { name: "pushes", value: pushes },
       ],
-      keypadPushView: makeView({ phase: "key", currentIndex: i, key }),
-      note: { vi: `2 + (${i} mod 8) = ${key}. Sau phím 9, phép mod đưa ta quay lại phím 2.`, en: `2 + (${i} mod 8) = ${key}. After key 9, modulo wraps back to key 2.` },
+      keypadPushView: makeView({ phase: "loop", currentIndex: i }),
+      note: {
+        vi: `range(len(word)) đưa i đến ${i}. Visualization dùng word[${i}] = '${ch}' để đánh dấu ký tự đang xét.`,
+        en: `range(len(word)) advances i to ${i}. The visualization marks word[${i}] = '${ch}' as the current letter.`,
+      },
     });
 
+    const key = 2 + (i % 8);
     const cost = Math.floor(i / 8) + 1;
+    const before = pushes;
+    pushes += cost;
+    assignments.push({ ch, index: i, key, cost });
     steps.push({
-      title: { vi: `'${ch}' cần ${cost} lần nhấn`, en: `'${ch}' needs ${cost} push${cost === 1 ? "" : "es"}` },
+      title: {
+        vi: `pushes += ${i} // 8 + 1 → ${pushes}`,
+        en: `pushes += ${i} // 8 + 1 → ${pushes}`,
+      },
       arr: [...chars],
       highlight: [i],
       mark: assignments.map((item) => item.index),
       codeLines: [6],
       vars: [
         { name: "i", value: i },
-        { name: "key", value: key },
-        { name: "cost = i // 8 + 1", value: cost },
-      ],
-      keypadPushView: makeView({ phase: "cost", currentIndex: i, key, cost }),
-      note: { vi: `${i} // 8 + 1 = ${cost}. Ký tự nằm ở tầng ${cost} của phím ${key}.`, en: `${i} // 8 + 1 = ${cost}. The letter occupies layer ${cost} on key ${key}.` },
-    });
-
-    const before = pushes;
-    pushes += cost;
-    assignments.push({ ch, index: i, key, cost });
-    steps.push({
-      title: { vi: `Cộng ${cost}: pushes = ${pushes}`, en: `Add ${cost}: pushes = ${pushes}` },
-      arr: [...chars],
-      highlight: [i],
-      mark: assignments.map((item) => item.index),
-      codeLines: [7],
-      vars: [
         { name: "pushes before", value: before },
-        { name: "cost", value: cost },
+        { name: "i // 8 + 1", value: cost },
         { name: "pushes after", value: pushes },
       ],
       keypadPushView: makeView({ phase: "add", currentIndex: i, key, cost }),
-      note: { vi: `${before} + ${cost} = ${pushes}. Đã đặt '${ch}' vào phím ${key}, tầng ${cost}.`, en: `${before} + ${cost} = ${pushes}. '${ch}' is now assigned to key ${key}, layer ${cost}.` },
+      note: {
+        vi: `${i} // 8 + 1 = ${cost}, nên pushes = ${before} + ${cost} = ${pushes}. Bảng phím đặt '${ch}' vào một ô tầng ${cost} để minh họa.`,
+        en: `${i} // 8 + 1 = ${cost}, so pushes = ${before} + ${cost} = ${pushes}. The key map places '${ch}' in a layer-${cost} slot for illustration.`,
+      },
     });
   });
 
@@ -1946,6 +1926,210 @@ function buildSteps3014(input) {
   });
 
   return { original: word, answer: pushes, steps };
+}
+
+function heapPush3014(heap, value) {
+  heap.push(value);
+  let child = heap.length - 1;
+  while (child > 0) {
+    const parent = Math.floor((child - 1) / 2);
+    if (heap[parent] <= heap[child]) break;
+    [heap[parent], heap[child]] = [heap[child], heap[parent]];
+    child = parent;
+  }
+}
+
+function heapPop3014(heap) {
+  const root = heap[0];
+  const last = heap.pop();
+  if (heap.length && last !== undefined) {
+    heap[0] = last;
+    let parent = 0;
+    while (true) {
+      const left = parent * 2 + 1;
+      const right = left + 1;
+      let smallest = parent;
+      if (left < heap.length && heap[left] < heap[smallest]) smallest = left;
+      if (right < heap.length && heap[right] < heap[smallest]) smallest = right;
+      if (smallest === parent) break;
+      [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];
+      parent = smallest;
+    }
+  }
+  return root;
+}
+
+/** LeetCode 3014, approach 2: Counter + max-heap simulated with negative values. */
+function buildSteps3014Heap(input) {
+  const word = String(input || "").trim().toLowerCase().replace(/[^a-z]/g, "").slice(0, 26);
+  const chars = [...word];
+  const counts = new Map();
+  chars.forEach((ch) => counts.set(ch, (counts.get(ch) || 0) + 1));
+  const freqEntries = [...counts.entries()].map(([ch, count]) => ({ ch, count }));
+  const steps = [];
+  const maxHeap = [];
+  const assignments = [];
+  let ans = null;
+  let index = null;
+
+  const makeView = (overrides = {}) => ({
+    word: chars,
+    phase: "input",
+    visibleFreqCount: 0,
+    freqEntries: freqEntries.map((entry) => ({ ...entry })),
+    activeFreqIndex: null,
+    heap: [...maxHeap],
+    frequency: null,
+    presses: null,
+    ans,
+    index,
+    assignments: assignments.map((item) => ({ ...item })),
+    activeAssignmentIndex: null,
+    ...overrides,
+  });
+
+  steps.push({
+    title: { vi: `Nhập word = "${word}"`, en: `Input word = "${word}"` },
+    arr: [...chars], highlight: [], mark: [], codeBlock: 2, codeLines: [2],
+    vars: [{ name: "word", value: `"${word}"` }],
+    keypadHeapView: makeView({ phase: "input" }),
+    note: { vi: "Cách 2 bắt đầu bằng cách đếm số lần xuất hiện của từng chữ.", en: "Approach 2 starts by counting each letter's frequency." },
+  });
+
+  steps.push({
+    title: { vi: "freq = Counter(word)", en: "freq = Counter(word)" },
+    arr: [...chars], highlight: chars.map((_, i) => i), mark: [], codeBlock: 2, codeLines: [4],
+    vars: [{ name: "freq", value: `{${freqEntries.map(({ ch, count }) => `'${ch}': ${count}`).join(", ")}}` }],
+    keypadHeapView: makeView({ phase: "count", visibleFreqCount: freqEntries.length }),
+    note: { vi: `Counter tạo ${freqEntries.length} cặp chữ → tần suất.`, en: `Counter creates ${freqEntries.length} letter → frequency entries.` },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo max_heap = []", en: "Initialize max_heap = []" },
+    arr: [...chars], highlight: [], mark: [], codeBlock: 2, codeLines: [7],
+    vars: [{ name: "max_heap", value: "[]" }],
+    keypadHeapView: makeView({ phase: "heap-init", visibleFreqCount: freqEntries.length }),
+    note: { vi: "Python heapq là min-heap, nên ta sẽ lưu -f để tần suất lớn nhất nổi lên root.", en: "Python heapq is a min-heap, so storing -f makes the largest frequency rise to the root." },
+  });
+
+  freqEntries.forEach(({ ch, count }, freqIndex) => {
+    steps.push({
+      title: { vi: `Vòng for lấy f = ${count}`, en: `The for loop takes f = ${count}` },
+      arr: [...chars], highlight: chars.map((value, i) => value === ch ? i : -1).filter((i) => i >= 0), mark: [],
+      codeBlock: 2, codeLines: [9],
+      vars: [{ name: "f", value: count }, { name: "max_heap", value: `[${maxHeap.join(", ")}]` }],
+      keypadHeapView: makeView({ phase: "heap-loop", visibleFreqCount: freqEntries.length, activeFreqIndex: freqIndex, frequency: count }),
+      note: { vi: `freq.values() đưa f = ${count} vào vòng lặp (tần suất của '${ch}').`, en: `freq.values() yields f = ${count} (the frequency of '${ch}').` },
+    });
+
+    heapPush3014(maxHeap, -count);
+    steps.push({
+      title: { vi: `heappush(max_heap, -${count})`, en: `heappush(max_heap, -${count})` },
+      arr: [...chars], highlight: chars.map((value, i) => value === ch ? i : -1).filter((i) => i >= 0), mark: [],
+      codeBlock: 2, codeLines: [10],
+      vars: [
+        { name: "f", value: count },
+        { name: "-f", value: -count },
+        { name: "max_heap", value: `[${maxHeap.join(", ")}]` },
+      ],
+      keypadHeapView: makeView({ phase: "heap-push", visibleFreqCount: freqEntries.length, activeFreqIndex: freqIndex, frequency: count }),
+      note: { vi: `Đẩy -${count}; root nhỏ nhất theo số âm tương ứng với tần suất thật lớn nhất.`, en: `Push -${count}; the smallest negative root represents the largest real frequency.` },
+    });
+  });
+
+  ans = 0;
+  steps.push({
+    title: { vi: "Khởi tạo ans = 0", en: "Initialize ans = 0" },
+    arr: [...chars], highlight: [], mark: [], codeBlock: 2, codeLines: [12],
+    vars: [{ name: "ans", value: ans }, { name: "max_heap", value: `[${maxHeap.join(", ")}]` }],
+    keypadHeapView: makeView({ phase: "ans-init", visibleFreqCount: freqEntries.length }),
+    note: { vi: "ans lưu tổng số lần nhấn đã tính.", en: "ans stores the accumulated number of pushes." },
+  });
+
+  index = 0;
+  steps.push({
+    title: { vi: "Khởi tạo index = 0", en: "Initialize index = 0" },
+    arr: [...chars], highlight: [], mark: [], codeBlock: 2, codeLines: [13],
+    vars: [{ name: "ans", value: ans }, { name: "index", value: index }],
+    keypadHeapView: makeView({ phase: "index-init", visibleFreqCount: freqEntries.length }),
+    note: { vi: "index đếm có bao nhiêu tần suất đã được gán; mỗi nhóm 8 index dùng thêm một lần nhấn.", en: "index counts assigned frequencies; every group of eight indices costs one extra push." },
+  });
+
+  while (maxHeap.length) {
+    steps.push({
+      title: { vi: `max_heap còn ${maxHeap.length} phần tử`, en: `max_heap still has ${maxHeap.length} item${maxHeap.length === 1 ? "" : "s"}` },
+      arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [16],
+      vars: [{ name: "max_heap", value: `[${maxHeap.join(", ")}]` }, { name: "bool(max_heap)", value: true }, { name: "index", value: index }, { name: "ans", value: ans }],
+      keypadHeapView: makeView({ phase: "while", visibleFreqCount: freqEntries.length }),
+      note: { vi: "Heap chưa rỗng nên đi vào vòng while.", en: "The heap is not empty, so enter the while loop." },
+    });
+
+    const stored = heapPop3014(maxHeap);
+    const frequency = -stored;
+    steps.push({
+      title: { vi: `frequency = -(${-frequency}) = ${frequency}`, en: `frequency = -(${-frequency}) = ${frequency}` },
+      arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [18],
+      vars: [{ name: "heappop(max_heap)", value: stored }, { name: "frequency", value: frequency }, { name: "max_heap after pop", value: `[${maxHeap.join(", ")}]` }],
+      keypadHeapView: makeView({ phase: "pop", visibleFreqCount: freqEntries.length, frequency, activeAssignmentIndex: index }),
+      note: { vi: `Pop root ${stored}, đổi dấu để lấy frequency = ${frequency}.`, en: `Pop root ${stored}, then negate it to recover frequency = ${frequency}.` },
+    });
+
+    const presses = Math.floor(index / 8) + 1;
+    const pushWord = presses === 1 ? "push" : "pushes";
+    steps.push({
+      title: { vi: `presses = ${index} // 8 + 1 = ${presses}`, en: `presses = ${index} // 8 + 1 = ${presses}` },
+      arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [20],
+      vars: [{ name: "index", value: index }, { name: "presses", value: presses }, { name: "frequency", value: frequency }],
+      keypadHeapView: makeView({ phase: "presses", visibleFreqCount: freqEntries.length, frequency, presses, activeAssignmentIndex: index }),
+      note: { vi: `index ${index} nằm trong nhóm [${Math.floor(index / 8) * 8}..${Math.floor(index / 8) * 8 + 7}], nên mỗi lần xuất hiện cần ${presses} lần nhấn.`, en: `index ${index} is in group [${Math.floor(index / 8) * 8}..${Math.floor(index / 8) * 8 + 7}], so each occurrence costs ${presses} ${pushWord}.` },
+    });
+
+    const before = ans;
+    const contribution = frequency * presses;
+    ans += contribution;
+    assignments.push({ index, key: 2 + (index % 8), cost: presses, frequency, contribution });
+    steps.push({
+      title: { vi: `ans += ${frequency} × ${presses} → ${ans}`, en: `ans += ${frequency} × ${presses} → ${ans}` },
+      arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [22],
+      vars: [{ name: "ans before", value: before }, { name: "frequency * presses", value: `${frequency} * ${presses} = ${contribution}` }, { name: "ans after", value: ans }],
+      keypadHeapView: makeView({ phase: "add", visibleFreqCount: freqEntries.length, frequency, presses, activeAssignmentIndex: index }),
+      note: { vi: `${frequency} lần xuất hiện × ${presses} lần nhấn = ${contribution}; ans = ${before} + ${contribution} = ${ans}.`, en: `${frequency} ${frequency === 1 ? "occurrence" : "occurrences"} × ${presses} ${pushWord} = ${contribution}; ans = ${before} + ${contribution} = ${ans}.` },
+    });
+
+    const previousIndex = index;
+    index += 1;
+    steps.push({
+      title: { vi: `index: ${previousIndex} → ${index}`, en: `index: ${previousIndex} → ${index}` },
+      arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [24],
+      vars: [{ name: "index before", value: previousIndex }, { name: "index after", value: index }, { name: "ans", value: ans }],
+      keypadHeapView: makeView({ phase: "increment", visibleFreqCount: freqEntries.length, frequency, presses, activeAssignmentIndex: previousIndex }),
+      note: { vi: "Tăng index để tần suất tiếp theo nhận ô rẻ nhất còn lại.", en: "Increment index so the next frequency takes the cheapest remaining slot." },
+    });
+  }
+
+  steps.push({
+    title: { vi: "max_heap rỗng → thoát while", en: "max_heap is empty → exit while" },
+    arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [16],
+    vars: [{ name: "max_heap", value: "[]" }, { name: "bool(max_heap)", value: false }, { name: "index", value: index }, { name: "ans", value: ans }],
+    keypadHeapView: makeView({ phase: "while-done", visibleFreqCount: freqEntries.length }),
+    note: { vi: "Không còn tần suất nào trong heap, điều kiện while là False.", en: "No frequencies remain in the heap, so the while condition is False." },
+  });
+
+  steps.push({
+    title: { vi: `Trả về ans = ${ans}`, en: `Return ans = ${ans}` },
+    arr: [...chars], highlight: [], mark: assignments.map((_, i) => i), codeBlock: 2, codeLines: [26], final: true,
+    vars: [{ name: "ans", value: ans }],
+    keypadHeapView: makeView({ phase: "done", visibleFreqCount: freqEntries.length }),
+    note: { vi: `Tổng nhỏ nhất là ${ans} lần nhấn.`, en: `The minimum total is ${ans} pushes.` },
+  });
+
+  return { original: word, answer: ans, steps };
+}
+
+function buildSteps3014(input, params) {
+  return Number(params && params.approach) === 2
+    ? buildSteps3014Heap(input)
+    : buildSteps3014Simple(input);
 }
 
 /** LeetCode 55: Jump Game — track the farthest reachable index. */
@@ -2099,27 +2283,69 @@ module.exports = {
     defaultInput: "xycdefghij",
     inputKind: "string",
     inputLabel: { vi: "word (các chữ khác nhau)", en: "word (distinct letters)" },
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Công thức trực tiếp", en: "Approach 1: Direct formula" } },
+          { value: "2", label: { vi: "Cách 2: Counter + max heap", en: "Approach 2: Counter + max heap" } },
+        ],
+      },
+    ],
     approach: [
       { vi: "Có 8 phím, nên 8 chữ đầu tiên đều được đặt ở tầng 1 và chỉ tốn 1 lần nhấn.", en: "There are eight keys, so the first eight letters all occupy layer 1 and cost one push each." },
       { vi: "Chữ thứ 9 đến 16 nằm ở tầng 2; tổng quát cost = i // 8 + 1.", en: "Letters 9 through 16 occupy layer 2; in general, cost = i // 8 + 1." },
       { vi: "Vì mọi chữ trong word khác nhau, thứ tự gán phím không làm thay đổi tổng chi phí.", en: "Because every letter in word is distinct, the key assignment order does not change the total cost." },
+      { vi: "Cách 2 dùng Counter và max heap để luôn lấy tần suất lớn nhất trước; với ràng buộc của bài I, mọi tần suất đều bằng 1.", en: "Approach 2 uses Counter and a max-heap to process the largest frequency first; under problem I's constraints, every frequency is 1." },
     ],
     complexity: {
-      time: "O(n)",
-      space: "O(1)",
-      note: { vi: "Duyệt word một lần và chỉ dùng vài biến. Bảng gán phím chỉ phục vụ visualization.", en: "Scan word once and use only a few variables. The key map exists only for visualization." },
+      time: "O(n) / O(n log n)",
+      space: "O(1) / O(n)",
+      note: { vi: "Cách 1: O(n), O(1). Cách 2: Counter + heap có tối đa n tần suất, O(n log n) time và O(n) space.", en: "Approach 1: O(n), O(1). Approach 2: Counter + heap holds at most n frequencies, using O(n log n) time and O(n) space." },
     },
     code: [
       "class Solution:",
       "    def minimumPushes(self, word: str) -> int:",
       "        pushes = 0",
-      "        for i, ch in enumerate(word):",
-      "            key = 2 + i % 8",
-      "            cost = i // 8 + 1",
-      "            pushes += cost",
+      "",
+      "        for i in range(len(word)):",
+      "            pushes += i // 8 + 1",
+      "",
       "        return pushes",
     ],
+    code2: [
+      "class Solution:",
+      "    def minimumPushes(self, word: str) -> int:",
+      "        # Step 1: Count frequencies",
+      "        freq = Counter(word)",
+      "",
+      "        # Step 2: Create a max heap",
+      "        max_heap = []",
+      "",
+      "        for f in freq.values():",
+      "            heapq.heappush(max_heap, -f)   # negative because heapq is a min-heap",
+      "",
+      "        ans = 0",
+      "        index = 0",
+      "",
+      "        # Step 3: Process highest frequencies first",
+      "        while max_heap:",
+      "",
+      "            frequency = -heapq.heappop(max_heap)",
+      "",
+      "            presses = index // 8 + 1",
+      "",
+      "            ans += frequency * presses",
+      "",
+      "            index += 1",
+      "",
+      "        return ans",
+    ],
+    codeLabel: { vi: "Cách 1: Công thức trực tiếp", en: "Approach 1: Direct formula" },
+    code2Label: { vi: "Cách 2: Counter + max heap", en: "Approach 2: Counter + max heap" },
     builder: buildSteps3014,
   },
   3947: {
