@@ -1543,86 +1543,253 @@ function buildSteps1044(input) {
   return { original: s, answer, steps };
 }
 
-/**
- * LeetCode 875: Koko Eating Bananas — binary search on the answer (speed).
- * hours(speed) is monotu decreasing in speed; find the smallest speed with
- * hours(speed) <= h.
- *
- * Code lines (1-indexed):
- *  1  class Solution:
- *  2      def minEatingSpeed(self, piles, h):
- *  3          def hours(speed): return sum(ceil(p/speed) for p in piles)
- *  4          lo, hi = 1, max(piles)
- *  5          while lo < hi:
- *  6              mid = (lo + hi) // 2
- *  7              if hours(mid) <= h: hi = mid
- *  8              else: lo = mid + 1
- *  9          return lo
- */
+/** LeetCode 875: Koko Eating Bananas — first feasible speed. */
 function buildSteps875(input, params) {
-  const piles = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
-  const h = params && params.h !== undefined ? Number(params.h) : 8;
+  const parsedPiles = Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
+  const piles = parsedPiles.map((pile) => Math.max(1, Math.trunc(pile)));
+  if (!piles.length) piles.push(1);
+  const parsedHours = params && params.h !== undefined ? Number(params.h) : 8;
+  const h = Number.isFinite(parsedHours) ? Math.max(piles.length, Math.trunc(parsedHours)) : 8;
   const steps = [];
-  const hoursNeeded = (speed) => piles.reduce((acc, p) => acc + Math.ceil(p / speed), 0);
+  const initialLo = 1;
+  const initialHi = Math.max(...piles);
+  const tested = [];
+  let lo = initialLo;
+  let hi = initialHi;
 
-  let lo = 1, hi = Math.max(...piles);
+  const breakdown = (speed) => piles.map((pile, index) => ({
+    index,
+    pile,
+    speed,
+    hours: Math.ceil(pile / speed),
+    fullHours: Math.floor(pile / speed),
+    remainder: pile % speed,
+  }));
+  const hoursNeeded = (speed) => breakdown(speed).reduce((total, item) => total + item.hours, 0);
 
-  steps.push({
-    title: { vi: `Binary search trên TỐC ĐỘ ăn: [1, ${hi}]`, en: `Binary search on EATING SPEED: [1, ${hi}]` },
-    arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    codeLines: [3, 4],
+  function addStep({
+    event,
+    phase,
+    title,
+    codeLine,
+    note,
+    mid = null,
+    perPile = [],
+    totalHours = null,
+    feasible = null,
+    whileResult = null,
+    previousLo = null,
+    previousHi = null,
+    answer = null,
+    slowerHours = null,
+    vars = [],
+    final = false,
+  }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      kokoSpeedView: {
+        event,
+        phase,
+        piles: [...piles],
+        h,
+        initialLo,
+        initialHi,
+        lo,
+        hi,
+        mid,
+        perPile: perPile.map((item) => ({ ...item })),
+        totalHours,
+        feasible,
+        whileResult,
+        previousLo,
+        previousHi,
+        answer,
+        slowerHours,
+        tested: tested.map((item) => ({ ...item })),
+      },
+    });
+  }
+
+  addStep({
+    event: "init-range",
+    phase: "setup",
+    title: { vi: `Tìm tốc độ nhỏ nhất trong [1, ${hi}]`, en: `Find the minimum speed in [1, ${hi}]` },
+    codeLine: 5,
     vars: [
       { name: "piles", value: `[${piles.join(", ")}]` },
-      { name: "h (hours limit)", value: h },
-      { name: "lo", value: lo }, { name: "hi", value: hi },
+      { name: "h", value: h },
+      { name: "lo", value: lo },
+      { name: "hi", value: hi },
     ],
     note: {
-      vi:
-        `Tốc độ càng lớn → càng ít giờ. Ta tìm tốc độ NHỎ NHẤT mà tổng giờ ≤ h=${h}.\n` +
-        `Khoảng tìm: [1, max(piles)=${hi}]. Với tốc độ v, giờ ăn = Σ ceil(pile/v).`,
-      en:
-        `Faster speed → fewer hours. Find the SMALLEST speed with total hours ≤ h=${h}.\n` +
-        `Search range: [1, max(piles)=${hi}]. At speed v, hours = Σ ceil(pile/v).`,
+      vi: `Tốc độ tối thiểu là 1. Tốc độ max(piles)=${hi} chắc chắn đủ vì mỗi đống mất đúng 1 giờ. Ta tìm tốc độ khả thi đầu tiên.`,
+      en: `The minimum possible speed is 1. Speed max(piles)=${hi} is guaranteed to work because each pile takes one hour. Find the first feasible speed.`,
     },
   });
 
-  while (lo < hi) {
+  while (true) {
+    const canContinue = lo < hi;
+    addStep({
+      event: "while-check",
+      phase: "range",
+      title: canContinue
+        ? { vi: `${lo} < ${hi} → còn nhiều hơn 1 ứng viên`, en: `${lo} < ${hi} → more than one candidate remains` }
+        : { vi: `${lo} = ${hi} → đã tìm thấy tốc độ đầu tiên khả thi`, en: `${lo} = ${hi} → first feasible speed found` },
+      codeLine: 6,
+      whileResult: canContinue,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "lo < hi", value: canContinue }],
+      note: canContinue
+        ? { vi: `Đáp án vẫn nằm trong khoảng đóng [${lo}, ${hi}].`, en: `The answer is still inside the closed interval [${lo}, ${hi}].` }
+        : { vi: `Khoảng chỉ còn một tốc độ: ${lo}. Vòng lặp kết thúc.`, en: `Only one speed remains: ${lo}. The loop stops.` },
+    });
+    if (!canContinue) break;
+
     const mid = Math.floor((lo + hi) / 2);
-    const need = hoursNeeded(mid);
-    const ok = need <= h;
-    steps.push({
-      title: { vi: `mid=${mid}: hours=${need} ${ok ? "≤" : ">"} h=${h}`, en: `mid=${mid}: hours=${need} ${ok ? "≤" : ">"} h=${h}` },
-      arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
-      highlight: [], mark: [],
-      codeLines: ok ? [5, 6, 7] : [5, 6, 8],
+    addStep({
+      event: "compute-mid",
+      phase: "range",
+      title: { vi: `Thử tốc độ mid = (${lo} + ${hi}) // 2 = ${mid}`, en: `Try speed mid = (${lo} + ${hi}) // 2 = ${mid}` },
+      codeLine: 7,
+      mid,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }],
+      note: { vi: `Koko thử ăn ${mid} quả mỗi giờ.`, en: `Koko tries eating ${mid} bananas per hour.` },
+    });
+
+    const perPile = breakdown(mid);
+    const totalHours = perPile.reduce((total, item) => total + item.hours, 0);
+    const feasible = totalHours <= h;
+    addStep({
+      event: "calculate-hours",
+      phase: "hours",
+      title: { vi: `Cộng giờ từng đống: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}`, en: `Add hours per pile: ${perPile.map((item) => item.hours).join(" + ")} = ${totalHours}` },
+      codeLine: 8,
+      mid,
+      perPile,
+      totalHours,
+      feasible,
       vars: [
-        { name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid (speed)", value: mid },
-        { name: "hours(mid)", value: need }, { name: "h", value: h }, { name: "ok?", value: ok },
+        { name: "mid", value: mid },
+        ...perPile.map((item) => ({ name: `ceil(${item.pile}/${mid})`, value: item.hours })),
+        { name: "hours", value: totalHours },
       ],
       note: {
-        vi: ok
-          ? `Với tốc độ ${mid}, cần ${need} giờ ≤ ${h} → đủ chậm vẫn kịp → thử CHẬM HƠN: hi = ${mid}.`
-          : `Với tốc độ ${mid}, cần ${need} giờ > ${h} → quá chậm → phải NHANH HƠN: lo = ${mid + 1}.`,
-        en: ok
-          ? `At speed ${mid}, need ${need} hours ≤ ${h} → still on time → try SLOWER: hi = ${mid}.`
-          : `At speed ${mid}, need ${need} hours > ${h} → too slow → must be FASTER: lo = ${mid + 1}.`,
+        vi: `Mỗi đống phải làm tròn lên vì Koko không chuyển phần thời gian còn dư sang đống kế tiếp. Tổng cộng cần ${totalHours} giờ.`,
+        en: `Each pile rounds up because Koko cannot use leftover time on another pile. The total is ${totalHours} hours.`,
       },
     });
-    if (ok) hi = mid;
-    else lo = mid + 1;
+
+    addStep({
+      event: "feasible-check",
+      phase: "decision",
+      title: { vi: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "kịp giờ" : "không kịp"}`, en: `${totalHours} ${feasible ? "≤" : ">"} ${h} → ${feasible ? "on time" : "too slow"}` },
+      codeLine: 9,
+      mid,
+      perPile,
+      totalHours,
+      feasible,
+      vars: [
+        { name: "hours", value: totalHours },
+        { name: "h", value: h },
+        { name: "hours <= h", value: feasible },
+      ],
+      note: feasible
+        ? { vi: `Tốc độ ${mid} khả thi, nhưng có thể chưa nhỏ nhất. Giữ mid và thử các tốc độ chậm hơn.`, en: `Speed ${mid} is feasible, but it may not be minimal. Keep mid and try slower speeds.` }
+        : { vi: `Tốc độ ${mid} quá chậm. Vì tốc độ nhỏ hơn còn tốn nhiều giờ hơn, loại toàn bộ tốc độ ≤ ${mid}.`, en: `Speed ${mid} is too slow. Smaller speeds take at least as long, so remove every speed ≤ ${mid}.` },
+    });
+
+    tested.push({ speed: mid, hours: totalHours, feasible });
+    const previousLo = lo;
+    const previousHi = hi;
+    if (feasible) {
+      hi = mid;
+      addStep({
+        event: "move-hi",
+        phase: "shrink",
+        title: { vi: `Khả thi → hi = mid = ${mid}`, en: `Feasible → hi = mid = ${mid}` },
+        codeLine: 10,
+        mid,
+        perPile,
+        totalHours,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "old hi", value: previousHi }, { name: "hi", value: hi }, { name: "lo", value: lo }],
+        note: { vi: `Giữ ${mid} vì nó vẫn có thể là đáp án. Khoảng mới: [${lo}, ${hi}].`, en: `Keep ${mid} because it may be the answer. New interval: [${lo}, ${hi}].` },
+      });
+    } else {
+      addStep({
+        event: "else-branch",
+        phase: "shrink",
+        title: { vi: `${totalHours} > ${h} → đi vào nhánh else`, en: `${totalHours} > ${h} → enter the else branch` },
+        codeLine: 11,
+        mid,
+        perPile,
+        totalHours,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "hours <= h", value: false }, { name: "mid", value: mid }],
+        note: { vi: `Điều kiện if sai nên thực hiện dòng 12.`, en: `The if condition is false, so line 12 runs next.` },
+      });
+      lo = mid + 1;
+      addStep({
+        event: "move-lo",
+        phase: "shrink",
+        title: { vi: `Quá chậm → lo = mid + 1 = ${lo}`, en: `Too slow → lo = mid + 1 = ${lo}` },
+        codeLine: 12,
+        mid,
+        perPile,
+        totalHours,
+        feasible,
+        previousLo,
+        previousHi,
+        vars: [{ name: "old lo", value: previousLo }, { name: "lo", value: lo }, { name: "hi", value: hi }],
+        note: { vi: `Loại [${previousLo}, ${mid}]. Khoảng mới: [${lo}, ${hi}].`, en: `Remove [${previousLo}, ${mid}]. New interval: [${lo}, ${hi}].` },
+      });
+    }
   }
 
-  steps.push({
-    title: { vi: `Đáp án: tốc độ tối thiểu = ${lo}`, en: `Answer: minimum speed = ${lo}` },
-    arr: [...piles], sub: piles.map((_, i) => `[${i}]`),
-    highlight: [], mark: [], final: true,
-    codeLines: [9],
-    vars: [{ name: "answer", value: lo }, { name: "hours at answer", value: hoursNeeded(lo) }],
-    note: { vi: `Tốc độ nhỏ nhất để ăn hết trong ${h} giờ = ${lo} (cần ${hoursNeeded(lo)} giờ).`, en: `Smallest speed to finish within ${h} hours = ${lo} (takes ${hoursNeeded(lo)} hours).` },
+  const answer = lo;
+  const answerBreakdown = breakdown(answer);
+  const answerHours = hoursNeeded(answer);
+  const slowerHours = answer > 1 ? hoursNeeded(answer - 1) : null;
+  addStep({
+    event: "done",
+    phase: "done",
+    title: { vi: `return ${answer} — tốc độ nhỏ nhất khả thi`, en: `return ${answer} — minimum feasible speed` },
+    codeLine: 13,
+    perPile: answerBreakdown,
+    totalHours: answerHours,
+    feasible: true,
+    answer,
+    slowerHours,
+    final: true,
+    vars: [
+      { name: "lo", value: answer },
+      { name: "hours(lo)", value: answerHours },
+      ...(slowerHours === null ? [] : [{ name: `hours(${answer - 1})`, value: slowerHours }]),
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: slowerHours === null
+        ? `Tốc độ 1 cần ${answerHours} giờ ≤ ${h}; đây đã là tốc độ nhỏ nhất có thể.`
+        : `Tốc độ ${answer} cần ${answerHours} giờ ≤ ${h}, còn tốc độ ${answer - 1} cần ${slowerHours} giờ > ${h}. Vì vậy ${answer} là nhỏ nhất.`,
+      en: slowerHours === null
+        ? `Speed 1 needs ${answerHours} hours ≤ ${h}; it is already the smallest possible speed.`
+        : `Speed ${answer} needs ${answerHours} hours ≤ ${h}, while speed ${answer - 1} needs ${slowerHours} hours > ${h}. Therefore ${answer} is minimal.`,
+    },
   });
 
-  return { original: piles, answer: lo, steps };
+  return { original: piles, answer, steps };
 }
 
 /** LeetCode 69: Sqrt(x) — binary search for floor(sqrt(x)). */
@@ -1973,14 +2140,18 @@ module.exports = {
     ],
     complexity: { time: "O(n log(max pile))", space: "O(1)", note: { vi: "Mỗi lần thử tốc độ tính giờ O(n).", en: "Each speed check computes hours in O(n)." } },
     code: [
+      "import math",
+      "",
       "class Solution:",
       "    def minEatingSpeed(self, piles, h):",
-      "        def hours(speed): return sum(ceil(p/speed) for p in piles)",
       "        lo, hi = 1, max(piles)",
       "        while lo < hi:",
       "            mid = (lo + hi) // 2",
-      "            if hours(mid) <= h: hi = mid",
-      "            else: lo = mid + 1",
+      "            hours = sum(math.ceil(p / mid) for p in piles)",
+      "            if hours <= h:",
+      "                hi = mid",
+      "            else:",
+      "                lo = mid + 1",
       "        return lo",
     ],
     builder: buildSteps875,

@@ -3051,6 +3051,128 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderKokoSpeedView(step) {
+  const view = step.kokoSpeedView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { setup: 0, range: 1, hours: 2, decision: 3, shrink: 3, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Chọn khoảng tốc độ", "2 · Thử tốc độ giữa", "3 · Tính giờ từng đống", "4 · Giữ nửa đúng"]
+    : ["1 · Set speed range", "2 · Try middle speed", "3 · Count each pile's hours", "4 · Keep the correct half"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const chosenSpeed = Number.isInteger(view.answer) ? view.answer : view.mid;
+  const activeRange = `[${view.lo}, ${view.hi}]`;
+  const statusValue = view.totalHours === null
+    ? (vi ? "chưa tính" : "not counted")
+    : `${view.totalHours} / ${view.h} ${vi ? "giờ" : "hours"}`;
+
+  const domainCount = view.initialHi - view.initialLo + 1;
+  let speedValues;
+  if (domainCount <= 24) {
+    speedValues = Array.from({ length: domainCount }, (_, index) => view.initialLo + index);
+  } else {
+    speedValues = [...new Set([
+      view.initialLo,
+      view.lo - 1,
+      view.lo,
+      view.mid,
+      view.hi,
+      view.hi + 1,
+      view.initialHi,
+      ...(view.tested || []).map((item) => item.speed),
+    ].filter((value) => Number.isInteger(value) && value >= view.initialLo && value <= view.initialHi))].sort((a, b) => a - b);
+  }
+
+  const speedCells = speedValues.map((speed, index) => {
+    const isAnswer = speed === view.answer;
+    const isMid = speed === view.mid && !isAnswer;
+    let zone = "active";
+    if (view.event === "done") zone = speed < view.answer ? "slow" : speed > view.answer ? "works" : "answer";
+    else if (speed < view.lo) zone = "slow";
+    else if (speed > view.hi) zone = "works";
+    const tested = (view.tested || []).find((item) => item.speed === speed);
+    const gapBefore = index > 0 && speed - speedValues[index - 1] > 1;
+    const labels = [
+      isAnswer ? (vi ? "đáp án" : "answer") : "",
+      isMid ? "mid" : "",
+      speed === view.lo && speed === view.hi ? "lo = hi" : speed === view.lo ? "lo" : speed === view.hi ? "hi" : "",
+    ].filter(Boolean).join(" · ");
+    const hours = tested ? `${tested.hours}h` : "";
+    return `${gapBefore ? '<span class="koko-speed-gap">…</span>' : ""}<span class="koko-speed-cell ${zone}${isMid ? " mid" : ""}${isAnswer ? " answer" : ""}"><small>${escapeHtml(labels || " ")}</small><strong>${speed}</strong><em>${hours}</em></span>`;
+  }).join("");
+
+  const perPile = view.perPile || [];
+  const pileRows = view.piles.map((pile, index) => {
+    const detail = perPile[index];
+    if (!detail || !Number.isInteger(chosenSpeed)) {
+      return `<div class="koko-pile-row"><span class="koko-pile-id">${vi ? "Đống" : "Pile"} ${index + 1}</span><strong>${pile} 🍌</strong><span class="koko-pile-wait">${vi ? "chờ chọn tốc độ" : "waiting for a speed"}</span></div>`;
+    }
+    const visibleHours = Math.min(detail.hours, 10);
+    const hourChips = Array.from({ length: visibleHours }, (_, hourIndex) => {
+      const eaten = hourIndex < detail.hours - 1 || detail.remainder === 0 ? chosenSpeed : detail.remainder;
+      return `<span>${Math.min(eaten, pile)}<small>h${hourIndex + 1}</small></span>`;
+    }).join("");
+    const extra = detail.hours > visibleHours ? `<b>+${detail.hours - visibleHours}</b>` : "";
+    return `<div class="koko-pile-row">
+      <span class="koko-pile-id">${vi ? "Đống" : "Pile"} ${index + 1}</span>
+      <strong>${pile} 🍌</strong>
+      <div class="koko-hour-chips" aria-label="${escapeHtml(`${detail.hours} hours`)}">${hourChips}${extra}</div>
+      <code>ceil(${pile} / ${chosenSpeed}) = ${detail.hours}h</code>
+    </div>`;
+  }).join("");
+
+  const hourEquation = perPile.length
+    ? `<div class="koko-hours-equation"><span>${perPile.map((item) => item.hours).join(" + ")}</span><i>=</i><strong>${view.totalHours}</strong><i>${view.totalHours <= view.h ? "≤" : ">"}</i><strong>h = ${view.h}</strong><b class="${view.totalHours <= view.h ? "works" : "slow"}">${view.totalHours <= view.h ? (vi ? "KỊP" : "WORKS") : (vi ? "QUÁ CHẬM" : "TOO SLOW")}</b></div>`
+    : `<div class="koko-hours-equation pending"><span>${vi ? "Chọn mid rồi tính ceil(pile / mid) cho từng đống" : "Choose mid, then compute ceil(pile / mid) for every pile"}</span></div>`;
+
+  let actionHtml;
+  if (view.event === "init-range") {
+    actionHtml = `<div class="koko-action setup"><small>${vi ? "KHOẢNG BAN ĐẦU" : "INITIAL RANGE"}</small><strong>lo = 1 · hi = max(piles) = ${view.initialHi}</strong><span>${vi ? "hi luôn đủ nhanh: mỗi đống chỉ cần 1 giờ" : "hi is guaranteed fast enough: every pile takes one hour"}</span></div>`;
+  } else if (view.event === "while-check") {
+    actionHtml = `<div class="koko-action condition ${view.whileResult ? "yes" : "no"}"><small>WHILE lo &lt; hi</small><strong>${view.lo} &lt; ${view.hi} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? "Còn nhiều tốc độ cần phân biệt" : "Multiple candidate speeds remain") : (vi ? "lo gặp hi: đây là tốc độ khả thi đầu tiên" : "lo meets hi: this is the first feasible speed")}</span></div>`;
+  } else if (view.event === "compute-mid") {
+    actionHtml = `<div class="koko-action mid"><small>COMPUTE MID</small><strong>(${view.lo} + ${view.hi}) // 2 = ${view.mid}</strong><span>${vi ? `Thử ăn ${view.mid} quả/giờ` : `Try eating ${view.mid} bananas/hour`}</span></div>`;
+  } else if (view.event === "calculate-hours") {
+    actionHtml = `<div class="koko-action count"><small>${vi ? "TÍNH TỔNG GIỜ" : "COUNT TOTAL HOURS"}</small><strong>hours = ${view.totalHours}</strong><span>${vi ? "Mỗi đống làm tròn lên riêng biệt" : "Round each pile up separately"}</span></div>`;
+  } else if (view.event === "feasible-check") {
+    actionHtml = `<div class="koko-action decision ${view.feasible ? "works" : "slow"}"><small>IF hours &lt;= h</small><strong>${view.totalHours} ${view.feasible ? "≤" : ">"} ${view.h} → ${view.feasible}</strong><span>${view.feasible ? (vi ? "mid kịp giờ; giữ mid và thử chậm hơn" : "mid works; keep mid and try slower") : (vi ? "mid quá chậm; mọi tốc độ nhỏ hơn cũng bị loại" : "mid is too slow; every smaller speed is removed")}</span></div>`;
+  } else if (view.event === "move-hi") {
+    actionHtml = `<div class="koko-action move works"><small>${vi ? "GIỮ NỬA TRÁI" : "KEEP LEFT HALF"}</small><strong>hi = mid = ${view.mid}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? "không bỏ mid vì mid có thể là đáp án" : "do not remove mid because it may be the answer"}</span></div>`;
+  } else if (view.event === "else-branch") {
+    actionHtml = `<div class="koko-action decision slow"><small>ELSE</small><strong>${view.totalHours} &gt; ${view.h}</strong><span>${vi ? "Điều kiện if sai; tiếp theo tăng lo" : "The if condition is false; increase lo next"}</span></div>`;
+  } else if (view.event === "move-lo") {
+    actionHtml = `<div class="koko-action move slow"><small>${vi ? "BỎ NỬA TRÁI" : "REMOVE LEFT HALF"}</small><strong>lo = mid + 1 = ${view.lo}</strong><span>[${view.previousLo}, ${view.previousHi}] → [${view.lo}, ${view.hi}] · ${vi ? `loại mọi tốc độ ≤ ${view.mid}` : `remove every speed ≤ ${view.mid}`}</span></div>`;
+  } else {
+    const proof = view.answer === 1
+      ? (vi ? `1 là tốc độ nhỏ nhất có thể và chỉ cần ${view.totalHours} giờ` : `1 is the smallest possible speed and needs only ${view.totalHours} hours`)
+      : `${view.answer}: ${view.totalHours}h ≤ ${view.h}h · ${view.answer - 1}: ${view.slowerHours}h > ${view.h}h`;
+    actionHtml = `<div class="koko-action result"><small>${vi ? "CHỨNG MINH NHỎ NHẤT" : "MINIMUM PROOF"}</small><strong>return ${view.answer}</strong><span>${proof}</span></div>`;
+  }
+
+  const testedHtml = (view.tested || []).length
+    ? `<div class="koko-tested"><small>${vi ? "ĐÃ THỬ" : "TESTED"}</small>${view.tested.map((item) => `<span class="${item.feasible ? "works" : "slow"}">k=${item.speed} → ${item.hours}h ${item.feasible ? "✓" : "✕"}</span>`).join("")}</div>`
+    : "";
+
+  el.innerHTML = `<div class="koko-speed-viz">
+    <div class="koko-phases">${phases}</div>
+    <div class="koko-summary">
+      <span><small>${vi ? "GIỚI HẠN" : "TIME LIMIT"}</small><strong>${view.h}h</strong></span>
+      <span><small>${vi ? "KHOẢNG TỐC ĐỘ" : "SPEED RANGE"}</small><strong>${activeRange}</strong></span>
+      <span><small>${vi ? "TỔNG GIỜ" : "TOTAL TIME"}</small><strong>${statusValue}</strong></span>
+    </div>
+    <div class="koko-speed-line" role="img" aria-label="${escapeHtml(vi ? `Khoảng tốc độ đang tìm ${activeRange}` : `Active speed range ${activeRange}`)}">${speedCells}</div>
+    <div class="koko-speed-legend"><span><i class="slow"></i>${vi ? "quá chậm / đã loại" : "too slow / removed"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active range"}</span><span><i class="works"></i>${vi ? "đủ nhanh" : "fast enough"}</span></div>
+    <div class="koko-piles"><div class="koko-piles-title"><strong>${vi ? "Mỗi đống mất bao nhiêu giờ?" : "How many hours does each pile take?"}</strong><span>${Number.isInteger(chosenSpeed) ? `speed = ${chosenSpeed} 🍌/h` : "speed = ?"}</span></div>${pileRows}</div>
+    ${hourEquation}
+    ${actionHtml}
+    ${testedHtml}
+  </div>`;
+}
+
 function renderSqrtBinaryView(step) {
   const view = step.sqrtBinaryView;
   const el = $("treeView");
@@ -6248,6 +6370,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.kokoSpeedView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderKokoSpeedView(step);
   } else if (step.sqrtBinaryView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
