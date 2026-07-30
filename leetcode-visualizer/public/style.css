@@ -1563,6 +1563,263 @@ button:disabled {
   text-align: center;
 }
 
+/* ---- LeetCode 84: Largest Rectangle in Histogram ---- */
+.histogram-rect-viz {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: #e2e8f0;
+  text-align: left;
+}
+
+.hist-phases {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hist-phases span {
+  min-width: 0;
+  padding: 7px 6px;
+  border-bottom: 3px solid #334155;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.hist-phases span.active { border-color: #f59e0b; color: #fbbf24; }
+.hist-phases span.done { border-color: #10b981; color: #6ee7b7; }
+
+.hist-best-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hist-best-summary > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.hist-best-summary small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.hist-best-summary strong { color: #f8fafc; font-size: 16px; }
+.hist-chart { display: grid; gap: 7px; min-width: 0; }
+
+.histogram-rect-svg {
+  display: block;
+  width: 100%;
+  max-height: 390px;
+  overflow: visible;
+}
+
+.hist-baseline { stroke: #64748b; stroke-width: 2; }
+.hist-bar rect { fill: #334155; stroke: #64748b; stroke-width: 2; }
+.hist-bar.in-stack rect { fill: rgba(99, 102, 241, 0.28); stroke: #818cf8; stroke-width: 3; }
+.hist-bar.current rect { fill: rgba(245, 158, 11, 0.26); stroke: #f59e0b; stroke-width: 4; }
+.hist-bar.popped rect { fill: rgba(239, 68, 68, 0.2); stroke: #f87171; stroke-width: 4; }
+.hist-bar.candidate-span rect { stroke: #f59e0b; }
+.hist-bar.best-span rect { fill: rgba(16, 185, 129, 0.2); }
+.hist-bar.sentinel rect { fill: rgba(148, 163, 184, 0.08); stroke: #94a3b8; stroke-dasharray: 5 4; }
+
+.hist-height,
+.hist-index,
+.hist-stack-mark,
+.hist-current-label,
+.hist-width-label {
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.hist-height { fill: #f8fafc; font-size: 16px; font-weight: 900; }
+.hist-index { fill: #94a3b8; font-size: 12px; font-weight: 750; }
+.hist-stack-mark { fill: #a5b4fc; font-size: 10px; font-weight: 850; letter-spacing: 0.04em; }
+.hist-current-pointer { fill: #f59e0b; }
+.hist-current-label { fill: #fbbf24; font-size: 14px; font-weight: 900; }
+
+.hist-best-rect {
+  fill: rgba(16, 185, 129, 0.1);
+  stroke: #10b981;
+  stroke-width: 3;
+  stroke-dasharray: 7 5;
+}
+
+.hist-candidate-rect {
+  fill: rgba(245, 158, 11, 0.13);
+  stroke: #f59e0b;
+  stroke-width: 4;
+}
+
+.hist-final-rect {
+  fill: rgba(16, 185, 129, 0.16);
+  stroke: #10b981;
+  stroke-width: 4;
+}
+
+.hist-width-line,
+.hist-width-tick { stroke: #f59e0b; stroke-width: 2.5; }
+.hist-width-label { fill: #fbbf24; font-size: 13px; font-weight: 850; }
+
+.hist-legend {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.hist-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.hist-legend i { width: 12px; height: 12px; border: 2px solid #64748b; border-radius: 3px; }
+.hist-legend i.current { border-color: #f59e0b; background: rgba(245, 158, 11, 0.22); }
+.hist-legend i.stack { border-color: #818cf8; background: rgba(99, 102, 241, 0.22); }
+.hist-legend i.candidate { border-color: #f59e0b; }
+.hist-legend i.best { border-color: #10b981; background: rgba(16, 185, 129, 0.16); }
+.hist-legend i.sentinel { border-color: #94a3b8; border-style: dashed; }
+
+.hist-detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(230px, 0.8fr);
+  align-items: stretch;
+  gap: 11px;
+}
+
+.hist-stack-lane {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #334155;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.hist-stack-lane > strong {
+  color: #cbd5e1;
+  font-size: 11px;
+  letter-spacing: 0.045em;
+}
+
+.hist-stack-lane > strong small { color: #94a3b8; font-size: 10px; font-weight: 700; }
+.hist-stack-lane > div { display: flex; align-items: center; gap: 6px; min-height: 51px; flex-wrap: wrap; }
+.hist-stack-lane > div > i { color: #64748b; font-size: 16px; font-style: normal; }
+
+.hist-stack-lane > div > span {
+  display: grid;
+  gap: 2px;
+  min-width: 75px;
+  padding: 6px 8px;
+  border: 2px solid #6366f1;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.hist-stack-lane > div > span.top {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.hist-stack-lane span small { color: #a5b4fc; font-size: 9px; font-weight: 850; }
+.hist-stack-lane span.top small { color: #fbbf24; }
+.hist-stack-lane span strong { color: #f8fafc; font-size: 12px; }
+.hist-stack-lane span em { color: #94a3b8; font-size: 10px; font-style: normal; }
+.hist-stack-empty { color: #64748b; font-size: 12px; font-style: normal; }
+
+.hist-action {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 13px;
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.hist-action small { color: #7dd3fc; font-size: 10px; font-weight: 850; letter-spacing: 0.06em; }
+.hist-action strong { color: #f8fafc; font-size: 17px; overflow-wrap: anywhere; }
+.hist-action b { color: #fbbf24; font-size: 13px; overflow-wrap: anywhere; }
+.hist-action span { color: #cbd5e1; font-size: 12px; }
+.hist-action.sentinel { border-color: #94a3b8; background: rgba(148, 163, 184, 0.08); }
+.hist-action.sentinel small { color: #cbd5e1; }
+.hist-action.compare.yes,
+.hist-action.pop { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+.hist-action.compare.yes small,
+.hist-action.pop small { color: #fca5a5; }
+.hist-action.compare.no,
+.hist-action.push { border-color: #6366f1; background: rgba(99, 102, 241, 0.08); }
+.hist-action.compare.no small,
+.hist-action.push small { color: #a5b4fc; }
+.hist-action.width,
+.hist-action.area { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.hist-action.width small,
+.hist-action.area small { color: #fbbf24; }
+.hist-action.area.improved,
+.hist-action.result { border-color: #10b981; background: rgba(16, 185, 129, 0.09); }
+.hist-action.area.improved small,
+.hist-action.result small { color: #6ee7b7; }
+
+[data-theme="light"] .histogram-rect-viz { color: #1e293b; }
+[data-theme="light"] .hist-phases span { border-color: #cbd5e1; color: #64748b; }
+[data-theme="light"] .hist-phases span.active { border-color: #d97706; color: #92400e; }
+[data-theme="light"] .hist-phases span.done { border-color: #059669; color: #047857; }
+[data-theme="light"] .hist-best-summary > span,
+[data-theme="light"] .hist-stack-lane { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .hist-best-summary strong,
+[data-theme="light"] .hist-stack-lane span strong,
+[data-theme="light"] .hist-action strong { color: #0f172a; }
+[data-theme="light"] .hist-baseline { stroke: #64748b; }
+[data-theme="light"] .hist-bar rect { fill: #e2e8f0; stroke: #64748b; }
+[data-theme="light"] .hist-bar.in-stack rect { fill: #e0e7ff; stroke: #6366f1; }
+[data-theme="light"] .hist-bar.current rect { fill: #fef3c7; stroke: #d97706; }
+[data-theme="light"] .hist-bar.popped rect { fill: #fee2e2; stroke: #dc2626; }
+[data-theme="light"] .hist-bar.best-span rect { fill: #d1fae5; }
+[data-theme="light"] .hist-bar.sentinel rect { fill: #f8fafc; stroke: #64748b; }
+[data-theme="light"] .hist-height { fill: #0f172a; }
+[data-theme="light"] .hist-index { fill: #475569; }
+[data-theme="light"] .hist-stack-mark { fill: #4338ca; }
+[data-theme="light"] .hist-current-label,
+[data-theme="light"] .hist-width-label { fill: #92400e; }
+[data-theme="light"] .hist-current-pointer { fill: #d97706; }
+[data-theme="light"] .hist-best-rect,
+[data-theme="light"] .hist-final-rect { stroke: #059669; }
+[data-theme="light"] .hist-candidate-rect,
+[data-theme="light"] .hist-width-line,
+[data-theme="light"] .hist-width-tick { stroke: #d97706; }
+[data-theme="light"] .hist-stack-lane > div > span { background: #eef2ff; border-color: #6366f1; }
+[data-theme="light"] .hist-stack-lane > div > span.top { background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .hist-action { background: #f0f9ff; }
+[data-theme="light"] .hist-action.sentinel { background: #f8fafc; }
+[data-theme="light"] .hist-action.compare.yes,
+[data-theme="light"] .hist-action.pop { background: #fef2f2; }
+[data-theme="light"] .hist-action.compare.no,
+[data-theme="light"] .hist-action.push { background: #eef2ff; }
+[data-theme="light"] .hist-action.width,
+[data-theme="light"] .hist-action.area { background: #fffbeb; }
+[data-theme="light"] .hist-action.area.improved,
+[data-theme="light"] .hist-action.result { background: #ecfdf5; }
+[data-theme="light"] .hist-action span { color: #475569; }
+
+@media (max-width: 700px) {
+  .hist-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hist-best-summary { grid-template-columns: 1fr; }
+  .hist-detail-row { grid-template-columns: 1fr; }
+  .histogram-rect-svg { max-height: 350px; }
+}
+
 /* ---- Stack visualization ---- */
 .stack-viz {
   min-height: 260px;

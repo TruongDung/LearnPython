@@ -1492,193 +1492,298 @@ function buildSteps1464(nums) {
  * rectangle that fits entirely within the histogram.
  *
  * Monotonic increasing stack of INDICES: as we scan left to right, whenever
- * the current bar is shorter than the bar at the top of the stack, that top
- * bar can never extend further right (it's "blocked" by the current shorter
- * bar), so we POP it and compute the rectangle it forms — its height times
- * the width between the new stack top (exclusive) and the current index
- * (exclusive). A sentinel height of 0 appended at the end forces every
- * remaining bar in the stack to be popped and evaluated.
+ * the current bar is shorter than or equal to the bar at the stack top, we
+ * POP that index and compute its rectangle. A shorter current bar supplies
+ * the first blocking boundary on the right; an equal bar replaces an older
+ * duplicate so the new index can represent the same height farther right.
+ * A sentinel height of 0 appended at the end forces every remaining bar in
+ * the stack to be popped and evaluated.
  */
-function buildSteps84(heights) {
-  const steps = [];
+function buildSteps84(inputHeights) {
+  const heights = [...inputHeights];
   const n = heights.length;
-  const bars = [...heights, 0]; // sentinel to flush the stack at the end
-  const stack = []; // indices into `bars`, heights strictly increasing
+  const bars = [...heights, 0];
+  const sentinelIndex = n;
+  const stack = [];
+  const steps = [];
   let maxArea = 0;
-  let bestLeft = -1, bestRight = -1, bestHeight = 0;
+  let bestRect = null;
 
   function stackLabel() {
-    return `[${stack.map((idx) => `${idx}:${bars[idx]}`).join(", ")}]`;
+    return `[${stack.map((index) => `${index}:${bars[index]}`).join(", ")}]`;
   }
 
-  function snap(opts) {
+  function addStep({
+    event,
+    phase,
+    title,
+    codeLines,
+    note,
+    currentIndex = null,
+    poppedIndex = null,
+    leftBoundary = null,
+    rightBoundary = null,
+    width = null,
+    candidateHeight = null,
+    candidateArea = null,
+    previousMax = null,
+    whileResult = null,
+    improved = null,
+    vars = [],
+    final = false,
+  }) {
+    const highlight = new Set();
+    if (Number.isInteger(currentIndex) && currentIndex < n) highlight.add(currentIndex);
+    if (Number.isInteger(poppedIndex) && poppedIndex < n) highlight.add(poppedIndex);
+    if (Number.isInteger(leftBoundary) && Number.isInteger(rightBoundary)) {
+      for (let index = leftBoundary; index <= rightBoundary && index < n; index++) highlight.add(index);
+    }
+    const bestIndices = bestRect
+      ? Array.from({ length: bestRect.right - bestRect.left + 1 }, (_, offset) => bestRect.left + offset)
+      : [];
+
     steps.push({
-      title: opts.title,
-      arr: heights,
-      sub: heights.map((_, i) => `[${i}]`),
-      highlight: opts.highlight || [],
-      mark: opts.mark || [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      stackView: {
-        title: "Monotonic stack (indices, increasing height)",
-        emptyLabel: "empty stack",
-        items: stack.map((idx) => ({ value: String(idx), detail: `height=${bars[idx]}` })),
-        input: bars.map((h) => String(h)),
-        inputLabel: "bars (heights + sentinel 0)",
-        current: opts.current,
-        status: [
-          { label: "i", value: opts.i !== undefined ? opts.i : "-" },
-          { label: "bars[i]", value: opts.i !== undefined ? bars[opts.i] : "-" },
-          { label: "stack", value: stackLabel() },
-          { label: "maxArea", value: maxArea },
-        ],
-      },
+      title,
+      arr: [...heights],
+      sub: heights.map((_, index) => `[${index}]`),
+      highlight: [...highlight],
+      mark: final ? bestIndices : [],
+      final,
+      codeLines,
       vars: [
         { name: "stack", value: stackLabel() },
-        { name: "maxArea", value: maxArea },
-        ...(opts.vars || []),
+        { name: "max_area", value: maxArea },
+        ...vars,
       ],
-      note: opts.note,
+      note,
+      histogramRectangleView: {
+        event,
+        phase,
+        heights: [...heights],
+        bars: [...bars],
+        originalLength: n,
+        sentinelIndex,
+        stack: [...stack],
+        currentIndex,
+        currentHeight: Number.isInteger(currentIndex) ? bars[currentIndex] : null,
+        poppedIndex,
+        leftBoundary,
+        rightBoundary,
+        width,
+        candidateHeight,
+        candidateArea,
+        previousMax,
+        whileResult,
+        improved,
+        maxArea,
+        bestRect: bestRect ? { ...bestRect } : null,
+      },
     });
   }
 
-  // Line 3: stack = []
-  snap({
-    title: { vi: "stack = []", en: "stack = []" },
+  addStep({
+    event: "init-stack",
+    phase: "setup",
+    title: { vi: "Khởi tạo stack rỗng", en: "Initialize an empty stack" },
     codeLines: [3],
-    vars: [{ name: "heights", value: `[${heights.join(",")}]` }],
+    vars: [{ name: "heights", value: `[${heights.join(", ")}]` }],
     note: {
-      vi: `heights=[${heights.join(",")}]. stack lưu INDEX của các cột theo thứ tự CHIỀU CAO TĂNG DẦN. Thêm cột "lính canh" cao 0 vào cuối để đảm bảo mọi cột trong stack đều được xử lý.`,
-      en: `heights=[${heights.join(",")}]. stack holds bar INDICES in strictly INCREASING height order. A sentinel bar of height 0 is appended at the end to flush every remaining bar in the stack.`,
+      vi: "stack lưu INDEX của các cột chưa tìm được biên phải. Chiều cao tại các index trong stack luôn tăng nghiêm ngặt từ đáy lên đỉnh.",
+      en: "stack stores INDICES whose right boundary is still unknown. Their heights are strictly increasing from bottom to top.",
     },
   });
 
-  // Line 4: max_area = 0
-  snap({
+  addStep({
+    event: "init-max",
+    phase: "setup",
     title: { vi: "max_area = 0", en: "max_area = 0" },
     codeLines: [4],
     note: {
-      vi: "max_area sẽ giữ diện tích hình chữ nhật lớn nhất tìm được.",
-      en: "max_area will hold the largest rectangle area found so far.",
+      vi: "Chưa tính hình chữ nhật nào nên diện tích lớn nhất ban đầu bằng 0.",
+      en: "No rectangle has been evaluated yet, so the initial maximum is 0.",
+    },
+  });
+
+  addStep({
+    event: "add-sentinel",
+    phase: "setup",
+    title: { vi: `bars = heights + [0] → thêm sentinel tại index ${sentinelIndex}`, en: `bars = heights + [0] → append sentinel at index ${sentinelIndex}` },
+    codeLines: [5],
+    currentIndex: sentinelIndex,
+    vars: [{ name: "bars", value: `[${bars.join(", ")}]` }],
+    note: {
+      vi: "Sentinel cao 0 buộc mọi cột còn lại bị pop ở cuối. Nó chỉ hỗ trợ thuật toán, không phải cột thật của histogram.",
+      en: "The height-0 sentinel forces every remaining bar to be popped at the end. It is not a real histogram bar.",
     },
   });
 
   for (let i = 0; i < bars.length; i++) {
-    // Line 5: for i in range(len(bars)):
-    snap({
-      title: { vi: `for i in range(len(bars)) → i=${i}`, en: `for i in range(len(bars)) → i=${i}` },
-      i, current: i < n ? i : undefined,
-      highlight: i < n ? [i] : [],
-      codeLines: [5],
+    addStep({
+      event: "scan",
+      phase: "scan",
+      title: i === sentinelIndex
+        ? { vi: `Duyệt sentinel i=${i}, height=0`, en: `Scan sentinel i=${i}, height=0` }
+        : { vi: `Duyệt cột i=${i}, height=${bars[i]}`, en: `Scan bar i=${i}, height=${bars[i]}` },
+      codeLines: [6],
+      currentIndex: i,
       vars: [{ name: "i", value: i }, { name: "bars[i]", value: bars[i] }],
-      note: {
-        vi: i < n ? `Xét cột i=${i}, chiều cao = ${bars[i]}.` : `i=${i} là cột LÍNH CANH (height=0) — sẽ buộc mọi cột còn lại trong stack bị pop.`,
-        en: i < n ? `Consider bar i=${i}, height = ${bars[i]}.` : `i=${i} is the SENTINEL bar (height=0) — will force every remaining stack bar to be popped.`,
-      },
+      note: i === sentinelIndex
+        ? { vi: "Đã đến sentinel: điều kiện while sẽ lần lượt xả các index còn lại trong stack.", en: "The scan reached the sentinel, so the while loop will flush the remaining stack indices." }
+        : { vi: `Bắt đầu xử lý cột ${i}; trước tiên so chiều cao ${bars[i]} với đỉnh stack.`, en: `Start processing bar ${i}; first compare height ${bars[i]} with the stack top.` },
     });
 
     while (true) {
-      const topIdx = stack.length ? stack[stack.length - 1] : -1;
-      const shouldPop = stack.length > 0 && bars[topIdx] >= bars[i];
+      const topIndex = stack.length ? stack[stack.length - 1] : null;
+      const shouldPop = topIndex !== null && bars[topIndex] >= bars[i];
+      const equalHeight = shouldPop && bars[topIndex] === bars[i];
 
-      // Line 6: while stack and bars[stack[-1]] >= bars[i]:
-      snap({
-        title: { vi: `while stack and bars[stack[-1]] >= bars[i] → ${shouldPop}`, en: `while stack and bars[stack[-1]] >= bars[i] → ${shouldPop}` },
-        i, current: i < n ? i : undefined,
-        highlight: [...(i < n ? [i] : []), ...(topIdx >= 0 && topIdx < n ? [topIdx] : [])],
-        codeLines: [6],
-        vars: topIdx >= 0 ? [{ name: "stack top", value: `${topIdx}:${bars[topIdx]}` }] : [],
+      addStep({
+        event: "while-check",
+        phase: "stack",
+        title: { vi: `Kiểm tra while → ${shouldPop}`, en: `Evaluate while → ${shouldPop}` },
+        codeLines: [7],
+        currentIndex: i,
+        poppedIndex: topIndex,
+        whileResult: shouldPop,
+        vars: topIndex === null
+          ? [{ name: "condition", value: false }]
+          : [
+              { name: "stack[-1]", value: topIndex },
+              { name: `bars[${topIndex}] >= bars[${i}]`, value: `${bars[topIndex]} >= ${bars[i]} → ${shouldPop}` },
+            ],
         note: shouldPop
-          ? { vi: `bars[top]=${bars[topIdx]} ≥ bars[i]=${bars[i]} → cột top KHÔNG THỂ mở rộng qua phải nữa (bị chặn bởi cột thấp hơn tại i) → sẽ pop.`, en: `bars[top]=${bars[topIdx]} ≥ bars[i]=${bars[i]} → the top bar CANNOT extend further right (blocked by the shorter bar at i) → will pop.` }
-          : { vi: stack.length === 0 ? "Stack rỗng → không pop, đẩy i vào stack." : `bars[top]=${bars[topIdx]} < bars[i]=${bars[i]} → cột top vẫn có thể mở rộng qua phải → dừng pop, đẩy i vào stack.`, en: stack.length === 0 ? "Stack is empty → no pop, push i." : `bars[top]=${bars[topIdx]} < bars[i]=${bars[i]} → the top bar can still extend right → stop popping, push i.` },
+          ? equalHeight
+            ? { vi: `Hai cột cùng cao ${bars[i]}. Pop index ${topIndex} để index ${i} mới đại diện cùng chiều cao nhưng có thể mở rộng xa hơn.`, en: `Both bars have height ${bars[i]}. Pop index ${topIndex} so the newer index ${i} represents that height and can extend farther.` }
+            : { vi: `Cột hiện tại thấp hơn đỉnh stack (${bars[i]} < ${bars[topIndex]}), nên i=${i} là biên phải đầu tiên chặn cột ${topIndex}.`, en: `The current bar is shorter than the top (${bars[i]} < ${bars[topIndex]}), so i=${i} is the first right boundary blocking bar ${topIndex}.` }
+          : topIndex === null
+            ? { vi: "Stack rỗng nên điều kiện while sai; chuyển sang push i.", en: "The stack is empty, so the while condition is false; proceed to push i." }
+            : { vi: `${bars[topIndex]} < ${bars[i]} nên chiều cao vẫn tăng; không pop.`, en: `${bars[topIndex]} < ${bars[i]}, so heights remain increasing; do not pop.` },
       });
 
       if (!shouldPop) break;
 
-      // Line 7: top = stack.pop()
       const top = stack.pop();
-      snap({
-        title: { vi: `top = stack.pop() → top=${top} (height=${bars[top]})`, en: `top = stack.pop() → top=${top} (height=${bars[top]})` },
-        i, current: i < n ? i : undefined,
-        highlight: [top, ...(i < n ? [i] : [])],
-        codeLines: [7],
-        vars: [{ name: "top", value: top }, { name: "height[top]", value: bars[top] }],
+      addStep({
+        event: "pop",
+        phase: "stack",
+        title: { vi: `top = stack.pop() → ${top}`, en: `top = stack.pop() → ${top}` },
+        codeLines: [8],
+        currentIndex: i,
+        poppedIndex: top,
+        candidateHeight: bars[top],
+        vars: [{ name: "top", value: top }, { name: "bars[top]", value: bars[top] }],
         note: {
-          vi: `Lấy cột top=${top} (cao ${bars[top]}) ra khỏi stack để tính hình chữ nhật mà nó làm chiều cao.`,
-          en: `Pop bar top=${top} (height ${bars[top]}) to compute the rectangle where it serves as the height.`,
+          vi: `Pop index ${top}. Cột cao ${bars[top]} đã tìm được biên phải độc quyền là i=${i}; tiếp theo tìm biên trái từ đỉnh stack mới.`,
+          en: `Pop index ${top}. Height ${bars[top]} now has exclusive right boundary i=${i}; next derive its left boundary from the new stack top.`,
         },
       });
 
-      // Line 8: width = i - stack[-1] - 1 if stack else i
-      const newTop = stack.length ? stack[stack.length - 1] : -1;
-      const width = stack.length ? i - newTop - 1 : i;
-      snap({
-        title: { vi: `width = i-stack[-1]-1 if stack else i → ${width}`, en: `width = i-stack[-1]-1 if stack else i → ${width}` },
-        i, current: i < n ? i : undefined,
-        highlight: [top, ...(i < n ? [i] : []), ...(newTop >= 0 ? [newTop] : [])],
-        codeLines: [8],
-        vars: [{ name: "new stack top", value: newTop >= 0 ? `${newTop}:${bars[newTop]}` : "empty" }, { name: "width", value: width }],
-        note: stack.length
-          ? { vi: `Còn cột newTop=${newTop} trong stack (cao ${bars[newTop]} < ${bars[top]}) → chiều rộng = i - newTop - 1 = ${i} - ${newTop} - 1 = ${width} (khoảng giữa 2 cột, không tính chính chúng).`, en: `Bar newTop=${newTop} remains in the stack (height ${bars[newTop]} < ${bars[top]}) → width = i - newTop - 1 = ${i} - ${newTop} - 1 = ${width} (the gap between the two bars, excluding them).` }
-          : { vi: `Stack rỗng sau khi pop → cột top=${top} là cột THẤP NHẤT tính từ đầu mảng tới i, nên chiều rộng = i = ${width}.`, en: `Stack is empty after popping → bar top=${top} is the SHORTEST bar from the start of the array up to i, so width = i = ${width}.` },
+      const newTop = stack.length ? stack[stack.length - 1] : null;
+      const leftBoundary = newTop === null ? 0 : newTop + 1;
+      const rightBoundary = i - 1;
+      const width = i - (newTop === null ? -1 : newTop) - 1;
+      addStep({
+        event: "width",
+        phase: "area",
+        title: { vi: `Khoảng hợp lệ [${leftBoundary}..${rightBoundary}] → width=${width}`, en: `Valid span [${leftBoundary}..${rightBoundary}] → width=${width}` },
+        codeLines: [9],
+        currentIndex: i,
+        poppedIndex: top,
+        leftBoundary,
+        rightBoundary,
+        width,
+        candidateHeight: bars[top],
+        vars: [
+          { name: "new stack top", value: newTop === null ? "empty" : `${newTop}:${bars[newTop]}` },
+          { name: "left", value: leftBoundary },
+          { name: "right", value: rightBoundary },
+          { name: "width", value: width },
+        ],
+        note: newTop === null
+          ? { vi: `Stack rỗng sau pop nên không có cột thấp hơn bên trái: width = i = ${i}.`, en: `The stack is empty after the pop, so no shorter bar exists on the left: width = i = ${i}.` }
+          : { vi: `Đỉnh stack mới ${newTop} là cột thấp hơn gần nhất bên trái; không lấy hai biên nên width = ${i} - ${newTop} - 1 = ${width}.`, en: `New stack top ${newTop} is the nearest shorter bar on the left; exclude both boundaries: width = ${i} - ${newTop} - 1 = ${width}.` },
       });
 
-      // Line 9: max_area = max(max_area, height[top] * width)
-      const area = bars[top] * width;
-      const oldMax = maxArea;
-      const improves = area > maxArea;
-      if (improves) { maxArea = area; bestHeight = bars[top]; bestRight = i; bestLeft = newTop; }
-      snap({
-        title: { vi: `max_area = max(max_area, height[top]*width) = max(${oldMax}, ${bars[top]}×${width}=${area}) → ${maxArea}`, en: `max_area = max(max_area, height[top]*width) = max(${oldMax}, ${bars[top]}×${width}=${area}) → ${maxArea}` },
-        i, current: i < n ? i : undefined,
-        highlight: [top, ...(i < n ? [i] : [])],
-        codeLines: [9],
-        vars: [{ name: "area", value: `${bars[top]}×${width} = ${area}` }, { name: "max_area", value: maxArea }],
-        note: improves
-          ? { vi: `Diện tích ${bars[top]}×${width}=${area} LỚN HƠN max_area cũ (${oldMax}) → cập nhật max_area=${maxArea}.`, en: `Area ${bars[top]}×${width}=${area} is LARGER than the old max_area (${oldMax}) → update max_area=${maxArea}.` }
-          : { vi: `Diện tích ${bars[top]}×${width}=${area} không lớn hơn max_area=${oldMax} → giữ nguyên.`, en: `Area ${bars[top]}×${width}=${area} isn't larger than max_area=${oldMax} → unchanged.` },
+      const candidateArea = bars[top] * width;
+      const previousMax = maxArea;
+      const improved = candidateArea > maxArea;
+      if (improved) {
+        maxArea = candidateArea;
+        bestRect = {
+          left: leftBoundary,
+          right: rightBoundary,
+          height: bars[top],
+          width,
+          area: candidateArea,
+        };
+      }
+      addStep({
+        event: "area",
+        phase: "area",
+        title: { vi: `area = ${bars[top]} × ${width} = ${candidateArea}; max_area = ${maxArea}`, en: `area = ${bars[top]} × ${width} = ${candidateArea}; max_area = ${maxArea}` },
+        codeLines: [10],
+        currentIndex: i,
+        poppedIndex: top,
+        leftBoundary,
+        rightBoundary,
+        width,
+        candidateHeight: bars[top],
+        candidateArea,
+        previousMax,
+        improved,
+        vars: [
+          { name: "height", value: bars[top] },
+          { name: "width", value: width },
+          { name: "area", value: candidateArea },
+        ],
+        note: improved
+          ? { vi: `${candidateArea} > ${previousMax}, cập nhật hình tốt nhất thành [${leftBoundary}..${rightBoundary}], height=${bars[top]}, area=${candidateArea}.`, en: `${candidateArea} > ${previousMax}, so the best rectangle becomes [${leftBoundary}..${rightBoundary}], height=${bars[top]}, area=${candidateArea}.` }
+          : { vi: `${candidateArea} ≤ ${previousMax}, giữ nguyên max_area=${maxArea}.`, en: `${candidateArea} ≤ ${previousMax}, so max_area remains ${maxArea}.` },
       });
     }
 
-    // Line 10: stack.append(i)
     stack.push(i);
-    snap({
-      title: { vi: `stack.append(i) → stack=${stackLabel()}`, en: `stack.append(i) → stack=${stackLabel()}` },
-      i, current: i < n ? i : undefined,
-      highlight: i < n ? [i] : [],
-      codeLines: [10],
-      note: i < n
-        ? { vi: `Đẩy i=${i} vào stack. Vì mọi cột cao hơn hoặc bằng đã bị pop ở trên, stack luôn giữ thứ tự chiều cao TĂNG DẦN.`, en: `Push i=${i} onto the stack. Since every taller-or-equal bar was popped above, the stack always stays in INCREASING height order.` }
-        : { vi: `Đẩy cột lính canh (i=${i}) vào stack — vô hại vì vòng lặp kết thúc ngay sau bước này.`, en: `Push the sentinel bar (i=${i}) onto the stack — harmless since the loop ends right after this step.` },
+    addStep({
+      event: "push",
+      phase: "stack",
+      title: { vi: `stack.append(${i}) → ${stackLabel()}`, en: `stack.append(${i}) → ${stackLabel()}` },
+      codeLines: [11],
+      currentIndex: i,
+      vars: [{ name: "i", value: i }],
+      note: i === sentinelIndex
+        ? { vi: `Đẩy sentinel index ${i}; đây là trạng thái stack thật khi vòng for kết thúc.`, en: `Push sentinel index ${i}; this is the real stack state when the for loop ends.` }
+        : { vi: `Đẩy index ${i}. Từ đáy tới đỉnh, các chiều cao trong stack tiếp tục tăng nghiêm ngặt.`, en: `Push index ${i}. Heights in the stack remain strictly increasing from bottom to top.` },
     });
   }
 
-  const fs = {
+  addStep({
+    event: "done",
+    phase: "done",
     title: { vi: `return max_area → ${maxArea}`, en: `return max_area → ${maxArea}` },
-    arr: heights,
-    sub: heights.map((_, i) => `[${i}]`),
-    highlight: bestLeft >= 0 || bestRight >= 0 ? Array.from({ length: (bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0) }, (_, k) => (bestLeft >= 0 ? bestLeft + 1 : 0) + k) : [],
-    mark: [],
+    codeLines: [12],
     final: true,
-    codeLines: [11],
-    stackView: {
-      title: "Monotonic stack (indices, increasing height)",
-      emptyLabel: "empty stack",
-      items: [],
-      input: bars.map((h) => String(h)),
-      inputLabel: "bars (heights + sentinel 0)",
-      status: [{ label: "maxArea", value: maxArea }],
-    },
-    vars: [{ name: "answer", value: maxArea }, { name: "best height", value: bestHeight }, { name: "best width", value: (bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0) }],
-    note: {
-      vi: `Diện tích hình chữ nhật lớn nhất = ${maxArea}${bestHeight ? ` (chiều cao ${bestHeight}, chiều rộng ${(bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0)}).` : "."}`,
-      en: `The largest rectangle area = ${maxArea}${bestHeight ? ` (height ${bestHeight}, width ${(bestRight >= 0 ? bestRight : n) - (bestLeft >= 0 ? bestLeft + 1 : 0)}).` : "."}`,
-    },
-  };
-  steps.push(fs);
+    leftBoundary: bestRect?.left ?? null,
+    rightBoundary: bestRect?.right ?? null,
+    width: bestRect?.width ?? null,
+    candidateHeight: bestRect?.height ?? null,
+    candidateArea: bestRect?.area ?? null,
+    vars: bestRect
+      ? [
+          { name: "best range", value: `[${bestRect.left}, ${bestRect.right}]` },
+          { name: "best height", value: bestRect.height },
+          { name: "best width", value: bestRect.width },
+          { name: "answer", value: maxArea },
+        ]
+      : [{ name: "answer", value: 0 }],
+    note: bestRect
+      ? {
+          vi: `Hình chữ nhật lớn nhất phủ các cột ${bestRect.left}..${bestRect.right}, cao ${bestRect.height}, rộng ${bestRect.width}, diện tích ${bestRect.area}.`,
+          en: `The largest rectangle spans bars ${bestRect.left}..${bestRect.right}, with height ${bestRect.height}, width ${bestRect.width}, and area ${bestRect.area}.`,
+        }
+      : { vi: "Histogram rỗng hoặc toàn cột cao 0 nên kết quả bằng 0.", en: "The histogram is empty or all bars have height 0, so the answer is 0." },
+  });
 
-  return { original: heights, answer: maxArea, steps };
+  return { original: [...heights], answer: maxArea, steps };
 }
 
 /**
@@ -3024,7 +3129,7 @@ module.exports = {
     extraParams: [],
     approach: [
       { vi: "Dùng stack lưu INDEX theo thứ tự CHIỀU CAO TĂNG DẦN. Thêm cột lính canh cao 0 vào cuối để buộc xả hết stack.", en: "Use a stack of INDICES in strictly INCREASING height order. Append a sentinel bar of height 0 to force-flush the stack at the end." },
-      { vi: "Khi cột hiện tại THẤP HƠN đỉnh stack → đỉnh không thể mở rộng qua phải → pop và tính diện tích (chiều cao = cột vừa pop, chiều rộng = khoảng giữa 2 cột lân cận trong stack).", en: "When the current bar is SHORTER than the stack top → the top can't extend right anymore → pop it and compute its area (height = popped bar, width = the gap between its neighboring bars in the stack)." },
+      { vi: "Khi cột hiện tại THẤP HƠN HOẶC BẰNG đỉnh stack → pop. Nếu thấp hơn, current là biên chặn bên phải; nếu bằng nhau, current thay index cũ để đại diện cùng chiều cao xa hơn về bên phải.", en: "When the current bar is LOWER THAN OR EQUAL TO the stack top → pop. A lower bar is the right blocker; an equal bar replaces the older index so the same height can be represented farther right." },
       { vi: "Sau khi pop hết cột cao hơn/bằng, đẩy cột hiện tại vào stack.", en: "After popping every taller-or-equal bar, push the current bar's index onto the stack." },
     ],
     complexity: {

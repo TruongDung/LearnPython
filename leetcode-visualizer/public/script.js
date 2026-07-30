@@ -3051,6 +3051,160 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderHistogramRectangleView(step) {
+  const view = step.histogramRectangleView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const bars = view.bars || [];
+  const n = view.originalLength || 0;
+  const phaseIndex = { setup: 0, scan: 0, stack: 1, area: 2, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Đọc cột i", "2 · Pop khi top ≥ current", "3 · Tính width × height", "4 · Cập nhật max_area"]
+    : ["1 · Read bar i", "2 · Pop while top ≥ current", "3 · Compute width × height", "4 · Update max_area"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    const icon = state === "done" ? "✓" : state === "active" ? "▶" : "○";
+    return `<span class="${state}">${icon} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const graphWidth = Math.max(620, bars.length * 82 + 90);
+  const graphHeight = 330;
+  const plotLeft = 55;
+  const plotRight = graphWidth - 35;
+  const baseline = 245;
+  const plotHeight = 165;
+  const cellWidth = (plotRight - plotLeft) / Math.max(1, bars.length);
+  const barWidth = Math.min(58, cellWidth * 0.68);
+  const maxHeight = Math.max(1, ...bars);
+  const stackSet = new Set(view.stack || []);
+  const best = view.bestRect;
+  const hasCandidate = Number.isInteger(view.leftBoundary)
+    && Number.isInteger(view.rightBoundary)
+    && view.rightBoundary >= view.leftBoundary
+    && Number.isFinite(view.candidateHeight);
+
+  function centerX(index) {
+    return plotLeft + (index + 0.5) * cellWidth;
+  }
+
+  function rectForRange(left, right, height) {
+    const x = centerX(left) - cellWidth / 2 + 4;
+    const width = Math.max(2, (right - left + 1) * cellWidth - 8);
+    const scaledHeight = height === 0 ? 2 : (height / maxHeight) * plotHeight;
+    return { x, y: baseline - scaledHeight, width, height: scaledHeight };
+  }
+
+  let rangeSvg = "";
+  if (best && view.event !== "done") {
+    const rect = rectForRange(best.left, best.right, best.height);
+    rangeSvg += `<rect class="hist-best-rect" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" rx="5"></rect>`;
+  }
+  if (hasCandidate) {
+    const rect = rectForRange(view.leftBoundary, view.rightBoundary, view.candidateHeight);
+    const candidateClass = view.event === "done" ? "hist-final-rect" : "hist-candidate-rect";
+    rangeSvg += `<rect class="${candidateClass}" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" rx="5"></rect>`;
+    const x1 = centerX(view.leftBoundary) - cellWidth / 2 + 7;
+    const x2 = centerX(view.rightBoundary) + cellWidth / 2 - 7;
+    rangeSvg += `<line class="hist-width-line" x1="${x1}" y1="${baseline + 34}" x2="${x2}" y2="${baseline + 34}"></line>
+      <line class="hist-width-tick" x1="${x1}" y1="${baseline + 27}" x2="${x1}" y2="${baseline + 41}"></line>
+      <line class="hist-width-tick" x1="${x2}" y1="${baseline + 27}" x2="${x2}" y2="${baseline + 41}"></line>
+      <text class="hist-width-label" x="${(x1 + x2) / 2}" y="${baseline + 55}">${vi ? "rộng" : "width"} = ${view.width}</text>`;
+  }
+
+  const barsSvg = bars.map((height, index) => {
+    const sentinel = index === view.sentinelIndex;
+    const scaledHeight = height === 0 ? 2 : (height / maxHeight) * plotHeight;
+    const x = centerX(index) - barWidth / 2;
+    const y = baseline - scaledHeight;
+    const classes = ["hist-bar"];
+    if (sentinel) classes.push("sentinel");
+    if (stackSet.has(index)) classes.push("in-stack");
+    if (index === view.currentIndex) classes.push("current");
+    if (index === view.poppedIndex) classes.push("popped");
+    if (hasCandidate && index >= view.leftBoundary && index <= view.rightBoundary) classes.push("candidate-span");
+    if (best && index >= best.left && index <= best.right) classes.push("best-span");
+    const indexLabel = sentinel ? `S(${index})` : `[${index}]`;
+    const stackMark = stackSet.has(index) ? `<text class="hist-stack-mark" x="${centerX(index)}" y="${Math.max(42, y - 27)}">STACK</text>` : "";
+    const currentMark = index === view.currentIndex
+      ? `<path class="hist-current-pointer" d="M ${centerX(index) - 8} 27 L ${centerX(index) + 8} 27 L ${centerX(index)} 39 Z"></path><text class="hist-current-label" x="${centerX(index)}" y="18">i</text>`
+      : "";
+    return `${currentMark}${stackMark}<g class="${classes.join(" ")}" aria-label="${sentinel ? "sentinel" : `bar ${index}`}, height ${height}">
+      <rect x="${x}" y="${y}" width="${barWidth}" height="${scaledHeight}" rx="4"></rect>
+      <text class="hist-height" x="${centerX(index)}" y="${Math.max(55, y - 8)}">${height}</text>
+      <text class="hist-index" x="${centerX(index)}" y="${baseline + 20}">${indexLabel}</text>
+    </g>`;
+  }).join("");
+
+  const chartLabel = vi
+    ? "Histogram với cột hiện tại, các index trong stack và hình chữ nhật đang được tính."
+    : "Histogram showing the current bar, stack indices, and rectangle being evaluated.";
+  const chartSvg = `<svg class="histogram-rect-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(chartLabel)}">
+    <line class="hist-baseline" x1="${plotLeft}" y1="${baseline}" x2="${plotRight}" y2="${baseline}"></line>
+    ${barsSvg}${rangeSvg}
+  </svg>`;
+
+  const stackItems = (view.stack || []).length
+    ? view.stack.map((index, position) => {
+        const top = position === view.stack.length - 1;
+        const sentinel = index === view.sentinelIndex;
+        return `<span class="${top ? "top" : ""}"><small>${top ? "TOP" : `#${position + 1}`}</small><strong>${sentinel ? `S(${index})` : `index ${index}`}</strong><em>h = ${bars[index]}</em></span>`;
+      }).join("<i>→</i>")
+    : `<em class="hist-stack-empty">∅ ${vi ? "stack rỗng" : "empty stack"}</em>`;
+
+  let actionHtml;
+  if (view.event === "init-stack") {
+    actionHtml = `<div class="hist-action rule"><small>STACK</small><strong>[]</strong><span>${vi ? "Lưu index theo chiều cao tăng nghiêm ngặt" : "Stores indices in strictly increasing height order"}</span></div>`;
+  } else if (view.event === "init-max") {
+    actionHtml = `<div class="hist-action rule"><small>MAXIMUM</small><strong>max_area = 0</strong><span>${vi ? "Chưa có candidate" : "No candidate yet"}</span></div>`;
+  } else if (view.event === "add-sentinel") {
+    actionHtml = `<div class="hist-action sentinel"><small>SENTINEL</small><strong>bars = heights + [0]</strong><span>${vi ? `Thêm S tại index ${view.sentinelIndex} để xả stack` : `Append S at index ${view.sentinelIndex} to flush the stack`}</span></div>`;
+  } else if (view.event === "scan") {
+    actionHtml = `<div class="hist-action scan"><small>${vi ? "CỘT HIỆN TẠI" : "CURRENT BAR"}</small><strong>i = ${view.currentIndex}</strong><b>bars[i] = ${view.currentHeight}</b><span>${view.currentIndex === view.sentinelIndex ? (vi ? "Sentinel bắt đầu xả stack" : "Sentinel starts flushing the stack") : (vi ? "So sánh với đỉnh stack" : "Compare with the stack top")}</span></div>`;
+  } else if (view.event === "while-check") {
+    const topIndex = view.poppedIndex;
+    const expression = topIndex === null
+      ? "stack is empty"
+      : `${bars[topIndex]} ≥ ${view.currentHeight}`;
+    actionHtml = `<div class="hist-action compare ${view.whileResult ? "yes" : "no"}"><small>WHILE CONDITION</small><strong>${escapeHtml(expression)} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? `Pop index ${topIndex}` : `Pop index ${topIndex}`) : (vi ? `Dừng pop và push index ${view.currentIndex}` : `Stop popping and push index ${view.currentIndex}`)}</span></div>`;
+  } else if (view.event === "pop") {
+    actionHtml = `<div class="hist-action pop"><small>POP</small><strong>top = ${view.poppedIndex}</strong><b>height = ${view.candidateHeight}</b><span>${vi ? `Biên phải độc quyền = i = ${view.currentIndex}` : `Exclusive right boundary = i = ${view.currentIndex}`}</span></div>`;
+  } else if (view.event === "width") {
+    const formula = view.leftBoundary === 0
+      ? `width = i = ${view.width}`
+      : `width = ${view.currentIndex} - ${view.leftBoundary - 1} - 1 = ${view.width}`;
+    actionHtml = `<div class="hist-action width"><small>${vi ? "BIÊN HÌNH CHỮ NHẬT" : "RECTANGLE BOUNDS"}</small><strong>[${view.leftBoundary} .. ${view.rightBoundary}]</strong><b>${formula}</b><span>${vi ? "Hai biên chặn không thuộc hình chữ nhật" : "The blocking boundaries are excluded"}</span></div>`;
+  } else if (view.event === "area") {
+    const decision = view.improved
+      ? (vi ? `${view.candidateArea} > ${view.previousMax} → UPDATE` : `${view.candidateArea} > ${view.previousMax} → UPDATE`)
+      : (vi ? `${view.candidateArea} ≤ ${view.previousMax} → KEEP` : `${view.candidateArea} ≤ ${view.previousMax} → KEEP`);
+    actionHtml = `<div class="hist-action area ${view.improved ? "improved" : "kept"}"><small>AREA</small><strong>${view.candidateHeight} × ${view.width} = ${view.candidateArea}</strong><b>${decision}</b><span>max_area = ${view.maxArea}</span></div>`;
+  } else if (view.event === "push") {
+    actionHtml = `<div class="hist-action push"><small>PUSH</small><strong>stack.append(${view.currentIndex})</strong><span>${view.currentIndex === view.sentinelIndex ? (vi ? "Stack cuối cùng chứa sentinel" : "The final stack contains the sentinel") : (vi ? "Đỉnh stack mới nằm bên phải" : "The new stack top is on the right")}</span></div>`;
+  } else {
+    actionHtml = `<div class="hist-action result"><small>${vi ? "KẾT QUẢ" : "RESULT"}</small><strong>max_area = ${view.maxArea}</strong>${best ? `<b>[${best.left}..${best.right}] · h=${best.height} · w=${best.width}</b>` : ""}</div>`;
+  }
+
+  const bestHtml = best
+    ? `<span><small>${vi ? "BEST RANGE" : "BEST RANGE"}</small><strong>[${best.left}..${best.right}]</strong></span>
+       <span><small>HEIGHT × WIDTH</small><strong>${best.height} × ${best.width}</strong></span>
+       <span><small>MAX AREA</small><strong>${best.area}</strong></span>`
+    : `<span><small>${vi ? "BEST RANGE" : "BEST RANGE"}</small><strong>—</strong></span>
+       <span><small>HEIGHT × WIDTH</small><strong>—</strong></span>
+       <span><small>MAX AREA</small><strong>${view.maxArea}</strong></span>`;
+
+  el.innerHTML = `<div class="histogram-rect-viz">
+    <div class="hist-phases">${phases}</div>
+    <div class="hist-best-summary">${bestHtml}</div>
+    <div class="hist-chart">${chartSvg}
+      <div class="hist-legend"><span><i class="current"></i>i</span><span><i class="stack"></i>stack</span><span><i class="candidate"></i>${vi ? "candidate" : "candidate"}</span><span><i class="best"></i>${vi ? "tốt nhất" : "best"}</span><span><i class="sentinel"></i>sentinel</span></div>
+    </div>
+    <div class="hist-detail-row">
+      <div class="hist-stack-lane"><strong>MONOTONIC STACK <small>${vi ? "đáy → đỉnh" : "bottom → top"}</small></strong><div>${stackItems}</div></div>
+      ${actionHtml}
+    </div>
+  </div>`;
+}
+
 function renderStackView(step) {
   const view = step.stackView || {};
   const stack = Array.isArray(view.items) ? view.items : [];
@@ -5963,6 +6117,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.histogramRectangleView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderHistogramRectangleView(step);
   } else if (step.stackView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
