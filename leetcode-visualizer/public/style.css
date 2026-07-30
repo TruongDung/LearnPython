@@ -1563,6 +1563,203 @@ button:disabled {
   text-align: center;
 }
 
+/* ---- LeetCode 69: integer square root binary search ---- */
+.sqrt-binary-viz {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: #e2e8f0;
+  text-align: left;
+}
+
+.sqrt-phases {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sqrt-phases span {
+  min-width: 0;
+  padding: 7px 6px;
+  border-bottom: 3px solid #334155;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.sqrt-phases span.active { border-color: #f59e0b; color: #fbbf24; }
+.sqrt-phases span.done { border-color: #10b981; color: #6ee7b7; }
+
+.sqrt-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sqrt-summary > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.sqrt-summary small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.sqrt-summary strong { color: #f8fafc; font-size: 17px; }
+.sqrt-chart { display: grid; gap: 7px; min-width: 0; }
+
+.sqrt-range-svg {
+  display: block;
+  width: 100%;
+  max-height: 285px;
+  overflow: visible;
+}
+
+.sqrt-zone { stroke-width: 2; }
+.sqrt-zone.confirmed { fill: rgba(16, 185, 129, 0.16); stroke: #10b981; }
+.sqrt-zone.active { fill: rgba(56, 189, 248, 0.16); stroke: #38bdf8; }
+.sqrt-zone.rejected { fill: rgba(239, 68, 68, 0.13); stroke: #ef4444; }
+.sqrt-zone.answer { fill: rgba(16, 185, 129, 0.24); stroke: #10b981; stroke-width: 4; }
+.sqrt-axis { stroke: #94a3b8; stroke-width: 2.5; }
+
+.sqrt-tick line { stroke: #64748b; stroke-width: 1.5; }
+.sqrt-tick text { text-anchor: middle; pointer-events: none; }
+.sqrt-tick text.value { fill: #f8fafc; font-size: 14px; font-weight: 850; }
+.sqrt-tick text.square { fill: #94a3b8; font-size: 10px; font-weight: 650; }
+.sqrt-tick.answer line { stroke: #10b981; stroke-width: 4; }
+.sqrt-tick.answer text.value { fill: #6ee7b7; }
+
+.sqrt-pointer line { stroke-width: 2.5; stroke-dasharray: 4 3; }
+.sqrt-pointer text { text-anchor: middle; font-size: 12px; font-weight: 850; }
+.sqrt-pointer.lo line { stroke: #38bdf8; }
+.sqrt-pointer.lo text { fill: #7dd3fc; }
+.sqrt-pointer.hi line { stroke: #a78bfa; }
+.sqrt-pointer.hi text { fill: #c4b5fd; }
+.sqrt-pointer.both line { stroke: #38bdf8; }
+.sqrt-pointer.both text { fill: #bae6fd; }
+.sqrt-pointer.mid line { stroke: #f59e0b; }
+.sqrt-pointer.mid path { fill: #f59e0b; }
+.sqrt-pointer.mid text { fill: #fbbf24; font-size: 13px; }
+
+.sqrt-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.sqrt-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sqrt-legend i { width: 13px; height: 11px; border: 2px solid #64748b; border-radius: 3px; }
+.sqrt-legend i.confirmed { border-color: #10b981; background: rgba(16, 185, 129, 0.16); }
+.sqrt-legend i.active { border-color: #38bdf8; background: rgba(56, 189, 248, 0.16); }
+.sqrt-legend i.rejected { border-color: #ef4444; background: rgba(239, 68, 68, 0.13); }
+
+.sqrt-equation {
+  display: grid;
+  grid-template-columns: minmax(75px, 1fr) auto minmax(75px, 1fr) auto minmax(75px, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.sqrt-equation > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.48);
+  text-align: center;
+}
+
+.sqrt-equation small { color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; }
+.sqrt-equation strong { color: #f8fafc; font-size: 17px; }
+.sqrt-equation > i { color: #94a3b8; font-size: 22px; font-style: normal; font-weight: 900; text-align: center; }
+.sqrt-equation.less > i:nth-of-type(2) { color: #38bdf8; }
+.sqrt-equation.greater > i:nth-of-type(2) { color: #ef4444; }
+.sqrt-equation.equal > i:nth-of-type(2) { color: #10b981; }
+
+.sqrt-action {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 13px;
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.sqrt-action small { color: #7dd3fc; font-size: 10px; font-weight: 850; letter-spacing: 0.06em; }
+.sqrt-action strong { color: #f8fafc; font-size: 18px; overflow-wrap: anywhere; }
+.sqrt-action b { color: #fbbf24; font-size: 14px; overflow-wrap: anywhere; }
+.sqrt-action span { color: #cbd5e1; font-size: 12px; }
+.sqrt-action.condition.yes,
+.sqrt-action.mid { border-color: #38bdf8; }
+.sqrt-action.condition.no { border-color: #a78bfa; background: rgba(167, 139, 250, 0.08); }
+.sqrt-action.condition.no small { color: #c4b5fd; }
+.sqrt-action.compare { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+.sqrt-action.compare small { color: #fbbf24; }
+.sqrt-action.compare.exact,
+.sqrt-action.result { border-color: #10b981; background: rgba(16, 185, 129, 0.09); }
+.sqrt-action.compare.exact small,
+.sqrt-action.result small { color: #6ee7b7; }
+.sqrt-action.move.right { border-color: #38bdf8; background: rgba(56, 189, 248, 0.08); }
+.sqrt-action.move.left { border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+.sqrt-action.move.left small { color: #fca5a5; }
+
+[data-theme="light"] .sqrt-binary-viz { color: #1e293b; }
+[data-theme="light"] .sqrt-phases span { border-color: #cbd5e1; color: #64748b; }
+[data-theme="light"] .sqrt-phases span.active { border-color: #d97706; color: #92400e; }
+[data-theme="light"] .sqrt-phases span.done { border-color: #059669; color: #047857; }
+[data-theme="light"] .sqrt-summary > span,
+[data-theme="light"] .sqrt-equation > span { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .sqrt-summary strong,
+[data-theme="light"] .sqrt-equation strong,
+[data-theme="light"] .sqrt-action strong { color: #0f172a; }
+[data-theme="light"] .sqrt-zone.confirmed,
+[data-theme="light"] .sqrt-zone.answer { stroke: #059669; }
+[data-theme="light"] .sqrt-zone.active { stroke: #0284c7; }
+[data-theme="light"] .sqrt-zone.rejected { stroke: #dc2626; }
+[data-theme="light"] .sqrt-axis,
+[data-theme="light"] .sqrt-tick line { stroke: #64748b; }
+[data-theme="light"] .sqrt-tick text.value { fill: #0f172a; }
+[data-theme="light"] .sqrt-tick text.square { fill: #64748b; }
+[data-theme="light"] .sqrt-tick.answer text.value { fill: #047857; }
+[data-theme="light"] .sqrt-pointer.lo text,
+[data-theme="light"] .sqrt-pointer.both text { fill: #0369a1; }
+[data-theme="light"] .sqrt-pointer.hi text { fill: #6d28d9; }
+[data-theme="light"] .sqrt-pointer.mid text { fill: #92400e; }
+[data-theme="light"] .sqrt-pointer.mid path { fill: #d97706; }
+[data-theme="light"] .sqrt-action { background: #f0f9ff; }
+[data-theme="light"] .sqrt-action.condition.no { background: #f5f3ff; }
+[data-theme="light"] .sqrt-action.compare { background: #fffbeb; }
+[data-theme="light"] .sqrt-action.compare.exact,
+[data-theme="light"] .sqrt-action.result { background: #ecfdf5; }
+[data-theme="light"] .sqrt-action.move.right { background: #f0f9ff; }
+[data-theme="light"] .sqrt-action.move.left { background: #fef2f2; }
+[data-theme="light"] .sqrt-action span { color: #475569; }
+
+@media (max-width: 700px) {
+  .sqrt-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sqrt-summary { grid-template-columns: 1fr; }
+  .sqrt-range-svg { max-height: 260px; }
+  .sqrt-equation { grid-template-columns: 1fr; }
+  .sqrt-equation > i { transform: rotate(90deg); font-size: 18px; }
+}
+
 /* ---- LeetCode 84: Largest Rectangle in Histogram ---- */
 .histogram-rect-viz {
   display: grid;

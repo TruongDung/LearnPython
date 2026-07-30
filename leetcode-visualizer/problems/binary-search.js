@@ -1627,27 +1627,227 @@ function buildSteps875(input, params) {
 
 /** LeetCode 69: Sqrt(x) — binary search for floor(sqrt(x)). */
 function buildSteps69(input) {
-  const x = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const parsed = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const x = Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
   const steps = [];
-  function snap(o) { steps.push({ title: o.title, arr: [], highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note }); }
-  if (x < 2) { snap({ title: { vi: `x=${x} < 2 → ${x}`, en: `x=${x} < 2 → ${x}` }, final: true, codeLines: [3], vars: [{ name: "answer", value: x }], note: { vi: "sqrt(0)=0, sqrt(1)=1.", en: "sqrt(0)=0, sqrt(1)=1." } }); return { original: x, answer: x, steps }; }
-  let lo = 1, hi = Math.floor(x / 2);
-  snap({ title: { vi: `Binary search trong [1, ${hi}]`, en: `Binary search in [1, ${hi}]` }, codeLines: [4], vars: [{ name: "x", value: x }, { name: "lo", value: lo }, { name: "hi", value: hi }], note: { vi: `Tìm m lớn nhất mà m² ≤ ${x}. Khoảng [1, x/2=${hi}].`, en: `Find the largest m with m² ≤ ${x}. Range [1, x/2=${hi}].` } });
-  let answer = 1;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const sq = mid * mid;
-    if (sq === x) { snap({ title: { vi: `mid=${mid}: ${mid}²=${sq} == ${x} → ${mid}`, en: `mid=${mid}: ${mid}²=${sq} == ${x} → ${mid}` }, final: true, codeLines: [5, 6, 7], vars: [{ name: "mid", value: mid }, { name: "mid²", value: sq }], note: { vi: `Bình phương đúng bằng x → sqrt = ${mid}.`, en: `Perfect square → sqrt = ${mid}.` } }); return { original: x, answer: mid, steps }; }
-    const less = sq < x;
-    snap({
-      title: { vi: `mid=${mid}: ${mid}²=${sq} ${less ? "<" : ">"} ${x}`, en: `mid=${mid}: ${mid}²=${sq} ${less ? "<" : ">"} ${x}` },
-      codeLines: less ? [5, 8, 9] : [5, 10, 11],
-      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "mid", value: mid }, { name: "mid²", value: sq }],
-      note: { vi: less ? `${sq} < ${x} → tìm lớn hơn → lo=${mid + 1}. (mid=${mid} là ứng viên floor)` : `${sq} > ${x} → tìm nhỏ hơn → hi=${mid - 1}.`, en: less ? `${sq} < ${x} → go larger → lo=${mid + 1}. (mid=${mid} is a floor candidate)` : `${sq} > ${x} → go smaller → hi=${mid - 1}.` },
+
+  let lo = x < 2 ? 0 : 1;
+  let hi = x < 2 ? x : Math.floor(x / 2);
+  const initialLo = lo;
+  const initialHi = hi;
+
+  function addStep({
+    event,
+    phase,
+    title,
+    codeLine,
+    note,
+    mid = null,
+    square = null,
+    comparison = null,
+    whileResult = null,
+    previousLo = null,
+    previousHi = null,
+    removedRange = null,
+    answer = null,
+    vars = [],
+    final = false,
+  }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      sqrtBinaryView: {
+        event,
+        phase,
+        x,
+        initialLo,
+        initialHi,
+        lo,
+        hi,
+        mid,
+        square,
+        comparison,
+        whileResult,
+        previousLo,
+        previousHi,
+        removedRange: removedRange ? { ...removedRange } : null,
+        answer,
+      },
     });
-    if (less) { lo = mid + 1; answer = mid; } else hi = mid - 1;
   }
-  snap({ title: { vi: `Đáp án: ${hi}`, en: `Answer: ${hi}` }, final: true, codeLines: [12], vars: [{ name: "answer", value: hi }], note: { vi: `hi là floor(sqrt(${x})) = ${hi}.`, en: `hi is floor(sqrt(${x})) = ${hi}.` } });
+
+  if (x < 2) {
+    addStep({
+      event: "base-case",
+      phase: "done",
+      title: { vi: `x=${x} < 2 → return ${x}`, en: `x=${x} < 2 → return ${x}` },
+      codeLine: 3,
+      answer: x,
+      final: true,
+      vars: [{ name: "x", value: x }, { name: "answer", value: x }],
+      note: {
+        vi: `Với x=${x}, căn bậc hai nguyên chính là ${x}; không cần binary search.`,
+        en: `For x=${x}, the integer square root is ${x}; no binary search is needed.`,
+      },
+    });
+    return { original: x, answer: x, steps };
+  }
+
+  addStep({
+    event: "init-range",
+    phase: "setup",
+    title: { vi: `Khởi tạo khoảng [lo, hi] = [1, ${hi}]`, en: `Initialize [lo, hi] = [1, ${hi}]` },
+    codeLine: 4,
+    vars: [{ name: "x", value: x }, { name: "lo", value: lo }, { name: "hi", value: hi }],
+    note: {
+      vi: `Vì x ≥ 2 nên floor(sqrt(x)) nằm trong [1, x // 2] = [1, ${hi}].`,
+      en: `Because x ≥ 2, floor(sqrt(x)) lies in [1, x // 2] = [1, ${hi}].`,
+    },
+  });
+
+  while (true) {
+    const canContinue = lo <= hi;
+    addStep({
+      event: "while-check",
+      phase: "range",
+      title: canContinue
+        ? { vi: `${lo} ≤ ${hi} → tiếp tục tìm`, en: `${lo} ≤ ${hi} → continue searching` }
+        : { vi: `${lo} > ${hi} → dừng binary search`, en: `${lo} > ${hi} → stop binary search` },
+      codeLine: 5,
+      whileResult: canContinue,
+      vars: [{ name: "lo", value: lo }, { name: "hi", value: hi }, { name: "lo <= hi", value: canContinue }],
+      note: canContinue
+        ? { vi: `Khoảng [${lo}, ${hi}] vẫn còn ứng viên.`, en: `The interval [${lo}, ${hi}] still contains candidates.` }
+        : { vi: `Hai con trỏ đã giao nhau. Lúc này hi=${hi} là số nguyên lớn nhất có bình phương ≤ ${x}.`, en: `The pointers have crossed. hi=${hi} is now the largest integer whose square is ≤ ${x}.` },
+    });
+    if (!canContinue) break;
+
+    const mid = Math.floor((lo + hi) / 2);
+    const square = mid * mid;
+    addStep({
+      event: "compute-mid",
+      phase: "compare",
+      title: { vi: `mid = (${lo} + ${hi}) // 2 = ${mid}`, en: `mid = (${lo} + ${hi}) // 2 = ${mid}` },
+      codeLine: 6,
+      mid,
+      square,
+      vars: [
+        { name: "lo", value: lo },
+        { name: "hi", value: hi },
+        { name: "mid", value: mid },
+        { name: "mid * mid", value: square },
+      ],
+      note: {
+        vi: `Chọn chính giữa khoảng hiện tại: mid=${mid}; tiếp theo so ${mid}²=${square} với x=${x}.`,
+        en: `Choose the center of the current interval: mid=${mid}; next compare ${mid}²=${square} with x=${x}.`,
+      },
+    });
+
+    const isExact = square === x;
+    addStep({
+      event: "exact-check",
+      phase: isExact ? "done" : "compare",
+      title: isExact
+        ? { vi: `${mid}² = ${x} → return ${mid}`, en: `${mid}² = ${x} → return ${mid}` }
+        : { vi: `${mid}² = ${square} ≠ ${x}`, en: `${mid}² = ${square} ≠ ${x}` },
+      codeLine: 7,
+      mid,
+      square,
+      comparison: isExact ? "equal" : square < x ? "less" : "greater",
+      answer: isExact ? mid : null,
+      final: isExact,
+      vars: [
+        { name: "mid", value: mid },
+        { name: "mid * mid", value: square },
+        { name: "mid * mid == x", value: isExact },
+        ...(isExact ? [{ name: "answer", value: mid }] : []),
+      ],
+      note: isExact
+        ? { vi: `${mid} là căn bậc hai chính xác của ${x}; hàm kết thúc ngay tại dòng 7.`, en: `${mid} is the exact square root of ${x}; the function returns immediately on line 7.` }
+        : { vi: "Không bằng x nên cần kiểm tra mid² nhỏ hơn hay lớn hơn x.", en: "It is not equal to x, so determine whether mid² is below or above x." },
+    });
+    if (isExact) return { original: x, answer: mid, steps };
+
+    if (square < x) {
+      const previousLo = lo;
+      const previousHi = hi;
+      lo = mid + 1;
+      addStep({
+        event: "move-lo",
+        phase: "shrink",
+        title: { vi: `${square} < ${x} → lo = ${mid + 1}`, en: `${square} < ${x} → lo = ${mid + 1}` },
+        codeLine: 8,
+        mid,
+        square,
+        comparison: "less",
+        previousLo,
+        previousHi,
+        removedRange: { from: previousLo, to: mid, side: "left" },
+        vars: [
+          { name: "mid * mid < x", value: true },
+          { name: "old lo", value: previousLo },
+          { name: "lo", value: lo },
+          { name: "hi", value: hi },
+        ],
+        note: {
+          vi: `${mid}² còn nhỏ hơn x. Các số ≤ ${mid} không thể cho đáp án lớn hơn, nên tiếp tục ở nửa phải [${lo}, ${hi}].`,
+          en: `${mid}² is below x. Values ≤ ${mid} cannot produce a larger answer, so continue in the right half [${lo}, ${hi}].`,
+        },
+      });
+    } else {
+      const previousLo = lo;
+      const previousHi = hi;
+      hi = mid - 1;
+      addStep({
+        event: "move-hi",
+        phase: "shrink",
+        title: { vi: `${square} > ${x} → hi = ${mid - 1}`, en: `${square} > ${x} → hi = ${mid - 1}` },
+        codeLine: 9,
+        mid,
+        square,
+        comparison: "greater",
+        previousLo,
+        previousHi,
+        removedRange: { from: mid, to: previousHi, side: "right" },
+        vars: [
+          { name: "mid * mid < x", value: false },
+          { name: "lo", value: lo },
+          { name: "old hi", value: previousHi },
+          { name: "hi", value: hi },
+        ],
+        note: {
+          vi: `${mid}² lớn hơn x. mid và mọi số bên phải đều quá lớn, nên tiếp tục ở nửa trái [${lo}, ${hi}].`,
+          en: `${mid}² is above x. mid and every value to its right are too large, so continue in the left half [${lo}, ${hi}].`,
+        },
+      });
+    }
+  }
+
+  addStep({
+    event: "done-floor",
+    phase: "done",
+    title: { vi: `return hi → ${hi}`, en: `return hi → ${hi}` },
+    codeLine: 10,
+    answer: hi,
+    final: true,
+    vars: [
+      { name: "lo", value: lo },
+      { name: "hi", value: hi },
+      { name: `${hi}²`, value: hi * hi },
+      { name: `${hi + 1}²`, value: (hi + 1) * (hi + 1) },
+      { name: "answer", value: hi },
+    ],
+    note: {
+      vi: `${hi}²=${hi * hi} ≤ ${x} < ${(hi + 1) * (hi + 1)}=(${hi + 1})², nên floor(sqrt(${x}))=${hi}.`,
+      en: `${hi}²=${hi * hi} ≤ ${x} < ${(hi + 1) * (hi + 1)}=(${hi + 1})², so floor(sqrt(${x}))=${hi}.`,
+    },
+  });
   return { original: x, answer: hi, steps };
 }
 
@@ -1737,7 +1937,7 @@ module.exports = {
     titleVi: { vi: "Căn bậc hai nguyên (binary search)", en: "Integer square root (binary search)" },
     statement: { vi: "Tính floor(sqrt(x)) không dùng hàm căn có sẵn. Nhập x.", en: "Compute floor(sqrt(x)) without built-in sqrt. Enter x." },
     defaultInput: [8],
-    inputKind: "integer", inputLabel: { vi: "x", en: "x" }, extraParams: [],
+    inputKind: "nonneg", inputLabel: { vi: "x", en: "x" }, extraParams: [],
     approach: [
       { vi: "Tìm m lớn nhất mà m² ≤ x — tính đơn điệu → binary search.", en: "Find the largest m with m² ≤ x — monotonic → binary search." },
       { vi: "mid² == x → trả về mid.", en: "mid² == x → return mid." },

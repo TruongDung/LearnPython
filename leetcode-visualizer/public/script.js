@@ -3051,6 +3051,137 @@ function renderLinkedList(step) {
   $("treeView").innerHTML = `<svg viewBox="0 0 ${totalW + 50} ${totalH}" width="${totalW + 50}" height="${totalH}" class="tree-svg">${svg}</svg>`;
 }
 
+function renderSqrtBinaryView(step) {
+  const view = step.sqrtBinaryView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const phaseIndex = { setup: 0, range: 1, compare: 2, shrink: 3, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Tạo [lo, hi]", "2 · Kiểm tra while / mid", "3 · So mid² với x", "4 · Thu hẹp / trả về"]
+    : ["1 · Build [lo, hi]", "2 · Check while / mid", "3 · Compare mid² to x", "4 · Shrink / return"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = phaseIndex > index ? "done" : phaseIndex === index ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"} ${escapeHtml(label)}</span>`;
+  }).join("");
+
+  const baseCase = view.event === "base-case";
+  const domainLo = baseCase ? 0 : view.initialLo;
+  const domainHi = Math.max(baseCase ? 1 : view.initialHi, domainLo);
+  const candidateCount = domainHi - domainLo + 1;
+  const graphWidth = 760;
+  const graphHeight = 230;
+  const plotLeft = 62;
+  const plotRight = graphWidth - 48;
+  const axisY = 108;
+  const bucketWidth = (plotRight - plotLeft) / Math.max(1, candidateCount);
+
+  function centerX(value) {
+    return plotLeft + (value - domainLo + 0.5) * bucketWidth;
+  }
+
+  function edgeX(value) {
+    return plotLeft + (value - domainLo) * bucketWidth;
+  }
+
+  function segment(from, to, className) {
+    const left = Math.max(domainLo, from);
+    const right = Math.min(domainHi, to);
+    if (left > right) return "";
+    return `<rect class="sqrt-zone ${className}" x="${edgeX(left)}" y="${axisY - 18}" width="${edgeX(right + 1) - edgeX(left)}" height="36" rx="7"></rect>`;
+  }
+
+  const confirmedEnd = baseCase ? view.answer : Math.min(domainHi, view.lo - 1);
+  const rejectedStart = baseCase ? domainHi + 1 : Math.max(domainLo, view.hi + 1);
+  const activeFrom = Math.max(domainLo, view.lo);
+  const activeTo = Math.min(domainHi, view.hi);
+  const zones = baseCase
+    ? segment(view.answer, view.answer, "answer")
+    : `${segment(domainLo, confirmedEnd, "confirmed")}${segment(activeFrom, activeTo, "active")}${segment(rejectedStart, domainHi, "rejected")}`;
+
+  let tickValues;
+  if (candidateCount <= 16) {
+    tickValues = Array.from({ length: candidateCount }, (_, index) => domainLo + index);
+  } else {
+    tickValues = [...new Set([
+      domainLo,
+      domainHi,
+      view.lo,
+      view.hi,
+      view.mid,
+      view.answer,
+    ].filter((value) => Number.isInteger(value) && value >= domainLo && value <= domainHi))].sort((a, b) => a - b);
+  }
+  const ticks = tickValues.map((value) => `<g class="sqrt-tick${value === view.answer ? " answer" : ""}">
+    <line x1="${centerX(value)}" y1="${axisY - 23}" x2="${centerX(value)}" y2="${axisY + 23}"></line>
+    <text class="value" x="${centerX(value)}" y="${axisY + 40}">${value}</text>
+    ${candidateCount <= 12 ? `<text class="square" x="${centerX(value)}" y="${axisY + 57}">${value}²=${value * value}</text>` : ""}
+  </g>`).join("");
+
+  let markers = "";
+  if (!baseCase) {
+    if (view.lo === view.hi && view.lo >= domainLo && view.lo <= domainHi) {
+      markers += `<g class="sqrt-pointer both"><line x1="${centerX(view.lo)}" y1="${axisY + 20}" x2="${centerX(view.lo)}" y2="${axisY + 78}"></line><text x="${centerX(view.lo)}" y="${axisY + 94}">lo = hi = ${view.lo}</text></g>`;
+    } else {
+      if (view.lo >= domainLo && view.lo <= domainHi + 1) {
+        const loX = view.lo > domainHi ? plotRight + 12 : centerX(view.lo);
+        markers += `<g class="sqrt-pointer lo"><line x1="${loX}" y1="${axisY + 20}" x2="${loX}" y2="${axisY + 68}"></line><text x="${loX}" y="${axisY + 84}">lo=${view.lo}</text></g>`;
+      }
+      if (view.hi >= domainLo - 1 && view.hi <= domainHi) {
+        const hiX = view.hi < domainLo ? plotLeft - 12 : centerX(view.hi);
+        markers += `<g class="sqrt-pointer hi"><line x1="${hiX}" y1="${axisY + 20}" x2="${hiX}" y2="${axisY + 45}"></line><text x="${hiX}" y="${axisY + 61}">hi=${view.hi}</text></g>`;
+      }
+    }
+  }
+  if (Number.isInteger(view.mid)) {
+    markers += `<g class="sqrt-pointer mid"><line x1="${centerX(view.mid)}" y1="${axisY - 20}" x2="${centerX(view.mid)}" y2="${axisY - 62}"></line><path d="M ${centerX(view.mid) - 8} ${axisY - 61} L ${centerX(view.mid) + 8} ${axisY - 61} L ${centerX(view.mid)} ${axisY - 48} Z"></path><text x="${centerX(view.mid)}" y="${axisY - 72}">mid=${view.mid} · ${view.mid}²=${view.square}</text></g>`;
+  }
+
+  const axisLabel = vi
+    ? `Binary search các số nguyên từ ${domainLo} đến ${domainHi}; vùng xanh lá đã xác nhận nhỏ, vùng xanh dương đang tìm, vùng đỏ quá lớn.`
+    : `Binary search over integers ${domainLo} through ${domainHi}; green is confirmed low, blue is active, and red is too large.`;
+  const rangeSvg = `<svg class="sqrt-range-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(axisLabel)}">
+    ${zones}<line class="sqrt-axis" x1="${plotLeft}" y1="${axisY}" x2="${plotRight}" y2="${axisY}"></line>${ticks}${markers}
+  </svg>`;
+
+  let actionHtml;
+  if (view.event === "base-case") {
+    actionHtml = `<div class="sqrt-action result"><small>BASE CASE</small><strong>x = ${view.x} &lt; 2</strong><b>return ${view.answer}</b></div>`;
+  } else if (view.event === "init-range") {
+    actionHtml = `<div class="sqrt-action setup"><small>${vi ? "KHOẢNG BAN ĐẦU" : "INITIAL RANGE"}</small><strong>[1, x // 2]</strong><b>[${view.lo}, ${view.hi}]</b><span>${vi ? "Đáp án không thể lớn hơn x // 2 khi x ≥ 2" : "For x ≥ 2, the answer cannot exceed x // 2"}</span></div>`;
+  } else if (view.event === "while-check") {
+    actionHtml = `<div class="sqrt-action condition ${view.whileResult ? "yes" : "no"}"><small>WHILE CONDITION</small><strong>${view.lo} ≤ ${view.hi} → ${view.whileResult}</strong><span>${view.whileResult ? (vi ? "Khoảng còn ứng viên" : "Candidates remain") : (vi ? "lo đã vượt hi; chuyển tới return hi" : "lo crossed hi; proceed to return hi")}</span></div>`;
+  } else if (view.event === "compute-mid") {
+    actionHtml = `<div class="sqrt-action mid"><small>COMPUTE MID</small><strong>(${view.lo} + ${view.hi}) // 2 = ${view.mid}</strong><b>${view.mid}² = ${view.square}</b></div>`;
+  } else if (view.event === "exact-check") {
+    const exact = view.comparison === "equal";
+    actionHtml = `<div class="sqrt-action compare ${exact ? "exact" : "not-exact"}"><small>EXACT?</small><strong>${view.square} ${exact ? "=" : "≠"} ${view.x}</strong><b>${exact ? `return ${view.mid}` : (vi ? "Tiếp tục so sánh" : "Continue comparing")}</b></div>`;
+  } else if (view.event === "move-lo") {
+    actionHtml = `<div class="sqrt-action move right"><small>${view.square} &lt; ${view.x}</small><strong>lo = mid + 1 = ${view.lo}</strong><b>[${view.previousLo}..${view.mid}] → ${vi ? "tìm bên phải" : "search right"}</b><span>${vi ? `mid=${view.mid} là ứng viên floor đã xác nhận` : `mid=${view.mid} is a confirmed floor candidate`}</span></div>`;
+  } else if (view.event === "move-hi") {
+    actionHtml = `<div class="sqrt-action move left"><small>${view.square} &gt; ${view.x}</small><strong>hi = mid - 1 = ${view.hi}</strong><b>[${view.mid}..${view.previousHi}] → ${vi ? "loại vì quá lớn" : "remove as too large"}</b></div>`;
+  } else {
+    actionHtml = `<div class="sqrt-action result"><small>${vi ? "CHỨNG MINH FLOOR" : "FLOOR PROOF"}</small><strong>${view.answer}² ≤ ${view.x} &lt; ${view.answer + 1}²</strong><b>${view.answer * view.answer} ≤ ${view.x} &lt; ${(view.answer + 1) * (view.answer + 1)}</b><span>return hi = ${view.answer}</span></div>`;
+  }
+
+  const rangeText = baseCase ? "—" : view.lo <= view.hi ? `[${view.lo}, ${view.hi}]` : "∅";
+  const bestConfirmed = baseCase ? view.answer : view.answer ?? Math.max(1, view.lo - 1);
+  const equation = Number.isInteger(view.mid)
+    ? `<div class="sqrt-equation ${view.comparison || "pending"}"><span><small>mid</small><strong>${view.mid}</strong></span><i>→</i><span><small>mid²</small><strong>${view.square}</strong></span><i>${view.comparison === "less" ? "<" : view.comparison === "greater" ? ">" : view.comparison === "equal" ? "=" : "?"}</i><span><small>x</small><strong>${view.x}</strong></span></div>`
+    : "";
+
+  el.innerHTML = `<div class="sqrt-binary-viz">
+    <div class="sqrt-phases">${phases}</div>
+    <div class="sqrt-summary">
+      <span><small>TARGET x</small><strong>${view.x}</strong></span>
+      <span><small>${vi ? "KHOẢNG ĐANG TÌM" : "ACTIVE RANGE"}</small><strong>${rangeText}</strong></span>
+      <span><small>${vi ? "ỨNG VIÊN ĐÃ XÁC NHẬN" : "CONFIRMED CANDIDATE"}</small><strong>${bestConfirmed ?? "—"}</strong></span>
+    </div>
+    <div class="sqrt-chart">${rangeSvg}<div class="sqrt-legend"><span><i class="confirmed"></i>${vi ? "đã tìm bên phải" : "searched right"}</span><span><i class="active"></i>${vi ? "đang tìm" : "active"}</span><span><i class="rejected"></i>${vi ? "quá lớn" : "too large"}</span></div></div>
+    ${equation}
+    ${actionHtml}
+  </div>`;
+}
+
 function renderHistogramRectangleView(step) {
   const view = step.histogramRectangleView;
   const el = $("treeView");
@@ -6117,6 +6248,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLinkedList(step);
+  } else if (step.sqrtBinaryView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSqrtBinaryView(step);
   } else if (step.histogramRectangleView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
