@@ -3244,7 +3244,179 @@ function buildSteps148(input) {
   return { original: vals, answer, steps };
 }
 
+/**
+ * LeetCode 92: Reverse Linked List II.
+ * "Insert-at-front" trick: one pass, no second scan.
+ * prev stays at the node just before position `left`.
+ * Repeatedly pull the node after curr and insert it right after prev.
+ */
+function buildSteps92(input, params) {
+  const vals = (Array.isArray(input)
+    ? [...input]
+    : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const n = vals.length;
+  const left  = Math.min(Math.max(1, Number(params && params.left  !== undefined ? params.left  : 2)), n);
+  const right = Math.min(Math.max(left, Number(params && params.right !== undefined ? params.right : Math.min(4, n))), n);
+  const steps = [];
+
+  // Working copy we mutate step by step
+  const list = [...vals];
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      arr:   [...list],
+      sub:   list.map((_, i) => `[${i + 1}]`),   // 1-indexed to match problem
+      highlight: o.highlight || [],
+      mark:      o.mark      || [],
+      final:     o.final     || false,
+      codeLines: o.codeLines || [],
+      vars:      o.vars      || [],
+      note:      o.note,
+    });
+  }
+
+  snap({
+    title: { vi: `List = [${vals.join("→")}], left=${left}, right=${right}`, en: `List = [${vals.join("→")}], left=${left}, right=${right}` },
+    codeLines: [3],
+    vars: [
+      { name: "head", value: `[${vals.join(", ")}]` },
+      { name: "left",  value: left  },
+      { name: "right", value: right },
+    ],
+    note: {
+      vi: `Đảo ngược các node từ vị trí ${left} đến ${right} (1-indexed). Dùng mẹo "insert-at-front": kéo node sau curr và cắm vào ngay sau prev.`,
+      en: `Reverse nodes from position ${left} to ${right} (1-indexed). Use the "insert-at-front" trick: pull the node after curr and splice it right after prev.`,
+    },
+  });
+
+  // Step 1: Advance prev to position left-1 (0-indexed: left-2, because 1-indexed)
+  const prevIdx = left - 2;   // index of the node just before `left` (−1 = dummy)
+  snap({
+    title: { vi: `Tiến đến node trước vị trí left=${left}`, en: `Advance to node before position left=${left}` },
+    highlight: prevIdx >= 0 ? [prevIdx] : [],
+    codeLines: [4, 5, 6],
+    vars: [
+      { name: "prev index",  value: prevIdx < 0 ? "dummy (before head)" : prevIdx },
+      { name: "curr index",  value: left - 1 },
+      { name: "prev.val",    value: prevIdx < 0 ? "dummy" : list[prevIdx] },
+    ],
+    note: {
+      vi: `Dịch chuyển prev ${left - 1} bước: prev bây giờ trỏ vào ${prevIdx < 0 ? "dummy node (trước head)" : `node ${list[prevIdx]} tại [${prevIdx + 1}]`}. curr trỏ vào node [${left}] = ${list[left - 1]}.`,
+      en: `Move prev ${left - 1} step(s): prev now points to ${prevIdx < 0 ? "the dummy node (before head)" : `node ${list[prevIdx]} at [${prevIdx + 1}]`}. curr points to node [${left}] = ${list[left - 1]}.`,
+    },
+  });
+
+  // Step 2: Insert-at-front iterations
+  let currIdx = left - 1;   // 0-indexed current node being anchored
+
+  for (let step = 0; step < right - left; step++) {
+    // nxt = curr.next (index currIdx+1 initially, but we keep currIdx fixed)
+    const nxtIdx = currIdx + 1;
+    const nxtVal = list[nxtIdx];
+
+    snap({
+      title: { vi: `Bước ${step + 1}: kéo node [${nxtIdx + 1}]=${nxtVal} vào đầu đoạn`, en: `Step ${step + 1}: pull node [${nxtIdx + 1}]=${nxtVal} to the front` },
+      highlight: [nxtIdx],
+      mark: Array.from({ length: step + 1 }, (_, k) => left - 1 + k),
+      codeLines: [8, 9, 10, 11],
+      vars: [
+        { name: "curr", value: `node [${currIdx + 1}] = ${list[currIdx]}` },
+        { name: "nxt",  value: `node [${nxtIdx + 1}] = ${nxtVal}` },
+        { name: "list (before)", value: `[${list.join(", ")}]` },
+      ],
+      note: {
+        vi: `curr.next = nxt.next (bỏ qua nxt trong chuỗi). nxt.next = prev.next (nxt trỏ vào đầu đoạn). prev.next = nxt (cắm nxt vào ngay sau prev).`,
+        en: `curr.next = nxt.next (detach nxt from the chain). nxt.next = prev.next (nxt points to current front of reversed segment). prev.next = nxt (splice nxt right after prev).`,
+      },
+    });
+
+    // Simulate the pointer manipulation on the list array
+    list.splice(nxtIdx, 1);
+    const insertAt = prevIdx + 1;
+    list.splice(insertAt, 0, nxtVal);
+    // currIdx stays pointing to the same node (which shifted right by 1)
+    currIdx = insertAt + 1;  // curr is now one position to the right of insert point
+
+    snap({
+      title: { vi: `Sau bước ${step + 1}: [${list.join("→")}]`, en: `After step ${step + 1}: [${list.join("→")}]` },
+      highlight: [insertAt],
+      mark: Array.from({ length: step + 2 }, (_, k) => left - 1 + k),
+      codeLines: [8, 9, 10, 11],
+      vars: [
+        { name: "list", value: `[${list.join(", ")}]` },
+        { name: "reversed so far", value: `[${list.slice(left - 1, left + step + 1).join(", ")}]` },
+      ],
+      note: {
+        vi: `${nxtVal} đã được cắm vào đầu đoạn đảo. List = [${list.join(", ")}].`,
+        en: `${nxtVal} is now spliced at the front of the reversed segment. List = [${list.join(", ")}].`,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `Kết quả: [${list.join("→")}]`, en: `Result: [${list.join("→")}]` },
+    highlight: [],
+    mark: Array.from({ length: right - left + 1 }, (_, k) => left - 1 + k),
+    final: true,
+    codeLines: [13],
+    vars: [
+      { name: "answer", value: `[${list.join(", ")}]` },
+      { name: "reversed segment", value: `[${list.slice(left - 1, right).join(", ")}]` },
+    ],
+    note: {
+      vi: `Đoạn từ vị trí ${left} đến ${right} đã được đảo ngược trong O(1) extra space và chỉ một lần duyệt.`,
+      en: `The segment from position ${left} to ${right} has been reversed in O(1) extra space with a single pass.`,
+    },
+  });
+
+  return { original: vals, answer: list, steps };
+}
+
 module.exports = {
+  92: {
+    id: 92, difficulty: "medium", slug: "reverse-linked-list-ii",
+    category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
+    title: { vi: "Reverse Linked List II", en: "Reverse Linked List II" },
+    titleVi: { vi: "Đảo ngược đoạn linked list từ left đến right", en: "Reverse a sublist from left to right" },
+    statement: {
+      vi: "Đảo ngược các node từ vị trí left đến right (1-indexed) trong một lần duyệt. Nhập giá trị list; left và right trong tham số.",
+      en: "Reverse the nodes from position left to right (1-indexed) in one pass. Enter the list values; left and right as parameters.",
+    },
+    defaultInput: [1, 2, 3, 4, 5],
+    inputKind: "integer",
+    inputLabel: { vi: "Linked list", en: "Linked list" },
+    extraParams: [
+      { key: "left",  label: { vi: "left (1-indexed)", en: "left (1-indexed)" },  default: 2 },
+      { key: "right", label: { vi: "right (1-indexed)", en: "right (1-indexed)" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Dùng dummy node để xử lý đồng nhất trường hợp left=1.", en: "Use a dummy node to handle left=1 uniformly." },
+      { vi: "Tiến prev đến node ngay trước vị trí left.", en: "Advance prev to the node just before position left." },
+      { vi: "Mẹo 'insert-at-front': right-left lần, kéo node curr.next ra và cắm vào ngay sau prev.", en: "'Insert-at-front' trick: repeat right-left times, pull curr.next out and splice it right after prev." },
+    ],
+    complexity: {
+      time: "O(right - left + 1) ⊆ O(n)",
+      space: "O(1)",
+      note: { vi: "Một lần duyệt, không cần lưu trữ thêm.", en: "Single pass, no extra storage." },
+    },
+    code: [
+      "class Solution:",
+      "    def reverseBetween(self, head, left, right):",
+      "        dummy = ListNode(0, head)",
+      "        prev = dummy",
+      "        for _ in range(left - 1):",
+      "            prev = prev.next",
+      "        curr = prev.next",
+      "        for _ in range(right - left):",
+      "            nxt = curr.next",
+      "            curr.next = nxt.next",
+      "            nxt.next = prev.next",
+      "            prev.next = nxt",
+      "        return dummy.next",
+    ],
+    builder: buildSteps92,
+  },
   61: {
     id: 61, difficulty: "medium", slug: "rotate-list",
     category: { key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" },
