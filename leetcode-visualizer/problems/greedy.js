@@ -2184,7 +2184,165 @@ function buildSteps179(input) {
   return { original: nums, answer, steps };
 }
 
+/**
+ * LeetCode 3016: Minimum Number of Pushes to Type Word II.
+ * Greedy: count frequency, sort descending, assign most frequent first.
+ * Keys 2-9 (8 keys), each can hold multiple letters.
+ * 1st-8th letters → 1 push, 9th-16th → 2 pushes, etc.
+ */
+function buildSteps3016(input) {
+  const word = String(input || "").trim().toLowerCase().replace(/[^a-z]/g, "");
+  const steps = [];
+  const freq = {};
+  
+  // Count frequency
+  for (const ch of word) {
+    freq[ch] = (freq[ch] || 0) + 1;
+  }
+  
+  const letters = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+  const frequencies = letters.map((ch) => freq[ch]);
+  const counts = letters.map((ch) => freq[ch]);
+  
+  steps.push({
+    title: { vi: "Đếm tần suất", en: "Count frequency" },
+    arr: frequencies,
+    sub: letters,
+    highlight: [],
+    mark: [],
+    codeLines: [3, 4],
+    vars: [
+      { name: "word", value: word },
+      { name: "unique letters", value: letters.length },
+    ],
+    note: {
+      vi: `Đếm tần suất các ký tự trong "${word}". Có ${letters.length} ký tự khác nhau.`,
+      en: `Count frequency of characters in "${word}". Found ${letters.length} distinct characters.`,
+    },
+  });
+  
+  steps.push({
+    title: { vi: "Sắp xếp giảm dần", en: "Sort descending" },
+    arr: frequencies,
+    sub: letters,
+    highlight: [],
+    mark: [],
+    codeLines: [5],
+    vars: [
+      { name: "frequencies", value: `[${frequencies.join(", ")}]` },
+    ],
+    note: {
+      vi: `Sắp xếp theo tần suất giảm dần. GREEDY: gán các ký tự xuất hiện nhiều nhất vào vị trí cần ít nhấn nhất (position=1).`,
+      en: `Sort by frequency descending. GREEDY: assign the most frequent characters to positions that require fewer presses (position=1).`,
+    },
+  });
+  
+  let totalPushes = 0;
+  const assignments = [];
+  
+  for (let i = 0; i < letters.length; i++) {
+    const ch = letters[i];
+    const count = counts[i];
+    const position = Math.floor(i / 8) + 1;  // 0-7 → pos 1, 8-15 → pos 2, etc.
+    const pushes = count * position;
+    totalPushes += pushes;
+    assignments.push({ ch, count, position, pushes });
+    
+    steps.push({
+      title: { vi: `i=${i}: '${ch}' → position ${position}`, en: `i=${i}: '${ch}' → position ${position}` },
+      arr: frequencies,
+      sub: letters,
+      highlight: [i],
+      mark: Array.from({ length: i + 1 }, (_, k) => k),
+      codeLines: [7, 8, 9, 10],
+      vars: [
+        { name: "i", value: i },
+        { name: "letter", value: ch },
+        { name: "count", value: count },
+        { name: "position", value: `⌊${i}/8⌋ + 1 = ${position}` },
+        { name: "pushes", value: `${count} × ${position} = ${pushes}` },
+        { name: "total", value: totalPushes },
+      ],
+      note: {
+        vi: i < 8
+          ? `'${ch}' xuất hiện ${count} lần, vị trí ${position} (keys 2-9, slot 1) → ${pushes} pushes. Total = ${totalPushes}.`
+          : i < 16
+            ? `'${ch}' xuất hiện ${count} lần, vị trí ${position} (keys 2-9, slot 2) → ${pushes} pushes. Total = ${totalPushes}.`
+            : `'${ch}' xuất hiện ${count} lần, vị trí ${position} → ${pushes} pushes. Total = ${totalPushes}.`,
+        en: i < 8
+          ? `'${ch}' appears ${count} times, position ${position} (keys 2-9, slot 1) → ${pushes} pushes. Total = ${totalPushes}.`
+          : i < 16
+            ? `'${ch}' appears ${count} times, position ${position} (keys 2-9, slot 2) → ${pushes} pushes. Total = ${totalPushes}.`
+            : `'${ch}' appears ${count} times, position ${position} → ${pushes} pushes. Total = ${totalPushes}.`,
+      },
+    });
+  }
+  
+  steps.push({
+    title: { vi: `Kết quả: ${totalPushes} pushes`, en: `Result: ${totalPushes} pushes` },
+    arr: frequencies,
+    sub: letters,
+    highlight: [],
+    mark: Array.from({ length: letters.length }, (_, k) => k),
+    final: true,
+    codeLines: [11],
+    vars: [
+      { name: "answer", value: totalPushes },
+      { name: "assignments", value: assignments.map((a) => `${a.ch}:pos${a.position}`).join(", ") },
+    ],
+    note: {
+      vi: `Tổng số pushes tối thiểu = ${totalPushes}. Gán: ${assignments.map((a) => `'${a.ch}'→pos${a.position}(${a.pushes})`).join(", ")}.`,
+      en: `Minimum total pushes = ${totalPushes}. Assignments: ${assignments.map((a) => `'${a.ch}'→pos${a.position}(${a.pushes})`).join(", ")}.`,
+    },
+  });
+  
+  return { original: word, answer: totalPushes, steps };
+}
+
 module.exports = {
+  3016: {
+    id: 3016, difficulty: "medium", slug: "minimum-number-of-pushes-to-type-word-ii",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Minimum Number of Pushes to Type Word II", en: "Minimum Number of Pushes to Type Word II" },
+    titleVi: { vi: "Số lần nhấn tối thiểu để gõ từ II (greedy + sort)", en: "Minimum pushes to type word II (greedy + sort)" },
+    statement: {
+      vi: "Bàn phím điện thoại có các phím 2-9 (8 phím). Mỗi phím có thể gán nhiều chữ cái. Phím i, chữ cái thứ j → cần j lần nhấn. Tìm cách gán để tổng số nhấn tối thiểu khi gõ word. Nhập word.",
+      en: "Telephone keypad has keys 2-9 (8 keys). Each key can be mapped to multiple letters. Key i, letter at position j → requires j presses. Find the optimal mapping to minimize total presses when typing word. Enter word.",
+    },
+    defaultInput: "abcde",
+    inputKind: "string",
+    inputLabel: { vi: "word (lowercase letters)", en: "word (lowercase letters)" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Đếm tần suất của mỗi ký tự trong word.", en: "Count frequency of each character in word." },
+      { vi: "Sắp xếp các tần suất giảm dần (greedy: gán ký tự xuất hiện nhiều vào vị trí cần ít nhấn).", en: "Sort frequencies descending (greedy: assign most frequent characters to positions needing fewer presses)." },
+      { vi: "8 ký tự đầu → position 1 (1 press), 8 ký tự tiếp → position 2 (2 presses), v.v.", en: "First 8 letters → position 1 (1 press), next 8 → position 2 (2 presses), etc." },
+      { vi: "Tổng pushes = Σ (frequency[i] × position[i]).", en: "Total pushes = Σ (frequency[i] × position[i])." },
+    ],
+    complexity: {
+      time: "O(n + k log k)",
+      space: "O(k)",
+      note: {
+        vi: "n = độ dài word, k = số ký tự khác nhau (≤ 26). Đếm O(n), sort O(k log k).",
+        en: "n = word length, k = distinct chars (≤ 26). Counting O(n), sorting O(k log k).",
+      },
+    },
+    code: [
+      "from collections import Counter",
+      "",
+      "class Solution:",
+      "    def minimumPushes(self, word: str) -> int:",
+      "        freq = Counter(word)",
+      "        frequencies = sorted(freq.values(), reverse=True)",
+      "        total_pushes = 0",
+      "        for i, count in enumerate(frequencies):",
+      "            position = (i // 8) + 1",
+      "            total_pushes += count * position",
+      "        return total_pushes",
+    ],
+    builder: buildSteps3016,
+  },
   55: {
     id: 55, difficulty: "medium", slug: "jump-game",
     category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
