@@ -2093,6 +2093,14 @@ function buildSteps301(input) {
   const s = String(input);
   const steps = [];
 
+  // Encode string as char array for bar display
+  function strToArr(str) {
+    return str.split("").map((ch) => ch === "(" ? 1 : ch === ")" ? 2 : 3);
+  }
+  function strToSub(str) {
+    return str.split("");
+  }
+
   function isValid(str) {
     let count = 0;
     for (const ch of str) {
@@ -2105,79 +2113,144 @@ function buildSteps301(input) {
     return count === 0;
   }
 
-  function snap(opts) {
-    steps.push({
-      title: opts.title,
-      arr: [],
-      highlight: [], mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
-    });
+  // Compute min removals needed (count unmatched '(' and ')')
+  function minRemovals(str) {
+    let open = 0, close = 0;
+    for (const ch of str) {
+      if (ch === "(") {
+        open += 1;
+      } else if (ch === ")") {
+        if (open > 0) open -= 1;
+        else close += 1;
+      }
+    }
+    return open + close;
   }
 
-  snap({
-    title: { vi: "level = {s}", en: "level = {s}" },
-    codeLines: [11],
+  const totalMin = minRemovals(s);
+  const chars = s.split("");
+
+  // ── Init step ─────────────────────────────────────────────────────
+  steps.push({
+    title: { vi: `Chuỗi gốc: "${s}"`, en: `Input string: "${s}"` },
+    arr: strToArr(s),
+    sub: strToSub(s),
+    highlight: [], mark: [], final: false,
+    codeLines: [3, 4, 5, 6, 7],
     vars: [
       { name: "s", value: `"${s}"` },
-      { name: "level", value: `{"${s}"}` },
-      { name: "removals", value: 0 },
+      { name: "length", value: s.length },
+      { name: "min removals needed", value: totalMin },
     ],
     note: {
       vi:
-        `BFS theo SỐ LẦN XÓA. Bắt đầu với chuỗi gốc (0 lần xóa).\n` +
-        `Level đầu tiên chứa chuỗi HỢP LỆ chính là đáp án (xóa ít nhất).`,
+        `Đếm nhanh: ${totalMin} ký tự dư thừa cần xóa. ` +
+        `BFS mức 0 = chuỗi gốc; mức k = tập các chuỗi nhận được sau đúng k lần xóa. ` +
+        `Mức đầu tiên có chuỗi HỢP LỆ chính là đáp án (dấu ( = cột thấp, ) = cột cao).`,
       en:
-        `BFS by NUMBER OF REMOVALS. Start with the original string (0 removals).\n` +
-        `The first level containing any VALID string is the answer (fewest removals).`,
+        `Quick count: ${totalMin} excess char(s) to remove. ` +
+        `BFS level 0 = original; level k = all strings obtainable by exactly k removals. ` +
+        `The first level with a VALID string is the answer. (( = low bar, ) = tall bar.)`,
     },
   });
 
   let level = new Set([s]);
   let removals = 0;
-  const seenLevels = [];
-  let answer = [""];
-  let guard = 0;
 
-  while (level.size > 0 && guard < 200) {
-    guard += 1;
-    const levelArr = [...level];
-    seenLevels.push({ removals, size: level.size });
-
-    // Check validity of each string in the level
+  while (level.size > 0) {
+    const levelArr = [...level].sort();
     const valid = levelArr.filter(isValid);
 
-    snap({
-      title: { vi: `Level ${removals} (xóa ${removals} ký tự): ${level.size} chuỗi`, en: `Level ${removals} (${removals} removed): ${level.size} strings` },
-      codeLines: [12, 13],
+    // ── Level overview ────────────────────────────────────────────────
+    steps.push({
+      title: { vi: `Level ${removals}: ${level.size} chuỗi (xóa ${removals} ký tự)`, en: `Level ${removals}: ${level.size} string(s) (${removals} removed)` },
+      arr: strToArr(levelArr[0] || ""),
+      sub: strToSub(levelArr[0] || ""),
+      highlight: [], mark: [], final: false,
+      codeLines: [8, 9, 10],
       vars: [
         { name: "removals", value: removals },
-        { name: "level size", value: level.size },
-        { name: "level", value: `{${levelArr.slice(0, 8).map((x) => `"${x}"`).join(", ")}${levelArr.length > 8 ? ", ..." : ""}}` },
-        { name: "valid found", value: valid.length },
+        { name: "# candidates", value: level.size },
+        { name: "candidates (first 6)", value: levelArr.slice(0, 6).map((x) => `"${x}"`).join(", ") + (levelArr.length > 6 ? "…" : "") },
+        { name: "# valid", value: valid.length },
       ],
       note: {
-        vi: `Kiểm tra is_valid cho từng chuỗi trong level (đã xóa ${removals} ký tự). Tìm thấy ${valid.length} chuỗi hợp lệ.`,
-        en: `Check is_valid for each string in this level (${removals} chars removed). Found ${valid.length} valid strings.`,
+        vi: `Level ${removals}: kiểm tra is_valid cho ${level.size} chuỗi ứng viên. Tìm thấy ${valid.length} chuỗi hợp lệ.`,
+        en: `Level ${removals}: check is_valid for ${level.size} candidate string(s). Found ${valid.length} valid string(s).`,
       },
     });
 
-    if (valid.length > 0) {
-      // dedupe + sort for stable answer
-      answer = [...new Set(valid)].sort();
-      snap({
-        title: { vi: `Có chuỗi hợp lệ → return [${answer.map((x) => `"${x}"`).join(", ")}]`, en: `Valid found → return [${answer.map((x) => `"${x}"`).join(", ")}]` },
-        final: true,
-        codeLines: [14],
+    // ── Per-candidate validity steps (show first 6 only to avoid explosion) ──
+    const SHOW_LIMIT = 6;
+    for (let ci = 0; ci < Math.min(levelArr.length, SHOW_LIMIT); ci++) {
+      const cand = levelArr[ci];
+      const ok = isValid(cand);
+      // Highlight first invalid char if any
+      let badIdx = -1;
+      let cnt = 0;
+      for (let i = 0; i < cand.length; i++) {
+        if (cand[i] === "(") cnt++;
+        else if (cand[i] === ")") {
+          cnt--;
+          if (cnt < 0) { badIdx = i; break; }
+        }
+      }
+      if (!ok && badIdx < 0 && cnt !== 0) {
+        // find last unmatched open
+        badIdx = cand.lastIndexOf("(");
+      }
+      steps.push({
+        title: ok
+          ? { vi: `"${cand}" ✓ HỢP LỆ`, en: `"${cand}" ✓ VALID` }
+          : { vi: `"${cand}" ✗ không hợp lệ`, en: `"${cand}" ✗ invalid` },
+        arr: strToArr(cand),
+        sub: strToSub(cand),
+        highlight: badIdx >= 0 ? [badIdx] : [],
+        mark: ok ? cand.split("").map((_, i) => i) : [],
+        final: false,
+        codeLines: [11, 12, 13, 14, 15],
         vars: [
-          { name: "removals (min)", value: removals },
-          { name: "answer", value: `[${answer.map((x) => `"${x}"`).join(", ")}]` },
+          { name: "candidate", value: `"${cand}"` },
+          { name: "is_valid", value: ok },
+          { name: "balance at end", value: cnt >= 0 ? cnt : `went negative at [${badIdx}]` },
+        ],
+        note: ok
+          ? { vi: `"${cand}" hợp lệ: tất cả dấu ngoặc đều khớp đôi và không bị âm.`, en: `"${cand}" is valid: all brackets are balanced and balance never goes negative.` }
+          : badIdx >= 0
+            ? { vi: `"${cand}" không hợp lệ: balance < 0 tại vị trí [${badIdx}] = '${cand[badIdx]}' (đánh dấu đỏ).`, en: `"${cand}" invalid: balance < 0 at index [${badIdx}] = '${cand[badIdx]}' (highlighted red).` }
+            : { vi: `"${cand}" không hợp lệ: còn ${cnt} dấu '(' chưa khớp.`, en: `"${cand}" invalid: ${cnt} unmatched '(' remaining.` },
+      });
+    }
+    if (levelArr.length > SHOW_LIMIT) {
+      steps.push({
+        title: { vi: `… và ${levelArr.length - SHOW_LIMIT} chuỗi khác`, en: `… and ${levelArr.length - SHOW_LIMIT} more` },
+        arr: [], highlight: [], mark: [], final: false,
+        codeLines: [11],
+        vars: [{ name: "skipped", value: levelArr.length - SHOW_LIMIT }],
+        note: {
+          vi: `(Bỏ qua ${levelArr.length - SHOW_LIMIT} chuỗi còn lại để tránh quá nhiều bước.)`,
+          en: `(Skipping ${levelArr.length - SHOW_LIMIT} remaining candidates to keep the step count manageable.)`,
+        },
+      });
+    }
+
+    if (valid.length > 0) {
+      const answer = [...new Set(valid)].sort();
+      steps.push({
+        title: { vi: `Kết quả: ${answer.map((x) => `"${x}"`).join(", ")}`, en: `Result: ${answer.map((x) => `"${x}"`).join(", ")}` },
+        arr: strToArr(answer[0]),
+        sub: strToSub(answer[0]),
+        highlight: [],
+        mark: answer[0].split("").map((_, i) => i),
+        final: true,
+        codeLines: [16, 17],
+        vars: [
+          { name: "min removals", value: removals },
+          { name: "answer", value: answer.map((x) => `"${x}"`).join(", ") },
         ],
         note: {
-          vi: `Level ${removals} là level ĐẦU TIÊN có chuỗi hợp lệ → đây là số lần xóa NHỎ NHẤT. Trả về mọi chuỗi hợp lệ (không trùng): [${answer.map((x) => `"${x}"`).join(", ")}].`,
-          en: `Level ${removals} is the FIRST level with a valid string → this is the MINIMUM number of removals. Return all distinct valid strings: [${answer.map((x) => `"${x}"`).join(", ")}].`,
+          vi: `Level ${removals} là mức ĐẦU TIÊN có chuỗi hợp lệ → xóa ít nhất ${removals} ký tự. Đáp án: [${answer.map((x) => `"${x}"`).join(", ")}].`,
+          en: `Level ${removals} is the FIRST level with valid strings → minimum ${removals} removal(s). Answer: [${answer.map((x) => `"${x}"`).join(", ")}].`,
         },
       });
       return { original: s, answer, steps };
@@ -2193,35 +2266,38 @@ function buildSteps301(input) {
       }
     }
 
-    snap({
-      title: { vi: `Tạo level ${removals + 1}: xóa 1 dấu ngoặc mỗi vị trí → ${nextLevel.size} chuỗi`, en: `Build level ${removals + 1}: remove 1 paren per position → ${nextLevel.size} strings` },
-      codeLines: [15, 16, 17, 18, 19, 20],
+    steps.push({
+      title: { vi: `Không có hợp lệ → sinh level ${removals + 1}`, en: `None valid → build level ${removals + 1}` },
+      arr: strToArr(s),
+      sub: strToSub(s),
+      highlight: [], mark: [], final: false,
+      codeLines: [18, 19, 20, 21],
       vars: [
         { name: "current level", value: removals },
-        { name: "next_level size", value: nextLevel.size },
-        { name: "next_level", value: `{${[...nextLevel].slice(0, 8).map((x) => `"${x}"`).join(", ")}${nextLevel.size > 8 ? ", ..." : ""}}` },
+        { name: "next level size", value: nextLevel.size },
       ],
       note: {
-        vi: `Không có chuỗi hợp lệ ở level ${removals}. Sinh level tiếp theo: với mỗi chuỗi, xóa 1 dấu '(' hoặc ')' tại từng vị trí. Set tự loại trùng → ${nextLevel.size} chuỗi.`,
-        en: `No valid string at level ${removals}. Generate the next level: for each string, remove one '(' or ')' at every position. The set dedupes → ${nextLevel.size} strings.`,
+        vi: `Chưa có chuỗi hợp lệ ở level ${removals}. Sinh level ${removals + 1}: mỗi chuỗi → xóa 1 '(' hoặc ')' tại từng vị trí. Set loại trùng → ${nextLevel.size} chuỗi ứng viên.`,
+        en: `No valid string at level ${removals}. Build level ${removals + 1}: each string → remove one '(' or ')' at every index. Set deduplicates → ${nextLevel.size} candidates.`,
       },
     });
 
     level = nextLevel;
     removals += 1;
+    if (removals > 6) break; // safety cap
   }
 
-  snap({
+  const answer = [""];
+  steps.push({
     title: { vi: `return [""]`, en: `return [""]` },
-    final: true,
-    codeLines: [21],
+    arr: [], highlight: [], mark: [], final: true,
+    codeLines: [22],
     vars: [{ name: "answer", value: '[""]' }],
     note: {
-      vi: `Đã xóa hết ký tự mà không tìm được chuỗi hợp lệ nào khác → trả về [""].`,
-      en: `Removed all characters without finding any other valid string → return [""].`,
+      vi: `Đã xóa hết ký tự mà không tìm được chuỗi hợp lệ → trả về [""].`,
+      en: `Removed all characters without finding a valid string → return [""].`,
     },
   });
-
   return { original: s, answer, steps };
 }
 
