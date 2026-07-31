@@ -6302,9 +6302,30 @@ function renderParallelCoursesView(step) {
 }
 
 function renderLoudRichView(step) {
-  const view = step.loudRichView;
+  const view = step.loudRichView || step.loudRichV2;
+  if (!view) return;
   const el = $("treeView");
   const vi = lang === "vi";
+  
+  // Detect BFS Kahn approach (has indegree/inQueue/processed)
+  const isBFS = !!step.loudRichV2;
+  
+  if (isBFS) {
+    // Simple BFS rendering
+    el.innerHTML = `<div class="loud-rich-bfs-wrapper">
+      <div class="loud-rich-phases"><strong>${vi ? "APPROACH 2: BFS Kahn (Topological Sort)" : "APPROACH 2: BFS Kahn (Topological Sort)"}</strong></div>
+      <div class="loud-rich-state">
+        <div><strong>${vi ? "In-degree" : "In-degree"}:</strong> [${view.indegree.join(", ")}]</div>
+        <div><strong>${vi ? "Answer" : "Answer"}:</strong> [${view.answer.join(", ")}]</div>
+        <div><strong>${vi ? "Queue" : "Queue"}:</strong> [${[...view.inQueue].join(", ") || "∅"}]</div>
+        <div><strong>${vi ? "Processed" : "Processed"}:</strong> {${[...view.processed].join(", ") || "∅"}}</div>
+      </div>
+      ${view.activeU !== undefined ? `<div class="loud-rich-active"><strong>${vi ? "Processing" : "Processing"}: u = ${view.activeU}</strong></div>` : ""}
+    </div>`;
+    return;
+  }
+  
+  // Original DFS rendering
   const phaseIndex = { build: 0, dfs: 1, explore: 2, compare: 3, memo: 4, done: 5 }[view.phase] ?? 0;
   const phaseLabels = vi
     ? ["1 · Đảo cạnh", "2 · Gọi DFS", "3 · Đi tới richer", "4 · So quiet", "5 · Memo"]
@@ -6495,7 +6516,7 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderParallelCoursesView(step);
-  } else if (step.loudRichView) {
+  } else if (step.loudRichView || step.loudRichV2) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
     $("gridView").classList.add("hidden");
