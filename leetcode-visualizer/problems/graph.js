@@ -14371,7 +14371,7 @@ function buildSteps851v2(input, params = {}) {
 
   function snap(title, note, codeLines, hl = [], mk = [], extra = {}, final = false) {
     steps.push({
-      title, note, codeLines, arr: [], highlight: hl, mark: mk, final,
+      title, note, codeLines, codeBlock: 2, arr: [], highlight: hl, mark: mk, final,
       vars: [
         { name: "answer", value: `[${answer.join(", ")}]` },
         { name: "indegree", value: `[${indegree.join(", ")}]` },
