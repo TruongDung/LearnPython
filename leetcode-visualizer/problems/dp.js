@@ -14397,6 +14397,12 @@ module.exports = {
         en: "Fill m×n table → O(m×n). Optimizable to O(n) with one row.",
       },
     },
+    approach: [
+      { vi: "dp[r][c] = chi phí nhỏ nhất để đến (r,c) từ (0,0) chỉ đi phải/xuống.", en: "dp[r][c] = minimum cost to reach (r,c) from (0,0) moving only right/down." },
+      { vi: "Khởi tạo: dp[0][0] = grid[0][0]; hàng đầu cộng dồn từ trái; cột đầu cộng dồn từ trên.", en: "Base: dp[0][0] = grid[0][0]; first row accumulates left→right; first column top→bottom." },
+      { vi: "dp[r][c] = grid[r][c] + min(dp[r-1][c], dp[r][c-1]).", en: "dp[r][c] = grid[r][c] + min(dp[r-1][c], dp[r][c-1])." },
+      { vi: "Đáp án = dp[m-1][n-1].", en: "Answer = dp[m-1][n-1]." },
+    ],
     code: [
       "class Solution:",
       "    def minPathSum(self, grid):",
