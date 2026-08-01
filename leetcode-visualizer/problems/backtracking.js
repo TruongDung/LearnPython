@@ -2637,9 +2637,15 @@ function buildSteps79(input, params) {
     path.pop();
     snap({
       title: { vi: `Backtrack from ${coord(r, c)}: khôi phục '${tmp}'`, en: `Backtrack from ${coord(r, c)}: restore '${tmp}'` },
-      current: { r, c }, restored: { r, c }, index: i, action: "backtrack", codeLines: [21, 22],
-      vars: [{ name: "backtrack", value: coord(r, c) }, { name: "restore char", value: `'${tmp}'` }, { name: "remaining path", value: path.length ? path.map((item) => coord(item.r, item.c)).join(" → ") : "∅" }, { name: "return", value: false }],
-      note: { vi: `Cả 4 hướng đều False. Bỏ ${coord(r, c)} khỏi path, trả ô về '${tmp}', rồi quay lại frame cha để thử hướng khác.`, en: `All four directions returned False. Remove ${coord(r, c)} from the path, restore '${tmp}', then return to the parent frame to try another direction.` },
+      current: { r, c }, restored: { r, c }, index: i, action: "backtrack", codeLines: [21],
+      vars: [{ name: "backtrack", value: coord(r, c) }, { name: "restore char", value: `'${tmp}'` }, { name: "remaining path", value: path.length ? path.map((item) => coord(item.r, item.c)).join(" → ") : "∅" }],
+      note: { vi: `Cả 4 hướng đều False. Bỏ ${coord(r, c)} khỏi path và khôi phục board[${r}][${c}] về '${tmp}'.`, en: `All four directions returned False. Remove ${coord(r, c)} from the path and restore board[${r}][${c}] to '${tmp}'.` },
+    });
+    snap({
+      title: { vi: `Trả về False từ dfs${coord(r, c)}`, en: `Return False from dfs${coord(r, c)}` },
+      current: { r, c }, index: i, action: "backtrack", codeLines: [22],
+      vars: [{ name: "at", value: coord(r, c) }, { name: "return", value: false }],
+      note: { vi: `Ô đã được khôi phục; trả False về frame cha để frame đó tiếp tục thử hướng khác.`, en: `The cell is restored; return False to the parent frame so it can try another direction.` },
     });
     callStack.pop();
     return false;
