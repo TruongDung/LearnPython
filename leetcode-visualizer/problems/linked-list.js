@@ -3023,6 +3023,8 @@ function buildSteps460(input, params) {
   const freq = new Map();    // key -> frequency
   const buckets = new Map(); // freq -> array of keys (LRU: front = oldest)
   let minFreq = 0;
+  const results = Array(ops.length).fill(null);
+  let completedOps = 0;
 
   const valStr = () => `{${[...val.entries()].map(([k, v]) => `${k}:${v}`).join(", ")}}`;
   const freqStr = () => `{${[...freq.entries()].map(([k, f]) => `${k}:${f}`).join(", ")}}`;
@@ -3031,17 +3033,80 @@ function buildSteps460(input, params) {
     return `{${fs.map((f) => `f${f}:[${buckets.get(f).join(",")}]`).join(", ")}}`;
   };
 
-  function touch(key) {
+  function touch(key, opIndex, operation) {
     const f = freq.get(key);
+    snap({
+      title: { vi: `_touch(${key})`, en: `_touch(${key})` },
+      codeLines: [6], opIndex, phase: "touch-enter", activeKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: "operation", value: operation }, { name: "key", value: key }],
+      note: { vi: `Bắt đầu tăng tần suất của key ${key} từ ${f} lên ${f + 1}.`, en: `Start increasing key ${key}'s frequency from ${f} to ${f + 1}.` },
+    });
+
     const arr = buckets.get(f);
+    snap({
+      title: { vi: `f = freq[${key}] = ${f}`, en: `f = freq[${key}] = ${f}` },
+      codeLines: [7], opIndex, phase: "touch-read", activeKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: "f", value: f }, { name: `buckets[${f}]`, value: `[${arr.join(", ")}]` }],
+      note: { vi: `Đọc tần suất hiện tại f=${f}; key ${key} đang nằm trong bucket f${f}.`, en: `Read current frequency f=${f}; key ${key} is in bucket f${f}.` },
+    });
+
     arr.splice(arr.indexOf(key), 1);
-    if (arr.length === 0) {
+    snap({
+      title: { vi: `Xóa key ${key} khỏi bucket f${f}`, en: `Remove key ${key} from bucket f${f}` },
+      codeLines: [7], opIndex, phase: "touch-remove", activeKey: key, movingKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: `buckets[${f}] after delete`, value: `[${arr.join(", ")}]` }],
+      note: { vi: `Key ${key} tạm rời bucket f${f}; bước sau sẽ đưa nó vào cuối bucket f${f + 1} (MRU).`, en: `Key ${key} temporarily leaves bucket f${f}; it will be appended to bucket f${f + 1} as MRU.` },
+    });
+
+    const bucketEmpty = arr.length === 0;
+    snap({
+      title: { vi: `bucket f${f} rỗng? ${bucketEmpty}`, en: `Is bucket f${f} empty? ${bucketEmpty}` },
+      codeLines: [8], opIndex, phase: "touch-empty-check", activeKey: key, movingKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: `bool(buckets[${f}])`, value: !bucketEmpty }],
+      note: bucketEmpty
+        ? { vi: `Không còn key nào ở f${f}, nên xóa bucket này.`, en: `No keys remain at f${f}, so delete this bucket.` }
+        : { vi: `Bucket f${f} vẫn còn key khác; min_freq chưa cần đổi.`, en: `Bucket f${f} still has another key; min_freq does not need to change.` },
+    });
+
+    if (bucketEmpty) {
       buckets.delete(f);
-      if (minFreq === f) minFreq += 1;
+      snap({
+        title: { vi: `Xóa bucket f${f}`, en: `Delete bucket f${f}` },
+        codeLines: [9], opIndex, phase: "touch-delete-bucket", activeKey: key, movingKey: key, fromFreq: f, toFreq: f + 1,
+        extraVars: [{ name: "deleted bucket", value: `f${f}` }],
+        note: { vi: `Bucket f${f} đã rỗng và được loại khỏi buckets.`, en: `Empty bucket f${f} is removed from buckets.` },
+      });
+
+      const shouldRaiseMin = minFreq === f;
+      if (shouldRaiseMin) minFreq += 1;
+      snap({
+        title: shouldRaiseMin
+          ? { vi: `min_freq: ${f} → ${minFreq}`, en: `min_freq: ${f} → ${minFreq}` }
+          : { vi: `min_freq=${minFreq} khác f=${f} → giữ nguyên`, en: `min_freq=${minFreq} differs from f=${f} → unchanged` },
+        codeLines: [10], opIndex, phase: "touch-min-freq", activeKey: key, movingKey: key, fromFreq: f, toFreq: f + 1,
+        extraVars: [{ name: "min_freq == f", value: shouldRaiseMin }, { name: "min_freq", value: minFreq }],
+        note: shouldRaiseMin
+          ? { vi: `Bucket nhỏ nhất vừa rỗng, nên min_freq tăng lên ${minFreq}.`, en: `The minimum bucket became empty, so min_freq increases to ${minFreq}.` }
+          : { vi: `Bucket vừa xóa không phải bucket min_freq, nên min_freq giữ ở ${minFreq}.`, en: `The removed bucket was not min_freq, so min_freq stays ${minFreq}.` },
+      });
     }
+
     freq.set(key, f + 1);
+    snap({
+      title: { vi: `freq[${key}] = ${f + 1}`, en: `freq[${key}] = ${f + 1}` },
+      codeLines: [11], opIndex, phase: "touch-update-freq", activeKey: key, movingKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: `freq[${key}]`, value: f + 1 }],
+      note: { vi: `Cập nhật bảng freq: key ${key} có tần suất mới ${f + 1}.`, en: `Update the freq map: key ${key} now has frequency ${f + 1}.` },
+    });
+
     if (!buckets.has(f + 1)) buckets.set(f + 1, []);
     buckets.get(f + 1).push(key);
+    snap({
+      title: { vi: `Đưa key ${key} vào cuối bucket f${f + 1}`, en: `Append key ${key} to bucket f${f + 1}` },
+      codeLines: [11], opIndex, phase: "touch-insert", activeKey: key, fromFreq: f, toFreq: f + 1,
+      extraVars: [{ name: `buckets[${f + 1}]`, value: `[${buckets.get(f + 1).join(", ")}]` }],
+      note: { vi: `Key ${key} trở thành MRU của bucket f${f + 1}; thứ tự trái→phải vẫn là LRU→MRU.`, en: `Key ${key} becomes MRU of bucket f${f + 1}; left-to-right order remains LRU→MRU.` },
+    });
   }
 
   function snap(opts) {
@@ -3060,12 +3125,36 @@ function buildSteps460(input, params) {
         ...(opts.extraVars || []),
       ],
       note: opts.note,
+      lfuCacheView: {
+        capacity,
+        size: val.size,
+        minFreq,
+        entries: [...val.entries()].map(([key, value]) => ({ key, value, freq: freq.get(key) ?? null })),
+        groups: [...buckets.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([frequency, keys]) => ({
+            frequency,
+            keys: keys.map((key) => ({ key, value: val.get(key), freq: freq.get(key) ?? frequency })),
+          })),
+        operations: ops.map((op) => ({ ...op })),
+        results: [...results],
+        completedOps,
+        activeOpIndex: opts.opIndex ?? null,
+        phase: opts.phase || "idle",
+        activeKey: opts.activeKey ?? null,
+        movingKey: opts.movingKey ?? null,
+        evictedKey: opts.evictedKey ?? null,
+        fromFreq: opts.fromFreq ?? null,
+        toFreq: opts.toFreq ?? null,
+        result: opts.result ?? null,
+      },
     });
   }
 
   snap({
     title: { vi: `Khởi tạo LFUCache(${capacity})`, en: `Initialize LFUCache(${capacity})` },
     codeLines: [3, 4, 5],
+    phase: "initialize",
     note: {
       vi:
         `LFU = xóa key ÍT DÙNG NHẤT; nếu hòa tần suất thì xóa key CŨ NHẤT (LRU).\n` +
@@ -3081,87 +3170,207 @@ function buildSteps460(input, params) {
   for (let oi = 0; oi < ops.length; oi++) {
     const op = ops[oi];
 
+    snap({
+      title: { vi: `Operation ${oi + 1}: ${op.label}`, en: `Operation ${oi + 1}: ${op.label}` },
+      codeLines: [op.type === "get" ? 12 : 15], opIndex: oi, phase: "operation-start", activeKey: op.key,
+      extraVars: [{ name: "operation", value: op.label }],
+      note: op.type === "get"
+        ? { vi: `Bắt đầu get key ${op.key}.`, en: `Begin get for key ${op.key}.` }
+        : { vi: `Bắt đầu put key ${op.key}, value ${op.value}.`, en: `Begin put for key ${op.key}, value ${op.value}.` },
+    });
+
     if (op.type === "get") {
       const hit = val.has(op.key);
+      snap({
+        title: hit
+          ? { vi: `key ${op.key} có trong val → hit`, en: `key ${op.key} is in val → hit` }
+          : { vi: `key ${op.key} không có trong val → miss`, en: `key ${op.key} is not in val → miss` },
+        codeLines: [13], opIndex: oi, phase: "get-check", activeKey: op.key,
+        extraVars: [{ name: `key ${op.key} in val`, value: hit }],
+        note: hit
+          ? { vi: `Tìm thấy key ${op.key}; cần _touch trước khi trả value.`, en: `Found key ${op.key}; _touch it before returning the value.` }
+          : { vi: `Không tìm thấy key ${op.key}; trả -1 và không đổi cache.`, en: `Key ${op.key} is absent; return -1 without changing the cache.` },
+      });
+
       if (!hit) {
+        results[oi] = -1;
+        completedOps = oi + 1;
         snap({
           title: { vi: `get(${op.key}) → -1 (miss)`, en: `get(${op.key}) → -1 (miss)` },
-          codeLines: [12, 13],
+          codeLines: [13], opIndex: oi, phase: "get-miss", activeKey: op.key, result: -1,
           extraVars: [{ name: "operation", value: op.label }, { name: "result", value: -1 }],
           note: { vi: `key ${op.key} không có trong cache → trả về -1.`, en: `key ${op.key} not in cache → return -1.` },
         });
       } else {
         const before = freq.get(op.key);
-        touch(op.key);
+        const value = val.get(op.key);
         snap({
-          title: { vi: `get(${op.key}) → ${val.get(op.key)} (freq ${before}→${freq.get(op.key)})`, en: `get(${op.key}) → ${val.get(op.key)} (freq ${before}→${freq.get(op.key)})` },
-          codeLines: [12, 14, 6, 7, 8, 9, 10, 11],
-          extraVars: [{ name: "operation", value: op.label }, { name: "result", value: val.get(op.key) }],
+          title: { vi: `Gọi _touch(${op.key}) trước khi trả ${value}`, en: `Call _touch(${op.key}) before returning ${value}` },
+          codeLines: [14], opIndex: oi, phase: "get-touch", activeKey: op.key, fromFreq: before, toFreq: before + 1,
+          extraVars: [{ name: "operation", value: op.label }, { name: "saved value", value }],
           note: {
-            vi: `key ${op.key} tồn tại → trả ${val.get(op.key)}. _touch tăng tần suất ${before}→${freq.get(op.key)}, chuyển key sang bucket f${freq.get(op.key)} (mới nhất).`,
-            en: `key ${op.key} exists → return ${val.get(op.key)}. _touch bumps freq ${before}→${freq.get(op.key)}, moving the key to bucket f${freq.get(op.key)} (most recent).`,
+            vi: `Lưu value=${value}, sau đó tăng tần suất ${before}→${before + 1}.`,
+            en: `Save value=${value}, then increase frequency ${before}→${before + 1}.`,
           },
+        });
+        touch(op.key, oi, op.label);
+        results[oi] = value;
+        completedOps = oi + 1;
+        snap({
+          title: { vi: `get(${op.key}) → ${value}`, en: `get(${op.key}) → ${value}` },
+          codeLines: [14], opIndex: oi, phase: "get-return", activeKey: op.key, result: value,
+          extraVars: [{ name: "result", value }, { name: `freq[${op.key}]`, value: freq.get(op.key) }],
+          note: { vi: `Trả ${value}; key ${op.key} hiện là MRU của bucket f${freq.get(op.key)}.`, en: `Return ${value}; key ${op.key} is now MRU in bucket f${freq.get(op.key)}.` },
         });
       }
     } else {
-      // put
-      if (capacity === 0) {
+      const zeroCapacity = capacity === 0;
+      snap({
+        title: zeroCapacity
+          ? { vi: "capacity == 0 → true", en: "capacity == 0 → true" }
+          : { vi: "capacity == 0 → false", en: "capacity == 0 → false" },
+        codeLines: [16], opIndex: oi, phase: "put-capacity-check", activeKey: op.key,
+        extraVars: [{ name: "self.cap == 0", value: zeroCapacity }],
+        note: zeroCapacity
+          ? { vi: "Cache không có chỗ chứa nên put kết thúc ngay.", en: "The cache has no storage, so put returns immediately." }
+          : { vi: `capacity=${capacity}, tiếp tục kiểm tra key ${op.key} đã tồn tại chưa.`, en: `capacity=${capacity}; continue by checking whether key ${op.key} exists.` },
+      });
+
+      if (zeroCapacity) {
+        results[oi] = null;
+        completedOps = oi + 1;
         snap({
           title: { vi: `put(${op.key}, ${op.value}): capacity=0 → bỏ qua`, en: `put(${op.key}, ${op.value}): capacity=0 → skip` },
-          codeLines: [15, 16],
+          codeLines: [16], opIndex: oi, phase: "put-capacity-return", activeKey: op.key,
           extraVars: [{ name: "operation", value: op.label }],
           note: { vi: "Cache dung lượng 0, không lưu gì.", en: "Zero-capacity cache stores nothing." },
         });
         continue;
       }
 
-      if (val.has(op.key)) {
+      const exists = val.has(op.key);
+      snap({
+        title: exists
+          ? { vi: `key ${op.key} đã có trong val`, en: `key ${op.key} already exists in val` }
+          : { vi: `key ${op.key} chưa có trong val`, en: `key ${op.key} is not in val` },
+        codeLines: [17], opIndex: oi, phase: "put-key-check", activeKey: op.key,
+        extraVars: [{ name: `key ${op.key} in val`, value: exists }],
+        note: exists
+          ? { vi: "Đây là update: đổi value rồi tăng tần suất bằng _touch.", en: "This is an update: replace the value, then increase frequency with _touch." }
+          : { vi: "Đây là key mới; bước tiếp theo kiểm tra cache đã đầy chưa.", en: "This is a new key; next check whether the cache is full." },
+      });
+
+      if (exists) {
         const before = freq.get(op.key);
         val.set(op.key, op.value);
-        touch(op.key);
         snap({
-          title: { vi: `put(${op.key}, ${op.value}): cập nhật (freq ${before}→${freq.get(op.key)})`, en: `put(${op.key}, ${op.value}): update (freq ${before}→${freq.get(op.key)})` },
-          codeLines: [17, 18],
-          extraVars: [{ name: "operation", value: op.label }],
+          title: { vi: `val[${op.key}] = ${op.value}`, en: `val[${op.key}] = ${op.value}` },
+          codeLines: [18], opIndex: oi, phase: "put-update-value", activeKey: op.key,
+          extraVars: [{ name: `val[${op.key}]`, value: op.value }],
           note: {
-            vi: `key ${op.key} đã có → cập nhật value=${op.value} và _touch tăng tần suất ${before}→${freq.get(op.key)}.`,
-            en: `key ${op.key} exists → update value=${op.value} and _touch bumps freq ${before}→${freq.get(op.key)}.`,
+            vi: `Chỉ value đổi thành ${op.value}; key ${op.key} vẫn tạm ở bucket f${before}.`,
+            en: `Only the value changes to ${op.value}; key ${op.key} is still temporarily in bucket f${before}.`,
           },
+        });
+        snap({
+          title: { vi: `Gọi _touch(${op.key})`, en: `Call _touch(${op.key})` },
+          codeLines: [18], opIndex: oi, phase: "put-update-touch", activeKey: op.key, fromFreq: before, toFreq: before + 1,
+          extraVars: [{ name: "operation", value: op.label }],
+          note: { vi: `put vào key có sẵn cũng được tính là một lần sử dụng: freq ${before}→${before + 1}.`, en: `Updating an existing key counts as use: freq ${before}→${before + 1}.` },
+        });
+        touch(op.key, oi, op.label);
+        results[oi] = null;
+        completedOps = oi + 1;
+        snap({
+          title: { vi: `put(${op.key}, ${op.value}) hoàn tất`, en: `put(${op.key}, ${op.value}) complete` },
+          codeLines: [18], opIndex: oi, phase: "put-update-return", activeKey: op.key,
+          extraVars: [{ name: `freq[${op.key}]`, value: freq.get(op.key) }],
+          note: { vi: `key ${op.key} hiện là MRU của bucket f${freq.get(op.key)}.`, en: `key ${op.key} is now MRU in bucket f${freq.get(op.key)}.` },
         });
         continue;
       }
 
-      // Evict if full
-      if (val.size >= capacity) {
+      const full = val.size >= capacity;
+      snap({
+        title: full
+          ? { vi: `${val.size} >= ${capacity} → cache đầy`, en: `${val.size} >= ${capacity} → cache full` }
+          : { vi: `${val.size} < ${capacity} → còn chỗ`, en: `${val.size} < ${capacity} → space available` },
+        codeLines: [19], opIndex: oi, phase: "put-full-check", activeKey: op.key,
+        extraVars: [{ name: "len(val)", value: val.size }, { name: "self.cap", value: capacity }],
+        note: full
+          ? { vi: `Phải evict key LRU ở bucket min_freq=f${minFreq} trước khi thêm key mới.`, en: `Evict the LRU key from min_freq bucket f${minFreq} before inserting the new key.` }
+          : { vi: "Không cần evict; chuyển thẳng sang thêm key mới.", en: "No eviction is needed; proceed to insertion." },
+      });
+
+      if (full) {
+        const evictionFreq = minFreq;
         const bucket = buckets.get(minFreq);
         const evictKey = bucket.shift();
-        if (bucket.length === 0) buckets.delete(minFreq);
+        snap({
+          title: { vi: `pop key đầu bucket f${evictionFreq} → ${evictKey}`, en: `Pop front of bucket f${evictionFreq} → ${evictKey}` },
+          codeLines: [20], opIndex: oi, phase: "put-evict-select", activeKey: op.key, evictedKey: evictKey, fromFreq: evictionFreq,
+          extraVars: [{ name: "evicted key", value: evictKey }, { name: `buckets[${evictionFreq}]`, value: `[${bucket.join(", ")}]` }],
+          note: {
+            vi: `Bucket f${evictionFreq} có tần suất nhỏ nhất; phần tử đầu là LRU nên chọn key ${evictKey}.`,
+            en: `Bucket f${evictionFreq} has the minimum frequency; its front is LRU, so key ${evictKey} is selected.`,
+          },
+        });
+
         val.delete(evictKey);
+        snap({
+          title: { vi: `del val[${evictKey}]`, en: `del val[${evictKey}]` },
+          codeLines: [21], opIndex: oi, phase: "put-evict-value", activeKey: op.key, evictedKey: evictKey, fromFreq: evictionFreq,
+          extraVars: [{ name: "evicted key", value: evictKey }],
+          note: { vi: `Xóa value của key ${evictKey}; bảng freq sẽ được xóa ở thao tác kế tiếp trên cùng dòng code.`, en: `Remove key ${evictKey}'s value; its frequency entry is deleted next on the same code line.` },
+        });
+
         freq.delete(evictKey);
         snap({
-          title: { vi: `Cache đầy → evict key ${evictKey} (freq nhỏ nhất=${minFreq}, cũ nhất)`, en: `Cache full → evict key ${evictKey} (min freq=${minFreq}, oldest)` },
-          codeLines: [19, 20, 21],
+          title: { vi: `del freq[${evictKey}]`, en: `del freq[${evictKey}]` },
+          codeLines: [21], opIndex: oi, phase: "put-evict-frequency", activeKey: op.key, evictedKey: evictKey, fromFreq: evictionFreq,
           extraVars: [{ name: "operation", value: op.label }, { name: "evicted key", value: evictKey }],
           note: {
-            vi: `len(val)=${capacity} ≥ capacity. Lấy key ĐẦU bucket f${minFreq} (ít dùng nhất + cũ nhất) = ${evictKey} và xóa.`,
-            en: `len(val)=${capacity} ≥ capacity. Take the FRONT key of bucket f${minFreq} (least-frequent + oldest) = ${evictKey} and remove it.`,
+            vi: `Key ${evictKey} đã bị loại hoàn toàn. Bucket f${evictionFreq} có thể đang rỗng; key mới sẽ vào f1 ngay sau đó.`,
+            en: `Key ${evictKey} is now fully removed. Bucket f${evictionFreq} may be empty; the new key enters f1 next.`,
           },
         });
       }
 
-      // Insert new key
       val.set(op.key, op.value);
+      snap({
+        title: { vi: `val[${op.key}] = ${op.value}`, en: `val[${op.key}] = ${op.value}` },
+        codeLines: [22], opIndex: oi, phase: "put-insert-value", activeKey: op.key,
+        extraVars: [{ name: `val[${op.key}]`, value: op.value }],
+        note: { vi: `Thêm cặp key-value ${op.key}:${op.value} vào val.`, en: `Insert key-value pair ${op.key}:${op.value} into val.` },
+      });
+
       freq.set(op.key, 1);
+      snap({
+        title: { vi: `freq[${op.key}] = 1`, en: `freq[${op.key}] = 1` },
+        codeLines: [22], opIndex: oi, phase: "put-insert-frequency", activeKey: op.key, toFreq: 1,
+        extraVars: [{ name: `freq[${op.key}]`, value: 1 }],
+        note: { vi: "Key mới luôn bắt đầu với tần suất 1.", en: "A new key always starts at frequency 1." },
+      });
+
       if (!buckets.has(1)) buckets.set(1, []);
       buckets.get(1).push(op.key);
-      minFreq = 1;
       snap({
-        title: { vi: `put(${op.key}, ${op.value}): thêm mới, freq=1, min_freq=1`, en: `put(${op.key}, ${op.value}): insert new, freq=1, min_freq=1` },
-        codeLines: [22, 23],
+        title: { vi: `Đưa key ${op.key} vào cuối bucket f1`, en: `Append key ${op.key} to bucket f1` },
+        codeLines: [23], opIndex: oi, phase: "put-insert-bucket", activeKey: op.key, toFreq: 1,
+        extraVars: [{ name: "buckets[1]", value: `[${buckets.get(1).join(", ")}]` }],
+        note: { vi: `Key ${op.key} là phần tử mới nhất (MRU) ở cuối bucket f1.`, en: `Key ${op.key} is the newest (MRU) entry at the end of bucket f1.` },
+      });
+
+      minFreq = 1;
+      results[oi] = null;
+      completedOps = oi + 1;
+      snap({
+        title: { vi: `min_freq = 1; put hoàn tất`, en: `min_freq = 1; put complete` },
+        codeLines: [23], opIndex: oi, phase: "put-insert-complete", activeKey: op.key,
         extraVars: [{ name: "operation", value: op.label }],
         note: {
-          vi: `Thêm key ${op.key}=${op.value} với freq=1 vào bucket f1. Key mới luôn có tần suất 1 → min_freq=1.`,
-          en: `Insert key ${op.key}=${op.value} with freq=1 into bucket f1. A new key always has frequency 1 → min_freq=1.`,
+          vi: `Vì vừa thêm key có freq=1, tần suất nhỏ nhất chắc chắn trở về 1.`,
+          en: `Because a key with freq=1 was inserted, the minimum frequency is now definitely 1.`,
         },
       });
     }
@@ -3171,13 +3380,14 @@ function buildSteps460(input, params) {
     title: { vi: "Hoàn tất tất cả operations", en: "All operations completed" },
     final: true,
     codeLines: [],
+    phase: "done",
     note: {
       vi: `Đã xử lý ${ops.length} operation. Trạng thái cuối: val=${valStr()}, freq=${freqStr()}.`,
       en: `Processed ${ops.length} operations. Final state: val=${valStr()}, freq=${freqStr()}.`,
     },
   });
 
-  return { original: input, answer: valStr(), steps };
+  return { original: input, answer: results, steps };
 }
 
 /** LeetCode 61: Rotate List right by k. */

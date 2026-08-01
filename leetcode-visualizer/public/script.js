@@ -2171,6 +2171,8 @@ function renderWordSearchView(step) {
         ? (vi ? "Nhánh sai: ô đã có trong path" : "Reject: cell is already in the path")
         : (vi ? "Nhánh sai: ký tự không khớp" : "Reject: character mismatch"),
     backtrack: vi ? "Bế tắc → khôi phục ô và lùi lại" : "Dead end → restore the cell and backtrack",
+    restore: vi ? "Dòng 21 · khôi phục board[row][col]" : "Line 21 · restore board[row][col]",
+    "return-false": vi ? "Dòng 22 · trả False về frame cha" : "Line 22 · return False to the parent",
     found: vi ? "Đã khớp đủ mọi ký tự" : "Every character has been matched",
     "return-true": vi ? "Nhánh con thành công → truyền True lên" : "Child succeeded → propagate True",
     "result-true": vi ? "Tìm thấy đường đi hợp lệ" : "A valid path was found",
@@ -6481,6 +6483,131 @@ function renderLoudRichView(step) {
   </div>`;
 }
 
+function renderLfuCacheView(step) {
+  const view = step.lfuCacheView;
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const groups = Array.isArray(view.groups) ? view.groups : [];
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+
+  const operationHtml = operations.map((operation, index) => {
+    const done = index < view.completedOps;
+    const active = index === view.activeOpIndex;
+    const classes = ["lfu-operation"];
+    if (done) classes.push("done");
+    if (active) classes.push("active");
+    else if (!done) classes.push("pending");
+    const result = done
+      ? operation.type === "put"
+        ? "null"
+        : String(results[index])
+      : "·";
+    return `<span class="${classes.join(" ")}">
+      <small>${index + 1}</small>
+      <code>${escapeHtml(operation.label)}</code>
+      <strong>→ ${escapeHtml(result)}</strong>
+    </span>`;
+  }).join("");
+
+  const bucketHtml = groups.length
+    ? groups.map((group) => {
+        const isMin = view.size > 0 && group.frequency === view.minFreq;
+        const nodes = Array.isArray(group.keys) ? group.keys : [];
+        const nodeHtml = nodes.length
+          ? nodes.map((entry, index) => {
+              const classes = ["lfu-node"];
+              if (entry.key === view.activeKey) classes.push("active");
+              if (entry.key === view.movingKey) classes.push("moving");
+              if (entry.key === view.evictedKey) classes.push("evicting");
+              const position = nodes.length === 1
+                ? "LRU = MRU"
+                : index === 0
+                  ? "LRU"
+                  : index === nodes.length - 1
+                    ? "MRU"
+                    : "";
+              const value = entry.value === undefined ? "—" : entry.value;
+              return `<div class="${classes.join(" ")}">
+                ${position ? `<span class="lfu-recency">${position}</span>` : ""}
+                <strong>key ${escapeHtml(entry.key)}</strong>
+                <span>value ${escapeHtml(value)}</span>
+                <small>freq ${escapeHtml(entry.freq)}</small>
+              </div>`;
+            }).join('<span class="lfu-order-arrow" aria-hidden="true">→</span>')
+          : `<span class="lfu-empty-bucket">${vi ? "bucket tạm rỗng" : "temporarily empty"}</span>`;
+        return `<section class="lfu-bucket${isMin ? " minimum" : ""}">
+          <header>
+            <span><small>FREQUENCY</small><strong>f${escapeHtml(group.frequency)}</strong></span>
+            ${isMin ? `<b>min_freq</b>` : ""}
+          </header>
+          <div class="lfu-bucket-order">
+            <span class="lfu-order-label">LRU</span>
+            <div class="lfu-node-row">${nodeHtml}</div>
+            <span class="lfu-order-label">MRU</span>
+          </div>
+        </section>`;
+      }).join("")
+    : `<div class="lfu-empty-cache"><strong>∅</strong><span>${vi ? "cache chưa có key" : "cache has no keys"}</span></div>`;
+
+  const indexHtml = entries.length
+    ? entries.map((entry) => {
+        const classes = ["lfu-index-entry"];
+        if (entry.key === view.activeKey) classes.push("active");
+        if (entry.key === view.movingKey) classes.push("moving");
+        if (entry.key === view.evictedKey) classes.push("evicting");
+        const frequency = entry.freq === null || entry.freq === undefined ? "?" : entry.freq;
+        return `<span class="${classes.join(" ")}"><code>${escapeHtml(entry.key)}</code><strong>${escapeHtml(entry.value)}</strong><small>f${escapeHtml(frequency)}</small></span>`;
+      }).join("")
+    : `<span class="lfu-index-empty">{ }</span>`;
+
+  const activeOperation = view.activeOpIndex === null ? null : operations[view.activeOpIndex];
+  const operationDone = view.activeOpIndex !== null && view.activeOpIndex < view.completedOps;
+  const currentResult = activeOperation && operationDone
+    ? activeOperation.type === "put" ? "null" : results[view.activeOpIndex]
+    : view.phase === "done" && operations.length
+      ? operations[operations.length - 1].type === "put" ? "null" : results[results.length - 1]
+      : "—";
+  const minFrequency = view.size > 0 ? view.minFreq : "—";
+  const moveHtml = view.movingKey !== null && view.fromFreq !== null && view.toFreq !== null
+    ? `<span class="lfu-movement"><strong>key ${escapeHtml(view.movingKey)}</strong><code>f${escapeHtml(view.fromFreq)} → f${escapeHtml(view.toFreq)}</code></span>`
+    : view.fromFreq !== null && view.toFreq !== null && view.activeKey !== null
+      ? `<span class="lfu-movement"><strong>key ${escapeHtml(view.activeKey)}</strong><code>f${escapeHtml(view.fromFreq)} → f${escapeHtml(view.toFreq)}</code></span>`
+      : "";
+  const evictionHtml = view.evictedKey !== null
+    ? `<span class="lfu-eviction"><strong>${vi ? "EVICT" : "EVICT"} key ${escapeHtml(view.evictedKey)}</strong><small>${vi ? `đầu bucket f${escapeHtml(view.fromFreq)} = LRU` : `front of bucket f${escapeHtml(view.fromFreq)} = LRU`}</small></span>`
+    : "";
+  const summary = vi
+    ? `LFU Cache có ${view.size} trên ${view.capacity} key, min_freq ${minFrequency}. ${pick(step.title)}`
+    : `LFU Cache contains ${view.size} of ${view.capacity} keys, min_freq ${minFrequency}. ${pick(step.title)}`;
+
+  treeView.innerHTML = `<div class="lfu-cache-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="lfu-operations" aria-label="${vi ? "Danh sách operations" : "Operation list"}">${operationHtml}</div>
+    <div class="lfu-status-row">
+      <span><small>CAPACITY</small><strong>${escapeHtml(view.capacity)}</strong></span>
+      <span><small>SIZE</small><strong>${escapeHtml(view.size)} / ${escapeHtml(view.capacity)}</strong></span>
+      <span class="minimum"><small>MIN_FREQ</small><strong>${escapeHtml(minFrequency)}</strong></span>
+      <span><small>RESULT</small><strong>${escapeHtml(currentResult)}</strong></span>
+    </div>
+    <div class="lfu-action-row">
+      <span class="lfu-action"><small>${vi ? "BƯỚC HIỆN TẠI" : "CURRENT STEP"}</small><strong>${escapeHtml(pick(step.title))}</strong></span>
+      ${moveHtml}${evictionHtml}
+    </div>
+    <div class="lfu-buckets">${bucketHtml}</div>
+    <section class="lfu-key-index">
+      <header><strong>KEY INDEX</strong><small>key → value · frequency</small></header>
+      <div>${indexHtml}</div>
+    </section>
+    <div class="lfu-legend" aria-hidden="true">
+      <span><i class="minimum"></i>min_freq bucket</span>
+      <span><i class="active"></i>${vi ? "key đang xử lý" : "active key"}</span>
+      <span><i class="evicting"></i>${vi ? "key bị loại" : "evicted key"}</span>
+      <span><b>LRU → MRU</b>${vi ? "cũ nhất → mới nhất" : "oldest → newest"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -6522,6 +6649,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLoudRichView(step);
+  } else if (step.lfuCacheView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLfuCacheView(step);
   } else if (step.kthPalindromeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

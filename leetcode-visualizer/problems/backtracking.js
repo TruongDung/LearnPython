@@ -2637,15 +2637,15 @@ function buildSteps79(input, params) {
     path.pop();
     snap({
       title: { vi: `Backtrack from ${coord(r, c)}: khôi phục '${tmp}'`, en: `Backtrack from ${coord(r, c)}: restore '${tmp}'` },
-      current: { r, c }, restored: { r, c }, index: i, action: "backtrack", codeLines: [21],
-      vars: [{ name: "backtrack", value: coord(r, c) }, { name: "restore char", value: `'${tmp}'` }, { name: "remaining path", value: path.length ? path.map((item) => coord(item.r, item.c)).join(" → ") : "∅" }],
-      note: { vi: `Cả 4 hướng đều False. Bỏ ${coord(r, c)} khỏi path và khôi phục board[${r}][${c}] về '${tmp}'.`, en: `All four directions returned False. Remove ${coord(r, c)} from the path and restore board[${r}][${c}] to '${tmp}'.` },
+      current: { r, c }, restored: { r, c }, index: i, action: "restore", codeLines: [21],
+      vars: [{ name: "backtrack", value: coord(r, c) }, { name: "board[row][col]", value: `'${tmp}'` }, { name: "remaining path", value: path.length ? path.map((item) => coord(item.r, item.c)).join(" → ") : "∅" }],
+      note: { vi: `Cả 4 hướng đều False. Dòng 21 khôi phục board[${r}][${c}] từ '#' về '${tmp}' và bỏ ô này khỏi đường đi hiện tại. Chưa return ở bước này.`, en: `All four directions returned False. Line 21 restores board[${r}][${c}] from '#' to '${tmp}' and removes the cell from the current path. This step has not returned yet.` },
     });
     snap({
-      title: { vi: `Trả về False từ dfs${coord(r, c)}`, en: `Return False from dfs${coord(r, c)}` },
-      current: { r, c }, index: i, action: "backtrack", codeLines: [22],
-      vars: [{ name: "at", value: coord(r, c) }, { name: "return", value: false }],
-      note: { vi: `Ô đã được khôi phục; trả False về frame cha để frame đó tiếp tục thử hướng khác.`, en: `The cell is restored; return False to the parent frame so it can try another direction.` },
+      title: { vi: `return False từ dfs${coord(r, c)}`, en: `return False from dfs${coord(r, c)}` },
+      current: { r, c }, restored: { r, c }, index: i, action: "return-false", result: false, codeLines: [22],
+      vars: [{ name: "at", value: coord(r, c) }, { name: "board[row][col]", value: `'${tmp}'` }, { name: "return", value: false }, { name: "parent action", value: "try next direction" }],
+      note: { vi: `Dòng 22 trả False cho frame cha. Ô ${coord(r, c)} đã được khôi phục, nên frame cha có thể thử hướng kế tiếp.`, en: `Line 22 returns False to the parent frame. Cell ${coord(r, c)} is already restored, so the parent can try its next direction.` },
     });
     callStack.pop();
     return false;
