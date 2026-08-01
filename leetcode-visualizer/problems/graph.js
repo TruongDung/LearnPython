@@ -14485,11 +14485,251 @@ function buildSteps851v2(input, params = {}) {
   return { original: { richer: richerEdges, quiet }, answer, steps };
 }
 
+/**
+ * LeetCode 4003: Minimum Cost Path with Alternating Directions III.
+ *
+ * Dijkstra on state (r, c, parity) where parity ∈ {0=even, 1=odd}.
+ * Parity 1 (odd action): right/down follows the rule → no penalty.
+ * Parity 0 (even action): left/up follows the rule → no penalty.
+ *
+ * Three choices each turn:
+ *   1. Move following parity  → dest entry cost only.
+ *   2. Move violating parity  → dest entry cost + penalty[r][c].
+ *   3. Wait in current cell   → penalty[r][c], parity flips.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  class Solution:
+ *  3      def minCost(self, m, n, penalty):
+ *  4          INF = float('inf')
+ *  5          dist = [[[INF]*2 for _ in range(n)] for _ in range(m)]
+ *  6          dist[0][0][1] = (0+1)*(0+1)
+ *  7          heap = [(dist[0][0][1], 0, 0, 1)]
+ *  8          while heap:
+ *  9              cost, r, c, par = heapq.heappop(heap)
+ * 10              if cost > dist[r][c][par]: continue
+ * 11              if r == m-1 and c == n-1: return cost
+ * 12              for dr, dc in [(0,1),(1,0),(0,-1),(-1,0)]:
+ * 13                  nr, nc = r+dr, c+dc
+ * 14                  if 0 <= nr < m and 0 <= nc < n:
+ * 15                      follows = (par==1 and dr+dc>0) or (par==0 and dr+dc<0)
+ * 16                      pen = 0 if follows else penalty[r][c]
+ * 17                      nc_cost = cost + (nr+1)*(nc+1) + pen
+ * 18                      if nc_cost < dist[nr][nc][1-par]:
+ * 19                          dist[nr][nc][1-par] = nc_cost
+ * 20                          heapq.heappush(heap, (nc_cost, nr, nc, 1-par))
+ * 21              wait_cost = cost + penalty[r][c]
+ * 22              if wait_cost < dist[r][c][1-par]:
+ * 23                  dist[r][c][1-par] = wait_cost
+ * 24                  heapq.heappush(heap, (wait_cost, r, c, 1-par))
+ * 25          return min(dist[m-1][n-1])
+ */
+function buildSteps4003(input, params) {
+  // Parse penalty matrix: rows separated by ';', values by ','
+  let penalty;
+  const raw = String(input || "").trim();
+  if (raw.includes(";")) {
+    penalty = raw.split(";").map((row) => row.split(",").map(Number));
+  } else {
+    penalty = [[1, 2], [3, 4]]; // fallback
+  }
+  const m = penalty.length;
+  const n = penalty[0].length;
+  const steps = [];
+  const INF = Infinity;
+  const entry = (r, c) => (r + 1) * (c + 1);
+  const fmt = (v) => (Number.isFinite(v) ? String(v) : "∞");
+
+  // dist[r][c][par] — par 1=odd, 0=even
+  const dist = Array.from({ length: m }, () =>
+    Array.from({ length: n }, () => [INF, INF])
+  );
+  const settled = new Set(); // "r,c,par" keys
+  const heapArr = []; // min-heap simulated as sorted array (small grids)
+  const push = (el) => { heapArr.push(el); heapArr.sort((a, b) => a[0] - b[0]); };
+  const pop = () => heapArr.shift();
+  const key = (r, c, p) => `${r},${c},${p}`;
+
+  function makeCells(curR, curC, curP) {
+    return Array.from({ length: m }, (_, r) =>
+      Array.from({ length: n }, (_, c) => {
+        const isStart = r === 0 && c === 0;
+        const isEnd = r === m - 1 && c === n - 1;
+        const dOdd = fmt(dist[r][c][1]);
+        const dEven = fmt(dist[r][c][0]);
+        let cls = "empty";
+        if (settled.has(key(r, c, 0)) || settled.has(key(r, c, 1))) cls = "visited";
+        if (r === curR && c === curC) cls = "current";
+        if (isEnd && cls === "visited") cls = "path";
+        const label = `(${r},${c})\ne:${entry(r, c)}`;
+        const metaSuffix = isStart ? " S" : isEnd ? " T" : "";
+        const meta = `o:${dOdd} e:${dEven} p:${penalty[r][c]}${metaSuffix}`;
+        return { label, meta, cls };
+      })
+    );
+  }
+
+  function snap(title, note, codeLines, vars = [], curR = null, curC = null, curP = null, final = false) {
+    steps.push({
+      title, note, codeLines, arr: [], highlight: [], mark: [], final,
+      vars: [
+        ...vars,
+        { name: "heap size", value: heapArr.length },
+      ],
+      bfsGrid: {
+        rows: m, cols: n,
+        variant: "effort-grid",
+        cells: makeCells(curR, curC, curP),
+      },
+    });
+  }
+
+  snap(
+    { vi: `Grid ${m}×${n}: entry cost = (r+1)(c+1), penalty[][]`, en: `Grid ${m}×${n}: entry cost = (r+1)(c+1), penalty[][]` },
+    {
+      vi: `Mỗi ô (r,c): chi phí vào = (r+1)×(c+1). Mỗi hành động có parity (lẻ/chẵn):\n` +
+          `• Parity LẺ: đi phải/xuống → không phạt.\n• Parity CHẴN: đi trái/lên → không phạt.\n` +
+          `• Vi phạm hoặc đứng chờ → cộng penalty[r][c].\n` +
+          `Ô hiển thị: o=chi phí parity lẻ, e=parity chẵn, p=penalty.`,
+      en: `Each cell (r,c): entry cost = (r+1)×(c+1). Each action has a parity (odd/even):\n` +
+          `• Odd parity: move right/down → no penalty.\n• Even parity: move left/up → no penalty.\n` +
+          `• Violating or waiting → add penalty[r][c].\n` +
+          `Cell labels: o=cost at odd parity, e=at even parity, p=penalty.`,
+    },
+    [3, 4, 5, 6, 7],
+    [{ name: "m", value: m }, { name: "n", value: n }, { name: "penalty", value: penalty.map((r) => `[${r.join(",")}]`).join(" ") }],
+  );
+
+  // Init
+  dist[0][0][1] = entry(0, 0);
+  push([dist[0][0][1], 0, 0, 1]);
+  snap(
+    { vi: `dist[0][0][odd] = entry(0,0) = ${entry(0, 0)}`, en: `dist[0][0][odd] = entry(0,0) = ${entry(0, 0)}` },
+    {
+      vi: `Xuất phát tại (0,0) với parity LẺ (action 1). Chi phí bắt đầu = (0+1)×(0+1) = ${entry(0, 0)}.`,
+      en: `Start at (0,0) with ODD parity (action 1). Initial cost = (0+1)×(0+1) = ${entry(0, 0)}.`,
+    },
+    [5, 6, 7],
+    [{ name: "dist[0][0][odd]", value: dist[0][0][1] }],
+    0, 0, 1,
+  );
+
+  let guard = 0;
+  while (heapArr.length > 0 && guard++ < 300) {
+    const [cost, r, c, par] = pop();
+    if (cost > dist[r][c][par]) continue;
+    if (settled.has(key(r, c, par))) continue;
+    settled.add(key(r, c, par));
+
+    const parName = par === 1 ? "odd" : "even";
+    snap(
+      { vi: `Lấy (${r},${c}) parity=${parName}, cost=${cost}`, en: `Pop (${r},${c}) parity=${parName}, cost=${cost}` },
+      {
+        vi: `Lấy ô tối ưu (${r},${c}) với parity ${parName} và cost=${cost} ra khỏi heap. Xét tất cả các hành động.`,
+        en: `Extract optimal cell (${r},${c}) at parity ${parName} with cost=${cost} from heap. Explore all actions.`,
+      },
+      [8, 9, 10],
+      [{ name: "r,c", value: `${r},${c}` }, { name: "parity", value: parName }, { name: "cost", value: cost }],
+      r, c, par,
+    );
+
+    if (r === m - 1 && c === n - 1) {
+      snap(
+        { vi: `Đến đích (${r},${c})! cost = ${cost}`, en: `Reached (${r},${c})! cost = ${cost}` },
+        { vi: `Đã tới đích (${m - 1},${n - 1}) với chi phí tối thiểu = ${cost}.`, en: `Reached destination (${m - 1},${n - 1}) with minimum cost = ${cost}.` },
+        [11],
+        [{ name: "answer", value: cost }],
+        r, c, par, true,
+      );
+      return { original: { m, n, penalty }, answer: cost, steps };
+    }
+
+    // Explore 4 neighbors
+    const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+    const DIR_NAMES = ["→ right", "↓ down", "← left", "↑ up"];
+    for (let d = 0; d < 4; d++) {
+      const [dr, dc] = DIRS[d];
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= m || nc < 0 || nc >= n) continue;
+      const follows = (par === 1 && dr + dc > 0) || (par === 0 && dr + dc < 0);
+      const pen = follows ? 0 : penalty[r][c];
+      const newCost = cost + entry(nr, nc) + pen;
+      const np = 1 - par;
+      const npName = np === 1 ? "odd" : "even";
+      const improved = newCost < dist[nr][nc][np];
+      if (improved) dist[nr][nc][np] = newCost;
+
+      snap(
+        {
+          vi: `${DIR_NAMES[d]}: (${nr},${nc}) parity=${npName}, cost=${newCost}${improved ? " ✓" : " (không cải thiện)"}`,
+          en: `${DIR_NAMES[d]}: (${nr},${nc}) parity=${npName}, cost=${newCost}${improved ? " ✓" : " (no improvement)"}`,
+        },
+        {
+          vi: follows
+            ? `Đi ${DIR_NAMES[d]} → đúng parity → không phạt. chi phí = ${cost} + entry(${nr},${nc})=${entry(nr, nc)} = ${newCost}.`
+            : `Đi ${DIR_NAMES[d]} → SAI parity → phạt penalty[${r}][${c}]=${penalty[r][c]}. chi phí = ${cost} + ${entry(nr, nc)} + ${penalty[r][c]} = ${newCost}.`,
+          en: follows
+            ? `Move ${DIR_NAMES[d]} → follows parity → no penalty. cost = ${cost} + entry(${nr},${nc})=${entry(nr, nc)} = ${newCost}.`
+            : `Move ${DIR_NAMES[d]} → VIOLATES parity → add penalty[${r}][${c}]=${penalty[r][c]}. cost = ${cost} + ${entry(nr, nc)} + ${penalty[r][c]} = ${newCost}.`,
+        },
+        follows ? [12, 13, 14, 15, 16, 17, 18] : [12, 13, 14, 15, 16, 17, 18, 19, 20],
+        [
+          { name: "direction", value: DIR_NAMES[d] },
+          { name: "follows parity?", value: follows },
+          { name: "penalty", value: pen },
+          { name: "new cost", value: newCost },
+          { name: "improved?", value: improved },
+        ],
+        r, c, par,
+      );
+
+      if (improved) push([newCost, nr, nc, np]);
+    }
+
+    // Wait
+    const waitCost = cost + penalty[r][c];
+    const np = 1 - par;
+    const npName = np === 1 ? "odd" : "even";
+    const improved = waitCost < dist[r][c][np];
+    if (improved) dist[r][c][np] = waitCost;
+
+    snap(
+      {
+        vi: `Chờ tại (${r},${c}): parity → ${npName}, cost=${waitCost}${improved ? " ✓" : " (không cải thiện)"}`,
+        en: `Wait at (${r},${c}): parity → ${npName}, cost=${waitCost}${improved ? " ✓" : " (no improvement)"}`,
+      },
+      {
+        vi: `Đứng chờ → trả penalty[${r}][${c}]=${penalty[r][c]}. cost = ${cost} + ${penalty[r][c]} = ${waitCost}. Parity đổi → ${npName}.`,
+        en: `Wait → pay penalty[${r}][${c}]=${penalty[r][c]}. cost = ${cost} + ${penalty[r][c]} = ${waitCost}. Parity flips → ${npName}.`,
+      },
+      [21, 22, 23, 24],
+      [
+        { name: "wait penalty", value: penalty[r][c] },
+        { name: "wait cost", value: waitCost },
+        { name: "improved?", value: improved },
+      ],
+      r, c, par,
+    );
+
+    if (improved) push([waitCost, r, c, np]);
+  }
+
+  const answer = Math.min(...dist[m - 1][n - 1]);
+  snap(
+    { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    { vi: `Chi phí tối thiểu = ${answer}.`, en: `Minimum cost = ${answer}.` },
+    [25],
+    [{ name: "answer", value: answer }],
+    m - 1, n - 1, null, true,
+  );
+  return { original: { m, n, penalty }, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
   __meta: {
-    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 210, 269, 399, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489],
+    order: [200, 994, 542, 1162, 1765, 286, 934, 417, 130, 1020, 1091, 505, 1926, 207, 210, 269, 399, 126, 127, 332, 743, 1514, 1631, 778, 1976, 787, 3977, 3620, 752, 815, 827, 847, 851, 864, 1136, 1192, 1197, 1236, 1293, 3286, 1368, 2290, 2577, 3341, 3342, 1377, 2492, 317, 329, 407, 489, 4003],
     extraCategories: {
       "multi-source-bfs": {
         order: [994, 542, 1162, 1765, 286, 934, 417, 130, 1020],
@@ -18042,6 +18282,72 @@ module.exports = {
   },
   ...multiSourceBfsProblems,
   ...floodFillProblems,
+  4003: {
+    id: 4003,
+    difficulty: "hard",
+    slug: "minimum-cost-path-with-alternating-directions-iii",
+    category: { key: "graph", vi: "Đồ thị / Dijkstra", en: "Graph / Dijkstra" },
+    title: { vi: "Minimum Cost Path with Alternating Directions III", en: "Minimum Cost Path with Alternating Directions III" },
+    titleVi: { vi: "Đường đi chi phí tối thiểu với hướng xen kẽ III", en: "Min-cost path with alternating direction parity" },
+    statement: {
+      vi:
+        "Lưới m×n. Chi phí vào ô (i,j) = (i+1)×(j+1). Mỗi hành động có parity (lẻ/chẵn): " +
+        "đi đúng hướng (lẻ→phải/xuống, chẵn→trái/lên) không bị phạt; " +
+        "đi sai hướng hoặc đứng chờ → cộng penalty[r][c]. Tìm chi phí tối thiểu từ (0,0) đến (m-1,n-1). " +
+        "Nhập penalty (hàng cách ';', giá trị cách ',').",
+      en:
+        "m×n grid. Entry cost of (i,j) = (i+1)×(j+1). Each action has a parity (odd/even): " +
+        "moving in the matching direction (odd→right/down, even→left/up) costs nothing extra; " +
+        "violating the parity or waiting adds penalty[r][c]. Find the minimum total cost from (0,0) to (m-1,n-1). " +
+        "Enter the penalty matrix (rows separated by ';', values by ',').",
+    },
+    defaultInput: "3,2;1,4",
+    inputKind: "string",
+    inputLabel: { vi: "penalty (hàng cách ';')", en: "penalty (rows separated by ';')" },
+    extraParams: [],
+    approach: [
+      { vi: "State = (r, c, parity): vị trí hiện tại và parity của hành động kế tiếp.", en: "State = (r, c, parity): current position and parity of the next action." },
+      { vi: "Dijkstra với min-heap trên state. Chi phí bắt đầu = entry(0,0), parity = 1 (lẻ).", en: "Dijkstra with a min-heap on states. Start cost = entry(0,0), parity = 1 (odd)." },
+      { vi: "Di chuyển đúng parity → chỉ trả entry cost đích. Sai parity → cộng penalty[r][c].", en: "Move following parity → only pay destination entry cost. Violate → add penalty[r][c]." },
+      { vi: "Đứng chờ → trả penalty[r][c], parity đổi.", en: "Wait → pay penalty[r][c], parity flips." },
+    ],
+    complexity: {
+      time: "O(m × n × log(m × n))",
+      space: "O(m × n)",
+      note: {
+        vi: "2 trạng thái parity mỗi ô → O(mn) nút; heap O(mn log mn).",
+        en: "2 parity states per cell → O(mn) nodes; heap O(mn log mn).",
+      },
+    },
+    code: [
+      "import heapq",
+      "class Solution:",
+      "    def minCost(self, m, n, penalty):",
+      "        INF = float('inf')",
+      "        dist = [[[INF]*2 for _ in range(n)] for _ in range(m)]",
+      "        dist[0][0][1] = (0+1)*(0+1)",
+      "        heap = [(dist[0][0][1], 0, 0, 1)]",
+      "        while heap:",
+      "            cost, r, c, par = heapq.heappop(heap)",
+      "            if cost > dist[r][c][par]: continue",
+      "            if r == m-1 and c == n-1: return cost",
+      "            for dr, dc in [(0,1),(1,0),(0,-1),(-1,0)]:",
+      "                nr, nc = r+dr, c+dc",
+      "                if 0 <= nr < m and 0 <= nc < n:",
+      "                    follows = (par==1 and dr+dc>0) or (par==0 and dr+dc<0)",
+      "                    pen = 0 if follows else penalty[r][c]",
+      "                    nc_cost = cost + (nr+1)*(nc+1) + pen",
+      "                    if nc_cost < dist[nr][nc][1-par]:",
+      "                        dist[nr][nc][1-par] = nc_cost",
+      "                        heapq.heappush(heap,(nc_cost,nr,nc,1-par))",
+      "            wait_cost = cost + penalty[r][c]",
+      "            if wait_cost < dist[r][c][1-par]:",
+      "                dist[r][c][1-par] = wait_cost",
+      "                heapq.heappush(heap,(wait_cost,r,c,1-par))",
+      "        return min(dist[m-1][n-1])",
+    ],
+    builder: buildSteps4003,
+  },
 };
 
 Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
