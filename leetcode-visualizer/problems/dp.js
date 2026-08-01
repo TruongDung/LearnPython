@@ -13369,7 +13369,250 @@ function buildSteps338(input) {
   return { original: n, answer: dp, steps };
 }
 
+/**
+ * LeetCode 486: Predict the Winner.
+ * dp[i][j] = max score advantage (current player − opponent) on nums[i..j].
+ *   dp[i][i] = nums[i]
+ *   dp[i][j] = max(nums[i] − dp[i+1][j],   ← take left
+ *                  nums[j] − dp[i][j−1])    ← take right
+ * Player 1 wins ⟺ dp[0][n−1] ≥ 0.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def predictTheWinner(self, nums):
+ *  3          n = len(nums)
+ *  4          dp = [[0]*n for _ in range(n)]
+ *  5          for i in range(n): dp[i][i] = nums[i]
+ *  6          for length in range(2, n+1):
+ *  7              for i in range(n-length+1):
+ *  8                  j = i + length - 1
+ *  9                  take_left  = nums[i] - dp[i+1][j]
+ * 10                  take_right = nums[j] - dp[i][j-1]
+ * 11                  dp[i][j] = max(take_left, take_right)
+ * 12          return dp[0][n-1] >= 0
+ */
+function buildSteps486(inputNums) {
+  const nums = Array.isArray(inputNums)
+    ? [...inputNums]
+    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const n = nums.length;
+  const steps = [];
+
+  // dp[i][j] = max advantage for current player on nums[i..j]
+  const dp = Array.from({ length: n }, () => Array(n).fill(null));
+
+  // Display grid: (n+1)×(n+1), row 0 = col headers, col 0 = row headers
+  const colHeaders = nums.map((v, i) => ({ index: `j=${i}`, char: String(v) }));
+  const rowHeaders = nums.map((v, i) => ({ index: `i=${i}`, char: String(v) }));
+
+  function makeDisplay() {
+    const d = Array.from({ length: n + 1 }, () => Array(n + 1).fill(""));
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        d[r + 1][c + 1] = dp[r][c] === null ? "·" : String(dp[r][c]);
+      }
+    }
+    return d;
+  }
+
+  function gridSnap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      grid: {
+        dp: makeDisplay(),
+        text1: "",
+        text2: "",
+        rowLabels: rowHeaders,
+        colLabels: colHeaders,
+        showIndices: false,
+        hlCell: opts.hlCell ? [opts.hlCell[0] + 1, opts.hlCell[1] + 1] : null,
+        pathCells: (opts.pathCells || []).map(([r, c]) => [r + 1, c + 1]),
+        largeCells: true,
+        caption: opts.caption || null,
+      },
+      highlight: [],
+      mark: [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────
+  gridSnap({
+    title: { vi: "Khởi tạo bảng DP", en: "Initialize DP table" },
+    codeLines: [3, 4],
+    vars: [
+      { name: "nums", value: `[${nums.join(", ")}]` },
+      { name: "n", value: n },
+    ],
+    note: {
+      vi:
+        `dp[i][j] = lợi thế điểm số tối đa (người hiện tại − đối thủ) trên nums[i..j].\n` +
+        `Cột/hàng header = chỉ số và giá trị. Ô trên đường chéo chính (i>j) không dùng.`,
+      en:
+        `dp[i][j] = max score advantage (current player − opponent) on nums[i..j].\n` +
+        `Headers show index and value. Cells above the main diagonal (i>j) are unused.`,
+    },
+  });
+
+  // ── Base case: length 1 ──────────────────────────────────────────────
+  for (let i = 0; i < n; i++) {
+    dp[i][i] = nums[i];
+    gridSnap({
+      title: { vi: `dp[${i}][${i}] = nums[${i}] = ${nums[i]}`, en: `dp[${i}][${i}] = nums[${i}] = ${nums[i]}` },
+      hlCell: [i, i],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: i },
+        { name: `nums[${i}]`, value: nums[i] },
+        { name: `dp[${i}][${i}]`, value: dp[i][i] },
+      ],
+      note: {
+        vi: `Khoảng đơn [${i},${i}]: chỉ có nums[${i}]=${nums[i]}. Người hiện tại lấy hết → lợi thế = ${nums[i]}.`,
+        en: `Single element [${i},${i}]: only nums[${i}]=${nums[i]}. Current player takes it → advantage = ${nums[i]}.`,
+      },
+    });
+  }
+
+  // ── Fill by increasing length ────────────────────────────────────────
+  for (let length = 2; length <= n; length++) {
+    for (let i = 0; i <= n - length; i++) {
+      const j = i + length - 1;
+
+      gridSnap({
+        title: { vi: `Khoảng [${i},${j}] length=${length}`, en: `Interval [${i},${j}] length=${length}` },
+        hlCell: [i, j],
+        pathCells: i + 1 <= j ? [[i + 1, j]] : [],
+        codeLines: [6, 7, 8],
+        vars: [
+          { name: "length", value: length },
+          { name: "i", value: i },
+          { name: "j", value: j },
+          { name: "nums[i]", value: nums[i] },
+          { name: "nums[j]", value: nums[j] },
+        ],
+        note: {
+          vi: `Tính dp[${i}][${j}]: người hiện tại chọn nums[${i}]=${nums[i]} (trái) hoặc nums[${j}]=${nums[j]} (phải).`,
+          en: `Compute dp[${i}][${j}]: current player picks nums[${i}]=${nums[i]} (left) or nums[${j}]=${nums[j]} (right).`,
+        },
+      });
+
+      const takeLeft  = nums[i] - (i + 1 <= j ? dp[i + 1][j] : 0);
+      const takeRight = nums[j] - (i <= j - 1 ? dp[i][j - 1] : 0);
+      dp[i][j] = Math.max(takeLeft, takeRight);
+      const picked = takeLeft >= takeRight ? "left" : "right";
+
+      gridSnap({
+        title: {
+          vi: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]} (chọn ${picked === "left" ? "trái" : "phải"})`,
+          en: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]} (pick ${picked})`,
+        },
+        hlCell: [i, j],
+        pathCells: picked === "left"
+          ? (i + 1 <= j ? [[i + 1, j]] : [])
+          : (i <= j - 1 ? [[i, j - 1]] : []),
+        codeLines: [9, 10, 11],
+        vars: [
+          { name: "take_left",  value: `nums[${i}](${nums[i]}) − dp[${i+1}][${j}](${i+1<=j ? dp[i+1][j] : 0}) = ${takeLeft}` },
+          { name: "take_right", value: `nums[${j}](${nums[j]}) − dp[${i}][${j-1}](${i<=j-1 ? dp[i][j-1] : 0}) = ${takeRight}` },
+          { name: `dp[${i}][${j}]`, value: dp[i][j] },
+          { name: "best choice", value: picked },
+        ],
+        note: {
+          vi:
+            `take_left = nums[${i}] − dp[${i+1}][${j}] = ${nums[i]} − ${i+1<=j?dp[i+1][j]:0} = ${takeLeft}\n` +
+            `take_right = nums[${j}] − dp[${i}][${j-1}] = ${nums[j]} − ${i<=j-1?dp[i][j-1]:0} = ${takeRight}\n` +
+            `dp[${i}][${j}] = max = ${dp[i][j]}. Nếu lợi thế > 0 → người chọn bài lần này thắng trong đoạn này.`,
+          en:
+            `take_left = nums[${i}] − dp[${i+1}][${j}] = ${nums[i]} − ${i+1<=j?dp[i+1][j]:0} = ${takeLeft}\n` +
+            `take_right = nums[${j}] − dp[${i}][${j-1}] = ${nums[j]} − ${i<=j-1?dp[i][j-1]:0} = ${takeRight}\n` +
+            `dp[${i}][${j}] = max = ${dp[i][j]}. Positive → current picker wins this sub-game.`,
+        },
+      });
+    }
+  }
+
+  const advantage = dp[0][n - 1];
+  const winner = advantage >= 0;
+  gridSnap({
+    title: {
+      vi: `dp[0][${n-1}] = ${advantage} → Player 1 ${winner ? "THẮNG" : "THUA"}`,
+      en: `dp[0][${n-1}] = ${advantage} → Player 1 ${winner ? "WINS" : "LOSES"}`,
+    },
+    hlCell: [0, n - 1],
+    final: true,
+    codeLines: [12],
+    caption: winner
+      ? `✓ Player 1 wins (advantage = ${advantage} ≥ 0)`
+      : `✗ Player 2 wins (advantage = ${advantage} < 0)`,
+    vars: [
+      { name: "dp[0][n-1]", value: advantage },
+      { name: "dp[0][n-1] >= 0?", value: winner },
+      { name: "answer", value: winner },
+    ],
+    note: {
+      vi:
+        `dp[0][${n-1}] = ${advantage}.\n` +
+        (winner
+          ? `≥ 0 → Player 1 có thể đảm bảo điểm số ≥ Player 2 → Player 1 THẮNG.`
+          : `< 0 → Player 2 luôn có thể đảm bảo điểm cao hơn → Player 2 THẮNG.`),
+      en:
+        `dp[0][${n-1}] = ${advantage}.\n` +
+        (winner
+          ? `≥ 0 → Player 1 can guarantee score ≥ Player 2 → Player 1 WINS.`
+          : `< 0 → Player 2 can always secure more points → Player 2 WINS.`),
+    },
+  });
+
+  return { original: nums, answer: winner, steps };
+}
+
 module.exports = {
+  486: {
+    id: 486,
+    difficulty: "medium",
+    slug: "predict-the-winner",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Predict the Winner", en: "Predict the Winner" },
+    titleVi: { vi: "Dự đoán người thắng (interval DP)", en: "Predict the winner (interval DP)" },
+    statement: {
+      vi: "Hai người chơi lần lượt chọn số ở đầu hoặc cuối mảng. Player 1 thắng nếu điểm ≥ Player 2. Nhập nums cách nhau dấu phẩy.",
+      en: "Two players alternate picking from either end of the array. Player 1 wins if their score ≥ Player 2. Enter nums comma-separated.",
+    },
+    defaultInput: [1, 5, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "dp[i][j] = lợi thế điểm số tối đa (người hiện tại − đối thủ) trên nums[i..j].", en: "dp[i][j] = max score advantage (current player − opponent) on nums[i..j]." },
+      { vi: "Base: dp[i][i] = nums[i] (người hiện tại lấy hết).", en: "Base: dp[i][i] = nums[i] (current player takes it)." },
+      { vi: "dp[i][j] = max(nums[i] − dp[i+1][j], nums[j] − dp[i][j-1]).", en: "dp[i][j] = max(nums[i] − dp[i+1][j], nums[j] − dp[i][j-1])." },
+      { vi: "Player 1 thắng ⟺ dp[0][n-1] ≥ 0.", en: "Player 1 wins ⟺ dp[0][n-1] ≥ 0." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: { vi: "Điền bảng n×n theo đường chéo.", en: "Fill the n×n table diagonally." },
+    },
+    code: [
+      "class Solution:",
+      "    def predictTheWinner(self, nums):",
+      "        n = len(nums)",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        for i in range(n): dp[i][i] = nums[i]",
+      "        for length in range(2, n+1):",
+      "            for i in range(n-length+1):",
+      "                j = i + length - 1",
+      "                take_left  = nums[i] - dp[i+1][j]",
+      "                take_right = nums[j] - dp[i][j-1]",
+      "                dp[i][j] = max(take_left, take_right)",
+      "        return dp[0][n-1] >= 0",
+    ],
+    builder: buildSteps486,
+  },
   118: {
     id: 118,
     difficulty: "easy",
