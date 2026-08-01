@@ -1843,6 +1843,11 @@ function distanceKGuideHtml(view) {
     actionText = vi
       ? `Đang tạo đường đi ngược con → cha. Đã ghi ${view.parentCount} liên kết.`
       : `Building reverse child → parent links. ${view.parentCount} links recorded.`;
+  } else if (view.phase === "collect" && view.distance !== null && view.distance !== undefined) {
+    const layerValues = (view.queue || []).map((item) => item.value).join(", ");
+    actionText = vi
+      ? `distance=${view.distance}=k nên toàn bộ queue [${layerValues}] là lớp cần lấy.`
+      : `distance=${view.distance}=k, so the entire queue [${layerValues}] is the requested layer.`;
   } else if (view.phase === "done") {
     actionText = vi
       ? `Hoàn tất: các node ở đúng lớp d=${view.k} là [${view.result.join(", ")}].`
@@ -2724,7 +2729,7 @@ function renderDecisionTree(step) {
 }
 
 // ---- Graph renderer (directed weighted graph) ----
-function renderGraph(step) {
+function renderGraph(step, targetId = "treeView") {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
   const n = nodes.length;
   const isLinear = step.graph.layout === "linear";
@@ -2970,11 +2975,138 @@ function renderGraph(step) {
   const caption = step.graph.caption
     ? `<div class="graph-caption">${escapeXml(pick(step.graph.caption))}</div>`
     : "";
-  $("treeView").innerHTML =
+  $(targetId).innerHTML =
     caption +
     `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" class="tree-svg graph-svg${isLinear ? " graph-linear" : ""}${isFlow ? " graph-flow" : ""}">` +
     defs + columnSvg + edgeSvg + nodeSvg +
     `</svg>`;
+}
+
+function renderNetworkDelayView(step) {
+  const view = step.networkDelayView;
+  const vi = lang === "vi";
+  const dijkstraPhases = new Set(["init", "pop", "stale", "inspect", "calculate", "compare", "update", "push"]);
+  const activeStage = view.phase === "build" ? 0 : dijkstraPhases.has(view.phase) ? 1 : 2;
+  const stageLabels = vi
+    ? ["1. Dựng graph", "2. Chạy Dijkstra", "3. Lấy max(dist)"]
+    : ["1. Build graph", "2. Run Dijkstra", "3. Take max(dist)"];
+  const stageHtml = stageLabels.map((label, index) => {
+    const state = index < activeStage ? "is-done" : index === activeStage ? "is-active" : "";
+    return `<span class="${state}">${index < activeStage ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const distanceHtml = view.distances.map((item) => {
+    const classes = ["network-delay-dist"];
+    let stateLabel = vi ? "chưa tới" : "unreached";
+    if (item.value !== "∞") stateLabel = vi ? "đã biết" : "known";
+    if (item.isSource) {
+      classes.push("is-source");
+      stateLabel = "source";
+    }
+    if (item.isFinalized) {
+      classes.push("is-finalized");
+      stateLabel = vi ? "đã chốt" : "finalized";
+    }
+    if (item.isCandidate) {
+      classes.push("is-candidate");
+      stateLabel = vi ? "đang so sánh" : "candidate";
+    }
+    if (item.isCurrent) {
+      classes.push("is-current");
+      stateLabel = vi ? "vừa pop" : "popped";
+    }
+    return `<div class="${classes.join(" ")}">
+      <small>node ${escapeHtml(item.node)}</small>
+      <strong>${escapeHtml(item.value)}</strong>
+      <em>${escapeHtml(stateLabel)}</em>
+    </div>`;
+  }).join("");
+
+  const heapHtml = view.heap.length
+    ? view.heap.map((item, index) => `<div class="network-delay-heap-item${index === 0 ? " is-front" : ""}">
+        <small>${index === 0 ? (vi ? "POP TIẾP" : "NEXT POP") : `[${index}]`}</small>
+        <strong>(${escapeHtml(item.distance)}, ${escapeHtml(item.node)})</strong>
+        <em>distance, node</em>
+      </div>`).join("")
+    : `<span class="network-delay-empty">${vi ? "heap rỗng" : "empty heap"}</span>`;
+
+  const edge = view.activeEdge;
+  const currentDistance = edge
+    ? (view.distances.find((item) => item.node === edge.u) || {}).value
+    : null;
+  let actionMain;
+  let actionDetail;
+  let outcomeClass = "";
+  if (view.phase === "build") {
+    actionMain = edge ? `${edge.u} → ${edge.v} · w=${edge.w}` : (vi ? "Tạo adjacency list" : "Create adjacency list");
+    actionDetail = edge
+      ? (vi ? "Lưu cạnh có hướng và trọng số vào graph[u]." : "Store the directed weighted edge in graph[u].")
+      : (vi ? "Chuẩn bị danh sách cạnh đi ra cho mỗi node." : "Prepare outgoing edges for every node.");
+  } else if (view.phase === "init") {
+    actionMain = `dist[${view.source}] = 0`;
+    actionDetail = vi ? "Nguồn vào heap với khoảng cách 0; các node khác vẫn là ∞." : "Push the source with distance 0; every other node remains ∞.";
+  } else if (view.phase === "pop") {
+    actionMain = view.currentNode === null
+      ? (vi ? "Lấy phần tử nhỏ nhất của heap" : "Take the minimum heap entry")
+      : `pop → node ${view.currentNode}`;
+    actionDetail = vi ? "Chỉ node có distance nhỏ nhất hiện tại được mở rộng." : "Only the node with the smallest current distance is expanded.";
+  } else if (view.phase === "stale") {
+    actionMain = vi ? `Bỏ qua bản ghi cũ của node ${view.currentNode}` : `Skip stale entry for node ${view.currentNode}`;
+    actionDetail = vi ? "Heap entry lớn hơn dist đang lưu, nên không được duyệt cạnh từ entry này." : "The heap entry exceeds the stored dist, so its outgoing edges are not explored.";
+    outcomeClass = "is-rejected";
+  } else if (edge && view.phase === "inspect") {
+    actionMain = `${edge.u} → ${edge.v} · w=${edge.w}`;
+    actionDetail = vi ? `Thử đi từ node ${edge.u} đang xử lý sang node ${edge.v}.` : `Try moving from current node ${edge.u} to node ${edge.v}.`;
+  } else if (edge && view.phase === "calculate") {
+    actionMain = `${currentDistance} + ${edge.w} = ${view.candidate}`;
+    actionDetail = vi ? `Đây là thời gian mới nếu tín hiệu đi qua cạnh ${edge.u} → ${edge.v}.` : `This is the candidate arrival time through edge ${edge.u} → ${edge.v}.`;
+  } else if (edge && view.phase === "compare") {
+    actionMain = `${view.candidate} < ${view.oldDistance} → ${view.improves ? "True" : "False"}`;
+    actionDetail = view.improves
+      ? (vi ? `Đường mới tốt hơn, dòng kế tiếp sẽ cập nhật dist[${edge.v}].` : `The new route is better; the next line updates dist[${edge.v}].`)
+      : (vi ? `Không tốt hơn, giữ nguyên dist[${edge.v}] = ${view.oldDistance}.` : `No improvement; keep dist[${edge.v}] = ${view.oldDistance}.`);
+    outcomeClass = view.improves ? "is-accepted" : "is-rejected";
+  } else if (edge && view.phase === "update") {
+    actionMain = `dist[${edge.v}]: ${view.oldDistance} → ${view.candidate}`;
+    actionDetail = vi ? "Khoảng cách ngắn nhất đã biết được thay bằng giá trị nhỏ hơn." : "Replace the known shortest distance with the smaller value.";
+    outcomeClass = "is-accepted";
+  } else if (edge && view.phase === "push") {
+    actionMain = `heappush((${view.candidate}, ${edge.v}))`;
+    actionDetail = vi ? "Trạng thái mới vào heap và sẽ được sắp theo distance." : "The improved state enters the heap and is ordered by distance.";
+    outcomeClass = "is-accepted";
+  } else if (view.phase === "done") {
+    actionMain = view.answer === -1 ? "return -1" : `return ${view.answer}`;
+    actionDetail = view.answer === -1
+      ? (vi ? "Vẫn còn node có dist = ∞, nên tín hiệu không tới được toàn mạng." : "At least one dist is ∞, so the signal cannot reach the whole network.")
+      : (vi ? `Giá trị lớn nhất trong dist là ${view.answer}: thời điểm node cuối cùng nhận tín hiệu.` : `The maximum dist is ${view.answer}: when the final node receives the signal.`);
+    outcomeClass = view.answer === -1 ? "is-rejected" : "is-accepted";
+  } else {
+    actionMain = vi ? "Heap rỗng → kiểm tra max(dist)" : "Heap empty → inspect max(dist)";
+    actionDetail = vi ? "Khoảng cách lớn nhất quyết định thời gian toàn mạng nhận được tín hiệu." : "The largest distance determines when the whole network has received the signal.";
+  }
+
+  const summary = vi
+    ? `Dijkstra từ nguồn ${view.source}. Heap có ${view.heap.length} trạng thái.`
+    : `Dijkstra from source ${view.source}. The heap contains ${view.heap.length} states.`;
+  $("treeView").innerHTML = `<section class="network-delay-viz" aria-label="${escapeHtml(summary)}">
+    <div class="network-delay-phases">${stageHtml}</div>
+    <div class="network-delay-workspace">
+      <div id="networkDelayGraph" class="network-delay-graph"></div>
+      <div class="network-delay-state">
+        <div class="network-delay-section-head"><strong>dist</strong><span>${vi ? "thời gian ngắn nhất đã biết" : "best known arrival time"}</span></div>
+        <div class="network-delay-distances">${distanceHtml}</div>
+        <div class="network-delay-section-head"><strong>min-heap</strong><span>${vi ? "ưu tiên distance nhỏ nhất" : "smallest distance first"}</span></div>
+        <div class="network-delay-heap">${heapHtml}</div>
+      </div>
+    </div>
+    <div class="network-delay-action ${outcomeClass}"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="network-delay-legend">
+      <span><i class="current"></i>${vi ? "vừa pop / đang xử lý" : "popped / current"}</span>
+      <span><i class="candidate"></i>${vi ? "node đang relax" : "relax candidate"}</span>
+      <span><i class="finalized"></i>${vi ? "khoảng cách đã chốt" : "finalized distance"}</span>
+    </div>
+  </section>`;
+  renderGraph(step, "networkDelayGraph");
 }
 
 // ---- Linked List renderer (horizontal box nodes with next arrows + curved random arrows) ----
@@ -6777,6 +6909,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKeypadHeapView(step);
+  } else if (step.networkDelayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNetworkDelayView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

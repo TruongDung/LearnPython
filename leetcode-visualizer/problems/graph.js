@@ -2570,6 +2570,7 @@ function buildSteps743(input, params) {
   const dist = Object.fromEntries(nodes.map((node) => [node, Infinity]));
   const parent = Object.fromEntries(nodes.map((node) => [node, null]));
   const finalized = new Set();
+  const heap = [];
   const formatValue = (value) => value === Infinity ? "∞" : String(value);
   const distStr = () => `{${nodes.map((node) => `${node}:${formatValue(dist[node])}`).join(", ")}}`;
   const heapStr = (heap) => `[${heap.map(([d, node]) => `(${d}, ${node})`).join(", ")}]`;
@@ -2585,11 +2586,47 @@ function buildSteps743(input, params) {
       dimUnfocused: true,
     };
   }
-  function pushStep({ title, codeLine, vars, note, hlNodes = [], hlEdges = [], annotations = {}, final = false }) {
+  function pushStep({
+    title,
+    codeLine,
+    vars,
+    note,
+    hlNodes = [],
+    hlEdges = [],
+    annotations = {},
+    final = false,
+    phase = "build",
+    currentNode = null,
+    activeEdge = null,
+    candidate = null,
+    oldDistance = null,
+    improves = null,
+    answerValue = null,
+  }) {
     steps.push({
       title,
       arr: [],
       graph: makeGraph(hlNodes, hlEdges, annotations),
+      networkDelayView: {
+        phase,
+        source: k,
+        distances: nodes.map((node) => ({
+          node,
+          value: formatValue(dist[node]),
+          isSource: node === k,
+          isCurrent: node === currentNode,
+          isFinalized: finalized.has(node),
+          isCandidate: !!activeEdge && node === activeEdge.v,
+        })),
+        heap: heap.map(([distance, node], index) => ({ distance, node, index })),
+        finalized: [...finalized],
+        currentNode,
+        activeEdge,
+        candidate,
+        oldDistance: oldDistance === Infinity ? "∞" : oldDistance,
+        improves,
+        answer: answerValue,
+      },
       highlight: [],
       mark: [],
       final,
@@ -2602,6 +2639,7 @@ function buildSteps743(input, params) {
   pushStep({
     title: { vi: "Tạo adjacency list", en: "Create the adjacency list" },
     codeLine: 6,
+    phase: "build",
     vars: [{ name: "graph", value: "defaultdict(list)" }],
     note: {
       vi: "graph[u] sẽ lưu các cạnh có hướng đi ra từ u dưới dạng (v, w).",
@@ -2613,6 +2651,8 @@ function buildSteps743(input, params) {
     pushStep({
       title: { vi: `Đọc cạnh ${u} → ${v}`, en: `Read edge ${u} → ${v}` },
       codeLine: 7,
+      phase: "build",
+      activeEdge: { u, v, w },
       hlNodes: [u, v],
       hlEdges: [[u, v]],
       vars: [{ name: "u, v, w", value: `${u}, ${v}, ${w}` }],
@@ -2625,6 +2665,8 @@ function buildSteps743(input, params) {
     pushStep({
       title: { vi: `graph[${u}].append((${v}, ${w}))`, en: `graph[${u}].append((${v}, ${w}))` },
       codeLine: 8,
+      phase: "build",
+      activeEdge: { u, v, w },
       hlNodes: [u, v],
       hlEdges: [[u, v]],
       vars: [{ name: `graph[${u}]`, value: `[${graph[u].map(([to, weight]) => `(${to}, ${weight})`).join(", ")}]` }],
@@ -2638,6 +2680,7 @@ function buildSteps743(input, params) {
   pushStep({
     title: { vi: "Khởi tạo mọi khoảng cách bằng ∞", en: "Initialize every distance to ∞" },
     codeLine: 9,
+    phase: "init",
     vars: [{ name: "dist", value: distStr() }],
     note: {
       vi: "Chưa có node nào nhận được tín hiệu, nên thời gian ngắn nhất tới mọi node ban đầu là ∞.",
@@ -2649,6 +2692,8 @@ function buildSteps743(input, params) {
   pushStep({
     title: { vi: `dist[${k}] = 0`, en: `dist[${k}] = 0` },
     codeLine: 10,
+    phase: "init",
+    currentNode: k,
     hlNodes: [k],
     vars: [{ name: "dist", value: distStr() }],
     note: {
@@ -2657,10 +2702,12 @@ function buildSteps743(input, params) {
     },
   });
 
-  const heap = [[0, k]];
+  heap.push([0, k]);
   pushStep({
     title: { vi: "Đưa nguồn vào min-heap", en: "Push the source into the min-heap" },
     codeLine: 11,
+    phase: "init",
+    currentNode: k,
     hlNodes: [k],
     vars: [{ name: "heap", value: heapStr(heap) }],
     note: {
@@ -2674,6 +2721,7 @@ function buildSteps743(input, params) {
     pushStep({
       title: { vi: "Heap chưa rỗng", en: "The heap is not empty" },
       codeLine: 12,
+      phase: "pop",
       vars: [{ name: "heap", value: heapStr(heap) }],
       note: {
         vi: "Còn trạng thái cần xử lý; tiếp tục lấy trạng thái có thời gian nhỏ nhất.",
@@ -2685,6 +2733,8 @@ function buildSteps743(input, params) {
     pushStep({
       title: { vi: `heappop → (${d}, ${u})`, en: `heappop → (${d}, ${u})` },
       codeLine: 13,
+      phase: "pop",
+      currentNode: u,
       hlNodes: [u],
       vars: [
         { name: "d", value: d },
@@ -2703,6 +2753,8 @@ function buildSteps743(input, params) {
         ? { vi: `${d} > dist[${u}]=${dist[u]}: bản ghi cũ`, en: `${d} > dist[${u}]=${dist[u]}: stale entry` }
         : { vi: `${d} > dist[${u}]=${dist[u]}? False`, en: `${d} > dist[${u}]=${dist[u]}? False` },
       codeLine: 14,
+      phase: stale ? "stale" : "pop",
+      currentNode: u,
       hlNodes: [u],
       vars: [
         { name: "d", value: d },
@@ -2724,6 +2776,8 @@ function buildSteps743(input, params) {
       pushStep({
         title: { vi: "Bỏ qua bản ghi cũ", en: "Skip the stale entry" },
         codeLine: 15,
+        phase: "stale",
+        currentNode: u,
         hlNodes: [u],
         vars: [{ name: "continue", value: true }],
         note: {
@@ -2739,6 +2793,9 @@ function buildSteps743(input, params) {
       pushStep({
         title: { vi: `Xét cạnh ${u} → ${v}`, en: `Inspect edge ${u} → ${v}` },
         codeLine: 16,
+        phase: "inspect",
+        currentNode: u,
+        activeEdge: { u, v, w },
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -2756,6 +2813,10 @@ function buildSteps743(input, params) {
       pushStep({
         title: { vi: `new_dist = ${d} + ${w} = ${newDist}`, en: `new_dist = ${d} + ${w} = ${newDist}` },
         codeLine: 17,
+        phase: "calculate",
+        currentNode: u,
+        activeEdge: { u, v, w },
+        candidate: newDist,
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -2776,6 +2837,12 @@ function buildSteps743(input, params) {
           ? { vi: `${newDist} < ${formatValue(oldDist)}: có cải thiện`, en: `${newDist} < ${formatValue(oldDist)}: improvement` }
           : { vi: `${newDist} < ${formatValue(oldDist)}? False`, en: `${newDist} < ${formatValue(oldDist)}? False` },
         codeLine: 18,
+        phase: "compare",
+        currentNode: u,
+        activeEdge: { u, v, w },
+        candidate: newDist,
+        oldDistance: oldDist,
+        improves,
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -2801,6 +2868,12 @@ function buildSteps743(input, params) {
       pushStep({
         title: { vi: `dist[${v}] = ${newDist}`, en: `dist[${v}] = ${newDist}` },
         codeLine: 19,
+        phase: "update",
+        currentNode: u,
+        activeEdge: { u, v, w },
+        candidate: newDist,
+        oldDistance: oldDist,
+        improves: true,
         hlNodes: [u, v],
         hlEdges: [[u, v]],
         vars: [
@@ -2818,6 +2891,12 @@ function buildSteps743(input, params) {
       pushStep({
         title: { vi: `heappush((${newDist}, ${v}))`, en: `heappush((${newDist}, ${v}))` },
         codeLine: 20,
+        phase: "push",
+        currentNode: u,
+        activeEdge: { u, v, w },
+        candidate: newDist,
+        oldDistance: oldDist,
+        improves: true,
         hlNodes: [v],
         vars: [
           { name: "pushed", value: `(${newDist}, ${v})` },
@@ -2834,6 +2913,7 @@ function buildSteps743(input, params) {
   pushStep({
     title: { vi: "Heap đã rỗng", en: "The heap is empty" },
     codeLine: 12,
+    phase: "finish",
     vars: [
       { name: "heap", value: "[]" },
       { name: "dist", value: distStr() },
@@ -2849,6 +2929,8 @@ function buildSteps743(input, params) {
   pushStep({
     title: { vi: `ans = ${formatValue(maxDist)}`, en: `ans = ${formatValue(maxDist)}` },
     codeLine: 21,
+    phase: "finish",
+    answerValue: answer,
     hlNodes: maxDist === Infinity ? nodes.filter((node) => dist[node] === Infinity) : nodes.filter((node) => dist[node] === maxDist),
     vars: [
       { name: "dist", value: distStr() },
@@ -2882,6 +2964,8 @@ function buildSteps743(input, params) {
       ? { vi: "Có node không nhận được tín hiệu", en: "Some node cannot receive the signal" }
       : { vi: `Kết quả ${answer}: ${pathText}`, en: `Result ${answer}: ${pathText}` },
     codeLine: 22,
+    phase: "done",
+    answerValue: answer,
     hlNodes: answer === -1 ? nodes.filter((node) => dist[node] === Infinity) : pathNodes,
     hlEdges: pathEdges,
     annotations: answer === -1 ? {} : { [pathNodes.at(-1)]: "last" },

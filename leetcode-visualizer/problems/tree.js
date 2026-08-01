@@ -2134,6 +2134,381 @@ function buildSteps863(input, params) {
   return { input, answer: `[${result.join(",")}]`, steps };
 }
 
+// ─── 863 Approach 2: parent map + BFS one complete layer at a time ───
+function buildSteps863v2(input, params) {
+  const root = parseTree(input);
+  const targetValue = Number(params.target);
+  const k = Number(params.k);
+  const target = findNode(root, targetValue);
+  const parent = new Map();
+  const parentEntries = [];
+  const visited = new Set();
+  const distanceById = new Map();
+  const result = [];
+  const resultIds = new Set();
+  const steps = [];
+  let queue = null;
+  let distance = null;
+  let size = null;
+  let phase = "parent";
+  let currentNode = null;
+  let inspectedNeighbor = null;
+
+  const formatQueue = () => queue === null ? "not initialized" : `[${queue.map((node) => node.val).join(", ")}]`;
+  const formatVisited = () => `[${[...visited].map((id) => findNodeById(root, id)).join(", ")}]`;
+  const formatParents = () => `{${parentEntries.map(([child, par]) => `${child}:${par}`).join(", ")}}`;
+  const addAnnotation = (annotations, nodeId, label, kind) => {
+    if (nodeId === null || nodeId === undefined) return;
+    if (!annotations[nodeId]) annotations[nodeId] = { labels: [] };
+    annotations[nodeId].labels.push({ label, kind });
+  };
+  const annotations = () => {
+    const resultAnnotations = {};
+    if (target) addAnnotation(resultAnnotations, target.id, "TARGET · d=0", "distance-target");
+    if (queue) {
+      queue.forEach((node) => {
+        const nodeDistance = distanceById.get(node.id);
+        addAnnotation(resultAnnotations, node.id, `QUEUE · d=${nodeDistance}`, "distance-queue");
+      });
+    }
+    resultIds.forEach((id) => addAnnotation(resultAnnotations, id, `ANSWER · d=${k}`, "distance-answer"));
+    if (currentNode) addAnnotation(resultAnnotations, currentNode.id, `CURRENT · d=${distance}`, "distance-current");
+    if (inspectedNeighbor && inspectedNeighbor.node) {
+      addAnnotation(
+        resultAnnotations,
+        inspectedNeighbor.node.id,
+        `${inspectedNeighbor.relation.toUpperCase()} · ${inspectedNeighbor.eligible ? "NEW" : "VISITED"}`,
+        inspectedNeighbor.eligible ? "distance-candidate" : "distance-rejected",
+      );
+    }
+    return resultAnnotations;
+  };
+  const makeDistanceKView = () => {
+    const layers = new Map();
+    distanceById.forEach((nodeDistance, id) => {
+      if (!layers.has(nodeDistance)) layers.set(nodeDistance, []);
+      layers.get(nodeDistance).push({
+        id,
+        value: findNodeById(root, id),
+        isTarget: !!target && id === target.id,
+        isCurrent: !!currentNode && id === currentNode.id,
+        isQueued: !!queue && queue.some((node) => node.id === id),
+        isAnswer: resultIds.has(id),
+      });
+    });
+    if (target && !distanceById.has(target.id)) {
+      layers.set(0, [{
+        id: target.id,
+        value: target.val,
+        isTarget: true,
+        isCurrent: false,
+        isQueued: false,
+        isAnswer: false,
+      }]);
+    }
+    return {
+      phase,
+      target: target ? target.val : targetValue,
+      k,
+      distance,
+      size,
+      current: currentNode ? { value: currentNode.val, distance } : null,
+      inspecting: inspectedNeighbor
+        ? {
+            relation: inspectedNeighbor.relation,
+            value: inspectedNeighbor.node ? inspectedNeighbor.node.val : "None",
+            eligible: inspectedNeighbor.eligible,
+            reason: inspectedNeighbor.reason,
+          }
+        : null,
+      layers: [...layers.entries()].sort(([a], [b]) => a - b).map(([nodeDistance, nodes]) => ({ distance: nodeDistance, nodes })),
+      queue: queue ? queue.map((node) => ({ value: node.val, distance: distanceById.get(node.id) })) : [],
+      visited: [...visited].map((id) => findNodeById(root, id)),
+      result: [...result],
+      parentCount: parentEntries.length,
+    };
+  };
+  const makeQueueView = (operation = "—", popped = "—", appended = "—") => {
+    const items = queue === null ? [] : queue.map((node) => `${node.val}@${distanceById.get(node.id) ?? "?"}`);
+    return {
+      title: "BFS Queue (current layer first)",
+      layout: "stacked",
+      items,
+      capacity: Math.max(5, items.length),
+      active: items.length ? 0 : -1,
+      status: [
+        { label: "operation", value: operation },
+        { label: "distance", value: distance ?? "—" },
+        { label: "size", value: size ?? "—" },
+        { label: "appended", value: appended },
+        { label: "popped", value: popped },
+      ],
+    };
+  };
+  const addStep = (opts) => {
+    const frame = snapshot(root, Object.assign({}, opts, {
+      codeBlock: 2,
+      annotations: opts.annotations || annotations(),
+      queueView: makeQueueView(opts.queueOperation, opts.popped, opts.appended),
+    }));
+    frame.distanceKView = makeDistanceKView();
+    steps.push(frame);
+  };
+
+  addStep({
+    title: { vi: `Gọi distanceK(target=${targetValue}, k=${k})`, en: `Call distanceK(target=${targetValue}, k=${k})` },
+    hlSet: target ? new Set([target.id]) : new Set(), codeLines: [5],
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "target", value: target ? `TreeNode(${target.val})` : "not found" }, { name: "k", value: k }],
+    queueOperation: "enter function",
+    note: { vi: "Cách 2 dựng parent map trước, sau đó BFS theo từng layer với một biến distance chung.", en: "Approach 2 builds the parent map, then runs layer-by-layer BFS with one shared distance variable." },
+  });
+  addStep({
+    title: { vi: "parent = {}", en: "parent = {}" }, codeLines: [6],
+    vars: [{ name: "parent", value: "{}" }], queueOperation: "initialize parent map",
+    note: { vi: "Map này cho phép BFS đi ngược từ node con lên cha.", en: "This map lets BFS move upward from a child to its parent." },
+  });
+  addStep({
+    title: { vi: "build_parent(root, None)", en: "build_parent(root, None)" },
+    hlSet: root ? new Set([root.id]) : new Set(), codeLines: [18],
+    vars: [{ name: "node", value: root ? root.val : "None" }, { name: "par", value: "None" }], queueOperation: "start parent DFS",
+    note: { vi: "Bắt đầu DFS từ root; tham số par mang node cha của frame hiện tại.", en: "Start DFS at root; par carries the current frame's parent node." },
+  });
+
+  function buildParent(node, par) {
+    addStep({
+      title: { vi: `Gọi build_parent(${node ? node.val : "None"}, ${par ? par.val : "None"})`, en: `Call build_parent(${node ? node.val : "None"}, ${par ? par.val : "None"})` },
+      hlSet: node ? new Set([node.id]) : par ? new Set([par.id]) : new Set(), codeLines: [9],
+      vars: [{ name: "node", value: node ? node.val : "None" }, { name: "par", value: par ? par.val : "None" }], queueOperation: "enter build_parent",
+      note: { vi: "Tạo một frame DFS để ghi parent cho node nếu node tồn tại.", en: "Create a DFS frame that records the node's parent when the node exists." },
+    });
+    const isNone = node === null;
+    addStep({
+      title: { vi: `node is None → ${isNone}`, en: `node is None → ${isNone}` },
+      hlSet: node ? new Set([node.id]) : par ? new Set([par.id]) : new Set(), codeLines: [10],
+      vars: [{ name: "node", value: node ? node.val : "None" }, { name: "condition", value: isNone }], queueOperation: "check node",
+      note: isNone
+        ? { vi: "Đã đi qua một nhánh rỗng; dòng kế tiếp return khỏi frame này.", en: "This branch is empty; the next line returns from this frame." }
+        : { vi: "Node tồn tại nên tiếp tục ghi parent.", en: "The node exists, so continue and record its parent." },
+    });
+    if (isNone) {
+      addStep({
+        title: { vi: "return khỏi build_parent(None, par)", en: "return from build_parent(None, par)" },
+        hlSet: par ? new Set([par.id]) : new Set(), codeLines: [11],
+        vars: [{ name: "return", value: "None" }], queueOperation: "return from empty branch",
+        note: { vi: "Không có node để ghi vào parent map.", en: "There is no node to add to the parent map." },
+      });
+      return;
+    }
+
+    parent.set(node.id, par);
+    parentEntries.push([node.val, par ? par.val : "None"]);
+    addStep({
+      title: { vi: `parent[${node.val}] = ${par ? par.val : "None"}`, en: `parent[${node.val}] = ${par ? par.val : "None"}` },
+      hlSet: new Set([node.id]), codeLines: [13],
+      vars: [{ name: "node", value: node.val }, { name: "par", value: par ? par.val : "None" }, { name: "parent", value: formatParents() }], queueOperation: "record parent",
+      note: par
+        ? { vi: `Tạo đường đi ngược ${node.val} → ${par.val}.`, en: `Create the reverse link ${node.val} → ${par.val}.` }
+        : { vi: `${node.val} là root nên parent của nó là None.`, en: `${node.val} is the root, so its parent is None.` },
+    });
+    addStep({
+      title: { vi: `build_parent(${node.left ? node.left.val : "None"}, ${node.val})`, en: `build_parent(${node.left ? node.left.val : "None"}, ${node.val})` },
+      hlSet: new Set([node.id].concat(node.left ? [node.left.id] : [])), codeLines: [15],
+      vars: [{ name: "node.left", value: node.left ? node.left.val : "None" }, { name: "par", value: node.val }], queueOperation: "recurse left",
+      note: { vi: "Duyệt nhánh trái và truyền node hiện tại làm par.", en: "Traverse the left branch and pass the current node as par." },
+    });
+    buildParent(node.left, node);
+    addStep({
+      title: { vi: `build_parent(${node.right ? node.right.val : "None"}, ${node.val})`, en: `build_parent(${node.right ? node.right.val : "None"}, ${node.val})` },
+      hlSet: new Set([node.id].concat(node.right ? [node.right.id] : [])), codeLines: [16],
+      vars: [{ name: "node.right", value: node.right ? node.right.val : "None" }, { name: "par", value: node.val }], queueOperation: "recurse right",
+      note: { vi: "Sau khi nhánh trái hoàn tất, duyệt nhánh phải.", en: "After the left branch finishes, traverse the right branch." },
+    });
+    buildParent(node.right, node);
+  }
+
+  buildParent(root, null);
+  if (!target) {
+    phase = "done";
+    const missingStep = snapshot(root, {
+      title: { vi: `Không tìm thấy target=${targetValue} → return []`, en: `target=${targetValue} not found → return []` },
+      codeLines: [43], codeBlock: 2, annotations: annotations(), queueView: makeQueueView("missing target"),
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "Target phải là một node trong cây.", en: "Target must be a node in the tree." },
+    });
+    missingStep.distanceKView = makeDistanceKView();
+    missingStep.final = true;
+    steps.push(missingStep);
+    return { input, answer: "[]", steps };
+  }
+
+  phase = "bfs";
+  queue = [target];
+  distanceById.set(target.id, 0);
+  addStep({
+    title: { vi: `queue = deque([${target.val}])`, en: `queue = deque([${target.val}])` },
+    hlSet: new Set([target.id]), codeLines: [21],
+    vars: [{ name: "queue", value: formatQueue() }], queueOperation: "enqueue target", appended: target.val,
+    note: { vi: "Queue bắt đầu với target; toàn bộ queue hiện tại thuộc layer d=0.", en: "The queue starts with target; the entire current queue belongs to layer d=0." },
+  });
+  visited.add(target.id);
+  addStep({
+    title: { vi: `visited = {${target.val}}`, en: `visited = {${target.val}}` },
+    hlSet: new Set([target.id]), wordSet: new Set(visited), codeLines: [22],
+    vars: [{ name: "visited", value: formatVisited() }], queueOperation: "mark target visited",
+    note: { vi: "Đánh dấu target ngay khi enqueue để không quay ngược lại nó.", en: "Mark target when enqueued so traversal cannot return to it." },
+  });
+  distance = 0;
+  addStep({
+    title: { vi: "distance = 0", en: "distance = 0" },
+    hlSet: new Set([target.id]), wordSet: new Set(visited), codeLines: [23],
+    vars: [{ name: "distance", value: distance }, { name: "queue", value: formatQueue() }], queueOperation: "initialize distance",
+    note: { vi: "Mọi node đang có trong queue đều cách target đúng distance cạnh.", en: "Every node currently in the queue is exactly distance edges from target." },
+  });
+
+  while (true) {
+    currentNode = null;
+    inspectedNeighbor = null;
+    size = null;
+    const hasNodes = queue.length > 0;
+    addStep({
+      title: hasNodes ? { vi: "while queue → True", en: "while queue → True" } : { vi: "while queue → False", en: "while queue → False" },
+      hlSet: new Set(queue.map((node) => node.id)), wordSet: new Set(visited), codeLines: [25],
+      vars: [{ name: "queue", value: formatQueue() }, { name: "distance", value: distance }, { name: "condition", value: hasNodes }], queueOperation: hasNodes ? "start layer" : "queue empty",
+      note: hasNodes
+        ? { vi: `Bắt đầu kiểm tra layer d=${distance}.`, en: `Begin checking layer d=${distance}.` }
+        : { vi: "Không còn node để mở rộng.", en: "No nodes remain to expand." },
+    });
+    if (!hasNodes) break;
+
+    const reachedK = distance === k;
+    phase = reachedK ? "collect" : "bfs";
+    addStep({
+      title: { vi: `distance == k: ${distance} == ${k} → ${reachedK}`, en: `distance == k: ${distance} == ${k} → ${reachedK}` },
+      hlSet: new Set(queue.map((node) => node.id)), wordSet: new Set(visited), codeLines: [27],
+      vars: [{ name: "distance", value: distance }, { name: "k", value: k }, { name: "queue", value: formatQueue() }, { name: "condition", value: reachedK }], queueOperation: "check target layer",
+      note: reachedK
+        ? { vi: "Queue hiện chứa chính xác toàn bộ node ở khoảng cách k; dòng kế tiếp trả chúng ngay.", en: "The queue now contains exactly all nodes at distance k; the next line returns them immediately." }
+        : { vi: "Chưa tới k nên phải mở rộng hết layer hiện tại.", en: "The target distance has not been reached, so expand the full current layer." },
+    });
+    if (reachedK) {
+      queue.forEach((node) => {
+        result.push(node.val);
+        resultIds.add(node.id);
+      });
+      phase = "done";
+      const finalStep = snapshot(root, {
+        title: { vi: `return [${result.join(", ")}] từ queue`, en: `return [${result.join(", ")}] from queue` },
+        hlSet: new Set(resultIds), wordSet: new Set(visited), annotations: annotations(), codeLines: [28], codeBlock: 2,
+        queueView: makeQueueView("return current layer"),
+        vars: [{ name: "distance", value: distance }, { name: "queue", value: formatQueue() }, { name: "return", value: `[${result.join(", ")}]` }],
+        note: { vi: `List comprehension lấy mọi node đang nằm trong queue của layer d=${k}.`, en: `The list comprehension returns every node currently in the d=${k} queue layer.` },
+      });
+      finalStep.distanceKView = makeDistanceKView();
+      finalStep.final = true;
+      steps.push(finalStep);
+      return { input, answer: `[${result.join(",")}]`, steps };
+    }
+
+    size = queue.length;
+    addStep({
+      title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
+      hlSet: new Set(queue.map((node) => node.id)), wordSet: new Set(visited), codeLines: [30],
+      vars: [{ name: "size", value: size }, { name: "distance", value: distance }, { name: "queue", value: formatQueue() }], queueOperation: "lock current layer",
+      note: { vi: `Chốt đúng ${size} node của layer d=${distance}; node append mới thuộc layer kế tiếp.`, en: `Lock exactly ${size} nodes from layer d=${distance}; newly appended nodes belong to the next layer.` },
+    });
+
+    for (let slot = 0; slot < size; slot++) {
+      addStep({
+        title: { vi: `for _: lượt ${slot + 1}/${size}`, en: `for _: iteration ${slot + 1}/${size}` },
+        hlSet: new Set(queue.length ? [queue[0].id] : []), wordSet: new Set(visited), codeLines: [32],
+        vars: [{ name: "_", value: slot }, { name: "size", value: size }, { name: "distance", value: distance }], queueOperation: "next node in layer",
+        note: { vi: `Chuẩn bị pop node thứ ${slot + 1}/${size} của layer hiện tại.`, en: `Prepare to pop node ${slot + 1}/${size} from the current layer.` },
+      });
+      const node = queue.shift();
+      currentNode = node;
+      addStep({
+        title: { vi: `node = queue.popleft() → ${node.val}`, en: `node = queue.popleft() → ${node.val}` },
+        hlSet: new Set([node.id]), wordSet: new Set(visited), codeLines: [33],
+        vars: [{ name: "node", value: node.val }, { name: "distance", value: distance }, { name: "queue", value: formatQueue() }], queueOperation: "popleft", popped: node.val,
+        note: { vi: `Lấy node ${node.val} thuộc layer d=${distance}.`, en: `Pop node ${node.val} from layer d=${distance}.` },
+      });
+
+      const neighbors = [
+        { relation: "left", node: node.left },
+        { relation: "right", node: node.right },
+        { relation: "parent", node: parent.get(node.id) },
+      ];
+      for (const candidate of neighbors) {
+        inspectedNeighbor = null;
+        addStep({
+          title: { vi: `neighbor (${candidate.relation}) = ${candidate.node ? candidate.node.val : "None"}`, en: `neighbor (${candidate.relation}) = ${candidate.node ? candidate.node.val : "None"}` },
+          hlSet: new Set([node.id].concat(candidate.node ? [candidate.node.id] : [])), wordSet: new Set(visited), codeLines: [36],
+          vars: [{ name: "node", value: node.val }, { name: "neighbor", value: candidate.node ? candidate.node.val : "None" }, { name: "relation", value: candidate.relation }], queueOperation: "inspect neighbor",
+          note: { vi: "Mỗi node có tối đa ba hướng đi: con trái, con phải và cha.", en: "Each node has up to three directions: left child, right child, and parent." },
+        });
+        const eligible = !!candidate.node && !visited.has(candidate.node.id);
+        inspectedNeighbor = {
+          relation: candidate.relation,
+          node: candidate.node,
+          eligible,
+          reason: !candidate.node ? "none" : eligible ? "new" : "visited",
+        };
+        addStep({
+          title: eligible
+            ? { vi: `${candidate.node.val} != None và chưa visited → True`, en: `${candidate.node.val} is not None and unvisited → True` }
+            : { vi: `${candidate.node ? candidate.node.val : "None"} hợp lệ và chưa visited → False`, en: `${candidate.node ? candidate.node.val : "None"} is valid and unvisited → False` },
+          hlSet: new Set([node.id].concat(candidate.node ? [candidate.node.id] : [])), wordSet: new Set(visited), codeLines: [37],
+          vars: [{ name: "neighbor", value: candidate.node ? candidate.node.val : "None" }, { name: "neighbor is not None", value: !!candidate.node }, { name: "neighbor not in visited", value: candidate.node ? !visited.has(candidate.node.id) : false }, { name: "condition", value: eligible }], queueOperation: eligible ? "accept neighbor" : "skip neighbor",
+          note: eligible
+            ? { vi: `${candidate.node.val} sẽ được đánh dấu trước khi enqueue.`, en: `${candidate.node.val} will be marked before it is enqueued.` }
+            : { vi: candidate.node ? `${candidate.node.val} đã visited nên bỏ qua.` : "Neighbor là None nên bỏ qua.", en: candidate.node ? `${candidate.node.val} is already visited, so skip it.` : "The neighbor is None, so skip it." },
+        });
+        if (!eligible) continue;
+
+        visited.add(candidate.node.id);
+        distanceById.set(candidate.node.id, distance + 1);
+        addStep({
+          title: { vi: `visited.add(${candidate.node.val})`, en: `visited.add(${candidate.node.val})` },
+          hlSet: new Set([node.id, candidate.node.id]), wordSet: new Set(visited), codeLines: [38],
+          vars: [{ name: "visited", value: formatVisited() }, { name: "neighbor distance", value: distance + 1 }], queueOperation: "mark visited",
+          note: { vi: "Đánh dấu trước khi append để node không thể vào queue lần thứ hai.", en: "Mark before appending so the node can never enter the queue twice." },
+        });
+        queue.push(candidate.node);
+        addStep({
+          title: { vi: `queue.append(${candidate.node.val})`, en: `queue.append(${candidate.node.val})` },
+          hlSet: new Set([node.id, candidate.node.id]), wordSet: new Set(visited), codeLines: [39],
+          vars: [{ name: "queue", value: formatQueue() }, { name: "appended layer", value: distance + 1 }], queueOperation: "append next layer", appended: candidate.node.val,
+          note: { vi: `${candidate.node.val} được thêm vào cuối queue và thuộc layer d=${distance + 1}.`, en: `${candidate.node.val} is appended to the queue tail and belongs to layer d=${distance + 1}.` },
+        });
+      }
+    }
+
+    currentNode = null;
+    inspectedNeighbor = null;
+    const previousDistance = distance;
+    distance += 1;
+    size = null;
+    addStep({
+      title: { vi: `distance += 1: ${previousDistance} → ${distance}`, en: `distance += 1: ${previousDistance} → ${distance}` },
+      hlSet: new Set(queue.map((node) => node.id)), wordSet: new Set(visited), codeLines: [41],
+      vars: [{ name: "distance", value: distance }, { name: "queue", value: formatQueue() }], queueOperation: "advance to next layer",
+      note: { vi: `Đã xử lý hết layer d=${previousDistance}; toàn bộ queue còn lại thuộc layer d=${distance}.`, en: `Layer d=${previousDistance} is complete; the entire remaining queue belongs to layer d=${distance}.` },
+    });
+  }
+
+  phase = "done";
+  const emptyStep = snapshot(root, {
+    title: { vi: "return []", en: "return []" },
+    wordSet: new Set(visited), annotations: annotations(), codeLines: [43], codeBlock: 2, queueView: makeQueueView("queue exhausted"),
+    vars: [{ name: "distance", value: distance }, { name: "answer", value: "[]" }],
+    note: { vi: "Cây không có node nào ở khoảng cách k.", en: "The tree has no node at distance k." },
+  });
+  emptyStep.distanceKView = makeDistanceKView();
+  emptyStep.final = true;
+  steps.push(emptyStep);
+  return { input, answer: "[]", steps };
+}
+
 // ─── 156: Binary Tree Upside Down ───
 function buildSteps156(input) {
   const root = parseTree(input); const steps = [];
@@ -3228,11 +3603,25 @@ module.exports = {
     statement: { vi: "Cho root, một nút target và số k, trả về giá trị tất cả nút cách target đúng k cạnh. Nhập level-order.", en: "Given root, a target node, and k, return values of all nodes exactly k edges from target. Enter as level-order." },
     defaultInput: "3,5,1,6,2,0,8,null,null,7,4",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
-    extraParams: [{ key: "target", label: { vi: "target", en: "target" }, allowNegative: true, default: 5 }, { key: "k", label: { vi: "k", en: "k" }, default: 2 }],
+    extraParams: [
+      {
+        key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: queue lưu (node, distance)", en: "Approach 1: queue stores (node, distance)" } },
+          { value: "2", label: { vi: "Cách 2: BFS theo từng layer", en: "Approach 2: layer-by-layer BFS" } },
+        ],
+      },
+      { key: "target", label: { vi: "target", en: "target" }, allowNegative: true, default: 5 },
+      { key: "k", label: { vi: "k", en: "k" }, default: 2 },
+    ],
     approach: [
-      { vi: "Xây map con→cha để biến cây thành đồ thị vô hướng. BFS từ target, lấy lớp thứ k.", en: "Build a child→parent map to turn the tree into an undirected graph. BFS from target, take layer k." },
+      { vi: "Cách 1: queue lưu cả node và distance; node có distance == k được thêm vào result.", en: "Approach 1: store both node and distance in the queue; append nodes whose distance equals k." },
+      { vi: "Cách 2: queue chỉ lưu node của các layer; khi distance == k, toàn bộ queue chính là đáp án.", en: "Approach 2: the queue stores layer nodes only; when distance == k, the entire queue is the answer." },
+      { vi: "Cả hai cách đều xây map con→cha để có thể đi trái, phải hoặc ngược lên cha.", en: "Both approaches build a child→parent map so traversal can move left, right, or upward to the parent." },
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Map cha + BFS đều O(n).", en: "Parent map + BFS both O(n)." } },
+    codeLabel: { vi: "Cách 1: queue lưu (node, distance)", en: "Approach 1: queue stores (node, distance)" },
+    code2Label: { vi: "Cách 2: BFS theo từng layer", en: "Approach 2: layer-by-layer BFS" },
     code: [
       "from collections import deque",
       "",
@@ -3261,7 +3650,55 @@ module.exports = {
       "                    queue.append((neighbor, distance + 1))",
       "        return result",
     ],
-    builder: buildSteps863,
+    code2: [
+      "from collections import deque",
+      "",
+      "",
+      "class Solution:",
+      "    def distanceK(self, root, target, k):",
+      "        parent = {}",
+      "",
+      "        # Bước 1: lưu parent của mỗi node",
+      "        def build_parent(node, par):",
+      "            if node is None:",
+      "                return",
+      "",
+      "            parent[node] = par",
+      "",
+      "            build_parent(node.left, node)",
+      "            build_parent(node.right, node)",
+      "",
+      "        build_parent(root, None)",
+      "",
+      "        # Bước 2: BFS bắt đầu từ target",
+      "        queue = deque([target])",
+      "        visited = {target}",
+      "        distance = 0",
+      "",
+      "        while queue:",
+      "            # Khi đã đi đúng k cạnh",
+      "            if distance == k:",
+      "                return [node.val for node in queue]",
+      "",
+      "            size = len(queue)",
+      "",
+      "            for _ in range(size):",
+      "                node = queue.popleft()",
+      "",
+      "                # Có thể đi trái, phải hoặc lên cha",
+      "                for neighbor in (node.left, node.right, parent[node]):",
+      "                    if neighbor is not None and neighbor not in visited:",
+      "                        visited.add(neighbor)",
+      "                        queue.append(neighbor)",
+      "",
+      "            distance += 1",
+      "",
+      "        return []",
+    ],
+    builder: (input, params) => {
+      const approach = Number(params && params.approach) || 1;
+      return approach === 2 ? buildSteps863v2(input, params) : buildSteps863(input, params);
+    },
   },
   156: {
     id: 156, difficulty: "medium", slug: "binary-tree-upside-down",
