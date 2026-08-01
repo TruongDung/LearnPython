@@ -2491,7 +2491,7 @@ function buildSteps79(input, params) {
   const inBounds = (r, c) => r >= 0 && r < R && c >= 0 && c < C;
   const pathSnapshot = () => path.map((item) => ({ ...item }));
   const stackSnapshot = () => callStack.map((item) => ({ ...item }));
-  const boardCells = () => board.map((row) => [...row]);
+  const boardCells = () => work.map((row) => [...row]);
   const currentChar = (r, c) => inBounds(r, c) ? board[r][c] : null;
 
   function snap(options) {
