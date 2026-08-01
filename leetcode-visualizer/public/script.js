@@ -2161,9 +2161,17 @@ function renderWordSearchView(step) {
   const focus = view.target || view.current;
   const actionLabels = {
     init: vi ? "Chuẩn bị DFS từ từng ô" : "Prepare DFS from every cell",
+    "row-loop": vi ? "Dòng 20 · chọn hàng bắt đầu" : "Line 20 · select a start row",
+    "col-loop": vi ? "Dòng 21 · chọn cột bắt đầu" : "Line 21 · select a start column",
     start: vi ? "Thử một điểm bắt đầu mới" : "Try a new start cell",
     call: vi ? "Tạo một frame DFS mới" : "Create a new DFS frame",
+    "base-check": vi ? "Dòng 6 · đã ghép đủ word chưa?" : "Line 6 · is the word complete?",
+    validate: vi ? "Dòng 8 · tọa độ và ký tự hợp lệ" : "Line 8 · valid coordinate and character",
+    "reject-check": vi ? "Dòng 8 · điều kiện invalid là True" : "Line 8 · invalid condition is True",
     match: vi ? "Ký tự khớp → thêm ô vào path" : "Character matches → add cell to path",
+    "save-char": vi ? "Dòng 11 · lưu ký tự vào tmp" : "Line 11 · save the character in tmp",
+    "found-start": vi ? "Dòng 13 · bắt đầu biểu thức OR" : "Line 13 · begin the OR expression",
+    "found-value": vi ? "Dòng 16 · gán kết quả cho found" : "Line 16 · assign the result to found",
     explore: vi ? "Thử ô kề theo thứ tự ↓ ↑ → ←" : "Try a neighbor in ↓ ↑ → ← order",
     reject: view.reason === "outside"
       ? (vi ? "Nhánh sai: tọa độ vượt biên" : "Reject: coordinate is outside the board")
@@ -2171,20 +2179,21 @@ function renderWordSearchView(step) {
         ? (vi ? "Nhánh sai: ô đã có trong path" : "Reject: cell is already in the path")
         : (vi ? "Nhánh sai: ký tự không khớp" : "Reject: character mismatch"),
     backtrack: vi ? "Bế tắc → khôi phục ô và lùi lại" : "Dead end → restore the cell and backtrack",
-    restore: vi ? "Dòng 21 · khôi phục board[row][col]" : "Line 21 · restore board[row][col]",
-    "return-false": vi ? "Dòng 22 · trả False về frame cha" : "Line 22 · return False to the parent",
+    restore: vi ? "Dòng 17 · khôi phục board[r][c]" : "Line 17 · restore board[r][c]",
+    "return-found": vi ? "Dòng 18 · trả found về frame cha" : "Line 18 · return found to the parent",
     found: vi ? "Đã khớp đủ mọi ký tự" : "Every character has been matched",
     "return-true": vi ? "Nhánh con thành công → truyền True lên" : "Child succeeded → propagate True",
     "result-true": vi ? "Tìm thấy đường đi hợp lệ" : "A valid path was found",
     "result-false": vi ? "Đã thử hết nhưng không có đường hợp lệ" : "All starts exhausted; no valid path",
   };
 
+  const rejectedAction = view.action === "reject" || view.action === "reject-check";
   const completed = view.result === true || view.action === "found" || view.action === "result-true";
   const matchedCount = completed ? view.word.length : Math.min(view.word.length, (view.path || []).length);
   const wordHtml = [...view.word].map((letter, index) => {
     const classes = ["word-search-letter"];
     if (index < matchedCount) classes.push("matched");
-    else if (index === view.index) classes.push(view.action === "reject" ? "rejected" : "needed");
+    else if (index === view.index) classes.push(rejectedAction ? "rejected" : "needed");
     return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(letter)}</strong></span>`;
   }).join('<i class="word-search-word-arrow">→</i>');
 
@@ -2203,8 +2212,8 @@ function renderWordSearchView(step) {
       state = vi ? "sắp thử" : "next";
     }
     if (sameCell(view.current, r, c)) {
-      classes.push(view.action === "reject" ? "rejected" : "current");
-      state = view.action === "reject" ? (vi ? "không hợp lệ" : "invalid") : (vi ? "đang xét" : "current");
+      classes.push(rejectedAction ? "rejected" : "current");
+      state = rejectedAction ? (vi ? "không hợp lệ" : "invalid") : (vi ? "đang xét" : "current");
     }
     if (sameCell(view.restored, r, c)) {
       classes.push("restored");
@@ -2220,7 +2229,7 @@ function renderWordSearchView(step) {
 
   const actual = isInside(focus) ? view.board[focus.r][focus.c] : (focus ? (vi ? "ngoài bảng" : "outside") : "—");
   const expected = view.index >= view.word.length ? "✓" : (view.word[view.index] || "—");
-  const comparisonClass = view.action === "reject" ? "is-rejected" : view.action === "match" || completed ? "is-matched" : "";
+  const comparisonClass = rejectedAction ? "is-rejected" : view.action === "match" || completed ? "is-matched" : "";
   const focusText = focus ? `(${focus.r},${focus.c})` : "—";
 
   const directionOrder = [
@@ -2248,7 +2257,7 @@ function renderWordSearchView(step) {
 
   treeView.innerHTML = `<div class="word-search-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="word-search-word"><span>${vi ? "Từ cần tìm" : "Target word"}</span><div>${wordHtml || '<span class="word-search-empty">empty</span>'}</div><em>${matchedCount}/${view.word.length}</em></div>
-    <div class="word-search-action ${comparisonClass}"><strong>${escapeHtml(actionLabels[view.action] || pick(step.title))}</strong><span>${escapeHtml(focusText)}</span><code>${escapeHtml(actual)} ${view.action === "reject" ? "≠" : "→"} ${escapeHtml(expected)}</code></div>
+    <div class="word-search-action ${comparisonClass}"><strong>${escapeHtml(actionLabels[view.action] || pick(step.title))}</strong><span>${escapeHtml(focusText)}</span><code>${escapeHtml(actual)} ${rejectedAction ? "≠" : "→"} ${escapeHtml(expected)}</code></div>
     <div class="word-search-main">
       <div class="word-search-board" style="grid-template-columns: repeat(${Math.max(1, view.cols)}, minmax(48px, 62px))">${cellsHtml}</div>
       <div class="word-search-trace">
