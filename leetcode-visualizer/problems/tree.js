@@ -1068,47 +1068,29 @@ function buildSteps199v2(input) {
       note: { vi: `Chốt ${size} node thuộc tầng hiện tại trước khi thêm node con.`, en: `Lock in the ${size} nodes belonging to this level before appending children.` },
     });
 
-    const currentLevelList = [];
-    snap({
-      title: { vi: "current_level_list = []", en: "current_level_list = []" },
-      codeLines: [10],
-      queueOperation: "initialize level list", levelSize: size,
-      vars: [{ name: "level", value: level }, { name: "size", value: size }, { name: "current_level_list", value: "[]" }],
-      note: { vi: "Danh sách này ghi lại toàn bộ giá trị của tầng hiện tại.", en: "This list records every value in the current level." },
-    });
-
     for (let i = 0; i < size; i++) {
       snap({
         title: { vi: `for i=${i} trong range(${size})`, en: `for i=${i} in range(${size})` },
-        codeLines: [11],
+        codeLines: [10],
         queueOperation: "next popleft", queueActive: 0, levelSize: size,
-        vars: [{ name: "level", value: level }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        vars: [{ name: "level", value: level }, { name: "i", value: i }, { name: "size", value: size }],
         note: { vi: `Xử lý node thứ ${i + 1}/${size} của tầng ${level}.`, en: `Process node ${i + 1}/${size} from level ${level}.` },
       });
 
       const curr = queue.shift();
       snap({
         title: { vi: `curr = queue.popleft() → ${curr.val}`, en: `curr = queue.popleft() → ${curr.val}` },
-        hlSet: new Set([curr.id]), codeLines: [12],
+        hlSet: new Set([curr.id]), codeLines: [11],
         queueOperation: `popleft ${curr.val}`, popped: curr.val, levelSize: size,
-        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "queue", value: formatNodes(queue) }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "queue", value: formatNodes(queue) }],
         note: { vi: `Lấy ${curr.val} ở đầu deque; queue còn ${formatNodes(queue)}.`, en: `Pop ${curr.val} from the deque front; remaining queue is ${formatNodes(queue)}.` },
-      });
-
-      currentLevelList.push(curr.val);
-      snap({
-        title: { vi: `Thêm ${curr.val} vào current_level_list`, en: `Append ${curr.val} to current_level_list` },
-        hlSet: new Set([curr.id]), codeLines: [13],
-        queueOperation: "record current value", popped: curr.val, levelSize: size,
-        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
-        note: { vi: `current_level_list = [${currentLevelList.join(",")}].`, en: `current_level_list = [${currentLevelList.join(",")}].` },
       });
 
       snap({
         title: { vi: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None", en: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None" },
-        hlSet: new Set([curr.id]), codeLines: [14],
+        hlSet: new Set([curr.id]), codeLines: [12],
         queueOperation: "check left child", popped: curr.val, levelSize: size,
-        vars: [{ name: "curr", value: curr.val }, { name: "curr.left", value: curr.left ? curr.left.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        vars: [{ name: "curr", value: curr.val }, { name: "curr.left", value: curr.left ? curr.left.val : "None" }, { name: "i", value: i }, { name: "size", value: size }],
         note: curr.left
           ? { vi: "Điều kiện True nên sẽ append con trái.", en: "The condition is true, so append the left child." }
           : { vi: "Điều kiện False; queue không đổi.", en: "The condition is false; queue is unchanged." },
@@ -1117,18 +1099,18 @@ function buildSteps199v2(input) {
         queue.push(curr.left);
         snap({
           title: { vi: `queue.append(${curr.left.val})`, en: `queue.append(${curr.left.val})` },
-          hlSet: new Set([curr.left.id]), codeLines: [15],
+          hlSet: new Set([curr.left.id]), codeLines: [13],
           queueOperation: `append ${curr.left.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.left.val, levelSize: size,
-          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }],
           note: { vi: `Thêm con trái; queue = ${formatNodes(queue)}.`, en: `Append the left child; queue = ${formatNodes(queue)}.` },
         });
       }
 
       snap({
         title: { vi: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None", en: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None" },
-        hlSet: new Set([curr.id]), codeLines: [16],
+        hlSet: new Set([curr.id]), codeLines: [14],
         queueOperation: "check right child", popped: curr.val, levelSize: size,
-        vars: [{ name: "curr", value: curr.val }, { name: "curr.right", value: curr.right ? curr.right.val : "None" }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        vars: [{ name: "curr", value: curr.val }, { name: "curr.right", value: curr.right ? curr.right.val : "None" }, { name: "i", value: i }, { name: "size", value: size }],
         note: curr.right
           ? { vi: "Điều kiện True nên sẽ append con phải.", en: "The condition is true, so append the right child." }
           : { vi: "Điều kiện False; queue không đổi.", en: "The condition is false; queue is unchanged." },
@@ -1137,9 +1119,9 @@ function buildSteps199v2(input) {
         queue.push(curr.right);
         snap({
           title: { vi: `queue.append(${curr.right.val})`, en: `queue.append(${curr.right.val})` },
-          hlSet: new Set([curr.right.id]), codeLines: [17],
+          hlSet: new Set([curr.right.id]), codeLines: [15],
           queueOperation: `append ${curr.right.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.right.val, levelSize: size,
-          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }],
           note: { vi: `Thêm con phải; queue = ${formatNodes(queue)}.`, en: `Append the right child; queue = ${formatNodes(queue)}.` },
         });
       }
@@ -1147,9 +1129,9 @@ function buildSteps199v2(input) {
       const isRightmost = i === size - 1;
       snap({
         title: { vi: `i == size - 1 → ${isRightmost}`, en: `i == size - 1 → ${isRightmost}` },
-        hlSet: new Set([curr.id]), codeLines: [18],
+        hlSet: new Set([curr.id]), codeLines: [16],
         queueOperation: "check rightmost", popped: curr.val, levelSize: size,
-        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "is rightmost", value: isRightmost }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+        vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "is rightmost", value: isRightmost }],
         note: isRightmost
           ? { vi: `${curr.val} là node cuối của tầng nên nhìn thấy từ bên phải.`, en: `${curr.val} is the level's last node, so it is visible from the right.` }
           : { vi: `${curr.val} chưa phải node cuối của tầng.`, en: `${curr.val} is not the level's last node.` },
@@ -1159,9 +1141,9 @@ function buildSteps199v2(input) {
         visible.add(curr.id);
         snap({
           title: { vi: `res.append(${curr.val})`, en: `res.append(${curr.val})` },
-          hlSet: new Set([curr.id]), codeLines: [19],
+          hlSet: new Set([curr.id]), codeLines: [17],
           queueOperation: `save rightmost ${curr.val}`, popped: curr.val, levelSize: size,
-          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }, { name: "current_level_list", value: `[${currentLevelList.join(",")}]` }],
+          vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }],
           note: { vi: `res = [${res.join(",")}].`, en: `res = [${res.join(",")}].` },
         });
       }
@@ -1179,7 +1161,7 @@ function buildSteps199v2(input) {
 
   const finalStep = snapshot(root, {
     title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
-    wordSet: new Set(visible), codeLines: [20], codeBlock: 2,
+    wordSet: new Set(visible), codeLines: [18], codeBlock: 2,
     queueView: makeQueueView({ queueOperation: "done" }),
     vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }, { name: "answer", value: `[${res.join(",")}]` }],
     note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
@@ -3082,10 +3064,8 @@ module.exports = {
       "        queue.append(root)",
       "        while queue:",
       "            size = len(queue)",
-      "            current_level_list = []",
       "            for i in range(size):",
       "                curr = queue.popleft()",
-      "                current_level_list.append(curr.val)",
       "                if curr.left:",
       "                    queue.append(curr.left)",
       "                if curr.right:",

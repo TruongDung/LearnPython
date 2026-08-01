@@ -6164,11 +6164,11 @@ function renderParallelCoursesView(step) {
   }).join("");
 
   const completedSet = new Set(view.completed || []);
-  const betweenSemesters = view.semester > 0
+  const betweenSemesters = Number(view.semester) > 0
     && (view.event === "semester-complete" || (view.event === "while-check" && (view.queue || []).length > 0));
   const currentQueue = betweenSemesters
     ? []
-    : (view.currentBatch || []).length
+    : view.batchActive
       ? view.currentBatch
       : view.queue || [];
   const displayedNextQueue = betweenSemesters ? view.queue || [] : view.nextQueue || [];
@@ -6239,33 +6239,41 @@ function renderParallelCoursesView(step) {
   } else if (view.event === "semester-complete") {
     const readyText = (view.queue || []).map((course) => `C${course}`).join(" + ") || "∅";
     actionHtml = `<div class="pc-action success"><small>${vi ? `XONG HỌC KỲ ${view.semester}` : `SEMESTER ${view.semester} COMPLETE`}</small><strong>${readyText}</strong><span>${vi ? `Trở thành queue đầu học kỳ ${view.semester + 1}` : `Becomes the starting queue for semester ${view.semester + 1}`}</span></div>`;
-  } else if (["seed-ready", "seed-blocked"].includes(view.event)) {
+  } else if (["seed-check-ready", "seed-check-blocked", "seed-ready"].includes(view.event)) {
     const degree = view.indegree[view.currentCourse - 1];
     const decision = view.event === "seed-ready"
-      ? (vi ? "in-degree = 0 → thêm vào queue học kỳ 1" : "in-degree = 0 → enqueue for semester 1")
+      ? (vi ? `queue.append(${view.currentCourseIndex})` : `queue.append(${view.currentCourseIndex})`)
+      : view.event === "seed-check-ready"
+        ? (vi ? "điều kiện True → bước sau sẽ append" : "condition is True → the next step appends")
       : (vi ? `còn ${degree} prerequisite → tiếp tục chờ` : `${degree} prerequisite(s) remain → keep waiting`);
-    actionHtml = `<div class="pc-action ${view.event === "seed-ready" ? "success" : "rule"}"><small>${vi ? "KIỂM TRA IN-DEGREE" : "CHECK IN-DEGREE"}</small><strong>C${view.currentCourse}</strong><b>in[C${view.currentCourse}] = ${degree}</b><span>${escapeHtml(decision)}</span></div>`;
+    actionHtml = `<div class="pc-action ${view.event === "seed-ready" ? "success" : "rule"}"><small>${vi ? "INDEX → MÔN HỌC" : "INDEX → COURSE"}</small><strong>i=${view.currentCourseIndex} → C${view.currentCourse}</strong><b>indegree[${view.currentCourseIndex}] = ${degree}</b><span>${escapeHtml(decision)}</span></div>`;
   } else if (view.phase === "build" && view.activeEdge) {
     const buildValue = view.event === "increment-indegree"
-      ? `in[C${view.activeEdge.to}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
+      ? `indegree[${view.activeEdge.to - 1}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
       : view.event === "add-edge"
-        ? `adj[C${view.activeEdge.from}].append(C${view.activeEdge.to})`
+        ? `graph[${view.activeEdge.from - 1}].append(${view.activeEdge.to - 1})`
         : (vi ? "Đọc cặp prerequisite" : "Read prerequisite pair");
     actionHtml = `<div class="pc-action edge"><small>${vi ? "XÂY ĐỒ THỊ" : "BUILD GRAPH"}</small><strong>C${view.activeEdge.from} → C${view.activeEdge.to}</strong><b>${escapeHtml(buildValue)}</b><span>${vi ? "Mũi tên đi từ prerequisite tới môn phụ thuộc" : "The arrow goes from prerequisite to dependent course"}</span></div>`;
   } else if (view.activeEdge) {
     const degreeText = view.indegreeBefore !== undefined
-      ? `in[C${view.activeEdge.to}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
-      : `in[C${view.activeEdge.to}] = ${view.indegree[view.activeEdge.to - 1]}`;
+      ? `indegree[${view.activeEdge.to - 1}]: ${view.indegreeBefore} → ${view.indegreeAfter}`
+      : `indegree[${view.activeEdge.to - 1}] = ${view.indegree[view.activeEdge.to - 1]}`;
     const decisionText = view.readyDecision === true
       ? (vi ? `C${view.activeEdge.to} đã sẵn sàng cho học kỳ sau` : `C${view.activeEdge.to} is ready for next semester`)
       : view.readyDecision === false
         ? (vi ? `C${view.activeEdge.to} vẫn phải chờ` : `C${view.activeEdge.to} is still blocked`)
         : (vi ? "Gỡ một prerequisite đã hoàn thành" : "Remove one completed prerequisite");
     actionHtml = `<div class="pc-action edge"><small>${vi ? "CẠNH ĐANG XỬ LÝ" : "ACTIVE EDGE"}</small><strong>C${view.activeEdge.from} → C${view.activeEdge.to}</strong><b>${escapeHtml(degreeText)}</b><span>${escapeHtml(decisionText)}</span></div>`;
+  } else if (view.event === "result-check") {
+    const ok = view.allCompleted === true;
+    actionHtml = `<div class="pc-action ${ok ? "success" : "cycle"}"><small>count == n</small><strong>${view.count} == ${view.n} → ${ok ? "True" : "False"}</strong><span>${ok ? (vi ? "trả semester ở dòng kế tiếp" : "return semester on the next line") : (vi ? "đi vào nhánh else" : "enter the else branch")}</span></div>`;
+  } else if (view.event === "else-branch") {
+    actionHtml = `<div class="pc-action cycle"><small>ELSE</small><strong>count &lt; n</strong><span>${vi ? "còn môn chưa thể lấy khỏi queue" : "some courses could not be removed from the queue"}</span></div>`;
   } else if (view.currentCourse !== null && view.currentCourse !== undefined) {
-    actionHtml = `<div class="pc-action course"><small>${vi ? "MÔN HIỆN TẠI" : "CURRENT COURSE"}</small><strong>C${view.currentCourse}</strong><span>${vi ? `Học kỳ ${view.semester} · gỡ tất cả cạnh đi ra` : `Semester ${view.semester} · remove every outgoing edge`}</span></div>`;
+    const processingSemester = view.activeSemester || view.semester || 1;
+    actionHtml = `<div class="pc-action course"><small>${vi ? "INDEX ĐANG XỬ LÝ" : "CURRENT INDEX"}</small><strong>curr=${view.currentCourseIndex} → C${view.currentCourse}</strong><span>${vi ? `Batch học kỳ ${processingSemester} · duyệt graph[curr]` : `Semester ${processingSemester} batch · scan graph[curr]`}</span></div>`;
   } else {
-    actionHtml = `<div class="pc-action rule"><code>queue = all courses with in-degree 0</code><span>${vi ? "Mỗi BFS level = một học kỳ" : "Each BFS level = one semester"}</span></div>`;
+    actionHtml = `<div class="pc-action rule"><code>queue stores 0-based indices</code><span>${vi ? "Mỗi BFS layer = một học kỳ" : "Each BFS layer = one semester"}</span></div>`;
   }
 
   const indegreeHtml = (view.courses || []).map((course) => {
@@ -6275,25 +6283,28 @@ function renderParallelCoursesView(step) {
     if (degree === 0) classes.push("ready");
     if (completedSet.has(course)) classes.push("completed");
     if (stuckSet.has(course)) classes.push("stuck");
-    return `<span class="${classes.join(" ")}"><small>C${course}</small><strong>${degree}</strong><em>${degree === 0 ? (vi ? "ready" : "ready") : `${degree} ${vi ? "còn lại" : "left"}`}</em></span>`;
+    return `<span class="${classes.join(" ")}"><small>C${course} · [${course - 1}]</small><strong>${degree}</strong><em>${degree === 0 ? (vi ? "ready" : "ready") : `${degree} ${vi ? "còn lại" : "left"}`}</em></span>`;
   }).join("");
 
   const historyHtml = (view.semesterHistory || []).length
     ? view.semesterHistory.map((item) => `<span><small>S${item.semester}</small><strong>${item.courses.map((course) => `C${course}`).join(" + ")}</strong></span>`).join("")
     : `<em>${vi ? "Chưa hoàn thành học kỳ nào" : "No completed semester yet"}</em>`;
 
-  const currentQueueTitle = view.semester > 0
-    ? (vi ? `HỌC KỲ ${view.semester} · CÒN LẠI` : `SEMESTER ${view.semester} · REMAINING`)
-    : (vi ? "QUEUE SẴN SÀNG BAN ĐẦU" : "INITIAL READY QUEUE");
-  const nextQueueTitle = view.semester > 0
-    ? (vi ? `QUEUE HỌC KỲ ${view.semester + 1}` : `SEMESTER ${view.semester + 1} QUEUE`)
-    : (vi ? "QUEUE HỌC KỲ 1" : "SEMESTER 1 QUEUE");
+  const queueSemester = view.activeSemester || ((view.semester || 0) + 1);
+  const currentQueueTitle = betweenSemesters
+    ? (vi ? `HỌC KỲ ${view.semester} · ĐÃ XONG` : `SEMESTER ${view.semester} · COMPLETE`)
+    : view.batchActive
+      ? (vi ? `HỌC KỲ ${queueSemester} · CÒN LẠI` : `SEMESTER ${queueSemester} · REMAINING`)
+      : (vi ? "QUEUE SẴN SÀNG BAN ĐẦU" : "INITIAL READY QUEUE");
+  const nextQueueTitle = view.batchActive
+    ? (vi ? `APPEND CHO HỌC KỲ ${queueSemester + 1}` : `APPENDED FOR SEMESTER ${queueSemester + 1}`)
+    : (vi ? `QUEUE HỌC KỲ ${queueSemester}` : `SEMESTER ${queueSemester} QUEUE`);
 
   el.innerHTML = `<div class="pc-viz">
     <div class="pc-phases">${phaseHtml}</div>
     <div class="pc-summary">
-      <span><small>${vi ? "HỌC KỲ" : "SEMESTER"}</small><strong>${view.semester || "—"}</strong></span>
-      <span><small>${vi ? "ĐÃ HỌC" : "TAKEN"}</small><strong>${view.taken}/${view.n}</strong></span>
+      <span><small>semester</small><strong>${view.semester ?? "—"}</strong></span>
+      <span><small>count</small><strong>${view.count ?? "—"}/${view.n}</strong></span>
       <span><small>${vi ? "QUEUE READY" : "READY QUEUE"}</small><strong>${currentQueue.length + displayedNextQueue.length}</strong></span>
     </div>
     <div class="pc-queues">

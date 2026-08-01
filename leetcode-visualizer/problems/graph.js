@@ -7504,8 +7504,8 @@ function buildSteps1136(input, params = {}) {
     && edge.to <= n
   ));
   const courses = Array.from({ length: n }, (_, index) => index + 1);
-  const adjacency = Array.from({ length: n + 1 }, () => []);
-  const indegree = Array(n + 1).fill(0);
+  const graph = Array.from({ length: n }, () => []);
+  const indegree = Array(n).fill(0);
   const builtEdgeKeys = new Set();
   const processedEdgeKeys = new Set();
   const completed = new Set();
@@ -7543,15 +7543,23 @@ function buildSteps1136(input, params = {}) {
   }
 
   const planColumns = buildSemesterPlan();
+  // The Python queue stores zero-based course indices. View snapshots convert
+  // them to C1..Cn only for the graph, while debugger variables stay zero-based.
   let queue = [];
   let currentBatch = [];
   let nextQueue = [];
-  let currentCourse = null;
-  let currentNeighbor = null;
+  let currentCourseIndex = null;
+  let currentNeighborIndex = null;
   let activeEdge = null;
   let semester = 0;
-  let taken = 0;
+  let count = 0;
   let loopSize = 0;
+  let activeSemester = null;
+  let batchActive = false;
+  let semesterInitialized = false;
+  let countInitialized = false;
+
+  const displayCourses = (indices) => indices.map((index) => index + 1);
 
   function snapshot(event, phase, extra = {}) {
     return {
@@ -7563,17 +7571,25 @@ function buildSteps1136(input, params = {}) {
       planColumns: planColumns.map((column) => ({ ...column, courses: [...column.courses] })),
       builtEdgeKeys: [...builtEdgeKeys],
       processedEdgeKeys: [...processedEdgeKeys],
-      indegree: indegree.slice(1),
-      queue: [...queue],
-      currentBatch: [...currentBatch],
-      nextQueue: [...nextQueue],
-      currentCourse,
-      currentNeighbor,
+      indegree: [...indegree],
+      queue: displayCourses(queue),
+      queueIndices: [...queue],
+      currentBatch: displayCourses(currentBatch),
+      currentBatchIndices: [...currentBatch],
+      nextQueue: displayCourses(nextQueue),
+      nextQueueIndices: [...nextQueue],
+      currentCourse: currentCourseIndex === null ? null : currentCourseIndex + 1,
+      currentCourseIndex,
+      currentNeighbor: currentNeighborIndex === null ? null : currentNeighborIndex + 1,
+      currentNeighborIndex,
       activeEdge: activeEdge ? { ...activeEdge } : null,
       completed: [...completed],
-      semester,
-      taken,
+      semester: semesterInitialized ? semester : null,
+      activeSemester,
+      taken: countInitialized ? count : 0,
+      count: countInitialized ? count : null,
       loopSize,
+      batchActive,
       semesterHistory: semesterHistory.map((item) => ({ semester: item.semester, courses: [...item.courses] })),
       answer: null,
       ...extra,
@@ -7597,34 +7613,34 @@ function buildSteps1136(input, params = {}) {
   addStep({
     event: "init",
     phase: "build",
-    title: { vi: `Có ${n} môn học`, en: `There are ${n} courses` },
-    codeLines: [4],
+    title: { vi: `Gọi minimumSemesters với n = ${n}`, en: `Call minimumSemesters with n = ${n}` },
+    codeLines: [2],
     vars: [{ name: "n", value: n }, { name: "relations", value: relations.length }],
     note: {
-      vi: "Mỗi cạnh u → v nghĩa là phải hoàn thành môn u trước khi học môn v.",
-      en: "Each edge u → v means course u must be completed before course v.",
+      vi: "Mỗi relation [u, v] nghĩa là phải hoàn thành môn u trước môn v.",
+      en: "Each relation [u, v] means course u must be completed before course v.",
     },
   });
   addStep({
-    event: "init-adjacency",
+    event: "init-graph",
     phase: "build",
-    title: { vi: "Tạo adjacency list rỗng", en: "Create an empty adjacency list" },
-    codeLines: [5],
-    vars: [{ name: "adj", value: "{}" }],
+    title: { vi: "graph = defaultdict(list)", en: "graph = defaultdict(list)" },
+    codeLines: [6],
+    vars: [{ name: "graph", value: "{}" }],
     note: {
-      vi: "adj[u] sẽ chứa những môn được mở khóa sau khi học xong u.",
-      en: "adj[u] will contain the courses unlocked after completing u.",
+      vi: "graph[index] sẽ chứa các index môn được mở khóa sau môn hiện tại.",
+      en: "graph[index] stores the course indices unlocked after the current course.",
     },
   });
   addStep({
     event: "init-indegree",
     phase: "build",
     title: { vi: "Khởi tạo mọi in-degree = 0", en: "Initialize every in-degree to 0" },
-    codeLines: [6],
-    vars: [{ name: "in_deg", value: `[${indegree.slice(1).join(", ")}]` }],
+    codeLines: [8],
+    vars: [{ name: "indegree", value: `[${indegree.join(", ")}]` }, { name: "length", value: n }],
     note: {
-      vi: "in_deg[v] đếm số môn tiên quyết của v chưa được hoàn thành.",
-      en: "in_deg[v] counts how many prerequisites of v are still unmet.",
+      vi: "Mảng có n phần tử; indegree[i] đếm số tiên quyết còn thiếu của môn i + 1.",
+      en: "The array has n entries; indegree[i] counts unmet prerequisites for course i + 1.",
     },
   });
 
@@ -7634,7 +7650,7 @@ function buildSteps1136(input, params = {}) {
       event: "read-relation",
       phase: "build",
       title: { vi: `Đọc relation ${edge.from} → ${edge.to}`, en: `Read relation ${edge.from} → ${edge.to}` },
-      codeLines: [7],
+      codeLines: [10],
       vars: [{ name: "u, v", value: `${edge.from}, ${edge.to}` }],
       note: {
         vi: `Môn ${edge.from} là tiên quyết trực tiếp của môn ${edge.to}.`,
@@ -7642,76 +7658,112 @@ function buildSteps1136(input, params = {}) {
       },
     });
 
-    adjacency[edge.from].push(edge);
+    const fromIndex = edge.from - 1;
+    const toIndex = edge.to - 1;
+    graph[fromIndex].push(edge);
     builtEdgeKeys.add(edge.key);
     addStep({
       event: "add-edge",
       phase: "build",
-      title: { vi: `adj[${edge.from}].append(${edge.to})`, en: `adj[${edge.from}].append(${edge.to})` },
-      codeLines: [8],
-      vars: [{ name: `adj[${edge.from}]`, value: `[${adjacency[edge.from].map((item) => item.to).join(", ")}]` }],
+      title: { vi: `graph[${fromIndex}].append(${toIndex})`, en: `graph[${fromIndex}].append(${toIndex})` },
+      codeLines: [11],
+      vars: [{ name: `graph[${fromIndex}]`, value: `[${graph[fromIndex].map((item) => item.to - 1).join(", ")}]` }],
       note: {
-        vi: `Thêm mũi tên ${edge.from} → ${edge.to} vào đồ thị.`,
-        en: `Add the arrow ${edge.from} → ${edge.to} to the graph.`,
+        vi: `Input dùng môn ${edge.from} → ${edge.to}; code đổi sang index ${fromIndex} → ${toIndex}.`,
+        en: `The input uses courses ${edge.from} → ${edge.to}; the code converts them to indices ${fromIndex} → ${toIndex}.`,
       },
     });
 
-    const before = indegree[edge.to];
-    indegree[edge.to]++;
+    const before = indegree[toIndex];
+    indegree[toIndex]++;
     addStep({
       event: "increment-indegree",
       phase: "build",
-      title: { vi: `in_deg[${edge.to}]: ${before} → ${indegree[edge.to]}`, en: `in_deg[${edge.to}]: ${before} → ${indegree[edge.to]}` },
-      codeLines: [9],
-      vars: [{ name: `in_deg[${edge.to}]`, value: indegree[edge.to] }],
+      title: { vi: `indegree[${toIndex}]: ${before} → ${indegree[toIndex]}`, en: `indegree[${toIndex}]: ${before} → ${indegree[toIndex]}` },
+      codeLines: [12],
+      vars: [{ name: `indegree[${toIndex}]`, value: indegree[toIndex] }],
       note: {
         vi: `Môn ${edge.to} có thêm một tiên quyết chưa hoàn thành: môn ${edge.from}.`,
         en: `Course ${edge.to} has one more unmet prerequisite: course ${edge.from}.`,
       },
-      extra: { indegreeBefore: before, indegreeAfter: indegree[edge.to] },
+      extra: { indegreeBefore: before, indegreeAfter: indegree[toIndex] },
     });
   }
   activeEdge = null;
 
-  for (const course of courses) {
-    currentCourse = course;
-    const ready = indegree[course] === 0;
-    if (ready) queue.push(course);
+  addStep({
+    event: "init-queue",
+    phase: "seed",
+    title: { vi: "queue = deque()", en: "queue = deque()" },
+    codeLines: [14],
+    vars: [{ name: "queue", value: "[]" }],
+    note: { vi: "Tạo queue rỗng trước khi tìm các môn có indegree bằng 0.", en: "Create an empty queue before finding zero-indegree courses." },
+  });
+
+  for (let index = 0; index < n; index++) {
+    currentCourseIndex = index;
     addStep({
-      event: ready ? "seed-ready" : "seed-blocked",
+      event: "seed-loop",
+      phase: "seed",
+      title: { vi: `for i: i = ${index}`, en: `for i: i = ${index}` },
+      codeLines: [16],
+      vars: [{ name: "i", value: index }, { name: "course", value: index + 1 }],
+      note: { vi: `Index ${index} đại diện cho môn ${index + 1}.`, en: `Index ${index} represents course ${index + 1}.` },
+    });
+
+    const ready = indegree[index] === 0;
+    addStep({
+      event: ready ? "seed-check-ready" : "seed-check-blocked",
       phase: "seed",
       title: ready
-        ? { vi: `Môn ${course}: in-degree 0 → vào queue`, en: `Course ${course}: in-degree 0 → enqueue` }
-        : { vi: `Môn ${course}: in-degree ${indegree[course]} → chưa sẵn sàng`, en: `Course ${course}: in-degree ${indegree[course]} → not ready` },
-      codeLines: [10],
+        ? { vi: `indegree[${index}] == 0 → True`, en: `indegree[${index}] == 0 → True` }
+        : { vi: `indegree[${index}] == 0 → False`, en: `indegree[${index}] == 0 → False` },
+      codeLines: [17],
       vars: [
-        { name: "i", value: course },
-        { name: `in_deg[${course}]`, value: indegree[course] },
+        { name: "i", value: index },
+        { name: `indegree[${index}]`, value: indegree[index] },
+        { name: "condition", value: ready },
         { name: "queue", value: `[${queue.join(", ")}]` },
       ],
       note: ready
-        ? { vi: `Môn ${course} không cần tiên quyết nên có thể học ngay trong học kỳ 1.`, en: `Course ${course} has no prerequisite and can be taken in semester 1.` }
-        : { vi: `Môn ${course} vẫn phải chờ ${indegree[course]} tiên quyết.`, en: `Course ${course} must still wait for ${indegree[course]} prerequisite(s).` },
+        ? { vi: `Môn ${index + 1} không còn tiên quyết, nên dòng 18 sẽ thêm index ${index} vào queue.`, en: `Course ${index + 1} has no unmet prerequisite, so line 18 will enqueue index ${index}.` }
+        : { vi: `Môn ${index + 1} còn ${indegree[index]} tiên quyết; bỏ qua dòng 18.`, en: `Course ${index + 1} has ${indegree[index]} unmet prerequisite(s); skip line 18.` },
       extra: { readyDecision: ready },
     });
-  }
-  currentCourse = null;
 
+    if (ready) {
+      queue.push(index);
+      addStep({
+        event: "seed-ready",
+        phase: "seed",
+        title: { vi: `queue.append(${index})`, en: `queue.append(${index})` },
+        codeLines: [18],
+        vars: [{ name: "queue", value: `[${queue.join(", ")}]` }, { name: `index ${index}`, value: `course ${index + 1}` }],
+        note: { vi: `Queue lưu index 0-based: ${index} chính là môn ${index + 1}.`, en: `The queue stores zero-based indices: ${index} is course ${index + 1}.` },
+        extra: { readyDecision: true },
+      });
+    }
+  }
+  currentCourseIndex = null;
+
+  semesterInitialized = true;
   addStep({
-    event: "init-taken",
+    event: "init-semester",
     phase: "seed",
-    title: { vi: "taken = 0", en: "taken = 0" },
-    codeLines: [11],
-    vars: [{ name: "taken", value: 0 }],
-    note: { vi: "taken đếm tổng số môn đã học xong.", en: "taken counts all completed courses." },
+    title: { vi: "semester = 0", en: "semester = 0" },
+    codeLines: [20],
+    vars: [{ name: "semester", value: 0 }],
+    note: { vi: "Chưa xử lý xong layer nào nên semester bắt đầu bằng 0.", en: "No layer has completed yet, so semester starts at 0." },
   });
+
+  countInitialized = true;
   addStep({
-    event: "init-semesters",
+    event: "init-count",
     phase: "seed",
-    title: { vi: "semesters = 0", en: "semesters = 0" },
-    codeLines: [12],
-    vars: [{ name: "semesters", value: 0 }],
-    note: { vi: "Chưa bắt đầu học kỳ nào.", en: "No semester has started yet." },
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [21],
+    vars: [{ name: "count", value: 0 }],
+    note: { vi: "count đếm số môn đã được pop và hoàn thành.", en: "count tracks courses that have been popped and completed." },
   });
 
   while (true) {
@@ -7720,171 +7772,199 @@ function buildSteps1136(input, params = {}) {
       event: "while-check",
       phase: hasReadyCourse ? "semester" : "check",
       title: hasReadyCourse
-        ? { vi: `queue có ${queue.length} môn → bắt đầu học kỳ mới`, en: `queue has ${queue.length} course(s) → start a new semester` }
+        ? { vi: `while queue → True`, en: `while queue → True` }
         : { vi: "queue rỗng → dừng BFS", en: "queue is empty → stop BFS" },
-      codeLines: [13],
+      codeLines: [22],
       vars: [{ name: "queue", value: `[${queue.join(", ")}]` }, { name: "condition", value: hasReadyCourse }],
       note: hasReadyCourse
-        ? { vi: "Tất cả môn đang ở queue có thể được học song song.", en: "Every course currently in the queue can be taken in parallel." }
+        ? { vi: `Queue không rỗng; bắt đầu layer cho học kỳ ${semester + 1}.`, en: `The queue is not empty; begin the layer for semester ${semester + 1}.` }
         : { vi: "Không còn môn có in-degree bằng 0.", en: "No course with in-degree 0 remains." },
       extra: { hasReadyCourse },
     });
     if (!hasReadyCourse) break;
 
-    semester++;
-    addStep({
-      event: "semester-start",
-      phase: "semester",
-      title: { vi: `Bắt đầu học kỳ ${semester}`, en: `Start semester ${semester}` },
-      codeLines: [14],
-      vars: [{ name: "semesters", value: semester }],
-      note: { vi: `Học kỳ ${semester} xử lý đúng các môn đang có trong queue.`, en: `Semester ${semester} processes exactly the courses currently queued.` },
-    });
-
-    const batch = [...queue];
-    queue = [];
+    activeSemester = semester + 1;
+    loopSize = queue.length;
+    const batch = queue.slice(0, loopSize);
     currentBatch = [...batch];
     nextQueue = [];
-    loopSize = batch.length;
+    batchActive = true;
     addStep({
       event: "capture-size",
       phase: "semester",
       title: { vi: `size = ${loopSize}: khóa batch [${batch.join(", ")}]`, en: `size = ${loopSize}: lock batch [${batch.join(", ")}]` },
-      codeLines: [15],
-      vars: [{ name: "size", value: loopSize }, { name: "this semester", value: `[${batch.join(", ")}]` }],
+      codeLines: [23],
+      vars: [{ name: "size", value: loopSize }, { name: "queue", value: `[${queue.join(", ")}]` }, { name: "semester being built", value: activeSemester }],
       note: {
-        vi: "Môn mới được mở khóa trong lúc xử lý sẽ vào queue của học kỳ kế tiếp, không chen vào batch hiện tại.",
-        en: "Courses unlocked during this batch go to next semester's queue, never into the current batch.",
+        vi: `size chốt ${loopSize} phần tử đầu queue cho học kỳ ${activeSemester}; phần tử append mới không được xử lý trong for này.`,
+        en: `size locks the first ${loopSize} queue entries into semester ${activeSemester}; newly appended entries are excluded from this for loop.`,
       },
     });
 
     for (let slot = 0; slot < batch.length; slot++) {
-      const course = batch[slot];
-      currentCourse = course;
-      currentNeighbor = null;
+      const curr = batch[slot];
+      currentCourseIndex = curr;
+      currentNeighborIndex = null;
       activeEdge = null;
       addStep({
         event: "batch-slot",
         phase: "semester",
-        title: { vi: `Lượt ${slot + 1}/${loopSize} của học kỳ ${semester}`, en: `Slot ${slot + 1}/${loopSize} in semester ${semester}` },
-        codeLines: [16],
+        title: { vi: `for _: lượt ${slot + 1}/${loopSize}`, en: `for _: iteration ${slot + 1}/${loopSize}` },
+        codeLines: [24],
         vars: [{ name: "_", value: slot }, { name: "size", value: loopSize }],
-        note: { vi: `Chuẩn bị lấy môn tiếp theo trong batch học kỳ ${semester}.`, en: `Prepare to take the next course in semester ${semester}'s batch.` },
+        note: { vi: `Đây là một trong đúng ${loopSize} lần pop của học kỳ ${activeSemester}.`, en: `This is one of exactly ${loopSize} pops in semester ${activeSemester}.` },
       });
 
+      const popped = queue.shift();
       currentBatch.shift();
       addStep({
         event: "dequeue",
         phase: "semester",
-        title: { vi: `u = queue.popleft() → ${course}`, en: `u = queue.popleft() → ${course}` },
-        codeLines: [17],
-        vars: [{ name: "u", value: course }, { name: "remaining this semester", value: `[${currentBatch.join(", ")}]` }],
-        note: { vi: `Lấy môn ${course} ra để hoàn thành trong học kỳ ${semester}.`, en: `Remove course ${course} to complete it in semester ${semester}.` },
+        title: { vi: `curr = queue.popleft() → ${popped}`, en: `curr = queue.popleft() → ${popped}` },
+        codeLines: [25],
+        vars: [{ name: "curr", value: popped }, { name: "course", value: popped + 1 }, { name: "queue", value: `[${queue.join(", ")}]` }],
+        note: { vi: `Pop index ${popped}, tức môn ${popped + 1}, khỏi đầu queue.`, en: `Pop index ${popped}, representing course ${popped + 1}, from the queue front.` },
       });
 
-      taken++;
-      completed.add(course);
+      count++;
+      completed.add(curr + 1);
       addStep({
-        event: "take-course",
+        event: "increment-count",
         phase: "semester",
-        title: { vi: `Hoàn thành môn ${course} → taken ${taken}/${n}`, en: `Complete course ${course} → taken ${taken}/${n}` },
-        codeLines: [18],
-        vars: [{ name: "taken", value: `${taken}/${n}` }],
-        note: { vi: `Môn ${course} đã hoàn thành; bây giờ có thể gỡ các cạnh đi ra từ nó.`, en: `Course ${course} is complete; its outgoing prerequisite edges can now be removed.` },
+        title: { vi: `count += 1 → ${count}`, en: `count += 1 → ${count}` },
+        codeLines: [26],
+        vars: [{ name: "count", value: `${count}/${n}` }, { name: "completed course", value: curr + 1 }],
+        note: { vi: `Đã hoàn thành môn ${curr + 1}; count hiện là ${count}.`, en: `Course ${curr + 1} is complete; count is now ${count}.` },
       });
 
-      for (const edge of adjacency[course]) {
-        currentNeighbor = edge.to;
+      for (const edge of graph[curr]) {
+        const nei = edge.to - 1;
+        currentNeighborIndex = nei;
         activeEdge = edge;
         addStep({
           event: "visit-dependent",
           phase: "relax",
-          title: { vi: `Xét dependent ${edge.from} → ${edge.to}`, en: `Visit dependent ${edge.from} → ${edge.to}` },
-          codeLines: [19],
-          vars: [{ name: "u, v", value: `${edge.from}, ${edge.to}` }],
-          note: { vi: `Vì môn ${edge.from} đã xong, môn ${edge.to} bớt một tiên quyết.`, en: `Because course ${edge.from} is done, course ${edge.to} loses one unmet prerequisite.` },
+          title: { vi: `for nei in graph[${curr}] → nei = ${nei}`, en: `for nei in graph[${curr}] → nei = ${nei}` },
+          codeLines: [28],
+          vars: [{ name: "curr", value: curr }, { name: "nei", value: nei }, { name: "edge", value: `${edge.from} → ${edge.to}` }],
+          note: { vi: `Môn ${edge.from} đã xong, nên xét cập nhật môn phụ thuộc ${edge.to}.`, en: `Course ${edge.from} is complete, so update dependent course ${edge.to}.` },
         });
 
-        const before = indegree[edge.to];
-        indegree[edge.to]--;
+        const before = indegree[nei];
+        indegree[nei]--;
         processedEdgeKeys.add(edge.key);
         addStep({
           event: "decrement-indegree",
           phase: "relax",
-          title: { vi: `in_deg[${edge.to}]: ${before} → ${indegree[edge.to]}`, en: `in_deg[${edge.to}]: ${before} → ${indegree[edge.to]}` },
-          codeLines: [20],
-          vars: [{ name: `in_deg[${edge.to}]`, value: indegree[edge.to] }],
+          title: { vi: `indegree[${nei}]: ${before} → ${indegree[nei]}`, en: `indegree[${nei}]: ${before} → ${indegree[nei]}` },
+          codeLines: [29],
+          vars: [{ name: `indegree[${nei}]`, value: indegree[nei] }],
           note: { vi: `Gỡ cạnh ${edge.from} → ${edge.to}; in-degree của ${edge.to} giảm một.`, en: `Remove edge ${edge.from} → ${edge.to}; ${edge.to}'s in-degree decreases by one.` },
-          extra: { indegreeBefore: before, indegreeAfter: indegree[edge.to] },
+          extra: { indegreeBefore: before, indegreeAfter: indegree[nei] },
         });
 
-        const ready = indegree[edge.to] === 0;
+        const ready = indegree[nei] === 0;
         addStep({
           event: "ready-check",
           phase: "relax",
           title: ready
-            ? { vi: `in_deg[${edge.to}] == 0 → sẵn sàng`, en: `in_deg[${edge.to}] == 0 → ready` }
-            : { vi: `in_deg[${edge.to}] = ${indegree[edge.to]} → vẫn phải chờ`, en: `in_deg[${edge.to}] = ${indegree[edge.to]} → still blocked` },
-          codeLines: [21],
-          vars: [{ name: `in_deg[${edge.to}] == 0`, value: ready }],
+            ? { vi: `indegree[${nei}] == 0 → True`, en: `indegree[${nei}] == 0 → True` }
+            : { vi: `indegree[${nei}] == 0 → False`, en: `indegree[${nei}] == 0 → False` },
+          codeLines: [30],
+          vars: [{ name: `indegree[${nei}]`, value: indegree[nei] }, { name: "condition", value: ready }],
           note: ready
             ? { vi: `Tất cả tiên quyết của môn ${edge.to} đã hoàn thành.`, en: `All prerequisites of course ${edge.to} are complete.` }
-            : { vi: `Môn ${edge.to} còn ${indegree[edge.to]} tiên quyết chưa hoàn thành.`, en: `Course ${edge.to} still has ${indegree[edge.to]} unmet prerequisite(s).` },
-          extra: { readyDecision: ready, indegreeBefore: before, indegreeAfter: indegree[edge.to] },
+            : { vi: `Môn ${edge.to} còn ${indegree[nei]} tiên quyết chưa hoàn thành.`, en: `Course ${edge.to} still has ${indegree[nei]} unmet prerequisite(s).` },
+          extra: { readyDecision: ready, indegreeBefore: before, indegreeAfter: indegree[nei] },
         });
 
         if (ready) {
-          nextQueue.push(edge.to);
+          queue.push(nei);
+          nextQueue.push(nei);
           addStep({
             event: "enqueue-next",
             phase: "relax",
-            title: { vi: `queue.append(${edge.to}) → học kỳ ${semester + 1}`, en: `queue.append(${edge.to}) → semester ${semester + 1}` },
-            codeLines: [22],
-            vars: [{ name: "next semester queue", value: `[${nextQueue.join(", ")}]` }],
-            note: { vi: `Môn ${edge.to} chỉ được học từ học kỳ ${semester + 1}, sau khi batch hiện tại kết thúc.`, en: `Course ${edge.to} can only be taken from semester ${semester + 1}, after the current batch ends.` },
+            title: { vi: `queue.append(${nei})`, en: `queue.append(${nei})` },
+            codeLines: [31],
+            vars: [{ name: "queue", value: `[${queue.join(", ")}]` }, { name: "appended index", value: nei }, { name: "course", value: nei + 1 }],
+            note: { vi: `Index ${nei} được append ngay, nhưng size=${loopSize} giữ nó lại cho học kỳ ${activeSemester + 1}.`, en: `Index ${nei} is appended now, but size=${loopSize} reserves it for semester ${activeSemester + 1}.` },
             extra: { readyDecision: true },
           });
         }
       }
     }
 
-    semesterHistory.push({ semester, courses: [...batch] });
-    queue = [...nextQueue];
+    const beforeSemester = semester;
+    semester++;
+    semesterHistory.push({ semester, courses: displayCourses(batch) });
     currentBatch = [];
-    nextQueue = [];
-    currentCourse = null;
-    currentNeighbor = null;
+    batchActive = false;
+    currentCourseIndex = null;
+    currentNeighborIndex = null;
     activeEdge = null;
+    activeSemester = null;
     addStep({
       event: "semester-complete",
       phase: "semester",
-      title: { vi: `Kết thúc học kỳ ${semester} → queue [${queue.join(", ")}]`, en: `Finish semester ${semester} → queue [${queue.join(", ")}]` },
-      codeLines: [13],
-      vars: [{ name: "completed semester", value: semester }, { name: "queue", value: `[${queue.join(", ")}]` }],
+      title: { vi: `semester += 1: ${beforeSemester} → ${semester}`, en: `semester += 1: ${beforeSemester} → ${semester}` },
+      codeLines: [33],
+      vars: [{ name: "semester", value: semester }, { name: "queue", value: `[${queue.join(", ")}]` }],
       note: queue.length
-        ? { vi: `Các môn [${queue.join(", ")}] đã sẵn sàng cho học kỳ ${semester + 1}.`, en: `Courses [${queue.join(", ")}] are ready for semester ${semester + 1}.` }
-        : { vi: "Không có môn mới được mở khóa.", en: "No new course was unlocked." },
-      extra: { justCompletedCourses: [...batch] },
+        ? { vi: `Đã xử lý xong đúng size=${loopSize} môn; queue [${queue.join(", ")}] dành cho học kỳ ${semester + 1}.`, en: `Exactly size=${loopSize} courses finished; queue [${queue.join(", ")}] belongs to semester ${semester + 1}.` }
+        : { vi: `Đã xử lý xong đúng size=${loopSize} môn và queue hiện rỗng.`, en: `Exactly size=${loopSize} courses finished and the queue is now empty.` },
+      extra: { justCompletedCourses: displayCourses(batch) },
+    });
+    nextQueue = [];
+  }
+
+  const allCompleted = count === n;
+  const stuckCourses = courses.filter((course) => !completed.has(course));
+  addStep({
+    event: "result-check",
+    phase: "check",
+    title: allCompleted
+      ? { vi: `count == n: ${count} == ${n} → True`, en: `count == n: ${count} == ${n} → True` }
+      : { vi: `count == n: ${count} == ${n} → False`, en: `count == n: ${count} == ${n} → False` },
+    codeLines: [35],
+    vars: [
+      { name: "count", value: count },
+      { name: "n", value: n },
+      { name: "condition", value: allCompleted },
+    ],
+    note: allCompleted
+      ? { vi: "Mọi môn đều đã được pop khỏi queue; dòng 36 sẽ trả semester.", en: "Every course was popped from the queue; line 36 returns semester." }
+      : { vi: `Chỉ xử lý được ${count}/${n} môn; đi vào nhánh else.`, en: `Only ${count}/${n} courses were processed; enter the else branch.` },
+    extra: { allCompleted, stuckCourses },
+  });
+
+  if (!allCompleted) {
+    addStep({
+      event: "else-branch",
+      phase: "check",
+      title: { vi: "else: còn môn bị kẹt", en: "else: courses remain stuck" },
+      codeLines: [37],
+      vars: [{ name: "stuck courses", value: `[${stuckCourses.join(", ")}]` }],
+      note: { vi: "Queue đã rỗng nhưng count < n, nên các môn còn lại nằm trong chu trình.", en: "The queue is empty while count < n, so the remaining courses are in a cycle." },
+      extra: { allCompleted: false, stuckCourses },
     });
   }
 
-  const answer = taken === n ? semester : -1;
-  const stuckCourses = courses.filter((course) => !completed.has(course));
+  const answer = allCompleted ? semester : -1;
   addStep({
-    event: answer === -1 ? "cycle" : "done",
+    event: allCompleted ? "done" : "cycle",
     phase: "done",
-    title: answer === -1
-      ? { vi: `Còn ${stuckCourses.length} môn bị kẹt → return -1`, en: `${stuckCourses.length} course(s) remain stuck → return -1` }
-      : { vi: `Hoàn thành ${n} môn trong ${semester} học kỳ`, en: `Finish ${n} courses in ${semester} semesters` },
-    codeLines: [23],
+    title: allCompleted
+      ? { vi: `return semester → ${semester}`, en: `return semester → ${semester}` }
+      : { vi: "return -1", en: "return -1" },
+    codeLines: [allCompleted ? 36 : 38],
     vars: [
-      { name: "taken", value: `${taken}/${n}` },
-      { name: "semesters", value: semester },
-      { name: "answer", value: answer },
+      { name: "count", value: `${count}/${n}` },
+      { name: "semester", value: semester },
+      { name: "return", value: answer },
     ],
-    note: answer === -1
-      ? { vi: `queue rỗng nhưng các môn [${stuckCourses.join(", ")}] vẫn còn in-degree > 0, chứng tỏ có chu trình.`, en: `The queue is empty while courses [${stuckCourses.join(", ")}] still have positive in-degree, proving a cycle exists.` }
-      : { vi: `Mỗi batch là một học kỳ; tổng cộng cần tối thiểu ${semester} học kỳ.`, en: `Each batch is one semester, so the minimum is ${semester} semesters.` },
+    note: allCompleted
+      ? { vi: `Học hết ${n} môn trong ${semester} layer, nên trả ${semester}.`, en: `All ${n} courses finished in ${semester} layers, so return ${semester}.` }
+      : { vi: `Các môn [${stuckCourses.join(", ")}] bị kẹt trong chu trình, nên trả -1.`, en: `Courses [${stuckCourses.join(", ")}] are stuck in a cycle, so return -1.` },
     final: true,
     extra: { answer, stuckCourses },
   });
@@ -17711,29 +17791,44 @@ module.exports = {
       },
     },
     code: [
-      "from collections import defaultdict, deque",
-      "",
       "class Solution:",
-      "    def minimumSemesters(self, n, relations):",
-      "        adj = defaultdict(list)",
-      "        in_deg = [0] * (n + 1)",
+      "    def minimumSemesters(self, n: int, relations: List[List[int]]) -> int:",
+      "        \"\"\"",
+      "        topo by layer",
+      "        \"\"\"",
+      "        graph = defaultdict(list)",
+      "",
+      "        indegree = [0 for _ in range(n)]",
+      "",
       "        for u, v in relations:",
-      "            adj[u].append(v)",
-      "            in_deg[v] += 1",
-      "        queue = deque([i for i in range(1, n+1) if in_deg[i] == 0])",
-      "        taken = 0",
-      "        semesters = 0",
+      "            graph[u-1].append(v-1)",
+      "            indegree[v-1] += 1",
+      "",
+      "        queue = deque()",
+      "",
+      "        for i in range(n):",
+      "            if indegree[i] == 0:",
+      "                queue.append(i)",
+      "",
+      "        semester = 0",
+      "        count = 0",
       "        while queue:",
-      "            semesters += 1",
       "            size = len(queue)",
       "            for _ in range(size):",
-      "                u = queue.popleft()",
-      "                taken += 1",
-      "                for v in adj[u]:",
-      "                    in_deg[v] -= 1",
-      "                    if in_deg[v] == 0:",
-      "                        queue.append(v)",
-      "        return semesters if taken == n else -1",
+      "                curr = queue.popleft()",
+      "                count += 1",
+      "",
+      "                for nei in graph[curr]:",
+      "                    indegree[nei] -= 1",
+      "                    if indegree[nei] == 0:",
+      "                        queue.append(nei)",
+      "",
+      "            semester += 1",
+      "",
+      "        if count == n:",
+      "            return semester",
+      "        else:",
+      "            return -1",
     ],
     builder: buildSteps1136,
   },

@@ -6,8 +6,117 @@
 // backtrack moves the active pointer to the parent, valid answers stay green,
 // and rejected/pruned branches stay red. Problem 77 already builds its own
 // decision tree, so the decorator is used by the other ten problems.
+function addWordSearchDecisionTree(result) {
+  if (!result || !Array.isArray(result.steps)) return result;
+
+  const NODE_LIMIT = 180;
+  let nextId = 1;
+  let truncated = false;
+  const root = {
+    id: 0,
+    label: "DFS",
+    labelLines: ["DFS", "starts"],
+    parentId: null,
+    depth: 0,
+    children: [],
+    complete: false,
+    pruned: false,
+  };
+  const nodesByKey = new Map([["root", root]]);
+
+  const framePart = (frame) => `${frame.r},${frame.c},${frame.i}`;
+  const stackKey = (stack, length = stack.length) => (
+    length > 0 ? stack.slice(0, length).map(framePart).join("|") : "root"
+  );
+
+  function ensureNode(stack, length) {
+    if (length <= 0) return root;
+    const key = stackKey(stack, length);
+    if (nodesByKey.has(key)) return nodesByKey.get(key);
+    const parent = ensureNode(stack, length - 1);
+    if (nextId >= NODE_LIMIT) {
+      truncated = true;
+      return parent;
+    }
+    const frame = stack[length - 1];
+    const node = {
+      id: nextId++,
+      label: `(${frame.r},${frame.c})`,
+      labelLines: [`(${frame.r},${frame.c})`, `i=${frame.i}`],
+      parentId: parent.id,
+      depth: parent.depth + 1,
+      children: [],
+      complete: false,
+      pruned: false,
+    };
+    parent.children.push(node);
+    nodesByKey.set(key, node);
+    return node;
+  }
+
+  function snapshotNodes(highlightId) {
+    const nodes = [];
+    let xCursor = 0;
+    function layout(node) {
+      let x;
+      if (node.children.length === 0) {
+        x = xCursor++;
+      } else {
+        const childXs = node.children.map(layout);
+        x = (childXs[0] + childXs[childXs.length - 1]) / 2;
+      }
+      nodes.push({
+        id: node.id,
+        label: node.label,
+        labelLines: [...node.labelLines],
+        x,
+        y: node.depth,
+        parentId: node.parentId,
+        hl: node.id === highlightId,
+        isWord: node.complete,
+        isPruned: node.pruned,
+      });
+      return x;
+    }
+    layout(root);
+    return nodes;
+  }
+
+  for (const step of result.steps) {
+    const view = step.wordSearchView || {};
+    const stack = Array.isArray(view.stack) ? view.stack.map((frame) => ({ ...frame })) : [];
+    let activeNode = stack.length ? ensureNode(stack, stack.length) : root;
+
+    if ((view.action === "start" || view.action === "explore") && view.target) {
+      const previewStack = [...stack, { r: view.target.r, c: view.target.c, i: view.index }];
+      activeNode = ensureNode(previewStack, previewStack.length);
+    }
+
+    if (["reject-check", "reject"].includes(view.action)) {
+      activeNode.pruned = true;
+    }
+    if (["found-value", "restore", "return-found"].includes(view.action) && view.result === false) {
+      activeNode.pruned = true;
+    }
+    if (view.action === "found" || (["found-value", "restore", "return-found"].includes(view.action) && view.result === true)) {
+      activeNode.complete = true;
+      activeNode.pruned = false;
+    }
+
+    step.decisionTree = {
+      nodes: snapshotNodes(activeNode.id),
+      showLevels: true,
+      levelLabelGutter: 58,
+      truncated,
+    };
+  }
+
+  return result;
+}
+
 function addBacktrackingDecisionTree(result, problemId) {
   if (!result || !Array.isArray(result.steps) || problemId === 77) return result;
+  if (problemId === 79) return addWordSearchDecisionTree(result);
 
   const NODE_LIMIT = 140;
   let nextId = 1;
