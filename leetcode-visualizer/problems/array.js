@@ -2707,7 +2707,344 @@ function buildSteps287(input) {
   return { original: nums, answer: slow, steps };
 }
 
+function parseRectangles850(input) {
+  if (Array.isArray(input)) {
+    return input.map((rectangle) => Array.isArray(rectangle) ? rectangle.map(Number) : []).filter((rectangle) => rectangle.length === 4);
+  }
+  return String(input)
+    .split(";")
+    .map((part) => part.split(",").map((value) => Number(value.trim())))
+    .filter((rectangle) => rectangle.length === 4 && rectangle.every(Number.isFinite));
+}
+
+/** LeetCode 850: Rectangle Area II — sweep x-events and merge active y-intervals. */
+function buildSteps850(input) {
+  const rectangles = parseRectangles850(input);
+  const valid = rectangles.length > 0 && rectangles.every(([x1, y1, x2, y2]) => (
+    [x1, y1, x2, y2].every(Number.isInteger) && x1 < x2 && y1 < y2
+  ));
+  const steps = [];
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [2],
+      vars: [{ name: "rectangles", value: JSON.stringify(rectangles) }],
+      note: {
+        vi: "Nhập mỗi hình theo dạng x1,y1,x2,y2; các hình cách nhau bằng dấu chấm phẩy và cần x1 < x2, y1 < y2.",
+        en: "Enter each rectangle as x1,y1,x2,y2 separated by semicolons, with x1 < x2 and y1 < y2.",
+      },
+    });
+    return { original: rectangles, answer: 0, steps };
+  }
+
+  const MOD = 1000000007n;
+  const events = [];
+  const active = [];
+  const processedBands = [];
+  let prevX = null;
+  let sweepX = null;
+  let coveredY = 0;
+  let currentEnd = null;
+  let currentInterval = null;
+  let mergedSegments = [];
+  let currentBand = null;
+  let areaExact = 0n;
+  let stripArea = 0n;
+  let currentEventIndex = -1;
+  let processedEventCount = 0;
+  let currentRectId = null;
+
+  const mergeIntervals = (items) => {
+    const sorted = [...items].sort((a, b) => a.y1 - b.y1 || a.y2 - b.y2 || a.rectId - b.rectId);
+    const merged = [];
+    for (const interval of sorted) {
+      const last = merged[merged.length - 1];
+      if (!last || interval.y1 > last.y2) merged.push({ y1: interval.y1, y2: interval.y2 });
+      else last.y2 = Math.max(last.y2, interval.y2);
+    }
+    return merged;
+  };
+
+  function addStep({ title, codeLine, phase, vars = [], note, final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      rectangleAreaView: {
+        phase,
+        rectangles: rectangles.map(([x1, y1, x2, y2], index) => ({ id: index + 1, x1, y1, x2, y2 })),
+        events: events.map((event, index) => ({
+          ...event,
+          index,
+          isCurrent: index === currentEventIndex,
+          isProcessed: index < processedEventCount,
+        })),
+        active: active.map((interval) => ({ ...interval })),
+        prevX,
+        sweepX,
+        coveredY,
+        currentEnd: currentEnd === -Infinity ? "-∞" : currentEnd,
+        currentInterval: currentInterval ? { ...currentInterval } : null,
+        mergedSegments: mergedSegments.map((segment) => ({ ...segment })),
+        processedBands: processedBands.map((band) => ({ ...band, segments: band.segments.map((segment) => ({ ...segment })) })),
+        currentBand: currentBand ? { ...currentBand, segments: currentBand.segments.map((segment) => ({ ...segment })) } : null,
+        area: areaExact.toString(),
+        stripArea: stripArea.toString(),
+        currentRectId,
+        answer: final ? Number(areaExact % MOD) : null,
+      },
+    });
+  }
+
+  addStep({
+    title: { vi: "MOD = 10⁹ + 7", en: "MOD = 10⁹ + 7" }, codeLine: 3, phase: "build",
+    vars: [{ name: "MOD", value: "1000000007" }],
+    note: { vi: "Chỉ áp dụng modulo khi trả kết quả; visualization vẫn giữ diện tích chính xác.", en: "Modulo is applied only to the returned result; the visualization keeps the exact area." },
+  });
+  addStep({
+    title: { vi: "events = []", en: "events = []" }, codeLine: 4, phase: "build",
+    vars: [{ name: "events", value: "[]" }],
+    note: { vi: "Mỗi hình tạo một event START tại x1 và một event END tại x2.", en: "Each rectangle creates a START event at x1 and an END event at x2." },
+  });
+
+  rectangles.forEach(([x1, y1, x2, y2], index) => {
+    const rectId = index + 1;
+    currentRectId = rectId;
+    addStep({
+      title: { vi: `Đọc R${rectId} = [${x1},${y1},${x2},${y2}]`, en: `Read R${rectId} = [${x1},${y1},${x2},${y2}]` }, codeLine: 5, phase: "build",
+      vars: [{ name: "x1,y1,x2,y2", value: `${x1},${y1},${x2},${y2}` }],
+      note: { vi: `R${rectId} phủ x trong [${x1},${x2}) và y trong [${y1},${y2}).`, en: `R${rectId} covers x in [${x1},${x2}) and y in [${y1},${y2}).` },
+    });
+    events.push({ x: x1, type: 1, y1, y2, rectId });
+    addStep({
+      title: { vi: `Thêm START R${rectId} tại x=${x1}`, en: `Add START R${rectId} at x=${x1}` }, codeLine: 6, phase: "build",
+      vars: [{ name: "event", value: `(${x1}, +1, ${y1}, ${y2})` }, { name: "events.length", value: events.length }],
+      note: { vi: `Khi đường quét tới x=${x1}, đoạn y=[${y1},${y2}) bắt đầu hoạt động.`, en: `When the sweep reaches x=${x1}, y=[${y1},${y2}) becomes active.` },
+    });
+    events.push({ x: x2, type: -1, y1, y2, rectId });
+    addStep({
+      title: { vi: `Thêm END R${rectId} tại x=${x2}`, en: `Add END R${rectId} at x=${x2}` }, codeLine: 7, phase: "build",
+      vars: [{ name: "event", value: `(${x2}, -1, ${y1}, ${y2})` }, { name: "events.length", value: events.length }],
+      note: { vi: `Tại x=${x2}, đoạn y của R${rectId} sẽ bị xóa khỏi active.`, en: `At x=${x2}, R${rectId}'s y-interval will be removed from active.` },
+    });
+  });
+
+  currentRectId = null;
+  events.sort((a, b) => a.x - b.x || a.type - b.type || a.rectId - b.rectId);
+  addStep({
+    title: { vi: "Sắp xếp events theo x", en: "Sort events by x" }, codeLine: 8, phase: "sort",
+    vars: [{ name: "events", value: `[${events.map((event) => `(${event.x},${event.type > 0 ? "+1" : "-1"},R${event.rectId})`).join(", ")}]` }],
+    note: { vi: "Đường quét xử lý event từ trái sang phải; END đứng trước START nếu cùng x.", en: "The sweep processes events left to right; END precedes START when x is tied." },
+  });
+  addStep({
+    title: { vi: "active = []", en: "active = []" }, codeLine: 9, phase: "init",
+    vars: [{ name: "active", value: "[]" }],
+    note: { vi: "active chứa các đoạn y của hình đang cắt qua dải x hiện tại.", en: "active stores y-intervals from rectangles crossing the current x-strip." },
+  });
+  prevX = events[0].x;
+  sweepX = prevX;
+  addStep({
+    title: { vi: `prev_x = ${prevX}`, en: `prev_x = ${prevX}` }, codeLine: 10, phase: "init",
+    vars: [{ name: "prev_x", value: prevX }],
+    note: { vi: "Chưa có chiều rộng để tính trước event đầu tiên.", en: "There is no strip width before the first event." },
+  });
+  addStep({
+    title: { vi: "area = 0", en: "area = 0" }, codeLine: 11, phase: "init",
+    vars: [{ name: "area", value: "0" }],
+    note: { vi: "Diện tích sẽ được cộng từng dải giữa hai giá trị x liên tiếp.", en: "Area is accumulated one strip between consecutive x-values at a time." },
+  });
+
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    const { x, type, y1, y2, rectId } = event;
+    currentEventIndex = index;
+    currentRectId = rectId;
+    sweepX = x;
+    coveredY = 0;
+    currentEnd = null;
+    currentInterval = null;
+    mergedSegments = [];
+    stripArea = 0n;
+    currentBand = { x1: prevX, x2: x, segments: [], coveredY: 0, area: "0", counted: false };
+    addStep({
+      title: { vi: `Event ${index + 1}: x=${x}, ${type === 1 ? "START" : "END"} R${rectId}`, en: `Event ${index + 1}: x=${x}, ${type === 1 ? "START" : "END"} R${rectId}` }, codeLine: 13, phase: "event",
+      vars: [{ name: "x", value: x }, { name: "event_type", value: type }, { name: "y1,y2", value: `${y1},${y2}` }],
+      note: { vi: `Trước khi áp dụng event tại x=${x}, tính diện tích dải [${prevX},${x}) bằng active hiện tại.`, en: `Before applying the event at x=${x}, measure strip [${prevX},${x}) using the current active set.` },
+    });
+    addStep({
+      title: { vi: "covered_y = 0", en: "covered_y = 0" }, codeLine: 14, phase: "measure",
+      vars: [{ name: "covered_y", value: 0 }, { name: "active", value: `[${active.map((item) => `R${item.rectId}[${item.y1},${item.y2})`).join(", ")}]` }],
+      note: { vi: "Quét các đoạn active để tính tổng chiều dài y hợp, không cộng phần chồng lặp.", en: "Scan active intervals to compute union y-length without double-counting overlaps." },
+    });
+    currentEnd = -Infinity;
+    addStep({
+      title: { vi: "current_end = -∞", en: "current_end = -∞" }, codeLine: 15, phase: "measure",
+      vars: [{ name: "current_end", value: "-∞" }],
+      note: { vi: "current_end là điểm y xa nhất đã được phủ trong lúc merge.", en: "current_end is the farthest y already covered during the merge." },
+    });
+
+    const sortedActive = [...active].sort((a, b) => a.y1 - b.y1 || a.y2 - b.y2 || a.rectId - b.rectId);
+    for (let activeIndex = 0; activeIndex < sortedActive.length; activeIndex++) {
+      const interval = sortedActive[activeIndex];
+      currentInterval = { ...interval };
+      addStep({
+        title: { vi: `Xét R${interval.rectId}: [${interval.y1},${interval.y2})`, en: `Inspect R${interval.rectId}: [${interval.y1},${interval.y2})` }, codeLine: 16, phase: "scan",
+        vars: [{ name: "start,end", value: `${interval.y1},${interval.y2}` }, { name: "current_end", value: currentEnd === -Infinity ? "-∞" : currentEnd }],
+        note: { vi: "Các đoạn được xét theo start tăng dần.", en: "Intervals are inspected by increasing start." },
+      });
+      const clippedStart = Math.max(currentEnd, interval.y1);
+      addStep({
+        title: { vi: `start = max(${currentEnd === -Infinity ? "-∞" : currentEnd}, ${interval.y1}) = ${clippedStart}`, en: `start = max(${currentEnd === -Infinity ? "-∞" : currentEnd}, ${interval.y1}) = ${clippedStart}` }, codeLine: 17, phase: "scan",
+        vars: [{ name: "start", value: clippedStart }, { name: "end", value: interval.y2 }],
+        note: { vi: "Nếu đoạn chồng phần đã phủ, bỏ qua phần chồng bằng cách đẩy start tới current_end.", en: "When this interval overlaps covered y, skip the overlap by moving start to current_end." },
+      });
+      const added = Math.max(0, interval.y2 - clippedStart);
+      coveredY += added;
+      addStep({
+        title: { vi: `covered_y += ${added} → ${coveredY}`, en: `covered_y += ${added} → ${coveredY}` }, codeLine: 18, phase: "merge",
+        vars: [{ name: "end - start", value: interval.y2 - clippedStart }, { name: "added", value: added }, { name: "covered_y", value: coveredY }],
+        note: added > 0
+          ? { vi: `Chỉ cộng ${added} đơn vị y chưa từng được tính.`, en: `Add only ${added} y-units not counted before.` }
+          : { vi: "Đoạn này nằm hoàn toàn trong phần đã phủ nên cộng 0.", en: "This interval is fully contained in covered y, so it adds 0." },
+      });
+      currentEnd = Math.max(currentEnd, interval.y2);
+      mergedSegments = mergeIntervals(sortedActive.slice(0, activeIndex + 1));
+      currentBand = { ...currentBand, segments: mergedSegments.map((segment) => ({ ...segment })), coveredY };
+      addStep({
+        title: { vi: `current_end = ${currentEnd}`, en: `current_end = ${currentEnd}` }, codeLine: 19, phase: "merge",
+        vars: [{ name: "current_end", value: currentEnd }, { name: "union y", value: `[${mergedSegments.map((segment) => `[${segment.y1},${segment.y2})`).join(", ")}]` }],
+        note: { vi: "current_end tiến tới cuối xa nhất của hợp các đoạn đã quét.", en: "current_end advances to the farthest end of the intervals scanned so far." },
+      });
+    }
+
+    currentInterval = null;
+    const fullUnion = mergeIntervals(active);
+    mergedSegments = fullUnion;
+    const dx = x - prevX;
+    stripArea = BigInt(dx) * BigInt(coveredY);
+    areaExact += stripArea;
+    currentBand = { x1: prevX, x2: x, segments: fullUnion.map((segment) => ({ ...segment })), coveredY, area: stripArea.toString(), counted: true };
+    if (dx > 0) processedBands.push({ ...currentBand, segments: currentBand.segments.map((segment) => ({ ...segment })) });
+    addStep({
+      title: { vi: `area += ${dx} × ${coveredY} = ${stripArea}`, en: `area += ${dx} × ${coveredY} = ${stripArea}` }, codeLine: 20, phase: "area",
+      vars: [{ name: "x - prev_x", value: dx }, { name: "covered_y", value: coveredY }, { name: "strip area", value: stripArea.toString() }, { name: "area", value: areaExact.toString() }],
+      note: { vi: `Dải [${prevX},${x}) rộng ${dx}, tổng y phủ ${coveredY}; cộng đúng ${stripArea}, kể cả khi các hình chồng nhau.`, en: `Strip [${prevX},${x}) has width ${dx} and union y-length ${coveredY}; add exactly ${stripArea}, even with overlaps.` },
+    });
+
+    const isStart = type === 1;
+    addStep({
+      title: { vi: `event_type == 1 → ${isStart}`, en: `event_type == 1 → ${isStart}` }, codeLine: 21, phase: "update",
+      vars: [{ name: "event_type", value: type }, { name: "condition", value: isStart }],
+      note: isStart
+        ? { vi: `START R${rectId}: thêm đoạn y sau khi dải bên trái đã được tính.`, en: `START R${rectId}: add its y-interval after measuring the strip to the left.` }
+        : { vi: `END R${rectId}: xóa đoạn y sau khi dải bên trái đã được tính.`, en: `END R${rectId}: remove its y-interval after measuring the strip to the left.` },
+    });
+    if (isStart) {
+      active.push({ y1, y2, rectId });
+      addStep({
+        title: { vi: `active.append([${y1},${y2}))`, en: `active.append([${y1},${y2}))` }, codeLine: 22, phase: "update",
+        vars: [{ name: "active", value: `[${active.map((item) => `R${item.rectId}[${item.y1},${item.y2})`).join(", ")}]` }],
+        note: { vi: `R${rectId} sẽ góp phần vào dải x tiếp theo.`, en: `R${rectId} will contribute to the next x-strip.` },
+      });
+    } else {
+      addStep({
+        title: { vi: "Đi vào nhánh else", en: "Enter the else branch" }, codeLine: 23, phase: "update",
+        vars: [{ name: "event", value: `END R${rectId}` }],
+        note: { vi: "Event kết thúc nên cần xóa đúng đoạn của hình này.", en: "This is an ending event, so remove this rectangle's interval." },
+      });
+      const removeIndex = active.findIndex((item) => item.rectId === rectId);
+      if (removeIndex !== -1) active.splice(removeIndex, 1);
+      addStep({
+        title: { vi: `active.remove([${y1},${y2}))`, en: `active.remove([${y1},${y2}))` }, codeLine: 24, phase: "update",
+        vars: [{ name: "active", value: `[${active.map((item) => `R${item.rectId}[${item.y1},${item.y2})`).join(", ")}]` }],
+        note: { vi: `R${rectId} không còn phủ phần bên phải x=${x}.`, en: `R${rectId} no longer covers anything to the right of x=${x}.` },
+      });
+    }
+    prevX = x;
+    processedEventCount = index + 1;
+    addStep({
+      title: { vi: `prev_x = ${x}`, en: `prev_x = ${x}` }, codeLine: 25, phase: "event",
+      vars: [{ name: "prev_x", value: prevX }, { name: "area", value: areaExact.toString() }],
+      note: { vi: "Event kế tiếp sẽ tạo dải bắt đầu từ x này với active vừa cập nhật.", en: "The next event will form a strip starting at this x with the updated active set." },
+    });
+  }
+
+  currentEventIndex = -1;
+  currentRectId = null;
+  currentInterval = null;
+  currentBand = null;
+  coveredY = 0;
+  currentEnd = null;
+  mergedSegments = mergeIntervals(active);
+  sweepX = events[events.length - 1].x;
+  const answer = Number(areaExact % MOD);
+  addStep({
+    title: { vi: `return ${areaExact} % 1000000007 = ${answer}`, en: `return ${areaExact} % 1000000007 = ${answer}` }, codeLine: 26, phase: "done", final: true,
+    vars: [{ name: "exact area", value: areaExact.toString() }, { name: "answer", value: answer }],
+    note: { vi: `Tổng diện tích hợp là ${areaExact}; sau modulo, đáp án là ${answer}.`, en: `The exact union area is ${areaExact}; after modulo, the answer is ${answer}.` },
+  });
+  return { original: rectangles, answer, steps };
+}
+
 module.exports = {
+  850: {
+    id: 850, difficulty: "hard", slug: "rectangle-area-ii",
+    category: { key: "array", vi: "Mảng / Sweep Line", en: "Array / Sweep Line" },
+    title: { vi: "Rectangle Area II", en: "Rectangle Area II" },
+    titleVi: { vi: "Tổng diện tích hợp của các hình chữ nhật", en: "Union area of rectangles" },
+    statement: {
+      vi: "Cho các hình chữ nhật song song với trục tọa độ. Tính tổng diện tích được phủ bởi ít nhất một hình và trả kết quả modulo 10⁹ + 7. Nhập mỗi hình theo dạng x1,y1,x2,y2; các hình cách nhau bằng dấu chấm phẩy.",
+      en: "Given axis-aligned rectangles, find the total area covered by at least one rectangle and return it modulo 10⁹ + 7. Enter each rectangle as x1,y1,x2,y2, separated by semicolons.",
+    },
+    defaultInput: "0,0,2,2;1,0,2,3;1,0,3,1",
+    inputKind: "string",
+    inputLabel: { vi: "rectangles (x1,y1,x2,y2;...)", en: "rectangles (x1,y1,x2,y2;...)" },
+    extraParams: [],
+    approach: [
+      { vi: "Biến mỗi hình thành START event tại x1 và END event tại x2, rồi sắp xếp theo x.", en: "Turn each rectangle into a START event at x1 and an END event at x2, then sort by x." },
+      { vi: "Giữa hai event, merge các đoạn y đang active để lấy chiều dài phủ thật, không đếm phần chồng lặp.", en: "Between two events, merge active y-intervals to get the actual covered length without double-counting overlaps." },
+      { vi: "Cộng (x - prev_x) × covered_y, rồi mới cập nhật active theo event hiện tại.", en: "Add (x - prev_x) × covered_y, then update active with the current event." },
+    ],
+    complexity: {
+      time: "O(n² log n)", space: "O(n)",
+      note: { vi: "Có 2n events; mỗi event sắp xếp tối đa n đoạn y đang active.", en: "There are 2n events; each event sorts up to n active y-intervals." },
+    },
+    code: [
+      "class Solution:",
+      "    def rectangleArea(self, rectangles):",
+      "        MOD = 10**9 + 7",
+      "        events = []",
+      "        for x1, y1, x2, y2 in rectangles:",
+      "            events.append((x1, 1, y1, y2))",
+      "            events.append((x2, -1, y1, y2))",
+      "        events.sort()",
+      "        active = []",
+      "        prev_x = events[0][0]",
+      "        area = 0",
+      "",
+      "        for x, event_type, y1, y2 in events:",
+      "            covered_y = 0",
+      "            current_end = float('-inf')",
+      "            for start, end in sorted(active):",
+      "                start = max(current_end, start)",
+      "                covered_y += max(0, end - start)",
+      "                current_end = max(current_end, end)",
+      "            area += (x - prev_x) * covered_y",
+      "            if event_type == 1:",
+      "                active.append((y1, y2))",
+      "            else:",
+      "                active.remove((y1, y2))",
+      "            prev_x = x",
+      "        return area % MOD",
+    ],
+    liveArgs: (input) => [parseRectangles850(input)],
+    builder: buildSteps850,
+  },
   240: {
     id: 240, difficulty: "medium", slug: "search-a-2d-matrix-ii",
     category: { key: "array", vi: "Mảng / Ma trận", en: "Array / Matrix" },

@@ -13379,7 +13379,7 @@ function buildSteps338(input) {
  *
  * Code lines (1-indexed):
  *  1  class Solution:
- *  2      def predictTheWinner(self, nums):
+ *  2      def PredictTheWinner(self, nums):
  *  3          n = len(nums)
  *  4          dp = [[0]*n for _ in range(n)]
  *  5          for i in range(n): dp[i][i] = nums[i]
@@ -13393,143 +13393,209 @@ function buildSteps338(input) {
  */
 function buildSteps486(inputNums) {
   const nums = Array.isArray(inputNums)
-    ? [...inputNums]
-    : String(inputNums).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+    ? inputNums.map(Number).filter(Number.isFinite)
+    : String(inputNums).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
   const n = nums.length;
   const steps = [];
-
-  // dp[i][j] = max advantage for current player on nums[i..j]
   const dp = Array.from({ length: n }, () => Array(n).fill(null));
 
-  // Display grid: (n+1)×(n+1), row 0 = col headers, col 0 = row headers
-  const colHeaders = nums.map((v, i) => ({ index: `j=${i}`, char: String(v) }));
-  const rowHeaders = nums.map((v, i) => ({ index: `i=${i}`, char: String(v) }));
-
-  function makeDisplay() {
-    const d = Array.from({ length: n + 1 }, () => Array(n + 1).fill(""));
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        d[r + 1][c + 1] = dp[r][c] === null ? "·" : String(dp[r][c]);
-      }
-    }
-    return d;
-  }
-
-  function gridSnap(opts) {
+  function addStep({
+    title,
+    codeLine,
+    phase,
+    length = null,
+    i = null,
+    j = null,
+    takeLeft = null,
+    takeRight = null,
+    picked = null,
+    final = false,
+    vars = [],
+    note,
+  }) {
     steps.push({
-      title: opts.title,
+      title,
       arr: [],
-      grid: {
-        dp: makeDisplay(),
-        text1: "",
-        text2: "",
-        rowLabels: rowHeaders,
-        colLabels: colHeaders,
-        showIndices: false,
-        hlCell: opts.hlCell ? [opts.hlCell[0] + 1, opts.hlCell[1] + 1] : null,
-        pathCells: (opts.pathCells || []).map(([r, c]) => [r + 1, c + 1]),
-        largeCells: true,
-        caption: opts.caption || null,
-      },
       highlight: [],
       mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      predictWinnerView: {
+        phase,
+        nums: [...nums],
+        dp: dp.map((row) => [...row]),
+        length,
+        i,
+        j,
+        takeLeft,
+        takeRight,
+        picked,
+        advantage: n && dp[0][n - 1] !== null ? dp[0][n - 1] : null,
+        winner: final ? dp[0][n - 1] >= 0 : null,
+      },
     });
   }
 
-  // ── Init ────────────────────────────────────────────────────────────
-  gridSnap({
-    title: { vi: "Khởi tạo bảng DP", en: "Initialize DP table" },
-    codeLines: [3, 4],
-    vars: [
-      { name: "nums", value: `[${nums.join(", ")}]` },
-      { name: "n", value: n },
-    ],
+  if (n === 0) {
+    steps.push({
+      title: { vi: "nums không được rỗng", en: "nums cannot be empty" },
+      arr: [], highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "nums", value: "[]" }],
+      note: { vi: "Bài toán yêu cầu ít nhất một số.", en: "The problem requires at least one number." },
+    });
+    return { original: nums, answer: false, steps };
+  }
+
+  addStep({
+    title: { vi: `n = len(nums) = ${n}`, en: `n = len(nums) = ${n}` },
+    codeLine: 3,
+    phase: "init",
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "n", value: n }],
     note: {
-      vi:
-        `dp[i][j] = lợi thế điểm số tối đa (người hiện tại − đối thủ) trên nums[i..j].\n` +
-        `Cột/hàng header = chỉ số và giá trị. Ô trên đường chéo chính (i>j) không dùng.`,
-      en:
-        `dp[i][j] = max score advantage (current player − opponent) on nums[i..j].\n` +
-        `Headers show index and value. Cells above the main diagonal (i>j) are unused.`,
+      vi: "Mỗi lượt chỉ được lấy số ngoài cùng bên trái hoặc bên phải.",
+      en: "Each turn may take only the leftmost or rightmost number.",
+    },
+  });
+  addStep({
+    title: { vi: `Tạo bảng dp ${n}×${n}`, en: `Create a ${n}×${n} dp table` },
+    codeLine: 4,
+    phase: "init",
+    vars: [{ name: "dp", value: `${n}×${n} zeros` }],
+    note: {
+      vi: "dp[i][j] sẽ lưu lợi thế điểm tối đa của người sắp chơi trên đoạn nums[i..j].",
+      en: "dp[i][j] stores the maximum score advantage for the player about to move on nums[i..j].",
     },
   });
 
-  // ── Base case: length 1 ──────────────────────────────────────────────
   for (let i = 0; i < n; i++) {
     dp[i][i] = nums[i];
-    gridSnap({
-      title: { vi: `dp[${i}][${i}] = nums[${i}] = ${nums[i]}`, en: `dp[${i}][${i}] = nums[${i}] = ${nums[i]}` },
-      hlCell: [i, i],
-      codeLines: [5],
-      vars: [
-        { name: "i", value: i },
-        { name: `nums[${i}]`, value: nums[i] },
-        { name: `dp[${i}][${i}]`, value: dp[i][i] },
-      ],
+    addStep({
+      title: { vi: `dp[${i}][${i}] = ${nums[i]}`, en: `dp[${i}][${i}] = ${nums[i]}` },
+      codeLine: 5,
+      phase: "base",
+      length: 1,
+      i,
+      j: i,
+      picked: "only",
+      vars: [{ name: "i", value: i }, { name: `dp[${i}][${i}]`, value: nums[i] }],
       note: {
-        vi: `Khoảng đơn [${i},${i}]: chỉ có nums[${i}]=${nums[i]}. Người hiện tại lấy hết → lợi thế = ${nums[i]}.`,
-        en: `Single element [${i},${i}]: only nums[${i}]=${nums[i]}. Current player takes it → advantage = ${nums[i]}.`,
+        vi: `Đoạn chỉ có ${nums[i]}; người hiện tại lấy số đó nên lợi thế bằng ${nums[i]}.`,
+        en: `The interval contains only ${nums[i]}; the current player takes it, so the advantage is ${nums[i]}.`,
       },
     });
   }
 
-  // ── Fill by increasing length ────────────────────────────────────────
   for (let length = 2; length <= n; length++) {
-    for (let i = 0; i <= n - length; i++) {
-      const j = i + length - 1;
+    addStep({
+      title: { vi: `length = ${length}`, en: `length = ${length}` },
+      codeLine: 6,
+      phase: "length",
+      length,
+      vars: [{ name: "length", value: length }],
+      note: {
+        vi: `Bắt đầu tính mọi đoạn dài ${length}; các đoạn ngắn hơn đã có kết quả.`,
+        en: `Start every interval of length ${length}; all shorter intervals are already known.`,
+      },
+    });
 
-      gridSnap({
-        title: { vi: `Khoảng [${i},${j}] length=${length}`, en: `Interval [${i},${j}] length=${length}` },
-        hlCell: [i, j],
-        pathCells: i + 1 <= j ? [[i + 1, j]] : [],
-        codeLines: [6, 7, 8],
-        vars: [
-          { name: "length", value: length },
-          { name: "i", value: i },
-          { name: "j", value: j },
-          { name: "nums[i]", value: nums[i] },
-          { name: "nums[j]", value: nums[j] },
-        ],
+    for (let i = 0; i <= n - length; i++) {
+      addStep({
+        title: { vi: `i = ${i}`, en: `i = ${i}` },
+        codeLine: 7,
+        phase: "interval-start",
+        length,
+        i,
+        vars: [{ name: "length", value: length }, { name: "i", value: i }],
         note: {
-          vi: `Tính dp[${i}][${j}]: người hiện tại chọn nums[${i}]=${nums[i]} (trái) hoặc nums[${j}]=${nums[j]} (phải).`,
-          en: `Compute dp[${i}][${j}]: current player picks nums[${i}]=${nums[i]} (left) or nums[${j}]=${nums[j]} (right).`,
+          vi: `Chọn đầu trái i=${i}; dòng kế tiếp tính đầu phải j.`,
+          en: `Choose left endpoint i=${i}; the next line computes right endpoint j.`,
         },
       });
 
-      const takeLeft  = nums[i] - (i + 1 <= j ? dp[i + 1][j] : 0);
-      const takeRight = nums[j] - (i <= j - 1 ? dp[i][j - 1] : 0);
-      dp[i][j] = Math.max(takeLeft, takeRight);
-      const picked = takeLeft >= takeRight ? "left" : "right";
-
-      gridSnap({
-        title: {
-          vi: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]} (chọn ${picked === "left" ? "trái" : "phải"})`,
-          en: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]} (pick ${picked})`,
+      const j = i + length - 1;
+      addStep({
+        title: { vi: `j = ${i} + ${length} - 1 = ${j}`, en: `j = ${i} + ${length} - 1 = ${j}` },
+        codeLine: 8,
+        phase: "interval",
+        length,
+        i,
+        j,
+        vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "interval", value: `[${nums.slice(i, j + 1).join(", ")}]` }],
+        note: {
+          vi: `Đoạn đang chơi là nums[${i}..${j}]; chỉ ${nums[i]} và ${nums[j]} có thể được lấy.`,
+          en: `The current game is nums[${i}..${j}]; only ${nums[i]} and ${nums[j]} may be taken.`,
         },
-        hlCell: [i, j],
-        pathCells: picked === "left"
-          ? (i + 1 <= j ? [[i + 1, j]] : [])
-          : (i <= j - 1 ? [[i, j - 1]] : []),
-        codeLines: [9, 10, 11],
+      });
+
+      const leftOpponent = dp[i + 1][j];
+      const takeLeft = nums[i] - leftOpponent;
+      addStep({
+        title: { vi: `take_left = ${nums[i]} - ${leftOpponent} = ${takeLeft}`, en: `take_left = ${nums[i]} - ${leftOpponent} = ${takeLeft}` },
+        codeLine: 9,
+        phase: "take-left",
+        length,
+        i,
+        j,
+        takeLeft,
         vars: [
-          { name: "take_left",  value: `nums[${i}](${nums[i]}) − dp[${i+1}][${j}](${i+1<=j ? dp[i+1][j] : 0}) = ${takeLeft}` },
-          { name: "take_right", value: `nums[${j}](${nums[j]}) − dp[${i}][${j-1}](${i<=j-1 ? dp[i][j-1] : 0}) = ${takeRight}` },
-          { name: `dp[${i}][${j}]`, value: dp[i][j] },
-          { name: "best choice", value: picked },
+          { name: "nums[i]", value: nums[i] },
+          { name: `dp[${i + 1}][${j}]`, value: leftOpponent },
+          { name: "take_left", value: takeLeft },
         ],
         note: {
-          vi:
-            `take_left = nums[${i}] − dp[${i+1}][${j}] = ${nums[i]} − ${i+1<=j?dp[i+1][j]:0} = ${takeLeft}\n` +
-            `take_right = nums[${j}] − dp[${i}][${j-1}] = ${nums[j]} − ${i<=j-1?dp[i][j-1]:0} = ${takeRight}\n` +
-            `dp[${i}][${j}] = max = ${dp[i][j]}. Nếu lợi thế > 0 → người chọn bài lần này thắng trong đoạn này.`,
-          en:
-            `take_left = nums[${i}] − dp[${i+1}][${j}] = ${nums[i]} − ${i+1<=j?dp[i+1][j]:0} = ${takeLeft}\n` +
-            `take_right = nums[${j}] − dp[${i}][${j-1}] = ${nums[j]} − ${i<=j-1?dp[i][j-1]:0} = ${takeRight}\n` +
-            `dp[${i}][${j}] = max = ${dp[i][j]}. Positive → current picker wins this sub-game.`,
+          vi: `Lấy trái được ${nums[i]}, nhưng đối thủ kế tiếp có lợi thế ${leftOpponent}; lợi thế ròng là ${takeLeft}.`,
+          en: `Taking left scores ${nums[i]}, but the opponent then has advantage ${leftOpponent}; net advantage is ${takeLeft}.`,
+        },
+      });
+
+      const rightOpponent = dp[i][j - 1];
+      const takeRight = nums[j] - rightOpponent;
+      addStep({
+        title: { vi: `take_right = ${nums[j]} - ${rightOpponent} = ${takeRight}`, en: `take_right = ${nums[j]} - ${rightOpponent} = ${takeRight}` },
+        codeLine: 10,
+        phase: "take-right",
+        length,
+        i,
+        j,
+        takeLeft,
+        takeRight,
+        vars: [
+          { name: "nums[j]", value: nums[j] },
+          { name: `dp[${i}][${j - 1}]`, value: rightOpponent },
+          { name: "take_right", value: takeRight },
+        ],
+        note: {
+          vi: `Lấy phải được ${nums[j]}, trừ lợi thế ${rightOpponent} của đối thủ; lợi thế ròng là ${takeRight}.`,
+          en: `Taking right scores ${nums[j]}, minus the opponent's advantage ${rightOpponent}; net advantage is ${takeRight}.`,
+        },
+      });
+
+      const picked = takeLeft >= takeRight ? "left" : "right";
+      dp[i][j] = Math.max(takeLeft, takeRight);
+      addStep({
+        title: {
+          vi: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]}`,
+          en: `dp[${i}][${j}] = max(${takeLeft}, ${takeRight}) = ${dp[i][j]}`,
+        },
+        codeLine: 11,
+        phase: "choose",
+        length,
+        i,
+        j,
+        takeLeft,
+        takeRight,
+        picked,
+        vars: [
+          { name: "take_left", value: takeLeft },
+          { name: "take_right", value: takeRight },
+          { name: "best choice", value: picked },
+          { name: `dp[${i}][${j}]`, value: dp[i][j] },
+        ],
+        note: {
+          vi: `Chọn ${picked === "left" ? "TRÁI" : "PHẢI"} vì tạo lợi thế lớn hơn cho người hiện tại.`,
+          en: `Choose ${picked.toUpperCase()} because it gives the current player the larger advantage.`,
         },
       });
     }
@@ -13537,34 +13603,37 @@ function buildSteps486(inputNums) {
 
   const advantage = dp[0][n - 1];
   const winner = advantage >= 0;
-  gridSnap({
+  const finalTakeLeft = n === 1 ? nums[0] : nums[0] - dp[1][n - 1];
+  const finalTakeRight = n === 1 ? nums[0] : nums[n - 1] - dp[0][n - 2];
+  const finalPicked = finalTakeLeft >= finalTakeRight ? "left" : "right";
+  addStep({
     title: {
-      vi: `dp[0][${n-1}] = ${advantage} → Player 1 ${winner ? "THẮNG" : "THUA"}`,
-      en: `dp[0][${n-1}] = ${advantage} → Player 1 ${winner ? "WINS" : "LOSES"}`,
+      vi: `dp[0][${n - 1}] = ${advantage} → ${winner}`,
+      en: `dp[0][${n - 1}] = ${advantage} → ${winner}`,
     },
-    hlCell: [0, n - 1],
+    codeLine: 12,
+    phase: "done",
+    length: n,
+    i: 0,
+    j: n - 1,
+    takeLeft: finalTakeLeft,
+    takeRight: finalTakeRight,
+    picked: finalPicked,
     final: true,
-    codeLines: [12],
-    caption: winner
-      ? `✓ Player 1 wins (advantage = ${advantage} ≥ 0)`
-      : `✗ Player 2 wins (advantage = ${advantage} < 0)`,
     vars: [
-      { name: "dp[0][n-1]", value: advantage },
-      { name: "dp[0][n-1] >= 0?", value: winner },
+      { name: "Player 1 advantage", value: advantage },
+      { name: "advantage >= 0", value: winner },
       { name: "answer", value: winner },
     ],
-    note: {
-      vi:
-        `dp[0][${n-1}] = ${advantage}.\n` +
-        (winner
-          ? `≥ 0 → Player 1 có thể đảm bảo điểm số ≥ Player 2 → Player 1 THẮNG.`
-          : `< 0 → Player 2 luôn có thể đảm bảo điểm cao hơn → Player 2 THẮNG.`),
-      en:
-        `dp[0][${n-1}] = ${advantage}.\n` +
-        (winner
-          ? `≥ 0 → Player 1 can guarantee score ≥ Player 2 → Player 1 WINS.`
-          : `< 0 → Player 2 can always secure more points → Player 2 WINS.`),
-    },
+    note: winner
+      ? {
+          vi: `Lợi thế ${advantage} ≥ 0, nên Player 1 có thể đảm bảo điểm không thấp hơn Player 2.`,
+          en: `Advantage ${advantage} ≥ 0, so Player 1 can guarantee a score at least as high as Player 2's.`,
+        }
+      : {
+          vi: `Lợi thế ${advantage} < 0, nên Player 1 không thể tránh thua nếu Player 2 chơi tối ưu.`,
+          en: `Advantage ${advantage} < 0, so Player 1 cannot avoid losing against optimal play.`,
+        },
   });
 
   return { original: nums, answer: winner, steps };
@@ -13599,7 +13668,7 @@ module.exports = {
     },
     code: [
       "class Solution:",
-      "    def predictTheWinner(self, nums):",
+      "    def PredictTheWinner(self, nums):",
       "        n = len(nums)",
       "        dp = [[0]*n for _ in range(n)]",
       "        for i in range(n): dp[i][i] = nums[i]",

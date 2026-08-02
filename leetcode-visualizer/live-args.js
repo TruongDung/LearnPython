@@ -399,6 +399,11 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         { name: "countWordsStartingWith", args: [params.countPrefix] },
         { name: "erase", args: [params.erase] },
       ]);
+    case 3829: {
+      const operations = parseFunctionOperations(input);
+      if (operations[0] && operations[0].name === "RideSharingSystem") operations.shift();
+      return designConfig("RideSharingSystem", [], operations);
+    }
     case 9001:
       return {
         functionName: "get_highest_earning_experiences",

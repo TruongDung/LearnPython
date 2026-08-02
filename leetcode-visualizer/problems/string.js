@@ -8108,7 +8108,428 @@ function buildSteps224(input) {
   return { original: s, answer, steps };
 }
 
+/** LeetCode 3829: Design Ride Sharing System — two FIFO queues + lazy rider cancellation. */
+function buildSteps3829(input) {
+  const parsed = parseDequeOps641(input);
+  const allowed = new Set(["addRider", "addDriver", "matchDriverWithRider", "cancelRider"]);
+  const calls = parsed
+    .filter((operation) => operation.name !== "RideSharingSystem")
+    .filter((operation) => allowed.has(operation.name))
+    .filter((operation) => {
+      if (operation.name === "matchDriverWithRider") return operation.args.length === 0;
+      return operation.args.length === 1 && Number.isInteger(operation.args[0]);
+    });
+  const operations = [
+    { name: "RideSharingSystem", args: [], label: "RideSharingSystem()" },
+    ...calls.map((operation) => ({
+      ...operation,
+      label: `${operation.name}(${operation.args.join(", ")})`,
+    })),
+  ];
+  const riders = [];
+  const drivers = [];
+  const activeRiders = new Set();
+  const results = Array(operations.length).fill(null);
+  const matches = [];
+  const steps = [];
+  const initialized = { riders: false, drivers: false, activeRiders: false };
+  let completedOps = 0;
+  let lastReturnLine = 7;
+
+  const riderQueueLabel = () => `[${riders.map((rider) => activeRiders.has(rider) ? rider : `${rider} (cancelled)`).join(", ")}]`;
+  const resultLabel = (result) => Array.isArray(result) ? `[${result.join(", ")}]` : "None";
+
+  function snapshot(options) {
+    steps.push({
+      title: options.title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: options.codeLine ? [options.codeLine] : [],
+      vars: [
+        { name: "riders", value: initialized.riders ? riderQueueLabel() : "not initialized" },
+        { name: "drivers", value: initialized.drivers ? `[${drivers.join(", ")}]` : "not initialized" },
+        { name: "active_riders", value: initialized.activeRiders ? `{${[...activeRiders].join(", ")}}` : "not initialized" },
+        { name: "outputs", value: `[${results.slice(0, completedOps).map(resultLabel).join(", ")}]` },
+        ...(options.vars || []),
+      ],
+      note: options.note,
+      rideSharingView: {
+        phase: options.phase || "idle",
+        operations: operations.map((operation) => ({ ...operation, args: [...operation.args] })),
+        results: results.map((result) => Array.isArray(result) ? [...result] : result),
+        completedOps,
+        activeOpIndex: options.opIndex ?? null,
+        riders: [...riders],
+        drivers: [...drivers],
+        activeRiders: [...activeRiders],
+        initialized: { ...initialized },
+        activeRider: options.activeRider ?? null,
+        activeDriver: options.activeDriver ?? null,
+        removedRider: options.removedRider ?? null,
+        cancelledRider: options.cancelledRider ?? null,
+        cancelHadEffect: options.cancelHadEffect ?? null,
+        pair: options.pair ? [...options.pair] : null,
+        condition: options.condition ?? null,
+        matches: matches.map((pair) => [...pair]),
+        returnValue: options.returnValue === undefined
+          ? null
+          : Array.isArray(options.returnValue) ? [...options.returnValue] : options.returnValue,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo RideSharingSystem", en: "Initialize RideSharingSystem" },
+    codeLine: 4,
+    opIndex: 0,
+    phase: "initialize",
+    note: { vi: "Hệ thống cần hai queue FIFO và một set lưu các rider vẫn còn hiệu lực.", en: "The system needs two FIFO queues and a set containing riders whose requests are still active." },
+  });
+  initialized.riders = true;
+  snapshot({
+    title: { vi: "riders = deque()", en: "riders = deque()" },
+    codeLine: 5,
+    opIndex: 0,
+    phase: "initialize",
+    note: { vi: "FRONT của riders luôn là yêu cầu đến sớm nhất chưa được lazy-cleanup.", en: "The riders FRONT is always the earliest request not yet lazily cleaned up." },
+  });
+  initialized.drivers = true;
+  snapshot({
+    title: { vi: "drivers = deque()", en: "drivers = deque()" },
+    codeLine: 6,
+    opIndex: 0,
+    phase: "initialize",
+    note: { vi: "FRONT của drivers là tài xế trở nên sẵn sàng sớm nhất.", en: "The drivers FRONT is the driver who became available earliest." },
+  });
+  initialized.activeRiders = true;
+  completedOps = 1;
+  snapshot({
+    title: { vi: "active_riders = set()", en: "active_riders = set()" },
+    codeLine: 7,
+    opIndex: 0,
+    phase: "initialize-done",
+    note: { vi: "Set cho phép cancel O(1). Rider bị hủy có thể còn trong queue nhưng không còn trong active_riders.", en: "The set makes cancellation O(1). A cancelled rider may remain in the queue but is absent from active_riders." },
+  });
+
+  for (let opIndex = 1; opIndex < operations.length; opIndex++) {
+    const operation = operations[opIndex];
+    const id = operation.args[0];
+
+    if (operation.name === "addRider") {
+      snapshot({
+        title: { vi: `Gọi addRider(${id})`, en: `Call addRider(${id})` },
+        codeLine: 9,
+        opIndex,
+        phase: "rider-call",
+        activeRider: id,
+        vars: [{ name: "riderId", value: id }],
+        note: { vi: `Rider ${id} đến sau mọi rider hiện có nên sẽ vào REAR.`, en: `Rider ${id} arrives after every current rider, so it will enter at REAR.` },
+      });
+      riders.push(id);
+      snapshot({
+        title: { vi: `Đưa rider ${id} vào REAR`, en: `Append rider ${id} at REAR` },
+        codeLine: 10,
+        opIndex,
+        phase: "rider-queued",
+        activeRider: id,
+        vars: [{ name: "action", value: `riders.append(${id})` }],
+        note: { vi: `Queue đã có rider ${id}, nhưng dòng tiếp theo mới đánh dấu request này là active.`, en: `The queue now contains rider ${id}, but the next line marks the request active.` },
+      });
+      activeRiders.add(id);
+      results[opIndex] = null;
+      completedOps = opIndex + 1;
+      snapshot({
+        title: { vi: `Kích hoạt rider ${id}`, en: `Activate rider ${id}` },
+        codeLine: 11,
+        opIndex,
+        phase: "rider-active",
+        activeRider: id,
+        vars: [{ name: "action", value: `active_riders.add(${id})` }],
+        note: { vi: `Rider ${id} vừa ở trong queue vừa ở trong active_riders nên đủ điều kiện được ghép.`, en: `Rider ${id} is now both queued and active, so the rider is eligible for matching.` },
+      });
+      lastReturnLine = 11;
+      continue;
+    }
+
+    if (operation.name === "addDriver") {
+      snapshot({
+        title: { vi: `Gọi addDriver(${id})`, en: `Call addDriver(${id})` },
+        codeLine: 13,
+        opIndex,
+        phase: "driver-call",
+        activeDriver: id,
+        vars: [{ name: "driverId", value: id }],
+        note: { vi: `Driver ${id} vừa sẵn sàng và sẽ đứng ở REAR.`, en: `Driver ${id} just became available and will enter at REAR.` },
+      });
+      drivers.push(id);
+      results[opIndex] = null;
+      completedOps = opIndex + 1;
+      snapshot({
+        title: { vi: `Đưa driver ${id} vào REAR`, en: `Append driver ${id} at REAR` },
+        codeLine: 14,
+        opIndex,
+        phase: "driver-queued",
+        activeDriver: id,
+        vars: [{ name: "action", value: `drivers.append(${id})` }],
+        note: { vi: `Driver ${id} đứng sau các driver đã đến trước; thứ tự FIFO được giữ nguyên.`, en: `Driver ${id} follows drivers who arrived earlier; FIFO order is preserved.` },
+      });
+      lastReturnLine = 14;
+      continue;
+    }
+
+    if (operation.name === "cancelRider") {
+      const hadEffect = activeRiders.has(id);
+      snapshot({
+        title: { vi: `Gọi cancelRider(${id})`, en: `Call cancelRider(${id})` },
+        codeLine: 26,
+        opIndex,
+        phase: "cancel-call",
+        activeRider: id,
+        cancelledRider: id,
+        cancelHadEffect: hadEffect,
+        vars: [{ name: "riderId", value: id }, { name: "riderId in active_riders", value: hadEffect }],
+        note: hadEffect
+          ? { vi: `Rider ${id} đang chờ nên request sẽ bị vô hiệu hóa.`, en: `Rider ${id} is waiting, so the request will be invalidated.` }
+          : { vi: `Rider ${id} không còn active (đã ghép, đã hủy hoặc không tồn tại), nên lời gọi không có tác dụng.`, en: `Rider ${id} is no longer active (matched, cancelled, or absent), so the call has no effect.` },
+      });
+      activeRiders.delete(id);
+      results[opIndex] = null;
+      completedOps = opIndex + 1;
+      snapshot({
+        title: hadEffect
+          ? { vi: `Hủy rider ${id}`, en: `Cancel rider ${id}` }
+          : { vi: `discard(${id}) không thay đổi set`, en: `discard(${id}) leaves the set unchanged` },
+        codeLine: 27,
+        opIndex,
+        phase: hadEffect ? "cancel-done" : "cancel-noop",
+        activeRider: id,
+        cancelledRider: id,
+        cancelHadEffect: hadEffect,
+        vars: [{ name: "action", value: `active_riders.discard(${id})` }],
+        note: hadEffect
+          ? { vi: `Rider ${id} được gạch mờ trong queue. Không xóa giữa deque; match() sẽ lazy-remove khi rider này tới FRONT.`, en: `Rider ${id} is dimmed in the queue. We avoid deleting from the middle; match() lazily removes the rider upon reaching FRONT.` }
+          : { vi: "set.discard không báo lỗi khi phần tử không tồn tại.", en: "set.discard does not raise when the element is absent." },
+      });
+      lastReturnLine = 27;
+      continue;
+    }
+
+    snapshot({
+      title: { vi: "Gọi matchDriverWithRider()", en: "Call matchDriverWithRider()" },
+      codeLine: 16,
+      opIndex,
+      phase: "match-call",
+      note: { vi: "Trước tiên phải dọn các rider đã hủy đang chắn ở FRONT; sau đó mới xét đủ hai phía để ghép.", en: "First clean cancelled riders blocking the FRONT; then verify both sides before matching." },
+    });
+
+    while (riders.length > 0 && !activeRiders.has(riders[0])) {
+      const staleRider = riders[0];
+      snapshot({
+        title: { vi: `FRONT rider ${staleRider} đã bị hủy`, en: `FRONT rider ${staleRider} is cancelled` },
+        codeLine: 17,
+        opIndex,
+        phase: "cleanup-check",
+        activeRider: staleRider,
+        cancelledRider: staleRider,
+        condition: true,
+        vars: [{ name: "while condition", value: true }, { name: "riders[0]", value: staleRider }],
+        note: { vi: `${staleRider} còn nằm vật lý ở FRONT nhưng không còn trong active_riders, nên không thể ghép.`, en: `${staleRider} is physically at FRONT but absent from active_riders, so this rider cannot be matched.` },
+      });
+      riders.shift();
+      snapshot({
+        title: { vi: `Lazy-remove rider ${staleRider}`, en: `Lazy-remove rider ${staleRider}` },
+        codeLine: 18,
+        opIndex,
+        phase: "cleanup-pop",
+        removedRider: staleRider,
+        cancelledRider: staleRider,
+        vars: [{ name: "popleft", value: staleRider }],
+        note: { vi: `Loại rider ${staleRider} khỏi FRONT trong O(1); rider kế tiếp trở thành người đến sớm nhất.`, en: `Remove rider ${staleRider} from FRONT in O(1); the next rider becomes the earliest arrival.` },
+      });
+    }
+
+    const cleanFront = riders.length > 0 ? riders[0] : null;
+    snapshot({
+      title: cleanFront === null
+        ? { vi: "Queue rider rỗng: dừng cleanup", en: "Rider queue empty: stop cleanup" }
+        : { vi: `FRONT rider ${cleanFront} vẫn active`, en: `FRONT rider ${cleanFront} is active` },
+      codeLine: 17,
+      opIndex,
+      phase: "cleanup-done",
+      activeRider: cleanFront,
+      condition: false,
+      vars: [{ name: "while condition", value: false }],
+      note: cleanFront === null
+        ? { vi: "Không còn rider nào để dọn hoặc ghép.", en: "No riders remain to clean or match." }
+        : { vi: `Rider ${cleanFront} có trong active_riders, nên giữ lại ở FRONT để ghép.`, en: `Rider ${cleanFront} is in active_riders, so keep this rider at FRONT for matching.` },
+    });
+
+    const noMatch = riders.length === 0 || drivers.length === 0;
+    snapshot({
+      title: noMatch
+        ? { vi: "Thiếu rider hoặc driver", en: "A rider or driver is missing" }
+        : { vi: "Cả hai queue đều sẵn sàng", en: "Both queues are ready" },
+      codeLine: 19,
+      opIndex,
+      phase: "availability-check",
+      activeRider: riders[0] ?? null,
+      activeDriver: drivers[0] ?? null,
+      condition: noMatch,
+      vars: [
+        { name: "not riders", value: riders.length === 0 },
+        { name: "not drivers", value: drivers.length === 0 },
+        { name: "condition", value: noMatch },
+      ],
+      note: noMatch
+        ? { vi: "Không được pop phía còn lại; giữ nguyên queue và trả [-1, -1].", en: "Do not pop the remaining side; preserve its queue and return [-1, -1]." }
+        : { vi: "FRONT của mỗi queue là người đến sớm nhất, nên hai phần tử này tạo cặp tiếp theo.", en: "Each FRONT is the earliest arrival, so these two entries form the next pair." },
+    });
+
+    if (noMatch) {
+      const result = [-1, -1];
+      results[opIndex] = result;
+      completedOps = opIndex + 1;
+      snapshot({
+        title: { vi: "Trả về [-1, -1]", en: "Return [-1, -1]" },
+        codeLine: 20,
+        opIndex,
+        phase: "no-match",
+        pair: result,
+        returnValue: result,
+        vars: [{ name: "return", value: "[-1, -1]" }],
+        note: { vi: "Chưa thể tạo chuyến đi; driver hoặc rider còn lại tiếp tục chờ cho lời gọi sau.", en: "No ride can be created yet; any remaining driver or rider continues waiting for a later call." },
+      });
+      lastReturnLine = 20;
+      continue;
+    }
+
+    const driver = drivers.shift();
+    snapshot({
+      title: { vi: `Lấy FRONT driver ${driver}`, en: `Take FRONT driver ${driver}` },
+      codeLine: 21,
+      opIndex,
+      phase: "take-driver",
+      activeDriver: driver,
+      activeRider: riders[0],
+      vars: [{ name: "driver", value: driver }, { name: "action", value: "drivers.popleft()" }],
+      note: { vi: `Driver ${driver} đến sớm nhất nên rời FRONT trước. Rider vẫn chưa bị pop ở dòng này.`, en: `Driver ${driver} arrived earliest, so this driver leaves FRONT first. The rider has not been popped on this line.` },
+    });
+    const rider = riders.shift();
+    snapshot({
+      title: { vi: `Lấy FRONT rider ${rider}`, en: `Take FRONT rider ${rider}` },
+      codeLine: 22,
+      opIndex,
+      phase: "take-rider",
+      activeDriver: driver,
+      activeRider: rider,
+      vars: [{ name: "rider", value: rider }, { name: "action", value: "riders.popleft()" }],
+      note: { vi: `Rider ${rider} là request active đến sớm nhất nên được ghép với driver ${driver}.`, en: `Rider ${rider} is the earliest active request, so this rider matches driver ${driver}.` },
+    });
+    activeRiders.delete(rider);
+    snapshot({
+      title: { vi: `Xóa rider ${rider} khỏi active_riders`, en: `Remove rider ${rider} from active_riders` },
+      codeLine: 23,
+      opIndex,
+      phase: "deactivate-match",
+      activeDriver: driver,
+      activeRider: rider,
+      vars: [{ name: "action", value: `active_riders.remove(${rider})` }],
+      note: { vi: `Request của rider ${rider} đã được dùng; cancelRider(${rider}) về sau sẽ không có tác dụng.`, en: `Rider ${rider}'s request has been consumed; a later cancelRider(${rider}) has no effect.` },
+    });
+    const pair = [driver, rider];
+    matches.push(pair);
+    results[opIndex] = pair;
+    completedOps = opIndex + 1;
+    snapshot({
+      title: { vi: `Ghép [driver ${driver}, rider ${rider}]`, en: `Match [driver ${driver}, rider ${rider}]` },
+      codeLine: 24,
+      opIndex,
+      phase: "matched",
+      activeDriver: driver,
+      activeRider: rider,
+      pair,
+      returnValue: pair,
+      vars: [{ name: "return", value: `[${driver}, ${rider}]` }],
+      note: { vi: `Thứ tự kết quả luôn là [driverId, riderId] = [${driver}, ${rider}].`, en: `The result order is always [driverId, riderId] = [${driver}, ${rider}].` },
+    });
+    lastReturnLine = 24;
+  }
+
+  snapshot({
+    title: { vi: "Hoàn tất mọi operation", en: "All operations complete" },
+    codeLine: lastReturnLine,
+    phase: "done",
+    final: true,
+    vars: [{ name: "matches", value: `[${matches.map((pair) => `[${pair.join(", ")}]`).join(", ")}]` }],
+    note: { vi: "Mỗi rider/driver chỉ vào và rời queue tối đa một lần; lazy-cleanup giúp chi phí trung bình mỗi operation là O(1).", en: "Each rider and driver enters and leaves a queue at most once; lazy cleanup gives O(1) amortized cost per operation." },
+  });
+
+  return { original: input, operations, outputs: results, matches, answer: results, steps };
+}
+
 module.exports = {
+  3829: {
+    id: 3829,
+    difficulty: "medium",
+    slug: "design-ride-sharing-system",
+    category: { key: "stack-queue", vi: "Stack / Queue", en: "Stack / Queue" },
+    title: { vi: "Design Ride Sharing System", en: "Design Ride Sharing System" },
+    titleVi: { vi: "Thiết kế hệ thống ghép rider và driver theo FIFO", en: "Match riders and drivers in FIFO order" },
+    statement: {
+      vi: "Thiết kế hệ thống quản lý rider đang chờ và driver đang sẵn sàng. matchDriverWithRider() ghép driver đến sớm nhất với rider chờ lâu nhất; cancelRider() chỉ hủy request chưa được ghép.",
+      en: "Design a system for waiting riders and available drivers. matchDriverWithRider() pairs the earliest driver with the earliest waiting rider; cancelRider() only cancels an unmatched request.",
+    },
+    defaultInput: "addRider(3); addRider(1); addRider(7); addDriver(2); matchDriverWithRider(); cancelRider(1); addDriver(5); matchDriverWithRider(); addDriver(9); matchDriverWithRider()",
+    inputKind: "string",
+    inputLabel: { vi: "Operations (ngăn bởi ;)", en: "Operations (separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "Hai deque giữ thứ tự đến: FRONT là rider/driver sớm nhất, REAR là người mới đến.", en: "Two deques preserve arrival order: FRONT is earliest and REAR is newest." },
+      { vi: "active_riders là set các request vẫn hợp lệ; cancel chỉ discard khỏi set trong O(1).", en: "active_riders stores valid requests; cancellation only discards from the set in O(1)." },
+      { vi: "Trước khi ghép, lazy-remove mọi rider đã hủy đang chắn ở FRONT.", en: "Before matching, lazily remove cancelled riders blocking the FRONT." },
+      { vi: "Chỉ khi cả hai queue còn phần tử mới popleft hai FRONT và trả [driverId, riderId].", en: "Only when both queues are nonempty do we popleft both FRONT entries and return [driverId, riderId]." },
+    ],
+    complexity: {
+      time: "O(1) amortized",
+      space: "O(riders + drivers)",
+      note: {
+        vi: "add/cancel là O(1). Một match riêng lẻ có thể dọn nhiều rider đã hủy, nhưng mỗi rider chỉ bị pop một lần nên chi phí trung bình là O(1).",
+        en: "add/cancel are O(1). One match can clean several cancelled riders, but each rider is popped once, so the amortized cost is O(1).",
+      },
+    },
+    code: [
+      "from collections import deque",
+      "",
+      "class RideSharingSystem:",
+      "    def __init__(self):",
+      "        self.riders = deque()",
+      "        self.drivers = deque()",
+      "        self.active_riders = set()",
+      "",
+      "    def addRider(self, riderId: int) -> None:",
+      "        self.riders.append(riderId)",
+      "        self.active_riders.add(riderId)",
+      "",
+      "    def addDriver(self, driverId: int) -> None:",
+      "        self.drivers.append(driverId)",
+      "",
+      "    def matchDriverWithRider(self) -> List[int]:",
+      "        while self.riders and self.riders[0] not in self.active_riders:",
+      "            self.riders.popleft()",
+      "        if not self.riders or not self.drivers:",
+      "            return [-1, -1]",
+      "        driver = self.drivers.popleft()",
+      "        rider = self.riders.popleft()",
+      "        self.active_riders.remove(rider)",
+      "        return [driver, rider]",
+      "",
+      "    def cancelRider(self, riderId: int) -> None:",
+      "        self.active_riders.discard(riderId)",
+    ],
+    builder: buildSteps3829,
+  },
   8: {
     id: 8, difficulty: "medium", slug: "string-to-integer-atoi",
     category: { key: "string", vi: "Chuỗi", en: "String" },

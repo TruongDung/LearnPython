@@ -2728,6 +2728,377 @@ function renderDecisionTree(step) {
   renderTree({ tree: step.decisionTree }, "decisionTreeView");
 }
 
+function renderPredictWinnerView(step) {
+  const view = step.predictWinnerView;
+  const vi = lang === "vi";
+  const hasI = Number.isInteger(view.i);
+  const hasJ = Number.isInteger(view.j);
+  const intervalReady = hasI && hasJ;
+  const intervalStage = new Set(["length", "interval-start", "interval", "take-left", "take-right", "choose"]);
+  const activeStage = view.phase === "done" ? 2 : intervalStage.has(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Đoạn dài 1", "2. Ghép đoạn dài hơn", "3. Kiểm tra Player 1"]
+    : ["1. Length-1 intervals", "2. Build longer intervals", "3. Check Player 1"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < activeStage ? "is-done" : index === activeStage ? "is-active" : "";
+    return `<span class="${state}">${index < activeStage ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const arrayHtml = view.nums.map((value, index) => {
+    const classes = ["predict-winner-number"];
+    if (intervalReady && (index < view.i || index > view.j)) classes.push("is-outside");
+    if (hasI && index === view.i) classes.push("is-left");
+    if (hasJ && index === view.j) classes.push("is-right");
+    if (hasI && hasJ && view.i === view.j && index === view.i) classes.push("is-only");
+    let pointers = "";
+    if (hasI && hasJ && view.i === view.j && index === view.i) {
+      pointers = `<span>${vi ? "CHỈ CÒN" : "ONLY"}</span>`;
+    } else {
+      if (hasI && index === view.i) pointers += `<span>L · i</span>`;
+      if (hasJ && index === view.j) pointers += `<span>R · j</span>`;
+    }
+    return `<div class="${classes.join(" ")}">
+      <div class="predict-winner-pointers">${pointers}</div>
+      <strong>${escapeHtml(value)}</strong>
+      <small>[${index}]</small>
+    </div>`;
+  }).join("");
+
+  const leftDependency = intervalReady && view.i + 1 <= view.j ? [view.i + 1, view.j] : null;
+  const rightDependency = intervalReady && view.i <= view.j - 1 ? [view.i, view.j - 1] : null;
+  let dpCells = `<div class="predict-winner-dp-cell is-corner">i \\ j</div>`;
+  view.nums.forEach((value, j) => {
+    dpCells += `<div class="predict-winner-dp-cell is-header"><small>j=${j}</small><strong>${escapeHtml(value)}</strong></div>`;
+  });
+  view.dp.forEach((row, i) => {
+    dpCells += `<div class="predict-winner-dp-cell is-header"><small>i=${i}</small><strong>${escapeHtml(view.nums[i])}</strong></div>`;
+    row.forEach((value, j) => {
+      const classes = ["predict-winner-dp-cell"];
+      if (i > j) classes.push("is-unused");
+      if (i === view.i && j === view.j) classes.push("is-active");
+      if (leftDependency && i === leftDependency[0] && j === leftDependency[1]) classes.push("is-left-dependency");
+      if (rightDependency && i === rightDependency[0] && j === rightDependency[1]) classes.push("is-right-dependency");
+      if (value !== null) classes.push("is-filled");
+      const cellValue = i > j ? "" : value === null ? "·" : value;
+      dpCells += `<div class="${classes.join(" ")}" role="gridcell" aria-label="dp ${i} ${j}: ${cellValue || "unused"}">
+        <small>${i <= j ? `[${i},${j}]` : ""}</small><strong>${escapeHtml(cellValue)}</strong>
+      </div>`;
+    });
+  });
+
+  const leftOpponent = leftDependency ? view.dp[leftDependency[0]][leftDependency[1]] : null;
+  const rightOpponent = rightDependency ? view.dp[rightDependency[0]][rightDependency[1]] : null;
+  const leftKnown = view.takeLeft !== null;
+  const rightKnown = view.takeRight !== null;
+  const leftClasses = ["predict-winner-choice", "is-left-choice"];
+  const rightClasses = ["predict-winner-choice", "is-right-choice"];
+  if (view.phase === "take-left") leftClasses.push("is-current");
+  if (view.phase === "take-right") rightClasses.push("is-current");
+  if (view.phase === "choose" || view.phase === "done") {
+    if (view.picked === "left") {
+      leftClasses.push("is-picked");
+      rightClasses.push("is-rejected");
+    } else {
+      rightClasses.push("is-picked");
+      leftClasses.push("is-rejected");
+    }
+  }
+  const leftChoiceHtml = intervalReady && view.i !== view.j
+    ? `<div class="${leftClasses.join(" ")}">
+        <div><b>${vi ? "LẤY TRÁI" : "TAKE LEFT"}</b><strong>${escapeHtml(view.nums[view.i])}</strong></div>
+        <code>${escapeHtml(view.nums[view.i])} - dp[${view.i + 1}][${view.j}]</code>
+        <span>${escapeHtml(view.nums[view.i])} - ${escapeHtml(leftOpponent)} = <b>${leftKnown ? escapeHtml(view.takeLeft) : "?"}</b></span>
+      </div>`
+    : "";
+  const rightChoiceHtml = intervalReady && view.i !== view.j
+    ? `<div class="${rightClasses.join(" ")}">
+        <div><b>${vi ? "LẤY PHẢI" : "TAKE RIGHT"}</b><strong>${escapeHtml(view.nums[view.j])}</strong></div>
+        <code>${escapeHtml(view.nums[view.j])} - dp[${view.i}][${view.j - 1}]</code>
+        <span>${escapeHtml(view.nums[view.j])} - ${escapeHtml(rightOpponent)} = <b>${rightKnown ? escapeHtml(view.takeRight) : "?"}</b></span>
+      </div>`
+    : "";
+
+  let actionMain;
+  let actionDetail;
+  let actionClass = "";
+  if (view.phase === "init") {
+    actionMain = "dp[i][j]";
+    actionDetail = vi ? "lợi thế tối đa của người sắp chơi trên đoạn [i..j]" : "best advantage for the player about to move on [i..j]";
+  } else if (view.phase === "base") {
+    actionMain = `dp[${view.i}][${view.j}] = ${view.nums[view.i]}`;
+    actionDetail = vi ? "Một số duy nhất: lấy nó, đối thủ không còn điểm trong đoạn này." : "One number remains: take it, leaving no score in this interval for the opponent.";
+  } else if (view.phase === "length") {
+    actionMain = `length = ${view.length}`;
+    actionDetail = vi ? "Chỉ dùng kết quả từ các đoạn ngắn hơn đã được tính." : "Use only previously computed shorter intervals.";
+  } else if (view.phase === "interval-start") {
+    actionMain = `i = ${view.i}`;
+    actionDetail = vi ? "Đặt đầu trái; j sẽ được tính từ i và length." : "Set the left endpoint; j is computed from i and length.";
+  } else if (view.phase === "interval") {
+    actionMain = `[i, j] = [${view.i}, ${view.j}]`;
+    actionDetail = vi ? `Chỉ có thể lấy ${view.nums[view.i]} bên trái hoặc ${view.nums[view.j]} bên phải.` : `Only ${view.nums[view.i]} on the left or ${view.nums[view.j]} on the right can be taken.`;
+  } else if (view.phase === "take-left") {
+    actionMain = `take_left = ${view.takeLeft}`;
+    actionDetail = vi ? "Điểm lấy được trừ lợi thế tối ưu của đối thủ trong đoạn còn lại." : "Score taken minus the opponent's optimal advantage on the remaining interval.";
+  } else if (view.phase === "take-right") {
+    actionMain = `take_right = ${view.takeRight}`;
+    actionDetail = vi ? "Tính tương tự khi lấy số ngoài cùng bên phải." : "Apply the same calculation after taking the rightmost number.";
+  } else if (view.phase === "choose") {
+    actionMain = `max(${view.takeLeft}, ${view.takeRight}) = ${view.dp[view.i][view.j]}`;
+    actionDetail = vi ? `Người hiện tại chọn ${view.picked === "left" ? "TRÁI" : "PHẢI"} để giữ lợi thế lớn hơn.` : `The current player chooses ${view.picked.toUpperCase()} for the larger advantage.`;
+    actionClass = "is-choice";
+  } else {
+    actionMain = `dp[0][${view.nums.length - 1}] = ${view.advantage}`;
+    actionDetail = view.winner
+      ? (vi ? `${view.advantage} ≥ 0 nên Player 1 thắng hoặc hòa.` : `${view.advantage} ≥ 0, so Player 1 wins or ties.`)
+      : (vi ? `${view.advantage} < 0 nên Player 2 thắng nếu cả hai chơi tối ưu.` : `${view.advantage} < 0, so Player 2 wins under optimal play.`);
+    actionClass = view.winner ? "is-winner" : "is-loser";
+  }
+
+  const choicesHtml = intervalReady && view.i !== view.j
+    ? `<div class="predict-winner-choices">${leftChoiceHtml}${rightChoiceHtml}</div>`
+    : `<div class="predict-winner-rule"><strong>${vi ? "Công thức" : "Formula"}</strong><code>pick - ${vi ? "lợi thế của đối thủ" : "opponent advantage"}</code></div>`;
+  const summary = vi
+    ? `Predict the Winner với ${view.nums.length} số; phase ${view.phase}.`
+    : `Predict the Winner with ${view.nums.length} numbers; phase ${view.phase}.`;
+  $("treeView").innerHTML = `<section class="predict-winner-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="predict-winner-phases">${phasesHtml}</div>
+    <div class="predict-winner-array">${arrayHtml}</div>
+    <div class="predict-winner-workspace">
+      <div class="predict-winner-table-block">
+        <div class="predict-winner-section-head"><strong>dp[i][j]</strong><span>${vi ? "người hiện tại - đối thủ" : "current player - opponent"}</span></div>
+        <div class="predict-winner-table-scroll">
+          <div class="predict-winner-dp-grid" role="grid" style="--predict-winner-size:${view.nums.length}">${dpCells}</div>
+        </div>
+      </div>
+      <div class="predict-winner-choice-block">
+        <div class="predict-winner-section-head"><strong>${vi ? "Hai lựa chọn" : "Two choices"}</strong><span>${intervalReady ? `[${view.i}, ${view.j}]` : "—"}</span></div>
+        ${choicesHtml}
+      </div>
+    </div>
+    <div class="predict-winner-action ${actionClass}"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="predict-winner-legend">
+      <span><i class="active"></i>${vi ? "ô đang tính" : "current cell"}</span>
+      <span><i class="left"></i>dp[i+1][j]</span>
+      <span><i class="right"></i>dp[i][j-1]</span>
+    </div>
+  </section>`;
+}
+
+function renderRectangleAreaView(step) {
+  const view = step.rectangleAreaView;
+  const vi = lang === "vi";
+  const phaseIndex = {
+    build: 0, sort: 0,
+    init: 1, event: 1, measure: 1, scan: 1, merge: 1,
+    area: 2, update: 2,
+    done: 3,
+  }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1. Tạo x-events", "2. Hợp các đoạn y", "3. Cộng diện tích dải", "4. Trả modulo"]
+    : ["1. Build x-events", "2. Merge y-intervals", "3. Add strip area", "4. Return modulo"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const eventsHtml = view.events.length
+    ? view.events.map((event) => {
+      const type = event.type === 1 ? "START" : "END";
+      const classes = ["rectangle-area-event", event.type === 1 ? "is-start" : "is-end"];
+      if (event.isCurrent) classes.push("is-current");
+      else if (event.isProcessed) classes.push("is-processed");
+      if (view.currentRectId === event.rectId && !event.isCurrent && view.phase === "build") classes.push("is-related");
+      return `<div class="${classes.join(" ")}">
+        <small>x = ${escapeHtml(event.x)}</small>
+        <strong>${type} R${escapeHtml(event.rectId)}</strong>
+        <span>[${escapeHtml(event.y1)}, ${escapeHtml(event.y2)})</span>
+      </div>`;
+    }).join("")
+    : `<span class="rectangle-area-empty">${vi ? "Chưa có event" : "No events yet"}</span>`;
+
+  const allX = view.rectangles.flatMap((rect) => [rect.x1, rect.x2]);
+  const allY = view.rectangles.flatMap((rect) => [rect.y1, rect.y2]);
+  const rawMinX = Math.min(...allX);
+  const rawMaxX = Math.max(...allX);
+  const rawMinY = Math.min(...allY);
+  const rawMaxY = Math.max(...allY);
+  const xPadding = Math.max(0.45, (rawMaxX - rawMinX) * 0.08);
+  const yPadding = Math.max(0.45, (rawMaxY - rawMinY) * 0.1);
+  const minX = rawMinX - xPadding;
+  const maxX = rawMaxX + xPadding;
+  const minY = rawMinY - yPadding;
+  const maxY = rawMaxY + yPadding;
+  const svgWidth = 620;
+  const svgHeight = 338;
+  const pad = { left: 48, right: 20, top: 22, bottom: 42 };
+  const plotWidth = svgWidth - pad.left - pad.right;
+  const plotHeight = svgHeight - pad.top - pad.bottom;
+  const sx = (x) => pad.left + ((x - minX) / (maxX - minX || 1)) * plotWidth;
+  const sy = (y) => pad.top + ((maxY - y) / (maxY - minY || 1)) * plotHeight;
+
+  const makeTicks = (values, minValue, maxValue) => {
+    const unique = [...new Set(values.concat(Number.isInteger(minValue) ? [minValue] : []))].sort((a, b) => a - b);
+    if (unique.length <= 9) return unique;
+    const ticks = [];
+    for (let index = 0; index < 7; index++) ticks.push(minValue + ((maxValue - minValue) * index) / 6);
+    return ticks;
+  };
+  const xTicks = makeTicks(allX, rawMinX, rawMaxX);
+  const yTicks = makeTicks(allY, rawMinY, rawMaxY);
+  let gridSvg = "";
+  xTicks.forEach((tick) => {
+    const x = sx(tick);
+    gridSvg += `<line class="rectangle-area-grid-line" x1="${x}" y1="${pad.top}" x2="${x}" y2="${svgHeight - pad.bottom}" />`;
+    gridSvg += `<text class="rectangle-area-axis-label" x="${x}" y="${svgHeight - 17}" text-anchor="middle">${escapeXml(Number(tick.toFixed(2)))}</text>`;
+  });
+  yTicks.forEach((tick) => {
+    const y = sy(tick);
+    gridSvg += `<line class="rectangle-area-grid-line" x1="${pad.left}" y1="${y}" x2="${svgWidth - pad.right}" y2="${y}" />`;
+    gridSvg += `<text class="rectangle-area-axis-label" x="${pad.left - 10}" y="${y}" text-anchor="end" dy="0.34em">${escapeXml(Number(tick.toFixed(2)))}</text>`;
+  });
+
+  let bandsSvg = "";
+  view.processedBands.forEach((band) => {
+    band.segments.forEach((segment) => {
+      const x = sx(band.x1);
+      const y = sy(segment.y2);
+      const width = Math.max(0, sx(band.x2) - x);
+      const height = Math.max(0, sy(segment.y1) - y);
+      bandsSvg += `<rect class="rectangle-area-counted-band" x="${x}" y="${y}" width="${width}" height="${height}" />`;
+    });
+  });
+  if (view.currentBand && view.currentBand.x2 > view.currentBand.x1) {
+    view.currentBand.segments.forEach((segment) => {
+      const x = sx(view.currentBand.x1);
+      const y = sy(segment.y2);
+      const width = Math.max(0, sx(view.currentBand.x2) - x);
+      const height = Math.max(0, sy(segment.y1) - y);
+      bandsSvg += `<rect class="rectangle-area-current-band${view.currentBand.counted ? " is-counted" : ""}" x="${x}" y="${y}" width="${width}" height="${height}" />`;
+    });
+  }
+
+  const sourceSvg = view.rectangles.map((rect) => {
+    const x = sx(rect.x1);
+    const y = sy(rect.y2);
+    const width = sx(rect.x2) - x;
+    const height = sy(rect.y1) - y;
+    const current = rect.id === view.currentRectId ? " is-current" : "";
+    return `<g class="rectangle-area-source rectangle-area-source-${(rect.id - 1) % 4 + 1}${current}">
+      <rect x="${x}" y="${y}" width="${width}" height="${height}" />
+      <text x="${x + width / 2}" y="${y + height / 2}" text-anchor="middle" dy="0.35em">R${escapeXml(rect.id)}</text>
+    </g>`;
+  }).join("");
+
+  let sweepSvg = "";
+  if (view.sweepX !== null) {
+    const x = sx(view.sweepX);
+    sweepSvg = `<line class="rectangle-area-sweep-line" x1="${x}" y1="${pad.top - 8}" x2="${x}" y2="${svgHeight - pad.bottom + 5}" />
+      <path class="rectangle-area-sweep-arrow" d="M ${x - 6} ${pad.top - 8} L ${x + 6} ${pad.top - 8} L ${x} ${pad.top} Z" />
+      <text class="rectangle-area-sweep-label" x="${x}" y="${pad.top - 11}" text-anchor="middle">x=${escapeXml(view.sweepX)}</text>`;
+  }
+  let intervalSvg = "";
+  if (view.currentInterval && view.sweepX !== null) {
+    const x = sx(view.sweepX) + 8;
+    const yTop = sy(view.currentInterval.y2);
+    const yBottom = sy(view.currentInterval.y1);
+    intervalSvg = `<line class="rectangle-area-scan-interval" x1="${x}" y1="${yTop}" x2="${x}" y2="${yBottom}" />
+      <circle class="rectangle-area-scan-point" cx="${x}" cy="${yTop}" r="4" />
+      <circle class="rectangle-area-scan-point" cx="${x}" cy="${yBottom}" r="4" />`;
+  }
+  const plotSummary = vi
+    ? `${view.rectangles.length} hình chữ nhật; diện tích đã cộng ${view.area}; đường quét ${view.sweepX === null ? "chưa gán" : `tại x=${view.sweepX}`}.`
+    : `${view.rectangles.length} rectangles; accumulated area ${view.area}; sweep ${view.sweepX === null ? "unset" : `at x=${view.sweepX}`}.`;
+
+  const activeHtml = view.active.length
+    ? view.active.map((interval) => {
+      const current = view.currentInterval && interval.rectId === view.currentInterval.rectId ? " is-current" : "";
+      return `<div class="rectangle-area-interval${current}"><b>R${escapeHtml(interval.rectId)}</b><code>[${escapeHtml(interval.y1)}, ${escapeHtml(interval.y2)})</code></div>`;
+    }).join("")
+    : `<span class="rectangle-area-empty">${vi ? "active đang rỗng" : "active is empty"}</span>`;
+  const unionHtml = view.mergedSegments.length
+    ? view.mergedSegments.map((segment) => `<code>[${escapeHtml(segment.y1)}, ${escapeHtml(segment.y2)})</code>`).join("")
+    : `<span class="rectangle-area-empty">${vi ? "chưa có đoạn y phủ" : "no covered y yet"}</span>`;
+
+  let actionMain = "";
+  let actionDetail = "";
+  if (view.phase === "build") {
+    actionMain = `events.length = ${view.events.length}`;
+    actionDetail = vi ? "Mỗi hình đóng góp START tại x1 và END tại x2." : "Each rectangle contributes START at x1 and END at x2.";
+  } else if (view.phase === "sort") {
+    actionMain = vi ? "Quét từ x nhỏ đến x lớn" : "Sweep from smaller to larger x";
+    actionDetail = vi ? "Các event cùng x không tạo diện tích vì Δx = 0." : "Events sharing an x add no area because Δx = 0.";
+  } else if (view.phase === "init") {
+    actionMain = `prev_x = ${view.prevX ?? "?"}, area = ${view.area}`;
+    actionDetail = vi ? "Khởi tạo vị trí bắt đầu và tổng diện tích." : "Initialize the starting position and accumulated area.";
+  } else if (view.phase === "event") {
+    actionMain = `[prev_x, x) = [${view.currentBand?.x1 ?? view.prevX}, ${view.sweepX})`;
+    actionDetail = vi ? "Luôn đo dải bên trái trước khi thay đổi active." : "Always measure the strip to the left before changing active.";
+  } else if (["measure", "scan", "merge"].includes(view.phase)) {
+    const end = view.currentEnd === null ? "?" : view.currentEnd;
+    actionMain = `covered_y = ${view.coveredY}`;
+    actionDetail = view.currentInterval
+      ? (vi ? `Đang merge R${view.currentInterval.rectId}[${view.currentInterval.y1},${view.currentInterval.y2}); current_end = ${end}.` : `Merging R${view.currentInterval.rectId}[${view.currentInterval.y1},${view.currentInterval.y2}); current_end = ${end}.`)
+      : (vi ? "Reset rồi merge các interval theo start tăng dần." : "Reset, then merge intervals by increasing start.");
+  } else if (view.phase === "area") {
+    const dx = view.currentBand ? view.currentBand.x2 - view.currentBand.x1 : 0;
+    actionMain = `${dx} × ${view.coveredY} = ${view.stripArea}`;
+    actionDetail = vi ? `Cộng diện tích dải một lần; area = ${view.area}.` : `Add the strip once; area = ${view.area}.`;
+  } else if (view.phase === "update") {
+    const event = view.events.find((item) => item.isCurrent);
+    actionMain = event ? `${event.type === 1 ? "START" : "END"} R${event.rectId}` : "active";
+    actionDetail = event
+      ? (event.type === 1
+        ? (vi ? "Thêm interval để dùng cho dải bên phải." : "Add its interval for the strip to the right.")
+        : (vi ? "Xóa interval vì hình đã kết thúc tại x này." : "Remove its interval because the rectangle ends at this x."))
+      : "";
+  } else {
+    actionMain = `${view.area} mod 1,000,000,007 = ${view.answer}`;
+    actionDetail = vi ? "Diện tích hợp cuối cùng: mỗi vùng chỉ được tính đúng một lần." : "Final union area: every region is counted exactly once.";
+  }
+
+  $("treeView").innerHTML = `<section class="rectangle-area-viz" role="img" aria-label="${escapeHtml(plotSummary)}">
+    <div class="rectangle-area-phases">${phasesHtml}</div>
+    <div class="rectangle-area-events" aria-label="x events">${eventsHtml}</div>
+    <div class="rectangle-area-workspace">
+      <div class="rectangle-area-plot-wrap">
+        <div class="rectangle-area-section-head"><strong>${vi ? "Mặt phẳng tọa độ" : "Coordinate plane"}</strong><span>${vi ? "đường quét đi từ trái sang phải" : "sweep moves left to right"}</span></div>
+        <svg class="rectangle-area-plot" viewBox="0 0 ${svgWidth} ${svgHeight}" role="img" aria-label="${escapeHtml(plotSummary)}">
+          <title>${escapeXml(plotSummary)}</title>
+          ${gridSvg}
+          <line class="rectangle-area-axis" x1="${pad.left}" y1="${svgHeight - pad.bottom}" x2="${svgWidth - pad.right}" y2="${svgHeight - pad.bottom}" />
+          <line class="rectangle-area-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${svgHeight - pad.bottom}" />
+          ${bandsSvg}${sourceSvg}${intervalSvg}${sweepSvg}
+          <text class="rectangle-area-axis-name" x="${svgWidth - pad.right}" y="${svgHeight - 7}" text-anchor="end">x</text>
+          <text class="rectangle-area-axis-name" x="${pad.left - 12}" y="${pad.top}" text-anchor="end">y</text>
+        </svg>
+      </div>
+      <aside class="rectangle-area-state">
+        <div class="rectangle-area-metrics">
+          <span><small>prev_x</small><strong>${view.prevX === null ? "—" : escapeHtml(view.prevX)}</strong></span>
+          <span><small>x</small><strong>${view.sweepX === null ? "—" : escapeHtml(view.sweepX)}</strong></span>
+          <span><small>covered_y</small><strong>${escapeHtml(view.coveredY)}</strong></span>
+          <span class="is-total"><small>area</small><strong>${escapeHtml(view.area)}</strong></span>
+        </div>
+        <div class="rectangle-area-state-section">
+          <div class="rectangle-area-section-head"><strong>active</strong><span>${view.active.length} interval${view.active.length === 1 ? "" : "s"}</span></div>
+          <div class="rectangle-area-active-list">${activeHtml}</div>
+        </div>
+        <div class="rectangle-area-state-section">
+          <div class="rectangle-area-section-head"><strong>${vi ? "Hợp trên trục y" : "Union on y-axis"}</strong><span>current_end = ${view.currentEnd === null ? "—" : escapeHtml(view.currentEnd)}</span></div>
+          <div class="rectangle-area-union-list">${unionHtml}</div>
+        </div>
+      </aside>
+    </div>
+    <div class="rectangle-area-action"><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rectangle-area-legend">
+      <span><i class="source"></i>${vi ? "hình ban đầu" : "source rectangle"}</span>
+      <span><i class="counted"></i>${vi ? "đã cộng vào area" : "counted area"}</span>
+      <span><i class="current"></i>${vi ? "dải đang tính" : "current strip"}</span>
+      <span><i class="sweep"></i>${vi ? "đường quét" : "sweep line"}</span>
+    </div>
+  </section>`;
+}
+
 // ---- Graph renderer (directed weighted graph) ----
 function renderGraph(step, targetId = "treeView") {
   const { nodes, edges, hlNodes, hlEdges, visitedNodes } = step.graph;
@@ -6760,6 +7131,197 @@ function renderLfuCacheView(step) {
   </div>`;
 }
 
+function renderRideSharingView(step) {
+  const view = step.rideSharingView;
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const activeSet = new Set(view.activeRiders || []);
+  const phaseIndex = {
+    initialize: 0,
+    "initialize-done": 0,
+    "rider-call": 1,
+    "rider-queued": 1,
+    "rider-active": 1,
+    "driver-call": 1,
+    "driver-queued": 1,
+    "cancel-call": 2,
+    "cancel-done": 2,
+    "cancel-noop": 2,
+    "cleanup-check": 2,
+    "cleanup-pop": 2,
+    "cleanup-done": 2,
+    "match-call": 3,
+    "availability-check": 3,
+    "take-driver": 3,
+    "take-rider": 3,
+    "deactivate-match": 3,
+    matched: 3,
+    "no-match": 3,
+    done: 3,
+  }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1. Khởi tạo", "2. Vào queue", "3. Hủy & dọn", "4. Ghép FRONT"]
+    : ["1. Initialize", "2. Join queues", "3. Cancel & clean", "4. Match FRONT"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const formatResult = (result) => Array.isArray(result) ? `[${result.join(", ")}]` : "null";
+  const operationsHtml = view.operations.map((operation, index) => {
+    const done = index < view.completedOps;
+    const active = index === view.activeOpIndex;
+    const classes = ["ride-sharing-operation"];
+    if (done) classes.push("is-done");
+    if (active) classes.push("is-active");
+    if (!done && !active) classes.push("is-pending");
+    const result = done ? formatResult(view.results[index]) : "·";
+    return `<div class="${classes.join(" ")}">
+      <small>${index}</small>
+      <code>${escapeHtml(operation.label)}</code>
+      <strong>→ ${escapeHtml(result)}</strong>
+    </div>`;
+  }).join("");
+
+  function queueLane(kind, items, initialized, activeId) {
+    const isRider = kind === "rider";
+    const label = isRider ? (vi ? "RIDER ĐANG CHỜ" : "WAITING RIDERS") : (vi ? "DRIVER SẴN SÀNG" : "AVAILABLE DRIVERS");
+    let cellsHtml;
+    if (!initialized) {
+      cellsHtml = `<span class="ride-sharing-empty">${vi ? "chưa khởi tạo" : "not initialized"}</span>`;
+    } else if (!items.length) {
+      cellsHtml = `<span class="ride-sharing-empty"><b>∅</b>${vi ? "queue rỗng" : "empty queue"}</span>`;
+    } else {
+      cellsHtml = items.map((id, index) => {
+        const cancelled = isRider && !activeSet.has(id);
+        const pending = isRider && view.phase === "rider-queued" && id === activeId;
+        const classes = ["ride-sharing-node", isRider ? "is-rider" : "is-driver"];
+        if (cancelled && !pending) classes.push("is-cancelled");
+        if (pending) classes.push("is-pending-active");
+        if (id === activeId) classes.push("is-current");
+        const status = cancelled && !pending
+          ? (vi ? "ĐÃ HỦY" : "CANCELLED")
+          : pending
+            ? (vi ? "CHƯA ACTIVE" : "NOT ACTIVE")
+            : isRider ? "ACTIVE" : "READY";
+        return `<div class="${classes.join(" ")}">
+          <span>${index === 0 ? "FRONT" : index === items.length - 1 ? "REAR" : `#${index}`}</span>
+          <strong>${isRider ? "R" : "D"}${escapeHtml(id)}</strong>
+          <small>${status}</small>
+        </div>${index < items.length - 1 ? '<i class="ride-sharing-queue-arrow" aria-hidden="true">→</i>' : ""}`;
+      }).join("");
+    }
+    return `<section class="ride-sharing-lane is-${kind}">
+      <header><span class="ride-sharing-kind">${isRider ? "R" : "D"}</span><strong>${label}</strong><small>${items.length} ${vi ? "trong deque" : "in deque"}</small></header>
+      <div class="ride-sharing-lane-track"><span class="ride-sharing-front-label">FRONT</span><div class="ride-sharing-cells">${cellsHtml}</div><span class="ride-sharing-rear-label">REAR</span></div>
+    </section>`;
+  }
+
+  const currentOperation = view.activeOpIndex === null ? null : view.operations[view.activeOpIndex];
+  const matchContext = new Set([
+    "match-call", "cleanup-check", "cleanup-pop", "cleanup-done", "availability-check",
+    "take-driver", "take-rider", "deactivate-match", "matched", "no-match",
+  ]).has(view.phase);
+  const selectedDriver = view.activeDriver ?? (matchContext ? (view.drivers[0] ?? null) : null);
+  const selectedRider = view.activeRider ?? view.removedRider ?? (matchContext ? (view.riders[0] ?? null) : null);
+  const hasPair = Array.isArray(view.pair);
+  const noPair = hasPair && view.pair[0] === -1;
+  const isCleaning = ["cleanup-check", "cleanup-pop"].includes(view.phase);
+  const gateClasses = ["ride-sharing-gate"];
+  if (hasPair) gateClasses.push(noPair ? "is-no-match" : "is-matched");
+  if (isCleaning) gateClasses.push("is-cleaning");
+  const gateResult = isCleaning
+    ? "BLOCKED"
+    : hasPair
+    ? `[${view.pair.join(", ")}]`
+    : selectedDriver !== null && selectedRider !== null
+      ? `[${selectedDriver}, ${selectedRider}]`
+      : "[driver, rider]";
+  const gateShapeLabel = isCleaning ? "cancelled FRONT" : "[driverId, riderId]";
+  let gateStatus;
+  if (view.phase === "cleanup-check") gateStatus = vi ? `R${view.cancelledRider} không còn active` : `R${view.cancelledRider} is inactive`;
+  else if (view.phase === "cleanup-pop") gateStatus = vi ? `lazy-remove R${view.removedRider}` : `lazy-remove R${view.removedRider}`;
+  else if (noPair) gateStatus = vi ? "CHƯA ĐỦ HAI PHÍA" : "ONE SIDE MISSING";
+  else if (hasPair) gateStatus = vi ? "ĐÃ GHÉP" : "MATCHED";
+  else gateStatus = vi ? "CHỜ CẶP FRONT" : "WAITING FOR BOTH FRONTS";
+  const gateHtml = `<div class="${gateClasses.join(" ")}">
+    <span class="ride-sharing-gate-source is-driver">${selectedDriver === null ? "D—" : `D${escapeHtml(selectedDriver)}`}</span>
+    <i aria-hidden="true">→</i>
+    <div><small>${escapeHtml(gateStatus)}</small><strong>${escapeHtml(gateResult)}</strong><span>${escapeHtml(gateShapeLabel)}</span></div>
+    <i aria-hidden="true">←</i>
+    <span class="ride-sharing-gate-source is-rider">${selectedRider === null ? "R—" : `R${escapeHtml(selectedRider)}`}</span>
+  </div>`;
+
+  const activeRidersHtml = view.initialized.activeRiders
+    ? view.activeRiders.length
+      ? view.activeRiders.map((rider) => `<span${rider === view.activeRider ? ' class="is-current"' : ""}>R${escapeHtml(rider)}</span>`).join("")
+      : `<em>∅</em>`
+    : `<em>${vi ? "chưa khởi tạo" : "not initialized"}</em>`;
+  const matchesHtml = view.matches.length
+    ? view.matches.map((pair, index) => `<span><small>#${index + 1}</small><b>D${escapeHtml(pair[0])}</b><i>+</i><b>R${escapeHtml(pair[1])}</b></span>`).join("")
+    : `<em>${vi ? "chưa có chuyến" : "no rides yet"}</em>`;
+
+  let actionDetail;
+  if (view.phase === "rider-queued") {
+    actionDetail = vi ? "Đã append vào deque; dòng 11 mới thêm rider vào active_riders." : "Appended to the deque; line 11 adds this rider to active_riders.";
+  } else if (view.phase === "cancel-done") {
+    actionDetail = vi ? "Node vẫn ở deque nhưng bị gạch mờ; không còn đủ điều kiện ghép." : "The node remains in the deque but is dimmed and no longer matchable.";
+  } else if (view.phase === "cancel-noop") {
+    actionDetail = vi ? "Rider không active nên discard không thay đổi hệ thống." : "The rider is not active, so discard changes nothing.";
+  } else if (view.phase === "cleanup-check") {
+    actionDetail = vi ? "FRONT đã hủy làm điều kiện while đúng; bước kế tiếp sẽ popleft." : "The cancelled FRONT makes the while condition true; the next step removes it with popleft.";
+  } else if (view.phase === "cleanup-pop") {
+    actionDetail = vi ? "Chỉ rider đã hủy rời queue; driver vẫn đứng yên." : "Only the cancelled rider leaves; the driver queue stays unchanged.";
+  } else if (view.phase === "availability-check") {
+    actionDetail = view.condition
+      ? (vi ? "Thiếu một phía nên không pop phía còn lại." : "One side is missing, so the remaining side is not popped.")
+      : (vi ? "Hai FRONT là cặp đến sớm nhất hợp lệ." : "The two FRONT entries are the earliest valid pair.");
+  } else if (view.phase === "take-driver") {
+    actionDetail = vi ? "Dòng 21 chỉ popleft driver; rider sẽ rời ở dòng 22." : "Line 21 poplefts only the driver; the rider leaves on line 22.";
+  } else if (view.phase === "take-rider") {
+    actionDetail = vi ? "Hai phần tử đã rời deque nhưng rider còn được xóa khỏi active_riders ở dòng 23." : "Both entries left their deques; line 23 still removes the rider from active_riders.";
+  } else if (view.phase === "matched") {
+    actionDetail = vi ? `Trả đúng thứ tự ${gateResult}: driver trước, rider sau.` : `Return ${gateResult} in driver-first, rider-second order.`;
+  } else if (view.phase === "no-match") {
+    actionDetail = vi ? "Trả [-1, -1] và giữ nguyên phần tử đang chờ ở queue còn lại." : "Return [-1, -1] and preserve the waiting entry on the other side.";
+  } else if (view.phase === "done") {
+    actionDetail = vi ? "Mọi operation đã hoàn tất; các queue hiển thị đúng trạng thái còn chờ." : "All operations are complete; the queues show the remaining waiting state.";
+  } else {
+    actionDetail = currentOperation
+      ? `${currentOperation.label}`
+      : (vi ? "Theo dõi hai queue FIFO và active_riders." : "Track both FIFO queues and active_riders.");
+  }
+  const summary = vi
+    ? `${view.riders.length} rider trong deque, ${view.activeRiders.length} rider active, ${view.drivers.length} driver sẵn sàng, ${view.matches.length} cặp đã ghép.`
+    : `${view.riders.length} riders in deque, ${view.activeRiders.length} active riders, ${view.drivers.length} available drivers, ${view.matches.length} completed matches.`;
+
+  treeView.innerHTML = `<section class="ride-sharing-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ride-sharing-phases">${phasesHtml}</div>
+    <div class="ride-sharing-operations" aria-label="${vi ? "Danh sách operation" : "Operation list"}">${operationsHtml}</div>
+    <div class="ride-sharing-status">
+      <span><small>${vi ? "RIDER ACTIVE" : "ACTIVE RIDERS"}</small><strong>${view.activeRiders.length}</strong></span>
+      <span><small>${vi ? "DRIVER SẴN SÀNG" : "READY DRIVERS"}</small><strong>${view.drivers.length}</strong></span>
+      <span class="is-total"><small>${vi ? "CHUYẾN ĐÃ GHÉP" : "MATCHED RIDES"}</small><strong>${view.matches.length}</strong></span>
+    </div>
+    <div class="ride-sharing-board">
+      ${queueLane("driver", view.drivers, view.initialized.drivers, view.activeDriver)}
+      ${gateHtml}
+      ${queueLane("rider", view.riders, view.initialized.riders, view.activeRider)}
+    </div>
+    <div class="ride-sharing-index-row">
+      <section><header><strong>active_riders</strong><small>set · O(1) discard</small></header><div class="ride-sharing-active-set">${activeRidersHtml}</div></section>
+      <section><header><strong>${vi ? "Lịch sử ghép" : "Match history"}</strong><small>[driver, rider]</small></header><div class="ride-sharing-match-history">${matchesHtml}</div></section>
+    </div>
+    <div class="ride-sharing-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="ride-sharing-legend">
+      <span><i class="driver"></i>driver ready</span>
+      <span><i class="rider"></i>rider active</span>
+      <span><i class="cancelled"></i>${vi ? "rider đã hủy" : "cancelled rider"}</span>
+      <span><b>FRONT → REAR</b>${vi ? "cũ nhất → mới nhất" : "oldest → newest"}</span>
+    </div>
+  </section>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -6807,6 +7369,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLfuCacheView(step);
+  } else if (step.rideSharingView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRideSharingView(step);
   } else if (step.kthPalindromeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -6909,6 +7477,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKeypadHeapView(step);
+  } else if (step.predictWinnerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPredictWinnerView(step);
+  } else if (step.rectangleAreaView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRectangleAreaView(step);
   } else if (step.networkDelayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
