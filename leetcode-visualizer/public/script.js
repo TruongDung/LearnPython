@@ -8366,6 +8366,130 @@ function renderRideSharingView(step) {
   </section>`;
 }
 
+// ---- Rectangle Area II: Sweep Line + Segment Tree ----
+function renderRectangleSweepView(step) {
+  const view = step.rectangleSweepView;
+  const el = $("treeView");
+  const rectangles = view.rectangles || [];
+  const xs = view.xs || [];
+
+  if (!rectangles.length || xs.length < 2) {
+    el.innerHTML = `<div class="rect850-empty">${lang === "vi" ? "Không có hình chữ nhật hợp lệ." : "No valid rectangles."}</div>`;
+    return;
+  }
+
+  const light = document.documentElement.getAttribute("data-theme") === "light";
+  const colors = {
+    text: light ? "#0f172a" : "#e2e8f0",
+    muted: light ? "#64748b" : "#94a3b8",
+    grid: light ? "#cbd5e1" : "#334155",
+    base: light ? "#818cf8" : "#a5b4fc",
+    covered: light ? "#4f46e5" : "#818cf8",
+    next: light ? "#d97706" : "#fbbf24",
+    treeFill: light ? "#eef2ff" : "#1e1b4b",
+    treeActive: light ? "#dbeafe" : "#172554",
+    treeStroke: light ? "#6366f1" : "#818cf8",
+  };
+
+  const allY = rectangles.flatMap((rectangle) => [rectangle[1], rectangle[3]]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...allY);
+  const maxY = Math.max(...allY);
+  const planeWidth = 600;
+  const planeHeight = 330;
+  const pad = { left: 52, right: 24, top: 24, bottom: 44 };
+  const plotWidth = planeWidth - pad.left - pad.right;
+  const plotHeight = planeHeight - pad.top - pad.bottom;
+  const scaleX = (x) => pad.left + ((x - minX) / Math.max(1, maxX - minX)) * plotWidth;
+  const scaleY = (y) => pad.top + ((maxY - y) / Math.max(1, maxY - minY)) * plotHeight;
+  const fmt = (number) => typeof number === "string"
+    ? number
+    : (Number.isInteger(number) ? String(number) : Number(number).toFixed(2));
+
+  const gridLinesX = xs.map((x) => `
+    <line x1="${scaleX(x)}" y1="${pad.top}" x2="${scaleX(x)}" y2="${planeHeight - pad.bottom}" stroke="${colors.grid}" stroke-width="1" />
+    <text x="${scaleX(x)}" y="${planeHeight - 18}" fill="${colors.muted}" text-anchor="middle">${fmt(x)}</text>`).join("");
+  const uniqueY = [...new Set(allY)].sort((a, b) => a - b);
+  const gridLinesY = uniqueY.map((y) => `
+    <line x1="${pad.left}" y1="${scaleY(y)}" x2="${planeWidth - pad.right}" y2="${scaleY(y)}" stroke="${colors.grid}" stroke-width="1" />
+    <text x="${pad.left - 10}" y="${scaleY(y) + 4}" fill="${colors.muted}" text-anchor="end">${fmt(y)}</text>`).join("");
+
+  const baseRectangles = rectangles.map(([x1, y1, x2, y2], index) => `
+    <rect x="${scaleX(x1)}" y="${scaleY(y2)}" width="${Math.max(1, scaleX(x2) - scaleX(x1))}" height="${Math.max(1, scaleY(y1) - scaleY(y2))}" fill="${colors.base}" fill-opacity="0.10" stroke="${colors.base}" stroke-width="1.5" />
+    <text x="${scaleX(x1) + 7}" y="${scaleY(y2) + 16}" fill="${colors.text}">R${index + 1}</text>`).join("");
+
+  const completedArea = rectangles.map(([x1, y1, x2, y2]) => {
+    const completedY = Math.min(Math.max(view.y, y1), y2);
+    if (completedY <= y1) return "";
+    return `<rect x="${scaleX(x1)}" y="${scaleY(completedY)}" width="${Math.max(1, scaleX(x2) - scaleX(x1))}" height="${Math.max(1, scaleY(y1) - scaleY(completedY))}" fill="${colors.covered}" fill-opacity="0.28" />`;
+  }).join("");
+
+  const nextStrip = (view.leafCounts || []).map((count, index) => {
+    if (count <= 0 || view.nextY <= view.y) return "";
+    return `<rect x="${scaleX(xs[index])}" y="${scaleY(view.nextY)}" width="${Math.max(1, scaleX(xs[index + 1]) - scaleX(xs[index]))}" height="${Math.max(1, scaleY(view.y) - scaleY(view.nextY))}" fill="${colors.next}" fill-opacity="0.28" />`;
+  }).join("");
+
+  const planeSvg = `<svg class="rect850-plane" viewBox="0 0 ${planeWidth} ${planeHeight}" role="img" aria-label="${lang === "vi" ? "Mặt phẳng với đường quét ngang" : "Plane with a horizontal sweep line"}">
+    ${gridLinesX}${gridLinesY}${completedArea}${nextStrip}${baseRectangles}
+    <line x1="${pad.left}" y1="${scaleY(view.y)}" x2="${planeWidth - pad.right}" y2="${scaleY(view.y)}" stroke="${colors.next}" stroke-width="3" />
+    <text x="${planeWidth - pad.right}" y="${Math.max(14, scaleY(view.y) - 7)}" fill="${colors.next}" text-anchor="end">sweep y=${fmt(view.y)}</text>
+  </svg>`;
+
+  const segmentCount = xs.length - 1;
+  const treeNodes = view.treeNodes || [];
+  const maxDepth = Math.max(0, ...treeNodes.map((node) => node.depth));
+  const treeWidth = Math.max(600, segmentCount * 105);
+  const treeHeight = 100 + maxDepth * 86;
+  const treePosition = new Map();
+  treeNodes.forEach((node) => {
+    treePosition.set(node.id, {
+      x: 50 + ((node.left + node.right + 1) / (2 * segmentCount)) * (treeWidth - 100),
+      y: 38 + node.depth * 86,
+    });
+  });
+  const treeEdges = treeNodes.filter((node) => node.parent !== null).map((node) => {
+    const from = treePosition.get(node.parent);
+    const to = treePosition.get(node.id);
+    return `<line x1="${from.x}" y1="${from.y + 25}" x2="${to.x}" y2="${to.y - 25}" stroke="${colors.grid}" stroke-width="1.5" />`;
+  }).join("");
+  const treeNodeHtml = treeNodes.map((node) => {
+    const position = treePosition.get(node.id);
+    const active = node.length > 0;
+    const range = `[${fmt(xs[node.left])}, ${fmt(xs[node.right + 1])})`;
+    return `<g>
+      <rect x="${position.x - 45}" y="${position.y - 25}" width="90" height="50" rx="9" fill="${active ? colors.treeActive : colors.treeFill}" stroke="${active ? colors.treeStroke : colors.grid}" stroke-width="${node.id === 1 ? 2 : 1}" />
+      <text x="${position.x}" y="${position.y - 4}" fill="${colors.text}" text-anchor="middle">${range}</text>
+      <text x="${position.x}" y="${position.y + 14}" fill="${active ? colors.treeStroke : colors.muted}" text-anchor="middle">len=${fmt(node.length)} · count=${node.count}</text>
+    </g>`;
+  }).join("");
+  const treeSvg = `<svg viewBox="0 0 ${treeWidth} ${treeHeight}" style="width:${treeWidth}px" role="img" aria-label="Segment Tree storing covered x length">${treeEdges}${treeNodeHtml}</svg>`;
+
+  const segmentHtml = (view.leafCounts || []).map((count, index) => `
+    <div class="rect850-segment ${count > 0 ? "active" : ""}">
+      <span>[${fmt(xs[index])}, ${fmt(xs[index + 1])})</span>
+      <strong>${lang === "vi" ? "phủ" : "cover"}: ${count}</strong>
+    </div>`).join("");
+  const eventHtml = (view.events || []).map((event) => `
+    <span class="rect850-event ${event.delta > 0 ? "add" : "remove"}">${event.delta > 0 ? "+" : "−"} R${event.rectangleIndex + 1} [${fmt(event.x1)}, ${fmt(event.x2)})</span>`).join("");
+
+  el.innerHTML = `<div class="rect850-viz">
+    <div class="rect850-stats">
+      <div><span>Δy</span><strong>${fmt(view.deltaY)}</strong></div>
+      <div><span>${lang === "vi" ? "covered_x mới" : "new covered_x"}</span><strong>${fmt(view.coveredX)}</strong></div>
+      <div><span>+ area</span><strong>${fmt(view.addedArea)}</strong></div>
+      <div><span>${lang === "vi" ? "tổng area" : "total area"}</span><strong>${fmt(view.area)}</strong></div>
+    </div>
+    <div class="rect850-section-title">${lang === "vi" ? "1. Sweep Line trên mặt phẳng" : "1. Sweep Line on the plane"}</div>
+    ${planeSvg}
+    <div class="rect850-events">${eventHtml}</div>
+    <div class="rect850-section-title">${lang === "vi" ? "2. Các đoạn x sau nén tọa độ" : "2. Compressed x segments"}</div>
+    <div class="rect850-segments">${segmentHtml}</div>
+    <div class="rect850-section-title">${lang === "vi" ? "3. Segment Tree · root.length = covered_x" : "3. Segment Tree · root.length = covered_x"}</div>
+    <div class="rect850-tree-scroll">${treeSvg}</div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -8389,6 +8513,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.rectangleSweepView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRectangleSweepView(step);
   } else if (step.kruskalEffortView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

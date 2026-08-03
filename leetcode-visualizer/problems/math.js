@@ -2770,7 +2770,267 @@ function buildSteps319(input) {
   return { original: n, answer, steps };
 }
 
+function parseRectangles850(input) {
+  return String(input)
+    .split(";")
+    .map((row) => row.split(",").map((value) => Number(value.trim())))
+    .filter(
+      (rectangle) =>
+        rectangle.length === 4 &&
+        rectangle.every(Number.isFinite) &&
+        rectangle[0] < rectangle[2] &&
+        rectangle[1] < rectangle[3]
+    );
+}
+
+/**
+ * LeetCode 850: Rectangle Area II.
+ * Sweep horizontal events and maintain the covered x-length with a segment tree.
+ */
+function buildSteps850(input) {
+  const MOD = 1000000007n;
+  const rectangles = parseRectangles850(input);
+
+  if (rectangles.length === 0) {
+    return {
+      original: [],
+      answer: 0,
+      steps: [{
+        title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+        rectangleSweepView: { rectangles: [], xs: [], y: 0, nextY: 0, coveredX: 0, area: 0, addedArea: 0, deltaY: 0, events: [], leafCounts: [], treeNodes: [] },
+        codeBlock: 2,
+        codeLines: [5],
+        vars: [{ name: "answer", value: 0 }],
+        note: {
+          vi: "Nhập mỗi hình theo x1,y1,x2,y2 và ngăn cách các hình bằng dấu chấm phẩy.",
+          en: "Enter each rectangle as x1,y1,x2,y2 and separate rectangles with semicolons.",
+        },
+        final: true,
+      }],
+    };
+  }
+
+  const xs = [...new Set(rectangles.flatMap(([x1, , x2]) => [x1, x2]))].sort((a, b) => a - b);
+  const xIndex = new Map(xs.map((x, index) => [x, index]));
+  const segmentCount = xs.length - 1;
+  const events = [];
+
+  rectangles.forEach(([x1, y1, x2, y2], rectangleIndex) => {
+    events.push({ y: y1, delta: 1, x1, x2, rectangleIndex });
+    events.push({ y: y2, delta: -1, x1, x2, rectangleIndex });
+  });
+  events.sort((a, b) => a.y - b.y || b.delta - a.delta || a.x1 - b.x1);
+
+  const coverCount = new Array(segmentCount * 4 + 5).fill(0);
+  const coveredLength = new Array(segmentCount * 4 + 5).fill(0);
+  const leafCounts = new Array(segmentCount).fill(0);
+
+  function update(node, left, right, queryLeft, queryRight, delta) {
+    if (queryLeft <= left && right <= queryRight) {
+      coverCount[node] += delta;
+    } else {
+      const middle = Math.floor((left + right) / 2);
+      if (queryLeft <= middle) update(node * 2, left, middle, queryLeft, queryRight, delta);
+      if (queryRight > middle) update(node * 2 + 1, middle + 1, right, queryLeft, queryRight, delta);
+    }
+
+    if (coverCount[node] > 0) {
+      coveredLength[node] = xs[right + 1] - xs[left];
+    } else if (left === right) {
+      coveredLength[node] = 0;
+    } else {
+      coveredLength[node] = coveredLength[node * 2] + coveredLength[node * 2 + 1];
+    }
+  }
+
+  function snapshotTree() {
+    const nodes = [];
+    function visit(node, left, right, depth, parent, inheritedCount) {
+      const effectiveCount = inheritedCount + coverCount[node];
+      const effectiveLength = effectiveCount > 0
+        ? xs[right + 1] - xs[left]
+        : coveredLength[node];
+      nodes.push({
+        id: node,
+        parent,
+        left,
+        right,
+        depth,
+        count: effectiveCount,
+        length: effectiveLength,
+      });
+      if (left === right) return;
+      const middle = Math.floor((left + right) / 2);
+      visit(node * 2, left, middle, depth + 1, node, effectiveCount);
+      visit(node * 2 + 1, middle + 1, right, depth + 1, node, effectiveCount);
+    }
+    visit(1, 0, segmentCount - 1, 0, null, 0);
+    return nodes;
+  }
+
+  const steps = [];
+  let eventIndex = 0;
+  let previousY = events[0].y;
+  let area = 0n;
+
+  while (eventIndex < events.length) {
+    const currentY = events[eventIndex].y;
+    const deltaY = currentY - previousY;
+    const coveredBefore = coveredLength[1];
+    const addedAreaExact = BigInt(coveredBefore) * BigInt(deltaY);
+    const addedArea = addedAreaExact <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(addedAreaExact)
+      : addedAreaExact.toString();
+    area = (area + addedAreaExact) % MOD;
+
+    const currentEvents = [];
+    while (eventIndex < events.length && events[eventIndex].y === currentY) {
+      const event = events[eventIndex];
+      const left = xIndex.get(event.x1);
+      const right = xIndex.get(event.x2) - 1;
+      update(1, 0, segmentCount - 1, left, right, event.delta);
+      for (let i = left; i <= right; i++) leafCounts[i] += event.delta;
+      currentEvents.push({ ...event });
+      eventIndex += 1;
+    }
+
+    const nextY = eventIndex < events.length ? events[eventIndex].y : currentY;
+    const coveredAfter = coveredLength[1];
+    const eventText = currentEvents
+      .map((event) => `${event.delta > 0 ? "+" : "−"}R${event.rectangleIndex + 1} [${event.x1}, ${event.x2})`)
+      .join(", ");
+
+    steps.push({
+      title: {
+        vi: `Quét tới y = ${currentY}`,
+        en: `Sweep to y = ${currentY}`,
+      },
+      codeBlock: 2,
+      rectangleSweepView: {
+        rectangles: rectangles.map((rectangle) => [...rectangle]),
+        xs: [...xs],
+        y: currentY,
+        previousY,
+        nextY,
+        deltaY,
+        coveredBefore,
+        coveredX: coveredAfter,
+        addedArea,
+        area: Number(area),
+        events: currentEvents,
+        leafCounts: [...leafCounts],
+        treeNodes: snapshotTree(),
+      },
+      codeLines: deltaY === 0 ? [8, 9, 10, 11] : [39, 40, 41, 42, 43],
+      vars: [
+        { name: "y", value: currentY },
+        { name: "delta_y", value: deltaY },
+        { name: "covered_x trước event", value: coveredBefore },
+        { name: "area cộng thêm", value: addedArea },
+        { name: "events", value: eventText || "∅" },
+        { name: "covered_x sau event", value: coveredAfter },
+        { name: "total_area", value: Number(area) },
+      ],
+      note: {
+        vi: deltaY === 0
+          ? `Khởi tạo tại y=${currentY}. Cập nhật ${eventText}; Segment Tree cho độ dài phủ x = ${coveredAfter}.`
+          : `Cộng ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}. Sau đó cập nhật ${eventText}; độ dài phủ cho dải tiếp theo là ${coveredAfter}.`,
+        en: deltaY === 0
+          ? `Initialize at y=${currentY}. Apply ${eventText}; the Segment Tree reports covered x-length ${coveredAfter}.`
+          : `Add ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}. Then apply ${eventText}; the next strip has covered x-length ${coveredAfter}.`,
+      },
+      final: eventIndex === events.length,
+    });
+
+    previousY = currentY;
+  }
+
+  return { original: rectangles, answer: Number(area), steps };
+}
+
 module.exports = {
+  850: {
+    id: 850,
+    difficulty: "hard",
+    slug: "rectangle-area-ii",
+    category: { key: "math", vi: "Toán học", en: "Math" },
+    tags: [
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+      { key: "sweep-line", vi: "Sweep Line", en: "Sweep Line" },
+    ],
+    title: { vi: "Rectangle Area II", en: "Rectangle Area II" },
+    titleVi: { vi: "Diện tích hợp các hình chữ nhật", en: "Union area of rectangles" },
+    statement: {
+      vi: "Cho nhiều hình chữ nhật song song với trục tọa độ. Tính tổng diện tích được phủ ít nhất một lần, modulo 10^9+7. Nhập mỗi hình theo x1,y1,x2,y2; ngăn cách bằng dấu chấm phẩy.",
+      en: "Given axis-aligned rectangles, return the total area covered by at least one rectangle modulo 10^9+7. Enter each rectangle as x1,y1,x2,y2; separate rectangles with semicolons.",
+    },
+    defaultInput: "0,0,2,2;1,0,2,3;1,0,3,1",
+    inputKind: "string",
+    debugMode: "semantic",
+    inputLabel: { vi: "rectangles (x1,y1,x2,y2; ...)", en: "rectangles (x1,y1,x2,y2; ...)" },
+    extraParams: [],
+    approach: [
+      { vi: "Tạo event +1 tại y1 và event −1 tại y2 cho mỗi đoạn [x1,x2).", en: "Create a +1 event at y1 and a −1 event at y2 for every [x1,x2) interval." },
+      { vi: "Nén tọa độ x; Segment Tree lưu tổng chiều dài x đang được phủ.", en: "Compress x-coordinates; the Segment Tree stores the total currently covered x-length." },
+      { vi: "Giữa hai mức y liên tiếp, cộng covered_x × delta_y vào diện tích.", en: "Between consecutive y-levels, add covered_x × delta_y to the area." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Có 2n events; mỗi event cập nhật Segment Tree trong O(log n).",
+        en: "There are 2n events; each updates the Segment Tree in O(log n).",
+      },
+    },
+    code: [
+      "from typing import List",
+      "",
+      "class Solution:",
+      "    def rectangleArea(self, rectangles: List[List[int]]) -> int:",
+      "        MOD = 10**9 + 7",
+      "        events, x_values = [], set()",
+      "        for x1, y1, x2, y2 in rectangles:",
+      "            events += [(y1, 1, x1, x2), (y2, -1, x1, x2)]",
+      "            x_values.update((x1, x2))",
+      "        events.sort()",
+      "        xs = sorted(x_values)",
+      "        index = {x: i for i, x in enumerate(xs)}",
+      "        m = len(xs) - 1",
+      "        count = [0] * (4 * m)",
+      "        length = [0] * (4 * m)",
+      "",
+      "        def update(node, left, right, ql, qr, delta):",
+      "            if ql <= left and right <= qr:",
+      "                count[node] += delta",
+      "            else:",
+      "                mid = (left + right) // 2",
+      "                if ql <= mid:",
+      "                    update(node * 2, left, mid, ql, qr, delta)",
+      "                if qr > mid:",
+      "                    update(node * 2 + 1, mid + 1, right, ql, qr, delta)",
+      "            if count[node] > 0:",
+      "                length[node] = xs[right + 1] - xs[left]",
+      "            elif left == right:",
+      "                length[node] = 0",
+      "            else:",
+      "                length[node] = length[node * 2] + length[node * 2 + 1]",
+      "",
+      "        area = 0",
+      "        previous_y = events[0][0]",
+      "        i = 0",
+      "        while i < len(events):",
+      "            y = events[i][0]",
+      "            area += length[1] * (y - previous_y)",
+      "            while i < len(events) and events[i][0] == y:",
+      "                _, delta, x1, x2 = events[i]",
+      "                update(1, 0, m - 1, index[x1], index[x2] - 1, delta)",
+      "                i += 1",
+      "            previous_y = y",
+      "        return area % MOD",
+    ],
+    liveArgs: (input) => [parseRectangles850(input)],
+    builder: buildSteps850,
+  },
   258: {
     id: 258, difficulty: "easy", slug: "add-digits",
     category: { key: "math", vi: "Toán học", en: "Math" },

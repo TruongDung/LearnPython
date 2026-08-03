@@ -1,4 +1,5 @@
 // Auto-generated: do not edit headers manually.
+const rectangle850SegmentTree = require("./math")[850];
 // Module of LeetCode Visualizer — category-specific builders and problem entries.
 
 /**
@@ -3392,6 +3393,7 @@ module.exports = {
   },
   850: {
     id: 850, difficulty: "hard", slug: "rectangle-area-ii",
+    tags: [{ key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" }],
     category: { key: "array", vi: "Mảng / Sweep Line", en: "Array / Sweep Line" },
     title: { vi: "Rectangle Area II", en: "Rectangle Area II" },
     titleVi: { vi: "Tổng diện tích hợp của các hình chữ nhật", en: "Union area of rectangles" },
@@ -3401,16 +3403,29 @@ module.exports = {
     },
     defaultInput: "0,0,2,2;1,0,2,3;1,0,3,1",
     inputKind: "string",
+    debugMode: "semantic",
     inputLabel: { vi: "rectangles (x1,y1,x2,y2;...)", en: "rectangles (x1,y1,x2,y2;...)" },
-    extraParams: [],
+    extraParams: [{
+      key: "approach",
+      type: "select",
+      label: { vi: "Cách giải", en: "Approach" },
+      default: 2,
+      options: [
+        { value: 1, label: { vi: "1 · Merge active intervals", en: "1 · Merge active intervals" } },
+        { value: 2, label: { vi: "2 · Segment Tree O(n log n)", en: "2 · Segment Tree O(n log n)" } },
+      ],
+    }],
     approach: [
-      { vi: "Biến mỗi hình thành START event tại x1 và END event tại x2, rồi sắp xếp theo x.", en: "Turn each rectangle into a START event at x1 and an END event at x2, then sort by x." },
-      { vi: "Giữa hai event, merge các đoạn y đang active để lấy chiều dài phủ thật, không đếm phần chồng lặp.", en: "Between two events, merge active y-intervals to get the actual covered length without double-counting overlaps." },
-      { vi: "Cộng (x - prev_x) × covered_y, rồi mới cập nhật active theo event hiện tại.", en: "Add (x - prev_x) × covered_y, then update active with the current event." },
+      { vi: "Cách 1 quét theo x và merge các đoạn y đang active.", en: "Approach 1 sweeps x and merges active y-intervals." },
+      { vi: "Cách 2 mặc định quét theo y, nén tọa độ x và dùng Segment Tree lưu covered_x.", en: "The default approach sweeps y, compresses x, and stores covered_x in a Segment Tree." },
+      { vi: "Giữa hai event, cộng covered_x × delta_y vào diện tích.", en: "Between consecutive events, add covered_x × delta_y to the area." },
     ],
     complexity: {
-      time: "O(n² log n)", space: "O(n)",
-      note: { vi: "Có 2n events; mỗi event sắp xếp tối đa n đoạn y đang active.", en: "There are 2n events; each event sorts up to n active y-intervals." },
+      time: "O(n log n)", space: "O(n)",
+      note: {
+        vi: "Cách 2 mặc định có 2n events; mỗi event cập nhật Segment Tree trong O(log n). Cách 1 tốn O(n² log n).",
+        en: "The default approach has 2n events and updates the Segment Tree in O(log n) each. Approach 1 takes O(n² log n).",
+      },
     },
     code: [
       "class Solution:",
@@ -3440,8 +3455,11 @@ module.exports = {
       "            prev_x = x",
       "        return area % MOD",
     ],
+    code2: rectangle850SegmentTree.code,
+    code2Label: { vi: "Cách 2 · Sweep Line + Segment Tree", en: "Approach 2 · Sweep Line + Segment Tree" },
     liveArgs: (input) => [parseRectangles850(input)],
     builder: buildSteps850,
+    builder2: rectangle850SegmentTree.builder,
   },
   240: {
     id: 240, difficulty: "medium", slug: "search-a-2d-matrix-ii",

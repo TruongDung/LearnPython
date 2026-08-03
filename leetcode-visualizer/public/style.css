@@ -2,6 +2,153 @@
   box-sizing: border-box;
 }
 
+/* LeetCode 850 · Sweep Line + Segment Tree */
+.rect850-viz {
+  width: 100%;
+  color: #e2e8f0;
+}
+
+.rect850-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.rect850-stats > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.65);
+}
+
+.rect850-stats span,
+.rect850-stats strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.rect850-stats span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.rect850-stats strong {
+  margin-top: 2px;
+  color: #f8fafc;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rect850-section-title {
+  margin: 13px 0 7px;
+  color: #c7d2fe;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.rect850-plane {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+}
+
+.rect850-plane text,
+.rect850-tree-scroll text {
+  font: 11px "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+.rect850-events,
+.rect850-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rect850-events {
+  min-height: 28px;
+  margin-top: 6px;
+}
+
+.rect850-event,
+.rect850-segment {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.55);
+}
+
+.rect850-event {
+  padding: 4px 8px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.rect850-event.add {
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #6ee7b7;
+}
+
+.rect850-event.remove {
+  border-color: rgba(251, 113, 133, 0.55);
+  color: #fda4af;
+}
+
+.rect850-segment {
+  flex: 1 1 100px;
+  min-width: 90px;
+  padding: 6px 8px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.rect850-segment span,
+.rect850-segment strong {
+  display: block;
+  font-size: 10px;
+}
+
+.rect850-segment.active {
+  border-color: #818cf8;
+  background: rgba(99, 102, 241, 0.18);
+  color: #e0e7ff;
+}
+
+.rect850-tree-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.rect850-tree-scroll svg {
+  display: block;
+  min-width: 100%;
+  height: auto;
+}
+
+.rect850-empty {
+  padding: 24px;
+  color: #fda4af;
+  text-align: center;
+}
+
+[data-theme="light"] .rect850-viz { color: #0f172a; }
+[data-theme="light"] .rect850-stats > div { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .rect850-stats span { color: #64748b; }
+[data-theme="light"] .rect850-stats strong { color: #0f172a; }
+[data-theme="light"] .rect850-section-title { color: #3730a3; }
+[data-theme="light"] .rect850-event,
+[data-theme="light"] .rect850-segment { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
+[data-theme="light"] .rect850-event.add { border-color: #059669; color: #047857; }
+[data-theme="light"] .rect850-event.remove { border-color: #e11d48; color: #be123c; }
+[data-theme="light"] .rect850-segment.active { border-color: #6366f1; background: #eef2ff; color: #312e81; }
+
+@media (max-width: 640px) {
+  .rect850-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Stop iOS Safari from auto-zooming long code lines in landscape /
    after selecting text. Without this, a wide line inside a
    horizontally-scrolling <pre> renders bigger than its siblings. */
