@@ -8,6 +8,42 @@
   color: #e2e8f0;
 }
 
+.rect850-debug {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-left: 4px solid #fbbf24;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.rect850-debug > span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rect850-debug > strong {
+  min-width: 0;
+  color: #f8fafc;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.rect850-debug > code {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
 .rect850-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -116,6 +152,10 @@
   color: #e0e7ff;
 }
 
+.rect850-segment.update-target {
+  box-shadow: inset 0 0 0 2px #fbbf24;
+}
+
 .rect850-tree-scroll {
   width: 100%;
   overflow-x: auto;
@@ -135,6 +175,10 @@
 }
 
 [data-theme="light"] .rect850-viz { color: #0f172a; }
+[data-theme="light"] .rect850-debug { border-left-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .rect850-debug > span { background: #fef3c7; color: #92400e; }
+[data-theme="light"] .rect850-debug > strong { color: #0f172a; }
+[data-theme="light"] .rect850-debug > code { color: #64748b; }
 [data-theme="light"] .rect850-stats > div { border-color: #cbd5e1; background: #f8fafc; }
 [data-theme="light"] .rect850-stats span { color: #64748b; }
 [data-theme="light"] .rect850-stats strong { color: #0f172a; }
@@ -144,6 +188,7 @@
 [data-theme="light"] .rect850-event.add { border-color: #059669; color: #047857; }
 [data-theme="light"] .rect850-event.remove { border-color: #e11d48; color: #be123c; }
 [data-theme="light"] .rect850-segment.active { border-color: #6366f1; background: #eef2ff; color: #312e81; }
+[data-theme="light"] .rect850-segment.update-target { box-shadow: inset 0 0 0 2px #d97706; }
 
 @media (max-width: 640px) {
   .rect850-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

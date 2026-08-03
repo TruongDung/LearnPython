@@ -2825,21 +2825,81 @@ function buildSteps850(input) {
   const coveredLength = new Array(segmentCount * 4 + 5).fill(0);
   const leafCounts = new Array(segmentCount).fill(0);
 
-  function update(node, left, right, queryLeft, queryRight, delta) {
+  function update(node, left, right, queryLeft, queryRight, delta, trace, depth = 0) {
+    trace({
+      line: 18,
+      node,
+      left,
+      right,
+      depth,
+      action: `Kiểm tra [${xs[left]}, ${xs[right + 1]}) có nằm trọn trong đoạn update hay không`,
+      actionEn: `Check whether [${xs[left]}, ${xs[right + 1]}) is fully inside the update range`,
+    });
     if (queryLeft <= left && right <= queryRight) {
       coverCount[node] += delta;
+      trace({
+        line: 19,
+        node,
+        left,
+        right,
+        depth,
+        action: `count[${node}] ${delta > 0 ? "+=" : "-="} 1 → ${coverCount[node]}`,
+        actionEn: `count[${node}] ${delta > 0 ? "+=" : "-="} 1 → ${coverCount[node]}`,
+      });
     } else {
       const middle = Math.floor((left + right) / 2);
-      if (queryLeft <= middle) update(node * 2, left, middle, queryLeft, queryRight, delta);
-      if (queryRight > middle) update(node * 2 + 1, middle + 1, right, queryLeft, queryRight, delta);
+      trace({
+        line: 21,
+        node,
+        left,
+        right,
+        depth,
+        action: `Chia node tại mid=${middle}: [${xs[left]}, ${xs[middle + 1]}) và [${xs[middle + 1]}, ${xs[right + 1]})`,
+        actionEn: `Split at mid=${middle}: [${xs[left]}, ${xs[middle + 1]}) and [${xs[middle + 1]}, ${xs[right + 1]})`,
+      });
+      if (queryLeft <= middle) {
+        trace({ line: 22, node, left, right, depth, action: "Đoạn update chạm node con trái", actionEn: "The update range intersects the left child" });
+        update(node * 2, left, middle, queryLeft, queryRight, delta, trace, depth + 1);
+      }
+      if (queryRight > middle) {
+        trace({ line: 24, node, left, right, depth, action: "Đoạn update chạm node con phải", actionEn: "The update range intersects the right child" });
+        update(node * 2 + 1, middle + 1, right, queryLeft, queryRight, delta, trace, depth + 1);
+      }
     }
 
     if (coverCount[node] > 0) {
       coveredLength[node] = xs[right + 1] - xs[left];
+      trace({
+        line: 27,
+        node,
+        left,
+        right,
+        depth,
+        action: `count[${node}] > 0 nên length[${node}] = ${coveredLength[node]}`,
+        actionEn: `count[${node}] > 0, so length[${node}] = ${coveredLength[node]}`,
+      });
     } else if (left === right) {
       coveredLength[node] = 0;
+      trace({
+        line: 29,
+        node,
+        left,
+        right,
+        depth,
+        action: `Node lá không còn được phủ nên length[${node}] = 0`,
+        actionEn: `The uncovered leaf now has length[${node}] = 0`,
+      });
     } else {
       coveredLength[node] = coveredLength[node * 2] + coveredLength[node * 2 + 1];
+      trace({
+        line: 31,
+        node,
+        left,
+        right,
+        depth,
+        action: `Gộp hai con: length[${node}] = ${coveredLength[node * 2]} + ${coveredLength[node * 2 + 1]} = ${coveredLength[node]}`,
+        actionEn: `Merge children: length[${node}] = ${coveredLength[node * 2]} + ${coveredLength[node * 2 + 1]} = ${coveredLength[node]}`,
+      });
     }
   }
 
@@ -2871,79 +2931,283 @@ function buildSteps850(input) {
   const steps = [];
   let eventIndex = 0;
   let previousY = events[0].y;
+  let currentY = previousY;
+  let nextY = previousY;
+  let deltaY = 0;
+  let coveredBefore = 0;
+  let addedArea = 0;
   let area = 0n;
+  let currentEvents = [];
+  let activeNode = null;
+  let activeRange = null;
+  let updateRange = null;
+  let callDepth = 0;
 
-  while (eventIndex < events.length) {
-    const currentY = events[eventIndex].y;
-    const deltaY = currentY - previousY;
-    const coveredBefore = coveredLength[1];
-    const addedAreaExact = BigInt(coveredBefore) * BigInt(deltaY);
-    const addedArea = addedAreaExact <= BigInt(Number.MAX_SAFE_INTEGER)
-      ? Number(addedAreaExact)
-      : addedAreaExact.toString();
-    area = (area + addedAreaExact) % MOD;
+  const formatExact = (value) => value <= BigInt(Number.MAX_SAFE_INTEGER)
+    ? Number(value)
+    : value.toString();
 
-    const currentEvents = [];
-    while (eventIndex < events.length && events[eventIndex].y === currentY) {
-      const event = events[eventIndex];
-      const left = xIndex.get(event.x1);
-      const right = xIndex.get(event.x2) - 1;
-      update(1, 0, segmentCount - 1, left, right, event.delta);
-      for (let i = left; i <= right; i++) leafCounts[i] += event.delta;
-      currentEvents.push({ ...event });
-      eventIndex += 1;
-    }
+  function makeView(phase, action) {
+    return {
+      rectangles: rectangles.map((rectangle) => [...rectangle]),
+      xs: [...xs],
+      y: currentY,
+      previousY,
+      nextY,
+      deltaY,
+      coveredBefore,
+      coveredX: coveredLength[1],
+      addedArea,
+      area: Number(area),
+      events: currentEvents.map((event) => ({ ...event })),
+      leafCounts: [...leafCounts],
+      treeNodes: snapshotTree(),
+      phase,
+      action,
+      activeNode,
+      activeRange: activeRange ? { ...activeRange } : null,
+      updateRange: updateRange ? { ...updateRange } : null,
+      callDepth,
+    };
+  }
 
-    const nextY = eventIndex < events.length ? events[eventIndex].y : currentY;
-    const coveredAfter = coveredLength[1];
-    const eventText = currentEvents
-      .map((event) => `${event.delta > 0 ? "+" : "−"}R${event.rectangleIndex + 1} [${event.x1}, ${event.x2})`)
-      .join(", ");
-
+  function addStep({ line, titleVi, titleEn, noteVi, noteEn, vars = [], phase = "setup", action = "", final = false }) {
     steps.push({
-      title: {
-        vi: `Quét tới y = ${currentY}`,
-        en: `Sweep to y = ${currentY}`,
-      },
+      title: { vi: titleVi, en: titleEn },
       codeBlock: 2,
-      rectangleSweepView: {
-        rectangles: rectangles.map((rectangle) => [...rectangle]),
-        xs: [...xs],
-        y: currentY,
-        previousY,
-        nextY,
-        deltaY,
-        coveredBefore,
-        coveredX: coveredAfter,
-        addedArea,
-        area: Number(area),
-        events: currentEvents,
-        leafCounts: [...leafCounts],
-        treeNodes: snapshotTree(),
-      },
-      codeLines: deltaY === 0 ? [8, 9, 10, 11] : [39, 40, 41, 42, 43],
-      vars: [
-        { name: "y", value: currentY },
-        { name: "delta_y", value: deltaY },
-        { name: "covered_x trước event", value: coveredBefore },
-        { name: "area cộng thêm", value: addedArea },
-        { name: "events", value: eventText || "∅" },
-        { name: "covered_x sau event", value: coveredAfter },
-        { name: "total_area", value: Number(area) },
-      ],
-      note: {
-        vi: deltaY === 0
-          ? `Khởi tạo tại y=${currentY}. Cập nhật ${eventText}; Segment Tree cho độ dài phủ x = ${coveredAfter}.`
-          : `Cộng ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}. Sau đó cập nhật ${eventText}; độ dài phủ cho dải tiếp theo là ${coveredAfter}.`,
-        en: deltaY === 0
-          ? `Initialize at y=${currentY}. Apply ${eventText}; the Segment Tree reports covered x-length ${coveredAfter}.`
-          : `Add ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}. Then apply ${eventText}; the next strip has covered x-length ${coveredAfter}.`,
-      },
-      final: eventIndex === events.length,
+      rectangleSweepView: makeView(phase, action || noteVi),
+      codeLines: [line],
+      vars,
+      note: { vi: noteVi, en: noteEn },
+      final,
+    });
+  }
+
+  addStep({
+    line: 5,
+    titleVi: "Dòng 5 · Khai báo MOD",
+    titleEn: "Line 5 · Define MOD",
+    noteVi: "MOD = 10⁹ + 7; chỉ dùng khi trả kết quả cuối.",
+    noteEn: "MOD = 10⁹ + 7; it is applied to the final result.",
+    vars: [{ name: "MOD", value: "1000000007" }],
+  });
+  addStep({
+    line: 6,
+    titleVi: "Dòng 6 · Khởi tạo events và x_values",
+    titleEn: "Line 6 · Initialize events and x_values",
+    noteVi: "events lưu cạnh ngang theo y; x_values dùng để nén tọa độ x.",
+    noteEn: "events stores horizontal sweep events; x_values is used for x compression.",
+    vars: [{ name: "events", value: "[]" }, { name: "x_values", value: "set()" }],
+  });
+
+  const setupEvents = [];
+  const setupXValues = new Set();
+  rectangles.forEach(([x1, y1, x2, y2], rectangleIndex) => {
+    addStep({
+      line: 7,
+      titleVi: `Dòng 7 · Đọc R${rectangleIndex + 1}`,
+      titleEn: `Line 7 · Read R${rectangleIndex + 1}`,
+      noteVi: `R${rectangleIndex + 1} = [${x1}, ${y1}, ${x2}, ${y2}].`,
+      noteEn: `R${rectangleIndex + 1} = [${x1}, ${y1}, ${x2}, ${y2}].`,
+      vars: [{ name: "x1,y1,x2,y2", value: `${x1},${y1},${x2},${y2}` }],
+    });
+    setupEvents.push(
+      { y: y1, delta: 1, x1, x2, rectangleIndex },
+      { y: y2, delta: -1, x1, x2, rectangleIndex }
+    );
+    currentEvents = setupEvents;
+    addStep({
+      line: 8,
+      titleVi: `Dòng 8 · Tạo hai event cho R${rectangleIndex + 1}`,
+      titleEn: `Line 8 · Create two events for R${rectangleIndex + 1}`,
+      noteVi: `Thêm START tại y=${y1} và END tại y=${y2}, cùng phủ đoạn x=[${x1}, ${x2}).`,
+      noteEn: `Add START at y=${y1} and END at y=${y2}, both covering x=[${x1}, ${x2}).`,
+      vars: [{ name: "events.length", value: setupEvents.length }],
+    });
+    setupXValues.add(x1);
+    setupXValues.add(x2);
+    addStep({
+      line: 9,
+      titleVi: `Dòng 9 · Thêm biên x của R${rectangleIndex + 1}`,
+      titleEn: `Line 9 · Add R${rectangleIndex + 1} x boundaries`,
+      noteVi: `x_values = {${[...setupXValues].sort((a, b) => a - b).join(", ")}}.`,
+      noteEn: `x_values = {${[...setupXValues].sort((a, b) => a - b).join(", ")}}.`,
+      vars: [{ name: "x_values", value: `{${[...setupXValues].sort((a, b) => a - b).join(", ")}}` }],
+    });
+  });
+
+  currentEvents = events;
+  addStep({
+    line: 10,
+    titleVi: "Dòng 10 · Sắp xếp events theo y",
+    titleEn: "Line 10 · Sort events by y",
+    noteVi: "Các event cùng y được xử lý chung trước khi chuyển sang dải y tiếp theo.",
+    noteEn: "Events sharing the same y are processed together before the next y-strip.",
+    vars: [{ name: "event y", value: `[${events.map((event) => event.y).join(", ")}]` }],
+  });
+  addStep({ line: 11, titleVi: "Dòng 11 · Nén tọa độ x", titleEn: "Line 11 · Compress x-coordinates", noteVi: `xs = [${xs.join(", ")}].`, noteEn: `xs = [${xs.join(", ")}].`, vars: [{ name: "xs", value: `[${xs.join(", ")}]` }] });
+  addStep({ line: 12, titleVi: "Dòng 12 · Tạo bảng x → index", titleEn: "Line 12 · Build x → index map", noteVi: `index = {${xs.map((x, index) => `${x}:${index}`).join(", ")}}.`, noteEn: `index = {${xs.map((x, index) => `${x}:${index}`).join(", ")}}.`, vars: [{ name: "index", value: `{${xs.map((x, index) => `${x}:${index}`).join(", ")}}` }] });
+  addStep({ line: 13, titleVi: "Dòng 13 · Đếm đoạn x cơ sở", titleEn: "Line 13 · Count elementary x segments", noteVi: `m = len(xs) - 1 = ${segmentCount}.`, noteEn: `m = len(xs) - 1 = ${segmentCount}.`, vars: [{ name: "m", value: segmentCount }] });
+  addStep({ line: 14, titleVi: "Dòng 14 · Khởi tạo count", titleEn: "Line 14 · Initialize count", noteVi: "count[node] lưu số event đang phủ toàn bộ node.", noteEn: "count[node] stores how many active ranges fully cover the node.", vars: [{ name: "count", value: `[0] × ${coverCount.length}` }] });
+  addStep({ line: 15, titleVi: "Dòng 15 · Khởi tạo length", titleEn: "Line 15 · Initialize length", noteVi: "length[1] sẽ luôn là tổng chiều dài x đang được phủ.", noteEn: "length[1] will always hold the total covered x-length.", vars: [{ name: "length[1]", value: 0 }] });
+  addStep({ line: 33, titleVi: "Dòng 33 · area = 0", titleEn: "Line 33 · area = 0", noteVi: "Bắt đầu cộng diện tích từng dải ngang.", noteEn: "Start accumulating horizontal strip areas.", vars: [{ name: "area", value: 0 }] });
+  addStep({ line: 34, titleVi: "Dòng 34 · previous_y", titleEn: "Line 34 · previous_y", noteVi: `previous_y = ${previousY}, là y của event đầu tiên.`, noteEn: `previous_y = ${previousY}, the first event y.`, vars: [{ name: "previous_y", value: previousY }] });
+  addStep({ line: 35, titleVi: "Dòng 35 · i = 0", titleEn: "Line 35 · i = 0", noteVi: "i trỏ tới event chưa xử lý tiếp theo.", noteEn: "i points to the next unprocessed event.", vars: [{ name: "i", value: 0 }] });
+
+  currentEvents = [];
+  while (eventIndex < events.length) {
+    addStep({
+      line: 36,
+      titleVi: `Dòng 36 · i=${eventIndex} < ${events.length}`,
+      titleEn: `Line 36 · i=${eventIndex} < ${events.length}`,
+      noteVi: "Điều kiện đúng nên tiếp tục vòng sweep.",
+      noteEn: "The condition is true, so the sweep continues.",
+      vars: [{ name: "i", value: eventIndex }, { name: "len(events)", value: events.length }],
+      phase: "sweep",
     });
 
+    currentY = events[eventIndex].y;
+    let nextEventIndex = eventIndex;
+    while (nextEventIndex < events.length && events[nextEventIndex].y === currentY) nextEventIndex += 1;
+    nextY = nextEventIndex < events.length ? events[nextEventIndex].y : currentY;
+    currentEvents = [];
+    addStep({
+      line: 37,
+      titleVi: `Dòng 37 · y = ${currentY}`,
+      titleEn: `Line 37 · y = ${currentY}`,
+      noteVi: `Lấy y từ events[${eventIndex}].`,
+      noteEn: `Read y from events[${eventIndex}].`,
+      vars: [{ name: "y", value: currentY }, { name: "previous_y", value: previousY }],
+      phase: "sweep",
+    });
+
+    deltaY = currentY - previousY;
+    coveredBefore = coveredLength[1];
+    const addedAreaExact = BigInt(coveredBefore) * BigInt(deltaY);
+    addedArea = formatExact(addedAreaExact);
+    area = (area + addedAreaExact) % MOD;
+    addStep({
+      line: 38,
+      titleVi: `Dòng 38 · Cộng diện tích dải y=[${previousY}, ${currentY})`,
+      titleEn: `Line 38 · Add strip y=[${previousY}, ${currentY})`,
+      noteVi: `area += ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}; area = ${Number(area)}.`,
+      noteEn: `area += ${coveredBefore} × (${currentY} − ${previousY}) = ${addedArea}; area = ${Number(area)}.`,
+      vars: [{ name: "length[1]", value: coveredBefore }, { name: "delta_y", value: deltaY }, { name: "added_area", value: addedArea }, { name: "area", value: Number(area) }],
+      phase: "area",
+    });
+
+    while (eventIndex < events.length && events[eventIndex].y === currentY) {
+      addStep({
+        line: 39,
+        titleVi: `Dòng 39 · Event ${eventIndex} có y=${currentY}`,
+        titleEn: `Line 39 · Event ${eventIndex} has y=${currentY}`,
+        noteVi: "Event thuộc nhóm y hiện tại nên được cập nhật vào Segment Tree.",
+        noteEn: "This event belongs to the current y-group and must update the Segment Tree.",
+        vars: [{ name: "i", value: eventIndex }, { name: "events[i][0] == y", value: true }],
+        phase: "event",
+      });
+
+      const event = events[eventIndex];
+      currentEvents.push({ ...event });
+      addStep({
+        line: 40,
+        titleVi: `Dòng 40 · Giải nén ${event.delta > 0 ? "START" : "END"} R${event.rectangleIndex + 1}`,
+        titleEn: `Line 40 · Unpack ${event.delta > 0 ? "START" : "END"} R${event.rectangleIndex + 1}`,
+        noteVi: `delta=${event.delta}, đoạn x=[${event.x1}, ${event.x2}).`,
+        noteEn: `delta=${event.delta}, x-range=[${event.x1}, ${event.x2}).`,
+        vars: [{ name: "delta", value: event.delta }, { name: "x1", value: event.x1 }, { name: "x2", value: event.x2 }],
+        phase: "event",
+      });
+
+      const left = xIndex.get(event.x1);
+      const right = xIndex.get(event.x2) - 1;
+      updateRange = { left, right, x1: event.x1, x2: event.x2, delta: event.delta };
+      activeNode = 1;
+      activeRange = { left: 0, right: segmentCount - 1 };
+      callDepth = 0;
+      for (let index = left; index <= right; index++) leafCounts[index] += event.delta;
+      addStep({
+        line: 41,
+        titleVi: `Dòng 41 · Gọi update cho [${event.x1}, ${event.x2})`,
+        titleEn: `Line 41 · Call update for [${event.x1}, ${event.x2})`,
+        noteVi: `Chỉ số nén cần cập nhật: [${left}, ${right}], delta=${event.delta}.`,
+        noteEn: `Compressed update indexes: [${left}, ${right}], delta=${event.delta}.`,
+        vars: [{ name: "ql", value: left }, { name: "qr", value: right }, { name: "delta", value: event.delta }],
+        phase: "update-call",
+      });
+
+      update(1, 0, segmentCount - 1, left, right, event.delta, (traceState) => {
+        activeNode = traceState.node;
+        activeRange = { left: traceState.left, right: traceState.right };
+        callDepth = traceState.depth;
+        addStep({
+          line: traceState.line,
+          titleVi: `Dòng ${traceState.line} · Node #${traceState.node} [${xs[traceState.left]}, ${xs[traceState.right + 1]})`,
+          titleEn: `Line ${traceState.line} · Node #${traceState.node} [${xs[traceState.left]}, ${xs[traceState.right + 1]})`,
+          noteVi: traceState.action,
+          noteEn: traceState.actionEn,
+          vars: [
+            { name: "node", value: traceState.node },
+            { name: "left,right", value: `${traceState.left},${traceState.right}` },
+            { name: "depth", value: traceState.depth },
+            { name: "count[node]", value: coverCount[traceState.node] },
+            { name: "length[node]", value: coveredLength[traceState.node] },
+          ],
+          phase: "segment-tree",
+        });
+      });
+
+      activeNode = null;
+      activeRange = null;
+      eventIndex += 1;
+      addStep({
+        line: 42,
+        titleVi: `Dòng 42 · i tăng thành ${eventIndex}`,
+        titleEn: `Line 42 · Increment i to ${eventIndex}`,
+        noteVi: `Event vừa xử lý xong; length[1] = ${coveredLength[1]}.`,
+        noteEn: `The event is complete; length[1] = ${coveredLength[1]}.`,
+        vars: [{ name: "i", value: eventIndex }, { name: "length[1]", value: coveredLength[1] }],
+        phase: "event-done",
+      });
+    }
+
+    updateRange = null;
+    activeNode = null;
+    activeRange = null;
     previousY = currentY;
+    addStep({
+      line: 43,
+      titleVi: `Dòng 43 · previous_y = ${previousY}`,
+      titleEn: `Line 43 · previous_y = ${previousY}`,
+      noteVi: `Nhóm event tại y=${currentY} hoàn tất; covered_x cho dải tiếp theo là ${coveredLength[1]}.`,
+      noteEn: `The y=${currentY} event group is complete; covered_x for the next strip is ${coveredLength[1]}.`,
+      vars: [{ name: "previous_y", value: previousY }, { name: "covered_x", value: coveredLength[1] }, { name: "area", value: Number(area) }],
+      phase: "level-done",
+    });
   }
+
+  currentEvents = [];
+  deltaY = 0;
+  addedArea = 0;
+  addStep({
+    line: 36,
+    titleVi: `Dòng 36 · i=${eventIndex}, vòng lặp kết thúc`,
+    titleEn: `Line 36 · i=${eventIndex}, loop ends`,
+    noteVi: "i đã bằng len(events), không còn event nào.",
+    noteEn: "i equals len(events), so no events remain.",
+    vars: [{ name: "i", value: eventIndex }, { name: "len(events)", value: events.length }],
+    phase: "done",
+  });
+  addStep({
+    line: 44,
+    titleVi: `Dòng 44 · Trả kết quả ${Number(area)}`,
+    titleEn: `Line 44 · Return ${Number(area)}`,
+    noteVi: `return area % MOD = ${Number(area)}.`,
+    noteEn: `return area % MOD = ${Number(area)}.`,
+    vars: [{ name: "area % MOD", value: Number(area) }],
+    phase: "return",
+    final: true,
+  });
 
   return { original: rectangles, answer: Number(area), steps };
 }

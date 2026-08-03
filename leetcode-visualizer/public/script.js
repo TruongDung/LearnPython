@@ -8456,24 +8456,40 @@ function renderRectangleSweepView(step) {
   const treeNodeHtml = treeNodes.map((node) => {
     const position = treePosition.get(node.id);
     const active = node.length > 0;
+    const current = node.id === view.activeNode;
     const range = `[${fmt(xs[node.left])}, ${fmt(xs[node.right + 1])})`;
     return `<g>
-      <rect x="${position.x - 45}" y="${position.y - 25}" width="90" height="50" rx="9" fill="${active ? colors.treeActive : colors.treeFill}" stroke="${active ? colors.treeStroke : colors.grid}" stroke-width="${node.id === 1 ? 2 : 1}" />
+      <rect x="${position.x - 45}" y="${position.y - 25}" width="90" height="50" rx="9" fill="${active ? colors.treeActive : colors.treeFill}" stroke="${current ? colors.next : active ? colors.treeStroke : colors.grid}" stroke-width="${current ? 4 : node.id === 1 ? 2 : 1}" />
       <text x="${position.x}" y="${position.y - 4}" fill="${colors.text}" text-anchor="middle">${range}</text>
       <text x="${position.x}" y="${position.y + 14}" fill="${active ? colors.treeStroke : colors.muted}" text-anchor="middle">len=${fmt(node.length)} · count=${node.count}</text>
     </g>`;
   }).join("");
   const treeSvg = `<svg viewBox="0 0 ${treeWidth} ${treeHeight}" style="width:${treeWidth}px" role="img" aria-label="Segment Tree storing covered x length">${treeEdges}${treeNodeHtml}</svg>`;
 
-  const segmentHtml = (view.leafCounts || []).map((count, index) => `
-    <div class="rect850-segment ${count > 0 ? "active" : ""}">
+  const segmentHtml = (view.leafCounts || []).map((count, index) => {
+    const target = view.updateRange && view.updateRange.left <= index && index <= view.updateRange.right;
+    return `
+    <div class="rect850-segment ${count > 0 ? "active" : ""} ${target ? "update-target" : ""}">
       <span>[${fmt(xs[index])}, ${fmt(xs[index + 1])})</span>
       <strong>${lang === "vi" ? "phủ" : "cover"}: ${count}</strong>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   const eventHtml = (view.events || []).map((event) => `
     <span class="rect850-event ${event.delta > 0 ? "add" : "remove"}">${event.delta > 0 ? "+" : "−"} R${event.rectangleIndex + 1} [${fmt(event.x1)}, ${fmt(event.x2)})</span>`).join("");
 
+  const debugRange = view.updateRange
+    ? `${view.updateRange.delta > 0 ? "+1" : "−1"} · [${fmt(view.updateRange.x1)}, ${fmt(view.updateRange.x2)})`
+    : "—";
+  const activeNodeLabel = view.activeNode
+    ? `node #${view.activeNode} · depth ${view.callDepth}`
+    : "—";
+
   el.innerHTML = `<div class="rect850-viz">
+    <div class="rect850-debug">
+      <span>${escapeHtml(view.phase || "setup")}</span>
+      <strong>${escapeHtml(view.action || "")}</strong>
+      <code>${escapeHtml(debugRange)} · ${escapeHtml(activeNodeLabel)}</code>
+    </div>
     <div class="rect850-stats">
       <div><span>Δy</span><strong>${fmt(view.deltaY)}</strong></div>
       <div><span>${lang === "vi" ? "covered_x mới" : "new covered_x"}</span><strong>${fmt(view.coveredX)}</strong></div>
