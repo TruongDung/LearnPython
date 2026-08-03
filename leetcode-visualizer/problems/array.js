@@ -2991,7 +2991,405 @@ function buildSteps850(input) {
   return { original: rectangles, answer, steps };
 }
 
+/** LeetCode 4013: Count Subarrays With Even Odd Ratio II — prefix sums + Fenwick tree. */
+function buildSteps4013(input, params = {}) {
+  const nums = Array.isArray(input)
+    ? input.map(Number)
+    : String(input).split(",").map((value) => Number(value.trim())).filter(Number.isFinite);
+  const a = Number(params.a);
+  const b = Number(params.b);
+  const steps = [];
+  const valid = nums.length > 0
+    && nums.every((value) => Number.isInteger(value) && value >= 1)
+    && Number.isInteger(a) && a >= 1
+    && Number.isInteger(b) && b >= 1;
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [...nums], highlight: [], mark: [], final: true, codeLines: [4],
+      vars: [{ name: "nums", value: nums }, { name: "a", value: a }, { name: "b", value: b }],
+      note: {
+        vi: "nums phải chứa số nguyên dương; a và b cũng phải là số nguyên dương.",
+        en: "nums must contain positive integers, and a and b must also be positive integers.",
+      },
+      evenOddRatioView: {
+        phase: "invalid", nums: [...nums], weights: [], pref: [], values: [], bit: [],
+        a, b, currentNumIndex: -1, currentPrefixIndex: -1, rank: null,
+        queryIndex: null, queryPath: [], updatePath: [], queryTotal: 0,
+        smaller: null, eligiblePrefixIndices: [], seen: 0, added: 0, ans: 0,
+      },
+    });
+    return { original: nums, nums, a, b, answer: 0, steps };
+  }
+
+  const weights = Array(nums.length).fill(null);
+  const pref = [0];
+  let values = [];
+  let bit = [];
+  let ans = 0;
+  let seen = 0;
+  let currentNumIndex = -1;
+  let currentPrefixIndex = -1;
+  let rank = null;
+  let queryIndex = null;
+  let queryPath = [];
+  let updatePath = [];
+  let queryTotal = 0;
+  let smaller = null;
+  let eligiblePrefixIndices = [];
+  let added = 0;
+
+  function addStep({ title, codeLine, phase, vars = [], note, final = false }) {
+    steps.push({
+      title,
+      arr: [...nums],
+      highlight: currentNumIndex >= 0 ? [currentNumIndex] : [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      evenOddRatioView: {
+        phase,
+        nums: [...nums],
+        weights: [...weights],
+        pref: [...pref],
+        values: [...values],
+        bit: bit.slice(1),
+        a,
+        b,
+        currentNumIndex,
+        currentPrefixIndex,
+        rank,
+        queryIndex,
+        queryPath: [...queryPath],
+        updatePath: [...updatePath],
+        queryTotal,
+        smaller,
+        eligiblePrefixIndices: [...eligiblePrefixIndices],
+        seen,
+        added,
+        ans,
+      },
+    });
+  }
+
+  addStep({
+    title: { vi: "pref = [0]", en: "pref = [0]" }, codeLine: 5, phase: "prefix-init",
+    vars: [{ name: "pref", value: [0] }, { name: "ratio limit", value: `${a}/${b}` }],
+    note: {
+      vi: "Prefix rỗng bằng 0. Mỗi số chẵn sẽ đóng góp +b, mỗi số lẻ đóng góp -a.",
+      en: "The empty prefix is 0. Each even number contributes +b; each odd number contributes -a.",
+    },
+  });
+
+  for (let index = 0; index < nums.length; index++) {
+    currentNumIndex = index;
+    const num = nums[index];
+    addStep({
+      title: { vi: `Đọc nums[${index}] = ${num}`, en: `Read nums[${index}] = ${num}` }, codeLine: 6, phase: "transform-read",
+      vars: [{ name: "num", value: num }, { name: "parity", value: num % 2 === 0 ? "even" : "odd" }],
+      note: {
+        vi: `Xét tính chẵn lẻ của ${num} để đổi bài toán tỉ lệ thành tổng trọng số.`,
+        en: `Inspect ${num}'s parity to turn the ratio condition into a weighted-sum condition.`,
+      },
+    });
+
+    const weight = num % 2 === 0 ? b : -a;
+    weights[index] = weight;
+    addStep({
+      title: { vi: `${num % 2 === 0 ? "Chẵn" : "Lẻ"} → weight = ${weight}`, en: `${num % 2 === 0 ? "Even" : "Odd"} → weight = ${weight}` },
+      codeLine: 7, phase: "transform-weight",
+      vars: [{ name: "num", value: num }, { name: "weight", value: weight }],
+      note: num % 2 === 0
+        ? { vi: `Số chẵn làm x tăng 1 nên b·x - a·y tăng b = ${b}.`, en: `An even number increments x, so b·x - a·y increases by b = ${b}.` }
+        : { vi: `Số lẻ làm y tăng 1 nên b·x - a·y giảm a = ${a}.`, en: `An odd number increments y, so b·x - a·y decreases by a = ${a}.` },
+    });
+
+    const nextPrefix = pref[pref.length - 1] + weight;
+    pref.push(nextPrefix);
+    currentPrefixIndex = pref.length - 1;
+    addStep({
+      title: { vi: `pref[${currentPrefixIndex}] = ${nextPrefix}`, en: `pref[${currentPrefixIndex}] = ${nextPrefix}` },
+      codeLine: 8, phase: "prefix-append",
+      vars: [{ name: "pref[-1] before", value: nextPrefix - weight }, { name: "weight", value: weight }, { name: `pref[${currentPrefixIndex}]`, value: nextPrefix }],
+      note: {
+        vi: `Cộng weight ${weight}: prefix mới = ${nextPrefix - weight} + (${weight}) = ${nextPrefix}.`,
+        en: `Add weight ${weight}: new prefix = ${nextPrefix - weight} + (${weight}) = ${nextPrefix}.`,
+      },
+    });
+  }
+
+  currentNumIndex = -1;
+  currentPrefixIndex = -1;
+  values = [...new Set(pref)].sort((left, right) => left - right);
+  addStep({
+    title: { vi: "Nén tọa độ các prefix", en: "Coordinate-compress prefixes" }, codeLine: 10, phase: "compress",
+    vars: [{ name: "pref", value: pref }, { name: "values", value: values }],
+    note: {
+      vi: `Sắp xếp các giá trị prefix duy nhất thành [${values.join(", ")}]. Rank tăng dần cho phép Fenwick đếm theo thứ tự giá trị.`,
+      en: `Sort unique prefix values as [${values.join(", ")}]. Increasing ranks let Fenwick count by value order.`,
+    },
+  });
+
+  bit = Array(values.length + 1).fill(0);
+  addStep({
+    title: { vi: "Khởi tạo Fenwick Tree", en: "Initialize Fenwick Tree" }, codeLine: 11, phase: "bit-init",
+    vars: [{ name: "len(values)", value: values.length }, { name: "bit", value: bit }],
+    note: {
+      vi: "BIT dùng index 1-based; mỗi lần thêm một prefix, cây lưu số lần các rank đã xuất hiện.",
+      en: "BIT is 1-based; whenever a prefix is inserted, it stores how many times each rank has appeared.",
+    },
+  });
+
+  ans = 0;
+  addStep({
+    title: { vi: "ans = 0", en: "ans = 0" }, codeLine: 25, phase: "scan-init",
+    vars: [{ name: "ans", value: ans }],
+    note: { vi: "ans tích lũy số subarray hợp lệ.", en: "ans accumulates the number of valid subarrays." },
+  });
+  seen = 0;
+  addStep({
+    title: { vi: "seen = 0", en: "seen = 0" }, codeLine: 26, phase: "scan-init",
+    vars: [{ name: "seen", value: seen }],
+    note: { vi: "seen là số prefix trước prefix hiện tại.", en: "seen is the number of prefixes before the current prefix." },
+  });
+
+  for (let prefixIndex = 0; prefixIndex < pref.length; prefixIndex++) {
+    const value = pref[prefixIndex];
+    currentPrefixIndex = prefixIndex;
+    currentNumIndex = prefixIndex - 1;
+    rank = null;
+    queryIndex = null;
+    queryPath = [];
+    updatePath = [];
+    queryTotal = 0;
+    smaller = null;
+    added = 0;
+    eligiblePrefixIndices = Array.from({ length: prefixIndex }, (_, index) => index)
+      .filter((index) => pref[index] >= value);
+
+    addStep({
+      title: { vi: `Quét pref[${prefixIndex}] = ${value}`, en: `Scan pref[${prefixIndex}] = ${value}` }, codeLine: 27, phase: "scan-prefix",
+      vars: [{ name: "value", value }, { name: "seen", value: seen }],
+      note: {
+        vi: `Cần đếm prefix trước đó >= ${value}; mỗi prefix như vậy tạo một subarray có tổng biến đổi <= 0.`,
+        en: `Count previous prefixes >= ${value}; each one creates a subarray with transformed sum <= 0.`,
+      },
+    });
+
+    rank = values.indexOf(value) + 1;
+    addStep({
+      title: { vi: `rank(${value}) = ${rank}`, en: `rank(${value}) = ${rank}` }, codeLine: 28, phase: "find-rank",
+      vars: [{ name: "value", value }, { name: "rank", value: rank }],
+      note: {
+        vi: `bisect_left tìm ${value} ở vị trí ${rank - 1}; cộng 1 để dùng BIT 1-based → rank ${rank}.`,
+        en: `bisect_left finds ${value} at position ${rank - 1}; add 1 for the 1-based BIT → rank ${rank}.`,
+      },
+    });
+
+    queryIndex = rank - 1;
+    addStep({
+      title: { vi: `smaller = query(${queryIndex})`, en: `smaller = query(${queryIndex})` }, codeLine: 29, phase: "query-call",
+      vars: [{ name: "rank - 1", value: queryIndex }],
+      note: {
+        vi: `Query tới rank ${queryIndex} chỉ đếm prefix trước đó < ${value}; prefix bằng ${value} không bị loại.`,
+        en: `Query through rank ${queryIndex} counts only previous prefixes < ${value}; prefixes equal to ${value} are not excluded.`,
+      },
+    });
+    addStep({
+      title: { vi: `Vào query(${queryIndex})`, en: `Enter query(${queryIndex})` }, codeLine: 18, phase: "query-enter",
+      vars: [{ name: "index", value: queryIndex }],
+      note: { vi: "Hàm query tính tổng tần suất từ rank 1 tới index.", en: "query returns the total frequency from rank 1 through index." },
+    });
+    queryTotal = 0;
+    addStep({
+      title: { vi: "total = 0", en: "total = 0" }, codeLine: 19, phase: "query-init",
+      vars: [{ name: "total", value: queryTotal }, { name: "index", value: queryIndex }],
+      note: { vi: "Bắt đầu tổng prefix nhỏ hơn từ 0.", en: "Start the smaller-prefix total at 0." },
+    });
+
+    let queryCursor = queryIndex;
+    while (queryCursor > 0) {
+      queryIndex = queryCursor;
+      addStep({
+        title: { vi: `${queryCursor} > 0 → tiếp tục query`, en: `${queryCursor} > 0 → continue query` }, codeLine: 20, phase: "query-check",
+        vars: [{ name: "index", value: queryCursor }, { name: "condition", value: true }],
+        note: { vi: `BIT[${queryCursor}] chứa tổng của một đoạn rank kết thúc tại ${queryCursor}.`, en: `BIT[${queryCursor}] stores a rank-range total ending at ${queryCursor}.` },
+      });
+      queryPath.push(queryCursor);
+      const bitValue = bit[queryCursor];
+      queryTotal += bitValue;
+      addStep({
+        title: { vi: `total += BIT[${queryCursor}] = ${bitValue}`, en: `total += BIT[${queryCursor}] = ${bitValue}` }, codeLine: 21, phase: "query-read",
+        vars: [{ name: `BIT[${queryCursor}]`, value: bitValue }, { name: "total", value: queryTotal }],
+        note: { vi: `Đã đếm ${queryTotal} prefix có rank nằm trong các đoạn BIT vừa ghé.`, en: `The visited BIT ranges contain ${queryTotal} prefixes so far.` },
+      });
+      const nextCursor = queryCursor - (queryCursor & -queryCursor);
+      queryIndex = nextCursor;
+      addStep({
+        title: { vi: `index: ${queryCursor} → ${nextCursor}`, en: `index: ${queryCursor} → ${nextCursor}` }, codeLine: 22, phase: "query-jump",
+        vars: [{ name: "lowbit", value: queryCursor & -queryCursor }, { name: "index", value: nextCursor }],
+        note: { vi: "Bỏ đoạn rank vừa cộng và nhảy tới node cha tiếp theo.", en: "Skip the rank range just counted and jump to the next parent node." },
+      });
+      queryCursor = nextCursor;
+    }
+    queryIndex = 0;
+    addStep({
+      title: { vi: "index = 0 → dừng query", en: "index = 0 → stop query" }, codeLine: 20, phase: "query-check",
+      vars: [{ name: "index", value: 0 }, { name: "condition", value: false }, { name: "total", value: queryTotal }],
+      note: { vi: "Không còn đoạn BIT nào cần cộng.", en: "No more BIT ranges remain to add." },
+    });
+    smaller = queryTotal;
+    addStep({
+      title: { vi: `return total = ${smaller}`, en: `return total = ${smaller}` }, codeLine: 23, phase: "query-return",
+      vars: [{ name: "smaller", value: smaller }],
+      note: { vi: `Có ${smaller} prefix trước đó nhỏ hơn ${value}.`, en: `${smaller} previous prefixes are smaller than ${value}.` },
+    });
+
+    added = seen - smaller;
+    ans += added;
+    addStep({
+      title: { vi: `ans += ${seen} - ${smaller} = ${added}`, en: `ans += ${seen} - ${smaller} = ${added}` }, codeLine: 30, phase: "count",
+      vars: [{ name: "seen", value: seen }, { name: "smaller", value: smaller }, { name: "valid starts", value: added }, { name: "ans", value: ans }],
+      note: {
+        vi: `${seen} prefix đã thấy trừ ${smaller} prefix nhỏ hơn = ${added} prefix >= ${value}; thêm ${added} subarray hợp lệ.`,
+        en: `${seen} seen prefixes minus ${smaller} smaller ones = ${added} prefixes >= ${value}; add ${added} valid subarrays.`,
+      },
+    });
+
+    addStep({
+      title: { vi: `add(rank ${rank})`, en: `add(rank ${rank})` }, codeLine: 31, phase: "update-call",
+      vars: [{ name: "rank", value: rank }],
+      note: { vi: `Đưa pref[${prefixIndex}] = ${value} vào Fenwick để các prefix sau có thể đếm nó.`, en: `Insert pref[${prefixIndex}] = ${value} into Fenwick so later prefixes can count it.` },
+    });
+    let updateCursor = rank;
+    addStep({
+      title: { vi: `Vào add(${rank})`, en: `Enter add(${rank})` }, codeLine: 13, phase: "update-enter",
+      vars: [{ name: "index", value: updateCursor }],
+      note: { vi: "Hàm add tăng các node BIT bao phủ rank hiện tại.", en: "add increments every BIT node whose range covers the current rank." },
+    });
+    while (updateCursor < bit.length) {
+      addStep({
+        title: { vi: `${updateCursor} < ${bit.length} → cập nhật`, en: `${updateCursor} < ${bit.length} → update` }, codeLine: 14, phase: "update-check",
+        vars: [{ name: "index", value: updateCursor }, { name: "condition", value: true }],
+        note: { vi: `BIT[${updateCursor}] bao phủ rank ${rank}, nên node này phải tăng 1.`, en: `BIT[${updateCursor}] covers rank ${rank}, so this node must increase by 1.` },
+      });
+      updatePath.push(updateCursor);
+      bit[updateCursor] += 1;
+      addStep({
+        title: { vi: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}`, en: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}` }, codeLine: 15, phase: "update-write",
+        vars: [{ name: `BIT[${updateCursor}]`, value: bit[updateCursor] }],
+        note: { vi: `Node BIT[${updateCursor}] giờ ghi nhận thêm prefix có rank ${rank}.`, en: `BIT[${updateCursor}] now records one more prefix at rank ${rank}.` },
+      });
+      const nextCursor = updateCursor + (updateCursor & -updateCursor);
+      addStep({
+        title: { vi: `index: ${updateCursor} → ${nextCursor}`, en: `index: ${updateCursor} → ${nextCursor}` }, codeLine: 16, phase: "update-jump",
+        vars: [{ name: "lowbit", value: updateCursor & -updateCursor }, { name: "index", value: nextCursor }],
+        note: { vi: "Nhảy tới node BIT cha tiếp theo cũng bao phủ rank này.", en: "Jump to the next parent BIT node that also covers this rank." },
+      });
+      updateCursor = nextCursor;
+    }
+    addStep({
+      title: { vi: `${updateCursor} < ${bit.length} → False`, en: `${updateCursor} < ${bit.length} → False` }, codeLine: 14, phase: "update-check",
+      vars: [{ name: "index", value: updateCursor }, { name: "condition", value: false }],
+      note: { vi: "index đã ra ngoài BIT nên add kết thúc.", en: "index is outside the BIT, so add finishes." },
+    });
+
+    seen += 1;
+    addStep({
+      title: { vi: `seen += 1 → ${seen}`, en: `seen += 1 → ${seen}` }, codeLine: 32, phase: "seen-update",
+      vars: [{ name: "seen", value: seen }, { name: "ans", value: ans }],
+      note: { vi: `pref[${prefixIndex}] đã trở thành prefix trước cho vòng lặp kế tiếp.`, en: `pref[${prefixIndex}] is now a previous prefix for the next iteration.` },
+    });
+  }
+
+  currentNumIndex = -1;
+  currentPrefixIndex = pref.length - 1;
+  rank = values.indexOf(pref[pref.length - 1]) + 1;
+  queryIndex = null;
+  queryPath = [];
+  updatePath = [];
+  eligiblePrefixIndices = [];
+  smaller = null;
+  added = 0;
+  addStep({
+    title: { vi: `Trả về ${ans}`, en: `Return ${ans}` }, codeLine: 33, phase: "done", final: true,
+    vars: [{ name: "ans", value: ans }],
+    note: {
+      vi: `Tổng cộng ${ans} subarray có ít nhất một số lẻ và tỉ lệ even/odd <= ${a}/${b}.`,
+      en: `There are ${ans} subarrays with at least one odd number and even/odd ratio <= ${a}/${b}.`,
+    },
+  });
+
+  return { original: nums, nums, a, b, answer: ans, steps };
+}
+
 module.exports = {
+  4013: {
+    id: 4013, difficulty: "hard", slug: "count-subarrays-with-even-odd-ratio-ii",
+    category: { key: "array", vi: "Mảng / Prefix Sum", en: "Array / Prefix Sum" },
+    title: { vi: "Count Subarrays With Even Odd Ratio II", en: "Count Subarrays With Even Odd Ratio II" },
+    titleVi: { vi: "Đếm subarray theo tỉ lệ chẵn/lẻ II", en: "Count subarrays by even/odd ratio II" },
+    statement: {
+      vi: "Cho nums và hai số nguyên dương a, b. Với mỗi subarray, gọi x là số phần tử chẵn và y là số phần tử lẻ. Đếm các subarray có y > 0 và x/y <= a/b.",
+      en: "Given nums and positive integers a and b, let x and y be the counts of even and odd elements in a subarray. Count subarrays where y > 0 and x/y <= a/b.",
+    },
+    defaultInput: [1, 2, 1, 2],
+    inputKind: "nonneg",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "a", label: { vi: "Tử số a", en: "Numerator a" }, default: 3, min: 1 },
+      { key: "b", label: { vi: "Mẫu số b", en: "Denominator b" }, default: 2, min: 1 },
+    ],
+    approach: [
+      { vi: "Đổi mỗi số chẵn thành +b và mỗi số lẻ thành -a. Khi đó điều kiện x/y <= a/b tương đương tổng biến đổi <= 0.", en: "Replace each even value with +b and each odd value with -a. Then x/y <= a/b is equivalent to transformed sum <= 0." },
+      { vi: "Subarray chỉ có số chẵn luôn có tổng biến đổi dương, nên điều kiện y > 0 được đảm bảo tự động.", en: "An all-even subarray always has a positive transformed sum, so the y > 0 condition is enforced automatically." },
+      { vi: "Với prefix sums, subarray [l..r] hợp lệ khi pref[r+1] <= pref[l].", en: "With prefix sums, subarray [l..r] is valid when pref[r+1] <= pref[l]." },
+      { vi: "Nén tọa độ và dùng Fenwick Tree để đếm số prefix trước đó >= prefix hiện tại.", en: "Coordinate-compress values and use a Fenwick Tree to count previous prefixes >= the current prefix." },
+    ],
+    complexity: {
+      time: "O(n log n)", space: "O(n)",
+      note: { vi: "Nén n+1 prefix; mỗi prefix thực hiện một query và một update Fenwick O(log n).", en: "Compress n+1 prefixes; each prefix performs one O(log n) Fenwick query and update." },
+    },
+    code: [
+      "from bisect import bisect_left",
+      "",
+      "class Solution:",
+      "    def countRatioSubarrays(self, nums: List[int], a: int, b: int) -> int:",
+      "        pref = [0]",
+      "        for num in nums:",
+      "            weight = b if num % 2 == 0 else -a",
+      "            pref.append(pref[-1] + weight)",
+      "",
+      "        values = sorted(set(pref))",
+      "        bit = [0] * (len(values) + 1)",
+      "",
+      "        def add(index):",
+      "            while index < len(bit):",
+      "                bit[index] += 1",
+      "                index += index & -index",
+      "",
+      "        def query(index):",
+      "            total = 0",
+      "            while index > 0:",
+      "                total += bit[index]",
+      "                index -= index & -index",
+      "            return total",
+      "",
+      "        ans = 0",
+      "        seen = 0",
+      "        for value in pref:",
+      "            rank = bisect_left(values, value) + 1",
+      "            smaller = query(rank - 1)",
+      "            ans += seen - smaller",
+      "            add(rank)",
+      "            seen += 1",
+      "        return ans",
+    ],
+    builder: buildSteps4013,
+  },
   850: {
     id: 850, difficulty: "hard", slug: "rectangle-area-ii",
     category: { key: "array", vi: "Mảng / Sweep Line", en: "Array / Sweep Line" },

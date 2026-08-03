@@ -2884,6 +2884,169 @@ function renderPredictWinnerView(step) {
   </section>`;
 }
 
+function renderStoneGameView(step) {
+  const view = step.stoneGameView;
+  const vi = lang === "vi";
+  const hasI = Number.isInteger(view.i);
+  const hasK = Number.isInteger(view.k);
+  const activeChoice = hasK ? view.k + 1 : null;
+  const solvingPhases = new Set([
+    "index", "take-reset", "best-reset", "choice", "bounds-check",
+    "accumulate", "compare", "commit",
+  ]);
+  const activePhase = view.phase === "result" ? 2 : solvingPhases.has(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Khởi tạo suffix DP", "2. Thử lấy 1-3 viên", "3. Đọc dấu dp[0]"]
+    : ["1. Initialize suffix DP", "2. Try taking 1-3", "3. Read dp[0] sign"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${index < activePhase ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const stoneHtml = view.stones.map((stone) => {
+    const classes = ["stone-game-stone"];
+    classes.push(stone.value < 0 ? "is-negative" : stone.value > 0 ? "is-positive" : "is-zero");
+    const selected = hasI && stone.index >= view.i && stone.index < view.i + view.selectedCount;
+    const cursor = hasI && hasK && stone.index === view.i + view.k;
+    if (hasI && stone.index < view.i) classes.push("is-before-suffix");
+    if (hasI && stone.index >= view.i) classes.push("is-suffix");
+    if (selected) classes.push("is-selected");
+    if (cursor) classes.push("is-cursor");
+    let pointer = "";
+    if (hasI && stone.index === view.i) pointer += `<span>i</span>`;
+    if (cursor) pointer += `<span>i+k</span>`;
+    const takeOrder = selected ? stone.index - view.i + 1 : null;
+    return `<div class="${classes.join(" ")}">
+      <div class="stone-game-pointer">${pointer}</div>
+      <strong>${escapeHtml(stone.value)}</strong>
+      <small>[${stone.index}]</small>
+      ${takeOrder === null ? "" : `<em>${vi ? "lấy" : "take"} ${takeOrder}</em>`}
+    </div>`;
+  }).join("");
+
+  const dpHtml = view.dp.map((cell) => {
+    const classes = ["stone-game-dp-cell"];
+    if (cell.known) classes.push("is-known");
+    if (cell.base) classes.push("is-base");
+    if (cell.index === view.i) classes.push("is-active");
+    if (cell.index === view.next) classes.push("is-dependency");
+    const value = cell.value === null ? "?" : cell.value;
+    let role = "";
+    if (cell.index === view.i) role = vi ? "đang tính" : "current";
+    else if (cell.index === view.next) role = vi ? "đối thủ" : "opponent";
+    else if (cell.base) role = "base";
+    return `<div class="${classes.join(" ")}">
+      <span>${role}</span><small>dp[${cell.index}]</small><strong>${escapeHtml(value)}</strong>
+    </div>`;
+  }).join("");
+
+  const optionHtml = [1, 2, 3].map((count) => {
+    const option = view.options.find((item) => item.count === count);
+    const classes = ["stone-game-option"];
+    if (activeChoice === count) classes.push("is-current");
+    if (view.bestCount === count && option) classes.push("is-best");
+    if (view.phase === "commit" && view.bestCount !== count && option) classes.push("is-rejected");
+    const isInvalid = activeChoice === count && view.phase === "bounds-check" && view.valid === false;
+    if (isInvalid) classes.push("is-invalid");
+
+    let stonesLabel = "—";
+    if (option) {
+      stonesLabel = option.indices.map((index) => view.stones[index].value).join(" + ");
+    } else if (hasI && view.i + count <= view.stones.length) {
+      stonesLabel = view.stones.slice(view.i, view.i + count).map((stone) => stone.value).join(" + ");
+    }
+    const status = option
+      ? (view.bestCount === count ? (vi ? "tốt nhất" : "best") : (vi ? "đã thử" : "tried"))
+      : isInvalid ? (vi ? "vượt mảng" : "out of range") : (vi ? "chưa thử" : "not tried");
+    return `<div class="${classes.join(" ")}">
+      <div class="stone-game-option-head"><b>${vi ? "LẤY" : "TAKE"} ${count}</b><span>${escapeHtml(status)}</span></div>
+      <strong>${escapeHtml(stonesLabel)}</strong>
+      <div class="stone-game-option-math">
+        <span><small>take</small><b>${option ? escapeHtml(option.take) : "?"}</b></span>
+        <i>−</i>
+        <span><small>${option ? `dp[${option.next}]` : "dp[next]"}</small><b>${option ? escapeHtml(option.opponent) : "?"}</b></span>
+        <i>=</i>
+        <span class="candidate"><small>candidate</small><b>${option ? escapeHtml(option.candidate) : "?"}</b></span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const nextCell = Number.isInteger(view.next) ? view.dp[view.next] : null;
+  const opponent = nextCell && nextCell.value !== null ? nextCell.value : "?";
+  const takeValue = view.take === null ? "?" : view.take;
+  const candidateValue = view.candidate === null ? "?" : view.candidate;
+  const bestValue = view.best === null ? "?" : view.best;
+  const formulaHtml = `<div class="stone-game-formula">
+    <span class="is-take"><small>${vi ? "điểm lấy ngay" : "score taken now"}</small><strong>${escapeHtml(takeValue)}</strong></span>
+    <i>−</i>
+    <span class="is-opponent"><small>${Number.isInteger(view.next) ? `dp[${view.next}] · ${vi ? "lợi thế đối thủ" : "opponent advantage"}` : "dp[next]"}</small><strong>${escapeHtml(opponent)}</strong></span>
+    <i>=</i>
+    <span class="is-candidate"><small>candidate</small><strong>${escapeHtml(candidateValue)}</strong></span>
+    <i>→ max →</i>
+    <span class="is-best"><small>${hasI ? `dp[${view.i}] · best` : "dp[i] · best"}</small><strong>${escapeHtml(bestValue)}</strong></span>
+  </div>`;
+
+  let actionDetail;
+  if (view.phase === "setup") {
+    actionDetail = vi ? "Đọc số viên đá; chưa có ô dp nào được tạo." : "Read the stones; no dp cell has been initialized yet.";
+  } else if (view.phase === "initialize") {
+    actionDetail = vi ? `dp[${view.stones.length}] = 0 vì suffix rỗng không còn điểm.` : `dp[${view.stones.length}] = 0 because the empty suffix has no score.`;
+  } else if (view.phase === "index") {
+    actionDetail = vi ? `Bắt đầu suffix tại i=${view.i}; các ô bên phải đã biết.` : `Start the suffix at i=${view.i}; all cells to its right are known.`;
+  } else if (view.phase === "take-reset") {
+    actionDetail = vi ? "Đặt take=0 trước khi cộng dần 1, 2 rồi 3 viên." : "Reset take=0 before accumulating 1, then 2, then 3 stones.";
+  } else if (view.phase === "best-reset") {
+    actionDetail = vi ? `Đặt dp[${view.i}]=−∞ để lựa chọn hợp lệ đầu tiên chắc chắn thay thế nó.` : `Set dp[${view.i}]=−∞ so the first valid choice must replace it.`;
+  } else if (view.phase === "choice") {
+    actionDetail = vi ? `k=${view.k} tương ứng thử lấy ${activeChoice} viên.` : `k=${view.k} means trying to take ${activeChoice} stone(s).`;
+  } else if (view.phase === "bounds-check") {
+    actionDetail = view.valid
+      ? (vi ? `i+k còn trong mảng, nên lựa chọn lấy ${activeChoice} viên hợp lệ.` : `i+k is inside the array, so taking ${activeChoice} stone(s) is valid.`)
+      : (vi ? `i+k vượt cuối mảng; bỏ qua lựa chọn lấy ${activeChoice} viên.` : `i+k is past the array; skip taking ${activeChoice} stone(s).`);
+  } else if (view.phase === "accumulate") {
+    actionDetail = vi ? `Cộng viên mới vào tổng đang lấy: take=${view.take}.` : `Add the new stone to the running taken sum: take=${view.take}.`;
+  } else if (view.phase === "compare") {
+    actionDetail = vi ? `Lấy ${view.take}, sau đó đối thủ có lợi thế ${opponent}; candidate=${view.candidate}. Giữ giá trị lớn nhất.` : `Take ${view.take}, then the opponent has advantage ${opponent}; candidate=${view.candidate}. Keep the maximum.`;
+  } else if (view.phase === "commit") {
+    actionDetail = vi ? `Lấy ${view.bestCount} viên là nước đi tốt nhất tại suffix này; chốt dp[${view.i}]=${view.best}.` : `Taking ${view.bestCount} stone(s) is best for this suffix; commit dp[${view.i}]=${view.best}.`;
+  } else {
+    const resultReason = view.winner === "Alice"
+      ? (vi ? "dp[0] dương: Alice hơn điểm khi cả hai chơi tối ưu." : "dp[0] is positive: Alice finishes ahead under optimal play.")
+      : view.winner === "Bob"
+        ? (vi ? "dp[0] âm: Bob hơn điểm khi cả hai chơi tối ưu." : "dp[0] is negative: Bob finishes ahead under optimal play.")
+        : (vi ? "dp[0] bằng 0: hai người hòa điểm." : "dp[0] is zero: both players tie.");
+    actionDetail = resultReason;
+  }
+
+  const resultClass = view.phase === "result" ? ` is-result is-${String(view.winner || "tie").toLowerCase()}` : "";
+  const summary = vi
+    ? `Stone Game III với ${view.stones.length} viên; trạng thái ${view.phase}.`
+    : `Stone Game III with ${view.stones.length} stones; phase ${view.phase}.`;
+  $("treeView").innerHTML = `<section class="stone-game-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="stone-game-phases">${phasesHtml}</div>
+    <section class="stone-game-stones-section">
+      <header><strong>stones</strong><span>${hasI ? `suffix [${view.i}..${view.stones.length - 1}]` : (vi ? "đầu vào" : "input")}</span></header>
+      <div class="stone-game-scroll"><div class="stone-game-stones">${stoneHtml}</div></div>
+    </section>
+    <section class="stone-game-dp-section">
+      <header><strong>suffix dp</strong><span>${vi ? "lợi thế người hiện tại − đối thủ" : "current-player advantage"}</span></header>
+      <div class="stone-game-scroll"><div class="stone-game-dp-row">${dpHtml}</div></div>
+    </section>
+    ${formulaHtml}
+    <section class="stone-game-options-section">
+      <header><strong>${vi ? "Ba nước đi có thể thử" : "Three possible moves"}</strong><span>candidate = take − dp[next]</span></header>
+      <div class="stone-game-options">${optionHtml}</div>
+    </section>
+    <div class="stone-game-action${resultClass}"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(actionDetail)}</span>${view.phase === "result" ? `<b>${escapeHtml(view.winner)}</b>` : ""}</div>
+    <div class="stone-game-legend">
+      <span><i class="selected"></i>${vi ? "đang lấy" : "stones taken"}</span>
+      <span><i class="opponent"></i>dp[next]</span>
+      <span><i class="best"></i>${vi ? "lựa chọn tốt nhất" : "best choice"}</span>
+      <span><b>dp[i] &gt; 0</b>Alice · <b>= 0</b>Tie · <b>&lt; 0</b>Bob</span>
+    </div>
+  </section>`;
+}
+
 function renderRectangleAreaView(step) {
   const view = step.rectangleAreaView;
   const vi = lang === "vi";
@@ -5784,6 +5947,153 @@ function renderFenwickView(step) {
   </div>`;
 }
 
+function renderEvenOddRatioView(step) {
+  const view = step.evenOddRatioView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const weights = Array.isArray(view.weights) ? view.weights : [];
+  const pref = Array.isArray(view.pref) ? view.pref : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const eligible = new Set(Array.isArray(view.eligiblePrefixIndices) ? view.eligiblePrefixIndices : []);
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const currentPrefixIndex = Number.isInteger(view.currentPrefixIndex) ? view.currentPrefixIndex : -1;
+  const currentNumIndex = Number.isInteger(view.currentNumIndex) ? view.currentNumIndex : -1;
+  const currentValue = currentPrefixIndex >= 0 ? pref[currentPrefixIndex] : null;
+  const vi = lang === "vi";
+  const countPhase = ![
+    "prefix-init", "transform-read", "transform-weight", "prefix-append", "compress", "bit-init",
+  ].includes(view.phase);
+  const phaseIndex = ["compress", "bit-init"].includes(view.phase) ? 1 : countPhase ? 2 : 0;
+  const phaseLabels = vi
+    ? ["1. Đổi trọng số", "2. Nén prefix", "3. Fenwick đếm"]
+    : ["1. Transform", "2. Compress prefixes", "3. Fenwick count"];
+  const phasesHtml = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : ""}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`).join("");
+
+  const numsHtml = nums.map((num, index) => {
+    const isEven = num % 2 === 0;
+    const weight = weights[index];
+    const classes = ["even-odd-ratio-number", isEven ? "is-even" : "is-odd"];
+    if (index === currentNumIndex) classes.push("is-current");
+    if (weight === null || weight === undefined) classes.push("is-pending");
+    return `<div class="${classes.join(" ")}">
+      <span>nums[${index}]</span>
+      <strong>${escapeHtml(num)}</strong>
+      <small>${isEven ? "EVEN" : "ODD"} · ${weight === null || weight === undefined ? "?" : weight > 0 ? `+${weight}` : weight}</small>
+    </div>`;
+  }).join("");
+
+  const prefixHtml = pref.map((value, index) => {
+    const classes = ["even-odd-ratio-prefix"];
+    let status = "";
+    if (index === currentPrefixIndex) {
+      classes.push("is-current");
+      status = vi ? "HIỆN TẠI" : "CURRENT";
+    } else if (view.phase !== "done" && currentPrefixIndex >= 0 && index < currentPrefixIndex) {
+      if (eligible.has(index)) {
+        classes.push("is-eligible");
+        status = `≥ ${currentValue}`;
+      } else {
+        classes.push("is-smaller");
+        status = `< ${currentValue}`;
+      }
+    } else if (view.phase !== "done" && countPhase && index > currentPrefixIndex) {
+      classes.push("is-future");
+      status = vi ? "CHƯA QUÉT" : "FUTURE";
+    }
+    return `<div class="${classes.join(" ")}">
+      <span>pref[${index}]</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(status)}</small>
+    </div>`;
+  }).join("");
+
+  const fenwickHtml = values.length
+    ? values.map((value, zeroIndex) => {
+        const index = zeroIndex + 1;
+        const lowbit = index & -index;
+        const left = index - lowbit + 1;
+        const classes = ["even-odd-ratio-bit"];
+        if (index === view.rank) classes.push("is-rank");
+        if (queryPath.has(index)) classes.push("is-query");
+        if (updatePath.has(index)) classes.push("is-update");
+        const pathLabel = queryPath.has(index) ? "QUERY" : updatePath.has(index) ? "UPDATE" : "";
+        return `<div class="${classes.join(" ")}">
+          <span>rank ${index} · value ${escapeHtml(value)}</span>
+          <strong>BIT[${index}] = ${escapeHtml(bit[zeroIndex] ?? 0)}</strong>
+          <small>[rank ${left}..${index}]${pathLabel ? ` · ${pathLabel}` : ""}</small>
+        </div>`;
+      }).join("")
+    : `<div class="even-odd-ratio-empty">${vi ? "Chưa nén tọa độ" : "Coordinates not compressed yet"}</div>`;
+
+  const isQuery = String(view.phase || "").startsWith("query");
+  const isUpdate = String(view.phase || "").startsWith("update");
+  const smallerValue = view.smaller === null || view.smaller === undefined
+    ? (isQuery ? view.queryTotal : "—")
+    : view.smaller;
+  const smallerLabel = isQuery && (view.smaller === null || view.smaller === undefined) ? "QUERY TOTAL" : "SMALLER";
+  const addedValue = view.smaller === null || view.smaller === undefined ? "—" : view.added;
+  const queryLabel = queryPath.size
+    ? [...queryPath].map((index) => `BIT[${index}]`).join(" → ")
+    : (vi ? "chưa đi qua node" : "no nodes visited");
+  const updateLabel = updatePath.size
+    ? [...updatePath].map((index) => `BIT[${index}]`).join(" → ")
+    : (vi ? "chưa đi qua node" : "no nodes visited");
+  const pathHtml = isQuery
+    ? `<span class="is-query"><small>QUERY PATH</small><strong>${escapeHtml(queryLabel)}</strong></span>`
+    : isUpdate
+      ? `<span class="is-update"><small>UPDATE PATH</small><strong>${escapeHtml(updateLabel)}</strong></span>`
+      : `<span><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${currentValue === null ? "—" : escapeHtml(currentValue)}</strong></span>`;
+  const countEquation = view.phase === "done"
+    ? `answer = ${escapeHtml(view.ans ?? 0)}`
+    : view.smaller === null || view.smaller === undefined
+      ? `${escapeHtml(view.seen ?? 0)} − smaller = ?`
+      : `${escapeHtml(view.seen)} − ${escapeHtml(view.smaller)} = ${escapeHtml(view.added)}`;
+  const summary = vi
+    ? `Prefix hiện tại ${currentValue ?? "chưa có"}; đã thấy ${view.seen ?? 0}; đáp án ${view.ans ?? 0}.`
+    : `Current prefix ${currentValue ?? "none"}; ${view.seen ?? 0} seen; answer ${view.ans ?? 0}.`;
+
+  $("treeView").innerHTML = `<section class="even-odd-ratio-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="even-odd-ratio-phases">${phasesHtml}</div>
+    <div class="even-odd-ratio-formula">
+      <span class="is-even"><small>EVEN</small><strong>+b = +${escapeHtml(view.b)}</strong></span>
+      <i aria-hidden="true">+</i>
+      <span class="is-odd"><small>ODD</small><strong>−a = −${escapeHtml(view.a)}</strong></span>
+      <i aria-hidden="true">⇒</i>
+      <code>b·x − a·y ≤ 0</code>
+      <i aria-hidden="true">⇒</i>
+      <code>pref[current] ≤ pref[start]</code>
+    </div>
+    <div class="even-odd-ratio-strip">
+      <header><strong>nums → weight</strong><small>${vi ? "chẵn +b · lẻ −a" : "even +b · odd −a"}</small></header>
+      <div class="even-odd-ratio-scroll"><div class="even-odd-ratio-number-row">${numsHtml}</div></div>
+    </div>
+    <div class="even-odd-ratio-strip">
+      <header><strong>prefix timeline</strong><small>${vi ? "prefix trước ≥ prefix hiện tại là một start hợp lệ" : "previous prefix ≥ current prefix is a valid start"}</small></header>
+      <div class="even-odd-ratio-scroll"><div class="even-odd-ratio-prefix-row">${prefixHtml}</div></div>
+    </div>
+    <div class="even-odd-ratio-strip is-fenwick">
+      <header><strong>compressed ranks + Fenwick</strong><small>${vi ? "query(rank−1) đếm prefix nhỏ hơn" : "query(rank−1) counts smaller prefixes"}</small></header>
+      <div class="even-odd-ratio-scroll"><div class="even-odd-ratio-bit-row">${fenwickHtml}</div></div>
+    </div>
+    <div class="even-odd-ratio-counts">
+      ${pathHtml}
+      <span><small>SEEN</small><strong>${escapeHtml(view.seen ?? 0)}</strong></span>
+      <span class="is-smaller"><small>${escapeHtml(smallerLabel)}</small><strong>${escapeHtml(smallerValue)}</strong></span>
+      <span class="is-valid"><small>${vi ? "START HỢP LỆ" : "VALID STARTS"}</small><strong>${escapeHtml(addedValue)}</strong></span>
+      <span class="is-answer"><small>ANSWER</small><strong>${escapeHtml(view.ans ?? 0)}</strong></span>
+    </div>
+    <div class="even-odd-ratio-equation"><span>${view.phase === "done" ? (vi ? "HOÀN TẤT" : "COMPLETE") : "seen − smaller"}</span><strong>${countEquation}</strong><small>${view.phase === "done" ? (vi ? "đã xử lý mọi prefix" : "all prefixes processed") : (vi ? "prefix trước ≥ current" : "previous prefixes ≥ current")}</small></div>
+    <div class="even-odd-ratio-legend" aria-hidden="true">
+      <span><i class="current"></i>${vi ? "prefix hiện tại" : "current prefix"}</span>
+      <span><i class="eligible"></i>${vi ? "start hợp lệ (≥)" : "valid start (≥)"}</span>
+      <span><i class="smaller"></i>${vi ? "bị query đếm (<)" : "counted as smaller (<)"}</span>
+      <span><i class="query"></i>query path</span>
+      <span><i class="update"></i>update path</span>
+    </div>
+  </section>`;
+}
+
 function renderSkylineView(step) {
   const view = step.skylineView || {};
   const buildings = Array.isArray(view.buildings) ? view.buildings : [];
@@ -7006,6 +7316,119 @@ function renderLoudRichView(step) {
   </div>`;
 }
 
+function renderLruCacheView(step) {
+  const view = step.lruCacheView || {};
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const order = Array.isArray(view.order) ? view.order : [];
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const pointerProgress = new Set(Array.isArray(view.pointerProgress) ? view.pointerProgress : []);
+  const initialized = view.initialized || {};
+  const phase = String(view.phase || "idle");
+  const phaseIndex = phase.startsWith("init") || phase === "ready"
+    ? 0
+    : phase.includes("lookup") || phase === "miss" || phase === "hit"
+      ? 1
+      : phase.includes("remove") || phase.includes("insert") || phase === "new-node" || phase === "update"
+        ? 2
+        : 3;
+  const phaseLabels = vi
+    ? ["1. Khởi tạo", "2. Tra hash map", "3. Đổi pointer", "4. Loại LRU"]
+    : ["1. Initialize", "2. Hash lookup", "3. Rewire pointers", "4. Evict LRU"];
+  const phasesHtml = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : ""}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`).join("");
+
+  const formatResult = (operation, value) => operation.type === "put" ? "null" : String(value);
+  const operationsHtml = operations.map((operation, index) => {
+    const done = index < Number(view.completedOps || 0);
+    const active = index === view.activeOpIndex;
+    const classes = ["lru-operation"];
+    if (done) classes.push("is-done");
+    if (active) classes.push("is-active");
+    if (!done && !active) classes.push("is-pending");
+    const result = done ? formatResult(operation, results[index]) : "·";
+    return `<span class="${classes.join(" ")}"><small>${index + 1}</small><code>${escapeHtml(operation.label)}</code><strong>→ ${escapeHtml(result)}</strong></span>`;
+  }).join("");
+
+  const orderKeys = new Set(order.map((node) => node.key));
+  const transientKey = view.transient ? view.transient.key : null;
+  const mapHtml = entries.length
+    ? entries.map((entry) => {
+        const classes = ["lru-map-entry"];
+        if (entry.key === view.activeKey) classes.push("is-active");
+        if (!orderKeys.has(entry.key)) classes.push("is-unlinked");
+        if (entry.key === transientKey) classes.push("is-transient");
+        const state = orderKeys.has(entry.key)
+          ? (vi ? "trong list" : "in list")
+          : (vi ? "chưa nối / đã tháo" : "unlinked / detached");
+        return `<span class="${classes.join(" ")}"><code>${escapeHtml(entry.key)}</code><i>→</i><strong>Node(${escapeHtml(entry.key)}, ${escapeHtml(entry.value)})</strong><small>${state}</small></span>`;
+      }).join("")
+    : `<em>{ }</em>`;
+
+  function sentinel(side) {
+    const ready = side === "left" ? initialized.left : initialized.right;
+    const pointerReady = side === "left" ? initialized.forward : initialized.backward;
+    const label = side === "left" ? "LEFT" : "RIGHT";
+    const role = side === "left" ? "LRU sentinel" : "MRU sentinel";
+    const pointer = side === "left" ? "left.next" : "right.prev";
+    return `<div class="lru-sentinel${ready ? " is-ready" : " is-pending"}"><small>${role}</small><strong>${label}</strong><span>${pointerReady ? pointer : "not linked"}</span></div>`;
+  }
+
+  const listParts = [sentinel("left")];
+  order.forEach((node, index) => {
+    listParts.push(`<span class="lru-double-arrow" aria-hidden="true"><i>next →</i><i>← prev</i></span>`);
+    const classes = ["lru-list-node"];
+    if (node.key === view.activeKey) classes.push("is-active");
+    if (node.key === transientKey && phase.includes("remove")) classes.push("is-removing");
+    listParts.push(`<div class="${classes.join(" ")}"><small>${index === 0 ? "LRU" : index === order.length - 1 ? "MRU" : `#${index + 1}`}</small><strong>${escapeHtml(node.key)} : ${escapeHtml(node.value)}</strong><span>Node(${escapeHtml(node.key)})</span></div>`);
+  });
+  if (initialized.left && initialized.right) listParts.push(`<span class="lru-double-arrow" aria-hidden="true"><i>next →</i><i>← prev</i></span>`);
+  listParts.push(sentinel("right"));
+  const transientHtml = view.transient
+    ? `<div class="lru-transient"><small>${escapeHtml(view.transient.status || "detached")}</small><strong>${escapeHtml(view.transient.key)} : ${escapeHtml(view.transient.value)}</strong><span>Node(${escapeHtml(view.transient.key)})</span></div>`
+    : `<div class="lru-transient is-empty"><strong>∅</strong><span>${vi ? "không có node rời list" : "no detached node"}</span></div>`;
+
+  const pointerItems = [
+    ["prev.next = next", "remove 1/2"],
+    ["next.prev = prev", "remove 2/2"],
+    ["prev.next = node", "insert 1/4"],
+    ["node.prev = prev", "insert 2/4"],
+    ["node.next = right", "insert 3/4"],
+    ["right.prev = node", "insert 4/4"],
+  ].map(([key, label]) => `<span class="${pointerProgress.has(key) ? "is-done" : ""}">${pointerProgress.has(key) ? "✓" : "○"}<b>${label}</b></span>`).join("");
+  const pointerContext = view.pointerAction
+    ? `<div class="lru-pointer-action"><div><small>prev</small><strong>${escapeHtml(view.prevLabel || "—")}</strong></div><i>↔</i><div class="is-node"><small>node</small><strong>${escapeHtml(view.nodeLabel || "—")}</strong></div><i>↔</i><div><small>next</small><strong>${escapeHtml(view.nextLabel || "—")}</strong></div><code>${escapeHtml(view.pointerAction)}</code></div>`
+    : `<div class="lru-pointer-action is-idle"><code>${vi ? "Chọn Next để theo dõi từng phép gán pointer" : "Use Next to follow each pointer assignment"}</code></div>`;
+
+  const lru = order.length ? `${order[0].key}:${order[0].value}` : "—";
+  const mru = order.length ? `${order[order.length - 1].key}:${order[order.length - 1].value}` : "—";
+  const currentOperation = view.activeOpIndex === null || view.activeOpIndex === undefined ? null : operations[view.activeOpIndex];
+  const currentResult = currentOperation && view.activeOpIndex < view.completedOps
+    ? formatResult(currentOperation, results[view.activeOpIndex])
+    : view.result === null || view.result === undefined ? "—" : view.result;
+  const summary = vi
+    ? `LRU Cache có ${entries.length} trên ${view.capacity} key; LRU ${lru}; MRU ${mru}.`
+    : `LRU Cache has ${entries.length} of ${view.capacity} keys; LRU ${lru}; MRU ${mru}.`;
+
+  treeView.innerHTML = `<section class="lru-cache-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="lru-phases">${phasesHtml}</div>
+    <div class="lru-operations" aria-label="${vi ? "Danh sách thao tác" : "Operation list"}">${operationsHtml}</div>
+    <div class="lru-status">
+      <span><small>SIZE / CAPACITY</small><strong>${entries.length} / ${escapeHtml(view.capacity)}</strong></span>
+      <span class="is-lru"><small>LEFT.next · LRU</small><strong>${escapeHtml(lru)}</strong></span>
+      <span class="is-mru"><small>RIGHT.prev · MRU</small><strong>${escapeHtml(mru)}</strong></span>
+      <span><small>RESULT</small><strong>${escapeHtml(currentResult)}</strong></span>
+    </div>
+    <section class="lru-map"><header><strong>HASH MAP</strong><small>key → exact Node reference · O(1) lookup</small></header><div>${mapHtml}</div></section>
+    <section class="lru-list"><header><strong>DOUBLY LINKED LIST</strong><small>LEFT · least recent → most recent · RIGHT</small></header><div class="lru-list-scroll"><div class="lru-list-track">${listParts.join("")}</div></div></section>
+    <div class="lru-pointer-board">${pointerContext}<div class="lru-pointer-progress">${pointerItems}</div></div>
+    <div class="lru-detached-row"><header><strong>${vi ? "NODE ĐANG THÁO / CHÈN" : "DETACHED / INSERTING NODE"}</strong><small>${vi ? "map và list có thể tạm khác nhau giữa hai dòng code" : "map and list can temporarily differ between code lines"}</small></header>${transientHtml}</div>
+    <div class="lru-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="lru-legend" aria-hidden="true"><span><i class="active"></i>${vi ? "node đang xử lý" : "active node"}</span><span><i class="detached"></i>${vi ? "node chưa nằm trong list" : "node outside list"}</span><span><b>LEFT.next</b> = LRU</span><span><b>RIGHT.prev</b> = MRU</span></div>
+  </section>`;
+}
+
 function renderLfuCacheView(step) {
   const view = step.lfuCacheView;
   const treeView = $("treeView");
@@ -7363,6 +7786,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLoudRichView(step);
+  } else if (step.lruCacheView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLruCacheView(step);
   } else if (step.lfuCacheView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -7477,6 +7906,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKeypadHeapView(step);
+  } else if (step.stoneGameView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGameView(step);
   } else if (step.predictWinnerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -7615,6 +8050,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRunningSumView(step);
+  } else if (step.evenOddRatioView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderEvenOddRatioView(step);
   } else if (step.fenwickView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -1338,6 +1338,8 @@ function buildSteps146(input, params) {
   const nodes = new Map(); // key -> { key, value }
   const order = []; // keys from LRU to MRU
   const outputs = [];
+  const initialized = { capacity: false, cache: false, left: false, right: false, forward: false, backward: false };
+  let currentOpIndex = null;
 
   function parseCommands(text) {
     return text
@@ -1428,6 +1430,31 @@ function buildSteps146(input, params) {
     steps.push({
       title: opts.title,
       arr: [],
+      lruCacheView: {
+        phase: opts.event || "idle",
+        capacity,
+        initialized: { ...initialized },
+        operations: commands.map((command) => ({
+          type: command.op,
+          key: command.key,
+          value: command.value,
+          label: command.op === "put" ? `put(${command.key}, ${command.value})` : `get(${command.key})`,
+        })),
+        activeOpIndex: currentOpIndex,
+        completedOps: outputs.length,
+        results: [...outputs],
+        order: order.map((key) => ({ key, value: nodes.get(key).value })),
+        entries: Array.from(nodes.values()).map((node) => ({ ...node })),
+        activeKey: opts.activeKey ?? null,
+        transient: opts.transient ? { ...opts.transient } : null,
+        result: opts.result ?? null,
+        pointerAction: opts.pointerAction || null,
+        pointerProgress: Array.isArray(opts.pointerProgress) ? [...opts.pointerProgress] : [],
+        prevLabel: opts.prevLabel || null,
+        nodeLabel: opts.nodeLabel || null,
+        nextLabel: opts.nextLabel || null,
+        operation: opts.operation || null,
+      },
       graph: {
         nodes: graphNodes,
         edges: graphEdges,
@@ -1470,27 +1497,185 @@ function buildSteps146(input, params) {
     return { original: raw, answer: [], steps };
   }
 
+  function removeWithSteps(key, operation, reason) {
+    const node = nodes.get(key);
+    const index = order.indexOf(key);
+    if (!node || index < 0) return;
+    const prevKey = index > 0 ? order[index - 1] : null;
+    const nextKey = index < order.length - 1 ? order[index + 1] : null;
+    const prevLabel = prevKey === null ? "LEFT" : `Node(${prevKey})`;
+    const nodeLabel = `Node(${key})`;
+    const nextLabel = nextKey === null ? "RIGHT" : `Node(${nextKey})`;
+
+    snapshot({
+      title: { vi: `Vào remove(Node ${key})`, en: `Enter remove(Node ${key})` },
+      activeKey: key, event: "remove-enter", operation, codeLines: [17],
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `remove(${nodeLabel})`,
+      vars: [{ name: "reason", value: reason }, { name: "prev | node | next", value: `${prevLabel} | ${nodeLabel} | ${nextLabel}` }],
+      note: {
+        vi: `Cần bỏ ${nodeLabel} nằm giữa ${prevLabel} và ${nextLabel}; hai hàng xóm phải nối trực tiếp với nhau.`,
+        en: `Remove ${nodeLabel} between ${prevLabel} and ${nextLabel}; its two neighbors must link directly together.`,
+      },
+    });
+    snapshot({
+      title: { vi: `${prevLabel}.next = ${nextLabel}`, en: `${prevLabel}.next = ${nextLabel}` },
+      activeKey: key, event: "remove-forward", operation, codeLines: [18],
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `${prevLabel}.next = ${nextLabel}`,
+      pointerProgress: ["prev.next = next"],
+      vars: [{ name: "forward link", value: `${prevLabel} -> ${nextLabel}` }],
+      note: {
+        vi: `Con trỏ next của ${prevLabel} bỏ qua ${nodeLabel} và trỏ thẳng tới ${nextLabel}. Chiều prev chưa cập nhật.`,
+        en: `${prevLabel}.next now skips ${nodeLabel} and points to ${nextLabel}. The backward link is not updated yet.`,
+      },
+    });
+
+    order.splice(index, 1);
+    snapshot({
+      title: { vi: `${nextLabel}.prev = ${prevLabel}`, en: `${nextLabel}.prev = ${prevLabel}` },
+      event: "remove-backward", operation, codeLines: [19],
+      transient: { key, value: node.value, status: "detached" },
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `${nextLabel}.prev = ${prevLabel}`,
+      pointerProgress: ["prev.next = next", "next.prev = prev"],
+      vars: [{ name: "backward link", value: `${nextLabel} <- ${prevLabel}` }, { name: "detached", value: `${key}:${node.value}` }],
+      note: {
+        vi: `Cập nhật chiều prev. ${nodeLabel} đã rời list nhưng vẫn còn trong hash map cho tới khi code xóa hoặc chèn lại.`,
+        en: `Update the backward link. ${nodeLabel} is detached from the list but remains in the hash map until code deletes or reinserts it.`,
+      },
+    });
+  }
+
+  function insertWithSteps(key, operation, reason) {
+    const node = nodes.get(key);
+    if (!node) return;
+    const prevKey = order.length ? order[order.length - 1] : null;
+    const prevLabel = prevKey === null ? "LEFT" : `Node(${prevKey})`;
+    const nodeLabel = `Node(${key})`;
+    const nextLabel = "RIGHT";
+    const transient = { key, value: node.value, status: "linking at MRU" };
+
+    snapshot({
+      title: { vi: `Vào insert(Node ${key})`, en: `Enter insert(Node ${key})` },
+      event: "insert-enter", operation, codeLines: [21], transient,
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `insert(${nodeLabel})`,
+      vars: [{ name: "reason", value: reason }],
+      note: {
+        vi: `${nodeLabel} sẽ được chèn ngay trước RIGHT sentinel, tức vị trí MRU.`,
+        en: `${nodeLabel} will be inserted immediately before the RIGHT sentinel, the MRU position.`,
+      },
+    });
+    snapshot({
+      title: { vi: `prev = right.prev → ${prevLabel}`, en: `prev = right.prev → ${prevLabel}` },
+      event: "insert-prev", operation, codeLines: [22], transient,
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `prev = ${prevLabel}`,
+      vars: [{ name: "prev", value: prevLabel }, { name: "right.prev", value: prevLabel }],
+      note: {
+        vi: `${prevLabel} hiện là node MRU cũ và sẽ đứng ngay trước node mới.`,
+        en: `${prevLabel} is the old MRU and will sit immediately before the new node.`,
+      },
+    });
+    snapshot({
+      title: { vi: `${prevLabel}.next = ${nodeLabel}`, en: `${prevLabel}.next = ${nodeLabel}` },
+      event: "insert-forward", operation, codeLines: [23], transient,
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `${prevLabel}.next = ${nodeLabel}`,
+      pointerProgress: ["prev.next = node"],
+      vars: [{ name: "forward link", value: `${prevLabel} -> ${nodeLabel}` }],
+      note: { vi: "Nối MRU cũ tiến tới node mới.", en: "Link the old MRU forward to the new node." },
+    });
+    snapshot({
+      title: { vi: `${nodeLabel}.prev = ${prevLabel}`, en: `${nodeLabel}.prev = ${prevLabel}` },
+      event: "insert-node-prev", operation, codeLines: [24], transient,
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `${nodeLabel}.prev = ${prevLabel}`,
+      pointerProgress: ["prev.next = node", "node.prev = prev"],
+      vars: [{ name: "backward link", value: `${nodeLabel} <- ${prevLabel}` }],
+      note: { vi: "Nối node mới quay lại MRU cũ.", en: "Link the new node backward to the old MRU." },
+    });
+    snapshot({
+      title: { vi: `${nodeLabel}.next = RIGHT`, en: `${nodeLabel}.next = RIGHT` },
+      event: "insert-node-next", operation, codeLines: [25], transient,
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `${nodeLabel}.next = RIGHT`,
+      pointerProgress: ["prev.next = node", "node.prev = prev", "node.next = right"],
+      vars: [{ name: "forward link", value: `${nodeLabel} -> RIGHT` }],
+      note: { vi: "Nối node mới tiến tới RIGHT sentinel.", en: "Link the new node forward to the RIGHT sentinel." },
+    });
+
+    order.push(key);
+    snapshot({
+      title: { vi: `RIGHT.prev = ${nodeLabel}`, en: `RIGHT.prev = ${nodeLabel}` },
+      activeKey: key, event: "insert-finish", operation, codeLines: [26],
+      prevLabel, nodeLabel, nextLabel,
+      pointerAction: `RIGHT.prev = ${nodeLabel}`,
+      pointerProgress: ["prev.next = node", "node.prev = prev", "node.next = right", "right.prev = node"],
+      vars: [{ name: "new MRU", value: `${key}:${node.value}` }],
+      note: {
+        vi: `Hoàn tất bốn con trỏ. ${nodeLabel} hiện là MRU, ngay trước RIGHT.`,
+        en: `All four pointers are complete. ${nodeLabel} is now MRU, immediately before RIGHT.`,
+      },
+    });
+  }
+
+  initialized.capacity = true;
   snapshot({
-    title: { vi: `Khởi tạo LRUCache(${capacity})`, en: `Initialize LRUCache(${capacity})` },
-    event: "ready",
-    operation: `LRUCache(${capacity})`,
-    codeLines: [10, 11, 12, 13, 14, 15],
-    vars: [{ name: "outputs", value: "[]" }],
-    note: {
-      vi: "Dùng hash map key->node để tìm O(1), và doubly linked list để biết node nào là LRU/MRU.",
-      en: "Use a hash map key->node for O(1) lookup, plus a doubly linked list for LRU/MRU order.",
-    },
+    title: { vi: `capacity = ${capacity}`, en: `capacity = ${capacity}` },
+    event: "init-capacity", operation: `LRUCache(${capacity})`, codeLines: [10],
+    vars: [{ name: "capacity", value: capacity }],
+    note: { vi: `Cache chỉ giữ tối đa ${capacity} node dữ liệu.`, en: `The cache stores at most ${capacity} data nodes.` },
+  });
+  initialized.cache = true;
+  snapshot({
+    title: { vi: "cache = {}", en: "cache = {}" },
+    event: "init-map", operation: `LRUCache(${capacity})`, codeLines: [11],
+    vars: [{ name: "cache", value: "{}" }],
+    note: { vi: "Hash map sẽ ánh xạ mỗi key tới đúng node trong list.", en: "The hash map will map each key to its exact list node." },
+  });
+  initialized.left = true;
+  snapshot({
+    title: { vi: "Tạo LEFT sentinel", en: "Create LEFT sentinel" },
+    event: "init-left", operation: `LRUCache(${capacity})`, codeLines: [12],
+    vars: [{ name: "left", value: "Node()" }],
+    note: { vi: "LEFT không chứa dữ liệu; left.next luôn chỉ LRU thật.", en: "LEFT stores no data; left.next always points to the real LRU." },
+  });
+  initialized.right = true;
+  snapshot({
+    title: { vi: "Tạo RIGHT sentinel", en: "Create RIGHT sentinel" },
+    event: "init-right", operation: `LRUCache(${capacity})`, codeLines: [13],
+    vars: [{ name: "right", value: "Node()" }],
+    note: { vi: "RIGHT không chứa dữ liệu; right.prev luôn chỉ MRU thật.", en: "RIGHT stores no data; right.prev always points to the real MRU." },
+  });
+  initialized.forward = true;
+  snapshot({
+    title: { vi: "LEFT.next = RIGHT", en: "LEFT.next = RIGHT" },
+    event: "init-forward", operation: `LRUCache(${capacity})`, codeLines: [14],
+    pointerAction: "LEFT.next = RIGHT", pointerProgress: ["left.next = right"],
+    vars: [{ name: "forward", value: "LEFT -> RIGHT" }],
+    note: { vi: "List rỗng có chiều next đi thẳng từ LEFT tới RIGHT.", en: "An empty list has its forward link directly from LEFT to RIGHT." },
+  });
+  initialized.backward = true;
+  snapshot({
+    title: { vi: "RIGHT.prev = LEFT", en: "RIGHT.prev = LEFT" },
+    event: "ready", operation: `LRUCache(${capacity})`, codeLines: [15],
+    pointerAction: "RIGHT.prev = LEFT", pointerProgress: ["left.next = right", "right.prev = left"],
+    vars: [{ name: "backward", value: "LEFT <- RIGHT" }, { name: "outputs", value: "[]" }],
+    note: { vi: "Hai sentinel đã nối hai chiều; cache sẵn sàng nhận operation.", en: "Both sentinels are linked in both directions; the cache is ready for operations." },
   });
 
-  for (const command of commands) {
+  for (const [commandIndex, command] of commands.entries()) {
+    currentOpIndex = commandIndex;
     if (command.op === "get") {
       snapshot({
-        title: { vi: `get(${command.key})`, en: `get(${command.key})` },
+        title: { vi: `key ${command.key} không có trong cache? → ${!nodes.has(command.key)}`, en: `key ${command.key} not in cache? → ${!nodes.has(command.key)}` },
         activeKey: command.key,
         event: nodes.has(command.key) ? "lookup-hit" : "lookup-miss",
         operation: `get(${command.key})`,
         codeLines: [29],
-        vars: [{ name: "operation", value: command.raw }],
+        vars: [{ name: "operation", value: command.raw }, { name: "key not in cache", value: !nodes.has(command.key) }],
         note: {
           vi: `Kiểm tra map có key ${command.key} hay không.`,
           en: `Check whether key ${command.key} exists in the map.`,
@@ -1532,38 +1717,33 @@ function buildSteps146(input, params) {
         },
       });
 
-      const nodeIndex = order.indexOf(command.key);
-      order.splice(nodeIndex, 1);
       snapshot({
-        title: { vi: `remove(node ${command.key})`, en: `remove(node ${command.key})` },
-        event: "detach",
-        operation: `get(${command.key})`,
-        transient: { key: command.key, value, status: "detached" },
-        highlightTransient: true,
-        codeLines: [32],
-        vars: [{ name: "action", value: "unlink node.prev <-> node.next" }],
-        note: {
-          vi: `Tháo node ${command.key}:${value} khỏi vị trí cũ bằng cách nối node.prev trực tiếp với node.next.`,
-          en: `Detach node ${command.key}:${value} from its old position by linking node.prev directly to node.next.`,
-        },
-      });
-
-      order.push(command.key);
-      snapshot({
-        title: { vi: `hit ${command.key}:${value} -> đưa lên MRU`, en: `hit ${command.key}:${value} -> move to MRU` },
+        title: { vi: `self.remove(node ${command.key})`, en: `self.remove(node ${command.key})` },
         activeKey: command.key,
-        event: "hit",
+        event: "remove-call",
         operation: `get(${command.key})`,
-        result: value,
-        codeLines: [33],
-        vars: [
-          { name: "action", value: "insert before right sentinel" },
-        ],
+        codeLines: [32],
+        vars: [{ name: "call", value: `remove(Node(${command.key}))` }],
         note: {
-          vi: `Đọc key ${command.key}, nên node này vừa được dùng gần nhất và chuyển sang phía MRU.`,
-          en: `Reading key ${command.key} makes it most recently used, so move it to the MRU side.`,
+          vi: `Nhảy vào helper remove để tháo node ${command.key}:${value} khỏi vị trí hiện tại.`,
+          en: `Enter the remove helper to detach node ${command.key}:${value} from its current position.`,
         },
       });
+      removeWithSteps(command.key, `get(${command.key})`, "get hit: move node to MRU");
+
+      snapshot({
+        title: { vi: `self.insert(node ${command.key})`, en: `self.insert(node ${command.key})` },
+        event: "insert-call",
+        operation: `get(${command.key})`,
+        codeLines: [33],
+        transient: { key: command.key, value, status: "detached" },
+        vars: [{ name: "call", value: `insert(Node(${command.key}))` }],
+        note: {
+          vi: `get hit tính là vừa sử dụng; helper insert sẽ nối node vào ngay trước RIGHT.`,
+          en: `A get hit counts as recent use; insert will link the node immediately before RIGHT.`,
+        },
+      });
+      insertWithSteps(command.key, `get(${command.key})`, "get hit: most recently used");
 
       outputs.push(value);
       snapshot({
@@ -1584,12 +1764,12 @@ function buildSteps146(input, params) {
       });
     } else if (command.op === "put") {
       snapshot({
-        title: { vi: `put(${command.key}, ${command.value})`, en: `put(${command.key}, ${command.value})` },
+        title: { vi: `key ${command.key} có trong cache? → ${nodes.has(command.key)}`, en: `key ${command.key} in cache? → ${nodes.has(command.key)}` },
         activeKey: command.key,
         event: nodes.has(command.key) ? "lookup-update" : "lookup-new",
         operation: `put(${command.key}, ${command.value})`,
         codeLines: [37],
-        vars: [{ name: "operation", value: command.raw }],
+        vars: [{ name: "operation", value: command.raw }, { name: "key in cache", value: nodes.has(command.key) }],
         note: {
           vi: `Nếu key ${command.key} đã có thì cập nhật value; nếu chưa có thì tạo node mới.`,
           en: `If key ${command.key} exists, update it; otherwise create a new node.`,
@@ -1598,21 +1778,19 @@ function buildSteps146(input, params) {
 
       if (nodes.has(command.key)) {
         const oldValue = nodes.get(command.key).value;
-        const oldIndex = order.indexOf(command.key);
-        order.splice(oldIndex, 1);
         snapshot({
-          title: { vi: `remove(cache[${command.key}])`, en: `remove(cache[${command.key}])` },
-          event: "detach",
+          title: { vi: `self.remove(cache[${command.key}])`, en: `self.remove(cache[${command.key}])` },
+          activeKey: command.key,
+          event: "remove-call",
           operation: `put(${command.key}, ${command.value})`,
-          transient: { key: command.key, value: oldValue, status: "old node detached" },
-          highlightTransient: true,
           codeLines: [38],
-          vars: [{ name: "old node", value: `${command.key}:${oldValue}` }],
+          vars: [{ name: "old node", value: `${command.key}:${oldValue}` }, { name: "call", value: `remove(cache[${command.key}])` }],
           note: {
-            vi: `Key ${command.key} đã tồn tại, nên tháo node cũ khỏi doubly linked list trước.`,
-            en: `Key ${command.key} already exists, so detach its old node from the doubly linked list first.`,
+            vi: `Key ${command.key} đã tồn tại; gọi remove rồi theo dõi hai phép gán pointer bên trong helper.`,
+            en: `Key ${command.key} exists; call remove and follow its two pointer assignments inside the helper.`,
           },
         });
+        removeWithSteps(command.key, `put(${command.key}, ${command.value})`, "replace existing key");
 
         nodes.set(command.key, { key: command.key, value: command.value });
         snapshot({
@@ -1629,20 +1807,21 @@ function buildSteps146(input, params) {
           },
         });
 
-        order.push(command.key);
         snapshot({
-          title: { vi: `update key ${command.key} -> MRU`, en: `update key ${command.key} -> MRU` },
-          activeKey: command.key,
-          event: "update",
+          title: { vi: `self.insert(cache[${command.key}])`, en: `self.insert(cache[${command.key}])` },
+          event: "insert-call",
           operation: `put(${command.key}, ${command.value})`,
           codeLines: [40],
-          vars: [{ name: "new value", value: command.value }],
+          transient: { key: command.key, value: command.value, status: "new node" },
+          vars: [{ name: "new value", value: command.value }, { name: "call", value: `insert(cache[${command.key}])` }],
           note: {
-            vi: "Put trên key đã tồn tại cũng tính là vừa sử dụng, nên đưa node sang MRU.",
-            en: "Putting an existing key counts as recent use, so move that node to MRU.",
+            vi: "Gọi insert để nối node value mới vào vị trí MRU.",
+            en: "Call insert to link the node with its new value at the MRU position.",
           },
         });
+        insertWithSteps(command.key, `put(${command.key}, ${command.value})`, "updated key becomes MRU");
 
+        outputs.push(null);
         snapshot({
           title: { vi: "Kiểm tra capacity", en: "Check capacity" },
           activeKey: command.key,
@@ -1658,7 +1837,6 @@ function buildSteps146(input, params) {
             en: "Updating an existing key does not increase the node count, so capacity is not exceeded.",
           },
         });
-        outputs.push(null);
         continue;
       }
 
@@ -1677,20 +1855,22 @@ function buildSteps146(input, params) {
         },
       });
 
-      order.push(command.key);
       snapshot({
-        title: { vi: `thêm node ${command.key}:${command.value} vào MRU`, en: `add node ${command.key}:${command.value} as MRU` },
-        activeKey: command.key,
-        event: "insert",
+        title: { vi: `self.insert(cache[${command.key}])`, en: `self.insert(cache[${command.key}])` },
+        event: "insert-call",
         operation: `put(${command.key}, ${command.value})`,
         codeLines: [40],
-        vars: [{ name: "insert", value: `${command.key}:${command.value}` }],
+        transient: { key: command.key, value: command.value, status: "new node" },
+        vars: [{ name: "call", value: `insert(cache[${command.key}])` }],
         note: {
-          vi: "Node mới được nối vào phía MRU của doubly linked list và map trỏ tới node đó.",
-          en: "The new node is linked on the MRU side of the doubly linked list and mapped by key.",
+          vi: "Node đã nằm trong map nhưng chưa nằm trong list; gọi insert để nối bốn pointer ở phía MRU.",
+          en: "The node is in the map but not the list; call insert to wire four pointers on the MRU side.",
         },
       });
+      insertWithSteps(command.key, `put(${command.key}, ${command.value})`, "new key becomes MRU");
 
+      const overCapacity = nodes.size > capacity;
+      if (!overCapacity) outputs.push(null);
       snapshot({
         title: { vi: "Kiểm tra capacity", en: "Check capacity" },
         activeKey: command.key,
@@ -1699,19 +1879,19 @@ function buildSteps146(input, params) {
         codeLines: [41],
         vars: [
           { name: "len(cache)", value: nodes.size },
-          { name: "condition", value: `${nodes.size} > ${capacity} = ${nodes.size > capacity}` },
+            { name: "condition", value: `${nodes.size} > ${capacity} = ${overCapacity}` },
         ],
         note: {
-          vi: nodes.size > capacity
+          vi: overCapacity
             ? `Cache có ${nodes.size} node, vượt capacity=${capacity}; cần loại LRU.`
             : `Cache có ${nodes.size} node, chưa vượt capacity=${capacity}.`,
-          en: nodes.size > capacity
+          en: overCapacity
             ? `The cache has ${nodes.size} nodes, exceeding capacity=${capacity}; evict the LRU node.`
             : `The cache has ${nodes.size} nodes, within capacity=${capacity}.`,
         },
       });
 
-      if (order.length > capacity) {
+      if (overCapacity) {
         const evictedKey = order[0];
         const evictedValue = nodes.get(evictedKey).value;
 
@@ -1731,25 +1911,25 @@ function buildSteps146(input, params) {
           },
         });
 
-        order.shift();
         snapshot({
-          title: { vi: `remove(lru ${evictedKey}:${evictedValue})`, en: `remove(lru ${evictedKey}:${evictedValue})` },
-          event: "detach",
+          title: { vi: `self.remove(lru ${evictedKey}:${evictedValue})`, en: `self.remove(lru ${evictedKey}:${evictedValue})` },
+          activeKey: evictedKey,
+          event: "remove-call",
           operation: `put(${command.key}, ${command.value})`,
-          transient: { key: evictedKey, value: evictedValue, status: "LRU unlinked" },
-          highlightTransient: true,
           codeLines: [43],
           vars: [
             { name: "lru", value: `${evictedKey}:${evictedValue}` },
-            { name: "map still contains key", value: nodes.has(evictedKey) },
+            { name: "call", value: `remove(Node(${evictedKey}))` },
           ],
           note: {
-            vi: `Tháo LRU ${evictedKey}:${evictedValue} khỏi doubly linked list. Hash map vẫn còn key này cho đến dòng kế tiếp.`,
-            en: `Unlink LRU ${evictedKey}:${evictedValue} from the doubly linked list. The hash map still contains its key until the next line.`,
+            vi: `Gọi helper remove để tháo LRU ${evictedKey}:${evictedValue}; map vẫn giữ key cho tới dòng 44.`,
+            en: `Call remove to detach LRU ${evictedKey}:${evictedValue}; the map keeps its key until line 44.`,
           },
         });
+        removeWithSteps(evictedKey, `put(${command.key}, ${command.value})`, "capacity exceeded: remove LRU");
 
         nodes.delete(evictedKey);
+        outputs.push(null);
         snapshot({
           title: { vi: `vượt capacity -> loại LRU ${evictedKey}:${evictedValue}`, en: `over capacity -> evict LRU ${evictedKey}:${evictedValue}` },
           activeKey: command.key,
@@ -1767,10 +1947,10 @@ function buildSteps146(input, params) {
           },
         });
       }
-      outputs.push(null);
     }
   }
 
+  currentOpIndex = null;
   snapshot({
     title: { vi: "Kết quả", en: "Result" },
     event: "complete",

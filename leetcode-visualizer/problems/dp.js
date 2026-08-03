@@ -4342,97 +4342,26 @@ function buildSteps740(nums) {
 
 /**
  * LeetCode 1406: Stone Game III.
- * dp[i] = best score difference current player can force from stones[i...].
- * Transition: take 1-3 stones and maximize (sum_taken - dp[next]).
+ * Suffix game DP with a line-by-line view of every 1-3 stone choice.
  */
 function buildSteps1406(stones) {
   const n = stones.length;
   const dp = new Array(n + 1).fill(0);
   const steps = [];
-
-  steps.push({
-    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
-    arr: [...dp],
-    sub: Array.from({ length: n + 1 }, (_, i) => String(i)),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4],
-    vars: [
-      { name: "n", value: n },
-      { name: "dp", value: [...dp] },
-    ],
-    note: {
-      vi: `dp[i] là chênh lệch điểm tốt nhất người chơi hiện tại có thể ép được từ stones[i...]. dp[${n}] = 0 vì không còn đá.`,
-      en: `dp[i] is the best score difference the current player can force from stones[i...]. dp[${n}] = 0 because no stones remain.`,
-    },
-  });
-
-  for (let i = n - 1; i >= 0; i--) {
-    let take = 0;
-    let best = -Infinity;
-    const options = [];
-
-    for (let k = 0; k < 3 && i + k < n; k++) {
-      take += stones[i + k];
-      const next = i + k + 1;
-      const diff = take - dp[next];
-      options.push({ count: k + 1, take, next, diff });
-      if (diff > best) best = diff;
-    }
-
-    dp[i] = best;
-
-    steps.push({
-      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
-      arr: [...dp],
-      sub: Array.from({ length: n + 1 }, (_, idx) => String(idx)),
-      highlight: [i],
-      mark: [i],
-      codeLines: [6, 7, 8, 9, 10],
-      vars: [
-        { name: "i", value: i },
-        { name: "best", value: best },
-        { name: "options", value: options.map((o) => `${o.count}:${o.diff}`).join(", ") },
-      ],
-      note: {
-        vi: `Thử 1-3 viên từ vị trí ${i}: ${options.map((o) => `${o.count} viên => ${o.take} - dp[${o.next}] = ${o.diff}`).join("; ")}. Chọn lớn nhất => dp[${i}] = ${dp[i]}.`,
-        en: `Try taking 1-3 stones from index ${i}: ${options.map((o) => `${o.count} stone(s) => ${o.take} - dp[${o.next}] = ${o.diff}`).join("; ")}. Pick the maximum => dp[${i}] = ${dp[i]}.`,
-      },
-    });
-  }
-
-  const diff = dp[0];
-  const answer = diff > 0 ? "Alice" : diff < 0 ? "Bob" : "Tie";
-
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [...dp],
-    sub: Array.from({ length: n + 1 }, (_, i) => String(i)),
-    highlight: [],
-    mark: [0],
-    final: true,
-    codeLines: [12],
-    vars: [
-      { name: "dp[0]", value: diff },
-      { name: "winner", value: answer },
-    ],
-    note: {
-      vi: `dp[0] = ${diff}. Dương => Alice thắng, âm => Bob thắng, 0 => hòa. Kết quả: ${answer}.`,
-      en: `dp[0] = ${diff}. Positive => Alice wins, negative => Bob wins, 0 => tie. Result: ${answer}.`,
-    },
-  });
-
-  return { stones: [...stones], answer, steps };
-}
-
-// More granular Stone Game III visualizer.
-// This later declaration intentionally replaces the compact version above so
-// every visual step matches the highlighted source line.
-function buildSteps1406(stones) {
-  const n = stones.length;
-  const dp = new Array(n + 1).fill(0);
-  const steps = [];
   const labels = Array.from({ length: n + 1 }, (_, i) => String(i));
+  const dpKnown = new Array(n + 1).fill(false);
+  let dpInitialized = false;
+  let phase = "setup";
+  let activeI = null;
+  let activeK = null;
+  let selectedCount = 0;
+  let take = null;
+  let currentNext = null;
+  let currentCandidate = null;
+  let currentValid = null;
+  let bestCount = null;
+  let optionRows = [];
+  let winner = null;
 
   function visibleDp() {
     return dp.map((v) => (Number.isFinite(v) ? v : 0));
@@ -4458,6 +4387,31 @@ function buildSteps1406(stones) {
       title: opts.title,
       arr: visibleDp(),
       sub: labels,
+      stoneGameView: {
+        phase,
+        stones: stones.map((value, index) => ({ index, value })),
+        dp: dp.map((value, index) => ({
+          index,
+          value: dpInitialized && (dpKnown[index] || (index === activeI && value === -Infinity))
+            ? (Number.isFinite(value) ? value : "-inf")
+            : null,
+          known: dpKnown[index],
+          base: index === n,
+        })),
+        i: activeI,
+        k: activeK,
+        selectedCount,
+        take,
+        next: currentNext,
+        candidate: currentCandidate,
+        valid: currentValid,
+        best: activeI === null || !dpInitialized
+          ? null
+          : (Number.isFinite(dp[activeI]) ? dp[activeI] : "-inf"),
+        bestCount,
+        options: optionRows.map((option) => ({ ...option, indices: [...option.indices] })),
+        winner,
+      },
       highlight: opts.highlight || [],
       mark: opts.mark || [],
       codeLines: [opts.codeLine],
@@ -4468,33 +4422,46 @@ function buildSteps1406(stones) {
   }
 
   step({
-    title: { vi: "Read n", en: "Read n" },
+    title: { vi: "Đọc n", en: "Read n" },
     codeLine: 3,
     vars: [
       { name: "n", value: n },
       { name: "stones", value: `[${stones.join(", ")}]` },
     ],
     note: {
-      vi: `There are ${n} stones.`,
+      vi: `Có ${n} viên đá trong mảng.`,
       en: `There are ${n} stones.`,
     },
   });
 
+  dpInitialized = true;
+  dpKnown[n] = true;
+  phase = "initialize";
   step({
-    title: { vi: "Initialize dp", en: "Initialize dp" },
+    title: { vi: "Khởi tạo dp", en: "Initialize dp" },
     codeLine: 4,
     vars: [
       { name: "dp", value: formatDp() },
     ],
     note: {
-      vi: `dp[i] = best score difference from stones[i...]. dp[${n}] = 0 because no stones remain.`,
+      vi: `dp[i] là lợi thế điểm tốt nhất trên suffix stones[i...]. dp[${n}] = 0 vì không còn viên đá nào.`,
       en: `dp[i] = best score difference from stones[i...]. dp[${n}] = 0 because no stones remain.`,
     },
   });
 
   for (let i = n - 1; i >= 0; i--) {
+    activeI = i;
+    activeK = null;
+    selectedCount = 0;
+    take = null;
+    currentNext = null;
+    currentCandidate = null;
+    currentValid = null;
+    bestCount = null;
+    optionRows = [];
+    phase = "index";
     step({
-      title: { vi: `Start i = ${i}`, en: `Start i = ${i}` },
+      title: { vi: `Bắt đầu i = ${i}`, en: `Start i = ${i}` },
       codeLine: 5,
       highlight: [i],
       vars: [
@@ -4502,14 +4469,15 @@ function buildSteps1406(stones) {
         { name: `stones[${i}]`, value: stones[i] },
       ],
       note: {
-        vi: `Compute dp[${i}] from right to left so dp[next] values are already known.`,
+        vi: `Tính dp[${i}] từ phải sang trái để mọi dp[next] cần dùng đều đã biết.`,
         en: `Compute dp[${i}] from right to left so dp[next] values are already known.`,
       },
     });
 
-    let take = 0;
+    take = 0;
+    phase = "take-reset";
     step({
-      title: { vi: "Reset take", en: "Reset take" },
+      title: { vi: "Đặt lại take", en: "Reset take" },
       codeLine: 6,
       highlight: [i],
       vars: [
@@ -4517,14 +4485,15 @@ function buildSteps1406(stones) {
         { name: "take", value: take },
       ],
       note: {
-        vi: "take accumulates the stones chosen on this turn.",
+        vi: "take cộng dồn điểm của các viên được lấy trong lượt hiện tại.",
         en: "take accumulates the stones chosen on this turn.",
       },
     });
 
     dp[i] = -Infinity;
+    phase = "best-reset";
     step({
-      title: { vi: `Set dp[${i}] = -inf`, en: `Set dp[${i}] = -inf` },
+      title: { vi: `Gán dp[${i}] = -inf`, en: `Set dp[${i}] = -inf` },
       codeLine: 7,
       highlight: [i],
       vars: [
@@ -4532,15 +4501,21 @@ function buildSteps1406(stones) {
         { name: "dp", value: formatDp() },
       ],
       note: {
-        vi: "Start with the worst value, then maximize over taking 1, 2, or 3 stones.",
+        vi: "Bắt đầu bằng giá trị nhỏ nhất, sau đó lấy max giữa các lựa chọn lấy 1, 2 hoặc 3 viên.",
         en: "Start with the worst value, then maximize over taking 1, 2, or 3 stones.",
       },
     });
 
     for (let k = 0; k < 3; k++) {
+      activeK = k;
+      selectedCount = 0;
+      currentNext = null;
+      currentCandidate = null;
+      currentValid = null;
+      phase = "choice";
       const valid = i + k < n;
       step({
-        title: { vi: `Loop k = ${k}`, en: `Loop k = ${k}` },
+        title: { vi: `Vòng lặp k = ${k}`, en: `Loop k = ${k}` },
         codeLine: 8,
         highlight: [i],
         vars: [
@@ -4548,13 +4523,16 @@ function buildSteps1406(stones) {
           { name: "k", value: k },
         ],
         note: {
-          vi: "Try one of the three possible move sizes: take 1, 2, or 3 stones.",
+          vi: "Thử một trong ba kích thước nước đi: lấy 1, 2 hoặc 3 viên.",
           en: "Try one of the three possible move sizes: take 1, 2, or 3 stones.",
         },
       });
 
+      currentValid = valid;
+      selectedCount = valid ? k + 1 : 0;
+      phase = "bounds-check";
       step({
-        title: { vi: `Check k = ${k}`, en: `Check k = ${k}` },
+        title: { vi: `Kiểm tra k = ${k}`, en: `Check k = ${k}` },
         codeLine: 9,
         highlight: valid ? range(i, k + 1) : [i],
         vars: [
@@ -4564,8 +4542,8 @@ function buildSteps1406(stones) {
         ],
         note: {
           vi: valid
-            ? `Taking ${k + 1} stone(s) is allowed.`
-            : `Index ${i + k} is outside the array, so skip this k.`,
+            ? `Có thể lấy ${k + 1} viên vì i + k vẫn nằm trong mảng.`
+            : `Index ${i + k} nằm ngoài mảng nên bỏ qua k này.`,
           en: valid
             ? `Taking ${k + 1} stone(s) is allowed.`
             : `Index ${i + k} is outside the array, so skip this k.`,
@@ -4575,8 +4553,10 @@ function buildSteps1406(stones) {
       if (!valid) continue;
 
       take += stones[i + k];
+      currentNext = i + k + 1;
+      phase = "accumulate";
       step({
-        title: { vi: `Add stones[${i + k}]`, en: `Add stones[${i + k}]` },
+        title: { vi: `Cộng stones[${i + k}]`, en: `Add stones[${i + k}]` },
         codeLine: 10,
         highlight: range(i, k + 1),
         vars: [
@@ -4584,7 +4564,7 @@ function buildSteps1406(stones) {
           { name: "take", value: take },
         ],
         note: {
-          vi: `After taking ${k + 1} stone(s), take = ${take}.`,
+          vi: `Sau khi lấy ${k + 1} viên, tổng điểm đang lấy là take = ${take}.`,
           en: `After taking ${k + 1} stone(s), take = ${take}.`,
         },
       });
@@ -4593,8 +4573,20 @@ function buildSteps1406(stones) {
       const candidate = take - dp[next];
       const before = dp[i];
       dp[i] = Math.max(dp[i], candidate);
+      currentCandidate = candidate;
+      if (candidate > before) bestCount = k + 1;
+      optionRows.push({
+        count: k + 1,
+        indices: range(i, k + 1),
+        take,
+        next,
+        opponent: dp[next],
+        candidate,
+      });
+      dpKnown[i] = true;
+      phase = "compare";
       step({
-        title: { vi: `Update dp[${i}]`, en: `Update dp[${i}]` },
+        title: { vi: `Cập nhật dp[${i}]`, en: `Update dp[${i}]` },
         codeLine: 11,
         highlight: range(i, k + 1),
         mark: [i],
@@ -4607,17 +4599,47 @@ function buildSteps1406(stones) {
           { name: `dp[${i}]`, value: dp[i] },
         ],
         note: {
-          vi: `Candidate = current score taken minus the opponent's best difference from index ${next}. Keep the maximum.`,
+          vi: `Candidate = điểm vừa lấy trừ lợi thế tốt nhất của đối thủ từ index ${next}. Giữ candidate lớn nhất.`,
           en: `Candidate = current score taken minus the opponent's best difference from index ${next}. Keep the maximum.`,
         },
       });
     }
+
+    activeK = null;
+    selectedCount = bestCount || 0;
+    currentNext = bestCount === null ? null : i + bestCount;
+    currentCandidate = dp[i];
+    currentValid = true;
+    phase = "commit";
+    step({
+      title: { vi: `Chốt dp[${i}] = ${dp[i]}`, en: `Commit dp[${i}] = ${dp[i]}` },
+      codeLine: 5,
+      highlight: [i],
+      mark: [i],
+      vars: [
+        { name: "i", value: i },
+        { name: "best move", value: `take ${bestCount}` },
+        { name: `dp[${i}]`, value: dp[i] },
+      ],
+      note: {
+        vi: `Trong các lựa chọn hợp lệ, lấy ${bestCount} viên cho lợi thế lớn nhất ${dp[i]}. dp[${i}] giờ sẵn sàng cho suffix bên trái.`,
+        en: `Among the valid choices, taking ${bestCount} stone(s) gives the largest advantage ${dp[i]}. dp[${i}] is now ready for the suffix to its left.`,
+      },
+    });
   }
 
   const diff = dp[0];
   const answer = diff > 0 ? "Alice" : diff < 0 ? "Bob" : "Tie";
+  activeI = 0;
+  activeK = null;
+  selectedCount = bestCount || 0;
+  currentNext = bestCount;
+  currentCandidate = diff;
+  currentValid = true;
+  winner = answer;
+  phase = "result";
   step({
-    title: { vi: `Result: ${answer}`, en: `Result: ${answer}` },
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
     codeLine: diff > 0 ? 12 : diff < 0 ? 13 : 14,
     mark: [0],
     final: true,
@@ -4626,7 +4648,7 @@ function buildSteps1406(stones) {
       { name: "winner", value: answer },
     ],
     note: {
-      vi: `dp[0] = ${diff}. Positive means Alice wins, negative means Bob wins, zero means Tie.`,
+      vi: `dp[0] = ${diff}. Dương nghĩa là Alice thắng, âm nghĩa là Bob thắng, bằng 0 nghĩa là hòa.`,
       en: `dp[0] = ${diff}. Positive means Alice wins, negative means Bob wins, zero means Tie.`,
     },
   });
@@ -15312,9 +15334,23 @@ module.exports = {
       en: "Given an array stones, two players take 1 to 3 stones from the start of the array on each turn. Each stone has a score. Return Alice, Bob, or Tie depending on who ends with the higher total.",
     },
     defaultInput: [1, 2, 3, 7],
-    inputKind: "positive",
+    inputKind: "integer",
     inputLabel: { vi: "stones", en: "stones" },
     extraParams: [],
+    approach: [
+      {
+        vi: "dp[i] là lợi thế điểm lớn nhất của người sắp chơi trên suffix stones[i...]: điểm của mình trừ điểm của đối thủ.",
+        en: "dp[i] is the largest score advantage for the player about to move on stones[i...]: current player's score minus the opponent's score.",
+      },
+      {
+        vi: "Tại i, thử lấy 1, 2 hoặc 3 viên. Mỗi lựa chọn có candidate = tổng vừa lấy - dp[next].",
+        en: "At i, try taking 1, 2, or 3 stones. Each choice has candidate = taken sum - dp[next].",
+      },
+      {
+        vi: "Tính từ phải sang trái để dp[next] luôn có sẵn; dấu của dp[0] quyết định Alice, Bob hay Tie.",
+        en: "Compute right to left so dp[next] is already known; the sign of dp[0] determines Alice, Bob, or Tie.",
+      },
+    ],
     complexity: {
       time: "O(n)",
       space: "O(n)",

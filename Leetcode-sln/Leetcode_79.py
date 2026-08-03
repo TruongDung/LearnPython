@@ -30,5 +30,3 @@ class Solution:
 sol = Solution()
 board = [["A", "B", "C", "E"], ["S", "F", "C", "S"], ["A", "D", "E", "E"]]
 print(sol.exist(board, "ABCCED"))  # True
-print(sol.exist(board, "SEE"))     # True
-print(sol.exist(board, "ABCB"))    # False
