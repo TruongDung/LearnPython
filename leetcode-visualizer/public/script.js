@@ -1568,6 +1568,7 @@ function renderFloodFillView(step) {
   const view = step.floodFillView;
   const vi = lang === "vi";
   const recursive = view.mode === "recursive";
+  const bfs = view.mode === "bfs";
   const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
   const coord = (cell) => Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
   const currentKey = keyOf(view.current);
@@ -1583,13 +1584,22 @@ function renderFloodFillView(step) {
   const recursiveCallPhases = new Set(["main-call", "dfs-enter", "recursive-call", "resume-frame"]);
   const recursiveCheckPhases = new Set(["bounds-check", "color-check", "return-bounds", "return-color"]);
   const recursiveFillPhases = new Set(["recolor", "dfs-complete", "main-resume", "done"]);
+  const bfsQueuePhases = new Set(["queue-init", "fill-start", "directions", "queue-check", "dequeue"]);
+  const bfsNeighborPhases = new Set(["direction", "next-row", "neighbor", "row-bounds", "col-bounds", "bounds-check", "continue-bounds", "color-check", "continue-color"]);
+  const bfsFillPhases = new Set(["fill-neighbor", "enqueue-neighbor", "queue-empty", "done"]);
   const activePhase = recursive
     ? recursiveFillPhases.has(view.phase) ? 3 : recursiveCheckPhases.has(view.phase) ? 2 : recursiveCallPhases.has(view.phase) ? 1 : 0
+    : bfs
+      ? bfsFillPhases.has(view.phase) ? 3 : bfsNeighborPhases.has(view.phase) ? 2 : bfsQueuePhases.has(view.phase) ? 1 : 0
     : fillPhases.has(view.phase) ? 3 : neighborPhases.has(view.phase) ? 2 : expansionPhases.has(view.phase) ? 1 : 0;
   const phaseLabels = recursive
     ? (vi
       ? ["1. Khởi tạo", "2. Vào frame dfs", "3. Hai base case", "4. Tô và gọi 4 hướng"]
       : ["1. Initialize", "2. Enter dfs frame", "3. Two base cases", "4. Recolor and call four ways"])
+    : bfs
+      ? (vi
+        ? ["1. Đọc màu gốc", "2. Dequeue ở FRONT", "3. Kiểm tra hàng xóm", "4. Tô và enqueue BACK"]
+        : ["1. Read source color", "2. Dequeue from FRONT", "3. Check a neighbor", "4. Recolor and enqueue at BACK"])
     : (vi
       ? ["1. Đọc màu gốc", "2. Pop từ DFS stack", "3. Kiểm tra hàng xóm", "4. Tô màu và push"]
       : ["1. Read source color", "2. Pop DFS stack", "3. Check a neighbor", "4. Recolor and push"]);
@@ -1621,8 +1631,14 @@ function renderFloodFillView(step) {
   const stackHtml = view.stack.length
     ? view.stack.map((cell, index) => {
       const top = index === view.stack.length - 1;
-      const label = recursive ? (top ? `TOP · d${index}` : `depth ${index}`) : (top ? "TOP" : `#${index}`);
-      return `<span class="${top ? "is-top" : ""}"><small>${label}</small><strong>${escapeHtml(coord(cell))}</strong></span>`;
+      const front = index === 0;
+      const back = top;
+      const label = recursive
+        ? (top ? `TOP · d${index}` : `depth ${index}`)
+        : bfs
+          ? (front && back ? "FRONT / BACK" : front ? "FRONT" : back ? "BACK" : `#${index}`)
+          : (top ? "TOP" : `#${index}`);
+      return `<span class="${(bfs ? front : top) ? "is-top" : ""}"><small>${label}</small><strong>${escapeHtml(coord(cell))}</strong></span>`;
     }).join("")
     : `<em>∅</em>`;
 
@@ -1656,7 +1672,18 @@ function renderFloodFillView(step) {
     recolor: ["FRAME STATE", "recolor", String(view.newColor)],
     "dfs-complete": ["FRAME STATE", "4 calls done", "RETURN"],
   }[view.phase] || ["FRAME STATE", "dfs(row,col)", "ACTIVE"];
-  const routeHtml = Array.isArray(view.current) && (!recursive || Array.isArray(view.neighbor))
+  const bfsState = {
+    "read-color": ["BFS SETUP", "read source", String(view.originalColor ?? "?")],
+    "same-color-check": ["BFS SETUP", "same color?", view.originalColor === view.newColor ? "True" : "False"],
+    "queue-init": ["QUEUE OP", "enqueue start", "BACK"],
+    "fill-start": ["VISITED", "recolor start", String(view.newColor)],
+    directions: ["BFS SETUP", "4 directions", "READY"],
+    dequeue: ["QUEUE OP", "popleft", "FRONT"],
+    direction: ["DIRECTION", activeDirection ? `(${activeDirection.delta.join(",")})` : "choose", arrow],
+    "next-row": ["COORDINATE", "next_row", String(view.nextRow ?? "?")],
+  }[view.phase] || ["BFS STATE", "queue traversal", "ACTIVE"];
+  const hasNeighbor = Array.isArray(view.neighbor);
+  const routeHtml = Array.isArray(view.current) && ((!recursive && !bfs) || hasNeighbor)
     ? `<div class="flood-fill-route">
         <span class="${currentInside ? "is-current" : "is-outside"}"><small>${hasTopFrame ? "TOP FRAME" : recursive ? "FOCUS" : "CURRENT"}</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(currentValue)}</em></span>
         <b>${arrow}</b>
@@ -1668,7 +1695,13 @@ function renderFloodFillView(step) {
           <b>→</b>
           <span class="is-check"><small>${escapeHtml(recursiveState[0])}</small><strong>${escapeHtml(recursiveState[1])}</strong><em>${escapeHtml(recursiveState[2])}</em></span>
         </div>`
-    : `<div class="flood-fill-route is-idle"><code>${recursive ? "dfs(row,col) → base cases → recolor → 4 calls" : "stack.pop() → current → 4 neighbors"}</code></div>`;
+      : bfs && Array.isArray(view.current)
+        ? `<div class="flood-fill-route is-frame">
+            <span class="${currentInside ? "is-current" : "is-outside"}"><small>CURRENT</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(currentValue)}</em></span>
+            <b>→</b>
+            <span class="is-check"><small>${escapeHtml(bfsState[0])}</small><strong>${escapeHtml(bfsState[1])}</strong><em>${escapeHtml(bfsState[2])}</em></span>
+          </div>`
+        : `<div class="flood-fill-route is-idle"><code>${recursive ? "dfs(row,col) → base cases → recolor → 4 calls" : bfs ? "queue.popleft() → current → enqueue neighbors" : "stack.pop() → current → 4 neighbors"}</code></div>`;
 
   const truth = (value) => value === null ? "?" : value ? "True" : "False";
   let decision = "?";
@@ -1703,6 +1736,33 @@ function renderFloodFillView(step) {
   } else if (recursive && view.phase === "main-resume") {
     decision = "DONE";
     decisionClass = "is-fill";
+  } else if (bfs && view.phase === "queue-init") {
+    decision = "ENQUEUE";
+    decisionClass = "is-push";
+  } else if (bfs && view.phase === "queue-check") {
+    decision = "CONTINUE";
+    decisionClass = "is-fill";
+  } else if (bfs && view.phase === "dequeue") {
+    decision = "DEQUEUE";
+    decisionClass = "is-push";
+  } else if (bfs && ["row-bounds", "col-bounds"].includes(view.phase)) {
+    decision = "STORE";
+    decisionClass = "is-fill";
+  } else if (bfs && view.phase === "bounds-check") {
+    decision = view.insideGrid ? "NEXT CHECK" : "SKIP";
+    decisionClass = view.insideGrid ? "is-fill" : "is-skip";
+  } else if (bfs && ["continue-bounds", "continue-color"].includes(view.phase)) {
+    decision = "SKIP";
+    decisionClass = "is-skip";
+  } else if (bfs && view.phase === "color-check") {
+    decision = view.matchesOriginal ? "RECOLOR" : "SKIP";
+    decisionClass = view.matchesOriginal ? "is-fill" : "is-skip";
+  } else if (bfs && view.phase === "enqueue-neighbor") {
+    decision = "ENQUEUE";
+    decisionClass = "is-push";
+  } else if (bfs && view.phase === "queue-empty") {
+    decision = "STOP";
+    decisionClass = "is-skip";
   } else if (view.phase === "stack-empty") {
     decision = "STOP";
     decisionClass = "is-skip";
@@ -1716,8 +1776,13 @@ function renderFloodFillView(step) {
     decision = view.canFill ? (vi ? "HỢP LỆ" : "FILL") : (vi ? "BỎ QUA" : "SKIP");
     decisionClass = view.canFill ? "is-fill" : "is-skip";
   }
+  const firstCheck = bfs && view.phase === "row-bounds"
+    ? { label: "ROW IN BOUNDS", value: view.rowInside }
+    : bfs && view.phase === "col-bounds"
+      ? { label: "COL IN BOUNDS", value: view.colInside }
+      : { label: vi ? "TRONG BIÊN" : "IN BOUNDS", value: view.insideGrid };
   const checksHtml = `<div class="flood-fill-checks">
-    <span class="${view.insideGrid === true ? "is-pass" : view.insideGrid === false ? "is-fail" : ""}"><small>${vi ? "TRONG BIÊN" : "IN BOUNDS"}</small><strong>${truth(view.insideGrid)}</strong></span>
+    <span class="${firstCheck.value === true ? "is-pass" : firstCheck.value === false ? "is-fail" : ""}"><small>${firstCheck.label}</small><strong>${truth(firstCheck.value)}</strong></span>
     <b>AND</b>
     <span class="${view.matchesOriginal === true ? "is-pass" : view.matchesOriginal === false ? "is-fail" : ""}"><small>${recursive ? "image[row][col] == original" : "image[next] == original"}</small><strong>${truth(view.matchesOriginal)}</strong></span>
     <b>→</b>
@@ -1725,7 +1790,57 @@ function renderFloodFillView(step) {
   </div>`;
 
   let actionDetail;
-  if (recursive && view.phase === "enter") {
+  if (bfs && view.phase === "enter") {
+    actionDetail = vi ? "Cách 3 dùng FIFO queue: lấy ô cũ nhất ở FRONT, thêm ô mới vào BACK." : "Approach 3 uses a FIFO queue: remove the oldest cell at FRONT and add new cells at BACK.";
+  } else if (bfs && view.phase === "dimensions") {
+    actionDetail = vi ? `Image có ${view.rows} hàng, ${view.cols} cột; đây là biên để chặn neighbor ngoài image.` : `The image has ${view.rows} rows and ${view.cols} columns; these bounds reject outside neighbors.`;
+  } else if (bfs && view.phase === "read-color") {
+    actionDetail = vi ? `Đọc original_color = ${view.originalColor} tại ô bắt đầu ${coord(view.start)}.` : `Read original_color = ${view.originalColor} from the start cell ${coord(view.start)}.`;
+  } else if (bfs && view.phase === "same-color-check") {
+    actionDetail = view.originalColor === view.newColor
+      ? (vi ? "Màu mới trùng màu gốc, nên return trước khi tạo queue." : "The new color matches the source, so return before creating the queue.")
+      : (vi ? "Màu mới khác màu gốc; tiếp tục khởi tạo BFS queue." : "The new color differs from the source; initialize the BFS queue.");
+  } else if (bfs && view.phase === "queue-init") {
+    actionDetail = vi ? `${coord(view.start)} vào queue; vì chỉ có một phần tử nên nó vừa là FRONT vừa là BACK.` : `${coord(view.start)} enters the queue; as its only item, it is both FRONT and BACK.`;
+  } else if (bfs && view.phase === "fill-start") {
+    actionDetail = vi ? "Tô ô bắt đầu ngay khi enqueue để đánh dấu visited và tránh enqueue trùng." : "Recolor the start cell on enqueue to mark it visited and prevent duplicate enqueue.";
+  } else if (bfs && view.phase === "directions") {
+    actionDetail = vi ? "Bốn hướng không có đường chéo: xuống, lên, phải, trái." : "Use four non-diagonal directions: down, up, right, and left.";
+  } else if (bfs && view.phase === "queue-check") {
+    actionDetail = vi ? `Queue còn ${view.stack.length} ô; BFS sẽ lấy ô ở FRONT.` : `${view.stack.length} cell(s) remain; BFS removes the FRONT cell next.`;
+  } else if (bfs && view.phase === "dequeue") {
+    actionDetail = vi ? `${coord(view.current)} vừa rời FRONT và trở thành CURRENT; thứ tự các ô còn lại không đổi.` : `${coord(view.current)} just left FRONT and became CURRENT; the remaining order is unchanged.`;
+  } else if (bfs && view.phase === "direction") {
+    actionDetail = vi ? `Từ CURRENT ${coord(view.current)}, chọn hướng ${arrow}; bước sau mới tính neighbor.` : `From CURRENT ${coord(view.current)}, choose direction ${arrow}; the next line computes the neighbor.`;
+  } else if (bfs && view.phase === "next-row") {
+    actionDetail = vi ? `Tính next_row = ${view.nextRow}; bước sau mới tính next_col.` : `Compute next_row = ${view.nextRow}; the next line computes next_col.`;
+  } else if (bfs && view.phase === "neighbor") {
+    actionDetail = vi ? `Hướng ${arrow} từ ${coord(view.current)} tạo neighbor ${coord(view.neighbor)}.` : `Direction ${arrow} from ${coord(view.current)} produces neighbor ${coord(view.neighbor)}.`;
+  } else if (bfs && view.phase === "row-bounds") {
+    actionDetail = vi ? `row_inside = ${truth(view.rowInside)} vì kiểm tra 0 <= ${view.nextRow} < ${view.rows}.` : `row_inside = ${truth(view.rowInside)} from checking 0 <= ${view.nextRow} < ${view.rows}.`;
+  } else if (bfs && view.phase === "col-bounds") {
+    actionDetail = vi ? `col_inside = ${truth(view.colInside)} vì kiểm tra 0 <= ${view.nextCol} < ${view.cols}.` : `col_inside = ${truth(view.colInside)} from checking 0 <= ${view.nextCol} < ${view.cols}.`;
+  } else if (bfs && view.phase === "bounds-check") {
+    actionDetail = view.insideGrid
+      ? (vi ? `${coord(view.neighbor)} nằm trong image; tiếp tục kiểm tra màu.` : `${coord(view.neighbor)} is inside the image; check its color next.`)
+      : (vi ? `${coord(view.neighbor)} nằm ngoài image; không được truy cập ô này.` : `${coord(view.neighbor)} is outside the image; do not access this cell.`);
+  } else if (bfs && view.phase === "continue-bounds") {
+    actionDetail = vi ? "continue bỏ neighbor ngoài biên và chuyển sang hướng tiếp theo; queue không đổi." : "continue skips the out-of-bounds neighbor and moves to the next direction; the queue is unchanged.";
+  } else if (bfs && view.phase === "color-check") {
+    actionDetail = view.matchesOriginal
+      ? (vi ? `image${coord(view.neighbor)} vẫn bằng ${view.originalColor}; neighbor thuộc vùng cần tô.` : `image${coord(view.neighbor)} still equals ${view.originalColor}; the neighbor belongs to the fill region.`)
+      : (vi ? `image${coord(view.neighbor)} không bằng ${view.originalColor}; đây là biên màu hoặc ô đã visited.` : `image${coord(view.neighbor)} does not equal ${view.originalColor}; it is a color boundary or an already visited cell.`);
+  } else if (bfs && view.phase === "continue-color") {
+    actionDetail = vi ? "continue bỏ ô khác màu hoặc đã tô; không thêm nó vào queue." : "continue skips a different or visited cell; it is not added to the queue.";
+  } else if (bfs && view.phase === "fill-neighbor") {
+    actionDetail = vi ? `Đổi ${coord(view.neighbor)} sang màu ${view.newColor} trước khi enqueue để đánh dấu visited.` : `Recolor ${coord(view.neighbor)} to ${view.newColor} before enqueueing it to mark it visited.`;
+  } else if (bfs && view.phase === "enqueue-neighbor") {
+    actionDetail = vi ? `${coord(view.neighbor)} vào BACK; mọi ô đứng trước sẽ được dequeue trước nó.` : `${coord(view.neighbor)} enters at BACK; every cell ahead of it will be dequeued first.`;
+  } else if (bfs && view.phase === "queue-empty") {
+    actionDetail = vi ? "Queue rỗng: toàn bộ component nối với ô bắt đầu đã được xử lý." : "The queue is empty: the entire component connected to the start has been processed.";
+  } else if (bfs) {
+    actionDetail = vi ? `Hoàn tất BFS: ${view.filledCount} ô đã đổi sang màu ${view.newColor}.` : `BFS complete: ${view.filledCount} cell(s) were changed to color ${view.newColor}.`;
+  } else if (recursive && view.phase === "enter") {
     actionDetail = vi ? "Cách 2 dùng call stack của dfs; mỗi lời gọi tạo một frame riêng." : "Approach 2 uses the dfs call stack; every call creates its own frame.";
   } else if (recursive && view.phase === "rows") {
     actionDetail = vi ? `rows = ${view.rows}: lưu số hàng để kiểm tra biên.` : `rows = ${view.rows}: store the row count for bounds checks.`;
@@ -1806,15 +1921,15 @@ function renderFloodFillView(step) {
   }
 
   const summary = vi
-    ? `Flood Fill ${view.rows} nhân ${view.cols}; đã tô ${view.filledCount} ô; ${recursive ? "call stack" : "stack"} có ${view.stack.length} frame.`
-    : `Flood Fill ${view.rows} by ${view.cols}; ${view.filledCount} cells recolored; ${view.stack.length} ${recursive ? "call" : "DFS"} stack frame(s).`;
-  $("treeView").innerHTML = `<section class="flood-fill-viz${recursive ? " is-recursive" : ""}" role="img" aria-label="${escapeHtml(summary)}">
+    ? `Flood Fill ${view.rows} nhân ${view.cols}; đã tô ${view.filledCount} ô; ${recursive ? "call stack" : bfs ? "queue" : "stack"} có ${view.stack.length} phần tử.`
+    : `Flood Fill ${view.rows} by ${view.cols}; ${view.filledCount} cells recolored; ${view.stack.length} item(s) in the ${recursive ? "call stack" : bfs ? "BFS queue" : "DFS stack"}.`;
+  $("treeView").innerHTML = `<section class="flood-fill-viz${recursive ? " is-recursive" : bfs ? " is-bfs" : ""}" role="img" aria-label="${escapeHtml(summary)}">
     <div class="flood-fill-phases">${phasesHtml}</div>
     <div class="flood-fill-status">
       <span><small>${vi ? "MÀU GỐC" : "SOURCE"}</small><strong>${view.originalColor === null ? "?" : escapeHtml(view.originalColor)}</strong></span>
       <span><small>${vi ? "MÀU MỚI" : "NEW COLOR"}</small><strong>${escapeHtml(view.newColor)}</strong></span>
       <span><small>${vi ? "ĐÃ TÔ" : "RECOLORED"}</small><strong>${view.filledCount}</strong></span>
-      <span><small>${recursive ? "CALL STACK" : "STACK"}</small><strong>${view.stack.length}</strong></span>
+      <span><small>${recursive ? "CALL STACK" : bfs ? "QUEUE" : "STACK"}</small><strong>${view.stack.length}</strong></span>
     </div>
     <div class="flood-fill-main">
       <section class="flood-fill-image-section">
@@ -1822,7 +1937,7 @@ function renderFloodFillView(step) {
         <div class="flood-fill-grid-scroll"><div class="flood-fill-grid" style="--flood-cols:${view.cols}">${cellsHtml}</div></div>
       </section>
       <section class="flood-fill-work-section">
-        <header><strong>${recursive ? "CALL STACK" : "DFS STACK"}</strong><span>${recursive ? (vi ? "TOP frame ở bên phải" : "TOP frame at the right") : (vi ? "push/pop ở bên phải" : "push/pop at the right")}</span></header>
+        <header><strong>${recursive ? "CALL STACK" : bfs ? "BFS QUEUE" : "DFS STACK"}</strong><span>${recursive ? (vi ? "TOP frame ở bên phải" : "TOP frame at the right") : bfs ? (vi ? "popleft FRONT · append BACK" : "popleft FRONT · append BACK") : (vi ? "push/pop ở bên phải" : "push/pop at the right")}</span></header>
         <div class="flood-fill-stack">${stackHtml}</div>
         <div class="flood-fill-directions">${directionHtml}</div>
         ${routeHtml}

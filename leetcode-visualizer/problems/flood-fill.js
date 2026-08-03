@@ -402,6 +402,253 @@ function buildSteps733Recursive(input, params = {}) {
   return { original, answer: image, steps };
 }
 
+function buildSteps733Bfs(input, params = {}) {
+  const parsed = parseNumbers(input);
+  const original = parsed.grid.map((row) => [...row]);
+  if (!parsed.valid) {
+    const result = invalid(original, tr("Image phải là ma trận chữ nhật gồm số nguyên.", "Image must be a rectangular integer matrix."));
+    result.steps.forEach((step) => { step.codeBlock = 3; });
+    return result;
+  }
+
+  const image = parsed.grid.map((row) => [...row]);
+  const rows = image.length;
+  const cols = image[0].length;
+  const startRow = Number(params.start_row ?? params.sr ?? 1);
+  const startCol = Number(params.start_col ?? params.sc ?? 1);
+  const color = Number(params.color ?? 2);
+  if (!Number.isInteger(startRow) || !Number.isInteger(startCol) || !Number.isInteger(color)
+    || startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols) {
+    const result = invalid(original, tr("sr/sc phải nằm trong image và color phải là số nguyên.", "sr/sc must be inside the image and color must be an integer."));
+    result.steps.forEach((step) => { step.codeBlock = 3; });
+    return result;
+  }
+
+  const originalColor = image[startRow][startCol];
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const changed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const queue = [];
+  const steps = [];
+  let phase = "enter";
+  let currentCell = null;
+  let neighborCell = null;
+  let activeDirection = null;
+  let nextRowValue = null;
+  let nextColValue = null;
+  let rowInside = null;
+  let colInside = null;
+  let insideGrid = null;
+  let matchesOriginal = null;
+  let canFillNeighbor = null;
+  let originalKnown = false;
+
+  function push(line, title, note, options = {}) {
+    const filledCount = changed.reduce((total, row) => total + row.filter(Boolean).length, 0);
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: [line],
+      codeBlock: 3,
+      vars: [
+        ...(options.vars || []),
+        { name: "queue", value: stackText(queue) },
+      ],
+      note,
+      floodFillView: {
+        phase,
+        mode: "bfs",
+        rows,
+        cols,
+        image: image.map((row) => [...row]),
+        original: original.map((row) => [...row]),
+        changed: changed.map((row) => [...row]),
+        start: [startRow, startCol],
+        current: currentCell ? [...currentCell] : null,
+        neighbor: neighborCell ? [...neighborCell] : null,
+        direction: activeDirection ? [...activeDirection] : null,
+        nextRow: nextRowValue,
+        nextCol: nextColValue,
+        rowInside,
+        colInside,
+        insideGrid,
+        matchesOriginal,
+        canFill: canFillNeighbor,
+        originalColor: originalKnown ? originalColor : null,
+        newColor: color,
+        stack: queue.map((cell) => [...cell]),
+        filledCount,
+      },
+    });
+  }
+
+  push(4, tr("Bắt đầu floodFill bằng BFS", "Enter BFS floodFill"), tr("Cách 3 dùng queue: lấy ở FRONT và thêm neighbor mới vào BACK.", "Approach 3 uses a queue: remove from FRONT and add new neighbors at BACK."), {
+    vars: [{ name: "start", value: coordText(startRow, startCol) }, { name: "color", value: color }],
+  });
+  phase = "dimensions";
+  push(5, tr(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), tr("Lưu kích thước để kiểm tra neighbor có nằm trong image hay không.", "Store the dimensions for neighbor bounds checks."), {
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+  });
+  originalKnown = true;
+  currentCell = [startRow, startCol];
+  phase = "read-color";
+  push(6, tr(`original_color = ${originalColor}`, `original_color = ${originalColor}`), tr("BFS chỉ thêm các ô nối liền còn mang màu gốc này.", "BFS only enqueues connected cells still carrying this source color."), {
+    vars: [{ name: "original_color", value: originalColor }],
+  });
+
+  const unchanged = originalColor === color;
+  phase = "same-color-check";
+  push(8, tr(`original_color == color → ${unchanged}`, `original_color == color → ${unchanged}`), unchanged
+    ? tr("Màu mới trùng màu gốc; return trước khi tạo queue.", "The new color matches the source; return before creating the queue.")
+    : tr("Màu khác nhau; có thể bắt đầu BFS.", "The colors differ; BFS can begin."), {
+    vars: [{ name: "same color?", value: unchanged }],
+  });
+  if (unchanged) {
+    phase = "done";
+    push(9, tr("return image", "return image"), tr("Image giữ nguyên và queue chưa được tạo.", "The image is unchanged and no queue is created."), {
+      final: true,
+      vars: [{ name: "answer", value: JSON.stringify(image) }],
+    });
+    return { original, answer: image, steps };
+  }
+
+  queue.push([startRow, startCol]);
+  phase = "queue-init";
+  push(11, tr(`queue = deque([${coordText(startRow, startCol)}])`, `queue = deque([${coordText(startRow, startCol)}])`), tr("Ô bắt đầu vừa là FRONT vừa là BACK của queue.", "The start cell is both FRONT and BACK of the queue."));
+
+  image[startRow][startCol] = color;
+  changed[startRow][startCol] = true;
+  phase = "fill-start";
+  push(12, tr(`image[${startRow}][${startCol}] = ${color}`, `image[${startRow}][${startCol}] = ${color}`), tr("Tô ngay khi enqueue để ô này không thể được thêm lần hai.", "Recolor on enqueue so this cell cannot be added twice."));
+
+  phase = "directions";
+  push(13, tr("Khai báo 4 hướng", "Define four directions"), tr("BFS lan theo cạnh: xuống, lên, phải, trái.", "BFS spreads through edges: down, up, right, and left."), {
+    vars: [{ name: "directions", value: "down, up, right, left" }],
+  });
+
+  while (queue.length) {
+    currentCell = null;
+    neighborCell = null;
+    activeDirection = null;
+    insideGrid = null;
+    matchesOriginal = null;
+    canFillNeighbor = null;
+    phase = "queue-check";
+    push(15, tr("while queue → True", "while queue → True"), tr(`Queue còn ${queue.length} ô; lấy ô ở FRONT tiếp theo.`, `${queue.length} cell(s) remain; remove the next cell from FRONT.`));
+
+    const [row, col] = queue.shift();
+    currentCell = [row, col];
+    phase = "dequeue";
+    push(16, tr(`popleft → ${coordText(row, col)}`, `popleft → ${coordText(row, col)}`), tr("Chỉ FRONT rời queue; các ô phía sau giữ nguyên thứ tự FIFO.", "Only FRONT leaves the queue; cells behind it keep FIFO order."), {
+      vars: [{ name: "row", value: row }, { name: "col", value: col }],
+    });
+
+    for (const [deltaRow, deltaCol] of directions) {
+      activeDirection = [deltaRow, deltaCol];
+      neighborCell = null;
+      nextRowValue = null;
+      nextColValue = null;
+      rowInside = null;
+      colInside = null;
+      insideGrid = null;
+      matchesOriginal = null;
+      canFillNeighbor = null;
+      phase = "direction";
+      push(18, tr(`Thử hướng (${deltaRow},${deltaCol})`, `Try direction (${deltaRow},${deltaCol})`), tr("Chọn một trong bốn hướng từ CURRENT.", "Choose one of four directions from CURRENT."), {
+        vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }],
+      });
+
+      const nextRow = row + deltaRow;
+      nextRowValue = nextRow;
+      phase = "next-row";
+      push(19, tr(`next_row = ${nextRow}`, `next_row = ${nextRow}`), tr("Tính hàng của neighbor; cột sẽ được tính ở dòng tiếp theo.", "Compute the neighbor row; its column is computed on the next line."), {
+        vars: [{ name: "next_row", value: nextRow }],
+      });
+
+      const nextCol = col + deltaCol;
+      nextColValue = nextCol;
+      neighborCell = [nextRow, nextCol];
+      phase = "neighbor";
+      push(20, tr(`next_col = ${nextCol}`, `next_col = ${nextCol}`), tr(`Ghép next_row và next_col thành neighbor ${coordText(nextRow, nextCol)}.`, `Combine next_row and next_col into neighbor ${coordText(nextRow, nextCol)}.`), {
+        vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
+      });
+
+      rowInside = nextRow >= 0 && nextRow < rows;
+      phase = "row-bounds";
+      push(22, tr(`row_inside = ${rowInside}`, `row_inside = ${rowInside}`), tr(`Kiểm tra 0 <= ${nextRow} < ${rows}.`, `Check 0 <= ${nextRow} < ${rows}.`), {
+        vars: [{ name: "row_inside", value: rowInside }],
+      });
+
+      colInside = nextCol >= 0 && nextCol < cols;
+      phase = "col-bounds";
+      push(23, tr(`col_inside = ${colInside}`, `col_inside = ${colInside}`), tr(`Kiểm tra 0 <= ${nextCol} < ${cols}.`, `Check 0 <= ${nextCol} < ${cols}.`), {
+        vars: [{ name: "col_inside", value: colInside }],
+      });
+
+      insideGrid = rowInside && colInside;
+      phase = "bounds-check";
+      push(25, tr(`not row_inside or not col_inside → ${!insideGrid}`, `not row_inside or not col_inside → ${!insideGrid}`), insideGrid
+        ? tr("Neighbor nằm trong image; tiếp tục kiểm tra màu.", "The neighbor is inside the image; check its color next.")
+        : tr("Neighbor ngoài image; dòng continue bỏ hướng này.", "The neighbor is outside the image; continue skips this direction."), {
+        vars: [{ name: "in bounds?", value: insideGrid }],
+      });
+      if (!insideGrid) {
+        phase = "continue-bounds";
+        push(26, tr("continue vì ngoài biên", "Continue out of bounds"), tr("Không truy cập image[next_row][next_col]; chuyển sang hướng kế tiếp.", "Do not access image[next_row][next_col]; move to the next direction."));
+        continue;
+      }
+
+      matchesOriginal = image[nextRow][nextCol] === originalColor;
+      canFillNeighbor = matchesOriginal;
+      phase = "color-check";
+      push(28, tr(`image[${nextRow}][${nextCol}] != original → ${!matchesOriginal}`, `image[${nextRow}][${nextCol}] != original → ${!matchesOriginal}`), matchesOriginal
+        ? tr("Neighbor còn màu gốc; được phép tô và enqueue.", "The neighbor still has the source color; recolor and enqueue it.")
+        : tr("Neighbor khác màu hoặc đã được tô; bỏ qua để không enqueue trùng.", "The neighbor differs or was already recolored; skip it to avoid duplicate enqueue."), {
+        vars: [{ name: `image[${nextRow}][${nextCol}]`, value: image[nextRow][nextCol] }, { name: "matches original?", value: matchesOriginal }],
+      });
+      if (!matchesOriginal) {
+        phase = "continue-color";
+        push(29, tr("continue vì màu không khớp", "Continue on color mismatch"), tr("Queue không thay đổi; xét hướng kế tiếp.", "The queue stays unchanged; inspect the next direction."));
+        continue;
+      }
+
+      image[nextRow][nextCol] = color;
+      changed[nextRow][nextCol] = true;
+      phase = "fill-neighbor";
+      push(31, tr(`image[${nextRow}][${nextCol}] = ${color}`, `image[${nextRow}][${nextCol}] = ${color}`), tr("Đánh dấu neighbor đã thăm trước khi đưa vào queue.", "Mark the neighbor visited before adding it to the queue."), {
+        vars: [{ name: "recolored", value: coordText(nextRow, nextCol) }],
+      });
+
+      queue.push([nextRow, nextCol]);
+      phase = "enqueue-neighbor";
+      push(32, tr(`queue.append(${coordText(nextRow, nextCol)})`, `queue.append(${coordText(nextRow, nextCol)})`), tr("Neighbor vào BACK; các ô đã chờ trước nó sẽ được xử lý trước.", "The neighbor enters at BACK; cells already waiting will be processed first."), {
+        vars: [{ name: "enqueued", value: coordText(nextRow, nextCol) }],
+      });
+    }
+  }
+
+  currentCell = null;
+  neighborCell = null;
+  activeDirection = null;
+  nextRowValue = null;
+  nextColValue = null;
+  rowInside = null;
+  colInside = null;
+  insideGrid = null;
+  matchesOriginal = null;
+  canFillNeighbor = null;
+  phase = "queue-empty";
+  push(15, tr("while queue → False", "while queue → False"), tr("Queue rỗng: không còn ô nào trong component cần mở rộng.", "The queue is empty: no cell in the component remains to expand."));
+  phase = "done";
+  push(34, tr("return image", "return image"), tr("Trả về image sau khi BFS tô xong toàn bộ vùng.", "Return the image after BFS fills the entire region."), {
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(image) }],
+  });
+  return { original, answer: image, steps };
+}
+
 function coordText(row, col) {
   return `(${row},${col})`;
 }
@@ -455,16 +702,18 @@ const problems = {
         options: [
           { value: "1", label: tr("Cách 1: DFS stack", "Approach 1: DFS stack") },
           { value: "2", label: tr("Cách 2: DFS đệ quy", "Approach 2: recursive DFS") },
+          { value: "3", label: tr("Cách 3: BFS queue", "Approach 3: BFS queue") },
         ],
       },
       { key: "start_row", label: tr("start_row", "start_row"), default: 1 },
       { key: "start_col", label: tr("start_col", "start_col"), default: 1 },
       { key: "color", label: tr("color mới", "new color"), default: 2 },
     ],
-    approach: [tr("Cả hai cách đều lưu màu ban đầu và trả ngay nếu màu mới đã giống màu cũ.", "Both approaches store the source color and return immediately when the new color already matches it."),tr("Cách 1 dùng stack tự tạo; tô ô trước khi push để không thêm trùng.", "Approach 1 uses an explicit stack and recolors before pushing to prevent duplicates."),tr("Cách 2 dùng recursive call stack; hai base case chặn ô ngoài biên và ô không còn màu gốc.", "Approach 2 uses the recursive call stack; two base cases stop out-of-bounds cells and cells no longer carrying the source color.")],
-    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô hợp lệ được tô một lần; bộ nhớ là stack tự tạo hoặc recursive call stack.", "Each valid cell is recolored once; memory is the explicit stack or the recursive call stack.") },
+    approach: [tr("Cả ba cách đều lưu màu ban đầu và tô ô ngay khi phát hiện để tránh thêm trùng.", "All three approaches store the source color and recolor on discovery to avoid duplicates."),tr("Cách 1 và 2 dùng DFS: stack tự tạo hoặc recursive call stack.", "Approaches 1 and 2 use DFS through an explicit stack or the recursive call stack."),tr("Cách 3 dùng BFS queue: popleft ở FRONT, append vào BACK nên vùng lan theo từng lớp.", "Approach 3 uses a BFS queue: popleft from FRONT and append at BACK, so the region spreads layer by layer.")],
+    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô hợp lệ được tô một lần; bộ nhớ là DFS stack, call stack hoặc BFS queue.", "Each valid cell is recolored once; memory is the DFS stack, call stack, or BFS queue.") },
     codeLabel: tr("Cách 1: DFS stack", "Approach 1: DFS stack"),
     code2Label: tr("Cách 2: DFS đệ quy", "Approach 2: recursive DFS"),
+    code3Label: tr("Cách 3: BFS queue", "Approach 3: BFS queue"),
     code: [
       "from typing import List", "", "class Solution:",
       "    def floodFill(self, image: List[List[int]], start_row: int, start_col: int, color: int) -> List[List[int]]:",
@@ -512,13 +761,52 @@ const problems = {
       "",
       "        return image",
     ],
+    code3: [
+      "from collections import deque",
+      "",
+      "class Solution:",
+      "    def floodFill(self, image, sr, sc, color):",
+      "        rows, cols = len(image), len(image[0])",
+      "        original_color = image[sr][sc]",
+      "",
+      "        if original_color == color:",
+      "            return image",
+      "",
+      "        queue = deque([(sr, sc)])",
+      "        image[sr][sc] = color",
+      "        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
+      "        while queue:",
+      "            row, col = queue.popleft()",
+      "",
+      "            for delta_row, delta_col in directions:",
+      "                next_row = row + delta_row",
+      "                next_col = col + delta_col",
+      "",
+      "                row_inside = 0 <= next_row < rows",
+      "                col_inside = 0 <= next_col < cols",
+      "",
+      "                if not row_inside or not col_inside:",
+      "                    continue",
+      "",
+      "                if image[next_row][next_col] != original_color:",
+      "                    continue",
+      "",
+      "                image[next_row][next_col] = color",
+      "                queue.append((next_row, next_col))",
+      "",
+      "        return image",
+    ],
     liveArgs: (input, params = {}) => {
       const parsed = parseNumbers(input);
       return [parsed.grid, Number(params.start_row ?? 1), Number(params.start_col ?? 1), Number(params.color ?? 2)];
     },
-    builder: (input, params) => Number(params && params.approach) === 2
-      ? buildSteps733Recursive(input, params)
-      : buildSteps733(input, params),
+    builder: (input, params) => {
+      const approach = Number(params && params.approach);
+      if (approach === 3) return buildSteps733Bfs(input, params);
+      if (approach === 2) return buildSteps733Recursive(input, params);
+      return buildSteps733(input, params);
+    },
   },
   200: {
     id: 200, difficulty: "medium", slug: "number-of-islands",
