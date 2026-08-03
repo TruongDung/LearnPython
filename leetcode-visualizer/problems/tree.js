@@ -73,6 +73,7 @@ function snapshot(root, opts) {
     codeBlock: opts.codeBlock,
     queueView: opts.queueView,
     rightSideBfsView: opts.rightSideBfsView,
+    rightSideDfsView: opts.rightSideDfsView,
     vars: opts.vars || [],
     note: opts.note,
   };
@@ -1237,6 +1238,250 @@ function buildSteps199v2(input) {
     rightSideBfsView: makeRightSideBfsView({ codeLines: [18], queueOperation: "done" }),
     vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }, { name: "answer", value: `[${res.join(",")}]` }],
     note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
+  });
+  finalStep.final = true;
+  steps.push(finalStep);
+  return { input, answer: `[${res.join(",")}]`, steps };
+}
+
+// ─── 199 Approach 3: right-first DFS, fully line-by-line ───
+function buildSteps199v3(input) {
+  const root = parseTree(input);
+  const steps = [];
+  const res = [];
+  const visible = new Set();
+  const selectedDepth = new Map();
+  const callStack = [];
+  const visitOrder = [];
+
+  function treeDepth(node, depth = 0) {
+    if (!node) return depth - 1;
+    return Math.max(treeDepth(node.left, depth + 1), treeDepth(node.right, depth + 1));
+  }
+  const maxDepth = Math.max(0, treeDepth(root));
+
+  function annotationsFor(current, nextCall) {
+    const annotations = {};
+    visible.forEach((id) => {
+      annotations[id] = {
+        labels: [{ label: `VIEW d=${selectedDepth.get(id)}`, kind: "rsv-dfs-answer" }],
+      };
+    });
+    if (current) {
+      const frame = callStack[callStack.length - 1];
+      const via = frame && frame.via !== "root" ? ` · ${frame.via.toUpperCase()}` : "";
+      const labels = annotations[current.id] && annotations[current.id].labels
+        ? [...annotations[current.id].labels]
+        : [];
+      labels.push({ label: `CURRENT${via}`, kind: "rsv-dfs-current" });
+      annotations[current.id] = { labels };
+    }
+    if (nextCall && nextCall.node) {
+      const labels = annotations[nextCall.node.id] && annotations[nextCall.node.id].labels
+        ? [...annotations[nextCall.node.id].labels]
+        : [];
+      labels.push({ label: `NEXT ${nextCall.side.toUpperCase()}`, kind: "rsv-dfs-next" });
+      annotations[nextCall.node.id] = { labels };
+    }
+    return annotations;
+  }
+
+  function makeDfsView(opts = {}) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current")
+      ? opts.current
+      : frame && frame.node;
+    return {
+      phase: opts.phase || "initialize",
+      current: current ? { id: current.id, val: current.val } : null,
+      isNullCall: Boolean(frame && frame.node === null),
+      depth: frame ? frame.depth : null,
+      via: frame ? frame.via : null,
+      stack: callStack.map((item) => ({
+        node: item.node ? item.node.val : null,
+        depth: item.depth,
+        via: item.via,
+      })),
+      result: [...res],
+      maxDepth,
+      decision: Object.prototype.hasOwnProperty.call(opts, "decision") ? opts.decision : null,
+      nextCall: opts.nextCall
+        ? {
+          node: opts.nextCall.node ? opts.nextCall.node.val : null,
+          depth: opts.nextCall.depth,
+          side: opts.nextCall.side,
+        }
+        : null,
+      visitOrder: visitOrder.map((item) => ({ ...item })),
+      selectedIds: [...visible],
+      action: opts.action,
+    };
+  }
+
+  function snap(opts) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current")
+      ? opts.current
+      : frame && frame.node;
+    const nextNode = opts.nextCall && opts.nextCall.node;
+    const highlighted = new Set();
+    if (current) highlighted.add(current.id);
+    if (nextNode) highlighted.add(nextNode.id);
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "node")) vars.push({ name: "node", value: current ? current.val : frame ? "None" : "not called" });
+    if (!vars.some((item) => item.name === "depth")) vars.push({ name: "depth", value: frame ? frame.depth : "not initialized" });
+    if (!vars.some((item) => item.name === "res")) vars.push({ name: "res", value: `[${res.join(",")}]` });
+    steps.push(snapshot(root, {
+      title: opts.title,
+      hlSet: opts.hlSet || highlighted,
+      wordSet: new Set(visible),
+      annotations: annotationsFor(current, opts.nextCall),
+      codeLines: opts.codeLines || [],
+      codeBlock: 3,
+      rightSideDfsView: makeDfsView({ ...opts, current }),
+      vars,
+      note: opts.note,
+    }));
+  }
+
+  snap({
+    title: { vi: "Bắt đầu rightSideView", en: "Enter rightSideView" },
+    codeLines: [2], phase: "initialize", current: null,
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    action: { vi: "Vào hàm; DFS chưa được gọi và call stack còn rỗng.", en: "Enter the function; DFS has not been called and the call stack is empty." },
+    note: { vi: "Cách 3 dùng DFS, luôn đi sang phải trước sang trái.", en: "Approach 3 uses DFS and always explores right before left." },
+  });
+
+  snap({
+    title: { vi: "res = []", en: "res = []" },
+    codeLines: [3], phase: "initialize", current: null,
+    action: { vi: "Khởi tạo res rỗng; res[depth] sẽ là node đầu tiên DFS gặp ở depth đó.", en: "Initialize an empty res; res[depth] will be the first node DFS reaches at that depth." },
+    note: { vi: "Mỗi depth chỉ được thêm đúng một lần.", en: "Each depth is appended exactly once." },
+  });
+
+  snap({
+    title: { vi: "Định nghĩa hàm dfs(node, depth)", en: "Define dfs(node, depth)" },
+    codeLines: [4], phase: "initialize", current: null,
+    action: { vi: "Tạo hàm đệ quy nhận node hiện tại và depth của node.", en: "Define the recursive helper with the current node and its depth." },
+    note: { vi: "Thân hàm chỉ chạy khi dfs được gọi.", en: "The helper body runs only when dfs is called." },
+  });
+
+  const rootCall = { node: root, depth: 0, side: "root" };
+  snap({
+    title: { vi: `Gọi dfs(${root ? root.val : "None"}, 0)`, en: `Call dfs(${root ? root.val : "None"}, 0)` },
+    codeLines: [11], phase: "call-root", current: null, nextCall: rootCall,
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    action: { vi: "Bắt đầu từ root ở depth 0.", en: "Start from root at depth 0." },
+    note: { vi: "Bước kế tiếp sẽ tạo frame đầu tiên trên call stack.", en: "The next step creates the first call-stack frame." },
+  });
+
+  function dfs(node, depth, via) {
+    callStack.push({ node, depth, via });
+    if (node) visitOrder.push({ id: node.id, val: node.val, depth, selected: false });
+
+    snap({
+      title: { vi: `Vào dfs(${node ? node.val : "None"}, ${depth})`, en: `Enter dfs(${node ? node.val : "None"}, ${depth})` },
+      codeLines: [4], phase: "enter",
+      action: node
+        ? { vi: `Push frame node=${node.val}, depth=${depth} lên call stack.`, en: `Push node=${node.val}, depth=${depth} onto the call stack.` }
+        : { vi: `Push frame node=None, depth=${depth} để xử lý base case.`, en: `Push node=None, depth=${depth} to handle the base case.` },
+      note: { vi: "Frame ở cuối stack là lời gọi đang chạy.", en: "The last stack frame is the active call." },
+    });
+
+    const isNull = node === null;
+    snap({
+      title: { vi: `if not node → ${isNull}`, en: `if not node → ${isNull}` },
+      codeLines: [5], phase: "check-null",
+      vars: [{ name: "not node", value: isNull }],
+      action: isNull
+        ? { vi: "node là None nên điều kiện True; đi vào return.", en: "node is None, so the condition is true; proceed to return." }
+        : { vi: `node=${node.val} tồn tại nên điều kiện False; tiếp tục kiểm tra depth.`, en: `node=${node.val} exists, so the condition is false; continue to the depth check.` },
+      note: isNull
+        ? { vi: "Đây là điểm dừng của một nhánh cây.", en: "This is the stopping point for a tree branch." }
+        : { vi: "Không chạy dòng return của base case.", en: "Skip the base-case return line." },
+    });
+
+    if (isNull) {
+      snap({
+        title: { vi: "return khỏi dfs(None)", en: "Return from dfs(None)" },
+        codeLines: [6], phase: "return-null",
+        action: { vi: "Pop frame None và quay lại lời gọi cha; res không đổi.", en: "Pop the None frame and return to the caller; res is unchanged." },
+        note: { vi: "Không có node nào được thêm vào kết quả.", en: "No node is added to the result." },
+      });
+      callStack.pop();
+      return;
+    }
+
+    const isFirstAtDepth = depth === res.length;
+    snap({
+      title: { vi: `depth == len(res) → ${isFirstAtDepth}`, en: `depth == len(res) → ${isFirstAtDepth}` },
+      codeLines: [7], phase: "check-depth", decision: isFirstAtDepth,
+      vars: [{ name: "depth", value: depth }, { name: "len(res)", value: res.length }],
+      action: isFirstAtDepth
+        ? { vi: `depth=${depth} chưa có đại diện; ${node.val} là node đầu tiên gặp ở depth này.`, en: `Depth ${depth} has no representative; ${node.val} is the first node reached at this depth.` }
+        : { vi: `depth=${depth} đã có res[${depth}]=${res[depth]}; không thêm ${node.val}.`, en: `Depth ${depth} already has res[${depth}]=${res[depth]}; do not add ${node.val}.` },
+      note: isFirstAtDepth
+        ? { vi: "Vì DFS đi phải trước, node đầu tiên của depth là node nhìn thấy từ bên phải.", en: "Because DFS goes right first, the first node at a depth is visible from the right." }
+        : { vi: "Node ngoài cùng bên phải của depth này đã được lưu trước đó.", en: "The rightmost node at this depth was already stored." },
+    });
+
+    if (isFirstAtDepth) {
+      res.push(node.val);
+      visible.add(node.id);
+      selectedDepth.set(node.id, depth);
+      visitOrder[visitOrder.length - 1].selected = true;
+      snap({
+        title: { vi: `res.append(${node.val})`, en: `res.append(${node.val})` },
+        codeLines: [8], phase: "save", decision: true,
+        action: { vi: `Lưu ${node.val} cho depth ${depth}; res=[${res.join(",")}].`, en: `Save ${node.val} for depth ${depth}; res=[${res.join(",")}].` },
+        note: { vi: `${node.val} được đánh dấu là node nhìn thấy bên phải.`, en: `${node.val} is marked as visible from the right.` },
+      });
+    }
+
+    const rightCall = { node: node.right, depth: depth + 1, side: "right" };
+    snap({
+      title: { vi: `Gọi dfs(${node.right ? node.right.val : "None"}, ${depth + 1}) bên PHẢI`, en: `Call dfs(${node.right ? node.right.val : "None"}, ${depth + 1}) on the RIGHT` },
+      codeLines: [9], phase: "call-right", nextCall: rightCall,
+      action: node.right
+        ? { vi: `Ưu tiên nhánh phải: từ ${node.val} đi tới ${node.right.val}.`, en: `Prioritize the right branch: move from ${node.val} to ${node.right.val}.` }
+        : { vi: `${node.val} không có con phải; vẫn gọi dfs(None) để chạy base case.`, en: `${node.val} has no right child; still call dfs(None) to execute the base case.` },
+      note: { vi: "Dòng gọi nhánh trái chỉ chạy sau khi toàn bộ nhánh phải return.", en: "The left-call line runs only after the entire right branch returns." },
+    });
+    dfs(node.right, depth + 1, "right");
+
+    const leftCall = { node: node.left, depth: depth + 1, side: "left" };
+    snap({
+      title: { vi: `Nhánh phải đã xong; gọi dfs(${node.left ? node.left.val : "None"}, ${depth + 1}) bên TRÁI`, en: `Right branch complete; call dfs(${node.left ? node.left.val : "None"}, ${depth + 1}) on the LEFT` },
+      codeLines: [10], phase: "call-left", nextCall: leftCall,
+      action: node.left
+        ? { vi: `Backtrack về ${node.val}, rồi mới đi sang con trái ${node.left.val}.`, en: `Backtrack to ${node.val}, then move to left child ${node.left.val}.` }
+        : { vi: `Backtrack về ${node.val}; không có con trái nên gọi dfs(None).`, en: `Backtrack to ${node.val}; it has no left child, so call dfs(None).` },
+      note: { vi: "Các depth đã có kết quả sẽ không bị ghi đè khi đi nhánh trái.", en: "Depths that already have a result are not overwritten while exploring left." },
+    });
+    dfs(node.left, depth + 1, "left");
+
+    snap({
+      title: { vi: `Hoàn tất dfs(${node.val}, ${depth})`, en: `Complete dfs(${node.val}, ${depth})` },
+      codeLines: [10], phase: "return-node",
+      action: { vi: `Cả nhánh phải và trái của ${node.val} đã xong; pop frame này để quay về caller.`, en: `Both branches of ${node.val} are complete; pop this frame and return to the caller.` },
+      note: { vi: "Đây là bước quay lui của DFS.", en: "This is the DFS backtracking step." },
+    });
+    callStack.pop();
+  }
+
+  dfs(root, 0, "root");
+
+  const finalStep = snapshot(root, {
+    title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
+    wordSet: new Set(visible),
+    annotations: annotationsFor(null, null),
+    codeLines: [12], codeBlock: 3,
+    rightSideDfsView: makeDfsView({
+      phase: "done", current: null,
+      action: { vi: `DFS hoàn tất; trả về [${res.join(",")}].`, en: `DFS is complete; return [${res.join(",")}].` },
+    }),
+    vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "answer", value: `[${res.join(",")}]` }],
+    note: { vi: `Right side view từ trên xuống là [${res.join(",")}].`, en: `The top-to-bottom right side view is [${res.join(",")}].` },
   });
   finalStep.final = true;
   steps.push(finalStep);
@@ -3490,16 +3735,19 @@ module.exports = {
         options: [
           { value: "1", label: { vi: "Cách 1: BFS queue theo tầng", en: "Approach 1: BFS queue by level" } },
           { value: "2", label: { vi: "Cách 2: BFS deque + size", en: "Approach 2: BFS deque + size" } },
+          { value: "3", label: { vi: "Cách 3: DFS ưu tiên nhánh phải", en: "Approach 3: right-first DFS" } },
         ],
       },
     ],
     approach: [
       { vi: "Cách 1: BFS theo tầng, lấy node cuối của queue hiện tại trước khi tạo queue tầng kế tiếp.", en: "Approach 1: BFS by level, taking the current queue's last node before building the next level." },
       { vi: "Cách 2: Dùng deque, chốt size của tầng rồi popleft đúng size node; node có i == size - 1 là node nhìn thấy bên phải.", en: "Approach 2: Use a deque, lock in the level size, then popleft exactly that many nodes; the node with i == size - 1 is visible from the right." },
+      { vi: "Cách 3: DFS đi nhánh phải trước; node đầu tiên gặp tại mỗi depth được thêm vào res vì đó là node ngoài cùng bên phải.", en: "Approach 3: DFS explores right first; the first node reached at each depth enters res because it is the rightmost node." },
     ],
-    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng.", en: "Queue holds at most one level." } },
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "BFS dùng queue tối đa O(n); DFS dùng call stack O(h).", en: "BFS uses up to O(n) queue space; DFS uses O(h) call-stack space." } },
     codeLabel: { vi: "Cách 1: BFS queue theo tầng", en: "Approach 1: BFS queue by level" },
     code2Label: { vi: "Cách 2: BFS deque + size", en: "Approach 2: BFS deque + size" },
+    code3Label: { vi: "Cách 3: DFS ưu tiên nhánh phải", en: "Approach 3: right-first DFS" },
     code: ["class Solution:", "    def rightSideView(self, root):", "        if not root: return []", "        res, queue = [], [root]", "        while queue:", "            res.append(queue[-1].val)   # rightmost", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
     code2: [
       "class Solution:",
@@ -3521,8 +3769,23 @@ module.exports = {
       "                    res.append(curr.val)",
       "        return res",
     ],
+    code3: [
+      "class Solution:",
+      "    def rightSideView(self, root):",
+      "        res = []",
+      "        def dfs(node, depth):",
+      "            if not node:",
+      "                return",
+      "            if depth == len(res):",
+      "                res.append(node.val)",
+      "            dfs(node.right, depth + 1)",
+      "            dfs(node.left, depth + 1)",
+      "        dfs(root, 0)",
+      "        return res",
+    ],
     builder: (input, params) => {
       const approach = Number(params && params.approach) || 1;
+      if (approach === 3) return buildSteps199v3(input);
       return approach === 2 ? buildSteps199v2(input) : buildSteps199(input);
     },
   },

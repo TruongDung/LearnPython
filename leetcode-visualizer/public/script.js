@@ -2446,6 +2446,111 @@ function rightSideBfsGuideHtml(view) {
   </section>`;
 }
 
+function rightSideDfsGuideHtml(view) {
+  const vi = lang === "vi";
+  const phaseGroup = {
+    initialize: 0,
+    "call-root": 0,
+    enter: 1,
+    "check-null": 1,
+    "call-right": 1,
+    "check-depth": 2,
+    save: 2,
+    "return-null": 3,
+    "call-left": 3,
+    "return-node": 3,
+    done: 3,
+  };
+  const activePhase = phaseGroup[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1. Gọi DFS từ root", "2. Đi nhánh PHẢI trước", "3. Lưu node đầu tiên mỗi depth", "4. Quay lui rồi đi TRÁI"]
+    : ["1. Call DFS from root", "2. Explore RIGHT first", "3. Save the first node per depth", "4. Backtrack, then go LEFT"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < activePhase;
+    const state = done ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${done ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+\.\s*/, ""))}</b></span>`;
+  }).join("");
+
+  const currentLabel = view.isNullCall
+    ? "None"
+    : view.current
+      ? view.current.val
+      : "—";
+  const viaLabel = view.via
+    ? view.via === "root"
+      ? "ROOT"
+      : view.via.toUpperCase()
+    : "—";
+  const statusHtml = `<div class="rsv-dfs-status">
+    <span><small>CURRENT NODE</small><strong>${escapeHtml(currentLabel)}</strong></span>
+    <span><small>DEPTH</small><strong>${view.depth === null ? "—" : escapeHtml(view.depth)}</strong></span>
+    <span><small>len(res)</small><strong>${(view.result || []).length}</strong></span>
+    <span><small>CALL VIA</small><strong>${escapeHtml(viaLabel)}</strong></span>
+  </div>`;
+
+  const stackHtml = (view.stack || []).length
+    ? view.stack.map((frame, index) => {
+      const isTop = index === view.stack.length - 1;
+      const frameClass = `${isTop ? " is-top" : ""}${frame.node === null ? " is-null" : ""}`;
+      const via = frame.via === "root" ? "ROOT" : frame.via.toUpperCase();
+      return `<span class="rsv-dfs-frame${frameClass}"><small>${via} · d=${frame.depth}</small><strong>${frame.node === null ? "None" : escapeHtml(frame.node)}</strong>${isTop ? `<em>${vi ? "ĐANG CHẠY" : "RUNNING"}</em>` : ""}</span>`;
+    }).join(`<b class="rsv-dfs-stack-arrow">→</b>`)
+    : `<em class="rsv-empty">${vi ? "call stack rỗng" : "empty call stack"}</em>`;
+
+  const depthRows = Array.from({ length: Math.max(1, (view.maxDepth || 0) + 1) }, (_, depth) => {
+    const hasValue = depth < (view.result || []).length;
+    const isCurrent = view.depth === depth;
+    const stateClass = `${hasValue ? " is-filled" : ""}${isCurrent ? " is-current" : ""}`;
+    const stateText = hasValue
+      ? (vi ? "đã chốt node phải nhất" : "rightmost node locked")
+      : isCurrent
+        ? (vi ? "đang kiểm tra depth này" : "checking this depth")
+        : (vi ? "chưa gặp" : "not reached");
+    return `<span class="rsv-dfs-depth${stateClass}"><small>depth ${depth}</small><strong>${hasValue ? escapeHtml(view.result[depth]) : "?"}</strong><em>${stateText}</em></span>`;
+  }).join("");
+
+  let decisionHtml;
+  if (view.decision === null) {
+    decisionHtml = `<code>depth == len(res)</code><strong>?</strong><span>${vi ? "True chỉ khi depth này chưa có node đại diện" : "True only when this depth has no representative"}</span>`;
+  } else {
+    const depth = view.depth === null ? "?" : view.depth;
+    const lenBefore = view.decision ? (view.result || []).length - (view.phase === "save" ? 1 : 0) : (view.result || []).length;
+    decisionHtml = `<code>${depth} == ${lenBefore}</code><strong class="${view.decision ? "is-true" : "is-false"}">${view.decision ? "True" : "False"}</strong><span>${view.decision ? (vi ? "node đầu tiên ở depth này → thêm vào res" : "first node at this depth → append to res") : (vi ? "depth đã có node nhìn thấy → bỏ qua" : "depth already has a visible node → skip")}</span>`;
+  }
+
+  const selectedIds = new Set(view.selectedIds || []);
+  const traversalHtml = (view.visitOrder || []).length
+    ? view.visitOrder.map((item, index) => {
+      const isCurrent = view.current && item.id === view.current.id;
+      const classes = `${selectedIds.has(item.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
+      return `<span class="rsv-dfs-visit${classes}"><small>#${index + 1} · d=${item.depth}</small><strong>${escapeHtml(item.val)}</strong>${selectedIds.has(item.id) ? `<em>VIEW</em>` : ""}</span>`;
+    }).join(`<b>→</b>`)
+    : `<em class="rsv-empty">${vi ? "chưa thăm node" : "no node visited yet"}</em>`;
+
+  const nextCallHtml = view.nextCall
+    ? `<span class="rsv-dfs-next-call"><small>${vi ? "LỜI GỌI KẾ TIẾP" : "NEXT CALL"}</small><code>dfs(${view.nextCall.node === null ? "None" : escapeHtml(view.nextCall.node)}, ${view.nextCall.depth})</code><strong>${escapeHtml(view.nextCall.side.toUpperCase())}</strong></span>`
+    : "";
+  const actionText = view.action ? pick(view.action) : (vi ? "DFS ưu tiên nhánh phải trước nhánh trái." : "DFS explores the right branch before the left branch.");
+  const resultHtml = (view.result || []).length
+    ? view.result.map((value, depth) => `<span><small>depth ${depth}</small><strong>${escapeHtml(value)}</strong></span>`).join("")
+    : `<em class="rsv-empty">[]</em>`;
+  const summary = vi
+    ? `DFS góc nhìn bên phải; depth hiện tại ${view.depth ?? "chưa có"}, kết quả [${(view.result || []).join(",")}].`
+    : `Right-side-view DFS; current depth ${view.depth ?? "none"}, result [${(view.result || []).join(",")}].`;
+
+  return `<section class="rsv-dfs-guide" aria-label="${escapeHtml(summary)}">
+    <div class="rsv-dfs-phases">${phasesHtml}</div>
+    ${statusHtml}
+    <div class="rsv-dfs-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame ngoài cùng bên phải đang chạy" : "the rightmost frame is running"}</span></header><div>${stackHtml}</div></div>
+    ${nextCallHtml}
+    <div class="rsv-dfs-depths"><header><strong>FIRST NODE AT EACH DEPTH</strong><span>RIGHT → LEFT</span></header><div>${depthRows}</div></div>
+    <div class="rsv-dfs-decision">${decisionHtml}</div>
+    <div class="rsv-dfs-action">${escapeHtml(actionText)}</div>
+    <div class="rsv-dfs-traversal"><strong>DFS ORDER</strong><div>${traversalHtml}</div></div>
+    <div class="rsv-result"><strong>RIGHT SIDE VIEW</strong><div>${resultHtml}</div></div>
+  </section>`;
+}
+
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -2602,7 +2707,8 @@ function renderTree(step, targetId = "treeView") {
     : "";
   const distanceKGuide = step.distanceKView ? distanceKGuideHtml(step.distanceKView) : "";
   const rightSideBfsGuide = step.rightSideBfsView ? rightSideBfsGuideHtml(step.rightSideBfsView) : "";
-  $(targetId).innerHTML = decisionHeader + distanceKGuide + rightSideBfsGuide + (step.queueView
+  const rightSideDfsGuide = step.rightSideDfsView ? rightSideDfsGuideHtml(step.rightSideDfsView) : "";
+  $(targetId).innerHTML = decisionHeader + distanceKGuide + rightSideBfsGuide + rightSideDfsGuide + (step.queueView
     ? `<div class="tree-queue-layout${step.queueView.layout === "stacked" ? " tree-queue-stacked" : ""}">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
