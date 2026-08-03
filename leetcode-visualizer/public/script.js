@@ -2551,6 +2551,83 @@ function rightSideDfsGuideHtml(view) {
   </section>`;
 }
 
+function lcaDeepestGuideHtml(view) {
+  const vi = lang === "vi";
+  const pair = (value) => value
+    ? `(${value.height}, ${value.lca})`
+    : "?";
+  const stack = (view.callStack || []).length
+    ? view.callStack.map((value, index) => (
+      `<span class="lca-stack-node${index === view.callStack.length - 1 ? " current" : ""}">${escapeHtml(`dfs(${value})`)}</span>`
+    )).join(`<i>→</i>`)
+    : `<span class="lca-stack-empty">${vi ? "trống" : "empty"}</span>`;
+
+  let decisionText;
+  let decisionClass = "waiting";
+  if (view.phase === "done") {
+    decisionClass = "done";
+    decisionText = vi
+      ? `Hoàn tất: các lá sâu nhất [${(view.deepestLeaves || []).join(", ")}] ở level ${view.deepestLevel}.`
+      : `Done: deepest leaves [${(view.deepestLeaves || []).join(", ")}] are at level ${view.deepestLevel}.`;
+  } else if (view.phase === "base") {
+    decisionClass = "base";
+    decisionText = vi ? "None là đáy đệ quy → trả (0, None)." : "None is the base case → return (0, None).";
+  } else if (view.decision === "equal") {
+    decisionClass = "equal";
+    decisionText = vi
+      ? `${view.left.height} = ${view.right.height} → chọn node hiện tại làm LCA.`
+      : `${view.left.height} = ${view.right.height} → current node becomes the LCA.`;
+  } else if (view.decision === "left" || view.decision === "right") {
+    decisionClass = view.decision;
+    decisionText = vi
+      ? `${view.decision === "left" ? "Trái" : "Phải"} cao hơn → giữ LCA của phía đó.`
+      : `${view.decision === "left" ? "Left" : "Right"} is taller → keep that side's LCA.`;
+  } else if (view.phase === "enter") {
+    decisionText = vi ? "Chờ kết quả cây trái và cây phải…" : "Waiting for the left and right subtree results…";
+  } else {
+    decisionText = vi
+      ? "Quy ước: dfs(node) trả về (chiều cao cây con, LCA)."
+      : "Contract: dfs(node) returns (subtree height, LCA).";
+  }
+
+  const resultPair = view.result ? pair(view.result) : view.phase === "base" ? "(0, None)" : "?";
+  const summary = vi
+    ? `Đệ quy postorder tìm LCA lá sâu nhất. Đã xử lý ${view.processed} trên ${view.total} node.`
+    : `Postorder recursion finds the LCA of deepest leaves. Processed ${view.processed} of ${view.total} nodes.`;
+
+  return `<section class="lca-deepest-guide" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="lca-contract">
+      <strong>dfs(node)</strong>
+      <span>→</span>
+      <code>(height, lca)</code>
+      <small>${vi ? "height = chiều cao từ node xuống lá sâu nhất" : "height = distance from node to its deepest leaf"}</small>
+    </div>
+    <div class="lca-stack-row">
+      <b>CALL STACK</b>
+      <div>${stack}</div>
+    </div>
+    <div class="lca-compare-row">
+      <div class="lca-side left${view.decision === "left" ? " chosen" : ""}">
+        <small>${vi ? "CÂY TRÁI TRẢ VỀ" : "LEFT RETURNS"}</small>
+        <strong>${escapeHtml(pair(view.left))}</strong>
+      </div>
+      <div class="lca-decision ${decisionClass}">
+        <span>${escapeHtml(decisionText)}</span>
+      </div>
+      <div class="lca-side right${view.decision === "right" ? " chosen" : ""}">
+        <small>${vi ? "CÂY PHẢI TRẢ VỀ" : "RIGHT RETURNS"}</small>
+        <strong>${escapeHtml(pair(view.right))}</strong>
+      </div>
+      <div class="lca-result${view.result || view.phase === "base" || view.phase === "done" ? " ready" : ""}">
+        <small>RETURN</small>
+        <strong>${escapeHtml(resultPair)}</strong>
+      </div>
+    </div>
+    <div class="lca-progress"><span style="width:${view.total ? Math.round((view.processed / view.total) * 100) : 0}%"></span></div>
+    <small class="lca-progress-label">POSTORDER · ${escapeHtml(view.processed)}/${escapeHtml(view.total)} ${vi ? "node đã xong" : "nodes complete"}</small>
+  </section>`;
+}
+
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -2687,7 +2764,7 @@ function renderTree(step, targetId = "treeView") {
   }
 
   const treeHtml =
-    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}">` +
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}${step.lcaDeepestView ? " lca-deepest-tree" : ""}">` +
     `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" class="tree-arrow"/></marker></defs>` +
     edges +
     circles +
@@ -2706,9 +2783,10 @@ function renderTree(step, targetId = "treeView") {
       </div>`
     : "";
   const distanceKGuide = step.distanceKView ? distanceKGuideHtml(step.distanceKView) : "";
+  const lcaDeepestGuide = step.lcaDeepestView ? lcaDeepestGuideHtml(step.lcaDeepestView) : "";
   const rightSideBfsGuide = step.rightSideBfsView ? rightSideBfsGuideHtml(step.rightSideBfsView) : "";
   const rightSideDfsGuide = step.rightSideDfsView ? rightSideDfsGuideHtml(step.rightSideDfsView) : "";
-  $(targetId).innerHTML = decisionHeader + distanceKGuide + rightSideBfsGuide + rightSideDfsGuide + (step.queueView
+  $(targetId).innerHTML = decisionHeader + distanceKGuide + lcaDeepestGuide + rightSideBfsGuide + rightSideDfsGuide + (step.queueView
     ? `<div class="tree-queue-layout${step.queueView.layout === "stacked" ? " tree-queue-stacked" : ""}">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>

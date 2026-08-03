@@ -72,6 +72,7 @@ function snapshot(root, opts) {
     codeLines: opts.codeLines || [],
     codeBlock: opts.codeBlock,
     queueView: opts.queueView,
+    lcaDeepestView: opts.lcaDeepestView,
     rightSideBfsView: opts.rightSideBfsView,
     rightSideDfsView: opts.rightSideDfsView,
     vars: opts.vars || [],
@@ -2118,23 +2119,180 @@ function buildSteps1676(input, params) {
 
 // ─── 1123: LCA of Deepest Leaves ───
 function buildSteps1123(input) {
-  const root = parseTree(input); const steps = [];
+  const root = parseTree(input);
+  const steps = [];
+  const callStack = [];
+  const returned = new Map();
+  let processed = 0;
+
+  const allNodes = [];
+  (function collect(node, depth) {
+    if (!node) return;
+    allNodes.push({ node, depth });
+    collect(node.left, depth + 1);
+    collect(node.right, depth + 1);
+  })(root, 0);
+  const deepestLevel = allNodes.length ? Math.max(...allNodes.map((item) => item.depth)) : 0;
+  const deepestLeaves = allNodes.filter(({ node, depth }) => depth === deepestLevel && !node.left && !node.right);
+
+  const pairText = (pair) => pair
+    ? `(${pair[0]}, ${pair[1] ? pair[1].val : "None"})`
+    : "?";
+  const completedAnnotations = (current = null, extra = {}) => {
+    const annotations = {};
+    returned.forEach((pair, id) => {
+      annotations[id] = { label: `↩ ${pairText(pair)}`, kind: "lca-returned" };
+    });
+    if (current) annotations[current.id] = { label: "CURRENT", kind: "lca-current" };
+    Object.entries(extra).forEach(([id, annotation]) => { annotations[id] = annotation; });
+    return annotations;
+  };
+  const makeView = ({ phase, node = null, left = null, right = null, decision = null, result = null }) => ({
+    phase,
+    current: node ? node.val : null,
+    callStack: callStack.map((frame) => frame.val),
+    left: left ? { height: left[0], lca: left[1] ? left[1].val : "None" } : null,
+    right: right ? { height: right[0], lca: right[1] ? right[1].val : "None" } : null,
+    decision,
+    result: result ? { height: result[0], lca: result[1] ? result[1].val : "None" } : null,
+    processed,
+    total: allNodes.length,
+    deepestLevel,
+    deepestLeaves: phase === "done" ? deepestLeaves.map(({ node: leaf }) => leaf.val) : [],
+  });
+
   steps.push(snapshot(root, {
-    title: { vi: "LCA của các lá sâu nhất", en: "LCA of deepest leaves" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "return (depth, lca)" }],
-    note: { vi: `Đệ quy trả về (độ sâu, lca). Nếu trái và phải sâu BẰNG nhau → nút hiện tại là LCA của các lá sâu nhất bên dưới. Ngược lại theo nhánh sâu hơn.`, en: `Recursion returns (depth, lca). If left and right are EQUALLY deep → current node is the LCA of the deepest leaves below. Otherwise follow the deeper branch.` },
+    title: { vi: "Mỗi lời gọi trả về (chiều cao, LCA)", en: "Each call returns (height, LCA)" },
+    codeLines: [2, 3],
+    vars: [
+      { name: "height", value: "subtree height" },
+      { name: "dfs(None)", value: "(0, None)" },
+    ],
+    lcaDeepestView: makeView({ phase: "intro" }),
+    note: {
+      vi: "Quan trọng: giá trị đầu tiên là CHIỀU CAO của cây con, không phải độ sâu tính từ root. Lá trả về (1, chính nó).",
+      en: "Important: the first value is subtree HEIGHT, not depth from the root. A leaf returns (1, itself).",
+    },
   }));
-  function dfs(node) {
-    if (!node) return [0, null];
-    const [ld, ln] = dfs(node.left); const [rd, rn] = dfs(node.right);
-    let res;
-    if (ld === rd) res = [ld + 1, node];
-    else res = ld > rd ? [ld + 1, ln] : [rd + 1, rn];
-    steps.push(snapshot(root, { title: { vi: `Nút ${node.val}: depth=${res[0]}, lca=${res[1] ? res[1].val : "null"}`, en: `Node ${node.val}: depth=${res[0]}, lca=${res[1] ? res[1].val : "null"}` }, hlSet: new Set([node.id]), wordSet: res[1] ? new Set([res[1].id]) : undefined, codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "leftDepth", value: ld }, { name: "rightDepth", value: rd }, { name: "lca", value: res[1] ? res[1].val : "null" }], note: { vi: ld === rd ? `Trái = phải (${ld}) → ${node.val} là LCA cục bộ.` : `Nhánh ${ld > rd ? "trái" : "phải"} sâu hơn → giữ lca = ${res[1] ? res[1].val : "null"}.`, en: ld === rd ? `Left = right (${ld}) → ${node.val} is the local LCA.` : `${ld > rd ? "Left" : "Right"} branch deeper → keep lca = ${res[1] ? res[1].val : "null"}.` } }));
-    return res;
+
+  let nullCallId = 0;
+  function dfs(node, parent = null, side = null) {
+    if (!node) {
+      const nullId = `null-${nullCallId++}`;
+      steps.push(snapshot(root, {
+        title: { vi: "Gặp None → trả về (0, None)", en: "Hit None → return (0, None)" },
+        hlSet: parent ? new Set([parent.id]) : undefined,
+        annotations: completedAnnotations(parent, parent ? {
+          [parent.id]: { label: `${side === "left" ? "LEFT" : "RIGHT"} child = None`, kind: "lca-null" },
+        } : {}),
+        nullChildren: parent ? [{ id: nullId, parentId: parent.id, side }] : [],
+        codeLines: [4, 5],
+        vars: [{ name: "node", value: "None" }, { name: "return", value: "(0, None)" }],
+        lcaDeepestView: makeView({ phase: "base", node: parent }),
+        note: {
+          vi: "None có chiều cao 0. Đây là mốc để một node lá tính được 1 + max(0, 0) = 1.",
+          en: "None has height 0. This lets a leaf compute 1 + max(0, 0) = 1.",
+        },
+      }));
+      return [0, null];
+    }
+
+    callStack.push(node);
+    steps.push(snapshot(root, {
+      title: { vi: `Vào dfs(${node.val}): xử lý trái trước`, en: `Enter dfs(${node.val}): process left first` },
+      hlSet: new Set([node.id]),
+      annotations: completedAnnotations(node),
+      codeLines: [3, 4, 6],
+      vars: [{ name: "node", value: node.val }, { name: "call stack", value: `[${callStack.map((frame) => frame.val).join(", ")}]` }],
+      lcaDeepestView: makeView({ phase: "enter", node }),
+      note: {
+        vi: "DFS postorder: chưa thể quyết định tại node hiện tại cho đến khi nhận kết quả từ cả cây con trái và phải.",
+        en: "Postorder DFS: the current node cannot decide until both child results are available.",
+      },
+    }));
+
+    const left = dfs(node.left, node, "left");
+    const right = dfs(node.right, node, "right");
+    let result;
+    let decision;
+    let codeLines;
+
+    if (left[0] === right[0]) {
+      result = [left[0] + 1, node];
+      decision = "equal";
+      codeLines = [8, 9];
+    } else if (left[0] > right[0]) {
+      result = [left[0] + 1, left[1]];
+      decision = "left";
+      codeLines = [10];
+    } else {
+      result = [right[0] + 1, right[1]];
+      decision = "right";
+      codeLines = [10];
+    }
+
+    returned.set(node.id, result);
+    processed += 1;
+    const childAnnotations = {};
+    if (node.left) childAnnotations[node.left.id] = { label: `L ${pairText(left)}`, kind: "lca-left" };
+    if (node.right) childAnnotations[node.right.id] = { label: `R ${pairText(right)}`, kind: "lca-right" };
+    steps.push(snapshot(root, {
+      title: {
+        vi: `Node ${node.val}: ${pairText(left)} và ${pairText(right)} → ${pairText(result)}`,
+        en: `Node ${node.val}: ${pairText(left)} and ${pairText(right)} → ${pairText(result)}`,
+      },
+      hlSet: new Set([node.id]),
+      wordSet: result[1] ? new Set([result[1].id]) : undefined,
+      annotations: completedAnnotations(node, childAnnotations),
+      codeLines,
+      vars: [
+        { name: "left", value: pairText(left) },
+        { name: "right", value: pairText(right) },
+        { name: "decision", value: decision === "equal" ? "equal → current node" : `${decision} is deeper` },
+        { name: "return", value: pairText(result) },
+      ],
+      lcaDeepestView: makeView({ phase: "compare", node, left, right, decision, result }),
+      note: decision === "equal"
+        ? {
+          vi: `Hai phía cao bằng nhau (${left[0]}). Lá sâu nhất xuất hiện ở cả hai phía, nên ${node.val} là điểm gặp thấp nhất của chúng.`,
+          en: `Both sides have equal height (${left[0]}). Deepest leaves occur on both sides, so ${node.val} is their lowest meeting point.`,
+        }
+        : {
+          vi: `Phía ${decision === "left" ? "trái" : "phải"} cao hơn. Mọi lá sâu nhất nằm phía đó, nên giữ LCA = ${result[1] ? result[1].val : "None"}.`,
+          en: `The ${decision} side is taller. Every deepest leaf is there, so keep LCA = ${result[1] ? result[1].val : "None"}.`,
+        },
+    }));
+    callStack.pop();
+    return result;
   }
-  const [, lcaNode] = dfs(root);
-  const fs = snapshot(root, { title: { vi: `LCA = ${lcaNode ? lcaNode.val : "null"}`, en: `LCA = ${lcaNode ? lcaNode.val : "null"}` }, wordSet: lcaNode ? new Set([lcaNode.id]) : undefined, vars: [{ name: "answer", value: lcaNode ? lcaNode.val : "null" }], note: { vi: `LCA của các lá sâu nhất = ${lcaNode ? lcaNode.val : "null"}.`, en: `LCA of the deepest leaves = ${lcaNode ? lcaNode.val : "null"}.` } }); fs.final = true; steps.push(fs);
+
+  const result = dfs(root);
+  const lcaNode = result[1];
+  const deepestIds = new Set(deepestLeaves.map(({ node }) => node.id));
+  const finalAnnotations = completedAnnotations(null);
+  deepestLeaves.forEach(({ node }) => {
+    finalAnnotations[node.id] = { label: "DEEPEST", kind: "lca-deepest" };
+  });
+  if (lcaNode) finalAnnotations[lcaNode.id] = { label: "LCA · ANSWER", kind: "lca-answer" };
+  const fs = snapshot(root, {
+    title: { vi: `Kết quả: LCA = ${lcaNode ? lcaNode.val : "None"}`, en: `Result: LCA = ${lcaNode ? lcaNode.val : "None"}` },
+    hlSet: deepestIds,
+    wordSet: lcaNode ? new Set([lcaNode.id]) : undefined,
+    annotations: finalAnnotations,
+    codeLines: [11],
+    vars: [
+      { name: "deepest leaves", value: `[${deepestLeaves.map(({ node }) => node.val).join(", ")}]` },
+      { name: "dfs(root)", value: pairText(result) },
+      { name: "answer", value: lcaNode ? lcaNode.val : "None" },
+    ],
+    lcaDeepestView: makeView({ phase: "done", result }),
+    note: {
+      vi: `Các lá sâu nhất là [${deepestLeaves.map(({ node }) => node.val).join(", ")}]. Thành phần thứ hai của dfs(root) chính là đáp án.`,
+      en: `The deepest leaves are [${deepestLeaves.map(({ node }) => node.val).join(", ")}]. The second component of dfs(root) is the answer.`,
+    },
+  });
+  fs.final = true;
+  steps.push(fs);
   return { input, answer: lcaNode ? lcaNode.val : "null", steps };
 }
 
@@ -3904,13 +4062,14 @@ module.exports = {
     title: { vi: "LCA of Deepest Leaves", en: "Lowest Common Ancestor of Deepest Leaves" },
     titleVi: { vi: "LCA của các lá sâu nhất", en: "LCA of the deepest leaves" },
     statement: { vi: "Cho root, tìm tổ tiên chung thấp nhất của TẤT CẢ các lá sâu nhất. Nhập level-order.", en: "Given root, find the lowest common ancestor of ALL the deepest leaves. Enter as level-order." },
-    defaultInput: "3,5,1,6,2,0,8,7,4",
+    defaultInput: "3,5,1,6,2,0,8,null,null,7,4",
     inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
     extraParams: [],
     approach: [
-      { vi: "Đệ quy trả (độ sâu, lca). Nếu trái và phải sâu bằng nhau → nút hiện tại là lca. Ngược lại theo nhánh sâu hơn.", en: "Recursion returns (depth, lca). If left and right equally deep → current node is lca. Else follow the deeper side." },
+      { vi: "Mỗi dfs trả về (chiều cao cây con, LCA của các lá sâu nhất trong cây con đó). None có chiều cao 0; lá có chiều cao 1.", en: "Each dfs returns (subtree height, LCA of that subtree's deepest leaves). None has height 0; a leaf has height 1." },
+      { vi: "Nếu hai phía cao bằng nhau, lá sâu nhất nằm ở cả hai phía nên node hiện tại là điểm gặp thấp nhất. Nếu lệch, chỉ giữ kết quả của phía cao hơn.", en: "If both sides have equal height, deepest leaves occur on both sides, so the current node is their lowest meeting point. Otherwise keep the taller side's result." },
     ],
-    complexity: { time: "O(n)", space: "O(h)", note: { vi: "1 lần duyệt postorder.", en: "One postorder pass." } },
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node được xử lý đúng một lần bằng postorder; h là chiều cao cây.", en: "Each node is processed once in postorder; h is the tree height." } },
     code: ["class Solution:", "    def lcaDeepestLeaves(self, root):", "        def dfs(node):", "            if not node:", "                return (0, None)", "            ld, ln = dfs(node.left)", "            rd, rn = dfs(node.right)", "            if ld == rd:", "                return (ld + 1, node)", "            return (ld + 1, ln) if ld > rd else (rd + 1, rn)", "        return dfs(root)[1]"],
     builder: buildSteps1123,
   },
