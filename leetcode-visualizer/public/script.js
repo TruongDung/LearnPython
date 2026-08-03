@@ -1564,6 +1564,182 @@ function effortGuideHtml(view) {
   </section>`;
 }
 
+function renderFloodFillView(step) {
+  const view = step.floodFillView;
+  const vi = lang === "vi";
+  const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const coord = (cell) => Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
+  const currentKey = keyOf(view.current);
+  const neighborKey = keyOf(view.neighbor);
+  const startKey = keyOf(view.start);
+  const neighborInside = Array.isArray(view.neighbor)
+    && view.neighbor[0] >= 0 && view.neighbor[0] < view.rows
+    && view.neighbor[1] >= 0 && view.neighbor[1] < view.cols;
+  const expansionPhases = new Set(["stack-init", "fill-start", "stack-check", "pop"]);
+  const neighborPhases = new Set(["direction", "neighbor", "neighbor-check"]);
+  const fillPhases = new Set(["fill-neighbor", "push-neighbor", "stack-empty", "done"]);
+  const activePhase = fillPhases.has(view.phase) ? 3 : neighborPhases.has(view.phase) ? 2 : expansionPhases.has(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Đọc màu gốc", "2. Pop từ DFS stack", "3. Kiểm tra hàng xóm", "4. Tô màu và push"]
+    : ["1. Read source color", "2. Pop DFS stack", "3. Check a neighbor", "4. Recolor and push"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < activePhase;
+    const state = done ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${done ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const cellsHtml = view.image.map((row, rowIndex) => row.map((value, colIndex) => {
+    const key = `${rowIndex},${colIndex}`;
+    const classes = ["flood-fill-cell"];
+    if (view.changed[rowIndex][colIndex]) classes.push("is-filled");
+    else if (view.original[rowIndex][colIndex] === view.originalColor) classes.push("is-source-color");
+    else classes.push("is-barrier");
+    if (key === startKey) classes.push("is-start");
+    if (key === currentKey) classes.push("is-current");
+    if (key === neighborKey) classes.push("is-neighbor");
+    const tags = [];
+    if (key === currentKey) tags.push("CUR");
+    if (key === neighborKey) tags.push("NEXT");
+    return `<div class="${classes.join(" ")}">
+      <small>[${rowIndex},${colIndex}]</small>
+      <strong>${escapeHtml(value)}</strong>
+      <span>${tags.join(" · ")}</span>
+    </div>`;
+  }).join("")).join("");
+
+  const stackHtml = view.stack.length
+    ? view.stack.map((cell, index) => {
+      const top = index === view.stack.length - 1;
+      return `<span class="${top ? "is-top" : ""}"><small>${top ? "TOP" : `#${index}`}</small><strong>${escapeHtml(coord(cell))}</strong></span>`;
+    }).join("")
+    : `<em>∅</em>`;
+
+  const directionDefinitions = [
+    { delta: [1, 0], arrow: "↓", vi: "xuống", en: "down" },
+    { delta: [-1, 0], arrow: "↑", vi: "lên", en: "up" },
+    { delta: [0, 1], arrow: "→", vi: "phải", en: "right" },
+    { delta: [0, -1], arrow: "←", vi: "trái", en: "left" },
+  ];
+  const directionHtml = directionDefinitions.map((direction) => {
+    const active = Array.isArray(view.direction)
+      && view.direction[0] === direction.delta[0] && view.direction[1] === direction.delta[1];
+    return `<span class="${active ? "is-active" : ""}"><b>${direction.arrow}</b><small>${escapeHtml(vi ? direction.vi : direction.en)}</small><code>(${direction.delta.join(",")})</code></span>`;
+  }).join("");
+
+  const activeDirection = directionDefinitions.find((direction) => Array.isArray(view.direction)
+    && view.direction[0] === direction.delta[0] && view.direction[1] === direction.delta[1]);
+  const arrow = activeDirection ? activeDirection.arrow : "→";
+  let neighborValue = "?";
+  if (neighborInside) neighborValue = view.image[view.neighbor[0]][view.neighbor[1]];
+  const routeHtml = Array.isArray(view.current)
+    ? `<div class="flood-fill-route">
+        <span class="is-current"><small>CURRENT</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(view.image[view.current[0]][view.current[1]])}</em></span>
+        <b>${arrow}</b>
+        <span class="${neighborInside ? "is-neighbor" : "is-outside"}"><small>NEIGHBOR</small><strong>${escapeHtml(coord(view.neighbor))}</strong><em>${neighborInside ? escapeHtml(neighborValue) : "OUT"}</em></span>
+      </div>`
+    : `<div class="flood-fill-route is-idle"><code>stack.pop() → current → 4 neighbors</code></div>`;
+
+  const truth = (value) => value === null ? "?" : value ? "True" : "False";
+  let decision = "?";
+  let decisionClass = "";
+  if (view.phase === "done") {
+    decision = "RETURN";
+    decisionClass = "is-fill";
+  } else if (view.phase === "stack-empty") {
+    decision = "STOP";
+    decisionClass = "is-skip";
+  } else if (view.phase === "fill-neighbor") {
+    decision = vi ? "TÔ MÀU" : "RECOLOR";
+    decisionClass = "is-fill";
+  } else if (view.phase === "push-neighbor") {
+    decision = "PUSH";
+    decisionClass = "is-push";
+  } else if (view.canFill !== null) {
+    decision = view.canFill ? (vi ? "HỢP LỆ" : "FILL") : (vi ? "BỎ QUA" : "SKIP");
+    decisionClass = view.canFill ? "is-fill" : "is-skip";
+  }
+  const checksHtml = `<div class="flood-fill-checks">
+    <span class="${view.insideGrid === true ? "is-pass" : view.insideGrid === false ? "is-fail" : ""}"><small>${vi ? "TRONG BIÊN" : "IN BOUNDS"}</small><strong>${truth(view.insideGrid)}</strong></span>
+    <b>AND</b>
+    <span class="${view.matchesOriginal === true ? "is-pass" : view.matchesOriginal === false ? "is-fail" : ""}"><small>image[next] == original</small><strong>${truth(view.matchesOriginal)}</strong></span>
+    <b>→</b>
+    <span class="flood-fill-decision ${decisionClass}"><small>${vi ? "HÀNH ĐỘNG" : "ACTION"}</small><strong>${escapeHtml(decision)}</strong></span>
+  </div>`;
+
+  let actionDetail;
+  if (view.phase === "enter") {
+    actionDetail = vi ? "Bắt đầu từ ô S và chỉ lan qua cạnh trên, dưới, trái, phải." : "Start at S and spread only through top, bottom, left, and right edges.";
+  } else if (view.phase === "dimensions") {
+    actionDetail = vi ? `Image có ${view.rows} hàng và ${view.cols} cột.` : `The image has ${view.rows} rows and ${view.cols} columns.`;
+  } else if (view.phase === "read-color") {
+    actionDetail = vi ? `Ô bắt đầu có màu ${view.originalColor}; chỉ ô nối liền vẫn mang màu này mới thuộc vùng.` : `The start cell has color ${view.originalColor}; only connected cells still carrying it belong to the region.`;
+  } else if (view.phase === "same-color-check") {
+    actionDetail = view.originalColor === view.newColor
+      ? (vi ? "Màu mới trùng màu gốc, nên trả ngay để tránh lặp." : "The new color matches the source, so return immediately to avoid looping.")
+      : (vi ? "Màu mới khác màu gốc; có thể bắt đầu DFS." : "The new color differs from the source, so DFS can begin.");
+  } else if (view.phase === "directions") {
+    actionDetail = vi ? "Bốn hướng không có đường chéo: xuống, lên, phải, trái." : "Use four non-diagonal directions: down, up, right, and left.";
+  } else if (view.phase === "stack-init") {
+    actionDetail = vi ? `Đưa ô bắt đầu ${coord(view.start)} vào TOP của stack.` : `Put the start cell ${coord(view.start)} on TOP of the stack.`;
+  } else if (view.phase === "fill-start") {
+    actionDetail = vi ? "Tô ô bắt đầu trước khi duyệt để nó không bao giờ được push lần hai." : "Recolor the start before traversal so it can never be pushed twice.";
+  } else if (view.phase === "stack-check") {
+    actionDetail = vi ? `Stack còn ${view.stack.length} ô, nên vòng while tiếp tục.` : `${view.stack.length} cell(s) remain on the stack, so the while loop continues.`;
+  } else if (view.phase === "pop") {
+    actionDetail = vi ? `${coord(view.current)} rời TOP và trở thành CURRENT để mở rộng.` : `${coord(view.current)} leaves TOP and becomes CURRENT for expansion.`;
+  } else if (view.phase === "direction") {
+    actionDetail = vi ? `Chọn hướng ${activeDirection ? activeDirection.arrow : ""}; bước kế tiếp mới tính tọa độ neighbor.` : `Choose direction ${activeDirection ? activeDirection.arrow : ""}; the next line computes the neighbor coordinate.`;
+  } else if (view.phase === "neighbor") {
+    actionDetail = vi ? `Từ CURRENT ${coord(view.current)}, hướng ${arrow} tạo neighbor ${coord(view.neighbor)}.` : `From CURRENT ${coord(view.current)}, direction ${arrow} produces neighbor ${coord(view.neighbor)}.`;
+  } else if (view.phase === "neighbor-check") {
+    actionDetail = view.canFill
+      ? (vi ? "Neighbor nằm trong biên và còn màu gốc, nên được phép tô." : "The neighbor is in bounds and still has the source color, so it can be filled.")
+      : (vi ? "Ít nhất một điều kiện sai; neighbor không được tô hay push." : "At least one condition fails; the neighbor is neither recolored nor pushed.");
+  } else if (view.phase === "fill-neighbor") {
+    actionDetail = vi ? `Đổi ${coord(view.neighbor)} sang màu ${view.newColor} trước khi push.` : `Recolor ${coord(view.neighbor)} to ${view.newColor} before pushing it.`;
+  } else if (view.phase === "push-neighbor") {
+    actionDetail = vi ? `${coord(view.neighbor)} đã ở TOP và sẽ được pop để tiếp tục lan.` : `${coord(view.neighbor)} is now on TOP and will later be popped to continue the fill.`;
+  } else if (view.phase === "stack-empty") {
+    actionDetail = vi ? "Stack rỗng: không còn ô nào trong component cần mở rộng." : "The stack is empty: no cell in the component remains to expand.";
+  } else {
+    actionDetail = vi ? `Hoàn tất: ${view.filledCount} ô đã đổi sang màu ${view.newColor}.` : `Complete: ${view.filledCount} cell(s) were changed to color ${view.newColor}.`;
+  }
+
+  const summary = vi
+    ? `Flood Fill ${view.rows} nhân ${view.cols}; đã tô ${view.filledCount} ô; stack có ${view.stack.length} ô.`
+    : `Flood Fill ${view.rows} by ${view.cols}; ${view.filledCount} cells recolored; ${view.stack.length} cells on the stack.`;
+  $("treeView").innerHTML = `<section class="flood-fill-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="flood-fill-phases">${phasesHtml}</div>
+    <div class="flood-fill-status">
+      <span><small>${vi ? "MÀU GỐC" : "SOURCE"}</small><strong>${view.originalColor === null ? "?" : escapeHtml(view.originalColor)}</strong></span>
+      <span><small>${vi ? "MÀU MỚI" : "NEW COLOR"}</small><strong>${escapeHtml(view.newColor)}</strong></span>
+      <span><small>${vi ? "ĐÃ TÔ" : "RECOLORED"}</small><strong>${view.filledCount}</strong></span>
+      <span><small>STACK</small><strong>${view.stack.length}</strong></span>
+    </div>
+    <div class="flood-fill-main">
+      <section class="flood-fill-image-section">
+        <header><strong>IMAGE</strong><span>${vi ? "tọa độ [row,col]" : "coordinates [row,col]"}</span></header>
+        <div class="flood-fill-grid-scroll"><div class="flood-fill-grid" style="--flood-cols:${view.cols}">${cellsHtml}</div></div>
+      </section>
+      <section class="flood-fill-work-section">
+        <header><strong>DFS STACK</strong><span>${vi ? "push/pop ở bên phải" : "push/pop at the right"}</span></header>
+        <div class="flood-fill-stack">${stackHtml}</div>
+        <div class="flood-fill-directions">${directionHtml}</div>
+        ${routeHtml}
+      </section>
+    </div>
+    ${checksHtml}
+    <div class="flood-fill-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="flood-fill-legend">
+      <span><i class="source"></i>${vi ? "còn màu gốc" : "source color"}</span>
+      <span><i class="filled"></i>${vi ? "đã đổi màu" : "recolored"}</span>
+      <span><i class="current"></i>CURRENT</span>
+      <span><i class="neighbor"></i>NEIGHBOR</span>
+      <span><b>S</b>${vi ? "ô bắt đầu" : "start cell"}</span>
+    </div>
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -7954,6 +8130,12 @@ function renderStep() {
     $("gridView").classList.remove("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGrid(step);
+  } else if (step.floodFillView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFloodFillView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

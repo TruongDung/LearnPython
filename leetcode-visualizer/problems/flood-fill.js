@@ -43,8 +43,10 @@ function recorder(rows, cols, getCells, getStack) {
   function push(line, title, note, options = {}) {
     const vars = [...(options.vars || [])];
     if (!vars.some((item) => item.name === "stack")) vars.push({ name: "stack", value: stackText(getStack()) });
-    steps.push({ title, arr: [], bfsGrid: { rows, cols, cells: getCells(options.current || null, options.discovered || null) },
-      highlight: [], mark: [], final: Boolean(options.final), codeLines: [line], vars, note });
+    const step = { title, arr: [], bfsGrid: { rows, cols, cells: getCells(options.current || null, options.discovered || null) },
+      highlight: [], mark: [], final: Boolean(options.final), codeLines: [line], vars, note };
+    if (options.floodFillView) step.floodFillView = options.floodFillView;
+    steps.push(step);
   }
   return { steps, push };
 }
@@ -65,6 +67,17 @@ function buildSteps733(input, params = {}) {
   const directions = [[1,0],[-1,0],[0,1],[0,-1]];
   let stack = [];
   const changed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  let phase = "enter";
+  let currentCell = null;
+  let neighborCell = null;
+  let activeDirection = null;
+  let insideGrid = null;
+  let matchesOriginal = null;
+  let canFillNeighbor = null;
+  let dimensionsKnown = false;
+  let originalKnown = false;
+  let directionsKnown = false;
+  let stackKnown = false;
   function cells(current, discovered) {
     const queued = new Set(stack.map(([row,col]) => `${row},${col}`));
     return image.map((matrixRow,row) => matrixRow.map((value,col) => {
@@ -75,36 +88,89 @@ function buildSteps733(input, params = {}) {
       return { label: String(value), cls };
     }));
   }
-  const { steps, push } = recorder(rows, cols, cells, () => stack);
+  const { steps, push: recordStep } = recorder(rows, cols, cells, () => stack);
+  function push(line, title, note, options = {}) {
+    const filledCount = changed.reduce((total, row) => total + row.filter(Boolean).length, 0);
+    recordStep(line, title, note, {
+      ...options,
+      floodFillView: {
+        phase,
+        rows,
+        cols,
+        image: image.map((row) => [...row]),
+        original: original.map((row) => [...row]),
+        changed: changed.map((row) => [...row]),
+        start: [startRow, startCol],
+        current: currentCell ? [...currentCell] : null,
+        neighbor: neighborCell ? [...neighborCell] : null,
+        direction: activeDirection ? [...activeDirection] : null,
+        insideGrid,
+        matchesOriginal,
+        canFill: canFillNeighbor,
+        originalColor: originalKnown ? originalColor : null,
+        newColor: color,
+        dimensionsKnown,
+        directionsKnown,
+        stackKnown,
+        stack: stack.map((cell) => [...cell]),
+        filledCount,
+      },
+    });
+  }
   push(4,tr("Bắt đầu floodFill","Enter floodFill"),tr("Tô toàn bộ component có cùng màu với ô bắt đầu.","Recolor the component matching the start cell."),{vars:[{name:"start",value:`(${startRow},${startCol})`},{name:"color",value:color}]});
+  dimensionsKnown = true;
+  phase = "dimensions";
   push(5,tr(`rows=${rows}, cols=${cols}`,`rows=${rows}, cols=${cols}`),tr("Lưu kích thước image.","Store image dimensions."),{vars:[{name:"rows",value:rows},{name:"cols",value:cols}]});
+  originalKnown = true;
+  currentCell = [startRow,startCol];
+  phase = "read-color";
   push(6,tr(`original_color = ${originalColor}`,`original_color = ${originalColor}`),tr("Chỉ các ô nối liền có màu này mới được tô.","Only connected cells with this color are filled."),{current:[startRow,startCol],vars:[{name:"original_color",value:originalColor}]});
   const unchanged = originalColor === color;
+  phase = "same-color-check";
   push(7,tr(`original_color == color → ${unchanged}`,`original_color == color → ${unchanged}`),unchanged?tr("Màu mới giống màu cũ; trả image ngay để tránh lặp vô hạn.","The new color matches the old one; return immediately."):tr("Màu khác nhau; tiếp tục DFS.","The colors differ; continue DFS."),{current:[startRow,startCol],vars:[{name:"same color?",value:unchanged}]});
-  if (unchanged) { push(7,tr("return image","return image"),tr("Image không thay đổi.","The image is unchanged."),{final:true,vars:[{name:"answer",value:JSON.stringify(image)}]}); return {original,answer:image,steps}; }
+  if (unchanged) { phase="done"; push(7,tr("return image","return image"),tr("Image không thay đổi.","The image is unchanged."),{final:true,vars:[{name:"answer",value:JSON.stringify(image)}]}); return {original,answer:image,steps}; }
+  canFillNeighbor = null;
+  currentCell = null;
+  directionsKnown = true;
+  phase = "directions";
   push(8,tr("Khai báo 4 hướng","Define four directions"),tr("Flood fill nối theo cạnh, không nối chéo.","Flood fill uses edges, not diagonals."),{vars:[{name:"directions",value:"down, up, right, left"}]});
   stack=[[startRow,startCol]];
+  stackKnown = true;
+  currentCell = [startRow,startCol];
+  phase = "stack-init";
   push(9,tr(`stack = [(${startRow},${startCol})]`,`stack = [(${startRow},${startCol})]`),tr("Đặt ô bắt đầu vào DFS stack.","Put the start cell on the DFS stack."),{current:[startRow,startCol]});
   image[startRow][startCol]=color; changed[startRow][startCol]=true;
+  phase = "fill-start";
   push(10,tr(`image[${startRow}][${startCol}] = ${color}`,`image[${startRow}][${startCol}] = ${color}`),tr("Tô trước khi enqueue để không thêm trùng.","Recolor before traversal to prevent duplicate pushes."),{current:[startRow,startCol],discovered:[startRow,startCol]});
   while(stack.length){
+    currentCell = null; neighborCell = null; activeDirection = null; insideGrid = null; matchesOriginal = null; canFillNeighbor = null; phase = "stack-check";
     push(11,tr("while stack → True","while stack → True"),tr("Stack còn ô cần mở rộng.","The stack still has a cell to expand."));
     const [row,col]=stack.pop();
+    currentCell = [row,col]; phase = "pop";
     push(12,tr(`pop → (${row},${col})`,`pop → (${row},${col})`),tr("Lấy ô trên cùng của stack.","Pop the top stack cell."),{current:[row,col],vars:[{name:"row",value:row},{name:"col",value:col}]});
     for(const [deltaRow,deltaCol] of directions){
+      activeDirection = [deltaRow,deltaCol]; neighborCell = null; insideGrid = null; matchesOriginal = null; canFillNeighbor = null; phase = "direction";
       push(13,tr(`Thử hướng (${deltaRow},${deltaCol})`,`Try direction (${deltaRow},${deltaCol})`),tr("Xét một neighbor.","Inspect one neighbor."),{current:[row,col],vars:[{name:"delta_row",value:deltaRow},{name:"delta_col",value:deltaCol}]});
       const nextRow=row+deltaRow,nextCol=col+deltaCol;
+      neighborCell = [nextRow,nextCol]; phase = "neighbor";
       push(14,tr(`next = (${nextRow},${nextCol})`,`next = (${nextRow},${nextCol})`),tr("Tính tọa độ neighbor.","Compute neighbor coordinates."),{current:[row,col],vars:[{name:"next_row",value:nextRow},{name:"next_col",value:nextCol}]});
-      const canFill=nextRow>=0&&nextRow<rows&&nextCol>=0&&nextCol<cols&&image[nextRow][nextCol]===originalColor;
+      insideGrid=nextRow>=0&&nextRow<rows&&nextCol>=0&&nextCol<cols;
+      matchesOriginal=insideGrid ? image[nextRow][nextCol]===originalColor : null;
+      const canFill=insideGrid&&matchesOriginal;
+      canFillNeighbor = canFill; phase = "neighbor-check";
       push(15,tr(`Neighbor có original_color → ${canFill}`,`Neighbor has original_color → ${canFill}`),canFill?tr("Neighbor thuộc component; sẽ tô màu.","The neighbor belongs to the component; recolor it."):tr("Ngoài biên hoặc màu khác/đã tô; bỏ qua.","Out of bounds or different/already filled; skip."),{current:nextRow>=0&&nextRow<rows&&nextCol>=0&&nextCol<cols?[nextRow,nextCol]:[row,col],vars:[{name:"can fill?",value:canFill}]});
       if(!canFill) continue;
       image[nextRow][nextCol]=color; changed[nextRow][nextCol]=true;
+      phase = "fill-neighbor";
       push(16,tr(`image[${nextRow}][${nextCol}] = ${color}`,`image[${nextRow}][${nextCol}] = ${color}`),tr("Tô neighbor ngay.","Recolor the neighbor immediately."),{current:[nextRow,nextCol],discovered:[nextRow,nextCol]});
       stack.push([nextRow,nextCol]);
+      phase = "push-neighbor";
       push(17,tr(`stack.append((${nextRow},${nextCol}))`,`stack.append((${nextRow},${nextCol}))`),tr("Đưa neighbor vào stack để tiếp tục lan.","Push the neighbor for further expansion."),{current:[nextRow,nextCol],discovered:[nextRow,nextCol]});
     }
   }
+  currentCell = null; neighborCell = null; activeDirection = null; insideGrid = null; matchesOriginal = null; canFillNeighbor = null; phase = "stack-empty";
   push(11,tr("while stack → False","while stack → False"),tr("Stack rỗng; component đã tô xong.","The stack is empty; the component is complete."));
+  phase = "done";
   push(18,tr("return image","return image"),tr("Trả về image sau flood fill.","Return the flood-filled image."),{final:true,vars:[{name:"answer",value:JSON.stringify(image)}]});
   return {original,answer:image,steps};
 }
