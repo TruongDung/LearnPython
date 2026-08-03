@@ -72,6 +72,7 @@ function snapshot(root, opts) {
     codeLines: opts.codeLines || [],
     codeBlock: opts.codeBlock,
     queueView: opts.queueView,
+    rightSideBfsView: opts.rightSideBfsView,
     vars: opts.vars || [],
     note: opts.note,
   };
@@ -964,6 +965,12 @@ function buildSteps199v2(input) {
   const res = [];
   const visible = new Set();
   let queue = null;
+  let level = 0;
+  let levelSize = 0;
+  let currentLevel = [];
+  let processedCount = 0;
+  let currentIndex = -1;
+  let currentNode = null;
   const formatNodes = (nodes) => nodes === null ? "not initialized" : `[${nodes.map((node) => node.val).join(",")}]`;
 
   function makeQueueView(opts = {}) {
@@ -982,6 +989,49 @@ function buildSteps199v2(input) {
     };
   }
 
+  function makeRightSideBfsView(opts = {}) {
+    const line = Array.isArray(opts.codeLines) ? opts.codeLines[0] : null;
+    const operation = opts.queueOperation || "";
+    let phase = opts.bfsPhase || "initialize";
+    if (!opts.bfsPhase) {
+      if (line === 7) phase = "enqueue-root";
+      else if (line === 8) phase = operation === "queue empty" ? "done-levels" : "while-queue";
+      else if (line === 9) phase = "lock-level";
+      else if (line === 10) phase = "level-index";
+      else if (line === 11) phase = "dequeue";
+      else if (line === 12) phase = "check-left";
+      else if (line === 13) phase = "enqueue-left";
+      else if (line === 14) phase = "check-right";
+      else if (line === 15) phase = "enqueue-right";
+      else if (line === 16) phase = "check-rightmost";
+      else if (line === 17) phase = "save-rightmost";
+      else if (line === 18 || line === 5) phase = "done";
+    }
+
+    const remainingCurrent = currentLevel.slice(processedCount);
+    const nextLevel = queue === null ? [] : queue.slice(remainingCurrent.length);
+    const rightmostIndex = levelSize > 0 ? levelSize - 1 : -1;
+    return {
+      phase,
+      level,
+      size: levelSize,
+      index: currentIndex,
+      current: currentNode ? { id: currentNode.id, val: currentNode.val } : null,
+      currentLevel: currentLevel.map((node) => ({ id: node.id, val: node.val })),
+      processedCount,
+      remainingCurrent: remainingCurrent.map((node) => ({ id: node.id, val: node.val })),
+      nextLevel: nextLevel.map((node) => ({ id: node.id, val: node.val })),
+      queue: queue === null ? [] : queue.map((node) => ({ id: node.id, val: node.val })),
+      rightmostIndex,
+      isRightmost: currentIndex >= 0 && currentIndex === rightmostIndex,
+      result: [...res],
+      selectedIds: [...visible],
+      childSide: opts.childSide || null,
+      child: opts.child || null,
+      operation,
+    };
+  }
+
   function snap(opts) {
     const vars = [...(opts.vars || [])];
     if (!vars.some((item) => item.name === "res")) vars.push({ name: "res", value: `[${res.join(",")}]` });
@@ -991,6 +1041,7 @@ function buildSteps199v2(input) {
       codeBlock: 2,
       wordSet: opts.wordSet || new Set(visible),
       queueView: makeQueueView(opts),
+      rightSideBfsView: makeRightSideBfsView(opts),
     })));
   }
 
@@ -1024,6 +1075,7 @@ function buildSteps199v2(input) {
       title: { vi: "return res → []", en: "return res → []" },
       codeLines: [5], codeBlock: 2,
       queueView: makeQueueView({ queueOperation: "early return" }),
+      rightSideBfsView: makeRightSideBfsView({ codeLines: [5], queueOperation: "early return" }),
       vars: [{ name: "res", value: "[]" }, { name: "queue", value: "not initialized" }, { name: "answer", value: "[]" }],
       note: { vi: "Trả về [] ngay vì root là None.", en: "Return [] immediately because root is None." },
     });
@@ -1049,8 +1101,12 @@ function buildSteps199v2(input) {
     note: { vi: `Đưa root ${root.val} vào queue.`, en: `Append root ${root.val} to the queue.` },
   });
 
-  let level = 0;
   while (queue.length) {
+    currentLevel = [...queue];
+    levelSize = queue.length;
+    processedCount = 0;
+    currentIndex = -1;
+    currentNode = null;
     snap({
       title: { vi: `Tầng ${level}: queue không rỗng`, en: `Level ${level}: queue is not empty` },
       hlSet: new Set(queue.map((node) => node.id)), codeLines: [8],
@@ -1060,6 +1116,7 @@ function buildSteps199v2(input) {
     });
 
     const size = queue.length;
+    levelSize = size;
     snap({
       title: { vi: `size = len(queue) = ${size}`, en: `size = len(queue) = ${size}` },
       hlSet: new Set(queue.slice(0, size).map((node) => node.id)), codeLines: [9],
@@ -1069,6 +1126,9 @@ function buildSteps199v2(input) {
     });
 
     for (let i = 0; i < size; i++) {
+      currentIndex = i;
+      currentNode = null;
+      processedCount = i;
       snap({
         title: { vi: `for i=${i} trong range(${size})`, en: `for i=${i} in range(${size})` },
         codeLines: [10],
@@ -1078,6 +1138,8 @@ function buildSteps199v2(input) {
       });
 
       const curr = queue.shift();
+      currentNode = curr;
+      processedCount = i + 1;
       snap({
         title: { vi: `curr = queue.popleft() → ${curr.val}`, en: `curr = queue.popleft() → ${curr.val}` },
         hlSet: new Set([curr.id]), codeLines: [11],
@@ -1090,6 +1152,7 @@ function buildSteps199v2(input) {
         title: { vi: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None", en: curr.left ? `curr.left = ${curr.left.val}` : "curr.left = None" },
         hlSet: new Set([curr.id]), codeLines: [12],
         queueOperation: "check left child", popped: curr.val, levelSize: size,
+        childSide: "left", child: curr.left ? curr.left.val : null,
         vars: [{ name: "curr", value: curr.val }, { name: "curr.left", value: curr.left ? curr.left.val : "None" }, { name: "i", value: i }, { name: "size", value: size }],
         note: curr.left
           ? { vi: "Điều kiện True nên sẽ append con trái.", en: "The condition is true, so append the left child." }
@@ -1101,6 +1164,7 @@ function buildSteps199v2(input) {
           title: { vi: `queue.append(${curr.left.val})`, en: `queue.append(${curr.left.val})` },
           hlSet: new Set([curr.left.id]), codeLines: [13],
           queueOperation: `append ${curr.left.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.left.val, levelSize: size,
+          childSide: "left", child: curr.left.val,
           vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }],
           note: { vi: `Thêm con trái; queue = ${formatNodes(queue)}.`, en: `Append the left child; queue = ${formatNodes(queue)}.` },
         });
@@ -1110,6 +1174,7 @@ function buildSteps199v2(input) {
         title: { vi: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None", en: curr.right ? `curr.right = ${curr.right.val}` : "curr.right = None" },
         hlSet: new Set([curr.id]), codeLines: [14],
         queueOperation: "check right child", popped: curr.val, levelSize: size,
+        childSide: "right", child: curr.right ? curr.right.val : null,
         vars: [{ name: "curr", value: curr.val }, { name: "curr.right", value: curr.right ? curr.right.val : "None" }, { name: "i", value: i }, { name: "size", value: size }],
         note: curr.right
           ? { vi: "Điều kiện True nên sẽ append con phải.", en: "The condition is true, so append the right child." }
@@ -1121,6 +1186,7 @@ function buildSteps199v2(input) {
           title: { vi: `queue.append(${curr.right.val})`, en: `queue.append(${curr.right.val})` },
           hlSet: new Set([curr.right.id]), codeLines: [15],
           queueOperation: `append ${curr.right.val}`, queueActive: queue.length - 1, popped: curr.val, appended: curr.right.val, levelSize: size,
+          childSide: "right", child: curr.right.val,
           vars: [{ name: "curr", value: curr.val }, { name: "i", value: i }, { name: "size", value: size }],
           note: { vi: `Thêm con phải; queue = ${formatNodes(queue)}.`, en: `Append the right child; queue = ${formatNodes(queue)}.` },
         });
@@ -1151,6 +1217,11 @@ function buildSteps199v2(input) {
     level++;
   }
 
+  currentLevel = [];
+  levelSize = 0;
+  processedCount = 0;
+  currentIndex = -1;
+  currentNode = null;
   snap({
     title: { vi: "queue rỗng → thoát while", en: "queue is empty → exit while" },
     codeLines: [8],
@@ -1163,6 +1234,7 @@ function buildSteps199v2(input) {
     title: { vi: `Kết quả: [${res.join(",")}]`, en: `Result: [${res.join(",")}]` },
     wordSet: new Set(visible), codeLines: [18], codeBlock: 2,
     queueView: makeQueueView({ queueOperation: "done" }),
+    rightSideBfsView: makeRightSideBfsView({ codeLines: [18], queueOperation: "done" }),
     vars: [{ name: "res", value: `[${res.join(",")}]` }, { name: "queue", value: "[]" }, { name: "answer", value: `[${res.join(",")}]` }],
     note: { vi: `Trả về right side view = [${res.join(",")}].`, en: `Return the right side view = [${res.join(",")}].` },
   });
@@ -3416,8 +3488,8 @@ module.exports = {
       {
         key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1",
         options: [
-          { value: "1", label: { vi: "Cách 1: queue theo từng tầng", en: "Approach 1: queue by level" } },
-          { value: "2", label: { vi: "Cách 2: deque + size", en: "Approach 2: deque + size" } },
+          { value: "1", label: { vi: "Cách 1: BFS queue theo tầng", en: "Approach 1: BFS queue by level" } },
+          { value: "2", label: { vi: "Cách 2: BFS deque + size", en: "Approach 2: BFS deque + size" } },
         ],
       },
     ],
@@ -3426,8 +3498,8 @@ module.exports = {
       { vi: "Cách 2: Dùng deque, chốt size của tầng rồi popleft đúng size node; node có i == size - 1 là node nhìn thấy bên phải.", en: "Approach 2: Use a deque, lock in the level size, then popleft exactly that many nodes; the node with i == size - 1 is visible from the right." },
     ],
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Queue chứa tối đa 1 tầng.", en: "Queue holds at most one level." } },
-    codeLabel: { vi: "Cách 1: queue theo từng tầng", en: "Approach 1: queue by level" },
-    code2Label: { vi: "Cách 2: deque + size", en: "Approach 2: deque + size" },
+    codeLabel: { vi: "Cách 1: BFS queue theo tầng", en: "Approach 1: BFS queue by level" },
+    code2Label: { vi: "Cách 2: BFS deque + size", en: "Approach 2: BFS deque + size" },
     code: ["class Solution:", "    def rightSideView(self, root):", "        if not root: return []", "        res, queue = [], [root]", "        while queue:", "            res.append(queue[-1].val)   # rightmost", "            nxt = []", "            for n in queue:", "                if n.left: nxt.append(n.left)", "                if n.right: nxt.append(n.right)", "            queue = nxt", "        return res"],
     code2: [
       "class Solution:",

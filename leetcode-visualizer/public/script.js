@@ -2323,6 +2323,129 @@ function distanceKGuideHtml(view) {
   </section>`;
 }
 
+function rightSideBfsGuideHtml(view) {
+  const vi = lang === "vi";
+  const phaseGroup = {
+    initialize: 0,
+    "enqueue-root": 0,
+    "while-queue": 1,
+    "lock-level": 1,
+    "level-index": 2,
+    dequeue: 2,
+    "check-left": 2,
+    "enqueue-left": 2,
+    "check-right": 2,
+    "enqueue-right": 2,
+    "check-rightmost": 3,
+    "save-rightmost": 3,
+    "done-levels": 3,
+    done: 3,
+  };
+  const activePhase = phaseGroup[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1. Enqueue root", "2. Chốt size của tầng", "3. Popleft và enqueue con", "4. Lưu node cuối tầng"]
+    : ["1. Enqueue root", "2. Lock the level size", "3. Popleft and enqueue children", "4. Save the level's last node"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < activePhase;
+    const state = done ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${done ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+\.\s*/, ""))}</b></span>`;
+  }).join("");
+
+  const selectedIds = new Set(view.selectedIds || []);
+  const currentLevelHtml = (view.currentLevel || []).length
+    ? view.currentLevel.map((node, index) => {
+      const isCurrent = view.current && node.id === view.current.id;
+      const isNext = !view.current && index === view.index;
+      const classes = [
+        "rsv-level-node",
+        index < view.processedCount ? "is-processed" : "is-pending",
+        isCurrent ? "is-current" : "",
+        isNext ? "is-next" : "",
+        index === view.rightmostIndex ? "is-rightmost" : "",
+        selectedIds.has(node.id) ? "is-saved" : "",
+      ].filter(Boolean).join(" ");
+      const stateLabel = isCurrent
+        ? "CURRENT"
+        : isNext
+          ? (vi ? "KẾ TIẾP" : "NEXT")
+          : index < view.processedCount
+            ? (vi ? "ĐÃ XỬ LÝ" : "PROCESSED")
+            : (vi ? "ĐANG CHỜ" : "WAITING");
+      return `<span class="${classes}"><small>i=${index}${index === view.rightmostIndex ? " · RIGHTMOST" : ""}</small><strong>${escapeHtml(node.val)}</strong><em>${stateLabel}</em></span>`;
+    }).join("")
+    : `<em class="rsv-empty">${vi ? "chưa chốt tầng" : "level not locked yet"}</em>`;
+
+  const nextLevelHtml = (view.nextLevel || []).length
+    ? view.nextLevel.map((node, index) => `<span class="rsv-next-node"><small>${index === 0 ? "FRONT" : index === view.nextLevel.length - 1 ? "BACK" : `#${index}`}</small><strong>${escapeHtml(node.val)}</strong></span>`).join("")
+    : `<em class="rsv-empty">${vi ? "chưa enqueue node con" : "no children enqueued yet"}</em>`;
+
+  const hasDecision = Number.isInteger(view.index) && view.index >= 0 && view.size > 0;
+  const decisionValue = hasDecision ? view.index === view.size - 1 : null;
+  const decisionHtml = hasDecision
+    ? `<code>i=${view.index} == size-1=${view.size - 1}</code><strong class="${decisionValue ? "is-true" : "is-false"}">${decisionValue ? "True" : "False"}</strong><span>${decisionValue ? (vi ? "node này là góc nhìn bên phải" : "this node is visible from the right") : (vi ? "tiếp tục tới node cuối tầng" : "continue to the level's last node")}</span>`
+    : `<code>i == size - 1</code><strong>?</strong><span>${vi ? "chỉ node cuối mỗi tầng được thêm vào res" : "only the last node of each level enters res"}</span>`;
+
+  let actionText;
+  if (view.phase === "lock-level") {
+    actionText = vi
+      ? `Chốt size=${view.size}: đúng ${view.size} node này thuộc level ${view.level}; node con enqueue sau đó thuộc level ${view.level + 1}.`
+      : `Lock size=${view.size}: exactly these ${view.size} node(s) belong to level ${view.level}; children enqueued afterward belong to level ${view.level + 1}.`;
+  } else if (view.phase === "dequeue" && view.current) {
+    actionText = vi
+      ? `Popleft ${view.current.val} ở FRONT; đây là node i=${view.index} trong ${view.size} node của level ${view.level}.`
+      : `Popleft ${view.current.val} from FRONT; it is node i=${view.index} among ${view.size} node(s) on level ${view.level}.`;
+  } else if (["check-left", "check-right"].includes(view.phase)) {
+    const side = view.childSide === "left" ? (vi ? "trái" : "left") : (vi ? "phải" : "right");
+    actionText = view.child === null
+      ? (vi ? `CURRENT không có con ${side}; queue không đổi.` : `CURRENT has no ${side} child; the queue stays unchanged.`)
+      : (vi ? `CURRENT có con ${side} ${view.child}; bước sau enqueue vào phần NEXT LEVEL.` : `CURRENT has ${side} child ${view.child}; enqueue it into NEXT LEVEL next.`);
+  } else if (["enqueue-left", "enqueue-right"].includes(view.phase)) {
+    actionText = vi
+      ? `Append ${view.child} vào BACK. Node này chờ ở level ${view.level + 1}, không làm thay đổi size=${view.size} đang chạy.`
+      : `Append ${view.child} at BACK. It waits for level ${view.level + 1} and does not change the active size=${view.size}.`;
+  } else if (view.phase === "check-rightmost" && view.current) {
+    actionText = decisionValue
+      ? (vi ? `${view.current.val} có i=size-1 nên là node phải nhất của level ${view.level}.` : `${view.current.val} has i=size-1, so it is the rightmost node on level ${view.level}.`)
+      : (vi ? `${view.current.val} chưa phải node cuối level; không thêm vào res.` : `${view.current.val} is not the level's last node; do not add it to res.`);
+  } else if (view.phase === "save-rightmost" && view.current) {
+    actionText = vi
+      ? `Thêm ${view.current.val} vào right side view: res=[${view.result.join(",")}].`
+      : `Add ${view.current.val} to the right side view: res=[${view.result.join(",")}].`;
+  } else if (["done", "done-levels"].includes(view.phase)) {
+    actionText = vi
+      ? `BFS hoàn tất; góc nhìn bên phải từ trên xuống là [${view.result.join(",")}].`
+      : `BFS is complete; the top-to-bottom right side view is [${view.result.join(",")}].`;
+  } else {
+    actionText = vi
+      ? "BFS xử lý từng tầng từ trái sang phải; node được popleft cuối cùng của mỗi tầng là node nhìn thấy bên phải."
+      : "BFS processes each level left to right; the last node popped from each level is visible from the right.";
+  }
+
+  const resultHtml = (view.result || []).length
+    ? view.result.map((value, index) => `<span><small>level ${index}</small><strong>${escapeHtml(value)}</strong></span>`).join("")
+    : `<em class="rsv-empty">[]</em>`;
+  const summary = vi
+    ? `BFS góc nhìn bên phải; đang ở level ${view.level}, kết quả [${view.result.join(",")}].`
+    : `Right-side-view BFS; current level ${view.level}, result [${view.result.join(",")}].`;
+  return `<section class="rsv-bfs-guide" aria-label="${escapeHtml(summary)}">
+    <div class="rsv-bfs-phases">${phasesHtml}</div>
+    <div class="rsv-bfs-status">
+      <span><small>LEVEL</small><strong>${view.size > 0 ? view.level : "—"}</strong></span>
+      <span><small>FIXED SIZE</small><strong>${view.size || "—"}</strong></span>
+      <span><small>i</small><strong>${view.index >= 0 ? view.index : "—"}</strong></span>
+      <span><small>QUEUE</small><strong>${(view.queue || []).length}</strong></span>
+    </div>
+    <div class="rsv-level-flow">
+      <div class="rsv-level-band"><header><strong>${vi ? "CURRENT LEVEL" : "CURRENT LEVEL"} ${view.size > 0 ? view.level : ""}</strong><span>size=${view.size || "?"} · ${vi ? "không đổi trong for-loop" : "fixed during the for-loop"}</span></header><div>${currentLevelHtml}</div></div>
+      <b>→</b>
+      <div class="rsv-level-band is-next"><header><strong>${vi ? "NEXT LEVEL" : "NEXT LEVEL"} ${view.size > 0 ? view.level + 1 : ""}</strong><span>${vi ? "node con append vào BACK" : "children append at BACK"}</span></header><div>${nextLevelHtml}</div></div>
+    </div>
+    <div class="rsv-bfs-decision">${decisionHtml}</div>
+    <div class="rsv-bfs-action">${escapeHtml(actionText)}</div>
+    <div class="rsv-result"><strong>RIGHT SIDE VIEW</strong><div>${resultHtml}</div></div>
+  </section>`;
+}
+
 function renderTree(step, targetId = "treeView") {
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -2478,7 +2601,8 @@ function renderTree(step, targetId = "treeView") {
       </div>`
     : "";
   const distanceKGuide = step.distanceKView ? distanceKGuideHtml(step.distanceKView) : "";
-  $(targetId).innerHTML = decisionHeader + distanceKGuide + (step.queueView
+  const rightSideBfsGuide = step.rightSideBfsView ? rightSideBfsGuideHtml(step.rightSideBfsView) : "";
+  $(targetId).innerHTML = decisionHeader + distanceKGuide + rightSideBfsGuide + (step.queueView
     ? `<div class="tree-queue-layout${step.queueView.layout === "stacked" ? " tree-queue-stacked" : ""}">
         <div class="tree-queue-tree">${treeHtml}</div>
         <div class="tree-queue-panel">${queueViewHtml(step.queueView, true)}</div>
