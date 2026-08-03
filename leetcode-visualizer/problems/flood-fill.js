@@ -95,6 +95,7 @@ function buildSteps733(input, params = {}) {
       ...options,
       floodFillView: {
         phase,
+        mode: "iterative",
         rows,
         cols,
         image: image.map((row) => [...row]),
@@ -175,6 +176,236 @@ function buildSteps733(input, params = {}) {
   return {original,answer:image,steps};
 }
 
+function buildSteps733Recursive(input, params = {}) {
+  const parsed = parseNumbers(input);
+  const original = parsed.grid.map((row) => [...row]);
+  if (!parsed.valid) {
+    const result = invalid(original, tr("Image phải là ma trận chữ nhật gồm số nguyên.", "Image must be a rectangular integer matrix."));
+    result.steps.forEach((step) => { step.codeBlock = 2; });
+    return result;
+  }
+
+  const image = parsed.grid.map((row) => [...row]);
+  const rows = image.length;
+  const cols = image[0].length;
+  const startRow = Number(params.start_row ?? params.sr ?? 1);
+  const startCol = Number(params.start_col ?? params.sc ?? 1);
+  const color = Number(params.color ?? 2);
+  if (!Number.isInteger(startRow) || !Number.isInteger(startCol) || !Number.isInteger(color)
+    || startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols) {
+    const result = invalid(original, tr("sr/sc phải nằm trong image và color phải là số nguyên.", "sr/sc must be inside the image and color must be an integer."));
+    result.steps.forEach((step) => { step.codeBlock = 2; });
+    return result;
+  }
+
+  const originalColor = image[startRow][startCol];
+  const changed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const callStack = [];
+  const steps = [];
+  let phase = "enter";
+  let currentCell = null;
+  let neighborCell = null;
+  let activeDirection = null;
+  let insideGrid = null;
+  let matchesOriginal = null;
+  let canFillNeighbor = null;
+  let dimensionsKnown = false;
+  let originalKnown = false;
+  let directionsKnown = false;
+  let stackKnown = false;
+
+  function push(line, title, note, options = {}) {
+    const filledCount = changed.reduce((total, row) => total + row.filter(Boolean).length, 0);
+    steps.push({
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: [line],
+      codeBlock: 2,
+      vars: [
+        ...(options.vars || []),
+        { name: "call stack", value: stackText(callStack.map((frame) => [frame.row, frame.col])) },
+      ],
+      note,
+      floodFillView: {
+        phase,
+        mode: "recursive",
+        rows,
+        cols,
+        image: image.map((row) => [...row]),
+        original: original.map((row) => [...row]),
+        changed: changed.map((row) => [...row]),
+        start: [startRow, startCol],
+        current: currentCell ? [...currentCell] : null,
+        neighbor: neighborCell ? [...neighborCell] : null,
+        direction: activeDirection ? [...activeDirection] : null,
+        insideGrid,
+        matchesOriginal,
+        canFill: canFillNeighbor,
+        originalColor: originalKnown ? originalColor : null,
+        newColor: color,
+        dimensionsKnown,
+        directionsKnown,
+        stackKnown,
+        stack: callStack.map((frame) => [frame.row, frame.col]),
+        stackFrames: callStack.map((frame, depth) => ({ ...frame, depth })),
+        filledCount,
+      },
+    });
+  }
+
+  push(2, tr("Bắt đầu floodFill đệ quy", "Enter recursive floodFill"), tr("Cách 2 dùng call stack của hàm dfs thay cho stack tự tạo.", "Approach 2 uses dfs call frames instead of an explicit stack."), {
+    vars: [{ name: "start", value: `(${startRow},${startCol})` }, { name: "color", value: color }],
+  });
+  phase = "rows";
+  push(3, tr(`rows = ${rows}`, `rows = ${rows}`), tr("Lưu số hàng của image.", "Store the image row count."), { vars: [{ name: "rows", value: rows }] });
+  dimensionsKnown = true;
+  phase = "dimensions";
+  push(4, tr(`cols = ${cols}`, `cols = ${cols}`), tr("Đã biết đầy đủ biên hợp lệ của image.", "The valid image bounds are now known."), { vars: [{ name: "cols", value: cols }] });
+  originalKnown = true;
+  currentCell = [startRow, startCol];
+  phase = "read-color";
+  push(6, tr(`original_color = ${originalColor}`, `original_color = ${originalColor}`), tr("DFS chỉ đi qua các ô nối liền còn mang màu gốc này.", "DFS only enters connected cells that still carry this source color."), {
+    vars: [{ name: "original_color", value: originalColor }],
+  });
+
+  const unchanged = originalColor === color;
+  phase = "same-color-check";
+  push(8, tr(`original_color == color → ${unchanged}`, `original_color == color → ${unchanged}`), unchanged
+    ? tr("Màu mới trùng màu gốc nên phải dừng trước khi gọi dfs.", "The new color matches the source, so stop before calling dfs.")
+    : tr("Hai màu khác nhau; tiếp tục định nghĩa dfs.", "The colors differ; continue to define dfs."), {
+    vars: [{ name: "same color?", value: unchanged }],
+  });
+  if (unchanged) {
+    phase = "done";
+    push(9, tr("return image", "return image"), tr("Image giữ nguyên và không tạo recursive frame nào.", "The image is unchanged and no recursive frame is created."), {
+      final: true,
+      vars: [{ name: "answer", value: JSON.stringify(image) }],
+    });
+    return { original, answer: image, steps };
+  }
+
+  currentCell = null;
+  directionsKnown = true;
+  phase = "define-dfs";
+  push(11, tr("Định nghĩa dfs(row, col)", "Define dfs(row, col)"), tr("Mỗi lời gọi kiểm tra hai base case, tô ô hợp lệ rồi gọi tiếp bốn hướng.", "Each call checks two base cases, recolors a valid cell, then calls four directions."));
+
+  function dfs(row, col, callerLine, relation) {
+    callStack.push({ row, col, callerLine, relation });
+    stackKnown = true;
+    currentCell = [row, col];
+    neighborCell = null;
+    insideGrid = null;
+    matchesOriginal = null;
+    canFillNeighbor = null;
+    phase = "dfs-enter";
+    push(11, tr(`Vào dfs(${row}, ${col})`, `Enter dfs(${row}, ${col})`), tr(`Tạo frame depth ${callStack.length - 1} trên call stack.`, `Create depth-${callStack.length - 1} frame on the call stack.`), {
+      vars: [{ name: "row", value: row }, { name: "col", value: col }, { name: "depth", value: callStack.length - 1 }],
+    });
+
+    insideGrid = row >= 0 && row < rows && col >= 0 && col < cols;
+    phase = "bounds-check";
+    push(12, tr(`Ngoài biên → ${!insideGrid}`, `Out of bounds → ${!insideGrid}`), insideGrid
+      ? tr(`${coordText(row, col)} nằm trong image; kiểm tra màu tiếp theo.`, `${coordText(row, col)} is inside the image; check its color next.`)
+      : tr(`${coordText(row, col)} nằm ngoài image; frame này phải return.`, `${coordText(row, col)} is outside the image; this frame must return.`), {
+      vars: [{ name: "in bounds?", value: insideGrid }],
+    });
+    if (!insideGrid) {
+      phase = "return-bounds";
+      push(13, tr(`return khỏi dfs(${row}, ${col})`, `Return from dfs(${row}, ${col})`), tr("Base case 1 dừng nhánh trước khi truy cập image[row][col].", "Base case 1 stops this branch before reading image[row][col]."));
+      callStack.pop();
+      return;
+    }
+
+    matchesOriginal = image[row][col] === originalColor;
+    canFillNeighbor = matchesOriginal;
+    phase = "color-check";
+    push(15, tr(`image[${row}][${col}] != original → ${!matchesOriginal}`, `image[${row}][${col}] != original → ${!matchesOriginal}`), matchesOriginal
+      ? tr("Ô vẫn mang màu gốc; frame được phép tô.", "The cell still has the source color; this frame may recolor it.")
+      : tr("Ô có màu khác hoặc đã được tô; return để không đi lặp.", "The cell has a different color or was already recolored; return to prevent revisiting."), {
+      vars: [{ name: `image[${row}][${col}]`, value: image[row][col] }, { name: "matches original?", value: matchesOriginal }],
+    });
+    if (!matchesOriginal) {
+      phase = "return-color";
+      push(16, tr(`return khỏi dfs(${row}, ${col})`, `Return from dfs(${row}, ${col})`), tr("Base case 2 kết thúc frame mà không thay đổi image.", "Base case 2 ends this frame without changing the image."));
+      callStack.pop();
+      return;
+    }
+
+    image[row][col] = color;
+    changed[row][col] = true;
+    phase = "recolor";
+    push(18, tr(`image[${row}][${col}] = ${color}`, `image[${row}][${col}] = ${color}`), tr("Tô trước bốn lời gọi con để lần quay lại ô này gặp base case 2.", "Recolor before the four child calls so any revisit hits base case 2."), {
+      vars: [{ name: "filled cell", value: coordText(row, col) }],
+    });
+
+    const calls = [
+      { line: 20, delta: [1, 0], label: tr("xuống", "down") },
+      { line: 21, delta: [-1, 0], label: tr("lên", "up") },
+      { line: 22, delta: [0, 1], label: tr("phải", "right") },
+      { line: 23, delta: [0, -1], label: tr("trái", "left") },
+    ];
+    for (const call of calls) {
+      const nextRow = row + call.delta[0];
+      const nextCol = col + call.delta[1];
+      currentCell = [row, col];
+      neighborCell = [nextRow, nextCol];
+      activeDirection = [...call.delta];
+      insideGrid = null;
+      matchesOriginal = null;
+      canFillNeighbor = null;
+      phase = "recursive-call";
+      push(call.line, tr(`Gọi dfs(${nextRow}, ${nextCol})`, `Call dfs(${nextRow}, ${nextCol})`), tr(`Tạm dừng frame ${coordText(row, col)} và đi ${call.label.vi} sang frame con.`, `Pause frame ${coordText(row, col)} and go ${call.label.en} into a child frame.`), {
+        vars: [{ name: "caller", value: coordText(row, col) }, { name: "callee", value: coordText(nextRow, nextCol) }],
+      });
+      dfs(nextRow, nextCol, call.line, call.label.en);
+      currentCell = [row, col];
+      neighborCell = [nextRow, nextCol];
+      activeDirection = [...call.delta];
+      insideGrid = null;
+      matchesOriginal = null;
+      canFillNeighbor = null;
+      phase = "resume-frame";
+      push(call.line, tr(`Trở lại dfs(${row}, ${col})`, `Resume dfs(${row}, ${col})`), tr(`Frame con ${coordText(nextRow, nextCol)} đã return; tiếp tục frame cha.`, `Child frame ${coordText(nextRow, nextCol)} returned; continue the parent frame.`), {
+        vars: [{ name: "resumed", value: coordText(row, col) }, { name: "depth", value: callStack.length - 1 }],
+      });
+    }
+
+    currentCell = [row, col];
+    neighborCell = null;
+    activeDirection = null;
+    insideGrid = null;
+    matchesOriginal = null;
+    canFillNeighbor = null;
+    phase = "dfs-complete";
+    push(23, tr(`Hoàn tất dfs(${row}, ${col})`, `Complete dfs(${row}, ${col})`), tr("Cả bốn hướng đã return; frame hiện tại rời call stack.", "All four directions returned; the current frame now leaves the call stack."));
+    callStack.pop();
+  }
+
+  stackKnown = true;
+  neighborCell = [startRow, startCol];
+  phase = "main-call";
+  push(25, tr(`Gọi dfs(${startRow}, ${startCol})`, `Call dfs(${startRow}, ${startCol})`), tr("Bắt đầu chuỗi đệ quy từ ô được chọn.", "Start the recursive chain from the selected cell."));
+  dfs(startRow, startCol, 25, "start");
+  currentCell = null;
+  neighborCell = null;
+  activeDirection = null;
+  phase = "main-resume";
+  push(25, tr("dfs(sr, sc) đã hoàn tất", "dfs(sr, sc) completed"), tr("Mọi recursive frame đã return; call stack trở lại rỗng.", "Every recursive frame returned; the call stack is empty again."));
+  phase = "done";
+  push(27, tr("return image", "return image"), tr("Trả về image sau khi DFS đệ quy tô xong component.", "Return the image after recursive DFS finishes the component."), {
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(image) }],
+  });
+  return { original, answer: image, steps };
+}
+
+function coordText(row, col) {
+  return `(${row},${col})`;
+}
+
 function buildSteps200Detailed(input) {
   const parsed=parseBinary(input,true), original=parsed.grid.map((row)=>[...row]);
   if(!parsed.valid) return invalid(original,tr("Grid chỉ được chứa 0 và 1.","Grid may contain only 0 and 1."));
@@ -219,12 +450,21 @@ const problems = {
     defaultInput: "1,1,1|1,1,0|1,0,1", inputKind: "string",
     inputLabel: tr("Image (hàng cách '|')", "Image (rows separated by '|')"),
     extraParams: [
+      {
+        key: "approach", label: tr("Cách giải", "Approach"), type: "select", default: "1",
+        options: [
+          { value: "1", label: tr("Cách 1: DFS stack", "Approach 1: DFS stack") },
+          { value: "2", label: tr("Cách 2: DFS đệ quy", "Approach 2: recursive DFS") },
+        ],
+      },
       { key: "start_row", label: tr("start_row", "start_row"), default: 1 },
       { key: "start_col", label: tr("start_col", "start_col"), default: 1 },
       { key: "color", label: tr("color mới", "new color"), default: 2 },
     ],
-    approach: [tr("Lưu màu ban đầu; nếu đã bằng màu mới thì trả ngay.", "Store the original color; return immediately if it already equals the new color."),tr("Tô ô trước khi đưa vào stack để không thêm trùng.", "Recolor a cell before pushing it to prevent duplicates."),tr("DFS stack lan sang bốn neighbor còn mang màu ban đầu.", "The DFS stack expands to four neighbors still carrying the original color.")],
-    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô trong component được push tối đa một lần.", "Each component cell is pushed at most once.") },
+    approach: [tr("Cả hai cách đều lưu màu ban đầu và trả ngay nếu màu mới đã giống màu cũ.", "Both approaches store the source color and return immediately when the new color already matches it."),tr("Cách 1 dùng stack tự tạo; tô ô trước khi push để không thêm trùng.", "Approach 1 uses an explicit stack and recolors before pushing to prevent duplicates."),tr("Cách 2 dùng recursive call stack; hai base case chặn ô ngoài biên và ô không còn màu gốc.", "Approach 2 uses the recursive call stack; two base cases stop out-of-bounds cells and cells no longer carrying the source color.")],
+    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô hợp lệ được tô một lần; bộ nhớ là stack tự tạo hoặc recursive call stack.", "Each valid cell is recolored once; memory is the explicit stack or the recursive call stack.") },
+    codeLabel: tr("Cách 1: DFS stack", "Approach 1: DFS stack"),
+    code2Label: tr("Cách 2: DFS đệ quy", "Approach 2: recursive DFS"),
     code: [
       "from typing import List", "", "class Solution:",
       "    def floodFill(self, image: List[List[int]], start_row: int, start_col: int, color: int) -> List[List[int]]:",
@@ -242,7 +482,43 @@ const problems = {
       "                    image[next_row][next_col] = color",
       "                    stack.append((next_row, next_col))",
       "        return image",
-    ], builder: buildSteps733,
+    ],
+    code2: [
+      "class Solution:",
+      "    def floodFill(self, image, sr, sc, color):",
+      "        rows = len(image)",
+      "        cols = len(image[0])",
+      "",
+      "        original_color = image[sr][sc]",
+      "",
+      "        if original_color == color:",
+      "            return image",
+      "",
+      "        def dfs(row, col):",
+      "            if row < 0 or row >= rows or col < 0 or col >= cols:",
+      "                return",
+      "",
+      "            if image[row][col] != original_color:",
+      "                return",
+      "",
+      "            image[row][col] = color",
+      "",
+      "            dfs(row + 1, col)",
+      "            dfs(row - 1, col)",
+      "            dfs(row, col + 1)",
+      "            dfs(row, col - 1)",
+      "",
+      "        dfs(sr, sc)",
+      "",
+      "        return image",
+    ],
+    liveArgs: (input, params = {}) => {
+      const parsed = parseNumbers(input);
+      return [parsed.grid, Number(params.start_row ?? 1), Number(params.start_col ?? 1), Number(params.color ?? 2)];
+    },
+    builder: (input, params) => Number(params && params.approach) === 2
+      ? buildSteps733Recursive(input, params)
+      : buildSteps733(input, params),
   },
   200: {
     id: 200, difficulty: "medium", slug: "number-of-islands",

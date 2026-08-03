@@ -1567,21 +1567,32 @@ function effortGuideHtml(view) {
 function renderFloodFillView(step) {
   const view = step.floodFillView;
   const vi = lang === "vi";
+  const recursive = view.mode === "recursive";
   const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
   const coord = (cell) => Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
   const currentKey = keyOf(view.current);
   const neighborKey = keyOf(view.neighbor);
   const startKey = keyOf(view.start);
+  const hasTopFrame = recursive && view.stack.length > 0;
   const neighborInside = Array.isArray(view.neighbor)
     && view.neighbor[0] >= 0 && view.neighbor[0] < view.rows
     && view.neighbor[1] >= 0 && view.neighbor[1] < view.cols;
   const expansionPhases = new Set(["stack-init", "fill-start", "stack-check", "pop"]);
   const neighborPhases = new Set(["direction", "neighbor", "neighbor-check"]);
   const fillPhases = new Set(["fill-neighbor", "push-neighbor", "stack-empty", "done"]);
-  const activePhase = fillPhases.has(view.phase) ? 3 : neighborPhases.has(view.phase) ? 2 : expansionPhases.has(view.phase) ? 1 : 0;
-  const phaseLabels = vi
-    ? ["1. Đọc màu gốc", "2. Pop từ DFS stack", "3. Kiểm tra hàng xóm", "4. Tô màu và push"]
-    : ["1. Read source color", "2. Pop DFS stack", "3. Check a neighbor", "4. Recolor and push"];
+  const recursiveCallPhases = new Set(["main-call", "dfs-enter", "recursive-call", "resume-frame"]);
+  const recursiveCheckPhases = new Set(["bounds-check", "color-check", "return-bounds", "return-color"]);
+  const recursiveFillPhases = new Set(["recolor", "dfs-complete", "main-resume", "done"]);
+  const activePhase = recursive
+    ? recursiveFillPhases.has(view.phase) ? 3 : recursiveCheckPhases.has(view.phase) ? 2 : recursiveCallPhases.has(view.phase) ? 1 : 0
+    : fillPhases.has(view.phase) ? 3 : neighborPhases.has(view.phase) ? 2 : expansionPhases.has(view.phase) ? 1 : 0;
+  const phaseLabels = recursive
+    ? (vi
+      ? ["1. Khởi tạo", "2. Vào frame dfs", "3. Hai base case", "4. Tô và gọi 4 hướng"]
+      : ["1. Initialize", "2. Enter dfs frame", "3. Two base cases", "4. Recolor and call four ways"])
+    : (vi
+      ? ["1. Đọc màu gốc", "2. Pop từ DFS stack", "3. Kiểm tra hàng xóm", "4. Tô màu và push"]
+      : ["1. Read source color", "2. Pop DFS stack", "3. Check a neighbor", "4. Recolor and push"]);
   const phasesHtml = phaseLabels.map((label, index) => {
     const done = view.phase === "done" || index < activePhase;
     const state = done ? "is-done" : index === activePhase ? "is-active" : "";
@@ -1598,7 +1609,7 @@ function renderFloodFillView(step) {
     if (key === currentKey) classes.push("is-current");
     if (key === neighborKey) classes.push("is-neighbor");
     const tags = [];
-    if (key === currentKey) tags.push("CUR");
+    if (key === currentKey) tags.push(recursive ? (hasTopFrame ? "TOP" : "READ") : "CUR");
     if (key === neighborKey) tags.push("NEXT");
     return `<div class="${classes.join(" ")}">
       <small>[${rowIndex},${colIndex}]</small>
@@ -1610,7 +1621,8 @@ function renderFloodFillView(step) {
   const stackHtml = view.stack.length
     ? view.stack.map((cell, index) => {
       const top = index === view.stack.length - 1;
-      return `<span class="${top ? "is-top" : ""}"><small>${top ? "TOP" : `#${index}`}</small><strong>${escapeHtml(coord(cell))}</strong></span>`;
+      const label = recursive ? (top ? `TOP · d${index}` : `depth ${index}`) : (top ? "TOP" : `#${index}`);
+      return `<span class="${top ? "is-top" : ""}"><small>${label}</small><strong>${escapeHtml(coord(cell))}</strong></span>`;
     }).join("")
     : `<em>∅</em>`;
 
@@ -1629,21 +1641,67 @@ function renderFloodFillView(step) {
   const activeDirection = directionDefinitions.find((direction) => Array.isArray(view.direction)
     && view.direction[0] === direction.delta[0] && view.direction[1] === direction.delta[1]);
   const arrow = activeDirection ? activeDirection.arrow : "→";
+  const currentInside = Array.isArray(view.current)
+    && view.current[0] >= 0 && view.current[0] < view.rows
+    && view.current[1] >= 0 && view.current[1] < view.cols;
+  const currentValue = currentInside ? view.image[view.current[0]][view.current[1]] : "OUT";
   let neighborValue = "?";
   if (neighborInside) neighborValue = view.image[view.neighbor[0]][view.neighbor[1]];
-  const routeHtml = Array.isArray(view.current)
+  const recursiveState = {
+    "dfs-enter": ["FRAME STATE", "enter", `d${Math.max(0, view.stack.length - 1)}`],
+    "bounds-check": ["BASE CASE 1", "in bounds?", view.insideGrid === null ? "?" : view.insideGrid ? "True" : "False"],
+    "return-bounds": ["FRAME STATE", "out of bounds", "RETURN"],
+    "color-check": ["BASE CASE 2", "source color?", view.matchesOriginal === null ? "?" : view.matchesOriginal ? "True" : "False"],
+    "return-color": ["FRAME STATE", "wrong/visited", "RETURN"],
+    recolor: ["FRAME STATE", "recolor", String(view.newColor)],
+    "dfs-complete": ["FRAME STATE", "4 calls done", "RETURN"],
+  }[view.phase] || ["FRAME STATE", "dfs(row,col)", "ACTIVE"];
+  const routeHtml = Array.isArray(view.current) && (!recursive || Array.isArray(view.neighbor))
     ? `<div class="flood-fill-route">
-        <span class="is-current"><small>CURRENT</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(view.image[view.current[0]][view.current[1]])}</em></span>
+        <span class="${currentInside ? "is-current" : "is-outside"}"><small>${hasTopFrame ? "TOP FRAME" : recursive ? "FOCUS" : "CURRENT"}</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(currentValue)}</em></span>
         <b>${arrow}</b>
         <span class="${neighborInside ? "is-neighbor" : "is-outside"}"><small>NEIGHBOR</small><strong>${escapeHtml(coord(view.neighbor))}</strong><em>${neighborInside ? escapeHtml(neighborValue) : "OUT"}</em></span>
       </div>`
-    : `<div class="flood-fill-route is-idle"><code>stack.pop() → current → 4 neighbors</code></div>`;
+    : recursive && Array.isArray(view.current)
+      ? `<div class="flood-fill-route is-frame">
+          <span class="${currentInside ? "is-current" : "is-outside"}"><small>${hasTopFrame ? "TOP FRAME" : "FOCUS"}</small><strong>${escapeHtml(coord(view.current))}</strong><em>${escapeHtml(currentValue)}</em></span>
+          <b>→</b>
+          <span class="is-check"><small>${escapeHtml(recursiveState[0])}</small><strong>${escapeHtml(recursiveState[1])}</strong><em>${escapeHtml(recursiveState[2])}</em></span>
+        </div>`
+    : `<div class="flood-fill-route is-idle"><code>${recursive ? "dfs(row,col) → base cases → recolor → 4 calls" : "stack.pop() → current → 4 neighbors"}</code></div>`;
 
   const truth = (value) => value === null ? "?" : value ? "True" : "False";
   let decision = "?";
   let decisionClass = "";
   if (view.phase === "done") {
     decision = "RETURN";
+    decisionClass = "is-fill";
+  } else if (recursive && view.phase === "main-call") {
+    decision = "CALL";
+    decisionClass = "is-push";
+  } else if (recursive && view.phase === "dfs-enter") {
+    decision = "ENTER";
+    decisionClass = "is-push";
+  } else if (recursive && view.phase === "bounds-check") {
+    decision = view.insideGrid ? "NEXT CHECK" : "RETURN";
+    decisionClass = view.insideGrid ? "is-fill" : "is-skip";
+  } else if (recursive && view.phase === "color-check") {
+    decision = view.matchesOriginal ? "RECOLOR" : "RETURN";
+    decisionClass = view.matchesOriginal ? "is-fill" : "is-skip";
+  } else if (recursive && ["return-bounds", "return-color", "dfs-complete"].includes(view.phase)) {
+    decision = "RETURN";
+    decisionClass = "is-skip";
+  } else if (recursive && view.phase === "recolor") {
+    decision = "RECOLOR";
+    decisionClass = "is-fill";
+  } else if (recursive && view.phase === "recursive-call") {
+    decision = "CALL";
+    decisionClass = "is-push";
+  } else if (recursive && view.phase === "resume-frame") {
+    decision = "RESUME";
+    decisionClass = "is-fill";
+  } else if (recursive && view.phase === "main-resume") {
+    decision = "DONE";
     decisionClass = "is-fill";
   } else if (view.phase === "stack-empty") {
     decision = "STOP";
@@ -1661,13 +1719,55 @@ function renderFloodFillView(step) {
   const checksHtml = `<div class="flood-fill-checks">
     <span class="${view.insideGrid === true ? "is-pass" : view.insideGrid === false ? "is-fail" : ""}"><small>${vi ? "TRONG BIÊN" : "IN BOUNDS"}</small><strong>${truth(view.insideGrid)}</strong></span>
     <b>AND</b>
-    <span class="${view.matchesOriginal === true ? "is-pass" : view.matchesOriginal === false ? "is-fail" : ""}"><small>image[next] == original</small><strong>${truth(view.matchesOriginal)}</strong></span>
+    <span class="${view.matchesOriginal === true ? "is-pass" : view.matchesOriginal === false ? "is-fail" : ""}"><small>${recursive ? "image[row][col] == original" : "image[next] == original"}</small><strong>${truth(view.matchesOriginal)}</strong></span>
     <b>→</b>
     <span class="flood-fill-decision ${decisionClass}"><small>${vi ? "HÀNH ĐỘNG" : "ACTION"}</small><strong>${escapeHtml(decision)}</strong></span>
   </div>`;
 
   let actionDetail;
-  if (view.phase === "enter") {
+  if (recursive && view.phase === "enter") {
+    actionDetail = vi ? "Cách 2 dùng call stack của dfs; mỗi lời gọi tạo một frame riêng." : "Approach 2 uses the dfs call stack; every call creates its own frame.";
+  } else if (recursive && view.phase === "rows") {
+    actionDetail = vi ? `rows = ${view.rows}: lưu số hàng để kiểm tra biên.` : `rows = ${view.rows}: store the row count for bounds checks.`;
+  } else if (recursive && view.phase === "dimensions") {
+    actionDetail = vi ? `cols = ${view.cols}: miền hợp lệ là row 0..${view.rows - 1}, col 0..${view.cols - 1}.` : `cols = ${view.cols}: valid coordinates are rows 0..${view.rows - 1}, cols 0..${view.cols - 1}.`;
+  } else if (recursive && view.phase === "read-color") {
+    actionDetail = vi ? `Đọc original_color = ${view.originalColor} tại ô bắt đầu ${coord(view.start)}.` : `Read original_color = ${view.originalColor} from the start cell ${coord(view.start)}.`;
+  } else if (recursive && view.phase === "same-color-check") {
+    actionDetail = view.originalColor === view.newColor
+      ? (vi ? "Màu mới trùng màu gốc, nên return ngay và không tạo frame dfs." : "The new color matches the source, so return before creating any dfs frame.")
+      : (vi ? "Màu mới khác màu gốc; tiếp tục định nghĩa và gọi dfs." : "The new color differs from the source; continue to define and call dfs.");
+  } else if (recursive && view.phase === "define-dfs") {
+    actionDetail = vi ? "Mỗi frame dfs chạy hai base case, tô ô hợp lệ, rồi lần lượt gọi xuống, lên, phải, trái." : "Each dfs frame checks two base cases, recolors a valid cell, then calls down, up, right, and left.";
+  } else if (recursive && view.phase === "main-call") {
+    actionDetail = vi ? `Dòng chính gọi dfs${coord(view.start)}; bước sau frame đầu tiên mới được đẩy vào call stack.` : `The main function calls dfs${coord(view.start)}; the next step pushes the first frame onto the call stack.`;
+  } else if (recursive && view.phase === "dfs-enter") {
+    actionDetail = vi ? `Tạo frame ${coord(view.current)} ở TOP; depth hiện tại là ${Math.max(0, view.stack.length - 1)}.` : `Create frame ${coord(view.current)} at TOP; the current depth is ${Math.max(0, view.stack.length - 1)}.`;
+  } else if (recursive && view.phase === "bounds-check") {
+    actionDetail = view.insideGrid
+      ? (vi ? `${coord(view.current)} nằm trong biên, nên frame chuyển sang kiểm tra màu.` : `${coord(view.current)} is in bounds, so this frame proceeds to the color check.`)
+      : (vi ? `${coord(view.current)} nằm ngoài biên, nên base case 1 sẽ return.` : `${coord(view.current)} is out of bounds, so base case 1 returns.`);
+  } else if (recursive && view.phase === "return-bounds") {
+    actionDetail = vi ? `Frame ${coord(view.current)} return vì ngoài biên; bước sau nó rời TOP và frame cha tiếp tục.` : `Frame ${coord(view.current)} returns out of bounds; next it leaves TOP and its parent resumes.`;
+  } else if (recursive && view.phase === "color-check") {
+    actionDetail = view.matchesOriginal
+      ? (vi ? `image${coord(view.current)} vẫn bằng original_color ${view.originalColor}, nên được phép tô.` : `image${coord(view.current)} still equals original_color ${view.originalColor}, so it may be recolored.`)
+      : (vi ? `image${coord(view.current)} không còn bằng ${view.originalColor}; base case 2 ngăn đi lặp hoặc vượt vùng.` : `image${coord(view.current)} no longer equals ${view.originalColor}; base case 2 prevents revisits or crossing the region.`);
+  } else if (recursive && view.phase === "return-color") {
+    actionDetail = vi ? `Frame ${coord(view.current)} return mà không tô; bước sau frame cha được resume.` : `Frame ${coord(view.current)} returns without recoloring; the parent frame resumes next.`;
+  } else if (recursive && view.phase === "recolor") {
+    actionDetail = vi ? `Đổi image${coord(view.current)} thành ${view.newColor} trước bốn lời gọi con để đánh dấu đã thăm.` : `Set image${coord(view.current)} to ${view.newColor} before the four child calls to mark it visited.`;
+  } else if (recursive && view.phase === "recursive-call") {
+    actionDetail = vi ? `Frame ${coord(view.current)} tạm dừng và gọi frame con ${coord(view.neighbor)} theo hướng ${arrow}.` : `Frame ${coord(view.current)} pauses and calls child frame ${coord(view.neighbor)} in direction ${arrow}.`;
+  } else if (recursive && view.phase === "resume-frame") {
+    actionDetail = vi ? `Frame con ${coord(view.neighbor)} đã rời stack; frame cha ${coord(view.current)} tiếp tục ở đúng dòng gọi.` : `Child frame ${coord(view.neighbor)} left the stack; parent frame ${coord(view.current)} resumes at that call line.`;
+  } else if (recursive && view.phase === "dfs-complete") {
+    actionDetail = vi ? `Bốn hướng của ${coord(view.current)} đều đã return; frame TOP này chuẩn bị rời call stack.` : `All four directions from ${coord(view.current)} returned; this TOP frame is ready to leave the call stack.`;
+  } else if (recursive && view.phase === "main-resume") {
+    actionDetail = vi ? "Frame gốc đã return; call stack rỗng và quyền điều khiển trở lại floodFill." : "The root frame returned; the call stack is empty and control is back in floodFill.";
+  } else if (recursive) {
+    actionDetail = vi ? `Hoàn tất: ${view.filledCount} ô đã đổi sang màu ${view.newColor}.` : `Complete: ${view.filledCount} cell(s) were changed to color ${view.newColor}.`;
+  } else if (view.phase === "enter") {
     actionDetail = vi ? "Bắt đầu từ ô S và chỉ lan qua cạnh trên, dưới, trái, phải." : "Start at S and spread only through top, bottom, left, and right edges.";
   } else if (view.phase === "dimensions") {
     actionDetail = vi ? `Image có ${view.rows} hàng và ${view.cols} cột.` : `The image has ${view.rows} rows and ${view.cols} columns.`;
@@ -1706,15 +1806,15 @@ function renderFloodFillView(step) {
   }
 
   const summary = vi
-    ? `Flood Fill ${view.rows} nhân ${view.cols}; đã tô ${view.filledCount} ô; stack có ${view.stack.length} ô.`
-    : `Flood Fill ${view.rows} by ${view.cols}; ${view.filledCount} cells recolored; ${view.stack.length} cells on the stack.`;
-  $("treeView").innerHTML = `<section class="flood-fill-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ? `Flood Fill ${view.rows} nhân ${view.cols}; đã tô ${view.filledCount} ô; ${recursive ? "call stack" : "stack"} có ${view.stack.length} frame.`
+    : `Flood Fill ${view.rows} by ${view.cols}; ${view.filledCount} cells recolored; ${view.stack.length} ${recursive ? "call" : "DFS"} stack frame(s).`;
+  $("treeView").innerHTML = `<section class="flood-fill-viz${recursive ? " is-recursive" : ""}" role="img" aria-label="${escapeHtml(summary)}">
     <div class="flood-fill-phases">${phasesHtml}</div>
     <div class="flood-fill-status">
       <span><small>${vi ? "MÀU GỐC" : "SOURCE"}</small><strong>${view.originalColor === null ? "?" : escapeHtml(view.originalColor)}</strong></span>
       <span><small>${vi ? "MÀU MỚI" : "NEW COLOR"}</small><strong>${escapeHtml(view.newColor)}</strong></span>
       <span><small>${vi ? "ĐÃ TÔ" : "RECOLORED"}</small><strong>${view.filledCount}</strong></span>
-      <span><small>STACK</small><strong>${view.stack.length}</strong></span>
+      <span><small>${recursive ? "CALL STACK" : "STACK"}</small><strong>${view.stack.length}</strong></span>
     </div>
     <div class="flood-fill-main">
       <section class="flood-fill-image-section">
@@ -1722,7 +1822,7 @@ function renderFloodFillView(step) {
         <div class="flood-fill-grid-scroll"><div class="flood-fill-grid" style="--flood-cols:${view.cols}">${cellsHtml}</div></div>
       </section>
       <section class="flood-fill-work-section">
-        <header><strong>DFS STACK</strong><span>${vi ? "push/pop ở bên phải" : "push/pop at the right"}</span></header>
+        <header><strong>${recursive ? "CALL STACK" : "DFS STACK"}</strong><span>${recursive ? (vi ? "TOP frame ở bên phải" : "TOP frame at the right") : (vi ? "push/pop ở bên phải" : "push/pop at the right")}</span></header>
         <div class="flood-fill-stack">${stackHtml}</div>
         <div class="flood-fill-directions">${directionHtml}</div>
         ${routeHtml}
@@ -1733,7 +1833,7 @@ function renderFloodFillView(step) {
     <div class="flood-fill-legend">
       <span><i class="source"></i>${vi ? "còn màu gốc" : "source color"}</span>
       <span><i class="filled"></i>${vi ? "đã đổi màu" : "recolored"}</span>
-      <span><i class="current"></i>CURRENT</span>
+      <span><i class="current"></i>${recursive ? "TOP FRAME" : "CURRENT"}</span>
       <span><i class="neighbor"></i>NEIGHBOR</span>
       <span><b>S</b>${vi ? "ô bắt đầu" : "start cell"}</span>
     </div>
