@@ -15269,6 +15269,11 @@ select option {
   outline-offset: 1px;
 }
 
+.flood-fill-cell.is-virus-frontier {
+  border-color: #fbbf24;
+  box-shadow: inset 0 3px 0 rgba(251, 191, 36, 0.65);
+}
+
 .flood-fill-cell.is-neighbor {
   border-color: #a78bfa;
   box-shadow: inset 0 -3px 0 rgba(167, 139, 250, 0.65);

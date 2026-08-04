@@ -2119,10 +2119,37 @@ function buildSteps749(input) {
     }));
   }
 
+  // ── Same tab-based visualization style as #733 (flood-fill-* UI) ────────
+  // These closure-level trackers are updated at key points in the algorithm
+  // below and read by snap() to build a `virusView` payload for every step.
+  let vvDay = 0;
+  let vvPhase = "scan-cell";
+  let vvRegionsInfo = []; // [{ size, frontierSize, walls }]
+  let vvQuarantineIndex = null;
+  let vvWallsToday = 0;
+  let totalWalls = 0; // declared early so snap() (used before the original `let total_walls` line) can read it
+
   function snap(o) {
+    const regionCells = o.regionCells || null;
+    const frontierCells = o.frontierCells || null;
+    const winnerCells = o.winnerCells || null;
     steps.push({
       title: o.title, arr: [],
-      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.visited || null, o.regionCells || null, o.frontierCells || null, o.winnerCells || null) },
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.visited || null, regionCells, frontierCells, winnerCells) },
+      virusView: {
+        rows, cols,
+        grid: work.map((row) => [...row]),
+        current: o.cur || null,
+        regionCells: regionCells ? [...regionCells] : [],
+        frontierCells: frontierCells ? [...frontierCells] : [],
+        winnerCells: winnerCells ? [...winnerCells] : [],
+        day: vvDay,
+        phase: vvPhase,
+        regions: vvRegionsInfo,
+        quarantineIndex: vvQuarantineIndex,
+        wallsToday: vvWallsToday,
+        totalWalls,
+      },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
       vars: [
@@ -2147,7 +2174,6 @@ function buildSteps749(input) {
     },
   });
 
-  let totalWalls = 0;
   snap({
     title: { vi: "total_walls = 0", en: "total_walls = 0" },
     codeLines: [4], vars: [{ name: "total_walls", value: 0 }],
@@ -2158,6 +2184,11 @@ function buildSteps749(input) {
   let guard = 0;
   while (guard++ < 30) {
     day += 1;
+    vvDay = day;
+    vvPhase = "scan-cell";
+    vvRegionsInfo = [];
+    vvQuarantineIndex = null;
+    vvWallsToday = 0;
     snap({
       title: { vi: `Ngày ${day}: while True → line 6-7 khởi tạo`, en: `Day ${day}: while True → line 6-7 setup` },
       codeLines: [5, 6, 7],
@@ -2207,6 +2238,7 @@ function buildSteps749(input) {
         const stack = [[r, c]];
         visited[r][c] = true;
         callStack.push(`region#${regions.length}`);
+        vvPhase = "dfs-visit";
 
         let innerGuard = 0;
         while (stack.length && innerGuard++ < rows * cols * 4) {
@@ -2227,6 +2259,7 @@ function buildSteps749(input) {
           for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             const nr = curR + dr;
             const nc = curC + dc;
+            vvPhase = "dfs-neighbor";
             snap({
               title: { vi: `line 16-17: dr,dc=(${dr},${dc}) → next=(${nr},${nc})`, en: `line 16-17: dr,dc=(${dr},${dc}) → next=(${nr},${nc})` },
               visited, cur: [curR, curC], regionCells: new Set([...region]), codeLines: [16, 17],
@@ -2295,6 +2328,8 @@ function buildSteps749(input) {
         regions.push(region);
         frontiers.push(frontier);
         wallCounts.push(walls);
+        vvPhase = "region-done";
+        vvRegionsInfo = regions.map((rg, i) => ({ size: rg.size, frontierSize: frontiers[i].size, walls: wallCounts[i] }));
         snap({
           title: { vi: `line 23: regions.append(...) — vùng #${regions.length - 1}: |region|=${region.size}, |frontier|=${frontier.size}, walls=${walls}`, en: `line 23: regions.append(...) — region #${regions.length - 1}: |region|=${region.size}, |frontier|=${frontier.size}, walls=${walls}` },
           regionCells: new Set([...region]), frontierCells: new Set([...frontier]), codeLines: [23],
@@ -2313,6 +2348,7 @@ function buildSteps749(input) {
     }
 
     // ── Line 24: no regions → break ───────────────────────────────────
+    vvPhase = "no-regions";
     snap({
       title: { vi: `line 24: not regions → ${regions.length === 0}`, en: `line 24: not regions → ${regions.length === 0}` },
       codeLines: [24],
@@ -2329,6 +2365,8 @@ function buildSteps749(input) {
     for (let i = 1; i < frontiers.length; i++) {
       if (frontiers[i].size > frontiers[maxIdx].size) maxIdx = i;
     }
+    vvPhase = "compare-frontiers";
+    vvQuarantineIndex = maxIdx;
     snap({
       title: { vi: `line 25: max_idx = argmax |frontier| → ${maxIdx} (|frontier|=${frontiers[maxIdx].size})`, en: `line 25: max_idx = argmax |frontier| → ${maxIdx} (|frontier|=${frontiers[maxIdx].size})` },
       regionCells: new Set([...regions[maxIdx]]), frontierCells: new Set([...frontiers[maxIdx]]),
@@ -2345,6 +2383,7 @@ function buildSteps749(input) {
 
     // ── Line 26: if the biggest frontier is 0, nothing spreads → break ──
     const noThreat = frontiers[maxIdx].size === 0;
+    vvPhase = "no-threat";
     snap({
       title: { vi: `line 26: len(frontiers[max_idx])==0 → ${noThreat}`, en: `line 26: len(frontiers[max_idx])==0 → ${noThreat}` },
       codeLines: [26],
@@ -2358,6 +2397,8 @@ function buildSteps749(input) {
 
     // ── Line 27: total_walls += wall_counts[max_idx] ──────────────────
     totalWalls += wallCounts[maxIdx];
+    vvWallsToday = wallCounts[maxIdx];
+    vvPhase = "add-walls";
     snap({
       title: { vi: `line 27: total_walls += ${wallCounts[maxIdx]} → ${totalWalls}`, en: `line 27: total_walls += ${wallCounts[maxIdx]} → ${totalWalls}` },
       regionCells: new Set([...regions[maxIdx]]),
@@ -2388,6 +2429,7 @@ function buildSteps749(input) {
           const [rr, cc] = key.split(",").map(Number);
           work[rr][cc] = 2;
         }
+        vvPhase = "mark-quarantine";
         snap({
           title: { vi: `line 30: is_infected[rr][cc] = 2 cho toàn vùng #${i}`, en: `line 30: is_infected[rr][cc] = 2 for all of region #${i}` },
           winnerCells: new Set([...regions[i]]), codeLines: [30],
@@ -2399,6 +2441,7 @@ function buildSteps749(input) {
           const [rr, cc] = key.split(",").map(Number);
           work[rr][cc] = 1;
         }
+        vvPhase = "spread-cell";
         snap({
           title: { vi: `line 31-32: is_infected[rr][cc] = 1 cho frontier vùng #${i}`, en: `line 31-32: is_infected[rr][cc] = 1 for region #${i}'s frontier` },
           frontierCells: new Set([...frontiers[i]]), codeLines: [31, 32],
@@ -2409,6 +2452,7 @@ function buildSteps749(input) {
     }
   }
 
+  vvPhase = "done";
   snap({
     title: { vi: `line 33: return total_walls = ${totalWalls}`, en: `line 33: return total_walls = ${totalWalls}` },
     final: true, codeLines: [33],

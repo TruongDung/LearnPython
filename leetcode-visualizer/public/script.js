@@ -1955,6 +1955,121 @@ function renderFloodFillView(step) {
   </section>`;
 }
 
+// ---- 749 Contain Virus renderer (reuses the flood-fill-* CSS from #733) ----
+function renderVirusView(step) {
+  const view = step.virusView;
+  const vi = lang === "vi";
+  const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : "";
+  const coord = (cell) => Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
+  const currentKey = keyOf(view.current);
+
+  // 4 tabs matching Contain Virus's own daily cycle:
+  //   1. Scan & DFS each region   2. Compare frontiers   3. Quarantine winner   4. Spread the rest
+  const scanPhases = new Set(["scan-cell", "dfs-visit", "dfs-neighbor", "region-done"]);
+  const comparePhases = new Set(["no-regions", "compare-frontiers", "no-threat"]);
+  const quarantinePhases = new Set(["add-walls", "mark-quarantine"]);
+  const spreadPhases = new Set(["spread-loop", "spread-cell", "done"]);
+  const activePhase = quarantinePhases.has(view.phase) ? 2 : spreadPhases.has(view.phase) ? 3 : comparePhases.has(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Quét & DFS từng vùng", "2. So sánh frontier", "3. Cách ly vùng thắng", "4. Lan các vùng còn lại"]
+    : ["1. Scan & DFS regions", "2. Compare frontiers", "3. Quarantine winner", "4. Spread the rest"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < activePhase;
+    const state = done ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${done ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // Grid cells: 0=uninfected, 1=infected, 2 or -1=quarantined (walled)
+  const regionSet = new Set(view.regionCells || []);
+  const frontierSet = new Set(view.frontierCells || []);
+  const winnerSet = new Set(view.winnerCells || []);
+  const cellsHtml = view.grid.map((row, rowIndex) => row.map((value, colIndex) => {
+    const key = `${rowIndex},${colIndex}`;
+    const classes = ["flood-fill-cell"];
+    const quarantined = value === 2 || value === -1;
+    if (quarantined) classes.push("is-filled");
+    else if (value === 1) classes.push("is-source-color");
+    else classes.push("is-barrier");
+    if (regionSet.has(key)) classes.push("is-neighbor");
+    if (frontierSet.has(key)) classes.push("is-virus-frontier");
+    if (winnerSet.has(key)) classes.push("is-current");
+    if (key === currentKey) classes.push("is-current");
+    const tags = [];
+    if (regionSet.has(key)) tags.push(vi ? "VÙNG" : "REGION");
+    if (frontierSet.has(key)) tags.push(vi ? "BIÊN" : "FRONTIER");
+    if (winnerSet.has(key)) tags.push(vi ? "CÁCH LY" : "WALLED");
+    return `<div class="${classes.join(" ")}">
+      <small>[${rowIndex},${colIndex}]</small>
+      <strong>${escapeHtml(value)}</strong>
+      <span>${tags.join(" · ")}</span>
+    </div>`;
+  }).join("")).join("");
+
+  // Region summary table: one row per region found this day
+  const regionsHtml = (view.regions && view.regions.length)
+    ? view.regions.map((region, index) => {
+      const isWinner = index === view.quarantineIndex;
+      return `<span class="${isWinner ? "is-top" : ""}">
+        <small>${vi ? "vùng" : "region"} #${index}</small>
+        <strong>${region.size} ${vi ? "ô" : "cells"}</strong>
+        <em>${vi ? "frontier" : "frontier"}=${region.frontierSize} · ${vi ? "tường" : "walls"}=${region.walls}</em>
+      </span>`;
+    }).join("")
+    : `<em>∅</em>`;
+
+  const truth = (value) => value === null || value === undefined ? "?" : value ? "True" : "False";
+  let decision = "?";
+  let decisionClass = "";
+  if (view.phase === "mark-quarantine") { decision = vi ? "CÁCH LY" : "QUARANTINE"; decisionClass = "is-fill"; }
+  else if (view.phase === "add-walls") { decision = vi ? "XÂY TƯỜNG" : "BUILD WALLS"; decisionClass = "is-fill"; }
+  else if (view.phase === "spread-cell") { decision = vi ? "LAN" : "SPREAD"; decisionClass = "is-push"; }
+  else if (view.phase === "no-threat" || view.phase === "no-regions") { decision = vi ? "DỪNG" : "STOP"; decisionClass = "is-skip"; }
+  else if (view.phase === "done") { decision = vi ? "TRẢ VỀ" : "RETURN"; decisionClass = "is-fill"; }
+  else if (view.phase === "compare-frontiers") { decision = vi ? "CHỌN VÙNG MAX" : "PICK MAX"; decisionClass = "is-push"; }
+  else if (view.phase === "dfs-visit" || view.phase === "dfs-neighbor") { decision = vi ? "MỞ RỘNG VÙNG" : "EXPAND REGION"; decisionClass = "is-push"; }
+
+  const checksHtml = `<div class="flood-fill-checks">
+    <span class="${view.day !== undefined ? "is-pass" : ""}"><small>${vi ? "NGÀY" : "DAY"}</small><strong>${view.day ?? "?"}</strong></span>
+    <b>·</b>
+    <span class="${view.regions && view.regions.length ? "is-pass" : ""}"><small>${vi ? "SỐ VÙNG" : "REGIONS"}</small><strong>${view.regions ? view.regions.length : "?"}</strong></span>
+    <b>→</b>
+    <span class="flood-fill-decision ${decisionClass}"><small>${vi ? "HÀNH ĐỘNG" : "ACTION"}</small><strong>${escapeHtml(decision)}</strong></span>
+  </div>`;
+
+  const summary = vi
+    ? `Contain Virus ${view.rows} nhân ${view.cols}; ngày ${view.day ?? "?"}; tổng tường = ${view.totalWalls ?? 0}.`
+    : `Contain Virus ${view.rows} by ${view.cols}; day ${view.day ?? "?"}; total walls = ${view.totalWalls ?? 0}.`;
+
+  $("treeView").innerHTML = `<section class="flood-fill-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="flood-fill-phases">${phasesHtml}</div>
+    <div class="flood-fill-status">
+      <span><small>${vi ? "NGÀY" : "DAY"}</small><strong>${view.day ?? "?"}</strong></span>
+      <span><small>${vi ? "SỐ VÙNG" : "REGIONS"}</small><strong>${view.regions ? view.regions.length : 0}</strong></span>
+      <span><small>${vi ? "TƯỜNG NGÀY NÀY" : "WALLS TODAY"}</small><strong>${view.wallsToday ?? 0}</strong></span>
+      <span><small>${vi ? "TỔNG TƯỜNG" : "TOTAL WALLS"}</small><strong>${view.totalWalls ?? 0}</strong></span>
+    </div>
+    <div class="flood-fill-main">
+      <section class="flood-fill-image-section">
+        <header><strong>GRID</strong><span>${vi ? "0=lành 1=nhiễm 2/-1=cách ly" : "0=clean 1=infected 2/-1=walled"}</span></header>
+        <div class="flood-fill-grid-scroll"><div class="flood-fill-grid" style="--flood-cols:${view.cols}">${cellsHtml}</div></div>
+      </section>
+      <section class="flood-fill-work-section">
+        <header><strong>${vi ? "CÁC VÙNG NGÀY NÀY" : "REGIONS THIS DAY"}</strong><span>${vi ? "vùng #max_idx sẽ bị cách ly" : "region #max_idx gets quarantined"}</span></header>
+        <div class="flood-fill-stack">${regionsHtml}</div>
+      </section>
+    </div>
+    ${checksHtml}
+    <div class="flood-fill-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="flood-fill-legend">
+      <span><i class="source"></i>${vi ? "đất nhiễm" : "infected"}</span>
+      <span><i class="filled"></i>${vi ? "đã cách ly" : "walled"}</span>
+      <span><i class="current"></i>${vi ? "vùng thắng" : "winning region"}</span>
+      <span><i class="neighbor"></i>${vi ? "vùng hiện tại" : "current region"}</span>
+      <span><b>F</b>${vi ? "biên (frontier)" : "frontier"}</span>
+    </div>
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -8805,6 +8920,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFloodFillView(step);
+  } else if (step.virusView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderVirusView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");
