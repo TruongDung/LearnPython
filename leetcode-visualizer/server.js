@@ -12,8 +12,8 @@ const { prepareDesignLiveRun, prepareGenericLiveArgs } = require("./live-args");
 
 const PREMIUM_PROBLEM_IDS = new Set([
   156, 246, 253, 269, 270, 276, 285, 314, 317, 323, 359, 366, 370, 426, 487,
-  505, 588, 642, 734, 760, 1101, 1136, 1166, 1197, 1216, 1236, 1258, 1644, 1650,
-  1676, 1804,
+  505, 588, 642, 734, 760, 1101, 1136, 1166, 1197, 1216, 1236, 1245, 1258, 1644,
+  1650, 1676, 1804,
 ]);
 
 function isPremium(problem) {
