@@ -669,6 +669,309 @@ function buildSteps130Bfs(input) {
   });
 }
 
+/**
+ * LeetCode 130 Approach 2: Recursive DFS from every border cell.
+ * Mark border-connected 'O' as '#' first, then in one final pass flip
+ * remaining 'O' → 'X' (captured) and '#' → 'O' (restored / safe).
+ *
+ * code2 lines (1-indexed):
+ *  1  class Solution:
+ *  2      def solve(self, board):
+ *  3          ROWS, COLS = len(board), len(board[0])
+ *  4          def dfs(r, c):
+ *  5              if r < 0 or c < 0 or r >= ROWS or c >= COLS:
+ *  6                  return
+ *  7              if board[r][c] != 'O':
+ *  8                  return
+ *  9              board[r][c] = '#'
+ * 10              dfs(r+1, c)
+ * 11              dfs(r-1, c)
+ * 12              dfs(r, c+1)
+ * 13              dfs(r, c-1)
+ * 14          for c in range(COLS):
+ * 15              dfs(0, c)
+ * 16              dfs(ROWS-1, c)
+ * 17          for r in range(ROWS):
+ * 18              dfs(r, 0)
+ * 19              dfs(r, COLS-1)
+ * 20          for r in range(ROWS):
+ * 21              for c in range(COLS):
+ * 22                  if board[r][c] == 'O':
+ * 23                      board[r][c] = 'X'
+ * 24                  elif board[r][c] == '#':
+ * 25                      board[r][c] = 'O'
+ */
+function buildSteps130Dfs(input) {
+  const parsed = parseGrid(input, new Set(["X", "O"]));
+  const original = parsed.grid.map((row) => [...row]);
+  if (!parsed.valid) {
+    return invalidResult(original, text("Board phải là ma trận chữ nhật chỉ gồm X và O.", "The board must be rectangular and contain only X and O."));
+  }
+  const board = original.map((row) => [...row]);
+  const ROWS = board.length;
+  const COLS = board[0].length;
+  const steps = [];
+
+  // Call stack of "dfs(r,c)" frames, mirrors the recursive Python call stack.
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
+
+  function makeCells(cur) {
+    return board.map((row, r) => row.map((v, c) => {
+      let cls = v === "X" ? "wall" : v === "#" ? "queued" : "empty";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: v, cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [], codeBlock: 2,
+      bfsGrid: { rows: ROWS, cols: COLS, cells: makeCells(o.cur || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+        { name: "depth", value: callStack.length },
+      ],
+      note: o.note,
+    });
+  }
+
+  // ── Line 3 ──────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "ROWS, COLS = len(board), len(board[0])", en: "ROWS, COLS = len(board), len(board[0])" },
+    codeLines: [3],
+    vars: [{ name: "ROWS", value: ROWS }, { name: "COLS", value: COLS }],
+    note: {
+      vi: `Board ${ROWS}×${COLS}. Ý tưởng: DFS từ MỌI ô 'O' trên biên, đánh dấu '#' cho các ô an toàn (nối tới biên). Cuối cùng: 'O' còn lại → 'X' (bị bao); '#' → 'O' (khôi phục).`,
+      en: `Board ${ROWS}×${COLS}. Idea: DFS from EVERY border 'O', marking safe (border-connected) cells '#'. Finally: remaining 'O' → 'X' (captured); '#' → 'O' (restored).`,
+    },
+  });
+
+  function dfs(r, c) {
+    callStack.push(`dfs(${r},${c})`);
+
+    // ── Line 5: boundary guard ───────────────────────────────────────
+    const oob = r < 0 || c < 0 || r >= ROWS || c >= COLS;
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 5: kiểm tra biên`, en: `dfs(${r},${c}) — line 5: boundary check` },
+      cur: oob ? null : [r, c], codeLines: [5],
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "out of bounds?", value: oob },
+      ],
+      note: {
+        vi: oob ? `(${r},${c}) nằm NGOÀI board → line 6 return.` : `(${r},${c}) nằm trong board → sang line 7.`,
+        en: oob ? `(${r},${c}) is OUTSIDE the board → line 6 return.` : `(${r},${c}) is inside the board → go to line 7.`,
+      },
+    });
+    if (oob) {
+      snap({
+        title: { vi: "line 6: return (ngoài biên)", en: "line 6: return (out of bounds)" },
+        codeLines: [6],
+        vars: [],
+        note: { vi: "Ô ngoài board, không làm gì cả.", en: "Cell is outside the board, do nothing." },
+      });
+      callStack.pop();
+      return;
+    }
+
+    // ── Line 7: not 'O' guard ────────────────────────────────────────
+    const notO = board[r][c] !== "O";
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 7: board[r][c] != 'O'?`, en: `dfs(${r},${c}) — line 7: board[r][c] != 'O'?` },
+      cur: [r, c], codeLines: [7],
+      vars: [
+        { name: "board[r][c]", value: board[r][c] },
+        { name: "not 'O'?", value: notO },
+      ],
+      note: {
+        vi: notO
+          ? `board[${r}][${c}] = '${board[r][c]}' (là 'X' hoặc đã là '#' — đã thăm) → line 8 return.`
+          : `board[${r}][${c}] = 'O' chưa thăm → sang line 9 để đánh dấu.`,
+        en: notO
+          ? `board[${r}][${c}] = '${board[r][c]}' (either 'X' or already '#' — visited) → line 8 return.`
+          : `board[${r}][${c}] = 'O' unvisited → go to line 9 to mark it.`,
+      },
+    });
+    if (notO) {
+      snap({
+        title: { vi: "line 8: return ('X' hoặc đã thăm)", en: "line 8: return ('X' or already visited)" },
+        cur: [r, c], codeLines: [8],
+        vars: [],
+        note: { vi: "Không phải 'O' chưa thăm — dừng nhánh đệ quy này.", en: "Not an unvisited 'O' — stop this recursive branch." },
+      });
+      callStack.pop();
+      return;
+    }
+
+    // ── Line 9: mark visited in-place ────────────────────────────────
+    const before = board.map((row) => row.join("")).join(" | ");
+    board[r][c] = "#";
+    const after = board.map((row) => row.join("")).join(" | ");
+    snap({
+      title: { vi: `line 9: board[${r}][${c}] = '#'  ⟵ 'O' bị ghi thành '#'`, en: `line 9: board[${r}][${c}] = '#'  ⟵ 'O' overwritten to '#'` },
+      cur: [r, c], codeLines: [9],
+      vars: [
+        { name: "board[r][c] trước", value: "O" },
+        { name: "board[r][c] sau", value: "#" },
+        { name: "board trước", value: before },
+        { name: "board sau", value: after },
+      ],
+      note: {
+        vi: `Đánh dấu (${r},${c}) là AN TOÀN (nối tới biên). '#' đóng vai trò visited-marker, giống 'S' ở cách BFS.\nboard: ${before}  →  ${after}`,
+        en: `Mark (${r},${c}) as SAFE (border-connected). '#' acts as the visited marker, similar to 'S' in the BFS approach.\nboard: ${before}  →  ${after}`,
+      },
+    });
+
+    // ── Lines 10–13: recurse in 4 directions ─────────────────────────
+    const DIRS = [
+      { dr: 1, dc: 0, line: 10, label: "dfs(r+1, c)" },
+      { dr: -1, dc: 0, line: 11, label: "dfs(r-1, c)" },
+      { dr: 0, dc: 1, line: 12, label: "dfs(r, c+1)" },
+      { dr: 0, dc: -1, line: 13, label: "dfs(r, c-1)" },
+    ];
+    for (const { dr, dc, line, label } of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      snap({
+        title: { vi: `line ${line}: gọi ${label} → dfs(${nr},${nc})`, en: `line ${line}: call ${label} → dfs(${nr},${nc})` },
+        cur: [r, c], codeLines: [line],
+        vars: [{ name: "calling", value: `dfs(${nr},${nc})` }],
+        note: { vi: `Đẩy frame dfs(${nr},${nc}) lên call stack.`, en: `Push frame dfs(${nr},${nc}) onto the call stack.` },
+      });
+      dfs(nr, nc);
+      snap({
+        title: { vi: `line ${line}: ${label} trả về (void) → quay lại dfs(${r},${c})`, en: `line ${line}: ${label} returned (void) → back in dfs(${r},${c})` },
+        cur: [r, c], codeLines: [line],
+        vars: [],
+        note: { vi: `Pop frame khỏi call stack, tiếp tục dfs(${r},${c}).`, en: `Pop the frame off the call stack, resume dfs(${r},${c}).` },
+      });
+    }
+    callStack.pop();
+  }
+
+  // ── Lines 14–16: top/bottom rows ─────────────────────────────────────
+  for (let c = 0; c < COLS; c++) {
+    snap({
+      title: { vi: `line 14: for c in range(COLS) → c = ${c}`, en: `line 14: for c in range(COLS) → c = ${c}` },
+      codeLines: [14],
+      vars: [{ name: "c", value: c }],
+      note: { vi: `Quét cột ${c} cho hàng trên/dưới.`, en: `Scan column ${c} for the top/bottom rows.` },
+    });
+    snap({
+      title: { vi: `line 15: dfs(0, ${c})`, en: `line 15: dfs(0, ${c})` },
+      cur: [0, c], codeLines: [15],
+      vars: [],
+      note: { vi: `Bắt đầu DFS từ hàng TRÊN, cột ${c}.`, en: `Start DFS from the TOP row, column ${c}.` },
+    });
+    dfs(0, c);
+    snap({
+      title: { vi: `line 16: dfs(${ROWS - 1}, ${c})`, en: `line 16: dfs(${ROWS - 1}, ${c})` },
+      cur: [ROWS - 1, c], codeLines: [16],
+      vars: [],
+      note: { vi: `Bắt đầu DFS từ hàng DƯỚI, cột ${c}.`, en: `Start DFS from the BOTTOM row, column ${c}.` },
+    });
+    dfs(ROWS - 1, c);
+  }
+
+  // ── Lines 17–19: left/right cols ──────────────────────────────────────
+  for (let r = 0; r < ROWS; r++) {
+    snap({
+      title: { vi: `line 17: for r in range(ROWS) → r = ${r}`, en: `line 17: for r in range(ROWS) → r = ${r}` },
+      codeLines: [17],
+      vars: [{ name: "r", value: r }],
+      note: { vi: `Quét hàng ${r} cho cột trái/phải.`, en: `Scan row ${r} for the left/right columns.` },
+    });
+    snap({
+      title: { vi: `line 18: dfs(${r}, 0)`, en: `line 18: dfs(${r}, 0)` },
+      cur: [r, 0], codeLines: [18],
+      vars: [],
+      note: { vi: `Bắt đầu DFS từ hàng ${r}, cột TRÁI.`, en: `Start DFS from row ${r}, LEFT column.` },
+    });
+    dfs(r, 0);
+    snap({
+      title: { vi: `line 19: dfs(${r}, ${COLS - 1})`, en: `line 19: dfs(${r}, ${COLS - 1})` },
+      cur: [r, COLS - 1], codeLines: [19],
+      vars: [],
+      note: { vi: `Bắt đầu DFS từ hàng ${r}, cột PHẢI.`, en: `Start DFS from row ${r}, RIGHT column.` },
+    });
+    dfs(r, COLS - 1);
+  }
+
+  // ── Lines 20–25: final pass ───────────────────────────────────────────
+  for (let r = 0; r < ROWS; r++) {
+    snap({
+      title: { vi: `line 20: for r in range(ROWS) → r = ${r}`, en: `line 20: for r in range(ROWS) → r = ${r}` },
+      codeLines: [20],
+      vars: [{ name: "r", value: r }],
+      note: { vi: `Quét hàng ${r} để capture/restore.`, en: `Scan row ${r} to capture/restore.` },
+    });
+    for (let c = 0; c < COLS; c++) {
+      snap({
+        title: { vi: `line 21: for c in range(COLS) → c = ${c}`, en: `line 21: for c in range(COLS) → c = ${c}` },
+        cur: [r, c], codeLines: [21],
+        vars: [{ name: "board[r][c]", value: board[r][c] }],
+        note: { vi: `Xét ô (${r},${c}) = '${board[r][c]}'.`, en: `Inspect cell (${r},${c}) = '${board[r][c]}'.` },
+      });
+      const isO = board[r][c] === "O";
+      snap({
+        title: { vi: `line 22: board[${r}][${c}] == 'O'? → ${isO}`, en: `line 22: board[${r}][${c}] == 'O'? → ${isO}` },
+        cur: [r, c], codeLines: [22],
+        vars: [{ name: "is 'O'?", value: isO }],
+        note: {
+          vi: isO ? `'O' không nối biên → BỊ BAO QUANH → line 23 đổi thành 'X'.` : `Không phải 'O' → kiểm tra '#' ở line 24.`,
+          en: isO ? `'O' is not border-connected → SURROUNDED → line 23 flips it to 'X'.` : `Not 'O' → check '#' at line 24.`,
+        },
+      });
+      if (isO) {
+        board[r][c] = "X";
+        snap({
+          title: { vi: `line 23: board[${r}][${c}] = 'X'  ⟵ 'O' bị bắt`, en: `line 23: board[${r}][${c}] = 'X'  ⟵ 'O' captured` },
+          cur: [r, c], codeLines: [23],
+          vars: [{ name: "board[r][c]", value: "X" }],
+          note: { vi: `Ô (${r},${c}) bị bao quanh hoàn toàn → đổi thành 'X'.`, en: `Cell (${r},${c}) is fully surrounded → flip to 'X'.` },
+        });
+        continue;
+      }
+      const isHash = board[r][c] === "#";
+      snap({
+        title: { vi: `line 24: elif board[${r}][${c}] == '#'? → ${isHash}`, en: `line 24: elif board[${r}][${c}] == '#'? → ${isHash}` },
+        cur: [r, c], codeLines: [24],
+        vars: [{ name: "is '#'?", value: isHash }],
+        note: {
+          vi: isHash ? `'#' (an toàn, nối biên) → line 25 khôi phục thành 'O'.` : `board[${r}][${c}] = '${board[r][c]}' (vẫn là 'X') → không đổi.`,
+          en: isHash ? `'#' (safe, border-connected) → line 25 restores it to 'O'.` : `board[${r}][${c}] = '${board[r][c]}' (still 'X') → unchanged.`,
+        },
+      });
+      if (isHash) {
+        board[r][c] = "O";
+        snap({
+          title: { vi: `line 25: board[${r}][${c}] = 'O'  ⟵ '#' được khôi phục`, en: `line 25: board[${r}][${c}] = 'O'  ⟵ '#' restored` },
+          cur: [r, c], codeLines: [25],
+          vars: [{ name: "board[r][c]", value: "O" }],
+          note: { vi: `Ô (${r},${c}) an toàn → khôi phục lại 'O'.`, en: `Cell (${r},${c}) is safe → restore it to 'O'.` },
+        });
+      }
+    }
+  }
+
+  const answer = board.map((row) => [...row]);
+  snap({
+    title: { vi: "Hoàn tất — board đã được cập nhật in-place", en: "Done — board updated in place" },
+    final: true, codeLines: [22, 23, 24, 25],
+    vars: [{ name: "answer", value: answer.map((row) => row.join("")).join(" | ") }],
+    note: {
+      vi: `Hoàn tất: mọi 'O' bị bao quanh đã thành 'X'; các vùng an toàn được khôi phục về 'O'. (Hàm sửa board in-place, không cần return.)`,
+      en: `Done: every surrounded 'O' became 'X'; safe regions were restored to 'O'. (The function mutates board in place, no return needed.)`,
+    },
+  });
+
+  return { original, answer, steps };
+}
+
 function buildSteps1020(input) {
   return buildBoundaryFlood(input, {
     allowed: new Set(["0", "1"]),
@@ -962,12 +1265,25 @@ const problems = {
     defaultInput: "XXXX|XOOX|XXOX|XOXX",
     inputKind: "string",
     inputLabel: text("Board X/O (hàng cách '|')", "X/O board (rows separated by '|')"),
-    approach: [
-      text("Đưa mọi O ở biên vào queue và đánh dấu S (safe).", "Put every border O in the queue and mark it S (safe)."),
-      text("BFS đánh dấu toàn bộ O nối với biên là safe.", "BFS marks every O connected to the border safe."),
-      text("O còn lại đổi thành X; S được khôi phục thành O.", "Remaining O cells become X; S cells are restored to O."),
+    extraParams: [
+      {
+        key: "approach",
+        label: text("Cách giải", "Approach"),
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: text("Cách 1: Multi-source BFS", "Approach 1: Multi-source BFS") },
+          { value: "2", label: text("Cách 2: DFS đệ quy từ biên", "Approach 2: Recursive DFS from the border") },
+        ],
+      },
     ],
-    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô được quét hằng số lần và enqueue tối đa một lần.", "Each cell is scanned a constant number of times and enqueued at most once.") },
+    approach: [
+      text("Cách 1 (BFS): đưa mọi O biên vào queue, đánh dấu 'S' (safe), lan theo BFS.", "Approach 1 (BFS): put every border O in the queue, mark it 'S' (safe), spread via BFS."),
+      text("Cách 2 (DFS): gọi dfs(r,c) từ mọi ô biên. dfs đánh dấu 'O' thành '#' rồi đệ quy 4 hướng.", "Approach 2 (DFS): call dfs(r,c) from every border cell. dfs marks 'O' as '#' then recurses in 4 directions."),
+      text("Cả hai cách: O còn lại (không nối biên) → X; ô an toàn (S hoặc #) → khôi phục O.", "Both approaches: remaining O (not border-connected) → X; safe cells (S or #) → restored to O."),
+    ],
+    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô được quét hằng số lần; BFS dùng queue, DFS dùng call stack đệ quy.", "Each cell is scanned a constant number of times; BFS uses a queue, DFS uses the recursive call stack.") },
+    codeLabel: text("Cách 1: Multi-source BFS", "Approach 1: Multi-source BFS"),
     code: [
       "from collections import deque", "from typing import List", "", "class Solution:",
       "    def solve(self, board: List[List[str]]) -> List[List[str]]:",
@@ -992,7 +1308,36 @@ const problems = {
       "                elif board[row][col] == 'S': board[row][col] = 'O'",
       "        return board",
     ],
+    code2Label: text("Cách 2: DFS đệ quy từ biên", "Approach 2: Recursive DFS from the border"),
+    code2: [
+      "class Solution:",
+      "    def solve(self, board):",
+      "        ROWS, COLS = len(board), len(board[0])",
+      "        def dfs(r, c):",
+      "            if r < 0 or c < 0 or r >= ROWS or c >= COLS:",
+      "                return",
+      "            if board[r][c] != 'O':",
+      "                return",
+      "            board[r][c] = '#'",
+      "            dfs(r+1, c)",
+      "            dfs(r-1, c)",
+      "            dfs(r, c+1)",
+      "            dfs(r, c-1)",
+      "        for c in range(COLS):",
+      "            dfs(0, c)",
+      "            dfs(ROWS-1, c)",
+      "        for r in range(ROWS):",
+      "            dfs(r, 0)",
+      "            dfs(r, COLS-1)",
+      "        for r in range(ROWS):",
+      "            for c in range(COLS):",
+      "                if board[r][c] == 'O':",
+      "                    board[r][c] = 'X'",
+      "                elif board[r][c] == '#':",
+      "                    board[r][c] = 'O'",
+    ],
     builder: buildSteps130Bfs,
+    builder2: buildSteps130Dfs,
   },
   1020: {
     id: 1020,
