@@ -1728,7 +1728,308 @@ function buildSteps1905v2(input) {
   return { original, answer: result, steps };
 }
 
+// ─── 1568: Minimum Number of Days to Disconnect Island — line-by-line ────────
+// code lines (1-indexed):
+//  1  class Solution:
+//  2      def minDays(self, grid):
+//  3          rows, cols = len(grid), len(grid[0])
+//  4          def count_islands(g):
+//  5              visited = [[False]*cols for _ in range(rows)]
+//  6              def dfs(r, c):
+//  7                  stack = [(r, c)]; visited[r][c] = True
+//  8                  while stack:
+//  9                      cr, cc = stack.pop()
+// 10                      for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
+// 11                          nr, nc = cr+dr, cc+dc
+// 12                          if 0<=nr<rows and 0<=nc<cols and g[nr][nc]==1 and not visited[nr][nc]:
+// 13                              visited[nr][nc] = True; stack.append((nr,nc))
+// 14              count = 0
+// 15              for r in range(rows):
+// 16                  for c in range(cols):
+// 17                      if g[r][c]==1 and not visited[r][c]:
+// 18                          count += 1; dfs(r, c)
+// 19              return count
+// 20          if count_islands(grid) != 1:
+// 21              return 0
+// 22          for r in range(rows):
+// 23              for c in range(cols):
+// 24                  if grid[r][c] == 1:
+// 25                      grid[r][c] = 0
+// 26                      if count_islands(grid) != 1:
+// 27                          grid[r][c] = 1
+// 28                          return 1
+// 29                      grid[r][c] = 1
+// 30          return 2
+function buildSteps1568(input) {
+  const { valid, grid } = parseBinary(input, false);
+  const steps = [];
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Grid phải gồm 0/1. Ví dụ: 0110|0110|0000.", en: "Grid must contain 0/1. Example: 0110|0110|0000." },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const work = grid.map((row) => [...row]);
+  const steps_ = steps; // alias, unused rename guard
+
+  function countIslandsTraced(g, { trace = false, removedCell = null } = {}) {
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+    let count = 0;
+
+    function makeCells(cur) {
+      return g.map((row, r) => row.map((v, c) => {
+        let cls = v === 0 ? "wall" : visited[r][c] ? "visited" : "empty";
+        if (removedCell && removedCell[0] === r && removedCell[1] === c) cls = "queued";
+        if (cur && cur[0] === r && cur[1] === c) cls = "current";
+        return { label: String(v), cls };
+      }));
+    }
+    function snap(o) {
+      if (!trace) return;
+      steps.push({
+        title: o.title, arr: [], codeBlock: 1,
+        bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
+        highlight: [], mark: [], final: false,
+        codeLines: o.codeLines || [],
+        vars: [...(o.vars || []), { name: "island count", value: count }],
+        note: o.note,
+      });
+    }
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (g[r][c] === 1 && !visited[r][c]) {
+          count += 1;
+          if (trace) {
+            snap({
+              title: { vi: `line 17-18: đảo mới tại (${r},${c}) → count = ${count}`, en: `line 17-18: new island at (${r},${c}) → count = ${count}` },
+              cur: [r, c], codeLines: [17, 18],
+              vars: [{ name: "r, c", value: `${r}, ${c}` }],
+              note: { vi: `Gặp đất chưa thăm → đảo thứ ${count}. Gọi dfs(${r},${c}) để tô hết đảo này.`, en: `Found unvisited land → island #${count}. Call dfs(${r},${c}) to flood the whole island.` },
+            });
+          }
+          const stack = [[r, c]];
+          visited[r][c] = true;
+          while (stack.length) {
+            const [cr, cc] = stack.pop();
+            for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nr = cr + dr;
+              const nc = cc + dc;
+              if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && g[nr][nc] === 1 && !visited[nr][nc]) {
+                visited[nr][nc] = true;
+                stack.push([nr, nc]);
+              }
+            }
+          }
+        }
+      }
+    }
+    if (trace) {
+      snap({
+        title: { vi: `line 19: return count = ${count}`, en: `line 19: return count = ${count}` },
+        codeLines: [19], vars: [],
+        note: { vi: `count_islands trả về ${count}.`, en: `count_islands returns ${count}.` },
+      });
+    }
+    return count;
+  }
+
+  function snapMain(o) {
+    steps.push({
+      title: o.title, arr: [],
+      bfsGrid: { rows, cols, cells: work.map((row, r) => row.map((v, c) => {
+        let cls = v === 0 ? "wall" : "empty";
+        if (o.cur && o.cur[0] === r && o.cur[1] === c) cls = "current";
+        if (o.removed && o.removed[0] === r && o.removed[1] === c) cls = "queued";
+        return { label: String(v), cls };
+      })) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
+
+  snapMain({
+    title: { vi: "rows, cols = len(grid), len(grid[0])", en: "rows, cols = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi:
+        "Chìa khóa: đáp án CHỈ CÓ THỂ là 0, 1, hoặc 2.\n" +
+        "0: lưới đã rời (0 hoặc ≥2 đảo). 1: xóa đúng 1 ô đất làm rời lưới. 2: mọi trường hợp còn lại (luôn xóa được bằng 2 ô).",
+      en:
+        "Key insight: the answer can ONLY be 0, 1, or 2.\n" +
+        "0: already disconnected (0 or ≥2 islands). 1: removing exactly one land cell disconnects it. 2: every other case (always achievable with 2 cells).",
+    },
+  });
+
+  const initialCount = countIslandsTraced(work, { trace: true });
+  snapMain({
+    title: { vi: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}`, en: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}` },
+    codeLines: [20],
+    vars: [{ name: "count_islands(grid)", value: initialCount }],
+    note: {
+      vi: initialCount !== 1
+        ? `Grid có ${initialCount} đảo (0 hoặc ≥2) → đã rời sẵn → line 21 return 0.`
+        : `Grid có đúng 1 đảo → chưa rời, cần thử xóa ô để tách.`,
+      en: initialCount !== 1
+        ? `Grid has ${initialCount} islands (0 or ≥2) → already disconnected → line 21 return 0.`
+        : `Grid has exactly 1 island → not yet disconnected, need to try removing cells.`,
+    },
+  });
+  if (initialCount !== 1) {
+    snapMain({
+      title: { vi: "line 21: return 0", en: "line 21: return 0" },
+      final: true, codeLines: [21],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Đã rời sẵn → 0 ngày.", en: "Already disconnected → 0 days." },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  for (let r = 0; r < rows; r++) {
+    snapMain({
+      title: { vi: `line 22: for r in range(rows) → r = ${r}`, en: `line 22: for r in range(rows) → r = ${r}` },
+      codeLines: [22], vars: [{ name: "r", value: r }],
+      note: { vi: `Thử xóa từng ô đất ở hàng ${r}.`, en: `Try removing each land cell in row ${r}.` },
+    });
+    for (let c = 0; c < cols; c++) {
+      snapMain({
+        title: { vi: `line 23: for c in range(cols) → c = ${c}`, en: `line 23: for c in range(cols) → c = ${c}` },
+        cur: [r, c], codeLines: [23], vars: [{ name: "c", value: c }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+      });
+      const isLand = work[r][c] === 1;
+      snapMain({
+        title: { vi: `line 24: grid[${r}][${c}] == 1? → ${isLand}`, en: `line 24: grid[${r}][${c}] == 1? → ${isLand}` },
+        cur: [r, c], codeLines: [24], vars: [{ name: "is land?", value: isLand }],
+        note: {
+          vi: isLand ? "Đất → thử xóa ở line 25." : "Nước → bỏ qua.",
+          en: isLand ? "Land → try removing it at line 25." : "Water → skip.",
+        },
+      });
+      if (!isLand) continue;
+
+      work[r][c] = 0;
+      snapMain({
+        title: { vi: `line 25: grid[${r}][${c}] = 0 (thử xóa)`, en: `line 25: grid[${r}][${c}] = 0 (trial removal)` },
+        removed: [r, c], codeLines: [25], vars: [{ name: "removed cell", value: `(${r},${c})` }],
+        note: { vi: `Tạm xóa (${r},${c}) để kiểm tra.`, en: `Temporarily remove (${r},${c}) to test.` },
+      });
+
+      const afterCount = countIslandsTraced(work, { trace: false });
+      const disconnects = afterCount !== 1;
+      snapMain({
+        title: { vi: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})`, en: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})` },
+        removed: [r, c], codeLines: [26],
+        vars: [{ name: "count_islands after removal", value: afterCount }, { name: "disconnects?", value: disconnects }],
+        note: {
+          vi: disconnects
+            ? `Xóa (${r},${c}) làm số đảo = ${afterCount} (khác 1) → lưới bị RỜI chỉ với 1 ngày!`
+            : `Xóa (${r},${c}) vẫn còn 1 đảo → không đủ, phục hồi ô này (line 29).`,
+          en: disconnects
+            ? `Removing (${r},${c}) makes island count = ${afterCount} (not 1) → the grid becomes disconnected in just 1 day!`
+            : `Removing (${r},${c}) still leaves 1 island → not enough, restore this cell (line 29).`,
+        },
+      });
+
+      if (disconnects) {
+        work[r][c] = 1;
+        snapMain({
+          title: { vi: "line 27-28: phục hồi ô rồi return 1", en: "line 27-28: restore cell then return 1" },
+          final: true, codeLines: [27, 28],
+          vars: [{ name: "answer", value: 1 }],
+          note: { vi: `Phục hồi grid[${r}][${c}]=1 (không sửa đổi grid đầu vào), trả về 1.`, en: `Restore grid[${r}][${c}]=1 (don't mutate the input), return 1.` },
+        });
+        return { original: grid, answer: 1, steps };
+      }
+      work[r][c] = 1;
+      snapMain({
+        title: { vi: `line 29: grid[${r}][${c}] = 1 (phục hồi)`, en: `line 29: grid[${r}][${c}] = 1 (restore)` },
+        cur: [r, c], codeLines: [29], vars: [],
+        note: { vi: `Không đủ để rời lưới → phục hồi và thử ô tiếp theo.`, en: `Not enough to disconnect → restore and try the next cell.` },
+      });
+    }
+  }
+
+  snapMain({
+    title: { vi: "line 30: return 2", en: "line 30: return 2" },
+    final: true, codeLines: [30],
+    vars: [{ name: "answer", value: 2 }],
+    note: {
+      vi: "Không ô đơn lẻ nào làm rời lưới được → cần đúng 2 ngày (luôn khả thi: xóa 2 ô liền kề trên 1 đường đi bất kỳ).",
+      en: "No single cell removal disconnects the grid → exactly 2 days needed (always achievable: remove any two adjacent cells along a path).",
+    },
+  });
+  return { original: grid, answer: 2, steps };
+}
+
 const problems = {
+  1568: {
+    id: 1568, difficulty: "hard", slug: "minimum-number-of-days-to-disconnect-island",
+    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
+    title: tr("Minimum Number of Days to Disconnect Island", "Minimum Number of Days to Disconnect Island"),
+    titleVi: tr("Số ngày tối thiểu để tách đảo (đáp án chỉ 0/1/2)", "Minimum days to disconnect the island (answer is only 0/1/2)"),
+    statement: tr(
+      "Mỗi ngày xóa 1 ô đất. Trả về số ngày tối thiểu để lưới bị rời (0 hoặc ≥2 đảo, hoặc rỗng). Nhập grid: hàng cách '|'.",
+      "Each day you may remove one land cell. Return the minimum number of days until the grid becomes disconnected (0 or ≥2 islands, or empty). Enter grid: rows separated by '|'."
+    ),
+    defaultInput: "0110|0110|0000",
+    inputKind: "string",
+    inputLabel: tr("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
+    approach: [
+      tr("Chìa khóa: đáp án chỉ có thể là 0, 1, hoặc 2 — không cần thử nhiều hơn.", "Key insight: the answer can only be 0, 1, or 2 — never more."),
+      tr("count_islands(grid): DFS/BFS đếm số thành phần liên thông của đất.", "count_islands(grid): DFS/BFS to count connected land components."),
+      tr("Nếu số đảo ban đầu ≠ 1 → đã rời sẵn → 0.", "If the initial island count ≠ 1 → already disconnected → 0."),
+      tr("Thử xóa từng ô đất; nếu sau khi xóa số đảo ≠ 1 → 1 ngày là đủ.", "Try removing each land cell; if the count becomes ≠ 1 afterward → 1 day is enough."),
+      tr("Không ô đơn lẻ nào đủ → 2 (luôn khả thi bằng cách xóa 2 ô liền kề).", "No single cell suffices → 2 (always achievable by removing two adjacent cells)."),
+    ],
+    complexity: {
+      time: "O((rows·cols)²)",
+      space: "O(rows·cols)",
+      note: tr("Thử xóa mỗi ô đất rồi đếm lại đảo O(rows·cols) → tổng O((rows·cols)²).", "Trying each land cell then recounting islands is O(rows·cols) → overall O((rows·cols)²)."),
+    },
+    code: [
+      "class Solution:",
+      "    def minDays(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        def count_islands(g):",
+      "            visited = [[False]*cols for _ in range(rows)]",
+      "            def dfs(r, c):",
+      "                stack = [(r, c)]; visited[r][c] = True",
+      "                while stack:",
+      "                    cr, cc = stack.pop()",
+      "                    for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:",
+      "                        nr, nc = cr+dr, cc+dc",
+      "                        if 0<=nr<rows and 0<=nc<cols and g[nr][nc]==1 and not visited[nr][nc]:",
+      "                            visited[nr][nc] = True; stack.append((nr,nc))",
+      "            count = 0",
+      "            for r in range(rows):",
+      "                for c in range(cols):",
+      "                    if g[r][c]==1 and not visited[r][c]:",
+      "                        count += 1; dfs(r, c)",
+      "            return count",
+      "        if count_islands(grid) != 1:",
+      "            return 0",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == 1:",
+      "                    grid[r][c] = 0",
+      "                    if count_islands(grid) != 1:",
+      "                        grid[r][c] = 1",
+      "                        return 1",
+      "                    grid[r][c] = 1",
+      "        return 2",
+    ],
+    builder: buildSteps1568,
+  },
   1254: {
     id: 1254, difficulty: "medium", slug: "number-of-closed-islands",
     category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
