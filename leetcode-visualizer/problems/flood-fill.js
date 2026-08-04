@@ -2051,7 +2051,438 @@ function buildSteps1568(input) {
   return { original: grid, answer: 2, steps };
 }
 
+// ─── 749: Contain Virus — full multi-region line-by-line debugger ───────────
+// code lines (1-indexed):
+//  1  class Solution:
+//  2      def containVirus(self, is_infected):
+//  3          rows, cols = len(is_infected), len(is_infected[0])
+//  4          total_walls = 0
+//  5          while True:
+//  6              visited = [[False]*cols for _ in range(rows)]
+//  7              regions, frontiers, wall_counts = [], [], []
+//  8              for r in range(rows):
+//  9                  for c in range(cols):
+// 10                      if is_infected[r][c]==1 and not visited[r][c]:
+// 11                          region, frontier, walls = set(), set(), 0
+// 12                          stack = [(r, c)]; visited[r][c] = True
+// 13                          while stack:
+// 14                              cur_r, cur_c = stack.pop()
+// 15                              region.add((cur_r, cur_c))
+// 16                              for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
+// 17                                  nr, nc = cur_r+dr, cur_c+dc
+// 18                                  if 0<=nr<rows and 0<=nc<cols:
+// 19                                      if is_infected[nr][nc]==1 and not visited[nr][nc]:
+// 20                                          visited[nr][nc]=True; stack.append((nr,nc))
+// 21                                      elif is_infected[nr][nc]==0:
+// 22                                          frontier.add((nr,nc)); walls+=1
+// 23                          regions.append(region); frontiers.append(frontier); wall_counts.append(walls)
+// 24              if not regions: break
+// 25              max_idx = max(range(len(regions)), key=lambda i: len(frontiers[i]))
+// 26              if len(frontiers[max_idx])==0: break
+// 27              total_walls += wall_counts[max_idx]
+// 28              for i, region in enumerate(regions):
+// 29                  if i == max_idx:
+// 30                      for (rr,cc) in region: is_infected[rr][cc]=2
+// 31                  else:
+// 32                      for (rr,cc) in frontiers[i]: is_infected[rr][cc]=1
+// 33          return total_walls
+function buildSteps749(input) {
+  const { valid, grid } = parseBinary(input, false);
+  const steps = [];
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Grid phải gồm 0/1. Ví dụ: 0100000 1|0100000 1.", en: "Grid must contain 0/1." },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const work = grid.map((row) => [...row]);
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
+
+  // Cell coloring: 0=uninfected(empty), 1=infected(wall), 2=quarantined(visited)
+  function makeCells(cur, visited, regionCells, frontierCells, winnerCells) {
+    return work.map((row, r) => row.map((v, c) => {
+      const key = `${r},${c}`;
+      let cls = v === 2 ? "visited" : v === 1 ? "wall" : "empty";
+      if (regionCells && regionCells.has(key)) cls = "current";
+      if (frontierCells && frontierCells.has(key)) cls = "queued";
+      if (winnerCells && winnerCells.has(key)) cls = "path";
+      if (visited && visited[r] && visited[r][c] && v === 1) cls = "wall";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: String(v), cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.visited || null, o.regionCells || null, o.frontierCells || null, o.winnerCells || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+      ],
+      note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: "rows, cols = len(is_infected), len(is_infected[0])", en: "rows, cols = len(is_infected), len(is_infected[0])" },
+    codeLines: [3],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi:
+        "Mỗi 'ngày' (vòng while): tìm mọi vùng nhiễm (region), với mỗi vùng tính frontier (ô lành kề) và số tường cần xây. " +
+        "Chọn vùng có frontier LỚN NHẤT để cách ly (tô 2), các vùng còn lại LAN ra frontier của chúng (tô 1). Lặp tới khi hết vùng hoặc vùng lớn nhất không đe dọa ai.",
+      en:
+        "Each 'day' (while loop): find every infected region, compute each region's frontier (adjacent uninfected cells) and wall count. " +
+        "Quarantine the region with the LARGEST frontier (mark 2), the rest SPREAD into their frontier (mark 1). Repeat until no regions remain or the largest region threatens nobody.",
+    },
+  });
+
+  let totalWalls = 0;
+  snap({
+    title: { vi: "total_walls = 0", en: "total_walls = 0" },
+    codeLines: [4], vars: [{ name: "total_walls", value: 0 }],
+    note: { vi: "Khởi tạo tổng số tường đã xây.", en: "Initialize the total wall count." },
+  });
+
+  let day = 0;
+  let guard = 0;
+  while (guard++ < 30) {
+    day += 1;
+    snap({
+      title: { vi: `Ngày ${day}: while True → line 6-7 khởi tạo`, en: `Day ${day}: while True → line 6-7 setup` },
+      codeLines: [5, 6, 7],
+      vars: [{ name: "day", value: day }, { name: "total_walls", value: totalWalls }],
+      note: { vi: "Reset visited, và 3 danh sách regions/frontiers/wall_counts cho ngày mới.", en: "Reset visited and the 3 lists regions/frontiers/wall_counts for the new day." },
+    });
+
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const regions = [];
+    const frontiers = [];
+    const wallCounts = [];
+
+    for (let r = 0; r < rows; r++) {
+      snap({
+        title: { vi: `line 8: for r in range(rows) → r = ${r}`, en: `line 8: for r in range(rows) → r = ${r}` },
+        visited, codeLines: [8], vars: [{ name: "r", value: r }],
+        note: { vi: `Quét hàng ${r} tìm ô nhiễm chưa thăm.`, en: `Scan row ${r} for unvisited infected cells.` },
+      });
+      for (let c = 0; c < cols; c++) {
+        snap({
+          title: { vi: `line 9: for c in range(cols) → c = ${c}`, en: `line 9: for c in range(cols) → c = ${c}` },
+          visited, cur: [r, c], codeLines: [9], vars: [{ name: "c", value: c }],
+          note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+        });
+        const isNewInfected = work[r][c] === 1 && !visited[r][c];
+        snap({
+          title: { vi: `line 10: is_infected[${r}][${c}]==1 and not visited → ${isNewInfected}`, en: `line 10: is_infected[${r}][${c}]==1 and not visited → ${isNewInfected}` },
+          visited, cur: [r, c], codeLines: [10],
+          vars: [{ name: "is_infected[r][c]", value: work[r][c] }, { name: "visited[r][c]", value: visited[r][c] }],
+          note: {
+            vi: isNewInfected ? "Ô nhiễm chưa thăm → bắt đầu DFS gom vùng mới (line 11-23)." : "Không phải ô nhiễm mới → bỏ qua.",
+            en: isNewInfected ? "Unvisited infected cell → start DFS to collect a new region (lines 11-23)." : "Not a new infected cell → skip.",
+          },
+        });
+        if (!isNewInfected) continue;
+
+        // ── DFS to collect one region ─────────────────────────────────
+        const region = new Set();
+        const frontier = new Set();
+        let walls = 0;
+        snap({
+          title: { vi: "line 11-12: region,frontier,walls = {},{},0; stack=[(r,c)]", en: "line 11-12: region,frontier,walls = {},{},0; stack=[(r,c)]" },
+          visited, cur: [r, c], codeLines: [11, 12],
+          vars: [{ name: "region", value: "{}" }, { name: "frontier", value: "{}" }, { name: "walls", value: 0 }],
+          note: { vi: `Khởi tạo tập vùng, tập biên, và bộ đếm tường cho vùng bắt đầu tại (${r},${c}).`, en: `Initialize the region set, frontier set, and wall counter for the region starting at (${r},${c}).` },
+        });
+        const stack = [[r, c]];
+        visited[r][c] = true;
+        callStack.push(`region#${regions.length}`);
+
+        let innerGuard = 0;
+        while (stack.length && innerGuard++ < rows * cols * 4) {
+          snap({
+            title: { vi: `line 13: while stack → True (len=${stack.length})`, en: `line 13: while stack → True (len=${stack.length})` },
+            visited, regionCells: new Set([...region].map(([a, b]) => `${a},${b}`)), codeLines: [13],
+            vars: [{ name: "stack size", value: stack.length }],
+            note: { vi: "Stack còn ô nhiễm cần xử lý.", en: "The stack still has infected cells to process." },
+          });
+          const [curR, curC] = stack.pop();
+          region.add(`${curR},${curC}`);
+          snap({
+            title: { vi: `line 14-15: pop → (${curR},${curC}); region.add`, en: `line 14-15: pop → (${curR},${curC}); region.add` },
+            visited, cur: [curR, curC], regionCells: new Set([...region]), codeLines: [14, 15],
+            vars: [{ name: "region size", value: region.size }],
+            note: { vi: `Lấy (${curR},${curC}) khỏi stack, thêm vào region.`, en: `Pop (${curR},${curC}) off the stack, add it to region.` },
+          });
+          for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nr = curR + dr;
+            const nc = curC + dc;
+            snap({
+              title: { vi: `line 16-17: dr,dc=(${dr},${dc}) → next=(${nr},${nc})`, en: `line 16-17: dr,dc=(${dr},${dc}) → next=(${nr},${nc})` },
+              visited, cur: [curR, curC], regionCells: new Set([...region]), codeLines: [16, 17],
+              vars: [{ name: "nr, nc", value: `${nr}, ${nc}` }],
+              note: { vi: `Xét hàng xóm (${nr},${nc}).`, en: `Check neighbor (${nr},${nc}).` },
+            });
+            const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+            snap({
+              title: { vi: `line 18: 0<=nr<rows and 0<=nc<cols → ${inBounds}`, en: `line 18: 0<=nr<rows and 0<=nc<cols → ${inBounds}` },
+              visited, cur: inBounds ? [nr, nc] : [curR, curC], regionCells: new Set([...region]), codeLines: [18],
+              vars: [{ name: "in bounds?", value: inBounds }],
+              note: { vi: inBounds ? "Trong lưới → kiểm tra trạng thái ô." : "Ngoài lưới → bỏ qua.", en: inBounds ? "Inside the grid → check the cell's state." : "Outside the grid → skip." },
+            });
+            if (!inBounds) continue;
+            const isNewInfectedNeighbor = work[nr][nc] === 1 && !visited[nr][nc];
+            const isUninfected = work[nr][nc] === 0;
+            snap({
+              title: { vi: `line 19: is_infected[${nr}][${nc}]==1 and not visited → ${isNewInfectedNeighbor}`, en: `line 19: is_infected[${nr}][${nc}]==1 and not visited → ${isNewInfectedNeighbor}` },
+              visited, cur: [nr, nc], regionCells: new Set([...region]), codeLines: [19],
+              vars: [{ name: "is_infected[nr][nc]", value: work[nr][nc] }, { name: "visited[nr][nc]", value: visited[nr][nc] }],
+              note: {
+                vi: isNewInfectedNeighbor ? "Đất nhiễm chưa thăm → line 20 thêm vào stack." : isUninfected ? "Ô lành (0) → line 21-22 xét frontier." : "Đã thăm hoặc đã cách ly → bỏ qua.",
+                en: isNewInfectedNeighbor ? "Unvisited infected neighbor → line 20 push it." : isUninfected ? "Uninfected cell (0) → lines 21-22 handle the frontier." : "Already visited or quarantined → skip.",
+              },
+            });
+            if (isNewInfectedNeighbor) {
+              visited[nr][nc] = true;
+              stack.push([nr, nc]);
+              snap({
+                title: { vi: `line 20: visited[${nr}][${nc}]=True; stack.append((${nr},${nc}))`, en: `line 20: visited[${nr}][${nc}]=True; stack.append((${nr},${nc}))` },
+                visited, cur: [nr, nc], regionCells: new Set([...region]), codeLines: [20],
+                vars: [{ name: "stack size", value: stack.length }],
+                note: { vi: `Đánh dấu (${nr},${nc}) đã thăm, đẩy vào stack để mở rộng vùng.`, en: `Mark (${nr},${nc}) visited, push it to keep growing the region.` },
+              });
+              continue;
+            }
+            if (isUninfected) {
+              const key = `${nr},${nc}`;
+              const isNewFrontier = !frontier.has(key);
+              snap({
+                title: { vi: `line 21: elif is_infected[${nr}][${nc}]==0 → True`, en: `line 21: elif is_infected[${nr}][${nc}]==0 → True` },
+                visited, cur: [nr, nc], regionCells: new Set([...region]), frontierCells: new Set([...frontier]), codeLines: [21],
+                vars: [{ name: "already in frontier?", value: !isNewFrontier }],
+                note: { vi: "Ô lành kề vùng nhiễm → thêm vào frontier (set tự loại trùng) và cộng walls.", en: "Uninfected cell adjacent to the region → add to frontier (the set dedupes) and increment walls." },
+              });
+              frontier.add(key);
+              walls += 1;
+              snap({
+                title: { vi: `line 22: frontier.add((${nr},${nc})); walls += 1 → ${walls}`, en: `line 22: frontier.add((${nr},${nc})); walls += 1 → ${walls}` },
+                visited, cur: [nr, nc], regionCells: new Set([...region]), frontierCells: new Set([...frontier]), codeLines: [22],
+                vars: [{ name: "frontier size", value: frontier.size }, { name: "walls", value: walls }],
+                note: {
+                  vi: isNewFrontier
+                    ? `(${nr},${nc}) là ô frontier MỚI → frontier=${frontier.size}, walls=${walls} (mỗi cạnh nhiễm-lành cần 1 tường, kể cả nếu (${nr},${nc}) đã có trong frontier từ hướng khác — walls KHÔNG dùng set nên vẫn cộng).`
+                    : `(${nr},${nc}) ĐÃ có trong frontier (từ ô nhiễm khác) nhưng walls vẫn += 1 vì mỗi CẠNH kề cần 1 tường riêng, dù cùng đích.`,
+                  en: isNewFrontier
+                    ? `(${nr},${nc}) is a NEW frontier cell → frontier=${frontier.size}, walls=${walls} (every infected-uninfected edge needs its own wall).`
+                    : `(${nr},${nc}) was ALREADY in frontier (reached from another infected cell) but walls still += 1, since every adjacent EDGE needs its own wall, even to the same destination cell.`,
+                },
+              });
+            }
+          }
+        }
+        callStack.pop();
+
+        regions.push(region);
+        frontiers.push(frontier);
+        wallCounts.push(walls);
+        snap({
+          title: { vi: `line 23: regions.append(...) — vùng #${regions.length - 1}: |region|=${region.size}, |frontier|=${frontier.size}, walls=${walls}`, en: `line 23: regions.append(...) — region #${regions.length - 1}: |region|=${region.size}, |frontier|=${frontier.size}, walls=${walls}` },
+          regionCells: new Set([...region]), frontierCells: new Set([...frontier]), codeLines: [23],
+          vars: [
+            { name: "region #", value: regions.length - 1 },
+            { name: "region size", value: region.size },
+            { name: "frontier size", value: frontier.size },
+            { name: "walls", value: walls },
+          ],
+          note: {
+            vi: `Vùng #${regions.length - 1} hoàn tất: ${region.size} ô nhiễm, đe dọa ${frontier.size} ô lành, cần ${walls} tường.`,
+            en: `Region #${regions.length - 1} complete: ${region.size} infected cells, threatens ${frontier.size} uninfected cells, needs ${walls} walls.`,
+          },
+        });
+      }
+    }
+
+    // ── Line 24: no regions → break ───────────────────────────────────
+    snap({
+      title: { vi: `line 24: not regions → ${regions.length === 0}`, en: `line 24: not regions → ${regions.length === 0}` },
+      codeLines: [24],
+      vars: [{ name: "regions found", value: regions.length }],
+      note: {
+        vi: regions.length === 0 ? "Không còn vùng nhiễm nào → break (kết thúc)." : `Có ${regions.length} vùng nhiễm → tiếp tục line 25.`,
+        en: regions.length === 0 ? "No infected regions left → break (finished)." : `Found ${regions.length} infected region(s) → continue to line 25.`,
+      },
+    });
+    if (regions.length === 0) break;
+
+    // ── Line 25: pick region with max frontier ────────────────────────
+    let maxIdx = 0;
+    for (let i = 1; i < frontiers.length; i++) {
+      if (frontiers[i].size > frontiers[maxIdx].size) maxIdx = i;
+    }
+    snap({
+      title: { vi: `line 25: max_idx = argmax |frontier| → ${maxIdx} (|frontier|=${frontiers[maxIdx].size})`, en: `line 25: max_idx = argmax |frontier| → ${maxIdx} (|frontier|=${frontiers[maxIdx].size})` },
+      regionCells: new Set([...regions[maxIdx]]), frontierCells: new Set([...frontiers[maxIdx]]),
+      codeLines: [25],
+      vars: [
+        { name: "frontier sizes", value: `[${frontiers.map((f) => f.size).join(", ")}]` },
+        { name: "max_idx", value: maxIdx },
+      ],
+      note: {
+        vi: `So sánh |frontier| của mọi vùng: [${frontiers.map((f) => f.size).join(", ")}]. Vùng #${maxIdx} đe dọa nhiều ô lành nhất → sẽ bị cách ly.`,
+        en: `Compare |frontier| across all regions: [${frontiers.map((f) => f.size).join(", ")}]. Region #${maxIdx} threatens the most uninfected cells → it will be quarantined.`,
+      },
+    });
+
+    // ── Line 26: if the biggest frontier is 0, nothing spreads → break ──
+    const noThreat = frontiers[maxIdx].size === 0;
+    snap({
+      title: { vi: `line 26: len(frontiers[max_idx])==0 → ${noThreat}`, en: `line 26: len(frontiers[max_idx])==0 → ${noThreat}` },
+      codeLines: [26],
+      vars: [{ name: "frontier[max_idx] size", value: frontiers[maxIdx].size }],
+      note: {
+        vi: noThreat ? "Vùng lớn nhất cũng không đe dọa ai (bị đóng kín) → break, không xây thêm tường." : "Vùng lớn nhất còn đe dọa ô lành → tiếp tục cách ly.",
+        en: noThreat ? "Even the largest region threatens nobody (fully enclosed) → break, no more walls needed." : "The largest region still threatens uninfected cells → proceed to quarantine.",
+      },
+    });
+    if (noThreat) break;
+
+    // ── Line 27: total_walls += wall_counts[max_idx] ──────────────────
+    totalWalls += wallCounts[maxIdx];
+    snap({
+      title: { vi: `line 27: total_walls += ${wallCounts[maxIdx]} → ${totalWalls}`, en: `line 27: total_walls += ${wallCounts[maxIdx]} → ${totalWalls}` },
+      regionCells: new Set([...regions[maxIdx]]),
+      codeLines: [27],
+      vars: [{ name: "wall_counts[max_idx]", value: wallCounts[maxIdx] }, { name: "total_walls", value: totalWalls }],
+      note: { vi: `Xây ${wallCounts[maxIdx]} tường quanh vùng #${maxIdx}. total_walls = ${totalWalls}.`, en: `Build ${wallCounts[maxIdx]} walls around region #${maxIdx}. total_walls = ${totalWalls}.` },
+    });
+
+    // ── Lines 28-32: apply updates ─────────────────────────────────────
+    for (let i = 0; i < regions.length; i++) {
+      snap({
+        title: { vi: `line 28: for i, region in enumerate(regions) → i = ${i}`, en: `line 28: for i, region in enumerate(regions) → i = ${i}` },
+        codeLines: [28], vars: [{ name: "i", value: i }],
+        note: { vi: `Xét vùng #${i}.`, en: `Process region #${i}.` },
+      });
+      const isWinner = i === maxIdx;
+      snap({
+        title: { vi: `line 29: i == max_idx → ${isWinner}`, en: `line 29: i == max_idx → ${isWinner}` },
+        regionCells: new Set([...regions[i]]), codeLines: [29],
+        vars: [{ name: "is quarantined region?", value: isWinner }],
+        note: {
+          vi: isWinner ? `Vùng #${i} bị cách ly → line 30: tô 2 (tường) cho mọi ô trong region.` : `Vùng #${i} không bị cách ly → line 31-32: LAN vào frontier của nó.`,
+          en: isWinner ? `Region #${i} is quarantined → line 30: mark 2 (walled) for every cell in the region.` : `Region #${i} is not quarantined → lines 31-32: it SPREADS into its frontier.`,
+        },
+      });
+      if (isWinner) {
+        for (const key of regions[i]) {
+          const [rr, cc] = key.split(",").map(Number);
+          work[rr][cc] = 2;
+        }
+        snap({
+          title: { vi: `line 30: is_infected[rr][cc] = 2 cho toàn vùng #${i}`, en: `line 30: is_infected[rr][cc] = 2 for all of region #${i}` },
+          winnerCells: new Set([...regions[i]]), codeLines: [30],
+          vars: [{ name: "cells quarantined", value: regions[i].size }],
+          note: { vi: `Toàn bộ ${regions[i].size} ô của vùng #${i} chuyển thành 2 (đã xây tường, không lan nữa).`, en: `All ${regions[i].size} cells of region #${i} become 2 (walled, will never spread again).` },
+        });
+      } else {
+        for (const key of frontiers[i]) {
+          const [rr, cc] = key.split(",").map(Number);
+          work[rr][cc] = 1;
+        }
+        snap({
+          title: { vi: `line 31-32: is_infected[rr][cc] = 1 cho frontier vùng #${i}`, en: `line 31-32: is_infected[rr][cc] = 1 for region #${i}'s frontier` },
+          frontierCells: new Set([...frontiers[i]]), codeLines: [31, 32],
+          vars: [{ name: "cells newly infected", value: frontiers[i].size }],
+          note: { vi: `Vùng #${i} lan sang ${frontiers[i].size} ô lành kề, các ô đó chuyển từ 0 → 1.`, en: `Region #${i} spreads into ${frontiers[i].size} adjacent uninfected cells, which flip from 0 → 1.` },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: `line 33: return total_walls = ${totalWalls}`, en: `line 33: return total_walls = ${totalWalls}` },
+    final: true, codeLines: [33],
+    vars: [{ name: "answer", value: totalWalls }],
+    note: {
+      vi: `Không còn vùng nào cần cách ly hoặc lan. Tổng số tường đã xây = ${totalWalls}.`,
+      en: `No more regions to quarantine or spread. Total walls built = ${totalWalls}.`,
+    },
+  });
+
+  return { original: grid, answer: totalWalls, steps };
+}
+
 const problems = {
+  749: {
+    id: 749, difficulty: "hard", slug: "contain-virus",
+    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
+    title: tr("Contain Virus", "Contain Virus"),
+    titleVi: tr("Ngăn chặn virus (chọn vùng đe dọa nhiều nhất mỗi ngày)", "Contain virus (quarantine the most-threatening region daily)"),
+    statement: tr(
+      "Mỗi ngày: tìm mọi vùng nhiễm, xây tường quanh vùng đe dọa NHIỀU ô lành nhất (dừng lan mãi), các vùng còn lại LAN sang ô lành kề. Lặp tới khi hết vùng hoặc vùng lớn nhất không đe dọa ai. Trả về tổng số tường. Nhập grid: hàng cách '|'.",
+      "Each day: find every infected region, wall off the region threatening the MOST uninfected cells (stops it spreading forever), the rest SPREAD into their adjacent uninfected cells. Repeat until no regions remain or the largest region threatens nobody. Return the total walls used. Enter grid: rows separated by '|'."
+    ),
+    defaultInput: "01000001|01000001|00000001|00000000",
+    inputKind: "string",
+    inputLabel: tr("Grid 0/1 (0=lành,1=nhiễm, hàng cách '|')", "0/1 grid (0=uninfected,1=infected, rows separated by '|')"),
+    approach: [
+      tr("Mỗi ngày, DFS gom từng vùng nhiễm liên thông, tính frontier (ô lành kề) và số tường cần cho vùng đó.", "Each day, DFS collects each connected infected region, computing its frontier (adjacent uninfected cells) and wall count."),
+      tr("Chọn vùng có |frontier| LỚN NHẤT để cách ly vĩnh viễn (tô 2 = tường).", "Pick the region with the LARGEST |frontier| to permanently quarantine (mark 2 = walled)."),
+      tr("Các vùng còn lại LAN vào frontier của chúng (tô 1 = nhiễm mới).", "The remaining regions SPREAD into their frontier (mark 1 = newly infected)."),
+      tr("Dừng khi không còn vùng nào, hoặc vùng lớn nhất cũng không đe dọa ai (frontier rỗng).", "Stop when no regions remain, or even the largest region threatens nobody (empty frontier)."),
+    ],
+    complexity: {
+      time: "O(days · rows · cols)",
+      space: "O(rows · cols)",
+      note: tr("Mỗi ngày quét toàn lưới O(rows·cols); số ngày bị chặn bởi kích thước lưới.", "Each day scans the whole grid O(rows·cols); the number of days is bounded by the grid size."),
+    },
+    code: [
+      "class Solution:",
+      "    def containVirus(self, is_infected):",
+      "        rows, cols = len(is_infected), len(is_infected[0])",
+      "        total_walls = 0",
+      "        while True:",
+      "            visited = [[False]*cols for _ in range(rows)]",
+      "            regions, frontiers, wall_counts = [], [], []",
+      "            for r in range(rows):",
+      "                for c in range(cols):",
+      "                    if is_infected[r][c]==1 and not visited[r][c]:",
+      "                        region, frontier, walls = set(), set(), 0",
+      "                        stack = [(r, c)]; visited[r][c] = True",
+      "                        while stack:",
+      "                            cur_r, cur_c = stack.pop()",
+      "                            region.add((cur_r, cur_c))",
+      "                            for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:",
+      "                                nr, nc = cur_r+dr, cur_c+dc",
+      "                                if 0<=nr<rows and 0<=nc<cols:",
+      "                                    if is_infected[nr][nc]==1 and not visited[nr][nc]:",
+      "                                        visited[nr][nc]=True; stack.append((nr,nc))",
+      "                                    elif is_infected[nr][nc]==0:",
+      "                                        frontier.add((nr,nc)); walls+=1",
+      "                        regions.append(region); frontiers.append(frontier); wall_counts.append(walls)",
+      "            if not regions: break",
+      "            max_idx = max(range(len(regions)), key=lambda i: len(frontiers[i]))",
+      "            if len(frontiers[max_idx])==0: break",
+      "            total_walls += wall_counts[max_idx]",
+      "            for i, region in enumerate(regions):",
+      "                if i == max_idx:",
+      "                    for (rr,cc) in region: is_infected[rr][cc]=2",
+      "                else:",
+      "                    for (rr,cc) in frontiers[i]: is_infected[rr][cc]=1",
+      "        return total_walls",
+    ],
+    builder: buildSteps749,
+  },
   1568: {
     id: 1568, difficulty: "hard", slug: "minimum-number-of-days-to-disconnect-island",
     category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
