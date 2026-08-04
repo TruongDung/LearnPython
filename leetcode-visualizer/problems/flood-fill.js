@@ -692,7 +692,265 @@ function buildSteps1905(input){
   push(24,tr(`return ${count}`,`return ${count}`),tr("Trả về tổng số sub-islands.","Return the total sub-island count."),{final:true,vars:[{name:"answer",value:count}]});return{original,answer:count,steps};
 }
 
+// ─── 463: Island Perimeter — detailed line-by-line debugger ──────────────────
+// code lines (1-indexed):
+//  1  class Solution:
+//  2      def islandPerimeter(self, grid):
+//  3          rows, cols = len(grid), len(grid[0])
+//  4          perimeter = 0
+//  5          for r in range(rows):
+//  6              for c in range(cols):
+//  7                  if grid[r][c] != 1:
+//  8                      continue
+//  9                  for delta_r, delta_c in [(1,0),(-1,0),(0,1),(0,-1)]:
+// 10                      next_r, next_c = r+delta_r, c+delta_c
+// 11                      out_of_bounds = next_r<0 or next_r>=rows or next_c<0 or next_c>=cols
+// 12                      if out_of_bounds or grid[next_r][next_c] == 0:
+// 13                          perimeter += 1
+// 14          return perimeter
+function buildSteps463(input) {
+  const parsed = parseBinary(input, true);
+  const original = parsed.grid.map((row) => [...row]);
+  if (!parsed.valid) {
+    return invalid(original, tr("Grid chỉ được chứa 0 và 1.", "Grid may contain only 0 and 1."));
+  }
+  const grid = parsed.grid.map((row) => row.map(Number));
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const steps = [];
+
+  // Track which of the 4 edges of each land cell are "perimeter" edges
+  // (edge[r][c] = { top, bottom, left, right } booleans), so we can draw them.
+  const edges = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ top: false, bottom: false, left: false, right: false })));
+  const scanned = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(cur, neighbor) {
+    return grid.map((row, r) => row.map((v, c) => {
+      let cls = v === 0 ? "wall" : "empty";
+      if (v === 1 && scanned[r][c]) cls = "visited";
+      if (neighbor && neighbor[0] === r && neighbor[1] === c) cls = "queued";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      const e = edges[r][c];
+      const edgeCount = (e.top ? 1 : 0) + (e.bottom ? 1 : 0) + (e.left ? 1 : 0) + (e.right ? 1 : 0);
+      const meta = v === 1 ? `⊥${edgeCount}` : "";
+      return { label: String(v), meta, cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.neighbor || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [...(o.vars || []), { name: "perimeter", value: o.perimeter !== undefined ? o.perimeter : "—" }],
+      note: o.note,
+    });
+  }
+
+  // ── Line 3 ──────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "rows, cols = len(grid), len(grid[0])", en: "rows, cols = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi: `Lưới ${rows}×${cols}. ⊥N trên mỗi ô đất = số cạnh CHU VI đã tính cho ô đó (0..4).`,
+      en: `Grid ${rows}×${cols}. ⊥N on each land cell = number of PERIMETER edges counted so far (0..4).`,
+    },
+  });
+
+  // ── Line 4 ──────────────────────────────────────────────────────────
+  let perimeter = 0;
+  snap({
+    title: { vi: "perimeter = 0", en: "perimeter = 0" },
+    codeLines: [4],
+    perimeter,
+    vars: [],
+    note: {
+      vi: "Mỗi ô đất góp 1 cạnh chu vi cho MỖI hướng (trên/dưới/trái/phải) là nước hoặc ngoài lưới.",
+      en: "Each land cell contributes 1 perimeter edge for EVERY side (up/down/left/right) that is water or out of bounds.",
+    },
+  });
+
+  const DIRS = [
+    { dr: 1, dc: 0, side: "bottom", label: "(1,0) ↓" },
+    { dr: -1, dc: 0, side: "top", label: "(-1,0) ↑" },
+    { dr: 0, dc: 1, side: "right", label: "(0,1) →" },
+    { dr: 0, dc: -1, side: "left", label: "(0,-1) ←" },
+  ];
+
+  for (let r = 0; r < rows; r++) {
+    // ── Line 5 ─────────────────────────────────────────────────────────
+    snap({
+      title: { vi: `line 5: for r in range(rows) → r = ${r}`, en: `line 5: for r in range(rows) → r = ${r}` },
+      codeLines: [5], perimeter,
+      vars: [{ name: "r", value: r }],
+      note: { vi: `Quét dòng ${r}.`, en: `Scan row ${r}.` },
+    });
+
+    for (let c = 0; c < cols; c++) {
+      // ── Line 6 ───────────────────────────────────────────────────────
+      snap({
+        title: { vi: `line 6: for c in range(cols) → c = ${c}`, en: `line 6: for c in range(cols) → c = ${c}` },
+        cur: [r, c], codeLines: [6], perimeter,
+        vars: [{ name: "r, c", value: `${r}, ${c}` }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+      });
+
+      // ── Line 7 ───────────────────────────────────────────────────────
+      const isLand = grid[r][c] === 1;
+      snap({
+        title: { vi: `line 7: grid[${r}][${c}] != 1?`, en: `line 7: grid[${r}][${c}] != 1?` },
+        cur: [r, c], codeLines: [7], perimeter,
+        vars: [{ name: "grid[r][c]", value: grid[r][c] }, { name: "is water?", value: !isLand }],
+        note: {
+          vi: isLand ? `grid[${r}][${c}] = 1 → là đất → sang line 9.` : `grid[${r}][${c}] = 0 → là nước → line 8 continue, bỏ ô này.`,
+          en: isLand ? `grid[${r}][${c}] = 1 → land → go to line 9.` : `grid[${r}][${c}] = 0 → water → line 8 continue, skip this cell.`,
+        },
+      });
+      if (!isLand) {
+        // ── Line 8 ────────────────────────────────────────────────────
+        snap({
+          title: { vi: "line 8: continue (là nước)", en: "line 8: continue (is water)" },
+          cur: [r, c], codeLines: [8], perimeter,
+          vars: [],
+          note: { vi: "Nước không có cạnh chu vi → bỏ qua ô này.", en: "Water contributes no perimeter → skip this cell." },
+        });
+        continue;
+      }
+      scanned[r][c] = true;
+
+      for (const { dr, dc, side, label } of DIRS) {
+        const nr = r + dr;
+        const nc = c + dc;
+
+        // ── Line 9 ──────────────────────────────────────────────────
+        snap({
+          title: { vi: `line 9: thử hướng ${label}`, en: `line 9: try direction ${label}` },
+          cur: [r, c], codeLines: [9], perimeter,
+          vars: [{ name: "delta_r, delta_c", value: `${dr}, ${dc}` }],
+          note: { vi: `Xét cạnh ${side} của ô (${r},${c}).`, en: `Check the ${side} side of cell (${r},${c}).` },
+        });
+
+        // ── Line 10 ─────────────────────────────────────────────────
+        snap({
+          title: { vi: `line 10: next_r, next_c = (${nr}, ${nc})`, en: `line 10: next_r, next_c = (${nr}, ${nc})` },
+          cur: [r, c], neighbor: [nr, nc], codeLines: [10], perimeter,
+          vars: [{ name: "next_r, next_c", value: `${nr}, ${nc}` }],
+          note: { vi: `Tọa độ hàng xóm theo hướng ${side}: (${nr},${nc}).`, en: `Neighbor coordinate towards ${side}: (${nr},${nc}).` },
+        });
+
+        // ── Line 11 ─────────────────────────────────────────────────
+        const oob = nr < 0 || nr >= rows || nc < 0 || nc >= cols;
+        snap({
+          title: { vi: `line 11: out_of_bounds = ${oob}`, en: `line 11: out_of_bounds = ${oob}` },
+          cur: [r, c], neighbor: oob ? null : [nr, nc], codeLines: [11], perimeter,
+          vars: [{ name: "out_of_bounds", value: oob }],
+          note: {
+            vi: oob ? `(${nr},${nc}) nằm NGOÀI lưới ${rows}×${cols}.` : `(${nr},${nc}) nằm trong lưới.`,
+            en: oob ? `(${nr},${nc}) is OUTSIDE the ${rows}×${cols} grid.` : `(${nr},${nc}) is inside the grid.`,
+          },
+        });
+
+        // ── Line 12 ─────────────────────────────────────────────────
+        const neighborWater = !oob && grid[nr][nc] === 0;
+        const isPerimeterEdge = oob || neighborWater;
+        snap({
+          title: {
+            vi: `line 12: out_of_bounds or grid[next]==0 → ${isPerimeterEdge}`,
+            en: `line 12: out_of_bounds or grid[next]==0 → ${isPerimeterEdge}`,
+          },
+          cur: [r, c], neighbor: oob ? null : [nr, nc], codeLines: [12], perimeter,
+          vars: [
+            { name: "out_of_bounds", value: oob },
+            { name: "grid[next_r][next_c]", value: oob ? "—" : grid[nr][nc] },
+            { name: "is perimeter edge?", value: isPerimeterEdge },
+          ],
+          note: {
+            vi: isPerimeterEdge
+              ? (oob ? `Ngoài lưới → cạnh ${side} là biên chu vi → line 13 cộng 1.` : `grid[${nr}][${nc}]=0 (nước) → cạnh ${side} là biên chu vi → line 13 cộng 1.`)
+              : `grid[${nr}][${nc}]=1 (đất liền kề) → cạnh ${side} KHÔNG phải biên chu vi, hai ô đất dính nhau che cạnh này.`,
+            en: isPerimeterEdge
+              ? (oob ? `Out of bounds → the ${side} side is a perimeter edge → line 13 adds 1.` : `grid[${nr}][${nc}]=0 (water) → the ${side} side is a perimeter edge → line 13 adds 1.`)
+              : `grid[${nr}][${nc}]=1 (adjacent land) → the ${side} side is NOT a perimeter edge, the two land cells cover it.`,
+          },
+        });
+
+        if (isPerimeterEdge) {
+          // ── Line 13 ───────────────────────────────────────────────
+          perimeter += 1;
+          edges[r][c][side] = true;
+          snap({
+            title: { vi: `line 13: perimeter += 1 → ${perimeter}`, en: `line 13: perimeter += 1 → ${perimeter}` },
+            cur: [r, c], codeLines: [13], perimeter,
+            vars: [{ name: "side counted", value: side }, { name: "perimeter", value: perimeter }],
+            note: {
+              vi: `Cộng 1 cạnh chu vi cho phía ${side} của (${r},${c}). perimeter = ${perimeter}.`,
+              en: `Add 1 perimeter edge for the ${side} side of (${r},${c}). perimeter = ${perimeter}.`,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // ── Line 14 ─────────────────────────────────────────────────────────
+  snap({
+    title: { vi: `line 14: return ${perimeter}`, en: `line 14: return ${perimeter}` },
+    final: true, codeLines: [14], perimeter,
+    vars: [{ name: "answer", value: perimeter }],
+    note: {
+      vi: `Đã quét hết lưới. Tổng chu vi đảo = ${perimeter}. Mỗi ⊥N trên ô đất cho biết ô đó góp bao nhiêu cạnh vào chu vi.`,
+      en: `Finished scanning. Total island perimeter = ${perimeter}. Each ⊥N on a land cell shows how many edges it contributed.`,
+    },
+  });
+
+  return { original: grid, answer: perimeter, steps };
+}
+
 const problems = {
+  463: {
+    id: 463, difficulty: "easy", slug: "island-perimeter",
+    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
+    title: tr("Island Perimeter", "Island Perimeter"),
+    titleVi: tr("Chu vi đảo (đếm cạnh biên)", "Island perimeter (count boundary edges)"),
+    statement: tr(
+      "Lưới chỉ có một đảo (không hồ bên trong). Trả về chu vi của đảo. Nhập grid: hàng cách '|'.",
+      "The grid contains exactly one island (no lakes). Return the island's perimeter. Enter grid: rows separated by '|'."
+    ),
+    defaultInput: "0100|1110|0100|1100",
+    inputKind: "string",
+    inputLabel: tr("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
+    approach: [
+      tr("Quét từng ô đất.", "Scan every land cell."),
+      tr("Với mỗi ô đất, xét 4 hướng: nếu hướng đó là nước hoặc ngoài lưới → +1 chu vi.", "For each land cell, check 4 directions: if that side is water or out of bounds → +1 perimeter."),
+      tr("Không cần DFS/BFS gom đảo — chỉ đếm cạnh biên trực tiếp.", "No DFS/BFS needed to group the island — just count boundary edges directly."),
+    ],
+    complexity: {
+      time: "O(rows·cols)",
+      space: "O(1)",
+      note: tr("Mỗi ô xét đúng 1 lần, 4 hướng cố định.", "Each cell is checked once, with 4 fixed directions."),
+    },
+    code: [
+      "class Solution:",
+      "    def islandPerimeter(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        perimeter = 0",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] != 1:",
+      "                    continue",
+      "                for delta_r, delta_c in [(1,0),(-1,0),(0,1),(0,-1)]:",
+      "                    next_r, next_c = r + delta_r, c + delta_c",
+      "                    out_of_bounds = (next_r < 0 or next_r >= rows or",
+      "                                      next_c < 0 or next_c >= cols)",
+      "                    if out_of_bounds or grid[next_r][next_c] == 0:",
+      "                        perimeter += 1",
+      "        return perimeter",
+    ],
+    builder: buildSteps463,
+  },
   733: {
     id: 733, difficulty: "easy", slug: "flood-fill",
     category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
