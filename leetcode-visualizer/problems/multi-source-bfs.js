@@ -643,8 +643,10 @@ function buildSteps130Bfs(input) {
     visitTrueNote: text("O này nối với vùng biên nên cũng safe.", "This O connects to the boundary region, so it is also safe."),
     visitFalseNote: text("Ngoài biên hoặc không còn là O; bỏ qua.", "Out of bounds or no longer O; skip it."),
     cell: (value) => {
+      // Show the LIVE board value so 'S' is visible exactly when line 11
+      // (board[row][col] = 'S') runs, instead of masking it back to "O".
       if (value === "X") return { label: "X", cls: "wall" };
-      if (value === "S") return { label: "O", cls: "path" };
+      if (value === "S") return { label: "S", cls: "path" };
       return { label: "O", cls: "empty" };
     },
     finish: ({ grid, rows, cols, push }) => {
