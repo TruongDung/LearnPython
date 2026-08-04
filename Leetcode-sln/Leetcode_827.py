@@ -4,48 +4,44 @@ from typing import List
 class Solution:
     def largestIsland(self, grid: List[List[int]]) -> int:
         n = len(grid)
-        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        size = {}
 
-        # Label each island with an id >= 2, record its size
-        island_size = {}
+        def dfs(r, c, island_id):
+            if r < 0 or r >= n or c < 0 or c >= n or grid[r][c] != 1:
+                return 0
+            grid[r][c] = island_id
+            area = 1
+            area += dfs(r + 1, c, island_id)
+            area += dfs(r - 1, c, island_id)
+            area += dfs(r, c + 1, island_id)
+            area += dfs(r, c - 1, island_id)
+            return area
+
+        # Step 1: label every island with a unique id (>= 2) and its area.
         island_id = 2
-
-        def dfs(r: int, c: int, idx: int) -> int:
-            stack = [(r, c)]
-            grid[r][c] = idx
-            size = 0
-            while stack:
-                cr, cc = stack.pop()
-                size += 1
-                for dr, dc in directions:
-                    nr, nc = cr + dr, cc + dc
-                    if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 1:
-                        grid[nr][nc] = idx
-                        stack.append((nr, nc))
-            return size
-
         for r in range(n):
             for c in range(n):
                 if grid[r][c] == 1:
-                    island_size[island_id] = dfs(r, c, island_id)
+                    size[island_id] = dfs(r, c, island_id)
                     island_id += 1
 
-        # Best without flipping (grid may be all land)
-        best = max(island_size.values(), default=0)
+        # Covers the all-land case where there is no 0 to flip.
+        best = max(size.values(), default=0)
 
-        # Try flipping each 0: sum sizes of distinct neighboring islands + 1
+        # Step 2: try flipping every water cell, summing DISTINCT
+        # neighboring island sizes (+1 for the flipped cell itself).
         for r in range(n):
             for c in range(n):
                 if grid[r][c] == 0:
                     seen = set()
                     total = 1
-                    for dr, dc in directions:
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] > 1:
-                            idx = grid[nr][nc]
-                            if idx not in seen:
-                                seen.add(idx)
-                                total += island_size[idx]
+                    for delta_r, delta_c in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        next_r, next_c = r + delta_r, c + delta_c
+                        if 0 <= next_r < n and 0 <= next_c < n and grid[next_r][next_c] > 1:
+                            neighbor_id = grid[next_r][next_c]
+                            if neighbor_id not in seen:
+                                seen.add(neighbor_id)
+                                total += size[neighbor_id]
                     best = max(best, total)
 
         return best

@@ -14279,188 +14279,386 @@ function buildSteps407(input) {
 }
 
 /**
- * LeetCode 827: Making A Large Island — component labeling + try each 0-flip.
- * 1) Label every island with a unique id ≥ 2 and record its size.
- * 2) For each water cell (0), sum the sizes of DISTINCT neighboring islands + 1.
+ * LeetCode 827: Making A Large Island — detailed line-by-line debugger.
  *
- * Code lines (1-indexed):
+ * Phase 1: recursive DFS labels every island with a unique id (>= 2) and
+ *          records its area in size[id]. The grid is mutated in place
+ *          (1 -> island_id) exactly like the Python code.
+ * Phase 2: best = the largest labeled island (handles the all-land case).
+ * Phase 3: try flipping every water (0) cell: sum DISTINCT neighboring
+ *          island sizes + 1 (the flipped cell itself); track the max.
+ *
+ * Code lines (1-indexed) match code exactly:
  *  1  class Solution:
  *  2      def largestIsland(self, grid):
- *  3          label each island id>=2, size[id] via DFS
- *  4          best = max island size (grid may be all land)
- *  5          for each cell (r,c) == 0:
- *  6              seen = set(); total = 1
- *  7              for neighbor with id>1: if id not seen: total += size[id]
- *  8              best = max(best, total)
- *  9          return best
+ *  3          n = len(grid)
+ *  4          size = {}
+ *  5          def dfs(r, c, island_id):
+ *  6              if r < 0 or r >= n or c < 0 or c >= n or grid[r][c] != 1:
+ *  7                  return 0
+ *  8              grid[r][c] = island_id
+ *  9              area = 1
+ * 10              area += dfs(r + 1, c, island_id)
+ * 11              area += dfs(r - 1, c, island_id)
+ * 12              area += dfs(r, c + 1, island_id)
+ * 13              area += dfs(r, c - 1, island_id)
+ * 14              return area
+ * 15          island_id = 2
+ * 16          for r in range(n):
+ * 17              for c in range(n):
+ * 18                  if grid[r][c] == 1:
+ * 19                      size[island_id] = dfs(r, c, island_id)
+ * 20                      island_id += 1
+ * 21          best = max(size.values(), default=0)
+ * 22          for r in range(n):
+ * 23              for c in range(n):
+ * 24                  if grid[r][c] == 0:
+ * 25                      seen = set()
+ * 26                      total = 1
+ * 27                      for delta_r, delta_c in [(1,0),(-1,0),(0,1),(0,-1)]:
+ * 28                          next_r, next_c = r + delta_r, c + delta_c
+ * 29                          if 0 <= next_r < n and 0 <= next_c < n and grid[next_r][next_c] > 1:
+ * 30                              neighbor_id = grid[next_r][next_c]
+ * 31                              if neighbor_id not in seen:
+ * 32                                  seen.add(neighbor_id)
+ * 33                                  total += size[neighbor_id]
+ * 34                      best = max(best, total)
+ * 35          return best
  */
 function buildSteps827(input) {
   const grid = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
     .map((row) => row.split(",").map((v) => Number(v.trim())));
   const steps = [];
-  if (!grid.length || !grid[0].length) {
+  if (!grid.length || !grid[0].length || grid.length !== grid[0].length) {
     steps.push({
-      title: { vi: "Lưới rỗng → 0", en: "Empty grid → 0" },
+      title: { vi: "Lưới rỗng hoặc không vuông → 0", en: "Empty or non-square grid → 0" },
       arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
-      final: true, codeLines: [2], vars: [{ name: "answer", value: 0 }],
-      note: { vi: "Nhập lưới 0/1 dạng 1,0;0,1", en: "Enter a 0/1 grid like 1,0;0,1" },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Nhập lưới VUÔNG n×n gồm 0/1, dạng 1,0;0,1", en: "Enter a SQUARE n×n grid of 0/1, like 1,0;0,1" },
     });
     return { original: grid, answer: 0, steps };
   }
 
-  const nRows = grid.length;
-  const nCols = grid[0].length;
-  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-  // label[r][c] = 0 for water, else island id >= 2
-  const label = grid.map((row) => row.map((v) => (v === 1 ? 1 : 0)));
+  const n = grid.length;
+  const work = grid.map((row) => [...row]); // mutated exactly like Python's `grid`
   const size = {};
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
 
-  function makeCells(cur, flip) {
-    return label.map((row, r) =>
-      row.map((v, c) => {
-        let cls, lab;
-        if (flip && flip[0] === r && flip[1] === c) { cls = "path"; lab = "+"; }
-        else if (v === 0) { cls = "wall"; lab = "0"; }
-        else if (v === 1) { cls = "empty"; lab = "1"; }
-        else { cls = "visited"; lab = `#${v}`; }
-        if (cur && cur[0] === r && cur[1] === c) cls = "current";
-        return { label: lab, cls };
-      })
-    );
+  function makeCells(cur) {
+    return work.map((row, r) => row.map((v, c) => {
+      let cls, label;
+      if (v === 0) { cls = "wall"; label = "0"; }
+      else if (v === 1) { cls = "empty"; label = "1"; }
+      else { cls = "visited"; label = String(v); }
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label, meta: v > 1 ? `#${v}` : "", cls };
+    }));
   }
 
-  function snap(opts) {
+  function snap(o) {
     steps.push({
-      title: opts.title,
-      arr: [],
-      bfsGrid: { rows: nRows, cols: nCols, cells: makeCells(opts.cur, opts.flip) },
-      highlight: [], mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
+      title: o.title, arr: [],
+      bfsGrid: { rows: n, cols: n, cells: makeCells(o.cur || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+        { name: "depth", value: callStack.length },
+      ],
+      note: o.note,
     });
   }
 
+  // ── Line 3-4 ────────────────────────────────────────────────────────
   snap({
-    title: { vi: "Bước 1: gán nhãn từng đảo", en: "Step 1: label each island" },
-    codeLines: [3],
-    vars: [{ name: "rows,cols", value: `${nRows},${nCols}` }],
+    title: { vi: "n = len(grid); size = {}", en: "n = len(grid); size = {}" },
+    codeLines: [3, 4],
+    vars: [{ name: "n", value: n }, { name: "size", value: "{}" }],
     note: {
       vi:
-        `Mỗi đảo (nhóm ô 1 nối 4 hướng) được gán 1 id ≥ 2 và ghi kích thước. Ô hiển thị "#id".\n` +
-        `Sau đó thử biến 1 ô nước (0) thành đất và cộng kích thước các đảo kề (KHÁC NHAU).`,
+        `Lưới ${n}×${n}. size[id] sẽ lưu diện tích đảo có nhãn id. ` +
+        `Chiến thuật: (1) gán nhãn từng đảo bằng DFS, (2) thử lật mỗi ô nước để nối các đảo kề.`,
       en:
-        `Each island (group of 1s connected 4-directionally) gets a unique id ≥ 2 with its size recorded. Cells show "#id".\n` +
-        `Then try flipping one water cell (0) to land and sum the sizes of DISTINCT neighboring islands.`,
+        `Grid ${n}×${n}. size[id] will store the area of the island labeled id. ` +
+        `Strategy: (1) label every island via DFS, (2) try flipping each water cell to merge neighboring islands.`,
     },
   });
 
-  // DFS label islands
-  let id = 2;
-  for (let r = 0; r < nRows; r++) {
-    for (let c = 0; c < nCols; c++) {
-      if (label[r][c] === 1) {
-        // BFS/DFS fill
-        const stack = [[r, c]];
-        label[r][c] = id;
-        let sz = 0;
-        while (stack.length) {
-          const [cr, cc] = stack.pop();
-          sz += 1;
-          for (const [dr, dc] of dirs) {
-            const nr = cr + dr, nc = cc + dc;
-            if (nr >= 0 && nr < nRows && nc >= 0 && nc < nCols && label[nr][nc] === 1) {
-              label[nr][nc] = id;
-              stack.push([nr, nc]);
-            }
-          }
-        }
-        size[id] = sz;
-        snap({
-          title: { vi: `Đảo #${id} tại (${r},${c}): kích thước ${sz}`, en: `Island #${id} at (${r},${c}): size ${sz}` },
-          cur: [r, c],
-          codeLines: [3],
-          vars: [
-            { name: "island id", value: id },
-            { name: "size", value: sz },
-            { name: "sizes", value: `{${Object.entries(size).map(([k, v]) => `#${k}:${v}`).join(", ")}}` },
-          ],
-          note: {
-            vi: `Tô toàn bộ đảo bắt đầu từ (${r},${c}) bằng id ${id}. Kích thước = ${sz} ô.`,
-            en: `Flood the island starting at (${r},${c}) with id ${id}. Size = ${sz} cells.`,
-          },
-        });
-        id += 1;
-      }
+  // ── DFS definition, invoked from the labeling loop below ──────────────
+  function dfs(r, c, islandId) {
+    callStack.push(`dfs(${r},${c},${islandId})`);
+
+    const oob = r < 0 || r >= n || c < 0 || c >= n;
+    const notLand = !oob && work[r][c] !== 1;
+    const stop = oob || notLand;
+    snap({
+      title: { vi: `dfs(${r},${c},${islandId}) — line 6: điều kiện dừng`, en: `dfs(${r},${c},${islandId}) — line 6: stop condition` },
+      cur: oob ? null : [r, c], codeLines: [6],
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "out of bounds?", value: oob },
+        { name: "grid[r][c]", value: oob ? "—" : work[r][c] },
+      ],
+      note: {
+        vi: stop
+          ? `${oob ? `(${r},${c}) ngoài lưới` : `grid[${r}][${c}]=${work[r][c]} (không phải đất 1, có thể là nước hoặc đã gán nhãn)`} → line 7 return 0.`
+          : `(${r},${c}) là đất (1) chưa gán nhãn → sang line 8.`,
+        en: stop
+          ? `${oob ? `(${r},${c}) is out of bounds` : `grid[${r}][${c}]=${work[r][c]} (not plain land 1 — water or already labeled)`} → line 7 return 0.`
+          : `(${r},${c}) is unlabeled land (1) → go to line 8.`,
+      },
+    });
+    if (stop) {
+      snap({
+        title: { vi: "line 7: return 0", en: "line 7: return 0" },
+        codeLines: [7], vars: [{ name: "returns", value: 0 }],
+        note: { vi: "Ngoài lưới, nước, hoặc đã có nhãn → không góp diện tích.", en: "Out of bounds, water, or already labeled → contributes no area." },
+      });
+      callStack.pop();
+      return 0;
+    }
+
+    // ── Line 8: relabel in place ────────────────────────────────────────
+    const before = work.map((row) => row.join("")).join(" | ");
+    work[r][c] = islandId;
+    const after = work.map((row) => row.join("")).join(" | ");
+    snap({
+      title: { vi: `line 8: grid[${r}][${c}] = ${islandId}  ⟵ 1 bị ghi thành ${islandId}`, en: `line 8: grid[${r}][${c}] = ${islandId}  ⟵ 1 overwritten to ${islandId}` },
+      cur: [r, c], codeLines: [8],
+      vars: [
+        { name: "grid[r][c] trước", value: 1 }, { name: "grid[r][c] sau", value: islandId },
+        { name: "grid trước", value: before }, { name: "grid sau", value: after },
+      ],
+      note: {
+        vi: `Đổi (${r},${c}) từ 1 → ${islandId} ngay trên lưới. Đây vừa là nhãn đảo, vừa là dấu "đã thăm".\ngrid: ${before}  →  ${after}`,
+        en: `Change (${r},${c}) from 1 → ${islandId} in place. This doubles as both the island label and the "visited" marker.\ngrid: ${before}  →  ${after}`,
+      },
+    });
+
+    // ── Line 9: area = 1 ─────────────────────────────────────────────────
+    let area = 1;
+    snap({
+      title: { vi: "line 9: area = 1", en: "line 9: area = 1" },
+      cur: [r, c], codeLines: [9], vars: [{ name: "area", value: area }],
+      note: { vi: `Ô (${r},${c}) tự đóng góp 1 vào diện tích.`, en: `Cell (${r},${c}) contributes 1 to the area by itself.` },
+    });
+
+    // ── Lines 10-13: recurse in 4 directions, accumulate ─────────────────
+    const DIRS = [
+      { dr: 1, dc: 0, line: 10, label: "dfs(r+1, c, island_id)" },
+      { dr: -1, dc: 0, line: 11, label: "dfs(r-1, c, island_id)" },
+      { dr: 0, dc: 1, line: 12, label: "dfs(r, c+1, island_id)" },
+      { dr: 0, dc: -1, line: 13, label: "dfs(r, c-1, island_id)" },
+    ];
+    for (const { dr, dc, line, label } of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      snap({
+        title: { vi: `line ${line}: gọi ${label} → dfs(${nr},${nc},${islandId})`, en: `line ${line}: call ${label} → dfs(${nr},${nc},${islandId})` },
+        cur: [r, c], codeLines: [line],
+        vars: [{ name: "calling", value: `dfs(${nr},${nc},${islandId})` }, { name: "area so far", value: area }],
+        note: { vi: `Đẩy frame dfs(${nr},${nc},${islandId}) lên call stack.`, en: `Push frame dfs(${nr},${nc},${islandId}) onto the call stack.` },
+      });
+      const child = dfs(nr, nc, islandId);
+      area += child;
+      snap({
+        title: { vi: `line ${line}: area += ${child} → area = ${area}`, en: `line ${line}: area += ${child} → area = ${area}` },
+        cur: [r, c], codeLines: [line],
+        vars: [{ name: "returned", value: child }, { name: "area", value: area }],
+        note: { vi: `Quay lại dfs(${r},${c},${islandId}). Cộng ${child} vào area → ${area}.`, en: `Back in dfs(${r},${c},${islandId}). Add ${child} to area → ${area}.` },
+      });
+    }
+
+    // ── Line 14: return area ─────────────────────────────────────────────
+    snap({
+      title: { vi: `line 14: return ${area}`, en: `line 14: return ${area}` },
+      cur: [r, c], codeLines: [14],
+      vars: [{ name: "returns", value: area }],
+      note: { vi: `dfs(${r},${c},${islandId}) hoàn tất, trả về diện tích ${area}.`, en: `dfs(${r},${c},${islandId}) finishes, returning area ${area}.` },
+    });
+    callStack.pop();
+    return area;
+  }
+
+  // ── Line 15 ─────────────────────────────────────────────────────────
+  let islandId = 2;
+  snap({
+    title: { vi: "island_id = 2", en: "island_id = 2" },
+    codeLines: [15], vars: [{ name: "island_id", value: islandId }],
+    note: { vi: "Nhãn đảo bắt đầu từ 2 (0=nước, 1=đất chưa gán nhãn).", en: "Island labels start at 2 (0=water, 1=unlabeled land)." },
+  });
+
+  // ── Lines 16-20: labeling loop ────────────────────────────────────────
+  for (let r = 0; r < n; r++) {
+    snap({
+      title: { vi: `line 16: for r in range(n) → r = ${r}`, en: `line 16: for r in range(n) → r = ${r}` },
+      codeLines: [16], vars: [{ name: "r", value: r }],
+      note: { vi: `Quét hàng ${r} để tìm đất chưa gán nhãn.`, en: `Scan row ${r} for unlabeled land.` },
+    });
+    for (let c = 0; c < n; c++) {
+      snap({
+        title: { vi: `line 17: for c in range(n) → c = ${c}`, en: `line 17: for c in range(n) → c = ${c}` },
+        cur: [r, c], codeLines: [17], vars: [{ name: "grid[r][c]", value: work[r][c] }],
+        note: { vi: `Xét ô (${r},${c}) = ${work[r][c]}.`, en: `Inspect cell (${r},${c}) = ${work[r][c]}.` },
+      });
+      const isUnlabeledLand = work[r][c] === 1;
+      snap({
+        title: { vi: `line 18: grid[${r}][${c}] == 1? → ${isUnlabeledLand}`, en: `line 18: grid[${r}][${c}] == 1? → ${isUnlabeledLand}` },
+        cur: [r, c], codeLines: [18], vars: [{ name: "is unlabeled land?", value: isUnlabeledLand }],
+        note: {
+          vi: isUnlabeledLand ? `Đất mới → gán nhãn ${islandId} ở line 19.` : `Không phải đất mới → bỏ qua.`,
+          en: isUnlabeledLand ? `New land → label it ${islandId} at line 19.` : `Not new land → skip.`,
+        },
+      });
+      if (!isUnlabeledLand) continue;
+      snap({
+        title: { vi: `line 19: size[${islandId}] = dfs(${r}, ${c}, ${islandId})`, en: `line 19: size[${islandId}] = dfs(${r}, ${c}, ${islandId})` },
+        cur: [r, c], codeLines: [19], vars: [{ name: "island_id", value: islandId }],
+        note: { vi: `Gọi DFS gốc để đo và gán nhãn toàn bộ đảo mới.`, en: `Call the root DFS to measure and label the entire new island.` },
+      });
+      const area = dfs(r, c, islandId);
+      size[islandId] = area;
+      snap({
+        title: { vi: `line 19: size[${islandId}] = ${area}`, en: `line 19: size[${islandId}] = ${area}` },
+        codeLines: [19],
+        vars: [{ name: `size[${islandId}]`, value: area }, { name: "size", value: `{${Object.entries(size).map(([k, v]) => `${k}:${v}`).join(", ")}}` }],
+        note: { vi: `DFS trả về diện tích ${area} cho đảo #${islandId}.`, en: `DFS returned area ${area} for island #${islandId}.` },
+      });
+      snap({
+        title: { vi: `line 20: island_id += 1 → ${islandId + 1}`, en: `line 20: island_id += 1 → ${islandId + 1}` },
+        codeLines: [20], vars: [{ name: "island_id", value: islandId + 1 }],
+        note: { vi: "Tăng island_id cho đảo tiếp theo.", en: "Increment island_id for the next island." },
+      });
+      islandId += 1;
     }
   }
 
-  let best = Math.max(0, ...Object.values(size));
+  // ── Line 21 ─────────────────────────────────────────────────────────
+  const sizeValues = Object.values(size);
+  let best = sizeValues.length ? Math.max(...sizeValues) : 0;
   snap({
-    title: { vi: `best (không lật) = ${best}`, en: `best (no flip) = ${best}` },
-    codeLines: [4],
-    vars: [
-      { name: "sizes", value: `{${Object.entries(size).map(([k, v]) => `#${k}:${v}`).join(", ")}}` },
-      { name: "best", value: best },
-    ],
+    title: { vi: `line 21: best = max(size.values(), default=0) = ${best}`, en: `line 21: best = max(size.values(), default=0) = ${best}` },
+    codeLines: [21],
+    vars: [{ name: "size", value: `{${Object.entries(size).map(([k, v]) => `${k}:${v}`).join(", ")}}` }, { name: "best", value: best }],
     note: {
-      vi: `Đảo lớn nhất hiện có (nếu không lật ô nào) = ${best}. Nếu lưới toàn đất thì đây là đáp án.`,
-      en: `Largest existing island (without any flip) = ${best}. If the grid is all land, this is the answer.`,
+      vi: `best = đảo lớn nhất hiện có = ${best}. Xử lý trường hợp lưới toàn đất (không có 0 để lật).`,
+      en: `best = the largest existing island = ${best}. Covers the all-land case (no 0 to flip).`,
     },
   });
 
-  // Try each 0
+  // ── Lines 22-34: try flipping every water cell ────────────────────────
   let hasZero = false;
-  for (let r = 0; r < nRows; r++) {
-    for (let c = 0; c < nCols; c++) {
-      if (label[r][c] === 0) {
-        hasZero = true;
-        const seen = new Set();
-        let total = 1;
-        const parts = [];
-        for (const [dr, dc] of dirs) {
-          const nr = r + dr, nc = c + dc;
-          if (nr >= 0 && nr < nRows && nc >= 0 && nc < nCols && label[nr][nc] > 1) {
-            const iid = label[nr][nc];
-            if (!seen.has(iid)) { seen.add(iid); total += size[iid]; parts.push(`#${iid}(${size[iid]})`); }
-          }
-        }
-        const improved = total > best;
-        if (improved) best = total;
+  for (let r = 0; r < n; r++) {
+    snap({
+      title: { vi: `line 22: for r in range(n) → r = ${r}`, en: `line 22: for r in range(n) → r = ${r}` },
+      codeLines: [22], vars: [{ name: "r", value: r }],
+      note: { vi: `Quét hàng ${r} để tìm ô nước có thể lật.`, en: `Scan row ${r} for a water cell to flip.` },
+    });
+    for (let c = 0; c < n; c++) {
+      snap({
+        title: { vi: `line 23: for c in range(n) → c = ${c}`, en: `line 23: for c in range(n) → c = ${c}` },
+        cur: [r, c], codeLines: [23], vars: [{ name: "grid[r][c]", value: work[r][c] }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+      });
+      const isWater = work[r][c] === 0;
+      snap({
+        title: { vi: `line 24: grid[${r}][${c}] == 0? → ${isWater}`, en: `line 24: grid[${r}][${c}] == 0? → ${isWater}` },
+        cur: [r, c], codeLines: [24], vars: [{ name: "is water?", value: isWater }],
+        note: {
+          vi: isWater ? `Ô nước → thử lật thành đất ở các line 25-34.` : `Không phải nước (là đảo đã gán nhãn) → bỏ qua.`,
+          en: isWater ? `Water cell → try flipping it to land in lines 25-34.` : `Not water (a labeled island cell) → skip.`,
+        },
+      });
+      if (!isWater) continue;
+      hasZero = true;
+
+      snap({
+        title: { vi: "line 25-26: seen = set(); total = 1", en: "line 25-26: seen = set(); total = 1" },
+        cur: [r, c], codeLines: [25, 26], vars: [{ name: "seen", value: "{}" }, { name: "total", value: 1 }],
+        note: { vi: `Nếu lật (${r},${c}) thành đất, nó tự đóng góp 1. seen tránh cộng trùng cùng 1 đảo qua 2 hướng.`, en: `If (${r},${c}) is flipped to land, it contributes 1 by itself. seen avoids double-counting the same island via 2 directions.` },
+      });
+
+      const seen = new Set();
+      let total = 1;
+      const DIRS4 = [{ dr: 1, dc: 0, line: 27 }, { dr: -1, dc: 0, line: 27 }, { dr: 0, dc: 1, line: 27 }, { dr: 0, dc: -1, line: 27 }];
+      for (const { dr, dc } of DIRS4) {
+        const nr = r + dr;
+        const nc = c + dc;
         snap({
-          title: { vi: `Lật (${r},${c}): 1 + ${parts.join(" + ") || "0"} = ${total}${improved ? ` → best=${best}` : ""}`, en: `Flip (${r},${c}): 1 + ${parts.join(" + ") || "0"} = ${total}${improved ? ` → best=${best}` : ""}` },
-          cur: null,
-          flip: [r, c],
-          codeLines: [5, 6, 7, 8],
-          vars: [
-            { name: "flip cell", value: `(${r},${c})` },
-            { name: "neighbor islands", value: parts.join(", ") || "none" },
-            { name: "total", value: total },
-            { name: "best", value: best },
-          ],
+          title: { vi: `line 27-28: next_r, next_c = (${nr}, ${nc})`, en: `line 27-28: next_r, next_c = (${nr}, ${nc})` },
+          cur: [r, c], codeLines: [27, 28], vars: [{ name: "next_r, next_c", value: `${nr}, ${nc}` }],
+          note: { vi: `Xét hàng xóm (${nr},${nc}).`, en: `Check neighbor (${nr},${nc}).` },
+        });
+        const inBounds = nr >= 0 && nr < n && nc >= 0 && nc < n;
+        const isIslandCell = inBounds && work[nr][nc] > 1;
+        snap({
+          title: { vi: `line 29: trong lưới AND grid[next]>1 → ${isIslandCell}`, en: `line 29: in bounds AND grid[next]>1 → ${isIslandCell}` },
+          cur: [r, c], codeLines: [29],
+          vars: [{ name: "in bounds?", value: inBounds }, { name: "grid[next_r][next_c]", value: inBounds ? work[nr][nc] : "—" }],
           note: {
-            vi: `Biến ô (${r},${c}) thành đất → nối các đảo kề KHÁC NHAU: ${parts.join(", ") || "không có"}. Tổng = 1 + ${parts.map((p) => p.match(/\((\d+)\)/)[1]).join(" + ") || "0"} = ${total}. ${improved ? `Lớn hơn best → best=${best}.` : `Không vượt best=${best}.`}`,
-            en: `Flip cell (${r},${c}) to land → connect DISTINCT neighboring islands: ${parts.join(", ") || "none"}. Total = 1 + ${parts.map((p) => p.match(/\((\d+)\)/)[1]).join(" + ") || "0"} = ${total}. ${improved ? `Beats best → best=${best}.` : `Doesn't beat best=${best}.`}`,
+            vi: isIslandCell ? `(${nr},${nc}) là ô đảo đã gán nhãn ${work[nr][nc]} → sang line 30.` : `Ngoài lưới hoặc là nước → bỏ qua.`,
+            en: isIslandCell ? `(${nr},${nc}) is a labeled island cell ${work[nr][nc]} → go to line 30.` : `Out of bounds or water → skip.`,
           },
         });
+        if (!isIslandCell) continue;
+        const neighborId = work[nr][nc];
+        snap({
+          title: { vi: `line 30: neighbor_id = grid[${nr}][${nc}] = ${neighborId}`, en: `line 30: neighbor_id = grid[${nr}][${nc}] = ${neighborId}` },
+          cur: [nr, nc], codeLines: [30], vars: [{ name: "neighbor_id", value: neighborId }],
+          note: { vi: `Đảo kề có nhãn ${neighborId}.`, en: `The neighboring island has label ${neighborId}.` },
+        });
+        const isNewSeen = !seen.has(neighborId);
+        snap({
+          title: { vi: `line 31: ${neighborId} not in seen → ${isNewSeen}`, en: `line 31: ${neighborId} not in seen → ${isNewSeen}` },
+          cur: [nr, nc], codeLines: [31], vars: [{ name: "seen", value: `{${[...seen].join(",")}}` }, { name: "is new?", value: isNewSeen }],
+          note: {
+            vi: isNewSeen ? `Đảo ${neighborId} CHƯA được cộng → sang line 32-33 để cộng vào total.` : `Đảo ${neighborId} ĐÃ được cộng rồi (có thể gặp lại qua hướng khác) → bỏ qua, tránh đếm trùng.`,
+            en: isNewSeen ? `Island ${neighborId} has NOT been added yet → go to lines 32-33 to add it to total.` : `Island ${neighborId} was ALREADY added (reached via another direction) → skip to avoid double-counting.`,
+          },
+        });
+        if (!isNewSeen) continue;
+        seen.add(neighborId);
+        total += size[neighborId];
+        snap({
+          title: { vi: `line 32-33: seen.add(${neighborId}); total += ${size[neighborId]} → ${total}`, en: `line 32-33: seen.add(${neighborId}); total += ${size[neighborId]} → ${total}` },
+          cur: [nr, nc], codeLines: [32, 33],
+          vars: [{ name: "seen", value: `{${[...seen].join(",")}}` }, { name: "total", value: total }],
+          note: { vi: `Cộng kích thước đảo ${neighborId} (=${size[neighborId]}) vào total → ${total}.`, en: `Add island ${neighborId}'s size (${size[neighborId]}) to total → ${total}.` },
+        });
       }
+
+      const improved = total > best;
+      if (improved) best = total;
+      snap({
+        title: { vi: `line 34: best = max(${improved ? total - 0 : best}, ${total}) → ${best}`, en: `line 34: best = max(best, ${total}) → ${best}` },
+        cur: [r, c], codeLines: [34],
+        vars: [{ name: "flip cell", value: `(${r},${c})` }, { name: "total", value: total }, { name: "best", value: best }],
+        note: {
+          vi: improved
+            ? `Lật (${r},${c}) cho tổng ${total} (đất mới + các đảo kề khác nhau), lớn hơn best cũ → best = ${best}.`
+            : `Lật (${r},${c}) cho tổng ${total}, không vượt best hiện tại = ${best}.`,
+          en: improved
+            ? `Flipping (${r},${c}) gives total ${total} (new land + distinct neighboring islands), beating the old best → best = ${best}.`
+            : `Flipping (${r},${c}) gives total ${total}, which doesn't beat the current best = ${best}.`,
+        },
+      });
     }
   }
 
+  // ── Line 35 ─────────────────────────────────────────────────────────
   snap({
-    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
-    cur: null,
-    final: true,
-    codeLines: [9],
+    title: { vi: `line 35: return ${best}`, en: `line 35: return ${best}` },
+    final: true, codeLines: [35],
     vars: [{ name: "answer", value: best }],
     note: {
       vi: hasZero
-        ? `Đảo lớn nhất sau khi lật tối đa 1 ô nước = ${best}.`
-        : `Không có ô nước để lật → giữ nguyên đảo lớn nhất = ${best}.`,
+        ? `Đã thử lật mọi ô nước. Đảo lớn nhất có thể tạo ra = ${best}.`
+        : `Lưới toàn đất, không có ô nước để lật → đáp án = đảo lớn nhất hiện có = ${best}.`,
       en: hasZero
-        ? `Largest island after flipping at most one water cell = ${best}.`
-        : `No water cell to flip → the largest island stays ${best}.`,
+        ? `Tried flipping every water cell. Largest possible island = ${best}.`
+        : `The grid is all land, no water to flip → the answer is the largest existing island = ${best}.`,
     },
   });
 
@@ -15685,31 +15883,53 @@ module.exports = {
     inputLabel: { vi: "Lưới 0/1 (hàng cách ;)", en: "0/1 grid (rows separated by ;)" },
     extraParams: [],
     approach: [
-      { vi: "Gán nhãn mỗi đảo với id ≥ 2 bằng DFS, ghi lại kích thước từng đảo.", en: "Label each island with id ≥ 2 via DFS, recording each island's size." },
-      { vi: "best ban đầu = đảo lớn nhất (khi lưới toàn đất, không có ô 0 để lật).", en: "Initial best = largest island (covers the all-land case)." },
-      { vi: "Với mỗi ô 0: cộng kích thước các đảo kề KHÁC NHAU + 1.", en: "For each 0 cell: sum sizes of DISTINCT neighboring islands + 1." },
-      { vi: "Đáp án = max của các tổng đó và best ban đầu.", en: "Answer = max of those sums and the initial best." },
+      { vi: "DFS đệ quy: dfs(r,c,island_id) đổi grid[r][c] từ 1 → island_id (vừa gán nhãn, vừa đánh dấu đã thăm) và trả về diện tích.", en: "Recursive DFS: dfs(r,c,island_id) changes grid[r][c] from 1 → island_id (labels AND marks visited) and returns the area." },
+      { vi: "Gán nhãn từng đảo với id ≥ 2, lưu size[id] = diện tích.", en: "Label each island with id ≥ 2, storing size[id] = area." },
+      { vi: "best ban đầu = max(size.values()) — xử lý trường hợp lưới toàn đất.", en: "Initial best = max(size.values()) — covers the all-land case." },
+      { vi: "Với mỗi ô nước (0): dùng seen để tránh cộng trùng cùng 1 đảo, cộng size các đảo kề KHÁC NHAU + 1.", en: "For each water (0) cell: use seen to avoid double-counting the same island, sum sizes of DISTINCT neighboring islands + 1." },
     ],
     complexity: {
       time: "O(n²)",
       space: "O(n²)",
       note: {
-        vi: "Một lượt DFS gán nhãn + một lượt thử từng ô 0.",
-        en: "One DFS labeling pass + one pass trying each 0 cell.",
+        vi: "Một lượt DFS gán nhãn O(n²) + một lượt thử từng ô nước O(n²).",
+        en: "One O(n²) DFS labeling pass + one O(n²) pass trying each water cell.",
       },
     },
     code: [
       "class Solution:",
       "    def largestIsland(self, grid):",
-      "        # DFS label each island id>=2, size[id] = area",
+      "        n = len(grid)",
+      "        size = {}",
+      "        def dfs(r, c, island_id):",
+      "            if r < 0 or r >= n or c < 0 or c >= n or grid[r][c] != 1:",
+      "                return 0",
+      "            grid[r][c] = island_id",
+      "            area = 1",
+      "            area += dfs(r + 1, c, island_id)",
+      "            area += dfs(r - 1, c, island_id)",
+      "            area += dfs(r, c + 1, island_id)",
+      "            area += dfs(r, c - 1, island_id)",
+      "            return area",
+      "        island_id = 2",
+      "        for r in range(n):",
+      "            for c in range(n):",
+      "                if grid[r][c] == 1:",
+      "                    size[island_id] = dfs(r, c, island_id)",
+      "                    island_id += 1",
       "        best = max(size.values(), default=0)",
       "        for r in range(n):",
       "            for c in range(n):",
       "                if grid[r][c] == 0:",
-      "                    seen = set(); total = 1",
-      "                    for nr, nc in neighbors(r, c):",
-      "                        if grid[nr][nc] > 1 and grid[nr][nc] not in seen:",
-      "                            seen.add(grid[nr][nc]); total += size[grid[nr][nc]]",
+      "                    seen = set()",
+      "                    total = 1",
+      "                    for delta_r, delta_c in [(1,0),(-1,0),(0,1),(0,-1)]:",
+      "                        next_r, next_c = r + delta_r, c + delta_c",
+      "                        if 0 <= next_r < n and 0 <= next_c < n and grid[next_r][next_c] > 1:",
+      "                            neighbor_id = grid[next_r][next_c]",
+      "                            if neighbor_id not in seen:",
+      "                                seen.add(neighbor_id)",
+      "                                total += size[neighbor_id]",
       "                    best = max(best, total)",
       "        return best",
     ],
