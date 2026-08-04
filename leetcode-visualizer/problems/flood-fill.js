@@ -951,13 +951,23 @@ function buildSteps463v2(input) {
     }));
   }
 
+  // Track current loop indices so every step (even before i/j exist yet)
+  // can show them consistently in the debug watch panel.
+  let curI = null;
+  let curJ = null;
+
   function snap(o) {
     steps.push({
       title: o.title, arr: [], codeBlock: 2,
       bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.peer || null) },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: [...(o.vars || []), { name: "total", value: o.total !== undefined ? o.total : "—" }],
+      vars: [
+        { name: "i", value: curI === null ? "—" : curI },
+        { name: "j", value: curJ === null ? "—" : curJ },
+        ...(o.vars || []),
+        { name: "total", value: o.total !== undefined ? o.total : "—" },
+      ],
       note: o.note,
     });
   }
@@ -987,19 +997,22 @@ function buildSteps463v2(input) {
 
   for (let i = 0; i < rows; i++) {
     // ── Line 6 ──────────────────────────────────────────────────────
+    curI = i;
+    curJ = null; // j does not exist yet at line 6, matches Python semantics
     snap({
       title: { vi: `line 6: for i in range(n_rows) → i = ${i}`, en: `line 6: for i in range(n_rows) → i = ${i}` },
       codeLines: [6], total,
-      vars: [{ name: "i", value: i }],
+      vars: [],
       note: { vi: `Quét dòng ${i}.`, en: `Scan row ${i}.` },
     });
 
     for (let j = 0; j < cols; j++) {
+      curJ = j;
       // ── Line 7 ────────────────────────────────────────────────────
       snap({
         title: { vi: `line 7: for j in range(n_cols) → j = ${j}`, en: `line 7: for j in range(n_cols) → j = ${j}` },
         cur: [i, j], codeLines: [7], total,
-        vars: [{ name: "i, j", value: `${i}, ${j}` }],
+        vars: [],
         note: { vi: `Xét ô (${i},${j}).`, en: `Inspect cell (${i},${j}).` },
       });
 
