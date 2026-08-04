@@ -15071,6 +15071,199 @@ function buildSteps4003(input, params) {
   return { original: { m, n, penalty }, answer, steps };
 }
 
+/**
+ * LeetCode 1245: Tree Diameter — double BFS.
+ *
+ * 1. BFS from any node (0) to find a farthest node A.
+ * 2. BFS from A to find the farthest node B and the distance — that
+ *    distance is the tree diameter (longest path, measured in edges).
+ * Works because in a tree, one endpoint of the diameter is always the
+ * node farthest from an arbitrary start.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def treeDiameter(self, edges):
+ *  3          if not edges: return 0
+ *  4          graph = defaultdict(list)
+ *  5          for u, v in edges:
+ *  6              graph[u].append(v); graph[v].append(u)
+ *  7          def bfs(start):
+ *  8              visited = {start}
+ *  9              queue = deque([(start, 0)])
+ * 10              far_node, far_dist = start, 0
+ * 11              while queue:
+ * 12                  node, dist = queue.popleft()
+ * 13                  if dist > far_dist: far_node, far_dist = node, dist
+ * 14                  for nei in graph[node]:
+ * 15                      if nei not in visited:
+ * 16                          visited.add(nei)
+ * 17                          queue.append((nei, dist+1))
+ * 18              return far_node, far_dist
+ * 19          a, _ = bfs(0)
+ * 20          _, diameter = bfs(a)
+ * 21          return diameter
+ */
+function buildSteps1245(input) {
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+  const steps = [];
+
+  if (edgeList.length === 0) {
+    steps.push({
+      title: { vi: "edges rỗng → return 0", en: "edges is empty → return 0" },
+      arr: [], graph: { nodes: [{ id: 0, label: "0" }], edges: [], hlNodes: [], hlEdges: [], visitedNodes: [] },
+      highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Không có cạnh → cây chỉ có 1 node → đường kính 0.", en: "No edges → the tree has a single node → diameter 0." },
+    });
+    return { original: edgeList, answer: 0, steps };
+  }
+
+  const nodeSet = new Set();
+  for (const [u, v] of edgeList) { nodeSet.add(u); nodeSet.add(v); }
+  const nodes = [...nodeSet].sort((a, b) => a - b);
+  const adj = {};
+  for (const v of nodes) adj[v] = [];
+  for (const [u, v] of edgeList) { adj[u].push(v); adj[v].push(u); }
+
+  function currentNodes() {
+    return nodes.map((id) => ({ id, label: String(id) }));
+  }
+  function currentEdges() {
+    return edgeList.map(([u, v]) => ({ u, v, w: "" }));
+  }
+
+  function snap({ hlNodes = [], hlEdges = [], visitedNodes = [], title, note, vars, codeLines, final = false }) {
+    steps.push({
+      title, arr: [],
+      graph: { nodes: currentNodes(), edges: currentEdges(), hlNodes, hlEdges, visitedNodes },
+      highlight: [], mark: [], final, codeLines, vars: vars || [], note,
+    });
+  }
+
+  snap({
+    title: { vi: "Ý tưởng: BFS 2 lần (double-BFS)", en: "Idea: double BFS" },
+    codeLines: [3, 4, 5, 6],
+    vars: [{ name: "n edges", value: edgeList.length }, { name: "n nodes", value: nodes.length }],
+    note: {
+      vi:
+        "Đường kính cây = đường đi dài nhất giữa 2 node. Tính chất: BFS từ MỘT node bất kỳ, node xa nhất tìm được (A) luôn là MỘT ĐẦU của đường kính. " +
+        "BFS lần 2 từ A cho ra đầu còn lại (B) và khoảng cách chính là đường kính.",
+      en:
+        "Tree diameter = the longest path between two nodes. Key property: BFS from ANY node, the farthest node found (A) is always ONE ENDPOINT of the diameter. " +
+        "A second BFS from A finds the other endpoint (B) and that distance is the diameter.",
+    },
+  });
+
+  function bfsTrace(start, phaseLabel, codeLinesForPhase) {
+    const visited = new Set([start]);
+    const queue = [[start, 0]];
+    let farNode = start;
+    let farDist = 0;
+
+    snap({
+      title: { vi: `${phaseLabel}: bfs(${start}) — khởi tạo`, en: `${phaseLabel}: bfs(${start}) — initialize` },
+      hlNodes: [start], visitedNodes: [start],
+      codeLines: [7, 8, 9, 10],
+      vars: [{ name: "start", value: start }, { name: "visited", value: `{${start}}` }, { name: "queue", value: `[(${start},0)]` }, { name: "far_node", value: farNode }, { name: "far_dist", value: farDist }],
+      note: {
+        vi: `Bắt đầu BFS từ node ${start}. visited={${start}}, queue=[(${start},0)].`,
+        en: `Start BFS from node ${start}. visited={${start}}, queue=[(${start},0)].`,
+      },
+    });
+
+    let guard = 0;
+    while (queue.length && guard++ < 500) {
+      const [node, dist] = queue.shift();
+      snap({
+        title: { vi: `${phaseLabel}: popleft → (${node}, dist=${dist})`, en: `${phaseLabel}: popleft → (${node}, dist=${dist})` },
+        hlNodes: [node], visitedNodes: [...visited],
+        codeLines: [12],
+        vars: [{ name: "node", value: node }, { name: "dist", value: dist }],
+        note: { vi: `Lấy (${node}, ${dist}) ra khỏi queue.`, en: `Dequeue (${node}, ${dist}).` },
+      });
+
+      const improved = dist > farDist;
+      if (improved) { farNode = node; farDist = dist; }
+      snap({
+        title: { vi: `${phaseLabel}: dist=${dist} > far_dist=${improved ? farDist - dist + dist : farDist}? → ${improved}`, en: `${phaseLabel}: dist=${dist} > far_dist? → ${improved}` },
+        hlNodes: [node], visitedNodes: [...visited],
+        codeLines: [13],
+        vars: [{ name: "far_node", value: farNode }, { name: "far_dist", value: farDist }],
+        note: improved
+          ? { vi: `Node ${node} ở xa hơn (dist=${dist}) → cập nhật far_node=${node}, far_dist=${dist}.`, en: `Node ${node} is farther (dist=${dist}) → update far_node=${node}, far_dist=${dist}.` }
+          : { vi: `dist=${dist} không lớn hơn far_dist=${farDist} → không cập nhật.`, en: `dist=${dist} does not exceed far_dist=${farDist} → no update.` },
+      });
+
+      for (const nei of adj[node]) {
+        const isNew = !visited.has(nei);
+        snap({
+          title: { vi: `${phaseLabel}: neighbor ${nei} chưa thăm? → ${isNew}`, en: `${phaseLabel}: neighbor ${nei} unvisited? → ${isNew}` },
+          hlNodes: [node, nei], hlEdges: [[node, nei]], visitedNodes: [...visited],
+          codeLines: [14, 15],
+          vars: [{ name: "neighbor", value: nei }, { name: "in visited?", value: !isNew }],
+          note: isNew
+            ? { vi: `${nei} chưa thăm → thêm vào visited và queue.`, en: `${nei} is unvisited → add it to visited and the queue.` }
+            : { vi: `${nei} đã thăm → bỏ qua.`, en: `${nei} was already visited → skip it.` },
+        });
+        if (isNew) {
+          visited.add(nei);
+          queue.push([nei, dist + 1]);
+          snap({
+            title: { vi: `${phaseLabel}: visited.add(${nei}); queue.append((${nei}, ${dist + 1}))`, en: `${phaseLabel}: visited.add(${nei}); queue.append((${nei}, ${dist + 1}))` },
+            hlNodes: [nei], hlEdges: [[node, nei]], visitedNodes: [...visited],
+            codeLines: [16, 17],
+            vars: [{ name: "visited size", value: visited.size }, { name: "queue", value: `[${queue.map(([n, d]) => `(${n},${d})`).join(", ")}]` }],
+            note: { vi: `${nei} đã được đưa vào visited và queue với dist=${dist + 1}.`, en: `${nei} added to visited and the queue with dist=${dist + 1}.` },
+          });
+        }
+      }
+    }
+
+    snap({
+      title: { vi: `${phaseLabel}: return (far_node=${farNode}, far_dist=${farDist})`, en: `${phaseLabel}: return (far_node=${farNode}, far_dist=${farDist})` },
+      hlNodes: [farNode], visitedNodes: [...visited],
+      codeLines: [18],
+      vars: [{ name: "far_node", value: farNode }, { name: "far_dist", value: farDist }],
+      note: { vi: `BFS từ ${start} kết thúc. Node xa nhất = ${farNode}, khoảng cách = ${farDist}.`, en: `BFS from ${start} is done. Farthest node = ${farNode}, distance = ${farDist}.` },
+    });
+
+    return { farNode, farDist };
+  }
+
+  const startNode = nodes[0];
+  const { farNode: a } = bfsTrace(startNode, "BFS #1", [19]);
+  snap({
+    title: { vi: `a = ${a} (một đầu của đường kính)`, en: `a = ${a} (one diameter endpoint)` },
+    hlNodes: [a],
+    codeLines: [19],
+    vars: [{ name: "a", value: a }],
+    note: {
+      vi: `Node xa nhất từ ${startNode} là ${a}. Theo tính chất cây, ${a} chắc chắn là một đầu mút của đường kính.`,
+      en: `The farthest node from ${startNode} is ${a}. By the tree property, ${a} is guaranteed to be one endpoint of the diameter.`,
+    },
+  });
+
+  const { farNode: b, farDist: diameter } = bfsTrace(a, "BFS #2", [20]);
+
+  snap({
+    title: { vi: `Kết quả: diameter = ${diameter}`, en: `Result: diameter = ${diameter}` },
+    hlNodes: [a, b], hlEdges: [], visitedNodes: nodes,
+    final: true, codeLines: [21],
+    vars: [{ name: "endpoint A", value: a }, { name: "endpoint B", value: b }, { name: "answer", value: diameter }],
+    note: {
+      vi: `BFS lần 2 từ ${a} tìm được node xa nhất ${b} với khoảng cách ${diameter}. Đây chính là đường kính của cây.`,
+      en: `The second BFS from ${a} finds the farthest node ${b} at distance ${diameter}. That distance is the tree's diameter.`,
+    },
+  });
+
+  return { original: edgeList, answer: diameter, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
@@ -18675,6 +18868,60 @@ module.exports = {
   },
   ...multiSourceBfsProblems,
   ...floodFillProblems,
+  1245: {
+    id: 1245,
+    difficulty: "medium",
+    slug: "tree-diameter",
+    category: { key: "graph", vi: "Đồ thị / BFS", en: "Graph / BFS" },
+    title: { vi: "Tree Diameter", en: "Tree Diameter" },
+    titleVi: { vi: "Đường kính cây (double BFS)", en: "Tree diameter (double BFS)" },
+    statement: {
+      vi: "Cho cây không trọng số n node với n-1 cạnh. Đường kính là số cạnh của đường đi dài nhất giữa 2 node bất kỳ. Nhập edges: mỗi cạnh 'u,v' cách nhau ';'.",
+      en: "Given an unweighted tree with n nodes and n-1 edges. The diameter is the number of edges on the longest path between any two nodes. Enter edges: each 'u,v' pair separated by ';'.",
+    },
+    defaultInput: "0,1;0,2",
+    inputKind: "string",
+    inputLabel: { vi: "edges (u,v cách nhau ;)", en: "edges (u,v pairs separated by ;)" },
+    extraParams: [],
+    approach: [
+      { vi: "BFS từ MỘT node bất kỳ (ví dụ node 0) → tìm node xa nhất A.", en: "BFS from ANY node (e.g. node 0) → find the farthest node A." },
+      { vi: "Tính chất cây: A luôn là một đầu mút của đường kính.", en: "Tree property: A is always one endpoint of the diameter." },
+      { vi: "BFS lần 2 từ A → tìm node xa nhất B và khoảng cách = đường kính.", en: "Second BFS from A → find the farthest node B; that distance is the diameter." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "2 lần BFS, mỗi lần O(n) trên cây có n-1 cạnh.",
+        en: "Two BFS passes, each O(n) on a tree with n-1 edges.",
+      },
+    },
+    code: [
+      "from collections import defaultdict, deque",
+      "class Solution:",
+      "    def treeDiameter(self, edges):",
+      "        if not edges: return 0",
+      "        graph = defaultdict(list)",
+      "        for u, v in edges:",
+      "            graph[u].append(v); graph[v].append(u)",
+      "        def bfs(start):",
+      "            visited = {start}",
+      "            queue = deque([(start, 0)])",
+      "            far_node, far_dist = start, 0",
+      "            while queue:",
+      "                node, dist = queue.popleft()",
+      "                if dist > far_dist: far_node, far_dist = node, dist",
+      "                for nei in graph[node]:",
+      "                    if nei not in visited:",
+      "                        visited.add(nei)",
+      "                        queue.append((nei, dist + 1))",
+      "            return far_node, far_dist",
+      "        a, _ = bfs(0)",
+      "        _, diameter = bfs(a)",
+      "        return diameter",
+    ],
+    builder: buildSteps1245,
+  },
   4003: {
     id: 4003,
     difficulty: "hard",
