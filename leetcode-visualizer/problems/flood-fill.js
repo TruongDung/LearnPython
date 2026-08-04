@@ -1031,24 +1031,32 @@ function buildSteps463v2(input) {
       });
 
       // ── Line 10: check left neighbor ──────────────────────────────
+      // Python's `and` short-circuits: when j==0, grid[i][j-1] is NEVER
+      // evaluated (no negative-index lookup happens). Reflect that exactly.
       const hasLeft = j > 0;
       const leftLand = hasLeft && grid[i][j - 1] === 1;
+      const leftExprTitle = hasLeft
+        ? `j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}`
+        : `j > 0 → False (dừng ở đây, không đọc grid[${i}][-1])`;
+      const leftExprTitleEn = hasLeft
+        ? `j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}`
+        : `j > 0 → False (stops here, grid[${i}][-1] is never read)`;
       snap({
-        title: { vi: `line 10: j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}`, en: `line 10: j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}` },
+        title: { vi: `line 10: ${leftExprTitle}`, en: `line 10: ${leftExprTitleEn}` },
         cur: [i, j], peer: hasLeft ? [i, j - 1] : null, codeLines: [10], total,
         vars: [
           { name: "j > 0?", value: hasLeft },
-          { name: `grid[${i}][${j - 1}]`, value: hasLeft ? grid[i][j - 1] : "—" },
+          { name: hasLeft ? `grid[${i}][${j - 1}]` : "grid[i][j-1]", value: hasLeft ? grid[i][j - 1] : "không đọc (short-circuit)" },
           { name: "left is land?", value: leftLand },
         ],
         note: {
           vi: !hasLeft
-            ? `j=0 → không có ô bên trái → bỏ qua line 11.`
+            ? `j=0 → "j > 0" là False → Python "and" NGẮT MẠCH ngay, không đọc grid[${i}][j-1] (tránh chỉ số âm sai) → bỏ qua line 11.`
             : leftLand
               ? `Ô bên trái (${i},${j - 1}) là đất → hai ô dính nhau → sang line 11 trừ cạnh chung.`
               : `Ô bên trái (${i},${j - 1}) là nước → không có cạnh chung để trừ.`,
           en: !hasLeft
-            ? `j=0 → no cell to the left → skip line 11.`
+            ? `j=0 → "j > 0" is False → Python's "and" SHORT-CIRCUITS immediately, grid[${i}][j-1] is never read (avoids a wrong negative index) → skip line 11.`
             : leftLand
               ? `Left cell (${i},${j - 1}) is land → the two cells touch → go to line 11 to subtract the shared edge.`
               : `Left cell (${i},${j - 1}) is water → no shared edge to subtract.`,
@@ -1070,24 +1078,31 @@ function buildSteps463v2(input) {
       }
 
       // ── Line 12: check top neighbor ────────────────────────────────
+      // Same short-circuit rule: when i==0, grid[i-1][j] is NEVER evaluated.
       const hasTop = i > 0;
       const topLand = hasTop && grid[i - 1][j] === 1;
+      const topExprTitle = hasTop
+        ? `i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}`
+        : `i > 0 → False (dừng ở đây, không đọc grid[-1][${j}])`;
+      const topExprTitleEn = hasTop
+        ? `i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}`
+        : `i > 0 → False (stops here, grid[-1][${j}] is never read)`;
       snap({
-        title: { vi: `line 12: i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}`, en: `line 12: i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}` },
+        title: { vi: `line 12: ${topExprTitle}`, en: `line 12: ${topExprTitleEn}` },
         cur: [i, j], peer: hasTop ? [i - 1, j] : null, codeLines: [12], total,
         vars: [
           { name: "i > 0?", value: hasTop },
-          { name: `grid[${i - 1}][${j}]`, value: hasTop ? grid[i - 1][j] : "—" },
+          { name: hasTop ? `grid[${i - 1}][${j}]` : "grid[i-1][j]", value: hasTop ? grid[i - 1][j] : "không đọc (short-circuit)" },
           { name: "top is land?", value: topLand },
         ],
         note: {
           vi: !hasTop
-            ? `i=0 → không có ô bên trên → bỏ qua line 13.`
+            ? `i=0 → "i > 0" là False → Python "and" NGẮT MẠCH ngay, không đọc grid[i-1][${j}] → bỏ qua line 13.`
             : topLand
               ? `Ô bên trên (${i - 1},${j}) là đất → hai ô dính nhau → sang line 13 trừ cạnh chung.`
               : `Ô bên trên (${i - 1},${j}) là nước → không có cạnh chung để trừ.`,
           en: !hasTop
-            ? `i=0 → no cell above → skip line 13.`
+            ? `i=0 → "i > 0" is False → Python's "and" SHORT-CIRCUITS immediately, grid[i-1][${j}] is never read → skip line 13.`
             : topLand
               ? `Top cell (${i - 1},${j}) is land → the two cells touch → go to line 13 to subtract the shared edge.`
               : `Top cell (${i - 1},${j}) is water → no shared edge to subtract.`,
