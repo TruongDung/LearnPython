@@ -1469,6 +1469,265 @@ function buildSteps1254(input) {
   return { original: grid, answer: closedCount, steps };
 }
 
+// ─── 1905 Approach 2: recursive DFS returning bool — line-by-line debugger ───
+// code2 lines (1-indexed):
+//  1  class Solution:
+//  2      def countSubIslands(self, grid1, grid2):
+//  3          rows = len(grid2)
+//  4          cols = len(grid2[0])
+//  5          def dfs(row, col):
+//  6              if (row < 0 or row >= rows or
+//  7                      col < 0 or col >= cols or
+//  8                      grid2[row][col] == 0):
+//  9                  return True
+// 10              is_sub_island = grid1[row][col] == 1
+// 11              grid2[row][col] = 0
+// 12              up = dfs(row - 1, col)
+// 13              down = dfs(row + 1, col)
+// 14              left = dfs(row, col - 1)
+// 15              right = dfs(row, col + 1)
+// 16              return (is_sub_island and up and down and left and right)
+// 17          result = 0
+// 18          for row in range(rows):
+// 19              for col in range(cols):
+// 20                  if grid2[row][col] == 1:
+// 21                      if dfs(row, col):
+// 22                          result += 1
+// 23          return result
+function buildSteps1905v2(input) {
+  const parsed = parseGridPair(input);
+  const original = { grid1: parsed.grid1?.map((r) => [...r]) || [], grid2: parsed.grid2?.map((r) => [...r]) || [] };
+  if (!parsed.valid) {
+    return invalid(original, tr("Nhập grid1;grid2, mỗi grid dùng '|' ngăn hàng và chỉ gồm 0/1.", "Enter grid1;grid2, using '|' between rows; both grids must contain only 0/1."));
+  }
+  const grid1 = parsed.grid1.map((r) => [...r]);
+  const grid2 = parsed.grid2.map((r) => [...r]);
+  const rows = grid2.length;
+  const cols = grid2[0].length;
+  const steps = [];
+
+  const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
+  let result = 0;
+
+  function makeCells(cur) {
+    return grid2.map((row, r) => row.map((v, c) => {
+      const onLand1 = grid1[r][c] === 1;
+      let cls = v === 0 ? (visited[r][c] ? "visited" : "wall") : "empty";
+      // Tint land that is NOT over grid1 land, so it's obvious why is_sub_island is False.
+      if (v === 1 && !onLand1) cls = "queued";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: String(v), meta: onLand1 ? "" : (v === 0 ? "" : "¬g1"), cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [], codeBlock: 2,
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+        { name: "depth", value: callStack.length },
+        { name: "result", value: result },
+      ],
+      note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: "rows = len(grid2); cols = len(grid2[0])", en: "rows = len(grid2); cols = len(grid2[0])" },
+    codeLines: [3, 4],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi:
+        "Cách khác: dfs(row,col) trả về BOOLEAN — True nếu toàn bộ đảo (từ ô này lan ra) đều nằm trên đất grid1. " +
+        "Ô ngoài biên/nước trả True 'rỗng' (vacuously true) vì không góp phần phá điều kiện. Ô mang nhãn '¬g1' là đất grid2 KHÔNG nằm trên đất grid1.",
+      en:
+        "Different structure: dfs(row,col) returns a BOOLEAN — True if the entire island (spreading from this cell) lies over grid1 land. " +
+        "Out-of-bounds/water cells vacuously return True since they can't break the condition. Cells tagged '¬g1' are grid2 land NOT over grid1 land.",
+    },
+  });
+
+  function dfs(row, col) {
+    callStack.push(`dfs(${row},${col})`);
+
+    const oob = row < 0 || row >= rows || col < 0 || col >= cols;
+    const isWater = !oob && grid2[row][col] === 0;
+    const stopCond = oob || isWater;
+    snap({
+      title: { vi: `dfs(${row},${col}) — line 6-8: kiểm tra điều kiện dừng`, en: `dfs(${row},${col}) — line 6-8: check stop condition` },
+      cur: oob ? null : [row, col], codeLines: [6, 7, 8],
+      vars: [
+        { name: "row, col", value: `${row}, ${col}` },
+        { name: "out of bounds?", value: oob },
+        { name: "grid2[row][col]", value: oob ? "—" : grid2[row][col] },
+      ],
+      note: {
+        vi: stopCond
+          ? `${oob ? `(${row},${col}) ngoài biên` : `grid2[${row}][${col}]=0 (nước/đã thăm)`} → line 9 return True (không phá điều kiện).`
+          : `(${row},${col}) là đất grid2 chưa thăm → tiếp tục sang line 10.`,
+        en: stopCond
+          ? `${oob ? `(${row},${col}) is out of bounds` : `grid2[${row}][${col}]=0 (water/visited)`} → line 9 return True (cannot break the condition).`
+          : `(${row},${col}) is unvisited grid2 land → continue to line 10.`,
+      },
+    });
+    if (stopCond) {
+      snap({
+        title: { vi: "line 9: return True (vacuously true)", en: "line 9: return True (vacuously true)" },
+        codeLines: [9], vars: [{ name: "returns", value: true }],
+        note: { vi: "Ô ngoài biên hoặc nước không thể làm is_sub_island sai → trả True.", en: "An out-of-bounds or water cell can never make is_sub_island false → return True." },
+      });
+      callStack.pop();
+      return true;
+    }
+
+    // ── Line 10: remember whether this cell sits on grid1 land ─────────
+    const isSubIsland = grid1[row][col] === 1;
+    snap({
+      title: { vi: `line 10: is_sub_island = grid1[${row}][${col}] == 1 → ${isSubIsland}`, en: `line 10: is_sub_island = grid1[${row}][${col}] == 1 → ${isSubIsland}` },
+      cur: [row, col], codeLines: [10],
+      vars: [{ name: "grid1[row][col]", value: grid1[row][col] }, { name: "is_sub_island", value: isSubIsland }],
+      note: {
+        vi: isSubIsland
+          ? `grid1[${row}][${col}]=1 → ô này NẰM TRÊN đất grid1 → is_sub_island=True (chưa kết luận, còn phụ thuộc 4 hướng).`
+          : `grid1[${row}][${col}]=0 → ô này KHÔNG nằm trên đất grid1 → is_sub_island=False → cả đảo chắc chắn KHÔNG phải sub-island.`,
+        en: isSubIsland
+          ? `grid1[${row}][${col}]=1 → this cell IS over grid1 land → is_sub_island=True (not final yet, depends on the 4 directions too).`
+          : `grid1[${row}][${col}]=0 → this cell is NOT over grid1 land → is_sub_island=False → the whole island CANNOT be a sub-island.`,
+      },
+    });
+
+    // ── Line 11: mark visited by flooding to water ──────────────────────
+    const before = grid2.map((r) => r.join("")).join(" | ");
+    grid2[row][col] = 0;
+    visited[row][col] = true;
+    const after = grid2.map((r) => r.join("")).join(" | ");
+    snap({
+      title: { vi: `line 11: grid2[${row}][${col}] = 0  ⟵ 1 bị ghi thành 0`, en: `line 11: grid2[${row}][${col}] = 0  ⟵ 1 overwritten to 0` },
+      cur: [row, col], codeLines: [11],
+      vars: [{ name: "grid2[row][col] trước", value: 1 }, { name: "grid2[row][col] sau", value: 0 }, { name: "grid2 trước", value: before }, { name: "grid2 sau", value: after }],
+      note: {
+        vi: `Đánh dấu (${row},${col}) đã thăm bằng cách "nhấn chìm" nó — dùng chính grid2 làm mảng visited.\ngrid2: ${before}  →  ${after}`,
+        en: `Mark (${row},${col}) visited by "flooding" it — grid2 itself doubles as the visited array.\ngrid2: ${before}  →  ${after}`,
+      },
+    });
+
+    // ── Lines 12-15: recurse in 4 directions, ALWAYS (no short-circuit) ──
+    const DIRS = [
+      { dr: -1, dc: 0, line: 12, varName: "up", label: "dfs(row-1, col)" },
+      { dr: 1, dc: 0, line: 13, varName: "down", label: "dfs(row+1, col)" },
+      { dr: 0, dc: -1, line: 14, varName: "left", label: "dfs(row, col-1)" },
+      { dr: 0, dc: 1, line: 15, varName: "right", label: "dfs(row, col+1)" },
+    ];
+    const results = {};
+    for (const { dr, dc, line, varName, label } of DIRS) {
+      const nr = row + dr;
+      const nc = col + dc;
+      snap({
+        title: { vi: `line ${line}: ${varName} = gọi ${label}`, en: `line ${line}: ${varName} = call ${label}` },
+        cur: [row, col], codeLines: [line],
+        vars: [{ name: "calling", value: `dfs(${nr},${nc})` }],
+        note: {
+          vi: `LƯU Ý: cả 4 hướng đều được gọi (không có short-circuit "and" ở đây) — Python luôn đánh giá cả 4 trước khi return ở line 16.`,
+          en: `NOTE: all 4 directions are always called (no short-circuiting here) — Python evaluates all 4 before the return on line 16.`,
+        },
+      });
+      const childResult = dfs(nr, nc);
+      results[varName] = childResult;
+      snap({
+        title: { vi: `line ${line}: ${varName} = ${childResult}`, en: `line ${line}: ${varName} = ${childResult}` },
+        cur: [row, col], codeLines: [line],
+        vars: [{ name: varName, value: childResult }],
+        note: { vi: `${label} trả về ${childResult}. Gán vào biến ${varName}.`, en: `${label} returned ${childResult}. Stored in ${varName}.` },
+      });
+    }
+
+    // ── Line 16: combine ─────────────────────────────────────────────────
+    const finalResult = isSubIsland && results.up && results.down && results.left && results.right;
+    snap({
+      title: { vi: `line 16: return (is_sub_island and up and down and left and right) → ${finalResult}`, en: `line 16: return (is_sub_island and up and down and left and right) → ${finalResult}` },
+      cur: [row, col], codeLines: [16],
+      vars: [
+        { name: "is_sub_island", value: isSubIsland },
+        { name: "up", value: results.up }, { name: "down", value: results.down },
+        { name: "left", value: results.left }, { name: "right", value: results.right },
+        { name: "returns", value: finalResult },
+      ],
+      note: {
+        vi: `dfs(${row},${col}) = ${isSubIsland} AND ${results.up} AND ${results.down} AND ${results.left} AND ${results.right} = ${finalResult}.`,
+        en: `dfs(${row},${col}) = ${isSubIsland} AND ${results.up} AND ${results.down} AND ${results.left} AND ${results.right} = ${finalResult}.`,
+      },
+    });
+    callStack.pop();
+    return finalResult;
+  }
+
+  snap({
+    title: { vi: "result = 0", en: "result = 0" },
+    codeLines: [17], vars: [],
+    note: { vi: "Khởi tạo bộ đếm sub-island.", en: "Initialize the sub-island counter." },
+  });
+
+  for (let row = 0; row < rows; row++) {
+    snap({
+      title: { vi: `line 18: for row in range(rows) → row = ${row}`, en: `line 18: for row in range(rows) → row = ${row}` },
+      codeLines: [18], vars: [{ name: "row", value: row }],
+      note: { vi: `Quét hàng ${row}.`, en: `Scan row ${row}.` },
+    });
+    for (let col = 0; col < cols; col++) {
+      snap({
+        title: { vi: `line 19: for col in range(cols) → col = ${col}`, en: `line 19: for col in range(cols) → col = ${col}` },
+        cur: [row, col], codeLines: [19], vars: [{ name: "col", value: col }],
+        note: { vi: `Xét ô (${row},${col}).`, en: `Inspect cell (${row},${col}).` },
+      });
+      const isLand = grid2[row][col] === 1;
+      snap({
+        title: { vi: `line 20: grid2[${row}][${col}] == 1? → ${isLand}`, en: `line 20: grid2[${row}][${col}] == 1? → ${isLand}` },
+        cur: [row, col], codeLines: [20],
+        vars: [{ name: "grid2[row][col]", value: grid2[row][col] }, { name: "is land?", value: isLand }],
+        note: {
+          vi: isLand ? `Đất chưa thăm → gọi dfs(${row},${col}) ở line 21.` : `Không phải đất mới → bỏ qua.`,
+          en: isLand ? `Unvisited land → call dfs(${row},${col}) at line 21.` : `Not new land → skip.`,
+        },
+      });
+      if (!isLand) continue;
+      snap({
+        title: { vi: `line 21: if dfs(${row}, ${col})`, en: `line 21: if dfs(${row}, ${col})` },
+        cur: [row, col], codeLines: [21], vars: [],
+        note: { vi: `Gọi dfs từ đảo mới, kiểm tra xem toàn đảo có phải sub-island.`, en: `Call dfs from a new island, checking whether the whole island is a sub-island.` },
+      });
+      const isSub = dfs(row, col);
+      if (isSub) {
+        result += 1;
+        snap({
+          title: { vi: `line 22: result += 1 → ${result}`, en: `line 22: result += 1 → ${result}` },
+          codeLines: [22], vars: [{ name: "result", value: result }],
+          note: { vi: `dfs trả True → đây là một sub-island → result = ${result}.`, en: `dfs returned True → this is a sub-island → result = ${result}.` },
+        });
+      } else {
+        snap({
+          title: { vi: `line 21: dfs trả False → không tăng result`, en: `line 21: dfs returned False → result unchanged` },
+          codeLines: [21], vars: [],
+          note: { vi: `Đảo này có ít nhất 1 ô không nằm trên đất grid1 → không phải sub-island.`, en: `This island has at least one cell not over grid1 land → not a sub-island.` },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: `line 23: return ${result}`, en: `line 23: return ${result}` },
+    final: true, codeLines: [23],
+    vars: [{ name: "answer", value: result }],
+    note: { vi: `Đã quét hết grid2. Số sub-island = ${result}.`, en: `Finished scanning grid2. Number of sub-islands = ${result}.` },
+  });
+
+  return { original, answer: result, steps };
+}
+
 const problems = {
   1254: {
     id: 1254, difficulty: "medium", slug: "number-of-closed-islands",
@@ -1816,8 +2075,24 @@ const problems = {
     statement: tr("Đếm các đảo trong grid2 mà mọi ô đất đều nằm trên ô đất của grid1. Nhập grid1;grid2.", "Count grid2 islands whose every land cell lies on grid1 land. Enter grid1;grid2."),
     defaultInput: "1,1,1,0,0|0,1,1,1,1|0,0,0,0,0|1,0,0,0,0|1,1,0,1,1;1,1,1,0,0|0,0,1,1,1|0,1,0,0,0|1,0,1,1,0|0,1,0,1,0",
     inputKind: "string", inputLabel: tr("grid1;grid2 (hàng cách '|')", "grid1;grid2 (rows separated by '|')"),
-    approach: [tr("Flood fill từng đảo chưa thăm trong grid2.", "Flood-fill each unvisited island in grid2."),tr("is_sub bắt đầu True và thành False nếu bất kỳ ô nào nằm trên nước grid1.", "is_sub starts True and becomes False if any cell lies over grid1 water."),tr("Chỉ tăng count sau khi đã duyệt toàn bộ đảo.", "Increment count only after traversing the entire island.")],
-    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô grid2 được xử lý tối đa một lần.", "Each grid2 cell is processed at most once.") },
+    extraParams: [
+      {
+        key: "approach",
+        label: tr("Cách giải", "Approach"),
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: tr("Cách 1: DFS lặp (stack)", "Approach 1: Iterative DFS (stack)") },
+          { value: "2", label: tr("Cách 2: DFS đệ quy trả về boolean", "Approach 2: Recursive DFS returning a boolean") },
+        ],
+      },
+    ],
+    approach: [
+      tr("Cách 1 (stack): flood fill từng đảo chưa thăm trong grid2. is_sub bắt đầu True và thành False nếu gặp ô ngoài grid1.", "Approach 1 (stack): flood-fill each unvisited island in grid2. is_sub starts True and becomes False if any cell lies over grid1 water."),
+      tr("Cách 2 (đệ quy): dfs(row,col) trả về BOOLEAN. Ô ngoài biên/nước trả True (vacuously true). Kết quả = is_sub_island AND cả 4 hướng.", "Approach 2 (recursive): dfs(row,col) returns a BOOLEAN. Out-of-bounds/water cells return True (vacuously true). Result = is_sub_island AND all 4 directions."),
+    ],
+    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô grid2 được xử lý tối đa một lần; cách 2 dùng call stack đệ quy thay cho stack thủ công.", "Each grid2 cell is processed at most once; approach 2 uses the recursive call stack instead of a manual stack.") },
+    codeLabel: tr("Cách 1: DFS lặp (stack)", "Approach 1: Iterative DFS (stack)"),
     code: [
       "from typing import List", "", "class Solution:",
       "    def countSubIslands(self, grid1: List[List[int]], grid2: List[List[int]]) -> int:",
@@ -1841,7 +2116,35 @@ const problems = {
       "                if is_sub:",
       "                    count += 1",
       "        return count",
-    ], builder: buildSteps1905,
+    ],
+    code2Label: tr("Cách 2: DFS đệ quy trả về boolean", "Approach 2: Recursive DFS returning a boolean"),
+    code2: [
+      "class Solution:",
+      "    def countSubIslands(self, grid1, grid2):",
+      "        rows = len(grid2)",
+      "        cols = len(grid2[0])",
+      "        def dfs(row, col):",
+      "            if (row < 0 or row >= rows or",
+      "                    col < 0 or col >= cols or",
+      "                    grid2[row][col] == 0):",
+      "                return True",
+      "            is_sub_island = grid1[row][col] == 1",
+      "            grid2[row][col] = 0",
+      "            up = dfs(row - 1, col)",
+      "            down = dfs(row + 1, col)",
+      "            left = dfs(row, col - 1)",
+      "            right = dfs(row, col + 1)",
+      "            return (is_sub_island and up and down and left and right)",
+      "        result = 0",
+      "        for row in range(rows):",
+      "            for col in range(cols):",
+      "                if grid2[row][col] == 1:",
+      "                    if dfs(row, col):",
+      "                        result += 1",
+      "        return result",
+    ],
+    builder: buildSteps1905,
+    builder2: buildSteps1905v2,
   },
 };
 
