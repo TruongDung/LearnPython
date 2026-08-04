@@ -2150,21 +2150,144 @@ function buildSteps55(input) {
   return { original: nums, answer, steps };
 }
 
-/** LeetCode 134: Gas Station. */
+/**
+ * LeetCode 134: Gas Station — greedy, line-by-line debugger.
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def canCompleteCircuit(self, gas, cost):
+ *  3          if sum(gas) < sum(cost):
+ *  4              return -1
+ *  5          start = 0
+ *  6          tank = 0
+ *  7          for i in range(len(gas)):
+ *  8              tank += gas[i] - cost[i]
+ *  9              if tank < 0:
+ * 10                  start = i + 1
+ * 11                  tank = 0
+ * 12          return start
+ */
 function buildSteps134(input, params) {
   const gas = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
   const cost = String(params && params.cost || "3,4,5,1,2").split(",").map((s) => Number(s.trim()));
   const n = gas.length;
   const steps = [];
-  steps.push({ title: { vi: "So tổng gas và tổng cost", en: "Compare total gas and total cost" }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [], codeLines: [3], vars: [{ name: "gas", value: `[${gas.join(",")}]` }, { name: "cost", value: `[${cost.join(",")}]` }, { name: "sum(gas)", value: gas.reduce((a, b) => a + b, 0) }, { name: "sum(cost)", value: cost.reduce((a, b) => a + b, 0) }], note: { vi: "Nếu tổng gas < tổng cost → -1. Ngược lại tồn tại 1 điểm xuất phát duy nhất.", en: "If total gas < total cost → -1. Otherwise a unique start exists." } });
-  if (gas.reduce((a, b) => a + b, 0) < cost.reduce((a, b) => a + b, 0)) { steps.push({ title: { vi: "Tổng gas < tổng cost → -1", en: "total gas < total cost → -1" }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [], final: true, codeLines: [4], vars: [{ name: "answer", value: -1 }], note: { vi: "Không đủ xăng để đi hết vòng.", en: "Not enough gas to complete the loop." } }); return { original: gas, answer: -1, steps }; }
-  let start = 0, tank = 0;
-  for (let i = 0; i < n; i++) {
-    tank += gas[i] - cost[i];
-    if (tank < 0) { steps.push({ title: { vi: `i=${i}: tank<0 → start=${i + 1}, reset tank`, en: `i=${i}: tank<0 → start=${i + 1}, reset tank` }, arr: [...gas], sub: gas.map((g, x) => `-${cost[x]}`), highlight: [i], mark: [], codeLines: [5, 6, 7, 8], vars: [{ name: "i", value: i }, { name: "tank", value: tank }, { name: "new start", value: i + 1 }], note: { vi: `Xăng âm tại ${i} → không station nào trong [${start}..${i}] làm điểm xuất phát được → start=${i + 1}.`, en: `Tank negative at ${i} → no station in [${start}..${i}] can be the start → start=${i + 1}.` } }); start = i + 1; tank = 0; }
-    else { steps.push({ title: { vi: `i=${i}: tank += ${gas[i]}-${cost[i]} = ${tank}`, en: `i=${i}: tank += ${gas[i]}-${cost[i]} = ${tank}` }, arr: [...gas], sub: gas.map((g, x) => `-${cost[x]}`), highlight: [i], mark: [start], codeLines: [5, 6], vars: [{ name: "i", value: i }, { name: "tank", value: tank }, { name: "start", value: start }], note: { vi: `Còn xăng (tank=${tank}) → tiếp tục với start=${start}.`, en: `Still have gas (tank=${tank}) → continue with start=${start}.` } }); }
+  const sub = () => gas.map((_, x) => `net ${x}: ${gas[x] - cost[x] >= 0 ? "+" : ""}${gas[x] - cost[x]}`);
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [...gas], sub: sub(),
+      highlight: o.highlight || [], mark: o.mark || [], final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
   }
-  steps.push({ title: { vi: `Đáp án: ${start}`, en: `Answer: ${start}` }, arr: [...gas], sub: gas.map((g, i) => `-${cost[i]}`), highlight: [], mark: [start], final: true, codeLines: [9], vars: [{ name: "answer", value: start }], note: { vi: `Điểm xuất phát duy nhất = station ${start}.`, en: `The unique valid start = station ${start}.` } });
+
+  const sumGas = gas.reduce((a, b) => a + b, 0);
+  const sumCost = cost.reduce((a, b) => a + b, 0);
+
+  // ── Line 3: sum(gas) < sum(cost)? ──────────────────────────────────
+  const insufficient = sumGas < sumCost;
+  snap({
+    title: { vi: `line 3: sum(gas) < sum(cost) → ${insufficient}`, en: `line 3: sum(gas) < sum(cost) → ${insufficient}` },
+    codeLines: [3],
+    vars: [
+      { name: "gas", value: `[${gas.join(",")}]` }, { name: "cost", value: `[${cost.join(",")}]` },
+      { name: "sum(gas)", value: sumGas }, { name: "sum(cost)", value: sumCost },
+    ],
+    note: {
+      vi: insufficient
+        ? `sum(gas)=${sumGas} < sum(cost)=${sumCost} → không đủ xăng cho toàn vòng → line 4 return -1.`
+        : `sum(gas)=${sumGas} ≥ sum(cost)=${sumCost} → đủ xăng, tồn tại DUY NHẤT một điểm xuất phát hợp lệ.`,
+      en: insufficient
+        ? `sum(gas)=${sumGas} < sum(cost)=${sumCost} → not enough gas for the whole loop → line 4 return -1.`
+        : `sum(gas)=${sumGas} ≥ sum(cost)=${sumCost} → enough gas, exactly ONE valid starting station exists.`,
+    },
+  });
+  if (insufficient) {
+    snap({
+      title: { vi: "line 4: return -1", en: "line 4: return -1" },
+      final: true, codeLines: [4], vars: [{ name: "answer", value: -1 }],
+      note: { vi: "Không đủ xăng để đi hết vòng, bất kể xuất phát ở đâu.", en: "Not enough gas to complete the loop, regardless of the starting point." },
+    });
+    return { original: gas, answer: -1, steps };
+  }
+
+  // ── Lines 5-6: start = 0; tank = 0 ─────────────────────────────────
+  let start = 0;
+  let tank = 0;
+  snap({
+    title: { vi: "line 5-6: start = 0; tank = 0", en: "line 5-6: start = 0; tank = 0" },
+    codeLines: [5, 6],
+    vars: [{ name: "start", value: 0 }, { name: "tank", value: 0 }],
+    note: {
+      vi: "start = ứng viên điểm xuất phát hiện tại. tank = xăng dư/thiếu tích lũy từ start tới i.",
+      en: "start = current candidate starting station. tank = accumulated gas surplus/deficit from start to i.",
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    // ── Line 7 ────────────────────────────────────────────────────────
+    snap({
+      title: { vi: `line 7: for i in range(len(gas)) → i = ${i}`, en: `line 7: for i in range(len(gas)) → i = ${i}` },
+      highlight: [i], mark: [start], codeLines: [7],
+      vars: [{ name: "i", value: i }, { name: "start", value: start }, { name: "tank", value: tank }],
+      note: { vi: `Xét station ${i}.`, en: `Inspect station ${i}.` },
+    });
+
+    // ── Line 8: tank += gas[i] - cost[i] ────────────────────────────────
+    const net = gas[i] - cost[i];
+    tank += net;
+    snap({
+      title: { vi: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}`, en: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}` },
+      highlight: [i], mark: [start], codeLines: [8],
+      vars: [{ name: "gas[i]", value: gas[i] }, { name: "cost[i]", value: cost[i] }, { name: "net", value: net }, { name: "tank", value: tank }],
+      note: {
+        vi: `Nhận ${gas[i]} xăng, tốn ${cost[i]} để tới station kế tiếp → net = ${net}. tank = ${tank}.`,
+        en: `Gain ${gas[i]} gas, spend ${cost[i]} reaching the next station → net = ${net}. tank = ${tank}.`,
+      },
+    });
+
+    // ── Line 9: if tank < 0 ─────────────────────────────────────────────
+    const negative = tank < 0;
+    snap({
+      title: { vi: `line 9: tank < 0 → ${negative}`, en: `line 9: tank < 0 → ${negative}` },
+      highlight: [i], mark: [start], codeLines: [9],
+      vars: [{ name: "tank", value: tank }, { name: "negative?", value: negative }],
+      note: {
+        vi: negative
+          ? `tank=${tank} âm → không station nào trong [${start}..${i}] làm điểm xuất phát được → line 10-11 chuyển start.`
+          : `tank=${tank} ≥ 0 → vẫn còn xăng, giữ nguyên start=${start}.`,
+        en: negative
+          ? `tank=${tank} is negative → no station in [${start}..${i}] can be a valid start → lines 10-11 move start.`
+          : `tank=${tank} ≥ 0 → still have gas, keep start=${start}.`,
+      },
+    });
+    if (negative) {
+      // ── Lines 10-11: start = i + 1; tank = 0 ──────────────────────────
+      const oldStart = start;
+      start = i + 1;
+      tank = 0;
+      snap({
+        title: { vi: `line 10-11: start = ${i}+1 = ${start}; tank = 0`, en: `line 10-11: start = ${i}+1 = ${start}; tank = 0` },
+        highlight: [i], mark: start < n ? [start] : [], codeLines: [10, 11],
+        vars: [{ name: "old start", value: oldStart }, { name: "new start", value: start }, { name: "tank (reset)", value: 0 }],
+        note: {
+          vi: `Bỏ toàn bộ [${oldStart}..${i}] làm ứng viên, thử lại từ station ${start}. tank reset về 0.`,
+          en: `Discard the whole [${oldStart}..${i}] range as a candidate, retry from station ${start}. tank resets to 0.`,
+        },
+      });
+    }
+  }
+
+  // ── Line 12: return start ────────────────────────────────────────────
+  snap({
+    title: { vi: `line 12: return start = ${start}`, en: `line 12: return start = ${start}` },
+    mark: [start], final: true, codeLines: [12],
+    vars: [{ name: "answer", value: start }],
+    note: {
+      vi: `Đã quét hết n station. Điểm xuất phát duy nhất hợp lệ = station ${start}.`,
+      en: `Finished scanning all stations. The unique valid starting station = ${start}.`,
+    },
+  });
   return { original: gas, answer: start, steps };
 }
 
@@ -2365,7 +2488,20 @@ module.exports = {
     extraParams: [{ key: "cost", label: { vi: "cost (cách bởi ,)", en: "cost (comma separated)" }, default: "3,4,5,1,2" }],
     approach: [{ vi: "Nếu tổng gas < tổng cost → -1.", en: "If total gas < total cost → -1." }, { vi: "Cộng dồn tank = gas[i]-cost[i].", en: "Accumulate tank = gas[i]-cost[i]." }, { vi: "Khi tank < 0, không station nào trong đoạn vừa qua là start → start = i+1, reset tank.", en: "When tank < 0, no station in that stretch can be the start → start = i+1, reset tank." }],
     complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt greedy.", en: "Single greedy pass." } },
-    code: ["class Solution:", "    def canCompleteCircuit(self, gas, cost):", "        if sum(gas) < sum(cost): return -1", "        start = tank = 0", "        for i in range(len(gas)):", "            tank += gas[i] - cost[i]", "            if tank < 0:", "                start = i + 1; tank = 0", "        return start"],
+    code: [
+      "class Solution:",
+      "    def canCompleteCircuit(self, gas, cost):",
+      "        if sum(gas) < sum(cost):",
+      "            return -1",
+      "        start = 0",
+      "        tank = 0",
+      "        for i in range(len(gas)):",
+      "            tank += gas[i] - cost[i]",
+      "            if tank < 0:",
+      "                start = i + 1",
+      "                tank = 0",
+      "        return start",
+    ],
     builder: buildSteps134,
   },
   179: {
