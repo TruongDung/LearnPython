@@ -844,8 +844,21 @@ const problems = {
     title: tr("Max Area of Island", "Max Area of Island"), titleVi: tr("Diện tích đảo lớn nhất", "Largest island area"),
     statement: tr("Trả về số ô đất trong đảo 4 hướng lớn nhất, hoặc 0 nếu không có đất.", "Return the number of land cells in the largest 4-connected island, or 0 if there is no land."),
     defaultInput: "00100|01110|00100|00011", inputKind: "string", inputLabel: tr("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
-    approach: [tr("Mỗi ô đất chưa thăm bắt đầu một flood fill.", "Each unvisited land cell starts a flood fill."),tr("Mỗi ô pop khỏi stack làm area += 1.", "Each cell popped from the stack increments area."),tr("Sau mỗi đảo, cập nhật max_area.", "After each island, update max_area.")],
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: BFS (iterative stack)", en: "Approach 1: BFS (iterative stack)" } },
+          { value: "2", label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" } },
+        ],
+      },
+    ],
+    approach: [tr("Cách 1 (BFS): dùng stack lặp. Mỗi ô đất pop ra → area++.", "Approach 1 (BFS): iterative stack. Each land cell popped → area++."),tr("Cách 2 (DFS đệ quy): dfs(r,c) return 0 nếu out-of-bounds hoặc nước, else ghi đè 0 và return 1 + dfs 4 hướng.", "Approach 2 (recursive DFS): dfs(r,c) returns 0 if OOB/water, else overwrites cell to 0 and returns 1 + dfs in 4 dirs.")],
     complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: tr("Mỗi ô đất được xử lý tối đa một lần.", "Each land cell is processed at most once.") },
+    codeLabel: { vi: "Cách 1: BFS (iterative stack)", en: "Approach 1: BFS (iterative stack)" },
     code: [
       "from typing import List", "", "class Solution:",
       "    def maxAreaOfIsland(self, grid: List[List[int]]) -> int:",
@@ -868,7 +881,29 @@ const problems = {
       "                            stack.append((next_row, next_col))",
       "                max_area = max(max_area, area)",
       "        return max_area",
-    ], builder: buildSteps695Detailed,
+    ],
+    code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
+    code2: [
+      "class Solution:",
+      "    def maxAreaOfIsland(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        max_area = 0",
+      "        def dfs(r, c):",
+      "            if r < 0 or r == m or c < 0 or c == n:",
+      "                return 0",
+      "            if grid[r][c] == 0:",
+      "                return 0",
+      "            grid[r][c] = 0",
+      "            return 1 + dfs(r+1,c) + dfs(r-1,c) + dfs(r,c+1) + dfs(r,c-1)",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if grid[r][c] == 1:",
+      "                    area = dfs(r, c)",
+      "                    max_area = max(max_area, area)",
+      "        return max_area",
+    ],
+    builder: buildSteps695Detailed,
+    builder2: buildSteps695v2,
   },
   1905: {
     id: 1905, difficulty: "medium", slug: "count-sub-islands",
@@ -905,5 +940,64 @@ const problems = {
     ], builder: buildSteps1905,
   },
 };
+
+// ─── 695 Approach 2: Recursive DFS builder (simplified, fewer steps) ──────────
+function buildSteps695v2(input) {
+  const { valid, grid } = parseBinary(input, true);
+  const steps = [];
+  if (!valid) {
+    steps.push({ title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" }, arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] }, final: true, codeBlock: 2, codeLines: [3], vars: [], note: { vi: "Grid phải gồm 0/1.", en: "Grid must contain 0/1." } });
+    return { original: [], answer: 0, steps };
+  }
+  const rows = grid.length, cols = grid[0].length;
+  const work = grid.map((row) => row.map((v) => Number(v)));
+  const consumed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(cur, bestSet) {
+    return grid.map((row, r) => row.map((cell, c) => {
+      let cls = cell === "0" ? "wall" : "empty";
+      if (consumed[r][c]) cls = "visited";
+      if (bestSet && bestSet.has(key(r, c))) cls = "path";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: cell, cls };
+    }));
+  }
+  function snap(o) {
+    steps.push({ title: o.title, arr: [], codeBlock: 2, bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.best || null) }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note });
+  }
+
+  snap({ title: { vi: `Grid ${rows}×${cols}`, en: `Grid ${rows}×${cols}` }, codeLines: [3, 4], vars: [{ name: "m", value: rows }, { name: "n", value: cols }], note: { vi: "DFS đệ quy: đánh dấu ô bằng grid[r][c]=0.", en: "Recursive DFS: mark cells by grid[r][c]=0." } });
+
+  let maxArea = 0, bestCells = new Set(), curIsland = [];
+
+  function dfs(r, c) {
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return 0;
+    if (work[r][c] === 0) return 0;
+    work[r][c] = 0; consumed[r][c] = true; curIsland.push(key(r, c));
+    snap({ title: { vi: `dfs(${r},${c}): đất → mark 0`, en: `dfs(${r},${c}): land → mark 0` }, cur: [r, c], best: bestCells, codeLines: [10, 11], vars: [{ name: "r,c", value: `${r},${c}` }], note: { vi: `Đánh dấu (${r},${c}) đã thăm, đệ quy 4 hướng.`, en: `Mark (${r},${c}) visited, recurse 4 dirs.` } });
+    return 1 + dfs(r + 1, c) + dfs(r - 1, c) + dfs(r, c + 1) + dfs(r, c - 1);
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (work[r][c] !== 1) continue;
+      curIsland = [];
+      const area = dfs(r, c);
+      const isNew = area > maxArea;
+      maxArea = Math.max(maxArea, area);
+      if (isNew) bestCells = new Set(curIsland);
+      snap({
+        title: { vi: `Đảo tại (${r},${c}): area=${area}, max_area=${maxArea}`, en: `Island at (${r},${c}): area=${area}, max_area=${maxArea}` },
+        best: bestCells, codeLines: [15, 16],
+        vars: [{ name: "area", value: area }, { name: "max_area", value: maxArea }],
+        note: { vi: isNew ? `Kỷ lục mới!` : `Không vượt max.`, en: isNew ? `New record!` : `Doesn't beat max.` },
+      });
+    }
+  }
+
+  snap({ title: { vi: `return ${maxArea}`, en: `return ${maxArea}` }, best: bestCells, final: true, codeLines: [17], vars: [{ name: "answer", value: maxArea }], note: { vi: `Diện tích đảo lớn nhất = ${maxArea}.`, en: `Largest island area = ${maxArea}.` } });
+  return { original: grid, answer: maxArea, steps };
+}
 
 module.exports = problems;

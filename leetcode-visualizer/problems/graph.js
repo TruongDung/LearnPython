@@ -660,6 +660,188 @@ function buildSteps695(input) {
 }
 
 /**
+ * LeetCode 695 Approach 2: Recursive DFS.
+ * Same result — mark visited by setting grid[r][c] = 0 in-place.
+ * Code lines (1-indexed match code2 array):
+ *  1  class Solution:
+ *  2      def maxAreaOfIsland(self, grid):
+ *  3          m, n = len(grid), len(grid[0])
+ *  4          max_area = 0
+ *  5          def dfs(r, c):
+ *  6              if r < 0 or r == m or c < 0 or c == n:
+ *  7                  return 0
+ *  8              if grid[r][c] == 0:
+ *  9                  return 0
+ * 10              grid[r][c] = 0
+ * 11              return 1 + dfs(r+1,c) + dfs(r-1,c) + dfs(r,c+1) + dfs(r,c-1)
+ * 12          for r in range(m):
+ * 13              for c in range(n):
+ * 14                  if grid[r][c] == 1:
+ * 15                      area = dfs(r, c)
+ * 16                      max_area = max(max_area, area)
+ * 17          return max_area
+ */
+function buildSteps695v2(input) {
+  const grid = parseIslandGrid(input);
+  const steps = [];
+
+  if (!grid.length || !grid[0].length || grid.some((row) => row.length !== grid[0].length || row.some((v) => v !== "0" && v !== "1"))) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], codeBlock: 2,
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Grid phải gồm 0/1.", en: "Grid must contain 0/1." },
+    });
+    return { original: grid, answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const work = grid.map((row) => row.map((v) => Number(v)));
+  const consumed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const key = (r, c) => `${r},${c}`;
+
+  function makeCells(current, bestCells = new Set()) {
+    return grid.map((row, r) =>
+      row.map((cell, c) => {
+        let cls = cell === "0" ? "wall" : "empty";
+        let label = cell;
+        if (consumed[r][c]) { cls = "visited"; label = String(islandId[r][c]); }
+        if (bestCells.has(key(r, c))) cls = "path";
+        if (current && current[0] === r && current[1] === c) cls = "current";
+        return { label, cls };
+      })
+    );
+  }
+
+  function pushStep(opts) {
+    steps.push({
+      title: opts.title, arr: [], codeBlock: 2,
+      bfsGrid: { rows, cols, cells: makeCells(opts.current || null, opts.bestCells || new Set()) },
+      highlight: [], mark: [], final: opts.final || false,
+      codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
+    codeLines: [3], vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
+    note: { vi: `Lưới ${rows}×${cols}. DFS đệ quy: đánh dấu ô đất bằng cách ghi đè grid[r][c]=0.`, en: `Grid ${rows}×${cols}. Recursive DFS: mark cells by overwriting grid[r][c]=0.` },
+  });
+
+  let maxArea = 0;
+  pushStep({
+    title: { vi: "max_area = 0", en: "max_area = 0" },
+    codeLines: [4], vars: [{ name: "max_area", value: 0 }],
+    note: { vi: "Khởi tạo kết quả.", en: "Initialize the result." },
+  });
+
+  let island = 0;
+  let bestCells = new Set();
+  let currentIslandCells = [];
+
+  function dfs(r, c) {
+    // boundary
+    const oob = r < 0 || r === rows || c < 0 || c === cols;
+    pushStep({
+      title: { vi: `dfs(${r},${c}): biên?`, en: `dfs(${r},${c}): boundary?` },
+      current: oob ? null : [r, c], bestCells,
+      codeLines: [6],
+      vars: [{ name: "r,c", value: `${r},${c}` }, { name: "out of bounds", value: oob }],
+      note: { vi: oob ? `(${r},${c}) ngoài lưới → return 0.` : `(${r},${c}) trong lưới.`, en: oob ? `(${r},${c}) out of bounds → return 0.` : `(${r},${c}) inside grid.` },
+    });
+    if (oob) {
+      pushStep({ title: { vi: "return 0 (ngoài biên)", en: "return 0 (out of bounds)" }, bestCells, codeLines: [7], vars: [{ name: "returns", value: 0 }], note: { vi: "Ngoài lưới.", en: "Out of bounds." } });
+      return 0;
+    }
+    // water / visited
+    const water = work[r][c] === 0;
+    pushStep({
+      title: { vi: `dfs(${r},${c}): grid[r][c]==0?`, en: `dfs(${r},${c}): grid[r][c]==0?` },
+      current: [r, c], bestCells, codeLines: [8],
+      vars: [{ name: "grid[r][c]", value: work[r][c] }],
+      note: { vi: water ? `(${r},${c}) là nước/đã thăm → return 0.` : `(${r},${c}) là đất.`, en: water ? `(${r},${c}) is water/visited → return 0.` : `(${r},${c}) is land.` },
+    });
+    if (water) {
+      pushStep({ title: { vi: "return 0 (nước/đã thăm)", en: "return 0 (water/visited)" }, current: [r, c], bestCells, codeLines: [9], vars: [{ name: "returns", value: 0 }], note: { vi: "Không đếm.", en: "Not counted." } });
+      return 0;
+    }
+    // mark
+    work[r][c] = 0; consumed[r][c] = true; islandId[r][c] = island;
+    currentIslandCells.push(key(r, c));
+    pushStep({
+      title: { vi: `grid[${r}][${c}] = 0 (mark visited)`, en: `grid[${r}][${c}] = 0 (mark visited)` },
+      current: [r, c], bestCells, codeLines: [10],
+      vars: [{ name: "grid[r][c]", value: 0 }],
+      note: { vi: `Đánh dấu đã thăm. Đệ quy 4 hướng.`, en: `Marked visited. Recurse in 4 directions.` },
+    });
+    // recurse
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const dirLabels = ["r+1,c","r-1,c","r,c+1","r,c-1"];
+    let total = 1;
+    for (let d = 0; d < 4; d++) {
+      const [dr, dc] = dirs[d];
+      const nr = r + dr, nc = c + dc;
+      pushStep({
+        title: { vi: `Gọi dfs(${nr},${nc}) [${dirLabels[d]}]`, en: `Call dfs(${nr},${nc}) [${dirLabels[d]}]` },
+        current: [r, c], bestCells, codeLines: [11],
+        vars: [{ name: "calling", value: `(${nr},${nc})` }, { name: "total so far", value: total }],
+        note: { vi: `Đệ quy vào (${nr},${nc}).`, en: `Recurse into (${nr},${nc}).` },
+      });
+      const child = dfs(nr, nc);
+      total += child;
+      pushStep({
+        title: { vi: `dfs(${nr},${nc}) = ${child} → total = ${total}`, en: `dfs(${nr},${nc}) = ${child} → total = ${total}` },
+        current: [r, c], bestCells, codeLines: [11],
+        vars: [{ name: "returned", value: child }, { name: "total", value: total }],
+        note: { vi: `Cộng ${child} vào total.`, en: `Add ${child} to total.` },
+      });
+    }
+    pushStep({
+      title: { vi: `return ${total}`, en: `return ${total}` },
+      current: [r, c], bestCells, codeLines: [11],
+      vars: [{ name: "returns", value: total }],
+      note: { vi: `dfs(${r},${c}) trả về ${total}.`, en: `dfs(${r},${c}) returns ${total}.` },
+    });
+    return total;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      pushStep({
+        title: { vi: `r=${r}, c=${c}: grid[r][c]=${work[r][c]}`, en: `r=${r}, c=${c}: grid[r][c]=${work[r][c]}` },
+        current: [r, c], bestCells, codeLines: [12, 13, 14],
+        vars: [{ name: "r,c", value: `${r},${c}` }, { name: "grid[r][c]", value: work[r][c] }, { name: "max_area", value: maxArea }],
+        note: { vi: work[r][c] === 1 ? `(${r},${c}) là đất → DFS.` : `(${r},${c}) bỏ qua.`, en: work[r][c] === 1 ? `(${r},${c}) is land → DFS.` : `(${r},${c}) skip.` },
+      });
+      if (work[r][c] !== 1) continue;
+      island++;
+      currentIslandCells = [];
+      const area = dfs(r, c);
+      const isNewMax = area > maxArea;
+      maxArea = Math.max(maxArea, area);
+      if (isNewMax) bestCells = new Set(currentIslandCells);
+      pushStep({
+        title: { vi: `max_area = max(${maxArea - (isNewMax ? 0 : area)}, ${area}) = ${maxArea}`, en: `max_area = max(${maxArea - (isNewMax ? 0 : area)}, ${area}) = ${maxArea}` },
+        bestCells, codeLines: [15, 16],
+        vars: [{ name: "area", value: area }, { name: "max_area", value: maxArea }],
+        note: { vi: isNewMax ? `Đảo #${island} (${area}) là kỷ lục mới.` : `Đảo #${island} (${area}) không vượt max.`, en: isNewMax ? `Island #${island} (${area}) is new record.` : `Island #${island} (${area}) doesn't beat max.` },
+      });
+    }
+  }
+
+  pushStep({
+    title: { vi: `return ${maxArea}`, en: `return ${maxArea}` },
+    bestCells, final: true, codeLines: [17],
+    vars: [{ name: "answer", value: maxArea }],
+    note: { vi: `Diện tích đảo lớn nhất = ${maxArea}.`, en: `Largest island area = ${maxArea}.` },
+  });
+  return { original: grid, answer: maxArea, steps };
+}
+
+/**
  * LeetCode 542: 01 Matrix.
  * Multi-source BFS starts from every zero and assigns each one its shortest
  * distance to a zero. Every trace step maps to exactly one displayed line.
@@ -15950,20 +16132,31 @@ module.exports = {
     defaultInput: "0010000|0111000|0010000|0000111|0000101",
     inputKind: "string",
     inputLabel: { vi: "Grid 0/1 (hàng cách '|')", en: "0/1 grid (rows separated by '|')" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: BFS (iterative stack)", en: "Approach 1: BFS (iterative stack)" } },
+          { value: "2", label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Duyệt từng ô. Nếu là nước hoặc đã thăm thì bỏ qua.", en: "Scan every cell. Skip water and already visited cells." },
-      { vi: "Khi gặp đất chưa thăm, chạy DFS/BFS để gom toàn bộ đảo đó.", en: "When unvisited land is found, run DFS/BFS to collect that whole island." },
-      { vi: "Mỗi ô đất pop ra khỏi stack làm area += 1.", en: "Each land cell popped from the stack increments area by 1." },
-      { vi: "Sau mỗi đảo, cập nhật max_area = max(max_area, area).", en: "After each island, update max_area = max(max_area, area)." },
+      { vi: "Cách 1 (BFS): dùng stack lặp. Mỗi ô đất pop ra → area++, đẩy 4 hàng xóm đất vào stack.", en: "Approach 1 (BFS): use an iterative stack. Each land cell popped → area++, push 4 land neighbors." },
+      { vi: "Cách 2 (DFS đệ quy): gọi dfs(r,c). Nếu ngoài biên hoặc grid[r][c]==0 → return 0. Ghi đè grid[r][c]=0 rồi return 1 + dfs 4 hướng.", en: "Approach 2 (recursive DFS): call dfs(r,c). If out of bounds or grid[r][c]==0 → return 0. Overwrite grid[r][c]=0 then return 1 + dfs in 4 directions." },
     ],
     complexity: {
       time: "O(m·n)",
       space: "O(m·n)",
       note: {
-        vi: "Mỗi ô được thăm tối đa một lần. Stack/visited có thể lên tới O(m·n) trong trường hợp cả grid là đất.",
-        en: "Each cell is visited at most once. Stack/visited can reach O(m·n) if the whole grid is land.",
+        vi: "Mỗi ô được thăm tối đa một lần.",
+        en: "Each cell is visited at most once.",
       },
     },
+    codeLabel: { vi: "Cách 1: BFS (iterative stack)", en: "Approach 1: BFS (iterative stack)" },
     code: [
       "class Solution:",
       "    def maxAreaOfIsland(self, grid):",
@@ -15985,7 +16178,28 @@ module.exports = {
       "                    max_area = max(max_area, area)",
       "        return max_area",
     ],
+    code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
+    code2: [
+      "class Solution:",
+      "    def maxAreaOfIsland(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        max_area = 0",
+      "        def dfs(r, c):",
+      "            if r < 0 or r == m or c < 0 or c == n:",
+      "                return 0",
+      "            if grid[r][c] == 0:",
+      "                return 0",
+      "            grid[r][c] = 0",
+      "            return 1 + dfs(r+1,c) + dfs(r-1,c) + dfs(r,c+1) + dfs(r,c-1)",
+      "        for r in range(m):",
+      "            for c in range(n):",
+      "                if grid[r][c] == 1:",
+      "                    area = dfs(r, c)",
+      "                    max_area = max(max_area, area)",
+      "        return max_area",
+    ],
     builder: buildSteps695,
+    builder2: buildSteps695v2,
   },
   994: {
     id: 994,
@@ -18531,4 +18745,8 @@ module.exports = {
 
 Object.defineProperty(module.exports, "__buildSteps1631Dijkstra", {
   value: buildSteps1631,
+});
+
+Object.defineProperty(module.exports, "__buildSteps695v2", {
+  value: buildSteps695v2,
 });
