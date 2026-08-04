@@ -3535,7 +3535,228 @@ function buildSteps355(rawInput, params) {
   return { answer, steps };
 }
 
+/**
+ * LeetCode 871: Minimum Number of Refueling Stops — greedy + max-heap.
+ * Only ever push a station's fuel onto the heap once its POSITION is
+ * within current reach; then always refuel from the LARGEST fuel amount
+ * available among reachable-but-unused stations.
+ *
+ * Code lines (1-indexed):
+ *  1  import heapq
+ *  2  class Solution:
+ *  3      def minRefuelStops(self, target, start_fuel, stations):
+ *  4          heap = []
+ *  5          fuel = start_fuel
+ *  6          stops = 0
+ *  7          i = 0
+ *  8          n = len(stations)
+ *  9          while fuel < target:
+ * 10              while i < n and stations[i][0] <= fuel:
+ * 11                  heapq.heappush(heap, -stations[i][1])
+ * 12                  i += 1
+ * 13              if not heap:
+ * 14                  return -1
+ * 15              fuel += -heapq.heappop(heap)
+ * 16              stops += 1
+ * 17          return stops
+ */
+function buildSteps871(input, params) {
+  const target = Number(params && params.target !== undefined ? params.target : 100);
+  const startFuel = Array.isArray(input) ? Number(input[0]) : Number(input);
+  const stationsRaw = String(params && params.stations || "10,60;20,30;30,30;60,40")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map((v) => Number(v.trim())));
+  const stations = stationsRaw.filter((s) => s.length === 2 && !s.some(Number.isNaN));
+  const n = stations.length;
+  const steps = [];
+
+  // Bar chart: one bar per station showing its FUEL amount, labeled with position.
+  const arr = stations.map((s) => s[1]);
+  const sub = stations.map((s) => `pos ${s[0]}`);
+  const heapStr = (heap) => heap.length ? `[${heap.map((v) => -v).sort((a, b) => b - a).join(", ")}]` : "[]";
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr, sub,
+      highlight: o.highlight || [], mark: o.mark || [], final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: "heap = []; fuel = start_fuel; stops = 0; i = 0", en: "heap = []; fuel = start_fuel; stops = 0; i = 0" },
+    codeLines: [4, 5, 6, 7, 8],
+    vars: [
+      { name: "target", value: target }, { name: "start_fuel", value: startFuel },
+      { name: "stations (pos,fuel)", value: stations.map(([p, f]) => `(${p},${f})`).join(", ") },
+      { name: "heap", value: "[]" }, { name: "fuel", value: startFuel }, { name: "stops", value: 0 }, { name: "i", value: 0 },
+    ],
+    note: {
+      vi:
+        "Greedy: chỉ đưa vào heap các trạm mà VỊ TRÍ đã trong tầm đi hiện tại (stations[i][0] <= fuel). " +
+        "Khi cần đổ thêm, luôn chọn trạm có NHIỀU XĂNG NHẤT trong số các trạm đã trong tầm nhưng chưa dùng.",
+      en:
+        "Greedy: only push a station onto the heap once its POSITION is within current reach (stations[i][0] <= fuel). " +
+        "When more fuel is needed, always refuel from the station with the MOST fuel among those already reachable but unused.",
+    },
+  });
+
+  const heap = []; // stores -fuel (max-heap via negation)
+  let fuel = startFuel;
+  let stops = 0;
+  let i = 0;
+  let guard = 0;
+
+  while (fuel < target && guard++ < n + 2) {
+    snap({
+      title: { vi: `line 9: fuel(${fuel}) < target(${target}) → True`, en: `line 9: fuel(${fuel}) < target(${target}) → True` },
+      codeLines: [9],
+      vars: [{ name: "fuel", value: fuel }, { name: "target", value: target }, { name: "heap", value: heapStr(heap) }],
+      note: { vi: `Chưa tới đích → cần xét thêm trạm hoặc đổ xăng.`, en: `Haven't reached the target yet → consider more stations or refuel.` },
+    });
+
+    while (i < n && stations[i][0] <= fuel) {
+      snap({
+        title: { vi: `line 10: stations[${i}][0]=${stations[i][0]} <= fuel=${fuel} → True`, en: `line 10: stations[${i}][0]=${stations[i][0]} <= fuel=${fuel} → True` },
+        highlight: [i],
+        codeLines: [10],
+        vars: [{ name: "i", value: i }, { name: "stations[i]", value: `(${stations[i][0]},${stations[i][1]})` }, { name: "fuel", value: fuel }],
+        note: { vi: `Trạm ${i} tại vị trí ${stations[i][0]} đã trong tầm đi (≤ fuel=${fuel}) → đưa vào heap.`, en: `Station ${i} at position ${stations[i][0]} is within reach (≤ fuel=${fuel}) → push it onto the heap.` },
+      });
+      heap.push(-stations[i][1]);
+      heap.sort((a, b) => a - b); // keep min-heap order for display convenience
+      snap({
+        title: { vi: `line 11: heapq.heappush(heap, -${stations[i][1]})`, en: `line 11: heapq.heappush(heap, -${stations[i][1]})` },
+        highlight: [i], mark: [i],
+        codeLines: [11],
+        vars: [{ name: "pushed fuel", value: stations[i][1] }, { name: "heap (max-first)", value: heapStr(heap) }],
+        note: { vi: `Đưa -${stations[i][1]} vào heap (mô phỏng max-heap bằng số âm). heap = ${heapStr(heap)}.`, en: `Push -${stations[i][1]} onto the heap (simulating a max-heap with negation). heap = ${heapStr(heap)}.` },
+      });
+      i += 1;
+      snap({
+        title: { vi: `line 12: i += 1 → i = ${i}`, en: `line 12: i += 1 → i = ${i}` },
+        codeLines: [12],
+        vars: [{ name: "i", value: i }],
+        note: { vi: `Chuyển sang trạm kế tiếp.`, en: `Move to the next station.` },
+      });
+    }
+    if (i < n) {
+      snap({
+        title: { vi: `line 10: stations[${i}][0]=${stations[i][0]} <= fuel=${fuel} → False`, en: `line 10: stations[${i}][0]=${stations[i][0]} <= fuel=${fuel} → False` },
+        highlight: [i],
+        codeLines: [10],
+        vars: [{ name: "i", value: i }, { name: "stations[i]", value: `(${stations[i][0]},${stations[i][1]})` }, { name: "fuel", value: fuel }],
+        note: { vi: `Trạm ${i} còn quá xa (vị trí ${stations[i][0]} > fuel=${fuel}) → dừng vòng trong, sang line 13.`, en: `Station ${i} is too far (position ${stations[i][0]} > fuel=${fuel}) → stop the inner loop, go to line 13.` },
+      });
+    } else {
+      snap({
+        title: { vi: `line 10: i(${i}) < n(${n}) → False`, en: `line 10: i(${i}) < n(${n}) → False` },
+        codeLines: [10],
+        vars: [{ name: "i", value: i }, { name: "n", value: n }],
+        note: { vi: `Đã xét hết mọi trạm → dừng vòng trong, sang line 13.`, en: `All stations have been considered → stop the inner loop, go to line 13.` },
+      });
+    }
+
+    const empty = heap.length === 0;
+    snap({
+      title: { vi: `line 13: not heap → ${empty}`, en: `line 13: not heap → ${empty}` },
+      codeLines: [13],
+      vars: [{ name: "heap", value: heapStr(heap) }, { name: "empty?", value: empty }],
+      note: {
+        vi: empty
+          ? "Heap rỗng: không còn trạm nào trong tầm để đổ thêm xăng → line 14 return -1."
+          : "Heap còn trạm → line 15 chọn trạm nhiều xăng nhất để đổ.",
+        en: empty
+          ? "Heap is empty: no reachable station left to refuel from → line 14 return -1."
+          : "Heap still has stations → line 15 picks the one with the most fuel.",
+      },
+    });
+    if (empty) {
+      snap({
+        title: { vi: "line 14: return -1", en: "line 14: return -1" },
+        final: true, codeLines: [14],
+        vars: [{ name: "answer", value: -1 }],
+        note: { vi: `Không thể tới target=${target} dù dùng hết mọi trạm trong tầm.`, en: `Cannot reach target=${target} even using every reachable station.` },
+      });
+      return { original: { target, startFuel, stations }, answer: -1, steps };
+    }
+
+    const best = -heap.shift();
+    const oldFuel = fuel;
+    fuel += best;
+    stops += 1;
+    snap({
+      title: { vi: `line 15: fuel += ${best} → fuel = ${fuel}`, en: `line 15: fuel += ${best} → fuel = ${fuel}` },
+      codeLines: [15],
+      vars: [{ name: "popped (max fuel)", value: best }, { name: "fuel (before)", value: oldFuel }, { name: "fuel (after)", value: fuel }, { name: "heap (remaining)", value: heapStr(heap) }],
+      note: { vi: `Lấy trạm nhiều xăng nhất (=${best}) trong heap, đổ vào bình: fuel = ${oldFuel} + ${best} = ${fuel}.`, en: `Pop the station with the most fuel (=${best}) from the heap, refuel: fuel = ${oldFuel} + ${best} = ${fuel}.` },
+    });
+    snap({
+      title: { vi: `line 16: stops += 1 → stops = ${stops}`, en: `line 16: stops += 1 → stops = ${stops}` },
+      codeLines: [16],
+      vars: [{ name: "stops", value: stops }],
+      note: { vi: `Đã dừng đổ xăng ${stops} lần.`, en: `Refueled ${stops} time(s) so far.` },
+    });
+  }
+
+  snap({
+    title: { vi: `line 17: return stops = ${stops}`, en: `line 17: return stops = ${stops}` },
+    final: true, codeLines: [17],
+    vars: [{ name: "answer", value: stops }, { name: "final fuel", value: fuel }],
+    note: { vi: `fuel=${fuel} ≥ target=${target} → đã tới đích với ${stops} lần đổ xăng.`, en: `fuel=${fuel} ≥ target=${target} → reached the target with ${stops} refuel stop(s).` },
+  });
+  return { original: { target, startFuel, stations }, answer: stops, steps };
+}
+
 module.exports = {
+  871: {
+    id: 871, difficulty: "hard", slug: "minimum-number-of-refueling-stops",
+    category: HEAP_CAT,
+    title: { vi: "Minimum Number of Refueling Stops", en: "Minimum Number of Refueling Stops" },
+    titleVi: { vi: "Số lần đổ xăng tối thiểu (greedy + max-heap)", en: "Minimum refueling stops (greedy + max-heap)" },
+    statement: {
+      vi: "Xe khởi đầu với start_fuel xăng, cần đi target đơn vị. Mỗi trạm [vị trí, xăng] cho phép đổ đầy thêm 'xăng' khi xe tới đó. Trả về số lần đổ xăng tối thiểu, hoặc -1 nếu không tới được. Nhập start_fuel; target và stations trong tham số.",
+      en: "A car starts with start_fuel and must travel target units. Each station [position, fuel] lets you add 'fuel' when you reach it. Return the minimum number of refueling stops, or -1 if unreachable. Enter start_fuel; target and stations as parameters.",
+    },
+    defaultInput: [10],
+    inputKind: "positive",
+    inputLabel: { vi: "start_fuel", en: "start_fuel" },
+    singleInput: true,
+    extraParams: [
+      { key: "target", label: { vi: "target", en: "target" }, default: 100 },
+      { key: "stations", label: { vi: "stations (pos,fuel cách nhau ;)", en: "stations (pos,fuel separated by ;)" }, default: "10,60;20,30;30,30;60,40", type: "string" },
+    ],
+    approach: [
+      { vi: "Duyệt trạm theo thứ tự vị trí tăng dần; chỉ đưa vào heap khi vị trí trạm ≤ fuel hiện tại (đã trong tầm).", en: "Scan stations in increasing position order; only push a station once its position ≤ current fuel (already reachable)." },
+      { vi: "Khi fuel < target, lấy trạm có NHIỀU XĂNG NHẤT trong heap để đổ (greedy: trì hoãn quyết định, chọn tốt nhất khi cần).", en: "When fuel < target, pop the station with the MOST fuel from the heap to refuel (greedy: delay the decision, pick the best when needed)." },
+      { vi: "Heap rỗng mà chưa tới target → không thể tới đích → -1.", en: "Empty heap before reaching target → unreachable → -1." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: { vi: "Mỗi trạm push/pop tối đa 1 lần trên heap kích thước O(n).", en: "Each station is pushed/popped at most once on an O(n) heap." },
+    },
+    code: [
+      "import heapq",
+      "class Solution:",
+      "    def minRefuelStops(self, target, start_fuel, stations):",
+      "        heap = []",
+      "        fuel = start_fuel",
+      "        stops = 0",
+      "        i = 0",
+      "        n = len(stations)",
+      "        while fuel < target:",
+      "            while i < n and stations[i][0] <= fuel:",
+      "                heapq.heappush(heap, -stations[i][1])",
+      "                i += 1",
+      "            if not heap:",
+      "                return -1",
+      "            fuel += -heapq.heappop(heap)",
+      "            stops += 1",
+      "        return stops",
+    ],
+    builder: buildSteps871,
+  },
   218: {
     id: 218,
     difficulty: "hard",
