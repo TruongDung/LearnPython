@@ -993,14 +993,21 @@ function buildSteps695v2(input) {
   let scanR = null;
   let scanC = null;
 
+  // label = LIVE value of grid[r][c] so the viewer literally sees 1 → 0
+  // happen when the code executes `grid[r][c] = 0` (line 10).
+  // meta  = which island absorbed the cell, kept as a small sub-label.
   function makeCells(cur, bestSet) {
-    return grid.map((row, r) => row.map((cell, c) => {
-      let cls = cell === "0" ? "wall" : "empty";
-      let label = cell;
-      if (consumed[r][c]) { cls = "visited"; label = String(islandId[r][c]); }
+    return grid.map((row, r) => row.map((origCell, c) => {
+      const live = String(work[r][c]);
+      let cls = origCell === "0" ? "wall" : "empty";
+      let meta = "";
+      if (consumed[r][c]) {
+        cls = "visited";
+        meta = `#${islandId[r][c]}`;
+      }
       if (bestSet && bestSet.has(key(r, c))) cls = "path";
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label, cls };
+      return { label: live, meta, cls };
     }));
   }
 
@@ -1035,10 +1042,16 @@ function buildSteps695v2(input) {
   snap({
     title: { vi: "max_area = 0", en: "max_area = 0" },
     codeLines: [4],
-    vars: [],
+    vars: [{ name: "grid (live)", value: work.map((row) => row.join("")).join(" | ") }],
     note: {
-      vi: "DFS đệ quy: mỗi lần gặp đất, ghi đè grid[r][c]=0 để không đếm lại, rồi cộng kết quả 4 hướng.",
-      en: "Recursive DFS: on land, overwrite grid[r][c]=0 so it is not recounted, then sum the 4 directions.",
+      vi:
+        "DFS đệ quy: mỗi lần gặp đất, ghi đè grid[r][c]=0 để không đếm lại, rồi cộng kết quả 4 hướng.\n" +
+        "Số lớn trong mỗi ô là GIÁ TRỊ THẬT của grid[r][c] — bạn sẽ thấy nó đổi 1 → 0 ngay khi code chạy line 10. " +
+        "Nhãn nhỏ #N cho biết ô đó bị hút vào đảo số mấy.",
+      en:
+        "Recursive DFS: on land, overwrite grid[r][c]=0 so it is not recounted, then sum the 4 directions.\n" +
+        "The big number in each cell is the LIVE value of grid[r][c] — you will watch it flip 1 → 0 the moment line 10 runs. " +
+        "The small #N tag shows which island absorbed that cell.",
     },
   });
 
@@ -1089,16 +1102,22 @@ function buildSteps695v2(input) {
       codeLines: [8],
       vars: [
         { name: "r, c", value: `${r}, ${c}` },
-        { name: "grid[r][c]", value: work[r][c] },
+        { name: "grid[r][c] (live)", value: work[r][c] },
+        { name: "grid gốc", value: grid[r][c] },
+        { name: "đã bị ghi đè?", value: consumed[r][c] },
         { name: "is water/visited?", value: water },
       ],
       note: {
         vi: water
-          ? `grid[${r}][${c}] = 0 → nước HOẶC đã thăm (đã bị ghi đè) → line 9.`
-          : `grid[${r}][${c}] = 1 → đất CHƯA thăm → sang line 10.`,
+          ? (consumed[r][c]
+              ? `grid[${r}][${c}] = 0 vì ô này ĐÃ THĂM (gốc là 1, bị line 10 ghi thành 0) → line 9 trả 0, chống đếm trùng.`
+              : `grid[${r}][${c}] = 0 vì đây là NƯỚC ngay từ đầu → line 9 trả 0.`)
+          : `grid[${r}][${c}] = 1 → đất CHƯA thăm → sang line 10 để ghi đè thành 0.`,
         en: water
-          ? `grid[${r}][${c}] = 0 → water OR already visited (overwritten) → line 9.`
-          : `grid[${r}][${c}] = 1 → UNVISITED land → go to line 10.`,
+          ? (consumed[r][c]
+              ? `grid[${r}][${c}] = 0 because this cell was ALREADY VISITED (originally 1, set to 0 by line 10) → line 9 returns 0, preventing a recount.`
+              : `grid[${r}][${c}] = 0 because it is WATER from the start → line 9 returns 0.`)
+          : `grid[${r}][${c}] = 1 → UNVISITED land → go to line 10 to overwrite it to 0.`,
       },
     });
     if (water) {
@@ -1114,23 +1133,34 @@ function buildSteps695v2(input) {
       return 0;
     }
 
-    // ── Line 10: mark visited in-place ───────────────────────────────
+    // ── Line 10: mark visited in-place (mutate the live grid) ────────
+    const gridBefore = work.map((row) => row.join("")).join(" | ");
     work[r][c] = 0;
     consumed[r][c] = true;
     islandId[r][c] = island;
     curIsland.push(key(r, c));
+    const gridAfter = work.map((row) => row.join("")).join(" | ");
     snap({
-      title: { vi: `line 10: grid[${r}][${c}] = 0 (đánh dấu đã thăm)`, en: `line 10: grid[${r}][${c}] = 0 (mark visited)` },
+      title: { vi: `line 10: grid[${r}][${c}] = 0  ⟵ 1 bị ghi thành 0`, en: `line 10: grid[${r}][${c}] = 0  ⟵ 1 overwritten to 0` },
       cur: [r, c],
       codeLines: [10],
       vars: [
-        { name: "grid[r][c] (sau)", value: 0 },
+        { name: "grid[r][c] trước", value: 1 },
+        { name: "grid[r][c] sau", value: 0 },
+        { name: "grid trước", value: gridBefore },
+        { name: "grid sau", value: gridAfter },
         { name: "island #", value: island },
         { name: "cells in island", value: curIsland.length },
       ],
       note: {
-        vi: `Ghi đè 1 → 0 để lần sau line 8 sẽ trả về 0. Ô (${r},${c}) thuộc đảo #${island}.`,
-        en: `Overwrite 1 → 0 so line 8 returns 0 next time. Cell (${r},${c}) belongs to island #${island}.`,
+        vi:
+          `Ô (${r},${c}) vừa đổi 1 → 0 ngay trên lưới. Đây là cách code đánh dấu "đã thăm" mà không cần mảng visited riêng:\n` +
+          `lần sau nếu quay lại (${r},${c}), line 8 thấy grid[r][c] == 0 và trả về 0 luôn.\n` +
+          `grid: ${gridBefore}  →  ${gridAfter}`,
+        en:
+          `Cell (${r},${c}) just flipped 1 → 0 in the grid. This is how the code marks "visited" without a separate visited set:\n` +
+          `if we ever come back to (${r},${c}), line 8 sees grid[r][c] == 0 and returns 0 immediately.\n` +
+          `grid: ${gridBefore}  →  ${gridAfter}`,
       },
     });
 
