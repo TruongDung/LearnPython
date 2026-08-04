@@ -941,62 +941,353 @@ const problems = {
   },
 };
 
-// ─── 695 Approach 2: Recursive DFS builder (simplified, fewer steps) ──────────
+// ─── 695 Approach 2: Recursive DFS — detailed line-by-line debugger ───────────
+// code2 lines (1-indexed):
+//  1  class Solution:
+//  2      def maxAreaOfIsland(self, grid):
+//  3          m, n = len(grid), len(grid[0])
+//  4          max_area = 0
+//  5          def dfs(r, c):
+//  6              if r < 0 or r == m or c < 0 or c == n:
+//  7                  return 0
+//  8              if grid[r][c] == 0:
+//  9                  return 0
+// 10              grid[r][c] = 0
+// 11              return 1 + dfs(r+1,c) + dfs(r-1,c) + dfs(r,c+1) + dfs(r,c-1)
+// 12          for r in range(m):
+// 13              for c in range(n):
+// 14                  if grid[r][c] == 1:
+// 15                      area = dfs(r, c)
+// 16                      max_area = max(max_area, area)
+// 17          return max_area
 function buildSteps695v2(input) {
   const { valid, grid } = parseBinary(input, true);
   const steps = [];
   if (!valid) {
-    steps.push({ title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" }, arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] }, final: true, codeBlock: 2, codeLines: [3], vars: [], note: { vi: "Grid phải gồm 0/1.", en: "Grid must contain 0/1." } });
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], codeBlock: 2,
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: { vi: "Grid phải gồm 0/1. Ví dụ: 00100|01110|00100|00011.", en: "Grid must contain 0/1. Example: 00100|01110|00100|00011." },
+    });
     return { original: [], answer: 0, steps };
   }
-  const rows = grid.length, cols = grid[0].length;
+
+  const rows = grid.length;
+  const cols = grid[0].length;
   const work = grid.map((row) => row.map((v) => Number(v)));
   const consumed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
   const key = (r, c) => `${r},${c}`;
+
+  // Call stack of "dfs(r,c)" frames for the debug panel.
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
+
+  let maxArea = 0;
+  let island = 0;
+  let bestCells = new Set();
+  let curIsland = [];
+  let scanR = null;
+  let scanC = null;
 
   function makeCells(cur, bestSet) {
     return grid.map((row, r) => row.map((cell, c) => {
       let cls = cell === "0" ? "wall" : "empty";
-      if (consumed[r][c]) cls = "visited";
+      let label = cell;
+      if (consumed[r][c]) { cls = "visited"; label = String(islandId[r][c]); }
       if (bestSet && bestSet.has(key(r, c))) cls = "path";
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label: cell, cls };
+      return { label, cls };
     }));
   }
+
   function snap(o) {
-    steps.push({ title: o.title, arr: [], codeBlock: 2, bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.best || null) }, highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note });
+    steps.push({
+      title: o.title,
+      arr: [],
+      codeBlock: 2,
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.best || bestCells) },
+      highlight: [], mark: [],
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+        { name: "depth", value: callStack.length },
+        { name: "max_area", value: maxArea },
+      ],
+      note: o.note,
+    });
   }
 
-  snap({ title: { vi: `Grid ${rows}×${cols}`, en: `Grid ${rows}×${cols}` }, codeLines: [3, 4], vars: [{ name: "m", value: rows }, { name: "n", value: cols }], note: { vi: "DFS đệ quy: đánh dấu ô bằng grid[r][c]=0.", en: "Recursive DFS: mark cells by grid[r][c]=0." } });
+  // ── Line 3 ──────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "m, n = len(grid), len(grid[0])", en: "m, n = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "m", value: rows }, { name: "n", value: cols }],
+    note: { vi: `Lưới ${rows} dòng × ${cols} cột.`, en: `Grid has ${rows} rows × ${cols} cols.` },
+  });
 
-  let maxArea = 0, bestCells = new Set(), curIsland = [];
+  // ── Line 4 ──────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "max_area = 0", en: "max_area = 0" },
+    codeLines: [4],
+    vars: [],
+    note: {
+      vi: "DFS đệ quy: mỗi lần gặp đất, ghi đè grid[r][c]=0 để không đếm lại, rồi cộng kết quả 4 hướng.",
+      en: "Recursive DFS: on land, overwrite grid[r][c]=0 so it is not recounted, then sum the 4 directions.",
+    },
+  });
+
+  const DIRS = [
+    { dr: 1, dc: 0, label: "dfs(r+1, c)" },
+    { dr: -1, dc: 0, label: "dfs(r-1, c)" },
+    { dr: 0, dc: 1, label: "dfs(r, c+1)" },
+    { dr: 0, dc: -1, label: "dfs(r, c-1)" },
+  ];
 
   function dfs(r, c) {
-    if (r < 0 || r >= rows || c < 0 || c >= cols) return 0;
-    if (work[r][c] === 0) return 0;
-    work[r][c] = 0; consumed[r][c] = true; curIsland.push(key(r, c));
-    snap({ title: { vi: `dfs(${r},${c}): đất → mark 0`, en: `dfs(${r},${c}): land → mark 0` }, cur: [r, c], best: bestCells, codeLines: [10, 11], vars: [{ name: "r,c", value: `${r},${c}` }], note: { vi: `Đánh dấu (${r},${c}) đã thăm, đệ quy 4 hướng.`, en: `Mark (${r},${c}) visited, recurse 4 dirs.` } });
-    return 1 + dfs(r + 1, c) + dfs(r - 1, c) + dfs(r, c + 1) + dfs(r, c - 1);
+    callStack.push(`dfs(${r},${c})`);
+
+    // ── Line 6: boundary guard ───────────────────────────────────────
+    const oob = r < 0 || r === rows || c < 0 || c === cols;
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 6: kiểm tra biên`, en: `dfs(${r},${c}) — line 6: boundary check` },
+      cur: oob ? null : [r, c],
+      codeLines: [6],
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "r < 0 or r == m", value: `${r} < 0 or ${r} == ${rows} → ${r < 0 || r === rows}` },
+        { name: "c < 0 or c == n", value: `${c} < 0 or ${c} == ${cols} → ${c < 0 || c === cols}` },
+        { name: "out of bounds?", value: oob },
+      ],
+      note: {
+        vi: oob ? `(${r},${c}) nằm NGOÀI lưới → đi vào line 7.` : `(${r},${c}) nằm trong lưới → bỏ qua line 7, sang line 8.`,
+        en: oob ? `(${r},${c}) is OUTSIDE the grid → go to line 7.` : `(${r},${c}) is inside → skip line 7, go to line 8.`,
+      },
+    });
+    if (oob) {
+      // ── Line 7 ────────────────────────────────────────────────────
+      snap({
+        title: { vi: `line 7: return 0 (ngoài biên)`, en: `line 7: return 0 (out of bounds)` },
+        codeLines: [7],
+        vars: [{ name: "returns", value: 0 }],
+        note: { vi: `Ô ngoài lưới không đóng góp diện tích. Quay về frame gọi.`, en: `Out-of-bounds contributes no area. Return to caller frame.` },
+      });
+      callStack.pop();
+      return 0;
+    }
+
+    // ── Line 8: water / already visited ──────────────────────────────
+    const water = work[r][c] === 0;
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 8: grid[r][c] == 0?`, en: `dfs(${r},${c}) — line 8: grid[r][c] == 0?` },
+      cur: [r, c],
+      codeLines: [8],
+      vars: [
+        { name: "r, c", value: `${r}, ${c}` },
+        { name: "grid[r][c]", value: work[r][c] },
+        { name: "is water/visited?", value: water },
+      ],
+      note: {
+        vi: water
+          ? `grid[${r}][${c}] = 0 → nước HOẶC đã thăm (đã bị ghi đè) → line 9.`
+          : `grid[${r}][${c}] = 1 → đất CHƯA thăm → sang line 10.`,
+        en: water
+          ? `grid[${r}][${c}] = 0 → water OR already visited (overwritten) → line 9.`
+          : `grid[${r}][${c}] = 1 → UNVISITED land → go to line 10.`,
+      },
+    });
+    if (water) {
+      // ── Line 9 ────────────────────────────────────────────────────
+      snap({
+        title: { vi: `line 9: return 0 (nước / đã thăm)`, en: `line 9: return 0 (water / visited)` },
+        cur: [r, c],
+        codeLines: [9],
+        vars: [{ name: "returns", value: 0 }],
+        note: { vi: `Không đếm lại ô này — đây chính là cơ chế chống đếm trùng.`, en: `Do not recount this cell — this is the dedup mechanism.` },
+      });
+      callStack.pop();
+      return 0;
+    }
+
+    // ── Line 10: mark visited in-place ───────────────────────────────
+    work[r][c] = 0;
+    consumed[r][c] = true;
+    islandId[r][c] = island;
+    curIsland.push(key(r, c));
+    snap({
+      title: { vi: `line 10: grid[${r}][${c}] = 0 (đánh dấu đã thăm)`, en: `line 10: grid[${r}][${c}] = 0 (mark visited)` },
+      cur: [r, c],
+      codeLines: [10],
+      vars: [
+        { name: "grid[r][c] (sau)", value: 0 },
+        { name: "island #", value: island },
+        { name: "cells in island", value: curIsland.length },
+      ],
+      note: {
+        vi: `Ghi đè 1 → 0 để lần sau line 8 sẽ trả về 0. Ô (${r},${c}) thuộc đảo #${island}.`,
+        en: `Overwrite 1 → 0 so line 8 returns 0 next time. Cell (${r},${c}) belongs to island #${island}.`,
+      },
+    });
+
+    // ── Line 11: return 1 + 4 recursive calls ────────────────────────
+    let total = 1;
+    snap({
+      title: { vi: `line 11: bắt đầu tính "1 + dfs(...)×4", total = 1`, en: `line 11: start evaluating "1 + dfs(...)×4", total = 1` },
+      cur: [r, c],
+      codeLines: [11],
+      vars: [{ name: "total (chính ô này)", value: total }],
+      note: {
+        vi: `Ô (${r},${c}) tự đóng góp 1. Python sẽ lần lượt gọi 4 dfs con và cộng kết quả.`,
+        en: `Cell (${r},${c}) contributes 1 itself. Python now evaluates the 4 child dfs calls left-to-right and sums them.`,
+      },
+    });
+
+    for (const { dr, dc, label } of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      snap({
+        title: { vi: `line 11: gọi ${label} → dfs(${nr},${nc})`, en: `line 11: call ${label} → dfs(${nr},${nc})` },
+        cur: [r, c],
+        codeLines: [11],
+        vars: [
+          { name: "from", value: `(${r},${c})` },
+          { name: "calling", value: `dfs(${nr},${nc})` },
+          { name: "total so far", value: total },
+        ],
+        note: { vi: `Đẩy frame dfs(${nr},${nc}) lên call stack.`, en: `Push frame dfs(${nr},${nc}) onto the call stack.` },
+      });
+
+      const child = dfs(nr, nc);
+      total += child;
+
+      snap({
+        title: { vi: `line 11: ${label} trả ${child} → total = ${total}`, en: `line 11: ${label} returned ${child} → total = ${total}` },
+        cur: [r, c],
+        codeLines: [11],
+        vars: [
+          { name: "returned", value: child },
+          { name: "total", value: total },
+        ],
+        note: { vi: `Quay lại frame dfs(${r},${c}). Cộng ${child} → total = ${total}.`, en: `Back in frame dfs(${r},${c}). Add ${child} → total = ${total}.` },
+      });
+    }
+
+    snap({
+      title: { vi: `line 11: return ${total} từ dfs(${r},${c})`, en: `line 11: return ${total} from dfs(${r},${c})` },
+      cur: [r, c],
+      codeLines: [11],
+      vars: [{ name: "returns", value: total }],
+      note: {
+        vi: `dfs(${r},${c}) xong: 1 + tổng 4 hướng = ${total}. Pop frame khỏi call stack.`,
+        en: `dfs(${r},${c}) done: 1 + sum of 4 directions = ${total}. Pop frame off the call stack.`,
+      },
+    });
+    callStack.pop();
+    return total;
   }
 
+  // ── Lines 12–16: outer scan ─────────────────────────────────────────
   for (let r = 0; r < rows; r++) {
+    scanR = r;
+    snap({
+      title: { vi: `line 12: for r in range(m) → r = ${r}`, en: `line 12: for r in range(m) → r = ${r}` },
+      codeLines: [12],
+      vars: [{ name: "r", value: r }],
+      note: { vi: `Quét dòng ${r}.`, en: `Scan row ${r}.` },
+    });
+
     for (let c = 0; c < cols; c++) {
-      if (work[r][c] !== 1) continue;
+      scanC = c;
+      snap({
+        title: { vi: `line 13: for c in range(n) → c = ${c}`, en: `line 13: for c in range(n) → c = ${c}` },
+        cur: [r, c],
+        codeLines: [13],
+        vars: [{ name: "r, c", value: `${r}, ${c}` }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+      });
+
+      const isLand = work[r][c] === 1;
+      snap({
+        title: { vi: `line 14: grid[${r}][${c}] == 1?`, en: `line 14: grid[${r}][${c}] == 1?` },
+        cur: [r, c],
+        codeLines: [14],
+        vars: [
+          { name: "grid[r][c]", value: work[r][c] },
+          { name: "is land?", value: isLand },
+        ],
+        note: {
+          vi: isLand
+            ? `(${r},${c}) là đất chưa thăm → bắt đầu đảo mới, gọi dfs (line 15).`
+            : `(${r},${c}) là nước hoặc đã thăm → bỏ qua, sang ô tiếp theo.`,
+          en: isLand
+            ? `(${r},${c}) is unvisited land → start a new island, call dfs (line 15).`
+            : `(${r},${c}) is water or visited → skip to the next cell.`,
+        },
+      });
+      if (!isLand) continue;
+
+      island++;
       curIsland = [];
+
+      snap({
+        title: { vi: `line 15: area = dfs(${r}, ${c}) — vào đảo #${island}`, en: `line 15: area = dfs(${r}, ${c}) — enter island #${island}` },
+        cur: [r, c],
+        codeLines: [15],
+        vars: [{ name: "island #", value: island }],
+        note: { vi: `Gọi DFS gốc để đo diện tích đảo #${island}.`, en: `Call the root DFS to measure island #${island}.` },
+      });
+
       const area = dfs(r, c);
+
+      snap({
+        title: { vi: `line 15: area = ${area}`, en: `line 15: area = ${area}` },
+        codeLines: [15],
+        vars: [{ name: "area", value: area }, { name: "island #", value: island }],
+        note: { vi: `DFS gốc trả về: đảo #${island} có ${area} ô.`, en: `Root DFS returned: island #${island} has ${area} cells.` },
+      });
+
+      const prevMax = maxArea;
       const isNew = area > maxArea;
       maxArea = Math.max(maxArea, area);
       if (isNew) bestCells = new Set(curIsland);
+
       snap({
-        title: { vi: `Đảo tại (${r},${c}): area=${area}, max_area=${maxArea}`, en: `Island at (${r},${c}): area=${area}, max_area=${maxArea}` },
-        best: bestCells, codeLines: [15, 16],
-        vars: [{ name: "area", value: area }, { name: "max_area", value: maxArea }],
-        note: { vi: isNew ? `Kỷ lục mới!` : `Không vượt max.`, en: isNew ? `New record!` : `Doesn't beat max.` },
+        title: { vi: `line 16: max_area = max(${prevMax}, ${area}) = ${maxArea}`, en: `line 16: max_area = max(${prevMax}, ${area}) = ${maxArea}` },
+        codeLines: [16],
+        vars: [
+          { name: "max_area (trước)", value: prevMax },
+          { name: "area", value: area },
+          { name: "new record?", value: isNew },
+        ],
+        note: {
+          vi: isNew
+            ? `Đảo #${island} (${area} ô) vượt kỷ lục cũ (${prevMax}) → tô xanh làm đảo lớn nhất hiện tại.`
+            : `Đảo #${island} (${area} ô) không vượt max_area = ${maxArea}.`,
+          en: isNew
+            ? `Island #${island} (${area} cells) beats the old record (${prevMax}) → highlighted as current largest.`
+            : `Island #${island} (${area} cells) does not beat max_area = ${maxArea}.`,
+        },
       });
     }
   }
 
-  snap({ title: { vi: `return ${maxArea}`, en: `return ${maxArea}` }, best: bestCells, final: true, codeLines: [17], vars: [{ name: "answer", value: maxArea }], note: { vi: `Diện tích đảo lớn nhất = ${maxArea}.`, en: `Largest island area = ${maxArea}.` } });
+  // ── Line 17 ─────────────────────────────────────────────────────────
+  snap({
+    title: { vi: `line 17: return ${maxArea}`, en: `line 17: return ${maxArea}` },
+    final: true,
+    codeLines: [17],
+    vars: [{ name: "answer", value: maxArea }, { name: "islands found", value: island }],
+    note: {
+      vi: `Đã quét hết ${rows}×${cols} ô, tìm được ${island} đảo. Diện tích lớn nhất = ${maxArea} (tô xanh).`,
+      en: `Scanned all ${rows}×${cols} cells, found ${island} island(s). Largest area = ${maxArea} (highlighted).`,
+    },
+  });
+
   return { original: grid, answer: maxArea, steps };
 }
 
