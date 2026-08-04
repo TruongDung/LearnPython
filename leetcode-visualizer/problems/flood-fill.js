@@ -940,13 +940,19 @@ function buildSteps463v2(input) {
   const contrib = Array.from({ length: rows }, () => Array(cols).fill(0));
   const scanned = Array.from({ length: rows }, () => Array(cols).fill(false));
 
-  function makeCells(cur, peer) {
+  // meta on a land cell = Σ<net edges so far>. The neighbor currently being
+  // read (grid[i][j-1] on line 10, grid[i-1][j] on line 12) is tagged with a
+  // small arrow so it's unmistakable which cell the code is comparing against.
+  function makeCells(cur, peer, peerLabel) {
     return grid.map((row, r) => row.map((v, c) => {
       let cls = v === 0 ? "wall" : "empty";
       if (v === 1 && scanned[r][c]) cls = "visited";
-      if (peer && peer[0] === r && peer[1] === c) cls = "queued";
+      let meta = v === 1 ? `Σ${contrib[r][c]}` : "";
+      if (peer && peer[0] === r && peer[1] === c) {
+        cls = "neighbor";
+        meta = peerLabel ? `${peerLabel} ${meta}`.trim() : meta;
+      }
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      const meta = v === 1 ? `Σ${contrib[r][c]}` : "";
       return { label: String(v), meta, cls };
     }));
   }
@@ -959,7 +965,7 @@ function buildSteps463v2(input) {
   function snap(o) {
     steps.push({
       title: o.title, arr: [], codeBlock: 2,
-      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.peer || null) },
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.peer || null, o.peerLabel || null) },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
       vars: [
@@ -1056,7 +1062,7 @@ function buildSteps463v2(input) {
         : `j > 0 → False (stops here, grid[${i}][-1] is never read)`;
       snap({
         title: { vi: `line 10: ${leftExprTitle}`, en: `line 10: ${leftExprTitleEn}` },
-        cur: [i, j], peer: hasLeft ? [i, j - 1] : null, codeLines: [10], total,
+        cur: [i, j], peer: hasLeft ? [i, j - 1] : null, peerLabel: hasLeft ? "←" : null, codeLines: [10], total,
         vars: [
           { name: "j > 0?", value: hasLeft },
           { name: hasLeft ? `grid[${i}][${j - 1}]` : "grid[i][j-1]", value: hasLeft ? grid[i][j - 1] : "không đọc (short-circuit)" },
@@ -1081,7 +1087,7 @@ function buildSteps463v2(input) {
         contrib[i][j] -= 2;
         snap({
           title: { vi: `line 11: total -= 2 → ${total}`, en: `line 11: total -= 2 → ${total}` },
-          cur: [i, j], peer: [i, j - 1], codeLines: [11], total,
+          cur: [i, j], peer: [i, j - 1], peerLabel: "←", codeLines: [11], total,
           vars: [{ name: "cell contribution", value: contrib[i][j] }, { name: "total", value: total }],
           note: {
             vi: `Cạnh chung TRÁI giữa (${i},${j}) và (${i},${j - 1}) không phải biên → trừ 2 (1 cạnh cho mỗi ô, tổng cộng 2). total = ${total}.`,
@@ -1102,7 +1108,7 @@ function buildSteps463v2(input) {
         : `i > 0 → False (stops here, grid[-1][${j}] is never read)`;
       snap({
         title: { vi: `line 12: ${topExprTitle}`, en: `line 12: ${topExprTitleEn}` },
-        cur: [i, j], peer: hasTop ? [i - 1, j] : null, codeLines: [12], total,
+        cur: [i, j], peer: hasTop ? [i - 1, j] : null, peerLabel: hasTop ? "↑" : null, codeLines: [12], total,
         vars: [
           { name: "i > 0?", value: hasTop },
           { name: hasTop ? `grid[${i - 1}][${j}]` : "grid[i-1][j]", value: hasTop ? grid[i - 1][j] : "không đọc (short-circuit)" },
@@ -1127,7 +1133,7 @@ function buildSteps463v2(input) {
         contrib[i][j] -= 2;
         snap({
           title: { vi: `line 13: total -= 2 → ${total}`, en: `line 13: total -= 2 → ${total}` },
-          cur: [i, j], peer: [i - 1, j], codeLines: [13], total,
+          cur: [i, j], peer: [i - 1, j], peerLabel: "↑", codeLines: [13], total,
           vars: [{ name: "cell contribution", value: contrib[i][j] }, { name: "total", value: total }],
           note: {
             vi: `Cạnh chung TRÊN giữa (${i},${j}) và (${i - 1},${j}) không phải biên → trừ 2. total = ${total}.`,
