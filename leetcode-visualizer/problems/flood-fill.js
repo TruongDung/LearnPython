@@ -1168,7 +1168,360 @@ function buildSteps463v2(input) {
   return { original: grid, answer: total, steps };
 }
 
+// ─── 1254: Number of Closed Islands — detailed line-by-line debugger ─────────
+// code lines (1-indexed):
+//  1  class Solution:
+//  2      def closedIsland(self, grid):
+//  3          rows, cols = len(grid), len(grid[0])
+//  4          def dfs(r, c):
+//  5              if r < 0 or r >= rows or c < 0 or c >= cols:
+//  6                  return
+//  7              if grid[r][c] != 0:
+//  8                  return
+//  9              grid[r][c] = 1
+// 10              dfs(r+1, c)
+// 11              dfs(r-1, c)
+// 12              dfs(r, c+1)
+// 13              dfs(r, c-1)
+// 14          for r in range(rows):
+// 15              dfs(r, 0)
+// 16              dfs(r, cols-1)
+// 17          for c in range(cols):
+// 18              dfs(0, c)
+// 19              dfs(rows-1, c)
+// 20          count = 0
+// 21          for r in range(1, rows-1):
+// 22              for c in range(1, cols-1):
+// 23                  if grid[r][c] == 0:
+// 24                      dfs(r, c)
+// 25                      count += 1
+// 26          return count
+function buildSteps1254(input) {
+  const { valid, grid } = parseBinary(input, true);
+  const steps = [];
+  if (!valid || grid.length < 3 || grid[0].length < 3) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      highlight: [], mark: [], final: true, codeLines: [3],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Grid phải gồm 0/1, kích thước tối thiểu 3×3. Ví dụ: 1111110|1000010|1011010|1000110|1111110.",
+        en: "Grid must contain 0/1 and be at least 3×3. Example: 1111110|1000010|1011010|1000110|1111110.",
+      },
+    });
+    return { original: [], answer: 0, steps };
+  }
+
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const work = grid.map((row) => row.map(Number));
+  const consumed = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const islandId = Array.from({ length: rows }, () => Array(cols).fill(0));
+  let island = 0;
+  let closedCount = 0;
+
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
+
+  // Cells shown as border/current/etc. + a #N tag on land absorbed into an island.
+  function makeCells(cur) {
+    return grid.map((row, r) => row.map((orig, c) => {
+      const live = String(work[r][c]);
+      const isBorder = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+      let cls = orig === "1" ? "wall" : isBorder ? "queued" : "empty";
+      let meta = "";
+      if (consumed[r][c]) {
+        cls = work[r][c] === 1 ? "wall" : "visited";
+        meta = islandId[r][c] ? `#${islandId[r][c]}` : "";
+      }
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: live, meta, cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [], codeBlock: 1,
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+        { name: "depth", value: callStack.length },
+        { name: "count", value: closedCount },
+      ],
+      note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: "rows, cols = len(grid), len(grid[0])", en: "rows, cols = len(grid), len(grid[0])" },
+    codeLines: [3],
+    vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
+    note: {
+      vi:
+        "Đảo 'closed' = nhóm ô đất (0) liên thông 4 hướng và KHÔNG chạm biên. " +
+        "Chiến thuật: xóa (nhấn chìm) mọi đất chạm biên trước, phần đất còn lại chắc chắn là closed.",
+      en:
+        "A 'closed' island = a 4-connected group of land (0) that does NOT touch the border. " +
+        "Strategy: flood away every border-touching land first; whatever land remains is guaranteed closed.",
+    },
+  });
+
+  function dfs(r, c) {
+    callStack.push(`dfs(${r},${c})`);
+
+    const oob = r < 0 || r >= rows || c < 0 || c >= cols;
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 5: kiểm tra biên`, en: `dfs(${r},${c}) — line 5: boundary check` },
+      cur: oob ? null : [r, c], codeLines: [5],
+      vars: [{ name: "r, c", value: `${r}, ${c}` }, { name: "out of bounds?", value: oob }],
+      note: {
+        vi: oob ? `(${r},${c}) nằm NGOÀI grid → line 6 return.` : `(${r},${c}) trong grid → sang line 7.`,
+        en: oob ? `(${r},${c}) is OUTSIDE the grid → line 6 return.` : `(${r},${c}) is inside → go to line 7.`,
+      },
+    });
+    if (oob) {
+      snap({
+        title: { vi: "line 6: return (ngoài biên)", en: "line 6: return (out of bounds)" },
+        codeLines: [6], vars: [],
+        note: { vi: "Ngoài grid, không làm gì.", en: "Outside the grid, do nothing." },
+      });
+      callStack.pop();
+      return;
+    }
+
+    const notLand = work[r][c] !== 0;
+    snap({
+      title: { vi: `dfs(${r},${c}) — line 7: grid[r][c] != 0?`, en: `dfs(${r},${c}) — line 7: grid[r][c] != 0?` },
+      cur: [r, c], codeLines: [7],
+      vars: [{ name: "grid[r][c] (live)", value: work[r][c] }, { name: "not land?", value: notLand }],
+      note: {
+        vi: notLand
+          ? `grid[${r}][${c}] = ${work[r][c]} (nước hoặc đã ngập) → line 8 return.`
+          : `grid[${r}][${c}] = 0 (đất chưa thăm) → sang line 9.`,
+        en: notLand
+          ? `grid[${r}][${c}] = ${work[r][c]} (water or already flooded) → line 8 return.`
+          : `grid[${r}][${c}] = 0 (unvisited land) → go to line 9.`,
+      },
+    });
+    if (notLand) {
+      snap({
+        title: { vi: "line 8: return (nước / đã ngập)", en: "line 8: return (water / already flooded)" },
+        cur: [r, c], codeLines: [8], vars: [],
+        note: { vi: "Không phải đất chưa thăm — dừng nhánh này.", en: "Not unvisited land — stop this branch." },
+      });
+      callStack.pop();
+      return;
+    }
+
+    const before = work.map((row) => row.join("")).join(" | ");
+    work[r][c] = 1;
+    consumed[r][c] = true;
+    if (island > 0) islandId[r][c] = island;
+    const after = work.map((row) => row.join("")).join(" | ");
+    snap({
+      title: { vi: `line 9: grid[${r}][${c}] = 1  ⟵ 0 bị ghi thành 1`, en: `line 9: grid[${r}][${c}] = 1  ⟵ 0 overwritten to 1` },
+      cur: [r, c], codeLines: [9],
+      vars: [
+        { name: "grid[r][c] trước", value: 0 }, { name: "grid[r][c] sau", value: 1 },
+        { name: "grid trước", value: before }, { name: "grid sau", value: after },
+      ],
+      note: {
+        vi: `"Nhấn chìm" (${r},${c}) thành nước để không đếm lại. Đây là cách đánh dấu visited không cần mảng riêng.\ngrid: ${before}  →  ${after}`,
+        en: `"Flood" (${r},${c}) into water so it's never counted again. This marks it visited without a separate array.\ngrid: ${before}  →  ${after}`,
+      },
+    });
+
+    const DIRS = [
+      { dr: 1, dc: 0, line: 10, label: "dfs(r+1, c)" },
+      { dr: -1, dc: 0, line: 11, label: "dfs(r-1, c)" },
+      { dr: 0, dc: 1, line: 12, label: "dfs(r, c+1)" },
+      { dr: 0, dc: -1, line: 13, label: "dfs(r, c-1)" },
+    ];
+    for (const { dr, dc, line, label } of DIRS) {
+      const nr = r + dr;
+      const nc = c + dc;
+      snap({
+        title: { vi: `line ${line}: gọi ${label} → dfs(${nr},${nc})`, en: `line ${line}: call ${label} → dfs(${nr},${nc})` },
+        cur: [r, c], codeLines: [line],
+        vars: [{ name: "calling", value: `dfs(${nr},${nc})` }],
+        note: { vi: `Đẩy frame dfs(${nr},${nc}) lên call stack.`, en: `Push frame dfs(${nr},${nc}) onto the call stack.` },
+      });
+      dfs(nr, nc);
+      snap({
+        title: { vi: `line ${line}: ${label} trả về → quay lại dfs(${r},${c})`, en: `line ${line}: ${label} returned → back in dfs(${r},${c})` },
+        cur: [r, c], codeLines: [line], vars: [],
+        note: { vi: `Pop frame, tiếp tục dfs(${r},${c}).`, en: `Pop the frame, resume dfs(${r},${c}).` },
+      });
+    }
+    callStack.pop();
+  }
+
+  // ── Lines 14–16: flood land touching left/right border ────────────────
+  for (let r = 0; r < rows; r++) {
+    snap({
+      title: { vi: `line 14: for r in range(rows) → r = ${r}`, en: `line 14: for r in range(rows) → r = ${r}` },
+      codeLines: [14], vars: [{ name: "r", value: r }],
+      note: { vi: `Nhấn chìm đất chạm cột trái/phải ở hàng ${r}.`, en: `Flood land touching the left/right column on row ${r}.` },
+    });
+    snap({
+      title: { vi: `line 15: dfs(${r}, 0)`, en: `line 15: dfs(${r}, 0)` },
+      cur: [r, 0], codeLines: [15], vars: [],
+      note: { vi: `Bắt đầu từ cột TRÁI, hàng ${r}.`, en: `Start from the LEFT column, row ${r}.` },
+    });
+    dfs(r, 0);
+    snap({
+      title: { vi: `line 16: dfs(${r}, ${cols - 1})`, en: `line 16: dfs(${r}, ${cols - 1})` },
+      cur: [r, cols - 1], codeLines: [16], vars: [],
+      note: { vi: `Bắt đầu từ cột PHẢI, hàng ${r}.`, en: `Start from the RIGHT column, row ${r}.` },
+    });
+    dfs(r, cols - 1);
+  }
+
+  // ── Lines 17–19: flood land touching top/bottom border ────────────────
+  for (let c = 0; c < cols; c++) {
+    snap({
+      title: { vi: `line 17: for c in range(cols) → c = ${c}`, en: `line 17: for c in range(cols) → c = ${c}` },
+      codeLines: [17], vars: [{ name: "c", value: c }],
+      note: { vi: `Nhấn chìm đất chạm hàng trên/dưới ở cột ${c}.`, en: `Flood land touching the top/bottom row on column ${c}.` },
+    });
+    snap({
+      title: { vi: `line 18: dfs(0, ${c})`, en: `line 18: dfs(0, ${c})` },
+      cur: [0, c], codeLines: [18], vars: [],
+      note: { vi: `Bắt đầu từ hàng TRÊN, cột ${c}.`, en: `Start from the TOP row, column ${c}.` },
+    });
+    dfs(0, c);
+    snap({
+      title: { vi: `line 19: dfs(${rows - 1}, ${c})`, en: `line 19: dfs(${rows - 1}, ${c})` },
+      cur: [rows - 1, c], codeLines: [19], vars: [],
+      note: { vi: `Bắt đầu từ hàng DƯỚI, cột ${c}.`, en: `Start from the BOTTOM row, column ${c}.` },
+    });
+    dfs(rows - 1, c);
+  }
+
+  // ── Line 20 ─────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [20], vars: [],
+    note: {
+      vi: "Mọi đất chạm biên đã bị nhấn chìm. Đất còn lại (nếu có) chắc chắn là closed island.",
+      en: "Every border-touching land has been flooded. Any remaining land is guaranteed to be a closed island.",
+    },
+  });
+
+  // ── Lines 21–25: count closed islands strictly inside ───────────────
+  for (let r = 1; r < rows - 1; r++) {
+    snap({
+      title: { vi: `line 21: for r in range(1, rows-1) → r = ${r}`, en: `line 21: for r in range(1, rows-1) → r = ${r}` },
+      codeLines: [21], vars: [{ name: "r", value: r }],
+      note: { vi: `Quét hàng ${r} (chỉ phần bên trong, không tính biên).`, en: `Scan row ${r} (interior only, border excluded).` },
+    });
+    for (let c = 1; c < cols - 1; c++) {
+      snap({
+        title: { vi: `line 22: for c in range(1, cols-1) → c = ${c}`, en: `line 22: for c in range(1, cols-1) → c = ${c}` },
+        cur: [r, c], codeLines: [22],
+        vars: [{ name: "grid[r][c] (live)", value: work[r][c] }],
+        note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+      });
+      const isLand = work[r][c] === 0;
+      snap({
+        title: { vi: `line 23: grid[${r}][${c}] == 0? → ${isLand}`, en: `line 23: grid[${r}][${c}] == 0? → ${isLand}` },
+        cur: [r, c], codeLines: [23],
+        vars: [{ name: "is unflooded land?", value: isLand }],
+        note: {
+          vi: isLand ? `Đất còn sót → đây là MỘT ĐẢO CLOSED mới → line 24-25.` : `Không phải đất (đã ngập hoặc là nước) → bỏ qua.`,
+          en: isLand ? `Remaining land → this is a NEW CLOSED ISLAND → line 24-25.` : `Not land (already flooded or water) → skip.`,
+        },
+      });
+      if (!isLand) continue;
+      island += 1;
+      snap({
+        title: { vi: `line 24: dfs(${r}, ${c}) — nhấn chìm đảo closed #${island}`, en: `line 24: dfs(${r}, ${c}) — flood closed island #${island}` },
+        cur: [r, c], codeLines: [24],
+        vars: [{ name: "island #", value: island }],
+        note: { vi: `Gọi DFS để nhấn chìm toàn bộ đảo closed #${island} (chỉ để loại trừ, không tính lại).`, en: `Call DFS to flood the entire closed island #${island} (purely to avoid recounting it).` },
+      });
+      dfs(r, c);
+      closedCount += 1;
+      snap({
+        title: { vi: `line 25: count += 1 → ${closedCount}`, en: `line 25: count += 1 → ${closedCount}` },
+        codeLines: [25],
+        vars: [{ name: "count", value: closedCount }],
+        note: { vi: `Đảo closed #${island} đã được đếm. count = ${closedCount}.`, en: `Closed island #${island} counted. count = ${closedCount}.` },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `line 26: return ${closedCount}`, en: `line 26: return ${closedCount}` },
+    final: true, codeLines: [26],
+    vars: [{ name: "answer", value: closedCount }],
+    note: {
+      vi: `Đã quét hết grid. Số đảo closed (không chạm biên) = ${closedCount}.`,
+      en: `Finished scanning. Number of closed islands (not touching the border) = ${closedCount}.`,
+    },
+  });
+
+  return { original: grid, answer: closedCount, steps };
+}
+
 const problems = {
+  1254: {
+    id: 1254, difficulty: "medium", slug: "number-of-closed-islands",
+    category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
+    title: tr("Number of Closed Islands", "Number of Closed Islands"),
+    titleVi: tr("Số đảo bị nước bao quanh hoàn toàn (closed)", "Count islands fully surrounded by water"),
+    statement: tr(
+      "Grid gồm 0 (đất) và 1 (nước). Đảo 'closed' là nhóm đất liên thông 4 hướng KHÔNG chạm biên grid. Đếm số đảo closed. Nhập grid: hàng cách '|'.",
+      "Grid of 0 (land) and 1 (water). A 'closed' island is a 4-connected land group that does NOT touch the grid border. Count closed islands. Enter grid: rows separated by '|'."
+    ),
+    defaultInput: "11111110|10000110|10101110|10000101|11111110",
+    inputKind: "string",
+    inputLabel: tr("Grid 0/1 (0=đất,1=nước, hàng cách '|')", "0/1 grid (0=land,1=water, rows separated by '|')"),
+    approach: [
+      tr("Đất chạm biên KHÔNG thể là closed → nhấn chìm (flood) hết đất chạm biên trước bằng DFS.", "Border-touching land can NEVER be closed → flood away all border-touching land first with DFS."),
+      tr("Sau khi loại biên, đất còn lại chắc chắn không chạm biên.", "After removing the border, any remaining land is guaranteed not to touch the border."),
+      tr("Quét phần bên trong: mỗi lần gặp đất còn lại → 1 đảo closed mới, DFS nhấn chìm nó rồi count += 1.", "Scan the interior: each remaining land cell found → one new closed island, DFS floods it then count += 1."),
+    ],
+    complexity: {
+      time: "O(rows·cols)",
+      space: "O(rows·cols)",
+      note: tr("Mỗi ô được thăm tối đa một lần qua đệ quy DFS.", "Each cell is visited at most once via recursive DFS."),
+    },
+    code: [
+      "class Solution:",
+      "    def closedIsland(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        def dfs(r, c):",
+      "            if r < 0 or r >= rows or c < 0 or c >= cols:",
+      "                return",
+      "            if grid[r][c] != 0:",
+      "                return",
+      "            grid[r][c] = 1",
+      "            dfs(r + 1, c)",
+      "            dfs(r - 1, c)",
+      "            dfs(r, c + 1)",
+      "            dfs(r, c - 1)",
+      "        for r in range(rows):",
+      "            dfs(r, 0)",
+      "            dfs(r, cols - 1)",
+      "        for c in range(cols):",
+      "            dfs(0, c)",
+      "            dfs(rows - 1, c)",
+      "        count = 0",
+      "        for r in range(1, rows - 1):",
+      "            for c in range(1, cols - 1):",
+      "                if grid[r][c] == 0:",
+      "                    dfs(r, c)",
+      "                    count += 1",
+      "        return count",
+    ],
+    builder: buildSteps1254,
+  },
   463: {
     id: 463, difficulty: "easy", slug: "island-perimeter",
     category: { key: "dfs", vi: "DFS", en: "DFS" }, tags: [floodFillTag],
