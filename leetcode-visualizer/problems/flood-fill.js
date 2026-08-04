@@ -1776,87 +1776,164 @@ function buildSteps1568(input) {
   const rows = grid.length;
   const cols = grid[0].length;
   const work = grid.map((row) => [...row]);
-  const steps_ = steps; // alias, unused rename guard
+  const callStack = [];
+  const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
 
-  function countIslandsTraced(g, { trace = false, removedCell = null } = {}) {
-    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
-    let count = 0;
-
-    function makeCells(cur) {
-      return g.map((row, r) => row.map((v, c) => {
-        let cls = v === 0 ? "wall" : visited[r][c] ? "visited" : "empty";
-        if (removedCell && removedCell[0] === r && removedCell[1] === c) cls = "queued";
-        if (cur && cur[0] === r && cur[1] === c) cls = "current";
-        return { label: String(v), cls };
-      }));
-    }
-    function snap(o) {
-      if (!trace) return;
-      steps.push({
-        title: o.title, arr: [], codeBlock: 1,
-        bfsGrid: { rows, cols, cells: makeCells(o.cur || null) },
-        highlight: [], mark: [], final: false,
-        codeLines: o.codeLines || [],
-        vars: [...(o.vars || []), { name: "island count", value: count }],
-        note: o.note,
-      });
-    }
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (g[r][c] === 1 && !visited[r][c]) {
-          count += 1;
-          if (trace) {
-            snap({
-              title: { vi: `line 17-18: đảo mới tại (${r},${c}) → count = ${count}`, en: `line 17-18: new island at (${r},${c}) → count = ${count}` },
-              cur: [r, c], codeLines: [17, 18],
-              vars: [{ name: "r, c", value: `${r}, ${c}` }],
-              note: { vi: `Gặp đất chưa thăm → đảo thứ ${count}. Gọi dfs(${r},${c}) để tô hết đảo này.`, en: `Found unvisited land → island #${count}. Call dfs(${r},${c}) to flood the whole island.` },
-            });
-          }
-          const stack = [[r, c]];
-          visited[r][c] = true;
-          while (stack.length) {
-            const [cr, cc] = stack.pop();
-            for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-              const nr = cr + dr;
-              const nc = cc + dc;
-              if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && g[nr][nc] === 1 && !visited[nr][nc]) {
-                visited[nr][nc] = true;
-                stack.push([nr, nc]);
-              }
-            }
-          }
-        }
-      }
-    }
-    if (trace) {
-      snap({
-        title: { vi: `line 19: return count = ${count}`, en: `line 19: return count = ${count}` },
-        codeLines: [19], vars: [],
-        note: { vi: `count_islands trả về ${count}.`, en: `count_islands returns ${count}.` },
-      });
-    }
-    return count;
+  // Renders the live `work` grid, overlaying the current DFS `visited` set
+  // (if provided) and marking the trial-removed cell in a distinct color.
+  function makeCells(visited, cur, removedCell) {
+    return work.map((row, r) => row.map((v, c) => {
+      let cls = v === 0 ? "wall" : (visited && visited[r][c]) ? "visited" : "empty";
+      if (removedCell && removedCell[0] === r && removedCell[1] === c) cls = "queued";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      return { label: String(v), cls };
+    }));
   }
 
-  function snapMain(o) {
+  function snap(o) {
     steps.push({
       title: o.title, arr: [],
-      bfsGrid: { rows, cols, cells: work.map((row, r) => row.map((v, c) => {
-        let cls = v === 0 ? "wall" : "empty";
-        if (o.cur && o.cur[0] === r && o.cur[1] === c) cls = "current";
-        if (o.removed && o.removed[0] === r && o.removed[1] === c) cls = "queued";
-        return { label: String(v), cls };
-      })) },
+      bfsGrid: { rows, cols, cells: makeCells(o.visited || null, o.cur || null, o.removed || null) },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
-      vars: o.vars || [],
+      vars: [
+        ...(o.vars || []),
+        { name: "call stack", value: stackText() },
+      ],
       note: o.note,
     });
   }
 
-  snapMain({
+  // ── count_islands(g), FULLY traced every single time it's called ────────
+  // (initial check AND every one of the rows*cols trial removals).
+  // contextLabel + removedCell let the viewer see WHICH call this is.
+  function countIslands(contextLabel, removedCell) {
+    const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+    snap({
+      title: { vi: `${contextLabel} — line 5: visited = ma trận False`, en: `${contextLabel} — line 5: visited = all-False grid` },
+      removed: removedCell, codeLines: [5],
+      vars: [{ name: "rows,cols", value: `${rows},${cols}` }],
+      note: { vi: "Tạo mảng visited cùng kích thước grid, khởi tạo toàn False.", en: "Create a visited array the same size as grid, initialized to all False." },
+    });
+
+    let count = 0;
+    snap({
+      title: { vi: `${contextLabel} — line 14: count = 0`, en: `${contextLabel} — line 14: count = 0` },
+      removed: removedCell, visited, codeLines: [14], vars: [{ name: "count", value: 0 }],
+      note: { vi: "Khởi tạo bộ đếm số đảo.", en: "Initialize the island counter." },
+    });
+
+    for (let r = 0; r < rows; r++) {
+      snap({
+        title: { vi: `${contextLabel} — line 15: for r in range(rows) → r = ${r}`, en: `${contextLabel} — line 15: for r in range(rows) → r = ${r}` },
+        removed: removedCell, visited, codeLines: [15], vars: [{ name: "r", value: r }, { name: "count", value: count }],
+        note: { vi: `Quét hàng ${r}.`, en: `Scan row ${r}.` },
+      });
+      for (let c = 0; c < cols; c++) {
+        snap({
+          title: { vi: `${contextLabel} — line 16: for c in range(cols) → c = ${c}`, en: `${contextLabel} — line 16: for c in range(cols) → c = ${c}` },
+          removed: removedCell, visited, cur: [r, c], codeLines: [16], vars: [{ name: "c", value: c }, { name: "count", value: count }],
+          note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
+        });
+        const isNewLand = work[r][c] === 1 && !visited[r][c];
+        snap({
+          title: { vi: `${contextLabel} — line 17: g[${r}][${c}]==1 and not visited[${r}][${c}] → ${isNewLand}`, en: `${contextLabel} — line 17: g[${r}][${c}]==1 and not visited[${r}][${c}] → ${isNewLand}` },
+          removed: removedCell, visited, cur: [r, c], codeLines: [17],
+          vars: [{ name: "g[r][c]", value: work[r][c] }, { name: "visited[r][c]", value: visited[r][c] }, { name: "is new land?", value: isNewLand }],
+          note: {
+            vi: isNewLand ? `Đất chưa thăm → đảo mới → line 18.` : `Nước hoặc đã thăm → bỏ qua.`,
+            en: isNewLand ? `Unvisited land → a new island → line 18.` : `Water or already visited → skip.`,
+          },
+        });
+        if (!isNewLand) continue;
+
+        count += 1;
+        snap({
+          title: { vi: `${contextLabel} — line 18: count += 1 → ${count}; gọi dfs(${r},${c})`, en: `${contextLabel} — line 18: count += 1 → ${count}; call dfs(${r},${c})` },
+          removed: removedCell, visited, cur: [r, c], codeLines: [18],
+          vars: [{ name: "count", value: count }],
+          note: { vi: `Đảo thứ ${count}. Gọi dfs(${r},${c}) để tô hết đảo này.`, en: `Island #${count}. Call dfs(${r},${c}) to flood the entire island.` },
+        });
+
+        // ── dfs(r, c): fully traced iterative flood fill ──────────────────
+        callStack.push(`dfs(${r},${c})`);
+        const stack = [[r, c]];
+        visited[r][c] = true;
+        snap({
+          title: { vi: `dfs(${r},${c}) — line 7: stack=[(${r},${c})]; visited[${r}][${c}]=True`, en: `dfs(${r},${c}) — line 7: stack=[(${r},${c})]; visited[${r}][${c}]=True` },
+          removed: removedCell, visited, cur: [r, c], codeLines: [7],
+          vars: [{ name: "stack", value: `[(${r},${c})]` }],
+          note: { vi: `Khởi tạo stack với ô gốc, đánh dấu đã thăm.`, en: `Seed the stack with the root cell, mark it visited.` },
+        });
+
+        let guard = 0;
+        while (stack.length && guard++ < rows * cols * 4) {
+          snap({
+            title: { vi: `dfs(${r},${c}) — line 8: while stack → True (len=${stack.length})`, en: `dfs(${r},${c}) — line 8: while stack → True (len=${stack.length})` },
+            removed: removedCell, visited, codeLines: [8],
+            vars: [{ name: "stack", value: `[${stack.map(([a, b]) => `(${a},${b})`).join(", ")}]` }],
+            note: { vi: "Stack còn ô cần xử lý.", en: "The stack still has cells to process." },
+          });
+          const [cr, cc] = stack.pop();
+          snap({
+            title: { vi: `dfs(${r},${c}) — line 9: cr,cc = stack.pop() → (${cr},${cc})`, en: `dfs(${r},${c}) — line 9: cr,cc = stack.pop() → (${cr},${cc})` },
+            removed: removedCell, visited, cur: [cr, cc], codeLines: [9],
+            vars: [{ name: "cr, cc", value: `${cr}, ${cc}` }],
+            note: { vi: `Lấy (${cr},${cc}) khỏi đỉnh stack.`, en: `Pop (${cr},${cc}) off the top of the stack.` },
+          });
+          for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nr = cr + dr;
+            const nc = cc + dc;
+            snap({
+              title: { vi: `dfs(${r},${c}) — line 10-11: dr,dc=(${dr},${dc}) → next=(${nr},${nc})`, en: `dfs(${r},${c}) — line 10-11: dr,dc=(${dr},${dc}) → next=(${nr},${nc})` },
+              removed: removedCell, visited, cur: [cr, cc], codeLines: [10, 11],
+              vars: [{ name: "dr, dc", value: `${dr}, ${dc}` }, { name: "nr, nc", value: `${nr}, ${nc}` }],
+              note: { vi: `Xét hàng xóm (${nr},${nc}).`, en: `Check neighbor (${nr},${nc}).` },
+            });
+            const inBounds = nr >= 0 && nr < rows && nc >= 0 && nc < cols;
+            const canVisit = inBounds && work[nr][nc] === 1 && !visited[nr][nc];
+            snap({
+              title: { vi: `dfs(${r},${c}) — line 12: trong lưới, là đất, chưa thăm → ${canVisit}`, en: `dfs(${r},${c}) — line 12: in bounds, land, unvisited → ${canVisit}` },
+              removed: removedCell, visited, cur: inBounds ? [nr, nc] : [cr, cc], codeLines: [12],
+              vars: [{ name: "in bounds?", value: inBounds }, { name: "g[nr][nc]", value: inBounds ? work[nr][nc] : "—" }, { name: "can visit?", value: canVisit }],
+              note: {
+                vi: canVisit ? `(${nr},${nc}) hợp lệ → line 13 đánh dấu và đẩy vào stack.` : `Ngoài lưới, nước, hoặc đã thăm → bỏ qua.`,
+                en: canVisit ? `(${nr},${nc}) is valid → line 13 marks it and pushes it.` : `Out of bounds, water, or already visited → skip.`,
+              },
+            });
+            if (canVisit) {
+              visited[nr][nc] = true;
+              stack.push([nr, nc]);
+              snap({
+                title: { vi: `dfs(${r},${c}) — line 13: visited[${nr}][${nc}]=True; stack.append((${nr},${nc}))`, en: `dfs(${r},${c}) — line 13: visited[${nr}][${nc}]=True; stack.append((${nr},${nc}))` },
+                removed: removedCell, visited, cur: [nr, nc], codeLines: [13],
+                vars: [{ name: "stack", value: `[${stack.map(([a, b]) => `(${a},${b})`).join(", ")}]` }],
+                note: { vi: `Đánh dấu (${nr},${nc}) đã thăm và đẩy vào stack để xử lý tiếp.`, en: `Mark (${nr},${nc}) visited and push it for later processing.` },
+              });
+            }
+          }
+        }
+        snap({
+          title: { vi: `dfs(${r},${c}) — line 8: while stack → False (rỗng)`, en: `dfs(${r},${c}) — line 8: while stack → False (empty)` },
+          removed: removedCell, visited, codeLines: [8], vars: [],
+          note: { vi: `Đảo #${count} đã được tô hết. Quay lại vòng lặp chính.`, en: `Island #${count} fully flooded. Return to the main loop.` },
+        });
+        callStack.pop();
+      }
+    }
+
+    snap({
+      title: { vi: `${contextLabel} — line 19: return count = ${count}`, en: `${contextLabel} — line 19: return count = ${count}` },
+      removed: removedCell, visited, codeLines: [19],
+      vars: [{ name: "count", value: count }],
+      note: { vi: `count_islands trả về ${count}.`, en: `count_islands returns ${count}.` },
+    });
+    return count;
+  }
+
+  // ── Line 3 ──────────────────────────────────────────────────────────
+  snap({
     title: { vi: "rows, cols = len(grid), len(grid[0])", en: "rows, cols = len(grid), len(grid[0])" },
     codeLines: [3],
     vars: [{ name: "rows", value: rows }, { name: "cols", value: cols }],
@@ -1870,8 +1947,9 @@ function buildSteps1568(input) {
     },
   });
 
-  const initialCount = countIslandsTraced(work, { trace: true });
-  snapMain({
+  // ── Line 20: initial count_islands call, fully traced ──────────────────
+  const initialCount = countIslands("Gọi ban đầu / Initial call", null);
+  snap({
     title: { vi: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}`, en: `line 20: count_islands(grid) != 1 → ${initialCount !== 1}` },
     codeLines: [20],
     vars: [{ name: "count_islands(grid)", value: initialCount }],
@@ -1885,7 +1963,7 @@ function buildSteps1568(input) {
     },
   });
   if (initialCount !== 1) {
-    snapMain({
+    snap({
       title: { vi: "line 21: return 0", en: "line 21: return 0" },
       final: true, codeLines: [21],
       vars: [{ name: "answer", value: 0 }],
@@ -1894,20 +1972,21 @@ function buildSteps1568(input) {
     return { original: grid, answer: 0, steps };
   }
 
+  // ── Lines 22-29: try removing each land cell, fully traced ─────────────
   for (let r = 0; r < rows; r++) {
-    snapMain({
+    snap({
       title: { vi: `line 22: for r in range(rows) → r = ${r}`, en: `line 22: for r in range(rows) → r = ${r}` },
       codeLines: [22], vars: [{ name: "r", value: r }],
       note: { vi: `Thử xóa từng ô đất ở hàng ${r}.`, en: `Try removing each land cell in row ${r}.` },
     });
     for (let c = 0; c < cols; c++) {
-      snapMain({
+      snap({
         title: { vi: `line 23: for c in range(cols) → c = ${c}`, en: `line 23: for c in range(cols) → c = ${c}` },
         cur: [r, c], codeLines: [23], vars: [{ name: "c", value: c }],
         note: { vi: `Xét ô (${r},${c}).`, en: `Inspect cell (${r},${c}).` },
       });
       const isLand = work[r][c] === 1;
-      snapMain({
+      snap({
         title: { vi: `line 24: grid[${r}][${c}] == 1? → ${isLand}`, en: `line 24: grid[${r}][${c}] == 1? → ${isLand}` },
         cur: [r, c], codeLines: [24], vars: [{ name: "is land?", value: isLand }],
         note: {
@@ -1918,15 +1997,15 @@ function buildSteps1568(input) {
       if (!isLand) continue;
 
       work[r][c] = 0;
-      snapMain({
+      snap({
         title: { vi: `line 25: grid[${r}][${c}] = 0 (thử xóa)`, en: `line 25: grid[${r}][${c}] = 0 (trial removal)` },
         removed: [r, c], codeLines: [25], vars: [{ name: "removed cell", value: `(${r},${c})` }],
         note: { vi: `Tạm xóa (${r},${c}) để kiểm tra.`, en: `Temporarily remove (${r},${c}) to test.` },
       });
 
-      const afterCount = countIslandsTraced(work, { trace: false });
+      const afterCount = countIslands(`Thử xóa (${r},${c}) / Trial removal (${r},${c})`, [r, c]);
       const disconnects = afterCount !== 1;
-      snapMain({
+      snap({
         title: { vi: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})`, en: `line 26: count_islands(grid) != 1 → ${disconnects} (count=${afterCount})` },
         removed: [r, c], codeLines: [26],
         vars: [{ name: "count_islands after removal", value: afterCount }, { name: "disconnects?", value: disconnects }],
@@ -1942,7 +2021,7 @@ function buildSteps1568(input) {
 
       if (disconnects) {
         work[r][c] = 1;
-        snapMain({
+        snap({
           title: { vi: "line 27-28: phục hồi ô rồi return 1", en: "line 27-28: restore cell then return 1" },
           final: true, codeLines: [27, 28],
           vars: [{ name: "answer", value: 1 }],
@@ -1951,7 +2030,7 @@ function buildSteps1568(input) {
         return { original: grid, answer: 1, steps };
       }
       work[r][c] = 1;
-      snapMain({
+      snap({
         title: { vi: `line 29: grid[${r}][${c}] = 1 (phục hồi)`, en: `line 29: grid[${r}][${c}] = 1 (restore)` },
         cur: [r, c], codeLines: [29], vars: [],
         note: { vi: `Không đủ để rời lưới → phục hồi và thử ô tiếp theo.`, en: `Not enough to disconnect → restore and try the next cell.` },
@@ -1959,7 +2038,8 @@ function buildSteps1568(input) {
     }
   }
 
-  snapMain({
+  // ── Line 30 ─────────────────────────────────────────────────────────
+  snap({
     title: { vi: "line 30: return 2", en: "line 30: return 2" },
     final: true, codeLines: [30],
     vars: [{ name: "answer", value: 2 }],
