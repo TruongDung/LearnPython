@@ -14345,21 +14345,26 @@ function buildSteps827(input) {
   const callStack = [];
   const stackText = () => (callStack.length ? callStack.join(" → ") : "∅");
 
-  function makeCells(cur) {
+  // flipMark: [r, c] of a water cell to render as the WINNING flip (green
+  // "path" cell, label "1", meta "★flip") — used only on the final result
+  // step so the viewer can see exactly where to change 0 → 1.
+  function makeCells(cur, flipMark) {
     return work.map((row, r) => row.map((v, c) => {
-      let cls, label;
-      if (v === 0) { cls = "wall"; label = "0"; }
+      let cls, label, meta = v > 1 ? `#${v}` : "";
+      if (flipMark && flipMark[0] === r && flipMark[1] === c) {
+        cls = "path"; label = "1"; meta = "★ flip";
+      } else if (v === 0) { cls = "wall"; label = "0"; }
       else if (v === 1) { cls = "empty"; label = "1"; }
       else { cls = "visited"; label = String(v); }
       if (cur && cur[0] === r && cur[1] === c) cls = "current";
-      return { label, meta: v > 1 ? `#${v}` : "", cls };
+      return { label, meta, cls };
     }));
   }
 
   function snap(o) {
     steps.push({
       title: o.title, arr: [],
-      bfsGrid: { rows: n, cols: n, cells: makeCells(o.cur || null) },
+      bfsGrid: { rows: n, cols: n, cells: makeCells(o.cur || null, o.flipMark || null) },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [],
       vars: [
@@ -14538,6 +14543,7 @@ function buildSteps827(input) {
   // ── Line 21 ─────────────────────────────────────────────────────────
   const sizeValues = Object.values(size);
   let best = sizeValues.length ? Math.max(...sizeValues) : 0;
+  let bestFlip = null; // [r, c] of the water cell that produced `best`, if any
   snap({
     title: { vi: `line 21: best = max(size.values(), default=0) = ${best}`, en: `line 21: best = max(size.values(), default=0) = ${best}` },
     codeLines: [21],
@@ -14630,17 +14636,17 @@ function buildSteps827(input) {
       }
 
       const improved = total > best;
-      if (improved) best = total;
+      if (improved) { best = total; bestFlip = [r, c]; }
       snap({
         title: { vi: `line 34: best = max(${improved ? total - 0 : best}, ${total}) → ${best}`, en: `line 34: best = max(best, ${total}) → ${best}` },
         cur: [r, c], codeLines: [34],
-        vars: [{ name: "flip cell", value: `(${r},${c})` }, { name: "total", value: total }, { name: "best", value: best }],
+        vars: [{ name: "flip cell", value: `(${r},${c})` }, { name: "total", value: total }, { name: "best", value: best }, { name: "best flip cell", value: bestFlip ? `(${bestFlip[0]},${bestFlip[1]})` : "none" }],
         note: {
           vi: improved
-            ? `Lật (${r},${c}) cho tổng ${total} (đất mới + các đảo kề khác nhau), lớn hơn best cũ → best = ${best}.`
+            ? `Lật (${r},${c}) cho tổng ${total} (đất mới + các đảo kề khác nhau), lớn hơn best cũ → best = ${best}. Đây là vị trí lật tốt nhất tính đến giờ.`
             : `Lật (${r},${c}) cho tổng ${total}, không vượt best hiện tại = ${best}.`,
           en: improved
-            ? `Flipping (${r},${c}) gives total ${total} (new land + distinct neighboring islands), beating the old best → best = ${best}.`
+            ? `Flipping (${r},${c}) gives total ${total} (new land + distinct neighboring islands), beating the old best → best = ${best}. This is the best flip position so far.`
             : `Flipping (${r},${c}) gives total ${total}, which doesn't beat the current best = ${best}.`,
         },
       });
@@ -14649,16 +14655,27 @@ function buildSteps827(input) {
 
   // ── Line 35 ─────────────────────────────────────────────────────────
   snap({
-    title: { vi: `line 35: return ${best}`, en: `line 35: return ${best}` },
+    title: {
+      vi: bestFlip ? `line 35: return ${best} — lật (${bestFlip[0]},${bestFlip[1]}) từ 0 → 1` : `line 35: return ${best}`,
+      en: bestFlip ? `line 35: return ${best} — flip (${bestFlip[0]},${bestFlip[1]}) from 0 → 1` : `line 35: return ${best}`,
+    },
     final: true, codeLines: [35],
-    vars: [{ name: "answer", value: best }],
+    flipMark: bestFlip,
+    vars: [
+      { name: "answer", value: best },
+      { name: "best flip position", value: bestFlip ? `(${bestFlip[0]},${bestFlip[1]})` : "none needed" },
+    ],
     note: {
-      vi: hasZero
-        ? `Đã thử lật mọi ô nước. Đảo lớn nhất có thể tạo ra = ${best}.`
-        : `Lưới toàn đất, không có ô nước để lật → đáp án = đảo lớn nhất hiện có = ${best}.`,
-      en: hasZero
-        ? `Tried flipping every water cell. Largest possible island = ${best}.`
-        : `The grid is all land, no water to flip → the answer is the largest existing island = ${best}.`,
+      vi: bestFlip
+        ? `Đã thử lật mọi ô nước. VỊ TRÍ TỐT NHẤT để đổi 0 → 1 là (${bestFlip[0]},${bestFlip[1]}) (đánh dấu ★ xanh trên lưới), cho đảo lớn nhất = ${best}.`
+        : hasZero
+          ? `Không ô nước nào cải thiện được kích thước đảo lớn nhất hiện có → giữ nguyên, không cần lật. best = ${best}.`
+          : `Lưới toàn đất, không có ô nước để lật → đáp án = đảo lớn nhất hiện có = ${best}.`,
+      en: bestFlip
+        ? `Tried flipping every water cell. The BEST position to change 0 → 1 is (${bestFlip[0]},${bestFlip[1]}) (marked ★ green on the grid), producing the largest island = ${best}.`
+        : hasZero
+          ? `No water cell improved on the existing largest island → no flip needed. best = ${best}.`
+          : `The grid is all land, no water to flip → the answer is the largest existing island = ${best}.`,
     },
   });
 
