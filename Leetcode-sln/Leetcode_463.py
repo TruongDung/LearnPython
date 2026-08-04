@@ -21,7 +21,36 @@ class Solution:
         return perimeter
 
 
+class SolutionApproach2:
+    # Alternative approach: assume every land cell has 4 free edges, then
+    # subtract 2 for each land neighbor to the LEFT or ABOVE. Because we only
+    # ever look backward (left/top), each touching pair of land cells is
+    # subtracted exactly once - never double-counted.
+    def islandPerimeter(self, grid: List[List[int]]) -> int:
+        n_rows = len(grid)
+        n_cols = len(grid[0])
+
+        total = 0
+
+        for i in range(n_rows):
+            for j in range(n_cols):
+                if grid[i][j] == 1:
+                    total += 4
+
+                    if j > 0 and grid[i][j - 1] == 1:
+                        total -= 2
+                    if i > 0 and grid[i - 1][j] == 1:
+                        total -= 2
+
+        return total
+
+
 sol = Solution()
 print(sol.islandPerimeter([[0, 1, 0, 0], [1, 1, 1, 0], [0, 1, 0, 0], [1, 1, 0, 0]]))  # 16
 print(sol.islandPerimeter([[1]]))     # 4
 print(sol.islandPerimeter([[1, 0]]))  # 4
+
+sol2 = SolutionApproach2()
+print(sol2.islandPerimeter([[0, 1, 0, 0], [1, 1, 1, 0], [0, 1, 0, 0], [1, 1, 0, 0]]))  # 16
+print(sol2.islandPerimeter([[1]]))     # 4
+print(sol2.islandPerimeter([[1, 0]]))  # 4

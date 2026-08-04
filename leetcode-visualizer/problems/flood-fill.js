@@ -909,6 +909,231 @@ function buildSteps463(input) {
   return { original: grid, answer: perimeter, steps };
 }
 
+// ─── 463 Approach 2: "+4 then subtract shared edges" — line-by-line ──────────
+// code2 lines (1-indexed):
+//  1  class Solution:
+//  2      def islandPerimeter(self, grid):
+//  3          n_rows = len(grid)
+//  4          n_cols = len(grid[0])
+//  5          total = 0
+//  6          for i in range(n_rows):
+//  7              for j in range(n_cols):
+//  8                  if grid[i][j] == 1:
+//  9                      total += 4
+// 10                      if j > 0 and grid[i][j-1] == 1:
+// 11                          total -= 2
+// 12                      if i > 0 and grid[i-1][j] == 1:
+// 13                          total -= 2
+// 14          return total
+function buildSteps463v2(input) {
+  const parsed = parseBinary(input, true);
+  const original = parsed.grid.map((row) => [...row]);
+  if (!parsed.valid) {
+    return invalid(original, tr("Grid chỉ được chứa 0 và 1.", "Grid may contain only 0 and 1."));
+  }
+  const grid = parsed.grid.map((row) => row.map(Number));
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const steps = [];
+
+  // contrib[r][c] = running perimeter contribution counted so far for that cell (starts at 0, up to 4).
+  const contrib = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const scanned = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+  function makeCells(cur, peer) {
+    return grid.map((row, r) => row.map((v, c) => {
+      let cls = v === 0 ? "wall" : "empty";
+      if (v === 1 && scanned[r][c]) cls = "visited";
+      if (peer && peer[0] === r && peer[1] === c) cls = "queued";
+      if (cur && cur[0] === r && cur[1] === c) cls = "current";
+      const meta = v === 1 ? `Σ${contrib[r][c]}` : "";
+      return { label: String(v), meta, cls };
+    }));
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [], codeBlock: 2,
+      bfsGrid: { rows, cols, cells: makeCells(o.cur || null, o.peer || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: [...(o.vars || []), { name: "total", value: o.total !== undefined ? o.total : "—" }],
+      note: o.note,
+    });
+  }
+
+  // ── Lines 3–4 ───────────────────────────────────────────────────────
+  snap({
+    title: { vi: "n_rows = len(grid); n_cols = len(grid[0])", en: "n_rows = len(grid); n_cols = len(grid[0])" },
+    codeLines: [3, 4],
+    vars: [{ name: "n_rows", value: rows }, { name: "n_cols", value: cols }],
+    note: {
+      vi: `Lưới ${rows}×${cols}. Ý tưởng khác: mỗi ô đất coi như CÓ SẴN 4 cạnh, rồi TRỪ ĐI 2 cho mỗi cặp đất kề TRÁI hoặc TRÊN (mỗi cặp đất dính chỉ trừ đúng 1 lần, không đếm 2 lần).`,
+      en: `Grid ${rows}×${cols}. Different idea: assume every land cell starts with 4 free edges, then SUBTRACT 2 for every LEFT or TOP land neighbor (each touching pair is subtracted exactly once, never twice).`,
+    },
+  });
+
+  // ── Line 5 ──────────────────────────────────────────────────────────
+  let total = 0;
+  snap({
+    title: { vi: "total = 0", en: "total = 0" },
+    codeLines: [5], total,
+    vars: [],
+    note: {
+      vi: "Σ trên mỗi ô đất là tổng đóng góp NET của ô đó vào total (4 trừ đi các lần bị trừ 2).",
+      en: "Σ on each land cell is that cell's NET contribution to total (4 minus every −2 deduction).",
+    },
+  });
+
+  for (let i = 0; i < rows; i++) {
+    // ── Line 6 ──────────────────────────────────────────────────────
+    snap({
+      title: { vi: `line 6: for i in range(n_rows) → i = ${i}`, en: `line 6: for i in range(n_rows) → i = ${i}` },
+      codeLines: [6], total,
+      vars: [{ name: "i", value: i }],
+      note: { vi: `Quét dòng ${i}.`, en: `Scan row ${i}.` },
+    });
+
+    for (let j = 0; j < cols; j++) {
+      // ── Line 7 ────────────────────────────────────────────────────
+      snap({
+        title: { vi: `line 7: for j in range(n_cols) → j = ${j}`, en: `line 7: for j in range(n_cols) → j = ${j}` },
+        cur: [i, j], codeLines: [7], total,
+        vars: [{ name: "i, j", value: `${i}, ${j}` }],
+        note: { vi: `Xét ô (${i},${j}).`, en: `Inspect cell (${i},${j}).` },
+      });
+
+      // ── Line 8 ────────────────────────────────────────────────────
+      const isLand = grid[i][j] === 1;
+      snap({
+        title: { vi: `line 8: grid[${i}][${j}] == 1?`, en: `line 8: grid[${i}][${j}] == 1?` },
+        cur: [i, j], codeLines: [8], total,
+        vars: [{ name: "grid[i][j]", value: grid[i][j] }, { name: "is land?", value: isLand }],
+        note: {
+          vi: isLand ? `grid[${i}][${j}] = 1 → là đất → sang line 9.` : `grid[${i}][${j}] = 0 → là nước → bỏ qua ô này, sang j tiếp theo.`,
+          en: isLand ? `grid[${i}][${j}] = 1 → land → go to line 9.` : `grid[${i}][${j}] = 0 → water → skip this cell, move to the next j.`,
+        },
+      });
+      if (!isLand) continue;
+      scanned[i][j] = true;
+
+      // ── Line 9: total += 4 ───────────────────────────────────────
+      total += 4;
+      contrib[i][j] += 4;
+      snap({
+        title: { vi: `line 9: total += 4 → ${total}`, en: `line 9: total += 4 → ${total}` },
+        cur: [i, j], codeLines: [9], total,
+        vars: [{ name: "cell contribution", value: contrib[i][j] }, { name: "total", value: total }],
+        note: {
+          vi: `Giả sử (${i},${j}) là đảo cô lập → có 4 cạnh tự do. total = ${total}. Bây giờ kiểm tra 2 hàng xóm ĐÃ QUÉT (trái, trên) để trừ cạnh dính.`,
+          en: `Assume (${i},${j}) is an isolated island → 4 free edges. total = ${total}. Now check its 2 ALREADY-SCANNED neighbors (left, top) to subtract shared edges.`,
+        },
+      });
+
+      // ── Line 10: check left neighbor ──────────────────────────────
+      const hasLeft = j > 0;
+      const leftLand = hasLeft && grid[i][j - 1] === 1;
+      snap({
+        title: { vi: `line 10: j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}`, en: `line 10: j > 0 and grid[${i}][${j - 1}] == 1 → ${leftLand}` },
+        cur: [i, j], peer: hasLeft ? [i, j - 1] : null, codeLines: [10], total,
+        vars: [
+          { name: "j > 0?", value: hasLeft },
+          { name: `grid[${i}][${j - 1}]`, value: hasLeft ? grid[i][j - 1] : "—" },
+          { name: "left is land?", value: leftLand },
+        ],
+        note: {
+          vi: !hasLeft
+            ? `j=0 → không có ô bên trái → bỏ qua line 11.`
+            : leftLand
+              ? `Ô bên trái (${i},${j - 1}) là đất → hai ô dính nhau → sang line 11 trừ cạnh chung.`
+              : `Ô bên trái (${i},${j - 1}) là nước → không có cạnh chung để trừ.`,
+          en: !hasLeft
+            ? `j=0 → no cell to the left → skip line 11.`
+            : leftLand
+              ? `Left cell (${i},${j - 1}) is land → the two cells touch → go to line 11 to subtract the shared edge.`
+              : `Left cell (${i},${j - 1}) is water → no shared edge to subtract.`,
+        },
+      });
+      if (leftLand) {
+        // ── Line 11: total -= 2 ─────────────────────────────────────
+        total -= 2;
+        contrib[i][j] -= 2;
+        snap({
+          title: { vi: `line 11: total -= 2 → ${total}`, en: `line 11: total -= 2 → ${total}` },
+          cur: [i, j], peer: [i, j - 1], codeLines: [11], total,
+          vars: [{ name: "cell contribution", value: contrib[i][j] }, { name: "total", value: total }],
+          note: {
+            vi: `Cạnh chung TRÁI giữa (${i},${j}) và (${i},${j - 1}) không phải biên → trừ 2 (1 cạnh cho mỗi ô, tổng cộng 2). total = ${total}.`,
+            en: `The shared LEFT edge between (${i},${j}) and (${i},${j - 1}) is not a boundary → subtract 2 (1 edge for each cell, 2 total). total = ${total}.`,
+          },
+        });
+      }
+
+      // ── Line 12: check top neighbor ────────────────────────────────
+      const hasTop = i > 0;
+      const topLand = hasTop && grid[i - 1][j] === 1;
+      snap({
+        title: { vi: `line 12: i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}`, en: `line 12: i > 0 and grid[${i - 1}][${j}] == 1 → ${topLand}` },
+        cur: [i, j], peer: hasTop ? [i - 1, j] : null, codeLines: [12], total,
+        vars: [
+          { name: "i > 0?", value: hasTop },
+          { name: `grid[${i - 1}][${j}]`, value: hasTop ? grid[i - 1][j] : "—" },
+          { name: "top is land?", value: topLand },
+        ],
+        note: {
+          vi: !hasTop
+            ? `i=0 → không có ô bên trên → bỏ qua line 13.`
+            : topLand
+              ? `Ô bên trên (${i - 1},${j}) là đất → hai ô dính nhau → sang line 13 trừ cạnh chung.`
+              : `Ô bên trên (${i - 1},${j}) là nước → không có cạnh chung để trừ.`,
+          en: !hasTop
+            ? `i=0 → no cell above → skip line 13.`
+            : topLand
+              ? `Top cell (${i - 1},${j}) is land → the two cells touch → go to line 13 to subtract the shared edge.`
+              : `Top cell (${i - 1},${j}) is water → no shared edge to subtract.`,
+        },
+      });
+      if (topLand) {
+        // ── Line 13: total -= 2 ─────────────────────────────────────
+        total -= 2;
+        contrib[i][j] -= 2;
+        snap({
+          title: { vi: `line 13: total -= 2 → ${total}`, en: `line 13: total -= 2 → ${total}` },
+          cur: [i, j], peer: [i - 1, j], codeLines: [13], total,
+          vars: [{ name: "cell contribution", value: contrib[i][j] }, { name: "total", value: total }],
+          note: {
+            vi: `Cạnh chung TRÊN giữa (${i},${j}) và (${i - 1},${j}) không phải biên → trừ 2. total = ${total}.`,
+            en: `The shared TOP edge between (${i},${j}) and (${i - 1},${j}) is not a boundary → subtract 2. total = ${total}.`,
+          },
+        });
+      }
+
+      snap({
+        title: { vi: `Xong ô (${i},${j}): đóng góp net = ${contrib[i][j]}`, en: `Done with (${i},${j}): net contribution = ${contrib[i][j]}` },
+        cur: [i, j], codeLines: [8, 9, 10, 11, 12, 13], total,
+        vars: [{ name: "cell net contribution", value: contrib[i][j] }, { name: "total", value: total }],
+        note: {
+          vi: `(${i},${j}) đóng góp net ${contrib[i][j]} cạnh (4 trừ đi các cạnh dính trái/trên). Chuyển sang ô kế tiếp.`,
+          en: `(${i},${j}) contributes a net of ${contrib[i][j]} edges (4 minus shared left/top edges). Move to the next cell.`,
+        },
+      });
+    }
+  }
+
+  // ── Line 14 ─────────────────────────────────────────────────────────
+  snap({
+    title: { vi: `line 14: return ${total}`, en: `line 14: return ${total}` },
+    final: true, codeLines: [14], total,
+    vars: [{ name: "answer", value: total }],
+    note: {
+      vi: `Đã quét hết lưới. Tổng chu vi = ${total}. Cách này KHÔNG cần xét ô bên phải/dưới vì cặp đó sẽ được ô bên phải/dưới tự trừ khi tới lượt nó (tính từ góc nhìn trái/trên của nó).`,
+      en: `Finished scanning. Total perimeter = ${total}. This approach never checks the right/bottom neighbor because that pair gets subtracted later, from the right/bottom cell's own left/top perspective.`,
+    },
+  });
+
+  return { original: grid, answer: total, steps };
+}
+
 const problems = {
   463: {
     id: 463, difficulty: "easy", slug: "island-perimeter",
@@ -922,16 +1147,28 @@ const problems = {
     defaultInput: "0100|1110|0100|1100",
     inputKind: "string",
     inputLabel: tr("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
+    extraParams: [
+      {
+        key: "approach",
+        label: tr("Cách giải", "Approach"),
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: tr("Cách 1: đếm 4 hướng trực tiếp", "Approach 1: check all 4 sides directly") },
+          { value: "2", label: tr("Cách 2: +4 rồi trừ cạnh dính trái/trên", "Approach 2: +4 then subtract shared left/top edges") },
+        ],
+      },
+    ],
     approach: [
-      tr("Quét từng ô đất.", "Scan every land cell."),
-      tr("Với mỗi ô đất, xét 4 hướng: nếu hướng đó là nước hoặc ngoài lưới → +1 chu vi.", "For each land cell, check 4 directions: if that side is water or out of bounds → +1 perimeter."),
-      tr("Không cần DFS/BFS gom đảo — chỉ đếm cạnh biên trực tiếp.", "No DFS/BFS needed to group the island — just count boundary edges directly."),
+      tr("Cách 1: với mỗi ô đất, xét 4 hướng: nếu hướng đó là nước hoặc ngoài lưới → +1 chu vi.", "Approach 1: for each land cell, check 4 directions: if that side is water or out of bounds → +1 perimeter."),
+      tr("Cách 2: mỗi ô đất giả sử có 4 cạnh tự do (+4), rồi trừ 2 cho mỗi ô đất kề TRÁI hoặc TRÊN (mỗi cặp chỉ trừ 1 lần, không đếm 2 lần vì chỉ nhìn về 1 phía).", "Approach 2: assume every land cell has 4 free edges (+4), then subtract 2 for every LEFT or TOP land neighbor (each pair subtracted exactly once by only looking backward)."),
     ],
     complexity: {
       time: "O(rows·cols)",
       space: "O(1)",
-      note: tr("Mỗi ô xét đúng 1 lần, 4 hướng cố định.", "Each cell is checked once, with 4 fixed directions."),
+      note: tr("Mỗi ô xét đúng 1 lần; cách 2 chỉ xét 2 hướng (trái, trên) thay vì 4.", "Each cell is checked once; approach 2 only checks 2 directions (left, top) instead of 4."),
     },
+    codeLabel: tr("Cách 1: đếm 4 hướng trực tiếp", "Approach 1: check all 4 sides directly"),
     code: [
       "class Solution:",
       "    def islandPerimeter(self, grid):",
@@ -949,7 +1186,25 @@ const problems = {
       "                        perimeter += 1",
       "        return perimeter",
     ],
+    code2Label: tr("Cách 2: +4 rồi trừ cạnh dính trái/trên", "Approach 2: +4 then subtract shared left/top edges"),
+    code2: [
+      "class Solution:",
+      "    def islandPerimeter(self, grid):",
+      "        n_rows = len(grid)",
+      "        n_cols = len(grid[0])",
+      "        total = 0",
+      "        for i in range(n_rows):",
+      "            for j in range(n_cols):",
+      "                if grid[i][j] == 1:",
+      "                    total += 4",
+      "                    if j > 0 and grid[i][j-1] == 1:",
+      "                        total -= 2",
+      "                    if i > 0 and grid[i-1][j] == 1:",
+      "                        total -= 2",
+      "        return total",
+    ],
     builder: buildSteps463,
+    builder2: buildSteps463v2,
   },
   733: {
     id: 733, difficulty: "easy", slug: "flood-fill",
