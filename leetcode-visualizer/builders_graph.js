@@ -386,29 +386,42 @@ function buildSteps1368(input) {
   const distStr = () => `[${dist.map((row) => `[${row.map(formatCost).join(", ")}]`).join(", ")}]`;
   const dequeStr = () => `[${deque.map(([cost, r, c]) => `(${cost}, ${r}, ${c})`).join(", ")}]`;
 
-  function makeCells(current = null, pathCells = new Set()) {
+  function makeCells(current = null, pathCells = new Set(), pathMoves = null) {
     const queued = new Set(deque.map(([, r, c]) => key(r, c)));
     return grid.map((row, r) => row.map((direction, c) => {
       const cellKey = key(r, c);
       let cls = "empty";
       if (finalized.has(cellKey)) cls = "visited";
       if (queued.has(cellKey)) cls = "queued";
-      if (pathCells.has(cellKey)) cls = "path";
+      if (pathCells.has(cellKey)) cls = "route";
       if (current && current[0] === r && current[1] === c) cls = "current";
       const endpoint = r === 0 && c === 0
         ? " · S"
         : r === rows - 1 && c === cols - 1
           ? " · T"
           : "";
-      return { label: arrow[direction], meta: `c:${formatCost(dist[r][c])}${endpoint}`, cls };
+      // On the final path, show the move taken and mark changed arrows (cost 1).
+      let move = "";
+      let label = arrow[direction];
+      if (pathMoves && pathMoves.has(cellKey)) {
+        const mv = pathMoves.get(cellKey);
+        if (mv.changed) {
+          move = ` · ✎${arrow[mv.code]}`;
+          label = `${arrow[direction]}→${arrow[mv.code]}`;
+          cls = "route changed";
+        } else {
+          move = ` · ${arrow[mv.code]}`;
+        }
+      }
+      return { label, meta: `c:${formatCost(dist[r][c])}${endpoint}${move}`, cls };
     }));
   }
 
-  function pushStep({ title, codeLine, vars, note, current = null, pathCells, final = false }) {
+  function pushStep({ title, codeLine, vars, note, current = null, pathCells, pathMoves = null, final = false }) {
     steps.push({
       title,
       arr: [],
-      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells) },
+      bfsGrid: { rows, cols, variant: "effort-grid", cells: makeCells(current, pathCells, pathMoves) },
       highlight: [],
       mark: [],
       final,
@@ -753,19 +766,35 @@ function buildSteps1368(input) {
   }
   const pathCells = new Set(path.map(([r, c]) => key(r, c)));
   const pathText = path.map(([r, c]) => `(${r},${c})`).join(" → ");
+
+  // For each cell on the path, record the direction moved to the next cell and
+  // whether that required changing the cell's arrow (an edge of cost 1).
+  const codeOf = (dr, dc) => (dr === 0 && dc === 1) ? 1 : (dr === 0 && dc === -1) ? 2 : (dr === 1 && dc === 0) ? 3 : 4;
+  const pathMoves = new Map();
+  const changedCells = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const [r, c] = path[i];
+    const [nr, nc] = path[i + 1];
+    const moveCode = codeOf(nr - r, nc - c);
+    const changed = grid[r][c] !== moveCode;
+    pathMoves.set(key(r, c), { code: moveCode, changed });
+    if (changed) changedCells.push(`(${r},${c})→${arrow[moveCode]}`);
+  }
+
   pushStep({
     title: { vi: `Chi phí nhỏ nhất = ${answer}`, en: `Minimum cost = ${answer}` },
     codeLine: 27,
     pathCells,
+    pathMoves,
     final: true,
     vars: [
       { name: "path", value: pathText },
-      { name: "arrow changes", value: answer },
+      { name: "arrows changed", value: answer > 0 ? changedCells.join(", ") : "0 (đi thẳng theo mũi tên có sẵn)" },
       { name: "answer", value: answer },
     ],
     note: {
-      vi: `Đường xanh lá: ${pathText}. Cần đổi đúng ${answer} mũi tên trên đường này; không có đường hợp lệ nào dùng ít lần đổi hơn.`,
-      en: `Green path: ${pathText}. It changes exactly ${answer} arrows; no valid route uses fewer changes.`,
+      vi: `Đường tối ưu (tô xanh ngọc): ${pathText}. Ô có ✎ là nơi PHẢI ĐỔI mũi tên (mỗi lần đổi tốn 1): ${answer > 0 ? changedCells.join(", ") : "không có — đi thẳng theo mũi tên sẵn có"}. Tổng số lần đổi = ${answer} = đáp án; không đường nào ít hơn.`,
+      en: `Optimal path (emerald): ${pathText}. Cells marked ✎ are where the arrow MUST change (each change costs 1): ${answer > 0 ? changedCells.join(", ") : "none — follow the existing arrows"}. Total changes = ${answer} = the answer; no route uses fewer.`,
     },
   });
 
