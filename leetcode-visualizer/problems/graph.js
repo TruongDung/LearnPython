@@ -15529,90 +15529,205 @@ function buildSteps3310(input, params) {
     });
   }
 
-  // Step 1: BFS from k to find suspicious set
+  // Line 3: adj = [[] for _ in range(n)]
   snap({
-    title: { vi: `BFS từ k=${k} để tìm tập suspicious`, en: `BFS from k=${k} to find the suspicious set` },
-    hlNodes: [k],
-    codeLines: [4, 5],
-    vars: [{ name: "n", value: n }, { name: "k", value: k }, { name: "edges", value: edges.map(([a, b]) => `${a}→${b}`).join(", ") }],
+    title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
+    codeLines: [3],
+    vars: [{ name: "n", value: n }, { name: "k", value: k }],
     note: {
-      vi: `Bắt đầu BFS/DFS từ method k=${k}. Mọi method mà k gọi được (trực tiếp hoặc gián tiếp) đều là "suspicious".`,
-      en: `Start BFS/DFS from method k=${k}. Every method reachable from k (directly or transitively) is "suspicious".`,
+      vi: `n=${n} methods, k=${k} bị lỗi. Xây adjacency list có hướng từ danh sách invocations.`,
+      en: `n=${n} methods, k=${k} is buggy. Build a directed adjacency list from the invocations.`,
     },
   });
 
-  const suspicious = new Set([k]);
+  // Line 4-5: for a, b in invocations: adj[a].append(b)
+  for (const [a, b] of edges) {
+    snap({
+      title: { vi: `for a,b in invocations → (${a},${b}): adj[${a}].append(${b})`, en: `for a,b in invocations → (${a},${b}): adj[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [4, 5],
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(",")}]` }],
+      note: {
+        vi: `Method ${a} gọi method ${b} → thêm ${b} vào adj[${a}].`,
+        en: `Method ${a} calls method ${b} → add ${b} to adj[${a}].`,
+      },
+    });
+  }
+
+  // Line 6: suspicious = set()
+  const suspicious = new Set();
+  snap({
+    title: { vi: "suspicious = set()", en: "suspicious = set()" },
+    codeLines: [6],
+    note: {
+      vi: "Tập suspicious sẽ chứa tất cả method mà k gọi được (trực/gián tiếp).",
+      en: "The suspicious set will hold every method reachable from k (directly or transitively).",
+    },
+  });
+
+  // Line 7: queue = deque([k])
   const queue = [k];
+  snap({
+    title: { vi: `queue = deque([${k}])`, en: `queue = deque([${k}])` },
+    hlNodes: [k],
+    codeLines: [7],
+    vars: [{ name: "queue", value: `[${k}]` }],
+    note: {
+      vi: `Đưa k=${k} vào queue để bắt đầu BFS.`,
+      en: `Push k=${k} into the queue to start BFS.`,
+    },
+  });
+
+  // Line 8: suspicious.add(k)
+  suspicious.add(k);
+  snap({
+    title: { vi: `suspicious.add(${k})`, en: `suspicious.add(${k})` },
+    hlNodes: [k],
+    visitedNodes: [...suspicious],
+    codeLines: [8],
+    vars: [{ name: "suspicious", value: `{${[...suspicious].join(",")}}` }],
+    note: {
+      vi: `k=${k} chắc chắn suspicious (nó là method bị lỗi).`,
+      en: `k=${k} is definitely suspicious (it's the buggy method itself).`,
+    },
+  });
+
+  // BFS loop
   while (queue.length) {
+    // Line 9: while queue:
+    snap({
+      title: { vi: `while queue → True (queue=[${queue.join(",")}])`, en: `while queue → True (queue=[${queue.join(",")}])` },
+      visitedNodes: [...suspicious],
+      codeLines: [9],
+      vars: [{ name: "queue", value: `[${queue.join(",")}]` }],
+      note: {
+        vi: `queue không rỗng → còn method cần kiểm tra hàng xóm.`,
+        en: `queue is not empty → there are still methods whose neighbors need checking.`,
+      },
+    });
+
+    // Line 10: node = queue.popleft()
     const node = queue.shift();
-    for (const next of adj[node]) {
-      if (!suspicious.has(next)) {
-        suspicious.add(next);
-        queue.push(next);
+    snap({
+      title: { vi: `node = queue.popleft() → ${node}`, en: `node = queue.popleft() → ${node}` },
+      hlNodes: [node],
+      visitedNodes: [...suspicious],
+      codeLines: [10],
+      vars: [{ name: "node", value: node }, { name: "adj[node]", value: `[${adj[node].join(",")}]` }],
+      note: {
+        vi: `Lấy method ${node} ra khỏi queue. Sẽ xét tất cả method mà ${node} gọi (adj[${node}]=[${adj[node].join(",")}]).`,
+        en: `Pop method ${node} from the queue. Will check all methods that ${node} calls (adj[${node}]=[${adj[node].join(",")}]).`,
+      },
+    });
+
+    for (const nxt of adj[node]) {
+      // Line 11: for nxt in adj[node]:
+      const alreadySuspicious = suspicious.has(nxt);
+      snap({
+        title: { vi: `for nxt in adj[${node}]: nxt=${nxt}; nxt in suspicious? → ${alreadySuspicious}`, en: `for nxt in adj[${node}]: nxt=${nxt}; nxt in suspicious? → ${alreadySuspicious}` },
+        hlNodes: [node, nxt],
+        hlEdges: [[node, nxt]],
+        visitedNodes: [...suspicious],
+        codeLines: [11, 12],
+        vars: [{ name: "nxt", value: nxt }],
+        note: alreadySuspicious
+          ? { vi: `${nxt} đã có trong suspicious → bỏ qua (đã xét trước đó).`, en: `${nxt} is already in suspicious → skip (already processed).` }
+          : { vi: `${nxt} chưa có trong suspicious → thêm vào.`, en: `${nxt} is not in suspicious yet → add it.` },
+      });
+
+      if (!alreadySuspicious) {
+        // Line 13-14: suspicious.add(nxt); queue.append(nxt)
+        suspicious.add(nxt);
+        queue.push(nxt);
+        snap({
+          title: { vi: `suspicious.add(${nxt}); queue.append(${nxt})`, en: `suspicious.add(${nxt}); queue.append(${nxt})` },
+          hlNodes: [nxt],
+          visitedNodes: [...suspicious],
+          codeLines: [13, 14],
+          vars: [{ name: "suspicious", value: `{${[...suspicious].sort((a, b) => a - b).join(",")}}` }, { name: "queue", value: `[${queue.join(",")}]` }],
+          note: {
+            vi: `Thêm ${nxt} vào suspicious và queue (sẽ xét hàng xóm của ${nxt} sau).`,
+            en: `Add ${nxt} to suspicious and queue (will check ${nxt}'s neighbors later).`,
+          },
+        });
       }
     }
   }
 
+  // Line 9 final: while queue → False
   snap({
-    title: { vi: `Tập suspicious = {${[...suspicious].sort((a, b) => a - b).join(",")}}`, en: `Suspicious set = {${[...suspicious].sort((a, b) => a - b).join(",")}}` },
-    hlNodes: [...suspicious],
+    title: { vi: "while queue → False (queue rỗng)", en: "while queue → False (queue empty)" },
     visitedNodes: [...suspicious],
-    codeLines: [6, 7, 8, 9],
+    codeLines: [9],
     vars: [{ name: "suspicious", value: `{${[...suspicious].sort((a, b) => a - b).join(",")}}` }],
     note: {
-      vi: `BFS hoàn tất. Tập suspicious gồm ${suspicious.size} method(s): {${[...suspicious].sort((a, b) => a - b).join(",")}}. Đây là tất cả method mà k=${k} có thể gọi tới (kể cả chính k).`,
-      en: `BFS complete. The suspicious set has ${suspicious.size} method(s): {${[...suspicious].sort((a, b) => a - b).join(",")}}. These are all methods reachable from k=${k} (including k itself).`,
+      vi: `BFS hoàn tất. Tập suspicious = {${[...suspicious].sort((a, b) => a - b).join(",")}} (${suspicious.size} methods).`,
+      en: `BFS complete. Suspicious set = {${[...suspicious].sort((a, b) => a - b).join(",")}} (${suspicious.size} methods).`,
     },
   });
 
-  // Step 2: Check if any external method calls into the suspicious set
+  // Line 15-16: for a, b in invocations: if a not in suspicious and b in suspicious: return list(range(n))
   let canRemove = true;
   let blockingEdge = null;
   for (const [u, v] of edges) {
-    if (!suspicious.has(u) && suspicious.has(v)) {
+    const uOut = !suspicious.has(u);
+    const vIn = suspicious.has(v);
+    const blocks = uOut && vIn;
+
+    snap({
+      title: { vi: `Kiểm cạnh (${u},${v}): ${u}∉S? ${uOut}, ${v}∈S? ${vIn} → ${blocks ? "CHẶN" : "OK"}`, en: `Check edge (${u},${v}): ${u}∉S? ${uOut}, ${v}∈S? ${vIn} → ${blocks ? "BLOCKS" : "OK"}` },
+      hlNodes: [u, v],
+      hlEdges: [[u, v]],
+      visitedNodes: [...suspicious],
+      codeLines: [15, 16],
+      vars: [{ name: "a,b", value: `(${u},${v})` }, { name: "a∉suspicious", value: uOut }, { name: "b∈suspicious", value: vIn }],
+      note: blocks
+        ? { vi: `Method ${u} ở NGOÀI suspicious nhưng GỌI ${v} BÊN TRONG → nếu xóa nhóm suspicious thì ${u} sẽ bị hỏng → KHÔNG THỂ xóa.`, en: `Method ${u} is OUTSIDE suspicious but CALLS ${v} INSIDE → removing the suspicious group would break ${u} → CANNOT remove.` }
+        : { vi: `Cạnh (${u},${v}) không chặn (${uOut ? "u ngoài nhưng v cũng ngoài" : "u trong suspicious nên vô hại"}).`, en: `Edge (${u},${v}) doesn't block (${uOut ? "u outside but v also outside" : "u is inside suspicious so harmless"}).` },
+    });
+
+    if (blocks) {
       canRemove = false;
       blockingEdge = [u, v];
+
+      // Line 17: return list(range(n))
+      snap({
+        title: { vi: `return list(range(n)) → [${allNodes.join(",")}]`, en: `return list(range(n)) → [${allNodes.join(",")}]` },
+        hlNodes: [u, v],
+        hlEdges: [[u, v]],
+        visitedNodes: [...suspicious],
+        final: true,
+        codeLines: [17],
+        vars: [{ name: "answer", value: `[${allNodes.join(",")}]` }],
+        note: {
+          vi: `Có method bên ngoài (${u}) gọi vào suspicious (${v}) → không thể xóa nhóm → trả tất cả ${n} methods.`,
+          en: `An outside method (${u}) calls into suspicious (${v}) → can't remove the group → return all ${n} methods.`,
+        },
+      });
       break;
     }
   }
 
-  snap({
-    title: canRemove
-      ? { vi: "Không có cạnh ngoài → vào suspicious → CÓ THỂ xóa", en: "No edge from outside → into suspicious → CAN remove" }
-      : { vi: `Cạnh ${blockingEdge[0]}→${blockingEdge[1]} chặn: ngoài gọi vào suspicious → KHÔNG THỂ xóa`, en: `Edge ${blockingEdge[0]}→${blockingEdge[1]} blocks: outside calls into suspicious → CANNOT remove` },
-    hlNodes: canRemove ? [...suspicious] : [blockingEdge[0], blockingEdge[1]],
-    hlEdges: blockingEdge ? [[blockingEdge[0], blockingEdge[1]]] : [],
-    visitedNodes: [...suspicious],
-    codeLines: [10, 11, 12],
-    vars: [{ name: "canRemove", value: canRemove }],
-    note: canRemove
-      ? { vi: `Duyệt tất cả cạnh: KHÔNG tìm thấy cạnh (u,v) nào mà u ∉ suspicious và v ∈ suspicious → nhóm suspicious bị "cô lập" → có thể xóa an toàn.`, en: `Checked all edges: NO edge (u,v) found where u ∉ suspicious and v ∈ suspicious → the suspicious group is "isolated" → safe to remove.` }
-      : { vi: `Cạnh (${blockingEdge[0]},${blockingEdge[1]}): method ${blockingEdge[0]} ở NGOÀI suspicious nhưng GỌI method ${blockingEdge[1]} BÊN TRONG → nếu xóa thì ${blockingEdge[0]} sẽ bị hỏng → KHÔNG thể xóa.`, en: `Edge (${blockingEdge[0]},${blockingEdge[1]}): method ${blockingEdge[0]} is OUTSIDE suspicious but CALLS method ${blockingEdge[1]} INSIDE → removing would break ${blockingEdge[0]} → CANNOT remove.` },
-  });
+  if (canRemove) {
+    // Line 18: return [i for i in range(n) if i not in suspicious]
+    const answer = allNodes.filter((id) => !suspicious.has(id));
+    snap({
+      title: { vi: `return [i for i in range(n) if i not in suspicious] → [${answer.join(",")}]`, en: `return [i for i in range(n) if i not in suspicious] → [${answer.join(",")}]` },
+      hlNodes: answer,
+      visitedNodes: [...suspicious],
+      final: true,
+      codeLines: [18],
+      vars: [{ name: "answer", value: `[${answer.join(",")}]` }],
+      note: {
+        vi: `Không có cạnh nào từ ngoài gọi vào suspicious → xóa nhóm an toàn. Còn lại: [${answer.join(",")}].`,
+        en: `No edge from outside calls into suspicious → safe to remove the group. Remaining: [${answer.join(",")}].`,
+      },
+    });
+    return { original: edges, n, k, answer, steps };
+  }
 
-  // Step 3: Return result
-  const answer = canRemove
-    ? allNodes.filter((id) => !suspicious.has(id))
-    : allNodes;
-
-  const fs = {
-    title: canRemove
-      ? { vi: `Xóa suspicious → còn lại [${answer.join(",")}]`, en: `Remove suspicious → remaining [${answer.join(",")}]` }
-      : { vi: `Không xóa được → trả tất cả [${answer.join(",")}]`, en: `Cannot remove → return all [${answer.join(",")}]` },
-    arr: [],
-    graph: makeGraph(canRemove ? answer : [], [], canRemove ? [...suspicious] : []),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [13, 14],
-    vars: [{ name: "answer", value: `[${answer.join(",")}]` }],
-    note: canRemove
-      ? { vi: `Nhóm suspicious {${[...suspicious].sort((a, b) => a - b).join(",")}} đã bị xóa. Các method còn lại: [${answer.join(",")}].`, en: `The suspicious group {${[...suspicious].sort((a, b) => a - b).join(",")}} has been removed. Remaining methods: [${answer.join(",")}].` }
-      : { vi: `Không thể xóa nhóm suspicious vì có method bên ngoài gọi vào. Trả về tất cả ${n} methods.`, en: `Cannot remove the suspicious group because an outside method calls into it. Return all ${n} methods.` },
-  };
-  steps.push(fs);
-
-  return { original: edges, n, k, answer, steps };
+  return { original: edges, n, k, answer: allNodes, steps };
 }
 
 module.exports = {
