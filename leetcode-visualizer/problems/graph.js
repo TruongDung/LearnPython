@@ -8706,8 +8706,19 @@ function buildSteps1319DFS(input, params) {
  * cell is popped, result is the answer. One code line highlighted per step.
  */
 function buildSteps1102(input) {
-  const grid = String(input || "")
-    .split("|").map((row) => row.split(",").map((s) => Number(s.trim())));
+  const raw = String(input || "").trim();
+  let grid;
+  if (raw.includes("[")) {
+    // LeetCode notation: [[5,4,5],[1,2,6],[7,4,6]]
+    grid = (raw.match(/\[([^\[\]]*)\]/g) || [])
+      .map((g) => g.replace(/[\[\]]/g, "").trim())
+      .filter((x) => x.length)
+      .map((row) => row.split(",").map((s) => Number(s.trim())));
+  } else {
+    // Pipe notation: 5,4,5|1,2,6|7,4,6
+    grid = raw.split("|").map((row) => row.split(",").map((s) => Number(s.trim())));
+  }
+  if (!grid.length) grid = [[]];
   const m = grid.length;
   const n = grid[0] ? grid[0].length : 0;
   const steps = [];
@@ -17226,14 +17237,14 @@ module.exports = {
     statement: {
       vi:
         "Cho lưới số m×n. Tìm đường đi từ (0,0) đến (m-1,n-1) (đi 4 hướng) sao cho GIÁ TRỊ NHỎ NHẤT trên đường là LỚN NHẤT có thể. " +
-        "Trả về giá trị đó. Nhập lưới: các hàng cách bởi '|', các số trong hàng cách bởi ','.",
+        "Trả về giá trị đó. Nhập lưới kiểu LeetCode: [[5,4,5],[1,2,6],[7,4,6]] (hoặc dạng '5,4,5|1,2,6').",
       en:
         "Given an m×n integer grid, find a path from (0,0) to (m-1,n-1) (4-directional) that maximizes the MINIMUM value on the path. " +
-        "Return that value. Enter the grid with rows separated by '|' and numbers by ','.",
+        "Return that value. Enter the grid in LeetCode form: [[5,4,5],[1,2,6],[7,4,6]] (or as '5,4,5|1,2,6').",
     },
-    defaultInput: "5,4,5|1,2,6|7,4,6",
+    defaultInput: "[[5,4,5],[1,2,6],[7,4,6]]",
     inputKind: "string",
-    inputLabel: { vi: "grid (hàng | , số ,)", en: "grid (rows |, numbers ,)" },
+    inputLabel: { vi: "grid (vd [[5,4,5],[1,2,6],[7,4,6]])", en: "grid (e.g. [[5,4,5],[1,2,6],[7,4,6]])" },
     singleInput: true,
     extraParams: [],
     approach: [
