@@ -2758,6 +2758,156 @@ function buildSteps3532Prefix(input, params) {
   return { input, answer: `[${answers.join(",")}]`, steps };
 }
 
+// ─── 1697: Checking Existence of Edge Length Limited Paths (offline Union-Find) ───
+function buildSteps1697(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 3;
+  const edgeList = String(input || "").split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map((x) => Number(x.trim())))
+    .filter((e) => e.length === 3 && !e.some(isNaN));
+  const queries = String((params && params.queries) || "").split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map((x) => Number(x.trim())))
+    .filter((q) => q.length === 3 && !q.some(isNaN));
+  const steps = [];
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+
+  const drawn = [];              // {u, v, w}
+  const drawnKeys = new Set();
+  function drawnEdges() { return drawn.map((e) => ({ u: e.u, v: e.v, w: e.w, undirected: true })); }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, arr: [],
+      graph: {
+        nodes: Array.from({ length: n }, (_, i) => ({ id: i, label: String(i) })),
+        edges: drawnEdges(),
+        hlNodes: o.hlNodes || [], hlEdges: o.hlEdges || [], visitedNodes: o.visitedNodes || [], annotations: {},
+      },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [], note: o.note,
+    });
+  }
+
+  const edgesStr = (list) => `[${list.map((e) => `(${e[0]},${e[1]},d${e[2]})`).join(", ")}]`;
+  const parentStr = () => `[${parent.join(",")}]`;
+
+  // ── Intro (line 2) ──
+  snap({
+    title: { vi: `Bài toán: ${n} node, ${edgeList.length} cạnh, ${queries.length} query`, en: `Problem: ${n} nodes, ${edgeList.length} edges, ${queries.length} queries` },
+    codeLines: [2],
+    vars: [
+      { name: "n", value: n },
+      { name: "edgeList", value: edgesStr(edgeList) },
+      { name: "queries", value: `[${queries.map((q) => `(${q[0]},${q[1]},lim${q[2]})`).join(", ")}]` },
+    ],
+    note: {
+      vi: `Mỗi query (p,q,limit): tồn tại đường p→q chỉ dùng cạnh có dist < limit? Ý tưởng OFFLINE: sắp cạnh theo dist tăng, sắp query theo limit tăng, rồi Union-Find gộp dần.`,
+      en: `Each query (p,q,limit): is there a path p→q using only edges with dist < limit? OFFLINE idea: sort edges by dist, sort queries by limit, then union incrementally.`,
+    },
+  });
+
+  // ── Line 3: sort edges by dist ──
+  const sortedEdges = edgeList.map((e) => [...e]).sort((a, b) => a[2] - b[2]);
+  snap({
+    title: { vi: "line 3: edgeList.sort theo dist", en: "line 3: edgeList.sort by dist" },
+    codeLines: [3],
+    vars: [{ name: "sorted edgeList", value: edgesStr(sortedEdges) }],
+    note: { vi: `Sắp cạnh theo khoảng cách tăng dần: ${edgesStr(sortedEdges)}.`, en: `Sort edges by increasing distance: ${edgesStr(sortedEdges)}.` },
+  });
+
+  // ── Line 4: sort queries by limit ──
+  const order = queries.map((_, i) => i).sort((a, b) => queries[a][2] - queries[b][2]);
+  snap({
+    title: { vi: "line 4: order = queries sắp theo limit", en: "line 4: order = queries sorted by limit" },
+    codeLines: [4],
+    vars: [{ name: "order", value: `[${order.join(", ")}]` }, { name: "limits", value: `[${order.map((i) => queries[i][2]).join(", ")}]` }],
+    note: { vi: `Xử lý query theo limit tăng dần để chỉ cần gộp cạnh MỘT LƯỢT. Thứ tự query gốc: [${order.join(", ")}].`, en: `Process queries by increasing limit so edges are unioned in a SINGLE sweep. Original query indices in order: [${order.join(", ")}].` },
+  });
+
+  // ── Line 5: parent init ──
+  snap({
+    title: { vi: "line 5: parent = list(range(n))", en: "line 5: parent = list(range(n))" },
+    codeLines: [5], vars: [{ name: "parent", value: parentStr() }],
+    note: { vi: "Union-Find: ban đầu mỗi node là nhóm riêng.", en: "Union-Find: each node starts in its own group." },
+  });
+
+  // ── Line 11: answer init, Line 12: ei = 0 ──
+  const answer = new Array(queries.length).fill(false);
+  snap({
+    title: { vi: "line 11-12: answer = [False]*q; ei = 0", en: "line 11-12: answer = [False]*q; ei = 0" },
+    codeLines: [11, 12], vars: [{ name: "answer", value: `[${answer.join(", ")}]` }, { name: "ei", value: 0 }],
+    note: { vi: "ei = con trỏ cạnh đã gộp (không lùi lại nhờ đã sắp xếp).", en: "ei = pointer to edges already unioned (never rewinds thanks to sorting)." },
+  });
+
+  let ei = 0;
+  for (const qi of order) {
+    const [p, q, limit] = queries[qi];
+    snap({
+      title: { vi: `line 13-14: i=${qi} → query (p=${p}, q=${q}, limit=${limit})`, en: `line 13-14: i=${qi} → query (p=${p}, q=${q}, limit=${limit})` },
+      hlNodes: [p, q], codeLines: [13, 14],
+      vars: [{ name: "i", value: qi }, { name: "p, q, limit", value: `${p}, ${q}, ${limit}` }, { name: "ei", value: ei }],
+      note: { vi: `Xử lý query gốc #${qi}: có đường ${p}→${q} với mọi cạnh dist < ${limit} không?`, en: `Handle original query #${qi}: is there a path ${p}→${q} with every edge dist < ${limit}?` },
+    });
+
+    // while ei < len and sortedEdges[ei][2] < limit
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const has = ei < sortedEdges.length;
+      const within = has && sortedEdges[ei][2] < limit;
+      snap({
+        title: { vi: `line 15: ei<${sortedEdges.length} và dist<${limit}? ${within}`, en: `line 15: ei<${sortedEdges.length} and dist<${limit}? ${within}` },
+        hlNodes: [p, q], hlEdges: within ? [[sortedEdges[ei][0], sortedEdges[ei][1]]] : [], codeLines: [15],
+        vars: [{ name: "ei", value: ei }, { name: has ? "edge[ei]" : "edge[ei]", value: has ? `(${sortedEdges[ei][0]},${sortedEdges[ei][1]},d${sortedEdges[ei][2]})` : "—" }, { name: "limit", value: limit }],
+        note: {
+          vi: within ? `Cạnh dist=${sortedEdges[ei][2]} < ${limit} → gộp cạnh này.` : has ? `Cạnh dist=${sortedEdges[ei][2]} ≥ ${limit} → dừng gộp cho query này.` : `Hết cạnh → dừng gộp.`,
+          en: within ? `Edge dist=${sortedEdges[ei][2]} < ${limit} → union this edge.` : has ? `Edge dist=${sortedEdges[ei][2]} ≥ ${limit} → stop unioning for this query.` : `No more edges → stop.`,
+        },
+      });
+      if (!within) break;
+
+      const [eu, ev, ew] = sortedEdges[ei];
+      parent[find(eu)] = find(ev);
+      const k = eu < ev ? `${eu}-${ev}` : `${ev}-${eu}`;
+      if (!drawnKeys.has(k)) { drawnKeys.add(k); drawn.push({ u: eu, v: ev, w: ew }); }
+      snap({
+        title: { vi: `line 16: union(${eu}, ${ev})`, en: `line 16: union(${eu}, ${ev})` },
+        hlNodes: [eu, ev], hlEdges: [[eu, ev]], codeLines: [16],
+        vars: [{ name: "edge", value: `(${eu},${ev},d${ew})` }, { name: "parent", value: parentStr() }],
+        note: { vi: `Gộp nhóm chứa ${eu} và ${ev} (cạnh dist ${ew}).`, en: `Union the groups of ${eu} and ${ev} (edge dist ${ew}).` },
+      });
+      ei += 1;
+      snap({
+        title: { vi: `line 17: ei += 1 → ${ei}`, en: `line 17: ei += 1 → ${ei}` },
+        hlNodes: [p, q], codeLines: [17], vars: [{ name: "ei", value: ei }],
+        note: { vi: `Chuyển sang cạnh tiếp theo (con trỏ không lùi).`, en: `Advance to the next edge (pointer never rewinds).` },
+      });
+    }
+
+    const rp = find(p), rq = find(q);
+    answer[qi] = rp === rq;
+    snap({
+      title: { vi: `line 18: find(${p})=${rp}, find(${q})=${rq} → ${answer[qi]}`, en: `line 18: find(${p})=${rp}, find(${q})=${rq} → ${answer[qi]}` },
+      hlNodes: [p, q], visitedNodes: answer[qi] ? [p, q] : [], codeLines: [18],
+      vars: [{ name: "find(p)", value: rp }, { name: "find(q)", value: rq }, { name: `answer[${qi}]`, value: answer[qi] }, { name: "answer", value: `[${answer.join(", ")}]` }],
+      note: {
+        vi: answer[qi] ? `${p} và ${q} cùng nhóm → CÓ đường hợp lệ → answer[${qi}] = True.` : `${p} và ${q} khác nhóm → KHÔNG có đường → answer[${qi}] = False.`,
+        en: answer[qi] ? `${p} and ${q} share a group → path exists → answer[${qi}] = True.` : `${p} and ${q} are in different groups → no path → answer[${qi}] = False.`,
+      },
+    });
+  }
+
+  snap({
+    title: { vi: `line 19: return [${answer.join(", ")}]`, en: `line 19: return [${answer.join(", ")}]` },
+    codeLines: [19], final: true,
+    vars: [{ name: "answer", value: `[${answer.join(", ")}]` }],
+    note: { vi: `Kết quả cuối: [${answer.join(", ")}].`, en: `Final result: [${answer.join(", ")}].` },
+  });
+
+  return { input, answer: `[${answer.join(", ")}]`, steps };
+}
+
 // ─── 684: Redundant Connection ───
 // Add edges one by one; the first edge connecting two already-connected nodes is redundant.
 function buildSteps684(input) {
@@ -3448,6 +3598,65 @@ module.exports = {
       const approach = Number(params && params.approach) || 1;
       return approach === 2 ? buildSteps323DFS(input, params) : buildSteps323(input, params);
     },
+  },
+  1697: {
+    id: 1697,
+    difficulty: "hard",
+    slug: "checking-existence-of-edge-length-limited-paths",
+    category: UF_CAT,
+    title: { vi: "Checking Existence of Edge Length Limited Paths", en: "Checking Existence of Edge Length Limited Paths" },
+    titleVi: { vi: "Kiểm tra đường đi giới hạn độ dài cạnh (offline Union-Find)", en: "Edge length limited paths (offline Union-Find)" },
+    statement: {
+      vi:
+        "Cho n node và edgeList[i]=[u,v,dist]. Mỗi query [p,q,limit]: có đường p→q chỉ dùng các cạnh có dist < limit không? " +
+        "Trả về mảng boolean. Nhập cạnh 'u,v,dist' cách bởi ';'; n và queries 'p,q,limit;...' trong tham số.",
+      en:
+        "Given n nodes and edgeList[i]=[u,v,dist]. Each query [p,q,limit]: is there a path p→q using only edges with dist < limit? " +
+        "Return a boolean array. Enter edges as 'u,v,dist' separated by ';'; n and queries 'p,q,limit;...' as parameters.",
+    },
+    defaultInput: "0,1,2;1,2,4;2,0,8;1,0,16",
+    inputKind: "string",
+    inputLabel: { vi: "edges (u,v,dist; cách bởi ;)", en: "edges (u,v,dist; separated by ;)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 3 },
+      { key: "queries", label: { vi: "queries (p,q,limit; cách bởi ;)", en: "queries (p,q,limit; separated by ;)" }, type: "string", default: "0,1,2;0,2,5" },
+    ],
+    approach: [
+      { vi: "OFFLINE: sắp cạnh theo dist tăng dần, sắp query theo limit tăng dần.", en: "OFFLINE: sort edges by increasing dist, sort queries by increasing limit." },
+      { vi: "Quét query theo limit tăng: gộp (union) mọi cạnh có dist < limit — con trỏ ei không bao giờ lùi.", en: "Sweep queries by increasing limit: union every edge with dist < limit — the pointer ei never rewinds." },
+      { vi: "Sau khi gộp, query đúng khi find(p) == find(q) (p, q cùng nhóm).", en: "After unioning, a query is true when find(p) == find(q) (p and q share a group)." },
+      { vi: "Ghi đáp án về đúng vị trí query gốc.", en: "Write the answer back to the original query index." },
+    ],
+    complexity: {
+      time: "O(E log E + Q log Q + (E+Q)·α)",
+      space: "O(n + Q)",
+      note: {
+        vi: "Sắp cạnh và query chiếm phần lớn; Union-Find gần như O(1) mỗi thao tác.",
+        en: "Sorting edges and queries dominates; Union-Find is near O(1) per operation.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def distanceLimitedPathsExist(self, n, edgeList, queries):",
+      "        edgeList.sort(key=lambda e: e[2])",
+      "        order = sorted(range(len(queries)), key=lambda i: queries[i][2])",
+      "        parent = list(range(n))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        answer = [False] * len(queries)",
+      "        ei = 0",
+      "        for i in order:",
+      "            p, q, limit = queries[i]",
+      "            while ei < len(edgeList) and edgeList[ei][2] < limit:",
+      "                parent[find(edgeList[ei][0])] = find(edgeList[ei][1])",
+      "                ei += 1",
+      "            answer[i] = find(p) == find(q)",
+      "        return answer",
+    ],
+    builder: buildSteps1697,
   },
   3532: {
     id: 3532,
