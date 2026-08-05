@@ -15504,22 +15504,38 @@ function buildSteps3310(input, params) {
   const adj = Array.from({ length: n }, () => []);
   for (const [a, b] of edges) { adj[a].push(b); }
   const graphEdges = edges.map(([u, v]) => ({ u, v, w: "" }));
+  const suspicious = new Set();
 
-  function makeGraph(hlNodes, hlEdges, visitedNodes) {
+  function makeGraph(hlNodes, hlEdges, visitedNodes, annotations) {
     return {
       nodes: allNodes.map((id) => ({ id, label: String(id) })),
       edges: graphEdges,
       hlNodes: hlNodes || [],
       hlEdges: hlEdges || [],
       visitedNodes: visitedNodes || [],
+      annotations: annotations || {},
     };
   }
 
+  // Build annotations dynamically: show "k" on the buggy method, "S" on
+  // suspicious nodes, so the viewer can VISUALLY distinguish them at a glance
+  // without reading the variable panel.
+  function buildAnnotations(suspiciousSet, extras) {
+    const ann = {};
+    ann[k] = "k (bug)";
+    for (const id of suspiciousSet) {
+      if (id !== k) ann[id] = "S";
+    }
+    if (extras) Object.assign(ann, extras);
+    return ann;
+  }
+
   function snap(opts) {
+    const ann = buildAnnotations(suspicious, opts.extraAnnotations);
     steps.push({
       title: opts.title,
       arr: [],
-      graph: makeGraph(opts.hlNodes, opts.hlEdges, opts.visitedNodes),
+      graph: makeGraph(opts.hlNodes, opts.hlEdges, opts.visitedNodes, ann),
       highlight: [],
       mark: [],
       final: opts.final || false,
@@ -15535,8 +15551,16 @@ function buildSteps3310(input, params) {
     codeLines: [3],
     vars: [{ name: "n", value: n }, { name: "k", value: k }],
     note: {
-      vi: `n=${n} methods, k=${k} bị lỗi. Xây adjacency list có hướng từ danh sách invocations.`,
-      en: `n=${n} methods, k=${k} is buggy. Build a directed adjacency list from the invocations.`,
+      vi: `Có ${n} methods (0..${n - 1}). Method k=${k} bị lỗi (buggy).\n` +
+        `Ý tưởng:\n` +
+        `1️⃣ BFS từ k → tìm tất cả method k gọi được = tập "suspicious" (vì k lỗi → mọi thứ k gọi cũng có thể lỗi).\n` +
+        `2️⃣ Kiểm tra: có method nào BÊN NGOÀI tập suspicious GỌI VÀO tập không? Nếu CÓ → không thể xóa (sẽ làm hỏng method bên ngoài). Nếu KHÔNG → xóa an toàn.\n` +
+        `Xây adjacency list có hướng từ danh sách invocations.`,
+      en: `There are ${n} methods (0..${n - 1}). Method k=${k} is buggy.\n` +
+        `Idea:\n` +
+        `1️⃣ BFS from k → find all methods k can call = the "suspicious" set (because k is buggy → everything it calls might be buggy too).\n` +
+        `2️⃣ Check: does ANY method OUTSIDE the suspicious set CALL INTO it? If YES → cannot remove (would break the external caller). If NO → safe to remove.\n` +
+        `Build a directed adjacency list from the invocations.`,
     },
   });
 
@@ -15556,7 +15580,7 @@ function buildSteps3310(input, params) {
   }
 
   // Line 6: suspicious = set()
-  const suspicious = new Set();
+  // (already declared empty at the top of the scope so snap() can reference it before this line)
   snap({
     title: { vi: "suspicious = set()", en: "suspicious = set()" },
     codeLines: [6],
