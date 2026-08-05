@@ -17232,6 +17232,7 @@ module.exports = {
     premium: true,
     slug: "path-with-maximum-minimum-value",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Path With Maximum Minimum Value", en: "Path With Maximum Minimum Value" },
     titleVi: { vi: "Đường có giá trị nhỏ nhất lớn nhất (max-heap)", en: "Path with maximum minimum value (max-heap)" },
     statement: {
