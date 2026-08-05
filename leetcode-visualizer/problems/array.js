@@ -3327,7 +3327,208 @@ function buildSteps4013(input, params = {}) {
   return { original: nums, nums, a, b, answer: ans, steps };
 }
 
+/**
+ * LeetCode 3731: Find Missing Elements.
+ *
+ * Given a sorted or unsorted array of integers, return all integers in the
+ * range [nums[0], nums[-1]) (exclusive of the last element) that are NOT
+ * present in nums.
+ *
+ * Algorithm (as given by user):
+ *   1. Sort nums.
+ *   2. Walk an integer counter i from nums[0] to nums[-1] (exclusive).
+ *   3. If i matches nums[j], advance j. Otherwise, i is missing → append to a.
+ */
+function buildSteps3731(input) {
+  const originalNums = [...input];
+  const nums = [...input];
+  const steps = [];
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: nums.map((_, idx) => `[${idx}]`),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: nums.sort()
+  snap({
+    title: { vi: "nums.sort()", en: "nums.sort()" },
+    codeLines: [3],
+    vars: [{ name: "nums (before sort)", value: `[${nums.join(",")}]` }],
+    note: {
+      vi: `nums = [${nums.join(",")}] trước khi sắp xếp. Sắp xếp để có thể dùng 1 con trỏ j đi từ trái sang phải.`,
+      en: `nums = [${nums.join(",")}] before sorting. Sort so we can use a single pointer j moving left to right.`,
+    },
+  });
+  nums.sort((a, b) => a - b);
+  snap({
+    title: { vi: `nums.sort() → [${nums.join(",")}]`, en: `nums.sort() → [${nums.join(",")}]` },
+    codeLines: [3],
+    vars: [{ name: "nums (after sort)", value: `[${nums.join(",")}]` }],
+    note: {
+      vi: `Sau sắp xếp: nums = [${nums.join(",")}]. Bây giờ nums[0]=${nums[0]} là giá trị nhỏ nhất, nums[-1]=${nums[nums.length - 1]} là lớn nhất.`,
+      en: `After sorting: nums = [${nums.join(",")}]. Now nums[0]=${nums[0]} is the minimum, nums[-1]=${nums[nums.length - 1]} is the maximum.`,
+    },
+  });
+
+  // Line 4: a = []
+  const a = [];
+  snap({
+    title: { vi: "a = []", en: "a = []" },
+    codeLines: [4],
+    vars: [{ name: "a", value: "[]" }],
+    note: {
+      vi: "a sẽ chứa các số bị thiếu trong dải [nums[0], nums[-1]).",
+      en: "a will hold the missing integers in the range [nums[0], nums[-1]).",
+    },
+  });
+
+  // Line 5: j = 0
+  let j = 0;
+  snap({
+    title: { vi: "j = 0", en: "j = 0" },
+    highlight: [0],
+    codeLines: [5],
+    vars: [{ name: "j", value: 0 }, { name: "nums[j]", value: nums[0] }],
+    note: {
+      vi: `j là con trỏ vào mảng nums (đã sắp xếp). Ban đầu j=0 → nums[j]=${nums[0]}.`,
+      en: `j is a pointer into the sorted nums array. Initially j=0 → nums[j]=${nums[0]}.`,
+    },
+  });
+
+  const loStart = nums[0];
+  const loEnd = nums[nums.length - 1];
+
+  // Line 6: for i in range(nums[0], nums[-1]):
+  for (let i = loStart; i < loEnd; i++) {
+    snap({
+      title: { vi: `for i in range(${loStart}, ${loEnd}): i=${i}`, en: `for i in range(${loStart}, ${loEnd}): i=${i}` },
+      highlight: [j],
+      codeLines: [6],
+      vars: [{ name: "i", value: i }, { name: "j", value: j }, { name: "nums[j]", value: nums[j] }],
+      note: {
+        vi: `Xét số nguyên i=${i}. Đây có nằm trong nums không?`,
+        en: `Consider integer i=${i}. Is it present in nums?`,
+      },
+    });
+
+    // Line 7: if nums[j] != i:
+    const missing = nums[j] !== i;
+    snap({
+      title: { vi: `if nums[j] != i → nums[${j}]=${nums[j]} != ${i} → ${missing}`, en: `if nums[j] != i → nums[${j}]=${nums[j]} != ${i} → ${missing}` },
+      highlight: [j],
+      codeLines: [7],
+      vars: [{ name: "nums[j]", value: nums[j] }, { name: "i", value: i }],
+      note: missing
+        ? { vi: `nums[${j}]=${nums[j]} ≠ i=${i} → ${i} KHÔNG có trong nums → thêm vào a.`, en: `nums[${j}]=${nums[j]} ≠ i=${i} → ${i} is NOT in nums → append to a.` }
+        : { vi: `nums[${j}]=${nums[j]} == i=${i} → ${i} có trong nums → tăng j để kiểm tra số tiếp theo.`, en: `nums[${j}]=${nums[j]} == i=${i} → ${i} is present in nums → advance j to check the next number.` },
+    });
+
+    if (missing) {
+      // Line 8: a.append(i)
+      a.push(i);
+      snap({
+        title: { vi: `a.append(${i}) → a=[${a.join(",")}]`, en: `a.append(${i}) → a=[${a.join(",")}]` },
+        highlight: [j],
+        codeLines: [8],
+        vars: [{ name: "a", value: `[${a.join(",")}]` }],
+        note: {
+          vi: `Thêm ${i} vào danh sách kết quả.`,
+          en: `Append ${i} to the result list.`,
+        },
+      });
+    } else {
+      // Line 10: j += 1
+      j++;
+      snap({
+        title: { vi: `j += 1 → j=${j}`, en: `j += 1 → j=${j}` },
+        highlight: [j < nums.length ? j : j - 1],
+        codeLines: [10],
+        vars: [{ name: "j", value: j }, { name: "nums[j]", value: j < nums.length ? nums[j] : "(end)" }],
+        note: {
+          vi: `i=${i} đã khớp với nums[${j - 1}], nên tăng j. Giờ j=${j}${j < nums.length ? `, nums[j]=${nums[j]}` : " (hết mảng)"}.`,
+          en: `i=${i} matched nums[${j - 1}], so advance j. Now j=${j}${j < nums.length ? `, nums[j]=${nums[j]}` : " (end of array)"}.`,
+        },
+      });
+    }
+  }
+
+  // Line 11: return a
+  const answer = [...a];
+  const fs = {
+    title: { vi: `return a → [${answer.join(",")}]`, en: `return a → [${answer.join(",")}]` },
+    arr: [...nums],
+    sub: nums.map((_, idx) => `[${idx}]`),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [11],
+    vars: [{ name: "answer", value: `[${answer.join(",")}]` }],
+    note: {
+      vi: `Các số bị thiếu trong dải [${loStart}, ${loEnd}): [${answer.join(",")}].`,
+      en: `Missing integers in range [${loStart}, ${loEnd}): [${answer.join(",")}].`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: originalNums, answer, steps };
+}
+
 module.exports = {
+  3731: {
+    id: 3731,
+    difficulty: "easy",
+    slug: "find-missing-elements",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Find Missing Elements", en: "Find Missing Elements" },
+    titleVi: { vi: "Tìm các số bị thiếu", en: "Find the missing elements" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên nums (có thể chưa sắp xếp). Sắp xếp mảng và trả về tất cả số nguyên " +
+        "nằm trong dải [nums.min, nums.max) nhưng KHÔNG xuất hiện trong nums.",
+      en:
+        "Given an integer array nums (possibly unsorted), sort it and return all integers " +
+        "in the range [nums.min, nums.max) that are NOT present in nums.",
+    },
+    defaultInput: [7, 4, 5, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Sắp xếp nums để có thể dùng 1 con trỏ j đi từ trái sang phải.", en: "Sort nums so a single pointer j can scan left to right." },
+      { vi: "Dùng biến đếm i từ nums[0] tới nums[-1] (không tính nums[-1] vì nó chắc chắn có trong nums). Nếu nums[j] == i thì i đang có trong nums → tăng j. Nếu nums[j] != i thì i bị thiếu → thêm vào kết quả.", en: "Walk integer counter i from nums[0] to nums[-1] (exclusive, since nums[-1] is always present). If nums[j] == i then i is in nums → advance j. If nums[j] != i then i is missing → append to result." },
+    ],
+    complexity: {
+      time: "O(n log n + range)",
+      space: "O(n)",
+      note: {
+        vi: "Sắp xếp O(n log n); duyệt O(range) ≈ O(n) nếu range không quá lớn.",
+        en: "Sort O(n log n); traversal O(range) ≈ O(n) if the range isn't much larger than n.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMissingElements(self, nums):",
+      "        nums.sort()",
+      "        a = []",
+      "        j = 0",
+      "        for i in range(nums[0], nums[-1]):",
+      "            if nums[j] != i:",
+      "                a.append(i)",
+      "            else:",
+      "                j += 1",
+      "        return a",
+    ],
+    builder: buildSteps3731,
+  },
   4013: {
     id: 4013, difficulty: "hard", slug: "count-subarrays-with-even-odd-ratio-ii",
     category: { key: "array", vi: "Mảng / Prefix Sum", en: "Array / Prefix Sum" },
