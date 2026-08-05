@@ -10296,6 +10296,60 @@ button:disabled {
   .kph-data-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Gas Deposits circular track (#9135) ---- */
+.gasc-viz {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  padding: 6px 4px;
+}
+.gasc-gauge { display: flex; gap: 12px; flex-wrap: wrap; }
+.gasc-box {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 16px; border-radius: 12px;
+  border: 1px solid #334155; background: #0f172a; min-width: 110px;
+}
+.gasc-box-label { font-size: 12px; color: #94a3b8; }
+.gasc-box-value { font-size: 24px; font-weight: 700; }
+.gasc-box.fuel .gasc-box-value { color: #4ade80; }
+.gasc-box.dist { border-color: #6366f1; }
+.gasc-box.dist .gasc-box-value { color: #a5b4fc; }
+
+.gasc-stage { display: flex; justify-content: center; }
+.gasc-svg { width: 100%; max-width: 420px; height: auto; }
+.gasc-track-ring { fill: none; stroke: #334155; stroke-width: 6; }
+.gasc-traveled-ring { fill: none; stroke: #22c55e; stroke-width: 6; opacity: .9; }
+.gasc-traveled-arc { fill: none; stroke: #22c55e; stroke-width: 6; stroke-linecap: round; }
+.gasc-wrap-mark { stroke: #f97316; stroke-width: 2; stroke-dasharray: 3 3; }
+.gasc-wrap-text { fill: #f97316; font-size: 12px; font-weight: 700; }
+.gasc-dot { stroke: #64748b; stroke-width: 3; fill: #1e293b; }
+.gasc-dot.state-start { stroke: #fbbf24; fill: #422006; }
+.gasc-dot.state-collected { stroke: #22c55e; fill: #052e16; }
+.gasc-dot.state-unreached { stroke: #ef4444; fill: #450a0a; }
+.gasc-dot.state-pending { stroke-dasharray: 3 3; }
+.gasc-dot.is-current { stroke: #6366f1; stroke-width: 4; }
+.gasc-dot-idx { fill: #e2e8f0; font-size: 12px; font-weight: 700; }
+.gasc-dot-label { fill: #cbd5e1; font-size: 11px; }
+.gasc-car { font-size: 22px; }
+.gasc-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #94a3b8; justify-content: center; }
+.gasc-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.gasc-legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 3px solid #64748b; box-sizing: border-box; }
+.gasc-legend i.lg-start { border-color: #fbbf24; background: #422006; }
+.gasc-legend i.lg-collected { border-color: #22c55e; background: #052e16; }
+.gasc-legend i.lg-current { border-color: #6366f1; }
+.gasc-legend i.lg-unreached { border-color: #ef4444; background: #450a0a; }
+.gasc-legend i.lg-pending { border-style: dashed; }
+
+[data-theme="light"] .gasc-viz { color: #1e293b; }
+[data-theme="light"] .gasc-box { background: #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .gasc-track-ring { stroke: #cbd5e1; }
+[data-theme="light"] .gasc-dot { fill: #f1f5f9; }
+[data-theme="light"] .gasc-dot-idx { fill: #1e293b; }
+[data-theme="light"] .gasc-dot-label { fill: #475569; }
+[data-theme="light"] .gasc-legend { color: #64748b; }
+
 /* ---- Gas Deposits max distance number-line (#9134) ---- */
 .gasdep-viz {
   display: grid;

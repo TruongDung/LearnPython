@@ -7411,6 +7411,91 @@ function renderGasStationView(step) {
   </div>`;
 }
 
+// ---- Gas Deposits on a circular track (#9135) ----
+function renderGasCircularView(step) {
+  const view = step.gasCircularView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const C = view.circumference || 100;
+  const cx = 170, cy = 170, R = 120;
+
+  // deg measured clockwise from the top (12 o'clock = position 0).
+  const polar = (deg, r) => {
+    const t = (-90 + deg) * Math.PI / 180;
+    return [cx + r * Math.cos(t), cy + r * Math.sin(t)];
+  };
+  const angleOf = (position) => ((position % C) / C) * 360;
+
+  // Base track circle.
+  let svg = `<circle cx="${cx}" cy="${cy}" r="${R}" class="gasc-track-ring" />`;
+
+  // Traveled arc (green). If distance >= C, show a full ring.
+  if (view.pos !== null && view.distance > 0) {
+    if (view.distance >= C) {
+      svg += `<circle cx="${cx}" cy="${cy}" r="${R}" class="gasc-traveled-ring" />`;
+    } else {
+      const a0 = angleOf(view.deposits[view.startIndex].position);
+      const sweep = (view.distance / C) * 360;
+      const a1 = a0 + sweep;
+      const [x0, y0] = polar(a0, R);
+      const [x1, y1] = polar(a1, R);
+      const largeArc = sweep > 180 ? 1 : 0;
+      svg += `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" class="gasc-traveled-arc" />`;
+    }
+  }
+
+  // Wrap marker at the top (position 0 / circumference).
+  const [wx, wy] = polar(0, R);
+  svg += `<line x1="${cx}" y1="${cy - R - 14}" x2="${cx}" y2="${cy - R + 14}" class="gasc-wrap-mark" />`;
+  svg += `<text x="${cx}" y="${cy - R - 20}" class="gasc-wrap-text" text-anchor="middle">0 / ${C}</text>`;
+
+  // Deposit dots + labels.
+  view.deposits.forEach((d) => {
+    const a = angleOf(d.position);
+    const [dx, dy] = polar(a, R);
+    let cls = "gasc-dot state-" + d.state;
+    if (view.currentIndex === d.index) cls += " is-current";
+    svg += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="11" class="${cls}" />`;
+    svg += `<text x="${dx.toFixed(1)}" y="${(dy + 4).toFixed(1)}" class="gasc-dot-idx" text-anchor="middle">${d.index}</text>`;
+    // Outer label with position & gas.
+    const [lx, ly] = polar(a, R + 30);
+    svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="gasc-dot-label" text-anchor="middle">@${d.position} ⛽${d.gas}</text>`;
+  });
+
+  // Car marker.
+  if (view.pos !== null) {
+    const a = angleOf(view.pos);
+    const [carX, carY] = polar(a, R);
+    svg += `<text x="${carX.toFixed(1)}" y="${(carY + 8).toFixed(1)}" class="gasc-car" text-anchor="middle">🚗</text>`;
+  }
+
+  const gaugeHtml = `
+    <div class="gasc-gauge">
+      <div class="gasc-box"><span class="gasc-box-label">${vi ? "Vị trí (pos)" : "Position (pos)"}</span><span class="gasc-box-value">${view.pos === null ? "—" : view.pos}</span></div>
+      <div class="gasc-box fuel"><span class="gasc-box-label">${vi ? "Xăng (tank)" : "Fuel (tank)"}</span><span class="gasc-box-value">${view.tank === null ? "—" : view.tank}</span></div>
+      <div class="gasc-box dist"><span class="gasc-box-label">${vi ? "Quãng đường" : "Distance"}</span><span class="gasc-box-value">${view.answer !== null ? view.answer : view.distance}</span></div>
+      <div class="gasc-box"><span class="gasc-box-label">${vi ? "Số vòng" : "Loops"}</span><span class="gasc-box-value">${view.loops}</span></div>
+    </div>`;
+
+  const summary = vi
+    ? `Đường đua vòng tròn chu vi ${C}: pos=${view.pos}, tank=${view.tank}, quãng đường=${view.distance}.`
+    : `Circular track of circumference ${C}: pos=${view.pos}, tank=${view.tank}, distance=${view.distance}.`;
+
+  el.innerHTML = `<div class="gasc-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${gaugeHtml}
+    <div class="gasc-stage">
+      <svg viewBox="0 0 340 360" class="gasc-svg" preserveAspectRatio="xMidYMid meet">${svg}</svg>
+    </div>
+    <div class="gasc-legend">
+      <span><i class="lg-start"></i>${vi ? "kho xuất phát" : "start deposit"}</span>
+      <span><i class="lg-collected"></i>${vi ? "đã ghé & đổ xăng" : "reached & refueled"}</span>
+      <span><i class="lg-current"></i>${vi ? "đang xét" : "current target"}</span>
+      <span><i class="lg-unreached"></i>${vi ? "không tới được" : "not reached"}</span>
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Gas Deposits max distance number-line (#9134) ----
 function renderGasDepositsView(step) {
   const view = step.gasDepositsView;
@@ -9091,6 +9176,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGasDepositsView(step);
+  } else if (step.gasCircularView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasCircularView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");
