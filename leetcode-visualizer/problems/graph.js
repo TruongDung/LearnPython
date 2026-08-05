@@ -18337,6 +18337,7 @@ module.exports = {
     difficulty: "hard",
     slug: "minimum-time-to-visit-a-cell-in-a-grid",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Minimum Time to Visit a Cell In a Grid", en: "Minimum Time to Visit a Cell In a Grid" },
     titleVi: { vi: "Thời gian nhỏ nhất để tới một ô trong grid", en: "Minimum time to visit a cell in a grid" },
     statement: {
