@@ -8700,6 +8700,209 @@ function buildSteps1319DFS(input, params) {
 }
 
 /**
+ * LeetCode 1102: Path With Maximum Minimum Value (Premium).
+ * Best-first search with a max-heap: always expand the reachable cell with the
+ * largest value; result = smallest value popped so far. When the bottom-right
+ * cell is popped, result is the answer. One code line highlighted per step.
+ */
+function buildSteps1102(input) {
+  const grid = String(input || "")
+    .split("|").map((row) => row.split(",").map((s) => Number(s.trim())));
+  const m = grid.length;
+  const n = grid[0] ? grid[0].length : 0;
+  const steps = [];
+
+  const invalid = !m || !n || grid.some((row) => row.length !== n || row.some((v) => isNaN(v)));
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [5], vars: [{ name: "answer", value: "invalid grid" }],
+      note: { vi: "Grid phải là ma trận số chữ nhật. Ví dụ: 5,4,5|1,2,6|7,4,6.", en: "Grid must be a rectangular integer matrix. Example: 5,4,5|1,2,6|7,4,6." },
+    });
+    return { original: grid, answer: null, steps };
+  }
+
+  const visited = Array.from({ length: m }, () => Array(n).fill(false));
+  let heap = []; // entries: [negVal, r, c]
+  let result = null;
+  const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+  const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
+  function popMax() {
+    let bi = 0;
+    for (let i = 1; i < heap.length; i++) if (cmp(heap[i], heap[bi]) < 0) bi = i;
+    return heap.splice(bi, 1)[0];
+  }
+  function heapLabel() {
+    if (!heap.length) return "[]";
+    return `[${heap.slice().sort(cmp).map((h) => `${-h[0]}@(${h[1]},${h[2]})`).join(", ")}]`;
+  }
+
+  function makeCells(current, neighbor) {
+    const heapSet = new Set(heap.map((h) => `${h[1]},${h[2]}`));
+    return grid.map((row, r) => row.map((val, c) => {
+      let cls = "empty";
+      if (visited[r][c]) cls = "visited";
+      if (heapSet.has(`${r},${c}`)) cls = "queued";
+      if (neighbor && neighbor[0] === r && neighbor[1] === c) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      return { label: String(val), cls };
+    }));
+  }
+
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "heap")) vars.push({ name: "heap (max)", value: heapLabel() });
+    if (result !== null && !vars.some((v) => v.name === "result")) vars.push({ name: "result", value: result });
+    steps.push({
+      title: o.title, arr: [],
+      bfsGrid: { rows: m, cols: n, cells: makeCells(o.current || null, o.neighbor || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
+    });
+  }
+
+  // Line 5: m, n = len(grid), len(grid[0])
+  snap({
+    title: { vi: `line 5: m, n = ${m}, ${n}`, en: `line 5: m, n = ${m}, ${n}` },
+    codeLines: [5],
+    vars: [{ name: "m", value: m }, { name: "n", value: n }],
+    note: { vi: `Grid ${m}×${n}. Tìm đường (0,0)→(${m - 1},${n - 1}) sao cho GIÁ TRỊ NHỎ NHẤT trên đường là LỚN NHẤT.`, en: `Grid ${m}×${n}. Find a path (0,0)→(${m - 1},${n - 1}) maximizing the MINIMUM value on it.` },
+  });
+
+  // Line 6: result = grid[0][0]
+  result = grid[0][0];
+  snap({
+    title: { vi: `line 6: result = grid[0][0] = ${result}`, en: `line 6: result = grid[0][0] = ${result}` },
+    codeLines: [6], current: [0, 0],
+    note: { vi: `result = giá trị nhỏ nhất gặp được cho tới giờ. Bắt đầu = ${result}.`, en: `result = smallest value seen so far. Starts at ${result}.` },
+  });
+
+  // Line 7: visited init
+  snap({
+    title: { vi: "line 7: visited = [[False]*n]*m", en: "line 7: visited = [[False]*n]*m" },
+    codeLines: [7],
+    note: { vi: "Mảng đánh dấu ô đã đưa vào heap.", en: "Marks cells already pushed to the heap." },
+  });
+
+  // Line 8: heap = [(-grid[0][0],0,0)]
+  heap.push([-grid[0][0], 0, 0]);
+  snap({
+    title: { vi: `line 8: heap = [(${-grid[0][0]}, 0, 0)]`, en: `line 8: heap = [(${-grid[0][0]}, 0, 0)]` },
+    codeLines: [8], current: [0, 0],
+    note: { vi: "Dùng max-heap: lưu -value để heapq (min-heap) lấy ra value LỚN NHẤT trước.", en: "Max-heap trick: store -value so heapq (a min-heap) pops the LARGEST value first." },
+  });
+
+  // Line 9: visited[0][0] = True
+  visited[0][0] = true;
+  snap({
+    title: { vi: "line 9: visited[0][0] = True", en: "line 9: visited[0][0] = True" },
+    codeLines: [9], current: [0, 0],
+    note: { vi: "Đánh dấu ô xuất phát đã vào heap.", en: "Mark the start cell as pushed." },
+  });
+
+  let done = false;
+  while (heap.length && !done) {
+    // Line 10: while heap
+    snap({
+      title: { vi: "line 10: while heap", en: "line 10: while heap" },
+      codeLines: [10],
+      note: { vi: `Heap còn ${heap.length} ô → tiếp tục.`, en: `Heap has ${heap.length} cells → continue.` },
+    });
+
+    // Line 11: val, r, c = heappop
+    const [negVal, r, c] = popMax();
+    const value = -negVal;
+    visited[r][c] = true;
+    snap({
+      title: { vi: `line 11: pop ô lớn nhất → (${r},${c}) value ${value}`, en: `line 11: pop largest → (${r},${c}) value ${value}` },
+      codeLines: [11], current: [r, c],
+      vars: [{ name: "val", value: negVal }, { name: "(r, c)", value: `(${r}, ${c})` }, { name: "value", value }],
+      note: { vi: `Lấy ra ô có value lớn nhất trong heap: (${r},${c}) = ${value}.`, en: `Pop the highest-value cell in the heap: (${r},${c}) = ${value}.` },
+    });
+
+    // Line 12: result = min(result, -val)
+    const oldResult = result;
+    result = Math.min(result, value);
+    snap({
+      title: { vi: `line 12: result = min(${oldResult}, ${value}) = ${result}`, en: `line 12: result = min(${oldResult}, ${value}) = ${result}` },
+      codeLines: [12], current: [r, c],
+      vars: [{ name: "result", value: result }],
+      note: { vi: `Cập nhật giá trị nhỏ nhất trên đường đã đi tới ô này → ${result}.`, en: `Update the minimum value along the path to this cell → ${result}.` },
+    });
+
+    // Line 13: if r == m-1 and c == n-1
+    const atEnd = r === m - 1 && c === n - 1;
+    snap({
+      title: { vi: `line 13: (${r},${c}) là góc phải-dưới? ${atEnd}`, en: `line 13: is (${r},${c}) bottom-right? ${atEnd}` },
+      codeLines: [13], current: [r, c],
+      vars: [{ name: "at target?", value: atEnd }],
+      note: {
+        vi: atEnd ? `Đã tới đích! Vì luôn mở rộng ô lớn nhất trước, result hiện tại chính là đáp án.` : `Chưa tới đích → mở rộng hàng xóm.`,
+        en: atEnd ? `Reached the target! Since we always expand the largest cell first, the current result is the answer.` : `Not the target yet → expand neighbours.`,
+      },
+    });
+    if (atEnd) {
+      // Line 14: return result
+      snap({
+        title: { vi: `line 14: return result = ${result}`, en: `line 14: return result = ${result}` },
+        codeLines: [14], current: [r, c], final: true,
+        vars: [{ name: "answer", value: result }],
+        note: { vi: `Đáp án = ${result} (giá trị nhỏ nhất lớn nhất có thể của một đường đi).`, en: `Answer = ${result} (the maximum possible minimum value over all paths).` },
+      });
+      done = true;
+      break;
+    }
+
+    // Line 15: for dr, dc in dirs
+    snap({
+      title: { vi: `line 15: for dr, dc in 4 hướng`, en: `line 15: for dr, dc in 4 directions` },
+      codeLines: [15], current: [r, c],
+      note: { vi: `Xét 4 hàng xóm của (${r},${c}).`, en: `Check the 4 neighbours of (${r},${c}).` },
+    });
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      const inBounds = nr >= 0 && nr < m && nc >= 0 && nc < n;
+      const isNew = inBounds && !visited[nr][nc];
+      snap({
+        title: { vi: `line 16-17: (${nr},${nc}) ${isNew ? "hợp lệ & mới" : inBounds ? "đã thăm" : "ngoài lưới"}`, en: `line 16-17: (${nr},${nc}) ${isNew ? "valid & new" : inBounds ? "visited" : "out of grid"}` },
+        codeLines: [16, 17], current: [r, c], neighbor: inBounds ? [nr, nc] : null,
+        vars: [{ name: "(nr, nc)", value: `(${nr}, ${nc})` }, { name: "in bounds?", value: inBounds }, { name: "new?", value: isNew }],
+        note: {
+          vi: isNew ? `(${nr},${nc}) trong lưới và chưa thăm → thêm vào heap (line 18-19).` : inBounds ? `(${nr},${nc}) đã thăm → bỏ qua.` : `(${nr},${nc}) ngoài lưới → bỏ qua.`,
+          en: isNew ? `(${nr},${nc}) is in-bounds and unvisited → push to heap (lines 18-19).` : inBounds ? `(${nr},${nc}) already visited → skip.` : `(${nr},${nc}) is out of grid → skip.`,
+        },
+      });
+      if (isNew) {
+        visited[nr][nc] = true;
+        heap.push([-grid[nr][nc], nr, nc]);
+        snap({
+          title: { vi: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}`, en: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}` },
+          codeLines: [18, 19], current: [r, c], neighbor: [nr, nc],
+          note: { vi: `Đánh dấu (${nr},${nc}) đã thăm và đẩy value ${grid[nr][nc]} vào max-heap.`, en: `Mark (${nr},${nc}) visited and push value ${grid[nr][nc]} to the max-heap.` },
+        });
+      }
+    }
+  }
+
+  if (!done) {
+    // Line 20: return result
+    snap({
+      title: { vi: `line 20: return result = ${result}`, en: `line 20: return result = ${result}` },
+      codeLines: [20], final: true,
+      vars: [{ name: "answer", value: result }],
+      note: { vi: `Đáp án = ${result}.`, en: `Answer = ${result}.` },
+    });
+  }
+
+  return { original: grid, answer: result, steps };
+}
+
+/**
  * LeetCode 2368: Reachable Nodes With Restrictions.
  * Iterative DFS from node 0 over an undirected tree, skipping restricted
  * (blocked) and already-visited neighbours. Count = number of reached nodes.
@@ -16987,6 +17190,65 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" },
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
+  },
+  1102: {
+    id: 1102,
+    difficulty: "medium",
+    premium: true,
+    slug: "path-with-maximum-minimum-value",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    title: { vi: "Path With Maximum Minimum Value", en: "Path With Maximum Minimum Value" },
+    titleVi: { vi: "Đường có giá trị nhỏ nhất lớn nhất (max-heap)", en: "Path with maximum minimum value (max-heap)" },
+    statement: {
+      vi:
+        "Cho lưới số m×n. Tìm đường đi từ (0,0) đến (m-1,n-1) (đi 4 hướng) sao cho GIÁ TRỊ NHỎ NHẤT trên đường là LỚN NHẤT có thể. " +
+        "Trả về giá trị đó. Nhập lưới: các hàng cách bởi '|', các số trong hàng cách bởi ','.",
+      en:
+        "Given an m×n integer grid, find a path from (0,0) to (m-1,n-1) (4-directional) that maximizes the MINIMUM value on the path. " +
+        "Return that value. Enter the grid with rows separated by '|' and numbers by ','.",
+    },
+    defaultInput: "5,4,5|1,2,6|7,4,6",
+    inputKind: "string",
+    inputLabel: { vi: "grid (hàng | , số ,)", en: "grid (rows |, numbers ,)" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Best-first search bằng max-heap: luôn mở rộng ô có value lớn nhất trong các ô tới được.", en: "Best-first search with a max-heap: always expand the reachable cell with the largest value." },
+      { vi: "result = giá trị nhỏ nhất từng lấy ra khỏi heap (cập nhật khi pop).", en: "result = smallest value popped from the heap so far (updated on each pop)." },
+      { vi: "Khi pop được ô (m-1,n-1) thì result chính là đáp án — vì mọi ô pop trước đó đều có value ≥ nó.", en: "When cell (m-1,n-1) is popped, result is the answer — every cell popped before it had a value ≥ it." },
+      { vi: "Mẹo: lưu -value để dùng min-heap của Python làm max-heap.", en: "Trick: store -value to use Python's min-heap as a max-heap." },
+    ],
+    complexity: {
+      time: "O(m·n·log(m·n))",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô vào/ra heap một lần; mỗi thao tác heap O(log(m·n)).",
+        en: "Each cell enters/leaves the heap once; each heap op is O(log(m·n)).",
+      },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def maximumMinimumPath(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        result = grid[0][0]",
+      "        visited = [[False] * n for _ in range(m)]",
+      "        heap = [(-grid[0][0], 0, 0)]",
+      "        visited[0][0] = True",
+      "        while heap:",
+      "            val, r, c = heapq.heappop(heap)",
+      "            result = min(result, -val)",
+      "            if r == m - 1 and c == n - 1:",
+      "                return result",
+      "            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < m and 0 <= nc < n and not visited[nr][nc]:",
+      "                    visited[nr][nc] = True",
+      "                    heapq.heappush(heap, (-grid[nr][nc], nr, nc))",
+      "        return result",
+    ],
+    builder: buildSteps1102,
   },
   2368: {
     id: 2368,
