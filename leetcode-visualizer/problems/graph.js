@@ -18894,6 +18894,7 @@ module.exports = {
     difficulty: "medium",
     slug: "path-with-maximum-probability",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Path with Maximum Probability", en: "Path with Maximum Probability" },
     titleVi: { vi: "Đường đi có xác suất lớn nhất", en: "Path with maximum probability" },
     statement: {
