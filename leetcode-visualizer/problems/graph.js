@@ -7309,138 +7309,195 @@ function buildSteps207(input, params) {
   const inDeg = {};
   const courses = Array.from({ length: numCourses }, (_, i) => i);
   for (const c of courses) { adj[c] = []; inDeg[c] = 0; }
-  for (const [a, b] of pairs) {
-    // b → a (must take b before a)
-    adj[b].push(a);
-    inDeg[a] = (inDeg[a] || 0) + 1;
-  }
 
-  const taken = new Set();
+  const taken = new Set();      // courses already "popped" (green)
+  const takenOrder = [];
+  let queue = [];               // FIFO of in-degree-0 courses
+  let takenCount = 0;
+
+  const inDegStr = () => courses.map((c) => `${c}:${inDeg[c]}`).join(", ");
+  const queueStr = () => `[${queue.join(", ")}]`;
 
   function makeGraph(hlNodes, hlEdges) {
+    const annotations = {};
+    for (const q of queue) annotations[q] = "queue";
     return {
       nodes: courses.map((id) => ({ id, dist: inDeg[id] })),
       edges: pairs.map(([a, b]) => ({ u: b, v: a, w: "" })),
       hlNodes: hlNodes || [],
       hlEdges: hlEdges || [],
       visitedNodes: [...taken],
+      annotations,
     };
   }
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [],
-    graph: makeGraph([], []),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5, 6, 7],
-    vars: [
-      { name: "numCourses", value: numCourses },
-      { name: "prerequisites", value: pairs.map(([a, b]) => `[${a},${b}]`).join(", ") || "none" },
-      { name: "in-degree", value: courses.map((c) => `${c}:${inDeg[c]}`).join(", ") },
-    ],
-    note: {
-      vi:
-        `Có ${numCourses} môn (0..${numCourses - 1}), ${pairs.length} điều kiện tiên quyết.\n` +
-        `Mỗi cặp [a, b] nghĩa là phải học b trước a → cạnh b → a.\n` +
-        `Số bên dưới nút = in-degree (số môn phải học trước nó).\n` +
-        `Mục tiêu: kiểm tra có thể học hết không (đồ thị không có chu trình)?`,
-      en:
-        `${numCourses} courses (0..${numCourses - 1}), ${pairs.length} prerequisites.\n` +
-        `Each [a, b] means take b before a → edge b → a.\n` +
-        `Number below node = in-degree (number of prerequisites).\n` +
-        `Goal: can all be finished (no cycle)?`,
-    },
-  });
-
-  let answer = true;
-
-  while (taken.size < numCourses) {
-    const available = courses.filter((c) => !taken.has(c) && inDeg[c] === 0);
-
-    if (available.length === 0) {
-      // Cycle
-      answer = false;
-      steps.push({
-        title: { vi: "Bế tắc → có chu trình → false", en: "Stuck → cycle detected → false" },
-        arr: [],
-        graph: makeGraph(courses.filter((c) => !taken.has(c)), []),
-        highlight: [],
-        mark: [],
-        final: true,
-        codeLines: [15, 16],
-        vars: [
-          { name: "taken", value: `${taken.size}/${numCourses}` },
-          { name: "remaining", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") },
-          { name: "answer", value: false },
-        ],
-        note: {
-          vi:
-            `Không còn môn nào có in-degree = 0, nhưng vẫn còn ${numCourses - taken.size} môn chưa học.\n` +
-            `→ Đồ thị có chu trình → KHÔNG thể hoàn thành → return false.`,
-          en:
-            `No course has in-degree = 0, but ${numCourses - taken.size} courses remain.\n` +
-            `→ Cycle exists → CANNOT finish → return false.`,
-        },
-      });
-      return { numCourses, edges: edgesRaw, answer: false, steps };
-    }
-
-    // Take all available this round
-    for (const c of available) taken.add(c);
-    const hlEdges = [];
-    for (const c of available) {
-      for (const next of adj[c]) {
-        inDeg[next]--;
-        hlEdges.push([c, next]);
-      }
-    }
-
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "queue")) vars.push({ name: "queue", value: queueStr() });
     steps.push({
-      title: { vi: `Lấy ${available.length} môn có in-deg = 0`, en: `Pop ${available.length} courses with in-deg = 0` },
-      arr: [],
-      graph: makeGraph(available, hlEdges),
-      highlight: [],
-      mark: [],
-      codeLines: [9, 10, 11, 12, 13, 14],
-      vars: [
-        { name: "available", value: `[${available.join(", ")}]` },
-        { name: "edges decremented", value: hlEdges.length },
-        { name: "in-degree after", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") || "(all done)" },
-        { name: "taken", value: `${taken.size}/${numCourses}` },
-      ],
-      note: {
-        vi:
-          `Lấy mọi môn có in-degree = 0: [${available.join(", ")}].\n` +
-          `Giảm in-degree các môn phụ thuộc (${hlEdges.length} cạnh).\n` +
-          `Đã học ${taken.size}/${numCourses} môn.`,
-        en:
-          `Pop all courses with in-degree = 0: [${available.join(", ")}].\n` +
-          `Decrement in-degree of dependents (${hlEdges.length} edges).\n` +
-          `Taken: ${taken.size}/${numCourses}.`,
-      },
+      title: o.title, arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
     });
   }
 
-  steps.push({
-    title: { vi: "✓ Hoàn thành tất cả → true", en: "✓ All done → true" },
-    arr: [],
-    graph: makeGraph([], []),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [17],
+  // ── Intro ────────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "Bài toán", en: "Problem" },
+    codeLines: [4],
     vars: [
-      { name: "taken", value: `${numCourses}/${numCourses}` },
-      { name: "answer", value: true },
+      { name: "numCourses", value: numCourses },
+      { name: "prerequisites", value: pairs.map(([a, b]) => `[${a},${b}]`).join(", ") || "none" },
     ],
     note: {
-      vi: `Đã học hết ${numCourses} môn → đồ thị không có chu trình → return true.`,
-      en: `All ${numCourses} courses taken → no cycle → return true.`,
+      vi:
+        `Có ${numCourses} môn (0..${numCourses - 1}), ${pairs.length} tiên quyết. Mỗi [a, b] = phải học b TRƯỚC a → cạnh b→a.\n` +
+        `Số DƯỚI mỗi nút = in-degree (số môn còn phải học trước nó). Nhãn "queue" = đang trong hàng đợi.\n` +
+        `Kahn's algorithm: cứ học môn nào in-degree = 0, rồi gỡ nó khỏi đồ thị. Học hết → true; kẹt lại → có chu trình → false.`,
+      en:
+        `${numCourses} courses (0..${numCourses - 1}), ${pairs.length} prerequisites. Each [a, b] = take b BEFORE a → edge b→a.\n` +
+        `Number UNDER each node = in-degree (prereqs still needed). "queue" label = currently in the queue.\n` +
+        `Kahn's algorithm: keep taking a course with in-degree 0 and remove it. Finish all → true; stuck → cycle → false.`,
     },
   });
 
-  return { numCourses, edges: edgesRaw, answer: true, steps };
+  // ── Line 5: adj = defaultdict(list) ───────────────────────────────────
+  snap({
+    title: { vi: "line 5: adj = defaultdict(list)", en: "line 5: adj = defaultdict(list)" },
+    codeLines: [5],
+    note: { vi: "Tạo danh sách kề rỗng cho mỗi môn.", en: "Create an empty adjacency list for each course." },
+  });
+
+  // ── Line 6: in_deg = [0] * numCourses ─────────────────────────────────
+  snap({
+    title: { vi: "line 6: in_deg = [0] * numCourses", en: "line 6: in_deg = [0] * numCourses" },
+    codeLines: [6],
+    vars: [{ name: "in_deg", value: inDegStr() }],
+    note: { vi: "Ban đầu mọi môn có in-degree = 0 (chưa đếm tiên quyết).", en: "Initially every course has in-degree 0 (prereqs not counted yet)." },
+  });
+
+  // ── Lines 7-9: build graph + in-degree ────────────────────────────────
+  for (const [a, b] of pairs) {
+    snap({
+      title: { vi: `line 7: a, b = ${a}, ${b}`, en: `line 7: a, b = ${a}, ${b}` },
+      hlNodes: [a, b], codeLines: [7],
+      note: { vi: `Xét tiên quyết [${a}, ${b}]: phải học ${b} trước ${a}.`, en: `Process prerequisite [${a}, ${b}]: take ${b} before ${a}.` },
+    });
+    adj[b].push(a);
+    snap({
+      title: { vi: `line 8: adj[${b}].append(${a})`, en: `line 8: adj[${b}].append(${a})` },
+      hlNodes: [b, a], hlEdges: [[b, a]], codeLines: [8],
+      vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm cạnh ${b}→${a} (học xong ${b} thì mở khoá ${a}).`, en: `Add edge ${b}→${a} (finishing ${b} unlocks ${a}).` },
+    });
+    inDeg[a] += 1;
+    snap({
+      title: { vi: `line 9: in_deg[${a}] += 1 → ${inDeg[a]}`, en: `line 9: in_deg[${a}] += 1 → ${inDeg[a]}` },
+      hlNodes: [a], codeLines: [9],
+      vars: [{ name: "in_deg", value: inDegStr() }],
+      note: { vi: `${a} có thêm 1 tiên quyết → in_deg[${a}] = ${inDeg[a]}.`, en: `${a} gains one prerequisite → in_deg[${a}] = ${inDeg[a]}.` },
+    });
+  }
+
+  // ── Line 10: queue = deque([i if in_deg[i]==0]) ───────────────────────
+  queue = courses.filter((c) => inDeg[c] === 0);
+  snap({
+    title: { vi: `line 10: queue = ${queueStr()}`, en: `line 10: queue = ${queueStr()}` },
+    hlNodes: [...queue], codeLines: [10],
+    note: {
+      vi: `Đưa mọi môn KHÔNG có tiên quyết (in-degree = 0) vào queue: ${queueStr()}. Đây là các môn học được ngay.`,
+      en: `Enqueue every course with NO prerequisites (in-degree = 0): ${queueStr()}. These can be taken immediately.`,
+    },
+  });
+
+  // ── Line 11: taken = 0 ────────────────────────────────────────────────
+  snap({
+    title: { vi: "line 11: taken = 0", en: "line 11: taken = 0" },
+    codeLines: [11],
+    vars: [{ name: "taken", value: 0 }],
+    note: { vi: "taken = số môn đã học xong.", en: "taken = number of courses finished." },
+  });
+
+  // ── Lines 12-18: process the queue ────────────────────────────────────
+  while (queue.length) {
+    snap({
+      title: { vi: "line 12: while queue", en: "line 12: while queue" },
+      codeLines: [12],
+      vars: [{ name: "taken", value: takenCount }],
+      note: { vi: `Queue còn ${queue.length} môn → tiếp tục.`, en: `Queue has ${queue.length} course(s) → continue.` },
+    });
+
+    const u = queue.shift();
+    snap({
+      title: { vi: `line 13: u = queue.popleft() = ${u}`, en: `line 13: u = queue.popleft() = ${u}` },
+      hlNodes: [u], codeLines: [13],
+      vars: [{ name: "u", value: u }],
+      note: { vi: `Lấy môn ${u} ở đầu queue ra học.`, en: `Take course ${u} from the front of the queue.` },
+    });
+
+    takenCount += 1;
+    taken.add(u);
+    takenOrder.push(u);
+    snap({
+      title: { vi: `line 14: taken += 1 → ${takenCount}`, en: `line 14: taken += 1 → ${takenCount}` },
+      hlNodes: [u], codeLines: [14],
+      vars: [{ name: "taken", value: takenCount }, { name: "order", value: `[${takenOrder.join(", ")}]` }],
+      note: { vi: `Học xong ${u} (tô xanh) → taken = ${takenCount}.`, en: `Finished ${u} (green) → taken = ${takenCount}.` },
+    });
+
+    snap({
+      title: { vi: `line 15: for v in adj[${u}] = [${adj[u].join(", ")}]`, en: `line 15: for v in adj[${u}] = [${adj[u].join(", ")}]` },
+      hlNodes: [u], hlEdges: adj[u].map((v) => [u, v]), codeLines: [15],
+      note: { vi: `Gỡ ${u} khỏi đồ thị: duyệt các môn phụ thuộc ${u}.`, en: `Remove ${u} from the graph: iterate the courses depending on ${u}.` },
+    });
+
+    for (const v of adj[u]) {
+      inDeg[v] -= 1;
+      snap({
+        title: { vi: `line 16: in_deg[${v}] -= 1 → ${inDeg[v]}`, en: `line 16: in_deg[${v}] -= 1 → ${inDeg[v]}` },
+        hlNodes: [v], hlEdges: [[u, v]], codeLines: [16],
+        vars: [{ name: "in_deg", value: inDegStr() }],
+        note: { vi: `${v} đã thỏa 1 tiên quyết (${u}) → in_deg[${v}] = ${inDeg[v]}.`, en: `${v} satisfied one prerequisite (${u}) → in_deg[${v}] = ${inDeg[v]}.` },
+      });
+      const zero = inDeg[v] === 0;
+      snap({
+        title: { vi: `line 17: in_deg[${v}] == 0? ${zero}`, en: `line 17: in_deg[${v}] == 0? ${zero}` },
+        hlNodes: [v], codeLines: [17],
+        note: {
+          vi: zero ? `${v} hết tiên quyết → có thể học → line 18.` : `${v} vẫn còn ${inDeg[v]} tiên quyết → chưa vào queue.`,
+          en: zero ? `${v} has no prerequisites left → can be taken → line 18.` : `${v} still needs ${inDeg[v]} prerequisite(s) → not enqueued.`,
+        },
+      });
+      if (zero) {
+        queue.push(v);
+        snap({
+          title: { vi: `line 18: queue.append(${v})`, en: `line 18: queue.append(${v})` },
+          hlNodes: [v], codeLines: [18],
+          note: { vi: `Đưa ${v} vào queue: ${queueStr()}.`, en: `Enqueue ${v}: ${queueStr()}.` },
+        });
+      }
+    }
+  }
+
+  // ── Line 19: return taken == numCourses ───────────────────────────────
+  const answer = takenCount === numCourses;
+  const remaining = courses.filter((c) => !taken.has(c));
+  snap({
+    title: { vi: `line 19: return ${takenCount} == ${numCourses} → ${answer}`, en: `line 19: return ${takenCount} == ${numCourses} → ${answer}` },
+    hlNodes: answer ? [] : remaining, codeLines: [19], final: true,
+    vars: [{ name: "taken", value: `${takenCount}/${numCourses}` }, { name: "answer", value: answer }],
+    note: {
+      vi: answer
+        ? `Đã học hết ${numCourses} môn → đồ thị không có chu trình → return True.`
+        : `Queue rỗng nhưng mới học ${takenCount}/${numCourses} môn. Còn [${remaining.join(", ")}] kẹt với in-degree > 0 → có CHU TRÌNH → return False.`,
+      en: answer
+        ? `All ${numCourses} courses taken → no cycle → return True.`
+        : `Queue is empty but only ${takenCount}/${numCourses} taken. [${remaining.join(", ")}] are stuck with in-degree > 0 → CYCLE → return False.`,
+    },
+  });
+
+  return { numCourses, edges: edgesRaw, answer, steps };
 }
 
 /**
