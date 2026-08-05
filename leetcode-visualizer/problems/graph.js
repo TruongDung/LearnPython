@@ -18274,6 +18274,7 @@ module.exports = {
     difficulty: "hard",
     slug: "minimum-obstacle-removal-to-reach-corner",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Minimum Obstacle Removal to Reach Corner", en: "Minimum Obstacle Removal to Reach Corner" },
     titleVi: { vi: "Xóa ít obstacle nhất để tới góc", en: "Minimum obstacle removal to reach the corner" },
     statement: {
