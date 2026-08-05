@@ -13281,6 +13281,25 @@ button:disabled {
   fill: #6ee7b7;
 }
 
+.graph-node.restricted circle {
+  fill: rgba(239, 68, 68, 0.18);
+  stroke: #ef4444;
+  stroke-dasharray: 4 3;
+}
+
+.graph-node.restricted text {
+  fill: #fca5a5;
+}
+
+[data-theme="light"] .graph-node.restricted circle {
+  fill: #fef2f2;
+  stroke: #ef4444;
+}
+
+[data-theme="light"] .graph-node.restricted text {
+  fill: #b91c1c;
+}
+
 .graph-node.hl circle {
   fill: rgba(245, 158, 11, 0.15);
   stroke: #f59e0b;

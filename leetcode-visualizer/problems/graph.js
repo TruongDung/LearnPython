@@ -8700,6 +8700,237 @@ function buildSteps1319DFS(input, params) {
 }
 
 /**
+ * LeetCode 2368: Reachable Nodes With Restrictions.
+ * Iterative DFS from node 0 over an undirected tree, skipping restricted
+ * (blocked) and already-visited neighbours. Count = number of reached nodes.
+ * One code line highlighted per step; restricted nodes drawn in red.
+ */
+function buildSteps2368(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 7;
+  const restricted = String(params && params.restricted !== undefined ? params.restricted : "4,5")
+    .split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const edgeList = String(input || "")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+
+  const steps = [];
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, id) => id);
+  const allEdges = [];
+  const blocked = new Set(restricted);
+
+  function visitedList(visited) {
+    return allNodes.filter((id) => visited.has(id));
+  }
+
+  function makeGraph(hlNodes = [], hlEdges = [], visited = []) {
+    const annotations = {};
+    for (const b of restricted) annotations[b] = "🚫";
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visited,
+      restrictedNodes: [...restricted],
+      annotations,
+    };
+  }
+
+  function push({ title, hlNodes, hlEdges, visited, codeLines, vars, note, final = false }) {
+    steps.push({
+      title, arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visited),
+      highlight: [], mark: [], final, codeLines, vars, note,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: DFS từ node 0, tránh node bị cấm", en: "Idea: DFS from node 0, avoid restricted nodes" },
+    hlNodes: [0],
+    codeLines: [4],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edgeList.length }, { name: "restricted", value: `[${restricted.join(", ")}]` }],
+    note: {
+      vi: `Cây vô hướng ${n} node. Đếm số node tới được từ node 0 mà không đi qua node bị cấm (đỏ). Node 0 chắc chắn không bị cấm.`,
+      en: `Undirected tree with ${n} nodes. Count nodes reachable from node 0 without stepping on restricted (red) nodes. Node 0 is guaranteed not restricted.`,
+    },
+  });
+
+  // Line 5: blocked = set(restricted)
+  push({
+    title: { vi: `line 5: blocked = set(restricted) = {${restricted.join(", ")}}`, en: `line 5: blocked = set(restricted) = {${restricted.join(", ")}}` },
+    hlNodes: restricted,
+    codeLines: [5],
+    vars: [{ name: "blocked", value: `{${restricted.join(", ")}}` }],
+    note: { vi: `Các node bị cấm (tô đỏ): ${restricted.join(", ") || "(không có)"}. Dùng set để kiểm tra O(1).`, en: `Restricted nodes (red): ${restricted.join(", ") || "(none)"}. Use a set for O(1) lookup.` },
+  });
+
+  // Line 6: adj = defaultdict(list)
+  push({
+    title: { vi: "line 6: adj = defaultdict(list)", en: "line 6: adj = defaultdict(list)" },
+    codeLines: [6],
+    vars: [{ name: "adj", value: "{}" }],
+    note: { vi: "Tạo adjacency list rỗng cho đồ thị vô hướng.", en: "Create an empty adjacency list for the undirected graph." },
+  });
+
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `line 7: a, b = ${a}, ${b}`, en: `line 7: a, b = ${a}, ${b}` },
+      hlNodes: [a, b],
+      codeLines: [7],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cạnh vô hướng (${a}, ${b}).`, en: `Process undirected edge (${a}, ${b}).` },
+    });
+    adj[a].push(b);
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "", undirected: true });
+    push({
+      title: { vi: `line 8-9: adj[${a}]+=${b}, adj[${b}]+=${a}`, en: `line 8-9: adj[${a}]+=${b}, adj[${b}]+=${a}` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [8, 9],
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }, { name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Đồ thị vô hướng nên thêm cả hai chiều.`, en: `Undirected graph, so add both directions.` },
+    });
+  }
+
+  const visited = new Set([0]);
+  // Line 10: visited = {0}
+  push({
+    title: { vi: "line 10: visited = {0}", en: "line 10: visited = {0}" },
+    hlNodes: [0],
+    visited: visitedList(visited),
+    codeLines: [10],
+    vars: [{ name: "visited", value: "{0}" }],
+    note: { vi: "Bắt đầu đã thăm node 0.", en: "Start with node 0 visited." },
+  });
+
+  const stack = [0];
+  // Line 11: stack = [0]
+  push({
+    title: { vi: "line 11: stack = [0]", en: "line 11: stack = [0]" },
+    hlNodes: [0],
+    visited: visitedList(visited),
+    codeLines: [11],
+    vars: [{ name: "stack", value: "[0]" }],
+    note: { vi: "Đưa node 0 vào stack DFS.", en: "Push node 0 onto the DFS stack." },
+  });
+
+  let count = 0;
+  // Line 12: count = 0
+  push({
+    title: { vi: "line 12: count = 0", en: "line 12: count = 0" },
+    visited: visitedList(visited),
+    codeLines: [12],
+    vars: [{ name: "count", value: 0 }],
+    note: { vi: "count = số node đã tới được.", en: "count = number of reachable nodes." },
+  });
+
+  while (stack.length) {
+    // Line 13: while stack
+    push({
+      title: { vi: "line 13: while stack", en: "line 13: while stack" },
+      visited: visitedList(visited),
+      codeLines: [13],
+      vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: "Còn node trong stack → tiếp tục.", en: "Stack is non-empty → continue." },
+    });
+
+    // Line 14: node = stack.pop()
+    const node = stack.pop();
+    push({
+      title: { vi: `line 14: node = stack.pop() = ${node}`, en: `line 14: node = stack.pop() = ${node}` },
+      hlNodes: [node],
+      visited: visitedList(visited),
+      codeLines: [14],
+      vars: [{ name: "node", value: node }, { name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: `Lấy node ${node} ra xử lý.`, en: `Pop node ${node} to process.` },
+    });
+
+    // Line 15: count += 1
+    count += 1;
+    push({
+      title: { vi: `line 15: count += 1 → ${count}`, en: `line 15: count += 1 → ${count}` },
+      hlNodes: [node],
+      visited: visitedList(visited),
+      codeLines: [15],
+      vars: [{ name: "count", value: count }],
+      note: { vi: `Đã tới node ${node} → count = ${count}.`, en: `Reached node ${node} → count = ${count}.` },
+    });
+
+    // Line 16: for nb in adj[node]
+    push({
+      title: { vi: `line 16: for nb in adj[${node}] = [${adj[node].join(", ")}]`, en: `line 16: for nb in adj[${node}] = [${adj[node].join(", ")}]` },
+      hlNodes: [node],
+      hlEdges: adj[node].map((nb) => [node, nb]),
+      visited: visitedList(visited),
+      codeLines: [16],
+      vars: [{ name: "neighbors", value: `[${adj[node].join(", ")}]` }],
+      note: { vi: `Duyệt hàng xóm của ${node}.`, en: `Iterate over ${node}'s neighbours.` },
+    });
+
+    for (const nb of adj[node]) {
+      const seen = visited.has(nb);
+      const isBlocked = blocked.has(nb);
+      const ok = !seen && !isBlocked;
+      push({
+        title: { vi: `line 17: nb=${nb} → ${ok ? "đi được" : "bỏ qua"}`, en: `line 17: nb=${nb} → ${ok ? "take it" : "skip"}` },
+        hlNodes: [node, nb],
+        hlEdges: [[node, nb]],
+        visited: visitedList(visited),
+        codeLines: [17],
+        vars: [
+          { name: "nb", value: nb },
+          { name: "in visited?", value: seen },
+          { name: "in blocked?", value: isBlocked },
+        ],
+        note: {
+          vi: ok
+            ? `${nb} chưa thăm và không bị cấm → thêm vào (line 18-19).`
+            : isBlocked
+              ? `${nb} bị CẤM (đỏ) → bỏ qua, không đi vào.`
+              : `${nb} đã thăm rồi → bỏ qua.`,
+          en: ok
+            ? `${nb} is unvisited and not blocked → add it (lines 18-19).`
+            : isBlocked
+              ? `${nb} is RESTRICTED (red) → skip, never enter.`
+              : `${nb} already visited → skip.`,
+        },
+      });
+      if (ok) {
+        visited.add(nb);
+        stack.push(nb);
+        push({
+          title: { vi: `line 18-19: visited.add(${nb}); stack.append(${nb})`, en: `line 18-19: visited.add(${nb}); stack.append(${nb})` },
+          hlNodes: [nb],
+          hlEdges: [[node, nb]],
+          visited: visitedList(visited),
+          codeLines: [18, 19],
+          vars: [{ name: "visited", value: `{${visitedList(visited).join(", ")}}` }, { name: "stack", value: `[${stack.join(", ")}]` }],
+          note: { vi: `Đánh dấu ${nb} đã thăm và đẩy vào stack.`, en: `Mark ${nb} visited and push it onto the stack.` },
+        });
+      }
+    }
+  }
+
+  // Line 20: return count
+  push({
+    title: { vi: `line 20: return count = ${count}`, en: `line 20: return count = ${count}` },
+    visited: visitedList(visited),
+    final: true,
+    codeLines: [20],
+    vars: [{ name: "answer", value: count }],
+    note: {
+      vi: `Stack rỗng. Tới được ${count} node từ node 0 mà không qua node bị cấm.`,
+      en: `Stack empty. Reached ${count} nodes from node 0 without any restricted node.`,
+    },
+  });
+
+  return { n, edges: edgeList, restricted, answer: count, steps };
+}
+
+/**
  * LeetCode 1971: Find if Path Exists in Graph.
  * Iterative DFS from source; return true as soon as destination is popped/found,
  * otherwise false once the stack is exhausted. One code line highlighted per step.
@@ -16756,6 +16987,66 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" },
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
+  },
+  2368: {
+    id: 2368,
+    difficulty: "medium",
+    slug: "reachable-nodes-with-restrictions",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    title: { vi: "Reachable Nodes With Restrictions", en: "Reachable Nodes With Restrictions" },
+    titleVi: { vi: "Đếm node tới được khi có node bị cấm", en: "Count reachable nodes with restrictions" },
+    statement: {
+      vi:
+        "Cho cây vô hướng n node (0..n-1) qua danh sách cạnh, và danh sách node bị cấm `restricted`. " +
+        "Xuất phát từ node 0 (không bao giờ bị cấm), đếm số node tới được mà không đi qua node bị cấm. Nhập cạnh 'a,b' cách bởi ';'.",
+      en:
+        "Given an undirected tree of n nodes (0..n-1) via an edge list, plus a `restricted` list. " +
+        "Starting from node 0 (never restricted), count how many nodes are reachable without visiting any restricted node. Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;1,2;3,1;4,0;0,5;5,6",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 7 },
+      { key: "restricted", label: { vi: "restricted (cách bởi ,)", en: "restricted (comma separated)" }, default: "4,5" },
+    ],
+    approach: [
+      { vi: "blocked = set(restricted) để kiểm tra O(1).", en: "blocked = set(restricted) for O(1) lookup." },
+      { vi: "Xây adjacency list từ danh sách cạnh (đồ thị vô hướng).", en: "Build an adjacency list from the edge list (undirected graph)." },
+      { vi: "DFS (dùng stack) từ node 0; bỏ qua hàng xóm đã thăm hoặc bị cấm.", en: "DFS (using a stack) from node 0; skip visited or restricted neighbours." },
+      { vi: "Đếm số node lấy ra khỏi stack = số node tới được.", en: "Count nodes popped from the stack = number of reachable nodes." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n + E)",
+      note: {
+        vi: "Xây adjacency list O(E). DFS thăm mỗi node/cạnh tối đa một lần → O(n+E). Cây nên E = n-1.",
+        en: "Build adjacency list O(E). DFS visits each node/edge at most once → O(n+E). Tree, so E = n-1.",
+      },
+    },
+    code: [
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def reachableNodes(self, n, edges, restricted):",
+      "        blocked = set(restricted)",
+      "        adj = defaultdict(list)",
+      "        for a, b in edges:",
+      "            adj[a].append(b)",
+      "            adj[b].append(a)",
+      "        visited = {0}",
+      "        stack = [0]",
+      "        count = 0",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            count += 1",
+      "            for nb in adj[node]:",
+      "                if nb not in visited and nb not in blocked:",
+      "                    visited.add(nb)",
+      "                    stack.append(nb)",
+      "        return count",
+    ],
+    builder: buildSteps2368,
   },
   1971: {
     id: 1971,

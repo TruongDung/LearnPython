@@ -4134,6 +4134,7 @@ function renderGraph(step, targetId = "treeView") {
 
   const hlNodeSet = new Set(hlNodes || []);
   const visitedSet = new Set(visitedNodes || []);
+  const restrictedSet = new Set(step.graph.restrictedNodes || []);
   const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}${e[2] ? `-${e[2]}` : ""}`));
 
   // Optional column dividers + labels (used by "semester"/level layouts to show
@@ -4275,8 +4276,10 @@ function renderGraph(step, targetId = "treeView") {
     const p = pos[node.id];
     const isHl = hlNodeSet.has(node.id);
     const isVisited = visitedSet.has(node.id);
+    const isRestricted = restrictedSet.has(node.id);
     let cls = "graph-node";
-    if (isHl) cls += " hl";
+    if (isRestricted) cls += " restricted";
+    else if (isHl) cls += " hl";
     else if (isVisited) cls += " visited";
 
     nodeSvg += `<g class="${cls}">`;
