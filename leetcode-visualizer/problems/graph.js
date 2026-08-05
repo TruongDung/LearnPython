@@ -8757,6 +8757,197 @@ function buildSteps1319DFS(input, params) {
 }
 
 /**
+ * LeetCode 1584: Min Cost to Connect All Points (MST via Prim's algorithm).
+ * Grow a spanning tree from node 0 with a min-heap keyed by Manhattan distance;
+ * each popped unvisited node commits its cheapest connecting edge. Points are
+ * drawn at their real coordinates (flow layout), MST edges appear as chosen.
+ */
+function buildSteps1584(input) {
+  const raw = String(input || "").trim();
+  let pts;
+  if (raw.includes("[")) {
+    pts = (raw.match(/\[([^\[\]]*)\]/g) || [])
+      .map((g) => g.replace(/[\[\]]/g, "").trim()).filter((x) => x.length)
+      .map((s) => s.split(",").map((v) => Number(v.trim())));
+  } else {
+    pts = raw.split(";").map((s) => s.trim()).filter(Boolean)
+      .map((s) => s.split(",").map((v) => Number(v.trim())));
+  }
+  const n = pts.length;
+  const steps = [];
+
+  const invalid = n < 1 || pts.some((p) => p.length !== 2 || p.some((v) => isNaN(v)));
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], graph: { nodes: [{ id: 0, label: "!" }], edges: [], hlNodes: [0], hlEdges: [], visitedNodes: [] },
+      highlight: [], mark: [], final: true, codeLines: [5], vars: [{ name: "answer", value: "invalid" }],
+      note: { vi: "Nhập các điểm dạng [[x,y],...] ví dụ [[0,0],[2,2],[3,10]].", en: "Enter points like [[x,y],...] e.g. [[0,0],[2,2],[3,10]]." },
+    });
+    return { original: pts, answer: null, steps };
+  }
+
+  // Normalized positions for the flow layout (flip y so larger y is up).
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = (maxX - minX) || 1, spanY = (maxY - minY) || 1;
+  const positions = {};
+  pts.forEach((p, i) => { positions[i] = { x: (p[0] - minX) / spanX, y: 1 - (p[1] - minY) / spanY }; });
+
+  const manhattan = (a, b) => Math.abs(pts[a][0] - pts[b][0]) + Math.abs(pts[a][1] - pts[b][1]);
+
+  const visited = new Array(n).fill(false);
+  let heap = []; // [cost, node, parent]
+  let total = 0;
+  let edgesUsed = 0;
+  const mstEdges = [];
+
+  const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
+  function popMin() {
+    let bi = 0;
+    for (let k = 1; k < heap.length; k++) if (cmp(heap[k], heap[bi]) < 0) bi = k;
+    return heap.splice(bi, 1)[0];
+  }
+  const heapStr = () => heap.length ? `[${heap.slice().sort(cmp).map((h) => `(${h[0]},n${h[1]}←n${h[2] < 0 ? "·" : h[2]})`).join(", ")}]` : "[]";
+  const visitedList = () => pts.map((_, i) => i).filter((i) => visited[i]);
+
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      layout: "flow", width: 660, height: 380, positions,
+      nodes: pts.map((p, i) => ({ id: i, label: String(i), sub: `(${p[0]},${p[1]})` })),
+      edges: mstEdges.map((e) => ({ u: e.u, v: e.v, w: e.w, undirected: true })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedList(),
+    };
+  }
+
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "heap")) vars.push({ name: "heap(min)", value: heapStr() });
+    if (!vars.some((v) => v.name === "total")) vars.push({ name: "total", value: total });
+    steps.push({
+      title: o.title, arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: `line 5: n = ${n}`, en: `line 5: n = ${n}` },
+    codeLines: [5],
+    vars: [{ name: "points", value: pts.map((p) => `(${p[0]},${p[1]})`).join(" ") }],
+    note: {
+      vi: `Nối ${n} điểm với chi phí = khoảng cách Manhattan |Δx|+|Δy|. Đây là bài Cây khung nhỏ nhất (MST) — dùng Prim + min-heap. Điểm vẽ theo tọa độ thật.`,
+      en: `Connect ${n} points where cost = Manhattan distance |Δx|+|Δy|. This is a Minimum Spanning Tree (MST) — solved with Prim + a min-heap. Points are drawn at their real coordinates.`,
+    },
+  });
+
+  snap({ title: { vi: "line 6: visited = [False]*n", en: "line 6: visited = [False]*n" }, codeLines: [6], note: { vi: "Chưa điểm nào được nối vào cây.", en: "No point is connected to the tree yet." } });
+
+  heap = [[0, 0, -1]];
+  snap({ title: { vi: "line 7: heap = [(0, 0, -1)]", en: "line 7: heap = [(0, 0, -1)]" }, hlNodes: [0], codeLines: [7], note: { vi: "Bắt đầu từ điểm 0 với chi phí 0 (chưa có cha). Heap sắp theo chi phí nhỏ nhất.", en: "Start from point 0 with cost 0 (no parent). The heap is ordered by smallest cost." } });
+
+  snap({ title: { vi: "line 8: total = 0", en: "line 8: total = 0" }, codeLines: [8], note: { vi: "total = tổng chi phí các cạnh đã chọn.", en: "total = sum of chosen edge costs." } });
+  snap({ title: { vi: "line 9: edges_used = 0", en: "line 9: edges_used = 0" }, codeLines: [9], note: { vi: "Đếm số điểm đã nối vào cây (cần đủ n).", en: "Count points connected to the tree (need all n)." } });
+
+  while (edgesUsed < n) {
+    snap({
+      title: { vi: `line 10: while edges_used < n → ${edgesUsed} < ${n}`, en: `line 10: while edges_used < n → ${edgesUsed} < ${n}` },
+      codeLines: [10], vars: [{ name: "edges_used", value: edgesUsed }],
+      note: { vi: `Còn thiếu điểm chưa nối → tiếp tục.`, en: `Some points not connected yet → continue.` },
+    });
+
+    const [cost, i, parent] = popMin();
+    snap({
+      title: { vi: `line 11: pop → (cost=${cost}, node=${i}, parent=${parent})`, en: `line 11: pop → (cost=${cost}, node=${i}, parent=${parent})` },
+      hlNodes: [i], hlEdges: parent >= 0 ? [[parent, i]] : [], codeLines: [11],
+      vars: [{ name: "cost", value: cost }, { name: "i", value: i }, { name: "parent", value: parent }],
+      note: { vi: `Lấy cạnh rẻ nhất trong heap: tới điểm ${i} với chi phí ${cost}${parent >= 0 ? ` từ điểm ${parent}` : " (điểm gốc)"}.`, en: `Pop the cheapest edge in the heap: reach point ${i} at cost ${cost}${parent >= 0 ? ` from point ${parent}` : " (root)"}.` },
+    });
+
+    const already = visited[i];
+    snap({
+      title: { vi: `line 12: visited[${i}]? ${already}`, en: `line 12: visited[${i}]? ${already}` },
+      hlNodes: [i], codeLines: [12], vars: [{ name: `visited[${i}]`, value: already }],
+      note: { vi: already ? `Điểm ${i} đã ở trong cây → cạnh này thừa.` : `Điểm ${i} chưa nối → nhận cạnh này.`, en: already ? `Point ${i} is already in the tree → this edge is redundant.` : `Point ${i} not connected → accept this edge.` },
+    });
+    if (already) {
+      snap({
+        title: { vi: "line 13: continue", en: "line 13: continue" },
+        hlNodes: [i], codeLines: [13],
+        note: { vi: `Bỏ qua cạnh thừa, quay lại đầu vòng lặp.`, en: `Skip the redundant edge and loop again.` },
+      });
+      continue;
+    }
+
+    visited[i] = true;
+    if (parent >= 0) mstEdges.push({ u: parent, v: i, w: cost });
+    snap({
+      title: { vi: `line 14: visited[${i}] = True`, en: `line 14: visited[${i}] = True` },
+      hlNodes: [i], hlEdges: parent >= 0 ? [[parent, i]] : [], codeLines: [14],
+      note: { vi: parent >= 0 ? `Nối điểm ${i} vào cây bằng cạnh ${parent}—${i} (chi phí ${cost}).` : `Điểm gốc ${i} vào cây.`, en: parent >= 0 ? `Connect point ${i} to the tree via edge ${parent}—${i} (cost ${cost}).` : `Root point ${i} joins the tree.` },
+    });
+
+    total += cost;
+    snap({
+      title: { vi: `line 15: total += ${cost} → ${total}`, en: `line 15: total += ${cost} → ${total}` },
+      hlNodes: [i], codeLines: [15], vars: [{ name: "total", value: total }],
+      note: { vi: `Cộng chi phí cạnh vừa chọn. total = ${total}.`, en: `Add the chosen edge cost. total = ${total}.` },
+    });
+
+    edgesUsed += 1;
+    snap({
+      title: { vi: `line 16: edges_used += 1 → ${edgesUsed}`, en: `line 16: edges_used += 1 → ${edgesUsed}` },
+      hlNodes: [i], codeLines: [16], vars: [{ name: "edges_used", value: edgesUsed }],
+      note: { vi: `Đã nối ${edgesUsed}/${n} điểm.`, en: `Connected ${edgesUsed}/${n} points.` },
+    });
+
+    if (edgesUsed === n) break; // no need to push more; tree complete
+
+    snap({
+      title: { vi: `line 17: for j in range(${n})`, en: `line 17: for j in range(${n})` },
+      hlNodes: [i], codeLines: [17],
+      note: { vi: `Thêm các cạnh từ ${i} tới các điểm CHƯA nối vào heap.`, en: `Push edges from ${i} to every UNCONNECTED point into the heap.` },
+    });
+
+    for (let j = 0; j < n; j++) {
+      if (visited[j]) {
+        snap({
+          title: { vi: `line 18: not visited[${j}]? False`, en: `line 18: not visited[${j}]? False` },
+          hlNodes: [i, j], codeLines: [18], vars: [{ name: "j", value: j }],
+          note: { vi: `Điểm ${j} đã ở trong cây → bỏ qua.`, en: `Point ${j} is already in the tree → skip.` },
+        });
+        continue;
+      }
+      const d = manhattan(i, j);
+      heap.push([d, j, i]);
+      snap({
+        title: { vi: `line 18-20: push (d=${d}, ${j}, ${i})`, en: `line 18-20: push (d=${d}, ${j}, ${i})` },
+        hlNodes: [i, j], hlEdges: [[i, j]], codeLines: [18, 19, 20],
+        vars: [{ name: "j", value: j }, { name: "d = |Δx|+|Δy|", value: `${d}` }],
+        note: { vi: `Khoảng cách Manhattan ${i}→${j} = ${d}. Đẩy cạnh này vào heap (chưa chọn).`, en: `Manhattan distance ${i}→${j} = ${d}. Push this candidate edge to the heap (not chosen yet).` },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `line 21: return total = ${total}`, en: `line 21: return total = ${total}` },
+    codeLines: [21], final: true,
+    vars: [{ name: "answer", value: total }, { name: "MST edges", value: mstEdges.map((e) => `${e.u}-${e.v}(${e.w})`).join(", ") || "(none)" }],
+    note: {
+      vi: `Cây khung nhỏ nhất đã nối hết ${n} điểm. Tổng chi phí nhỏ nhất = ${total}. Các cạnh cây: ${mstEdges.map((e) => `${e.u}—${e.v}(${e.w})`).join(", ") || "(không có)"}.`,
+      en: `The MST connects all ${n} points. Minimum total cost = ${total}. Tree edges: ${mstEdges.map((e) => `${e.u}—${e.v}(${e.w})`).join(", ") || "(none)"}.`,
+    },
+  });
+
+  return { original: pts, answer: total, steps };
+}
+
+/**
  * LeetCode 1102: Path With Maximum Minimum Value (Premium).
  * Best-first search with a max-heap: always expand the reachable cell with the
  * largest value; result = smallest value popped so far. When the bottom-right
@@ -17282,6 +17473,68 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DFS iterative (stack)", en: "Approach 1: Iterative DFS (stack)" },
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
+  },
+  1584: {
+    id: 1584,
+    difficulty: "medium",
+    slug: "min-cost-to-connect-all-points",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" }],
+    title: { vi: "Min Cost to Connect All Points", en: "Min Cost to Connect All Points" },
+    titleVi: { vi: "Chi phí nhỏ nhất nối tất cả điểm (MST - Prim)", en: "Min cost to connect all points (MST - Prim)" },
+    statement: {
+      vi:
+        "Cho các điểm trên mặt phẳng. Chi phí nối 2 điểm = khoảng cách Manhattan |xi-xj|+|yi-yj|. " +
+        "Tìm chi phí nhỏ nhất để nối tất cả các điểm sao cho có đúng một đường đi giữa mọi cặp điểm (Cây khung nhỏ nhất). " +
+        "Nhập điểm kiểu LeetCode: [[0,0],[2,2],[3,10]] (hoặc dạng '0,0;2,2;3,10').",
+      en:
+        "Given points on a plane, the cost to connect two points is their Manhattan distance |xi-xj|+|yi-yj|. " +
+        "Return the minimum cost to connect all points so exactly one path exists between any two (Minimum Spanning Tree). " +
+        "Enter points in LeetCode form: [[0,0],[2,2],[3,10]] (or as '0,0;2,2;3,10').",
+    },
+    defaultInput: "[[0,0],[2,2],[3,10],[5,2],[7,0]]",
+    inputKind: "string",
+    inputLabel: { vi: "points (vd [[0,0],[2,2],[3,10]])", en: "points (e.g. [[0,0],[2,2],[3,10]])" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Đây là bài Cây khung nhỏ nhất (MST): coi mỗi điểm là 1 đỉnh, cạnh giữa 2 điểm có trọng số = khoảng cách Manhattan.", en: "This is a Minimum Spanning Tree (MST): each point is a node, each edge weight is the Manhattan distance." },
+      { vi: "Prim: bắt đầu từ điểm 0, dùng min-heap giữ các cạnh (chi phí, đỉnh, cha).", en: "Prim: start from point 0, use a min-heap of edges (cost, node, parent)." },
+      { vi: "Liên tục lấy cạnh rẻ nhất tới một điểm CHƯA nối; nếu điểm đã nối thì bỏ qua (cạnh thừa).", en: "Repeatedly take the cheapest edge to an UNCONNECTED point; skip if already connected (redundant edge)." },
+      { vi: "Khi nhận điểm mới, cộng chi phí và đẩy các cạnh từ nó tới các điểm còn lại. Dừng khi đã nối đủ n điểm.", en: "When a new point joins, add its cost and push its edges to the rest. Stop when all n points are connected." },
+    ],
+    complexity: {
+      time: "O(n² log n)",
+      space: "O(n²)",
+      note: {
+        vi: "Đồ thị đầy đủ n điểm có O(n²) cạnh; mỗi thao tác heap O(log). Với n nhỏ Prim kiểu này rất gọn.",
+        en: "The complete graph on n points has O(n²) edges; each heap op is O(log). For small n this Prim variant is compact.",
+      },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def minCostConnectPoints(self, points):",
+      "        n = len(points)",
+      "        visited = [False] * n",
+      "        heap = [(0, 0, -1)]  # (cost, node, parent)",
+      "        total = 0",
+      "        edges_used = 0",
+      "        while edges_used < n:",
+      "            cost, i, parent = heapq.heappop(heap)",
+      "            if visited[i]:",
+      "                continue",
+      "            visited[i] = True",
+      "            total += cost",
+      "            edges_used += 1",
+      "            for j in range(n):",
+      "                if not visited[j]:",
+      "                    d = abs(points[i][0]-points[j][0]) + abs(points[i][1]-points[j][1])",
+      "                    heapq.heappush(heap, (d, j, i))",
+      "        return total",
+    ],
+    builder: buildSteps1584,
   },
   1102: {
     id: 1102,
