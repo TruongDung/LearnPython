@@ -345,11 +345,17 @@ function buildSteps1293(input, params) {
 
 // ─── 1368: Minimum Cost Valid Path in Grid (0-1 BFS) ───
 function buildSteps1368(input) {
-  const grid = String(input)
-    .split(/[|;]/)
-    .map((row) => row.trim())
-    .filter(Boolean)
-    .map((row) => row.split(",").map((value) => Number(value.trim())));
+  const raw1368 = String(input).trim();
+  const grid = raw1368.includes("[")
+    ? (raw1368.match(/\[([^\[\]]*)\]/g) || [])
+        .map((g) => g.replace(/[\[\]]/g, "").trim())
+        .filter((x) => x.length)
+        .map((row) => row.split(",").map((value) => Number(value.trim())))
+    : raw1368
+        .split(/[|;]/)
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .map((row) => row.split(",").map((value) => Number(value.trim())));
   const steps = [];
   const rows = grid.length;
   const cols = rows > 0 ? grid[0].length : 0;

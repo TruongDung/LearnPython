@@ -18214,15 +18214,15 @@ module.exports = {
       vi:
         "Lưới m×n, mỗi ô có mũi tên: 1=phải, 2=trái, 3=xuống, 4=lên. " +
         "Đi từ (0,0) đến (m-1,n-1). Đi theo mũi tên = chi phí 0, đổi hướng mũi tên = chi phí 1. " +
-        "Tìm chi phí nhỏ nhất (0-1 BFS). Nhập lưới: hàng cách bởi |, giá trị cách bởi dấu phẩy.",
+        "Tìm chi phí nhỏ nhất (0-1 BFS). Nhập lưới kiểu LeetCode: [[1,1,3],[3,2,2],[1,1,4]] (hoặc dạng '1,1,3|3,2,2').",
       en:
         "Grid m×n, each cell has an arrow: 1=right, 2=left, 3=down, 4=up. " +
         "Travel from (0,0) to (m-1,n-1). Following the arrow costs 0, changing it costs 1. " +
-        "Find minimum cost (0-1 BFS). Enter grid: rows separated by |, values comma-separated.",
+        "Find minimum cost (0-1 BFS). Enter grid in LeetCode form: [[1,1,3],[3,2,2],[1,1,4]] (or as '1,1,3|3,2,2').",
     },
-    defaultInput: "1,1,3|3,2,2|1,1,4",
+    defaultInput: "[[1,1,3],[3,2,2],[1,1,4]]",
     inputKind: "string",
-    inputLabel: { vi: "Lưới (hàng cách bởi |)", en: "Grid (rows separated by |)" },
+    inputLabel: { vi: "Lưới (vd [[1,1,3],[3,2,2],[1,1,4]])", en: "Grid (e.g. [[1,1,3],[3,2,2],[1,1,4]])" },
     extraParams: [],
     approach: [
       { vi: "Mỗi ô là một nút. Đi theo mũi tên có sẵn = chi phí 0, đổi hướng = chi phí 1.", en: "Each cell is a node. Following the existing arrow = cost 0, changing direction = cost 1." },
