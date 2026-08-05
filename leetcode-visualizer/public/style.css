@@ -10296,6 +10296,115 @@ button:disabled {
   .kph-data-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Gas Station track (#134) ---- */
+.gas-station-viz {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  padding: 4px;
+}
+.gas-feasibility {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  background: #0f172a;
+}
+.gas-feasibility.ok { border-color: #22c55e; }
+.gas-feasibility.bad { border-color: #ef4444; }
+.gas-feas-row { display: flex; align-items: center; gap: 10px; }
+.gas-feas-label { min-width: 120px; font-size: 13px; }
+.gas-feas-bar {
+  flex: 1;
+  height: 16px;
+  background: #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gas-feas-fill { height: 100%; border-radius: 8px; transition: width .3s ease; }
+.gas-feas-fill.gas { background: linear-gradient(90deg, #34d399, #10b981); }
+.gas-feas-fill.cost { background: linear-gradient(90deg, #fb923c, #f97316); }
+.gas-feas-verdict { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.gas-feasibility.ok .gas-feas-verdict { color: #4ade80; }
+.gas-feasibility.bad .gas-feas-verdict { color: #f87171; }
+
+.gas-tank-gauge { display: flex; gap: 14px; flex-wrap: wrap; }
+.gas-tank-box, .gas-start-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  min-width: 140px;
+}
+.gas-tank-label, .gas-start-label { font-size: 12px; color: #94a3b8; }
+.gas-tank-value, .gas-start-value { font-size: 24px; font-weight: 700; }
+.gas-tank-box.pos .gas-tank-value { color: #4ade80; }
+.gas-tank-box.neg { border-color: #ef4444; }
+.gas-tank-box.neg .gas-tank-value { color: #f87171; }
+.gas-start-value { color: #fbbf24; }
+
+.gas-track {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.gas-arrow { align-self: center; color: #64748b; font-size: 18px; }
+.gas-station-card {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid #334155;
+  background: #1e293b;
+  min-width: 96px;
+  transition: all .2s ease;
+}
+.gas-station-card.state-pending { opacity: .55; }
+.gas-station-card.state-reached { border-color: #38bdf8; background: #0c2a3a; }
+.gas-station-card.state-discarded { opacity: .5; border-color: #475569; background: #1a1a1a; }
+.gas-station-card.state-discarded .gas-st-head { text-decoration: line-through; }
+.gas-station-card.state-answer { border-color: #22c55e; background: #052e16; box-shadow: 0 0 0 3px rgba(34,197,94,.35); }
+.gas-station-card.is-current { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.4); transform: translateY(-3px); }
+.gas-station-card.is-start { border-color: #fbbf24; }
+.gas-st-head { font-size: 12px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; }
+.gas-st-badge { font-size: 10px; color: #fbbf24; font-weight: 600; }
+.gas-station-card.state-answer .gas-st-badge { color: #4ade80; }
+.gas-st-row { display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; }
+.gas-st-net { font-size: 13px; font-weight: 700; text-align: center; border-radius: 6px; padding: 2px 0; }
+.gas-st-net.pos { color: #4ade80; background: rgba(34,197,94,.12); }
+.gas-st-net.neg { color: #f87171; background: rgba(239,68,68,.12); }
+.gas-st-tank { font-size: 12px; text-align: center; color: #94a3b8; border-top: 1px dashed #334155; padding-top: 3px; }
+.gas-st-tank.pos { color: #7dd3fc; }
+.gas-st-tank.neg { color: #f87171; font-weight: 700; }
+
+.gas-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #94a3b8; }
+.gas-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.gas-legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 2px solid transparent; }
+.gas-legend i.lg-pending { background: #334155; opacity: .55; }
+.gas-legend i.lg-reached { background: #0c2a3a; border-color: #38bdf8; }
+.gas-legend i.lg-current { background: #1e293b; border-color: #6366f1; }
+.gas-legend i.lg-start { background: #1e293b; border-color: #fbbf24; }
+.gas-legend i.lg-discarded { background: #1a1a1a; border-color: #475569; }
+.gas-legend i.lg-answer { background: #052e16; border-color: #22c55e; }
+
+[data-theme="light"] .gas-station-viz { color: #1e293b; }
+[data-theme="light"] .gas-feasibility,
+[data-theme="light"] .gas-tank-box,
+[data-theme="light"] .gas-start-box { background: #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .gas-station-card { background: #f1f5f9; border-color: #cbd5e1; }
+[data-theme="light"] .gas-station-card.state-reached { background: #e0f2fe; }
+[data-theme="light"] .gas-station-card.state-answer { background: #dcfce7; }
+[data-theme="light"] .gas-feas-bar { background: #e2e8f0; }
+[data-theme="light"] .gas-st-row { color: #475569; }
+[data-theme="light"] .gas-legend { color: #64748b; }
+
 /* ---- Real-time experience profit tracker (#9001) ---- */
 .profit-tracker-viz {
   display: grid;

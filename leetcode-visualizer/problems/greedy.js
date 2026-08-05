@@ -2171,24 +2171,56 @@ function buildSteps134(input, params) {
   const cost = String(params && params.cost || "3,4,5,1,2").split(",").map((s) => Number(s.trim()));
   const n = gas.length;
   const steps = [];
-  const sub = () => gas.map((_, x) => `net ${x}: ${gas[x] - cost[x] >= 0 ? "+" : ""}${gas[x] - cost[x]}`);
-
-  function snap(o) {
-    steps.push({
-      title: o.title, arr: [...gas], sub: sub(),
-      highlight: o.highlight || [], mark: o.mark || [], final: o.final || false,
-      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
-    });
-  }
 
   const sumGas = gas.reduce((a, b) => a + b, 0);
   const sumCost = cost.reduce((a, b) => a + b, 0);
+
+  // Per-station settled state: "pending" | "reached" | "discarded"
+  const stateAt = new Array(n).fill("pending");
+  // Running tank value recorded right after processing that station (or null if not yet).
+  const tankAt = new Array(n).fill(null);
+
+  let start = 0;
+  let tank = 0;
+
+  // Build the gasStationView snapshot from the current state.
+  function view(o) {
+    return {
+      n,
+      sumGas, sumCost,
+      feasible: sumGas >= sumCost,
+      start,
+      tank,
+      currentIndex: (o.current === undefined ? null : o.current),
+      phase: o.phase,
+      answer: (o.answer === undefined ? null : o.answer),
+      stations: gas.map((g, x) => ({
+        index: x,
+        gas: g,
+        cost: cost[x],
+        net: g - cost[x],
+        tank: tankAt[x],
+        state: stateAt[x],
+      })),
+    };
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      gasStationView: view(o),
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
 
   // ── Line 3: sum(gas) < sum(cost)? ──────────────────────────────────
   const insufficient = sumGas < sumCost;
   snap({
     title: { vi: `line 3: sum(gas) < sum(cost) → ${insufficient}`, en: `line 3: sum(gas) < sum(cost) → ${insufficient}` },
-    codeLines: [3],
+    codeLines: [3], phase: "check-total",
     vars: [
       { name: "gas", value: `[${gas.join(",")}]` }, { name: "cost", value: `[${cost.join(",")}]` },
       { name: "sum(gas)", value: sumGas }, { name: "sum(cost)", value: sumCost },
@@ -2205,22 +2237,21 @@ function buildSteps134(input, params) {
   if (insufficient) {
     snap({
       title: { vi: "line 4: return -1", en: "line 4: return -1" },
-      final: true, codeLines: [4], vars: [{ name: "answer", value: -1 }],
+      final: true, codeLines: [4], phase: "answer", answer: -1,
+      vars: [{ name: "answer", value: -1 }],
       note: { vi: "Không đủ xăng để đi hết vòng, bất kể xuất phát ở đâu.", en: "Not enough gas to complete the loop, regardless of the starting point." },
     });
     return { original: gas, answer: -1, steps };
   }
 
   // ── Lines 5-6: start = 0; tank = 0 ─────────────────────────────────
-  let start = 0;
-  let tank = 0;
   snap({
     title: { vi: "line 5-6: start = 0; tank = 0", en: "line 5-6: start = 0; tank = 0" },
-    codeLines: [5, 6],
+    codeLines: [5, 6], phase: "init",
     vars: [{ name: "start", value: 0 }, { name: "tank", value: 0 }],
     note: {
-      vi: "start = ứng viên điểm xuất phát hiện tại. tank = xăng dư/thiếu tích lũy từ start tới i.",
-      en: "start = current candidate starting station. tank = accumulated gas surplus/deficit from start to i.",
+      vi: "start = ứng viên điểm xuất phát hiện tại. tank = xăng còn lại trong bình khi đi từ start tới i.",
+      en: "start = current candidate starting station. tank = fuel left in the tank when driving from start to i.",
     },
   });
 
@@ -2228,21 +2259,22 @@ function buildSteps134(input, params) {
     // ── Line 7 ────────────────────────────────────────────────────────
     snap({
       title: { vi: `line 7: for i in range(len(gas)) → i = ${i}`, en: `line 7: for i in range(len(gas)) → i = ${i}` },
-      highlight: [i], mark: [start], codeLines: [7],
+      codeLines: [7], phase: "examine", current: i,
       vars: [{ name: "i", value: i }, { name: "start", value: start }, { name: "tank", value: tank }],
-      note: { vi: `Xét station ${i}.`, en: `Inspect station ${i}.` },
+      note: { vi: `Xe đang ở station ${i}, xuất phát thử từ station ${start}.`, en: `Car is at station ${i}, tentatively started from station ${start}.` },
     });
 
     // ── Line 8: tank += gas[i] - cost[i] ────────────────────────────────
     const net = gas[i] - cost[i];
     tank += net;
+    tankAt[i] = tank;
     snap({
       title: { vi: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}`, en: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}` },
-      highlight: [i], mark: [start], codeLines: [8],
+      codeLines: [8], phase: "accumulate", current: i,
       vars: [{ name: "gas[i]", value: gas[i] }, { name: "cost[i]", value: cost[i] }, { name: "net", value: net }, { name: "tank", value: tank }],
       note: {
-        vi: `Nhận ${gas[i]} xăng, tốn ${cost[i]} để tới station kế tiếp → net = ${net}. tank = ${tank}.`,
-        en: `Gain ${gas[i]} gas, spend ${cost[i]} reaching the next station → net = ${net}. tank = ${tank}.`,
+        vi: `Đổ ${gas[i]} xăng, tốn ${cost[i]} để chạy tới station kế → net = ${net >= 0 ? "+" : ""}${net}. Bình còn tank = ${tank}.`,
+        en: `Add ${gas[i]} gas, spend ${cost[i]} to drive to the next station → net = ${net >= 0 ? "+" : ""}${net}. Tank now = ${tank}.`,
       },
     });
 
@@ -2250,42 +2282,45 @@ function buildSteps134(input, params) {
     const negative = tank < 0;
     snap({
       title: { vi: `line 9: tank < 0 → ${negative}`, en: `line 9: tank < 0 → ${negative}` },
-      highlight: [i], mark: [start], codeLines: [9],
+      codeLines: [9], phase: "check-negative", current: i,
       vars: [{ name: "tank", value: tank }, { name: "negative?", value: negative }],
       note: {
         vi: negative
-          ? `tank=${tank} âm → không station nào trong [${start}..${i}] làm điểm xuất phát được → line 10-11 chuyển start.`
-          : `tank=${tank} ≥ 0 → vẫn còn xăng, giữ nguyên start=${start}.`,
+          ? `tank=${tank} âm → hết xăng giữa đường. Không station nào trong [${start}..${i}] làm điểm xuất phát được → line 10-11 chuyển start.`
+          : `tank=${tank} ≥ 0 → bình vẫn còn xăng, đi tiếp, giữ nguyên start=${start}.`,
         en: negative
-          ? `tank=${tank} is negative → no station in [${start}..${i}] can be a valid start → lines 10-11 move start.`
-          : `tank=${tank} ≥ 0 → still have gas, keep start=${start}.`,
+          ? `tank=${tank} is negative → ran out of gas mid-way. No station in [${start}..${i}] can be a valid start → lines 10-11 move start.`
+          : `tank=${tank} ≥ 0 → still have fuel, keep going, keep start=${start}.`,
       },
     });
     if (negative) {
       // ── Lines 10-11: start = i + 1; tank = 0 ──────────────────────────
       const oldStart = start;
+      for (let k = oldStart; k <= i; k++) stateAt[k] = "discarded";
       start = i + 1;
       tank = 0;
       snap({
         title: { vi: `line 10-11: start = ${i}+1 = ${start}; tank = 0`, en: `line 10-11: start = ${i}+1 = ${start}; tank = 0` },
-        highlight: [i], mark: start < n ? [start] : [], codeLines: [10, 11],
+        codeLines: [10, 11], phase: "move-start", current: i,
         vars: [{ name: "old start", value: oldStart }, { name: "new start", value: start }, { name: "tank (reset)", value: 0 }],
         note: {
-          vi: `Bỏ toàn bộ [${oldStart}..${i}] làm ứng viên, thử lại từ station ${start}. tank reset về 0.`,
-          en: `Discard the whole [${oldStart}..${i}] range as a candidate, retry from station ${start}. tank resets to 0.`,
+          vi: `Loại bỏ cả đoạn [${oldStart}..${i}] khỏi danh sách ứng viên (tô xám), thử lại từ station ${start}. Bình reset về 0.`,
+          en: `Discard the whole [${oldStart}..${i}] range (greyed out), retry from station ${start}. Tank resets to 0.`,
         },
       });
+    } else {
+      stateAt[i] = "reached";
     }
   }
 
   // ── Line 12: return start ────────────────────────────────────────────
   snap({
     title: { vi: `line 12: return start = ${start}`, en: `line 12: return start = ${start}` },
-    mark: [start], final: true, codeLines: [12],
+    final: true, codeLines: [12], phase: "answer", answer: start,
     vars: [{ name: "answer", value: start }],
     note: {
-      vi: `Đã quét hết n station. Điểm xuất phát duy nhất hợp lệ = station ${start}.`,
-      en: `Finished scanning all stations. The unique valid starting station = ${start}.`,
+      vi: `Đã quét hết ${n} station. Điểm xuất phát duy nhất hợp lệ = station ${start} (tô xanh).`,
+      en: `Finished scanning all ${n} stations. The unique valid starting station = ${start} (highlighted green).`,
     },
   });
   return { original: gas, answer: start, steps };

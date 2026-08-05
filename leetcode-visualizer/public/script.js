@@ -7328,6 +7328,89 @@ function renderTwitterView(step) {
   </style>`;
 }
 
+// ---- Gas Station track (#134) ----
+function renderGasStationView(step) {
+  const view = step.gasStationView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const answerStart = (view.answer !== null && view.answer >= 0) ? view.answer : null;
+
+  // Feasibility bar: total gas vs total cost.
+  const maxSum = Math.max(view.sumGas, view.sumCost, 1);
+  const gasPct = Math.round((view.sumGas / maxSum) * 100);
+  const costPct = Math.round((view.sumCost / maxSum) * 100);
+  const feasHtml = `
+    <div class="gas-feasibility ${view.feasible ? "ok" : "bad"}">
+      <div class="gas-feas-row">
+        <span class="gas-feas-label">⛽ Σgas = ${view.sumGas}</span>
+        <div class="gas-feas-bar"><div class="gas-feas-fill gas" style="width:${gasPct}%"></div></div>
+      </div>
+      <div class="gas-feas-row">
+        <span class="gas-feas-label">🚗 Σcost = ${view.sumCost}</span>
+        <div class="gas-feas-bar"><div class="gas-feas-fill cost" style="width:${costPct}%"></div></div>
+      </div>
+      <div class="gas-feas-verdict">
+        ${view.feasible
+          ? (vi ? `Σgas ≥ Σcost → có 1 điểm xuất phát hợp lệ` : `Σgas ≥ Σcost → one valid start exists`)
+          : (vi ? `Σgas < Σcost → không thể đi hết vòng (-1)` : `Σgas < Σcost → cannot complete the loop (-1)`)}
+      </div>
+    </div>`;
+
+  // Tank gauge.
+  const tankNeg = view.tank < 0;
+  const tankHtml = `
+    <div class="gas-tank-gauge">
+      <div class="gas-tank-box ${tankNeg ? "neg" : "pos"}">
+        <span class="gas-tank-label">${vi ? "Bình xăng (tank)" : "Fuel tank"}</span>
+        <span class="gas-tank-value">${view.tank}</span>
+      </div>
+      <div class="gas-start-box">
+        <span class="gas-start-label">${vi ? "Ứng viên start" : "Candidate start"}</span>
+        <span class="gas-start-value">${view.start < view.n ? "▶ " + view.start : (vi ? "hết" : "none")}</span>
+      </div>
+    </div>`;
+
+  // Station track.
+  const cardsHtml = view.stations.map((s) => {
+    let cls = "state-" + s.state;
+    const isAnswer = answerStart !== null && s.index === answerStart;
+    if (isAnswer) cls = "state-answer";
+    const isCurrent = view.currentIndex === s.index;
+    const isStart = view.start === s.index && !isAnswer && view.phase !== "answer";
+    if (isCurrent) cls += " is-current";
+    if (isStart) cls += " is-start";
+    const netCls = s.net >= 0 ? "pos" : "neg";
+    const tankShown = s.tank === null ? "—" : String(s.tank);
+    const tankCls = s.tank === null ? "" : (s.tank < 0 ? "neg" : "pos");
+    const badge = isAnswer ? "★ START" : (isStart ? "▶ start" : (isCurrent ? (vi ? "xe ở đây" : "car here") : ""));
+    return `<div class="gas-station-card ${cls}">
+      <div class="gas-st-head">station ${s.index}${badge ? `<span class="gas-st-badge">${badge}</span>` : ""}</div>
+      <div class="gas-st-row"><span>⛽ gas</span><strong>${s.gas}</strong></div>
+      <div class="gas-st-row"><span>🚗 cost</span><strong>${s.cost}</strong></div>
+      <div class="gas-st-net ${netCls}">net ${s.net >= 0 ? "+" : ""}${s.net}</div>
+      <div class="gas-st-tank ${tankCls}">tank ${tankShown}</div>
+    </div>`;
+  }).join(`<div class="gas-arrow">→</div>`);
+
+  const summary = vi
+    ? `Trạm xăng: start=${view.start}, tank=${view.tank}.`
+    : `Gas station: start=${view.start}, tank=${view.tank}.`;
+
+  el.innerHTML = `<div class="gas-station-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${feasHtml}
+    ${tankHtml}
+    <div class="gas-track">${cardsHtml}</div>
+    <div class="gas-legend">
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+      <span><i class="lg-reached"></i>${vi ? "đã qua (tank≥0)" : "reached (tank≥0)"}</span>
+      <span><i class="lg-current"></i>${vi ? "xe đang ở đây" : "car here"}</span>
+      <span><i class="lg-start"></i>${vi ? "ứng viên start" : "candidate start"}</span>
+      <span><i class="lg-discarded"></i>${vi ? "đã loại bỏ" : "discarded"}</span>
+      <span><i class="lg-answer"></i>${vi ? "start hợp lệ" : "valid start"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Real-time experience profit tracker (#9001) ----
 function renderProfitTrackerView(step) {
   const view = step.profitTrackerView;
@@ -8926,6 +9009,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderVirusView(step);
+  } else if (step.gasStationView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasStationView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");
