@@ -18463,6 +18463,7 @@ module.exports = {
     difficulty: "medium",
     slug: "find-minimum-time-to-reach-last-room-ii",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Find Minimum Time to Reach Last Room II", en: "Find Minimum Time to Reach Last Room II" },
     titleVi: { vi: "Thời gian nhỏ nhất để tới phòng cuối II", en: "Minimum time to reach the last room II" },
     statement: {
