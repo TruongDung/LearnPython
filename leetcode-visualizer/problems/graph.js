@@ -8727,7 +8727,18 @@ function buildSteps1102(input) {
   const visited = Array.from({ length: m }, () => Array(n).fill(false));
   let heap = []; // entries: [negVal, r, c]
   let result = null;
+  const parent = {}; // "r,c" -> [pr, pc] (how we first reached that cell)
   const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+  function reconstruct(endR, endC) {
+    const route = [];
+    let cur = [endR, endC];
+    while (cur) {
+      route.push(cur);
+      cur = parent[`${cur[0]},${cur[1]}`] || null;
+    }
+    return route.reverse();
+  }
 
   const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
   function popMax() {
@@ -8740,12 +8751,14 @@ function buildSteps1102(input) {
     return `[${heap.slice().sort(cmp).map((h) => `${-h[0]}@(${h[1]},${h[2]})`).join(", ")}]`;
   }
 
-  function makeCells(current, neighbor) {
+  function makeCells(current, neighbor, route) {
     const heapSet = new Set(heap.map((h) => `${h[1]},${h[2]}`));
+    const routeSet = new Set((route || []).map(([r, c]) => `${r},${c}`));
     return grid.map((row, r) => row.map((val, c) => {
       let cls = "empty";
       if (visited[r][c]) cls = "visited";
       if (heapSet.has(`${r},${c}`)) cls = "queued";
+      if (routeSet.has(`${r},${c}`)) cls = "route";
       if (neighbor && neighbor[0] === r && neighbor[1] === c) cls = "path";
       if (current && current[0] === r && current[1] === c) cls = "current";
       return { label: String(val), cls };
@@ -8758,7 +8771,7 @@ function buildSteps1102(input) {
     if (result !== null && !vars.some((v) => v.name === "result")) vars.push({ name: "result", value: result });
     steps.push({
       title: o.title, arr: [],
-      bfsGrid: { rows: m, cols: n, cells: makeCells(o.current || null, o.neighbor || null) },
+      bfsGrid: { rows: m, cols: n, cells: makeCells(o.current || null, o.neighbor || null, o.route || null) },
       highlight: [], mark: [], final: o.final || false,
       codeLines: o.codeLines || [], vars, note: o.note,
     });
@@ -8845,12 +8858,22 @@ function buildSteps1102(input) {
       },
     });
     if (atEnd) {
-      // Line 14: return result
+      const route = reconstruct(r, c);
+      const routeStr = route.map(([rr, cc]) => `(${rr},${cc})`).join(" → ");
+      const pathVals = route.map(([rr, cc]) => grid[rr][cc]);
+      // Line 14: return result — highlight the reconstructed winning path.
       snap({
         title: { vi: `line 14: return result = ${result}`, en: `line 14: return result = ${result}` },
-        codeLines: [14], current: [r, c], final: true,
-        vars: [{ name: "answer", value: result }],
-        note: { vi: `Đáp án = ${result} (giá trị nhỏ nhất lớn nhất có thể của một đường đi).`, en: `Answer = ${result} (the maximum possible minimum value over all paths).` },
+        codeLines: [14], route, final: true,
+        vars: [
+          { name: "answer", value: result },
+          { name: "path", value: routeStr },
+          { name: "path values", value: `[${pathVals.join(", ")}] → min = ${Math.min(...pathVals)}` },
+        ],
+        note: {
+          vi: `Đáp án = ${result}. Đường đi tối ưu (tô xanh, lần theo parent từ đích về (0,0)): ${routeStr}. Giá trị các ô = [${pathVals.join(", ")}], nhỏ nhất = ${Math.min(...pathVals)} = result.`,
+          en: `Answer = ${result}. Optimal path (green, traced via parents from target back to (0,0)): ${routeStr}. Cell values = [${pathVals.join(", ")}], minimum = ${Math.min(...pathVals)} = result.`,
+        },
       });
       done = true;
       break;
@@ -8879,11 +8902,12 @@ function buildSteps1102(input) {
       });
       if (isNew) {
         visited[nr][nc] = true;
+        parent[`${nr},${nc}`] = [r, c];
         heap.push([-grid[nr][nc], nr, nc]);
         snap({
           title: { vi: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}`, en: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}` },
           codeLines: [18, 19], current: [r, c], neighbor: [nr, nc],
-          note: { vi: `Đánh dấu (${nr},${nc}) đã thăm và đẩy value ${grid[nr][nc]} vào max-heap.`, en: `Mark (${nr},${nc}) visited and push value ${grid[nr][nc]} to the max-heap.` },
+          note: { vi: `Đánh dấu (${nr},${nc}) đã thăm, ghi (${nr},${nc})←(${r},${c}) và đẩy value ${grid[nr][nc]} vào max-heap.`, en: `Mark (${nr},${nc}) visited, record parent (${nr},${nc})←(${r},${c}), and push value ${grid[nr][nc]} to the max-heap.` },
         });
       }
     }
