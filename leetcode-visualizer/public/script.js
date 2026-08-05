@@ -7411,6 +7411,76 @@ function renderGasStationView(step) {
   </div>`;
 }
 
+// ---- Gas Deposits max distance number-line (#9134) ----
+function renderGasDepositsView(step) {
+  const view = step.gasDepositsView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const scaleMax = view.scaleMax || 1;
+  const pct = (x) => Math.max(0, Math.min(100, (x / scaleMax) * 100));
+
+  const startPct = view.startPos === null ? 0 : pct(view.startPos);
+  const carPct = view.pos === null ? startPct : pct(view.pos);
+  const travWidth = Math.max(0, carPct - startPct);
+
+  // Deposit markers on the number line.
+  const markersHtml = view.deposits.map((d) => {
+    let cls = "state-" + d.state;
+    if (view.currentIndex === d.index) cls += " is-current";
+    return `<div class="gasdep-marker ${cls}" style="left:${pct(d.position)}%">
+      <div class="gasdep-dot"></div>
+      <div class="gasdep-mlabel"><span class="gasdep-mpos">@${d.position}</span><span class="gasdep-mgas">⛽${d.gas}</span></div>
+    </div>`;
+  }).join("");
+
+  const carHtml = view.pos === null ? "" :
+    `<div class="gasdep-car" style="left:${carPct}%">🚗</div>`;
+
+  const lineHtml = `
+    <div class="gasdep-line">
+      <div class="gasdep-track">
+        <div class="gasdep-baseline"></div>
+        <div class="gasdep-traveled" style="left:${startPct}%;width:${travWidth}%"></div>
+        ${markersHtml}
+        ${carHtml}
+      </div>
+      <div class="gasdep-scale"><span>0</span><span>${scaleMax}</span></div>
+    </div>`;
+
+  const tankNeg = view.tank !== null && view.tank < 0;
+  const gaugeHtml = `
+    <div class="gasdep-gauge">
+      <div class="gasdep-box">
+        <span class="gasdep-box-label">${vi ? "Vị trí xe (pos)" : "Car position (pos)"}</span>
+        <span class="gasdep-box-value">${view.pos === null ? "—" : view.pos}</span>
+      </div>
+      <div class="gasdep-box ${tankNeg ? "neg" : "fuel"}">
+        <span class="gasdep-box-label">${vi ? "Bình xăng (tank)" : "Fuel (tank)"}</span>
+        <span class="gasdep-box-value">${view.tank === null ? "—" : view.tank}</span>
+      </div>
+      <div class="gasdep-box dist">
+        <span class="gasdep-box-label">${vi ? "Quãng đường" : "Distance"}</span>
+        <span class="gasdep-box-value">${view.answer !== null ? view.answer : view.distance}</span>
+      </div>
+    </div>`;
+
+  const summary = vi
+    ? `Kho xăng: pos=${view.pos}, tank=${view.tank}, quãng đường=${view.distance}.`
+    : `Gas deposits: pos=${view.pos}, tank=${view.tank}, distance=${view.distance}.`;
+
+  el.innerHTML = `<div class="gasdep-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${gaugeHtml}
+    ${lineHtml}
+    <div class="gasdep-legend">
+      <span><i class="lg-start"></i>${vi ? "kho xuất phát" : "start deposit"}</span>
+      <span><i class="lg-collected"></i>${vi ? "đã ghé & đổ xăng" : "reached & refueled"}</span>
+      <span><i class="lg-current"></i>${vi ? "đang xét" : "current target"}</span>
+      <span><i class="lg-unreached"></i>${vi ? "không tới được" : "not reached"}</span>
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Real-time experience profit tracker (#9001) ----
 function renderProfitTrackerView(step) {
   const view = step.profitTrackerView;
@@ -9015,6 +9085,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGasStationView(step);
+  } else if (step.gasDepositsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasDepositsView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");
