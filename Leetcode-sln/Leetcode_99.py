@@ -27,17 +27,13 @@ class Solution:
 
         self.inorder(curr.right)
 
-
 node_3 = TreeNode(3)
 node_1 = TreeNode(1)
 node_4 = TreeNode(4)
 node_2 = TreeNode(2)
-
-node_3.left = node_1      # Nút 1 là con trái của 3
-node_3.right = node_4     # Nút 4 là con phải của 3
-
-node_4.left = node_2      # Nút 2 là con trái của 4
-
+node_3.left = node_1      
+node_3.right = node_4     
+node_4.left = node_2      
 root = node_3
 
 sol = Solution()
