@@ -3607,9 +3607,73 @@ function buildSteps113(input, params) {
   return { input, answer: result, steps };
 }
 
+// ─── 111: Minimum Depth of Binary Tree ───
+function buildSteps111(input) {
+  const root = parseTree(input);
+  const steps = [];
+  steps.push(snapshot(root, {
+    title: { vi: "Độ sâu nhỏ nhất của cây", en: "Minimum depth of binary tree" },
+    codeLines: [2, 3],
+    vars: [{ name: "rule", value: "depth = 1 + min(left, right) if both exist" }],
+    note: {
+      vi: `Tìm đường NGẮN NHẤT từ gốc xuống lá. Lưu ý: nếu node CHỈ có 1 con, không được lấy min với 0 (vì phía null không phải lá).`,
+      en: `Find the SHORTEST path from root to leaf. Note: if a node has ONLY one child, don't min with 0 (the null side is not a leaf).`,
+    },
+  }));
+  let answer = 0;
+  function dfs(node) {
+    if (!node) return 0;
+    const l = dfs(node.left);
+    const r = dfs(node.right);
+    let d;
+    if (l === 0 && r === 0) {
+      d = 1; // leaf node
+    } else if (l === 0) {
+      d = 1 + r; // only right child exists
+    } else if (r === 0) {
+      d = 1 + l; // only left child exists
+    } else {
+      d = 1 + Math.min(l, r); // both children exist
+    }
+    const reason = (l === 0 && r === 0)
+      ? { vi: `Lá → depth = 1.`, en: `Leaf → depth = 1.` }
+      : (l === 0)
+        ? { vi: `Chỉ có con phải (depth ${r}), bỏ qua null trái → depth = 1 + ${r} = ${d}.`, en: `Only right child (depth ${r}), skip null left → depth = 1 + ${r} = ${d}.` }
+        : (r === 0)
+          ? { vi: `Chỉ có con trái (depth ${l}), bỏ qua null phải → depth = 1 + ${l} = ${d}.`, en: `Only left child (depth ${l}), skip null right → depth = 1 + ${l} = ${d}.` }
+          : { vi: `Hai con: depth = 1 + min(${l}, ${r}) = ${d}.`, en: `Both children: depth = 1 + min(${l}, ${r}) = ${d}.` };
+    steps.push(snapshot(root, {
+      title: { vi: `Nút ${node.val}: minDepth = ${d}`, en: `Node ${node.val}: minDepth = ${d}` },
+      hlSet: new Set([node.id]),
+      codeLines: [4, 5, 6, 7],
+      vars: [
+        { name: "node", value: node.val },
+        { name: "left depth", value: l },
+        { name: "right depth", value: r },
+        { name: "minDepth", value: d },
+      ],
+      note: reason,
+    }));
+    return d;
+  }
+  const ans = dfs(root);
+  answer = ans;
+  const fs = snapshot(root, {
+    title: { vi: `Min depth = ${answer}`, en: `Min depth = ${answer}` },
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Độ sâu nhỏ nhất (đường ngắn nhất gốc→lá) = ${answer}.`,
+      en: `Minimum depth (shortest root→leaf path) = ${answer}.`,
+    },
+  });
+  fs.final = true;
+  steps.push(fs);
+  return { input, answer, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [144, 94, 145, 104, 102, 543, 110, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
+    order: [144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -3741,6 +3805,24 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(h)", note: { vi: "Mỗi node thăm 1 lần.", en: "Each node visited once." } },
     code: ["class Solution:", "    def isBalanced(self, root):", "        def height(node):", "            if not node: return 0", "            lh = height(node.left)", "            if lh == -1: return -1", "            rh = height(node.right)", "            if rh == -1: return -1", "            if abs(lh - rh) > 1: return -1", "            return 1 + max(lh, rh)", "        return height(root) != -1"],
     builder: buildSteps110,
+  },
+  111: {
+    id: 111, difficulty: "easy", slug: "minimum-depth-of-binary-tree",
+    category: TREE_CAT,
+    title: { vi: "Minimum Depth of Binary Tree", en: "Minimum Depth of Binary Tree" },
+    titleVi: { vi: "Độ sâu nhỏ nhất của cây", en: "Minimum depth of tree" },
+    statement: { vi: "Cho root của cây nhị phân, trả về độ sâu nhỏ nhất (số nút trên đường ngắn nhất từ gốc xuống lá). Lưu ý: node chỉ có 1 con KHÔNG phải lá. Nhập level-order.", en: "Given the root of a binary tree, return its minimum depth (number of nodes along the shortest root-to-leaf path). Note: a node with only one child is NOT a leaf. Enter as level-order." },
+    defaultInput: "3,9,20,null,null,15,7",
+    inputKind: "string", inputLabel: { vi: "Tree (level-order)", en: "Tree (level-order)" },
+    extraParams: [],
+    approach: [
+      { vi: "Đệ quy: nếu node null → 0. Nếu lá → 1.", en: "Recursion: if null → 0. If leaf → 1." },
+      { vi: "Nếu chỉ có 1 con → đi theo con đó (KHÔNG lấy min với 0).", en: "If only one child → follow that child (do NOT min with 0)." },
+      { vi: "Cả 2 con → 1 + min(left, right).", en: "Both children → 1 + min(left, right)." },
+    ],
+    complexity: { time: "O(n)", space: "O(h)", note: { vi: "Duyệt mỗi nút 1 lần. Stack O(h).", en: "Visit each node once. Stack O(h)." } },
+    code: ["class Solution:", "    def minDepth(self, root):", "        if not root:", "            return 0", "        left = self.minDepth(root.left)", "        right = self.minDepth(root.right)", "        if not root.left: return 1 + right", "        if not root.right: return 1 + left", "        return 1 + min(left, right)"],
+    builder: buildSteps111,
   },
   113: {
     id: 113, difficulty: "medium", slug: "path-sum-ii",
