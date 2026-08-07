@@ -4134,6 +4134,7 @@ function renderGraph(step, targetId = "treeView") {
 
   const hlNodeSet = new Set(hlNodes || []);
   const visitedSet = new Set(visitedNodes || []);
+  const restrictedSet = new Set(step.graph.restrictedNodes || []);
   const hlEdgeSet = new Set((hlEdges || []).map((e) => `${e[0]}-${e[1]}${e[2] ? `-${e[2]}` : ""}`));
 
   // Optional column dividers + labels (used by "semester"/level layouts to show
@@ -4275,8 +4276,10 @@ function renderGraph(step, targetId = "treeView") {
     const p = pos[node.id];
     const isHl = hlNodeSet.has(node.id);
     const isVisited = visitedSet.has(node.id);
+    const isRestricted = restrictedSet.has(node.id);
     let cls = "graph-node";
-    if (isHl) cls += " hl";
+    if (isRestricted) cls += " restricted";
+    else if (isHl) cls += " hl";
     else if (isVisited) cls += " visited";
 
     nodeSvg += `<g class="${cls}">`;
@@ -7328,6 +7331,244 @@ function renderTwitterView(step) {
   </style>`;
 }
 
+// ---- Gas Station track (#134) ----
+function renderGasStationView(step) {
+  const view = step.gasStationView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const answerStart = (view.answer !== null && view.answer >= 0) ? view.answer : null;
+
+  // Feasibility bar: total gas vs total cost.
+  const maxSum = Math.max(view.sumGas, view.sumCost, 1);
+  const gasPct = Math.round((view.sumGas / maxSum) * 100);
+  const costPct = Math.round((view.sumCost / maxSum) * 100);
+  const feasHtml = `
+    <div class="gas-feasibility ${view.feasible ? "ok" : "bad"}">
+      <div class="gas-feas-row">
+        <span class="gas-feas-label">⛽ Σgas = ${view.sumGas}</span>
+        <div class="gas-feas-bar"><div class="gas-feas-fill gas" style="width:${gasPct}%"></div></div>
+      </div>
+      <div class="gas-feas-row">
+        <span class="gas-feas-label">🚗 Σcost = ${view.sumCost}</span>
+        <div class="gas-feas-bar"><div class="gas-feas-fill cost" style="width:${costPct}%"></div></div>
+      </div>
+      <div class="gas-feas-verdict">
+        ${view.feasible
+          ? (vi ? `Σgas ≥ Σcost → có 1 điểm xuất phát hợp lệ` : `Σgas ≥ Σcost → one valid start exists`)
+          : (vi ? `Σgas < Σcost → không thể đi hết vòng (-1)` : `Σgas < Σcost → cannot complete the loop (-1)`)}
+      </div>
+    </div>`;
+
+  // Tank gauge.
+  const tankNeg = view.tank < 0;
+  const tankHtml = `
+    <div class="gas-tank-gauge">
+      <div class="gas-tank-box ${tankNeg ? "neg" : "pos"}">
+        <span class="gas-tank-label">${vi ? "Bình xăng (tank)" : "Fuel tank"}</span>
+        <span class="gas-tank-value">${view.tank}</span>
+      </div>
+      <div class="gas-start-box">
+        <span class="gas-start-label">${vi ? "Ứng viên start" : "Candidate start"}</span>
+        <span class="gas-start-value">${view.start < view.n ? "▶ " + view.start : (vi ? "hết" : "none")}</span>
+      </div>
+    </div>`;
+
+  // Station track.
+  const cardsHtml = view.stations.map((s) => {
+    let cls = "state-" + s.state;
+    const isAnswer = answerStart !== null && s.index === answerStart;
+    if (isAnswer) cls = "state-answer";
+    const isCurrent = view.currentIndex === s.index;
+    const isStart = view.start === s.index && !isAnswer && view.phase !== "answer";
+    if (isCurrent) cls += " is-current";
+    if (isStart) cls += " is-start";
+    const netCls = s.net >= 0 ? "pos" : "neg";
+    const tankShown = s.tank === null ? "—" : String(s.tank);
+    const tankCls = s.tank === null ? "" : (s.tank < 0 ? "neg" : "pos");
+    const badge = isAnswer ? "★ START" : (isStart ? "▶ start" : (isCurrent ? (vi ? "xe ở đây" : "car here") : ""));
+    return `<div class="gas-station-card ${cls}">
+      <div class="gas-st-head">station ${s.index}${badge ? `<span class="gas-st-badge">${badge}</span>` : ""}</div>
+      <div class="gas-st-row"><span>⛽ gas</span><strong>${s.gas}</strong></div>
+      <div class="gas-st-row"><span>🚗 cost</span><strong>${s.cost}</strong></div>
+      <div class="gas-st-net ${netCls}">net ${s.net >= 0 ? "+" : ""}${s.net}</div>
+      <div class="gas-st-tank ${tankCls}">tank ${tankShown}</div>
+    </div>`;
+  }).join(`<div class="gas-arrow">→</div>`);
+
+  const summary = vi
+    ? `Trạm xăng: start=${view.start}, tank=${view.tank}.`
+    : `Gas station: start=${view.start}, tank=${view.tank}.`;
+
+  el.innerHTML = `<div class="gas-station-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${feasHtml}
+    ${tankHtml}
+    <div class="gas-track">${cardsHtml}</div>
+    <div class="gas-legend">
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+      <span><i class="lg-reached"></i>${vi ? "đã qua (tank≥0)" : "reached (tank≥0)"}</span>
+      <span><i class="lg-current"></i>${vi ? "xe đang ở đây" : "car here"}</span>
+      <span><i class="lg-start"></i>${vi ? "ứng viên start" : "candidate start"}</span>
+      <span><i class="lg-discarded"></i>${vi ? "đã loại bỏ" : "discarded"}</span>
+      <span><i class="lg-answer"></i>${vi ? "start hợp lệ" : "valid start"}</span>
+    </div>
+  </div>`;
+}
+
+// ---- Gas Deposits on a circular track (#9135) ----
+function renderGasCircularView(step) {
+  const view = step.gasCircularView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const C = view.circumference || 100;
+  const cx = 170, cy = 170, R = 120;
+
+  // deg measured clockwise from the top (12 o'clock = position 0).
+  const polar = (deg, r) => {
+    const t = (-90 + deg) * Math.PI / 180;
+    return [cx + r * Math.cos(t), cy + r * Math.sin(t)];
+  };
+  const angleOf = (position) => ((position % C) / C) * 360;
+
+  // Base track circle.
+  let svg = `<circle cx="${cx}" cy="${cy}" r="${R}" class="gasc-track-ring" />`;
+
+  // Traveled arc (green). If distance >= C, show a full ring.
+  if (view.pos !== null && view.distance > 0) {
+    if (view.distance >= C) {
+      svg += `<circle cx="${cx}" cy="${cy}" r="${R}" class="gasc-traveled-ring" />`;
+    } else {
+      const a0 = angleOf(view.deposits[view.startIndex].position);
+      const sweep = (view.distance / C) * 360;
+      const a1 = a0 + sweep;
+      const [x0, y0] = polar(a0, R);
+      const [x1, y1] = polar(a1, R);
+      const largeArc = sweep > 180 ? 1 : 0;
+      svg += `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" class="gasc-traveled-arc" />`;
+    }
+  }
+
+  // Wrap marker at the top (position 0 / circumference).
+  const [wx, wy] = polar(0, R);
+  svg += `<line x1="${cx}" y1="${cy - R - 14}" x2="${cx}" y2="${cy - R + 14}" class="gasc-wrap-mark" />`;
+  svg += `<text x="${cx}" y="${cy - R - 20}" class="gasc-wrap-text" text-anchor="middle">0 / ${C}</text>`;
+
+  // Deposit dots + labels.
+  view.deposits.forEach((d) => {
+    const a = angleOf(d.position);
+    const [dx, dy] = polar(a, R);
+    let cls = "gasc-dot state-" + d.state;
+    if (view.currentIndex === d.index) cls += " is-current";
+    svg += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="11" class="${cls}" />`;
+    svg += `<text x="${dx.toFixed(1)}" y="${(dy + 4).toFixed(1)}" class="gasc-dot-idx" text-anchor="middle">${d.index}</text>`;
+    // Outer label with position & gas.
+    const [lx, ly] = polar(a, R + 30);
+    svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" class="gasc-dot-label" text-anchor="middle">@${d.position} ⛽${d.gas}</text>`;
+  });
+
+  // Car marker.
+  if (view.pos !== null) {
+    const a = angleOf(view.pos);
+    const [carX, carY] = polar(a, R);
+    svg += `<text x="${carX.toFixed(1)}" y="${(carY + 8).toFixed(1)}" class="gasc-car" text-anchor="middle">🚗</text>`;
+  }
+
+  const gaugeHtml = `
+    <div class="gasc-gauge">
+      <div class="gasc-box"><span class="gasc-box-label">${vi ? "Vị trí (pos)" : "Position (pos)"}</span><span class="gasc-box-value">${view.pos === null ? "—" : view.pos}</span></div>
+      <div class="gasc-box fuel"><span class="gasc-box-label">${vi ? "Xăng (tank)" : "Fuel (tank)"}</span><span class="gasc-box-value">${view.tank === null ? "—" : view.tank}</span></div>
+      <div class="gasc-box dist"><span class="gasc-box-label">${vi ? "Quãng đường" : "Distance"}</span><span class="gasc-box-value">${view.answer !== null ? view.answer : view.distance}</span></div>
+      <div class="gasc-box"><span class="gasc-box-label">${vi ? "Số vòng" : "Loops"}</span><span class="gasc-box-value">${view.loops}</span></div>
+    </div>`;
+
+  const summary = vi
+    ? `Đường đua vòng tròn chu vi ${C}: pos=${view.pos}, tank=${view.tank}, quãng đường=${view.distance}.`
+    : `Circular track of circumference ${C}: pos=${view.pos}, tank=${view.tank}, distance=${view.distance}.`;
+
+  el.innerHTML = `<div class="gasc-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${gaugeHtml}
+    <div class="gasc-stage">
+      <svg viewBox="0 0 340 360" class="gasc-svg" preserveAspectRatio="xMidYMid meet">${svg}</svg>
+    </div>
+    <div class="gasc-legend">
+      <span><i class="lg-start"></i>${vi ? "kho xuất phát" : "start deposit"}</span>
+      <span><i class="lg-collected"></i>${vi ? "đã ghé & đổ xăng" : "reached & refueled"}</span>
+      <span><i class="lg-current"></i>${vi ? "đang xét" : "current target"}</span>
+      <span><i class="lg-unreached"></i>${vi ? "không tới được" : "not reached"}</span>
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+    </div>
+  </div>`;
+}
+
+// ---- Gas Deposits max distance number-line (#9134) ----
+function renderGasDepositsView(step) {
+  const view = step.gasDepositsView;
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const scaleMax = view.scaleMax || 1;
+  const pct = (x) => Math.max(0, Math.min(100, (x / scaleMax) * 100));
+
+  const startPct = view.startPos === null ? 0 : pct(view.startPos);
+  const carPct = view.pos === null ? startPct : pct(view.pos);
+  const travWidth = Math.max(0, carPct - startPct);
+
+  // Deposit markers on the number line.
+  const markersHtml = view.deposits.map((d) => {
+    let cls = "state-" + d.state;
+    if (view.currentIndex === d.index) cls += " is-current";
+    return `<div class="gasdep-marker ${cls}" style="left:${pct(d.position)}%">
+      <div class="gasdep-dot"></div>
+      <div class="gasdep-mlabel"><span class="gasdep-mpos">@${d.position}</span><span class="gasdep-mgas">⛽${d.gas}</span></div>
+    </div>`;
+  }).join("");
+
+  const carHtml = view.pos === null ? "" :
+    `<div class="gasdep-car" style="left:${carPct}%">🚗</div>`;
+
+  const lineHtml = `
+    <div class="gasdep-line">
+      <div class="gasdep-track">
+        <div class="gasdep-baseline"></div>
+        <div class="gasdep-traveled" style="left:${startPct}%;width:${travWidth}%"></div>
+        ${markersHtml}
+        ${carHtml}
+      </div>
+      <div class="gasdep-scale"><span>0</span><span>${scaleMax}</span></div>
+    </div>`;
+
+  const tankNeg = view.tank !== null && view.tank < 0;
+  const gaugeHtml = `
+    <div class="gasdep-gauge">
+      <div class="gasdep-box">
+        <span class="gasdep-box-label">${vi ? "Vị trí xe (pos)" : "Car position (pos)"}</span>
+        <span class="gasdep-box-value">${view.pos === null ? "—" : view.pos}</span>
+      </div>
+      <div class="gasdep-box ${tankNeg ? "neg" : "fuel"}">
+        <span class="gasdep-box-label">${vi ? "Bình xăng (tank)" : "Fuel (tank)"}</span>
+        <span class="gasdep-box-value">${view.tank === null ? "—" : view.tank}</span>
+      </div>
+      <div class="gasdep-box dist">
+        <span class="gasdep-box-label">${vi ? "Quãng đường" : "Distance"}</span>
+        <span class="gasdep-box-value">${view.answer !== null ? view.answer : view.distance}</span>
+      </div>
+    </div>`;
+
+  const summary = vi
+    ? `Kho xăng: pos=${view.pos}, tank=${view.tank}, quãng đường=${view.distance}.`
+    : `Gas deposits: pos=${view.pos}, tank=${view.tank}, distance=${view.distance}.`;
+
+  el.innerHTML = `<div class="gasdep-viz" role="img" aria-label="${escapeHtml(summary)}">
+    ${gaugeHtml}
+    ${lineHtml}
+    <div class="gasdep-legend">
+      <span><i class="lg-start"></i>${vi ? "kho xuất phát" : "start deposit"}</span>
+      <span><i class="lg-collected"></i>${vi ? "đã ghé & đổ xăng" : "reached & refueled"}</span>
+      <span><i class="lg-current"></i>${vi ? "đang xét" : "current target"}</span>
+      <span><i class="lg-unreached"></i>${vi ? "không tới được" : "not reached"}</span>
+      <span><i class="lg-pending"></i>${vi ? "chưa tới" : "pending"}</span>
+    </div>
+  </div>`;
+}
+
 // ---- Real-time experience profit tracker (#9001) ----
 function renderProfitTrackerView(step) {
   const view = step.profitTrackerView;
@@ -8926,6 +9167,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderVirusView(step);
+  } else if (step.gasStationView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasStationView(step);
+  } else if (step.gasDepositsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasDepositsView(step);
+  } else if (step.gasCircularView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderGasCircularView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

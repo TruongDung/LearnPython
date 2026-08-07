@@ -2171,24 +2171,56 @@ function buildSteps134(input, params) {
   const cost = String(params && params.cost || "3,4,5,1,2").split(",").map((s) => Number(s.trim()));
   const n = gas.length;
   const steps = [];
-  const sub = () => gas.map((_, x) => `net ${x}: ${gas[x] - cost[x] >= 0 ? "+" : ""}${gas[x] - cost[x]}`);
-
-  function snap(o) {
-    steps.push({
-      title: o.title, arr: [...gas], sub: sub(),
-      highlight: o.highlight || [], mark: o.mark || [], final: o.final || false,
-      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
-    });
-  }
 
   const sumGas = gas.reduce((a, b) => a + b, 0);
   const sumCost = cost.reduce((a, b) => a + b, 0);
+
+  // Per-station settled state: "pending" | "reached" | "discarded"
+  const stateAt = new Array(n).fill("pending");
+  // Running tank value recorded right after processing that station (or null if not yet).
+  const tankAt = new Array(n).fill(null);
+
+  let start = 0;
+  let tank = 0;
+
+  // Build the gasStationView snapshot from the current state.
+  function view(o) {
+    return {
+      n,
+      sumGas, sumCost,
+      feasible: sumGas >= sumCost,
+      start,
+      tank,
+      currentIndex: (o.current === undefined ? null : o.current),
+      phase: o.phase,
+      answer: (o.answer === undefined ? null : o.answer),
+      stations: gas.map((g, x) => ({
+        index: x,
+        gas: g,
+        cost: cost[x],
+        net: g - cost[x],
+        tank: tankAt[x],
+        state: stateAt[x],
+      })),
+    };
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title,
+      gasStationView: view(o),
+      final: o.final || false,
+      codeLines: o.codeLines || [],
+      vars: o.vars || [],
+      note: o.note,
+    });
+  }
 
   // ── Line 3: sum(gas) < sum(cost)? ──────────────────────────────────
   const insufficient = sumGas < sumCost;
   snap({
     title: { vi: `line 3: sum(gas) < sum(cost) → ${insufficient}`, en: `line 3: sum(gas) < sum(cost) → ${insufficient}` },
-    codeLines: [3],
+    codeLines: [3], phase: "check-total",
     vars: [
       { name: "gas", value: `[${gas.join(",")}]` }, { name: "cost", value: `[${cost.join(",")}]` },
       { name: "sum(gas)", value: sumGas }, { name: "sum(cost)", value: sumCost },
@@ -2205,22 +2237,21 @@ function buildSteps134(input, params) {
   if (insufficient) {
     snap({
       title: { vi: "line 4: return -1", en: "line 4: return -1" },
-      final: true, codeLines: [4], vars: [{ name: "answer", value: -1 }],
+      final: true, codeLines: [4], phase: "answer", answer: -1,
+      vars: [{ name: "answer", value: -1 }],
       note: { vi: "Không đủ xăng để đi hết vòng, bất kể xuất phát ở đâu.", en: "Not enough gas to complete the loop, regardless of the starting point." },
     });
     return { original: gas, answer: -1, steps };
   }
 
   // ── Lines 5-6: start = 0; tank = 0 ─────────────────────────────────
-  let start = 0;
-  let tank = 0;
   snap({
     title: { vi: "line 5-6: start = 0; tank = 0", en: "line 5-6: start = 0; tank = 0" },
-    codeLines: [5, 6],
+    codeLines: [5, 6], phase: "init",
     vars: [{ name: "start", value: 0 }, { name: "tank", value: 0 }],
     note: {
-      vi: "start = ứng viên điểm xuất phát hiện tại. tank = xăng dư/thiếu tích lũy từ start tới i.",
-      en: "start = current candidate starting station. tank = accumulated gas surplus/deficit from start to i.",
+      vi: "start = ứng viên điểm xuất phát hiện tại. tank = xăng còn lại trong bình khi đi từ start tới i.",
+      en: "start = current candidate starting station. tank = fuel left in the tank when driving from start to i.",
     },
   });
 
@@ -2228,21 +2259,22 @@ function buildSteps134(input, params) {
     // ── Line 7 ────────────────────────────────────────────────────────
     snap({
       title: { vi: `line 7: for i in range(len(gas)) → i = ${i}`, en: `line 7: for i in range(len(gas)) → i = ${i}` },
-      highlight: [i], mark: [start], codeLines: [7],
+      codeLines: [7], phase: "examine", current: i,
       vars: [{ name: "i", value: i }, { name: "start", value: start }, { name: "tank", value: tank }],
-      note: { vi: `Xét station ${i}.`, en: `Inspect station ${i}.` },
+      note: { vi: `Xe đang ở station ${i}, xuất phát thử từ station ${start}.`, en: `Car is at station ${i}, tentatively started from station ${start}.` },
     });
 
     // ── Line 8: tank += gas[i] - cost[i] ────────────────────────────────
     const net = gas[i] - cost[i];
     tank += net;
+    tankAt[i] = tank;
     snap({
       title: { vi: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}`, en: `line 8: tank += gas[${i}]-cost[${i}] = ${net >= 0 ? "+" : ""}${net} → tank = ${tank}` },
-      highlight: [i], mark: [start], codeLines: [8],
+      codeLines: [8], phase: "accumulate", current: i,
       vars: [{ name: "gas[i]", value: gas[i] }, { name: "cost[i]", value: cost[i] }, { name: "net", value: net }, { name: "tank", value: tank }],
       note: {
-        vi: `Nhận ${gas[i]} xăng, tốn ${cost[i]} để tới station kế tiếp → net = ${net}. tank = ${tank}.`,
-        en: `Gain ${gas[i]} gas, spend ${cost[i]} reaching the next station → net = ${net}. tank = ${tank}.`,
+        vi: `Đổ ${gas[i]} xăng, tốn ${cost[i]} để chạy tới station kế → net = ${net >= 0 ? "+" : ""}${net}. Bình còn tank = ${tank}.`,
+        en: `Add ${gas[i]} gas, spend ${cost[i]} to drive to the next station → net = ${net >= 0 ? "+" : ""}${net}. Tank now = ${tank}.`,
       },
     });
 
@@ -2250,45 +2282,487 @@ function buildSteps134(input, params) {
     const negative = tank < 0;
     snap({
       title: { vi: `line 9: tank < 0 → ${negative}`, en: `line 9: tank < 0 → ${negative}` },
-      highlight: [i], mark: [start], codeLines: [9],
+      codeLines: [9], phase: "check-negative", current: i,
       vars: [{ name: "tank", value: tank }, { name: "negative?", value: negative }],
       note: {
         vi: negative
-          ? `tank=${tank} âm → không station nào trong [${start}..${i}] làm điểm xuất phát được → line 10-11 chuyển start.`
-          : `tank=${tank} ≥ 0 → vẫn còn xăng, giữ nguyên start=${start}.`,
+          ? `tank=${tank} âm → hết xăng giữa đường. Không station nào trong [${start}..${i}] làm điểm xuất phát được → line 10-11 chuyển start.`
+          : `tank=${tank} ≥ 0 → bình vẫn còn xăng, đi tiếp, giữ nguyên start=${start}.`,
         en: negative
-          ? `tank=${tank} is negative → no station in [${start}..${i}] can be a valid start → lines 10-11 move start.`
-          : `tank=${tank} ≥ 0 → still have gas, keep start=${start}.`,
+          ? `tank=${tank} is negative → ran out of gas mid-way. No station in [${start}..${i}] can be a valid start → lines 10-11 move start.`
+          : `tank=${tank} ≥ 0 → still have fuel, keep going, keep start=${start}.`,
       },
     });
     if (negative) {
       // ── Lines 10-11: start = i + 1; tank = 0 ──────────────────────────
       const oldStart = start;
+      for (let k = oldStart; k <= i; k++) stateAt[k] = "discarded";
       start = i + 1;
       tank = 0;
       snap({
         title: { vi: `line 10-11: start = ${i}+1 = ${start}; tank = 0`, en: `line 10-11: start = ${i}+1 = ${start}; tank = 0` },
-        highlight: [i], mark: start < n ? [start] : [], codeLines: [10, 11],
+        codeLines: [10, 11], phase: "move-start", current: i,
         vars: [{ name: "old start", value: oldStart }, { name: "new start", value: start }, { name: "tank (reset)", value: 0 }],
         note: {
-          vi: `Bỏ toàn bộ [${oldStart}..${i}] làm ứng viên, thử lại từ station ${start}. tank reset về 0.`,
-          en: `Discard the whole [${oldStart}..${i}] range as a candidate, retry from station ${start}. tank resets to 0.`,
+          vi: `Loại bỏ cả đoạn [${oldStart}..${i}] khỏi danh sách ứng viên (tô xám), thử lại từ station ${start}. Bình reset về 0.`,
+          en: `Discard the whole [${oldStart}..${i}] range (greyed out), retry from station ${start}. Tank resets to 0.`,
         },
       });
+    } else {
+      stateAt[i] = "reached";
     }
   }
 
   // ── Line 12: return start ────────────────────────────────────────────
   snap({
     title: { vi: `line 12: return start = ${start}`, en: `line 12: return start = ${start}` },
-    mark: [start], final: true, codeLines: [12],
+    final: true, codeLines: [12], phase: "answer", answer: start,
     vars: [{ name: "answer", value: start }],
     note: {
-      vi: `Đã quét hết n station. Điểm xuất phát duy nhất hợp lệ = station ${start}.`,
-      en: `Finished scanning all stations. The unique valid starting station = ${start}.`,
+      vi: `Đã quét hết ${n} station. Điểm xuất phát duy nhất hợp lệ = station ${start} (tô xanh).`,
+      en: `Finished scanning all ${n} stations. The unique valid starting station = ${start} (highlighted green).`,
     },
   });
   return { original: gas, answer: start, steps };
+}
+
+/**
+ * Custom (Gas-Station variant): maximum drivable distance from a start deposit.
+ * deposits = [(position, gas), ...] sorted by position; collect gas at each
+ * deposit reached, burn 1 fuel per unit distance, coast on leftover fuel.
+ */
+function buildSteps9134(input, params) {
+  const raw = Array.isArray(input) ? input.join(";") : String(input || "");
+  const deposits = raw.split(";")
+    .map((pair) => pair.split(",").map((s) => Number(s.trim())))
+    .filter((p) => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+  const n = deposits.length;
+  let start = Number(params && params.start);
+  if (isNaN(start)) start = 0;
+  start = Math.max(0, Math.min(n - 1, start));
+
+  const steps = [];
+  const stateAt = new Array(n).fill("pending");
+  for (let k = 0; k < start; k++) stateAt[k] = "before-start";
+
+  let startPos;
+  let pos;
+  let tank;
+
+  function view(o) {
+    const positions = deposits.map((d) => d[0]);
+    const scaleMax = Math.max(...positions, (pos === undefined ? 0 : pos), 1);
+    const distance = (pos !== undefined && startPos !== undefined) ? pos - startPos : 0;
+    return {
+      n, startIndex: start,
+      startPos: startPos === undefined ? null : startPos,
+      pos: pos === undefined ? null : pos,
+      tank: tank === undefined ? null : tank,
+      distance, scaleMax,
+      phase: o.phase,
+      answer: o.answer === undefined ? null : o.answer,
+      currentIndex: o.current === undefined ? null : o.current,
+      deposits: deposits.map((d, x) => ({ index: x, position: d[0], gas: d[1], state: stateAt[x] })),
+    };
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, gasDepositsView: view(o), final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+
+  const depStr = deposits.map((d) => `(${d[0]},${d[1]})`).join(" ");
+
+  // Line 3: n = len(deposits)
+  snap({
+    title: { vi: `line 3: n = len(deposits) = ${n}`, en: `line 3: n = len(deposits) = ${n}` },
+    codeLines: [3], phase: "init",
+    vars: [{ name: "deposits", value: depStr }, { name: "start", value: start }, { name: "n", value: n }],
+    note: {
+      vi: `Có ${n} kho xăng, mỗi kho là (vị trí, lượng xăng). Xuất phát tại kho index ${start}.`,
+      en: `There are ${n} gas deposits, each (position, gas). We start at deposit index ${start}.`,
+    },
+  });
+
+  // Line 4: start_pos = deposits[start][0]
+  startPos = deposits[start][0];
+  stateAt[start] = "start";
+  snap({
+    title: { vi: `line 4: start_pos = deposits[${start}][0] = ${startPos}`, en: `line 4: start_pos = deposits[${start}][0] = ${startPos}` },
+    codeLines: [4], phase: "start", current: start,
+    vars: [{ name: "start_pos", value: startPos }],
+    note: {
+      vi: `Ghi lại vị trí xuất phát start_pos = ${startPos} để tính quãng đường ở cuối.`,
+      en: `Record the starting position start_pos = ${startPos} to compute the distance at the end.`,
+    },
+  });
+
+  // Line 5: pos = start_pos
+  pos = startPos;
+  snap({
+    title: { vi: `line 5: pos = start_pos = ${pos}`, en: `line 5: pos = start_pos = ${pos}` },
+    codeLines: [5], phase: "start", current: start,
+    vars: [{ name: "pos", value: pos }],
+    note: {
+      vi: `pos = vị trí hiện tại của xe = ${pos}.`,
+      en: `pos = the car's current position = ${pos}.`,
+    },
+  });
+
+  // Line 6: tank = deposits[start][1]
+  tank = deposits[start][1];
+  snap({
+    title: { vi: `line 6: tank = deposits[${start}][1] = ${tank}`, en: `line 6: tank = deposits[${start}][1] = ${tank}` },
+    codeLines: [6], phase: "start", current: start,
+    vars: [{ name: "tank", value: tank }],
+    note: {
+      vi: `Đổ xăng ở kho xuất phát → bình có tank = ${tank}.`,
+      en: `Fill up at the starting deposit → tank = ${tank}.`,
+    },
+  });
+
+  let returned = false;
+  for (let i = start + 1; i < n && !returned; i++) {
+    // Line 7: for i
+    snap({
+      title: { vi: `line 7: i = ${i} (kho tiếp theo @${deposits[i][0]})`, en: `line 7: i = ${i} (next deposit @${deposits[i][0]})` },
+      codeLines: [7], phase: "loop", current: i,
+      vars: [{ name: "i", value: i }, { name: "pos", value: pos }, { name: "tank", value: tank }],
+      note: { vi: `Thử lái tới kho ${i} ở vị trí ${deposits[i][0]}.`, en: `Try to drive to deposit ${i} at position ${deposits[i][0]}.` },
+    });
+
+    // Line 8: gap
+    const gap = deposits[i][0] - pos;
+    snap({
+      title: { vi: `line 8: gap = ${deposits[i][0]} - ${pos} = ${gap}`, en: `line 8: gap = ${deposits[i][0]} - ${pos} = ${gap}` },
+      codeLines: [8], phase: "loop", current: i,
+      vars: [{ name: "gap", value: gap }, { name: "tank", value: tank }],
+      note: {
+        vi: `Khoảng cách từ pos=${pos} tới kho ${i} là ${gap}. Cần ${gap} xăng để đi tới đó.`,
+        en: `Distance from pos=${pos} to deposit ${i} is ${gap}. Need ${gap} gas to reach it.`,
+      },
+    });
+
+    // Line 9: if tank >= gap
+    const canReach = tank >= gap;
+    snap({
+      title: { vi: `line 9: tank >= gap → ${tank} >= ${gap} → ${canReach}`, en: `line 9: tank >= gap → ${tank} >= ${gap} → ${canReach}` },
+      codeLines: [9], phase: "loop", current: i,
+      vars: [{ name: "tank", value: tank }, { name: "gap", value: gap }, { name: "reach?", value: canReach }],
+      note: {
+        vi: canReach
+          ? `Đủ xăng (${tank} ≥ ${gap}) → tới được kho ${i} → line 10-12.`
+          : `Không đủ xăng (${tank} < ${gap}) → không tới được kho ${i} → line 13-15 coast rồi dừng.`,
+        en: canReach
+          ? `Enough fuel (${tank} ≥ ${gap}) → can reach deposit ${i} → lines 10-12.`
+          : `Not enough fuel (${tank} < ${gap}) → cannot reach deposit ${i} → lines 13-15 coast then stop.`,
+      },
+    });
+
+    if (canReach) {
+      // Line 10: tank -= gap
+      tank -= gap;
+      snap({
+        title: { vi: `line 10: tank -= gap → tank = ${tank}`, en: `line 10: tank -= gap → tank = ${tank}` },
+        codeLines: [10], phase: "loop", current: i,
+        vars: [{ name: "tank", value: tank }],
+        note: { vi: `Đốt ${gap} xăng để đi hết đoạn đường. Bình còn ${tank}.`, en: `Burn ${gap} gas to cover the stretch. Tank now ${tank}.` },
+      });
+      // Line 11: pos = deposits[i][0]
+      pos = deposits[i][0];
+      stateAt[i] = "collected";
+      snap({
+        title: { vi: `line 11: pos = ${pos}`, en: `line 11: pos = ${pos}` },
+        codeLines: [11], phase: "loop", current: i,
+        vars: [{ name: "pos", value: pos }, { name: "distance", value: pos - startPos }],
+        note: { vi: `Xe đã tới kho ${i}, pos = ${pos}. Quãng đường = ${pos - startPos}.`, en: `Car reached deposit ${i}, pos = ${pos}. Distance = ${pos - startPos}.` },
+      });
+      // Line 12: tank += deposits[i][1]
+      tank += deposits[i][1];
+      snap({
+        title: { vi: `line 12: tank += ${deposits[i][1]} → tank = ${tank}`, en: `line 12: tank += ${deposits[i][1]} → tank = ${tank}` },
+        codeLines: [12], phase: "loop", current: i,
+        vars: [{ name: "tank", value: tank }],
+        note: { vi: `Đổ thêm ${deposits[i][1]} xăng ở kho ${i}. Bình có ${tank}.`, en: `Refuel ${deposits[i][1]} at deposit ${i}. Tank = ${tank}.` },
+      });
+    } else {
+      // Line 13: else
+      // Line 14: pos += tank (coast)
+      const coasted = tank;
+      pos += tank;
+      tank = 0;
+      stateAt[i] = "unreached";
+      snap({
+        title: { vi: `line 14: pos += tank → pos = ${pos}`, en: `line 14: pos += tank → pos = ${pos}` },
+        codeLines: [13, 14], phase: "coast", current: i,
+        vars: [{ name: "coast", value: coasted }, { name: "pos", value: pos }, { name: "tank", value: 0 }],
+        note: {
+          vi: `Chạy nốt ${coasted} xăng còn lại → dừng giữa đường tại pos = ${pos} (chưa tới kho ${i}).`,
+          en: `Coast the remaining ${coasted} fuel → stop mid-road at pos = ${pos} (deposit ${i} not reached).`,
+        },
+      });
+      // Line 15: return pos - start_pos
+      returned = true;
+      snap({
+        title: { vi: `line 15: return ${pos} - ${startPos} = ${pos - startPos}`, en: `line 15: return ${pos} - ${startPos} = ${pos - startPos}` },
+        codeLines: [15], phase: "answer", current: i, final: true, answer: pos - startPos,
+        vars: [{ name: "answer", value: pos - startPos }],
+        note: {
+          vi: `Hết xăng giữa đường → quãng đường tối đa = pos - start_pos = ${pos - startPos}.`,
+          en: `Ran out mid-road → maximum distance = pos - start_pos = ${pos - startPos}.`,
+        },
+      });
+    }
+  }
+
+  if (!returned) {
+    // Line 16: pos += tank (coast beyond last deposit)
+    const leftover = tank;
+    pos += tank;
+    tank = 0;
+    snap({
+      title: { vi: `line 16: pos += tank → pos = ${pos}`, en: `line 16: pos += tank → pos = ${pos}` },
+      codeLines: [16], phase: "coast",
+      vars: [{ name: "leftover", value: leftover }, { name: "pos", value: pos }],
+      note: {
+        vi: `Đã qua kho cuối cùng, chạy nốt ${leftover} xăng còn lại → pos = ${pos}.`,
+        en: `Passed the last deposit, coast the remaining ${leftover} fuel → pos = ${pos}.`,
+      },
+    });
+    // Line 17: return pos - start_pos
+    snap({
+      title: { vi: `line 17: return ${pos} - ${startPos} = ${pos - startPos}`, en: `line 17: return ${pos} - ${startPos} = ${pos - startPos}` },
+      codeLines: [17], phase: "answer", final: true, answer: pos - startPos,
+      vars: [{ name: "answer", value: pos - startPos }],
+      note: {
+        vi: `Quãng đường tối đa = pos - start_pos = ${pos - startPos}.`,
+        en: `Maximum distance = pos - start_pos = ${pos - startPos}.`,
+      },
+    });
+  }
+
+  return { original: deposits, answer: pos - startPos, steps };
+}
+
+/**
+ * Custom (Circular Gas-Station variant): maximum drivable distance on a loop.
+ * Track is a circle of length `circumference`; driving past it wraps to 0,
+ * so deposits before the start index become reachable. Arc to next deposit
+ * = (next_pos - pos) % circumference. Collect each deposit's gas once.
+ */
+function buildSteps9135(input, params) {
+  const raw = Array.isArray(input) ? input.join(";") : String(input || "");
+  const deposits = raw.split(";")
+    .map((pair) => pair.split(",").map((s) => Number(s.trim())))
+    .filter((p) => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+  const n = deposits.length;
+  let start = Number(params && params.start);
+  if (isNaN(start)) start = 0;
+  start = Math.max(0, Math.min(n - 1, start));
+  let circumference = Number(params && params.circumference);
+  if (isNaN(circumference) || circumference <= 0) circumference = 100;
+
+  const steps = [];
+  const stateAt = new Array(n).fill("pending");
+
+  let pos;
+  let tank;
+  let distance = 0;
+
+  function view(o) {
+    return {
+      n, circumference, startIndex: start,
+      pos: pos === undefined ? null : pos,
+      tank: tank === undefined ? null : tank,
+      distance,
+      phase: o.phase,
+      answer: o.answer === undefined ? null : o.answer,
+      currentIndex: o.current === undefined ? null : o.current,
+      loops: pos === undefined ? 0 : Math.floor(distance / circumference),
+      deposits: deposits.map((d, x) => ({ index: x, position: d[0], gas: d[1], state: stateAt[x] })),
+    };
+  }
+
+  function snap(o) {
+    steps.push({
+      title: o.title, gasCircularView: view(o), final: o.final || false,
+      codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+    });
+  }
+
+  const depStr = deposits.map((d) => `(${d[0]},${d[1]})`).join(" ");
+
+  // Line 3: n = len(deposits)
+  snap({
+    title: { vi: `line 3: n = len(deposits) = ${n}`, en: `line 3: n = len(deposits) = ${n}` },
+    codeLines: [3], phase: "init",
+    vars: [{ name: "deposits", value: depStr }, { name: "start", value: start }, { name: "circumference", value: circumference }, { name: "n", value: n }],
+    note: {
+      vi: `Đường đua là VÒNG TRÒN chu vi ${circumference}. Có ${n} kho xăng, xuất phát ở kho ${start}.`,
+      en: `The track is a CIRCLE of circumference ${circumference}. There are ${n} deposits; start at deposit ${start}.`,
+    },
+  });
+
+  // Line 4: pos, tank = deposits[start]
+  pos = deposits[start][0];
+  tank = deposits[start][1];
+  stateAt[start] = "start";
+  snap({
+    title: { vi: `line 4: pos, tank = deposits[${start}] = (${pos}, ${tank})`, en: `line 4: pos, tank = deposits[${start}] = (${pos}, ${tank})` },
+    codeLines: [4], phase: "start", current: start,
+    vars: [{ name: "pos", value: pos }, { name: "tank", value: tank }],
+    note: { vi: `Xe ở vị trí ${pos}, đổ xăng kho xuất phát → tank = ${tank}.`, en: `Car at position ${pos}, fill up at the start deposit → tank = ${tank}.` },
+  });
+
+  // Line 5: distance = 0
+  snap({
+    title: { vi: "line 5: distance = 0", en: "line 5: distance = 0" },
+    codeLines: [5], phase: "start", current: start,
+    vars: [{ name: "distance", value: 0 }],
+    note: { vi: "distance = tổng quãng đường đã đi (đo dọc theo vòng tròn).", en: "distance = total distance travelled (measured along the loop)." },
+  });
+
+  let returned = false;
+  for (let k = 1; k < n && !returned; k++) {
+    const i = (start + k) % n;
+    // Line 6: for k
+    snap({
+      title: { vi: `line 6: k = ${k}/${n - 1}`, en: `line 6: k = ${k}/${n - 1}` },
+      codeLines: [6], phase: "loop",
+      vars: [{ name: "k", value: k }, { name: "pos", value: pos }, { name: "tank", value: tank }, { name: "distance", value: distance }],
+      note: { vi: `Xét kho thứ ${k} kể từ start (theo vòng tròn).`, en: `Consider the ${k}-th deposit after start (around the loop).` },
+    });
+
+    // Line 7: i = (start + k) % n
+    const wrapped = (start + k) >= n;
+    snap({
+      title: { vi: `line 7: i = (${start}+${k}) % ${n} = ${i}${wrapped ? " (wrap!)" : ""}`, en: `line 7: i = (${start}+${k}) % ${n} = ${i}${wrapped ? " (wrap!)" : ""}` },
+      codeLines: [7], phase: "loop", current: i,
+      vars: [{ name: "i", value: i }, { name: "wrapped?", value: wrapped }],
+      note: {
+        vi: wrapped
+          ? `WRAP: chỉ số vượt cuối mảng → quay vòng về kho ${i} (nằm TRƯỚC start). Đây là kho mà bản đường-thẳng bỏ qua!`
+          : `Kho tiếp theo là index ${i}.`,
+        en: wrapped
+          ? `WRAP: index passed the array end → wrap to deposit ${i} (located BEFORE start). This is the deposit the linear version skips!`
+          : `The next deposit is index ${i}.`,
+      },
+    });
+
+    // Line 8: next_pos
+    const nextPos = deposits[i][0];
+    snap({
+      title: { vi: `line 8: next_pos = deposits[${i}][0] = ${nextPos}`, en: `line 8: next_pos = deposits[${i}][0] = ${nextPos}` },
+      codeLines: [8], phase: "loop", current: i,
+      vars: [{ name: "next_pos", value: nextPos }, { name: "pos", value: pos }],
+      note: { vi: `Vị trí kho đích trên vòng tròn = ${nextPos}.`, en: `Target deposit position on the loop = ${nextPos}.` },
+    });
+
+    // Line 9: gap = (next_pos - pos) % circumference
+    const gap = ((nextPos - pos) % circumference + circumference) % circumference;
+    snap({
+      title: { vi: `line 9: gap = (${nextPos} - ${pos}) % ${circumference} = ${gap}`, en: `line 9: gap = (${nextPos} - ${pos}) % ${circumference} = ${gap}` },
+      codeLines: [9], phase: "loop", current: i,
+      vars: [{ name: "gap", value: gap }, { name: "tank", value: tank }],
+      note: {
+        vi: `Cung đường đi tới (theo chiều vòng) = ${gap}. Dùng % ${circumference} để tính đúng cả khi phải vượt mốc ${circumference} rồi về 0.`,
+        en: `Arc distance going forward = ${gap}. The % ${circumference} handles crossing the ${circumference} mark back to 0.`,
+      },
+    });
+
+    // Line 10: if tank < gap
+    const strand = tank < gap;
+    snap({
+      title: { vi: `line 10: tank < gap → ${tank} < ${gap} → ${strand}`, en: `line 10: tank < gap → ${tank} < ${gap} → ${strand}` },
+      codeLines: [10], phase: "loop", current: i,
+      vars: [{ name: "tank", value: tank }, { name: "gap", value: gap }, { name: "strand?", value: strand }],
+      note: {
+        vi: strand
+          ? `Không đủ xăng đi tới kho ${i} → line 11: chạy nốt ${tank} rồi dừng.`
+          : `Đủ xăng → tới được kho ${i} → line 12-15.`,
+        en: strand
+          ? `Not enough fuel to reach deposit ${i} → line 11: coast ${tank} then stop.`
+          : `Enough fuel → reach deposit ${i} → lines 12-15.`,
+      },
+    });
+
+    if (strand) {
+      // Line 11: return distance + tank
+      stateAt[i] = "unreached";
+      const ans = distance + tank;
+      returned = true;
+      snap({
+        title: { vi: `line 11: return ${distance} + ${tank} = ${ans}`, en: `line 11: return ${distance} + ${tank} = ${ans}` },
+        codeLines: [11], phase: "answer", current: i, final: true, answer: ans,
+        vars: [{ name: "answer", value: ans }],
+        note: {
+          vi: `Kẹt giữa đường: chạy nốt ${tank} xăng cuối. Quãng đường tối đa = ${ans}.`,
+          en: `Stranded mid-arc: burn the last ${tank} fuel. Maximum distance = ${ans}.`,
+        },
+      });
+    } else {
+      // Line 12: tank -= gap
+      tank -= gap;
+      snap({
+        title: { vi: `line 12: tank -= gap → tank = ${tank}`, en: `line 12: tank -= gap → tank = ${tank}` },
+        codeLines: [12], phase: "loop", current: i,
+        vars: [{ name: "tank", value: tank }],
+        note: { vi: `Đốt ${gap} xăng đi hết cung. Bình còn ${tank}.`, en: `Burn ${gap} fuel over the arc. Tank now ${tank}.` },
+      });
+      // Line 13: distance += gap
+      distance += gap;
+      snap({
+        title: { vi: `line 13: distance += gap → distance = ${distance}`, en: `line 13: distance += gap → distance = ${distance}` },
+        codeLines: [13], phase: "loop", current: i,
+        vars: [{ name: "distance", value: distance }],
+        note: { vi: `Tổng quãng đường = ${distance}.`, en: `Total distance = ${distance}.` },
+      });
+      // Line 14: pos = next_pos
+      pos = nextPos;
+      stateAt[i] = "collected";
+      snap({
+        title: { vi: `line 14: pos = ${pos}`, en: `line 14: pos = ${pos}` },
+        codeLines: [14], phase: "loop", current: i,
+        vars: [{ name: "pos", value: pos }],
+        note: { vi: `Xe đã tới kho ${i} tại vị trí ${pos}.`, en: `Car reached deposit ${i} at position ${pos}.` },
+      });
+      // Line 15: tank += deposits[i][1]
+      tank += deposits[i][1];
+      snap({
+        title: { vi: `line 15: tank += ${deposits[i][1]} → tank = ${tank}`, en: `line 15: tank += ${deposits[i][1]} → tank = ${tank}` },
+        codeLines: [15], phase: "loop", current: i,
+        vars: [{ name: "tank", value: tank }],
+        note: {
+          vi: wrapped
+            ? `Gom ${deposits[i][1]} xăng ở kho ${i} (kho vòng lại) → tank = ${tank}. Chính nhờ xăng này mà đi được xa hơn bản đường thẳng.`
+            : `Gom ${deposits[i][1]} xăng ở kho ${i} → tank = ${tank}.`,
+          en: wrapped
+            ? `Collect ${deposits[i][1]} fuel at deposit ${i} (wrapped deposit) → tank = ${tank}. This extra fuel is exactly what makes the circular answer bigger.`
+            : `Collect ${deposits[i][1]} fuel at deposit ${i} → tank = ${tank}.`,
+        },
+      });
+    }
+  }
+
+  if (!returned) {
+    // Line 16: return distance + tank
+    const ans = distance + tank;
+    distance = ans;
+    snap({
+      title: { vi: `line 16: return ${ans - tank} + ${tank} = ${ans}`, en: `line 16: return ${ans - tank} + ${tank} = ${ans}` },
+      codeLines: [16], phase: "answer", final: true, answer: ans,
+      vars: [{ name: "answer", value: ans }],
+      note: {
+        vi: `Đã gom hết mọi kho mà chưa kẹt → chạy nốt ${tank} xăng thừa. Quãng đường tối đa = ${ans}.`,
+        en: `Collected every deposit without stranding → coast the leftover ${tank}. Maximum distance = ${ans}.`,
+      },
+    });
+    return { original: deposits, answer: ans, steps };
+  }
+
+  return { original: deposits, answer: distance + tank, steps };
 }
 
 /** LeetCode 179: Largest Number — custom comparator a+b vs b+a. */
@@ -2503,6 +2977,92 @@ module.exports = {
       "        return start",
     ],
     builder: buildSteps134,
+  },
+  9134: {
+    id: 9134, difficulty: "medium", slug: "gas-deposits-max-distance",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Gas Deposits — Max Distance", en: "Gas Deposits — Max Distance" },
+    titleVi: { vi: "Kho xăng — quãng đường xa nhất (biến thể Gas Station)", en: "Gas deposits — maximum distance (Gas Station variant)" },
+    statement: {
+      vi: "Cho các kho xăng (vị trí, lượng xăng) sắp theo vị trí tăng dần và một chỉ số xuất phát start. Đi 1 đơn vị đường đốt 1 xăng; tới kho nào thì đổ thêm xăng kho đó; hết xăng thì chạy nốt phần còn lại rồi dừng. Tìm quãng đường xa nhất. Nhập các cặp 'pos,gas' cách nhau bởi ';'.",
+      en: "Given gas deposits (position, gas) sorted by position and a start index. Driving 1 unit burns 1 gas; collect a deposit's gas when reached; when fuel runs out coast the rest and stop. Return the maximum distance. Enter 'pos,gas' pairs separated by ';'.",
+    },
+    defaultInput: "0,20;20,20;40,20;80,20",
+    inputKind: "string",
+    inputLabel: { vi: "deposits (pos,gas cách nhau ;)", en: "deposits (pos,gas separated by ;)" },
+    singleInput: true,
+    extraParams: [{ key: "start", label: { vi: "start (chỉ số kho xuất phát)", en: "start (starting deposit index)" }, default: "0" }],
+    approach: [
+      { vi: "Ghi lại start_pos, nạp xăng ở kho xuất phát vào tank.", en: "Record start_pos, load the starting deposit's gas into the tank." },
+      { vi: "Với mỗi kho kế tiếp: tính gap = khoảng cách. Nếu tank ≥ gap thì đi tới, trừ gap, rồi cộng xăng kho đó.", en: "For each next deposit: compute gap = distance. If tank ≥ gap, drive there, subtract gap, then add that deposit's gas." },
+      { vi: "Nếu tank < gap: chạy nốt tank đơn vị (pos += tank) rồi dừng.", en: "If tank < gap: coast tank more units (pos += tank) then stop." },
+      { vi: "Nếu qua hết các kho: chạy nốt xăng thừa. Đáp án = pos - start_pos.", en: "If all deposits are passed: coast the leftover fuel. Answer = pos - start_pos." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt greedy qua các kho.", en: "Single greedy pass over the deposits." } },
+    code: [
+      "class Solution:",
+      "    def maxDistance(self, deposits, start):",
+      "        n = len(deposits)",
+      "        start_pos = deposits[start][0]",
+      "        pos = start_pos",
+      "        tank = deposits[start][1]",
+      "        for i in range(start + 1, n):",
+      "            gap = deposits[i][0] - pos",
+      "            if tank >= gap:",
+      "                tank -= gap",
+      "                pos = deposits[i][0]",
+      "                tank += deposits[i][1]",
+      "            else:",
+      "                pos += tank",
+      "                return pos - start_pos",
+      "        pos += tank",
+      "        return pos - start_pos",
+    ],
+    builder: buildSteps9134,
+  },
+  9135: {
+    id: 9135, difficulty: "medium", slug: "gas-deposits-circular-track",
+    category: { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    title: { vi: "Gas Deposits — Circular Track", en: "Gas Deposits — Circular Track" },
+    titleVi: { vi: "Kho xăng trên đường đua vòng tròn (biến thể circumference)", en: "Gas deposits on a circular track (circumference variant)" },
+    statement: {
+      vi: "Giống bài kho xăng nhưng đường đua là VÒNG TRÒN chu vi C. Khi đi qua mốc C thì quay về vị trí 0 và đi tiếp → có thể ghé cả các kho nằm TRƯỚC start. Cung đường tới kho kế = (next_pos - pos) % C. Đi 1 đơn vị đốt 1 xăng; tới kho nào gom xăng kho đó (mỗi kho 1 lần). Tìm quãng đường xa nhất. Nhập cặp 'pos,gas' cách nhau ';'.",
+      en: "Like the gas-deposits problem but the track is a CIRCLE of circumference C. Passing C wraps back to position 0 and continues → deposits located BEFORE start become reachable. Arc to the next deposit = (next_pos - pos) % C. Driving 1 unit burns 1 gas; collect each deposit's gas once. Return the maximum distance. Enter 'pos,gas' pairs separated by ';'.",
+    },
+    defaultInput: "0,40;30,40;70,40",
+    inputKind: "string",
+    inputLabel: { vi: "deposits (pos,gas cách nhau ;)", en: "deposits (pos,gas separated by ;)" },
+    singleInput: true,
+    extraParams: [
+      { key: "start", label: { vi: "start (chỉ số kho xuất phát)", en: "start (starting deposit index)" }, default: "1" },
+      { key: "circumference", label: { vi: "circumference (chu vi vòng)", en: "circumference (loop length)" }, default: "100" },
+    ],
+    approach: [
+      { vi: "Nạp xăng kho xuất phát vào tank, distance = 0.", en: "Load the start deposit's gas into tank, distance = 0." },
+      { vi: "Duyệt n-1 kho còn lại theo VÒNG TRÒN: i = (start + k) % n (wrap về đầu mảng).", en: "Visit the other n-1 deposits around the LOOP: i = (start + k) % n (wraps to the array start)." },
+      { vi: "Cung đường tới kho kế = (next_pos - pos) % circumference. Nếu tank < cung → chạy nốt tank rồi dừng.", en: "Arc to next deposit = (next_pos - pos) % circumference. If tank < arc → coast tank then stop." },
+      { vi: "Ngược lại: trừ cung, cộng distance, cập nhật pos, gom xăng kho đó. Cuối cùng chạy nốt xăng thừa.", en: "Otherwise: subtract the arc, add to distance, update pos, collect that deposit's gas. Finally coast the leftover fuel." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt greedy quanh vòng tròn.", en: "Single greedy pass around the loop." } },
+    code: [
+      "class Solution:",
+      "    def maxDistance(self, deposits, start, circumference):",
+      "        n = len(deposits)",
+      "        pos, tank = deposits[start]",
+      "        distance = 0",
+      "        for k in range(1, n):",
+      "            i = (start + k) % n",
+      "            next_pos = deposits[i][0]",
+      "            gap = (next_pos - pos) % circumference",
+      "            if tank < gap:",
+      "                return distance + tank",
+      "            tank -= gap",
+      "            distance += gap",
+      "            pos = next_pos",
+      "            tank += deposits[i][1]",
+      "        return distance + tank",
+    ],
+    builder: buildSteps9135,
   },
   179: {
     id: 179, difficulty: "medium", slug: "largest-number",

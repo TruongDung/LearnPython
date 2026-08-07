@@ -7309,138 +7309,195 @@ function buildSteps207(input, params) {
   const inDeg = {};
   const courses = Array.from({ length: numCourses }, (_, i) => i);
   for (const c of courses) { adj[c] = []; inDeg[c] = 0; }
-  for (const [a, b] of pairs) {
-    // b → a (must take b before a)
-    adj[b].push(a);
-    inDeg[a] = (inDeg[a] || 0) + 1;
-  }
 
-  const taken = new Set();
+  const taken = new Set();      // courses already "popped" (green)
+  const takenOrder = [];
+  let queue = [];               // FIFO of in-degree-0 courses
+  let takenCount = 0;
+
+  const inDegStr = () => courses.map((c) => `${c}:${inDeg[c]}`).join(", ");
+  const queueStr = () => `[${queue.join(", ")}]`;
 
   function makeGraph(hlNodes, hlEdges) {
+    const annotations = {};
+    for (const q of queue) annotations[q] = "queue";
     return {
       nodes: courses.map((id) => ({ id, dist: inDeg[id] })),
       edges: pairs.map(([a, b]) => ({ u: b, v: a, w: "" })),
       hlNodes: hlNodes || [],
       hlEdges: hlEdges || [],
       visitedNodes: [...taken],
+      annotations,
     };
   }
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [],
-    graph: makeGraph([], []),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5, 6, 7],
-    vars: [
-      { name: "numCourses", value: numCourses },
-      { name: "prerequisites", value: pairs.map(([a, b]) => `[${a},${b}]`).join(", ") || "none" },
-      { name: "in-degree", value: courses.map((c) => `${c}:${inDeg[c]}`).join(", ") },
-    ],
-    note: {
-      vi:
-        `Có ${numCourses} môn (0..${numCourses - 1}), ${pairs.length} điều kiện tiên quyết.\n` +
-        `Mỗi cặp [a, b] nghĩa là phải học b trước a → cạnh b → a.\n` +
-        `Số bên dưới nút = in-degree (số môn phải học trước nó).\n` +
-        `Mục tiêu: kiểm tra có thể học hết không (đồ thị không có chu trình)?`,
-      en:
-        `${numCourses} courses (0..${numCourses - 1}), ${pairs.length} prerequisites.\n` +
-        `Each [a, b] means take b before a → edge b → a.\n` +
-        `Number below node = in-degree (number of prerequisites).\n` +
-        `Goal: can all be finished (no cycle)?`,
-    },
-  });
-
-  let answer = true;
-
-  while (taken.size < numCourses) {
-    const available = courses.filter((c) => !taken.has(c) && inDeg[c] === 0);
-
-    if (available.length === 0) {
-      // Cycle
-      answer = false;
-      steps.push({
-        title: { vi: "Bế tắc → có chu trình → false", en: "Stuck → cycle detected → false" },
-        arr: [],
-        graph: makeGraph(courses.filter((c) => !taken.has(c)), []),
-        highlight: [],
-        mark: [],
-        final: true,
-        codeLines: [15, 16],
-        vars: [
-          { name: "taken", value: `${taken.size}/${numCourses}` },
-          { name: "remaining", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") },
-          { name: "answer", value: false },
-        ],
-        note: {
-          vi:
-            `Không còn môn nào có in-degree = 0, nhưng vẫn còn ${numCourses - taken.size} môn chưa học.\n` +
-            `→ Đồ thị có chu trình → KHÔNG thể hoàn thành → return false.`,
-          en:
-            `No course has in-degree = 0, but ${numCourses - taken.size} courses remain.\n` +
-            `→ Cycle exists → CANNOT finish → return false.`,
-        },
-      });
-      return { numCourses, edges: edgesRaw, answer: false, steps };
-    }
-
-    // Take all available this round
-    for (const c of available) taken.add(c);
-    const hlEdges = [];
-    for (const c of available) {
-      for (const next of adj[c]) {
-        inDeg[next]--;
-        hlEdges.push([c, next]);
-      }
-    }
-
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "queue")) vars.push({ name: "queue", value: queueStr() });
     steps.push({
-      title: { vi: `Lấy ${available.length} môn có in-deg = 0`, en: `Pop ${available.length} courses with in-deg = 0` },
-      arr: [],
-      graph: makeGraph(available, hlEdges),
-      highlight: [],
-      mark: [],
-      codeLines: [9, 10, 11, 12, 13, 14],
-      vars: [
-        { name: "available", value: `[${available.join(", ")}]` },
-        { name: "edges decremented", value: hlEdges.length },
-        { name: "in-degree after", value: courses.filter((c) => !taken.has(c)).map((c) => `${c}:${inDeg[c]}`).join(", ") || "(all done)" },
-        { name: "taken", value: `${taken.size}/${numCourses}` },
-      ],
-      note: {
-        vi:
-          `Lấy mọi môn có in-degree = 0: [${available.join(", ")}].\n` +
-          `Giảm in-degree các môn phụ thuộc (${hlEdges.length} cạnh).\n` +
-          `Đã học ${taken.size}/${numCourses} môn.`,
-        en:
-          `Pop all courses with in-degree = 0: [${available.join(", ")}].\n` +
-          `Decrement in-degree of dependents (${hlEdges.length} edges).\n` +
-          `Taken: ${taken.size}/${numCourses}.`,
-      },
+      title: o.title, arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
     });
   }
 
-  steps.push({
-    title: { vi: "✓ Hoàn thành tất cả → true", en: "✓ All done → true" },
-    arr: [],
-    graph: makeGraph([], []),
-    highlight: [],
-    mark: [],
-    final: true,
-    codeLines: [17],
+  // ── Intro ────────────────────────────────────────────────────────────
+  snap({
+    title: { vi: "Bài toán", en: "Problem" },
+    codeLines: [4],
     vars: [
-      { name: "taken", value: `${numCourses}/${numCourses}` },
-      { name: "answer", value: true },
+      { name: "numCourses", value: numCourses },
+      { name: "prerequisites", value: pairs.map(([a, b]) => `[${a},${b}]`).join(", ") || "none" },
     ],
     note: {
-      vi: `Đã học hết ${numCourses} môn → đồ thị không có chu trình → return true.`,
-      en: `All ${numCourses} courses taken → no cycle → return true.`,
+      vi:
+        `Có ${numCourses} môn (0..${numCourses - 1}), ${pairs.length} tiên quyết. Mỗi [a, b] = phải học b TRƯỚC a → cạnh b→a.\n` +
+        `Số DƯỚI mỗi nút = in-degree (số môn còn phải học trước nó). Nhãn "queue" = đang trong hàng đợi.\n` +
+        `Kahn's algorithm: cứ học môn nào in-degree = 0, rồi gỡ nó khỏi đồ thị. Học hết → true; kẹt lại → có chu trình → false.`,
+      en:
+        `${numCourses} courses (0..${numCourses - 1}), ${pairs.length} prerequisites. Each [a, b] = take b BEFORE a → edge b→a.\n` +
+        `Number UNDER each node = in-degree (prereqs still needed). "queue" label = currently in the queue.\n` +
+        `Kahn's algorithm: keep taking a course with in-degree 0 and remove it. Finish all → true; stuck → cycle → false.`,
     },
   });
 
-  return { numCourses, edges: edgesRaw, answer: true, steps };
+  // ── Line 5: adj = defaultdict(list) ───────────────────────────────────
+  snap({
+    title: { vi: "line 5: adj = defaultdict(list)", en: "line 5: adj = defaultdict(list)" },
+    codeLines: [5],
+    note: { vi: "Tạo danh sách kề rỗng cho mỗi môn.", en: "Create an empty adjacency list for each course." },
+  });
+
+  // ── Line 6: in_deg = [0] * numCourses ─────────────────────────────────
+  snap({
+    title: { vi: "line 6: in_deg = [0] * numCourses", en: "line 6: in_deg = [0] * numCourses" },
+    codeLines: [6],
+    vars: [{ name: "in_deg", value: inDegStr() }],
+    note: { vi: "Ban đầu mọi môn có in-degree = 0 (chưa đếm tiên quyết).", en: "Initially every course has in-degree 0 (prereqs not counted yet)." },
+  });
+
+  // ── Lines 7-9: build graph + in-degree ────────────────────────────────
+  for (const [a, b] of pairs) {
+    snap({
+      title: { vi: `line 7: a, b = ${a}, ${b}`, en: `line 7: a, b = ${a}, ${b}` },
+      hlNodes: [a, b], codeLines: [7],
+      note: { vi: `Xét tiên quyết [${a}, ${b}]: phải học ${b} trước ${a}.`, en: `Process prerequisite [${a}, ${b}]: take ${b} before ${a}.` },
+    });
+    adj[b].push(a);
+    snap({
+      title: { vi: `line 8: adj[${b}].append(${a})`, en: `line 8: adj[${b}].append(${a})` },
+      hlNodes: [b, a], hlEdges: [[b, a]], codeLines: [8],
+      vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Thêm cạnh ${b}→${a} (học xong ${b} thì mở khoá ${a}).`, en: `Add edge ${b}→${a} (finishing ${b} unlocks ${a}).` },
+    });
+    inDeg[a] += 1;
+    snap({
+      title: { vi: `line 9: in_deg[${a}] += 1 → ${inDeg[a]}`, en: `line 9: in_deg[${a}] += 1 → ${inDeg[a]}` },
+      hlNodes: [a], codeLines: [9],
+      vars: [{ name: "in_deg", value: inDegStr() }],
+      note: { vi: `${a} có thêm 1 tiên quyết → in_deg[${a}] = ${inDeg[a]}.`, en: `${a} gains one prerequisite → in_deg[${a}] = ${inDeg[a]}.` },
+    });
+  }
+
+  // ── Line 10: queue = deque([i if in_deg[i]==0]) ───────────────────────
+  queue = courses.filter((c) => inDeg[c] === 0);
+  snap({
+    title: { vi: `line 10: queue = ${queueStr()}`, en: `line 10: queue = ${queueStr()}` },
+    hlNodes: [...queue], codeLines: [10],
+    note: {
+      vi: `Đưa mọi môn KHÔNG có tiên quyết (in-degree = 0) vào queue: ${queueStr()}. Đây là các môn học được ngay.`,
+      en: `Enqueue every course with NO prerequisites (in-degree = 0): ${queueStr()}. These can be taken immediately.`,
+    },
+  });
+
+  // ── Line 11: taken = 0 ────────────────────────────────────────────────
+  snap({
+    title: { vi: "line 11: taken = 0", en: "line 11: taken = 0" },
+    codeLines: [11],
+    vars: [{ name: "taken", value: 0 }],
+    note: { vi: "taken = số môn đã học xong.", en: "taken = number of courses finished." },
+  });
+
+  // ── Lines 12-18: process the queue ────────────────────────────────────
+  while (queue.length) {
+    snap({
+      title: { vi: "line 12: while queue", en: "line 12: while queue" },
+      codeLines: [12],
+      vars: [{ name: "taken", value: takenCount }],
+      note: { vi: `Queue còn ${queue.length} môn → tiếp tục.`, en: `Queue has ${queue.length} course(s) → continue.` },
+    });
+
+    const u = queue.shift();
+    snap({
+      title: { vi: `line 13: u = queue.popleft() = ${u}`, en: `line 13: u = queue.popleft() = ${u}` },
+      hlNodes: [u], codeLines: [13],
+      vars: [{ name: "u", value: u }],
+      note: { vi: `Lấy môn ${u} ở đầu queue ra học.`, en: `Take course ${u} from the front of the queue.` },
+    });
+
+    takenCount += 1;
+    taken.add(u);
+    takenOrder.push(u);
+    snap({
+      title: { vi: `line 14: taken += 1 → ${takenCount}`, en: `line 14: taken += 1 → ${takenCount}` },
+      hlNodes: [u], codeLines: [14],
+      vars: [{ name: "taken", value: takenCount }, { name: "order", value: `[${takenOrder.join(", ")}]` }],
+      note: { vi: `Học xong ${u} (tô xanh) → taken = ${takenCount}.`, en: `Finished ${u} (green) → taken = ${takenCount}.` },
+    });
+
+    snap({
+      title: { vi: `line 15: for v in adj[${u}] = [${adj[u].join(", ")}]`, en: `line 15: for v in adj[${u}] = [${adj[u].join(", ")}]` },
+      hlNodes: [u], hlEdges: adj[u].map((v) => [u, v]), codeLines: [15],
+      note: { vi: `Gỡ ${u} khỏi đồ thị: duyệt các môn phụ thuộc ${u}.`, en: `Remove ${u} from the graph: iterate the courses depending on ${u}.` },
+    });
+
+    for (const v of adj[u]) {
+      inDeg[v] -= 1;
+      snap({
+        title: { vi: `line 16: in_deg[${v}] -= 1 → ${inDeg[v]}`, en: `line 16: in_deg[${v}] -= 1 → ${inDeg[v]}` },
+        hlNodes: [v], hlEdges: [[u, v]], codeLines: [16],
+        vars: [{ name: "in_deg", value: inDegStr() }],
+        note: { vi: `${v} đã thỏa 1 tiên quyết (${u}) → in_deg[${v}] = ${inDeg[v]}.`, en: `${v} satisfied one prerequisite (${u}) → in_deg[${v}] = ${inDeg[v]}.` },
+      });
+      const zero = inDeg[v] === 0;
+      snap({
+        title: { vi: `line 17: in_deg[${v}] == 0? ${zero}`, en: `line 17: in_deg[${v}] == 0? ${zero}` },
+        hlNodes: [v], codeLines: [17],
+        note: {
+          vi: zero ? `${v} hết tiên quyết → có thể học → line 18.` : `${v} vẫn còn ${inDeg[v]} tiên quyết → chưa vào queue.`,
+          en: zero ? `${v} has no prerequisites left → can be taken → line 18.` : `${v} still needs ${inDeg[v]} prerequisite(s) → not enqueued.`,
+        },
+      });
+      if (zero) {
+        queue.push(v);
+        snap({
+          title: { vi: `line 18: queue.append(${v})`, en: `line 18: queue.append(${v})` },
+          hlNodes: [v], codeLines: [18],
+          note: { vi: `Đưa ${v} vào queue: ${queueStr()}.`, en: `Enqueue ${v}: ${queueStr()}.` },
+        });
+      }
+    }
+  }
+
+  // ── Line 19: return taken == numCourses ───────────────────────────────
+  const answer = takenCount === numCourses;
+  const remaining = courses.filter((c) => !taken.has(c));
+  snap({
+    title: { vi: `line 19: return ${takenCount} == ${numCourses} → ${answer}`, en: `line 19: return ${takenCount} == ${numCourses} → ${answer}` },
+    hlNodes: answer ? [] : remaining, codeLines: [19], final: true,
+    vars: [{ name: "taken", value: `${takenCount}/${numCourses}` }, { name: "answer", value: answer }],
+    note: {
+      vi: answer
+        ? `Đã học hết ${numCourses} môn → đồ thị không có chu trình → return True.`
+        : `Queue rỗng nhưng mới học ${takenCount}/${numCourses} môn. Còn [${remaining.join(", ")}] kẹt với in-degree > 0 → có CHU TRÌNH → return False.`,
+      en: answer
+        ? `All ${numCourses} courses taken → no cycle → return True.`
+        : `Queue is empty but only ${takenCount}/${numCourses} taken. [${remaining.join(", ")}] are stuck with in-degree > 0 → CYCLE → return False.`,
+    },
+  });
+
+  return { numCourses, edges: edgesRaw, answer, steps };
 }
 
 /**
@@ -8697,6 +8754,666 @@ function buildSteps1319DFS(input, params) {
   steps.push(fs);
 
   return { input, answer, steps };
+}
+
+/**
+ * LeetCode 1584: Min Cost to Connect All Points (MST via Prim's algorithm).
+ * Grow a spanning tree from node 0 with a min-heap keyed by Manhattan distance;
+ * each popped unvisited node commits its cheapest connecting edge. Points are
+ * drawn at their real coordinates (flow layout), MST edges appear as chosen.
+ */
+function buildSteps1584(input) {
+  const raw = String(input || "").trim();
+  let pts;
+  if (raw.includes("[")) {
+    pts = (raw.match(/\[([^\[\]]*)\]/g) || [])
+      .map((g) => g.replace(/[\[\]]/g, "").trim()).filter((x) => x.length)
+      .map((s) => s.split(",").map((v) => Number(v.trim())));
+  } else {
+    pts = raw.split(";").map((s) => s.trim()).filter(Boolean)
+      .map((s) => s.split(",").map((v) => Number(v.trim())));
+  }
+  const n = pts.length;
+  const steps = [];
+
+  const invalid = n < 1 || pts.some((p) => p.length !== 2 || p.some((v) => isNaN(v)));
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [], graph: { nodes: [{ id: 0, label: "!" }], edges: [], hlNodes: [0], hlEdges: [], visitedNodes: [] },
+      highlight: [], mark: [], final: true, codeLines: [5], vars: [{ name: "answer", value: "invalid" }],
+      note: { vi: "Nhập các điểm dạng [[x,y],...] ví dụ [[0,0],[2,2],[3,10]].", en: "Enter points like [[x,y],...] e.g. [[0,0],[2,2],[3,10]]." },
+    });
+    return { original: pts, answer: null, steps };
+  }
+
+  // Normalized positions for the flow layout (flip y so larger y is up).
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = (maxX - minX) || 1, spanY = (maxY - minY) || 1;
+  const positions = {};
+  pts.forEach((p, i) => { positions[i] = { x: (p[0] - minX) / spanX, y: 1 - (p[1] - minY) / spanY }; });
+
+  const manhattan = (a, b) => Math.abs(pts[a][0] - pts[b][0]) + Math.abs(pts[a][1] - pts[b][1]);
+
+  const visited = new Array(n).fill(false);
+  let heap = []; // [cost, node, parent]
+  let total = 0;
+  let edgesUsed = 0;
+  const mstEdges = [];
+
+  const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
+  function popMin() {
+    let bi = 0;
+    for (let k = 1; k < heap.length; k++) if (cmp(heap[k], heap[bi]) < 0) bi = k;
+    return heap.splice(bi, 1)[0];
+  }
+  const heapStr = () => heap.length ? `[${heap.slice().sort(cmp).map((h) => `(${h[0]},n${h[1]}←n${h[2] < 0 ? "·" : h[2]})`).join(", ")}]` : "[]";
+  const visitedList = () => pts.map((_, i) => i).filter((i) => visited[i]);
+
+  function makeGraph(hlNodes, hlEdges) {
+    return {
+      layout: "flow", width: 660, height: 380, positions,
+      nodes: pts.map((p, i) => ({ id: i, label: String(i), sub: `(${p[0]},${p[1]})` })),
+      edges: mstEdges.map((e) => ({ u: e.u, v: e.v, w: e.w, undirected: true })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: visitedList(),
+    };
+  }
+
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "heap")) vars.push({ name: "heap(min)", value: heapStr() });
+    if (!vars.some((v) => v.name === "total")) vars.push({ name: "total", value: total });
+    steps.push({
+      title: o.title, arr: [],
+      graph: makeGraph(o.hlNodes, o.hlEdges),
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
+    });
+  }
+
+  snap({
+    title: { vi: `line 5: n = ${n}`, en: `line 5: n = ${n}` },
+    codeLines: [5],
+    vars: [{ name: "points", value: pts.map((p) => `(${p[0]},${p[1]})`).join(" ") }],
+    note: {
+      vi: `Nối ${n} điểm với chi phí = khoảng cách Manhattan |Δx|+|Δy|. Đây là bài Cây khung nhỏ nhất (MST) — dùng Prim + min-heap. Điểm vẽ theo tọa độ thật.`,
+      en: `Connect ${n} points where cost = Manhattan distance |Δx|+|Δy|. This is a Minimum Spanning Tree (MST) — solved with Prim + a min-heap. Points are drawn at their real coordinates.`,
+    },
+  });
+
+  snap({ title: { vi: "line 6: visited = [False]*n", en: "line 6: visited = [False]*n" }, codeLines: [6], note: { vi: "Chưa điểm nào được nối vào cây.", en: "No point is connected to the tree yet." } });
+
+  heap = [[0, 0, -1]];
+  snap({ title: { vi: "line 7: heap = [(0, 0, -1)]", en: "line 7: heap = [(0, 0, -1)]" }, hlNodes: [0], codeLines: [7], note: { vi: "Bắt đầu từ điểm 0 với chi phí 0 (chưa có cha). Heap sắp theo chi phí nhỏ nhất.", en: "Start from point 0 with cost 0 (no parent). The heap is ordered by smallest cost." } });
+
+  snap({ title: { vi: "line 8: total = 0", en: "line 8: total = 0" }, codeLines: [8], note: { vi: "total = tổng chi phí các cạnh đã chọn.", en: "total = sum of chosen edge costs." } });
+  snap({ title: { vi: "line 9: edges_used = 0", en: "line 9: edges_used = 0" }, codeLines: [9], note: { vi: "Đếm số điểm đã nối vào cây (cần đủ n).", en: "Count points connected to the tree (need all n)." } });
+
+  while (edgesUsed < n) {
+    snap({
+      title: { vi: `line 10: while edges_used < n → ${edgesUsed} < ${n}`, en: `line 10: while edges_used < n → ${edgesUsed} < ${n}` },
+      codeLines: [10], vars: [{ name: "edges_used", value: edgesUsed }],
+      note: { vi: `Còn thiếu điểm chưa nối → tiếp tục.`, en: `Some points not connected yet → continue.` },
+    });
+
+    const [cost, i, parent] = popMin();
+    snap({
+      title: { vi: `line 11: pop → (cost=${cost}, node=${i}, parent=${parent})`, en: `line 11: pop → (cost=${cost}, node=${i}, parent=${parent})` },
+      hlNodes: [i], hlEdges: parent >= 0 ? [[parent, i]] : [], codeLines: [11],
+      vars: [{ name: "cost", value: cost }, { name: "i", value: i }, { name: "parent", value: parent }],
+      note: { vi: `Lấy cạnh rẻ nhất trong heap: tới điểm ${i} với chi phí ${cost}${parent >= 0 ? ` từ điểm ${parent}` : " (điểm gốc)"}.`, en: `Pop the cheapest edge in the heap: reach point ${i} at cost ${cost}${parent >= 0 ? ` from point ${parent}` : " (root)"}.` },
+    });
+
+    const already = visited[i];
+    snap({
+      title: { vi: `line 12: visited[${i}]? ${already}`, en: `line 12: visited[${i}]? ${already}` },
+      hlNodes: [i], codeLines: [12], vars: [{ name: `visited[${i}]`, value: already }],
+      note: { vi: already ? `Điểm ${i} đã ở trong cây → cạnh này thừa.` : `Điểm ${i} chưa nối → nhận cạnh này.`, en: already ? `Point ${i} is already in the tree → this edge is redundant.` : `Point ${i} not connected → accept this edge.` },
+    });
+    if (already) {
+      snap({
+        title: { vi: "line 13: continue", en: "line 13: continue" },
+        hlNodes: [i], codeLines: [13],
+        note: { vi: `Bỏ qua cạnh thừa, quay lại đầu vòng lặp.`, en: `Skip the redundant edge and loop again.` },
+      });
+      continue;
+    }
+
+    visited[i] = true;
+    if (parent >= 0) mstEdges.push({ u: parent, v: i, w: cost });
+    snap({
+      title: { vi: `line 14: visited[${i}] = True`, en: `line 14: visited[${i}] = True` },
+      hlNodes: [i], hlEdges: parent >= 0 ? [[parent, i]] : [], codeLines: [14],
+      note: { vi: parent >= 0 ? `Nối điểm ${i} vào cây bằng cạnh ${parent}—${i} (chi phí ${cost}).` : `Điểm gốc ${i} vào cây.`, en: parent >= 0 ? `Connect point ${i} to the tree via edge ${parent}—${i} (cost ${cost}).` : `Root point ${i} joins the tree.` },
+    });
+
+    total += cost;
+    snap({
+      title: { vi: `line 15: total += ${cost} → ${total}`, en: `line 15: total += ${cost} → ${total}` },
+      hlNodes: [i], codeLines: [15], vars: [{ name: "total", value: total }],
+      note: { vi: `Cộng chi phí cạnh vừa chọn. total = ${total}.`, en: `Add the chosen edge cost. total = ${total}.` },
+    });
+
+    edgesUsed += 1;
+    snap({
+      title: { vi: `line 16: edges_used += 1 → ${edgesUsed}`, en: `line 16: edges_used += 1 → ${edgesUsed}` },
+      hlNodes: [i], codeLines: [16], vars: [{ name: "edges_used", value: edgesUsed }],
+      note: { vi: `Đã nối ${edgesUsed}/${n} điểm.`, en: `Connected ${edgesUsed}/${n} points.` },
+    });
+
+    if (edgesUsed === n) break; // no need to push more; tree complete
+
+    snap({
+      title: { vi: `line 17: for j in range(${n})`, en: `line 17: for j in range(${n})` },
+      hlNodes: [i], codeLines: [17],
+      note: { vi: `Thêm các cạnh từ ${i} tới các điểm CHƯA nối vào heap.`, en: `Push edges from ${i} to every UNCONNECTED point into the heap.` },
+    });
+
+    for (let j = 0; j < n; j++) {
+      if (visited[j]) {
+        snap({
+          title: { vi: `line 18: not visited[${j}]? False`, en: `line 18: not visited[${j}]? False` },
+          hlNodes: [i, j], codeLines: [18], vars: [{ name: "j", value: j }],
+          note: { vi: `Điểm ${j} đã ở trong cây → bỏ qua.`, en: `Point ${j} is already in the tree → skip.` },
+        });
+        continue;
+      }
+      const d = manhattan(i, j);
+      heap.push([d, j, i]);
+      snap({
+        title: { vi: `line 18-20: push (d=${d}, ${j}, ${i})`, en: `line 18-20: push (d=${d}, ${j}, ${i})` },
+        hlNodes: [i, j], hlEdges: [[i, j]], codeLines: [18, 19, 20],
+        vars: [{ name: "j", value: j }, { name: "d = |Δx|+|Δy|", value: `${d}` }],
+        note: { vi: `Khoảng cách Manhattan ${i}→${j} = ${d}. Đẩy cạnh này vào heap (chưa chọn).`, en: `Manhattan distance ${i}→${j} = ${d}. Push this candidate edge to the heap (not chosen yet).` },
+      });
+    }
+  }
+
+  snap({
+    title: { vi: `line 21: return total = ${total}`, en: `line 21: return total = ${total}` },
+    codeLines: [21], final: true,
+    vars: [{ name: "answer", value: total }, { name: "MST edges", value: mstEdges.map((e) => `${e.u}-${e.v}(${e.w})`).join(", ") || "(none)" }],
+    note: {
+      vi: `Cây khung nhỏ nhất đã nối hết ${n} điểm. Tổng chi phí nhỏ nhất = ${total}. Các cạnh cây: ${mstEdges.map((e) => `${e.u}—${e.v}(${e.w})`).join(", ") || "(không có)"}.`,
+      en: `The MST connects all ${n} points. Minimum total cost = ${total}. Tree edges: ${mstEdges.map((e) => `${e.u}—${e.v}(${e.w})`).join(", ") || "(none)"}.`,
+    },
+  });
+
+  return { original: pts, answer: total, steps };
+}
+
+/**
+ * LeetCode 1102: Path With Maximum Minimum Value (Premium).
+ * Best-first search with a max-heap: always expand the reachable cell with the
+ * largest value; result = smallest value popped so far. When the bottom-right
+ * cell is popped, result is the answer. One code line highlighted per step.
+ */
+function buildSteps1102(input) {
+  const raw = String(input || "").trim();
+  let grid;
+  if (raw.includes("[")) {
+    // LeetCode notation: [[5,4,5],[1,2,6],[7,4,6]]
+    grid = (raw.match(/\[([^\[\]]*)\]/g) || [])
+      .map((g) => g.replace(/[\[\]]/g, "").trim())
+      .filter((x) => x.length)
+      .map((row) => row.split(",").map((s) => Number(s.trim())));
+  } else {
+    // Pipe notation: 5,4,5|1,2,6|7,4,6
+    grid = raw.split("|").map((row) => row.split(",").map((s) => Number(s.trim())));
+  }
+  if (!grid.length) grid = [[]];
+  const m = grid.length;
+  const n = grid[0] ? grid[0].length : 0;
+  const steps = [];
+
+  const invalid = !m || !n || grid.some((row) => row.length !== n || row.some((v) => isNaN(v)));
+  if (invalid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: [],
+      bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
+      final: true, codeLines: [5], vars: [{ name: "answer", value: "invalid grid" }],
+      note: { vi: "Grid phải là ma trận số chữ nhật. Ví dụ: 5,4,5|1,2,6|7,4,6.", en: "Grid must be a rectangular integer matrix. Example: 5,4,5|1,2,6|7,4,6." },
+    });
+    return { original: grid, answer: null, steps };
+  }
+
+  const visited = Array.from({ length: m }, () => Array(n).fill(false));
+  let heap = []; // entries: [negVal, r, c]
+  let result = null;
+  const parent = {}; // "r,c" -> [pr, pc] (how we first reached that cell)
+  const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+  function reconstruct(endR, endC) {
+    const route = [];
+    let cur = [endR, endC];
+    while (cur) {
+      route.push(cur);
+      cur = parent[`${cur[0]},${cur[1]}`] || null;
+    }
+    return route.reverse();
+  }
+
+  const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]);
+  function popMax() {
+    let bi = 0;
+    for (let i = 1; i < heap.length; i++) if (cmp(heap[i], heap[bi]) < 0) bi = i;
+    return heap.splice(bi, 1)[0];
+  }
+  function heapLabel() {
+    if (!heap.length) return "[]";
+    return `[${heap.slice().sort(cmp).map((h) => `${-h[0]}@(${h[1]},${h[2]})`).join(", ")}]`;
+  }
+
+  function makeCells(current, neighbor, route) {
+    const heapSet = new Set(heap.map((h) => `${h[1]},${h[2]}`));
+    const routeSet = new Set((route || []).map(([r, c]) => `${r},${c}`));
+    return grid.map((row, r) => row.map((val, c) => {
+      let cls = "empty";
+      if (visited[r][c]) cls = "visited";
+      if (heapSet.has(`${r},${c}`)) cls = "queued";
+      if (routeSet.has(`${r},${c}`)) cls = "route";
+      if (neighbor && neighbor[0] === r && neighbor[1] === c) cls = "path";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      return { label: String(val), cls };
+    }));
+  }
+
+  function snap(o) {
+    const vars = [...(o.vars || [])];
+    if (!vars.some((v) => v.name === "heap")) vars.push({ name: "heap (max)", value: heapLabel() });
+    if (result !== null && !vars.some((v) => v.name === "result")) vars.push({ name: "result", value: result });
+    steps.push({
+      title: o.title, arr: [],
+      bfsGrid: { rows: m, cols: n, cells: makeCells(o.current || null, o.neighbor || null, o.route || null) },
+      highlight: [], mark: [], final: o.final || false,
+      codeLines: o.codeLines || [], vars, note: o.note,
+    });
+  }
+
+  // Line 5: m, n = len(grid), len(grid[0])
+  snap({
+    title: { vi: `line 5: m, n = ${m}, ${n}`, en: `line 5: m, n = ${m}, ${n}` },
+    codeLines: [5],
+    vars: [{ name: "m", value: m }, { name: "n", value: n }],
+    note: { vi: `Grid ${m}×${n}. Tìm đường (0,0)→(${m - 1},${n - 1}) sao cho GIÁ TRỊ NHỎ NHẤT trên đường là LỚN NHẤT.`, en: `Grid ${m}×${n}. Find a path (0,0)→(${m - 1},${n - 1}) maximizing the MINIMUM value on it.` },
+  });
+
+  // Line 6: result = grid[0][0]
+  result = grid[0][0];
+  snap({
+    title: { vi: `line 6: result = grid[0][0] = ${result}`, en: `line 6: result = grid[0][0] = ${result}` },
+    codeLines: [6], current: [0, 0],
+    note: { vi: `result = giá trị nhỏ nhất gặp được cho tới giờ. Bắt đầu = ${result}.`, en: `result = smallest value seen so far. Starts at ${result}.` },
+  });
+
+  // Line 7: visited init
+  snap({
+    title: { vi: "line 7: visited = [[False]*n]*m", en: "line 7: visited = [[False]*n]*m" },
+    codeLines: [7],
+    note: { vi: "Mảng đánh dấu ô đã đưa vào heap.", en: "Marks cells already pushed to the heap." },
+  });
+
+  // Line 8: heap = [(-grid[0][0],0,0)]
+  heap.push([-grid[0][0], 0, 0]);
+  snap({
+    title: { vi: `line 8: heap = [(${-grid[0][0]}, 0, 0)]`, en: `line 8: heap = [(${-grid[0][0]}, 0, 0)]` },
+    codeLines: [8], current: [0, 0],
+    note: { vi: "Dùng max-heap: lưu -value để heapq (min-heap) lấy ra value LỚN NHẤT trước.", en: "Max-heap trick: store -value so heapq (a min-heap) pops the LARGEST value first." },
+  });
+
+  // Line 9: visited[0][0] = True
+  visited[0][0] = true;
+  snap({
+    title: { vi: "line 9: visited[0][0] = True", en: "line 9: visited[0][0] = True" },
+    codeLines: [9], current: [0, 0],
+    note: { vi: "Đánh dấu ô xuất phát đã vào heap.", en: "Mark the start cell as pushed." },
+  });
+
+  let done = false;
+  while (heap.length && !done) {
+    // Line 10: while heap
+    snap({
+      title: { vi: "line 10: while heap", en: "line 10: while heap" },
+      codeLines: [10],
+      note: { vi: `Heap còn ${heap.length} ô → tiếp tục.`, en: `Heap has ${heap.length} cells → continue.` },
+    });
+
+    // Line 11: val, r, c = heappop
+    const [negVal, r, c] = popMax();
+    const value = -negVal;
+    visited[r][c] = true;
+    snap({
+      title: { vi: `line 11: pop ô lớn nhất → (${r},${c}) value ${value}`, en: `line 11: pop largest → (${r},${c}) value ${value}` },
+      codeLines: [11], current: [r, c],
+      vars: [{ name: "val", value: negVal }, { name: "(r, c)", value: `(${r}, ${c})` }, { name: "value", value }],
+      note: { vi: `Lấy ra ô có value lớn nhất trong heap: (${r},${c}) = ${value}.`, en: `Pop the highest-value cell in the heap: (${r},${c}) = ${value}.` },
+    });
+
+    // Line 12: result = min(result, -val)
+    const oldResult = result;
+    result = Math.min(result, value);
+    snap({
+      title: { vi: `line 12: result = min(${oldResult}, ${value}) = ${result}`, en: `line 12: result = min(${oldResult}, ${value}) = ${result}` },
+      codeLines: [12], current: [r, c],
+      vars: [{ name: "result", value: result }],
+      note: { vi: `Cập nhật giá trị nhỏ nhất trên đường đã đi tới ô này → ${result}.`, en: `Update the minimum value along the path to this cell → ${result}.` },
+    });
+
+    // Line 13: if r == m-1 and c == n-1
+    const atEnd = r === m - 1 && c === n - 1;
+    snap({
+      title: { vi: `line 13: (${r},${c}) là góc phải-dưới? ${atEnd}`, en: `line 13: is (${r},${c}) bottom-right? ${atEnd}` },
+      codeLines: [13], current: [r, c],
+      vars: [{ name: "at target?", value: atEnd }],
+      note: {
+        vi: atEnd ? `Đã tới đích! Vì luôn mở rộng ô lớn nhất trước, result hiện tại chính là đáp án.` : `Chưa tới đích → mở rộng hàng xóm.`,
+        en: atEnd ? `Reached the target! Since we always expand the largest cell first, the current result is the answer.` : `Not the target yet → expand neighbours.`,
+      },
+    });
+    if (atEnd) {
+      const route = reconstruct(r, c);
+      const routeStr = route.map(([rr, cc]) => `(${rr},${cc})`).join(" → ");
+      const pathVals = route.map(([rr, cc]) => grid[rr][cc]);
+      // Line 14: return result — highlight the reconstructed winning path.
+      snap({
+        title: { vi: `line 14: return result = ${result}`, en: `line 14: return result = ${result}` },
+        codeLines: [14], route, final: true,
+        vars: [
+          { name: "answer", value: result },
+          { name: "path", value: routeStr },
+          { name: "path values", value: `[${pathVals.join(", ")}] → min = ${Math.min(...pathVals)}` },
+        ],
+        note: {
+          vi: `Đáp án = ${result}. Đường đi tối ưu (tô xanh, lần theo parent từ đích về (0,0)): ${routeStr}. Giá trị các ô = [${pathVals.join(", ")}], nhỏ nhất = ${Math.min(...pathVals)} = result.`,
+          en: `Answer = ${result}. Optimal path (green, traced via parents from target back to (0,0)): ${routeStr}. Cell values = [${pathVals.join(", ")}], minimum = ${Math.min(...pathVals)} = result.`,
+        },
+      });
+      done = true;
+      break;
+    }
+
+    // Line 15: for dr, dc in dirs
+    snap({
+      title: { vi: `line 15: for dr, dc in 4 hướng`, en: `line 15: for dr, dc in 4 directions` },
+      codeLines: [15], current: [r, c],
+      note: { vi: `Xét 4 hàng xóm của (${r},${c}).`, en: `Check the 4 neighbours of (${r},${c}).` },
+    });
+
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr;
+      const nc = c + dc;
+      const inBounds = nr >= 0 && nr < m && nc >= 0 && nc < n;
+      const isNew = inBounds && !visited[nr][nc];
+      snap({
+        title: { vi: `line 16-17: (${nr},${nc}) ${isNew ? "hợp lệ & mới" : inBounds ? "đã thăm" : "ngoài lưới"}`, en: `line 16-17: (${nr},${nc}) ${isNew ? "valid & new" : inBounds ? "visited" : "out of grid"}` },
+        codeLines: [16, 17], current: [r, c], neighbor: inBounds ? [nr, nc] : null,
+        vars: [{ name: "(nr, nc)", value: `(${nr}, ${nc})` }, { name: "in bounds?", value: inBounds }, { name: "new?", value: isNew }],
+        note: {
+          vi: isNew ? `(${nr},${nc}) trong lưới và chưa thăm → thêm vào heap (line 18-19).` : inBounds ? `(${nr},${nc}) đã thăm → bỏ qua.` : `(${nr},${nc}) ngoài lưới → bỏ qua.`,
+          en: isNew ? `(${nr},${nc}) is in-bounds and unvisited → push to heap (lines 18-19).` : inBounds ? `(${nr},${nc}) already visited → skip.` : `(${nr},${nc}) is out of grid → skip.`,
+        },
+      });
+      if (isNew) {
+        visited[nr][nc] = true;
+        parent[`${nr},${nc}`] = [r, c];
+        heap.push([-grid[nr][nc], nr, nc]);
+        snap({
+          title: { vi: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}`, en: `line 18-19: push (${nr},${nc}) value ${grid[nr][nc]}` },
+          codeLines: [18, 19], current: [r, c], neighbor: [nr, nc],
+          note: { vi: `Đánh dấu (${nr},${nc}) đã thăm, ghi (${nr},${nc})←(${r},${c}) và đẩy value ${grid[nr][nc]} vào max-heap.`, en: `Mark (${nr},${nc}) visited, record parent (${nr},${nc})←(${r},${c}), and push value ${grid[nr][nc]} to the max-heap.` },
+        });
+      }
+    }
+  }
+
+  if (!done) {
+    // Line 20: return result
+    snap({
+      title: { vi: `line 20: return result = ${result}`, en: `line 20: return result = ${result}` },
+      codeLines: [20], final: true,
+      vars: [{ name: "answer", value: result }],
+      note: { vi: `Đáp án = ${result}.`, en: `Answer = ${result}.` },
+    });
+  }
+
+  return { original: grid, answer: result, steps };
+}
+
+/**
+ * LeetCode 2368: Reachable Nodes With Restrictions.
+ * Iterative DFS from node 0 over an undirected tree, skipping restricted
+ * (blocked) and already-visited neighbours. Count = number of reached nodes.
+ * One code line highlighted per step; restricted nodes drawn in red.
+ */
+function buildSteps2368(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 7;
+  const restricted = String(params && params.restricted !== undefined ? params.restricted : "4,5")
+    .split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x));
+  const edgeList = String(input || "")
+    .split(";").map((s) => s.trim()).filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+
+  const steps = [];
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, id) => id);
+  const allEdges = [];
+  const blocked = new Set(restricted);
+
+  function visitedList(visited) {
+    return allNodes.filter((id) => visited.has(id));
+  }
+
+  function makeGraph(hlNodes = [], hlEdges = [], visited = []) {
+    const annotations = {};
+    for (const b of restricted) annotations[b] = "🚫";
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visited,
+      restrictedNodes: [...restricted],
+      annotations,
+    };
+  }
+
+  function push({ title, hlNodes, hlEdges, visited, codeLines, vars, note, final = false }) {
+    steps.push({
+      title, arr: [],
+      graph: makeGraph(hlNodes, hlEdges, visited),
+      highlight: [], mark: [], final, codeLines, vars, note,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: DFS từ node 0, tránh node bị cấm", en: "Idea: DFS from node 0, avoid restricted nodes" },
+    hlNodes: [0],
+    codeLines: [4],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edgeList.length }, { name: "restricted", value: `[${restricted.join(", ")}]` }],
+    note: {
+      vi: `Cây vô hướng ${n} node. Đếm số node tới được từ node 0 mà không đi qua node bị cấm (đỏ). Node 0 chắc chắn không bị cấm.`,
+      en: `Undirected tree with ${n} nodes. Count nodes reachable from node 0 without stepping on restricted (red) nodes. Node 0 is guaranteed not restricted.`,
+    },
+  });
+
+  // Line 5: blocked = set(restricted)
+  push({
+    title: { vi: `line 5: blocked = set(restricted) = {${restricted.join(", ")}}`, en: `line 5: blocked = set(restricted) = {${restricted.join(", ")}}` },
+    hlNodes: restricted,
+    codeLines: [5],
+    vars: [{ name: "blocked", value: `{${restricted.join(", ")}}` }],
+    note: { vi: `Các node bị cấm (tô đỏ): ${restricted.join(", ") || "(không có)"}. Dùng set để kiểm tra O(1).`, en: `Restricted nodes (red): ${restricted.join(", ") || "(none)"}. Use a set for O(1) lookup.` },
+  });
+
+  // Line 6: adj = defaultdict(list)
+  push({
+    title: { vi: "line 6: adj = defaultdict(list)", en: "line 6: adj = defaultdict(list)" },
+    codeLines: [6],
+    vars: [{ name: "adj", value: "{}" }],
+    note: { vi: "Tạo adjacency list rỗng cho đồ thị vô hướng.", en: "Create an empty adjacency list for the undirected graph." },
+  });
+
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `line 7: a, b = ${a}, ${b}`, en: `line 7: a, b = ${a}, ${b}` },
+      hlNodes: [a, b],
+      codeLines: [7],
+      vars: [{ name: "a", value: a }, { name: "b", value: b }],
+      note: { vi: `Xét cạnh vô hướng (${a}, ${b}).`, en: `Process undirected edge (${a}, ${b}).` },
+    });
+    adj[a].push(b);
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "", undirected: true });
+    push({
+      title: { vi: `line 8-9: adj[${a}]+=${b}, adj[${b}]+=${a}`, en: `line 8-9: adj[${a}]+=${b}, adj[${b}]+=${a}` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [8, 9],
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }, { name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Đồ thị vô hướng nên thêm cả hai chiều.`, en: `Undirected graph, so add both directions.` },
+    });
+  }
+
+  const visited = new Set([0]);
+  // Line 10: visited = {0}
+  push({
+    title: { vi: "line 10: visited = {0}", en: "line 10: visited = {0}" },
+    hlNodes: [0],
+    visited: visitedList(visited),
+    codeLines: [10],
+    vars: [{ name: "visited", value: "{0}" }],
+    note: { vi: "Bắt đầu đã thăm node 0.", en: "Start with node 0 visited." },
+  });
+
+  const stack = [0];
+  // Line 11: stack = [0]
+  push({
+    title: { vi: "line 11: stack = [0]", en: "line 11: stack = [0]" },
+    hlNodes: [0],
+    visited: visitedList(visited),
+    codeLines: [11],
+    vars: [{ name: "stack", value: "[0]" }],
+    note: { vi: "Đưa node 0 vào stack DFS.", en: "Push node 0 onto the DFS stack." },
+  });
+
+  let count = 0;
+  // Line 12: count = 0
+  push({
+    title: { vi: "line 12: count = 0", en: "line 12: count = 0" },
+    visited: visitedList(visited),
+    codeLines: [12],
+    vars: [{ name: "count", value: 0 }],
+    note: { vi: "count = số node đã tới được.", en: "count = number of reachable nodes." },
+  });
+
+  while (stack.length) {
+    // Line 13: while stack
+    push({
+      title: { vi: "line 13: while stack", en: "line 13: while stack" },
+      visited: visitedList(visited),
+      codeLines: [13],
+      vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: "Còn node trong stack → tiếp tục.", en: "Stack is non-empty → continue." },
+    });
+
+    // Line 14: node = stack.pop()
+    const node = stack.pop();
+    push({
+      title: { vi: `line 14: node = stack.pop() = ${node}`, en: `line 14: node = stack.pop() = ${node}` },
+      hlNodes: [node],
+      visited: visitedList(visited),
+      codeLines: [14],
+      vars: [{ name: "node", value: node }, { name: "stack", value: `[${stack.join(", ")}]` }],
+      note: { vi: `Lấy node ${node} ra xử lý.`, en: `Pop node ${node} to process.` },
+    });
+
+    // Line 15: count += 1
+    count += 1;
+    push({
+      title: { vi: `line 15: count += 1 → ${count}`, en: `line 15: count += 1 → ${count}` },
+      hlNodes: [node],
+      visited: visitedList(visited),
+      codeLines: [15],
+      vars: [{ name: "count", value: count }],
+      note: { vi: `Đã tới node ${node} → count = ${count}.`, en: `Reached node ${node} → count = ${count}.` },
+    });
+
+    // Line 16: for nb in adj[node]
+    push({
+      title: { vi: `line 16: for nb in adj[${node}] = [${adj[node].join(", ")}]`, en: `line 16: for nb in adj[${node}] = [${adj[node].join(", ")}]` },
+      hlNodes: [node],
+      hlEdges: adj[node].map((nb) => [node, nb]),
+      visited: visitedList(visited),
+      codeLines: [16],
+      vars: [{ name: "neighbors", value: `[${adj[node].join(", ")}]` }],
+      note: { vi: `Duyệt hàng xóm của ${node}.`, en: `Iterate over ${node}'s neighbours.` },
+    });
+
+    for (const nb of adj[node]) {
+      const seen = visited.has(nb);
+      const isBlocked = blocked.has(nb);
+      const ok = !seen && !isBlocked;
+      push({
+        title: { vi: `line 17: nb=${nb} → ${ok ? "đi được" : "bỏ qua"}`, en: `line 17: nb=${nb} → ${ok ? "take it" : "skip"}` },
+        hlNodes: [node, nb],
+        hlEdges: [[node, nb]],
+        visited: visitedList(visited),
+        codeLines: [17],
+        vars: [
+          { name: "nb", value: nb },
+          { name: "in visited?", value: seen },
+          { name: "in blocked?", value: isBlocked },
+        ],
+        note: {
+          vi: ok
+            ? `${nb} chưa thăm và không bị cấm → thêm vào (line 18-19).`
+            : isBlocked
+              ? `${nb} bị CẤM (đỏ) → bỏ qua, không đi vào.`
+              : `${nb} đã thăm rồi → bỏ qua.`,
+          en: ok
+            ? `${nb} is unvisited and not blocked → add it (lines 18-19).`
+            : isBlocked
+              ? `${nb} is RESTRICTED (red) → skip, never enter.`
+              : `${nb} already visited → skip.`,
+        },
+      });
+      if (ok) {
+        visited.add(nb);
+        stack.push(nb);
+        push({
+          title: { vi: `line 18-19: visited.add(${nb}); stack.append(${nb})`, en: `line 18-19: visited.add(${nb}); stack.append(${nb})` },
+          hlNodes: [nb],
+          hlEdges: [[node, nb]],
+          visited: visitedList(visited),
+          codeLines: [18, 19],
+          vars: [{ name: "visited", value: `{${visitedList(visited).join(", ")}}` }, { name: "stack", value: `[${stack.join(", ")}]` }],
+          note: { vi: `Đánh dấu ${nb} đã thăm và đẩy vào stack.`, en: `Mark ${nb} visited and push it onto the stack.` },
+        });
+      }
+    }
+  }
+
+  // Line 20: return count
+  push({
+    title: { vi: `line 20: return count = ${count}`, en: `line 20: return count = ${count}` },
+    visited: visitedList(visited),
+    final: true,
+    codeLines: [20],
+    vars: [{ name: "answer", value: count }],
+    note: {
+      vi: `Stack rỗng. Tới được ${count} node từ node 0 mà không qua node bị cấm.`,
+      en: `Stack empty. Reached ${count} nodes from node 0 without any restricted node.`,
+    },
+  });
+
+  return { n, edges: edgeList, restricted, answer: count, steps };
 }
 
 /**
@@ -16757,6 +17474,188 @@ module.exports = {
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
     builder: buildSteps2685,
   },
+  1584: {
+    id: 1584,
+    difficulty: "medium",
+    slug: "min-cost-to-connect-all-points",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" }],
+    title: { vi: "Min Cost to Connect All Points", en: "Min Cost to Connect All Points" },
+    titleVi: { vi: "Chi phí nhỏ nhất nối tất cả điểm (MST - Prim)", en: "Min cost to connect all points (MST - Prim)" },
+    statement: {
+      vi:
+        "Cho các điểm trên mặt phẳng. Chi phí nối 2 điểm = khoảng cách Manhattan |xi-xj|+|yi-yj|. " +
+        "Tìm chi phí nhỏ nhất để nối tất cả các điểm sao cho có đúng một đường đi giữa mọi cặp điểm (Cây khung nhỏ nhất). " +
+        "Nhập điểm kiểu LeetCode: [[0,0],[2,2],[3,10]] (hoặc dạng '0,0;2,2;3,10').",
+      en:
+        "Given points on a plane, the cost to connect two points is their Manhattan distance |xi-xj|+|yi-yj|. " +
+        "Return the minimum cost to connect all points so exactly one path exists between any two (Minimum Spanning Tree). " +
+        "Enter points in LeetCode form: [[0,0],[2,2],[3,10]] (or as '0,0;2,2;3,10').",
+    },
+    defaultInput: "[[0,0],[2,2],[3,10],[5,2],[7,0]]",
+    inputKind: "string",
+    inputLabel: { vi: "points (vd [[0,0],[2,2],[3,10]])", en: "points (e.g. [[0,0],[2,2],[3,10]])" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Đây là bài Cây khung nhỏ nhất (MST): coi mỗi điểm là 1 đỉnh, cạnh giữa 2 điểm có trọng số = khoảng cách Manhattan.", en: "This is a Minimum Spanning Tree (MST): each point is a node, each edge weight is the Manhattan distance." },
+      { vi: "Prim: bắt đầu từ điểm 0, dùng min-heap giữ các cạnh (chi phí, đỉnh, cha).", en: "Prim: start from point 0, use a min-heap of edges (cost, node, parent)." },
+      { vi: "Liên tục lấy cạnh rẻ nhất tới một điểm CHƯA nối; nếu điểm đã nối thì bỏ qua (cạnh thừa).", en: "Repeatedly take the cheapest edge to an UNCONNECTED point; skip if already connected (redundant edge)." },
+      { vi: "Khi nhận điểm mới, cộng chi phí và đẩy các cạnh từ nó tới các điểm còn lại. Dừng khi đã nối đủ n điểm.", en: "When a new point joins, add its cost and push its edges to the rest. Stop when all n points are connected." },
+    ],
+    complexity: {
+      time: "O(n² log n)",
+      space: "O(n²)",
+      note: {
+        vi: "Đồ thị đầy đủ n điểm có O(n²) cạnh; mỗi thao tác heap O(log). Với n nhỏ Prim kiểu này rất gọn.",
+        en: "The complete graph on n points has O(n²) edges; each heap op is O(log). For small n this Prim variant is compact.",
+      },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def minCostConnectPoints(self, points):",
+      "        n = len(points)",
+      "        visited = [False] * n",
+      "        heap = [(0, 0, -1)]  # (cost, node, parent)",
+      "        total = 0",
+      "        edges_used = 0",
+      "        while edges_used < n:",
+      "            cost, i, parent = heapq.heappop(heap)",
+      "            if visited[i]:",
+      "                continue",
+      "            visited[i] = True",
+      "            total += cost",
+      "            edges_used += 1",
+      "            for j in range(n):",
+      "                if not visited[j]:",
+      "                    d = abs(points[i][0]-points[j][0]) + abs(points[i][1]-points[j][1])",
+      "                    heapq.heappush(heap, (d, j, i))",
+      "        return total",
+    ],
+    builder: buildSteps1584,
+  },
+  1102: {
+    id: 1102,
+    difficulty: "medium",
+    premium: true,
+    slug: "path-with-maximum-minimum-value",
+    category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
+    title: { vi: "Path With Maximum Minimum Value", en: "Path With Maximum Minimum Value" },
+    titleVi: { vi: "Đường có giá trị nhỏ nhất lớn nhất (max-heap)", en: "Path with maximum minimum value (max-heap)" },
+    statement: {
+      vi:
+        "Cho lưới số m×n. Tìm đường đi từ (0,0) đến (m-1,n-1) (đi 4 hướng) sao cho GIÁ TRỊ NHỎ NHẤT trên đường là LỚN NHẤT có thể. " +
+        "Trả về giá trị đó. Nhập lưới kiểu LeetCode: [[5,4,5],[1,2,6],[7,4,6]] (hoặc dạng '5,4,5|1,2,6').",
+      en:
+        "Given an m×n integer grid, find a path from (0,0) to (m-1,n-1) (4-directional) that maximizes the MINIMUM value on the path. " +
+        "Return that value. Enter the grid in LeetCode form: [[5,4,5],[1,2,6],[7,4,6]] (or as '5,4,5|1,2,6').",
+    },
+    defaultInput: "[[5,4,5],[1,2,6],[7,4,6]]",
+    inputKind: "string",
+    inputLabel: { vi: "grid (vd [[5,4,5],[1,2,6],[7,4,6]])", en: "grid (e.g. [[5,4,5],[1,2,6],[7,4,6]])" },
+    singleInput: true,
+    extraParams: [],
+    approach: [
+      { vi: "Best-first search bằng max-heap: luôn mở rộng ô có value lớn nhất trong các ô tới được.", en: "Best-first search with a max-heap: always expand the reachable cell with the largest value." },
+      { vi: "result = giá trị nhỏ nhất từng lấy ra khỏi heap (cập nhật khi pop).", en: "result = smallest value popped from the heap so far (updated on each pop)." },
+      { vi: "Khi pop được ô (m-1,n-1) thì result chính là đáp án — vì mọi ô pop trước đó đều có value ≥ nó.", en: "When cell (m-1,n-1) is popped, result is the answer — every cell popped before it had a value ≥ it." },
+      { vi: "Mẹo: lưu -value để dùng min-heap của Python làm max-heap.", en: "Trick: store -value to use Python's min-heap as a max-heap." },
+    ],
+    complexity: {
+      time: "O(m·n·log(m·n))",
+      space: "O(m·n)",
+      note: {
+        vi: "Mỗi ô vào/ra heap một lần; mỗi thao tác heap O(log(m·n)).",
+        en: "Each cell enters/leaves the heap once; each heap op is O(log(m·n)).",
+      },
+    },
+    code: [
+      "import heapq",
+      "",
+      "class Solution:",
+      "    def maximumMinimumPath(self, grid):",
+      "        m, n = len(grid), len(grid[0])",
+      "        result = grid[0][0]",
+      "        visited = [[False] * n for _ in range(m)]",
+      "        heap = [(-grid[0][0], 0, 0)]",
+      "        visited[0][0] = True",
+      "        while heap:",
+      "            val, r, c = heapq.heappop(heap)",
+      "            result = min(result, -val)",
+      "            if r == m - 1 and c == n - 1:",
+      "                return result",
+      "            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < m and 0 <= nc < n and not visited[nr][nc]:",
+      "                    visited[nr][nc] = True",
+      "                    heapq.heappush(heap, (-grid[nr][nc], nr, nc))",
+      "        return result",
+    ],
+    builder: buildSteps1102,
+  },
+  2368: {
+    id: 2368,
+    difficulty: "medium",
+    slug: "reachable-nodes-with-restrictions",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    title: { vi: "Reachable Nodes With Restrictions", en: "Reachable Nodes With Restrictions" },
+    titleVi: { vi: "Đếm node tới được khi có node bị cấm", en: "Count reachable nodes with restrictions" },
+    statement: {
+      vi:
+        "Cho cây vô hướng n node (0..n-1) qua danh sách cạnh, và danh sách node bị cấm `restricted`. " +
+        "Xuất phát từ node 0 (không bao giờ bị cấm), đếm số node tới được mà không đi qua node bị cấm. Nhập cạnh 'a,b' cách bởi ';'.",
+      en:
+        "Given an undirected tree of n nodes (0..n-1) via an edge list, plus a `restricted` list. " +
+        "Starting from node 0 (never restricted), count how many nodes are reachable without visiting any restricted node. Enter edges as 'a,b' separated by ';'.",
+    },
+    defaultInput: "0,1;1,2;3,1;4,0;0,5;5,6",
+    inputKind: "string",
+    inputLabel: { vi: "edges (a,b; ngăn bởi ;)", en: "edges (a,b; semicolon separated)" },
+    extraParams: [
+      { key: "n", label: { vi: "n (số node)", en: "n (nodes)" }, default: 7 },
+      { key: "restricted", label: { vi: "restricted (cách bởi ,)", en: "restricted (comma separated)" }, default: "4,5" },
+    ],
+    approach: [
+      { vi: "blocked = set(restricted) để kiểm tra O(1).", en: "blocked = set(restricted) for O(1) lookup." },
+      { vi: "Xây adjacency list từ danh sách cạnh (đồ thị vô hướng).", en: "Build an adjacency list from the edge list (undirected graph)." },
+      { vi: "DFS (dùng stack) từ node 0; bỏ qua hàng xóm đã thăm hoặc bị cấm.", en: "DFS (using a stack) from node 0; skip visited or restricted neighbours." },
+      { vi: "Đếm số node lấy ra khỏi stack = số node tới được.", en: "Count nodes popped from the stack = number of reachable nodes." },
+    ],
+    complexity: {
+      time: "O(n + E)",
+      space: "O(n + E)",
+      note: {
+        vi: "Xây adjacency list O(E). DFS thăm mỗi node/cạnh tối đa một lần → O(n+E). Cây nên E = n-1.",
+        en: "Build adjacency list O(E). DFS visits each node/edge at most once → O(n+E). Tree, so E = n-1.",
+      },
+    },
+    code: [
+      "from collections import defaultdict",
+      "",
+      "class Solution:",
+      "    def reachableNodes(self, n, edges, restricted):",
+      "        blocked = set(restricted)",
+      "        adj = defaultdict(list)",
+      "        for a, b in edges:",
+      "            adj[a].append(b)",
+      "            adj[b].append(a)",
+      "        visited = {0}",
+      "        stack = [0]",
+      "        count = 0",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            count += 1",
+      "            for nb in adj[node]:",
+      "                if nb not in visited and nb not in blocked:",
+      "                    visited.add(nb)",
+      "                    stack.append(nb)",
+      "        return count",
+    ],
+    builder: buildSteps2368,
+  },
   1971: {
     id: 1971,
     difficulty: "easy",
@@ -17561,21 +18460,22 @@ module.exports = {
     difficulty: "hard",
     slug: "minimum-cost-to-make-at-least-one-valid-path-in-a-grid",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Minimum Cost to Make at Least One Valid Path in a Grid", en: "Minimum Cost to Make at Least One Valid Path in a Grid" },
     titleVi: { vi: "Chi phí nhỏ nhất tạo đường đi hợp lệ", en: "Min cost for a valid grid path" },
     statement: {
       vi:
         "Lưới m×n, mỗi ô có mũi tên: 1=phải, 2=trái, 3=xuống, 4=lên. " +
         "Đi từ (0,0) đến (m-1,n-1). Đi theo mũi tên = chi phí 0, đổi hướng mũi tên = chi phí 1. " +
-        "Tìm chi phí nhỏ nhất (0-1 BFS). Nhập lưới: hàng cách bởi |, giá trị cách bởi dấu phẩy.",
+        "Tìm chi phí nhỏ nhất (0-1 BFS). Nhập lưới kiểu LeetCode: [[1,1,3],[3,2,2],[1,1,4]] (hoặc dạng '1,1,3|3,2,2').",
       en:
         "Grid m×n, each cell has an arrow: 1=right, 2=left, 3=down, 4=up. " +
         "Travel from (0,0) to (m-1,n-1). Following the arrow costs 0, changing it costs 1. " +
-        "Find minimum cost (0-1 BFS). Enter grid: rows separated by |, values comma-separated.",
+        "Find minimum cost (0-1 BFS). Enter grid in LeetCode form: [[1,1,3],[3,2,2],[1,1,4]] (or as '1,1,3|3,2,2').",
     },
-    defaultInput: "1,1,3|3,2,2|1,1,4",
+    defaultInput: "[[1,1,3],[3,2,2],[1,1,4]]",
     inputKind: "string",
-    inputLabel: { vi: "Lưới (hàng cách bởi |)", en: "Grid (rows separated by |)" },
+    inputLabel: { vi: "Lưới (vd [[1,1,3],[3,2,2],[1,1,4]])", en: "Grid (e.g. [[1,1,3],[3,2,2],[1,1,4]])" },
     extraParams: [],
     approach: [
       { vi: "Mỗi ô là một nút. Đi theo mũi tên có sẵn = chi phí 0, đổi hướng = chi phí 1.", en: "Each cell is a node. Following the existing arrow = cost 0, changing direction = cost 1." },
@@ -17628,6 +18528,7 @@ module.exports = {
     difficulty: "hard",
     slug: "minimum-obstacle-removal-to-reach-corner",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Minimum Obstacle Removal to Reach Corner", en: "Minimum Obstacle Removal to Reach Corner" },
     titleVi: { vi: "Xóa ít obstacle nhất để tới góc", en: "Minimum obstacle removal to reach the corner" },
     statement: {
@@ -17689,6 +18590,7 @@ module.exports = {
     difficulty: "hard",
     slug: "minimum-time-to-visit-a-cell-in-a-grid",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Minimum Time to Visit a Cell In a Grid", en: "Minimum Time to Visit a Cell In a Grid" },
     titleVi: { vi: "Thời gian nhỏ nhất để tới một ô trong grid", en: "Minimum time to visit a cell in a grid" },
     statement: {
@@ -17754,6 +18656,7 @@ module.exports = {
     difficulty: "medium",
     slug: "find-minimum-time-to-reach-last-room-i",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Find Minimum Time to Reach Last Room I", en: "Find Minimum Time to Reach Last Room I" },
     titleVi: { vi: "Thời gian nhỏ nhất để tới phòng cuối I", en: "Minimum time to reach the last room I" },
     statement: {
@@ -17813,6 +18716,7 @@ module.exports = {
     difficulty: "medium",
     slug: "find-minimum-time-to-reach-last-room-ii",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Find Minimum Time to Reach Last Room II", en: "Find Minimum Time to Reach Last Room II" },
     titleVi: { vi: "Thời gian nhỏ nhất để tới phòng cuối II", en: "Minimum time to reach the last room II" },
     statement: {
@@ -18248,6 +19152,7 @@ module.exports = {
     difficulty: "medium",
     slug: "path-with-maximum-probability",
     category: { key: "graph", vi: "Đồ thị", en: "Graph" },
+    tags: [{ key: "dijkstra", vi: "Dijkstra", en: "Dijkstra" }],
     title: { vi: "Path with Maximum Probability", en: "Path with Maximum Probability" },
     titleVi: { vi: "Đường đi có xác suất lớn nhất", en: "Path with maximum probability" },
     statement: {
