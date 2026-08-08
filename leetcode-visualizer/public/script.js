@@ -9233,6 +9233,120 @@ function renderAverageWindowView(step) {
   </div>`;
 }
 
+function renderPrefixAverageView(step) {
+  const view = step.prefixAverageView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const k = Number(view.k) || 1;
+  const vi = lang === "vi";
+  const phaseIndex = { initialize: 0, build: 1, query: 2, done: 3 }[view.phase] ?? 0;
+  const labels = vi
+    ? ["1 · Đặt prefix[0] = 0", "2 · Dựng mảng prefix", "3 · Trừ hai mốc prefix"]
+    : ["1 · Set prefix[0] = 0", "2 · Build the prefix array", "3 · Subtract two prefix marks"];
+  const phases = labels.map((label, index) => {
+    const done = view.phase === "done" || index < phaseIndex;
+    const state = done ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const format = (value, empty = "—") => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return empty;
+    return String(Number(Number(value).toFixed(5)));
+  };
+  const inWindow = (index) => (
+    Number.isInteger(view.windowLeft)
+    && Number.isInteger(view.windowRight)
+    && index >= view.windowLeft
+    && index < view.windowRight
+  );
+  const inBest = (index) => (
+    Number.isInteger(view.bestLeft)
+    && Number.isInteger(view.bestRight)
+    && index >= view.bestLeft
+    && index < view.bestRight
+  );
+  const numsHtml = nums.map((value, index) => {
+    const classes = ["prefix643-cell", "num"];
+    if (inWindow(index)) classes.push("window");
+    if (inBest(index)) classes.push("best");
+    if (index === view.activeNumIndex) classes.push("active");
+    const markers = [];
+    if (index === view.activeNumIndex) markers.push("num");
+    if (index === view.windowLeft) markers.push("L");
+    if (index === view.windowRight - 1) markers.push("R−1");
+    return `<span class="${classes.join(" ")}"><small>nums[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${markers.join(" · ")}</em></span>`;
+  }).join("");
+  const prefixHtml = prefix.map((value, index) => {
+    const classes = ["prefix643-cell", "prefix"];
+    if (value !== null) classes.push("known");
+    if (index === view.activePrefixFrom) classes.push("from");
+    if (index === view.activePrefixTo) classes.push("to");
+    if (index === view.windowLeft) classes.push("left-boundary");
+    if (index === view.windowRight) classes.push("right-boundary");
+    if (index === view.bestLeft || index === view.bestRight) classes.push("best-boundary");
+    const marker = index === view.windowLeft
+      ? "LEFT"
+      : index === view.windowRight
+        ? "RIGHT"
+        : index === view.activePrefixFrom
+          ? "FROM"
+          : index === view.activePrefixTo
+            ? "TO"
+            : "";
+    return `<span class="${classes.join(" ")}"><small>prefix[${index}]</small><strong>${value === null ? "_" : escapeHtml(String(value))}</strong><em>${marker}</em></span>`;
+  }).join("");
+
+  let actionHtml;
+  if (view.event === "enter") {
+    actionHtml = `<div class="prefix643-formula"><small>${vi ? "ĐỊNH NGHĨA" : "DEFINITION"}</small><strong>prefix[t] = sum(nums[0..t−1])</strong></div>`;
+  } else if (view.event === "init-prefix") {
+    actionHtml = `<div class="prefix643-formula"><small>${vi ? "MỐC GỐC" : "BASE MARK"}</small><code>prefix[0] = 0</code><span>${vi ? "0 phần tử có tổng bằng 0" : "zero values have sum zero"}</span></div>`;
+  } else if (view.event === "prefix-loop") {
+    actionHtml = `<div class="prefix643-build"><span><small>FROM</small><strong>prefix[${view.activePrefixFrom}] = ${format(prefix[view.activePrefixFrom])}</strong></span><b>+</b><span><small>NUM</small><strong>nums[${view.activeNumIndex}] = ${format(nums[view.activeNumIndex])}</strong></span><b>→</b><span><small>TO</small><strong>prefix[${view.activePrefixTo}] = ?</strong></span></div>`;
+  } else if (view.event === "prefix-assign") {
+    actionHtml = `<div class="prefix643-formula build"><small>prefix[i + 1] = prefix[i] + num</small><code>${format(prefix[view.activePrefixFrom])} + (${format(nums[view.activeNumIndex])}) = ${format(prefix[view.activePrefixTo])}</code></div>`;
+  } else if (view.event === "init-record") {
+    actionHtml = `<div class="prefix643-formula record"><small>${vi ? "KHỞI TẠO KỶ LỤC" : "INITIALIZE RECORD"}</small><code>max_sum = −∞</code></div>`;
+  } else if (["window-loop", "window-sum"].includes(view.event)) {
+    const hasSum = view.windowSum !== null;
+    actionHtml = `<div class="prefix643-query">
+      <span class="right"><small>RIGHT PREFIX</small><strong>prefix[${view.windowRight}]</strong><b>${format(prefix[view.windowRight])}</b></span>
+      <div><code>${format(prefix[view.windowRight])} − ${format(prefix[view.windowLeft])}${hasSum ? ` = ${format(view.windowSum)}` : ""}</code><strong>${vi ? `nums[${view.windowLeft}..${view.windowRight - 1}]` : `nums[${view.windowLeft}..${view.windowRight - 1}]`}</strong></div>
+      <span class="left"><small>LEFT PREFIX</small><strong>prefix[${view.windowLeft}]</strong><b>${format(prefix[view.windowLeft])}</b></span>
+    </div>`;
+  } else if (["compare", "apply-max"].includes(view.event)) {
+    const update = view.shouldUpdate === true;
+    const previous = view.recordBefore === null ? "−∞" : format(view.recordBefore);
+    actionHtml = `<div class="prefix643-compare">
+      <span><small>${vi ? "TỔNG CỬA SỔ" : "WINDOW SUM"}</small><strong>${format(view.windowSum)}</strong><b>avg ${format(view.currentAverage)}</b></span>
+      <div><code>${format(view.windowSum)} ${update ? ">" : "≤"} ${previous}</code><strong class="${update ? "update" : "keep"}">${update ? "UPDATE" : "KEEP"}</strong></div>
+      <span><small>${vi ? "KỶ LỤC TRƯỚC" : "PREVIOUS RECORD"}</small><strong>${previous}</strong><b>${view.recordBefore === null ? "no window yet" : `avg ${format(view.recordBefore / k)}`}</b></span>
+    </div>`;
+  } else {
+    actionHtml = `<div class="prefix643-formula result"><small>return max_sum / k</small><code>${format(view.maxSum)} / ${k} = ${format(view.maxAverage)}</code></div>`;
+  }
+
+  const currentRange = Number.isInteger(view.windowLeft) ? `[${view.windowLeft}..${view.windowRight - 1}]` : "—";
+  const bestRange = Number.isInteger(view.bestLeft) ? `[${view.bestLeft}..${view.bestRight - 1}]` : "—";
+  const windows = Array.isArray(view.evaluatedWindows) ? view.evaluatedWindows : [];
+  const historyHtml = windows.length
+    ? windows.map((window, index) => `<span class="${window.isBest ? "best" : ""}${window.left === view.windowLeft && window.right === view.windowRight ? " current" : ""}"><small>#${index + 1} · [${window.left}..${window.right - 1}]</small><strong>sum ${format(window.sum)}</strong><b>avg ${format(window.average)}</b>${window.isBest ? "<em>BEST</em>" : ""}</span>`).join("")
+    : `<em>${vi ? "Chưa truy vấn cửa sổ" : "No queried window yet"}</em>`;
+
+  $("treeView").innerHTML = `<div class="prefix643-viz">
+    <div class="avg643-phases">${phases}</div>
+    <div class="prefix643-rule"><strong>PREFIX SUM</strong><span>sum(left..right−1) = prefix[right] − prefix[left]</span></div>
+    <section class="prefix643-section"><header><strong>NUMS</strong><span>${vi ? "phần tử gốc" : "original values"}</span></header><div class="prefix643-row nums">${numsHtml}</div></section>
+    <section class="prefix643-section"><header><strong>PREFIX</strong><span>${vi ? "n + 1 mốc tổng tích lũy" : "n + 1 cumulative-sum marks"}</span></header><div class="prefix643-row prefix">${prefixHtml}</div></section>
+    <div class="prefix643-legend"><span><i class="window"></i>${vi ? "cửa sổ hiện tại" : "current window"}</span><span><i class="left"></i>prefix[left]</span><span><i class="right"></i>prefix[right]</span><span><i class="best"></i>best</span></div>
+    ${actionHtml}
+    <div class="avg643-stats">
+      <span><small>${vi ? "CỬA SỔ HIỆN TẠI" : "CURRENT WINDOW"}</small><strong>${currentRange}</strong><b>sum ${format(view.windowSum)} · avg ${format(view.currentAverage)}</b></span>
+      <span><small>${vi ? "CỬA SỔ TỐT NHẤT" : "BEST WINDOW"}</small><strong>${bestRange}</strong><b>max_sum ${format(view.maxSum)} · avg ${format(view.maxAverage)}</b></span>
+    </div>
+    <div class="avg643-history"><header><strong>${vi ? "CÁC CỬA SỔ ĐÃ TRUY VẤN" : "QUERIED WINDOWS"}</strong><span>prefix[right] − prefix[left]</span></header><div>${historyHtml}</div></div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -9256,6 +9370,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.prefixAverageView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefixAverageView(step);
   } else if (step.averageWindowView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

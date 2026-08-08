@@ -1243,6 +1243,10 @@ function buildSteps1208(s, params) {
  * Keep the sum of one fixed-size window and slide it one position at a time.
  */
 function buildSteps643(input, params) {
+  if (Number(params && params.approach) === 2) {
+    return buildSteps643Prefix(input, params);
+  }
+
   const nums = Array.isArray(input) ? input.map(Number) : [];
   const k = Number(params && params.k);
   if (!nums.length || !Number.isInteger(k) || k < 1 || k > nums.length) {
@@ -1512,6 +1516,271 @@ function buildSteps643(input, params) {
   });
 
   return { original: nums, k, answer, steps };
+}
+
+/**
+ * LeetCode 643, approach 2: prefix sums.
+ * prefix[right] - prefix[left] gives the sum of nums[left..right-1].
+ */
+function buildSteps643Prefix(input, params) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const k = Number(params && params.k);
+  if (!nums.length || !Number.isInteger(k) || k < 1 || k > nums.length) {
+    throw new Error("k must be an integer between 1 and nums.length");
+  }
+
+  const steps = [];
+  const prefix = new Array(nums.length + 1).fill(null);
+  const evaluatedWindows = [];
+  const format = (value) => Number(value.toFixed(5));
+  let activeNumIndex = null;
+  let activePrefixFrom = null;
+  let activePrefixTo = null;
+  let windowLeft = null;
+  let windowRight = null;
+  let windowSum = null;
+  let maxSum = null;
+  let recordBefore = null;
+  let bestLeft = null;
+  let bestRight = null;
+  let shouldUpdate = null;
+
+  const phaseFor = (event) => {
+    if (["enter", "init-prefix"].includes(event)) return "initialize";
+    if (["prefix-loop", "prefix-assign"].includes(event)) return "build";
+    if (["init-record", "window-loop", "window-sum", "compare", "apply-max"].includes(event)) return "query";
+    return "done";
+  };
+  const makeView = (event, overrides = {}) => ({
+    event,
+    phase: phaseFor(event),
+    nums: [...nums],
+    k,
+    prefix: [...prefix],
+    activeNumIndex,
+    activePrefixFrom,
+    activePrefixTo,
+    windowLeft,
+    windowRight,
+    windowSum,
+    currentAverage: windowSum === null ? null : windowSum / k,
+    maxSum,
+    maxAverage: maxSum === null ? null : maxSum / k,
+    recordBefore,
+    bestLeft,
+    bestRight,
+    shouldUpdate,
+    evaluatedWindows: evaluatedWindows.map((window) => ({ ...window })),
+    ...overrides,
+  });
+  const variables = (extra = []) => {
+    const values = [
+      { name: "k", value: k },
+      { name: "prefix", value: `[${prefix.map((value) => value === null ? "_" : value).join(", ")}]` },
+    ];
+    if (windowSum !== null) values.push({ name: "window_sum", value: windowSum });
+    if (maxSum !== null) values.push({ name: "max_sum", value: maxSum });
+    return [...values, ...extra];
+  };
+  const push = ({ event, title, line, note, vars = variables(), final = false, view = {} }) => {
+    const highlighted = Number.isInteger(windowLeft) && Number.isInteger(windowRight)
+      ? Array.from({ length: windowRight - windowLeft }, (_, offset) => windowLeft + offset)
+      : [];
+    steps.push({
+      title,
+      arr: [...nums],
+      highlight: highlighted,
+      mark: Number.isInteger(bestLeft) && Number.isInteger(bestRight)
+        ? Array.from({ length: bestRight - bestLeft }, (_, offset) => bestLeft + offset)
+        : [],
+      prefixAverageView: makeView(event, view),
+      codeBlock: 2,
+      codeLines: [line],
+      vars,
+      note,
+      final,
+    });
+  };
+
+  push({
+    event: "enter",
+    title: { vi: "Bắt đầu cách Prefix Sum", en: "Enter the Prefix Sum approach" },
+    line: 2,
+    note: {
+      vi: "Mảng prefix chưa được tạo. prefix[t] sẽ lưu tổng của nums[0..t-1].",
+      en: "The prefix array has not been created yet. prefix[t] will store the sum of nums[0..t-1].",
+    },
+  });
+
+  prefix[0] = 0;
+  push({
+    event: "init-prefix",
+    title: { vi: `Tạo prefix có ${prefix.length} ô`, en: `Create ${prefix.length} prefix cells` },
+    line: 3,
+    note: {
+      vi: `prefix[0] = 0 vì chưa lấy phần tử nào; ${nums.length} ô còn lại sẽ được điền lần lượt.`,
+      en: `prefix[0] = 0 because no value has been taken; the remaining ${nums.length} cells will be filled from left to right.`,
+    },
+  });
+
+  for (let i = 0; i < nums.length; i++) {
+    activeNumIndex = i;
+    activePrefixFrom = i;
+    activePrefixTo = i + 1;
+    push({
+      event: "prefix-loop",
+      title: { vi: `i = ${i}, num = ${nums[i]}`, en: `i = ${i}, num = ${nums[i]}` },
+      line: 4,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+      ]),
+      note: {
+        vi: `Đọc nums[${i}] = ${nums[i]}; dùng prefix[${i}] để tính ô kế tiếp.`,
+        en: `Read nums[${i}] = ${nums[i]}; use prefix[${i}] to compute the next cell.`,
+      },
+    });
+
+    prefix[i + 1] = prefix[i] + nums[i];
+    push({
+      event: "prefix-assign",
+      title: { vi: `prefix[${i + 1}] = ${prefix[i + 1]}`, en: `prefix[${i + 1}] = ${prefix[i + 1]}` },
+      line: 5,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+      ]),
+      note: {
+        vi: `prefix[${i + 1}] = prefix[${i}] + nums[${i}] = ${prefix[i]} + (${nums[i]}) = ${prefix[i + 1]}.`,
+        en: `prefix[${i + 1}] = prefix[${i}] + nums[${i}] = ${prefix[i]} + (${nums[i]}) = ${prefix[i + 1]}.`,
+      },
+    });
+  }
+
+  activeNumIndex = null;
+  activePrefixFrom = null;
+  activePrefixTo = null;
+  push({
+    event: "init-record",
+    title: { vi: "max_sum = -∞", en: "max_sum = -∞" },
+    line: 6,
+    vars: variables([{ name: "max_sum", value: "-∞" }]),
+    note: {
+      vi: "Khởi tạo kỷ lục nhỏ hơn mọi tổng cửa sổ để cửa sổ đầu tiên chắc chắn được nhận.",
+      en: "Start below every possible window sum so the first window is guaranteed to become the record.",
+    },
+  });
+
+  for (let right = k; right <= nums.length; right++) {
+    windowLeft = right - k;
+    windowRight = right;
+    windowSum = null;
+    recordBefore = maxSum;
+    shouldUpdate = null;
+    push({
+      event: "window-loop",
+      title: { vi: `right = ${right}, left = ${windowLeft}`, en: `right = ${right}, left = ${windowLeft}` },
+      line: 7,
+      vars: variables([
+        { name: "left", value: windowLeft },
+        { name: "right", value: right },
+      ]),
+      note: {
+        vi: `Hai mốc prefix[${windowLeft}] và prefix[${right}] bao quanh nums[${windowLeft}..${right - 1}], đúng ${k} phần tử.`,
+        en: `prefix[${windowLeft}] and prefix[${right}] bound nums[${windowLeft}..${right - 1}], exactly ${k} values.`,
+      },
+    });
+
+    windowSum = prefix[right] - prefix[windowLeft];
+    push({
+      event: "window-sum",
+      title: { vi: `window_sum = ${windowSum}`, en: `window_sum = ${windowSum}` },
+      line: 8,
+      vars: variables([
+        { name: "left", value: windowLeft },
+        { name: "right", value: right },
+      ]),
+      note: {
+        vi: `prefix[${right}] - prefix[${windowLeft}] = ${prefix[right]} - (${prefix[windowLeft]}) = ${windowSum}. Phần prefix trước left bị triệt tiêu.`,
+        en: `prefix[${right}] - prefix[${windowLeft}] = ${prefix[right]} - (${prefix[windowLeft]}) = ${windowSum}. The prefix before left cancels out.`,
+      },
+    });
+
+    shouldUpdate = maxSum === null || windowSum > maxSum;
+    recordBefore = maxSum;
+    push({
+      event: "compare",
+      title: shouldUpdate
+        ? { vi: `${windowSum} > ${maxSum === null ? "-∞" : maxSum}: cập nhật`, en: `${windowSum} > ${maxSum === null ? "-∞" : maxSum}: update` }
+        : { vi: `${windowSum} ≤ ${maxSum}: giữ kỷ lục`, en: `${windowSum} ≤ ${maxSum}: keep the record` },
+      line: 9,
+      vars: variables([
+        { name: "left", value: windowLeft },
+        { name: "right", value: right },
+        { name: "window_sum > max_sum", value: shouldUpdate },
+      ]),
+      note: shouldUpdate
+        ? { vi: "Tổng cửa sổ hiện tại tốt hơn kỷ lục trước.", en: "The current window sum beats the previous record." }
+        : { vi: "Kỷ lục hiện tại vẫn lớn hơn hoặc bằng tổng này.", en: "The current record is still greater than or equal to this sum." },
+    });
+
+    if (shouldUpdate) {
+      maxSum = windowSum;
+      bestLeft = windowLeft;
+      bestRight = right;
+      evaluatedWindows.forEach((window) => { window.isBest = false; });
+    }
+    evaluatedWindows.push({
+      left: windowLeft,
+      right,
+      sum: windowSum,
+      average: windowSum / k,
+      isBest: shouldUpdate,
+    });
+    push({
+      event: "apply-max",
+      title: shouldUpdate
+        ? { vi: `max_sum = ${maxSum}`, en: `max_sum = ${maxSum}` }
+        : { vi: `max_sum vẫn là ${maxSum}`, en: `max_sum stays ${maxSum}` },
+      line: 9,
+      vars: variables([
+        { name: "best window", value: `[${bestLeft}..${bestRight - 1}]` },
+      ]),
+      note: shouldUpdate
+        ? { vi: `Lưu nums[${bestLeft}..${bestRight - 1}] làm cửa sổ tốt nhất.`, en: `Store nums[${bestLeft}..${bestRight - 1}] as the best window.` }
+        : { vi: `Giữ nums[${bestLeft}..${bestRight - 1}] là cửa sổ tốt nhất.`, en: `Keep nums[${bestLeft}..${bestRight - 1}] as the best window.` },
+    });
+  }
+
+  const answer = maxSum / k;
+  activeNumIndex = null;
+  activePrefixFrom = null;
+  activePrefixTo = null;
+  shouldUpdate = null;
+  recordBefore = null;
+  push({
+    event: "done",
+    title: { vi: `Trả về ${format(answer)}`, en: `Return ${format(answer)}` },
+    line: 10,
+    vars: [
+      { name: "max_sum", value: maxSum },
+      { name: "k", value: k },
+      { name: "answer", value: format(answer) },
+    ],
+    note: {
+      vi: `Cửa sổ tốt nhất nums[${bestLeft}..${bestRight - 1}] có trung bình ${maxSum} / ${k} = ${format(answer)}.`,
+      en: `The best window nums[${bestLeft}..${bestRight - 1}] has average ${maxSum} / ${k} = ${format(answer)}.`,
+    },
+    final: true,
+    view: {
+      windowLeft: bestLeft,
+      windowRight: bestRight,
+      windowSum: maxSum,
+      currentAverage: answer,
+    },
+  });
+
+  return { original: nums, k, prefix, answer, steps };
 }
 
 /**
@@ -3149,27 +3418,37 @@ module.exports = {
     inputKind: "integer",
     extraParams: [
       { key: "k", type: "number", label: { vi: "Độ dài cửa sổ k", en: "Window size k" }, default: 4 },
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn cách visualize", en: "Visualization approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1: Sliding Window", en: "Approach 1: Sliding Window" } },
+          { value: 2, label: { vi: "Cách 2: Prefix Sum", en: "Approach 2: Prefix Sum" } },
+        ],
+      },
     ],
     approach: [
       {
-        vi: "Tính tổng của k phần tử đầu tiên. Vì mọi cửa sổ đều có cùng độ dài k, cửa sổ có tổng lớn nhất cũng có trung bình lớn nhất.",
-        en: "Sum the first k values. Because every window has the same length k, the window with the largest sum also has the largest average.",
+        vi: "Cách 1 (Sliding Window): tính tổng k phần tử đầu, rồi mỗi lần trượt thì cộng IN và trừ OUT. Dùng O(1) bộ nhớ phụ.",
+        en: "Approach 1 (Sliding Window): sum the first k values, then add IN and subtract OUT for every slide. Uses O(1) extra space.",
       },
       {
-        vi: "Mỗi lần trượt một ô: cộng phần tử IN bên phải và trừ phần tử OUT bên trái, rồi cập nhật max_sum.",
-        en: "For each one-cell slide, add the incoming value on the right, subtract the outgoing value on the left, then update max_sum.",
+        vi: "Cách 2 (Prefix Sum): dựng prefix[t] = tổng nums[0..t-1]. Tổng cửa sổ nums[left..right-1] = prefix[right] - prefix[left].",
+        en: "Approach 2 (Prefix Sum): build prefix[t] as the sum of nums[0..t-1]. Then nums[left..right-1] sums to prefix[right] - prefix[left].",
       },
       {
-        vi: "Chỉ chia max_sum cho k một lần ở cuối để tránh phép chia lặp lại.",
-        en: "Divide max_sum by k only once at the end to avoid repeated division.",
+        vi: "Cả hai cách đều so sánh tổng vì mọi cửa sổ có cùng độ dài k, rồi chỉ chia max_sum cho k một lần ở cuối.",
+        en: "Both approaches compare sums because every window has the same length k, then divide max_sum by k once at the end.",
       },
     ],
     complexity: {
       time: "O(n)",
-      space: "O(1)",
+      space: "O(1) / O(n)",
       note: {
-        vi: "Tính cửa sổ đầu trong O(k), sau đó mỗi phần tử còn lại được thêm và một phần tử cũ được bỏ đúng một lần. Chỉ dùng vài biến tổng.",
-        en: "The first window costs O(k); afterward each remaining value enters once and one old value leaves once. Only a few numeric variables are stored.",
+        vi: "Cách 1 dùng O(1) bộ nhớ phụ. Cách 2 dùng mảng prefix dài n+1 nên cần O(n) bộ nhớ; mỗi tổng cửa sổ được truy vấn trong O(1).",
+        en: "Approach 1 uses O(1) extra space. Approach 2 stores an n+1 prefix array, so it uses O(n) space and answers each window-sum query in O(1).",
       },
     },
     code: [
@@ -3184,6 +3463,20 @@ module.exports = {
       "",
       "        return max_sum / k",
     ],
+    code2: [
+      "class Solution:",
+      "    def findMaxAverage(self, nums: List[int], k: int) -> float:",
+      "        prefix = [0] * (len(nums) + 1)",
+      "        for i, num in enumerate(nums):",
+      "            prefix[i + 1] = prefix[i] + num",
+      "        max_sum = float('-inf')",
+      "        for right in range(k, len(nums) + 1):",
+      "            window_sum = prefix[right] - prefix[right - k]",
+      "            max_sum = max(max_sum, window_sum)",
+      "        return max_sum / k",
+    ],
+    codeLabel: { vi: "Cách 1: Sliding Window", en: "Approach 1: Sliding Window" },
+    code2Label: { vi: "Cách 2: Prefix Sum", en: "Approach 2: Prefix Sum" },
     builder: buildSteps643,
   },
   487: {
