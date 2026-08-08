@@ -15622,143 +15622,293 @@ function buildSteps399(input, params) {
  * Propagate the quietest known person DOWN the richer-than edges.
  */
 function buildSteps851v2(input, params = {}) {
-  const richerRaw = String(input).split(",").map((e) => e.trim()).filter(Boolean);
+  const richerRaw = String(input).split(",").map((edge) => edge.trim()).filter(Boolean);
   const quiet = String(params.quiet || "")
     .split(",")
-    .map((v) => parseInt(v.trim(), 10))
+    .map((value) => Number.parseInt(value.trim(), 10))
     .filter(Number.isFinite);
   const n = quiet.length;
   const steps = [];
+  const richerEdges = richerRaw.map((edge, index) => {
+    const [a, b] = edge.split("-").map(Number);
+    return { key: `${index}:${a}-${b}`, a, b };
+  }).filter((edge) => Number.isInteger(edge.a) && Number.isInteger(edge.b) && edge.a >= 0 && edge.a < n && edge.b >= 0 && edge.b < n);
 
-  // Build forward graph  a → b (a richer than b)  +  track in-degree
-  const graph = Array.from({ length: n }, () => []);  // graph[a] = [list of poorer people]
-  const indegree = new Array(n).fill(0);
-  const richerEdges = richerRaw.map((e) => {
-    const [a, b] = e.split("-").map(Number);
-    return { a, b };
-  }).filter((e) => Number.isInteger(e.a) && Number.isInteger(e.b) && e.a >= 0 && e.a < n && e.b >= 0 && e.b < n);
-
-  for (const { a, b } of richerEdges) {
-    graph[a].push(b);
-    indegree[b]++;
-  }
-
-  const answer = Array.from({ length: n }, (_, i) => i);  // answer[i] = i initially
+  let graph = null;
+  let indegree = null;
+  let answer = null;
+  let queue = null;
+  let head = 0;
   const inQueue = new Set();
   const processed = new Set();
+  const builtEdgeKeys = new Set();
+  const processedEdgeKeys = new Set();
+  const topoOrder = [];
 
-  function snap(title, note, codeLines, hl = [], mk = [], extra = {}, final = false) {
+  const arrayText = (values) => values === null ? "not initialized" : `[${values.join(", ")}]`;
+  const pendingQueue = () => queue === null ? null : queue.slice(head);
+
+  function snap({
+    title,
+    note,
+    codeLines,
+    event,
+    phase,
+    final = false,
+    vars = [],
+    view = {},
+  }) {
+    const baseVars = [];
+    if (answer !== null) baseVars.push({ name: "answer", value: arrayText(answer) });
+    if (indegree !== null) baseVars.push({ name: "indegree", value: arrayText(indegree) });
+    if (queue !== null) baseVars.push({ name: "q", value: arrayText(pendingQueue()) });
     steps.push({
-      title, note, codeLines, codeBlock: 2, arr: [], highlight: hl, mark: mk, final,
-      vars: [
-        { name: "answer", value: `[${answer.join(", ")}]` },
-        { name: "indegree", value: `[${indegree.join(", ")}]` },
-        ...(extra.vars || []),
-      ],
+      title, note, codeLines, codeBlock: 2, arr: [], highlight: [], mark: [], final,
+      vars: [...baseVars, ...vars],
       loudRichV2: {
-        n, quiet: [...quiet],
-        richerEdges,
-        graph: graph.map((nb) => [...nb]),
-        answer: [...answer],
-        indegree: [...indegree],
+        event,
+        phase,
+        n,
+        quiet: [...quiet],
+        richerEdges: richerEdges.map((edge) => ({ ...edge })),
+        graph: graph === null ? Array.from({ length: n }, () => []) : graph.map((neighbors) => [...neighbors]),
+        answer: answer === null ? null : [...answer],
+        indegree: indegree === null ? null : [...indegree],
+        queue: pendingQueue(),
         inQueue: [...inQueue],
         processed: [...processed],
-        ...(extra.view || {}),
+        topoOrder: [...topoOrder],
+        builtEdgeKeys: [...builtEdgeKeys],
+        processedEdgeKeys: [...processedEdgeKeys],
+        ...view,
       },
     });
   }
 
-  snap(
-    { vi: "Khởi tạo đồ thị + indegree", en: "Build graph + indegree" },
-    { vi: `Dựng đồ thị hướng a→b (a giàu hơn b) và mảng indegree. indegree[i] = số người giàu hơn i trực tiếp. answer[i] = i ban đầu (mỗi người tự đại diện cho chính mình).`, en: `Build directed graph a→b (a richer than b) and the indegree array. indegree[i] = number of people directly richer than i. answer[i] = i initially (each person represents themselves).` },
-    [3, 4, 5, 6, 7],
-  );
+  snap({
+    title: { vi: "Bắt đầu loudAndRich", en: "Enter loudAndRich" },
+    note: { vi: "Cách 2 giữ cạnh đúng hướng a → b: người giàu hơn truyền ứng viên quiet xuống người nghèo hơn.", en: "Approach 2 keeps edges as a → b: richer people propagate quiet candidates down to poorer people." },
+    codeLines: [2], event: "enter", phase: "build",
+    vars: [{ name: "richer", value: richerRaw.join(", ") }, { name: "quiet", value: arrayText(quiet) }],
+  });
 
-  // Fill queue with in-degree 0 nodes
-  const queue = [];
-  for (let i = 0; i < n; i++) {
-    if (indegree[i] === 0) { queue.push(i); inQueue.add(i); }
+  snap({
+    title: { vi: `n = len(quiet) = ${n}`, en: `n = len(quiet) = ${n}` },
+    note: { vi: `Có ${n} người P0..P${Math.max(0, n - 1)}; quiet càng nhỏ nghĩa là càng ít ồn.`, en: `There are ${n} people P0..P${Math.max(0, n - 1)}; a smaller quiet value means quieter.` },
+    codeLines: [3], event: "read-n", phase: "build",
+    vars: [{ name: "n", value: n }, { name: "quiet", value: arrayText(quiet) }],
+  });
+
+  graph = Array.from({ length: n }, () => []);
+  snap({
+    title: { vi: "Tạo graph[a] = danh sách người nghèo hơn", en: "Create graph[a] = poorer people" },
+    note: { vi: "graph[a] chứa b khi a giàu hơn b. Mũi tên luôn đi từ RICHER xuống POORER.", en: "graph[a] contains b when a is richer than b. Every arrow points from RICHER down to POORER." },
+    codeLines: [4], event: "init-graph", phase: "build",
+    vars: [{ name: "graph", value: `{${graph.map((_, person) => `${person}:[]`).join(", ")}}` }],
+  });
+
+  indegree = new Array(n).fill(0);
+  snap({
+    title: { vi: "indegree = [0] * n", en: "indegree = [0] * n" },
+    note: { vi: "indegree[b] sẽ đếm số người giàu hơn b chưa được xử lý.", en: "indegree[b] will count richer predecessors of b that have not been processed." },
+    codeLines: [5], event: "init-indegree", phase: "build",
+  });
+
+  for (let edgeIndex = 0; edgeIndex < richerEdges.length; edgeIndex++) {
+    const edge = richerEdges[edgeIndex];
+    snap({
+      title: { vi: `Đọc richer[${edgeIndex}] = [${edge.a}, ${edge.b}]`, en: `Read richer[${edgeIndex}] = [${edge.a}, ${edge.b}]` },
+      note: { vi: `P${edge.a} giàu hơn P${edge.b}; chuẩn bị tạo cạnh P${edge.a} → P${edge.b}.`, en: `P${edge.a} is richer than P${edge.b}; prepare edge P${edge.a} → P${edge.b}.` },
+      codeLines: [6], event: "read-edge", phase: "build",
+      vars: [{ name: "a", value: edge.a }, { name: "b", value: edge.b }],
+      view: { activeInputIndex: edgeIndex, activeEdgeKey: edge.key, activeU: edge.a, activeV: edge.b },
+    });
+
+    graph[edge.a].push(edge.b);
+    builtEdgeKeys.add(edge.key);
+    snap({
+      title: { vi: `graph[${edge.a}].append(${edge.b})`, en: `graph[${edge.a}].append(${edge.b})` },
+      note: { vi: `Khi BFS xử lý P${edge.a}, candidate tốt nhất của P${edge.a} sẽ được truyền xuống P${edge.b}.`, en: `When BFS processes P${edge.a}, P${edge.a}'s best candidate will propagate down to P${edge.b}.` },
+      codeLines: [7], event: "add-edge", phase: "build",
+      vars: [{ name: `graph[${edge.a}]`, value: arrayText(graph[edge.a]) }],
+      view: { activeInputIndex: edgeIndex, activeEdgeKey: edge.key, activeU: edge.a, activeV: edge.b },
+    });
+
+    const indegreeBefore = indegree[edge.b];
+    indegree[edge.b] += 1;
+    snap({
+      title: { vi: `indegree[${edge.b}]: ${indegreeBefore} → ${indegree[edge.b]}`, en: `indegree[${edge.b}]: ${indegreeBefore} → ${indegree[edge.b]}` },
+      note: { vi: `P${edge.b} có thêm một predecessor giàu hơn là P${edge.a}.`, en: `P${edge.b} gains one richer predecessor: P${edge.a}.` },
+      codeLines: [8], event: "increment-indegree", phase: "build",
+      vars: [{ name: "a, b", value: `${edge.a}, ${edge.b}` }, { name: `indegree[${edge.b}]`, value: indegree[edge.b] }],
+      view: { activeInputIndex: edgeIndex, activeEdgeKey: edge.key, activeU: edge.a, activeV: edge.b, indegreeBefore, indegreeAfter: indegree[edge.b] },
+    });
   }
-  snap(
-    { vi: "Nạp các nút có indegree = 0 vào queue", en: "Enqueue all nodes with indegree = 0" },
-    { vi: `Các nút indegree=0 là những người KHÔNG có ai giàu hơn trực tiếp → xuất phát điểm của BFS. Queue = [${queue.join(", ")}].`, en: `Nodes with indegree=0 have no one directly richer than them → BFS starting points. Queue = [${queue.join(", ")}].` },
-    [8, 9, 10],
-    [], [], { vars: [{ name: "queue", value: `[${queue.join(", ")}]` }] },
-  );
 
-  let head = 0;  // queue pointer (simulate deque.popleft)
-  while (head < queue.length) {
-    const u = queue[head++];
-    inQueue.delete(u);
-    processed.add(u);
+  answer = Array.from({ length: n }, (_, person) => person);
+  snap({
+    title: { vi: "answer = [0, 1, ..., n-1]", en: "answer = [0, 1, ..., n-1]" },
+    note: { vi: "Ban đầu mỗi người chỉ biết chính mình: answer[i] = i. BFS sẽ thay bằng người ít ồn hơn nếu tìm thấy từ phía richer.", en: "Initially each person only knows themselves: answer[i] = i. BFS replaces it when a quieter richer candidate arrives." },
+    codeLines: [9], event: "init-answer", phase: "seed",
+  });
 
-    snap(
-      { vi: `Lấy u = ${u} từ queue`, en: `Dequeue u = ${u}` },
-      { vi: `u=${u}: answer[${u}]=${answer[u]} (người ít ồn nhất trong nhóm giàu hơn hoặc bằng ${u} đã biết). Xét tất cả v mà ${u} giàu hơn.`, en: `u=${u}: answer[${u}]=${answer[u]} (the quietest person at least as rich as ${u} known so far). Process every v poorer than ${u}.` },
-      [11, 12],
-      [u], [],
-      { vars: [{ name: "u", value: u }, { name: "answer[u]", value: answer[u] }, { name: "quiet[answer[u]]", value: quiet[answer[u]] }], view: { activeU: u } },
-    );
+  queue = [];
+  snap({
+    title: { vi: "Tạo deque rỗng", en: "Create an empty deque" },
+    note: { vi: "Queue sẽ chứa các node đã nhận đủ thông tin từ mọi người giàu hơn trực tiếp.", en: "The queue will contain nodes that have received information from every directly richer person." },
+    codeLines: [10], event: "init-queue", phase: "seed",
+  });
 
-    for (const v of graph[u]) {
-      const oldBest = answer[v];
-      const candidateBest = answer[u];
-      const update = quiet[candidateBest] < quiet[oldBest];
+  for (let i = 0; i < n; i++) {
+    snap({
+      title: { vi: `for i = ${i}`, en: `for i = ${i}` },
+      note: { vi: `Xét P${i}: indegree[${i}] = ${indegree[i]}.`, en: `Inspect P${i}: indegree[${i}] = ${indegree[i]}.` },
+      codeLines: [11], event: "seed-loop", phase: "seed",
+      vars: [{ name: "i", value: i }], view: { seedPerson: i },
+    });
 
-      snap(
-        {
-          vi: update
-            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → cập nhật answer[${v}]`
-            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → giữ nguyên`,
-          en: update
-            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → update answer[${v}]`
-            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → keep`,
-        },
-        {
-          vi: update
-            ? `Người ít ồn nhất bên phía giàu hơn của ${u} (= người ${candidateBest}, quiet=${quiet[candidateBest]}) ít ồn hơn best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
-            : `Best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) ít ồn bằng hoặc hơn candidate từ ${u} → giữ answer[${v}] = ${oldBest}.`,
-          en: update
-            ? `The quietest person at least as rich as ${u} (person ${candidateBest}, quiet=${quiet[candidateBest]}) is quieter than ${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
-            : `${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) is equal or quieter than the candidate from ${u} → keep answer[${v}] = ${oldBest}.`,
-        },
-        update ? [13, 14, 15] : [13, 14],
-        [u, v], [],
-        { vars: [{ name: "u", value: u }, { name: "v", value: v }, { name: "answer[u]", value: candidateBest }, { name: "quiet[answer[u]]", value: quiet[candidateBest] }, { name: "answer[v] (before)", value: oldBest }, { name: "update?", value: update }], view: { activeU: u, activeV: v } },
-      );
+    const isReady = indegree[i] === 0;
+    snap({
+      title: { vi: `indegree[${i}] == 0 → ${isReady}`, en: `indegree[${i}] == 0 → ${isReady}` },
+      note: isReady
+        ? { vi: `P${i} không chờ người giàu hơn nào; có thể vào queue ngay.`, en: `P${i} is waiting for no richer predecessor; it can enter the queue now.` }
+        : { vi: `P${i} còn chờ ${indegree[i]} người giàu hơn được xử lý; chưa enqueue.`, en: `P${i} still waits for ${indegree[i]} richer predecessor(s); do not enqueue yet.` },
+      codeLines: [12], event: "seed-check", phase: "seed",
+      vars: [{ name: "i", value: i }, { name: `indegree[${i}]`, value: indegree[i] }, { name: "ready?", value: isReady }],
+      view: { seedPerson: i, ready: isReady },
+    });
 
-      if (update) answer[v] = answer[u];
-
-      indegree[v]--;
-      const enqueue = indegree[v] === 0;
-      if (enqueue) { queue.push(v); inQueue.add(v); }
-
-      snap(
-        {
-          vi: enqueue ? `indegree[${v}]-- = 0 → enqueue ${v}` : `indegree[${v}]-- = ${indegree[v]}`,
-          en: enqueue ? `indegree[${v}]-- = 0 → enqueue ${v}` : `indegree[${v}]-- = ${indegree[v]}`,
-        },
-        {
-          vi: enqueue
-            ? `Giảm indegree[${v}] về 0 → mọi người giàu hơn ${v} đã được xử lý → đẩy ${v} vào queue. Queue = [${queue.slice(head).join(", ")}].`
-            : `Giảm indegree[${v}] về ${indegree[v]} → còn ${indegree[v]} người giàu hơn ${v} chưa xử lý.`,
-          en: enqueue
-            ? `Decrement indegree[${v}] to 0 → all people richer than ${v} have been processed → enqueue ${v}. Queue = [${queue.slice(head).join(", ")}].`
-            : `Decrement indegree[${v}] to ${indegree[v]} → still ${indegree[v]} people richer than ${v} unprocessed.`,
-        },
-        [16, 17, 18],
-        [v], [],
-        { vars: [{ name: "v", value: v }, { name: "answer[v]", value: answer[v] }, { name: "indegree[v]", value: indegree[v] }, { name: "enqueue?", value: enqueue }], view: { activeU: u, activeV: v } },
-      );
+    if (isReady) {
+      queue.push(i);
+      inQueue.add(i);
+      snap({
+        title: { vi: `q.append(${i})`, en: `q.append(${i})` },
+        note: { vi: `Đưa P${i} vào BACK của queue.`, en: `Append P${i} at the BACK of the queue.` },
+        codeLines: [13], event: "seed-enqueue", phase: "seed",
+        vars: [{ name: "i", value: i }], view: { seedPerson: i, ready: true, enqueuedPerson: i },
+      });
     }
   }
 
-  snap(
-    { vi: "Kết quả", en: "Result" },
-    { vi: `answer = [${answer.join(", ")}]. Với mỗi người i, answer[i] là người ít ồn nhất giàu hơn hoặc bằng i.`, en: `answer = [${answer.join(", ")}]. For each person i, answer[i] is the least quiet person at least as rich as i.` },
-    [19],
-    [], [], {}, true,
-  );
+  while (head < queue.length) {
+    snap({
+      title: { vi: `while q → True, queue = ${arrayText(pendingQueue())}`, en: `while q → True, queue = ${arrayText(pendingQueue())}` },
+      note: { vi: "Queue còn node ready; lấy node ở FRONT để truyền candidate xuống các node nghèo hơn.", en: "The queue still has a ready node; take the FRONT node and propagate its candidate to poorer nodes." },
+      codeLines: [14], event: "while-queue", phase: "propagate",
+    });
+
+    const u = queue[head++];
+    inQueue.delete(u);
+    processed.add(u);
+    topoOrder.push(u);
+
+    snap({
+      title: { vi: `u = q.popleft() → ${u}`, en: `u = q.popleft() → ${u}` },
+      note: { vi: `P${u} đã nhận đủ thông tin richer. Candidate hoàn chỉnh của nó là P${answer[u]} (quiet=${quiet[answer[u]]}).`, en: `P${u} has received all richer information. Its finalized candidate is P${answer[u]} (quiet=${quiet[answer[u]]}).` },
+      codeLines: [15], event: "dequeue", phase: "propagate",
+      vars: [{ name: "u", value: u }, { name: "answer[u]", value: answer[u] }, { name: "quiet[answer[u]]", value: quiet[answer[u]] }],
+      view: { activeU: u, dequeuedPerson: u },
+    });
+
+    for (let neighborIndex = 0; neighborIndex < graph[u].length; neighborIndex++) {
+      const v = graph[u][neighborIndex];
+      const edge = richerEdges.find((item) => item.a === u && item.b === v && !processedEdgeKeys.has(item.key));
+      const activeEdgeKey = edge ? edge.key : null;
+      snap({
+        title: { vi: `for v = ${v} trong graph[${u}]`, en: `for v = ${v} in graph[${u}]` },
+        note: { vi: `Đi theo cạnh richer → poorer: P${u} → P${v}.`, en: `Follow the richer → poorer edge: P${u} → P${v}.` },
+        codeLines: [16], event: "select-edge", phase: "propagate",
+        vars: [{ name: "u", value: u }, { name: "v", value: v }],
+        view: { activeU: u, activeV: v, activeEdgeKey, neighborIndex },
+      });
+
+      const oldBest = answer[v];
+      const candidateBest = answer[u];
+      const shouldUpdate = quiet[candidateBest] < quiet[oldBest];
+
+      snap({
+        title: {
+          vi: shouldUpdate
+            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → cập nhật answer[${v}]`
+            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → giữ nguyên`,
+          en: shouldUpdate
+            ? `quiet[answer[${u}]]=${quiet[candidateBest]} < quiet[answer[${v}]]=${quiet[oldBest]} → update answer[${v}]`
+            : `quiet[answer[${u}]]=${quiet[candidateBest]} >= quiet[answer[${v}]]=${quiet[oldBest]} → keep`,
+        },
+        note: {
+          vi: shouldUpdate
+            ? `Người ít ồn nhất bên phía giàu hơn của ${u} (= người ${candidateBest}, quiet=${quiet[candidateBest]}) ít ồn hơn best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
+            : `Best hiện tại của ${v} (người ${oldBest}, quiet=${quiet[oldBest]}) ít ồn bằng hoặc hơn candidate từ ${u} → giữ answer[${v}] = ${oldBest}.`,
+          en: shouldUpdate
+            ? `The quietest person at least as rich as ${u} (person ${candidateBest}, quiet=${quiet[candidateBest]}) is quieter than ${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) → answer[${v}] = ${candidateBest}.`
+            : `${v}'s current best (person ${oldBest}, quiet=${quiet[oldBest]}) is equal or quieter than the candidate from ${u} → keep answer[${v}] = ${oldBest}.`,
+        },
+        codeLines: [17], event: "compare", phase: "propagate",
+        vars: [{ name: "u", value: u }, { name: "v", value: v }, { name: "answer[u]", value: candidateBest }, { name: "answer[v]", value: oldBest }, { name: "update?", value: shouldUpdate }],
+        view: { activeU: u, activeV: v, activeEdgeKey, candidatePerson: candidateBest, currentBestPerson: oldBest, shouldUpdate, answerBefore: oldBest },
+      });
+
+      if (shouldUpdate) {
+        answer[v] = answer[u];
+        snap({
+          title: { vi: `answer[${v}] = answer[${u}] = ${answer[v]}`, en: `answer[${v}] = answer[${u}] = ${answer[v]}` },
+          note: { vi: `P${v} đổi best từ P${oldBest} sang P${answer[v]}.`, en: `P${v} changes its best candidate from P${oldBest} to P${answer[v]}.` },
+          codeLines: [18], event: "update-answer", phase: "propagate",
+          vars: [{ name: "u", value: u }, { name: "v", value: v }, { name: `answer[${v}]`, value: answer[v] }],
+          view: { activeU: u, activeV: v, activeEdgeKey, candidatePerson: candidateBest, currentBestPerson: oldBest, shouldUpdate: true, answerBefore: oldBest, answerAfter: answer[v], changedPerson: v },
+        });
+      }
+
+      const indegreeBefore = indegree[v];
+      indegree[v] -= 1;
+      processedEdgeKeys.add(activeEdgeKey);
+      snap({
+        title: { vi: `indegree[${v}]: ${indegreeBefore} → ${indegree[v]}`, en: `indegree[${v}]: ${indegreeBefore} → ${indegree[v]}` },
+        note: indegree[v] === 0
+          ? { vi: `Đã xử lý xong cạnh cuối cùng đi vào P${v}; candidate answer[${v}] giờ đã hoàn chỉnh.`, en: `The last incoming edge to P${v} is processed; answer[${v}] is now finalized.` }
+          : { vi: `P${v} còn chờ ${indegree[v]} predecessor giàu hơn truyền candidate tới.`, en: `P${v} still waits for ${indegree[v]} richer predecessor(s) to propagate candidates.` },
+        codeLines: [19], event: "decrement-indegree", phase: "unlock",
+        vars: [{ name: "u", value: u }, { name: "v", value: v }, { name: `indegree[${v}]`, value: indegree[v] }],
+        view: { activeU: u, activeV: v, activeEdgeKey, indegreeBefore, indegreeAfter: indegree[v] },
+      });
+
+      const ready = indegree[v] === 0;
+      snap({
+        title: { vi: `indegree[${v}] == 0 → ${ready}`, en: `indegree[${v}] == 0 → ${ready}` },
+        note: ready
+          ? { vi: `P${v} đã nhận thông tin từ TẤT CẢ người giàu hơn trực tiếp; bước sau enqueue.`, en: `P${v} has received information from ALL directly richer people; enqueue it next.` }
+          : { vi: `Chưa thể xử lý P${v}; answer[${v}] vẫn có thể được cải thiện bởi predecessor còn lại.`, en: `P${v} cannot be processed yet; answer[${v}] may still improve from remaining predecessors.` },
+        codeLines: [20], event: "check-ready", phase: "unlock",
+        vars: [{ name: "v", value: v }, { name: `indegree[${v}]`, value: indegree[v] }, { name: "ready?", value: ready }],
+        view: { activeU: u, activeV: v, activeEdgeKey, ready },
+      });
+
+      if (ready) {
+        queue.push(v);
+        inQueue.add(v);
+        snap({
+          title: { vi: `q.append(${v})`, en: `q.append(${v})` },
+          note: { vi: `Đưa P${v} vào BACK. Queue đang chờ = ${arrayText(pendingQueue())}.`, en: `Append P${v} at the BACK. Pending queue = ${arrayText(pendingQueue())}.` },
+          codeLines: [21], event: "enqueue", phase: "unlock",
+          vars: [{ name: "v", value: v }],
+          view: { activeU: u, activeV: v, activeEdgeKey, ready: true, enqueuedPerson: v },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: "while q → False", en: "while q → False" },
+    note: { vi: "Queue rỗng: mọi node đã được xử lý theo thứ tự từ giàu hơn xuống nghèo hơn.", en: "The queue is empty: every node has been processed from richer to poorer." },
+    codeLines: [14], event: "queue-empty", phase: "done",
+  });
+
+  snap({
+    title: { vi: `return answer → ${arrayText(answer)}`, en: `return answer → ${arrayText(answer)}` },
+    note: { vi: `Với mỗi Pi, answer[i] là người ít ồn nhất trong Pi và tất cả người giàu hơn Pi.`, en: `For each Pi, answer[i] is the quietest among Pi and everyone richer than Pi.` },
+    codeLines: [22], event: "done", phase: "done", final: true,
+    vars: [{ name: "answer", value: arrayText(answer) }],
+  });
 
   return { original: { richer: richerEdges, quiet }, answer, steps };
 }

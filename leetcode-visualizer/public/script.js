@@ -8191,30 +8191,228 @@ function renderParallelCoursesView(step) {
   </div>`;
 }
 
+function loudRichKahnHtml(view) {
+  const vi = lang === "vi";
+  const phaseIndex = { build: 0, seed: 1, propagate: 2, unlock: 3, done: 4 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Dựng cạnh richer → poorer", "2 · Enqueue indegree = 0", "3 · Truyền best quiet xuống", "4 · Giảm indegree và mở khóa"]
+    : ["1 · Build richer → poorer edges", "2 · Enqueue indegree = 0", "3 · Propagate the best quiet", "4 · Decrement indegree and unlock"];
+  const phases = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < phaseIndex;
+    const state = done ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const builtEdgeKeys = new Set(view.builtEdgeKeys || []);
+  const processedEdgeKeys = new Set(view.processedEdgeKeys || []);
+  const queueSet = new Set(view.queue || []);
+  const processedSet = new Set(view.processed || []);
+  const relationChips = (view.richerEdges || []).map((edge, index) => {
+    const classes = [];
+    if (builtEdgeKeys.has(edge.key)) classes.push("built");
+    if (processedEdgeKeys.has(edge.key)) classes.push("processed");
+    if (edge.key === view.activeEdgeKey) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>#${index + 1}</small><strong>P${edge.a} &gt; P${edge.b}</strong><em>P${edge.a} → P${edge.b}</em></span>`;
+  }).join("");
+
+  const layoutAdj = Array.from({ length: view.n }, () => []);
+  const layoutIndegree = new Array(view.n).fill(0);
+  for (const edge of view.richerEdges || []) {
+    layoutAdj[edge.a].push(edge.b);
+    layoutIndegree[edge.b] += 1;
+  }
+  const layoutQueue = [];
+  const levels = new Array(view.n).fill(0);
+  layoutIndegree.forEach((degree, person) => { if (degree === 0) layoutQueue.push(person); });
+  for (let index = 0; index < layoutQueue.length; index++) {
+    const person = layoutQueue[index];
+    for (const poorer of layoutAdj[person]) {
+      levels[poorer] = Math.max(levels[poorer], levels[person] + 1);
+      layoutIndegree[poorer] -= 1;
+      if (layoutIndegree[poorer] === 0) layoutQueue.push(poorer);
+    }
+  }
+  const maxLevel = Math.max(0, ...levels);
+  const layers = Array.from({ length: maxLevel + 1 }, () => []);
+  levels.forEach((level, person) => layers[level].push(person));
+  const maxLayerSize = Math.max(1, ...layers.map((layer) => layer.length));
+  const graphWidth = Math.max(520, 100 + maxLayerSize * 116);
+  const graphHeight = Math.max(150, 104 + maxLevel * 124);
+  const nodeRadius = 36;
+  const positions = new Map();
+  layers.forEach((layer, level) => {
+    layer.forEach((person, index) => {
+      positions.set(person, {
+        x: ((index + 1) * graphWidth) / (layer.length + 1),
+        y: 54 + level * 124,
+      });
+    });
+  });
+
+  const edgesHtml = (view.richerEdges || []).map((edge) => {
+    const from = positions.get(edge.a);
+    const to = positions.get(edge.b);
+    if (!from || !to) return "";
+    const active = edge.key === view.activeEdgeKey;
+    const classes = ["lrk-edge"];
+    if (!builtEdgeKeys.has(edge.key)) classes.push("unbuilt");
+    else if (processedEdgeKeys.has(edge.key)) classes.push("processed");
+    else classes.push("built");
+    if (active) classes.push("active");
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length;
+    const uy = dy / length;
+    const x1 = from.x + ux * (nodeRadius + 2);
+    const y1 = from.y + uy * (nodeRadius + 2);
+    const x2 = to.x - ux * (nodeRadius + 7);
+    const y2 = to.y - uy * (nodeRadius + 7);
+    return `<line class="${classes.join(" ")}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#${active ? "lrk-arrow-active" : "lrk-arrow"})"></line>`;
+  }).join("");
+
+  const nodesHtml = Array.from({ length: view.n }, (_, person) => {
+    const point = positions.get(person) || { x: graphWidth / 2, y: graphHeight / 2 };
+    const degree = view.indegree === null ? null : view.indegree[person];
+    const best = view.answer === null ? null : view.answer[person];
+    const classes = ["lrk-node"];
+    if (degree !== null && degree > 0) classes.push("locked");
+    if (degree === 0 && !processedSet.has(person)) classes.push("ready");
+    if (queueSet.has(person)) classes.push("queued");
+    if (processedSet.has(person)) classes.push("processed");
+    if (person === view.seedPerson) classes.push("seed");
+    if (person === view.activeU) classes.push("source");
+    if (person === view.activeV) classes.push("target");
+    const degreeText = degree === null ? "in —" : `in ${degree}`;
+    const bestText = best === null ? "best —" : `best P${best} · q${view.quiet[best]}`;
+    const stateText = person === view.activeU
+      ? "SOURCE"
+      : person === view.activeV
+        ? "TARGET"
+        : queueSet.has(person)
+          ? "QUEUE"
+          : processedSet.has(person)
+            ? "DONE"
+            : degree === 0
+              ? "READY"
+              : degree === null
+                ? "WAIT"
+                : `WAIT ${degree}`;
+    return `<g class="${classes.join(" ")}" aria-label="person ${person}, quiet ${view.quiet[person]}, ${degreeText}, ${bestText}">
+      <circle cx="${point.x}" cy="${point.y}" r="${nodeRadius}"></circle>
+      <text class="quiet" x="${point.x}" y="${point.y - 18}">quiet ${view.quiet[person]}</text>
+      <text class="person" x="${point.x}" y="${point.y + 4}">P${person}</text>
+      <text class="best" x="${point.x}" y="${point.y + 23}">${bestText}</text>
+      <text class="degree" x="${point.x}" y="${point.y + nodeRadius + 15}">${degreeText} · ${stateText}</text>
+    </g>`;
+  }).join("");
+  const graphSummary = vi
+    ? "Đồ thị Kahn có mũi tên từ người giàu hơn xuống người nghèo hơn."
+    : "Kahn graph with arrows from richer people down to poorer people.";
+  const graphSvg = `<svg class="lrk-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="${escapeHtml(graphSummary)}">
+    <defs>
+      <marker id="lrk-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z"></path></marker>
+      <marker id="lrk-arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="13" markerHeight="13" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z"></path></marker>
+    </defs>
+    ${edgesHtml}${nodesHtml}
+  </svg>`;
+
+  const queueHtml = view.queue === null
+    ? `<em>${vi ? "chưa khởi tạo" : "not initialized"}</em>`
+    : view.queue.length
+      ? view.queue.map((person, index) => `<span class="${person === view.enqueuedPerson ? "new" : ""}"><small>${index === 0 ? "FRONT" : index === view.queue.length - 1 ? "BACK" : `#${index}`}</small><strong>P${person}</strong><em>best P${view.answer[person]} · q${view.quiet[view.answer[person]]}</em></span>`).join("")
+      : `<em>${vi ? "queue rỗng" : "empty queue"}</em>`;
+  const currentHtml = Number.isInteger(view.activeU) && ["dequeue", "select-edge", "compare", "update-answer", "decrement-indegree", "check-ready", "enqueue"].includes(view.event)
+    ? `<span><small>CURRENT u</small><strong>P${view.activeU}</strong><em>best P${view.answer[view.activeU]} · q${view.quiet[view.answer[view.activeU]]}</em></span>`
+    : `<em>${vi ? "chưa popleft" : "nothing dequeued"}</em>`;
+  const topoHtml = (view.topoOrder || []).length
+    ? view.topoOrder.map((person, index) => `<span><small>#${index + 1}</small><strong>P${person}</strong></span>`).join(`<b>→</b>`)
+    : `<em>${vi ? "chưa xử lý node" : "no processed node"}</em>`;
+
+  let actionHtml;
+  if (view.candidatePerson !== undefined && view.currentBestPerson !== undefined) {
+    const update = view.shouldUpdate === true;
+    actionHtml = `<div class="lrk-compare">
+      <span class="candidate"><small>${vi ? `CANDIDATE TỪ P${view.activeU}` : `CANDIDATE FROM P${view.activeU}`}</small><strong>P${view.candidatePerson}</strong><b>quiet ${view.quiet[view.candidatePerson]}</b></span>
+      <div><code>${view.quiet[view.candidatePerson]} ${update ? "<" : "≥"} ${view.quiet[view.currentBestPerson]}</code><strong class="${update ? "update" : "keep"}">${update ? "UPDATE" : "KEEP"}</strong></div>
+      <span><small>${vi ? `BEST HIỆN TẠI CỦA P${view.activeV}` : `CURRENT BEST FOR P${view.activeV}`}</small><strong>P${view.currentBestPerson}</strong><b>quiet ${view.quiet[view.currentBestPerson]}</b></span>
+    </div>`;
+  } else if (view.indegreeBefore !== undefined && view.indegreeAfter !== undefined) {
+    actionHtml = `<div class="lrk-degree-action"><small>${vi ? "SỐ RICHER PREDECESSOR CHƯA XỬ LÝ" : "UNPROCESSED RICHER PREDECESSORS"}</small><strong>indegree[P${view.activeV}]</strong><code>${view.indegreeBefore} → ${view.indegreeAfter}</code><span>${view.indegreeAfter === 0 ? (vi ? "Đã nhận đủ candidate · sẵn sàng enqueue" : "All candidates received · ready to enqueue") : (vi ? `Còn chờ ${view.indegreeAfter} predecessor` : `Still waiting for ${view.indegreeAfter} predecessor(s)`)}</span></div>`;
+  } else if (view.event === "seed-check") {
+    const degree = view.indegree[view.seedPerson];
+    actionHtml = `<div class="lrk-seed-action ${view.ready ? "ready" : "locked"}"><small>SEED QUEUE</small><strong>P${view.seedPerson}</strong><code>indegree[${view.seedPerson}] = ${degree}</code><span>${view.ready ? (vi ? "0 → enqueue" : "0 → enqueue") : (vi ? `${degree} → chưa enqueue` : `${degree} → do not enqueue`)}</span></div>`;
+  } else if (["seed-enqueue", "enqueue"].includes(view.event) && Number.isInteger(view.enqueuedPerson)) {
+    actionHtml = `<div class="lrk-seed-action ready"><small>${vi ? "THÊM VÀO QUEUE" : "ADD TO QUEUE"}</small><strong>P${view.enqueuedPerson}</strong><code>q.append(${view.enqueuedPerson})</code><span>${vi ? `P${view.enqueuedPerson} đi vào BACK của queue` : `P${view.enqueuedPerson} moves to the BACK of the queue`}</span></div>`;
+  } else if (view.event === "check-ready") {
+    actionHtml = `<div class="lrk-seed-action ${view.ready ? "ready" : "locked"}"><small>${vi ? "MỞ KHÓA TARGET" : "UNLOCK TARGET"}</small><strong>P${view.activeV}</strong><code>indegree[${view.activeV}] = ${view.indegree[view.activeV]}</code><span>${view.ready ? (vi ? "Đã nhận đủ mọi candidate" : "All candidates received") : (vi ? "Vẫn còn predecessor chưa xử lý" : "Still has an unprocessed predecessor")}</span></div>`;
+  } else if (Number.isInteger(view.activeU) && Number.isInteger(view.activeV)) {
+    actionHtml = `<div class="lrk-edge-action"><small>RICHER → POORER</small><strong>P${view.activeU} → P${view.activeV}</strong><span>${vi ? `Truyền best quiet từ P${view.activeU} xuống P${view.activeV}` : `Propagate the best quiet from P${view.activeU} down to P${view.activeV}`}</span></div>`;
+  } else if (view.event === "dequeue") {
+    actionHtml = `<div class="lrk-edge-action"><small>POP FRONT</small><strong>P${view.activeU} · best P${view.answer[view.activeU]}</strong><span>${vi ? "Candidate của u đã hoàn chỉnh vì indegree[u] = 0" : "u's candidate is finalized because indegree[u] = 0"}</span></div>`;
+  } else {
+    actionHtml = `<div class="lrk-rule"><code>answer[v] = quieter(answer[v], answer[u])</code><span>${vi ? "Chỉ truyền từ richer u xuống poorer v; v chỉ vào queue khi indegree[v] = 0." : "Propagate only from richer u to poorer v; v enters the queue only when indegree[v] = 0."}</span></div>`;
+  }
+
+  const indegreeHtml = Array.from({ length: view.n }, (_, person) => {
+    const degree = view.indegree === null ? null : view.indegree[person];
+    const classes = [];
+    if (person === view.activeU) classes.push("source");
+    if (person === view.activeV || person === view.seedPerson) classes.push("target");
+    if (queueSet.has(person)) classes.push("queued");
+    if (processedSet.has(person)) classes.push("processed");
+    if (degree === 0 && !processedSet.has(person)) classes.push("ready");
+    const status = degree === null
+      ? (vi ? "chưa tạo" : "not created")
+      : processedSet.has(person)
+        ? (vi ? "đã xử lý" : "processed")
+        : queueSet.has(person)
+          ? "queue"
+          : degree === 0
+            ? "ready"
+            : (vi ? `chờ ${degree}` : `wait ${degree}`);
+    return `<span class="${classes.join(" ")}"><small>P${person}</small><strong>${degree === null ? "—" : degree}</strong><em>${status}</em></span>`;
+  }).join("");
+
+  const answerHtml = Array.from({ length: view.n }, (_, person) => {
+    const best = view.answer === null ? null : view.answer[person];
+    const classes = [];
+    if (person === view.activeV) classes.push("target");
+    if (person === view.changedPerson) classes.push("changed");
+    if (processedSet.has(person)) classes.push("finalized");
+    return `<span class="${classes.join(" ")}"><small>answer[${person}]</small><strong>${best === null ? "—" : `P${best}`}</strong><em>${best === null ? "not initialized" : `quiet ${view.quiet[best]}`}</em></span>`;
+  }).join("");
+
+  return `<div class="loud-rich-kahn">
+    <div class="lrk-phases">${phases}</div>
+    <div class="lrk-direction"><strong>RICHER</strong><code>P a → P b</code><strong>POORER</strong><span>${vi ? "candidate quiet đi cùng chiều mũi tên" : "quiet candidates follow the arrow"}</span></div>
+    <div class="lrk-relations"><header><strong>RICHER INPUT</strong><span>${vi ? "a > b trở thành cạnh a → b" : "a > b becomes edge a → b"}</span></header><div>${relationChips || "∅"}</div></div>
+    <div class="lrk-queue-flow">
+      <div><small>CURRENT</small><section>${currentHtml}</section></div><b>→</b>
+      <div><small>QUEUE · FRONT → BACK</small><section>${queueHtml}</section></div>
+    </div>
+    <div class="lrk-main">
+      <div class="lrk-graph">${graphSvg}<div class="lrk-legend"><span><i class="source"></i>source u</span><span><i class="target"></i>target v</span><span><i class="queued"></i>queue</span><span><i class="processed"></i>${vi ? "đã xử lý" : "processed"}</span></div></div>
+      <div class="lrk-debug">${actionHtml}<div class="lrk-indegree"><header><strong>INDEGREE</strong><span>${vi ? "số richer predecessor còn chờ" : "richer predecessors still pending"}</span></header><div>${indegreeHtml}</div></div></div>
+    </div>
+    <div class="lrk-topo"><strong>TOPO ORDER</strong><div>${topoHtml}</div></div>
+    <div class="lrk-answer"><header><strong>ANSWER</strong><span>answer[i] = ${vi ? "người quiet nhất giàu hơn hoặc bằng i" : "quietest person richer than or equal to i"}</span></header><div>${answerHtml}</div></div>
+  </div>`;
+}
+
 function renderLoudRichView(step) {
   const view = step.loudRichView || step.loudRichV2;
   if (!view) return;
   const el = $("treeView");
   const vi = lang === "vi";
-  
-  // Detect BFS Kahn approach (has indegree/inQueue/processed)
+
   const isBFS = !!step.loudRichV2;
-  
+
   if (isBFS) {
-    // Simple BFS rendering
-    el.innerHTML = `<div class="loud-rich-bfs-wrapper">
-      <div class="loud-rich-phases"><strong>${vi ? "APPROACH 2: BFS Kahn (Topological Sort)" : "APPROACH 2: BFS Kahn (Topological Sort)"}</strong></div>
-      <div class="loud-rich-state">
-        <div><strong>${vi ? "In-degree" : "In-degree"}:</strong> [${view.indegree.join(", ")}]</div>
-        <div><strong>${vi ? "Answer" : "Answer"}:</strong> [${view.answer.join(", ")}]</div>
-        <div><strong>${vi ? "Queue" : "Queue"}:</strong> [${[...view.inQueue].join(", ") || "∅"}]</div>
-        <div><strong>${vi ? "Processed" : "Processed"}:</strong> {${[...view.processed].join(", ") || "∅"}}</div>
-      </div>
-      ${view.activeU !== undefined ? `<div class="loud-rich-active"><strong>${vi ? "Processing" : "Processing"}: u = ${view.activeU}</strong></div>` : ""}
-    </div>`;
+    el.innerHTML = loudRichKahnHtml(view);
     return;
   }
-  
+
   // Original DFS rendering
   const phaseIndex = { build: 0, dfs: 1, explore: 2, compare: 3, memo: 4, done: 5 }[view.phase] ?? 0;
   const phaseLabels = vi
