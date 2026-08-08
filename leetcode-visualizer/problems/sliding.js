@@ -1239,6 +1239,282 @@ function buildSteps1208(s, params) {
 }
 
 /**
+ * LeetCode 643: Maximum Average Subarray I.
+ * Keep the sum of one fixed-size window and slide it one position at a time.
+ */
+function buildSteps643(input, params) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const k = Number(params && params.k);
+  if (!nums.length || !Number.isInteger(k) || k < 1 || k > nums.length) {
+    throw new Error("k must be an integer between 1 and nums.length");
+  }
+
+  const steps = [];
+  const indices = (left, right) => (
+    Number.isInteger(left) && Number.isInteger(right) && left <= right
+      ? Array.from({ length: right - left + 1 }, (_, offset) => left + offset)
+      : []
+  );
+  const format = (value) => Number(value.toFixed(5));
+  let currentLeft = null;
+  let currentRight = null;
+  let nextLeft = null;
+  let nextRight = null;
+  let bestLeft = null;
+  let bestRight = null;
+  let windowSum = null;
+  let maxSum = null;
+  let outgoingIndex = null;
+  let incomingIndex = null;
+  let operation = null;
+  let shouldUpdate = null;
+  const evaluatedWindows = [];
+
+  const phaseFor = (event) => {
+    if (["enter", "select-initial", "init-sum", "init-max"].includes(event)) return "initialize";
+    if (["advance", "calculate-slide", "apply-slide"].includes(event)) return "slide";
+    if (["compare", "apply-max"].includes(event)) return "compare";
+    return "done";
+  };
+  const makeView = (event, overrides = {}) => ({
+    event,
+    phase: phaseFor(event),
+    nums: [...nums],
+    k,
+    currentLeft,
+    currentRight,
+    nextLeft,
+    nextRight,
+    bestLeft,
+    bestRight,
+    windowSum,
+    maxSum,
+    currentAverage: windowSum === null ? null : windowSum / k,
+    maxAverage: maxSum === null ? null : maxSum / k,
+    outgoingIndex,
+    incomingIndex,
+    operation: operation ? { ...operation } : null,
+    shouldUpdate,
+    evaluatedWindows: evaluatedWindows.map((window) => ({ ...window })),
+    ...overrides,
+  });
+  const variables = (extra = []) => {
+    const values = [{ name: "k", value: k }];
+    if (windowSum !== null) values.push({ name: "window_sum", value: windowSum });
+    if (maxSum !== null) values.push({ name: "max_sum", value: maxSum });
+    return [...values, ...extra];
+  };
+  const push = ({ event, title, line, note, vars = variables(), final = false, view = {} }) => {
+    steps.push({
+      title,
+      arr: [...nums],
+      highlight: indices(currentLeft, currentRight),
+      mark: indices(bestLeft, bestRight),
+      averageWindowView: makeView(event, view),
+      codeLines: [line],
+      vars,
+      note,
+      final,
+    });
+  };
+
+  push({
+    event: "enter",
+    title: { vi: "Bắt đầu findMaxAverage", en: "Enter findMaxAverage" },
+    line: 2,
+    note: {
+      vi: `Ta cần tìm cửa sổ liên tiếp dài đúng k = ${k} có tổng lớn nhất. Chưa gán window_sum hoặc max_sum.`,
+      en: `Find the contiguous window of exactly k = ${k} elements with the largest sum. window_sum and max_sum are not assigned yet.`,
+    },
+  });
+
+  currentLeft = 0;
+  currentRight = k - 1;
+  push({
+    event: "select-initial",
+    title: { vi: `Chọn nums[:${k}]`, en: `Select nums[:${k}]` },
+    line: 3,
+    note: {
+      vi: `Cửa sổ đầu tiên là [0..${k - 1}]. Bước tiếp theo mới tính và gán tổng của ${k} phần tử này.`,
+      en: `The first window is [0..${k - 1}]. The next step computes and assigns the sum of these ${k} values.`,
+    },
+  });
+
+  const firstWindow = nums.slice(0, k);
+  const firstWindowExpression = firstWindow.map((value, index) => {
+    if (index === 0) return String(value);
+    return value < 0 ? `- ${Math.abs(value)}` : `+ ${value}`;
+  }).join(" ");
+  windowSum = firstWindow.reduce((sum, value) => sum + value, 0);
+  push({
+    event: "init-sum",
+    title: { vi: `window_sum = ${windowSum}`, en: `window_sum = ${windowSum}` },
+    line: 3,
+    note: {
+      vi: `sum(nums[:${k}]) = ${firstWindowExpression} = ${windowSum}.`,
+      en: `sum(nums[:${k}]) = ${firstWindowExpression} = ${windowSum}.`,
+    },
+  });
+
+  maxSum = windowSum;
+  bestLeft = currentLeft;
+  bestRight = currentRight;
+  evaluatedWindows.push({
+    left: currentLeft,
+    right: currentRight,
+    sum: windowSum,
+    average: windowSum / k,
+    isBest: true,
+  });
+  push({
+    event: "init-max",
+    title: { vi: `max_sum = ${maxSum}`, en: `max_sum = ${maxSum}` },
+    line: 4,
+    note: {
+      vi: `Cửa sổ đầu tiên tạm giữ kỷ lục: tổng ${maxSum}, trung bình ${format(maxSum / k)}.`,
+      en: `The first window starts as the record: sum ${maxSum}, average ${format(maxSum / k)}.`,
+    },
+  });
+
+  for (let i = k; i < nums.length; i++) {
+    outgoingIndex = i - k;
+    incomingIndex = i;
+    nextLeft = currentLeft + 1;
+    nextRight = i;
+    operation = null;
+    shouldUpdate = null;
+    push({
+      event: "advance",
+      title: { vi: `i = ${i}: xác định OUT và IN`, en: `i = ${i}: identify OUT and IN` },
+      line: 6,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "OUT", value: `nums[${outgoingIndex}] = ${nums[outgoingIndex]}` },
+        { name: "IN", value: `nums[${incomingIndex}] = ${nums[incomingIndex]}` },
+      ]),
+      note: {
+        vi: `Để trượt sang [${nextLeft}..${nextRight}], bỏ nums[${outgoingIndex}] = ${nums[outgoingIndex]} và thêm nums[${incomingIndex}] = ${nums[incomingIndex]}.`,
+        en: `To slide to [${nextLeft}..${nextRight}], remove nums[${outgoingIndex}] = ${nums[outgoingIndex]} and add nums[${incomingIndex}] = ${nums[incomingIndex]}.`,
+      },
+    });
+
+    const previousSum = windowSum;
+    const nextSum = previousSum + nums[incomingIndex] - nums[outgoingIndex];
+    operation = {
+      previousSum,
+      incomingValue: nums[incomingIndex],
+      outgoingValue: nums[outgoingIndex],
+      result: nextSum,
+    };
+    push({
+      event: "calculate-slide",
+      title: {
+        vi: `${previousSum} + ${nums[incomingIndex]} - ${nums[outgoingIndex]} = ${nextSum}`,
+        en: `${previousSum} + ${nums[incomingIndex]} - ${nums[outgoingIndex]} = ${nextSum}`,
+      },
+      line: 7,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "next window_sum", value: nextSum },
+      ]),
+      note: {
+        vi: "Tính tổng cửa sổ mới từ tổng cũ; không cần cộng lại toàn bộ k phần tử.",
+        en: "Compute the new window sum from the old sum; there is no need to add all k values again.",
+      },
+    });
+
+    windowSum = nextSum;
+    currentLeft = nextLeft;
+    currentRight = nextRight;
+    push({
+      event: "apply-slide",
+      title: { vi: `Gán window_sum = ${windowSum}`, en: `Assign window_sum = ${windowSum}` },
+      line: 7,
+      vars: variables([{ name: "i", value: i }]),
+      note: {
+        vi: `Cửa sổ hiện tại đã chuyển thành [${currentLeft}..${currentRight}], tổng ${windowSum}, trung bình ${format(windowSum / k)}.`,
+        en: `The current window is now [${currentLeft}..${currentRight}], sum ${windowSum}, average ${format(windowSum / k)}.`,
+      },
+    });
+
+    shouldUpdate = windowSum > maxSum;
+    push({
+      event: "compare",
+      title: shouldUpdate
+        ? { vi: `${windowSum} > ${maxSum}: cập nhật kỷ lục`, en: `${windowSum} > ${maxSum}: update the record` }
+        : { vi: `${windowSum} ≤ ${maxSum}: giữ kỷ lục`, en: `${windowSum} ≤ ${maxSum}: keep the record` },
+      line: 8,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "window_sum > max_sum", value: shouldUpdate },
+      ]),
+      note: shouldUpdate
+        ? { vi: `Tổng ${windowSum} lớn hơn max_sum ${maxSum}.`, en: `Sum ${windowSum} is greater than max_sum ${maxSum}.` }
+        : { vi: `Tổng ${windowSum} không vượt max_sum ${maxSum}.`, en: `Sum ${windowSum} does not beat max_sum ${maxSum}.` },
+    });
+
+    if (shouldUpdate) {
+      maxSum = windowSum;
+      bestLeft = currentLeft;
+      bestRight = currentRight;
+      evaluatedWindows.forEach((window) => { window.isBest = false; });
+    }
+    evaluatedWindows.push({
+      left: currentLeft,
+      right: currentRight,
+      sum: windowSum,
+      average: windowSum / k,
+      isBest: shouldUpdate,
+    });
+    push({
+      event: "apply-max",
+      title: shouldUpdate
+        ? { vi: `max_sum = ${maxSum}`, en: `max_sum = ${maxSum}` }
+        : { vi: `max_sum vẫn là ${maxSum}`, en: `max_sum stays ${maxSum}` },
+      line: 8,
+      vars: variables([
+        { name: "i", value: i },
+        { name: "best window", value: `[${bestLeft}..${bestRight}]` },
+      ]),
+      note: shouldUpdate
+        ? { vi: `Lưu [${bestLeft}..${bestRight}] làm cửa sổ tốt nhất mới.`, en: `Store [${bestLeft}..${bestRight}] as the new best window.` }
+        : { vi: `Giữ cửa sổ tốt nhất [${bestLeft}..${bestRight}].`, en: `Keep the best window [${bestLeft}..${bestRight}].` },
+    });
+  }
+
+  outgoingIndex = null;
+  incomingIndex = null;
+  nextLeft = null;
+  nextRight = null;
+  operation = null;
+  shouldUpdate = null;
+  const answer = maxSum / k;
+  push({
+    event: "done",
+    title: { vi: `Trả về ${format(answer)}`, en: `Return ${format(answer)}` },
+    line: 10,
+    vars: [
+      { name: "max_sum", value: maxSum },
+      { name: "k", value: k },
+      { name: "answer", value: format(answer) },
+    ],
+    note: {
+      vi: `Cửa sổ tốt nhất [${bestLeft}..${bestRight}] có trung bình ${maxSum} / ${k} = ${format(answer)}.`,
+      en: `The best window [${bestLeft}..${bestRight}] has average ${maxSum} / ${k} = ${format(answer)}.`,
+    },
+    final: true,
+    view: {
+      currentLeft: bestLeft,
+      currentRight: bestRight,
+      windowSum: maxSum,
+      currentAverage: answer,
+    },
+  });
+
+  return { original: nums, k, answer, steps };
+}
+
+/**
  * LeetCode 487: Max Consecutive Ones II.
  * Sliding window: allow flipping at most one 0 to 1.
  */
@@ -2857,6 +3133,58 @@ module.exports = {
       "        return min_len if min_len != float('inf') else 0",
     ],
     builder: buildSteps209,
+  },
+  643: {
+    id: 643,
+    difficulty: "easy",
+    slug: "maximum-average-subarray-i",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Maximum Average Subarray I", en: "Maximum Average Subarray I" },
+    titleVi: { vi: "Đoạn con có trung bình lớn nhất I", en: "Maximum average subarray I" },
+    statement: {
+      vi: "Cho mảng số nguyên nums gồm n phần tử và số nguyên k. Tìm đoạn con liên tiếp có đúng k phần tử với giá trị trung bình lớn nhất và trả về giá trị trung bình đó.",
+      en: "Given an integer array nums of n elements and an integer k, find the contiguous subarray of exactly k elements with the maximum average and return that average.",
+    },
+    defaultInput: [1, 12, -5, -6, 50, 3],
+    inputKind: "integer",
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "Độ dài cửa sổ k", en: "Window size k" }, default: 4 },
+    ],
+    approach: [
+      {
+        vi: "Tính tổng của k phần tử đầu tiên. Vì mọi cửa sổ đều có cùng độ dài k, cửa sổ có tổng lớn nhất cũng có trung bình lớn nhất.",
+        en: "Sum the first k values. Because every window has the same length k, the window with the largest sum also has the largest average.",
+      },
+      {
+        vi: "Mỗi lần trượt một ô: cộng phần tử IN bên phải và trừ phần tử OUT bên trái, rồi cập nhật max_sum.",
+        en: "For each one-cell slide, add the incoming value on the right, subtract the outgoing value on the left, then update max_sum.",
+      },
+      {
+        vi: "Chỉ chia max_sum cho k một lần ở cuối để tránh phép chia lặp lại.",
+        en: "Divide max_sum by k only once at the end to avoid repeated division.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Tính cửa sổ đầu trong O(k), sau đó mỗi phần tử còn lại được thêm và một phần tử cũ được bỏ đúng một lần. Chỉ dùng vài biến tổng.",
+        en: "The first window costs O(k); afterward each remaining value enters once and one old value leaves once. Only a few numeric variables are stored.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMaxAverage(self, nums: List[int], k: int) -> float:",
+      "        window_sum = sum(nums[:k])",
+      "        max_sum = window_sum",
+      "",
+      "        for i in range(k, len(nums)):",
+      "            window_sum += nums[i] - nums[i - k]",
+      "            max_sum = max(max_sum, window_sum)",
+      "",
+      "        return max_sum / k",
+    ],
+    builder: buildSteps643,
   },
   487: {
     id: 487,

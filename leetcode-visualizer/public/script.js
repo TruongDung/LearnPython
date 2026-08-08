@@ -9138,6 +9138,101 @@ function renderRectangleSweepView(step) {
   </div>`;
 }
 
+function renderAverageWindowView(step) {
+  const view = step.averageWindowView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const k = Number(view.k) || 1;
+  const vi = lang === "vi";
+  const phaseIndex = { initialize: 0, slide: 1, compare: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Tạo cửa sổ đầu", "2 · OUT trái · IN phải", "3 · So với max_sum"]
+    : ["1 · Build first window", "2 · OUT left · IN right", "3 · Compare with max_sum"];
+  const phases = phaseLabels.map((label, index) => {
+    const done = view.phase === "done" || index < phaseIndex;
+    const state = done ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const inRange = (index, left, right) => (
+    Number.isInteger(left) && Number.isInteger(right) && index >= left && index <= right
+  );
+  const format = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+    return String(Number(Number(value).toFixed(5)));
+  };
+  const maxMagnitude = Math.max(1, ...nums.map((value) => Math.abs(Number(value) || 0)));
+  const cells = nums.map((value, index) => {
+    const classes = ["avg643-cell"];
+    if (inRange(index, view.currentLeft, view.currentRight)) classes.push("current-window");
+    if (["advance", "calculate-slide"].includes(view.event) && inRange(index, view.nextLeft, view.nextRight)) classes.push("next-window");
+    if (inRange(index, view.bestLeft, view.bestRight)) classes.push("best-window");
+    if (index === view.outgoingIndex) classes.push("outgoing");
+    if (index === view.incomingIndex) classes.push("incoming");
+    const markers = [];
+    if (index === view.outgoingIndex) markers.push("OUT");
+    if (index === view.incomingIndex) markers.push("IN");
+    if (index === view.currentLeft) markers.push("L");
+    if (index === view.currentRight) markers.push("R");
+    const magnitude = Math.max(7, Math.round((Math.abs(value) / maxMagnitude) * 42));
+    return `<div class="${classes.join(" ")}" aria-label="nums[${index}] = ${escapeHtml(String(value))}">
+      <div class="avg643-markers">${markers.map((marker) => `<span>${marker}</span>`).join("")}</div>
+      <div class="avg643-index">[${index}]</div>
+      <div class="avg643-bar-zone"><i class="${value < 0 ? "negative" : "positive"}" style="--avg643-bar:${magnitude}%"></i><b>${escapeHtml(String(value))}</b></div>
+    </div>`;
+  }).join("");
+
+  const initialValues = nums.slice(0, k);
+  const signedExpression = initialValues.map((value, index) => {
+    if (index === 0) return String(value);
+    return value < 0 ? `− ${Math.abs(value)}` : `+ ${value}`;
+  }).join(" ");
+  let actionHtml;
+  if (view.event === "enter") {
+    actionHtml = `<div class="avg643-formula"><small>${vi ? "MỤC TIÊU" : "GOAL"}</small><strong>${vi ? `Tìm tổng lớn nhất trong mọi cửa sổ dài ${k}` : `Find the largest sum among all length-${k} windows`}</strong></div>`;
+  } else if (view.event === "select-initial") {
+    actionHtml = `<div class="avg643-formula"><small>${vi ? "CỬA SỔ ĐẦU" : "FIRST WINDOW"}</small><code>nums[:${k}] = [${escapeHtml(initialValues.join(", "))}]</code></div>`;
+  } else if (view.event === "init-sum" || view.event === "init-max") {
+    actionHtml = `<div class="avg643-formula"><small>${view.event === "init-sum" ? "window_sum" : "max_sum = window_sum"}</small><code>${escapeHtml(signedExpression)} = ${format(view.windowSum)}</code></div>`;
+  } else if (view.event === "advance") {
+    actionHtml = `<div class="avg643-move"><span class="out"><small>OUT</small><strong>nums[${view.outgoingIndex}]</strong><b>${escapeHtml(String(nums[view.outgoingIndex]))}</b></span><i>→</i><span class="in"><small>IN</small><strong>nums[${view.incomingIndex}]</strong><b>${escapeHtml(String(nums[view.incomingIndex]))}</b></span></div>`;
+  } else if (["calculate-slide", "apply-slide"].includes(view.event) && view.operation) {
+    actionHtml = `<div class="avg643-formula slide"><small>window_sum += IN − OUT</small><code>${format(view.operation.previousSum)} + (${format(view.operation.incomingValue)}) − (${format(view.operation.outgoingValue)}) = ${format(view.operation.result)}</code></div>`;
+  } else if (["compare", "apply-max"].includes(view.event)) {
+    const update = view.shouldUpdate === true;
+    const candidateSum = view.windowSum;
+    const recordSum = view.event === "apply-max" && update && view.evaluatedWindows.length > 1
+      ? Math.max(...view.evaluatedWindows.slice(0, -1).map((window) => window.sum))
+      : view.maxSum;
+    actionHtml = `<div class="avg643-compare">
+      <span><small>${vi ? "CỬA SỔ HIỆN TẠI" : "CURRENT WINDOW"}</small><strong>${format(candidateSum)}</strong><b>avg ${format(candidateSum / k)}</b></span>
+      <div><code>${format(candidateSum)} ${update ? ">" : "≤"} ${format(recordSum)}</code><strong class="${update ? "update" : "keep"}">${update ? "UPDATE" : "KEEP"}</strong></div>
+      <span><small>${vi ? "KỶ LỤC TRƯỚC" : "PREVIOUS RECORD"}</small><strong>${format(recordSum)}</strong><b>avg ${format(recordSum / k)}</b></span>
+    </div>`;
+  } else {
+    actionHtml = `<div class="avg643-formula result"><small>return max_sum / k</small><code>${format(view.maxSum)} / ${k} = ${format(view.maxAverage)}</code></div>`;
+  }
+
+  const currentRange = Number.isInteger(view.currentLeft) ? `[${view.currentLeft}..${view.currentRight}]` : "—";
+  const bestRange = Number.isInteger(view.bestLeft) ? `[${view.bestLeft}..${view.bestRight}]` : "—";
+  const statsHtml = `<div class="avg643-stats">
+    <span><small>${vi ? "CỬA SỔ HIỆN TẠI" : "CURRENT WINDOW"}</small><strong>${currentRange}</strong><b>sum ${format(view.windowSum)} · avg ${format(view.currentAverage)}</b></span>
+    <span><small>${vi ? "CỬA SỔ TỐT NHẤT" : "BEST WINDOW"}</small><strong>${bestRange}</strong><b>max_sum ${format(view.maxSum)} · avg ${format(view.maxAverage)}</b></span>
+  </div>`;
+  const windows = Array.isArray(view.evaluatedWindows) ? view.evaluatedWindows : [];
+  const ledgerHtml = windows.length
+    ? windows.map((window, index) => `<span class="${window.isBest ? "best" : ""}${window.left === view.currentLeft && window.right === view.currentRight ? " current" : ""}"><small>#${index + 1} · [${window.left}..${window.right}]</small><strong>sum ${format(window.sum)}</strong><b>avg ${format(window.average)}</b>${window.isBest ? "<em>BEST</em>" : ""}</span>`).join("")
+    : `<em>${vi ? "Chưa đánh giá cửa sổ" : "No evaluated window yet"}</em>`;
+
+  $("treeView").innerHTML = `<div class="avg643-viz">
+    <div class="avg643-phases">${phases}</div>
+    <div class="avg643-rule"><strong>${vi ? `CỬA SỔ CỐ ĐỊNH k = ${k}` : `FIXED WINDOW k = ${k}`}</strong><span>window_sum(new) = window_sum(old) + IN − OUT</span></div>
+    <div class="avg643-array">${cells}</div>
+    <div class="avg643-legend"><span><i class="window"></i>${vi ? "cửa sổ hiện tại" : "current window"}</span><span><i class="out"></i>OUT</span><span><i class="in"></i>IN</span><span><i class="best"></i>best</span></div>
+    ${actionHtml}
+    ${statsHtml}
+    <div class="avg643-history"><header><strong>${vi ? "CÁC CỬA SỔ ĐÃ ĐÁNH GIÁ" : "EVALUATED WINDOWS"}</strong><span>${vi ? "cùng độ dài nên so tổng là đủ" : "equal length, so comparing sums is enough"}</span></header><div>${ledgerHtml}</div></div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -9161,6 +9256,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.averageWindowView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAverageWindowView(step);
   } else if (step.rectangleSweepView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
