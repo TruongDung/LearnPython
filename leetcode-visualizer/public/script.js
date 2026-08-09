@@ -4928,6 +4928,7 @@ function renderPathExistsDfsView(step) {
   const returnLabel = view.returnValue === null || view.returnValue === undefined
     ? (vi ? "chưa return" : "no return yet")
     : String(view.returnValue);
+  const isDone = view.phase === "done";
   const summary = vi
     ? `DFS đệ quy từ ${source} tới ${destination}. Stack có ${callStack.length} frame.`
     : `Recursive DFS from ${source} to ${destination}. Stack has ${callStack.length} frame(s).`;
@@ -4948,8 +4949,8 @@ function renderPathExistsDfsView(step) {
         <div class="path1971-head"><strong>adjacency list</strong><span>${vi ? "hàng xóm của từng node" : "neighbors per node"}</span></div>
         <div>${adjHtml}</div>
       </div>
-      <div class="path1971-decision ${returnClass}">
-        <small>${vi ? "Bước hiện tại" : "Current step"}</small>
+      <div class="path1971-decision ${returnClass}${isDone ? " done" : ""}">
+        <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
         <strong>${escapeHtml(decisionText)}</strong>
         <div>
           ${activeNode === null ? "" : `<span>node = ${escapeHtml(activeNode)}</span>`}
@@ -4960,6 +4961,120 @@ function renderPathExistsDfsView(step) {
     </div>
   </section>`;
   renderGraph(step, "path1971Graph");
+}
+
+function renderPathExistsBfsView(step) {
+  const view = step.pathExistsBfsView || {};
+  const vi = lang === "vi";
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const visited = new Set(Array.isArray(view.visited) ? view.visited : []);
+  const adj = Array.isArray(view.adj) ? view.adj : [];
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const activeNeighbor = Number.isInteger(view.activeNeighbor) ? view.activeNeighbor : null;
+  const source = Number.isInteger(view.source) ? view.source : null;
+  const destination = Number.isInteger(view.destination) ? view.destination : null;
+
+  const stage = ["intro", "check-source", "build-adj", "init-bfs"].includes(view.phase)
+    ? 0
+    : view.phase === "done" ? 2 : 1;
+  const stageLabels = vi
+    ? ["1 · Dựng graph", "2 · BFS queue", "3 · Return kết quả"]
+    : ["1 · Build graph", "2 · BFS queue", "3 · Return result"];
+  const phases = stageLabels.map((label, index) => {
+    const state = index < stage ? "done" : index === stage ? "active" : "";
+    return `<span class="${state}">${index < stage ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`;
+  }).join("");
+
+  const queueHtml = queue.length
+    ? queue.map((node, index) => `<span class="${index === 0 ? "top" : ""}"><small>${index === 0 ? "front" : `#${index + 1}`}</small><strong>${escapeHtml(node)}</strong></span>`).join("")
+    : `<span class="path1971-empty">${vi ? "queue rỗng" : "empty queue"}</span>`;
+
+  const visitedHtml = adj.length
+    ? adj.map((_, node) => {
+      const classes = [
+        "path1971-node-chip",
+        visited.has(node) ? "visited" : "",
+        node === activeNode ? "active" : "",
+        node === source ? "source" : "",
+        node === destination ? "destination" : "",
+      ].filter(Boolean).join(" ");
+      return `<span class="${classes}">${node}</span>`;
+    }).join("")
+    : `<span class="path1971-empty">∅</span>`;
+
+  const adjHtml = adj.length
+    ? adj.map((neighbors, node) => {
+      const neighborHtml = neighbors.length
+        ? neighbors.map((nb) => `<span class="${nb === activeNeighbor ? "current" : visited.has(nb) ? "visited" : ""}">${escapeHtml(nb)}</span>`).join("")
+        : "<em>∅</em>";
+      return `<div class="path1971-adj-row ${node === activeNode ? "active" : ""}">
+        <b>${node}</b><i>→</i><div>${neighborHtml}</div>
+      </div>`;
+    }).join("")
+    : `<div class="path1971-empty">${vi ? "adj đang rỗng" : "adj is empty"}</div>`;
+
+  const decisionText = {
+    intro: vi ? "BFS dùng queue để duyệt component từ source theo thứ tự FIFO." : "BFS uses a queue to explore source's component in FIFO order.",
+    "source-is-destination": vi ? "source đã trùng destination." : "source is already destination.",
+    "source-not-destination": vi ? "source khác destination, cần dựng graph rồi BFS." : "source differs from destination; build graph then BFS.",
+    "init-adj": vi ? "Tạo danh sách kề rỗng cho mọi node." : "Create an empty adjacency list for every node.",
+    "read-edge": vi ? "Đọc một cạnh vô hướng từ input." : "Read one undirected edge from input.",
+    "append-forward": vi ? "Thêm chiều a → b vào adjacency list." : "Add direction a → b to the adjacency list.",
+    "append-backward": vi ? "Thêm chiều b → a vì graph vô hướng." : "Add direction b → a because the graph is undirected.",
+    "init-visited": vi ? "Khởi tạo visited để không enqueue trùng node." : "Initialize visited to avoid enqueueing a node twice.",
+    "init-queue": vi ? "Queue bắt đầu với source ở front." : "The queue starts with source at the front.",
+    "mark-source": vi ? "Đánh dấu source ngay khi enqueue." : "Mark source as soon as it is enqueued.",
+    "while-queue": vi ? "Queue chưa rỗng, tiếp tục pop node ở front." : "The queue is not empty; pop the front node next.",
+    dequeue: vi ? "Lấy node ở front ra để xử lý." : "Remove the front node for processing.",
+    "destination-found": vi ? "Node vừa pop chính là destination." : "The popped node is destination.",
+    "not-destination": vi ? "Chưa tới destination, thử các hàng xóm." : "Not destination yet; inspect neighbors.",
+    "iterate-neighbors": vi ? "Duyệt từng hàng xóm của node hiện tại." : "Iterate through the current node's neighbors.",
+    "skip-visited": vi ? "Hàng xóm đã visited, không enqueue lại." : "This neighbor is already visited; do not enqueue it again.",
+    "visit-neighbor": vi ? "Hàng xóm chưa visited, chuẩn bị đánh dấu và enqueue." : "This neighbor is unvisited; mark and enqueue it.",
+    "mark-neighbor": vi ? "Đánh dấu hàng xóm trước khi enqueue." : "Mark the neighbor before enqueueing it.",
+    "enqueue-neighbor": vi ? "Đưa hàng xóm vào cuối queue." : "Append the neighbor to the back of the queue.",
+    "queue-empty": vi ? "Queue rỗng, BFS đã duyệt hết component của source." : "The queue is empty; BFS has explored source's entire component.",
+    "done-true": vi ? "Có đường đi từ source tới destination." : "A path exists from source to destination.",
+    "done-false": vi ? "Không có đường đi trong component của source." : "No path exists in source's component.",
+  }[view.decision] || (vi ? "Theo dõi BFS bằng queue." : "Trace BFS with a queue.");
+
+  const returnClass = view.returnValue === true ? "true" : view.returnValue === false ? "false" : "";
+  const returnLabel = view.returnValue === null || view.returnValue === undefined
+    ? (vi ? "chưa return" : "no return yet")
+    : String(view.returnValue);
+  const isDone = view.phase === "done";
+  const summary = vi
+    ? `BFS từ ${source} tới ${destination}. Queue có ${queue.length} node đang chờ.`
+    : `BFS from ${source} to ${destination}. Queue has ${queue.length} pending node(s).`;
+
+  $("treeView").innerHTML = `<section class="path1971-viz" aria-label="${escapeHtml(summary)}">
+    <div class="path1971-phases">${phases}</div>
+    <div class="path1971-layout">
+      <div id="path1971BfsGraph" class="path1971-graph"></div>
+      <div class="path1971-state">
+        <div class="path1971-head"><strong>queue</strong><span>${vi ? "front được pop trước" : "front pops first"}</span></div>
+        <div class="path1971-stack">${queueHtml}</div>
+        <div class="path1971-head"><strong>visited</strong><span>${visited.size}/${adj.length}</span></div>
+        <div class="path1971-visited">${visitedHtml}</div>
+      </div>
+    </div>
+    <div class="path1971-lower">
+      <div class="path1971-adj">
+        <div class="path1971-head"><strong>adjacency list</strong><span>${vi ? "hàng xóm của từng node" : "neighbors per node"}</span></div>
+        <div>${adjHtml}</div>
+      </div>
+      <div class="path1971-decision ${returnClass}${isDone ? " done" : ""}">
+        <small>${isDone ? (vi ? "Hoàn tất" : "Done") : (vi ? "Bước hiện tại" : "Current step")}</small>
+        <strong>${escapeHtml(decisionText)}</strong>
+        <div>
+          ${activeNode === null ? "" : `<span>node = ${escapeHtml(activeNode)}</span>`}
+          ${activeNeighbor === null ? "" : `<span>nb = ${escapeHtml(activeNeighbor)}</span>`}
+          <span>return = ${escapeHtml(returnLabel)}</span>
+        </div>
+      </div>
+    </div>
+  </section>`;
+  renderGraph(step, "path1971BfsGraph");
 }
 
 // ---- Linked List renderer (horizontal box nodes with next arrows + curved random arrows) ----
@@ -10517,6 +10632,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPathExistsDfsView(step);
+  } else if (step.pathExistsBfsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPathExistsBfsView(step);
   } else if (step.replaceWordsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

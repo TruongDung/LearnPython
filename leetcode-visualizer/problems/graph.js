@@ -9498,6 +9498,7 @@ function buildSteps2368(input, params) {
  */
 function buildSteps1971(input, params) {
   const approach = Number(params && params.approach) || 1;
+  if (approach === 3) return buildSteps1971BFS(input, params);
   if (approach === 2) return buildSteps1971RecursiveDFS(input, params);
   return buildSteps1971StackDFS(input, params);
 }
@@ -9776,6 +9777,368 @@ function buildSteps1971StackDFS(input, params) {
   return { n, edges: edgeList, source, destination, answer: found, steps };
 }
 
+function buildSteps1971BFS(input, params) {
+  const n = params && params.n !== undefined ? Number(params.n) : 6;
+  const source = params && params.source !== undefined ? Number(params.source) : 0;
+  const destination = params && params.destination !== undefined ? Number(params.destination) : 5;
+  const edgeList = String(input || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(",").map(Number))
+    .filter((e) => e.length === 2 && !e.some(Number.isNaN));
+
+  const steps = [];
+  const adj = Array.from({ length: n }, () => []);
+  const allNodes = Array.from({ length: n }, (_, id) => id);
+  const allEdges = [];
+  const visited = new Array(n).fill(false);
+  const queue = [];
+  let head = 0;
+
+  function visitedList() {
+    return allNodes.filter((id) => visited[id]);
+  }
+
+  function pendingQueue() {
+    return queue.slice(head);
+  }
+
+  function makeGraph(hlNodes = [], hlEdges = []) {
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id) })),
+      edges: allEdges.slice(),
+      hlNodes,
+      hlEdges,
+      visitedNodes: visitedList(),
+    };
+  }
+
+  function push({
+    title,
+    hlNodes = [],
+    hlEdges = [],
+    codeLines = [],
+    vars = [],
+    note,
+    final = false,
+    phase = "setup",
+    activeNode = null,
+    activeNeighbor = null,
+    returnValue = null,
+    decision = "",
+  }) {
+    const q = pendingQueue();
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges),
+      pathExistsBfsView: {
+        n,
+        source,
+        destination,
+        phase,
+        activeNode,
+        activeNeighbor,
+        returnValue,
+        decision,
+        queue: q,
+        visited: visitedList(),
+        adj: adj.map((neighbors) => neighbors.slice()),
+      },
+      highlight: [],
+      mark: [],
+      final,
+      codeBlock: 3,
+      codeLines,
+      vars: [
+        { name: "queue", value: q.length ? `[${q.join(", ")}]` : "[]" },
+        { name: "visited", value: `{${visitedList().join(", ")}}` },
+        ...vars,
+      ],
+      note,
+    });
+  }
+
+  push({
+    title: { vi: "Cách 3: BFS dùng queue", en: "Approach 3: BFS with queue" },
+    hlNodes: [source, destination],
+    codeLines: [3],
+    phase: "intro",
+    activeNode: source,
+    decision: "intro",
+    vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
+    note: {
+      vi: "BFS duyệt component theo từng lớp bằng queue. Nếu pop được destination thì tồn tại đường đi.",
+      en: "BFS explores the component level by level with a queue. If destination is popped, a path exists.",
+    },
+  });
+
+  if (source === destination) {
+    push({
+      title: { vi: "source == destination? True", en: "source == destination? True" },
+      hlNodes: [source],
+      codeLines: [4],
+      phase: "check-source",
+      activeNode: source,
+      returnValue: true,
+      decision: "source-is-destination",
+      vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
+      note: { vi: "Source đã là destination.", en: "Source is already the destination." },
+    });
+    push({
+      title: { vi: "return True", en: "return True" },
+      hlNodes: [source],
+      final: true,
+      codeLines: [5],
+      phase: "done",
+      activeNode: source,
+      returnValue: true,
+      decision: "done-true",
+      vars: [{ name: "answer", value: true }],
+      note: { vi: "Không cần đi qua cạnh nào.", en: "No edge traversal is needed." },
+    });
+    return { n, edges: edgeList, source, destination, answer: true, steps };
+  }
+
+  push({
+    title: { vi: "source == destination? False", en: "source == destination? False" },
+    hlNodes: [source, destination],
+    codeLines: [4],
+    phase: "check-source",
+    activeNode: source,
+    decision: "source-not-destination",
+    vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
+    note: { vi: "Cần BFS để xem destination có cùng component với source không.", en: "Use BFS to check whether destination is in source's component." },
+  });
+
+  push({
+    title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
+    codeLines: [6],
+    phase: "build-adj",
+    decision: "init-adj",
+    vars: [{ name: "n", value: n }],
+    note: { vi: `Tạo adjacency list rỗng cho ${n} đỉnh.`, en: `Create an empty adjacency list for ${n} nodes.` },
+  });
+
+  for (const [a, b] of edgeList) {
+    push({
+      title: { vi: `for a, b in edges: ${a}, ${b}`, en: `for a, b in edges: ${a}, ${b}` },
+      hlNodes: [a, b],
+      codeLines: [7],
+      phase: "build-adj",
+      activeNode: a,
+      activeNeighbor: b,
+      decision: "read-edge",
+      vars: [{ name: "edge", value: `(${a}, ${b})` }],
+      note: { vi: `Đọc cạnh vô hướng (${a}, ${b}).`, en: `Read undirected edge (${a}, ${b}).` },
+    });
+    adj[a].push(b);
+    push({
+      title: { vi: `adj[${a}].append(${b})`, en: `adj[${a}].append(${b})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [8],
+      phase: "build-adj",
+      activeNode: a,
+      activeNeighbor: b,
+      decision: "append-forward",
+      vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }],
+      note: { vi: `Từ ${a} có thể đi sang ${b}.`, en: `From ${a}, we can move to ${b}.` },
+    });
+    adj[b].push(a);
+    allEdges.push({ u: a, v: b, w: "" });
+    push({
+      title: { vi: `adj[${b}].append(${a})`, en: `adj[${b}].append(${a})` },
+      hlNodes: [a, b],
+      hlEdges: [[a, b]],
+      codeLines: [9],
+      phase: "build-adj",
+      activeNode: b,
+      activeNeighbor: a,
+      decision: "append-backward",
+      vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
+      note: { vi: `Vì graph vô hướng, từ ${b} cũng đi sang ${a}.`, en: `Because the graph is undirected, ${b} can also move to ${a}.` },
+    });
+  }
+
+  push({
+    title: { vi: "visited = [False] * n", en: "visited = [False] * n" },
+    codeLines: [10],
+    phase: "init-bfs",
+    decision: "init-visited",
+    vars: [{ name: "visited", value: `[${visited.map(() => "F").join(", ")}]` }],
+    note: { vi: "Ban đầu chưa node nào được enqueue/thăm.", en: "Initially no node has been enqueued/visited." },
+  });
+
+  queue.push(source);
+  push({
+    title: { vi: `q = deque([${source}])`, en: `q = deque([${source}])` },
+    hlNodes: [source],
+    codeLines: [11],
+    phase: "init-bfs",
+    activeNode: source,
+    decision: "init-queue",
+    vars: [{ name: "queue", value: `[${source}]` }],
+    note: { vi: `Đưa source ${source} vào queue để bắt đầu BFS.`, en: `Put source ${source} into the queue to start BFS.` },
+  });
+
+  visited[source] = true;
+  push({
+    title: { vi: `visited[${source}] = True`, en: `visited[${source}] = True` },
+    hlNodes: [source],
+    codeLines: [12],
+    phase: "init-bfs",
+    activeNode: source,
+    decision: "mark-source",
+    vars: [{ name: "visited[source]", value: true }],
+    note: { vi: "Đánh dấu ngay khi enqueue để node không bị đưa vào queue nhiều lần.", en: "Mark as soon as it is enqueued so the node is not queued multiple times." },
+  });
+
+  let found = false;
+  while (head < queue.length) {
+    push({
+      title: { vi: `while q: queue = [${pendingQueue().join(", ")}]`, en: `while q: queue = [${pendingQueue().join(", ")}]` },
+      codeLines: [13],
+      phase: "bfs",
+      decision: "while-queue",
+      vars: [{ name: "queue", value: `[${pendingQueue().join(", ")}]` }],
+      note: { vi: "Queue còn node, BFS tiếp tục xử lý node ở FRONT.", en: "The queue is non-empty, so BFS processes the FRONT node next." },
+    });
+
+    const node = queue[head++];
+    push({
+      title: { vi: `node = q.popleft() → ${node}`, en: `node = q.popleft() → ${node}` },
+      hlNodes: [node],
+      codeLines: [14],
+      phase: "bfs",
+      activeNode: node,
+      decision: "dequeue",
+      vars: [{ name: "node", value: node }, { name: "queue", value: `[${pendingQueue().join(", ")}]` }],
+      note: { vi: `Lấy ${node} ra khỏi đầu queue để kiểm tra.`, en: `Remove ${node} from the front of the queue to inspect it.` },
+    });
+
+    const isDestination = node === destination;
+    push({
+      title: { vi: `node == destination? ${isDestination ? "True" : "False"}`, en: `node == destination? ${isDestination ? "True" : "False"}` },
+      hlNodes: [node, destination],
+      codeLines: [15],
+      phase: "bfs",
+      activeNode: node,
+      returnValue: isDestination ? true : null,
+      decision: isDestination ? "destination-found" : "not-destination",
+      vars: [{ name: "node", value: node }, { name: "destination", value: destination }],
+      note: {
+        vi: isDestination ? `Đã pop được destination ${destination}.` : `${node} chưa phải destination ${destination}.`,
+        en: isDestination ? `Destination ${destination} has been popped.` : `${node} is not destination ${destination}.`,
+      },
+    });
+
+    if (isDestination) {
+      push({
+        title: { vi: "return True", en: "return True" },
+        hlNodes: [node],
+        final: true,
+        codeLines: [16],
+        phase: "done",
+        activeNode: node,
+        returnValue: true,
+        decision: "done-true",
+        vars: [{ name: "answer", value: true }],
+        note: { vi: "BFS đã tìm thấy đường đi tới destination.", en: "BFS found a path to destination." },
+      });
+      found = true;
+      break;
+    }
+
+    push({
+      title: { vi: `for nb in adj[${node}]: [${adj[node].join(", ")}]`, en: `for nb in adj[${node}]: [${adj[node].join(", ")}]` },
+      hlNodes: [node],
+      hlEdges: adj[node].map((nb) => [node, nb]),
+      codeLines: [17],
+      phase: "neighbors",
+      activeNode: node,
+      decision: "iterate-neighbors",
+      vars: [{ name: "neighbors", value: `[${adj[node].join(", ")}]` }],
+      note: { vi: `Xem từng hàng xóm của ${node}.`, en: `Inspect each neighbor of ${node}.` },
+    });
+
+    for (const nb of adj[node]) {
+      const alreadyVisited = visited[nb];
+      push({
+        title: { vi: `visited[${nb}]? ${alreadyVisited ? "True" : "False"}`, en: `visited[${nb}]? ${alreadyVisited ? "True" : "False"}` },
+        hlNodes: [node, nb],
+        hlEdges: [[node, nb]],
+        codeLines: [18],
+        phase: "neighbors",
+        activeNode: node,
+        activeNeighbor: nb,
+        decision: alreadyVisited ? "skip-visited" : "visit-neighbor",
+        vars: [{ name: "nb", value: nb }, { name: "visited[nb]", value: alreadyVisited }],
+        note: alreadyVisited
+          ? { vi: `${nb} đã visited, bỏ qua để tránh lặp.`, en: `${nb} is already visited, skip it to avoid cycles.` }
+          : { vi: `${nb} chưa visited, đánh dấu rồi enqueue.`, en: `${nb} is unvisited, mark it and enqueue it.` },
+      });
+
+      if (!alreadyVisited) {
+        visited[nb] = true;
+        push({
+          title: { vi: `visited[${nb}] = True`, en: `visited[${nb}] = True` },
+          hlNodes: [nb],
+          hlEdges: [[node, nb]],
+          codeLines: [19],
+          phase: "enqueue",
+          activeNode: node,
+          activeNeighbor: nb,
+          decision: "mark-neighbor",
+          vars: [{ name: "visited[nb]", value: true }],
+          note: { vi: `Đánh dấu ${nb} trước khi đưa vào queue.`, en: `Mark ${nb} before putting it into the queue.` },
+        });
+        queue.push(nb);
+        push({
+          title: { vi: `q.append(${nb})`, en: `q.append(${nb})` },
+          hlNodes: [nb],
+          hlEdges: [[node, nb]],
+          codeLines: [20],
+          phase: "enqueue",
+          activeNode: node,
+          activeNeighbor: nb,
+          decision: "enqueue-neighbor",
+          vars: [{ name: "queue", value: `[${pendingQueue().join(", ")}]` }],
+          note: { vi: `Đưa ${nb} vào cuối queue; BFS sẽ xử lý sau các node đang chờ trước đó.`, en: `Append ${nb} to the back of the queue; BFS will process it after earlier queued nodes.` },
+        });
+      }
+    }
+  }
+
+  if (!found) {
+    push({
+      title: { vi: "while q: queue rỗng", en: "while q: queue is empty" },
+      codeLines: [13],
+      phase: "done",
+      decision: "queue-empty",
+      note: { vi: "Queue rỗng, đã duyệt hết component chứa source.", en: "The queue is empty; source's entire component has been explored." },
+    });
+    push({
+      title: { vi: "return False", en: "return False" },
+      hlNodes: [source, destination],
+      final: true,
+      codeLines: [21],
+      phase: "done",
+      activeNode: source,
+      returnValue: false,
+      decision: "done-false",
+      vars: [{ name: "answer", value: false }],
+      note: {
+        vi: `Không pop được destination ${destination}; không có đường đi từ ${source}.`,
+        en: `Destination ${destination} was never popped; no path exists from ${source}.`,
+      },
+    });
+  }
+
+  return { n, edges: edgeList, source, destination, answer: found, steps };
+}
+
 function buildSteps1971RecursiveDFS(input, params) {
   const n = params && params.n !== undefined ? Number(params.n) : 6;
   const source = params && params.source !== undefined ? Number(params.source) : 0;
@@ -9946,7 +10309,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `Gọi dfs(${node})`, en: `Call dfs(${node})` },
       hlNodes: [node],
       hlEdges: from === null ? [] : [[from, node]],
-      codeLines: [8],
+      codeLines: [9],
       phase: "enter",
       activeNode: node,
       decision: "enter-call",
@@ -9961,7 +10324,7 @@ function buildSteps1971RecursiveDFS(input, params) {
     push({
       title: { vi: `node == destination? ${isDestination ? "True" : "False"}`, en: `node == destination? ${isDestination ? "True" : "False"}` },
       hlNodes: [node, destination],
-      codeLines: [9],
+      codeLines: [10],
       phase: "check-destination",
       activeNode: node,
       returnValue: isDestination ? true : null,
@@ -9976,7 +10339,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       push({
         title: { vi: "return True", en: "return True" },
         hlNodes: [node],
-        codeLines: [9],
+        codeLines: [11],
         phase: "return",
         activeNode: node,
         returnValue: true,
@@ -9995,7 +10358,7 @@ function buildSteps1971RecursiveDFS(input, params) {
     push({
       title: { vi: `node in visited? ${alreadyVisited ? "True" : "False"}`, en: `node in visited? ${alreadyVisited ? "True" : "False"}` },
       hlNodes: [node],
-      codeLines: [10],
+      codeLines: [12],
       phase: "check-visited",
       activeNode: node,
       returnValue: alreadyVisited ? false : null,
@@ -10010,7 +10373,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       push({
         title: { vi: "return False", en: "return False" },
         hlNodes: [node],
-        codeLines: [10],
+        codeLines: [13],
         phase: "return",
         activeNode: node,
         returnValue: false,
@@ -10029,7 +10392,7 @@ function buildSteps1971RecursiveDFS(input, params) {
     push({
       title: { vi: `visited.add(${node})`, en: `visited.add(${node})` },
       hlNodes: [node],
-      codeLines: [11],
+      codeLines: [14],
       phase: "mark-visited",
       activeNode: node,
       decision: "mark-visited",
@@ -10044,7 +10407,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `for nb in adj[${node}]: [${adj[node].join(", ")}]`, en: `for nb in adj[${node}]: [${adj[node].join(", ")}]` },
       hlNodes: [node],
       hlEdges: adj[node].map((nb) => [node, nb]),
-      codeLines: [12],
+      codeLines: [15],
       phase: "neighbors",
       activeNode: node,
       decision: "iterate-neighbors",
@@ -10060,7 +10423,7 @@ function buildSteps1971RecursiveDFS(input, params) {
         title: { vi: `Thử dfs(${nb}) từ ${node}`, en: `Try dfs(${nb}) from ${node}` },
         hlNodes: [node, nb],
         hlEdges: [[node, nb]],
-        codeLines: [13],
+        codeLines: [16],
         phase: "recurse",
         activeNode: node,
         activeNeighbor: nb,
@@ -10076,7 +10439,7 @@ function buildSteps1971RecursiveDFS(input, params) {
           title: { vi: `dfs(${nb}) trả True`, en: `dfs(${nb}) returned True` },
           hlNodes: [node, nb],
           hlEdges: [[node, nb]],
-          codeLines: [13],
+          codeLines: [17],
           phase: "bubble-true",
           activeNode: node,
           activeNeighbor: nb,
@@ -10095,7 +10458,7 @@ function buildSteps1971RecursiveDFS(input, params) {
         title: { vi: `dfs(${nb}) trả False`, en: `dfs(${nb}) returned False` },
         hlNodes: [node, nb],
         hlEdges: [[node, nb]],
-        codeLines: [13],
+        codeLines: [16],
         phase: "backtrack",
         activeNode: node,
         activeNeighbor: nb,
@@ -10112,7 +10475,7 @@ function buildSteps1971RecursiveDFS(input, params) {
     push({
       title: { vi: `dfs(${node}) hết hàng xóm → False`, en: `dfs(${node}) exhausted neighbors → False` },
       hlNodes: [node],
-      codeLines: [14],
+      codeLines: [18],
       phase: "return",
       activeNode: node,
       returnValue: false,
@@ -10130,7 +10493,7 @@ function buildSteps1971RecursiveDFS(input, params) {
   push({
     title: { vi: `return dfs(${source})`, en: `return dfs(${source})` },
     hlNodes: [source],
-    codeLines: [15],
+    codeLines: [20],
     phase: "start",
     activeNode: source,
     decision: "start-dfs",
@@ -10146,7 +10509,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: "Kết quả: True", en: "Result: True" },
       hlNodes: [source, destination],
       final: true,
-      codeLines: [15],
+      codeLines: [20],
       phase: "done",
       activeNode: destination,
       returnValue: true,
@@ -10162,7 +10525,7 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: "Kết quả: False", en: "Result: False" },
       hlNodes: [source, destination],
       final: true,
-      codeLines: [15],
+      codeLines: [20],
       phase: "done",
       activeNode: source,
       returnValue: false,
@@ -18316,6 +18679,7 @@ module.exports = {
         options: [
           { value: "1", label: { vi: "Cách 1: DFS dùng stack", en: "Approach 1: DFS with stack" } },
           { value: "2", label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" } },
+          { value: "3", label: { vi: "Cách 3: BFS dùng queue", en: "Approach 3: BFS with queue" } },
         ],
       },
       { key: "n", label: { vi: "n (số đỉnh)", en: "n (vertices)" }, default: 6 },
@@ -18325,7 +18689,7 @@ module.exports = {
     approach: [
       { vi: "source và destination chỉ cần nằm trong cùng connected component.", en: "source and destination just need to be in the same connected component." },
       { vi: "Xây adjacency list từ danh sách cạnh (đồ thị vô hướng).", en: "Build an adjacency list from the edge list (undirected graph)." },
-      { vi: "Cách 1 dùng stack để DFS lặp; Cách 2 dùng hàm dfs(node) đệ quy.", en: "Approach 1 uses an explicit stack; Approach 2 uses recursive dfs(node)." },
+      { vi: "Có thể duyệt component bằng DFS stack, DFS đệ quy, hoặc BFS queue.", en: "The component can be explored with stack DFS, recursive DFS, or queue BFS." },
       { vi: "Nếu gặp destination thì trả True; nếu duyệt hết component mà không gặp thì trả False.", en: "Return True when destination is reached; otherwise return False after the component is exhausted." },
     ],
     complexity: {
@@ -18383,6 +18747,30 @@ module.exports = {
       "        return dfs(source)",
     ],
     code2Label: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: Recursive DFS" },
+    code3: [
+      "from collections import deque",
+      "class Solution:",
+      "    def validPath(self, n, edges, source, destination):",
+      "        if source == destination:",
+      "            return True",
+      "        adj = [[] for _ in range(n)]",
+      "        for a, b in edges:",
+      "            adj[a].append(b)",
+      "            adj[b].append(a)",
+      "        visited = [False] * n",
+      "        q = deque([source])",
+      "        visited[source] = True",
+      "        while q:",
+      "            node = q.popleft()",
+      "            if node == destination:",
+      "                return True",
+      "            for nb in adj[node]:",
+      "                if not visited[nb]:",
+      "                    visited[nb] = True",
+      "                    q.append(nb)",
+      "        return False",
+    ],
+    code3Label: { vi: "Cách 3: BFS dùng queue", en: "Approach 3: BFS with queue" },
     builder: buildSteps1971,
   },
   695: {
