@@ -876,10 +876,17 @@ button:disabled {
 }
 
 .live-exit-btn,
+.live-clear-btn,
 .live-reset-btn {
   border-color: rgba(148, 163, 184, 0.35);
   background: rgba(148, 163, 184, 0.08);
   color: #94a3b8;
+}
+
+.live-clear-btn {
+  border-color: rgba(251, 191, 36, 0.38);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fcd34d;
 }
 
 .live-editor-wrap {

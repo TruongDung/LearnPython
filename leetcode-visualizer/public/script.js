@@ -55,6 +55,7 @@ const I18N = {
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
     liveRunBtn: "▶ Chạy code của tôi",
+    liveClearBtn: "Clear thân hàm",
     liveResetBtn: "↺ Về code gốc",
     autoTheme: "Tự động",
   },
@@ -93,6 +94,7 @@ const I18N = {
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
     liveRunBtn: "▶ Run my code",
+    liveClearBtn: "Clear body",
     liveResetBtn: "↺ Reset to original",
     autoTheme: "Auto",
   },
@@ -11053,6 +11055,23 @@ function currentPrimaryCode() {
   return (localizedCode || (problemData && problemData.code) || []).join("\n");
 }
 
+function clearedSolutionSkeleton(sourceCode) {
+  const code = String(sourceCode || "");
+  const classMatch = code.match(/^([ \t]*)class\s+Solution\s*:[ \t]*(?:#.*)?$/m);
+  if (!classMatch) return "class Solution:\n    pass";
+
+  const classIndent = classMatch[1] || "";
+  const afterClass = code.slice(classMatch.index + classMatch[0].length);
+  const methodMatch = afterClass.match(/\n([ \t]+)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->[^\n:]+)?\s*:[ \t]*(?:#.*)?/);
+  if (!methodMatch) return `${classIndent}class Solution:\n${classIndent}    pass`;
+
+  const methodIndent = methodMatch[1];
+  const methodName = methodMatch[2];
+  const args = methodMatch[3].trim();
+  const bodyIndent = `${methodIndent}    `;
+  return `${classIndent}class Solution:\n${methodIndent}def ${methodName}(${args}):\n${bodyIndent}pass`;
+}
+
 async function collectLiveCallArgs() {
   // Re-use the same input/params the canned visualizer already validated.
   const isString = problemData && problemData.inputKind === "string";
@@ -11659,6 +11678,19 @@ $("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
 });
 
 $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
+
+$("liveClearBtn") && $("liveClearBtn").addEventListener("click", async () => {
+  const editor = await ensureMonacoEditor();
+  const skeleton = clearedSolutionSkeleton(editor.getValue() || currentPrimaryCode());
+  editor.setValue(skeleton);
+  const passLine = skeleton.split("\n").findIndex((line) => line.trim() === "pass") + 1;
+  if (passLine > 0) {
+    editor.setPosition({ lineNumber: passLine, column: skeleton.split("\n")[passLine - 1].length + 1 });
+    editor.focus();
+  }
+  hide("liveError");
+  $("liveStatus").textContent = "";
+});
 
 $("liveResetBtn") && $("liveResetBtn").addEventListener("click", async () => {
   const editor = await ensureMonacoEditor();
