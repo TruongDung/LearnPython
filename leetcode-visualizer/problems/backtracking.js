@@ -2861,6 +2861,354 @@ function buildSteps79(input, params) {
   return { original: board, answer: found, steps };
 }
 
+/** LeetCode 491: Non-decreasing Subsequences. */
+function buildSteps491(input) {
+  const nums = (Array.isArray(input) ? input : String(input).split(","))
+    .map((value) => Number(value));
+  const steps = [];
+  const result = [];
+  const current = [];
+  const chosenIndices = [];
+  const callStack = [];
+  const MAX_STEPS = 600;
+  let traceTruncated = false;
+
+  const valid = nums.length > 0 && nums.every(Number.isInteger);
+
+  function pushStep(options) {
+    if (steps.length >= MAX_STEPS && !options.final) {
+      traceTruncated = true;
+      return;
+    }
+    const used = options.used instanceof Set ? [...options.used] : [];
+    const visibleResults = result.slice(-12).map((sequence) => [...sequence]);
+    steps.push({
+      title: options.title,
+      arr: [],
+      highlight: Number.isInteger(options.i) ? [options.i] : [],
+      mark: [...chosenIndices],
+      final: Boolean(options.final),
+      codeLines: options.codeLines || [],
+      vars: options.vars || [],
+      note: options.note,
+      nonDecreasingView: {
+        nums: [...nums],
+        current: [...current],
+        chosenIndices: [...chosenIndices],
+        start: Number.isInteger(options.start) ? options.start : null,
+        i: Number.isInteger(options.i) ? options.i : null,
+        candidate: Number.isInteger(options.i) ? nums[options.i] : null,
+        used,
+        action: options.action || "step",
+        duplicate: options.duplicate ?? null,
+        orderOk: options.orderOk ?? null,
+        last: options.last !== undefined
+          ? options.last
+          : current.length
+            ? current[current.length - 1]
+            : null,
+        depth: current.length,
+        callStack: callStack.map((frame) => ({ ...frame })),
+        results: visibleResults,
+        resultCount: result.length,
+        traceTruncated,
+      },
+    });
+  }
+
+  if (!valid) {
+    pushStep({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      codeLines: [2],
+      action: "invalid",
+      final: true,
+      vars: [{ name: "answer", value: "[]" }],
+      note: { vi: "nums phải là một mảng số nguyên không rỗng.", en: "nums must be a non-empty integer array." },
+    });
+    return { original: nums, answer: [], steps };
+  }
+
+  pushStep({
+    title: { vi: "Bắt đầu findSubsequences", en: "Enter findSubsequences" },
+    codeLines: [2],
+    action: "enter",
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
+    note: { vi: "Giữ nguyên thứ tự ban đầu của nums; bài này không được sort.", en: "Keep nums in its original order; this problem must not sort the array." },
+  });
+
+  pushStep({
+    title: { vi: "result = []", en: "result = []" },
+    codeLines: [3],
+    action: "result-init",
+    vars: [{ name: "result", value: "[]" }],
+    note: { vi: "result sẽ chứa các subsequence khác nhau có độ dài ít nhất 2.", en: "result will hold distinct subsequences of length at least 2." },
+  });
+
+  pushStep({
+    title: { vi: "current = []", en: "current = []" },
+    codeLines: [4],
+    action: "current-init",
+    vars: [{ name: "current", value: "[]" }],
+    note: { vi: "current là subsequence đang được xây dựng.", en: "current is the subsequence currently being built." },
+  });
+
+  pushStep({
+    title: { vi: "Gọi backtrack(0)", en: "Call backtrack(0)" },
+    codeLines: [22],
+    action: "root-call",
+    start: 0,
+    vars: [{ name: "next call", value: "backtrack(0)" }],
+    note: { vi: "Bắt đầu thử từ index 0.", en: "Start trying candidates from index 0." },
+  });
+
+  function backtrack(start) {
+    callStack.push({ start, depth: current.length });
+    pushStep({
+      title: { vi: `Vào backtrack(${start})`, en: `Enter backtrack(${start})` },
+      codeLines: [6],
+      action: "call",
+      start,
+      vars: [
+        { name: "start", value: start },
+        { name: "current", value: `[${current.join(", ")}]` },
+      ],
+      note: { vi: `Frame này chỉ được chọn các index từ ${start} trở đi.`, en: `This frame may only choose indices from ${start} onward.` },
+    });
+
+    const canSave = current.length >= 2;
+    pushStep({
+      title: { vi: `len(current) >= 2 → ${canSave}`, en: `len(current) >= 2 → ${canSave}` },
+      codeLines: [7],
+      action: "save-check",
+      start,
+      vars: [
+        { name: "len(current)", value: current.length },
+        { name: "can save?", value: canSave },
+      ],
+      note: canSave
+        ? { vi: "current đã đủ 2 phần tử nên đây là một đáp án hợp lệ.", en: "current has at least 2 elements, so it is a valid answer." }
+        : { vi: "Chưa đủ 2 phần tử; tiếp tục mở rộng current.", en: "Fewer than 2 elements; keep extending current." },
+    });
+
+    if (canSave) {
+      result.push([...current]);
+      pushStep({
+        title: { vi: `Lưu [${current.join(", ")}]`, en: `Save [${current.join(", ")}]` },
+        codeLines: [8],
+        action: "save",
+        start,
+        vars: [
+          { name: "saved", value: `[${current.join(", ")}]` },
+          { name: "result count", value: result.length },
+        ],
+        note: { vi: `Thêm một bản sao của current vào result. Hiện có ${result.length} đáp án.`, en: `Append a copy of current to result. There are now ${result.length} answers.` },
+      });
+    }
+
+    const used = new Set();
+    pushStep({
+      title: { vi: `used = set() ở depth ${current.length}`, en: `used = set() at depth ${current.length}` },
+      codeLines: [10],
+      action: "used-init",
+      start,
+      used,
+      vars: [
+        { name: "used", value: "{}" },
+        { name: "scope", value: `depth ${current.length}` },
+      ],
+      note: { vi: "used là set cục bộ của frame này, dùng để bỏ giá trị trùng ở cùng một level.", en: "used is local to this frame and removes duplicate values at the same level." },
+    });
+
+    for (let i = start; i < nums.length; i += 1) {
+      pushStep({
+        title: { vi: `Xét nums[${i}] = ${nums[i]}`, en: `Inspect nums[${i}] = ${nums[i]}` },
+        codeLines: [11],
+        action: "loop",
+        start,
+        i,
+        used,
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "used", value: `{${[...used].join(", ")}}` },
+        ],
+        note: { vi: `Ứng viên hiện tại là ${nums[i]} tại index ${i}.`, en: `The current candidate is ${nums[i]} at index ${i}.` },
+      });
+
+      const duplicate = used.has(nums[i]);
+      pushStep({
+        title: { vi: `${nums[i]} in used → ${duplicate}`, en: `${nums[i]} in used → ${duplicate}` },
+        codeLines: [12],
+        action: "duplicate-check",
+        start,
+        i,
+        used,
+        duplicate,
+        vars: [
+          { name: "nums[i]", value: nums[i] },
+          { name: "used", value: `{${[...used].join(", ")}}` },
+          { name: "duplicate?", value: duplicate },
+        ],
+        note: duplicate
+          ? { vi: `${nums[i]} đã được thử ở level này; chọn lại sẽ tạo subsequence trùng.`, en: `${nums[i]} was already tried at this level; choosing it again would duplicate subsequences.` }
+          : { vi: `${nums[i]} chưa xuất hiện trong used của level này.`, en: `${nums[i]} has not appeared in this level's used set.` },
+      });
+
+      if (duplicate) {
+        pushStep({
+          title: { vi: `Skip ${nums[i]}: trùng cùng level`, en: `Skip ${nums[i]}: duplicate at this level` },
+          codeLines: [13],
+          action: "skip-duplicate",
+          start,
+          i,
+          used,
+          duplicate: true,
+          vars: [
+            { name: "i", value: i },
+            { name: "nums[i]", value: nums[i] },
+            { name: "continue", value: `i = ${i + 1}` },
+          ],
+          note: { vi: "continue bỏ qua ứng viên này nhưng không ảnh hưởng used của frame cha/con khác.", en: "continue skips this candidate without affecting used sets in other frames." },
+        });
+        continue;
+      }
+
+      const last = current.length ? current[current.length - 1] : null;
+      const orderOk = last === null || nums[i] >= last;
+      pushStep({
+        title: last === null
+          ? { vi: "current rỗng → thứ tự hợp lệ", en: "current is empty → order is valid" }
+          : { vi: `${nums[i]} >= ${last} → ${orderOk}`, en: `${nums[i]} >= ${last} → ${orderOk}` },
+        codeLines: [14],
+        action: "order-check",
+        start,
+        i,
+        used,
+        duplicate: false,
+        orderOk,
+        last,
+        vars: [
+          { name: "candidate", value: nums[i] },
+          { name: "last", value: last === null ? "none" : last },
+          { name: "non-decreasing?", value: orderOk },
+        ],
+        note: orderOk
+          ? { vi: "Ứng viên không nhỏ hơn phần tử cuối nên có thể nối vào current.", en: "The candidate is not smaller than the last value, so it may extend current." }
+          : { vi: `${nums[i]} < ${last} sẽ làm dãy giảm, nên phải bỏ qua.`, en: `${nums[i]} < ${last} would decrease the sequence, so it must be skipped.` },
+      });
+
+      if (!orderOk) {
+        pushStep({
+          title: { vi: `Skip ${nums[i]}: làm dãy giảm`, en: `Skip ${nums[i]}: would decrease` },
+          codeLines: [15],
+          action: "skip-order",
+          start,
+          i,
+          used,
+          duplicate: false,
+          orderOk: false,
+          vars: [
+            { name: "i", value: i },
+            { name: "nums[i]", value: nums[i] },
+            { name: "continue", value: `i = ${i + 1}` },
+          ],
+          note: { vi: "Không thêm ứng viên này vào used vì nó chưa được thử như một nhánh hợp lệ ở level hiện tại.", en: "Do not add this candidate to used because it was not tried as a valid branch at this level." },
+        });
+        continue;
+      }
+
+      used.add(nums[i]);
+      pushStep({
+        title: { vi: `used.add(${nums[i]})`, en: `used.add(${nums[i]})` },
+        codeLines: [17],
+        action: "used-add",
+        start,
+        i,
+        used,
+        duplicate: false,
+        orderOk: true,
+        last,
+        vars: [{ name: "used", value: `{${[...used].join(", ")}}` }],
+        note: { vi: `Đánh dấu ${nums[i]} đã được mở thành một nhánh tại depth ${current.length}.`, en: `Mark ${nums[i]} as already branched from depth ${current.length}.` },
+      });
+
+      current.push(nums[i]);
+      chosenIndices.push(i);
+      pushStep({
+        title: { vi: `Thêm nums[${i}] = ${nums[i]}`, en: `Add nums[${i}] = ${nums[i]}` },
+        codeLines: [18],
+        action: "choose",
+        start,
+        i,
+        used,
+        duplicate: false,
+        orderOk: true,
+        last,
+        vars: [
+          { name: "i", value: i },
+          { name: "nums[i]", value: nums[i] },
+          { name: "current", value: `[${current.join(", ")}]` },
+          { name: "chosen indices", value: `[${chosenIndices.join(", ")}]` },
+        ],
+        note: { vi: `current trở thành [${current.join(", ")}].`, en: `current becomes [${current.join(", ")}].` },
+      });
+
+      pushStep({
+        title: { vi: `Gọi backtrack(${i + 1})`, en: `Call backtrack(${i + 1})` },
+        codeLines: [19],
+        action: "recurse",
+        start,
+        i,
+        used,
+        duplicate: false,
+        orderOk: true,
+        last,
+        vars: [{ name: "next call", value: `backtrack(${i + 1})` }],
+        note: { vi: `Chỉ xét các index sau ${i} để giữ đúng thứ tự subsequence.`, en: `Only inspect indices after ${i} to preserve subsequence order.` },
+      });
+
+      backtrack(i + 1);
+
+      const popped = current.pop();
+      chosenIndices.pop();
+      pushStep({
+        title: { vi: `Quay lui: bỏ ${popped}`, en: `Backtrack: pop ${popped}` },
+        codeLines: [20],
+        action: "backtrack",
+        start,
+        i,
+        used,
+        vars: [
+          { name: "popped", value: popped },
+          { name: "current", value: `[${current.join(", ")}]` },
+        ],
+        note: { vi: `Trở về [${current.join(", ")}] để thử ứng viên tiếp theo ở cùng level. used vẫn là set của level này.`, en: `Return to [${current.join(", ")}] to try the next candidate at this level. used remains local to this level.` },
+      });
+    }
+
+    callStack.pop();
+  }
+
+  backtrack(0);
+
+  pushStep({
+    title: { vi: `Trả về ${result.length} subsequence`, en: `Return ${result.length} subsequences` },
+    codeLines: [23],
+    action: "result",
+    final: true,
+    vars: [
+      { name: "answer count", value: result.length },
+      { name: "answer", value: result.map((sequence) => `[${sequence.join(",")}]`).join(", ") },
+    ],
+    note: {
+      vi: `Tìm được ${result.length} subsequence tăng không giảm khác nhau.${traceTruncated ? " Trace đã giới hạn số bước hiển thị." : ""}`,
+      en: `Found ${result.length} distinct non-decreasing subsequences.${traceTruncated ? " The displayed trace was capped." : ""}`,
+    },
+  });
+
+  return { original: [...nums], answer: result, steps };
+}
+
 /** LeetCode 131: Palindrome Partitioning. */
 function buildSteps131(input) {
   const s = String(input);
@@ -2940,6 +3288,62 @@ module.exports = {
     complexity: { time: "O(n·2^n)", space: "O(n)", note: { vi: "2^n cách chia, kiểm tra palindrome O(n).", en: "2^n partitions, O(n) palindrome checks." } },
     code: ["class Solution:", "    def partition(self, s):", "        res = []", "        def bt(start, path):", "            if start == len(s): res.append(list(path)); return", "            for end in range(start+1, len(s)+1):", "                piece = s[start:end]", "                if piece == piece[::-1]:", "                    path.append(piece); bt(end, path); path.pop()", "        bt(0, []); return res"],
     builder: buildSteps131,
+  },
+  491: {
+    id: 491,
+    difficulty: "medium",
+    slug: "non-decreasing-subsequences",
+    category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Non-decreasing Subsequences", en: "Non-decreasing Subsequences" },
+    titleVi: { vi: "Các dãy con tăng không giảm", en: "Distinct non-decreasing subsequences" },
+    statement: {
+      vi: "Cho mảng số nguyên nums. Trả về tất cả subsequence khác nhau có ít nhất 2 phần tử và tăng không giảm. Các phần tử phải giữ nguyên thứ tự index ban đầu.",
+      en: "Given an integer array nums, return all distinct non-decreasing subsequences with at least two elements. Elements must preserve their original index order.",
+    },
+    defaultInput: [4, 6, 7, 7],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Backtracking với start: sau khi chọn index i, lời gọi sau chỉ xét từ i + 1 để giữ thứ tự subsequence.", en: "Backtrack with start: after choosing index i, the next call only considers i + 1 onward to preserve subsequence order." },
+      { vi: "Chỉ nối nums[i] khi current rỗng hoặc nums[i] >= current[-1].", en: "Append nums[i] only when current is empty or nums[i] >= current[-1]." },
+      { vi: "Mỗi frame có một used riêng; nếu một giá trị đã được thử ở cùng depth thì skip để loại đáp án trùng.", en: "Each frame owns a local used set; skip values already tried at the same depth to remove duplicate answers." },
+      { vi: "Mỗi khi len(current) >= 2, lưu một bản sao vì mọi phần mở rộng hiện tại đều là đáp án hợp lệ.", en: "Whenever len(current) >= 2, save a copy because the current sequence is already a valid answer." },
+    ],
+    complexity: {
+      time: "O(2ⁿ · n)",
+      space: "O(n)",
+      note: {
+        vi: "Có tối đa 2ⁿ subsequence; copy mỗi đáp án tốn O(n). Stack, current và các set trên một đường đệ quy dùng O(n).",
+        en: "There are up to 2ⁿ subsequences and copying each answer costs O(n). The recursion stack, current path, and per-path sets use O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findSubsequences(self, nums):",
+      "        result = []",
+      "        current = []",
+      "",
+      "        def backtrack(start):",
+      "            if len(current) >= 2:",
+      "                result.append(current[:])",
+      "",
+      "            used = set()",
+      "            for i in range(start, len(nums)):",
+      "                if nums[i] in used:",
+      "                    continue",
+      "                if current and nums[i] < current[-1]:",
+      "                    continue",
+      "",
+      "                used.add(nums[i])",
+      "                current.append(nums[i])",
+      "                backtrack(i + 1)",
+      "                current.pop()",
+      "",
+      "        backtrack(0)",
+      "        return result",
+    ],
+    builder: (input, params) => addBacktrackingDecisionTree(buildSteps491(input, params), 491),
   },
   282: {
     id: 282,

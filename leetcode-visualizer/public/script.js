@@ -13,6 +13,8 @@ let problemSearchQuery = "";
 let debugBreakpoints = new Set();
 let debugWatches = [];
 let searchErrorState = null;
+let themeMode = "manual";
+let themeAutoTimer = null;
 const RECENT_PROBLEMS_KEY = "recentProblems";
 const RECENT_PROBLEMS_LIMIT = 10;
 
@@ -54,6 +56,7 @@ const I18N = {
     liveExitBtn: "Đóng editor",
     liveRunBtn: "▶ Chạy code của tôi",
     liveResetBtn: "↺ Về code gốc",
+    autoTheme: "Tự động",
   },
   en: {
     subtitle: "Enter a LeetCode problem number to watch the algorithm run step by step",
@@ -91,6 +94,7 @@ const I18N = {
     liveExitBtn: "Exit editor",
     liveRunBtn: "▶ Run my code",
     liveResetBtn: "↺ Reset to original",
+    autoTheme: "Auto",
   },
 };
 
@@ -133,6 +137,7 @@ function applyStaticStrings() {
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
   const keywordInput = $("problemKeyword");
   if (keywordInput) keywordInput.placeholder = t().keywordSearchPlaceholder;
+  updateThemeButtons();
 }
 
 function readRecentProblems() {
@@ -3668,6 +3673,111 @@ function renderKeypadHeapView(step) {
 
 function renderDecisionTree(step) {
   renderTree({ tree: step.decisionTree }, "decisionTreeView");
+}
+
+function renderNonDecreasingSubsequencesView(step) {
+  const view = step.nonDecreasingView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const current = Array.isArray(view.current) ? view.current : [];
+  const chosenIndices = Array.isArray(view.chosenIndices) ? view.chosenIndices : [];
+  const used = Array.isArray(view.used) ? view.used : [];
+  const results = Array.isArray(view.results) ? view.results : [];
+  const chosenOrder = new Map(chosenIndices.map((index, order) => [index, order + 1]));
+  const candidateKnown = Number.isInteger(view.i);
+  const duplicateKnown = typeof view.duplicate === "boolean";
+  const orderKnown = typeof view.orderOk === "boolean";
+  const duplicateRejected = view.duplicate === true;
+  const orderRejected = view.orderOk === false;
+  const accepted = candidateKnown && view.duplicate === false && view.orderOk === true;
+  const activePhase = view.action === "result" || view.action === "save"
+    ? 2
+    : new Set(["loop", "duplicate-check", "skip-duplicate", "order-check", "skip-order", "used-add", "choose", "recurse", "backtrack"]).has(view.action)
+      ? 1
+      : 0;
+  const phaseLabels = vi
+    ? ["1. Mở một frame", "2. Lọc rồi chọn", "3. Lưu đáp án"]
+    : ["1. Open a frame", "2. Filter then choose", "3. Save answers"];
+  const phaseHtml = phaseLabels.map((label, index) => {
+    const state = index < activePhase ? "is-done" : index === activePhase ? "is-active" : "";
+    return `<span class="${state}">${index < activePhase ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const arrayHtml = nums.map((value, index) => {
+    const classes = ["nds-number"];
+    if (chosenOrder.has(index)) classes.push("is-chosen");
+    if (index === view.i) classes.push("is-candidate");
+    if (index === view.i && duplicateRejected) classes.push("is-duplicate-reject");
+    if (index === view.i && orderRejected) classes.push("is-order-reject");
+    if (index === view.i && accepted) classes.push("is-accepted");
+    if (Number.isInteger(view.start) && index < view.start && !chosenOrder.has(index)) classes.push("is-before-start");
+    let pointer = "";
+    if (index === view.i) pointer = `<span class="nds-pointer">i</span>`;
+    else if (chosenOrder.has(index)) pointer = `<span class="nds-pick-order">#${chosenOrder.get(index)}</span>`;
+    const start = Number.isInteger(view.start) && index === view.start
+      ? `<em class="nds-start">start</em>`
+      : "";
+    return `<div class="${classes.join(" ")}">${pointer}${start}<small>[${index}]</small><strong>${escapeHtml(value)}</strong></div>`;
+  }).join("");
+
+  const currentHtml = current.length
+    ? current.map((value, index) => `<span><small>#${index + 1}</small><strong>${escapeHtml(value)}</strong></span>`).join("<b>→</b>")
+    : `<em>∅</em>`;
+  const usedHtml = used.length
+    ? used.map((value) => `<span>${escapeHtml(value)}</span>`).join("")
+    : `<em>{ }</em>`;
+  const stackHtml = Array.isArray(view.callStack) && view.callStack.length
+    ? view.callStack.map((frame, index) => `<span class="${index === view.callStack.length - 1 ? "is-active" : ""}"><small>d=${frame.depth}</small><strong>backtrack(${frame.start})</strong></span>`).join("<b>→</b>")
+    : `<em>${vi ? "chưa vào hàm" : "not entered"}</em>`;
+
+  function checkClass(known, pass) {
+    if (!known) return "is-pending";
+    return pass ? "is-pass" : "is-fail";
+  }
+  const uniquePass = duplicateKnown ? !view.duplicate : false;
+  const orderText = view.last === null
+    ? (vi ? "current rỗng" : "current is empty")
+    : candidateKnown
+      ? `${view.candidate} >= ${view.last}`
+      : "nums[i] >= current[-1]";
+  const checksHtml = `<div class="nds-check ${checkClass(duplicateKnown, uniquePass)}">
+      <b>1</b><span><strong>nums[i] ∉ used</strong><small>${duplicateKnown ? `${view.candidate} ${uniquePass ? "∉" : "∈"} {${used.join(", ")}}` : (vi ? "chưa kiểm tra" : "not checked")}</small></span><em>${duplicateKnown ? (uniquePass ? "PASS" : "SKIP") : "?"}</em>
+    </div>
+    <div class="nds-check ${checkClass(orderKnown, view.orderOk)}">
+      <b>2</b><span><strong>${vi ? "Không làm dãy giảm" : "Does not decrease"}</strong><small>${escapeHtml(orderText)}</small></span><em>${orderKnown ? (view.orderOk ? "PASS" : "SKIP") : "?"}</em>
+    </div>`;
+
+  const resultHtml = results.length
+    ? results.map((sequence, index) => {
+      const newest = view.action === "save" && index === results.length - 1;
+      return `<span class="${newest ? "is-new" : ""}">[${sequence.map(escapeHtml).join(", ")}]</span>`;
+    }).join("")
+    : `<em>${vi ? "chưa có đáp án" : "no answers yet"}</em>`;
+  const truncated = view.resultCount > results.length
+    ? `<small>+${view.resultCount - results.length} ${vi ? "đáp án trước" : "earlier"}</small>`
+    : "";
+  const summary = vi
+    ? `Non-decreasing Subsequences; current có ${current.length} phần tử; đã lưu ${view.resultCount || 0} đáp án.`
+    : `Non-decreasing Subsequences; current has ${current.length} values; ${view.resultCount || 0} answers saved.`;
+
+  $("treeView").innerHTML = `<section class="nds-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="nds-phases">${phaseHtml}</div>
+    <div class="nds-frame-bar">
+      <span><small>FRAME</small><strong>${Number.isInteger(view.start) ? `backtrack(${view.start})` : "—"}</strong></span>
+      <span><small>DEPTH</small><strong>${escapeHtml(view.depth ?? 0)}</strong></span>
+      <span><small>${vi ? "ĐÁP ÁN" : "ANSWERS"}</small><strong>${escapeHtml(view.resultCount ?? 0)}</strong></span>
+    </div>
+    <section class="nds-array-section"><header><strong>nums</strong><span>${vi ? "giữ nguyên thứ tự index" : "preserve index order"}</span></header><div class="nds-array">${arrayHtml}</div></section>
+    <div class="nds-state-row">
+      <section class="nds-current-section"><header><strong>current</strong><span>${vi ? "subsequence đang xây" : "subsequence being built"}</span></header><div class="nds-current">${currentHtml}</div></section>
+      <section class="nds-used-section"><header><strong>used</strong><span>${vi ? "chỉ thuộc frame hiện tại" : "current frame only"}</span></header><div class="nds-used">${usedHtml}</div></section>
+    </div>
+    <section class="nds-checks-section"><header><strong>${vi ? "HAI CỔNG TRƯỚC KHI CHỌN" : "TWO GATES BEFORE CHOOSING"}</strong><span>${candidateKnown ? `nums[${view.i}] = ${view.candidate}` : (vi ? "chưa có ứng viên" : "no candidate")}</span></header><div class="nds-checks">${checksHtml}</div></section>
+    <section class="nds-stack-section"><header><strong>CALL STACK</strong><span>start → i + 1</span></header><div class="nds-stack">${stackHtml}</div></section>
+    <section class="nds-results-section"><header><strong>result</strong><span>${view.resultCount || 0} ${vi ? "dãy khác nhau" : "distinct sequences"}</span></header><div class="nds-results">${resultHtml}</div>${truncated}</section>
+    <div class="nds-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="nds-legend"><span><i class="chosen"></i>${vi ? "đã chọn" : "chosen"}</span><span><i class="candidate"></i>${vi ? "đang xét" : "candidate"}</span><span><i class="duplicate"></i>${vi ? "trùng level" : "same-level duplicate"}</span><span><i class="decrease"></i>${vi ? "làm dãy giảm" : "would decrease"}</span></div>
+  </section>`;
 }
 
 function renderPredictWinnerView(step) {
@@ -10223,6 +10333,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderDigitPodiumView(step);
+  } else if (step.nonDecreasingView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderNonDecreasingSubsequencesView(step);
   } else if (step.partitionView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -10299,20 +10415,61 @@ if (savedId) {
 }
 loadProblem();
 
-// ---- Theme toggle (dark/light) ----
+// ---- Theme toggle (auto/dark/light) ----
 (function initTheme() {
   const saved = localStorage.getItem("theme");
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const theme = saved || (prefersDark ? "dark" : "dark"); // default dark
-  applyTheme(theme);
+  const savedMode = localStorage.getItem("themeMode");
+  themeMode = savedMode === "auto" ? "auto" : "manual";
+  if (themeMode === "auto") {
+    applyAutoTheme();
+    themeAutoTimer = window.setInterval(applyAutoTheme, 60000);
+  } else {
+    applyTheme(saved === "light" ? "light" : "dark");
+  }
+  updateThemeButtons();
 })();
 
 $("themeToggle").addEventListener("click", () => {
   const current = document.documentElement.dataset.theme || "dark";
   const next = current === "dark" ? "light" : "dark";
+  setThemeMode("manual");
   applyTheme(next);
   localStorage.setItem("theme", next);
 });
+
+$("themeAuto").addEventListener("click", () => {
+  if (themeMode === "auto") {
+    setThemeMode("manual");
+    localStorage.setItem("theme", document.documentElement.dataset.theme || "dark");
+  } else {
+    setThemeMode("auto");
+    applyAutoTheme();
+  }
+});
+
+function themeFromCurrentTime(now = new Date()) {
+  const hour = now.getHours();
+  return hour >= 6 && hour < 18 ? "light" : "dark";
+}
+
+function setThemeMode(mode) {
+  themeMode = mode === "auto" ? "auto" : "manual";
+  localStorage.setItem("themeMode", themeMode);
+  if (themeAutoTimer) {
+    window.clearInterval(themeAutoTimer);
+    themeAutoTimer = null;
+  }
+  if (themeMode === "auto") {
+    themeAutoTimer = window.setInterval(applyAutoTheme, 60000);
+  }
+  updateThemeButtons();
+}
+
+function applyAutoTheme() {
+  const theme = themeFromCurrentTime();
+  applyTheme(theme);
+  localStorage.setItem("theme", theme);
+}
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -10327,6 +10484,25 @@ function applyTheme(theme) {
   } else {
     moonIcon.classList.remove("hidden");
     sunIcon.classList.add("hidden");
+  }
+  updateThemeButtons();
+}
+
+function updateThemeButtons() {
+  const autoBtn = $("themeAuto");
+  if (autoBtn) {
+    autoBtn.textContent = t().autoTheme || "Auto";
+    autoBtn.classList.toggle("active", themeMode === "auto");
+    autoBtn.setAttribute("aria-pressed", themeMode === "auto" ? "true" : "false");
+    autoBtn.title = themeMode === "auto"
+      ? (lang === "vi" ? "Đang tự động đổi sáng/tối theo giờ hiện tại" : "Using day/night by current time")
+      : (lang === "vi" ? "Bật tự động sáng/tối theo giờ hiện tại" : "Use day/night by current time");
+  }
+  const toggleBtn = $("themeToggle");
+  if (toggleBtn) {
+    toggleBtn.setAttribute("aria-label", themeMode === "auto"
+      ? (lang === "vi" ? "Chuyển sang chỉnh theme thủ công" : "Switch to manual theme")
+      : (lang === "vi" ? "Đổi sáng/tối" : "Toggle theme"));
   }
 }
 
@@ -10493,11 +10669,15 @@ function registerPythonCompletions(monaco) {
     ["abs", "abs(${1:value})"],
     ["all", "all(${1:iterable})"],
     ["any", "any(${1:iterable})"],
+    ["bin", "bin(${1:number})"],
     ["bool", "bool(${1:value})"],
+    ["chr", "chr(${1:code})"],
     ["dict", "dict(${1})"],
+    ["divmod", "divmod(${1:a}, ${2:b})"],
     ["enumerate", "enumerate(${1:iterable})"],
     ["filter", "filter(${1:function}, ${2:iterable})"],
     ["float", "float(${1:value})"],
+    ["hash", "hash(${1:value})"],
     ["int", "int(${1:value})"],
     ["len", "len(${1:collection})"],
     ["list", "list(${1:iterable})"],
@@ -10505,9 +10685,12 @@ function registerPythonCompletions(monaco) {
     ["max", "max(${1:iterable})"],
     ["min", "min(${1:iterable})"],
     ["next", "next(${1:iterator})"],
+    ["ord", "ord(${1:char})"],
+    ["pow", "pow(${1:base}, ${2:exp})"],
     ["print", "print(${1:value})"],
     ["range", "range(${1:stop})"],
     ["reversed", "reversed(${1:sequence})"],
+    ["round", "round(${1:number})"],
     ["set", "set(${1:iterable})"],
     ["sorted", "sorted(${1:iterable})"],
     ["str", "str(${1:value})"],
@@ -10515,54 +10698,176 @@ function registerPythonCompletions(monaco) {
     ["tuple", "tuple(${1:iterable})"],
     ["zip", "zip(${1:iterables})"],
   ];
+  const leetcodeHelpers = [
+    ["List", "List[${1:int}]", "typing.List"],
+    ["Optional", "Optional[${1:TreeNode}]", "typing.Optional"],
+    ["Dict", "Dict[${1:str}, ${2:int}]", "typing.Dict"],
+    ["Set", "Set[${1:int}]", "typing.Set"],
+    ["Tuple", "Tuple[${1:int}, ${2:int}]", "typing.Tuple"],
+    ["deque", "deque(${1})", "collections.deque"],
+    ["defaultdict", "defaultdict(${1:int})", "collections.defaultdict"],
+    ["Counter", "Counter(${1:iterable})", "collections.Counter"],
+    ["heapq", "heapq", "heapq module"],
+    ["heappush", "heapq.heappush(${1:heap}, ${2:item})", "heapq.heappush"],
+    ["heappop", "heapq.heappop(${1:heap})", "heapq.heappop"],
+    ["bisect_left", "bisect_left(${1:a}, ${2:x})", "bisect.bisect_left"],
+    ["bisect_right", "bisect_right(${1:a}, ${2:x})", "bisect.bisect_right"],
+    ["lru_cache", "@lru_cache(None)\ndef ${1:dp}(${2:state}):\n\t${0:pass}", "functools.lru_cache"],
+    ["cache", "@cache\ndef ${1:dp}(${2:state}):\n\t${0:pass}", "functools.cache"],
+    ["TreeNode", "TreeNode", "LeetCode tree node"],
+    ["ListNode", "ListNode", "LeetCode linked-list node"],
+  ];
+  const imports = [
+    ["from typing import ...", "from typing import List, Optional, Dict, Set, Tuple", "Typing imports"],
+    ["from collections import ...", "from collections import Counter, defaultdict, deque", "Collections imports"],
+    ["from heapq import ...", "from heapq import heappush, heappop, heapify", "Heap imports"],
+    ["from bisect import ...", "from bisect import bisect_left, bisect_right", "Bisect imports"],
+    ["from functools import ...", "from functools import cache, lru_cache", "Memoization imports"],
+  ];
+  const dotMembers = [
+    ["append", "append(${1:value})", "list.append"],
+    ["extend", "extend(${1:iterable})", "list.extend"],
+    ["pop", "pop(${1})", "list/dict/set pop"],
+    ["sort", "sort()", "list.sort in place"],
+    ["reverse", "reverse()", "list.reverse in place"],
+    ["copy", "copy()", "shallow copy"],
+    ["join", "join(${1:iterable})", "str.join"],
+    ["split", "split(${1})", "str.split"],
+    ["strip", "strip()", "str.strip"],
+    ["startswith", "startswith(${1:prefix})", "str.startswith"],
+    ["endswith", "endswith(${1:suffix})", "str.endswith"],
+    ["find", "find(${1:sub})", "str.find"],
+    ["items", "items()", "dict.items"],
+    ["keys", "keys()", "dict.keys"],
+    ["values", "values()", "dict.values"],
+    ["get", "get(${1:key}, ${2:default})", "dict.get"],
+    ["setdefault", "setdefault(${1:key}, ${2:default})", "dict.setdefault"],
+    ["add", "add(${1:value})", "set.add"],
+    ["remove", "remove(${1:value})", "set.remove"],
+    ["discard", "discard(${1:value})", "set.discard"],
+    ["popleft", "popleft()", "deque.popleft"],
+    ["appendleft", "appendleft(${1:value})", "deque.appendleft"],
+  ];
   const snippets = [
     ["def function", "def ${1:function_name}(${2:args}):\n\t${0:pass}", "Function definition"],
     ["class definition", "class ${1:ClassName}:\n\tdef __init__(self, ${2:args}):\n\t\t${0:pass}", "Class definition"],
     ["if statement", "if ${1:condition}:\n\t${0:pass}", "If statement"],
     ["if / else", "if ${1:condition}:\n\t${2:pass}\nelse:\n\t${0:pass}", "If / else statement"],
+    ["if guard continue", "if ${1:condition}:\n\tcontinue", "Guard clause in loop"],
     ["for loop", "for ${1:item} in ${2:iterable}:\n\t${0:pass}", "For loop"],
     ["for range loop", "for ${1:i} in range(${2:n}):\n\t${0:pass}", "For loop with range"],
+    ["for enumerate", "for ${1:i}, ${2:value} in enumerate(${3:nums}):\n\t${0:pass}", "Loop with index and value"],
     ["while loop", "while ${1:condition}:\n\t${0:pass}", "While loop"],
+    ["while queue", "while ${1:queue}:\n\t${2:node} = ${1:queue}.popleft()\n\t${0:pass}", "BFS queue loop"],
     ["try / except", "try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:error}:\n\t${0:pass}", "Try / except block"],
     ["list comprehension", "[${1:expression} for ${2:item} in ${3:iterable}]", "List comprehension"],
+    ["dict comprehension", "{${1:key}: ${2:value} for ${3:item} in ${4:iterable}}", "Dict comprehension"],
+    ["two pointers", "${1:left}, ${2:right} = 0, len(${3:nums}) - 1\nwhile ${1:left} < ${2:right}:\n\t${0:pass}", "Two pointer skeleton"],
+    ["binary search", "${1:left}, ${2:right} = 0, len(${3:nums}) - 1\nwhile ${1:left} <= ${2:right}:\n\t${4:mid} = (${1:left} + ${2:right}) // 2\n\t${0:pass}", "Binary search skeleton"],
+    ["DFS function", "def dfs(${1:node}):\n\tif not ${1:node}:\n\t\treturn ${2:None}\n\t${0:pass}", "DFS helper"],
+    ["BFS queue", "q = deque([${1:start}])\nwhile q:\n\t${2:node} = q.popleft()\n\t${0:pass}", "BFS with deque"],
+    ["heap pattern", "heap = []\nheappush(heap, ${1:item})\n${2:item} = heappop(heap)", "Min-heap pattern"],
+    ["memoized dp", "@lru_cache(None)\ndef dp(${1:i}):\n\t${0:pass}", "Memoized DP helper"],
     ["LeetCode Solution", "class Solution:\n\tdef ${1:method}(self, ${2:args}):\n\t\t${0:pass}", "LeetCode Solution class"],
   ];
 
   monaco.languages.registerCompletionItemProvider("python", {
-    triggerCharacters: ["."],
+    triggerCharacters: [".", "_"],
     provideCompletionItems(model, position) {
       const word = model.getWordUntilPosition(position);
+      const lineBeforeCursor = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+      const currentLine = position.lineNumber;
       const range = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
         endColumn: word.endColumn,
       };
-      const suggestions = keywords.map((keyword) => ({
-        label: keyword,
-        kind: monaco.languages.CompletionItemKind.Keyword,
-        insertText: keyword,
-        range,
-        detail: lang === "vi" ? "Từ khóa Python" : "Python keyword",
-        sortText: `2-${keyword}`,
-      }));
-      builtins.forEach(([name, insertText]) => suggestions.push({
-        label: name,
-        kind: monaco.languages.CompletionItemKind.Function,
-        insertText,
-        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        range,
-        detail: lang === "vi" ? "Hàm dựng sẵn Python" : "Python built-in function",
-        sortText: `1-${name}`,
-      }));
-      snippets.forEach(([label, insertText, detail]) => suggestions.push({
+      const suggestions = [];
+      const addSnippet = ([label, insertText, detail], priority = 0) => suggestions.push({
         label,
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText,
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
         range,
         detail,
-        sortText: `0-${label}`,
+        sortText: `${priority}-${label}`,
+      });
+      const addFunction = ([name, insertText, detail], priority = 1) => suggestions.push({
+        label: name,
+        kind: monaco.languages.CompletionItemKind.Function,
+        insertText,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        detail: detail || (lang === "vi" ? "Hàm dựng sẵn Python" : "Python built-in function"),
+        sortText: `${priority}-${name}`,
+      });
+      const addLocalFunction = (fn, priority = 0) => suggestions.push({
+        label: fn.name,
+        kind: monaco.languages.CompletionItemKind.Function,
+        insertText: `${fn.name}(${fn.params.map((param, index) => `\${${index + 1}:${param}}`).join(", ")})`,
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        range,
+        detail: lang === "vi" ? "Hàm đã khai báo trong editor" : "Function declared in this editor",
+        documentation: `def ${fn.name}(${fn.rawParams.join(", ")})`,
+        sortText: `${priority}-${fn.name}`,
+      });
+
+      const declaredFunctions = [];
+      const seenFunctionNames = new Set();
+      const functionPattern = /^(\s*)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*:/;
+      for (let lineNumber = 1; lineNumber <= model.getLineCount(); lineNumber += 1) {
+        if (lineNumber === currentLine && /^\s*def\b/.test(model.getLineContent(lineNumber))) continue;
+        const match = model.getLineContent(lineNumber).match(functionPattern);
+        if (!match) continue;
+        const name = match[2];
+        if (seenFunctionNames.has(name)) continue;
+        seenFunctionNames.add(name);
+        const rawParams = match[3]
+          .split(",")
+          .map((param) => param.trim())
+          .filter(Boolean);
+        const params = rawParams
+          .map((param) => param.split("=")[0].split(":")[0].trim().replace(/^\*+/, ""))
+          .filter((param) => param && param !== "self" && param !== "cls");
+        declaredFunctions.push({ name, rawParams, params, indent: match[1].length, lineNumber });
+      }
+
+      if (lineBeforeCursor.endsWith(".")) {
+        dotMembers.forEach((item) => addFunction(item, 0));
+        return { suggestions };
+      }
+
+      const inImportLine = /^\s*(from|import)\b/.test(lineBeforeCursor);
+      if (inImportLine || lineBeforeCursor.trim() === "") {
+        imports.forEach((item) => addSnippet(item, 0));
+      }
+
+      if (/^\s*for\b/.test(lineBeforeCursor)) {
+        [
+          ["range(len(...))", "range(len(${1:nums}))", "Loop over indices"],
+          ["enumerate(...)", "enumerate(${1:nums})", "Loop over index and value"],
+        ].forEach((item) => addSnippet(item, 0));
+      }
+      if (/^\s*if\b/.test(lineBeforeCursor)) {
+        [
+          ["not empty", "${1:arr}", "Truthy collection check"],
+          ["bounds check", "0 <= ${1:i} < ${2:n}", "Index bounds check"],
+          ["visited check", "${1:node} not in ${2:visited}", "Graph/tree visited guard"],
+        ].forEach((item) => addSnippet(item, 0));
+      }
+
+      declaredFunctions.forEach((fn) => addLocalFunction(fn, 0));
+      snippets.forEach((item) => addSnippet(item, 1));
+      leetcodeHelpers.forEach((item) => addFunction(item, 2));
+      builtins.forEach((item) => addFunction(item, 3));
+      keywords.forEach((keyword) => suggestions.push({
+        label: keyword,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        insertText: keyword,
+        range,
+        detail: lang === "vi" ? "Từ khóa Python" : "Python keyword",
+        sortText: `4-${keyword}`,
       }));
       return { suggestions };
     },
