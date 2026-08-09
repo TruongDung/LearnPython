@@ -6144,6 +6144,123 @@ function renderSynonymSentenceView(step) {
   </div>`;
 }
 
+function renderReplaceWordsView(step) {
+  const view = step.replaceWordsView || {};
+  const treeView = $("treeView");
+  const vi = lang === "vi";
+  const roots = Array.isArray(view.roots) ? view.roots : [];
+  const sentenceWords = Array.isArray(view.sentenceWords) ? view.sentenceWords : [];
+  const resultWords = Array.isArray(view.resultWords) ? view.resultWords : [];
+  const wordIndex = Number.isInteger(view.wordIndex) ? view.wordIndex : null;
+  const charIndex = Number.isInteger(view.charIndex) ? view.charIndex : null;
+  const currentWord = view.word || (wordIndex !== null ? sentenceWords[wordIndex] : "");
+  const phase = view.phase || "build";
+  const foundRoot = view.foundRoot || "";
+  const replacement = view.replacement || "";
+  const prefix = view.prefix || "";
+  const missingChar = view.missingChar || "";
+
+  const dictionaryHtml = roots.length
+    ? roots.map((root) => {
+      const active = currentWord === root || foundRoot === root || prefix === root;
+      return `<span class="rw-root${active ? " active" : ""}">${escapeHtml(root)}</span>`;
+    }).join("")
+    : `<span class="rw-empty">∅</span>`;
+
+  const sentenceHtml = sentenceWords.length
+    ? sentenceWords.map((word, index) => {
+      const classes = ["rw-word"];
+      if (index < resultWords.length) classes.push("done");
+      if (index === wordIndex) classes.push("current");
+      const label = index < resultWords.length ? resultWords[index] : word;
+      if (index < resultWords.length && resultWords[index] !== word) classes.push("changed");
+      return `<span class="${classes.join(" ")}"><small>${escapeHtml(word)}</small><strong>${escapeHtml(label)}</strong></span>`;
+    }).join("")
+    : `<span class="rw-empty">${vi ? "Không có câu" : "No sentence"}</span>`;
+
+  const charHtml = currentWord
+    ? currentWord.split("").map((ch, index) => {
+      const classes = ["rw-char"];
+      if (index < prefix.length && phase !== "miss") classes.push("matched");
+      if (index === charIndex) classes.push(phase === "miss" ? "missing" : "current");
+      if (foundRoot && index < foundRoot.length) classes.push("root-prefix");
+      return `<span class="${classes.join(" ")}"><b>${escapeHtml(ch)}</b><small>${index}</small></span>`;
+    }).join("")
+    : `<span class="rw-empty">∅</span>`;
+
+  const resultHtml = resultWords.length
+    ? resultWords.map((word) => `<span class="rw-result-token">${escapeHtml(word)}</span>`).join("")
+    : `<span class="rw-empty">[]</span>`;
+
+  const pathHtml = (Array.isArray(view.pathChars) && view.pathChars.length)
+    ? view.pathChars.map((ch) => `<span>${escapeHtml(ch)}</span>`).join("<i>→</i>")
+    : "<span>root</span>";
+
+  let decisionClass = "";
+  let decisionMain = "";
+  let decisionSub = "";
+  if (phase === "replace") {
+    decisionClass = "replace";
+    decisionMain = `${currentWord} → ${replacement}`;
+    decisionSub = vi ? "dùng root ngắn nhất đã gặp" : "use the shortest root found";
+  } else if (phase === "keep") {
+    decisionClass = "keep";
+    decisionMain = currentWord;
+    decisionSub = vi ? "không có root phù hợp, giữ nguyên" : "no matching root, keep original";
+  } else if (phase === "miss") {
+    decisionClass = "miss";
+    decisionMain = vi ? `Thiếu cạnh '${missingChar}'` : `Missing edge '${missingChar}'`;
+    decisionSub = vi ? "không thể tiếp tục theo Trie" : "cannot continue in the Trie";
+  } else if (phase === "found-root" || phase === "candidate-root") {
+    decisionClass = "found";
+    decisionMain = foundRoot ? `root = ${foundRoot}` : prefix;
+    decisionSub = vi ? "dừng sớm vì đây là root ngắn nhất" : "stop early because this is the shortest root";
+  } else if (phase === "done") {
+    decisionClass = "done";
+    decisionMain = resultWords.join(" ");
+    decisionSub = vi ? "câu sau khi thay thế" : "sentence after replacement";
+  } else if (phase === "build" || phase === "mark-root") {
+    decisionClass = "build";
+    decisionMain = currentWord ? (phase === "mark-root" ? `${currentWord} ✓` : currentWord) : (vi ? "Xây Trie" : "Build Trie");
+    decisionSub = vi ? "chèn root dictionary vào Trie" : "insert dictionary roots into the Trie";
+  } else {
+    decisionClass = "scan";
+    decisionMain = prefix || currentWord || (vi ? "Bắt đầu tra từ" : "Start lookup");
+    decisionSub = vi ? "đọc từng ký tự từ trái sang phải" : "read characters from left to right";
+  }
+
+  const summary = vi
+    ? `Replace Words: ${roots.length} root và ${sentenceWords.length} từ trong câu.`
+    : `Replace Words with ${roots.length} roots and ${sentenceWords.length} sentence words.`;
+
+  treeView.innerHTML = `<section class="replace-words-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rw-section">
+      <header><strong>Dictionary roots</strong><span>${vi ? "root càng ngắn càng ưu tiên" : "shorter root wins"}</span></header>
+      <div class="rw-root-row">${dictionaryHtml}</div>
+    </div>
+    <div class="rw-section">
+      <header><strong>Sentence</strong><span>${vi ? "trên: từ gốc, dưới: kết quả" : "top: original, bottom: output"}</span></header>
+      <div class="rw-sentence-row">${sentenceHtml}</div>
+    </div>
+    <div class="rw-workspace">
+      <div class="rw-section">
+        <header><strong>${vi ? "Word đang xét" : "Current word"}</strong><span>${currentWord ? escapeHtml(currentWord) : "—"}</span></header>
+        <div class="rw-char-row">${charHtml}</div>
+        <div class="rw-path"><small>${vi ? "Đường đi Trie" : "Trie path"}</small><div>${pathHtml}</div></div>
+      </div>
+      <div class="rw-decision ${decisionClass}">
+        <small>${vi ? "Quyết định" : "Decision"}</small>
+        <strong>${escapeHtml(decisionMain || "—")}</strong>
+        <span>${escapeHtml(decisionSub || "")}</span>
+      </div>
+    </div>
+    <div class="rw-section result">
+      <header><strong>${vi ? "Result đang có" : "Current result"}</strong><span>${resultWords.length}/${sentenceWords.length}</span></header>
+      <div class="rw-result-row">${resultHtml}</div>
+    </div>
+  </section>`;
+}
+
 function renderPrefix2DView(step) {
   const view = step.prefix2DView || {};
   const matrix = Array.isArray(view.matrix) ? view.matrix : [];
@@ -10281,6 +10398,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNetworkDelayView(step);
+  } else if (step.replaceWordsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReplaceWordsView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
