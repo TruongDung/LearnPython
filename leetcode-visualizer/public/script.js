@@ -3698,6 +3698,155 @@ function renderPredictWinnerView(step) {
   </section>`;
 }
 
+function renderStoneGameIIView(step) {
+  const view = step.stoneGameIIView || {};
+  const vi = lang === "vi";
+  const piles = Array.isArray(view.piles) ? view.piles : [];
+  const suffix = Array.isArray(view.suffix) ? view.suffix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const options = Array.isArray(view.options) ? view.options : [];
+  const hasState = Number.isInteger(view.i) && Number.isInteger(view.m);
+  const hasChoice = hasState && Number.isInteger(view.x);
+  const phaseIndex = view.phase === "result" ? 2 : ["dp-init", "dp"].includes(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Dựng tổng suffix", "2. Điền dp[i][M] và thử X", "3. Trả dp[0][1]"]
+    : ["1. Build suffix totals", "2. Fill dp[i][M] and try X", "3. Return dp[0][1]"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const maxPile = Math.max(1, ...piles.map((pile) => pile.value));
+  const selectedEnd = hasChoice ? Math.min(piles.length, view.i + view.x) : null;
+  const pilesHtml = piles.map((pile) => {
+    const classes = ["sg2-pile"];
+    if (Number.isInteger(view.i) && pile.index < view.i) classes.push("is-consumed");
+    if (Number.isInteger(view.i) && pile.index >= view.i) classes.push("is-remaining");
+    if (hasChoice && pile.index >= view.i && pile.index < selectedEnd) classes.push("is-taken");
+    if (Number.isInteger(view.nextI) && pile.index >= view.nextI) classes.push("is-opponent-suffix");
+    if (pile.index === view.i) classes.push("is-start");
+    const pointers = [];
+    if (pile.index === view.i) pointers.push("i");
+    if (hasChoice && pile.index === selectedEnd - 1) pointers.push(`X=${view.x}`);
+    if (pile.index === view.nextI) pointers.push(vi ? "đối thủ" : "opponent");
+    const height = 18 + Math.round((pile.value / maxPile) * 32);
+    return `<div class="${classes.join(" ")}">
+      <div class="sg2-pointers">${pointers.map((pointer) => `<span>${escapeHtml(pointer)}</span>`).join("")}</div>
+      <div class="sg2-pile-bar" style="--sg2-pile-height:${height}px"><strong>${escapeHtml(pile.value)}</strong></div>
+      <small>[${pile.index}]</small>
+    </div>`;
+  }).join("");
+
+  const suffixHtml = suffix.map((cell) => {
+    const classes = ["sg2-suffix-cell"];
+    if (cell.index === view.i) classes.push("is-active");
+    if (cell.index === view.nextI) classes.push("is-dependency");
+    if (!cell.known) classes.push("is-pending");
+    return `<span class="${classes.join(" ")}"><small>suffix[${cell.index}]</small><strong>${cell.known ? escapeHtml(cell.value) : "?"}</strong></span>`;
+  }).join("");
+
+  const columnHeaders = Array.from({ length: view.n || 0 }, (_, index) => `<div class="sg2-dp-head">M=${index + 1}</div>`).join("");
+  const dpRows = dp.map((row, rowIndex) => {
+    const cells = row.map((cell) => {
+      const classes = ["sg2-dp-cell"];
+      if (cell.known) classes.push("is-known");
+      if (cell.i === view.i && cell.m === view.m) classes.push("is-active");
+      if (cell.i === view.nextI && cell.m === view.nextM) classes.push("is-dependency");
+      if (cell.i === view.n) classes.push("is-base");
+      const role = cell.i === view.i && cell.m === view.m
+        ? (vi ? "đang tính" : "current")
+        : cell.i === view.nextI && cell.m === view.nextM
+          ? (vi ? "đối thủ" : "opponent")
+          : "";
+      return `<div class="${classes.join(" ")}" role="gridcell" aria-label="dp ${cell.i} ${cell.m}: ${cell.known ? cell.value : "unknown"}"><small>${escapeHtml(role)}</small><strong>${cell.known ? escapeHtml(cell.value) : "?"}</strong></div>`;
+    }).join("");
+    const rowSuffix = suffix[rowIndex] && suffix[rowIndex].known ? suffix[rowIndex].value : "?";
+    return `<div class="sg2-dp-row-head"><strong>i=${rowIndex}</strong><small>Σ=${escapeHtml(rowSuffix)}</small></div>${cells}`;
+  }).join("");
+
+  const stateHtml = `<div class="sg2-state-strip">
+    <span><small>${vi ? "TRẠNG THÁI" : "STATE"}</small><strong>${hasState ? `dp[${view.i}][${view.m}]` : "dp[i][M]"}</strong></span>
+    <span><small>${vi ? "CÒN LẠI" : "REMAINING"}</small><strong>${Number.isInteger(view.remaining) ? view.remaining : "?"} ${vi ? "đống" : "piles"}</strong></span>
+    <span><small>${vi ? "GIỚI HẠN LƯỢT" : "TURN LIMIT"}</small><strong>${Number.isInteger(view.m) ? `1 ≤ X ≤ ${view.maxTake}` : "1 ≤ X ≤ 2M"}</strong></span>
+    <span><small>${hasState ? `suffix[${view.i}]` : "suffix[i]"}</small><strong>${hasState && suffix[view.i]?.known ? escapeHtml(suffix[view.i].value) : "?"}</strong></span>
+  </div>`;
+
+  let formulaHtml;
+  if (view.phase === "suffix" && Number.isInteger(view.i)) {
+    const left = piles[view.i]?.value ?? "?";
+    const right = suffix[view.i + 1]?.known ? suffix[view.i + 1].value : "?";
+    const result = suffix[view.i]?.known ? suffix[view.i].value : "?";
+    formulaHtml = `<div class="sg2-formula suffix"><span><small>piles[${view.i}]</small><strong>${escapeHtml(left)}</strong></span><i>+</i><span><small>suffix[${view.i + 1}]</small><strong>${escapeHtml(right)}</strong></span><i>=</i><span class="is-result"><small>suffix[${view.i}]</small><strong>${escapeHtml(result)}</strong></span></div>`;
+  } else {
+    const suffixValue = hasState && suffix[view.i]?.known ? suffix[view.i].value : "?";
+    const opponentValue = view.opponent === null || view.opponent === undefined ? "?" : view.opponent;
+    const candidateValue = view.candidate === null || view.candidate === undefined ? "?" : view.candidate;
+    formulaHtml = `<div class="sg2-formula"><span><small>${hasState ? `suffix[${view.i}] · ${vi ? "tổng còn lại" : "remaining total"}` : "suffix[i]"}</small><strong>${escapeHtml(suffixValue)}</strong></span><i>−</i><span class="is-opponent"><small>${Number.isInteger(view.nextI) ? `dp[${view.nextI}][${view.nextM}] · ${vi ? "đối thủ" : "opponent"}` : "dp[i+X][max(M,X)]"}</small><strong>${escapeHtml(opponentValue)}</strong></span><i>=</i><span class="is-result"><small>${vi ? "người hiện tại đảm bảo" : "current player secures"}</small><strong>${escapeHtml(candidateValue)}</strong></span></div>`;
+  }
+
+  let optionCounts;
+  if (view.takeAll || view.phase === "result") {
+    optionCounts = options.map((option) => option.x);
+  } else {
+    optionCounts = Array.from({ length: Number.isInteger(view.maxTake) ? view.maxTake : 0 }, (_, index) => index + 1);
+  }
+  const optionsHtml = optionCounts.length ? optionCounts.map((x) => {
+    const option = options.find((item) => item.x === x);
+    const classes = ["sg2-option"];
+    if (x === view.x) classes.push("is-current");
+    if (option && x === view.bestX) classes.push("is-best");
+    if (!option) classes.push("is-pending");
+    const indices = option ? `[${option.indices.join(", ")}]` : (hasState ? `[${view.i}..${view.i + x - 1}]` : "—");
+    return `<div class="${classes.join(" ")}">
+      <header><strong>X=${x}</strong><span>${option && x === view.bestX ? (vi ? "TỐT NHẤT" : "BEST") : option ? (vi ? "ĐÃ THỬ" : "TRIED") : (vi ? "CHƯA THỬ" : "PENDING")}</span></header>
+      <code>${escapeHtml(indices)}</code>
+      <div><span><small>${vi ? "lấy ngay" : "take now"}</small><b>${option ? escapeHtml(option.immediate) : "?"}</b></span><span><small>${vi ? "đối thủ" : "opponent"}</small><b>${option ? escapeHtml(option.opponent) : "?"}</b></span><span><small>${vi ? "đảm bảo" : "secures"}</small><b>${option ? escapeHtml(option.candidate) : "?"}</b></span></div>
+      <small>${option ? `→ dp[${option.nextI}][${option.nextM}]` : `→ dp[${hasState ? view.i + x : "i+X"}][max(M,${x})]`}</small>
+    </div>`;
+  }).join("") : `<div class="sg2-options-empty">${vi ? "Các lựa chọn X sẽ xuất hiện khi bắt đầu một trạng thái dp." : "X choices appear when a dp state begins."}</div>`;
+
+  let detail;
+  if (view.event === "enter") detail = vi ? "Alice bắt đầu tại (i=0, M=1)." : "Alice starts at (i=0, M=1).";
+  else if (view.event === "read-n") detail = vi ? "Mỗi trạng thái được xác định bởi vị trí i và giới hạn M." : "Each state is identified by position i and limit M.";
+  else if (view.event === "init-suffix") detail = vi ? "Suffix rỗng sau cuối mảng có tổng bằng 0." : "The empty suffix after the array has total 0.";
+  else if (view.event === "suffix-loop") detail = vi ? `Chuẩn bị cộng piles[${view.i}] vào suffix bên phải.` : `Prepare to add piles[${view.i}] to the suffix on its right.`;
+  else if (view.event === "suffix-save") detail = vi ? `Đã biết tổng đá từ vị trí ${view.i} đến cuối.` : `The total from position ${view.i} to the end is now known.`;
+  else if (view.event === "init-dp") detail = vi ? `Hàng i=${view.n} là base case: không còn đá nên mọi giá trị bằng 0.` : `Row i=${view.n} is the base case: no piles remain, so every value is 0.`;
+  else if (view.event === "outer-loop") detail = vi ? `Mở hàng i=${view.i}; các hàng i lớn hơn đã sẵn sàng.` : `Open row i=${view.i}; rows with larger i are ready.`;
+  else if (view.event === "inner-loop") detail = vi ? `Tại M=${view.m}, được xét X từ 1 đến ${view.maxTake}.` : `At M=${view.m}, X ranges from 1 through ${view.maxTake}.`;
+  else if (view.event === "take-all-check") detail = view.takeAll
+    ? (vi ? `2M đủ phủ ${view.remaining} đống còn lại.` : `2M covers all ${view.remaining} remaining piles.`)
+    : (vi ? "Không thể lấy hết; phải tính phần tối ưu của đối thủ." : "Cannot take all; the opponent's optimal remainder must be considered.");
+  else if (view.event === "take-all") detail = vi ? `Lấy hết ${view.remaining} đống và để lại 0 cho đối thủ.` : `Take all ${view.remaining} piles and leave 0 for the opponent.`;
+  else if (view.event === "else-branch") detail = vi ? `So sánh ${view.maxTake} lựa chọn X.` : `Compare ${view.maxTake} possible X choices.`;
+  else if (view.event === "reset-best") detail = vi ? "Đặt best=0 trước khi thử lựa chọn đầu tiên." : "Reset best=0 before evaluating the first choice.";
+  else if (view.event === "option-loop") detail = vi ? `X=${view.x}: lấy ${view.immediate} viên ngay, rồi chuyển lượt sang dp[${view.nextI}][${view.nextM}].` : `X=${view.x}: take ${view.immediate} now, then pass the turn to dp[${view.nextI}][${view.nextM}].`;
+  else if (view.event === "evaluate-option") detail = vi ? `Đối thủ đảm bảo ${view.opponent}; người hiện tại còn ${view.candidate}. Best hiện tại là ${view.best}.` : `The opponent secures ${view.opponent}; the current player keeps ${view.candidate}. Current best is ${view.best}.`;
+  else if (view.event === "commit") detail = vi ? `Chọn X=${view.bestX} và lưu dp[${view.i}][${view.m}]=${view.best}.` : `Choose X=${view.bestX} and store dp[${view.i}][${view.m}]=${view.best}.`;
+  else detail = vi ? `Alice đảm bảo ${view.alice}/${view.total} viên khi cả hai chơi tối ưu.` : `Alice guarantees ${view.alice}/${view.total} stones under optimal play.`;
+
+  const resultHtml = view.phase === "result" ? `<div class="sg2-result-split">
+    <span class="alice" style="--sg2-share:${view.total ? (view.alice / view.total) * 100 : 0}%"><small>ALICE · dp[0][1]</small><strong>${escapeHtml(view.alice)}</strong><i></i></span>
+    <span class="bob" style="--sg2-share:${view.total ? (view.bob / view.total) * 100 : 0}%"><small>BOB · ${vi ? "còn lại" : "remainder"}</small><strong>${escapeHtml(view.bob)}</strong><i></i></span>
+  </div>` : "";
+
+  const summary = vi
+    ? `Stone Game II với ${piles.length} đống; trạng thái ${view.phase}.`
+    : `Stone Game II with ${piles.length} piles; phase ${view.phase}.`;
+  $("treeView").innerHTML = `<section class="stone-game-ii-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sg2-phases">${phasesHtml}</div>
+    ${stateHtml}
+    <section class="sg2-piles-section"><header><strong>PILES</strong><span>${hasChoice ? `${vi ? "lấy" : "take"} X=${view.x} · next (${view.nextI}, ${view.nextM})` : (vi ? "độ cao biểu diễn số đá" : "height represents stones")}</span></header><div class="sg2-piles">${pilesHtml}</div></section>
+    <section class="sg2-suffix-section"><header><strong>SUFFIX TOTALS</strong><span>suffix[i] = piles[i] + suffix[i+1]</span></header><div class="sg2-suffix-row">${suffixHtml}</div></section>
+    ${formulaHtml}
+    <section class="sg2-options-section"><header><strong>${vi ? "LỰA CHỌN X" : "X CHOICES"}</strong><span>${hasState ? `dp[${view.i}][${view.m}]` : "dp[i][M]"}</span></header><div class="sg2-options">${optionsHtml}</div></section>
+    <section class="sg2-table-section"><header><strong>DP TABLE</strong><span>${vi ? "số đá tối đa người hiện tại đảm bảo" : "maximum stones current player secures"}</span></header><div class="sg2-table-scroll"><div class="sg2-dp-grid" role="grid" style="--sg2-cols:${view.n || 1}"><div class="sg2-dp-corner">i / M</div>${columnHeaders}${dpRows}</div></div></section>
+    ${resultHtml}
+    <div class="sg2-action ${view.takeAll ? "is-take-all" : ""} ${view.phase === "result" ? "is-result" : ""}"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(detail)}</span></div>
+    <div class="sg2-legend"><span><i class="current"></i>${vi ? "trạng thái hiện tại" : "current state"}</span><span><i class="taken"></i>${vi ? "đống đang lấy" : "piles taken"}</span><span><i class="opponent"></i>${vi ? "trạng thái đối thủ" : "opponent state"}</span><span><i class="best"></i>${vi ? "lựa chọn tốt nhất" : "best choice"}</span></div>
+  </section>`;
+}
+
 function renderStoneGameView(step) {
   const view = step.stoneGameView;
   const vi = lang === "vi";
@@ -9649,6 +9798,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKeypadHeapView(step);
+  } else if (step.stoneGameIIView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGameIIView(step);
   } else if (step.stoneGameView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

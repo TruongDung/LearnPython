@@ -4790,106 +4790,417 @@ function buildSteps1140(piles) {
   const n = piles.length;
   const steps = [];
   const suffix = new Array(n + 1).fill(0);
-  for (let i = n - 1; i >= 0; i--) suffix[i] = suffix[i + 1] + piles[i];
-
+  const suffixKnown = new Array(n + 1).fill(false);
   const dp = Array.from({ length: n + 1 }, () => Array(n + 1).fill(0));
+  const dpKnown = Array.from({ length: n + 1 }, () => Array(n + 1).fill(false));
+  const choice = Array.from({ length: n + 1 }, () => Array(n + 1).fill(null));
+  let phase = "setup";
+  let event = "enter";
+  let activeI = null;
+  let activeM = null;
+  let activeX = null;
+  let remaining = null;
+  let maxTake = null;
+  let nextI = null;
+  let nextM = null;
+  let immediate = null;
+  let opponent = null;
+  let candidate = null;
+  let best = null;
+  let bestX = null;
+  let takeAll = false;
+  let options = [];
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [...piles],
-    sub: piles.map((_, i) => String(i)),
-    grid: dp.map((row) => [...row]),
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5, 6],
-    vars: [
-      { name: "n", value: n },
-      { name: "suffix", value: `[${suffix.slice(0, n).join(", ")}]` },
-    ],
+  function suffixLabel() {
+    return `[${suffix.map((value, index) => suffixKnown[index] ? value : "_").join(", ")}]`;
+  }
+
+  function dpLabel(i, m) {
+    return Number.isInteger(i) && Number.isInteger(m) && dpKnown[i][m] ? dp[i][m] : "?";
+  }
+
+  function makeView(overrides = {}) {
+    return {
+      phase,
+      event,
+      piles: piles.map((value, index) => ({ index, value })),
+      suffix: suffix.map((value, index) => ({ index, value, known: suffixKnown[index] })),
+      dp: dp.map((row, i) => row.slice(1).map((value, offset) => ({
+        i,
+        m: offset + 1,
+        value: dpKnown[i][offset + 1] ? value : null,
+        known: dpKnown[i][offset + 1],
+      }))),
+      n,
+      i: activeI,
+      m: activeM,
+      x: activeX,
+      remaining,
+      maxTake,
+      nextI,
+      nextM,
+      immediate,
+      opponent,
+      candidate,
+      best,
+      bestX,
+      takeAll,
+      options: options.map((option) => ({ ...option, indices: [...option.indices] })),
+      total: suffixKnown[0] ? suffix[0] : piles.reduce((sum, value) => sum + value, 0),
+      ...overrides,
+    };
+  }
+
+  function pushStep({ title, line, note, vars = [], final = false, view = {} }) {
+    const baseVars = [
+      { name: "suffix", value: suffixLabel() },
+      { name: "i", value: activeI === null ? "not set" : activeI },
+      { name: "M", value: activeM === null ? "not set" : activeM },
+      { name: "X", value: activeX === null ? "not set" : activeX },
+    ];
+    steps.push({
+      title,
+      arr: [...piles],
+      sub: piles.map((_, index) => String(index)),
+      highlight: Number.isInteger(activeI) && activeI < n ? [activeI] : [],
+      mark: Number.isInteger(activeI) && Number.isInteger(activeX)
+        ? Array.from({ length: Math.min(activeX, n - activeI) }, (_, offset) => activeI + offset)
+        : [],
+      stoneGameIIView: makeView(view),
+      codeLines: [line],
+      vars: [...baseVars, ...vars],
+      note,
+      final,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Bắt đầu stoneGameII", en: "Enter stoneGameII" },
+    line: 2,
+    vars: [{ name: "piles", value: `[${piles.join(", ")}]` }],
     note: {
-      vi: `suffix[i] là tổng số đá còn lại từ vị trí i. dp[i][M] là số đá tối đa người chơi hiện tại có thể lấy được từ i khi M hiện tại = M.`,
-      en: `suffix[i] is the remaining total from position i. dp[i][M] is the maximum stones the current player can obtain from i with current M = M.`,
+      vi: "Alice bắt đầu với i=0 và M=1. Mỗi lượt được lấy X đống liên tiếp, 1 <= X <= 2M.",
+      en: "Alice starts at i=0 with M=1. Each turn takes X consecutive piles where 1 <= X <= 2M.",
+    },
+  });
+
+  event = "read-n";
+  pushStep({
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    line: 3,
+    vars: [{ name: "n", value: n }],
+    note: {
+      vi: `Có ${n} đống đá. Trạng thái dp[i][M] bắt đầu tại đống i với giới hạn hiện tại M.`,
+      en: `There are ${n} piles. State dp[i][M] starts at pile i with the current limit M.`,
+    },
+  });
+
+  suffixKnown[n] = true;
+  phase = "suffix";
+  event = "init-suffix";
+  pushStep({
+    title: { vi: "Khởi tạo suffix", en: "Initialize suffix" },
+    line: 4,
+    vars: [{ name: `suffix[${n}]`, value: 0 }],
+    note: {
+      vi: `suffix[${n}] = 0 vì sau đống cuối không còn viên đá nào.`,
+      en: `suffix[${n}] = 0 because no stones remain after the last pile.`,
     },
   });
 
   for (let i = n - 1; i >= 0; i--) {
+    activeI = i;
+    event = "suffix-loop";
+    pushStep({
+      title: { vi: `Dựng suffix tại i=${i}`, en: `Build suffix at i=${i}` },
+      line: 5,
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Cộng piles[${i}] vào tổng đã biết ở suffix[${i + 1}].`,
+        en: `Add piles[${i}] to the known total at suffix[${i + 1}].`,
+      },
+    });
+
+    suffix[i] = suffix[i + 1] + piles[i];
+    suffixKnown[i] = true;
+    event = "suffix-save";
+    pushStep({
+      title: { vi: `suffix[${i}] = ${suffix[i]}`, en: `suffix[${i}] = ${suffix[i]}` },
+      line: 6,
+      vars: [
+        { name: `piles[${i}]`, value: piles[i] },
+        { name: `suffix[${i + 1}]`, value: suffix[i + 1] },
+        { name: `suffix[${i}]`, value: `${piles[i]} + ${suffix[i + 1]} = ${suffix[i]}` },
+      ],
+      note: {
+        vi: `Từ đống ${i} đến cuối có tổng ${suffix[i]} viên đá.`,
+        en: `Piles ${i} through the end contain ${suffix[i]} stones in total.`,
+      },
+    });
+  }
+
+  phase = "dp-init";
+  event = "init-dp";
+  activeI = null;
+  for (let m = 1; m <= n; m++) dpKnown[n][m] = true;
+  pushStep({
+    title: { vi: "Khởi tạo bảng dp", en: "Initialize the dp table" },
+    line: 7,
+    vars: [{ name: "dp shape", value: `${n + 1} x ${n + 1}` }],
+    note: {
+      vi: `dp[i][M] là số đá tối đa người đang tới lượt lấy được từ suffix i. Hàng dp[${n}][M] = 0 vì không còn đống nào.`,
+      en: `dp[i][M] is the maximum stones the current player can secure from suffix i. Row dp[${n}][M] = 0 because no piles remain.`,
+    },
+  });
+
+  phase = "dp";
+  for (let i = n - 1; i >= 0; i--) {
+    activeI = i;
+    activeM = null;
+    activeX = null;
+    event = "outer-loop";
+    pushStep({
+      title: { vi: `Bắt đầu hàng i=${i}`, en: `Start row i=${i}` },
+      line: 8,
+      vars: [{ name: "remaining piles", value: n - i }, { name: `suffix[${i}]`, value: suffix[i] }],
+      note: {
+        vi: `Đi từ phải sang trái để mọi trạng thái đối thủ dp[i+X][...] đã được tính trước.`,
+        en: `Move right to left so every opponent state dp[i+X][...] is already available.`,
+      },
+    });
+
     for (let m = 1; m <= n; m++) {
-      const remaining = n - i;
-      if (2 * m >= remaining) {
+      activeM = m;
+      activeX = null;
+      remaining = n - i;
+      maxTake = Math.min(2 * m, remaining);
+      nextI = null;
+      nextM = null;
+      immediate = null;
+      opponent = null;
+      candidate = null;
+      best = null;
+      bestX = null;
+      takeAll = false;
+      options = [];
+      event = "inner-loop";
+      pushStep({
+        title: { vi: `Xét trạng thái dp[${i}][${m}]`, en: `Visit state dp[${i}][${m}]` },
+        line: 9,
+        vars: [
+          { name: "i", value: i },
+          { name: "M", value: m },
+          { name: "allowed X", value: `1..${maxTake}` },
+        ],
+        note: {
+          vi: `Còn ${remaining} đống; với M=${m}, lượt này được lấy tối đa min(2M, remaining) = ${maxTake} đống.`,
+          en: `${remaining} piles remain; with M=${m}, this turn may take at most min(2M, remaining) = ${maxTake} piles.`,
+        },
+      });
+
+      takeAll = 2 * m >= remaining;
+      event = "take-all-check";
+      pushStep({
+        title: takeAll
+          ? { vi: `${2 * m} >= ${remaining}: có thể lấy hết`, en: `${2 * m} >= ${remaining}: can take all` }
+          : { vi: `${2 * m} < ${remaining}: phải thử từng X`, en: `${2 * m} < ${remaining}: try each X` },
+        line: 10,
+        vars: [
+          { name: "2 * M", value: 2 * m },
+          { name: "n - i", value: remaining },
+          { name: "condition", value: takeAll },
+        ],
+        note: takeAll
+          ? { vi: "Tất cả đống còn lại nằm trong giới hạn 2M, nên lấy hết là tối ưu.", en: "Every remaining pile fits within 2M, so taking all is optimal." }
+          : { vi: "Chưa thể kết thúc game trong lượt này; cần để đối thủ chơi trên suffix còn lại.", en: "The game cannot end this turn; the opponent must play on the remaining suffix." },
+      });
+
+      if (takeAll) {
+        activeX = remaining;
+        immediate = suffix[i];
+        nextI = n;
+        nextM = Math.max(m, remaining);
+        opponent = 0;
+        candidate = suffix[i];
+        best = suffix[i];
+        bestX = remaining;
+        options = [{
+          x: remaining,
+          indices: Array.from({ length: remaining }, (_, offset) => i + offset),
+          immediate,
+          nextI,
+          nextM,
+          opponent,
+          candidate,
+          best: true,
+        }];
         dp[i][m] = suffix[i];
-        steps.push({
-          title: { vi: `dp[${i}][${m}]`, en: `dp[${i}][${m}]` },
-          arr: [...piles],
-          sub: piles.map((_, idx) => String(idx)),
-          grid: dp.map((row) => [...row]),
-          highlight: [i],
-          mark: [i],
-          codeLines: [8, 9],
+        dpKnown[i][m] = true;
+        choice[i][m] = remaining;
+        event = "take-all";
+        pushStep({
+          title: { vi: `dp[${i}][${m}] = ${suffix[i]}`, en: `dp[${i}][${m}] = ${suffix[i]}` },
+          line: 11,
           vars: [
-            { name: "i", value: i },
-            { name: "M", value: m },
-            { name: "remaining", value: remaining },
-            { name: "dp[i][M]", value: dp[i][m] },
+            { name: `suffix[${i}]`, value: suffix[i] },
+            { name: `dp[${i}][${m}]`, value: dp[i][m] },
           ],
           note: {
-            vi: `Vì 2M = ${2 * m} >= số đá còn lại ${remaining}, người chơi hiện tại lấy hết suffix => dp[${i}][${m}] = suffix[${i}] = ${suffix[i]}.`,
-            en: `Because 2M = ${2 * m} >= remaining stones ${remaining}, the current player can take the whole suffix => dp[${i}][${m}] = suffix[${i}] = ${suffix[i]}.`,
+            vi: `Lấy cả ${remaining} đống còn lại, nhận toàn bộ ${suffix[i]} viên; đối thủ nhận 0.`,
+            en: `Take all ${remaining} remaining piles, secure all ${suffix[i]} stones, and leave 0 for the opponent.`,
           },
         });
         continue;
       }
 
-      let best = 0;
-      const options = [];
-      for (let x = 1; x <= 2 * m && i + x <= n; x++) {
-        const nextM = Math.max(m, x);
-        const gained = suffix[i] - dp[i + x][nextM];
-        options.push({ x, nextM, gained });
-        if (gained > best) best = gained;
-      }
-      dp[i][m] = best;
+      event = "else-branch";
+      pushStep({
+        title: { vi: "Đi vào nhánh thử lựa chọn", en: "Enter the choice branch" },
+        line: 12,
+        note: {
+          vi: `Phải so sánh mọi X từ 1 đến ${2 * m}.`,
+          en: `Every X from 1 through ${2 * m} must be compared.`,
+        },
+      });
 
-      steps.push({
-        title: { vi: `Tính dp[${i}][${m}]`, en: `Compute dp[${i}][${m}]` },
-        arr: [...piles],
-        sub: piles.map((_, idx) => String(idx)),
-        grid: dp.map((row) => [...row]),
-        highlight: [i],
-        mark: [i],
-        codeLines: [10, 11, 12, 13],
+      best = 0;
+      event = "reset-best";
+      pushStep({
+        title: { vi: "best = 0", en: "best = 0" },
+        line: 13,
+        vars: [{ name: "best", value: best }],
+        note: {
+          vi: "best giữ số đá lớn nhất người hiện tại có thể đảm bảo sau các lựa chọn đã thử.",
+          en: "best stores the largest total the current player can guarantee among tried choices.",
+        },
+      });
+
+      for (let x = 1; x <= 2 * m; x++) {
+        activeX = x;
+        nextI = i + x;
+        nextM = Math.max(m, x);
+        immediate = suffix[i] - suffix[nextI];
+        opponent = dp[nextI][nextM];
+        candidate = null;
+        event = "option-loop";
+        pushStep({
+          title: { vi: `Thử X=${x}`, en: `Try X=${x}` },
+          line: 14,
+          vars: [
+            { name: "X", value: x },
+            { name: "taken now", value: immediate },
+            { name: "next state", value: `dp[${nextI}][${nextM}]` },
+          ],
+          note: {
+            vi: `Lấy các đống [${i}..${nextI - 1}] được ${immediate} viên. Đối thủ bắt đầu tại i=${nextI}, M=max(${m}, ${x})=${nextM}.`,
+            en: `Take piles [${i}..${nextI - 1}] for ${immediate} stones. The opponent starts at i=${nextI}, M=max(${m}, ${x})=${nextM}.`,
+          },
+        });
+
+        candidate = suffix[i] - opponent;
+        const becomesBest = candidate > best;
+        if (becomesBest) {
+          best = candidate;
+          bestX = x;
+        }
+        options.push({
+          x,
+          indices: Array.from({ length: x }, (_, offset) => i + offset),
+          immediate,
+          nextI,
+          nextM,
+          opponent,
+          candidate,
+          best: becomesBest,
+        });
+        event = "evaluate-option";
+        pushStep({
+          title: becomesBest
+            ? { vi: `X=${x} tạo best mới ${best}`, en: `X=${x} sets new best ${best}` }
+            : { vi: `X=${x} cho ${candidate}, giữ best=${best}`, en: `X=${x} gives ${candidate}; keep best=${best}` },
+          line: 15,
+          vars: [
+            { name: `dp[${nextI}][${nextM}]`, value: opponent },
+            { name: "candidate", value: `${suffix[i]} - ${opponent} = ${candidate}` },
+            { name: "best", value: best },
+          ],
+          note: {
+            vi: `Trong tổng ${suffix[i]} viên còn lại, đối thủ tối ưu lấy ${opponent}; người hiện tại đảm bảo ${candidate}. ${becomesBest ? `Đây là lựa chọn tốt nhất mới.` : `Nó không vượt best hiện tại ${best}.`}`,
+            en: `Of the ${suffix[i]} remaining stones, the optimal opponent secures ${opponent}; the current player guarantees ${candidate}. ${becomesBest ? "This is the new best choice." : `It does not beat the current best ${best}.`}`,
+          },
+        });
+      }
+
+      dp[i][m] = best;
+      dpKnown[i][m] = true;
+      choice[i][m] = bestX;
+      activeX = bestX;
+      const chosen = options.find((option) => option.x === bestX);
+      if (chosen) {
+        nextI = chosen.nextI;
+        nextM = chosen.nextM;
+        immediate = chosen.immediate;
+        opponent = chosen.opponent;
+        candidate = chosen.candidate;
+      }
+      event = "commit";
+      pushStep({
+        title: { vi: `Chốt dp[${i}][${m}] = ${best}`, en: `Commit dp[${i}][${m}] = ${best}` },
+        line: 16,
         vars: [
-          { name: "i", value: i },
-          { name: "M", value: m },
-          { name: "options", value: options.map((o) => `x=${o.x}: ${o.gained}`).join(", ") },
-          { name: "dp[i][M]", value: dp[i][m] },
+          { name: "best X", value: bestX },
+          { name: `dp[${i}][${m}]`, value: best },
         ],
         note: {
-          vi: `Thử lấy x = 1..${2 * m}. Các lựa chọn: ${options.map((o) => `x=${o.x} => suffix[${i}] - dp[${i + o.x}][${o.nextM}] = ${o.gained}`).join("; ")}. Chọn lớn nhất => dp[${i}][${m}] = ${dp[i][m]}.`,
-          en: `Try x = 1..${2 * m}. Options: ${options.map((o) => `x=${o.x} => suffix[${i}] - dp[${i + o.x}][${o.nextM}] = ${o.gained}`).join("; ")}. Pick the maximum => dp[${i}][${m}] = ${dp[i][m]}.`,
+          vi: `Trong trạng thái (i=${i}, M=${m}), lấy X=${bestX} giúp người hiện tại đảm bảo nhiều nhất ${best} viên.`,
+          en: `At state (i=${i}, M=${m}), taking X=${bestX} lets the current player guarantee the maximum ${best} stones.`,
         },
       });
     }
   }
 
   const answer = dp[0][1];
-  steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
-    arr: [...piles],
-    sub: piles.map((_, i) => String(i)),
-    grid: dp.map((row) => [...row]),
-    highlight: [],
-    mark: [0],
-    final: true,
-    codeLines: [15],
+  const bob = suffix[0] - answer;
+  const firstX = choice[0][1];
+  phase = "result";
+  event = "return";
+  activeI = 0;
+  activeM = 1;
+  activeX = firstX;
+  remaining = n;
+  maxTake = Math.min(2, n);
+  nextI = firstX;
+  nextM = Math.max(1, firstX);
+  immediate = suffix[0] - suffix[firstX];
+  opponent = dp[nextI][nextM];
+  candidate = answer;
+  best = answer;
+  bestX = firstX;
+  takeAll = false;
+  options = [{
+    x: firstX,
+    indices: Array.from({ length: firstX }, (_, offset) => offset),
+    immediate,
+    nextI,
+    nextM,
+    opponent,
+    candidate: answer,
+    best: true,
+  }];
+  pushStep({
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    line: 17,
     vars: [
       { name: "dp[0][1]", value: answer },
-      { name: "Alice stones", value: answer },
-      { name: "Bob stones", value: suffix[0] - answer },
+      { name: "Alice", value: answer },
+      { name: "Bob", value: bob },
     ],
     note: {
-      vi: `Alice có thể lấy tối đa ${answer} viên. Bob nhận ${suffix[0] - answer} viên còn lại. Vì vậy Alice thắng/đạt kết quả tối ưu theo DP.`,
-      en: `Alice can obtain at most ${answer} stones. Bob gets the remaining ${suffix[0] - answer}. So Alice wins or achieves the optimal DP result.`,
+      vi: `Từ trạng thái đầu (i=0, M=1), Alice có thể đảm bảo tối đa ${answer}/${suffix[0]} viên; Bob nhận ${bob} viên còn lại.`,
+      en: `From the initial state (i=0, M=1), Alice can guarantee at most ${answer}/${suffix[0]} stones; Bob receives the remaining ${bob}.`,
     },
+    final: true,
+    view: { answer, alice: answer, bob },
   });
 
   return { piles: [...piles], answer, steps };
@@ -15244,6 +15555,20 @@ module.exports = {
     inputKind: "positive",
     inputLabel: { vi: "piles", en: "piles" },
     extraParams: [],
+    approach: [
+      {
+        vi: "Dựng suffix[i] để biết tổng số đá còn lại từ đống i đến cuối.",
+        en: "Build suffix[i] to know the total stones remaining from pile i onward.",
+      },
+      {
+        vi: "dp[i][M] là số đá tối đa người đang tới lượt có thể đảm bảo khi bắt đầu tại i với giới hạn M.",
+        en: "dp[i][M] is the maximum stones the current player can guarantee when starting at i with limit M.",
+      },
+      {
+        vi: "Với mỗi X trong [1, 2M], phần người hiện tại nhận là suffix[i] - dp[i+X][max(M,X)]; chọn giá trị lớn nhất.",
+        en: "For each X in [1, 2M], the current player gets suffix[i] - dp[i+X][max(M,X)]; keep the maximum.",
+      },
+    ],
     complexity: {
       time: "O(n^3)",
       space: "O(n^2)",
