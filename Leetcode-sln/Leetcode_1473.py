@@ -3,6 +3,7 @@ from typing import List
 
 
 class Solution:
+    # pylint: disable-next=too-many-positional-arguments
     def minCost(self, houses: List[int], cost: List[List[int]],
                 m: int, n: int, target: int) -> int:
         INF = float('inf')

@@ -34,9 +34,9 @@ node_3 = TreeNode(3)
 node_1 = TreeNode(1)
 node_4 = TreeNode(4)
 node_2 = TreeNode(2)
-node_3.left = node_1      
-node_3.right = node_4     
-node_4.left = node_2      
+node_3.left = node_1
+node_3.right = node_4
+node_4.left = node_2
 root = node_3
 
 sol = Solution()

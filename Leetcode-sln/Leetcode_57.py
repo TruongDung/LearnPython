@@ -6,7 +6,6 @@ class Solution:
         merged = []
         for start, end in intervals:
             a1 = intervals[start]
-        return 
 
 
 sol = Solution()
