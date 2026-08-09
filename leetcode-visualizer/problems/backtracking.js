@@ -3294,7 +3294,6 @@ module.exports = {
     difficulty: "medium",
     slug: "non-decreasing-subsequences",
     category: { key: "backtracking", vi: "Quay lui", en: "Backtracking" },
-    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
     title: { vi: "Non-decreasing Subsequences", en: "Non-decreasing Subsequences" },
     titleVi: { vi: "Các dãy con tăng không giảm", en: "Distinct non-decreasing subsequences" },
     statement: {

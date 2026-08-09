@@ -1450,6 +1450,188 @@ function buildSteps252(input) {
   return { original, answer: true, steps };
 }
 
+// LeetCode 646: Maximum Length of Pair Chain.
+// Greedy: sort by right endpoint, then take the next pair whose left is greater
+// than the end of the last chosen pair.
+function buildSteps646(input) {
+  const rawParts = String(input || "").split(";").map((part) => part.trim()).filter(Boolean);
+  const parsed = rawParts.map((part) => part.split(",").map((value) => Number(value.trim())));
+  const valid = parsed.length > 0 && parsed.every((pair) => (
+    pair.length === 2
+    && Number.isFinite(pair[0])
+    && Number.isFinite(pair[1])
+    && pair[0] < pair[1]
+  ));
+  const original = valid ? parsed.map((pair) => [...pair]) : [];
+  const steps = [];
+  const display = (pairs) => pairs.map(([left, right]) => `[${left},${right}]`);
+  const widths = (pairs) => pairs.map(([left, right]) => Math.max(1, right - left));
+
+  if (!valid) {
+    steps.push({
+      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      arr: rawParts,
+      highlight: [],
+      mark: [],
+      codeLines: [2],
+      vars: [{ name: "input", value: String(input || "") }],
+      note: {
+        vi: "Mỗi cặp phải có dạng left,right với left < right; các cặp cách nhau bởi dấu ';'. Ví dụ: 1,2;2,3;3,4.",
+        en: "Each pair must be left,right with left < right; separate pairs with ';'. Example: 1,2;2,3;3,4.",
+      },
+      final: true,
+    });
+    return { original, answer: 0, steps };
+  }
+
+  steps.push({
+    title: { vi: "Danh sách cặp ban đầu", en: "Original pairs" },
+    arr: widths(original),
+    sub: display(original),
+    highlight: [],
+    mark: [],
+    codeLines: [2],
+    vars: [
+      { name: "pairs", value: display(original).join(" ") },
+      { name: "n", value: original.length },
+    ],
+    note: {
+      vi: "Muốn nối [a,b] -> [c,d] thì bắt buộc b < c. Ta cần chọn nhiều cặp nhất có thể.",
+      en: "To chain [a,b] -> [c,d], we need b < c. The goal is to choose as many pairs as possible.",
+    },
+  });
+
+  const pairs = original.map(([left, right], index) => ({ left, right, index }));
+  pairs.sort((a, b) => a.right - b.right || a.left - b.left);
+  const sortedPairs = pairs.map(({ left, right }) => [left, right]);
+  const sortedLabels = display(sortedPairs);
+  const sortedWidths = widths(sortedPairs);
+
+  steps.push({
+    title: { vi: "Sắp xếp theo điểm kết thúc", en: "Sort by ending point" },
+    arr: sortedWidths,
+    sub: sortedLabels,
+    highlight: pairs.map((_, index) => index),
+    mark: [],
+    codeLines: [3],
+    vars: [
+      { name: "sorted", value: sortedLabels.join(" ") },
+      { name: "rule", value: "right ASC, left ASC" },
+    ],
+    note: {
+      vi: "Greedy chọn cặp kết thúc sớm nhất trước. Kết thúc càng sớm thì càng để lại nhiều khoảng trống cho các cặp phía sau.",
+      en: "Greedy takes the pair that ends earliest first. An earlier end leaves more room for later pairs.",
+    },
+  });
+
+  let currentEnd = -Infinity;
+  let answer = 0;
+  const chosen = [];
+
+  steps.push({
+    title: { vi: "Khởi tạo", en: "Initialize" },
+    arr: sortedWidths,
+    sub: sortedLabels,
+    highlight: [],
+    mark: [],
+    codeLines: [4, 5],
+    vars: [
+      { name: "current_end", value: "-inf" },
+      { name: "answer", value: 0 },
+    ],
+    note: {
+      vi: "current_end lưu điểm kết thúc của cặp cuối cùng đã chọn. Ban đầu chưa chọn gì nên là -inf.",
+      en: "current_end stores the end of the last chosen pair. Before choosing anything, it is -inf.",
+    },
+  });
+
+  for (let i = 0; i < pairs.length; i++) {
+    const { left, right } = pairs[i];
+    const canTake = left > currentEnd;
+
+    steps.push({
+      title: { vi: `Xét cặp [${left},${right}]`, en: `Inspect pair [${left},${right}]` },
+      arr: sortedWidths,
+      sub: sortedLabels,
+      highlight: [i],
+      mark: chosen.slice(),
+      codeLines: [6],
+      vars: [
+        { name: "i", value: i },
+        { name: "pair", value: `[${left},${right}]` },
+        { name: "current_end", value: currentEnd === -Infinity ? "-inf" : currentEnd },
+        { name: "answer", value: answer },
+      ],
+      note: {
+        vi: `Kiểm tra left = ${left} có lớn hơn current_end = ${currentEnd === -Infinity ? "-inf" : currentEnd} hay không.`,
+        en: `Check whether left = ${left} is greater than current_end = ${currentEnd === -Infinity ? "-inf" : currentEnd}.`,
+      },
+    });
+
+    if (canTake) {
+      answer += 1;
+      const oldEnd = currentEnd;
+      currentEnd = right;
+      chosen.push(i);
+      steps.push({
+        title: { vi: `${left} > ${oldEnd === -Infinity ? "-inf" : oldEnd}: chọn`, en: `${left} > ${oldEnd === -Infinity ? "-inf" : oldEnd}: take` },
+        arr: sortedWidths,
+        sub: sortedLabels,
+        highlight: [i],
+        mark: chosen.slice(),
+        codeLines: [7, 8, 9],
+        vars: [
+          { name: "answer", value: answer },
+          { name: "current_end", value: currentEnd },
+          { name: "chain", value: chosen.map((idx) => sortedLabels[idx]).join(" -> ") },
+        ],
+        note: {
+          vi: `Cặp này nối được sau cặp đã chọn trước đó, nên tăng answer lên ${answer} và cập nhật current_end = ${right}.`,
+          en: `This pair can follow the previous chosen pair, so answer becomes ${answer} and current_end becomes ${right}.`,
+        },
+      });
+    } else {
+      steps.push({
+        title: { vi: `${left} <= ${currentEnd}: bỏ qua`, en: `${left} <= ${currentEnd}: skip` },
+        arr: sortedWidths,
+        sub: sortedLabels,
+        highlight: [i],
+        mark: chosen.slice(),
+        codeLines: [7],
+        vars: [
+          { name: "answer", value: answer },
+          { name: "current_end", value: currentEnd },
+          { name: "chain", value: chosen.map((idx) => sortedLabels[idx]).join(" -> ") || "(empty)" },
+        ],
+        note: {
+          vi: `left = ${left} không lớn hơn current_end = ${currentEnd}, nên nếu chọn cặp này chuỗi sẽ bị đứt. Bỏ qua.`,
+          en: `left = ${left} is not greater than current_end = ${currentEnd}, so taking it would break the chain. Skip it.`,
+        },
+      });
+    }
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: sortedWidths,
+    sub: sortedLabels,
+    highlight: [],
+    mark: chosen.slice(),
+    codeLines: [10],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "chain", value: chosen.map((idx) => sortedLabels[idx]).join(" -> ") || "(empty)" },
+    ],
+    note: {
+      vi: `Chuỗi dài nhất có ${answer} cặp: ${chosen.map((idx) => sortedLabels[idx]).join(" -> ") || "(empty)"}.`,
+      en: `The longest chain has ${answer} pair(s): ${chosen.map((idx) => sortedLabels[idx]).join(" -> ") || "(empty)"}.`,
+    },
+    final: true,
+  });
+
+  return { original, answer, steps };
+}
+
 function buildSteps3947(input, params) {
   const steps = [];
   const initialBudget = Number(params && params.budget);
@@ -3122,6 +3304,63 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps252,
+  },
+  646: {
+    id: 646,
+    difficulty: "medium",
+    slug: "maximum-length-of-pair-chain",
+    category: { key: "greedy", vi: "Tham lam & Sắp xếp", en: "Greedy & Sorting" },
+    title: { vi: "Maximum Length of Pair Chain", en: "Maximum Length of Pair Chain" },
+    titleVi: { vi: "Độ dài lớn nhất của chuỗi cặp", en: "Maximum length of pair chain" },
+    statement: {
+      vi:
+        "Cho mảng pairs, trong đó pairs[i] = [left_i, right_i] và left_i < right_i. " +
+        "Một cặp p2 = [c,d] có thể theo sau p1 = [a,b] nếu b < c. Trả về độ dài lớn nhất của chuỗi cặp.",
+      en:
+        "Given pairs where pairs[i] = [left_i, right_i] and left_i < right_i. " +
+        "A pair p2 = [c,d] can follow p1 = [a,b] if b < c. Return the longest possible chain length.",
+    },
+    defaultInput: "1,2;2,3;3,4",
+    inputKind: "string",
+    inputLabel: { vi: "pairs (left,right; ...)", en: "pairs (left,right; ...)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Sắp xếp các cặp theo right tăng dần. Đây giống bài chọn nhiều khoảng không giao nhau nhất.",
+        en: "Sort pairs by increasing right endpoint. This is the same greedy shape as selecting the most non-overlapping intervals.",
+      },
+      {
+        vi: "Duyệt từ trái sang phải sau khi sort. Nếu left > current_end thì chọn cặp này và cập nhật current_end = right.",
+        en: "Scan the sorted pairs. If left > current_end, take this pair and update current_end = right.",
+      },
+      {
+        vi: "Nếu left <= current_end thì bỏ qua, vì cặp này không thể nối sau chuỗi hiện tại.",
+        en: "If left <= current_end, skip it because it cannot follow the current chain.",
+      },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(1)",
+      note: {
+        vi: "Sắp xếp chi phối O(n log n); lượt quét sau đó O(n). Bộ nhớ phụ O(1), không tính việc sort.",
+        en: "Sorting dominates at O(n log n); the later scan is O(n). Extra space is O(1), excluding sorting internals.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findLongestChain(self, pairs):",
+      "        pairs.sort(key=lambda pair: pair[1])",
+      "        current_end = float('-inf')",
+      "        answer = 0",
+      "",
+      "        for left, right in pairs:",
+      "            if left > current_end:",
+      "                answer += 1",
+      "                current_end = right",
+      "",
+      "        return answer",
+    ],
+    builder: buildSteps646,
   },
   3014: {
     id: 3014,
