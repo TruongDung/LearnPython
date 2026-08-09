@@ -8469,7 +8469,518 @@ function buildSteps3829(input) {
   return { original: input, operations, outputs: results, matches, answer: results, steps };
 }
 
+/**
+ * LeetCode 3302: Find the Lexicographically Smallest Valid Sequence.
+ * Build rightmost suffix-match positions, then greedily take the earliest
+ * feasible index while spending at most one mismatch.
+ */
+function buildSteps3302(input, params) {
+  const word1 = typeof input === "string" ? input : String(input ?? "");
+  const word2 = typeof (params && params.word2) === "string" ? params.word2 : "";
+  if (!word1.length || !word2.length || word2.length >= word1.length) {
+    throw new Error("word1 and word2 must be non-empty and word2 must be shorter than word1");
+  }
+
+  const n = word1.length;
+  const m = word2.length;
+  const steps = [];
+  const suffix = new Array(m).fill(-1);
+  const suffixStatus = new Array(m).fill("pending");
+  const selections = [];
+  const answer = [];
+  let phase = "setup";
+  let event = "enter";
+  let backI = null;
+  let backJ = null;
+  let forwardI = null;
+  let targetJ = null;
+  let mismatchUsed = false;
+  let decision = null;
+
+  const makeView = (overrides = {}) => ({
+    phase,
+    event,
+    word1,
+    word2,
+    suffix: [...suffix],
+    suffixStatus: [...suffixStatus],
+    backI,
+    backJ,
+    forwardI,
+    targetJ,
+    mismatchUsed,
+    decision: decision ? { ...decision } : null,
+    answer: [...answer],
+    selections: selections.map((selection) => ({ ...selection })),
+    ...overrides,
+  });
+  const suffixText = () => `[${suffix.map((value, index) => (
+    suffixStatus[index] === "pending" ? "_" : value
+  )).join(", ")}]`;
+  const variables = (extra = []) => {
+    const values = [
+      { name: "suffix", value: suffixText() },
+      { name: "answer", value: `[${answer.join(", ")}]` },
+      { name: "changed", value: mismatchUsed },
+    ];
+    return [...values, ...extra];
+  };
+  const push = ({ title, line, note, vars = variables(), final = false, view = {} }) => {
+    steps.push({
+      title,
+      arr: word1.split(""),
+      sub: word1.split("").map((char, index) => `${index}:${char}`),
+      highlight: Number.isInteger(forwardI) ? [forwardI] : Number.isInteger(backI) && backI >= 0 ? [backI] : [],
+      mark: [...answer],
+      validSequenceView: makeView(view),
+      codeLines: [line],
+      vars,
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Bắt đầu validSequence", en: "Enter validSequence" },
+    line: 2,
+    vars: [
+      { name: "word1", value: JSON.stringify(word1) },
+      { name: "word2", value: JSON.stringify(word2) },
+    ],
+    note: {
+      vi: "Ta cần chọn m chỉ số tăng dần; chuỗi tạo ra được phép sai word2 nhiều nhất một ký tự.",
+      en: "Choose m increasing indices; the resulting string may differ from word2 at at most one character.",
+    },
+  });
+
+  event = "read-lengths";
+  push({
+    title: { vi: `n = ${n}, m = ${m}`, en: `n = ${n}, m = ${m}` },
+    line: 3,
+    vars: [{ name: "n", value: n }, { name: "m", value: m }],
+    note: {
+      vi: `Kết quả phải có đúng ${m} chỉ số lấy từ word1 dài ${n}.`,
+      en: `The result must contain exactly ${m} indices selected from word1 of length ${n}.`,
+    },
+  });
+
+  event = "init-suffix";
+  push({
+    title: { vi: "Tạo bảng suffix", en: "Create the suffix table" },
+    line: 4,
+    note: {
+      vi: "suffix[j] sẽ là vị trí xa nhất bên phải có thể bắt đầu khớp chính xác word2[j:].",
+      en: "suffix[j] will be the rightmost position that can begin an exact match of word2[j:].",
+    },
+  });
+
+  phase = "suffix";
+  backI = n - 1;
+  event = "init-back-pointer";
+  push({
+    title: { vi: `i = ${backI}`, en: `i = ${backI}` },
+    line: 5,
+    vars: variables([{ name: "i", value: backI }]),
+    note: {
+      vi: "Dựng bảng từ phải sang trái để dành nhiều chỗ nhất cho lựa chọn greedy phía trước.",
+      en: "Build from right to left so the forward greedy pass keeps as much room as possible.",
+    },
+  });
+
+  for (let j = m - 1; j >= 0; j--) {
+    backJ = j;
+    event = "suffix-target";
+    decision = null;
+    push({
+      title: { vi: `Tìm word2[${j}] = '${word2[j]}'`, en: `Find word2[${j}] = '${word2[j]}'` },
+      line: 6,
+      vars: variables([
+        { name: "i", value: backI },
+        { name: "j", value: j },
+        { name: "target", value: JSON.stringify(word2[j]) },
+      ]),
+      note: {
+        vi: `Tìm lần xuất hiện ngoài cùng bên phải của '${word2[j]}' trước mốc hiện tại.`,
+        en: `Find the rightmost '${word2[j]}' before the current boundary.`,
+      },
+    });
+
+    while (backI >= 0 && word1[backI] !== word2[j]) {
+      event = "suffix-scan";
+      decision = {
+        type: "suffix-skip",
+        word1Index: backI,
+        word2Index: j,
+        canTake: false,
+      };
+      push({
+        title: { vi: `'${word1[backI]}' ≠ '${word2[j]}': bỏ i=${backI}`, en: `'${word1[backI]}' ≠ '${word2[j]}': skip i=${backI}` },
+        line: 7,
+        vars: variables([
+          { name: "i", value: backI },
+          { name: "j", value: j },
+          { name: "word1[i] == word2[j]", value: false },
+        ]),
+        note: {
+          vi: `word1[${backI}] không thể khớp word2[${j}], tiếp tục đi sang trái.`,
+          en: `word1[${backI}] cannot match word2[${j}], so continue leftward.`,
+        },
+      });
+      backI -= 1;
+      event = "suffix-move";
+      push({
+        title: { vi: `i giảm còn ${backI}`, en: `Decrement i to ${backI}` },
+        line: 8,
+        vars: variables([{ name: "i", value: backI }, { name: "j", value: j }]),
+        note: {
+          vi: "Con trỏ i chỉ đi sang trái, nên toàn bộ lượt dựng suffix là O(n + m).",
+          en: "Pointer i only moves left, so the complete suffix build is O(n + m).",
+        },
+      });
+    }
+
+    event = "suffix-exhausted-check";
+    decision = {
+      type: "suffix-check",
+      word1Index: backI,
+      word2Index: j,
+      canTake: backI >= 0,
+    };
+    push({
+      title: backI < 0
+        ? { vi: "i < 0: hậu tố này không thể khớp", en: "i < 0: this suffix cannot match" }
+        : { vi: `Tìm thấy '${word2[j]}' tại i=${backI}`, en: `Found '${word2[j]}' at i=${backI}` },
+      line: 9,
+      vars: variables([{ name: "i < 0", value: backI < 0 }, { name: "j", value: j }]),
+      note: backI < 0
+        ? { vi: `Không thể khớp chính xác word2[${j}:]; các mốc bên trái cũng không thể.`, en: `word2[${j}:] cannot match exactly; earlier suffix starts cannot match either.` }
+        : { vi: `Có thể lưu vị trí ${backI} cho suffix[${j}].`, en: `Position ${backI} can be stored in suffix[${j}].` },
+    });
+
+    if (backI < 0) {
+      for (let index = 0; index <= j; index++) suffixStatus[index] = "impossible";
+      event = "suffix-break";
+      push({
+        title: { vi: "Dừng vòng dựng suffix", en: "Stop building suffix" },
+        line: 10,
+        note: {
+          vi: "Các hậu tố đã lưu bên phải vẫn hữu ích để kiểm tra vị trí dùng một lần mismatch.",
+          en: "The suffix positions already stored on the right are still useful for validating the one mismatch.",
+        },
+      });
+      break;
+    }
+
+    suffix[j] = backI;
+    suffixStatus[j] = "matched";
+    event = "suffix-save";
+    decision = { type: "suffix-save", word1Index: backI, word2Index: j, canTake: true };
+    push({
+      title: { vi: `suffix[${j}] = ${backI}`, en: `suffix[${j}] = ${backI}` },
+      line: 11,
+      vars: variables([{ name: `suffix[${j}]`, value: backI }]),
+      note: {
+        vi: `word2[${j}:] có thể khớp chính xác bắt đầu từ word1[${backI}].`,
+        en: `word2[${j}:] can match exactly starting at word1[${backI}].`,
+      },
+    });
+    backI -= 1;
+    event = "suffix-reserve-left";
+    push({
+      title: { vi: `i = ${backI} cho ký tự trước`, en: `Set i = ${backI} for the previous character` },
+      line: 12,
+      vars: variables([{ name: "i", value: backI }]),
+      note: {
+        vi: "Giảm i để các chỉ số suffix luôn tăng dần khi đọc word2 từ trái sang phải.",
+        en: "Decrement i so suffix indices remain increasing when word2 is read left to right.",
+      },
+    });
+  }
+
+  phase = "greedy";
+  backI = null;
+  backJ = null;
+  decision = null;
+  event = "init-answer";
+  push({
+    title: { vi: "answer = []", en: "answer = []" },
+    line: 14,
+    note: {
+      vi: "Bây giờ duyệt word1 từ trái sang phải và chọn chỉ số khả thi đầu tiên.",
+      en: "Now scan word1 left to right and take the first feasible index.",
+    },
+  });
+
+  targetJ = 0;
+  event = "init-target";
+  push({
+    title: { vi: "j = 0", en: "j = 0" },
+    line: 15,
+    vars: variables([{ name: "j", value: targetJ }]),
+    note: {
+      vi: "j chỉ ký tự tiếp theo trong word2 cần tạo.",
+      en: "j points to the next character of word2 that must be produced.",
+    },
+  });
+
+  event = "init-coupon";
+  push({
+    title: { vi: "changed = False", en: "changed = False" },
+    line: 16,
+    note: {
+      vi: "Phiếu mismatch vẫn còn: ta có thể chọn đúng một ký tự không khớp khi việc đó vẫn khả thi.",
+      en: "The mismatch coupon is available: one nonmatching character may be selected when the suffix remains feasible.",
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    forwardI = i;
+    event = "greedy-loop";
+    decision = null;
+    push({
+      title: { vi: `Xét i=${i}, '${word1[i]}'`, en: `Consider i=${i}, '${word1[i]}'` },
+      line: 17,
+      vars: variables([{ name: "i", value: i }, { name: "j", value: targetJ }]),
+      note: {
+        vi: `Vì duyệt i tăng dần, chỉ số khả thi đầu tiên sẽ cho mảng answer nhỏ nhất theo thứ tự từ điển.`,
+        en: `Because i increases, the first feasible index gives the lexicographically smallest answer array.`,
+      },
+    });
+
+    event = "complete-check";
+    decision = { type: "complete-check", canTake: targetJ === m };
+    push({
+      title: targetJ === m
+        ? { vi: "j == m: đã đủ chỉ số", en: "j == m: enough indices selected" }
+        : { vi: `j=${targetJ} < m=${m}: tiếp tục`, en: `j=${targetJ} < m=${m}: continue` },
+      line: 18,
+      vars: variables([{ name: "j == m", value: targetJ === m }]),
+      note: targetJ === m
+        ? { vi: "Đã tạo đủ word2, không cần xét chỉ số lớn hơn.", en: "word2 is complete, so larger indices are unnecessary." }
+        : { vi: `Vẫn cần tạo word2[${targetJ}:].`, en: `word2[${targetJ}:] still needs to be produced.` },
+    });
+    if (targetJ === m) {
+      event = "greedy-break";
+      push({
+        title: { vi: "Dừng vòng greedy", en: "Stop the greedy loop" },
+        line: 19,
+        note: { vi: "answer đã hoàn chỉnh.", en: "answer is complete." },
+      });
+      break;
+    }
+
+    const matches = word1[i] === word2[targetJ];
+    event = "match-check";
+    decision = {
+      type: "match",
+      word1Index: i,
+      word2Index: targetJ,
+      canTake: matches,
+    };
+    push({
+      title: matches
+        ? { vi: `'${word1[i]}' == '${word2[targetJ]}'`, en: `'${word1[i]}' == '${word2[targetJ]}'` }
+        : { vi: `'${word1[i]}' ≠ '${word2[targetJ]}'`, en: `'${word1[i]}' ≠ '${word2[targetJ]}'` },
+      line: 20,
+      vars: variables([{ name: "word1[i] == word2[j]", value: matches }]),
+      note: matches
+        ? { vi: "Khớp chính xác luôn an toàn và không dùng phiếu mismatch.", en: "An exact match is always safe and does not spend the mismatch coupon." }
+        : { vi: "Không khớp; cần kiểm tra xem có thể dùng mismatch tại chỉ số này hay không.", en: "The characters differ; check whether the mismatch can be spent at this index." },
+    });
+
+    if (matches) {
+      const matchedTarget = targetJ;
+      answer.push(i);
+      selections.push({ word1Index: i, word2Index: matchedTarget, mismatch: false });
+      event = "append-match";
+      decision = { type: "selected-match", word1Index: i, word2Index: matchedTarget, canTake: true };
+      push({
+        title: { vi: `answer.append(${i})`, en: `answer.append(${i})` },
+        line: 21,
+        note: {
+          vi: `Chọn chỉ số ${i}: word1[${i}] = word2[${matchedTarget}] = '${word1[i]}'.`,
+          en: `Select index ${i}: word1[${i}] = word2[${matchedTarget}] = '${word1[i]}'.`,
+        },
+      });
+      targetJ += 1;
+      event = "advance-target-match";
+      push({
+        title: { vi: `j tăng thành ${targetJ}`, en: `Increment j to ${targetJ}` },
+        line: 22,
+        vars: variables([{ name: "j", value: targetJ }]),
+        note: { vi: "Chuyển sang ký tự mục tiêu tiếp theo.", en: "Move to the next target character." },
+      });
+      continue;
+    }
+
+    const futureBound = targetJ === m - 1 ? null : suffix[targetJ + 1];
+    const futureExists = targetJ === m - 1 || futureBound >= 0;
+    const leavesRoom = targetJ === m - 1 || i < futureBound;
+    const canMismatch = !mismatchUsed && futureExists && leavesRoom;
+    event = "mismatch-check";
+    decision = {
+      type: "mismatch",
+      word1Index: i,
+      word2Index: targetJ,
+      canTake: canMismatch,
+      futureBound,
+      futureExists,
+      leavesRoom,
+      mismatchUsed,
+    };
+    push({
+      title: canMismatch
+        ? { vi: `Có thể dùng mismatch tại i=${i}`, en: `Mismatch is feasible at i=${i}` }
+        : { vi: `Không thể chọn i=${i}`, en: `Cannot select i=${i}` },
+      line: 23,
+      vars: variables([
+        { name: "not changed", value: !mismatchUsed },
+        { name: "future bound", value: targetJ === m - 1 ? "last target" : futureBound },
+        { name: "i < suffix[j + 1]", value: targetJ === m - 1 ? true : leavesRoom },
+      ]),
+      note: canMismatch
+        ? { vi: targetJ === m - 1 ? "Đây là ký tự mục tiêu cuối nên không cần chừa hậu tố." : `${i} < suffix[${targetJ + 1}] = ${futureBound}, nên phần còn lại vẫn khớp được chính xác.`, en: targetJ === m - 1 ? "This is the final target, so no suffix space is needed." : `${i} < suffix[${targetJ + 1}] = ${futureBound}, so the remainder can still match exactly.` }
+        : { vi: mismatchUsed ? "Phiếu mismatch đã dùng; phải bỏ chỉ số này." : !futureExists ? "Hậu tố còn lại không thể khớp chính xác." : `${i} không nhỏ hơn suffix[${targetJ + 1}] = ${futureBound}; chọn i sẽ chặn hậu tố.`, en: mismatchUsed ? "The mismatch coupon is already spent, so skip this index." : !futureExists ? "The remaining suffix cannot match exactly." : `${i} is not smaller than suffix[${targetJ + 1}] = ${futureBound}; selecting i would block the suffix.` },
+    });
+
+    if (!canMismatch) continue;
+
+    const mismatchTarget = targetJ;
+    answer.push(i);
+    selections.push({ word1Index: i, word2Index: mismatchTarget, mismatch: true });
+    event = "append-mismatch";
+    decision = { type: "selected-mismatch", word1Index: i, word2Index: mismatchTarget, canTake: true, futureBound };
+    push({
+      title: { vi: `answer.append(${i}) bằng mismatch`, en: `answer.append(${i}) using the mismatch` },
+      line: 24,
+      note: {
+        vi: `Chọn chỉ số nhỏ nhất ${i}; '${word1[i]}' sẽ được xem như '${word2[mismatchTarget]}'.`,
+        en: `Select the smallest index ${i}; '${word1[i]}' will be treated as '${word2[mismatchTarget]}'.`,
+      },
+    });
+    targetJ += 1;
+    event = "advance-target-mismatch";
+    push({
+      title: { vi: `j tăng thành ${targetJ}`, en: `Increment j to ${targetJ}` },
+      line: 25,
+      vars: variables([{ name: "j", value: targetJ }]),
+      note: { vi: "Mismatch đã tạo xong một ký tự mục tiêu.", en: "The mismatch has produced one target character." },
+    });
+    mismatchUsed = true;
+    event = "spend-mismatch";
+    push({
+      title: { vi: "changed = True", en: "changed = True" },
+      line: 26,
+      note: {
+        vi: "Từ giờ chỉ được chọn các ký tự khớp chính xác.",
+        en: "From now on, only exact character matches may be selected.",
+      },
+    });
+  }
+
+  phase = "done";
+  event = "done";
+  forwardI = null;
+  decision = null;
+  const valid = targetJ === m;
+  const result = valid ? [...answer] : [];
+  push({
+    title: valid
+      ? { vi: `Trả về [${result.join(", ")}]`, en: `Return [${result.join(", ")}]` }
+      : { vi: "Không có valid sequence", en: "No valid sequence exists" },
+    line: 27,
+    vars: [
+      { name: "j", value: targetJ },
+      { name: "m", value: m },
+      { name: "return", value: `[${result.join(", ")}]` },
+    ],
+    note: valid
+      ? { vi: `Các chỉ số tăng dần [${result.join(", ")}] tạo chuỗi "${selections.map((selection) => word1[selection.word1Index]).join("")}" và dùng ${mismatchUsed ? "1" : "0"} mismatch.`, en: `Increasing indices [${result.join(", ")}] form "${selections.map((selection) => word1[selection.word1Index]).join("")}" using ${mismatchUsed ? "1" : "0"} mismatch.` }
+      : { vi: `Chỉ tạo được ${targetJ}/${m} ký tự nên phải trả mảng rỗng.`, en: `Only ${targetJ}/${m} target characters were produced, so return an empty array.` },
+    final: true,
+    view: { result, valid },
+  });
+
+  return { original: word1, word2, answer: result, steps };
+}
+
 module.exports = {
+  3302: {
+    id: 3302,
+    difficulty: "medium",
+    slug: "find-the-lexicographically-smallest-valid-sequence",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: {
+      vi: "Find the Lexicographically Smallest Valid Sequence",
+      en: "Find the Lexicographically Smallest Valid Sequence",
+    },
+    titleVi: {
+      vi: "Tìm dãy chỉ số hợp lệ nhỏ nhất theo thứ tự từ điển",
+      en: "Lexicographically smallest valid index sequence",
+    },
+    statement: {
+      vi: "Cho word1 và word2. Chọn word2.length chỉ số tăng dần trong word1 sao cho chuỗi tạo được khác word2 nhiều nhất một ký tự. Trả về dãy chỉ số nhỏ nhất theo thứ tự từ điển, hoặc [] nếu không tồn tại.",
+      en: "Given word1 and word2, choose word2.length increasing indices from word1 so the resulting string differs from word2 in at most one character. Return the lexicographically smallest index sequence, or [] if none exists.",
+    },
+    defaultInput: "bacdc",
+    inputKind: "string",
+    inputLabel: { vi: "word1", en: "word1" },
+    extraParams: [
+      { key: "word2", type: "string", label: { vi: "word2", en: "word2" }, default: "abc" },
+    ],
+    approach: [
+      {
+        vi: "Duyệt ngược để dựng suffix[j]: vị trí ngoài cùng bên phải có thể bắt đầu khớp chính xác word2[j:].",
+        en: "Scan backward to build suffix[j]: the rightmost position that can start an exact match of word2[j:].",
+      },
+      {
+        vi: "Duyệt word1 từ trái sang phải. Nếu ký tự khớp thì chọn ngay vì đó là chỉ số nhỏ nhất khả thi.",
+        en: "Scan word1 left to right. Select an exact match immediately because it is the smallest feasible index.",
+      },
+      {
+        vi: "Nếu ký tự sai và chưa dùng mismatch, chỉ chọn khi đây là target cuối hoặc i < suffix[j+1], đảm bảo phần còn lại vẫn khớp được.",
+        en: "For a differing character with the mismatch unused, select it only for the final target or when i < suffix[j+1], keeping the remaining exact suffix feasible.",
+      },
+    ],
+    complexity: {
+      time: "O(n + m)",
+      space: "O(m)",
+      note: {
+        vi: "Con trỏ dựng suffix chỉ đi sang trái và con trỏ greedy chỉ đi sang phải. Mảng suffix có m phần tử.",
+        en: "The suffix pointer only moves left and the greedy pointer only moves right. The suffix array stores m positions.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def validSequence(self, word1: str, word2: str) -> List[int]:",
+      "        n, m = len(word1), len(word2)",
+      "        suffix = [-1] * m",
+      "        i = n - 1",
+      "        for j in range(m - 1, -1, -1):",
+      "            while i >= 0 and word1[i] != word2[j]:",
+      "                i -= 1",
+      "            if i < 0:",
+      "                break",
+      "            suffix[j] = i",
+      "            i -= 1",
+      "",
+      "        answer = []",
+      "        j = 0",
+      "        changed = False",
+      "        for i, char in enumerate(word1):",
+      "            if j == m:",
+      "                break",
+      "            if char == word2[j]:",
+      "                answer.append(i)",
+      "                j += 1",
+      "            elif not changed and (j == m - 1 or i < suffix[j + 1]):",
+      "                answer.append(i)",
+      "                j += 1",
+      "                changed = True",
+      "        return answer if j == m else []",
+    ],
+    builder: buildSteps3302,
+  },
   3829: {
     id: 3829,
     difficulty: "medium",

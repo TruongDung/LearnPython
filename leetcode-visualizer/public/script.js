@@ -9347,6 +9347,123 @@ function renderPrefixAverageView(step) {
   </div>`;
 }
 
+function renderValidSequenceView(step) {
+  const view = step.validSequenceView || {};
+  const word1 = typeof view.word1 === "string" ? view.word1 : "";
+  const word2 = typeof view.word2 === "string" ? view.word2 : "";
+  const suffix = Array.isArray(view.suffix) ? view.suffix : [];
+  const suffixStatus = Array.isArray(view.suffixStatus) ? view.suffixStatus : [];
+  const selections = Array.isArray(view.selections) ? view.selections : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const vi = lang === "vi";
+  const phaseIndex = { setup: 0, suffix: 0, greedy: 1, done: 2 }[view.phase] ?? 0;
+  const labels = vi
+    ? ["1 · Dựng suffix từ phải", "2 · Greedy chọn chỉ số nhỏ nhất", "3 · Kiểm tra đủ m chỉ số"]
+    : ["1 · Build suffix from the right", "2 · Greedily take smallest indices", "3 · Verify all m indices"];
+  const phases = labels.map((label, index) => {
+    const done = view.phase === "done" || index < phaseIndex;
+    const state = done ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const selectionByWord1 = new Map(selections.map((selection) => [selection.word1Index, selection]));
+  const selectionByWord2 = new Map(selections.map((selection) => [selection.word2Index, selection]));
+  const suffixWord1 = new Set(suffix.filter((value, index) => suffixStatus[index] === "matched" && value >= 0));
+
+  const word1Html = [...word1].map((char, index) => {
+    const selected = selectionByWord1.get(index);
+    const classes = ["valid3302-cell", "source"];
+    if (index === view.backI) classes.push("back-pointer");
+    if (index === view.forwardI) classes.push("forward-pointer");
+    if (selected) classes.push("selected", selected.mismatch ? "mismatch" : "exact");
+    if (suffixWord1.has(index)) classes.push("suffix-position");
+    const markers = [];
+    if (index === view.backI) markers.push("BACK i");
+    if (index === view.forwardI) markers.push("i");
+    if (selected) markers.push(selected.mismatch ? "CHANGED" : `#${selected.word2Index + 1}`);
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(char)}</strong><em>${markers.join(" · ")}</em></span>`;
+  }).join("");
+  const word2Html = [...word2].map((char, index) => {
+    const selected = selectionByWord2.get(index);
+    const isTarget = index === view.backJ || index === view.targetJ;
+    const classes = ["valid3302-cell", "target"];
+    if (isTarget) classes.push("active-target");
+    if (selected) classes.push("filled", selected.mismatch ? "mismatch" : "exact");
+    const marker = selected
+      ? `← word1[${selected.word1Index}]${selected.mismatch ? " · changed" : ""}`
+      : isTarget
+        ? "TARGET j"
+        : "";
+    return `<span class="${classes.join(" ")}"><small>word2[${index}]</small><strong>${escapeHtml(char)}</strong><em>${escapeHtml(marker)}</em></span>`;
+  }).join("");
+  const suffixHtml = [...word2].map((char, index) => {
+    const status = suffixStatus[index] || "pending";
+    const active = index === view.backJ || (view.decision && view.decision.futureBound === suffix[index]);
+    const value = status === "pending" ? "_" : suffix[index];
+    const statusText = status === "matched"
+      ? `word1[${suffix[index]}] = '${word1[suffix[index]]}'`
+      : status === "impossible"
+        ? (vi ? "không thể khớp" : "cannot match")
+        : (vi ? "chưa tính" : "pending");
+    return `<span class="valid3302-suffix ${status}${active ? " active" : ""}"><small>suffix[${index}] · '${escapeHtml(char)}'</small><strong>${escapeHtml(String(value))}</strong><em>${escapeHtml(statusText)}</em></span>`;
+  }).join("");
+
+  const selectedString = selections.map((selection) => word1[selection.word1Index]).join("");
+  const answerHtml = selections.length
+    ? selections.map((selection) => `<span class="${selection.mismatch ? "mismatch" : "exact"}"><small>target ${selection.word2Index}</small><strong>${selection.word1Index}</strong><em>'${escapeHtml(word1[selection.word1Index])}'${selection.mismatch ? ` → '${escapeHtml(word2[selection.word2Index])}'` : ""}</em></span>`).join(`<b>→</b>`)
+    : `<em>${vi ? "Chưa chọn chỉ số" : "No selected index"}</em>`;
+  const couponHtml = `<div class="valid3302-coupon ${view.mismatchUsed ? "used" : "available"}"><small>${vi ? "PHIẾU MISMATCH" : "MISMATCH COUPON"}</small><strong>${view.mismatchUsed ? (vi ? "ĐÃ DÙNG" : "USED") : (vi ? "CÒN 1 LẦN" : "1 AVAILABLE")}</strong><span>${view.mismatchUsed ? (vi ? "Chỉ được chọn exact match" : "Exact matches only") : (vi ? "Có thể đổi tối đa một ký tự" : "At most one character may change")}</span></div>`;
+
+  const decision = view.decision || {};
+  let decisionHtml;
+  if (view.phase === "suffix") {
+    const sourceIndex = Number.isInteger(view.backI) ? view.backI : decision.word1Index;
+    const targetIndex = Number.isInteger(view.backJ) ? view.backJ : decision.word2Index;
+    if (view.event === "suffix-save") {
+      decisionHtml = `<div class="valid3302-decision suffix"><small>${vi ? "LƯU MỐC BÊN PHẢI" : "SAVE RIGHTMOST MARK"}</small><strong>suffix[${targetIndex}] = ${sourceIndex}</strong><code>word1[${sourceIndex}] = word2[${targetIndex}] = '${escapeHtml(word2[targetIndex] || "")}'</code></div>`;
+    } else if (["suffix-break", "suffix-exhausted-check"].includes(view.event) && sourceIndex < 0) {
+      decisionHtml = `<div class="valid3302-decision reject"><small>${vi ? "HẾT WORD1" : "WORD1 EXHAUSTED"}</small><strong>i = ${sourceIndex}</strong><span>${vi ? "Dừng dựng các suffix bên trái" : "Stop building earlier suffix entries"}</span></div>`;
+    } else if (Number.isInteger(sourceIndex) && sourceIndex >= 0 && Number.isInteger(targetIndex)) {
+      const equal = word1[sourceIndex] === word2[targetIndex];
+      decisionHtml = `<div class="valid3302-char-check ${equal ? "accept" : "reject"}"><span><small>word1[${sourceIndex}]</small><strong>'${escapeHtml(word1[sourceIndex])}'</strong></span><code>${equal ? "=" : "≠"}</code><span><small>word2[${targetIndex}]</small><strong>'${escapeHtml(word2[targetIndex])}'</strong></span><b>${equal ? (vi ? "LƯU" : "SAVE") : (vi ? "ĐI TRÁI" : "MOVE LEFT")}</b></div>`;
+    } else {
+      decisionHtml = `<div class="valid3302-decision suffix"><small>RIGHTMOST EXACT SUFFIX</small><strong>${vi ? "Chuẩn bị quét từ phải sang trái" : "Prepare the right-to-left scan"}</strong></div>`;
+    }
+  } else if (view.phase === "greedy") {
+    const sourceIndex = Number.isInteger(view.forwardI) ? view.forwardI : decision.word1Index;
+    const targetIndex = Number.isInteger(view.targetJ) && view.targetJ < word2.length ? view.targetJ : decision.word2Index;
+    if (decision.type === "mismatch") {
+      const lastTarget = targetIndex === word2.length - 1;
+      const bound = decision.futureBound;
+      decisionHtml = `<div class="valid3302-gate ${decision.canTake ? "accept" : "reject"}">
+        <header><strong>${decision.canTake ? (vi ? "CHỌN MISMATCH" : "TAKE MISMATCH") : (vi ? "BỎ CHỈ SỐ NÀY" : "SKIP THIS INDEX")}</strong><code>i=${sourceIndex}</code></header>
+        <div><span class="${!decision.mismatchUsed ? "pass" : "fail"}"><small>1</small><b>${decision.mismatchUsed ? (vi ? "coupon đã dùng" : "coupon already used") : (vi ? "coupon chưa dùng" : "coupon unused")}</b></span><span class="${decision.futureExists ? "pass" : "fail"}"><small>2</small><b>${lastTarget ? (vi ? "target cuối" : "last target") : (vi ? "có exact suffix" : "exact suffix exists")}</b></span><span class="${decision.leavesRoom ? "pass" : "fail"}"><small>3</small><b>${lastTarget ? (vi ? "không cần chừa chỗ" : "no suffix space needed") : `${sourceIndex} < suffix[${targetIndex + 1}] = ${bound}`}</b></span></div>
+      </div>`;
+    } else if (["match", "selected-match", "append-match"].includes(decision.type)) {
+      decisionHtml = `<div class="valid3302-char-check accept"><span><small>word1[${sourceIndex}]</small><strong>'${escapeHtml(word1[sourceIndex] || "")}'</strong></span><code>=</code><span><small>word2[${targetIndex}]</small><strong>'${escapeHtml(word2[targetIndex] || "")}'</strong></span><b>${vi ? "CHỌN EXACT" : "TAKE EXACT"}</b></div>`;
+    } else if (decision.type === "selected-mismatch") {
+      decisionHtml = `<div class="valid3302-char-check mismatch"><span><small>word1[${sourceIndex}]</small><strong>'${escapeHtml(word1[sourceIndex] || "")}'</strong></span><code>→</code><span><small>word2[${targetIndex}]</small><strong>'${escapeHtml(word2[targetIndex] || "")}'</strong></span><b>${vi ? "DÙNG MISMATCH" : "SPEND MISMATCH"}</b></div>`;
+    } else {
+      decisionHtml = `<div class="valid3302-decision greedy"><small>${vi ? "QUY TẮC GREEDY" : "GREEDY RULE"}</small><strong>${vi ? "Xét i từ nhỏ đến lớn; chọn ngay khi khả thi" : "Scan i in increasing order; take it as soon as feasible"}</strong></div>`;
+    }
+  } else if (view.phase === "done") {
+    const result = Array.isArray(view.result) ? view.result : answer;
+    decisionHtml = `<div class="valid3302-decision result ${view.valid ? "accept" : "reject"}"><small>RETURN</small><strong>[${result.join(", ")}]</strong><code>${view.valid ? `"${escapeHtml(selectedString)}" ≈ "${escapeHtml(word2)}"` : `${selections.length}/${word2.length}`}</code></div>`;
+  } else {
+    decisionHtml = `<div class="valid3302-decision"><small>${vi ? "MỤC TIÊU" : "GOAL"}</small><strong>${vi ? "Mảng chỉ số nhỏ nhất, không phải chuỗi nhỏ nhất" : "Smallest index array, not the smallest formed string"}</strong></div>`;
+  }
+
+  $("treeView").innerHTML = `<div class="valid3302-viz">
+    <div class="valid3302-phases">${phases}</div>
+    <div class="valid3302-rule"><strong>VALID</strong><span>indices ↑ · selected string differs from word2 at ≤ 1 position</span></div>
+    <section class="valid3302-section"><header><strong>WORD1 · SOURCE INDICES</strong><span>${vi ? "chọn từ trái sang phải" : "select left to right"}</span></header><div class="valid3302-row">${word1Html}</div></section>
+    <section class="valid3302-section"><header><strong>WORD2 · TARGET</strong><span>${vi ? "mỗi ô cần một chỉ số" : "one source index per cell"}</span></header><div class="valid3302-row target">${word2Html}</div></section>
+    <section class="valid3302-section suffix"><header><strong>RIGHTMOST SUFFIX FEASIBILITY</strong><span>suffix[j] → word2[j:] exact</span></header><div class="valid3302-suffix-row">${suffixHtml}</div></section>
+    <div class="valid3302-status">${couponHtml}<div class="valid3302-answer"><small>ANSWER INDICES</small><div>${answerHtml}</div><span>${selectedString ? `formed = "${escapeHtml(selectedString)}"` : "formed = \"\""}</span></div></div>
+    ${decisionHtml}
+    <div class="valid3302-legend"><span><i class="pointer"></i>${vi ? "con trỏ hiện tại" : "current pointer"}</span><span><i class="exact"></i>exact</span><span><i class="mismatch"></i>mismatch</span><span><i class="suffix"></i>suffix position</span></div>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -9370,6 +9487,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.validSequenceView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderValidSequenceView(step);
   } else if (step.prefixAverageView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
