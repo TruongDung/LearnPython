@@ -11027,6 +11027,7 @@ let pyodideInstance = null;
 let pyodideLoadPromise = null;
 let liveMode = false;
 let liveSteps = [];
+let liveResizeInitialized = false;
 
 const LIVE_I18N = {
   vi: {
@@ -11470,6 +11471,7 @@ async function ensureMonacoEditor() {
       monacoEditorInstance.setValue(currentPrimaryCode());
       monacoSourceKey = sourceKey;
     }
+    monacoEditorInstance.layout();
     return monacoEditorInstance;
   }
   $("liveStatus").textContent = lt().loading;
@@ -11510,7 +11512,74 @@ async function ensureMonacoEditor() {
   });
   monacoSourceKey = sourceKey;
   $("liveStatus").textContent = "";
+  monacoEditorInstance.layout();
   return monacoEditorInstance;
+}
+
+function initLiveEditorResize() {
+  if (liveResizeInitialized) return;
+  const wrap = $("liveEditorWrap");
+  const editorHost = $("monacoEditor");
+  const handle = $("liveResizeHandle");
+  if (!wrap || !editorHost || !handle) return;
+  liveResizeInitialized = true;
+
+  const storageKey = "leetcode-live-editor-size";
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+  function applySize(width, height) {
+    const parentWidth = wrap.parentElement ? wrap.parentElement.clientWidth : window.innerWidth;
+    const nextWidth = clamp(width, Math.min(280, parentWidth), parentWidth);
+    const nextHeight = clamp(height, 220, Math.max(360, Math.round(window.innerHeight * 0.78)));
+    wrap.style.setProperty("--live-editor-width", `${Math.round(nextWidth)}px`);
+    wrap.style.setProperty("--live-editor-height", `${Math.round(nextHeight)}px`);
+    if (monacoEditorInstance) monacoEditorInstance.layout();
+    return { width: nextWidth, height: nextHeight };
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+    if (saved && Number.isFinite(saved.width) && Number.isFinite(saved.height)) {
+      applySize(saved.width, saved.height);
+    }
+  } catch (_) {
+    localStorage.removeItem(storageKey);
+  }
+
+  handle.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = wrap.getBoundingClientRect().width;
+    const startHeight = editorHost.getBoundingClientRect().height;
+    wrap.classList.add("is-resizing");
+    handle.setPointerCapture(event.pointerId);
+
+    const onMove = (moveEvent) => {
+      const size = applySize(startWidth + moveEvent.clientX - startX, startHeight + moveEvent.clientY - startY);
+      localStorage.setItem(storageKey, JSON.stringify(size));
+    };
+    const onEnd = (endEvent) => {
+      wrap.classList.remove("is-resizing");
+      if (handle.hasPointerCapture(endEvent.pointerId)) handle.releasePointerCapture(endEvent.pointerId);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onEnd);
+      handle.removeEventListener("pointercancel", onEnd);
+    };
+
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onEnd);
+    handle.addEventListener("pointercancel", onEnd);
+  });
+
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    const currentWidth = wrap.getBoundingClientRect().width;
+    const currentHeight = editorHost.getBoundingClientRect().height;
+    const size = applySize(currentWidth, currentHeight + 60);
+    localStorage.setItem(storageKey, JSON.stringify(size));
+  });
 }
 
 async function ensurePyodide() {
@@ -12062,3 +12131,5 @@ $("liveResetBtn") && $("liveResetBtn").addEventListener("click", async () => {
   hide("liveError");
   $("liveStatus").textContent = "";
 });
+
+initLiveEditorResize();
