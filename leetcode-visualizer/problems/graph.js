@@ -9808,11 +9808,37 @@ function buildSteps1971RecursiveDFS(input, params) {
     };
   }
 
-  function push({ title, hlNodes = [], hlEdges = [], codeLines = [], vars = [], note, final = false }) {
+  function push({
+    title,
+    hlNodes = [],
+    hlEdges = [],
+    codeLines = [],
+    vars = [],
+    note,
+    final = false,
+    phase = "setup",
+    activeNode = null,
+    activeNeighbor = null,
+    returnValue = null,
+    decision = "",
+  }) {
     steps.push({
       title,
       arr: [],
       graph: makeGraph(hlNodes, hlEdges),
+      pathExistsDfsView: {
+        n,
+        source,
+        destination,
+        phase,
+        activeNode,
+        activeNeighbor,
+        returnValue,
+        decision,
+        callStack: callStack.slice(),
+        visited: visitedList(),
+        adj: adj.map((neighbors) => neighbors.slice()),
+      },
       highlight: [],
       mark: [],
       final,
@@ -9831,6 +9857,9 @@ function buildSteps1971RecursiveDFS(input, params) {
     title: { vi: "Cách 2: DFS đệ quy", en: "Approach 2: recursive DFS" },
     hlNodes: [source, destination],
     codeLines: [2],
+    phase: "intro",
+    activeNode: source,
+    decision: "define-dfs",
     vars: [{ name: "source", value: source }, { name: "destination", value: destination }],
     note: {
       vi: "Ta viết hàm dfs(node). Nếu node là destination thì trả True; nếu đã thăm thì trả False; ngược lại thử đệ quy từng hàng xóm.",
@@ -9841,6 +9870,8 @@ function buildSteps1971RecursiveDFS(input, params) {
   push({
     title: { vi: "adj = [[] for _ in range(n)]", en: "adj = [[] for _ in range(n)]" },
     codeLines: [3],
+    phase: "build-adj",
+    decision: "init-adj",
     vars: [{ name: "n", value: n }],
     note: {
       vi: `Tạo adjacency list rỗng cho ${n} đỉnh.`,
@@ -9853,6 +9884,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `for a, b in edges: ${a}, ${b}`, en: `for a, b in edges: ${a}, ${b}` },
       hlNodes: [a, b],
       codeLines: [4],
+      phase: "build-adj",
+      activeNode: a,
+      activeNeighbor: b,
+      decision: "read-edge",
       vars: [{ name: "edge", value: `(${a}, ${b})` }],
       note: {
         vi: `Xét cạnh vô hướng (${a}, ${b}).`,
@@ -9865,6 +9900,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [a, b],
       hlEdges: [[a, b]],
       codeLines: [5],
+      phase: "build-adj",
+      activeNode: a,
+      activeNeighbor: b,
+      decision: "append-forward",
       vars: [{ name: `adj[${a}]`, value: `[${adj[a].join(", ")}]` }],
       note: {
         vi: `Từ ${a} có thể đi sang ${b}.`,
@@ -9878,6 +9917,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [a, b],
       hlEdges: [[a, b]],
       codeLines: [6],
+      phase: "build-adj",
+      activeNode: b,
+      activeNeighbor: a,
+      decision: "append-backward",
       vars: [{ name: `adj[${b}]`, value: `[${adj[b].join(", ")}]` }],
       note: {
         vi: `Vì đồ thị vô hướng, từ ${b} cũng đi sang ${a}.`,
@@ -9889,6 +9932,8 @@ function buildSteps1971RecursiveDFS(input, params) {
   push({
     title: { vi: "visited = set()", en: "visited = set()" },
     codeLines: [7],
+    phase: "init-visited",
+    decision: "init-visited",
     note: {
       vi: "Set visited giúp tránh lặp vô hạn khi đồ thị có chu trình.",
       en: "The visited set prevents infinite recursion in cyclic graphs.",
@@ -9902,6 +9947,9 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [node],
       hlEdges: from === null ? [] : [[from, node]],
       codeLines: [8],
+      phase: "enter",
+      activeNode: node,
+      decision: "enter-call",
       vars: [{ name: "node", value: node }],
       note: {
         vi: `Vào hàm dfs với node = ${node}.`,
@@ -9914,6 +9962,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `node == destination? ${isDestination ? "True" : "False"}`, en: `node == destination? ${isDestination ? "True" : "False"}` },
       hlNodes: [node, destination],
       codeLines: [9],
+      phase: "check-destination",
+      activeNode: node,
+      returnValue: isDestination ? true : null,
+      decision: isDestination ? "destination-found" : "not-destination",
       vars: [{ name: "node", value: node }, { name: "destination", value: destination }],
       note: {
         vi: isDestination ? `Đã tới destination (${destination}).` : `${node} chưa phải destination (${destination}).`,
@@ -9925,6 +9977,10 @@ function buildSteps1971RecursiveDFS(input, params) {
         title: { vi: "return True", en: "return True" },
         hlNodes: [node],
         codeLines: [9],
+        phase: "return",
+        activeNode: node,
+        returnValue: true,
+        decision: "return-true",
         vars: [{ name: "answer", value: true }],
         note: {
           vi: "Tìm thấy đường đi, True sẽ lan ngược qua các lời gọi dfs trước đó.",
@@ -9940,6 +9996,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `node in visited? ${alreadyVisited ? "True" : "False"}`, en: `node in visited? ${alreadyVisited ? "True" : "False"}` },
       hlNodes: [node],
       codeLines: [10],
+      phase: "check-visited",
+      activeNode: node,
+      returnValue: alreadyVisited ? false : null,
+      decision: alreadyVisited ? "already-visited" : "not-visited",
       vars: [{ name: "node", value: node }],
       note: {
         vi: alreadyVisited ? `${node} đã thăm rồi, nhánh này dừng.` : `${node} chưa thăm, tiếp tục đánh dấu.`,
@@ -9951,6 +10011,10 @@ function buildSteps1971RecursiveDFS(input, params) {
         title: { vi: "return False", en: "return False" },
         hlNodes: [node],
         codeLines: [10],
+        phase: "return",
+        activeNode: node,
+        returnValue: false,
+        decision: "return-false-visited",
         vars: [{ name: "return", value: false }],
         note: {
           vi: "Không cần xét lại node đã thăm.",
@@ -9966,6 +10030,9 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `visited.add(${node})`, en: `visited.add(${node})` },
       hlNodes: [node],
       codeLines: [11],
+      phase: "mark-visited",
+      activeNode: node,
+      decision: "mark-visited",
       vars: [{ name: "visited", value: `{${[...visited].join(", ")}}` }],
       note: {
         vi: `Đánh dấu ${node} đã thăm trước khi đi sang hàng xóm.`,
@@ -9978,6 +10045,9 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [node],
       hlEdges: adj[node].map((nb) => [node, nb]),
       codeLines: [12],
+      phase: "neighbors",
+      activeNode: node,
+      decision: "iterate-neighbors",
       vars: [{ name: "neighbors", value: `[${adj[node].join(", ")}]` }],
       note: {
         vi: `Thử lần lượt các hàng xóm của ${node}.`,
@@ -9991,6 +10061,10 @@ function buildSteps1971RecursiveDFS(input, params) {
         hlNodes: [node, nb],
         hlEdges: [[node, nb]],
         codeLines: [13],
+        phase: "recurse",
+        activeNode: node,
+        activeNeighbor: nb,
+        decision: "call-neighbor",
         vars: [{ name: "nb", value: nb }],
         note: {
           vi: `Gọi đệ quy sang hàng xóm ${nb}.`,
@@ -10003,6 +10077,11 @@ function buildSteps1971RecursiveDFS(input, params) {
           hlNodes: [node, nb],
           hlEdges: [[node, nb]],
           codeLines: [13],
+          phase: "bubble-true",
+          activeNode: node,
+          activeNeighbor: nb,
+          returnValue: true,
+          decision: "bubble-true",
           vars: [{ name: "answer", value: true }],
           note: {
             vi: `Một nhánh từ ${node} đã tới destination, nên trả True ngay.`,
@@ -10017,6 +10096,11 @@ function buildSteps1971RecursiveDFS(input, params) {
         hlNodes: [node, nb],
         hlEdges: [[node, nb]],
         codeLines: [13],
+        phase: "backtrack",
+        activeNode: node,
+        activeNeighbor: nb,
+        returnValue: false,
+        decision: "neighbor-false",
         vars: [{ name: "nb", value: nb }],
         note: {
           vi: `Nhánh qua ${nb} không tới destination, thử hàng xóm tiếp theo.`,
@@ -10029,6 +10113,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       title: { vi: `dfs(${node}) hết hàng xóm → False`, en: `dfs(${node}) exhausted neighbors → False` },
       hlNodes: [node],
       codeLines: [14],
+      phase: "return",
+      activeNode: node,
+      returnValue: false,
+      decision: "return-false-exhausted",
       vars: [{ name: "return", value: false }],
       note: {
         vi: `Từ ${node} không còn nhánh nào tới destination.`,
@@ -10043,6 +10131,9 @@ function buildSteps1971RecursiveDFS(input, params) {
     title: { vi: `return dfs(${source})`, en: `return dfs(${source})` },
     hlNodes: [source],
     codeLines: [15],
+    phase: "start",
+    activeNode: source,
+    decision: "start-dfs",
     vars: [{ name: "source", value: source }],
     note: {
       vi: "Bắt đầu DFS từ source.",
@@ -10056,6 +10147,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [source, destination],
       final: true,
       codeLines: [15],
+      phase: "done",
+      activeNode: destination,
+      returnValue: true,
+      decision: "done-true",
       vars: [{ name: "answer", value: true }],
       note: {
         vi: `Có đường đi từ ${source} tới ${destination}.`,
@@ -10068,6 +10163,10 @@ function buildSteps1971RecursiveDFS(input, params) {
       hlNodes: [source, destination],
       final: true,
       codeLines: [15],
+      phase: "done",
+      activeNode: source,
+      returnValue: false,
+      decision: "done-false",
       vars: [{ name: "answer", value: false }],
       note: {
         vi: `Không có nhánh DFS nào đi từ ${source} tới ${destination}.`,

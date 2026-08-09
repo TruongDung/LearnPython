@@ -4849,6 +4849,119 @@ function renderNetworkDelayView(step) {
   renderGraph(step, "networkDelayGraph");
 }
 
+function renderPathExistsDfsView(step) {
+  const view = step.pathExistsDfsView || {};
+  const vi = lang === "vi";
+  const callStack = Array.isArray(view.callStack) ? view.callStack : [];
+  const visited = new Set(Array.isArray(view.visited) ? view.visited : []);
+  const adj = Array.isArray(view.adj) ? view.adj : [];
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const activeNeighbor = Number.isInteger(view.activeNeighbor) ? view.activeNeighbor : null;
+  const source = Number.isInteger(view.source) ? view.source : null;
+  const destination = Number.isInteger(view.destination) ? view.destination : null;
+
+  const stage = ["intro", "build-adj", "init-visited"].includes(view.phase)
+    ? 0
+    : view.phase === "done" ? 2 : 1;
+  const stageLabels = vi
+    ? ["1 · Dựng graph", "2 · DFS đệ quy", "3 · Return kết quả"]
+    : ["1 · Build graph", "2 · Recursive DFS", "3 · Return result"];
+  const phases = stageLabels.map((label, index) => {
+    const state = index < stage ? "done" : index === stage ? "active" : "";
+    return `<span class="${state}">${index < stage ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`;
+  }).join("");
+
+  const stackHtml = callStack.length
+    ? callStack.map((node, index) => `<span class="${index === callStack.length - 1 ? "top" : ""}"><small>#${index + 1}</small><strong>dfs(${escapeHtml(node)})</strong></span>`).join("")
+    : `<span class="path1971-empty">${vi ? "stack rỗng" : "empty stack"}</span>`;
+
+  const visitedHtml = adj.length
+    ? adj.map((_, node) => {
+      const classes = [
+        "path1971-node-chip",
+        visited.has(node) ? "visited" : "",
+        node === activeNode ? "active" : "",
+        node === source ? "source" : "",
+        node === destination ? "destination" : "",
+      ].filter(Boolean).join(" ");
+      return `<span class="${classes}">${node}</span>`;
+    }).join("")
+    : `<span class="path1971-empty">∅</span>`;
+
+  const adjHtml = adj.length
+    ? adj.map((neighbors, node) => {
+      const neighborHtml = neighbors.length
+        ? neighbors.map((nb) => `<span class="${nb === activeNeighbor ? "current" : visited.has(nb) ? "visited" : ""}">${escapeHtml(nb)}</span>`).join("")
+        : "<em>∅</em>";
+      return `<div class="path1971-adj-row ${node === activeNode ? "active" : ""}">
+        <b>${node}</b><i>→</i><div>${neighborHtml}</div>
+      </div>`;
+    }).join("")
+    : `<div class="path1971-empty">${vi ? "adj đang rỗng" : "adj is empty"}</div>`;
+
+  const decisionText = {
+    "define-dfs": vi ? "Định nghĩa dfs(node): kiểm tra đích, kiểm tra visited, rồi thử từng hàng xóm." : "Define dfs(node): check destination, check visited, then try each neighbor.",
+    "init-adj": vi ? "Tạo danh sách kề rỗng cho mọi node." : "Create an empty adjacency list for every node.",
+    "read-edge": vi ? "Đọc một cạnh vô hướng từ input." : "Read one undirected edge from input.",
+    "append-forward": vi ? "Thêm chiều a → b vào adjacency list." : "Add direction a → b to the adjacency list.",
+    "append-backward": vi ? "Thêm chiều b → a vì graph vô hướng." : "Add direction b → a because the graph is undirected.",
+    "init-visited": vi ? "Khởi tạo visited để tránh lặp trong chu trình." : "Initialize visited to avoid cycles.",
+    "start-dfs": vi ? "Gọi dfs(source) để bắt đầu tìm đường." : "Call dfs(source) to start searching.",
+    "enter-call": vi ? "Một frame dfs mới được đặt lên call stack." : "A new dfs frame is pushed onto the call stack.",
+    "destination-found": vi ? "node hiện tại chính là destination." : "The current node is the destination.",
+    "not-destination": vi ? "Chưa tới đích, tiếp tục kiểm tra visited." : "Not at the destination yet; check visited next.",
+    "already-visited": vi ? "Node đã thăm rồi, nhánh này trả False." : "This node was already visited; this branch returns False.",
+    "not-visited": vi ? "Node chưa thăm, có thể mở rộng nhánh này." : "This node is unvisited; this branch can expand.",
+    "mark-visited": vi ? "Đánh dấu node trước khi đi sang hàng xóm." : "Mark the node before exploring neighbors.",
+    "iterate-neighbors": vi ? "Duyệt từng hàng xóm trong adj[node]." : "Iterate through adj[node].",
+    "call-neighbor": vi ? "Gọi dfs(neighbor), call stack sâu thêm một tầng." : "Call dfs(neighbor); the call stack goes one level deeper.",
+    "neighbor-false": vi ? "Nhánh vừa thử trả False, quay lại frame hiện tại." : "The tried branch returned False; return to the current frame.",
+    "return-false-exhausted": vi ? "Hết hàng xóm mà không tới đích, trả False." : "No neighbor reaches the destination; return False.",
+    "return-false-visited": vi ? "Gặp node đã thăm, trả False để chặn chu trình." : "Hit a visited node; return False to stop the cycle.",
+    "return-true": vi ? "Tới destination, trả True." : "Reached destination; return True.",
+    "bubble-true": vi ? "True lan ngược lên các frame cha." : "True bubbles back up through parent frames.",
+    "done-true": vi ? "Có đường đi từ source tới destination." : "A path exists from source to destination.",
+    "done-false": vi ? "Không có đường đi trong component của source." : "No path exists in source's component.",
+  }[view.decision] || (vi ? "Theo dõi DFS đệ quy." : "Trace recursive DFS.");
+
+  const returnClass = view.returnValue === true ? "true" : view.returnValue === false ? "false" : "";
+  const returnLabel = view.returnValue === null || view.returnValue === undefined
+    ? (vi ? "chưa return" : "no return yet")
+    : String(view.returnValue);
+  const summary = vi
+    ? `DFS đệ quy từ ${source} tới ${destination}. Stack có ${callStack.length} frame.`
+    : `Recursive DFS from ${source} to ${destination}. Stack has ${callStack.length} frame(s).`;
+
+  $("treeView").innerHTML = `<section class="path1971-viz" aria-label="${escapeHtml(summary)}">
+    <div class="path1971-phases">${phases}</div>
+    <div class="path1971-layout">
+      <div id="path1971Graph" class="path1971-graph"></div>
+      <div class="path1971-state">
+        <div class="path1971-head"><strong>call stack</strong><span>${vi ? "frame trên cùng đang chạy" : "top frame is running"}</span></div>
+        <div class="path1971-stack">${stackHtml}</div>
+        <div class="path1971-head"><strong>visited</strong><span>${visited.size}/${adj.length}</span></div>
+        <div class="path1971-visited">${visitedHtml}</div>
+      </div>
+    </div>
+    <div class="path1971-lower">
+      <div class="path1971-adj">
+        <div class="path1971-head"><strong>adjacency list</strong><span>${vi ? "hàng xóm của từng node" : "neighbors per node"}</span></div>
+        <div>${adjHtml}</div>
+      </div>
+      <div class="path1971-decision ${returnClass}">
+        <small>${vi ? "Bước hiện tại" : "Current step"}</small>
+        <strong>${escapeHtml(decisionText)}</strong>
+        <div>
+          ${activeNode === null ? "" : `<span>node = ${escapeHtml(activeNode)}</span>`}
+          ${activeNeighbor === null ? "" : `<span>nb = ${escapeHtml(activeNeighbor)}</span>`}
+          <span>return = ${escapeHtml(returnLabel)}</span>
+        </div>
+      </div>
+    </div>
+  </section>`;
+  renderGraph(step, "path1971Graph");
+}
+
 // ---- Linked List renderer (horizontal box nodes with next arrows + curved random arrows) ----
 function renderLinkedList(step) {
   const { nodes, hlIdx, markIdx } = step.linkedList;
@@ -10398,6 +10511,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderNetworkDelayView(step);
+  } else if (step.pathExistsDfsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPathExistsDfsView(step);
   } else if (step.replaceWordsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
