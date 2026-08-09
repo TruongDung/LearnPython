@@ -2515,7 +2515,7 @@ function buildSteps307(input, params) {
       return { op, first, second, tokenCount: tokens.length };
     });
 
-  const validCommands = commands.length > 0 && commands.every((command) => {
+  const validCommands = nums.length > 0 && commands.length > 0 && commands.every((command) => {
     const validName = command.op === "update" || command.op === "sumrange";
     const validArgs = command.tokenCount === 3
       && Number.isInteger(command.first)
@@ -2532,12 +2532,13 @@ function buildSteps307(input, params) {
       steps: [{
         title: { vi: "Thao tác không hợp lệ", en: "Invalid operations" },
         codeLines: [1],
-        fenwickView: {
+        segmentTreeView: {
           nums,
-          bit: new Array(nums.length).fill(0),
+          tree: [],
+          coverage: [],
           activeNums: [],
-          activeBit: [],
-          visitedBit: [],
+          activeTree: [],
+          selectedTree: [],
           path: [],
           mode: "idle",
           status: [{ label: "operations", value: rawOperations || "-" }],
@@ -2553,12 +2554,20 @@ function buildSteps307(input, params) {
   }
 
   const n = nums.length;
-  const bit = new Array(n + 1).fill(0);
+  const tree = new Array(2 * n).fill(0);
+  const coverage = Array.from({ length: 2 * n }, () => []);
   const outputs = [null];
   const steps = [];
   const detailedTrace = n <= 40 && commands.length <= 40;
 
-  const bitText = () => `[${bit.slice(1).join(", ")}]`;
+  for (let i = 0; i < n; i += 1) {
+    coverage[n + i] = [i];
+  }
+  for (let i = n - 1; i > 0; i -= 1) {
+    coverage[i] = [...(coverage[2 * i] || []), ...(coverage[2 * i + 1] || [])].sort((a, b) => a - b);
+  }
+
+  const treeText = () => `[${tree.slice(1).join(", ")}]`;
   const numsText = () => `[${nums.join(", ")}]`;
   const outputsText = () => JSON.stringify(outputs);
 
@@ -2568,8 +2577,8 @@ function buildSteps307(input, params) {
     note,
     mode = "idle",
     activeNums = [],
-    activeBit = [],
-    visitedBit = [],
+    activeTree = [],
+    selectedTree = [],
     path = [],
     status = [],
     vars = [],
@@ -2580,19 +2589,20 @@ function buildSteps307(input, params) {
     const step = {
       title,
       codeLines: [codeLine],
-      fenwickView: {
+      segmentTreeView: {
         nums: [...nums],
-        bit: bit.slice(1),
+        tree: tree.slice(1),
+        coverage: coverage.slice(1).map((items) => [...items]),
         activeNums: [...activeNums],
-        activeBit: [...activeBit],
-        visitedBit: [...visitedBit],
+        activeTree: [...activeTree],
+        selectedTree: [...selectedTree],
         path: [...path],
         mode,
         status,
       },
       vars: [
         { name: "nums", value: numsText() },
-        { name: "bit", value: bitText() },
+        { name: "tree", value: treeText() },
         { name: "outputs", value: outputsText() },
         ...vars,
       ],
@@ -2602,233 +2612,44 @@ function buildSteps307(input, params) {
     steps.push(step);
   }
 
-  function traceAdd(startIndex, delta, context) {
-    let index = startIndex;
-    const path = [];
-
-    snapshot({
-      title: { vi: `_add(index=${index}, delta=${delta})`, en: `_add(index=${index}, delta=${delta})` },
-      codeLine: 8,
-      mode: context.mode,
-      activeNums: context.activeNums,
-      activeBit: [index],
-      path,
-      status: context.status,
-      vars: [{ name: "index", value: index }, { name: "delta", value: delta }],
-      note: {
-        vi: "Fenwick dùng index 1-based; bắt đầu tại ô tương ứng với phần tử đang cập nhật.",
-        en: "Fenwick uses 1-based indices; start at the cell corresponding to the updated element.",
-      },
-    });
-
-    while (index <= n) {
-      snapshot({
-        title: { vi: `index ${index} còn nằm trong BIT`, en: `index ${index} is inside the BIT` },
-        codeLine: 9,
-        mode: context.mode,
-        activeNums: context.activeNums,
-        activeBit: [index],
-        visitedBit: path,
-        path: [...path, index],
-        status: context.status,
-        vars: [{ name: "index", value: index }, { name: "delta", value: delta }],
-        note: {
-          vi: `BIT[${index}] quản lý đoạn [${index - (index & -index)}, ${index - 1}] của nums.`,
-          en: `BIT[${index}] covers nums[${index - (index & -index)}..${index - 1}].`,
-        },
-      });
-
-      const before = bit[index];
-      bit[index] += delta;
-      path.push(index);
-      snapshot({
-        title: { vi: `BIT[${index}] = ${before} + (${delta}) = ${bit[index]}`, en: `BIT[${index}] = ${before} + (${delta}) = ${bit[index]}` },
-        codeLine: 10,
-        mode: context.mode,
-        activeNums: context.activeNums,
-        activeBit: [index],
-        visitedBit: path,
-        path,
-        status: context.status,
-        vars: [{ name: `bit[${index}]`, value: `${before} + (${delta}) = ${bit[index]}` }],
-        note: {
-          vi: `Cộng delta vào tổng đoạn mà BIT[${index}] đại diện.`,
-          en: `Add delta to the range sum represented by BIT[${index}].`,
-        },
-      });
-
-      const lowbit = index & -index;
-      const next = index + lowbit;
-      snapshot({
-        title: { vi: `Nhảy ${index} + lowbit(${index}) = ${next}`, en: `Jump ${index} + lowbit(${index}) = ${next}` },
-        codeLine: 11,
-        mode: context.mode,
-        activeNums: context.activeNums,
-        activeBit: next <= n ? [next] : [],
-        visitedBit: path,
-        path: next <= n ? [...path, next] : path,
-        status: context.status,
-        vars: [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
-        note: {
-          vi: next <= n ? `Đi tới node cha BIT[${next}], node này quản lý một đoạn lớn hơn.` : `${next} vượt n=${n}, kết thúc đường update.`,
-          en: next <= n ? `Move to parent BIT[${next}], which covers a larger range.` : `${next} exceeds n=${n}, so the update path ends.`,
-        },
-      });
-      index = next;
-    }
-
-    snapshot({
-      title: { vi: "Kết thúc đường cập nhật BIT", en: "Finish the BIT update path" },
-      codeLine: 9,
-      mode: context.mode,
-      activeNums: context.activeNums,
-      visitedBit: path,
-      path,
-      status: context.status,
-      vars: [{ name: "index", value: index }, { name: "n", value: n }],
-      note: { vi: `index=${index} > n=${n}, vòng lặp dừng.`, en: `index=${index} > n=${n}, so the loop stops.` },
-    });
-  }
-
-  function tracePrefix(startIndex, context) {
-    let index = startIndex;
-    let total = 0;
-    const path = [];
-
-    snapshot({
-      title: { vi: `_prefix(index=${index})`, en: `_prefix(index=${index})` },
-      codeLine: 18,
-      mode: "query",
-      activeNums: context.activeNums,
-      activeBit: index > 0 ? [index] : [],
-      path,
-      status: context.status,
-      vars: [{ name: "index", value: index }],
-      note: { vi: `Tính tổng nums[0..${index - 1}] bằng các đoạn rời nhau trong BIT.`, en: `Compute nums[0..${index - 1}] using disjoint ranges stored in the BIT.` },
-    });
-    snapshot({
-      title: { vi: "Khởi tạo total = 0", en: "Initialize total = 0" },
-      codeLine: 19,
-      mode: "query",
-      activeNums: context.activeNums,
-      activeBit: index > 0 ? [index] : [],
-      path,
-      status: context.status,
-      vars: [{ name: "total", value: total }],
-      note: { vi: "Mỗi node trên đường đi sẽ đóng góp đúng một đoạn không chồng lặp.", en: "Each visited node contributes one non-overlapping range." },
-    });
-
-    while (index > 0) {
-      snapshot({
-        title: { vi: `index=${index} > 0`, en: `index=${index} > 0` },
-        codeLine: 20,
-        mode: "query",
-        activeNums: context.activeNums,
-        activeBit: [index],
-        visitedBit: path,
-        path: [...path, index],
-        status: context.status,
-        vars: [{ name: "index", value: index }, { name: "total", value: total }],
-        note: { vi: `Đọc tổng đoạn [${index - (index & -index)}, ${index - 1}] từ BIT[${index}].`, en: `Read range [${index - (index & -index)}, ${index - 1}] from BIT[${index}].` },
-      });
-
-      const before = total;
-      total += bit[index];
-      path.push(index);
-      snapshot({
-        title: { vi: `total = ${before} + ${bit[index]} = ${total}`, en: `total = ${before} + ${bit[index]} = ${total}` },
-        codeLine: 21,
-        mode: "query",
-        activeNums: context.activeNums,
-        activeBit: [index],
-        visitedBit: path,
-        path,
-        status: context.status,
-        vars: [{ name: "total", value: `${before} + ${bit[index]} = ${total}` }, { name: `bit[${index}]`, value: bit[index] }],
-        note: { vi: `Cộng tổng lưu tại BIT[${index}] vào kết quả prefix.`, en: `Add the sum stored at BIT[${index}] to the prefix result.` },
-      });
-
-      const lowbit = index & -index;
-      const next = index - lowbit;
-      snapshot({
-        title: { vi: `Lùi ${index} - lowbit(${index}) = ${next}`, en: `Move ${index} - lowbit(${index}) = ${next}` },
-        codeLine: 22,
-        mode: "query",
-        activeNums: context.activeNums,
-        activeBit: next > 0 ? [next] : [],
-        visitedBit: path,
-        path: next > 0 ? [...path, next] : path,
-        status: context.status,
-        vars: [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
-        note: { vi: next > 0 ? `Bỏ đoạn vừa cộng và đi tới phần prefix còn lại tại BIT[${next}].` : "Đã phủ hết prefix, index trở về 0.", en: next > 0 ? `Remove the covered range and continue with BIT[${next}].` : "The whole prefix is covered, so index reaches 0." },
-      });
-      index = next;
-    }
-
-    snapshot({
-      title: { vi: "index = 0, dừng query", en: "index = 0, stop the query" },
-      codeLine: 20,
-      mode: "query",
-      activeNums: context.activeNums,
-      visitedBit: path,
-      path,
-      status: context.status,
-      vars: [{ name: "index", value: index }, { name: "total", value: total }],
-      note: { vi: "Không còn đoạn prefix nào cần cộng.", en: "No prefix range remains to be added." },
-    });
-    snapshot({
-      title: { vi: `Trả về prefix sum ${total}`, en: `Return prefix sum ${total}` },
-      codeLine: 23,
-      mode: "query",
-      activeNums: context.activeNums,
-      visitedBit: path,
-      path,
-      status: context.status,
-      vars: [{ name: "return", value: total }],
-      note: { vi: `Tổng prefix cần tìm là ${total}.`, en: `The requested prefix sum is ${total}.` },
-    });
-    return total;
-  }
-
   snapshot({
-    title: { vi: "Sao chép nums để hỗ trợ update", en: "Copy nums for future updates" },
+    title: { vi: "Tạo segment tree dạng mảng 2*n", en: "Create a 2*n array segment tree" },
     codeLine: 3,
     mode: "build",
-    status: [{ label: "n", value: n }, { label: "phase", value: "build" }],
-    note: { vi: "Cần giữ giá trị hiện tại của nums[index] để tính delta khi update.", en: "Keep each current nums[index] value so update can compute its delta." },
+    status: [{ label: "n", value: n }, { label: "tree size", value: 2 * n }],
+    note: { vi: "Nửa sau của mảng tree là các lá; nửa đầu là các tổng cha.", en: "The second half stores leaves; the first half stores parent sums." },
     force: true,
-  });
-  snapshot({
-    title: { vi: `Tạo BIT gồm ${n} ô 0`, en: `Create ${n} zeroed BIT cells` },
-    codeLine: 4,
-    mode: "build",
-    status: [{ label: "BIT size", value: n }, { label: "indexing", value: "1-based" }],
-    note: { vi: "bit[0] không dùng; hình chỉ hiển thị bit[1..n].", en: "bit[0] is unused; the visual shows bit[1..n]." },
   });
 
   for (let index = 0; index < n; index += 1) {
+    tree[n + index] = nums[index];
     snapshot({
-      title: { vi: `Build từ nums[${index}] = ${nums[index]}`, en: `Build from nums[${index}] = ${nums[index]}` },
+      title: { vi: `Gán lá tree[${n + index}] = nums[${index}]`, en: `Set leaf tree[${n + index}] = nums[${index}]` },
       codeLine: 5,
       mode: "build",
       activeNums: [index],
-      status: [{ label: "i", value: index }, { label: "value", value: nums[index] }],
-      vars: [{ name: "i", value: index }, { name: "value", value: nums[index] }],
-      note: { vi: "Duyệt từng phần tử để cộng nó vào mọi Fenwick node chứa index này.", en: "Visit each value and add it to every Fenwick node whose range contains this index." },
+      activeTree: [n + index],
+      path: [n + index],
+      status: [{ label: "i", value: index }, { label: "leaf", value: n + index }, { label: "value", value: nums[index] }],
+      vars: [{ name: `tree[${n + index}]`, value: nums[index] }],
+      note: { vi: `Lá tree[${n + index}] đại diện cho nums[${index}].`, en: `Leaf tree[${n + index}] represents nums[${index}].` },
     });
+  }
+
+  for (let index = n - 1; index > 0; index -= 1) {
+    const leftChild = 2 * index;
+    const rightChild = 2 * index + 1;
+    tree[index] = tree[leftChild] + tree[rightChild];
     snapshot({
-      title: { vi: `Gọi _add(${index + 1}, ${nums[index]})`, en: `Call _add(${index + 1}, ${nums[index]})` },
-      codeLine: 6,
+      title: { vi: `tree[${index}] = tree[${leftChild}] + tree[${rightChild}]`, en: `tree[${index}] = tree[${leftChild}] + tree[${rightChild}]` },
+      codeLine: 8,
       mode: "build",
-      activeNums: [index],
-      activeBit: [index + 1],
-      status: [{ label: "i", value: index }, { label: "delta", value: nums[index] }],
-      note: { vi: "Đổi index nums 0-based sang index BIT 1-based.", en: "Convert the 0-based nums index to the 1-based BIT index." },
-    });
-    traceAdd(index + 1, nums[index], {
-      mode: "build",
-      activeNums: [index],
-      status: [{ label: "build nums index", value: index }, { label: "value", value: nums[index] }],
+      activeNums: coverage[index],
+      activeTree: [index, leftChild, rightChild].filter((node) => node < 2 * n),
+      path: [leftChild, rightChild, index].filter((node) => node < 2 * n),
+      status: [{ label: "parent", value: index }, { label: "sum", value: tree[index] }],
+      vars: [{ name: `tree[${index}]`, value: `${tree[leftChild]} + ${tree[rightChild]} = ${tree[index]}` }],
+      note: { vi: "Mỗi node cha lưu tổng của hai node con trực tiếp.", en: "Each parent stores the sum of its two direct children." },
     });
   }
 
@@ -2839,59 +2660,63 @@ function buildSteps307(input, params) {
     if (command.op === "update") {
       const index = command.first;
       const value = command.second;
+      let pos = index + n;
       snapshot({
         title: { vi: `update(${index}, ${value})`, en: `update(${index}, ${value})` },
-        codeLine: 13,
+        codeLine: 10,
         mode: "update",
         activeNums: [index],
+        activeTree: [pos],
+        path: [pos],
         status: [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "update", value: `[${index}] = ${value}` }],
-        vars: [{ name: "index", value: index }, { name: "val", value: value }],
-        note: { vi: `Đổi nums[${index}] từ ${nums[index]} thành ${value}.`, en: `Change nums[${index}] from ${nums[index]} to ${value}.` },
-      });
-      const delta = value - nums[index];
-      snapshot({
-        title: { vi: `delta = ${value} - ${nums[index]} = ${delta}`, en: `delta = ${value} - ${nums[index]} = ${delta}` },
-        codeLine: 14,
-        mode: "update",
-        activeNums: [index],
-        status: [{ label: "old", value: nums[index] }, { label: "new", value }, { label: "delta", value: delta }],
-        vars: [{ name: "delta", value: `${value} - ${nums[index]} = ${delta}` }],
-        note: { vi: "Fenwick chỉ cần cộng phần chênh lệch vào các node liên quan.", en: "Fenwick only needs to add the difference to affected nodes." },
+        vars: [{ name: "pos", value: `${index} + ${n} = ${pos}` }, { name: "val", value }],
+        note: { vi: "Đổi index của nums sang vị trí lá trong tree.", en: "Convert the nums index to its leaf position in tree." },
       });
       const oldValue = nums[index];
       nums[index] = value;
+      tree[pos] = value;
       snapshot({
-        title: { vi: `Ghi nums[${index}] = ${value}`, en: `Write nums[${index}] = ${value}` },
-        codeLine: 15,
+        title: { vi: `Ghi tree[${pos}] = ${value}`, en: `Write tree[${pos}] = ${value}` },
+        codeLine: 12,
         mode: "update",
         activeNums: [index],
-        status: [{ label: "old", value: oldValue }, { label: "new", value }, { label: "delta", value: delta }],
-        vars: [{ name: `nums[${index}]`, value }],
-        note: { vi: "Mảng gốc giờ phản ánh giá trị mới.", en: "The source array now reflects the new value." },
+        activeTree: [pos],
+        path: [pos],
+        status: [{ label: "old", value: oldValue }, { label: "new", value }],
+        vars: [{ name: `tree[${pos}]`, value }, { name: `nums[${index}]`, value }],
+        note: { vi: "Sau khi sửa lá, các node cha trên đường lên root cần tính lại.", en: "After changing the leaf, recompute every parent on the path to the root." },
       });
-      snapshot({
-        title: { vi: `Gọi _add(${index + 1}, ${delta})`, en: `Call _add(${index + 1}, ${delta})` },
-        codeLine: 16,
-        mode: "update",
-        activeNums: [index],
-        activeBit: [index + 1],
-        status: [{ label: "update", value: `[${index}]` }, { label: "delta", value: delta }],
-        note: { vi: "Bắt đầu cập nhật các Fenwick range chứa nums[index].", en: "Begin updating Fenwick ranges that contain nums[index]." },
-      });
-      traceAdd(index + 1, delta, {
-        mode: "update",
-        activeNums: [index],
-        status: [{ label: "update index", value: index }, { label: "delta", value: delta }],
-      });
+      const path = [pos];
+      while (pos > 1) {
+        pos = Math.floor(pos / 2);
+        const leftChild = 2 * pos;
+        const rightChild = 2 * pos + 1;
+        const before = tree[pos];
+        tree[pos] = tree[leftChild] + tree[rightChild];
+        path.push(pos);
+        snapshot({
+          title: { vi: `Tính lại tree[${pos}]`, en: `Recompute tree[${pos}]` },
+          codeLine: 16,
+          mode: "update",
+          activeNums: coverage[pos],
+          activeTree: [pos, leftChild, rightChild].filter((node) => node < 2 * n),
+          selectedTree: path,
+          path,
+          status: [{ label: "parent", value: pos }, { label: "before", value: before }, { label: "after", value: tree[pos] }],
+          vars: [{ name: `tree[${pos}]`, value: `${tree[leftChild]} + ${tree[rightChild]} = ${tree[pos]}` }],
+          note: { vi: `Đi lên node cha ${pos}; tổng mới lấy từ hai con.`, en: `Move to parent ${pos}; its new sum comes from its two children.` },
+        });
+      }
       outputs.push(null);
       snapshot({
         title: { vi: `Hoàn tất update(${index}, ${value})`, en: `Finish update(${index}, ${value})` },
         codeLine: 16,
         mode: "update",
         activeNums: [index],
+        selectedTree: path,
+        path,
         status: [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "output", value: "null" }],
-        vars: [{ name: "delta", value: delta }],
-        note: { vi: "Mảng nums và BIT đã đồng bộ.", en: "nums and the BIT are now synchronized." },
+        note: { vi: "Mảng nums và segment tree đã đồng bộ.", en: "nums and the segment tree are now synchronized." },
         final: isLast,
         force: isLast,
       });
@@ -2900,46 +2725,98 @@ function buildSteps307(input, params) {
       const right = command.second;
       const activeNums = Array.from({ length: right - left + 1 }, (_, offset) => left + offset);
       const status = [{ label: "operation", value: `${commandIndex + 1}/${commands.length}` }, { label: "range", value: `[${left}, ${right}]` }];
+      let leftPos = left + n;
+      let rightPos = right + n;
+      let total = 0;
+      const selectedTree = [];
       snapshot({
         title: { vi: `sumRange(${left}, ${right})`, en: `sumRange(${left}, ${right})` },
-        codeLine: 25,
+        codeLine: 18,
         mode: "query",
         activeNums,
+        activeTree: [leftPos, rightPos],
+        path: [leftPos, rightPos],
         status,
-        vars: [{ name: "left", value: left }, { name: "right", value: right }],
-        note: { vi: "Tổng đoạn bằng prefix(right + 1) trừ prefix(left).", en: "The range sum is prefix(right + 1) minus prefix(left)." },
+        vars: [{ name: "left", value: leftPos }, { name: "right", value: rightPos }, { name: "total", value: total }],
+        note: { vi: "Đưa hai đầu query xuống hàng lá rồi đi dần lên cha.", en: "Move both query endpoints to leaves, then climb toward the root." },
       });
+      while (leftPos <= rightPos) {
+        snapshot({
+          title: { vi: `left=${leftPos}, right=${rightPos}`, en: `left=${leftPos}, right=${rightPos}` },
+          codeLine: 24,
+          mode: "query",
+          activeNums,
+          activeTree: [leftPos, rightPos],
+          selectedTree,
+          path: [leftPos, rightPos],
+          status: [...status, { label: "total", value: total }],
+          vars: [{ name: "left", value: leftPos }, { name: "right", value: rightPos }, { name: "total", value: total }],
+          note: { vi: "Nếu left là con phải hoặc right là con trái, node đó là một đoạn trọn vẹn cần cộng.", en: "If left is a right child or right is a left child, that whole node contributes to the answer." },
+        });
+        if (leftPos % 2 === 1) {
+          const before = total;
+          total += tree[leftPos];
+          selectedTree.push(leftPos);
+          snapshot({
+            title: { vi: `Cộng tree[${leftPos}]`, en: `Add tree[${leftPos}]` },
+            codeLine: 26,
+            mode: "query",
+            activeNums: coverage[leftPos],
+            activeTree: [leftPos],
+            selectedTree,
+            path: selectedTree,
+            status: [...status, { label: "total", value: `${before} + ${tree[leftPos]} = ${total}` }],
+            vars: [{ name: "total", value: `${before} + ${tree[leftPos]} = ${total}` }],
+            note: { vi: `Node ${leftPos} nằm trọn trong query nên cộng trực tiếp.`, en: `Node ${leftPos} is fully inside the query, so add it directly.` },
+          });
+          leftPos += 1;
+        }
+        if (rightPos % 2 === 0) {
+          const before = total;
+          total += tree[rightPos];
+          selectedTree.push(rightPos);
+          snapshot({
+            title: { vi: `Cộng tree[${rightPos}]`, en: `Add tree[${rightPos}]` },
+            codeLine: 29,
+            mode: "query",
+            activeNums: coverage[rightPos],
+            activeTree: [rightPos],
+            selectedTree,
+            path: selectedTree,
+            status: [...status, { label: "total", value: `${before} + ${tree[rightPos]} = ${total}` }],
+            vars: [{ name: "total", value: `${before} + ${tree[rightPos]} = ${total}` }],
+            note: { vi: `Node ${rightPos} nằm trọn trong query nên cộng trực tiếp.`, en: `Node ${rightPos} is fully inside the query, so add it directly.` },
+          });
+          rightPos -= 1;
+        }
+        leftPos = Math.floor(leftPos / 2);
+        rightPos = Math.floor(rightPos / 2);
+        snapshot({
+          title: { vi: "Đi lên tầng cha", en: "Move to the parent level" },
+          codeLine: 33,
+          mode: "query",
+          activeNums,
+          activeTree: leftPos <= rightPos ? [leftPos, rightPos] : [],
+          selectedTree,
+          path: leftPos <= rightPos ? [leftPos, rightPos] : selectedTree,
+          status: [...status, { label: "total", value: total }],
+          vars: [{ name: "left", value: leftPos }, { name: "right", value: rightPos }],
+          note: leftPos <= rightPos
+            ? { vi: "Hai con trỏ tiếp tục xét ở tầng cao hơn.", en: "The two pointers continue at the next higher level." }
+            : { vi: "Hai con trỏ đã vượt nhau, query kết thúc.", en: "The pointers crossed, so the query ends." },
+        });
+      }
+      outputs.push(total);
       snapshot({
-        title: { vi: `Tính _prefix(${right + 1})`, en: `Compute _prefix(${right + 1})` },
-        codeLine: 26,
+        title: { vi: `sumRange(${left}, ${right}) = ${total}`, en: `sumRange(${left}, ${right}) = ${total}` },
+        codeLine: 35,
         mode: "query",
         activeNums,
-        activeBit: [right + 1],
-        status,
-        note: { vi: `Vế phải bao gồm nums[0..${right}].`, en: `The right prefix includes nums[0..${right}].` },
-      });
-      const rightPrefix = tracePrefix(right + 1, { activeNums, status });
-      snapshot({
-        title: { vi: `Tính _prefix(${left})`, en: `Compute _prefix(${left})` },
-        codeLine: 26,
-        mode: "query",
-        activeNums,
-        activeBit: left > 0 ? [left] : [],
-        status,
-        vars: [{ name: "right prefix", value: rightPrefix }],
-        note: { vi: `Vế trái loại phần nums[0..${left - 1}] khỏi tổng.`, en: `The left prefix removes nums[0..${left - 1}] from the total.` },
-      });
-      const leftPrefix = tracePrefix(left, { activeNums, status });
-      const result = rightPrefix - leftPrefix;
-      outputs.push(result);
-      snapshot({
-        title: { vi: `${rightPrefix} - ${leftPrefix} = ${result}`, en: `${rightPrefix} - ${leftPrefix} = ${result}` },
-        codeLine: 26,
-        mode: "query",
-        activeNums,
-        status: [...status, { label: "answer", value: result }],
-        vars: [{ name: "right prefix", value: rightPrefix }, { name: "left prefix", value: leftPrefix }, { name: "return", value: result }],
-        note: { vi: `sumRange(${left}, ${right}) = ${result}.`, en: `sumRange(${left}, ${right}) = ${result}.` },
+        selectedTree,
+        path: selectedTree,
+        status: [...status, { label: "answer", value: total }],
+        vars: [{ name: "return", value: total }],
+        note: { vi: "Các node đã chọn phủ đúng đoạn query và không chồng lặp.", en: "The selected nodes cover exactly the query range without overlap." },
         final: isLast,
         force: isLast,
       });
@@ -4501,45 +4378,49 @@ module.exports = {
       default: "sumRange 0 2 | update 1 2 | sumRange 0 2",
     }],
     approach: [
-      { vi: "Fenwick Tree lưu các tổng đoạn theo lowbit; bit[i] quản lý nums[i-lowbit(i)..i-1].", en: "A Fenwick Tree stores lowbit ranges; bit[i] covers nums[i-lowbit(i)..i-1]." },
-      { vi: "update tính delta rồi đi lên bằng i += lowbit(i), cộng delta vào mọi node cha.", en: "update computes delta, then climbs with i += lowbit(i), adding delta to each parent." },
-      { vi: "Prefix sum đi xuống bằng i -= lowbit(i); sumRange = prefix(right+1) - prefix(left).", en: "A prefix sum descends with i -= lowbit(i); sumRange = prefix(right+1) - prefix(left)." },
+      { vi: "Segment Tree cách 2 dùng mảng 2*n: tree[n+i] là lá ứng với nums[i], tree[i] là tổng hai con.", en: "The second Segment Tree style uses a 2*n array: tree[n+i] is the leaf for nums[i], and tree[i] is the sum of its children." },
+      { vi: "update sửa lá index+n rồi đi ngược lên root, tính lại từng node cha.", en: "update changes the leaf index+n, then climbs to the root and recomputes each parent." },
+      { vi: "sumRange đưa left/right xuống hàng lá; gặp con phải ở trái hoặc con trái ở phải thì cộng node đó rồi nhảy lên cha.", en: "sumRange moves left/right to leaves; when the left pointer is a right child or the right pointer is a left child, add that node and climb." },
     ],
     complexity: {
-      time: "O(n log n) build, O(log n) update/query",
+      time: "O(n) build, O(log n) update/query",
       space: "O(n)",
       note: {
-        vi: "Mỗi đường update hoặc prefix chỉ đi qua tối đa O(log n) Fenwick node.",
-        en: "Each update or prefix path visits at most O(log n) Fenwick nodes.",
+        vi: "Mỗi lần update hoặc query chỉ đi qua chiều cao của segment tree.",
+        en: "Each update or query touches only the height of the segment tree.",
       },
     },
     code: [
       "class NumArray:",
       "    def __init__(self, nums: List[int]):",
-      "        self.nums = nums[:]",
-      "        self.bit = [0] * (len(nums) + 1)",
-      "        for i, value in enumerate(nums):",
-      "            self._add(i + 1, value)",
-      "",
-      "    def _add(self, index: int, delta: int) -> None:",
-      "        while index < len(self.bit):",
-      "            self.bit[index] += delta",
-      "            index += index & -index",
+      "        self.n = len(nums)",
+      "        self.tree = [0] * (2 * self.n)",
+      "        for i, num in enumerate(nums):",
+      "            self.tree[self.n + i] = num",
+      "        for i in range(self.n - 1, 0, -1):",
+      "            self.tree[i] = self.tree[2 * i] + self.tree[2 * i + 1]",
       "",
       "    def update(self, index: int, val: int) -> None:",
-      "        delta = val - self.nums[index]",
-      "        self.nums[index] = val",
-      "        self._add(index + 1, delta)",
-      "",
-      "    def _prefix(self, index: int) -> int:",
-      "        total = 0",
-      "        while index > 0:",
-      "            total += self.bit[index]",
-      "            index -= index & -index",
-      "        return total",
+      "        pos = index + self.n",
+      "        self.tree[pos] = val",
+      "        while pos > 1:",
+      "            pos //= 2",
+      "            self.tree[pos] = self.tree[2 * pos] + self.tree[2 * pos + 1]",
       "",
       "    def sumRange(self, left: int, right: int) -> int:",
-      "        return self._prefix(right + 1) - self._prefix(left)",
+      "        left += self.n",
+      "        right += self.n",
+      "        total = 0",
+      "        while left <= right:",
+      "            if left % 2 == 1:",
+      "                total += self.tree[left]",
+      "                left += 1",
+      "            if right % 2 == 0:",
+      "                total += self.tree[right]",
+      "                right -= 1",
+      "            left //= 2",
+      "            right //= 2",
+      "        return total",
     ],
     builder: buildSteps307,
   },

@@ -8667,6 +8667,229 @@ button:disabled {
   border-color: #10b981;
 }
 
+/* ---- Segment Tree visualization ---- */
+.segment-tree-viz {
+  min-height: 320px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.segment-tree-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+.segment-tree-mode span {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(14, 165, 233, 0.18);
+  color: #bae6fd;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.segment-tree-mode strong {
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.segment-tree-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.segment-tree-heading {
+  margin: 8px 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.segment-tree-nums {
+  min-width: calc(var(--segment-nums-cols) * 76px);
+  display: grid;
+  grid-template-columns: repeat(var(--segment-nums-cols), minmax(68px, 1fr));
+  gap: 8px;
+}
+
+.segment-tree-levels {
+  min-width: 680px;
+  display: grid;
+  gap: 10px;
+}
+
+.segment-tree-level {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.segment-tree-level-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+.segment-tree-level-nodes {
+  display: grid;
+  grid-template-columns: repeat(var(--segment-level-cols), minmax(68px, 1fr));
+  gap: 8px;
+}
+
+.segment-tree-cell {
+  min-width: 0;
+  min-height: 72px;
+  padding: 7px 6px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.38);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.segment-tree-cell span,
+.segment-tree-cell small,
+.segment-tree-status span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.segment-tree-cell strong,
+.segment-tree-status strong {
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.segment-tree-cell small {
+  max-width: 100%;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.segment-tree-cell.selected:not(.active) {
+  border-color: rgba(14, 165, 233, 0.56);
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.segment-tree-viz.mode-build .segment-tree-cell.active,
+.segment-tree-viz.mode-update .segment-tree-cell.active {
+  border-color: rgba(245, 158, 11, 0.8);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.12);
+}
+
+.segment-tree-viz.mode-query .segment-tree-cell.active {
+  border-color: rgba(16, 185, 129, 0.76);
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.segment-tree-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.segment-tree-status div {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.segment-tree-status strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 14px;
+}
+
+[data-theme="light"] .segment-tree-viz {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .segment-tree-mode span {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+[data-theme="light"] .segment-tree-mode strong,
+[data-theme="light"] .segment-tree-heading,
+[data-theme="light"] .segment-tree-cell span,
+[data-theme="light"] .segment-tree-cell small,
+[data-theme="light"] .segment-tree-status span {
+  color: #475569;
+}
+
+[data-theme="light"] .segment-tree-level-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .segment-tree-cell,
+[data-theme="light"] .segment-tree-status div {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .segment-tree-cell strong,
+[data-theme="light"] .segment-tree-status strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .segment-tree-cell.selected:not(.active) {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+[data-theme="light"] .segment-tree-viz.mode-build .segment-tree-cell.active,
+[data-theme="light"] .segment-tree-viz.mode-update .segment-tree-cell.active {
+  background: #fffbeb;
+  border-color: #f59e0b;
+}
+
+[data-theme="light"] .segment-tree-viz.mode-query .segment-tree-cell.active {
+  background: #ecfdf5;
+  border-color: #10b981;
+}
+
+@media (max-width: 720px) {
+  .segment-tree-viz {
+    padding: 14px;
+  }
+
+  .segment-tree-levels {
+    min-width: 560px;
+  }
+
+  .segment-tree-level {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+}
+
 /* ---- Step note ---- */
 .note {
   margin: 16px 0;

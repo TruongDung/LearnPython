@@ -7041,6 +7041,81 @@ function renderFenwickView(step) {
   </div>`;
 }
 
+function renderSegmentTreeView(step) {
+  const view = step.segmentTreeView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const coverage = Array.isArray(view.coverage) ? view.coverage : [];
+  const activeNums = new Set(Array.isArray(view.activeNums) ? view.activeNums : []);
+  const activeTree = new Set(Array.isArray(view.activeTree) ? view.activeTree : []);
+  const selectedTree = new Set(Array.isArray(view.selectedTree) ? view.selectedTree : []);
+  const path = Array.isArray(view.path) ? view.path : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const mode = ["build", "update", "query"].includes(view.mode) ? view.mode : "idle";
+  const nodeCount = tree.length;
+
+  const numsCells = nums.map((value, index) => `<div class="segment-tree-cell nums-cell${activeNums.has(index) ? " active" : ""}">
+    <span>nums[${index}]</span>
+    <strong>${escapeHtml(String(value))}</strong>
+  </div>`).join("");
+
+  const levels = [];
+  for (let start = 1; start <= nodeCount; start *= 2) {
+    const end = Math.min(start * 2 - 1, nodeCount);
+    const nodes = [];
+    for (let index = start; index <= end; index += 1) nodes.push(index);
+    levels.push(nodes);
+  }
+
+  const treeLevels = levels.map((nodes, levelIndex) => {
+    const cells = nodes.map((index) => {
+      const value = tree[index - 1];
+      const covers = Array.isArray(coverage[index - 1]) ? coverage[index - 1] : [];
+      const coverageText = covers.length ? `{${covers.join(",")}}` : "{}";
+      const classes = [
+        "segment-tree-cell",
+        "tree-cell",
+        activeTree.has(index) ? "active" : "",
+        selectedTree.has(index) ? "selected" : "",
+      ].filter(Boolean).join(" ");
+      return `<div class="${classes}" aria-label="${escapeHtml(`tree ${index}, sum ${value}, covers ${coverageText}`)}">
+        <span>tree[${index}]</span>
+        <strong>${escapeHtml(String(value))}</strong>
+        <small>${escapeHtml(coverageText)}</small>
+      </div>`;
+    }).join("");
+    return `<div class="segment-tree-level" style="--segment-level-cols:${nodes.length}">
+      <div class="segment-tree-level-label">L${levelIndex}</div>
+      <div class="segment-tree-level-nodes">${cells}</div>
+    </div>`;
+  }).join("");
+
+  const pathText = path.length > 0
+    ? path.map((index) => `tree[${escapeHtml(String(index))}]`).join(" -> ")
+    : (lang === "vi" ? "chưa có node" : "no nodes yet");
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+  const modeLabel = {
+    build: "build",
+    update: "update",
+    query: lang === "vi" ? "truy vấn" : "query",
+    idle: lang === "vi" ? "chờ" : "idle",
+  }[mode];
+
+  $("treeView").innerHTML = `<div class="segment-tree-viz mode-${mode}">
+    <div class="segment-tree-mode"><span>${escapeHtml(modeLabel)}</span><strong>${pathText}</strong></div>
+    <div class="segment-tree-scroll">
+      <div class="segment-tree-heading">nums (0-based)</div>
+      <div class="segment-tree-nums" style="--segment-nums-cols:${Math.max(1, nums.length)}">${numsCells}</div>
+      <div class="segment-tree-heading">Segment Tree array (1-based display)</div>
+      <div class="segment-tree-levels">${treeLevels}</div>
+    </div>
+    <div class="segment-tree-status">${statusItems}</div>
+  </div>`;
+}
+
 function renderEvenOddRatioView(step) {
   const view = step.evenOddRatioView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -10118,6 +10193,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEvenOddRatioView(step);
+  } else if (step.segmentTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSegmentTreeView(step);
   } else if (step.fenwickView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
