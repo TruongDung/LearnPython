@@ -13339,6 +13339,306 @@ button:disabled {
   color: #065f46;
 }
 
+/* ---- Pair chain timeline (#646) ---- */
+.pair-chain-viz {
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.pair-chain-status {
+  margin-bottom: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pair-chain-order,
+.pair-chain-result-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.pair-chain-order > span,
+.pair-chain-result-row > span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pair-chain-result-row > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pair-chain-chip,
+.pair-chain-selected,
+.pair-chain-empty-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.32);
+  color: #cbd5e1;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pair-chain-chip.current {
+  border-color: #60a5fa;
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
+}
+
+.pair-chain-chip.chosen,
+.pair-chain-selected {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.13);
+  color: #a7f3d0;
+}
+
+.pair-chain-chip.skipped {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fecaca;
+  text-decoration: line-through;
+}
+
+.pair-chain-arrow {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.pair-chain-svg {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+
+.pair-chain-grid,
+.pair-chain-lane {
+  stroke: rgba(148, 163, 184, 0.18);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.pair-chain-axis {
+  stroke: #64748b;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.pair-chain-tick,
+.pair-chain-row-label,
+.pair-chain-role-label,
+.pair-chain-boundary-label {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pair-chain-interval rect {
+  fill: rgba(99, 102, 241, 0.13);
+  stroke: #64748b;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
+}
+
+.pair-chain-interval.current rect {
+  fill: rgba(59, 130, 246, 0.24);
+  stroke: #60a5fa;
+  stroke-width: 2.5;
+}
+
+.pair-chain-interval.chosen rect {
+  fill: rgba(16, 185, 129, 0.18);
+  stroke: #10b981;
+  stroke-width: 2.4;
+}
+
+.pair-chain-interval.skipped rect {
+  fill: rgba(239, 68, 68, 0.08);
+  stroke: rgba(248, 113, 113, 0.72);
+  opacity: 0.78;
+}
+
+.pair-chain-dot {
+  fill: #94a3b8;
+}
+
+.pair-chain-interval.current .pair-chain-dot {
+  fill: #60a5fa;
+}
+
+.pair-chain-interval.chosen .pair-chain-dot {
+  fill: #10b981;
+}
+
+.pair-chain-interval.skipped .pair-chain-dot {
+  fill: #f87171;
+}
+
+.pair-chain-bar-label {
+  fill: #f8fafc;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pair-chain-role-label {
+  fill: #cbd5e1;
+}
+
+.pair-chain-boundary {
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.pair-chain-boundary.current-start {
+  stroke: #60a5fa;
+}
+
+.pair-chain-boundary.previous-end {
+  stroke: #f59e0b;
+}
+
+.pair-chain-boundary-label.current-start {
+  fill: #bfdbfe;
+}
+
+.pair-chain-boundary-label.previous-end {
+  fill: #fcd34d;
+}
+
+.pair-chain-decision {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pair-chain-decision strong,
+.pair-chain-decision span {
+  overflow-wrap: anywhere;
+}
+
+.pair-chain-decision.take,
+.pair-chain-decision.done {
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  background: rgba(16, 185, 129, 0.11);
+  color: #a7f3d0;
+}
+
+.pair-chain-decision.skip {
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  background: rgba(239, 68, 68, 0.1);
+  color: #fecaca;
+}
+
+.pair-chain-empty {
+  display: grid;
+  min-height: 200px;
+  place-items: center;
+  color: #94a3b8;
+}
+
+[data-theme="light"] .pair-chain-status,
+[data-theme="light"] .pair-chain-order > span,
+[data-theme="light"] .pair-chain-result-row > span,
+[data-theme="light"] .pair-chain-empty {
+  color: #64748b;
+}
+
+[data-theme="light"] .pair-chain-chip,
+[data-theme="light"] .pair-chain-empty-chip {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+[data-theme="light"] .pair-chain-chip.current {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .pair-chain-chip.chosen,
+[data-theme="light"] .pair-chain-selected {
+  border-color: #059669;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+[data-theme="light"] .pair-chain-chip.skipped {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+[data-theme="light"] .pair-chain-tick,
+[data-theme="light"] .pair-chain-row-label,
+[data-theme="light"] .pair-chain-role-label {
+  fill: #64748b;
+}
+
+[data-theme="light"] .pair-chain-interval rect {
+  fill: rgba(79, 70, 229, 0.1);
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .pair-chain-interval.current rect {
+  fill: rgba(37, 99, 235, 0.16);
+  stroke: #2563eb;
+}
+
+[data-theme="light"] .pair-chain-interval.chosen rect {
+  fill: rgba(5, 150, 105, 0.14);
+  stroke: #059669;
+}
+
+[data-theme="light"] .pair-chain-interval.skipped rect {
+  fill: rgba(220, 38, 38, 0.08);
+  stroke: #dc2626;
+}
+
+[data-theme="light"] .pair-chain-bar-label {
+  fill: #0f172a;
+}
+
+[data-theme="light"] .pair-chain-decision.take,
+[data-theme="light"] .pair-chain-decision.done {
+  color: #065f46;
+}
+
+[data-theme="light"] .pair-chain-decision.skip {
+  color: #991b1b;
+}
+
 /* ---- Skyline sweep-line view ---- */
 .skyline-viz {
   color: #e2e8f0;

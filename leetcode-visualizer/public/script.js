@@ -7590,6 +7590,138 @@ function renderMeetingRoomsTimelineView(step) {
   </div>`;
 }
 
+// ---- Pair chain timeline (#646) ----
+function renderPairChainView(step) {
+  const view = step.pairChainView;
+  const pairs = view.pairs || [];
+  const el = $("treeView");
+  if (!pairs.length) {
+    el.innerHTML = `<div class="pair-chain-empty">${lang === "vi" ? "Không có cặp" : "No pairs"}</div>`;
+    return;
+  }
+
+  const minTime = Math.min(...pairs.map((pair) => pair.left));
+  const maxTime = Math.max(...pairs.map((pair) => pair.right));
+  const span = Math.max(1, maxTime - minTime);
+  const width = 820;
+  const leftPad = 102;
+  const rightPad = 28;
+  const top = 58;
+  const rowHeight = 52;
+  const axisY = top + pairs.length * rowHeight + 8;
+  const height = axisY + 116;
+  const plotWidth = width - leftPad - rightPad;
+  const x = (value) => leftPad + ((value - minTime) / span) * plotWidth;
+  const chosen = new Set(view.chosen || []);
+  const skipped = new Set(view.skipped || []);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : null;
+  const current = currentIndex === null ? null : pairs[currentIndex];
+  const previousEnd = view.previousEnd;
+  const previousEndLabel = previousEnd === null || previousEnd === undefined
+    ? "-inf"
+    : previousEnd === -Infinity ? "-inf" : String(previousEnd);
+
+  const tickValues = [...new Set(pairs.flatMap((pair) => [pair.left, pair.right]))].sort((a, b) => a - b);
+  const shownTicks = tickValues.length <= 10
+    ? tickValues
+    : Array.from({ length: 6 }, (_, index) => minTime + (span * index) / 5);
+  const ticks = shownTicks.map((time) => {
+    const px = x(time);
+    const label = Number.isInteger(time) ? time : Number(time.toFixed(1));
+    return `<line class="pair-chain-grid" x1="${px}" y1="${top - 20}" x2="${px}" y2="${axisY}"></line>
+      <text class="pair-chain-tick" x="${px}" y="${axisY + 23}" text-anchor="middle">${label}</text>`;
+  }).join("");
+
+  const rows = pairs.map((pair, index) => {
+    const y = top + index * rowHeight;
+    const classes = ["pair-chain-interval"];
+    if (chosen.has(index)) classes.push("chosen");
+    if (skipped.has(index)) classes.push("skipped");
+    if (index === currentIndex) classes.push("current");
+    const role = chosen.has(index)
+      ? (lang === "vi" ? "chọn" : "take")
+      : skipped.has(index) ? (lang === "vi" ? "bỏ" : "skip") : "";
+    return `<g class="${classes.join(" ")}">
+      <text class="pair-chain-row-label" x="${leftPad - 12}" y="${y + 23}" text-anchor="end">P${index + 1}</text>
+      <line class="pair-chain-lane" x1="${leftPad}" y1="${y + 20}" x2="${width - rightPad}" y2="${y + 20}"></line>
+      <rect x="${x(pair.left)}" y="${y + 5}" width="${Math.max(7, x(pair.right) - x(pair.left))}" height="30" rx="7"></rect>
+      <circle class="pair-chain-dot left" cx="${x(pair.left)}" cy="${y + 20}" r="4"></circle>
+      <circle class="pair-chain-dot right" cx="${x(pair.right)}" cy="${y + 20}" r="4"></circle>
+      <text class="pair-chain-bar-label" x="${(x(pair.left) + x(pair.right)) / 2}" y="${y + 25}" text-anchor="middle">[${pair.left}, ${pair.right}]</text>
+      ${role ? `<text class="pair-chain-role-label" x="${leftPad - 12}" y="${y + 39}" text-anchor="end">${escapeXml(role)}</text>` : ""}
+      <title>${escapeXml(`P${index + 1} [${pair.left}, ${pair.right}]`)}</title>
+    </g>`;
+  }).join("");
+
+  const currentStartLine = current
+    ? `<line class="pair-chain-boundary current-start" x1="${x(current.left)}" y1="${top - 24}" x2="${x(current.left)}" y2="${axisY}"></line>
+       <text class="pair-chain-boundary-label current-start" x="${x(current.left) + 6}" y="${top - 30}">left=${current.left}</text>`
+    : "";
+  const previousEndLine = current && Number.isFinite(previousEnd)
+    ? `<line class="pair-chain-boundary previous-end" x1="${x(previousEnd)}" y1="${top - 24}" x2="${x(previousEnd)}" y2="${axisY}"></line>
+       <text class="pair-chain-boundary-label previous-end" x="${x(previousEnd) + 6}" y="${top - 14}">current_end=${previousEnd}</text>`
+    : "";
+
+  let decision = "";
+  if (current && view.decision) {
+    const ok = view.decision === "take";
+    const operator = ok ? ">" : "<=";
+    const result = ok
+      ? (lang === "vi" ? "CHỌN" : "TAKE")
+      : (lang === "vi" ? "BỎ QUA" : "SKIP");
+    decision = `<div class="pair-chain-decision ${ok ? "take" : "skip"}">
+      <strong>${escapeHtml(String(current.left))} ${operator} ${escapeHtml(previousEndLabel)}</strong>
+      <span>${escapeHtml(result)}</span>
+    </div>`;
+  } else if (view.phase === "done") {
+    decision = `<div class="pair-chain-decision done">
+      <strong>${lang === "vi" ? "Hoàn tất" : "Done"}</strong>
+      <span>${lang === "vi" ? "Chuỗi đã chọn là đáp án" : "Chosen chain is the answer"}</span>
+    </div>`;
+  }
+
+  const sortedChips = pairs.map((pair, index) => {
+    const classes = ["pair-chain-chip"];
+    if (chosen.has(index)) classes.push("chosen");
+    if (skipped.has(index)) classes.push("skipped");
+    if (index === currentIndex) classes.push("current");
+    return `<span class="${classes.join(" ")}">P${index + 1} [${pair.left},${pair.right}]</span>`;
+  }).join("");
+  const chainChips = (view.chosen || []).length
+    ? view.chosen.map((index) => {
+        const pair = pairs[index];
+        return `<span class="pair-chain-selected">[${pair.left},${pair.right}]</span>`;
+      }).join(`<span class="pair-chain-arrow">→</span>`)
+    : `<span class="pair-chain-empty-chip">∅</span>`;
+  const phaseLabel = {
+    original: lang === "vi" ? "Input ban đầu" : "Original input",
+    sorted: lang === "vi" ? "Sort theo right tăng dần" : "Sorted by right endpoint",
+    init: lang === "vi" ? "Khởi tạo current_end = -inf" : "Initialize current_end = -inf",
+    inspect: lang === "vi" ? "Đang kiểm tra điều kiện nối chuỗi" : "Checking whether the pair can extend the chain",
+    take: lang === "vi" ? "Chọn cặp này vào chain" : "Take this pair into the chain",
+    skip: lang === "vi" ? "Bỏ qua vì không nối được" : "Skip because it cannot connect",
+    done: lang === "vi" ? "Kết quả cuối cùng" : "Final result",
+  }[view.phase] || "";
+  const summary = lang === "vi"
+    ? `Pair chain gồm ${pairs.length} cặp. Các cặp được quét theo right tăng dần.`
+    : `Pair chain with ${pairs.length} pairs scanned by increasing right endpoint.`;
+
+  el.innerHTML = `<div class="pair-chain-viz">
+    <div class="pair-chain-status">${escapeHtml(phaseLabel)}</div>
+    <div class="pair-chain-order"><span>${lang === "vi" ? "Thứ tự quét:" : "Scan order:"}</span>${sortedChips}</div>
+    <svg class="pair-chain-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
+      <title>${escapeXml(summary)}</title>
+      ${ticks}
+      <line class="pair-chain-axis" x1="${leftPad}" y1="${axisY}" x2="${width - rightPad}" y2="${axisY}"></line>
+      ${rows}
+      ${previousEndLine}
+      ${currentStartLine}
+    </svg>
+    ${decision}
+    <div class="pair-chain-result-row"><span>${lang === "vi" ? "Chain đang chọn:" : "Current chain:"}</span><div>${chainChips}</div></div>
+  </div>`;
+}
+
 // ---- Meeting interval timeline (#252) ----
 function renderMeetingTimelineView(step) {
   const view = step.meetingTimelineView;
@@ -10063,6 +10195,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMeetingRoomsTimelineView(step);
+  } else if (step.pairChainView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPairChainView(step);
   } else if (step.meetingTimelineView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

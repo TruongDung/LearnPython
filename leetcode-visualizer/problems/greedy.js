@@ -1466,6 +1466,15 @@ function buildSteps646(input) {
   const steps = [];
   const display = (pairs) => pairs.map(([left, right]) => `[${left},${right}]`);
   const widths = (pairs) => pairs.map(([left, right]) => Math.max(1, right - left));
+  const makePairChainView = (pairs, currentIndex = null, chosen = [], skipped = [], phase = "scan", decision = null, previousEnd = null) => ({
+    pairs: pairs.map(([left, right], index) => ({ left, right, index })),
+    currentIndex,
+    chosen: chosen.slice(),
+    skipped: skipped.slice(),
+    phase,
+    decision,
+    previousEnd,
+  });
 
   if (!valid) {
     steps.push({
@@ -1488,6 +1497,7 @@ function buildSteps646(input) {
     title: { vi: "Danh sách cặp ban đầu", en: "Original pairs" },
     arr: widths(original),
     sub: display(original),
+    pairChainView: makePairChainView(original, null, [], [], "original"),
     highlight: [],
     mark: [],
     codeLines: [2],
@@ -1511,6 +1521,7 @@ function buildSteps646(input) {
     title: { vi: "Sắp xếp theo điểm kết thúc", en: "Sort by ending point" },
     arr: sortedWidths,
     sub: sortedLabels,
+    pairChainView: makePairChainView(sortedPairs, null, [], [], "sorted"),
     highlight: pairs.map((_, index) => index),
     mark: [],
     codeLines: [3],
@@ -1527,11 +1538,13 @@ function buildSteps646(input) {
   let currentEnd = -Infinity;
   let answer = 0;
   const chosen = [];
+  const skipped = [];
 
   steps.push({
     title: { vi: "Khởi tạo", en: "Initialize" },
     arr: sortedWidths,
     sub: sortedLabels,
+    pairChainView: makePairChainView(sortedPairs, null, [], [], "init"),
     highlight: [],
     mark: [],
     codeLines: [4, 5],
@@ -1548,11 +1561,13 @@ function buildSteps646(input) {
   for (let i = 0; i < pairs.length; i++) {
     const { left, right } = pairs[i];
     const canTake = left > currentEnd;
+    const previousEnd = currentEnd;
 
     steps.push({
       title: { vi: `Xét cặp [${left},${right}]`, en: `Inspect pair [${left},${right}]` },
       arr: sortedWidths,
       sub: sortedLabels,
+      pairChainView: makePairChainView(sortedPairs, i, chosen, skipped, "inspect", null, previousEnd),
       highlight: [i],
       mark: chosen.slice(),
       codeLines: [6],
@@ -1570,13 +1585,13 @@ function buildSteps646(input) {
 
     if (canTake) {
       answer += 1;
-      const oldEnd = currentEnd;
       currentEnd = right;
       chosen.push(i);
       steps.push({
-        title: { vi: `${left} > ${oldEnd === -Infinity ? "-inf" : oldEnd}: chọn`, en: `${left} > ${oldEnd === -Infinity ? "-inf" : oldEnd}: take` },
+        title: { vi: `${left} > ${previousEnd === -Infinity ? "-inf" : previousEnd}: chọn`, en: `${left} > ${previousEnd === -Infinity ? "-inf" : previousEnd}: take` },
         arr: sortedWidths,
         sub: sortedLabels,
+        pairChainView: makePairChainView(sortedPairs, i, chosen, skipped, "take", "take", previousEnd),
         highlight: [i],
         mark: chosen.slice(),
         codeLines: [7, 8, 9],
@@ -1591,10 +1606,12 @@ function buildSteps646(input) {
         },
       });
     } else {
+      skipped.push(i);
       steps.push({
         title: { vi: `${left} <= ${currentEnd}: bỏ qua`, en: `${left} <= ${currentEnd}: skip` },
         arr: sortedWidths,
         sub: sortedLabels,
+        pairChainView: makePairChainView(sortedPairs, i, chosen, skipped, "skip", "skip", previousEnd),
         highlight: [i],
         mark: chosen.slice(),
         codeLines: [7],
@@ -1615,6 +1632,7 @@ function buildSteps646(input) {
     title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
     arr: sortedWidths,
     sub: sortedLabels,
+    pairChainView: makePairChainView(sortedPairs, null, chosen, skipped, "done", "done", currentEnd),
     highlight: [],
     mark: chosen.slice(),
     codeLines: [10],
