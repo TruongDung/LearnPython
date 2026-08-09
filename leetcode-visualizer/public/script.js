@@ -11654,8 +11654,8 @@ function initLiveEditorResize() {
 
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
-    if (saved && Number.isFinite(saved.width) && Number.isFinite(saved.height)) {
-      applySize(saved.width, saved.height);
+    if (saved && Number.isFinite(saved.height)) {
+      applySize(wrap.parentElement ? wrap.parentElement.clientWidth : window.innerWidth, saved.height);
     }
   } catch (_) {
     localStorage.removeItem(storageKey);
@@ -11672,7 +11672,7 @@ function initLiveEditorResize() {
 
     const onMove = (moveEvent) => {
       const size = applySize(startWidth + moveEvent.clientX - startX, startHeight + moveEvent.clientY - startY);
-      localStorage.setItem(storageKey, JSON.stringify(size));
+      localStorage.setItem(storageKey, JSON.stringify({ height: size.height }));
     };
     const onEnd = (endEvent) => {
       wrap.classList.remove("is-resizing");
@@ -11693,8 +11693,16 @@ function initLiveEditorResize() {
     const currentWidth = wrap.getBoundingClientRect().width;
     const currentHeight = editorHost.getBoundingClientRect().height;
     const size = applySize(currentWidth, currentHeight + 60);
-    localStorage.setItem(storageKey, JSON.stringify(size));
+    localStorage.setItem(storageKey, JSON.stringify({ height: size.height }));
   });
+}
+
+function setLiveEditorLayoutMode(on) {
+  const wrap = $("liveEditorWrap");
+  const split = wrap && wrap.closest(".viz-split");
+  if (split) split.classList.toggle("live-editing", on);
+  if (wrap && on) wrap.style.setProperty("--live-editor-width", "100%");
+  if (monacoEditorInstance) requestAnimationFrame(() => monacoEditorInstance.layout());
 }
 
 async function ensurePyodide() {
@@ -12103,6 +12111,7 @@ function enterLiveStepMode(userCode, answer) {
   // highlighted trace instead, so code + step controls behave like the
   // canned mode. Re-show "Edit & run code" so the user can hop back into
   // the editor (with their code preserved) without fully exiting live mode.
+  setLiveEditorLayoutMode(false);
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
   $("liveEditBtn").classList.remove("hidden");
@@ -12184,6 +12193,7 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
+  setLiveEditorLayoutMode(false);
   $("liveExitBtn").classList.add("hidden");
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
@@ -12195,6 +12205,7 @@ function resetLiveEditorState() {
 
 function setLiveMode(on) {
   liveMode = on;
+  setLiveEditorLayoutMode(on);
   $("liveExitBtn").classList.toggle("hidden", !on);
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
@@ -12209,10 +12220,7 @@ function setLiveMode(on) {
 }
 
 $("liveEditBtn") && $("liveEditBtn").addEventListener("click", async () => {
-  liveMode = true;
-  $("liveExitBtn").classList.remove("hidden");
-  $("liveEditorWrap").classList.remove("hidden");
-  $("codePanel").classList.add("hidden");
+  setLiveMode(true);
   try {
     await ensureMonacoEditor();
   } catch (err) {

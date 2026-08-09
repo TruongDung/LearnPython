@@ -848,6 +848,23 @@ button:disabled {
   overflow: hidden;
 }
 
+.viz-split.live-editing {
+  align-items: stretch;
+}
+
+.viz-split.live-editing .viz-left {
+  flex: 1 1 100%;
+  overflow: visible;
+}
+
+.viz-split.live-editing .viz-right {
+  display: none;
+}
+
+.viz-split.live-editing .live-editor-wrap {
+  width: 100%;
+}
+
 .code-mode-bar {
   display: flex;
   justify-content: flex-end;
