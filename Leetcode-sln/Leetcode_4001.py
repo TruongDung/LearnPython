@@ -1,6 +1,9 @@
+from typing import List
+
+
 #4001. Aggregate Two Time Series
 class Solution:
-    def aggregateTimeSeries(self, series1: list[list[int]], series2: list[list[int]]) -> list[list[int]]:
+    def aggregateTimeSeries(self, series1: List[List[int]], series2: List[List[int]]) -> List[List[int]]:
         i, j = 0, 0
         n, m = len(series1), len(series2)
         res = []
