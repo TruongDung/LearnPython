@@ -11274,6 +11274,32 @@ function registerPythonCompletions(monaco) {
     ["memoized dp", "@lru_cache(None)\ndef dp(${1:i}):\n\t${0:pass}", "Memoized DP helper"],
     ["LeetCode Solution", "class Solution:\n\tdef ${1:method}(self, ${2:args}):\n\t\t${0:pass}", "LeetCode Solution class"],
   ];
+  const ignoredLocalNames = new Set([
+    "self", "cls", "True", "False", "None", "and", "or", "not", "in", "is",
+    "if", "else", "elif", "for", "while", "return", "def", "class", "with",
+    "as", "try", "except", "finally", "import", "from", "pass", "break", "continue",
+  ]);
+  const localNamePattern = /^[A-Za-z_]\w*$/;
+
+  function cleanPythonName(raw) {
+    const name = String(raw || "")
+      .trim()
+      .replace(/^\*+/, "")
+      .split("=")[0]
+      .split(":")[0]
+      .trim();
+    return localNamePattern.test(name) && !ignoredLocalNames.has(name) ? name : "";
+  }
+
+  function addNamesFromTarget(target, addName) {
+    String(target || "")
+      .replace(/\[[^\]]*\]/g, "")
+      .replace(/\([^)]*\)/g, "")
+      .split(",")
+      .map(cleanPythonName)
+      .filter(Boolean)
+      .forEach(addName);
+  }
 
   monaco.languages.registerCompletionItemProvider("python", {
     triggerCharacters: [".", "_"],
@@ -11316,13 +11342,26 @@ function registerPythonCompletions(monaco) {
         documentation: `def ${fn.name}(${fn.rawParams.join(", ")})`,
         sortText: `${priority}-${fn.name}`,
       });
+      const addLocalVariable = (item, priority = 0) => suggestions.push({
+        label: item.name,
+        kind: monaco.languages.CompletionItemKind.Variable,
+        insertText: item.name,
+        range,
+        detail: item.detail || (lang === "vi" ? "Biến đã khai báo trong editor" : "Variable declared in this editor"),
+        documentation: item.source ? `${item.source} · line ${item.lineNumber}` : undefined,
+        sortText: `${priority}-${String(item.lineNumber).padStart(4, "0")}-${item.name}`,
+      });
 
       const declaredFunctions = [];
+      const declaredVariables = [];
       const seenFunctionNames = new Set();
+      const seenVariableNames = new Set();
       const functionPattern = /^(\s*)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*:/;
+      let activeFunction = null;
       for (let lineNumber = 1; lineNumber <= model.getLineCount(); lineNumber += 1) {
-        if (lineNumber === currentLine && /^\s*def\b/.test(model.getLineContent(lineNumber))) continue;
-        const match = model.getLineContent(lineNumber).match(functionPattern);
+        const line = model.getLineContent(lineNumber);
+        if (lineNumber === currentLine && /^\s*def\b/.test(line)) continue;
+        const match = line.match(functionPattern);
         if (!match) continue;
         const name = match[2];
         if (seenFunctionNames.has(name)) continue;
@@ -11335,6 +11374,81 @@ function registerPythonCompletions(monaco) {
           .map((param) => param.split("=")[0].split(":")[0].trim().replace(/^\*+/, ""))
           .filter((param) => param && param !== "self" && param !== "cls");
         declaredFunctions.push({ name, rawParams, params, indent: match[1].length, lineNumber });
+        if (lineNumber <= currentLine && (!activeFunction || lineNumber > activeFunction.lineNumber)) {
+          activeFunction = { name, rawParams, params, indent: match[1].length, lineNumber };
+        }
+      }
+
+      function rememberVariable(name, lineNumber, source, detail) {
+        if (!name || seenVariableNames.has(name)) return;
+        seenVariableNames.add(name);
+        declaredVariables.push({ name, lineNumber, source, detail });
+      }
+
+      if (activeFunction) {
+        activeFunction.params.forEach((param) => {
+          rememberVariable(
+            param,
+            activeFunction.lineNumber,
+            `def ${activeFunction.name}(${activeFunction.rawParams.join(", ")})`,
+            lang === "vi" ? "Tham số của function hiện tại" : "Parameter of the current function",
+          );
+        });
+      }
+
+      for (let lineNumber = 1; lineNumber < currentLine; lineNumber += 1) {
+        const rawLine = model.getLineContent(lineNumber);
+        const codeLine = rawLine.replace(/#.*/, "");
+        if (!codeLine.trim()) continue;
+        const indent = (codeLine.match(/^\s*/) || [""])[0].length;
+        if (activeFunction && lineNumber > activeFunction.lineNumber && indent <= activeFunction.indent) break;
+
+        const addVariableFromLine = (name, source, detail) => rememberVariable(name, lineNumber, source, detail);
+        const forMatch = codeLine.match(/^\s*(?:async\s+)?for\s+(.+?)\s+in\s+.+:/);
+        if (forMatch) {
+          addNamesFromTarget(forMatch[1], (name) => addVariableFromLine(
+            name,
+            codeLine.trim(),
+            lang === "vi" ? "Biến vòng lặp đã khai báo" : "Loop variable declared earlier",
+          ));
+        }
+
+        const withMatch = codeLine.match(/^\s*with\s+.+?\s+as\s+([A-Za-z_]\w*)\s*:/);
+        if (withMatch) {
+          addVariableFromLine(withMatch[1], codeLine.trim(), lang === "vi" ? "Biến từ with/as" : "Variable from with/as");
+        }
+
+        const exceptMatch = codeLine.match(/^\s*except\b.*?\s+as\s+([A-Za-z_]\w*)\s*:/);
+        if (exceptMatch) {
+          addVariableFromLine(exceptMatch[1], codeLine.trim(), lang === "vi" ? "Biến exception" : "Exception variable");
+        }
+
+        const importMatch = codeLine.match(/^\s*import\s+(.+)/);
+        if (importMatch) {
+          importMatch[1].split(",").forEach((part) => {
+            const pieces = part.trim().split(/\s+as\s+/);
+            const alias = pieces[1] || pieces[0].split(".")[0];
+            addVariableFromLine(cleanPythonName(alias), codeLine.trim(), lang === "vi" ? "Tên import đã khai báo" : "Imported name");
+          });
+        }
+
+        const fromImportMatch = codeLine.match(/^\s*from\s+\S+\s+import\s+(.+)/);
+        if (fromImportMatch) {
+          fromImportMatch[1].split(",").forEach((part) => {
+            const pieces = part.trim().split(/\s+as\s+/);
+            const imported = pieces[1] || pieces[0];
+            addVariableFromLine(cleanPythonName(imported), codeLine.trim(), lang === "vi" ? "Tên import đã khai báo" : "Imported name");
+          });
+        }
+
+        const assignmentMatch = codeLine.match(/^\s*([^=<>!]+?)\s*(?::=[^=]|=(?!=))/);
+        if (assignmentMatch && !/^\s*(if|elif|while|return|assert)\b/.test(codeLine)) {
+          addNamesFromTarget(assignmentMatch[1], (name) => addVariableFromLine(
+            name,
+            codeLine.trim(),
+            lang === "vi" ? "Biến đã gán trước đó" : "Assigned earlier",
+          ));
+        }
       }
 
       if (lineBeforeCursor.endsWith(".")) {
@@ -11361,6 +11475,7 @@ function registerPythonCompletions(monaco) {
         ].forEach((item) => addSnippet(item, 0));
       }
 
+      declaredVariables.forEach((item) => addLocalVariable(item, 0));
       declaredFunctions.forEach((fn) => addLocalFunction(fn, 0));
       snippets.forEach((item) => addSnippet(item, 1));
       leetcodeHelpers.forEach((item) => addFunction(item, 2));
