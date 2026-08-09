@@ -2070,6 +2070,134 @@ function renderVirusView(step) {
   </section>`;
 }
 
+function renderRottingOrangesView(step) {
+  const view = step.rottingOrangesView || {};
+  const vi = lang === "vi";
+  const grid = Array.isArray(view.grid) ? view.grid : [];
+  const frontier = Array.isArray(view.frontier) ? view.frontier : [];
+  const nextFrontier = Array.isArray(view.nextFrontier) ? view.nextFrontier : [];
+  const queue = Array.isArray(view.queue) ? view.queue : [];
+  const newlyRotten = Array.isArray(view.newlyRotten) ? view.newlyRotten : [];
+  const key = (row, col) => `${row},${col}`;
+  const sourceKey = view.source ? key(view.source[0], view.source[1]) : "";
+  const neighborKey = view.neighbor ? key(view.neighbor[0], view.neighbor[1]) : "";
+  const frontierKeys = new Set(frontier.map((cell) => key(cell.row, cell.col)));
+  const nextKeys = new Set(nextFrontier.map((cell) => key(cell.row, cell.col)));
+  const queueKeys = new Set(queue.map((cell) => key(cell.row, cell.col)));
+  const newKeys = new Set(newlyRotten.map(([row, col]) => key(row, col)));
+  const phaseIndex = view.phase === "result" ? 2 : view.phase === "spread" ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Quét nguồn và đếm cam tươi", "2. Lan theo từng lớp BFS", "3. Kiểm tra cam tươi còn lại"]
+    : ["1. Scan sources and count fresh", "2. Spread one BFS layer per minute", "3. Check remaining fresh"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const cellsHtml = grid.flatMap((row) => row.map((cell) => {
+    const cellKey = key(cell.row, cell.col);
+    const classes = ["rotting-cell"];
+    if (cell.value === 0) classes.push("is-empty");
+    else if (cell.value === 1) classes.push("is-fresh");
+    else classes.push("is-rotten");
+    if (frontierKeys.has(cellKey)) classes.push("is-frontier");
+    if (nextKeys.has(cellKey)) classes.push("is-next-frontier");
+    if (cellKey === sourceKey) classes.push("is-source");
+    if (cellKey === neighborKey) classes.push("is-neighbor");
+    if (newKeys.has(cellKey)) classes.push("is-newly-rotten");
+    let badge = "";
+    if (cellKey === sourceKey) badge = vi ? "ĐANG LAN" : "SPREADING";
+    else if (newKeys.has(cellKey)) badge = `NEW · t=${cell.rottenMinute}`;
+    else if (nextKeys.has(cellKey)) badge = "NEXT";
+    else if (frontierKeys.has(cellKey)) badge = "NOW";
+    const stateLabel = cell.value === 0
+      ? (vi ? "TRỐNG" : "EMPTY")
+      : cell.value === 1
+        ? "FRESH"
+        : `ROTTEN · t=${Math.max(0, cell.rottenMinute)}`;
+    const orange = cell.value === 0
+      ? `<span class="rotting-empty-mark">0</span>`
+      : `<span class="rotting-orange"><i></i><b>${cell.value === 1 ? "1" : "2"}</b></span>`;
+    return `<div class="${classes.join(" ")}" role="gridcell" aria-label="cell ${cell.row}, ${cell.col}: ${escapeHtml(stateLabel)}">
+      <span class="rotting-cell-badge">${escapeHtml(badge)}</span>
+      ${orange}
+      <small>[${cell.row},${cell.col}]</small>
+      <em>${escapeHtml(stateLabel)}</em>
+    </div>`;
+  })).join("");
+
+  const makeQueueLane = (items, kind) => items.length
+    ? items.map((cell, index) => {
+      const cellKey = key(cell.row, cell.col);
+      const classes = ["rotting-queue-chip"];
+      if (cellKey === sourceKey) classes.push("is-current");
+      if (kind === "current" && !queueKeys.has(cellKey) && cellKey !== sourceKey) classes.push("is-processed");
+      if (kind === "next") classes.push("is-next");
+      return `<span class="${classes.join(" ")}"><small>${index + 1}</small><strong>(${cell.row},${cell.col})</strong><em>t=${Math.max(0, cell.rottenMinute)}</em></span>`;
+    }).join(`<b>→</b>`)
+    : `<em class="rotting-lane-empty">${vi ? "trống" : "empty"}</em>`;
+
+  const timelineHtml = (view.timeline || []).map((entry) => `<span class="${entry.minute === view.minutes ? "is-current" : entry.minute === view.targetMinute ? "is-next" : ""}"><small>${vi ? "PHÚT" : "MIN"} ${entry.minute}</small><strong>${entry.cells.length}</strong><em>${entry.cells.map(([row, col]) => `(${row},${col})`).join(" · ") || "—"}</em></span>`).join("");
+
+  const directions = [
+    { delta: [-1, 0], arrow: "↑", label: vi ? "LÊN" : "UP", cls: "up" },
+    { delta: [0, 1], arrow: "→", label: vi ? "PHẢI" : "RIGHT", cls: "right" },
+    { delta: [1, 0], arrow: "↓", label: vi ? "XUỐNG" : "DOWN", cls: "down" },
+    { delta: [0, -1], arrow: "←", label: vi ? "TRÁI" : "LEFT", cls: "left" },
+  ];
+  const directionHtml = directions.map((direction) => {
+    const active = view.direction && view.direction[0] === direction.delta[0] && view.direction[1] === direction.delta[1];
+    return `<span class="rotting-direction ${direction.cls}${active ? " is-active" : ""}"><strong>${direction.arrow}</strong><small>${direction.label}</small><em>(${direction.delta.join(",")})</em></span>`;
+  }).join("");
+
+  let checkHtml;
+  if (view.neighbor) {
+    const inBounds = view.check ? view.check.inBounds : null;
+    const isFresh = view.check ? view.check.isFresh : null;
+    const sourceText = view.source ? `(${view.source.join(",")})` : "?";
+    const directionText = view.direction ? `(${view.direction.join(",")})` : "?";
+    const neighborText = `(${view.neighbor.join(",")})`;
+    const accepted = inBounds === true && isFresh === true;
+    checkHtml = `<div class="rotting-neighbor-check ${accepted ? "is-pass" : inBounds === false || isFresh === false ? "is-fail" : ""}">
+      <div class="rotting-coordinate"><span><small>${vi ? "CAM NGUỒN" : "SOURCE"}</small><strong>${escapeHtml(sourceText)}</strong></span><i>+</i><span><small>${vi ? "HƯỚNG" : "DIRECTION"}</small><strong>${escapeHtml(directionText)}</strong></span><i>=</i><span><small>${vi ? "Ô KẾ" : "NEIGHBOR"}</small><strong>${escapeHtml(neighborText)}</strong></span></div>
+      <div class="rotting-checks"><span class="${inBounds === true ? "pass" : inBounds === false ? "fail" : "pending"}"><b>1</b><small>${vi ? "nằm trong grid" : "inside grid"}</small><strong>${inBounds === null ? "?" : String(inBounds)}</strong></span><span class="${isFresh === true ? "pass" : isFresh === false ? "fail" : "pending"}"><b>2</b><small>grid[next] == 1</small><strong>${isFresh === null ? "?" : String(isFresh)}</strong></span><em>${accepted ? (vi ? "CAM NÀY SẼ THỐI" : "THIS ORANGE ROTS") : inBounds === false || isFresh === false ? (vi ? "BỎ QUA HƯỚNG NÀY" : "SKIP THIS DIRECTION") : (vi ? "ĐANG KIỂM TRA" : "CHECKING")}</em></div>
+    </div>`;
+  } else {
+    checkHtml = `<div class="rotting-rule"><strong>1 ${vi ? "phút" : "minute"} = 1 BFS level</strong><span>${vi ? "Chỉ frontier NOW được lan; cam NEXT phải chờ phút sau." : "Only the NOW frontier spreads; NEXT oranges wait for the following minute."}</span></div>`;
+  }
+
+  const initialFresh = Number.isInteger(view.initialFresh) ? view.initialFresh : 0;
+  const freshValue = Number.isInteger(view.fresh) ? view.fresh : "?";
+  const rottedFresh = Number.isInteger(view.fresh) && initialFresh > 0 ? initialFresh - view.fresh : 0;
+  const progress = initialFresh > 0 ? Math.max(0, Math.min(100, (rottedFresh / initialFresh) * 100)) : 0;
+  const resultHtml = view.phase === "result" && view.answer !== undefined
+    ? `<div class="rotting-result ${view.answer === -1 ? "is-impossible" : "is-success"}"><small>RETURN</small><strong>${escapeHtml(view.answer)}</strong><span>${view.answer === -1 ? (vi ? `${view.fresh} cam tươi bị cô lập` : `${view.fresh} fresh orange(s) are isolated`) : (vi ? `mọi cam tươi đã thối sau ${view.answer} phút` : `all fresh oranges rotted after ${view.answer} minute(s)`)}</span></div>`
+    : "";
+  const summary = vi
+    ? `Rotting Oranges trên grid ${view.rows} nhân ${view.cols}; phút ${view.minutes ?? "?"}; còn ${freshValue} cam tươi.`
+    : `Rotting Oranges on a ${view.rows} by ${view.cols} grid; minute ${view.minutes ?? "?"}; ${freshValue} fresh remain.`;
+
+  $("treeView").innerHTML = `<section class="rotting-oranges-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rotting-phases">${phasesHtml}</div>
+    <div class="rotting-status">
+      <span><small>${vi ? "PHÚT ĐÃ XONG" : "MINUTE DONE"}</small><strong>${view.minutes === null ? "—" : escapeHtml(view.minutes)}</strong></span>
+      <span><small>${vi ? "CAM TƯƠI CÒN" : "FRESH LEFT"}</small><strong>${escapeHtml(freshValue)}</strong><i style="--rotting-progress:${progress}%"></i></span>
+      <span><small>FRONTIER NOW</small><strong>${frontier.length}</strong></span>
+      <span><small>FRONTIER NEXT</small><strong>${nextFrontier.length}</strong></span>
+    </div>
+    <section class="rotting-grid-section"><header><strong>GRID</strong><span>0 ${vi ? "trống" : "empty"} · 1 fresh · 2 rotten</span></header><div class="rotting-grid" role="grid" style="--rotting-cols:${view.cols}">${cellsHtml}</div></section>
+    <div class="rotting-workspace">
+      <section class="rotting-queue-section"><header><strong>QUEUE BY MINUTE</strong><span>${vi ? "hai lớp không được trộn khi xử lý" : "process the two layers separately"}</span></header><div class="rotting-lane current"><label>NOW · t=${view.minutes ?? 0}</label><div>${makeQueueLane(frontier, "current")}</div></div><div class="rotting-lane next"><label>NEXT · t=${view.targetMinute ?? 1}</label><div>${makeQueueLane(nextFrontier, "next")}</div></div></section>
+      <section class="rotting-directions-section"><header><strong>4 DIRECTIONS</strong><span>${view.source ? `source (${view.source.join(",")})` : (vi ? "chưa có source" : "no source yet")}</span></header><div class="rotting-directions">${directionHtml}</div></section>
+    </div>
+    ${checkHtml}
+    <section class="rotting-timeline-section"><header><strong>${vi ? "LỊCH SỬ LAN" : "SPREAD TIMELINE"}</strong><span>${vi ? "số cam mới thối mỗi phút" : "newly rotten oranges per minute"}</span></header><div class="rotting-timeline">${timelineHtml || `<em>${vi ? "chưa có cam thối" : "no rotten oranges yet"}</em>`}</div></section>
+    ${resultHtml}
+    <div class="rotting-action"><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="rotting-legend"><span><i class="fresh"></i>fresh</span><span><i class="now"></i>frontier NOW</span><span><i class="next"></i>frontier NEXT</span><span><i class="source"></i>${vi ? "đang lan" : "spreading source"}</span><span><i class="empty"></i>${vi ? "ô trống" : "empty"}</span></div>
+  </section>`;
+}
+
 function renderBfsGrid(step) {
   const { cells, rows, cols, variant } = step.bfsGrid;
   const el = $("bfsGridView");
@@ -9882,6 +10010,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderGasCircularView(step);
+  } else if (step.rottingOrangesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRottingOrangesView(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

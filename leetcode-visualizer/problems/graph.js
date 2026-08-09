@@ -1304,6 +1304,11 @@ function buildSteps994LineByLine(input) {
   let queue = null;
   let fresh = null;
   let minutes = null;
+  let initialFresh = null;
+  let currentFrontier = [];
+  let nextFrontier = [];
+  let currentLevelSize = null;
+  let currentLevelIndex = null;
 
   function queueLabel() {
     if (queue === null) return "not initialized";
@@ -1329,10 +1334,68 @@ function buildSteps994LineByLine(input) {
     if (!vars.some((item) => item.name === "queue")) vars.push({ name: "queue", value: queueLabel() });
     if (!vars.some((item) => item.name === "fresh")) vars.push({ name: "fresh", value: fresh === null ? "not initialized" : fresh });
     if (!vars.some((item) => item.name === "minutes")) vars.push({ name: "minutes", value: minutes === null ? "not initialized" : minutes });
+    const eventByLine = {
+      4: "enter", 5: "dimensions", 6: "queue-init", 7: "fresh-init",
+      8: "scan-row", 9: "scan-cell", 10: "fresh-check", 11: "fresh-count",
+      12: "rotten-check", 13: "source-enqueue", 14: "fresh-zero-check",
+      15: "return-zero", 16: "minutes-init", 17: "directions-init",
+      18: "while-check", 19: "level-node", 20: "dequeue", 21: "direction",
+      22: "neighbor", 23: "neighbor-check", 24: "rot", 25: "fresh-decrement",
+      26: "enqueue-next", 27: "minute-complete", 28: "return",
+    };
+    const phase = opts.phase || (opts.codeLine <= 13
+      ? "scan"
+      : opts.codeLine <= 17
+        ? "ready"
+        : opts.codeLine <= 27
+          ? "spread"
+          : "result");
+    const source = opts.source || (opts.neighbor ? null : opts.current) || null;
+    const neighbor = opts.neighbor || null;
+    const newlyRotten = opts.newlyRotten ? [...opts.newlyRotten].map((item) => item.split(",").map(Number)) : [];
+    const timeline = [];
+    const maxKnownMinute = rottenAt.reduce((maxMinute, row) => Math.max(maxMinute, ...row), 0);
+    for (let minute = 0; minute <= maxKnownMinute; minute++) {
+      const cells = [];
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (rottenAt[row][col] === minute) cells.push([row, col]);
+        }
+      }
+      timeline.push({ minute, cells });
+    }
     steps.push({
       title: opts.title,
       arr: [],
       bfsGrid: { rows, cols, cells: makeCells(opts.current, opts.newlyRotten) },
+      rottingOrangesView: {
+        phase,
+        event: opts.event || eventByLine[opts.codeLine] || "step",
+        rows,
+        cols,
+        grid: grid.map((gridRow, row) => gridRow.map((value, col) => ({
+          row,
+          col,
+          value: Number(value),
+          rottenMinute: rottenAt[row][col],
+        }))),
+        queue: (queue || []).map(([row, col], index) => ({ row, col, index, rottenMinute: rottenAt[row][col] })),
+        frontier: currentFrontier.map(([row, col]) => ({ row, col, rottenMinute: rottenAt[row][col] })),
+        nextFrontier: nextFrontier.map(([row, col]) => ({ row, col, rottenMinute: rottenAt[row][col] })),
+        source: source ? [...source] : null,
+        neighbor: neighbor ? [...neighbor] : null,
+        direction: opts.direction ? [...opts.direction] : null,
+        check: opts.check ? { ...opts.check } : null,
+        newlyRotten,
+        fresh,
+        initialFresh,
+        minutes,
+        targetMinute: minutes === null ? null : minutes + 1,
+        levelSize: currentLevelSize,
+        levelIndex: currentLevelIndex,
+        timeline,
+        answer: opts.answer,
+      },
       highlight: [],
       mark: [],
       final: Boolean(opts.final),
@@ -1431,6 +1494,9 @@ function buildSteps994LineByLine(input) {
     }
   }
 
+  initialFresh = fresh;
+  currentFrontier = queue.map(([row, col]) => [row, col]);
+
   pushStep({
     title: { vi: `fresh == 0 → ${fresh === 0}`, en: `fresh == 0 → ${fresh === 0}` },
     codeLine: 14,
@@ -1444,6 +1510,7 @@ function buildSteps994LineByLine(input) {
     pushStep({
       title: { vi: "return 0", en: "return 0" },
       codeLine: 15, final: true,
+      phase: "result", answer: 0,
       vars: [{ name: "answer", value: 0 }],
       note: { vi: "Trả về 0 ngay.", en: "Return 0 immediately." },
     });
@@ -1465,6 +1532,10 @@ function buildSteps994LineByLine(input) {
   });
 
   while (queue.length && fresh > 0) {
+    currentLevelSize = queue.length;
+    currentLevelIndex = null;
+    currentFrontier = queue.slice(0, currentLevelSize).map(([row, col]) => [row, col]);
+    nextFrontier = [];
     pushStep({
       title: { vi: `while queue and fresh > 0 → True`, en: `while queue and fresh > 0 → True` },
       codeLine: 18,
@@ -1472,9 +1543,10 @@ function buildSteps994LineByLine(input) {
       note: { vi: "Queue còn nguồn lây và vẫn còn cam tươi.", en: "The queue has spreading sources and fresh oranges remain." },
     });
 
-    const levelSize = queue.length;
+    const levelSize = currentLevelSize;
     const rottedThisMinute = [];
     for (let index = 0; index < levelSize; index++) {
+      currentLevelIndex = index;
       pushStep({
         title: { vi: `Xử lý node ${index + 1}/${levelSize} của phút ${minutes + 1}`, en: `Process node ${index + 1}/${levelSize} for minute ${minutes + 1}` },
         codeLine: 19,
@@ -1485,7 +1557,7 @@ function buildSteps994LineByLine(input) {
       const [row, col] = queue.shift();
       pushStep({
         title: { vi: `popleft → (${row},${col})`, en: `popleft → (${row},${col})` },
-        current: [row, col], codeLine: 20,
+        current: [row, col], source: [row, col], codeLine: 20,
         vars: [{ name: "row", value: row }, { name: "col", value: col }],
         note: { vi: `Lấy cam thối (${row},${col}) khỏi đầu queue.`, en: `Remove rotten orange (${row},${col}) from the queue front.` },
       });
@@ -1493,7 +1565,7 @@ function buildSteps994LineByLine(input) {
       for (const [deltaRow, deltaCol] of directions) {
         pushStep({
           title: { vi: `Thử hướng (${deltaRow},${deltaCol})`, en: `Try direction (${deltaRow},${deltaCol})` },
-          current: [row, col], codeLine: 21,
+          current: [row, col], source: [row, col], direction: [deltaRow, deltaCol], codeLine: 21,
           vars: [{ name: "delta_row", value: deltaRow }, { name: "delta_col", value: deltaCol }, { name: "row", value: row }, { name: "col", value: col }],
           note: { vi: "Xét một trong bốn ô lân cận.", en: "Inspect one of the four neighboring cells." },
         });
@@ -1502,7 +1574,7 @@ function buildSteps994LineByLine(input) {
         const nextCol = col + deltaCol;
         pushStep({
           title: { vi: `next = (${nextRow},${nextCol})`, en: `next = (${nextRow},${nextCol})` },
-          current: [row, col], codeLine: 22,
+          current: [row, col], source: [row, col], neighbor: [nextRow, nextCol], direction: [deltaRow, deltaCol], codeLine: 22,
           vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
           note: { vi: "Tính tọa độ ô kế tiếp.", en: "Compute the neighboring coordinates." },
         });
@@ -1511,7 +1583,7 @@ function buildSteps994LineByLine(input) {
         const isFreshNeighbor = inBounds && grid[nextRow][nextCol] === "1";
         pushStep({
           title: { vi: `Ô (${nextRow},${nextCol}) hợp lệ và tươi → ${isFreshNeighbor}`, en: `Cell (${nextRow},${nextCol}) is valid and fresh → ${isFreshNeighbor}` },
-          current: inBounds ? [nextRow, nextCol] : [row, col], codeLine: 23,
+          current: inBounds ? [nextRow, nextCol] : [row, col], source: [row, col], neighbor: [nextRow, nextCol], direction: [deltaRow, deltaCol], check: { inBounds, isFresh: isFreshNeighbor }, codeLine: 23,
           vars: [{ name: "in bounds?", value: inBounds }, { name: "fresh neighbor?", value: isFreshNeighbor }],
           note: isFreshNeighbor
             ? { vi: "Điều kiện True; cam này sẽ bị thối.", en: "The condition is true; this orange will rot." }
@@ -1524,7 +1596,7 @@ function buildSteps994LineByLine(input) {
         const newlyRotten = new Set([key(nextRow, nextCol)]);
         pushStep({
           title: { vi: `grid[${nextRow}][${nextCol}] = 2`, en: `grid[${nextRow}][${nextCol}] = 2` },
-          current: [nextRow, nextCol], newlyRotten, codeLine: 24,
+          current: [nextRow, nextCol], source: [row, col], neighbor: [nextRow, nextCol], direction: [deltaRow, deltaCol], check: { inBounds: true, isFresh: true }, newlyRotten, codeLine: 24,
           vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
           note: { vi: `Đánh dấu cam tại (${nextRow},${nextCol}) là thối ở phút ${minutes + 1}.`, en: `Mark orange (${nextRow},${nextCol}) rotten at minute ${minutes + 1}.` },
         });
@@ -1532,16 +1604,17 @@ function buildSteps994LineByLine(input) {
         fresh--;
         pushStep({
           title: { vi: `fresh -= 1 → ${fresh}`, en: `fresh -= 1 → ${fresh}` },
-          current: [nextRow, nextCol], newlyRotten, codeLine: 25,
+          current: [nextRow, nextCol], source: [row, col], neighbor: [nextRow, nextCol], direction: [deltaRow, deltaCol], check: { inBounds: true, isFresh: true }, newlyRotten, codeLine: 25,
           vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
           note: { vi: `Còn ${fresh} cam tươi.`, en: `${fresh} fresh orange(s) remain.` },
         });
 
         queue.push([nextRow, nextCol]);
+        nextFrontier.push([nextRow, nextCol]);
         rottedThisMinute.push([nextRow, nextCol]);
         pushStep({
           title: { vi: `queue.append((${nextRow},${nextCol}))`, en: `queue.append((${nextRow},${nextCol}))` },
-          current: [nextRow, nextCol], newlyRotten, codeLine: 26,
+          current: [nextRow, nextCol], source: [row, col], neighbor: [nextRow, nextCol], direction: [deltaRow, deltaCol], check: { inBounds: true, isFresh: true }, newlyRotten, codeLine: 26,
           vars: [{ name: "next_row", value: nextRow }, { name: "next_col", value: nextCol }],
           note: { vi: "Thêm cam vừa thối vào frontier của phút kế tiếp.", en: "Append the newly rotten orange to the next minute's frontier." },
         });
@@ -1549,6 +1622,8 @@ function buildSteps994LineByLine(input) {
     }
 
     minutes++;
+    currentFrontier = nextFrontier.map(([row, col]) => [row, col]);
+    nextFrontier = [];
     pushStep({
       title: { vi: `minutes += 1 → ${minutes}`, en: `minutes += 1 → ${minutes}` },
       codeLine: 27,
@@ -1559,7 +1634,7 @@ function buildSteps994LineByLine(input) {
 
   pushStep({
     title: { vi: "Thoát vòng while", en: "Exit the while loop" },
-    codeLine: 18,
+    codeLine: 18, event: "while-exit", phase: "result",
     vars: [{ name: "condition", value: Boolean(queue.length && fresh > 0) }],
     note: fresh === 0
       ? { vi: "fresh = 0 nên BFS hoàn tất.", en: "fresh = 0, so BFS is complete." }
@@ -1569,7 +1644,7 @@ function buildSteps994LineByLine(input) {
   const answer = fresh === 0 ? minutes : -1;
   pushStep({
     title: answer === -1 ? { vi: "return -1", en: "return -1" } : { vi: `return ${minutes}`, en: `return ${minutes}` },
-    codeLine: 28, final: true,
+    codeLine: 28, final: true, answer,
     vars: [{ name: "answer", value: answer }],
     note: answer === -1
       ? { vi: "Vẫn còn cam tươi không thể tiếp cận nên trả -1.", en: "Unreachable fresh oranges remain, so return -1." }
