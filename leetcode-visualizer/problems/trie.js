@@ -2255,6 +2255,7 @@ module.exports = {
     },
     defaultInput: "cat,bat,rat",
     inputKind: "string",
+    debugMode: "semantic",
     inputLabel: { vi: "Danh sách gốc từ (cách nhau bởi dấu phẩy)", en: "Dictionary roots (comma separated)" },
     extraParams: [
       {
