@@ -790,7 +790,7 @@ function buildSteps648(input, params) {
 
   snapshot({
     title: { vi: "Khởi tạo Trie từ dictionary", en: "Build Trie from dictionary" },
-    codeLines: [8, 9],
+    codeLines: [9],
     highlight: [trieRoot.id],
     currentNodeId: trieRoot.id,
     note: {
@@ -802,20 +802,74 @@ function buildSteps648(input, params) {
   for (const rootWord of roots) {
     let node = trieRoot;
     const path = [trieRoot.id];
+    snapshot({
+      title: { vi: `Dòng 11 · lấy root "${rootWord}"`, en: `Line 11 · take root "${rootWord}"` },
+      codeLines: [11],
+      highlight: [...path],
+      currentNodeId: node.id,
+      vars: [{ name: "w", value: rootWord }],
+      phase: "build",
+      action: "take-root",
+      word: rootWord,
+      note: {
+        vi: `Bắt đầu chèn root "${rootWord}" từ dictionary vào Trie.`,
+        en: `Start inserting dictionary root "${rootWord}" into the Trie.`,
+      },
+    });
+    snapshot({
+      title: { vi: "Dòng 12 · node = root", en: "Line 12 · node = root" },
+      codeLines: [12],
+      highlight: [...path],
+      currentNodeId: node.id,
+      vars: [
+        { name: "w", value: rootWord },
+        { name: "node", value: "root" },
+      ],
+      phase: "build",
+      action: "reset-node",
+      word: rootWord,
+      note: {
+        vi: "Mỗi root dictionary luôn bắt đầu đi từ node gốc của Trie.",
+        en: "Each dictionary root always starts from the Trie root node.",
+      },
+    });
+
     for (let i = 0; i < rootWord.length; i += 1) {
       const ch = rootWord[i];
+      snapshot({
+        title: { vi: `Dòng 13 · đọc '${ch}'`, en: `Line 13 · read '${ch}'` },
+        codeLines: [13],
+        highlight: [...path],
+        currentNodeId: node.id,
+        vars: [
+          { name: "w", value: rootWord },
+          { name: "ch", value: ch },
+          { name: "prefix", value: rootWord.slice(0, i + 1) },
+          { name: "exists?", value: node.children[ch] ? "True" : "False" },
+        ],
+        phase: "build",
+        action: "read-build-char",
+        word: rootWord,
+        charIndex: i,
+        prefix: rootWord.slice(0, i + 1),
+        pathChars: rootWord.slice(0, i).split(""),
+        note: {
+          vi: `Xét ký tự '${ch}' của root "${rootWord}". Kiểm tra từ node hiện tại đã có cạnh này chưa.`,
+          en: `Read '${ch}' from root "${rootWord}" and check whether the current node already has this edge.`,
+        },
+      });
+
       if (!node.children[ch]) {
         node.children[ch] = makeNode(ch, node.id);
         snapshot({
-          title: { vi: `insert("${rootWord}") · tạo '${ch}'`, en: `insert("${rootWord}") · create '${ch}'` },
-          codeLines: [13, 14, 15],
+          title: { vi: `Dòng 14 · tạo node '${ch}'`, en: `Line 14 · create node '${ch}'` },
+          codeLines: [14],
           highlight: [...path, node.children[ch].id],
-          currentNodeId: node.children[ch].id,
+          currentNodeId: node.id,
           vars: [
-            { name: "root", value: rootWord },
-            { name: "i", value: i },
+            { name: "w", value: rootWord },
             { name: "ch", value: ch },
-            { name: "action", value: "create child" },
+            { name: "node.children[ch]", value: "new TrieNode()" },
           ],
           phase: "build",
           action: "create",
@@ -824,60 +878,81 @@ function buildSteps648(input, params) {
           prefix: rootWord.slice(0, i + 1),
           pathChars: rootWord.slice(0, i + 1).split(""),
           note: {
-            vi: `Từ node hiện tại chưa có cạnh '${ch}', nên tạo node mới cho ký tự này.`,
-            en: `The current node has no '${ch}' edge, so create a new node for this character.`,
-          },
-        });
-      } else {
-        snapshot({
-          title: { vi: `insert("${rootWord}") · đi theo '${ch}'`, en: `insert("${rootWord}") · follow '${ch}'` },
-          codeLines: [13, 15],
-          highlight: [...path, node.children[ch].id],
-          currentNodeId: node.children[ch].id,
-          vars: [
-            { name: "root", value: rootWord },
-            { name: "i", value: i },
-            { name: "ch", value: ch },
-            { name: "action", value: "reuse child" },
-          ],
-          phase: "build",
-          action: "reuse",
-          word: rootWord,
-          charIndex: i,
-          prefix: rootWord.slice(0, i + 1),
-          pathChars: rootWord.slice(0, i + 1).split(""),
-          note: {
-            vi: `Cạnh '${ch}' đã có sẵn, chỉ cần đi xuống node đó.`,
-            en: `The '${ch}' edge already exists, so just move to that node.`,
+            vi: `Cạnh '${ch}' chưa tồn tại, nên dòng này tạo node con mới. Con trỏ node vẫn đang ở node cha.`,
+            en: `The '${ch}' edge does not exist, so this line creates a new child. The node pointer is still at the parent.`,
           },
         });
       }
+
       node = node.children[ch];
       path.push(node.id);
+      snapshot({
+        title: { vi: `Dòng 15 · đi xuống '${ch}'`, en: `Line 15 · move to '${ch}'` },
+        codeLines: [15],
+        highlight: [...path],
+        currentNodeId: node.id,
+        vars: [
+          { name: "w", value: rootWord },
+          { name: "ch", value: ch },
+          { name: "node", value: `child '${ch}'` },
+        ],
+        phase: "build",
+        action: "move-child",
+        word: rootWord,
+        charIndex: i,
+        prefix: rootWord.slice(0, i + 1),
+        pathChars: rootWord.slice(0, i + 1).split(""),
+        note: {
+          vi: `Sau dòng này, con trỏ node đi xuống node ký tự '${ch}'.`,
+          en: `After this line, the node pointer moves down to the '${ch}' node.`,
+        },
+      });
     }
-    node.isRoot = true;
-    node.rootWord = rootWord;
 
+    node.isRoot = true;
     snapshot({
-      title: { vi: `Đánh dấu root "${rootWord}"`, en: `Mark root "${rootWord}"` },
-      codeLines: [16, 17],
+      title: { vi: `Dòng 16 · is_root = True`, en: "Line 16 · is_root = True" },
+      codeLines: [16],
       highlight: [...path],
       currentNodeId: node.id,
       stopNodeId: node.id,
       vars: [
-        { name: "root", value: rootWord },
+        { name: "w", value: rootWord },
         { name: "node.is_root", value: "True" },
-        { name: "node.word", value: rootWord },
+        { name: "node.word", value: "(empty)" },
       ],
       phase: "mark-root",
       action: "mark-root",
       word: rootWord,
       prefix: rootWord,
+      pathChars: rootWord.split(""),
+      note: {
+        vi: `Node cuối của "${rootWord}" được đánh dấu là một root hợp lệ, nhưng chưa lưu word ở dòng này.`,
+        en: `The last node of "${rootWord}" is marked as a valid root, but the word has not been stored yet on this line.`,
+      },
+    });
+
+    node.rootWord = rootWord;
+    snapshot({
+      title: { vi: `Dòng 17 · word = "${rootWord}"`, en: `Line 17 · word = "${rootWord}"` },
+      codeLines: [17],
+      highlight: [...path],
+      currentNodeId: node.id,
+      stopNodeId: node.id,
+      vars: [
+        { name: "w", value: rootWord },
+        { name: "node.is_root", value: "True" },
+        { name: "node.word", value: rootWord },
+      ],
+      phase: "mark-root",
+      action: "store-root-word",
+      word: rootWord,
+      prefix: rootWord,
       foundRoot: rootWord,
       pathChars: rootWord.split(""),
       note: {
-        vi: `Node cuối của "${rootWord}" được đánh dấu là một gốc từ hợp lệ. Khi tra câu, gặp node này là dừng ngay để lấy root ngắn nhất.`,
-        en: `The last node of "${rootWord}" is marked as a valid root. During lookup, reaching it means stop immediately to use the shortest root.`,
+        vi: `Lưu "${rootWord}" vào node terminal. Khi lookup gặp node này, ta có thể thay word bằng root này.`,
+        en: `Store "${rootWord}" in the terminal node. During lookup, reaching this node allows replacing the word with this root.`,
       },
     });
   }
@@ -890,10 +965,10 @@ function buildSteps648(input, params) {
     let missingChar = "";
 
     snapshot({
-      title: { vi: `Xử lý word ${wordIndex + 1}: "${word}"`, en: `Process word ${wordIndex + 1}: "${word}"` },
-      codeLines: [20, 21],
+      title: { vi: `Dòng 20 · word = "${word}"`, en: `Line 20 · word = "${word}"` },
+      codeLines: [20],
       highlight: [...path],
-      currentNodeId: trieRoot.id,
+      currentNodeId: null,
       vars: [
         { name: "word", value: word },
         { name: "prefix", value: "" },
@@ -905,18 +980,65 @@ function buildSteps648(input, params) {
       prefix: "",
       pathChars: [],
       note: {
-        vi: `Bắt đầu từ root của Trie và đọc "${word}" từ trái sang phải.`,
-        en: `Start from the Trie root and read "${word}" from left to right.`,
+        vi: `Lấy word thứ ${wordIndex + 1} trong sentence: "${word}".`,
+        en: `Take sentence word ${wordIndex + 1}: "${word}".`,
+      },
+    });
+    snapshot({
+      title: { vi: "Dòng 21 · node = root", en: "Line 21 · node = root" },
+      codeLines: [21],
+      highlight: [...path],
+      currentNodeId: trieRoot.id,
+      vars: [
+        { name: "word", value: word },
+        { name: "node", value: "root" },
+        { name: "prefix", value: "" },
+      ],
+      phase: "lookup-start",
+      action: "lookup-reset-node",
+      wordIndex,
+      word,
+      prefix: "",
+      pathChars: [],
+      note: {
+        vi: `Bắt đầu lookup "${word}" từ root của Trie.`,
+        en: `Start looking up "${word}" from the Trie root.`,
       },
     });
 
     for (let i = 0; i < word.length; i += 1) {
       const ch = word[i];
+      snapshot({
+        title: { vi: `Dòng 22 · đọc '${ch}'`, en: `Line 22 · read '${ch}'` },
+        codeLines: [22],
+        highlight: [...path],
+        currentNodeId: node.id,
+        stopNodeId: node.isRoot ? node.id : null,
+        vars: [
+          { name: "word", value: word },
+          { name: "ch", value: ch },
+          { name: "prefix", value: word.slice(0, i) || "" },
+          { name: "node.is_root", value: node.isRoot ? "True" : "False" },
+        ],
+        phase: node.isRoot ? "found-root" : "lookup",
+        action: "read-word-char",
+        wordIndex,
+        word,
+        charIndex: i,
+        prefix: word.slice(0, i),
+        foundRoot: node.isRoot ? node.rootWord : "",
+        pathChars: word.slice(0, i).split(""),
+        note: {
+          vi: `Chuẩn bị xử lý ký tự '${ch}'. Trước khi đi tiếp, kiểm tra node hiện tại có phải root không.`,
+          en: `Prepare to process '${ch}'. Before moving, check whether the current node is already a root.`,
+        },
+      });
+
       if (node.isRoot) {
         foundRoot = node.rootWord;
         snapshot({
-          title: { vi: `Gặp root "${foundRoot}"`, en: `Found root "${foundRoot}"` },
-          codeLines: [23, 24],
+          title: { vi: `Dòng 23 · gặp root "${foundRoot}"`, en: `Line 23 · found root "${foundRoot}"` },
+          codeLines: [23],
           highlight: [...path],
           currentNodeId: node.id,
           stopNodeId: node.id,
@@ -934,8 +1056,32 @@ function buildSteps648(input, params) {
           foundRoot,
           pathChars: foundRoot.split(""),
           note: {
-            vi: `"${foundRoot}" đã là root hợp lệ, nên dừng trước khi đọc thêm '${ch}'. Đây chính là root ngắn nhất.`,
-            en: `"${foundRoot}" is already a valid root, so stop before reading '${ch}'. This is the shortest root.`,
+            vi: `Điều kiện đúng: node hiện tại đã là root "${foundRoot}". Đây là root ngắn nhất vì ta đọc từ trái sang phải.`,
+            en: `The condition is true: the current node is root "${foundRoot}". It is the shortest root because we scan left to right.`,
+          },
+        });
+        snapshot({
+          title: { vi: "Dòng 24 · break", en: "Line 24 · break" },
+          codeLines: [24],
+          highlight: [...path],
+          currentNodeId: node.id,
+          stopNodeId: node.id,
+          vars: [
+            { name: "word", value: word },
+            { name: "prefix", value: foundRoot },
+            { name: "break", value: "stop scanning word" },
+          ],
+          phase: "found-root",
+          action: "break-shortest-root",
+          wordIndex,
+          word,
+          charIndex: i,
+          prefix: foundRoot,
+          foundRoot,
+          pathChars: foundRoot.split(""),
+          note: {
+            vi: `Dừng vòng lặp ký tự ngay tại root "${foundRoot}". Không cần đọc phần còn lại của "${word}".`,
+            en: `Stop the character loop at root "${foundRoot}". The rest of "${word}" does not need to be read.`,
           },
         });
         break;
@@ -943,8 +1089,8 @@ function buildSteps648(input, params) {
       if (!node.children[ch]) {
         missingChar = ch;
         snapshot({
-          title: { vi: `Không có cạnh '${ch}'`, en: `No '${ch}' edge` },
-          codeLines: [25, 26],
+          title: { vi: `Dòng 25 · thiếu cạnh '${ch}'`, en: `Line 25 · missing '${ch}' edge` },
+          codeLines: [25],
           highlight: [...path],
           currentNodeId: node.id,
           failNodeId: node.id,
@@ -962,8 +1108,32 @@ function buildSteps648(input, params) {
           missingChar: ch,
           pathChars: word.slice(0, i).split(""),
           note: {
-            vi: `Từ đường đi hiện tại không có ký tự '${ch}', vậy không có root nào là tiền tố của "${word}".`,
-            en: `The current path has no '${ch}' edge, so no dictionary root is a prefix of "${word}".`,
+            vi: `Điều kiện đúng: từ node hiện tại không có cạnh '${ch}', nên lookup thất bại cho "${word}".`,
+            en: `The condition is true: the current node has no '${ch}' edge, so lookup fails for "${word}".`,
+          },
+        });
+        snapshot({
+          title: { vi: "Dòng 26 · break", en: "Line 26 · break" },
+          codeLines: [26],
+          highlight: [...path],
+          currentNodeId: node.id,
+          failNodeId: node.id,
+          vars: [
+            { name: "word", value: word },
+            { name: "missing char", value: ch },
+            { name: "break", value: "no matching root" },
+          ],
+          phase: "miss",
+          action: "break-missing-edge",
+          wordIndex,
+          word,
+          charIndex: i,
+          prefix: word.slice(0, i + 1),
+          missingChar: ch,
+          pathChars: word.slice(0, i).split(""),
+          note: {
+            vi: `Dừng vòng lặp ký tự. Vì không tới root nào, "${word}" sẽ được giữ nguyên ở dòng append.`,
+            en: `Stop the character loop. Since no root was reached, "${word}" will be kept at append time.`,
           },
         });
         break;
@@ -971,8 +1141,8 @@ function buildSteps648(input, params) {
       node = node.children[ch];
       path.push(node.id);
       snapshot({
-        title: { vi: `Đọc '${ch}' trong "${word}"`, en: `Read '${ch}' in "${word}"` },
-        codeLines: [22, 25, 27],
+        title: { vi: `Dòng 27 · node = child '${ch}'`, en: `Line 27 · node = child '${ch}'` },
+        codeLines: [27],
         highlight: [...path],
         currentNodeId: node.id,
         vars: [
@@ -991,49 +1161,24 @@ function buildSteps648(input, params) {
         pathChars: word.slice(0, i + 1).split(""),
         note: node.isRoot
           ? {
-              vi: `Prefix "${node.rootWord}" là root trong dictionary. Bước tiếp theo sẽ dừng và dùng root này.`,
-              en: `Prefix "${node.rootWord}" is a dictionary root. The next step will stop and use this root.`,
+              vi: `Sau khi đi xuống '${ch}', prefix "${node.rootWord}" đã là root trong dictionary.`,
+              en: `After moving to '${ch}', prefix "${node.rootWord}" is a dictionary root.`,
             }
           : {
-              vi: `Prefix "${word.slice(0, i + 1)}" vẫn chưa phải root, tiếp tục đọc ký tự kế tiếp.`,
-              en: `Prefix "${word.slice(0, i + 1)}" is not a root yet, so continue to the next character.`,
+              vi: `Sau khi đi xuống '${ch}', prefix "${word.slice(0, i + 1)}" vẫn chưa phải root.`,
+              en: `After moving to '${ch}', prefix "${word.slice(0, i + 1)}" is not a root yet.`,
             },
       });
     }
 
-    if (!foundRoot && node.isRoot) {
-      foundRoot = node.rootWord;
-      snapshot({
-        title: { vi: `Kết thúc tại root "${foundRoot}"`, en: `End at root "${foundRoot}"` },
-        codeLines: [23, 24],
-        highlight: [...path],
-        currentNodeId: node.id,
-        stopNodeId: node.id,
-        vars: [
-          { name: "word", value: word },
-          { name: "prefix", value: foundRoot },
-        ],
-        phase: "found-root",
-        action: "end-at-root",
-        wordIndex,
-        word,
-        prefix: foundRoot,
-        foundRoot,
-        pathChars: foundRoot.split(""),
-        note: {
-          vi: `Đọc xong prefix "${foundRoot}" và node này là root hợp lệ.`,
-          en: `Finished reading prefix "${foundRoot}", and this node is a valid root.`,
-        },
-      });
-    }
-
+    if (!foundRoot && node.isRoot) foundRoot = node.rootWord;
     const replacement = foundRoot || word;
     resultWords.push(replacement);
 
     snapshot({
       title: {
-        vi: foundRoot ? `"${word}" → "${foundRoot}"` : `"${word}" (giữ nguyên)`,
-        en: foundRoot ? `"${word}" → "${foundRoot}"` : `"${word}" (unchanged)`,
+        vi: foundRoot ? `Dòng 28 · append "${foundRoot}"` : `Dòng 28 · append "${word}"`,
+        en: foundRoot ? `Line 28 · append "${foundRoot}"` : `Line 28 · append "${word}"`,
       },
       codeLines: [28],
       highlight: [...path],
@@ -2255,7 +2400,6 @@ module.exports = {
     },
     defaultInput: "cat,bat,rat",
     inputKind: "string",
-    debugMode: "semantic",
     inputLabel: { vi: "Danh sách gốc từ (cách nhau bởi dấu phẩy)", en: "Dictionary roots (comma separated)" },
     extraParams: [
       {
