@@ -2533,7 +2533,7 @@ function buildSteps303(nums, params) {
   return { steps, answer };
 }
 
-function buildSteps2080(nums, params) {
+function buildSteps2080IndexMap(nums, params) {
   const n = nums.length;
   const leftRaw = Number.parseInt(params && params.left, 10);
   const rightRaw = Number.parseInt(params && params.right, 10);
@@ -2773,6 +2773,183 @@ function buildSteps2080(nums, params) {
   });
 
   return { steps, answer };
+}
+
+function buildSteps2080SegmentTree(nums, params) {
+  const n = nums.length;
+  const leftRaw = Number.parseInt(params && params.left, 10);
+  const rightRaw = Number.parseInt(params && params.right, 10);
+  const valueRaw = Number.parseInt(params && params.value, 10);
+  const left = Math.max(0, Math.min(n - 1, Number.isInteger(leftRaw) ? leftRaw : 0));
+  const right = Math.max(left, Math.min(n - 1, Number.isInteger(rightRaw) ? rightRaw : n - 1));
+  const value = Number.isInteger(valueRaw) ? valueRaw : nums[0];
+  let size = 1;
+  while (size < n) size *= 2;
+
+  const tree = Array.from({ length: 2 * size }, () => new Map());
+  const coverage = Array.from({ length: 2 * size }, () => []);
+  const steps = [];
+  const selected = [];
+  const queryIndices = Array.from({ length: right - left + 1 }, (_, offset) => left + offset);
+  const formatMap = (map) => {
+    if (!(map instanceof Map) || map.size === 0) return "∅";
+    return `{${Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([key, count]) => `${key}:${count}`).join(", ")}}`;
+  };
+  const treeSnapshot = () => tree.slice(1).map(formatMap);
+  const coverageSnapshot = () => coverage.slice(1).map((indices) => [...indices]);
+  const snapshot = ({ title, note, codeLine, mode = "build", activeTree = [], status = [], vars = [], final = false }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      final,
+      segmentTreeView: {
+        nums: [...nums],
+        tree: treeSnapshot(),
+        coverage: coverageSnapshot(),
+        activeNums: mode === "query" ? [...queryIndices] : [],
+        activeTree: [...activeTree],
+        selectedTree: [...selected],
+        path: [...activeTree],
+        mode,
+        mapMode: true,
+        status,
+      },
+      vars: [
+        { name: "query", value: `(${left}, ${right}, ${value})` },
+        ...vars,
+      ],
+    });
+  };
+
+  snapshot({
+    title: { vi: `Tạo Segment Tree với ${size} lá`, en: `Create a Segment Tree with ${size} leaves` },
+    note: {
+      vi: "Mỗi node lưu một bảng {value: số lần xuất hiện} trong đoạn mà node quản lý. size là lũy thừa 2 nhỏ nhất không bé hơn n.",
+      en: "Each node stores a {value: frequency} map for its covered range. size is the smallest power of two not less than n.",
+    },
+    codeLine: 8,
+    status: [{ label: "n", value: n }, { label: "size", value: size }, { label: "tree nodes", value: 2 * size - 1 }],
+  });
+
+  for (let index = 0; index < n; index += 1) {
+    const node = size + index;
+    tree[node].set(nums[index], 1);
+    coverage[node] = [index];
+    snapshot({
+      title: { vi: `Lá tree[${node}] nhận arr[${index}] = ${nums[index]}`, en: `Leaf tree[${node}] receives arr[${index}] = ${nums[index]}` },
+      note: {
+        vi: `Lá chỉ quản lý index ${index}, nên frequency map là {${nums[index]}:1}.`,
+        en: `This leaf covers only index ${index}, so its frequency map is {${nums[index]}:1}.`,
+      },
+      codeLine: 10,
+      activeTree: [node],
+      status: [{ label: "leaf", value: node }, { label: "range", value: `[${index}, ${index}]` }, { label: "map", value: formatMap(tree[node]) }],
+      vars: [{ name: `tree[${node}]`, value: formatMap(tree[node]) }],
+    });
+  }
+
+  for (let node = size - 1; node >= 1; node -= 1) {
+    const merged = new Map(tree[node * 2]);
+    for (const [key, count] of tree[node * 2 + 1]) merged.set(key, (merged.get(key) || 0) + count);
+    tree[node] = merged;
+    coverage[node] = [...coverage[node * 2], ...coverage[node * 2 + 1]];
+    if (coverage[node].length === 0) continue;
+    snapshot({
+      title: { vi: `Gộp hai con vào tree[${node}]`, en: `Merge both children into tree[${node}]` },
+      note: {
+        vi: `Cộng frequency theo từng value từ tree[${node * 2}] và tree[${node * 2 + 1}].`,
+        en: `Add frequencies value by value from tree[${node * 2}] and tree[${node * 2 + 1}].`,
+      },
+      codeLine: 12,
+      activeTree: [node * 2, node * 2 + 1, node],
+      status: [
+        { label: `tree[${node * 2}]`, value: formatMap(tree[node * 2]) },
+        { label: `tree[${node * 2 + 1}]`, value: formatMap(tree[node * 2 + 1]) },
+        { label: `tree[${node}]`, value: formatMap(tree[node]) },
+      ],
+      vars: [{ name: `tree[${node}]`, value: formatMap(tree[node]) }],
+    });
+  }
+
+  let queryLeft = left + size;
+  let queryRight = right + size + 1;
+  let answer = 0;
+  snapshot({
+    title: { vi: `Query [${left}, ${right}] cho value ${value}`, en: `Query [${left}, ${right}] for value ${value}` },
+    note: {
+      vi: `Đổi sang đoạn nửa mở ở tầng lá: [${queryLeft}, ${queryRight}). Mỗi node được chọn nằm hoàn toàn trong query.`,
+      en: `Convert to a half-open leaf range [${queryLeft}, ${queryRight}). Every selected node lies completely inside the query.`,
+    },
+    codeLine: 15,
+    mode: "query",
+    activeTree: [queryLeft, queryRight - 1],
+    status: [{ label: "leaf range", value: `[${queryLeft}, ${queryRight})` }, { label: "target value", value }],
+    vars: [{ name: "left", value: queryLeft }, { name: "right", value: queryRight }, { name: "answer", value: 0 }],
+  });
+
+  while (queryLeft < queryRight) {
+    const pickedThisLevel = [];
+    if (queryLeft % 2 === 1) {
+      pickedThisLevel.push(queryLeft);
+      selected.push(queryLeft);
+      answer += tree[queryLeft].get(value) || 0;
+      queryLeft += 1;
+    }
+    if (queryRight % 2 === 1) {
+      queryRight -= 1;
+      pickedThisLevel.push(queryRight);
+      selected.push(queryRight);
+      answer += tree[queryRight].get(value) || 0;
+    }
+    snapshot({
+      title: {
+        vi: pickedThisLevel.length ? `Chọn node ${pickedThisLevel.join(", ")}` : "Không chọn node ở level này",
+        en: pickedThisLevel.length ? `Select node ${pickedThisLevel.join(", ")}` : "Select no node at this level",
+      },
+      note: {
+        vi: pickedThisLevel.length
+          ? `Các node này nằm trọn trong [${left}, ${right}]. Cộng count của value ${value}, tổng hiện tại = ${answer}.`
+          : "Hai biên chưa tạo thành node nằm trọn trong query; đi lên node cha.",
+        en: pickedThisLevel.length
+          ? `These nodes lie fully inside [${left}, ${right}]. Add their count for value ${value}; running total = ${answer}.`
+          : "Neither boundary forms a fully covered node yet; climb to the parents.",
+      },
+      codeLine: pickedThisLevel.length ? 19 : 17,
+      mode: "query",
+      activeTree: pickedThisLevel,
+      status: [
+        ...pickedThisLevel.map((node) => ({ label: `tree[${node}][${value}]`, value: tree[node].get(value) || 0 })),
+        { label: "answer", value: answer },
+        { label: "next bounds", value: `[${Math.floor(queryLeft / 2)}, ${Math.floor(queryRight / 2)})` },
+      ],
+      vars: [{ name: "answer", value: answer }],
+    });
+    queryLeft = Math.floor(queryLeft / 2);
+    queryRight = Math.floor(queryRight / 2);
+  }
+
+  snapshot({
+    title: { vi: `Kết quả: ${answer} lần xuất hiện`, en: `Result: ${answer} occurrences` },
+    note: {
+      vi: `Tổng frequency của value ${value} trong các node phủ đúng đoạn [${left}, ${right}] là ${answer}.`,
+      en: `The total frequency of value ${value} across the nodes that exactly cover [${left}, ${right}] is ${answer}.`,
+    },
+    codeLine: 26,
+    mode: "query",
+    activeTree: [...selected],
+    status: [{ label: "selected nodes", value: selected.join(", ") || "∅" }, { label: "answer", value: answer }],
+    vars: [{ name: "answer", value: answer }],
+    final: true,
+  });
+  return { steps, answer };
+}
+
+function buildSteps2080(nums, params) {
+  return Number(params && params.approach) === 2
+    ? buildSteps2080SegmentTree(nums, params)
+    : buildSteps2080IndexMap(nums, params);
 }
 
 function buildSteps2286(input, params) {
@@ -5144,6 +5321,7 @@ module.exports = {
     category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
     tags: [
       { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
     ],
     title: { vi: "Range Frequency Queries", en: "Range Frequency Queries" },
     titleVi: { vi: "Truy vấn tần suất trong đoạn", en: "Range frequency queries" },
@@ -5158,18 +5336,23 @@ module.exports = {
       { key: "left", type: "number", label: { vi: "left", en: "left" }, default: 1 },
       { key: "right", type: "number", label: { vi: "right", en: "right" }, default: 2 },
       { key: "value", type: "number", label: { vi: "value", en: "value" }, default: 4 },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Hash Map + Binary Search", en: "Approach 1: Hash Map + Binary Search" } },
+        { value: "2", label: { vi: "Cách 2: Segment Tree frequency map", en: "Approach 2: Segment Tree frequency maps" } },
+      ] },
     ],
     approach: [
       { vi: "Trong constructor, tạo hashmap value → list các index xuất hiện.", en: "In the constructor, build a hashmap from value to its occurrence indices." },
       { vi: "Các list index đã tăng dần vì ta duyệt arr từ trái sang phải.", en: "Each index list is sorted because arr is scanned left to right." },
       { vi: "Query dùng bisect_left(list, left) và bisect_right(list, right); hiệu hai vị trí là tần suất.", en: "A query uses bisect_left(list, left) and bisect_right(list, right); the difference is the frequency." },
+      { vi: "Cách 2: mỗi node Segment Tree lưu frequency map của đoạn; query tách [left, right] thành O(log n) node và cộng count của value.", en: "Approach 2: each Segment Tree node stores a frequency map; a query decomposes [left, right] into O(log n) nodes and sums the count for value." },
     ],
     complexity: {
-      time: "O(n) build, O(log k) query",
-      space: "O(n)",
+      time: "C1: O(n) build, O(log k) query · C2: O(n log n) build, O(log n) query",
+      space: "C1: O(n) · C2: O(n log n)",
       note: {
-        vi: "k là số lần value xuất hiện. Mỗi query binary search trên list index của riêng value đó.",
-        en: "k is the number of occurrences of value. Each query binary-searches only that value's index list.",
+        vi: "Cách 1 thường tối ưu hơn cho bài này. Cách 2 minh họa range query tổng quát bằng frequency map ở mỗi node.",
+        en: "Approach 1 is usually more efficient here. Approach 2 demonstrates a general range query using a frequency map at each node.",
       },
     },
     code: [
@@ -5188,6 +5371,37 @@ module.exports = {
       "        r = bisect_right(indices, right)",
       "        return r - l",
     ],
+    codeLabel: { vi: "Cách 1 · Hash Map + Binary Search", en: "Approach 1 · Hash Map + Binary Search" },
+    code2Label: { vi: "Cách 2 · Segment Tree frequency map", en: "Approach 2 · Segment Tree frequency maps" },
+    code2: [
+      "from collections import Counter",
+      "",
+      "class RangeFreqQuery:",
+      "    def __init__(self, arr: List[int]):",
+      "        self.n, self.size = len(arr), 1",
+      "        while self.size < self.n:",
+      "            self.size *= 2",
+      "        self.tree = [Counter() for _ in range(2 * self.size)]",
+      "        for index, value in enumerate(arr):",
+      "            self.tree[self.size + index][value] = 1",
+      "        for node in range(self.size - 1, 0, -1):",
+      "            self.tree[node] = self.tree[2 * node] + self.tree[2 * node + 1]",
+      "    def query(self, left: int, right: int, value: int) -> int:",
+      "        left += self.size",
+      "        right += self.size + 1",
+      "        answer = 0",
+      "        while left < right:",
+      "            if left % 2 == 1:",
+      "                answer += self.tree[left][value]",
+      "                left += 1",
+      "            if right % 2 == 1:",
+      "                right -= 1",
+      "                answer += self.tree[right][value]",
+      "            left //= 2",
+      "            right //= 2",
+      "        return answer",
+    ],
+    debugMode: "semantic",
     builder: buildSteps2080,
   },
   2286: {
@@ -5196,6 +5410,7 @@ module.exports = {
     slug: "booking-concert-tickets-in-groups",
     category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
     tags: [
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
       { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
     ],
     title: { vi: "Booking Concert Tickets in Groups", en: "Booking Concert Tickets in Groups" },

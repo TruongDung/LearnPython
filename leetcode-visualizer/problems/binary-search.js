@@ -1550,7 +1550,7 @@ function buildSteps410(nums, params) {
  * 12              else: hi = mid - 1
  * 13          return s[start:start+best]
  */
-function buildSteps1044(input) {
+function buildSteps1044Legacy(input) {
   const s = String(input);
   const n = s.length;
   const steps = [];
@@ -1677,6 +1677,202 @@ function buildSteps1044(input) {
 }
 
 /** LeetCode 875: Koko Eating Bananas — first feasible speed. */
+/** Detailed 1044 walkthrough: binary-search rounds plus every rolling-hash window. */
+function buildSteps1044(input) {
+  const s = String(input);
+  const chars = [...s];
+  const n = chars.length;
+  const steps = [];
+  const base = 26n;
+  const mod = 1000000007n;
+  const values = chars.map((char) => BigInt(char.charCodeAt(0) - 96));
+  const lines = {
+    setup: [3, 4, 5, 19, 20], choose: [21, 22, 23], init: [6, 7, 8, 9, 10, 11],
+    slide: [12, 13, 17], match: [12, 13, 14, 15, 16], found: [24, 25, 26],
+    miss: [27, 28], done: [29],
+  };
+  const range = (start, length) => Number.isInteger(start) && start >= 0
+    ? Array.from({ length }, (_, offset) => start + offset)
+    : [];
+  const view = (overrides = {}) => ({
+    phase: "intro", s, chars, n, base: Number(base), mod: Number(mod), round: 0,
+    lo: n > 1 ? 1 : 0, hi: Math.max(0, n - 1), mid: null,
+    currentStart: null, currentEnd: null, previousStart: null,
+    currentHash: null, previousHash: null, power: null, outgoing: null, incoming: null,
+    windows: [], bestStart: -1, bestLength: 0, decision: null, history: [],
+    ...overrides,
+  });
+  const add = (title, note, codeLines, data, final = false) => {
+    steps.push({
+      title, note, codeLines, final,
+      arr: chars,
+      sub: chars.map((_, index) => `[${index}]`),
+      highlight: range(data.currentStart, data.mid || 0),
+      mark: range(data.bestStart, data.bestLength),
+      vars: [
+        { name: "lo", value: data.lo },
+        { name: "hi", value: data.hi },
+        ...(data.mid === null ? [] : [{ name: "L = mid", value: data.mid }]),
+        { name: "best", value: data.bestLength ? `"${s.slice(data.bestStart, data.bestStart + data.bestLength)}"` : '""' },
+      ],
+      longestDupView: data,
+    });
+  };
+
+  if (n < 2) {
+    const data = view({ phase: "done", lo: 0, hi: 0, decision: "empty" });
+    add(
+      { vi: 'Chuỗi ngắn hơn 2 ký tự → return ""', en: 'String shorter than 2 → return ""' },
+      { vi: "Cần ít nhất hai vị trí để một chuỗi con xuất hiện hai lần.", en: "A substring needs at least two positions to occur twice." },
+      lines.done, data, true,
+    );
+    return { original: s, answer: "", steps };
+  }
+
+  let lo = 1;
+  let hi = n - 1;
+  let bestStart = -1;
+  let bestLength = 0;
+  let round = 0;
+  const history = [];
+
+  add(
+    { vi: "Mục tiêu: binary search độ dài chuỗi con lặp", en: "Goal: binary-search the duplicate length" },
+    {
+      vi: "Nếu tồn tại chuỗi con lặp dài L thì mọi độ dài nhỏ hơn L cũng khả thi. Ta tìm L lớn nhất trong [1, n−1]; mỗi lần kiểm tra L bằng Rolling Hash.",
+      en: "If a duplicate of length L exists, every shorter length is feasible. Find the largest L in [1, n−1], checking each L with a rolling hash.",
+    },
+    lines.setup, view({ lo, hi, bestStart, bestLength }),
+  );
+
+  while (lo <= hi) {
+    round += 1;
+    const mid = Math.floor((lo + hi) / 2);
+    const roundLo = lo;
+    const roundHi = hi;
+    const common = () => ({
+      round, lo: roundLo, hi: roundHi, mid, bestStart, bestLength,
+      history: history.map((item) => ({ ...item })),
+    });
+    add(
+      { vi: `Vòng ${round}: chọn L = ${mid}`, en: `Round ${round}: choose L = ${mid}` },
+      {
+        vi: `Khoảng hiện tại [${roundLo}, ${roundHi}]. Ta kiểm tra xem có hai cửa sổ độ dài ${mid} giống hệt nhau không.`,
+        en: `Current range [${roundLo}, ${roundHi}]. Check whether two length-${mid} windows are identical.`,
+      },
+      lines.choose, view({ ...common(), phase: "choose-length" }),
+    );
+
+    let power = 1n;
+    for (let index = 0; index < mid; index += 1) power = (power * base) % mod;
+    let hash = 0n;
+    for (let index = 0; index < mid; index += 1) hash = (hash * base + values[index]) % mod;
+    const seen = new Map([[hash.toString(), [0]]]);
+    const windows = [{ start: 0, text: s.slice(0, mid), hash: hash.toString(), status: "seen" }];
+    add(
+      { vi: `Khởi tạo hash cho "${s.slice(0, mid)}"`, en: `Initialize the hash for "${s.slice(0, mid)}"` },
+      {
+        vi: `Mã hóa a=1,…,z=26. Tính hash cửa sổ [0..${mid - 1}] và lưu start=0. power=base^L giúp loại ký tự bên trái khi trượt.`,
+        en: `Encode a=1,…,z=26. Hash window [0..${mid - 1}] and store start=0. power=base^L removes the outgoing character when sliding.`,
+      },
+      lines.init,
+      view({ ...common(), phase: "hash-init", currentStart: 0, currentEnd: mid - 1, currentHash: hash.toString(), power: power.toString(), windows: windows.map((item) => ({ ...item })) }),
+    );
+
+    let foundStart = -1;
+    let matchedStart = -1;
+    for (let start = 1; start + mid <= n; start += 1) {
+      const oldHash = hash;
+      const outgoing = chars[start - 1];
+      const incoming = chars[start + mid - 1];
+      hash = (hash * base - values[start - 1] * power + values[start + mid - 1]) % mod;
+      if (hash < 0n) hash += mod;
+      const key = hash.toString();
+      const candidates = seen.get(key) || [];
+      matchedStart = candidates.find((previous) => s.slice(previous, previous + mid) === s.slice(start, start + mid));
+      const matched = matchedStart !== undefined;
+      const collision = !matched && candidates.length > 0;
+      const record = { start, text: s.slice(start, start + mid), hash: key, status: matched ? "match" : (collision ? "collision" : "seen") };
+      windows.push(record);
+      add(
+        {
+          vi: matched ? `Tìm thấy "${record.text}" ở hai vị trí` : `Trượt sang cửa sổ [${start}..${start + mid - 1}]`,
+          en: matched ? `Found "${record.text}" at two positions` : `Slide to window [${start}..${start + mid - 1}]`,
+        },
+        {
+          vi: matched
+            ? `Hash ${key} đã có tại index ${matchedStart}. So sánh trực tiếp xác nhận s[${matchedStart}:${matchedStart + mid}] = s[${start}:${start + mid}] = "${record.text}".`
+            : collision
+              ? `Hash ${key} đã có nhưng chuỗi thực tế khác nhau: đây là collision, tiếp tục quét.`
+              : `Bỏ '${outgoing}', nhân hash cũ với base ${base}, rồi thêm '${incoming}'. Hash ${key} chưa có nên lưu start=${start}.`,
+          en: matched
+            ? `Hash ${key} exists at index ${matchedStart}. Direct comparison confirms s[${matchedStart}:${matchedStart + mid}] = s[${start}:${start + mid}] = "${record.text}".`
+            : collision
+              ? `Hash ${key} exists but the actual strings differ: this is a collision, so keep scanning.`
+              : `Remove '${outgoing}', multiply the old hash by base ${base}, then add '${incoming}'. Hash ${key} is new, so store start=${start}.`,
+        },
+        matched ? lines.match : lines.slide,
+        view({
+          ...common(), phase: matched ? "match" : "slide", currentStart: start, currentEnd: start + mid - 1,
+          previousStart: matched ? matchedStart : null, currentHash: key, previousHash: oldHash.toString(),
+          power: power.toString(), outgoing, incoming, windows: windows.map((item) => ({ ...item })),
+          decision: matched ? "found" : (collision ? "collision" : "new-hash"),
+        }),
+      );
+      if (matched) {
+        foundStart = start;
+        break;
+      }
+      if (!seen.has(key)) seen.set(key, []);
+      seen.get(key).push(start);
+    }
+
+    const found = foundStart !== -1;
+    if (found) {
+      bestStart = foundStart;
+      bestLength = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+    history.push({ round, lo: roundLo, hi: roundHi, mid, found, nextLo: lo, nextHi: hi });
+    add(
+      {
+        vi: found ? `L=${mid} khả thi → thử dài hơn` : `L=${mid} không khả thi → thử ngắn hơn`,
+        en: found ? `L=${mid} is feasible → try longer` : `L=${mid} is not feasible → try shorter`,
+      },
+      {
+        vi: found
+          ? `Đã tìm thấy "${s.slice(bestStart, bestStart + bestLength)}". Lưu làm best và đặt lo=${lo}.`
+          : `Quét hết ${n - mid + 1} cửa sổ mà không có cặp giống nhau. Đặt hi=${hi}.`,
+        en: found
+          ? `Found "${s.slice(bestStart, bestStart + bestLength)}". Save it as best and set lo=${lo}.`
+          : `Scanned all ${n - mid + 1} windows without an equal pair. Set hi=${hi}.`,
+      },
+      found ? lines.found : lines.miss,
+      view({
+        round, phase: "decision", lo, hi, mid, bestStart, bestLength,
+        currentStart: foundStart, currentEnd: found ? foundStart + mid - 1 : null,
+        previousStart: found ? matchedStart : null, decision: found ? "longer" : "shorter",
+        windows: windows.map((item) => ({ ...item })), history: history.map((item) => ({ ...item })),
+      }),
+    );
+  }
+
+  const answer = bestStart === -1 ? "" : s.slice(bestStart, bestStart + bestLength);
+  add(
+    { vi: `Hoàn tất → return "${answer}"`, en: `Done → return "${answer}"` },
+    {
+      vi: answer ? `lo > hi. Chuỗi con lặp dài nhất là "${answer}", độ dài ${bestLength}; hai lần xuất hiện có thể chồng lấn.` : "Không có độ dài nào khả thi nên trả về chuỗi rỗng.",
+      en: answer ? `lo > hi. The longest duplicated substring is "${answer}", length ${bestLength}; its occurrences may overlap.` : "No length is feasible, so return the empty string.",
+    },
+    lines.done,
+    view({ round, phase: "done", lo, hi, bestStart, bestLength, currentStart: bestStart, currentEnd: bestStart >= 0 ? bestStart + bestLength - 1 : null, decision: "done", history: history.map((item) => ({ ...item })) }),
+    true,
+  );
+  return { original: s, answer, steps };
+}
+
 function buildSteps875(input, params) {
   const parsedPiles = Array.isArray(input)
     ? [...input]
@@ -2785,18 +2981,33 @@ module.exports = {
     code: [
       "class Solution:",
       "    def longestDupSubstring(self, s):",
-      "        def search(L):",
-      "            # rolling hash of window length L; seen = set of hashes",
-      "            # for each window: if hash seen -> return start, else add",
+      "        n = len(s)",
+      "        base, mod = 26, 1_000_000_007",
+      "        values = [ord(char) - ord('a') + 1 for char in s]",
+      "        def search(length):",
+      "            power = pow(base, length, mod)",
+      "            current = 0",
+      "            for value in values[:length]:",
+      "                current = (current * base + value) % mod",
+      "            seen = {current: [0]}",
+      "            for start in range(1, n - length + 1):",
+      "                current = (current * base - values[start - 1] * power + values[start + length - 1]) % mod",
+      "                for previous in seen.get(current, []):",
+      "                    if s[previous:previous + length] == s[start:start + length]:",
+      "                        return start",
+      "                seen.setdefault(current, []).append(start)",
       "            return -1",
-      "        lo, hi = 1, n - 1",
-      "        start, best = -1, 0",
+      "        lo, hi = 1, len(s) - 1",
+      "        best_start, best_length = -1, 0",
       "        while lo <= hi:",
-      "            mid = (lo + hi) // 2",
-      "            idx = search(mid)",
-      "            if idx != -1: start, best = idx, mid; lo = mid + 1",
-      "            else: hi = mid - 1",
-      "        return s[start:start+best]",
+      "            length = (lo + hi) // 2",
+      "            duplicate_start = search(length)",
+      "            if duplicate_start != -1:",
+      "                best_start, best_length = duplicate_start, length",
+      "                lo = length + 1",
+      "            else:",
+      "                hi = length - 1",
+      "        return s[best_start:best_start + best_length]",
     ],
     builder: buildSteps1044,
   },

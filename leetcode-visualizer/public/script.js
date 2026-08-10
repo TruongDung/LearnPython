@@ -7921,6 +7921,7 @@ function renderFenwickView(step) {
 
 function renderSegmentTreeView(step) {
   const view = step.segmentTreeView || {};
+  const mapMode = view.mapMode === true;
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const tree = Array.isArray(view.tree) ? view.tree : [];
   const coverage = Array.isArray(view.coverage) ? view.coverage : [];
@@ -7982,12 +7983,12 @@ function renderSegmentTreeView(step) {
     idle: lang === "vi" ? "chờ" : "idle",
   }[mode];
 
-  $("treeView").innerHTML = `<div class="segment-tree-viz mode-${mode}">
+  $("treeView").innerHTML = `<div class="segment-tree-viz mode-${mode}${mapMode ? " map-mode" : ""}">
     <div class="segment-tree-mode"><span>${escapeHtml(modeLabel)}</span><strong>${pathText}</strong></div>
     <div class="segment-tree-scroll">
       <div class="segment-tree-heading">nums (0-based)</div>
       <div class="segment-tree-nums" style="--segment-nums-cols:${Math.max(1, nums.length)}">${numsCells}</div>
-      <div class="segment-tree-heading">Segment Tree array (1-based display)</div>
+      <div class="segment-tree-heading">${mapMode ? "Segment Tree · {value: frequency}" : "Segment Tree array (1-based display)"}</div>
       <div class="segment-tree-levels">${treeLevels}</div>
     </div>
     <div class="segment-tree-status">${statusItems}</div>
@@ -10826,6 +10827,90 @@ function renderValidSequenceView(step) {
   </div>`;
 }
 
+function renderLongestDuplicateView(step) {
+  const view = step.longestDupView || {};
+  const vi = lang === "vi";
+  const source = String(view.s || "");
+  const chars = Array.isArray(view.chars) ? view.chars : [...String(view.s || "")];
+  const windows = Array.isArray(view.windows) ? view.windows : [];
+  const history = Array.isArray(view.history) ? view.history : [];
+  const currentStart = Number.isInteger(view.currentStart) ? view.currentStart : -1;
+  const previousStart = Number.isInteger(view.previousStart) ? view.previousStart : -1;
+  const length = Number.isInteger(view.mid) ? view.mid : 0;
+  const bestStart = Number.isInteger(view.bestStart) ? view.bestStart : -1;
+  const bestLength = Number.isInteger(view.bestLength) ? view.bestLength : 0;
+  const phaseIndex = ["intro", "choose-length"].includes(view.phase) ? 0
+    : ["hash-init", "slide", "match"].includes(view.phase) ? 1
+      : 2;
+  const phaseLabels = vi
+    ? ["1 · Chọn độ dài L", "2 · Quét Rolling Hash", "3 · Cập nhật đáp án"]
+    : ["1 · Choose length L", "2 · Scan rolling hashes", "3 · Update answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`).join("");
+
+  const tested = new Map(history.map((item) => [item.mid, item.found]));
+  const lengthCells = Array.from({ length: Math.max(0, chars.length - 1) }, (_, index) => {
+    const candidate = index + 1;
+    const classes = ["ld1044-length"];
+    if (candidate === view.mid) classes.push("current");
+    if (tested.has(candidate)) classes.push(tested.get(candidate) ? "feasible" : "infeasible");
+    if (candidate < view.lo || candidate > view.hi) classes.push("outside");
+    return `<span class="${classes.join(" ")}"><small>L</small><strong>${candidate}</strong></span>`;
+  }).join("");
+
+  const charCells = chars.map((char, index) => {
+    const inCurrent = length > 0 && index >= currentStart && index < currentStart + length;
+    const inPrevious = length > 0 && index >= previousStart && index < previousStart + length;
+    const inBest = bestLength > 0 && index >= bestStart && index < bestStart + bestLength;
+    const classes = ["ld1044-char"];
+    if (inBest) classes.push("best");
+    if (inCurrent) classes.push("current");
+    if (inPrevious) classes.push("previous");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${inCurrent ? "B" : inPrevious ? "A" : ""}</em></span>`;
+  }).join("");
+
+  let hashDetail = `<div class="ld1044-hash idle"><small>${vi ? "ROLLING HASH" : "ROLLING HASH"}</small><strong>hash(window)</strong><span>${vi ? "Chọn L trước khi bắt đầu quét" : "Choose L before scanning"}</span></div>`;
+  if (view.phase === "hash-init") {
+    hashDetail = `<div class="ld1044-hash"><small>${vi ? "HASH CỬA SỔ ĐẦU" : "FIRST WINDOW HASH"}</small><strong>h = ${escapeHtml(String(view.currentHash))}</strong><span>power = ${view.base}<sup>${view.mid}</sup> mod ${view.mod} = ${escapeHtml(String(view.power))}</span></div>`;
+  } else if (["slide", "match"].includes(view.phase)) {
+    const state = view.decision === "found" ? "success" : view.decision === "collision" ? "collision" : "";
+    hashDetail = `<div class="ld1044-hash ${state}"><small>${vi ? "CÔNG THỨC TRƯỢT" : "ROLLING FORMULA"}</small><strong>h' = (h × ${view.base} − '${escapeHtml(view.outgoing)}' × power + '${escapeHtml(view.incoming)}') mod M</strong><span>${escapeHtml(String(view.previousHash))} → ${escapeHtml(String(view.currentHash))}</span></div>`;
+  }
+
+  const visibleWindows = windows.slice(-12);
+  const hiddenCount = windows.length - visibleWindows.length;
+  const windowRows = visibleWindows.map((item) => {
+    const isCurrent = item.start === currentStart;
+    const isPrevious = item.start === previousStart;
+    const classes = [item.status || "seen"];
+    if (isCurrent) classes.push("current");
+    if (isPrevious) classes.push("previous");
+    const status = isPrevious ? "MATCH A" : isCurrent && view.decision === "found" ? "MATCH B" : item.status === "collision" ? "COLLISION" : isCurrent ? "CURRENT" : "SEEN";
+    return `<tr class="${classes.join(" ")}"><td>${item.start}</td><td><code>"${escapeHtml(item.text)}"</code></td><td><code>${escapeHtml(String(item.hash))}</code></td><td><span>${status}</span></td></tr>`;
+  }).join("");
+  const windowsTable = windows.length
+    ? `<div class="ld1044-table-wrap"><table class="ld1044-table"><thead><tr><th>start</th><th>substring</th><th>hash</th><th>state</th></tr></thead><tbody>${hiddenCount > 0 ? `<tr><td colspan="4">… ${hiddenCount} ${vi ? "cửa sổ trước" : "earlier windows"}</td></tr>` : ""}${windowRows}</tbody></table></div>`
+    : `<div class="ld1044-empty">${vi ? "Chưa tạo cửa sổ hash" : "No hash window yet"}</div>`;
+
+  const historyRows = history.map((item) => `<tr><td>${item.round}</td><td>[${item.lo}, ${item.hi}]</td><td>${item.mid}</td><td><b class="${item.found ? "yes" : "no"}">${item.found ? (vi ? "CÓ" : "YES") : (vi ? "KHÔNG" : "NO")}</b></td><td>[${item.nextLo}, ${item.nextHi}]</td></tr>`).join("");
+  const historyTable = historyRows
+    ? `<table class="ld1044-history"><thead><tr><th>#</th><th>[lo, hi]</th><th>mid</th><th>dup?</th><th>${vi ? "khoảng mới" : "next range"}</th></tr></thead><tbody>${historyRows}</tbody></table>`
+    : `<div class="ld1044-empty">${vi ? "Chưa có quyết định binary search" : "No binary-search decision yet"}</div>`;
+  const bestText = bestLength > 0 ? source.slice(bestStart, bestStart + bestLength) : "";
+  const decisionText = view.decision === "longer" ? (vi ? "Có duplicate → lo = mid + 1" : "Duplicate found → lo = mid + 1")
+    : view.decision === "shorter" ? (vi ? "Không có duplicate → hi = mid − 1" : "No duplicate → hi = mid − 1")
+      : view.decision === "found" ? (vi ? "Hash trùng + chuỗi trùng → tìm thấy" : "Same hash + same text → found")
+        : (vi ? "Đang kiểm tra" : "Checking");
+
+  $("treeView").innerHTML = `<div class="ld1044-viz">
+    <div class="ld1044-phases">${phases}</div>
+    <section class="ld1044-bounds"><header><strong>BINARY SEARCH · LENGTH</strong><span>lo=${view.lo} · hi=${view.hi}${view.mid === null ? "" : ` · mid=${view.mid}`}</span></header><div>${lengthCells}</div></section>
+    <section class="ld1044-string"><header><strong>s = "${escapeHtml(view.s || "")}"</strong><span>${vi ? "A/B là hai lần xuất hiện được xác nhận" : "A/B are the confirmed occurrences"}</span></header><div class="ld1044-char-row">${charCells}</div></section>
+    <div class="ld1044-main">${hashDetail}<div class="ld1044-best"><small>BEST SO FAR</small><strong>"${escapeHtml(bestText)}"</strong><span>start=${bestStart} · length=${bestLength}</span></div></div>
+    <section class="ld1044-section"><header><strong>${vi ? "CÁC CỬA SỔ ĐÃ QUÉT · L=" : "SCANNED WINDOWS · L="}${view.mid ?? "—"}</strong><span>${escapeHtml(decisionText)}</span></header>${windowsTable}</section>
+    <section class="ld1044-section history"><header><strong>${vi ? "NHẬT KÝ BINARY SEARCH" : "BINARY SEARCH LOG"}</strong><span>${vi ? "CÓ → sang phải · KHÔNG → sang trái" : "YES → right · NO → left"}</span></header>${historyTable}</section>
+  </div>`;
+}
+
 // ---- Render a single step ----
 function renderStep() {
   const step = steps[stepIndex];
@@ -10849,6 +10934,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.longestDupView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderLongestDuplicateView(step);
   } else if (step.validSequenceView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
