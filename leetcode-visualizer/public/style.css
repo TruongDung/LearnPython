@@ -7510,10 +7510,26 @@ button:disabled {
   stroke: #34d399;
 }
 
-.rw-trie-node .rw-trie-word {
+.rw-trie-meta rect {
+  fill: rgba(15, 23, 42, 0.9);
+  stroke: rgba(148, 163, 184, 0.42);
+  stroke-width: 1.5;
+}
+
+.rw-trie-meta.terminal rect {
+  fill: rgba(6, 78, 59, 0.86);
+  stroke: rgba(52, 211, 153, 0.78);
+}
+
+.rw-trie-meta text {
+  fill: #cbd5e1;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.rw-trie-meta.terminal text,
+.rw-trie-meta .rw-trie-word {
   fill: #a7f3d0;
-  font-size: 10px;
-  font-weight: 800;
 }
 
 .rw-trie-empty {
@@ -7784,6 +7800,25 @@ button:disabled {
 [data-theme="light"] .rw-trie-node.active.terminal circle,
 [data-theme="light"] .rw-trie-node.active .rw-trie-ring {
   stroke: #059669;
+}
+
+[data-theme="light"] .rw-trie-meta rect {
+  fill: #ffffff;
+  stroke: #cbd5e1;
+}
+
+[data-theme="light"] .rw-trie-meta.terminal rect {
+  fill: #ecfdf5;
+  stroke: #059669;
+}
+
+[data-theme="light"] .rw-trie-meta text {
+  fill: #475569;
+}
+
+[data-theme="light"] .rw-trie-meta.terminal text,
+[data-theme="light"] .rw-trie-meta .rw-trie-word {
+  fill: #047857;
 }
 
 [data-theme="light"] .rw-root.active,

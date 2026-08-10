@@ -6544,10 +6544,11 @@ function renderReplaceWordsView(step) {
       const maxX = trieNodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
       const maxY = trieNodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
       const width = Math.max(560, (maxX + 1) * 92 + 80);
-      const height = Math.max(180, (maxY + 1) * 82 + 48);
+      const height = Math.max(220, (maxY + 1) * 92 + 72);
       const xFor = (node) => 40 + (Number(node.x) || 0) * 92;
-      const yFor = (node) => 36 + (Number(node.y) || 0) * 82;
+      const yFor = (node) => 36 + (Number(node.y) || 0) * 92;
       const nodeById = new Map(trieNodes.map((node) => [node.id, node]));
+      const shortenTrieWord = (word) => (String(word).length > 14 ? `${String(word).slice(0, 11)}...` : String(word));
       const edges = trieNodes
         .filter((node) => node.parentId !== null && node.parentId !== undefined && nodeById.has(node.parentId))
         .map((node) => ({ from: nodeById.get(node.parentId), to: node }))
@@ -6570,14 +6571,22 @@ function renderReplaceWordsView(step) {
         if (node.isWord) classes.push("terminal");
         if (activeTrieIds.has(node.id)) classes.push("active");
         const label = node.parentId === null || node.parentId === undefined ? "root" : node.label;
-        const wordBadge = node.isWord && node.sub
-          ? `<text class="rw-trie-word" x="0" y="39">${escapeHtml(node.sub)}</text>`
+        const showMeta = node.isWord || activeTrieIds.has(node.id);
+        const metaWidth = node.isWord && node.sub
+          ? Math.min(152, Math.max(94, 70 + String(node.sub).length * 7))
+          : 92;
+        const metaBadge = showMeta
+          ? `<g class="rw-trie-meta${node.isWord ? " terminal" : ""}" transform="translate(${-metaWidth / 2} 32)">
+              <rect width="${metaWidth}" height="${node.isWord ? 38 : 20}" rx="6"></rect>
+              <text x="${metaWidth / 2}" y="14">is_root=${node.isWord ? "True" : "False"}</text>
+              ${node.isWord && node.sub ? `<text class="rw-trie-word" x="${metaWidth / 2}" y="30">word="${escapeHtml(shortenTrieWord(node.sub))}"</text>` : ""}
+            </g>`
           : "";
         return `<g class="${classes.join(" ")}" transform="translate(${xFor(node)} ${yFor(node)})">
           <circle r="21"></circle>
           <text y="5">${escapeHtml(label)}</text>
           ${node.isWord ? '<circle class="rw-trie-ring" r="26"></circle>' : ""}
-          ${wordBadge}
+          ${metaBadge}
         </g>`;
       }).join("");
 
