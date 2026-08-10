@@ -2797,11 +2797,11 @@ function buildSteps2080SegmentTree(nums, params) {
   };
   const treeSnapshot = () => tree.slice(1).map(formatMap);
   const coverageSnapshot = () => coverage.slice(1).map((indices) => [...indices]);
-  const snapshot = ({ title, note, codeLine, mode = "build", activeTree = [], status = [], vars = [], final = false }) => {
+  const snapshot = ({ title, note, codeLine, codeLines, mode = "build", activeTree = [], status = [], vars = [], final = false }) => {
     steps.push({
       title,
       note,
-      codeLines: [codeLine],
+      codeLines: Array.isArray(codeLines) ? codeLines : [codeLine],
       codeBlock: 2,
       final,
       segmentTreeView: {
@@ -2829,7 +2829,7 @@ function buildSteps2080SegmentTree(nums, params) {
       vi: "Mỗi node lưu một bảng {value: số lần xuất hiện} trong đoạn mà node quản lý. size là lũy thừa 2 nhỏ nhất không bé hơn n.",
       en: "Each node stores a {value: frequency} map for its covered range. size is the smallest power of two not less than n.",
     },
-    codeLine: 8,
+    codeLines: [5, 6, 7, 8],
     status: [{ label: "n", value: n }, { label: "size", value: size }, { label: "tree nodes", value: 2 * size - 1 }],
   });
 
@@ -2843,7 +2843,7 @@ function buildSteps2080SegmentTree(nums, params) {
         vi: `Lá chỉ quản lý index ${index}, nên frequency map là {${nums[index]}:1}.`,
         en: `This leaf covers only index ${index}, so its frequency map is {${nums[index]}:1}.`,
       },
-      codeLine: 10,
+      codeLines: [9, 10],
       activeTree: [node],
       status: [{ label: "leaf", value: node }, { label: "range", value: `[${index}, ${index}]` }, { label: "map", value: formatMap(tree[node]) }],
       vars: [{ name: `tree[${node}]`, value: formatMap(tree[node]) }],
@@ -2862,7 +2862,7 @@ function buildSteps2080SegmentTree(nums, params) {
         vi: `Cộng frequency theo từng value từ tree[${node * 2}] và tree[${node * 2 + 1}].`,
         en: `Add frequencies value by value from tree[${node * 2}] and tree[${node * 2 + 1}].`,
       },
-      codeLine: 12,
+      codeLines: [11, 12],
       activeTree: [node * 2, node * 2 + 1, node],
       status: [
         { label: `tree[${node * 2}]`, value: formatMap(tree[node * 2]) },
@@ -2882,7 +2882,7 @@ function buildSteps2080SegmentTree(nums, params) {
       vi: `Đổi sang đoạn nửa mở ở tầng lá: [${queryLeft}, ${queryRight}). Mỗi node được chọn nằm hoàn toàn trong query.`,
       en: `Convert to a half-open leaf range [${queryLeft}, ${queryRight}). Every selected node lies completely inside the query.`,
     },
-    codeLine: 15,
+    codeLines: [13, 14, 15, 16],
     mode: "query",
     activeTree: [queryLeft, queryRight - 1],
     status: [{ label: "leaf range", value: `[${queryLeft}, ${queryRight})` }, { label: "target value", value }],
@@ -2891,13 +2891,15 @@ function buildSteps2080SegmentTree(nums, params) {
 
   while (queryLeft < queryRight) {
     const pickedThisLevel = [];
-    if (queryLeft % 2 === 1) {
+    const pickedLeft = queryLeft % 2 === 1;
+    const pickedRight = queryRight % 2 === 1;
+    if (pickedLeft) {
       pickedThisLevel.push(queryLeft);
       selected.push(queryLeft);
       answer += tree[queryLeft].get(value) || 0;
       queryLeft += 1;
     }
-    if (queryRight % 2 === 1) {
+    if (pickedRight) {
       queryRight -= 1;
       pickedThisLevel.push(queryRight);
       selected.push(queryRight);
@@ -2916,7 +2918,13 @@ function buildSteps2080SegmentTree(nums, params) {
           ? `These nodes lie fully inside [${left}, ${right}]. Add their count for value ${value}; running total = ${answer}.`
           : "Neither boundary forms a fully covered node yet; climb to the parents.",
       },
-      codeLine: pickedThisLevel.length ? 19 : 17,
+      codeLines: [
+        17,
+        ...(pickedLeft ? [18, 19, 20] : []),
+        ...(pickedRight ? [21, 22, 23] : []),
+        24,
+        25,
+      ],
       mode: "query",
       activeTree: pickedThisLevel,
       status: [
@@ -5401,7 +5409,6 @@ module.exports = {
       "            right //= 2",
       "        return answer",
     ],
-    debugMode: "semantic",
     builder: buildSteps2080,
   },
   2286: {
