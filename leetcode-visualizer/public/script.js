@@ -7577,20 +7577,32 @@ function renderPrefix1DView(step) {
   const query = view.query || null;
   const left = query && Number.isInteger(query.left) ? query.left : -1;
   const right = query && Number.isInteger(query.right) ? query.right : -1;
+  const isRangeSumImmutable = view.kind === "range-sum-immutable";
 
   const numsCells = nums.map((num, index) => {
     const inQuery = left >= 0 && index >= left && index <= right;
-    return `<div class="prefix1d-cell input${index === current ? " current" : ""}${inQuery ? " in-query" : ""}">
+    const excludedLeft = isRangeSumImmutable && left > 0 && index < left;
+    return `<div class="prefix1d-cell input${index === current ? " current" : ""}${inQuery ? " in-query" : ""}${excludedLeft ? " excluded-left" : ""}">
       <span>[${index}]</span>
       <strong>${escapeHtml(String(num))}</strong>
+      ${inQuery ? `<small>${escapeHtml(lang === "vi" ? "lấy" : "keep")}</small>` : ""}
+      ${excludedLeft ? `<small>${escapeHtml(lang === "vi" ? "trừ ra" : "subtract")}</small>` : ""}
     </div>`;
   }).join("");
 
   const prefixCells = prefix.map((value, index) => {
     const isQueryEdge = query && (index === left || index === right + 1);
+    const isLeftEdge = query && index === left;
+    const isRightEdge = query && index === right + 1;
+    const rangeLabel = index === 0
+      ? "0"
+      : `nums[0..${index - 1}]`;
     return `<div class="prefix1d-cell prefix${index === prefixIndex ? " current" : ""}${isQueryEdge ? " edge" : ""}">
       <span>p[${index}]</span>
       <strong>${value == null ? "-" : escapeHtml(String(value))}</strong>
+      ${isRightEdge ? `<small>${escapeHtml(lang === "vi" ? "tổng đến right" : "sum through right")}</small>` : ""}
+      ${isLeftEdge ? `<small>${escapeHtml(lang === "vi" ? "trước left" : "before left")}</small>` : ""}
+      ${!isRightEdge && !isLeftEdge ? `<small>${escapeHtml(rangeLabel)}</small>` : ""}
     </div>`;
   }).join("");
 
@@ -7599,8 +7611,33 @@ function renderPrefix1DView(step) {
     <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
   </div>`).join("");
 
+  let proofHtml = "";
+  if (isRangeSumImmutable && query && Number.isInteger(query.answer)) {
+    const rightPrefixIndex = Number.isInteger(query.rightPrefixIndex) ? query.rightPrefixIndex : right + 1;
+    const leftPrefixIndex = Number.isInteger(query.leftPrefixIndex) ? query.leftPrefixIndex : left;
+    const rightPrefixValue = query.rightPrefixValue ?? prefix[rightPrefixIndex];
+    const leftPrefixValue = query.leftPrefixValue ?? prefix[leftPrefixIndex];
+    const included = Array.isArray(query.included) ? query.included : nums.slice(left, right + 1);
+    const excludedLeft = Array.isArray(query.excludedLeft) ? query.excludedLeft : nums.slice(0, left);
+    proofHtml = `<div class="prefix1d-proof">
+      <div class="prefix1d-proof-title">${escapeHtml(lang === "vi" ? "Cách tính sumRange" : "How sumRange is computed")}</div>
+      <div class="prefix1d-formula">
+        <span class="take"><small>prefix[${escapeHtml(String(rightPrefixIndex))}]</small><b>${escapeHtml(String(rightPrefixValue))}</b></span>
+        <strong>-</strong>
+        <span class="drop"><small>prefix[${escapeHtml(String(leftPrefixIndex))}]</small><b>${escapeHtml(String(leftPrefixValue))}</b></span>
+        <strong>=</strong>
+        <span class="answer"><small>sumRange(${escapeHtml(String(left))}, ${escapeHtml(String(right))})</small><b>${escapeHtml(String(query.answer))}</b></span>
+      </div>
+      <div class="prefix1d-proof-detail">
+        <span>${escapeHtml(lang === "vi" ? "prefix[right+1] chứa:" : "prefix[right+1] contains:")} [${escapeHtml(nums.slice(0, right + 1).join(", "))}]</span>
+        <span>${escapeHtml(lang === "vi" ? "trừ phần trước left:" : "subtract before left:")} [${escapeHtml(excludedLeft.join(", ") || "∅")}]</span>
+        <span>${escapeHtml(lang === "vi" ? "còn lại đoạn query:" : "remaining query range:")} [${escapeHtml(included.join(", "))}]</span>
+      </div>
+    </div>`;
+  }
+
   $("treeView").innerHTML = `
-    <div class="prefix1d-viz">
+    <div class="prefix1d-viz${isRangeSumImmutable ? " range-sum-query" : ""}">
       <div>
         <div class="prefix1d-heading">nums</div>
         <div class="prefix1d-row">${numsCells}</div>
@@ -7609,7 +7646,212 @@ function renderPrefix1DView(step) {
         <div class="prefix1d-heading">prefix</div>
         <div class="prefix1d-row prefix-row">${prefixCells}</div>
       </div>
+      ${proofHtml}
       <div class="prefix1d-status">${statusItems}</div>
+    </div>`;
+}
+
+function renderRangeFrequencyView(step) {
+  const view = step.rangeFrequencyView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const query = view.query || {};
+  const left = Number.isInteger(query.left) ? query.left : -1;
+  const right = Number.isInteger(query.right) ? query.right : -1;
+  const value = query.value;
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const activeValue = view.activeValue;
+  const queryPositions = new Set(Array.isArray(view.queryPositions) ? view.queryPositions : []);
+  const activeEntry = entries.find((entry) => entry.value === activeValue)
+    || entries.find((entry) => entry.value === value)
+    || null;
+  const activeIndices = activeEntry && Array.isArray(activeEntry.indices) ? activeEntry.indices : [];
+  const lo = Number.isInteger(view.lo) ? view.lo : null;
+  const hi = Number.isInteger(view.hi) ? view.hi : null;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : null;
+  const rightPos = Number.isInteger(view.rightPos) ? view.rightPos : null;
+
+  const numCells = nums.map((num, index) => {
+    const inRange = left >= 0 && index >= left && index <= right;
+    const isTarget = num === value;
+    const isAnswer = queryPositions.has(index);
+    const classes = ["rfq-num"];
+    if (index === current) classes.push("current");
+    if (inRange) classes.push("in-range");
+    if (isTarget) classes.push("target");
+    if (isAnswer) classes.push("answer");
+    return `<div class="${classes.join(" ")}">
+      <span>[${index}]</span>
+      <strong>${escapeHtml(String(num))}</strong>
+      ${isAnswer ? `<small>${escapeHtml(lang === "vi" ? "đếm" : "count")}</small>` : ""}
+    </div>`;
+  }).join("");
+
+  const entryRows = entries.length
+    ? entries.map((entry) => {
+      const isActive = entry.value === activeValue || entry.value === value;
+      const indexChips = (Array.isArray(entry.indices) ? entry.indices : []).map((index) => {
+        const isQueryHit = entry.value === value && index >= left && index <= right;
+        return `<span class="${isQueryHit ? "hit" : ""}">${escapeHtml(String(index))}</span>`;
+      }).join("");
+      return `<div class="rfq-entry${isActive ? " active" : ""}">
+        <strong>${escapeHtml(String(entry.value))}</strong>
+        <div>${indexChips || "<span>∅</span>"}</div>
+      </div>`;
+    }).join("")
+    : `<div class="rfq-empty">${escapeHtml(lang === "vi" ? "Chưa có index nào" : "No indices yet")}</div>`;
+
+  const indexCells = activeIndices.length
+    ? activeIndices.map((index, pos) => {
+      const inWindow = lo !== null && hi !== null && pos >= lo && pos < hi;
+      const inAnswerSlice = leftPos !== null && rightPos !== null && pos >= leftPos && pos < rightPos;
+      const classes = ["rfq-index"];
+      if (pos === mid) classes.push("mid");
+      if (inWindow) classes.push("window");
+      if (inAnswerSlice) classes.push("answer");
+      return `<div class="${classes.join(" ")}">
+        <span>pos ${pos}</span>
+        <strong>${escapeHtml(String(index))}</strong>
+        ${pos === mid ? "<small>mid</small>" : ""}
+      </div>`;
+    }).join("")
+    : `<div class="rfq-empty">${escapeHtml(lang === "vi" ? "Value này không xuất hiện" : "This value does not appear")}</div>`;
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const formulaHtml = Number.isInteger(view.answer)
+    ? `<div class="rfq-formula">
+        <span><small>bisect_right</small><b>${escapeHtml(String(rightPos ?? "-"))}</b></span>
+        <strong>-</strong>
+        <span><small>bisect_left</small><b>${escapeHtml(String(leftPos ?? "-"))}</b></span>
+        <strong>=</strong>
+        <span class="answer"><small>frequency</small><b>${escapeHtml(String(view.answer))}</b></span>
+      </div>`
+    : "";
+
+  $("treeView").innerHTML = `
+    <div class="rfq-viz">
+      <div class="rfq-query">
+        <span><small>left</small><b>${escapeHtml(String(left))}</b></span>
+        <span><small>right</small><b>${escapeHtml(String(right))}</b></span>
+        <span><small>value</small><b>${escapeHtml(String(value))}</b></span>
+      </div>
+      <section>
+        <div class="rfq-heading">arr</div>
+        <div class="rfq-num-row">${numCells}</div>
+      </section>
+      <section>
+        <div class="rfq-heading">value → sorted indices</div>
+        <div class="rfq-map">${entryRows}</div>
+      </section>
+      <section>
+        <div class="rfq-heading">${escapeHtml(lang === "vi" ? "Binary search trên list của value" : "Binary search on value's index list")}</div>
+        <div class="rfq-index-row">${indexCells}</div>
+      </section>
+      ${formulaHtml}
+      <div class="rfq-status">${statusItems}</div>
+    </div>`;
+}
+
+function renderBookMyShowView(step) {
+  const view = step.bookMyShowView || {};
+  const n = Number.isInteger(view.n) ? view.n : 0;
+  const m = Number.isInteger(view.m) ? view.m : 0;
+  const used = Array.isArray(view.used) ? view.used : [];
+  const remaining = Array.isArray(view.remaining) ? view.remaining : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const operationIndex = Number.isInteger(view.operationIndex) ? view.operationIndex : -1;
+  const activeRows = new Set(Array.isArray(view.activeRows) ? view.activeRows : []);
+  const allocation = Array.isArray(view.allocation) ? view.allocation : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const phase = view.phase || "init";
+  const operation = view.operation || null;
+
+  const allocationCovers = (row, seat) => allocation.some((item) => (
+    item && item.row === row && seat >= item.start && seat < item.start + item.count
+  ));
+
+  const rowsHtml = Array.from({ length: n }, (_, row) => {
+    const seats = Array.from({ length: m }, (_, seat) => {
+      const booked = seat < (used[row] || 0);
+      const allocated = allocationCovers(row, seat);
+      const classes = ["bms-seat"];
+      if (booked) classes.push("booked");
+      if (allocated) classes.push("allocated");
+      return `<span class="${classes.join(" ")}" title="row ${row}, seat ${seat}">${seat}</span>`;
+    }).join("");
+    return `<div class="bms-row${activeRows.has(row) ? " active" : ""}">
+      <div class="bms-row-label">
+        <strong>row ${row}</strong>
+        <span>${escapeHtml(String(remaining[row] ?? 0))}/${escapeHtml(String(m))} ${escapeHtml(lang === "vi" ? "trống" : "free")}</span>
+      </div>
+      <div class="bms-seats">${seats}</div>
+    </div>`;
+  }).join("");
+
+  const levels = new Map();
+  treeNodes.forEach((node) => {
+    const depth = Number.isInteger(node.depth) ? node.depth : 0;
+    if (!levels.has(depth)) levels.set(depth, []);
+    levels.get(depth).push(node);
+  });
+  const treeHtml = [...levels.entries()].sort((a, b) => a[0] - b[0]).map(([depth, nodes]) => {
+    const cells = nodes.sort((a, b) => a.left - b.left).map((node) => `<div class="bms-tree-node${node.active ? " active" : ""}">
+      <span>[${escapeHtml(String(node.left))}..${escapeHtml(String(node.right))}]</span>
+      <strong>max ${escapeHtml(String(node.max))}</strong>
+      <small>sum ${escapeHtml(String(node.sum))}</small>
+    </div>`).join("");
+    return `<div class="bms-tree-level" style="--bms-tree-cols:${Math.max(1, nodes.length)}">
+      <span class="bms-tree-depth">L${depth}</span>
+      <div>${cells}</div>
+    </div>`;
+  }).join("");
+
+  const operationsHtml = operations.length
+    ? operations.map((item, index) => `<span class="${index === operationIndex ? "active" : index < operationIndex ? "done" : ""}">${escapeHtml(String(item))}</span>`).join("")
+    : `<span>${escapeHtml(lang === "vi" ? "Không có operation" : "No operations")}</span>`;
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const resultText = view.result === null || view.result === undefined
+    ? "-"
+    : Array.isArray(view.result)
+      ? `[${view.result.join(", ")}]`
+      : String(view.result);
+  const outputsHtml = outputs.length
+    ? outputs.map((item) => `<span>${escapeHtml(Array.isArray(item) ? `[${item.join(", ")}]` : String(item))}</span>`).join("")
+    : `<span>[]</span>`;
+  const opText = operation
+    ? `${operation.op}(${operation.k}, ${operation.maxRow})`
+    : (lang === "vi" ? "khởi tạo" : "initialize");
+
+  $("treeView").innerHTML = `
+    <div class="bms-viz phase-${escapeHtml(phase)}">
+      <div class="bms-topline">
+        <span>${escapeHtml(opText)}</span>
+        <strong>${escapeHtml(lang === "vi" ? "Kết quả hiện tại" : "Current result")}: ${escapeHtml(resultText)}</strong>
+      </div>
+      <div class="bms-operations">${operationsHtml}</div>
+      <section>
+        <div class="bms-heading">${escapeHtml(lang === "vi" ? "Hàng ghế" : "Seat rows")}</div>
+        <div class="bms-rows">${rowsHtml}</div>
+      </section>
+      <section>
+        <div class="bms-heading">Segment Tree · max / sum remaining</div>
+        <div class="bms-tree">${treeHtml}</div>
+      </section>
+      <div class="bms-status">${statusItems}</div>
+      <div class="bms-output"><small>outputs</small><div>${outputsHtml}</div></div>
     </div>`;
 }
 
@@ -10991,6 +11233,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderEvenOddRatioView(step);
+  } else if (step.bookMyShowView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBookMyShowView(step);
   } else if (step.segmentTreeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -11003,6 +11251,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFenwickView(step);
+  } else if (step.rangeFrequencyView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeFrequencyView(step);
   } else if (step.prefix1DView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

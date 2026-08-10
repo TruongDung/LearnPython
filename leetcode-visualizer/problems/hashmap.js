@@ -2419,6 +2419,7 @@ function buildSteps303(nums, params) {
   const steps = [];
 
   const makeView = ({ current = -1, prefixIndex = -1, query = null, status = [] } = {}) => ({
+    kind: "range-sum-immutable",
     nums: [...nums],
     prefix: [...prefix],
     current,
@@ -2446,10 +2447,32 @@ function buildSteps303(nums, params) {
 
   for (let i = 0; i < n; i += 1) {
     const before = prefix[i];
+    steps.push({
+      title: { vi: `Doc nums[${i}] = ${nums[i]}`, en: `Read nums[${i}] = ${nums[i]}` },
+      codeLines: [4],
+      prefix1DView: makeView({
+        current: i,
+        prefixIndex: i,
+        status: [
+          { label: "i", value: i },
+          { label: "num", value: nums[i] },
+          { label: `prefix[${i}]`, value: before },
+        ],
+      }),
+      vars: [
+        { name: "num", value: nums[i] },
+        { name: "previous prefix", value: before },
+      ],
+      note: {
+        vi: `Lay nums[${i}] = ${nums[i]}. prefix hien tai van la ${before}; chua append gia tri moi.`,
+        en: `Take nums[${i}] = ${nums[i]}. The current prefix is still ${before}; the new value has not been appended yet.`,
+      },
+    });
+
     prefix[i + 1] = before + nums[i];
     steps.push({
       title: { vi: `prefix[${i + 1}] = ${prefix[i + 1]}`, en: `prefix[${i + 1}] = ${prefix[i + 1]}` },
-      codeLines: [4, 5],
+      codeLines: [5],
       prefix1DView: makeView({
         current: i,
         prefixIndex: i + 1,
@@ -2477,7 +2500,17 @@ function buildSteps303(nums, params) {
     title: { vi: `sumRange(${left}, ${right}) = ${answer}`, en: `sumRange(${left}, ${right}) = ${answer}` },
     codeLines: [8],
     prefix1DView: makeView({
-      query: { left, right },
+      query: {
+        left,
+        right,
+        rightPrefixIndex: right + 1,
+        leftPrefixIndex: left,
+        rightPrefixValue: prefix[right + 1],
+        leftPrefixValue: prefix[left],
+        answer,
+        included: nums.slice(left, right + 1),
+        excludedLeft: nums.slice(0, left),
+      },
       prefixIndex: -1,
       status: [
         { label: `prefix[${right + 1}]`, value: prefix[right + 1] },
@@ -2498,6 +2531,686 @@ function buildSteps303(nums, params) {
   });
 
   return { steps, answer };
+}
+
+function buildSteps2080(nums, params) {
+  const n = nums.length;
+  const leftRaw = Number.parseInt(params && params.left, 10);
+  const rightRaw = Number.parseInt(params && params.right, 10);
+  const valueRaw = Number.parseInt(params && params.value, 10);
+  const left = Math.max(0, Math.min(n - 1, Number.isInteger(leftRaw) ? leftRaw : 0));
+  const right = Math.max(left, Math.min(n - 1, Number.isInteger(rightRaw) ? rightRaw : n - 1));
+  const value = Number.isInteger(valueRaw) ? valueRaw : nums[0];
+  const indexMap = new Map();
+  const steps = [];
+  const queryPositions = [];
+  let currentValue = null;
+
+  const sortedEntries = () => Array.from(indexMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([key, indices]) => ({ value: key, indices: [...indices] }));
+
+  const makeView = ({
+    phase = "build",
+    current = -1,
+    activeValue = currentValue,
+    targetValue = value,
+    lo = null,
+    hi = null,
+    mid = null,
+    leftPos = null,
+    rightPos = null,
+    answer = null,
+    status = [],
+  } = {}) => ({
+    nums: [...nums],
+    entries: sortedEntries(),
+    query: { left, right, value: targetValue },
+    queryPositions: [...queryPositions],
+    phase,
+    current,
+    activeValue,
+    lo,
+    hi,
+    mid,
+    leftPos,
+    rightPos,
+    answer,
+    status,
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo bảng value → indices", en: "Initialize value → indices table" },
+    codeLines: [6],
+    rangeFrequencyView: makeView({
+      phase: "build",
+      status: [
+        { label: "left", value: left },
+        { label: "right", value: right },
+        { label: "value", value },
+      ],
+    }),
+    vars: [
+      { name: "pos", value: "{}" },
+      { name: "query", value: `(${left}, ${right}, ${value})` },
+    ],
+    note: {
+      vi: "Constructor sẽ lưu mọi vị trí xuất hiện của từng giá trị. Vì duyệt từ trái sang phải, mỗi list index tự động tăng dần.",
+      en: "The constructor stores all occurrence positions for each value. Since we scan left to right, each index list is naturally sorted.",
+    },
+  });
+
+  for (let i = 0; i < n; i += 1) {
+    const num = nums[i];
+    currentValue = num;
+    steps.push({
+      title: { vi: `Đọc arr[${i}] = ${num}`, en: `Read arr[${i}] = ${num}` },
+      codeLines: [7],
+      rangeFrequencyView: makeView({
+        phase: "build",
+        current: i,
+        activeValue: num,
+        status: [
+          { label: "i", value: i },
+          { label: "arr[i]", value: num },
+          { label: "pos[num] before", value: `[${(indexMap.get(num) || []).join(", ")}]` },
+        ],
+      }),
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: num },
+      ],
+      note: {
+        vi: `Chuẩn bị thêm index ${i} vào list của value ${num}.`,
+        en: `Prepare to append index ${i} to the list for value ${num}.`,
+      },
+    });
+
+    if (!indexMap.has(num)) indexMap.set(num, []);
+    indexMap.get(num).push(i);
+    steps.push({
+      title: { vi: `pos[${num}].append(${i})`, en: `pos[${num}].append(${i})` },
+      codeLines: [8],
+      rangeFrequencyView: makeView({
+        phase: "build",
+        current: i,
+        activeValue: num,
+        status: [
+          { label: "value", value: num },
+          { label: "indices", value: `[${indexMap.get(num).join(", ")}]` },
+        ],
+      }),
+      vars: [
+        { name: `pos[${num}]`, value: `[${indexMap.get(num).join(", ")}]` },
+      ],
+      note: {
+        vi: `Value ${num} xuất hiện ở index ${i}, nên lưu lại index này.`,
+        en: `Value ${num} appears at index ${i}, so store this index.`,
+      },
+    });
+  }
+
+  const positions = indexMap.get(value) || [];
+  for (const index of positions) {
+    if (index >= left && index <= right) queryPositions.push(index);
+  }
+
+  steps.push({
+    title: { vi: `Lấy list index của value ${value}`, en: `Get index list for value ${value}` },
+    codeLines: [11],
+    rangeFrequencyView: makeView({
+      phase: "query",
+      activeValue: value,
+      status: [
+        { label: "indices", value: `[${positions.join(", ")}]` },
+        { label: "range", value: `[${left}, ${right}]` },
+      ],
+    }),
+    vars: [
+      { name: "arr", value: `[${positions.join(", ")}]` },
+      { name: "left,right,value", value: `${left}, ${right}, ${value}` },
+    ],
+    note: {
+      vi: `Chỉ cần xét list index của ${value}; các value khác không ảnh hưởng tới query này.`,
+      en: `Only the index list for ${value} matters; other values do not affect this query.`,
+    },
+  });
+
+  const traceBisect = (target, kind, line) => {
+    let lo = 0;
+    let hi = positions.length;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const goRight = kind === "left" ? positions[mid] < target : positions[mid] <= target;
+      steps.push({
+        title: {
+          vi: `${kind === "left" ? "bisect_left" : "bisect_right"}: mid=${mid}`,
+          en: `${kind === "left" ? "bisect_left" : "bisect_right"}: mid=${mid}`,
+        },
+        codeLines: [line],
+        rangeFrequencyView: makeView({
+          phase: kind,
+          activeValue: value,
+          lo,
+          hi,
+          mid,
+          status: [
+            { label: "target", value: target },
+            { label: "indices[mid]", value: positions[mid] ?? "-" },
+            { label: "move", value: goRight ? "lo = mid + 1" : "hi = mid" },
+          ],
+        }),
+        vars: [
+          { name: "lo", value: lo },
+          { name: "hi", value: hi },
+          { name: "mid", value: mid },
+          { name: "target", value: target },
+        ],
+        note: {
+          vi: goRight
+            ? `indices[${mid}] = ${positions[mid]} vẫn ${kind === "left" ? "< left" : "<= right"}, nên bỏ nửa trái.`
+            : `indices[${mid}] = ${positions[mid]} đã đủ lớn, giữ nửa trái.`,
+          en: goRight
+            ? `indices[${mid}] = ${positions[mid]} is still ${kind === "left" ? "< left" : "<= right"}, so discard the left half.`
+            : `indices[${mid}] = ${positions[mid]} is large enough, so keep the left half.`,
+        },
+      });
+      if (goRight) lo = mid + 1;
+      else hi = mid;
+    }
+    steps.push({
+      title: {
+        vi: `${kind === "left" ? "left_bound" : "right_bound"} = ${lo}`,
+        en: `${kind === "left" ? "left_bound" : "right_bound"} = ${lo}`,
+      },
+      codeLines: [line],
+      rangeFrequencyView: makeView({
+        phase: kind,
+        activeValue: value,
+        leftPos: kind === "left" ? lo : null,
+        rightPos: kind === "right" ? lo : null,
+        status: [
+          { label: kind === "left" ? "bisect_left" : "bisect_right", value: lo },
+        ],
+      }),
+      vars: [{ name: kind === "left" ? "l" : "r", value: lo }],
+      note: {
+        vi: `${kind === "left" ? "Vị trí đầu tiên có index >= left" : "Vị trí đầu tiên có index > right"} là ${lo}.`,
+        en: `${kind === "left" ? "The first position with index >= left" : "The first position with index > right"} is ${lo}.`,
+      },
+    });
+    return lo;
+  };
+
+  const leftPos = traceBisect(left, "left", 12);
+  const rightPos = traceBisect(right, "right", 13);
+  const answer = rightPos - leftPos;
+  steps.push({
+    title: { vi: `frequency = ${rightPos} - ${leftPos} = ${answer}`, en: `frequency = ${rightPos} - ${leftPos} = ${answer}` },
+    codeLines: [14],
+    rangeFrequencyView: makeView({
+      phase: "answer",
+      activeValue: value,
+      leftPos,
+      rightPos,
+      answer,
+      status: [
+        { label: "left_bound", value: leftPos },
+        { label: "right_bound", value: rightPos },
+        { label: "answer", value: answer },
+      ],
+    }),
+    vars: [
+      { name: "left_bound", value: leftPos },
+      { name: "right_bound", value: rightPos },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Có ${answer} index của value ${value} nằm trong đoạn [${left}, ${right}].`,
+      en: `There are ${answer} indices of value ${value} inside [${left}, ${right}].`,
+    },
+    final: true,
+  });
+
+  return { steps, answer };
+}
+
+function buildSteps2286(input, params) {
+  const n = Math.max(1, Math.min(12, Number.isInteger(input[0]) ? input[0] : 3));
+  const m = Math.max(1, Math.min(12, Number.isInteger(input[1]) ? input[1] : 5));
+  const rawOperations = String((params && params.operations) || "").trim();
+  const commands = rawOperations
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const tokens = part.split(/\s+/);
+      const op = (tokens[0] || "").toLowerCase();
+      const k = Number(tokens[1]);
+      const maxRow = Number(tokens[2]);
+      return { op, k, maxRow, tokenCount: tokens.length, raw: part };
+    });
+  const validCommands = commands.length > 0 && commands.every((command) => {
+    const validName = command.op === "gather" || command.op === "scatter";
+    return validName
+      && command.tokenCount === 3
+      && Number.isInteger(command.k)
+      && command.k > 0
+      && Number.isInteger(command.maxRow)
+      && command.maxRow >= 0;
+  });
+
+  const used = new Array(n).fill(0);
+  const steps = [];
+  const outputs = [];
+
+  const clampRow = (row) => Math.max(0, Math.min(n - 1, row));
+  const remaining = () => used.map((taken) => m - taken);
+  const totalRemaining = (maxRow) => remaining().slice(0, clampRow(maxRow) + 1).reduce((sum, value) => sum + value, 0);
+
+  function buildTreeNodes(activeRows = [], activeRanges = []) {
+    const rem = remaining();
+    const nodes = [];
+    let id = 1;
+    function dfs(left, right, depth) {
+      const nodeId = id++;
+      if (left === right) {
+        nodes.push({
+          id: nodeId,
+          left,
+          right,
+          depth,
+          max: rem[left],
+          sum: rem[left],
+          active: activeRows.includes(left) || activeRanges.some(([a, b]) => left >= a && right <= b),
+        });
+        return { max: rem[left], sum: rem[left] };
+      }
+      const mid = Math.floor((left + right) / 2);
+      const leftInfo = dfs(left, mid, depth + 1);
+      const rightInfo = dfs(mid + 1, right, depth + 1);
+      const max = Math.max(leftInfo.max, rightInfo.max);
+      const sum = leftInfo.sum + rightInfo.sum;
+      nodes.push({
+        id: nodeId,
+        left,
+        right,
+        depth,
+        max,
+        sum,
+        active: activeRanges.some(([a, b]) => left >= a && right <= b)
+          || activeRows.some((row) => row >= left && row <= right),
+      });
+      return { max, sum };
+    }
+    dfs(0, n - 1, 0);
+    return nodes.sort((a, b) => (a.depth - b.depth) || (a.left - b.left));
+  }
+
+  function snapshot({
+    title,
+    codeLine,
+    note,
+    phase = "init",
+    operationIndex = -1,
+    operation = null,
+    activeRows = [],
+    activeRanges = [],
+    allocation = [],
+    result = null,
+    status = [],
+    vars = [],
+    final = false,
+  }) {
+    const step = {
+      title,
+      codeLines: [codeLine],
+      bookMyShowView: {
+        n,
+        m,
+        used: [...used],
+        remaining: remaining(),
+        treeNodes: buildTreeNodes(activeRows, activeRanges),
+        operations: commands.map((command) => command.raw),
+        operationIndex,
+        operation,
+        phase,
+        activeRows: [...activeRows],
+        activeRanges: activeRanges.map((range) => [...range]),
+        allocation: allocation.map((item) => ({ ...item })),
+        outputs: [...outputs],
+        result,
+        status,
+      },
+      vars: [
+        { name: "used", value: `[${used.join(", ")}]` },
+        { name: "remaining", value: `[${remaining().join(", ")}]` },
+        { name: "outputs", value: JSON.stringify(outputs) },
+        ...vars,
+      ],
+      note,
+    };
+    if (final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!validCommands) {
+    return {
+      original: { n, m, operations: rawOperations },
+      answer: null,
+      steps: [{
+        title: { vi: "Operations không hợp lệ", en: "Invalid operations" },
+        codeLines: [1],
+        bookMyShowView: {
+          n,
+          m,
+          used: [...used],
+          remaining: remaining(),
+          treeNodes: buildTreeNodes(),
+          operations: [],
+          operationIndex: -1,
+          operation: null,
+          phase: "invalid",
+          activeRows: [],
+          activeRanges: [],
+          allocation: [],
+          outputs: [],
+          result: null,
+          status: [{ label: "format", value: "gather k maxRow | scatter k maxRow" }],
+        },
+        vars: [{ name: "operations", value: rawOperations || "-" }],
+        note: {
+          vi: "Dùng cú pháp: gather k maxRow | scatter k maxRow.",
+          en: "Use: gather k maxRow | scatter k maxRow.",
+        },
+        final: true,
+      }],
+    };
+  }
+
+  snapshot({
+    title: { vi: `Khởi tạo ${n} hàng, mỗi hàng ${m} ghế`, en: `Initialize ${n} rows with ${m} seats each` },
+    codeLine: 5,
+    phase: "init",
+    status: [
+      { label: "rows", value: n },
+      { label: "seats/row", value: m },
+      { label: "root max/sum", value: `${m}/${n * m}` },
+    ],
+    note: {
+      vi: "Mỗi row bắt đầu còn m ghế. Segment tree root lưu max remaining của một hàng và tổng remaining toàn rạp.",
+      en: "Each row starts with m remaining seats. The segment tree root stores max remaining in one row and total remaining seats.",
+    },
+  });
+
+  function findGatherRow(k, maxRow) {
+    const limit = clampRow(maxRow);
+    for (let row = 0; row <= limit; row += 1) {
+      if (m - used[row] >= k) return row;
+    }
+    return -1;
+  }
+
+  for (let index = 0; index < commands.length; index += 1) {
+    const command = commands[index];
+    const maxRow = clampRow(command.maxRow);
+    const opLabel = `${command.op}(${command.k}, ${command.maxRow})`;
+    snapshot({
+      title: { vi: `Operation ${index + 1}: ${opLabel}`, en: `Operation ${index + 1}: ${opLabel}` },
+      codeLine: command.op === "gather" ? 8 : 15,
+      phase: command.op,
+      operationIndex: index,
+      operation: command,
+      activeRanges: [[0, maxRow]],
+      status: [
+        { label: "k", value: command.k },
+        { label: "maxRow", value: command.maxRow },
+        { label: "search rows", value: `0..${maxRow}` },
+      ],
+      vars: [{ name: "operation", value: opLabel }],
+      note: {
+        vi: command.op === "gather"
+          ? "gather cần tìm một hàng đầu tiên có đủ k ghế liên tiếp."
+          : "scatter chỉ cần đủ tổng số ghế trống trong các hàng 0..maxRow.",
+        en: command.op === "gather"
+          ? "gather needs the first row with at least k consecutive free seats."
+          : "scatter only needs enough total free seats across rows 0..maxRow.",
+      },
+    });
+
+    if (command.op === "gather") {
+      const row = findGatherRow(command.k, maxRow);
+      snapshot({
+        title: { vi: row >= 0 ? `Tìm thấy row ${row}` : "Không có row đủ chỗ", en: row >= 0 ? `Found row ${row}` : "No row has enough seats" },
+        codeLine: 9,
+        phase: "gather",
+        operationIndex: index,
+        operation: command,
+        activeRows: row >= 0 ? [row] : [],
+        activeRanges: [[0, maxRow]],
+        result: row >= 0 ? [row, used[row]] : [],
+        status: [
+          { label: "needed", value: command.k },
+          { label: "row", value: row >= 0 ? row : "none" },
+          { label: "max remaining in range", value: Math.max(...remaining().slice(0, maxRow + 1)) },
+        ],
+        vars: [{ name: "row", value: row }],
+        note: {
+          vi: row >= 0
+            ? `Row ${row} còn ${m - used[row]} ghế, đủ cho ${command.k} người ngồi liên tiếp.`
+            : `Không hàng nào trong 0..${maxRow} còn đủ ${command.k} ghế liên tiếp.`,
+          en: row >= 0
+            ? `Row ${row} has ${m - used[row]} remaining seats, enough for ${command.k} consecutive people.`
+            : `No row in 0..${maxRow} has ${command.k} consecutive remaining seats.`,
+        },
+      });
+
+      if (row < 0) {
+        outputs.push([]);
+        snapshot({
+          title: { vi: "gather trả []", en: "gather returns []" },
+          codeLine: 10,
+          phase: "gather",
+          operationIndex: index,
+          operation: command,
+          activeRanges: [[0, maxRow]],
+          result: [],
+          status: [{ label: "return", value: "[]" }],
+          vars: [{ name: "return", value: "[]" }],
+          note: { vi: "Không cập nhật ghế vì gather thất bại.", en: "No seats are updated because gather failed." },
+        });
+        continue;
+      }
+
+      const startSeat = used[row];
+      snapshot({
+        title: { vi: `start = used[${row}] = ${startSeat}`, en: `start = used[${row}] = ${startSeat}` },
+        codeLine: 11,
+        phase: "gather",
+        operationIndex: index,
+        operation: command,
+        activeRows: [row],
+        allocation: [{ row, start: startSeat, count: command.k }],
+        result: [row, startSeat],
+        status: [
+          { label: "row", value: row },
+          { label: "start seat", value: startSeat },
+        ],
+        vars: [{ name: "start", value: startSeat }],
+        note: {
+          vi: `Ghế đầu tiên còn trống trong row ${row} là seat ${startSeat}.`,
+          en: `The first free seat in row ${row} is seat ${startSeat}.`,
+        },
+      });
+
+      used[row] += command.k;
+      snapshot({
+        title: { vi: `Book ${command.k} ghế ở row ${row}`, en: `Book ${command.k} seats in row ${row}` },
+        codeLine: 12,
+        phase: "gather",
+        operationIndex: index,
+        operation: command,
+        activeRows: [row],
+        allocation: [{ row, start: startSeat, count: command.k }],
+        result: [row, startSeat],
+        status: [
+          { label: "used[row]", value: used[row] },
+          { label: "remaining[row]", value: m - used[row] },
+        ],
+        vars: [{ name: `used[${row}]`, value: used[row] }],
+        note: {
+          vi: `Cập nhật row ${row}: đã dùng ${used[row]} ghế, còn ${m - used[row]}.`,
+          en: `Update row ${row}: ${used[row]} seats used, ${m - used[row]} remaining.`,
+        },
+      });
+      outputs.push([row, startSeat]);
+      snapshot({
+        title: { vi: `Return [${row}, ${startSeat}]`, en: `Return [${row}, ${startSeat}]` },
+        codeLine: 14,
+        phase: "gather",
+        operationIndex: index,
+        operation: command,
+        activeRows: [row],
+        allocation: [{ row, start: startSeat, count: command.k }],
+        result: [row, startSeat],
+        status: [{ label: "return", value: `[${row}, ${startSeat}]` }],
+        vars: [{ name: "return", value: `[${row}, ${startSeat}]` }],
+        note: {
+          vi: "gather trả về row và seat bắt đầu.",
+          en: "gather returns the row and starting seat.",
+        },
+      });
+    } else {
+      const available = totalRemaining(maxRow);
+      snapshot({
+        title: { vi: `Tổng ghế trống 0..${maxRow} = ${available}`, en: `Free seats in 0..${maxRow} = ${available}` },
+        codeLine: 16,
+        phase: "scatter",
+        operationIndex: index,
+        operation: command,
+        activeRanges: [[0, maxRow]],
+        result: available >= command.k,
+        status: [
+          { label: "needed", value: command.k },
+          { label: "available", value: available },
+        ],
+        vars: [{ name: "available", value: available }],
+        note: {
+          vi: available >= command.k
+            ? "Đủ tổng số ghế, scatter sẽ phân bổ từ hàng nhỏ đến lớn."
+            : "Không đủ tổng số ghế trong phạm vi, scatter trả False.",
+          en: available >= command.k
+            ? "There are enough seats, so scatter will allocate from smaller rows to larger rows."
+            : "Not enough seats in range, so scatter returns False.",
+        },
+      });
+
+      if (available < command.k) {
+        outputs.push(false);
+        snapshot({
+          title: { vi: "scatter trả False", en: "scatter returns False" },
+          codeLine: 16,
+          phase: "scatter",
+          operationIndex: index,
+          operation: command,
+          activeRanges: [[0, maxRow]],
+          result: false,
+          status: [{ label: "return", value: "False" }],
+          vars: [{ name: "return", value: "False" }],
+          note: { vi: "Không có cập nhật ghế.", en: "No seats are updated." },
+        });
+        continue;
+      }
+
+      let remainingNeed = command.k;
+      const allocation = [];
+      for (let row = 0; row <= maxRow && remainingNeed > 0; row += 1) {
+        snapshot({
+          title: { vi: `Xét row ${row}`, en: `Inspect row ${row}` },
+          codeLine: 17,
+          phase: "scatter",
+          operationIndex: index,
+          operation: command,
+          activeRows: [row],
+          activeRanges: [[0, maxRow]],
+          allocation,
+          status: [
+            { label: "need", value: remainingNeed },
+            { label: `free row ${row}`, value: m - used[row] },
+          ],
+          vars: [{ name: "row", value: row }, { name: "k", value: remainingNeed }],
+          note: {
+            vi: `scatter lấy ghế trống từ row ${row} nếu còn cần.`,
+            en: `scatter takes free seats from row ${row} if more seats are still needed.`,
+          },
+        });
+        const take = Math.min(remainingNeed, m - used[row]);
+        snapshot({
+          title: { vi: `take = ${take}`, en: `take = ${take}` },
+          codeLine: 18,
+          phase: "scatter",
+          operationIndex: index,
+          operation: command,
+          activeRows: [row],
+          activeRanges: [[0, maxRow]],
+          allocation: take > 0 ? [...allocation, { row, start: used[row], count: take }] : allocation,
+          status: [
+            { label: "need", value: remainingNeed },
+            { label: "take", value: take },
+          ],
+          vars: [{ name: "take", value: take }],
+          note: {
+            vi: `Lấy min(k còn lại, ghế trống row ${row}) = ${take}.`,
+            en: `Take min(remaining k, free seats in row ${row}) = ${take}.`,
+          },
+        });
+        if (take === 0) continue;
+        const startSeat = used[row];
+        used[row] += take;
+        remainingNeed -= take;
+        allocation.push({ row, start: startSeat, count: take });
+        snapshot({
+          title: { vi: `Book ${take} ghế ở row ${row}`, en: `Book ${take} seats in row ${row}` },
+          codeLine: 19,
+          phase: "scatter",
+          operationIndex: index,
+          operation: command,
+          activeRows: [row],
+          activeRanges: [[0, maxRow]],
+          allocation,
+          status: [
+            { label: "used[row]", value: used[row] },
+            { label: "remaining need", value: remainingNeed },
+          ],
+          vars: [{ name: `used[${row}]`, value: used[row] }],
+          note: {
+            vi: `Cập nhật row ${row}, rồi giảm k còn lại.`,
+            en: `Update row ${row}, then reduce the remaining k.`,
+          },
+        });
+      }
+      outputs.push(true);
+      snapshot({
+        title: { vi: "scatter trả True", en: "scatter returns True" },
+        codeLine: 22,
+        phase: "scatter",
+        operationIndex: index,
+        operation: command,
+        activeRanges: [[0, maxRow]],
+        allocation,
+        result: true,
+        status: [{ label: "return", value: "True" }],
+        vars: [{ name: "return", value: "True" }],
+        note: {
+          vi: "Đã book đủ số ghế yêu cầu.",
+          en: "All requested seats have been booked.",
+        },
+      });
+    }
+  }
+
+  if (steps.length) steps[steps.length - 1].final = true;
+  return { steps, answer: outputs };
 }
 
 function buildSteps307(input, params) {
@@ -4423,6 +5136,126 @@ module.exports = {
       "        return total",
     ],
     builder: buildSteps307,
+  },
+  2080: {
+    id: 2080,
+    difficulty: "medium",
+    slug: "range-frequency-queries",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [
+      { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
+    ],
+    title: { vi: "Range Frequency Queries", en: "Range Frequency Queries" },
+    titleVi: { vi: "Truy vấn tần suất trong đoạn", en: "Range frequency queries" },
+    statement: {
+      vi: "Thiết kế RangeFreqQuery. Với mỗi query(left, right, value), trả về số lần value xuất hiện trong arr[left..right].",
+      en: "Design RangeFreqQuery. For each query(left, right, value), return how many times value appears in arr[left..right].",
+    },
+    defaultInput: [12, 33, 4, 56, 22, 2, 34, 33, 22, 12, 34, 56],
+    inputKind: "integer",
+    inputLabel: { vi: "arr", en: "arr" },
+    extraParams: [
+      { key: "left", type: "number", label: { vi: "left", en: "left" }, default: 1 },
+      { key: "right", type: "number", label: { vi: "right", en: "right" }, default: 2 },
+      { key: "value", type: "number", label: { vi: "value", en: "value" }, default: 4 },
+    ],
+    approach: [
+      { vi: "Trong constructor, tạo hashmap value → list các index xuất hiện.", en: "In the constructor, build a hashmap from value to its occurrence indices." },
+      { vi: "Các list index đã tăng dần vì ta duyệt arr từ trái sang phải.", en: "Each index list is sorted because arr is scanned left to right." },
+      { vi: "Query dùng bisect_left(list, left) và bisect_right(list, right); hiệu hai vị trí là tần suất.", en: "A query uses bisect_left(list, left) and bisect_right(list, right); the difference is the frequency." },
+    ],
+    complexity: {
+      time: "O(n) build, O(log k) query",
+      space: "O(n)",
+      note: {
+        vi: "k là số lần value xuất hiện. Mỗi query binary search trên list index của riêng value đó.",
+        en: "k is the number of occurrences of value. Each query binary-searches only that value's index list.",
+      },
+    },
+    code: [
+      "from collections import defaultdict",
+      "from bisect import bisect_left, bisect_right",
+      "",
+      "class RangeFreqQuery:",
+      "    def __init__(self, arr: List[int]):",
+      "        self.pos = defaultdict(list)",
+      "        for i, num in enumerate(arr):",
+      "            self.pos[num].append(i)",
+      "",
+      "    def query(self, left: int, right: int, value: int) -> int:",
+      "        indices = self.pos[value]",
+      "        l = bisect_left(indices, left)",
+      "        r = bisect_right(indices, right)",
+      "        return r - l",
+    ],
+    builder: buildSteps2080,
+  },
+  2286: {
+    id: 2286,
+    difficulty: "hard",
+    slug: "booking-concert-tickets-in-groups",
+    category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+    tags: [
+      { key: "binary-search", vi: "Binary Search", en: "Binary Search" },
+    ],
+    title: { vi: "Booking Concert Tickets in Groups", en: "Booking Concert Tickets in Groups" },
+    titleVi: { vi: "Đặt vé concert theo nhóm", en: "Book concert seats for groups" },
+    statement: {
+      vi: "Thiết kế BookMyShow với n hàng, mỗi hàng m ghế. gather(k, maxRow) cần k ghế liên tiếp trong một hàng <= maxRow; scatter(k, maxRow) cần tổng k ghế bất kỳ trong các hàng <= maxRow.",
+      en: "Design BookMyShow with n rows and m seats per row. gather(k, maxRow) needs k consecutive seats in one row <= maxRow; scatter(k, maxRow) needs any k seats across rows <= maxRow.",
+    },
+    defaultInput: [2, 5],
+    inputKind: "positive",
+    inputLabel: { vi: "n,m", en: "n,m" },
+    extraParams: [{
+      key: "operations",
+      type: "string",
+      label: { vi: "Thao tác (ngăn bằng |)", en: "Operations (separated by |)" },
+      default: "gather 4 0 | gather 2 0 | scatter 5 1 | scatter 5 1",
+    }],
+    approach: [
+      { vi: "Mỗi row lưu used[row], nên remaining[row] = m - used[row].", en: "Each row stores used[row], so remaining[row] = m - used[row]." },
+      { vi: "Segment Tree lưu max remaining để gather tìm hàng đầu tiên đủ k ghế liên tiếp.", en: "A segment tree stores max remaining seats so gather can find the first row with at least k consecutive seats." },
+      { vi: "Segment Tree cũng lưu sum remaining để scatter kiểm tra tổng ghế trống trong 0..maxRow.", en: "The segment tree also stores sum remaining seats so scatter can check total availability in 0..maxRow." },
+    ],
+    complexity: {
+      time: "O(log n) gather, O((r+1) log n) scatter worst-case",
+      space: "O(n)",
+      note: {
+        vi: "gather tìm bằng max tree. scatter kiểm tra tổng O(log n), rồi phân bổ theo các row nhỏ nhất còn ghế; mỗi row cập nhật tree.",
+        en: "gather searches using the max tree. scatter checks total in O(log n), then fills the smallest rows with free seats; each touched row updates the tree.",
+      },
+    },
+    code: [
+      "class BookMyShow:",
+      "    def __init__(self, n: int, m: int):",
+      "        self.n = n",
+      "        self.m = m",
+      "        self.used = [0] * n",
+      "        self.seg = SegmentTree([m] * n)",
+      "",
+      "    def gather(self, k: int, maxRow: int) -> List[int]:",
+      "        row = self.seg.first_at_least(k, 0, maxRow)",
+      "        if row == -1:",
+      "            return []",
+      "        start = self.used[row]",
+      "        self.used[row] += k",
+      "        self.seg.update(row, self.m - self.used[row])",
+      "        return [row, start]",
+      "",
+      "    def scatter(self, k: int, maxRow: int) -> bool:",
+      "        if self.seg.sum_range(0, maxRow) < k:",
+      "            return False",
+      "        for row in range(maxRow + 1):",
+      "            take = min(k, self.m - self.used[row])",
+      "            self.used[row] += take",
+      "            k -= take",
+      "            self.seg.update(row, self.m - self.used[row])",
+      "            if k == 0:",
+      "                return True",
+      "        return True",
+    ],
+    builder: buildSteps2286,
   },
   370: {
     id: 370,
