@@ -3482,7 +3482,367 @@ function buildSteps3731(input) {
   return { original: originalNums, answer, steps };
 }
 
+/** LeetCode 315: Count of Smaller Numbers After Self — compression + Fenwick Tree. */
+function buildSteps315(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const n = nums.length;
+  const values = [...new Set(nums)].sort((a, b) => a - b);
+  const ranks = new Map(values.map((value, index) => [value, index + 1]));
+  const bit = Array(values.length + 1).fill(0);
+  const answer = Array(n).fill(null);
+  const steps = [];
+  let currentIndex = -1;
+  let currentRank = null;
+  let queryCursor = null;
+  let queryLimit = null;
+  let queryTotal = 0;
+  let queryPath = [];
+  let updateCursor = null;
+  let updatePath = [];
+  let action = "compress";
+
+  const makeView = () => ({
+    phase: action,
+    nums: [...nums],
+    values: [...values],
+    ranks: values.map((value, index) => ({ value, rank: index + 1 })),
+    bit: bit.slice(1),
+    answer: [...answer],
+    currentIndex,
+    currentRank,
+    queryCursor,
+    queryLimit,
+    queryTotal,
+    queryPath: [...queryPath],
+    updateCursor,
+    updatePath: [...updatePath],
+    processedIndices: Array.from({ length: n }, (_, index) => index).filter((index) => answer[index] !== null),
+  });
+  const addStep = ({ title, note, codeLine, phase, vars = [], final = false }) => {
+    action = phase;
+    const view = makeView();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: view.processedIndices,
+      vars: [
+        { name: "answer", value: `[${answer.map((value) => value === null ? "_" : value).join(", ")}]` },
+        ...vars,
+      ],
+      countSmallerView: view,
+    });
+  };
+
+  addStep({
+    title: { vi: "Nén tọa độ các giá trị", en: "Coordinate-compress the values" },
+    note: {
+      vi: `Sắp xếp các giá trị duy nhất: [${values.join(", ")}]. Giá trị nhỏ hơn luôn có rank nhỏ hơn, nên Fenwick có thể đếm theo rank.`,
+      en: `Sort the unique values: [${values.join(", ")}]. Smaller values always have smaller ranks, so Fenwick can count by rank.`,
+    },
+    codeLine: 3,
+    phase: "compress",
+    vars: [{ name: "values", value: `[${values.join(", ")}]` }],
+  });
+  addStep({
+    title: { vi: "Tạo ánh xạ value → rank", en: "Build the value → rank mapping" },
+    note: {
+      vi: `Rank dùng index 1-based: ${values.map((value) => `${value}→${ranks.get(value)}`).join(", ")}.`,
+      en: `Ranks are 1-based: ${values.map((value) => `${value}→${ranks.get(value)}`).join(", ")}.`,
+    },
+    codeLine: 4,
+    phase: "rank",
+    vars: [{ name: "rank", value: `{${values.map((value) => `${value}:${ranks.get(value)}`).join(", ")}}` }],
+  });
+  addStep({
+    title: { vi: "Khởi tạo Fenwick Tree", en: "Initialize the Fenwick Tree" },
+    note: {
+      vi: "BIT[r] lưu số phần tử đã quét thuộc một đoạn rank. Ban đầu chưa có phần tử nào ở bên phải.",
+      en: "BIT[r] stores how many scanned elements fall in a rank range. Initially, no elements are on the processed right side.",
+    },
+    codeLine: 5,
+    phase: "bit-init",
+    vars: [{ name: "bit", value: `[${bit.join(", ")}]` }],
+  });
+  addStep({
+    title: { vi: "Khởi tạo mảng kết quả", en: "Initialize the answer array" },
+    note: {
+      vi: "answer[i] sẽ lưu số phần tử nhỏ hơn nums[i] nằm ở bên phải i.",
+      en: "answer[i] will store how many elements smaller than nums[i] occur to its right.",
+    },
+    codeLine: 6,
+    phase: "answer-init",
+  });
+
+  for (let index = n - 1; index >= 0; index -= 1) {
+    currentIndex = index;
+    currentRank = null;
+    queryCursor = null;
+    queryLimit = null;
+    queryTotal = 0;
+    queryPath = [];
+    updateCursor = null;
+    updatePath = [];
+    addStep({
+      title: { vi: `Quét i=${index} từ phải sang trái`, en: `Scan i=${index} from right to left` },
+      note: {
+        vi: `Các index lớn hơn ${index} đã nằm trong Fenwick. Bây giờ xét nums[${index}] = ${nums[index]}.`,
+        en: `All indices greater than ${index} are already in Fenwick. Now inspect nums[${index}] = ${nums[index]}.`,
+      },
+      codeLine: 17,
+      phase: "scan",
+      vars: [{ name: "index", value: index }, { name: "nums[index]", value: nums[index] }],
+    });
+
+    currentRank = ranks.get(nums[index]);
+    addStep({
+      title: { vi: `rank(${nums[index]}) = ${currentRank}`, en: `rank(${nums[index]}) = ${currentRank}` },
+      note: {
+        vi: `Mọi giá trị nhỏ hơn ${nums[index]} có rank trong [1, ${currentRank - 1}].`,
+        en: `Every value smaller than ${nums[index]} has a rank in [1, ${currentRank - 1}].`,
+      },
+      codeLine: 18,
+      phase: "rank-current",
+      vars: [{ name: "current_rank", value: currentRank }],
+    });
+
+    queryLimit = currentRank - 1;
+    queryCursor = queryLimit;
+    addStep({
+      title: { vi: `query(${queryLimit}) đếm rank nhỏ hơn`, en: `query(${queryLimit}) counts smaller ranks` },
+      note: {
+        vi: `Không query tới current_rank vì bài yêu cầu nhỏ hơn nghiêm ngặt, không tính giá trị bằng ${nums[index]}.`,
+        en: `Do not query through current_rank because the problem asks for strictly smaller values, excluding values equal to ${nums[index]}.`,
+      },
+      codeLine: 19,
+      phase: "query-call",
+      vars: [{ name: "current_rank - 1", value: queryLimit }],
+    });
+    addStep({
+      title: { vi: `Vào query(${queryLimit})`, en: `Enter query(${queryLimit})` },
+      note: { vi: "query lấy prefix sum của tần suất rank.", en: "query returns a prefix sum of rank frequencies." },
+      codeLine: 7,
+      phase: "query-enter",
+      vars: [{ name: "index", value: queryCursor }],
+    });
+    queryTotal = 0;
+    addStep({
+      title: { vi: "total = 0", en: "total = 0" },
+      note: { vi: "Bắt đầu tổng số phần tử nhỏ hơn từ 0.", en: "Start the smaller-element count at 0." },
+      codeLine: 8,
+      phase: "query-init",
+      vars: [{ name: "total", value: queryTotal }],
+    });
+    while (queryCursor > 0) {
+      addStep({
+        title: { vi: `${queryCursor} > 0 → đọc BIT[${queryCursor}]`, en: `${queryCursor} > 0 → read BIT[${queryCursor}]` },
+        note: {
+          vi: `BIT[${queryCursor}] chứa tổng tần suất của đoạn rank kết thúc tại ${queryCursor}.`,
+          en: `BIT[${queryCursor}] stores the frequency total for a rank range ending at ${queryCursor}.`,
+        },
+        codeLine: 9,
+        phase: "query-check",
+        vars: [{ name: "index", value: queryCursor }],
+      });
+      queryPath.push(queryCursor);
+      queryTotal += bit[queryCursor];
+      addStep({
+        title: { vi: `total += BIT[${queryCursor}] → ${queryTotal}`, en: `total += BIT[${queryCursor}] → ${queryTotal}` },
+        note: {
+          vi: `Node này đóng góp ${bit[queryCursor]}; tổng số phần tử nhỏ hơn hiện là ${queryTotal}.`,
+          en: `This node contributes ${bit[queryCursor]}; the smaller-element total is now ${queryTotal}.`,
+        },
+        codeLine: 10,
+        phase: "query-read",
+        vars: [{ name: `BIT[${queryCursor}]`, value: bit[queryCursor] }, { name: "total", value: queryTotal }],
+      });
+      const previousCursor = queryCursor;
+      queryCursor -= queryCursor & -queryCursor;
+      addStep({
+        title: { vi: `index: ${previousCursor} → ${queryCursor}`, en: `index: ${previousCursor} → ${queryCursor}` },
+        note: {
+          vi: `Trừ lowbit(${previousCursor}) = ${previousCursor & -previousCursor} để chuyển sang đoạn prefix tiếp theo.`,
+          en: `Subtract lowbit(${previousCursor}) = ${previousCursor & -previousCursor} to move to the next prefix range.`,
+        },
+        codeLine: 11,
+        phase: "query-jump",
+        vars: [{ name: "index", value: queryCursor }],
+      });
+    }
+    addStep({
+      title: { vi: "index = 0 → kết thúc query", en: "index = 0 → finish query" },
+      note: { vi: "Đã cộng hết các đoạn rank nhỏ hơn.", en: "All smaller-rank ranges have been added." },
+      codeLine: 9,
+      phase: "query-check",
+      vars: [{ name: "index", value: 0 }, { name: "total", value: queryTotal }],
+    });
+    addStep({
+      title: { vi: `return ${queryTotal}`, en: `return ${queryTotal}` },
+      note: {
+        vi: `Có ${queryTotal} phần tử đã quét nhỏ hơn ${nums[index]}.`,
+        en: `${queryTotal} processed elements are smaller than ${nums[index]}.`,
+      },
+      codeLine: 12,
+      phase: "query-return",
+      vars: [{ name: "total", value: queryTotal }],
+    });
+    answer[index] = queryTotal;
+    addStep({
+      title: { vi: `answer[${index}] = ${queryTotal}`, en: `answer[${index}] = ${queryTotal}` },
+      note: {
+        vi: `Ghi kết quả cho nums[${index}] = ${nums[index]}.`,
+        en: `Store the result for nums[${index}] = ${nums[index]}.`,
+      },
+      codeLine: 19,
+      phase: "answer-write",
+      vars: [{ name: `answer[${index}]`, value: queryTotal }],
+    });
+
+    updateCursor = currentRank;
+    addStep({
+      title: { vi: `update(rank ${currentRank})`, en: `update(rank ${currentRank})` },
+      note: {
+        vi: `Đưa ${nums[index]} vào Fenwick để các phần tử bên trái có thể đếm nó.`,
+        en: `Insert ${nums[index]} into Fenwick so elements to its left can count it.`,
+      },
+      codeLine: 20,
+      phase: "update-call",
+      vars: [{ name: "current_rank", value: currentRank }],
+    });
+    addStep({
+      title: { vi: `Vào update(${currentRank})`, en: `Enter update(${currentRank})` },
+      note: { vi: "update tăng mọi node BIT bao phủ rank này.", en: "update increments every BIT node covering this rank." },
+      codeLine: 13,
+      phase: "update-enter",
+      vars: [{ name: "index", value: updateCursor }],
+    });
+    while (updateCursor < bit.length) {
+      addStep({
+        title: { vi: `${updateCursor} < ${bit.length} → cập nhật`, en: `${updateCursor} < ${bit.length} → update` },
+        note: {
+          vi: `BIT[${updateCursor}] có đoạn phủ chứa rank ${currentRank}.`,
+          en: `BIT[${updateCursor}] covers rank ${currentRank}.`,
+        },
+        codeLine: 14,
+        phase: "update-check",
+        vars: [{ name: "index", value: updateCursor }],
+      });
+      updatePath.push(updateCursor);
+      bit[updateCursor] += 1;
+      addStep({
+        title: { vi: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}`, en: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}` },
+        note: {
+          vi: `Node BIT[${updateCursor}] giờ ghi nhận thêm một phần tử có rank ${currentRank}.`,
+          en: `BIT[${updateCursor}] now records one more element at rank ${currentRank}.`,
+        },
+        codeLine: 15,
+        phase: "update-write",
+        vars: [{ name: `BIT[${updateCursor}]`, value: bit[updateCursor] }],
+      });
+      const previousCursor = updateCursor;
+      updateCursor += updateCursor & -updateCursor;
+      addStep({
+        title: { vi: `index: ${previousCursor} → ${updateCursor}`, en: `index: ${previousCursor} → ${updateCursor}` },
+        note: {
+          vi: `Cộng lowbit(${previousCursor}) = ${previousCursor & -previousCursor} để đi lên node cha.`,
+          en: `Add lowbit(${previousCursor}) = ${previousCursor & -previousCursor} to climb to the parent node.`,
+        },
+        codeLine: 16,
+        phase: "update-jump",
+        vars: [{ name: "index", value: updateCursor }],
+      });
+    }
+    addStep({
+      title: { vi: `${updateCursor} >= ${bit.length} → kết thúc update`, en: `${updateCursor} >= ${bit.length} → finish update` },
+      note: {
+        vi: `nums[${index}] = ${nums[index]} đã được thêm hoàn toàn vào Fenwick.`,
+        en: `nums[${index}] = ${nums[index]} is now fully inserted into Fenwick.`,
+      },
+      codeLine: 14,
+      phase: "update-check",
+      vars: [{ name: "index", value: updateCursor }],
+    });
+  }
+
+  currentIndex = -1;
+  currentRank = null;
+  queryCursor = null;
+  updateCursor = null;
+  addStep({
+    title: { vi: `Hoàn tất → [${answer.join(", ")}]`, en: `Done → [${answer.join(", ")}]` },
+    note: {
+      vi: "Mỗi answer[i] là số phần tử nhỏ hơn nums[i] nằm ở bên phải i.",
+      en: "Each answer[i] is the number of elements smaller than nums[i] to its right.",
+    },
+    codeLine: 21,
+    phase: "done",
+    vars: [{ name: "return", value: `[${answer.join(", ")}]` }],
+    final: true,
+  });
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
+  315: {
+    id: 315,
+    difficulty: "hard",
+    slug: "count-of-smaller-numbers-after-self",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" },
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+    ],
+    title: { vi: "Count of Smaller Numbers After Self", en: "Count of Smaller Numbers After Self" },
+    titleVi: { vi: "Đếm số nhỏ hơn ở bên phải", en: "Count smaller values to the right" },
+    statement: {
+      vi: "Cho mảng nums. Trả về answer, trong đó answer[i] là số phần tử nhỏ hơn nums[i] nằm bên phải index i.",
+      en: "Given nums, return answer where answer[i] is the number of elements smaller than nums[i] to the right of index i.",
+    },
+    defaultInput: [5, 2, 6, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Nén các giá trị thành rank 1-based; giá trị nhỏ hơn có rank nhỏ hơn.", en: "Compress values into 1-based ranks; smaller values receive smaller ranks." },
+      { vi: "Quét nums từ phải sang trái để Fenwick chỉ chứa các phần tử ở bên phải index hiện tại.", en: "Scan nums from right to left so Fenwick contains only elements to the right of the current index." },
+      { vi: "query(rank - 1) đếm các giá trị nhỏ hơn nghiêm ngặt; update(rank) thêm nums[i] vào cây.", en: "query(rank - 1) counts strictly smaller values; update(rank) inserts nums[i] into the tree." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Nén tọa độ O(n log n); mỗi phần tử thực hiện một query và một update Fenwick O(log n).",
+        en: "Coordinate compression takes O(n log n); each element performs one O(log n) Fenwick query and update.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countSmaller(self, nums: List[int]) -> List[int]:",
+      "        values = sorted(set(nums))",
+      "        rank = {value: index + 1 for index, value in enumerate(values)}",
+      "        bit = [0] * (len(values) + 1)",
+      "        answer = [0] * len(nums)",
+      "        def query(index):",
+      "            total = 0",
+      "            while index > 0:",
+      "                total += bit[index]",
+      "                index -= index & -index",
+      "            return total",
+      "        def update(index):",
+      "            while index < len(bit):",
+      "                bit[index] += 1",
+      "                index += index & -index",
+      "        for index in range(len(nums) - 1, -1, -1):",
+      "            current_rank = rank[nums[index]]",
+      "            answer[index] = query(current_rank - 1)",
+      "            update(current_rank)",
+      "        return answer",
+    ],
+    builder: buildSteps315,
+  },
   3731: {
     id: 3731,
     difficulty: "easy",

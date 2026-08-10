@@ -7855,6 +7855,92 @@ function renderBookMyShowView(step) {
     </div>`;
 }
 
+function renderCountSmallerView(step) {
+  const view = step.countSmallerView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const ranks = Array.isArray(view.ranks) ? view.ranks : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const processed = new Set(Array.isArray(view.processedIndices) ? view.processedIndices : []);
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const currentRank = Number.isInteger(view.currentRank) ? view.currentRank : null;
+  const queryCursor = Number.isInteger(view.queryCursor) ? view.queryCursor : null;
+  const updateCursor = Number.isInteger(view.updateCursor) ? view.updateCursor : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "rank", "bit-init", "answer-init"].includes(phase) ? 0
+    : ["scan", "rank-current"].includes(phase) ? 1
+      : phase === "done" ? 3 : 2;
+  const phaseLabels = vi
+    ? ["1 · Nén tọa độ", "2 · Quét phải → trái", "3 · Query + Update", "4 · Kết quả"]
+    : ["1 · Compress", "2 · Scan right → left", "3 · Query + Update", "4 · Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const rankHtml = ranks.map((item) => {
+    const active = item.rank === currentRank;
+    const smaller = currentRank !== null && item.rank < currentRank;
+    return `<span class="cs315-rank${active ? " active" : ""}${smaller ? " smaller" : ""}"><small>${escapeHtml(String(item.value))}</small><strong>r${item.rank}</strong></span>`;
+  }).join("");
+  const numsHtml = nums.map((num, index) => {
+    const classes = ["cs315-num"];
+    if (index === currentIndex) classes.push("current");
+    if (processed.has(index)) classes.push("processed");
+    if (currentIndex >= 0 && index > currentIndex) classes.push("right-side");
+    const result = answer[index];
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(num))}</strong><em>${result === null || result === undefined ? "_" : escapeHtml(String(result))}</em></span>`;
+  }).join("");
+  const bitHtml = bit.map((count, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const rankLeft = index - lowbit + 1;
+    const valueLeft = values[rankLeft - 1];
+    const valueRight = values[index - 1];
+    const classes = ["cs315-bit"];
+    if (queryPath.has(index)) classes.push("query-path");
+    if (updatePath.has(index)) classes.push("update-path");
+    if (index === queryCursor || index === updateCursor) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${rankLeft}..r${index}</em><i>${escapeHtml(String(valueLeft))}..${escapeHtml(String(valueRight))}</i></span>`;
+  }).join("");
+
+  const currentValue = currentIndex >= 0 ? nums[currentIndex] : null;
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Sắp xếp unique values và gán rank" : "Sort unique values and assign ranks";
+  let actionDetail = "value ↑ ⇔ rank ↑";
+  if (phase.startsWith("query") || phase === "answer-write") {
+    actionLabel = "QUERY";
+    actionMain = `query(${view.queryLimit ?? "—"}) = ${view.queryTotal ?? 0}`;
+    actionDetail = vi
+      ? `Đếm value < ${currentValue} bằng prefix rank < r${currentRank}`
+      : `Count values < ${currentValue} using ranks below r${currentRank}`;
+  } else if (phase.startsWith("update")) {
+    actionLabel = "UPDATE";
+    actionMain = `update(r${currentRank})`;
+    actionDetail = vi ? `Thêm ${currentValue} vào các node BIT cha` : `Insert ${currentValue} into its BIT ancestors`;
+  } else if (["scan", "rank-current"].includes(phase)) {
+    actionLabel = vi ? "ĐANG XÉT" : "CURRENT";
+    actionMain = currentIndex >= 0 ? `nums[${currentIndex}] = ${currentValue}` : "—";
+    actionDetail = vi ? "Fenwick chỉ chứa phần bên phải" : "Fenwick contains only the right side";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = `[${answer.join(", ")}]`;
+    actionDetail = vi ? "Số nhỏ hơn ở bên phải cho từng index" : "Smaller-right count for every index";
+  }
+  const queryPathText = (view.queryPath || []).length ? view.queryPath.map((index) => `BIT[${index}]`).join(" → ") : "—";
+  const updatePathText = (view.updatePath || []).length ? view.updatePath.map((index) => `BIT[${index}]`).join(" → ") : "—";
+
+  $("treeView").innerHTML = `<div class="cs315-viz phase-${escapeHtml(phase)}">
+    <div class="cs315-phases">${phases}</div>
+    <section class="cs315-section"><header><strong>VALUE → COMPRESSED RANK</strong><span>${vi ? "rank nhỏ hơn = value nhỏ hơn" : "smaller rank = smaller value"}</span></header><div class="cs315-ranks">${rankHtml}</div></section>
+    <section class="cs315-section"><header><strong>NUMS · ${vi ? "QUÉT TỪ PHẢI SANG TRÁI" : "SCAN RIGHT TO LEFT"}</strong><span>${vi ? "số dưới ô là answer[i]" : "number below is answer[i]"}</span></header><div class="cs315-nums">${numsHtml}</div></section>
+    <div class="cs315-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <section class="cs315-section"><header><strong>FENWICK TREE · FREQUENCY BY RANK</strong><span>lowbit → ${vi ? "đoạn rank được phủ" : "covered rank range"}</span></header><div class="cs315-bits">${bitHtml}</div><div class="cs315-paths"><span><b>query</b>${escapeHtml(queryPathText)}</span><span><b>update</b>${escapeHtml(updatePathText)}</span></div></section>
+    <div class="cs315-rule"><span><b>query(r−1)</b>${vi ? "đếm nhỏ hơn nghiêm ngặt" : "counts strictly smaller"}</span><i>→</i><span><b>update(r)</b>${vi ? "thêm phần tử hiện tại" : "inserts current value"}</span></div>
+  </div>`;
+}
+
 function renderFenwickView(step) {
   const view = step.fenwickView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -11318,6 +11404,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRunningSumView(step);
+  } else if (step.countSmallerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountSmallerView(step);
   } else if (step.evenOddRatioView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
