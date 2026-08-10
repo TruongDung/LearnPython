@@ -7426,6 +7426,107 @@ button:disabled {
   font-weight: 750;
 }
 
+.rw-trie-section {
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.rw-trie-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 8px;
+}
+
+.rw-trie-svg {
+  display: block;
+  width: max(100%, 560px);
+  min-height: 190px;
+  color: #cbd5e1;
+}
+
+.rw-trie-edge line {
+  stroke: rgba(148, 163, 184, 0.45);
+  stroke-width: 2;
+}
+
+.rw-trie-edge text {
+  fill: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgba(15, 23, 42, 0.92);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  text-anchor: middle;
+}
+
+.rw-trie-edge.active line {
+  stroke: #34d399;
+  stroke-width: 3;
+}
+
+.rw-trie-edge.active text {
+  fill: #a7f3d0;
+}
+
+.rw-trie-node circle {
+  fill: #0f172a;
+  stroke: rgba(148, 163, 184, 0.62);
+  stroke-width: 2;
+}
+
+.rw-trie-node text {
+  fill: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.rw-trie-node .rw-trie-ring {
+  fill: none;
+  stroke: #10b981;
+  stroke-width: 3;
+}
+
+.rw-trie-node.terminal circle {
+  fill: rgba(16, 185, 129, 0.13);
+  stroke: #10b981;
+}
+
+.rw-trie-node.active circle {
+  fill: rgba(96, 165, 250, 0.2);
+  stroke: #60a5fa;
+  stroke-width: 3;
+}
+
+.rw-trie-node.active.terminal circle,
+.rw-trie-node.active .rw-trie-ring {
+  stroke: #34d399;
+}
+
+.rw-trie-node .rw-trie-word {
+  fill: #a7f3d0;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.rw-trie-empty {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  border: 1px dashed rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .rw-root.active,
 .rw-result-token {
   border-color: rgba(16, 185, 129, 0.52);
@@ -7634,11 +7735,55 @@ button:disabled {
 [data-theme="light"] .rw-root,
 [data-theme="light"] .rw-word,
 [data-theme="light"] .rw-char,
+[data-theme="light"] .rw-trie-section,
 [data-theme="light"] .rw-decision,
 [data-theme="light"] .rw-empty {
   border-color: #cbd5e1;
   background: #f8fafc;
   color: #334155;
+}
+
+[data-theme="light"] .rw-trie-edge line {
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .rw-trie-edge text {
+  fill: #64748b;
+  stroke: #f8fafc;
+}
+
+[data-theme="light"] .rw-trie-edge.active line {
+  stroke: #059669;
+}
+
+[data-theme="light"] .rw-trie-edge.active text,
+[data-theme="light"] .rw-trie-node .rw-trie-word {
+  fill: #047857;
+}
+
+[data-theme="light"] .rw-trie-node circle {
+  fill: #ffffff;
+  stroke: #94a3b8;
+}
+
+[data-theme="light"] .rw-trie-node text {
+  fill: #0f172a;
+}
+
+[data-theme="light"] .rw-trie-node.terminal circle {
+  fill: #ecfdf5;
+  stroke: #059669;
+}
+
+[data-theme="light"] .rw-trie-node.active circle {
+  fill: #dbeafe;
+  stroke: #2563eb;
+}
+
+[data-theme="light"] .rw-trie-node .rw-trie-ring,
+[data-theme="light"] .rw-trie-node.active.terminal circle,
+[data-theme="light"] .rw-trie-node.active .rw-trie-ring {
+  stroke: #059669;
 }
 
 [data-theme="light"] .rw-root.active,
@@ -10267,6 +10412,99 @@ button:disabled {
   color: #f87171;
   font-size: 14px;
   margin-top: 8px;
+}
+
+.live-error-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.12);
+  color: #fecaca;
+}
+
+.live-error-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.live-error-head strong {
+  min-width: 0;
+  color: #fee2e2;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.live-error-head span {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.16);
+  color: #fecaca;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.live-error-message {
+  min-width: 0;
+  color: #fca5a5;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.live-error-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.live-error-meta span {
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.34);
+  color: #e2e8f0;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.live-error-hint {
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.live-error-details {
+  min-width: 0;
+}
+
+.live-error-details summary {
+  cursor: pointer;
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.live-error-details pre {
+  max-height: 180px;
+  margin: 8px 0 0;
+  padding: 9px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.44);
+  color: #e2e8f0;
+  font-size: 11px;
+  white-space: pre-wrap;
 }
 
 .hidden {
@@ -15766,6 +16004,40 @@ button:disabled {
 
 [data-theme="light"] .error {
   color: #dc2626;
+}
+
+[data-theme="light"] .live-error-card {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+[data-theme="light"] .live-error-head strong,
+[data-theme="light"] .live-error-message {
+  color: #991b1b;
+}
+
+[data-theme="light"] .live-error-head span {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+[data-theme="light"] .live-error-meta span {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+[data-theme="light"] .live-error-hint {
+  color: #334155;
+}
+
+[data-theme="light"] .live-error-details summary {
+  color: #b91c1c;
+}
+
+[data-theme="light"] .live-error-details pre {
+  background: #fff7f7;
+  color: #334155;
 }
 
 [data-theme="light"] .tree-view {

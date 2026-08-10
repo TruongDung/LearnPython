@@ -6537,6 +6537,59 @@ function renderReplaceWordsView(step) {
     ? view.pathChars.map((ch) => `<span>${escapeHtml(ch)}</span>`).join("<i>→</i>")
     : "<span>root</span>";
 
+  const trieNodes = step.tree && Array.isArray(step.tree.nodes) ? step.tree.nodes : [];
+  const activeTrieIds = new Set(trieNodes.filter((node) => node.hl).map((node) => node.id));
+  const trieHtml = trieNodes.length
+    ? (() => {
+      const maxX = trieNodes.reduce((max, node) => Math.max(max, Number(node.x) || 0), 0);
+      const maxY = trieNodes.reduce((max, node) => Math.max(max, Number(node.y) || 0), 0);
+      const width = Math.max(560, (maxX + 1) * 92 + 80);
+      const height = Math.max(180, (maxY + 1) * 82 + 48);
+      const xFor = (node) => 40 + (Number(node.x) || 0) * 92;
+      const yFor = (node) => 36 + (Number(node.y) || 0) * 82;
+      const nodeById = new Map(trieNodes.map((node) => [node.id, node]));
+      const edges = trieNodes
+        .filter((node) => node.parentId !== null && node.parentId !== undefined && nodeById.has(node.parentId))
+        .map((node) => ({ from: nodeById.get(node.parentId), to: node }))
+        .sort((a, b) => (a.to.y - b.to.y) || (a.to.x - b.to.x));
+
+      const edgeSvg = edges.map(({ from, to }) => {
+        const active = activeTrieIds.has(from.id) && activeTrieIds.has(to.id);
+        const x1 = xFor(from);
+        const y1 = yFor(from);
+        const x2 = xFor(to);
+        const y2 = yFor(to);
+        return `<g class="rw-trie-edge${active ? " active" : ""}">
+          <line x1="${x1}" y1="${y1 + 18}" x2="${x2}" y2="${y2 - 18}"></line>
+          <text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}">${escapeHtml(to.label)}</text>
+        </g>`;
+      }).join("");
+
+      const nodeSvg = trieNodes.map((node) => {
+        const classes = ["rw-trie-node"];
+        if (node.isWord) classes.push("terminal");
+        if (activeTrieIds.has(node.id)) classes.push("active");
+        const label = node.parentId === null || node.parentId === undefined ? "root" : node.label;
+        const wordBadge = node.isWord && node.sub
+          ? `<text class="rw-trie-word" x="0" y="39">${escapeHtml(node.sub)}</text>`
+          : "";
+        return `<g class="${classes.join(" ")}" transform="translate(${xFor(node)} ${yFor(node)})">
+          <circle r="21"></circle>
+          <text y="5">${escapeHtml(label)}</text>
+          ${node.isWord ? '<circle class="rw-trie-ring" r="26"></circle>' : ""}
+          ${wordBadge}
+        </g>`;
+      }).join("");
+
+      return `<div class="rw-trie-scroll">
+        <svg class="rw-trie-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(vi ? "Cây Trie của dictionary" : "Dictionary Trie")}">
+          ${edgeSvg}
+          ${nodeSvg}
+        </svg>
+      </div>`;
+    })()
+    : `<div class="rw-trie-empty">${vi ? "Trie đang rỗng" : "Trie is empty"}</div>`;
+
   let decisionClass = "";
   let decisionMain = "";
   let decisionSub = "";
@@ -6578,6 +6631,10 @@ function renderReplaceWordsView(step) {
     <div class="rw-section">
       <header><strong>Dictionary roots</strong><span>${vi ? "root càng ngắn càng ưu tiên" : "shorter root wins"}</span></header>
       <div class="rw-root-row">${dictionaryHtml}</div>
+    </div>
+    <div class="rw-section rw-trie-section">
+      <header><strong>${vi ? "Cây Trie" : "Trie tree"}</strong><span>${vi ? "xanh = đường/prefix đang đi" : "green = active prefix path"}</span></header>
+      ${trieHtml}
     </div>
     <div class="rw-section">
       <header><strong>Sentence</strong><span>${vi ? "trên: từ gốc, dưới: kết quả" : "top: original, bottom: output"}</span></header>
@@ -11026,6 +11083,69 @@ function showError(id, msg) {
   el.classList.remove("hidden");
 }
 
+function showRichError(id, html) {
+  const el = $(id);
+  el.innerHTML = html;
+  el.classList.remove("hidden");
+}
+
+function formatPythonRuntimeError(err) {
+  const raw = ((err && err.message) || String(err || "")).trim();
+  const text = raw.replace(/^PythonError:\s*/i, "").trim();
+  const lines = text.split(/\r?\n/).map((line) => line.trimEnd()).filter(Boolean);
+  const userFrames = [...text.matchAll(/File\s+"<usercode>",\s+line\s+(\d+),\s+in\s+([A-Za-z_]\w*)/g)];
+  const lastUserFrame = userFrames.length ? userFrames[userFrames.length - 1] : null;
+  const errorLine = [...lines].reverse().find((line) => /^[A-Za-z_]\w*(?:Error|Exception|Warning)\s*:/.test(line)) || lines[lines.length - 1] || text;
+  const errorMatch = errorLine.match(/^([A-Za-z_]\w*)\s*:\s*(.*)$/);
+  const errorType = errorMatch ? errorMatch[1] : "Runtime error";
+  const errorMessage = errorMatch ? errorMatch[2] : errorLine;
+  const lineNumber = lastUserFrame ? Number(lastUserFrame[1]) : null;
+  const functionName = lastUserFrame ? lastUserFrame[2] : null;
+  const hintMap = {
+    IndexError: lang === "vi"
+      ? "Kiểm tra lại index, độ dài list, hoặc dữ liệu input. Lỗi này thường xảy ra khi truy cập arr[i] nhưng i nằm ngoài phạm vi."
+      : "Check the index, list length, or input data. This usually happens when arr[i] is outside the valid range.",
+    KeyError: lang === "vi"
+      ? "Key chưa tồn tại trong dict/set lookup. Thử kiểm tra điều kiện trước khi truy cập hoặc dùng dict.get(...)."
+      : "The key does not exist for this dict/set lookup. Check before accessing it or use dict.get(...).",
+    TypeError: lang === "vi"
+      ? "Kiểm tra kiểu dữ liệu hoặc số lượng tham số truyền vào hàm."
+      : "Check the data type or the number of arguments passed to a function.",
+    ValueError: lang === "vi"
+      ? "Một giá trị không đúng định dạng/kỳ vọng. Kiểm tra bước ép kiểu hoặc parse input."
+      : "A value has an unexpected format. Check type conversion or input parsing.",
+    AttributeError: lang === "vi"
+      ? "Object không có thuộc tính/phương thức này. Kiểm tra biến có đúng kiểu mong muốn không."
+      : "The object does not have this attribute/method. Check whether the variable has the expected type.",
+    NameError: lang === "vi"
+      ? "Tên biến/hàm chưa được khai báo hoặc bị gõ sai."
+      : "A variable/function name is missing or misspelled.",
+  };
+  const hint = hintMap[errorType] || (lang === "vi"
+    ? "Xem dòng được báo bên dưới, kiểm tra biến local và điều kiện biên quanh dòng đó."
+    : "Look at the reported line below, then check local variables and boundary conditions around it.");
+  const title = lang === "vi" ? "Code của bạn gặp lỗi khi chạy" : "Your code hit a runtime error";
+  const location = lineNumber
+    ? (lang === "vi" ? `Dòng ${lineNumber}${functionName ? ` trong ${functionName}()` : ""}` : `Line ${lineNumber}${functionName ? ` in ${functionName}()` : ""}`)
+    : (lang === "vi" ? "Không xác định được dòng trong code của bạn" : "Could not identify a user-code line");
+  return `
+    <div class="live-error-card">
+      <div class="live-error-head">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(errorType)}</span>
+      </div>
+      <div class="live-error-message">${escapeHtml(errorMessage || errorType)}</div>
+      <div class="live-error-meta">
+        <span>${escapeHtml(location)}</span>
+      </div>
+      <div class="live-error-hint">${escapeHtml(hint)}</div>
+      <details class="live-error-details">
+        <summary>${escapeHtml(lang === "vi" ? "Chi tiết kỹ thuật" : "Technical details")}</summary>
+        <pre>${escapeHtml(text)}</pre>
+      </details>
+    </div>`;
+}
+
 // Initialize
 applyStaticStrings();
 loadCatalog();
@@ -12205,8 +12325,7 @@ async function runLiveCode() {
     enterLiveStepMode(userCode, answer);
   } catch (err) {
     $("liveStatus").textContent = "";
-    const msg = (err && err.message) || String(err);
-    showError("liveError", msg);
+    showRichError("liveError", formatPythonRuntimeError(err));
   }
 }
 
