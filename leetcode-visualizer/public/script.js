@@ -11604,6 +11604,7 @@ async function ensureMonacoEditor() {
     lineHeight: 21,
     minimap: { enabled: false },
     automaticLayout: true,
+    fixedOverflowWidgets: true,
     scrollBeyondLastLine: false,
     renderLineHighlight: "all",
     renderWhitespace: "selection",

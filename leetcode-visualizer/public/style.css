@@ -925,7 +925,6 @@ button:disabled {
 .monaco-editor-host {
   height: var(--live-editor-height, 360px);
   width: 100%;
-  overflow: hidden;
   border-radius: 10px 10px 0 0;
 }
 
