@@ -4250,6 +4250,119 @@ function renderStoneGameView(step) {
   </section>`;
 }
 
+function renderStoneGameIVView(step) {
+  const view = step.stoneGameIVView || {};
+  const vi = lang === "vi";
+  const phaseIndex = view.phase === "result" ? 2 : ["try", "check", "win", "next", "lose"].includes(view.phase) ? 1 : 0;
+  const phaseLabels = vi
+    ? ["1. Base losing state", "2. Thử số chính phương", "3. Đọc dp[n]"]
+    : ["1. Base losing state", "2. Try perfect squares", "3. Read dp[n]"];
+  const phasesHtml = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "is-done" : index === phaseIndex ? "is-active" : "";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : ""}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const dpHtml = (view.dp || []).map((cell) => {
+    const classes = ["sg4-cell"];
+    if (cell.known) classes.push(cell.value ? "is-win" : "is-lose");
+    if (cell.active) classes.push("is-active");
+    if (cell.remain) classes.push("is-remain");
+    const label = cell.known ? (cell.value ? "WIN" : "LOSE") : "?";
+    return `<div class="${classes.join(" ")}">
+      <small>${cell.index}</small>
+      <strong>${escapeHtml(label)}</strong>
+    </div>`;
+  }).join("");
+
+  const squareHtml = (view.squares || []).map((item) => {
+    const classes = ["sg4-square"];
+    if (item.move === view.activeMove) classes.push("is-active");
+    if (item.square > view.activeI && Number.isInteger(view.activeI)) classes.push("is-too-big");
+    return `<div class="${classes.join(" ")}"><small>${item.move}²</small><strong>${item.square}</strong></div>`;
+  }).join("");
+
+  const optionHtml = (view.options || []).length
+    ? view.options.map((option) => {
+      const classes = ["sg4-option", option.winning ? "is-winning" : "is-losing"];
+      if (option.square === view.activeSquare) classes.push("is-current");
+      return `<div class="${classes.join(" ")}">
+        <b>${vi ? "Lấy" : "Take"} ${option.square}</b>
+        <span>${view.activeI} - ${option.square} = ${option.remain}</span>
+        <strong>dp[${option.remain}] = ${option.remainValue ? "WIN" : "LOSE"}</strong>
+        <em>${option.winning ? (vi ? "nước thắng" : "winning move") : (vi ? "chưa thắng" : "not winning")}</em>
+      </div>`;
+    }).join("")
+    : `<div class="sg4-empty">${vi ? "Chưa thử square nào." : "No square tried yet."}</div>`;
+
+  const activeSquare = Number.isInteger(view.activeSquare) ? view.activeSquare : "?";
+  const activeRemain = Number.isInteger(view.activeRemain) ? view.activeRemain : "?";
+  const remainCell = Number.isInteger(view.activeRemain) ? (view.dp || [])[view.activeRemain] : null;
+  const remainValue = remainCell && remainCell.known ? (remainCell.value ? "WIN" : "LOSE") : "?";
+  const formulaHtml = `<div class="sg4-formula">
+    <span><small>${vi ? "đang xét" : "current"}</small><strong>dp[${Number.isInteger(view.activeI) ? view.activeI : "i"}]</strong></span>
+    <i>${vi ? "lấy" : "take"}</i>
+    <span class="is-square"><small>square</small><strong>${escapeHtml(activeSquare)}</strong></span>
+    <i>→</i>
+    <span class="is-remain"><small>i - square</small><strong>${escapeHtml(activeRemain)}</strong></span>
+    <i>${vi ? "đối thủ nhận" : "opponent gets"}</i>
+    <span class="${remainValue === "LOSE" ? "is-good" : ""}"><small>dp[remain]</small><strong>${escapeHtml(remainValue)}</strong></span>
+  </div>`;
+
+  let detail;
+  if (view.phase === "intro") {
+    detail = vi ? "Mỗi trạng thái chỉ cần biết WIN hay LOSE cho người đang tới lượt." : "Each state only needs WIN or LOSE for the current player.";
+  } else if (view.phase === "init") {
+    detail = vi ? "dp[0] = LOSE vì không còn viên nào để lấy." : "dp[0] = LOSE because there are no stones to take.";
+  } else if (view.phase === "state") {
+    detail = vi ? `Bắt đầu tính dp[${view.activeI}], mặc định coi là LOSE.` : `Start computing dp[${view.activeI}], initially treated as LOSE.`;
+  } else if (view.phase === "try") {
+    detail = vi ? `Thử lấy ${activeSquare} viên, còn lại ${activeRemain}.` : `Try taking ${activeSquare} stones, leaving ${activeRemain}.`;
+  } else if (view.phase === "check") {
+    detail = remainValue === "LOSE"
+      ? (vi ? "Phần còn lại là LOSE cho đối thủ, vậy đây là nước thắng." : "The remainder is LOSE for the opponent, so this is a winning move.")
+      : (vi ? "Phần còn lại là WIN cho đối thủ, nên chưa thể chốt thắng." : "The remainder is WIN for the opponent, so this move cannot prove a win.");
+  } else if (view.phase === "win") {
+    detail = vi ? `Chốt dp[${view.activeI}] = WIN và dừng thử square khác.` : `Set dp[${view.activeI}] = WIN and stop trying other squares.`;
+  } else if (view.phase === "lose") {
+    detail = vi ? `Không có square nào đẩy đối thủ vào LOSE, nên dp[${view.activeI}] = LOSE.` : `No square sends the opponent to LOSE, so dp[${view.activeI}] = LOSE.`;
+  } else if (view.phase === "next") {
+    detail = vi ? "Nước vừa thử không thắng, thử square kế tiếp." : "The tried move is not winning, try the next square.";
+  } else {
+    const answer = (view.dp || [])[view.n] && (view.dp || [])[view.n].value;
+    detail = answer
+      ? (vi ? `dp[${view.n}] = WIN, Alice thắng.` : `dp[${view.n}] = WIN, Alice wins.`)
+      : (vi ? `dp[${view.n}] = LOSE, Alice thua nếu Bob tối ưu.` : `dp[${view.n}] = LOSE, Alice loses if Bob plays optimally.`);
+  }
+
+  const resultCell = (view.dp || [])[view.n] || {};
+  const resultClass = view.phase === "result" ? (resultCell.value ? " is-win" : " is-lose") : "";
+  const summary = vi
+    ? `Stone Game IV với n=${view.n}; trạng thái ${view.phase}.`
+    : `Stone Game IV with n=${view.n}; phase ${view.phase}.`;
+  $("treeView").innerHTML = `<section class="sg4-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="sg4-phases">${phasesHtml}</div>
+    <section class="sg4-section">
+      <header><strong>dp states</strong><span>${vi ? "WIN/LOSE cho người đang tới lượt" : "WIN/LOSE for the current player"}</span></header>
+      <div class="sg4-scroll"><div class="sg4-row">${dpHtml}</div></div>
+    </section>
+    <section class="sg4-section">
+      <header><strong>${vi ? "Số chính phương" : "Perfect squares"}</strong><span>${vi ? "các nước có thể lấy" : "possible amounts to take"}</span></header>
+      <div class="sg4-squares">${squareHtml}</div>
+    </section>
+    ${formulaHtml}
+    <section class="sg4-section">
+      <header><strong>${vi ? "Các nước đã thử cho i hiện tại" : "Moves tried for current i"}</strong><span>dp[i] = any(not dp[i-square])</span></header>
+      <div class="sg4-options">${optionHtml}</div>
+    </section>
+    <div class="sg4-action${resultClass}">
+      <strong>${escapeHtml(pick(step.title))}</strong>
+      <span>${escapeHtml(detail)}</span>
+      ${view.phase === "result" ? `<b>${resultCell.value ? "Alice wins" : "Alice loses"}</b>` : ""}
+    </div>
+    <div class="sg4-legend"><span><i class="win"></i>WIN</span><span><i class="lose"></i>LOSE</span><span><i class="remain"></i>dp[i-square]</span><span><i class="square"></i>${vi ? "square đang thử" : "current square"}</span></div>
+  </section>`;
+}
+
 function renderRectangleAreaView(step) {
   const view = step.rectangleAreaView;
   const vi = lang === "vi";
@@ -10602,6 +10715,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderStoneGameIIView(step);
+  } else if (step.stoneGameIVView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGameIVView(step);
   } else if (step.stoneGameView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -17327,6 +17327,403 @@ button:disabled {
   .sg2-result-split { grid-template-columns: 1fr; }
 }
 
+/* ---- 1510: Stone Game IV ---- */
+.sg4-viz {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sg4-phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sg4-phases span {
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  color: #64748b;
+  text-align: center;
+}
+
+.sg4-phases span.is-active {
+  border-color: rgba(245, 158, 11, 0.65);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fde68a;
+}
+
+.sg4-phases span.is-done {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #6ee7b7;
+}
+
+.sg4-phases b {
+  min-width: 0;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.sg4-section {
+  min-width: 0;
+}
+
+.sg4-section > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.sg4-section > header strong {
+  color: #cbd5e1;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.sg4-section > header span {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.sg4-scroll {
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.sg4-row,
+.sg4-squares,
+.sg4-options {
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sg4-row {
+  width: max-content;
+  min-width: 100%;
+}
+
+.sg4-cell {
+  min-width: 58px;
+  min-height: 58px;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px dashed rgba(148, 163, 184, 0.24);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.sg4-cell small,
+.sg4-square small,
+.sg4-formula small {
+  color: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 10px;
+}
+
+.sg4-cell strong {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sg4-cell.is-win {
+  border-style: solid;
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.11);
+}
+
+.sg4-cell.is-win strong { color: #6ee7b7; }
+
+.sg4-cell.is-lose {
+  border-style: solid;
+  border-color: rgba(248, 113, 113, 0.48);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sg4-cell.is-lose strong { color: #fecaca; }
+
+.sg4-cell.is-active {
+  outline: 2px solid rgba(245, 158, 11, 0.7);
+  outline-offset: 2px;
+}
+
+.sg4-cell.is-remain {
+  box-shadow: inset 0 -4px 0 rgba(167, 139, 250, 0.72);
+}
+
+.sg4-squares {
+  flex-wrap: wrap;
+}
+
+.sg4-square {
+  min-width: 64px;
+  min-height: 48px;
+  padding: 6px 8px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.sg4-square strong {
+  color: #e2e8f0;
+  font-size: 18px;
+}
+
+.sg4-square.is-active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.13);
+}
+
+.sg4-square.is-too-big {
+  opacity: 0.42;
+}
+
+.sg4-formula {
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) auto minmax(70px, 0.8fr) auto minmax(80px, 1fr) auto minmax(86px, 1fr);
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sg4-formula > span {
+  min-width: 0;
+  min-height: 54px;
+  padding: 7px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.32);
+  text-align: center;
+}
+
+.sg4-formula i {
+  align-self: center;
+  color: #64748b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: center;
+}
+
+.sg4-formula strong {
+  color: #f8fafc;
+  font-size: 16px;
+}
+
+.sg4-formula .is-square { border-color: rgba(245, 158, 11, 0.54); }
+.sg4-formula .is-remain { border-color: rgba(167, 139, 250, 0.55); }
+.sg4-formula .is-good { border-color: rgba(16, 185, 129, 0.55); background: rgba(16, 185, 129, 0.11); }
+
+.sg4-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+}
+
+.sg4-option,
+.sg4-empty {
+  min-width: 0;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.sg4-option b {
+  color: #e2e8f0;
+  font-size: 11px;
+}
+
+.sg4-option span,
+.sg4-option em,
+.sg4-empty {
+  color: #94a3b8;
+  font-size: 10px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.sg4-option strong {
+  color: #cbd5e1;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 11px;
+}
+
+.sg4-option.is-current {
+  border-color: #f59e0b;
+}
+
+.sg4-option.is-winning {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.11);
+}
+
+.sg4-option.is-winning em {
+  color: #6ee7b7;
+  font-weight: 800;
+}
+
+.sg4-option.is-losing {
+  opacity: 0.66;
+}
+
+.sg4-action {
+  min-width: 0;
+  padding: 9px 11px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.sg4-action strong {
+  color: #fde68a;
+  font-size: 12px;
+}
+
+.sg4-action span {
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.sg4-action > b {
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: #10b981;
+  color: #052e2b;
+  font-size: 12px;
+}
+
+.sg4-action.is-win {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-left-color: #10b981;
+  background: rgba(16, 185, 129, 0.11);
+}
+
+.sg4-action.is-lose {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-left-color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sg4-action.is-lose > b {
+  background: #f87171;
+  color: #450a0a;
+}
+
+.sg4-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #64748b;
+  font-size: 9px;
+}
+
+.sg4-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sg4-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.sg4-legend i.win { background: #10b981; }
+.sg4-legend i.lose { background: #f87171; }
+.sg4-legend i.remain { background: #a78bfa; }
+.sg4-legend i.square { background: #f59e0b; }
+
+[data-theme="light"] .sg4-phases span,
+[data-theme="light"] .sg4-cell,
+[data-theme="light"] .sg4-square,
+[data-theme="light"] .sg4-formula > span,
+[data-theme="light"] .sg4-option,
+[data-theme="light"] .sg4-empty {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+[data-theme="light"] .sg4-section > header strong,
+[data-theme="light"] .sg4-square strong,
+[data-theme="light"] .sg4-formula strong,
+[data-theme="light"] .sg4-option b,
+[data-theme="light"] .sg4-option strong,
+[data-theme="light"] .sg4-action span {
+  color: #0f172a;
+}
+
+[data-theme="light"] .sg4-cell.is-win,
+[data-theme="light"] .sg4-option.is-winning,
+[data-theme="light"] .sg4-action.is-win {
+  border-color: #059669;
+  background: #ecfdf5;
+}
+
+[data-theme="light"] .sg4-cell.is-lose,
+[data-theme="light"] .sg4-action.is-lose {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+[data-theme="light"] .sg4-cell.is-win strong { color: #047857; }
+[data-theme="light"] .sg4-cell.is-lose strong { color: #991b1b; }
+[data-theme="light"] .sg4-square.is-active,
+[data-theme="light"] .sg4-phases span.is-active {
+  border-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+@media (max-width: 760px) {
+  .sg4-phases,
+  .sg4-formula {
+    grid-template-columns: 1fr;
+  }
+
+  .sg4-formula i {
+    display: none;
+  }
+
+  .sg4-action,
+  .sg4-action.is-win,
+  .sg4-action.is-lose {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ---- 1406: Stone Game III ---- */
 .stone-game-viz {
   display: grid;

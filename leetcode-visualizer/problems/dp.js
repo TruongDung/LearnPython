@@ -4341,6 +4341,215 @@ function buildSteps740(nums) {
 }
 
 /**
+ * LeetCode 1510: Stone Game IV.
+ * Boolean game DP: dp[i] is true if the current player has a move taking
+ * a perfect square that leaves a losing state for the opponent.
+ */
+function buildSteps1510(input) {
+  const raw = Array.isArray(input) ? input[0] : input;
+  const n = Math.max(0, Math.min(60, Number.parseInt(raw, 10) || 7));
+  const dp = new Array(n + 1).fill(false);
+  const known = new Array(n + 1).fill(false);
+  const steps = [];
+  const squares = [];
+  for (let move = 1; move * move <= n; move += 1) squares.push(move * move);
+
+  let phase = "intro";
+  let activeI = null;
+  let activeMove = null;
+  let activeSquare = null;
+  let activeRemain = null;
+  let options = [];
+
+  function makeView() {
+    return {
+      n,
+      phase,
+      activeI,
+      activeMove,
+      activeSquare,
+      activeRemain,
+      squares: squares.map((square, index) => ({ move: index + 1, square })),
+      dp: dp.map((value, index) => ({
+        index,
+        value: known[index] ? value : null,
+        known: known[index],
+        active: index === activeI,
+        remain: index === activeRemain,
+      })),
+      options: options.map((option) => ({ ...option })),
+    };
+  }
+
+  function dpText() {
+    return `[${dp.map((value, index) => (known[index] ? (value ? "T" : "F") : index === activeI ? "?" : "·")).join(", ")}]`;
+  }
+
+  function push({ title, codeLines, vars = [], note, final = false }) {
+    steps.push({
+      title,
+      arr: dp.map((value, index) => (known[index] ? (value ? 1 : 0) : 0)),
+      sub: dp.map((_, index) => String(index)),
+      highlight: Number.isInteger(activeI) ? [activeI] : [],
+      mark: Number.isInteger(activeRemain) ? [activeRemain] : [],
+      stoneGameIVView: makeView(),
+      codeLines,
+      vars: [{ name: "dp", value: dpText() }, ...vars],
+      note,
+      final,
+    });
+  }
+
+  push({
+    title: { vi: "Ý tưởng: win/lose DP", en: "Idea: win/lose DP" },
+    codeLines: [2],
+    vars: [{ name: "n", value: n }, { name: "perfect squares", value: `[${squares.join(", ")}]` }],
+    note: {
+      vi: "dp[i] = True nếu người đang chơi có thể lấy một số chính phương và để lại trạng thái thua cho đối thủ.",
+      en: "dp[i] is True if the current player can take a perfect square and leave a losing state for the opponent.",
+    },
+  });
+
+  phase = "init";
+  known[0] = true;
+  push({
+    title: { vi: "Khởi tạo dp[0] = False", en: "Initialize dp[0] = False" },
+    codeLines: [3],
+    vars: [{ name: "dp[0]", value: false }],
+    note: {
+      vi: "Không còn đá thì người tới lượt không lấy được gì, nên đó là trạng thái thua.",
+      en: "With no stones left, the current player cannot move, so this is a losing state.",
+    },
+  });
+
+  for (let i = 1; i <= n; i += 1) {
+    phase = "state";
+    activeI = i;
+    activeMove = null;
+    activeSquare = null;
+    activeRemain = null;
+    options = [];
+    push({
+      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
+      codeLines: [4],
+      vars: [{ name: "i", value: i }],
+      note: {
+        vi: `Xét trạng thái còn ${i} viên đá. Mặc định dp[${i}] = False cho tới khi tìm được nước thắng.`,
+        en: `Consider ${i} stones remaining. dp[${i}] stays False until a winning move is found.`,
+      },
+    });
+
+    let foundWinningMove = false;
+    for (let move = 1; move * move <= i; move += 1) {
+      const square = move * move;
+      const remain = i - square;
+      activeMove = move;
+      activeSquare = square;
+      activeRemain = remain;
+
+      phase = "try";
+      push({
+        title: { vi: `Thử lấy ${move}² = ${square}`, en: `Try taking ${move}² = ${square}` },
+        codeLines: [6, 7],
+        vars: [{ name: "move", value: move }, { name: "square", value: square }, { name: "i - square", value: remain }],
+        note: {
+          vi: `Nếu lấy ${square} viên từ ${i}, đối thủ sẽ nhận trạng thái còn ${remain} viên.`,
+          en: `If we take ${square} from ${i}, the opponent receives the state with ${remain} stones.`,
+        },
+      });
+
+      const opponentLoses = !dp[remain];
+      options.push({ move, square, remain, remainValue: dp[remain], winning: opponentLoses });
+      phase = "check";
+      push({
+        title: {
+          vi: `not dp[${remain}]? ${opponentLoses ? "True" : "False"}`,
+          en: `not dp[${remain}]? ${opponentLoses ? "True" : "False"}`,
+        },
+        codeLines: [8],
+        vars: [{ name: `dp[${remain}]`, value: dp[remain] }, { name: "winning move?", value: opponentLoses }],
+        note: opponentLoses
+          ? {
+              vi: `dp[${remain}] là False, nghĩa là đối thủ thua ở phần còn lại. Vậy lấy ${square} là nước thắng.`,
+              en: `dp[${remain}] is False, so the opponent loses on the remaining state. Taking ${square} is a winning move.`,
+            }
+          : {
+              vi: `dp[${remain}] là True, đối thủ có thể thắng từ phần còn lại. Nước này không đủ tốt.`,
+              en: `dp[${remain}] is True, so the opponent can win from the remaining state. This move is not good enough.`,
+            },
+      });
+
+      if (opponentLoses) {
+        dp[i] = true;
+        known[i] = true;
+        foundWinningMove = true;
+        phase = "win";
+        push({
+          title: { vi: `dp[${i}] = True`, en: `dp[${i}] = True` },
+          codeLines: [9, 10],
+          vars: [{ name: `dp[${i}]`, value: true }, { name: "best square", value: square }],
+          note: {
+            vi: `Chỉ cần một nước đi tới losing state là đủ. Dừng thử các square khác cho i=${i}.`,
+            en: `One move to a losing state is enough. Stop trying other squares for i=${i}.`,
+          },
+        });
+        break;
+      }
+
+      phase = "next";
+      push({
+        title: { vi: "move += 1", en: "move += 1" },
+        codeLines: [11],
+        vars: [{ name: "next move", value: move + 1 }],
+        note: {
+          vi: "Nước vừa thử không thắng, nên thử số chính phương kế tiếp.",
+          en: "The tried move is not winning, so try the next perfect square.",
+        },
+      });
+    }
+
+    known[i] = true;
+    if (!foundWinningMove) {
+      activeMove = null;
+      activeSquare = null;
+      activeRemain = null;
+      phase = "lose";
+      push({
+        title: { vi: `dp[${i}] vẫn False`, en: `dp[${i}] remains False` },
+        codeLines: [6],
+        vars: [{ name: `dp[${i}]`, value: false }],
+        note: {
+          vi: `Không có số chính phương nào đưa đối thủ vào trạng thái thua, nên ${i} là losing state.`,
+          en: `No perfect square leaves the opponent in a losing state, so ${i} is a losing state.`,
+        },
+      });
+    }
+  }
+
+  activeI = n;
+  activeMove = null;
+  activeSquare = null;
+  activeRemain = null;
+  phase = "result";
+  push({
+    title: { vi: `return dp[${n}]`, en: `return dp[${n}]` },
+    codeLines: [12],
+    vars: [{ name: "answer", value: dp[n] }],
+    note: {
+      vi: dp[n]
+        ? `dp[${n}] = True, Alice có nước đi thắng khi cả hai chơi tối ưu.`
+        : `dp[${n}] = False, Alice không có nước thắng nếu Bob chơi tối ưu.`,
+      en: dp[n]
+        ? `dp[${n}] = True, so Alice has a winning move under optimal play.`
+        : `dp[${n}] = False, so Alice has no winning move if Bob plays optimally.`,
+    },
+    final: true,
+  });
+
+  return { original: n, answer: dp[n], steps };
+}
+
+/**
  * LeetCode 1406: Stone Game III.
  * Suffix game DP with a line-by-line view of every 1-3 stone choice.
  */
@@ -15646,6 +15855,61 @@ module.exports = {
       "#     return True",
     ],
     builder: buildSteps877,
+  },
+  1510: {
+    id: 1510,
+    difficulty: "hard",
+    slug: "stone-game-iv",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game IV", en: "Stone Game IV" },
+    titleVi: { vi: "Trò chơi đá IV (square DP)", en: "Stone Game IV (square DP)" },
+    statement: {
+      vi: "Có n viên đá. Hai người chơi luân phiên lấy đi một số viên là số chính phương khác 0 (1, 4, 9, ...). Người không thể đi sẽ thua. Trả về true nếu Alice thắng khi cả hai chơi tối ưu.",
+      en: "There are n stones. Players alternate taking a non-zero square number of stones (1, 4, 9, ...). A player who cannot move loses. Return true if Alice wins with optimal play.",
+    },
+    defaultInput: [7],
+    inputKind: "positive",
+    inputLabel: { vi: "n", en: "n" },
+    singleInput: true,
+    maxInput: 60,
+    extraParams: [],
+    approach: [
+      {
+        vi: "dp[i] = True nếu người đang tới lượt có thể thắng khi còn i viên đá.",
+        en: "dp[i] = True if the current player can win with i stones remaining.",
+      },
+      {
+        vi: "Từ i, thử lấy từng số chính phương square <= i. Sau khi lấy, đối thủ nhận trạng thái i - square.",
+        en: "From i, try each square <= i. After taking it, the opponent receives state i - square.",
+      },
+      {
+        vi: "Nếu tồn tại square sao cho dp[i - square] == False, thì dp[i] = True vì ta đẩy đối thủ vào losing state.",
+        en: "If any square has dp[i - square] == False, then dp[i] = True because we hand the opponent a losing state.",
+      },
+    ],
+    complexity: {
+      time: "O(n√n)",
+      space: "O(n)",
+      note: {
+        vi: "Có n trạng thái; mỗi trạng thái thử tối đa √i số chính phương.",
+        en: "There are n states; each state tries up to √i perfect squares.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def winnerSquareGame(self, n):",
+      "        dp = [False] * (n + 1)",
+      "        for i in range(1, n + 1):",
+      "            move = 1",
+      "            while move * move <= i:",
+      "                square = move * move",
+      "                if not dp[i - square]:",
+      "                    dp[i] = True",
+      "                    break",
+      "                move += 1",
+      "        return dp[n]",
+    ],
+    builder: buildSteps1510,
   },
   1406: {
     id: 1406,
