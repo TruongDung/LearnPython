@@ -2164,7 +2164,7 @@ function buildSteps209(nums, params = {}) {
   return { original: [...nums], answer, steps };
 }
 
-function buildSteps713(nums, params) {
+function buildSteps713Legacy(nums, params) {
   const k = params.k;
   const n = nums.length;
   const steps = [];
@@ -2255,6 +2255,157 @@ function buildSteps713(nums, params) {
  * all substrings starting from left..current_left ending at right..n-1 are valid.
  * Count += n - right for each valid window position after shrinking.
  */
+/** LeetCode 713: detailed sliding-window product visualization. */
+function buildSteps713(nums, params = {}) {
+  const kRaw = Number(params.k);
+  const k = Number.isFinite(kRaw) ? Math.trunc(kRaw) : 100;
+  const steps = [];
+  let left = 0;
+  let right = -1;
+  let product = 1;
+  let count = 0;
+  let phase = "guard";
+  let removedIndex = null;
+  let added = 0;
+  let newSubarrays = [];
+
+  const indices = (lo, hi) => (
+    Number.isInteger(lo) && Number.isInteger(hi) && lo <= hi
+      ? Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset)
+      : []
+  );
+  const snapshot = () => ({
+    nums: [...nums], k, left, right, product, count, phase, removedIndex,
+    added, newSubarrays: newSubarrays.map((item) => ({ ...item, values: [...item.values] })),
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: indices(left, right),
+      mark: [],
+      vars: [
+        { name: "k", value: k },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "product", value: product },
+        { name: "count", value: count },
+        ...vars,
+      ],
+      productSubarrayView: snapshot(),
+    });
+  };
+
+  if (k <= 1) {
+    addStep(
+      { vi: `${k} <= 1 → return 0`, en: `${k} <= 1 → return 0` },
+      { vi: "Mọi nums[i] đều dương và >= 1, nên không có tích nào nhỏ hơn k.", en: "Every nums[i] is positive and >= 1, so no product can be less than k." },
+      3, "done", [{ name: "answer", value: 0 }], true,
+    );
+    return { original: [...nums], answer: 0, steps };
+  }
+
+  addStep(
+    { vi: `${k} <= 1 → False`, en: `${k} <= 1 → False` },
+    { vi: "Có thể tồn tại tích dương nhỏ hơn k; tiếp tục sliding window.", en: "A positive product may be less than k; continue with the sliding window." },
+    3, "guard", [{ name: "k", value: k }],
+  );
+  addStep(
+    { vi: "left = 0", en: "left = 0" },
+    { vi: "Cạnh trái bắt đầu ở đầu mảng.", en: "The left edge starts at the beginning of the array." },
+    4, "init", [{ name: "left", value: left }],
+  );
+  addStep(
+    { vi: "product = 1", en: "product = 1" },
+    { vi: "Tích của cửa sổ rỗng dùng giá trị đơn vị là 1.", en: "The empty window product starts at the multiplicative identity 1." },
+    5, "init", [{ name: "product", value: product }],
+  );
+  addStep(
+    { vi: "count = 0", en: "count = 0" },
+    { vi: "Chưa đếm subarray hợp lệ nào.", en: "No valid subarray has been counted yet." },
+    6, "init", [{ name: "count", value: count }],
+  );
+
+  for (right = 0; right < nums.length; right += 1) {
+    removedIndex = null;
+    added = 0;
+    newSubarrays = [];
+    addStep(
+      { vi: `Di chuyển right đến index ${right}`, en: `Move right to index ${right}` },
+      { vi: `Chuẩn bị nhân nums[${right}] = ${nums[right]} vào cửa sổ.`, en: `Prepare to multiply nums[${right}] = ${nums[right]} into the window.` },
+      7, "expand", [{ name: "nums[right]", value: nums[right] }],
+    );
+    const beforeMultiply = product;
+    product *= nums[right];
+    addStep(
+      { vi: `product *= ${nums[right]} → ${product}`, en: `product *= ${nums[right]} → ${product}` },
+      { vi: `${beforeMultiply} × ${nums[right]} = ${product}.`, en: `${beforeMultiply} × ${nums[right]} = ${product}.` },
+      8, "multiply", [{ name: "previous product", value: beforeMultiply }, { name: "nums[right]", value: nums[right] }],
+    );
+
+    while (product >= k) {
+      addStep(
+        { vi: `${product} >= ${k} → True`, en: `${product} >= ${k} → True` },
+        { vi: "Tích chưa hợp lệ; phải bỏ phần tử ngoài cùng bên trái.", en: "The product is not valid yet; remove the leftmost value." },
+        9, "too-large", [{ name: "product", value: product }],
+      );
+      removedIndex = left;
+      const removedValue = nums[left];
+      const beforeDivide = product;
+      product = Math.trunc(product / removedValue);
+      addStep(
+        { vi: `product //= nums[${left}] → ${product}`, en: `product //= nums[${left}] → ${product}` },
+        { vi: `${beforeDivide} ÷ ${removedValue} = ${product}. Phần tử index ${left} rời cửa sổ.`, en: `${beforeDivide} ÷ ${removedValue} = ${product}. The value at index ${left} leaves the window.` },
+        10, "divide", [{ name: "removed", value: removedValue }, { name: "product", value: product }],
+      );
+      left += 1;
+      addStep(
+        { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+        { vi: "Cập nhật cạnh trái rồi kiểm tra lại product >= k.", en: "Advance the left edge, then check product >= k again." },
+        11, "shrink", [{ name: "left", value: left }],
+      );
+      removedIndex = null;
+    }
+
+    addStep(
+      { vi: `${product} >= ${k} → False`, en: `${product} >= ${k} → False` },
+      { vi: `Cửa sổ [${left}..${right}] đã có tích ${product} < ${k}.`, en: `Window [${left}..${right}] now has product ${product} < ${k}.` },
+      9, "valid", [{ name: "product", value: product }],
+    );
+
+    added = right - left + 1;
+    newSubarrays = [];
+    for (let start = right; start >= Math.max(left, right - 11); start -= 1) {
+      newSubarrays.push({
+        left: start,
+        right,
+        values: nums.slice(start, right + 1),
+        product: nums.slice(start, right + 1).reduce((value, num) => value * num, 1),
+      });
+    }
+    count += added;
+    addStep(
+      { vi: `count += ${right} - ${left} + 1 → ${count}`, en: `count += ${right} - ${left} + 1 → ${count}` },
+      { vi: `Có ${added} subarray mới kết thúc tại right=${right}; start có thể là ${left}..${right}.`, en: `${added} new subarrays end at right=${right}; start may be any index from ${left} through ${right}.` },
+      12, "count", [{ name: "added", value: added }, { name: "count", value: count }],
+    );
+  }
+
+  removedIndex = null;
+  added = 0;
+  newSubarrays = [];
+  addStep(
+    { vi: `return ${count}`, en: `return ${count}` },
+    { vi: `Tổng cộng có ${count} subarray liên tiếp có tích < ${k}.`, en: `There are ${count} contiguous subarrays with product < ${k}.` },
+    13, "done", [{ name: "answer", value: count }], true,
+  );
+  return { original: [...nums], answer: count, steps };
+}
+
 function buildSteps1358(input, params) {
   const approach = (params && params.approach) || 1;
   if (approach === 2) return buildSteps1358Last(input);

@@ -11581,6 +11581,74 @@ function renderRectangleSweepView(step) {
   </div>`;
 }
 
+function renderProductSubarrayView(step) {
+  const view = step.productSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "guard");
+  const phaseIndex = phase === "done" ? 3
+    : phase === "count" ? 2
+      : ["too-large", "divide", "shrink"].includes(phase) ? 1
+        : 0;
+  const labels = vi
+    ? ["Nhân nums[right]", "Chia nums[left]", "Đếm suffix mới", "Kết quả"]
+    : ["Multiply nums[right]", "Divide nums[left]", "Count new suffixes", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const right = Number.isInteger(view.right) && view.right < nums.length ? view.right : null;
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const removedIndex = Number.isInteger(view.removedIndex) ? view.removedIndex : null;
+  const hasWindow = right !== null && left <= right;
+  const inWindow = (index) => hasWindow && index >= left && index <= right;
+  const cells = nums.map((value, index) => {
+    const classes = ["psa713-cell"];
+    if (inWindow(index)) classes.push("in-window");
+    if (index === left && hasWindow) classes.push("left-edge");
+    if (index === right) classes.push("right-edge");
+    if (index === removedIndex) classes.push("removed");
+    const pointers = [];
+    if (index === left && hasWindow) pointers.push("L");
+    if (index === right) pointers.push("R");
+    return `<div class="${classes.join(" ")}" aria-label="nums[${index}] = ${escapeHtml(String(value))}"><small>index ${index}</small><strong>${escapeHtml(String(value))}</strong><span>${pointers.map((pointer) => `<b>${pointer}</b>`).join("")}</span></div>`;
+  }).join("");
+  const activeValues = nums.filter((_, index) => inWindow(index) && index !== removedIndex);
+  const expression = activeValues.length ? activeValues.join(" × ") : "1";
+  const product = Number(view.product) || 0;
+  const k = Number(view.k) || 0;
+  const valid = k > 1 && product < k;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const subarrays = Array.isArray(view.newSubarrays) ? view.newSubarrays : [];
+  const hiddenSubarrays = Math.max(0, (Number(view.added) || 0) - subarrays.length);
+  const subarrayHtml = subarrays.length
+    ? subarrays.map((item) => `<span><small>[${item.left}..${item.right}]</small><strong>[${escapeHtml(item.values.join(", "))}]</strong><em>product ${escapeHtml(String(item.product))}</em></span>`).join("")
+    : `<i>${vi ? "Sau khi product < k, các suffix kết thúc tại right sẽ xuất hiện ở đây." : "Once product < k, suffixes ending at right appear here."}</i>`;
+  const statusClass = phase === "done" ? "done"
+    : ["too-large", "divide", "shrink"].includes(phase) ? "shrink"
+      : phase === "count" ? "count" : valid ? "valid" : "expand";
+  const statusLabel = phase === "done" ? (vi ? "HOÀN TẤT" : "DONE")
+    : ["too-large", "divide", "shrink"].includes(phase) ? `product >= k · ${vi ? "CO LEFT" : "SHRINK LEFT"}`
+      : phase === "count" ? `+${view.added} ${vi ? "SUBARRAY" : "SUBARRAYS"}`
+        : valid ? "product < k" : (vi ? "MỞ RỘNG RIGHT" : "EXPAND RIGHT");
+  const statusDetail = phase === "count"
+    ? (vi ? `Giữ right=${right}; chọn start bất kỳ từ ${left} đến ${right}.` : `Fix right=${right}; choose any start from ${left} through ${right}.`)
+    : ["too-large", "divide", "shrink"].includes(phase)
+      ? (vi ? "Bỏ nums[left] vì mọi số đều dương nên phép chia làm tích giảm." : "Remove nums[left]; all values are positive, so division decreases the product.")
+      : phase === "done" ? (vi ? `Tổng số subarray hợp lệ = ${view.count}` : `Total valid subarrays = ${view.count}`)
+        : (vi ? "Thêm nums[right] để xét các subarray kết thúc tại vị trí mới." : "Add nums[right] to inspect subarrays ending at the new position.");
+
+  $("treeView").innerHTML = `<div class="psa713-viz phase-${escapeHtml(phase)}">
+    <div class="psa713-phases">${phases}</div>
+    <div class="psa713-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="psa713-array"><header><strong>nums</strong><span>${vi ? "viền xanh = cửa sổ product < k · đỏ = đang loại" : "blue border = product < k window · red = being removed"}</span></header><div class="psa713-scroll"><div class="psa713-cells">${cells}</div></div></section>
+    <div class="psa713-equation"><small>${vi ? "TÍCH CỬA SỔ" : "WINDOW PRODUCT"}</small><code>${escapeHtml(expression)} = ${escapeHtml(String(product))}</code><strong>${escapeHtml(String(product))} ${valid ? "<" : ">="} ${escapeHtml(String(k))}</strong></div>
+    <div class="psa713-status ${statusClass}"><small>${escapeHtml(statusLabel)}</small><strong>${escapeHtml(statusDetail)}</strong></div>
+    <div class="psa713-metrics"><span><small>PRODUCT / K</small><strong>${escapeHtml(String(product))} / ${escapeHtml(String(k))}</strong></span><span><small>${vi ? "MỚI THÊM" : "JUST ADDED"}</small><strong>+${escapeHtml(String(view.added || 0))}</strong></span><span class="total"><small>COUNT</small><strong>${escapeHtml(String(view.count || 0))}</strong></span></div>
+    <section class="psa713-new"><header><strong>${vi ? `SUBARRAY MỚI KẾT THÚC TẠI right=${right ?? "—"}` : `NEW SUBARRAYS ENDING AT right=${right ?? "—"}`}</strong><span>right - left + 1 = ${escapeHtml(String(view.added || 0))}</span></header><div>${subarrayHtml}${hiddenSubarrays ? `<b class="psa713-more">+${hiddenSubarrays} ${vi ? "đoạn khác" : "more"}</b>` : ""}</div></section>
+  </div>`;
+}
+
 function renderMinimumSubarrayView(step) {
   const view = step.minimumSubarrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -12112,6 +12180,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefixAverageView(step);
+  } else if (step.productSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderProductSubarrayView(step);
   } else if (step.minimumSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
