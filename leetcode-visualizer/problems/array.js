@@ -4159,7 +4159,1592 @@ function buildSteps2996(input) {
   return { original: [...nums], answer: total, steps };
 }
 
+/** LeetCode 699: Falling Squares — coordinate compression + lazy segment tree. */
+function buildSteps699(input) {
+  let positions = [];
+  if (Array.isArray(input) && input.every((item) => Array.isArray(item))) {
+    positions = input.map((item) => [Number(item[0]), Number(item[1])]);
+  } else if (Array.isArray(input)) {
+    for (let index = 0; index + 1 < input.length; index += 2) positions.push([Number(input[index]), Number(input[index + 1])]);
+  } else {
+    const raw = String(input ?? "").trim();
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((item) => Array.isArray(item))) {
+        positions = parsed.map((item) => [Number(item[0]), Number(item[1])]);
+      }
+    } catch (_error) {
+      // Fall through to the compact "left,size; ..." format used by the UI.
+    }
+    if (!positions.length && raw) {
+      positions = raw
+        .split(/[;|\n]+/)
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .map((row) => row.split(/[\s,]+/).map(Number).slice(0, 2));
+    }
+  }
+  positions = positions.filter((item) => item.length === 2 && Number.isFinite(item[0]) && Number.isFinite(item[1]) && item[1] > 0);
+  const coords = [...new Set(positions.flatMap(([left, size]) => [left, left + size]))].sort((a, b) => a - b);
+  const indexOf = new Map(coords.map((value, index) => [value, index]));
+  const segmentCount = Math.max(0, coords.length - 1);
+  const tree = Array(Math.max(2, segmentCount * 4 + 2)).fill(0);
+  const lazy = Array(tree.length).fill(null);
+  const leafHeights = Array(segmentCount).fill(0);
+  const placed = [];
+  const outputs = [];
+  const steps = [];
+  let phase = "compress";
+  let currentSquare = -1;
+  let queryLeft = null;
+  let queryRight = null;
+  let baseHeight = 0;
+  let newHeight = 0;
+  let activeNode = null;
+  let queryVisited = [];
+  let updateVisited = [];
+  let operation = null;
+  let returnedValue = null;
+
+  const collectTreeNodes = () => {
+    const nodes = [];
+    const visit = (node, start, end, depth) => {
+      if (start > end || start < 0 || end >= segmentCount) return;
+      nodes.push({
+        node,
+        start,
+        end,
+        depth,
+        value: tree[node],
+        lazy: lazy[node],
+        xLeft: coords[start],
+        xRight: coords[end + 1],
+      });
+      if (start === end) return;
+      const mid = Math.floor((start + end) / 2);
+      visit(node * 2, start, mid, depth + 1);
+      visit(node * 2 + 1, mid + 1, end, depth + 1);
+    };
+    if (segmentCount > 0) visit(1, 0, segmentCount - 1, 0);
+    return nodes;
+  };
+  const makeView = () => ({
+    phase,
+    positions: positions.map((item) => [...item]),
+    coords: [...coords],
+    segments: leafHeights.map((height, index) => ({ left: coords[index], right: coords[index + 1], height })),
+    treeNodes: collectTreeNodes(),
+    placed: placed.map((item) => ({ ...item })),
+    outputs: [...outputs],
+    currentSquare,
+    queryLeft,
+    queryRight,
+    baseHeight,
+    newHeight,
+    activeNode,
+    queryVisited: [...queryVisited],
+    updateVisited: [...updateVisited],
+    operation,
+    returnedValue,
+  });
+  const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
+    phase = nextPhase;
+    const view = makeView();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: positions.map((item) => item[0]),
+      highlight: currentSquare >= 0 ? [currentSquare] : [],
+      mark: Array.from({ length: Math.max(0, currentSquare) }, (_, index) => index),
+      vars: [
+        { name: "answer", value: `[${outputs.join(", ")}]` },
+        ...(queryLeft !== null ? [{ name: "compressed range", value: `[${queryLeft}, ${queryRight}]` }] : []),
+        ...vars,
+      ],
+      fallingSquaresView: view,
+    });
+  };
+
+  addStep({
+    title: { vi: "Nén tất cả cạnh trái/phải", en: "Compress every left/right edge" },
+    note: {
+      vi: `Các cạnh duy nhất theo thứ tự: [${coords.join(", ")}]. Mỗi cặp cạnh liên tiếp tạo một ground segment không thể bị chia nhỏ thêm.`,
+      en: `Unique sorted edges: [${coords.join(", ")}]. Each adjacent edge pair forms one ground segment that never needs another split.`,
+    },
+    codeLine: 3,
+    nextPhase: "compress",
+    vars: [{ name: "coords", value: `[${coords.join(", ")}]` }],
+  });
+  addStep({
+    title: { vi: "Tạo ánh xạ tọa độ → index", en: "Build coordinate → index mapping" },
+    note: {
+      vi: `${coords.map((value, index) => `${value}→${index}`).join(", ")}. Square [left, right) phủ segment index index[left]..index[right]−1.`,
+      en: `${coords.map((value, index) => `${value}→${index}`).join(", ")}. Square [left, right) covers segment indices index[left]..index[right]−1.`,
+    },
+    codeLine: 4,
+    nextPhase: "map",
+  });
+  addStep({
+    title: { vi: `Có ${segmentCount} ground segment`, en: `${segmentCount} ground segments` },
+    note: { vi: "Segment Tree lưu maximum height trên các ground segment này.", en: "The Segment Tree stores maximum height over these ground segments." },
+    codeLine: 5,
+    nextPhase: "segments",
+    vars: [{ name: "n", value: segmentCount }],
+  });
+  addStep({
+    title: { vi: "Khởi tạo tree và lazy", en: "Initialize tree and lazy arrays" },
+    note: {
+      vi: "tree[node] là max height; lazy[node] khác None nghĩa là toàn bộ đoạn node đang được gán cùng một height.",
+      en: "tree[node] is a max height; non-None lazy[node] means the node's entire range has one assigned height.",
+    },
+    codeLine: 6,
+    nextPhase: "tree-init",
+  });
+  addStep({
+    title: { vi: "lazy = None cho mọi node", en: "Set every lazy value to None" },
+    note: { vi: "Chưa có range assignment nào đang chờ đẩy xuống con.", en: "No range assignment is waiting to propagate to children." },
+    codeLine: 7,
+    nextPhase: "tree-init",
+  });
+  addStep({
+    title: { vi: "answer = []", en: "answer = []" },
+    note: { vi: "Sau mỗi square, append maximum height toàn cục.", en: "Append the global maximum height after every square." },
+    codeLine: 27,
+    nextPhase: "ready",
+  });
+
+  function push(node, start, end) {
+    if (lazy[node] === null || start === end) return;
+    activeNode = node;
+    addStep({
+      title: { vi: `Đẩy lazy ${lazy[node]} từ node ${node}`, en: `Push lazy ${lazy[node]} from node ${node}` },
+      note: { vi: `Node ${node} bị chia nhỏ cho thao tác hiện tại, nên assignment phải truyền xuống hai con.`, en: `Node ${node} is being split for the current operation, so its assignment must propagate to both children.` },
+      codeLine: 8,
+      nextPhase: "push-lazy",
+      vars: [{ name: `lazy[${node}]`, value: lazy[node] }],
+    });
+    const assigned = lazy[node];
+    for (const child of [node * 2, node * 2 + 1]) {
+      tree[child] = assigned;
+      lazy[child] = assigned;
+    }
+    addStep({
+      title: { vi: `Gán hai node con = ${assigned}`, en: `Assign both child nodes = ${assigned}` },
+      note: { vi: `tree và lazy của node ${node * 2}, ${node * 2 + 1} cùng nhận ${assigned}.`, en: `tree and lazy for nodes ${node * 2}, ${node * 2 + 1} both receive ${assigned}.` },
+      codeLine: 11,
+      nextPhase: "push-lazy",
+    });
+    lazy[node] = null;
+    addStep({
+      title: { vi: `lazy[${node}] = None`, en: `lazy[${node}] = None` },
+      note: { vi: "Assignment đã được đẩy hết xuống con.", en: "The assignment has been fully propagated to the children." },
+      codeLine: 13,
+      nextPhase: "push-lazy",
+    });
+  }
+
+  function query(node, start, end, left, right) {
+    activeNode = node;
+    queryVisited.push(node);
+    returnedValue = null;
+    addStep({
+      title: { vi: `query node ${node} · segment [${start}, ${end}]`, en: `query node ${node} · segment [${start}, ${end}]` },
+      note: { vi: `So sánh node range [${start}, ${end}] với query [${left}, ${right}].`, en: `Compare node range [${start}, ${end}] with query [${left}, ${right}].` },
+      codeLine: 14,
+      nextPhase: "query",
+      vars: [{ name: "node", value: node }, { name: "tree[node]", value: tree[node] }],
+    });
+    if (right < start || end < left) {
+      returnedValue = 0;
+      addStep({
+        title: { vi: "Không giao nhau → return 0", en: "Disjoint → return 0" },
+        note: { vi: "Node này không đóng góp vào chiều cao nền.", en: "This node contributes nothing to the base height." },
+        codeLine: 15,
+        nextPhase: "query-skip",
+        vars: [{ name: "return", value: 0 }],
+      });
+      return 0;
+    }
+    if (left <= start && end <= right) {
+      returnedValue = tree[node];
+      addStep({
+        title: { vi: `Phủ hoàn toàn → return ${tree[node]}`, en: `Fully covered → return ${tree[node]}` },
+        note: { vi: `Dùng trực tiếp max height đã lưu tại node ${node}.`, en: `Use the max height already stored at node ${node}.` },
+        codeLine: 16,
+        nextPhase: "query-hit",
+        vars: [{ name: "return", value: tree[node] }],
+      });
+      return tree[node];
+    }
+    push(node, start, end);
+    const mid = Math.floor((start + end) / 2);
+    activeNode = node;
+    addStep({
+      title: { vi: `Chia query tại mid=${mid}`, en: `Split query at mid=${mid}` },
+      note: { vi: "Query cả hai node con và lấy maximum.", en: "Query both children and take their maximum." },
+      codeLine: 18,
+      nextPhase: "query-split",
+      vars: [{ name: "mid", value: mid }],
+    });
+    const leftValue = query(node * 2, start, mid, left, right);
+    const rightValue = query(node * 2 + 1, mid + 1, end, left, right);
+    const result = Math.max(leftValue, rightValue);
+    activeNode = node;
+    returnedValue = result;
+    addStep({
+      title: { vi: `max(${leftValue}, ${rightValue}) = ${result}`, en: `max(${leftValue}, ${rightValue}) = ${result}` },
+      note: { vi: `Node ${node} trả chiều cao nền lớn nhất ${result}.`, en: `Node ${node} returns maximum base height ${result}.` },
+      codeLine: 19,
+      nextPhase: "query-return",
+      vars: [{ name: "return", value: result }],
+    });
+    return result;
+  }
+
+  function assign(node, start, end, left, right, height) {
+    activeNode = node;
+    updateVisited.push(node);
+    addStep({
+      title: { vi: `assign node ${node} · segment [${start}, ${end}]`, en: `assign node ${node} · segment [${start}, ${end}]` },
+      note: { vi: `Cố gắng gán height ${height} cho phần giao với update [${left}, ${right}].`, en: `Try to assign height ${height} to the overlap with update [${left}, ${right}].` },
+      codeLine: 20,
+      nextPhase: "update",
+      vars: [{ name: "node", value: node }, { name: "height", value: height }],
+    });
+    if (right < start || end < left) {
+      addStep({
+        title: { vi: "Không giao nhau → return", en: "Disjoint → return" },
+        note: { vi: "Không thay đổi node này.", en: "Leave this node unchanged." },
+        codeLine: 21,
+        nextPhase: "update-skip",
+      });
+      return;
+    }
+    if (left <= start && end <= right) {
+      tree[node] = height;
+      lazy[node] = height;
+      addStep({
+        title: { vi: `Phủ hoàn toàn → tree[${node}] = lazy[${node}] = ${height}`, en: `Fully covered → tree[${node}] = lazy[${node}] = ${height}` },
+        note: { vi: "Lazy assignment cho phép dừng tại node này mà chưa cần đi xuống từng leaf.", en: "Lazy assignment lets us stop at this node without visiting every leaf." },
+        codeLine: 22,
+        nextPhase: "update-hit",
+        vars: [{ name: `tree[${node}]`, value: height }, { name: `lazy[${node}]`, value: height }],
+      });
+      return;
+    }
+    push(node, start, end);
+    const mid = Math.floor((start + end) / 2);
+    activeNode = node;
+    addStep({
+      title: { vi: `Chia update tại mid=${mid}`, en: `Split update at mid=${mid}` },
+      note: { vi: "Update cả hai node con có thể giao với range.", en: "Update both children that may overlap the range." },
+      codeLine: 24,
+      nextPhase: "update-split",
+      vars: [{ name: "mid", value: mid }],
+    });
+    assign(node * 2, start, mid, left, right, height);
+    assign(node * 2 + 1, mid + 1, end, left, right, height);
+    tree[node] = Math.max(tree[node * 2], tree[node * 2 + 1]);
+    activeNode = node;
+    addStep({
+      title: { vi: `Kéo lên tree[${node}] = ${tree[node]}`, en: `Pull tree[${node}] = ${tree[node]}` },
+      note: { vi: `max(tree[${node * 2}], tree[${node * 2 + 1}]) = ${tree[node]}.`, en: `max(tree[${node * 2}], tree[${node * 2 + 1}]) = ${tree[node]}.` },
+      codeLine: 26,
+      nextPhase: "update-pull",
+      vars: [{ name: `tree[${node}]`, value: tree[node] }],
+    });
+  }
+
+  for (let squareIndex = 0; squareIndex < positions.length; squareIndex += 1) {
+    const [left, size] = positions[squareIndex];
+    const right = left + size;
+    currentSquare = squareIndex;
+    queryLeft = null;
+    queryRight = null;
+    baseHeight = 0;
+    newHeight = 0;
+    activeNode = null;
+    queryVisited = [];
+    updateVisited = [];
+    operation = "square";
+    returnedValue = null;
+    addStep({
+      title: { vi: `Square ${squareIndex}: [${left}, ${right}) · size ${size}`, en: `Square ${squareIndex}: [${left}, ${right}) · size ${size}` },
+      note: { vi: "Square rơi thẳng xuống và dừng trên maximum height của toàn bộ khoảng nó phủ.", en: "The square falls vertically and stops on the maximum height across its entire footprint." },
+      codeLine: 28,
+      nextPhase: "square",
+      vars: [{ name: "left, size", value: `[${left}, ${size}]` }],
+    });
+    addStep({
+      title: { vi: `right = ${left} + ${size} = ${right}`, en: `right = ${left} + ${size} = ${right}` },
+      note: { vi: `Dùng interval nửa mở [${left}, ${right}) để hai square chỉ chạm cạnh không bị coi là overlap.`, en: `Use half-open interval [${left}, ${right}) so squares touching only at an edge do not overlap.` },
+      codeLine: 29,
+      nextPhase: "square",
+      vars: [{ name: "right", value: right }],
+    });
+    queryLeft = indexOf.get(left);
+    queryRight = indexOf.get(right) - 1;
+    addStep({
+      title: { vi: `Compressed range = [${queryLeft}, ${queryRight}]`, en: `Compressed range = [${queryLeft}, ${queryRight}]` },
+      note: { vi: `Square phủ ground segment ${queryLeft}..${queryRight}.`, en: `The square covers ground segments ${queryLeft}..${queryRight}.` },
+      codeLine: 30,
+      nextPhase: "map-square",
+      vars: [{ name: "ql", value: queryLeft }, { name: "qr", value: queryRight }],
+    });
+    operation = "query";
+    queryVisited = [];
+    activeNode = null;
+    addStep({
+      title: { vi: `Query base height trên [${queryLeft}, ${queryRight}]`, en: `Query base height on [${queryLeft}, ${queryRight}]` },
+      note: { vi: "Lấy maximum, không lấy minimum hay average, vì square phải nằm trên vật cản cao nhất dưới nó.", en: "Take the maximum—not minimum or average—because the square must sit above the tallest obstacle beneath it." },
+      codeLine: 31,
+      nextPhase: "query-start",
+    });
+    baseHeight = segmentCount > 0 ? query(1, 0, segmentCount - 1, queryLeft, queryRight) : 0;
+    activeNode = null;
+    returnedValue = baseHeight;
+    addStep({
+      title: { vi: `base = ${baseHeight}`, en: `base = ${baseHeight}` },
+      note: { vi: `Square sẽ bắt đầu từ height ${baseHeight}.`, en: `The square will start at height ${baseHeight}.` },
+      codeLine: 31,
+      nextPhase: "query-done",
+      vars: [{ name: "base", value: baseHeight }],
+    });
+    newHeight = baseHeight + size;
+    addStep({
+      title: { vi: `top = ${baseHeight} + ${size} = ${newHeight}`, en: `top = ${baseHeight} + ${size} = ${newHeight}` },
+      note: { vi: "Toàn bộ footprint của square nhận cùng top height mới.", en: "The square's entire footprint receives the same new top height." },
+      codeLine: 32,
+      nextPhase: "calculate",
+      vars: [{ name: "top", value: newHeight }],
+    });
+    operation = "update";
+    updateVisited = [];
+    activeNode = null;
+    addStep({
+      title: { vi: `Range assign [${queryLeft}, ${queryRight}] = ${newHeight}`, en: `Range assign [${queryLeft}, ${queryRight}] = ${newHeight}` },
+      note: { vi: "Đây là assignment, không phải cộng: mặt trên mới của mọi segment bị phủ chính là top của square.", en: "This is assignment, not addition: every covered segment's new surface is the square's top." },
+      codeLine: 33,
+      nextPhase: "update-start",
+    });
+    if (segmentCount > 0) assign(1, 0, segmentCount - 1, queryLeft, queryRight, newHeight);
+    for (let index = queryLeft; index <= queryRight; index += 1) leafHeights[index] = newHeight;
+    placed.push({ index: squareIndex, left, right, size, bottom: baseHeight, top: newHeight });
+    activeNode = null;
+    addStep({
+      title: { vi: "Square đã nằm trên skyline", en: "Square is now part of the skyline" },
+      note: { vi: `Các segment [${queryLeft}, ${queryRight}] có surface height ${newHeight}.`, en: `Segments [${queryLeft}, ${queryRight}] now have surface height ${newHeight}.` },
+      codeLine: 33,
+      nextPhase: "landed",
+      vars: [{ name: "top", value: newHeight }],
+    });
+    const globalMax = segmentCount > 0 ? tree[1] : 0;
+    outputs.push(globalMax);
+    operation = "output";
+    addStep({
+      title: { vi: `Append global max ${globalMax}`, en: `Append global max ${globalMax}` },
+      note: { vi: `Root tree[1] lưu maximum của toàn bộ skyline: answer = [${outputs.join(", ")}].`, en: `Root tree[1] stores the entire skyline maximum: answer = [${outputs.join(", ")}].` },
+      codeLine: 34,
+      nextPhase: "output",
+      vars: [{ name: "tree[1]", value: globalMax }],
+    });
+  }
+
+  currentSquare = -1;
+  queryLeft = null;
+  queryRight = null;
+  activeNode = null;
+  queryVisited = [];
+  updateVisited = [];
+  operation = "done";
+  returnedValue = null;
+  addStep({
+    title: { vi: `Hoàn tất → [${outputs.join(", ")}]`, en: `Done → [${outputs.join(", ")}]` },
+    note: { vi: "Mỗi phần tử là maximum height sau khi square tương ứng rơi xuống.", en: "Each value is the maximum height after its corresponding square falls." },
+    codeLine: 35,
+    nextPhase: "done",
+    vars: [{ name: "answer", value: `[${outputs.join(", ")}]` }],
+    final: true,
+  });
+  return { original: positions.map((item) => [...item]), answer: [...outputs], steps };
+}
+
+/** LeetCode 493: Reverse Pairs — merge-sort cross-pair counting. */
+function buildSteps493(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const working = nums.map((value, originalIndex) => ({ value, originalIndex }));
+  const steps = [];
+  const stack = [];
+  let phase = "start";
+  let range = null;
+  let leftPos = null;
+  let rightCursor = null;
+  let validPositions = [];
+  let rangeCount = 0;
+  let lastAdded = 0;
+  let mergedRange = null;
+
+  const makeView = () => ({
+    phase,
+    nums: [...nums],
+    working: working.map((item) => ({ ...item })),
+    stack: stack.map((item) => ({ ...item })),
+    range: range ? { ...range } : null,
+    leftPos,
+    rightCursor,
+    validPositions: [...validPositions],
+    rangeCount,
+    lastAdded,
+    mergedRange: mergedRange ? { ...mergedRange } : null,
+  });
+  const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
+    phase = nextPhase;
+    const view = makeView();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: leftPos !== null && leftPos >= 0 && working[leftPos] ? [working[leftPos].originalIndex] : [],
+      mark: validPositions.map((position) => working[position]?.originalIndex).filter(Number.isInteger),
+      vars: [
+        ...(range ? [{ name: "range", value: `[${range.start}, ${range.end})` }] : []),
+        ...vars,
+      ],
+      reversePairsView: view,
+    });
+  };
+
+  addStep({
+    title: { vi: "Bắt đầu Merge Sort", en: "Start Merge Sort" },
+    note: {
+      vi: "Một reverse pair cần i < j và nums[i] > 2 × nums[j]. Merge Sort giữ điều kiện index bằng cách chia nửa trái/phải, rồi sort mỗi nửa theo value để đếm nhanh.",
+      en: "A reverse pair needs i < j and nums[i] > 2 × nums[j]. Merge Sort preserves index order through left/right halves, then sorts values for fast counting.",
+    },
+    codeLine: 16,
+    nextPhase: "start",
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }],
+  });
+
+  function sortCount(start, end, depth) {
+    range = { start, end, mid: null, depth };
+    leftPos = null;
+    rightCursor = null;
+    validPositions = [];
+    rangeCount = 0;
+    lastAdded = 0;
+    mergedRange = null;
+    stack.push({ start, end, depth });
+    addStep({
+      title: { vi: `sort_count(${start}, ${end})`, en: `sort_count(${start}, ${end})` },
+      note: { vi: `Xử lý đoạn positions [${start}, ${end}).`, en: `Process positions [${start}, ${end}).` },
+      codeLine: 3,
+      nextPhase: "divide",
+      vars: [{ name: "depth", value: depth }],
+    });
+    addStep({
+      title: { vi: `${end} - ${start} ${end - start <= 1 ? "≤" : ">"} 1`, en: `${end} - ${start} ${end - start <= 1 ? "≤" : ">"} 1` },
+      note: end - start <= 1
+        ? { vi: "Đoạn có tối đa một phần tử nên không thể tạo pair.", en: "A range with at most one element cannot form a pair." }
+        : { vi: "Tiếp tục chia đoạn thành hai nửa theo index.", en: "Keep dividing the range into index-ordered halves." },
+      codeLine: 4,
+      nextPhase: "divide",
+    });
+    if (end - start <= 1) {
+      addStep({
+        title: { vi: "Base case → return 0", en: "Base case → return 0" },
+        note: { vi: "Một phần tử không có reverse pair.", en: "One element contains no reverse pair." },
+        codeLine: 5,
+        nextPhase: "base",
+        vars: [{ name: "count", value: 0 }],
+      });
+      stack.pop();
+      return 0;
+    }
+
+    const mid = Math.floor((start + end) / 2);
+    range = { start, mid, end, depth };
+    addStep({
+      title: { vi: `mid = ${mid}`, en: `mid = ${mid}` },
+      note: {
+        vi: `Nửa trái [${start}, ${mid}) luôn chứa original index sớm hơn nửa phải [${mid}, ${end}).`,
+        en: `The left half [${start}, ${mid}) always contains earlier original indices than the right half [${mid}, ${end}).`,
+      },
+      codeLine: 6,
+      nextPhase: "divide",
+      vars: [{ name: "mid", value: mid }],
+    });
+    addStep({
+      title: { vi: `Đệ quy nửa trái [${start}, ${mid})`, en: `Recurse left [${start}, ${mid})` },
+      note: { vi: "Đếm pair nằm hoàn toàn trong nửa trái.", en: "Count pairs entirely inside the left half." },
+      codeLine: 7,
+      nextPhase: "divide",
+    });
+    const leftCount = sortCount(start, mid, depth + 1);
+    range = { start, mid, end, depth };
+    addStep({
+      title: { vi: `Nửa trái trả ${leftCount}`, en: `Left half returns ${leftCount}` },
+      note: { vi: "Tiếp tục đếm pair nằm hoàn toàn trong nửa phải.", en: "Continue with pairs entirely inside the right half." },
+      codeLine: 8,
+      nextPhase: "divide",
+      vars: [{ name: "left_count", value: leftCount }],
+    });
+    const rightCount = sortCount(mid, end, depth + 1);
+    range = { start, mid, end, depth };
+    rangeCount = leftCount + rightCount;
+    addStep({
+      title: { vi: `count = ${leftCount} + ${rightCount} = ${rangeCount}`, en: `count = ${leftCount} + ${rightCount} = ${rangeCount}` },
+      note: {
+        vi: "Hai nửa đã sort theo value. Bây giờ chỉ cần đếm các pair chéo có left ở nửa trái và right ở nửa phải.",
+        en: "Both halves are sorted by value. Now count cross pairs with left in the left half and right in the right half.",
+      },
+      codeLine: 8,
+      nextPhase: "count",
+      vars: [{ name: "count", value: rangeCount }],
+    });
+
+    rightCursor = mid;
+    addStep({
+      title: { vi: `right = mid = ${mid}`, en: `right = mid = ${mid}` },
+      note: {
+        vi: "right chỉ tiến tới vì các left value được xét theo thứ tự tăng dần.",
+        en: "right only moves forward because left values are inspected in increasing order.",
+      },
+      codeLine: 9,
+      nextPhase: "count",
+      vars: [{ name: "right", value: rightCursor }],
+    });
+
+    for (let left = start; left < mid; left += 1) {
+      leftPos = left;
+      validPositions = Array.from({ length: Math.max(0, rightCursor - mid) }, (_, offset) => mid + offset);
+      lastAdded = 0;
+      addStep({
+        title: { vi: `Xét left=${left}: value ${working[left].value}`, en: `Inspect left=${left}: value ${working[left].value}` },
+        note: {
+          vi: `Tìm các value bên phải thỏa ${working[left].value} > 2 × right.value.`,
+          en: `Find right-side values satisfying ${working[left].value} > 2 × right.value.`,
+        },
+        codeLine: 10,
+        nextPhase: "count",
+        vars: [{ name: "left value", value: working[left].value }],
+      });
+      while (rightCursor < end && working[left].value > 2 * working[rightCursor].value) {
+        validPositions = Array.from({ length: rightCursor - mid + 1 }, (_, offset) => mid + offset);
+        addStep({
+          title: {
+            vi: `${working[left].value} > 2 × ${working[rightCursor].value} ✓`,
+            en: `${working[left].value} > 2 × ${working[rightCursor].value} ✓`,
+          },
+          note: {
+            vi: `Original pair (${working[left].originalIndex}, ${working[rightCursor].originalIndex}) hợp lệ. Vì nửa phải đã sort, mọi position từ mid đến right hiện tại cũng hợp lệ.`,
+            en: `Original pair (${working[left].originalIndex}, ${working[rightCursor].originalIndex}) is valid. Since the right half is sorted, every position from mid through this right position is valid.`,
+          },
+          codeLine: 11,
+          nextPhase: "compare-valid",
+          vars: [{ name: "right", value: rightCursor }],
+        });
+        rightCursor += 1;
+        addStep({
+          title: { vi: `right → ${rightCursor}`, en: `right → ${rightCursor}` },
+          note: { vi: "Thử value lớn hơn tiếp theo trong nửa phải.", en: "Try the next larger value in the right half." },
+          codeLine: 12,
+          nextPhase: "move-right",
+          vars: [{ name: "right", value: rightCursor }],
+        });
+      }
+      addStep({
+        title: rightCursor < end
+          ? { vi: `${working[left].value} ≤ 2 × ${working[rightCursor].value} → dừng`, en: `${working[left].value} ≤ 2 × ${working[rightCursor].value} → stop` }
+          : { vi: "right đã đến cuối nửa phải", en: "right reached the end of the right half" },
+        note: rightCursor < end
+          ? { vi: "Value hiện tại và mọi value lớn hơn phía sau đều không thể tạo reverse pair với left này.", en: "This value and every larger value after it cannot form a reverse pair with this left value." }
+          : { vi: "Mọi value trong nửa phải đều hợp lệ với left này.", en: "Every value in the right half is valid with this left value." },
+        codeLine: 11,
+        nextPhase: "count",
+      });
+      lastAdded = rightCursor - mid;
+      validPositions = Array.from({ length: lastAdded }, (_, offset) => mid + offset);
+      rangeCount += lastAdded;
+      addStep({
+        title: { vi: `count += ${rightCursor} - ${mid} = ${lastAdded}`, en: `count += ${rightCursor} - ${mid} = ${lastAdded}` },
+        note: {
+          vi: `${lastAdded} value bên phải tạo reverse pair với original index ${working[left].originalIndex}; count của đoạn là ${rangeCount}.`,
+          en: `${lastAdded} right-side values form reverse pairs with original index ${working[left].originalIndex}; the range count is ${rangeCount}.`,
+        },
+        codeLine: 13,
+        nextPhase: "count-add",
+        vars: [{ name: "right - mid", value: lastAdded }, { name: "count", value: rangeCount }],
+      });
+    }
+
+    const merged = working.slice(start, end).sort((a, b) => a.value - b.value || a.originalIndex - b.originalIndex);
+    working.splice(start, end - start, ...merged);
+    leftPos = null;
+    rightCursor = null;
+    validPositions = [];
+    mergedRange = { start, end };
+    addStep({
+      title: { vi: `Merge và sort [${start}, ${end})`, en: `Merge and sort [${start}, ${end})` },
+      note: {
+        vi: `Đoạn sau merge: [${working.slice(start, end).map((item) => item.value).join(", ")}]. Cấp cha sẽ dùng thứ tự tăng dần này.`,
+        en: `Merged range: [${working.slice(start, end).map((item) => item.value).join(", ")}]. The parent level will use this increasing order.`,
+      },
+      codeLine: 14,
+      nextPhase: "merge",
+      vars: [{ name: "sorted", value: `[${working.slice(start, end).map((item) => item.value).join(", ")}]` }],
+    });
+    addStep({
+      title: { vi: `return count = ${rangeCount}`, en: `return count = ${rangeCount}` },
+      note: { vi: `Đoạn [${start}, ${end}) đóng góp ${rangeCount} reverse pair.`, en: `Range [${start}, ${end}) contributes ${rangeCount} reverse pairs.` },
+      codeLine: 15,
+      nextPhase: "return",
+      vars: [{ name: "count", value: rangeCount }],
+    });
+    stack.pop();
+    return rangeCount;
+  }
+
+  const answer = sortCount(0, working.length, 0);
+  range = { start: 0, mid: Math.floor(working.length / 2), end: working.length, depth: 0 };
+  leftPos = null;
+  rightCursor = null;
+  validPositions = [];
+  rangeCount = answer;
+  lastAdded = 0;
+  mergedRange = { start: 0, end: working.length };
+  addStep({
+    title: { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    note: { vi: `Có ${answer} cặp (i, j) thỏa i < j và nums[i] > 2 × nums[j].`, en: `${answer} pairs (i, j) satisfy i < j and nums[i] > 2 × nums[j].` },
+    codeLine: 16,
+    nextPhase: "done",
+    vars: [{ name: "answer", value: answer }],
+    final: true,
+  });
+  return { original: [...nums], answer, steps };
+}
+
+/** LeetCode 1649: Create Sorted Array Through Instructions — compression + Fenwick Tree. */
+function buildSteps1649(input) {
+  const instructions = Array.isArray(input) ? input.map(Number) : [];
+  const values = [...new Set(instructions)].sort((a, b) => a - b);
+  const ranks = new Map(values.map((value, index) => [value, index + 1]));
+  const bit = Array(values.length + 1).fill(0);
+  const MOD = 1000000007;
+  const steps = [];
+  const costs = Array(instructions.length).fill(null);
+  let phase = "compress";
+  let currentIndex = -1;
+  let currentValue = null;
+  let currentRank = null;
+  let queryKind = null;
+  let queryLimit = null;
+  let queryCursor = null;
+  let queryTotal = 0;
+  let queryPath = [];
+  let updateCursor = null;
+  let updatePath = [];
+  let less = 0;
+  let lessOrEqual = 0;
+  let greater = 0;
+  let currentCost = 0;
+  let totalCost = 0;
+
+  const makeView = () => ({
+    phase,
+    instructions: [...instructions],
+    values: [...values],
+    ranks: values.map((value, index) => ({ value, rank: index + 1 })),
+    bit: bit.slice(1),
+    costs: [...costs],
+    currentIndex,
+    currentValue,
+    currentRank,
+    queryKind,
+    queryLimit,
+    queryCursor,
+    queryTotal,
+    queryPath: [...queryPath],
+    updateCursor,
+    updatePath: [...updatePath],
+    less,
+    lessOrEqual,
+    greater,
+    currentCost,
+    totalCost,
+    inserted: currentIndex >= 0 ? currentIndex : costs.filter((value) => value !== null).length,
+    mod: MOD,
+  });
+  const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
+    phase = nextPhase;
+    const view = makeView();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...instructions],
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: Array.from({ length: Math.max(0, currentIndex) }, (_, index) => index),
+      vars: [
+        { name: "answer", value: totalCost },
+        ...(currentIndex >= 0 ? [{ name: "inserted", value: currentIndex }] : []),
+        ...vars,
+      ],
+      sortedArrayCostView: view,
+    });
+  };
+
+  addStep({
+    title: { vi: "Nén tọa độ instructions", en: "Coordinate-compress instructions" },
+    note: {
+      vi: `Sắp xếp các giá trị duy nhất: [${values.join(", ")}]. Thứ tự rank giữ nguyên quan hệ nhỏ hơn/lớn hơn.`,
+      en: `Sort the unique values: [${values.join(", ")}]. Rank order preserves smaller/greater comparisons.`,
+    },
+    codeLine: 4,
+    nextPhase: "compress",
+    vars: [{ name: "values", value: `[${values.join(", ")}]` }],
+  });
+  addStep({
+    title: { vi: "Tạo ánh xạ value → rank", en: "Build the value → rank mapping" },
+    note: {
+      vi: `Dùng rank 1-based cho Fenwick: ${values.map((value) => `${value}→${ranks.get(value)}`).join(", ")}.`,
+      en: `Use 1-based ranks for Fenwick: ${values.map((value) => `${value}→${ranks.get(value)}`).join(", ")}.`,
+    },
+    codeLine: 5,
+    nextPhase: "rank",
+    vars: [{ name: "rank", value: `{${values.map((value) => `${value}:${ranks.get(value)}`).join(", ")}}` }],
+  });
+  addStep({
+    title: { vi: "Khởi tạo Fenwick Tree", en: "Initialize the Fenwick Tree" },
+    note: {
+      vi: "BIT lưu tần suất của các giá trị đã được chèn, được nhóm theo rank.",
+      en: "BIT stores frequencies of values already inserted, grouped by rank.",
+    },
+    codeLine: 6,
+    nextPhase: "bit-init",
+    vars: [{ name: "bit", value: `[${bit.join(", ")}]` }],
+  });
+  addStep({
+    title: { vi: "answer = 0", en: "answer = 0" },
+    note: {
+      vi: "Chi phí tổng được cộng modulo 1,000,000,007 sau mỗi instruction.",
+      en: "The running cost is reduced modulo 1,000,000,007 after every instruction.",
+    },
+    codeLine: 17,
+    nextPhase: "init",
+  });
+
+  function tracedQuery(limit, kind, callLine) {
+    queryKind = kind;
+    queryLimit = limit;
+    queryCursor = limit;
+    queryTotal = 0;
+    queryPath = [];
+    updateCursor = null;
+    updatePath = [];
+    const targetText = kind === "less"
+      ? { vi: "nhỏ hơn", en: "strictly smaller" }
+      : { vi: "nhỏ hơn hoặc bằng", en: "less than or equal" };
+    addStep({
+      title: { vi: `Gọi query(${limit}) để đếm ${targetText.vi}`, en: `Call query(${limit}) to count ${targetText.en}` },
+      note: kind === "less"
+        ? { vi: `Các rank 1..${limit} đại diện cho value < ${currentValue}.`, en: `Ranks 1..${limit} represent values < ${currentValue}.` }
+        : { vi: `Các rank 1..${limit} đại diện cho value ≤ ${currentValue}.`, en: `Ranks 1..${limit} represent values ≤ ${currentValue}.` },
+      codeLine: callLine,
+      nextPhase: kind === "less" ? "query-less" : "query-lte",
+      vars: [{ name: "query index", value: limit }],
+    });
+    addStep({
+      title: { vi: `Vào query(${limit})`, en: `Enter query(${limit})` },
+      note: { vi: "Fenwick query tính prefix frequency đến rank này.", en: "A Fenwick query computes the prefix frequency through this rank." },
+      codeLine: 7,
+      nextPhase: kind === "less" ? "query-less" : "query-lte",
+    });
+    addStep({
+      title: { vi: "query total = 0", en: "query total = 0" },
+      note: { vi: "Bắt đầu cộng các node Fenwick trên query path.", en: "Start accumulating Fenwick nodes on the query path." },
+      codeLine: 8,
+      nextPhase: kind === "less" ? "query-less" : "query-lte",
+      vars: [{ name: "query total", value: 0 }],
+    });
+    while (queryCursor > 0) {
+      addStep({
+        title: { vi: `${queryCursor} > 0 → đọc BIT[${queryCursor}]`, en: `${queryCursor} > 0 → read BIT[${queryCursor}]` },
+        note: {
+          vi: `Node này đang chứa ${bit[queryCursor]} phần tử đã chèn trong đoạn rank mà nó quản lý.`,
+          en: `This node currently contains ${bit[queryCursor]} inserted elements in its covered rank range.`,
+        },
+        codeLine: 9,
+        nextPhase: kind === "less" ? "query-less" : "query-lte",
+      });
+      queryPath.push(queryCursor);
+      queryTotal += bit[queryCursor];
+      addStep({
+        title: { vi: `total += BIT[${queryCursor}] → ${queryTotal}`, en: `total += BIT[${queryCursor}] → ${queryTotal}` },
+        note: { vi: `Cộng ${bit[queryCursor]}, query total hiện là ${queryTotal}.`, en: `Add ${bit[queryCursor]}; the query total is now ${queryTotal}.` },
+        codeLine: 10,
+        nextPhase: kind === "less" ? "query-less" : "query-lte",
+        vars: [{ name: `BIT[${queryCursor}]`, value: bit[queryCursor] }, { name: "query total", value: queryTotal }],
+      });
+      const previous = queryCursor;
+      queryCursor -= queryCursor & -queryCursor;
+      addStep({
+        title: { vi: `index: ${previous} → ${queryCursor}`, en: `index: ${previous} → ${queryCursor}` },
+        note: {
+          vi: `Trừ lowbit(${previous}) = ${previous & -previous} để đi đến node prefix tiếp theo.`,
+          en: `Subtract lowbit(${previous}) = ${previous & -previous} to reach the next prefix node.`,
+        },
+        codeLine: 11,
+        nextPhase: kind === "less" ? "query-less" : "query-lte",
+        vars: [{ name: "index", value: queryCursor }],
+      });
+    }
+    addStep({
+      title: { vi: "index = 0 → kết thúc query", en: "index = 0 → finish query" },
+      note: { vi: "Đã đi hết query path.", en: "The query path is complete." },
+      codeLine: 9,
+      nextPhase: kind === "less" ? "query-less" : "query-lte",
+      vars: [{ name: "query total", value: queryTotal }],
+    });
+    addStep({
+      title: { vi: `query(${limit}) trả ${queryTotal}`, en: `query(${limit}) returns ${queryTotal}` },
+      note: { vi: `Có ${queryTotal} giá trị đã chèn thuộc prefix rank 1..${limit}.`, en: `${queryTotal} inserted values belong to rank prefix 1..${limit}.` },
+      codeLine: 12,
+      nextPhase: kind === "less" ? "query-less" : "query-lte",
+      vars: [{ name: "return", value: queryTotal }],
+    });
+    return queryTotal;
+  }
+
+  function tracedUpdate(rankValue) {
+    queryKind = null;
+    queryCursor = null;
+    queryPath = [];
+    updateCursor = rankValue;
+    updatePath = [];
+    addStep({
+      title: { vi: `Gọi update(${rankValue})`, en: `Call update(${rankValue})` },
+      note: { vi: `Thêm value ${currentValue} vào tần suất rank ${rankValue}.`, en: `Insert value ${currentValue} into frequency rank ${rankValue}.` },
+      codeLine: 24,
+      nextPhase: "update",
+      vars: [{ name: "rank", value: rankValue }],
+    });
+    addStep({
+      title: { vi: `Vào update(${rankValue})`, en: `Enter update(${rankValue})` },
+      note: { vi: "Update đi từ node hiện tại lên các node cha Fenwick.", en: "Update walks from the current node through its Fenwick ancestors." },
+      codeLine: 13,
+      nextPhase: "update",
+    });
+    while (updateCursor < bit.length) {
+      addStep({
+        title: { vi: `${updateCursor} < ${bit.length} → cập nhật node`, en: `${updateCursor} < ${bit.length} → update node` },
+        note: { vi: `BIT[${updateCursor}] quản lý một đoạn rank chứa rank ${rankValue}.`, en: `BIT[${updateCursor}] covers a rank range containing rank ${rankValue}.` },
+        codeLine: 14,
+        nextPhase: "update",
+      });
+      updatePath.push(updateCursor);
+      bit[updateCursor] += 1;
+      addStep({
+        title: { vi: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}`, en: `BIT[${updateCursor}] += 1 → ${bit[updateCursor]}` },
+        note: { vi: `Node này giờ chứa tổng tần suất ${bit[updateCursor]}.`, en: `This node now stores frequency total ${bit[updateCursor]}.` },
+        codeLine: 15,
+        nextPhase: "update",
+        vars: [{ name: `BIT[${updateCursor}]`, value: bit[updateCursor] }],
+      });
+      const previous = updateCursor;
+      updateCursor += updateCursor & -updateCursor;
+      addStep({
+        title: { vi: `index: ${previous} → ${updateCursor}`, en: `index: ${previous} → ${updateCursor}` },
+        note: { vi: `Cộng lowbit(${previous}) = ${previous & -previous} để đi lên node cha.`, en: `Add lowbit(${previous}) = ${previous & -previous} to move to the parent node.` },
+        codeLine: 16,
+        nextPhase: "update",
+        vars: [{ name: "index", value: updateCursor }],
+      });
+    }
+    addStep({
+      title: { vi: "Update hoàn tất", en: "Update complete" },
+      note: { vi: `${currentValue} đã nằm trong Fenwick và sẽ được tính cho instruction tiếp theo.`, en: `${currentValue} is now in Fenwick and will be counted for the next instruction.` },
+      codeLine: 14,
+      nextPhase: "update-done",
+    });
+  }
+
+  for (let index = 0; index < instructions.length; index += 1) {
+    currentIndex = index;
+    currentValue = instructions[index];
+    currentRank = null;
+    queryKind = null;
+    queryLimit = null;
+    queryCursor = null;
+    queryTotal = 0;
+    queryPath = [];
+    updateCursor = null;
+    updatePath = [];
+    less = 0;
+    lessOrEqual = 0;
+    greater = 0;
+    currentCost = 0;
+    addStep({
+      title: { vi: `Xử lý instructions[${index}] = ${currentValue}`, en: `Process instructions[${index}] = ${currentValue}` },
+      note: { vi: `Trước khi chèn đã có ${index} phần tử trong sorted array.`, en: `${index} elements are already in the sorted array before this insertion.` },
+      codeLine: 18,
+      nextPhase: "scan",
+      vars: [{ name: "value", value: currentValue }],
+    });
+    currentRank = ranks.get(currentValue);
+    addStep({
+      title: { vi: `rank(${currentValue}) = ${currentRank}`, en: `rank(${currentValue}) = ${currentRank}` },
+      note: { vi: "Dùng rank để query tần suất theo thứ tự giá trị.", en: "Use the rank to query frequencies by value order." },
+      codeLine: 19,
+      nextPhase: "rank-current",
+      vars: [{ name: "r", value: currentRank }],
+    });
+
+    less = tracedQuery(currentRank - 1, "less", 20);
+    addStep({
+      title: { vi: `less = ${less}`, en: `less = ${less}` },
+      note: { vi: `Có ${less} phần tử đã chèn nhỏ hơn ${currentValue}.`, en: `${less} inserted elements are smaller than ${currentValue}.` },
+      codeLine: 20,
+      nextPhase: "less-result",
+      vars: [{ name: "less", value: less }],
+    });
+    lessOrEqual = tracedQuery(currentRank, "lte", 21);
+    greater = index - lessOrEqual;
+    addStep({
+      title: { vi: `greater = ${index} - ${lessOrEqual} = ${greater}`, en: `greater = ${index} - ${lessOrEqual} = ${greater}` },
+      note: {
+        vi: `Lấy số đã chèn (${index}) trừ số ≤ ${currentValue} (${lessOrEqual}); giá trị bằng không được tính là lớn hơn.`,
+        en: `Subtract values ≤ ${currentValue} (${lessOrEqual}) from inserted count (${index}); equal values are not greater.`,
+      },
+      codeLine: 21,
+      nextPhase: "greater-result",
+      vars: [{ name: "less_or_equal", value: lessOrEqual }, { name: "greater", value: greater }],
+    });
+    currentCost = Math.min(less, greater);
+    costs[index] = currentCost;
+    addStep({
+      title: { vi: `cost = min(${less}, ${greater}) = ${currentCost}`, en: `cost = min(${less}, ${greater}) = ${currentCost}` },
+      note: { vi: "Chi phí chèn là nhánh rẻ hơn giữa số nhỏ hơn và số lớn hơn.", en: "Insertion cost is the cheaper side between smaller and greater counts." },
+      codeLine: 22,
+      nextPhase: "cost",
+      vars: [{ name: "cost", value: currentCost }],
+    });
+    const previousTotal = totalCost;
+    totalCost = (totalCost + currentCost) % MOD;
+    addStep({
+      title: { vi: `answer = (${previousTotal} + ${currentCost}) mod M → ${totalCost}`, en: `answer = (${previousTotal} + ${currentCost}) mod M → ${totalCost}` },
+      note: { vi: `Cộng chi phí hiện tại và lấy modulo ${MOD}.`, en: `Add the current cost and reduce modulo ${MOD}.` },
+      codeLine: 23,
+      nextPhase: "cost-add",
+      vars: [{ name: "answer", value: totalCost }],
+    });
+    tracedUpdate(currentRank);
+  }
+
+  currentIndex = -1;
+  currentValue = null;
+  currentRank = null;
+  queryKind = null;
+  queryCursor = null;
+  queryPath = [];
+  updateCursor = null;
+  updatePath = [];
+  currentCost = 0;
+  addStep({
+    title: { vi: `Hoàn tất → return ${totalCost}`, en: `Done → return ${totalCost}` },
+    note: { vi: `Tổng chi phí tạo sorted array là ${totalCost}.`, en: `The total cost to create the sorted array is ${totalCost}.` },
+    codeLine: 25,
+    nextPhase: "done",
+    vars: [{ name: "answer", value: totalCost }],
+    final: true,
+  });
+  return { original: [...instructions], answer: totalCost, steps };
+}
+
+/** LeetCode 327: Count of Range Sum — prefix sums + merge-sort pair counting. */
+function buildSteps327(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const lowerRaw = Number(params.lower);
+  const upperRaw = Number(params.upper);
+  const lower = Number.isFinite(lowerRaw) ? Math.trunc(lowerRaw) : -2;
+  const upper = Number.isFinite(upperRaw) ? Math.max(lower, Math.trunc(upperRaw)) : 2;
+  const prefixOriginal = [{ sum: 0, originalIndex: 0 }];
+  let working = [];
+  const steps = [];
+  const stack = [];
+  let phase = "prefix";
+  let currentNumIndex = -1;
+  let range = null;
+  let leftPos = null;
+  let low = null;
+  let high = null;
+  let validPositions = [];
+  let rangeCount = 0;
+  let lastAdded = 0;
+  let mergedRange = null;
+
+  const snapshotView = () => ({
+    phase,
+    nums: [...nums],
+    lower,
+    upper,
+    prefixOriginal: prefixOriginal.map((item) => ({ ...item })),
+    working: working.map((item) => ({ ...item })),
+    currentNumIndex,
+    range: range ? { ...range } : null,
+    leftPos,
+    low,
+    high,
+    validPositions: [...validPositions],
+    rangeCount,
+    lastAdded,
+    mergedRange: mergedRange ? { ...mergedRange } : null,
+    stack: stack.map((item) => ({ ...item })),
+  });
+  const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
+    phase = nextPhase;
+    const view = snapshotView();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: currentNumIndex >= 0 ? [currentNumIndex] : [],
+      mark: [],
+      vars: [
+        { name: "lower, upper", value: `[${lower}, ${upper}]` },
+        ...(range ? [{ name: "range", value: `[${range.start}, ${range.end})` }] : []),
+        ...vars,
+      ],
+      rangeSumCountView: view,
+    });
+  };
+
+  addStep({
+    title: { vi: "Khởi tạo prefix với P0 = 0", en: "Initialize prefix with P0 = 0" },
+    note: {
+      vi: "Pj − Pi là tổng subarray nums[i..j−1]. Thêm P0 để biểu diễn các subarray bắt đầu tại index 0.",
+      en: "Pj − Pi is the sum of nums[i..j−1]. P0 represents subarrays that start at index 0.",
+    },
+    codeLine: 3,
+    nextPhase: "prefix",
+    vars: [{ name: "prefix", value: "[(0, P0)]" }],
+  });
+  let running = 0;
+  for (let index = 0; index < nums.length; index += 1) {
+    currentNumIndex = index;
+    running += nums[index];
+    addStep({
+      title: { vi: `running += nums[${index}] → ${running}`, en: `running += nums[${index}] → ${running}` },
+      note: {
+        vi: `Tổng từ nums[0] đến nums[${index}] là ${running}.`,
+        en: `The sum from nums[0] through nums[${index}] is ${running}.`,
+      },
+      codeLine: 4,
+      nextPhase: "prefix",
+      vars: [{ name: "running", value: running }],
+    });
+    prefixOriginal.push({ sum: running, originalIndex: index + 1 });
+    addStep({
+      title: { vi: `Thêm P${index + 1} = ${running}`, en: `Append P${index + 1} = ${running}` },
+      note: {
+        vi: `P${index + 1} lưu tổng của nums[0..${index}].`,
+        en: `P${index + 1} stores the sum of nums[0..${index}].`,
+      },
+      codeLine: 5,
+      nextPhase: "prefix",
+      vars: [{ name: `P${index + 1}`, value: running }],
+    });
+  }
+  currentNumIndex = -1;
+  working = prefixOriginal.map((item) => ({ ...item }));
+  addStep({
+    title: { vi: "Bắt đầu Merge Sort trên prefix", en: "Start Merge Sort on the prefixes" },
+    note: {
+      vi: "Mỗi lần chia, nửa trái chứa prefix index sớm hơn nửa phải. Sau khi hai nửa đã sort theo sum, dùng hai con trỏ để đếm cặp chéo.",
+      en: "Each split keeps earlier prefix indices on the left. Once both halves are sorted by sum, two pointers count cross-half pairs.",
+    },
+    codeLine: 21,
+    nextPhase: "divide",
+  });
+
+  function sortCount(start, end, depth) {
+    range = { start, end, mid: null, depth };
+    leftPos = null;
+    low = null;
+    high = null;
+    validPositions = [];
+    rangeCount = 0;
+    lastAdded = 0;
+    mergedRange = null;
+    stack.push({ start, end, depth });
+    addStep({
+      title: { vi: `sort_count(${start}, ${end})`, en: `sort_count(${start}, ${end})` },
+      note: {
+        vi: `Xử lý đoạn prefix positions [${start}, ${end}).`,
+        en: `Process prefix positions [${start}, ${end}).`,
+      },
+      codeLine: 6,
+      nextPhase: "divide",
+      vars: [{ name: "depth", value: depth }],
+    });
+    addStep({
+      title: { vi: `${end} - ${start} ${end - start <= 1 ? "≤" : ">"} 1`, en: `${end} - ${start} ${end - start <= 1 ? "≤" : ">"} 1` },
+      note: end - start <= 1
+        ? { vi: "Đoạn có tối đa một prefix nên không thể tạo cặp.", en: "A range with at most one prefix cannot form a pair." }
+        : { vi: "Đoạn còn nhiều hơn một prefix nên tiếp tục chia.", en: "The range has more than one prefix, so keep dividing." },
+      codeLine: 7,
+      nextPhase: "divide",
+    });
+    if (end - start <= 1) {
+      addStep({
+        title: { vi: "Base case → return 0", en: "Base case → return 0" },
+        note: { vi: "Không có range sum nào trong một prefix đơn lẻ.", en: "A single prefix contains no range-sum pair." },
+        codeLine: 8,
+        nextPhase: "base",
+        vars: [{ name: "count", value: 0 }],
+      });
+      stack.pop();
+      return 0;
+    }
+
+    const mid = Math.floor((start + end) / 2);
+    range = { start, mid, end, depth };
+    addStep({
+      title: { vi: `mid = ${mid}`, en: `mid = ${mid}` },
+      note: {
+        vi: `Chia thành [${start}, ${mid}) và [${mid}, ${end}). Prefix index trong nửa trái luôn xảy ra trước nửa phải.`,
+        en: `Split into [${start}, ${mid}) and [${mid}, ${end}). Prefix indices in the left half always occur before the right half.`,
+      },
+      codeLine: 9,
+      nextPhase: "divide",
+      vars: [{ name: "mid", value: mid }],
+    });
+    addStep({
+      title: { vi: `Đệ quy nửa trái [${start}, ${mid})`, en: `Recurse left [${start}, ${mid})` },
+      note: { vi: "Đếm các cặp hoàn toàn nằm trong nửa trái.", en: "Count pairs entirely inside the left half." },
+      codeLine: 10,
+      nextPhase: "divide",
+    });
+    const leftCount = sortCount(start, mid, depth + 1);
+    range = { start, mid, end, depth };
+    addStep({
+      title: { vi: `Nửa trái trả ${leftCount}`, en: `Left half returns ${leftCount}` },
+      note: { vi: "Tiếp tục đếm các cặp hoàn toàn trong nửa phải.", en: "Continue with pairs entirely inside the right half." },
+      codeLine: 11,
+      nextPhase: "divide",
+      vars: [{ name: "left_count", value: leftCount }],
+    });
+    const rightCount = sortCount(mid, end, depth + 1);
+    range = { start, mid, end, depth };
+    rangeCount = leftCount + rightCount;
+    addStep({
+      title: { vi: `count = ${leftCount} + ${rightCount} = ${rangeCount}`, en: `count = ${leftCount} + ${rightCount} = ${rangeCount}` },
+      note: {
+        vi: "Hai nửa hiện đã sort theo prefix sum. Bây giờ đếm các cặp có prefix trái ở nửa trái và prefix phải ở nửa phải.",
+        en: "Both halves are now sorted by prefix sum. Count pairs whose left prefix is in the left half and right prefix is in the right half.",
+      },
+      codeLine: 11,
+      nextPhase: "count",
+      vars: [{ name: "count", value: rangeCount }],
+    });
+
+    low = mid;
+    high = mid;
+    addStep({
+      title: { vi: `low = high = mid = ${mid}`, en: `low = high = mid = ${mid}` },
+      note: {
+        vi: "low sẽ tìm prefix phải đầu tiên có hiệu ≥ lower; high tìm vị trí đầu tiên có hiệu > upper.",
+        en: "low finds the first right prefix with difference ≥ lower; high finds the first with difference > upper.",
+      },
+      codeLine: 12,
+      nextPhase: "count",
+      vars: [{ name: "low", value: low }, { name: "high", value: high }],
+    });
+
+    for (let left = start; left < mid; left += 1) {
+      leftPos = left;
+      validPositions = [];
+      lastAdded = 0;
+      addStep({
+        title: { vi: `Xét prefix trái ${left}`, en: `Inspect left prefix ${left}` },
+        note: {
+          vi: `Prefix trái là P${working[left].originalIndex} = ${working[left].sum}. Tìm các prefix phải có hiệu trong [${lower}, ${upper}].`,
+          en: `The left prefix is P${working[left].originalIndex} = ${working[left].sum}. Find right prefixes whose difference lies in [${lower}, ${upper}].`,
+        },
+        codeLine: 13,
+        nextPhase: "count",
+        vars: [{ name: "left_sum", value: working[left].sum }],
+      });
+
+      while (low < end && working[low].sum - working[left].sum < lower) {
+        addStep({
+          title: { vi: `${working[low].sum} - ${working[left].sum} < ${lower}`, en: `${working[low].sum} - ${working[left].sum} < ${lower}` },
+          note: {
+            vi: `Hiệu ${working[low].sum - working[left].sum} quá nhỏ, bỏ prefix phải P${working[low].originalIndex}.`,
+            en: `Difference ${working[low].sum - working[left].sum} is too small, so skip right prefix P${working[low].originalIndex}.`,
+          },
+          codeLine: 14,
+          nextPhase: "move-low",
+          vars: [{ name: "low", value: low }],
+        });
+        low += 1;
+        addStep({
+          title: { vi: `low → ${low}`, en: `low → ${low}` },
+          note: { vi: "Di chuyển low sang prefix sum lớn hơn.", en: "Move low to a larger prefix sum." },
+          codeLine: 15,
+          nextPhase: "move-low",
+          vars: [{ name: "low", value: low }],
+        });
+      }
+      addStep({
+        title: { vi: `low dừng tại ${low}`, en: `low stops at ${low}` },
+        note: low < end
+          ? { vi: `Hiệu đầu tiên không nhỏ hơn lower là ${working[low].sum - working[left].sum}.`, en: `The first difference not below lower is ${working[low].sum - working[left].sum}.` }
+          : { vi: "Không còn prefix phải đạt lower.", en: "No right prefix reaches lower." },
+        codeLine: 14,
+        nextPhase: "count",
+      });
+
+      while (high < end && working[high].sum - working[left].sum <= upper) {
+        addStep({
+          title: { vi: `${working[high].sum} - ${working[left].sum} ≤ ${upper}`, en: `${working[high].sum} - ${working[left].sum} ≤ ${upper}` },
+          note: {
+            vi: `Prefix phải P${working[high].originalIndex} vẫn không vượt upper nên mở rộng cửa sổ hợp lệ.`,
+            en: `Right prefix P${working[high].originalIndex} is still within upper, so expand the valid window.`,
+          },
+          codeLine: 16,
+          nextPhase: "move-high",
+          vars: [{ name: "high", value: high }],
+        });
+        high += 1;
+        addStep({
+          title: { vi: `high → ${high}`, en: `high → ${high}` },
+          note: { vi: "Tiếp tục tìm vị trí đầu tiên có hiệu > upper.", en: "Continue to the first difference greater than upper." },
+          codeLine: 17,
+          nextPhase: "move-high",
+          vars: [{ name: "high", value: high }],
+        });
+      }
+      addStep({
+        title: { vi: `high dừng tại ${high}`, en: `high stops at ${high}` },
+        note: { vi: "Khoảng prefix phải hợp lệ là [low, high).", en: "The valid right-prefix window is [low, high)." },
+        codeLine: 16,
+        nextPhase: "count",
+      });
+      validPositions = Array.from({ length: Math.max(0, high - low) }, (_, offset) => low + offset);
+      lastAdded = Math.max(0, high - low);
+      rangeCount += lastAdded;
+      addStep({
+        title: { vi: `count += ${high} - ${low} = ${lastAdded}`, en: `count += ${high} - ${low} = ${lastAdded}` },
+        note: {
+          vi: `Có ${lastAdded} prefix phải tạo range sum hợp lệ với P${working[left].originalIndex}. count của đoạn = ${rangeCount}.`,
+          en: `${lastAdded} right prefixes form valid range sums with P${working[left].originalIndex}. The range count is ${rangeCount}.`,
+        },
+        codeLine: 18,
+        nextPhase: "count-add",
+        vars: [{ name: "high - low", value: lastAdded }, { name: "count", value: rangeCount }],
+      });
+    }
+
+    const beforeMerge = working.slice(start, end).map((item) => ({ ...item }));
+    const merged = beforeMerge.sort((a, b) => a.sum - b.sum || a.originalIndex - b.originalIndex);
+    working.splice(start, end - start, ...merged);
+    mergedRange = { start, end };
+    leftPos = null;
+    low = null;
+    high = null;
+    validPositions = [];
+    addStep({
+      title: { vi: `Merge và sort đoạn [${start}, ${end})`, en: `Merge and sort [${start}, ${end})` },
+      note: {
+        vi: `Đoạn được sắp theo prefix sum để cấp cha có thể dùng hai con trỏ: [${working.slice(start, end).map((item) => item.sum).join(", ")}].`,
+        en: `Sort the range by prefix sum so its parent can use two pointers: [${working.slice(start, end).map((item) => item.sum).join(", ")}].`,
+      },
+      codeLine: 19,
+      nextPhase: "merge",
+      vars: [{ name: "sorted sums", value: `[${working.slice(start, end).map((item) => item.sum).join(", ")}]` }],
+    });
+    addStep({
+      title: { vi: `return count = ${rangeCount}`, en: `return count = ${rangeCount}` },
+      note: {
+        vi: `Đoạn [${start}, ${end}) đóng góp tổng cộng ${rangeCount} range sum hợp lệ.`,
+        en: `Range [${start}, ${end}) contributes ${rangeCount} valid range sums in total.`,
+      },
+      codeLine: 20,
+      nextPhase: "return",
+      vars: [{ name: "count", value: rangeCount }],
+    });
+    stack.pop();
+    return rangeCount;
+  }
+
+  const answer = sortCount(0, working.length, 0);
+  range = { start: 0, mid: Math.floor(working.length / 2), end: working.length, depth: 0 };
+  rangeCount = answer;
+  lastAdded = 0;
+  mergedRange = { start: 0, end: working.length };
+  addStep({
+    title: { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    note: {
+      vi: `Có ${answer} subarray có tổng nằm trong [${lower}, ${upper}].`,
+      en: `${answer} subarrays have sums in [${lower}, ${upper}].`,
+    },
+    codeLine: 21,
+    nextPhase: "done",
+    vars: [{ name: "answer", value: answer }],
+    final: true,
+  });
+  return { original: [...nums], answer, steps };
+}
+
 module.exports = {
+  699: {
+    id: 699,
+    difficulty: "hard",
+    slug: "falling-squares",
+    category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+    tags: [
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+      { key: "lazy-propagation", vi: "Lazy Propagation", en: "Lazy Propagation" },
+    ],
+    title: { vi: "Falling Squares", en: "Falling Squares" },
+    titleVi: { vi: "Các hình vuông rơi", en: "Falling squares" },
+    statement: {
+      vi: "Mỗi positions[i] = [left, size] mô tả một hình vuông rơi xuống interval [left, left+size). Sau mỗi lần rơi, trả maximum height của toàn bộ skyline.",
+      en: "Each positions[i] = [left, size] describes a square falling onto interval [left, left+size). Return the global maximum skyline height after every fall.",
+    },
+    defaultInput: "1,2;2,3;6,1",
+    inputKind: "string",
+    inputLabel: { vi: "positions (left,size; ...)", en: "positions (left,size; ...)" },
+    approach: [
+      { vi: "Nén toàn bộ cạnh left và left+size thành các ground segment liên tiếp.", en: "Compress every left and left+size edge into adjacent ground segments." },
+      { vi: "Query maximum height trên footprint để tìm đáy, rồi top = base + size.", en: "Query the maximum height across the footprint for its base, then top = base + size." },
+      { vi: "Lazy Segment Tree range-assign toàn bộ footprint bằng top; root là maximum toàn cục.", en: "Lazy Segment Tree range-assigns the entire footprint to top; the root is the global maximum." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Có tối đa 2n cạnh nén; mỗi square thực hiện một range-max query và một lazy range assignment O(log n).",
+        en: "There are at most 2n compressed edges; every square performs one range-max query and one lazy range assignment in O(log n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def fallingSquares(self, positions):",
+      "        coords = sorted({x for left, size in positions for x in (left, left + size)})",
+      "        index = {x: i for i, x in enumerate(coords)}",
+      "        n = len(coords) - 1",
+      "        tree = [0] * (4 * n)",
+      "        lazy = [None] * (4 * n)",
+      "        def push(node):",
+      "            if lazy[node] is None: return",
+      "            for child in (node * 2, node * 2 + 1):",
+      "                tree[child] = lazy[node]",
+      "                lazy[child] = lazy[node]",
+      "            lazy[node] = None",
+      "        def query(node, start, end, left, right):",
+      "            if right < start or end < left: return 0",
+      "            if left <= start and end <= right: return tree[node]",
+      "            push(node)",
+      "            mid = (start + end) // 2",
+      "            return max(query(node*2,start,mid,left,right), query(node*2+1,mid+1,end,left,right))",
+      "        def assign(node, start, end, left, right, height):",
+      "            if right < start or end < left: return",
+      "            if left <= start and end <= right: tree[node] = lazy[node] = height; return",
+      "            push(node)",
+      "            mid = (start + end) // 2",
+      "            assign(node*2, start, mid, left, right, height); assign(node*2+1, mid+1, end, left, right, height)",
+      "            tree[node] = max(tree[node*2], tree[node*2+1])",
+      "        answer = []",
+      "        for left, size in positions:",
+      "            right = left + size",
+      "            ql, qr = index[left], index[right] - 1",
+      "            base = query(1, 0, n-1, ql, qr)",
+      "            top = base + size",
+      "            assign(1, 0, n-1, ql, qr, top)",
+      "            answer.append(tree[1])",
+      "        return answer",
+    ],
+    builder: buildSteps699,
+  },
+  493: {
+    id: 493,
+    difficulty: "hard",
+    slug: "reverse-pairs",
+    category: { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
+    tags: [
+      { key: "merge-sort", vi: "Merge Sort", en: "Merge Sort" },
+      { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+    ],
+    title: { vi: "Reverse Pairs", en: "Reverse Pairs" },
+    titleVi: { vi: "Đếm cặp đảo đặc biệt", en: "Count special reverse pairs" },
+    statement: {
+      vi: "Cho mảng nums. Đếm số cặp index (i, j) sao cho i < j và nums[i] > 2 × nums[j].",
+      en: "Given nums, count index pairs (i, j) such that i < j and nums[i] > 2 × nums[j].",
+    },
+    defaultInput: [1, 3, 2, 3, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    approach: [
+      { vi: "Merge Sort chia theo index, nên phần tử nửa trái luôn có index nhỏ hơn phần tử nửa phải.", en: "Merge Sort splits by index, so every left-half element has an earlier index than every right-half element." },
+      { vi: "Sau khi hai nửa đã sort, dùng con trỏ right đơn điệu để đếm value phải thỏa left > 2 × right.", en: "Once both halves are sorted, use a monotonic right pointer to count right values satisfying left > 2 × right." },
+      { vi: "Merge hai nửa theo value để cấp đệ quy cha tiếp tục đếm trong thời gian tuyến tính.", en: "Merge the halves by value so the parent recursion level can keep counting linearly." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi level Merge Sort quét hai nửa bằng con trỏ chỉ tiến; có O(log n) level.",
+        en: "Each Merge Sort level scans both halves with forward-only pointers across O(log n) levels.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def reversePairs(self, nums):",
+      "        def sort_count(start, end):",
+      "            if end - start <= 1:",
+      "                return 0",
+      "            mid = (start + end) // 2",
+      "            count = sort_count(start, mid)",
+      "            count += sort_count(mid, end)",
+      "            right = mid",
+      "            for left in range(start, mid):",
+      "                while right < end and nums[left] > 2 * nums[right]:",
+      "                    right += 1",
+      "                count += right - mid",
+      "            nums[start:end] = sorted(nums[start:end])",
+      "            return count",
+      "        return sort_count(0, len(nums))",
+    ],
+    builder: buildSteps493,
+  },
+  1649: {
+    id: 1649,
+    difficulty: "hard",
+    slug: "create-sorted-array-through-instructions",
+    category: { key: "fenwick-tree", vi: "Fenwick Tree", en: "Fenwick Tree" },
+    tags: [
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+      { key: "binary-indexed-tree", vi: "Binary Indexed Tree", en: "Binary Indexed Tree" },
+    ],
+    title: { vi: "Create Sorted Array Through Instructions", en: "Create Sorted Array Through Instructions" },
+    titleVi: { vi: "Tạo mảng đã sắp xếp qua các chỉ dẫn", en: "Create a sorted array through instructions" },
+    statement: {
+      vi: "Chèn lần lượt mỗi giá trị trong instructions vào một mảng đã sắp xếp. Chi phí mỗi lần chèn là min(số phần tử nhỏ hơn, số phần tử lớn hơn). Trả tổng chi phí modulo 10⁹+7.",
+      en: "Insert each value from instructions into a sorted array. Each insertion costs min(number of smaller elements, number of greater elements). Return the total cost modulo 10⁹+7.",
+    },
+    defaultInput: [1, 5, 6, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "instructions", en: "instructions" },
+    approach: [
+      { vi: "Nén các giá trị thành rank 1-based theo thứ tự tăng dần.", en: "Coordinate-compress values into increasing 1-based ranks." },
+      { vi: "Fenwick query(rank−1) đếm giá trị nhỏ hơn; inserted − query(rank) đếm giá trị lớn hơn.", en: "Fenwick query(rank−1) counts smaller values; inserted − query(rank) counts greater values." },
+      { vi: "Cộng min(less, greater), rồi update rank hiện tại vào Fenwick.", en: "Add min(less, greater), then update the current rank in Fenwick." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Nén tọa độ O(n log n); mỗi instruction có hai query và một update Fenwick O(log n).",
+        en: "Coordinate compression costs O(n log n); every instruction performs two queries and one Fenwick update in O(log n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def createSortedArray(self, instructions):",
+      "        MOD = 10**9 + 7",
+      "        values = sorted(set(instructions))",
+      "        rank = {value: i + 1 for i, value in enumerate(values)}",
+      "        bit = [0] * (len(values) + 1)",
+      "        def query(index):",
+      "            total = 0",
+      "            while index > 0:",
+      "                total += bit[index]",
+      "                index -= index & -index",
+      "            return total",
+      "        def update(index):",
+      "            while index < len(bit):",
+      "                bit[index] += 1",
+      "                index += index & -index",
+      "        answer = 0",
+      "        for inserted, value in enumerate(instructions):",
+      "            r = rank[value]",
+      "            less = query(r - 1)",
+      "            greater = inserted - query(r)",
+      "            cost = min(less, greater)",
+      "            answer = (answer + cost) % MOD",
+      "            update(r)",
+      "        return answer",
+    ],
+    builder: buildSteps1649,
+  },
+  327: {
+    id: 327,
+    difficulty: "hard",
+    slug: "count-of-range-sum",
+    category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    tags: [
+      { key: "merge-sort", vi: "Merge Sort", en: "Merge Sort" },
+      { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
+    ],
+    title: { vi: "Count of Range Sum", en: "Count of Range Sum" },
+    titleVi: { vi: "Đếm tổng đoạn trong khoảng", en: "Count range sums inside bounds" },
+    statement: {
+      vi: "Cho mảng nums và hai số lower, upper. Đếm số subarray có tổng nằm trong đoạn đóng [lower, upper].",
+      en: "Given nums and lower and upper, count the subarrays whose sums lie in the inclusive range [lower, upper].",
+    },
+    defaultInput: [-2, 5, -1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "lower", type: "number", label: { vi: "lower", en: "lower" }, default: -2, allowNegative: true },
+      { key: "upper", type: "number", label: { vi: "upper", en: "upper" }, default: 2, allowNegative: true },
+    ],
+    approach: [
+      { vi: "Dùng prefix: sum(nums[i..j−1]) = Pj − Pi.", en: "Use prefixes: sum(nums[i..j−1]) = Pj − Pi." },
+      { vi: "Merge Sort giữ thứ tự prefix index qua hai nửa, đồng thời sort mỗi nửa theo giá trị prefix sum.", en: "Merge Sort preserves prefix-index order across halves while sorting each half by prefix-sum value." },
+      { vi: "Với mỗi prefix trái, hai con trỏ low/high tìm các prefix phải thỏa lower ≤ Pright − Pleft ≤ upper.", en: "For each left prefix, low/high locate right prefixes satisfying lower ≤ Pright − Pleft ≤ upper." },
+    ],
+    complexity: {
+      time: "O(n log n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi level Merge Sort quét tuyến tính bằng các con trỏ đơn điệu; có O(log n) level.",
+        en: "Each Merge Sort level scans linearly with monotonic pointers, across O(log n) levels.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countRangeSum(self, nums, lower, upper):",
+      "        prefix = [(0, 0)]",
+      "        for index, num in enumerate(nums):",
+      "            prefix.append((prefix[-1][0] + num, index + 1))",
+      "        def sort_count(start, end):",
+      "            if end - start <= 1:",
+      "                return 0",
+      "            mid = (start + end) // 2",
+      "            count = sort_count(start, mid)",
+      "            count += sort_count(mid, end)",
+      "            low = high = mid",
+      "            for left in range(start, mid):",
+      "                while low < end and prefix[low][0] - prefix[left][0] < lower:",
+      "                    low += 1",
+      "                while high < end and prefix[high][0] - prefix[left][0] <= upper:",
+      "                    high += 1",
+      "                count += high - low",
+      "            prefix[start:end] = sorted(prefix[start:end])",
+      "            return count",
+      "        return sort_count(0, len(prefix))",
+    ],
+    builder: buildSteps327,
+  },
   2996: {
     id: 2996,
     difficulty: "easy",

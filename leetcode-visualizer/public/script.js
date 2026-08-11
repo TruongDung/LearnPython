@@ -55,6 +55,7 @@ const I18N = {
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
     liveRunBtn: "▶ Chạy code của tôi",
+    liveCopyBtn: "⧉ Sao chép code",
     liveClearBtn: "Clear thân hàm",
     liveResetBtn: "↺ Về code gốc",
     autoTheme: "Tự động",
@@ -94,6 +95,7 @@ const I18N = {
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
     liveRunBtn: "▶ Run my code",
+    liveCopyBtn: "⧉ Copy code",
     liveClearBtn: "Clear body",
     liveResetBtn: "↺ Reset to original",
     autoTheme: "Auto",
@@ -7867,6 +7869,363 @@ function renderBookMyShowView(step) {
     </div>`;
 }
 
+function renderFallingSquaresView(step) {
+  const view = step.fallingSquaresView || {};
+  const vi = lang === "vi";
+  const positions = Array.isArray(view.positions) ? view.positions : [];
+  const coords = Array.isArray(view.coords) ? view.coords : [];
+  const segments = Array.isArray(view.segments) ? view.segments : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const queryVisited = new Set(Array.isArray(view.queryVisited) ? view.queryVisited : []);
+  const updateVisited = new Set(Array.isArray(view.updateVisited) ? view.updateVisited : []);
+  const currentSquare = Number.isInteger(view.currentSquare) ? view.currentSquare : -1;
+  const queryLeft = Number.isInteger(view.queryLeft) ? view.queryLeft : -1;
+  const queryRight = Number.isInteger(view.queryRight) ? view.queryRight : -1;
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "map", "segments", "tree-init", "ready"].includes(phase) ? 0
+    : ["square", "map-square"].includes(phase) ? 1
+      : phase.startsWith("query") || phase === "push-lazy" && view.operation === "query" ? 2
+        : phase === "calculate" ? 3
+          : phase.startsWith("update") || ["push-lazy", "landed"].includes(phase) ? 4 : 5;
+  const phaseLabels = vi
+    ? ["1 · Nén tọa độ", "2 · Square rơi", "3 · Query nền", "4 · Tính top", "5 · Lazy assign", "6 · Maximum"]
+    : ["1 · Compress", "2 · Drop square", "3 · Query base", "4 · Compute top", "5 · Lazy assign", "6 · Maximum"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const positionsHtml = positions.map((item, index) => {
+    const classes = ["fs699-position"];
+    if (index < currentSquare || phase === "done") classes.push("processed");
+    if (index === currentSquare) classes.push("current");
+    const right = Number(item[0]) + Number(item[1]);
+    return `<span class="${classes.join(" ")}"><small>#${index}</small><strong>[${escapeHtml(String(item[0]))}, ${escapeHtml(String(item[1]))}]</strong><em>[${escapeHtml(String(item[0]))}, ${escapeHtml(String(right))})</em></span>`;
+  }).join("");
+  const maxHeight = Math.max(1, ...segments.map((segment) => Number(segment.height) || 0), Number(view.newHeight) || 0, ...outputs.map(Number));
+  const segmentsHtml = segments.map((segment, index) => {
+    const active = queryLeft >= 0 && index >= queryLeft && index <= queryRight;
+    const height = Number(segment.height) || 0;
+    const pct = height > 0 ? Math.max(8, (height / maxHeight) * 100) : 0;
+    return `<div class="fs699-segment${active ? " footprint" : ""}" style="--fs699-height:${pct}%">
+      <div class="fs699-column">${height > 0 ? `<strong>${escapeHtml(String(height))}</strong>` : ""}</div>
+      <span>[${escapeHtml(String(segment.left))},${escapeHtml(String(segment.right))})</span>
+      <small>s${index}</small>
+    </div>`;
+  }).join("");
+  const edgeHtml = coords.map((coord, index) => `<span><small>c${index}</small><strong>${escapeHtml(String(coord))}</strong></span>`).join("");
+
+  const levels = new Map();
+  for (const node of treeNodes) {
+    if (!levels.has(node.depth)) levels.set(node.depth, []);
+    levels.get(node.depth).push(node);
+  }
+  const treeHtml = [...levels.entries()].map(([depth, nodes]) => `<div class="fs699-tree-level"><small>L${depth}</small><div>${nodes.map((node) => {
+    const classes = ["fs699-node"];
+    if (queryVisited.has(node.node)) classes.push("query");
+    if (updateVisited.has(node.node)) classes.push("update");
+    if (node.node === activeNode) classes.push("active");
+    if (node.lazy !== null && node.lazy !== undefined) classes.push("lazy");
+    return `<span class="${classes.join(" ")}"><small>node ${node.node} · s${node.start}..s${node.end}</small><strong>${escapeHtml(String(node.value))}</strong><em>[${escapeHtml(String(node.xLeft))},${escapeHtml(String(node.xRight))})</em><i>lazy ${node.lazy === null || node.lazy === undefined ? "—" : escapeHtml(String(node.lazy))}</i></span>`;
+  }).join("")}</div></div>`).join("");
+
+  const square = currentSquare >= 0 ? positions[currentSquare] : null;
+  const squareSize = square ? Number(square[1]) : 0;
+  const globalMax = outputs.length ? outputs[outputs.length - 1] : (treeNodes[0]?.value ?? 0);
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén cạnh thành ground segments" : "Compress edges into ground segments";
+  let actionDetail = coords.length ? `[${coords.join(", ")}]` : "—";
+  if (["square", "map-square"].includes(phase)) {
+    actionLabel = vi ? "SQUARE ĐANG RƠI" : "DROPPING SQUARE";
+    actionMain = square ? `[${square[0]}, ${Number(square[0]) + squareSize}) · size ${squareSize}` : "—";
+    actionDetail = queryLeft >= 0 ? `segments ${queryLeft}..${queryRight}` : (vi ? "đang ánh xạ footprint" : "mapping footprint");
+  } else if (phase.startsWith("query") || phase === "push-lazy" && view.operation === "query") {
+    actionLabel = "RANGE MAX QUERY";
+    actionMain = `max(s${queryLeft}..s${queryRight}) = ${view.returnedValue ?? view.baseHeight ?? 0}`;
+    actionDetail = vi ? "chiều cao nền là vật cản cao nhất" : "the base is the tallest obstacle";
+  } else if (phase === "calculate") {
+    actionLabel = "NEW TOP";
+    actionMain = `${view.baseHeight ?? 0} + ${squareSize} = ${view.newHeight ?? 0}`;
+    actionDetail = vi ? "base + cạnh square" : "base + square size";
+  } else if (phase.startsWith("update") || ["push-lazy", "landed"].includes(phase)) {
+    actionLabel = "RANGE ASSIGN";
+    actionMain = `s${queryLeft}..s${queryRight} = ${view.newHeight ?? 0}`;
+    actionDetail = vi ? "assignment, không phải cộng" : "assignment, not addition";
+  } else if (["output", "done"].includes(phase)) {
+    actionLabel = phase === "done" ? "RETURN" : "GLOBAL MAX";
+    actionMain = phase === "done" ? `[${outputs.join(", ")}]` : String(globalMax);
+    actionDetail = phase === "done" ? (vi ? "maximum sau mỗi lần rơi" : "maximum after every drop") : "tree[1]";
+  }
+  const outputsHtml = outputs.length ? outputs.map((value, index) => `<span><small>#${index}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("") : `<em>—</em>`;
+
+  $("treeView").innerHTML = `<div class="fs699-viz phase-${escapeHtml(phase)}">
+    <div class="fs699-phases">${phases}</div>
+    <section class="fs699-section"><header><strong>POSITIONS · [LEFT, SIZE]</strong><span>${vi ? "interval thật dùng dạng [left, right)" : "physical interval is [left, right)"}</span></header><div class="fs699-positions">${positionsHtml}</div></section>
+    <div class="fs699-edges"><small>COMPRESSED EDGES</small><div>${edgeHtml || "—"}</div></div>
+    <section class="fs699-section"><header><strong>SKYLINE · GROUND SEGMENTS</strong><span>${vi ? "viền vàng = footprint hiện tại" : "yellow border = current footprint"}</span></header><div class="fs699-skyline" style="--fs699-cols:${Math.max(1, segments.length)}">${segmentsHtml || "—"}</div></section>
+    <div class="fs699-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="fs699-metrics"><span><small>base</small><strong>${escapeHtml(String(view.baseHeight ?? 0))}</strong></span><span><small>size</small><strong>${square ? escapeHtml(String(squareSize)) : "—"}</strong></span><span><small>new top</small><strong>${escapeHtml(String(view.newHeight ?? 0))}</strong></span><span class="max"><small>global max</small><strong>${escapeHtml(String(globalMax))}</strong></span></div>
+    <section class="fs699-section"><header><strong>LAZY SEGMENT TREE · RANGE MAX + RANGE ASSIGN</strong><span>${vi ? "xanh = query · cam = update · chấm tím = lazy" : "green = query · orange = update · purple = lazy"}</span></header><div class="fs699-tree">${treeHtml || "—"}</div></section>
+    <div class="fs699-bottom"><div class="fs699-outputs"><small>ANSWER</small><div>${outputsHtml}</div></div><code>base = range_max(footprint) · top = base + size · assign(footprint, top)</code></div>
+  </div>`;
+}
+
+function renderReversePairsView(step) {
+  const view = step.reversePairsView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const working = Array.isArray(view.working) ? view.working : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
+  const range = view.range || {};
+  const start = Number.isInteger(range.start) ? range.start : -1;
+  const mid = Number.isInteger(range.mid) ? range.mid : -1;
+  const end = Number.isInteger(range.end) ? range.end : -1;
+  const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
+  const rightCursor = Number.isInteger(view.rightCursor) ? view.rightCursor : null;
+  const phase = String(view.phase || "start");
+  const phaseIndex = ["start", "divide", "base"].includes(phase) ? 0
+    : ["count", "compare-valid", "move-right", "count-add"].includes(phase) ? 1
+      : ["merge", "return"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["1 · Chia theo index", "2 · Đếm pair chéo", "3 · Merge theo value", "4 · Kết quả"]
+    : ["1 · Divide by index", "2 · Count cross pairs", "3 · Merge by value", "4 · Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const originalHtml = nums.map((value, index) => `<span class="rp493-original"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("");
+  const workingHtml = working.map((item, position) => {
+    const classes = ["rp493-work"];
+    if (position >= start && position < mid) classes.push("left-half");
+    if (position >= mid && position < end) classes.push("right-half");
+    if (position === leftPos) classes.push("left-current");
+    if (validPositions.has(position)) classes.push("valid");
+    if (position === rightCursor) classes.push("right-cursor");
+    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
+    const marker = position === leftPos ? "L" : position === rightCursor ? "R" : validPositions.has(position) ? "✓" : "";
+    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.value))}</strong><em>original i=${item.originalIndex}</em><i>${marker}</i></span>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
+    : `<span><strong>—</strong></span>`;
+
+  const leftItem = leftPos >= 0 ? working[leftPos] : null;
+  const rightItem = rightCursor !== null && rightCursor >= 0 && rightCursor < end ? working[rightCursor] : null;
+  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
+  let actionMain = "nums[i] > 2 × nums[j]";
+  let actionDetail = vi ? "đồng thời original i < original j" : "while original i < original j";
+  if (leftItem && rightItem) {
+    const valid = leftItem.value > 2 * rightItem.value;
+    actionLabel = valid ? (vi ? "PAIR HỢP LỆ" : "VALID PAIR") : (vi ? "DỪNG CON TRỎ" : "STOP POINTER");
+    actionMain = `${leftItem.value} ${valid ? ">" : "≤"} 2 × ${rightItem.value} = ${2 * rightItem.value}`;
+    actionDetail = valid
+      ? `${vi ? "original pair" : "original pair"} (${leftItem.originalIndex}, ${rightItem.originalIndex})`
+      : (vi ? "các right value phía sau còn lớn hơn" : "later right values are even larger");
+  } else if (leftItem && rightCursor !== null && rightCursor >= end) {
+    actionLabel = vi ? "HẾT NỬA PHẢI" : "RIGHT END";
+    actionMain = `right = ${rightCursor} = end`;
+    actionDetail = vi ? "mọi right value trong cửa sổ đều hợp lệ" : "every right value in the window is valid";
+  } else if (phase === "merge") {
+    actionLabel = "MERGE";
+    actionMain = `[${working.slice(start, end).map((item) => item.value).join(", ")}]`;
+    actionDetail = vi ? "đã sort để cấp cha dùng two pointers" : "sorted for the parent two-pointer scan";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.rangeCount ?? 0);
+    actionDetail = vi ? "reverse pairs" : "reverse pairs";
+  }
+  const doubledRight = rightItem ? 2 * rightItem.value : null;
+
+  $("treeView").innerHTML = `<div class="rp493-viz phase-${escapeHtml(phase)}">
+    <div class="rp493-phases">${phases}</div>
+    <section class="rp493-section"><header><strong>ORIGINAL NUMS · ${vi ? "INDEX KHÔNG THAY ĐỔI" : "INDEX NEVER CHANGES"}</strong><span>i &lt; j</span></header><div class="rp493-scroll"><div class="rp493-row">${originalHtml}</div></div></section>
+    <div class="rp493-recursion"><div><small>RECURSION STACK</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
+    <section class="rp493-section"><header><strong>WORKING ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = pair hợp lệ" : "blue = left · purple = right · green = valid pair"}</span></header><div class="rp493-scroll"><div class="rp493-row">${workingHtml || "—"}</div></div></section>
+    <div class="rp493-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rp493-metrics"><span><small>left value</small><strong>${leftItem ? escapeHtml(String(leftItem.value)) : "—"}</strong></span><span><small>2 × right</small><strong>${doubledRight === null ? "—" : escapeHtml(String(doubledRight))}</strong></span><span><small>right − mid</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
+    <div class="rp493-rule"><code>left.value &gt; 2 × right.value</code><span>${vi ? "right chỉ tiến → mỗi merge level O(n)" : "right only moves forward → O(n) per merge level"}</span></div>
+  </div>`;
+}
+
+function renderSortedArrayCostView(step) {
+  const view = step.sortedArrayCostView || {};
+  const vi = lang === "vi";
+  const instructions = Array.isArray(view.instructions) ? view.instructions : [];
+  const ranks = Array.isArray(view.ranks) ? view.ranks : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const costs = Array.isArray(view.costs) ? view.costs : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const currentRank = Number.isInteger(view.currentRank) ? view.currentRank : null;
+  const queryCursor = Number.isInteger(view.queryCursor) ? view.queryCursor : null;
+  const updateCursor = Number.isInteger(view.updateCursor) ? view.updateCursor : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "rank", "bit-init", "init"].includes(phase) ? 0
+    : ["scan", "rank-current"].includes(phase) ? 1
+      : phase.startsWith("query") || ["less-result", "greater-result"].includes(phase) ? 2
+        : ["cost", "cost-add"].includes(phase) ? 3
+          : ["update", "update-done"].includes(phase) ? 4 : 5;
+  const phaseLabels = vi
+    ? ["1 · Nén rank", "2 · Đọc instruction", "3 · Query BIT", "4 · Tính cost", "5 · Update BIT", "6 · Kết quả"]
+    : ["1 · Compress", "2 · Read instruction", "3 · Query BIT", "4 · Compute cost", "5 · Update BIT", "6 · Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const instructionHtml = instructions.map((value, index) => {
+    const classes = ["ca1649-instruction"];
+    if (index < currentIndex || phase === "done") classes.push("processed");
+    if (index === currentIndex) classes.push("current");
+    const cost = costs[index];
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong><em>${cost === null || cost === undefined ? "cost _" : `cost ${escapeHtml(String(cost))}`}</em></span>`;
+  }).join("");
+  const rankHtml = ranks.map((item) => {
+    const classes = ["ca1649-rank"];
+    if (item.rank === currentRank) classes.push("active");
+    if (currentRank !== null && item.rank < currentRank) classes.push("less");
+    if (currentRank !== null && item.rank > currentRank) classes.push("greater");
+    return `<span class="${classes.join(" ")}"><small>${escapeHtml(String(item.value))}</small><strong>r${item.rank}</strong></span>`;
+  }).join("");
+  const bitHtml = bit.map((count, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const leftRank = index - lowbit + 1;
+    const classes = ["ca1649-bit"];
+    if (queryPath.has(index)) classes.push("query-path");
+    if (updatePath.has(index)) classes.push("update-path");
+    if (index === queryCursor || index === updateCursor) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${leftRank}..r${index}</em><i>${escapeHtml(String(values[leftRank - 1]))}..${escapeHtml(String(values[index - 1]))}</i></span>`;
+  }).join("");
+
+  const includeCurrent = phase === "update-done";
+  const sortedLength = phase === "done" ? instructions.length : Math.max(0, currentIndex + (includeCurrent ? 1 : 0));
+  const sortedValues = instructions.slice(0, sortedLength).sort((a, b) => a - b);
+  const sortedHtml = sortedValues.length
+    ? sortedValues.map((value) => `<span>${escapeHtml(String(value))}</span>`).join("")
+    : `<em>${vi ? "chưa có phần tử" : "empty"}</em>`;
+  const queryPathText = queryPath.size ? [...queryPath].map((index) => `BIT[${index}]`).join(" → ") : "—";
+  const updatePathText = updatePath.size ? [...updatePath].map((index) => `BIT[${index}]`).join(" → ") : "—";
+
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén value thành rank tăng dần" : "Compress values into increasing ranks";
+  let actionDetail = "value ↑ ⇔ rank ↑";
+  if (phase.startsWith("query")) {
+    const isLess = view.queryKind === "less";
+    actionLabel = isLess ? "QUERY LESS" : "QUERY ≤";
+    actionMain = `query(${view.queryLimit ?? "—"}) = ${view.queryTotal ?? 0}`;
+    actionDetail = isLess
+      ? (vi ? `đếm value < ${view.currentValue}` : `count values < ${view.currentValue}`)
+      : (vi ? `đếm value ≤ ${view.currentValue}` : `count values ≤ ${view.currentValue}`);
+  } else if (["less-result", "greater-result"].includes(phase)) {
+    actionLabel = vi ? "HAI PHÍA" : "TWO SIDES";
+    actionMain = `less = ${view.less ?? 0} · greater = ${view.greater ?? 0}`;
+    actionDetail = vi ? "value bằng nhau không thuộc phía nào" : "equal values belong to neither side";
+  } else if (["cost", "cost-add"].includes(phase)) {
+    actionLabel = "COST";
+    actionMain = `min(${view.less ?? 0}, ${view.greater ?? 0}) = ${view.currentCost ?? 0}`;
+    actionDetail = `${vi ? "tổng" : "total"} = ${view.totalCost ?? 0}`;
+  } else if (["update", "update-done"].includes(phase)) {
+    actionLabel = "UPDATE";
+    actionMain = `update(r${view.currentRank ?? "—"})`;
+    actionDetail = vi ? `chèn ${view.currentValue} vào các node BIT cha` : `insert ${view.currentValue} into BIT ancestors`;
+  } else if (["scan", "rank-current"].includes(phase)) {
+    actionLabel = vi ? "ĐANG CHÈN" : "INSERT";
+    actionMain = currentIndex >= 0 ? `instructions[${currentIndex}] = ${view.currentValue}` : "—";
+    actionDetail = vi ? `${currentIndex} phần tử đã có trước đó` : `${currentIndex} elements already inserted`;
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.totalCost ?? 0);
+    actionDetail = vi ? "tổng insertion cost modulo 10⁹+7" : "total insertion cost modulo 10⁹+7";
+  }
+
+  $("treeView").innerHTML = `<div class="ca1649-viz phase-${escapeHtml(phase)}">
+    <div class="ca1649-phases">${phases}</div>
+    <section class="ca1649-section"><header><strong>INSTRUCTIONS</strong><span>${vi ? "số dưới ô = cost của lần chèn" : "number below = insertion cost"}</span></header><div class="ca1649-scroll"><div class="ca1649-instructions">${instructionHtml}</div></div></section>
+    <section class="ca1649-section"><header><strong>VALUE → COMPRESSED RANK</strong><span>${vi ? "xanh = nhỏ hơn · tím = lớn hơn" : "green = smaller · purple = greater"}</span></header><div class="ca1649-ranks">${rankHtml}</div></section>
+    <div class="ca1649-sorted"><small>${vi ? "SORTED ARRAY HIỆN TẠI" : "CURRENT SORTED ARRAY"}</small><div>${sortedHtml}</div></div>
+    <div class="ca1649-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="ca1649-metrics"><span><small>inserted</small><strong>${sortedLength}</strong></span><span class="less"><small>less</small><strong>${escapeHtml(String(view.less ?? 0))}</strong></span><span class="greater"><small>greater</small><strong>${escapeHtml(String(view.greater ?? 0))}</strong></span><span class="cost"><small>min / cost</small><strong>${escapeHtml(String(view.currentCost ?? 0))}</strong></span><span class="total"><small>total cost</small><strong>${escapeHtml(String(view.totalCost ?? 0))}</strong></span></div>
+    <section class="ca1649-section"><header><strong>FENWICK TREE · FREQUENCY BY RANK</strong><span>lowbit → ${vi ? "đoạn rank được phủ" : "covered rank range"}</span></header><div class="ca1649-bits">${bitHtml || "—"}</div><div class="ca1649-paths"><span><b>query</b>${escapeHtml(queryPathText)}</span><span><b>update</b>${escapeHtml(updatePathText)}</span></div></section>
+    <div class="ca1649-rule"><code>less = query(r−1)</code><i>·</i><code>greater = inserted − query(r)</code><i>·</i><code>cost = min(less, greater)</code></div>
+  </div>`;
+}
+
+function renderRangeSumCountView(step) {
+  const view = step.rangeSumCountView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefixOriginal = Array.isArray(view.prefixOriginal) ? view.prefixOriginal : [];
+  const working = Array.isArray(view.working) ? view.working : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
+  const range = view.range || {};
+  const start = Number.isInteger(range.start) ? range.start : -1;
+  const mid = Number.isInteger(range.mid) ? range.mid : -1;
+  const end = Number.isInteger(range.end) ? range.end : -1;
+  const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
+  const low = Number.isInteger(view.low) ? view.low : null;
+  const high = Number.isInteger(view.high) ? view.high : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = phase === "prefix" ? 0
+    : ["divide", "base"].includes(phase) ? 1
+      : ["merge", "return", "done"].includes(phase) ? 3 : 2;
+  const phaseLabels = vi
+    ? ["1 · Prefix Sum", "2 · Chia Merge Sort", "3 · Đếm cặp chéo", "4 · Merge"]
+    : ["1 · Prefix sums", "2 · Divide", "3 · Count cross pairs", "4 · Merge"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const numsHtml = nums.map((num, index) => `<span class="rs327-num${index === view.currentNumIndex ? " active" : ""}"><small>nums[${index}]</small><strong>${escapeHtml(String(num))}</strong></span>`).join("");
+  const prefixHtml = prefixOriginal.map((item) => `<span class="rs327-prefix"><small>P${escapeHtml(String(item.originalIndex))}</small><strong>${escapeHtml(String(item.sum))}</strong><em>nums[0..${item.originalIndex - 1}]</em></span>`).join("");
+  const workingHtml = working.map((item, position) => {
+    const classes = ["rs327-work"];
+    if (position >= start && position < mid) classes.push("left-half");
+    if (position >= mid && position < end) classes.push("right-half");
+    if (position === leftPos) classes.push("left-current");
+    if (validPositions.has(position)) classes.push("valid");
+    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
+    const markers = [];
+    if (position === low) markers.push("low");
+    if (position === high) markers.push("high");
+    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.sum))}</strong><em>P${escapeHtml(String(item.originalIndex))}</em><i>${escapeHtml(markers.join(" · "))}</i></span>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
+    : `<span><strong>—</strong></span>`;
+
+  const leftItem = leftPos >= 0 ? working[leftPos] : null;
+  const lowerTarget = leftItem ? leftItem.sum + Number(view.lower) : null;
+  const upperTarget = leftItem ? leftItem.sum + Number(view.upper) : null;
+  const validItems = [...validPositions].map((position) => working[position]).filter(Boolean);
+  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
+  let actionMain = `${view.lower} ≤ Pj − Pi ≤ ${view.upper}`;
+  let actionDetail = vi ? "Đếm cặp prefix với i < j" : "Count prefix pairs with i < j";
+  if (leftItem) {
+    actionLabel = vi ? "PREFIX TRÁI" : "LEFT PREFIX";
+    actionMain = `P${leftItem.originalIndex} = ${leftItem.sum} · right sum ∈ [${lowerTarget}, ${upperTarget}]`;
+    actionDetail = validItems.length
+      ? `${vi ? "hợp lệ" : "valid"}: ${validItems.map((item) => `P${item.originalIndex}=${item.sum}`).join(", ")}`
+      : (vi ? "chưa có prefix phải hợp lệ" : "no valid right prefix yet");
+  } else if (phase === "merge") {
+    actionLabel = "MERGE";
+    actionMain = `[${start}, ${end}) → ${working.slice(start, end).map((item) => item.sum).join(", ")}`;
+    actionDetail = vi ? "Sắp theo prefix sum cho level cha" : "Sorted by prefix sum for the parent level";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.rangeCount);
+    actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+  }
+  const lowText = low === null ? "—" : low >= end && end >= 0 ? `${low} (end)` : String(low);
+  const highText = high === null ? "—" : high >= end && end >= 0 ? `${high} (end)` : String(high);
+
+  $("treeView").innerHTML = `<div class="rs327-viz phase-${escapeHtml(phase)}">
+    <div class="rs327-phases">${phases}</div>
+    <section class="rs327-section"><header><strong>NUMS → ORIGINAL PREFIX SUMS</strong><span>Pj − Pi = sum(nums[i..j−1])</span></header><div class="rs327-scroll"><div class="rs327-row">${numsHtml}</div><div class="rs327-row prefix">${prefixHtml}</div></div></section>
+    <div class="rs327-recursion"><div><small>${vi ? "RECURSION STACK" : "RECURSION STACK"}</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
+    <section class="rs327-section"><header><strong>WORKING PREFIX ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = valid" : "blue = left · purple = right · green = valid"}</span></header><div class="rs327-scroll"><div class="rs327-row working">${workingHtml || "—"}</div></div></section>
+    <div class="rs327-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rs327-metrics"><span><small>low</small><strong>${escapeHtml(lowText)}</strong></span><span><small>high</small><strong>${escapeHtml(highText)}</strong></span><span><small>high − low</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
+    <div class="rs327-rule"><code>${escapeHtml(String(view.lower))} ≤ right.sum − left.sum ≤ ${escapeHtml(String(view.upper))}</code><span>${vi ? "low tìm cận dưới · high tìm sau cận trên" : "low finds lower bound · high finds after upper bound"}</span></div>
+  </div>`;
+}
+
 function renderCountSmallerView(step) {
   const view = step.countSmallerView || {};
   const vi = lang === "vi";
@@ -11664,6 +12023,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMissingIntegerView(step);
+  } else if (step.fallingSquaresView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFallingSquaresView(step);
+  } else if (step.reversePairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReversePairsView(step);
+  } else if (step.sortedArrayCostView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSortedArrayCostView(step);
+  } else if (step.rangeSumCountView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumCountView(step);
   } else if (step.countSmallerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -11979,6 +12362,7 @@ let pyodideLoadPromise = null;
 let liveMode = false;
 let liveSteps = [];
 let liveResizeInitialized = false;
+let liveCopyResetTimer = null;
 
 const LIVE_I18N = {
   vi: {
@@ -11986,12 +12370,16 @@ const LIVE_I18N = {
     running: "Đang chạy...",
     ready: (n) => `Đã chạy xong — ${n} bước.`,
     doneNoTrace: "Chạy xong nhưng không bắt được dòng nào (code có thể không gọi hàm nào).",
+    copied: "✓ Đã sao chép!",
+    copyFailed: "Không thể sao chép code.",
   },
   en: {
     loading: "Loading Python runtime (first time only)...",
     running: "Running...",
     ready: (n) => `Finished — ${n} step(s).`,
     doneNoTrace: "Ran successfully but no traced lines were captured (no function was called).",
+    copied: "✓ Copied!",
+    copyFailed: "Could not copy code.",
   },
 };
 const lt = () => LIVE_I18N[lang] || LIVE_I18N.en;
@@ -13144,6 +13532,12 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
+  clearTimeout(liveCopyResetTimer);
+  liveCopyResetTimer = null;
+  if ($("liveCopyBtn")) {
+    $("liveCopyBtn").textContent = t().liveCopyBtn;
+    $("liveCopyBtn").classList.remove("copied");
+  }
   setLiveEditorLayoutMode(false);
   $("liveExitBtn").classList.add("hidden");
   $("liveEditorWrap").classList.add("hidden");
@@ -13184,6 +13578,49 @@ $("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
 });
 
 $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
+
+async function copyLiveEditorCode() {
+  const button = $("liveCopyBtn");
+  if (!button) return;
+  try {
+    const editor = await ensureMonacoEditor();
+    const code = editor.getValue();
+    let copied = false;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      try {
+        await navigator.clipboard.writeText(code);
+        copied = true;
+      } catch (_clipboardError) {
+        copied = false;
+      }
+    }
+    if (!copied) {
+      const fallback = document.createElement("textarea");
+      fallback.value = code;
+      fallback.setAttribute("readonly", "");
+      fallback.style.position = "fixed";
+      fallback.style.opacity = "0";
+      document.body.appendChild(fallback);
+      fallback.select();
+      copied = document.execCommand("copy");
+      fallback.remove();
+      if (!copied) throw new Error("Copy command failed");
+    }
+    clearTimeout(liveCopyResetTimer);
+    button.textContent = lt().copied;
+    button.classList.add("copied");
+    $("liveStatus").textContent = "";
+    liveCopyResetTimer = setTimeout(() => {
+      button.textContent = t().liveCopyBtn;
+      button.classList.remove("copied");
+    }, 1800);
+  } catch (_error) {
+    button.classList.remove("copied");
+    $("liveStatus").textContent = lt().copyFailed;
+  }
+}
+
+$("liveCopyBtn") && $("liveCopyBtn").addEventListener("click", copyLiveEditorCode);
 
 $("liveClearBtn") && $("liveClearBtn").addEventListener("click", async () => {
   const editor = await ensureMonacoEditor();
