@@ -979,16 +979,30 @@ button:disabled {
 .live-exit-btn,
 .live-run-btn,
 .live-copy-btn,
+.live-clear-btn,
 .live-reset-btn {
+  height: 34px;
   border: 1px solid rgba(99, 102, 241, 0.4);
   background: rgba(99, 102, 241, 0.1);
   color: #a5b4fc;
   border-radius: 8px;
-  padding: 5px 12px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.live-run-btn,
+.live-clear-btn,
+.live-reset-btn {
+  width: 140px;
 }
 
 .live-edit-btn:hover,
@@ -1013,10 +1027,18 @@ button:disabled {
 }
 
 .live-copy-btn {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
   border-color: rgba(34, 211, 238, 0.42);
   background: rgba(34, 211, 238, 0.09);
   color: #67e8f9;
 }
+
+.live-copy-btn svg { display: block; }
+.live-copy-btn .live-copy-check { display: none; }
+.live-copy-btn.copied .live-copy-icon { display: none; }
+.live-copy-btn.copied .live-copy-check { display: block; }
 
 .live-copy-btn.copied {
   border-color: rgba(34, 197, 94, 0.55);
@@ -12174,6 +12196,8 @@ button:disabled {
   -webkit-overflow-scrolling: touch;
   max-height: 420px;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
   font-size: 11.5px;
   line-height: 1.55;
   position: sticky;

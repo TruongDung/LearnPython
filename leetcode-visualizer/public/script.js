@@ -55,7 +55,7 @@ const I18N = {
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
     liveRunBtn: "▶ Chạy code của tôi",
-    liveCopyBtn: "⧉ Sao chép code",
+    liveCopyBtn: "Sao chép code",
     liveClearBtn: "Clear thân hàm",
     liveResetBtn: "↺ Về code gốc",
     autoTheme: "Tự động",
@@ -95,7 +95,7 @@ const I18N = {
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
     liveRunBtn: "▶ Run my code",
-    liveCopyBtn: "⧉ Copy code",
+    liveCopyBtn: "Copy code",
     liveClearBtn: "Clear body",
     liveResetBtn: "↺ Reset to original",
     autoTheme: "Auto",
@@ -141,6 +141,11 @@ function applyStaticStrings() {
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
   const keywordInput = $("problemKeyword");
   if (keywordInput) keywordInput.placeholder = t().keywordSearchPlaceholder;
+  const liveCopyButton = $("liveCopyBtn");
+  if (liveCopyButton && !liveCopyButton.classList.contains("copied")) {
+    liveCopyButton.setAttribute("aria-label", t().liveCopyBtn);
+    liveCopyButton.title = t().liveCopyBtn;
+  }
   updateThemeButtons();
 }
 
@@ -12876,18 +12881,18 @@ function currentPrimaryCode() {
 function clearedSolutionSkeleton(sourceCode) {
   const code = String(sourceCode || "");
   const classMatch = code.match(/^([ \t]*)class\s+Solution\s*:[ \t]*(?:#.*)?$/m);
-  if (!classMatch) return "class Solution:\n    pass";
+  if (!classMatch) return "class Solution:\n    ";
 
   const classIndent = classMatch[1] || "";
   const afterClass = code.slice(classMatch.index + classMatch[0].length);
   const methodMatch = afterClass.match(/\n([ \t]+)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->[^\n:]+)?\s*:[ \t]*(?:#.*)?/);
-  if (!methodMatch) return `${classIndent}class Solution:\n${classIndent}    pass`;
+  if (!methodMatch) return `${classIndent}class Solution:\n${classIndent}    `;
 
   const methodIndent = methodMatch[1];
   const methodName = methodMatch[2];
   const args = methodMatch[3].trim();
   const bodyIndent = `${methodIndent}    `;
-  return `${classIndent}class Solution:\n${methodIndent}def ${methodName}(${args}):\n${bodyIndent}pass`;
+  return `${classIndent}class Solution:\n${methodIndent}def ${methodName}(${args}):\n${bodyIndent}`;
 }
 
 async function collectLiveCallArgs() {
@@ -12938,7 +12943,7 @@ async function ensureMonacoEditor() {
     language: "python",
     theme: isLight ? "leetcode-python-light" : "leetcode-python-dark",
     fontFamily: '"Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, Menlo, monospace',
-    fontLigatures: true,
+    fontLigatures: false,
     fontSize: 14,
     lineHeight: 21,
     minimap: { enabled: false },
@@ -13535,8 +13540,7 @@ function resetLiveEditorState() {
   clearTimeout(liveCopyResetTimer);
   liveCopyResetTimer = null;
   if ($("liveCopyBtn")) {
-    $("liveCopyBtn").textContent = t().liveCopyBtn;
-    $("liveCopyBtn").classList.remove("copied");
+    setLiveCopyButtonState(false);
   }
   setLiveEditorLayoutMode(false);
   $("liveExitBtn").classList.add("hidden");
@@ -13579,6 +13583,15 @@ $("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
 
 $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
 
+function setLiveCopyButtonState(copied) {
+  const button = $("liveCopyBtn");
+  if (!button) return;
+  button.classList.toggle("copied", copied);
+  const label = copied ? lt().copied : t().liveCopyBtn;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
 async function copyLiveEditorCode() {
   const button = $("liveCopyBtn");
   if (!button) return;
@@ -13607,15 +13620,13 @@ async function copyLiveEditorCode() {
       if (!copied) throw new Error("Copy command failed");
     }
     clearTimeout(liveCopyResetTimer);
-    button.textContent = lt().copied;
-    button.classList.add("copied");
+    setLiveCopyButtonState(true);
     $("liveStatus").textContent = "";
     liveCopyResetTimer = setTimeout(() => {
-      button.textContent = t().liveCopyBtn;
-      button.classList.remove("copied");
+      setLiveCopyButtonState(false);
     }, 1800);
   } catch (_error) {
-    button.classList.remove("copied");
+    setLiveCopyButtonState(false);
     $("liveStatus").textContent = lt().copyFailed;
   }
 }
@@ -13626,11 +13637,10 @@ $("liveClearBtn") && $("liveClearBtn").addEventListener("click", async () => {
   const editor = await ensureMonacoEditor();
   const skeleton = clearedSolutionSkeleton(editor.getValue() || currentPrimaryCode());
   editor.setValue(skeleton);
-  const passLine = skeleton.split("\n").findIndex((line) => line.trim() === "pass") + 1;
-  if (passLine > 0) {
-    editor.setPosition({ lineNumber: passLine, column: skeleton.split("\n")[passLine - 1].length + 1 });
-    editor.focus();
-  }
+  const skeletonLines = skeleton.split("\n");
+  const bodyLine = skeletonLines.length;
+  editor.setPosition({ lineNumber: bodyLine, column: skeletonLines[bodyLine - 1].length + 1 });
+  editor.focus();
   hide("liveError");
   $("liveStatus").textContent = "";
 });
