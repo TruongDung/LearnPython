@@ -78,7 +78,7 @@ function buildSteps1295(nums) {
  * Walk up from the left, walk down to the right.
  * Valid if peak is not at either end.
  */
-function buildSteps941(nums) {
+function buildSteps941Legacy(nums) {
   const n = nums.length;
   const steps = [];
 
@@ -206,7 +206,163 @@ function buildSteps941(nums) {
  * Traverse right to left, track running max. Replace each element with the max to its right.
  * Last element becomes -1.
  */
-function buildSteps1299(nums) {
+/** LeetCode 941: exact line-by-line mountain profile visualization. */
+function buildSteps941(nums) {
+  const n = nums.length;
+  const steps = [];
+  let i = 0;
+  let peak = null;
+  let phase = "length";
+  let activeEdge = null;
+  let failedEdge = null;
+  let validatedEdges = [];
+  let result = null;
+  let reason = "";
+
+  const snapshot = () => ({
+    nums: [...nums], n, i, peak, phase, activeEdge, failedEdge,
+    validatedEdges: [...validatedEdges], result, reason,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: Number.isInteger(i) && i < n ? [i] : [],
+      mark: peak === null ? [] : [peak],
+      vars: [
+        { name: "n", value: n },
+        { name: "i", value: i },
+        { name: "peak", value: peak === null ? "?" : peak },
+        ...vars,
+      ],
+      mountainArrayView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: `n = len(arr) = ${n}`, en: `n = len(arr) = ${n}` },
+    { vi: "Một ngọn núi cần đoạn tăng, một đỉnh và đoạn giảm.", en: "A mountain needs an ascent, one peak, and a descent." },
+    3, "length", [{ name: "n", value: n }],
+  );
+  if (n < 3) {
+    result = false;
+    reason = "too-short";
+    addStep(
+      { vi: `${n} < 3 → return False`, en: `${n} < 3 → return False` },
+      { vi: "Ít hơn 3 điểm thì không thể có cả sườn lên và sườn xuống.", en: "Fewer than 3 points cannot contain both an ascent and a descent." },
+      4, "done", [{ name: "result", value: false }], true,
+    );
+    return { original: [...nums], answer: false, steps };
+  }
+  addStep(
+    { vi: `${n} < 3 → False`, en: `${n} < 3 → False` },
+    { vi: "Mảng đủ dài; bắt đầu tìm đỉnh.", en: "The array is long enough; start searching for the peak." },
+    4, "length", [],
+  );
+  i = 0;
+  addStep(
+    { vi: "i = 0", en: "i = 0" },
+    { vi: "Bắt đầu ở chân núi bên trái.", en: "Start at the left foot of the mountain." },
+    5, "climb", [{ name: "i", value: i }],
+  );
+
+  while (i + 1 < n && nums[i] < nums[i + 1]) {
+    activeEdge = i;
+    addStep(
+      { vi: `${nums[i]} < ${nums[i + 1]} → tiếp tục leo`, en: `${nums[i]} < ${nums[i + 1]} → keep climbing` },
+      { vi: `Cạnh [${i}→${i + 1}] tăng nghiêm ngặt, đúng sườn lên.`, en: `Edge [${i}→${i + 1}] is strictly increasing, so it belongs to the ascent.` },
+      6, "climb-check", [{ name: "arr[i]", value: nums[i] }, { name: "arr[i+1]", value: nums[i + 1] }],
+    );
+    validatedEdges.push(i);
+    i += 1;
+    activeEdge = null;
+    addStep(
+      { vi: `i += 1 → ${i}`, en: `i += 1 → ${i}` },
+      { vi: `Con trỏ đã leo tới arr[${i}] = ${nums[i]}.`, en: `The pointer has climbed to arr[${i}] = ${nums[i]}.` },
+      7, "climb", [{ name: "i", value: i }],
+    );
+  }
+
+  activeEdge = i + 1 < n ? i : null;
+  if (activeEdge !== null && nums[i] === nums[i + 1]) failedEdge = i;
+  addStep(
+    {
+      vi: activeEdge === null ? "Đã tới cuối mảng → dừng leo" : `${nums[i]} < ${nums[i + 1]} → False`,
+      en: activeEdge === null ? "Reached the array end → stop climbing" : `${nums[i]} < ${nums[i + 1]} → False`,
+    },
+    {
+      vi: activeEdge === null ? "Không còn điểm bên phải để leo tiếp." : (nums[i] === nums[i + 1] ? "Hai giá trị bằng nhau tạo đoạn phẳng, không được phép trong núi." : "Giá trị tiếp theo thấp hơn; vị trí hiện tại là ứng viên đỉnh."),
+      en: activeEdge === null ? "There is no point to the right." : (nums[i] === nums[i + 1] ? "Equal adjacent values form a plateau, which a mountain forbids." : "The next value is lower, so the current position is the peak candidate."),
+    },
+    6, "climb-stop", [],
+  );
+
+  peak = i;
+  activeEdge = null;
+  if (peak === 0 || peak === n - 1) {
+    result = false;
+    reason = peak === 0 ? "no-ascent" : "no-descent";
+    addStep(
+      { vi: `peak = ${peak} nằm ở biên → False`, en: `peak = ${peak} is on a boundary → False` },
+      { vi: peak === 0 ? "Không có sườn tăng trước đỉnh." : "Không có sườn giảm sau đỉnh.", en: peak === 0 ? "There is no ascent before the peak." : "There is no descent after the peak." },
+      8, "done", [{ name: "result", value: false }], true,
+    );
+    return { original: [...nums], answer: false, steps };
+  }
+  failedEdge = null;
+  addStep(
+    { vi: `0 < peak=${peak} < ${n - 1}`, en: `0 < peak=${peak} < ${n - 1}` },
+    { vi: `arr[${peak}] = ${nums[peak]} là đỉnh nội bộ hợp lệ; bắt đầu đi xuống.`, en: `arr[${peak}] = ${nums[peak]} is a valid internal peak; begin descending.` },
+    8, "peak", [{ name: "arr[peak]", value: nums[peak] }],
+  );
+
+  while (i + 1 < n && nums[i] > nums[i + 1]) {
+    activeEdge = i;
+    addStep(
+      { vi: `${nums[i]} > ${nums[i + 1]} → tiếp tục xuống`, en: `${nums[i]} > ${nums[i + 1]} → keep descending` },
+      { vi: `Cạnh [${i}→${i + 1}] giảm nghiêm ngặt, đúng sườn xuống.`, en: `Edge [${i}→${i + 1}] is strictly decreasing, so it belongs to the descent.` },
+      9, "descend-check", [{ name: "arr[i]", value: nums[i] }, { name: "arr[i+1]", value: nums[i + 1] }],
+    );
+    validatedEdges.push(i);
+    i += 1;
+    activeEdge = null;
+    addStep(
+      { vi: `i += 1 → ${i}`, en: `i += 1 → ${i}` },
+      { vi: `Con trỏ đã xuống tới arr[${i}] = ${nums[i]}.`, en: `The pointer has descended to arr[${i}] = ${nums[i]}.` },
+      10, "descend", [{ name: "i", value: i }],
+    );
+  }
+
+  activeEdge = i + 1 < n ? i : null;
+  if (activeEdge !== null) failedEdge = i;
+  addStep(
+    {
+      vi: activeEdge === null ? "Đã tới cuối mảng → dừng xuống" : `${nums[i]} > ${nums[i + 1]} → False`,
+      en: activeEdge === null ? "Reached the array end → stop descending" : `${nums[i]} > ${nums[i + 1]} → False`,
+    },
+    {
+      vi: activeEdge === null ? "Sườn xuống đã đi hết mảng." : (nums[i] === nums[i + 1] ? "Gặp đoạn phẳng trên sườn xuống." : "Mảng tăng trở lại sau đỉnh, tạo thêm một đỉnh/đáy."),
+      en: activeEdge === null ? "The descent reaches the array end." : (nums[i] === nums[i + 1] ? "A plateau appears on the descent." : "The array rises again after the peak, creating another turn."),
+    },
+    9, "descend-stop", [],
+  );
+
+  result = i === n - 1;
+  reason = result ? "valid" : "stopped-early";
+  activeEdge = null;
+  addStep(
+    { vi: `return ${i} == ${n - 1} → ${result ? "True" : "False"}`, en: `return ${i} == ${n - 1} → ${result ? "True" : "False"}` },
+    { vi: result ? "Đã tăng nghiêm ngặt tới một đỉnh rồi giảm nghiêm ngặt tới cuối mảng." : `Dừng sớm ở index ${i}; phần còn lại không tiếp tục giảm.`, en: result ? "The array strictly rises to one peak, then strictly falls to the end." : `Stopped early at index ${i}; the remaining values do not keep decreasing.` },
+    11, "done", [{ name: "result", value: result }], true,
+  );
+  return { original: [...nums], answer: result, steps };
+}
+
+function buildSteps1299Legacy(nums) {
   const n = nums.length;
   const original = [...nums];
   const arr = [...nums];
@@ -264,6 +420,127 @@ function buildSteps1299(nums) {
     },
   });
 
+  return { original, answer: arr, steps };
+}
+
+/** LeetCode 1299: exact line-by-line right-to-left maximum visualization. */
+function buildSteps1299(nums) {
+  const n = nums.length;
+  const original = [...nums];
+  const arr = [...nums];
+  const steps = [];
+  let rightMax = -1;
+  let rightMaxSource = null;
+  let previousRightMax = -1;
+  let previousMaxSource = null;
+  let currentI = null;
+  let cur = null;
+  let writeValue = null;
+  let writeSource = null;
+  let processedFrom = n;
+  let phase = "length";
+  let maxUpdated = false;
+
+  const snapshot = () => ({
+    original: [...original], arr: [...arr], n, rightMax, rightMaxSource,
+    previousRightMax, previousMaxSource, currentI, cur, writeValue, writeSource,
+    processedFrom, phase, maxUpdated,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...arr],
+      highlight: Number.isInteger(currentI) ? [currentI] : [],
+      mark: rightMaxSource === null ? [] : [rightMaxSource],
+      vars: [
+        { name: "n", value: n },
+        { name: "i", value: currentI === null ? "?" : currentI },
+        { name: "cur", value: cur === null ? "?" : cur },
+        { name: "right_max", value: rightMax },
+        ...vars,
+      ],
+      replaceGreatestView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: `n = len(arr) = ${n}`, en: `n = len(arr) = ${n}` },
+    { vi: "Ta sẽ xử lý mảng từ phải sang trái để luôn biết maximum ở bên phải.", en: "Process the array right to left so the maximum on the right is always known." },
+    3, "length", [{ name: "n", value: n }],
+  );
+  rightMax = -1;
+  addStep(
+    { vi: "right_max = -1", en: "right_max = -1" },
+    { vi: "Bên phải phần tử cuối không có giá trị nào, nên đáp án cuối là -1.", en: "Nothing exists to the right of the last value, so its replacement is -1." },
+    4, "init", [{ name: "right_max", value: rightMax }],
+  );
+
+  for (let i = n - 1; i >= 0; i -= 1) {
+    currentI = i;
+    cur = null;
+    writeValue = null;
+    writeSource = null;
+    previousRightMax = rightMax;
+    previousMaxSource = rightMaxSource;
+    maxUpdated = false;
+    addStep(
+      { vi: `Vòng lặp: i = ${i}`, en: `Loop: i = ${i}` },
+      { vi: `Xử lý arr[${i}] từ phải sang trái; các index ${i + 1}..${n - 1} đã hoàn tất.`, en: `Process arr[${i}] right to left; indices ${i + 1}..${n - 1} are complete.` },
+      5, "scan", [{ name: "i", value: i }],
+    );
+
+    cur = arr[i];
+    addStep(
+      { vi: `cur = arr[${i}] = ${cur}`, en: `cur = arr[${i}] = ${cur}` },
+      { vi: "Lưu giá trị gốc trước khi ghi đè lên arr[i].", en: "Save the original value before overwriting arr[i]." },
+      6, "read", [{ name: "cur", value: cur }],
+    );
+
+    writeValue = rightMax;
+    writeSource = rightMaxSource;
+    arr[i] = rightMax;
+    processedFrom = i;
+    addStep(
+      { vi: `arr[${i}] = right_max → ${writeValue}`, en: `arr[${i}] = right_max → ${writeValue}` },
+      { vi: writeSource === null ? "Index cuối nhận -1 vì không có phần tử bên phải." : `Maximum hoàn toàn bên phải đến từ original[${writeSource}] = ${original[writeSource]}.`, en: writeSource === null ? "The last index receives -1 because nothing is to its right." : `The strict-right maximum comes from original[${writeSource}] = ${original[writeSource]}.` },
+      7, "write", [{ name: "arr[i]", value: writeValue }, { name: "source index", value: writeSource === null ? "none" : writeSource }],
+    );
+
+    previousRightMax = rightMax;
+    previousMaxSource = rightMaxSource;
+    if (cur > rightMax) {
+      rightMax = cur;
+      rightMaxSource = i;
+      maxUpdated = true;
+    }
+    addStep(
+      {
+        vi: `right_max = max(${previousRightMax}, ${cur}) → ${rightMax}`,
+        en: `right_max = max(${previousRightMax}, ${cur}) → ${rightMax}`,
+      },
+      {
+        vi: maxUpdated ? `${cur} lớn hơn maximum cũ, nên trở thành maximum cho index tiếp theo bên trái.` : `${cur} không lớn hơn maximum cũ; giữ right_max = ${rightMax}.`,
+        en: maxUpdated ? `${cur} exceeds the old maximum, so it becomes the maximum for the next index to the left.` : `${cur} does not exceed the old maximum; keep right_max = ${rightMax}.`,
+      },
+      8, "update", [{ name: "old right_max", value: previousRightMax }, { name: "new right_max", value: rightMax }],
+    );
+  }
+
+  currentI = null;
+  cur = null;
+  writeValue = null;
+  writeSource = null;
+  processedFrom = 0;
+  maxUpdated = false;
+  addStep(
+    { vi: `return [${arr.join(", ")}]`, en: `return [${arr.join(", ")}]` },
+    { vi: "Mỗi vị trí đã được thay bằng maximum nằm hoàn toàn bên phải của nó.", en: "Every position has been replaced by the maximum strictly to its right." },
+    9, "done", [{ name: "result", value: [...arr] }], true,
+  );
   return { original, answer: arr, steps };
 }
 

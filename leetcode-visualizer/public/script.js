@@ -11581,6 +11581,160 @@ function renderRectangleSweepView(step) {
   </div>`;
 }
 
+function renderReplaceGreatestView(step) {
+  const view = step.replaceGreatestView || {};
+  const original = Array.isArray(view.original) ? view.original : [];
+  const arr = Array.isArray(view.arr) ? view.arr : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "length");
+  const phaseIndex = phase === "done" ? 3
+    : phase === "update" ? 2
+      : phase === "write" ? 1 : 0;
+  const labels = vi
+    ? ["Đọc từ phải", "Ghi maximum cũ", "Cập nhật maximum", "Kết quả"]
+    : ["Read from right", "Write old maximum", "Update maximum", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const current = Number.isInteger(view.currentI) ? view.currentI : null;
+  const processedFrom = Number.isInteger(view.processedFrom) ? view.processedFrom : original.length;
+  const maxSource = Number.isInteger(view.rightMaxSource) ? view.rightMaxSource : null;
+  const writeSource = Number.isInteger(view.writeSource) ? view.writeSource : null;
+  const sourceCells = original.map((value, index) => {
+    const classes = ["rg1299-cell"];
+    if (index >= processedFrom || phase === "done") classes.push("scanned");
+    if (index === current) classes.push("current");
+    if (index === maxSource) classes.push("max-source");
+    if (index === writeSource) classes.push("write-source");
+    const markers = [];
+    if (index === current) markers.push("i");
+    if (index === maxSource) markers.push("MAX");
+    if (index === writeSource && index !== maxSource) markers.push("WRITE");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${markers.join(" · ")}</em></span>`;
+  }).join("");
+  const outputCells = arr.map((value, index) => {
+    const written = index >= processedFrom || phase === "done";
+    const classes = ["rg1299-cell", "output"];
+    if (written) classes.push("written");
+    if (index === current && written) classes.push("current-write");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${written ? escapeHtml(String(value)) : "?"}</strong><em>${written ? (index === current ? "JUST WRITTEN" : "DONE") : "WAIT"}</em></span>`;
+  }).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const curText = view.cur === null || view.cur === undefined ? "?" : String(view.cur);
+  const oldMax = view.previousRightMax === null || view.previousRightMax === undefined ? -1 : view.previousRightMax;
+  const writeText = view.writeValue === null || view.writeValue === undefined ? "?" : String(view.writeValue);
+  const flow = [
+    { key: "read", label: "SAVE ORIGINAL", code: `cur = ${curText}` },
+    { key: "write", label: "WRITE ANSWER", code: `arr[i] = ${writeText}` },
+    { key: "update", label: "PREPARE NEXT i", code: `right_max = max(${oldMax}, ${curText}) = ${view.rightMax}` },
+  ].map((item, index) => `<div class="rg1299-flow-step${phase === item.key ? " active" : ""}${["write", "update", "done"].includes(phase) && index === 0 ? " done" : ""}${["update", "done"].includes(phase) && index === 1 ? " done" : ""}${phase === "done" && index === 2 ? " done" : ""}"><small>${item.label}</small><code>${escapeHtml(item.code)}</code></div>${index < 2 ? "<i>→</i>" : ""}`).join("");
+  let statusLabel = vi ? "QUÉT TỪ PHẢI SANG TRÁI" : "SCAN RIGHT TO LEFT";
+  let statusDetail = vi ? "right_max chỉ chứa các giá trị hoàn toàn bên phải i." : "right_max contains only values strictly to the right of i.";
+  let statusClass = "scan";
+  if (phase === "write") {
+    statusLabel = vi ? "GHI TRƯỚC" : "WRITE FIRST";
+    statusDetail = vi ? `arr[${current}] nhận maximum cũ ${writeText}; chưa được dùng cur=${curText}.` : `arr[${current}] receives old maximum ${writeText}; cur=${curText} is not included yet.`;
+    statusClass = "write";
+  } else if (phase === "update") {
+    statusLabel = view.maxUpdated ? (vi ? "MAXIMUM MỚI" : "NEW MAXIMUM") : (vi ? "GIỮ MAXIMUM" : "KEEP MAXIMUM");
+    statusDetail = view.maxUpdated ? (vi ? `${curText} trở thành right_max cho index tiếp theo bên trái.` : `${curText} becomes right_max for the next index to the left.`) : (vi ? `${curText} không vượt ${oldMax}; right_max không đổi.` : `${curText} does not exceed ${oldMax}; right_max stays unchanged.`);
+    statusClass = view.maxUpdated ? "new-max" : "keep-max";
+  } else if (phase === "done") {
+    statusLabel = vi ? "HOÀN TẤT" : "DONE";
+    statusDetail = vi ? "Tất cả vị trí đã nhận maximum ở bên phải." : "Every position now stores the maximum to its right.";
+    statusClass = "done";
+  }
+
+  $("treeView").innerHTML = `<div class="rg1299-viz phase-${escapeHtml(phase)}">
+    <div class="rg1299-phases">${phases}</div>
+    <div class="rg1299-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rg1299-row"><header><strong>ORIGINAL · READ ONLY</strong><span>${vi ? "xanh = đã quét · MAX = nguồn maximum hiện tại" : "blue = scanned · MAX = current maximum source"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${sourceCells}</div></div></section>
+    <div class="rg1299-flow">${flow}</div>
+    <div class="rg1299-status ${statusClass}"><small>${escapeHtml(statusLabel)}</small><strong>${escapeHtml(statusDetail)}</strong></div>
+    <section class="rg1299-row"><header><strong>OUTPUT · arr</strong><span>${vi ? "? = chưa xử lý · lục = đã ghi đáp án" : "? = waiting · green = answer written"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${outputCells}</div></div></section>
+    <div class="rg1299-metrics"><span><small>OLD RIGHT_MAX</small><strong>${escapeHtml(String(oldMax))}</strong></span><span><small>CUR</small><strong>${escapeHtml(curText)}</strong></span><span class="max"><small>NEW RIGHT_MAX</small><strong>${escapeHtml(String(view.rightMax))}</strong></span></div>
+  </div>`;
+}
+
+function renderMountainArrayView(step) {
+  const view = step.mountainArrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "length");
+  const phaseIndex = phase === "done" ? 3
+    : ["descend-check", "descend", "descend-stop"].includes(phase) ? 2
+      : phase === "peak" ? 1 : 0;
+  const labels = vi
+    ? ["Leo nghiêm ngặt", "Đỉnh nội bộ", "Xuống nghiêm ngặt", "Kết quả"]
+    : ["Strict ascent", "Internal peak", "Strict descent", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const validated = new Set(Array.isArray(view.validatedEdges) ? view.validatedEdges : []);
+  const activeEdge = Number.isInteger(view.activeEdge) ? view.activeEdge : null;
+  const failedEdge = Number.isInteger(view.failedEdge) ? view.failedEdge : null;
+  const peak = Number.isInteger(view.peak) ? view.peak : null;
+  const current = Number.isInteger(view.i) ? view.i : 0;
+  const width = Math.max(360, nums.length * 76 + 28);
+  const height = 210;
+  const minValue = nums.length ? Math.min(...nums) : 0;
+  const maxValue = nums.length ? Math.max(...nums) : 1;
+  const range = Math.max(1, maxValue - minValue);
+  const xAt = (index) => nums.length <= 1 ? width / 2 : 38 + index * ((width - 76) / (nums.length - 1));
+  const yAt = (value) => 160 - ((value - minValue) / range) * 105;
+  const edges = nums.slice(0, -1).map((value, index) => {
+    const next = nums[index + 1];
+    const direction = value < next ? "up" : value > next ? "down" : "flat";
+    const classes = ["mt941-edge", direction];
+    if (validated.has(index)) classes.push("validated");
+    if (index === activeEdge) classes.push("active");
+    if (index === failedEdge) classes.push("failed");
+    const x1 = xAt(index), y1 = yAt(value), x2 = xAt(index + 1), y2 = yAt(next);
+    const symbol = direction === "up" ? "↑" : direction === "down" ? "↓" : "=";
+    return `<g class="${classes.join(" ")}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 7}" text-anchor="middle">${symbol}</text></g>`;
+  }).join("");
+  const points = nums.map((value, index) => {
+    const classes = ["mt941-point"];
+    if (index === current) classes.push("current");
+    if (index === peak) classes.push("peak");
+    if (failedEdge !== null && (index === failedEdge || index === failedEdge + 1)) classes.push("failed");
+    const x = xAt(index), y = yAt(value);
+    return `<g class="${classes.join(" ")}"><circle cx="${x}" cy="${y}" r="7"/><text class="value" x="${x}" y="${y - 13}" text-anchor="middle">${escapeHtml(String(value))}</text><text class="index" x="${x}" y="${y + 24}" text-anchor="middle">[${index}]</text>${index === peak ? `<text class="peak-label" x="${x}" y="${Math.max(16, y - 31)}" text-anchor="middle">PEAK</text>` : ""}</g>`;
+  }).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  let comparison = vi ? "Chưa so sánh hai điểm kề nhau" : "No adjacent comparison yet";
+  if (activeEdge !== null && activeEdge + 1 < nums.length) {
+    const leftValue = nums[activeEdge], rightValue = nums[activeEdge + 1];
+    const descending = phase.startsWith("descend");
+    comparison = `arr[${activeEdge}] = ${leftValue} ${descending ? ">" : "<"} arr[${activeEdge + 1}] = ${rightValue}`;
+  } else if (peak !== null) {
+    comparison = `peak = index ${peak} · value ${nums[peak]}`;
+  }
+  const resultKnown = typeof view.result === "boolean";
+  const resultClass = resultKnown ? (view.result ? "success" : "failure") : "checking";
+  const resultLabel = resultKnown ? (view.result ? "TRUE · VALID MOUNTAIN" : "FALSE · NOT A MOUNTAIN") : (vi ? "ĐANG KIỂM TRA" : "CHECKING");
+  const reasonText = view.reason === "too-short" ? (vi ? "Cần ít nhất 3 phần tử" : "At least 3 values are required")
+    : view.reason === "no-ascent" ? (vi ? "Đỉnh ở index 0: thiếu sườn lên" : "Peak at index 0: ascent is missing")
+      : view.reason === "no-descent" ? (vi ? "Đỉnh ở cuối: thiếu sườn xuống" : "Peak at the end: descent is missing")
+        : view.reason === "stopped-early" ? (vi ? "Sườn xuống bị phẳng hoặc tăng trở lại" : "The descent becomes flat or rises again")
+          : view.reason === "valid" ? (vi ? "Tăng tới một đỉnh rồi giảm tới cuối" : "Rises to one peak, then falls to the end")
+            : comparison;
+  const ascentState = view.reason === "no-ascent" ? "fail" : peak !== null ? "pass" : "active";
+  const peakState = ["no-ascent", "no-descent"].includes(view.reason) ? "fail" : peak !== null ? "pass" : "pending";
+  const descentState = view.reason === "stopped-early" ? "fail" : view.reason === "valid" ? "pass" : phase.startsWith("descend") ? "active" : "pending";
+
+  $("treeView").innerHTML = `<div class="mt941-viz phase-${escapeHtml(phase)}">
+    <div class="mt941-phases">${phases}</div>
+    <div class="mt941-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="mt941-rules"><span class="${ascentState}"><b>1</b><small>${vi ? "SƯỜN LÊN" : "ASCENT"}</small><code>arr[j] &lt; arr[j+1]</code></span><span class="${peakState}"><b>2</b><small>PEAK</small><code>0 &lt; peak &lt; n-1</code></span><span class="${descentState}"><b>3</b><small>${vi ? "SƯỜN XUỐNG" : "DESCENT"}</small><code>arr[j] &gt; arr[j+1]</code></span></div>
+    <section class="mt941-profile"><header><strong>MOUNTAIN PROFILE</strong><code>${escapeHtml(comparison)}</code></header><div><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${vi ? "Biểu đồ đường của mảng núi" : "Line profile of the mountain array"}"><line class="mt941-ground" x1="22" y1="182" x2="${width - 22}" y2="182"/>${edges}${points}</svg></div></section>
+    <div class="mt941-metrics"><span><small>i</small><strong>${escapeHtml(String(current))}</strong></span><span><small>PEAK INDEX</small><strong>${peak === null ? "?" : escapeHtml(String(peak))}</strong></span><span><small>LAST INDEX</small><strong>${Math.max(0, nums.length - 1)}</strong></span></div>
+    <div class="mt941-result ${resultClass}"><small>${escapeHtml(resultLabel)}</small><strong>${escapeHtml(reasonText)}</strong></div>
+  </div>`;
+}
+
 function renderProductSubarrayView(step) {
   const view = step.productSubarrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -12180,6 +12334,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefixAverageView(step);
+  } else if (step.replaceGreatestView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReplaceGreatestView(step);
+  } else if (step.mountainArrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMountainArrayView(step);
   } else if (step.productSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
