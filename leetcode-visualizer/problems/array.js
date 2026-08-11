@@ -4572,6 +4572,225 @@ function buildSteps699(input) {
 }
 
 /** LeetCode 493: Reverse Pairs — merge-sort cross-pair counting. */
+function buildSteps732(input) {
+  let bookings = [];
+  if (Array.isArray(input) && input.every((item) => Array.isArray(item))) {
+    bookings = input.map((item) => [Number(item[0]), Number(item[1])]);
+  } else if (Array.isArray(input)) {
+    for (let index = 0; index + 1 < input.length; index += 2) bookings.push([Number(input[index]), Number(input[index + 1])]);
+  } else {
+    const raw = String(input ?? "").trim();
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((item) => Array.isArray(item))) {
+        bookings = parsed.map((item) => [Number(item[0]), Number(item[1])]);
+      }
+    } catch (_error) {
+      // Fall through to compact "start,end; ..." input.
+    }
+    if (!bookings.length && raw) {
+      bookings = raw
+        .split(/[;|\n]+/)
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .map((row) => row.split(/[\s,]+/).map(Number).slice(0, 2));
+    }
+  }
+  bookings = bookings.filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && start < end);
+  const LIMIT_LEFT = 0;
+  const LIMIT_RIGHT = 1000000000 - 1;
+  const tree = new Map();
+  const lazy = new Map();
+  const ranges = new Map([[1, { start: LIMIT_LEFT, end: LIMIT_RIGHT, depth: 0 }]]);
+  const steps = [];
+  const outputs = [];
+  const processed = [];
+  let phase = "init";
+  let currentBooking = -1;
+  let activeNode = null;
+  let visitedNodes = [];
+  let coveredNodes = [];
+  let pulledNodes = [];
+  let queryLeft = null;
+  let queryRight = null;
+
+  const valueAt = (node) => tree.get(node) || 0;
+  const lazyAt = (node) => lazy.get(node) || 0;
+  const makeSegments = () => {
+    const edges = [...new Set(bookings.flatMap(([start, end]) => [start, end]))].sort((a, b) => a - b);
+    return edges.slice(0, -1).map((left, index) => {
+      const right = edges[index + 1];
+      const count = processed.reduce((total, booking) => total + (booking.start <= left && right <= booking.end ? 1 : 0), 0);
+      const current = currentBooking >= 0 && bookings[currentBooking]
+        ? bookings[currentBooking][0] <= left && right <= bookings[currentBooking][1]
+        : false;
+      return { left, right, count, current };
+    });
+  };
+  const makeView = () => ({
+    phase,
+    bookings: bookings.map((item) => [...item]),
+    processed: processed.map((item) => ({ ...item })),
+    outputs: [...outputs],
+    currentBooking,
+    activeNode,
+    visitedNodes: [...visitedNodes],
+    coveredNodes: [...coveredNodes],
+    pulledNodes: [...pulledNodes],
+    queryLeft,
+    queryRight,
+    segments: makeSegments(),
+    treeNodes: [...ranges.entries()]
+      .filter(([node]) => tree.has(node) || visitedNodes.includes(node) || node === 1)
+      .map(([node, range]) => ({ node, ...range, value: valueAt(node), lazy: lazyAt(node) }))
+      .sort((a, b) => a.depth - b.depth || a.node - b.node),
+  });
+  const addStep = ({ title, note, codeLine, nextPhase, vars = [], final = false }) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: bookings.map((item) => item[0]),
+      highlight: currentBooking >= 0 ? [currentBooking] : [],
+      mark: Array.from({ length: Math.max(0, currentBooking) }, (_, index) => index),
+      vars: [
+        { name: "max overlap", value: valueAt(1) },
+        ...(queryLeft !== null ? [{ name: "update range", value: `[${queryLeft}, ${queryRight}]` }] : []),
+        ...vars,
+      ],
+      calendarThreeView: makeView(),
+    });
+  };
+
+  addStep({
+    title: { vi: "Khởi tạo Dynamic Segment Tree", en: "Initialize the Dynamic Segment Tree" },
+    note: {
+      vi: "Không tạo sẵn 4 * 10^9 node. Chỉ các node nằm trên đường update mới được materialize trong dictionary.",
+      en: "Do not allocate 4 * 10^9 nodes. Only nodes touched by an update are materialized in dictionaries.",
+    },
+    codeLine: 3,
+    nextPhase: "init",
+    vars: [{ name: "domain", value: "[0, 10^9-1]" }],
+  });
+  addStep({
+    title: { vi: "lazy[node] lưu số booking phủ toàn node", en: "lazy[node] stores full-node coverage" },
+    note: {
+      vi: "tree[node] là overlap lớn nhất trong đoạn; lazy[node] là phần cộng áp dụng cho toàn bộ đoạn node.",
+      en: "tree[node] is the maximum overlap in the range; lazy[node] is the increment applied to the entire node range.",
+    },
+    codeLine: 4,
+    nextPhase: "init",
+  });
+
+  function update(node, start, end, left, right, depth) {
+    activeNode = node;
+    if (!visitedNodes.includes(node)) visitedNodes.push(node);
+    ranges.set(node, { start, end, depth });
+    if (right < start || end < left) return;
+    if (left <= start && end <= right) {
+      tree.set(node, valueAt(node) + 1);
+      lazy.set(node, lazyAt(node) + 1);
+      if (!coveredNodes.includes(node)) coveredNodes.push(node);
+      return;
+    }
+    const mid = Math.floor((start + end) / 2);
+    ranges.set(node * 2, { start, end: mid, depth: depth + 1 });
+    ranges.set(node * 2 + 1, { start: mid + 1, end, depth: depth + 1 });
+    update(node * 2, start, mid, left, right, depth + 1);
+    update(node * 2 + 1, mid + 1, end, left, right, depth + 1);
+    tree.set(node, lazyAt(node) + Math.max(valueAt(node * 2), valueAt(node * 2 + 1)));
+    activeNode = node;
+    if (!pulledNodes.includes(node)) pulledNodes.push(node);
+  }
+
+  for (let index = 0; index < bookings.length; index += 1) {
+    const [start, end] = bookings[index];
+    currentBooking = index;
+    queryLeft = start;
+    queryRight = end - 1;
+    activeNode = null;
+    visitedNodes = [];
+    coveredNodes = [];
+    pulledNodes = [];
+    addStep({
+      title: { vi: `book(${start}, ${end})`, en: `book(${start}, ${end})` },
+      note: {
+        vi: `Đổi interval nửa mở [${start}, ${end}) thành range nguyên [${start}, ${end - 1}].`,
+        en: `Convert half-open interval [${start}, ${end}) into integer range [${start}, ${end - 1}].`,
+      },
+      codeLine: 19,
+      nextPhase: "booking",
+      vars: [{ name: "start, end", value: `[${start}, ${end}]` }],
+    });
+    update(1, LIMIT_LEFT, LIMIT_RIGHT, queryLeft, queryRight, 0);
+    activeNode = visitedNodes[visitedNodes.length - 1] ?? 1;
+    addStep({
+      title: { vi: `Đi qua ${visitedNodes.length} dynamic node`, en: `Visit ${visitedNodes.length} dynamic nodes` },
+      note: {
+        vi: `Chỉ materialize các node giao với [${queryLeft}, ${queryRight}]; độ sâu tối đa khoảng 30.`,
+        en: `Only nodes intersecting [${queryLeft}, ${queryRight}] are materialized; maximum depth is about 30.`,
+      },
+      codeLine: 6,
+      nextPhase: "visit",
+      vars: [{ name: "visited", value: visitedNodes.length }],
+    });
+    activeNode = coveredNodes[coveredNodes.length - 1] ?? 1;
+    addStep({
+      title: { vi: `${coveredNodes.length} node được lazy +1`, en: `${coveredNodes.length} nodes receive lazy +1` },
+      note: {
+        vi: "Mỗi node được phủ hoàn toàn dừng đệ quy và tăng tree/lazy trực tiếp.",
+        en: "Each fully covered node stops recursion and increments tree/lazy directly.",
+      },
+      codeLine: 10,
+      nextPhase: "cover",
+      vars: [{ name: "covered nodes", value: coveredNodes.length }],
+    });
+    activeNode = 1;
+    addStep({
+      title: { vi: `Pull ${pulledNodes.length} node về root`, en: `Pull ${pulledNodes.length} nodes back to the root` },
+      note: {
+        vi: `Root hiện lưu maximum overlap ${valueAt(1)} theo công thức lazy + max(left, right).`,
+        en: `The root now stores maximum overlap ${valueAt(1)} via lazy + max(left, right).`,
+      },
+      codeLine: 16,
+      nextPhase: "pull",
+      vars: [{ name: "pulled nodes", value: pulledNodes.length }],
+    });
+    processed.push({ index, start, end, overlap: valueAt(1) });
+    outputs.push(valueAt(1));
+    activeNode = 1;
+    addStep({
+      title: { vi: `Root trả maximum overlap = ${valueAt(1)}`, en: `Root returns maximum overlap = ${valueAt(1)}` },
+      note: {
+        vi: `Sau booking ${index + 1}, answer = [${outputs.join(", ")}].`,
+        en: `After booking ${index + 1}, answer = [${outputs.join(", ")}].`,
+      },
+      codeLine: 20,
+      nextPhase: "output",
+      vars: [{ name: "return", value: valueAt(1) }],
+    });
+  }
+
+  currentBooking = -1;
+  queryLeft = null;
+  queryRight = null;
+  activeNode = null;
+  visitedNodes = [];
+  coveredNodes = [];
+  pulledNodes = [];
+  addStep({
+    title: { vi: `Hoàn tất → [${outputs.join(", ")}]`, en: `Done → [${outputs.join(", ")}]` },
+    note: { vi: "Mỗi kết quả là số booking chồng lấp lớn nhất sau lần gọi tương ứng.", en: "Each result is the maximum overlap after the corresponding call." },
+    codeLine: 20,
+    nextPhase: "done",
+    vars: [{ name: "answer", value: `[${outputs.join(", ")}]` }],
+    final: true,
+  });
+  return { original: bookings.map((item) => [...item]), answer: [...outputs], steps };
+}
+
 function buildSteps493MergeSort(input) {
   const nums = Array.isArray(input) ? input.map(Number) : [];
   const working = nums.map((value, originalIndex) => ({ value, originalIndex }));
@@ -5878,10 +6097,201 @@ function buildSteps327SegmentTree(input, params = {}) {
   return { original: [...nums], answer, steps };
 }
 
+function buildSteps327Fenwick(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const lowerRaw = Number(params.lower);
+  const upperRaw = Number(params.upper);
+  const lower = Number.isFinite(lowerRaw) ? Math.trunc(lowerRaw) : -2;
+  const upper = Number.isFinite(upperRaw) ? Math.max(lower, Math.trunc(upperRaw)) : 2;
+  const prefix = [0];
+  for (const num of nums) prefix.push(prefix[prefix.length - 1] + num);
+  const values = [...new Set(prefix)].sort((a, b) => a - b);
+  const ranks = new Map(values.map((value, index) => [value, index + 1]));
+  const bit = Array(values.length + 1).fill(0);
+  const steps = [];
+  let phase = "prefix";
+  let prefixIndex = 0;
+  let leftRank = null;
+  let rightRank = null;
+  let leftPath = [];
+  let rightPath = [];
+  let updatePath = [];
+  let leftCount = 0;
+  let rightCount = 0;
+  let found = 0;
+  let answer = 0;
+
+  const lowerBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const upperBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const query = (index) => {
+    const path = [];
+    let total = 0;
+    while (index > 0) {
+      path.push(index);
+      total += bit[index];
+      index -= index & -index;
+    }
+    return { total, path };
+  };
+  const update = (index) => {
+    const path = [];
+    while (index < bit.length) {
+      path.push(index);
+      bit[index] += 1;
+      index += index & -index;
+    }
+    return path;
+  };
+  const snapshot = () => ({
+    phase,
+    nums: [...nums],
+    prefix: [...prefix],
+    values: [...values],
+    ranks: values.map((value, index) => ({ value, rank: index + 1 })),
+    bit: bit.slice(1),
+    lower,
+    upper,
+    prefixIndex,
+    leftRank,
+    rightRank,
+    leftPath: [...leftPath],
+    rightPath: [...rightPath],
+    updatePath: [...updatePath],
+    leftCount,
+    rightCount,
+    found,
+    answer,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 3,
+      final,
+      arr: [...nums],
+      highlight: prefixIndex > 0 ? [prefixIndex - 1] : [],
+      mark: [],
+      vars: [
+        { name: "lower, upper", value: `[${lower}, ${upper}]` },
+        { name: "answer", value: answer },
+        ...vars,
+      ],
+      rangeSumFenwickView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: "Tạo toàn bộ prefix sum", en: "Build every prefix sum" },
+    { vi: "Pj là tổng nums[0..j-1]; P0 = 0.", en: "Pj is the sum of nums[0..j-1]; P0 = 0." },
+    7, "prefix", [{ name: "prefix", value: `[${prefix.join(", ")}]` }],
+  );
+  addStep(
+    { vi: "Nén prefix thành rank 1-based", en: "Compress prefixes into 1-based ranks" },
+    { vi: "BIT dùng rank 1-based và lưu frequency của các prefix đã đi qua.", en: "The BIT uses 1-based ranks and stores frequencies of earlier prefixes." },
+    8, "compress", [{ name: "values", value: `[${values.join(", ")}]` }],
+  );
+
+  prefixIndex = 0;
+  updatePath = update(ranks.get(0));
+  addStep(
+    { vi: "Update P0 = 0 vào BIT", en: "Update P0 = 0 into the BIT" },
+    { vi: "BIT phải chứa prefix rỗng trước khi xét subarray đầu tiên.", en: "The BIT must contain the empty prefix before processing the first subarray." },
+    25, "update", [{ name: "rank(P0)", value: ranks.get(0) }],
+  );
+
+  for (let index = 1; index < prefix.length; index += 1) {
+    prefixIndex = index;
+    leftRank = null;
+    rightRank = null;
+    leftPath = [];
+    rightPath = [];
+    updatePath = [];
+    leftCount = 0;
+    rightCount = 0;
+    found = 0;
+    const current = prefix[index];
+    const minPrevious = current - upper;
+    const maxPrevious = current - lower;
+    addStep(
+      { vi: `Xét P${index} = ${current}`, en: `Process P${index} = ${current}` },
+      { vi: `Tìm prefix trước đó trong [${minPrevious}, ${maxPrevious}].`, en: `Find earlier prefixes inside [${minPrevious}, ${maxPrevious}].` },
+      26, "scan", [{ name: "current", value: current }],
+    );
+    leftRank = lowerBound(minPrevious) + 1;
+    rightRank = upperBound(maxPrevious);
+    addStep(
+      { vi: `Khoảng rank = [${leftRank}, ${rightRank}]`, en: `Rank interval = [${leftRank}, ${rightRank}]` },
+      { vi: "left là rank đầu tiên >= current-upper; right là rank cuối cùng <= current-lower.", en: "left is the first rank >= current-upper; right is the last rank <= current-lower." },
+      28, "bounds", [{ name: "value interval", value: `[${minPrevious}, ${maxPrevious}]` }],
+    );
+    const rightResult = query(rightRank);
+    const leftResult = query(leftRank - 1);
+    rightCount = rightResult.total;
+    leftCount = leftResult.total;
+    rightPath = rightResult.path;
+    leftPath = leftResult.path;
+    found = rightCount - leftCount;
+    addStep(
+      { vi: `query(${rightRank}) - query(${leftRank - 1}) = ${found}`, en: `query(${rightRank}) - query(${leftRank - 1}) = ${found}` },
+      { vi: `${rightCount} prefix <= cận trên, trừ ${leftCount} prefix nhỏ hơn cận dưới.`, en: `${rightCount} prefixes are <= the upper bound; subtract ${leftCount} below the lower bound.` },
+      29, "query", [{ name: "right prefix count", value: rightCount }, { name: "left prefix count", value: leftCount }],
+    );
+    answer += found;
+    addStep(
+      { vi: `answer += ${found} → ${answer}`, en: `answer += ${found} → ${answer}` },
+      { vi: "Cộng số prefix trước đó tạo range sum hợp lệ.", en: "Add the earlier prefixes that form valid range sums." },
+      29, "count", [{ name: "found", value: found }],
+    );
+    leftPath = [];
+    rightPath = [];
+    updatePath = update(ranks.get(current));
+    addStep(
+      { vi: `Update rank của P${index}`, en: `Update P${index}'s rank` },
+      { vi: "Update sau query để prefix hiện tại không tự ghép với chính nó.", en: "Update after querying so the current prefix never pairs with itself." },
+      30, "update", [{ name: `rank(P${index})`, value: ranks.get(current) }],
+    );
+  }
+
+  prefixIndex = prefix.length - 1;
+  leftRank = null;
+  rightRank = null;
+  leftPath = [];
+  rightPath = [];
+  updatePath = [];
+  found = 0;
+  addStep(
+    { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    { vi: `Có ${answer} subarray có tổng trong [${lower}, ${upper}].`, en: `${answer} subarrays have sums in [${lower}, ${upper}].` },
+    31, "done", [{ name: "answer", value: answer }], true,
+  );
+  return { original: [...nums], answer, steps };
+}
+
 function buildSteps327(input, params = {}) {
-  return Number(params && params.approach) === 2
-    ? buildSteps327SegmentTree(input, params)
-    : buildSteps327MergeSort(input, params);
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 3) return buildSteps327Fenwick(input, params);
+  if (approach === 2) return buildSteps327SegmentTree(input, params);
+  return buildSteps327MergeSort(input, params);
 }
 
 module.exports = {
@@ -5954,6 +6364,62 @@ module.exports = {
       "        return answer",
     ],
     builder: buildSteps699,
+  },
+  732: {
+    id: 732,
+    difficulty: "hard",
+    slug: "my-calendar-iii",
+    category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+    tags: [
+      { key: "dynamic-segment-tree", vi: "Dynamic Segment Tree", en: "Dynamic Segment Tree" },
+      { key: "lazy-propagation", vi: "Lazy Propagation", en: "Lazy Propagation" },
+      { key: "interval", vi: "Khoảng", en: "Interval" },
+    ],
+    title: { vi: "My Calendar III", en: "My Calendar III" },
+    titleVi: { vi: "Lịch có số lần chồng lấp lớn nhất", en: "Calendar with maximum overlap" },
+    statement: {
+      vi: "Thiết kế MyCalendarThree. Mỗi book(start, end) thêm một sự kiện nửa mở [start, end) và trả số sự kiện chồng lấp đồng thời lớn nhất sau lần thêm đó.",
+      en: "Design MyCalendarThree. Each book(start, end) adds a half-open event [start, end) and returns the maximum number of concurrent events after that booking.",
+    },
+    defaultInput: "10,20;50,60;10,40;5,15;5,10;25,55",
+    inputKind: "string",
+    inputLabel: { vi: "bookings (start,end; ...)", en: "bookings (start,end; ...)" },
+    approach: [
+      { vi: "Mỗi booking [start, end) được update +1 trên range nguyên [start, end-1].", en: "Each half-open booking [start, end) adds 1 over integer range [start, end-1]." },
+      { vi: "Dynamic Segment Tree bao phủ [0, 10^9-1] nhưng chỉ tạo node trên các đường update thực sự được đi qua.", en: "A Dynamic Segment Tree covers [0, 10^9-1] but materializes only nodes actually visited by updates." },
+      { vi: "tree[node] = lazy[node] + max(tree[left], tree[right]); tree[1] luôn là overlap lớn nhất toàn lịch.", en: "tree[node] = lazy[node] + max(tree[left], tree[right]); tree[1] is always the calendar's global maximum overlap." },
+    ],
+    complexity: {
+      time: "O(log C) / booking",
+      space: "O(n log C)",
+      note: {
+        vi: "C = 10^9 là miền thời gian. Mỗi booking đi qua O(log C) level; dictionary chỉ lưu các node đã được sử dụng.",
+        en: "C = 10^9 is the time domain. Each booking visits O(log C) levels; dictionaries store only materialized nodes.",
+      },
+    },
+    code: [
+      "class MyCalendarThree:",
+      "    def __init__(self):",
+      "        self.tree = {}",
+      "        self.lazy = {}",
+      "",
+      "    def update(self, node, start, end, left, right):",
+      "        if right < start or end < left:",
+      "            return",
+      "        if left <= start and end <= right:",
+      "            self.tree[node] = self.tree.get(node, 0) + 1",
+      "            self.lazy[node] = self.lazy.get(node, 0) + 1",
+      "            return",
+      "        mid = (start + end) // 2",
+      "        self.update(node * 2, start, mid, left, right)",
+      "        self.update(node * 2 + 1, mid + 1, end, left, right)",
+      "        self.tree[node] = self.lazy.get(node, 0) + max(self.tree.get(node * 2, 0), self.tree.get(node * 2 + 1, 0))",
+      "",
+      "    def book(self, start: int, end: int) -> int:",
+      "        self.update(1, 0, 10**9 - 1, start, end - 1)",
+      "        return self.tree[1]",
+    ],
+    builder: buildSteps732,
   },
   493: {
     id: 493,
@@ -6121,6 +6587,7 @@ module.exports = {
       { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
       { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
       { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
+      { key: "binary-indexed-tree", vi: "Binary Indexed Tree", en: "Binary Indexed Tree" },
     ],
     title: { vi: "Count of Range Sum", en: "Count of Range Sum" },
     titleVi: { vi: "Đếm tổng đoạn trong khoảng", en: "Count range sums inside bounds" },
@@ -6137,6 +6604,7 @@ module.exports = {
       { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
         { value: "1", label: { vi: "Cách 1: Prefix Sum + Merge Sort", en: "Approach 1: Prefix Sum + Merge Sort" } },
         { value: "2", label: { vi: "Cách 2: Prefix Sum + Segment Tree", en: "Approach 2: Prefix Sum + Segment Tree" } },
+        { value: "3", label: { vi: "Cách 3: Prefix Sum + Fenwick Tree / BIT", en: "Approach 3: Prefix Sum + Fenwick Tree / BIT" } },
       ] },
     ],
     approach: [
@@ -6144,13 +6612,14 @@ module.exports = {
       { vi: "Merge Sort giữ thứ tự prefix index qua hai nửa, đồng thời sort mỗi nửa theo giá trị prefix sum.", en: "Merge Sort preserves prefix-index order across halves while sorting each half by prefix-sum value." },
       { vi: "Với mỗi prefix trái, hai con trỏ low/high tìm các prefix phải thỏa lower ≤ Pright − Pleft ≤ upper.", en: "For each left prefix, low/high locate right prefixes satisfying lower ≤ Pright − Pleft ≤ upper." },
       { vi: "Cách 2 quét prefix từ trái sang phải; Segment Tree đếm các prefix trước đó nằm trong [current−upper, current−lower].", en: "Approach 2 scans prefixes left to right; a Segment Tree counts earlier prefixes inside [current−upper, current−lower]." },
+      { vi: "Cách 3 dùng BIT: count đoạn rank [left, right] = query(right) - query(left-1), rồi update rank của prefix hiện tại.", en: "Approach 3 uses a BIT: rank-range count [left, right] = query(right) - query(left-1), then updates the current prefix rank." },
     ],
     complexity: {
-      time: "O(n log n) · cả hai cách",
+      time: "O(n log n) · cả ba cách",
       space: "O(n)",
       note: {
-        vi: "Cách 1 quét tuyến tính ở mỗi level Merge Sort. Cách 2 nén tọa độ rồi thực hiện một range query và một point update O(log n) cho mỗi prefix.",
-        en: "Approach 1 scans linearly at every Merge Sort level. Approach 2 compresses coordinates, then performs one O(log n) range query and point update per prefix.",
+        vi: "Cách 1 dùng Merge Sort. Cách 2 dùng Segment Tree. Cách 3 dùng hai prefix query và một update BIT O(log n) cho mỗi prefix.",
+        en: "Approach 1 uses Merge Sort. Approach 2 uses a Segment Tree. Approach 3 performs two BIT prefix queries and one O(log n) update per prefix.",
       },
     },
     code: [
@@ -6214,6 +6683,40 @@ module.exports = {
       "            right = bisect_right(values, current - lower) - 1",
       "            answer += query(1, 0, len(values)-1, left, right)",
       "            update(1, 0, len(values)-1, rank[current])",
+      "        return answer",
+    ],
+    code3Label: { vi: "Cách 3 · Prefix Sum + Fenwick Tree / BIT", en: "Approach 3 · Prefix Sum + Fenwick Tree / BIT" },
+    code3: [
+      "from bisect import bisect_left, bisect_right",
+      "",
+      "class Solution:",
+      "    def countRangeSum(self, nums, lower, upper):",
+      "        prefix = [0]",
+      "        for num in nums:",
+      "            prefix.append(prefix[-1] + num)",
+      "        values = sorted(set(prefix))",
+      "        rank = {value: i + 1 for i, value in enumerate(values)}",
+      "        bit = [0] * (len(values) + 1)",
+      "",
+      "        def query(index):",
+      "            total = 0",
+      "            while index > 0:",
+      "                total += bit[index]",
+      "                index -= index & -index",
+      "            return total",
+      "",
+      "        def update(index):",
+      "            while index < len(bit):",
+      "                bit[index] += 1",
+      "                index += index & -index",
+      "",
+      "        answer = 0",
+      "        update(rank[0])",
+      "        for current in prefix[1:]:",
+      "            left = bisect_left(values, current - upper) + 1",
+      "            right = bisect_right(values, current - lower)",
+      "            answer += query(right) - query(left - 1)",
+      "            update(rank[current])",
       "        return answer",
     ],
     builder: buildSteps327,

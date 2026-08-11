@@ -2004,6 +2004,119 @@ button:disabled {
   .fs699-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* ---- LeetCode 732: My Calendar III ---- */
+.cal732-viz {
+  min-height: 440px; padding: 18px; display: grid; gap: 12px; align-content: center;
+  color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px;
+  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 38%), rgba(15, 23, 42, 0.3);
+}
+.cal732-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.cal732-phases span {
+  min-height: 34px; padding: 6px 8px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  color: #64748b; font-size: 10px; text-align: center; border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px; background: rgba(15, 23, 42, 0.42);
+}
+.cal732-phases span b { font-weight: 650; }
+.cal732-phases span.active { color: #e0f2fe; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.15); }
+.cal732-phases span.done { color: #bbf7d0; border-color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+.cal732-section { display: grid; gap: 8px; min-width: 0; }
+.cal732-section header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cal732-section header strong { color: #e2e8f0; font-size: 11px; letter-spacing: 0.055em; }
+.cal732-section header span { color: #94a3b8; font-size: 10px; }
+.cal732-scroll { min-width: 0; overflow-x: auto; padding: 2px 2px 6px; }
+.cal732-bookings { display: flex; gap: 7px; min-width: max-content; }
+.cal732-booking {
+  min-width: 88px; min-height: 53px; padding: 7px 9px; display: grid; place-items: center; gap: 1px;
+  color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 8px; background: rgba(15, 23, 42, 0.52);
+}
+.cal732-booking small { color: #64748b; font-size: 8px; }
+.cal732-booking strong { font-size: 12px; }
+.cal732-booking em { color: #94a3b8; font-size: 9px; font-style: normal; }
+.cal732-booking.processed { border-color: rgba(34, 197, 94, 0.48); background: rgba(34, 197, 94, 0.08); }
+.cal732-booking.processed em { color: #86efac; }
+.cal732-booking.current { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14); transform: translateY(-2px); }
+.cal732-timeline {
+  min-height: 118px; padding: 9px 8px 5px; display: flex; align-items: stretch; gap: 3px;
+  overflow-x: auto; border-left: 1px solid rgba(148, 163, 184, 0.25); border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+.cal732-segment {
+  min-width: 54px; flex: var(--cal732-grow) 0 54px; display: grid; grid-template-rows: 14px minmax(70px, 1fr) 17px;
+  place-items: end center; color: #94a3b8;
+}
+.cal732-segment b { color: #cbd5e1; font-size: 10px; }
+.cal732-segment i {
+  width: calc(100% - 4px); height: var(--cal732-height); align-self: end;
+  border: 1px solid rgba(14, 165, 233, 0.56); border-bottom: none; border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.52), rgba(14, 165, 233, 0.18));
+}
+.cal732-segment small { font-size: 8px; white-space: nowrap; }
+.cal732-segment.current i { border-color: #f59e0b; background: rgba(245, 158, 11, 0.2); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18); }
+.cal732-segment.peak i { border-color: #22c55e; background: linear-gradient(180deg, rgba(34, 197, 94, 0.58), rgba(34, 197, 94, 0.18)); }
+.cal732-action {
+  padding: 9px 11px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px;
+  border: 1px solid rgba(34, 211, 238, 0.34); border-radius: 8px; background: rgba(8, 145, 178, 0.08);
+}
+.cal732-action small { grid-row: 1 / span 2; align-self: center; color: #67e8f9; font-size: 9px; letter-spacing: 0.08em; }
+.cal732-action strong { color: #ecfeff; font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+.cal732-action span { color: #94a3b8; font-size: 10px; }
+.cal732-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.cal732-metrics > span {
+  min-height: 48px; padding: 7px; display: grid; place-items: center; gap: 2px;
+  border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 8px; background: rgba(15, 23, 42, 0.4);
+}
+.cal732-metrics small { color: #94a3b8; font-size: 9px; }
+.cal732-metrics strong { color: #e2e8f0; font-size: 16px; }
+.cal732-metrics .max { border-color: rgba(34, 197, 94, 0.5); background: rgba(34, 197, 94, 0.1); }
+.cal732-metrics .max strong { color: #86efac; }
+.cal732-tree { min-height: 62px; padding: 7px; display: flex; gap: 6px; overflow-x: auto; border-radius: 8px; background: rgba(15, 23, 42, 0.46); }
+.cal732-node {
+  min-width: 116px; min-height: 54px; padding: 6px 8px; display: grid; place-items: center; gap: 1px;
+  color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 7px; background: rgba(15, 23, 42, 0.68);
+}
+.cal732-node small { color: #64748b; font-size: 8px; }
+.cal732-node strong { font-size: 15px; }
+.cal732-node em, .cal732-node i { color: #94a3b8; font-size: 8px; font-style: normal; }
+.cal732-node.visited { border-color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+.cal732-node.covered { border-color: #22c55e; background: rgba(34, 197, 94, 0.19); }
+.cal732-node.pulled { border-color: #a78bfa; background: rgba(167, 139, 250, 0.13); }
+.cal732-node.active { box-shadow: 0 0 0 2px #f59e0b inset; transform: translateY(-2px); }
+.cal732-bottom { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+.cal732-outputs { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.cal732-outputs > small { flex: 0 0 auto; color: #86efac; font-size: 9px; letter-spacing: 0.08em; }
+.cal732-outputs > div { min-width: 0; display: flex; gap: 5px; overflow-x: auto; }
+.cal732-outputs span { min-width: 34px; padding: 4px 6px; display: grid; place-items: center; border-radius: 6px; color: #bbf7d0; background: rgba(34, 197, 94, 0.13); }
+.cal732-outputs span small { font-size: 7px; }
+.cal732-outputs span strong { font-size: 12px; }
+.cal732-outputs em { color: #64748b; font-size: 9px; }
+.cal732-bottom code { padding: 5px 8px; color: #bae6fd; border-radius: 6px; background: rgba(14, 165, 233, 0.09); font-size: 9px; white-space: nowrap; }
+
+[data-theme="light"] .cal732-viz { color: #0f172a; border-color: #cbd5e1; background: radial-gradient(circle at top right, #f0f9ff, transparent 38%), #ffffff; }
+[data-theme="light"] .cal732-phases span, [data-theme="light"] .cal732-booking,
+[data-theme="light"] .cal732-node, [data-theme="light"] .cal732-metrics > span { color: #334155; border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .cal732-phases span.active { color: #075985; border-color: #0284c7; background: #f0f9ff; }
+[data-theme="light"] .cal732-phases span.done, [data-theme="light"] .cal732-booking.processed { color: #166534; border-color: #22c55e; background: #f0fdf4; }
+[data-theme="light"] .cal732-action { border-color: #67e8f9; background: #ecfeff; }
+[data-theme="light"] .cal732-action strong, [data-theme="light"] .cal732-section header strong, [data-theme="light"] .cal732-metrics strong { color: #0f172a; }
+[data-theme="light"] .cal732-tree { background: #f1f5f9; }
+[data-theme="light"] .cal732-node.covered { border-color: #22c55e; background: #dcfce7; }
+[data-theme="light"] .cal732-node.pulled { border-color: #a78bfa; background: #f5f3ff; }
+[data-theme="light"] .cal732-metrics .max { border-color: #86efac; background: #f0fdf4; }
+[data-theme="light"] .cal732-metrics .max strong { color: #166534; }
+[data-theme="light"] .cal732-bottom code { color: #075985; background: #f0f9ff; }
+
+@media (max-width: 700px) {
+  .cal732-viz { padding: 13px 9px; gap: 10px; }
+  .cal732-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cal732-action { grid-template-columns: minmax(0, 1fr); }
+  .cal732-action small { grid-row: auto; }
+  .cal732-bottom { grid-template-columns: minmax(0, 1fr); }
+  .cal732-bottom code { white-space: normal; }
+}
+@media (max-width: 440px) {
+  .cal732-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cal732-metrics .max { grid-column: span 2; }
+}
+
 /* ---- 491: Non-decreasing Subsequences ---- */
 .nds-viz {
   display: grid;

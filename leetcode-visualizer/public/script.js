@@ -7974,6 +7974,97 @@ function renderFallingSquaresView(step) {
   </div>`;
 }
 
+function renderCalendarThreeView(step) {
+  const view = step.calendarThreeView || {};
+  const vi = lang === "vi";
+  const bookings = Array.isArray(view.bookings) ? view.bookings : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const segments = Array.isArray(view.segments) ? view.segments : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const visited = new Set(Array.isArray(view.visitedNodes) ? view.visitedNodes : []);
+  const covered = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const pulled = new Set(Array.isArray(view.pulledNodes) ? view.pulledNodes : []);
+  const current = Number.isInteger(view.currentBooking) ? view.currentBooking : -1;
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const phase = String(view.phase || "init");
+  const phaseIndex = phase === "init" ? 0
+    : ["booking", "visit", "split", "skip"].includes(phase) ? 1
+      : ["cover", "pull"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["1 · Dynamic Tree", "2 · Đi xuống range", "3 · Lazy + Pull", "4 · Root answer"]
+    : ["1 · Dynamic tree", "2 · Descend range", "3 · Lazy + pull", "4 · Root answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const bookingHtml = bookings.map(([start, end], index) => {
+    const classes = ["cal732-booking"];
+    if (index < outputs.length) classes.push("processed");
+    if (index === current) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>book #${index + 1}</small><strong>[${escapeHtml(String(start))}, ${escapeHtml(String(end))})</strong><em>${index < outputs.length ? `max = ${outputs[index]}` : index === current ? "updating" : "waiting"}</em></span>`;
+  }).join("");
+  const maxCount = Math.max(1, ...segments.map((item) => Number(item.count) || 0));
+  const timelineHtml = segments.map((item) => {
+    const classes = ["cal732-segment"];
+    if (item.current && current >= outputs.length) classes.push("current");
+    if (item.count === maxCount && item.count > 0) classes.push("peak");
+    const height = Math.max(8, (Number(item.count) || 0) / maxCount * 92);
+    const grow = Math.max(1, Math.min(10, Number(item.right) - Number(item.left)));
+    return `<span class="${classes.join(" ")}" style="--cal732-height:${height}%;--cal732-grow:${grow}"><b>${escapeHtml(String(item.count))}</b><i></i><small>[${escapeHtml(String(item.left))},${escapeHtml(String(item.right))})</small></span>`;
+  }).join("");
+
+  const nodeCandidates = treeNodes.filter((item) => item.depth <= 3 || visited.has(item.node) || item.node === 1);
+  const rootNode = nodeCandidates.find((item) => item.node === 1);
+  const visibleNodes = nodeCandidates.length <= 70
+    ? nodeCandidates
+    : [rootNode, ...nodeCandidates.filter((item) => item.node !== 1).slice(-69)].filter(Boolean);
+  const treeHtml = visibleNodes.map((item) => {
+    const classes = ["cal732-node"];
+    if (visited.has(item.node)) classes.push("visited");
+    if (covered.has(item.node)) classes.push("covered");
+    if (pulled.has(item.node)) classes.push("pulled");
+    if (item.node === activeNode) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>d${item.depth} · node ${item.node}</small><strong>${escapeHtml(String(item.value))}</strong><em>[${escapeHtml(String(item.start))}, ${escapeHtml(String(item.end))}]</em><i>lazy ${escapeHtml(String(item.lazy))}</i></span>`;
+  }).join("");
+  const currentBooking = current >= 0 ? bookings[current] : null;
+  const rootValue = treeNodes.find((item) => item.node === 1)?.value || 0;
+  let actionLabel = vi ? "KHỞI TẠO" : "INITIALIZE";
+  let actionMain = "domain = [0, 10^9 - 1]";
+  let actionDetail = vi ? "Chỉ tạo node khi update chạm tới" : "Materialize nodes only when touched";
+  if (phase === "booking" && currentBooking) {
+    actionLabel = `BOOK #${current + 1}`;
+    actionMain = `[${currentBooking[0]}, ${currentBooking[1]}) -> [${view.queryLeft}, ${view.queryRight}]`;
+    actionDetail = vi ? "end - 1 giữ đúng interval nửa mở" : "end - 1 preserves half-open semantics";
+  } else if (["visit", "split", "skip"].includes(phase)) {
+    actionLabel = phase === "skip" ? (vi ? "BỎ QUA" : "SKIP") : (vi ? "ĐI XUỐNG" : "DESCEND");
+    actionMain = activeNode === null ? "—" : `node ${activeNode}`;
+    actionDetail = vi ? "Chỉ đi vào các đoạn giao với booking" : "Visit only ranges overlapping the booking";
+  } else if (phase === "cover") {
+    actionLabel = "LAZY +1";
+    actionMain = activeNode === null ? "—" : `node ${activeNode}`;
+    actionDetail = vi ? "Đoạn được phủ hoàn toàn, dừng đệ quy" : "Fully covered range; stop descending";
+  } else if (phase === "pull") {
+    actionLabel = "PULL";
+    actionMain = activeNode === null ? "—" : `tree[${activeNode}]`;
+    actionDetail = "lazy + max(left, right)";
+  } else if (phase === "output" || phase === "done") {
+    actionLabel = phase === "done" ? "DONE" : "RETURN";
+    actionMain = String(rootValue);
+    actionDetail = vi ? "maximum overlap tại root" : "maximum overlap at the root";
+  }
+  const outputsHtml = outputs.length
+    ? outputs.map((value, index) => `<span><small>#${index + 1}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("")
+    : `<em>${vi ? "chưa có kết quả" : "no result yet"}</em>`;
+
+  $("treeView").innerHTML = `<div class="cal732-viz phase-${escapeHtml(phase)}">
+    <div class="cal732-phases">${phases}</div>
+    <section class="cal732-section"><header><strong>BOOKINGS · HALF-OPEN INTERVALS</strong><span>${vi ? "viền vàng = booking hiện tại" : "yellow border = current booking"}</span></header><div class="cal732-scroll"><div class="cal732-bookings">${bookingHtml}</div></div></section>
+    <section class="cal732-section"><header><strong>CALENDAR OVERLAP TIMELINE</strong><span>${vi ? "cột cao nhất = overlap toàn cục" : "tallest column = global overlap"}</span></header><div class="cal732-timeline">${timelineHtml || "—"}</div></section>
+    <div class="cal732-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="cal732-metrics"><span><small>${vi ? "ĐÃ BOOK" : "BOOKED"}</small><strong>${outputs.length}</strong></span><span><small>${vi ? "NODE ĐÃ TẠO" : "MATERIALIZED"}</small><strong>${treeNodes.length}</strong></span><span class="max"><small>ROOT MAX</small><strong>${escapeHtml(String(rootValue))}</strong></span></div>
+    <section class="cal732-section"><header><strong>DYNAMIC SEGMENT TREE · CURRENT UPDATE TRACE</strong><span>${vi ? "xanh = cover · tím = pull · cam = active" : "green = cover · purple = pull · orange = active"}</span></header><div class="cal732-tree">${treeHtml || "—"}</div></section>
+    <div class="cal732-bottom"><div class="cal732-outputs"><small>RETURN VALUES</small><div>${outputsHtml}</div></div><code>tree[node] = lazy[node] + max(left, right)</code></div>
+  </div>`;
+}
+
 function renderReversePairsView(step) {
   const view = step.reversePairsView || {};
   const vi = lang === "vi";
@@ -8411,6 +8502,95 @@ function renderRangeSumSegmentTreeView(step) {
     <div class="rs327st-metrics"><span><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${currentSum === null ? "—" : escapeHtml(String(currentSum))}</strong></span><span><small>${vi ? "QUERY TÌM THẤY" : "QUERY FOUND"}</small><strong>${escapeHtml(String(view.queryCount || 0))}</strong></span><span class="count"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
     <section class="rs327st-section tree"><header><strong>SEGMENT TREE · PREFIX FREQUENCY</strong><span>${vi ? "mỗi node lưu tổng frequency trong range rank" : "each node stores total frequency in its rank range"}</span></header><div class="rs327st-tree">${treeHtml}</div></section>
     <div class="rs327st-rule"><code>lower <= Pj - Pi <= upper</code><span>⇔</span><code>Pj - upper <= Pi <= Pj - lower</code></div>
+  </div>`;
+}
+
+function renderRangeSumFenwickView(step) {
+  const view = step.rangeSumFenwickView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const ranks = Array.isArray(view.ranks) ? view.ranks : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const leftPath = new Set(Array.isArray(view.leftPath) ? view.leftPath : []);
+  const rightPath = new Set(Array.isArray(view.rightPath) ? view.rightPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const queryPath = new Set([...leftPath, ...rightPath]);
+  const current = Number.isInteger(view.prefixIndex) ? view.prefixIndex : 0;
+  const leftRank = Number.isInteger(view.leftRank) ? view.leftRank : null;
+  const rightRank = Number.isInteger(view.rightRank) ? view.rightRank : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = ["prefix", "compress"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Prefix + nén", "2 · Tìm khoảng rank", "3 · BIT Query + Update", "4 · Kết quả"]
+    : ["1 · Prefix + compress", "2 · Find rank interval", "3 · BIT Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const prefixHtml = prefix.map((sum, index) => {
+    const classes = ["ca1649-instruction"];
+    if (index < current || phase === "done") classes.push("processed");
+    if (index === current && phase !== "done") classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${index < current || phase === "done" ? "in BIT" : index === current ? "current" : "waiting"}</em></span>`;
+  }).join("");
+  const rankHtml = ranks.map((item) => {
+    const classes = ["ca1649-rank"];
+    if (leftRank !== null && rightRank !== null && item.rank >= leftRank && item.rank <= rightRank) classes.push("less");
+    if (current < prefix.length && item.value === prefix[current]) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>${escapeHtml(String(item.value))}</small><strong>r${item.rank}</strong></span>`;
+  }).join("");
+  const bitHtml = bit.map((count, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const left = index - lowbit + 1;
+    const classes = ["ca1649-bit"];
+    if (queryPath.has(index)) classes.push("query-path");
+    if (updatePath.has(index)) classes.push("update-path");
+    return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${left}..r${index}</em><i>${escapeHtml(`${ranks[left - 1]?.value ?? "?"}..${ranks[index - 1]?.value ?? "?"}`)}</i></span>`;
+  }).join("");
+
+  const currentSum = current < prefix.length ? prefix[current] : null;
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Tạo prefix và nén thành rank 1-based" : "Build prefixes and compress into 1-based ranks";
+  let actionDetail = vi ? "BIT lưu frequency của prefix đã đi qua" : "The BIT stores frequencies of earlier prefixes";
+  if (phase === "scan") {
+    actionLabel = vi ? `XÉT P${current}` : `PROCESS P${current}`;
+    actionMain = `current = ${currentSum}`;
+    actionDetail = `${currentSum - Number(view.upper)} <= previous <= ${currentSum - Number(view.lower)}`;
+  } else if (phase === "bounds") {
+    actionLabel = vi ? "KHOẢNG RANK" : "RANK INTERVAL";
+    actionMain = `[${leftRank}, ${rightRank}]`;
+    actionDetail = vi ? "nền xanh = prefix value cần đếm" : "green fill = prefix values to count";
+  } else if (phase === "query") {
+    actionLabel = "BIT RANGE QUERY";
+    actionMain = `query(${rightRank}) - query(${leftRank - 1}) = ${view.found || 0}`;
+    actionDetail = `${view.rightCount || 0} - ${view.leftCount || 0}`;
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = vi ? "Cộng số prefix trước đó hợp lệ" : "Add valid earlier prefixes";
+  } else if (phase === "update") {
+    actionLabel = "BIT UPDATE";
+    actionMain = `insert P${current} = ${currentSum}`;
+    actionDetail = vi ? "Node cam là update path theo lowbit" : "Orange nodes are the lowbit update path";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+  }
+
+  const leftPathText = leftPath.size ? [...leftPath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  const rightPathText = rightPath.size ? [...rightPath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  const updatePathText = updatePath.size ? [...updatePath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  $("treeView").innerHTML = `<div class="ca1649-viz rs327bit-viz phase-${escapeHtml(phase)}">
+    <div class="ca1649-phases">${phases}</div>
+    <section class="ca1649-section"><header><strong>NUMS -> PREFIX SUMS</strong><span>${vi ? "xanh = đã update vào BIT · cam = đang xét" : "green = updated into BIT · orange = current"}</span></header><div class="ca1649-scroll"><div class="ca1649-instructions">${prefixHtml}</div></div></section>
+    <section class="ca1649-section"><header><strong>VALUE -> 1-BASED RANK</strong><span>${vi ? "nền xanh = khoảng cần query" : "green fill = queried interval"}</span></header><div class="ca1649-ranks">${rankHtml}</div></section>
+    <div class="ca1649-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="ca1649-metrics"><span><small>CURRENT</small><strong>${currentSum === null ? "—" : escapeHtml(String(currentSum))}</strong></span><span class="less"><small>query(left-1)</small><strong>${escapeHtml(String(view.leftCount || 0))}</strong></span><span class="greater"><small>query(right)</small><strong>${escapeHtml(String(view.rightCount || 0))}</strong></span><span class="cost"><small>FOUND</small><strong>${escapeHtml(String(view.found || 0))}</strong></span><span class="total"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="ca1649-section"><header><strong>FENWICK TREE / BIT · PREFIX FREQUENCY</strong><span>lowbit -> ${vi ? "range rank được quản lý" : "covered rank range"}</span></header><div class="ca1649-bits">${bitHtml}</div><div class="ca1649-paths"><span><b>query(left-1)</b>${escapeHtml(leftPathText)}</span><span><b>query(right)</b>${escapeHtml(rightPathText)}</span><span><b>update</b>${escapeHtml(updatePathText)}</span></div></section>
+    <div class="ca1649-rule"><code>count(left..right) = query(right) - query(left-1)</code><i>·</i><code>update(rank[current])</code></div>
   </div>`;
 }
 
@@ -12211,6 +12391,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMissingIntegerView(step);
+  } else if (step.calendarThreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalendarThreeView(step);
   } else if (step.fallingSquaresView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -12235,6 +12421,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSortedArrayCostView(step);
+  } else if (step.rangeSumFenwickView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumFenwickView(step);
   } else if (step.rangeSumSegmentTreeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
