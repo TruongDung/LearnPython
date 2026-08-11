@@ -14183,14 +14183,12 @@ function enterLiveStepMode(userCode, answer) {
   stepIndex = 0;
   resetBreakpoints();
   renderLiveCodePanel(userLines);
-  // Collapse the whole Monaco editor panel and show the read-only
-  // highlighted trace instead, so code + step controls behave like the
-  // canned mode. Re-show "Edit & run code" so the user can hop back into
-  // the editor (with their code preserved) without fully exiting live mode.
+  // Collapse Monaco and show the read-only highlighted trace. This is still
+  // live mode, so keep only "Exit editor" visible in the mode bar.
   setLiveEditorLayoutMode(false);
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
-  $("liveEditBtn").classList.remove("hidden");
+  $("liveEditBtn").classList.add("hidden");
   renderStep();
 }
 
@@ -14287,6 +14285,7 @@ function resetLiveEditorState() {
 function setLiveMode(on) {
   liveMode = on;
   setLiveEditorLayoutMode(on);
+  $("liveEditBtn").classList.toggle("hidden", on);
   $("liveExitBtn").classList.toggle("hidden", !on);
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
