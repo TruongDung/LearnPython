@@ -7941,6 +7941,73 @@ function renderCountSmallerView(step) {
   </div>`;
 }
 
+function renderTrappingRainView(step) {
+  const view = step.trappingRainView || {};
+  const heights = Array.isArray(view.height) ? view.height : [];
+  const water = Array.isArray(view.water) ? view.water : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const leftMax = Number.isFinite(Number(view.leftMax)) ? Number(view.leftMax) : null;
+  const rightMax = Number.isFinite(Number(view.rightMax)) ? Number(view.rightMax) : null;
+  const total = Number.isFinite(Number(view.total)) ? Number(view.total) : 0;
+  const add = Number.isFinite(Number(view.add)) ? Number(view.add) : null;
+  const maxLevel = Math.max(1, ...heights, ...water.map((w, i) => (heights[i] || 0) + (w || 0)), leftMax || 0, rightMax || 0);
+  const compact = heights.length >= 10;
+
+  const cells = heights.map((height, index) => {
+    const w = water[index] || 0;
+    const landPct = Math.max(4, (height / maxLevel) * 100);
+    const waterPct = w > 0 ? Math.max(8, (w / maxLevel) * 100) : 0;
+    const classes = ["trap-cell"];
+    if (index === left) classes.push("left");
+    if (index === right) classes.push("right");
+    if (index === current) classes.push("current");
+    if (w > 0) classes.push("has-water");
+    return `<div class="${classes.join(" ")}" style="--land:${landPct}%;--water:${waterPct}%">
+      <div class="trap-tank">
+        ${w > 0 ? `<span class="trap-water"><b>${escapeHtml(String(w))}</b></span>` : ""}
+        <span class="trap-bar"><b>${escapeHtml(String(height))}</b></span>
+      </div>
+      <div class="trap-index">[${index}]</div>
+      <div class="trap-pointer-row">
+        ${index === left ? '<span class="trap-pointer left">L</span>' : ""}
+        ${index === right ? '<span class="trap-pointer right">R</span>' : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(item.label ?? ""))}</span>
+    <strong>${escapeHtml(String(item.value ?? "-"))}</strong>
+  </div>`).join("");
+
+  const formulaHtml = current >= 0
+    ? `<div class="trap-formula ${add && add > 0 ? "positive" : ""}">
+        <small>${escapeHtml(view.side === "left" ? "left side" : "right side")}</small>
+        <strong>${escapeHtml(String(view.decision || ""))}</strong>
+        <span>${escapeHtml(lang === "vi" ? "nước thêm" : "water added")} = ${escapeHtml(String(add ?? 0))}</span>
+      </div>`
+    : `<div class="trap-formula">
+        <small>${escapeHtml(lang === "vi" ? "quy tắc" : "rule")}</small>
+        <strong>${escapeHtml(leftMax !== null && rightMax !== null ? `min wall = min(${leftMax}, ${rightMax})` : "water = min(left_max, right_max) - height[i]")}</strong>
+        <span>${escapeHtml(lang === "vi" ? "luôn xử lý phía có max thấp hơn" : "process the side with the lower max")}</span>
+      </div>`;
+
+  $("treeView").innerHTML = `
+    <div class="trap-viz${compact ? " compact" : ""}">
+      <div class="trap-summary">
+        <span><small>left_max</small><b>${escapeHtml(String(leftMax ?? "-"))}</b></span>
+        <span><small>right_max</small><b>${escapeHtml(String(rightMax ?? "-"))}</b></span>
+        <span><small>total water</small><b>${escapeHtml(String(total))}</b></span>
+      </div>
+      <div class="trap-chart" style="--trap-cols:${Math.max(1, heights.length)}">${cells}</div>
+      ${formulaHtml}
+      <div class="trap-status">${statusItems}</div>
+    </div>`;
+}
+
 function renderFenwickView(step) {
   const view = step.fenwickView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -11422,6 +11489,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBookMyShowView(step);
+  } else if (step.trappingRainView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTrappingRainView(step);
   } else if (step.segmentTreeView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

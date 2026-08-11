@@ -1830,6 +1830,31 @@ function buildSteps42(input) {
 
   // sub row shows how much water sits above each bar so far
   const makeSub = () => height.map((h, i) => (water[i] > 0 ? `💧${water[i]}` : ""));
+  const makeView = ({
+    left = -1,
+    right = -1,
+    leftMax = null,
+    rightMax = null,
+    current = -1,
+    side = "",
+    add = null,
+    total = 0,
+    decision = "",
+    status = [],
+  } = {}) => ({
+    height: [...height],
+    water: [...water],
+    left,
+    right,
+    leftMax,
+    rightMax,
+    current,
+    side,
+    add,
+    total,
+    decision,
+    status,
+  });
 
   let left = 0;
   let right = n - 1;
@@ -1837,106 +1862,220 @@ function buildSteps42(input) {
   let rightMax = height[right];
   let total = 0;
 
-  steps.push({
-    title: { vi: "Khởi tạo hai con trỏ", en: "Initialize two pointers" },
-    arr: [...height],
-    sub: makeSub(),
-    highlight: [left, right],
-    mark: [],
-    codeLines: [4, 5, 6],
-    vars: [
-      { name: "left", value: left },
-      { name: "right", value: right },
-      { name: "left_max", value: leftMax },
-      { name: "right_max", value: rightMax },
-      { name: "water", value: total },
-    ],
-    note: {
-      vi:
-        `left=0, right=${right}. left_max=${leftMax}, right_max=${rightMax}.\n` +
-        "Ý tưởng: nước trên 1 cột = min(tường cao nhất bên trái, bên phải) - chiều cao cột.\n" +
-        "Di chuyển con trỏ ở phía có tường THẤP HƠN vì phía đó quyết định mức nước.",
-      en:
-        `left=0, right=${right}. left_max=${leftMax}, right_max=${rightMax}.\n` +
-        "Idea: water above a bar = min(tallest left wall, tallest right wall) - bar height.\n" +
-        "Move the pointer on the SHORTER wall side because that side limits the water level.",
-    },
-  });
-
-  while (left < right) {
-    const useLeft = leftMax < rightMax;
+  function pushTrapStep({
+    title,
+    codeLine,
+    note,
+    current = -1,
+    side = "",
+    add = null,
+    decision = "",
+    status = [],
+    vars = [],
+    mark = [],
+  }) {
     steps.push({
-      title: { vi: `left_max=${leftMax} ${useLeft ? "<" : "≥"} right_max=${rightMax}`, en: `left_max=${leftMax} ${useLeft ? "<" : "≥"} right_max=${rightMax}` },
+      title,
       arr: [...height],
       sub: makeSub(),
-      highlight: [left, right],
-      mark: [],
-      codeLines: [7, 8],
+      trappingRainView: makeView({
+        left,
+        right,
+        leftMax,
+        rightMax,
+        current,
+        side,
+        add,
+        total,
+        decision,
+        status,
+      }),
+      highlight: [left, right].filter((index) => index >= 0),
+      mark,
+      codeLines: [codeLine],
       vars: [
         { name: "left", value: left },
         { name: "right", value: right },
         { name: "left_max", value: leftMax },
         { name: "right_max", value: rightMax },
-        { name: "condition left_max < right_max", value: useLeft },
+        { name: "water", value: total },
+        ...vars,
       ],
+      note,
+    });
+  }
+
+  pushTrapStep({
+    title: { vi: "Dòng 4 · đặt left/right", en: "Line 4 · set left/right" },
+    codeLine: 4,
+    decision: "left, right = 0, len(height) - 1",
+    status: [{ label: "left", value: left }, { label: "right", value: right }],
+    note: {
+      vi: `Bắt đầu với left=0 và right=${right}, hai con trỏ đứng ở hai đầu mảng.`,
+      en: `Start with left=0 and right=${right}, one pointer at each end.`,
+    },
+  });
+
+  pushTrapStep({
+    title: { vi: "Dòng 5 · đặt left_max/right_max", en: "Line 5 · set left_max/right_max" },
+    codeLine: 5,
+    decision: "left_max, right_max = height[left], height[right]",
+    status: [{ label: "left_max", value: leftMax }, { label: "right_max", value: rightMax }],
+    note: {
+      vi: `left_max=${leftMax}, right_max=${rightMax}. Đây là tường cao nhất đã thấy từ mỗi phía.`,
+      en: `left_max=${leftMax}, right_max=${rightMax}. These are the tallest walls seen from each side.`,
+    },
+  });
+
+  pushTrapStep({
+    title: { vi: "Dòng 6 · water = 0", en: "Line 6 · water = 0" },
+    codeLine: 6,
+    decision: "water = 0",
+    status: [{ label: "water", value: total }],
+    note: {
+      vi: "Chưa xử lý cột nào nên tổng nước ban đầu là 0.",
+      en: "No bar has been processed yet, so total water starts at 0.",
+    },
+  });
+
+  while (left < right) {
+    const useLeft = leftMax < rightMax;
+    pushTrapStep({
+      title: { vi: `Dòng 7 · ${left} < ${right}`, en: `Line 7 · ${left} < ${right}` },
+      codeLine: 7,
+      decision: "while left < right",
+      status: [{ label: "left", value: left }, { label: "right", value: right }],
+      note: {
+        vi: "Vòng lặp tiếp tục vì hai con trỏ chưa gặp nhau.",
+        en: "The loop continues because the two pointers have not met.",
+      },
+    });
+
+    pushTrapStep({
+      title: { vi: `Dòng 8 · ${leftMax} ${useLeft ? "<" : "≥"} ${rightMax}`, en: `Line 8 · ${leftMax} ${useLeft ? "<" : "≥"} ${rightMax}` },
+      codeLine: 8,
+      side: useLeft ? "left" : "right",
+      decision: useLeft ? "left_max < right_max" : "left_max >= right_max",
+      status: [
+        { label: "left_max", value: leftMax },
+        { label: "right_max", value: rightMax },
+        { label: "branch", value: useLeft ? "left" : "right" },
+      ],
+      vars: [{ name: "condition", value: useLeft }],
       note: {
         vi: useLeft
-          ? `Tường trái (${leftMax}) thấp hơn tường phải (${rightMax}) → xử lý bên TRÁI, dời left.`
-          : `Tường phải (${rightMax}) ≤ tường trái (${leftMax}) → xử lý bên PHẢI, dời right.`,
+          ? `Tường trái thấp hơn, nên xử lý cột bên trái.`
+          : `Tường phải không cao hơn tường trái, nên xử lý cột bên phải.`,
         en: useLeft
-          ? `Left wall (${leftMax}) is shorter than right wall (${rightMax}) → process LEFT side, move left.`
-          : `Right wall (${rightMax}) ≤ left wall (${leftMax}) → process RIGHT side, move right.`,
+          ? "The left wall is lower, so process the left side."
+          : "The right wall is not higher than the left wall, so process the right side.",
       },
     });
 
     if (useLeft) {
       left += 1;
+      pushTrapStep({
+        title: { vi: `Dòng 9 · left = ${left}`, en: `Line 9 · left = ${left}` },
+        codeLine: 9,
+        current: left,
+        side: "left",
+        decision: "left += 1",
+        status: [{ label: "height[left]", value: height[left] }],
+        note: {
+          vi: `Di chuyển left sang index ${left}.`,
+          en: `Move left to index ${left}.`,
+        },
+      });
+
       leftMax = Math.max(leftMax, height[left]);
+      pushTrapStep({
+        title: { vi: `Dòng 10 · left_max = ${leftMax}`, en: `Line 10 · left_max = ${leftMax}` },
+        codeLine: 10,
+        current: left,
+        side: "left",
+        decision: `left_max = max(left_max, height[${left}])`,
+        status: [{ label: "height[left]", value: height[left] }, { label: "left_max", value: leftMax }],
+        note: {
+          vi: `Cập nhật tường cao nhất bên trái sau khi thấy height[${left}] = ${height[left]}.`,
+          en: `Update the tallest left wall after seeing height[${left}] = ${height[left]}.`,
+        },
+      });
+
       const add = leftMax - height[left];
       water[left] = add;
       total += add;
-      steps.push({
-        title: { vi: `left→${left}: left_max=${leftMax}, +${add} nước`, en: `left→${left}: left_max=${leftMax}, +${add} water` },
-        arr: [...height],
-        sub: makeSub(),
-        highlight: [left, right],
+      pushTrapStep({
+        title: { vi: `Dòng 11 · cộng ${add} nước`, en: `Line 11 · add ${add} water` },
+        codeLine: 11,
+        current: left,
+        side: "left",
+        add,
+        decision: `water += ${leftMax} - ${height[left]}`,
+        status: [{ label: "added", value: add }, { label: "total", value: total }],
         mark: add > 0 ? [left] : [],
-        codeLines: [9, 10, 11],
-        vars: [
-          { name: "left", value: left },
-          { name: "height[left]", value: height[left] },
-          { name: "left_max", value: leftMax },
-          { name: "water added", value: add },
-          { name: "water", value: total },
-        ],
+        vars: [{ name: "water added", value: add }],
         note: {
-          vi: `left tiến tới ${left}. left_max = max(${leftMax}) . Nước trên cột ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Tổng nước = ${total}.`,
-          en: `left advances to ${left}. left_max = ${leftMax}. Water above bar ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Total = ${total}.`,
+          vi: `Nước trên cột ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Tổng = ${total}.`,
+          en: `Water above bar ${left} = left_max - height[${left}] = ${leftMax} - ${height[left]} = ${add}. Total = ${total}.`,
         },
       });
     } else {
+      pushTrapStep({
+        title: { vi: "Dòng 12 · vào else", en: "Line 12 · enter else" },
+        codeLine: 12,
+        side: "right",
+        decision: "else",
+        status: [{ label: "branch", value: "right" }],
+        note: {
+          vi: "Xử lý phía phải vì right_max là phía giới hạn.",
+          en: "Process the right side because right_max is the limiting side.",
+        },
+      });
+
       right -= 1;
+      pushTrapStep({
+        title: { vi: `Dòng 13 · right = ${right}`, en: `Line 13 · right = ${right}` },
+        codeLine: 13,
+        current: right,
+        side: "right",
+        decision: "right -= 1",
+        status: [{ label: "height[right]", value: height[right] }],
+        note: {
+          vi: `Di chuyển right sang index ${right}.`,
+          en: `Move right to index ${right}.`,
+        },
+      });
+
       rightMax = Math.max(rightMax, height[right]);
+      pushTrapStep({
+        title: { vi: `Dòng 14 · right_max = ${rightMax}`, en: `Line 14 · right_max = ${rightMax}` },
+        codeLine: 14,
+        current: right,
+        side: "right",
+        decision: `right_max = max(right_max, height[${right}])`,
+        status: [{ label: "height[right]", value: height[right] }, { label: "right_max", value: rightMax }],
+        note: {
+          vi: `Cập nhật tường cao nhất bên phải sau khi thấy height[${right}] = ${height[right]}.`,
+          en: `Update the tallest right wall after seeing height[${right}] = ${height[right]}.`,
+        },
+      });
+
       const add = rightMax - height[right];
       water[right] = add;
       total += add;
-      steps.push({
-        title: { vi: `right→${right}: right_max=${rightMax}, +${add} nước`, en: `right→${right}: right_max=${rightMax}, +${add} water` },
-        arr: [...height],
-        sub: makeSub(),
-        highlight: [left, right],
+      pushTrapStep({
+        title: { vi: `Dòng 15 · cộng ${add} nước`, en: `Line 15 · add ${add} water` },
+        codeLine: 15,
+        current: right,
+        side: "right",
+        add,
+        decision: `water += ${rightMax} - ${height[right]}`,
+        status: [{ label: "added", value: add }, { label: "total", value: total }],
         mark: add > 0 ? [right] : [],
-        codeLines: [12, 13, 14, 15],
-        vars: [
-          { name: "right", value: right },
-          { name: "height[right]", value: height[right] },
-          { name: "right_max", value: rightMax },
-          { name: "water added", value: add },
-          { name: "water", value: total },
-        ],
+        vars: [{ name: "water added", value: add }],
         note: {
-          vi: `right lùi tới ${right}. right_max = ${rightMax}. Nước trên cột ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Tổng nước = ${total}.`,
-          en: `right retreats to ${right}. right_max = ${rightMax}. Water above bar ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Total = ${total}.`,
+          vi: `Nước trên cột ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Tổng = ${total}.`,
+          en: `Water above bar ${right} = right_max - height[${right}] = ${rightMax} - ${height[right]} = ${add}. Total = ${total}.`,
         },
       });
     }
@@ -1946,6 +2085,15 @@ function buildSteps42(input) {
     title: { vi: `return water = ${total}`, en: `return water = ${total}` },
     arr: [...height],
     sub: makeSub(),
+    trappingRainView: makeView({
+      left,
+      right,
+      leftMax,
+      rightMax,
+      total,
+      decision: "done",
+      status: [{ label: "answer", value: total }],
+    }),
     highlight: [],
     mark: water.map((w, i) => (w > 0 ? i : -1)).filter((x) => x >= 0),
     final: true,
