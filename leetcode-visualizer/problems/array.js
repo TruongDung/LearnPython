@@ -3933,7 +3933,285 @@ function buildSteps315(input) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 2996: Smallest Missing Integer Greater Than Sequential Prefix Sum.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def missingInteger(self, nums):
+ *  3          total = nums[0]
+ *  4          i = 1
+ *  5          while i < len(nums) and nums[i] == nums[i - 1] + 1:
+ *  6              total += nums[i]
+ *  7              i += 1
+ *  8          seen = set(nums)
+ *  9          while total in seen:
+ * 10              total += 1
+ * 11          return total
+ */
+function buildSteps2996(input) {
+  const nums = Array.isArray(input) ? input.map(Number).filter((value) => Number.isFinite(value)) : [];
+  const steps = [];
+
+  if (!nums.length) {
+    const view = {
+      nums: [],
+      prefixEnd: -1,
+      currentIndex: -1,
+      sum: 0,
+      seen: [],
+      candidate: 0,
+      candidates: [],
+      phase: "done",
+      decision: "empty visual input",
+      status: [{ label: "answer", value: 0 }],
+    };
+    steps.push({
+      title: { vi: "Input rỗng", en: "Empty input" },
+      arr: [],
+      missingIntegerView: view,
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: "Bài gốc luôn có nums không rỗng; nếu input rỗng thì visualization trả 0 để không lỗi.",
+        en: "The original problem has non-empty nums; for an empty visual input, return 0.",
+      },
+    });
+    return { original: nums, answer: 0, steps };
+  }
+
+  let total = nums[0];
+  let i = 1;
+  let prefixEnd = 0;
+  const seen = new Set(nums);
+  const candidates = [];
+  const sortedSeen = () => [...seen].sort((a, b) => a - b);
+  const prefixIndices = () => Array.from({ length: prefixEnd + 1 }, (_, index) => index);
+
+  function makeView({ phase, currentIndex = -1, candidate = null, decision = "", status = [] } = {}) {
+    return {
+      nums: [...nums],
+      prefixEnd,
+      currentIndex,
+      sum: total,
+      seen: sortedSeen(),
+      candidate,
+      candidates: [...candidates],
+      phase,
+      decision,
+      status,
+    };
+  }
+
+  steps.push({
+    title: { vi: `Khởi tạo total = nums[0] = ${total}`, en: `Initialize total = nums[0] = ${total}` },
+    arr: [...nums],
+    highlight: [0],
+    mark: [0],
+    missingIntegerView: makeView({
+      phase: "prefix",
+      currentIndex: 0,
+      decision: "total = nums[0]",
+      status: [{ label: "prefix", value: "[0..0]" }, { label: "total", value: total }],
+    }),
+    codeLines: [3, 4],
+    vars: [{ name: "total", value: total }, { name: "i", value: i }],
+    note: {
+      vi: "Prefix liên tiếp phải bắt đầu từ nums[0]. Lấy nums[0] làm tổng ban đầu.",
+      en: "The sequential prefix must start at nums[0]. Use nums[0] as the initial sum.",
+    },
+  });
+
+  while (i < nums.length && nums[i] === nums[i - 1] + 1) {
+    steps.push({
+      title: { vi: `nums[${i}] nối tiếp nums[${i - 1}]`, en: `nums[${i}] follows nums[${i - 1}]` },
+      arr: [...nums],
+      highlight: [i - 1, i],
+      mark: prefixIndices(),
+      missingIntegerView: makeView({
+        phase: "prefix",
+        currentIndex: i,
+        decision: `${nums[i]} == ${nums[i - 1]} + 1`,
+        status: [{ label: "check", value: "continue" }, { label: "total before", value: total }],
+      }),
+      codeLines: [5],
+      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "total", value: total }],
+      note: {
+        vi: `${nums[i]} đúng bằng ${nums[i - 1]} + 1, nên vẫn thuộc prefix tăng liên tiếp.`,
+        en: `${nums[i]} equals ${nums[i - 1]} + 1, so it stays inside the sequential prefix.`,
+      },
+    });
+
+    total += nums[i];
+    prefixEnd = i;
+    steps.push({
+      title: { vi: `Cộng nums[${i}] → total = ${total}`, en: `Add nums[${i}] → total = ${total}` },
+      arr: [...nums],
+      highlight: [i],
+      mark: prefixIndices(),
+      missingIntegerView: makeView({
+        phase: "prefix",
+        currentIndex: i,
+        decision: `total += nums[${i}]`,
+        status: [{ label: "added", value: nums[i] }, { label: "total", value: total }],
+      }),
+      codeLines: [6, 7],
+      vars: [{ name: "i", value: i }, { name: "total", value: total }],
+      note: {
+        vi: `Prefix hiện tại là nums[0..${prefixEnd}], tổng = ${total}.`,
+        en: `Current prefix is nums[0..${prefixEnd}], sum = ${total}.`,
+      },
+    });
+    i += 1;
+  }
+
+  steps.push({
+    title: i < nums.length
+      ? { vi: `Prefix dừng trước nums[${i}]`, en: `Prefix stops before nums[${i}]` }
+      : { vi: "Toàn bộ mảng là prefix liên tiếp", en: "The whole array is a sequential prefix" },
+    arr: [...nums],
+    highlight: i < nums.length ? [i - 1, i] : [],
+    mark: prefixIndices(),
+    missingIntegerView: makeView({
+      phase: "prefix-stop",
+      currentIndex: i < nums.length ? i : -1,
+      decision: i < nums.length ? `${nums[i]} != ${nums[i - 1]} + 1` : "reached end of nums",
+      status: [{ label: "prefix", value: `[0..${prefixEnd}]` }, { label: "prefix sum", value: total }],
+    }),
+    codeLines: [5],
+    vars: [{ name: "i", value: i }, { name: "total", value: total }],
+    note: i < nums.length
+      ? {
+        vi: `nums[${i}]=${nums[i]} không bằng ${nums[i - 1]}+1, nên prefix kết thúc ở index ${prefixEnd}.`,
+        en: `nums[${i}]=${nums[i]} is not ${nums[i - 1]}+1, so the prefix ends at index ${prefixEnd}.`,
+      }
+      : {
+        vi: `Không gặp chỗ đứt đoạn. Tổng prefix = ${total}.`,
+        en: `No break in the sequence. Prefix sum = ${total}.`,
+      },
+  });
+
+  steps.push({
+    title: { vi: "Tạo set(nums)", en: "Build set(nums)" },
+    arr: [...nums],
+    highlight: [],
+    mark: prefixIndices(),
+    missingIntegerView: makeView({
+      phase: "set",
+      candidate: total,
+      decision: "seen = set(nums)",
+      status: [{ label: "seen size", value: seen.size }, { label: "start candidate", value: total }],
+    }),
+    codeLines: [8],
+    vars: [{ name: "seen", value: `{${sortedSeen().join(", ")}}` }, { name: "candidate", value: total }],
+    note: {
+      vi: "Dùng set để kiểm tra candidate có xuất hiện trong nums hay không trong O(1).",
+      en: "Use a set to test whether a candidate appears in nums in O(1).",
+    },
+  });
+
+  const startCandidate = total;
+  while (seen.has(total)) {
+    candidates.push({ value: total, exists: true });
+    steps.push({
+      title: { vi: `${total} đã có trong nums`, en: `${total} exists in nums` },
+      arr: [...nums],
+      highlight: nums.map((value, index) => (value === total ? index : -1)).filter((index) => index >= 0),
+      mark: prefixIndices(),
+      missingIntegerView: makeView({
+        phase: "candidate",
+        candidate: total,
+        decision: `${total} in seen`,
+        status: [{ label: "candidate", value: total }, { label: "exists?", value: "yes" }],
+      }),
+      codeLines: [9, 10],
+      vars: [{ name: "candidate", value: total }, { name: "in seen?", value: true }],
+      note: {
+        vi: `${total} chưa phải đáp án vì đã xuất hiện trong nums. Tăng candidate lên 1.`,
+        en: `${total} is not the answer because it appears in nums. Increment the candidate by 1.`,
+      },
+    });
+    total += 1;
+  }
+
+  candidates.push({ value: total, exists: false });
+  steps.push({
+    title: { vi: `return ${total}`, en: `return ${total}` },
+    arr: [...nums],
+    highlight: [],
+    mark: prefixIndices(),
+    missingIntegerView: makeView({
+      phase: "done",
+      candidate: total,
+      decision: `${total} not in seen`,
+      status: [{ label: "answer", value: total }, { label: "started from", value: startCandidate }],
+    }),
+    final: true,
+    codeLines: [9, 11],
+    vars: [{ name: "answer", value: total }],
+    note: {
+      vi: `${total} là số nhỏ nhất >= ${startCandidate} mà không xuất hiện trong nums.`,
+      en: `${total} is the smallest integer >= ${startCandidate} that does not appear in nums.`,
+    },
+  });
+
+  return { original: [...nums], answer: total, steps };
+}
+
 module.exports = {
+  2996: {
+    id: 2996,
+    difficulty: "easy",
+    slug: "smallest-missing-integer-greater-than-sequential-prefix-sum",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    tags: [
+      { key: "hash-set", vi: "Hash Set", en: "Hash Set" },
+      { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
+    ],
+    title: { vi: "Smallest Missing Integer Greater Than Sequential Prefix Sum", en: "Smallest Missing Integer Greater Than Sequential Prefix Sum" },
+    titleVi: { vi: "Số thiếu nhỏ nhất từ tổng prefix liên tiếp", en: "Smallest missing from sequential prefix sum" },
+    statement: {
+      vi:
+        "Cho nums. Lấy prefix dài nhất bắt đầu từ nums[0] sao cho mỗi số sau bằng số trước + 1. " +
+        "Tính tổng prefix đó, rồi trả về số nguyên nhỏ nhất lớn hơn hoặc bằng tổng này nhưng không xuất hiện trong nums.",
+      en:
+        "Given nums, take the longest prefix starting at nums[0] where each next value equals previous + 1. " +
+        "Sum that prefix, then return the smallest integer greater than or equal to that sum that is missing from nums.",
+    },
+    defaultInput: [1, 2, 3, 2, 5],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [
+      { vi: "Bắt đầu total = nums[0], rồi đi từ trái sang phải khi nums[i] == nums[i-1] + 1.", en: "Start total = nums[0], then scan while nums[i] == nums[i-1] + 1." },
+      { vi: "Khi prefix bị đứt, total chính là sequential prefix sum.", en: "When the prefix breaks, total is the sequential prefix sum." },
+      { vi: "Dùng set(nums) để kiểm tra nhanh candidate có xuất hiện không.", en: "Use set(nums) for fast membership checks." },
+      { vi: "Trong khi candidate nằm trong set, tăng candidate. Số đầu tiên không có trong set là đáp án.", en: "While the candidate is in the set, increment it. The first value not in the set is the answer." },
+    ],
+    complexity: {
+      time: "O(n + k)",
+      space: "O(n)",
+      note: {
+        vi: "n để tạo set và quét prefix; k là số candidate phải nhảy qua vì đã xuất hiện trong nums.",
+        en: "n builds the set and scans the prefix; k is the number of candidates skipped because they appear in nums.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def missingInteger(self, nums: List[int]) -> int:",
+      "        total = nums[0]",
+      "        i = 1",
+      "        while i < len(nums) and nums[i] == nums[i - 1] + 1:",
+      "            total += nums[i]",
+      "            i += 1",
+      "        seen = set(nums)",
+      "        while total in seen:",
+      "            total += 1",
+      "        return total",
+    ],
+    builder: buildSteps2996,
+  },
   315: {
     id: 315,
     difficulty: "hard",

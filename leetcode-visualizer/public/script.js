@@ -8104,6 +8104,79 @@ function renderTrapRain2View(step) {
   </div>`;
 }
 
+function renderMissingIntegerView(step) {
+  const view = step.missingIntegerView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const seen = Array.isArray(view.seen) ? view.seen : [];
+  const candidates = Array.isArray(view.candidates) ? view.candidates : [];
+  const prefixEnd = Number.isInteger(view.prefixEnd) ? view.prefixEnd : -1;
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const candidate = view.candidate === null || view.candidate === undefined ? null : Number(view.candidate);
+  const status = Array.isArray(view.status) ? view.status : [];
+  const phase = String(view.phase || "prefix");
+  const seenSet = new Set(seen.map((value) => String(value)));
+
+  const numsHtml = nums.map((num, index) => {
+    const classes = ["mi2996-num"];
+    if (index <= prefixEnd) classes.push("is-prefix");
+    if (index === currentIndex) classes.push("is-current");
+    if (candidate !== null && num === candidate) classes.push("is-candidate-hit");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(num))}</strong></span>`;
+  }).join("");
+
+  const seenHtml = seen.length
+    ? seen.map((value) => `<span class="${candidate !== null && Number(value) === candidate ? "is-hit" : ""}">${escapeHtml(String(value))}</span>`).join("")
+    : `<span class="mi2996-empty">∅</span>`;
+  const candidateItems = candidates.length ? candidates : (candidate !== null ? [{ value: candidate, exists: seenSet.has(String(candidate)) }] : []);
+  const candidatesHtml = candidateItems.length
+    ? candidateItems.map((item) => `<span class="${item.exists ? "exists" : "missing"}"><small>${item.exists ? (vi ? "có" : "seen") : (vi ? "thiếu" : "missing")}</small><strong>${escapeHtml(String(item.value))}</strong></span>`).join("")
+    : `<span class="mi2996-empty">${vi ? "chưa kiểm tra" : "not checked yet"}</span>`;
+  const statusHtml = status.map((item) => `<span><small>${escapeHtml(String(item.label ?? ""))}</small><strong>${escapeHtml(String(item.value ?? "-"))}</strong></span>`).join("");
+
+  const phaseLabel = phase === "prefix"
+    ? (vi ? "1 · Tìm prefix liên tiếp" : "1 · Find sequential prefix")
+    : phase === "prefix-stop"
+      ? (vi ? "2 · Chốt prefix sum" : "2 · Fix prefix sum")
+      : phase === "set"
+        ? (vi ? "3 · Tạo hash set" : "3 · Build hash set")
+        : phase === "candidate"
+          ? (vi ? "4 · Nhảy candidate" : "4 · Advance candidate")
+          : (vi ? "5 · Trả đáp án" : "5 · Return answer");
+  const action = phase === "prefix"
+    ? (vi ? "Cộng các số từ đầu khi mỗi số tăng đúng 1." : "Add numbers from the start while each value increases by exactly 1.")
+    : phase === "prefix-stop"
+      ? (vi ? "Prefix dừng ở chỗ đầu tiên không nối tiếp." : "The prefix stops at the first non-sequential value.")
+      : phase === "set"
+        ? (vi ? "Set giúp kiểm tra candidate có trong nums hay không." : "The set lets us check whether a candidate is in nums.")
+        : phase === "candidate"
+          ? (vi ? "Candidate đã có trong nums, tăng thêm 1." : "The candidate exists in nums, so increment it.")
+          : (vi ? "Candidate đầu tiên không có trong nums là đáp án." : "The first candidate missing from nums is the answer.");
+
+  $("treeView").innerHTML = `<div class="mi2996-viz phase-${escapeHtml(phase)}">
+    <div class="mi2996-summary">
+      <span><small>prefix sum</small><strong>${escapeHtml(String(view.sum ?? 0))}</strong></span>
+      <span><small>candidate</small><strong>${escapeHtml(candidate === null ? "-" : String(candidate))}</strong></span>
+      <span><small>${vi ? "prefix" : "prefix"}</small><strong>${prefixEnd >= 0 ? `[0..${prefixEnd}]` : "-"}</strong></span>
+    </div>
+    <section class="mi2996-section">
+      <header><strong>${escapeHtml(phaseLabel)}</strong><span>${escapeHtml(action)}</span></header>
+      <div class="mi2996-nums">${numsHtml}</div>
+    </section>
+    <div class="mi2996-two-col">
+      <section class="mi2996-section">
+        <header><strong>SET(NUMS)</strong><span>${vi ? "dùng để kiểm tra O(1)" : "used for O(1) lookup"}</span></header>
+        <div class="mi2996-seen">${seenHtml}</div>
+      </section>
+      <section class="mi2996-section">
+        <header><strong>${vi ? "CANDIDATE" : "CANDIDATE"}</strong><span>${escapeHtml(String(view.decision || ""))}</span></header>
+        <div class="mi2996-candidates">${candidatesHtml}</div>
+      </section>
+    </div>
+    <div class="mi2996-status">${statusHtml}</div>
+  </div>`;
+}
+
 function renderFenwickView(step) {
   const view = step.fenwickView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -11573,6 +11646,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRunningSumView(step);
+  } else if (step.missingIntegerView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMissingIntegerView(step);
   } else if (step.countSmallerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
