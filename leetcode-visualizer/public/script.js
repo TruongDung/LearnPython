@@ -8008,6 +8008,102 @@ function renderTrappingRainView(step) {
     </div>`;
 }
 
+function renderTrapRain2View(step) {
+  const view = step.trapRain2View || {};
+  const vi = lang === "vi";
+  const heightMap = Array.isArray(view.heightMap) ? view.heightMap : [];
+  const waterAt = Array.isArray(view.waterAt) ? view.waterAt : [];
+  const visited = Array.isArray(view.visited) ? view.visited : [];
+  const rows = Number.isInteger(view.rows) ? view.rows : heightMap.length;
+  const cols = Number.isInteger(view.cols) ? view.cols : (heightMap[0] || []).length;
+  const heap = Array.isArray(view.heap) ? view.heap : [];
+  const popped = view.popped || null;
+  const neighbor = view.neighbor || null;
+  const status = Array.isArray(view.status) ? view.status : [];
+  const phase = String(view.phase || "init");
+  const keyOf = (cell) => cell ? `${cell.r},${cell.c}` : "";
+  const poppedKey = keyOf(popped);
+  const neighborKey = keyOf(neighbor);
+  const maxLevel = Math.max(1, ...heightMap.flat().map((value) => Number(value) || 0), Number(view.wall) || 0, Number(view.newWall) || 0);
+
+  const cellsHtml = heightMap.map((row, r) => row.map((height, c) => {
+    const cellKey = `${r},${c}`;
+    const water = Number((waterAt[r] || [])[c]) || 0;
+    const isVisited = Boolean((visited[r] || [])[c]);
+    const isBorder = r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
+    const classes = ["rain2-cell"];
+    if (isBorder) classes.push("is-border");
+    if (isVisited) classes.push("is-visited");
+    if (cellKey === poppedKey) classes.push("is-popped");
+    if (cellKey === neighborKey) classes.push("is-neighbor");
+    if (water > 0) classes.push("has-water");
+    const heightPct = Math.max(12, ((Number(height) || 0) / maxLevel) * 100);
+    const waterPct = water > 0 ? Math.max(16, (water / maxLevel) * 100) : 0;
+    return `<div class="${classes.join(" ")}" style="--rain2-height:${heightPct}%;--rain2-water:${waterPct}%">
+      <span class="rain2-coord">[${r},${c}]</span>
+      <div class="rain2-column">
+        ${water > 0 ? `<i class="rain2-water">+${escapeHtml(String(water))}</i>` : ""}
+        <b>${escapeHtml(String(height))}</b>
+      </div>
+    </div>`;
+  }).join("")).join("");
+
+  const heapHtml = heap.length
+    ? heap.map((item, index) => `<span class="${index === 0 ? "is-top" : ""}">
+        <small>${index === 0 ? "TOP" : `#${index + 1}`}</small>
+        <strong>${escapeHtml(String(item.wall))}</strong>
+        <em>(${escapeHtml(String(item.r))},${escapeHtml(String(item.c))})</em>
+      </span>`).join("")
+    : `<span class="rain2-heap-empty">∅</span>`;
+  const moreHeap = view.heapSize > heap.length ? `<small class="rain2-more">+${escapeHtml(String(view.heapSize - heap.length))}</small>` : "";
+
+  const formula = view.trapped === null || view.trapped === undefined
+    ? (vi ? "Chờ xét ô hàng xóm" : "Waiting for a neighbor")
+    : `max(0, ${view.wall} - ${view.cellHeight}) = ${view.trapped}`;
+  const mainAction = phase === "init"
+    ? (vi ? "Đưa toàn bộ biên vào min-heap" : "Push all border cells into the min-heap")
+    : phase === "pop"
+      ? (vi ? `Pop tường thấp nhất (${popped?.r},${popped?.c})` : `Pop lowest wall (${popped?.r},${popped?.c})`)
+      : phase === "done"
+        ? (vi ? "Hoàn tất xử lý tất cả ô" : "All cells processed")
+        : (vi ? `Xét hàng xóm (${neighbor?.r},${neighbor?.c})` : `Check neighbor (${neighbor?.r},${neighbor?.c})`);
+  const detail = phase === "trap"
+    ? (vi ? "Ô thấp hơn tường biên nên giữ được nước." : "The cell is lower than the boundary, so it traps water.")
+    : phase === "push"
+      ? (vi ? "Ô không thấp hơn tường biên, chỉ trở thành tường mới." : "The cell is not lower than the boundary, so it becomes a new wall.")
+      : phase === "pop"
+        ? (vi ? "Heap luôn cho ta mức tường thấp nhất đang bao quanh vùng chưa thăm." : "The heap gives the lowest wall around the unvisited area.")
+        : (vi ? "Biên không giữ nước, nhưng dùng làm tường ban đầu." : "Border cells hold no water, but they are the initial walls.");
+
+  const statusHtml = status.map((item) => `<span><small>${escapeHtml(String(item.label ?? ""))}</small><strong>${escapeHtml(String(item.value ?? "-"))}</strong></span>`).join("");
+
+  $("treeView").innerHTML = `<div class="rain2-viz phase-${escapeHtml(phase)}">
+    <div class="rain2-summary">
+      <span><small>${vi ? "Tổng nước" : "Total water"}</small><strong>${escapeHtml(String(view.total ?? 0))}</strong></span>
+      <span><small>${vi ? "Tường hiện tại" : "Current wall"}</small><strong>${escapeHtml(String(view.wall ?? "-"))}</strong></span>
+      <span><small>${vi ? "Nước thêm" : "Added water"}</small><strong>${escapeHtml(String(view.trapped ?? "-"))}</strong></span>
+    </div>
+    <div class="rain2-layout">
+      <section class="rain2-grid-card">
+        <header><strong>HEIGHT MAP</strong><span>${vi ? "xanh = nước, vàng = ô đang xét" : "blue = water, yellow = active cell"}</span></header>
+        <div class="rain2-grid" style="--rain2-cols:${Math.max(1, cols)}">${cellsHtml}</div>
+      </section>
+      <aside class="rain2-side">
+        <div class="rain2-action"><small>${escapeHtml(phase.toUpperCase())}</small><strong>${escapeHtml(mainAction)}</strong><span>${escapeHtml(detail)}</span></div>
+        <div class="rain2-formula"><small>${vi ? "Công thức" : "Formula"}</small><strong>${escapeHtml(formula)}</strong><span>${escapeHtml(String(view.decision || ""))}</span></div>
+        <div class="rain2-heap"><header><strong>MIN-HEAP</strong><small>${vi ? "wall thấp nhất đứng đầu" : "lowest wall first"}</small></header><div>${heapHtml}${moreHeap}</div></div>
+        <div class="rain2-status">${statusHtml}</div>
+      </aside>
+    </div>
+    <div class="rain2-legend">
+      <span><i class="border"></i>${vi ? "biên/đã thăm" : "border/visited"}</span>
+      <span><i class="popped"></i>${vi ? "vừa pop" : "popped"}</span>
+      <span><i class="neighbor"></i>${vi ? "hàng xóm" : "neighbor"}</span>
+      <span><i class="water"></i>${vi ? "có nước" : "water"}</span>
+    </div>
+  </div>`;
+}
+
 function renderFenwickView(step) {
   const view = step.fenwickView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -11375,6 +11471,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRottingOrangesView(step);
+  } else if (step.trapRain2View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTrapRain2View(step);
   } else if (step.bfsGrid) {
     $("bars").classList.add("hidden");
     $("treeView").classList.add("hidden");

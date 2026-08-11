@@ -10075,6 +10075,316 @@ button:disabled {
   font-size: 10px;
 }
 
+/* ---- Trapping Rain Water II visualization (#407) ---- */
+.rain2-viz {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.1), transparent 42%),
+    rgba(15, 23, 42, 0.3);
+}
+
+.rain2-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.rain2-summary span,
+.rain2-action,
+.rain2-formula,
+.rain2-heap,
+.rain2-status span,
+.rain2-grid-card {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.rain2-summary span {
+  padding: 8px 10px;
+}
+
+.rain2-summary small,
+.rain2-action small,
+.rain2-formula small,
+.rain2-status small,
+.rain2-heap small,
+.rain2-grid-card header span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.rain2-summary strong,
+.rain2-action strong,
+.rain2-formula strong,
+.rain2-status strong,
+.rain2-heap strong,
+.rain2-grid-card header strong {
+  display: block;
+  color: #f8fafc;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.rain2-summary strong {
+  margin-top: 3px;
+  font-size: 22px;
+}
+
+.rain2-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.rain2-grid-card {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.rain2-grid-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.rain2-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--rain2-cols), minmax(36px, 1fr));
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rain2-cell {
+  position: relative;
+  display: grid;
+  align-content: end;
+  min-width: 0;
+  min-height: 86px;
+  padding: 7px 4px 5px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.42);
+  overflow: hidden;
+}
+
+.rain2-cell.is-border,
+.rain2-cell.is-visited {
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.rain2-cell.is-popped {
+  outline: 2px solid rgba(245, 158, 11, 0.8);
+  outline-offset: 2px;
+}
+
+.rain2-cell.is-neighbor {
+  border-color: rgba(34, 197, 94, 0.75);
+  box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.22);
+}
+
+.rain2-cell.has-water {
+  background: rgba(14, 165, 233, 0.14);
+}
+
+.rain2-coord {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  z-index: 2;
+  color: #94a3b8;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.rain2-column {
+  position: relative;
+  display: grid;
+  align-content: end;
+  justify-items: center;
+  height: 62px;
+  min-width: 0;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.28);
+}
+
+.rain2-column b {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: var(--rain2-height);
+  min-height: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, #64748b, #334155);
+  color: #f8fafc;
+  font-size: 11px;
+  text-shadow: 0 1px 1px rgba(15, 23, 42, 0.45);
+}
+
+.rain2-water {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: var(--rain2-water);
+  min-height: 0;
+  border: 1px solid rgba(56, 189, 248, 0.65);
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.74), rgba(14, 165, 233, 0.32));
+  color: #e0f2fe;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.rain2-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.rain2-heap,
+.rain2-status {
+  grid-column: 1 / -1;
+}
+
+.rain2-action,
+.rain2-formula,
+.rain2-heap {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+}
+
+.rain2-action {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.rain2-formula {
+  border-color: rgba(14, 165, 233, 0.38);
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.rain2-action span,
+.rain2-formula span {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.rain2-heap header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.rain2-heap > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.rain2-heap span,
+.rain2-heap-empty,
+.rain2-more {
+  display: inline-grid;
+  gap: 1px;
+  min-width: 54px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.rain2-heap span.is-top {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fef3c7;
+}
+
+.rain2-heap em {
+  color: #94a3b8;
+  font-style: normal;
+}
+
+.rain2-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.rain2-status span {
+  padding: 7px 8px;
+}
+
+.rain2-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rain2-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.rain2-legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+}
+
+.rain2-legend .border { background: rgba(56, 189, 248, 0.28); }
+.rain2-legend .popped { background: rgba(245, 158, 11, 0.75); }
+.rain2-legend .neighbor { background: rgba(34, 197, 94, 0.72); }
+.rain2-legend .water { background: rgba(14, 165, 233, 0.72); }
+
+@media (max-width: 760px) {
+  .rain2-summary,
+  .rain2-side {
+    grid-template-columns: 1fr;
+  }
+
+  .rain2-grid {
+    grid-template-columns: repeat(var(--rain2-cols), minmax(28px, 1fr));
+    gap: 4px;
+  }
+
+  .rain2-cell {
+    min-height: 74px;
+  }
+
+  .rain2-column {
+    height: 52px;
+  }
+}
+
 /* LeetCode #4013 — transformed prefixes and Fenwick rank counting. */
 .even-odd-ratio-viz {
   box-sizing: border-box;
@@ -17153,6 +17463,91 @@ button:disabled {
 
 [data-theme="light"] .trap-formula span {
   color: #334155;
+}
+
+[data-theme="light"] .rain2-viz {
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.08), transparent 42%),
+    #f8fafc;
+  border-color: #bae6fd;
+}
+
+[data-theme="light"] .rain2-summary span,
+[data-theme="light"] .rain2-action,
+[data-theme="light"] .rain2-formula,
+[data-theme="light"] .rain2-heap,
+[data-theme="light"] .rain2-status span,
+[data-theme="light"] .rain2-grid-card,
+[data-theme="light"] .rain2-cell {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .rain2-summary small,
+[data-theme="light"] .rain2-action small,
+[data-theme="light"] .rain2-formula small,
+[data-theme="light"] .rain2-status small,
+[data-theme="light"] .rain2-heap small,
+[data-theme="light"] .rain2-grid-card header span,
+[data-theme="light"] .rain2-coord,
+[data-theme="light"] .rain2-legend,
+[data-theme="light"] .rain2-heap em {
+  color: #475569;
+}
+
+[data-theme="light"] .rain2-summary strong,
+[data-theme="light"] .rain2-action strong,
+[data-theme="light"] .rain2-formula strong,
+[data-theme="light"] .rain2-status strong,
+[data-theme="light"] .rain2-heap strong,
+[data-theme="light"] .rain2-grid-card header strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .rain2-cell.has-water {
+  background: #e0f2fe;
+}
+
+[data-theme="light"] .rain2-column {
+  border-bottom-color: #cbd5e1;
+}
+
+[data-theme="light"] .rain2-column b {
+  border-color: #64748b;
+  background: linear-gradient(180deg, #cbd5e1, #64748b);
+}
+
+[data-theme="light"] .rain2-water {
+  border-color: #0284c7;
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.9), rgba(14, 165, 233, 0.36));
+  color: #075985;
+}
+
+[data-theme="light"] .rain2-action {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+[data-theme="light"] .rain2-formula {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+[data-theme="light"] .rain2-action span,
+[data-theme="light"] .rain2-formula span {
+  color: #334155;
+}
+
+[data-theme="light"] .rain2-heap span,
+[data-theme="light"] .rain2-heap-empty,
+[data-theme="light"] .rain2-more {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+[data-theme="light"] .rain2-heap span.is-top {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 [data-theme="light"] .bar .col {

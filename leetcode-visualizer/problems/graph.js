@@ -15685,14 +15685,36 @@ function buildSteps864(input) {
  *  1  import heapq
  *  2  class Solution:
  *  3      def trapRainWater(self, heightMap):
- *  4          push all border cells into a min-heap; mark visited
- *  5          water = 0
- *  6          while heap:
- *  7              height, r, c = heappop(heap)
- *  8              for each unvisited neighbor (nr, nc):
- *  9                  water += max(0, height - heightMap[nr][nc])
- * 10                  push (max(height, heightMap[nr][nc]), nr, nc)
- * 11          return water
+ *  4          if not heightMap or not heightMap[0]: return 0
+ *  5
+ *  6
+ *  7          rows, cols = len(heightMap), len(heightMap[0])
+ *  8          heap = []
+ *  9          visited = [[False] * cols for _ in range(rows)]
+ * 10
+ * 11          for r in range(rows):
+ * 12              for c in range(cols):
+ * 13                  if r == 0 or r == rows - 1 or c == 0 or c == cols - 1:
+ * 14                      heapq.heappush(heap, (heightMap[r][c], r, c))
+ * 15                      visited[r][c] = True
+ * 16
+ * 17          water = 0
+ * 18          dirs = [(1,0), (-1,0), (0,1), (0,-1)]
+ * 19
+ * 20          while heap:
+ * 21              height, r, c = heapq.heappop(heap)
+ * 22              for dr, dc in dirs:
+ * 23                  nr, nc = r + dr, c + dc
+ * 24                  if nr < 0 or nr >= rows or nc < 0 or nc >= cols or visited[nr][nc]:
+ * 25                      continue
+ * 26
+ * 27                  visited[nr][nc] = True
+ * 28                  trapped = max(0, height - heightMap[nr][nc])
+ * 29                  water += trapped
+ * 30                  new_height = max(height, heightMap[nr][nc])
+ * 31                  heapq.heappush(heap, (new_height, nr, nc))
+ * 32
+ * 33          return water
  */
 function buildSteps407(input) {
   const heightMap = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
@@ -15703,7 +15725,7 @@ function buildSteps407(input) {
     steps.push({
       title: { vi: "Lưới < 3×3 → không giữ được nước → 0", en: "Grid < 3×3 → no water → 0" },
       arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "0", cls: "empty" }]] },
-      final: true, codeLines: [3], vars: [{ name: "answer", value: 0 }],
+      final: true, codeLines: [4, 5], vars: [{ name: "answer", value: 0 }],
       note: { vi: "Cần ít nhất 3×3. Nhập dạng 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1", en: "Need at least 3×3. Enter like 1,4,3,1,3,2;3,2,1,3,2,4;2,3,3,2,3,1" },
     });
     return { original: heightMap, answer: 0, steps };
@@ -15713,6 +15735,7 @@ function buildSteps407(input) {
   const cols = heightMap[0].length;
   const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
   const waterAt = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const heap = [];
 
   function makeCells(cur) {
     return heightMap.map((row, r) =>
@@ -15725,11 +15748,35 @@ function buildSteps407(input) {
     );
   }
 
+  function makeTrapRain2View(opts = {}) {
+    const sortedHeap = [...heap].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    return {
+      heightMap: heightMap.map((row) => [...row]),
+      waterAt: waterAt.map((row) => [...row]),
+      visited: visited.map((row) => [...row]),
+      rows,
+      cols,
+      heap: sortedHeap.slice(0, 12).map(([wall, r, c]) => ({ wall, r, c })),
+      heapSize: heap.length,
+      popped: opts.popped || null,
+      neighbor: opts.neighbor || null,
+      phase: opts.phase || "init",
+      wall: opts.wall ?? null,
+      cellHeight: opts.cellHeight ?? null,
+      trapped: opts.trapped ?? null,
+      newWall: opts.newWall ?? null,
+      total: opts.total ?? 0,
+      decision: opts.decision || "",
+      status: opts.status || [],
+    };
+  }
+
   function snap(opts) {
     steps.push({
       title: opts.title,
       arr: [],
       bfsGrid: { rows, cols, cells: makeCells(opts.cur) },
+      trapRain2View: makeTrapRain2View(opts.view || {}),
       highlight: [], mark: [],
       final: opts.final || false,
       codeLines: opts.codeLines || [],
@@ -15739,7 +15786,6 @@ function buildSteps407(input) {
   }
 
   // Min-heap
-  const heap = [];
   const hpush = (item) => {
     heap.push(item);
     let i = heap.length - 1;
@@ -15770,7 +15816,16 @@ function buildSteps407(input) {
 
   snap({
     title: { vi: "Đẩy toàn bộ ô biên vào min-heap", en: "Push all border cells into the min-heap" },
-    codeLines: [4, 5],
+    codeLines: [7, 8, 9, 11, 12, 13, 14, 15, 17],
+    view: {
+      phase: "init",
+      total: 0,
+      decision: "border cells enter heap first",
+      status: [
+        { label: "border cells", value: heap.length },
+        { label: "water", value: 0 },
+      ],
+    },
     vars: [
       { name: "rows,cols", value: `${rows},${cols}` },
       { name: "border cells", value: heap.length },
@@ -15795,6 +15850,35 @@ function buildSteps407(input) {
     const [height, r, c] = hpop();
     const verbose = guard <= 80;
 
+    if (verbose) {
+      snap({
+        title: { vi: `Pop tường thấp nhất: (${r},${c}) mức ${height}`, en: `Pop lowest wall: (${r},${c}) level ${height}` },
+        cur: [r, c],
+        codeLines: [20, 21],
+        view: {
+          phase: "pop",
+          popped: { r, c, wall: height },
+          wall: height,
+          total: water,
+          decision: "min-heap pops the smallest boundary",
+          status: [
+            { label: "popped", value: `(${r},${c})` },
+            { label: "wall", value: height },
+            { label: "heap left", value: heap.length },
+          ],
+        },
+        vars: [
+          { name: "height", value: height },
+          { name: "r,c", value: `${r},${c}` },
+          { name: "total water", value: water },
+        ],
+        note: {
+          vi: `Lấy ô biên thấp nhất hiện tại từ heap: (${r},${c}) với mức tường ${height}. Mức này là giới hạn an toàn để xét các ô kề bên trong.`,
+          en: `Pop the current lowest boundary from the heap: (${r},${c}) with wall level ${height}. This level safely bounds its inner neighbors.`,
+        },
+      });
+    }
+
     for (const [dr, dc] of dirs) {
       const nr = r + dr, nc = c + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || visited[nr][nc]) continue;
@@ -15809,7 +15893,23 @@ function buildSteps407(input) {
         snap({
           title: { vi: `Từ tường ${height} → ô (${nr},${nc}) cao ${heightMap[nr][nc]}: +${trapped}💧`, en: `From wall ${height} → cell (${nr},${nc}) height ${heightMap[nr][nc]}: +${trapped}💧` },
           cur: [nr, nc],
-          codeLines: [6, 7, 8, 9, 10],
+          codeLines: [22, 23, 24, 25, 27, 28, 29, 30, 31],
+          view: {
+            phase: trapped > 0 ? "trap" : "push",
+            popped: { r, c, wall: height },
+            neighbor: { r: nr, c: nc },
+            wall: height,
+            cellHeight: heightMap[nr][nc],
+            trapped,
+            newWall: newHeight,
+            total: water,
+            decision: `max(0, ${height} - ${heightMap[nr][nc]}) = ${trapped}`,
+            status: [
+              { label: "from wall", value: `(${r},${c})` },
+              { label: "neighbor", value: `(${nr},${nc})` },
+              { label: "new wall", value: newHeight },
+            ],
+          },
           vars: [
             { name: "boundary height", value: height },
             { name: "cell height", value: heightMap[nr][nc] },
@@ -15830,7 +15930,13 @@ function buildSteps407(input) {
     title: { vi: `return water = ${water}`, en: `return water = ${water}` },
     cur: null,
     final: true,
-    codeLines: [11],
+    codeLines: [33],
+    view: {
+      phase: "done",
+      total: water,
+      decision: "all reachable cells processed",
+      status: [{ label: "answer", value: water }],
+    },
     vars: [{ name: "answer (water)", value: water }],
     note: {
       vi: `Tổng lượng nước giữ được trên bản đồ 2D = ${water}. Các ô có nước hiển thị "+n💧".`,
@@ -17857,13 +17963,35 @@ module.exports = {
       "import heapq",
       "class Solution:",
       "    def trapRainWater(self, heightMap):",
-      "        # push all border cells into a min-heap; mark visited",
+      "        if not heightMap or not heightMap[0]:",
+      "            return 0",
+      "",
+      "        rows, cols = len(heightMap), len(heightMap[0])",
+      "        heap = []",
+      "        visited = [[False] * cols for _ in range(rows)]",
+      "",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if r == 0 or r == rows - 1 or c == 0 or c == cols - 1:",
+      "                    heapq.heappush(heap, (heightMap[r][c], r, c))",
+      "                    visited[r][c] = True",
+      "",
       "        water = 0",
+      "        dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)]",
+      "",
       "        while heap:",
       "            height, r, c = heapq.heappop(heap)",
-      "            for nr, nc in neighbors(r, c):",
-      "                water += max(0, height - heightMap[nr][nc])",
-      "                heapq.heappush(heap, (max(height, heightMap[nr][nc]), nr, nc))",
+      "            for dr, dc in dirs:",
+      "                nr, nc = r + dr, c + dc",
+      "                if nr < 0 or nr >= rows or nc < 0 or nc >= cols or visited[nr][nc]:",
+      "                    continue",
+      "",
+      "                visited[nr][nc] = True",
+      "                trapped = max(0, height - heightMap[nr][nc])",
+      "                water += trapped",
+      "                new_height = max(height, heightMap[nr][nc])",
+      "                heapq.heappush(heap, (new_height, nr, nc))",
+      "",
       "        return water",
     ],
     builder: buildSteps407,
