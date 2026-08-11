@@ -1009,7 +1009,9 @@ button:disabled {
 .live-run-btn,
 .live-clear-btn,
 .live-reset-btn {
-  width: 140px;
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
 }
 
 .live-edit-btn:hover,
@@ -1042,7 +1044,10 @@ button:disabled {
   color: #67e8f9;
 }
 
-.live-copy-btn svg { display: block; }
+.live-run-btn svg,
+.live-copy-btn svg,
+.live-clear-btn svg,
+.live-reset-btn svg { display: block; }
 .live-copy-btn .live-copy-check { display: none; }
 .live-copy-btn.copied .live-copy-icon { display: none; }
 .live-copy-btn.copied .live-copy-check { display: block; }

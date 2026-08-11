@@ -54,10 +54,10 @@ const I18N = {
     clearRecent: "Xóa",
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
-    liveRunBtn: "▶ Chạy code của tôi",
+    liveRunBtn: "Chạy code của tôi",
     liveCopyBtn: "Sao chép code",
     liveClearBtn: "Clear thân hàm",
-    liveResetBtn: "↺ Về code gốc",
+    liveResetBtn: "Về code gốc",
     autoTheme: "Tự động",
   },
   en: {
@@ -94,10 +94,10 @@ const I18N = {
     clearRecent: "Clear",
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
-    liveRunBtn: "▶ Run my code",
+    liveRunBtn: "Run my code",
     liveCopyBtn: "Copy code",
     liveClearBtn: "Clear body",
-    liveResetBtn: "↺ Reset to original",
+    liveResetBtn: "Reset to original",
     autoTheme: "Auto",
   },
 };
@@ -146,6 +146,12 @@ function applyStaticStrings() {
     liveCopyButton.setAttribute("aria-label", t().liveCopyBtn);
     liveCopyButton.title = t().liveCopyBtn;
   }
+  ["liveRunBtn", "liveClearBtn", "liveResetBtn"].forEach((id) => {
+    const button = $(id);
+    if (!button) return;
+    button.setAttribute("aria-label", t()[id]);
+    button.title = t()[id];
+  });
   updateThemeButtons();
 }
 
