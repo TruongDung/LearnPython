@@ -7612,26 +7612,38 @@ function renderPrefix1DView(step) {
   </div>`).join("");
 
   let proofHtml = "";
-  if (isRangeSumImmutable && query && Number.isInteger(query.answer)) {
+  if (isRangeSumImmutable && query) {
     const rightPrefixIndex = Number.isInteger(query.rightPrefixIndex) ? query.rightPrefixIndex : right + 1;
     const leftPrefixIndex = Number.isInteger(query.leftPrefixIndex) ? query.leftPrefixIndex : left;
-    const rightPrefixValue = query.rightPrefixValue ?? prefix[rightPrefixIndex];
-    const leftPrefixValue = query.leftPrefixValue ?? prefix[leftPrefixIndex];
+    const queryPhase = String(query.phase || "subtract");
+    const phaseRank = { "select-range": 0, "right-prefix": 1, "left-prefix": 2, subtract: 3 }[queryPhase] ?? 3;
+    const rightReady = phaseRank >= 1;
+    const leftReady = phaseRank >= 2;
+    const answerReady = phaseRank >= 3 && Number.isInteger(query.answer);
+    const rightPrefixValue = rightReady ? (query.rightPrefixValue ?? prefix[rightPrefixIndex]) : "?";
+    const leftPrefixValue = leftReady ? (query.leftPrefixValue ?? prefix[leftPrefixIndex]) : "?";
     const included = Array.isArray(query.included) ? query.included : nums.slice(left, right + 1);
     const excludedLeft = Array.isArray(query.excludedLeft) ? query.excludedLeft : nums.slice(0, left);
-    proofHtml = `<div class="prefix1d-proof">
-      <div class="prefix1d-proof-title">${escapeHtml(lang === "vi" ? "Cách tính sumRange" : "How sumRange is computed")}</div>
+    const proofTitle = queryPhase === "select-range"
+      ? (lang === "vi" ? `Chọn đoạn nums[${left}..${right}]` : `Select range nums[${left}..${right}]`)
+      : queryPhase === "right-prefix"
+        ? (lang === "vi" ? "Bước 1 · Lấy tổng đến right" : "Step 1 · Read the sum through right")
+        : queryPhase === "left-prefix"
+          ? (lang === "vi" ? "Bước 2 · Lấy phần trước left" : "Step 2 · Read the part before left")
+          : (lang === "vi" ? "Bước 3 · Trừ để giữ lại range" : "Step 3 · Subtract to isolate the range");
+    proofHtml = `<div class="prefix1d-proof phase-${escapeHtml(queryPhase)}">
+      <div class="prefix1d-proof-title">${escapeHtml(proofTitle)}</div>
       <div class="prefix1d-formula">
-        <span class="take"><small>prefix[${escapeHtml(String(rightPrefixIndex))}]</small><b>${escapeHtml(String(rightPrefixValue))}</b></span>
+        <span class="take${queryPhase === "right-prefix" ? " is-active" : ""}"><small>prefix[${escapeHtml(String(rightPrefixIndex))}]</small><b>${escapeHtml(String(rightPrefixValue))}</b></span>
         <strong>-</strong>
-        <span class="drop"><small>prefix[${escapeHtml(String(leftPrefixIndex))}]</small><b>${escapeHtml(String(leftPrefixValue))}</b></span>
+        <span class="drop${queryPhase === "left-prefix" ? " is-active" : ""}"><small>prefix[${escapeHtml(String(leftPrefixIndex))}]</small><b>${escapeHtml(String(leftPrefixValue))}</b></span>
         <strong>=</strong>
-        <span class="answer"><small>sumRange(${escapeHtml(String(left))}, ${escapeHtml(String(right))})</small><b>${escapeHtml(String(query.answer))}</b></span>
+        <span class="answer${queryPhase === "subtract" ? " is-active" : ""}"><small>sumRange(${escapeHtml(String(left))}, ${escapeHtml(String(right))})</small><b>${answerReady ? escapeHtml(String(query.answer)) : "?"}</b></span>
       </div>
       <div class="prefix1d-proof-detail">
-        <span>${escapeHtml(lang === "vi" ? "prefix[right+1] chứa:" : "prefix[right+1] contains:")} [${escapeHtml(nums.slice(0, right + 1).join(", "))}]</span>
-        <span>${escapeHtml(lang === "vi" ? "trừ phần trước left:" : "subtract before left:")} [${escapeHtml(excludedLeft.join(", ") || "∅")}]</span>
-        <span>${escapeHtml(lang === "vi" ? "còn lại đoạn query:" : "remaining query range:")} [${escapeHtml(included.join(", "))}]</span>
+        <span class="${rightReady ? "is-ready" : ""}">${rightReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "prefix[right+1] chứa:" : "prefix[right+1] contains:")} [${escapeHtml(nums.slice(0, right + 1).join(", "))}]</span>
+        <span class="${leftReady ? "is-ready" : ""}">${leftReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "trừ phần trước left:" : "subtract before left:")} [${escapeHtml(excludedLeft.join(", ") || "∅")}]</span>
+        <span class="${answerReady ? "is-ready" : ""}">${answerReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "còn lại đoạn query:" : "remaining query range:")} [${escapeHtml(included.join(", "))}]</span>
       </div>
     </div>`;
   }

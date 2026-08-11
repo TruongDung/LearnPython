@@ -9421,6 +9421,18 @@ button:disabled {
   background: rgba(245, 158, 11, 0.12);
 }
 
+.prefix1d-formula > span.is-active {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+}
+
+.prefix1d-proof:not(.phase-subtract) .prefix1d-formula .answer b,
+.prefix1d-proof.phase-select-range .prefix1d-formula .take b,
+.prefix1d-proof.phase-select-range .prefix1d-formula .drop b,
+.prefix1d-proof.phase-right-prefix .prefix1d-formula .drop b {
+  color: #64748b;
+}
+
 .prefix1d-proof-detail {
   display: grid;
   gap: 5px;
@@ -11258,6 +11270,15 @@ button:disabled {
   font-weight: 800;
   line-height: 1;
   overflow-wrap: anywhere;
+}
+
+.prefix1d-proof-detail span:not(.is-ready) {
+  color: #64748b;
+  opacity: 0.72;
+}
+
+.prefix1d-proof-detail span.is-ready {
+  color: #a7f3d0;
 }
 
 .segment-tree-viz.map-mode .segment-tree-levels {
@@ -17392,6 +17413,14 @@ button:disabled {
 [data-theme="light"] .prefix1d-formula .answer {
   background: #fffbeb;
   border-color: #f59e0b;
+}
+
+[data-theme="light"] .prefix1d-proof-detail span.is-ready {
+  color: #047857;
+}
+
+[data-theme="light"] .prefix1d-proof-detail span:not(.is-ready) {
+  color: #64748b;
 }
 
 [data-theme="light"] .rfq-viz {
