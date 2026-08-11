@@ -8517,10 +8517,12 @@ function renderRangeSumFenwickView(step) {
   const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
   const queryPath = new Set([...leftPath, ...rightPath]);
   const current = Number.isInteger(view.prefixIndex) ? view.prefixIndex : 0;
+  const storedThrough = Number.isInteger(view.storedThrough) ? view.storedThrough : -1;
+  const activeBitIndex = Number.isInteger(view.activeBitIndex) ? view.activeBitIndex : null;
   const leftRank = Number.isInteger(view.leftRank) ? view.leftRank : null;
   const rightRank = Number.isInteger(view.rightRank) ? view.rightRank : null;
   const phase = String(view.phase || "prefix");
-  const phaseIndex = ["prefix", "compress"].includes(phase) ? 0
+  const phaseIndex = ["prefix", "prefix-init", "prefix-loop", "prefix-append", "compress", "rank", "bit-init", "answer-init"].includes(phase) ? 0
     : phase === "done" ? 3
       : ["scan", "bounds"].includes(phase) ? 1 : 2;
   const labels = vi
@@ -8530,9 +8532,12 @@ function renderRangeSumFenwickView(step) {
 
   const prefixHtml = prefix.map((sum, index) => {
     const classes = ["ca1649-instruction"];
-    if (index < current || phase === "done") classes.push("processed");
+    if (index <= storedThrough || phase === "done") classes.push("processed");
     if (index === current && phase !== "done") classes.push("current");
-    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${index < current || phase === "done" ? "in BIT" : index === current ? "current" : "waiting"}</em></span>`;
+    const state = index <= storedThrough || phase === "done"
+      ? "in BIT"
+      : index === current ? "current" : (phase.startsWith("prefix") ? "built" : "waiting");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${state}</em></span>`;
   }).join("");
   const rankHtml = ranks.map((item) => {
     const classes = ["ca1649-rank"];
@@ -8547,6 +8552,7 @@ function renderRangeSumFenwickView(step) {
     const classes = ["ca1649-bit"];
     if (queryPath.has(index)) classes.push("query-path");
     if (updatePath.has(index)) classes.push("update-path");
+    if (index === activeBitIndex) classes.push("active");
     return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${left}..r${index}</em><i>${escapeHtml(`${ranks[left - 1]?.value ?? "?"}..${ranks[index - 1]?.value ?? "?"}`)}</i></span>`;
   }).join("");
 
@@ -8578,6 +8584,13 @@ function renderRangeSumFenwickView(step) {
     actionLabel = "RETURN";
     actionMain = String(view.answer || 0);
     actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  if (Number.isInteger(activeLine)) {
+    actionLabel = vi ? `DÒNG ${activeLine}` : `LINE ${activeLine}`;
+    actionMain = pick(step.title);
+    actionDetail = pick(step.note);
   }
 
   const leftPathText = leftPath.size ? [...leftPath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
@@ -11562,6 +11575,86 @@ function renderRectangleSweepView(step) {
   </div>`;
 }
 
+function renderMinimumSubarrayView(step) {
+  const view = step.minimumSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const phaseIndex = phase === "done" ? 3
+    : ["record", "remove", "shrink"].includes(phase) ? 2
+      : ["eligible"].includes(phase) ? 1
+        : 0;
+  const phaseLabels = vi
+    ? ["Mở rộng right", "Đủ target", "Lưu best + co left", "Kết quả"]
+    : ["Expand right", "Reach target", "Save best + shrink left", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const currentRight = Number.isInteger(view.right) && view.right < nums.length ? view.right : null;
+  const currentLeft = Number.isInteger(view.left) ? view.left : 0;
+  const removedIndex = Number.isInteger(view.removedIndex) ? view.removedIndex : null;
+  const hasWindow = currentRight !== null && currentLeft <= currentRight;
+  const inCurrent = (index) => hasWindow && index >= currentLeft && index <= currentRight;
+  const inBest = (index) => Number.isInteger(view.bestLeft) && Number.isInteger(view.bestRight)
+    && index >= view.bestLeft && index <= view.bestRight;
+  const cells = nums.map((value, index) => {
+    const classes = ["msa209-cell"];
+    if (inCurrent(index)) classes.push("in-window");
+    if (inBest(index)) classes.push("in-best");
+    if (index === currentRight) classes.push("right-edge");
+    if (index === currentLeft && hasWindow) classes.push("left-edge");
+    if (index === removedIndex) classes.push("removed");
+    const pointers = [];
+    if (index === currentLeft && hasWindow) pointers.push("L");
+    if (index === currentRight) pointers.push("R");
+    return `<div class="${classes.join(" ")}" aria-label="nums[${index}] = ${escapeHtml(String(value))}">
+      <small>index ${index}</small><strong>${escapeHtml(String(value))}</strong>
+      <span>${pointers.map((pointer) => `<b>${pointer}</b>`).join("")}</span>
+    </div>`;
+  }).join("");
+
+  const activeValues = nums.filter((_, index) => inCurrent(index) && index !== removedIndex);
+  const expression = activeValues.length ? activeValues.join(" + ") : "0";
+  const currentLength = hasWindow
+    ? Math.max(0, currentRight - currentLeft + 1 - (removedIndex === currentLeft ? 1 : 0))
+    : 0;
+  const minLenText = view.minLen === null || view.minLen === undefined ? "∞" : String(view.minLen);
+  const target = Number(view.target) || 0;
+  const total = Number(view.total) || 0;
+  const valid = total >= target;
+  const progress = target > 0 ? Math.max(0, Math.min(100, Math.round((total / target) * 100))) : 100;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const shrinking = ["remove", "shrink"].includes(phase);
+  const statusClass = phase === "done" ? "done" : shrinking ? "remove" : view.improved ? "new-best" : valid ? "valid" : "need-more";
+  const statusText = phase === "done" ? (vi ? "HOÀN TẤT" : "DONE")
+    : shrinking ? (vi ? "CO CỬA SỔ" : "SHRINK WINDOW")
+      : view.improved ? (vi ? "KỶ LỤC MỚI" : "NEW BEST")
+        : valid ? (vi ? "ĐỦ TARGET" : "TARGET REACHED")
+          : (vi ? "CHƯA ĐỦ · MỞ RỘNG" : "NOT ENOUGH · EXPAND");
+  const statusInstruction = phase === "done"
+    ? (view.minLen === null ? (vi ? "Không tìm thấy đoạn hợp lệ" : "No valid window found") : (vi ? `Độ dài nhỏ nhất = ${view.minLen}` : `Minimum length = ${view.minLen}`))
+    : shrinking
+      ? (vi ? "Bỏ phần tử trái, tăng left rồi kiểm tra lại" : "Remove the leftmost value, advance left, then check again")
+      : valid
+        ? (vi ? "Ghi nhận độ dài, rồi bỏ phần tử bên trái" : "Record its length, then remove the leftmost value")
+        : (vi ? "Thêm số dương tiếp theo ở bên phải" : "Add the next positive value on the right");
+  const bestValues = Number.isInteger(view.bestLeft) && Number.isInteger(view.bestRight)
+    ? nums.slice(view.bestLeft, view.bestRight + 1)
+    : [];
+  const bestRange = bestValues.length ? `[${view.bestLeft}..${view.bestRight}]` : "—";
+
+  $("treeView").innerHTML = `<div class="msa209-viz phase-${escapeHtml(phase)}">
+    <div class="msa209-phases">${phases}</div>
+    <div class="msa209-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="msa209-array"><header><strong>nums</strong><span>${vi ? "viền xanh = cửa sổ hiện tại · nền lục = đáp án tốt nhất" : "blue border = current window · green fill = best answer"}</span></header><div class="msa209-scroll"><div class="msa209-cells">${cells}</div></div></section>
+    <div class="msa209-equation"><small>${vi ? "TỔNG CỬA SỔ" : "WINDOW SUM"}</small><code>${escapeHtml(expression)} = ${escapeHtml(String(total))}</code><div><i style="width:${progress}%"></i></div><span>${escapeHtml(String(total))} ${valid ? ">=" : "<"} ${escapeHtml(String(target))}</span></div>
+    <div class="msa209-status ${statusClass}"><small>${escapeHtml(statusText)}</small><strong>${escapeHtml(statusInstruction)}</strong></div>
+    <div class="msa209-metrics"><span><small>TOTAL / TARGET</small><strong>${escapeHtml(String(total))} / ${escapeHtml(String(target))}</strong></span><span><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></span><span class="best"><small>MIN_LEN</small><strong>${escapeHtml(minLenText)}</strong></span></div>
+    <div class="msa209-best"><small>${vi ? "ĐÁP ÁN TỐT NHẤT ĐÃ TÌM THẤY" : "BEST ANSWER FOUND SO FAR"}</small><strong>${escapeHtml(bestRange)}</strong><code>${bestValues.length ? `[${escapeHtml(bestValues.join(", "))}]` : "—"}</code></div>
+  </div>`;
+}
+
 function renderAverageWindowView(step) {
   const view = step.averageWindowView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -12013,6 +12106,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefixAverageView(step);
+  } else if (step.minimumSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinimumSubarrayView(step);
   } else if (step.averageWindowView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

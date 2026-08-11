@@ -1889,7 +1889,7 @@ function buildSteps487(nums) {
  * LeetCode 209: Minimum Size Subarray Sum.
  * Sliding window: expand right, shrink left while sum >= target, track min length.
  */
-function buildSteps209(nums, params) {
+function buildSteps209Legacy(nums, params) {
   const target = params.target;
   const n = nums.length;
   const steps = [];
@@ -2001,6 +2001,169 @@ function buildSteps209(nums, params) {
  * Sliding window: expand right (multiply), shrink left (divide) while product >= k.
  * Count of valid subarrays ending at right = right - left + 1.
  */
+/** LeetCode 209: detailed sliding-window visualization and line-by-line trace. */
+function buildSteps209(nums, params = {}) {
+  const targetRaw = Number(params.target);
+  const target = Number.isFinite(targetRaw) ? Math.max(1, Math.trunc(targetRaw)) : 7;
+  const steps = [];
+  let left = 0;
+  let right = -1;
+  let total = 0;
+  let minLen = Infinity;
+  let bestL = null;
+  let bestR = null;
+  let phase = "init";
+  let removedIndex = null;
+  let candidateLen = null;
+  let improved = false;
+
+  const indices = (lo, hi) => (
+    Number.isInteger(lo) && Number.isInteger(hi) && lo <= hi
+      ? Array.from({ length: hi - lo + 1 }, (_, offset) => lo + offset)
+      : []
+  );
+  const snapshot = () => ({
+    nums: [...nums], target, left, right, total, phase, removedIndex,
+    candidateLen, improved, minLen: minLen === Infinity ? null : minLen,
+    bestLeft: bestL, bestRight: bestR,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
+      arr: [...nums],
+      highlight: indices(left, right),
+      mark: bestL === null ? [] : indices(bestL, bestR),
+      vars: [
+        { name: "target", value: target },
+        { name: "left", value: left },
+        { name: "right", value: right },
+        { name: "total", value: total },
+        { name: "min_len", value: minLen === Infinity ? "∞" : minLen },
+        ...vars,
+      ],
+      minimumSubarrayView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: "left = 0", en: "left = 0" },
+    { vi: "Cạnh trái bắt đầu ở đầu mảng.", en: "The left edge starts at the beginning of the array." },
+    3, "init", [{ name: "left", value: left }],
+  );
+  addStep(
+    { vi: "total = 0", en: "total = 0" },
+    { vi: "Cửa sổ ban đầu rỗng nên tổng bằng 0.", en: "The initial window is empty, so its sum is 0." },
+    4, "init", [{ name: "total", value: total }],
+  );
+  addStep(
+    { vi: "min_len = ∞", en: "min_len = ∞" },
+    { vi: "Chưa tìm thấy cửa sổ nào đạt target.", en: "No window has reached the target yet." },
+    5, "init", [{ name: "min_len", value: "∞" }],
+  );
+
+  for (right = 0; right < nums.length; right += 1) {
+    removedIndex = null;
+    candidateLen = null;
+    improved = false;
+    addStep(
+      { vi: `Di chuyển right đến index ${right}`, en: `Move right to index ${right}` },
+      { vi: `Chuẩn bị đưa nums[${right}] = ${nums[right]} vào cửa sổ.`, en: `Prepare to add nums[${right}] = ${nums[right]} to the window.` },
+      6, "expand", [{ name: "nums[right]", value: nums[right] }],
+    );
+    const previousTotal = total;
+    total += nums[right];
+    addStep(
+      { vi: `total += ${nums[right]} → ${total}`, en: `total += ${nums[right]} → ${total}` },
+      { vi: `${previousTotal} + ${nums[right]} = ${total}. Cửa sổ hiện tại là [${left}..${right}].`, en: `${previousTotal} + ${nums[right]} = ${total}. The current window is [${left}..${right}].` },
+      7, "expand", [{ name: "previous total", value: previousTotal }, { name: "nums[right]", value: nums[right] }],
+    );
+
+    while (total >= target) {
+      candidateLen = right - left + 1;
+      improved = candidateLen < minLen;
+      addStep(
+        { vi: `${total} >= ${target} → True`, en: `${total} >= ${target} → True` },
+        { vi: `Cửa sổ đã hợp lệ. Ghi nhận độ dài ${candidateLen}, rồi thử co bên trái.`, en: `The window is valid. Record length ${candidateLen}, then try shrinking from the left.` },
+        8, "eligible", [{ name: "window length", value: candidateLen }],
+      );
+      if (improved) {
+        minLen = candidateLen;
+        bestL = left;
+        bestR = right;
+      }
+      addStep(
+        {
+          vi: improved ? `min_len = ${candidateLen} · kỷ lục mới` : `min_len giữ nguyên = ${minLen}`,
+          en: improved ? `min_len = ${candidateLen} · new best` : `Keep min_len = ${minLen}`,
+        },
+        {
+          vi: improved
+            ? `Đoạn [${left}..${right}] ngắn hơn mọi đáp án trước đó.`
+            : `Đoạn [${left}..${right}] dài ${candidateLen}, không ngắn hơn best hiện tại.`,
+          en: improved
+            ? `Window [${left}..${right}] is shorter than every previous answer.`
+            : `Window [${left}..${right}] has length ${candidateLen}, not shorter than the current best.`,
+        },
+        9, "record", [{ name: "candidate length", value: candidateLen }, { name: "updated", value: improved }],
+      );
+
+      removedIndex = left;
+      const removedValue = nums[left];
+      const beforeRemoval = total;
+      total -= removedValue;
+      addStep(
+        { vi: `total -= nums[${left}] → ${total}`, en: `total -= nums[${left}] → ${total}` },
+        { vi: `${beforeRemoval} - ${removedValue} = ${total}. Loại phần tử trái để cửa sổ ngắn hơn.`, en: `${beforeRemoval} - ${removedValue} = ${total}. Remove the leftmost value to shorten the window.` },
+        10, "remove", [{ name: "removed", value: removedValue }, { name: "total", value: total }],
+      );
+      left += 1;
+      addStep(
+        { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+        { vi: `Cạnh trái mới là index ${left}; kiểm tra lại total >= target.`, en: `The new left edge is index ${left}; check total >= target again.` },
+        11, "shrink", [{ name: "left", value: left }],
+      );
+      removedIndex = null;
+    }
+
+    candidateLen = left <= right ? right - left + 1 : 0;
+    improved = false;
+    addStep(
+      { vi: `${total} >= ${target} → False`, en: `${total} >= ${target} → False` },
+      {
+        vi: right + 1 < nums.length
+          ? "Tổng chưa đủ target; cần mở rộng right để thêm số dương tiếp theo."
+          : "Tổng chưa đủ target và đã hết mảng; dừng quét.",
+        en: right + 1 < nums.length
+          ? "The sum is below target; expand right to add the next positive value."
+          : "The sum is below target and the array is exhausted; stop scanning.",
+      },
+      8, "need-more", [{ name: "total", value: total }],
+    );
+  }
+
+  const answer = minLen === Infinity ? 0 : minLen;
+  removedIndex = null;
+  candidateLen = null;
+  improved = false;
+  addStep(
+    { vi: `return ${answer}`, en: `return ${answer}` },
+    {
+      vi: answer === 0
+        ? `Không có đoạn con nào có tổng >= ${target}.`
+        : `Đoạn ngắn nhất là [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}], dài ${answer}.`,
+      en: answer === 0
+        ? `No subarray has sum >= ${target}.`
+        : `The shortest window is [${bestL}..${bestR}] = [${nums.slice(bestL, bestR + 1).join(", ")}], length ${answer}.`,
+    },
+    12, "done", [{ name: "answer", value: answer }], true,
+  );
+  return { original: [...nums], answer, steps };
+}
+
 function buildSteps713(nums, params) {
   const k = params.k;
   const n = nums.length;

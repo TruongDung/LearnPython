@@ -6097,7 +6097,7 @@ function buildSteps327SegmentTree(input, params = {}) {
   return { original: [...nums], answer, steps };
 }
 
-function buildSteps327Fenwick(input, params = {}) {
+function buildSteps327FenwickLegacy(input, params = {}) {
   const nums = Array.isArray(input) ? input.map(Number) : [];
   const lowerRaw = Number(params.lower);
   const upperRaw = Number(params.upper);
@@ -6281,6 +6281,304 @@ function buildSteps327Fenwick(input, params = {}) {
   found = 0;
   addStep(
     { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    { vi: `Có ${answer} subarray có tổng trong [${lower}, ${upper}].`, en: `${answer} subarrays have sums in [${lower}, ${upper}].` },
+    31, "done", [{ name: "answer", value: answer }], true,
+  );
+  return { original: [...nums], answer, steps };
+}
+
+/** LeetCode 327, approach 3: exact line-by-line Fenwick Tree debugger. */
+function buildSteps327Fenwick(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const lowerRaw = Number(params.lower);
+  const upperRaw = Number(params.upper);
+  const lower = Number.isFinite(lowerRaw) ? Math.trunc(lowerRaw) : -2;
+  const upper = Number.isFinite(upperRaw) ? Math.max(lower, Math.trunc(upperRaw)) : 2;
+  const prefix = [];
+  let values = [];
+  let rank = new Map();
+  let bit = [];
+  const steps = [];
+  let phase = "prefix-init";
+  let operation = "prefix";
+  let prefixIndex = 0;
+  let storedThrough = -1;
+  let leftRank = null;
+  let rightRank = null;
+  let leftPath = [];
+  let rightPath = [];
+  let updatePath = [];
+  let leftCount = 0;
+  let rightCount = 0;
+  let found = 0;
+  let answer = 0;
+  let activeBitIndex = null;
+  let queryCursor = null;
+  let queryTotal = 0;
+
+  const lowerBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const upperBound = (target) => {
+    let left = 0;
+    let right = values.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const snapshot = () => ({
+    phase, operation, nums: [...nums], prefix: [...prefix], values: [...values],
+    ranks: values.map((value, index) => ({ value, rank: index + 1 })),
+    bit: bit.slice(1), lower, upper, prefixIndex, storedThrough, leftRank, rightRank,
+    leftPath: [...leftPath], rightPath: [...rightPath], updatePath: [...updatePath],
+    leftCount, rightCount, found, answer, activeBitIndex, queryCursor, queryTotal,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title, note, codeLines: [codeLine], codeBlock: 3, final,
+      arr: [...nums], highlight: prefixIndex > 0 ? [prefixIndex - 1] : [], mark: [],
+      vars: [{ name: "lower, upper", value: `[${lower}, ${upper}]` }, { name: "answer", value: answer }, ...vars],
+      rangeSumFenwickView: snapshot(),
+    });
+  };
+
+  const traceQuery = (startIndex, side) => {
+    const isRight = side === "right";
+    const path = [];
+    let index = startIndex;
+    let total = 0;
+    operation = isRight ? "query-right" : "query-left";
+    activeBitIndex = null;
+    queryCursor = index;
+    queryTotal = 0;
+    if (isRight) rightPath = [];
+    else leftPath = [];
+    addStep(
+      { vi: `Gọi query(${startIndex})`, en: `Call query(${startIndex})` },
+      { vi: isRight ? "Đếm prefix có rank <= right." : "Đếm prefix có rank < left.", en: isRight ? "Count prefixes with rank <= right." : "Count prefixes with rank < left." },
+      29, "query-call", [{ name: "index", value: startIndex }],
+    );
+    addStep(
+      { vi: `Vào query(index=${startIndex})`, en: `Enter query(index=${startIndex})` },
+      { vi: "Tạm dừng vòng lặp chính và chạy hàm prefix query.", en: "Pause the main loop and execute the prefix-query helper." },
+      12, "query-enter", [{ name: "index", value: startIndex }],
+    );
+    addStep(
+      { vi: "total = 0", en: "total = 0" },
+      { vi: "Khởi tạo tổng frequency cho query này.", en: "Initialize the frequency total for this query." },
+      13, "query-init", [{ name: "total", value: 0 }],
+    );
+    while (index > 0) {
+      activeBitIndex = index;
+      queryCursor = index;
+      addStep(
+        { vi: `${index} > 0 → tiếp tục`, en: `${index} > 0 → continue` },
+        { vi: `BIT[${index}] là node tiếp theo trên query path.`, en: `BIT[${index}] is the next node on the query path.` },
+        14, "query-check", [{ name: "index", value: index }, { name: "total", value: total }],
+      );
+      path.push(index);
+      total += bit[index];
+      queryTotal = total;
+      if (isRight) { rightPath = [...path]; rightCount = total; }
+      else { leftPath = [...path]; leftCount = total; }
+      addStep(
+        { vi: `total += BIT[${index}] → ${total}`, en: `total += BIT[${index}] → ${total}` },
+        { vi: `Cộng frequency ${bit[index]} do node này quản lý.`, en: `Add the frequency ${bit[index]} covered by this node.` },
+        15, "query-read", [{ name: `BIT[${index}]`, value: bit[index] }, { name: "total", value: total }],
+      );
+      const lowbit = index & -index;
+      const next = index - lowbit;
+      addStep(
+        { vi: `index -= lowbit(${index}) → ${next}`, en: `index -= lowbit(${index}) → ${next}` },
+        { vi: `Bỏ đoạn rank vừa đếm dài ${lowbit}, rồi đi về node cha.`, en: `Remove the ${lowbit}-rank block just counted, then move to its parent.` },
+        16, "query-jump", [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
+      );
+      index = next;
+      queryCursor = index;
+    }
+    activeBitIndex = null;
+    addStep(
+      { vi: "index = 0 → dừng while", en: "index = 0 → stop while" },
+      { vi: "Query path đã đi hết các đoạn rank cần cộng.", en: "The query path has covered every required rank block." },
+      14, "query-check", [{ name: "index", value: 0 }, { name: "total", value: total }],
+    );
+    addStep(
+      { vi: `return total = ${total}`, en: `return total = ${total}` },
+      { vi: `query(${startIndex}) trả về ${total}.`, en: `query(${startIndex}) returns ${total}.` },
+      17, "query-return", [{ name: "total", value: total }],
+    );
+    return total;
+  };
+
+  const traceUpdate = (startIndex, label, callerLine) => {
+    let index = startIndex;
+    updatePath = [];
+    operation = "update";
+    activeBitIndex = null;
+    addStep(
+      { vi: `Gọi update(${startIndex}) cho ${label}`, en: `Call update(${startIndex}) for ${label}` },
+      { vi: "Thêm một prefix vào các node Fenwick cha.", en: "Insert one prefix into its Fenwick ancestors." },
+      callerLine, "update-call", [{ name: "index", value: startIndex }],
+    );
+    addStep(
+      { vi: `Vào update(index=${startIndex})`, en: `Enter update(index=${startIndex})` },
+      { vi: "Tạm dừng vòng lặp chính và chạy hàm Fenwick update.", en: "Pause the main loop and execute the Fenwick-update helper." },
+      19, "update-enter", [{ name: "index", value: startIndex }],
+    );
+    while (index < bit.length) {
+      activeBitIndex = index;
+      addStep(
+        { vi: `${index} < ${bit.length} → cập nhật`, en: `${index} < ${bit.length} → update` },
+        { vi: `BIT[${index}] chứa rank ${startIndex}, nên frequency tăng 1.`, en: `BIT[${index}] covers rank ${startIndex}, so its frequency increases by 1.` },
+        20, "update-check", [{ name: "index", value: index }],
+      );
+      bit[index] += 1;
+      updatePath.push(index);
+      addStep(
+        { vi: `BIT[${index}] += 1 → ${bit[index]}`, en: `BIT[${index}] += 1 → ${bit[index]}` },
+        { vi: "Node hiện tại đã ghi nhận prefix mới.", en: "The current node now includes the new prefix." },
+        21, "update-write", [{ name: `BIT[${index}]`, value: bit[index] }],
+      );
+      const lowbit = index & -index;
+      const next = index + lowbit;
+      addStep(
+        { vi: `index += lowbit(${index}) → ${next}`, en: `index += lowbit(${index}) → ${next}` },
+        { vi: `Nhảy lên node cha bằng lowbit = ${lowbit}.`, en: `Jump to the parent node using lowbit = ${lowbit}.` },
+        22, "update-jump", [{ name: "lowbit", value: lowbit }, { name: "next index", value: next }],
+      );
+      index = next;
+    }
+    activeBitIndex = null;
+    addStep(
+      { vi: `${index} < ${bit.length} → False`, en: `${index} < ${bit.length} → False` },
+      { vi: "Đã vượt kích thước BIT, kết thúc update.", en: "The index is outside the BIT, so the update is complete." },
+      20, "update-check", [{ name: "index", value: index }],
+    );
+  };
+
+  prefix.push(0);
+  addStep(
+    { vi: "prefix = [0]", en: "prefix = [0]" },
+    { vi: "P0 = 0 biểu diễn prefix rỗng trước nums[0].", en: "P0 = 0 represents the empty prefix before nums[0]." },
+    5, "prefix-init", [{ name: "prefix", value: `[${prefix.join(", ")}]` }],
+  );
+  nums.forEach((num, index) => {
+    prefixIndex = index + 1;
+    operation = "prefix";
+    addStep(
+      { vi: `Đọc nums[${index}] = ${num}`, en: `Read nums[${index}] = ${num}` },
+      { vi: "Vòng for xử lý phần tử tiếp theo.", en: "The for-loop reads the next element." },
+      6, "prefix-loop", [{ name: "num", value: num }],
+    );
+    const nextPrefix = prefix[prefix.length - 1] + num;
+    prefix.push(nextPrefix);
+    addStep(
+      { vi: `prefix.append(${nextPrefix})`, en: `prefix.append(${nextPrefix})` },
+      { vi: `${nextPrefix - num} + ${num} = ${nextPrefix}.`, en: `${nextPrefix - num} + ${num} = ${nextPrefix}.` },
+      7, "prefix-append", [{ name: "prefix", value: `[${prefix.join(", ")}]` }],
+    );
+  });
+
+  values = [...new Set(prefix)].sort((a, b) => a - b);
+  addStep(
+    { vi: "Sắp xếp và loại prefix trùng", en: "Sort and deduplicate prefixes" },
+    { vi: "Mỗi giá trị prefix duy nhất sẽ nhận một rank tăng dần.", en: "Each distinct prefix value receives an increasing rank." },
+    8, "compress", [{ name: "values", value: `[${values.join(", ")}]` }],
+  );
+  rank = new Map(values.map((value, index) => [value, index + 1]));
+  addStep(
+    { vi: "Tạo rank 1-based", en: "Build 1-based ranks" },
+    { vi: "Fenwick Tree dùng index từ 1 và vẫn giữ thứ tự giá trị.", en: "The Fenwick Tree is 1-based while preserving value order." },
+    9, "rank", [{ name: "rank", value: values.map((value) => `${value}:${rank.get(value)}`).join(", ") }],
+  );
+  bit = Array(values.length + 1).fill(0);
+  addStep(
+    { vi: `Khởi tạo BIT với ${bit.length} ô`, en: `Initialize BIT with ${bit.length} slots` },
+    { vi: "BIT[0] không dùng; các frequency còn lại bắt đầu bằng 0.", en: "BIT[0] is unused; every other frequency starts at 0." },
+    10, "bit-init", [{ name: "bit", value: `[${bit.join(", ")}]` }],
+  );
+
+  answer = 0;
+  addStep(
+    { vi: "answer = 0", en: "answer = 0" },
+    { vi: "Chưa có range sum nào được đếm.", en: "No range sum has been counted yet." },
+    24, "answer-init", [{ name: "answer", value: answer }],
+  );
+  prefixIndex = 0;
+  traceUpdate(rank.get(0), "P0 = 0", 25);
+  storedThrough = 0;
+
+  for (let index = 1; index < prefix.length; index += 1) {
+    prefixIndex = index;
+    leftRank = null;
+    rightRank = null;
+    leftPath = [];
+    rightPath = [];
+    updatePath = [];
+    leftCount = 0;
+    rightCount = 0;
+    found = 0;
+    const current = prefix[index];
+    const minPrevious = current - upper;
+    const maxPrevious = current - lower;
+    activeBitIndex = null;
+    operation = "scan";
+    addStep(
+      { vi: `Vòng for: current = P${index} = ${current}`, en: `For-loop: current = P${index} = ${current}` },
+      { vi: `Cần tìm prefix trước đó trong [${minPrevious}, ${maxPrevious}].`, en: `Find earlier prefixes inside [${minPrevious}, ${maxPrevious}].` },
+      26, "scan", [{ name: "current", value: current }],
+    );
+    leftRank = lowerBound(minPrevious) + 1;
+    addStep(
+      { vi: `left = ${leftRank}`, en: `left = ${leftRank}` },
+      { vi: `bisect_left tìm vị trí đầu tiên >= ${minPrevious}; cộng 1 để đổi sang rank 1-based.`, en: `bisect_left finds the first value >= ${minPrevious}; add 1 for a 1-based rank.` },
+      27, "bounds", [{ name: "current - upper", value: minPrevious }, { name: "left", value: leftRank }],
+    );
+    rightRank = upperBound(maxPrevious);
+    addStep(
+      { vi: `right = ${rightRank}`, en: `right = ${rightRank}` },
+      { vi: `bisect_right tìm vị trí sau giá trị cuối <= ${maxPrevious}; đó cũng là rank cuối cần query.`, en: `bisect_right finds the position after the last value <= ${maxPrevious}; it is also the final rank to query.` },
+      28, "bounds", [{ name: "current - lower", value: maxPrevious }, { name: "right", value: rightRank }],
+    );
+    rightCount = traceQuery(rightRank, "right");
+    leftCount = traceQuery(leftRank - 1, "left");
+    found = rightCount - leftCount;
+    answer += found;
+    operation = "count";
+    activeBitIndex = null;
+    addStep(
+      { vi: `answer += ${rightCount} - ${leftCount} → ${answer}`, en: `answer += ${rightCount} - ${leftCount} → ${answer}` },
+      { vi: `Có ${found} prefix trước đó tạo range sum hợp lệ với P${index}.`, en: `${found} earlier prefixes form valid range sums with P${index}.` },
+      29, "count", [{ name: "found", value: found }],
+    );
+    leftPath = [];
+    rightPath = [];
+    traceUpdate(rank.get(current), `P${index} = ${current}`, 30);
+    storedThrough = index;
+  }
+
+  prefixIndex = prefix.length - 1;
+  leftRank = null;
+  rightRank = null;
+  leftPath = [];
+  rightPath = [];
+  updatePath = [];
+  found = 0;
+  activeBitIndex = null;
+  operation = "done";
+  addStep(
+    { vi: `return ${answer}`, en: `return ${answer}` },
     { vi: `Có ${answer} subarray có tổng trong [${lower}, ${upper}].`, en: `${answer} subarrays have sums in [${lower}, ${upper}].` },
     31, "done", [{ name: "answer", value: answer }], true,
   );
