@@ -8050,6 +8050,97 @@ function renderReversePairsView(step) {
   </div>`;
 }
 
+function renderReversePairsSegmentTreeView(step) {
+  const view = step.reversePairsSegmentTreeView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const ranges = Array.isArray(view.treeRanges) ? view.treeRanges : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const coveredNodes = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const current = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const queryLeft = Number.isInteger(view.queryLeft) ? view.queryLeft : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "init"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Nén tọa độ", "2 · Quét trái -> phải", "3 · Query + Update", "4 · Kết quả"]
+    : ["1 · Compress", "2 · Scan left -> right", "3 · Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const numsHtml = nums.map((value, index) => {
+    const classes = ["rp493st-num"];
+    if (index < current || phase === "done") classes.push("stored");
+    if (index === current) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong><em>${index < current || phase === "done" ? "in tree" : index === current ? "current j" : "waiting"}</em></span>`;
+  }).join("");
+  const ranksHtml = values.map((value, index) => {
+    const classes = ["rp493st-rank"];
+    if (queryLeft !== null && index >= queryLeft) classes.push("inside");
+    if (current >= 0 && value === nums[current]) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>rank ${index}</small><strong>${escapeHtml(String(value))}</strong></span>`;
+  }).join("");
+
+  const depths = new Map();
+  ranges.forEach((item) => {
+    if (!depths.has(item.depth)) depths.set(item.depth, []);
+    depths.get(item.depth).push(item);
+  });
+  const treeHtml = [...depths.entries()].sort((a, b) => a[0] - b[0]).map(([depth, nodes]) => {
+    const nodesHtml = nodes.map((item) => {
+      const classes = ["rp493st-node"];
+      if (queryPath.has(item.node)) classes.push("visited");
+      if (coveredNodes.has(item.node)) classes.push("covered");
+      if (updatePath.has(item.node)) classes.push("updated");
+      return `<span class="${classes.join(" ")}"><small>node ${item.node} · r${item.start}..r${item.end}</small><strong>${escapeHtml(String(tree[item.node] || 0))}</strong><em>${escapeHtml(`${values[item.start]}..${values[item.end]}`)}</em></span>`;
+    }).join("");
+    return `<div class="rp493st-level"><b>L${depth}</b><div>${nodesHtml}</div></div>`;
+  }).join("");
+
+  const currentValue = current >= 0 ? nums[current] : null;
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén value thành rank tăng dần" : "Compress values into increasing ranks";
+  let actionDetail = vi ? "Cây lưu frequency của các index đã đi qua" : "The tree stores frequencies from earlier indices";
+  if (phase === "scan") {
+    actionLabel = vi ? `XÉT j=${current}` : `PROCESS j=${current}`;
+    actionMain = `nums[j] = ${currentValue}`;
+    actionDetail = vi ? `${current} value trước đó đang ở trong cây` : `${current} earlier values are in the tree`;
+  } else if (phase === "bounds") {
+    actionLabel = "BISECT_RIGHT";
+    actionMain = `${vi ? "tìm value" : "find values"} > 2 * ${currentValue} = ${view.threshold}`;
+    actionDetail = queryLeft === null ? "—" : `query ranks [${queryLeft}, ${Math.max(0, values.length - 1)}]`;
+  } else if (phase === "query") {
+    actionLabel = "QUERY";
+    actionMain = `frequency = ${view.found || 0}`;
+    actionDetail = vi ? "Node xanh lá nằm trọn trong khoảng > 2 * nums[j]" : "Green nodes are fully inside the > 2 * nums[j] interval";
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = `i < ${current} · nums[i] > ${view.threshold}`;
+  } else if (phase === "update") {
+    actionLabel = "UPDATE";
+    actionMain = `insert nums[${current}] = ${currentValue}`;
+    actionDetail = vi ? "Node cam là đường update từ leaf lên root" : "Orange nodes are the update path from leaf to root";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = "reverse pairs";
+  }
+
+  $("treeView").innerHTML = `<div class="rp493st-viz phase-${escapeHtml(phase)}">
+    <div class="rp493st-phases">${phases}</div>
+    <section class="rp493st-section"><header><strong>NUMS · LEFT-TO-RIGHT SCAN</strong><span>${vi ? "xanh = đã update · viền sáng = j hiện tại" : "green = updated · bright border = current j"}</span></header><div class="rp493st-scroll"><div class="rp493st-nums">${numsHtml}</div></div></section>
+    <section class="rp493st-section"><header><strong>VALUE -> COMPRESSED RANK</strong><span>${vi ? "nền xanh = value > 2 * nums[j]" : "green fill = value > 2 * nums[j]"}</span></header><div class="rp493st-ranks">${ranksHtml}</div></section>
+    <div class="rp493st-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rp493st-metrics"><span><small>${vi ? "ĐÃ THẤY" : "SEEN"}</small><strong>${Math.max(0, current)}</strong></span><span><small>${vi ? "QUERY TÌM THẤY" : "QUERY FOUND"}</small><strong>${escapeHtml(String(view.found || 0))}</strong></span><span class="count"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="rp493st-section"><header><strong>SEGMENT TREE · VALUE FREQUENCY</strong><span>${vi ? "node lưu tổng frequency trong range rank" : "nodes store total frequency in each rank range"}</span></header><div class="rp493st-tree">${treeHtml}</div></section>
+    <div class="rp493st-rule"><code>nums[i] > 2 * nums[j]</code><span>+</span><code>${vi ? "query trước, update sau" : "query first, update second"}</code></div>
+  </div>`;
+}
+
 function renderSortedArrayCostView(step) {
   const view = step.sortedArrayCostView || {};
   const vi = lang === "vi";
@@ -8228,6 +8319,98 @@ function renderRangeSumCountView(step) {
     <div class="rs327-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
     <div class="rs327-metrics"><span><small>low</small><strong>${escapeHtml(lowText)}</strong></span><span><small>high</small><strong>${escapeHtml(highText)}</strong></span><span><small>high − low</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
     <div class="rs327-rule"><code>${escapeHtml(String(view.lower))} ≤ right.sum − left.sum ≤ ${escapeHtml(String(view.upper))}</code><span>${vi ? "low tìm cận dưới · high tìm sau cận trên" : "low finds lower bound · high finds after upper bound"}</span></div>
+  </div>`;
+}
+
+function renderRangeSumSegmentTreeView(step) {
+  const view = step.rangeSumSegmentTreeView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const ranges = Array.isArray(view.treeRanges) ? view.treeRanges : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const coveredNodes = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const current = Number.isInteger(view.prefixIndex) ? view.prefixIndex : 0;
+  const left = Number.isInteger(view.queryLeft) ? view.queryLeft : null;
+  const right = Number.isInteger(view.queryRight) ? view.queryRight : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = ["prefix", "compress"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Prefix + nén", "2 · Tìm khoảng rank", "3 · Query + Update", "4 · Kết quả"]
+    : ["1 · Prefix + compress", "2 · Find rank interval", "3 · Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const prefixHtml = prefix.map((sum, index) => {
+    const classes = ["rs327st-prefix"];
+    if (index < current || (phase === "done" && index <= current) || (index === 0 && current === 0 && phase === "update")) classes.push("stored");
+    if (index === current && phase !== "done") classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${index === 0 ? "empty" : `nums[0..${index - 1}]`}</em></span>`;
+  }).join("");
+  const rankHtml = values.map((value, index) => {
+    const classes = ["rs327st-rank"];
+    if (left !== null && right !== null && index >= left && index <= right) classes.push("inside");
+    if (current < prefix.length && value === prefix[current]) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>rank ${index}</small><strong>${escapeHtml(String(value))}</strong></span>`;
+  }).join("");
+
+  const depths = new Map();
+  ranges.forEach((item) => {
+    if (!depths.has(item.depth)) depths.set(item.depth, []);
+    depths.get(item.depth).push(item);
+  });
+  const treeHtml = [...depths.entries()].sort((a, b) => a[0] - b[0]).map(([depth, nodes]) => {
+    const nodesHtml = nodes.map((item) => {
+      const classes = ["rs327st-node"];
+      if (queryPath.has(item.node)) classes.push("visited");
+      if (coveredNodes.has(item.node)) classes.push("covered");
+      if (updatePath.has(item.node)) classes.push("updated");
+      const valueRange = values.length ? `${values[item.start]}..${values[item.end]}` : "—";
+      return `<span class="${classes.join(" ")}"><small>node ${item.node} · r${item.start}..r${item.end}</small><strong>${escapeHtml(String(tree[item.node] || 0))}</strong><em>${escapeHtml(valueRange)}</em></span>`;
+    }).join("");
+    return `<div class="rs327st-level"><b>L${depth}</b><div>${nodesHtml}</div></div>`;
+  }).join("");
+
+  const currentSum = current < prefix.length ? prefix[current] : null;
+  const minValue = currentSum === null ? null : currentSum - Number(view.upper);
+  const maxValue = currentSum === null ? null : currentSum - Number(view.lower);
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Tạo prefix và nén tọa độ" : "Build prefixes and compress coordinates";
+  let actionDetail = vi ? "Mỗi leaf đại diện một prefix sum" : "Each leaf represents one prefix-sum value";
+  if (["scan", "bounds"].includes(phase)) {
+    actionLabel = vi ? `XÉT P${current}` : `PROCESS P${current}`;
+    actionMain = `${minValue} <= previous prefix <= ${maxValue}`;
+    actionDetail = left === null ? "—" : `value interval -> rank [${left}, ${right}]`;
+  } else if (phase === "query") {
+    actionLabel = "QUERY";
+    actionMain = `query(rank ${left}..${right}) = ${view.queryCount || 0}`;
+    actionDetail = vi ? "Node xanh lá nằm trọn trong khoảng và được cộng" : "Green nodes are fully covered and added";
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = vi ? "Cộng số prefix trước đó hợp lệ" : "Add valid earlier prefixes";
+  } else if (phase === "update") {
+    actionLabel = "UPDATE";
+    actionMain = currentSum === null ? "—" : `insert P${current} = ${currentSum}`;
+    actionDetail = vi ? "Node màu cam là đường cập nhật từ leaf lên root" : "Orange nodes form the update path from leaf to root";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = vi ? "subarray sum hợp lệ" : "valid subarray sums";
+  }
+
+  $("treeView").innerHTML = `<div class="rs327st-viz phase-${escapeHtml(phase)}">
+    <div class="rs327st-phases">${phases}</div>
+    <section class="rs327st-section"><header><strong>NUMS -> PREFIX SUMS</strong><span>${vi ? "xanh = đã lưu · viền sáng = đang xét" : "green = stored · bright border = current"}</span></header><div class="rs327st-scroll"><div class="rs327st-nums">${nums.map((num, index) => `<span><small>nums[${index}]</small><strong>${escapeHtml(String(num))}</strong></span>`).join("")}</div><div class="rs327st-prefixes">${prefixHtml}</div></div></section>
+    <section class="rs327st-section"><header><strong>COORDINATE COMPRESSION</strong><span>${vi ? "nền xanh = khoảng query" : "green fill = query interval"}</span></header><div class="rs327st-ranks">${rankHtml}</div></section>
+    <div class="rs327st-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rs327st-metrics"><span><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${currentSum === null ? "—" : escapeHtml(String(currentSum))}</strong></span><span><small>${vi ? "QUERY TÌM THẤY" : "QUERY FOUND"}</small><strong>${escapeHtml(String(view.queryCount || 0))}</strong></span><span class="count"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="rs327st-section tree"><header><strong>SEGMENT TREE · PREFIX FREQUENCY</strong><span>${vi ? "mỗi node lưu tổng frequency trong range rank" : "each node stores total frequency in its rank range"}</span></header><div class="rs327st-tree">${treeHtml}</div></section>
+    <div class="rs327st-rule"><code>lower <= Pj - Pi <= upper</code><span>⇔</span><code>Pj - upper <= Pi <= Pj - lower</code></div>
   </div>`;
 }
 
@@ -12034,6 +12217,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFallingSquaresView(step);
+  } else if (step.reversePairsSegmentTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReversePairsSegmentTreeView(step);
   } else if (step.reversePairsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -12046,6 +12235,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSortedArrayCostView(step);
+  } else if (step.rangeSumSegmentTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumSegmentTreeView(step);
   } else if (step.rangeSumCountView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

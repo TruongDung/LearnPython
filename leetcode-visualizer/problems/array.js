@@ -4572,7 +4572,7 @@ function buildSteps699(input) {
 }
 
 /** LeetCode 493: Reverse Pairs — merge-sort cross-pair counting. */
-function buildSteps493(input) {
+function buildSteps493MergeSort(input) {
   const nums = Array.isArray(input) ? input.map(Number) : [];
   const working = nums.map((value, originalIndex) => ({ value, originalIndex }));
   const steps = [];
@@ -4828,6 +4828,170 @@ function buildSteps493(input) {
 }
 
 /** LeetCode 1649: Create Sorted Array Through Instructions — compression + Fenwick Tree. */
+function buildSteps493SegmentTree(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const values = [...new Set(nums)].sort((a, b) => a - b);
+  const rank = new Map(values.map((value, index) => [value, index]));
+  const size = values.length;
+  const tree = Array(Math.max(1, size * 4)).fill(0);
+  const treeRanges = [];
+  const steps = [];
+  let phase = "compress";
+  let currentIndex = -1;
+  let threshold = null;
+  let queryLeft = null;
+  let queryPath = [];
+  let coveredNodes = [];
+  let updatePath = [];
+  let found = 0;
+  let answer = 0;
+
+  const collectRanges = (node, start, end, depth) => {
+    treeRanges.push({ node, start, end, depth });
+    if (start === end) return;
+    const mid = Math.floor((start + end) / 2);
+    collectRanges(node * 2, start, mid, depth + 1);
+    collectRanges(node * 2 + 1, mid + 1, end, depth + 1);
+  };
+  if (size) collectRanges(1, 0, size - 1, 0);
+
+  const upperBound = (target) => {
+    let left = 0;
+    let right = size;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const query = (node, start, end, left, right) => {
+    queryPath.push(node);
+    if (right < start || end < left) return 0;
+    if (left <= start && end <= right) {
+      coveredNodes.push(node);
+      return tree[node];
+    }
+    const mid = Math.floor((start + end) / 2);
+    return query(node * 2, start, mid, left, right)
+      + query(node * 2 + 1, mid + 1, end, left, right);
+  };
+  const update = (node, start, end, index) => {
+    updatePath.push(node);
+    if (start === end) {
+      tree[node] += 1;
+      return;
+    }
+    const mid = Math.floor((start + end) / 2);
+    if (index <= mid) update(node * 2, start, mid, index);
+    else update(node * 2 + 1, mid + 1, end, index);
+    tree[node] = tree[node * 2] + tree[node * 2 + 1];
+  };
+  const snapshot = () => ({
+    phase,
+    nums: [...nums],
+    values: [...values],
+    tree: [...tree],
+    treeRanges: treeRanges.map((item) => ({ ...item })),
+    currentIndex,
+    threshold,
+    queryLeft,
+    queryPath: [...queryPath],
+    coveredNodes: [...coveredNodes],
+    updatePath: [...updatePath],
+    found,
+    answer,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      final,
+      arr: [...nums],
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: [],
+      vars: [{ name: "answer", value: answer }, ...vars],
+      reversePairsSegmentTreeView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: "Nén tọa độ các giá trị", en: "Coordinate-compress the values" },
+    { vi: "Sắp các value duy nhất để mỗi value có một rank tăng dần.", en: "Sort unique values so every value receives an increasing rank." },
+    5, "compress", [{ name: "values", value: `[${values.join(", ")}]` }],
+  );
+  addStep(
+    { vi: "Khởi tạo Segment Tree tần suất", en: "Initialize the frequency Segment Tree" },
+    { vi: "Mỗi node lưu số value đã xuất hiện trong range rank của nó.", en: "Every node stores the number of seen values in its rank range." },
+    7, "init",
+  );
+
+  for (let index = 0; index < nums.length; index += 1) {
+    currentIndex = index;
+    threshold = 2 * nums[index];
+    queryLeft = null;
+    queryPath = [];
+    coveredNodes = [];
+    updatePath = [];
+    found = 0;
+    addStep(
+      { vi: `Xét nums[${index}] = ${nums[index]}`, en: `Process nums[${index}] = ${nums[index]}` },
+      { vi: `Cây đang chứa ${index} value ở các index nhỏ hơn ${index}.`, en: `The tree contains ${index} values from earlier indices.` },
+      27, "scan", [{ name: "value", value: nums[index] }, { name: "seen", value: index }],
+    );
+    queryLeft = upperBound(threshold);
+    addStep(
+      { vi: `Tìm value đầu tiên > ${threshold}`, en: `Find the first value > ${threshold}` },
+      { vi: `bisect_right(${threshold}) trả rank ${queryLeft}; cần query [${queryLeft}, ${size - 1}].`, en: `bisect_right(${threshold}) returns rank ${queryLeft}; query [${queryLeft}, ${size - 1}].` },
+      28, "bounds", [{ name: "2 * value", value: threshold }, { name: "first rank", value: queryLeft }],
+    );
+    if (size && queryLeft < size) found = query(1, 0, size - 1, queryLeft, size - 1);
+    addStep(
+      { vi: `Segment Tree query trả ${found}`, en: `Segment Tree query returns ${found}` },
+      { vi: `${found} value trước đó lớn hơn 2 * ${nums[index]} = ${threshold}.`, en: `${found} earlier values are greater than 2 * ${nums[index]} = ${threshold}.` },
+      30, "query", [{ name: "found", value: found }],
+    );
+    answer += found;
+    addStep(
+      { vi: `answer += ${found} → ${answer}`, en: `answer += ${found} → ${answer}` },
+      { vi: `Các value được đếm đều có index i < ${index}.`, en: `Every counted value has index i < ${index}.` },
+      30, "count", [{ name: "found", value: found }],
+    );
+    queryPath = [];
+    coveredNodes = [];
+    updatePath = [];
+    if (size) update(1, 0, size - 1, rank.get(nums[index]));
+    addStep(
+      { vi: `Update value ${nums[index]} vào cây`, en: `Update value ${nums[index]} into the tree` },
+      { vi: "Chỉ update sau query để nums[j] không tự ghép với chính nó.", en: "Update after querying so nums[j] never pairs with itself." },
+      31, "update", [{ name: "rank", value: rank.get(nums[index]) }],
+    );
+  }
+
+  currentIndex = -1;
+  threshold = null;
+  queryLeft = null;
+  queryPath = [];
+  coveredNodes = [];
+  updatePath = [];
+  found = 0;
+  addStep(
+    { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    { vi: `Có ${answer} cặp (i, j) thỏa i < j và nums[i] > 2 * nums[j].`, en: `${answer} pairs satisfy i < j and nums[i] > 2 * nums[j].` },
+    32, "done", [{ name: "answer", value: answer }], true,
+  );
+  return { original: [...nums], answer, steps };
+}
+
+function buildSteps493(input, params = {}) {
+  return Number(params && params.approach) === 2
+    ? buildSteps493SegmentTree(input)
+    : buildSteps493MergeSort(input);
+}
+
 function buildSteps1649(input) {
   const instructions = Array.isArray(input) ? input.map(Number) : [];
   const values = [...new Set(instructions)].sort((a, b) => a - b);
@@ -5166,7 +5330,7 @@ function buildSteps1649(input) {
 }
 
 /** LeetCode 327: Count of Range Sum — prefix sums + merge-sort pair counting. */
-function buildSteps327(input, params = {}) {
+function buildSteps327MergeSort(input, params = {}) {
   const nums = Array.isArray(input) ? input.map(Number) : [];
   const lowerRaw = Number(params.lower);
   const upperRaw = Number(params.upper);
@@ -5503,6 +5667,223 @@ function buildSteps327(input, params = {}) {
   return { original: [...nums], answer, steps };
 }
 
+/** LeetCode 327, approach 2: prefix sums + coordinate compression + Segment Tree. */
+function buildSteps327SegmentTree(input, params = {}) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const lowerRaw = Number(params.lower);
+  const upperRaw = Number(params.upper);
+  const lower = Number.isFinite(lowerRaw) ? Math.trunc(lowerRaw) : -2;
+  const upper = Number.isFinite(upperRaw) ? Math.max(lower, Math.trunc(upperRaw)) : 2;
+  const prefix = [0];
+  for (const num of nums) prefix.push(prefix[prefix.length - 1] + num);
+  const values = [...new Set(prefix)].sort((a, b) => a - b);
+  const rank = new Map(values.map((value, index) => [value, index]));
+  const size = values.length;
+  const tree = Array(Math.max(1, size * 4)).fill(0);
+  const steps = [];
+  let phase = "prefix";
+  let prefixIndex = 0;
+  let queryLeft = null;
+  let queryRight = null;
+  let queryPath = [];
+  let coveredNodes = [];
+  let updatePath = [];
+  let queryCount = 0;
+  let answer = 0;
+
+  const lowerBound = (target) => {
+    let left = 0;
+    let right = size;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const upperBound = (target) => {
+    let left = 0;
+    let right = size;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (values[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  };
+  const treeRanges = [];
+  const collectRanges = (node, start, end, depth) => {
+    treeRanges.push({ node, start, end, depth });
+    if (start === end) return;
+    const mid = Math.floor((start + end) / 2);
+    collectRanges(node * 2, start, mid, depth + 1);
+    collectRanges(node * 2 + 1, mid + 1, end, depth + 1);
+  };
+  if (size) collectRanges(1, 0, size - 1, 0);
+
+  const snapshot = () => ({
+    phase,
+    nums: [...nums],
+    prefix: [...prefix],
+    values: [...values],
+    tree: [...tree],
+    treeRanges: treeRanges.map((item) => ({ ...item })),
+    lower,
+    upper,
+    prefixIndex,
+    queryLeft,
+    queryRight,
+    queryPath: [...queryPath],
+    coveredNodes: [...coveredNodes],
+    updatePath: [...updatePath],
+    queryCount,
+    answer,
+  });
+  const addStep = (title, note, codeLine, nextPhase, vars = [], final = false) => {
+    phase = nextPhase;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      final,
+      arr: [...nums],
+      highlight: prefixIndex > 0 ? [prefixIndex - 1] : [],
+      mark: [],
+      vars: [
+        { name: "lower, upper", value: `[${lower}, ${upper}]` },
+        { name: "answer", value: answer },
+        ...vars,
+      ],
+      rangeSumSegmentTreeView: snapshot(),
+    });
+  };
+
+  addStep(
+    { vi: "Tạo toàn bộ prefix sum", en: "Build every prefix sum" },
+    { vi: "Pj là tổng nums[0..j-1]; P0 = 0.", en: "Pj is the sum of nums[0..j-1]; P0 = 0." },
+    7,
+    "prefix",
+    [{ name: "prefix", value: `[${prefix.join(", ")}]` }],
+  );
+  addStep(
+    { vi: "Nén tọa độ các prefix", en: "Coordinate-compress the prefixes" },
+    { vi: "Mỗi prefix sum được đổi thành một rank tăng dần để Segment Tree lưu tần suất.", en: "Each prefix sum receives an increasing rank so the Segment Tree can store frequencies." },
+    8,
+    "compress",
+    [{ name: "values", value: `[${values.join(", ")}]` }],
+  );
+
+  const query = (node, start, end, left, right) => {
+    queryPath.push(node);
+    if (right < start || end < left) return 0;
+    if (left <= start && end <= right) {
+      coveredNodes.push(node);
+      return tree[node];
+    }
+    const mid = Math.floor((start + end) / 2);
+    return query(node * 2, start, mid, left, right)
+      + query(node * 2 + 1, mid + 1, end, left, right);
+  };
+  const update = (node, start, end, index) => {
+    updatePath.push(node);
+    if (start === end) {
+      tree[node] += 1;
+      return;
+    }
+    const mid = Math.floor((start + end) / 2);
+    if (index <= mid) update(node * 2, start, mid, index);
+    else update(node * 2 + 1, mid + 1, end, index);
+    tree[node] = tree[node * 2] + tree[node * 2 + 1];
+  };
+
+  prefixIndex = 0;
+  updatePath = [];
+  if (size) update(1, 0, size - 1, rank.get(0));
+  addStep(
+    { vi: "Đưa P0 = 0 vào cây", en: "Insert P0 = 0 into the tree" },
+    { vi: "Cây chỉ chứa các prefix xuất hiện trước prefix đang xét.", en: "The tree contains only prefixes that occur before the current prefix." },
+    30,
+    "update",
+    [{ name: "rank(P0)", value: rank.get(0) }],
+  );
+
+  for (let index = 1; index < prefix.length; index += 1) {
+    prefixIndex = index;
+    queryPath = [];
+    coveredNodes = [];
+    updatePath = [];
+    queryCount = 0;
+    const current = prefix[index];
+    const minPrevious = current - upper;
+    const maxPrevious = current - lower;
+    queryLeft = lowerBound(minPrevious);
+    queryRight = upperBound(maxPrevious) - 1;
+    addStep(
+      { vi: `Xét P${index} = ${current}`, en: `Process P${index} = ${current}` },
+      { vi: `Cần tìm prefix trước đó Pi trong [${minPrevious}, ${maxPrevious}].`, en: `Find earlier prefixes Pi inside [${minPrevious}, ${maxPrevious}].` },
+      31,
+      "scan",
+      [{ name: "current", value: current }],
+    );
+    addStep(
+      { vi: `Đổi khoảng value thành rank [${queryLeft}, ${queryRight}]`, en: `Convert the value interval to ranks [${queryLeft}, ${queryRight}]` },
+      { vi: "bisect_left lấy rank đầu tiên >= current-upper; bisect_right lấy vị trí sau current-lower.", en: "bisect_left finds the first rank >= current-upper; bisect_right finds the position after current-lower." },
+      32,
+      "bounds",
+      [{ name: "value interval", value: `[${minPrevious}, ${maxPrevious}]` }],
+    );
+    if (size && queryLeft <= queryRight) queryCount = query(1, 0, size - 1, queryLeft, queryRight);
+    addStep(
+      { vi: `Segment Tree query trả ${queryCount}`, en: `Segment Tree query returns ${queryCount}` },
+      { vi: `${queryCount} prefix trước đó tạo subarray sum hợp lệ kết thúc tại index ${index - 1}.`, en: `${queryCount} earlier prefixes form valid subarray sums ending at index ${index - 1}.` },
+      34,
+      "query",
+      [{ name: "found", value: queryCount }],
+    );
+    answer += queryCount;
+    addStep(
+      { vi: `answer += ${queryCount} → ${answer}`, en: `answer += ${queryCount} → ${answer}` },
+      { vi: "Cộng số prefix hợp lệ vừa truy vấn vào kết quả.", en: "Add the newly queried valid-prefix count to the answer." },
+      34,
+      "count",
+      [{ name: "found", value: queryCount }],
+    );
+    queryPath = [];
+    coveredNodes = [];
+    updatePath = [];
+    update(1, 0, size - 1, rank.get(current));
+    addStep(
+      { vi: `Update rank của P${index}`, en: `Update P${index}'s rank` },
+      { vi: `Sau query mới thêm ${current}; nhờ vậy một prefix không bao giờ tự ghép với chính nó.`, en: `Insert ${current} only after querying, so a prefix never pairs with itself.` },
+      35,
+      "update",
+      [{ name: `rank(P${index})`, value: rank.get(current) }],
+    );
+  }
+  queryLeft = null;
+  queryRight = null;
+  queryPath = [];
+  coveredNodes = [];
+  updatePath = [];
+  queryCount = 0;
+  addStep(
+    { vi: `Hoàn tất → return ${answer}`, en: `Done → return ${answer}` },
+    { vi: `Có ${answer} subarray có tổng trong [${lower}, ${upper}].`, en: `${answer} subarrays have sums in [${lower}, ${upper}].` },
+    36,
+    "done",
+    [{ name: "answer", value: answer }],
+    true,
+  );
+  return { original: [...nums], answer, steps };
+}
+
+function buildSteps327(input, params = {}) {
+  return Number(params && params.approach) === 2
+    ? buildSteps327SegmentTree(input, params)
+    : buildSteps327MergeSort(input, params);
+}
+
 module.exports = {
   699: {
     id: 699,
@@ -5582,6 +5963,8 @@ module.exports = {
     tags: [
       { key: "merge-sort", vi: "Merge Sort", en: "Merge Sort" },
       { key: "two-pointers", vi: "Hai con trỏ", en: "Two Pointers" },
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
     ],
     title: { vi: "Reverse Pairs", en: "Reverse Pairs" },
     titleVi: { vi: "Đếm cặp đảo đặc biệt", en: "Count special reverse pairs" },
@@ -5592,17 +5975,24 @@ module.exports = {
     defaultInput: [1, 3, 2, 3, 1],
     inputKind: "integer",
     inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Merge Sort + Two Pointers", en: "Approach 1: Merge Sort + Two Pointers" } },
+        { value: "2", label: { vi: "Cách 2: Segment Tree", en: "Approach 2: Segment Tree" } },
+      ] },
+    ],
     approach: [
       { vi: "Merge Sort chia theo index, nên phần tử nửa trái luôn có index nhỏ hơn phần tử nửa phải.", en: "Merge Sort splits by index, so every left-half element has an earlier index than every right-half element." },
       { vi: "Sau khi hai nửa đã sort, dùng con trỏ right đơn điệu để đếm value phải thỏa left > 2 × right.", en: "Once both halves are sorted, use a monotonic right pointer to count right values satisfying left > 2 × right." },
       { vi: "Merge hai nửa theo value để cấp đệ quy cha tiếp tục đếm trong thời gian tuyến tính.", en: "Merge the halves by value so the parent recursion level can keep counting linearly." },
+      { vi: "Cách 2 quét trái sang phải; với nums[j], Segment Tree đếm các nums[i] đã thấy có value > 2 * nums[j].", en: "Approach 2 scans left to right; for nums[j], a Segment Tree counts seen nums[i] values greater than 2 * nums[j]." },
     ],
     complexity: {
       time: "O(n log n)",
       space: "O(n)",
       note: {
-        vi: "Mỗi level Merge Sort quét hai nửa bằng con trỏ chỉ tiến; có O(log n) level.",
-        en: "Each Merge Sort level scans both halves with forward-only pointers across O(log n) levels.",
+        vi: "Cách 1 quét tuyến tính ở mỗi level Merge Sort. Cách 2 thực hiện một range query và một point update O(log n) cho mỗi phần tử.",
+        en: "Approach 1 scans linearly at every Merge Sort level. Approach 2 performs one O(log n) range query and point update per element.",
       },
     },
     code: [
@@ -5622,6 +6012,42 @@ module.exports = {
       "            nums[start:end] = sorted(nums[start:end])",
       "            return count",
       "        return sort_count(0, len(nums))",
+    ],
+    codeLabel: { vi: "Cách 1 · Merge Sort + Two Pointers", en: "Approach 1 · Merge Sort + Two Pointers" },
+    code2Label: { vi: "Cách 2 · Segment Tree", en: "Approach 2 · Segment Tree" },
+    code2: [
+      "from bisect import bisect_right",
+      "",
+      "class Solution:",
+      "    def reversePairs(self, nums):",
+      "        values = sorted(set(nums))",
+      "        rank = {value: i for i, value in enumerate(values)}",
+      "        tree = [0] * (4 * len(values))",
+      "",
+      "        def query(node, start, end, left, right):",
+      "            if right < start or end < left:",
+      "                return 0",
+      "            if left <= start and end <= right:",
+      "                return tree[node]",
+      "            mid = (start + end) // 2",
+      "            return query(node*2, start, mid, left, right) + query(node*2+1, mid+1, end, left, right)",
+      "",
+      "        def update(node, start, end, index):",
+      "            if start == end:",
+      "                tree[node] += 1",
+      "                return",
+      "            mid = (start + end) // 2",
+      "            if index <= mid: update(node*2, start, mid, index)",
+      "            else: update(node*2+1, mid+1, end, index)",
+      "            tree[node] = tree[node*2] + tree[node*2+1]",
+      "",
+      "        answer = 0",
+      "        for value in nums:",
+      "            first = bisect_right(values, 2 * value)",
+      "            if first < len(values):",
+      "                answer += query(1, 0, len(values)-1, first, len(values)-1)",
+      "            update(1, 0, len(values)-1, rank[value])",
+      "        return answer",
     ],
     builder: buildSteps493,
   },
@@ -5693,6 +6119,8 @@ module.exports = {
     tags: [
       { key: "merge-sort", vi: "Merge Sort", en: "Merge Sort" },
       { key: "divide-and-conquer", vi: "Chia để trị", en: "Divide and Conquer" },
+      { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+      { key: "coordinate-compression", vi: "Nén tọa độ", en: "Coordinate Compression" },
     ],
     title: { vi: "Count of Range Sum", en: "Count of Range Sum" },
     titleVi: { vi: "Đếm tổng đoạn trong khoảng", en: "Count range sums inside bounds" },
@@ -5706,18 +6134,23 @@ module.exports = {
     extraParams: [
       { key: "lower", type: "number", label: { vi: "lower", en: "lower" }, default: -2, allowNegative: true },
       { key: "upper", type: "number", label: { vi: "upper", en: "upper" }, default: 2, allowNegative: true },
+      { key: "approach", label: { vi: "Cách giải", en: "Approach" }, type: "select", default: "1", options: [
+        { value: "1", label: { vi: "Cách 1: Prefix Sum + Merge Sort", en: "Approach 1: Prefix Sum + Merge Sort" } },
+        { value: "2", label: { vi: "Cách 2: Prefix Sum + Segment Tree", en: "Approach 2: Prefix Sum + Segment Tree" } },
+      ] },
     ],
     approach: [
       { vi: "Dùng prefix: sum(nums[i..j−1]) = Pj − Pi.", en: "Use prefixes: sum(nums[i..j−1]) = Pj − Pi." },
       { vi: "Merge Sort giữ thứ tự prefix index qua hai nửa, đồng thời sort mỗi nửa theo giá trị prefix sum.", en: "Merge Sort preserves prefix-index order across halves while sorting each half by prefix-sum value." },
       { vi: "Với mỗi prefix trái, hai con trỏ low/high tìm các prefix phải thỏa lower ≤ Pright − Pleft ≤ upper.", en: "For each left prefix, low/high locate right prefixes satisfying lower ≤ Pright − Pleft ≤ upper." },
+      { vi: "Cách 2 quét prefix từ trái sang phải; Segment Tree đếm các prefix trước đó nằm trong [current−upper, current−lower].", en: "Approach 2 scans prefixes left to right; a Segment Tree counts earlier prefixes inside [current−upper, current−lower]." },
     ],
     complexity: {
-      time: "O(n log n)",
+      time: "O(n log n) · cả hai cách",
       space: "O(n)",
       note: {
-        vi: "Mỗi level Merge Sort quét tuyến tính bằng các con trỏ đơn điệu; có O(log n) level.",
-        en: "Each Merge Sort level scans linearly with monotonic pointers, across O(log n) levels.",
+        vi: "Cách 1 quét tuyến tính ở mỗi level Merge Sort. Cách 2 nén tọa độ rồi thực hiện một range query và một point update O(log n) cho mỗi prefix.",
+        en: "Approach 1 scans linearly at every Merge Sort level. Approach 2 compresses coordinates, then performs one O(log n) range query and point update per prefix.",
       },
     },
     code: [
@@ -5742,6 +6175,46 @@ module.exports = {
       "            prefix[start:end] = sorted(prefix[start:end])",
       "            return count",
       "        return sort_count(0, len(prefix))",
+    ],
+    codeLabel: { vi: "Cách 1 · Prefix Sum + Merge Sort", en: "Approach 1 · Prefix Sum + Merge Sort" },
+    code2Label: { vi: "Cách 2 · Prefix Sum + Segment Tree", en: "Approach 2 · Prefix Sum + Segment Tree" },
+    code2: [
+      "from bisect import bisect_left, bisect_right",
+      "",
+      "class Solution:",
+      "    def countRangeSum(self, nums, lower, upper):",
+      "        prefix = [0]",
+      "        for num in nums:",
+      "            prefix.append(prefix[-1] + num)",
+      "        values = sorted(set(prefix))",
+      "        rank = {value: i for i, value in enumerate(values)}",
+      "        tree = [0] * (4 * len(values))",
+      "",
+      "        def query(node, start, end, left, right):",
+      "            if right < start or end < left:",
+      "                return 0",
+      "            if left <= start and end <= right:",
+      "                return tree[node]",
+      "            mid = (start + end) // 2",
+      "            return query(node*2, start, mid, left, right) + query(node*2+1, mid+1, end, left, right)",
+      "",
+      "        def update(node, start, end, index):",
+      "            if start == end:",
+      "                tree[node] += 1",
+      "                return",
+      "            mid = (start + end) // 2",
+      "            if index <= mid: update(node*2, start, mid, index)",
+      "            else: update(node*2+1, mid+1, end, index)",
+      "            tree[node] = tree[node*2] + tree[node*2+1]",
+      "",
+      "        answer = 0",
+      "        update(1, 0, len(values)-1, rank[0])",
+      "        for current in prefix[1:]:",
+      "            left = bisect_left(values, current - upper)",
+      "            right = bisect_right(values, current - lower) - 1",
+      "            answer += query(1, 0, len(values)-1, left, right)",
+      "            update(1, 0, len(values)-1, rank[current])",
+      "        return answer",
     ],
     builder: buildSteps327,
   },

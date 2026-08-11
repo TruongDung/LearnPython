@@ -322,6 +322,13 @@ textarea,
   touch-action: manipulation;
 }
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 .app {
   max-width: 1200px;
   margin: 0 auto;
@@ -1415,6 +1422,92 @@ button:disabled {
   .rs327-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* ---- LeetCode 327, approach 2: Segment Tree ---- */
+.rs327st-viz {
+  min-height: 430px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: radial-gradient(circle at top right, rgba(16, 185, 129, 0.1), transparent 38%), #07111f;
+}
+.rs327st-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.rs327st-phases span {
+  min-height: 31px; padding: 6px 8px; display: flex; align-items: center; gap: 6px;
+  color: #64748b; font-size: 10px; border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 7px; background: rgba(15, 23, 42, 0.6);
+}
+.rs327st-phases span b { font-weight: 650; }
+.rs327st-phases span.active { color: #d1fae5; border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
+.rs327st-phases span.done { color: #bbf7d0; border-color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+.rs327st-section { display: grid; gap: 8px; min-width: 0; }
+.rs327st-section header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rs327st-section header strong { color: #e2e8f0; font-size: 11px; letter-spacing: 0.055em; }
+.rs327st-section header span { color: #94a3b8; font-size: 10px; }
+.rs327st-scroll { min-width: 0; overflow-x: auto; padding: 2px 2px 6px; }
+.rs327st-nums, .rs327st-prefixes, .rs327st-ranks { display: flex; gap: 7px; min-width: max-content; }
+.rs327st-prefixes { margin-top: 7px; }
+.rs327st-nums > span, .rs327st-prefix, .rs327st-rank, .rs327st-node {
+  min-width: 67px; min-height: 50px; padding: 6px; display: grid; place-items: center; gap: 2px;
+  border: 1px solid rgba(100, 116, 139, 0.4); border-radius: 7px; background: rgba(15, 23, 42, 0.76);
+}
+.rs327st-nums small, .rs327st-prefix small, .rs327st-rank small, .rs327st-node small { color: #94a3b8; font-size: 9px; }
+.rs327st-nums strong, .rs327st-prefix strong, .rs327st-rank strong, .rs327st-node strong { color: inherit; font-size: 15px; }
+.rs327st-prefix em, .rs327st-node em { color: #94a3b8; font-size: 8px; font-style: normal; }
+.rs327st-prefix.stored { color: #bbf7d0; border-color: #22c55e; background: rgba(34, 197, 94, 0.12); }
+.rs327st-prefix.active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28); transform: translateY(-2px); }
+.rs327st-rank.inside { color: #dcfce7; border-color: #22c55e; background: rgba(34, 197, 94, 0.2); }
+.rs327st-rank.current { box-shadow: 0 0 0 2px #38bdf8 inset; }
+.rs327st-action {
+  padding: 9px 11px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px;
+  border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 8px; background: rgba(8, 145, 178, 0.08);
+}
+.rs327st-action small { grid-row: 1 / span 2; align-self: center; color: #67e8f9; font-size: 9px; letter-spacing: 0.08em; }
+.rs327st-action strong { color: #ecfeff; font-size: 13px; overflow-wrap: anywhere; }
+.rs327st-action span { color: #94a3b8; font-size: 10px; }
+.rs327st-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.rs327st-metrics > span {
+  min-height: 48px; padding: 7px; display: grid; place-items: center; gap: 2px;
+  border: 1px solid rgba(100, 116, 139, 0.35); border-radius: 7px; background: rgba(15, 23, 42, 0.62);
+}
+.rs327st-metrics small { color: #94a3b8; font-size: 9px; }
+.rs327st-metrics strong { font-size: 16px; }
+.rs327st-metrics .count { color: #86efac; border-color: rgba(34, 197, 94, 0.5); background: rgba(34, 197, 94, 0.1); }
+.rs327st-tree { display: grid; gap: 7px; padding: 9px; overflow-x: auto; border-radius: 8px; background: rgba(15, 23, 42, 0.48); }
+.rs327st-level { min-width: max-content; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 7px; }
+.rs327st-level > b { color: #64748b; font-size: 9px; }
+.rs327st-level > div { display: flex; justify-content: space-around; gap: 7px; }
+.rs327st-node { min-width: 94px; min-height: 48px; }
+.rs327st-node.visited { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+.rs327st-node.covered { color: #dcfce7; border-color: #22c55e; background: rgba(34, 197, 94, 0.24); }
+.rs327st-node.updated { color: #fef3c7; border-color: #f59e0b; background: rgba(245, 158, 11, 0.18); }
+.rs327st-rule { display: flex; justify-content: center; align-items: center; gap: 9px; flex-wrap: wrap; color: #94a3b8; font-size: 10px; }
+.rs327st-rule code { padding: 4px 7px; color: #fde68a; border-radius: 5px; background: rgba(245, 158, 11, 0.1); }
+
+[data-theme="light"] .rs327st-viz { color: #0f172a; border-color: #cbd5e1; background: radial-gradient(circle at top right, #ecfdf5, transparent 38%), #ffffff; }
+[data-theme="light"] .rs327st-phases span, [data-theme="light"] .rs327st-nums > span,
+[data-theme="light"] .rs327st-prefix, [data-theme="light"] .rs327st-rank,
+[data-theme="light"] .rs327st-node, [data-theme="light"] .rs327st-metrics > span { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .rs327st-phases span.active { color: #065f46; border-color: #10b981; background: #ecfdf5; }
+[data-theme="light"] .rs327st-prefix.stored, [data-theme="light"] .rs327st-rank.inside,
+[data-theme="light"] .rs327st-node.covered { color: #14532d; border-color: #22c55e; background: #dcfce7; }
+[data-theme="light"] .rs327st-node.updated { color: #78350f; border-color: #f59e0b; background: #fef3c7; }
+[data-theme="light"] .rs327st-action { border-color: #67e8f9; background: #ecfeff; }
+[data-theme="light"] .rs327st-action strong, [data-theme="light"] .rs327st-section header strong { color: #0f172a; }
+[data-theme="light"] .rs327st-tree { background: #f1f5f9; }
+[data-theme="light"] .rs327st-rule code { color: #92400e; background: #fffbeb; }
+
+@media (max-width: 640px) {
+  .rs327st-viz { padding: 13px 9px; gap: 10px; }
+  .rs327st-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rs327st-action { grid-template-columns: minmax(0, 1fr); }
+  .rs327st-action small { grid-row: auto; }
+  .rs327st-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* ---- LeetCode 1649: Create Sorted Array Through Instructions ---- */
 .ca1649-viz {
   min-height: 420px;
@@ -1723,6 +1816,85 @@ button:disabled {
   .rp493-action { grid-template-columns: minmax(0, 1fr); }
   .rp493-action small { grid-row: auto; }
   .rp493-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---- LeetCode 493, approach 2: Segment Tree ---- */
+.rp493st-viz {
+  min-height: 430px; padding: 18px; display: grid; gap: 12px; align-content: center;
+  color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px;
+  background: radial-gradient(circle at top right, rgba(244, 63, 94, 0.11), transparent 38%), #07111f;
+}
+.rp493st-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.rp493st-phases span {
+  min-height: 31px; padding: 6px 8px; display: flex; align-items: center; gap: 6px;
+  color: #64748b; font-size: 10px; border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 7px; background: rgba(15, 23, 42, 0.6);
+}
+.rp493st-phases span b { font-weight: 650; }
+.rp493st-phases span.active { color: #ffe4e6; border-color: #f43f5e; background: rgba(244, 63, 94, 0.15); }
+.rp493st-phases span.done { color: #bbf7d0; border-color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+.rp493st-section { display: grid; gap: 8px; min-width: 0; }
+.rp493st-section header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rp493st-section header strong { color: #e2e8f0; font-size: 11px; letter-spacing: 0.055em; }
+.rp493st-section header span { color: #94a3b8; font-size: 10px; }
+.rp493st-scroll { min-width: 0; overflow-x: auto; padding: 2px 2px 6px; }
+.rp493st-nums, .rp493st-ranks { display: flex; gap: 7px; min-width: max-content; }
+.rp493st-num, .rp493st-rank, .rp493st-node {
+  min-width: 67px; min-height: 50px; padding: 6px; display: grid; place-items: center; gap: 2px;
+  border: 1px solid rgba(100, 116, 139, 0.4); border-radius: 7px; background: rgba(15, 23, 42, 0.76);
+}
+.rp493st-num small, .rp493st-rank small, .rp493st-node small { color: #94a3b8; font-size: 9px; }
+.rp493st-num strong, .rp493st-rank strong, .rp493st-node strong { color: inherit; font-size: 15px; }
+.rp493st-num em, .rp493st-node em { color: #94a3b8; font-size: 8px; font-style: normal; }
+.rp493st-num.stored { color: #bbf7d0; border-color: #22c55e; background: rgba(34, 197, 94, 0.12); }
+.rp493st-num.active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.28); transform: translateY(-2px); }
+.rp493st-rank.inside { color: #dcfce7; border-color: #22c55e; background: rgba(34, 197, 94, 0.2); }
+.rp493st-rank.current { box-shadow: 0 0 0 2px #fb7185 inset; }
+.rp493st-action {
+  padding: 9px 11px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px;
+  border: 1px solid rgba(251, 113, 133, 0.4); border-radius: 8px; background: rgba(244, 63, 94, 0.08);
+}
+.rp493st-action small { grid-row: 1 / span 2; align-self: center; color: #fda4af; font-size: 9px; letter-spacing: 0.08em; }
+.rp493st-action strong { color: #fff1f2; font-size: 13px; overflow-wrap: anywhere; }
+.rp493st-action span { color: #94a3b8; font-size: 10px; }
+.rp493st-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.rp493st-metrics > span {
+  min-height: 48px; padding: 7px; display: grid; place-items: center; gap: 2px;
+  border: 1px solid rgba(100, 116, 139, 0.35); border-radius: 7px; background: rgba(15, 23, 42, 0.62);
+}
+.rp493st-metrics small { color: #94a3b8; font-size: 9px; }
+.rp493st-metrics strong { font-size: 16px; }
+.rp493st-metrics .count { color: #86efac; border-color: rgba(34, 197, 94, 0.5); background: rgba(34, 197, 94, 0.1); }
+.rp493st-tree { display: grid; gap: 7px; padding: 9px; overflow-x: auto; border-radius: 8px; background: rgba(15, 23, 42, 0.48); }
+.rp493st-level { min-width: max-content; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 7px; }
+.rp493st-level > b { color: #64748b; font-size: 9px; }
+.rp493st-level > div { display: flex; justify-content: space-around; gap: 7px; }
+.rp493st-node { min-width: 94px; min-height: 48px; }
+.rp493st-node.visited { border-color: #38bdf8; background: rgba(56, 189, 248, 0.12); }
+.rp493st-node.covered { color: #dcfce7; border-color: #22c55e; background: rgba(34, 197, 94, 0.24); }
+.rp493st-node.updated { color: #fef3c7; border-color: #f59e0b; background: rgba(245, 158, 11, 0.18); }
+.rp493st-rule { display: flex; justify-content: center; align-items: center; gap: 9px; flex-wrap: wrap; color: #94a3b8; font-size: 10px; }
+.rp493st-rule code { padding: 4px 7px; color: #fecdd3; border-radius: 5px; background: rgba(244, 63, 94, 0.09); }
+
+[data-theme="light"] .rp493st-viz { color: #0f172a; border-color: #cbd5e1; background: radial-gradient(circle at top right, #fff1f2, transparent 38%), #ffffff; }
+[data-theme="light"] .rp493st-phases span, [data-theme="light"] .rp493st-num,
+[data-theme="light"] .rp493st-rank, [data-theme="light"] .rp493st-node,
+[data-theme="light"] .rp493st-metrics > span { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .rp493st-phases span.active { color: #9f1239; border-color: #e11d48; background: #fff1f2; }
+[data-theme="light"] .rp493st-num.stored, [data-theme="light"] .rp493st-rank.inside,
+[data-theme="light"] .rp493st-node.covered { color: #14532d; border-color: #22c55e; background: #dcfce7; }
+[data-theme="light"] .rp493st-node.updated { color: #78350f; border-color: #f59e0b; background: #fef3c7; }
+[data-theme="light"] .rp493st-action { border-color: #fda4af; background: #fff1f2; }
+[data-theme="light"] .rp493st-action strong, [data-theme="light"] .rp493st-section header strong { color: #0f172a; }
+[data-theme="light"] .rp493st-tree { background: #f1f5f9; }
+[data-theme="light"] .rp493st-rule code { color: #9f1239; background: #fff1f2; }
+
+@media (max-width: 640px) {
+  .rp493st-viz { padding: 13px 9px; gap: 10px; }
+  .rp493st-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rp493st-action { grid-template-columns: minmax(0, 1fr); }
+  .rp493st-action small { grid-row: auto; }
+  .rp493st-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---- LeetCode 699: Falling Squares ---- */
@@ -17210,6 +17382,7 @@ button:disabled {
   color: #cbd5e1;
   font-size: 12px;
   font-weight: 800;
+  font-family: inherit;
   cursor: pointer;
   box-shadow: none;
   transition: all 0.2s;
