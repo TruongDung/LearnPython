@@ -2892,6 +2892,122 @@ function lcaDeepestGuideHtml(view) {
 }
 
 function renderTree(step, targetId = "treeView") {
+  if (step.pathSumView && targetId === "treeView") {
+    const view = step.pathSumView || {};
+    const vi = lang === "vi";
+    const phaseLabels = {
+      intro: vi ? "Quy tắc" : "Rule",
+      "call-root": vi ? "Gọi root" : "Call root",
+      enter: vi ? "Vào hàm" : "Enter call",
+      "check-null": vi ? "Kiểm tra None" : "Check None",
+      "return-null": vi ? "None trả False" : "None returns False",
+      subtract: vi ? "Trừ giá trị node" : "Subtract node value",
+      "check-leaf": vi ? "Kiểm tra lá" : "Check leaf",
+      "return-leaf": vi ? "Lá trả kết quả" : "Leaf returns result",
+      "call-left": vi ? "Gọi trái" : "Call left",
+      "left-return": vi ? "Trái trả về" : "Left returned",
+      "call-right": vi ? "Gọi phải" : "Call right",
+      "return-right": vi ? "Phải trả về" : "Right returned",
+      "short-circuit": vi ? "Short-circuit" : "Short-circuit",
+      done: vi ? "Hoàn tất" : "Complete",
+    };
+    const phase = phaseLabels[view.phase] || view.phase || "—";
+    const stack = Array.isArray(view.stack) ? view.stack : [];
+    const stackHtml = stack.length
+      ? stack.map((frame, index) => `<li class="ps112-frame${index === stack.length - 1 ? " active" : ""}">
+          <span>#${index + 1}</span><strong>${escapeHtml(frame.value === null ? "None" : frame.value)}</strong>
+          <small>${escapeHtml(`target=${frame.target} · remain=${frame.remaining === null ? "—" : frame.remaining}`)}</small>
+          <em>${escapeHtml(frame.stage || "")}</em>
+        </li>`).join("")
+      : `<li class="ps112-empty">${vi ? "Stack rỗng: lời gọi root đã return." : "Empty stack: the root call has returned."}</li>`;
+    const activePath = Array.isArray(view.activePath) && view.activePath.length ? view.activePath.join(" → ") : "—";
+    const successPath = Array.isArray(view.successfulPath) && view.successfulPath.length ? view.successfulPath.join(" → ") : (vi ? "chưa tìm thấy" : "not found yet");
+    const nextText = view.nextCall
+      ? `${view.nextCall.side} → ${view.nextCall.value === null ? "None" : view.nextCall.value} · target=${view.nextCall.target}`
+      : (view.shortCircuit ? (vi ? "Nhánh phải bị bỏ qua" : "Right branch is skipped") : (vi ? "không có lời gọi chờ" : "no pending call"));
+    const remaining = view.remaining === undefined ? "—" : view.remaining;
+    const leafDecision = view.isLeaf === undefined ? "—" : view.isLeaf ? (vi ? "LÁ" : "LEAF") : (vi ? "chưa phải lá" : "not a leaf");
+    const result = view.returnValue === undefined ? "—" : String(view.returnValue);
+    const target = $(targetId);
+    target.innerHTML = `<div class="ps112-viz">
+      <section class="ps112-rule"><strong>${vi ? "ĐIỀU KIỆN TRUE" : "TRUE CONDITION"}</strong><code>leaf and remaining == 0</code><span>${vi ? "Không phải lá thì phải tiếp tục DFS. `or` dừng sớm khi nhánh trái là True." : "A non-leaf must keep searching. `or` short-circuits once the left branch is True."}</span></section>
+      <div class="ps112-layout">
+        <section class="ps112-tree-card"><header><strong>${vi ? "CÂY VÀ KẾT QUẢ CÁC LỜI GỌI" : "TREE AND CALL RESULTS"}</strong><span>${vi ? "cam = đang chạy · xanh = True · đỏ = False" : "amber = running · green = True · red = False"}</span></header><div id="ps112Tree" class="ps112-tree"></div></section>
+        <aside class="ps112-side">
+          <section class="ps112-phase"><span>${vi ? "PHA HIỆN TẠI" : "CURRENT PHASE"}</span><strong>${escapeHtml(phase)}</strong><small>${view.current ? `${vi ? "node" : "node"} ${view.current.value}` : "—"}</small></section>
+          <section class="ps112-state"><div><span>target</span><strong>${escapeHtml(view.target === undefined ? "—" : view.target)}</strong></div><div><span>remaining</span><strong>${escapeHtml(remaining)}</strong></div><div><span>${vi ? "trạng thái" : "state"}</span><strong>${escapeHtml(leafDecision)}</strong></div></section>
+          <section class="ps112-path"><span>${vi ? "ĐƯỜNG ĐANG XÉT" : "ACTIVE PATH"}</span><strong>${escapeHtml(activePath)}</strong><small>${vi ? "ĐƯỜNG TÌM ĐƯỢC" : "FOUND PATH"}: ${escapeHtml(successPath)}</small></section>
+          <section class="ps112-stack"><header><strong>CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+          <section class="ps112-branch"><div><span>left</span><strong>${escapeHtml(view.leftResult === undefined ? "—" : view.leftResult)}</strong></div><div><span>right</span><strong>${escapeHtml(view.rightResult === undefined ? "—" : view.rightResult)}</strong></div><div><span>return</span><strong>${escapeHtml(result)}</strong></div></section>
+          <section class="ps112-next${view.shortCircuit ? " skipped" : ""}"><span>${view.shortCircuit ? (vi ? "SHORT-CIRCUIT" : "SHORT-CIRCUIT") : (vi ? "LỜI GỌI TIẾP THEO" : "NEXT CALL")}</span><strong>${escapeHtml(nextText)}</strong></section>
+        </aside>
+      </div>
+    </div>`;
+    renderTree(step, "ps112Tree");
+    return;
+  }
+  if (step.maxDepthView && targetId === "treeView") {
+    const view = step.maxDepthView || {};
+    const vi = lang === "vi";
+    const phaseLabels = {
+      intro: vi ? "Quy tắc" : "Rule",
+      "call-root": vi ? "Gọi root" : "Call root",
+      enter: vi ? "Vào hàm" : "Enter call",
+      "check-base": vi ? "Kiểm tra base case" : "Check base case",
+      "return-null": vi ? "None trả 0" : "None returns 0",
+      "call-left": vi ? "Gọi trái" : "Call left",
+      "left-return": vi ? "Trái trả về" : "Left returned",
+      "call-right": vi ? "Gọi phải" : "Call right",
+      "right-return": vi ? "Phải trả về" : "Right returned",
+      compute: vi ? "Tính công thức" : "Compute formula",
+      "return-node": vi ? "Trả về cha" : "Return to parent",
+      done: vi ? "Hoàn tất" : "Complete",
+    };
+    const phase = phaseLabels[view.phase] || view.phase || "—";
+    const stack = Array.isArray(view.stack) ? view.stack : [];
+    const stackHtml = stack.length
+      ? stack.map((frame, index) => `<li class="md104-frame${index === stack.length - 1 ? " active" : ""}">
+          <span>#${index + 1}</span><strong>${escapeHtml(frame.value === null ? "None" : frame.value)}</strong>
+          <small>${escapeHtml((vi ? "level " : "level ") + frame.level + " · " + (frame.side || "root"))}</small>
+          <em>${escapeHtml(frame.stage || "")}</em>
+        </li>`).join("")
+      : `<li class="md104-stack-empty">${vi ? "Stack rỗng: tất cả lời gọi đã return." : "Empty stack: every call has returned."}</li>`;
+    const currentText = view.current
+      ? `${vi ? "node" : "node"} ${view.current.value} · ${vi ? "level" : "level"} ${view.currentLevel}`
+      : (view.phase === "return-null" ? "None" : (vi ? "chưa có / đã xong" : "not started / complete"));
+    const nextText = view.nextCall
+      ? `${view.nextCall.side} → ${view.nextCall.value === null ? "None" : view.nextCall.value} (${vi ? "level" : "level"} ${view.nextCall.level})`
+      : (vi ? "không có lời gọi tiếp theo" : "no pending call");
+    const left = view.leftDepth === undefined ? "—" : view.leftDepth;
+    const right = view.rightDepth === undefined ? "—" : view.rightDepth;
+    const formula = view.formula || (vi ? "Chờ hai nhánh trả về." : "Waiting for both branches to return.");
+    const maxBefore = view.visualMaxBefore === undefined ? "—" : view.visualMaxBefore;
+    const maxAfter = view.visualMaxAfter === undefined ? "—" : view.visualMaxAfter;
+    const updateText = view.maxUpdated
+      ? (vi ? "CẬP NHẬT" : "UPDATED")
+      : (view.visualMaxAfter === undefined ? (vi ? "chưa tính" : "not computed") : (vi ? "không đổi" : "unchanged"));
+    const target = $(targetId);
+    target.innerHTML = `<div class="md104-viz">
+      <section class="md104-rule">
+        <strong>${vi ? "CÔNG THỨC CỦA MỖI NODE" : "EVERY NODE'S FORMULA"}</strong>
+        <code>depth(node) = 1 + max(depth(left), depth(right))</code>
+        <span>${vi ? "Base case: None → 0 · lá → 1 · tính hậu tự từ dưới lên" : "Base case: None → 0 · leaf → 1 · postorder, bottom-up"}</span>
+      </section>
+      <div class="md104-layout">
+        <section class="md104-tree-card"><header><strong>${vi ? "CÂY VÀ GIÁ TRỊ ĐÃ TRẢ" : "TREE AND RETURNED VALUES"}</strong><span>${vi ? "cam = lời gọi hiện tại · xanh = đã return" : "amber = active call · green = returned"}</span></header><div id="md104Tree" class="md104-tree"></div></section>
+        <aside class="md104-side">
+          <section class="md104-phase"><span>${vi ? "PHA HIỆN TẠI" : "CURRENT PHASE"}</span><strong>${escapeHtml(phase)}</strong><small>${escapeHtml(currentText)}</small></section>
+          <section class="md104-call"><span>${vi ? "LỜI GỌI TIẾP THEO" : "NEXT CALL"}</span><strong>${escapeHtml(nextText)}</strong></section>
+          <section class="md104-stack"><header><strong>${vi ? "CALL STACK" : "CALL STACK"}</strong><span>${vi ? "dòng cuối là active" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+          <section class="md104-returns"><div><span>left</span><strong>${escapeHtml(left)}</strong></div><div><span>right</span><strong>${escapeHtml(right)}</strong></div><div><span>${vi ? "return" : "return"}</span><strong>${escapeHtml(view.returnDepth === undefined ? "—" : view.returnDepth)}</strong></div></section>
+          <section class="md104-formula"><span>${vi ? "CÔNG THỨC / QUYẾT ĐỊNH" : "FORMULA / DECISION"}</span><code>${escapeHtml(formula)}</code></section>
+          <section class="md104-meter${view.maxUpdated ? " updated" : ""}"><span>${vi ? "TALLEST SEEN (chỉ để minh họa)" : "TALLEST SEEN (visual aid only)"}</span><strong>${escapeHtml(maxBefore)} → ${escapeHtml(maxAfter)}</strong><em>${escapeHtml(updateText)}</em></section>
+        </aside>
+      </div>
+    </div>`;
+    renderTree(step, "md104Tree");
+    return;
+  }
   const nodes = step.tree.nodes;
   const arrowId = `tree-arrow-${String(targetId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const treeAnnotations = step.tree.annotations || {}; // { nodeId: "label" | { label, kind } }
@@ -3027,7 +3143,7 @@ function renderTree(step, targetId = "treeView") {
   }
 
   const treeHtml =
-    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}${step.lcaDeepestView ? " lca-deepest-tree" : ""}">` +
+    `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="tree-svg${width <= 520 ? " tree-svg-fit" : ""}${step.lcaDeepestView ? " lca-deepest-tree" : ""}${step.maxDepthView ? " md104-tree-svg" : ""}">` +
     `<defs><marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" class="tree-arrow"/></marker></defs>` +
     edges +
     circles +

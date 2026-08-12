@@ -73,6 +73,7 @@ function snapshot(root, opts) {
     codeBlock: opts.codeBlock,
     queueView: opts.queueView,
     lcaDeepestView: opts.lcaDeepestView,
+    maxDepthView: opts.maxDepthView,
     rightSideBfsView: opts.rightSideBfsView,
     rightSideDfsView: opts.rightSideDfsView,
     vars: opts.vars || [],
@@ -183,32 +184,227 @@ function buildSteps145(input) {
 
 // ─── 104: Maximum Depth of Binary Tree ───
 function buildSteps104(input) {
-  const root = parseTree(input); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: "Độ sâu lớn nhất của cây", en: "Maximum depth of binary tree" },
-    codeLines: [2, 3], vars: [{ name: "rule", value: "depth = 1 + max(left, right)" }],
-    note: { vi: `depth(node) = 1 + max(depth(trái), depth(phải)). null → 0, lá → 1. Tính từ dưới lên (postorder).`, en: `depth(node) = 1 + max(depth(left), depth(right)). null → 0, leaf → 1. Computed bottom-up (postorder).` },
-  }));
-  let answer = 0;
-  function dfs(node) {
-    if (!node) return 0;
-    const l = dfs(node.left), r = dfs(node.right);
-    const d = 1 + Math.max(l, r); answer = Math.max(answer, d);
-    steps.push(snapshot(root, {
-      title: { vi: `Nút ${node.val}: depth = ${d}`, en: `Node ${node.val}: depth = ${d}` },
-      hlSet: new Set([node.id]), codeLines: [4, 5],
-      vars: [{ name: "node", value: node.val }, { name: "left depth", value: l }, { name: "right depth", value: r }, { name: "depth", value: d }],
-      note: { vi: `depth = 1 + max(${l}, ${r}) = ${d}.`, en: `depth = 1 + max(${l}, ${r}) = ${d}.` },
-    }));
-    return d;
+  const root = parseTree(input);
+  const steps = [];
+  const callStack = [];
+  const returnedDepths = new Map();
+  let visualMax = 0;
+
+  const sideText = (side, language) => {
+    if (side === "root") return language === "vi" ? "gốc" : "root";
+    if (language === "vi") return side === "left" ? "trái" : "phải";
+    return side;
+  };
+
+  function annotationsFor(current, nextCall, nullChild) {
+    const annotations = {};
+    const existingLabels = (id) => {
+      const annotation = annotations[id];
+      if (!annotation) return [];
+      if (Array.isArray(annotation.labels)) return [...annotation.labels];
+      return [{ label: annotation.label, kind: annotation.kind || "" }];
+    };
+    returnedDepths.forEach((depth, id) => {
+      annotations[id] = { label: `↩ depth ${depth}`, kind: "md-return" };
+    });
+    if (current) {
+      // While a frame is active, show one CURRENT badge instead of stacking it
+      // with its completed return-depth badge at the same tree position.
+      annotations[current.id] = {
+        labels: [{ label: `CURRENT · level ${callStack[callStack.length - 1].level}`, kind: "md-current" }],
+      };
+    }
+    if (nextCall && nextCall.node) {
+      const labels = existingLabels(nextCall.node.id);
+      labels.push({ label: `NEXT · ${nextCall.side.toUpperCase()}`, kind: "md-next" });
+      annotations[nextCall.node.id] = { labels };
+    }
+    if (nullChild) {
+      annotations[nullChild.id] = { label: `${nullChild.side.toUpperCase()} = None`, kind: "md-null" };
+    }
+    return annotations;
   }
-  const ans = dfs(root);
-  const fs = snapshot(root, {
-    title: { vi: `Max depth = ${ans}`, en: `Max depth = ${ans}` },
-    vars: [{ name: "answer", value: ans }],
-    note: { vi: `Độ sâu lớn nhất của cây = ${ans}.`, en: `Maximum depth of the tree = ${ans}.` },
-  }); fs.final = true; steps.push(fs);
-  return { input, answer: ans, steps };
+
+  function makeView(opts) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current") ? opts.current : frame && frame.node;
+    return {
+      phase: opts.phase,
+      current: current ? { id: current.id, value: current.val } : null,
+      currentLevel: frame ? frame.level : null,
+      currentSide: frame ? frame.side : null,
+      stack: callStack.map((item) => ({
+        value: item.node ? item.node.val : null,
+        level: item.level,
+        side: item.side,
+        stage: item.stage,
+      })),
+      nextCall: opts.nextCall ? {
+        value: opts.nextCall.node ? opts.nextCall.node.val : null,
+        level: opts.nextCall.level,
+        side: opts.nextCall.side,
+      } : null,
+      leftDepth: opts.leftDepth,
+      rightDepth: opts.rightDepth,
+      returnDepth: opts.returnDepth,
+      formula: opts.formula || null,
+      visualMaxBefore: opts.visualMaxBefore,
+      visualMaxAfter: opts.visualMaxAfter,
+      maxUpdated: opts.maxUpdated,
+      completed: [...returnedDepths.entries()].map(([id, depth]) => ({ id, depth })),
+    };
+  }
+
+  function addStep(opts) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current") ? opts.current : frame && frame.node;
+    const highlighted = new Set(opts.highlightIds || []);
+    if (current) highlighted.add(current.id);
+    if (opts.nextCall && opts.nextCall.node) highlighted.add(opts.nextCall.node.id);
+    if (opts.parent) highlighted.add(opts.parent.id);
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "call stack")) {
+      vars.push({ name: "call stack", value: callStack.length ? `[${callStack.map((item) => item.node ? item.node.val : "None").join(" → ")}]` : "[]" });
+    }
+    const treeStep = snapshot(root, {
+      title: opts.title,
+      hlSet: highlighted,
+      wordSet: new Set(returnedDepths.keys()),
+      annotations: annotationsFor(current, opts.nextCall, opts.nullChild),
+      nullChildren: opts.nullChild ? [opts.nullChild] : [],
+      codeLines: opts.codeLines,
+      maxDepthView: makeView({ ...opts, current }),
+      vars,
+      note: opts.note,
+    });
+    steps.push(treeStep);
+  }
+
+  addStep({
+    title: { vi: "Quy tắc: node đợi cả hai nhánh rồi mới return", en: "Rule: a node waits for both branches before returning" },
+    codeLines: [2], phase: "intro", current: null,
+    vars: [{ name: "rule", value: "depth(node) = 1 + max(left, right)" }, { name: "base case", value: "depth(None) = 0" }],
+    note: { vi: "Đây là DFS hậu tự (postorder): tính depth từ lá đi ngược lên root. Số level trên cây bắt đầu từ 0, còn depth trả về bắt đầu từ 1 ở lá.", en: "This is postorder DFS: compute depths from leaves back to the root. Tree levels start at 0, while a leaf returns depth 1." },
+  });
+
+  function dfs(node, parent, side, level) {
+    callStack.push({ node, side, level, stage: "enter" });
+    addStep({
+      title: { vi: `Vào maxDepth(${node ? node.val : "None"})`, en: `Enter maxDepth(${node ? node.val : "None"})` },
+      codeLines: [3], phase: "enter", parent,
+      vars: [{ name: "node", value: node ? node.val : "None" }, { name: "level", value: level }, { name: "called from", value: sideText(side, "en") }],
+      note: node
+        ? { vi: `Push frame cho node ${node.val}. Trước hết kiểm tra base case ở dòng 3.`, en: `Push a frame for node ${node.val}. First check the base case on line 3.` }
+        : { vi: `Push frame None: đây là lời gọi cho con ${sideText(side, "vi")} không tồn tại.`, en: `Push a None frame: this call is for a missing ${sideText(side, "en")} child.` },
+    });
+
+    const isNull = !node;
+    callStack[callStack.length - 1].stage = "check-base";
+    addStep({
+      title: { vi: `if not root → ${isNull ? "ĐÚNG" : "SAI"}`, en: `if not root → ${isNull ? "TRUE" : "FALSE"}` },
+      codeLines: [3], phase: "check-base", parent,
+      vars: [{ name: "node", value: node ? node.val : "None" }, { name: "not root", value: isNull }],
+      note: isNull
+        ? { vi: "root là None nên điều kiện đúng; nhánh rỗng có depth bằng 0.", en: "root is None, so the condition is true; an empty branch has depth 0." }
+        : { vi: `root là node ${node.val}, nên bỏ qua return 0 và tính hai cây con.`, en: `root is node ${node.val}, so skip return 0 and compute both subtrees.` },
+    });
+
+    if (isNull) {
+      const nullChild = parent ? { id: `md-null-${parent.id}-${side}-${level}`, parentId: parent.id, side } : null;
+      callStack[callStack.length - 1].stage = "return-0";
+      addStep({
+        title: { vi: "Base case: return 0", en: "Base case: return 0" },
+        codeLines: [4], phase: "return-null", current: null, parent, nullChild,
+        vars: [{ name: "return", value: 0 }, { name: "meaning", value: "no node → no level" }],
+        note: { vi: "Không có node ở nhánh này, nên lời gọi trả về 0 cho lời gọi cha.", en: "There is no node in this branch, so this call returns 0 to its caller." },
+      });
+      callStack.pop();
+      return 0;
+    }
+
+    const leftCall = { node: node.left, side: "left", level: level + 1 };
+    callStack[callStack.length - 1].stage = "call-left";
+    addStep({
+      title: { vi: `Gọi maxDepth(con trái của ${node.val})`, en: `Call maxDepth(${node.val}.left)` },
+      codeLines: [5], phase: "call-left", nextCall: leftCall,
+      vars: [{ name: "node", value: node.val }, { name: "left child", value: node.left ? node.left.val : "None" }, { name: "left depth", value: "waiting" }],
+      note: { vi: `Dòng 5 phải chạy xong toàn bộ nhánh trái trước. ${node.left ? `Đi vào node ${node.left.val}.` : "Không có con trái, nên sẽ gọi maxDepth(None)."}`, en: `Line 5 must finish the entire left branch first. ${node.left ? `Enter node ${node.left.val}.` : "There is no left child, so it calls maxDepth(None)."}` },
+    });
+    const leftDepth = dfs(node.left, node, "left", level + 1);
+
+    callStack[callStack.length - 1].stage = "left-returned";
+    addStep({
+      title: { vi: `Con trái của ${node.val} trả về ${leftDepth}`, en: `Left child of ${node.val} returns ${leftDepth}` },
+      codeLines: [5], phase: "left-return", leftDepth,
+      vars: [{ name: "left depth", value: leftDepth }, { name: "right depth", value: "waiting" }],
+      note: { vi: `Biến left nhận giá trị ${leftDepth}. Bây giờ mới có thể chạy dòng 6 cho nhánh phải.`, en: `Variable left receives ${leftDepth}. Only now can line 6 run for the right branch.` },
+    });
+
+    const rightCall = { node: node.right, side: "right", level: level + 1 };
+    callStack[callStack.length - 1].stage = "call-right";
+    addStep({
+      title: { vi: `Gọi maxDepth(con phải của ${node.val})`, en: `Call maxDepth(${node.val}.right)` },
+      codeLines: [6], phase: "call-right", leftDepth, nextCall: rightCall,
+      vars: [{ name: "left depth", value: leftDepth }, { name: "right child", value: node.right ? node.right.val : "None" }, { name: "right depth", value: "waiting" }],
+      note: { vi: `Đã có left = ${leftDepth}; dòng 6 duyệt nhánh phải. ${node.right ? `Đi vào node ${node.right.val}.` : "Không có con phải, nên sẽ gọi maxDepth(None)."}`, en: `left = ${leftDepth} is ready; line 6 explores the right branch. ${node.right ? `Enter node ${node.right.val}.` : "There is no right child, so it calls maxDepth(None)."}` },
+    });
+    const rightDepth = dfs(node.right, node, "right", level + 1);
+
+    callStack[callStack.length - 1].stage = "right-returned";
+    addStep({
+      title: { vi: `Con phải của ${node.val} trả về ${rightDepth}`, en: `Right child of ${node.val} returns ${rightDepth}` },
+      codeLines: [6], phase: "right-return", leftDepth, rightDepth,
+      vars: [{ name: "left depth", value: leftDepth }, { name: "right depth", value: rightDepth }],
+      note: { vi: `Đủ hai kết quả: left = ${leftDepth}, right = ${rightDepth}. Node ${node.val} đã sẵn sàng tính depth của chính nó.`, en: `Both results are ready: left = ${leftDepth}, right = ${rightDepth}. Node ${node.val} can now compute its own depth.` },
+    });
+
+    const depth = 1 + Math.max(leftDepth, rightDepth);
+    const visualMaxBefore = visualMax;
+    visualMax = Math.max(visualMax, depth);
+    const maxUpdated = visualMax > visualMaxBefore;
+    returnedDepths.set(node.id, depth);
+    callStack[callStack.length - 1].stage = "compute-return";
+    addStep({
+      title: { vi: `Tính depth(${node.val}) = ${depth}`, en: `Compute depth(${node.val}) = ${depth}` },
+      codeLines: [7], phase: "compute", leftDepth, rightDepth, returnDepth: depth,
+      formula: `1 + max(${leftDepth}, ${rightDepth}) = ${depth}`,
+      visualMaxBefore, visualMaxAfter: visualMax, maxUpdated,
+      vars: [{ name: "left", value: leftDepth }, { name: "right", value: rightDepth }, { name: "return", value: depth }, { name: "tallest seen (visual)", value: `${visualMaxBefore} → ${visualMax}` }],
+      note: { vi: `Dòng 7: 1 + max(${leftDepth}, ${rightDepth}) = ${depth}. Đồng hồ “tallest seen” chỉ để minh họa; code Python không cần biến global này.`, en: `Line 7: 1 + max(${leftDepth}, ${rightDepth}) = ${depth}. The “tallest seen” meter is visualization-only; the Python code needs no global variable.` },
+    });
+    callStack[callStack.length - 1].stage = "return";
+    addStep({
+      title: { vi: `Return ${depth} từ node ${node.val}`, en: `Return ${depth} from node ${node.val}` },
+      codeLines: [7], phase: "return-node", leftDepth, rightDepth, returnDepth: depth,
+      formula: `depth(${node.val}) = ${depth}`,
+      visualMaxBefore, visualMaxAfter: visualMax, maxUpdated,
+      vars: [{ name: "return to parent", value: depth }, { name: "completed node", value: node.val }],
+      note: { vi: `Pop frame ${node.val} và đưa depth ${depth} về lời gọi cha. Nhãn ↩ dưới node lưu giá trị đã hoàn tất.`, en: `Pop frame ${node.val} and pass depth ${depth} back to its caller. The ↩ label under the node records its completed value.` },
+    });
+    callStack.pop();
+    return depth;
+  }
+
+  const rootCall = { node: root, side: "root", level: 0 };
+  addStep({
+    title: { vi: `Bắt đầu maxDepth(${root ? root.val : "None"})`, en: `Start maxDepth(${root ? root.val : "None"})` },
+    codeLines: [2], phase: "call-root", current: null, nextCall: rootCall,
+    vars: [{ name: "root", value: root ? root.val : "None" }],
+    note: { vi: "Gọi hàm ở root. Frame ở cuối call stack luôn là lời gọi hiện đang chạy.", en: "Call the function at the root. The last call-stack frame is always the active call." },
+  });
+  const answer = dfs(root, null, "root", 0);
+  const finalStep = snapshot(root, {
+    title: { vi: `Kết quả: maximum depth = ${answer}`, en: `Result: maximum depth = ${answer}` },
+    wordSet: new Set(returnedDepths.keys()),
+    annotations: annotationsFor(null, null, null),
+    codeLines: [7],
+    maxDepthView: makeView({ phase: "done", current: null, returnDepth: answer, formula: `maxDepth(root) = ${answer}`, visualMaxBefore: visualMax, visualMaxAfter: visualMax, maxUpdated: false }),
+    vars: [{ name: "maxDepth(root)", value: answer }, { name: "answer", value: answer }, { name: "call stack", value: "[]" }],
+    note: { vi: `Tất cả lời gọi đã return. Độ sâu lớn nhất của cây là ${answer}.`, en: `Every call has returned. The maximum depth of the tree is ${answer}.` },
+  });
+  finalStep.final = true;
+  steps.push(finalStep);
+  return { input, answer, steps };
 }
 
 // ─── 102: Binary Tree Level Order Traversal (BFS by level) ───
@@ -245,38 +441,270 @@ function buildSteps102(input) {
 
 // ─── 112: Path Sum (root-to-leaf) ───
 function buildSteps112(input, params) {
-  const root = parseTree(input); const target = params.target !== undefined ? Number(params.target) : 20; const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: `Có đường root→leaf tổng = ${target}?`, en: `Path root→leaf summing to ${target}?` },
-    codeLines: [2, 3], vars: [{ name: "targetSum", value: target }],
-    note: { vi: `Đi từ GỐC xuống LÁ, trừ dần giá trị nút khỏi target. Tới lá mà remaining = 0 → tìm thấy.`, en: `Go from ROOT to LEAF, subtracting each node value from target. Reach a leaf with remaining = 0 → found.` },
-  }));
-  let answer = false; const foundPath = [];
-  function dfs(node, remaining, path) {
-    if (!node) return false;
-    const rem = remaining - node.val;
-    const np = [...path, node.id];
-    const isLeaf = !node.left && !node.right;
-    steps.push(snapshot(root, {
-      title: { vi: `Tại ${node.val}, còn lại ${rem}`, en: `At ${node.val}, remaining ${rem}` },
-      hlSet: new Set([node.id]), wordSet: new Set(np), codeLines: [4, 5],
-      vars: [{ name: "node", value: node.val }, { name: "remaining", value: rem }, { name: "leaf?", value: isLeaf }],
-      note: {
-        vi: `remaining = ${remaining} - ${node.val} = ${rem}.` + (isLeaf ? (rem === 0 ? ` Lá & remaining = 0 → TÌM THẤY!` : ` Lá nhưng remaining ≠ 0 → quay lui.`) : ``),
-        en: `remaining = ${remaining} - ${node.val} = ${rem}.` + (isLeaf ? (rem === 0 ? ` Leaf & remaining = 0 → FOUND!` : ` Leaf but remaining ≠ 0 → backtrack.`) : ``),
-      },
-    }));
-    if (isLeaf && rem === 0) { answer = true; foundPath.push(...np); return true; }
-    if (dfs(node.left, rem, np)) return true;
-    if (dfs(node.right, rem, np)) return true;
-    return false;
+  const root = parseTree(input);
+  const target = params && params.target !== undefined ? Number(params.target) : 20;
+  const steps = [];
+  const callStack = [];
+  const returned = new Map();
+  let successfulPathIds = [];
+  let successfulPathValues = [];
+
+  function annotationLabels(annotations, id) {
+    const value = annotations[id];
+    if (!value) return [];
+    return Array.isArray(value.labels)
+      ? [...value.labels]
+      : [{ label: value.label, kind: value.kind || "" }];
   }
-  if (root) dfs(root, target, []);
-  const fs = snapshot(root, {
-    title: { vi: answer ? `✓ Có đường tổng = ${target}` : `✗ Không có đường nào`, en: answer ? `✓ Path summing to ${target} exists` : `✗ No such path` },
-    wordSet: answer ? new Set(foundPath) : undefined, vars: [{ name: "answer", value: answer }],
-    note: { vi: answer ? `Tồn tại đường root→leaf có tổng = ${target}.` : `Không có đường root→leaf nào tổng = ${target}.`, en: answer ? `A root→leaf path sums to ${target}.` : `No root→leaf path sums to ${target}.` },
-  }); fs.final = true; steps.push(fs);
+
+  function annotationsFor(current, nextCall, nullChild) {
+    const annotations = {};
+    returned.forEach((result, id) => {
+      annotations[id] = { label: `↩ ${result}`, kind: result ? "ps112-true" : "ps112-false" };
+    });
+    if (current) {
+      const labels = annotationLabels(annotations, current.id);
+      labels.push({ label: "CURRENT", kind: "ps112-current" });
+      annotations[current.id] = { labels };
+    }
+    if (nextCall && nextCall.node) {
+      const labels = annotationLabels(annotations, nextCall.node.id);
+      labels.push({ label: `NEXT · ${nextCall.side.toUpperCase()}`, kind: "ps112-next" });
+      annotations[nextCall.node.id] = { labels };
+    }
+    if (nullChild) annotations[nullChild.id] = { label: `${nullChild.side.toUpperCase()} = None`, kind: "ps112-null" };
+    return annotations;
+  }
+
+  function makeView(opts) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current") ? opts.current : frame && frame.node;
+    return {
+      phase: opts.phase,
+      target,
+      current: current ? { id: current.id, value: current.val } : null,
+      remainingBefore: opts.remainingBefore,
+      remaining: opts.remaining,
+      isLeaf: opts.isLeaf,
+      leafMatch: opts.leafMatch,
+      leftResult: opts.leftResult,
+      rightResult: opts.rightResult,
+      returnValue: opts.returnValue,
+      shortCircuit: opts.shortCircuit || null,
+      nextCall: opts.nextCall ? {
+        value: opts.nextCall.node ? opts.nextCall.node.val : null,
+        side: opts.nextCall.side,
+        target: opts.nextCall.target,
+      } : null,
+      stack: callStack.map((item) => ({
+        value: item.node ? item.node.val : null,
+        side: item.side,
+        target: item.target,
+        remaining: item.remaining,
+        path: item.pathValues,
+        stage: item.stage,
+      })),
+      activePath: frame ? frame.pathValues : [],
+      successfulPath: [...successfulPathValues],
+    };
+  }
+
+  function addStep(opts) {
+    const frame = callStack[callStack.length - 1] || null;
+    const current = Object.prototype.hasOwnProperty.call(opts, "current") ? opts.current : frame && frame.node;
+    const highlights = new Set(opts.highlightIds || []);
+    if (current) highlights.add(current.id);
+    if (opts.parent) highlights.add(opts.parent.id);
+    if (opts.nextCall && opts.nextCall.node) highlights.add(opts.nextCall.node.id);
+    const activePathIds = frame ? frame.pathIds : [];
+    const wordSet = successfulPathIds.length ? new Set(successfulPathIds) : new Set(activePathIds);
+    const vars = [...(opts.vars || [])];
+    if (!vars.some((item) => item.name === "call stack")) {
+      vars.push({ name: "call stack", value: callStack.length ? `[${callStack.map((item) => item.node ? item.node.val : "None").join(" → ")}]` : "[]" });
+    }
+    const treeStep = snapshot(root, {
+      title: opts.title,
+      hlSet: highlights,
+      wordSet,
+      annotations: annotationsFor(current, opts.nextCall, opts.nullChild),
+      nullChildren: opts.nullChild ? [opts.nullChild] : [],
+      codeLines: opts.codeLines,
+      vars,
+      note: opts.note,
+    });
+    treeStep.pathSumView = makeView({ ...opts, current });
+    treeStep.tree.nodes.forEach((node) => {
+      if (returned.has(node.id)) node.sub = `↩ ${returned.get(node.id)}`;
+    });
+    steps.push(treeStep);
+  }
+
+  addStep({
+    title: { vi: `Mục tiêu: có đường root → leaf tổng ${target}?`, en: `Goal: is there a root → leaf path summing to ${target}?` },
+    codeLines: [2], phase: "intro", current: null,
+    vars: [{ name: "targetSum", value: target }, { name: "rule", value: "remaining = targetSum - node.val" }],
+    note: { vi: "Mỗi lời gọi nhận một target còn lại. Tại node, trừ node.val; chỉ trả True khi đến LÁ và remaining bằng 0.", en: "Each call receives a remaining target. At a node, subtract node.val; return True only at a LEAF with remaining 0." },
+  });
+
+  function dfs(node, currentTarget, pathIds, pathValues, parent, side) {
+    callStack.push({ node, side, target: currentTarget, remaining: null, pathIds, pathValues, stage: "enter" });
+    addStep({
+      title: { vi: `Vào hasPathSum(${node ? node.val : "None"}, ${currentTarget})`, en: `Enter hasPathSum(${node ? node.val : "None"}, ${currentTarget})` },
+      codeLines: [3], phase: "enter", parent,
+      vars: [{ name: "root", value: node ? node.val : "None" }, { name: "targetSum", value: currentTarget }, { name: "path", value: `[${pathValues.join(", ")}]` }],
+      note: node
+        ? { vi: `Push frame node ${node.val}; trước hết kiểm tra root có phải None không.`, en: `Push a frame for node ${node.val}; first check whether root is None.` }
+        : { vi: `Push frame None cho nhánh ${side}; đây là base case trả False.`, en: `Push a None frame for the ${side} branch; this is the base case that returns False.` },
+    });
+
+    const isNull = !node;
+    callStack[callStack.length - 1].stage = "check-null";
+    addStep({
+      title: { vi: `if not root → ${isNull ? "ĐÚNG" : "SAI"}`, en: `if not root → ${isNull ? "TRUE" : "FALSE"}` },
+      codeLines: [3], phase: "check-null", parent,
+      vars: [{ name: "root", value: node ? node.val : "None" }, { name: "not root", value: isNull }],
+      note: isNull
+        ? { vi: "Không tồn tại node nên không thể tạo đường root→leaf hợp lệ ở nhánh này.", en: "No node exists, so this branch cannot form a valid root-to-leaf path." }
+        : { vi: `Node ${node.val} tồn tại; tiếp tục trừ node.val khỏi target còn lại.`, en: `Node ${node.val} exists; continue by subtracting node.val from the remaining target.` },
+    });
+    if (isNull) {
+      const nullChild = parent ? { id: `ps112-null-${parent.id}-${side}-${callStack.length}`, parentId: parent.id, side } : null;
+      callStack[callStack.length - 1].stage = "return-false";
+      addStep({
+        title: { vi: "Base case: return False", en: "Base case: return False" },
+        codeLines: [3], phase: "return-null", current: null, parent, nullChild, returnValue: false,
+        vars: [{ name: "return", value: false }, { name: "reason", value: "root is None" }],
+        note: { vi: "Dòng 3 trả False ngay lập tức cho nhánh rỗng.", en: "Line 3 immediately returns False for an empty branch." },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    const remaining = currentTarget - node.val;
+    const currentPathIds = [...pathIds, node.id];
+    const currentPathValues = [...pathValues, node.val];
+    callStack[callStack.length - 1].remaining = remaining;
+    callStack[callStack.length - 1].pathIds = currentPathIds;
+    callStack[callStack.length - 1].pathValues = currentPathValues;
+    callStack[callStack.length - 1].stage = "subtract";
+    addStep({
+      title: { vi: `remaining = ${currentTarget} − ${node.val} = ${remaining}`, en: `remaining = ${currentTarget} − ${node.val} = ${remaining}` },
+      codeLines: [4], phase: "subtract", remainingBefore: currentTarget, remaining,
+      vars: [{ name: "targetSum", value: currentTarget }, { name: "node.val", value: node.val }, { name: "remaining", value: remaining }, { name: "path", value: `[${currentPathValues.join(", ")}]` }],
+      note: { vi: `Đường hiện tại là [${currentPathValues.join(", ")}]. Các lời gọi con phải tìm phần tổng còn lại là ${remaining}.`, en: `The current path is [${currentPathValues.join(", ")}]. Child calls must find the remaining sum ${remaining}.` },
+    });
+
+    const isLeaf = !node.left && !node.right;
+    callStack[callStack.length - 1].stage = "check-leaf";
+    addStep({
+      title: { vi: `Node ${node.val} có phải lá? → ${isLeaf ? "ĐÚNG" : "SAI"}`, en: `Is node ${node.val} a leaf? → ${isLeaf ? "TRUE" : "FALSE"}` },
+      codeLines: [5], phase: "check-leaf", remaining, isLeaf,
+      vars: [{ name: "left", value: node.left ? node.left.val : "None" }, { name: "right", value: node.right ? node.right.val : "None" }, { name: "is leaf", value: isLeaf }, { name: "remaining", value: remaining }],
+      note: isLeaf
+        ? { vi: "Đây là lá: chỉ bây giờ remaining == 0 mới chứng minh được một đường hợp lệ.", en: "This is a leaf: only now can remaining == 0 prove a valid path." }
+        : { vi: "Chưa phải lá, nên không được trả True dù remaining có thể đang bằng 0; phải đi tiếp xuống lá.", en: "This is not a leaf, so do not return True even if remaining is 0; continue down to a leaf." },
+    });
+
+    if (isLeaf) {
+      const leafMatch = remaining === 0;
+      if (leafMatch) {
+        successfulPathIds = [...currentPathIds];
+        successfulPathValues = [...currentPathValues];
+      }
+      returned.set(node.id, leafMatch);
+      callStack[callStack.length - 1].stage = "return-leaf";
+      addStep({
+        title: { vi: `Lá ${node.val}: remaining == 0 → ${leafMatch}`, en: `Leaf ${node.val}: remaining == 0 → ${leafMatch}` },
+        codeLines: [6], phase: "return-leaf", remaining, isLeaf: true, leafMatch, returnValue: leafMatch,
+        vars: [{ name: "remaining == 0", value: leafMatch }, { name: "return", value: leafMatch }, { name: "path", value: `[${currentPathValues.join(", ")}]` }],
+        note: leafMatch
+          ? { vi: `✓ [${currentPathValues.join(", ")}] có tổng đúng ${target}; trả True.`, en: `✓ [${currentPathValues.join(", ")}] sums to ${target}; return True.` }
+          : { vi: `✗ [${currentPathValues.join(", ")}] không đạt tổng ${target}; trả False và backtrack.`, en: `✗ [${currentPathValues.join(", ")}] does not sum to ${target}; return False and backtrack.` },
+      });
+      callStack.pop();
+      return leafMatch;
+    }
+
+    const leftCall = { node: node.left, side: "left", target: remaining };
+    callStack[callStack.length - 1].stage = "call-left";
+    addStep({
+      title: { vi: `Gọi nhánh trái của ${node.val}`, en: `Call the left branch of ${node.val}` },
+      codeLines: [7], phase: "call-left", remaining, nextCall: leftCall,
+      vars: [{ name: "remaining", value: remaining }, { name: "left child", value: node.left ? node.left.val : "None" }, { name: "left result", value: "waiting" }],
+      note: { vi: `Vế đầu của toán tử or: hasPathSum(left, ${remaining}). Phải chờ nó return trước khi quyết định có gọi phải không.`, en: `First side of the or expression: hasPathSum(left, ${remaining}). Wait for it to return before deciding whether to call right.` },
+    });
+    const leftResult = dfs(node.left, remaining, currentPathIds, currentPathValues, node, "left");
+
+    callStack[callStack.length - 1].stage = "left-returned";
+    addStep({
+      title: { vi: `Nhánh trái của ${node.val} trả về ${leftResult}`, en: `Left branch of ${node.val} returns ${leftResult}` },
+      codeLines: [7], phase: "left-return", remaining, leftResult,
+      vars: [{ name: "left result", value: leftResult }, { name: "or", value: leftResult ? "True or ..." : "False or ..." }],
+      note: leftResult
+        ? { vi: "Vế trái đã True. Python short-circuit: KHÔNG gọi nhánh phải; toàn biểu thức or là True.", en: "The left side is already True. Python short-circuits: do NOT call the right branch; the whole or expression is True." }
+        : { vi: "Vế trái False, nên phải đánh giá vế phải ở dòng 8.", en: "The left side is False, so evaluate the right side on line 8." },
+    });
+
+    if (leftResult) {
+      returned.set(node.id, true);
+      callStack[callStack.length - 1].stage = "short-circuit";
+      addStep({
+        title: { vi: `Short-circuit tại ${node.val}: return True`, en: `Short-circuit at ${node.val}: return True` },
+        codeLines: [7], phase: "short-circuit", remaining, leftResult: true, returnValue: true, shortCircuit: "right skipped",
+        vars: [{ name: "left result", value: true }, { name: "right call", value: "SKIPPED" }, { name: "return", value: true }],
+        note: { vi: "Không chạy dòng 8 vì `True or anything` luôn là True. Giá trị True được trả ngược lên cha.", en: "Line 8 does not run because `True or anything` is always True. Return True to the caller." },
+      });
+      callStack.pop();
+      return true;
+    }
+
+    const rightCall = { node: node.right, side: "right", target: remaining };
+    callStack[callStack.length - 1].stage = "call-right";
+    addStep({
+      title: { vi: `Gọi nhánh phải của ${node.val}`, en: `Call the right branch of ${node.val}` },
+      codeLines: [8], phase: "call-right", remaining, leftResult: false, nextCall: rightCall,
+      vars: [{ name: "left result", value: false }, { name: "right child", value: node.right ? node.right.val : "None" }, { name: "right result", value: "waiting" }],
+      note: { vi: "Vì trái trả False, dòng 8 phải gọi hasPathSum(right, remaining).", en: "Because the left side returned False, line 8 must call hasPathSum(right, remaining)." },
+    });
+    const rightResult = dfs(node.right, remaining, currentPathIds, currentPathValues, node, "right");
+
+    returned.set(node.id, rightResult);
+    callStack[callStack.length - 1].stage = "return-right";
+    addStep({
+      title: { vi: `Nhánh phải của ${node.val} trả về ${rightResult} → return ${rightResult}`, en: `Right branch of ${node.val} returns ${rightResult} → return ${rightResult}` },
+      codeLines: [8], phase: "return-right", remaining, leftResult: false, rightResult, returnValue: rightResult,
+      vars: [{ name: "left result", value: false }, { name: "right result", value: rightResult }, { name: "return", value: rightResult }],
+      note: { vi: `False or ${rightResult} = ${rightResult}; node ${node.val} trả giá trị này về cha.`, en: `False or ${rightResult} = ${rightResult}; node ${node.val} returns this value to its caller.` },
+    });
+    callStack.pop();
+    return rightResult;
+  }
+
+  const rootCall = { node: root, side: "root", target };
+  addStep({
+    title: { vi: `Bắt đầu hasPathSum(root, ${target})`, en: `Start hasPathSum(root, ${target})` },
+    codeLines: [2], phase: "call-root", current: null, nextCall: rootCall,
+    vars: [{ name: "root", value: root ? root.val : "None" }, { name: "targetSum", value: target }],
+    note: { vi: "Gọi hàm tại root. Frame cuối trong stack sẽ là lời gọi đang thực thi.", en: "Call the function at the root. The last frame in the stack will be the active call." },
+  });
+  const answer = dfs(root, target, [], [], null, "root");
+  const finalStep = snapshot(root, {
+    title: { vi: answer ? `✓ Tìm thấy đường tổng ${target}` : `✗ Không có đường root→leaf tổng ${target}`, en: answer ? `✓ Found a path summing to ${target}` : `✗ No root-to-leaf path sums to ${target}` },
+    hlSet: answer ? new Set(successfulPathIds) : undefined,
+    wordSet: answer ? new Set(successfulPathIds) : undefined,
+    annotations: annotationsFor(null, null, null),
+    codeLines: [7],
+    vars: [{ name: "answer", value: answer }, { name: "successful path", value: answer ? `[${successfulPathValues.join(", ")}]` : "none" }, { name: "call stack", value: "[]" }],
+    note: answer
+      ? { vi: `Đường [${successfulPathValues.join(", ")}] đi từ root đến lá và có tổng ${target}.`, en: `Path [${successfulPathValues.join(", ")}] goes from root to a leaf and sums to ${target}.` }
+      : { vi: "Đã thử mọi nhánh cần thiết; không có lá nào kết thúc với remaining = 0.", en: "All required branches were tried; no leaf ended with remaining 0." },
+  });
+  finalStep.pathSumView = makeView({ phase: "done", current: null, returnValue: answer });
+  finalStep.tree.nodes.forEach((node) => {
+    if (returned.has(node.id)) node.sub = `↩ ${returned.get(node.id)}`;
+  });
+  finalStep.final = true;
+  steps.push(finalStep);
   return { input, answer, steps };
 }
 
