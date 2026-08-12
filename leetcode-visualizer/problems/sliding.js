@@ -3506,7 +3506,231 @@ function buildSteps2444(inputNums, params) {
   return { original: nums, minK, maxK, answer: res, steps };
 }
 
+/**
+ * LeetCode 2958: Length of Longest Subarray With at Most K Frequency.
+ *
+ * Sliding window: expand right, track freq of each element. When any element's
+ * freq exceeds k, shrink left until the offending element's freq drops to k.
+ * The answer is the max window size seen.
+ */
+function buildSteps2958(nums, params) {
+  const k = Number(params && params.k !== undefined ? params.k : 2);
+  const steps = [];
+  const n = nums.length;
+  const freq = new Map();
+  let left = 0;
+  let ans = 0;
+  let bestL = 0, bestR = -1;
+
+  function freqStr() {
+    return `{${[...freq.entries()].filter(([, v]) => v > 0).map(([key, v]) => `${key}:${v}`).join(", ")}}`;
+  }
+
+  function windowIndices(l, r) {
+    return Array.from({ length: Math.max(0, r - l + 1) }, (_, i) => l + i);
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: windowIndices(opts.left !== undefined ? opts.left : left, opts.right !== undefined ? opts.right : -1),
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "left", value: opts.left !== undefined ? opts.left : left },
+        { name: "right", value: opts.right !== undefined ? opts.right : "-" },
+        { name: "freq", value: freqStr() },
+        { name: "ans (max len)", value: ans },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+    });
+  }
+
+  // Line 3: freq = {}
+  snap({
+    title: { vi: "freq = {}, left = 0, ans = 0", en: "freq = {}, left = 0, ans = 0" },
+    left: 0,
+    codeLines: [3],
+    note: {
+      vi: `nums=[${nums.join(",")}], k=${k}.\nÝ tưởng: cửa sổ [left, right] mở rộng right từng bước. Khi bất kỳ phần tử nào trong cửa sổ xuất hiện > k lần → thu hẹp left cho tới khi hợp lệ. Kích thước cửa sổ lớn nhất = đáp án.\nfreq đếm số lần xuất hiện mỗi giá trị TRONG cửa sổ hiện tại.`,
+      en: `nums=[${nums.join(",")}], k=${k}.\nIdea: window [left, right] expands right one step at a time. When ANY element's frequency in the window exceeds k → shrink left until valid again. The largest window size is the answer.\nfreq counts occurrences of each value WITHIN the current window.`,
+    },
+  });
+
+  for (let right = 0; right < n; right++) {
+    const val = nums[right];
+
+    // Line 4: for right in range(len(nums)):
+    snap({
+      title: { vi: `for right in range(n): right=${right}, nums[right]=${val}`, en: `for right in range(n): right=${right}, nums[right]=${val}` },
+      left, right,
+      codeLines: [4],
+      vars: [{ name: "nums[right]", value: val }],
+      note: {
+        vi: `Mở rộng cửa sổ sang phải: right=${right}, giá trị = ${val}.`,
+        en: `Expand the window to the right: right=${right}, value = ${val}.`,
+      },
+    });
+
+    // Line 5: freq[nums[right]] += 1
+    freq.set(val, (freq.get(val) || 0) + 1);
+    snap({
+      title: { vi: `freq[${val}] += 1 → freq[${val}]=${freq.get(val)}`, en: `freq[${val}] += 1 → freq[${val}]=${freq.get(val)}` },
+      left, right,
+      codeLines: [5],
+      vars: [{ name: `freq[${val}]`, value: freq.get(val) }],
+      note: {
+        vi: `Tăng đếm freq[${val}] = ${freq.get(val)}.`,
+        en: `Increment freq[${val}] = ${freq.get(val)}.`,
+      },
+    });
+
+    // Line 6: while freq[nums[right]] > k:
+    while (freq.get(val) > k) {
+      snap({
+        title: { vi: `while freq[${val}] > k → ${freq.get(val)} > ${k} → True`, en: `while freq[${val}] > k → ${freq.get(val)} > ${k} → True` },
+        left, right,
+        codeLines: [6],
+        vars: [{ name: `freq[${val}]`, value: freq.get(val) }],
+        note: {
+          vi: `freq[${val}]=${freq.get(val)} VƯỢT k=${k} → cửa sổ KHÔNG hợp lệ, cần thu hẹp left.`,
+          en: `freq[${val}]=${freq.get(val)} EXCEEDS k=${k} → window is INVALID, need to shrink left.`,
+        },
+      });
+
+      // Line 7: freq[nums[left]] -= 1
+      const leftVal = nums[left];
+      freq.set(leftVal, freq.get(leftVal) - 1);
+      snap({
+        title: { vi: `freq[${leftVal}] -= 1 → freq[${leftVal}]=${freq.get(leftVal)}`, en: `freq[${leftVal}] -= 1 → freq[${leftVal}]=${freq.get(leftVal)}` },
+        left, right,
+        codeLines: [7],
+        vars: [{ name: `freq[${leftVal}]`, value: freq.get(leftVal) }],
+        note: {
+          vi: `Loại nums[left]=${leftVal} ra khỏi cửa sổ: freq[${leftVal}] giảm còn ${freq.get(leftVal)}.`,
+          en: `Remove nums[left]=${leftVal} from the window: freq[${leftVal}] drops to ${freq.get(leftVal)}.`,
+        },
+      });
+
+      // Line 8: left += 1
+      left++;
+      snap({
+        title: { vi: `left += 1 → left=${left}`, en: `left += 1 → left=${left}` },
+        left, right,
+        codeLines: [8],
+        note: {
+          vi: `Thu hẹp cửa sổ: left=${left}.`,
+          en: `Shrink window: left=${left}.`,
+        },
+      });
+    }
+
+    // Line 6 (False): while check passes
+    if (freq.get(val) <= k) {
+      snap({
+        title: { vi: `while freq[${val}] > k → ${freq.get(val)} > ${k} → False`, en: `while freq[${val}] > k → ${freq.get(val)} > ${k} → False` },
+        left, right,
+        codeLines: [6],
+        note: {
+          vi: `freq[${val}]=${freq.get(val)} ≤ k=${k} → cửa sổ HỢP LỆ, không cần thu hẹp thêm.`,
+          en: `freq[${val}]=${freq.get(val)} ≤ k=${k} → window is VALID, no further shrinking needed.`,
+        },
+      });
+    }
+
+    // Line 9: ans = max(ans, right - left + 1)
+    const windowLen = right - left + 1;
+    const improves = windowLen > ans;
+    if (improves) { ans = windowLen; bestL = left; bestR = right; }
+    snap({
+      title: { vi: `ans = max(ans, right-left+1) = max(${ans - (improves ? windowLen - (ans) : 0)}, ${windowLen}) → ${ans}`, en: `ans = max(ans, right-left+1) = max(${improves ? ans - windowLen + (ans) : ans}, ${windowLen}) → ${ans}` },
+      left, right,
+      mark: improves ? windowIndices(left, right) : [],
+      codeLines: [9],
+      vars: [{ name: "window size", value: windowLen }],
+      note: improves
+        ? { vi: `Cửa sổ [${left}..${right}] có size=${windowLen} LỚN HƠN ans cũ → cập nhật ans=${ans}.`, en: `Window [${left}..${right}] has size=${windowLen} which is LARGER than old ans → update ans=${ans}.` }
+        : { vi: `Cửa sổ [${left}..${right}] có size=${windowLen}, không lớn hơn ans=${ans} → giữ nguyên.`, en: `Window [${left}..${right}] has size=${windowLen}, not larger than ans=${ans} → unchanged.` },
+    });
+  }
+
+  // Line 10: return ans
+  const fs = {
+    title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` },
+    arr: [...nums],
+    sub: nums.map((_, i) => `[${i}]`),
+    highlight: windowIndices(bestL, bestR),
+    mark: windowIndices(bestL, bestR),
+    final: true,
+    codeLines: [10],
+    vars: [
+      { name: "left", value: left },
+      { name: "ans", value: ans },
+      { name: "best window", value: `[${bestL}..${bestR}]` },
+    ],
+    note: {
+      vi: `Cửa sổ dài nhất mà mọi phần tử xuất hiện ≤ ${k} lần = ${ans} (vị trí [${bestL}..${bestR}]). Highlight = cửa sổ tốt nhất.`,
+      en: `The longest window where every element appears ≤ ${k} times = ${ans} (positions [${bestL}..${bestR}]). Highlighted = the best window.`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: nums, k, answer: ans, steps };
+}
+
 module.exports = {
+  2958: {
+    id: 2958,
+    difficulty: "medium",
+    slug: "length-of-longest-subarray-with-at-most-k-frequency",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    title: { vi: "Length of Longest Subarray With at Most K Frequency", en: "Length of Longest Subarray With at Most K Frequency" },
+    titleVi: { vi: "Subarray dài nhất mỗi phần tử ≤ k lần", en: "Longest subarray where every element appears ≤ k times" },
+    statement: {
+      vi:
+        "Cho mảng số nguyên nums và số k. Tìm độ dài subarray LIÊN TIẾP dài nhất sao cho mỗi phần tử " +
+        "trong subarray đó xuất hiện TỐI ĐA k lần.",
+      en:
+        "Given an integer array nums and an integer k, find the length of the longest CONTIGUOUS subarray " +
+        "such that every element in that subarray appears AT MOST k times.",
+    },
+    defaultInput: [1, 2, 3, 1, 2, 3, 1, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "k", label: { vi: "k (max frequency)", en: "k (max frequency)" }, default: 2 }],
+    approach: [
+      { vi: "Sliding window [left, right]: mở rộng right, đếm freq mỗi phần tử trong cửa sổ.", en: "Sliding window [left, right]: expand right, count freq of each element in the window." },
+      { vi: "Khi freq của phần tử vừa thêm VƯỢT k → thu hẹp left cho tới khi hợp lệ lại.", en: "When the newly-added element's freq EXCEEDS k → shrink left until valid again." },
+      { vi: "Kích thước cửa sổ lớn nhất = đáp án.", en: "The largest window size is the answer." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi phần tử vào/ra cửa sổ tối đa 1 lần. freq hashmap O(n).",
+        en: "Each element enters/exits the window at most once. freq hashmap O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSubarrayLength(self, nums, k):",
+      "        freq = {}",
+      "        left = 0",
+      "        ans = 0",
+      "        for right in range(len(nums)):",
+      "            freq[nums[right]] = freq.get(nums[right], 0) + 1",
+      "            while freq[nums[right]] > k:",
+      "                freq[nums[left]] -= 1",
+      "                left += 1",
+      "            ans = max(ans, right - left + 1)",
+      "        return ans",
+    ],
+    builder: buildSteps2958,
+  },
   3: {
     id: 3,
     difficulty: "medium",
