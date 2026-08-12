@@ -54,9 +54,10 @@ const I18N = {
     clearRecent: "Xóa",
     liveEditBtn: "✎ Sửa & chạy code",
     liveExitBtn: "Đóng editor",
-    liveRunBtn: "▶ Chạy code của tôi",
+    liveRunBtn: "Chạy code của tôi",
+    liveCopyBtn: "Sao chép code",
     liveClearBtn: "Clear thân hàm",
-    liveResetBtn: "↺ Về code gốc",
+    liveResetBtn: "Về code gốc",
     autoTheme: "Tự động",
   },
   en: {
@@ -93,9 +94,10 @@ const I18N = {
     clearRecent: "Clear",
     liveEditBtn: "✎ Edit & run code",
     liveExitBtn: "Exit editor",
-    liveRunBtn: "▶ Run my code",
+    liveRunBtn: "Run my code",
+    liveCopyBtn: "Copy code",
     liveClearBtn: "Clear body",
-    liveResetBtn: "↺ Reset to original",
+    liveResetBtn: "Reset to original",
     autoTheme: "Auto",
   },
 };
@@ -139,6 +141,17 @@ function applyStaticStrings() {
   $("playBtn").textContent = playTimer ? t().playStop : t().play;
   const keywordInput = $("problemKeyword");
   if (keywordInput) keywordInput.placeholder = t().keywordSearchPlaceholder;
+  const liveCopyButton = $("liveCopyBtn");
+  if (liveCopyButton && !liveCopyButton.classList.contains("copied")) {
+    liveCopyButton.setAttribute("aria-label", t().liveCopyBtn);
+    liveCopyButton.title = t().liveCopyBtn;
+  }
+  ["liveRunBtn", "liveClearBtn", "liveResetBtn"].forEach((id) => {
+    const button = $(id);
+    if (!button) return;
+    button.setAttribute("aria-label", t()[id]);
+    button.title = t()[id];
+  });
   updateThemeButtons();
 }
 
@@ -7612,26 +7625,38 @@ function renderPrefix1DView(step) {
   </div>`).join("");
 
   let proofHtml = "";
-  if (isRangeSumImmutable && query && Number.isInteger(query.answer)) {
+  if (isRangeSumImmutable && query) {
     const rightPrefixIndex = Number.isInteger(query.rightPrefixIndex) ? query.rightPrefixIndex : right + 1;
     const leftPrefixIndex = Number.isInteger(query.leftPrefixIndex) ? query.leftPrefixIndex : left;
-    const rightPrefixValue = query.rightPrefixValue ?? prefix[rightPrefixIndex];
-    const leftPrefixValue = query.leftPrefixValue ?? prefix[leftPrefixIndex];
+    const queryPhase = String(query.phase || "subtract");
+    const phaseRank = { "select-range": 0, "right-prefix": 1, "left-prefix": 2, subtract: 3 }[queryPhase] ?? 3;
+    const rightReady = phaseRank >= 1;
+    const leftReady = phaseRank >= 2;
+    const answerReady = phaseRank >= 3 && Number.isInteger(query.answer);
+    const rightPrefixValue = rightReady ? (query.rightPrefixValue ?? prefix[rightPrefixIndex]) : "?";
+    const leftPrefixValue = leftReady ? (query.leftPrefixValue ?? prefix[leftPrefixIndex]) : "?";
     const included = Array.isArray(query.included) ? query.included : nums.slice(left, right + 1);
     const excludedLeft = Array.isArray(query.excludedLeft) ? query.excludedLeft : nums.slice(0, left);
-    proofHtml = `<div class="prefix1d-proof">
-      <div class="prefix1d-proof-title">${escapeHtml(lang === "vi" ? "Cách tính sumRange" : "How sumRange is computed")}</div>
+    const proofTitle = queryPhase === "select-range"
+      ? (lang === "vi" ? `Chọn đoạn nums[${left}..${right}]` : `Select range nums[${left}..${right}]`)
+      : queryPhase === "right-prefix"
+        ? (lang === "vi" ? "Bước 1 · Lấy tổng đến right" : "Step 1 · Read the sum through right")
+        : queryPhase === "left-prefix"
+          ? (lang === "vi" ? "Bước 2 · Lấy phần trước left" : "Step 2 · Read the part before left")
+          : (lang === "vi" ? "Bước 3 · Trừ để giữ lại range" : "Step 3 · Subtract to isolate the range");
+    proofHtml = `<div class="prefix1d-proof phase-${escapeHtml(queryPhase)}">
+      <div class="prefix1d-proof-title">${escapeHtml(proofTitle)}</div>
       <div class="prefix1d-formula">
-        <span class="take"><small>prefix[${escapeHtml(String(rightPrefixIndex))}]</small><b>${escapeHtml(String(rightPrefixValue))}</b></span>
+        <span class="take${queryPhase === "right-prefix" ? " is-active" : ""}"><small>prefix[${escapeHtml(String(rightPrefixIndex))}]</small><b>${escapeHtml(String(rightPrefixValue))}</b></span>
         <strong>-</strong>
-        <span class="drop"><small>prefix[${escapeHtml(String(leftPrefixIndex))}]</small><b>${escapeHtml(String(leftPrefixValue))}</b></span>
+        <span class="drop${queryPhase === "left-prefix" ? " is-active" : ""}"><small>prefix[${escapeHtml(String(leftPrefixIndex))}]</small><b>${escapeHtml(String(leftPrefixValue))}</b></span>
         <strong>=</strong>
-        <span class="answer"><small>sumRange(${escapeHtml(String(left))}, ${escapeHtml(String(right))})</small><b>${escapeHtml(String(query.answer))}</b></span>
+        <span class="answer${queryPhase === "subtract" ? " is-active" : ""}"><small>sumRange(${escapeHtml(String(left))}, ${escapeHtml(String(right))})</small><b>${answerReady ? escapeHtml(String(query.answer)) : "?"}</b></span>
       </div>
       <div class="prefix1d-proof-detail">
-        <span>${escapeHtml(lang === "vi" ? "prefix[right+1] chứa:" : "prefix[right+1] contains:")} [${escapeHtml(nums.slice(0, right + 1).join(", "))}]</span>
-        <span>${escapeHtml(lang === "vi" ? "trừ phần trước left:" : "subtract before left:")} [${escapeHtml(excludedLeft.join(", ") || "∅")}]</span>
-        <span>${escapeHtml(lang === "vi" ? "còn lại đoạn query:" : "remaining query range:")} [${escapeHtml(included.join(", "))}]</span>
+        <span class="${rightReady ? "is-ready" : ""}">${rightReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "prefix[right+1] chứa:" : "prefix[right+1] contains:")} [${escapeHtml(nums.slice(0, right + 1).join(", "))}]</span>
+        <span class="${leftReady ? "is-ready" : ""}">${leftReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "trừ phần trước left:" : "subtract before left:")} [${escapeHtml(excludedLeft.join(", ") || "∅")}]</span>
+        <span class="${answerReady ? "is-ready" : ""}">${answerReady ? "✓ " : "○ "}${escapeHtml(lang === "vi" ? "còn lại đoạn query:" : "remaining query range:")} [${escapeHtml(included.join(", "))}]</span>
       </div>
     </div>`;
   }
@@ -7853,6 +7878,739 @@ function renderBookMyShowView(step) {
       <div class="bms-status">${statusItems}</div>
       <div class="bms-output"><small>outputs</small><div>${outputsHtml}</div></div>
     </div>`;
+}
+
+function renderFallingSquaresView(step) {
+  const view = step.fallingSquaresView || {};
+  const vi = lang === "vi";
+  const positions = Array.isArray(view.positions) ? view.positions : [];
+  const coords = Array.isArray(view.coords) ? view.coords : [];
+  const segments = Array.isArray(view.segments) ? view.segments : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const queryVisited = new Set(Array.isArray(view.queryVisited) ? view.queryVisited : []);
+  const updateVisited = new Set(Array.isArray(view.updateVisited) ? view.updateVisited : []);
+  const currentSquare = Number.isInteger(view.currentSquare) ? view.currentSquare : -1;
+  const queryLeft = Number.isInteger(view.queryLeft) ? view.queryLeft : -1;
+  const queryRight = Number.isInteger(view.queryRight) ? view.queryRight : -1;
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "map", "segments", "tree-init", "ready"].includes(phase) ? 0
+    : ["square", "map-square"].includes(phase) ? 1
+      : phase.startsWith("query") || phase === "push-lazy" && view.operation === "query" ? 2
+        : phase === "calculate" ? 3
+          : phase.startsWith("update") || ["push-lazy", "landed"].includes(phase) ? 4 : 5;
+  const phaseLabels = vi
+    ? ["1 · Nén tọa độ", "2 · Square rơi", "3 · Query nền", "4 · Tính top", "5 · Lazy assign", "6 · Maximum"]
+    : ["1 · Compress", "2 · Drop square", "3 · Query base", "4 · Compute top", "5 · Lazy assign", "6 · Maximum"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const positionsHtml = positions.map((item, index) => {
+    const classes = ["fs699-position"];
+    if (index < currentSquare || phase === "done") classes.push("processed");
+    if (index === currentSquare) classes.push("current");
+    const right = Number(item[0]) + Number(item[1]);
+    return `<span class="${classes.join(" ")}"><small>#${index}</small><strong>[${escapeHtml(String(item[0]))}, ${escapeHtml(String(item[1]))}]</strong><em>[${escapeHtml(String(item[0]))}, ${escapeHtml(String(right))})</em></span>`;
+  }).join("");
+  const maxHeight = Math.max(1, ...segments.map((segment) => Number(segment.height) || 0), Number(view.newHeight) || 0, ...outputs.map(Number));
+  const segmentsHtml = segments.map((segment, index) => {
+    const active = queryLeft >= 0 && index >= queryLeft && index <= queryRight;
+    const height = Number(segment.height) || 0;
+    const pct = height > 0 ? Math.max(8, (height / maxHeight) * 100) : 0;
+    return `<div class="fs699-segment${active ? " footprint" : ""}" style="--fs699-height:${pct}%">
+      <div class="fs699-column">${height > 0 ? `<strong>${escapeHtml(String(height))}</strong>` : ""}</div>
+      <span>[${escapeHtml(String(segment.left))},${escapeHtml(String(segment.right))})</span>
+      <small>s${index}</small>
+    </div>`;
+  }).join("");
+  const edgeHtml = coords.map((coord, index) => `<span><small>c${index}</small><strong>${escapeHtml(String(coord))}</strong></span>`).join("");
+
+  const levels = new Map();
+  for (const node of treeNodes) {
+    if (!levels.has(node.depth)) levels.set(node.depth, []);
+    levels.get(node.depth).push(node);
+  }
+  const treeHtml = [...levels.entries()].map(([depth, nodes]) => `<div class="fs699-tree-level"><small>L${depth}</small><div>${nodes.map((node) => {
+    const classes = ["fs699-node"];
+    if (queryVisited.has(node.node)) classes.push("query");
+    if (updateVisited.has(node.node)) classes.push("update");
+    if (node.node === activeNode) classes.push("active");
+    if (node.lazy !== null && node.lazy !== undefined) classes.push("lazy");
+    return `<span class="${classes.join(" ")}"><small>node ${node.node} · s${node.start}..s${node.end}</small><strong>${escapeHtml(String(node.value))}</strong><em>[${escapeHtml(String(node.xLeft))},${escapeHtml(String(node.xRight))})</em><i>lazy ${node.lazy === null || node.lazy === undefined ? "—" : escapeHtml(String(node.lazy))}</i></span>`;
+  }).join("")}</div></div>`).join("");
+
+  const square = currentSquare >= 0 ? positions[currentSquare] : null;
+  const squareSize = square ? Number(square[1]) : 0;
+  const globalMax = outputs.length ? outputs[outputs.length - 1] : (treeNodes[0]?.value ?? 0);
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén cạnh thành ground segments" : "Compress edges into ground segments";
+  let actionDetail = coords.length ? `[${coords.join(", ")}]` : "—";
+  if (["square", "map-square"].includes(phase)) {
+    actionLabel = vi ? "SQUARE ĐANG RƠI" : "DROPPING SQUARE";
+    actionMain = square ? `[${square[0]}, ${Number(square[0]) + squareSize}) · size ${squareSize}` : "—";
+    actionDetail = queryLeft >= 0 ? `segments ${queryLeft}..${queryRight}` : (vi ? "đang ánh xạ footprint" : "mapping footprint");
+  } else if (phase.startsWith("query") || phase === "push-lazy" && view.operation === "query") {
+    actionLabel = "RANGE MAX QUERY";
+    actionMain = `max(s${queryLeft}..s${queryRight}) = ${view.returnedValue ?? view.baseHeight ?? 0}`;
+    actionDetail = vi ? "chiều cao nền là vật cản cao nhất" : "the base is the tallest obstacle";
+  } else if (phase === "calculate") {
+    actionLabel = "NEW TOP";
+    actionMain = `${view.baseHeight ?? 0} + ${squareSize} = ${view.newHeight ?? 0}`;
+    actionDetail = vi ? "base + cạnh square" : "base + square size";
+  } else if (phase.startsWith("update") || ["push-lazy", "landed"].includes(phase)) {
+    actionLabel = "RANGE ASSIGN";
+    actionMain = `s${queryLeft}..s${queryRight} = ${view.newHeight ?? 0}`;
+    actionDetail = vi ? "assignment, không phải cộng" : "assignment, not addition";
+  } else if (["output", "done"].includes(phase)) {
+    actionLabel = phase === "done" ? "RETURN" : "GLOBAL MAX";
+    actionMain = phase === "done" ? `[${outputs.join(", ")}]` : String(globalMax);
+    actionDetail = phase === "done" ? (vi ? "maximum sau mỗi lần rơi" : "maximum after every drop") : "tree[1]";
+  }
+  const outputsHtml = outputs.length ? outputs.map((value, index) => `<span><small>#${index}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("") : `<em>—</em>`;
+
+  $("treeView").innerHTML = `<div class="fs699-viz phase-${escapeHtml(phase)}">
+    <div class="fs699-phases">${phases}</div>
+    <section class="fs699-section"><header><strong>POSITIONS · [LEFT, SIZE]</strong><span>${vi ? "interval thật dùng dạng [left, right)" : "physical interval is [left, right)"}</span></header><div class="fs699-positions">${positionsHtml}</div></section>
+    <div class="fs699-edges"><small>COMPRESSED EDGES</small><div>${edgeHtml || "—"}</div></div>
+    <section class="fs699-section"><header><strong>SKYLINE · GROUND SEGMENTS</strong><span>${vi ? "viền vàng = footprint hiện tại" : "yellow border = current footprint"}</span></header><div class="fs699-skyline" style="--fs699-cols:${Math.max(1, segments.length)}">${segmentsHtml || "—"}</div></section>
+    <div class="fs699-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="fs699-metrics"><span><small>base</small><strong>${escapeHtml(String(view.baseHeight ?? 0))}</strong></span><span><small>size</small><strong>${square ? escapeHtml(String(squareSize)) : "—"}</strong></span><span><small>new top</small><strong>${escapeHtml(String(view.newHeight ?? 0))}</strong></span><span class="max"><small>global max</small><strong>${escapeHtml(String(globalMax))}</strong></span></div>
+    <section class="fs699-section"><header><strong>LAZY SEGMENT TREE · RANGE MAX + RANGE ASSIGN</strong><span>${vi ? "xanh = query · cam = update · chấm tím = lazy" : "green = query · orange = update · purple = lazy"}</span></header><div class="fs699-tree">${treeHtml || "—"}</div></section>
+    <div class="fs699-bottom"><div class="fs699-outputs"><small>ANSWER</small><div>${outputsHtml}</div></div><code>base = range_max(footprint) · top = base + size · assign(footprint, top)</code></div>
+  </div>`;
+}
+
+function renderCalendarThreeView(step) {
+  const view = step.calendarThreeView || {};
+  const vi = lang === "vi";
+  const bookings = Array.isArray(view.bookings) ? view.bookings : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const segments = Array.isArray(view.segments) ? view.segments : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const visited = new Set(Array.isArray(view.visitedNodes) ? view.visitedNodes : []);
+  const covered = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const pulled = new Set(Array.isArray(view.pulledNodes) ? view.pulledNodes : []);
+  const current = Number.isInteger(view.currentBooking) ? view.currentBooking : -1;
+  const activeNode = Number.isInteger(view.activeNode) ? view.activeNode : null;
+  const phase = String(view.phase || "init");
+  const phaseIndex = phase === "init" ? 0
+    : ["booking", "visit", "split", "skip"].includes(phase) ? 1
+      : ["cover", "pull"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["1 · Dynamic Tree", "2 · Đi xuống range", "3 · Lazy + Pull", "4 · Root answer"]
+    : ["1 · Dynamic tree", "2 · Descend range", "3 · Lazy + pull", "4 · Root answer"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const bookingHtml = bookings.map(([start, end], index) => {
+    const classes = ["cal732-booking"];
+    if (index < outputs.length) classes.push("processed");
+    if (index === current) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>book #${index + 1}</small><strong>[${escapeHtml(String(start))}, ${escapeHtml(String(end))})</strong><em>${index < outputs.length ? `max = ${outputs[index]}` : index === current ? "updating" : "waiting"}</em></span>`;
+  }).join("");
+  const maxCount = Math.max(1, ...segments.map((item) => Number(item.count) || 0));
+  const timelineHtml = segments.map((item) => {
+    const classes = ["cal732-segment"];
+    if (item.current && current >= outputs.length) classes.push("current");
+    if (item.count === maxCount && item.count > 0) classes.push("peak");
+    const height = Math.max(8, (Number(item.count) || 0) / maxCount * 92);
+    const grow = Math.max(1, Math.min(10, Number(item.right) - Number(item.left)));
+    return `<span class="${classes.join(" ")}" style="--cal732-height:${height}%;--cal732-grow:${grow}"><b>${escapeHtml(String(item.count))}</b><i></i><small>[${escapeHtml(String(item.left))},${escapeHtml(String(item.right))})</small></span>`;
+  }).join("");
+
+  const nodeCandidates = treeNodes.filter((item) => item.depth <= 3 || visited.has(item.node) || item.node === 1);
+  const rootNode = nodeCandidates.find((item) => item.node === 1);
+  const visibleNodes = nodeCandidates.length <= 70
+    ? nodeCandidates
+    : [rootNode, ...nodeCandidates.filter((item) => item.node !== 1).slice(-69)].filter(Boolean);
+  const treeHtml = visibleNodes.map((item) => {
+    const classes = ["cal732-node"];
+    if (visited.has(item.node)) classes.push("visited");
+    if (covered.has(item.node)) classes.push("covered");
+    if (pulled.has(item.node)) classes.push("pulled");
+    if (item.node === activeNode) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>d${item.depth} · node ${item.node}</small><strong>${escapeHtml(String(item.value))}</strong><em>[${escapeHtml(String(item.start))}, ${escapeHtml(String(item.end))}]</em><i>lazy ${escapeHtml(String(item.lazy))}</i></span>`;
+  }).join("");
+  const currentBooking = current >= 0 ? bookings[current] : null;
+  const rootValue = treeNodes.find((item) => item.node === 1)?.value || 0;
+  let actionLabel = vi ? "KHỞI TẠO" : "INITIALIZE";
+  let actionMain = "domain = [0, 10^9 - 1]";
+  let actionDetail = vi ? "Chỉ tạo node khi update chạm tới" : "Materialize nodes only when touched";
+  if (phase === "booking" && currentBooking) {
+    actionLabel = `BOOK #${current + 1}`;
+    actionMain = `[${currentBooking[0]}, ${currentBooking[1]}) -> [${view.queryLeft}, ${view.queryRight}]`;
+    actionDetail = vi ? "end - 1 giữ đúng interval nửa mở" : "end - 1 preserves half-open semantics";
+  } else if (["visit", "split", "skip"].includes(phase)) {
+    actionLabel = phase === "skip" ? (vi ? "BỎ QUA" : "SKIP") : (vi ? "ĐI XUỐNG" : "DESCEND");
+    actionMain = activeNode === null ? "—" : `node ${activeNode}`;
+    actionDetail = vi ? "Chỉ đi vào các đoạn giao với booking" : "Visit only ranges overlapping the booking";
+  } else if (phase === "cover") {
+    actionLabel = "LAZY +1";
+    actionMain = activeNode === null ? "—" : `node ${activeNode}`;
+    actionDetail = vi ? "Đoạn được phủ hoàn toàn, dừng đệ quy" : "Fully covered range; stop descending";
+  } else if (phase === "pull") {
+    actionLabel = "PULL";
+    actionMain = activeNode === null ? "—" : `tree[${activeNode}]`;
+    actionDetail = "lazy + max(left, right)";
+  } else if (phase === "output" || phase === "done") {
+    actionLabel = phase === "done" ? "DONE" : "RETURN";
+    actionMain = String(rootValue);
+    actionDetail = vi ? "maximum overlap tại root" : "maximum overlap at the root";
+  }
+  const outputsHtml = outputs.length
+    ? outputs.map((value, index) => `<span><small>#${index + 1}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("")
+    : `<em>${vi ? "chưa có kết quả" : "no result yet"}</em>`;
+
+  $("treeView").innerHTML = `<div class="cal732-viz phase-${escapeHtml(phase)}">
+    <div class="cal732-phases">${phases}</div>
+    <section class="cal732-section"><header><strong>BOOKINGS · HALF-OPEN INTERVALS</strong><span>${vi ? "viền vàng = booking hiện tại" : "yellow border = current booking"}</span></header><div class="cal732-scroll"><div class="cal732-bookings">${bookingHtml}</div></div></section>
+    <section class="cal732-section"><header><strong>CALENDAR OVERLAP TIMELINE</strong><span>${vi ? "cột cao nhất = overlap toàn cục" : "tallest column = global overlap"}</span></header><div class="cal732-timeline">${timelineHtml || "—"}</div></section>
+    <div class="cal732-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="cal732-metrics"><span><small>${vi ? "ĐÃ BOOK" : "BOOKED"}</small><strong>${outputs.length}</strong></span><span><small>${vi ? "NODE ĐÃ TẠO" : "MATERIALIZED"}</small><strong>${treeNodes.length}</strong></span><span class="max"><small>ROOT MAX</small><strong>${escapeHtml(String(rootValue))}</strong></span></div>
+    <section class="cal732-section"><header><strong>DYNAMIC SEGMENT TREE · CURRENT UPDATE TRACE</strong><span>${vi ? "xanh = cover · tím = pull · cam = active" : "green = cover · purple = pull · orange = active"}</span></header><div class="cal732-tree">${treeHtml || "—"}</div></section>
+    <div class="cal732-bottom"><div class="cal732-outputs"><small>RETURN VALUES</small><div>${outputsHtml}</div></div><code>tree[node] = lazy[node] + max(left, right)</code></div>
+  </div>`;
+}
+
+function renderReversePairsView(step) {
+  const view = step.reversePairsView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const working = Array.isArray(view.working) ? view.working : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
+  const range = view.range || {};
+  const start = Number.isInteger(range.start) ? range.start : -1;
+  const mid = Number.isInteger(range.mid) ? range.mid : -1;
+  const end = Number.isInteger(range.end) ? range.end : -1;
+  const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
+  const rightCursor = Number.isInteger(view.rightCursor) ? view.rightCursor : null;
+  const phase = String(view.phase || "start");
+  const phaseIndex = ["start", "divide", "base"].includes(phase) ? 0
+    : ["count", "compare-valid", "move-right", "count-add"].includes(phase) ? 1
+      : ["merge", "return"].includes(phase) ? 2 : 3;
+  const phaseLabels = vi
+    ? ["1 · Chia theo index", "2 · Đếm pair chéo", "3 · Merge theo value", "4 · Kết quả"]
+    : ["1 · Divide by index", "2 · Count cross pairs", "3 · Merge by value", "4 · Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const originalHtml = nums.map((value, index) => `<span class="rp493-original"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong></span>`).join("");
+  const workingHtml = working.map((item, position) => {
+    const classes = ["rp493-work"];
+    if (position >= start && position < mid) classes.push("left-half");
+    if (position >= mid && position < end) classes.push("right-half");
+    if (position === leftPos) classes.push("left-current");
+    if (validPositions.has(position)) classes.push("valid");
+    if (position === rightCursor) classes.push("right-cursor");
+    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
+    const marker = position === leftPos ? "L" : position === rightCursor ? "R" : validPositions.has(position) ? "✓" : "";
+    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.value))}</strong><em>original i=${item.originalIndex}</em><i>${marker}</i></span>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
+    : `<span><strong>—</strong></span>`;
+
+  const leftItem = leftPos >= 0 ? working[leftPos] : null;
+  const rightItem = rightCursor !== null && rightCursor >= 0 && rightCursor < end ? working[rightCursor] : null;
+  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
+  let actionMain = "nums[i] > 2 × nums[j]";
+  let actionDetail = vi ? "đồng thời original i < original j" : "while original i < original j";
+  if (leftItem && rightItem) {
+    const valid = leftItem.value > 2 * rightItem.value;
+    actionLabel = valid ? (vi ? "PAIR HỢP LỆ" : "VALID PAIR") : (vi ? "DỪNG CON TRỎ" : "STOP POINTER");
+    actionMain = `${leftItem.value} ${valid ? ">" : "≤"} 2 × ${rightItem.value} = ${2 * rightItem.value}`;
+    actionDetail = valid
+      ? `${vi ? "original pair" : "original pair"} (${leftItem.originalIndex}, ${rightItem.originalIndex})`
+      : (vi ? "các right value phía sau còn lớn hơn" : "later right values are even larger");
+  } else if (leftItem && rightCursor !== null && rightCursor >= end) {
+    actionLabel = vi ? "HẾT NỬA PHẢI" : "RIGHT END";
+    actionMain = `right = ${rightCursor} = end`;
+    actionDetail = vi ? "mọi right value trong cửa sổ đều hợp lệ" : "every right value in the window is valid";
+  } else if (phase === "merge") {
+    actionLabel = "MERGE";
+    actionMain = `[${working.slice(start, end).map((item) => item.value).join(", ")}]`;
+    actionDetail = vi ? "đã sort để cấp cha dùng two pointers" : "sorted for the parent two-pointer scan";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.rangeCount ?? 0);
+    actionDetail = vi ? "reverse pairs" : "reverse pairs";
+  }
+  const doubledRight = rightItem ? 2 * rightItem.value : null;
+
+  $("treeView").innerHTML = `<div class="rp493-viz phase-${escapeHtml(phase)}">
+    <div class="rp493-phases">${phases}</div>
+    <section class="rp493-section"><header><strong>ORIGINAL NUMS · ${vi ? "INDEX KHÔNG THAY ĐỔI" : "INDEX NEVER CHANGES"}</strong><span>i &lt; j</span></header><div class="rp493-scroll"><div class="rp493-row">${originalHtml}</div></div></section>
+    <div class="rp493-recursion"><div><small>RECURSION STACK</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
+    <section class="rp493-section"><header><strong>WORKING ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = pair hợp lệ" : "blue = left · purple = right · green = valid pair"}</span></header><div class="rp493-scroll"><div class="rp493-row">${workingHtml || "—"}</div></div></section>
+    <div class="rp493-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rp493-metrics"><span><small>left value</small><strong>${leftItem ? escapeHtml(String(leftItem.value)) : "—"}</strong></span><span><small>2 × right</small><strong>${doubledRight === null ? "—" : escapeHtml(String(doubledRight))}</strong></span><span><small>right − mid</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
+    <div class="rp493-rule"><code>left.value &gt; 2 × right.value</code><span>${vi ? "right chỉ tiến → mỗi merge level O(n)" : "right only moves forward → O(n) per merge level"}</span></div>
+  </div>`;
+}
+
+function renderReversePairsSegmentTreeView(step) {
+  const view = step.reversePairsSegmentTreeView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const ranges = Array.isArray(view.treeRanges) ? view.treeRanges : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const coveredNodes = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const current = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const queryLeft = Number.isInteger(view.queryLeft) ? view.queryLeft : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "init"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Nén tọa độ", "2 · Quét trái -> phải", "3 · Query + Update", "4 · Kết quả"]
+    : ["1 · Compress", "2 · Scan left -> right", "3 · Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const numsHtml = nums.map((value, index) => {
+    const classes = ["rp493st-num"];
+    if (index < current || phase === "done") classes.push("stored");
+    if (index === current) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong><em>${index < current || phase === "done" ? "in tree" : index === current ? "current j" : "waiting"}</em></span>`;
+  }).join("");
+  const ranksHtml = values.map((value, index) => {
+    const classes = ["rp493st-rank"];
+    if (queryLeft !== null && index >= queryLeft) classes.push("inside");
+    if (current >= 0 && value === nums[current]) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>rank ${index}</small><strong>${escapeHtml(String(value))}</strong></span>`;
+  }).join("");
+
+  const depths = new Map();
+  ranges.forEach((item) => {
+    if (!depths.has(item.depth)) depths.set(item.depth, []);
+    depths.get(item.depth).push(item);
+  });
+  const treeHtml = [...depths.entries()].sort((a, b) => a[0] - b[0]).map(([depth, nodes]) => {
+    const nodesHtml = nodes.map((item) => {
+      const classes = ["rp493st-node"];
+      if (queryPath.has(item.node)) classes.push("visited");
+      if (coveredNodes.has(item.node)) classes.push("covered");
+      if (updatePath.has(item.node)) classes.push("updated");
+      return `<span class="${classes.join(" ")}"><small>node ${item.node} · r${item.start}..r${item.end}</small><strong>${escapeHtml(String(tree[item.node] || 0))}</strong><em>${escapeHtml(`${values[item.start]}..${values[item.end]}`)}</em></span>`;
+    }).join("");
+    return `<div class="rp493st-level"><b>L${depth}</b><div>${nodesHtml}</div></div>`;
+  }).join("");
+
+  const currentValue = current >= 0 ? nums[current] : null;
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén value thành rank tăng dần" : "Compress values into increasing ranks";
+  let actionDetail = vi ? "Cây lưu frequency của các index đã đi qua" : "The tree stores frequencies from earlier indices";
+  if (phase === "scan") {
+    actionLabel = vi ? `XÉT j=${current}` : `PROCESS j=${current}`;
+    actionMain = `nums[j] = ${currentValue}`;
+    actionDetail = vi ? `${current} value trước đó đang ở trong cây` : `${current} earlier values are in the tree`;
+  } else if (phase === "bounds") {
+    actionLabel = "BISECT_RIGHT";
+    actionMain = `${vi ? "tìm value" : "find values"} > 2 * ${currentValue} = ${view.threshold}`;
+    actionDetail = queryLeft === null ? "—" : `query ranks [${queryLeft}, ${Math.max(0, values.length - 1)}]`;
+  } else if (phase === "query") {
+    actionLabel = "QUERY";
+    actionMain = `frequency = ${view.found || 0}`;
+    actionDetail = vi ? "Node xanh lá nằm trọn trong khoảng > 2 * nums[j]" : "Green nodes are fully inside the > 2 * nums[j] interval";
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = `i < ${current} · nums[i] > ${view.threshold}`;
+  } else if (phase === "update") {
+    actionLabel = "UPDATE";
+    actionMain = `insert nums[${current}] = ${currentValue}`;
+    actionDetail = vi ? "Node cam là đường update từ leaf lên root" : "Orange nodes are the update path from leaf to root";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = "reverse pairs";
+  }
+
+  $("treeView").innerHTML = `<div class="rp493st-viz phase-${escapeHtml(phase)}">
+    <div class="rp493st-phases">${phases}</div>
+    <section class="rp493st-section"><header><strong>NUMS · LEFT-TO-RIGHT SCAN</strong><span>${vi ? "xanh = đã update · viền sáng = j hiện tại" : "green = updated · bright border = current j"}</span></header><div class="rp493st-scroll"><div class="rp493st-nums">${numsHtml}</div></div></section>
+    <section class="rp493st-section"><header><strong>VALUE -> COMPRESSED RANK</strong><span>${vi ? "nền xanh = value > 2 * nums[j]" : "green fill = value > 2 * nums[j]"}</span></header><div class="rp493st-ranks">${ranksHtml}</div></section>
+    <div class="rp493st-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rp493st-metrics"><span><small>${vi ? "ĐÃ THẤY" : "SEEN"}</small><strong>${Math.max(0, current)}</strong></span><span><small>${vi ? "QUERY TÌM THẤY" : "QUERY FOUND"}</small><strong>${escapeHtml(String(view.found || 0))}</strong></span><span class="count"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="rp493st-section"><header><strong>SEGMENT TREE · VALUE FREQUENCY</strong><span>${vi ? "node lưu tổng frequency trong range rank" : "nodes store total frequency in each rank range"}</span></header><div class="rp493st-tree">${treeHtml}</div></section>
+    <div class="rp493st-rule"><code>nums[i] > 2 * nums[j]</code><span>+</span><code>${vi ? "query trước, update sau" : "query first, update second"}</code></div>
+  </div>`;
+}
+
+function renderSortedArrayCostView(step) {
+  const view = step.sortedArrayCostView || {};
+  const vi = lang === "vi";
+  const instructions = Array.isArray(view.instructions) ? view.instructions : [];
+  const ranks = Array.isArray(view.ranks) ? view.ranks : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const costs = Array.isArray(view.costs) ? view.costs : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const currentRank = Number.isInteger(view.currentRank) ? view.currentRank : null;
+  const queryCursor = Number.isInteger(view.queryCursor) ? view.queryCursor : null;
+  const updateCursor = Number.isInteger(view.updateCursor) ? view.updateCursor : null;
+  const phase = String(view.phase || "compress");
+  const phaseIndex = ["compress", "rank", "bit-init", "init"].includes(phase) ? 0
+    : ["scan", "rank-current"].includes(phase) ? 1
+      : phase.startsWith("query") || ["less-result", "greater-result"].includes(phase) ? 2
+        : ["cost", "cost-add"].includes(phase) ? 3
+          : ["update", "update-done"].includes(phase) ? 4 : 5;
+  const phaseLabels = vi
+    ? ["1 · Nén rank", "2 · Đọc instruction", "3 · Query BIT", "4 · Tính cost", "5 · Update BIT", "6 · Kết quả"]
+    : ["1 · Compress", "2 · Read instruction", "3 · Query BIT", "4 · Compute cost", "5 · Update BIT", "6 · Result"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const instructionHtml = instructions.map((value, index) => {
+    const classes = ["ca1649-instruction"];
+    if (index < currentIndex || phase === "done") classes.push("processed");
+    if (index === currentIndex) classes.push("current");
+    const cost = costs[index];
+    return `<span class="${classes.join(" ")}"><small>i=${index}</small><strong>${escapeHtml(String(value))}</strong><em>${cost === null || cost === undefined ? "cost _" : `cost ${escapeHtml(String(cost))}`}</em></span>`;
+  }).join("");
+  const rankHtml = ranks.map((item) => {
+    const classes = ["ca1649-rank"];
+    if (item.rank === currentRank) classes.push("active");
+    if (currentRank !== null && item.rank < currentRank) classes.push("less");
+    if (currentRank !== null && item.rank > currentRank) classes.push("greater");
+    return `<span class="${classes.join(" ")}"><small>${escapeHtml(String(item.value))}</small><strong>r${item.rank}</strong></span>`;
+  }).join("");
+  const bitHtml = bit.map((count, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const leftRank = index - lowbit + 1;
+    const classes = ["ca1649-bit"];
+    if (queryPath.has(index)) classes.push("query-path");
+    if (updatePath.has(index)) classes.push("update-path");
+    if (index === queryCursor || index === updateCursor) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${leftRank}..r${index}</em><i>${escapeHtml(String(values[leftRank - 1]))}..${escapeHtml(String(values[index - 1]))}</i></span>`;
+  }).join("");
+
+  const includeCurrent = phase === "update-done";
+  const sortedLength = phase === "done" ? instructions.length : Math.max(0, currentIndex + (includeCurrent ? 1 : 0));
+  const sortedValues = instructions.slice(0, sortedLength).sort((a, b) => a - b);
+  const sortedHtml = sortedValues.length
+    ? sortedValues.map((value) => `<span>${escapeHtml(String(value))}</span>`).join("")
+    : `<em>${vi ? "chưa có phần tử" : "empty"}</em>`;
+  const queryPathText = queryPath.size ? [...queryPath].map((index) => `BIT[${index}]`).join(" → ") : "—";
+  const updatePathText = updatePath.size ? [...updatePath].map((index) => `BIT[${index}]`).join(" → ") : "—";
+
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Nén value thành rank tăng dần" : "Compress values into increasing ranks";
+  let actionDetail = "value ↑ ⇔ rank ↑";
+  if (phase.startsWith("query")) {
+    const isLess = view.queryKind === "less";
+    actionLabel = isLess ? "QUERY LESS" : "QUERY ≤";
+    actionMain = `query(${view.queryLimit ?? "—"}) = ${view.queryTotal ?? 0}`;
+    actionDetail = isLess
+      ? (vi ? `đếm value < ${view.currentValue}` : `count values < ${view.currentValue}`)
+      : (vi ? `đếm value ≤ ${view.currentValue}` : `count values ≤ ${view.currentValue}`);
+  } else if (["less-result", "greater-result"].includes(phase)) {
+    actionLabel = vi ? "HAI PHÍA" : "TWO SIDES";
+    actionMain = `less = ${view.less ?? 0} · greater = ${view.greater ?? 0}`;
+    actionDetail = vi ? "value bằng nhau không thuộc phía nào" : "equal values belong to neither side";
+  } else if (["cost", "cost-add"].includes(phase)) {
+    actionLabel = "COST";
+    actionMain = `min(${view.less ?? 0}, ${view.greater ?? 0}) = ${view.currentCost ?? 0}`;
+    actionDetail = `${vi ? "tổng" : "total"} = ${view.totalCost ?? 0}`;
+  } else if (["update", "update-done"].includes(phase)) {
+    actionLabel = "UPDATE";
+    actionMain = `update(r${view.currentRank ?? "—"})`;
+    actionDetail = vi ? `chèn ${view.currentValue} vào các node BIT cha` : `insert ${view.currentValue} into BIT ancestors`;
+  } else if (["scan", "rank-current"].includes(phase)) {
+    actionLabel = vi ? "ĐANG CHÈN" : "INSERT";
+    actionMain = currentIndex >= 0 ? `instructions[${currentIndex}] = ${view.currentValue}` : "—";
+    actionDetail = vi ? `${currentIndex} phần tử đã có trước đó` : `${currentIndex} elements already inserted`;
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.totalCost ?? 0);
+    actionDetail = vi ? "tổng insertion cost modulo 10⁹+7" : "total insertion cost modulo 10⁹+7";
+  }
+
+  $("treeView").innerHTML = `<div class="ca1649-viz phase-${escapeHtml(phase)}">
+    <div class="ca1649-phases">${phases}</div>
+    <section class="ca1649-section"><header><strong>INSTRUCTIONS</strong><span>${vi ? "số dưới ô = cost của lần chèn" : "number below = insertion cost"}</span></header><div class="ca1649-scroll"><div class="ca1649-instructions">${instructionHtml}</div></div></section>
+    <section class="ca1649-section"><header><strong>VALUE → COMPRESSED RANK</strong><span>${vi ? "xanh = nhỏ hơn · tím = lớn hơn" : "green = smaller · purple = greater"}</span></header><div class="ca1649-ranks">${rankHtml}</div></section>
+    <div class="ca1649-sorted"><small>${vi ? "SORTED ARRAY HIỆN TẠI" : "CURRENT SORTED ARRAY"}</small><div>${sortedHtml}</div></div>
+    <div class="ca1649-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="ca1649-metrics"><span><small>inserted</small><strong>${sortedLength}</strong></span><span class="less"><small>less</small><strong>${escapeHtml(String(view.less ?? 0))}</strong></span><span class="greater"><small>greater</small><strong>${escapeHtml(String(view.greater ?? 0))}</strong></span><span class="cost"><small>min / cost</small><strong>${escapeHtml(String(view.currentCost ?? 0))}</strong></span><span class="total"><small>total cost</small><strong>${escapeHtml(String(view.totalCost ?? 0))}</strong></span></div>
+    <section class="ca1649-section"><header><strong>FENWICK TREE · FREQUENCY BY RANK</strong><span>lowbit → ${vi ? "đoạn rank được phủ" : "covered rank range"}</span></header><div class="ca1649-bits">${bitHtml || "—"}</div><div class="ca1649-paths"><span><b>query</b>${escapeHtml(queryPathText)}</span><span><b>update</b>${escapeHtml(updatePathText)}</span></div></section>
+    <div class="ca1649-rule"><code>less = query(r−1)</code><i>·</i><code>greater = inserted − query(r)</code><i>·</i><code>cost = min(less, greater)</code></div>
+  </div>`;
+}
+
+function renderRangeSumCountView(step) {
+  const view = step.rangeSumCountView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefixOriginal = Array.isArray(view.prefixOriginal) ? view.prefixOriginal : [];
+  const working = Array.isArray(view.working) ? view.working : [];
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const validPositions = new Set(Array.isArray(view.validPositions) ? view.validPositions : []);
+  const range = view.range || {};
+  const start = Number.isInteger(range.start) ? range.start : -1;
+  const mid = Number.isInteger(range.mid) ? range.mid : -1;
+  const end = Number.isInteger(range.end) ? range.end : -1;
+  const leftPos = Number.isInteger(view.leftPos) ? view.leftPos : -1;
+  const low = Number.isInteger(view.low) ? view.low : null;
+  const high = Number.isInteger(view.high) ? view.high : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = phase === "prefix" ? 0
+    : ["divide", "base"].includes(phase) ? 1
+      : ["merge", "return", "done"].includes(phase) ? 3 : 2;
+  const phaseLabels = vi
+    ? ["1 · Prefix Sum", "2 · Chia Merge Sort", "3 · Đếm cặp chéo", "4 · Merge"]
+    : ["1 · Prefix sums", "2 · Divide", "3 · Count cross pairs", "4 · Merge"];
+  const phases = phaseLabels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const numsHtml = nums.map((num, index) => `<span class="rs327-num${index === view.currentNumIndex ? " active" : ""}"><small>nums[${index}]</small><strong>${escapeHtml(String(num))}</strong></span>`).join("");
+  const prefixHtml = prefixOriginal.map((item) => `<span class="rs327-prefix"><small>P${escapeHtml(String(item.originalIndex))}</small><strong>${escapeHtml(String(item.sum))}</strong><em>nums[0..${item.originalIndex - 1}]</em></span>`).join("");
+  const workingHtml = working.map((item, position) => {
+    const classes = ["rs327-work"];
+    if (position >= start && position < mid) classes.push("left-half");
+    if (position >= mid && position < end) classes.push("right-half");
+    if (position === leftPos) classes.push("left-current");
+    if (validPositions.has(position)) classes.push("valid");
+    if (view.mergedRange && position >= view.mergedRange.start && position < view.mergedRange.end) classes.push("merged");
+    const markers = [];
+    if (position === low) markers.push("low");
+    if (position === high) markers.push("high");
+    return `<span class="${classes.join(" ")}"><small>pos ${position}</small><strong>${escapeHtml(String(item.sum))}</strong><em>P${escapeHtml(String(item.originalIndex))}</em><i>${escapeHtml(markers.join(" · "))}</i></span>`;
+  }).join("");
+  const stackHtml = stack.length
+    ? stack.map((frame, index) => `<span class="${index === stack.length - 1 ? "active" : ""}"><small>d${frame.depth}</small><strong>[${frame.start}, ${frame.end})</strong></span>`).join("")
+    : `<span><strong>—</strong></span>`;
+
+  const leftItem = leftPos >= 0 ? working[leftPos] : null;
+  const lowerTarget = leftItem ? leftItem.sum + Number(view.lower) : null;
+  const upperTarget = leftItem ? leftItem.sum + Number(view.upper) : null;
+  const validItems = [...validPositions].map((position) => working[position]).filter(Boolean);
+  let actionLabel = vi ? "MỤC TIÊU" : "GOAL";
+  let actionMain = `${view.lower} ≤ Pj − Pi ≤ ${view.upper}`;
+  let actionDetail = vi ? "Đếm cặp prefix với i < j" : "Count prefix pairs with i < j";
+  if (leftItem) {
+    actionLabel = vi ? "PREFIX TRÁI" : "LEFT PREFIX";
+    actionMain = `P${leftItem.originalIndex} = ${leftItem.sum} · right sum ∈ [${lowerTarget}, ${upperTarget}]`;
+    actionDetail = validItems.length
+      ? `${vi ? "hợp lệ" : "valid"}: ${validItems.map((item) => `P${item.originalIndex}=${item.sum}`).join(", ")}`
+      : (vi ? "chưa có prefix phải hợp lệ" : "no valid right prefix yet");
+  } else if (phase === "merge") {
+    actionLabel = "MERGE";
+    actionMain = `[${start}, ${end}) → ${working.slice(start, end).map((item) => item.sum).join(", ")}`;
+    actionDetail = vi ? "Sắp theo prefix sum cho level cha" : "Sorted by prefix sum for the parent level";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.rangeCount);
+    actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+  }
+  const lowText = low === null ? "—" : low >= end && end >= 0 ? `${low} (end)` : String(low);
+  const highText = high === null ? "—" : high >= end && end >= 0 ? `${high} (end)` : String(high);
+
+  $("treeView").innerHTML = `<div class="rs327-viz phase-${escapeHtml(phase)}">
+    <div class="rs327-phases">${phases}</div>
+    <section class="rs327-section"><header><strong>NUMS → ORIGINAL PREFIX SUMS</strong><span>Pj − Pi = sum(nums[i..j−1])</span></header><div class="rs327-scroll"><div class="rs327-row">${numsHtml}</div><div class="rs327-row prefix">${prefixHtml}</div></div></section>
+    <div class="rs327-recursion"><div><small>${vi ? "RECURSION STACK" : "RECURSION STACK"}</small><span>${stackHtml}</span></div><strong>${start >= 0 ? `[${start}, ${mid >= 0 ? mid : "?"}) | [${mid >= 0 ? mid : "?"}, ${end})` : "—"}</strong></div>
+    <section class="rs327-section"><header><strong>WORKING PREFIX ARRAY · SORTED INSIDE COMPLETED HALVES</strong><span>${vi ? "xanh = left · tím = right · lục = valid" : "blue = left · purple = right · green = valid"}</span></header><div class="rs327-scroll"><div class="rs327-row working">${workingHtml || "—"}</div></div></section>
+    <div class="rs327-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rs327-metrics"><span><small>low</small><strong>${escapeHtml(lowText)}</strong></span><span><small>high</small><strong>${escapeHtml(highText)}</strong></span><span><small>high − low</small><strong>${escapeHtml(String(view.lastAdded ?? 0))}</strong></span><span class="count"><small>${vi ? "COUNT ĐOẠN" : "RANGE COUNT"}</small><strong>${escapeHtml(String(view.rangeCount ?? 0))}</strong></span></div>
+    <div class="rs327-rule"><code>${escapeHtml(String(view.lower))} ≤ right.sum − left.sum ≤ ${escapeHtml(String(view.upper))}</code><span>${vi ? "low tìm cận dưới · high tìm sau cận trên" : "low finds lower bound · high finds after upper bound"}</span></div>
+  </div>`;
+}
+
+function renderRangeSumSegmentTreeView(step) {
+  const view = step.rangeSumSegmentTreeView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const tree = Array.isArray(view.tree) ? view.tree : [];
+  const ranges = Array.isArray(view.treeRanges) ? view.treeRanges : [];
+  const queryPath = new Set(Array.isArray(view.queryPath) ? view.queryPath : []);
+  const coveredNodes = new Set(Array.isArray(view.coveredNodes) ? view.coveredNodes : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const current = Number.isInteger(view.prefixIndex) ? view.prefixIndex : 0;
+  const left = Number.isInteger(view.queryLeft) ? view.queryLeft : null;
+  const right = Number.isInteger(view.queryRight) ? view.queryRight : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = ["prefix", "compress"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Prefix + nén", "2 · Tìm khoảng rank", "3 · Query + Update", "4 · Kết quả"]
+    : ["1 · Prefix + compress", "2 · Find rank interval", "3 · Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const prefixHtml = prefix.map((sum, index) => {
+    const classes = ["rs327st-prefix"];
+    if (index < current || (phase === "done" && index <= current) || (index === 0 && current === 0 && phase === "update")) classes.push("stored");
+    if (index === current && phase !== "done") classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${index === 0 ? "empty" : `nums[0..${index - 1}]`}</em></span>`;
+  }).join("");
+  const rankHtml = values.map((value, index) => {
+    const classes = ["rs327st-rank"];
+    if (left !== null && right !== null && index >= left && index <= right) classes.push("inside");
+    if (current < prefix.length && value === prefix[current]) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>rank ${index}</small><strong>${escapeHtml(String(value))}</strong></span>`;
+  }).join("");
+
+  const depths = new Map();
+  ranges.forEach((item) => {
+    if (!depths.has(item.depth)) depths.set(item.depth, []);
+    depths.get(item.depth).push(item);
+  });
+  const treeHtml = [...depths.entries()].sort((a, b) => a[0] - b[0]).map(([depth, nodes]) => {
+    const nodesHtml = nodes.map((item) => {
+      const classes = ["rs327st-node"];
+      if (queryPath.has(item.node)) classes.push("visited");
+      if (coveredNodes.has(item.node)) classes.push("covered");
+      if (updatePath.has(item.node)) classes.push("updated");
+      const valueRange = values.length ? `${values[item.start]}..${values[item.end]}` : "—";
+      return `<span class="${classes.join(" ")}"><small>node ${item.node} · r${item.start}..r${item.end}</small><strong>${escapeHtml(String(tree[item.node] || 0))}</strong><em>${escapeHtml(valueRange)}</em></span>`;
+    }).join("");
+    return `<div class="rs327st-level"><b>L${depth}</b><div>${nodesHtml}</div></div>`;
+  }).join("");
+
+  const currentSum = current < prefix.length ? prefix[current] : null;
+  const minValue = currentSum === null ? null : currentSum - Number(view.upper);
+  const maxValue = currentSum === null ? null : currentSum - Number(view.lower);
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Tạo prefix và nén tọa độ" : "Build prefixes and compress coordinates";
+  let actionDetail = vi ? "Mỗi leaf đại diện một prefix sum" : "Each leaf represents one prefix-sum value";
+  if (["scan", "bounds"].includes(phase)) {
+    actionLabel = vi ? `XÉT P${current}` : `PROCESS P${current}`;
+    actionMain = `${minValue} <= previous prefix <= ${maxValue}`;
+    actionDetail = left === null ? "—" : `value interval -> rank [${left}, ${right}]`;
+  } else if (phase === "query") {
+    actionLabel = "QUERY";
+    actionMain = `query(rank ${left}..${right}) = ${view.queryCount || 0}`;
+    actionDetail = vi ? "Node xanh lá nằm trọn trong khoảng và được cộng" : "Green nodes are fully covered and added";
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = vi ? "Cộng số prefix trước đó hợp lệ" : "Add valid earlier prefixes";
+  } else if (phase === "update") {
+    actionLabel = "UPDATE";
+    actionMain = currentSum === null ? "—" : `insert P${current} = ${currentSum}`;
+    actionDetail = vi ? "Node màu cam là đường cập nhật từ leaf lên root" : "Orange nodes form the update path from leaf to root";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = vi ? "subarray sum hợp lệ" : "valid subarray sums";
+  }
+
+  $("treeView").innerHTML = `<div class="rs327st-viz phase-${escapeHtml(phase)}">
+    <div class="rs327st-phases">${phases}</div>
+    <section class="rs327st-section"><header><strong>NUMS -> PREFIX SUMS</strong><span>${vi ? "xanh = đã lưu · viền sáng = đang xét" : "green = stored · bright border = current"}</span></header><div class="rs327st-scroll"><div class="rs327st-nums">${nums.map((num, index) => `<span><small>nums[${index}]</small><strong>${escapeHtml(String(num))}</strong></span>`).join("")}</div><div class="rs327st-prefixes">${prefixHtml}</div></div></section>
+    <section class="rs327st-section"><header><strong>COORDINATE COMPRESSION</strong><span>${vi ? "nền xanh = khoảng query" : "green fill = query interval"}</span></header><div class="rs327st-ranks">${rankHtml}</div></section>
+    <div class="rs327st-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="rs327st-metrics"><span><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${currentSum === null ? "—" : escapeHtml(String(currentSum))}</strong></span><span><small>${vi ? "QUERY TÌM THẤY" : "QUERY FOUND"}</small><strong>${escapeHtml(String(view.queryCount || 0))}</strong></span><span class="count"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="rs327st-section tree"><header><strong>SEGMENT TREE · PREFIX FREQUENCY</strong><span>${vi ? "mỗi node lưu tổng frequency trong range rank" : "each node stores total frequency in its rank range"}</span></header><div class="rs327st-tree">${treeHtml}</div></section>
+    <div class="rs327st-rule"><code>lower <= Pj - Pi <= upper</code><span>⇔</span><code>Pj - upper <= Pi <= Pj - lower</code></div>
+  </div>`;
+}
+
+function renderRangeSumFenwickView(step) {
+  const view = step.rangeSumFenwickView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const ranks = Array.isArray(view.ranks) ? view.ranks : [];
+  const bit = Array.isArray(view.bit) ? view.bit : [];
+  const leftPath = new Set(Array.isArray(view.leftPath) ? view.leftPath : []);
+  const rightPath = new Set(Array.isArray(view.rightPath) ? view.rightPath : []);
+  const updatePath = new Set(Array.isArray(view.updatePath) ? view.updatePath : []);
+  const queryPath = new Set([...leftPath, ...rightPath]);
+  const current = Number.isInteger(view.prefixIndex) ? view.prefixIndex : 0;
+  const storedThrough = Number.isInteger(view.storedThrough) ? view.storedThrough : -1;
+  const activeBitIndex = Number.isInteger(view.activeBitIndex) ? view.activeBitIndex : null;
+  const leftRank = Number.isInteger(view.leftRank) ? view.leftRank : null;
+  const rightRank = Number.isInteger(view.rightRank) ? view.rightRank : null;
+  const phase = String(view.phase || "prefix");
+  const phaseIndex = ["prefix", "prefix-init", "prefix-loop", "prefix-append", "compress", "rank", "bit-init", "answer-init"].includes(phase) ? 0
+    : phase === "done" ? 3
+      : ["scan", "bounds"].includes(phase) ? 1 : 2;
+  const labels = vi
+    ? ["1 · Prefix + nén", "2 · Tìm khoảng rank", "3 · BIT Query + Update", "4 · Kết quả"]
+    : ["1 · Prefix + compress", "2 · Find rank interval", "3 · BIT Query + Update", "4 · Result"];
+  const phases = labels.map((label, index) => `<span class="${index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""}">${index < phaseIndex ? "✓" : index + 1}<b>${escapeHtml(label.replace(/^\d+ · /, ""))}</b></span>`).join("");
+
+  const prefixHtml = prefix.map((sum, index) => {
+    const classes = ["ca1649-instruction"];
+    if (index <= storedThrough || phase === "done") classes.push("processed");
+    if (index === current && phase !== "done") classes.push("current");
+    const state = index <= storedThrough || phase === "done"
+      ? "in BIT"
+      : index === current ? "current" : (phase.startsWith("prefix") ? "built" : "waiting");
+    return `<span class="${classes.join(" ")}"><small>P${index}</small><strong>${escapeHtml(String(sum))}</strong><em>${state}</em></span>`;
+  }).join("");
+  const rankHtml = ranks.map((item) => {
+    const classes = ["ca1649-rank"];
+    if (leftRank !== null && rightRank !== null && item.rank >= leftRank && item.rank <= rightRank) classes.push("less");
+    if (current < prefix.length && item.value === prefix[current]) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>${escapeHtml(String(item.value))}</small><strong>r${item.rank}</strong></span>`;
+  }).join("");
+  const bitHtml = bit.map((count, zeroIndex) => {
+    const index = zeroIndex + 1;
+    const lowbit = index & -index;
+    const left = index - lowbit + 1;
+    const classes = ["ca1649-bit"];
+    if (queryPath.has(index)) classes.push("query-path");
+    if (updatePath.has(index)) classes.push("update-path");
+    if (index === activeBitIndex) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>BIT[${index}]</small><strong>${escapeHtml(String(count))}</strong><em>r${left}..r${index}</em><i>${escapeHtml(`${ranks[left - 1]?.value ?? "?"}..${ranks[index - 1]?.value ?? "?"}`)}</i></span>`;
+  }).join("");
+
+  const currentSum = current < prefix.length ? prefix[current] : null;
+  let actionLabel = vi ? "CHUẨN BỊ" : "PREPARE";
+  let actionMain = vi ? "Tạo prefix và nén thành rank 1-based" : "Build prefixes and compress into 1-based ranks";
+  let actionDetail = vi ? "BIT lưu frequency của prefix đã đi qua" : "The BIT stores frequencies of earlier prefixes";
+  if (phase === "scan") {
+    actionLabel = vi ? `XÉT P${current}` : `PROCESS P${current}`;
+    actionMain = `current = ${currentSum}`;
+    actionDetail = `${currentSum - Number(view.upper)} <= previous <= ${currentSum - Number(view.lower)}`;
+  } else if (phase === "bounds") {
+    actionLabel = vi ? "KHOẢNG RANK" : "RANK INTERVAL";
+    actionMain = `[${leftRank}, ${rightRank}]`;
+    actionDetail = vi ? "nền xanh = prefix value cần đếm" : "green fill = prefix values to count";
+  } else if (phase === "query") {
+    actionLabel = "BIT RANGE QUERY";
+    actionMain = `query(${rightRank}) - query(${leftRank - 1}) = ${view.found || 0}`;
+    actionDetail = `${view.rightCount || 0} - ${view.leftCount || 0}`;
+  } else if (phase === "count") {
+    actionLabel = "COUNT";
+    actionMain = `answer = ${view.answer || 0}`;
+    actionDetail = vi ? "Cộng số prefix trước đó hợp lệ" : "Add valid earlier prefixes";
+  } else if (phase === "update") {
+    actionLabel = "BIT UPDATE";
+    actionMain = `insert P${current} = ${currentSum}`;
+    actionDetail = vi ? "Node cam là update path theo lowbit" : "Orange nodes are the lowbit update path";
+  } else if (phase === "done") {
+    actionLabel = "RETURN";
+    actionMain = String(view.answer || 0);
+    actionDetail = vi ? "range sum hợp lệ" : "valid range sums";
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  if (Number.isInteger(activeLine)) {
+    actionLabel = vi ? `DÒNG ${activeLine}` : `LINE ${activeLine}`;
+    actionMain = pick(step.title);
+    actionDetail = pick(step.note);
+  }
+
+  const leftPathText = leftPath.size ? [...leftPath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  const rightPathText = rightPath.size ? [...rightPath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  const updatePathText = updatePath.size ? [...updatePath].map((index) => `BIT[${index}]`).join(" -> ") : "—";
+  $("treeView").innerHTML = `<div class="ca1649-viz rs327bit-viz phase-${escapeHtml(phase)}">
+    <div class="ca1649-phases">${phases}</div>
+    <section class="ca1649-section"><header><strong>NUMS -> PREFIX SUMS</strong><span>${vi ? "xanh = đã update vào BIT · cam = đang xét" : "green = updated into BIT · orange = current"}</span></header><div class="ca1649-scroll"><div class="ca1649-instructions">${prefixHtml}</div></div></section>
+    <section class="ca1649-section"><header><strong>VALUE -> 1-BASED RANK</strong><span>${vi ? "nền xanh = khoảng cần query" : "green fill = queried interval"}</span></header><div class="ca1649-ranks">${rankHtml}</div></section>
+    <div class="ca1649-action"><small>${escapeHtml(actionLabel)}</small><strong>${escapeHtml(actionMain)}</strong><span>${escapeHtml(actionDetail)}</span></div>
+    <div class="ca1649-metrics"><span><small>CURRENT</small><strong>${currentSum === null ? "—" : escapeHtml(String(currentSum))}</strong></span><span class="less"><small>query(left-1)</small><strong>${escapeHtml(String(view.leftCount || 0))}</strong></span><span class="greater"><small>query(right)</small><strong>${escapeHtml(String(view.rightCount || 0))}</strong></span><span class="cost"><small>FOUND</small><strong>${escapeHtml(String(view.found || 0))}</strong></span><span class="total"><small>ANSWER</small><strong>${escapeHtml(String(view.answer || 0))}</strong></span></div>
+    <section class="ca1649-section"><header><strong>FENWICK TREE / BIT · PREFIX FREQUENCY</strong><span>lowbit -> ${vi ? "range rank được quản lý" : "covered rank range"}</span></header><div class="ca1649-bits">${bitHtml}</div><div class="ca1649-paths"><span><b>query(left-1)</b>${escapeHtml(leftPathText)}</span><span><b>query(right)</b>${escapeHtml(rightPathText)}</span><span><b>update</b>${escapeHtml(updatePathText)}</span></div></section>
+    <div class="ca1649-rule"><code>count(left..right) = query(right) - query(left-1)</code><i>·</i><code>update(rank[current])</code></div>
+  </div>`;
 }
 
 function renderCountSmallerView(step) {
@@ -10823,6 +11581,308 @@ function renderRectangleSweepView(step) {
   </div>`;
 }
 
+function renderReplaceGreatestView(step) {
+  const view = step.replaceGreatestView || {};
+  const original = Array.isArray(view.original) ? view.original : [];
+  const arr = Array.isArray(view.arr) ? view.arr : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "length");
+  const phaseIndex = phase === "done" ? 3
+    : phase === "update" ? 2
+      : phase === "write" ? 1 : 0;
+  const labels = vi
+    ? ["Đọc từ phải", "Ghi maximum cũ", "Cập nhật maximum", "Kết quả"]
+    : ["Read from right", "Write old maximum", "Update maximum", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const current = Number.isInteger(view.currentI) ? view.currentI : null;
+  const processedFrom = Number.isInteger(view.processedFrom) ? view.processedFrom : original.length;
+  const maxSource = Number.isInteger(view.rightMaxSource) ? view.rightMaxSource : null;
+  const writeSource = Number.isInteger(view.writeSource) ? view.writeSource : null;
+  const sourceCells = original.map((value, index) => {
+    const classes = ["rg1299-cell"];
+    if (index >= processedFrom || phase === "done") classes.push("scanned");
+    if (index === current) classes.push("current");
+    if (index === maxSource) classes.push("max-source");
+    if (index === writeSource) classes.push("write-source");
+    const markers = [];
+    if (index === current) markers.push("i");
+    if (index === maxSource) markers.push("MAX");
+    if (index === writeSource && index !== maxSource) markers.push("WRITE");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(String(value))}</strong><em>${markers.join(" · ")}</em></span>`;
+  }).join("");
+  const outputCells = arr.map((value, index) => {
+    const written = index >= processedFrom || phase === "done";
+    const classes = ["rg1299-cell", "output"];
+    if (written) classes.push("written");
+    if (index === current && written) classes.push("current-write");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${written ? escapeHtml(String(value)) : "?"}</strong><em>${written ? (index === current ? "JUST WRITTEN" : "DONE") : "WAIT"}</em></span>`;
+  }).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const curText = view.cur === null || view.cur === undefined ? "?" : String(view.cur);
+  const oldMax = view.previousRightMax === null || view.previousRightMax === undefined ? -1 : view.previousRightMax;
+  const writeText = view.writeValue === null || view.writeValue === undefined ? "?" : String(view.writeValue);
+  const flow = [
+    { key: "read", label: "SAVE ORIGINAL", code: `cur = ${curText}` },
+    { key: "write", label: "WRITE ANSWER", code: `arr[i] = ${writeText}` },
+    { key: "update", label: "PREPARE NEXT i", code: `right_max = max(${oldMax}, ${curText}) = ${view.rightMax}` },
+  ].map((item, index) => `<div class="rg1299-flow-step${phase === item.key ? " active" : ""}${["write", "update", "done"].includes(phase) && index === 0 ? " done" : ""}${["update", "done"].includes(phase) && index === 1 ? " done" : ""}${phase === "done" && index === 2 ? " done" : ""}"><small>${item.label}</small><code>${escapeHtml(item.code)}</code></div>${index < 2 ? "<i>→</i>" : ""}`).join("");
+  let statusLabel = vi ? "QUÉT TỪ PHẢI SANG TRÁI" : "SCAN RIGHT TO LEFT";
+  let statusDetail = vi ? "right_max chỉ chứa các giá trị hoàn toàn bên phải i." : "right_max contains only values strictly to the right of i.";
+  let statusClass = "scan";
+  if (phase === "write") {
+    statusLabel = vi ? "GHI TRƯỚC" : "WRITE FIRST";
+    statusDetail = vi ? `arr[${current}] nhận maximum cũ ${writeText}; chưa được dùng cur=${curText}.` : `arr[${current}] receives old maximum ${writeText}; cur=${curText} is not included yet.`;
+    statusClass = "write";
+  } else if (phase === "update") {
+    statusLabel = view.maxUpdated ? (vi ? "MAXIMUM MỚI" : "NEW MAXIMUM") : (vi ? "GIỮ MAXIMUM" : "KEEP MAXIMUM");
+    statusDetail = view.maxUpdated ? (vi ? `${curText} trở thành right_max cho index tiếp theo bên trái.` : `${curText} becomes right_max for the next index to the left.`) : (vi ? `${curText} không vượt ${oldMax}; right_max không đổi.` : `${curText} does not exceed ${oldMax}; right_max stays unchanged.`);
+    statusClass = view.maxUpdated ? "new-max" : "keep-max";
+  } else if (phase === "done") {
+    statusLabel = vi ? "HOÀN TẤT" : "DONE";
+    statusDetail = vi ? "Tất cả vị trí đã nhận maximum ở bên phải." : "Every position now stores the maximum to its right.";
+    statusClass = "done";
+  }
+
+  $("treeView").innerHTML = `<div class="rg1299-viz phase-${escapeHtml(phase)}">
+    <div class="rg1299-phases">${phases}</div>
+    <div class="rg1299-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="rg1299-row"><header><strong>ORIGINAL · READ ONLY</strong><span>${vi ? "xanh = đã quét · MAX = nguồn maximum hiện tại" : "blue = scanned · MAX = current maximum source"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${sourceCells}</div></div></section>
+    <div class="rg1299-flow">${flow}</div>
+    <div class="rg1299-status ${statusClass}"><small>${escapeHtml(statusLabel)}</small><strong>${escapeHtml(statusDetail)}</strong></div>
+    <section class="rg1299-row"><header><strong>OUTPUT · arr</strong><span>${vi ? "? = chưa xử lý · lục = đã ghi đáp án" : "? = waiting · green = answer written"}</span></header><div class="rg1299-scroll"><div class="rg1299-cells">${outputCells}</div></div></section>
+    <div class="rg1299-metrics"><span><small>OLD RIGHT_MAX</small><strong>${escapeHtml(String(oldMax))}</strong></span><span><small>CUR</small><strong>${escapeHtml(curText)}</strong></span><span class="max"><small>NEW RIGHT_MAX</small><strong>${escapeHtml(String(view.rightMax))}</strong></span></div>
+  </div>`;
+}
+
+function renderMountainArrayView(step) {
+  const view = step.mountainArrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "length");
+  const phaseIndex = phase === "done" ? 3
+    : ["descend-check", "descend", "descend-stop"].includes(phase) ? 2
+      : phase === "peak" ? 1 : 0;
+  const labels = vi
+    ? ["Leo nghiêm ngặt", "Đỉnh nội bộ", "Xuống nghiêm ngặt", "Kết quả"]
+    : ["Strict ascent", "Internal peak", "Strict descent", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const validated = new Set(Array.isArray(view.validatedEdges) ? view.validatedEdges : []);
+  const activeEdge = Number.isInteger(view.activeEdge) ? view.activeEdge : null;
+  const failedEdge = Number.isInteger(view.failedEdge) ? view.failedEdge : null;
+  const peak = Number.isInteger(view.peak) ? view.peak : null;
+  const current = Number.isInteger(view.i) ? view.i : 0;
+  const width = Math.max(360, nums.length * 76 + 28);
+  const height = 210;
+  const minValue = nums.length ? Math.min(...nums) : 0;
+  const maxValue = nums.length ? Math.max(...nums) : 1;
+  const range = Math.max(1, maxValue - minValue);
+  const xAt = (index) => nums.length <= 1 ? width / 2 : 38 + index * ((width - 76) / (nums.length - 1));
+  const yAt = (value) => 160 - ((value - minValue) / range) * 105;
+  const edges = nums.slice(0, -1).map((value, index) => {
+    const next = nums[index + 1];
+    const direction = value < next ? "up" : value > next ? "down" : "flat";
+    const classes = ["mt941-edge", direction];
+    if (validated.has(index)) classes.push("validated");
+    if (index === activeEdge) classes.push("active");
+    if (index === failedEdge) classes.push("failed");
+    const x1 = xAt(index), y1 = yAt(value), x2 = xAt(index + 1), y2 = yAt(next);
+    const symbol = direction === "up" ? "↑" : direction === "down" ? "↓" : "=";
+    return `<g class="${classes.join(" ")}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 7}" text-anchor="middle">${symbol}</text></g>`;
+  }).join("");
+  const points = nums.map((value, index) => {
+    const classes = ["mt941-point"];
+    if (index === current) classes.push("current");
+    if (index === peak) classes.push("peak");
+    if (failedEdge !== null && (index === failedEdge || index === failedEdge + 1)) classes.push("failed");
+    const x = xAt(index), y = yAt(value);
+    return `<g class="${classes.join(" ")}"><circle cx="${x}" cy="${y}" r="7"/><text class="value" x="${x}" y="${y - 13}" text-anchor="middle">${escapeHtml(String(value))}</text><text class="index" x="${x}" y="${y + 24}" text-anchor="middle">[${index}]</text>${index === peak ? `<text class="peak-label" x="${x}" y="${Math.max(16, y - 31)}" text-anchor="middle">PEAK</text>` : ""}</g>`;
+  }).join("");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  let comparison = vi ? "Chưa so sánh hai điểm kề nhau" : "No adjacent comparison yet";
+  if (activeEdge !== null && activeEdge + 1 < nums.length) {
+    const leftValue = nums[activeEdge], rightValue = nums[activeEdge + 1];
+    const descending = phase.startsWith("descend");
+    comparison = `arr[${activeEdge}] = ${leftValue} ${descending ? ">" : "<"} arr[${activeEdge + 1}] = ${rightValue}`;
+  } else if (peak !== null) {
+    comparison = `peak = index ${peak} · value ${nums[peak]}`;
+  }
+  const resultKnown = typeof view.result === "boolean";
+  const resultClass = resultKnown ? (view.result ? "success" : "failure") : "checking";
+  const resultLabel = resultKnown ? (view.result ? "TRUE · VALID MOUNTAIN" : "FALSE · NOT A MOUNTAIN") : (vi ? "ĐANG KIỂM TRA" : "CHECKING");
+  const reasonText = view.reason === "too-short" ? (vi ? "Cần ít nhất 3 phần tử" : "At least 3 values are required")
+    : view.reason === "no-ascent" ? (vi ? "Đỉnh ở index 0: thiếu sườn lên" : "Peak at index 0: ascent is missing")
+      : view.reason === "no-descent" ? (vi ? "Đỉnh ở cuối: thiếu sườn xuống" : "Peak at the end: descent is missing")
+        : view.reason === "stopped-early" ? (vi ? "Sườn xuống bị phẳng hoặc tăng trở lại" : "The descent becomes flat or rises again")
+          : view.reason === "valid" ? (vi ? "Tăng tới một đỉnh rồi giảm tới cuối" : "Rises to one peak, then falls to the end")
+            : comparison;
+  const ascentState = view.reason === "no-ascent" ? "fail" : peak !== null ? "pass" : "active";
+  const peakState = ["no-ascent", "no-descent"].includes(view.reason) ? "fail" : peak !== null ? "pass" : "pending";
+  const descentState = view.reason === "stopped-early" ? "fail" : view.reason === "valid" ? "pass" : phase.startsWith("descend") ? "active" : "pending";
+
+  $("treeView").innerHTML = `<div class="mt941-viz phase-${escapeHtml(phase)}">
+    <div class="mt941-phases">${phases}</div>
+    <div class="mt941-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <div class="mt941-rules"><span class="${ascentState}"><b>1</b><small>${vi ? "SƯỜN LÊN" : "ASCENT"}</small><code>arr[j] &lt; arr[j+1]</code></span><span class="${peakState}"><b>2</b><small>PEAK</small><code>0 &lt; peak &lt; n-1</code></span><span class="${descentState}"><b>3</b><small>${vi ? "SƯỜN XUỐNG" : "DESCENT"}</small><code>arr[j] &gt; arr[j+1]</code></span></div>
+    <section class="mt941-profile"><header><strong>MOUNTAIN PROFILE</strong><code>${escapeHtml(comparison)}</code></header><div><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${vi ? "Biểu đồ đường của mảng núi" : "Line profile of the mountain array"}"><line class="mt941-ground" x1="22" y1="182" x2="${width - 22}" y2="182"/>${edges}${points}</svg></div></section>
+    <div class="mt941-metrics"><span><small>i</small><strong>${escapeHtml(String(current))}</strong></span><span><small>PEAK INDEX</small><strong>${peak === null ? "?" : escapeHtml(String(peak))}</strong></span><span><small>LAST INDEX</small><strong>${Math.max(0, nums.length - 1)}</strong></span></div>
+    <div class="mt941-result ${resultClass}"><small>${escapeHtml(resultLabel)}</small><strong>${escapeHtml(reasonText)}</strong></div>
+  </div>`;
+}
+
+function renderProductSubarrayView(step) {
+  const view = step.productSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "guard");
+  const phaseIndex = phase === "done" ? 3
+    : phase === "count" ? 2
+      : ["too-large", "divide", "shrink"].includes(phase) ? 1
+        : 0;
+  const labels = vi
+    ? ["Nhân nums[right]", "Chia nums[left]", "Đếm suffix mới", "Kết quả"]
+    : ["Multiply nums[right]", "Divide nums[left]", "Count new suffixes", "Result"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const right = Number.isInteger(view.right) && view.right < nums.length ? view.right : null;
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const removedIndex = Number.isInteger(view.removedIndex) ? view.removedIndex : null;
+  const hasWindow = right !== null && left <= right;
+  const inWindow = (index) => hasWindow && index >= left && index <= right;
+  const cells = nums.map((value, index) => {
+    const classes = ["psa713-cell"];
+    if (inWindow(index)) classes.push("in-window");
+    if (index === left && hasWindow) classes.push("left-edge");
+    if (index === right) classes.push("right-edge");
+    if (index === removedIndex) classes.push("removed");
+    const pointers = [];
+    if (index === left && hasWindow) pointers.push("L");
+    if (index === right) pointers.push("R");
+    return `<div class="${classes.join(" ")}" aria-label="nums[${index}] = ${escapeHtml(String(value))}"><small>index ${index}</small><strong>${escapeHtml(String(value))}</strong><span>${pointers.map((pointer) => `<b>${pointer}</b>`).join("")}</span></div>`;
+  }).join("");
+  const activeValues = nums.filter((_, index) => inWindow(index) && index !== removedIndex);
+  const expression = activeValues.length ? activeValues.join(" × ") : "1";
+  const product = Number(view.product) || 0;
+  const k = Number(view.k) || 0;
+  const valid = k > 1 && product < k;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const subarrays = Array.isArray(view.newSubarrays) ? view.newSubarrays : [];
+  const hiddenSubarrays = Math.max(0, (Number(view.added) || 0) - subarrays.length);
+  const subarrayHtml = subarrays.length
+    ? subarrays.map((item) => `<span><small>[${item.left}..${item.right}]</small><strong>[${escapeHtml(item.values.join(", "))}]</strong><em>product ${escapeHtml(String(item.product))}</em></span>`).join("")
+    : `<i>${vi ? "Sau khi product < k, các suffix kết thúc tại right sẽ xuất hiện ở đây." : "Once product < k, suffixes ending at right appear here."}</i>`;
+  const statusClass = phase === "done" ? "done"
+    : ["too-large", "divide", "shrink"].includes(phase) ? "shrink"
+      : phase === "count" ? "count" : valid ? "valid" : "expand";
+  const statusLabel = phase === "done" ? (vi ? "HOÀN TẤT" : "DONE")
+    : ["too-large", "divide", "shrink"].includes(phase) ? `product >= k · ${vi ? "CO LEFT" : "SHRINK LEFT"}`
+      : phase === "count" ? `+${view.added} ${vi ? "SUBARRAY" : "SUBARRAYS"}`
+        : valid ? "product < k" : (vi ? "MỞ RỘNG RIGHT" : "EXPAND RIGHT");
+  const statusDetail = phase === "count"
+    ? (vi ? `Giữ right=${right}; chọn start bất kỳ từ ${left} đến ${right}.` : `Fix right=${right}; choose any start from ${left} through ${right}.`)
+    : ["too-large", "divide", "shrink"].includes(phase)
+      ? (vi ? "Bỏ nums[left] vì mọi số đều dương nên phép chia làm tích giảm." : "Remove nums[left]; all values are positive, so division decreases the product.")
+      : phase === "done" ? (vi ? `Tổng số subarray hợp lệ = ${view.count}` : `Total valid subarrays = ${view.count}`)
+        : (vi ? "Thêm nums[right] để xét các subarray kết thúc tại vị trí mới." : "Add nums[right] to inspect subarrays ending at the new position.");
+
+  $("treeView").innerHTML = `<div class="psa713-viz phase-${escapeHtml(phase)}">
+    <div class="psa713-phases">${phases}</div>
+    <div class="psa713-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="psa713-array"><header><strong>nums</strong><span>${vi ? "viền xanh = cửa sổ product < k · đỏ = đang loại" : "blue border = product < k window · red = being removed"}</span></header><div class="psa713-scroll"><div class="psa713-cells">${cells}</div></div></section>
+    <div class="psa713-equation"><small>${vi ? "TÍCH CỬA SỔ" : "WINDOW PRODUCT"}</small><code>${escapeHtml(expression)} = ${escapeHtml(String(product))}</code><strong>${escapeHtml(String(product))} ${valid ? "<" : ">="} ${escapeHtml(String(k))}</strong></div>
+    <div class="psa713-status ${statusClass}"><small>${escapeHtml(statusLabel)}</small><strong>${escapeHtml(statusDetail)}</strong></div>
+    <div class="psa713-metrics"><span><small>PRODUCT / K</small><strong>${escapeHtml(String(product))} / ${escapeHtml(String(k))}</strong></span><span><small>${vi ? "MỚI THÊM" : "JUST ADDED"}</small><strong>+${escapeHtml(String(view.added || 0))}</strong></span><span class="total"><small>COUNT</small><strong>${escapeHtml(String(view.count || 0))}</strong></span></div>
+    <section class="psa713-new"><header><strong>${vi ? `SUBARRAY MỚI KẾT THÚC TẠI right=${right ?? "—"}` : `NEW SUBARRAYS ENDING AT right=${right ?? "—"}`}</strong><span>right - left + 1 = ${escapeHtml(String(view.added || 0))}</span></header><div>${subarrayHtml}${hiddenSubarrays ? `<b class="psa713-more">+${hiddenSubarrays} ${vi ? "đoạn khác" : "more"}</b>` : ""}</div></section>
+  </div>`;
+}
+
+function renderMinimumSubarrayView(step) {
+  const view = step.minimumSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const phaseIndex = phase === "done" ? 3
+    : ["record", "remove", "shrink"].includes(phase) ? 2
+      : ["eligible"].includes(phase) ? 1
+        : 0;
+  const phaseLabels = vi
+    ? ["Mở rộng right", "Đủ target", "Lưu best + co left", "Kết quả"]
+    : ["Expand right", "Reach target", "Save best + shrink left", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+  const currentRight = Number.isInteger(view.right) && view.right < nums.length ? view.right : null;
+  const currentLeft = Number.isInteger(view.left) ? view.left : 0;
+  const removedIndex = Number.isInteger(view.removedIndex) ? view.removedIndex : null;
+  const hasWindow = currentRight !== null && currentLeft <= currentRight;
+  const inCurrent = (index) => hasWindow && index >= currentLeft && index <= currentRight;
+  const inBest = (index) => Number.isInteger(view.bestLeft) && Number.isInteger(view.bestRight)
+    && index >= view.bestLeft && index <= view.bestRight;
+  const cells = nums.map((value, index) => {
+    const classes = ["msa209-cell"];
+    if (inCurrent(index)) classes.push("in-window");
+    if (inBest(index)) classes.push("in-best");
+    if (index === currentRight) classes.push("right-edge");
+    if (index === currentLeft && hasWindow) classes.push("left-edge");
+    if (index === removedIndex) classes.push("removed");
+    const pointers = [];
+    if (index === currentLeft && hasWindow) pointers.push("L");
+    if (index === currentRight) pointers.push("R");
+    return `<div class="${classes.join(" ")}" aria-label="nums[${index}] = ${escapeHtml(String(value))}">
+      <small>index ${index}</small><strong>${escapeHtml(String(value))}</strong>
+      <span>${pointers.map((pointer) => `<b>${pointer}</b>`).join("")}</span>
+    </div>`;
+  }).join("");
+
+  const activeValues = nums.filter((_, index) => inCurrent(index) && index !== removedIndex);
+  const expression = activeValues.length ? activeValues.join(" + ") : "0";
+  const currentLength = hasWindow
+    ? Math.max(0, currentRight - currentLeft + 1 - (removedIndex === currentLeft ? 1 : 0))
+    : 0;
+  const minLenText = view.minLen === null || view.minLen === undefined ? "∞" : String(view.minLen);
+  const target = Number(view.target) || 0;
+  const total = Number(view.total) || 0;
+  const valid = total >= target;
+  const progress = target > 0 ? Math.max(0, Math.min(100, Math.round((total / target) * 100))) : 100;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const shrinking = ["remove", "shrink"].includes(phase);
+  const statusClass = phase === "done" ? "done" : shrinking ? "remove" : view.improved ? "new-best" : valid ? "valid" : "need-more";
+  const statusText = phase === "done" ? (vi ? "HOÀN TẤT" : "DONE")
+    : shrinking ? (vi ? "CO CỬA SỔ" : "SHRINK WINDOW")
+      : view.improved ? (vi ? "KỶ LỤC MỚI" : "NEW BEST")
+        : valid ? (vi ? "ĐỦ TARGET" : "TARGET REACHED")
+          : (vi ? "CHƯA ĐỦ · MỞ RỘNG" : "NOT ENOUGH · EXPAND");
+  const statusInstruction = phase === "done"
+    ? (view.minLen === null ? (vi ? "Không tìm thấy đoạn hợp lệ" : "No valid window found") : (vi ? `Độ dài nhỏ nhất = ${view.minLen}` : `Minimum length = ${view.minLen}`))
+    : shrinking
+      ? (vi ? "Bỏ phần tử trái, tăng left rồi kiểm tra lại" : "Remove the leftmost value, advance left, then check again")
+      : valid
+        ? (vi ? "Ghi nhận độ dài, rồi bỏ phần tử bên trái" : "Record its length, then remove the leftmost value")
+        : (vi ? "Thêm số dương tiếp theo ở bên phải" : "Add the next positive value on the right");
+  const bestValues = Number.isInteger(view.bestLeft) && Number.isInteger(view.bestRight)
+    ? nums.slice(view.bestLeft, view.bestRight + 1)
+    : [];
+  const bestRange = bestValues.length ? `[${view.bestLeft}..${view.bestRight}]` : "—";
+
+  $("treeView").innerHTML = `<div class="msa209-viz phase-${escapeHtml(phase)}">
+    <div class="msa209-phases">${phases}</div>
+    <div class="msa209-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="msa209-array"><header><strong>nums</strong><span>${vi ? "viền xanh = cửa sổ hiện tại · nền lục = đáp án tốt nhất" : "blue border = current window · green fill = best answer"}</span></header><div class="msa209-scroll"><div class="msa209-cells">${cells}</div></div></section>
+    <div class="msa209-equation"><small>${vi ? "TỔNG CỬA SỔ" : "WINDOW SUM"}</small><code>${escapeHtml(expression)} = ${escapeHtml(String(total))}</code><div><i style="width:${progress}%"></i></div><span>${escapeHtml(String(total))} ${valid ? ">=" : "<"} ${escapeHtml(String(target))}</span></div>
+    <div class="msa209-status ${statusClass}"><small>${escapeHtml(statusText)}</small><strong>${escapeHtml(statusInstruction)}</strong></div>
+    <div class="msa209-metrics"><span><small>TOTAL / TARGET</small><strong>${escapeHtml(String(total))} / ${escapeHtml(String(target))}</strong></span><span><small>${vi ? "ĐỘ DÀI HIỆN TẠI" : "CURRENT LENGTH"}</small><strong>${currentLength}</strong></span><span class="best"><small>MIN_LEN</small><strong>${escapeHtml(minLenText)}</strong></span></div>
+    <div class="msa209-best"><small>${vi ? "ĐÁP ÁN TỐT NHẤT ĐÃ TÌM THẤY" : "BEST ANSWER FOUND SO FAR"}</small><strong>${escapeHtml(bestRange)}</strong><code>${bestValues.length ? `[${escapeHtml(bestValues.join(", "))}]` : "—"}</code></div>
+  </div>`;
+}
+
 function renderAverageWindowView(step) {
   const view = step.averageWindowView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -11274,6 +12334,30 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefixAverageView(step);
+  } else if (step.replaceGreatestView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReplaceGreatestView(step);
+  } else if (step.mountainArrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMountainArrayView(step);
+  } else if (step.productSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderProductSubarrayView(step);
+  } else if (step.minimumSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinimumSubarrayView(step);
   } else if (step.averageWindowView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -11652,6 +12736,54 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMissingIntegerView(step);
+  } else if (step.calendarThreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCalendarThreeView(step);
+  } else if (step.fallingSquaresView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFallingSquaresView(step);
+  } else if (step.reversePairsSegmentTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReversePairsSegmentTreeView(step);
+  } else if (step.reversePairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderReversePairsView(step);
+  } else if (step.sortedArrayCostView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSortedArrayCostView(step);
+  } else if (step.rangeSumFenwickView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumFenwickView(step);
+  } else if (step.rangeSumSegmentTreeView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumSegmentTreeView(step);
+  } else if (step.rangeSumCountView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRangeSumCountView(step);
   } else if (step.countSmallerView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -11967,6 +13099,7 @@ let pyodideLoadPromise = null;
 let liveMode = false;
 let liveSteps = [];
 let liveResizeInitialized = false;
+let liveCopyResetTimer = null;
 
 const LIVE_I18N = {
   vi: {
@@ -11974,12 +13107,16 @@ const LIVE_I18N = {
     running: "Đang chạy...",
     ready: (n) => `Đã chạy xong — ${n} bước.`,
     doneNoTrace: "Chạy xong nhưng không bắt được dòng nào (code có thể không gọi hàm nào).",
+    copied: "✓ Đã sao chép!",
+    copyFailed: "Không thể sao chép code.",
   },
   en: {
     loading: "Loading Python runtime (first time only)...",
     running: "Running...",
     ready: (n) => `Finished — ${n} step(s).`,
     doneNoTrace: "Ran successfully but no traced lines were captured (no function was called).",
+    copied: "✓ Copied!",
+    copyFailed: "Could not copy code.",
   },
 };
 const lt = () => LIVE_I18N[lang] || LIVE_I18N.en;
@@ -12476,18 +13613,18 @@ function currentPrimaryCode() {
 function clearedSolutionSkeleton(sourceCode) {
   const code = String(sourceCode || "");
   const classMatch = code.match(/^([ \t]*)class\s+Solution\s*:[ \t]*(?:#.*)?$/m);
-  if (!classMatch) return "class Solution:\n    pass";
+  if (!classMatch) return "class Solution:\n    ";
 
   const classIndent = classMatch[1] || "";
   const afterClass = code.slice(classMatch.index + classMatch[0].length);
   const methodMatch = afterClass.match(/\n([ \t]+)def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->[^\n:]+)?\s*:[ \t]*(?:#.*)?/);
-  if (!methodMatch) return `${classIndent}class Solution:\n${classIndent}    pass`;
+  if (!methodMatch) return `${classIndent}class Solution:\n${classIndent}    `;
 
   const methodIndent = methodMatch[1];
   const methodName = methodMatch[2];
   const args = methodMatch[3].trim();
   const bodyIndent = `${methodIndent}    `;
-  return `${classIndent}class Solution:\n${methodIndent}def ${methodName}(${args}):\n${bodyIndent}pass`;
+  return `${classIndent}class Solution:\n${methodIndent}def ${methodName}(${args}):\n${bodyIndent}`;
 }
 
 async function collectLiveCallArgs() {
@@ -12538,7 +13675,7 @@ async function ensureMonacoEditor() {
     language: "python",
     theme: isLight ? "leetcode-python-light" : "leetcode-python-dark",
     fontFamily: '"Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, Menlo, monospace',
-    fontLigatures: true,
+    fontLigatures: false,
     fontSize: 14,
     lineHeight: 21,
     minimap: { enabled: false },
@@ -13046,14 +14183,12 @@ function enterLiveStepMode(userCode, answer) {
   stepIndex = 0;
   resetBreakpoints();
   renderLiveCodePanel(userLines);
-  // Collapse the whole Monaco editor panel and show the read-only
-  // highlighted trace instead, so code + step controls behave like the
-  // canned mode. Re-show "Edit & run code" so the user can hop back into
-  // the editor (with their code preserved) without fully exiting live mode.
+  // Collapse Monaco and show the read-only highlighted trace. This is still
+  // live mode, so keep only "Exit editor" visible in the mode bar.
   setLiveEditorLayoutMode(false);
   $("liveEditorWrap").classList.add("hidden");
   $("codePanel").classList.remove("hidden");
-  $("liveEditBtn").classList.remove("hidden");
+  $("liveEditBtn").classList.add("hidden");
   renderStep();
 }
 
@@ -13132,6 +14267,11 @@ function renderLiveCodePanel(userLines) {
 function resetLiveEditorState() {
   liveMode = false;
   liveSteps = [];
+  clearTimeout(liveCopyResetTimer);
+  liveCopyResetTimer = null;
+  if ($("liveCopyBtn")) {
+    setLiveCopyButtonState(false);
+  }
   setLiveEditorLayoutMode(false);
   $("liveExitBtn").classList.add("hidden");
   $("liveEditorWrap").classList.add("hidden");
@@ -13145,6 +14285,7 @@ function resetLiveEditorState() {
 function setLiveMode(on) {
   liveMode = on;
   setLiveEditorLayoutMode(on);
+  $("liveEditBtn").classList.toggle("hidden", on);
   $("liveExitBtn").classList.toggle("hidden", !on);
   $("liveEditorWrap").classList.toggle("hidden", !on);
   $("codePanel").classList.toggle("hidden", on);
@@ -13173,15 +14314,64 @@ $("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
 
 $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
 
+function setLiveCopyButtonState(copied) {
+  const button = $("liveCopyBtn");
+  if (!button) return;
+  button.classList.toggle("copied", copied);
+  const label = copied ? lt().copied : t().liveCopyBtn;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
+async function copyLiveEditorCode() {
+  const button = $("liveCopyBtn");
+  if (!button) return;
+  try {
+    const editor = await ensureMonacoEditor();
+    const code = editor.getValue();
+    let copied = false;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      try {
+        await navigator.clipboard.writeText(code);
+        copied = true;
+      } catch (_clipboardError) {
+        copied = false;
+      }
+    }
+    if (!copied) {
+      const fallback = document.createElement("textarea");
+      fallback.value = code;
+      fallback.setAttribute("readonly", "");
+      fallback.style.position = "fixed";
+      fallback.style.opacity = "0";
+      document.body.appendChild(fallback);
+      fallback.select();
+      copied = document.execCommand("copy");
+      fallback.remove();
+      if (!copied) throw new Error("Copy command failed");
+    }
+    clearTimeout(liveCopyResetTimer);
+    setLiveCopyButtonState(true);
+    $("liveStatus").textContent = "";
+    liveCopyResetTimer = setTimeout(() => {
+      setLiveCopyButtonState(false);
+    }, 1800);
+  } catch (_error) {
+    setLiveCopyButtonState(false);
+    $("liveStatus").textContent = lt().copyFailed;
+  }
+}
+
+$("liveCopyBtn") && $("liveCopyBtn").addEventListener("click", copyLiveEditorCode);
+
 $("liveClearBtn") && $("liveClearBtn").addEventListener("click", async () => {
   const editor = await ensureMonacoEditor();
   const skeleton = clearedSolutionSkeleton(editor.getValue() || currentPrimaryCode());
   editor.setValue(skeleton);
-  const passLine = skeleton.split("\n").findIndex((line) => line.trim() === "pass") + 1;
-  if (passLine > 0) {
-    editor.setPosition({ lineNumber: passLine, column: skeleton.split("\n")[passLine - 1].length + 1 });
-    editor.focus();
-  }
+  const skeletonLines = skeleton.split("\n");
+  const bodyLine = skeletonLines.length;
+  editor.setPosition({ lineNumber: bodyLine, column: skeletonLines[bodyLine - 1].length + 1 });
+  editor.focus();
   hide("liveError");
   $("liveStatus").textContent = "";
 });

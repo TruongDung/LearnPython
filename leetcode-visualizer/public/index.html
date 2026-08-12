@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0c0a1a" />
     <title>LeetCode Visualizer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><rect x='5' y='17' width='5' height='10' rx='1.5' fill='%23f8fafc'/><rect x='13' y='10' width='5' height='17' rx='1.5' fill='%23fbbf24'/><rect x='21' y='5' width='5' height='22' rx='1.5' fill='%23f8fafc'/></svg>" />
-    <link rel="stylesheet" href="style.css?v=20260810-315-fenwick" />
+    <link rel="stylesheet" href="style.css?v=20260811-lc732-calendar" />
   </head>
   <body>
     <div class="app">
@@ -118,9 +118,19 @@
             <div id="liveEditorWrap" class="live-editor-wrap hidden">
               <div id="monacoEditor" class="monaco-editor-host"></div>
               <div class="live-editor-actions">
-                <button id="liveRunBtn" type="button" class="live-run-btn" data-i18n="liveRunBtn">▶ Run my code</button>
-                <button id="liveClearBtn" type="button" class="live-clear-btn" data-i18n="liveClearBtn">Clear body</button>
-                <button id="liveResetBtn" type="button" class="live-reset-btn" data-i18n="liveResetBtn">↺ Reset to original</button>
+                <button id="liveRunBtn" type="button" class="live-run-btn" aria-label="Run my code" title="Run my code">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                </button>
+                <button id="liveCopyBtn" type="button" class="live-copy-btn" aria-label="Copy code" title="Copy code">
+                  <svg class="live-copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <svg class="live-copy-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <button id="liveClearBtn" type="button" class="live-clear-btn" aria-label="Clear body" title="Clear body">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 21-4-4L14.5 5.5a2.1 2.1 0 0 1 3 0l1 1a2.1 2.1 0 0 1 0 3L7 21Z"/><path d="m11 19-6-6"/><path d="M7 21h14"/></svg>
+                </button>
+                <button id="liveResetBtn" type="button" class="live-reset-btn" aria-label="Reset to original" title="Reset to original">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                </button>
                 <span id="liveStatus" class="live-status"></span>
               </div>
               <p id="liveError" class="error hidden"></p>
@@ -165,6 +175,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
-    <script src="script.js?v=20260810-315-fenwick"></script>
+    <script src="script.js?v=20260811-lc732-calendar"></script>
   </body>
 </html>

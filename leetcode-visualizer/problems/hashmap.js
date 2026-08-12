@@ -2429,7 +2429,7 @@ function buildSteps303(nums, params) {
   });
 
   steps.push({
-    title: { vi: "Khoi tao prefix[0] = 0", en: "Initialize prefix[0] = 0" },
+    title: { vi: "Khởi tạo prefix[0] = 0", en: "Initialize prefix[0] = 0" },
     codeLines: [3],
     prefix1DView: makeView({
       prefixIndex: 0,
@@ -2440,7 +2440,7 @@ function buildSteps303(nums, params) {
     }),
     vars: [{ name: "prefix[0]", value: 0 }, { name: "query", value: `[${left}, ${right}]` }],
     note: {
-      vi: "prefix co them 1 o dau. prefix[i] la tong nums[0..i-1].",
+      vi: "prefix có thêm một ô đầu. prefix[i] là tổng nums[0..i-1].",
       en: "prefix has one extra leading cell. prefix[i] is the sum of nums[0..i-1].",
     },
   });
@@ -2448,7 +2448,7 @@ function buildSteps303(nums, params) {
   for (let i = 0; i < n; i += 1) {
     const before = prefix[i];
     steps.push({
-      title: { vi: `Doc nums[${i}] = ${nums[i]}`, en: `Read nums[${i}] = ${nums[i]}` },
+      title: { vi: `Đọc nums[${i}] = ${nums[i]}`, en: `Read nums[${i}] = ${nums[i]}` },
       codeLines: [4],
       prefix1DView: makeView({
         current: i,
@@ -2464,7 +2464,7 @@ function buildSteps303(nums, params) {
         { name: "previous prefix", value: before },
       ],
       note: {
-        vi: `Lay nums[${i}] = ${nums[i]}. prefix hien tai van la ${before}; chua append gia tri moi.`,
+        vi: `Lấy nums[${i}] = ${nums[i]}. Prefix hiện tại vẫn là ${before}; chưa append giá trị mới.`,
         en: `Take nums[${i}] = ${nums[i]}. The current prefix is still ${before}; the new value has not been appended yet.`,
       },
     });
@@ -2489,28 +2489,91 @@ function buildSteps303(nums, params) {
         { name: "prefix", value: `[${prefix.map((v) => v == null ? "_" : v).join(", ")}]` },
       ],
       note: {
-        vi: `Lay tong truoc do ${before} cong nums[${i}] = ${nums[i]}.`,
+        vi: `Lấy tổng trước đó ${before} cộng nums[${i}] = ${nums[i]}.`,
         en: `Take the previous sum ${before} plus nums[${i}] = ${nums[i]}.`,
       },
     });
   }
 
   const answer = prefix[right + 1] - prefix[left];
+  const queryView = (phase, extra = {}) => ({
+    left,
+    right,
+    phase,
+    rightPrefixIndex: right + 1,
+    leftPrefixIndex: left,
+    included: nums.slice(left, right + 1),
+    excludedLeft: nums.slice(0, left),
+    ...extra,
+  });
+
   steps.push({
-    title: { vi: `sumRange(${left}, ${right}) = ${answer}`, en: `sumRange(${left}, ${right}) = ${answer}` },
+    title: { vi: `Gọi sumRange(${left}, ${right})`, en: `Call sumRange(${left}, ${right})` },
+    codeLines: [7],
+    prefix1DView: makeView({
+      query: queryView("select-range"),
+      status: [
+        { label: "left", value: left },
+        { label: "right", value: right },
+        { label: "target", value: `nums[${left}..${right}]` },
+      ],
+    }),
+    vars: [{ name: "left", value: left }, { name: "right", value: right }],
+    note: {
+      vi: `Cần tổng đoạn đóng nums[${left}..${right}]. Prefix dùng đoạn nửa mở, nên mốc phải là right + 1 = ${right + 1}.`,
+      en: `We need the closed range nums[${left}..${right}]. Prefix sums use half-open ranges, so the right boundary is right + 1 = ${right + 1}.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: `right_sum = prefix[${right + 1}]`, en: `right_sum = prefix[${right + 1}]` },
     codeLines: [8],
     prefix1DView: makeView({
-      query: {
-        left,
-        right,
-        rightPrefixIndex: right + 1,
-        leftPrefixIndex: left,
+      query: queryView("right-prefix", { rightPrefixValue: prefix[right + 1] }),
+      prefixIndex: right + 1,
+      status: [
+        { label: `prefix[${right + 1}]`, value: prefix[right + 1] },
+        { label: "contains", value: `nums[0..${right}]` },
+      ],
+    }),
+    vars: [{ name: "right_sum", value: prefix[right + 1] }],
+    note: {
+      vi: `prefix[${right + 1}] = ${prefix[right + 1]} chứa tổng từ nums[0] đến nums[${right}], gồm cả phần cần lấy và phần trước left.`,
+      en: `prefix[${right + 1}] = ${prefix[right + 1]} contains nums[0] through nums[${right}], including both the target range and the part before left.`,
+    },
+  });
+
+  steps.push({
+    title: { vi: `left_sum = prefix[${left}]`, en: `left_sum = prefix[${left}]` },
+    codeLines: [9],
+    prefix1DView: makeView({
+      query: queryView("left-prefix", {
+        rightPrefixValue: prefix[right + 1],
+        leftPrefixValue: prefix[left],
+      }),
+      prefixIndex: left,
+      status: [
+        { label: `prefix[${right + 1}]`, value: prefix[right + 1] },
+        { label: `prefix[${left}]`, value: prefix[left] },
+        { label: "subtract", value: `nums[0..${left - 1}]` },
+      ],
+    }),
+    vars: [{ name: "right_sum", value: prefix[right + 1] }, { name: "left_sum", value: prefix[left] }],
+    note: {
+      vi: `prefix[${left}] = ${prefix[left]} chính là tổng phần đứng trước left. Trừ phần này sẽ chỉ còn nums[${left}..${right}].`,
+      en: `prefix[${left}] = ${prefix[left]} is exactly the sum before left. Subtracting it leaves only nums[${left}..${right}].`,
+    },
+  });
+
+  steps.push({
+    title: { vi: `${prefix[right + 1]} - ${prefix[left]} = ${answer}`, en: `${prefix[right + 1]} - ${prefix[left]} = ${answer}` },
+    codeLines: [10],
+    prefix1DView: makeView({
+      query: queryView("subtract", {
         rightPrefixValue: prefix[right + 1],
         leftPrefixValue: prefix[left],
         answer,
-        included: nums.slice(left, right + 1),
-        excludedLeft: nums.slice(0, left),
-      },
+      }),
       prefixIndex: -1,
       status: [
         { label: `prefix[${right + 1}]`, value: prefix[right + 1] },
@@ -2524,7 +2587,7 @@ function buildSteps303(nums, params) {
       { name: "answer", value: `${prefix[right + 1]} - ${prefix[left]} = ${answer}` },
     ],
     note: {
-      vi: `Tong nums[${left}..${right}] = prefix[${right + 1}] - prefix[${left}].`,
+      vi: `Tổng nums[${left}..${right}] = prefix[${right + 1}] - prefix[${left}].`,
       en: `Sum nums[${left}..${right}] = prefix[${right + 1}] - prefix[${left}].`,
     },
     final: true,
@@ -5218,9 +5281,9 @@ module.exports = {
     slug: "range-sum-query-immutable",
     category: { key: "prefix-sum", vi: "Prefix Sum", en: "Prefix Sum" },
     title: { vi: "Range Sum Query - Immutable", en: "Range Sum Query - Immutable" },
-    titleVi: { vi: "Truy van tong doan bat bien", en: "Immutable range sum query" },
+    titleVi: { vi: "Truy vấn tổng đoạn bất biến", en: "Immutable range sum query" },
     statement: {
-      vi: "Cho mang nums khong thay doi. Thiet ke NumArray de tra ve tong nums[left..right] nhieu lan.",
+      vi: "Cho mảng nums không thay đổi. Thiết kế NumArray để trả về tổng nums[left..right] nhiều lần.",
       en: "Given an immutable array nums, design NumArray to return the sum of nums[left..right] many times.",
     },
     defaultInput: [-2, 0, 3, -5, 2, -1],
@@ -5231,7 +5294,7 @@ module.exports = {
       { key: "right", type: "number", label: { vi: "right", en: "right" }, default: 2 },
     ],
     approach: [
-      { vi: "Build prefix voi prefix[0] = 0.", en: "Build prefix with prefix[0] = 0." },
+      { vi: "Xây dựng prefix với prefix[0] = 0.", en: "Build prefix with prefix[0] = 0." },
       { vi: "prefix[i + 1] = prefix[i] + nums[i].", en: "prefix[i + 1] = prefix[i] + nums[i]." },
       { vi: "sumRange(left, right) = prefix[right + 1] - prefix[left].", en: "sumRange(left, right) = prefix[right + 1] - prefix[left]." },
     ],
@@ -5239,7 +5302,7 @@ module.exports = {
       time: "O(n) build, O(1) query",
       space: "O(n)",
       note: {
-        vi: "Moi query chi doc hai o prefix.",
+        vi: "Mỗi query chỉ đọc hai ô prefix.",
         en: "Each query reads only two prefix cells.",
       },
     },
@@ -5251,7 +5314,9 @@ module.exports = {
       "            self.prefix.append(self.prefix[-1] + num)",
       "",
       "    def sumRange(self, left: int, right: int) -> int:",
-      "        return self.prefix[right + 1] - self.prefix[left]",
+      "        right_sum = self.prefix[right + 1]",
+      "        left_sum = self.prefix[left]",
+      "        return right_sum - left_sum",
     ],
     builder: buildSteps303,
   },
