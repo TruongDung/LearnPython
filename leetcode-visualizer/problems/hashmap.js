@@ -1004,8 +1004,8 @@ function buildSteps560(nums, params) {
       { name: "res", value: answer },
     ],
     note: {
-      vi: "count[0] = 1 đại diện cho tổng tiền tố rỗng P[-1] = 0. Nhờ mốc này, đoạn con bắt đầu từ index 0 cũng được đếm.",
-      en: "count[0] = 1 represents the empty prefix P[-1] = 0. This lets us count subarrays that start at index 0.",
+      vi: "count[0] = 1 nghĩa là trước khi bắt đầu mảng, ta đã gặp prefix sum 0 một lần tại vị trí giả P[-1]. Ví dụ P[i] = k thì needed = 0 và đoạn bắt đầu từ index 0 được tính.",
+      en: "count[0] = 1 means we have already seen prefix sum 0 once at the virtual position P[-1]. For example, if P[i] = k then needed = 0 and the range starts at index 0.",
     },
   });
 
@@ -1066,8 +1066,8 @@ function buildSteps560(nums, params) {
       }),
       vars: loopVars(i),
       note: {
-        vi: `Tổng nums[0..${i}] = ${prefixSum}. Đây là P[${i}].`,
-        en: `The sum of nums[0..${i}] is ${prefixSum}. This is P[${i}].`,
+        vi: `P[${i}] = P[${i - 1}] + nums[${i}] = ${beforePrefix} + (${nums[i]}) = ${prefixSum}. Đây là tổng toàn bộ nums[0..${i}], chưa phải tổng của một đoạn con bất kỳ.` ,
+        en: `P[${i}] = P[${i - 1}] + nums[${i}] = ${beforePrefix} + (${nums[i]}) = ${prefixSum}. This is the full prefix sum nums[0..${i}], not yet the sum of an arbitrary subarray.`,
       },
     });
 
@@ -1101,11 +1101,11 @@ function buildSteps560(nums, params) {
       ]),
       note: {
         vi: matchingPositions.length
-          ? `Có ${matchingPositions.length} prefix trước đó bằng ${needed}. Mỗi prefix tạo một subarray có tổng ${k}.`
-          : `Chưa có prefix nào bằng ${needed}, nên index ${i} chưa tạo subarray mới.`,
+          ? `P[${i}] = ${prefixSum} nên cần P[j] = ${prefixSum} - (${k}) = ${needed}. Đã thấy P[j] = ${needed} tại ${positionsString(matchingPositions)}; mỗi vị trí tạo đoạn nums[j+1..${i}] có tổng ${prefixSum} - ${needed} = ${k}.`
+          : `P[${i}] = ${prefixSum} nên cần P[j] = ${prefixSum} - (${k}) = ${needed}, nhưng count chưa có tổng này. Vì vậy chưa có đoạn con kết thúc tại index ${i} có tổng ${k}.`,
         en: matchingPositions.length
-          ? `${matchingPositions.length} earlier prefix(es) equal ${needed}. Each creates a subarray whose sum is ${k}.`
-          : `No earlier prefix equals ${needed}, so index ${i} creates no new subarray.`,
+          ? `P[${i}] = ${prefixSum}, so we need P[j] = ${prefixSum} - (${k}) = ${needed}. P[j] = ${needed} appears at ${positionsString(matchingPositions)}; each position creates nums[j+1..${i}] with sum ${prefixSum} - ${needed} = ${k}.`
+          : `P[${i}] = ${prefixSum}, so we need P[j] = ${prefixSum} - (${k}) = ${needed}, but count has not seen this sum. No subarray ending at index ${i} sums to ${k}.`,
       },
     });
 
@@ -1132,11 +1132,11 @@ function buildSteps560(nums, params) {
       ]),
       note: {
         vi: contribution
-          ? `Có ${contribution} prefix phù hợp, nên cộng ${contribution} vào res. Các đoạn mới: ${rangesString(matchingPositions, i)}.`
-          : "Không có prefix phù hợp, nên res không đổi.",
+          ? `count[${needed}] = ${contribution}, nên có ${contribution} prefix phù hợp. Cộng ${contribution} vào res: ${beforeAnswer} + ${contribution} = ${answer}. Các đoạn mới là ${rangesString(matchingPositions, i)}.`
+          : `count[${needed}] = 0 nên không có prefix phù hợp. Không có đoạn mới được cộng, res vẫn bằng ${answer}.`,
         en: contribution
-          ? `${contribution} matching prefix(es) add ${contribution} to res. New ranges: ${rangesString(matchingPositions, i)}.`
-          : "There is no matching prefix, so res stays unchanged.",
+          ? `count[${needed}] = ${contribution}, so ${contribution} prefixes match. Add ${contribution} to res: ${beforeAnswer} + ${contribution} = ${answer}. New ranges: ${rangesString(matchingPositions, i)}.`
+          : `count[${needed}] = 0, so no earlier prefix matches. No new range is added and res remains ${answer}.`,
       },
     });
 
@@ -1164,8 +1164,8 @@ function buildSteps560(nums, params) {
         { name: "prefix positions", value: positionsString(prefixPositions.get(prefixSum)) },
       ]),
       note: {
-        vi: `Lưu P[${i}] = ${prefixSum}. Những phần tử sau có thể dùng prefix này để tạo subarray tổng bằng k.`,
-        en: `Store P[${i}] = ${prefixSum}. Later elements can use this prefix to form subarrays summing to k.`,
+        vi: `Đã kiểm tra xong index ${i}, bây giờ mới lưu P[${i}] = ${prefixSum} vào count. Lưu sau bước kiểm tra rất quan trọng: nếu lưu trước, prefix hiện tại có thể tự ghép với chính nó thành đoạn rỗng.`,
+        en: `Index ${i} has been checked; now store P[${i}] = ${prefixSum} in count. Storing it after the check is important: storing it first could pair the prefix with itself and create an empty range.`,
       },
     });
   }
@@ -5323,8 +5323,8 @@ module.exports = {
     title: { vi: "Subarray Sum Equals K", en: "Subarray Sum Equals K" },
     titleVi: { vi: "Đếm mảng con có tổng bằng K", en: "Count subarrays with sum K" },
     statement: {
-      vi: "Cho một mảng số nguyên nums và số nguyên k. Hãy trả về số lượng mảng con liên tiếp, không rỗng có tổng bằng k.",
-      en: "Given an integer array nums and an integer k, return the total number of contiguous, non-empty subarrays whose sum equals k.",
+      vi: "Cho một mảng số nguyên nums và số nguyên k. Hãy đếm các mảng con liên tiếp, không rỗng có tổng bằng k. Ví dụ nums = [1,1,1], k = 2 thì có [0..1] và [1..2] → đáp án 2.",
+      en: "Given an integer array nums and an integer k, count non-empty contiguous subarrays whose sum equals k. Example: nums = [1,1,1], k = 2 has [0..1] and [1..2] → answer 2.",
     },
     defaultInput: [1, 1, 1],
     inputKind: "integer",
@@ -5334,16 +5334,20 @@ module.exports = {
     ],
     approach: [
       {
-        vi: "Tính tổng tiền tố prefix_sum đến vị trí hiện tại. Một đoạn nums[l..r] có tổng k khi prefix_sum[r] - prefix_sum[l-1] = k.",
-        en: "Track the prefix sum through the current index. A subarray nums[l..r] sums to k when prefix[r] - prefix[l-1] = k.",
+        vi: "Đặt P[i] = nums[0] + ... + nums[i]. Khi đó tổng đoạn nums[l..r] = P[r] - P[l-1], vì phần tổng trước l bị triệt tiêu.",
+        en: "Define P[i] = nums[0] + ... + nums[i]. Then sum(nums[l..r]) = P[r] - P[l-1], because the earlier prefix cancels out.",
       },
       {
-        vi: "Tại prefix_sum hiện tại, cần tìm prefix_sum - k đã xuất hiện trước đó.",
-        en: "For the current prefix sum, look for an earlier prefix equal to prefix_sum - k.",
+        vi: "Khi đang ở index i, P[i] đã biết. Muốn đoạn kết thúc tại i có tổng k, ta cần tìm prefix cũ P[j] = P[i] - k.",
+        en: "At index i, P[i] is known. For a subarray ending at i to sum to k, find an earlier prefix P[j] = P[i] - k.",
       },
       {
-        vi: "count lưu tần suất từng tổng tiền tố; mỗi prefix phù hợp tạo ra một mảng con mới.",
-        en: "count stores each prefix-sum frequency; every matching prefix creates one new subarray.",
+        vi: "Mỗi lần tìm thấy P[j], ta có đúng một đoạn nums[j+1..i]. Vì vậy count[needed] chính là số đoạn mới cần cộng vào res.",
+        en: "Each matching P[j] gives exactly one range nums[j+1..i]. Therefore count[needed] is exactly how many new ranges to add to res.",
+      },
+      {
+        vi: "Lưu prefix hiện tại vào count sau khi kiểm tra để không dùng chính nó tạo đoạn rỗng.",
+        en: "Store the current prefix in count only after checking, so it cannot form an empty subarray with itself.",
       },
     ],
     complexity: {

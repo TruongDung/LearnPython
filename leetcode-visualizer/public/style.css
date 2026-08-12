@@ -9055,6 +9055,26 @@ button:disabled {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.prefix-count-guide {
+  display: grid;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  border-radius: 7px;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.prefix-count-guide strong {
+  color: #fbbf24;
+  font-size: 13px;
+}
+
+.prefix-count-guide span {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .remainder-heading {
   margin-bottom: 8px;
   color: #94a3b8;

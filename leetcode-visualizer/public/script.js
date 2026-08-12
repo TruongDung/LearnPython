@@ -6766,6 +6766,21 @@ function renderPrefixSumCountView(step) {
     : value;
   const isMatching = (position) => matchingPositions.includes(position);
   const formatPositions = (positions) => positions.length ? positions.join(", ") : "none";
+  const currentPrefix = current >= 0 ? prefixSums[current] : null;
+  const guideHtml = current < 0
+    ? `<div class="prefix-count-guide">
+        <strong>${escapeHtml(pick({ vi: "Mục tiêu của bài", en: "Goal of this problem" }))}</strong>
+        <span>${escapeHtml(pick({ vi: `Tìm mọi đoạn con liên tiếp có tổng đúng bằng k = ${view.k}. Ta sẽ dùng tổng tiền tố để biến việc tìm đoạn con thành phép trừ hai tổng.`, en: `Find every contiguous subarray whose sum is exactly k = ${view.k}. Prefix sums turn each subarray check into subtracting two prefix sums.` }))}</span>
+      </div>`
+    : !hasNeeded
+      ? `<div class="prefix-count-guide">
+          <strong>${escapeHtml(pick({ vi: `Đang tính P[${current}]`, en: `Computing P[${current}]` }))}</strong>
+          <span>${escapeHtml(pick({ vi: `P[${current}] là tổng từ nums[0] đến nums[${current}]. Sau đó mới tính prefix cần tìm = P[${current}] - k.`, en: `P[${current}] is the sum from nums[0] through nums[${current}]. Next we will compute the needed prefix = P[${current}] - k.` }))}</span>
+        </div>`
+      : `<div class="prefix-count-guide">
+          <strong>${escapeHtml(pick({ vi: `Tại index ${current}: tìm đoạn con kết thúc ở đây`, en: `At index ${current}: find subarrays ending here` }))}</strong>
+          <span>${escapeHtml(pick({ vi: `P[${current}] = ${currentPrefix}. Cần P[j] = P[${current}] - k = ${currentPrefix} - (${view.k}) = ${view.needed}. Nếu có P[j] như vậy thì nums[j+1..${current}] có tổng bằng k.`, en: `P[${current}] = ${currentPrefix}. We need P[j] = P[${current}] - k = ${currentPrefix} - (${view.k}) = ${view.needed}. Each such P[j] makes nums[j+1..${current}] sum to k.` }))}</span>
+        </div>`;
 
   const numCells = nums.map((num, index) => {
     const processed = prefixSums[index] !== null && prefixSums[index] !== undefined;
@@ -6802,10 +6817,10 @@ function renderPrefixSumCountView(step) {
 
   const rangeCells = newSubarrays.length
     ? newSubarrays.map((range) => `<div class="remainder-map-cell">
-        <span>${escapeHtml(pick({ vi: "đoạn con", en: "subarray" }))}</span>
-        <strong>[${escapeHtml(String(range.start))}..${escapeHtml(String(range.end))}]</strong>
+        <span>${escapeHtml(pick({ vi: `nums[${range.start}..${range.end}]`, en: `nums[${range.start}..${range.end}]` }))}<br><small>P[${escapeHtml(String(range.previousPosition))}] → P[${escapeHtml(String(current))}]</small></span>
+        <strong>sum = ${escapeHtml(String(view.k))}</strong>
       </div>`).join("")
-    : `<div class="remainder-map-cell"><span>${escapeHtml(pick({ vi: "đoạn con mới", en: "new subarrays" }))}</span><strong>none</strong></div>`;
+    : `<div class="remainder-map-cell"><span>${escapeHtml(pick({ vi: "Chưa có đoạn phù hợp", en: "No matching range yet" }))}</span><strong>none</strong></div>`;
 
   const statusItems = statuses.map((item) => `<div>
     <span>${escapeHtml(String(pickText(item.label) ?? ""))}</span>
@@ -6826,15 +6841,15 @@ function renderPrefixSumCountView(step) {
         </div>
         <strong class="remainder-proof-operator">-</strong>
         <div class="remainder-proof-term">
-          <span>${escapeHtml(pick({ vi: "Tổng cần tìm trước đó", en: "Needed earlier prefix" }))}</span>
-          <strong>${escapeHtml(String(currentPrefix))} - ${escapeHtml(String(view.k ?? "k"))} = ${escapeHtml(String(view.needed))}</strong>
-          <small>${escapeHtml(pick({ vi: "prefix_sum - k", en: "prefix_sum - k" }))}</small>
+          <span>${escapeHtml(pick({ vi: "Prefix trước đó cần có", en: "Earlier prefix we need" }))}</span>
+          <strong>P[j] = ${escapeHtml(String(currentPrefix))} - ${escapeHtml(String(view.k ?? "k"))} = ${escapeHtml(String(view.needed))}</strong>
+          <small>${escapeHtml(pick({ vi: "để phần còn lại có tổng k", en: "so the remaining range sums to k" }))}</small>
         </div>
         <strong class="remainder-proof-operator">=</strong>
         <div class="remainder-proof-term result">
-          <span>${escapeHtml(pick({ vi: "Số đoạn mới", en: "New subarrays" }))}</span>
-          <strong>${escapeHtml(String(added))}</strong>
-          <small>${escapeHtml(pick({ vi: "mỗi prefix phù hợp tạo 1 đoạn", en: "one range per matching prefix" }))}</small>
+          <span>${escapeHtml(pick({ vi: "Tổng đoạn con", en: "Subarray sum" }))}</span>
+          <strong>${escapeHtml(String(currentPrefix))} - ${escapeHtml(String(view.needed))} = ${escapeHtml(String(view.k))}</strong>
+          <small>${escapeHtml(pick({ vi: `${added} prefix khớp → ${added} đoạn con mới`, en: `${added} matching prefix(es) → ${added} new range(s)` }))}</small>
         </div>
       </div>
       <div class="remainder-proof-conclusion">${escapeHtml(added
@@ -6845,21 +6860,22 @@ function renderPrefixSumCountView(step) {
 
   $("treeView").innerHTML = `
     <div class="remainder-viz prefix-count-viz">
+      ${guideHtml}
       <section>
-        <div class="remainder-heading">${escapeHtml(pick({ vi: "Mảng nums", en: "Input nums" }))}</div>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Mảng nums — ô đang xét", en: "Input nums — current position" }))}</div>
         <div class="remainder-cells">${numCells}</div>
       </section>
       <section>
-        <div class="remainder-heading">${escapeHtml(pick({ vi: "Các tổng tiền tố đã biết", en: "Known prefix sums" }))}</div>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Các prefix sum đã tính: P[j]", en: "Computed prefix sums: P[j]" }))}</div>
         <div class="remainder-cells">${prefixCells}</div>
       </section>
       ${proofHtml}
       <section>
-        <div class="remainder-heading">${escapeHtml(pick({ vi: "Các đoạn con mới được đếm ở bước này", en: "New subarrays counted at this step" }))}</div>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Đoạn con được cộng vào res ở bước này", en: "Subarrays added to res at this step" }))}</div>
         <div class="remainder-map">${rangeCells}</div>
       </section>
       <section>
-        <div class="remainder-heading">${escapeHtml(pick({ vi: "count: tần suất tổng tiền tố", en: "count: prefix-sum frequencies" }))}</div>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "count — mỗi prefix sum xuất hiện bao nhiêu lần", en: "count — frequency of each prefix sum" }))}</div>
         <div class="remainder-map">${mapCells}</div>
       </section>
       <div class="remainder-status">${statusItems}</div>
@@ -6867,6 +6883,7 @@ function renderPrefixSumCountView(step) {
 }
 
 function renderPrefixRemainderView(step) {
+  const view = step.prefixRemainderView || {};
   const pickViewText = (value) => {
     const isLocalized = value && !Array.isArray(value) && typeof value === "object"
       && (Object.prototype.hasOwnProperty.call(value, "vi") || Object.prototype.hasOwnProperty.call(value, "en"));
