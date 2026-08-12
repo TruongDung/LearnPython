@@ -1531,6 +1531,218 @@ function buildSteps410(nums, params) {
 }
 
 /**
+ * LeetCode 2226: Maximum Candies Allocated to K Children.
+ *
+ * Given candies piles and k children, find the MAXIMUM number of candies
+ * each child can get if every child must receive the SAME amount (from a
+ * single pile - candies from different piles cannot be combined).
+ *
+ * Binary search on the ANSWER (candies per child): the answer lies in
+ * [0, max(candies)]. For a candidate `mid` (candies per child), each pile
+ * `c` can feed `c // mid` children. If the TOTAL children fed (sum of
+ * c // mid over all piles) is:
+ *   - >= k → mid is FEASIBLE (maybe can go bigger) → left = mid + 1
+ *   - < k  → mid is TOO BIG (not enough children fed) → right = mid - 1
+ * The largest feasible mid is the answer (0 if even mid=1 can't feed k kids).
+ */
+function buildSteps2226(candies, params) {
+  const k = Number(params && params.k !== undefined ? params.k : 2);
+  const steps = [];
+  const n = candies.length;
+
+  function feedCount(mid) {
+    if (mid <= 0) return Infinity; // guard, never called with mid<=0 in practice
+    const fedPer = candies.map((c) => Math.floor(c / mid));
+    const total = fedPer.reduce((a, b) => a + b, 0);
+    return { fedPer, total };
+  }
+
+  function subLabels(l, r, m) {
+    return candies.map((_, i) => {
+      const tags = [];
+      if (i === l) tags.push("L");
+      if (m !== undefined && i === m) tags.push("M");
+      if (i === r) tags.push("R");
+      return tags.length ? `[${i}] ${tags.join("/")}` : `[${i}]`;
+    });
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [...candies],
+      sub: opts.sub || candies.map((_, i) => `[${i}]`),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  }
+
+  const totalCandies = candies.reduce((a, b) => a + b, 0);
+  const maxPile = Math.max(...candies);
+
+  // Line 3: if sum(candies) < k: return 0
+  const impossible = totalCandies < k;
+  snap({
+    title: { vi: `if sum(candies) < k → ${totalCandies} < ${k} → ${impossible}`, en: `if sum(candies) < k → ${totalCandies} < ${k} → ${impossible}` },
+    sub: subLabels(undefined, undefined),
+    codeLines: [3],
+    vars: [
+      { name: "candies", value: `[${candies.join(",")}]` },
+      { name: "k", value: k },
+      { name: "sum(candies)", value: totalCandies },
+    ],
+    note: impossible
+      ? { vi: `Tổng số kẹo ${totalCandies} < ${k} trẻ em → dù chia mỗi trẻ 1 kẹo cũng không đủ → trả về 0.`, en: `Total candies ${totalCandies} < ${k} children → even 1 candy each isn't enough → return 0.` }
+      : { vi: `Tổng số kẹo ${totalCandies} ≥ ${k} → có thể chia được, tiếp tục binary search.`, en: `Total candies ${totalCandies} ≥ ${k} → a split is possible, continue with binary search.` },
+  });
+
+  if (impossible) {
+    const fs = {
+      title: { vi: "return 0", en: "return 0" },
+      arr: [...candies],
+      sub: candies.map((_, i) => `[${i}]`),
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [4],
+      vars: [{ name: "answer", value: 0 }],
+      note: {
+        vi: `Không thể phát đủ kẹo cho ${k} trẻ em (mỗi trẻ tối thiểu 1 kẹo) vì tổng chỉ có ${totalCandies}.`,
+        en: `Cannot give at least 1 candy to each of ${k} children since the total is only ${totalCandies}.`,
+      },
+    };
+    steps.push(fs);
+    return { original: [...candies], answer: 0, steps };
+  }
+
+  // Line 5: left, right = 1, max(candies)
+  let left = 1;
+  let right = maxPile;
+  snap({
+    title: { vi: `left, right = 1, max(candies) → left=${left}, right=${right}`, en: `left, right = 1, max(candies) → left=${left}, right=${right}` },
+    sub: subLabels(undefined, undefined),
+    codeLines: [5],
+    vars: [
+      { name: "left (min candies/child)", value: left },
+      { name: "right (max pile)", value: right },
+    ],
+    note: {
+      vi: `Đáp án (số kẹo/trẻ) nằm trong [1, max(candies)] = [1, ${right}]: không thể vượt quá đống kẹo lớn nhất (1 đống không thể chia quá số kẹo nó có).`,
+      en: `The answer (candies per child) lies in [1, max(candies)] = [1, ${right}]: it can't exceed the largest pile (a single pile can't give out more candies than it has).`,
+    },
+  });
+
+  let answer = 0;
+
+  while (left <= right) {
+    // Line 6: while left <= right:
+    snap({
+      title: { vi: `while left <= right → ${left} <= ${right} → True`, en: `while left <= right → ${left} <= ${right} → True` },
+      sub: subLabels(undefined, undefined),
+      codeLines: [6],
+      vars: [{ name: "left", value: left }, { name: "right", value: right }],
+      note: {
+        vi: `left=${left} ≤ right=${right} → còn khoảng để tìm đáp án lớn nhất, tiếp tục.`,
+        en: `left=${left} ≤ right=${right} → there's still a range to search for the largest answer, continue.`,
+      },
+    });
+
+    // Line 7: mid = (left + right) // 2
+    const mid = Math.floor((left + right) / 2);
+    snap({
+      title: { vi: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}`, en: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}` },
+      sub: subLabels(undefined, undefined),
+      codeLines: [7],
+      vars: [{ name: "mid (candies/child thử)", value: mid }],
+      note: {
+        vi: `Thử mid=${mid} kẹo/trẻ: mỗi đống chia được bao nhiêu trẻ?`,
+        en: `Try mid=${mid} candies/child: how many children can each pile feed?`,
+      },
+    });
+
+    // Line 8: count = sum(c // mid for c in candies)
+    const { fedPer, total } = feedCount(mid);
+    const fedStr = fedPer.map((f, i) => `${candies[i]}//${mid}=${f}`).join(", ");
+    snap({
+      title: { vi: `count = sum(c // mid) → ${total} trẻ được nhận kẹo`, en: `count = sum(c // mid) → ${total} children fed` },
+      sub: candies.map((v, i) => `[${i}] →${fedPer[i]}`),
+      mark: fedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
+      codeLines: [8],
+      vars: [{ name: "children fed", value: total }, { name: "breakdown", value: fedStr }],
+      note: {
+        vi: `Mỗi đống c chia được c // mid trẻ (chia nguyên). Tổng cộng ${total} trẻ được nhận đủ ${mid} kẹo.`,
+        en: `Each pile c can feed c // mid children (integer division). In total ${total} children get exactly ${mid} candies.`,
+      },
+    });
+
+    const feasible = total >= k;
+    // Line 9: if count >= k:
+    snap({
+      title: { vi: `if count >= k → ${total} >= ${k} → ${feasible}`, en: `if count >= k → ${total} >= ${k} → ${feasible}` },
+      sub: candies.map((v, i) => `[${i}] →${fedPer[i]}`),
+      mark: fedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
+      codeLines: [9],
+      vars: [{ name: "count", value: total }, { name: "k", value: k }],
+      note: feasible
+        ? { vi: `${total} ≥ k=${k} → mid=${mid} KHẢ THI (đủ trẻ được chia), thử giá trị LỚN HƠN → left=mid+1.`, en: `${total} ≥ k=${k} → mid=${mid} is FEASIBLE (enough children fed), try LARGER → left=mid+1.` }
+        : { vi: `${total} < k=${k} → mid=${mid} QUÁ LỚN (không đủ trẻ được chia) → right=mid-1.`, en: `${total} < k=${k} → mid=${mid} is TOO BIG (not enough children fed) → right=mid-1.` },
+    });
+
+    if (feasible) {
+      answer = mid;
+      // Line 10: left = mid + 1
+      left = mid + 1;
+      snap({
+        title: { vi: `left = mid + 1 → left = ${left}`, en: `left = mid + 1 → left = ${left}` },
+        sub: subLabels(undefined, undefined),
+        codeLines: [10],
+        vars: [{ name: "left", value: left }, { name: "best answer so far", value: answer }],
+        note: {
+          vi: `left = ${left}. mid=${mid} khả thi nên lưu tạm là đáp án tốt nhất, thử giá trị lớn hơn.`,
+          en: `left = ${left}. mid=${mid} is feasible so it's kept as the best answer so far, try a bigger value.`,
+        },
+      });
+    } else {
+      // Line 12: right = mid - 1
+      right = mid - 1;
+      snap({
+        title: { vi: `right = mid - 1 → right = ${right}`, en: `right = mid - 1 → right = ${right}` },
+        sub: subLabels(undefined, undefined),
+        codeLines: [12],
+        vars: [{ name: "right", value: right }],
+        note: {
+          vi: `right = ${right}. mid=${mid} không khả thi, thu hẹp phạm vi tìm kiếm về phía nhỏ hơn.`,
+          en: `right = ${right}. mid=${mid} is not feasible, shrink the search range toward smaller values.`,
+        },
+      });
+    }
+  }
+
+  const { fedPer: finalFedPer } = feedCount(answer);
+  const fs = {
+    title: { vi: `return right → ${answer}`, en: `return right → ${answer}` },
+    arr: [...candies],
+    sub: candies.map((v, i) => `[${i}] →${finalFedPer[i]}`),
+    highlight: [],
+    mark: finalFedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
+    final: true,
+    codeLines: [13],
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `left > right, vòng lặp kết thúc. right=${answer} là giá trị LỚN NHẤT sao cho ≥ ${k} trẻ có thể nhận đủ ${answer} kẹo.`,
+      en: `left > right, the loop ends. right=${answer} is the LARGEST value such that ≥ ${k} children can each receive ${answer} candies.`,
+    },
+  };
+  steps.push(fs);
+
+  return { original: [...candies], answer, steps };
+}
+
+/**
  * LeetCode 1044: Longest Duplicate Substring — binary search on length +
  * Rabin-Karp rolling hash. search(L) checks if some substring of length L
  * appears twice; the answer length is monotonic so we binary search it.
@@ -3065,6 +3277,57 @@ module.exports = {
       "        return groups",
     ],
     builder: buildSteps410,
+  },
+  2226: {
+    id: 2226,
+    difficulty: "medium",
+    slug: "maximum-candies-allocated-to-k-children",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Maximum Candies Allocated to K Children", en: "Maximum Candies Allocated to K Children" },
+    titleVi: { vi: "Số kẹo tối đa chia cho k trẻ em", en: "Maximum candies each of k children can get" },
+    statement: {
+      vi:
+        "Cho mảng candies gồm m đống kẹo và số nguyên k (số trẻ em). Mỗi trẻ chỉ được nhận kẹo từ MỘT đống " +
+        "duy nhất, và mọi trẻ phải nhận SỐ KẸO BẰNG NHAU. Tìm số kẹo TỐI ĐA mỗi trẻ có thể nhận được.",
+      en:
+        "Given an array candies of m piles and an integer k (number of children), each child gets candies from " +
+        "a SINGLE pile only, and every child must receive the SAME amount. Find the MAXIMUM candies each child " +
+        "can get.",
+    },
+    defaultInput: [5, 8, 6],
+    inputKind: "positive",
+    inputLabel: { vi: "candies (đống kẹo)", en: "candies (piles)" },
+    extraParams: [{ key: "k", label: { vi: "k (số trẻ em)", en: "k (number of children)" }, default: 3 }],
+    approach: [
+      { vi: "Nếu tổng kẹo < k → không đủ để mỗi trẻ có ít nhất 1 kẹo → trả về 0.", en: "If the total candies < k → not enough for at least 1 candy each → return 0." },
+      { vi: "Binary search trên ĐÁP ÁN (số kẹo/trẻ): nằm trong [1, max(candies)].", en: "Binary search on the ANSWER (candies per child): it lies in [1, max(candies)]." },
+      { vi: "Với mid, mỗi đống c chia được c // mid trẻ. Tổng số trẻ được chia = sum(c // mid).", en: "For a given mid, each pile c can feed c // mid children. Total children fed = sum(c // mid)." },
+      { vi: "Nếu tổng ≥ k → mid khả thi, thử LỚN HƠN (left=mid+1). Nếu < k → mid quá lớn (right=mid-1).", en: "If the total ≥ k → mid is feasible, try LARGER (left=mid+1). If < k → mid is too big (right=mid-1)." },
+    ],
+    complexity: {
+      time: "O(n·log(max(candies)))",
+      space: "O(1)",
+      note: {
+        vi: "Binary search O(log(max)) lần, mỗi lần tính tổng trẻ được chia tốn O(n).",
+        en: "O(log(max)) binary search iterations, each computing the fed-children total in O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maximumCandies(self, candies, k):",
+      "        if sum(candies) < k:",
+      "            return 0",
+      "        left, right = 1, max(candies)",
+      "        while left <= right:",
+      "            mid = (left + right) // 2",
+      "            count = sum(c // mid for c in candies)",
+      "            if count >= k:",
+      "                left = mid + 1",
+      "            else:",
+      "                right = mid - 1",
+      "        return right",
+    ],
+    builder: buildSteps2226,
   },
   __meta: {
     order: [69, 410, 4, 33, 34, 911, 875, 1011, 1044],
