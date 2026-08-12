@@ -6750,8 +6750,123 @@ function renderPrefix2DView(step) {
     </div>`;
 }
 
+function renderPrefixSumCountView(step) {
+  const view = step.prefixSumCountView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const prefixSums = Array.isArray(view.prefixSums) ? view.prefixSums : [];
+  const entries = Array.isArray(view.entries) ? view.entries : [];
+  const matchingPositions = Array.isArray(view.matchingPositions) ? view.matchingPositions : [];
+  const newSubarrays = Array.isArray(view.newSubarrays) ? view.newSubarrays : [];
+  const statuses = Array.isArray(view.status) ? view.status : [];
+  const current = Number.isInteger(view.current) ? view.current : -1;
+  const hasNeeded = view.needed !== null && view.needed !== undefined;
+  const pickText = (value) => value && typeof value === "object" && !Array.isArray(value)
+    && (Object.prototype.hasOwnProperty.call(value, "vi") || Object.prototype.hasOwnProperty.call(value, "en"))
+    ? pick(value)
+    : value;
+  const isMatching = (position) => matchingPositions.includes(position);
+  const formatPositions = (positions) => positions.length ? positions.join(", ") : "none";
+
+  const numCells = nums.map((num, index) => {
+    const processed = prefixSums[index] !== null && prefixSums[index] !== undefined;
+    const classes = ["remainder-cell"];
+    if (processed) classes.push("processed");
+    if (index === current) classes.push("current");
+    return `<div class="${classes.join(" ")}">
+      <span class="remainder-index">nums[${index}]</span>
+      <strong>${escapeHtml(String(num))}</strong>
+      <span>${escapeHtml(pick({ vi: processed ? "đã cộng" : "chưa đọc", en: processed ? "processed" : "pending" }))}</span>
+    </div>`;
+  }).join("");
+
+  const prefixCells = [{ position: -1, value: 0 }]
+    .concat(prefixSums
+      .map((value, position) => ({ position, value }))
+      .filter((item) => item.value !== null && item.value !== undefined))
+    .map((item) => {
+      const classes = ["remainder-cell"];
+      if (isMatching(item.position)) classes.push("match");
+      if (item.position === current) classes.push("current");
+      const label = item.position === -1 ? "P[-1]" : `P[${item.position}]`;
+      return `<div class="${classes.join(" ")}">
+        <span class="remainder-index">${label}</span>
+        <strong>${escapeHtml(String(item.value))}</strong>
+        <span>${escapeHtml(item.position === -1 ? "empty prefix" : "prefix sum")}</span>
+      </div>`;
+    }).join("");
+
+  const mapCells = entries.map((entry) => `<div class="remainder-map-cell">
+    <span>${escapeHtml(pick({ vi: "tổng", en: "sum" }))} ${escapeHtml(String(entry.sum))}<br><small>P[${escapeHtml(formatPositions(entry.positions || []))}]</small></span>
+    <strong>${escapeHtml(pick({ vi: "số lần", en: "count" }))} ${escapeHtml(String(entry.frequency))}</strong>
+  </div>`).join("");
+
+  const rangeCells = newSubarrays.length
+    ? newSubarrays.map((range) => `<div class="remainder-map-cell">
+        <span>${escapeHtml(pick({ vi: "đoạn con", en: "subarray" }))}</span>
+        <strong>[${escapeHtml(String(range.start))}..${escapeHtml(String(range.end))}]</strong>
+      </div>`).join("")
+    : `<div class="remainder-map-cell"><span>${escapeHtml(pick({ vi: "đoạn con mới", en: "new subarrays" }))}</span><strong>none</strong></div>`;
+
+  const statusItems = statuses.map((item) => `<div>
+    <span>${escapeHtml(String(pickText(item.label) ?? ""))}</span>
+    <strong>${escapeHtml(String(pickText(item.value) ?? "-"))}</strong>
+  </div>`).join("");
+
+  let proofHtml = "";
+  if (current >= 0 && hasNeeded) {
+    const currentPrefix = prefixSums[current];
+    const added = newSubarrays.length;
+    proofHtml = `<div class="remainder-proof ${added ? "valid" : "none"}">
+      <div class="remainder-heading">${escapeHtml(pick({ vi: "Vì sao tạo được subarray tổng bằng k?", en: "Why these subarrays sum to k" }))}</div>
+      <div class="remainder-proof-flow">
+        <div class="remainder-proof-term">
+          <span>${escapeHtml(pick({ vi: "Tổng hiện tại", en: "Current prefix" }))}</span>
+          <strong>P[${escapeHtml(String(current))}] = ${escapeHtml(String(currentPrefix))}</strong>
+          <small>${escapeHtml(String(currentPrefix))}</small>
+        </div>
+        <strong class="remainder-proof-operator">-</strong>
+        <div class="remainder-proof-term">
+          <span>${escapeHtml(pick({ vi: "Tổng cần tìm trước đó", en: "Needed earlier prefix" }))}</span>
+          <strong>${escapeHtml(String(currentPrefix))} - ${escapeHtml(String(view.k ?? "k"))} = ${escapeHtml(String(view.needed))}</strong>
+          <small>${escapeHtml(pick({ vi: "prefix_sum - k", en: "prefix_sum - k" }))}</small>
+        </div>
+        <strong class="remainder-proof-operator">=</strong>
+        <div class="remainder-proof-term result">
+          <span>${escapeHtml(pick({ vi: "Số đoạn mới", en: "New subarrays" }))}</span>
+          <strong>${escapeHtml(String(added))}</strong>
+          <small>${escapeHtml(pick({ vi: "mỗi prefix phù hợp tạo 1 đoạn", en: "one range per matching prefix" }))}</small>
+        </div>
+      </div>
+      <div class="remainder-proof-conclusion">${escapeHtml(added
+        ? pick({ vi: `Các prefix tại P[${formatPositions(matchingPositions)}] đều bằng ${view.needed}; lấy hiệu với P[${current}] sẽ cho tổng đúng bằng k.`, en: `Prefixes at P[${formatPositions(matchingPositions)}] equal ${view.needed}; subtracting each from P[${current}] gives exactly k.` })
+        : pick({ vi: `Không có prefix trước đó bằng ${view.needed}, nên chưa tạo đoạn con mới tại index ${current}.`, en: `No earlier prefix equals ${view.needed}, so index ${current} creates no new subarray.` }))}</div>
+    </div>`;
+  }
+
+  $("treeView").innerHTML = `
+    <div class="remainder-viz prefix-count-viz">
+      <section>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Mảng nums", en: "Input nums" }))}</div>
+        <div class="remainder-cells">${numCells}</div>
+      </section>
+      <section>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Các tổng tiền tố đã biết", en: "Known prefix sums" }))}</div>
+        <div class="remainder-cells">${prefixCells}</div>
+      </section>
+      ${proofHtml}
+      <section>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "Các đoạn con mới được đếm ở bước này", en: "New subarrays counted at this step" }))}</div>
+        <div class="remainder-map">${rangeCells}</div>
+      </section>
+      <section>
+        <div class="remainder-heading">${escapeHtml(pick({ vi: "count: tần suất tổng tiền tố", en: "count: prefix-sum frequencies" }))}</div>
+        <div class="remainder-map">${mapCells}</div>
+      </section>
+      <div class="remainder-status">${statusItems}</div>
+    </div>`;
+}
+
 function renderPrefixRemainderView(step) {
-  const view = step.prefixRemainderView || {};
   const pickViewText = (value) => {
     const isLocalized = value && !Array.isArray(value) && typeof value === "object"
       && (Object.prototype.hasOwnProperty.call(value, "vi") || Object.prototype.hasOwnProperty.call(value, "en"));
@@ -13017,6 +13132,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPrefix2DView(step);
+  } else if (step.prefixSumCountView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPrefixSumCountView(step);
   } else if (step.prefixRemainderView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

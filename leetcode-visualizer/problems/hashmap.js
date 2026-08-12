@@ -944,6 +944,258 @@ function buildSteps1399(input) {
   return { n, answer, steps };
 }
 
+function buildSteps560(nums, params) {
+  const parsedK = Number.parseInt(params && params.k, 10);
+  const k = Number.isInteger(parsedK) ? parsedK : 0;
+  const count = new Map([[0, 1]]);
+  const prefixPositions = new Map([[0, [-1]]]);
+  const prefixSums = new Array(nums.length).fill(null);
+  const steps = [];
+  let prefixSum = 0;
+  let answer = 0;
+
+  const mapEntries = () => [...count.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([sum, frequency]) => ({
+      sum,
+      frequency,
+      positions: [...(prefixPositions.get(sum) || [])],
+    }));
+  const mapString = () => `{${mapEntries().map((entry) => `${entry.sum}: ${entry.frequency}`).join(", ")}}`;
+  const positionsString = (positions) => positions.length ? `[${positions.join(", ")}]` : "none";
+  const rangesString = (positions, end) => positions.length
+    ? positions.map((position) => `[${position + 1}..${end}]`).join(", ")
+    : "none";
+  const makeView = ({ current = -1, needed = null, matchingPositions = [], newSubarrays = [], status = [] } = {}) => ({
+    nums: [...nums],
+    prefixSums: [...prefixSums],
+    current,
+    k,
+    needed,
+    matchingPositions: [...matchingPositions],
+    newSubarrays: newSubarrays.map((range) => ({ ...range })),
+    entries: mapEntries(),
+    status,
+  });
+  const loopVars = (i, extras = []) => [
+    { name: "i", value: i },
+    { name: "num", value: nums[i] },
+    { name: "prefix_sum", value: prefixSum },
+    { name: "needed", value: prefixSum - k },
+    { name: "res", value: answer },
+    { name: "count", value: mapString() },
+    ...extras,
+  ];
+
+  steps.push({
+    title: { vi: "Khởi tạo count = {0: 1}", en: "Initialize count = {0: 1}" },
+    codeLines: [3, 4],
+    prefixSumCountView: makeView({
+      status: [
+        { label: "k", value: k },
+        { label: "count[0]", value: 1 },
+        { label: "prefix position", value: -1 },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "count", value: mapString() },
+      { name: "prefix_sum", value: prefixSum },
+      { name: "res", value: answer },
+    ],
+    note: {
+      vi: "count[0] = 1 đại diện cho tổng tiền tố rỗng P[-1] = 0. Nhờ mốc này, đoạn con bắt đầu từ index 0 cũng được đếm.",
+      en: "count[0] = 1 represents the empty prefix P[-1] = 0. This lets us count subarrays that start at index 0.",
+    },
+  });
+
+  steps.push({
+    title: { vi: "Khởi tạo prefix_sum = 0 và res = 0", en: "Initialize prefix_sum = 0 and res = 0" },
+    codeLines: [5, 6],
+    prefixSumCountView: makeView({
+      status: [
+        { label: "prefix_sum", value: prefixSum },
+        { label: "res", value: answer },
+        { label: "count", value: mapString() },
+      ],
+    }),
+    vars: [
+      { name: "k", value: k },
+      { name: "prefix_sum", value: prefixSum },
+      { name: "res", value: answer },
+      { name: "count", value: mapString() },
+    ],
+    note: {
+      vi: "Chưa đọc phần tử nào: tổng tiền tố và số đoạn con hợp lệ đều bằng 0.",
+      en: "No number has been processed yet, so both the prefix sum and the valid-subarray count are 0.",
+    },
+  });
+
+  for (let i = 0; i < nums.length; i += 1) {
+    steps.push({
+      title: { vi: `Vòng lặp: num = nums[${i}] = ${nums[i]}`, en: `Loop: num = nums[${i}] = ${nums[i]}` },
+      codeLines: [7],
+      prefixSumCountView: makeView({
+        current: i,
+        status: [
+          { label: "i", value: i },
+          { label: "num", value: nums[i] },
+          { label: "prefix_sum before", value: prefixSum },
+        ],
+      }),
+      vars: loopVars(i),
+      note: {
+        vi: `Bắt đầu xử lý nums[${i}] = ${nums[i]}. prefix_sum hiện tại vẫn là ${prefixSum}.`,
+        en: `Start processing nums[${i}] = ${nums[i]}. The current prefix_sum is still ${prefixSum}.`,
+      },
+    });
+
+    const beforePrefix = prefixSum;
+    prefixSum += nums[i];
+    prefixSums[i] = prefixSum;
+    steps.push({
+      title: { vi: `prefix_sum = ${beforePrefix} + (${nums[i]}) = ${prefixSum}`, en: `prefix_sum = ${beforePrefix} + (${nums[i]}) = ${prefixSum}` },
+      codeLines: [8],
+      prefixSumCountView: makeView({
+        current: i,
+        status: [
+          { label: "previous prefix", value: beforePrefix },
+          { label: "num", value: nums[i] },
+          { label: "prefix_sum", value: prefixSum },
+        ],
+      }),
+      vars: loopVars(i),
+      note: {
+        vi: `Tổng nums[0..${i}] = ${prefixSum}. Đây là P[${i}].`,
+        en: `The sum of nums[0..${i}] is ${prefixSum}. This is P[${i}].`,
+      },
+    });
+
+    const needed = prefixSum - k;
+    const matchingPositions = [...(prefixPositions.get(needed) || [])];
+    const contribution = count.get(needed) || 0;
+    const newSubarrays = matchingPositions.map((position) => ({
+      start: position + 1,
+      end: i,
+      previousPosition: position,
+    }));
+    steps.push({
+      title: { vi: `needed = ${prefixSum} - (${k}) = ${needed}`, en: `needed = ${prefixSum} - (${k}) = ${needed}` },
+      codeLines: [9],
+      prefixSumCountView: makeView({
+        current: i,
+        needed,
+        matchingPositions,
+        newSubarrays,
+        status: [
+          { label: "prefix_sum", value: prefixSum },
+          { label: "k", value: k },
+          { label: "needed", value: needed },
+          { label: "count[needed]", value: contribution },
+        ],
+      }),
+      vars: loopVars(i, [
+        { name: "needed", value: needed },
+        { name: "needed in count", value: count.has(needed) },
+        { name: "matching prefix positions", value: positionsString(matchingPositions) },
+      ]),
+      note: {
+        vi: matchingPositions.length
+          ? `Có ${matchingPositions.length} prefix trước đó bằng ${needed}. Mỗi prefix tạo một subarray có tổng ${k}.`
+          : `Chưa có prefix nào bằng ${needed}, nên index ${i} chưa tạo subarray mới.`,
+        en: matchingPositions.length
+          ? `${matchingPositions.length} earlier prefix(es) equal ${needed}. Each creates a subarray whose sum is ${k}.`
+          : `No earlier prefix equals ${needed}, so index ${i} creates no new subarray.`,
+      },
+    });
+
+    const beforeAnswer = answer;
+    answer += contribution;
+    steps.push({
+      title: { vi: `res = ${beforeAnswer} + ${contribution} = ${answer}`, en: `res = ${beforeAnswer} + ${contribution} = ${answer}` },
+      codeLines: [10],
+      prefixSumCountView: makeView({
+        current: i,
+        needed,
+        matchingPositions,
+        newSubarrays,
+        status: [
+          { label: "matching prefixes", value: positionsString(matchingPositions) },
+          { label: "new subarrays", value: rangesString(matchingPositions, i) },
+          { label: "added", value: contribution },
+          { label: "res", value: answer },
+        ],
+      }),
+      vars: loopVars(i, [
+        { name: `count[${needed}]`, value: contribution },
+        { name: "new subarrays", value: rangesString(matchingPositions, i) },
+      ]),
+      note: {
+        vi: contribution
+          ? `Có ${contribution} prefix phù hợp, nên cộng ${contribution} vào res. Các đoạn mới: ${rangesString(matchingPositions, i)}.`
+          : "Không có prefix phù hợp, nên res không đổi.",
+        en: contribution
+          ? `${contribution} matching prefix(es) add ${contribution} to res. New ranges: ${rangesString(matchingPositions, i)}.`
+          : "There is no matching prefix, so res stays unchanged.",
+      },
+    });
+
+    const oldFrequency = count.get(prefixSum) || 0;
+    count.set(prefixSum, oldFrequency + 1);
+    if (!prefixPositions.has(prefixSum)) prefixPositions.set(prefixSum, []);
+    prefixPositions.get(prefixSum).push(i);
+    steps.push({
+      title: { vi: `count[${prefixSum}] = ${oldFrequency + 1}`, en: `count[${prefixSum}] = ${oldFrequency + 1}` },
+      codeLines: [11],
+      prefixSumCountView: makeView({
+        current: i,
+        needed,
+        matchingPositions,
+        newSubarrays,
+        status: [
+          { label: "stored prefix", value: `P[${i}] = ${prefixSum}` },
+          { label: "old frequency", value: oldFrequency },
+          { label: "new frequency", value: oldFrequency + 1 },
+          { label: "res", value: answer },
+        ],
+      }),
+      vars: loopVars(i, [
+        { name: `count[${prefixSum}]`, value: oldFrequency + 1 },
+        { name: "prefix positions", value: positionsString(prefixPositions.get(prefixSum)) },
+      ]),
+      note: {
+        vi: `Lưu P[${i}] = ${prefixSum}. Những phần tử sau có thể dùng prefix này để tạo subarray tổng bằng k.`,
+        en: `Store P[${i}] = ${prefixSum}. Later elements can use this prefix to form subarrays summing to k.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Trả về ${answer}`, en: `Return ${answer}` },
+    codeLines: [12],
+    prefixSumCountView: makeView({
+      status: [
+        { label: "processed", value: nums.length },
+        { label: "count", value: mapString() },
+        { label: "answer", value: answer },
+      ],
+    }),
+    vars: [
+      { name: "prefix_sum", value: prefixSum },
+      { name: "res", value: answer },
+      { name: "count", value: mapString() },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Có tổng cộng ${answer} đoạn con liên tiếp có tổng đúng bằng k = ${k}.`,
+      en: `There are ${answer} contiguous subarrays whose sum is exactly k = ${k}.`,
+    },
+    final: true,
+  });
+
+  return { steps, answer };
+}
+
 function buildSteps523(nums, params) {
   const parsedK = Number.parseInt(params && params.k, 10);
   const k = Number.isInteger(parsedK) && parsedK > 0 ? parsedK : 1;
@@ -5062,6 +5314,61 @@ module.exports = {
       "        return True",
     ],
     builder: buildSteps205,
+  },
+  560: {
+    id: 560,
+    difficulty: "medium",
+    slug: "subarray-sum-equals-k",
+    category: { key: "prefix-sum", vi: "Tổng tiền tố", en: "Prefix Sum" },
+    title: { vi: "Subarray Sum Equals K", en: "Subarray Sum Equals K" },
+    titleVi: { vi: "Đếm mảng con có tổng bằng K", en: "Count subarrays with sum K" },
+    statement: {
+      vi: "Cho một mảng số nguyên nums và số nguyên k. Hãy trả về số lượng mảng con liên tiếp, không rỗng có tổng bằng k.",
+      en: "Given an integer array nums and an integer k, return the total number of contiguous, non-empty subarrays whose sum equals k.",
+    },
+    defaultInput: [1, 1, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k", en: "k" }, default: 2, allowNegative: true, min: -2147483648, max: 2147483647 },
+    ],
+    approach: [
+      {
+        vi: "Tính tổng tiền tố prefix_sum đến vị trí hiện tại. Một đoạn nums[l..r] có tổng k khi prefix_sum[r] - prefix_sum[l-1] = k.",
+        en: "Track the prefix sum through the current index. A subarray nums[l..r] sums to k when prefix[r] - prefix[l-1] = k.",
+      },
+      {
+        vi: "Tại prefix_sum hiện tại, cần tìm prefix_sum - k đã xuất hiện trước đó.",
+        en: "For the current prefix sum, look for an earlier prefix equal to prefix_sum - k.",
+      },
+      {
+        vi: "count lưu tần suất từng tổng tiền tố; mỗi prefix phù hợp tạo ra một mảng con mới.",
+        en: "count stores each prefix-sum frequency; every matching prefix creates one new subarray.",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Duyệt nums một lần và lưu tần suất các tổng tiền tố trong hash map.",
+        en: "Scan nums once and store prefix-sum frequencies in a hash map.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def subarraySum(self, nums, k):",
+      "        count = defaultdict(int)",
+      "        count[0] = 1",
+      "        cur = 0",
+      "        res = 0",
+      "        for num in nums:",
+      "            cur += num",
+      "            if cur-k in count:",
+      "                res += count[cur - k]",
+      "            count[cur] += 1",
+      "        return res",
+    ],
+    builder: buildSteps560,
   },
   523: {
     id: 523,

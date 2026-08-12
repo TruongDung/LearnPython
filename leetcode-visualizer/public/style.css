@@ -9098,6 +9098,12 @@ button:disabled {
   font-size: 11px;
 }
 
+.remainder-cell.processed {
+  border-color: rgba(99, 102, 241, 0.48);
+  background: rgba(99, 102, 241, 0.11);
+  color: #c7d2fe;
+}
+
 .remainder-cell.match {
   border-color: rgba(16, 185, 129, 0.62);
   background: rgba(16, 185, 129, 0.15);
