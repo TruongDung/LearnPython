@@ -3530,23 +3530,45 @@ function buildSteps2958(nums, params) {
     return Array.from({ length: Math.max(0, r - l + 1) }, (_, i) => l + i);
   }
 
+  function freqObj() {
+    const o = {};
+    for (const [key, v] of freq.entries()) {
+      if (v > 0) o[key] = v;
+    }
+    return o;
+  }
+
   function snap(opts) {
+    const curLeft = opts.left !== undefined ? opts.left : left;
+    const curRight = opts.right !== undefined ? opts.right : -1;
     steps.push({
       title: opts.title,
       arr: [...nums],
       sub: nums.map((_, i) => `[${i}]`),
-      highlight: windowIndices(opts.left !== undefined ? opts.left : left, opts.right !== undefined ? opts.right : -1),
+      highlight: windowIndices(curLeft, curRight),
       mark: opts.mark || [],
       final: opts.final || false,
       codeLines: opts.codeLines || [],
       vars: [
-        { name: "left", value: opts.left !== undefined ? opts.left : left },
-        { name: "right", value: opts.right !== undefined ? opts.right : "-" },
+        { name: "left", value: curLeft },
+        { name: "right", value: curRight >= 0 ? curRight : "-" },
         { name: "freq", value: freqStr() },
         { name: "ans (max len)", value: ans },
         ...(opts.vars || []),
       ],
       note: opts.note,
+      slidingFreqView: {
+        nums: [...nums],
+        left: curLeft,
+        right: curRight,
+        window: windowIndices(curLeft, curRight),
+        best: bestR >= bestL ? windowIndices(bestL, bestR) : [],
+        freq: freqObj(),
+        k,
+        activeValue: opts.activeValue,
+        overLimit: !!opts.overLimit,
+        ans,
+      },
     });
   }
 
@@ -3570,6 +3592,7 @@ function buildSteps2958(nums, params) {
       left, right,
       codeLines: [4],
       vars: [{ name: "nums[right]", value: val }],
+      activeValue: val,
       note: {
         vi: `Mở rộng cửa sổ sang phải: right=${right}, giá trị = ${val}.`,
         en: `Expand the window to the right: right=${right}, value = ${val}.`,
@@ -3583,6 +3606,8 @@ function buildSteps2958(nums, params) {
       left, right,
       codeLines: [5],
       vars: [{ name: `freq[${val}]`, value: freq.get(val) }],
+      activeValue: val,
+      overLimit: freq.get(val) > k,
       note: {
         vi: `Tăng đếm freq[${val}] = ${freq.get(val)}.`,
         en: `Increment freq[${val}] = ${freq.get(val)}.`,
@@ -3596,6 +3621,8 @@ function buildSteps2958(nums, params) {
         left, right,
         codeLines: [6],
         vars: [{ name: `freq[${val}]`, value: freq.get(val) }],
+        activeValue: val,
+        overLimit: true,
         note: {
           vi: `freq[${val}]=${freq.get(val)} VƯỢT k=${k} → cửa sổ KHÔNG hợp lệ, cần thu hẹp left.`,
           en: `freq[${val}]=${freq.get(val)} EXCEEDS k=${k} → window is INVALID, need to shrink left.`,
@@ -3610,6 +3637,8 @@ function buildSteps2958(nums, params) {
         left, right,
         codeLines: [7],
         vars: [{ name: `freq[${leftVal}]`, value: freq.get(leftVal) }],
+        activeValue: val,
+        overLimit: freq.get(val) > k,
         note: {
           vi: `Loại nums[left]=${leftVal} ra khỏi cửa sổ: freq[${leftVal}] giảm còn ${freq.get(leftVal)}.`,
           en: `Remove nums[left]=${leftVal} from the window: freq[${leftVal}] drops to ${freq.get(leftVal)}.`,
@@ -3622,6 +3651,8 @@ function buildSteps2958(nums, params) {
         title: { vi: `left += 1 → left=${left}`, en: `left += 1 → left=${left}` },
         left, right,
         codeLines: [8],
+        activeValue: val,
+        overLimit: freq.get(val) > k,
         note: {
           vi: `Thu hẹp cửa sổ: left=${left}.`,
           en: `Shrink window: left=${left}.`,
@@ -3635,6 +3666,7 @@ function buildSteps2958(nums, params) {
         title: { vi: `while freq[${val}] > k → ${freq.get(val)} > ${k} → False`, en: `while freq[${val}] > k → ${freq.get(val)} > ${k} → False` },
         left, right,
         codeLines: [6],
+        activeValue: val,
         note: {
           vi: `freq[${val}]=${freq.get(val)} ≤ k=${k} → cửa sổ HỢP LỆ, không cần thu hẹp thêm.`,
           en: `freq[${val}]=${freq.get(val)} ≤ k=${k} → window is VALID, no further shrinking needed.`,
@@ -3652,6 +3684,7 @@ function buildSteps2958(nums, params) {
       mark: improves ? windowIndices(left, right) : [],
       codeLines: [9],
       vars: [{ name: "window size", value: windowLen }],
+      activeValue: val,
       note: improves
         ? { vi: `Cửa sổ [${left}..${right}] có size=${windowLen} LỚN HƠN ans cũ → cập nhật ans=${ans}.`, en: `Window [${left}..${right}] has size=${windowLen} which is LARGER than old ans → update ans=${ans}.` }
         : { vi: `Cửa sổ [${left}..${right}] có size=${windowLen}, không lớn hơn ans=${ans} → giữ nguyên.`, en: `Window [${left}..${right}] has size=${windowLen}, not larger than ans=${ans} → unchanged.` },
@@ -3675,6 +3708,23 @@ function buildSteps2958(nums, params) {
     note: {
       vi: `Cửa sổ dài nhất mà mọi phần tử xuất hiện ≤ ${k} lần = ${ans} (vị trí [${bestL}..${bestR}]). Highlight = cửa sổ tốt nhất.`,
       en: `The longest window where every element appears ≤ ${k} times = ${ans} (positions [${bestL}..${bestR}]). Highlighted = the best window.`,
+    },
+    slidingFreqView: {
+      nums: [...nums],
+      left: bestL,
+      right: bestR,
+      window: windowIndices(bestL, bestR),
+      best: windowIndices(bestL, bestR),
+      freq: (() => {
+        const o = {};
+        for (let i = bestL; i <= bestR; i++) o[nums[i]] = (o[nums[i]] || 0) + 1;
+        return o;
+      })(),
+      k,
+      activeValue: undefined,
+      overLimit: false,
+      ans,
+      done: true,
     },
   };
   steps.push(fs);

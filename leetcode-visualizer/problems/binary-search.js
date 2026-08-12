@@ -4281,6 +4281,453 @@ function buildSteps35v2(nums, params) {
   return { original: [...nums], answer, steps };
 }
 
+/**
+ * LeetCode 153: Find Minimum in Rotated Sorted Array (no duplicates).
+ * Binary search over the closed range [left, right], comparing nums[mid]
+ * against nums[right] to decide which half can still contain the minimum.
+ * Since all elements are distinct, there is no tie case (unlike bai 154).
+ */
+function buildSteps153(nums, params) {
+  const steps = [];
+  let left = 0;
+  let right = nums.length - 1;
+
+  function labels(l, r, mid) {
+    return nums.map((_, index) => {
+      const tags = [];
+      if (index === l) tags.push("L");
+      if (index === mid) tags.push("M");
+      if (index === r) tags.push("R");
+      return tags.length ? `[${index}] ${tags.join("/")}` : `[${index}]`;
+    });
+  }
+
+  function activeRange(l, r) {
+    return l <= r ? Array.from({ length: r - l + 1 }, (_, index) => l + index) : [];
+  }
+
+  function pushStep({
+    title,
+    note,
+    mid,
+    codeLines,
+    final = false,
+    answer,
+    phase = "range",
+    keptHalf = null,
+    eliminated = [],
+    comparison = null,
+  }) {
+    const vars = [
+      { name: "left (L)", value: left },
+      { name: "right (R)", value: right },
+    ];
+    if (Number.isInteger(mid)) {
+      vars.splice(2, 0,
+        { name: "mid (M)", value: mid },
+        { name: "nums[M]", value: nums[mid] },
+        { name: "nums[R]", value: nums[right] },
+      );
+    }
+    if (answer !== undefined) vars.push({ name: "answer", value: answer });
+
+    steps.push({
+      title,
+      arr: [...nums],
+      findMinRotatedView: {
+        nums: [...nums],
+        left,
+        right,
+        mid: Number.isInteger(mid) ? mid : null,
+        phase,
+        keptHalf,
+        eliminated,
+        comparison,
+        duplicateShrink: false,
+        minIndex: final ? left : null,
+      },
+      sub: labels(left, right, mid),
+      highlight: activeRange(left, right),
+      mark: Number.isInteger(mid) ? [mid] : [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo vùng tìm kiếm", en: "Initialize the search range" },
+    note: {
+      vi: `Tìm phần tử nhỏ nhất trong mảng đã xoay (mọi phần tử phân biệt). L và R bao quanh toàn bộ mảng.`,
+      en: `Find the minimum element in the rotated array (all elements distinct). L and R bound the entire array.`,
+    },
+    codeLines: [3],
+    comparison: {
+      vi: `Vùng ứng viên ban đầu: [0, ${nums.length - 1}]`,
+      en: `Initial candidate range: [0, ${nums.length - 1}]`,
+    },
+  });
+
+  while (left < right) {
+    pushStep({
+      title: { vi: `while L < R → ${left} < ${right} → True`, en: `while L < R → ${left} < ${right} → True` },
+      note: {
+        vi: "Vùng tìm kiếm còn nhiều hơn 1 phần tử, nên bắt đầu một vòng lặp mới. M chưa được gán ở bước này.",
+        en: "The search range has more than one candidate, so begin a new loop iteration. M is not assigned at this step.",
+      },
+      codeLines: [4],
+      phase: "range",
+      comparison: {
+        vi: `L=${left} < R=${right} → tiếp tục; M chưa được gán`,
+        en: `L=${left} < R=${right} → continue; M is not assigned yet`,
+      },
+    });
+
+    const mid = Math.floor((left + right) / 2);
+    pushStep({
+      title: { vi: `M = (L + R) // 2 = ${mid}`, en: `M = (L + R) // 2 = ${mid}` },
+      note: {
+        vi: `Xét nums[${mid}]=${nums[mid]} ở giữa vùng [${left}, ${right}], sẽ so sánh với nums[R]=${nums[right]}.`,
+        en: `Inspect nums[${mid}]=${nums[mid]} in the middle of [${left}, ${right}], to be compared with nums[R]=${nums[right]}.`,
+      },
+      mid,
+      codeLines: [5],
+      phase: "mid",
+      comparison: {
+        vi: `So sánh nums[M]=${nums[mid]} với nums[R]=${nums[right]}`,
+        en: `Compare nums[M]=${nums[mid]} with nums[R]=${nums[right]}`,
+      },
+    });
+
+    if (nums[mid] > nums[right]) {
+      pushStep({
+        title: { vi: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → True`, en: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → True` },
+        note: {
+          vi: `nums[M]=${nums[mid]} lớn hơn nums[R]=${nums[right]}, nghĩa là điểm xoay (min) nằm bên PHẢI của mid.`,
+          en: `nums[M]=${nums[mid]} is greater than nums[R]=${nums[right]}, so the pivot (min) lies to the RIGHT of mid.`,
+        },
+        mid,
+        codeLines: [6],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → min nằm bên phải M`, en: `${nums[mid]} > ${nums[right]} → min is to the right of M` },
+      });
+
+      const previousLeft = left;
+      left = mid + 1;
+      pushStep({
+        title: { vi: `left = M + 1 = ${left}`, en: `left = M + 1 = ${left}` },
+        note: {
+          vi: `Loại đoạn [${previousLeft}, ${mid}] vì chắc chắn không chứa min (mid không thể là min do nums[M] > nums[R]).`,
+          en: `Discard [${previousLeft}, ${mid}] since it cannot contain the minimum (mid can't be the min because nums[M] > nums[R]).`,
+        },
+        mid,
+        codeLines: [7],
+        phase: "narrow",
+        keptHalf: "right",
+        eliminated: Array.from({ length: mid - previousLeft + 1 }, (_, index) => previousLeft + index),
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → left = M + 1`, en: `${nums[mid]} > ${nums[right]} → left = M + 1` },
+      });
+    } else {
+      pushStep({
+        title: { vi: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False`, en: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False` },
+        note: {
+          vi: `nums[M]=${nums[mid]} nhỏ hơn nums[R]=${nums[right]} (không thể bằng vì mọi phần tử phân biệt), đi vào else ở dòng 8.`,
+          en: `nums[M]=${nums[mid]} is less than nums[R]=${nums[right]} (can't be equal since all elements are distinct), enter the else on line 8.`,
+        },
+        mid,
+        codeLines: [6],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → False`, en: `${nums[mid]} > ${nums[right]} → False` },
+      });
+
+      const previousRight = right;
+      right = mid;
+      pushStep({
+        title: { vi: `right = M = ${right}`, en: `right = M = ${right}` },
+        note: {
+          vi: `nums[M]=${nums[mid]} < nums[R]=${nums[previousRight]}, nên M có thể chính là min hoặc min nằm bên trái M → GIỮ M lại, loại [${mid + 1}, ${previousRight}].`,
+          en: `nums[M]=${nums[mid]} < nums[R]=${nums[previousRight]}, so M could be the min or the min is to its left → KEEP M, discard [${mid + 1}, ${previousRight}].`,
+        },
+        mid,
+        codeLines: [8],
+        phase: "narrow",
+        keptHalf: "left",
+        eliminated: previousRight > mid ? Array.from({ length: previousRight - mid }, (_, index) => mid + 1 + index) : [],
+        comparison: { vi: `${nums[mid]} < ${nums[right]} → right = M`, en: `${nums[mid]} < ${nums[right]} → right = M` },
+      });
+    }
+  }
+
+  pushStep({
+    title: { vi: `L == R == ${left} → return nums[${left}] = ${nums[left]}`, en: `L == R == ${left} → return nums[${left}] = ${nums[left]}` },
+    note: {
+      vi: `Vùng tìm kiếm chỉ còn 1 phần tử tại index ${left}. Đó chính là phần tử nhỏ nhất = ${nums[left]}.`,
+      en: `The search range has narrowed to a single element at index ${left}. That is the minimum = ${nums[left]}.`,
+    },
+    codeLines: [9],
+    final: true,
+    answer: nums[left],
+    phase: "found",
+    comparison: { vi: `L = R = ${left} → dừng vòng lặp`, en: `L = R = ${left} → loop ends` },
+  });
+
+  return { original: [...nums], answer: nums[left], steps };
+}
+
+/**
+ * LeetCode 154: Find Minimum in Rotated Sorted Array II.
+ * Binary search over the closed range [left, right], always comparing
+ * nums[mid] against nums[right] to decide which half can still contain the
+ * minimum. When nums[mid] == nums[right] we cannot tell which side holds the
+ * minimum (duplicates), so we shrink right by 1 instead of halving - this is
+ * what makes worst case O(n) when the whole array is one repeated value.
+ */
+function buildSteps154(nums, params) {
+  const steps = [];
+  let left = 0;
+  let right = nums.length - 1;
+
+  function labels(l, r, mid) {
+    return nums.map((_, index) => {
+      const tags = [];
+      if (index === l) tags.push("L");
+      if (index === mid) tags.push("M");
+      if (index === r) tags.push("R");
+      return tags.length ? `[${index}] ${tags.join("/")}` : `[${index}]`;
+    });
+  }
+
+  function activeRange(l, r) {
+    return l <= r ? Array.from({ length: r - l + 1 }, (_, index) => l + index) : [];
+  }
+
+  function pushStep({
+    title,
+    note,
+    mid,
+    codeLines,
+    final = false,
+    answer,
+    phase = "range",
+    keptHalf = null,
+    eliminated = [],
+    comparison = null,
+    duplicateShrink = false,
+  }) {
+    const vars = [
+      { name: "left (L)", value: left },
+      { name: "right (R)", value: right },
+    ];
+    if (Number.isInteger(mid)) {
+      vars.splice(2, 0,
+        { name: "mid (M)", value: mid },
+        { name: "nums[M]", value: nums[mid] },
+        { name: "nums[R]", value: nums[right] },
+      );
+    }
+    if (answer !== undefined) vars.push({ name: "answer", value: answer });
+
+    steps.push({
+      title,
+      arr: [...nums],
+      findMinRotatedView: {
+        nums: [...nums],
+        left,
+        right,
+        mid: Number.isInteger(mid) ? mid : null,
+        phase,
+        keptHalf,
+        eliminated,
+        comparison,
+        duplicateShrink,
+        minIndex: final ? left : null,
+      },
+      sub: labels(left, right, mid),
+      highlight: activeRange(left, right),
+      mark: Number.isInteger(mid) ? [mid] : [],
+      final,
+      codeLines,
+      vars,
+      note,
+    });
+  }
+
+  pushStep({
+    title: { vi: "Khởi tạo vùng tìm kiếm", en: "Initialize the search range" },
+    note: {
+      vi: `Tìm phần tử nhỏ nhất trong mảng đã xoay (có thể có phần tử trùng). L và R bao quanh toàn bộ mảng.`,
+      en: `Find the minimum element in the rotated array (duplicates allowed). L and R bound the entire array.`,
+    },
+    codeLines: [3],
+    comparison: {
+      vi: `Vùng ứng viên ban đầu: [0, ${nums.length - 1}]`,
+      en: `Initial candidate range: [0, ${nums.length - 1}]`,
+    },
+  });
+
+  while (left < right) {
+    pushStep({
+      title: { vi: `while L < R → ${left} < ${right} → True`, en: `while L < R → ${left} < ${right} → True` },
+      note: {
+        vi: "Vùng tìm kiếm còn nhiều hơn 1 phần tử, nên bắt đầu một vòng lặp mới. M chưa được gán ở bước này.",
+        en: "The search range has more than one candidate, so begin a new loop iteration. M is not assigned at this step.",
+      },
+      codeLines: [4],
+      phase: "range",
+      comparison: {
+        vi: `L=${left} < R=${right} → tiếp tục; M chưa được gán`,
+        en: `L=${left} < R=${right} → continue; M is not assigned yet`,
+      },
+    });
+
+    const mid = Math.floor((left + right) / 2);
+    pushStep({
+      title: { vi: `M = (L + R) // 2 = ${mid}`, en: `M = (L + R) // 2 = ${mid}` },
+      note: {
+        vi: `Xét nums[${mid}]=${nums[mid]} ở giữa vùng [${left}, ${right}], sẽ so sánh với nums[R]=${nums[right]}.`,
+        en: `Inspect nums[${mid}]=${nums[mid]} in the middle of [${left}, ${right}], to be compared with nums[R]=${nums[right]}.`,
+      },
+      mid,
+      codeLines: [5],
+      phase: "mid",
+      comparison: {
+        vi: `So sánh nums[M]=${nums[mid]} với nums[R]=${nums[right]}`,
+        en: `Compare nums[M]=${nums[mid]} with nums[R]=${nums[right]}`,
+      },
+    });
+
+    if (nums[mid] > nums[right]) {
+      pushStep({
+        title: { vi: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → True`, en: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → True` },
+        note: {
+          vi: `nums[M]=${nums[mid]} lớn hơn nums[R]=${nums[right]}, nghĩa là điểm xoay (min) nằm bên PHẢI của mid.`,
+          en: `nums[M]=${nums[mid]} is greater than nums[R]=${nums[right]}, so the pivot (min) lies to the RIGHT of mid.`,
+        },
+        mid,
+        codeLines: [6],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → min nằm bên phải M`, en: `${nums[mid]} > ${nums[right]} → min is to the right of M` },
+      });
+
+      const previousLeft = left;
+      left = mid + 1;
+      pushStep({
+        title: { vi: `left = M + 1 = ${left}`, en: `left = M + 1 = ${left}` },
+        note: {
+          vi: `Loại đoạn [${previousLeft}, ${mid}] vì chắc chắn không chứa min (mid không thể là min do nums[M] > nums[R]).`,
+          en: `Discard [${previousLeft}, ${mid}] since it cannot contain the minimum (mid can't be the min because nums[M] > nums[R]).`,
+        },
+        mid,
+        codeLines: [7],
+        phase: "narrow",
+        keptHalf: "right",
+        eliminated: Array.from({ length: mid - previousLeft + 1 }, (_, index) => previousLeft + index),
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → left = M + 1`, en: `${nums[mid]} > ${nums[right]} → left = M + 1` },
+      });
+    } else if (nums[mid] < nums[right]) {
+      pushStep({
+        title: { vi: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False`, en: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False` },
+        note: {
+          vi: `nums[M]=${nums[mid]} không lớn hơn nums[R]=${nums[right]}, đi sang elif ở dòng 8.`,
+          en: `nums[M]=${nums[mid]} is not greater than nums[R]=${nums[right]}, move to the elif on line 8.`,
+        },
+        mid,
+        codeLines: [6],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → False`, en: `${nums[mid]} > ${nums[right]} → False` },
+      });
+
+      pushStep({
+        title: { vi: `nums[M] < nums[R] → ${nums[mid]} < ${nums[right]} → True`, en: `nums[M] < nums[R] → ${nums[mid]} < ${nums[right]} → True` },
+        note: {
+          vi: `nums[M]=${nums[mid]} nhỏ hơn nums[R]=${nums[right]}, nghĩa là M có thể chính là min hoặc min nằm bên TRÁI của M (không loại M).`,
+          en: `nums[M]=${nums[mid]} is less than nums[R]=${nums[right]}, so M itself could be the min, or the min lies to its LEFT (M is not discarded).`,
+        },
+        mid,
+        codeLines: [8],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} < ${nums[right]} → min ở M hoặc bên trái M`, en: `${nums[mid]} < ${nums[right]} → min is at M or to its left` },
+      });
+
+      const previousRight = right;
+      right = mid;
+      pushStep({
+        title: { vi: `right = M = ${right}`, en: `right = M = ${right}` },
+        note: {
+          vi: `Loại đoạn [${mid + 1}, ${previousRight}] vì mid=${mid} vẫn có thể là min nên được GIỮ LẠI.`,
+          en: `Discard [${mid + 1}, ${previousRight}] since mid=${mid} might still be the min, so it is KEPT.`,
+        },
+        mid,
+        codeLines: [9],
+        phase: "narrow",
+        keptHalf: "left",
+        eliminated: previousRight > mid ? Array.from({ length: previousRight - mid }, (_, index) => mid + 1 + index) : [],
+        comparison: { vi: `${nums[mid]} < ${nums[right]} → right = M`, en: `${nums[mid]} < ${nums[right]} → right = M` },
+      });
+    } else {
+      pushStep({
+        title: { vi: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False`, en: `nums[M] > nums[R] → ${nums[mid]} > ${nums[right]} → False` },
+        note: {
+          vi: `nums[M]=${nums[mid]} không lớn hơn nums[R]=${nums[right]}, đi sang elif ở dòng 8.`,
+          en: `nums[M]=${nums[mid]} is not greater than nums[R]=${nums[right]}, move to the elif on line 8.`,
+        },
+        mid,
+        codeLines: [6],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} > ${nums[right]} → False`, en: `${nums[mid]} > ${nums[right]} → False` },
+      });
+
+      pushStep({
+        title: { vi: `nums[M] < nums[R] → ${nums[mid]} < ${nums[right]} → False`, en: `nums[M] < nums[R] → ${nums[mid]} < ${nums[right]} → False` },
+        note: {
+          vi: `nums[M]=${nums[mid]} bằng nums[R]=${nums[right]}, đi vào else ở dòng 10: không biết min nằm nửa nào.`,
+          en: `nums[M]=${nums[mid]} equals nums[R]=${nums[right]}, enter the else on line 10: we can't tell which half holds the min.`,
+        },
+        mid,
+        codeLines: [8],
+        phase: "sorted",
+        comparison: { vi: `${nums[mid]} < ${nums[right]} → False`, en: `${nums[mid]} < ${nums[right]} → False` },
+        duplicateShrink: true,
+      });
+
+      const previousRight = right;
+      right -= 1;
+      pushStep({
+        title: { vi: `nums[M] == nums[R] → right -= 1 → right = ${right}`, en: `nums[M] == nums[R] → right -= 1 → right = ${right}` },
+        note: {
+          vi: `nums[M]=nums[R]=${nums[mid]}: có phần tử trùng nên không thể xác định min ở nửa trái hay phải. ` +
+            `Ta chỉ AN TOÀN loại bỏ chính nums[R] (vì nums[M] cũng bằng giá trị đó nên min vẫn còn trong vùng còn lại).`,
+          en: `nums[M]=nums[R]=${nums[mid]}: duplicates make it impossible to tell which half holds the min. ` +
+            `We can only SAFELY discard nums[R] itself (since nums[M] equals it too, the min is still present in what remains).`,
+        },
+        mid,
+        codeLines: [10],
+        phase: "narrow",
+        keptHalf: "left",
+        eliminated: [previousRight],
+        duplicateShrink: true,
+        comparison: { vi: `${nums[mid]} == ${nums[previousRight]} → right -= 1 (chỉ loại 1 phần tử)`, en: `${nums[mid]} == ${nums[previousRight]} → right -= 1 (discard only 1 element)` },
+      });
+    }
+  }
+
+  pushStep({
+    title: { vi: `L == R == ${left} → return nums[${left}] = ${nums[left]}`, en: `L == R == ${left} → return nums[${left}] = ${nums[left]}` },
+    note: {
+      vi: `Vùng tìm kiếm chỉ còn 1 phần tử tại index ${left}. Đó chính là phần tử nhỏ nhất = ${nums[left]}.`,
+      en: `The search range has narrowed to a single element at index ${left}. That is the minimum = ${nums[left]}.`,
+    },
+    codeLines: [11],
+    final: true,
+    answer: nums[left],
+    phase: "found",
+    comparison: { vi: `L = R = ${left} → dừng vòng lặp`, en: `L = R = ${left} → loop ends` },
+  });
+
+  return { original: [...nums], answer: nums[left], steps };
+}
+
 module.exports = Object.assign(module.exports, {
   33: {
     id: 33,
@@ -4502,5 +4949,100 @@ module.exports = Object.assign(module.exports, {
       const approach = Number(params && params.approach) || 1;
       return approach === 2 ? buildSteps35v2(nums, params) : buildSteps35(nums, params);
     },
+  },
+  153: {
+    id: 153,
+    difficulty: "medium",
+    slug: "find-minimum-in-rotated-sorted-array",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Find Minimum in Rotated Sorted Array", en: "Find Minimum in Rotated Sorted Array" },
+    titleVi: { vi: "Tìm phần tử nhỏ nhất trong mảng xoay", en: "Find the minimum in a rotated sorted array" },
+    statement: {
+      vi:
+        "Mảng nums gồm các phần tử phân biệt, ban đầu tăng dần, rồi bị xoay tại một pivot chưa biết. " +
+        "Tìm phần tử nhỏ nhất trong mảng đã xoay.",
+      en:
+        "An array nums of distinct elements, originally sorted in ascending order, is rotated at an unknown " +
+        "pivot. Find the minimum element in the rotated array.",
+    },
+    defaultInput: [3, 4, 5, 1, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (mảng đã xoay, phân biệt)", en: "nums (rotated array, distinct)" },
+    approach: [
+      { vi: "Binary search với vùng đóng [left, right], luôn so sánh nums[mid] với nums[right].", en: "Binary search over the closed range [left, right], always comparing nums[mid] with nums[right]." },
+      { vi: "Nếu nums[mid] > nums[right]: điểm xoay (min) nằm bên phải mid → left = mid + 1.", en: "If nums[mid] > nums[right]: the pivot (min) is to the right of mid → left = mid + 1." },
+      { vi: "Ngược lại (nums[mid] < nums[right], không thể bằng vì phân biệt): mid có thể chính là min hoặc min nằm bên trái → right = mid.", en: "Otherwise (nums[mid] < nums[right], can't be equal since elements are distinct): mid could be the min, or the min is to its left → right = mid." },
+      { vi: "Vòng lặp kết thúc khi left == right, đó chính là vị trí phần tử nhỏ nhất.", en: "The loop ends when left == right, which is the position of the minimum element." },
+    ],
+    complexity: {
+      time: "O(log n)",
+      space: "O(1)",
+      note: {
+        vi: "Mỗi vòng lặp luôn loại được đúng một nửa vùng tìm kiếm vì không có phần tử trùng.",
+        en: "Each iteration always discards exactly half of the search range since there are no duplicates.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMin(self, nums):",
+      "        left, right = 0, len(nums) - 1",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            if nums[mid] > nums[right]:",
+      "                left = mid + 1",
+      "            else:",
+      "                right = mid",
+      "        return nums[left]",
+    ],
+    builder: buildSteps153,
+  },
+  154: {
+    id: 154,
+    difficulty: "hard",
+    slug: "find-minimum-in-rotated-sorted-array-ii",
+    category: { key: "binary-search", vi: "Tìm kiếm nhị phân", en: "Binary Search" },
+    title: { vi: "Find Minimum in Rotated Sorted Array II", en: "Find Minimum in Rotated Sorted Array II" },
+    titleVi: { vi: "Tìm phần tử nhỏ nhất trong mảng xoay (có phần tử trùng)", en: "Find the minimum in a rotated sorted array with duplicates" },
+    statement: {
+      vi:
+        "Mảng nums ban đầu tăng dần (không nghiêm ngặt, có thể trùng), rồi bị xoay tại một pivot chưa biết. " +
+        "Tìm phần tử nhỏ nhất trong mảng đã xoay.",
+      en:
+        "An array nums, originally sorted in non-decreasing order (duplicates allowed), is rotated at an unknown " +
+        "pivot. Find the minimum element in the rotated array.",
+    },
+    defaultInput: [2, 2, 2, 0, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "nums (mảng đã xoay, có thể trùng)", en: "nums (rotated array, duplicates allowed)" },
+    approach: [
+      { vi: "Binary search với vùng đóng [left, right], luôn so sánh nums[mid] với nums[right].", en: "Binary search over the closed range [left, right], always comparing nums[mid] with nums[right]." },
+      { vi: "Nếu nums[mid] > nums[right]: điểm xoay (min) nằm bên phải mid → left = mid + 1.", en: "If nums[mid] > nums[right]: the pivot (min) is to the right of mid → left = mid + 1." },
+      { vi: "Nếu nums[mid] < nums[right]: mid có thể chính là min hoặc min nằm bên trái → right = mid.", en: "If nums[mid] < nums[right]: mid could be the min, or the min is to its left → right = mid." },
+      { vi: "Nếu nums[mid] == nums[right]: không thể biết min ở nửa nào → right -= 1 để loại bỏ 1 phần tử trùng chắc chắn không mất min.", en: "If nums[mid] == nums[right]: we can't tell which half holds the min → right -= 1 to safely discard one duplicate without losing the minimum." },
+      { vi: "Vòng lặp kết thúc khi left == right, đó chính là vị trí phần tử nhỏ nhất.", en: "The loop ends when left == right, which is the position of the minimum element." },
+    ],
+    complexity: {
+      time: "O(log n) trung bình, O(n) trường hợp xấu nhất (toàn phần tử trùng)",
+      space: "O(1)",
+      note: {
+        vi: "Nhánh right -= 1 chỉ loại 1 phần tử mỗi lần nên khi mảng có rất nhiều phần tử trùng (VD toàn số giống nhau), độ phức tạp suy biến về O(n).",
+        en: "The right -= 1 branch only discards one element at a time, so when the array has many duplicates (e.g. all equal), complexity degrades to O(n).",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def findMin(self, nums):",
+      "        left, right = 0, len(nums) - 1",
+      "        while left < right:",
+      "            mid = (left + right) // 2",
+      "            if nums[mid] > nums[right]:",
+      "                left = mid + 1",
+      "            elif nums[mid] < nums[right]:",
+      "                right = mid",
+      "            else:",
+      "                right -= 1",
+      "        return nums[left]",
+    ],
+    builder: buildSteps154,
   },
 });

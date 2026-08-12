@@ -7131,6 +7131,92 @@ function renderTwoPointerMergeView(step) {
     </div>`;
 }
 
+// ---- Sliding-window frequency visualization (e.g. bai 2958: Length of
+// Longest Subarray With at Most K Frequency) ----
+// Shows the array as a row of cells with the [left, right] window boxed
+// together, colored L/R pointer arrows above the boundary cells, a live
+// "freq table" panel listing the count of every distinct value currently
+// inside the window (the offending value highlighted in red once it exceeds
+// k), and a separate dimmed row marking the best window found so far.
+function renderSlidingFreqView(step) {
+  const view = step.slidingFreqView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const windowSet = new Set(Array.isArray(view.window) ? view.window : []);
+  const bestSet = new Set(Array.isArray(view.best) ? view.best : []);
+  const freq = view.freq || {};
+  const k = view.k;
+  const activeValue = view.activeValue;
+  const overLimit = !!view.overLimit;
+  const vi = lang === "vi";
+
+  const cells = nums.map((v, i) => {
+    const names = [];
+    if (i === left) names.push("L");
+    if (i === right) names.push("R");
+    const arrowsHtml = names.map((name) => {
+      const cls = name === "L" ? "tp-ptr-a" : "tp-ptr-b";
+      return `<div class="tp-pointer-arrow ${cls}"><span class="tp-pointer-name">${name}</span><span class="tp-pointer-caret">\u25BC</span></div>`;
+    }).join("");
+    const inWindow = windowSet.has(i);
+    const inBest = bestSet.has(i);
+    const isOffending = overLimit && v === activeValue && inWindow;
+    const classes = [
+      "sfw-cell",
+      inWindow ? "sfw-cell-window" : "",
+      inBest && !inWindow ? "sfw-cell-best" : "",
+      isOffending ? "sfw-cell-over" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="sfw-cell-wrap">
+      <div class="tp-pointer-stack">${arrowsHtml}</div>
+      <div class="${classes}">
+        <span class="tp-cell-idx">[${i}]</span>
+        <strong>${escapeHtml(String(v))}</strong>
+      </div>
+    </div>`;
+  }).join("");
+
+  const freqEntries = Object.entries(freq).sort((a, b) => Number(a[0]) - Number(b[0]));
+  const freqHtml = freqEntries.length
+    ? freqEntries.map(([val, count]) => {
+        const isOver = overLimit && Number(val) === Number(activeValue);
+        const atK = !isOver && Number(count) === Number(k) && Number(val) === Number(activeValue);
+        const cls = isOver ? "sfw-freq-over" : atK ? "sfw-freq-atk" : "";
+        return `<div class="sfw-freq-card ${cls}">
+          <span class="sfw-freq-value">${escapeHtml(String(val))}</span>
+          <span class="sfw-freq-count">${escapeHtml(String(count))}</span>
+        </div>`;
+      }).join("")
+    : `<span class="sfw-freq-empty">${vi ? "(rỗng)" : "(empty)"}</span>`;
+
+  const windowLen = right >= left && left >= 0 ? right - left + 1 : 0;
+  const statusText = view.done
+    ? (vi ? `Cửa sổ tốt nhất: [${left}..${right}], độ dài = ${view.ans}` : `Best window: [${left}..${right}], length = ${view.ans}`)
+    : overLimit
+      ? (vi ? `freq[${activeValue}] vượt k=${k} → đang thu hẹp cửa sổ từ bên trái` : `freq[${activeValue}] exceeds k=${k} → shrinking window from the left`)
+      : (vi ? `Cửa sổ hiện tại [${left}..${right}] hợp lệ, độ dài = ${windowLen}, ans tốt nhất = ${view.ans}` : `Current window [${left}..${right}] is valid, length = ${windowLen}, best ans = ${view.ans}`);
+
+  $("treeView").innerHTML = `
+    <div class="sfw-viz">
+      <div class="sfw-row">
+        <span class="tp-row-label">nums</span>
+        <div class="tp-row-cells sfw-row-cells">${cells}</div>
+      </div>
+      <div class="sfw-freq-panel">
+        <div class="sfw-freq-title">${vi ? `Bảng đếm freq trong cửa sổ (k=${k})` : `freq table inside window (k=${k})`}</div>
+        <div class="sfw-freq-cards">${freqHtml}</div>
+      </div>
+      <div class="sfw-status ${overLimit ? "sfw-status-over" : view.done ? "sfw-status-done" : ""}">${statusText}</div>
+      <div class="tp-legend">
+        <span><i class="tp-legend-swatch tp-ptr-a"></i>L = left</span>
+        <span><i class="tp-legend-swatch tp-ptr-b"></i>R = right</span>
+        <span><i class="sfw-legend-swatch sfw-legend-best"></i>${vi ? "ô đã từng nằm trong cửa sổ tốt nhất" : "cell in best window so far"}</span>
+        <span><i class="sfw-legend-swatch sfw-legend-over"></i>${vi ? "phần tử vượt k" : "element exceeding k"}</span>
+      </div>
+    </div>`;
+}
+
 // ---- Rotated-array binary search visualization (LeetCode 33) ----
 function renderRotatedSearchView(step) {
   const view = step.rotatedSearchView || {};
@@ -7214,6 +7300,96 @@ function renderRotatedSearchView(step) {
       <span><i class="legend-active"></i>${vi ? "còn xét" : "candidate"}</span>
       <span><i class="legend-sorted"></i>${vi ? "nửa tăng dần" : "sorted half"}</span>
       <span><i class="legend-mid"></i>mid</span>
+      <span><i class="legend-discarded"></i>${vi ? "đã loại" : "discarded"}</span>
+    </div>
+  </div>`;
+}
+
+// ---- Find Minimum in Rotated Sorted Array II visualization (LeetCode 154) ----
+// Reuses the same column/pointer layout as the bai 33 rotated-search view,
+// but there is no target: instead nums[mid] is always compared against
+// nums[right], and the duplicate-shrink case (nums[mid] == nums[right],
+// right -= 1) gets its own distinct highlight so it's clear only one
+// element is discarded instead of a whole half.
+function renderFindMinRotatedView(step) {
+  const view = step.findMinRotatedView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const left = Number.isInteger(view.left) ? view.left : -1;
+  const right = Number.isInteger(view.right) ? view.right : -1;
+  const mid = Number.isInteger(view.mid) ? view.mid : -1;
+  const eliminated = new Set(Array.isArray(view.eliminated) ? view.eliminated : []);
+  const comparison = pick(view.comparison) || "";
+  const vi = lang === "vi";
+  const minValue = nums.length ? Math.min(...nums) : 0;
+  const maxValue = nums.length ? Math.max(...nums) : 0;
+
+  function columnHeight(value) {
+    if (maxValue === minValue) return 64;
+    return 44 + Math.round(((value - minValue) / (maxValue - minValue)) * 42);
+  }
+
+  function pointerLabels(index) {
+    const labels = [];
+    if (index === left) labels.push("L");
+    if (index === mid) labels.push("M");
+    if (index === right) labels.push("R");
+    return labels;
+  }
+
+  const cells = nums.map((value, index) => {
+    const pointers = pointerLabels(index);
+    const active = index >= left && index <= right;
+    const found = view.phase === "found" && index === view.minIndex;
+    const duplicateHit = view.duplicateShrink && index === right;
+    const classes = [
+      "rotated-cell",
+      active ? "active" : "discarded",
+      eliminated.has(index) ? "just-eliminated" : "",
+      view.phase === "narrow" && active ? "kept" : "",
+      index === mid && view.phase !== "found" ? "mid" : "",
+      duplicateHit ? "duplicate-hit" : "",
+      found ? "found" : "",
+    ].filter(Boolean).join(" ");
+    const pointerHtml = pointers.length
+      ? pointers.map((label) => `<span class="rotated-pointer pointer-${label.toLowerCase()}">${label}<i></i></span>`).join("")
+      : `<span class="rotated-pointer-spacer"></span>`;
+
+    return `<div class="rotated-cell-wrap">
+      <div class="rotated-pointers">${pointerHtml}</div>
+      <div class="${classes}" style="--rotated-height: ${columnHeight(value)}px">
+        <strong>${escapeHtml(String(value))}</strong>
+        <span>[${index}]</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const stateLabel = ({
+    range: vi ? "Vùng đang tìm" : "Search range",
+    mid: vi ? "Kiểm tra điểm giữa" : "Check midpoint",
+    sorted: view.duplicateShrink
+      ? (vi ? "Trùng nums[M] == nums[R]" : "Tie: nums[M] == nums[R]")
+      : (vi ? "So sánh nums[M] với nums[R]" : "Compare nums[M] with nums[R]"),
+    narrow: view.duplicateShrink
+      ? (vi ? "Loại bỏ 1 phần tử trùng (right -= 1)" : "Discard 1 duplicate (right -= 1)")
+      : (vi ? `Giữ nửa ${view.keptHalf === "left" ? "TRÁI" : "PHẢI"}` : `Keep the ${view.keptHalf === "left" ? "LEFT" : "RIGHT"} half`),
+    found: vi ? "Đã tìm thấy min" : "Minimum found",
+  })[view.phase] || (vi ? "Vùng đang tìm" : "Search range");
+
+  const summary = vi
+    ? `Tìm phần tử nhỏ nhất trong mảng xoay. ${stateLabel}. ${comparison}`
+    : `Finding the minimum in a rotated array. ${stateLabel}. ${comparison}`;
+
+  $("treeView").innerHTML = `<div class="rotated-search-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="rotated-search-head">
+      <span class="rotated-target">${vi ? "tìm" : "finding"} <strong>min</strong></span>
+      <span class="rotated-phase${view.duplicateShrink ? " rotated-phase-dup" : ""}">${escapeHtml(stateLabel)}</span>
+    </div>
+    <div class="rotated-cells">${cells}</div>
+    <div class="rotated-decision">${escapeHtml(comparison)}</div>
+    <div class="rotated-legend">
+      <span><i class="legend-active"></i>${vi ? "còn xét" : "candidate"}</span>
+      <span><i class="legend-mid"></i>mid</span>
+      <span><i class="legend-dup"></i>${vi ? "trùng, loại 1 phần tử" : "duplicate, discard 1"}</span>
       <span><i class="legend-discarded"></i>${vi ? "đã loại" : "discarded"}</span>
     </div>
   </div>`;
@@ -12436,6 +12612,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRotatedSearchView(step);
+  } else if (step.findMinRotatedView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFindMinRotatedView(step);
   } else if (step.twitterView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -12868,6 +13050,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMultiSlotPodiumView(step);
+  } else if (step.slidingFreqView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSlidingFreqView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
