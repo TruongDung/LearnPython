@@ -1578,6 +1578,21 @@ function buildSteps2226(candies, params) {
       codeLines: opts.codeLines || [],
       vars: opts.vars || [],
       note: opts.note,
+      candyAllocationView: {
+        candies: [...candies],
+        k,
+        left: opts.left,
+        right: opts.right,
+        mid: opts.mid,
+        fedPer: opts.fedPer || null,
+        total: opts.total,
+        feasible: opts.feasible !== undefined ? opts.feasible : null,
+        bestAnswer: opts.bestAnswer !== undefined ? opts.bestAnswer : null,
+        maxPile,
+        phase: opts.phase || "range",
+        impossible: !!opts.impossible,
+        finalAnswer: opts.finalAnswer,
+      },
     });
   }
 
@@ -1590,6 +1605,8 @@ function buildSteps2226(candies, params) {
     title: { vi: `if sum(candies) < k → ${totalCandies} < ${k} → ${impossible}`, en: `if sum(candies) < k → ${totalCandies} < ${k} → ${impossible}` },
     sub: subLabels(undefined, undefined),
     codeLines: [3],
+    phase: "check",
+    impossible,
     vars: [
       { name: "candies", value: `[${candies.join(",")}]` },
       { name: "k", value: k },
@@ -1601,21 +1618,20 @@ function buildSteps2226(candies, params) {
   });
 
   if (impossible) {
-    const fs = {
+    snap({
       title: { vi: "return 0", en: "return 0" },
-      arr: [...candies],
       sub: candies.map((_, i) => `[${i}]`),
-      highlight: [],
-      mark: [],
-      final: true,
       codeLines: [4],
+      final: true,
+      phase: "found",
+      impossible: true,
+      finalAnswer: 0,
       vars: [{ name: "answer", value: 0 }],
       note: {
         vi: `Không thể phát đủ kẹo cho ${k} trẻ em (mỗi trẻ tối thiểu 1 kẹo) vì tổng chỉ có ${totalCandies}.`,
         en: `Cannot give at least 1 candy to each of ${k} children since the total is only ${totalCandies}.`,
       },
-    };
-    steps.push(fs);
+    });
     return { original: [...candies], answer: 0, steps };
   }
 
@@ -1626,6 +1642,8 @@ function buildSteps2226(candies, params) {
     title: { vi: `left, right = 1, max(candies) → left=${left}, right=${right}`, en: `left, right = 1, max(candies) → left=${left}, right=${right}` },
     sub: subLabels(undefined, undefined),
     codeLines: [5],
+    phase: "range",
+    left, right,
     vars: [
       { name: "left (min candies/child)", value: left },
       { name: "right (max pile)", value: right },
@@ -1644,6 +1662,9 @@ function buildSteps2226(candies, params) {
       title: { vi: `while left <= right → ${left} <= ${right} → True`, en: `while left <= right → ${left} <= ${right} → True` },
       sub: subLabels(undefined, undefined),
       codeLines: [6],
+      phase: "range",
+      left, right,
+      bestAnswer: answer,
       vars: [{ name: "left", value: left }, { name: "right", value: right }],
       note: {
         vi: `left=${left} ≤ right=${right} → còn khoảng để tìm đáp án lớn nhất, tiếp tục.`,
@@ -1657,6 +1678,9 @@ function buildSteps2226(candies, params) {
       title: { vi: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}`, en: `mid = (left+right)//2 = (${left}+${right})//2 = ${mid}` },
       sub: subLabels(undefined, undefined),
       codeLines: [7],
+      phase: "mid",
+      left, right, mid,
+      bestAnswer: answer,
       vars: [{ name: "mid (candies/child thử)", value: mid }],
       note: {
         vi: `Thử mid=${mid} kẹo/trẻ: mỗi đống chia được bao nhiêu trẻ?`,
@@ -1672,6 +1696,9 @@ function buildSteps2226(candies, params) {
       sub: candies.map((v, i) => `[${i}] →${fedPer[i]}`),
       mark: fedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
       codeLines: [8],
+      phase: "count",
+      left, right, mid, fedPer, total,
+      bestAnswer: answer,
       vars: [{ name: "children fed", value: total }, { name: "breakdown", value: fedStr }],
       note: {
         vi: `Mỗi đống c chia được c // mid trẻ (chia nguyên). Tổng cộng ${total} trẻ được nhận đủ ${mid} kẹo.`,
@@ -1686,6 +1713,9 @@ function buildSteps2226(candies, params) {
       sub: candies.map((v, i) => `[${i}] →${fedPer[i]}`),
       mark: fedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
       codeLines: [9],
+      phase: "compare",
+      left, right, mid, fedPer, total, feasible,
+      bestAnswer: answer,
       vars: [{ name: "count", value: total }, { name: "k", value: k }],
       note: feasible
         ? { vi: `${total} ≥ k=${k} → mid=${mid} KHẢ THI (đủ trẻ được chia), thử giá trị LỚN HƠN → left=mid+1.`, en: `${total} ≥ k=${k} → mid=${mid} is FEASIBLE (enough children fed), try LARGER → left=mid+1.` }
@@ -1700,6 +1730,9 @@ function buildSteps2226(candies, params) {
         title: { vi: `left = mid + 1 → left = ${left}`, en: `left = mid + 1 → left = ${left}` },
         sub: subLabels(undefined, undefined),
         codeLines: [10],
+        phase: "narrow-up",
+        left, right, mid, fedPer, total, feasible,
+        bestAnswer: answer,
         vars: [{ name: "left", value: left }, { name: "best answer so far", value: answer }],
         note: {
           vi: `left = ${left}. mid=${mid} khả thi nên lưu tạm là đáp án tốt nhất, thử giá trị lớn hơn.`,
@@ -1713,6 +1746,9 @@ function buildSteps2226(candies, params) {
         title: { vi: `right = mid - 1 → right = ${right}`, en: `right = mid - 1 → right = ${right}` },
         sub: subLabels(undefined, undefined),
         codeLines: [12],
+        phase: "narrow-down",
+        left, right, mid, fedPer, total, feasible,
+        bestAnswer: answer,
         vars: [{ name: "right", value: right }],
         note: {
           vi: `right = ${right}. mid=${mid} không khả thi, thu hẹp phạm vi tìm kiếm về phía nhỏ hơn.`,
@@ -1722,22 +1758,23 @@ function buildSteps2226(candies, params) {
     }
   }
 
-  const { fedPer: finalFedPer } = feedCount(answer);
-  const fs = {
+  const { fedPer: finalFedPer, total: finalTotal } = feedCount(answer);
+  snap({
     title: { vi: `return right → ${answer}`, en: `return right → ${answer}` },
-    arr: [...candies],
     sub: candies.map((v, i) => `[${i}] →${finalFedPer[i]}`),
-    highlight: [],
     mark: finalFedPer.map((f, i) => (f > 0 ? i : -1)).filter((i) => i >= 0),
     final: true,
     codeLines: [13],
+    phase: "found",
+    left, right, fedPer: finalFedPer, total: finalTotal,
+    bestAnswer: answer,
+    finalAnswer: answer,
     vars: [{ name: "answer", value: answer }],
     note: {
       vi: `left > right, vòng lặp kết thúc. right=${answer} là giá trị LỚN NHẤT sao cho ≥ ${k} trẻ có thể nhận đủ ${answer} kẹo.`,
       en: `left > right, the loop ends. right=${answer} is the LARGEST value such that ≥ ${k} children can each receive ${answer} candies.`,
     },
-  };
-  steps.push(fs);
+  });
 
   return { original: [...candies], answer, steps };
 }

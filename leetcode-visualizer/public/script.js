@@ -7642,6 +7642,129 @@ function renderDuplicateZerosView(step) {
   </div>`;
 }
 
+// ---- Candy allocation visualization (bai 2226: Maximum Candies Allocated
+// to K Children) ----
+// Binary search on the answer (candies per child). Shows:
+//  1. A number-line strip with L/mid/R markers over [1, max(candies)].
+//  2. Each pile as a column with a "children fed" badge (pile // mid),
+//     colored consistently so it's obvious which piles contribute.
+//  3. A total-fed vs k comparison bar showing feasible/infeasible at a glance.
+function renderCandyAllocationView(step) {
+  const view = step.candyAllocationView || {};
+  const candies = Array.isArray(view.candies) ? view.candies : [];
+  const k = view.k;
+  const maxPile = Number.isInteger(view.maxPile) ? view.maxPile : Math.max(1, ...candies);
+  const left = Number.isInteger(view.left) ? view.left : null;
+  const right = Number.isInteger(view.right) ? view.right : null;
+  const mid = Number.isInteger(view.mid) ? view.mid : null;
+  const fedPer = Array.isArray(view.fedPer) ? view.fedPer : null;
+  const total = Number.isInteger(view.total) ? view.total : null;
+  const feasible = view.feasible;
+  const bestAnswer = Number.isInteger(view.bestAnswer) ? view.bestAnswer : 0;
+  const phase = view.phase || "range";
+  const impossible = !!view.impossible;
+  const finalAnswer = view.finalAnswer;
+  const vi = lang === "vi";
+
+  function pctOf(value) {
+    if (!maxPile) return 0;
+    return Math.max(2, Math.round((value / maxPile) * 100));
+  }
+
+  // ---- 1. Number-line strip over [1, maxPile] with L / mid / R markers ----
+  let rangeHtml = "";
+  if (!impossible) {
+    const markers = [];
+    if (Number.isInteger(left)) markers.push({ pos: left, label: "L", cls: "candy-mark-l" });
+    if (Number.isInteger(mid)) markers.push({ pos: mid, label: "M", cls: "candy-mark-m" });
+    if (Number.isInteger(right)) markers.push({ pos: right, label: "R", cls: "candy-mark-r" });
+    const markersHtml = markers.map((m) => {
+      const leftPct = maxPile > 1 ? ((m.pos - 1) / (maxPile - 1)) * 100 : 50;
+      return `<div class="candy-range-marker ${m.cls}" style="left:${leftPct}%">
+        <span class="candy-range-marker-label">${m.label}</span>
+        <span class="candy-range-marker-value">${m.pos}</span>
+      </div>`;
+    }).join("");
+    const bandLeftPct = Number.isInteger(left) && maxPile > 1 ? ((left - 1) / (maxPile - 1)) * 100 : 0;
+    const bandRightPct = Number.isInteger(right) && maxPile > 1 ? ((right - 1) / (maxPile - 1)) * 100 : 100;
+    rangeHtml = `
+      <div class="candy-range-panel">
+        <div class="candy-range-title">${vi ? `Tìm số kẹo/trẻ tối ưu trong [1, ${maxPile}]` : `Searching candies/child in [1, ${maxPile}]`}</div>
+        <div class="candy-range-track">
+          <div class="candy-range-band" style="left:${bandLeftPct}%; width:${Math.max(0, bandRightPct - bandLeftPct)}%"></div>
+          ${markersHtml}
+        </div>
+      </div>`;
+  }
+
+  // ---- 2. Candy piles as columns with "children fed" badges ----
+  const pilesHtml = candies.map((c, i) => {
+    const fed = fedPer ? fedPer[i] : null;
+    const contributes = fed !== null && fed > 0;
+    const heightPct = pctOf(c);
+    const classes = ["candy-pile", contributes ? "candy-pile-active" : ""].filter(Boolean).join(" ");
+    const badge = fed !== null
+      ? `<div class="candy-pile-badge${contributes ? "" : " candy-pile-badge-zero"}">${vi ? "nuôi" : "feeds"} <strong>${fed}</strong></div>`
+      : "";
+    return `<div class="candy-pile-wrap">
+      ${badge}
+      <div class="${classes}" style="height:${heightPct}%">
+        <span class="candy-pile-value">${escapeHtml(String(c))}</span>
+      </div>
+      <span class="candy-pile-idx">[${i}]</span>
+      ${mid !== null && contributes ? `<span class="candy-pile-formula">${c}÷${mid}=${fed}</span>` : ""}
+    </div>`;
+  }).join("");
+
+  // ---- 3. Total-fed vs k comparison bar ----
+  let totalBarHtml = "";
+  if (total !== null) {
+    const maxScale = Math.max(total, k, 1);
+    const totalPct = Math.min(100, Math.round((total / maxScale) * 100));
+    const kPct = Math.min(100, Math.round((k / maxScale) * 100));
+    const barCls = feasible === true ? "candy-total-bar-ok" : feasible === false ? "candy-total-bar-bad" : "";
+    totalBarHtml = `
+      <div class="candy-total-panel">
+        <div class="candy-total-row">
+          <span class="candy-total-label">${vi ? "Tổng trẻ được chia" : "Total children fed"}</span>
+          <span class="candy-total-value">${total}</span>
+        </div>
+        <div class="candy-total-track">
+          <div class="candy-total-fill ${barCls}" style="width:${totalPct}%"></div>
+          <div class="candy-total-k-marker" style="left:${kPct}%"><span>k=${k}</span></div>
+        </div>
+        <div class="candy-total-verdict ${barCls}">
+          ${feasible === true
+            ? (vi ? `${total} ≥ k=${k} → khả thi, thử LỚN HƠN` : `${total} ≥ k=${k} → feasible, try LARGER`)
+            : feasible === false
+              ? (vi ? `${total} < k=${k} → không khả thi, thử NHỎ HƠN` : `${total} < k=${k} → infeasible, try SMALLER`)
+              : ""}
+        </div>
+      </div>`;
+  }
+
+  const statusText = impossible
+    ? (vi ? `Tổng kẹo không đủ cho ${k} trẻ → trả về 0` : `Total candies not enough for ${k} children → return 0`)
+    : phase === "found"
+      ? (vi ? `Đáp án tối đa: mỗi trẻ nhận ${finalAnswer !== undefined ? finalAnswer : bestAnswer} kẹo` : `Final answer: each child gets ${finalAnswer !== undefined ? finalAnswer : bestAnswer} candies`)
+      : (vi ? `Đáp án tốt nhất tạm thời: ${bestAnswer} kẹo/trẻ` : `Best answer so far: ${bestAnswer} candies/child`);
+
+  $("treeView").innerHTML = `
+    <div class="candy-alloc-viz">
+      <div class="candy-alloc-head">
+        <span class="candy-alloc-k">${vi ? "trẻ em" : "children"} <strong>k=${k}</strong></span>
+        <span class="candy-alloc-status${phase === "found" ? " candy-alloc-status-done" : ""}">${escapeHtml(statusText)}</span>
+      </div>
+      ${rangeHtml}
+      <div class="candy-piles-row">${pilesHtml}</div>
+      ${totalBarHtml}
+      <div class="candy-legend">
+        <span><i class="candy-legend-swatch candy-legend-active"></i>${vi ? "đống góp phần chia kẹo" : "pile contributing candies"}</span>
+        <span><i class="candy-legend-swatch candy-legend-zero"></i>${vi ? "đống không chia được (quá ít)" : "pile that can't feed anyone"}</span>
+      </div>
+    </div>`;
+}
+
 // ---- Multi-slot podium visualization (e.g. bai 628: track top-3 & bottom-2) ----
 function renderMultiSlotPodiumView(step) {
   const view = step.multiSlotPodiumView || {};
@@ -13056,6 +13179,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderSlidingFreqView(step);
+  } else if (step.candyAllocationView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCandyAllocationView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
