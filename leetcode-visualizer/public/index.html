@@ -176,5 +176,31 @@
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
     <script src="script.js?v=20260812-lc560-dedupe"></script>
+    <script>
+      (() => {
+        const removeDuplicatePrefixSumViews = () => {
+          const treeViews = [...document.querySelectorAll(".tree-view")];
+          if (treeViews.length > 1) {
+            treeViews.slice(0, -1).forEach((treeView) => treeView.remove());
+          }
+
+          const views = [...document.querySelectorAll(".remainder-viz")];
+          const activeView = views[views.length - 1];
+          if (!activeView) return;
+
+          views.slice(0, -1).forEach((view) => {
+            const wrapper = view.closest(".tree-view");
+            (wrapper || view).remove();
+          });
+          document.querySelectorAll(".prefix-count-guide").forEach((guide) => {
+            if (!activeView.contains(guide)) guide.remove();
+          });
+        };
+
+        new MutationObserver(removeDuplicatePrefixSumViews)
+          .observe(document.documentElement, { childList: true, subtree: true });
+        removeDuplicatePrefixSumViews();
+      })();
+    </script>
   </body>
 </html>
