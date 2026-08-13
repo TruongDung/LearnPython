@@ -2655,7 +2655,6 @@ function buildSteps642(input, params = {}) {
 
   const steps = [];
   const counts = new Map();
-  sentences.forEach((s, i) => counts.set(s, (counts.get(s) || 0) + (Number.isFinite(times[i]) ? times[i] : 0)));
   const makeNode = () => ({ children: Object.create(null), hot: [] });
   const root = makeNode();
 
@@ -2663,21 +2662,41 @@ function buildSteps642(input, params = {}) {
     return (counts.get(right) - counts.get(left)) || left.localeCompare(right);
   }
 
-  function updateHot(node, sentence) {
+  function updateHot(node, sentence, nodePrefix) {
+    const before = [...node.hot];
     node.hot = [...new Set([...node.hot, sentence])].sort(compareSentences).slice(0, 3);
+    return {
+      prefix: nodePrefix,
+      before,
+      after: [...node.hot],
+      changed: before.join("\u0000") !== node.hot.join("\u0000"),
+    };
   }
 
-  function insertSentence(sentence) {
+  function addSentence(sentence, amount) {
+    const countBefore = counts.get(sentence) || 0;
+    counts.set(sentence, countBefore + amount);
+    const updates = [];
     let node = root;
-    updateHot(node, sentence);
+    let nodePrefix = "";
+    updates.push(updateHot(node, sentence, nodePrefix));
     for (const char of sentence) {
+      nodePrefix += char;
       if (!node.children[char]) node.children[char] = makeNode();
       node = node.children[char];
-      updateHot(node, sentence);
+      updates.push(updateHot(node, sentence, nodePrefix));
     }
+    return { countBefore, countAfter: counts.get(sentence), updates };
   }
 
-  [...counts.keys()].forEach(insertSentence);
+  function getNode(value) {
+    let node = root;
+    for (const char of value) {
+      node = node ? node.children[char] : null;
+    }
+    return node;
+  }
+
   let currentNode = root;
   let prefix = "";
 
@@ -2699,16 +2718,25 @@ function buildSteps642(input, params = {}) {
   }
 
   function snap(opts) {
-    const nodeHot = opts.top3 || [];
+    const triePrefix = opts.triePrefix ?? opts.prefix ?? prefix;
+    const inspectPrefix = opts.inspectPrefix ?? triePrefix;
+    const inspectedNode = getNode(inspectPrefix);
+    const nodeHot = opts.top3 ?? (inspectedNode ? [...inspectedNode.hot] : []);
     const candidates = nodeHot.map((sentence, index) => ({
       sentence,
       count: counts.get(sentence) || 0,
       rank: index + 1,
-      selected: true,
+      score: `(-${counts.get(sentence) || 0}, "${sentence}")`,
       tiedWithPrevious: index > 0 && counts.get(nodeHot[index - 1]) === counts.get(sentence),
     }));
-    const suggestions = [...nodeHot];
-    const triePrefix = opts.triePrefix ?? opts.prefix ?? prefix;
+    const suggestions = opts.returnValue ?? [];
+    const nodeChildren = inspectedNode
+      ? Object.keys(inspectedNode.children).sort().map((char) => ({
+        char,
+        prefix: inspectPrefix + char,
+        hot: [...inspectedNode.children[char].hot],
+      }))
+      : [];
     const history = [...counts.entries()]
       .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
       .map(([sentence, count]) => ({ sentence, count }));
@@ -2717,6 +2745,7 @@ function buildSteps642(input, params = {}) {
       arr: [],
       autocompleteView: {
         phase: opts.phase || "type",
+        stage: opts.stage || "inspect",
         action: opts.action || "rank",
         typedChars: [...typed],
         charIndex: opts.charIndex ?? -1,
@@ -2726,10 +2755,18 @@ function buildSteps642(input, params = {}) {
         history,
         triePath: getTriePath(triePrefix),
         triePrefix,
-        nodeFound: opts.nodeFound ?? Boolean(currentNode),
+        inspectPrefix,
+        nodeFound: opts.nodeFound ?? Boolean(inspectedNode),
         nodeHot: [...nodeHot],
+        nodeChildren,
         candidates,
         suggestions: [...suggestions],
+        edgeFromPrefix: opts.edgeFromPrefix ?? "",
+        edgeChar: opts.edgeChar ?? "",
+        edgeFound: opts.edgeFound,
+        cacheUpdates: opts.cacheUpdates || [],
+        focusUpdatePrefix: opts.focusUpdatePrefix,
+        sentenceBeingAdded: opts.sentenceBeingAdded || "",
         committedSentence: opts.committedSentence || "",
         countBefore: opts.countBefore,
         countAfter: opts.countAfter,
@@ -2745,98 +2782,273 @@ function buildSteps642(input, params = {}) {
 
   snap({
     phase: "init",
+    stage: "init-empty",
     action: "history",
     prefix: "",
+    triePrefix: "",
     top3: [],
-    decision: { vi: "Chèn mỗi câu và cache hot[3] tại từng node", en: "Insert every sentence and cache hot[3] at each node" },
-    title: { vi: "Khởi tạo Trie từ lịch sử", en: "Build the Trie from history" },
-    codeLines: [8, 9, 10, 11, 12, 13],
+    returnValue: [],
+    decision: { vi: "Bắt đầu với root rỗng", en: "Start with an empty root" },
+    title: { vi: "Tạo root Trie và bảng frequency", en: "Create the Trie root and frequency table" },
+    codeLines: [8, 9, 10, 11],
     vars: [
-      { name: "sentences", value: sentences.map((s) => `"${s}"`).join(", ") },
-      { name: "times", value: `[${times.join(", ")}]` },
-      { name: "root.hot", value: `[${root.hot.map((s) => `"${s}"`).join(", ")}]` },
-      { name: "prefix", value: '""' },
+      { name: "counts", value: "{}" },
+      { name: "root.children", value: "{}" },
+      { name: "root.hot", value: "[]" },
+      { name: "node", value: "root" },
     ],
     note: {
-      vi:
-        `Chèn từng câu vào Trie. Mỗi node đại diện cho một prefix và lưu sẵn hot[3] theo (count giảm, chữ cái tăng).\n` +
-        `Vì top 3 đã được cache, khi gõ một ký tự ta chỉ cần đi một cạnh Trie rồi đọc node.hot. '#' sẽ lưu câu mới và cập nhật cache trên đường đi.`,
-      en:
-        `Insert every sentence into the Trie. Each node represents a prefix and caches hot[3] by (count desc, lexicographic asc).\n` +
-        `Because top 3 is cached, typing follows one Trie edge and reads node.hot. '#' stores the sentence and refreshes caches along its path.`,
+      vi: "Ban đầu Trie chỉ có root. Tiếp theo, từng câu lịch sử sẽ được chèn và cập nhật hot[3] ở mọi prefix trên đường đi.",
+      en: "The Trie initially contains only root. Each historical sentence will be inserted and update hot[3] at every prefix on its path.",
     },
   });
 
+  sentences.forEach((sentence, index) => {
+    const frequency = Number.isFinite(times[index]) ? times[index] : 0;
+    const added = addSentence(sentence, frequency);
+    const sentenceNode = getNode(sentence);
+    snap({
+      phase: "init",
+      stage: "build-sentence",
+      action: "history",
+      prefix: "",
+      triePrefix: sentence,
+      inspectPrefix: sentence,
+      nodeFound: true,
+      top3: sentenceNode ? [...sentenceNode.hot] : [],
+      returnValue: [],
+      sentenceBeingAdded: sentence,
+      countBefore: added.countBefore,
+      countAfter: added.countAfter,
+      cacheUpdates: added.updates,
+      decision: { vi: `Chèn "${sentence}" (${frequency} lần) qua ${sentence.length + 1} node`, en: `Insert "${sentence}" (${frequency} times) through ${sentence.length + 1} nodes` },
+      title: { vi: `Build Trie ${index + 1}/${sentences.length}: "${sentence}"`, en: `Build Trie ${index + 1}/${sentences.length}: "${sentence}"` },
+      codeLines: [12, 13, 21, 22, 23, 24, 25, 26, 27],
+      vars: [
+        { name: "sentence", value: `"${sentence}"` },
+        { name: "frequency", value: frequency },
+        { name: "counts[sentence]", value: `${added.countBefore} → ${added.countAfter}` },
+        { name: "updated nodes", value: added.updates.length },
+        { name: "root.hot", value: `[${root.hot.map((s) => `"${s}"`).join(", ")}]` },
+      ],
+      note: {
+        vi: `Tăng frequency của "${sentence}" lên ${added.countAfter}. Đi từ root qua từng ký tự và sort lại hot[3] tại ${added.updates.length} node. Bảng CACHE UPDATE cho biết giá trị trước → sau.`,
+        en: `Set the frequency of "${sentence}" to ${added.countAfter}. Walk from root through every character and re-sort hot[3] at ${added.updates.length} nodes. CACHE UPDATE shows before → after.`,
+      },
+    });
+  });
+
   for (const [charIndex, c] of [...typed].entries()) {
+    const shownChar = c === " " ? "␠" : c;
     if (c === "#") {
       const committedSentence = prefix;
+      const currentHot = currentNode ? [...currentNode.hot] : [];
       const countBefore = counts.get(committedSentence) || 0;
-      counts.set(committedSentence, countBefore + 1);
-      insertSentence(committedSentence);
+
       snap({
         phase: "commit",
+        stage: "commit-detect",
+        action: "inspect",
+        charIndex,
+        inputChar: c,
+        prefixBefore: committedSentence,
+        prefix: committedSentence,
+        triePrefix: committedSentence,
+        inspectPrefix: committedSentence,
+        nodeFound: Boolean(currentNode),
+        top3: currentHot,
+        returnValue: [],
+        committedSentence,
+        countBefore,
+        countAfter: countBefore,
+        decision: { vi: `Phát hiện '#' → câu hoàn chỉnh là "${committedSentence}"`, en: `Detected '#' → completed sentence is "${committedSentence}"` },
+        title: { vi: `Commit 1/3: đọc câu "${committedSentence}"`, en: `Commit 1/3: read sentence "${committedSentence}"` },
+        codeLines: [29, 30],
+        vars: [
+          { name: "c", value: "'#'" },
+          { name: "sentence", value: `"${committedSentence}"` },
+          { name: "old frequency", value: countBefore },
+          { name: "return", value: "[]" },
+        ],
+        note: {
+          vi: `'#' không được thêm vào prefix. Prefix hiện tại "${committedSentence}" trở thành câu cần lưu; input('#') luôn trả về [].`,
+          en: `'#' is not appended to the prefix. The current prefix "${committedSentence}" becomes the sentence to store; input('#') always returns [].`,
+        },
+      });
+
+      const added = addSentence(committedSentence, 1);
+      const committedNode = getNode(committedSentence);
+      snap({
+        phase: "commit",
+        stage: "commit-update",
+        action: "inspect",
+        charIndex,
+        inputChar: c,
+        prefixBefore: committedSentence,
+        prefix: committedSentence,
+        triePrefix: committedSentence,
+        inspectPrefix: committedSentence,
+        nodeFound: true,
+        top3: committedNode ? [...committedNode.hot] : [],
+        returnValue: [],
+        sentenceBeingAdded: committedSentence,
+        committedSentence,
+        countBefore: added.countBefore,
+        countAfter: added.countAfter,
+        cacheUpdates: added.updates,
+        decision: { vi: `frequency ${added.countBefore} → ${added.countAfter}; cập nhật ${added.updates.length} cache`, en: `frequency ${added.countBefore} → ${added.countAfter}; refresh ${added.updates.length} caches` },
+        title: { vi: "Commit 2/3: cập nhật frequency và hot[3]", en: "Commit 2/3: update frequency and hot[3]" },
+        codeLines: [21, 22, 23, 24, 25, 26, 27, 31],
+        vars: [
+          { name: `counts["${committedSentence}"]`, value: `${added.countBefore} → ${added.countAfter}` },
+          { name: "path nodes", value: added.updates.length },
+          { name: "changed caches", value: added.updates.filter((update) => update.changed).length },
+        ],
+        note: {
+          vi: `Đi lại toàn bộ đường Trie của "${committedSentence}". Tại mỗi prefix, thêm câu vào cache, sort theo (-frequency, sentence), rồi chỉ giữ 3 câu đầu.`,
+          en: `Walk the full Trie path of "${committedSentence}". At each prefix, add it to the cache, sort by (-frequency, sentence), then keep only the first three.`,
+        },
+      });
+
+      prefix = "";
+      currentNode = root;
+      snap({
+        phase: "commit",
+        stage: "commit-reset",
         action: "commit",
         charIndex,
         inputChar: c,
         prefixBefore: committedSentence,
         prefix: "",
-        triePrefix: committedSentence,
+        triePrefix: "",
+        inspectPrefix: "",
         nodeFound: true,
+        top3: [...root.hot],
+        returnValue: [],
         committedSentence,
-        countBefore,
-        countAfter: countBefore + 1,
-        top3: [],
-        decision: { vi: `Cập nhật hot[3] dọc đường đi rồi reset`, en: `Refresh hot[3] along the path, then reset` },
-        title: { vi: `input('#'): thêm "${committedSentence}" vào Trie`, en: `input('#'): add "${committedSentence}" to the Trie` },
-        codeLines: [30, 31, 32, 33, 34],
+        countBefore: added.countBefore,
+        countAfter: added.countAfter,
+        decision: { vi: "Reset prefix = '' và node = root", en: "Reset prefix = '' and node = root" },
+        title: { vi: "Commit 3/3: reset về root", en: "Commit 3/3: reset to root" },
+        codeLines: [32, 33, 34],
         vars: [
-          { name: "saved sentence", value: `"${committedSentence}"` },
-          { name: "count", value: `${countBefore} → ${countBefore + 1}` },
           { name: "prefix", value: '""' },
           { name: "node", value: "root" },
+          { name: "return", value: "[]" },
         ],
         note: {
-          vi: `'#' kết thúc câu. Tăng counts["${committedSentence}"] lên 1, đi lại đường Trie của câu này để cập nhật hot[3], rồi reset về root.`,
-          en: `'#' ends the sentence. Increment counts["${committedSentence}"], walk its Trie path to refresh hot[3], then reset to root.`,
+          vi: "Câu đã được lưu. Hệ thống quay về root để sẵn sàng nhận một truy vấn autocomplete mới.",
+          en: "The sentence is stored. The system returns to root and is ready for a new autocomplete query.",
         },
       });
-      prefix = "";
-      currentNode = root;
       continue;
     }
 
     const prefixBefore = prefix;
+    const edgeFound = Boolean(currentNode && currentNode.children[c]);
+    const beforeHot = currentNode ? [...currentNode.hot] : [];
+    snap({
+      phase: "type",
+      stage: "read-char",
+      action: "inspect",
+      charIndex,
+      inputChar: c,
+      prefixBefore,
+      prefix: prefixBefore,
+      triePrefix: prefixBefore,
+      inspectPrefix: prefixBefore,
+      nodeFound: Boolean(currentNode),
+      top3: beforeHot,
+      returnValue: [],
+      edgeFromPrefix: prefixBefore,
+      edgeChar: c,
+      edgeFound,
+      decision: { vi: `Đọc c='${shownChar}', chuẩn bị kiểm tra children[c]`, en: `Read c='${shownChar}', prepare to inspect children[c]` },
+      title: { vi: `input('${shownChar}') 1/3: đọc ký tự`, en: `input('${shownChar}') 1/3: read character` },
+      codeLines: [29, 35],
+      vars: [
+        { name: "c", value: `'${shownChar}'` },
+        { name: "prefix before", value: `"${prefixBefore}"` },
+        { name: "lookup", value: `node.children.get('${shownChar}')` },
+      ],
+      note: {
+        vi: `Đang đứng tại node prefix "${prefixBefore}". Ta chưa di chuyển; bước kế tiếp sẽ kiểm tra cạnh '${shownChar}'.`,
+        en: `Currently at the node for prefix "${prefixBefore}". No movement yet; the next step checks edge '${shownChar}'.`,
+      },
+    });
+
     prefix += c;
     currentNode = currentNode ? (currentNode.children[c] || null) : null;
     const top3 = currentNode ? [...currentNode.hot] : [];
+    snap({
+      phase: "type",
+      stage: "follow-edge",
+      action: currentNode ? "inspect" : "no-match",
+      charIndex,
+      inputChar: c,
+      prefixBefore,
+      prefix,
+      triePrefix: prefix,
+      inspectPrefix: prefix,
+      nodeFound: Boolean(currentNode),
+      top3,
+      returnValue: [],
+      edgeFromPrefix: prefixBefore,
+      edgeChar: c,
+      edgeFound: Boolean(currentNode),
+      decision: currentNode
+        ? { vi: `Tìm thấy cạnh '${shownChar}' → chuyển current node`, en: `Found '${shownChar}' edge → move current node` }
+        : { vi: `Không có cạnh '${shownChar}' → node = None`, en: `No '${shownChar}' edge → node = None` },
+      title: { vi: `input('${shownChar}') 2/3: lookup cạnh Trie`, en: `input('${shownChar}') 2/3: look up Trie edge` },
+      codeLines: [35, 36],
+      vars: [
+        { name: "prefix", value: `"${prefix}"` },
+        { name: `children['${shownChar}']`, value: currentNode ? `TrieNode("${prefix}")` : "None" },
+        { name: "node.hot", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
+      ],
+      note: {
+        vi: currentNode
+          ? `Lookup thành công. current node bây giờ đại diện prefix "${prefix}"; cache hot[3] đã có sẵn, không cần DFS hay quét history.`
+          : `Lookup thất bại. Node trở thành None; mọi ký tự tiếp theo sẽ tiếp tục trả [] cho đến khi gặp '#'.`,
+        en: currentNode
+          ? `Lookup succeeded. The current node now represents prefix "${prefix}"; hot[3] is already cached, so no DFS or history scan is needed.`
+          : `Lookup failed. The node becomes None; following characters keep returning [] until '#'.`,
+      },
+    });
 
     snap({
       phase: "type",
+      stage: "return-hot",
       action: currentNode ? "rank" : "no-match",
       charIndex,
       inputChar: c,
       prefixBefore,
       prefix,
+      triePrefix: prefix,
+      inspectPrefix: prefix,
       nodeFound: Boolean(currentNode),
       top3,
+      returnValue: top3,
+      edgeFromPrefix: prefixBefore,
+      edgeChar: c,
+      edgeFound: Boolean(currentNode),
       decision: currentNode
-        ? { vi: `Đi theo cạnh '${c}' → trả node.hot[3]`, en: `Follow edge '${c}' → return node.hot[3]` }
-        : { vi: `Không có cạnh '${c}' → []`, en: `No '${c}' edge → []` },
-      title: { vi: `input('${c}'): đi tới node prefix="${prefix}"`, en: `input('${c}'): move to prefix="${prefix}" node` },
-      codeLines: [29, 35, 36, 37],
+        ? { vi: `Copy node.hot → trả ${top3.length} gợi ý`, en: `Copy node.hot → return ${top3.length} suggestions` }
+        : { vi: "node = None → return []", en: "node = None → return []" },
+      title: { vi: `input('${shownChar}') 3/3: trả kết quả`, en: `input('${shownChar}') 3/3: return result` },
+      codeLines: [37],
       vars: [
-        { name: "c", value: `'${c}'` },
-        { name: "prefix", value: `"${prefix}"` },
-        { name: "node", value: currentNode ? `TrieNode("${prefix}")` : "None" },
+        { name: "ranking key", value: "(-frequency, sentence)" },
         { name: "node.hot", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
+        { name: "return", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
       ],
       note: {
         vi: currentNode
-          ? `Từ node trước, đi đúng 1 cạnh '${c}'. Node cho prefix "${prefix}" đã cache sẵn top 3: [${top3.map((s) => `"${s}"`).join(", ")}]. Không cần quét toàn bộ câu.`
-          : `Trie không có cạnh '${c}' tại prefix trước đó, nên không có gợi ý. Các ký tự tiếp theo vẫn trả về [] cho đến khi gặp '#'.`,
+          ? `Trả bản copy node.hot. Thứ tự đã đúng: frequency giảm dần; nếu bằng nhau thì sentence tăng dần theo từ điển.`
+          : "Không có node tương ứng với prefix nên kết quả là [].",
         en: currentNode
-          ? `Follow exactly one '${c}' edge. The node for prefix "${prefix}" already caches top 3: [${top3.map((s) => `"${s}"`).join(", ")}]. No full scan is needed.`
-          : `The Trie has no '${c}' edge from the previous prefix, so there are no suggestions until '#'.`,
+          ? `Return a copy of node.hot. It is already ordered by frequency descending, then sentence lexicographically ascending.`
+          : "There is no node for the prefix, so the result is [].",
       },
     });
   }
@@ -2844,23 +3056,27 @@ function buildSteps642(input, params = {}) {
   const finalTop3 = currentNode && prefix ? [...currentNode.hot] : [];
   snap({
     phase: "done",
+    stage: "done",
     action: "done",
     charIndex: typed.length,
     prefix,
+    triePrefix: prefix,
+    inspectPrefix: prefix,
     nodeFound: Boolean(currentNode),
     top3: finalTop3,
-    decision: { vi: `Đã xử lý ${typed.length} ký tự bằng Trie`, en: `Processed ${typed.length} character(s) with the Trie` },
-    title: { vi: "Hoàn tất chuỗi ký tự", en: "Finished the input sequence" },
+    returnValue: finalTop3,
+    decision: { vi: `Hoàn tất ${typed.length} input call qua ${steps.length} debug step`, en: `Finished ${typed.length} input calls across ${steps.length} debug steps` },
+    title: { vi: "Hoàn tất toàn bộ input stream", en: "Finished the complete input stream" },
     final: true,
     codeLines: [37],
     vars: [
       { name: "prefix", value: `"${prefix}"` },
       { name: "node", value: currentNode ? `TrieNode("${prefix}")` : "None" },
-      { name: "node.hot", value: `[${finalTop3.map((s) => `"${s}"`).join(", ")}]` },
+      { name: "last return", value: `[${finalTop3.map((s) => `"${s}"`).join(", ")}]` },
     ],
     note: {
-      vi: `Đã xử lý toàn bộ "${typed}". Mỗi ký tự thường chỉ đi một cạnh Trie và trả node.hot; '#' mới cập nhật các node trên đường đi của câu.`,
-      en: `Processed "${typed}". A normal character follows one Trie edge and returns node.hot; only '#' updates nodes along the sentence path.`,
+      vi: `Visualization đã tách từng input thành các bước đọc ký tự, lookup cạnh, inspect cache và return; '#' được tách thành detect, update và reset.`,
+      en: `The visualization splits every input into read, edge lookup, cache inspection, and return; '#' is split into detect, update, and reset.`,
     },
   });
 

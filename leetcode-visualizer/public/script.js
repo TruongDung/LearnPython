@@ -13140,65 +13140,98 @@ function renderLongestDuplicateView(step) {
 function renderAutocompleteView(step) {
   const view = step.autocompleteView || {};
   const vi = lang === "vi";
+  const showChar = (char) => char === " " ? "␠" : char === "#" ? "#" : char;
+  const displayPrefix = (value) => String(value || "").replace(/ /g, "␠");
   const phases = [
-    vi ? "1 · Dựng Trie + hot[3]" : "1 · Build Trie + hot[3]",
-    vi ? "2 · Đi theo cạnh ký tự" : "2 · Follow character edge",
-    vi ? "3 · Cập nhật khi gặp #" : "3 · Update on #",
+    vi ? "1 · Build Trie + cache" : "1 · Build Trie + cache",
+    vi ? "2 · Debug từng input(c)" : "2 · Debug each input(c)",
+    vi ? "3 · Commit và cập nhật" : "3 · Commit and update",
   ];
   const phaseRank = view.phase === "init" ? 0 : view.phase === "commit" ? 2 : 1;
-  const phasesHtml = phases.map((label, index) => `<span class="${index === phaseRank ? "active" : index < phaseRank ? "done" : ""}">${escapeHtml(label)}</span>`).join("");
-  const showChar = (char) => char === " " ? "␠" : char === "#" ? "#" : char;
-  const charName = (char) => char === " " ? (vi ? "space" : "space") : char === "#" ? (vi ? "kết thúc" : "commit") : char;
+  const phasesHtml = phases.map((label, index) => {
+    const state = view.phase === "done" || index < phaseRank ? "done" : index === phaseRank ? "active" : "";
+    return `<span class="${state}">${escapeHtml(label)}</span>`;
+  }).join("");
+  const stageLabels = {
+    "init-empty": ["INIT", vi ? "Tạo root rỗng" : "Create empty root"],
+    "build-sentence": ["BUILD", vi ? "Chèn một câu lịch sử" : "Insert one historical sentence"],
+    "read-char": ["INPUT · 1/3", vi ? "Đọc ký tự và giữ nguyên node" : "Read character and keep current node"],
+    "follow-edge": ["INPUT · 2/3", vi ? "Lookup cạnh children[c]" : "Look up children[c] edge"],
+    "return-hot": ["INPUT · 3/3", vi ? "Đọc cache và trả kết quả" : "Read cache and return result"],
+    "commit-detect": ["COMMIT · 1/3", vi ? "Nhận diện câu hoàn chỉnh" : "Identify completed sentence"],
+    "commit-update": ["COMMIT · 2/3", vi ? "Cập nhật frequency và cache" : "Update frequency and caches"],
+    "commit-reset": ["COMMIT · 3/3", vi ? "Reset về root" : "Reset to root"],
+    done: ["DONE", vi ? "Hoàn tất input stream" : "Input stream complete"],
+  };
+  const [stageCode, stageText] = stageLabels[view.stage] || ["DEBUG", vi ? "Kiểm tra trạng thái" : "Inspect state"];
   const typedHtml = (view.typedChars || []).map((char, index) => {
     const classes = ["ac642-char"];
     if (index < view.charIndex || view.phase === "done") classes.push("done");
     else if (index === view.charIndex) classes.push(char === "#" ? "commit" : "active");
-    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(showChar(char))}</strong><em>${escapeHtml(charName(char))}</em></span>`;
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(showChar(char))}</strong><em>${char === " " ? "space" : char === "#" ? "commit" : "char"}</em></span>`;
   }).join("") || `<span class="ac642-empty">${vi ? "Không có ký tự" : "No input characters"}</span>`;
 
-  const historyHtml = (view.history || []).map((item) => `<div><strong>${escapeHtml(item.sentence)}</strong><span>${escapeHtml(item.count)}</span></div>`).join("") || `<div class="ac642-empty">∅</div>`;
+  const historyHtml = (view.history || []).map((item) => `<div><strong>${escapeHtml(item.sentence)}</strong><span>${escapeHtml(item.count)}</span></div>`).join("") || `<div class="ac642-empty">${vi ? "Chưa chèn câu nào" : "No sentences inserted yet"}</div>`;
   const triePathHtml = (view.triePath || []).map((item, index, path) => {
     const label = item.char === "ROOT" ? "ROOT" : showChar(item.char);
     const classes = ["ac642-trie-node"];
     if (!item.found) classes.push("missing");
     if (index === path.length - 1) classes.push("current");
     const cache = item.hot && item.hot.length ? item.hot.map((sentence) => `“${sentence}”`).join(" · ") : "[]";
-    return `${index ? `<i class="ac642-edge">→</i>` : ""}<div class="${classes.join(" ")}"><small>${escapeHtml(label)}</small><strong>${item.prefix ? `“${escapeHtml(item.prefix.replace(/ /g, "␠"))}”` : "prefix = empty"}</strong><em>hot[3]: ${escapeHtml(cache)}</em></div>`;
+    return `${index ? `<i class="ac642-edge">→</i>` : ""}<div class="${classes.join(" ")}"><small>${escapeHtml(label)}</small><strong>${item.prefix ? `“${escapeHtml(displayPrefix(item.prefix))}”` : "prefix = empty"}</strong><em>hot[3]: ${escapeHtml(cache)}</em></div>`;
   }).join("");
+  const childrenHtml = (view.nodeChildren || []).map((child) => `<div class="ac642-child"><b>${escapeHtml(showChar(child.char))}</b><span>→ “${escapeHtml(displayPrefix(child.prefix))}”</span><em>${escapeHtml(child.hot.slice(0, 3).join(" · ") || "hot=[]")}</em></div>`).join("") || `<div class="ac642-empty">${view.nodeFound ? (vi ? "Node lá · không có children" : "Leaf node · no children") : "node = None"}</div>`;
   const candidatesHtml = (view.candidates || []).map((candidate) => `<div class="ac642-candidate selected">
-    <b>#${candidate.rank}</b><strong>${escapeHtml(candidate.sentence)}</strong><span>${escapeHtml(candidate.count)}×</span><em>${candidate.tiedWithPrevious ? (vi ? "cùng count → A–Z" : "count tie → A–Z") : candidate.rank === 1 ? (vi ? "hot nhất tại node này" : "hottest at this node") : ""}</em>
-  </div>`).join("") || `<div class="ac642-no-match">${view.phase === "init" ? (vi ? "Chọn Next để đi theo từng ký tự" : "Choose Next to follow each character") : view.action === "commit" ? (vi ? "Đã cập nhật hot[3] dọc đường Trie" : "Updated hot[3] along the Trie path") : (vi ? `Node prefix “${escapeHtml(view.prefix || "")}” không tồn tại` : `The node for prefix “${escapeHtml(view.prefix || "")}” does not exist`)}</div>`;
+    <b>#${candidate.rank}</b><strong>${escapeHtml(candidate.sentence)}</strong><span>${escapeHtml(candidate.count)}×</span><em>key = ${escapeHtml(candidate.score)}${candidate.tiedWithPrevious ? (vi ? " · hòa count → A–Z" : " · count tie → A–Z") : ""}</em>
+  </div>`).join("") || `<div class="ac642-no-match">${view.nodeFound ? (vi ? "Cache hot[3] đang rỗng" : "hot[3] cache is empty") : (vi ? `Không có node cho prefix “${escapeHtml(displayPrefix(view.inspectPrefix))}”` : `No node for prefix “${escapeHtml(displayPrefix(view.inspectPrefix))}”`)}</div>`;
+  const returnReady = ["return-hot", "commit-detect", "commit-update", "commit-reset", "done"].includes(view.stage);
   const suggestionSlots = Array.from({ length: 3 }, (_, index) => {
     const sentence = (view.suggestions || [])[index];
-    return `<div class="ac642-slot ${sentence ? "filled" : "empty"}"><b>${index + 1}</b><span>${sentence ? escapeHtml(sentence) : "—"}</span></div>`;
+    return `<div class="ac642-slot ${sentence ? "filled" : "empty"}"><b>${index + 1}</b><span>${sentence ? escapeHtml(sentence) : returnReady ? "—" : (vi ? "chờ return" : "waiting")}</span></div>`;
   }).join("");
-  const actionLabels = {
-    history: vi ? "DỰNG TRIE + CACHE" : "BUILD TRIE + CACHE",
-    rank: vi ? "ĐI 1 CẠNH → ĐỌC hot[3]" : "FOLLOW 1 EDGE → READ hot[3]",
-    "no-match": vi ? "KHÔNG CÓ CẠNH" : "EDGE NOT FOUND",
-    commit: vi ? "CẬP NHẬT TRIE → RESET" : "UPDATE TRIE → RESET",
-    done: vi ? "HOÀN TẤT" : "COMPLETE",
-  };
-  const actionClass = ["rank", "no-match", "commit", "done"].includes(view.action) ? view.action : "";
-  const prefixDisplay = String(view.prefix || "").replace(/ /g, "␠");
-  const beforeDisplay = String(view.prefixBefore || "").replace(/ /g, "␠");
+  const cacheUpdatesHtml = (view.cacheUpdates || []).map((update) => {
+    const before = update.before.length ? update.before.join(" · ") : "[]";
+    const after = update.after.length ? update.after.join(" · ") : "[]";
+    const label = update.prefix ? `“${displayPrefix(update.prefix)}”` : "ROOT";
+    return `<div class="ac642-cache-row ${update.changed ? "changed" : "unchanged"}"><strong>${escapeHtml(label)}</strong><code>${escapeHtml(before)}</code><i>→</i><code>${escapeHtml(after)}</code><span>${update.changed ? (vi ? "ĐỔI" : "CHANGED") : (vi ? "GIỮ NGUYÊN" : "SAME")}</span></div>`;
+  }).join("");
+
+  const edgePending = view.stage === "read-char";
+  const hasEdgeProbe = view.edgeChar !== undefined && view.edgeChar !== "";
+  const edgeState = edgePending ? "pending" : view.edgeFound ? "found" : "missing";
+  const edgeResult = edgePending
+    ? (vi ? "chưa lookup" : "not looked up yet")
+    : view.edgeFound ? `TrieNode(“${displayPrefix(String(view.edgeFromPrefix || "") + String(view.edgeChar || ""))}”)` : "None";
+  const prefixDisplay = displayPrefix(view.prefix);
+  const beforeDisplay = displayPrefix(view.prefixBefore);
+  let operationCode = `prefix = “${prefixDisplay}”`;
+  if (view.stage === "build-sentence") operationCode = `_add(“${view.sentenceBeingAdded}”, ${view.countAfter - view.countBefore})`;
+  else if (view.stage === "read-char") operationCode = `c = '${showChar(view.inputChar)}'`;
+  else if (view.stage === "follow-edge") operationCode = `node.children.get('${showChar(view.inputChar)}') → ${view.nodeFound ? "node" : "None"}`;
+  else if (view.stage === "return-hot") operationCode = `return ${view.nodeFound ? "node.hot[:]" : "[]"}`;
+  else if (view.stage && view.stage.startsWith("commit")) operationCode = `input('#') · “${displayPrefix(view.committedSentence)}”`;
   const summary = vi
-    ? `Trie autocomplete tại prefix ${prefixDisplay || "rỗng"}; node ${view.nodeFound ? "tồn tại" : "không tồn tại"}, hot[3] có ${(view.nodeHot || []).length} câu.`
-    : `Trie autocomplete at prefix ${prefixDisplay || "empty"}; node ${view.nodeFound ? "exists" : "is missing"}, hot[3] has ${(view.nodeHot || []).length} entries.`;
+    ? `Debug Trie bước ${stageCode}, prefix ${prefixDisplay || "rỗng"}, node ${view.nodeFound ? "tồn tại" : "không tồn tại"}.`
+    : `Trie debug stage ${stageCode}, prefix ${prefixDisplay || "empty"}, node ${view.nodeFound ? "exists" : "is missing"}.`;
 
   $("treeView").innerHTML = `<section class="ac642-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="ac642-phases">${phasesHtml}</div>
+    <section class="ac642-stage ${escapeHtml(view.stage || "inspect")}"><b>${escapeHtml(stageCode)}</b><strong>${escapeHtml(stageText)}</strong><span>${escapeHtml(pick(view.decision) || "—")}</span></section>
     <section class="ac642-input"><header><strong>INPUT STREAM</strong><span>␠ = space · # = commit</span></header><div>${typedHtml}</div></section>
-    <section class="ac642-action ${actionClass}"><span>${escapeHtml(actionLabels[view.action] || "AUTOCOMPLETE")}</span><strong>${escapeHtml(pick(view.decision) || "—")}</strong><code>"${escapeHtml(beforeDisplay)}" + ${view.inputChar ? `'${escapeHtml(showChar(view.inputChar))}'` : "—"} → "${escapeHtml(prefixDisplay)}"</code></section>
-    <section class="ac642-search"><span>⌕</span><div><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${prefixDisplay ? escapeHtml(prefixDisplay) : `<i>${vi ? "rỗng" : "empty"}</i>`}</strong></div><em class="${view.nodeFound ? "found" : "missing"}">${view.nodeFound ? (vi ? "NODE TỒN TẠI" : "NODE FOUND") : (vi ? "KHÔNG CÓ NODE" : "NO NODE")}</em></section>
-    <section class="ac642-trie"><header><strong>${vi ? "ĐƯỜNG ĐI TRONG TRIE" : "ACTIVE TRIE PATH"}</strong><span>${vi ? "mỗi ký tự = đi 1 cạnh" : "one character = one edge"}</span></header><div>${triePathHtml}</div></section>
-    <section class="ac642-rule"><span><b>1</b> node.children[c]</span><i>→</i><span><b>2</b> current node</span><i>→</i><span><b>3</b> return node.hot[:]</span></section>
+    <section class="ac642-action ${escapeHtml(view.action || "inspect")}"><span>EXECUTE</span><strong>${escapeHtml(operationCode)}</strong><code>before “${escapeHtml(beforeDisplay)}” → now “${escapeHtml(prefixDisplay)}”</code></section>
+    <div class="ac642-debug-grid">
+      <section class="ac642-probe ${hasEdgeProbe ? edgeState : "idle"}"><header><strong>EDGE PROBE</strong><span>O(1) average</span></header>${hasEdgeProbe ? `<div><small>FROM</small><code>${view.edgeFromPrefix ? `“${escapeHtml(displayPrefix(view.edgeFromPrefix))}”` : "ROOT"}</code><i>children[ '${escapeHtml(showChar(view.edgeChar))}' ]</i><b>→ ${escapeHtml(edgeResult)}</b></div>` : `<div class="ac642-empty">${vi ? "Chưa có ký tự để lookup" : "No character to look up yet"}</div>`}</section>
+      <section class="ac642-inspector ${view.nodeFound ? "found" : "missing"}"><header><strong>NODE INSPECTOR</strong><span>${view.nodeFound ? "TrieNode" : "None"}</span></header><div class="ac642-inspector-head"><small>PREFIX</small><code>${view.inspectPrefix ? `“${escapeHtml(displayPrefix(view.inspectPrefix))}”` : "ROOT"}</code><small>CHILDREN</small><b>${(view.nodeChildren || []).length}</b><small>HOT SIZE</small><b>${(view.nodeHot || []).length}/3</b></div><div class="ac642-children">${childrenHtml}</div></section>
+    </div>
+    <section class="ac642-trie"><header><strong>${vi ? "ĐƯỜNG TRIE ĐANG INSPECT" : "INSPECTED TRIE PATH"}</strong><span>ROOT → prefix</span></header><div>${triePathHtml}</div></section>
+    ${cacheUpdatesHtml ? `<section class="ac642-cache-updates"><header><strong>CACHE UPDATE · hot[3]</strong><span>${vi ? "prefix · trước → sau" : "prefix · before → after"}</span></header><div>${cacheUpdatesHtml}</div></section>` : ""}
+    <section class="ac642-rule"><span><b>1</b> read c</span><i>→</i><span><b>2</b> children[c]</span><i>→</i><span><b>3</b> inspect hot[3]</span><i>→</i><span><b>4</b> return copy</span></section>
     <div class="ac642-layout">
       <section class="ac642-card history"><header><strong>${vi ? "TẦN SUẤT TOÀN CỤC" : "GLOBAL FREQUENCIES"}</strong><span>sentence → count</span></header><div>${historyHtml}</div></section>
-      <section class="ac642-card ranking"><header><strong>${vi ? "CACHE CỦA NODE: hot[3]" : "NODE CACHE: hot[3]"}</strong><span>count ↓ · sentence A–Z</span></header><div>${candidatesHtml}</div></section>
-      <section class="ac642-card top"><header><strong>RETURN</strong><span>node.hot[:]</span></header><div>${suggestionSlots}</div></section>
+      <section class="ac642-card ranking"><header><strong>${vi ? "NODE CACHE + RANKING KEY" : "NODE CACHE + RANKING KEY"}</strong><span>(-count, sentence)</span></header><div>${candidatesHtml}</div></section>
+      <section class="ac642-card top"><header><strong>RETURN VALUE</strong><span>${returnReady ? "ready" : "not executed"}</span></header><div>${suggestionSlots}</div></section>
     </div>
-    ${view.action === "commit" ? `<section class="ac642-commit"><span># END SENTENCE</span><strong>"${escapeHtml(view.committedSentence)}"</strong><div><code>${escapeHtml(view.countBefore)}</code><b>→ +1 →</b><code>${escapeHtml(view.countAfter)}</code></div><em>prefix = "" · return []</em></section>` : ""}
+    ${view.phase === "commit" ? `<section class="ac642-commit"><span># END SENTENCE</span><strong>“${escapeHtml(view.committedSentence)}”</strong><div><code>${escapeHtml(view.countBefore)}</code><b>→ +${view.countAfter - view.countBefore} →</b><code>${escapeHtml(view.countAfter)}</code></div><em>${view.stage === "commit-reset" ? "prefix = '' · node = root" : "return []"}</em></section>` : ""}
   </section>`;
 }
 
