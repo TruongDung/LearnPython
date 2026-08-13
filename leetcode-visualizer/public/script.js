@@ -1039,6 +1039,14 @@ function renderCodeLineHtml(line) {
 
 function renderCode() {
   const panel = $("codePanel");
+  const split = panel.closest(".viz-split");
+  const problemId = Number(problemData && problemData.id);
+  if (split) {
+    split.classList.toggle("problem-642-layout", problemId === 642);
+    split.classList.toggle("problem-648-layout", problemId === 648);
+    split.classList.toggle("problem-211-layout", problemId === 211);
+    split.classList.toggle("problem-212-layout", problemId === 212);
+  }
   const localizedCode = problemData && (lang === "vi" ? problemData.codeVi : problemData.codeEn);
   const code = localizedCode || (problemData && problemData.code) || [];
   const code2 = (problemData && problemData.code2) || null;
@@ -13210,6 +13218,13 @@ function renderAutocompleteView(step) {
   else if (view.stage === "follow-edge") operationCode = `node.children.get('${showChar(view.inputChar)}') → ${view.nodeFound ? "node" : "None"}`;
   else if (view.stage === "return-hot") operationCode = `return ${view.nodeFound ? "node.hot[:]" : "[]"}`;
   else if (view.stage && view.stage.startsWith("commit")) operationCode = `input('#') · “${displayPrefix(view.committedSentence)}”`;
+  const isBuildStage = view.phase === "init";
+  const isTypingStage = ["read-char", "follow-edge", "return-hot"].includes(view.stage);
+  const isCommitStage = view.phase === "commit";
+  const showHistory = isBuildStage || view.stage === "commit-update";
+  const showRanking = view.stage !== "init-empty";
+  const showReturn = isTypingStage || ["commit-detect", "commit-reset", "done"].includes(view.stage);
+  const visibleCards = [showHistory, showRanking, showReturn].filter(Boolean).length;
   const summary = vi
     ? `Debug Trie bước ${stageCode}, prefix ${prefixDisplay || "rỗng"}, node ${view.nodeFound ? "tồn tại" : "không tồn tại"}.`
     : `Trie debug stage ${stageCode}, prefix ${prefixDisplay || "empty"}, node ${view.nodeFound ? "exists" : "is missing"}.`;
@@ -13217,21 +13232,22 @@ function renderAutocompleteView(step) {
   $("treeView").innerHTML = `<section class="ac642-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="ac642-phases">${phasesHtml}</div>
     <section class="ac642-stage ${escapeHtml(view.stage || "inspect")}"><b>${escapeHtml(stageCode)}</b><strong>${escapeHtml(stageText)}</strong><span>${escapeHtml(pick(view.decision) || "—")}</span></section>
-    <section class="ac642-input"><header><strong>INPUT STREAM</strong><span>␠ = space · # = commit</span></header><div>${typedHtml}</div></section>
-    <section class="ac642-action ${escapeHtml(view.action || "inspect")}"><span>EXECUTE</span><strong>${escapeHtml(operationCode)}</strong><code>before “${escapeHtml(beforeDisplay)}” → now “${escapeHtml(prefixDisplay)}”</code></section>
-    <div class="ac642-debug-grid">
+    ${isBuildStage ? `<section class="ac642-build-focus"><div><small>${vi ? "CÂU ĐANG CHÈN" : "INSERTING SENTENCE"}</small><strong>${view.sentenceBeingAdded ? `“${escapeHtml(view.sentenceBeingAdded)}”` : (vi ? "Khởi tạo root" : "Initialize root")}</strong></div><div><small>FREQUENCY</small><strong>${view.sentenceBeingAdded ? `${escapeHtml(view.countBefore)} → ${escapeHtml(view.countAfter)}` : "—"}</strong></div><div><small>${vi ? "NODE CẬP NHẬT" : "UPDATED NODES"}</small><strong>${(view.cacheUpdates || []).length}</strong></div></section>` : ""}
+    ${!isBuildStage ? `<section class="ac642-input"><header><strong>INPUT STREAM</strong><span>␠ = space · # = commit</span></header><div>${typedHtml}</div></section>` : ""}
+    <section class="ac642-action ${escapeHtml(view.action || "inspect")}"><span>EXECUTE</span><strong>${escapeHtml(operationCode)}</strong>${!isBuildStage ? `<code>before “${escapeHtml(beforeDisplay)}” → now “${escapeHtml(prefixDisplay)}”</code>` : ""}</section>
+    ${isTypingStage ? `<div class="ac642-debug-grid">
       <section class="ac642-probe ${hasEdgeProbe ? edgeState : "idle"}"><header><strong>EDGE PROBE</strong><span>O(1) average</span></header>${hasEdgeProbe ? `<div><small>FROM</small><code>${view.edgeFromPrefix ? `“${escapeHtml(displayPrefix(view.edgeFromPrefix))}”` : "ROOT"}</code><i>children[ '${escapeHtml(showChar(view.edgeChar))}' ]</i><b>→ ${escapeHtml(edgeResult)}</b></div>` : `<div class="ac642-empty">${vi ? "Chưa có ký tự để lookup" : "No character to look up yet"}</div>`}</section>
       <section class="ac642-inspector ${view.nodeFound ? "found" : "missing"}"><header><strong>NODE INSPECTOR</strong><span>${view.nodeFound ? "TrieNode" : "None"}</span></header><div class="ac642-inspector-head"><small>PREFIX</small><code>${view.inspectPrefix ? `“${escapeHtml(displayPrefix(view.inspectPrefix))}”` : "ROOT"}</code><small>CHILDREN</small><b>${(view.nodeChildren || []).length}</b><small>HOT SIZE</small><b>${(view.nodeHot || []).length}/3</b></div><div class="ac642-children">${childrenHtml}</div></section>
-    </div>
-    <section class="ac642-trie"><header><strong>${vi ? "ĐƯỜNG TRIE ĐANG INSPECT" : "INSPECTED TRIE PATH"}</strong><span>ROOT → prefix</span></header><div>${triePathHtml}</div></section>
-    ${cacheUpdatesHtml ? `<section class="ac642-cache-updates"><header><strong>CACHE UPDATE · hot[3]</strong><span>${vi ? "prefix · trước → sau" : "prefix · before → after"}</span></header><div>${cacheUpdatesHtml}</div></section>` : ""}
-    <section class="ac642-rule"><span><b>1</b> read c</span><i>→</i><span><b>2</b> children[c]</span><i>→</i><span><b>3</b> inspect hot[3]</span><i>→</i><span><b>4</b> return copy</span></section>
-    <div class="ac642-layout">
-      <section class="ac642-card history"><header><strong>${vi ? "TẦN SUẤT TOÀN CỤC" : "GLOBAL FREQUENCIES"}</strong><span>sentence → count</span></header><div>${historyHtml}</div></section>
-      <section class="ac642-card ranking"><header><strong>${vi ? "NODE CACHE + RANKING KEY" : "NODE CACHE + RANKING KEY"}</strong><span>(-count, sentence)</span></header><div>${candidatesHtml}</div></section>
-      <section class="ac642-card top"><header><strong>RETURN VALUE</strong><span>${returnReady ? "ready" : "not executed"}</span></header><div>${suggestionSlots}</div></section>
-    </div>
-    ${view.phase === "commit" ? `<section class="ac642-commit"><span># END SENTENCE</span><strong>“${escapeHtml(view.committedSentence)}”</strong><div><code>${escapeHtml(view.countBefore)}</code><b>→ +${view.countAfter - view.countBefore} →</b><code>${escapeHtml(view.countAfter)}</code></div><em>${view.stage === "commit-reset" ? "prefix = '' · node = root" : "return []"}</em></section>` : ""}
+    </div>` : ""}
+    ${isCommitStage ? `<section class="ac642-commit"><span># END SENTENCE</span><strong>“${escapeHtml(view.committedSentence)}”</strong><div><code>${escapeHtml(view.countBefore)}</code><b>→ +${view.countAfter - view.countBefore} →</b><code>${escapeHtml(view.countAfter)}</code></div><em>${view.stage === "commit-reset" ? "prefix = '' · node = root" : "return []"}</em></section>` : ""}
+    <section class="ac642-trie"><header><strong>${isBuildStage ? (vi ? "ĐƯỜNG CHÈN VÀO TRIE" : "TRIE INSERT PATH") : (vi ? "ĐƯỜNG TRIE ĐANG INSPECT" : "INSPECTED TRIE PATH")}</strong><span>ROOT → prefix</span></header><div>${triePathHtml}</div></section>
+    ${cacheUpdatesHtml ? `<section class="ac642-cache-updates"><header><strong>CACHE UPDATE · hot[3]</strong><span>${vi ? "chỉ xem trước → sau" : "before → after"}</span></header><div>${cacheUpdatesHtml}</div></section>` : ""}
+    ${isTypingStage ? `<section class="ac642-rule"><span><b>1</b> read c</span><i>→</i><span><b>2</b> children[c]</span><i>→</i><span><b>3</b> inspect hot[3]</span><i>→</i><span><b>4</b> return copy</span></section>` : ""}
+    ${visibleCards ? `<div class="ac642-layout cards-${visibleCards}">
+      ${showHistory ? `<section class="ac642-card history"><header><strong>${vi ? "TẦN SUẤT" : "FREQUENCIES"}</strong><span>sentence → count</span></header><div>${historyHtml}</div></section>` : ""}
+      ${showRanking ? `<section class="ac642-card ranking"><header><strong>${vi ? "HOT[3] TẠI NODE" : "NODE HOT[3]"}</strong><span>(-count, sentence)</span></header><div>${candidatesHtml}</div></section>` : ""}
+      ${showReturn ? `<section class="ac642-card top"><header><strong>RETURN VALUE</strong><span>${returnReady ? "ready" : "not executed"}</span></header><div>${suggestionSlots}</div></section>` : ""}
+    </div>` : ""}
   </section>`;
 }
 
