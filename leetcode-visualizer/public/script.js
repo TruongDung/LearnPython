@@ -7379,6 +7379,53 @@ function renderTwoPointerMergeView(step) {
     </div>`;
 }
 
+function renderTriangleCountView(step) {
+  const view = step.triangleCountView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const pointerClass = { left: "tri-ptr-left", right: "tri-ptr-right", k: "tri-ptr-k" };
+  const pointerIndex = { left: view.left, right: view.right, k: view.k };
+  const validSet = new Set();
+  if (Number.isInteger(view.validStart) && Number.isInteger(view.validEnd)) {
+    for (let i = view.validStart; i <= view.validEnd; i++) validSet.add(i);
+  }
+
+  const cells = nums.map((value, index) => {
+    const names = Object.entries(pointerIndex).filter(([, pointer]) => pointer === index).map(([name]) => name);
+    const arrows = names.map((name) => `<div class="tri-pointer ${pointerClass[name]}"><span>${escapeHtml(name)}</span><b>▼</b></div>`).join("");
+    const classes = [
+      "tri-cell",
+      names.length ? "tri-cell-active" : "",
+      validSet.has(index) ? "tri-cell-counted" : "",
+    ].filter(Boolean).join(" ");
+    return `<div class="tri-cell-wrap">
+      <div class="tri-pointer-stack">${arrows}</div>
+      <div class="${classes}"><span>[${index}]</span><strong>${escapeHtml(String(value))}</strong></div>
+    </div>`;
+  }).join("");
+
+  const comparison = Number.isFinite(view.sum) && Number.isInteger(view.k)
+    ? `${view.sum} ${view.condition ? ">" : "≤"} ${nums[view.k]}`
+    : pick({ vi: "Chọn ba cạnh để kiểm tra", en: "Choose three sides to test" });
+  const status = view.added
+    ? pick({ vi: `Đếm thêm ${view.added} tam giác`, en: `Count ${view.added} more triangles` })
+    : view.phase === "done"
+      ? pick({ vi: "Đã hoàn tất", en: "Complete" })
+      : view.condition === false
+        ? pick({ vi: "Chưa đủ điều kiện tam giác", en: "Triangle condition fails" })
+        : view.condition === true
+          ? pick({ vi: "Điều kiện tam giác đúng", en: "Triangle condition holds" })
+          : "";
+
+  $("treeView").innerHTML = `<div class="triangle-viz">
+    <div class="tri-row"><span class="tri-label">nums (sorted)</span><div class="tri-cells">${cells}</div></div>
+    <div class="tri-panels">
+      <div class="tri-formula"><span>${escapeHtml(pick({ vi: "Kiểm tra", en: "Check" }))}</span><strong>${escapeHtml(comparison)}</strong></div>
+      <div class="tri-count"><span>count</span><strong>${escapeHtml(String(view.count ?? 0))}</strong>${status ? `<em>${escapeHtml(status)}</em>` : ""}</div>
+    </div>
+    <div class="tri-legend"><span><i class="tri-ptr-left"></i>left</span><span><i class="tri-ptr-right"></i>right</span><span><i class="tri-ptr-k"></i>k (cạnh lớn nhất)</span></div>
+  </div>`;
+}
+
 // ---- Sliding-window frequency visualization (e.g. bai 2958: Length of
 // Longest Subarray With at Most K Frequency) ----
 // Shows the array as a row of cells with the [left, right] window boxed
@@ -13670,6 +13717,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderTwoPointerMergeView(step);
+  } else if (step.triangleCountView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTriangleCountView(step);
   } else if (step.multiSlotPodiumView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

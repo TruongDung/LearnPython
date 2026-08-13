@@ -9121,6 +9121,155 @@ function buildSteps1404(input) {
 }
 
 /**
+ * Approach 2 for LeetCode 1404: convert the binary string to an integer,
+ * then directly test parity with num % 2. JavaScript BigInt is used here to
+ * preserve Python's arbitrary-size-int behavior for the original constraints.
+ */
+function buildSteps1404v2(input) {
+  const original = String(input || "").trim();
+  const steps = [];
+  const valid = /^1[01]*$/.test(original);
+
+  function carryPath(binary) {
+    const path = [];
+    let i = binary.length - 1;
+    while (i >= 0 && binary[i] === "1") { path.push(i); i--; }
+    path.push(i >= 0 ? i : -1);
+    return path;
+  }
+
+  function snap(opts) {
+    const before = opts.before ?? original;
+    const after = opts.after ?? before;
+    steps.push({
+      title: opts.title,
+      arr: after.split("").map(() => 1),
+      sub: after.split(""),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeBlock: 2,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      binaryReductionView: {
+        before, after,
+        operation: opts.operation || "idle",
+        lsbIndex: opts.lsbIndex,
+        carryIndices: opts.carryIndices || [],
+        steps: opts.steps,
+        final: opts.final || false,
+      },
+    });
+  }
+
+  if (!valid) {
+    snap({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      after: original || "?", final: true, codeLines: [2],
+      vars: [{ name: "s", value: `"${original}"` }],
+      note: { vi: "s phải là chuỗi nhị phân không rỗng, bắt đầu bằng '1'.", en: "s must be a non-empty binary string beginning with '1'." },
+    });
+    return { original, answer: null, steps };
+  }
+
+  let count = 0;
+  let num;
+
+  // Line 3: steps = 0
+  snap({
+    title: { vi: "steps = 0", en: "steps = 0" }, after: original, codeLines: [3], steps: count,
+    vars: [{ name: "steps", value: count }],
+    note: { vi: "Khởi tạo bộ đếm thao tác.", en: "Initialize the operation counter." },
+  });
+
+  // Line 4: num = int(s, 2)
+  num = BigInt(`0b${original}`);
+  snap({
+    title: { vi: `num = int(s, 2) → ${num.toString()}`, en: `num = int(s, 2) → ${num.toString()}` },
+    after: num.toString(2), codeLines: [4], steps: count,
+    vars: [{ name: "s", value: `"${original}"` }, { name: "num (decimal)", value: num.toString() }, { name: "num (binary)", value: `"${num.toString(2)}"` }],
+    note: { vi: `Chuyển "${original}" từ hệ 2 sang số nguyên num=${num.toString()}. (Trong Python, int có độ chính xác không giới hạn; visualizer dùng BigInt tương đương.)`, en: `Convert "${original}" from binary to integer num=${num.toString()}. (Python ints have unlimited precision; the visualizer uses equivalent BigInt.)` },
+  });
+
+  while (num !== 1n) {
+    const beforeNum = num;
+    const before = beforeNum.toString(2);
+
+    // Line 5: while num != 1:
+    snap({
+      title: { vi: `while num != 1 → ${beforeNum} != 1 → True`, en: `while num != 1 → ${beforeNum} != 1 → True` },
+      after: before, codeLines: [5], operation: "check", steps: count,
+      vars: [{ name: "num (decimal)", value: beforeNum.toString() }, { name: "num (binary)", value: `"${before}"` }],
+      note: { vi: `num=${beforeNum} chưa bằng 1, tiếp tục kiểm tra tính chẵn/lẻ.`, en: `num=${beforeNum} is not 1 yet, so continue checking parity.` },
+    });
+
+    const isEven = beforeNum % 2n === 0n;
+    // Line 6: if num % 2 == 0:
+    snap({
+      title: { vi: `if num % 2 == 0 → ${beforeNum} % 2 = ${isEven ? 0 : 1} → ${isEven}`, en: `if num % 2 == 0 → ${beforeNum} % 2 = ${isEven ? 0 : 1} → ${isEven}` },
+      after: before, codeLines: [6], operation: "check", lsbIndex: before.length - 1, steps: count,
+      vars: [{ name: "num % 2", value: isEven ? 0 : 1 }],
+      note: isEven
+        ? { vi: "Phần dư 0 → num chẵn → chia nguyên cho 2.", en: "Remainder 0 → num is even → integer-divide by 2." }
+        : { vi: "Phần dư 1 → num lẻ → cộng 1.", en: "Remainder 1 → num is odd → add 1." },
+    });
+
+    let operation;
+    let carryIndices = [];
+    if (isEven) {
+      // Line 7: num //= 2
+      num /= 2n;
+      operation = "divide";
+      snap({
+        title: { vi: `num //= 2 → ${beforeNum} // 2 = ${num}`, en: `num //= 2 → ${beforeNum} // 2 = ${num}` },
+        before, after: num.toString(2), codeLines: [7], operation, lsbIndex: before.length - 1, steps: count,
+        vars: [{ name: "num (decimal)", value: num.toString() }, { name: "num (binary)", value: `"${num.toString(2)}"` }],
+        note: { vi: `Chia ${beforeNum} cho 2, nhận ${num}. Dạng nhị phân bỏ bit 0 cuối.`, en: `Divide ${beforeNum} by 2 to get ${num}. Binary form removes the trailing 0 bit.` },
+      });
+    } else {
+      // Line 8: else:
+      snap({
+        title: { vi: "else: num là số lẻ", en: "else: num is odd" },
+        after: before, codeLines: [8], operation: "branch-add", lsbIndex: before.length - 1, steps: count,
+        vars: [{ name: "num % 2", value: 1 }],
+        note: { vi: "Không thể chia một số lẻ cho 2 ở bài này; cần cộng 1 để số trở thành chẵn.", en: "We do not divide an odd number by 2 in this problem; add 1 first to make it even." },
+      });
+
+      // Line 9: num += 1
+      carryIndices = carryPath(before);
+      num += 1n;
+      operation = "add";
+      snap({
+        title: { vi: `num += 1 → ${beforeNum} + 1 = ${num}`, en: `num += 1 → ${beforeNum} + 1 = ${num}` },
+        before, after: num.toString(2), codeLines: [9], operation, lsbIndex: before.length - 1, carryIndices, steps: count,
+        vars: [{ name: "num (decimal)", value: num.toString() }, { name: "num (binary)", value: `"${num.toString(2)}"` }],
+        note: { vi: `Cộng 1: ${beforeNum} → ${num}. View vẫn tô vàng đường carry ở dạng nhị phân.`, en: `Add 1: ${beforeNum} → ${num}. The view still highlights the binary carry path in gold.` },
+      });
+    }
+
+    // Line 10: steps += 1
+    count++;
+    snap({
+      title: { vi: `steps += 1 → steps=${count}`, en: `steps += 1 → steps=${count}` },
+      before, after: num.toString(2), codeLines: [10], operation, lsbIndex: before.length - 1, carryIndices, steps: count,
+      vars: [{ name: "num", value: num.toString() }, { name: "steps", value: count }],
+      note: { vi: `Đã thực hiện ${operation === "divide" ? "phép chia 2" : "phép cộng 1"}; tăng steps lên ${count}.`, en: `Completed ${operation === "divide" ? "division by 2" : "addition by 1"}; increase steps to ${count}.` },
+    });
+  }
+
+  // Line 11: return steps
+  snap({
+    title: { vi: `return steps → ${count}`, en: `return steps → ${count}` },
+    after: "1", final: true, codeLines: [11], operation: "found", steps: count,
+    vars: [{ name: "num", value: "1" }, { name: "steps", value: count }],
+    note: { vi: `num đã là 1. Trả về ${count} bước.`, en: `num is now 1. Return ${count} steps.` },
+  });
+
+  return { original, answer: count, steps };
+}
+
+/**
  * LeetCode 2213: Longest Substring of One Repeating Character.
  *
  * s is mutated one character at a time by queries. After EACH query, find
@@ -9447,17 +9596,29 @@ module.exports = {
     defaultInput: "1101",
     inputKind: "string",
     inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        default: "1",
+        label: { vi: "Cách giải", en: "Approach" },
+        options: [
+          { value: "1", label: { vi: "Cách 1: Mô phỏng chuỗi nhị phân", en: "Approach 1: Binary-string simulation" } },
+          { value: "2", label: { vi: "Cách 2: Chuyển sang số nguyên", en: "Approach 2: Integer parity simulation" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Nhìn bit cuối (LSB): 0 nghĩa là số chẵn, nên chia 2 bằng cách bỏ bit 0 cuối.", en: "Inspect the last bit (LSB): 0 means even, so divide by 2 by removing that trailing 0." },
-      { vi: "Bit cuối 1 nghĩa là số lẻ, nên cộng 1. Carry lan từ phải sang trái qua các bit 1 cuối.", en: "A last bit of 1 means odd, so add 1. The carry propagates right-to-left through trailing 1 bits." },
-      { vi: "Lặp lại đến khi chuỗi chỉ còn \"1\".", en: "Repeat until the string is exactly \"1\"." },
+      { vi: "Cách 1 nhìn bit cuối (LSB): 0 nghĩa là số chẵn, nên chia 2 bằng cách bỏ bit 0 cuối.", en: "Approach 1 inspects the last bit (LSB): 0 means even, so divide by 2 by removing that trailing 0." },
+      { vi: "Cách 2 chuyển s sang số nguyên, kiểm tra num % 2, rồi chia 2 hoặc cộng 1 trực tiếp.", en: "Approach 2 converts s to an integer, checks num % 2, then directly divides by 2 or adds 1." },
+      { vi: "Cả hai cách lặp lại đến khi giá trị bằng 1.", en: "Both approaches repeat until the value equals 1." },
     ],
     complexity: {
-      time: "O(n²) với mô phỏng chuỗi trực tiếp",
+      time: "O(n²) với mô phỏng chuỗi trực tiếp; Cách 2 phụ thuộc kích thước số nguyên",
       space: "O(n)",
       note: {
-        vi: "Mô phỏng trực tiếp rất dễ quan sát; mỗi lần +1 có thể carry qua O(n) bit. Có thể tối ưu O(n) bằng cách duyệt từ phải sang trái với biến carry.",
-        en: "The direct string simulation is easy to observe; each +1 may carry across O(n) bits. It can be optimized to O(n) with one right-to-left pass and a carry variable.",
+        vi: "Cách 1 rất dễ quan sát; mỗi lần +1 có thể carry qua O(n) bit. Cách 2 bám sát code Python bằng số nguyên; visualizer dùng BigInt để không mất độ chính xác với chuỗi nhị phân dài.",
+        en: "Approach 1 is easy to observe; each +1 may carry across O(n) bits. Approach 2 follows the Python integer code and uses BigInt in the visualizer to preserve precision for long binary strings.",
       },
     },
     code: [
@@ -9472,7 +9633,24 @@ module.exports = {
       "            steps += 1",
       "        return steps",
     ],
-    builder: buildSteps1404,
+    code2: [
+      "class Solution:",
+      "    def numSteps(self, s: str) -> int:",
+      "        steps = 0",
+      "        num = int(s, 2)",
+      "        while num != 1:",
+      "            if num % 2 == 0:",
+      "                num //= 2",
+      "            else:",
+      "                num += 1",
+      "            steps += 1",
+      "        return steps",
+    ],
+    codeLabel: { vi: "Cách 1: Mô phỏng chuỗi nhị phân", en: "Approach 1: Binary-string simulation" },
+    code2Label: { vi: "Cách 2: Chuyển sang số nguyên", en: "Approach 2: Integer parity simulation" },
+    builder: (input, params) => String(params && params.approach) === "2"
+      ? buildSteps1404v2(input)
+      : buildSteps1404(input),
   },
   2213: {
     id: 2213,

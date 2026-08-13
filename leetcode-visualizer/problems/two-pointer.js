@@ -3383,6 +3383,149 @@ function buildSteps16(input, params) {
   return { original: nums, answer: closest, steps };
 }
 
+/**
+ * LeetCode 611: Valid Triangle Number.
+ * Sort the sides, fix the largest side nums[k], then scan left/right.
+ */
+function buildSteps611(input) {
+  const original = Array.isArray(input)
+    ? [...input]
+    : String(input || "").split(",").map((s) => Number(s.trim())).filter((x) => !Number.isNaN(x));
+  const steps = [];
+  const valid = original.length >= 3 && original.every((x) => Number.isFinite(x) && x > 0);
+  const nums = [...original].sort((a, b) => a - b);
+
+  function snap(opts) {
+    const pointers = [opts.left, opts.right, opts.k].filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < nums.length);
+    steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: nums.map((_, i) => `[${i}]`),
+      highlight: opts.highlight || pointers,
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      triangleCountView: {
+        nums: [...nums],
+        left: opts.left,
+        right: opts.right,
+        k: opts.k,
+        count: opts.count,
+        sum: opts.sum,
+        condition: opts.condition,
+        added: opts.added || 0,
+        validStart: opts.validStart,
+        validEnd: opts.validEnd,
+        phase: opts.phase || "idle",
+      },
+    });
+  }
+
+  if (!valid) {
+    snap({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      codeLines: [2], final: true,
+      vars: [{ name: "nums", value: `[${original.join(", ")}]` }],
+      note: { vi: "nums phải có ít nhất 3 cạnh có độ dài nguyên dương.", en: "nums must contain at least three positive side lengths." },
+    });
+    return { original, answer: null, steps };
+  }
+
+  let count = 0;
+  snap({
+    title: { vi: `nums.sort() → [${nums.join(", ")}]`, en: `nums.sort() → [${nums.join(", ")}]` },
+    codeLines: [3], count,
+    vars: [{ name: "nums (sorted)", value: `[${nums.join(", ")}]` }],
+    note: { vi: "Sắp xếp tăng dần. Khi cố định cạnh lớn nhất nums[k], chỉ cần kiểm tra nums[left] + nums[right] > nums[k].", en: "Sort ascending. After fixing the largest side nums[k], only check nums[left] + nums[right] > nums[k]." },
+  });
+  snap({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [4], count,
+    vars: [{ name: "count", value: count }],
+    note: { vi: "count lưu tổng số bộ ba tạo thành tam giác.", en: "count stores the total number of triangle triplets." },
+  });
+
+  for (let k = nums.length - 1; k >= 2; k--) {
+    snap({
+      title: { vi: `for k = ${k}: cố định cạnh lớn nhất nums[k]=${nums[k]}`, en: `for k = ${k}: fix largest side nums[k]=${nums[k]}` },
+      codeLines: [5], k, count,
+      vars: [{ name: "k", value: k }, { name: "nums[k]", value: nums[k] }, { name: "count", value: count }],
+      note: { vi: "Vì mảng đã tăng dần, nums[k] là cạnh lớn nhất của mọi bộ ba đang xét.", en: "Because the array is sorted, nums[k] is the largest side of every triplet currently considered." },
+    });
+
+    let left = 0;
+    let right = k - 1;
+    snap({
+      title: { vi: `left=0, right=${right}`, en: `left=0, right=${right}` },
+      codeLines: [6], left, right, k, count,
+      vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "k", value: k }],
+      note: { vi: "Đặt hai con trỏ trong đoạn [0..k-1].", en: "Place two pointers inside range [0..k-1]." },
+    });
+
+    while (left < right) {
+      snap({
+        title: { vi: `while left < right → ${left} < ${right} → True`, en: `while left < right → ${left} < ${right} → True` },
+        codeLines: [7], left, right, k, count, phase: "while-check",
+        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "k", value: k }],
+        note: { vi: "Hai con trỏ chưa gặp nhau, tiếp tục kiểm tra một cặp cạnh.", en: "The two pointers have not met, so inspect another pair of sides." },
+      });
+      const sum = nums[left] + nums[right];
+      const condition = sum > nums[k];
+      snap({
+        title: { vi: `nums[${left}] + nums[${right}] > nums[${k}] → ${nums[left]} + ${nums[right]} > ${nums[k]} là ${condition}`, en: `nums[${left}] + nums[${right}] > nums[${k}] → ${nums[left]} + ${nums[right]} > ${nums[k]} is ${condition}` },
+        codeLines: [8], left, right, k, count, sum, condition, phase: "compare",
+        vars: [{ name: "left", value: left }, { name: "right", value: right }, { name: "k", value: k }, { name: "sum", value: sum }],
+        note: condition
+          ? { vi: `Đúng. Vì nums[left..right-1] đều ≥ nums[left], mọi i từ ${left} đến ${right - 1} ghép với right và k đều hợp lệ.`, en: `True. Since nums[left..right-1] are all ≥ nums[left], every i from ${left} to ${right - 1} forms a valid triangle with right and k.` }
+          : { vi: "Sai: tổng hai cạnh nhỏ nhất đang chọn chưa vượt cạnh lớn nhất, nên phải tăng left.", en: "False: the selected two sides do not exceed the largest side, so increase left." },
+      });
+
+      if (condition) {
+        const added = right - left;
+        count += added;
+        snap({
+          title: { vi: `count += right-left → +${added}, count=${count}`, en: `count += right-left → +${added}, count=${count}` },
+          codeLines: [9], left, right, k, count, sum, condition, added, validStart: left, validEnd: right - 1, phase: "count",
+          mark: Array.from({ length: added }, (_, offset) => left + offset),
+          vars: [{ name: "right - left", value: added }, { name: "count", value: count }],
+          note: { vi: `Cộng ${added}: các tam giác (nums[i], nums[${right}], nums[${k}]) với i ∈ [${left}..${right - 1}] đều hợp lệ.`, en: `Add ${added}: triangles (nums[i], nums[${right}], nums[${k}]) for i ∈ [${left}..${right - 1}] are all valid.` },
+        });
+        right--;
+        snap({
+          title: { vi: `right -= 1 → right=${right}`, en: `right -= 1 → right=${right}` },
+          codeLines: [10], left, right, k, count, phase: "move-right",
+          vars: [{ name: "right", value: right }, { name: "count", value: count }],
+          note: { vi: "Đã đếm xong mọi bộ ba dùng right cũ, lùi right để thử cạnh giữa nhỏ hơn.", en: "All triplets using the old right were counted, so move right leftward to try a smaller middle side." },
+        });
+      } else {
+        snap({
+          title: { vi: "else: điều kiện tam giác chưa đúng", en: "else: triangle condition is not met" },
+          codeLines: [11], left, right, k, count, sum, condition, phase: "else",
+          vars: [{ name: "sum", value: sum }, { name: "nums[k]", value: nums[k] }],
+          note: { vi: "Đi vào else vì sum ≤ nums[k].", en: "Enter else because sum ≤ nums[k]." },
+        });
+        left++;
+        snap({
+          title: { vi: `left += 1 → left=${left}`, en: `left += 1 → left=${left}` },
+          codeLines: [12], left, right, k, count, phase: "move-left",
+          vars: [{ name: "left", value: left }, { name: "count", value: count }],
+          note: { vi: "Tăng left để tăng tổng nums[left] + nums[right].", en: "Increase left to raise nums[left] + nums[right]." },
+        });
+      }
+    }
+  }
+
+  snap({
+    title: { vi: `return count → ${count}`, en: `return count → ${count}` },
+    codeLines: [13], count, final: true, phase: "done",
+    vars: [{ name: "count", value: count }],
+    note: { vi: `Có ${count} bộ ba chỉ số tạo thành tam giác hợp lệ.`, en: `There are ${count} index triplets that form valid triangles.` },
+  });
+  return { original, answer: count, steps };
+}
+
 /** LeetCode 18: 4Sum. */
 function buildSteps18(input, params) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
@@ -3465,6 +3608,45 @@ module.exports = {
     complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Sort + hai con trỏ.", en: "Sort + two pointers." } },
     code: ["class Solution:", "    def threeSumClosest(self, nums, target):", "        nums.sort(); closest = nums[0]+nums[1]+nums[2]", "        for i in range(len(nums)-2):", "            l, r = i+1, len(nums)-1", "            while l < r:", "                s = nums[i]+nums[l]+nums[r]", "                if abs(s-target) < abs(closest-target): closest = s", "                if s < target: l += 1", "                elif s > target: r -= 1", "                else: return s", "        return closest"],
     builder: buildSteps16,
+  },
+  611: {
+    id: 611,
+    difficulty: "medium",
+    slug: "valid-triangle-number",
+    category: { key: "two-pointer", vi: "Hai con trỏ", en: "Two Pointers" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Valid Triangle Number", en: "Valid Triangle Number" },
+    titleVi: { vi: "Đếm bộ ba tạo thành tam giác", en: "Count valid triangle triplets" },
+    statement: {
+      vi: "Cho mảng cạnh nums. Đếm số bộ ba chỉ số i < j < k sao cho ba độ dài đó tạo thành một tam giác.",
+      en: "Given side lengths nums, count index triplets i < j < k whose three lengths form a triangle.",
+    },
+    defaultInput: [2, 2, 3, 4],
+    inputKind: "positive",
+    inputLabel: { vi: "nums (độ dài cạnh)", en: "nums (side lengths)" },
+    extraParams: [],
+    approach: [
+      { vi: "Sắp xếp tăng dần, rồi cố định nums[k] là cạnh lớn nhất.", en: "Sort ascending, then fix nums[k] as the largest side." },
+      { vi: "Dùng left=0 và right=k-1. Kiểm tra nums[left] + nums[right] > nums[k].", en: "Use left=0 and right=k-1. Check nums[left] + nums[right] > nums[k]." },
+      { vi: "Nếu đúng, mọi i trong [left..right-1] đều hợp lệ: cộng right-left rồi right--. Nếu sai, left++.", en: "If true, every i in [left..right-1] is valid: add right-left then right--. Otherwise left++." },
+    ],
+    complexity: { time: "O(n²)", space: "O(1)", note: { vi: "Sau khi sort O(n log n), mỗi k chạy hai con trỏ trong O(n).", en: "After O(n log n) sorting, two pointers run in O(n) for each k." } },
+    code: [
+      "class Solution:",
+      "    def triangleNumber(self, nums):",
+      "        nums.sort()",
+      "        count = 0",
+      "        for k in range(len(nums) - 1, 1, -1):",
+      "            left, right = 0, k - 1",
+      "            while left < right:",
+      "                if nums[left] + nums[right] > nums[k]:",
+      "                    count += right - left",
+      "                    right -= 1",
+      "                else:",
+      "                    left += 1",
+      "        return count",
+    ],
+    builder: buildSteps611,
   },
   18: {
     id: 18, difficulty: "medium", slug: "4sum",
