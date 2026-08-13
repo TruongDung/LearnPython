@@ -30819,3 +30819,63 @@ html, body {
 }
 [data-theme="light"] .md104-tree-svg .tree-annotation.md-current,
 [data-theme="light"] .md104-tree-svg .tree-annotation.md-next { stroke: #ffffff; }
+
+/* LeetCode 211 · WordDictionary Trie + wildcard DFS */
+.wd211-viz { display: grid; gap: 12px; color: #e2e8f0; }
+.wd211-phases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.wd211-phases span { padding: 8px 10px; border: 1px solid #334155; border-radius: 9px; background: #111827; color: #64748b; text-align: center; font-size: 11px; font-weight: 750; }
+.wd211-phases span.active { border-color: #38bdf8; background: rgba(14,165,233,.14); color: #bae6fd; }
+.wd211-phases span.done { border-color: #22c55e; background: rgba(34,197,94,.1); color: #86efac; }
+.wd211-words, .wd211-tree-card, .wd211-pattern, .wd211-decision, .wd211-branches, .wd211-stack, .wd211-result { border: 1px solid #263449; border-radius: 11px; background: rgba(15,23,42,.76); }
+.wd211-words, .wd211-pattern, .wd211-decision, .wd211-branches, .wd211-result { padding: 10px 12px; }
+.wd211-words header, .wd211-tree-card header, .wd211-pattern header, .wd211-branches header, .wd211-stack header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wd211-words header span, .wd211-tree-card header span, .wd211-pattern header span, .wd211-branches header span, .wd211-stack header span { color: #94a3b8; font-size: 10px; }
+.wd211-words > div, .wd211-branches > div { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.wd211-words > div span, .wd211-branches > div span { padding: 4px 8px; border: 1px solid #475569; border-radius: 999px; color: #94a3b8; font: 11px Consolas, monospace; }
+.wd211-words > div span.active, .wd211-branches > div span.active { border-color: #f59e0b; background: rgba(245,158,11,.14); color: #fde68a; }
+.wd211-words > div span.done { border-color: #22c55e; background: rgba(34,197,94,.1); color: #86efac; }
+.wd211-branches > div span.tried { border-color: #ef4444; background: rgba(239,68,68,.1); color: #fca5a5; }
+.wd211-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(270px, .8fr); gap: 12px; align-items: start; }
+.wd211-tree-card { min-width: 0; overflow: hidden; }
+.wd211-tree-card > header { padding: 10px 12px; border-bottom: 1px solid #263449; }
+.wd211-tree { min-height: 230px; overflow: auto; padding: 8px; }
+.wd211-tree .tree-svg { display: block; margin: 0 auto; }
+.wd211-side { display: grid; gap: 8px; min-width: 0; }
+.wd211-pattern > div { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 3px; }
+.wd211-char { position: relative; flex: 0 0 48px; min-height: 58px; display: grid; place-items: center; align-content: center; border: 1px solid #475569; border-radius: 9px; background: #111827; }
+.wd211-char small { position: absolute; top: 3px; left: 6px; color: #64748b; font-size: 9px; }
+.wd211-char strong { color: #f8fafc; font: 800 19px Consolas, monospace; }
+.wd211-char em { color: #64748b; font-size: 9px; font-style: normal; }
+.wd211-char.wildcard { border-color: #a855f7; background: rgba(168,85,247,.11); }
+.wd211-char.wildcard strong { color: #d8b4fe; }
+.wd211-char.active { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.2); transform: translateY(-2px); }
+.wd211-char.done { border-color: #22c55e; background: rgba(34,197,94,.08); }
+.wd211-decision { display: grid; gap: 4px; border-left: 4px solid #38bdf8; }
+.wd211-decision > span, .wd211-result > span { color: #7dd3fc; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.wd211-decision > strong { color: #f8fafc; overflow-wrap: anywhere; }
+.wd211-decision > small { color: #94a3b8; }
+.wd211-stack { overflow: hidden; }
+.wd211-stack header { padding: 9px 11px; border-bottom: 1px solid #263449; }
+.wd211-stack ol { display: grid; gap: 5px; max-height: 205px; overflow-y: auto; margin: 0; padding: 9px; list-style: none; }
+.wd211-stack li { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 1px 7px; padding: 6px 8px; border: 1px solid #334155; border-radius: 8px; background: #111827; }
+.wd211-stack li > span { grid-row: 1 / 3; color: #64748b; font-size: 10px; }
+.wd211-stack li > strong { color: #e2e8f0; font: 11px Consolas, monospace; }
+.wd211-stack li > small { color: #94a3b8; font-size: 9px; }
+.wd211-stack li > em { grid-column: 2; color: #64748b; font-size: 9px; font-style: normal; }
+.wd211-stack li.active { border-color: #f59e0b; background: rgba(245,158,11,.1); }
+.wd211-stack li.empty, .wd211-empty, .wd211-branches span.empty { color: #64748b; }
+.wd211-result { display: flex; align-items: center; justify-content: space-between; }
+.wd211-result strong { color: #cbd5e1; font-size: 22px; }
+.wd211-result.success, .wd211-decision.success { border-color: #22c55e; }
+.wd211-result.success strong { color: #86efac; }
+.wd211-result.failure, .wd211-decision.failure { border-color: #ef4444; }
+.wd211-result.failure strong { color: #fca5a5; }
+[data-theme="light"] .wd211-viz { color: #1e293b; }
+[data-theme="light"] .wd211-phases span, [data-theme="light"] .wd211-words, [data-theme="light"] .wd211-tree-card, [data-theme="light"] .wd211-pattern, [data-theme="light"] .wd211-decision, [data-theme="light"] .wd211-branches, [data-theme="light"] .wd211-stack, [data-theme="light"] .wd211-result, [data-theme="light"] .wd211-char, [data-theme="light"] .wd211-stack li { background: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .wd211-phases span.active, [data-theme="light"] .wd211-char.active { background: #fffbeb; border-color: #d97706; color: #92400e; }
+[data-theme="light"] .wd211-phases span.done, [data-theme="light"] .wd211-words > div span.done, [data-theme="light"] .wd211-char.done { background: #f0fdf4; border-color: #16a34a; color: #166534; }
+[data-theme="light"] .wd211-char strong, [data-theme="light"] .wd211-decision > strong, [data-theme="light"] .wd211-stack li > strong { color: #0f172a; }
+[data-theme="light"] .wd211-char.wildcard { background: #faf5ff; border-color: #9333ea; }
+[data-theme="light"] .wd211-char.wildcard strong { color: #7e22ce; }
+@media (max-width: 820px) { .wd211-layout { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .wd211-phases { grid-template-columns: 1fr; } .wd211-tree { min-height: 180px; } }

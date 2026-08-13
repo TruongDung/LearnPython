@@ -327,6 +327,8 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
   switch (problem.id) {
     case 146:
       return designConfig("LRUCache", [params.capacity], parseSpaceOperations(input));
+    case 173:
+      return designConfig("BSTIterator", [treeMarker(input)], parseFunctionOperations(params.operations || ""));
     case 155:
     case 346:
     case 362:
@@ -347,7 +349,7 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
     case 211:
       return designConfig("WordDictionary", [], [
         ...words(input).map((word) => ({ name: "addWord", args: [word] })),
-        { name: "search", args: [params.search] },
+        { name: "search", args: [String(params.search || "").trim()] },
       ]);
     case 297:
       return designConfig("Codec", [], [

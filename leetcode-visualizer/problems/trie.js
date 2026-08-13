@@ -446,7 +446,7 @@ function buildSteps1804(input, params) {
  *  - addWord: standard trie insert.
  *  - search: DFS; when encountering '.', branch into all children.
  */
-function buildSteps211(input, params) {
+function buildSteps211Legacy(input, params) {
   const words = String(input)
     .split(",")
     .map((w) => w.trim())
@@ -690,6 +690,372 @@ function buildSteps211(input, params) {
 
   if (steps.length) steps[steps.length - 1].final = true;
   return { words, answer: `added ${words.length} word(s)`, steps };
+}
+
+/**
+ * LeetCode 211: detailed Trie build + wildcard DFS visualization.
+ * The view separates the build/search phases and preserves DFS branch history.
+ */
+function buildSteps211(input, params = {}) {
+  const words = String(input).split(",").map((word) => word.trim()).filter(Boolean);
+  const pattern = String(params.search || "").trim();
+  let nextId = 0;
+  const makeNode = (label, parentId) => ({ id: nextId++, label, parentId, isWord: false, children: {} });
+  const root = makeNode("•", null);
+  const steps = [];
+  const callStack = [];
+  const triedNodes = new Set();
+  const failedNodes = new Set();
+  let matchedPath = [];
+
+  function addStep(opts) {
+    const activePath = opts.path || [];
+    const currentId = opts.current ? opts.current.id : null;
+    const branchId = opts.branch ? opts.branch.id : null;
+    const nodes = [];
+    let xCursor = 0;
+    function layout(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      const childXs = keys.map((key) => layout(node.children[key], depth + 1));
+      const x = childXs.length ? (childXs[0] + childXs[childXs.length - 1]) / 2 : xCursor++;
+      const status = node.id === currentId ? "CUR" : node.id === branchId ? "TRY" : "";
+      nodes.push({
+        id: node.id,
+        label: node.label,
+        labelLines: status ? [node.label, status] : undefined,
+        x,
+        y: depth,
+        parentId: node.parentId,
+        isWord: node.isWord,
+        hl: activePath.includes(node.id) || node.id === branchId,
+        isPruned: failedNodes.has(node.id) && !activePath.includes(node.id),
+      });
+      return x;
+    }
+    layout(root, 0);
+
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: { nodes, showLevels: false },
+      wordDictionaryView: {
+        phase: opts.phase,
+        words: [...words],
+        pattern,
+        patternIndex: opts.patternIndex ?? null,
+        currentWord: opts.currentWord || "",
+        wordIndex: opts.wordIndex ?? null,
+        charIndex: opts.charIndex ?? null,
+        callStack: callStack.map((frame) => ({ ...frame })),
+        branches: opts.branches || [],
+        activeBranch: opts.activeBranch || "",
+        triedBranches: opts.triedBranches || [],
+        decision: opts.decision || "",
+        result: opts.result,
+        activePath: [...activePath],
+        triedCount: triedNodes.size,
+        failedCount: failedNodes.size,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines,
+      vars: [
+        { name: "operation", value: opts.operation || "WordDictionary()" },
+        { name: "pattern index i", value: opts.patternIndex ?? "—" },
+        { name: "DFS call stack", value: callStack.length ? `[${callStack.map((frame) => `${frame.node}@${frame.i}`).join(" → ")}]` : "[]" },
+        { name: "decision", value: opts.decision || "—" },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  addStep({
+    phase: "build",
+    title: { vi: "Pha 1 — Khởi tạo WordDictionary", en: "Phase 1 — Initialize WordDictionary" },
+    codeLines: [7, 8],
+    current: root,
+    path: [root.id],
+    decision: "root = TrieNode()",
+    vars: [{ name: "words to add", value: `[${words.join(", ")}]` }],
+    note: { vi: `Trie bắt đầu với node gốc •. Ta sẽ thêm ${words.length} từ theo từng ký tự để thấy node nào được tạo và node nào được dùng lại.`, en: `The Trie starts with root •. Add ${words.length} word(s) character by character to see which nodes are created or reused.` },
+  });
+
+  words.forEach((word, wordIndex) => {
+    let node = root;
+    const path = [root.id];
+    addStep({
+      phase: "build",
+      title: { vi: `addWord("${word}") — bắt đầu`, en: `addWord("${word}") — start` },
+      codeLines: [10, 11],
+      current: root,
+      path,
+      currentWord: word,
+      wordIndex,
+      charIndex: 0,
+      operation: `addWord("${word}")`,
+      decision: "node = root",
+      note: { vi: `Bắt đầu tại root. Mỗi ký tự sẽ tương ứng với một cạnh trong Trie.`, en: `Start at root. Each character corresponds to one Trie edge.` },
+    });
+
+    [...word].forEach((ch, charIndex) => {
+      const exists = Boolean(node.children[ch]);
+      addStep({
+        phase: "build",
+        title: { vi: `Kiểm tra cạnh '${ch}'`, en: `Check edge '${ch}'` },
+        codeLines: [12, 13],
+        current: node,
+        path,
+        currentWord: word,
+        wordIndex,
+        charIndex,
+        operation: `addWord("${word}")`,
+        decision: exists ? `cạnh '${ch}' đã có → dùng lại` : `chưa có '${ch}' → tạo node`,
+        note: exists
+          ? { vi: `Prefix này đã tồn tại, nên dùng lại node '${ch}' thay vì tạo bản sao.`, en: `This prefix already exists, so reuse node '${ch}' instead of duplicating it.` }
+          : { vi: `Không có cạnh '${ch}' từ node hiện tại, nên cần tạo TrieNode mới.`, en: `The current node has no '${ch}' edge, so create a new TrieNode.` },
+      });
+      if (!exists) node.children[ch] = makeNode(ch, node.id);
+      const child = node.children[ch];
+      addStep({
+        phase: "build",
+        title: exists ? { vi: `Dùng lại node '${ch}'`, en: `Reuse node '${ch}'` } : { vi: `Tạo node '${ch}'`, en: `Create node '${ch}'` },
+        codeLines: exists ? [15] : [14, 15],
+        current: child,
+        path: [...path, child.id],
+        currentWord: word,
+        wordIndex,
+        charIndex,
+        operation: `addWord("${word}")`,
+        decision: exists ? "reuse + descend" : "create + descend",
+        vars: [{ name: "created", value: exists ? "False" : "True" }],
+        note: { vi: `Di chuyển node tới '${ch}'. Prefix hiện tại = "${word.slice(0, charIndex + 1)}".`, en: `Move node to '${ch}'. Current prefix = "${word.slice(0, charIndex + 1)}".` },
+      });
+      node = child;
+      path.push(node.id);
+    });
+    node.isWord = true;
+    addStep({
+      phase: "build",
+      title: { vi: `Đánh dấu kết thúc từ "${word}"`, en: `Mark end of word "${word}"` },
+      codeLines: [16],
+      current: node,
+      path,
+      currentWord: word,
+      wordIndex,
+      charIndex: word.length,
+      operation: `addWord("${word}")`,
+      decision: "is_word = True",
+      vars: [{ name: "terminal word", value: word }],
+      note: { vi: `Node cuối được đánh dấu is_word=True. Vòng xanh nghĩa là một từ hoàn chỉnh kết thúc tại đây.`, en: `Mark the last node is_word=True. The green ring means a complete word ends here.` },
+    });
+  });
+
+  addStep({
+    phase: "search",
+    title: { vi: `Pha 2 — search("${pattern}")`, en: `Phase 2 — search("${pattern}")` },
+    codeLines: [18, 19, 30],
+    current: root,
+    path: [root.id],
+    patternIndex: 0,
+    operation: `search("${pattern}")`,
+    decision: "dfs(root, 0)",
+    note: { vi: "DFS đọc pattern từ trái sang phải. Ký tự thường đi đúng một cạnh; dấu '.' phải thử lần lượt mọi cạnh con.", en: "DFS reads the pattern left to right. A literal follows one edge; '.' must try every child edge." },
+  });
+
+  function search(node, index, path, via = "root") {
+    callStack.push({ node: node.label, i: index, via, suffix: pattern.slice(index) || "∅" });
+    addStep({
+      phase: "search",
+      title: { vi: `Vào dfs(node='${node.label}', i=${index})`, en: `Enter dfs(node='${node.label}', i=${index})` },
+      codeLines: [19],
+      current: node,
+      path,
+      patternIndex: index,
+      operation: `search("${pattern}")`,
+      decision: `đang khớp suffix "${pattern.slice(index)}"`,
+      note: { vi: `Push một frame DFS. i=${index} nghĩa là ${index} ký tự đầu đã khớp.`, en: `Push a DFS frame. i=${index} means the first ${index} pattern character(s) already matched.` },
+    });
+
+    if (index === pattern.length) {
+      const result = node.isWord;
+      if (result) matchedPath = [...path];
+      addStep({
+        phase: "search",
+        title: result ? { vi: "Hết pattern và đang ở cuối từ → True", en: "Pattern ended at a complete word → True" } : { vi: "Hết pattern nhưng chưa phải cuối từ → False", en: "Pattern ended before a complete word → False" },
+        codeLines: [20, 21],
+        current: node,
+        path,
+        patternIndex: index,
+        operation: `search("${pattern}")`,
+        decision: `return is_word → ${result ? "True" : "False"}`,
+        result,
+        vars: [{ name: "node.is_word", value: result ? "True" : "False" }],
+        note: result
+          ? { vi: "Đã dùng hết pattern và node hiện tại có is_word=True, nên tìm thấy một từ hoàn chỉnh.", en: "The pattern is exhausted and the current node has is_word=True, so a complete word matched." }
+          : { vi: "Khớp hết ký tự nhưng chỉ dừng ở prefix, không phải một từ đã thêm.", en: "All characters matched, but this is only a prefix, not an added word." },
+      });
+      callStack.pop();
+      return result;
+    }
+
+    const ch = pattern[index];
+    if (ch === ".") {
+      const keys = Object.keys(node.children).sort();
+      addStep({
+        phase: "wildcard",
+        title: { vi: `Wildcard '.' tại i=${index}`, en: `Wildcard '.' at i=${index}` },
+        codeLines: [22, 23],
+        current: node,
+        path,
+        patternIndex: index,
+        branches: keys,
+        operation: `search("${pattern}")`,
+        decision: keys.length ? `thử ${keys.length} nhánh: ${keys.join(", ")}` : "không có nhánh con",
+        note: { vi: `'.' khớp đúng một ký tự bất kỳ. DFS sẽ thử từng nhánh [${keys.join(", ") || "rỗng"}] và backtrack nếu nhánh đó thất bại.`, en: `'.' matches exactly one arbitrary character. DFS tries [${keys.join(", ") || "none"}] and backtracks after a failed branch.` },
+      });
+      const attempted = [];
+      for (const key of keys) {
+        const child = node.children[key];
+        attempted.push(key);
+        triedNodes.add(child.id);
+        addStep({
+          phase: "wildcard",
+          title: { vi: `'.' thử nhánh '${key}'`, en: `'.' tries branch '${key}'` },
+          codeLines: [23, 24],
+          current: node,
+          branch: child,
+          path: [...path, child.id],
+          patternIndex: index,
+          branches: keys,
+          activeBranch: key,
+          triedBranches: attempted,
+          operation: `search("${pattern}")`,
+          decision: `dfs('${key}', ${index + 1})`,
+          note: { vi: `Tạm xem '.' là '${key}' và đi sâu với ký tự pattern kế tiếp.`, en: `Temporarily let '.' match '${key}' and recurse on the next pattern character.` },
+        });
+        if (search(child, index + 1, [...path, child.id], `.${key}`)) {
+          addStep({
+            phase: "wildcard",
+            title: { vi: `Nhánh '${key}' trả True → dừng`, en: `Branch '${key}' returned True → stop` },
+            codeLines: [24, 25],
+            current: node,
+            path: matchedPath,
+            patternIndex: index,
+            branches: keys,
+            activeBranch: key,
+            triedBranches: attempted,
+            operation: `search("${pattern}")`,
+            decision: "return True (short-circuit)",
+            result: true,
+            note: { vi: `Một nhánh wildcard đã tìm thấy từ khớp, nên return True ngay và không thử các nhánh còn lại.`, en: `A wildcard branch found a match, so return True immediately without trying later branches.` },
+          });
+          callStack.pop();
+          return true;
+        }
+        failedNodes.add(child.id);
+        addStep({
+          phase: "backtrack",
+          title: { vi: `Nhánh '${key}' thất bại → backtrack`, en: `Branch '${key}' failed → backtrack` },
+          codeLines: [23, 24],
+          current: node,
+          path,
+          patternIndex: index,
+          branches: keys,
+          triedBranches: attempted,
+          operation: `search("${pattern}")`,
+          decision: "False → thử nhánh kế tiếp",
+          result: false,
+          note: { vi: `Nhánh '${key}' không khớp toàn bộ pattern. Tô đỏ nhánh đã thất bại và quay về frame trước.`, en: `Branch '${key}' did not match the whole pattern. Mark it failed and return to the previous frame.` },
+        });
+      }
+      addStep({
+        phase: "backtrack",
+        title: { vi: "Mọi nhánh của '.' đều thất bại", en: "Every '.' branch failed" },
+        codeLines: [26],
+        current: node,
+        path,
+        patternIndex: index,
+        branches: keys,
+        triedBranches: attempted,
+        operation: `search("${pattern}")`,
+        decision: "return False",
+        result: false,
+        note: { vi: "Không nhánh con nào tạo được một từ hoàn chỉnh khớp pattern, nên frame này trả False.", en: "No child branch produced a complete matching word, so this frame returns False." },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    const child = node.children[ch];
+    if (!child) {
+      addStep({
+        phase: "backtrack",
+        title: { vi: `Không có cạnh '${ch}' → False`, en: `No '${ch}' edge → False` },
+        codeLines: [27, 28],
+        current: node,
+        path,
+        patternIndex: index,
+        operation: `search("${pattern}")`,
+        decision: `missing '${ch}' → return False`,
+        result: false,
+        note: { vi: `Ký tự thường phải khớp chính xác. Node hiện tại không có con '${ch}', nên nhánh này kết thúc.`, en: `A literal must match exactly. The current node has no '${ch}' child, so this branch ends.` },
+      });
+      callStack.pop();
+      return false;
+    }
+
+    addStep({
+      phase: "search",
+      title: { vi: `Theo cạnh '${ch}'`, en: `Follow edge '${ch}'` },
+      codeLines: [27, 29],
+      current: node,
+      branch: child,
+      path: [...path, child.id],
+      patternIndex: index,
+      operation: `search("${pattern}")`,
+      decision: `dfs('${ch}', ${index + 1})`,
+      note: { vi: `Ký tự '${ch}' tồn tại, nên đi đúng một nhánh và tăng i lên ${index + 1}.`, en: `Literal '${ch}' exists, so follow that one edge and advance i to ${index + 1}.` },
+    });
+    const result = search(child, index + 1, [...path, child.id], ch);
+    if (!result) failedNodes.add(child.id);
+    addStep({
+      phase: result ? "search" : "backtrack",
+      title: { vi: `dfs('${ch}', ${index + 1}) trả ${result ? "True" : "False"}`, en: `dfs('${ch}', ${index + 1}) returned ${result ? "True" : "False"}` },
+      codeLines: [29],
+      current: node,
+      path: result ? matchedPath : path,
+      patternIndex: index,
+      operation: `search("${pattern}")`,
+      decision: `return ${result ? "True" : "False"}`,
+      result,
+      note: result
+        ? { vi: `Nhánh '${ch}' khớp phần pattern còn lại, truyền True ngược lên call stack.`, en: `The '${ch}' branch matched the remaining pattern, so propagate True up the call stack.` }
+        : { vi: `Nhánh '${ch}' thất bại, quay lui về node cha.`, en: `The '${ch}' branch failed, so backtrack to its parent.` },
+    });
+    callStack.pop();
+    return result;
+  }
+
+  const result = pattern ? search(root, 0, [root.id]) : false;
+  addStep({
+    phase: "done",
+    title: { vi: `Pha 3 — search("${pattern}") = ${result ? "True" : "False"}`, en: `Phase 3 — search("${pattern}") = ${result ? "True" : "False"}` },
+    codeLines: [30],
+    current: result && matchedPath.length ? null : root,
+    path: result ? matchedPath : [root.id],
+    patternIndex: pattern.length,
+    operation: `search("${pattern}")`,
+    decision: `final result = ${result ? "True" : "False"}`,
+    result,
+    vars: [{ name: "answer", value: result ? "True" : "False" }],
+    note: result
+      ? { vi: `Tìm thấy ít nhất một từ trong Trie khớp "${pattern}". Đường màu vàng/xanh là đường khớp thành công.`, en: `At least one Trie word matches "${pattern}". The highlighted path is the successful route.` }
+      : { vi: `Đã thử mọi nhánh cần thiết nhưng không có từ hoàn chỉnh nào khớp "${pattern}".`, en: `Every required branch was tried, but no complete word matches "${pattern}".` },
+    final: true,
+  });
+  return { words, pattern, answer: result, steps };
 }
 
 /**
@@ -2340,6 +2706,12 @@ module.exports = {
         label: { vi: "search(pattern) - dùng '.' cho ký tự bất kỳ", en: "search(pattern) - use '.' for any char" },
         default: ".ad",
       },
+    ],
+    approach: [
+      { vi: "addWord: đi từng ký tự từ root; tạo node nếu cạnh chưa có, dùng lại node nếu chung prefix, rồi đánh dấu is_word=True ở ký tự cuối.", en: "addWord: walk characters from root; create a missing edge, reuse shared-prefix nodes, then mark is_word=True at the last character." },
+      { vi: "search với ký tự thường: chỉ đi đúng cạnh tương ứng. Thiếu cạnh thì nhánh đó trả False ngay.", en: "search with a literal: follow exactly that edge. A missing edge makes that branch return False immediately." },
+      { vi: "search với '.': DFS thử mọi node con, backtrack khi False, và dừng sớm ngay khi một nhánh trả True.", en: "search with '.': DFS tries every child, backtracks after False, and short-circuits as soon as one branch returns True." },
+      { vi: "Khớp hết pattern chỉ thành công khi node cuối có is_word=True; một prefix chưa đủ.", en: "Exhausting the pattern succeeds only when the final node has is_word=True; a prefix alone is not enough." },
     ],
     complexity: {
       time: "O(L) add / O(26^dots · L) search",

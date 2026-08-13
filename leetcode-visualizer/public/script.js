@@ -13137,6 +13137,51 @@ function renderLongestDuplicateView(step) {
 }
 
 // ---- Render a single step ----
+function renderWordDictionaryView(step) {
+  const view = step.wordDictionaryView || {};
+  const vi = lang === "vi";
+  const phases = [
+    { key: "build", label: vi ? "1 · Xây Trie" : "1 · Build Trie" },
+    { key: "search", label: vi ? "2 · DFS tìm kiếm" : "2 · DFS search" },
+    { key: "done", label: vi ? "3 · Kết quả" : "3 · Result" },
+  ];
+  const phaseRank = view.phase === "build" ? 0 : view.phase === "done" ? 2 : 1;
+  const phaseHtml = phases.map((phase, index) => `<span class="${index === phaseRank ? "active" : index < phaseRank ? "done" : ""}">${escapeHtml(phase.label)}</span>`).join("");
+  const wordsHtml = (view.words || []).map((word, index) => {
+    const cls = view.phase === "build" && index === view.wordIndex ? "active" : index < Number(view.wordIndex ?? -1) || view.phase !== "build" ? "done" : "";
+    return `<span class="${cls}">${escapeHtml(word)}</span>`;
+  }).join("");
+  const patternHtml = [...String(view.pattern || "")].map((char, index) => {
+    const classes = [char === "." ? "wildcard" : ""];
+    if (index === view.patternIndex) classes.push("active");
+    else if (Number.isInteger(view.patternIndex) && index < view.patternIndex) classes.push("done");
+    return `<div class="wd211-char ${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${char === "." ? (vi ? "bất kỳ" : "any") : "exact"}</em></div>`;
+  }).join("") || `<div class="wd211-empty">${vi ? "Pattern rỗng" : "Empty pattern"}</div>`;
+  const stack = Array.isArray(view.callStack) ? view.callStack : [];
+  const stackHtml = stack.length ? stack.map((frame, index) => `<li class="${index === stack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>dfs(${escapeHtml(frame.node)}, ${escapeHtml(frame.i)})</strong><small>${vi ? "còn lại" : "remaining"}: ${escapeHtml(frame.suffix)}</small><em>${escapeHtml(frame.via)}</em></li>`).join("") : `<li class="empty">${vi ? "Call stack rỗng" : "Empty call stack"}</li>`;
+  const branches = Array.isArray(view.branches) ? view.branches : [];
+  const tried = new Set(view.triedBranches || []);
+  const branchesHtml = branches.length ? branches.map((branch) => `<span class="${branch === view.activeBranch ? "active" : tried.has(branch) ? "tried" : ""}">'${escapeHtml(branch)}'</span>`).join("") : `<span class="empty">${vi ? "không có nhánh" : "no branches"}</span>`;
+  const resultText = view.result === undefined ? "—" : view.result ? "True" : "False";
+  const resultClass = view.result === undefined ? "" : view.result ? "success" : "failure";
+  const treeView = $("treeView");
+  treeView.innerHTML = `<section class="wd211-viz">
+    <div class="wd211-phases">${phaseHtml}</div>
+    <section class="wd211-words"><header><strong>addWord queue</strong><span>${vi ? "xanh = đã thêm" : "green = added"}</span></header><div>${wordsHtml}</div></section>
+    <div class="wd211-layout">
+      <section class="wd211-tree-card"><header><strong>${vi ? "TRIE HIỆN TẠI" : "CURRENT TRIE"}</strong><span>${vi ? "vòng xanh = cuối từ · cam = đường đang xét · đỏ = nhánh thất bại" : "green ring = word end · amber = active path · red = failed branch"}</span></header><div id="wd211Tree" class="wd211-tree"></div></section>
+      <aside class="wd211-side">
+        <section class="wd211-pattern"><header><strong>PATTERN</strong><span>i = ${escapeHtml(view.patternIndex ?? "—")}</span></header><div>${patternHtml}</div></section>
+        <section class="wd211-decision ${resultClass}"><span>${vi ? "QUYẾT ĐỊNH HIỆN TẠI" : "CURRENT DECISION"}</span><strong>${escapeHtml(view.decision || "—")}</strong><small>${vi ? "đã thử" : "tried"}: ${escapeHtml(view.triedCount || 0)} · ${vi ? "thất bại" : "failed"}: ${escapeHtml(view.failedCount || 0)}</small></section>
+        <section class="wd211-branches"><header><strong>${vi ? "NHÁNH CỦA '.'" : "'.' BRANCHES"}</strong><span>${vi ? "thử từ trái sang phải" : "try left to right"}</span></header><div>${branchesHtml}</div></section>
+        <section class="wd211-stack"><header><strong>DFS CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+        <section class="wd211-result ${resultClass}"><span>RETURN / RESULT</span><strong>${escapeHtml(resultText)}</strong></section>
+      </aside>
+    </div>
+  </section>`;
+  renderTree(step, "wd211Tree");
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -13411,6 +13456,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPathExistsBfsView(step);
+  } else if (step.wordDictionaryView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordDictionaryView(step);
   } else if (step.replaceWordsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
