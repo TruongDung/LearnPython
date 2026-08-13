@@ -17573,6 +17573,353 @@ function buildSteps3310(input, params) {
   return { original: edges, n, k, answer: allNodes, steps };
 }
 
+function buildSteps841(input) {
+  const raw = String(input ?? "").trim();
+  const steps = [];
+  let rooms = [];
+  let inputError = "";
+
+  if (!raw) {
+    inputError = "Enter at least room 0. Use | to separate rooms and commas to separate keys.";
+  } else {
+    rooms = raw.split("|").map((roomText) => {
+      const text = roomText.trim();
+      if (!text) return [];
+      const keys = text.split(",").map((keyText) => keyText.trim());
+      if (keys.some((key) => !/^\d+$/.test(key))) {
+        inputError = "Each key must be a non-negative integer.";
+        return [];
+      }
+      return keys.map(Number);
+    });
+    if (!inputError) {
+      const invalidKey = rooms.flat().find((key) => !Number.isInteger(key) || key < 0 || key >= rooms.length);
+      if (invalidKey !== undefined) inputError = `Key ${invalidKey} must name an existing room (0..${rooms.length - 1}).`;
+    }
+  }
+
+  const allNodes = Array.from({ length: rooms.length }, (_, id) => id);
+  const allEdges = rooms.flatMap((keys, room) => keys.map((key) => ({ u: room, v: key, w: "" })));
+  const visited = new Set();
+  const stack = [];
+
+  function makeGraph(hlNodes = [], hlEdges = []) {
+    return {
+      nodes: allNodes.map((id) => ({ id, label: String(id), sub: rooms[id] && rooms[id].length ? `keys: ${rooms[id].join(", ")}` : "keys: —" })),
+      edges: allEdges,
+      hlNodes,
+      hlEdges,
+      visitedNodes: [...visited],
+      restrictedNodes: allNodes.filter((id) => !visited.has(id)),
+      caption: { vi: "Mũi tên a → b nghĩa là room a chứa key mở room b.", en: "Arrow a → b means room a contains the key that opens room b." },
+    };
+  }
+
+  function push({ title, codeLines, note, hlNodes = [], hlEdges = [], vars = [], final = false }) {
+    steps.push({
+      title,
+      arr: [],
+      graph: makeGraph(hlNodes, hlEdges),
+      highlight: [],
+      mark: [],
+      codeLines,
+      vars: [
+        { name: "stack", value: `[${stack.join(", ")}]` },
+        { name: "visited / opened", value: `{${[...visited].sort((a, b) => a - b).join(", ")}}` },
+        ...vars,
+      ],
+      note,
+      final,
+    });
+  }
+
+  if (inputError) {
+    push({
+      title: { vi: "Input phòng không hợp lệ", en: "Invalid rooms input" },
+      codeLines: [2],
+      vars: [{ name: "error", value: inputError }],
+      note: { vi: `Không thể bắt đầu DFS: ${inputError}`, en: `Cannot start DFS: ${inputError}` },
+      final: true,
+    });
+    return { original: rooms, answer: false, steps };
+  }
+
+  push({
+    title: { vi: `Mục tiêu: mở tất cả ${rooms.length} phòng từ room 0`, en: `Goal: open all ${rooms.length} rooms starting in room 0` },
+    codeLines: [2],
+    hlNodes: [0],
+    vars: [{ name: "rooms", value: JSON.stringify(rooms) }, { name: "rule", value: "visit a room once when its key is found" }],
+    note: { vi: "Mỗi room chứa key dẫn tới các room khác. DFS từ room 0; cuối cùng mọi room phải thuộc visited.", en: "Each room holds keys to other rooms. DFS begins at room 0; eventually every room must be in visited." },
+  });
+
+  visited.add(0);
+  push({
+    title: { vi: "visited = {0}", en: "visited = {0}" },
+    codeLines: [3],
+    hlNodes: [0],
+    vars: [{ name: "visited", value: "{0}" }],
+    note: { vi: "Room 0 mở sẵn, nên đánh dấu visited ngay. Điều này cũng tránh đưa cùng room vào stack nhiều lần.", en: "Room 0 starts unlocked, so mark it visited immediately. This also prevents adding the same room to the stack twice." },
+  });
+
+  stack.push(0);
+  push({
+    title: { vi: "stack = [0]", en: "stack = [0]" },
+    codeLines: [4],
+    hlNodes: [0],
+    vars: [{ name: "stack", value: "[0]" }],
+    note: { vi: "Đưa room 0 vào stack. Stack thực hiện DFS theo LIFO: room ở cuối sẽ được xử lý trước.", en: "Push room 0 onto the stack. The stack performs LIFO DFS: the last room is processed first." },
+  });
+
+  while (stack.length) {
+    push({
+      title: { vi: `while stack: còn [${stack.join(", ")}]`, en: `while stack: still [${stack.join(", ")}]` },
+      codeLines: [5],
+      hlNodes: [stack[stack.length - 1]],
+      note: { vi: "Stack chưa rỗng nên còn room đã mở cần kiểm tra key bên trong.", en: "The stack is non-empty, so an opened room still needs its keys inspected." },
+    });
+
+    const room = stack.pop();
+    push({
+      title: { vi: `room = stack.pop() → ${room}`, en: `room = stack.pop() → ${room}` },
+      codeLines: [6],
+      hlNodes: [room],
+      vars: [{ name: "current room", value: room }, { name: `keys in room ${room}`, value: `[${rooms[room].join(", ")}]` }],
+      note: { vi: `Lấy room ${room} khỏi đỉnh stack để đọc các key của nó.`, en: `Pop room ${room} from the stack top to inspect its keys.` },
+    });
+
+    push({
+      title: { vi: `for key in rooms[${room}]: [${rooms[room].join(", ")}]`, en: `for key in rooms[${room}]: [${rooms[room].join(", ")}]` },
+      codeLines: [7],
+      hlNodes: [room],
+      hlEdges: rooms[room].map((key) => [room, key]),
+      vars: [{ name: "current room", value: room }, { name: "keys", value: `[${rooms[room].join(", ")}]` }],
+      note: rooms[room].length
+        ? { vi: `Lần lượt thử ${rooms[room].length} key trong room ${room}.`, en: `Try each of the ${rooms[room].length} key(s) in room ${room}.` }
+        : { vi: `Room ${room} không có key nào, quay lại stack.`, en: `Room ${room} has no keys, so return to the stack.` },
+    });
+
+    for (const key of rooms[room]) {
+      const alreadyVisited = visited.has(key);
+      push({
+        title: { vi: `key ${key} đã mở? → ${alreadyVisited ? "ĐÚNG, bỏ qua" : "SAI, sẽ mở"}`, en: `Is key ${key} already opened? → ${alreadyVisited ? "TRUE, skip" : "FALSE, open it"}` },
+        codeLines: [8],
+        hlNodes: [room, key],
+        hlEdges: [[room, key]],
+        vars: [{ name: "current room", value: room }, { name: "key", value: key }, { name: "key in visited", value: alreadyVisited }],
+        note: alreadyVisited
+          ? { vi: `Room ${key} đã mở/được lên lịch rồi, không push lại để tránh vòng lặp.`, en: `Room ${key} is already opened or scheduled, so do not push it again; this avoids cycles.` }
+          : { vi: `Key ${key} mở room ${key}; đánh dấu trước rồi mới push vào stack.`, en: `Key ${key} opens room ${key}; mark it before pushing it onto the stack.` },
+      });
+      if (!alreadyVisited) {
+        visited.add(key);
+        push({
+          title: { vi: `visited.add(${key})`, en: `visited.add(${key})` },
+          codeLines: [9],
+          hlNodes: [key],
+          hlEdges: [[room, key]],
+          vars: [{ name: "newly opened", value: key }, { name: "visited", value: `{${[...visited].sort((a, b) => a - b).join(", ")}}` }],
+          note: { vi: `Room ${key} đã được mở. Đánh dấu ngay để key trùng không thể push ${key} thêm lần nữa.`, en: `Room ${key} is now opened. Mark it immediately so a duplicate key cannot push ${key} again.` },
+        });
+        stack.push(key);
+        push({
+          title: { vi: `stack.append(${key})`, en: `stack.append(${key})` },
+          codeLines: [10],
+          hlNodes: [key],
+          hlEdges: [[room, key]],
+          vars: [{ name: "stack", value: `[${stack.join(", ")}]` }],
+          note: { vi: `Đưa room ${key} vào đỉnh stack; nó sẽ được khám phá theo thứ tự DFS.`, en: `Push room ${key} onto the stack top; it will be explored in DFS order.` },
+        });
+      }
+    }
+  }
+
+  const answer = visited.size === rooms.length;
+  push({
+    title: { vi: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}`, en: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}` },
+    codeLines: [11],
+    hlNodes: answer ? allNodes : [...visited],
+    vars: [{ name: "opened rooms", value: visited.size }, { name: "total rooms", value: rooms.length }, { name: "answer", value: answer }],
+    note: answer
+      ? { vi: `✓ Đã mở tất cả ${rooms.length} room.`, en: `✓ All ${rooms.length} rooms were opened.` }
+      : { vi: `✗ Chỉ mở được ${visited.size}/${rooms.length} room. Các room đỏ không có key nào mở được từ room 0.`, en: `✗ Only ${visited.size}/${rooms.length} rooms were opened. The red rooms have no key path from room 0.` },
+    final: true,
+  });
+
+  return { original: rooms, answer, steps };
+}
+
+function buildSteps841BFS(input) {
+  const raw = String(input ?? "").trim();
+  const steps = [];
+  let rooms = [];
+  let error = "";
+  if (!raw) {
+    error = "Enter at least room 0. Use | to separate rooms and commas to separate keys.";
+  } else {
+    rooms = raw.split("|").map((roomText) => {
+      const text = roomText.trim();
+      if (!text) return [];
+      const keys = text.split(",").map((keyText) => keyText.trim());
+      if (keys.some((key) => !/^\d+$/.test(key))) { error = "Each key must be a non-negative integer."; return []; }
+      return keys.map(Number);
+    });
+    if (!error) {
+      const invalidKey = rooms.flat().find((key) => !Number.isInteger(key) || key < 0 || key >= rooms.length);
+      if (invalidKey !== undefined) error = `Key ${invalidKey} must name an existing room (0..${rooms.length - 1}).`;
+    }
+  }
+
+  const allNodes = Array.from({ length: rooms.length }, (_, id) => id);
+  const allEdges = rooms.flatMap((keys, room) => keys.map((key) => ({ u: room, v: key, w: "" })));
+  const visited = new Set();
+  const queue = [];
+  let head = 0;
+  const pendingQueue = () => queue.slice(head);
+  const makeGraph = (hlNodes = [], hlEdges = []) => ({
+    nodes: allNodes.map((id) => ({ id, label: String(id), sub: rooms[id] && rooms[id].length ? `keys: ${rooms[id].join(", ")}` : "keys: —" })),
+    edges: allEdges,
+    hlNodes,
+    hlEdges,
+    visitedNodes: [...visited],
+    restrictedNodes: allNodes.filter((id) => !visited.has(id)),
+    caption: { vi: "Mũi tên a → b nghĩa là room a chứa key mở room b.", en: "Arrow a → b means room a contains the key that opens room b." },
+  });
+  const push = ({ title, codeLines, note, hlNodes = [], hlEdges = [], vars = [], final = false }) => {
+    steps.push({
+      title, arr: [], graph: makeGraph(hlNodes, hlEdges), highlight: [], mark: [], codeBlock: 2, codeLines,
+      vars: [
+        { name: "queue (front → back)", value: `[${pendingQueue().join(", ")}]` },
+        { name: "visited / opened", value: `{${[...visited].sort((a, b) => a - b).join(", ")}}` },
+        ...vars,
+      ],
+      note, final,
+    });
+  };
+
+  if (error) {
+    push({ title: { vi: "Input phòng không hợp lệ", en: "Invalid rooms input" }, codeLines: [3], vars: [{ name: "error", value: error }], note: { vi: `Không thể bắt đầu BFS: ${error}`, en: `Cannot start BFS: ${error}` }, final: true });
+    return { original: rooms, answer: false, steps };
+  }
+
+  push({
+    title: { vi: `BFS: mở tất cả ${rooms.length} phòng từ room 0`, en: `BFS: open all ${rooms.length} rooms from room 0` },
+    codeLines: [3], hlNodes: [0], vars: [{ name: "rooms", value: JSON.stringify(rooms) }, { name: "BFS rule", value: "dequeue FRONT, append BACK" }],
+    note: { vi: "BFS dùng queue FIFO. Room được mở sớm hơn sẽ được xử lý trước; mỗi key mới mở một room mới.", en: "BFS uses a FIFO queue. Earlier-opened rooms are processed first; each new key opens a new room." },
+  });
+
+  visited.add(0);
+  push({ title: { vi: "visited = {0}", en: "visited = {0}" }, codeLines: [4], hlNodes: [0], vars: [{ name: "visited", value: "{0}" }], note: { vi: "Room 0 mở sẵn. Đánh dấu ngay khi enqueue để không enqueue trùng room trong cycle.", en: "Room 0 starts unlocked. Mark it when enqueued so cycles cannot enqueue the same room twice." } });
+
+  queue.push(0);
+  push({ title: { vi: "queue = deque([0])", en: "queue = deque([0])" }, codeLines: [5], hlNodes: [0], note: { vi: "Room 0 vào FRONT của queue. BFS sẽ pop ở FRONT và append key mới ở BACK.", en: "Room 0 enters the queue FRONT. BFS pops the FRONT and appends new keys at the BACK." } });
+
+  while (head < queue.length) {
+    push({ title: { vi: `while queue: [${pendingQueue().join(", ")}]`, en: `while queue: [${pendingQueue().join(", ")}]` }, codeLines: [6], hlNodes: [queue[head]], note: { vi: "Queue chưa rỗng; xử lý room ở FRONT trước.", en: "The queue is non-empty; process the FRONT room first." } });
+    const room = queue[head++];
+    push({ title: { vi: `room = queue.popleft() → ${room}`, en: `room = queue.popleft() → ${room}` }, codeLines: [7], hlNodes: [room], vars: [{ name: "current room", value: room }, { name: `keys in room ${room}`, value: `[${rooms[room].join(", ")}]` }], note: { vi: `Lấy room ${room} ở FRONT. Các room còn lại trong queue vẫn chờ theo thứ tự vào queue.`, en: `Remove room ${room} from the FRONT. The remaining rooms keep their queue order.` } });
+    push({ title: { vi: `for key in rooms[${room}]: [${rooms[room].join(", ")}]`, en: `for key in rooms[${room}]: [${rooms[room].join(", ")}]` }, codeLines: [8], hlNodes: [room], hlEdges: rooms[room].map((key) => [room, key]), vars: [{ name: "keys", value: `[${rooms[room].join(", ")}]` }], note: rooms[room].length ? { vi: `Duyệt từng key có trong room ${room}.`, en: `Inspect every key in room ${room}.` } : { vi: `Room ${room} không có key nào.`, en: `Room ${room} has no keys.` } });
+    for (const key of rooms[room]) {
+      const alreadyVisited = visited.has(key);
+      push({ title: { vi: `key ${key} in visited? → ${alreadyVisited ? "ĐÚNG, bỏ qua" : "SAI, sẽ mở"}`, en: `key ${key} in visited? → ${alreadyVisited ? "TRUE, skip" : "FALSE, open it"}` }, codeLines: [9], hlNodes: [room, key], hlEdges: [[room, key]], vars: [{ name: "current room", value: room }, { name: "key", value: key }, { name: "key in visited", value: alreadyVisited }], note: alreadyVisited ? { vi: `Room ${key} đã mở/đang chờ trong queue, bỏ qua key lặp.`, en: `Room ${key} is already opened or queued, so skip the duplicate key.` } : { vi: `Key ${key} mở room ${key}; đánh dấu rồi enqueue ở BACK.`, en: `Key ${key} opens room ${key}; mark it, then enqueue it at the BACK.` } });
+      if (!alreadyVisited) {
+        visited.add(key);
+        push({ title: { vi: `visited.add(${key})`, en: `visited.add(${key})` }, codeLines: [10], hlNodes: [key], hlEdges: [[room, key]], vars: [{ name: "newly opened", value: key }], note: { vi: `Đánh dấu ${key} ngay bây giờ để không thể bị enqueue lần nữa.`, en: `Mark ${key} now so it cannot be enqueued again.` } });
+        queue.push(key);
+        push({ title: { vi: `queue.append(${key})`, en: `queue.append(${key})` }, codeLines: [11], hlNodes: [key], hlEdges: [[room, key]], note: { vi: `Đưa ${key} vào BACK. Nó sẽ được xử lý sau mọi room đang chờ trước đó.`, en: `Append ${key} at the BACK. It will be processed after every room already waiting.` } });
+      }
+    }
+  }
+
+  const answer = visited.size === rooms.length;
+  push({ title: { vi: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}`, en: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}` }, codeLines: [12], hlNodes: answer ? allNodes : [...visited], vars: [{ name: "opened rooms", value: visited.size }, { name: "total rooms", value: rooms.length }, { name: "answer", value: answer }], note: answer ? { vi: `✓ BFS đã mở đủ ${rooms.length} room.`, en: `✓ BFS opened all ${rooms.length} rooms.` } : { vi: `✗ BFS chỉ mở ${visited.size}/${rooms.length} room. Các room đỏ không thể tới từ room 0.`, en: `✗ BFS opened only ${visited.size}/${rooms.length} rooms. The red rooms are unreachable from room 0.` }, final: true });
+  return { original: rooms, answer, steps };
+}
+
+function buildSteps841RecursiveDFS(input) {
+  const raw = String(input ?? "").trim();
+  const steps = [];
+  let rooms = [];
+  let error = "";
+  if (!raw) error = "Enter at least room 0. Use | to separate rooms and commas to separate keys.";
+  else {
+    rooms = raw.split("|").map((part) => {
+      const text = part.trim();
+      if (!text) return [];
+      const keys = text.split(",").map((key) => key.trim());
+      if (keys.some((key) => !/^\d+$/.test(key))) { error = "Each key must be a non-negative integer."; return []; }
+      return keys.map(Number);
+    });
+    if (!error) {
+      const invalidKey = rooms.flat().find((key) => !Number.isInteger(key) || key < 0 || key >= rooms.length);
+      if (invalidKey !== undefined) error = `Key ${invalidKey} must name an existing room (0..${rooms.length - 1}).`;
+    }
+  }
+
+  const allNodes = Array.from({ length: rooms.length }, (_, id) => id);
+  const allEdges = rooms.flatMap((keys, room) => keys.map((key) => ({ u: room, v: key, w: "" })));
+  const visited = new Set();
+  const callStack = [];
+  const makeGraph = (hlNodes = [], hlEdges = []) => ({
+    nodes: allNodes.map((id) => ({ id, label: String(id), sub: rooms[id] && rooms[id].length ? `keys: ${rooms[id].join(", ")}` : "keys: —" })),
+    edges: allEdges,
+    hlNodes,
+    hlEdges,
+    visitedNodes: [...visited],
+    restrictedNodes: allNodes.filter((id) => !visited.has(id)),
+    caption: { vi: "Mũi tên a → b nghĩa là room a chứa key mở room b.", en: "Arrow a → b means room a contains the key that opens room b." },
+  });
+  const push = ({ title, codeLines, note, current = null, next = null, vars = [], final = false }) => {
+    const highlighted = [current, next].filter((id) => id !== null && id !== undefined);
+    steps.push({
+      title, arr: [], graph: makeGraph(highlighted, current !== null && next !== null && next !== undefined ? [[current, next]] : []),
+      highlight: [], mark: [], codeBlock: 3, codeLines,
+      vars: [
+        { name: "call stack", value: callStack.length ? `[${callStack.join(" → ")}]` : "[]" },
+        { name: "visited / opened", value: `{${[...visited].sort((a, b) => a - b).join(", ")}}` },
+        ...vars,
+      ],
+      note, final,
+    });
+  };
+
+  if (error) {
+    push({ title: { vi: "Input phòng không hợp lệ", en: "Invalid rooms input" }, codeLines: [2], vars: [{ name: "error", value: error }], note: { vi: `Không thể bắt đầu DFS đệ quy: ${error}`, en: `Cannot start recursive DFS: ${error}` }, final: true });
+    return { original: rooms, answer: false, steps };
+  }
+
+  push({ title: { vi: `DFS đệ quy: mở tất cả ${rooms.length} phòng từ room 0`, en: `Recursive DFS: open all ${rooms.length} rooms from room 0` }, codeLines: [2], current: 0, vars: [{ name: "rooms", value: JSON.stringify(rooms) }, { name: "rule", value: "one dfs call = one stack frame" }], note: { vi: "Mỗi lời gọi dfs(room) tạo một frame. Base case room đã visited sẽ return ngay để chặn cycle.", en: "Each dfs(room) call creates a frame. The already-visited base case returns immediately to stop cycles." } });
+  push({ title: { vi: "visited = set()", en: "visited = set()" }, codeLines: [3], vars: [{ name: "visited", value: "{}" }], note: { vi: "Khởi tạo tập các room đã mở.", en: "Initialize the set of opened rooms." } });
+  push({ title: { vi: "Định nghĩa dfs(room)", en: "Define dfs(room)" }, codeLines: [4], vars: [{ name: "dfs", value: "open room, then follow every key recursively" }], note: { vi: "Hàm con sẽ mở room hiện tại, rồi gọi đệ quy với từng key bên trong.", en: "The helper opens the current room, then recursively follows every key inside it." } });
+
+  function dfs(room, parent = null) {
+    callStack.push(room);
+    push({ title: { vi: `Vào dfs(${room})`, en: `Enter dfs(${room})` }, codeLines: [5], current: room, vars: [{ name: "room", value: room }, { name: "called from", value: parent === null ? "root" : parent }], note: { vi: `Push frame ${room}; trước hết kiểm tra base case.`, en: `Push frame ${room}; first check the base case.` } });
+    const alreadyVisited = visited.has(room);
+    push({ title: { vi: `room ${room} in visited? → ${alreadyVisited ? "ĐÚNG" : "SAI"}`, en: `room ${room} in visited? → ${alreadyVisited ? "TRUE" : "FALSE"}` }, codeLines: [5], current: room, vars: [{ name: "room in visited", value: alreadyVisited }], note: alreadyVisited ? { vi: `Room ${room} đã mở; đây là cycle/key trùng nên không duyệt lại.`, en: `Room ${room} is already open; this is a cycle or duplicate key, so do not explore it again.` } : { vi: `Room ${room} chưa mở, tiếp tục đánh dấu và duyệt key.`, en: `Room ${room} is not open yet, so mark it and inspect its keys.` } });
+    if (alreadyVisited) {
+      push({ title: { vi: `return từ dfs(${room})`, en: `Return from dfs(${room})` }, codeLines: [6], current: room, vars: [{ name: "return", value: "None (already visited)" }], note: { vi: "Base case: pop frame này và quay về lời gọi cha.", en: "Base case: pop this frame and resume the caller." } });
+      callStack.pop();
+      return;
+    }
+    visited.add(room);
+    push({ title: { vi: `visited.add(${room})`, en: `visited.add(${room})` }, codeLines: [7], current: room, vars: [{ name: "newly opened", value: room }], note: { vi: `Mở room ${room} trước khi gọi con, nên cycle không thể đệ quy vô hạn.`, en: `Open room ${room} before child calls, so cycles cannot recurse forever.` } });
+    push({ title: { vi: `for key in rooms[${room}]: [${rooms[room].join(", ")}]`, en: `for key in rooms[${room}]: [${rooms[room].join(", ")}]` }, codeLines: [8], current: room, vars: [{ name: "keys", value: `[${rooms[room].join(", ")}]` }], note: rooms[room].length ? { vi: `Gọi dfs cho từng key trong room ${room}.`, en: `Call dfs for every key in room ${room}.` } : { vi: `Room ${room} không có key nào.`, en: `Room ${room} has no keys.` } });
+    for (const key of rooms[room]) {
+      push({ title: { vi: `Gọi dfs(${key}) từ room ${room}`, en: `Call dfs(${key}) from room ${room}` }, codeLines: [9], current: room, next: key, vars: [{ name: "key", value: key }], note: { vi: `Tạo frame con ${key}; frame ${room} chờ đến khi lời gọi con return.`, en: `Create child frame ${key}; frame ${room} waits until the child call returns.` } });
+      dfs(key, room);
+      push({ title: { vi: `dfs(${key}) đã return về room ${room}`, en: `dfs(${key}) returned to room ${room}` }, codeLines: [9], current: room, vars: [{ name: "returned child", value: key }], note: { vi: `Frame ${key} đã rời stack; tiếp tục key tiếp theo của room ${room}.`, en: `Frame ${key} left the stack; continue with room ${room}'s next key.` } });
+    }
+    push({ title: { vi: `Hoàn tất dfs(${room})`, en: `Complete dfs(${room})` }, codeLines: [9], current: room, vars: [{ name: "return", value: "None" }], note: { vi: `Mọi key đã xử lý; pop frame ${room} về cha.`, en: `Every key is handled; pop frame ${room} back to its caller.` } });
+    callStack.pop();
+  }
+
+  push({ title: { vi: "Gọi dfs(0)", en: "Call dfs(0)" }, codeLines: [10], current: 0, note: { vi: "Bắt đầu DFS đệ quy từ room 0 mở sẵn.", en: "Start recursive DFS from the initially unlocked room 0." } });
+  dfs(0);
+  const answer = visited.size === rooms.length;
+  push({ title: { vi: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}`, en: `len(visited) == len(rooms) → ${visited.size} == ${rooms.length} → ${answer}` }, codeLines: [11], vars: [{ name: "opened rooms", value: visited.size }, { name: "total rooms", value: rooms.length }, { name: "answer", value: answer }], note: answer ? { vi: `✓ DFS đệ quy đã mở đủ ${rooms.length} room.`, en: `✓ Recursive DFS opened all ${rooms.length} rooms.` } : { vi: `✗ DFS đệ quy chỉ mở ${visited.size}/${rooms.length} room. Các room đỏ không có đường key từ 0.`, en: `✗ Recursive DFS opened only ${visited.size}/${rooms.length} rooms. The red rooms have no key path from 0.` }, final: true });
+  return { original: rooms, answer, steps };
+}
+
 module.exports = {
   // Category metadata: recommended display order for the Graph tag.
   // Picked up by problems/index.js and exposed to the catalog UI.
@@ -17592,6 +17939,91 @@ module.exports = {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
     },
+  },
+  841: {
+    id: 841,
+    difficulty: "medium",
+    slug: "keys-and-rooms",
+    category: { key: "dfs", vi: "DFS", en: "DFS" },
+    title: { vi: "Keys and Rooms", en: "Keys and Rooms" },
+    titleVi: { vi: "Chìa khóa và các căn phòng", en: "Keys and Rooms" },
+    statement: {
+      vi: "Có n phòng đánh số 0..n-1. Room 0 mở sẵn; mỗi room chứa các key mở những room khác. Hãy xác định có thể mở TẤT CẢ room hay không. Nhập rooms theo dạng 'keys-room-0|keys-room-1|...'; key trong cùng room cách nhau bởi dấu phẩy. Ví dụ 1|2|3| nghĩa là [[1],[2],[3],[]].",
+      en: "There are n rooms numbered 0..n-1. Room 0 starts unlocked, and every room contains keys for other rooms. Determine whether ALL rooms can be opened. Enter rooms as 'room-0-keys|room-1-keys|...'; use commas between keys in one room. For example, 1|2|3| means [[1],[2],[3],[]].",
+    },
+    defaultInput: "1|2|3|",
+    inputKind: "string",
+    inputLabel: { vi: "Keys trong mỗi room (room cách '|'; key cách ',')", en: "Keys per room (rooms with '|'; keys with ',')" },
+    extraParams: [
+      {
+        key: "approach",
+        label: { vi: "Cách duyệt", en: "Traversal approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: DFS dùng stack", en: "Approach 1: DFS with stack" } },
+          { value: "2", label: { vi: "Cách 2: BFS dùng queue", en: "Approach 2: BFS with queue" } },
+          { value: "3", label: { vi: "Cách 3: DFS đệ quy", en: "Approach 3: Recursive DFS" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Room 0 mở sẵn: đánh dấu 0 vào visited, rồi bắt đầu duyệt.", en: "Room 0 starts unlocked: mark 0 visited, then begin the traversal." },
+      { vi: "Dùng từng key trong room hiện tại để mở các room chưa visited.", en: "Use each key in the current room to open unvisited rooms." },
+      { vi: "Đánh dấu visited trước khi mở rộng room để chu trình không duyệt lại một room.", en: "Mark visited before expanding a room so cycles cannot revisit it." },
+      { vi: "Kết thúc: visited phải chứa đúng n room.", en: "At the end, visited must contain exactly n rooms." },
+    ],
+    complexity: {
+      time: "O(n + k)",
+      space: "O(n)",
+      note: { vi: "Mỗi room mở tối đa một lần; k là tổng số key trong tất cả room.", en: "Each room is opened at most once; k is the total number of keys across all rooms." },
+    },
+    code: [
+      "class Solution:",
+      "    def canVisitAllRooms(self, rooms):",
+      "        visited = {0}",
+      "        stack = [0]",
+      "        while stack:",
+      "            room = stack.pop()",
+      "            for key in rooms[room]:",
+      "                if key not in visited:",
+      "                    visited.add(key)",
+      "                    stack.append(key)",
+      "        return len(visited) == len(rooms)",
+    ],
+    codeLabel: { vi: "Cách 1: DFS dùng stack", en: "Approach 1: DFS with stack" },
+    code2: [
+      "from collections import deque",
+      "class Solution:",
+      "    def canVisitAllRooms(self, rooms):",
+      "        visited = {0}",
+      "        queue = deque([0])",
+      "        while queue:",
+      "            room = queue.popleft()",
+      "            for key in rooms[room]:",
+      "                if key not in visited:",
+      "                    visited.add(key)",
+      "                    queue.append(key)",
+      "        return len(visited) == len(rooms)",
+    ],
+    code2Label: { vi: "Cách 2: BFS dùng queue", en: "Approach 2: BFS with queue" },
+    code3: [
+      "class Solution:",
+      "    def canVisitAllRooms(self, rooms):",
+      "        visited = set()",
+      "        def dfs(room):",
+      "            if room in visited:",
+      "                return",
+      "            visited.add(room)",
+      "            for key in rooms[room]:",
+      "                dfs(key)",
+      "        dfs(0)",
+      "        return len(visited) == len(rooms)",
+    ],
+    code3Label: { vi: "Cách 3: DFS đệ quy", en: "Approach 3: Recursive DFS" },
+    builder: buildSteps841,
+    builder2: buildSteps841BFS,
+    builder3: buildSteps841RecursiveDFS,
   },
   329: {
     id: 329,

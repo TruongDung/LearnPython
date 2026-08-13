@@ -229,9 +229,11 @@ app.post("/api/problem/:id/solve", (req, res) => {
   }
 
   res.json(
-    (params.approach === 2 || params.approach === "2") && typeof problem.builder2 === "function"
-      ? problem.builder2(input, params)
-      : problem.builder(input, params)
+    (params.approach === 3 || params.approach === "3") && typeof problem.builder3 === "function"
+      ? problem.builder3(input, params)
+      : (params.approach === 2 || params.approach === "2") && typeof problem.builder2 === "function"
+        ? problem.builder2(input, params)
+        : problem.builder(input, params)
   );
 });
 
