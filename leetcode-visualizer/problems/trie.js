@@ -2601,47 +2601,140 @@ function buildSteps212(input, params) {
 }
 
 /**
- * LeetCode 642: Design Search Autocomplete System.
- * Keep a counter of historical sentences. As the user types, build a prefix
- * and return the top 3 matching sentences ranked by (count desc, lexicographic
- * asc). '#' ends a sentence: store it (+1) and reset the prefix.
+ * LeetCode 642: Design Search Autocomplete System — Trie + cached hot[3].
+ * Every Trie node stores the three best historical sentences for its prefix.
+ * Typing a character follows one Trie edge and returns that node's hot cache.
+ * '#' stores the completed sentence, refreshes caches along its path, and resets.
  *
  * Input: the typed characters as a string (each char is one input() call).
  * Params: sentences (|-separated) and times (comma-separated).
  *
  * Code lines (1-indexed):
- *  1  class AutocompleteSystem:
- *  2      def __init__(self, sentences, times):
- *  3          self.counts = defaultdict(int)
- *  4          for s, t in zip(sentences, times): self.counts[s] += t
- *  5          self.prefix = ""
- *  6      def input(self, c):
- *  7          if c == '#':
- *  8              self.counts[self.prefix] += 1
- *  9              self.prefix = ""
- * 10              return []
- * 11          self.prefix += c
- * 12          matches = [(s, cnt) for s, cnt in self.counts.items()
- * 13                     if s.startswith(self.prefix)]
- * 14          matches.sort(key=lambda x: (-x[1], x[0]))
- * 15          return [s for s, _ in matches[:3]]
+ *  1  class TrieNode:
+ *  2      def __init__(self):
+ *  3          self.children = {}
+ *  4          self.hot = []
+ *  5
+ *  6  class AutocompleteSystem:
+ *  7      def __init__(self, sentences, times):
+ *  8          self.counts = {}
+ *  9          self.root = TrieNode()
+ * 10          self.prefix = ""
+ * 11          self.node = self.root
+ * 12          for s, t in zip(sentences, times):
+ * 13              self._add(s, t)
+ * 14
+ * 15      def _update_hot(self, node, sentence):
+ * 16          if sentence not in node.hot:
+ * 17              node.hot.append(sentence)
+ * 18          node.hot.sort(key=lambda s: (-self.counts[s], s))
+ * 19          node.hot = node.hot[:3]
+ * 20
+ * 21      def _add(self, sentence, amount):
+ * 22          self.counts[sentence] = self.counts.get(sentence, 0) + amount
+ * 23          node = self.root
+ * 24          self._update_hot(node, sentence)
+ * 25          for ch in sentence:
+ * 26              node = node.children.setdefault(ch, TrieNode())
+ * 27              self._update_hot(node, sentence)
+ * 28
+ * 29      def input(self, c):
+ * 30          if c == '#':
+ * 31              self._add(self.prefix, 1)
+ * 32              self.prefix = ""
+ * 33              self.node = self.root
+ * 34              return []
+ * 35          self.prefix += c
+ * 36          self.node = self.node.children.get(c) if self.node else None
+ * 37          return self.node.hot[:] if self.node else []
  */
-function buildSteps642(input, params) {
-  const sentences = String(params && params.sentences || "i love you|island|iroman|i love leetcode").split("|").map((s) => s.trim()).filter(Boolean);
-  const times = String(params && params.times || "5,3,2,2").split(",").map((x) => Number(x.trim()));
-  const typed = String(input || "i ");
+function buildSteps642(input, params = {}) {
+  const sentences = String(params.sentences ?? "i love you|island|iroman|i love leetcode").split("|").map((s) => s.trim()).filter(Boolean);
+  const times = String(params.times ?? "5,3,2,2").split(",").map((x) => Number(x.trim()));
+  const typed = input === undefined || input === null ? "i " : String(input);
 
   const steps = [];
   const counts = new Map();
-  sentences.forEach((s, i) => counts.set(s, (counts.get(s) || 0) + (times[i] || 0)));
+  sentences.forEach((s, i) => counts.set(s, (counts.get(s) || 0) + (Number.isFinite(times[i]) ? times[i] : 0)));
+  const makeNode = () => ({ children: Object.create(null), hot: [] });
+  const root = makeNode();
+
+  function compareSentences(left, right) {
+    return (counts.get(right) - counts.get(left)) || left.localeCompare(right);
+  }
+
+  function updateHot(node, sentence) {
+    node.hot = [...new Set([...node.hot, sentence])].sort(compareSentences).slice(0, 3);
+  }
+
+  function insertSentence(sentence) {
+    let node = root;
+    updateHot(node, sentence);
+    for (const char of sentence) {
+      if (!node.children[char]) node.children[char] = makeNode();
+      node = node.children[char];
+      updateHot(node, sentence);
+    }
+  }
+
+  [...counts.keys()].forEach(insertSentence);
+  let currentNode = root;
   let prefix = "";
 
-  const countsStr = () => `{${[...counts.entries()].map(([s, c]) => `"${s}":${c}`).join(", ")}}`;
+  function getTriePath(value) {
+    const path = [{ char: "ROOT", prefix: "", hot: [...root.hot], found: true }];
+    let node = root;
+    let built = "";
+    for (const char of value) {
+      built += char;
+      node = node ? node.children[char] : null;
+      path.push({
+        char,
+        prefix: built,
+        hot: node ? [...node.hot] : [],
+        found: Boolean(node),
+      });
+    }
+    return path;
+  }
 
   function snap(opts) {
+    const nodeHot = opts.top3 || [];
+    const candidates = nodeHot.map((sentence, index) => ({
+      sentence,
+      count: counts.get(sentence) || 0,
+      rank: index + 1,
+      selected: true,
+      tiedWithPrevious: index > 0 && counts.get(nodeHot[index - 1]) === counts.get(sentence),
+    }));
+    const suggestions = [...nodeHot];
+    const triePrefix = opts.triePrefix ?? opts.prefix ?? prefix;
+    const history = [...counts.entries()]
+      .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+      .map(([sentence, count]) => ({ sentence, count }));
     steps.push({
       title: opts.title,
       arr: [],
+      autocompleteView: {
+        phase: opts.phase || "type",
+        action: opts.action || "rank",
+        typedChars: [...typed],
+        charIndex: opts.charIndex ?? -1,
+        inputChar: opts.inputChar || "",
+        prefixBefore: opts.prefixBefore ?? prefix,
+        prefix: opts.prefix ?? prefix,
+        history,
+        triePath: getTriePath(triePrefix),
+        triePrefix,
+        nodeFound: opts.nodeFound ?? Boolean(currentNode),
+        nodeHot: [...nodeHot],
+        candidates,
+        suggestions: [...suggestions],
+        committedSentence: opts.committedSentence || "",
+        countBefore: opts.countBefore,
+        countAfter: opts.countAfter,
+        decision: opts.decision || "",
+      },
       highlight: [], mark: [],
       final: opts.final || false,
       codeLines: opts.codeLines || [],
@@ -2651,82 +2744,123 @@ function buildSteps642(input, params) {
   }
 
   snap({
-    title: { vi: "Khởi tạo counts từ lịch sử", en: "Initialize counts from history" },
-    codeLines: [3, 4, 5],
+    phase: "init",
+    action: "history",
+    prefix: "",
+    top3: [],
+    decision: { vi: "Chèn mỗi câu và cache hot[3] tại từng node", en: "Insert every sentence and cache hot[3] at each node" },
+    title: { vi: "Khởi tạo Trie từ lịch sử", en: "Build the Trie from history" },
+    codeLines: [8, 9, 10, 11, 12, 13],
     vars: [
       { name: "sentences", value: sentences.map((s) => `"${s}"`).join(", ") },
       { name: "times", value: `[${times.join(", ")}]` },
-      { name: "counts", value: countsStr() },
+      { name: "root.hot", value: `[${root.hot.map((s) => `"${s}"`).join(", ")}]` },
       { name: "prefix", value: '""' },
     ],
     note: {
       vi:
-        `counts đếm số lần mỗi câu đã được gõ trước đây.\n` +
-        `Khi người dùng gõ, ta ghép prefix và trả về TOP 3 câu khớp prefix, xếp theo (count giảm, rồi thứ tự từ điển tăng).\n` +
-        `Ký tự '#' kết thúc câu: lưu câu (+1) và reset prefix.`,
+        `Chèn từng câu vào Trie. Mỗi node đại diện cho một prefix và lưu sẵn hot[3] theo (count giảm, chữ cái tăng).\n` +
+        `Vì top 3 đã được cache, khi gõ một ký tự ta chỉ cần đi một cạnh Trie rồi đọc node.hot. '#' sẽ lưu câu mới và cập nhật cache trên đường đi.`,
       en:
-        `counts stores how many times each sentence was typed historically.\n` +
-        `As the user types, we build a prefix and return the TOP 3 matching sentences ranked by (count desc, then lexicographic asc).\n` +
-        `'#' ends a sentence: store it (+1) and reset the prefix.`,
+        `Insert every sentence into the Trie. Each node represents a prefix and caches hot[3] by (count desc, lexicographic asc).\n` +
+        `Because top 3 is cached, typing follows one Trie edge and reads node.hot. '#' stores the sentence and refreshes caches along its path.`,
     },
   });
 
-  for (const c of typed) {
+  for (const [charIndex, c] of [...typed].entries()) {
     if (c === "#") {
-      counts.set(prefix, (counts.get(prefix) || 0) + 1);
+      const committedSentence = prefix;
+      const countBefore = counts.get(committedSentence) || 0;
+      counts.set(committedSentence, countBefore + 1);
+      insertSentence(committedSentence);
       snap({
-        title: { vi: `input('#'): lưu "${prefix}", reset prefix`, en: `input('#'): store "${prefix}", reset prefix` },
-        codeLines: [7, 8, 9, 10],
+        phase: "commit",
+        action: "commit",
+        charIndex,
+        inputChar: c,
+        prefixBefore: committedSentence,
+        prefix: "",
+        triePrefix: committedSentence,
+        nodeFound: true,
+        committedSentence,
+        countBefore,
+        countAfter: countBefore + 1,
+        top3: [],
+        decision: { vi: `Cập nhật hot[3] dọc đường đi rồi reset`, en: `Refresh hot[3] along the path, then reset` },
+        title: { vi: `input('#'): thêm "${committedSentence}" vào Trie`, en: `input('#'): add "${committedSentence}" to the Trie` },
+        codeLines: [30, 31, 32, 33, 34],
         vars: [
-          { name: "saved sentence", value: `"${prefix}"` },
-          { name: "counts", value: countsStr() },
+          { name: "saved sentence", value: `"${committedSentence}"` },
+          { name: "count", value: `${countBefore} → ${countBefore + 1}` },
           { name: "prefix", value: '""' },
+          { name: "node", value: "root" },
         ],
         note: {
-          vi: `'#' báo hết câu. counts["${prefix}"] += 1. Reset prefix = "". Trả về [].`,
-          en: `'#' ends the sentence. counts["${prefix}"] += 1. Reset prefix = "". Return [].`,
+          vi: `'#' kết thúc câu. Tăng counts["${committedSentence}"] lên 1, đi lại đường Trie của câu này để cập nhật hot[3], rồi reset về root.`,
+          en: `'#' ends the sentence. Increment counts["${committedSentence}"], walk its Trie path to refresh hot[3], then reset to root.`,
         },
       });
       prefix = "";
+      currentNode = root;
       continue;
     }
 
+    const prefixBefore = prefix;
     prefix += c;
-    const matches = [...counts.entries()].filter(([s]) => s.startsWith(prefix));
-    matches.sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-    const top3 = matches.slice(0, 3).map(([s]) => s);
+    currentNode = currentNode ? (currentNode.children[c] || null) : null;
+    const top3 = currentNode ? [...currentNode.hot] : [];
 
     snap({
-      title: { vi: `input('${c}'): prefix="${prefix}" → top 3`, en: `input('${c}'): prefix="${prefix}" → top 3` },
-      codeLines: [6, 11, 12, 13, 14, 15],
+      phase: "type",
+      action: currentNode ? "rank" : "no-match",
+      charIndex,
+      inputChar: c,
+      prefixBefore,
+      prefix,
+      nodeFound: Boolean(currentNode),
+      top3,
+      decision: currentNode
+        ? { vi: `Đi theo cạnh '${c}' → trả node.hot[3]`, en: `Follow edge '${c}' → return node.hot[3]` }
+        : { vi: `Không có cạnh '${c}' → []`, en: `No '${c}' edge → []` },
+      title: { vi: `input('${c}'): đi tới node prefix="${prefix}"`, en: `input('${c}'): move to prefix="${prefix}" node` },
+      codeLines: [29, 35, 36, 37],
       vars: [
         { name: "c", value: `'${c}'` },
         { name: "prefix", value: `"${prefix}"` },
-        { name: "matches", value: matches.map(([s, cnt]) => `("${s}",${cnt})`).join(", ") || "none" },
-        { name: "top 3", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
+        { name: "node", value: currentNode ? `TrieNode("${prefix}")` : "None" },
+        { name: "node.hot", value: `[${top3.map((s) => `"${s}"`).join(", ")}]` },
       ],
       note: {
-        vi:
-          `Ghép '${c}' → prefix = "${prefix}". Lọc các câu bắt đầu bằng prefix: ${matches.length} câu.\n` +
-          `Sắp theo (count giảm, chữ cái tăng), lấy 3 câu đầu: [${top3.map((s) => `"${s}"`).join(", ")}].`,
-        en:
-          `Append '${c}' → prefix = "${prefix}". Filter sentences starting with the prefix: ${matches.length} matches.\n` +
-          `Sort by (count desc, lexicographic asc), take the first 3: [${top3.map((s) => `"${s}"`).join(", ")}].`,
+        vi: currentNode
+          ? `Từ node trước, đi đúng 1 cạnh '${c}'. Node cho prefix "${prefix}" đã cache sẵn top 3: [${top3.map((s) => `"${s}"`).join(", ")}]. Không cần quét toàn bộ câu.`
+          : `Trie không có cạnh '${c}' tại prefix trước đó, nên không có gợi ý. Các ký tự tiếp theo vẫn trả về [] cho đến khi gặp '#'.`,
+        en: currentNode
+          ? `Follow exactly one '${c}' edge. The node for prefix "${prefix}" already caches top 3: [${top3.map((s) => `"${s}"`).join(", ")}]. No full scan is needed.`
+          : `The Trie has no '${c}' edge from the previous prefix, so there are no suggestions until '#'.`,
       },
     });
   }
 
+  const finalTop3 = currentNode && prefix ? [...currentNode.hot] : [];
   snap({
+    phase: "done",
+    action: "done",
+    charIndex: typed.length,
+    prefix,
+    nodeFound: Boolean(currentNode),
+    top3: finalTop3,
+    decision: { vi: `Đã xử lý ${typed.length} ký tự bằng Trie`, en: `Processed ${typed.length} character(s) with the Trie` },
     title: { vi: "Hoàn tất chuỗi ký tự", en: "Finished the input sequence" },
     final: true,
-    codeLines: [15],
+    codeLines: [37],
     vars: [
       { name: "prefix", value: `"${prefix}"` },
-      { name: "counts", value: countsStr() },
+      { name: "node", value: currentNode ? `TrieNode("${prefix}")` : "None" },
+      { name: "node.hot", value: `[${finalTop3.map((s) => `"${s}"`).join(", ")}]` },
     ],
     note: {
-      vi: `Đã xử lý toàn bộ chuỗi gõ "${typed}". Hệ thống luôn gợi ý top 3 câu theo tần suất và thứ tự từ điển.`,
-      en: `Processed the whole typed sequence "${typed}". The system always suggests the top 3 sentences by frequency and lexicographic order.`,
+      vi: `Đã xử lý toàn bộ "${typed}". Mỗi ký tự thường chỉ đi một cạnh Trie và trả node.hot; '#' mới cập nhật các node trên đường đi của câu.`,
+      en: `Processed "${typed}". A normal character follows one Trie edge and returns node.hot; only '#' updates nodes along the sentence path.`,
     },
   });
 
@@ -2755,39 +2889,61 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Ký tự gõ vào", en: "Typed characters" },
     extraParams: [
-      { key: "sentences", label: { vi: "Câu lịch sử (cách bởi |)", en: "History sentences (| separated)" }, default: "i love you|island|iroman|i love leetcode" },
-      { key: "times", label: { vi: "Số lần (cách bởi ,)", en: "Times (comma separated)" }, default: "5,3,2,2" },
+      { key: "sentences", type: "string", label: { vi: "Câu lịch sử (cách bởi |)", en: "History sentences (| separated)" }, default: "i love you|island|iroman|i love leetcode" },
+      { key: "times", type: "string", label: { vi: "Số lần (cách bởi ,)", en: "Times (comma separated)" }, default: "5,3,2,2" },
     ],
     approach: [
-      { vi: "counts: câu → số lần đã gõ. Khởi tạo từ lịch sử (sentences, times).", en: "counts: sentence → usage count. Initialize from history (sentences, times)." },
-      { vi: "Mỗi input(c) ghép c vào prefix, lọc câu bắt đầu bằng prefix.", en: "Each input(c) appends c to the prefix, then filters sentences starting with the prefix." },
-      { vi: "Sắp theo (count giảm, chữ cái tăng), trả về 3 câu đầu.", en: "Sort by (count desc, lexicographic asc), return the first 3." },
-      { vi: "'#' lưu prefix hiện tại (+1) vào counts và reset prefix.", en: "'#' stores the current prefix (+1) into counts and resets the prefix." },
+      { vi: "Dựng Trie; mỗi node đại diện một prefix và cache sẵn hot[3].", en: "Build a Trie; each prefix node caches its hot[3] suggestions." },
+      { vi: "hot[3] luôn được xếp theo: frequency giảm dần, rồi câu tăng dần theo từ điển.", en: "hot[3] is ordered by frequency descending, then sentence lexicographically ascending." },
+      { vi: "input(c): đi từ node hiện tại qua children[c], trả ngay node.hot; không quét toàn bộ lịch sử.", en: "input(c): follow children[c] from the current node and return node.hot without scanning history." },
+      { vi: "input('#'): tăng frequency của câu, cập nhật hot[3] dọc đường Trie, rồi reset về root.", en: "input('#'): increment the sentence frequency, refresh hot[3] along its Trie path, then reset to root." },
     ],
     complexity: {
-      time: "O(n·L) mỗi ký tự",
-      space: "O(n·L)",
+      time: "input(char): O(1), input('#'): O(L)",
+      space: "O(S)",
       note: {
-        vi: "n = số câu, L = độ dài câu. Bản Trie tối ưu hơn nhưng ý tưởng xếp hạng giống nhau.",
-        en: "n = sentences, L = length. A Trie version is faster but the ranking idea is identical.",
+        vi: "L = độ dài câu vừa lưu; S = tổng số ký tự trong Trie. Mỗi node chỉ cache tối đa 3 câu nên sort là hằng số.",
+        en: "L = committed sentence length; S = total Trie characters. Each node caches at most 3 sentences, so its sort is constant-sized.",
       },
     },
     code: [
+      "class TrieNode:",
+      "    def __init__(self):",
+      "        self.children = {}",
+      "        self.hot = []",
+      "",
       "class AutocompleteSystem:",
       "    def __init__(self, sentences, times):",
-      "        self.counts = defaultdict(int)",
-      "        for s, t in zip(sentences, times): self.counts[s] += t",
+      "        self.counts = {}",
+      "        self.root = TrieNode()",
       "        self.prefix = ''",
+      "        self.node = self.root",
+      "        for s, t in zip(sentences, times):",
+      "            self._add(s, t)",
+      "",
+      "    def _update_hot(self, node, sentence):",
+      "        if sentence not in node.hot:",
+      "            node.hot.append(sentence)",
+      "        node.hot.sort(key=lambda s: (-self.counts[s], s))",
+      "        node.hot = node.hot[:3]",
+      "",
+      "    def _add(self, sentence, amount):",
+      "        self.counts[sentence] = self.counts.get(sentence, 0) + amount",
+      "        node = self.root",
+      "        self._update_hot(node, sentence)",
+      "        for ch in sentence:",
+      "            node = node.children.setdefault(ch, TrieNode())",
+      "            self._update_hot(node, sentence)",
+      "",
       "    def input(self, c):",
       "        if c == '#':",
-      "            self.counts[self.prefix] += 1",
+      "            self._add(self.prefix, 1)",
       "            self.prefix = ''",
+      "            self.node = self.root",
       "            return []",
       "        self.prefix += c",
-      "        matches = [(s, cnt) for s, cnt in self.counts.items()",
-      "                   if s.startswith(self.prefix)]",
-      "        matches.sort(key=lambda x: (-x[1], x[0]))",
-      "        return [s for s, _ in matches[:3]]",
+      "        self.node = self.node.children.get(c) if self.node else None",
+      "        return self.node.hot[:] if self.node else []",
     ],
     builder: buildSteps642,
   },

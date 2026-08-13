@@ -371,6 +371,15 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
       const operations = parseFunctionOperations(input).map((operation) => ({ ...operation, name: aliases[operation.name] || operation.name }));
       return designConfig("FileSystem", [], operations);
     }
+    case 642:
+      return designConfig(
+        "AutocompleteSystem",
+        [
+          String(params.sentences || "").split("|").map((sentence) => sentence.trim()).filter(Boolean),
+          parseNumberList(params.times),
+        ],
+        [...String(input)].map((char) => ({ name: "input", args: [char] })),
+      );
     case 676:
       return designConfig("MagicDictionary", [], [
         { name: "buildDict", args: [words(input)] },

@@ -13137,6 +13137,71 @@ function renderLongestDuplicateView(step) {
 }
 
 // ---- Render a single step ----
+function renderAutocompleteView(step) {
+  const view = step.autocompleteView || {};
+  const vi = lang === "vi";
+  const phases = [
+    vi ? "1 · Dựng Trie + hot[3]" : "1 · Build Trie + hot[3]",
+    vi ? "2 · Đi theo cạnh ký tự" : "2 · Follow character edge",
+    vi ? "3 · Cập nhật khi gặp #" : "3 · Update on #",
+  ];
+  const phaseRank = view.phase === "init" ? 0 : view.phase === "commit" ? 2 : 1;
+  const phasesHtml = phases.map((label, index) => `<span class="${index === phaseRank ? "active" : index < phaseRank ? "done" : ""}">${escapeHtml(label)}</span>`).join("");
+  const showChar = (char) => char === " " ? "␠" : char === "#" ? "#" : char;
+  const charName = (char) => char === " " ? (vi ? "space" : "space") : char === "#" ? (vi ? "kết thúc" : "commit") : char;
+  const typedHtml = (view.typedChars || []).map((char, index) => {
+    const classes = ["ac642-char"];
+    if (index < view.charIndex || view.phase === "done") classes.push("done");
+    else if (index === view.charIndex) classes.push(char === "#" ? "commit" : "active");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(showChar(char))}</strong><em>${escapeHtml(charName(char))}</em></span>`;
+  }).join("") || `<span class="ac642-empty">${vi ? "Không có ký tự" : "No input characters"}</span>`;
+
+  const historyHtml = (view.history || []).map((item) => `<div><strong>${escapeHtml(item.sentence)}</strong><span>${escapeHtml(item.count)}</span></div>`).join("") || `<div class="ac642-empty">∅</div>`;
+  const triePathHtml = (view.triePath || []).map((item, index, path) => {
+    const label = item.char === "ROOT" ? "ROOT" : showChar(item.char);
+    const classes = ["ac642-trie-node"];
+    if (!item.found) classes.push("missing");
+    if (index === path.length - 1) classes.push("current");
+    const cache = item.hot && item.hot.length ? item.hot.map((sentence) => `“${sentence}”`).join(" · ") : "[]";
+    return `${index ? `<i class="ac642-edge">→</i>` : ""}<div class="${classes.join(" ")}"><small>${escapeHtml(label)}</small><strong>${item.prefix ? `“${escapeHtml(item.prefix.replace(/ /g, "␠"))}”` : "prefix = empty"}</strong><em>hot[3]: ${escapeHtml(cache)}</em></div>`;
+  }).join("");
+  const candidatesHtml = (view.candidates || []).map((candidate) => `<div class="ac642-candidate selected">
+    <b>#${candidate.rank}</b><strong>${escapeHtml(candidate.sentence)}</strong><span>${escapeHtml(candidate.count)}×</span><em>${candidate.tiedWithPrevious ? (vi ? "cùng count → A–Z" : "count tie → A–Z") : candidate.rank === 1 ? (vi ? "hot nhất tại node này" : "hottest at this node") : ""}</em>
+  </div>`).join("") || `<div class="ac642-no-match">${view.phase === "init" ? (vi ? "Chọn Next để đi theo từng ký tự" : "Choose Next to follow each character") : view.action === "commit" ? (vi ? "Đã cập nhật hot[3] dọc đường Trie" : "Updated hot[3] along the Trie path") : (vi ? `Node prefix “${escapeHtml(view.prefix || "")}” không tồn tại` : `The node for prefix “${escapeHtml(view.prefix || "")}” does not exist`)}</div>`;
+  const suggestionSlots = Array.from({ length: 3 }, (_, index) => {
+    const sentence = (view.suggestions || [])[index];
+    return `<div class="ac642-slot ${sentence ? "filled" : "empty"}"><b>${index + 1}</b><span>${sentence ? escapeHtml(sentence) : "—"}</span></div>`;
+  }).join("");
+  const actionLabels = {
+    history: vi ? "DỰNG TRIE + CACHE" : "BUILD TRIE + CACHE",
+    rank: vi ? "ĐI 1 CẠNH → ĐỌC hot[3]" : "FOLLOW 1 EDGE → READ hot[3]",
+    "no-match": vi ? "KHÔNG CÓ CẠNH" : "EDGE NOT FOUND",
+    commit: vi ? "CẬP NHẬT TRIE → RESET" : "UPDATE TRIE → RESET",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+  const actionClass = ["rank", "no-match", "commit", "done"].includes(view.action) ? view.action : "";
+  const prefixDisplay = String(view.prefix || "").replace(/ /g, "␠");
+  const beforeDisplay = String(view.prefixBefore || "").replace(/ /g, "␠");
+  const summary = vi
+    ? `Trie autocomplete tại prefix ${prefixDisplay || "rỗng"}; node ${view.nodeFound ? "tồn tại" : "không tồn tại"}, hot[3] có ${(view.nodeHot || []).length} câu.`
+    : `Trie autocomplete at prefix ${prefixDisplay || "empty"}; node ${view.nodeFound ? "exists" : "is missing"}, hot[3] has ${(view.nodeHot || []).length} entries.`;
+
+  $("treeView").innerHTML = `<section class="ac642-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ac642-phases">${phasesHtml}</div>
+    <section class="ac642-input"><header><strong>INPUT STREAM</strong><span>␠ = space · # = commit</span></header><div>${typedHtml}</div></section>
+    <section class="ac642-action ${actionClass}"><span>${escapeHtml(actionLabels[view.action] || "AUTOCOMPLETE")}</span><strong>${escapeHtml(pick(view.decision) || "—")}</strong><code>"${escapeHtml(beforeDisplay)}" + ${view.inputChar ? `'${escapeHtml(showChar(view.inputChar))}'` : "—"} → "${escapeHtml(prefixDisplay)}"</code></section>
+    <section class="ac642-search"><span>⌕</span><div><small>${vi ? "PREFIX HIỆN TẠI" : "CURRENT PREFIX"}</small><strong>${prefixDisplay ? escapeHtml(prefixDisplay) : `<i>${vi ? "rỗng" : "empty"}</i>`}</strong></div><em class="${view.nodeFound ? "found" : "missing"}">${view.nodeFound ? (vi ? "NODE TỒN TẠI" : "NODE FOUND") : (vi ? "KHÔNG CÓ NODE" : "NO NODE")}</em></section>
+    <section class="ac642-trie"><header><strong>${vi ? "ĐƯỜNG ĐI TRONG TRIE" : "ACTIVE TRIE PATH"}</strong><span>${vi ? "mỗi ký tự = đi 1 cạnh" : "one character = one edge"}</span></header><div>${triePathHtml}</div></section>
+    <section class="ac642-rule"><span><b>1</b> node.children[c]</span><i>→</i><span><b>2</b> current node</span><i>→</i><span><b>3</b> return node.hot[:]</span></section>
+    <div class="ac642-layout">
+      <section class="ac642-card history"><header><strong>${vi ? "TẦN SUẤT TOÀN CỤC" : "GLOBAL FREQUENCIES"}</strong><span>sentence → count</span></header><div>${historyHtml}</div></section>
+      <section class="ac642-card ranking"><header><strong>${vi ? "CACHE CỦA NODE: hot[3]" : "NODE CACHE: hot[3]"}</strong><span>count ↓ · sentence A–Z</span></header><div>${candidatesHtml}</div></section>
+      <section class="ac642-card top"><header><strong>RETURN</strong><span>node.hot[:]</span></header><div>${suggestionSlots}</div></section>
+    </div>
+    ${view.action === "commit" ? `<section class="ac642-commit"><span># END SENTENCE</span><strong>"${escapeHtml(view.committedSentence)}"</strong><div><code>${escapeHtml(view.countBefore)}</code><b>→ +1 →</b><code>${escapeHtml(view.countAfter)}</code></div><em>prefix = "" · return []</em></section>` : ""}
+  </section>`;
+}
+
 function renderFileSystemView(step) {
   const view = step.fileSystemView || {};
   const vi = lang === "vi";
@@ -13644,6 +13709,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPathExistsBfsView(step);
+  } else if (step.autocompleteView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAutocompleteView(step);
   } else if (step.fileSystemView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
