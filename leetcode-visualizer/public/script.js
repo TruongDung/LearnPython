@@ -7890,6 +7890,126 @@ function renderDuplicateZerosView(step) {
   </div>`;
 }
 
+// ---- Four-sum pair-hash visualization (bai 454: 4Sum II) ----
+// Shows the four input arrays in separate rows, a frequency map of a+b pair
+// sums, and the complementary -(c+d) lookup that completes a+b+c+d = 0.
+function renderFourSumPairsView(step) {
+  const view = step.fourSumPairsView || {};
+  const rows = [
+    { name: "nums1", values: Array.isArray(view.nums1) ? view.nums1 : [], active: view.activeA, cls: "fsp-row-a" },
+    { name: "nums2", values: Array.isArray(view.nums2) ? view.nums2 : [], active: view.activeB, cls: "fsp-row-b" },
+    { name: "nums3", values: Array.isArray(view.nums3) ? view.nums3 : [], active: view.activeC, cls: "fsp-row-c" },
+    { name: "nums4", values: Array.isArray(view.nums4) ? view.nums4 : [], active: view.activeD, cls: "fsp-row-d" },
+  ];
+  const pairEntries = Array.isArray(view.pairEntries) ? view.pairEntries : [];
+  const phase = view.phase || "build";
+  const vi = lang === "vi";
+
+  function renderRow(row) {
+    const cells = row.values.map((value, index) => {
+      const active = index === row.active;
+      return `<div class="fsp-num-cell${active ? " active" : ""}"><span>[${index}]</span><strong>${escapeHtml(String(value))}</strong></div>`;
+    }).join("");
+    return `<div class="fsp-row ${row.cls}"><span class="fsp-row-label">${row.name}</span><div class="fsp-row-cells">${cells}</div></div>`;
+  }
+
+  const mapHtml = pairEntries.length
+    ? pairEntries.map(({ sum, count }) => `<div class="fsp-map-card${sum === view.pairSum || sum === view.complement ? " active" : ""}${sum === view.complement ? " complement" : ""}"><span>${escapeHtml(String(sum))}</span><strong>×${escapeHtml(String(count))}</strong></div>`).join("")
+    : `<span class="fsp-map-empty">{ }</span>`;
+
+  let action = vi ? "Đang xây dựng bảng pair_count của các tổng a+b." : "Building the pair_count table for a+b sums.";
+  if (phase === "store-pair") {
+    action = vi
+      ? `Lưu tổng a+b = ${view.pairSum}; tần suất của tổng này được tăng lên.`
+      : `Store a+b = ${view.pairSum}; its frequency is incremented.`;
+  } else if (phase === "lookup-complement") {
+    action = view.foundCount
+      ? (vi ? `Tìm thấy ${view.foundCount} cặp a+b = ${view.complement}; chúng ghép được với c+d để tạo 0.` : `Found ${view.foundCount} pair(s) where a+b = ${view.complement}; they pair with c+d to make 0.`)
+      : (vi ? `Cần a+b = ${view.complement}, nhưng hash map không có tổng này.` : `Need a+b = ${view.complement}, but the hash map does not have this sum.`);
+  } else if (phase === "found") {
+    action = vi ? `Hoàn tất: có ${view.answer || 0} tuple tổng bằng 0.` : `Done: ${view.answer || 0} tuples sum to 0.`;
+  }
+
+  const formula = view.complement !== undefined
+    ? `<div class="fsp-formula"><code>a + b</code><span>=</span><strong>${escapeHtml(String(view.complement))}</strong><span>=</span><code>-(c + d)</code></div>`
+    : `<div class="fsp-formula muted"><code>a + b + c + d = 0</code></div>`;
+
+  $("treeView").innerHTML = `
+    <div class="fsp-viz">
+      <div class="fsp-arrays">${rows.map(renderRow).join("")}</div>
+      <section class="fsp-map-panel"><header><strong>pair_count</strong><span>${vi ? "tổng a+b → số cặp" : "sum a+b → pair frequency"}</span></header><div class="fsp-map-cards">${mapHtml}</div></section>
+      ${formula}
+      <div class="fsp-action">${escapeHtml(action)}</div>
+      <div class="fsp-result"><span>${vi ? "count" : "count"}</span><strong>${escapeHtml(String(view.answer || 0))}</strong></div>
+    </div>`;
+}
+
+// ---- Binary reduction visualization (bai 1404: Number of Steps to Reduce
+// a Number in Binary Representation to One) ----
+// Shows the binary number before and after every operation. For /2 the
+// trailing zero being removed is red; for +1, the affected trailing ones
+// and the receiving carry bit are gold so carry propagation is visible.
+function renderBinaryReductionView(step) {
+  const view = step.binaryReductionView || {};
+  const before = String(view.before ?? "");
+  const after = String(view.after ?? before);
+  const operation = view.operation || "idle";
+  const lsbIndex = Number.isInteger(view.lsbIndex) ? view.lsbIndex : -1;
+  const carryIndices = new Set(Array.isArray(view.carryIndices) ? view.carryIndices : []);
+  const stepsCount = view.steps;
+  const vi = lang === "vi";
+
+  function bitRow(bits, role) {
+    const isBefore = role === "before";
+    const cells = [...bits].map((bit, index) => {
+      const isLsb = isBefore && index === lsbIndex;
+      const isCarry = isBefore && carryIndices.has(index);
+      const classes = [
+        "br-bit-cell",
+        isLsb && operation === "divide" ? "br-bit-remove" : "",
+        isCarry && operation === "add" ? "br-bit-carry" : "",
+      ].filter(Boolean).join(" ");
+      const pointer = isLsb
+        ? `<div class="br-lsb-pointer"><span>LSB</span><i>\u25BC</i></div>`
+        : `<div class="br-lsb-space"></div>`;
+      return `<div class="br-bit-wrap">${pointer}<div class="${classes}"><span>[${index}]</span><strong>${escapeHtml(bit)}</strong></div></div>`;
+    }).join("");
+    return `<div class="br-row"><span class="br-row-label">${escapeHtml(role)}</span><div class="br-bits">${cells}</div></div>`;
+  }
+
+  const opText = ({
+    divide: "/ 2",
+    add: "+ 1",
+    check: vi ? "kiểm tra" : "check",
+    "branch-add": vi ? "số lẻ" : "odd",
+    found: vi ? "xong" : "done",
+    idle: "",
+  })[operation] || "";
+  const changed = before !== after;
+  const summary = operation === "divide"
+    ? (vi ? "Số chẵn: bỏ bit 0 cuối để chia 2." : "Even number: remove the trailing 0 to divide by 2.")
+    : operation === "add"
+      ? (vi ? "Số lẻ: cộng 1; vàng là các bit carry đi qua." : "Odd number: add 1; gold marks the carry path.")
+      : operation === "found"
+        ? (vi ? "Đã đạt đúng giá trị 1." : "The value has reached exactly 1.")
+        : (vi ? "Kiểm tra bit cuối để chọn phép toán tiếp theo." : "Inspect the final bit to choose the next operation.");
+
+  $("treeView").innerHTML = `
+    <div class="binary-reduce-viz">
+      <div class="br-head">
+        <span class="br-step-badge">${vi ? "bước" : "steps"} <strong>${escapeHtml(String(stepsCount ?? 0))}</strong></span>
+        <span class="br-operation br-operation-${escapeHtml(operation)}">${escapeHtml(opText)}</span>
+      </div>
+      ${changed ? `${bitRow(before, "before")}<div class="br-transform">${escapeHtml(opText)}</div>${bitRow(after, "after")}` : bitRow(after, "s")}
+      <div class="br-summary">${escapeHtml(summary)}</div>
+      <div class="br-legend">
+        <span><i class="br-swatch br-swatch-lsb"></i>${vi ? "bit cuối (LSB)" : "last bit (LSB)"}</span>
+        <span><i class="br-swatch br-swatch-remove"></i>${vi ? "bit 0 bị bỏ khi /2" : "0 removed by /2"}</span>
+        <span><i class="br-swatch br-swatch-carry"></i>${vi ? "đường đi carry khi +1" : "carry path for +1"}</span>
+      </div>
+    </div>`;
+}
+
 // ---- Repeating-runs visualization (bai 2213: Longest Substring of One
 // Repeating Character) ----
 // Shows the string as a strip of character cells grouped into colored
@@ -13574,6 +13694,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRepeatingRunsView(step);
+  } else if (step.binaryReductionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBinaryReductionView(step);
+  } else if (step.fourSumPairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFourSumPairsView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

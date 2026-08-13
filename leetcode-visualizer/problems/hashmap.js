@@ -4939,7 +4939,222 @@ function buildSteps202(input) {
   return { original: n0, answer, steps };
 }
 
+/**
+ * LeetCode 454: 4Sum II.
+ * Count tuples (a, b, c, d) where a + b + c + d = 0 using a hash map of
+ * all pair sums a + b. Then every c + d needs the complementary key
+ * -(c + d). Duplicated pair sums are stored as frequencies, not just keys.
+ */
+function buildSteps454(nums1, params) {
+  const parseList = (value) => String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .map(Number)
+    .filter(Number.isFinite);
+  const A = Array.isArray(nums1) ? nums1.map(Number).filter(Number.isFinite) : parseList(nums1);
+  const B = parseList(params && params.nums2);
+  const C = parseList(params && params.nums3);
+  const D = parseList(params && params.nums4);
+  const steps = [];
+  const valid = A.length && B.length && C.length && D.length;
+
+  function mapEntries(pairCount) {
+    return [...pairCount.entries()].sort((x, y) => x[0] - y[0]).map(([sum, count]) => ({ sum, count }));
+  }
+
+  function snap(opts, pairCount, answer) {
+    steps.push({
+      title: opts.title,
+      arr: [...A],
+      sub: A.map((_, index) => `[${index}]`),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      fourSumPairsView: {
+        nums1: [...A], nums2: [...B], nums3: [...C], nums4: [...D],
+        activeA: opts.activeA,
+        activeB: opts.activeB,
+        activeC: opts.activeC,
+        activeD: opts.activeD,
+        pairSum: opts.pairSum,
+        complement: opts.complement,
+        foundCount: opts.foundCount,
+        pairEntries: mapEntries(pairCount),
+        answer,
+        phase: opts.phase || "build",
+      },
+    });
+  }
+
+  if (!valid) {
+    snap({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "nums1", value: `[${A.join(",")}]` }, { name: "nums2", value: `[${B.join(",")}]` }, { name: "nums3", value: `[${C.join(",")}]` }, { name: "nums4", value: `[${D.join(",")}]` }],
+      note: { vi: "Cần nhập đủ bốn mảng số nguyên không rỗng.", en: "All four non-empty integer arrays are required." },
+      phase: "invalid",
+    }, new Map(), 0);
+    return { original: { nums1: A, nums2: B, nums3: C, nums4: D }, answer: 0, steps };
+  }
+
+  const pairCount = new Map();
+  let answer = 0;
+
+  // Line 3: pair_count = {}
+  snap({
+    title: { vi: "pair_count = {}", en: "pair_count = {}" },
+    codeLines: [3],
+    vars: [{ name: "pair_count", value: "{}" }],
+    note: { vi: "Hash map sẽ lưu {tổng a+b : số cặp (a,b) tạo tổng đó}.", en: "The hash map stores {sum a+b : number of (a,b) pairs producing that sum}." },
+    phase: "init-map",
+  }, pairCount, answer);
+
+  for (let ai = 0; ai < A.length; ai++) {
+    const a = A[ai];
+    // Line 4
+    snap({
+      title: { vi: `for a in nums1: a=nums1[${ai}]=${a}`, en: `for a in nums1: a=nums1[${ai}]=${a}` },
+      codeLines: [4], activeA: ai,
+      vars: [{ name: "a", value: a }],
+      note: { vi: `Chọn a=${a}; ghép nó lần lượt với mọi b trong nums2.`, en: `Choose a=${a}; pair it with every b in nums2.` },
+      phase: "choose-a",
+    }, pairCount, answer);
+
+    for (let bi = 0; bi < B.length; bi++) {
+      const b = B[bi];
+      // Line 5
+      snap({
+        title: { vi: `for b in nums2: b=nums2[${bi}]=${b}`, en: `for b in nums2: b=nums2[${bi}]=${b}` },
+        codeLines: [5], activeA: ai, activeB: bi,
+        vars: [{ name: "a", value: a }, { name: "b", value: b }],
+        note: { vi: `Xét cặp (a,b)=(${a},${b}).`, en: `Inspect pair (a,b)=(${a},${b}).` },
+        phase: "choose-b",
+      }, pairCount, answer);
+
+      const sum = a + b;
+      const oldCount = pairCount.get(sum) || 0;
+      pairCount.set(sum, oldCount + 1);
+      // Line 6
+      snap({
+        title: { vi: `pair_count[${a}+${b}=${sum}] = ${oldCount}+1 = ${oldCount + 1}`, en: `pair_count[${a}+${b}=${sum}] = ${oldCount}+1 = ${oldCount + 1}` },
+        codeLines: [6], activeA: ai, activeB: bi, pairSum: sum,
+        vars: [{ name: "a + b", value: sum }, { name: `pair_count[${sum}]`, value: oldCount + 1 }],
+        note: { vi: `Lưu tần suất tổng ${sum}. Nếu nhiều cặp (a,b) có cùng tổng thì phải cộng dồn vì mỗi cặp là một tuple riêng.`, en: `Store the frequency of sum ${sum}. Multiple (a,b) pairs with the same sum must accumulate because each is a separate tuple.` },
+        phase: "store-pair",
+      }, pairCount, answer);
+    }
+  }
+
+  // Line 7: count = 0
+  snap({
+    title: { vi: "count = 0", en: "count = 0" },
+    codeLines: [7],
+    vars: [{ name: "count", value: answer }],
+    note: { vi: "Đã có tất cả tổng a+b. Bây giờ duyệt các cặp (c,d) và tìm tổng bù trong hash map.", en: "All a+b sums are ready. Now scan (c,d) pairs and look up their complement in the hash map." },
+    phase: "init-count",
+  }, pairCount, answer);
+
+  for (let ci = 0; ci < C.length; ci++) {
+    const c = C[ci];
+    // Line 8
+    snap({
+      title: { vi: `for c in nums3: c=nums3[${ci}]=${c}`, en: `for c in nums3: c=nums3[${ci}]=${c}` },
+      codeLines: [8], activeC: ci,
+      vars: [{ name: "c", value: c }],
+      note: { vi: `Chọn c=${c}; ghép nó với mọi d trong nums4.`, en: `Choose c=${c}; pair it with every d in nums4.` },
+      phase: "choose-c",
+    }, pairCount, answer);
+
+    for (let di = 0; di < D.length; di++) {
+      const d = D[di];
+      // Line 9
+      snap({
+        title: { vi: `for d in nums4: d=nums4[${di}]=${d}`, en: `for d in nums4: d=nums4[${di}]=${d}` },
+        codeLines: [9], activeC: ci, activeD: di,
+        vars: [{ name: "c", value: c }, { name: "d", value: d }],
+        note: { vi: `Xét cặp (c,d)=(${c},${d}).`, en: `Inspect pair (c,d)=(${c},${d}).` },
+        phase: "choose-d",
+      }, pairCount, answer);
+
+      const complement = -(c + d);
+      const foundCount = pairCount.get(complement) || 0;
+      answer += foundCount;
+      // Line 10
+      snap({
+        title: { vi: `count += pair_count[-(${c}+${d})=${complement}] = ${foundCount} → ${answer}`, en: `count += pair_count[-(${c}+${d})=${complement}] = ${foundCount} → ${answer}` },
+        codeLines: [10], activeC: ci, activeD: di, complement, foundCount,
+        vars: [{ name: "-(c+d)", value: complement }, { name: `pair_count[${complement}]`, value: foundCount }, { name: "count", value: answer }],
+        note: foundCount
+          ? { vi: `Cần a+b=${complement} để a+b+c+d=0. Hash map có ${foundCount} cặp như vậy, nên count tăng ${foundCount}.`, en: `Need a+b=${complement} so a+b+c+d=0. The hash map has ${foundCount} such pair(s), so count increases by ${foundCount}.` }
+          : { vi: `Cần a+b=${complement}, nhưng hash map không có tổng này → không có tuple mới.`, en: `Need a+b=${complement}, but the hash map has no such sum → no new tuple.` },
+        phase: "lookup-complement",
+      }, pairCount, answer);
+    }
+  }
+
+  // Line 11: return count
+  snap({
+    title: { vi: `return count → ${answer}`, en: `return count → ${answer}` },
+    final: true, codeLines: [11],
+    vars: [{ name: "count", value: answer }],
+    note: { vi: `Tổng số tuple (a,b,c,d) có a+b+c+d=0 là ${answer}.`, en: `The total number of tuples (a,b,c,d) with a+b+c+d=0 is ${answer}.` },
+    phase: "found",
+  }, pairCount, answer);
+
+  return { original: { nums1: A, nums2: B, nums3: C, nums4: D }, answer, steps };
+}
+
 module.exports = {
+  454: {
+    id: 454,
+    difficulty: "medium",
+    slug: "4sum-ii",
+    category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "4Sum II", en: "4Sum II" },
+    titleVi: { vi: "Đếm bộ bốn có tổng bằng 0", en: "Count quadruplets with sum zero" },
+    statement: {
+      vi: "Cho bốn mảng số nguyên nums1, nums2, nums3, nums4 có cùng độ dài. Đếm số tuple (i,j,k,l) sao cho nums1[i] + nums2[j] + nums3[k] + nums4[l] = 0.",
+      en: "Given four integer arrays nums1, nums2, nums3, and nums4 of the same length, count tuples (i,j,k,l) such that nums1[i] + nums2[j] + nums3[k] + nums4[l] = 0.",
+    },
+    defaultInput: "1,2",
+    inputKind: "integer",
+    inputLabel: { vi: "nums1", en: "nums1" },
+    extraParams: [
+      { key: "nums2", type: "string", label: { vi: "nums2 (cách bởi ,)", en: "nums2 (comma separated)" }, default: "-2,-1" },
+      { key: "nums3", type: "string", label: { vi: "nums3 (cách bởi ,)", en: "nums3 (comma separated)" }, default: "-1,2" },
+      { key: "nums4", type: "string", label: { vi: "nums4 (cách bởi ,)", en: "nums4 (comma separated)" }, default: "0,2" },
+    ],
+    approach: [
+      { vi: "Duyệt tất cả cặp (a,b) từ nums1 × nums2 và lưu tần suất từng tổng a+b vào hash map.", en: "Enumerate all (a,b) pairs from nums1 × nums2 and store the frequency of every a+b sum in a hash map." },
+      { vi: "Với từng cặp (c,d), cần a+b = -(c+d) để tổng bốn số bằng 0.", en: "For each (c,d) pair, we need a+b = -(c+d) so all four numbers sum to 0." },
+      { vi: "Cộng pair_count[-(c+d)] vào kết quả; tần suất tự động tính mọi cặp (a,b) trùng tổng.", en: "Add pair_count[-(c+d)] to the result; frequencies automatically count every (a,b) pair with that sum." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: { vi: "Hai lần duyệt cặp O(n²); hash map có tối đa O(n²) tổng khác nhau.", en: "Two O(n²) pair scans; the hash map has up to O(n²) distinct sums." },
+    },
+    code: [
+      "class Solution:",
+      "    def fourSumCount(self, nums1, nums2, nums3, nums4):",
+      "        pair_count = {}",
+      "        for a in nums1:",
+      "            for b in nums2:",
+      "                pair_count[a + b] = pair_count.get(a + b, 0) + 1",
+      "        count = 0",
+      "        for c in nums3:",
+      "            for d in nums4:",
+      "                count += pair_count.get(-(c + d), 0)",
+      "        return count",
+    ],
+    builder: buildSteps454,
+  },
   202: {
     id: 202, difficulty: "easy", slug: "happy-number",
     category: { key: "hashmap", vi: "Hash Map", en: "Hash Map" },

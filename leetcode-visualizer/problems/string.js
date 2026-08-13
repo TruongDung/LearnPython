@@ -8905,6 +8905,222 @@ function buildSteps3302(input, params) {
 }
 
 /**
+ * LeetCode 1404: Number of Steps to Reduce a Number in Binary Representation to One.
+ *
+ * Simulate directly on the binary string:
+ *   - last bit 0 → even → divide by 2 by removing that last bit
+ *   - last bit 1 → odd  → add 1 with binary carry propagation
+ * Stop once the string is exactly "1".
+ */
+function buildSteps1404(input) {
+  const original = String(input || "").trim();
+  const steps = [];
+  const valid = /^1[01]*$/.test(original);
+
+  function addOne(binary) {
+    const bits = binary.split("");
+    const carryIndices = [];
+    let i = bits.length - 1;
+    while (i >= 0 && bits[i] === "1") {
+      carryIndices.push(i);
+      bits[i] = "0";
+      i--;
+    }
+    if (i >= 0) {
+      carryIndices.push(i);
+      bits[i] = "1";
+    } else {
+      bits.unshift("1");
+      // Leading carry is represented as -1, while old indices remain available.
+      carryIndices.push(-1);
+    }
+    return { result: bits.join(""), carryIndices };
+  }
+
+  function snap(opts) {
+    const before = opts.before ?? original;
+    const after = opts.after ?? before;
+    steps.push({
+      title: opts.title,
+      arr: after.split("").map(() => 1),
+      sub: after.split(""),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      binaryReductionView: {
+        before,
+        after,
+        operation: opts.operation || "idle",
+        lsbIndex: opts.lsbIndex,
+        carryIndices: opts.carryIndices || [],
+        steps: opts.steps,
+        final: opts.final || false,
+      },
+    });
+  }
+
+  if (!valid) {
+    snap({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      after: original || "?",
+      final: true,
+      codeLines: [2],
+      vars: [{ name: "s", value: `"${original}"` }],
+      note: {
+        vi: "s phải là chuỗi nhị phân không rỗng, bắt đầu bằng '1' (không có số 0 ở đầu).",
+        en: "s must be a non-empty binary string beginning with '1' (no leading zero).",
+      },
+    });
+    return { original, answer: null, steps };
+  }
+
+  let current = original;
+  let count = 0;
+
+  // Line 3: steps = 0
+  snap({
+    title: { vi: "steps = 0", en: "steps = 0" },
+    after: current,
+    codeLines: [3],
+    steps: count,
+    vars: [{ name: "s", value: `"${current}"` }, { name: "steps", value: count }],
+    note: {
+      vi: `Bắt đầu với s="${current}". Mỗi phép +1 hoặc /2 tính là đúng 1 bước.`,
+      en: `Start with s="${current}". Every +1 or /2 operation counts as exactly 1 step.`,
+    },
+  });
+
+  while (current !== "1") {
+    // Line 4: while s != "1":
+    snap({
+      title: { vi: `while s != "1" → "${current}" != "1" → True`, en: `while s != "1" → "${current}" != "1" → True` },
+      after: current,
+      codeLines: [4],
+      operation: "check",
+      steps: count,
+      vars: [{ name: "s", value: `"${current}"` }, { name: "steps", value: count }],
+      note: {
+        vi: `s chưa phải "1", nên tiếp tục xét bit cuối cùng s[-1]='${current.at(-1)}'.`,
+        en: `s is not yet "1", so inspect its last bit s[-1]='${current.at(-1)}'.`,
+      },
+    });
+
+    const isEven = current.at(-1) === "0";
+    // Line 5: if s[-1] == "0":
+    snap({
+      title: { vi: `if s[-1] == "0" → '${current.at(-1)}' == '0' → ${isEven}`, en: `if s[-1] == "0" → '${current.at(-1)}' == '0' → ${isEven}` },
+      after: current,
+      codeLines: [5],
+      operation: "check",
+      lsbIndex: current.length - 1,
+      steps: count,
+      vars: [{ name: "s[-1] (LSB)", value: `'${current.at(-1)}'` }],
+      note: isEven
+        ? { vi: "Bit cuối là 0 → số chẵn → được phép chia 2.", en: "The last bit is 0 → the number is even → divide by 2." }
+        : { vi: "Bit cuối là 1 → số lẻ → phải cộng 1 trước.", en: "The last bit is 1 → the number is odd → add 1 first." },
+    });
+
+    const before = current;
+    let operation;
+    let carryIndices = [];
+
+    if (isEven) {
+      // Line 6: s = s[:-1]
+      current = current.slice(0, -1);
+      operation = "divide";
+      snap({
+        title: { vi: `s = s[:-1] → "${before}" / 2 = "${current}"`, en: `s = s[:-1] → "${before}" / 2 = "${current}"` },
+        before,
+        after: current,
+        codeLines: [6],
+        operation,
+        lsbIndex: before.length - 1,
+        steps: count,
+        vars: [{ name: "s", value: `"${current}"` }],
+        note: {
+          vi: "Trong nhị phân, chia số chẵn cho 2 = bỏ bit 0 ở cuối chuỗi.",
+          en: "In binary, dividing an even number by 2 means removing its trailing 0 bit.",
+        },
+      });
+    } else {
+      // Line 7: else:
+      snap({
+        title: { vi: "else: bit cuối là 1", en: "else: the last bit is 1" },
+        after: before,
+        codeLines: [7],
+        operation: "branch-add",
+        lsbIndex: before.length - 1,
+        steps: count,
+        vars: [{ name: "s[-1]", value: "'1'" }],
+        note: {
+          vi: "Số lẻ không thể chia 2 ngay. Đi vào else để cộng 1, biến nó thành số chẵn.",
+          en: "An odd number cannot be divided by 2 immediately. Enter else to add 1 and make it even.",
+        },
+      });
+
+      // Line 8: s = bin(int(s, 2) + 1)[2:]
+      const addition = addOne(before);
+      current = addition.result;
+      carryIndices = addition.carryIndices;
+      operation = "add";
+      snap({
+        title: { vi: `s = bin(int(s,2)+1)[2:] → "${before}" + 1 = "${current}"`, en: `s = bin(int(s,2)+1)[2:] → "${before}" + 1 = "${current}"` },
+        before,
+        after: current,
+        codeLines: [8],
+        operation,
+        lsbIndex: before.length - 1,
+        carryIndices,
+        steps: count,
+        vars: [{ name: "s", value: `"${current}"` }],
+        note: {
+          vi: `Cộng 1 theo nhị phân: carry đi từ phải sang trái qua các bit 1 cuối. Các vị trí carry: ${carryIndices.filter((i) => i >= 0).map((i) => `[${i}]`).join(", ") || "không có"}.`,
+          en: `Add 1 in binary: the carry moves right-to-left through trailing 1 bits. Carry positions: ${carryIndices.filter((i) => i >= 0).map((i) => `[${i}]`).join(", ") || "none"}.`,
+        },
+      });
+    }
+
+    // Line 9: steps += 1
+    count++;
+    snap({
+      title: { vi: `steps += 1 → steps=${count}`, en: `steps += 1 → steps=${count}` },
+      before,
+      after: current,
+      codeLines: [9],
+      operation,
+      lsbIndex: before.length - 1,
+      carryIndices,
+      steps: count,
+      vars: [{ name: "s", value: `"${current}"` }, { name: "steps", value: count }],
+      note: {
+        vi: `${operation === "divide" ? "Chia 2" : "Cộng 1"} vừa thực hiện, nên tăng bộ đếm bước lên ${count}.`,
+        en: `${operation === "divide" ? "Division by 2" : "Addition by 1"} was just performed, so increase the step count to ${count}.`,
+      },
+    });
+  }
+
+  // Line 10: return steps
+  snap({
+    title: { vi: `return steps → ${count}`, en: `return steps → ${count}` },
+    after: current,
+    final: true,
+    codeLines: [10],
+    operation: "found",
+    steps: count,
+    vars: [{ name: "s", value: `"${current}"` }, { name: "steps", value: count }],
+    note: {
+      vi: `Đã giảm được về s="1" sau ${count} bước.`,
+      en: `The value has reached s="1" after ${count} steps.`,
+    },
+  });
+
+  return { original, answer: count, steps };
+}
+
+/**
  * LeetCode 2213: Longest Substring of One Repeating Character.
  *
  * s is mutated one character at a time by queries. After EACH query, find
@@ -9216,6 +9432,48 @@ function buildSteps2213(input, params) {
 }
 
 module.exports = {
+  1404: {
+    id: 1404,
+    difficulty: "medium",
+    slug: "number-of-steps-to-reduce-a-number-in-binary-representation-to-one",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [{ key: "math", vi: "Toán học", en: "Math" }],
+    title: { vi: "Number of Steps to Reduce a Number in Binary Representation to One", en: "Number of Steps to Reduce a Number in Binary Representation to One" },
+    titleVi: { vi: "Số bước giảm số nhị phân về 1", en: "Steps to reduce a binary number to one" },
+    statement: {
+      vi: "Cho số nguyên dương ở dạng chuỗi nhị phân s. Nếu s là số chẵn thì chia 2; nếu s là số lẻ (trừ 1) thì cộng 1. Trả về số bước cần thiết để đưa s về đúng 1.",
+      en: "Given a positive integer as a binary string s, divide it by 2 if it is even, or add 1 if it is odd (except 1). Return the number of steps needed to reach exactly 1.",
+    },
+    defaultInput: "1101",
+    inputKind: "string",
+    inputLabel: { vi: "s (chuỗi nhị phân)", en: "s (binary string)" },
+    approach: [
+      { vi: "Nhìn bit cuối (LSB): 0 nghĩa là số chẵn, nên chia 2 bằng cách bỏ bit 0 cuối.", en: "Inspect the last bit (LSB): 0 means even, so divide by 2 by removing that trailing 0." },
+      { vi: "Bit cuối 1 nghĩa là số lẻ, nên cộng 1. Carry lan từ phải sang trái qua các bit 1 cuối.", en: "A last bit of 1 means odd, so add 1. The carry propagates right-to-left through trailing 1 bits." },
+      { vi: "Lặp lại đến khi chuỗi chỉ còn \"1\".", en: "Repeat until the string is exactly \"1\"." },
+    ],
+    complexity: {
+      time: "O(n²) với mô phỏng chuỗi trực tiếp",
+      space: "O(n)",
+      note: {
+        vi: "Mô phỏng trực tiếp rất dễ quan sát; mỗi lần +1 có thể carry qua O(n) bit. Có thể tối ưu O(n) bằng cách duyệt từ phải sang trái với biến carry.",
+        en: "The direct string simulation is easy to observe; each +1 may carry across O(n) bits. It can be optimized to O(n) with one right-to-left pass and a carry variable.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def numSteps(self, s):",
+      "        steps = 0",
+      "        while s != \"1\":",
+      "            if s[-1] == \"0\":",
+      "                s = s[:-1]",
+      "            else:",
+      "                s = bin(int(s, 2) + 1)[2:]",
+      "            steps += 1",
+      "        return steps",
+    ],
+    builder: buildSteps1404,
+  },
   2213: {
     id: 2213,
     difficulty: "hard",
