@@ -7908,6 +7908,9 @@ function renderRepeatingRunsView(step) {
   const currentRun = view.currentRun || null;
   const bestRun = view.bestRun || null;
   const lengths = Array.isArray(view.lengths) ? view.lengths : [];
+  const treeNodes = Array.isArray(view.treeNodes) ? view.treeNodes : [];
+  const merge = view.merge || null;
+  const rootBest = Number.isFinite(Number(view.rootBest)) ? Number(view.rootBest) : null;
   const queryIndex = Number.isInteger(view.queryIndex) ? view.queryIndex : null;
   const totalQueries = view.totalQueries;
   const vi = lang === "vi";
@@ -7965,15 +7968,45 @@ function renderRepeatingRunsView(step) {
   const queryLabel = queryIndex !== null
     ? (vi ? `Query ${queryIndex + 1}/${totalQueries}` : `Query ${queryIndex + 1}/${totalQueries}`)
     : (vi ? "Khởi tạo" : "Setup");
+  const treeHtml = treeNodes.length
+    ? treeNodes.map((node) => `<span class="run-tree-node${node.root ? " is-root" : ""}${node.active ? " is-active" : ""}${node.path ? " is-path" : ""}">
+        <small>#${escapeHtml(String(node.id))} · [${escapeHtml(String(node.l))}..${escapeHtml(String(node.r))}]</small>
+        <strong>${escapeHtml(String(node.best))}</strong>
+        <em>pre ${escapeHtml(String(node.pref))} · suf ${escapeHtml(String(node.suff))}</em>
+        <i>${escapeHtml(String(node.leftChar))}…${escapeHtml(String(node.rightChar))}</i>
+      </span>`).join("")
+    : `<span class="run-length-empty">${vi ? "(chưa build cây)" : "(tree not built yet)"}</span>`;
+  const mergeHtml = merge
+    ? `<div class="run-merge-card">
+        <small>${vi ? "merge đang chạy" : "current merge"}</small>
+        <strong>node #${escapeHtml(String(merge.node))}: best ${escapeHtml(String(merge.beforeBest))} → ${escapeHtml(String(merge.afterBest))}</strong>
+        <span>${merge.canJoin
+    ? escapeHtml(`cross = ${merge.left.suff} + ${merge.right.pref} = ${merge.cross}`)
+    : escapeHtml(vi ? "không nối được qua giữa" : "cannot join across the middle")}</span>
+      </div>`
+    : `<div class="run-merge-card">
+        <small>${vi ? "quy tắc node" : "node rule"}</small>
+        <strong>best = max(left.best, right.best, cross)</strong>
+        <span>${vi ? "cross chỉ có khi ký tự cuối trái == ký tự đầu phải" : "cross exists only when left last char == right first char"}</span>
+      </div>`;
 
   $("treeView").innerHTML = `
     <div class="run-viz">
       <div class="run-head">
         <span class="run-query-badge">${escapeHtml(queryLabel)}</span>
+        ${rootBest !== null ? `<span class="run-query-badge run-root-badge">root.best = ${escapeHtml(String(rootBest))}</span>` : ""}
         <span class="run-info">${escapeHtml(currentRunLabel)}</span>
         <span class="run-info run-info-best">${escapeHtml(bestRunLabel)}</span>
       </div>
       <div class="run-cells">${cells}</div>
+      <div class="run-tree-panel">
+        <div class="run-tree-head">
+          <strong>SEGMENT TREE</strong>
+          <span>${vi ? "mỗi node hiển thị best / pref / suff" : "each node shows best / pref / suff"}</span>
+        </div>
+        <div class="run-tree-nodes">${treeHtml}</div>
+      </div>
+      ${mergeHtml}
       <div class="run-lengths-panel">
         <span class="run-lengths-label">${vi ? "lengths (kết quả từng query)" : "lengths (result per query)"}</span>
         <div class="run-lengths-chips">${lengthsHtml}</div>

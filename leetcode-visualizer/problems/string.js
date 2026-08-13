@@ -7857,7 +7857,7 @@ function buildSteps65(input) {
 
   snap({
     title: { vi: "state = 0 (start)", en: "state = 0 (start)" },
-    codeLines: [3, 4, 5],
+    codeLines: [34, 35],
     vars: [
       { name: "s", value: `"${s}"` },
       { name: "state", value: "0 (start)" },
@@ -8909,28 +8909,22 @@ function buildSteps3302(input, params) {
  *
  * s is mutated one character at a time by queries. After EACH query, find
  * the length of the longest run of a single repeating character in the
- * WHOLE string. The efficient approach uses a segment tree, but for a clear
- * step-by-step visualization we rescan the string after each update: apply
- * the character change, then scan left to right tracking the current run
- * length and the best run length seen so far.
+ * WHOLE string. Use a segment tree where every node stores enough summary
+ * information to merge two adjacent intervals:
+ *   left character, right character, prefix run length, suffix run length,
+ *   best run length, and interval length.
  *
  * Code lines (1-indexed):
  *  1  class Solution:
  *  2      def longestRepeating(self, s, queryCharacters, queryIndices):
- *  3          chars = list(s)
- *  4          lengths = []
- *  5          for i in range(len(queryCharacters)):
- *  6              chars[queryIndices[i]] = queryCharacters[i]
- *  7              best = 1
- *  8              run = 1
- *  9              for j in range(1, len(chars)):
- * 10                  if chars[j] == chars[j - 1]:
- * 11                      run += 1
- * 12                  else:
- * 13                      run = 1
- * 14                  best = max(best, run)
- * 15              lengths.append(best)
- * 16          return lengths
+ *  3          n = len(s)
+ *  4          build a segment tree over s
+ *  5          ans = []
+ *  6          for ch, index in zip(queryCharacters, queryIndices):
+ *  7              update the leaf at index to ch
+ *  8              while moving upward: merge(left_child, right_child)
+ *  9              ans.append(tree[1].best)
+ * 10          return ans
  */
 function buildSteps2213(input, params) {
   const s = String(input || "");
@@ -8974,7 +8968,6 @@ function buildSteps2213(input, params) {
   const lengths = [];
 
   function runsFor(arr) {
-    // Returns [{ start, end, length, ch }] for every maximal run, for the view.
     const runs = [];
     let start = 0;
     for (let j = 1; j <= arr.length; j++) {
@@ -8984,6 +8977,65 @@ function buildSteps2213(input, params) {
       }
     }
     return runs;
+  }
+
+  let size = 1;
+  while (size < n) size *= 2;
+  const tree = Array.from({ length: size * 2 }, () => null);
+
+  function makeEmpty(l, r) {
+    return { l, r, len: 0, leftChar: "", rightChar: "", pref: 0, suff: 0, best: 0 };
+  }
+
+  function makeLeaf(index, ch) {
+    return { l: index, r: index, len: 1, leftChar: ch, rightChar: ch, pref: 1, suff: 1, best: 1 };
+  }
+
+  function mergeNode(left, right) {
+    if (!left || left.len === 0) return right || makeEmpty(0, -1);
+    if (!right || right.len === 0) return left;
+    const node = {
+      l: left.l,
+      r: right.r,
+      len: left.len + right.len,
+      leftChar: left.leftChar,
+      rightChar: right.rightChar,
+      pref: left.pref,
+      suff: right.suff,
+      best: Math.max(left.best, right.best),
+    };
+    const canJoin = left.rightChar === right.leftChar;
+    if (canJoin) {
+      const cross = left.suff + right.pref;
+      node.best = Math.max(node.best, cross);
+      if (left.pref === left.len) node.pref = left.len + right.pref;
+      if (right.suff === right.len) node.suff = right.len + left.suff;
+    }
+    return node;
+  }
+
+  function visibleTreeNodes(activeNode = null, path = []) {
+    const pathSet = new Set(path);
+    const nodes = [];
+    for (let id = 1; id < tree.length; id++) {
+      const node = tree[id];
+      if (!node || node.len === 0 || node.l >= n) continue;
+      nodes.push({
+        id,
+        l: node.l,
+        r: Math.min(node.r, n - 1),
+        len: node.len,
+        leftChar: node.leftChar,
+        rightChar: node.rightChar,
+        pref: node.pref,
+        suff: node.suff,
+        best: node.best,
+        active: id === activeNode,
+        path: pathSet.has(id),
+        root: id === 1,
+      });
+    }
+    return nodes.slice(0, 31);
   }
 
   function snap(opts) {
@@ -9009,23 +9061,32 @@ function buildSteps2213(input, params) {
         lengths: [...lengths],
         phase: opts.phase || "scan",
         changedIndex: opts.changedIndex,
+        treeNodes: visibleTreeNodes(opts.activeNode, opts.updatePath || []),
+        merge: opts.merge,
+        rootBest: tree[1] ? tree[1].best : 0,
       },
     });
   }
 
-  // Line 3-4: chars = list(s); lengths = []
+  for (let i = 0; i < size; i++) {
+    tree[size + i] = i < n ? makeLeaf(i, chars[i]) : makeEmpty(i, i);
+  }
+  for (let id = size - 1; id >= 1; id--) {
+    tree[id] = mergeNode(tree[id * 2], tree[id * 2 + 1]);
+  }
+
   snap({
-    title: { vi: `chars = list(s) → [${chars.join(",")}], lengths = []`, en: `chars = list(s) → [${chars.join(",")}], lengths = []` },
-    codeLines: [3, 4],
+    title: { vi: "Build Segment Tree từ chuỗi ban đầu", en: "Build the Segment Tree from the initial string" },
+    codeLines: [3, 4, 5],
     phase: "init",
     vars: [
       { name: "s", value: `"${s}"` },
-      { name: "chars", value: `[${chars.join(",")}]` },
-      { name: "lengths", value: "[]" },
+      { name: "root.best", value: tree[1].best },
+      { name: "ans", value: "[]" },
     ],
     note: {
-      vi: `s="${s}" có ${k} query. Ta sẽ áp dụng từng query rồi quét lại TOÀN BỘ chuỗi để tìm run (đoạn lặp) dài nhất.`,
-      en: `s="${s}" has ${k} queries. We apply each query then rescan the WHOLE string to find the longest run (repeated block).`,
+      vi: "Mỗi node lưu: pref = run dài nhất ở đầu đoạn, suff = run dài nhất ở cuối đoạn, best = run dài nhất trong đoạn.",
+      en: "Each node stores: pref = longest run at the left edge, suff = longest run at the right edge, best = longest run inside the interval.",
     },
   });
 
@@ -9033,11 +9094,11 @@ function buildSteps2213(input, params) {
     const idx = queryIndices[qi];
     const ch = queryCharacters[qi];
     const oldCh = chars[idx];
+    const updatePath = [];
 
-    // Line 5: for i in range(len(queryCharacters)):
     snap({
       title: { vi: `Query ${qi}: queryIndices[${qi}]=${idx}, queryCharacters[${qi}]='${ch}'`, en: `Query ${qi}: queryIndices[${qi}]=${idx}, queryCharacters[${qi}]='${ch}'` },
-      codeLines: [5],
+      codeLines: [36],
       phase: "query-start",
       queryIndex: qi,
       activeIndex: idx,
@@ -9045,161 +9106,102 @@ function buildSteps2213(input, params) {
         { name: "i (query)", value: qi },
         { name: "queryIndices[i]", value: idx },
         { name: "queryCharacters[i]", value: `'${ch}'` },
+        { name: "root.best", value: tree[1].best },
       ],
       note: {
-        vi: `Bắt đầu query thứ ${qi}: sẽ đổi chars[${idx}] từ '${oldCh}' thành '${ch}'.`,
-        en: `Start query ${qi}: will change chars[${idx}] from '${oldCh}' to '${ch}'.`,
+        vi: `Bắt đầu query ${qi + 1}: đổi index ${idx} từ '${oldCh}' thành '${ch}', rồi cập nhật đường đi từ leaf lên root.`,
+        en: `Start query ${qi + 1}: change index ${idx} from '${oldCh}' to '${ch}', then update the path from leaf to root.`,
       },
     });
 
-    // Line 6: chars[queryIndices[i]] = queryCharacters[i]
     chars[idx] = ch;
+    let nodeId = size + idx;
+    tree[nodeId] = makeLeaf(idx, ch);
+    updatePath.push(nodeId);
     snap({
-      title: { vi: `chars[${idx}] = '${ch}'`, en: `chars[${idx}] = '${ch}'` },
-      codeLines: [6],
-      phase: "apply",
+      title: { vi: `Update leaf: s[${idx}] = '${ch}'`, en: `Update leaf: s[${idx}] = '${ch}'` },
+      codeLines: [37],
+      phase: "leaf-update",
       queryIndex: qi,
       activeIndex: idx,
       changedIndex: idx,
-      vars: [{ name: "chars", value: `[${chars.join(",")}]` }],
+      activeNode: nodeId,
+      updatePath,
+      vars: [{ name: "chars", value: `[${chars.join(",")}]` }, { name: "leaf", value: nodeId }],
       note: {
-        vi: `Đã cập nhật chars[${idx}]: '${oldCh}' → '${ch}'. Chuỗi hiện tại: "${chars.join("")}".`,
-        en: `Updated chars[${idx}]: '${oldCh}' → '${ch}'. Current string: "${chars.join("")}".`,
+        vi: `Leaf của index ${idx} bây giờ là ký tự '${ch}', nên pref=suff=best=1.`,
+        en: `The leaf for index ${idx} is now '${ch}', so pref=suff=best=1.`,
       },
     });
 
-    // Line 7-8: best = 1; run = 1
-    let best = 1;
-    let run = 1;
-    snap({
-      title: { vi: "best = 1, run = 1", en: "best = 1, run = 1" },
-      codeLines: [7, 8],
-      phase: "scan-init",
-      queryIndex: qi,
-      currentRun: { start: 0, end: 0, length: 1 },
-      bestRun: { start: 0, end: 0, length: 1 },
-      vars: [{ name: "best", value: best }, { name: "run", value: run }],
-      note: {
-        vi: `Bắt đầu quét từ trái. Phần tử đầu chars[0]='${chars[0]}' tự nó là 1 run độ dài 1.`,
-        en: `Start scanning from the left. The first element chars[0]='${chars[0]}' is itself a run of length 1.`,
-      },
-    });
-
-    let runStart = 0;
-    for (let j = 1; j < n; j++) {
-      // Line 9: for j in range(1, len(chars)):
+    nodeId = Math.floor(nodeId / 2);
+    while (nodeId >= 1) {
+      const left = tree[nodeId * 2];
+      const right = tree[nodeId * 2 + 1];
+      const before = tree[nodeId];
+      tree[nodeId] = mergeNode(left, right);
+      updatePath.push(nodeId);
+      const canJoin = left && right && left.len > 0 && right.len > 0 && left.rightChar === right.leftChar;
+      const cross = canJoin ? left.suff + right.pref : 0;
       snap({
-        title: { vi: `for j in range(1,n): j=${j}, chars[j]='${chars[j]}'`, en: `for j in range(1,n): j=${j}, chars[j]='${chars[j]}'` },
-        codeLines: [9],
-        phase: "scan",
+        title: { vi: `Merge node ${nodeId}: [${tree[nodeId].l}..${tree[nodeId].r}]`, en: `Merge node ${nodeId}: [${tree[nodeId].l}..${tree[nodeId].r}]` },
+        codeLines: [32, 37],
+        phase: "merge",
         queryIndex: qi,
-        activeIndex: j,
-        compareIndex: j - 1,
-        currentRun: { start: runStart, end: j - 1, length: j - runStart },
-        bestRun: { start: null, end: null, length: best },
-        vars: [{ name: "j", value: j }, { name: "chars[j]", value: `'${chars[j]}'` }, { name: "chars[j-1]", value: `'${chars[j - 1]}'` }],
+        changedIndex: idx,
+        activeNode: nodeId,
+        updatePath,
+        merge: {
+          node: nodeId,
+          left: left ? { best: left.best, suff: left.suff, rightChar: left.rightChar } : null,
+          right: right ? { best: right.best, pref: right.pref, leftChar: right.leftChar } : null,
+          canJoin,
+          cross,
+          beforeBest: before ? before.best : 0,
+          afterBest: tree[nodeId].best,
+        },
+        vars: [
+          { name: "node", value: nodeId },
+          { name: "left.best", value: left ? left.best : 0 },
+          { name: "right.best", value: right ? right.best : 0 },
+          { name: "cross", value: cross },
+          { name: "node.best", value: tree[nodeId].best },
+        ],
         note: {
-          vi: `So sánh chars[${j}]='${chars[j]}' với chars[${j - 1}]='${chars[j - 1]}'.`,
-          en: `Compare chars[${j}]='${chars[j]}' with chars[${j - 1}]='${chars[j - 1]}'.`,
+          vi: canJoin
+            ? `Hai nửa nối được vì '${left.rightChar}' == '${right.leftChar}'. cross = left.suff(${left.suff}) + right.pref(${right.pref}) = ${cross}.`
+            : `Hai nửa không nối được ở giữa, nên best chỉ lấy max(left.best, right.best).`,
+          en: canJoin
+            ? `The two halves can join because '${left.rightChar}' == '${right.leftChar}'. cross = left.suff(${left.suff}) + right.pref(${right.pref}) = ${cross}.`
+            : "The two halves cannot join across the middle, so best is max(left.best, right.best).",
         },
       });
-
-      const same = chars[j] === chars[j - 1];
-      // Line 10: if chars[j] == chars[j-1]:
-      snap({
-        title: { vi: `if chars[j] == chars[j-1] → '${chars[j]}' == '${chars[j - 1]}' → ${same}`, en: `if chars[j] == chars[j-1] → '${chars[j]}' == '${chars[j - 1]}' → ${same}` },
-        codeLines: [10],
-        phase: "scan-compare",
-        queryIndex: qi,
-        activeIndex: j,
-        compareIndex: j - 1,
-        currentRun: { start: runStart, end: j - 1, length: j - runStart },
-        bestRun: { start: null, end: null, length: best },
-        vars: [{ name: "condition", value: same ? "True" : "False" }],
-        note: same
-          ? { vi: `Giống ký tự trước → nối dài run hiện tại.`, en: `Matches the previous character → extend the current run.` }
-          : { vi: `Khác ký tự trước → run hiện tại bị CẮT, bắt đầu run mới tại j=${j}.`, en: `Differs from the previous character → the current run BREAKS, start a new run at j=${j}.` },
-      });
-
-      if (same) {
-        // Line 11: run += 1
-        run++;
-        snap({
-          title: { vi: `run += 1 → run = ${run}`, en: `run += 1 → run = ${run}` },
-          codeLines: [11],
-          phase: "extend",
-          queryIndex: qi,
-          activeIndex: j,
-          currentRun: { start: runStart, end: j, length: run },
-          bestRun: { start: null, end: null, length: best },
-          vars: [{ name: "run", value: run }],
-          note: {
-            vi: `Run '${chars[j]}' hiện kéo dài từ index ${runStart} đến ${j}, độ dài ${run}.`,
-            en: `The '${chars[j]}' run now spans index ${runStart} to ${j}, length ${run}.`,
-          },
-        });
-      } else {
-        // Line 13: run = 1
-        runStart = j;
-        run = 1;
-        snap({
-          title: { vi: `run = 1 (reset)`, en: `run = 1 (reset)` },
-          codeLines: [13],
-          phase: "reset",
-          queryIndex: qi,
-          activeIndex: j,
-          currentRun: { start: runStart, end: j, length: run },
-          bestRun: { start: null, end: null, length: best },
-          vars: [{ name: "run", value: run }],
-          note: {
-            vi: `Bắt đầu run mới '${chars[j]}' tại index ${j}, độ dài 1.`,
-            en: `Start a new '${chars[j]}' run at index ${j}, length 1.`,
-          },
-        });
-      }
-
-      const improves = run > best;
-      if (improves) best = run;
-      // Line 14: best = max(best, run)
-      snap({
-        title: { vi: `best = max(best, run) = ${best}`, en: `best = max(best, run) = ${best}` },
-        codeLines: [14],
-        phase: "update-best",
-        queryIndex: qi,
-        activeIndex: j,
-        currentRun: { start: runStart, end: j, length: run },
-        bestRun: { start: runStart, end: j, length: best },
-        vars: [{ name: "best", value: best }],
-        note: improves
-          ? { vi: `run=${run} > best cũ → best cập nhật thành ${best}.`, en: `run=${run} > previous best → best updated to ${best}.` }
-          : { vi: `run=${run} không vượt best=${best} → giữ nguyên.`, en: `run=${run} doesn't exceed best=${best} → unchanged.` },
-      });
+      nodeId = Math.floor(nodeId / 2);
     }
 
-    lengths.push(best);
-    // Line 15: lengths.append(best)
+    lengths.push(tree[1].best);
     const finalRuns = runsFor(chars);
     const bestRunInfo = finalRuns.reduce((acc, r) => (r.length > acc.length ? r : acc), finalRuns[0]);
     snap({
-      title: { vi: `lengths.append(${best}) → lengths=[${lengths.join(",")}]`, en: `lengths.append(${best}) → lengths=[${lengths.join(",")}]` },
-      codeLines: [15],
+      title: { vi: `Root.best = ${tree[1].best} → append answer`, en: `Root.best = ${tree[1].best} → append answer` },
+      codeLines: [38],
       phase: "query-done",
       queryIndex: qi,
       runs: finalRuns,
       bestRun: bestRunInfo,
+      updatePath,
       vars: [{ name: "lengths", value: `[${lengths.join(",")}]` }],
       note: {
-        vi: `Sau query ${qi}, chuỗi = "${chars.join("")}". Run dài nhất = ${best} (ký tự '${bestRunInfo.ch}', index [${bestRunInfo.start}..${bestRunInfo.end}]).`,
-        en: `After query ${qi}, string = "${chars.join("")}". Longest run = ${best} (character '${bestRunInfo.ch}', index [${bestRunInfo.start}..${bestRunInfo.end}]).`,
+        vi: `Sau query ${qi + 1}, root.best cho toàn chuỗi = ${tree[1].best}. Chuỗi hiện tại: "${chars.join("")}".`,
+        en: `After query ${qi + 1}, root.best for the whole string = ${tree[1].best}. Current string: "${chars.join("")}".`,
       },
     });
   }
 
-  // Line 16: return lengths
   const finalRuns = runsFor(chars);
   snap({
     title: { vi: `return lengths → [${lengths.join(",")}]`, en: `return lengths → [${lengths.join(",")}]` },
-    codeLines: [16],
+    codeLines: [39],
     final: true,
     phase: "found",
     runs: finalRuns,
@@ -9240,35 +9242,59 @@ module.exports = {
     ],
     approach: [
       { vi: "Với mỗi query, cập nhật chars[queryIndices[i]] = queryCharacters[i].", en: "For each query, update chars[queryIndices[i]] = queryCharacters[i]." },
-      { vi: "Quét lại TOÀN BỘ chuỗi, theo dõi độ dài run hiện tại (chars[j]==chars[j-1] → nối dài, khác → reset về 1).", en: "Rescan the WHOLE string, tracking the current run length (chars[j]==chars[j-1] → extend, otherwise → reset to 1)." },
-      { vi: "best = run dài nhất gặp trong lần quét đó → lưu vào lengths.", en: "best = the longest run seen during that scan → store it in lengths." },
-      { vi: "(Cách tối ưu O(k·log n) dùng Segment Tree lưu lmx/rmx/mx từng node; ở đây dùng rescan O(k·n) để dễ debug từng bước.)", en: "(The optimal O(k·log n) approach uses a Segment Tree storing lmx/rmx/mx per node; here we use an O(k·n) rescan for clearer step-by-step debugging.)" },
+      { vi: "Mỗi node Segment Tree lưu 6 thông tin: len, left char, right char, pref, suff, best.", en: "Each Segment Tree node stores 6 values: len, left char, right char, pref, suff, best." },
+      { vi: "Khi merge hai node, nếu ký tự cuối bên trái bằng ký tự đầu bên phải thì có cross run = left.suff + right.pref.", en: "When merging two nodes, if the left interval's last char equals the right interval's first char, cross run = left.suff + right.pref." },
+      { vi: "Sau point update, chỉ cần merge lại các node trên đường từ leaf lên root; root.best là đáp án sau query.", en: "After a point update, only merge nodes on the path from the leaf to the root; root.best is the answer after the query." },
     ],
     complexity: {
-      time: "O(k·n) với cách rescan (bài gốc tối ưu O((k+n)·log n) bằng Segment Tree)",
+      time: "O((n+k)·log n)",
       space: "O(n)",
       note: {
-        vi: "Với n, k lên tới 1e5, rescan O(k·n) có thể chậm trên input lớn; đây là cách trực quan, dễ hiểu để học thuật toán.",
-        en: "With n, k up to 1e5, the O(k·n) rescan can be slow on large inputs; this is the intuitive version for learning the algorithm.",
+        vi: "Build tree O(n). Mỗi query update một leaf và merge O(log n) node cha.",
+        en: "Build the tree in O(n). Each query updates one leaf and merges O(log n) ancestors.",
       },
     },
     code: [
       "class Solution:",
       "    def longestRepeating(self, s, queryCharacters, queryIndices):",
-      "        chars = list(s)",
-      "        lengths = []",
-      "        for i in range(len(queryCharacters)):",
-      "            chars[queryIndices[i]] = queryCharacters[i]",
-      "            best = 1",
-      "            run = 1",
-      "            for j in range(1, len(chars)):",
-      "                if chars[j] == chars[j - 1]:",
-      "                    run += 1",
-      "                else:",
-      "                    run = 1",
-      "                best = max(best, run)",
-      "            lengths.append(best)",
-      "        return lengths",
+      "        n = len(s)",
+      "        tree = [None] * (4 * n)",
+      "",
+      "        def merge(a, b):",
+      "            length = a[0] + b[0]",
+      "            left_char, right_char = a[1], b[2]",
+      "            pref, suff = a[3], b[4]",
+      "            best = max(a[5], b[5])",
+      "            if a[2] == b[1]:",
+      "                best = max(best, a[4] + b[3])",
+      "                if a[3] == a[0]: pref = a[0] + b[3]",
+      "                if b[4] == b[0]: suff = b[0] + a[4]",
+      "            return (length, left_char, right_char, pref, suff, best)",
+      "",
+      "        def build(node, l, r):",
+      "            if l == r:",
+      "                tree[node] = (1, s[l], s[l], 1, 1, 1)",
+      "                return",
+      "            mid = (l + r) // 2",
+      "            build(node * 2, l, mid)",
+      "            build(node * 2 + 1, mid + 1, r)",
+      "            tree[node] = merge(tree[node * 2], tree[node * 2 + 1])",
+      "",
+      "        def update(node, l, r, index, ch):",
+      "            if l == r:",
+      "                tree[node] = (1, ch, ch, 1, 1, 1)",
+      "                return",
+      "            mid = (l + r) // 2",
+      "            if index <= mid: update(node * 2, l, mid, index, ch)",
+      "            else: update(node * 2 + 1, mid + 1, r, index, ch)",
+      "            tree[node] = merge(tree[node * 2], tree[node * 2 + 1])",
+      "",
+      "        build(1, 0, n - 1)",
+      "        ans = []",
+      "        for ch, index in zip(queryCharacters, queryIndices):",
+      "            update(1, 0, n - 1, index, ch)",
+      "            ans.append(tree[1][5])",
+      "        return ans",
     ],
     builder: buildSteps2213,
   },
