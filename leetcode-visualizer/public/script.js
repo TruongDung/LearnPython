@@ -14387,6 +14387,9 @@ async function ensureMonacoEditor() {
     minimap: { enabled: false },
     automaticLayout: true,
     fixedOverflowWidgets: true,
+    // Monaco's sticky header uses a separate default font and can look
+    // inconsistent near the end of long solutions, so keep one code surface.
+    stickyScroll: { enabled: false },
     scrollBeyondLastLine: false,
     renderLineHighlight: "all",
     renderWhitespace: "selection",
