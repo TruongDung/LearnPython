@@ -13584,6 +13584,106 @@ function renderWordDictionaryView(step) {
   renderTree(step, "wd211Tree");
 }
 
+function renderClearStarsView(step) {
+  const view = step.clearStarsView || {};
+  const chars = Array.isArray(view.chars) ? view.chars : [...String(view.s || "")];
+  const removed = Array.isArray(view.removed) ? view.removed : [];
+  const buckets = Array.isArray(view.buckets) ? view.buckets : [];
+  const vi = lang === "vi";
+  const phaseIndex = ["setup", "scan", "push"].includes(view.phase) ? 0
+    : ["star", "choose"].includes(view.phase) ? 1
+      : view.phase === "remove" ? 2
+        : 3;
+  const phaseLabels = vi
+    ? ["1 · Quét & push index", "2 · Chọn chữ nhỏ nhất", "3 · Xóa bên phải nhất", "4 · Ghép kết quả"]
+    : ["1 · Scan & push index", "2 · Choose smallest letter", "3 · Remove rightmost", "4 · Join result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${index < phaseIndex ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const tape = chars.map((char, index) => {
+    const classes = ["clear3170-char"];
+    if (index === view.currentIndex) classes.push("current");
+    if (index <= view.scannedThrough) classes.push("scanned");
+    if (char === "*") classes.push("star");
+    if (removed[index]) classes.push("removed");
+    if (index === view.chosenIndex) classes.push("chosen");
+    const state = index === view.chosenIndex
+      ? (vi ? "được chọn" : "chosen")
+      : removed[index]
+        ? (char === "*" ? "STAR" : (vi ? "đã xóa" : "removed"))
+        : index > view.scannedThrough
+          ? (vi ? "chờ" : "pending")
+          : (vi ? "giữ" : "keep");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${escapeHtml(char)}</strong><em>${escapeHtml(state)}</em></span>`;
+  }).join("");
+
+  const mask = chars.map((_, index) => `<span class="${removed[index] ? "on" : "off"}"><small>${index}</small><strong>${removed[index] ? "1" : "0"}</strong></span>`).join("");
+  const visibleBuckets = buckets.filter((bucket) => bucket.indices.length > 0 || bucket.letter === view.chosenLetter);
+  const bucketHtml = visibleBuckets.length
+    ? visibleBuckets.map((bucket) => {
+      const isChosen = bucket.letter === view.chosenLetter;
+      const isSmallest = bucket.letter === view.smallestAvailable;
+      const indices = bucket.indices.map((index, position) => {
+        const isTop = position === bucket.indices.length - 1;
+        return `<span class="${isTop ? "top" : ""}"><small>${isTop ? "TOP" : "index"}</small><strong>${index}</strong></span>`;
+      }).join("") || `<em>${vi ? "rỗng sau pop" : "empty after pop"}</em>`;
+      return `<article class="clear3170-bucket${isChosen ? " chosen" : ""}${isSmallest ? " smallest" : ""}"><header><strong>'${escapeHtml(bucket.letter)}'</strong><span>${bucket.indices.length} index</span></header><div>${indices}</div>${isSmallest ? `<b>${vi ? "NHỎ NHẤT" : "SMALLEST"}</b>` : ""}</article>`;
+    }).join("")
+    : `<div class="clear3170-empty">${vi ? "Chưa có ký tự khả dụng trong bucket" : "No available character in the buckets"}</div>`;
+
+  const selectedLetter = view.chosenLetter ? `'${escapeHtml(view.chosenLetter)}'` : "—";
+  const selectedIndex = Number.isInteger(view.chosenIndex) ? view.chosenIndex : "—";
+  let actionLabel = vi ? "KHỞI TẠO" : "INITIALIZE";
+  let actionCode = "positions = [[], ..., []]";
+  let actionDetail = vi ? "26 stack, một stack cho mỗi chữ cái" : "26 stacks, one per letter";
+  if (view.event === "read-letter") {
+    actionLabel = vi ? "ĐỌC KÝ TỰ" : "READ LETTER";
+    actionCode = `s[${view.currentIndex}] = '${escapeHtml(chars[view.currentIndex])}'`;
+    actionDetail = vi ? "Không phải dấu * → chuẩn bị push index" : "Not a star → prepare to push its index";
+  } else if (view.event === "push-index") {
+    actionLabel = "PUSH INDEX";
+    actionCode = `positions['${escapeHtml(chars[view.currentIndex])}'].append(${view.currentIndex})`;
+    actionDetail = vi ? "Index lớn nhất nằm ở TOP bên phải" : "The largest index is TOP on the right";
+  } else if (view.event === "mark-star") {
+    actionLabel = vi ? "GẶP DẤU *" : "STAR FOUND";
+    actionCode = `removed[${view.currentIndex}] = True`;
+    actionDetail = vi ? "Xóa dấu * trước, sau đó chọn bucket" : "Remove the star first, then choose a bucket";
+  } else if (view.event === "choose-smallest") {
+    actionLabel = vi ? "GREEDY · CHỌN BUCKET" : "GREEDY · CHOOSE BUCKET";
+    actionCode = `first non-empty bucket = ${selectedLetter}`;
+    actionDetail = `TOP = index ${selectedIndex}`;
+  } else if (view.event === "remove-rightmost") {
+    actionLabel = vi ? "POP · XÓA BÊN PHẢI NHẤT" : "POP · REMOVE RIGHTMOST";
+    actionCode = `removed[${selectedIndex}] = True`;
+    actionDetail = `${selectedLetter} · ${vi ? "pop TOP để giữ occurrence bên trái" : "pop TOP to keep the left occurrence"}`;
+  } else if (view.event === "return") {
+    actionLabel = "RETURN";
+    actionCode = `"${escapeHtml(view.resultSoFar || "")}"`;
+    actionDetail = vi ? "Nối các ô có removed = 0" : "Join cells whose removed flag is 0";
+  }
+
+  const summary = vi
+    ? `Quét chuỗi ${view.s || ""}; bucket nhỏ nhất ${view.smallestAvailable || "không có"}; kết quả hiện tại ${view.resultSoFar || "rỗng"}.`
+    : `Scan ${view.s || ""}; smallest bucket ${view.smallestAvailable || "none"}; current result ${view.resultSoFar || "empty"}.`;
+
+  $("treeView").innerHTML = `<section class="clear3170-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="clear3170-phases">${phases}</div>
+    <section class="clear3170-rule"><strong>GREEDY RULE</strong><span>${vi ? "chọn chữ nhỏ nhất · nếu trùng, xóa index lớn nhất (bên phải nhất)" : "choose the smallest letter · on a tie, remove its largest (rightmost) index"}</span></section>
+    <section class="clear3170-tape"><header><strong>INPUT TAPE · s</strong><span>${vi ? "gạch chéo = removed" : "strikethrough = removed"}</span></header><div>${tape}</div></section>
+    <section class="clear3170-action ${escapeHtml(view.event || "setup")}"><small>${escapeHtml(actionLabel)}</small><strong>${actionCode}</strong><span>${escapeHtml(actionDetail)}</span></section>
+    <section class="clear3170-buckets"><header><strong>26 LETTER BUCKETS · INDEX STACKS</strong><span>${vi ? "chỉ hiện bucket đang có dữ liệu" : "only non-empty buckets are shown"}</span></header><div>${bucketHtml}</div></section>
+    <div class="clear3170-choice">
+      <section class="smallest"><small>${vi ? "1 · KÝ TỰ NHỎ NHẤT" : "1 · SMALLEST LETTER"}</small><strong>${selectedLetter}</strong><span>${view.chosenLetter ? `${vi ? "bucket đầu tiên không rỗng" : "first non-empty bucket"}` : "a → z"}</span></section>
+      <i>→</i>
+      <section class="rightmost"><small>${vi ? "2 · OCCURRENCE BÊN PHẢI NHẤT" : "2 · RIGHTMOST OCCURRENCE"}</small><strong>index ${selectedIndex}</strong><span>${view.chosenLetter ? "bucket.pop() = TOP" : (vi ? "index lớn nhất trong bucket" : "largest index in the bucket")}</span></section>
+    </div>
+    <section class="clear3170-mask"><header><strong>REMOVED MASK</strong><span>1 = ${vi ? "bỏ" : "discard"} · 0 = ${vi ? "giữ" : "keep"}</span></header><div>${mask}</div></section>
+    <section class="clear3170-result"><small>${vi ? "KẾT QUẢ ĐANG GIỮ" : "KEPT RESULT SO FAR"}</small><strong>"${escapeHtml(view.resultSoFar || "")}"</strong><span>${vi ? "đọc trái → phải, bỏ * và mọi ô removed = 1" : "read left → right, skipping stars and every removed = 1 cell"}</span></section>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -13612,6 +13712,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderLongestDuplicateView(step);
+  } else if (step.clearStarsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClearStarsView(step);
   } else if (step.validSequenceView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
