@@ -1873,86 +1873,439 @@ function buildSteps1166(input, params) {
  * LeetCode 588: Design In-Memory File System.
  * Trie: mkdir, addContentToFile, readContentFromFile, ls.
  */
-function buildSteps588(input, params) {
-  const ops = String(input).split(";").map((s) => s.trim()).filter(Boolean);
-
+function buildSteps588(input) {
+  const operations = String(input).split(";").map((value) => value.trim()).filter(Boolean);
   let idCounter = 0;
-  const makeNode = (label, parentId) => ({ id: idCounter++, label, parentId, content: null, children: {} });
+  const makeNode = (label, parentId, type = "directory") => ({
+    id: idCounter++,
+    label,
+    parentId,
+    type,
+    content: type === "file" ? "" : null,
+    children: {},
+  });
   const root = makeNode("/", null);
   const steps = [];
+  const outputs = [];
+  const MAX_STEPS = 180;
 
-  function snapshot(opts) {
+  function stripQuotes(value) {
+    const text = String(value || "").trim();
+    return ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))
+      ? text.slice(1, -1)
+      : text;
+  }
+
+  function parseOperation(raw) {
+    let match = raw.match(/^ls\((.*)\)$/i);
+    if (match) return { name: "ls", path: stripQuotes(match[1]) || "/", raw };
+    match = raw.match(/^mkdir\((.*)\)$/i);
+    if (match) return { name: "mkdir", path: stripQuotes(match[1]), raw };
+    match = raw.match(/^(?:addContentToFile|add)\(([^,]+),\s*"([\s\S]*)"\)$/i);
+    if (match) return { name: "addContentToFile", path: stripQuotes(match[1]), content: match[2], raw };
+    match = raw.match(/^(?:readContentFromFile|read)\((.*)\)$/i);
+    if (match) return { name: "readContentFromFile", path: stripQuotes(match[1]), raw };
+    return { name: "invalid", path: "", raw };
+  }
+
+  const parsedOperations = operations.map(parseOperation);
+
+  function inventory() {
+    let directories = 0;
+    let files = 0;
+    function walk(node) {
+      if (node.type === "file") files += 1;
+      else directories += 1;
+      Object.values(node.children).forEach(walk);
+    }
+    walk(root);
+    return { directories, files };
+  }
+
+  function formatValue(value) {
+    if (Array.isArray(value)) return `[${value.map((item) => `"${item}"`).join(", ")}]`;
+    if (value === undefined) return "—";
+    if (value === null) return "None";
+    return `"${value}"`;
+  }
+
+  function addStep(options, force = false) {
+    if (!force && steps.length >= MAX_STEPS) return;
+    const activeIds = options.activeIds || [root.id];
+    const annotations = {};
+    if (options.currentId !== undefined && options.currentId !== null && !["init", "done"].includes(options.action)) {
+      annotations[options.currentId] = {
+        label: options.createdId === options.currentId
+          ? (options.entryType === "file" ? "NEW FILE" : "NEW DIR")
+          : "current",
+        kind: options.createdId === options.currentId ? "answer" : "current",
+      };
+    }
     const nodes = [];
     let nextX = 0;
-    function dfs(node, depth) {
+    function layout(node, depth) {
       const keys = Object.keys(node.children).sort();
-      let x;
-      if (keys.length === 0) { x = nextX++; }
-      else { const xs = keys.map((k) => dfs(node.children[k], depth + 1)); x = (xs[0] + xs[xs.length - 1]) / 2; }
-      const lbl = node.content !== null ? `📄${node.label}` : node.label;
-      nodes.push({ id: node.id, label: lbl, x, y: depth, parentId: node.parentId, isWord: node.content !== null, hl: opts.highlight ? opts.highlight.includes(node.id) : false });
+      const childXs = keys.map((key) => layout(node.children[key], depth + 1));
+      const x = childXs.length ? (childXs[0] + childXs[childXs.length - 1]) / 2 : nextX++;
+      nodes.push({
+        id: node.id,
+        label: node.label,
+        x,
+        y: depth,
+        parentId: node.parentId,
+        isWord: node.type === "file",
+        hl: activeIds.includes(node.id),
+      });
       return x;
     }
-    dfs(root, 0);
-    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note });
+    layout(root, 0);
+    const currentNode = options.currentId === undefined || options.currentId === null
+      ? null
+      : findNode(root, options.currentId);
+    const counts = inventory();
+    const parts = options.parts || [];
+
+    steps.push({
+      title: options.title,
+      arr: [],
+      tree: { nodes, annotations, showLevels: false },
+      fileSystemView: {
+        phase: options.phase || "navigate",
+        action: options.action || "visit",
+        operations: parsedOperations.map((operation) => operation.raw),
+        operationIndex: options.operationIndex ?? -1,
+        operationName: options.operationName || "FileSystem",
+        rawOperation: options.rawOperation || "FileSystem()",
+        path: options.path || "/",
+        parts: [...parts],
+        partIndex: options.partIndex ?? -1,
+        createdPartIndexes: [...(options.createdPartIndexes || [])],
+        currentId: options.currentId ?? root.id,
+        currentNode: currentNode ? {
+          name: currentNode.label,
+          type: currentNode.type,
+          content: currentNode.content,
+          children: Object.keys(currentNode.children).sort(),
+        } : null,
+        entryType: options.entryType || (currentNode ? currentNode.type : "directory"),
+        appendedContent: options.appendedContent || "",
+        contentBefore: options.contentBefore,
+        contentAfter: options.contentAfter,
+        result: options.result,
+        outputs: outputs.map((output) => ({ ...output })),
+        decision: options.decision || "",
+        valid: options.valid !== false,
+        directories: counts.directories,
+        files: counts.files,
+      },
+      highlight: [],
+      mark: [],
+      codeLines: options.codeLines || [],
+      vars: [
+        { name: "operation", value: options.rawOperation || "FileSystem()" },
+        { name: "path parts", value: parts.length ? `[${parts.map((part) => `"${part}"`).join(", ")}]` : "[]" },
+        { name: "current node", value: currentNode ? `${currentNode.type}: ${currentNode.label}` : "None" },
+        { name: "return", value: formatValue(options.result) },
+      ],
+      note: options.note,
+      final: Boolean(options.final),
+    });
   }
 
-  snapshot({ title: { vi: "Khởi tạo File System", en: "Init File System" }, highlight: [root.id], vars: [], note: { vi: "Hệ thống file rỗng.", en: "Empty file system." } });
+  function findNode(node, id) {
+    if (node.id === id) return node;
+    for (const child of Object.values(node.children)) {
+      const found = findNode(child, id);
+      if (found) return found;
+    }
+    return null;
+  }
 
-  function navigate(path, create) {
-    const parts = path.split("/").filter(Boolean);
+  function navigate(path, config) {
+    const parts = String(path).split("/").filter(Boolean);
+    const activeIds = [root.id];
+    const createdPartIndexes = [];
     let node = root;
-    const ids = [root.id];
-    for (const p of parts) {
-      if (!node.children[p]) {
-        if (!create) return { node: null, ids };
-        node.children[p] = makeNode(p, node.id);
+
+    addStep({
+      phase: "parse",
+      action: "split",
+      operationIndex: config.operationIndex,
+      operationName: config.operationName,
+      rawOperation: config.rawOperation,
+      path,
+      parts,
+      currentId: root.id,
+      activeIds,
+      createdPartIndexes,
+      codeLines: [29, 30, 31],
+      decision: parts.length ? `path.split('/') → [${parts.join(", ")}]` : "path = '/' → stay at root",
+      note: {
+        vi: parts.length
+          ? `Tách "${path}" thành ${parts.length} phần. Bắt đầu từ root rồi đi lần lượt từ trái sang phải.`
+          : `Đường dẫn "/" chính là root, không cần đi qua segment nào.`,
+        en: parts.length
+          ? `Split "${path}" into ${parts.length} part(s). Start at root and walk left to right.`
+          : `Path "/" is the root itself, so no segment traversal is needed.`,
+      },
+    });
+
+    for (let index = 0; index < parts.length; index++) {
+      const part = parts[index];
+      const isTerminal = index === parts.length - 1;
+      const existing = node.children[part];
+      if (!existing && !config.create) {
+        addStep({
+          phase: "navigate",
+          action: "missing",
+          operationIndex: config.operationIndex,
+          operationName: config.operationName,
+          rawOperation: config.rawOperation,
+          path,
+          parts,
+          partIndex: index,
+          currentId: node.id,
+          activeIds,
+          createdPartIndexes,
+          valid: false,
+          codeLines: [34, 35, 36],
+          decision: `children does not contain "${part}" → path missing`,
+          note: {
+            vi: `Node hiện tại không có con "${part}" và thao tác này không được tạo node, nên đường dẫn không tồn tại.`,
+            en: `The current node has no "${part}" child and this operation cannot create nodes, so the path is missing.`,
+          },
+        });
+        return { node: null, parts, activeIds, createdPartIndexes };
       }
-      node = node.children[p];
-      ids.push(node.id);
+
+      let created = false;
+      if (!existing) {
+        const type = isTerminal && config.terminalType === "file" ? "file" : "directory";
+        node.children[part] = makeNode(part, node.id, type);
+        created = true;
+        createdPartIndexes.push(index);
+      }
+      node = node.children[part];
+      activeIds.push(node.id);
+      addStep({
+        phase: "navigate",
+        action: created ? (node.type === "file" ? "create-file" : "create-directory") : "reuse",
+        operationIndex: config.operationIndex,
+        operationName: config.operationName,
+        rawOperation: config.rawOperation,
+        path,
+        parts,
+        partIndex: index,
+        currentId: node.id,
+        createdId: created ? node.id : null,
+        activeIds: [...activeIds],
+        createdPartIndexes,
+        entryType: node.type,
+        codeLines: created ? [34, 37, 38] : [34, 38],
+        decision: created
+          ? `missing "${part}" → create ${node.type}`
+          : `found "${part}" → reuse existing ${node.type}`,
+        note: created
+          ? {
+              vi: `Chưa có "${part}" nên tạo ${node.type === "file" ? "FILE" : "FOLDER"} mới rồi di chuyển vào node đó.`,
+              en: `"${part}" is missing, so create a new ${node.type.toUpperCase()} and move into it.`,
+            }
+          : {
+              vi: `"${part}" đã tồn tại. Dùng lại node cũ, không tạo bản sao.`,
+              en: `"${part}" already exists. Reuse it instead of creating a duplicate.`,
+            },
+      });
     }
-    return { node, ids };
+    return { node, parts, activeIds, createdPartIndexes };
   }
 
-  const results = [];
-  for (const op of ops) {
-    let m;
-    if ((m = op.match(/^ls\(([^)]*)\)$/i))) {
-      const path = m[1].trim() || "/";
-      const { node, ids } = navigate(path, false);
-      let listing = [];
-      if (node) {
-        if (node.content !== null) {
-          listing = [node.label];
-        } else {
-          listing = Object.keys(node.children).sort();
-        }
-      }
-      results.push(`ls("${path}") = [${listing.join(",")}]`);
-      snapshot({ title: { vi: `ls("${path}")`, en: `ls("${path}")` }, highlight: ids, vars: [{ name: "op", value: `ls("${path}")` }, { name: "result", value: `[${listing.join(", ")}]` }], note: { vi: `Liệt kê: [${listing.join(", ")}].`, en: `List: [${listing.join(", ")}].` } });
-    } else if ((m = op.match(/^mkdir\(([^)]+)\)$/i))) {
-      const path = m[1].trim();
-      const { ids } = navigate(path, true);
-      results.push(`mkdir("${path}")`);
-      snapshot({ title: { vi: `mkdir("${path}")`, en: `mkdir("${path}")` }, highlight: ids, vars: [{ name: "op", value: `mkdir("${path}")` }], note: { vi: "Tạo thư mục (và cha nếu cần).", en: "Create directory (and parents if needed)." } });
-    } else if ((m = op.match(/^add\(([^,]+),\s*"([^"]*)"\)$/i))) {
-      const path = m[1].trim();
-      const content = m[2];
-      const { node, ids } = navigate(path, true);
-      node.content = (node.content || "") + content;
-      results.push(`addContent("${path}", "${content}")`);
-      snapshot({ title: { vi: `addContent("${path}")`, en: `addContent("${path}")` }, highlight: ids, vars: [{ name: "op", value: `add("${path}","${content}")` }, { name: "content", value: node.content }], note: { vi: `Nội dung file: "${node.content}".`, en: `File content: "${node.content}".` } });
-    } else if ((m = op.match(/^read\(([^)]+)\)$/i))) {
-      const path = m[1].trim();
-      const { node, ids } = navigate(path, false);
-      const c = node ? node.content || "" : "";
-      results.push(`read("${path}") = "${c}"`);
-      snapshot({ title: { vi: `read("${path}")`, en: `read("${path}")` }, highlight: ids, vars: [{ name: "op", value: `read("${path}")` }, { name: "content", value: c }], note: { vi: `Đọc file: "${c}".`, en: `Read file: "${c}".` } });
-    }
-  }
+  addStep({
+    phase: "parse",
+    action: "init",
+    title: { vi: "Khởi tạo FileSystem với một root folder", en: "Initialize FileSystem with one root folder" },
+    currentId: root.id,
+    activeIds: [root.id],
+    codeLines: [7, 8],
+    decision: "self.root = TrieNode()",
+    note: {
+      vi: "Mỗi segment của đường dẫn là một node Trie. Folder chứa children; file chứa content và được vẽ bằng vòng xanh.",
+      en: "Each path segment is a Trie node. A folder owns children; a file owns content and is shown with a green ring.",
+    },
+  }, true);
 
-  if (steps.length) steps[steps.length - 1].final = true;
-  return { ops, answer: results.join(" | "), steps };
+  parsedOperations.forEach((operation, operationIndex) => {
+    const common = {
+      operationIndex,
+      operationName: operation.name,
+      rawOperation: operation.raw,
+      path: operation.path,
+    };
+
+    if (operation.name === "invalid") {
+      addStep({
+        ...common,
+        phase: "result",
+        action: "invalid",
+        title: { vi: `Không hiểu lệnh: ${operation.raw}`, en: `Unknown operation: ${operation.raw}` },
+        valid: false,
+        codeLines: [],
+        decision: "invalid operation syntax",
+        result: "Invalid operation",
+        note: {
+          vi: "Dùng ls(path), mkdir(path), addContentToFile(path, \"content\") hoặc readContentFromFile(path). Alias add/read vẫn được hỗ trợ.",
+          en: "Use ls(path), mkdir(path), addContentToFile(path, \"content\"), or readContentFromFile(path). add/read aliases are also supported.",
+        },
+      });
+      return;
+    }
+
+    if (operation.name === "mkdir") {
+      const walked = navigate(operation.path, { ...common, create: true, terminalType: "directory" });
+      outputs.push({ operation: operation.raw, value: "None" });
+      addStep({
+        ...common,
+        phase: "result",
+        action: "mkdir-done",
+        title: { vi: `mkdir("${operation.path}") hoàn tất`, en: `mkdir("${operation.path}") complete` },
+        parts: walked.parts,
+        partIndex: walked.parts.length - 1,
+        currentId: walked.node ? walked.node.id : root.id,
+        activeIds: walked.activeIds,
+        createdPartIndexes: walked.createdPartIndexes,
+        entryType: "directory",
+        codeLines: [16, 17],
+        result: null,
+        decision: `created ${walked.createdPartIndexes.length} new folder(s)`,
+        note: {
+          vi: `Đã tạo toàn bộ folder còn thiếu. mkdir không trả dữ liệu; cấu trúc cây được giữ lại cho lệnh tiếp theo.`,
+          en: `Every missing folder now exists. mkdir returns no data; the tree remains for the next operation.`,
+        },
+      });
+      return;
+    }
+
+    if (operation.name === "addContentToFile") {
+      const walked = navigate(operation.path, { ...common, create: true, terminalType: "file" });
+      const node = walked.node;
+      const before = node.type === "file" ? node.content : "";
+      node.type = "file";
+      node.content = before + operation.content;
+      outputs.push({ operation: operation.raw, value: "None" });
+      addStep({
+        ...common,
+        phase: "result",
+        action: "write",
+        title: { vi: `Ghi thêm vào file "${node.label}"`, en: `Append to file "${node.label}"` },
+        parts: walked.parts,
+        partIndex: walked.parts.length - 1,
+        currentId: node.id,
+        activeIds: walked.activeIds,
+        createdPartIndexes: walked.createdPartIndexes,
+        entryType: "file",
+        appendedContent: operation.content,
+        contentBefore: before,
+        contentAfter: node.content,
+        codeLines: [19, 20, 21, 22, 23],
+        result: null,
+        decision: `content = "${before}" + "${operation.content}" → "${node.content}"`,
+        note: {
+          vi: `addContentToFile luôn APPEND, không ghi đè: nội dung cũ "${before}" cộng thêm "${operation.content}".`,
+          en: `addContentToFile APPENDS rather than overwrites: old "${before}" plus "${operation.content}".`,
+        },
+      });
+      return;
+    }
+
+    if (operation.name === "readContentFromFile") {
+      const walked = navigate(operation.path, { ...common, create: false });
+      const content = walked.node && walked.node.type === "file" ? walked.node.content : "";
+      outputs.push({ operation: operation.raw, value: content });
+      addStep({
+        ...common,
+        phase: "result",
+        action: walked.node ? "read" : "missing",
+        title: walked.node
+          ? { vi: `Đọc file → "${content}"`, en: `Read file → "${content}"` }
+          : { vi: "Không tìm thấy file", en: "File not found" },
+        parts: walked.parts,
+        partIndex: walked.parts.length - 1,
+        currentId: walked.node ? walked.node.id : root.id,
+        activeIds: walked.activeIds,
+        createdPartIndexes: walked.createdPartIndexes,
+        entryType: "file",
+        codeLines: [25, 26, 27],
+        result: content,
+        valid: Boolean(walked.node),
+        decision: walked.node ? `return content → "${content}"` : "missing path",
+        note: walked.node
+          ? { vi: `Node cuối là file. Trả nguyên chuỗi content đang lưu: "${content}".`, en: `The terminal node is a file. Return its stored content: "${content}".` }
+          : { vi: "Đường dẫn không tồn tại nên không thể đọc file.", en: "The path does not exist, so the file cannot be read." },
+      });
+      return;
+    }
+
+    const walked = navigate(operation.path, { ...common, create: false });
+    let listing = [];
+    if (walked.node) {
+      listing = walked.node.type === "file"
+        ? [walked.node.label]
+        : Object.keys(walked.node.children).sort();
+    }
+    outputs.push({ operation: operation.raw, value: listing });
+    addStep({
+      ...common,
+      phase: "result",
+      action: walked.node ? "list" : "missing",
+      title: walked.node
+        ? { vi: `ls → [${listing.join(", ")}]`, en: `ls → [${listing.join(", ")}]` }
+        : { vi: "Không tìm thấy đường dẫn", en: "Path not found" },
+      parts: walked.parts,
+      partIndex: walked.parts.length - 1,
+      currentId: walked.node ? walked.node.id : root.id,
+      activeIds: walked.activeIds,
+      createdPartIndexes: walked.createdPartIndexes,
+      entryType: walked.node ? walked.node.type : "directory",
+      codeLines: [10, 11, 12, 13, 14],
+      result: listing,
+      valid: Boolean(walked.node),
+      decision: walked.node
+        ? (walked.node.type === "file" ? "file → return [file name]" : "directory → sort child names")
+        : "missing path",
+      note: walked.node
+        ? {
+            vi: walked.node.type === "file"
+              ? "Nếu path trỏ tới file, ls trả về đúng tên file đó."
+              : `Nếu path trỏ tới folder, ls sắp xếp tên các children: [${listing.join(", ")}].`,
+            en: walked.node.type === "file"
+              ? "When path points to a file, ls returns that file name."
+              : `When path points to a folder, ls sorts its child names: [${listing.join(", ")}].`,
+          }
+        : { vi: "Đường dẫn không tồn tại.", en: "The path does not exist." },
+    });
+  });
+
+  const answer = outputs.map((output) => `${output.operation} → ${Array.isArray(output.value) ? `[${output.value.join(",")}]` : output.value}`).join(" | ");
+  addStep({
+    phase: "done",
+    action: "done",
+    operationIndex: parsedOperations.length,
+    operationName: "done",
+    rawOperation: "All operations complete",
+    path: "/",
+    currentId: root.id,
+    activeIds: [root.id],
+    codeLines: [],
+    result: answer,
+    final: true,
+    decision: `completed ${parsedOperations.length} operation(s)`,
+    title: { vi: "Hoàn tất toàn bộ thao tác", en: "All operations complete" },
+    note: {
+      vi: "Cây cuối cùng giữ cả folder và file. Vòng xanh biểu thị file; node thường là folder.",
+      en: "The final tree retains both folders and files. Green-ring nodes are files; regular nodes are folders.",
+    },
+  }, true);
+
+  return { ops: operations, answer, steps };
 }
 
 /**
@@ -1981,159 +2334,268 @@ function buildSteps588(input, params) {
  */
 function buildSteps212(input, params) {
   const board = String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
-    .map((row) => row.split(",").map((v) => v.trim()));
-  const words = String(params && params.words || "oath,pea,eat,rain").split(",").map((w) => w.trim()).filter(Boolean);
-  const steps = [];
-
-  if (!board.length || !board[0].length) {
-    steps.push({
-      title: { vi: "Bảng rỗng → []", en: "Empty board → []" },
-      arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] },
-      final: true, codeLines: [2], vars: [{ name: "answer", value: "[]" }],
-      note: { vi: "Nhập bảng dạng o,a,a,n;e,t,a,e;i,h,k,r;i,f,l,v", en: "Enter board like o,a,a,n;e,t,a,e;i,h,k,r;i,f,l,v" },
-    });
-    return { original: board, answer: [], steps };
-  }
-
+    .map((row) => row.split(",").map((value) => value.trim()));
+  const words = String(params && params.words || "oath,pea,eat,rain")
+    .split(",").map((word) => word.trim()).filter(Boolean);
   const rows = board.length;
-  const cols = Math.max(...board.map((r) => r.length));
-
-  // Build trie
+  const cols = rows ? Math.max(...board.map((row) => row.length)) : 0;
+  const steps = [];
   const trie = {};
+  const found = [];
+  const foundSet = new Set();
+  const pathStack = [];
+  const callStack = [];
+  const used = new Set();
+  const MAX_VISUAL_STEPS = 120;
+
   for (const word of words) {
     let node = trie;
     for (const ch of word) node = (node[ch] = node[ch] || {});
     node.$ = word;
   }
 
-  const found = [];
-  const work = board.map((r) => [...r]); // mutable board copy for '#'
-
-  function makeCells(cur, pathCells) {
-    const pathSet = new Set((pathCells || []).map(([r, c]) => `${r},${c}`));
-    return work.map((row, r) =>
-      Array.from({ length: cols }, (_, c) => {
-        const ch = row[c] !== undefined ? row[c] : "";
-        let cls = "empty";
-        if (ch === "#") cls = "visited";
-        if (pathSet.has(`${r},${c}`)) cls = "path";
-        if (cur && cur[0] === r && cur[1] === c) cls = "current";
-        return { label: ch === "#" ? "·" : ch, cls };
-      })
-    );
+  function pathText(path = pathStack) {
+    return path.map(([r, c]) => board[r][c]).join("");
   }
 
-  function snap(opts) {
+  function trieSnapshot(activePrefix = "", annotation) {
+    const nodes = [];
+    const annotations = {};
+    let leafX = 0;
+
+    function layout(node, prefix, label, parentId, depth) {
+      const keys = Object.keys(node).filter((key) => key !== "$").sort();
+      const childXs = keys.map((key) => layout(node[key], prefix + key, key, prefix || "root", depth + 1));
+      const x = childXs.length ? (childXs[0] + childXs[childXs.length - 1]) / 2 : leafX++;
+      const id = prefix || "root";
+      const isOnPath = prefix === "" || (activePrefix && activePrefix.startsWith(prefix));
+      nodes.push({
+        id,
+        label: prefix ? label : "•",
+        x,
+        y: depth,
+        parentId,
+        isWord: words.includes(prefix),
+        hl: Boolean(isOnPath),
+      });
+      return x;
+    }
+
+    layout(trie, "", "•", null, 0);
+    const activeId = activePrefix || "root";
+    if (annotation && nodes.some((node) => node.id === activeId)) {
+      annotations[activeId] = { label: annotation.label, kind: annotation.kind || "" };
+    }
+    return { nodes, annotations, showLevels: false };
+  }
+
+  function addStep(options, force = false) {
+    if (!force && steps.length >= MAX_VISUAL_STEPS) return;
+    const path = (options.path || pathStack).map(([r, c]) => ({ r, c, char: board[r][c] }));
+    const prefix = options.prefix !== undefined ? options.prefix : path.map((cell) => cell.char).join("");
+    const trieNode = prefix.split("").reduce((node, ch) => node && node[ch], trie) || trie;
+    const children = Object.keys(trieNode).filter((key) => key !== "$").sort();
+    const annotation = options.annotation || (options.action === "prune"
+      ? { label: `no '${options.needed}'`, kind: "pruned" }
+      : options.action === "found"
+        ? { label: `✓ ${options.foundWord}`, kind: "answer" }
+        : prefix
+          ? { label: `prefix: ${prefix}`, kind: "current" }
+          : { label: "root", kind: "current" });
+
     steps.push({
-      title: opts.title,
+      title: options.title,
       arr: [],
-      bfsGrid: { rows, cols, cells: makeCells(opts.cur, opts.path) },
-      highlight: [], mark: [],
-      final: opts.final || false,
-      codeLines: opts.codeLines || [],
-      vars: opts.vars || [],
-      note: opts.note,
+      tree: trieSnapshot(prefix, annotation),
+      wordSearchIIView: {
+        phase: options.phase || "search",
+        action: options.action || "match",
+        board: board.map((row) => [...row]),
+        rows,
+        cols,
+        words: [...words],
+        found: [...found],
+        path,
+        prefix,
+        current: options.current || null,
+        candidate: options.candidate || null,
+        restored: options.restored || null,
+        direction: options.direction || "",
+        needed: options.needed || "",
+        trieChildren: children,
+        callStack: callStack.map((frame) => ({ ...frame })),
+        decision: options.decision || "",
+        foundWord: options.foundWord || "",
+      },
+      highlight: [],
+      mark: [],
+      final: Boolean(options.final),
+      codeLines: options.codeLines || [],
+      vars: [
+        { name: "prefix", value: prefix || "∅" },
+        { name: "path", value: path.length ? path.map((cell) => `(${cell.r},${cell.c})`).join(" → ") : "[]" },
+        { name: "Trie children", value: children.join(", ") || "∅" },
+        { name: "result", value: `[${found.map((word) => `"${word}"`).join(", ")}]` },
+        ...(options.vars || []),
+      ],
+      note: options.note,
     });
   }
 
-  snap({
-    title: { vi: "Xây Trie từ words", en: "Build Trie from words" },
-    codeLines: [3, 4],
-    vars: [
-      { name: "words", value: words.map((w) => `"${w}"`).join(", ") },
-      { name: "result", value: "[]" },
-    ],
+  addStep({
+    phase: "build",
+    action: "build",
+    title: { vi: "Pha 1 — Xây Trie từ toàn bộ words", en: "Phase 1 — Build one Trie from all words" },
+    codeLines: [6, 7, 8, 9, 10, 11],
+    decision: { vi: "Gộp các prefix chung vào cùng một nhánh", en: "Merge shared prefixes into the same branch" },
+    vars: [{ name: "words", value: `[${words.map((word) => `"${word}"`).join(", ")}]` }],
     note: {
-      vi:
-        `Đưa mọi từ vào Trie (cây tiền tố). Lá đánh dấu '$' = từ hoàn chỉnh.\n` +
-        `DFS từng ô của bảng; chỉ đi tiếp nếu chữ cái là con của node Trie hiện tại → CẮT TỈA mạnh.\n` +
-        `Ô đang thăm tô '#' để tránh dùng lại; khôi phục khi quay lui.`,
-      en:
-        `Insert every word into a Trie (prefix tree). A leaf marks '$' = a complete word.\n` +
-        `DFS each board cell; continue only if the letter is a child of the current Trie node → strong PRUNING.\n` +
-        `Mark the current cell '#' to avoid reuse; restore on backtrack.`,
+      vi: "Mỗi đường từ root đến vòng xanh là một từ. Khi DFS trên board, chỉ những ký tự có cạnh tương ứng trong Trie mới được đi tiếp.",
+      en: "Each root-to-green-ring path is a word. During board DFS, only letters with a matching Trie edge may continue.",
     },
-  });
+  }, true);
 
-  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-  let guard = 0;
-  const pathStack = [];
+  if (!rows || !cols) {
+    addStep({
+      phase: "done",
+      action: "done",
+      title: { vi: "Bảng rỗng → []", en: "Empty board → []" },
+      codeLines: [3, 4],
+      decision: { vi: "Không có ô bắt đầu", en: "There is no start cell" },
+      final: true,
+      note: { vi: "Board rỗng nên không thể tạo từ nào.", en: "An empty board cannot form any word." },
+    }, true);
+    return { original: board, answer: [], steps };
+  }
 
-  function dfs(r, c, node) {
-    if (guard > 150) return;
-    const ch = work[r][c];
-    if (ch === "#" || !(ch in node)) return;
-    guard += 1;
+  addStep({
+    phase: "search",
+    action: "start",
+    title: { vi: "Pha 2 — DFS từng ô + cắt tỉa bằng Trie", en: "Phase 2 — DFS each cell + Trie pruning" },
+    codeLines: [12, 14, 29, 30, 31],
+    decision: { vi: "Bắt đầu ở root; thử từng ô làm ký tự đầu", en: "Start at root; try every cell as the first letter" },
+    note: {
+      vi: "Board và Trie chạy song song: đi sang một ô trên board cũng phải đi được một cạnh trong Trie. Không có cạnh → dừng nhánh ngay.",
+      en: "The board and Trie advance together: every board move must match a Trie edge. A missing edge prunes the branch immediately.",
+    },
+  }, true);
 
-    const nxt = node[ch];
-    pathStack.push([r, c]);
+  const directions = [
+    [-1, 0, "↑"],
+    [1, 0, "↓"],
+    [0, -1, "←"],
+    [0, 1, "→"],
+  ];
 
-    const isWord = nxt.$ !== undefined;
-    if (isWord) {
-      found.push(nxt.$);
-      const w = nxt.$;
-      delete nxt.$;
-      snap({
-        title: { vi: `Tìm thấy từ "${w}" tại (${r},${c})`, en: `Found word "${w}" at (${r},${c})` },
-        cur: [r, c],
-        path: [...pathStack],
-        codeLines: [8, 9],
-        vars: [
-          { name: "path", value: pathStack.map(([pr, pc]) => work[pr][pc] === "#" ? "?" : work[pr][pc]).join("") },
-          { name: "word found", value: w },
-          { name: "result", value: `[${found.map((x) => `"${x}"`).join(", ")}]` },
-        ],
+  function dfs(r, c, node, direction = "start") {
+    const key = `${r},${c}`;
+    if (used.has(key)) return;
+    const ch = board[r][c];
+    const next = node[ch];
+
+    if (!next) {
+      addStep({
+        action: "prune",
+        title: { vi: `Cắt nhánh: Trie không có cạnh '${ch}'`, en: `Prune: Trie has no '${ch}' edge` },
+        codeLines: [15, 16, 17],
+        current: pathStack.length ? { r: pathStack[pathStack.length - 1][0], c: pathStack[pathStack.length - 1][1] } : null,
+        candidate: { r, c },
+        direction,
+        needed: ch,
+        decision: { vi: `prefix "${pathText()}" + '${ch}' không tồn tại → return`, en: `prefix "${pathText()}" + '${ch}' does not exist → return` },
         note: {
-          vi: `Node Trie có '$' → đường đi (tô xanh) tạo thành từ "${w}". Thêm vào result và xóa '$' để không trùng.`,
-          en: `The Trie node has '$' → the highlighted path spells "${w}". Add to result and delete '$' to avoid duplicates.`,
+          vi: `Ô (${r},${c}) chứa '${ch}', nhưng node Trie hiện tại không có con '${ch}'. Không cần DFS sâu hơn — đây là lợi ích chính của Trie.`,
+          en: `Cell (${r},${c}) is '${ch}', but the current Trie node has no '${ch}' child. Stop immediately — this is the Trie's main benefit.`,
         },
       });
-    } else if (guard <= 40) {
-      snap({
-        title: { vi: `dfs(${r},${c})='${ch}' khớp Trie → đi tiếp`, en: `dfs(${r},${c})='${ch}' matches Trie → continue` },
-        cur: [r, c],
-        path: [...pathStack],
-        codeLines: [5, 6, 7, 8],
-        vars: [
-          { name: "cell", value: `(${r},${c})='${ch}'` },
-          { name: "trie children", value: Object.keys(nxt).filter((x) => x !== "$").join(", ") || "none" },
-        ],
-        note: {
-          vi: `'${ch}' là con hợp lệ trong Trie → prefix hiện tại "${pathStack.map(([pr, pc]) => board[pr][pc]).join("")}" còn triển vọng. Thử 4 hướng.`,
-          en: `'${ch}' is a valid Trie child → current prefix "${pathStack.map(([pr, pc]) => board[pr][pc]).join("")}" is promising. Try 4 directions.`,
-        },
-      });
+      return;
     }
 
-    work[r][c] = "#";
-    for (const [dr, dc] of dirs) {
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < rows && nc >= 0 && nc < (board[nr] ? board[nr].length : 0) && work[nr][nc] !== "#") {
-        dfs(nr, nc, nxt);
+    pathStack.push([r, c]);
+    used.add(key);
+    callStack.push({ r, c, char: ch, prefix: pathText(), direction });
+    const prefix = pathText();
+    addStep({
+      action: "match",
+      title: { vi: `Khớp '${ch}' → prefix = "${prefix}"`, en: `Match '${ch}' → prefix = "${prefix}"` },
+      codeLines: [14, 15, 16, 18],
+      current: { r, c },
+      candidate: { r, c },
+      direction,
+      decision: { vi: `Có cạnh '${ch}' trong Trie → tiếp tục`, en: `Trie contains '${ch}' edge → continue` },
+      note: {
+        vi: `Thêm ô (${r},${c}) vào path và đánh dấu đã dùng. Các vòng xanh trong Trie là nơi một từ hoàn chỉnh kết thúc.`,
+        en: `Add (${r},${c}) to the path and mark it used. Green rings in the Trie mark complete words.`,
+      },
+    });
+
+    if (next.$ !== undefined) {
+      const word = next.$;
+      if (!foundSet.has(word)) {
+        foundSet.add(word);
+        found.push(word);
+      }
+      delete next.$;
+      addStep({
+        action: "found",
+        title: { vi: `✓ Tìm thấy "${word}"`, en: `✓ Found "${word}"` },
+        codeLines: [19, 20, 21],
+        current: { r, c },
+        candidate: { r, c },
+        direction,
+        foundWord: word,
+        decision: { vi: `Node kết thúc từ → thêm "${word}" vào result`, en: `Terminal node → append "${word}" to result` },
+        note: {
+          vi: `Path màu xanh trên board và đường màu cam trong Trie cùng đánh vần "${word}". Xóa '$' để không thêm trùng từ này.`,
+          en: `The green board path and amber Trie path both spell "${word}". Delete '$' so the word is not added twice.`,
+        },
+      }, true);
+    }
+
+    for (const [dr, dc, arrow] of directions) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < board[nr].length && !used.has(`${nr},${nc}`)) {
+        dfs(nr, nc, next, arrow);
       }
     }
-    work[r][c] = ch; // restore
+
+    callStack.pop();
+    used.delete(key);
     pathStack.pop();
+    addStep({
+      action: "backtrack",
+      title: { vi: `Backtrack: khôi phục ô (${r},${c})`, en: `Backtrack: restore cell (${r},${c})` },
+      codeLines: [22, 23, 24, 25, 26, 27],
+      current: pathStack.length ? { r: pathStack[pathStack.length - 1][0], c: pathStack[pathStack.length - 1][1] } : null,
+      restored: { r, c },
+      direction,
+      decision: { vi: "Bỏ ô khỏi path để nhánh khác có thể dùng", en: "Remove the cell so another branch may use it" },
+      note: {
+        vi: "DFS đã thử xong mọi hàng xóm hợp lệ. Khôi phục ô, lùi một frame và tiếp tục thử hướng khác.",
+        en: "DFS has tried every valid neighbor. Restore the cell, pop one frame, and continue with another direction.",
+      },
+    });
   }
 
   for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < board[r].length; c++) {
-      dfs(r, c, trie);
-    }
+    for (let c = 0; c < board[r].length; c++) dfs(r, c, trie);
   }
 
-  const answer = [...new Set(found)];
-  snap({
-    title: { vi: `Kết quả: [${answer.map((w) => `"${w}"`).join(", ")}]`, en: `Result: [${answer.map((w) => `"${w}"`).join(", ")}]` },
-    cur: null,
+  const answer = [...found];
+  addStep({
+    phase: "done",
+    action: "done",
+    title: { vi: `Pha 3 — Hoàn tất: tìm thấy ${answer.length} từ`, en: `Phase 3 — Complete: found ${answer.length} word(s)` },
+    codeLines: [29, 30, 31, 32],
     final: true,
-    codeLines: [13, 14, 15],
-    vars: [{ name: "answer", value: `[${answer.map((w) => `"${w}"`).join(", ")}]` }],
+    decision: { vi: "Đã thử mọi ô bắt đầu", en: "Every start cell has been tried" },
+    vars: [{ name: "answer", value: `[${answer.map((word) => `"${word}"`).join(", ")}]` }],
     note: {
-      vi: `Các từ tìm được trên bảng: [${answer.map((w) => `"${w}"`).join(", ")}]. Trie giúp cắt tỉa những nhánh không dẫn tới từ nào.`,
-      en: `Words found on the board: [${answer.map((w) => `"${w}"`).join(", ")}]. The Trie prunes branches that lead to no word.`,
+      vi: `Kết quả = [${answer.map((word) => `"${word}"`).join(", ")}]. Màu đỏ cho thấy nhánh bị Trie cắt ngay; nhờ vậy không phải duyệt mọi đường đi có thể.`,
+      en: `Result = [${answer.map((word) => `"${word}"`).join(", ")}]. Red states show immediate Trie pruning, avoiding exploration of every possible path.`,
     },
-  });
+  }, true);
 
   return { original: board, answer, steps };
 }
@@ -2350,7 +2812,7 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Bảng (hàng cách ;)", en: "Board (rows separated by ;)" },
     extraParams: [
-      { key: "words", label: { vi: "words (cách bởi ,)", en: "words (comma separated)" }, default: "oath,pea,eat,rain" },
+      { key: "words", type: "string", label: { vi: "words (cách bởi ,)", en: "words (comma separated)" }, default: "oath,pea,eat,rain" },
     ],
     approach: [
       { vi: "Xây Trie chứa mọi từ; lá đánh dấu '$' (từ hoàn chỉnh).", en: "Build a Trie of all words; a leaf marks '$' (a complete word)." },
@@ -2369,24 +2831,41 @@ module.exports = {
     code: [
       "class Solution:",
       "    def findWords(self, board, words):",
+      "        if not board or not board[0]:",
+      "            return []",
+      "        rows, cols = len(board), len(board[0])",
       "        trie = {}",
-      "        for w in words:",
+      "        for word in words:",
       "            node = trie",
-      "            for ch in w: node = node.setdefault(ch, {})",
-      "            node['$'] = w",
+      "            for ch in word:",
+      "                node = node.setdefault(ch, {})",
+      "            node['$'] = word",
       "        result = []",
+      "",
       "        def dfs(r, c, node):",
       "            ch = board[r][c]",
-      "            if ch not in node: return",
+      "            if ch not in node:",
+      "                return",
       "            nxt = node[ch]",
-      "            if '$' in nxt: result.append(nxt['$']); del nxt['$']",
+      "            if '$' in nxt:",
+      "                result.append(nxt['$'])",
+      "                del nxt['$']",
       "            board[r][c] = '#'",
-      "            for nr, nc in neighbors(r, c):",
-      "                if board[nr][nc] != '#': dfs(nr, nc, nxt)",
+      "            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] != '#':",
+      "                    dfs(nr, nc, nxt)",
       "            board[r][c] = ch",
+      "",
       "        for r in range(rows):",
-      "            for c in range(cols): dfs(r, c, trie)",
+      "            for c in range(cols):",
+      "                dfs(r, c, trie)",
       "        return result",
+    ],
+    liveArgs: (input, params = {}) => [
+      String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
+        .map((row) => row.split(",").map((value) => value.trim())),
+      String(params.words || "").split(",").map((word) => word.trim()).filter(Boolean),
     ],
     builder: buildSteps212,
   },
@@ -2458,11 +2937,23 @@ module.exports = {
       vi: "Hỗ trợ: ls(path), mkdir(path), addContentToFile(path, content), readContentFromFile(path).",
       en: "Support: ls(path), mkdir(path), addContentToFile(path, content), readContentFromFile(path).",
     },
-    defaultInput: 'mkdir(/a/b/c);add(/a/b/c/d,"hello");read(/a/b/c/d);ls(/a/b/c)',
+    defaultInput: 'mkdir(/a/b/c);addContentToFile(/a/b/c/d,"hello");readContentFromFile(/a/b/c/d);ls(/a/b/c)',
     inputKind: "string",
-    inputLabel: { vi: "Các lệnh (;ngăn cách)", en: "Operations (semicolon separated)" },
+    inputLabel: { vi: "Các lệnh (; ngăn cách)", en: "Operations (semicolon separated)" },
     extraParams: [],
-    complexity: { time: "O(L)", space: "O(N·L+C)", note: { vi: "Mỗi thao tác O(L). Bộ nhớ O(N·L + tổng nội dung file).", en: "Each operation O(L). Memory O(N·L + total file content)." } },
+    approach: [
+      { vi: "Mỗi segment trong path là một node Trie: node thường là folder, node có content là file.", en: "Each path segment is a Trie node: regular nodes are folders and content-bearing nodes are files." },
+      { vi: "_navigate tách path theo '/', đi từ root và dùng lại node đã có; mkdir/addContentToFile tạo node còn thiếu.", en: "_navigate splits path by '/', starts at root, reuses existing nodes, and lets mkdir/addContentToFile create missing nodes." },
+      { vi: "addContentToFile nối thêm content; readContentFromFile trả content; ls trả tên file hoặc danh sách children đã sort.", en: "addContentToFile appends content; readContentFromFile returns content; ls returns a file name or sorted child names." },
+    ],
+    complexity: {
+      time: "navigate O(L); ls O(L + K log K)",
+      space: "O(N·L + C)",
+      note: {
+        vi: "L = số segment của path, K = số children cần sort, C = tổng nội dung file. Đọc/ghi còn phụ thuộc độ dài content.",
+        en: "L = path segments, K = children to sort, C = total file content. Reading/writing also depends on content length.",
+      },
+    },
     code: [
       "class TrieNode:",
       "    def __init__(self):",

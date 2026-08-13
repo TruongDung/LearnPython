@@ -13137,6 +13137,188 @@ function renderLongestDuplicateView(step) {
 }
 
 // ---- Render a single step ----
+function renderFileSystemView(step) {
+  const view = step.fileSystemView || {};
+  const vi = lang === "vi";
+  const formatResult = (value) => {
+    if (value === undefined) return "—";
+    if (value === null) return "None";
+    if (Array.isArray(value)) return `[${value.map((item) => `"${item}"`).join(", ")}]`;
+    return `"${String(value)}"`;
+  };
+  const phases = [
+    { key: "parse", label: vi ? "1 · Tách đường dẫn" : "1 · Split path" },
+    { key: "navigate", label: vi ? "2 · Đi trên Trie" : "2 · Walk Trie" },
+    { key: "result", label: vi ? "3 · Thực hiện / trả về" : "3 · Execute / return" },
+  ];
+  const phaseRank = view.phase === "parse" ? 0 : view.phase === "navigate" ? 1 : 2;
+  const phaseHtml = phases.map((phase, index) => `<span class="${index === phaseRank ? "active" : index < phaseRank ? "done" : ""}">${escapeHtml(phase.label)}</span>`).join("");
+
+  const operationHtml = (view.operations || []).map((operation, index) => {
+    const classes = [];
+    if (view.phase === "done" || index < view.operationIndex) classes.push("done");
+    else if (index === view.operationIndex) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>#${index + 1}</small><strong>${escapeHtml(operation)}</strong></span>`;
+  }).join("") || `<span class="empty">${vi ? "Không có thao tác" : "No operations"}</span>`;
+
+  const createdIndexes = new Set(view.createdPartIndexes || []);
+  const pathParts = Array.isArray(view.parts) ? view.parts : [];
+  const pathHtml = [
+    `<span class="fs588-segment root ${pathParts.length === 0 ? "active" : "done"}"><small>root</small><strong>/</strong><em>folder</em></span>`,
+    ...pathParts.map((part, index) => {
+      const classes = ["fs588-segment"];
+      if (index < view.partIndex) classes.push("done");
+      if (index === view.partIndex) classes.push("active");
+      if (createdIndexes.has(index)) classes.push("created");
+      const terminalType = index === pathParts.length - 1 ? view.entryType : "directory";
+      return `<i>→</i><span class="${classes.join(" ")}"><small>part[${index}]</small><strong>${escapeHtml(part)}</strong><em>${terminalType === "file" ? "file" : "folder"}${createdIndexes.has(index) ? " · NEW" : ""}</em></span>`;
+    }),
+  ].join("");
+
+  const node = view.currentNode;
+  const nodeIcon = node && node.type === "file" ? "📄" : "📁";
+  const childrenHtml = node && node.children && node.children.length
+    ? node.children.map((child) => `<span>${escapeHtml(child)}</span>`).join("")
+    : `<span class="empty">∅</span>`;
+  const content = node && node.type === "file" ? String(node.content ?? "") : "";
+  const detailHtml = node
+    ? `<div class="fs588-node-head"><b>${nodeIcon}</b><div><small>${node.type === "file" ? "FILE" : "FOLDER"}</small><strong>${escapeHtml(node.name)}</strong></div></div>
+       <div class="fs588-node-data"><span>${node.type === "file" ? "content" : "children"}</span>${node.type === "file" ? `<code>"${escapeHtml(content)}"</code><small>${content.length} char${content.length === 1 ? "" : "s"}</small>` : `<div>${childrenHtml}</div><small>${node.children.length} item${node.children.length === 1 ? "" : "s"}</small>`}</div>`
+    : `<div class="fs588-node-missing"><b>!</b><strong>${vi ? "Không tìm thấy node" : "Node not found"}</strong></div>`;
+
+  const actionLabels = {
+    init: vi ? "KHỞI TẠO ROOT" : "INITIALIZE ROOT",
+    split: vi ? "PATH → SEGMENTS" : "PATH → SEGMENTS",
+    reuse: vi ? "NODE ĐÃ CÓ → DÙNG LẠI" : "NODE EXISTS → REUSE",
+    "create-directory": vi ? "THIẾU NODE → TẠO FOLDER" : "MISSING NODE → CREATE FOLDER",
+    "create-file": vi ? "THIẾU NODE → TẠO FILE" : "MISSING NODE → CREATE FILE",
+    "mkdir-done": "MKDIR COMPLETE",
+    write: vi ? "APPEND CONTENT" : "APPEND CONTENT",
+    read: vi ? "ĐỌC CONTENT" : "READ CONTENT",
+    list: vi ? "LIỆT KÊ VÀ SORT" : "LIST AND SORT",
+    missing: vi ? "ĐƯỜNG DẪN KHÔNG TỒN TẠI" : "PATH NOT FOUND",
+    invalid: vi ? "LỆNH KHÔNG HỢP LỆ" : "INVALID OPERATION",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+  const actionClass = ["create-directory", "create-file", "write", "read", "list", "missing", "invalid", "done"].includes(view.action) ? view.action : "";
+  const isWriting = view.action === "write";
+  const summary = vi
+    ? `File System: ${view.rawOperation}. ${view.directories} folder và ${view.files} file.`
+    : `File System: ${view.rawOperation}. ${view.directories} folders and ${view.files} files.`;
+
+  $("treeView").innerHTML = `<section class="fs588-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="fs588-phases">${phaseHtml}</div>
+    <section class="fs588-operations"><header><strong>OPERATIONS</strong><span>${vi ? "cam = đang chạy · xanh = hoàn tất" : "amber = active · green = complete"}</span></header><div>${operationHtml}</div></section>
+    <section class="fs588-action ${actionClass} ${view.valid === false ? "failure" : ""}"><span>${escapeHtml(actionLabels[view.action] || "FILE SYSTEM")}</span><strong>${escapeHtml(pick(view.decision) || "—")}</strong><code>${escapeHtml(view.rawOperation || "FileSystem()")}</code></section>
+    <section class="fs588-path"><header><strong>PATH = "${escapeHtml(view.path || "/")}"</strong><span>${vi ? "đọc từ trái sang phải" : "walk left to right"}</span></header><div>${pathHtml}</div></section>
+    <div class="fs588-layout">
+      <section class="fs588-tree-card"><header><strong>${vi ? "CẤU TRÚC FILE SYSTEM" : "FILE SYSTEM STRUCTURE"}</strong><span>${vi ? "folder = xanh dương · file = vòng xanh lá · cam = đang xét" : "folder = blue · file = green ring · amber = current"}</span></header><div id="fs588Tree" class="fs588-tree"></div><footer><span>📁 ${view.directories} folder</span><span>📄 ${view.files} file</span></footer></section>
+      <aside class="fs588-side">
+        <section class="fs588-current"><header><strong>${vi ? "CHỈ XEM NODE ĐANG XÉT" : "CURRENT NODE ONLY"}</strong><span>${escapeHtml(node ? node.type : "missing")}</span></header>${detailHtml}</section>
+        ${isWriting ? `<section class="fs588-append"><span>APPEND, NOT OVERWRITE</span><div><code>"${escapeHtml(view.contentBefore ?? "")}"</code><b>+</b><code>"${escapeHtml(view.appendedContent || "")}"</code><b>=</b><code class="after">"${escapeHtml(view.contentAfter ?? "")}"</code></div></section>` : ""}
+        <section class="fs588-return ${view.valid === false ? "failure" : view.phase === "result" || view.phase === "done" ? "success" : ""}"><span>RETURN / RESULT</span><strong>${escapeHtml(formatResult(view.result))}</strong><small>${view.action === "list" ? (vi ? "folder → sort children · file → [name]" : "folder → sort children · file → [name]") : view.action === "read" ? "return node.content" : view.action === "write" ? "content += new_content" : "—"}</small></section>
+      </aside>
+    </div>
+  </section>`;
+  renderTree(step, "fs588Tree");
+}
+
+function renderWordSearchIIView(step) {
+  const view = step.wordSearchIIView || {};
+  const vi = lang === "vi";
+  const phases = [
+    { key: "build", label: vi ? "1 · Xây Trie" : "1 · Build Trie" },
+    { key: "search", label: vi ? "2 · DFS trên Board" : "2 · DFS Board" },
+    { key: "done", label: vi ? "3 · Kết quả" : "3 · Result" },
+  ];
+  const phaseRank = view.phase === "build" ? 0 : view.phase === "done" ? 2 : 1;
+  const phaseHtml = phases.map((phase, index) => `<span class="${index === phaseRank ? "active" : index < phaseRank ? "done" : ""}">${escapeHtml(phase.label)}</span>`).join("");
+  const pathMap = new Map((view.path || []).map((cell, index) => [`${cell.r},${cell.c}`, { ...cell, order: index + 1 }]));
+  const sameCell = (cell, r, c) => cell && cell.r === r && cell.c === c;
+  const foundSet = new Set(view.found || []);
+  const prefix = String(view.prefix || "");
+
+  const wordsHtml = (view.words || []).map((word) => {
+    const classes = [];
+    if (foundSet.has(word)) classes.push("found");
+    else if (prefix && word.startsWith(prefix)) classes.push("candidate");
+    return `<span class="${classes.join(" ")}">${foundSet.has(word) ? "✓ " : ""}${escapeHtml(word)}</span>`;
+  }).join("") || `<span class="empty">${vi ? "Không có words" : "No words"}</span>`;
+
+  const boardRows = Array.isArray(view.board) ? view.board : [];
+  const boardHtml = boardRows.length ? boardRows.flatMap((row, r) => Array.from({ length: view.cols || row.length }, (_, c) => {
+    if (c >= row.length) return `<div class="ws212-cell empty" aria-hidden="true"></div>`;
+    const pathCell = pathMap.get(`${r},${c}`);
+    const classes = ["ws212-cell"];
+    let state = "";
+    if (pathCell) {
+      classes.push(view.action === "found" ? "found-path" : "in-path");
+      state = `${vi ? "bước" : "step"} ${pathCell.order}`;
+    }
+    if (sameCell(view.current, r, c)) {
+      classes.push("current");
+      state = vi ? "đang đứng" : "current";
+    }
+    if (sameCell(view.candidate, r, c) && view.action === "prune") {
+      classes.push("pruned");
+      state = vi ? "bị cắt" : "pruned";
+    }
+    if (sameCell(view.restored, r, c)) {
+      classes.push("restored");
+      state = "backtrack";
+    }
+    return `<div class="${classes.join(" ")}"><small>(${r},${c})</small><strong>${escapeHtml(row[c])}</strong><span>${escapeHtml(state)}</span>${pathCell ? `<b>${pathCell.order}</b>` : ""}</div>`;
+  })).join("") : `<div class="ws212-empty">${vi ? "Board rỗng" : "Empty board"}</div>`;
+
+  const pathHtml = (view.path || []).length
+    ? view.path.map((cell, index) => `<span><small>${index + 1}</small><strong>${escapeHtml(cell.char)}</strong><em>(${cell.r},${cell.c})</em></span>`).join("<i>→</i>")
+    : `<span class="empty">∅</span>`;
+  const childrenHtml = (view.trieChildren || []).length
+    ? view.trieChildren.map((char) => `<span class="${char === view.needed ? "missing" : ""}">'${escapeHtml(char)}'</span>`).join("")
+    : `<span class="empty">∅</span>`;
+  const stackHtml = (view.callStack || []).length
+    ? view.callStack.map((frame, index) => `<li class="${index === view.callStack.length - 1 ? "active" : ""}"><span>#${index + 1}</span><strong>dfs(${frame.r}, ${frame.c})</strong><small>prefix = "${escapeHtml(frame.prefix)}"</small><em>${escapeHtml(frame.direction)}</em></li>`).join("")
+    : `<li class="empty">${vi ? "Call stack rỗng" : "Empty call stack"}</li>`;
+  const resultHtml = (view.found || []).length
+    ? view.found.map((word) => `<span>✓ ${escapeHtml(word)}</span>`).join("")
+    : `<span class="empty">[]</span>`;
+
+  const actionLabels = {
+    build: vi ? "GỘP PREFIX CHUNG" : "MERGE SHARED PREFIXES",
+    start: vi ? "BẮT ĐẦU DFS" : "START DFS",
+    match: vi ? "MATCH · ĐI TIẾP" : "MATCH · CONTINUE",
+    prune: vi ? "PRUNE · RETURN NGAY" : "PRUNE · RETURN NOW",
+    found: vi ? "FOUND · THÊM KẾT QUẢ" : "FOUND · ADD RESULT",
+    backtrack: vi ? "BACKTRACK · KHÔI PHỤC" : "BACKTRACK · RESTORE",
+    done: vi ? "HOÀN TẤT" : "COMPLETE",
+  };
+  const actionClass = ["prune", "found", "backtrack", "done"].includes(view.action) ? view.action : "";
+  const moveText = view.candidate
+    ? `${view.direction || "start"} (${view.candidate.r},${view.candidate.c}) = '${boardRows[view.candidate.r]?.[view.candidate.c] || ""}'`
+    : (vi ? "chưa chọn ô" : "no cell selected");
+  const summary = vi
+    ? `Word Search II: prefix ${prefix || "rỗng"}, đã tìm ${foundSet.size} từ.`
+    : `Word Search II: prefix ${prefix || "empty"}, found ${foundSet.size} words.`;
+
+  $("treeView").innerHTML = `<section class="ws212-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ws212-phases">${phaseHtml}</div>
+    <section class="ws212-words"><header><strong>WORDS / TERMINAL NODES</strong><span>${vi ? "xanh = đã tìm · cam = còn khớp prefix" : "green = found · amber = matches prefix"}</span></header><div>${wordsHtml}</div></section>
+    <div class="ws212-action ${actionClass}"><span>${escapeHtml(actionLabels[view.action] || "DFS")}</span><strong>${escapeHtml(pick(view.decision) || "—")}</strong><code>${escapeHtml(moveText)}</code></div>
+    <div class="ws212-layout">
+      <section class="ws212-card board"><header><strong>BOARD</strong><span>${vi ? "số = thứ tự trong path" : "number = path order"}</span></header><div class="ws212-board" style="grid-template-columns: repeat(${Math.max(1, view.cols || 1)}, minmax(48px, 62px))">${boardHtml}</div></section>
+      <section class="ws212-card trie"><header><strong>TRIE · PREFIX "${escapeHtml(prefix)}"</strong><span>${vi ? "cam = đường đồng bộ với board · vòng xanh = cuối từ" : "amber = board-synced path · green ring = word end"}</span></header><div id="ws212Trie" class="ws212-trie"></div></section>
+    </div>
+    <div class="ws212-bottom">
+      <section class="ws212-state"><div><span>PREFIX</span><strong>"${escapeHtml(prefix)}"</strong></div><div><span>${vi ? "TRIE CÓ THỂ ĐI" : "TRIE CAN FOLLOW"}</span><p>${childrenHtml}</p></div><div><span>${vi ? "MOVE ĐANG THỬ" : "MOVE BEING TRIED"}</span><strong>${escapeHtml(moveText)}</strong></div></section>
+      <section class="ws212-stack"><header><strong>DFS CALL STACK</strong><span>${vi ? "frame cuối đang chạy" : "last frame is active"}</span></header><ol>${stackHtml}</ol></section>
+    </div>
+    <section class="ws212-path"><b>BOARD PATH</b><div>${pathHtml}</div></section>
+    <section class="ws212-result ${view.action === "done" ? "done" : ""}"><b>RESULT</b><div>${resultHtml}</div><strong>${foundSet.size}/${(view.words || []).length}</strong></section>
+    <div class="ws212-legend"><span><i class="path"></i>${vi ? "path hợp lệ" : "valid path"}</span><span><i class="current"></i>${vi ? "ô hiện tại" : "current cell"}</span><span><i class="pruned"></i>Trie prune</span><span><i class="restored"></i>backtrack</span></div>
+  </section>`;
+  renderTree(step, "ws212Trie");
+}
+
 function renderWordDictionaryView(step) {
   const view = step.wordDictionaryView || {};
   const vi = lang === "vi";
@@ -13390,6 +13572,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderRecoverBstView(step);
+  } else if (step.wordSearchIIView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWordSearchIIView(step);
   } else if (step.wordSearchView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -13456,6 +13644,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPathExistsBfsView(step);
+  } else if (step.fileSystemView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFileSystemView(step);
   } else if (step.wordDictionaryView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
