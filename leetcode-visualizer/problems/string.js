@@ -9220,7 +9220,8 @@ module.exports = {
     id: 2213,
     difficulty: "hard",
     slug: "longest-substring-of-one-repeating-character",
-    category: { key: "string", vi: "Chuỗi", en: "String" },
+    category: { key: "segment-tree", vi: "Segment Tree", en: "Segment Tree" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
     title: { vi: "Longest Substring of One Repeating Character", en: "Longest Substring of One Repeating Character" },
     titleVi: { vi: "Substring lặp dài nhất sau mỗi query", en: "Longest repeating substring after each query" },
     statement: {
