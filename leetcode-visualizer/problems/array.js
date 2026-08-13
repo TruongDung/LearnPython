@@ -8032,6 +8032,180 @@ module.exports = {
     ],
     builder: buildSteps84,
   },
+  739: {
+    id: 739,
+    difficulty: "medium",
+    slug: "daily-temperatures",
+    category: { key: "array", vi: "Mảng", en: "Array" },
+    title: { vi: "Daily Temperatures", en: "Daily Temperatures" },
+    titleVi: { vi: "Nhiệt độ hằng ngày", en: "Daily Temperatures" },
+    statement: {
+      vi: "Cho mảng temperatures, với mỗi ngày i hãy trả về cần chờ bao nhiêu ngày đến ngày ấm hơn tiếp theo. Nếu không có ngày nào ấm hơn ở bên phải thì trả về 0.",
+      en: "Given temperatures, return for every day i how many days you must wait for a warmer temperature. Return 0 when no warmer day exists to its right.",
+    },
+    defaultInput: [73, 74, 75, 71, 69, 72, 76, 73],
+    inputKind: "nonneg",
+    inputLabel: { vi: "temperatures", en: "temperatures" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt từ trái sang phải; stack giữ INDEX của các ngày chưa tìm thấy ngày ấm hơn, theo nhiệt độ GIẢM DẦN từ đáy đến đỉnh.", en: "Scan left to right; the stack holds INDICES still waiting for a warmer day, with temperatures DECREASING from bottom to top." },
+      { vi: "Nếu nhiệt độ hôm nay cao hơn nhiệt độ ở đỉnh, hôm nay là ngày ấm hơn đầu tiên của đỉnh: pop và ghi answer[prev] = i - prev.", en: "If today is warmer than the stack top, today is that top's first warmer day: pop it and set answer[prev] = i - prev." },
+      { vi: "Sau khi giải quyết mọi ngày lạnh hơn, push index hôm nay. Các index còn lại sau vòng lặp không có ngày ấm hơn nên giữ answer = 0.", en: "After resolving every colder day, push today's index. Indices left after the scan have no warmer day, so their answer remains 0." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: { vi: "Mỗi index được push một lần và pop nhiều nhất một lần.", en: "Every index is pushed once and popped at most once." },
+    },
+    code: [
+      "class Solution:",
+      "    def dailyTemperatures(self, temperatures):",
+      "        answer = [0] * len(temperatures)",
+      "        stack = []",
+      "        for i, temp in enumerate(temperatures):",
+      "            while stack and temperatures[stack[-1]] < temp:",
+      "                prev = stack.pop()",
+      "                answer[prev] = i - prev",
+      "            stack.append(i)",
+      "        return answer",
+    ],
+    builder: function buildSteps739(inputTemperatures) {
+      const temperatures = [...inputTemperatures];
+      const answer = Array(temperatures.length).fill(0);
+      const stack = [];
+      const steps = [];
+
+      const stackLabel = () => `[${stack.map((index) => `${index}:${temperatures[index]}°`).join(", ")}]`;
+      const answerLabel = () => `[${answer.join(", ")}]`;
+      const stackItems = () => stack.map((index) => ({
+        value: `${temperatures[index]}°`,
+        detail: `index ${index}`,
+      }));
+
+      function addStep({ title, codeLines, note, current = null, highlightIndices = [], status = [], vars = [], final = false }) {
+        const highlight = new Set(highlightIndices);
+        if (Number.isInteger(current)) highlight.add(current);
+        const top = stack.length ? stack[stack.length - 1] : null;
+        steps.push({
+          title,
+          arr: [...temperatures],
+          sub: temperatures.map((_, index) => `i=${index} · wait=${answer[index]}`),
+          highlight: [...highlight],
+          mark: final ? answer.map((days, index) => days > 0 ? index : -1).filter((index) => index >= 0) : [],
+          final,
+          codeLines,
+          vars: [
+            { name: "stack (bottom → top)", value: stackLabel() },
+            { name: "answer", value: answerLabel() },
+            ...vars,
+          ],
+          note,
+          stackView: {
+            title: "Monotonic decreasing stack (indices)",
+            emptyLabel: "empty stack",
+            input: [...temperatures],
+            inputLabel: "temperatures",
+            current,
+            items: stackItems(),
+            status: [
+              { label: "top", value: top === null ? "empty" : `${top}: ${temperatures[top]}°` },
+              { label: "current", value: Number.isInteger(current) ? `${current}: ${temperatures[current]}°` : "—" },
+              { label: "answer", value: answerLabel() },
+              ...status,
+            ],
+          },
+        });
+      }
+
+      addStep({
+        title: { vi: "answer = [0] × n", en: "answer = [0] × n" },
+        codeLines: [3],
+        vars: [{ name: "n", value: temperatures.length }],
+        note: { vi: "Mặc định mỗi ngày trả về 0. Chỉ thay đổi khi tìm được ngày ấm hơn đầu tiên ở bên phải.", en: "Every day starts with answer 0. Change it only when its first warmer day on the right is found." },
+      });
+      addStep({
+        title: { vi: "stack = []", en: "stack = []" },
+        codeLines: [4],
+        note: { vi: "Stack lưu index của các ngày còn đang chờ nhiệt độ cao hơn. Nhiệt độ giảm dần từ đáy lên đỉnh.", en: "The stack stores indices of days still waiting for a warmer temperature. Temperatures decrease from bottom to top." },
+      });
+
+      for (let i = 0; i < temperatures.length; i++) {
+        const temp = temperatures[i];
+        addStep({
+          title: { vi: `Duyệt i=${i}, temp=${temp}°`, en: `Scan i=${i}, temp=${temp}°` },
+          codeLines: [5],
+          current: i,
+          vars: [{ name: "i", value: i }, { name: "temp", value: temp }],
+          note: { vi: `Ngày ${i} có ${temp}°. So sánh nó với ngày ở đỉnh stack để xem ngày nào vừa gặp nhiệt độ ấm hơn đầu tiên.`, en: `Day ${i} is ${temp}°. Compare it with the stack top to see which day just found its first warmer temperature.` },
+        });
+
+        while (true) {
+          const previous = stack.length ? stack[stack.length - 1] : null;
+          const isWarmer = previous !== null && temperatures[previous] < temp;
+          addStep({
+            title: { vi: `while top < ${temp}° → ${isWarmer ? "ĐÚNG" : "SAI"}`, en: `while top < ${temp}° → ${isWarmer ? "TRUE" : "FALSE"}` },
+            codeLines: [6],
+            current: i,
+            highlightIndices: previous === null ? [] : [previous],
+            status: [{ label: "condition", value: previous === null ? "stack is empty → False" : `${temperatures[previous]}° < ${temp}° → ${isWarmer}` }],
+            vars: previous === null
+              ? [{ name: "condition", value: false }]
+              : [{ name: "prev (top)", value: previous }, { name: "temperatures[prev] < temp", value: `${temperatures[previous]} < ${temp} → ${isWarmer}` }],
+            note: isWarmer
+              ? { vi: `Ngày ${i} ấm hơn ngày ${previous} (${temp}° > ${temperatures[previous]}°). Đây là ngày ấm hơn ĐẦU TIÊN vì ${previous} vẫn chưa bị pop.`, en: `Day ${i} is warmer than day ${previous} (${temp}° > ${temperatures[previous]}°). It is the FIRST warmer day because ${previous} is still unresolved on the stack.` }
+              : previous === null
+                ? { vi: "Stack rỗng, không còn ngày nào chờ được giải quyết. Chuyển sang push hôm nay.", en: "The stack is empty, so no waiting day can be resolved. Proceed to push today." }
+                : { vi: `Đỉnh ${previous} có ${temperatures[previous]}° không thấp hơn ${temp}°. Giữ nó lại vì vẫn có thể gặp ngày ấm hơn sau này.`, en: `Top ${previous} is ${temperatures[previous]}°, which is not lower than ${temp}°. Keep it because a warmer day may appear later.` },
+          });
+          if (!isWarmer) break;
+
+          const resolved = stack.pop();
+          addStep({
+            title: { vi: `prev = stack.pop() → ${resolved}`, en: `prev = stack.pop() → ${resolved}` },
+            codeLines: [7],
+            current: i,
+            highlightIndices: [resolved],
+            status: [{ label: "popped / resolved", value: `${resolved}: ${temperatures[resolved]}°` }],
+            vars: [{ name: "prev", value: resolved }, { name: "temperature[prev]", value: temperatures[resolved] }],
+            note: { vi: `Pop ngày ${resolved}: ngày ${i} vừa là ngày đầu tiên ấm hơn của nó.`, en: `Pop day ${resolved}: day ${i} is its first warmer day.` },
+          });
+
+          answer[resolved] = i - resolved;
+          addStep({
+            title: { vi: `answer[${resolved}] = ${i} - ${resolved} = ${answer[resolved]}`, en: `answer[${resolved}] = ${i} - ${resolved} = ${answer[resolved]}` },
+            codeLines: [8],
+            current: i,
+            highlightIndices: [resolved],
+            status: [{ label: `answer[${resolved}]`, value: answer[resolved] }],
+            vars: [{ name: "prev", value: resolved }, { name: "days waited", value: answer[resolved] }],
+            note: { vi: `Từ ngày ${resolved} đến ngày ${i} cần chờ ${answer[resolved]} ngày.`, en: `From day ${resolved} to day ${i}, the wait is ${answer[resolved]} day(s).` },
+          });
+        }
+
+        stack.push(i);
+        addStep({
+          title: { vi: `stack.append(${i})`, en: `stack.append(${i})` },
+          codeLines: [9],
+          current: i,
+          vars: [{ name: "pushed index", value: i }],
+          note: { vi: `Ngày ${i} chưa thấy ngày ấm hơn của chính nó, nên push vào stack để chờ. Stack vẫn giảm dần nhiệt độ.`, en: `Day ${i} has not found its own warmer day yet, so push it onto the stack to wait. The stack remains decreasing by temperature.` },
+        });
+      }
+
+      addStep({
+        title: { vi: `return answer → ${answerLabel()}`, en: `return answer → ${answerLabel()}` },
+        codeLines: [10],
+        final: true,
+        status: [{ label: "unresolved indices", value: stack.length ? `[${stack.join(", ")}] → remain 0` : "none" }],
+        vars: [{ name: "unresolved", value: stack.length ? `[${stack.join(", ")}]` : "[]" }, { name: "answer", value: answerLabel() }],
+        note: stack.length
+          ? { vi: `Các ngày còn trong stack [${stack.join(", ")}] không có ngày ấm hơn ở bên phải nên answer của chúng giữ 0.`, en: `The days still in stack [${stack.join(", ")}] have no warmer day to the right, so their answers stay 0.` }
+          : { vi: "Không còn ngày nào chờ xử lý.", en: "No day remains unresolved." },
+      });
+
+      return { original: temperatures, answer, steps };
+    },
+  },
   628: {
     id: 628,
     difficulty: "easy",
