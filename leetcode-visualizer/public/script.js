@@ -7890,6 +7890,102 @@ function renderDuplicateZerosView(step) {
   </div>`;
 }
 
+// ---- Repeating-runs visualization (bai 2213: Longest Substring of One
+// Repeating Character) ----
+// Shows the string as a strip of character cells grouped into colored
+// "run" blocks (consecutive equal characters share a color band below
+// them), the scan pointer j / j-1 as arrows while comparing, the current
+// run highlighted with a bracket, and the best run found so far
+// highlighted in gold. A small "lengths so far" trail shows the answer
+// building up query by query.
+function renderRepeatingRunsView(step) {
+  const view = step.repeatingRunsView || {};
+  const chars = Array.isArray(view.chars) ? view.chars : [];
+  const runs = Array.isArray(view.runs) ? view.runs : [];
+  const activeIndex = Number.isInteger(view.activeIndex) ? view.activeIndex : -1;
+  const compareIndex = Number.isInteger(view.compareIndex) ? view.compareIndex : -1;
+  const changedIndex = Number.isInteger(view.changedIndex) ? view.changedIndex : -1;
+  const currentRun = view.currentRun || null;
+  const bestRun = view.bestRun || null;
+  const lengths = Array.isArray(view.lengths) ? view.lengths : [];
+  const queryIndex = Number.isInteger(view.queryIndex) ? view.queryIndex : null;
+  const totalQueries = view.totalQueries;
+  const vi = lang === "vi";
+
+  // Assign each run a rotating color class so adjacent runs are visually distinct.
+  const runPalette = ["run-c0", "run-c1", "run-c2", "run-c3", "run-c4"];
+  const runOfIndex = new Array(chars.length).fill(-1);
+  runs.forEach((r, ri) => {
+    for (let i = r.start; i <= r.end; i++) runOfIndex[i] = ri;
+  });
+
+  const inCurrentRun = (i) => currentRun && i >= currentRun.start && i <= currentRun.end;
+  const inBestRun = (i) => bestRun && bestRun.start !== null && bestRun.start !== undefined && i >= bestRun.start && i <= bestRun.end;
+
+  const cells = chars.map((ch, i) => {
+    const runIdx = runOfIndex[i];
+    const paletteCls = runIdx >= 0 ? runPalette[runIdx % runPalette.length] : "";
+    const isActive = i === activeIndex;
+    const isCompare = i === compareIndex;
+    const isChanged = i === changedIndex;
+    const isCurrent = inCurrentRun(i);
+    const isBest = inBestRun(i);
+    const classes = [
+      "run-cell",
+      paletteCls,
+      isCurrent ? "run-cell-current" : "",
+      isBest ? "run-cell-best" : "",
+      isChanged ? "run-cell-changed" : "",
+    ].filter(Boolean).join(" ");
+    const arrowHtml = isActive
+      ? `<div class="run-pointer run-pointer-j"><span>j</span><i>\u25BC</i></div>`
+      : isCompare
+        ? `<div class="run-pointer run-pointer-j1"><span>j-1</span><i>\u25BC</i></div>`
+        : `<div class="run-pointer-spacer"></div>`;
+    return `<div class="run-cell-wrap">
+      ${arrowHtml}
+      <div class="${classes}">
+        <span class="run-cell-idx">[${i}]</span>
+        <strong>${escapeHtml(ch)}</strong>
+      </div>
+    </div>`;
+  }).join("");
+
+  const currentRunLabel = currentRun
+    ? `${vi ? "run hiện tại" : "current run"}: '${chars[currentRun.start] ?? ""}' × ${currentRun.length} [${currentRun.start}..${currentRun.end}]`
+    : "";
+  const bestRunLabel = bestRun
+    ? `${vi ? "best run" : "best run"}: '${bestRun.ch || chars[bestRun.start] || ""}' × ${bestRun.length}${bestRun.start !== null && bestRun.start !== undefined ? ` [${bestRun.start}..${bestRun.end}]` : ""}`
+    : "";
+
+  const lengthsHtml = lengths.length
+    ? lengths.map((len, i) => `<span class="run-length-chip${i === lengths.length - 1 ? " run-length-chip-latest" : ""}">${len}</span>`).join("")
+    : `<span class="run-length-empty">${vi ? "(chưa có)" : "(none yet)"}</span>`;
+
+  const queryLabel = queryIndex !== null
+    ? (vi ? `Query ${queryIndex + 1}/${totalQueries}` : `Query ${queryIndex + 1}/${totalQueries}`)
+    : (vi ? "Khởi tạo" : "Setup");
+
+  $("treeView").innerHTML = `
+    <div class="run-viz">
+      <div class="run-head">
+        <span class="run-query-badge">${escapeHtml(queryLabel)}</span>
+        <span class="run-info">${escapeHtml(currentRunLabel)}</span>
+        <span class="run-info run-info-best">${escapeHtml(bestRunLabel)}</span>
+      </div>
+      <div class="run-cells">${cells}</div>
+      <div class="run-lengths-panel">
+        <span class="run-lengths-label">${vi ? "lengths (kết quả từng query)" : "lengths (result per query)"}</span>
+        <div class="run-lengths-chips">${lengthsHtml}</div>
+      </div>
+      <div class="run-legend">
+        <span><i class="run-legend-swatch run-legend-current"></i>${vi ? "run đang quét" : "run being scanned"}</span>
+        <span><i class="run-legend-swatch run-legend-best"></i>${vi ? "run tốt nhất" : "best run"}</span>
+        <span><i class="run-legend-swatch run-legend-changed"></i>${vi ? "ký tự vừa đổi" : "just-changed character"}</span>
+      </div>
+    </div>`;
+}
+
 // ---- Candy allocation visualization (bai 2226: Maximum Candies Allocated
 // to K Children) ----
 // Binary search on the answer (candies per child). Shows:
@@ -13439,6 +13535,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderCandyAllocationView(step);
+  } else if (step.repeatingRunsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderRepeatingRunsView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");

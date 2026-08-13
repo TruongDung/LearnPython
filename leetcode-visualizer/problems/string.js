@@ -8904,7 +8904,374 @@ function buildSteps3302(input, params) {
   return { original: word1, word2, answer: result, steps };
 }
 
+/**
+ * LeetCode 2213: Longest Substring of One Repeating Character.
+ *
+ * s is mutated one character at a time by queries. After EACH query, find
+ * the length of the longest run of a single repeating character in the
+ * WHOLE string. The efficient approach uses a segment tree, but for a clear
+ * step-by-step visualization we rescan the string after each update: apply
+ * the character change, then scan left to right tracking the current run
+ * length and the best run length seen so far.
+ *
+ * Code lines (1-indexed):
+ *  1  class Solution:
+ *  2      def longestRepeating(self, s, queryCharacters, queryIndices):
+ *  3          chars = list(s)
+ *  4          lengths = []
+ *  5          for i in range(len(queryCharacters)):
+ *  6              chars[queryIndices[i]] = queryCharacters[i]
+ *  7              best = 1
+ *  8              run = 1
+ *  9              for j in range(1, len(chars)):
+ * 10                  if chars[j] == chars[j - 1]:
+ * 11                      run += 1
+ * 12                  else:
+ * 13                      run = 1
+ * 14                  best = max(best, run)
+ * 15              lengths.append(best)
+ * 16          return lengths
+ */
+function buildSteps2213(input, params) {
+  const s = String(input || "");
+  const queryCharacters = String((params && params.queryCharacters) || "").trim();
+  const queryIndicesRaw = String((params && params.queryIndices) || "").trim();
+  const queryIndices = queryIndicesRaw.length
+    ? queryIndicesRaw.split(",").map((x) => Number(x.trim()))
+    : [];
+  const steps = [];
+  const n = s.length;
+
+  const invalid = n === 0
+    || queryCharacters.length === 0
+    || queryCharacters.length !== queryIndices.length
+    || queryIndices.some((idx) => !Number.isInteger(idx) || idx < 0 || idx >= n);
+
+  if (invalid) {
+    steps.push({
+      title: { vi: "Input không hợp lệ", en: "Invalid input" },
+      arr: s.split("").map(() => 1),
+      sub: s.split(""),
+      highlight: [],
+      mark: [],
+      final: true,
+      codeLines: [2],
+      vars: [
+        { name: "s", value: `"${s}"` },
+        { name: "queryCharacters", value: `"${queryCharacters}"` },
+        { name: "queryIndices", value: `[${queryIndices.join(",")}]` },
+      ],
+      note: {
+        vi: "s không rỗng; queryCharacters.length phải bằng queryIndices.length; mỗi queryIndices[i] phải là chỉ số hợp lệ trong s.",
+        en: "s must be non-empty; queryCharacters.length must equal queryIndices.length; every queryIndices[i] must be a valid index into s.",
+      },
+    });
+    return { original: s, answer: [], steps };
+  }
+
+  const chars = s.split("");
+  const k = queryCharacters.length;
+  const lengths = [];
+
+  function runsFor(arr) {
+    // Returns [{ start, end, length, ch }] for every maximal run, for the view.
+    const runs = [];
+    let start = 0;
+    for (let j = 1; j <= arr.length; j++) {
+      if (j === arr.length || arr[j] !== arr[j - 1]) {
+        runs.push({ start, end: j - 1, length: j - start, ch: arr[start] });
+        start = j;
+      }
+    }
+    return runs;
+  }
+
+  function snap(opts) {
+    steps.push({
+      title: opts.title,
+      arr: chars.map(() => 1),
+      sub: [...chars],
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: opts.final || false,
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+      repeatingRunsView: {
+        chars: [...chars],
+        runs: opts.runs || runsFor(chars),
+        activeIndex: opts.activeIndex,
+        compareIndex: opts.compareIndex,
+        bestRun: opts.bestRun,
+        currentRun: opts.currentRun,
+        queryIndex: opts.queryIndex,
+        totalQueries: k,
+        lengths: [...lengths],
+        phase: opts.phase || "scan",
+        changedIndex: opts.changedIndex,
+      },
+    });
+  }
+
+  // Line 3-4: chars = list(s); lengths = []
+  snap({
+    title: { vi: `chars = list(s) → [${chars.join(",")}], lengths = []`, en: `chars = list(s) → [${chars.join(",")}], lengths = []` },
+    codeLines: [3, 4],
+    phase: "init",
+    vars: [
+      { name: "s", value: `"${s}"` },
+      { name: "chars", value: `[${chars.join(",")}]` },
+      { name: "lengths", value: "[]" },
+    ],
+    note: {
+      vi: `s="${s}" có ${k} query. Ta sẽ áp dụng từng query rồi quét lại TOÀN BỘ chuỗi để tìm run (đoạn lặp) dài nhất.`,
+      en: `s="${s}" has ${k} queries. We apply each query then rescan the WHOLE string to find the longest run (repeated block).`,
+    },
+  });
+
+  for (let qi = 0; qi < k; qi++) {
+    const idx = queryIndices[qi];
+    const ch = queryCharacters[qi];
+    const oldCh = chars[idx];
+
+    // Line 5: for i in range(len(queryCharacters)):
+    snap({
+      title: { vi: `Query ${qi}: queryIndices[${qi}]=${idx}, queryCharacters[${qi}]='${ch}'`, en: `Query ${qi}: queryIndices[${qi}]=${idx}, queryCharacters[${qi}]='${ch}'` },
+      codeLines: [5],
+      phase: "query-start",
+      queryIndex: qi,
+      activeIndex: idx,
+      vars: [
+        { name: "i (query)", value: qi },
+        { name: "queryIndices[i]", value: idx },
+        { name: "queryCharacters[i]", value: `'${ch}'` },
+      ],
+      note: {
+        vi: `Bắt đầu query thứ ${qi}: sẽ đổi chars[${idx}] từ '${oldCh}' thành '${ch}'.`,
+        en: `Start query ${qi}: will change chars[${idx}] from '${oldCh}' to '${ch}'.`,
+      },
+    });
+
+    // Line 6: chars[queryIndices[i]] = queryCharacters[i]
+    chars[idx] = ch;
+    snap({
+      title: { vi: `chars[${idx}] = '${ch}'`, en: `chars[${idx}] = '${ch}'` },
+      codeLines: [6],
+      phase: "apply",
+      queryIndex: qi,
+      activeIndex: idx,
+      changedIndex: idx,
+      vars: [{ name: "chars", value: `[${chars.join(",")}]` }],
+      note: {
+        vi: `Đã cập nhật chars[${idx}]: '${oldCh}' → '${ch}'. Chuỗi hiện tại: "${chars.join("")}".`,
+        en: `Updated chars[${idx}]: '${oldCh}' → '${ch}'. Current string: "${chars.join("")}".`,
+      },
+    });
+
+    // Line 7-8: best = 1; run = 1
+    let best = 1;
+    let run = 1;
+    snap({
+      title: { vi: "best = 1, run = 1", en: "best = 1, run = 1" },
+      codeLines: [7, 8],
+      phase: "scan-init",
+      queryIndex: qi,
+      currentRun: { start: 0, end: 0, length: 1 },
+      bestRun: { start: 0, end: 0, length: 1 },
+      vars: [{ name: "best", value: best }, { name: "run", value: run }],
+      note: {
+        vi: `Bắt đầu quét từ trái. Phần tử đầu chars[0]='${chars[0]}' tự nó là 1 run độ dài 1.`,
+        en: `Start scanning from the left. The first element chars[0]='${chars[0]}' is itself a run of length 1.`,
+      },
+    });
+
+    let runStart = 0;
+    for (let j = 1; j < n; j++) {
+      // Line 9: for j in range(1, len(chars)):
+      snap({
+        title: { vi: `for j in range(1,n): j=${j}, chars[j]='${chars[j]}'`, en: `for j in range(1,n): j=${j}, chars[j]='${chars[j]}'` },
+        codeLines: [9],
+        phase: "scan",
+        queryIndex: qi,
+        activeIndex: j,
+        compareIndex: j - 1,
+        currentRun: { start: runStart, end: j - 1, length: j - runStart },
+        bestRun: { start: null, end: null, length: best },
+        vars: [{ name: "j", value: j }, { name: "chars[j]", value: `'${chars[j]}'` }, { name: "chars[j-1]", value: `'${chars[j - 1]}'` }],
+        note: {
+          vi: `So sánh chars[${j}]='${chars[j]}' với chars[${j - 1}]='${chars[j - 1]}'.`,
+          en: `Compare chars[${j}]='${chars[j]}' with chars[${j - 1}]='${chars[j - 1]}'.`,
+        },
+      });
+
+      const same = chars[j] === chars[j - 1];
+      // Line 10: if chars[j] == chars[j-1]:
+      snap({
+        title: { vi: `if chars[j] == chars[j-1] → '${chars[j]}' == '${chars[j - 1]}' → ${same}`, en: `if chars[j] == chars[j-1] → '${chars[j]}' == '${chars[j - 1]}' → ${same}` },
+        codeLines: [10],
+        phase: "scan-compare",
+        queryIndex: qi,
+        activeIndex: j,
+        compareIndex: j - 1,
+        currentRun: { start: runStart, end: j - 1, length: j - runStart },
+        bestRun: { start: null, end: null, length: best },
+        vars: [{ name: "condition", value: same ? "True" : "False" }],
+        note: same
+          ? { vi: `Giống ký tự trước → nối dài run hiện tại.`, en: `Matches the previous character → extend the current run.` }
+          : { vi: `Khác ký tự trước → run hiện tại bị CẮT, bắt đầu run mới tại j=${j}.`, en: `Differs from the previous character → the current run BREAKS, start a new run at j=${j}.` },
+      });
+
+      if (same) {
+        // Line 11: run += 1
+        run++;
+        snap({
+          title: { vi: `run += 1 → run = ${run}`, en: `run += 1 → run = ${run}` },
+          codeLines: [11],
+          phase: "extend",
+          queryIndex: qi,
+          activeIndex: j,
+          currentRun: { start: runStart, end: j, length: run },
+          bestRun: { start: null, end: null, length: best },
+          vars: [{ name: "run", value: run }],
+          note: {
+            vi: `Run '${chars[j]}' hiện kéo dài từ index ${runStart} đến ${j}, độ dài ${run}.`,
+            en: `The '${chars[j]}' run now spans index ${runStart} to ${j}, length ${run}.`,
+          },
+        });
+      } else {
+        // Line 13: run = 1
+        runStart = j;
+        run = 1;
+        snap({
+          title: { vi: `run = 1 (reset)`, en: `run = 1 (reset)` },
+          codeLines: [13],
+          phase: "reset",
+          queryIndex: qi,
+          activeIndex: j,
+          currentRun: { start: runStart, end: j, length: run },
+          bestRun: { start: null, end: null, length: best },
+          vars: [{ name: "run", value: run }],
+          note: {
+            vi: `Bắt đầu run mới '${chars[j]}' tại index ${j}, độ dài 1.`,
+            en: `Start a new '${chars[j]}' run at index ${j}, length 1.`,
+          },
+        });
+      }
+
+      const improves = run > best;
+      if (improves) best = run;
+      // Line 14: best = max(best, run)
+      snap({
+        title: { vi: `best = max(best, run) = ${best}`, en: `best = max(best, run) = ${best}` },
+        codeLines: [14],
+        phase: "update-best",
+        queryIndex: qi,
+        activeIndex: j,
+        currentRun: { start: runStart, end: j, length: run },
+        bestRun: { start: runStart, end: j, length: best },
+        vars: [{ name: "best", value: best }],
+        note: improves
+          ? { vi: `run=${run} > best cũ → best cập nhật thành ${best}.`, en: `run=${run} > previous best → best updated to ${best}.` }
+          : { vi: `run=${run} không vượt best=${best} → giữ nguyên.`, en: `run=${run} doesn't exceed best=${best} → unchanged.` },
+      });
+    }
+
+    lengths.push(best);
+    // Line 15: lengths.append(best)
+    const finalRuns = runsFor(chars);
+    const bestRunInfo = finalRuns.reduce((acc, r) => (r.length > acc.length ? r : acc), finalRuns[0]);
+    snap({
+      title: { vi: `lengths.append(${best}) → lengths=[${lengths.join(",")}]`, en: `lengths.append(${best}) → lengths=[${lengths.join(",")}]` },
+      codeLines: [15],
+      phase: "query-done",
+      queryIndex: qi,
+      runs: finalRuns,
+      bestRun: bestRunInfo,
+      vars: [{ name: "lengths", value: `[${lengths.join(",")}]` }],
+      note: {
+        vi: `Sau query ${qi}, chuỗi = "${chars.join("")}". Run dài nhất = ${best} (ký tự '${bestRunInfo.ch}', index [${bestRunInfo.start}..${bestRunInfo.end}]).`,
+        en: `After query ${qi}, string = "${chars.join("")}". Longest run = ${best} (character '${bestRunInfo.ch}', index [${bestRunInfo.start}..${bestRunInfo.end}]).`,
+      },
+    });
+  }
+
+  // Line 16: return lengths
+  const finalRuns = runsFor(chars);
+  snap({
+    title: { vi: `return lengths → [${lengths.join(",")}]`, en: `return lengths → [${lengths.join(",")}]` },
+    codeLines: [16],
+    final: true,
+    phase: "found",
+    runs: finalRuns,
+    vars: [{ name: "lengths", value: `[${lengths.join(",")}]` }],
+    note: {
+      vi: `Đã xử lý cả ${k} query. Kết quả: lengths = [${lengths.join(",")}].`,
+      en: `All ${k} queries processed. Result: lengths = [${lengths.join(",")}].`,
+    },
+  });
+
+  return { original: s, answer: lengths, steps };
+}
+
 module.exports = {
+  2213: {
+    id: 2213,
+    difficulty: "hard",
+    slug: "longest-substring-of-one-repeating-character",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    title: { vi: "Longest Substring of One Repeating Character", en: "Longest Substring of One Repeating Character" },
+    titleVi: { vi: "Substring lặp dài nhất sau mỗi query", en: "Longest repeating substring after each query" },
+    statement: {
+      vi:
+        "Cho chuỗi s (0-indexed). Cho queryCharacters và queryIndices cùng độ dài k: query thứ i đổi " +
+        "s[queryIndices[i]] thành queryCharacters[i]. Sau MỖI query, tìm độ dài substring LIÊN TIẾP dài nhất " +
+        "gồm CÙNG MỘT ký tự lặp lại. Trả về mảng lengths.",
+      en:
+        "Given a 0-indexed string s, queryCharacters and queryIndices of the same length k: the ith query sets " +
+        "s[queryIndices[i]] to queryCharacters[i]. After EACH query, find the length of the longest CONTIGUOUS " +
+        "substring of a SINGLE repeating character. Return the array lengths.",
+    },
+    defaultInput: "babacc",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [
+      { key: "queryCharacters", type: "string", label: { vi: "queryCharacters", en: "queryCharacters" }, default: "bcb" },
+      { key: "queryIndices", type: "string", label: { vi: "queryIndices (cách bởi ,)", en: "queryIndices (comma separated)" }, default: "1,3,3" },
+    ],
+    approach: [
+      { vi: "Với mỗi query, cập nhật chars[queryIndices[i]] = queryCharacters[i].", en: "For each query, update chars[queryIndices[i]] = queryCharacters[i]." },
+      { vi: "Quét lại TOÀN BỘ chuỗi, theo dõi độ dài run hiện tại (chars[j]==chars[j-1] → nối dài, khác → reset về 1).", en: "Rescan the WHOLE string, tracking the current run length (chars[j]==chars[j-1] → extend, otherwise → reset to 1)." },
+      { vi: "best = run dài nhất gặp trong lần quét đó → lưu vào lengths.", en: "best = the longest run seen during that scan → store it in lengths." },
+      { vi: "(Cách tối ưu O(k·log n) dùng Segment Tree lưu lmx/rmx/mx từng node; ở đây dùng rescan O(k·n) để dễ debug từng bước.)", en: "(The optimal O(k·log n) approach uses a Segment Tree storing lmx/rmx/mx per node; here we use an O(k·n) rescan for clearer step-by-step debugging.)" },
+    ],
+    complexity: {
+      time: "O(k·n) với cách rescan (bài gốc tối ưu O((k+n)·log n) bằng Segment Tree)",
+      space: "O(n)",
+      note: {
+        vi: "Với n, k lên tới 1e5, rescan O(k·n) có thể chậm trên input lớn; đây là cách trực quan, dễ hiểu để học thuật toán.",
+        en: "With n, k up to 1e5, the O(k·n) rescan can be slow on large inputs; this is the intuitive version for learning the algorithm.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def longestRepeating(self, s, queryCharacters, queryIndices):",
+      "        chars = list(s)",
+      "        lengths = []",
+      "        for i in range(len(queryCharacters)):",
+      "            chars[queryIndices[i]] = queryCharacters[i]",
+      "            best = 1",
+      "            run = 1",
+      "            for j in range(1, len(chars)):",
+      "                if chars[j] == chars[j - 1]:",
+      "                    run += 1",
+      "                else:",
+      "                    run = 1",
+      "                best = max(best, run)",
+      "            lengths.append(best)",
+      "        return lengths",
+    ],
+    builder: buildSteps2213,
+  },
   3302: {
     id: 3302,
     difficulty: "medium",
