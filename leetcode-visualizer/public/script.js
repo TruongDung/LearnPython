@@ -1042,6 +1042,7 @@ function renderCode() {
   const split = panel.closest(".viz-split");
   const problemId = Number(problemData && problemData.id);
   if (split) {
+    split.classList.toggle("problem-173-layout", problemId === 173);
     split.classList.toggle("problem-642-layout", problemId === 642);
     split.classList.toggle("problem-648-layout", problemId === 648);
     split.classList.toggle("problem-211-layout", problemId === 211);
@@ -2897,6 +2898,102 @@ function lcaDeepestGuideHtml(view) {
     <div class="lca-progress"><span style="width:${view.total ? Math.round((view.processed / view.total) * 100) : 0}%"></span></div>
     <small class="lca-progress-label">POSTORDER · ${escapeHtml(view.processed)}/${escapeHtml(view.total)} ${vi ? "node đã xong" : "nodes complete"}</small>
   </section>`;
+}
+
+function renderBstIteratorView(step) {
+  const view = step.bstIteratorView || {};
+  const vi = lang === "vi";
+  const stageLabels = {
+    constructor: vi ? "Tạo iterator" : "Create iterator",
+    "stack-init": vi ? "Khởi tạo stack" : "Initialize stack",
+    "push-left-start": vi ? "Bắt đầu push đường trái" : "Start pushing left path",
+    "push-check": vi ? "Kiểm tra node" : "Check node",
+    push: vi ? "Push node lên TOP" : "Push node onto TOP",
+    "move-left": vi ? "Đi sang con trái" : "Move to left child",
+    pop: vi ? "Pop node nhỏ nhất" : "Pop smallest node",
+    "right-subtree": vi ? "Chuyển sang subtree phải" : "Move to right subtree",
+    emit: vi ? "Trả kết quả next()" : "Return next() result",
+    "has-next": vi ? "Kiểm tra stack" : "Check stack",
+    "invalid-next": vi ? "next() không hợp lệ" : "Invalid next()",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const stage = stageLabels[view.phase] || view.phase || "—";
+  const operation = view.phase === "done"
+    ? (vi ? "hoàn tất tất cả operations" : "all operations complete")
+    : view.operationIndex === null || view.operationIndex === undefined
+      ? "constructor"
+      : `#${view.operationIndex + 1} ${view.operationName}()`;
+  const stack = Array.isArray(view.stack) ? view.stack : [];
+  const stackDisplay = [...stack].reverse();
+  const stackHtml = stackDisplay.length
+    ? stackDisplay.map((item, index) => `<div class="bsti-stack-item${index === 0 ? " top" : ""}">
+        <span>${index === 0 ? "TOP" : `#${item.index}`}</span><strong>${escapeHtml(item.value)}</strong><small>${index === 0 ? (vi ? "pop trước" : "pop first") : (vi ? "đang chờ" : "waiting")}</small>
+      </div>`).join("")
+    : `<div class="bsti-stack-empty">${vi ? "STACK RỖNG" : "EMPTY STACK"}</div>`;
+  const stackArray = `[${stack.map((item) => item.value).join(", ")}]`;
+  const beforeArray = `[${(view.stackBefore || []).map((item) => item.value).join(", ")}]`;
+  const emitted = Array.isArray(view.emitted) ? view.emitted : [];
+  const emittedHtml = emitted.length
+    ? emitted.map((value, index) => `<span><small>${index + 1}</small><strong>${escapeHtml(value)}</strong></span>`).join("")
+    : `<em>${vi ? "Chưa có giá trị nào được return" : "No value has been returned yet"}</em>`;
+  const operationsHtml = (view.operations || []).map((item) => {
+    const state = view.phase === "done"
+      ? "done"
+      : view.operationIndex === item.index ? "active" : view.operationIndex !== null && item.index < view.operationIndex ? "done" : "";
+    return `<span class="${state}"><b>${item.index + 1}</b>${escapeHtml(item.name)}()</span>`;
+  }).join("") || `<em>${vi ? "Không có operation" : "No operations"}</em>`;
+  const pushPath = (view.pushPath || []).map((item) => item.value).join(" → ") || "—";
+
+  let action = vi ? "Quan sát trạng thái iterator" : "Inspect iterator state";
+  if (view.phase === "push") action = `PUSH ${view.current ? view.current.value : "node"} → TOP`;
+  else if (view.phase === "pop") action = `POP TOP → ${view.popped ? view.popped.value : "—"}`;
+  else if (view.phase === "move-left") action = `${view.current ? view.current.value : "node"}.left → ${view.nextNode ? view.nextNode.value : "None"}`;
+  else if (view.phase === "right-subtree") action = `${view.popped ? view.popped.value : "node"}.right → ${view.rightRoot ? view.rightRoot.value : "None"}`;
+  else if (view.phase === "emit") action = `RETURN ${view.popped ? view.popped.value : "—"}`;
+  else if (view.phase === "has-next") action = `bool(stack) → ${String(view.hasNextResult)}`;
+  else if (view.phase === "push-check") action = `while node → ${view.current ? "True" : "False"}`;
+
+  const isNext = view.operationName === "next";
+  const isHasNext = view.operationName === "hasNext";
+  const flowActive = view.phase === "pop" ? 0
+    : ["right-subtree", "push-check", "push", "move-left"].includes(view.phase) && isNext ? 1
+      : view.phase === "emit" ? 2 : -1;
+  let flowHtml;
+  if (isNext) {
+    flowHtml = [vi ? "POP TOP" : "POP TOP", "pushLeft(node.right)", vi ? "RETURN value" : "RETURN value"]
+      .map((label, index) => `<span class="${index === flowActive ? "active" : index < flowActive ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("<i>→</i>");
+  } else if (isHasNext) {
+    flowHtml = `<span class="${view.phase === "has-next" ? "active" : ""}"><b>?</b>bool(stack) = stack ${stack.length ? "≠ []" : "= []"}</span>`;
+  } else {
+    const constructorActive = ["constructor", "stack-init"].includes(view.phase) ? 0
+      : view.phase === "push-left-start" ? 1
+        : ["push-check", "push", "move-left"].includes(view.phase) ? 2 : -1;
+    flowHtml = ["stack = []", vi ? "push root" : "push root", vi ? "đi trái đến None" : "follow left to None"]
+      .map((label, index) => `<span class="${index === constructorActive ? "active" : index < constructorActive ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("<i>→</i>");
+  }
+  const hasNextClass = view.hasNextResult === null ? "pending" : view.hasNextResult ? "true" : "false";
+  const hasNextText = view.hasNextResult === null ? "—" : String(view.hasNextResult);
+  const transitionText = view.stackBefore && view.stackBefore.length
+    ? `${beforeArray} → ${stackArray}`
+    : `${vi ? "stack hiện tại" : "current stack"} = ${stackArray}`;
+
+  $("treeView").innerHTML = `<section class="bsti-viz">
+    <section class="bsti-rule"><strong>BST ITERATOR</strong><code>TOP = ${view.nextValue === null ? "None" : escapeHtml(view.nextValue)}</code><span>${vi ? "TOP luôn là node nhỏ nhất chưa được trả về" : "TOP is always the smallest node not returned yet"}</span></section>
+    <section class="bsti-stage"><div><small>${vi ? "PHA" : "PHASE"}</small><strong>${escapeHtml(stage)}</strong></div><div><small>OPERATION</small><strong>${escapeHtml(operation)}</strong></div><code>${escapeHtml(action)}</code></section>
+    <div class="bsti-layout">
+      <section class="bsti-tree-card"><header><strong>${vi ? "CÂY BST" : "BST"}</strong><span>${vi ? "cam = đang xét · xanh = đã return · nhãn STACK/TOP = đang chờ" : "amber = current · green = returned · STACK/TOP labels = waiting"}</span></header><div id="bstiTree" class="bsti-tree"></div></section>
+      <aside class="bsti-side">
+        <section class="bsti-stack-card"><header><strong>ITERATOR STACK</strong><span>${vi ? "TOP ở trên · pop trước" : "TOP above · popped first"}</span></header><div class="bsti-stack-shell"><b>TOP</b><div>${stackHtml}</div><b>BOTTOM</b></div><footer><code>${escapeHtml(stackArray)}</code><span>bottom → top</span></footer></section>
+        ${view.popped ? `<section class="bsti-popped"><span>${vi ? "VỪA POP" : "POPPED"}</span><strong>${escapeHtml(view.popped.value)}</strong><code>${escapeHtml(transitionText)}</code></section>` : ""}
+        <section class="bsti-flow"><header><strong>${isNext ? "next()" : "hasNext()"}</strong><span>${vi ? "luồng xử lý" : "execution flow"}</span></header><div>${flowHtml}</div></section>
+        <section class="bsti-path"><span>pushLeft path</span><strong>${escapeHtml(pushPath)}</strong><small>${view.rightRoot ? `${vi ? "subtree phải bắt đầu tại" : "right subtree starts at"} ${view.rightRoot.value}` : (vi ? "đi trái cho đến None" : "follow left pointers until None")}</small></section>
+        <section class="bsti-hasnext ${hasNextClass}"><span>hasNext()</span><strong>${escapeHtml(hasNextText)}</strong><small>stack ${stack.length ? "≠ []" : "= []"}</small></section>
+      </aside>
+    </div>
+    <section class="bsti-emitted"><header><strong>${vi ? "INORDER ĐÃ RETURN" : "EMITTED INORDER"}</strong><span>${vi ? "chỉ gồm kết quả next(), không gồm boolean" : "next() values only; booleans excluded"}</span></header><div>${emittedHtml}</div></section>
+    <section class="bsti-operations"><header><strong>OPERATIONS</strong><span>${vi ? "xanh = xong · cam = hiện tại" : "green = done · amber = active"}</span></header><div>${operationsHtml}</div></section>
+  </section>`;
+  renderTree(step, "bstiTree");
 }
 
 function renderTree(step, targetId = "treeView") {
@@ -13782,6 +13879,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderReplaceWordsView(step);
+  } else if (step.bstIteratorView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBstIteratorView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

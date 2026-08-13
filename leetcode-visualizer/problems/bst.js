@@ -2349,6 +2349,7 @@ module.exports = {
       const root = parseBST(input);
       const stack = [];
       const returned = new Set();
+      const emitted = [];
       const outputs = [];
       const steps = [];
       const operations = String(params.operations || "")
@@ -2389,7 +2390,29 @@ module.exports = {
         return labels;
       }
 
-      function addStep({ title, codeLines, note, current = null, nextNode = null, operationIndex = null, vars = [], final = false }) {
+      const stackSnapshot = (items) => items.map((node, index) => ({
+        id: node.id,
+        value: node.val,
+        index,
+        isTop: index === items.length - 1,
+      }));
+
+      function addStep({
+        title,
+        codeLines,
+        note,
+        phase = "inspect",
+        current = null,
+        nextNode = null,
+        popped = null,
+        rightRoot = null,
+        stackBefore = null,
+        pushPath = [],
+        hasNextResult = null,
+        operationIndex = null,
+        vars = [],
+        final = false,
+      }) {
         const highlighted = new Set();
         if (current) highlighted.add(current.id);
         if (nextNode) highlighted.add(nextNode.id);
@@ -2401,6 +2424,7 @@ module.exports = {
           codeLines,
           vars: [
             { name: "inorder stack", value: stackText() },
+            { name: "emitted inorder", value: `[${emitted.join(", ")}]` },
             { name: "outputs", value: outputsText() },
             { name: "operations", value: operationText },
             { name: "active operation", value: operationIndex === null ? "constructor" : `${operationIndex + 1}. ${operations[operationIndex]}()` },
@@ -2408,22 +2432,42 @@ module.exports = {
           ],
           note,
         });
-        step.tree.nodes.forEach((node) => {
-          const status = statuses.get(node.id);
-          if (status) node.labelLines = [String(node.label), status];
+        step.tree.nodes.forEach((treeNode) => {
+          const status = statuses.get(treeNode.id);
+          if (status) treeNode.labelLines = [String(treeNode.label), status];
         });
+        step.bstIteratorView = {
+          phase,
+          stack: stackSnapshot(stack),
+          stackBefore: stackBefore ? stackSnapshot(stackBefore) : [],
+          emitted: [...emitted],
+          outputs: [...outputs],
+          operations: operations.map((name, index) => ({ name, index })),
+          operationIndex,
+          operationName: operationIndex === null ? "constructor" : operations[operationIndex],
+          current: current ? { id: current.id, value: current.val } : null,
+          nextNode: nextNode ? { id: nextNode.id, value: nextNode.val } : null,
+          popped: popped ? { id: popped.id, value: popped.val } : null,
+          rightRoot: rightRoot ? { id: rightRoot.id, value: rightRoot.val } : null,
+          pushPath: pushPath.map((node) => ({ id: node.id, value: node.val })),
+          hasNextResult,
+          nextValue: stack.length ? stack[stack.length - 1].val : null,
+        };
         step.final = final;
         steps.push(step);
       }
 
       function pushLeft(start, operationIndex, sourceLabel) {
         let node = start;
+        const path = [];
         while (true) {
           addStep({
+            phase: "push-check",
             title: { vi: `while node → ${node ? "ĐÚNG" : "SAI"}`, en: `while node → ${node ? "TRUE" : "FALSE"}` },
             codeLines: [6],
             current: node,
             operationIndex,
+            pushPath: path,
             vars: [{ name: "node", value: node ? node.val : "None" }, { name: "called by", value: sourceLabel }],
             note: node
               ? { vi: `Node ${node.val} tồn tại, nên tiếp tục push nó vào stack. Đi trái trước để node nhỏ nhất của subtree lên TOP.`, en: `Node ${node.val} exists, so push it onto the stack. Go left first so this subtree's smallest node reaches the TOP.` }
@@ -2431,33 +2475,41 @@ module.exports = {
           });
           if (!node) break;
 
+          const beforePush = [...stack];
           stack.push(node);
+          path.push(node);
           addStep({
+            phase: "push",
             title: { vi: `stack.append(node ${node.val})`, en: `stack.append(node ${node.val})` },
             codeLines: [7],
             current: node,
             operationIndex,
+            stackBefore: beforePush,
+            pushPath: path,
             vars: [{ name: "pushed node", value: node.val }],
-            note: { vi: `Push ${node.val}. Sau khi tiếp tục đi trái, node cuối cùng trên đường này sẽ là inorder next.`, en: `Push ${node.val}. After continuing left, the last node on this path will be the next inorder value.` },
+            note: { vi: `Push ${node.val} lên TOP. Tiếp tục đi trái; node trái nhất sẽ trở thành giá trị next() nhỏ nhất.`, en: `Push ${node.val} onto TOP. Continue left; the leftmost node becomes the smallest next() value.` },
           });
 
           const left = node.left;
           addStep({
+            phase: "move-left",
             title: { vi: `node = node.left → ${left ? left.val : "None"}`, en: `node = node.left → ${left ? left.val : "None"}` },
             codeLines: [8],
             current: node,
             nextNode: left,
             operationIndex,
+            pushPath: path,
             vars: [{ name: "next node", value: left ? left.val : "None" }],
             note: left
-              ? { vi: `Đi sang trái đến ${left.val}; inorder luôn phải xử lý toàn bộ nhánh trái trước node hiện tại.`, en: `Move left to ${left.val}; inorder must process the entire left subtree before the current node.` }
-              : { vi: `Node ${node.val} không có con trái, nên nó đang ở TOP và sẽ là giá trị next nhỏ nhất.`, en: `Node ${node.val} has no left child, so it is at the TOP and will be the next smallest value.` },
+              ? { vi: `Đi sang trái đến ${left.val}; inorder luôn xử lý toàn bộ nhánh trái trước node hiện tại.`, en: `Move left to ${left.val}; inorder always processes the entire left subtree before the current node.` }
+              : { vi: `Node ${node.val} không có con trái. ${node.val} đang ở TOP nên là giá trị nhỏ nhất tiếp theo.`, en: `Node ${node.val} has no left child. ${node.val} is now TOP, so it is the next smallest value.` },
           });
           node = left;
         }
       }
 
       addStep({
+        phase: "constructor",
         title: { vi: "Tạo BSTIterator(root)", en: "Create BSTIterator(root)" },
         codeLines: [2],
         current: root,
@@ -2465,12 +2517,14 @@ module.exports = {
         note: { vi: "Iterator không lưu toàn bộ inorder. Nó chỉ chuẩn bị đường trái cần thiết đầu tiên.", en: "The iterator does not store the whole inorder traversal. It prepares only the first needed left path." },
       });
       addStep({
+        phase: "stack-init",
         title: { vi: "self.stack = []", en: "self.stack = []" },
         codeLines: [3],
         vars: [{ name: "stack", value: "[]" }],
         note: { vi: "Khởi tạo stack rỗng cho các node đang chờ xử lý.", en: "Initialize the empty stack of nodes waiting to be processed." },
       });
       addStep({
+        phase: "push-left-start",
         title: { vi: `_push_left(${root ? root.val : "None"})`, en: `_push_left(${root ? root.val : "None"})` },
         codeLines: [4],
         nextNode: root,
@@ -2484,9 +2538,11 @@ module.exports = {
           const result = stack.length > 0;
           outputs.push(result);
           addStep({
+            phase: "has-next",
             title: { vi: `hasNext() → ${result}`, en: `hasNext() → ${result}` },
             codeLines: [14],
             operationIndex,
+            hasNextResult: result,
             vars: [{ name: "bool(self.stack)", value: result }, { name: "returned", value: result }],
             note: result
               ? { vi: `Stack còn TOP ${stack[stack.length - 1].val}, nên vẫn còn một giá trị inorder để next() trả về.`, en: `The stack still has TOP ${stack[stack.length - 1].val}, so an inorder value remains for next().` }
@@ -2498,6 +2554,7 @@ module.exports = {
         if (!stack.length) {
           outputs.push("error");
           addStep({
+            phase: "invalid-next",
             title: { vi: "next() khi stack rỗng → không hợp lệ", en: "next() with an empty stack → invalid" },
             codeLines: [10],
             operationIndex,
@@ -2507,20 +2564,27 @@ module.exports = {
           return;
         }
 
+        const beforePop = [...stack];
         const node = stack.pop();
         addStep({
+          phase: "pop",
           title: { vi: `node = stack.pop() → ${node.val}`, en: `node = stack.pop() → ${node.val}` },
           codeLines: [10],
           current: node,
+          popped: node,
+          stackBefore: beforePop,
           operationIndex,
           vars: [{ name: "popped node", value: node.val }],
           note: { vi: `TOP ${node.val} là node nhỏ nhất chưa trả về. Pop nó chính là phần "node" của inorder left → node → right.`, en: `TOP ${node.val} is the smallest node not yet returned. Popping it performs the "node" part of inorder left → node → right.` },
         });
         addStep({
+          phase: "right-subtree",
           title: { vi: `_push_left(${node.right ? node.right.val : "None"})`, en: `_push_left(${node.right ? node.right.val : "None"})` },
           codeLines: [11],
           current: node,
           nextNode: node.right,
+          popped: node,
+          rightRoot: node.right,
           operationIndex,
           vars: [{ name: "right subtree root", value: node.right ? node.right.val : "None" }],
           note: node.right
@@ -2530,10 +2594,13 @@ module.exports = {
         pushLeft(node.right, operationIndex, `next() after ${node.val}`);
         returned.add(node.id);
         outputs.push(node.val);
+        emitted.push(node.val);
         addStep({
+          phase: "emit",
           title: { vi: `return node.val → ${node.val}`, en: `return node.val → ${node.val}` },
           codeLines: [12],
           current: node,
+          popped: node,
           operationIndex,
           vars: [{ name: "returned", value: node.val }],
           note: { vi: `next() trả ${node.val}. Các node xanh là phần inorder đã trả; TOP mới là giá trị kế tiếp nếu còn.`, en: `next() returns ${node.val}. Green nodes have been returned in inorder; the new TOP is the next value if one remains.` },
@@ -2542,6 +2609,7 @@ module.exports = {
 
       const finalLine = operations.length && operations[operations.length - 1] === "next" ? 12 : 14;
       addStep({
+        phase: "done",
         title: { vi: `Hoàn tất mô phỏng → outputs = ${outputsText()}`, en: `Simulation complete → outputs = ${outputsText()}` },
         codeLines: [finalLine],
         vars: [{ name: "remaining stack", value: stackText() }, { name: "answer", value: outputsText() }],
