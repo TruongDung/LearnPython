@@ -9580,7 +9580,251 @@ function buildSteps2213(input, params) {
   return { original: s, answer: lengths, steps };
 }
 
+/**
+ * LeetCode 3170: Lexicographically Minimum String After Removing Stars.
+ * Keep one stack of indices per letter. A star removes the smallest available
+ * letter; popping that bucket removes its rightmost occurrence, which leaves
+ * the lexicographically smallest possible prefix.
+ */
+function buildSteps3170(input) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  if (!/^[a-z*]+$/.test(s)) {
+    throw new Error("s must contain only lowercase English letters and '*'");
+  }
+
+  const chars = [...s];
+  const positions = Array.from({ length: 26 }, () => []);
+  const removed = new Array(chars.length).fill(false);
+  const steps = [];
+  let currentIndex = -1;
+  let phase = "setup";
+  let event = "setup";
+  let chosenLetter = null;
+  let chosenIndex = null;
+
+  const nonEmptyBuckets = () => positions
+    .map((indices, index) => ({ letter: String.fromCharCode(97 + index), indices: [...indices] }))
+    .filter((bucket) => bucket.indices.length > 0);
+  const resultThrough = (end) => chars
+    .filter((char, index) => index <= end && char !== "*" && !removed[index])
+    .join("");
+  const bucketSummary = () => {
+    const buckets = nonEmptyBuckets();
+    return buckets.length
+      ? buckets.map((bucket) => `${bucket.letter}:[${bucket.indices.join(",")}]`).join(" ")
+      : "{}";
+  };
+  const push = ({ title, note, codeLines, final = false }) => {
+    const buckets = positions.map((indices, index) => ({
+      letter: String.fromCharCode(97 + index),
+      indices: [...indices],
+    }));
+    const smallest = buckets.find((bucket) => bucket.indices.length > 0);
+    steps.push({
+      title,
+      arr: [...chars],
+      highlight: currentIndex >= 0 ? [currentIndex] : [],
+      mark: removed.map((isRemoved, index) => isRemoved ? index : -1).filter((index) => index >= 0),
+      clearStarsView: {
+        s,
+        chars: [...chars],
+        currentIndex,
+        scannedThrough: currentIndex,
+        phase,
+        event,
+        buckets,
+        smallestAvailable: smallest ? smallest.letter : null,
+        chosenLetter,
+        chosenIndex,
+        removed: [...removed],
+        resultSoFar: resultThrough(currentIndex),
+      },
+      codeLines,
+      vars: [
+        { name: "i", value: currentIndex },
+        { name: "positions", value: bucketSummary() },
+        { name: "removed", value: `[${removed.map((value) => value ? 1 : 0).join(", ")}]` },
+        { name: "result", value: JSON.stringify(resultThrough(currentIndex)) },
+      ],
+      note,
+      final,
+    });
+  };
+
+  push({
+    title: { vi: "Khởi tạo 26 bucket chỉ số", en: "Initialize 26 index buckets" },
+    codeLines: [3, 4],
+    note: {
+      vi: "Mỗi bucket là một stack chứa các vị trí chưa bị xóa của cùng một chữ cái.",
+      en: "Each bucket is a stack of still-available positions for one letter.",
+    },
+  });
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    currentIndex = i;
+    chosenLetter = null;
+    chosenIndex = null;
+
+    if (char !== "*") {
+      phase = "scan";
+      event = "read-letter";
+      push({
+        title: { vi: `Đọc s[${i}] = '${char}'`, en: `Read s[${i}] = '${char}'` },
+        codeLines: [5, 6],
+        note: {
+          vi: `Đây là chữ thường, nên vị trí ${i} sẽ được đưa vào bucket '${char}'.`,
+          en: `This is a lowercase letter, so index ${i} will be pushed into bucket '${char}'.`,
+        },
+      });
+
+      positions[char.charCodeAt(0) - 97].push(i);
+      phase = "push";
+      event = "push-index";
+      push({
+        title: { vi: `Push ${i} vào bucket '${char}'`, en: `Push ${i} into bucket '${char}'` },
+        codeLines: [7, 8],
+        note: {
+          vi: `Bucket '${char}' giữ chỉ số tăng dần; phần tử bên phải là TOP và là lần xuất hiện bên phải nhất.`,
+          en: `Bucket '${char}' keeps increasing indices; its rightmost item is TOP and the rightmost occurrence.`,
+        },
+      });
+      continue;
+    }
+
+    if (!positions.some((bucket) => bucket.length > 0)) {
+      throw new Error(`star at index ${i} has no available letter on its left`);
+    }
+
+    removed[i] = true;
+    phase = "star";
+    event = "mark-star";
+    push({
+      title: { vi: `Gặp dấu * tại index ${i}`, en: `Encounter * at index ${i}` },
+      codeLines: [5, 6, 9],
+      note: {
+        vi: "Dấu * luôn bị xóa. Bây giờ tìm bucket nhỏ nhất theo alphabet còn phần tử.",
+        en: "The star is always removed. Now find the alphabetically smallest non-empty bucket.",
+      },
+    });
+
+    const bucketIndex = positions.findIndex((bucket) => bucket.length > 0);
+    chosenLetter = String.fromCharCode(97 + bucketIndex);
+    chosenIndex = positions[bucketIndex][positions[bucketIndex].length - 1];
+    phase = "choose";
+    event = "choose-smallest";
+    push({
+      title: {
+        vi: `Chọn bucket nhỏ nhất '${chosenLetter}'`,
+        en: `Choose smallest bucket '${chosenLetter}'`,
+      },
+      codeLines: [10, 11],
+      note: {
+        vi: `Bucket '${chosenLetter}' là bucket không rỗng đầu tiên. TOP = ${chosenIndex} là lần xuất hiện bên phải nhất của '${chosenLetter}'.`,
+        en: `Bucket '${chosenLetter}' is the first non-empty bucket. TOP = ${chosenIndex} is the rightmost '${chosenLetter}'.`,
+      },
+    });
+
+    positions[bucketIndex].pop();
+    removed[chosenIndex] = true;
+    phase = "remove";
+    event = "remove-rightmost";
+    push({
+      title: {
+        vi: `Xóa '${chosenLetter}' tại index ${chosenIndex}`,
+        en: `Remove '${chosenLetter}' at index ${chosenIndex}`,
+      },
+      codeLines: [12, 13],
+      note: {
+        vi: `Pop TOP để xóa '${chosenLetter}' bên phải nhất. Cách tie-break này giữ các ký tự nhỏ ở bên trái và làm kết quả nhỏ nhất.`,
+        en: `Pop TOP to remove the rightmost '${chosenLetter}'. This tie-break keeps smaller letters farther left and minimizes the result.`,
+      },
+    });
+  }
+
+  const answer = chars.filter((char, index) => char !== "*" && !removed[index]).join("");
+  currentIndex = chars.length - 1;
+  phase = "done";
+  event = "return";
+  chosenLetter = null;
+  chosenIndex = null;
+  push({
+    title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
+    codeLines: [14],
+    final: true,
+    note: {
+      vi: "Bỏ mọi vị trí có removed = 1 rồi nối các ký tự còn lại theo thứ tự ban đầu.",
+      en: "Discard every position with removed = 1, then join the remaining letters in original order.",
+    },
+  });
+
+  return { original: s, answer, steps };
+}
+
 module.exports = {
+  3170: {
+    id: 3170,
+    difficulty: "medium",
+    slug: "lexicographically-minimum-string-after-removing-stars",
+    category: { key: "string", vi: "Chuỗi", en: "String" },
+    tags: [{ key: "greedy", vi: "Tham lam", en: "Greedy" }],
+    title: {
+      vi: "Lexicographically Minimum String After Removing Stars",
+      en: "Lexicographically Minimum String After Removing Stars",
+    },
+    titleVi: {
+      vi: "Chuỗi nhỏ nhất sau khi xóa các dấu sao",
+      en: "Lexicographically minimum string after removing stars",
+    },
+    statement: {
+      vi: "Cho chuỗi s gồm chữ thường và dấu *. Với mỗi dấu *, xóa dấu đó và một ký tự nhỏ nhất theo thứ tự từ điển ở bên trái. Nếu có nhiều ký tự nhỏ nhất giống nhau, được chọn vị trí cần xóa. Trả về chuỗi nhỏ nhất có thể.",
+      en: "Given a string s of lowercase letters and stars, remove each star together with one lexicographically smallest character to its left. If that character occurs more than once, choose which occurrence to remove. Return the smallest possible string.",
+    },
+    defaultInput: "aaba*",
+    inputKind: "string",
+    inputLabel: { vi: "s (chữ thường và *)", en: "s (lowercase letters and *)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Dùng 26 bucket; bucket của mỗi chữ lưu các index chưa bị xóa theo dạng stack.",
+        en: "Use 26 buckets; each letter's bucket stores its available indices as a stack.",
+      },
+      {
+        vi: "Khi gặp *, chọn bucket không rỗng đầu tiên từ 'a' đến 'z': đó là ký tự nhỏ nhất phải xóa.",
+        en: "At a star, choose the first non-empty bucket from 'a' to 'z': that is the smallest letter to remove.",
+      },
+      {
+        vi: "Pop index trên TOP để xóa lần xuất hiện bên phải nhất; giữ ký tự nhỏ ở vị trí trái hơn giúp kết quả nhỏ nhất.",
+        en: "Pop the TOP index to remove the rightmost occurrence; keeping smaller letters farther left minimizes the result.",
+      },
+    ],
+    complexity: {
+      time: "O(26n) = O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi ký tự được push/pop tối đa một lần; mỗi dấu * chỉ quét tối đa 26 bucket.",
+        en: "Each character is pushed/popped at most once; each star scans at most 26 buckets.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def clearStars(self, s: str) -> str:",
+      "        positions = [[] for _ in range(26)]",
+      "        removed = [False] * len(s)",
+      "        for i, char in enumerate(s):",
+      "            if char != '*':",
+      "                positions[ord(char) - ord('a')].append(i)",
+      "                continue",
+      "            removed[i] = True",
+      "            for bucket in positions:",
+      "                if bucket:",
+      "                    removed[bucket.pop()] = True",
+      "                    break",
+      "        return ''.join(char for i, char in enumerate(s) if not removed[i])",
+    ],
+    debugMode: "semantic",
+    builder: buildSteps3170,
+  },
   1404: {
     id: 1404,
     difficulty: "medium",

@@ -2971,8 +2971,15 @@ function renderBstIteratorView(step) {
     flowHtml = ["stack = []", vi ? "push root" : "push root", vi ? "đi trái đến None" : "follow left to None"]
       .map((label, index) => `<span class="${index === constructorActive ? "active" : index < constructorActive ? "done" : ""}"><b>${index + 1}</b>${escapeHtml(label)}</span>`).join("<i>→</i>");
   }
-  const hasNextClass = view.hasNextResult === null ? "pending" : view.hasNextResult ? "true" : "false";
-  const hasNextText = view.hasNextResult === null ? "—" : String(view.hasNextResult);
+  const hasNextIsActual = view.phase === "has-next";
+  const hasNextValue = hasNextIsActual ? Boolean(view.hasNextResult) : stack.length > 0;
+  const hasNextClass = hasNextValue ? "true" : "false";
+  const hasNextText = hasNextValue ? "TRUE" : "FALSE";
+  const hasNextMode = hasNextIsActual ? (vi ? "ĐANG GỌI" : "CALLED") : (vi ? "XEM TRƯỚC" : "PREVIEW");
+  const hasNextReason = stack.length
+    ? `${stackArray} ≠ [] · ${stack.length} ${vi ? "node đang chờ" : "waiting node(s)"}`
+    : `${stackArray} = [] · ${vi ? "không còn node" : "no node remains"}`;
+  const flowTitle = isNext ? "next()" : isHasNext ? "hasNext()" : "constructor";
   const transitionText = view.stackBefore && view.stackBefore.length
     ? `${beforeArray} → ${stackArray}`
     : `${vi ? "stack hiện tại" : "current stack"} = ${stackArray}`;
@@ -2985,9 +2992,9 @@ function renderBstIteratorView(step) {
       <aside class="bsti-side">
         <section class="bsti-stack-card"><header><strong>ITERATOR STACK</strong><span>${vi ? "TOP ở trên · pop trước" : "TOP above · popped first"}</span></header><div class="bsti-stack-shell"><b>TOP</b><div>${stackHtml}</div><b>BOTTOM</b></div><footer><code>${escapeHtml(stackArray)}</code><span>bottom → top</span></footer></section>
         ${view.popped ? `<section class="bsti-popped"><span>${vi ? "VỪA POP" : "POPPED"}</span><strong>${escapeHtml(view.popped.value)}</strong><code>${escapeHtml(transitionText)}</code></section>` : ""}
-        <section class="bsti-flow"><header><strong>${isNext ? "next()" : "hasNext()"}</strong><span>${vi ? "luồng xử lý" : "execution flow"}</span></header><div>${flowHtml}</div></section>
+        <section class="bsti-flow"><header><strong>${escapeHtml(flowTitle)}</strong><span>${vi ? "luồng xử lý" : "execution flow"}</span></header><div>${flowHtml}</div></section>
         <section class="bsti-path"><span>pushLeft path</span><strong>${escapeHtml(pushPath)}</strong><small>${view.rightRoot ? `${vi ? "subtree phải bắt đầu tại" : "right subtree starts at"} ${view.rightRoot.value}` : (vi ? "đi trái cho đến None" : "follow left pointers until None")}</small></section>
-        <section class="bsti-hasnext ${hasNextClass}"><span>hasNext()</span><strong>${escapeHtml(hasNextText)}</strong><small>stack ${stack.length ? "≠ []" : "= []"}</small></section>
+        <section class="bsti-hasnext ${hasNextClass}"><div><span>hasNext()</span><code>bool(stack)</code><em>${escapeHtml(hasNextMode)}</em></div><strong>${escapeHtml(hasNextText)}</strong><small>${escapeHtml(hasNextReason)}</small></section>
       </aside>
     </div>
     <section class="bsti-emitted"><header><strong>${vi ? "INORDER ĐÃ RETURN" : "EMITTED INORDER"}</strong><span>${vi ? "chỉ gồm kết quả next(), không gồm boolean" : "next() values only; booleans excluded"}</span></header><div>${emittedHtml}</div></section>
@@ -3134,7 +3141,8 @@ function renderTree(step, targetId = "treeView") {
   const maxY = Math.max(0, ...nodes.map((n) => n.y));
   const hasMultiLineLabels = nodes.some((n) => Array.isArray(n.labelLines) && n.labelLines.length > 1);
   const hasSubLabels = nodes.some((n) => n.sub !== undefined && n.sub !== null);
-  const r = hasMultiLineLabels ? 30 : 18;
+  const isBstIteratorTree = targetId === "bstiTree";
+  const r = hasMultiLineLabels ? (isBstIteratorTree ? 32 : 30) : 18;
   // For single-line labels, widen the node into a pill shape when the text
   // wouldn't fit in a plain circle (e.g. "-1, leetcode"), instead of shrinking
   // the font until it's unreadable.
@@ -3147,9 +3155,9 @@ function renderTree(step, targetId = "treeView") {
   const maxAnnotationHalfWidth = Math.max(0, ...nodes.flatMap((n) => (
     annotationItems(treeAnnotations[n.id]).map((item) => String(item.label ?? "").length * 6.6 / 2)
   )));
-  const colW = hasMultiLineLabels ? 84 : Math.max(60, maxHalfWidth * 2 + 14);
+  const colW = hasMultiLineLabels ? (isBstIteratorTree ? 96 : 84) : Math.max(60, maxHalfWidth * 2 + 14);
   const annotationExtra = Math.max(0, maxAnnotationLines - 1) * 14;
-  const rowH = (hasMultiLineLabels ? 96 : 78) + (hasSubLabels ? 16 : 0) + annotationExtra;
+  const rowH = (hasMultiLineLabels ? (isBstIteratorTree ? 104 : 96) : 78) + (hasSubLabels ? 16 : 0) + annotationExtra;
   const naturalBasePad = hasMultiLineLabels
     ? Math.max(44, maxAnnotationHalfWidth + 6)
     : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
@@ -3205,9 +3213,10 @@ function renderTree(step, targetId = "treeView") {
       circles += `<circle cx="${c.x}" cy="${c.y}" r="${r}" />`;
     }
     if (Array.isArray(n.labelLines) && n.labelLines.length > 0) {
-      const lineGap = 11;
+      const lineGap = isBstIteratorTree ? 12 : 11;
+      const labelFontSize = isBstIteratorTree ? 10.5 : 9.5;
       const firstY = c.y - ((n.labelLines.length - 1) * lineGap) / 2;
-      circles += `<text x="${c.x}" y="${firstY}" text-anchor="middle" font-size="9.5">`;
+      circles += `<text x="${c.x}" y="${firstY}" text-anchor="middle" font-size="${labelFontSize}">`;
       n.labelLines.forEach((line, index) => {
         circles += `<tspan x="${c.x}" dy="${index === 0 ? 0 : lineGap}">${escapeXml(line)}</tspan>`;
       });
