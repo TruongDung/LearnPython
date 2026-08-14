@@ -1670,6 +1670,401 @@ function buildSteps1101(input, params) {
   return { input, answer, steps };
 }
 
+// ─── 1101 Approach 2: explicit UnionFind class + recursive path compression ───
+function parse1101Data(input, params = {}) {
+  const n = Number(params.n);
+  if (!Number.isInteger(n) || n < 2) throw new Error("n must be an integer greater than or equal to 2");
+  const raw = String(input).trim();
+  if (!raw) throw new Error("logs must not be empty");
+  const logs = raw.split(";").filter((part) => part.trim()).map((part) => {
+    const values = part.split(",").map((value) => value.trim());
+    if (values.length !== 3 || values.some((value) => value === "")) {
+      throw new Error("every log must contain timestamp,u,v");
+    }
+    const parsed = values.map(Number);
+    if (!parsed.every(Number.isInteger)) throw new Error("every log value must be an integer");
+    return parsed;
+  });
+  logs.forEach(([time, u, v]) => {
+    if (time < 0) throw new Error("timestamps must be non-negative");
+    if (u < 0 || u >= n || v < 0 || v >= n) throw new Error(`friend pair (${u},${v}) is outside 0..${n - 1}`);
+    if (u === v) throw new Error(`friend pair (${u},${v}) must contain two different people`);
+  });
+  return { n, logs };
+}
+
+function buildSteps1101ExplicitUnionFind(input, params = {}) {
+  const parsed = parse1101Data(input, params);
+  const n = parsed.n;
+  const logs = parsed.logs.map((log) => [...log]);
+  const root = Array.from({ length: n }, (_, index) => index);
+  const rank = new Array(n).fill(1);
+  const addedEdges = new Set();
+  const steps = [];
+  let count = n;
+  let answer = -1;
+  let currentLog = null;
+
+  const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+  function peekRoot(node) {
+    let current = node;
+    while (root[current] !== current) current = root[current];
+    return current;
+  }
+
+  function snapshot({ title, note, codeLine, event, highlight = [], currentEdge = null,
+    extraVars = [], final = false }) {
+    const groups = new Map();
+    for (let person = 0; person < n; person++) {
+      const personRoot = peekRoot(person);
+      if (!groups.has(personRoot)) groups.set(personRoot, []);
+      groups.get(personRoot).push(person);
+    }
+    const graphEdges = [...addedEdges].map((key) => {
+      const [u, v] = key.split("-").map(Number);
+      return { u, v, w: "" };
+    });
+    if (currentEdge && !addedEdges.has(edgeKey(currentEdge[0], currentEdge[1]))) {
+      graphEdges.push({ u: currentEdge[0], v: currentEdge[1], w: "?" });
+    }
+    const connectedNodes = [...groups.values()].filter((members) => members.length > 1).flat();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      arr: [...root],
+      sub: [...rank],
+      highlight: [...highlight],
+      mark: Array.from({ length: n }, (_, person) => person).filter((person) => root[person] === person),
+      graph: {
+        nodes: Array.from({ length: n }, (_, person) => ({ id: person, label: String(person) })),
+        edges: graphEdges,
+        hlNodes: [...highlight],
+        hlEdges: currentEdge ? [[currentEdge[0], currentEdge[1]]] : [],
+        visitedNodes: connectedNodes,
+      },
+      vars: [
+        { name: "root", value: `[${root.join(", ")}]` },
+        { name: "rank", value: `[${rank.join(", ")}]` },
+        { name: "count", value: count },
+        ...extraVars,
+      ],
+      unionFind1101View: {
+        event,
+        n,
+        logs: logs.map((log) => [...log]),
+        currentLog: currentLog ? [...currentLog] : null,
+        root: [...root],
+        rank: [...rank],
+        count,
+        groups: [...groups.entries()].map(([groupRoot, members]) => ({ root: groupRoot, members: [...members] })),
+        acceptedEdges: graphEdges.filter((edge) => edge.w !== "?").map((edge) => ({ ...edge })),
+        currentEdge: currentEdge ? [...currentEdge] : null,
+      },
+      final,
+    });
+  }
+
+  function findVisual(x, label, depth = 0) {
+    const indent = "  ".repeat(depth);
+    snapshot({
+      title: { vi: `${indent}find(${x}): kiểm tra root[${x}]`, en: `${indent}find(${x}): check root[${x}]` },
+      note: root[x] === x
+        ? { vi: `${x} đang là root của chính nó.`, en: `${x} is currently its own root.` }
+        : { vi: `root[${x}] = ${root[x]}, tiếp tục đệ quy để tìm root cuối.`, en: `root[${x}] = ${root[x]}; recurse to find the final root.` },
+      codeLine: 10,
+      event: "find-check",
+      highlight: [x],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: label, value: x }, { name: "find depth", value: depth }],
+    });
+    if (root[x] === x) {
+      snapshot({
+        title: { vi: `${indent}find(${x}) → ${x}`, en: `${indent}find(${x}) → ${x}` },
+        note: { vi: "Điều kiện base case đúng, trả root hiện tại.", en: "The base case is true; return the current root." },
+        codeLine: 11,
+        event: "find-base",
+        highlight: [x],
+        currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+        extraVars: [{ name: `find(${x})`, value: x }],
+      });
+      return x;
+    }
+
+    const parentBefore = root[x];
+    snapshot({
+      title: { vi: `${indent}Gọi find(root[${x}]) = find(${parentBefore})`, en: `${indent}Call find(root[${x}]) = find(${parentBefore})` },
+      note: { vi: "Đi xuống parent trước, sau đó gán trực tiếp node hiện tại về root cuối.", en: "Follow the parent first, then point the current node directly to the final root." },
+      codeLine: 12,
+      event: "find-recurse",
+      highlight: [x, parentBefore],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: "x", value: x }, { name: "root[x] before", value: parentBefore }],
+    });
+    const foundRoot = findVisual(parentBefore, label, depth + 1);
+    root[x] = foundRoot;
+    snapshot({
+      title: { vi: `Path compression: root[${x}] = ${foundRoot}`, en: `Path compression: root[${x}] = ${foundRoot}` },
+      note: parentBefore === foundRoot
+        ? { vi: `${x} đã trỏ trực tiếp tới root nên mảng root không đổi.`, en: `${x} already pointed directly to the root, so the root array is unchanged.` }
+        : { vi: `Rút ngắn đường đi ${x} → ${parentBefore} → … → ${foundRoot} thành ${x} → ${foundRoot}.`, en: `Compress ${x} → ${parentBefore} → … → ${foundRoot} into ${x} → ${foundRoot}.` },
+      codeLine: 13,
+      event: "path-compress",
+      highlight: [x, foundRoot],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: "root_x", value: foundRoot }],
+    });
+    snapshot({
+      title: { vi: `find(${x}) trả ${foundRoot}`, en: `find(${x}) returns ${foundRoot}` },
+      note: { vi: "Trả root đã được cache sau path compression.", en: "Return the root cached by path compression." },
+      codeLine: 14,
+      event: "find-return",
+      highlight: [x, foundRoot],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: `find(${x})`, value: foundRoot }],
+    });
+    return foundRoot;
+  }
+
+  function unionVisual(x, y) {
+    const rootX = findVisual(x, "x");
+    snapshot({
+      title: { vi: `root_x = ${rootX}`, en: `root_x = ${rootX}` },
+      note: { vi: `Lưu kết quả find(${x}) vào root_x.`, en: `Store find(${x}) in root_x.` },
+      codeLine: 17,
+      event: "root-x",
+      highlight: [x, rootX],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }],
+    });
+    const rootY = findVisual(y, "y");
+    snapshot({
+      title: { vi: `root_y = ${rootY}`, en: `root_y = ${rootY}` },
+      note: { vi: `Lưu kết quả find(${y}) vào root_y.`, en: `Store find(${y}) in root_y.` },
+      codeLine: 18,
+      event: "root-y",
+      highlight: [y, rootY],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }, { name: "root_y", value: rootY }],
+    });
+    snapshot({
+      title: rootX === rootY
+        ? { vi: `R${rootX} = R${rootY}: đã cùng nhóm`, en: `R${rootX} = R${rootY}: already one group` }
+        : { vi: `R${rootX} ≠ R${rootY}: cần union`, en: `R${rootX} ≠ R${rootY}: union is needed` },
+      note: rootX === rootY
+        ? { vi: "Không merge và không giảm count.", en: "Do not merge or decrement count." }
+        : { vi: "Hai root khác nhau, tiếp tục so sánh rank.", en: "The roots differ; compare their ranks next." },
+      codeLine: 19,
+      event: "compare-roots",
+      highlight: [rootX, rootY],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }, { name: "root_y", value: rootY }],
+    });
+    if (rootX === rootY) {
+      snapshot({
+        title: { vi: "return: bỏ qua cạnh dư", en: "return: skip the redundant edge" },
+        note: { vi: "Hai người đã kết nối gián tiếp nên trạng thái DSU giữ nguyên.", en: "The people are already indirectly connected, so the DSU remains unchanged." },
+        codeLine: 20,
+        event: "skip-union",
+        highlight: [x, y],
+        currentEdge: [x, y],
+      });
+      return false;
+    }
+
+    snapshot({
+      title: { vi: `So sánh rank[${rootX}] > rank[${rootY}]`, en: `Compare rank[${rootX}] > rank[${rootY}]` },
+      note: { vi: `${rank[rootX]} > ${rank[rootY]} là ${rank[rootX] > rank[rootY]}.`, en: `${rank[rootX]} > ${rank[rootY]} is ${rank[rootX] > rank[rootY]}.` },
+      codeLine: 21,
+      event: "rank-greater",
+      highlight: [rootX, rootY],
+      currentEdge: [x, y],
+    });
+    if (rank[rootX] > rank[rootY]) {
+      root[rootY] = rootX;
+      addedEdges.add(edgeKey(x, y));
+      snapshot({
+        title: { vi: `Gắn R${rootY} vào R${rootX}`, en: `Attach R${rootY} to R${rootX}` },
+        note: { vi: "Tree rank thấp hơn nối dưới tree rank cao hơn.", en: "Attach the lower-rank tree below the higher-rank tree." },
+        codeLine: 22,
+        event: "attach-y-to-x",
+        highlight: [rootX, rootY],
+        currentEdge: [x, y],
+      });
+    } else {
+      snapshot({
+        title: { vi: `So sánh rank[${rootX}] < rank[${rootY}]`, en: `Compare rank[${rootX}] < rank[${rootY}]` },
+        note: { vi: `${rank[rootX]} < ${rank[rootY]} là ${rank[rootX] < rank[rootY]}.`, en: `${rank[rootX]} < ${rank[rootY]} is ${rank[rootX] < rank[rootY]}.` },
+        codeLine: 23,
+        event: "rank-less",
+        highlight: [rootX, rootY],
+        currentEdge: [x, y],
+      });
+      if (rank[rootX] < rank[rootY]) {
+        root[rootX] = rootY;
+        addedEdges.add(edgeKey(x, y));
+        snapshot({
+          title: { vi: `Gắn R${rootX} vào R${rootY}`, en: `Attach R${rootX} to R${rootY}` },
+          note: { vi: "Tree rank thấp hơn nối dưới tree rank cao hơn.", en: "Attach the lower-rank tree below the higher-rank tree." },
+          codeLine: 24,
+          event: "attach-x-to-y",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+      } else {
+        snapshot({
+          title: { vi: `Hai rank bằng ${rank[rootX]}`, en: `Both ranks equal ${rank[rootX]}` },
+          note: { vi: "Có thể chọn một root; code giữ root_x làm root mới.", en: "Either root works; the code keeps root_x as the new root." },
+          codeLine: 25,
+          event: "equal-rank",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+        root[rootY] = rootX;
+        addedEdges.add(edgeKey(x, y));
+        snapshot({
+          title: { vi: `root[${rootY}] = ${rootX}`, en: `root[${rootY}] = ${rootX}` },
+          note: { vi: `Gắn R${rootY} vào R${rootX}.`, en: `Attach R${rootY} below R${rootX}.` },
+          codeLine: 26,
+          event: "attach-equal-rank",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+        rank[rootX] += 1;
+        snapshot({
+          title: { vi: `rank[${rootX}] tăng lên ${rank[rootX]}`, en: `rank[${rootX}] increases to ${rank[rootX]}` },
+          note: { vi: "Chỉ tăng rank khi merge hai tree có cùng rank.", en: "Increase rank only when merging two equal-rank trees." },
+          codeLine: 27,
+          event: "increase-rank",
+          highlight: [rootX],
+          currentEdge: [x, y],
+        });
+      }
+    }
+
+    count -= 1;
+    snapshot({
+      title: { vi: `count giảm: ${count + 1} → ${count}`, en: `count decreases: ${count + 1} → ${count}` },
+      note: { vi: "Một merge thành công luôn giảm số component đúng 1.", en: "Every successful merge decreases the component count by exactly one." },
+      codeLine: 28,
+      event: "decrement-count",
+      highlight: [x, y],
+      currentEdge: [x, y],
+      extraVars: [{ name: "merged", value: true }],
+    });
+    return true;
+  }
+
+  snapshot({
+    title: { vi: `Tạo UnionFind(${n})`, en: `Create UnionFind(${n})` },
+    note: { vi: "Cách 2 đóng gói root, rank và count trong một class riêng.", en: "Approach 2 encapsulates root, rank, and count in a dedicated class." },
+    codeLine: 38,
+    event: "construct-call",
+    extraVars: [{ name: "n", value: n }],
+  });
+  snapshot({ title: { vi: "Khởi tạo root", en: "Initialize root" }, note: { vi: "Ban đầu mỗi người là root riêng.", en: "Initially every person is a separate root." }, codeLine: 5, event: "init-root" });
+  snapshot({ title: { vi: "Khởi tạo rank = 1", en: "Initialize rank = 1" }, note: { vi: "Mỗi component ban đầu có rank 1.", en: "Every initial component has rank 1." }, codeLine: 6, event: "init-rank" });
+  snapshot({ title: { vi: `Khởi tạo count = ${n}`, en: `Initialize count = ${n}` }, note: { vi: "count theo dõi trực tiếp số component còn lại.", en: "count directly tracks the number of remaining components." }, codeLine: 7, event: "init-count" });
+
+  logs.sort((a, b) => a[0] - b[0]);
+  snapshot({
+    title: { vi: "Sort logs theo timestamp", en: "Sort logs by timestamp" },
+    note: { vi: logs.map(([time, u, v]) => `${time}:(${u},${v})`).join(" → "), en: logs.map(([time, u, v]) => `${time}:(${u},${v})`).join(" → ") },
+    codeLine: 39,
+    event: "sort-logs",
+    extraVars: [{ name: "logs", value: JSON.stringify(logs) }],
+  });
+
+  for (let index = 0; index < logs.length; index++) {
+    currentLog = logs[index];
+    const [time, u, v] = currentLog;
+    snapshot({
+      title: { vi: `Log #${index}: timestamp ${time}`, en: `Log #${index}: timestamp ${time}` },
+      note: { vi: `Lấy sự kiện tiếp theo theo thời gian: ${u} và ${v} trở thành bạn.`, en: `Read the next chronological event: ${u} and ${v} become friends.` },
+      codeLine: 40,
+      event: "loop-log",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "log", value: `[${time}, ${u}, ${v}]` }],
+    });
+    snapshot({
+      title: { vi: `time=${time}, u=${u}, v=${v}`, en: `time=${time}, u=${u}, v=${v}` },
+      note: { vi: "Unpack timestamp và hai người từ log.", en: "Unpack the timestamp and two people from the log." },
+      codeLine: 41,
+      event: "unpack-log",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "time", value: time }, { name: "u", value: u }, { name: "v", value: v }],
+    });
+    snapshot({
+      title: { vi: `Gọi uf.union(${u}, ${v})`, en: `Call uf.union(${u}, ${v})` },
+      note: { vi: "Union sẽ gọi recursive find cho cả hai đầu rồi merge theo rank nếu cần.", en: "Union recursively finds both roots, then merges by rank when needed." },
+      codeLine: 42,
+      event: "union-call",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    unionVisual(u, v);
+    snapshot({
+      title: { vi: "Gọi uf.get_count()", en: "Call uf.get_count()" },
+      note: { vi: "Đọc số component hiện tại từ object UnionFind.", en: "Read the current component count from the UnionFind object." },
+      codeLine: 33,
+      event: "get-count-call",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    snapshot({
+      title: { vi: `get_count() trả ${count}`, en: `get_count() returns ${count}` },
+      note: { vi: "Không cần quét lại root; count đã được cập nhật sau mỗi merge.", en: "No root scan is needed; count is maintained after every merge." },
+      codeLine: 34,
+      event: "get-count-return",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    snapshot({
+      title: count === 1
+        ? { vi: "count == 1 → tất cả đã kết nối", en: "count == 1 → everyone is connected" }
+        : { vi: `count = ${count}, tiếp tục`, en: `count = ${count}; continue` },
+      note: count === 1
+        ? { vi: `Timestamp ${time} là thời điểm sớm nhất.`, en: `Timestamp ${time} is the earliest moment.` }
+        : { vi: "Vẫn còn nhiều component nên xử lý log kế tiếp.", en: "Multiple components remain, so process the next log." },
+      codeLine: 43,
+      event: "check-count",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "count == 1", value: count === 1 }],
+    });
+    if (count === 1) {
+      answer = time;
+      snapshot({
+        title: { vi: `Trả timestamp ${time}`, en: `Return timestamp ${time}` },
+        note: { vi: `Mọi người thuộc cùng một component tại thời điểm ${time}.`, en: `Everyone belongs to one component at timestamp ${time}.` },
+        codeLine: 44,
+        event: "return-time",
+        highlight: Array.from({ length: n }, (_, person) => person),
+        extraVars: [{ name: "answer", value: answer }],
+        final: true,
+      });
+      break;
+    }
+  }
+
+  if (answer === -1) {
+    currentLog = null;
+    snapshot({
+      title: { vi: "Không thể kết nối tất cả → -1", en: "Everyone never connects → -1" },
+      note: { vi: "Đã xử lý hết logs nhưng count vẫn lớn hơn 1.", en: "All logs were processed but count is still greater than one." },
+      codeLine: 45,
+      event: "return-negative-one",
+      extraVars: [{ name: "answer", value: -1 }],
+      final: true,
+    });
+  }
+
+  return { input, answer, steps };
+}
+
 // ─── 1319 DFS: Number of Operations to Make Network Connected ───
 // Line-by-line trace of the exact code2 shown to the user:
 //  1  from collections import defaultdict
@@ -4095,16 +4490,29 @@ module.exports = {
     defaultInput: "20,0,2;50,1,3;10,0,1;80,3,4;70,2,3",
     inputKind: "string",
     inputLabel: { vi: "Logs (t,a,b cách bởi ';')", en: "Logs (t,a,b separated by ';')" },
-    extraParams: [{ key: "n", label: { vi: "n (số người)", en: "n (number of people)" }, default: 5 }],
+    extraParams: [
+      { key: "n", label: { vi: "n (số người)", en: "n (number of people)" }, default: 5 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: parent inline + iterative find", en: "Approach 1: inline parent + iterative find" } },
+          { value: "2", label: { vi: "Cách 2: class UnionFind + recursive find", en: "Approach 2: UnionFind class + recursive find" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Sắp logs theo timestamp tăng dần.", en: "Sort logs by timestamp ascending." },
-      { vi: "Union-Find: lần lượt union từng cặp (a, b). Mỗi union giảm components đi 1.", en: "Union-Find: union each pair (a, b). Each merge decreases component count by 1." },
-      { vi: "Khi components = 1 → trả timestamp của log đó. Nếu không bao giờ về 1 → trả -1.", en: "When components = 1 → return that log's timestamp. If it never reaches 1 → return -1." },
+      { vi: "Cả hai cách đều sort logs theo timestamp tăng dần rồi thêm từng cạnh friendship vào DSU.", en: "Both approaches sort logs by timestamp and add friendship edges to the DSU one at a time." },
+      { vi: "Cách 1: dùng parent/components trực tiếp trong Solution và iterative find với path halving.", en: "Approach 1: keep parent/components directly in Solution and use iterative find with path halving." },
+      { vi: "Cách 2: đóng gói root, rank và count trong class UnionFind; recursive find thực hiện path compression rõ từng bước.", en: "Approach 2: encapsulate root, rank, and count in a UnionFind class; recursive find performs visible path compression." },
+      { vi: "Mỗi union thành công giảm component count đi 1. Khi count = 1, timestamp hiện tại là đáp án sớm nhất.", en: "Every successful union decreases the component count by one. When count = 1, the current timestamp is the earliest answer." },
     ],
     complexity: {
       time: "O(m log m + m·α(n))",
       space: "O(n)",
-      note: { vi: "m = số logs, sắp xếp O(m log m). Mỗi union/find gần O(1).", en: "m = number of logs, sort O(m log m). Each union/find near O(1)." },
+      note: { vi: "m = số logs; sort tốn O(m log m), còn find/union có amortized α(n).", en: "m is the number of logs; sorting costs O(m log m), while find/union take amortized α(n)." },
     },
     code: [
       "class Solution:",
@@ -4126,7 +4534,61 @@ module.exports = {
       "                return t",
       "        return -1",
     ],
+    code2: [
+      "from typing import List",
+      "",
+      "class UnionFind:",
+      "    def __init__(self, n):",
+      "        self.root = [i for i in range(n)]",
+      "        self.rank = [1 for _ in range(n)]",
+      "        self.count = n",
+      "",
+      "    def find(self, x):",
+      "        if x == self.root[x]:",
+      "            return x",
+      "        root_x = self.find(self.root[x])",
+      "        self.root[x] = root_x  # path compression",
+      "        return root_x",
+      "",
+      "    def union(self, x, y):",
+      "        root_x = self.find(x)",
+      "        root_y = self.find(y)",
+      "        if root_x == root_y:",
+      "            return",
+      "        if self.rank[root_x] > self.rank[root_y]:",
+      "            self.root[root_y] = root_x",
+      "        elif self.rank[root_x] < self.rank[root_y]:",
+      "            self.root[root_x] = root_y",
+      "        else:",
+      "            self.root[root_y] = root_x",
+      "            self.rank[root_x] += 1",
+      "        self.count -= 1",
+      "",
+      "    def is_connected(self, x, y):",
+      "        return self.find(x) == self.find(y)",
+      "",
+      "    def get_count(self):",
+      "        return self.count",
+      "",
+      "class Solution:",
+      "    def earliestAcq(self, logs: List[List[int]], n: int) -> int:",
+      "        uf = UnionFind(n)",
+      "        logs.sort(key=lambda x: x[0])",
+      "        for log in logs:",
+      "            time, u, v = log",
+      "            uf.union(u, v)",
+      "            if uf.get_count() == 1:",
+      "                return time",
+      "        return -1",
+    ],
+    codeLabel: { vi: "Cách 1: parent inline + iterative find", en: "Approach 1: inline parent + iterative find" },
+    code2Label: { vi: "Cách 2: class UnionFind + recursive path compression", en: "Approach 2: UnionFind class + recursive path compression" },
     builder: buildSteps1101,
+    builder2: buildSteps1101ExplicitUnionFind,
+    liveArgs(input, params = {}) {
+      const { n, logs } = parse1101Data(input, params);
+      return [logs, n];
+    },
   },
   1319: {
     id: 1319,
