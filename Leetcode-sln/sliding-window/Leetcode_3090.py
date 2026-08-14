@@ -3,7 +3,7 @@ class Solution:
         left = 0
         max_occ = 0
         dic_s = {}
-        
+
         for right in range(len(s)):
             dic_s[s[right]] = dic_s.get(s[right], 0 ) +1
             while dic_s[s[right]] > 2:

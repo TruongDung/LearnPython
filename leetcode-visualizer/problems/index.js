@@ -12,7 +12,7 @@
 
 const categories = {
   dp: require("./dp"),
-  sliding: Object.assign(require("./sliding"), require("./sliding-advanced")),
+  sliding: Object.assign(require("./sliding"), require("./sliding-advanced"), require("./sliding-missing")),
   graph: require("./graph"),
   math: require("./math"),
   "two-pointer": require("./two-pointer"),
