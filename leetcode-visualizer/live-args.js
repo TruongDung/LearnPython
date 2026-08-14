@@ -385,6 +385,8 @@ function prepareDesignLiveRun(problem, input, params = {}, codeBlock = 1) {
         { name: "buildDict", args: [words(input)] },
         ...words(params.search).map((word) => ({ name: "search", args: [word] })),
       ]);
+    case 677:
+      return designConfig("MapSum", [], parseFunctionOperations(input));
     case 911:
       return designConfig("TopVotedCandidate", [input, parseNumberList(params.times)],
         parseNumberList(params.queries).map((query) => ({ name: "q", args: [query] })));

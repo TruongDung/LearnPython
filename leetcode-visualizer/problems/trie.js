@@ -3083,7 +3083,417 @@ function buildSteps642(input, params = {}) {
   return { original: typed, answer: `prefix="${prefix}"`, steps };
 }
 
+/**
+ * LeetCode 677: Map Sum Pairs.
+ * Each Trie node caches the sum of all key values in its subtree. Replacing a
+ * key propagates only delta = newValue - oldValue along that key's path.
+ */
+function buildSteps677(input) {
+  const stripQuotes = (value) => {
+    const text = String(value ?? "").trim();
+    return ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))
+      ? text.slice(1, -1)
+      : text;
+  };
+  const operations = String(input).split(/\s*[;|]\s*/).filter(Boolean).map((raw, index) => {
+    const match = raw.trim().match(/^(insert|sum)\s*\((.*)\)$/i);
+    if (!match) throw new Error(`Invalid operation #${index + 1}: ${raw}`);
+    const type = match[1].toLowerCase();
+    const args = match[2].split(",").map((item) => item.trim());
+    if (type === "insert") {
+      const key = stripQuotes(args[0]);
+      const value = Number(args[1]);
+      if (!/^[a-z]+$/.test(key) || !Number.isInteger(value) || value < 0 || args.length !== 2) {
+        throw new Error(`insert requires a lowercase key and a non-negative integer: ${raw}`);
+      }
+      return { type, key, value, label: `insert(\"${key}\", ${value})` };
+    }
+    const prefix = stripQuotes(args[0]);
+    if (!/^[a-z]+$/.test(prefix) || args.length !== 1) {
+      throw new Error(`sum requires one lowercase prefix: ${raw}`);
+    }
+    return { type, prefix, label: `sum(\"${prefix}\")` };
+  });
+  if (!operations.length) throw new Error("Enter at least one insert(...) or sum(...) operation");
+
+  let nextId = 0;
+  const makeNode = (char, prefix, parentId) => ({
+    id: nextId++,
+    char,
+    prefix,
+    parentId,
+    score: 0,
+    children: {},
+  });
+  const root = makeNode("ROOT", "", null);
+  const values = new Map();
+  const outputs = [];
+  const steps = [];
+
+  function treeSnapshot(activeIds = [], activeId = null, createdId = null) {
+    const nodes = [];
+    const annotations = {};
+    let nextX = 0;
+    const activeSet = new Set(activeIds);
+    function dfs(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      let x;
+      if (!keys.length) {
+        x = nextX++;
+      } else {
+        const childXs = keys.map((key) => dfs(node.children[key], depth + 1));
+        x = (childXs[0] + childXs[childXs.length - 1]) / 2;
+      }
+      nodes.push({
+        id: node.id,
+        labelLines: [node.char === "ROOT" ? "ROOT" : `'${node.char}'`, `Σ=${node.score}`],
+        x,
+        y: depth,
+        parentId: node.parentId,
+        hl: activeSet.has(node.id),
+        isWord: node.prefix !== "" && values.has(node.prefix),
+      });
+      if (node.id === activeId) annotations[node.id] = { label: "CURRENT", kind: "current" };
+      if (node.id === createdId) annotations[node.id] = { label: "NEW NODE", kind: "created" };
+      return x;
+    }
+    dfs(root, 0);
+    return { nodes, annotations, showLevels: false };
+  }
+
+  function pathDetails(prefixes) {
+    const details = [];
+    let node = root;
+    details.push({ prefix: "", char: "ROOT", score: root.score });
+    for (const prefix of prefixes.slice(1)) {
+      const char = prefix[prefix.length - 1];
+      if (!node.children[char]) break;
+      node = node.children[char];
+      details.push({ prefix, char, score: node.score });
+    }
+    return details;
+  }
+
+  function snapshot(opts) {
+    const op = Number.isInteger(opts.opIndex) && opts.opIndex >= 0 ? operations[opts.opIndex] : null;
+    const target = op ? (op.type === "insert" ? op.key : op.prefix) : "";
+    const prefixes = opts.pathPrefixes || [""];
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: treeSnapshot(opts.activeIds || [root.id], opts.activeId ?? root.id, opts.createdId ?? null),
+      mapSumView: {
+        phase: opts.phase || "operation",
+        event: opts.event || "inspect",
+        operations: operations.map((operation) => ({ ...operation })),
+        opIndex: opts.opIndex ?? -1,
+        operation: op ? { ...op } : null,
+        target,
+        charIndex: opts.charIndex ?? -1,
+        edgeChar: opts.edgeChar ?? null,
+        edgeFound: opts.edgeFound,
+        currentPrefix: opts.currentPrefix ?? "",
+        path: pathDetails(prefixes),
+        oldValue: opts.oldValue,
+        newValue: opts.newValue,
+        delta: opts.delta,
+        change: opts.change ? { ...opts.change } : null,
+        result: opts.result,
+        nodeFound: opts.nodeFound,
+        values: [...values.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => ({ key, value })),
+        outputs: outputs.map((output) => ({ ...output })),
+      },
+      highlight: [],
+      mark: [],
+      codeLines: opts.codeLines || [],
+      vars: [
+        { name: "operation", value: op ? op.label : "MapSum()" },
+        { name: "prefix", value: JSON.stringify(opts.currentPrefix ?? "") },
+        ...(opts.delta === undefined ? [] : [{ name: "delta", value: opts.delta }]),
+        ...(opts.result === undefined ? [] : [{ name: "result", value: opts.result }]),
+        { name: "values", value: `{${[...values.entries()].map(([key, value]) => `${key}:${value}`).join(", ")}}` },
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo MapSum", en: "Initialize MapSum" },
+    phase: "init",
+    event: "init",
+    opIndex: -1,
+    codeLines: [7, 8, 9],
+    note: {
+      vi: "Trie bắt đầu với root rỗng. values nhớ giá trị chính xác của từng key để xử lý overwrite.",
+      en: "The Trie starts with an empty root. values remembers each key's exact value so overwrites can use a delta.",
+    },
+  });
+
+  operations.forEach((op, opIndex) => {
+    snapshot({
+      title: { vi: `Thao tác ${opIndex + 1}: ${op.label}`, en: `Operation ${opIndex + 1}: ${op.label}` },
+      phase: "operation",
+      event: "operation-start",
+      opIndex,
+      codeLines: [op.type === "insert" ? 10 : 19],
+      note: op.type === "insert"
+        ? { vi: `Bắt đầu insert key "${op.key}" với value = ${op.value}.`, en: `Begin inserting key "${op.key}" with value = ${op.value}.` }
+        : { vi: `Bắt đầu tìm prefix "${op.prefix}"; không cần DFS vì node đã cache tổng.`, en: `Begin looking up prefix "${op.prefix}"; no DFS is needed because the node caches its sum.` },
+    });
+
+    if (op.type === "insert") {
+      const oldValue = values.get(op.key) || 0;
+      const delta = op.value - oldValue;
+      values.set(op.key, op.value);
+      snapshot({
+        title: { vi: `Tính delta = ${op.value} − ${oldValue} = ${delta}`, en: `Compute delta = ${op.value} − ${oldValue} = ${delta}` },
+        phase: "delta",
+        event: "delta",
+        opIndex,
+        oldValue,
+        newValue: op.value,
+        delta,
+        codeLines: [11, 12],
+        note: {
+          vi: `Chỉ cộng delta = ${delta} lên các node. Nhờ vậy overwrite không cộng trùng toàn bộ value mới.`,
+          en: `Only add delta = ${delta} to the path. This prevents an overwrite from adding the full new value twice.`,
+        },
+      });
+
+      let node = root;
+      const activeIds = [root.id];
+      const prefixes = [""];
+      for (let charIndex = 0; charIndex < op.key.length; charIndex++) {
+        const char = op.key[charIndex];
+        const prefix = op.key.slice(0, charIndex + 1);
+        const existed = Boolean(node.children[char]);
+        if (!existed) node.children[char] = makeNode(char, prefix, node.id);
+        node = node.children[char];
+        activeIds.push(node.id);
+        prefixes.push(prefix);
+        snapshot({
+          title: {
+            vi: `${existed ? "Đi theo" : "Tạo"} cạnh '${char}' → prefix "${prefix}"`,
+            en: `${existed ? "Follow" : "Create"} edge '${char}' → prefix "${prefix}"`,
+          },
+          phase: "walk",
+          event: existed ? "follow-edge" : "create-edge",
+          opIndex,
+          charIndex,
+          edgeChar: char,
+          edgeFound: existed,
+          currentPrefix: prefix,
+          pathPrefixes: [...prefixes],
+          activeIds: [...activeIds],
+          activeId: node.id,
+          createdId: existed ? null : node.id,
+          oldValue,
+          newValue: op.value,
+          delta,
+          codeLines: [14, 15, 16, 17],
+          note: {
+            vi: existed
+              ? `Cạnh '${char}' đã tồn tại; di chuyển node tới prefix "${prefix}".`
+              : `Chưa có cạnh '${char}', tạo TrieNode mới cho prefix "${prefix}".`,
+            en: existed
+              ? `Edge '${char}' exists; move node to prefix "${prefix}".`
+              : `Edge '${char}' is missing; create a TrieNode for prefix "${prefix}".`,
+          },
+        });
+
+        const before = node.score;
+        node.score += delta;
+        snapshot({
+          title: { vi: `Cập nhật Σ("${prefix}"): ${before} → ${node.score}`, en: `Update Σ("${prefix}"): ${before} → ${node.score}` },
+          phase: "update",
+          event: "update-score",
+          opIndex,
+          charIndex,
+          edgeChar: char,
+          edgeFound: true,
+          currentPrefix: prefix,
+          pathPrefixes: [...prefixes],
+          activeIds: [...activeIds],
+          activeId: node.id,
+          oldValue,
+          newValue: op.value,
+          delta,
+          change: { prefix, before, after: node.score },
+          codeLines: [18],
+          note: {
+            vi: `node.score += delta: ${before} + (${delta}) = ${node.score}. Đây là tổng value của mọi key bắt đầu bằng "${prefix}".`,
+            en: `node.score += delta: ${before} + (${delta}) = ${node.score}. This is the value sum of all keys starting with "${prefix}".`,
+          },
+        });
+      }
+      return;
+    }
+
+    let node = root;
+    const activeIds = [root.id];
+    const prefixes = [""];
+    let missing = false;
+    for (let charIndex = 0; charIndex < op.prefix.length; charIndex++) {
+      const char = op.prefix[charIndex];
+      const prefix = op.prefix.slice(0, charIndex + 1);
+      if (!node.children[char]) {
+        missing = true;
+        snapshot({
+          title: { vi: `Không có cạnh '${char}' → tổng = 0`, en: `Missing edge '${char}' → sum = 0` },
+          phase: "walk",
+          event: "missing-edge",
+          opIndex,
+          charIndex,
+          edgeChar: char,
+          edgeFound: false,
+          currentPrefix: prefixes[prefixes.length - 1],
+          pathPrefixes: [...prefixes],
+          activeIds: [...activeIds],
+          activeId: node.id,
+          result: 0,
+          nodeFound: false,
+          codeLines: [21, 22],
+          note: {
+            vi: `Prefix bị đứt tại '${char}', nên không key nào khớp và sum trả về 0.`,
+            en: `The prefix path breaks at '${char}', so no key matches and sum returns 0.`,
+          },
+        });
+        break;
+      }
+      node = node.children[char];
+      activeIds.push(node.id);
+      prefixes.push(prefix);
+      snapshot({
+        title: { vi: `Đi theo '${char}' → prefix "${prefix}"`, en: `Follow '${char}' → prefix "${prefix}"` },
+        phase: "walk",
+        event: "query-edge",
+        opIndex,
+        charIndex,
+        edgeChar: char,
+        edgeFound: true,
+        currentPrefix: prefix,
+        pathPrefixes: [...prefixes],
+        activeIds: [...activeIds],
+        activeId: node.id,
+        nodeFound: true,
+        codeLines: [21, 22, 23],
+        note: {
+          vi: `Tìm thấy node prefix "${prefix}" với tổng cache hiện tại Σ = ${node.score}.`,
+          en: `Found prefix node "${prefix}" with current cached sum Σ = ${node.score}.`,
+        },
+      });
+    }
+
+    const result = missing ? 0 : node.score;
+    outputs.push({ opIndex, prefix: op.prefix, value: result });
+    snapshot({
+      title: { vi: `sum("${op.prefix}") = ${result}`, en: `sum("${op.prefix}") = ${result}` },
+      phase: "return",
+      event: "return-sum",
+      opIndex,
+      charIndex: missing ? Math.max(0, prefixes.length - 1) : op.prefix.length - 1,
+      edgeFound: !missing,
+      currentPrefix: missing ? prefixes[prefixes.length - 1] : op.prefix,
+      pathPrefixes: [...prefixes],
+      activeIds: [...activeIds],
+      activeId: node.id,
+      result,
+      nodeFound: !missing,
+      codeLines: missing ? [22] : [24],
+      note: missing
+        ? { vi: `Đường prefix không tồn tại → trả về 0.`, en: `The prefix path does not exist → return 0.` }
+        : { vi: `Đọc trực tiếp node.score = ${result}; không cần duyệt các key con.`, en: `Read node.score = ${result} directly; no descendant traversal is needed.` },
+    });
+  });
+
+  const answer = outputs.map((output) => output.value);
+  snapshot({
+    title: { vi: `Hoàn tất · kết quả sum = [${answer.join(", ")}]`, en: `Done · sum results = [${answer.join(", ")}]` },
+    phase: "done",
+    event: "done",
+    opIndex: operations.length,
+    activeIds: [root.id],
+    activeId: root.id,
+    codeLines: [],
+    final: true,
+    note: {
+      vi: "Mỗi insert/sum chỉ đi qua độ dài key hoặc prefix; tổng đã được cache ngay tại node.",
+      en: "Each insert/sum only walks the key or prefix length; every sum is cached directly on its node.",
+    },
+  });
+
+  return { operations, answer, steps };
+}
+
 module.exports = {
+  677: {
+    id: 677,
+    difficulty: "medium",
+    slug: "map-sum-pairs",
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    tags: [{ key: "hashmap", vi: "Bảng băm", en: "Hash Map" }],
+    title: { vi: "Map Sum Pairs", en: "Map Sum Pairs" },
+    titleVi: { vi: "Cặp ánh xạ và tổng theo tiền tố", en: "Map keys and query prefix sums" },
+    statement: {
+      vi: "Thiết kế MapSum hỗ trợ insert(key, val) và sum(prefix). insert gán val cho key, ghi đè giá trị cũ nếu key đã tồn tại. sum trả về tổng value của mọi key bắt đầu bằng prefix.",
+      en: "Design MapSum with insert(key, val) and sum(prefix). insert assigns val to key, replacing its old value when present. sum returns the values of all keys beginning with prefix.",
+    },
+    defaultInput: "insert(apple, 3); sum(ap); insert(app, 2); sum(ap); insert(apple, 2); sum(ap)",
+    inputKind: "string",
+    inputLabel: { vi: "Thao tác: insert(key, value); sum(prefix)", en: "Operations: insert(key, value); sum(prefix)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Mỗi Trie node lưu score = tổng value của tất cả key đi qua node đó.",
+        en: "Each Trie node stores score = the sum of values for every key passing through that node.",
+      },
+      {
+        vi: "Hash map values nhớ giá trị cũ. Khi overwrite, tính delta = new − old rồi chỉ cộng delta trên đường key.",
+        en: "A values hash map remembers old values. On overwrite, compute delta = new − old and add only delta along the key path.",
+      },
+      {
+        vi: "sum(prefix) đi tới node cuối của prefix và trả node.score ngay lập tức; thiếu cạnh thì trả 0.",
+        en: "sum(prefix) walks to the final prefix node and returns node.score immediately; a missing edge returns 0.",
+      },
+    ],
+    complexity: {
+      time: "insert: O(K) · sum: O(P)",
+      space: "O(ΣK)",
+      note: {
+        vi: "K là độ dài key, P là độ dài prefix. Trie chứa tối đa tổng số ký tự khác nhau trên mọi key.",
+        en: "K is key length and P is prefix length. The Trie stores at most the total distinct path characters across all keys.",
+      },
+    },
+    code: [
+      "class TrieNode:",
+      "    def __init__(self):",
+      "        self.children = {}",
+      "        self.score = 0",
+      "",
+      "class MapSum:",
+      "    def __init__(self):",
+      "        self.root = TrieNode()",
+      "        self.values = {}",
+      "    def insert(self, key: str, val: int) -> None:",
+      "        delta = val - self.values.get(key, 0)",
+      "        self.values[key] = val",
+      "        node = self.root",
+      "        for char in key:",
+      "            if char not in node.children:",
+      "                node.children[char] = TrieNode()",
+      "            node = node.children[char]",
+      "            node.score += delta",
+      "    def sum(self, prefix: str) -> int:",
+      "        node = self.root",
+      "        for char in prefix:",
+      "            if char not in node.children:",
+      "                return 0",
+      "            node = node.children[char]",
+      "        return node.score",
+    ],
+    builder: buildSteps677,
+  },
   642: {
     id: 642,
     difficulty: "hard",

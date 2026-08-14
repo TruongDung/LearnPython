@@ -1043,6 +1043,7 @@ function renderCode() {
   const problemId = Number(problemData && problemData.id);
   if (split) {
     split.classList.toggle("problem-173-layout", problemId === 173);
+    split.classList.toggle("problem-677-layout", problemId === 677);
     split.classList.toggle("problem-642-layout", problemId === 642);
     split.classList.toggle("problem-648-layout", problemId === 648);
     split.classList.toggle("problem-211-layout", problemId === 211);
@@ -13755,6 +13756,153 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderMapSumView(step) {
+  const view = step.mapSumView || {};
+  const vi = lang === "vi";
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const path = Array.isArray(view.path) ? view.path : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const operation = view.operation || null;
+  const target = String(view.target || "");
+  const phaseIndex = ["init", "operation"].includes(view.phase) ? 0
+    : view.phase === "delta" ? 1
+      : ["walk", "update"].includes(view.phase) ? 2
+        : 3;
+  const phaseLabels = vi
+    ? ["1 · Đọc thao tác", "2 · Tính delta", "3 · Đi Trie & cập nhật", "4 · Trả prefix sum"]
+    : ["1 · Read operation", "2 · Compute delta", "3 · Walk Trie & update", "4 · Return prefix sum"];
+  const phases = phaseLabels.map((label, index) => {
+    const skippedDelta = operation && operation.type === "sum" && index === 1;
+    const done = view.phase === "done" || index < phaseIndex || skippedDelta;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : "pending"}">${skippedDelta ? "↷" : done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const operationHtml = operations.map((item, index) => {
+    const done = view.phase === "done" || index < view.opIndex;
+    const active = index === view.opIndex;
+    const kind = item.type === "insert" ? "insert" : "sum";
+    return `<span class="${kind}${active ? " active" : ""}${done ? " done" : ""}"><small>${index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${done ? "✓" : active ? "RUN" : "WAIT"}</em></span>`;
+  }).join("");
+
+  const targetHtml = [...target].map((char, index) => {
+    const classes = ["ms677-char"];
+    if (index === view.charIndex) classes.push("active");
+    if (index < view.charIndex || (view.event === "return-sum" && view.nodeFound)) classes.push("done");
+    if (index === view.charIndex && view.edgeFound === false) classes.push("missing");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${index === view.charIndex ? "char" : ""}</em></span>`;
+  }).join("") || `<span class="ms677-empty">${vi ? "Chưa có key/prefix" : "No key/prefix yet"}</span>`;
+
+  const pathHtml = path.map((node, index) => {
+    const current = node.prefix === view.currentPrefix;
+    const changed = view.change && node.prefix === view.change.prefix;
+    const score = changed ? `${view.change.before} → ${view.change.after}` : `Σ=${node.score}`;
+    const label = node.prefix === "" ? "ROOT" : `“${escapeHtml(node.prefix)}”`;
+    return `${index ? "<i>→</i>" : ""}<span class="${current ? "current" : ""}${changed ? " changed" : ""}"><small>${escapeHtml(node.char)}</small><strong>${label}</strong><em>${escapeHtml(score)}</em></span>`;
+  }).join("");
+
+  const valuesHtml = values.length
+    ? values.map((entry) => `<div><code>"${escapeHtml(entry.key)}"</code><strong>${entry.value}</strong></div>`).join("")
+    : `<div class="ms677-empty">${vi ? "values đang rỗng" : "values is empty"}</div>`;
+  const outputsHtml = outputs.length
+    ? outputs.map((output) => `<div><code>sum("${escapeHtml(output.prefix)}")</code><strong>${output.value}</strong></div>`).join("")
+    : `<div class="ms677-empty">${vi ? "Chưa gọi sum(prefix)" : "No sum(prefix) call yet"}</div>`;
+
+  const hasDelta = Number.isFinite(view.delta);
+  const deltaClass = !hasDelta ? "idle" : view.delta > 0 ? "positive" : view.delta < 0 ? "negative" : "zero";
+  const deltaFormula = hasDelta
+    ? `${view.newValue} − ${view.oldValue} = ${view.delta >= 0 ? "+" : ""}${view.delta}`
+    : "new − old";
+  const change = view.change;
+  const nodeScore = change
+    ? `${change.before} + (${view.delta}) = ${change.after}`
+    : path.length ? `Σ = ${path[path.length - 1].score}` : "Σ = 0";
+
+  let actionState = "inspect";
+  let actionLabel = vi ? "KHỞI TẠO" : "INITIALIZE";
+  let actionCode = "root = TrieNode()";
+  let actionDetail = vi ? "Mỗi node cache tổng Σ" : "Each node caches a sum Σ";
+  if (view.event === "operation-start") {
+    actionState = operation ? operation.type : "inspect";
+    actionLabel = operation && operation.type === "insert" ? "INSERT" : "SUM";
+    actionCode = operation ? operation.label : "—";
+    actionDetail = operation && operation.type === "insert"
+      ? (vi ? "overwrite cần delta" : "an overwrite requires delta")
+      : (vi ? "lookup prefix rồi đọc score" : "look up prefix, then read score");
+  } else if (view.event === "delta") {
+    actionState = "delta";
+    actionLabel = "DELTA";
+    actionCode = `delta = ${deltaFormula}`;
+    actionDetail = vi ? "truyền phần chênh lệch, không cộng lại toàn bộ value" : "propagate only the difference, not the full value";
+  } else if (["follow-edge", "create-edge", "query-edge"].includes(view.event)) {
+    actionState = view.event === "create-edge" ? "create" : "walk";
+    actionLabel = view.event === "create-edge" ? "CREATE EDGE" : "FOLLOW EDGE";
+    actionCode = `children['${escapeHtml(view.edgeChar || "")}'] → “${escapeHtml(view.currentPrefix || "ROOT")}”`;
+    actionDetail = view.event === "create-edge" ? (vi ? "tạo node mới với Σ=0" : "create a node with Σ=0") : (vi ? "node đã tồn tại" : "existing node");
+  } else if (view.event === "update-score") {
+    actionState = "update";
+    actionLabel = "UPDATE Σ";
+    actionCode = `score += delta → ${nodeScore}`;
+    actionDetail = vi ? `prefix “${view.currentPrefix}” nhận cùng delta` : `prefix “${view.currentPrefix}” receives the same delta`;
+  } else if (view.event === "missing-edge") {
+    actionState = "missing";
+    actionLabel = "MISSING EDGE";
+    actionCode = `children['${escapeHtml(view.edgeChar || "")}'] = None`;
+    actionDetail = vi ? "không có key khớp → return 0" : "no matching key → return 0";
+  } else if (view.event === "return-sum") {
+    actionState = view.nodeFound ? "return" : "missing";
+    actionLabel = "RETURN";
+    actionCode = view.nodeFound ? `node.score = ${view.result}` : "0";
+    actionDetail = vi ? "đọc cache tại node cuối prefix" : "read the cache at the final prefix node";
+  } else if (view.event === "done") {
+    actionState = "return";
+    actionLabel = "DONE";
+    actionCode = `[${outputs.map((output) => output.value).join(", ")}]`;
+    actionDetail = vi ? "tất cả kết quả sum(prefix)" : "all sum(prefix) results";
+  }
+
+  const resultText = view.result === undefined ? "—" : String(view.result);
+  const summary = vi
+    ? `MapSum: ${operation ? operation.label : "khởi tạo"}; prefix hiện tại ${view.currentPrefix || "root"}; kết quả ${resultText}.`
+    : `MapSum: ${operation ? operation.label : "initialize"}; current prefix ${view.currentPrefix || "root"}; result ${resultText}.`;
+
+  $("treeView").innerHTML = `<section class="ms677-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ms677-phases">${phases}</div>
+    <section class="ms677-operations"><header><strong>OPERATION TIMELINE</strong><span>${vi ? "xanh = xong · cam = đang chạy" : "green = done · amber = running"}</span></header><div>${operationHtml}</div></section>
+    <section class="ms677-rule"><strong>NODE CACHE</strong><span>score(prefix) = Σ values[key] where key.startswith(prefix)</span></section>
+    <section class="ms677-action ${actionState}"><small>${escapeHtml(actionLabel)}</small><strong>${actionCode}</strong><span>${escapeHtml(actionDetail)}</span></section>
+    <div class="ms677-layout">
+      <section class="ms677-tree-card"><header><strong>MAPSUM TRIE · Σ ON EVERY NODE</strong><span>${vi ? "vòng xanh = key hoàn chỉnh · cam = path hiện tại" : "green ring = complete key · amber = current path"}</span></header><div id="ms677Tree" class="ms677-tree"></div></section>
+      <aside class="ms677-side">
+        <section class="ms677-target"><header><strong>${operation && operation.type === "insert" ? "KEY" : "PREFIX"}</strong><span>i = ${view.charIndex ?? "—"}</span></header><div>${targetHtml}</div></section>
+        <section class="ms677-delta ${deltaClass}"><small>OVERWRITE FORMULA</small><strong>${escapeHtml(deltaFormula)}</strong><span>${hasDelta ? `old=${view.oldValue} · new=${view.newValue}` : (vi ? "chỉ dùng cho insert" : "insert only")}</span></section>
+        <section class="ms677-node"><small>CURRENT NODE</small><strong>${view.currentPrefix ? `“${escapeHtml(view.currentPrefix)}”` : "ROOT"}</strong><code>${escapeHtml(nodeScore)}</code></section>
+        <section class="ms677-result ${view.result === undefined ? "idle" : view.nodeFound === false ? "missing" : "ready"}"><small>sum(prefix)</small><strong>${escapeHtml(resultText)}</strong><span>${view.result === undefined ? (vi ? "chờ query" : "waiting") : (vi ? "đọc trực tiếp node.score" : "read node.score directly")}</span></section>
+      </aside>
+    </div>
+    <section class="ms677-path"><header><strong>${vi ? "ĐƯỜNG PREFIX HIỆN TẠI" : "CURRENT PREFIX PATH"}</strong><span>ROOT → ${escapeHtml(view.currentPrefix || "...")}</span></header><div>${pathHtml}</div></section>
+    <div class="ms677-data">
+      <section><header><strong>VALUES HASH MAP</strong><span>${vi ? "key → giá trị mới nhất" : "key → latest value"}</span></header><div>${valuesHtml}</div></section>
+      <section><header><strong>SUM OUTPUTS</strong><span>${vi ? "theo thứ tự query" : "in query order"}</span></header><div>${outputsHtml}</div></section>
+    </div>
+  </section>`;
+  renderTree(step, "ms677Tree");
+  const mapSumSvg = $("ms677Tree").querySelector("svg.tree-svg");
+  if (mapSumSvg) {
+    const naturalWidth = Number(mapSumSvg.getAttribute("width"));
+    const naturalHeight = Number(mapSumSvg.getAttribute("height"));
+    mapSumSvg.classList.remove("tree-svg-fit");
+    if (Number.isFinite(naturalWidth) && naturalWidth > 0) {
+      mapSumSvg.style.setProperty("width", `${naturalWidth}px`, "important");
+      mapSumSvg.style.setProperty("min-width", `${naturalWidth}px`, "important");
+      mapSumSvg.style.setProperty("max-width", "none", "important");
+    }
+    if (Number.isFinite(naturalHeight) && naturalHeight > 0) {
+      mapSumSvg.style.setProperty("height", `${naturalHeight}px`, "important");
+    }
+  }
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -13777,6 +13925,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.mapSumView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMapSumView(step);
   } else if (step.longestDupView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
