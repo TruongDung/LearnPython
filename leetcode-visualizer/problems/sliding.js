@@ -3899,119 +3899,57 @@ function buildStepsAtMostDistinct(input, limit, config) {
   let bestLeft = 0;
   let bestRight = -1;
   const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const distinct = () => [...freq.values()].filter((count) => count > 0).length;
   const freqText = () => {
-    const entries = [...freq.entries()].filter(([, count]) => count > 0);
+    const entries = [...freq.entries()];
     return entries.length ? `{${entries.map(([value, count]) => `${JSON.stringify(value)}:${count}`).join(", ")}}` : "{}";
   };
-  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => {
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note, activeValue, overLimit = false, viewLeft = left, viewFreq, viewFreqText }) => {
+    const window = indices(viewLeft, right);
     steps.push({
-      title,
-      arr: [...items],
-      sub: items.map((_, index) => `[${index}]`),
-      highlight: indices(left, right),
-      mark,
-      final,
-      codeLines: [line],
-      vars: [
-        { name: "left", value: left },
-        { name: "right", value: right >= 0 ? right : "-" },
-        { name: "freq", value: freqText() },
-        { name: "distinct", value: freq.size },
-        { name: "ans", value: ans },
-        ...vars,
-      ],
+      title, arr: [...items], sub: items.map((_, index) => `[${index}]`), highlight: window, mark, final, codeLines: [line],
+      vars: [{ name: "left", value: viewLeft }, { name: "right", value: right >= 0 ? right : "-" }, { name: "freq", value: viewFreqText || freqText() }, { name: "distinct", value: distinct() }, { name: "limit", value: limit }, { name: "ans", value: ans }, ...vars],
       note,
+      slidingFreqView: { nums: [...items], label: config.source, left: viewLeft, right, window, best: bestRight >= bestLeft ? indices(bestLeft, bestRight) : [], freq: viewFreq || Object.fromEntries(freq), k: limit, mode: "distinct", activeValue, overLimit, ans, done: final },
     });
   };
 
-  snap({ title: { vi: "freq = {}", en: "freq = {}" }, line: 3, note: { vi: "freq đếm các phần tử trong cửa sổ hiện tại.", en: "freq counts items in the current window." } });
-  snap({ title: { vi: "left = 0", en: "left = 0" }, line: 4, note: { vi: "left là biên trái của cửa sổ.", en: "left is the window's left boundary." } });
-  snap({ title: { vi: "ans = 0", en: "ans = 0" }, line: 5, note: { vi: "ans lưu độ dài lớn nhất hợp lệ.", en: "ans stores the largest valid length." } });
+  snap({ title: { vi: "freq = {}", en: "freq = {}" }, line: 3, note: { vi: `freq đếm phần tử trong cửa sổ; tối đa ${limit} giá trị distinct.`, en: `freq counts window items; at most ${limit} distinct values are allowed.` } });
+  snap({ title: { vi: "left = 0", en: "left = 0" }, line: 4, note: { vi: "left là biên trái cửa sổ.", en: "left is the window's left boundary." } });
+  snap({ title: { vi: "ans = 0", en: "ans = 0" }, line: 5, note: { vi: "ans là độ dài cửa sổ hợp lệ lớn nhất.", en: "ans is the largest valid-window length." } });
 
   for (let right = 0; right < items.length; right++) {
     const value = items[right];
-    snap({
-      title: { vi: `Xét ${config.source}[${right}] = ${JSON.stringify(value)}`, en: `Inspect ${config.source}[${right}] = ${JSON.stringify(value)}` },
-      line: 6,
-      right,
-      vars: [{ name: config.itemVar, value: JSON.stringify(value) }],
-      note: { vi: "Mở rộng biên phải thêm một phần tử.", en: "Expand the right boundary by one item." },
-    });
+    snap({ title: { vi: `Xét ${config.source}[${right}] = ${JSON.stringify(value)}`, en: `Inspect ${config.source}[${right}] = ${JSON.stringify(value)}` }, line: 6, right, activeValue: value, vars: [{ name: config.itemVar, value: JSON.stringify(value) }], note: { vi: "Mở rộng cửa sổ sang phải.", en: "Expand the window to the right." } });
     freq.set(value, (freq.get(value) || 0) + 1);
-    snap({
-      title: { vi: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}`, en: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}` },
-      line: 7,
-      right,
-      note: { vi: `Cửa sổ đang có ${freq.size} giá trị phân biệt.`, en: `The window now has ${freq.size} distinct values.` },
-    });
+    snap({ title: { vi: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}`, en: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}` }, line: 7, right, activeValue: value, overLimit: distinct() > limit, note: { vi: `Cửa sổ có ${distinct()} giá trị distinct.`, en: `The window has ${distinct()} distinct values.` } });
 
-    while (freq.size > limit) {
-      snap({
-        title: { vi: `${freq.size} distinct > ${limit} → thu hẹp`, en: `${freq.size} distinct > ${limit} → shrink` },
-        line: 8,
-        right,
-        note: { vi: `Vượt giới hạn ${limit} giá trị phân biệt nên cửa sổ chưa hợp lệ.`, en: `The ${limit}-distinct limit is exceeded, so the window is invalid.` },
-      });
+    while (distinct() > limit) {
+      snap({ title: { vi: `${distinct()} distinct > ${limit} → thu hẹp`, en: `${distinct()} distinct > ${limit} → shrink` }, line: 8, right, activeValue: value, overLimit: true, note: { vi: "Vượt giới hạn distinct nên cửa sổ chưa hợp lệ.", en: "The distinct limit is exceeded, so the window is invalid." } });
       const removed = items[left];
       freq.set(removed, freq.get(removed) - 1);
-      snap({
-        title: { vi: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}`, en: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}` },
-        line: 9,
-        right,
-        note: { vi: `Bỏ ${JSON.stringify(removed)} tại left=${left} khỏi cửa sổ.`, en: `Remove ${JSON.stringify(removed)} at left=${left} from the window.` },
-      });
-      if (freq.get(removed) === 0) {
+      snap({ title: { vi: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}`, en: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}` }, line: 9, right, activeValue: value, overLimit: distinct() > limit, vars: [{ name: "removed", value: JSON.stringify(removed) }], note: { vi: `Loại ${JSON.stringify(removed)} ở left=${left} khỏi freq.`, en: `Remove ${JSON.stringify(removed)} at left=${left} from freq.` } });
+      const becomesZero = freq.get(removed) === 0;
+      snap({ title: becomesZero ? { vi: `freq[${JSON.stringify(removed)}] == 0 → True`, en: `freq[${JSON.stringify(removed)}] == 0 → True` } : { vi: `freq[${JSON.stringify(removed)}] == 0 → False`, en: `freq[${JSON.stringify(removed)}] == 0 → False` }, line: 10, right, activeValue: value, overLimit: distinct() > limit, note: becomesZero ? { vi: "Phần tử này đã rời hoàn toàn cửa sổ.", en: "This item has fully left the window." } : { vi: "Phần tử này vẫn còn trong cửa sổ.", en: "This item remains in the window." } });
+      if (becomesZero) {
         freq.delete(removed);
-        snap({
-          title: { vi: `del freq[${JSON.stringify(removed)}]`, en: `del freq[${JSON.stringify(removed)}]` },
-          line: 10,
-          right,
-          note: { vi: `${JSON.stringify(removed)} không còn trong cửa sổ nên xóa key; số distinct giảm.`, en: `${JSON.stringify(removed)} is no longer in the window, so delete its key; distinct count drops.` },
-        });
+        snap({ title: { vi: `del freq[${JSON.stringify(removed)}]`, en: `del freq[${JSON.stringify(removed)}]` }, line: 11, right, activeValue: value, overLimit: distinct() > limit, note: { vi: `Xóa key; còn ${distinct()} distinct.`, en: `Delete the key; ${distinct()} distinct values remain.` } });
       }
       left++;
-      snap({
-        title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
-        line: 11,
-        right,
-        note: { vi: "Dịch biên trái sang phải một vị trí.", en: "Move the left boundary one position right." },
-      });
+      snap({ title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, line: 12, right, activeValue: value, overLimit: distinct() > limit, note: { vi: "Dịch biên trái sang phải.", en: "Move the left boundary right." } });
     }
 
-    snap({
-      title: { vi: `${freq.size} distinct ≤ ${limit} → cửa sổ hợp lệ`, en: `${freq.size} distinct ≤ ${limit} → valid window` },
-      line: 8,
-      right,
-      note: { vi: "Không cần thu hẹp thêm.", en: "No further shrinking is needed." },
-    });
+    snap({ title: { vi: `${distinct()} distinct ≤ ${limit} → hợp lệ`, en: `${distinct()} distinct ≤ ${limit} → valid` }, line: 8, right, activeValue: value, note: { vi: "Cửa sổ thỏa giới hạn distinct.", en: "The window satisfies the distinct limit." } });
     const length = right - left + 1;
     const oldAns = ans;
-    if (length > ans) {
-      ans = length;
-      bestLeft = left;
-      bestRight = right;
-    }
-    snap({
-      title: { vi: `ans = max(${oldAns}, ${length}) → ${ans}`, en: `ans = max(${oldAns}, ${length}) → ${ans}` },
-      line: 12,
-      right,
-      mark: length > oldAns ? indices(left, right) : [],
-      vars: [{ name: "window length", value: length }, { name: "best window", value: `[${bestLeft}..${bestRight}]` }],
-      note: length > oldAns
-        ? { vi: "Đây là cửa sổ hợp lệ dài nhất mới.", en: "This is the new longest valid window." }
-        : { vi: "Độ dài hiện tại không vượt kỷ lục.", en: "The current length does not beat the record." },
-    });
+    if (length > ans) { ans = length; bestLeft = left; bestRight = right; }
+    snap({ title: { vi: `ans = max(${oldAns}, ${length}) → ${ans}`, en: `ans = max(${oldAns}, ${length}) → ${ans}` }, line: 13, right, activeValue: value, mark: length > oldAns ? indices(left, right) : [], vars: [{ name: "window length", value: length }], note: length > oldAns ? { vi: "Cửa sổ hợp lệ dài nhất mới.", en: "This is the new longest valid window." } : { vi: "Không vượt đáp án hiện tại.", en: "It does not beat the current answer." } });
   }
 
-  snap({
-    title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` },
-    line: 13,
-    right: bestRight,
-    mark: indices(bestLeft, bestRight),
-    final: true,
-    vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }],
-    note: { vi: `Cửa sổ tốt nhất có độ dài ${ans}.`, en: `The best window has length ${ans}.` },
-  });
+  const bestFreq = {};
+  for (let index = bestLeft; index <= bestRight; index++) bestFreq[items[index]] = (bestFreq[items[index]] || 0) + 1;
+  const bestFreqText = Object.keys(bestFreq).length ? `{${Object.entries(bestFreq).map(([value, count]) => `${JSON.stringify(value)}:${count}`).join(", ")}}` : "{}";
+  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 14, right: bestRight, viewLeft: bestLeft, viewFreq: bestFreq, viewFreqText: bestFreqText, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Cửa sổ tốt nhất có độ dài ${ans}.`, en: `The best window has length ${ans}.` } });
   return { original: config.isString ? String(input ?? "") : items, k: limit, answer: ans, steps };
 }
 
@@ -4186,17 +4124,15 @@ function buildSteps1695(input) {
   let bestRight = -1;
   const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
   const seenText = () => `{${[...seen].join(", ")}}`;
-  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => steps.push({
-    title,
-    arr: [...nums],
-    sub: nums.map((_, index) => `[${index}]`),
-    highlight: indices(left, right),
-    mark,
-    final,
-    codeLines: [line],
-    vars: [{ name: "left", value: left }, { name: "right", value: right >= 0 ? right : "-" }, { name: "seen", value: seenText() }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
-    note,
-  });
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note, activeValue, overLimit = false, viewLeft = left, viewFreq }) => {
+    const window = indices(viewLeft, right);
+    steps.push({
+      title, arr: [...nums], sub: nums.map((_, index) => `[${index}]`), highlight: window, mark, final, codeLines: [line],
+      vars: [{ name: "left", value: viewLeft }, { name: "right", value: right >= 0 ? right : "-" }, { name: "seen", value: seenText() }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
+      note,
+      slidingFreqView: { nums: [...nums], label: "nums", left: viewLeft, right, window, best: bestRight >= bestLeft ? indices(bestLeft, bestRight) : [], freq: viewFreq || Object.fromEntries([...seen].map((value) => [value, 1])), k: Math.max(1, right - viewLeft + 1), mode: "distinct", activeValue, overLimit, ans, done: final },
+    });
+  };
 
   snap({ title: { vi: "seen = set()", en: "seen = set()" }, line: 3, note: { vi: "seen giữ các giá trị không lặp trong cửa sổ.", en: "seen stores the window's non-repeating values." } });
   snap({ title: { vi: "left = 0", en: "left = 0" }, line: 4, note: { vi: "Khởi tạo biên trái.", en: "Initialize the left boundary." } });
@@ -4224,7 +4160,9 @@ function buildSteps1695(input) {
     if (windowSum > ans) { ans = windowSum; bestLeft = left; bestRight = right; }
     snap({ title: { vi: `ans = max(${oldAns}, ${windowSum}) → ${ans}`, en: `ans = max(${oldAns}, ${windowSum}) → ${ans}` }, line: 14, right, mark: windowSum > oldAns ? indices(left, right) : [], note: { vi: "Cập nhật tổng lớn nhất bằng tổng cửa sổ hợp lệ.", en: "Update the maximum with the valid window sum." } });
   }
-  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 15, right: bestRight, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Unique subarray tốt nhất có tổng ${ans}.`, en: `The best unique subarray has sum ${ans}.` } });
+  const bestFreq = {};
+  for (let index = bestLeft; index <= bestRight; index++) bestFreq[nums[index]] = (bestFreq[nums[index]] || 0) + 1;
+  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 15, right: bestRight, viewLeft: bestLeft, viewFreq: bestFreq, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Unique subarray tốt nhất có tổng ${ans}.`, en: `The best unique subarray has sum ${ans}.` } });
   return { original: nums, answer: ans, steps };
 }
 
@@ -4242,21 +4180,17 @@ function buildSteps2461(input, params) {
   let bestRight = -1;
   const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
   const freqText = () => {
-    const entries = [...freq.entries()].filter(([, count]) => count > 0);
+    const entries = [...freq.entries()];
     return entries.length ? `{${entries.map(([value, count]) => `${value}:${count}`).join(", ")}}` : "{}";
   };
-  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => {
-    const left = right < 0 ? 0 : Math.max(0, right - k + 1);
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note, activeValue, overLimit = false, viewLeft, viewFreq, viewFreqText }) => {
+    const left = viewLeft ?? (right < 0 ? 0 : Math.max(0, right - k + 1));
+    const window = indices(left, right);
     steps.push({
-      title,
-      arr: [...nums],
-      sub: nums.map((_, index) => `[${index}]`),
-      highlight: indices(left, right),
-      mark,
-      final,
-      codeLines: [line],
-      vars: [{ name: "k", value: k }, { name: "left", value: right < 0 ? "-" : left }, { name: "right", value: right >= 0 ? right : "-" }, { name: "freq", value: freqText() }, { name: "distinct", value: freq.size }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
+      title, arr: [...nums], sub: nums.map((_, index) => `[${index}]`), highlight: window, mark, final, codeLines: [line],
+      vars: [{ name: "k", value: k }, { name: "left", value: right < 0 ? "-" : left }, { name: "right", value: right >= 0 ? right : "-" }, { name: "freq", value: viewFreqText || freqText() }, { name: "distinct", value: [...freq.values()].filter((count) => count > 0).length }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
       note,
+      slidingFreqView: { nums: [...nums], label: "nums", left, right, window, best: bestRight >= bestLeft ? indices(bestLeft, bestRight) : [], freq: viewFreq || Object.fromEntries(freq), k, mode: "distinct", activeValue, overLimit, ans, done: final },
     });
   };
 
@@ -4297,7 +4231,10 @@ function buildSteps2461(input, params) {
       snap({ title: { vi: `ans = max(${oldAns}, ${windowSum}) → ${ans}`, en: `ans = max(${oldAns}, ${windowSum}) → ${ans}` }, line: 17, right, mark: windowSum > oldAns ? indices(left, right) : [], note: { vi: "So sánh tổng của cửa sổ distinct hợp lệ với kỷ lục.", en: "Compare the valid distinct-window sum with the record." } });
     }
   }
-  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 18, right: bestRight, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Tổng lớn nhất của subarray dài ${k} với các phần tử distinct là ${ans}.`, en: `The largest sum of a length-${k} subarray with distinct values is ${ans}.` } });
+  const bestFreq = {};
+  for (let index = bestLeft; index <= bestRight; index++) bestFreq[nums[index]] = (bestFreq[nums[index]] || 0) + 1;
+  const bestFreqText = Object.keys(bestFreq).length ? `{${Object.entries(bestFreq).map(([value, count]) => `${value}:${count}`).join(", ")}}` : "{}";
+  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 18, right: bestRight, viewLeft: bestLeft, viewFreq: bestFreq, viewFreqText: bestFreqText, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Tổng lớn nhất của subarray dài ${k} với các phần tử distinct là ${ans}.`, en: `The largest sum of a length-${k} subarray with distinct values is ${ans}.` } });
   return { original: nums, k, answer: ans, steps };
 }
 
