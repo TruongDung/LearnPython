@@ -452,6 +452,100 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "sliding") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion sliding-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🪟</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "17 pattern Sliding Window · lộ trình phỏng vấn" : "17 Sliding Window patterns · interview roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const patterns = [
+          { name: "1. Fixed Size", problems: [[643, "Maximum Average Subarray I"], [1343, "Number of Sub-arrays of Size K and Average ≥ Threshold"], [1456, "Maximum Number of Vowels in a Substring of Given Length"], [2461, "Maximum Sum of Distinct Subarrays With Length K"], [1423, "Maximum Points You Can Obtain from Cards"], [1052, "Grumpy Bookstore Owner"], [567, "Permutation in String"], [438, "Find All Anagrams in a String"]] },
+          { name: "2. Longest Valid Window", problems: [[3, "Longest Substring Without Repeating Characters"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [1493, "Longest Subarray of 1's After Deleting One Element"], [2024, "Maximize the Confusion of an Exam"], [2958, "Length of Longest Subarray With at Most K Frequency"], [1208, "Get Equal Substrings Within Budget"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"]] },
+          { name: "3. Shortest Valid Window", problems: [[76, "Minimum Window Substring"], [209, "Minimum Size Subarray Sum"], [1234, "Replace the Substring for Balanced String"], [632, "Smallest Range Covering Elements from K Lists"]] },
+          { name: "4. Frequency / Character Counting", problems: [[3, "Longest Substring Without Repeating Characters"], [76, "Minimum Window Substring"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [438, "Find All Anagrams in a String"], [567, "Permutation in String"], [904, "Fruit Into Baskets"], [992, "Subarrays with K Different Integers"], [1358, "Number of Substrings Containing All Three Characters"], [2958, "Length of Longest Subarray With at Most K Frequency"]] },
+          { name: "5. At Most K", problems: [[159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [2024, "Maximize the Confusion of an Exam"], [2958, "Length of Longest Subarray With at Most K Frequency"], [992, "Subarrays with K Different Integers"]] },
+          { name: "6. Exactly K / Exactly Condition", problems: [[992, "Subarrays with K Different Integers"], [930, "Binary Subarrays With Sum"], [1248, "Count Number of Nice Subarrays"], [1358, "Number of Substrings Containing All Three Characters"]] },
+          { name: "7. Anagram / Permutation", problems: [[438, "Find All Anagrams in a String"], [567, "Permutation in String"], [76, "Minimum Window Substring"], [30, "Substring with Concatenation of All Words"]] },
+          { name: "8. Monotonic Deque", problems: [[239, "Sliding Window Maximum"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"], [862, "Shortest Subarray with Sum at Least K"], [1696, "Jump Game VI"], [2762, "Continuous Subarrays"]] },
+          { name: "9. Prefix Sum + Sliding Window", problems: [[209, "Minimum Size Subarray Sum"], [862, "Shortest Subarray with Sum at Least K"], [930, "Binary Subarrays With Sum"], [1248, "Count Number of Nice Subarrays"], [1703, "Minimum Adjacent Swaps for K Consecutive Ones"]] },
+          { name: "10. Sliding Window + Heap", problems: [[480, "Sliding Window Median"], [632, "Smallest Range Covering Elements from K Lists"]] },
+          { name: "11. Sliding Window + Two Deques", problems: [[1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"]] },
+          { name: "12. Sliding Window + Sort", problems: [[1838, "Frequency of the Most Frequent Element"], [2302, "Count Subarrays With Score Less Than K"]] },
+          { name: "13. Sliding Window + Binary Search", problems: [[1838, "Frequency of the Most Frequent Element"], [2513, "Minimize the Maximum of Two Arrays"]] },
+          { name: "14. Complement Window", problems: [[1423, "Maximum Points You Can Obtain from Cards"], [1658, "Minimum Operations to Reduce X to Zero"], [2516, "Take K of Each Character From Left and Right"]] },
+          { name: "15. String Sliding Window", problems: [[3, "Longest Substring Without Repeating Characters"], [30, "Substring with Concatenation of All Words"], [76, "Minimum Window Substring"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [438, "Find All Anagrams in a String"], [567, "Permutation in String"], [1208, "Get Equal Substrings Within Budget"], [1234, "Replace the Substring for Balanced String"], [1358, "Number of Substrings Containing All Three Characters"], [2024, "Maximize the Confusion of an Exam"]] },
+          { name: "16. Array Sliding Window", problems: [[209, "Minimum Size Subarray Sum"], [643, "Maximum Average Subarray I"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [1052, "Grumpy Bookstore Owner"], [1423, "Maximum Points You Can Obtain from Cards"], [1493, "Longest Subarray of 1's After Deleting One Element"], [1658, "Minimum Operations to Reduce X to Zero"], [1838, "Frequency of the Most Frequent Element"], [2461, "Maximum Sum of Distinct Subarrays With Length K"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
+          { name: "17. Advanced Sliding Window", problems: [[30, "Substring with Concatenation of All Words"], [76, "Minimum Window Substring"], [239, "Sliding Window Maximum"], [480, "Sliding Window Median"], [632, "Smallest Range Covering Elements from K Lists"], [862, "Shortest Subarray with Sum at Least K"], [992, "Subarrays with K Different Integers"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"], [1703, "Minimum Adjacent Swaps for K Consecutive Ones"], [1838, "Frequency of the Most Frequent Element"], [2302, "Count Subarrays With Score Less Than K"], [2444, "Count Subarrays With Fixed Bounds"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
+        ];
+        const sequence = [3, 209, 567, 438, 424, 904, 1004, 76, 239, 992, 1438, 862];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-sliding-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`;
+        const roadmapItem = (id) => supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-sliding-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`;
+        const patternCards = patterns.map((pattern, index) => `<details class="sliding-pattern-card" open><summary><span>${String(index + 1).padStart(2, "0")}</span><strong>${pattern.name.replace(/^\d+\.\s*/, "")}</strong><small>${pattern.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${pattern.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "SLIDING WINDOW LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "17 pattern Sliding Window cần nhớ" : "17 Sliding Window patterns to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Nhận diện loại cửa sổ trước: fixed, longest, shortest, frequency, deque hoặc kỹ thuật kết hợp."
+          : "Identify the window type first: fixed, longest, shortest, frequency, deque, or a combined technique.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Sliding Window" : "Close Sliding Window learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section sliding-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "17 nhóm bài cốt lõi" : "17 core problem groups"}</h3><p>${vi ? "Bấm tiêu đề để thu gọn; bài chưa có visualization được đánh dấu riêng." : "Select a heading to collapse it; unavailable visualizations are marked separately."}</p></div></div>
+            <div class="sliding-pattern-grid">${patternCards}</div>
+          </section>
+          <section class="trie-roadmap sliding-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Đi từ cửa sổ cơ bản đến frequency, deque và bài shortest nâng cao." : "Progress from basic windows to frequency, deque, and advanced shortest-window problems."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-sliding-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.slidingProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");

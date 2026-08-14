@@ -32183,3 +32183,37 @@ html, body {
 [data-theme="light"] .trie-problem-row:focus-visible { background: #e0f2fe; }
 [data-theme="light"] .trie-problem-row span { color: #0369a1; }
 [data-theme="light"] .trie-problem-row b { color: #1e293b; }
+
+/* Sliding Window category · Learning Map */
+.sliding-learn-suggestion {
+  border-color: rgba(16, 185, 129, .42);
+  background: linear-gradient(120deg, rgba(16, 185, 129, .13), rgba(14, 165, 233, .1));
+}
+.sliding-learn-suggestion:hover { border-color: #10b981; box-shadow: 0 8px 24px rgba(16, 185, 129, .14); }
+.sliding-learn-suggestion .trie-learn-suggestion-icon { background: rgba(16, 185, 129, .15); }
+.sliding-pattern-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.sliding-pattern-card { min-width: 0; overflow: hidden; border: 1px solid #334155; border-radius: 11px; background: rgba(30, 41, 59, .64); }
+.sliding-pattern-card summary { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 11px; cursor: pointer; list-style: none; -webkit-user-select: none; user-select: none; }
+.sliding-pattern-card summary::-webkit-details-marker { display: none; }
+.sliding-pattern-card summary::after { content: "▸"; grid-column: 3; grid-row: 1; color: #94a3b8; font-size: 10px; transition: transform .15s; }
+.sliding-pattern-card[open] summary::after { transform: rotate(90deg); }
+.sliding-pattern-card summary > span { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid rgba(16, 185, 129, .45); border-radius: 7px; color: #6ee7b7; font: 750 9px Consolas, monospace; }
+.sliding-pattern-card summary > strong { color: #d1fae5; font-size: 11px; overflow-wrap: anywhere; }
+.sliding-pattern-card summary > small { grid-column: 3; grid-row: 2; color: #64748b; font-size: 8px; text-align: right; }
+.sliding-pattern-card ul { display: grid; gap: 0; margin: 0; padding: 4px 10px 9px; border-top: 1px solid rgba(148, 163, 184, .1); list-style: none; }
+.sliding-pattern-card li { display: block; border-bottom: 1px solid rgba(148, 163, 184, .08); }
+.sliding-pattern-card li:last-child { border-bottom: 0; }
+.trie-problem-row.unavailable, .trie-problem-link.unavailable { cursor: not-allowed; opacity: .5; }
+.trie-problem-row.unavailable:hover { background: transparent; }
+.trie-problem-row b em { display: block; margin-top: 2px; color: #94a3b8; font-size: 8px; font-style: normal; font-weight: 500; }
+.sliding-roadmap { margin-top: 20px; border-color: rgba(16, 185, 129, .38); background: linear-gradient(120deg, rgba(16, 185, 129, .09), rgba(14, 165, 233, .07)); }
+[data-theme="light"] .sliding-learn-suggestion { border-color: #6ee7b7; background: linear-gradient(120deg, #ecfdf5, #ecfeff); }
+[data-theme="light"] .sliding-pattern-card { border-color: #dbe3ee; background: #fff; }
+[data-theme="light"] .sliding-pattern-card summary { background: #f8fafc; }
+[data-theme="light"] .sliding-pattern-card summary > span { border-color: #34d399; background: #ecfdf5; color: #047857; }
+[data-theme="light"] .sliding-pattern-card summary > strong { color: #065f46; }
+[data-theme="light"] .sliding-pattern-card ul { border-top-color: #e2e8f0; }
+[data-theme="light"] .sliding-pattern-card li { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .trie-problem-row b em { color: #64748b; }
+[data-theme="light"] .sliding-roadmap { border-color: #a7f3d0; background: linear-gradient(120deg, #ecfdf5, #ecfeff); }
+@media (max-width: 700px) { .sliding-pattern-grid { grid-template-columns: 1fr; } }

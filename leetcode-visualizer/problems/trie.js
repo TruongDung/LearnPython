@@ -4433,6 +4433,16 @@ module.exports = {
     inputLabel: { vi: "Các từ chèn (cách nhau bởi dấu phẩy)", en: "Words to insert (comma separated)" },
     extraParams: [
       {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách cài đặt Trie", en: "Trie implementation" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1 · class TrieNode", en: "Approach 1 · TrieNode class" } },
+          { value: 2, label: { vi: "Cách 2 · Nested dictionary + '$'", en: "Approach 2 · Nested dictionary + '$'" } },
+        ],
+      },
+      {
         key: "search",
         type: "string",
         label: { vi: "search(word)", en: "search(word)" },
@@ -4445,14 +4455,29 @@ module.exports = {
         default: "appl",
       },
     ],
+    approach: [
+      {
+        vi: "Cách 1 dùng class TrieNode với children và is_word; Cách 2 dùng mỗi dictionary con như một Trie node.",
+        en: "Approach 1 uses TrieNode with children and is_word; Approach 2 uses each nested dictionary as a Trie node.",
+      },
+      {
+        vi: "Trong Cách 2, node['$'] = True đánh dấu một từ hoàn chỉnh kết thúc tại dictionary hiện tại.",
+        en: "In Approach 2, node['$'] = True marks a complete word ending at the current dictionary.",
+      },
+      {
+        vi: "search phải kiểm tra '$' sau khi đi hết word; startsWith chỉ cần đi hết prefix nên không cần '$'.",
+        en: "search must check '$' after consuming the word; startsWith only needs to consume the prefix and does not require '$'.",
+      },
+    ],
     complexity: {
       time: "O(L)",
       space: "O(N·L)",
       note: {
-        vi: "Mỗi thao tác (insert/search/startsWith) duyệt qua tối đa L ký tự nên O(L). Bộ nhớ tối đa O(N·L) với N từ, mỗi từ dài tối đa L.",
-        en: "Each operation (insert/search/startsWith) walks at most L characters, so O(L). Memory is at most O(N·L) for N words of length up to L.",
+        vi: "Hai cách chỉ khác cách biểu diễn node. Mỗi thao tác duyệt tối đa L ký tự nên O(L); Trie chứa tối đa O(N·L) ký tự.",
+        en: "The approaches differ only in node representation. Each operation walks at most L characters, so O(L); the Trie stores at most O(N·L) characters.",
       },
     },
+    codeLabel: { vi: "Cách 1 · class TrieNode", en: "Approach 1 · TrieNode class" },
     code: [
       "class TrieNode:",
       "    def __init__(self):",
@@ -4487,7 +4512,275 @@ module.exports = {
       "            node = node.children[ch]",
       "        return True",
     ],
+    code2Label: { vi: "Cách 2 · Nested dictionary + '$'", en: "Approach 2 · Nested dictionary + '$'" },
+    code2: [
+      "class Trie:",
+      "    def __init__(self):",
+      "        self.root = {}",
+      "",
+      "    def insert(self, word: str) -> None:",
+      "        node = self.root",
+      "        for ch in word:",
+      "            node = node.setdefault(ch, {})",
+      "        node['$'] = True",
+      "",
+      "    def search(self, word: str) -> bool:",
+      "        node = self.root",
+      "        for ch in word:",
+      "            if ch not in node:",
+      "                return False",
+      "            node = node[ch]",
+      "        return '$' in node",
+      "",
+      "    def startsWith(self, prefix: str) -> bool:",
+      "        node = self.root",
+      "        for ch in prefix:",
+      "            if ch not in node:",
+      "                return False",
+      "            node = node[ch]",
+      "        return True",
+    ],
     builder: buildSteps208,
+    builder2(input, params = {}) {
+      const words = String(input).split(",").map((word) => word.trim()).filter(Boolean);
+      const searchWord = String(params.search || "").trim();
+      const prefixWord = String(params.prefix || "").trim();
+      const trie = {};
+      const steps = [];
+      const ROOT_KEY = "root";
+      const owns = (node, key) => Object.prototype.hasOwnProperty.call(node, key);
+      const nodeKey = (prefix) => prefix || ROOT_KEY;
+      const terminalKey = (prefix) => `${prefix}$`;
+
+      function treeSnapshot(activeKeys = [], annotation) {
+        const nodes = [];
+        const annotations = {};
+        const active = new Set(activeKeys);
+        let leafX = 0;
+
+        function layout(node, prefix, label, parentId, depth) {
+          const id = nodeKey(prefix);
+          const childXs = [];
+          const chars = Object.keys(node).filter((key) => key !== "$").sort();
+          for (const ch of chars) {
+            childXs.push(layout(node[ch], prefix + ch, ch, id, depth + 1));
+          }
+          if (owns(node, "$")) {
+            const markerId = terminalKey(prefix);
+            const markerX = leafX++;
+            childXs.push(markerX);
+            nodes.push({
+              id: markerId,
+              label: "$",
+              x: markerX,
+              y: depth + 1,
+              parentId: id,
+              isWord: true,
+              hl: active.has(markerId),
+            });
+          }
+          const x = childXs.length
+            ? (childXs[0] + childXs[childXs.length - 1]) / 2
+            : leafX++;
+          nodes.push({
+            id,
+            label: prefix ? label : "•",
+            x,
+            y: depth,
+            parentId,
+            isWord: false,
+            hl: active.has(id),
+          });
+          return x;
+        }
+
+        layout(trie, "", "•", null, 0);
+        if (annotation && nodes.some((node) => node.id === annotation.id)) {
+          annotations[annotation.id] = { label: annotation.label, kind: annotation.kind || "current" };
+        }
+        return { nodes, annotations, showLevels: false };
+      }
+
+      function snapshot(options) {
+        steps.push({
+          title: options.title,
+          arr: [],
+          tree: treeSnapshot(options.activeKeys || [ROOT_KEY], options.annotation),
+          highlight: [],
+          mark: [],
+          codeBlock: 2,
+          codeLines: options.codeLines || [],
+          vars: options.vars || [],
+          note: options.note,
+          final: Boolean(options.final),
+        });
+      }
+
+      snapshot({
+        title: { vi: "Dòng 2–3 · root = {}", en: "Lines 2–3 · root = {}" },
+        codeLines: [2, 3],
+        activeKeys: [ROOT_KEY],
+        annotation: { id: ROOT_KEY, label: "root = {}" },
+        vars: [{ name: "words", value: `[${words.join(", ")}]` }],
+        note: {
+          vi: "Dictionary rỗng là root của Trie. Mỗi dictionary con sau đó đại diện cho một Trie node.",
+          en: "The empty dictionary is the Trie root. Each nested dictionary will represent one Trie node.",
+        },
+      });
+
+      for (const word of words) {
+        let node = trie;
+        let prefix = "";
+        const path = [ROOT_KEY];
+        for (const ch of word) {
+          const existed = owns(node, ch);
+          if (!existed) node[ch] = {};
+          node = node[ch];
+          prefix += ch;
+          path.push(nodeKey(prefix));
+          snapshot({
+            title: {
+              vi: `Dòng 7–8 · ${existed ? "dùng lại" : "tạo"} key '${ch}' cho "${word}"`,
+              en: `Lines 7–8 · ${existed ? "reuse" : "create"} '${ch}' for "${word}"`,
+            },
+            codeLines: [7, 8],
+            activeKeys: [...path],
+            annotation: { id: nodeKey(prefix), label: existed ? "reuse" : "new {}" },
+            vars: [
+              { name: "operation", value: `insert("${word}")` },
+              { name: "ch", value: ch },
+              { name: "prefix", value: prefix },
+              { name: "created?", value: existed ? "False" : "True" },
+            ],
+            note: {
+              vi: existed
+                ? `setdefault('${ch}', {}) trả về dictionary con đã tồn tại cho prefix "${prefix}".`
+                : `Key '${ch}' chưa có, nên setdefault tạo {} mới cho prefix "${prefix}".`,
+              en: existed
+                ? `setdefault('${ch}', {}) returns the existing child dictionary for prefix "${prefix}".`
+                : `Key '${ch}' is absent, so setdefault creates a new {} for prefix "${prefix}".`,
+            },
+          });
+        }
+        node["$"] = true;
+        const marker = terminalKey(prefix);
+        snapshot({
+          title: { vi: `Dòng 9 · đánh dấu cuối từ "${word}" bằng '$'`, en: `Line 9 · mark "${word}" with '$'` },
+          codeLines: [9],
+          activeKeys: [...path, marker],
+          annotation: { id: marker, label: "True", kind: "answer" },
+          vars: [
+            { name: "operation", value: `insert("${word}")` },
+            { name: "node['$']", value: "True" },
+          ],
+          note: {
+            vi: `Thêm node '$' dưới prefix "${prefix}". Vòng xanh cho biết một từ hoàn chỉnh kết thúc tại đây.`,
+            en: `Add a '$' node below prefix "${prefix}". Its green ring marks the end of a complete word.`,
+          },
+        });
+      }
+
+      function traverse(target, isSearch, operation) {
+        let node = trie;
+        let prefix = "";
+        const path = [ROOT_KEY];
+        const loopLine = isSearch ? 13 : 21;
+        const checkLine = isSearch ? 14 : 22;
+        const falseLine = isSearch ? 15 : 23;
+        const moveLine = isSearch ? 16 : 24;
+
+        for (const ch of target) {
+          if (!owns(node, ch)) {
+            snapshot({
+              title: { vi: `${operation} · thiếu key '${ch}'`, en: `${operation} · missing key '${ch}'` },
+              codeLines: [loopLine, checkLine, falseLine],
+              activeKeys: [...path],
+              annotation: { id: nodeKey(prefix), label: `no '${ch}'`, kind: "pruned" },
+              vars: [
+                { name: "operation", value: operation },
+                { name: "ch", value: ch },
+                { name: "result", value: "False" },
+              ],
+              note: {
+                vi: `Dictionary của prefix "${prefix}" không có key '${ch}', nên trả về False ngay.`,
+                en: `The dictionary for prefix "${prefix}" has no '${ch}' key, so return False immediately.`,
+              },
+            });
+            return false;
+          }
+          node = node[ch];
+          prefix += ch;
+          path.push(nodeKey(prefix));
+          snapshot({
+            title: { vi: `${operation} · đi qua '${ch}'`, en: `${operation} · follow '${ch}'` },
+            codeLines: [loopLine, checkLine, moveLine],
+            activeKeys: [...path],
+            annotation: { id: nodeKey(prefix), label: `prefix: ${prefix}` },
+            vars: [
+              { name: "operation", value: operation },
+              { name: "ch", value: ch },
+              { name: "prefix", value: prefix },
+            ],
+            note: {
+              vi: `Key '${ch}' tồn tại, nên node đi xuống dictionary con của prefix "${prefix}".`,
+              en: `Key '${ch}' exists, so node descends into the child dictionary for prefix "${prefix}".`,
+            },
+          });
+        }
+
+        const result = isSearch ? owns(node, "$") : true;
+        const marker = terminalKey(prefix);
+        snapshot({
+          title: {
+            vi: isSearch
+              ? `${operation} · '$' ${result ? "tồn tại" : "không tồn tại"}`
+              : `${operation} · đã đi hết prefix`,
+            en: isSearch
+              ? `${operation} · '$' ${result ? "exists" : "is absent"}`
+              : `${operation} · prefix consumed`,
+          },
+          codeLines: [isSearch ? 17 : 25],
+          activeKeys: isSearch && result ? [...path, marker] : [...path],
+          annotation: {
+            id: isSearch && result ? marker : nodeKey(prefix),
+            label: result ? "True" : "False",
+            kind: result ? "answer" : "pruned",
+          },
+          vars: [
+            { name: "operation", value: operation },
+            ...(isSearch ? [{ name: "'$' in node", value: result ? "True" : "False" }] : []),
+            { name: "result", value: result ? "True" : "False" },
+          ],
+          note: isSearch
+            ? {
+                vi: result
+                  ? `Đã đi hết "${target}" và dictionary hiện tại có '$' → đây là một từ hoàn chỉnh.`
+                  : `Đã đi hết "${target}" nhưng không có '$' → chỉ là prefix, chưa phải từ hoàn chỉnh.`,
+                en: result
+                  ? `Consumed "${target}" and the current dictionary has '$' → it is a complete word.`
+                  : `Consumed "${target}" but there is no '$' → it is only a prefix, not a complete word.`,
+              }
+            : {
+                vi: `Đã đi hết prefix "${target}" nên trả về True; không cần kiểm tra '$'.`,
+                en: `The whole prefix "${target}" was consumed, so return True; '$' is not checked.`,
+              },
+        });
+        return result;
+      }
+
+      const summary = [];
+      if (searchWord) {
+        const result = traverse(searchWord, true, `search("${searchWord}")`);
+        summary.push(`search("${searchWord}") = ${result}`);
+      }
+      if (prefixWord) {
+        const result = traverse(prefixWord, false, `startsWith("${prefixWord}")`);
+        summary.push(`startsWith("${prefixWord}") = ${result}`);
+      }
+      if (steps.length) steps[steps.length - 1].final = true;
+      const answer = summary.length ? summary.join("  |  ") : `inserted ${words.length} word(s)`;
+      return { words, answer, steps };
+    },
   },
   1804: {
     id: 1804,
