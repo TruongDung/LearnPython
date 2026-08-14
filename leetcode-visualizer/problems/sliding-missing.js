@@ -265,6 +265,18 @@ module.exports = {
           ]),
           { name: "answers so far", value: answerTable() },
         ],
+        occurrenceLookupView: {
+          nums: [...nums],
+          x,
+          positions: [...positions],
+          queries: [...queries],
+          answer: [...answer],
+          phase: extra.phase || "1. Build positions",
+          currentIndex: Number.isInteger(currentIndex) ? currentIndex : -1,
+          queryIndex: Number.isInteger(queryIndex) ? queryIndex : -1,
+          lookup: extra.lookup || "",
+          final: Boolean(extra.final),
+        },
         note,
       });
     };

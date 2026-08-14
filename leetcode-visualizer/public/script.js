@@ -8018,6 +8018,65 @@ function renderPalindromeBuildView(step) {
 }
 
 // ---- Duplicate zeros visualization (LeetCode 1089) ----
+function renderOccurrenceLookupView(step) {
+  const view = step.occurrenceLookupView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const positions = Array.isArray(view.positions) ? view.positions : [];
+  const queries = Array.isArray(view.queries) ? view.queries : [];
+  const answer = Array.isArray(view.answer) ? view.answer : [];
+  const x = view.x;
+  const currentIndex = Number.isInteger(view.currentIndex) ? view.currentIndex : -1;
+  const queryIndex = Number.isInteger(view.queryIndex) ? view.queryIndex : -1;
+  const vi = lang === "vi";
+  const phase = view.final ? (vi ? "Hoàn tất" : "Complete") : queryIndex >= 0 ? (vi ? "Pha 2 · Tra query" : "Phase 2 · Query lookup") : (vi ? "Pha 1 · Quét nums" : "Phase 1 · Scan nums");
+  const currentQuery = queryIndex >= 0 ? queries[queryIndex] : null;
+  const hasAnswer = queryIndex >= 0 && queryIndex < answer.length;
+  const currentAnswer = hasAnswer ? answer[queryIndex] : null;
+  const formula = currentQuery === null
+    ? (vi ? "Mỗi lần gặp x, lưu index vào positions theo đúng thứ tự." : "Whenever x appears, store its index in positions in encounter order.")
+    : currentAnswer === null
+      ? `q = ${currentQuery} → positions[${currentQuery - 1}] → ?`
+      : currentAnswer === -1
+        ? `q = ${currentQuery} → positions[${currentQuery - 1}] → ${vi ? "không tồn tại" : "missing"} → -1`
+        : `q = ${currentQuery} → positions[${currentQuery - 1}] = ${currentAnswer}`;
+
+  const numsHtml = nums.map((value, index) => {
+    const occurrence = positions.indexOf(index) + 1;
+    const isCurrent = index === currentIndex;
+    const isTarget = value === x;
+    return `<div class="ol-num${isCurrent ? " current" : ""}${isTarget ? " target" : ""}${occurrence ? " found" : ""}">
+      ${isCurrent ? `<b class="ol-pointer">${vi ? "đang xét" : "scan"}</b>` : ""}
+      <small>index ${index}</small><strong>${escapeHtml(String(value))}</strong>
+      <em>${occurrence ? `${vi ? "lần" : "occ"} #${occurrence}` : isTarget ? (vi ? "x" : "target") : ""}</em>
+    </div>`;
+  }).join("");
+
+  const mapHtml = positions.length ? positions.map((index, occurrence) => {
+    const active = currentQuery === occurrence + 1 || currentIndex === index;
+    return `<div class="ol-map${active ? " active" : ""}"><b>#${occurrence + 1}</b><span>→</span><strong>index ${index}</strong><small>nums[${index}] = ${escapeHtml(String(nums[index]))}</small></div>`;
+  }).join("") : `<p class="ol-empty">${vi ? "Chưa tìm thấy x nào." : "No occurrences of x yet."}</p>`;
+
+  const queryHtml = queries.map((query, index) => {
+    const isCurrent = index === queryIndex;
+    const completed = index < answer.length;
+    const result = completed ? answer[index] : "?";
+    const missing = completed && result === -1;
+    const ordinal = vi ? `lần #${query}` : `occurrence ${query}`;
+    return `<div class="ol-query${isCurrent ? " current" : ""}${completed ? " done" : ""}${missing ? " missing" : ""}"><small>q${index + 1}</small><b>${ordinal}</b><span>${completed ? `→ ${escapeHtml(String(result))}` : "→ ?"}</span></div>`;
+  }).join("");
+
+  const summary = vi
+    ? `Target x = ${x}. Positions lưu index của các lần xuất hiện; query q đọc positions[q−1].`
+    : `Target x = ${x}. Positions stores occurrence indices; query q reads positions[q−1].`;
+  $("treeView").innerHTML = `<div class="occurrence-lookup-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <header><span class="ol-phase">${escapeHtml(phase)}</span><strong>x = ${escapeHtml(String(x))}</strong></header>
+    <section><h4>${vi ? "1. Quét nums — các ô x được giữ lại" : "1. Scan nums — keep target cells"}</h4><div class="ol-nums">${numsHtml}</div></section>
+    <div class="ol-flow">${vi ? "gặp x → lưu index theo thứ tự" : "find x → save its index in order"}</div>
+    <section><h4>${vi ? "2. Bảng positions: lần xuất hiện → index" : "2. positions table: occurrence → index"}</h4><div class="ol-maps">${mapHtml}</div></section>
+    <section><h4>${vi ? "3. Queries: q → positions[q − 1]" : "3. Queries: q → positions[q − 1]"}</h4><div class="ol-queries">${queryHtml}</div><div class="ol-formula">${escapeHtml(formula)}</div></section>
+  </div>`;
+}
+
 function renderDuplicateZerosView(step) {
   const view = step.duplicateZerosView || {};
   const source = Array.isArray(view.source) ? view.source : [];
@@ -13826,6 +13885,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderPalindromeBuildView(step);
+  } else if (step.occurrenceLookupView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderOccurrenceLookupView(step);
   } else if (step.duplicateZerosView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
