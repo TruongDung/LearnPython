@@ -338,6 +338,102 @@ function renderCatalog() {
       itemsEl.appendChild(guideBox);
     }
 
+    if (group.key === "trie") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🧭</span><span><strong>${lang === "vi" ? "Learn Suggestion" : "Learn Suggestion"}</strong><small>${lang === "vi" ? "8 loại Trie · 3 level · lộ trình phỏng vấn" : "8 Trie patterns · 3 levels · interview roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const patterns = [
+          { name: "Prefix Trie", note: vi ? "Prefix cơ bản · thay root · gợi ý tìm kiếm" : "Basic prefixes · root replacement · search suggestions", ids: [208, 648, 1268] },
+          { name: "String Trie", note: vi ? "Wildcard · từ điển · ghép nhiều từ" : "Wildcards · dictionaries · combined words", ids: [211, 676, 472] },
+          { name: "Binary Trie", note: vi ? "Bit 0/1 · Maximum XOR" : "Bits 0/1 · Maximum XOR", ids: [421, 1707, 1938, 2935] },
+          { name: "Trie + Backtracking", note: vi ? "DFS trên board · sinh hình vuông từ" : "Board DFS · build word squares", ids: [212, 425] },
+          { name: "Reverse Trie", note: vi ? "Đọc chuỗi ngược · palindrome" : "Read strings backward · palindromes", ids: [1032, 336] },
+          { name: "Prefix + Suffix", note: vi ? "Kết hợp tiền tố và hậu tố" : "Combine prefixes and suffixes", ids: [745, 3042, 3045] },
+          { name: "Counting / Aggregate", note: vi ? "Đếm prefix · cộng giá trị theo prefix" : "Count prefixes · aggregate values", ids: [677, 1804] },
+          { name: "Complete Prefix", note: vi ? "Mọi prefix đều phải tồn tại" : "Every prefix must exist", ids: [720, 1858, 3043] },
+        ];
+        const levels = [
+          {
+            tone: "green",
+            icon: "🟢",
+            title: vi ? "Level 1 — Phải biết" : "Level 1 — Must know",
+            problems: [
+              [208, "Implement Trie"], [211, "Design Add and Search Words"], [648, "Replace Words"],
+              [677, "Map Sum Pairs"], [720, "Longest Word"], [1268, "Search Suggestions"], [1804, "Implement Trie II"],
+            ],
+          },
+          {
+            tone: "yellow",
+            icon: "🟡",
+            title: vi ? "Level 2 — Muốn giỏi Trie" : "Level 2 — Become strong at Trie",
+            problems: [
+              [212, "Word Search II"], [421, "Maximum XOR"], [676, "Magic Dictionary"],
+              [745, "Prefix and Suffix Search"], [1032, "Stream of Characters"],
+              [1858, "Longest Word With All Prefixes"], [3043, "Longest Common Prefix"],
+            ],
+          },
+          {
+            tone: "red",
+            icon: "🔴",
+            title: vi ? "Level 3 — Nâng cao" : "Level 3 — Advanced",
+            problems: [
+              [336, "Palindrome Pairs"], [425, "Word Squares"], [472, "Concatenated Words"],
+              [1707, "Maximum XOR With an Element"], [1938, "Maximum Genetic Difference"],
+              [1948, "Delete Duplicate Folders"], [2935, "Maximum Strong Pair XOR II"],
+              [3045, "Prefix and Suffix Pairs II"],
+            ],
+          },
+        ];
+        const sequence = [208, 211, 648, 677, 720, 1268, 212, 421, 745, 1032, 1707];
+        const patternCards = patterns.map((pattern, index) => `<article class="trie-pattern-card"><span class="trie-pattern-number">${String(index + 1).padStart(2, "0")}</span><h4>${pattern.name}</h4><p>${pattern.note}</p><div>${pattern.ids.map((id) => `<span>#${id}</span>`).join("")}</div></article>`).join("");
+        const levelCards = levels.map((level) => `<article class="trie-level-card ${level.tone}"><h4><span>${level.icon}</span>${level.title}</h4><ul>${level.problems.map(([id, name]) => `<li><span>#${id}</span><b>${name}</b></li>`).join("")}</ul></article>`).join("");
+
+        $("trieLearnEyebrow").textContent = "TRIE LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Bạn chỉ cần nhớ 8 loại Trie" : "The 8 Trie patterns to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Không cần làm hết mọi bài. Hãy nhận diện đúng pattern trước, sau đó học theo level phỏng vấn."
+          : "You do not need to solve everything. Recognize the pattern first, then progress through the interview levels.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình học Trie" : "Close Trie learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "8 loại Trie cốt lõi" : "8 core Trie patterns"}</h3><p>${vi ? "Nhìn dạng bài để chọn đúng biến thể Trie." : "Use the problem shape to select the right Trie variant."}</p></div></div>
+            <div class="trie-pattern-grid">${patternCards}</div>
+          </section>
+          <section class="trie-learn-section">
+            <div class="trie-interview-note">⭐ <strong>${vi ? "Nếu mục tiêu là phỏng vấn:" : "If your goal is interviews:"}</strong> ${vi ? "không cần làm hết — chia thành 3 level." : "do not solve everything — use these 3 levels."}</div>
+            <div class="trie-level-grid">${levelCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>03</span><div><h3>${vi ? "Thứ tự học từ đầu" : "Recommended learning order"}</h3><p>${vi ? "Đi từ thao tác Trie cơ bản đến backtracking và Binary Trie." : "Move from basic Trie operations to backtracking and Binary Trie."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `<span>#${id}</span>${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        closeButton.onclick = () => dialog.close();
+        dialog.onclick = (event) => {
+          if (event.target === dialog) dialog.close();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
