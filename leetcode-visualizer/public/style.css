@@ -32254,3 +32254,34 @@ html, body {
 [data-theme="light"] .trie-problem-row b em { color: #64748b; }
 [data-theme="light"] .sliding-roadmap { border-color: #a7f3d0; background: linear-gradient(120deg, #ecfdf5, #ecfeff); }
 @media (max-width: 700px) { .sliding-pattern-grid { grid-template-columns: 1fr; } }
+
+/* Segment Tree category · Learning Map */
+.segment-learn-suggestion {
+  border-color: rgba(168, 85, 247, .44);
+  background: linear-gradient(120deg, rgba(124, 58, 237, .14), rgba(245, 158, 11, .09));
+}
+.segment-learn-suggestion:hover { border-color: #a855f7; box-shadow: 0 8px 24px rgba(124, 58, 237, .16); }
+.segment-learn-suggestion .trie-learn-suggestion-icon { background: rgba(168, 85, 247, .16); }
+.segment-pattern-card { border-color: rgba(168, 85, 247, .34); background: linear-gradient(145deg, rgba(30, 41, 59, .76), rgba(76, 29, 149, .12)); }
+.segment-pattern-card summary > span { border-color: rgba(192, 132, 252, .48); color: #d8b4fe; font: 15px/1 sans-serif; }
+.segment-pattern-card summary > strong { color: #e9d5ff; }
+.segment-pattern-card .trie-problem-row span { color: #d8b4fe; }
+.segment-pattern-card .trie-problem-row:hover { background: rgba(168, 85, 247, .1); }
+.segment-stars { margin-left: 6px; color: #fbbf24; font: 700 8px/1 Consolas, monospace; letter-spacing: -1px; white-space: nowrap; }
+.segment-roadmap { margin-top: 20px; border-color: rgba(168, 85, 247, .4); background: linear-gradient(120deg, rgba(124, 58, 237, .11), rgba(245, 158, 11, .07)); }
+.segment-roadmap .trie-problem-link { border-color: rgba(192, 132, 252, .4); background: rgba(124, 58, 237, .11); color: #d8b4fe; }
+.segment-roadmap .trie-problem-link:hover,
+.segment-roadmap .trie-problem-link:focus-visible { border-color: #c084fc; background: rgba(168, 85, 247, .22); color: #f3e8ff; }
+[data-theme="light"] .segment-learn-suggestion { border-color: #c4b5fd; background: linear-gradient(120deg, #f5f3ff, #fffbeb); }
+[data-theme="light"] .segment-pattern-card { border-color: #ddd6fe; background: #fff; }
+[data-theme="light"] .segment-pattern-card summary { background: #faf5ff; }
+[data-theme="light"] .segment-pattern-card summary > span { border-color: #a78bfa; background: #f5f3ff; color: #6d28d9; }
+[data-theme="light"] .segment-pattern-card summary > strong { color: #581c87; }
+[data-theme="light"] .segment-pattern-card .trie-problem-row span { color: #6d28d9; }
+[data-theme="light"] .segment-pattern-card .trie-problem-row:hover,
+[data-theme="light"] .segment-pattern-card .trie-problem-row:focus-visible { background: #f5f3ff; }
+[data-theme="light"] .segment-stars { color: #92400e; }
+[data-theme="light"] .segment-roadmap { border-color: #c4b5fd; background: linear-gradient(120deg, #f5f3ff, #fffbeb); }
+[data-theme="light"] .segment-roadmap .trie-problem-link { border-color: #a78bfa; background: #ede9fe; color: #5b21b6; }
+[data-theme="light"] .segment-roadmap .trie-problem-link:hover,
+[data-theme="light"] .segment-roadmap .trie-problem-link:focus-visible { border-color: #7c3aed; background: #ddd6fe; color: #4c1d95; }

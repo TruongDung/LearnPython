@@ -546,6 +546,93 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "segment-tree") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion segment-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🌳</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "7 nhóm Segment Tree · lộ trình từ nền tảng đến DP" : "7 Segment Tree groups · foundation-to-DP roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🟢", name: vi ? "Nền tảng" : "Foundation", problems: [[303, "Range Sum Query - Immutable", 0], [307, "Range Sum Query - Mutable", 5]] },
+          { icon: "🟡", name: vi ? "Cốt lõi" : "Core", problems: [[315, "Count of Smaller Numbers After Self", 5], [673, "Number of Longest Increasing Subsequence", 4], [1649, "Create Sorted Array Through Instructions", 4]] },
+          { icon: "🟡", name: vi ? "Nén tọa độ" : "Coordinate Compression", problems: [[729, "My Calendar I", 0], [731, "My Calendar II", 0], [715, "Range Module", 5]] },
+          { icon: "🔴", name: "Lazy Propagation", problems: [[732, "My Calendar III", 5], [2569, "Handling Sum Queries After Update", 5]] },
+          { icon: "🔴", name: vi ? "Đếm" : "Counting", problems: [[327, "Count of Range Sum", 0], [493, "Reverse Pairs", 0]] },
+          { icon: "🔴", name: "Sweep Line", problems: [[699, "Falling Squares", 0], [850, "Rectangle Area II", 0]] },
+          { icon: "🔴", name: "DP", problems: [[2407, "Longest Increasing Subsequence II", 5]] },
+        ];
+        const sequence = [303, 307, 315, 673, 729, 731, 715, 732, 699, 850, 1649, 2407, 2569, 2926];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name, stars]) => {
+          const rating = stars ? `<small class="segment-stars" aria-label="${stars} stars">${"★".repeat(stars)}</small>` : "";
+          return supportedIds.has(id)
+            ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-segment-problem-id="${id}"><span>#${id}</span><b>${name}${rating}</b></a></li>`
+            : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}${rating}<em>${unavailableText}</em></b></span></li>`;
+        };
+        const roadmapItem = (id) => supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-segment-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`;
+        const groupCards = groups.map((item, index) => `<details class="sliding-pattern-card segment-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "SEGMENT TREE LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "7 nhóm Segment Tree cần nhớ" : "7 Segment Tree groups to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Đi từ range query cơ bản đến nén tọa độ, lazy propagation, counting, sweep line và DP."
+          : "Progress from basic range queries to compression, lazy propagation, counting, sweep line, and DP.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Segment Tree" : "Close Segment Tree learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section segment-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "7 nhóm bài cốt lõi" : "7 core problem groups"}</h3><p>${vi ? "Số sao thể hiện mức độ ưu tiên; bài chưa có visualization được đánh dấu riêng." : "Stars indicate priority; unavailable visualizations are marked separately."}</p></div></div>
+            <div class="sliding-pattern-grid segment-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap segment-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Học range sum trước, sau đó counting, calendar/lazy, sweep line và DP nâng cao." : "Start with range sums, then counting, calendar/lazy, sweep line, and advanced DP."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-segment-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.segmentProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
