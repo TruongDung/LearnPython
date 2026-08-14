@@ -7564,11 +7564,14 @@ function renderSlidingFreqView(step) {
   const vi = lang === "vi";
 
   const cells = nums.map((v, i) => {
-    const names = [];
-    if (i === left) names.push("L");
-    if (i === right) names.push("R");
+    const names = i === left && i === right
+      ? ["L/R"]
+      : [
+        ...(i === left ? ["L"] : []),
+        ...(i === right ? ["R"] : []),
+      ];
     const arrowsHtml = names.map((name) => {
-      const cls = name === "L" ? "tp-ptr-a" : "tp-ptr-b";
+      const cls = name === "R" ? "tp-ptr-b" : "tp-ptr-a";
       return `<div class="tp-pointer-arrow ${cls}"><span class="tp-pointer-name">${name}</span><span class="tp-pointer-caret">\u25BC</span></div>`;
     }).join("");
     const inWindow = windowSet.has(i);
