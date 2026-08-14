@@ -207,3 +207,125 @@ module.exports = {
     632: { id: 632, difficulty: "hard", slug: "smallest-range-covering-elements-from-k-lists", category, tags: hardTags, title: text("Smallest Range Covering Elements from K Lists", "Smallest Range Covering Elements from K Lists"), titleVi: text("Range nhỏ nhất chứa phần tử từ K list", "Smallest Range Covering Elements from K Lists"), statement: text("Tìm range nhỏ nhất chứa ít nhất một số từ mỗi list đã sắp xếp.", "Find the smallest range containing at least one number from every sorted list."), defaultInput: "4,10,15,24,26|0,9,12,20|5,18,22,30", inputKind: "string", inputLabel: text("Các list đã sắp xếp (cách bởi |)", "Sorted lists (pipe separated)"), extraParams: [], complexity: { time: "O(N log K)", space: "O(K)", note: text("Min-heap chứa một phần tử từ mỗi list; chỉ tiến list đang giữ minimum.", "A min-heap holds one item per list; advance only the list holding the minimum.") }, code: ["class Solution:", "    def smallestRange(self, nums):", "        heap = first_item_from_each_list(); current_max = max(heap)", "        best = [-inf, inf]", "        while True:", "            low, row, index = heappop(heap)", "            if current_max-low < best[1]-best[0]: best = [low, current_max]", "            if index + 1 == len(nums[row]): break", "            next_value = nums[row][index+1]; current_max = max(current_max, next_value)", "            heappush(heap, (next_value, row, index+1))", "        return best"], builder: buildSteps632 },
   });
 })();
+
+
+// LeetCode 3159 · collect occurrence positions, then answer one-based occurrence queries.
+(() => {
+  const text = (vi, en) => ({ vi, en });
+
+  function parseQueries(raw) {
+    const queries = String(raw ?? "").split(",").map((value) => Number(value.trim())).filter((value) => Number.isInteger(value));
+    if (!queries.length || queries.some((query) => query < 1)) {
+      throw new Error("queries must be comma-separated positive occurrence numbers");
+    }
+    return queries;
+  }
+
+  function buildSteps3159(input, params = {}) {
+    const nums = Array.isArray(input) ? input.map(Number) : [];
+    const x = Number(params.x ?? 1);
+    const queries = parseQueries(params.queries ?? "1,3,2");
+    if (!nums.length || nums.some((value) => !Number.isFinite(value)) || !Number.isFinite(x)) {
+      throw new Error("nums must be a non-empty numeric array and x must be numeric");
+    }
+
+    const positions = [];
+    const answer = [];
+    const steps = [];
+    const occurrenceLabel = () => positions.length ? `[${positions.join(", ")}]` : "[]";
+    const answerLabel = () => answer.length ? `[${answer.join(", ")}]` : "[]";
+    const snap = (title, line, note, extra = {}) => {
+      const currentIndex = extra.currentIndex;
+      const queryIndex = extra.queryIndex;
+      steps.push({
+        title,
+        arr: [...nums],
+        sub: nums.map((_, index) => `[${index}]`),
+        highlight: currentIndex === undefined ? [] : [currentIndex],
+        mark: extra.mark ?? [...positions],
+        final: Boolean(extra.final),
+        codeLines: [line],
+        vars: [
+          { name: "x", value: x },
+          { name: "positions of x", value: occurrenceLabel() },
+          { name: "queries (1-based)", value: `[${queries.join(", ")}]` },
+          ...(queryIndex === undefined ? [] : [{ name: "current query", value: `queries[${queryIndex}] = ${queries[queryIndex]}` }]),
+          { name: "answer", value: answerLabel() },
+        ],
+        note,
+      });
+    };
+
+    snap(text("Khởi tạo positions = []", "Initialize positions = []"), 3,
+      text("positions sẽ lưu chỉ số 0-based của mọi lần xuất hiện của x.", "positions will store the zero-based index of every occurrence of x."));
+
+    for (let index = 0; index < nums.length; index++) {
+      snap(text(`Xét nums[${index}] = ${nums[index]}`, `Inspect nums[${index}] = ${nums[index]}`), 5,
+        text("Duyệt mảng một lần để xác định các lần xuất hiện của x.", "Scan the array once to locate occurrences of x."), { currentIndex: index });
+      if (nums[index] === x) {
+        positions.push(index);
+        snap(text(`nums[${index}] == x → lưu vị trí ${index}`, `nums[${index}] == x → save position ${index}`), 6,
+          text(`Đây là lần xuất hiện thứ ${positions.length} của x; query ${positions.length} sẽ trả về index ${index}.`, `This is occurrence ${positions.length} of x; query ${positions.length} returns index ${index}.`),
+          { currentIndex: index, mark: [...positions] });
+      }
+    }
+
+    snap(text("Khởi tạo answer = []", "Initialize answer = []"), 7,
+      text("Mỗi query q hỏi vị trí của lần xuất hiện thứ q (q là 1-based).", "Each query q asks for the position of occurrence q (q is one-based)."));
+
+    for (let queryIndex = 0; queryIndex < queries.length; queryIndex++) {
+      const occurrence = queries[queryIndex];
+      snap(text(`Xử lý query ${occurrence}`, `Process query ${occurrence}`), 8,
+        text("Dùng q - 1 vì positions là mảng 0-based.", "Use q - 1 because positions is zero-based."), { queryIndex });
+      const result = occurrence <= positions.length ? positions[occurrence - 1] : -1;
+      answer.push(result);
+      snap(text(`answer.append(${result})`, `answer.append(${result})`), 9,
+        result === -1
+          ? text(`Chỉ có ${positions.length} lần xuất hiện, nên query ${occurrence} không tồn tại → -1.`, `Only ${positions.length} occurrences exist, so query ${occurrence} is unavailable → -1.`)
+          : text(`positions[${occurrence - 1}] = ${result}, nên đây là đáp án cho query ${occurrence}.`, `positions[${occurrence - 1}] = ${result}, so this is the answer for query ${occurrence}.`),
+        { queryIndex, mark: result === -1 ? [...positions] : [result] });
+    }
+
+    snap(text(`return [${answer.join(", ")}]`, `return [${answer.join(", ")}]`), 10,
+      text("Tất cả query đã được trả lời bằng lookup O(1) trong positions.", "Every query has been answered by an O(1) lookup in positions."), { final: true });
+    return { original: nums, x, queries, answer, steps };
+  }
+
+  Object.assign(module.exports, {
+    3159: {
+      id: 3159,
+      difficulty: "easy",
+      slug: "find-occurrences-of-an-element-in-an-array",
+      category,
+      tags: arrayTag,
+      title: text("Find Occurrences of an Element in an Array", "Find Occurrences of an Element in an Array"),
+      titleVi: text("Tìm các lần xuất hiện của một phần tử trong mảng", "Find Occurrences of an Element in an Array"),
+      statement: text("Với mỗi query q, trả về index của lần xuất hiện thứ q (đếm từ 1) của x trong nums; nếu không tồn tại thì trả về −1.", "For every query q, return the index of the q-th (one-based) occurrence of x in nums, or −1 when it does not exist."),
+      defaultInput: [1, 3, 1, 7, 1, 2],
+      inputKind: "integer",
+      inputLabel: text("nums", "nums"),
+      extraParams: [
+        { key: "x", label: text("x (giá trị cần tìm)", "x (value to find)"), default: 1 },
+        { key: "queries", type: "string", label: text("queries (1-based, cách bởi dấu phẩy)", "queries (1-based, comma separated)"), default: "1,3,2,4" },
+      ],
+      complexity: {
+        time: "O(n + q)",
+        space: "O(n)",
+        note: text("Quét nums để lưu vị trí của x, sau đó mỗi query chỉ là một lần truy cập mảng.", "Scan nums to store positions of x, then answer each query with one array access."),
+      },
+      code: [
+        "class Solution:",
+        "    def occurrencesOfElement(self, nums, queries, x):",
+        "        positions = []",
+        "        for index, value in enumerate(nums):",
+        "            if value == x:",
+        "                positions.append(index)",
+        "        answer = []",
+        "        for occurrence in queries:",
+        "            answer.append(positions[occurrence-1] if occurrence <= len(positions) else -1)",
+        "        return answer",
+      ],
+      builder: buildSteps3159,
+    },
+  });
+})();
