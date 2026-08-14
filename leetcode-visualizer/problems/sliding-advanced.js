@@ -144,6 +144,56 @@ function buildSteps2962(input, params) {
   return { original: nums, k, answer: ans, steps };
 }
 
+function buildStepsFixedMatch(input, params, config) {
+  const text = String(input ?? "");
+  const pattern = String(params?.[config.patternKey] ?? config.defaultPattern);
+  if (!pattern) throw new Error(`${config.patternKey} must not be empty`);
+  const chars = [...text]; const need = new Map(); const window = new Map(); const steps = [];
+  for (const ch of pattern) need.set(ch, (need.get(ch) || 0) + 1);
+  let left = 0; const matches = [];
+  const equal = () => need.size === window.size && [...need].every(([ch, count]) => window.get(ch) === count);
+  const snap = (title, line, right = -1, note, extra = {}) => {
+    const windowIndices = range(left, right);
+    steps.push(makeStep(chars, {
+      title, line, highlight: windowIndices, mark: extra.mark || [], final: extra.final, note,
+      vars: [{ name: config.patternKey, value: JSON.stringify(pattern) }, { name: "need", value: mapText(need) }, { name: "windowFreq", value: mapText(window) }, { name: "left", value: left }, { name: "right", value: right >= 0 ? right : "-" }, { name: config.resultName, value: config.existsOnly ? (matches.length ? "True" : "False") : `[${matches.join(", ")}]` }, ...(extra.vars || [])],
+      slidingFreqView: { nums: chars, label: config.textLabel, left, right, window: windowIndices, best: extra.mark || [], freq: Object.fromEntries(window), k: pattern.length, mode: "frequency", activeValue: extra.activeValue, overLimit: false, ans: config.existsOnly ? (matches.length ? 1 : 0) : matches.length, done: extra.final },
+    }));
+  };
+  snap({ vi: `need = Counter(${config.patternKey})`, en: `need = Counter(${config.patternKey})` }, 3, -1, { vi: `Mẫu ${JSON.stringify(pattern)} yêu cầu đúng frequency: ${mapText(need)}.`, en: `Pattern ${JSON.stringify(pattern)} requires exact frequencies: ${mapText(need)}.` });
+  snap({ vi: "window = {}, left = 0", en: "window = {}, left = 0" }, 4, -1, { vi: "Cửa sổ luôn được giữ có độ dài bằng pattern.", en: "The window is kept at the pattern length." });
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    snap({ vi: `Xét ${config.textLabel}[${right}] = ${JSON.stringify(ch)}`, en: `Inspect ${config.textLabel}[${right}] = ${JSON.stringify(ch)}` }, 5, right, { vi: "Mở rộng fixed window sang phải.", en: "Expand the fixed window to the right." }, { activeValue: ch });
+    window.set(ch, (window.get(ch) || 0) + 1);
+    snap({ vi: `window[${JSON.stringify(ch)}] += 1 → ${window.get(ch)}`, en: `window[${JSON.stringify(ch)}] += 1 → ${window.get(ch)}` }, 6, right, { vi: "Ghi nhận ký tự mới trong frequency của cửa sổ.", en: "Record the new character in the window frequency." }, { activeValue: ch });
+    if (right - left + 1 > pattern.length) {
+      snap({ vi: `window size > ${pattern.length} → bỏ cạnh trái`, en: `window size > ${pattern.length} → remove left edge` }, 7, right, { vi: "Cửa sổ đang dài hơn pattern, cần loại ký tự cũ nhất.", en: "The window is longer than the pattern, so remove its oldest character." });
+      const removed = chars[left]; window.set(removed, window.get(removed) - 1); if (window.get(removed) === 0) window.delete(removed);
+      snap({ vi: `window[${JSON.stringify(removed)}] -= 1`, en: `window[${JSON.stringify(removed)}] -= 1` }, 8, right, { vi: `Loại ${JSON.stringify(removed)} khỏi frequency cửa sổ.`, en: `Remove ${JSON.stringify(removed)} from the window frequency.` }, { vars: [{ name: "removed", value: JSON.stringify(removed) }] });
+      left++;
+      snap({ vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, 9, right, { vi: "Cửa sổ quay về đúng độ dài pattern.", en: "The window returns to the pattern length." });
+    }
+    const isMatch = right - left + 1 === pattern.length && equal();
+    snap({ vi: isMatch ? "windowFreq == need → khớp" : "windowFreq != need → chưa khớp", en: isMatch ? "windowFreq == need → match" : "windowFreq != need → no match" }, 10, right, { vi: isMatch ? "Mọi ký tự và số lần xuất hiện đều khớp pattern." : "Frequency hiện tại chưa giống pattern.", en: isMatch ? "Every character and count matches the pattern." : "The current frequency does not yet match the pattern." }, { mark: isMatch ? range(left, right) : [] });
+    if (isMatch) {
+      matches.push(left);
+      snap({ vi: config.existsOnly ? `return True tại start=${left}` : `ans.append(${left})`, en: config.existsOnly ? `return True at start=${left}` : `ans.append(${left})` }, 11, right, { vi: config.existsOnly ? "Đã tìm thấy một hoán vị của pattern trong text." : `Lưu vị trí bắt đầu ${left} của anagram.`, en: config.existsOnly ? "A permutation of the pattern was found in the text." : `Save anagram start index ${left}.` }, { mark: range(left, right), vars: [{ name: "matched window", value: JSON.stringify(text.slice(left, right + 1)) }] });
+      if (config.existsOnly) return { original: text, [config.patternKey]: pattern, answer: true, steps: steps.map((step, index) => index === steps.length - 1 ? { ...step, final: true } : step) };
+    }
+  }
+  snap({ vi: config.existsOnly ? "return False" : `return ans → [${matches.join(", ")}]`, en: config.existsOnly ? "return False" : `return ans → [${matches.join(", ")}]` }, 12, chars.length - 1, { vi: config.existsOnly ? "Không có window nào là hoán vị của pattern." : "Đây là mọi start index có anagram của pattern.", en: config.existsOnly ? "No window is a permutation of the pattern." : "These are all start indices containing a pattern anagram." }, { final: true });
+  return { original: text, [config.patternKey]: pattern, answer: config.existsOnly ? false : matches, steps };
+}
+
+function buildSteps438(input, params) {
+  return buildStepsFixedMatch(input, params, { patternKey: "p", defaultPattern: "abc", textLabel: "s", resultName: "anagram starts", existsOnly: false });
+}
+
+function buildSteps567(input, params) {
+  return buildStepsFixedMatch(input, params, { patternKey: "s1", defaultPattern: "ab", textLabel: "s2", resultName: "contains permutation", existsOnly: true });
+}
+
 const category = { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" };
 const arrayTag = [{ key: "array", vi: "Mảng", en: "Array" }];
 
@@ -154,3 +204,7 @@ module.exports = {
   2799: { id: 2799, difficulty: "medium", slug: "count-complete-subarrays-in-an-array", category, tags: arrayTag, title: { vi: "Count Complete Subarrays in an Array", en: "Count Complete Subarrays in an Array" }, titleVi: { vi: "Đếm complete subarray", en: "Count complete subarrays" }, statement: { vi: "Đếm subarray chứa mọi giá trị distinct xuất hiện trong toàn mảng.", en: "Count subarrays containing every distinct value from the full array." }, defaultInput: [1, 3, 1, 2, 2], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [], complexity: { time: "O(n)", space: "O(n)", note: { vi: "Cửa sổ trượt với frequency map.", en: "Sliding window with a frequency map." } }, code: ["class Solution:", "    def countCompleteSubarrays(self, nums):", "        target = len(set(nums))", "        freq = {}; left = ans = 0", "        for right, num in enumerate(nums):", "            freq[num] = freq.get(num, 0) + 1", "            while len(freq) == target:", "                ans += len(nums) - right", "                remove_from(freq, left); left += 1", "        return ans"], builder: buildSteps2799 },
   2962: { id: 2962, difficulty: "medium", slug: "count-subarrays-where-max-element-appears-at-least-k-times", category, tags: arrayTag, title: { vi: "Count Subarrays Where Max Element Appears at Least K Times", en: "Count Subarrays Where Max Element Appears at Least K Times" }, titleVi: { vi: "Đếm subarray có phần tử lớn nhất xuất hiện ít nhất K lần", en: "Count subarrays where the maximum appears at least K times" }, statement: { vi: "Đếm subarray mà giá trị lớn nhất của toàn mảng xuất hiện ít nhất k lần.", en: "Count subarrays in which the global maximum appears at least k times." }, defaultInput: [1, 3, 2, 3, 3], inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [{ key: "k", label: { vi: "k (số lần max xuất hiện)", en: "k (maximum occurrences)" }, default: 2 }], complexity: { time: "O(n)", space: "O(1)", note: { vi: "Chỉ theo dõi số lần maxValue trong cửa sổ.", en: "Track only maxValue occurrences in the window." } }, code: ["class Solution:", "    def countSubarrays(self, nums, k):", "        max_value = max(nums)", "        left = count_max = ans = 0", "        for right, num in enumerate(nums):", "            if num == max_value: count_max += 1", "            while count_max >= k:", "                ans += len(nums) - right", "                if nums[left] == max_value: count_max -= 1", "                left += 1", "        return ans"], builder: buildSteps2962 },
 };
+
+module.exports[438] = { id: 438, difficulty: "medium", slug: "find-all-anagrams-in-a-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Find All Anagrams in a String", en: "Find All Anagrams in a String" }, titleVi: { vi: "Tìm mọi anagram trong chuỗi", en: "Find all anagrams in a string" }, statement: { vi: "Tìm mọi vị trí bắt đầu trong s mà substring là anagram của p.", en: "Find all start indices in s whose substring is an anagram of p." }, defaultInput: "cbaebabacd", inputKind: "string", inputLabel: { vi: "Chuỗi s", en: "String s" }, extraParams: [{ key: "p", type: "string", label: { vi: "Pattern p", en: "Pattern p" }, default: "abc" }], complexity: { time: "O(|s| + |p|)", space: "O(alphabet)", note: { vi: "Fixed window có độ dài bằng p và so sánh frequency map.", en: "Use a fixed window of p's length and compare frequency maps." } }, code: ["class Solution:", "    def findAnagrams(self, s, p):", "        need = Counter(p)", "        window = {}; left = 0; ans = []", "        for right, ch in enumerate(s):", "            window[ch] = window.get(ch, 0) + 1", "            if right - left + 1 > len(p):", "                remove_from(window, s[left])", "                left += 1", "            if right - left + 1 == len(p) and window == need:", "                ans.append(left)", "        return ans"], builder: buildSteps438 };
+
+module.exports[567] = { id: 567, difficulty: "medium", slug: "permutation-in-string", category, tags: [{ key: "string", vi: "Chuỗi", en: "String" }], title: { vi: "Permutation in String", en: "Permutation in String" }, titleVi: { vi: "Hoán vị trong chuỗi", en: "Permutation in String" }, statement: { vi: "Kiểm tra s2 có chứa một hoán vị của s1 hay không.", en: "Check whether s2 contains a permutation of s1." }, defaultInput: "eidbaooo", inputKind: "string", inputLabel: { vi: "Chuỗi s2", en: "String s2" }, extraParams: [{ key: "s1", type: "string", label: { vi: "Pattern s1", en: "Pattern s1" }, default: "ab" }], complexity: { time: "O(|s1| + |s2|)", space: "O(alphabet)", note: { vi: "Fixed window có độ dài bằng s1.", en: "Use a fixed window of s1's length." } }, code: ["class Solution:", "    def checkInclusion(self, s1, s2):", "        need = Counter(s1)", "        window = {}; left = 0", "        for right, ch in enumerate(s2):", "            window[ch] = window.get(ch, 0) + 1", "            if right - left + 1 > len(s1):", "                remove_from(window, s2[left])", "                left += 1", "            if right - left + 1 == len(s1) and window == need:", "                return True", "        return False"], builder: buildSteps567 };
