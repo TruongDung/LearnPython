@@ -4158,6 +4158,7 @@ function buildSteps2461(input, params) {
 module.exports = {
   159: {
     id: 159,
+    premium: true,
     difficulty: "medium",
     slug: "longest-substring-with-at-most-two-distinct-characters",
     category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
