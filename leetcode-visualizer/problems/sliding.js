@@ -3732,7 +3732,198 @@ function buildSteps2958(nums, params) {
   return { original: nums, k, answer: ans, steps };
 }
 
+/**
+ * LeetCode 3090: Maximum Length Substring With Two Occurrences.
+ * Keep a sliding window where every character appears at most twice.
+ */
+function buildSteps3090(input) {
+  const s = typeof input === "string" ? input : String(input ?? "");
+  const chars = [...s];
+  const freq = new Map();
+  const steps = [];
+  let left = 0;
+  let ans = 0;
+  let bestL = 0;
+  let bestR = -1;
+
+  const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const freqObj = () => Object.fromEntries([...freq.entries()].filter(([, count]) => count > 0));
+  const freqText = () => {
+    const entries = [...freq.entries()].filter(([, count]) => count > 0);
+    return entries.length ? `{${entries.map(([ch, count]) => `${JSON.stringify(ch)}:${count}`).join(", ")}}` : "{}";
+  };
+  const snap = (opts) => {
+    const curLeft = opts.left ?? left;
+    const right = opts.right ?? -1;
+    const window = indices(curLeft, right);
+    const visibleFreq = opts.freq || freqObj();
+    const visibleFreqText = opts.freqText || freqText();
+    steps.push({
+      title: opts.title,
+      arr: [...chars],
+      sub: chars.map((_, index) => `[${index}]`),
+      highlight: window,
+      mark: opts.mark || [],
+      final: Boolean(opts.final),
+      codeLines: [opts.codeLine],
+      vars: [
+        { name: "left", value: curLeft },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "freq", value: visibleFreqText },
+        { name: "ans", value: ans },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      slidingFreqView: {
+        nums: [...chars],
+        label: "s",
+        left: curLeft,
+        right,
+        window,
+        best: bestR >= bestL ? indices(bestL, bestR) : [],
+        freq: visibleFreq,
+        k: 2,
+        activeValue: opts.activeValue,
+        overLimit: Boolean(opts.overLimit),
+        ans,
+        done: Boolean(opts.final),
+      },
+    });
+  };
+
+  snap({
+    title: { vi: "freq = {}", en: "freq = {}" },
+    codeLine: 3,
+    note: { vi: "freq đếm số lần xuất hiện của từng ký tự trong cửa sổ hiện tại.", en: "freq counts each character's occurrences inside the current window." },
+  });
+  snap({
+    title: { vi: "left = 0", en: "left = 0" },
+    codeLine: 4,
+    note: { vi: "left là biên trái của cửa sổ trượt.", en: "left is the sliding window's left boundary." },
+  });
+  snap({
+    title: { vi: "ans = 0", en: "ans = 0" },
+    codeLine: 5,
+    note: { vi: "ans lưu độ dài cửa sổ hợp lệ lớn nhất.", en: "ans stores the largest valid window length." },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    snap({
+      title: { vi: `for right=${right}, ch=${JSON.stringify(ch)}`, en: `for right=${right}, ch=${JSON.stringify(ch)}` },
+      codeLine: 6, right, activeValue: ch,
+      vars: [{ name: "ch", value: JSON.stringify(ch) }],
+      note: { vi: `Mở rộng cửa sổ để xét s[${right}]=${JSON.stringify(ch)}.`, en: `Expand the window to inspect s[${right}]=${JSON.stringify(ch)}.` },
+    });
+
+    freq.set(ch, (freq.get(ch) || 0) + 1);
+    snap({
+      title: { vi: `freq[${JSON.stringify(ch)}] += 1 → ${freq.get(ch)}`, en: `freq[${JSON.stringify(ch)}] += 1 → ${freq.get(ch)}` },
+      codeLine: 7, right, activeValue: ch, overLimit: freq.get(ch) > 2,
+      vars: [{ name: `freq[${JSON.stringify(ch)}]`, value: freq.get(ch) }],
+      note: { vi: `Ký tự ${JSON.stringify(ch)} hiện có ${freq.get(ch)} lần trong cửa sổ. Giới hạn là 2.`, en: `Character ${JSON.stringify(ch)} now appears ${freq.get(ch)} times in the window. The limit is 2.` },
+    });
+
+    while (freq.get(ch) > 2) {
+      snap({
+        title: { vi: `while freq[${JSON.stringify(ch)}] > 2 → ${freq.get(ch)} > 2 → True`, en: `while freq[${JSON.stringify(ch)}] > 2 → ${freq.get(ch)} > 2 → True` },
+        codeLine: 8, right, activeValue: ch, overLimit: true,
+        vars: [{ name: `freq[${JSON.stringify(ch)}]`, value: freq.get(ch) }],
+        note: { vi: `Có 3 lần ${JSON.stringify(ch)}, nên cửa sổ không hợp lệ và phải thu hẹp từ left.`, en: `There are three ${JSON.stringify(ch)} characters, so the window is invalid and must shrink from left.` },
+      });
+      const removed = chars[left];
+      freq.set(removed, freq.get(removed) - 1);
+      snap({
+        title: { vi: `freq[s[left]=${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}`, en: `freq[s[left]=${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}` },
+        codeLine: 9, right, activeValue: ch, overLimit: freq.get(ch) > 2,
+        vars: [{ name: "removed", value: JSON.stringify(removed) }, { name: `freq[${JSON.stringify(removed)}]`, value: freq.get(removed) }],
+        note: { vi: `Bỏ s[${left}]=${JSON.stringify(removed)} khỏi cửa sổ trước khi dịch left.`, en: `Remove s[${left}]=${JSON.stringify(removed)} from the window before moving left.` },
+      });
+      left++;
+      snap({
+        title: { vi: `left += 1 → left=${left}`, en: `left += 1 → left=${left}` },
+        codeLine: 10, right, activeValue: ch, overLimit: freq.get(ch) > 2,
+        note: { vi: "Dịch biên trái sang phải một vị trí.", en: "Move the left boundary one position right." },
+      });
+    }
+
+    snap({
+      title: { vi: `while freq[${JSON.stringify(ch)}] > 2 → ${freq.get(ch)} > 2 → False`, en: `while freq[${JSON.stringify(ch)}] > 2 → ${freq.get(ch)} > 2 → False` },
+      codeLine: 8, right, activeValue: ch,
+      note: { vi: "Mọi ký tự trong cửa sổ đều xuất hiện không quá 2 lần; cửa sổ hợp lệ.", en: "Every character occurs at most twice in the window; it is valid." },
+    });
+
+    const length = right - left + 1;
+    const previousAns = ans;
+    if (length > ans) {
+      ans = length;
+      bestL = left;
+      bestR = right;
+    }
+    snap({
+      title: { vi: `ans = max(${previousAns}, ${length}) → ${ans}`, en: `ans = max(${previousAns}, ${length}) → ${ans}` },
+      codeLine: 11, right, activeValue: ch, mark: length > previousAns ? indices(left, right) : [],
+      vars: [{ name: "window length", value: length }, { name: "best window", value: `[${bestL}..${bestR}]` }],
+      note: length > previousAns
+        ? { vi: `Cửa sổ [${left}..${right}] dài ${length} là kỷ lục mới.`, en: `Window [${left}..${right}] of length ${length} is a new record.` }
+        : { vi: `Độ dài ${length} không vượt ans=${previousAns}; giữ đáp án ${ans}.`, en: `Length ${length} does not beat ans=${previousAns}; keep ${ans}.` },
+    });
+  }
+
+  const bestText = bestR >= bestL ? s.slice(bestL, bestR + 1) : "";
+  const bestFreq = {};
+  for (let index = bestL; index <= bestR; index++) bestFreq[chars[index]] = (bestFreq[chars[index]] || 0) + 1;
+  const bestFreqText = Object.keys(bestFreq).length
+    ? `{${Object.entries(bestFreq).map(([ch, count]) => `${JSON.stringify(ch)}:${count}`).join(", ")}}`
+    : "{}";
+  snap({
+    title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` },
+    codeLine: 12, left: bestL, right: bestR, freq: bestFreq, freqText: bestFreqText, activeValue: undefined, final: true,
+    vars: [{ name: "best substring", value: JSON.stringify(bestText) }],
+    note: { vi: `Substring dài nhất hợp lệ là ${JSON.stringify(bestText)}, độ dài ${ans}.`, en: `The longest valid substring is ${JSON.stringify(bestText)}, with length ${ans}.` },
+  });
+  return { original: s, answer: ans, steps };
+}
+
 module.exports = {
+  3090: {
+    id: 3090,
+    difficulty: "easy",
+    slug: "maximum-length-substring-with-two-occurrences",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Maximum Length Substring With Two Occurrences", en: "Maximum Length Substring With Two Occurrences" },
+    titleVi: { vi: "Substring dài nhất với mỗi ký tự tối đa hai lần", en: "Longest substring with each character at most twice" },
+    statement: {
+      vi: "Cho chuỗi s. Trả về độ dài substring dài nhất sao cho mỗi ký tự trong substring đó xuất hiện không quá 2 lần.",
+      en: "Given a string s, return the longest substring in which every character appears at most twice.",
+    },
+    defaultInput: "bcbbbcba",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [],
+    approach: [
+      { vi: "Mở rộng right và tăng freq của ký tự mới.", en: "Expand right and increment the new character's frequency." },
+      { vi: "Nếu freq[ch] > 2, giảm freq[s[left]] rồi tăng left đến khi cửa sổ hợp lệ.", en: "If freq[ch] > 2, decrement freq[s[left]] and advance left until the window is valid." },
+      { vi: "Sau mỗi right, cập nhật ans bằng độ dài cửa sổ hợp lệ hiện tại.", en: "After each right, update ans with the current valid window length." },
+    ],
+    complexity: { time: "O(n)", space: "O(min(n, alphabet))", note: { vi: "Mỗi ký tự đi vào và rời cửa sổ tối đa một lần.", en: "Each character enters and leaves the window at most once." } },
+    code: [
+      "class Solution:",
+      "    def maximumLengthSubstring(self, s):",
+      "        freq = {}",
+      "        left = 0",
+      "        ans = 0",
+      "        for right, ch in enumerate(s):",
+      "            freq[ch] = freq.get(ch, 0) + 1",
+      "            while freq[ch] > 2:",
+      "                freq[s[left]] -= 1",
+      "                left += 1",
+      "            ans = max(ans, right - left + 1)",
+      "        return ans",
+    ],
+    builder: buildSteps3090,
+  },
   2958: {
     id: 2958,
     difficulty: "medium",

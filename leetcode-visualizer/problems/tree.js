@@ -4099,13 +4099,208 @@ function buildSteps111(input) {
   return { input, answer, steps };
 }
 
+/**
+ * LeetCode 114: Flatten Binary Tree to Linked List.
+ * Iteratively splice each left subtree between the current node and its
+ * original right subtree. The result follows preorder through right pointers.
+ */
+function buildSteps114(input) {
+  const root = parseTree(input);
+  const steps = [];
+
+  function chainIds() {
+    const ids = new Set();
+    let node = root;
+    while (node) {
+      ids.add(node.id);
+      node = node.right;
+    }
+    return ids;
+  }
+
+  function snap(opts) {
+    const annotations = {};
+    if (opts.cur) annotations[opts.cur.id] = { label: "cur", kind: "current" };
+    if (opts.predecessor) annotations[opts.predecessor.id] = { label: "pred", kind: "predecessor" };
+    const step = snapshot(root, {
+      title: opts.title,
+      hlSet: new Set([opts.cur, opts.predecessor].filter(Boolean).map((node) => node.id)),
+      wordSet: opts.wordSet || chainIds(),
+      annotations,
+      nullChildren: opts.nullChildren || [],
+      codeLines: opts.codeLines,
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+    if (opts.final) step.final = true;
+    steps.push(step);
+  }
+
+  if (!root) {
+    snap({
+      title: { vi: "Cây rỗng → không cần thay đổi", en: "Empty tree → no changes needed" },
+      codeLines: [2], final: true,
+      vars: [{ name: "root", value: "None" }],
+      note: { vi: "Không có node để flatten.", en: "There is no node to flatten." },
+    });
+    return { input, answer: [], steps };
+  }
+
+  let cur = root;
+  snap({
+    title: { vi: `cur = root (${cur.val})`, en: `cur = root (${cur.val})` },
+    codeLines: [3], cur,
+    vars: [{ name: "cur", value: cur.val }],
+    note: { vi: "Bắt đầu tại root. Chuỗi kết quả cuối cùng sẽ đi qua các con trỏ right theo preorder.", en: "Start at root. The final chain follows right pointers in preorder." },
+  });
+
+  while (cur) {
+    snap({
+      title: { vi: `while cur: cur = ${cur.val}`, en: `while cur: cur = ${cur.val}` },
+      codeLines: [4], cur,
+      vars: [{ name: "cur", value: cur.val }],
+      note: { vi: "cur tồn tại, xử lý node này.", en: "cur exists, so process this node." },
+    });
+
+    const hasLeft = Boolean(cur.left);
+    snap({
+      title: { vi: `if cur.left → ${hasLeft}`, en: `if cur.left → ${hasLeft}` },
+      codeLines: [5], cur,
+      vars: [{ name: "cur.left", value: hasLeft ? cur.left.val : "None" }],
+      note: hasLeft
+        ? { vi: `Có cây con trái bắt đầu tại ${cur.left.val}; cần chèn nó sau cur.`, en: `A left subtree starts at ${cur.left.val}; splice it after cur.` }
+        : { vi: "Không có cây con trái, liên kết right hiện tại đã đúng; chỉ cần tiến cur.", en: "There is no left subtree, so the current right link is already correct; advance cur." },
+    });
+
+    if (hasLeft) {
+      let predecessor = cur.left;
+      snap({
+        title: { vi: `predecessor = cur.left → ${predecessor.val}`, en: `predecessor = cur.left → ${predecessor.val}` },
+        codeLines: [6], cur, predecessor,
+        vars: [{ name: "cur", value: cur.val }, { name: "predecessor", value: predecessor.val }],
+        note: { vi: "Tìm node ngoài cùng bên phải của cây con trái. Node này sẽ nối lại với cây con phải cũ.", en: "Find the rightmost node of the left subtree. It will reconnect to the old right subtree." },
+      });
+
+      while (predecessor.right) {
+        snap({
+          title: { vi: `while predecessor.right: ${predecessor.val}.right = ${predecessor.right.val}`, en: `while predecessor.right: ${predecessor.val}.right = ${predecessor.right.val}` },
+          codeLines: [7], cur, predecessor,
+          vars: [{ name: "predecessor", value: predecessor.val }, { name: "predecessor.right", value: predecessor.right.val }],
+          note: { vi: "Chưa phải node phải nhất của cây con trái, tiếp tục đi sang phải.", en: "This is not yet the rightmost node of the left subtree, so continue rightward." },
+        });
+        predecessor = predecessor.right;
+        snap({
+          title: { vi: `predecessor = predecessor.right → ${predecessor.val}`, en: `predecessor = predecessor.right → ${predecessor.val}` },
+          codeLines: [8], cur, predecessor,
+          vars: [{ name: "predecessor", value: predecessor.val }],
+          note: { vi: "Cập nhật predecessor sang node kế tiếp bên phải.", en: "Advance predecessor to the next right node." },
+        });
+      }
+
+      const oldRight = cur.right;
+      // Detach the old right edge in the visual model before showing its new
+      // owner. This avoids a temporary two-parent DAG in the tree renderer.
+      cur.right = null;
+      predecessor.right = oldRight;
+      snap({
+        title: { vi: `${predecessor.val}.right = cur.right (${oldRight ? oldRight.val : "None"})`, en: `${predecessor.val}.right = cur.right (${oldRight ? oldRight.val : "None"})` },
+        codeLines: [9], cur, predecessor,
+        vars: [{ name: "predecessor", value: predecessor.val }, { name: "old right subtree", value: oldRight ? oldRight.val : "None" }],
+        note: { vi: "Nối đuôi của cây trái với cây phải cũ để không mất bất kỳ node nào.", en: "Connect the left subtree's tail to the old right subtree so no node is lost." },
+      });
+
+      const leftRoot = cur.left;
+      // Likewise, detach the old left edge before it becomes cur.right so
+      // each snapshot remains a renderable tree rather than a shared subtree.
+      cur.left = null;
+      cur.right = leftRoot;
+      snap({
+        title: { vi: `cur.right = cur.left → ${cur.val}.right = ${leftRoot.val}`, en: `cur.right = cur.left → ${cur.val}.right = ${leftRoot.val}` },
+        codeLines: [10], cur, predecessor,
+        vars: [{ name: "cur.right", value: leftRoot.val }],
+        note: { vi: "Đưa cả cây trái sang right, đúng thứ tự preorder: cur → left subtree → right subtree cũ.", en: "Move the full left subtree to right, yielding preorder: cur → left subtree → old right subtree." },
+      });
+
+      cur.left = null;
+      snap({
+        title: { vi: `${cur.val}.left = None`, en: `${cur.val}.left = None` },
+        codeLines: [11], cur, predecessor,
+        nullChildren: [{ id: `null-left-${cur.id}`, parentId: cur.id, side: "left" }],
+        vars: [{ name: "cur.left", value: "None" }],
+        note: { vi: "Xóa con trỏ left. Mỗi node của linked list kết quả chỉ còn right (next).", en: "Clear left. Each node in the final linked list has only right (next)." },
+      });
+    }
+
+    cur = cur.right;
+    snap({
+      title: { vi: `cur = cur.right → ${cur ? cur.val : "None"}`, en: `cur = cur.right → ${cur ? cur.val : "None"}` },
+      codeLines: [12], cur,
+      vars: [{ name: "cur", value: cur ? cur.val : "None" }],
+      note: { vi: cur ? "Tiến theo liên kết right vừa được xác lập để xử lý node kế tiếp." : "Đã đi qua cuối chuỗi right." , en: cur ? "Advance through the newly established right link to process the next node." : "Reached the end of the right chain." },
+    });
+  }
+
+  const order = [];
+  let node = root;
+  while (node) {
+    order.push(node.val);
+    node = node.right;
+  }
+  snap({
+    title: { vi: `return → ${order.join(" → ")}`, en: `return → ${order.join(" → ")}` },
+    codeLines: [13], final: true,
+    vars: [{ name: "right-only chain", value: order.join(" → ") }],
+    note: { vi: `Cây đã được flatten thành linked list theo preorder: ${order.join(" → ")}. Tất cả left đều là None.`, en: `The tree is flattened into a preorder linked list: ${order.join(" → ")}. Every left pointer is None.` },
+  });
+  return { input, answer: order, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
+    order: [114, 144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
     },
+  },
+  114: {
+    id: 114,
+    difficulty: "medium",
+    slug: "flatten-binary-tree-to-linked-list",
+    category: TREE_CAT,
+    tags: [{ key: "linked-list", vi: "Danh sách liên kết", en: "Linked List" }],
+    title: { vi: "Flatten Binary Tree to Linked List", en: "Flatten Binary Tree to Linked List" },
+    titleVi: { vi: "Làm phẳng cây nhị phân thành linked list", en: "Flatten binary tree into a linked list" },
+    statement: {
+      vi: "Biến đổi cây tại chỗ thành linked list theo thứ tự preorder. Mỗi node chỉ dùng con trỏ right làm next và mọi con trỏ left phải là null.",
+      en: "Transform the tree in-place into a preorder linked list. Each node uses only right as next and every left pointer must be null.",
+    },
+    defaultInput: "1,2,5,3,4,null,6",
+    inputKind: "string",
+    inputLabel: { vi: "Tree (level-order; null cho node rỗng)", en: "Tree (level-order; null for empty)" },
+    extraParams: [],
+    approach: [
+      { vi: "Duyệt cur theo right. Nếu cur không có left, liên kết right đã đúng và chỉ cần đi tiếp.", en: "Walk cur through right. If cur has no left, its right link is already correct, so continue." },
+      { vi: "Nếu có left, tìm predecessor: node ngoài cùng bên phải của cây trái.", en: "If left exists, find the predecessor: the rightmost node in the left subtree." },
+      { vi: "Nối predecessor.right với cur.right cũ, chuyển cur.left sang cur.right, rồi đặt cur.left = None.", en: "Link predecessor.right to old cur.right, move cur.left to cur.right, then set cur.left = None." },
+    ],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Mỗi liên kết được đi qua hoặc đổi hướng số lần hằng số; không cần stack/đệ quy phụ.", en: "Each link is traversed or redirected a constant number of times; no auxiliary stack or recursion is needed." } },
+    code: [
+      "class Solution:",
+      "    def flatten(self, root):",
+      "        cur = root",
+      "        while cur:",
+      "            if cur.left:",
+      "                predecessor = cur.left",
+      "                while predecessor.right:",
+      "                    predecessor = predecessor.right",
+      "                predecessor.right = cur.right",
+      "                cur.right = cur.left",
+      "                cur.left = None",
+      "            cur = cur.right",
+      "        return",
+    ],
+    builder: buildSteps114,
   },
   144: {
     id: 144, difficulty: "easy", slug: "binary-tree-preorder-traversal",

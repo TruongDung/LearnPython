@@ -7556,6 +7556,7 @@ function renderSlidingFreqView(step) {
   const bestSet = new Set(Array.isArray(view.best) ? view.best : []);
   const freq = view.freq || {};
   const k = view.k;
+  const rowLabel = view.label || "nums";
   const activeValue = view.activeValue;
   const overLimit = !!view.overLimit;
   const vi = lang === "vi";
@@ -7609,7 +7610,7 @@ function renderSlidingFreqView(step) {
   $("treeView").innerHTML = `
     <div class="sfw-viz">
       <div class="sfw-row">
-        <span class="tp-row-label">nums</span>
+        <span class="tp-row-label">${escapeHtml(rowLabel)}</span>
         <div class="tp-row-cells sfw-row-cells">${cells}</div>
       </div>
       <div class="sfw-freq-panel">
