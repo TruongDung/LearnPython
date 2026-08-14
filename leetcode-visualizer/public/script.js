@@ -395,8 +395,8 @@ function renderCatalog() {
           },
         ];
         const sequence = [208, 211, 648, 677, 720, 1268, 212, 421, 745, 1032, 1707];
-        const patternCards = patterns.map((pattern, index) => `<article class="trie-pattern-card"><span class="trie-pattern-number">${String(index + 1).padStart(2, "0")}</span><h4>${pattern.name}</h4><p>${pattern.note}</p><div>${pattern.ids.map((id) => `<span>#${id}</span>`).join("")}</div></article>`).join("");
-        const levelCards = levels.map((level) => `<article class="trie-level-card ${level.tone}"><h4><span>${level.icon}</span>${level.title}</h4><ul>${level.problems.map(([id, name]) => `<li><span>#${id}</span><b>${name}</b></li>`).join("")}</ul></article>`).join("");
+        const patternCards = patterns.map((pattern, index) => `<article class="trie-pattern-card"><span class="trie-pattern-number">${String(index + 1).padStart(2, "0")}</span><h4>${pattern.name}</h4><p>${pattern.note}</p><div>${pattern.ids.map((id) => `<a class="trie-problem-link" href="#leetcode-${id}" data-trie-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`).join("")}</div></article>`).join("");
+        const levelCards = levels.map((level) => `<article class="trie-level-card ${level.tone}"><h4><span>${level.icon}</span>${level.title}</h4><ul>${level.problems.map(([id, name]) => `<li><a class="trie-problem-row" href="#leetcode-${id}" data-trie-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`).join("")}</ul></article>`).join("");
 
         $("trieLearnEyebrow").textContent = "TRIE LEARNING MAP";
         $("trieLearnTitle").textContent = vi ? "Bạn chỉ cần nhớ 8 loại Trie" : "The 8 Trie patterns to remember";
@@ -415,13 +415,31 @@ function renderCatalog() {
           </section>
           <section class="trie-roadmap">
             <div class="trie-learn-section-title"><span>03</span><div><h3>${vi ? "Thứ tự học từ đầu" : "Recommended learning order"}</h3><p>${vi ? "Đi từ thao tác Trie cơ bản đến backtracking và Binary Trie." : "Move from basic Trie operations to backtracking and Binary Trie."}</p></div></div>
-            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `<span>#${id}</span>${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `<a class="trie-problem-link" href="#leetcode-${id}" data-trie-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
           </section>`;
 
         let restoreFocus = learnButton;
-        closeButton.onclick = () => dialog.close();
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-trie-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.trieProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
         dialog.onclick = (event) => {
-          if (event.target === dialog) dialog.close();
+          if (event.target === dialog) closeDialog();
         };
         dialog.onclose = () => {
           if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
@@ -13681,14 +13699,21 @@ function renderWordSearchIIView(step) {
     if (c >= row.length) return `<div class="ws212-cell empty" aria-hidden="true"></div>`;
     const pathCell = pathMap.get(`${r},${c}`);
     const classes = ["ws212-cell"];
+    const isMarked = row[c] === "#";
     let state = "";
     if (pathCell) {
       classes.push(view.action === "found" ? "found-path" : "in-path");
       state = `${vi ? "bước" : "step"} ${pathCell.order}`;
     }
+    if (isMarked) {
+      classes.push("marked");
+      state = vi ? "đã khóa bằng #" : "locked with #";
+    }
     if (sameCell(view.current, r, c)) {
       classes.push("current");
-      state = vi ? "đang đứng" : "current";
+      state = view.action === "mark"
+        ? (vi ? "board[r][c] = '#'" : "board[r][c] = '#'")
+        : (vi ? "đang đứng" : "current");
     }
     if (sameCell(view.candidate, r, c) && view.action === "prune") {
       classes.push("pruned");
@@ -13696,7 +13721,7 @@ function renderWordSearchIIView(step) {
     }
     if (sameCell(view.restored, r, c)) {
       classes.push("restored");
-      state = "backtrack";
+      state = vi ? "khôi phục ký tự" : "character restored";
     }
     return `<div class="${classes.join(" ")}"><small>(${r},${c})</small><strong>${escapeHtml(row[c])}</strong><span>${escapeHtml(state)}</span>${pathCell ? `<b>${pathCell.order}</b>` : ""}</div>`;
   })).join("") : `<div class="ws212-empty">${vi ? "Board rỗng" : "Empty board"}</div>`;
@@ -13718,12 +13743,13 @@ function renderWordSearchIIView(step) {
     build: vi ? "GỘP PREFIX CHUNG" : "MERGE SHARED PREFIXES",
     start: vi ? "BẮT ĐẦU DFS" : "START DFS",
     match: vi ? "MATCH · ĐI TIẾP" : "MATCH · CONTINUE",
+    mark: vi ? "VISITED · ĐÁNH DẤU #" : "VISITED · MARK WITH #",
     prune: vi ? "PRUNE · RETURN NGAY" : "PRUNE · RETURN NOW",
     found: vi ? "FOUND · THÊM KẾT QUẢ" : "FOUND · ADD RESULT",
     backtrack: vi ? "BACKTRACK · KHÔI PHỤC" : "BACKTRACK · RESTORE",
     done: vi ? "HOÀN TẤT" : "COMPLETE",
   };
-  const actionClass = ["prune", "found", "backtrack", "done"].includes(view.action) ? view.action : "";
+  const actionClass = ["mark", "prune", "found", "backtrack", "done"].includes(view.action) ? view.action : "";
   const moveText = view.candidate
     ? `${view.direction || "start"} (${view.candidate.r},${view.candidate.c}) = '${boardRows[view.candidate.r]?.[view.candidate.c] || ""}'`
     : (vi ? "chưa chọn ô" : "no cell selected");

@@ -32126,3 +32126,60 @@ html, body {
 [data-theme="light"] .trie-level-card li span { color: #0369a1; }
 [data-theme="light"] .trie-level-card li b { color: #1e293b; }
 [data-theme="light"] .trie-roadmap-sequence i { color: #475569; font-weight: 800; }
+
+/* LeetCode 212 · explicit board[r][c] = '#' visualization */
+.ws212-cell.marked {
+  border-color: #f59e0b;
+  background: repeating-linear-gradient(135deg, rgba(245, 158, 11, .18) 0 7px, rgba(120, 53, 15, .22) 7px 14px);
+  box-shadow: inset 0 0 0 2px rgba(245, 158, 11, .13);
+}
+.ws212-cell.marked > strong { color: #fbbf24; font-size: 24px; }
+.ws212-cell.marked > span { color: #fde68a; font-weight: 800; }
+.ws212-action.mark { border-left-color: #f59e0b; background: rgba(245, 158, 11, .09); }
+.ws212-action.mark > span { color: #fbbf24; }
+[data-theme="light"] .ws212-cell.marked {
+  border-color: #d97706;
+  background: repeating-linear-gradient(135deg, #fffbeb 0 7px, #fef3c7 7px 14px);
+}
+[data-theme="light"] .ws212-cell.marked > strong { color: #92400e; }
+[data-theme="light"] .ws212-cell.marked > span { color: #78350f; }
+[data-theme="light"] .ws212-action.mark { border-left-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .ws212-action.mark > span { color: #92400e; }
+
+/* Trie Learning Map · internal problem hyperlinks */
+.trie-problem-link,
+.trie-problem-row { text-decoration: none; cursor: pointer; }
+.trie-pattern-card > div .trie-problem-link,
+.trie-roadmap-sequence .trie-problem-link {
+  padding: 3px 6px; border: 1px solid rgba(56, 189, 248, .35); border-radius: 6px;
+  background: rgba(14, 165, 233, .1); color: #7dd3fc;
+  font: 700 10px Consolas, monospace; transition: border-color .15s, background .15s, transform .15s;
+}
+.trie-pattern-card > div .trie-problem-link:hover,
+.trie-roadmap-sequence .trie-problem-link:hover,
+.trie-problem-link:focus-visible {
+  border-color: #38bdf8; background: rgba(14, 165, 233, .22); color: #e0f2fe;
+  outline: 2px solid rgba(56, 189, 248, .35); outline-offset: 2px; transform: translateY(-1px);
+}
+.trie-level-card li { display: block; padding: 0; }
+.trie-problem-row {
+  width: 100%; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 7px;
+  align-items: baseline; padding: 6px 1px; border-radius: 5px; color: inherit;
+}
+.trie-problem-row:hover { background: rgba(56, 189, 248, .1); }
+.trie-problem-row:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; background: rgba(56, 189, 248, .1); }
+.trie-problem-row span { color: #7dd3fc; font: 700 10px Consolas, monospace; }
+.trie-problem-row b { color: #e2e8f0; font-size: 10.5px; font-weight: 650; }
+[data-theme="light"] .trie-pattern-card > div .trie-problem-link,
+[data-theme="light"] .trie-roadmap-sequence .trie-problem-link {
+  border-color: #7dd3fc; background: #e0f2fe; color: #075985;
+}
+[data-theme="light"] .trie-pattern-card > div .trie-problem-link:hover,
+[data-theme="light"] .trie-roadmap-sequence .trie-problem-link:hover,
+[data-theme="light"] .trie-problem-link:focus-visible {
+  border-color: #0284c7; background: #bae6fd; color: #0c4a6e;
+}
+[data-theme="light"] .trie-problem-row:hover,
+[data-theme="light"] .trie-problem-row:focus-visible { background: #e0f2fe; }
+[data-theme="light"] .trie-problem-row span { color: #0369a1; }
+[data-theme="light"] .trie-problem-row b { color: #1e293b; }

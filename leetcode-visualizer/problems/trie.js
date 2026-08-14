@@ -4204,18 +4204,80 @@ module.exports = {
         prune: [22, 23, 24],
         match: [21, 22, 23, 25],
         found: [26, 27, 28],
-        backtrack: [29, 30, 31, 32, 33, 34],
+        mark: [29],
+        backtrack: [30, 31, 32, 33, 34],
         done: [36, 37, 38, 39],
       };
-      output.steps = output.steps.map((step) => {
+
+      function showVisitedCells(step, includeCurrent) {
         const view = step.wordSearchIIView || {};
-        const emptyBoard = view.action === "done" && (!view.rows || !view.cols);
+        const board = (view.board || []).map((row) => [...row]);
+        const path = Array.isArray(view.path) ? view.path : [];
+        const markedCount = includeCurrent ? path.length : Math.max(0, path.length - 1);
+        for (let index = 0; index < markedCount; index += 1) {
+          const cell = path[index];
+          if (board[cell.r] && cell.c >= 0 && cell.c < board[cell.r].length) {
+            board[cell.r][cell.c] = "#";
+          }
+        }
         return {
           ...step,
-          codeBlock: 2,
-          codeLines: emptyBoard ? [8, 9] : (linesByAction[view.action] || step.codeLines),
+          wordSearchIIView: { ...view, board },
         };
+      }
+
+      const visualSteps = [];
+      output.steps.forEach((step, index) => {
+        const view = step.wordSearchIIView || {};
+        const action = view.action || "";
+        const emptyBoard = action === "done" && (!view.rows || !view.cols);
+        const remapped = {
+          ...step,
+          codeBlock: 2,
+          codeLines: emptyBoard ? [8, 9] : (linesByAction[action] || step.codeLines),
+        };
+        const currentIsNotMarkedYet = action === "match" || action === "found";
+        visualSteps.push(showVisitedCells(remapped, !currentIsNotMarkedYet));
+
+        const nextAction = output.steps[index + 1] && output.steps[index + 1].wordSearchIIView
+          ? output.steps[index + 1].wordSearchIIView.action
+          : "";
+        const shouldShowMark = action === "found" || (action === "match" && nextAction !== "found");
+        if (!shouldShowMark || !view.path || !view.path.length) return;
+
+        const current = view.path[view.path.length - 1];
+        const markStep = showVisitedCells({
+          ...remapped,
+          title: {
+            vi: `Dòng 29 · đánh dấu ô (${current.r},${current.c}) = '#'`,
+            en: `Line 29 · mark cell (${current.r},${current.c}) = '#'`,
+          },
+          final: false,
+          codeLines: linesByAction.mark,
+          vars: [
+            ...(step.vars || []),
+            { name: `board[${current.r}][${current.c}]`, value: "'#'" },
+            { name: "meaning", value: "visited in current DFS path" },
+          ],
+          note: {
+            vi: `Tạm đổi '${current.char}' thành '#'. DFS kế tiếp sẽ không thể dùng lại ô (${current.r},${current.c}); ký tự gốc vẫn được giữ trong BOARD PATH để backtrack khôi phục.`,
+            en: `Temporarily replace '${current.char}' with '#'. Deeper DFS calls cannot reuse (${current.r},${current.c}); BOARD PATH keeps the original character for restoration.`,
+          },
+          wordSearchIIView: {
+            ...view,
+            action: "mark",
+            current: { r: current.r, c: current.c },
+            candidate: { r: current.r, c: current.c },
+            restored: null,
+            decision: {
+              vi: `board[${current.r}][${current.c}] = '#' → khóa ô trong path hiện tại`,
+              en: `board[${current.r}][${current.c}] = '#' → lock the cell in the current path`,
+            },
+          },
+        }, true);
+        visualSteps.push(markStep);
       });
+      output.steps = visualSteps;
       return output;
     },
   },
