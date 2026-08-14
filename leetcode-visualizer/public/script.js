@@ -6910,6 +6910,49 @@ function renderReplaceWordsView(step) {
       <div class="rw-result-row">${resultHtml}</div>
     </div>
   </section>`;
+
+  if (Number(view.approach) === 2) {
+    const trieHeading = treeView.querySelector(".rw-trie-section header strong");
+    const trieHint = treeView.querySelector(".rw-trie-section header span");
+    const pathHeading = treeView.querySelector(".rw-path small");
+    if (trieHeading) trieHeading.textContent = vi ? "Nested dictionary" : "Nested dictionary";
+    if (trieHint) trieHint.textContent = vi ? "mỗi dict con là một Trie node; $ đánh dấu root" : "each child dict is a Trie node; $ marks a root";
+    if (pathHeading) pathHeading.textContent = vi ? "Đường đi dictionary" : "Dictionary path";
+
+    treeView.querySelectorAll(".rw-trie-node:not(.terminal) .rw-trie-meta").forEach((meta) => meta.remove());
+    const terminalData = trieNodes.filter((node) => node.isWord);
+    treeView.querySelectorAll(".rw-trie-node.terminal").forEach((group, index) => {
+      const rootWord = String((terminalData[index] && terminalData[index].sub) || "");
+      const shortened = rootWord.length > 14 ? `${rootWord.slice(0, 11)}...` : rootWord;
+      const texts = group.querySelectorAll(".rw-trie-meta text");
+      if (texts[0]) texts[0].textContent = `$ = \"${shortened}\"`;
+      if (texts[1]) texts[1].remove();
+    });
+  } else if (Number(view.approach) === 3) {
+    const testedPrefixes = Array.isArray(view.testedPrefixes) ? view.testedPrefixes : [];
+    const setTokens = roots.length
+      ? roots.map((root) => {
+        const active = root === prefix || root === foundRoot;
+        return `<span class="rw-root${active ? " active" : ""}">${escapeHtml(root)}</span>`;
+      }).join("")
+      : `<span class="rw-empty">∅</span>`;
+    const prefixTokens = testedPrefixes.length
+      ? testedPrefixes.map((item, index) => {
+        const isCurrent = index === testedPrefixes.length - 1;
+        const isMatch = roots.includes(item);
+        return `<span class="rw-root${isCurrent || isMatch ? " active" : ""}">${escapeHtml(item)}</span>`;
+      }).join("<i>→</i>")
+      : `<span class="rw-empty">${vi ? "Chưa thử prefix" : "No prefix tested"}</span>`;
+    const setSection = treeView.querySelector(".rw-trie-section");
+    if (setSection) {
+      setSection.innerHTML = `<header><strong>${vi ? "Set lookup" : "Set lookup"}</strong><span>${vi ? "không xây Trie; kiểm tra prefix in roots" : "no Trie; check prefix in roots"}</span></header>
+        <div class="rw-root-row">${setTokens}</div>`;
+    }
+    const workspacePath = treeView.querySelector(".rw-workspace .rw-path");
+    if (workspacePath) {
+      workspacePath.innerHTML = `<small>${vi ? "Các prefix đã thử" : "Tested prefixes"}</small><div>${prefixTokens}</div>`;
+    }
+  }
 }
 
 function renderPrefix2DView(step) {

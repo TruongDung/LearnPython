@@ -1594,6 +1594,499 @@ function buildSteps648(input, params) {
 }
 
 /**
+ * LeetCode 648 — Approach 2: nested dictionaries are Trie nodes.
+ * Character keys are edges; "$" is an explicit terminal entry containing
+ * the complete dictionary root.
+ */
+function buildSteps648NestedDict(input, params) {
+  const roots = String(input).split(",").map((word) => word.trim()).filter(Boolean);
+  const sentence = String((params && params.sentence) || "").trim();
+  const sentenceWords = sentence.split(/\s+/).filter(Boolean);
+  const trie = {};
+  const resultWords = [];
+  const steps = [];
+  const ids = new Map();
+  let nextId = 0;
+  const ROOT_KEY = "@root";
+  const terminalKey = (prefix) => `${prefix}::$`;
+  const idFor = (key) => {
+    if (!ids.has(key)) ids.set(key, nextId++);
+    return ids.get(key);
+  };
+  const owns = (node, key) => Object.prototype.hasOwnProperty.call(node, key);
+  idFor(ROOT_KEY);
+
+  function makeTree(opts) {
+    const nodes = [];
+    const annotations = {};
+    const highlighted = new Set(opts.highlightKeys || [ROOT_KEY]);
+    let nextX = 0;
+
+    function visit(node, prefix, label, parentId, depth) {
+      const key = prefix || ROOT_KEY;
+      const id = idFor(key);
+      const childXs = [];
+      const chars = Object.keys(node).filter((char) => char !== "$").sort();
+      for (const char of chars) {
+        childXs.push(visit(node[char], prefix + char, char, id, depth + 1));
+      }
+      if (owns(node, "$")) {
+        const markerKey = terminalKey(prefix);
+        const markerId = idFor(markerKey);
+        const markerX = nextX++;
+        childXs.push(markerX);
+        nodes.push({
+          id: markerId,
+          label: "$",
+          x: markerX,
+          y: depth + 1,
+          parentId: id,
+          isWord: true,
+          hl: highlighted.has(markerKey),
+          sub: node["$"],
+        });
+      }
+      const x = childXs.length
+        ? (childXs[0] + childXs[childXs.length - 1]) / 2
+        : nextX++;
+      nodes.push({
+        id,
+        label: prefix ? label : "•",
+        x,
+        y: depth,
+        parentId,
+        isWord: false,
+        hl: highlighted.has(key),
+        sub: "",
+      });
+      return x;
+    }
+
+    visit(trie, "", "•", null, 0);
+    if (opts.currentKey) annotations[idFor(opts.currentKey)] = { label: "cur", kind: "current" };
+    if (opts.stopKey) annotations[idFor(opts.stopKey)] = { label: "$", kind: "answer" };
+    if (opts.failKey) annotations[idFor(opts.failKey)] = { label: "miss", kind: "pruned" };
+    return { nodes, annotations };
+  }
+
+  function snapshot(opts) {
+    steps.push({
+      title: opts.title,
+      arr: [],
+      tree: makeTree(opts),
+      replaceWordsView: {
+        approach: 2,
+        roots: [...roots],
+        sentenceWords: [...sentenceWords],
+        resultWords: [...resultWords],
+        wordIndex: opts.wordIndex ?? null,
+        word: opts.word || "",
+        charIndex: opts.charIndex ?? null,
+        prefix: opts.prefix || "",
+        phase: opts.phase || "build",
+        action: opts.action || "",
+        foundRoot: opts.foundRoot || "",
+        replacement: opts.replacement || "",
+        missingChar: opts.missingChar || "",
+        pathChars: opts.pathChars || [],
+      },
+      highlight: [],
+      mark: [],
+      codeBlock: 2,
+      codeLines: [opts.line],
+      vars: [
+        { name: "dictionary", value: `[${roots.join(", ")}]` },
+        { name: "sentence", value: sentence || "(empty)" },
+        { name: "result", value: resultWords.length ? resultWords.join(" ") : "[]" },
+        ...(opts.vars || []),
+      ],
+      note: opts.note,
+      final: Boolean(opts.final),
+    });
+  }
+
+  snapshot({
+    title: { vi: "Dòng 3 · trie = {}", en: "Line 3 · trie = {}" },
+    line: 3,
+    currentKey: ROOT_KEY,
+    highlightKeys: [ROOT_KEY],
+    action: "init-dict",
+    note: {
+      vi: "Dictionary rỗng này là root của Trie. Mỗi dictionary con sau đó sẽ đóng vai trò một Trie node.",
+      en: "This empty dictionary is the Trie root. Every nested dictionary will act as a Trie node.",
+    },
+  });
+
+  for (const rootWord of roots) {
+    let node = trie;
+    let prefix = "";
+    const pathKeys = [ROOT_KEY];
+    snapshot({
+      title: { vi: `Dòng 5 · lấy root_word "${rootWord}"`, en: `Line 5 · take root_word "${rootWord}"` },
+      line: 5,
+      currentKey: ROOT_KEY,
+      highlightKeys: [...pathKeys],
+      word: rootWord,
+      action: "take-root",
+      vars: [{ name: "root_word", value: rootWord }],
+      note: {
+        vi: `Bắt đầu chèn "${rootWord}" vào nested dictionary.`,
+        en: `Begin inserting "${rootWord}" into the nested dictionary.`,
+      },
+    });
+    snapshot({
+      title: { vi: "Dòng 6 · node = trie", en: "Line 6 · node = trie" },
+      line: 6,
+      currentKey: ROOT_KEY,
+      highlightKeys: [...pathKeys],
+      word: rootWord,
+      action: "reset-node",
+      vars: [{ name: "node", value: "trie (root dict)" }],
+      note: {
+        vi: "Mỗi root word luôn bắt đầu từ dictionary gốc.",
+        en: "Every root word starts at the root dictionary.",
+      },
+    });
+
+    for (let index = 0; index < rootWord.length; index += 1) {
+      const char = rootWord[index];
+      const nextPrefix = prefix + char;
+      const existed = owns(node, char);
+      snapshot({
+        title: { vi: `Dòng 7 · đọc '${char}'`, en: `Line 7 · read '${char}'` },
+        line: 7,
+        currentKey: prefix || ROOT_KEY,
+        highlightKeys: [...pathKeys],
+        word: rootWord,
+        charIndex: index,
+        prefix: nextPrefix,
+        pathChars: prefix.split(""),
+        action: "read-build-char",
+        vars: [
+          { name: "char", value: char },
+          { name: `char in node`, value: existed ? "True" : "False" },
+        ],
+        note: {
+          vi: `Chuẩn bị gọi setdefault('${char}', {}) tại dictionary của prefix "${prefix}".`,
+          en: `Prepare setdefault('${char}', {}) in the dictionary for prefix "${prefix}".`,
+        },
+      });
+
+      if (!existed) node[char] = {};
+      node = node[char];
+      prefix = nextPrefix;
+      pathKeys.push(prefix);
+      snapshot({
+        title: {
+          vi: `Dòng 8 · ${existed ? "dùng lại" : "tạo"} node '${char}'`,
+          en: `Line 8 · ${existed ? "reuse" : "create"} '${char}' node`,
+        },
+        line: 8,
+        currentKey: prefix,
+        highlightKeys: [...pathKeys],
+        word: rootWord,
+        charIndex: index,
+        prefix,
+        pathChars: prefix.split(""),
+        action: existed ? "setdefault-existing" : "setdefault-create",
+        vars: [
+          { name: "char", value: char },
+          { name: "node", value: `trie["${prefix.split("").join('"]["')}"]` },
+          { name: "created?", value: existed ? "False" : "True" },
+        ],
+        note: {
+          vi: existed
+            ? `Key '${char}' đã tồn tại, setdefault trả dictionary con hiện có.`
+            : `Key '${char}' chưa tồn tại, setdefault tạo {} rồi trả dictionary con mới.`,
+          en: existed
+            ? `Key '${char}' exists, so setdefault returns its existing child dictionary.`
+            : `Key '${char}' is absent, so setdefault creates {} and returns the new child dictionary.`,
+        },
+      });
+    }
+
+    node["$"] = rootWord;
+    const marker = terminalKey(prefix);
+    snapshot({
+      title: { vi: `Dòng 9 · node["$"] = "${rootWord}"`, en: `Line 9 · node["$"] = "${rootWord}"` },
+      line: 9,
+      currentKey: marker,
+      stopKey: marker,
+      highlightKeys: [...pathKeys, marker],
+      word: rootWord,
+      prefix: rootWord,
+      foundRoot: rootWord,
+      pathChars: [...rootWord, "$"],
+      phase: "mark-root",
+      action: "store-dollar",
+      vars: [
+        { name: 'node["$"]', value: rootWord },
+        { name: "$ means", value: "end of root word" },
+      ],
+      note: {
+        vi: `Node '$' xuất hiện và lưu nguyên root "${rootWord}". Đây là terminal marker của nested-dictionary Trie.`,
+        en: `The '$' node appears and stores root "${rootWord}". It is the nested-dictionary Trie's terminal marker.`,
+      },
+    });
+  }
+
+  snapshot({
+    title: { vi: "Dòng 11 · định nghĩa find_root", en: "Line 11 · define find_root" },
+    line: 11,
+    currentKey: ROOT_KEY,
+    highlightKeys: [ROOT_KEY],
+    action: "define-find-root",
+    note: {
+      vi: "find_root sẽ đi qua nested dictionary và trả về ngay khi gặp key '$'.",
+      en: "find_root walks the nested dictionaries and returns as soon as it finds key '$'.",
+    },
+  });
+
+  for (let wordIndex = 0; wordIndex < sentenceWords.length; wordIndex += 1) {
+    const word = sentenceWords[wordIndex];
+    let node = trie;
+    let prefix = "";
+    let returned = false;
+    const pathKeys = [ROOT_KEY];
+
+    snapshot({
+      title: { vi: `Dòng 20 · gọi find_root("${word}")`, en: `Line 20 · call find_root("${word}")` },
+      line: 20,
+      currentKey: ROOT_KEY,
+      highlightKeys: [ROOT_KEY],
+      wordIndex,
+      word,
+      phase: "lookup-start",
+      action: "call-find-root",
+      vars: [{ name: "word", value: word }],
+      note: {
+        vi: `Generator đang cần replacement cho từ "${word}".`,
+        en: `The generator now needs a replacement for "${word}".`,
+      },
+    });
+    snapshot({
+      title: { vi: "Dòng 12 · node = trie", en: "Line 12 · node = trie" },
+      line: 12,
+      currentKey: ROOT_KEY,
+      highlightKeys: [...pathKeys],
+      wordIndex,
+      word,
+      phase: "lookup-start",
+      action: "lookup-reset-node",
+      note: {
+        vi: `Bắt đầu lookup "${word}" từ root dictionary.`,
+        en: `Start looking up "${word}" from the root dictionary.`,
+      },
+    });
+
+    for (let index = 0; index < word.length; index += 1) {
+      const char = word[index];
+      snapshot({
+        title: { vi: `Dòng 13 · đọc '${char}'`, en: `Line 13 · read '${char}'` },
+        line: 13,
+        currentKey: prefix || ROOT_KEY,
+        highlightKeys: [...pathKeys],
+        wordIndex,
+        word,
+        charIndex: index,
+        prefix,
+        pathChars: prefix.split(""),
+        phase: "lookup",
+        action: "read-word-char",
+        vars: [{ name: "char", value: char }],
+        note: {
+          vi: `Xét ký tự '${char}' tiếp theo của "${word}".`,
+          en: `Read the next character '${char}' from "${word}".`,
+        },
+      });
+
+      const exists = owns(node, char);
+      snapshot({
+        title: {
+          vi: `Dòng 14 · '${char}' ${exists ? "có" : "không có"} trong node`,
+          en: `Line 14 · '${char}' is ${exists ? "in" : "not in"} node`,
+        },
+        line: 14,
+        currentKey: prefix || ROOT_KEY,
+        failKey: exists ? null : (prefix || ROOT_KEY),
+        highlightKeys: [...pathKeys],
+        wordIndex,
+        word,
+        charIndex: index,
+        prefix: exists ? prefix : prefix + char,
+        missingChar: exists ? "" : char,
+        pathChars: prefix.split(""),
+        phase: exists ? "lookup" : "miss",
+        action: exists ? "edge-exists" : "missing-edge",
+        vars: [{ name: `"${char}" in node`, value: exists ? "True" : "False" }],
+        note: {
+          vi: exists
+            ? `Dictionary hiện tại có key '${char}', nên lookup có thể đi tiếp.`
+            : `Dictionary hiện tại thiếu key '${char}', nên không root nào khớp "${word}".`,
+          en: exists
+            ? `The current dictionary contains '${char}', so lookup can continue.`
+            : `The current dictionary lacks '${char}', so no root matches "${word}".`,
+        },
+      });
+
+      if (!exists) {
+        resultWords.push(word);
+        snapshot({
+          title: { vi: `Dòng 15 · return "${word}"`, en: `Line 15 · return "${word}"` },
+          line: 15,
+          currentKey: prefix || ROOT_KEY,
+          failKey: prefix || ROOT_KEY,
+          highlightKeys: [...pathKeys],
+          wordIndex,
+          word,
+          charIndex: index,
+          prefix: prefix + char,
+          missingChar: char,
+          replacement: word,
+          pathChars: prefix.split(""),
+          phase: "keep",
+          action: "return-original-miss",
+          vars: [{ name: "return", value: word }],
+          note: {
+            vi: `Thiếu cạnh '${char}' nên find_root trả lại từ gốc "${word}".`,
+            en: `Because edge '${char}' is missing, find_root returns original word "${word}".`,
+          },
+        });
+        returned = true;
+        break;
+      }
+
+      node = node[char];
+      prefix += char;
+      pathKeys.push(prefix);
+      snapshot({
+        title: { vi: `Dòng 16 · node = node['${char}']`, en: `Line 16 · node = node['${char}']` },
+        line: 16,
+        currentKey: prefix,
+        highlightKeys: [...pathKeys],
+        wordIndex,
+        word,
+        charIndex: index,
+        prefix,
+        pathChars: prefix.split(""),
+        phase: "lookup",
+        action: "move-dict-child",
+        vars: [
+          { name: "node prefix", value: prefix },
+          { name: '"$" in node', value: owns(node, "$" ) ? "True" : "False" },
+        ],
+        note: {
+          vi: `Con trỏ node đi xuống dictionary con của '${char}', ứng với prefix "${prefix}".`,
+          en: `The node pointer moves into '${char}' child dictionary for prefix "${prefix}".`,
+        },
+      });
+
+      const hasTerminal = owns(node, "$");
+      const marker = terminalKey(prefix);
+      snapshot({
+        title: {
+          vi: `Dòng 17 · "$" ${hasTerminal ? "có" : "không có"} trong node`,
+          en: `Line 17 · "$" is ${hasTerminal ? "in" : "not in"} node`,
+        },
+        line: 17,
+        currentKey: hasTerminal ? marker : prefix,
+        stopKey: hasTerminal ? marker : null,
+        highlightKeys: hasTerminal ? [...pathKeys, marker] : [...pathKeys],
+        wordIndex,
+        word,
+        charIndex: index,
+        prefix,
+        foundRoot: hasTerminal ? node["$"] : "",
+        pathChars: hasTerminal ? [...prefix, "$" ] : prefix.split(""),
+        phase: hasTerminal ? "candidate-root" : "lookup",
+        action: hasTerminal ? "dollar-found" : "dollar-missing",
+        vars: [{ name: '"$" in node', value: hasTerminal ? "True" : "False" }],
+        note: {
+          vi: hasTerminal
+            ? `Key '$' tồn tại: prefix "${prefix}" là một root hoàn chỉnh.`
+            : `Chưa có key '$': prefix "${prefix}" chưa phải root hoàn chỉnh.`,
+          en: hasTerminal
+            ? `Key '$' exists: prefix "${prefix}" is a complete dictionary root.`
+            : `There is no '$' key yet: prefix "${prefix}" is not a complete root.`,
+        },
+      });
+
+      if (hasTerminal) {
+        const replacement = node["$"];
+        resultWords.push(replacement);
+        snapshot({
+          title: { vi: `Dòng 18 · return node["$"] = "${replacement}"`, en: `Line 18 · return node["$"] = "${replacement}"` },
+          line: 18,
+          currentKey: marker,
+          stopKey: marker,
+          highlightKeys: [...pathKeys, marker],
+          wordIndex,
+          word,
+          charIndex: index,
+          prefix,
+          foundRoot: replacement,
+          replacement,
+          pathChars: [...prefix, "$"],
+          phase: "replace",
+          action: "return-dollar-root",
+          vars: [
+            { name: 'node["$"]', value: replacement },
+            { name: "return", value: replacement },
+          ],
+          note: {
+            vi: `Trả ngay "${replacement}". Vì đọc trái sang phải, đây là root ngắn nhất của "${word}".`,
+            en: `Return "${replacement}" immediately. Scanning left to right guarantees it is the shortest root of "${word}".`,
+          },
+        });
+        returned = true;
+        break;
+      }
+    }
+
+    if (!returned) {
+      resultWords.push(word);
+      snapshot({
+        title: { vi: `Dòng 19 · return "${word}"`, en: `Line 19 · return "${word}"` },
+        line: 19,
+        currentKey: prefix || ROOT_KEY,
+        highlightKeys: [...pathKeys],
+        wordIndex,
+        word,
+        charIndex: word.length - 1,
+        prefix,
+        replacement: word,
+        pathChars: prefix.split(""),
+        phase: "keep",
+        action: "return-original-end",
+        vars: [{ name: "return", value: word }],
+        note: {
+          vi: `Đã đọc hết "${word}" nhưng không gặp '$', nên giữ nguyên từ.`,
+          en: `The whole word was consumed without finding '$', so keep the original word.`,
+        },
+      });
+    }
+  }
+
+  const answer = resultWords.join(" ");
+  snapshot({
+    title: { vi: `Dòng 20 · kết quả "${answer}"`, en: `Line 20 · result "${answer}"` },
+    line: 20,
+    currentKey: ROOT_KEY,
+    highlightKeys: [ROOT_KEY],
+    phase: "done",
+    action: "done",
+    final: true,
+    vars: [{ name: "return", value: answer }],
+    note: {
+      vi: `join các kết quả find_root: "${answer}".`,
+      en: `Join all find_root results: "${answer}".`,
+    },
+  });
+
+  return { roots, sentence, answer, steps };
+}
+
+/**
  * LeetCode 676: Implement Magic Dictionary.
  * Trie + search with exactly one character changed.
  */
@@ -3594,22 +4087,33 @@ module.exports = {
     inputKind: "string",
     inputLabel: { vi: "Bảng (hàng cách ;)", en: "Board (rows separated by ;)" },
     extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách cài đặt Trie", en: "Trie implementation" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1 · Nested dictionary + '$'", en: "Approach 1 · Nested dictionary + '$'" } },
+          { value: 2, label: { vi: "Cách 2 · class TrieNode", en: "Approach 2 · TrieNode class" } },
+        ],
+      },
       { key: "words", type: "string", label: { vi: "words (cách bởi ,)", en: "words (comma separated)" }, default: "oath,pea,eat,rain" },
     ],
     approach: [
-      { vi: "Xây Trie chứa mọi từ; lá đánh dấu '$' (từ hoàn chỉnh).", en: "Build a Trie of all words; a leaf marks '$' (a complete word)." },
-      { vi: "DFS từng ô; chỉ đi tiếp nếu chữ cái là con của node Trie hiện tại (cắt tỉa mạnh).", en: "DFS each cell; continue only if the letter is a child of the current Trie node (strong pruning)." },
-      { vi: "Đánh dấu ô đang thăm '#' để không dùng lại; khôi phục khi quay lui.", en: "Mark the current cell '#' so it isn't reused; restore on backtrack." },
-      { vi: "Khi gặp '$' trong node → thêm từ vào kết quả, xóa '$' để tránh trùng.", en: "When a node has '$' → add the word to the result and delete '$' to avoid duplicates." },
+      { vi: "Cách 1 dùng nested dictionary; key '$' vừa đánh dấu cuối từ vừa lưu từ hoàn chỉnh.", en: "Approach 1 uses nested dictionaries; '$' both marks a word ending and stores the complete word." },
+      { vi: "Cách 2 khai báo rõ TrieNode với children và word; word khác None nghĩa là node kết thúc một từ.", en: "Approach 2 declares TrieNode explicitly with children and word; a non-None word marks a complete word." },
+      { vi: "DFS từng ô; chỉ đi tiếp nếu chữ cái là con của node Trie hiện tại. Đánh dấu ô bằng '#' rồi khôi phục khi backtrack.", en: "DFS each cell and continue only through a child of the current Trie node. Mark a cell with '#' and restore it on backtrack." },
+      { vi: "Khi tìm thấy từ, xóa '$' ở Cách 1 hoặc đặt word = None ở Cách 2 để tránh kết quả trùng.", en: "After finding a word, delete '$' in Approach 1 or set word = None in Approach 2 to avoid duplicates." },
     ],
     complexity: {
       time: "O(rows·cols·4^L)",
       space: "O(total word length)",
       note: {
-        vi: "L = độ dài từ dài nhất. Trie giúp cắt tỉa sớm nên thực tế nhanh hơn nhiều.",
-        en: "L = longest word length. The Trie prunes early, so it's much faster in practice.",
+        vi: "Hai cách chỉ khác cách biểu diễn Trie nên có cùng độ phức tạp. L là độ dài từ dài nhất; Trie giúp cắt tỉa sớm.",
+        en: "The approaches differ only in Trie representation and have the same complexity. L is the longest word length; the Trie enables early pruning.",
       },
     },
+    codeLabel: { vi: "Cách 1 · Nested dictionary + '$'", en: "Approach 1 · Nested dictionary + '$'" },
     code: [
       "class Solution:",
       "    def findWords(self, board, words):",
@@ -3644,12 +4148,76 @@ module.exports = {
       "                dfs(r, c, trie)",
       "        return result",
     ],
+    code2Label: { vi: "Cách 2 · class TrieNode", en: "Approach 2 · TrieNode class" },
+    code2: [
+      "class TrieNode:",
+      "    def __init__(self):",
+      "        self.children = {}",
+      "        self.word = None",
+      "",
+      "class Solution:",
+      "    def findWords(self, board, words):",
+      "        if not board or not board[0]:",
+      "            return []",
+      "        rows, cols = len(board), len(board[0])",
+      "        root = TrieNode()",
+      "        for word in words:",
+      "            node = root",
+      "            for ch in word:",
+      "                if ch not in node.children:",
+      "                    node.children[ch] = TrieNode()",
+      "                node = node.children[ch]",
+      "            node.word = word",
+      "        result = []",
+      "",
+      "        def dfs(r, c, node):",
+      "            ch = board[r][c]",
+      "            if ch not in node.children:",
+      "                return",
+      "            nxt = node.children[ch]",
+      "            if nxt.word is not None:",
+      "                result.append(nxt.word)",
+      "                nxt.word = None",
+      "            board[r][c] = '#'",
+      "            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] != '#':",
+      "                    dfs(nr, nc, nxt)",
+      "            board[r][c] = ch",
+      "",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                dfs(r, c, root)",
+      "        return result",
+    ],
     liveArgs: (input, params = {}) => [
       String(input).split(/[;|]/).map((row) => row.trim()).filter(Boolean)
         .map((row) => row.split(",").map((value) => value.trim())),
       String(params.words || "").split(",").map((word) => word.trim()).filter(Boolean),
     ],
     builder: buildSteps212,
+    builder2(input, params = {}) {
+      const output = buildSteps212(input, params);
+      const linesByAction = {
+        build: [11, 12, 13, 14, 15, 16, 17, 18],
+        start: [19, 21, 36, 37, 38],
+        prune: [22, 23, 24],
+        match: [21, 22, 23, 25],
+        found: [26, 27, 28],
+        backtrack: [29, 30, 31, 32, 33, 34],
+        done: [36, 37, 38, 39],
+      };
+      output.steps = output.steps.map((step) => {
+        const view = step.wordSearchIIView || {};
+        const emptyBoard = view.action === "done" && (!view.rows || !view.cols);
+        return {
+          ...step,
+          codeBlock: 2,
+          codeLines: emptyBoard ? [8, 9] : (linesByAction[view.action] || step.codeLines),
+        };
+      });
+      return output;
+    },
   },
   676: {
     id: 676,
@@ -4048,6 +4616,17 @@ module.exports = {
     inputLabel: { vi: "Danh sách gốc từ (cách nhau bởi dấu phẩy)", en: "Dictionary roots (comma separated)" },
     extraParams: [
       {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách giải", en: "Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "Cách 1 · class TrieNode", en: "Approach 1 · TrieNode class" } },
+          { value: 2, label: { vi: "Cách 2 · Nested dictionary + '$'", en: "Approach 2 · Nested dictionary + '$'" } },
+          { value: 3, label: { vi: "Cách 3 · Set + quét prefix", en: "Approach 3 · Set + prefix scan" } },
+        ],
+      },
+      {
         key: "sentence",
         type: "string",
         label: { vi: "Câu cần thay thế", en: "Sentence to process" },
@@ -4055,27 +4634,28 @@ module.exports = {
       },
     ],
     complexity: {
-      time: "O(N·L + S·L)",
+      time: "Trie: O(N·L + S·L) · Set: O(N·L + S·L²)",
       space: "O(N·L)",
       note: {
-        vi: "Xây Trie từ N gốc từ dài tối đa L: O(N·L). Duyệt S từ trong câu, mỗi từ tra Trie tối đa L bước: O(S·L). Bộ nhớ Trie: O(N·L).",
-        en: "Build Trie from N roots of max length L: O(N·L). Process S words in sentence, each Trie lookup at most L steps: O(S·L). Trie memory: O(N·L).",
+        vi: "Cách 1 và 2 xây Trie rồi tra tối đa L ký tự cho mỗi từ. Cách 3 lưu root trong Set; việc tạo và băm mọi prefix khiến mỗi từ dài L có thể tốn O(L²).",
+        en: "Approaches 1 and 2 build a Trie and inspect at most L characters per word. Approach 3 stores roots in a Set; creating and hashing every prefix can cost O(L²) per word.",
       },
     },
     approach: [
       {
-        vi: "Chèn từng root trong dictionary vào Trie; node cuối lưu lại root đó.",
-        en: "Insert each dictionary root into a Trie; the terminal node stores that root.",
+        vi: "Cách 1 dùng class TrieNode; Cách 2 dùng nested dictionary; cả hai đều là Trie.",
+        en: "Approach 1 uses a TrieNode class; Approach 2 uses nested dictionaries; both are Tries.",
       },
       {
-        vi: "Với mỗi word trong sentence, đi từ trái sang phải trên Trie để thử các prefix.",
-        en: "For each sentence word, walk left to right through the Trie to test prefixes.",
+        vi: "Cách 3 không dùng TrieNode hoặc Trie: đưa dictionary vào Set rồi thử word[:1], word[:2], ...",
+        en: "Approach 3 does not use TrieNode or a Trie: put the dictionary in a Set and test word[:1], word[:2], ...",
       },
       {
-        vi: "Vừa gặp node là root thì dừng ngay: vì đọc từ trái sang phải nên đó là root ngắn nhất.",
-        en: "Stop as soon as a root node is reached: because we scan left to right, it is the shortest root.",
+        vi: "Trả ngay prefix đầu tiên có trong dictionary; do duyệt từ ngắn đến dài nên đó là root ngắn nhất.",
+        en: "Return the first prefix found in the dictionary; scanning shortest to longest guarantees the shortest root.",
       },
     ],
+    codeLabel: { vi: "Cách 1 · class TrieNode", en: "Approach 1 · TrieNode class" },
     code: [
       "class TrieNode:",
       "    def __init__(self):",
@@ -4108,6 +4688,263 @@ module.exports = {
       "            result.append(node.word if node.is_root else word)",
       "        return ' '.join(result)",
     ],
+    code2Label: { vi: "Cách 2 · Nested dictionary + '$'", en: "Approach 2 · Nested dictionary + '$'" },
+    code2: [
+      "class Solution:",
+      "    def replaceWords(self, dictionary, sentence):",
+      "        trie = {}",
+      "        # Build Trie",
+      "        for root_word in dictionary:",
+      "            node = trie",
+      "            for char in root_word:",
+      "                node = node.setdefault(char, {})",
+      "            node[\"$\"] = root_word",
+      "",
+      "        def find_root(word):",
+      "            node = trie",
+      "            for char in word:",
+      "                if char not in node:",
+      "                    return word",
+      "                node = node[char]",
+      "                if \"$\" in node:",
+      "                    return node[\"$\"]",
+      "            return word",
+      "        return \" \".join(find_root(word) for word in sentence.split())",
+    ],
+    code3Label: { vi: "Cách 3 · Set + quét prefix (không dùng Trie)", en: "Approach 3 · Set + prefix scan (no Trie)" },
+    code3: [
+      "class Solution:",
+      "    def replaceWords(self, dictionary, sentence):",
+      "        roots = set(dictionary)",
+      "",
+      "        def find_root(word):",
+      "            for length in range(1, len(word) + 1):",
+      "                prefix = word[:length]",
+      "",
+      "                if prefix in roots:",
+      "                    return prefix",
+      "",
+      "            return word",
+      "",
+      "        return \" \".join(find_root(word) for word in sentence.split())",
+    ],
     builder: buildSteps648,
+    builder2: buildSteps648NestedDict,
+    builder3(input, params) {
+      const roots = String(input).split(",").map((word) => word.trim()).filter(Boolean);
+      const rootSet = new Set(roots);
+      const sentence = String((params && params.sentence) || "").trim();
+      const sentenceWords = sentence.split(/\s+/).filter(Boolean);
+      const resultWords = [];
+      const steps = [];
+
+      function snapshot(opts) {
+        steps.push({
+          title: opts.title,
+          arr: [],
+          tree: { nodes: [], annotations: {} },
+          replaceWordsView: {
+            approach: 3,
+            roots: [...roots],
+            sentenceWords: [...sentenceWords],
+            resultWords: [...resultWords],
+            wordIndex: opts.wordIndex ?? null,
+            word: opts.word || "",
+            charIndex: opts.charIndex ?? null,
+            prefix: opts.prefix || "",
+            testedPrefixes: [...(opts.testedPrefixes || [])],
+            phase: opts.phase || "build",
+            action: opts.action || "",
+            foundRoot: opts.foundRoot || "",
+            replacement: opts.replacement || "",
+            missingChar: "",
+            pathChars: opts.prefix ? opts.prefix.split("") : [],
+          },
+          highlight: [],
+          mark: [],
+          codeBlock: 3,
+          codeLines: [opts.line],
+          vars: [
+            { name: "dictionary", value: `[${roots.join(", ")}]` },
+            { name: "sentence", value: sentence || "(empty)" },
+            { name: "result", value: resultWords.length ? resultWords.join(" ") : "[]" },
+            ...(opts.vars || []),
+          ],
+          note: opts.note,
+          final: Boolean(opts.final),
+        });
+      }
+
+      snapshot({
+        title: { vi: "Dòng 3 · roots = set(dictionary)", en: "Line 3 · roots = set(dictionary)" },
+        line: 3,
+        action: "build-set",
+        vars: [{ name: "roots", value: `{${roots.join(", ")}}` }],
+        note: {
+          vi: "Chuyển dictionary thành Set để kiểm tra một prefix trong thời gian trung bình O(1). Không có Trie nào được tạo.",
+          en: "Convert the dictionary to a Set for average O(1) prefix membership checks. No Trie is built.",
+        },
+      });
+      snapshot({
+        title: { vi: "Dòng 5 · định nghĩa find_root", en: "Line 5 · define find_root" },
+        line: 5,
+        action: "define-find-root",
+        note: {
+          vi: "find_root sẽ tạo các prefix từ ngắn đến dài và trả prefix khớp đầu tiên.",
+          en: "find_root will create prefixes from shortest to longest and return the first match.",
+        },
+      });
+
+      for (let wordIndex = 0; wordIndex < sentenceWords.length; wordIndex += 1) {
+        const word = sentenceWords[wordIndex];
+        const testedPrefixes = [];
+        let replacement = word;
+        let foundRoot = "";
+
+        snapshot({
+          title: { vi: `Dòng 14 · gọi find_root("${word}")`, en: `Line 14 · call find_root("${word}")` },
+          line: 14,
+          wordIndex,
+          word,
+          testedPrefixes,
+          phase: "lookup-start",
+          action: "call-find-root",
+          vars: [{ name: "word", value: word }],
+          note: {
+            vi: `Cần tìm root ngắn nhất cho "${word}".`,
+            en: `Find the shortest root for "${word}".`,
+          },
+        });
+
+        for (let length = 1; length <= word.length; length += 1) {
+          snapshot({
+            title: { vi: `Dòng 6 · length = ${length}`, en: `Line 6 · length = ${length}` },
+            line: 6,
+            wordIndex,
+            word,
+            charIndex: length - 1,
+            prefix: word.slice(0, length - 1),
+            testedPrefixes,
+            phase: "lookup",
+            action: "next-length",
+            vars: [{ name: "length", value: length }],
+            note: {
+              vi: `Thử prefix có độ dài ${length}; các prefix ngắn hơn đã không khớp.`,
+              en: `Try a prefix of length ${length}; all shorter prefixes have failed.`,
+            },
+          });
+
+          const prefix = word.slice(0, length);
+          testedPrefixes.push(prefix);
+          snapshot({
+            title: { vi: `Dòng 7 · prefix = "${prefix}"`, en: `Line 7 · prefix = "${prefix}"` },
+            line: 7,
+            wordIndex,
+            word,
+            charIndex: length - 1,
+            prefix,
+            testedPrefixes,
+            phase: "lookup",
+            action: "slice-prefix",
+            vars: [
+              { name: "length", value: length },
+              { name: "prefix", value: prefix },
+            ],
+            note: {
+              vi: `Cắt ${length} ký tự đầu của "${word}" để được prefix "${prefix}".`,
+              en: `Slice the first ${length} characters of "${word}" to get prefix "${prefix}".`,
+            },
+          });
+
+          const exists = rootSet.has(prefix);
+          snapshot({
+            title: {
+              vi: `Dòng 9 · "${prefix}" ${exists ? "có" : "không có"} trong roots`,
+              en: `Line 9 · "${prefix}" is ${exists ? "in" : "not in"} roots`,
+            },
+            line: 9,
+            wordIndex,
+            word,
+            charIndex: length - 1,
+            prefix,
+            testedPrefixes,
+            foundRoot: exists ? prefix : "",
+            phase: exists ? "candidate-root" : "lookup",
+            action: exists ? "set-hit" : "set-miss",
+            vars: [{ name: "prefix in roots", value: exists ? "True" : "False" }],
+            note: {
+              vi: exists
+                ? `Set chứa "${prefix}", nên đây là root ngắn nhất.`
+                : `Set không chứa "${prefix}"; tiếp tục thử prefix dài hơn.`,
+              en: exists
+                ? `The Set contains "${prefix}", so it is the shortest root.`
+                : `The Set does not contain "${prefix}"; continue with a longer prefix.`,
+            },
+          });
+
+          if (exists) {
+            foundRoot = prefix;
+            replacement = prefix;
+            resultWords.push(replacement);
+            snapshot({
+              title: { vi: `Dòng 10 · return "${prefix}"`, en: `Line 10 · return "${prefix}"` },
+              line: 10,
+              wordIndex,
+              word,
+              charIndex: length - 1,
+              prefix,
+              testedPrefixes,
+              foundRoot,
+              replacement,
+              phase: "replace",
+              action: "return-prefix",
+              vars: [{ name: "return", value: replacement }],
+              note: {
+                vi: `Trả "${prefix}" ngay. Không cần thử các prefix dài hơn của "${word}".`,
+                en: `Return "${prefix}" immediately. Longer prefixes of "${word}" are unnecessary.`,
+              },
+            });
+            break;
+          }
+        }
+
+        if (!foundRoot) {
+          resultWords.push(word);
+          snapshot({
+            title: { vi: `Dòng 12 · return "${word}"`, en: `Line 12 · return "${word}"` },
+            line: 12,
+            wordIndex,
+            word,
+            charIndex: word.length - 1,
+            prefix: testedPrefixes[testedPrefixes.length - 1] || "",
+            testedPrefixes,
+            replacement: word,
+            phase: "keep",
+            action: "return-original",
+            vars: [{ name: "return", value: word }],
+            note: {
+              vi: `Không prefix nào có trong roots, nên giữ nguyên "${word}".`,
+              en: `No prefix is in roots, so keep "${word}" unchanged.`,
+            },
+          });
+        }
+      }
+
+      const answer = resultWords.join(" ");
+      snapshot({
+        title: { vi: `Dòng 14 · kết quả "${answer}"`, en: `Line 14 · result "${answer}"` },
+        line: 14,
+        phase: "done",
+        action: "done",
+        final: true,
+        vars: [{ name: "return", value: answer }],
+        note: {
+          vi: `Ghép các kết quả find_root thành câu: "${answer}".`,
+          en: `Join the find_root results into the sentence: "${answer}".`,
+        },
+      });
+
+      return { roots, sentence, answer, steps };
+    },
   },
 };
