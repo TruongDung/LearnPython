@@ -1002,6 +1002,194 @@ function buildSteps1020(input) {
   });
 }
 
+function buildSteps1020Dfs(input) {
+  const parsed = parseGrid(input, new Set(["0", "1"]));
+  const original = parsed.grid.map((row) => row.map(Number));
+  if (!parsed.valid) {
+    return {
+      original,
+      answer: null,
+      steps: [{ title: text("Đầu vào không hợp lệ", "Invalid input"), arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] }, highlight: [], mark: [], final: true, codeBlock: 2, codeLines: [2], vars: [], note: text("Grid phải là ma trận chữ nhật chỉ gồm 0 và 1.", "Grid must be rectangular and contain only 0 and 1.") }],
+    };
+  }
+  const grid = original.map((row) => [...row]);
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const steps = [];
+  const stack = [];
+
+  function cells(current = null, discovered = null) {
+    return original.map((row, r) => row.map((value, c) => {
+      let cls = value === 0 ? "wall" : (grid[r][c] === 0 ? "path" : "empty");
+      if (discovered && discovered[0] === r && discovered[1] === c) cls = "queued";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      return { label: value ? "1" : "", cls };
+    }));
+  }
+  function snap(codeLine, title, note, options = {}) {
+    steps.push({
+      title, arr: [], bfsGrid: { rows, cols, cells: cells(options.current, options.discovered) }, highlight: [], mark: [],
+      final: Boolean(options.final), codeBlock: 2, codeLines: [codeLine],
+      vars: [
+        { name: "call stack", value: `[${stack.map(([r, c]) => `(${r},${c})`).join(" → ")}]` },
+        ...(options.vars || []),
+      ],
+      note,
+    });
+  }
+
+  snap(3, text(`ROWS=${rows}, COLS=${cols}`, `ROWS=${rows}, COLS=${cols}`), text("Lưu kích thước grid trước khi DFS.", "Store grid dimensions before DFS."));
+  const calls = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  function dfs(r, c) {
+    stack.push([r, c]);
+    snap(4, text(`Vào dfs(${r},${c})`, `Enter dfs(${r},${c})`), text("DFS chỉ xóa đất nối được với biên.", "DFS only erases land reachable from the boundary."), { current: r >= 0 && r < rows && c >= 0 && c < cols ? [r, c] : null });
+    const outside = r < 0 || r >= rows || c < 0 || c >= cols;
+    snap(5, text(`Kiểm tra ngoài biên → ${outside}`, `Check out of bounds → ${outside}`), outside ? text("Tọa độ nằm ngoài grid.", "The coordinate is outside the grid.") : text("Tọa độ vẫn nằm trong grid.", "The coordinate is inside the grid."), { current: outside ? null : [r, c] });
+    if (outside) {
+      snap(6, text("return (ngoài biên)", "return (out of bounds)"), text("Dừng nhánh DFS này.", "Stop this DFS branch."));
+      stack.pop();
+      return;
+    }
+    const waterOrSeen = grid[r][c] === 0;
+    snap(7, text(`grid[${r}][${c}] == 0 → ${waterOrSeen}`, `grid[${r}][${c}] == 0 → ${waterOrSeen}`), waterOrSeen ? text("Là nước hoặc đất an toàn đã xóa.", "It is water or already-erased safe land.") : text("Đây là đất chưa thăm.", "This is unvisited land."), { current: [r, c] });
+    if (waterOrSeen) {
+      snap(8, text("return (water / seen)", "return (water / seen)"), text("Không thể lan DFS qua ô này.", "DFS cannot spread through this cell."), { current: [r, c] });
+      stack.pop();
+      return;
+    }
+    grid[r][c] = 0;
+    snap(9, text(`grid[${r}][${c}] = 0`, `grid[${r}][${c}] = 0`), text("Đánh dấu đất nối biên là an toàn (không phải enclave).", "Mark boundary-connected land as safe (not an enclave)."), { current: [r, c], discovered: [r, c] });
+    calls.forEach(([dr, dc], index) => {
+      const nr = r + dr;
+      const nc = c + dc;
+      const codeLine = 10 + index;
+      snap(codeLine, text(`dfs(${nr},${nc})`, `dfs(${nr},${nc})`), text("Đệ quy sang một trong bốn ô kề cạnh.", "Recurse into one of four orthogonal neighbors."), { current: [r, c] });
+      dfs(nr, nc);
+    });
+    stack.pop();
+  }
+
+  for (let r = 0; r < rows; r++) {
+    snap(14, text(`for r in range(ROWS): r=${r}`, `for r in range(ROWS): r=${r}`), text("Gọi DFS tại hai biên trái/phải của hàng.", "Call DFS at the row's left and right boundaries."), { vars: [{ name: "r", value: r }] });
+    snap(15, text(`dfs(${r}, 0)`, `dfs(${r}, 0)`), text("Kiểm tra ô biên trái.", "Inspect the left boundary cell."), { current: [r, 0] });
+    dfs(r, 0);
+    snap(16, text(`dfs(${r}, ${cols - 1})`, `dfs(${r}, ${cols - 1})`), text("Kiểm tra ô biên phải.", "Inspect the right boundary cell."), { current: [r, cols - 1] });
+    dfs(r, cols - 1);
+  }
+  for (let c = 0; c < cols; c++) {
+    snap(17, text(`for c in range(COLS): c=${c}`, `for c in range(COLS): c=${c}`), text("Gọi DFS tại hai biên trên/dưới của cột.", "Call DFS at the column's top and bottom boundaries."), { vars: [{ name: "c", value: c }] });
+    snap(18, text(`dfs(0, ${c})`, `dfs(0, ${c})`), text("Kiểm tra ô biên trên.", "Inspect the top boundary cell."), { current: [0, c] });
+    dfs(0, c);
+    snap(19, text(`dfs(${rows - 1}, ${c})`, `dfs(${rows - 1}, ${c})`), text("Kiểm tra ô biên dưới.", "Inspect the bottom boundary cell."), { current: [rows - 1, c] });
+    dfs(rows - 1, c);
+  }
+  const answer = grid.flat().reduce((sum, value) => sum + value, 0);
+  snap(20, text(`return sum(grid) → ${answer}`, `return sum(grid) → ${answer}`), text("Các ô đất còn lại không nối được biên, chính là enclave.", "The remaining land cannot reach the boundary, so it is enclave land."), { final: true, vars: [{ name: "enclaves", value: answer }] });
+  return { original, answer, steps };
+}
+
+function buildSteps1020UnionFind(input) {
+  const parsed = parseGrid(input, new Set(["0", "1"]));
+  const original = parsed.grid.map((row) => row.map(Number));
+  if (!parsed.valid) {
+    return {
+      original,
+      answer: null,
+      steps: [{ title: text("Đầu vào không hợp lệ", "Invalid input"), arr: [], bfsGrid: { rows: 1, cols: 1, cells: [[{ label: "!", cls: "current" }]] }, highlight: [], mark: [], final: true, codeBlock: 3, codeLines: [2], vars: [], note: text("Grid phải là ma trận chữ nhật chỉ gồm 0 và 1.", "Grid must be rectangular and contain only 0 and 1.") }],
+    };
+  }
+  const rows = original.length;
+  const cols = original[0].length;
+  const virtual = rows * cols;
+  const parent = Array.from({ length: virtual + 1 }, (_, index) => index);
+  const steps = [];
+  const id = (r, c) => r * cols + c;
+  const coord = (node) => node === virtual ? "BORDER" : `(${Math.floor(node / cols)},${node % cols})`;
+  function find(node) {
+    while (parent[node] !== node) {
+      parent[node] = parent[parent[node]];
+      node = parent[node];
+    }
+    return node;
+  }
+  function cells(current = null, discovered = null) {
+    const borderRoot = find(virtual);
+    return original.map((row, r) => row.map((value, c) => {
+      let cls = "wall";
+      if (value === 1) cls = find(id(r, c)) === borderRoot ? "path" : "empty";
+      if (discovered && discovered[0] === r && discovered[1] === c) cls = "queued";
+      if (current && current[0] === r && current[1] === c) cls = "current";
+      return { label: value ? "1" : "", cls };
+    }));
+  }
+  function snap(codeLine, title, note, options = {}) {
+    steps.push({
+      title, arr: [], bfsGrid: { rows, cols, cells: cells(options.current, options.discovered) }, highlight: [], mark: [],
+      final: Boolean(options.final), codeBlock: 3, codeLines: [codeLine],
+      vars: [
+        { name: "virtual BORDER", value: virtual },
+        { name: "BORDER root", value: find(virtual) },
+        ...(options.vars || []),
+      ],
+      note,
+    });
+  }
+  function union(a, b, callLine, current, reason) {
+    snap(callLine, text(`union(${coord(a)}, ${coord(b)})`, `union(${coord(a)}, ${coord(b)})`), reason, { current, vars: [{ name: "union", value: `${a} ↔ ${b}` }] });
+    const rootA = find(a);
+    const rootB = find(b);
+    snap(11, text(`root_a=${rootA}, root_b=${rootB}`, `root_a=${rootA}, root_b=${rootB}`), text("Tìm hai component đại diện trước khi gộp.", "Find the two component representatives before merging."), { current, vars: [{ name: "root_a", value: rootA }, { name: "root_b", value: rootB }] });
+    if (rootA === rootB) {
+      snap(12, text("root_a == root_b → return", "root_a == root_b → return"), text("Hai node đã cùng component; không cần union lại.", "The nodes already share a component; no union is needed."), { current });
+      return;
+    }
+    parent[rootB] = rootA;
+    snap(13, text(`parent[${rootB}] = ${rootA}`, `parent[${rootB}] = ${rootA}`), text("Gộp component root_b vào root_a.", "Attach root_b's component to root_a."), { current, vars: [{ name: `parent[${rootB}]`, value: rootA }] });
+  }
+
+  snap(3, text(`rows=${rows}, cols=${cols}`, `rows=${rows}, cols=${cols}`), text("Lưu kích thước grid.", "Store grid dimensions."));
+  snap(4, text(`virtual = rows * cols = ${virtual}`, `virtual = rows * cols = ${virtual}`), text("Node ảo BORDER đại diện cho mọi đất nối được với biên.", "The virtual BORDER node represents every land cell connected to the boundary."));
+  snap(5, text(`parent = [0..${virtual}]`, `parent = [0..${virtual}]`), text("Ban đầu mỗi ô đất và BORDER là component riêng.", "Initially every land cell and BORDER are separate components."));
+
+  for (let r = 0; r < rows; r++) {
+    snap(14, text(`for r: r=${r}`, `for r: r=${r}`), text("Duyệt từng hàng để tạo các component đất.", "Scan each row to build land components."), { vars: [{ name: "r", value: r }] });
+    for (let c = 0; c < cols; c++) {
+      const land = original[r][c] === 1;
+      snap(15, text(`for c: c=${c}`, `for c: c=${c}`), text("Xét một ô trong hàng hiện tại.", "Inspect one cell in the current row."), { current: [r, c], vars: [{ name: "c", value: c }] });
+      snap(16, text(`grid[${r}][${c}] == 1 → ${land}`, `grid[${r}][${c}] == 1 → ${land}`), land ? text("Đây là đất; xét các union cần thiết.", "This is land; inspect required unions.") : text("Đây là nước; bỏ qua.", "This is water; skip it."), { current: [r, c] });
+      if (!land) continue;
+      const node = id(r, c);
+      const border = r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+      snap(17, text(`is_border(${r},${c}) → ${border}`, `is_border(${r},${c}) → ${border}`), border ? text("Đất biên phải nối với BORDER ảo.", "Boundary land must connect to virtual BORDER.") : text("Không phải đất biên.", "This is not boundary land."), { current: [r, c] });
+      if (border) union(node, virtual, 18, [r, c], text("Nối đất biên với component BORDER.", "Connect boundary land to the BORDER component."));
+      const downLand = r + 1 < rows && original[r + 1][c] === 1;
+      snap(19, text(`down là land → ${downLand}`, `down is land → ${downLand}`), text("Chỉ xét down và right để không union trùng cạnh.", "Only inspect down and right to avoid duplicate edge unions."), { current: [r, c] });
+      if (downLand) union(node, id(r + 1, c), 20, [r, c], text("Gộp hai ô đất kề nhau theo chiều dọc.", "Merge vertically adjacent land cells."));
+      const rightLand = c + 1 < cols && original[r][c + 1] === 1;
+      snap(21, text(`right là land → ${rightLand}`, `right is land → ${rightLand}`), text("Kiểm tra neighbor bên phải.", "Inspect the right neighbor."), { current: [r, c] });
+      if (rightLand) union(node, id(r, c + 1), 22, [r, c], text("Gộp hai ô đất kề nhau theo chiều ngang.", "Merge horizontally adjacent land cells."));
+    }
+  }
+  const borderRoot = find(virtual);
+  snap(23, text(`border_root = find(BORDER) → ${borderRoot}`, `border_root = find(BORDER) → ${borderRoot}`), text("Mọi đất có root này đều có đường ra biên.", "Every land cell with this root can reach the boundary."), { vars: [{ name: "border_root", value: borderRoot }] });
+  let enclaves = 0;
+  snap(24, text("enclaves = 0", "enclaves = 0"), text("Bắt đầu đếm các đất không nối BORDER.", "Start counting land that is not connected to BORDER."));
+  for (let r = 0; r < rows; r++) {
+    snap(25, text(`for r: r=${r}`, `for r: r=${r}`), text("Duyệt lại để đếm enclave.", "Scan again to count enclaves."), { vars: [{ name: "r", value: r }] });
+    for (let c = 0; c < cols; c++) {
+      snap(26, text(`for c: c=${c}`, `for c: c=${c}`), text("Xét một ô để đếm.", "Inspect one cell for counting."), { current: [r, c] });
+      const enclave = original[r][c] === 1 && find(id(r, c)) !== borderRoot;
+      snap(27, text(`land và root != BORDER → ${enclave}`, `land and root != BORDER → ${enclave}`), enclave ? text("Ô đất này bị bao kín; tăng kết quả.", "This land cell is enclosed; increment the result.") : text("Là nước hoặc nối được biên; không đếm.", "It is water or reaches the boundary; do not count it."), { current: [r, c] });
+      if (enclave) {
+        enclaves++;
+        snap(28, text(`enclaves += 1 → ${enclaves}`, `enclaves += 1 → ${enclaves}`), text("Đếm thêm một ô enclave.", "Count one more enclave cell."), { current: [r, c], discovered: [r, c] });
+      }
+    }
+  }
+  snap(29, text(`return enclaves → ${enclaves}`, `return enclaves → ${enclaves}`), text("Trả về số ô đất không nối với BORDER.", "Return the number of land cells not connected to BORDER."), { final: true, vars: [{ name: "enclaves", value: enclaves }] });
+  return { original, answer: enclaves, steps };
+}
+
 const graphCategory = { key: "graph", vi: "Đồ thị", en: "Graph" };
 const multiSourceTag = { key: "multi-source-bfs", vi: "Multi-source BFS", en: "Multi-source BFS" };
 const floodFillTag = { key: "flood-fill", vi: "Flood Fill", en: "Flood Fill" };
@@ -1353,12 +1541,26 @@ const problems = {
     defaultInput: "0,0,0,0|1,0,1,0|0,1,1,0|0,0,0,0",
     inputKind: "string",
     inputLabel: text("Grid 0/1 (hàng cách '|')", "0/1 grid (rows separated by '|')"),
-    approach: [
-      text("Đưa mọi ô đất ở biên vào queue và xóa thành 0.", "Put every border land cell in the queue and erase it to 0."),
-      text("BFS xóa toàn bộ đất nối với biên.", "BFS removes all land connected to the boundary."),
-      text("Tổng các ô 1 còn lại chính là số enclave cells.", "The sum of remaining 1 cells is the enclave count."),
+    extraParams: [
+      {
+        key: "approach",
+        label: text("Cách giải", "Approach"),
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: text("Cách 1: Multi-source BFS", "Approach 1: Multi-source BFS") },
+          { value: "2", label: text("Cách 2: DFS từ biên", "Approach 2: DFS from the boundary") },
+          { value: "3", label: text("Cách 3: Union-Find + BORDER ảo", "Approach 3: Union-Find + virtual BORDER") },
+        ],
+      },
     ],
-    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("Mỗi ô đất nối biên được enqueue tối đa một lần.", "Each boundary-connected land cell is enqueued at most once.") },
+    approach: [
+      text("Cách 1 (BFS): đưa mọi ô đất ở biên vào queue và xóa thành 0.", "Approach 1 (BFS): put every border land cell in a queue and erase it to 0."),
+      text("Cách 2 (DFS): gọi DFS từ mọi đất biên để xóa toàn bộ vùng đất có thể đi tới biên.", "Approach 2 (DFS): call DFS from every border land cell to erase all land that can reach the boundary."),
+      text("Cách 3 (Union-Find): nối đất biên với node BORDER ảo; đất không cùng component với BORDER là enclave.", "Approach 3 (Union-Find): connect boundary land to a virtual BORDER node; land outside BORDER's component is enclave land."),
+    ],
+    complexity: { time: "O(rows·cols)", space: "O(rows·cols)", note: text("BFS/DFS cần queue hoặc call stack; Union-Find dùng mảng parent cho mỗi ô và một node BORDER ảo.", "BFS/DFS use a queue or call stack; Union-Find uses a parent array for each cell plus one virtual BORDER node.") },
+    codeLabel: text("Cách 1: Multi-source BFS", "Approach 1: Multi-source BFS"),
     code: [
       "from collections import deque", "from typing import List", "", "class Solution:",
       "    def numEnclaves(self, grid: List[List[int]]) -> int:",
@@ -1380,7 +1582,64 @@ const problems = {
       "        enclaves = sum(sum(row) for row in grid)",
       "        return enclaves",
     ],
+    code2Label: text("Cách 2: DFS đệ quy từ biên", "Approach 2: Recursive DFS from the boundary"),
+    code2: [
+      "class Solution:",
+      "    def numEnclaves(self, grid):",
+      "        ROWS, COLS = len(grid), len(grid[0])",
+      "        def dfs(r, c):",
+      "            if r < 0 or r >= ROWS or c < 0 or c >= COLS:",
+      "                return",
+      "            if grid[r][c] == 0:",
+      "                return",
+      "            grid[r][c] = 0",
+      "            dfs(r + 1, c)",
+      "            dfs(r - 1, c)",
+      "            dfs(r, c + 1)",
+      "            dfs(r, c - 1)",
+      "        for r in range(ROWS):",
+      "            dfs(r, 0)",
+      "            dfs(r, COLS - 1)",
+      "        for c in range(COLS):",
+      "            dfs(0, c)",
+      "            dfs(ROWS - 1, c)",
+      "        return sum(map(sum, grid))",
+    ],
+    code3Label: text("Cách 3: Union-Find + BORDER ảo", "Approach 3: Union-Find + virtual BORDER"),
+    code3: [
+      "class Solution:",
+      "    def numEnclaves(self, grid):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        virtual = rows * cols",
+      "        parent = list(range(virtual + 1))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]; x = parent[x]",
+      "            return x",
+      "        def union(a, b):",
+      "            root_a, root_b = find(a), find(b)",
+      "            if root_a == root_b: return",
+      "            parent[root_b] = root_a",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == 1:",
+      "                    if r in (0, rows-1) or c in (0, cols-1):",
+      "                        union(r * cols + c, virtual)",
+      "                    if r + 1 < rows and grid[r+1][c] == 1:",
+      "                        union(r * cols + c, (r+1) * cols + c)",
+      "                    if c + 1 < cols and grid[r][c+1] == 1:",
+      "                        union(r * cols + c, r * cols + c + 1)",
+      "        border_root = find(virtual)",
+      "        enclaves = 0",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if grid[r][c] == 1 and find(r * cols + c) != border_root:",
+      "                    enclaves += 1",
+      "        return enclaves",
+    ],
     builder: buildSteps1020,
+    builder2: buildSteps1020Dfs,
+    builder3: buildSteps1020UnionFind,
   },
 };
 

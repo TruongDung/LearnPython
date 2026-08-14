@@ -3885,7 +3885,367 @@ function buildSteps3090(input) {
   return { original: s, answer: ans, steps };
 }
 
+/**
+ * Shared visualization for windows with at most a fixed number of distinct values.
+ */
+function buildStepsAtMostDistinct(input, limit, config) {
+  const items = config.isString ? [...String(input ?? "")] : (Array.isArray(input) ? input.map(Number) : []);
+  if (!Number.isInteger(limit) || limit < 0) throw new Error("k must be a non-negative integer");
+
+  const steps = [];
+  const freq = new Map();
+  let left = 0;
+  let ans = 0;
+  let bestLeft = 0;
+  let bestRight = -1;
+  const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const freqText = () => {
+    const entries = [...freq.entries()].filter(([, count]) => count > 0);
+    return entries.length ? `{${entries.map(([value, count]) => `${JSON.stringify(value)}:${count}`).join(", ")}}` : "{}";
+  };
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => {
+    steps.push({
+      title,
+      arr: [...items],
+      sub: items.map((_, index) => `[${index}]`),
+      highlight: indices(left, right),
+      mark,
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "left", value: left },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "freq", value: freqText() },
+        { name: "distinct", value: freq.size },
+        { name: "ans", value: ans },
+        ...vars,
+      ],
+      note,
+    });
+  };
+
+  snap({ title: { vi: "freq = {}", en: "freq = {}" }, line: 3, note: { vi: "freq đếm các phần tử trong cửa sổ hiện tại.", en: "freq counts items in the current window." } });
+  snap({ title: { vi: "left = 0", en: "left = 0" }, line: 4, note: { vi: "left là biên trái của cửa sổ.", en: "left is the window's left boundary." } });
+  snap({ title: { vi: "ans = 0", en: "ans = 0" }, line: 5, note: { vi: "ans lưu độ dài lớn nhất hợp lệ.", en: "ans stores the largest valid length." } });
+
+  for (let right = 0; right < items.length; right++) {
+    const value = items[right];
+    snap({
+      title: { vi: `Xét ${config.source}[${right}] = ${JSON.stringify(value)}`, en: `Inspect ${config.source}[${right}] = ${JSON.stringify(value)}` },
+      line: 6,
+      right,
+      vars: [{ name: config.itemVar, value: JSON.stringify(value) }],
+      note: { vi: "Mở rộng biên phải thêm một phần tử.", en: "Expand the right boundary by one item." },
+    });
+    freq.set(value, (freq.get(value) || 0) + 1);
+    snap({
+      title: { vi: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}`, en: `freq[${JSON.stringify(value)}] += 1 → ${freq.get(value)}` },
+      line: 7,
+      right,
+      note: { vi: `Cửa sổ đang có ${freq.size} giá trị phân biệt.`, en: `The window now has ${freq.size} distinct values.` },
+    });
+
+    while (freq.size > limit) {
+      snap({
+        title: { vi: `${freq.size} distinct > ${limit} → thu hẹp`, en: `${freq.size} distinct > ${limit} → shrink` },
+        line: 8,
+        right,
+        note: { vi: `Vượt giới hạn ${limit} giá trị phân biệt nên cửa sổ chưa hợp lệ.`, en: `The ${limit}-distinct limit is exceeded, so the window is invalid.` },
+      });
+      const removed = items[left];
+      freq.set(removed, freq.get(removed) - 1);
+      snap({
+        title: { vi: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}`, en: `freq[${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}` },
+        line: 9,
+        right,
+        note: { vi: `Bỏ ${JSON.stringify(removed)} tại left=${left} khỏi cửa sổ.`, en: `Remove ${JSON.stringify(removed)} at left=${left} from the window.` },
+      });
+      if (freq.get(removed) === 0) {
+        freq.delete(removed);
+        snap({
+          title: { vi: `del freq[${JSON.stringify(removed)}]`, en: `del freq[${JSON.stringify(removed)}]` },
+          line: 10,
+          right,
+          note: { vi: `${JSON.stringify(removed)} không còn trong cửa sổ nên xóa key; số distinct giảm.`, en: `${JSON.stringify(removed)} is no longer in the window, so delete its key; distinct count drops.` },
+        });
+      }
+      left++;
+      snap({
+        title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` },
+        line: 11,
+        right,
+        note: { vi: "Dịch biên trái sang phải một vị trí.", en: "Move the left boundary one position right." },
+      });
+    }
+
+    snap({
+      title: { vi: `${freq.size} distinct ≤ ${limit} → cửa sổ hợp lệ`, en: `${freq.size} distinct ≤ ${limit} → valid window` },
+      line: 8,
+      right,
+      note: { vi: "Không cần thu hẹp thêm.", en: "No further shrinking is needed." },
+    });
+    const length = right - left + 1;
+    const oldAns = ans;
+    if (length > ans) {
+      ans = length;
+      bestLeft = left;
+      bestRight = right;
+    }
+    snap({
+      title: { vi: `ans = max(${oldAns}, ${length}) → ${ans}`, en: `ans = max(${oldAns}, ${length}) → ${ans}` },
+      line: 12,
+      right,
+      mark: length > oldAns ? indices(left, right) : [],
+      vars: [{ name: "window length", value: length }, { name: "best window", value: `[${bestLeft}..${bestRight}]` }],
+      note: length > oldAns
+        ? { vi: "Đây là cửa sổ hợp lệ dài nhất mới.", en: "This is the new longest valid window." }
+        : { vi: "Độ dài hiện tại không vượt kỷ lục.", en: "The current length does not beat the record." },
+    });
+  }
+
+  snap({
+    title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` },
+    line: 13,
+    right: bestRight,
+    mark: indices(bestLeft, bestRight),
+    final: true,
+    vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }],
+    note: { vi: `Cửa sổ tốt nhất có độ dài ${ans}.`, en: `The best window has length ${ans}.` },
+  });
+  return { original: config.isString ? String(input ?? "") : items, k: limit, answer: ans, steps };
+}
+
+function buildSteps159(input) {
+  return buildStepsAtMostDistinct(input, 2, { isString: true, source: "s", itemVar: "ch" });
+}
+
+function buildSteps340(input, params) {
+  const k = Number(params && params.k !== undefined ? params.k : 2);
+  return buildStepsAtMostDistinct(input, k, { isString: true, source: "s", itemVar: "ch" });
+}
+
+function buildSteps904(input) {
+  return buildStepsAtMostDistinct(input, 2, { isString: false, source: "fruits", itemVar: "fruit" });
+}
+
+/** LeetCode 1695: unique-value window plus its running sum. */
+function buildSteps1695(input) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const steps = [];
+  const seen = new Set();
+  let left = 0;
+  let windowSum = 0;
+  let ans = 0;
+  let bestLeft = 0;
+  let bestRight = -1;
+  const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const seenText = () => `{${[...seen].join(", ")}}`;
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => steps.push({
+    title,
+    arr: [...nums],
+    sub: nums.map((_, index) => `[${index}]`),
+    highlight: indices(left, right),
+    mark,
+    final,
+    codeLines: [line],
+    vars: [{ name: "left", value: left }, { name: "right", value: right >= 0 ? right : "-" }, { name: "seen", value: seenText() }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
+    note,
+  });
+
+  snap({ title: { vi: "seen = set()", en: "seen = set()" }, line: 3, note: { vi: "seen giữ các giá trị không lặp trong cửa sổ.", en: "seen stores the window's non-repeating values." } });
+  snap({ title: { vi: "left = 0", en: "left = 0" }, line: 4, note: { vi: "Khởi tạo biên trái.", en: "Initialize the left boundary." } });
+  snap({ title: { vi: "window_sum = 0", en: "window_sum = 0" }, line: 5, note: { vi: "Tổng của cửa sổ hiện tại ban đầu bằng 0.", en: "The current window sum starts at 0." } });
+  snap({ title: { vi: "ans = 0", en: "ans = 0" }, line: 6, note: { vi: "ans là tổng unique-subarray lớn nhất.", en: "ans is the largest unique-subarray sum." } });
+
+  for (let right = 0; right < nums.length; right++) {
+    const value = nums[right];
+    snap({ title: { vi: `Xét nums[${right}] = ${value}`, en: `Inspect nums[${right}] = ${value}` }, line: 7, right, note: { vi: "Mở rộng cửa sổ sang phải.", en: "Expand the window to the right." } });
+    while (seen.has(value)) {
+      snap({ title: { vi: `${value} đã có trong seen → thu hẹp`, en: `${value} is already in seen → shrink` }, line: 8, right, note: { vi: "Cửa sổ phải chứa các phần tử distinct, nên loại cạnh trái cho đến khi hết trùng.", en: "The window must be distinct, so remove the left edge until the duplicate is gone." } });
+      const removed = nums[left];
+      seen.delete(removed);
+      snap({ title: { vi: `seen.remove(${removed})`, en: `seen.remove(${removed})` }, line: 9, right, note: { vi: `Xóa nums[${left}] khỏi set.`, en: `Remove nums[${left}] from the set.` } });
+      windowSum -= removed;
+      snap({ title: { vi: `window_sum -= ${removed} → ${windowSum}`, en: `window_sum -= ${removed} → ${windowSum}` }, line: 10, right, note: { vi: "Loại giá trị đó khỏi tổng cửa sổ.", en: "Remove that value from the window sum." } });
+      left++;
+      snap({ title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, line: 11, right, note: { vi: "Dịch biên trái.", en: "Move the left boundary." } });
+    }
+    seen.add(value);
+    snap({ title: { vi: `seen.add(${value})`, en: `seen.add(${value})` }, line: 12, right, note: { vi: "Giá trị mới hiện là duy nhất trong cửa sổ.", en: "The new value is now unique in the window." } });
+    windowSum += value;
+    snap({ title: { vi: `window_sum += ${value} → ${windowSum}`, en: `window_sum += ${value} → ${windowSum}` }, line: 13, right, note: { vi: "Cộng giá trị mới vào tổng cửa sổ.", en: "Add the new value to the window sum." } });
+    const oldAns = ans;
+    if (windowSum > ans) { ans = windowSum; bestLeft = left; bestRight = right; }
+    snap({ title: { vi: `ans = max(${oldAns}, ${windowSum}) → ${ans}`, en: `ans = max(${oldAns}, ${windowSum}) → ${ans}` }, line: 14, right, mark: windowSum > oldAns ? indices(left, right) : [], note: { vi: "Cập nhật tổng lớn nhất bằng tổng cửa sổ hợp lệ.", en: "Update the maximum with the valid window sum." } });
+  }
+  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 15, right: bestRight, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Unique subarray tốt nhất có tổng ${ans}.`, en: `The best unique subarray has sum ${ans}.` } });
+  return { original: nums, answer: ans, steps };
+}
+
+/** LeetCode 2461: exactly-k window whose values are all distinct. */
+function buildSteps2461(input, params) {
+  const nums = Array.isArray(input) ? input.map(Number) : [];
+  const k = Number(params && params.k !== undefined ? params.k : 3);
+  if (!Number.isInteger(k) || k < 1 || k > nums.length) throw new Error("k must be an integer between 1 and nums.length");
+
+  const steps = [];
+  const freq = new Map();
+  let windowSum = 0;
+  let ans = 0;
+  let bestLeft = 0;
+  let bestRight = -1;
+  const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const freqText = () => {
+    const entries = [...freq.entries()].filter(([, count]) => count > 0);
+    return entries.length ? `{${entries.map(([value, count]) => `${value}:${count}`).join(", ")}}` : "{}";
+  };
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note }) => {
+    const left = right < 0 ? 0 : Math.max(0, right - k + 1);
+    steps.push({
+      title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: indices(left, right),
+      mark,
+      final,
+      codeLines: [line],
+      vars: [{ name: "k", value: k }, { name: "left", value: right < 0 ? "-" : left }, { name: "right", value: right >= 0 ? right : "-" }, { name: "freq", value: freqText() }, { name: "distinct", value: freq.size }, { name: "window_sum", value: windowSum }, { name: "ans", value: ans }, ...vars],
+      note,
+    });
+  };
+
+  snap({ title: { vi: "freq = {}", en: "freq = {}" }, line: 3, note: { vi: "freq đếm các số trong cửa sổ dài k.", en: "freq counts values in the length-k window." } });
+  snap({ title: { vi: "window_sum = 0", en: "window_sum = 0" }, line: 4, note: { vi: "Khởi tạo tổng cửa sổ.", en: "Initialize the window sum." } });
+  snap({ title: { vi: "ans = 0", en: "ans = 0" }, line: 5, note: { vi: "ans là tổng lớn nhất của cửa sổ hợp lệ.", en: "ans is the largest valid-window sum." } });
+
+  for (let right = 0; right < nums.length; right++) {
+    const value = nums[right];
+    snap({ title: { vi: `Xét nums[${right}] = ${value}`, en: `Inspect nums[${right}] = ${value}` }, line: 6, right, note: { vi: "Đưa phần tử mới vào phía phải.", en: "Bring the new item in on the right." } });
+    windowSum += value;
+    snap({ title: { vi: `window_sum += ${value} → ${windowSum}`, en: `window_sum += ${value} → ${windowSum}` }, line: 7, right, note: { vi: "Cộng phần tử mới vào tổng.", en: "Add the new item to the sum." } });
+    freq.set(value, (freq.get(value) || 0) + 1);
+    snap({ title: { vi: `freq[${value}] += 1 → ${freq.get(value)}`, en: `freq[${value}] += 1 → ${freq.get(value)}` }, line: 8, right, note: { vi: "Ghi nhận tần suất của phần tử mới.", en: "Record the new item's frequency." } });
+
+    if (right >= k) {
+      snap({ title: { vi: `right=${right} ≥ k=${k} → bỏ phần tử cũ`, en: `right=${right} ≥ k=${k} → remove old item` }, line: 9, right, note: { vi: "Cửa sổ tạm có k+1 phần tử, phải bỏ cạnh trái cũ.", en: "The temporary window has k+1 items, so remove its old left edge." } });
+      const outgoing = nums[right - k];
+      snap({ title: { vi: `outgoing = nums[${right - k}] = ${outgoing}`, en: `outgoing = nums[${right - k}] = ${outgoing}` }, line: 10, right, note: { vi: "Xác định phần tử rời cửa sổ.", en: "Identify the outgoing item." } });
+      windowSum -= outgoing;
+      snap({ title: { vi: `window_sum -= ${outgoing} → ${windowSum}`, en: `window_sum -= ${outgoing} → ${windowSum}` }, line: 11, right, note: { vi: "Giữ tổng cho đúng k phần tử.", en: "Keep the sum for exactly k items." } });
+      freq.set(outgoing, freq.get(outgoing) - 1);
+      snap({ title: { vi: `freq[${outgoing}] -= 1 → ${freq.get(outgoing)}`, en: `freq[${outgoing}] -= 1 → ${freq.get(outgoing)}` }, line: 12, right, note: { vi: "Giảm tần suất của phần tử rời cửa sổ.", en: "Decrease the outgoing item's frequency." } });
+      if (freq.get(outgoing) === 0) {
+        snap({ title: { vi: `freq[${outgoing}] == 0`, en: `freq[${outgoing}] == 0` }, line: 13, right, note: { vi: "Không còn bản sao nào của giá trị này trong cửa sổ.", en: "No copy of this value remains in the window." } });
+        freq.delete(outgoing);
+        snap({ title: { vi: `del freq[${outgoing}]`, en: `del freq[${outgoing}]` }, line: 14, right, note: { vi: "Xóa key có tần suất 0.", en: "Delete the zero-frequency key." } });
+      }
+    }
+
+    const left = Math.max(0, right - k + 1);
+    snap({ title: { vi: `left = ${left}`, en: `left = ${left}` }, line: 15, right, note: { vi: "Đây là biên trái của cửa sổ k phần tử hiện tại.", en: "This is the current length-k window's left boundary." } });
+    const isValid = right >= k - 1 && freq.size === k;
+    snap({ title: isValid ? { vi: `len(freq) == k == ${k} → hợp lệ`, en: `len(freq) == k == ${k} → valid` } : { vi: `Cửa sổ chưa đủ k distinct`, en: `Window is not yet k-distinct` }, line: 16, right, note: isValid ? { vi: "Cửa sổ dài đúng k và mọi phần tử đều distinct.", en: "The window has exactly k items and all are distinct." } : { vi: "Chỉ cập nhật ans khi đủ k phần tử distinct.", en: "Update ans only for k distinct items." } });
+    if (isValid) {
+      const oldAns = ans;
+      if (windowSum > ans) { ans = windowSum; bestLeft = left; bestRight = right; }
+      snap({ title: { vi: `ans = max(${oldAns}, ${windowSum}) → ${ans}`, en: `ans = max(${oldAns}, ${windowSum}) → ${ans}` }, line: 17, right, mark: windowSum > oldAns ? indices(left, right) : [], note: { vi: "So sánh tổng của cửa sổ distinct hợp lệ với kỷ lục.", en: "Compare the valid distinct-window sum with the record." } });
+    }
+  }
+  snap({ title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 18, right: bestRight, mark: indices(bestLeft, bestRight), final: true, vars: [{ name: "best window", value: `[${bestLeft}..${bestRight}]` }], note: { vi: `Tổng lớn nhất của subarray dài ${k} với các phần tử distinct là ${ans}.`, en: `The largest sum of a length-${k} subarray with distinct values is ${ans}.` } });
+  return { original: nums, k, answer: ans, steps };
+}
+
 module.exports = {
+  159: {
+    id: 159,
+    difficulty: "medium",
+    slug: "longest-substring-with-at-most-two-distinct-characters",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Longest Substring with At Most Two Distinct Characters", en: "Longest Substring with At Most Two Distinct Characters" },
+    titleVi: { vi: "Substring dài nhất có tối đa hai ký tự khác nhau", en: "Longest substring with at most two distinct characters" },
+    statement: { vi: "Cho chuỗi s, trả về độ dài substring dài nhất chứa không quá 2 ký tự phân biệt.", en: "Given a string s, return the length of the longest substring containing at most 2 distinct characters." },
+    defaultInput: "eceba",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [],
+    approach: [{ vi: "Mở rộng right và đếm tần suất ký tự.", en: "Expand right and count character frequencies." }, { vi: "Nếu có hơn 2 ký tự distinct, thu hẹp từ left.", en: "If more than 2 characters are distinct, shrink from left." }, { vi: "Cập nhật độ dài cửa sổ hợp lệ lớn nhất.", en: "Update the largest valid window length." }],
+    complexity: { time: "O(n)", space: "O(min(n, alphabet))", note: { vi: "Mỗi ký tự vào và rời cửa sổ tối đa một lần.", en: "Each character enters and leaves the window at most once." } },
+    code: ["class Solution:", "    def lengthOfLongestSubstringTwoDistinct(self, s):", "        freq = {}", "        left = 0", "        ans = 0", "        for right, ch in enumerate(s):", "            freq[ch] = freq.get(ch, 0) + 1", "            while len(freq) > 2:", "                freq[s[left]] -= 1", "                if freq[s[left]] == 0:", "                    del freq[s[left]]", "                left += 1", "            ans = max(ans, right - left + 1)", "        return ans"],
+    builder: buildSteps159,
+  },
+  340: {
+    id: 340,
+    difficulty: "medium",
+    slug: "longest-substring-with-at-most-k-distinct-characters",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "string", vi: "Chuỗi", en: "String" }],
+    title: { vi: "Longest Substring with At Most K Distinct Characters", en: "Longest Substring with At Most K Distinct Characters" },
+    titleVi: { vi: "Substring dài nhất có tối đa K ký tự khác nhau", en: "Longest substring with at most K distinct characters" },
+    statement: { vi: "Cho chuỗi s và số k, trả về độ dài substring dài nhất chứa không quá k ký tự phân biệt.", en: "Given a string s and integer k, return the length of the longest substring containing at most k distinct characters." },
+    defaultInput: "eceba",
+    inputKind: "string",
+    inputLabel: { vi: "Chuỗi s", en: "String s" },
+    extraParams: [{ key: "k", label: { vi: "k (số ký tự distinct tối đa)", en: "k (maximum distinct characters)" }, default: 2 }],
+    approach: [{ vi: "Mở rộng right và đếm tần suất ký tự.", en: "Expand right and count character frequencies." }, { vi: "Thu hẹp left khi số ký tự distinct vượt k.", en: "Shrink left when the distinct-character count exceeds k." }, { vi: "Lưu độ dài lớn nhất của cửa sổ hợp lệ.", en: "Keep the maximum valid-window length." }],
+    complexity: { time: "O(n)", space: "O(min(n, alphabet))", note: { vi: "Hai biên chỉ đi về trước.", en: "Both boundaries move only forward." } },
+    code: ["class Solution:", "    def lengthOfLongestSubstringKDistinct(self, s, k):", "        freq = {}", "        left = 0", "        ans = 0", "        for right, ch in enumerate(s):", "            freq[ch] = freq.get(ch, 0) + 1", "            while len(freq) > k:", "                freq[s[left]] -= 1", "                if freq[s[left]] == 0:", "                    del freq[s[left]]", "                left += 1", "            ans = max(ans, right - left + 1)", "        return ans"],
+    builder: buildSteps340,
+  },
+  904: {
+    id: 904,
+    difficulty: "medium",
+    slug: "fruit-into-baskets",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Fruit Into Baskets", en: "Fruit Into Baskets" },
+    titleVi: { vi: "Hái trái cây vào hai giỏ", en: "Fruit Into Baskets" },
+    statement: { vi: "Cho mảng fruits; tìm subarray liên tiếp dài nhất chứa không quá 2 loại trái cây.", en: "Given fruits, find the longest contiguous subarray containing at most 2 fruit types." },
+    defaultInput: [1, 2, 1],
+    inputKind: "integer",
+    inputLabel: { vi: "fruits", en: "fruits" },
+    extraParams: [],
+    approach: [{ vi: "Cửa sổ biểu diễn đoạn cây hái liên tiếp.", en: "The window represents the consecutive trees picked from." }, { vi: "Giữ tối đa hai loại fruit bằng frequency map.", en: "Keep at most two fruit types with a frequency map." }, { vi: "Cửa sổ dài nhất là số trái cây hái được nhiều nhất.", en: "The longest window is the maximum fruit count." }],
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Map chứa tối đa vài loại fruit trong cửa sổ hợp lệ.", en: "The map contains only a few fruit types in a valid window." } },
+    code: ["class Solution:", "    def totalFruit(self, fruits):", "        freq = {}", "        left = 0", "        ans = 0", "        for right, fruit in enumerate(fruits):", "            freq[fruit] = freq.get(fruit, 0) + 1", "            while len(freq) > 2:", "                freq[fruits[left]] -= 1", "                if freq[fruits[left]] == 0:", "                    del freq[fruits[left]]", "                left += 1", "            ans = max(ans, right - left + 1)", "        return ans"],
+    builder: buildSteps904,
+  },
+  1695: {
+    id: 1695,
+    difficulty: "medium",
+    slug: "maximum-erasure-value",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Maximum Erasure Value", en: "Maximum Erasure Value" },
+    titleVi: { vi: "Tổng lớn nhất của subarray không trùng", en: "Maximum sum of a unique subarray" },
+    statement: { vi: "Xóa một subarray sao cho các phần tử đều distinct. Trả về tổng lớn nhất có thể.", en: "Erase a subarray with all distinct elements and return the largest possible sum." },
+    defaultInput: [4, 2, 4, 5, 6],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [],
+    approach: [{ vi: "Giữ cửa sổ chỉ có các số distinct và tổng window_sum.", en: "Keep a window of distinct numbers and its window_sum." }, { vi: "Khi số mới bị trùng, bỏ lần lượt cạnh trái.", en: "When the new number is duplicated, remove the left edge one item at a time." }, { vi: "Sau khi hợp lệ, dùng window_sum cập nhật đáp án.", en: "After it becomes valid, use window_sum to update the answer." }],
+    complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi phần tử được thêm và loại bỏ nhiều nhất một lần.", en: "Each item is added and removed at most once." } },
+    code: ["class Solution:", "    def maximumUniqueSubarray(self, nums):", "        seen = set()", "        left = 0", "        window_sum = 0", "        ans = 0", "        for right, num in enumerate(nums):", "            while num in seen:", "                seen.remove(nums[left])", "                window_sum -= nums[left]", "                left += 1", "            seen.add(num)", "            window_sum += num", "            ans = max(ans, window_sum)", "        return ans"],
+    builder: buildSteps1695,
+  },
+  2461: {
+    id: 2461,
+    difficulty: "medium",
+    slug: "maximum-sum-of-distinct-subarrays-with-length-k",
+    category: { key: "sliding", vi: "Cửa sổ trượt", en: "Sliding Window" },
+    tags: [{ key: "array", vi: "Mảng", en: "Array" }],
+    title: { vi: "Maximum Sum of Distinct Subarrays With Length K", en: "Maximum Sum of Distinct Subarrays With Length K" },
+    titleVi: { vi: "Tổng lớn nhất của subarray distinct độ dài K", en: "Maximum sum of a length-K distinct subarray" },
+    statement: { vi: "Tìm tổng lớn nhất của subarray dài đúng k mà mọi phần tử đều distinct.", en: "Find the largest sum of a subarray of exactly k elements where every value is distinct." },
+    defaultInput: [1, 5, 4, 2, 9, 9, 9],
+    inputKind: "integer",
+    inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [{ key: "k", label: { vi: "k (độ dài cửa sổ)", en: "k (window length)" }, default: 3 }],
+    approach: [{ vi: "Trượt một cửa sổ có đúng k phần tử và giữ window_sum.", en: "Slide a window of exactly k items while keeping window_sum." }, { vi: "Dùng freq để biết cửa sổ có đủ k giá trị distinct hay không.", en: "Use freq to determine whether the window has k distinct values." }, { vi: "Chỉ cập nhật ans khi cửa sổ hợp lệ.", en: "Update ans only when the window is valid." }],
+    complexity: { time: "O(n)", space: "O(k)", note: { vi: "Mỗi phần tử vào và ra khỏi cửa sổ một lần.", en: "Each item enters and leaves the window once." } },
+    code: ["class Solution:", "    def maximumSubarraySum(self, nums, k):", "        freq = {}", "        window_sum = 0", "        ans = 0", "        for right, num in enumerate(nums):", "            window_sum += num", "            freq[num] = freq.get(num, 0) + 1", "            if right >= k:", "                outgoing = nums[right - k]", "                window_sum -= outgoing", "                freq[outgoing] -= 1", "                if freq[outgoing] == 0:", "                    del freq[outgoing]", "            left = max(0, right - k + 1)", "            if right >= k - 1 and len(freq) == k:", "                ans = max(ans, window_sum)", "        return ans"],
+    builder: buildSteps2461,
+  },
   3090: {
     id: 3090,
     difficulty: "easy",
