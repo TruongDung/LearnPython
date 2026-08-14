@@ -7556,6 +7556,8 @@ function renderSlidingFreqView(step) {
   const bestSet = new Set(Array.isArray(view.best) ? view.best : []);
   const freq = view.freq || {};
   const k = view.k;
+  const mode = view.mode || "frequency";
+  const isDistinctMode = mode === "distinct";
   const rowLabel = view.label || "nums";
   const activeValue = view.activeValue;
   const overLimit = !!view.overLimit;
@@ -7587,11 +7589,12 @@ function renderSlidingFreqView(step) {
     </div>`;
   }).join("");
 
-  const freqEntries = Object.entries(freq).sort((a, b) => Number(a[0]) - Number(b[0]));
+  const freqEntries = Object.entries(freq).sort(([a], [b]) => String(a).localeCompare(String(b)));
   const freqHtml = freqEntries.length
     ? freqEntries.map(([val, count]) => {
-        const isOver = overLimit && Number(val) === Number(activeValue);
-        const atK = !isOver && Number(count) === Number(k) && Number(val) === Number(activeValue);
+        const isActive = String(val) === String(activeValue);
+        const isOver = overLimit && isActive;
+        const atK = !isDistinctMode && !isOver && Number(count) === Number(k) && isActive;
         const cls = isOver ? "sfw-freq-over" : atK ? "sfw-freq-atk" : "";
         return `<div class="sfw-freq-card ${cls}">
           <span class="sfw-freq-value">${escapeHtml(String(val))}</span>
@@ -7601,11 +7604,16 @@ function renderSlidingFreqView(step) {
     : `<span class="sfw-freq-empty">${vi ? "(rỗng)" : "(empty)"}</span>`;
 
   const windowLen = right >= left && left >= 0 ? right - left + 1 : 0;
+  const distinct = freqEntries.filter(([, count]) => Number(count) > 0).length;
   const statusText = view.done
     ? (vi ? `Cửa sổ tốt nhất: [${left}..${right}], độ dài = ${view.ans}` : `Best window: [${left}..${right}], length = ${view.ans}`)
     : overLimit
-      ? (vi ? `freq[${activeValue}] vượt k=${k} → đang thu hẹp cửa sổ từ bên trái` : `freq[${activeValue}] exceeds k=${k} → shrinking window from the left`)
-      : (vi ? `Cửa sổ hiện tại [${left}..${right}] hợp lệ, độ dài = ${windowLen}, ans tốt nhất = ${view.ans}` : `Current window [${left}..${right}] is valid, length = ${windowLen}, best ans = ${view.ans}`);
+      ? isDistinctMode
+        ? (vi ? `${distinct} ký tự distinct > ${k} → đang thu hẹp cửa sổ từ bên trái` : `${distinct} distinct characters > ${k} → shrinking the window from the left`)
+        : (vi ? `freq[${activeValue}] vượt k=${k} → đang thu hẹp cửa sổ từ bên trái` : `freq[${activeValue}] exceeds k=${k} → shrinking window from the left`)
+      : isDistinctMode
+        ? (vi ? `Cửa sổ [${left}..${right}] có ${distinct}/${k} ký tự distinct, độ dài = ${windowLen}, ans = ${view.ans}` : `Window [${left}..${right}] has ${distinct}/${k} distinct characters, length = ${windowLen}, ans = ${view.ans}`)
+        : (vi ? `Cửa sổ hiện tại [${left}..${right}] hợp lệ, độ dài = ${windowLen}, ans tốt nhất = ${view.ans}` : `Current window [${left}..${right}] is valid, length = ${windowLen}, best ans = ${view.ans}`);
 
   $("treeView").innerHTML = `
     <div class="sfw-viz">
@@ -7614,7 +7622,7 @@ function renderSlidingFreqView(step) {
         <div class="tp-row-cells sfw-row-cells">${cells}</div>
       </div>
       <div class="sfw-freq-panel">
-        <div class="sfw-freq-title">${vi ? `Bảng đếm freq trong cửa sổ (k=${k})` : `freq table inside window (k=${k})`}</div>
+        <div class="sfw-freq-title">${isDistinctMode ? (vi ? `Bảng freq trong cửa sổ — tối đa ${k} ký tự distinct` : `Window freq table — at most ${k} distinct characters`) : (vi ? `Bảng đếm freq trong cửa sổ (k=${k})` : `freq table inside window (k=${k})`)}</div>
         <div class="sfw-freq-cards">${freqHtml}</div>
       </div>
       <div class="sfw-status ${overLimit ? "sfw-status-over" : view.done ? "sfw-status-done" : ""}">${statusText}</div>
@@ -7622,7 +7630,7 @@ function renderSlidingFreqView(step) {
         <span><i class="tp-legend-swatch tp-ptr-a"></i>L = left</span>
         <span><i class="tp-legend-swatch tp-ptr-b"></i>R = right</span>
         <span><i class="sfw-legend-swatch sfw-legend-best"></i>${vi ? "ô đã từng nằm trong cửa sổ tốt nhất" : "cell in best window so far"}</span>
-        <span><i class="sfw-legend-swatch sfw-legend-over"></i>${vi ? "phần tử vượt k" : "element exceeding k"}</span>
+        <span><i class="sfw-legend-swatch sfw-legend-over"></i>${isDistinctMode ? (vi ? "ký tự mới làm vượt giới hạn distinct" : "new character exceeding the distinct limit") : (vi ? "phần tử vượt k" : "element exceeding k")}</span>
       </div>
     </div>`;
 }

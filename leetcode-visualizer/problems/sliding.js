@@ -4016,7 +4016,153 @@ function buildStepsAtMostDistinct(input, limit, config) {
 }
 
 function buildSteps159(input) {
-  return buildStepsAtMostDistinct(input, 2, { isString: true, source: "s", itemVar: "ch" });
+  const s = String(input ?? "");
+  const chars = [...s];
+  const freq = new Map();
+  const steps = [];
+  let left = 0;
+  let ans = 0;
+  let bestLeft = 0;
+  let bestRight = -1;
+
+  const indices = (start, end) => Array.from({ length: Math.max(0, end - start + 1) }, (_, offset) => start + offset);
+  const distinctCount = () => [...freq.values()].filter((count) => count > 0).length;
+  const freqObject = () => Object.fromEntries(freq);
+  const freqText = () => {
+    const entries = [...freq.entries()];
+    return entries.length ? `{${entries.map(([ch, count]) => `${JSON.stringify(ch)}:${count}`).join(", ")}}` : "{}";
+  };
+  const snap = ({ title, line, right = -1, mark = [], final = false, vars = [], note, activeValue, overLimit = false, viewLeft = left, viewFreq, viewFreqText }) => {
+    const window = indices(viewLeft, right);
+    steps.push({
+      title,
+      arr: [...chars],
+      sub: chars.map((_, index) => `[${index}]`),
+      highlight: window,
+      mark,
+      final,
+      codeLines: [line],
+      vars: [
+        { name: "left", value: viewLeft },
+        { name: "right", value: right >= 0 ? right : "-" },
+        { name: "freq", value: viewFreqText || freqText() },
+        { name: "distinct", value: distinctCount() },
+        { name: "limit", value: 2 },
+        { name: "ans", value: ans },
+        ...vars,
+      ],
+      note,
+      slidingFreqView: {
+        nums: [...chars],
+        label: "s",
+        left: viewLeft,
+        right,
+        window,
+        best: bestRight >= bestLeft ? indices(bestLeft, bestRight) : [],
+        freq: viewFreq || freqObject(),
+        k: 2,
+        mode: "distinct",
+        activeValue,
+        overLimit,
+        ans,
+        done: final,
+      },
+    });
+  };
+
+  snap({
+    title: { vi: "freq = {}", en: "freq = {}" }, line: 3,
+    note: { vi: "freq đếm mỗi ký tự trong cửa sổ. Điều kiện hợp lệ: có tối đa 2 ký tự distinct.", en: "freq counts characters in the window. A valid window has at most 2 distinct characters." },
+  });
+  snap({
+    title: { vi: "left = 0", en: "left = 0" }, line: 4,
+    note: { vi: "left là biên trái của substring đang xét.", en: "left is the left boundary of the current substring." },
+  });
+  snap({
+    title: { vi: "ans = 0", en: "ans = 0" }, line: 5,
+    note: { vi: "ans lưu độ dài substring hợp lệ dài nhất đã tìm được.", en: "ans stores the longest valid substring found so far." },
+  });
+
+  for (let right = 0; right < chars.length; right++) {
+    const ch = chars[right];
+    snap({
+      title: { vi: `Xét s[${right}] = ${JSON.stringify(ch)}`, en: `Inspect s[${right}] = ${JSON.stringify(ch)}` }, line: 6, right, activeValue: ch,
+      vars: [{ name: "ch", value: JSON.stringify(ch) }],
+      note: { vi: "Mở rộng cửa sổ bằng cách đưa ký tự mới vào bên phải.", en: "Expand the window by adding the next character on the right." },
+    });
+
+    freq.set(ch, (freq.get(ch) || 0) + 1);
+    snap({
+      title: { vi: `freq[${JSON.stringify(ch)}] += 1 → ${freq.get(ch)}`, en: `freq[${JSON.stringify(ch)}] += 1 → ${freq.get(ch)}` }, line: 7, right, activeValue: ch, overLimit: distinctCount() > 2,
+      vars: [{ name: `freq[${JSON.stringify(ch)}]`, value: freq.get(ch) }],
+      note: { vi: `Cửa sổ hiện có ${distinctCount()} ký tự distinct.`, en: `The window now has ${distinctCount()} distinct characters.` },
+    });
+
+    while (distinctCount() > 2) {
+      snap({
+        title: { vi: `${distinctCount()} distinct > 2 → thu hẹp`, en: `${distinctCount()} distinct > 2 → shrink` }, line: 8, right, activeValue: ch, overLimit: true,
+        note: { vi: "Cửa sổ có quá 2 ký tự khác nhau, nên chưa hợp lệ.", en: "The window has more than two distinct characters, so it is invalid." },
+      });
+      const removed = chars[left];
+      freq.set(removed, freq.get(removed) - 1);
+      snap({
+        title: { vi: `freq[s[left]=${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}`, en: `freq[s[left]=${JSON.stringify(removed)}] -= 1 → ${freq.get(removed)}` }, line: 9, right, activeValue: ch, overLimit: distinctCount() > 2,
+        vars: [{ name: "removed", value: JSON.stringify(removed) }],
+        note: { vi: `Loại s[${left}] khỏi frequency trước khi dịch left.`, en: `Remove s[${left}] from the frequency map before moving left.` },
+      });
+      const becomesZero = freq.get(removed) === 0;
+      snap({
+        title: becomesZero ? { vi: `freq[${JSON.stringify(removed)}] == 0 → True`, en: `freq[${JSON.stringify(removed)}] == 0 → True` } : { vi: `freq[${JSON.stringify(removed)}] == 0 → False`, en: `freq[${JSON.stringify(removed)}] == 0 → False` }, line: 10, right, activeValue: ch, overLimit: distinctCount() > 2,
+        note: becomesZero
+          ? { vi: `${JSON.stringify(removed)} đã rời hoàn toàn khỏi cửa sổ, cần xóa key để giảm số distinct.`, en: `${JSON.stringify(removed)} has fully left the window, so delete its key to reduce the distinct count.` }
+          : { vi: `${JSON.stringify(removed)} vẫn còn trong cửa sổ, giữ key freq này.`, en: `${JSON.stringify(removed)} still remains in the window, so keep its freq key.` },
+      });
+      if (becomesZero) {
+        freq.delete(removed);
+        snap({
+          title: { vi: `del freq[${JSON.stringify(removed)}]`, en: `del freq[${JSON.stringify(removed)}]` }, line: 11, right, activeValue: ch, overLimit: distinctCount() > 2,
+          note: { vi: `Xóa key ${JSON.stringify(removed)}; cửa sổ còn ${distinctCount()} ký tự distinct.`, en: `Delete key ${JSON.stringify(removed)}; the window now has ${distinctCount()} distinct characters.` },
+        });
+      }
+      left++;
+      snap({
+        title: { vi: `left += 1 → ${left}`, en: `left += 1 → ${left}` }, line: 12, right, activeValue: ch, overLimit: distinctCount() > 2,
+        note: { vi: "Dịch biên trái sang phải một vị trí.", en: "Move the left boundary one position right." },
+      });
+    }
+
+    snap({
+      title: { vi: `${distinctCount()} distinct ≤ 2 → hợp lệ`, en: `${distinctCount()} distinct ≤ 2 → valid` }, line: 8, right, activeValue: ch,
+      note: { vi: "Cửa sổ hiện tại thỏa điều kiện tối đa hai ký tự distinct.", en: "The current window satisfies the at-most-two-distinct condition." },
+    });
+    const length = right - left + 1;
+    const previousAns = ans;
+    if (length > ans) {
+      ans = length;
+      bestLeft = left;
+      bestRight = right;
+    }
+    snap({
+      title: { vi: `ans = max(${previousAns}, ${length}) → ${ans}`, en: `ans = max(${previousAns}, ${length}) → ${ans}` }, line: 13, right, activeValue: ch,
+      mark: length > previousAns ? indices(left, right) : [],
+      vars: [{ name: "window length", value: length }, { name: "best substring", value: JSON.stringify(s.slice(bestLeft, bestRight + 1)) }],
+      note: length > previousAns
+        ? { vi: `Substring ${JSON.stringify(s.slice(left, right + 1))} là đáp án tốt nhất mới.`, en: `Substring ${JSON.stringify(s.slice(left, right + 1))} is the new best answer.` }
+        : { vi: `Độ dài ${length} không vượt đáp án hiện tại ${ans}.`, en: `Length ${length} does not beat the current answer ${ans}.` },
+    });
+  }
+
+  const bestText = s.slice(bestLeft, bestRight + 1);
+  const bestFreq = {};
+  for (let index = bestLeft; index <= bestRight; index++) bestFreq[chars[index]] = (bestFreq[chars[index]] || 0) + 1;
+  const bestFreqText = Object.keys(bestFreq).length ? `{${Object.entries(bestFreq).map(([ch, count]) => `${JSON.stringify(ch)}:${count}`).join(", ")}}` : "{}";
+  snap({
+    title: { vi: `return ans → ${ans}`, en: `return ans → ${ans}` }, line: 14, right: bestRight, viewLeft: bestLeft, final: true,
+    viewFreq: bestFreq, viewFreqText: bestFreqText,
+    vars: [{ name: "best substring", value: JSON.stringify(bestText) }],
+    note: { vi: `Substring hợp lệ dài nhất là ${JSON.stringify(bestText)}, độ dài ${ans}.`, en: `The longest valid substring is ${JSON.stringify(bestText)}, with length ${ans}.` },
+  });
+  return { original: s, answer: ans, steps };
 }
 
 function buildSteps340(input, params) {
