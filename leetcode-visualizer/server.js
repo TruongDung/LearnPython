@@ -228,13 +228,16 @@ app.post("/api/problem/:id/solve", (req, res) => {
     return res.status(400).json({ error: "Chuỗi s và t phải có cùng độ dài." });
   }
 
-  res.json(
-    (params.approach === 3 || params.approach === "3") && typeof problem.builder3 === "function"
+  try {
+    const result = (params.approach === 3 || params.approach === "3") && typeof problem.builder3 === "function"
       ? problem.builder3(input, params)
       : (params.approach === 2 || params.approach === "2") && typeof problem.builder2 === "function"
         ? problem.builder2(input, params)
-        : problem.builder(input, params)
-  );
+        : problem.builder(input, params);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: String((err && err.message) || err) });
+  }
 });
 
 app.listen(PORT, () => {

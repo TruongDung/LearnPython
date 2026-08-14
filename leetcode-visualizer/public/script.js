@@ -11595,6 +11595,147 @@ function renderCyclicSortView(step) {
   </div>`;
 }
 
+function renderWaterDistributionView(step) {
+  const view = step.waterDistributionView || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const accepted = new Set((view.acceptedEdges || []).map((edge) => edge.key));
+  const rejected = new Set(view.rejectedEdgeKeys || []);
+  const currentKey = view.currentEdge ? view.currentEdge.key : null;
+  const phaseIndex = { transform: 0, sort: 1, kruskal: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Thêm nguồn ảo 0", "2 · Sort mọi lựa chọn", "3 · Kruskal + DSU", "4 · Hệ thống tối ưu"]
+    : ["1 · Add virtual source 0", "2 · Sort all options", "3 · Kruskal + DSU", "4 · Optimal network"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const edgeLabel = (edge) => `${edge.kind === "well" ? "W" : "P"}${edge.sourceIndex + 1}`;
+  const edgeKindLabel = (edge) => edge.kind === "well" ? (vi ? "GIẾNG" : "WELL") : (vi ? "ỐNG" : "PIPE");
+  const edgeChips = edges.map((edge, index) => {
+    const classes = [edge.kind];
+    if (accepted.has(edge.key)) classes.push("accepted");
+    if (rejected.has(edge.key)) classes.push("rejected");
+    if (edge.key === currentKey) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>#${view.sorted ? index + 1 : "·"} · ${edgeKindLabel(edge)}</small><b>${escapeHtml(edgeLabel(edge))}: ${edge.u}↔${edge.v}</b><strong>$${escapeHtml(edge.cost)}</strong></span>`;
+  }).join("") || `<em>${vi ? "Đang tạo danh sách cạnh..." : "Building the edge list..."}</em>`;
+
+  const maxHousesPerRow = 4;
+  const houseColumns = Math.max(1, Math.min(n, maxHousesPerRow));
+  const houseRows = Math.max(1, Math.ceil(n / maxHousesPerRow));
+  const width = 620;
+  const houseRowGap = 126;
+  const firstHouseY = 218;
+  const height = firstHouseY + (houseRows - 1) * houseRowGap + 76;
+  const sourcePoint = { x: width / 2, y: 48 };
+  const housePoint = (house) => {
+    const row = Math.floor((house - 1) / maxHousesPerRow);
+    const firstHouseInRow = row * maxHousesPerRow + 1;
+    const housesInRow = Math.min(maxHousesPerRow, n - row * maxHousesPerRow);
+    const column = house - firstHouseInRow;
+    const rowWidth = housesInRow <= 1 ? 0 : width - 130;
+    return {
+      x: housesInRow <= 1 ? width / 2 : 65 + column * (rowWidth / (housesInRow - 1)),
+      y: firstHouseY + row * houseRowGap,
+    };
+  };
+  const edgePriority = (edge) => edge.key === currentKey ? 3 : accepted.has(edge.key) ? 2 : rejected.has(edge.key) ? 0 : 1;
+  const orderedEdges = [...edges].sort((a, b) => edgePriority(a) - edgePriority(b));
+  const graphEdges = orderedEdges.map((edge) => {
+    const classes = ["water1168-edge", edge.kind];
+    if (accepted.has(edge.key)) classes.push("accepted");
+    if (rejected.has(edge.key)) classes.push("rejected");
+    if (edge.key === currentKey) classes.push("current");
+    let path;
+    let labelX;
+    let labelY;
+    if (edge.kind === "well") {
+      const target = housePoint(edge.v);
+      path = `M ${sourcePoint.x} ${sourcePoint.y + 22} L ${target.x} ${target.y - 28}`;
+      labelX = sourcePoint.x * 0.45 + target.x * 0.55;
+      labelY = sourcePoint.y * 0.45 + target.y * 0.55 - 7;
+    } else {
+      const from = housePoint(edge.u);
+      const to = housePoint(edge.v);
+      const middleX = (from.x + to.x) / 2;
+      const controlY = 145 - (edge.sourceIndex % 4) * 15;
+      path = `M ${from.x} ${from.y - 25} Q ${middleX} ${controlY} ${to.x} ${to.y - 25}`;
+      labelX = middleX;
+      labelY = (from.y + 2 * controlY + to.y) / 4 - 5;
+    }
+    const showLabel = accepted.has(edge.key) || edge.key === currentKey;
+    return `<g class="${classes.join(" ")}" aria-label="${escapeHtml(`${edgeKindLabel(edge)} ${edge.u} to ${edge.v}, cost ${edge.cost}`)}"><path d="${path}"></path>${showLabel ? `<text x="${labelX}" y="${labelY}">${escapeHtml(edgeLabel(edge))} · $${escapeHtml(edge.cost)}</text>` : ""}</g>`;
+  }).join("");
+
+  const selectedWellHouses = new Set((view.acceptedEdges || []).filter((edge) => edge.kind === "well").map((edge) => edge.v));
+  const currentEndpoints = new Set(view.currentEdge ? [view.currentEdge.u, view.currentEdge.v] : []);
+  const rootFor = (node) => view.roots && view.roots[node] !== undefined ? view.roots[node] : node;
+  const houseNodes = Array.from({ length: n }, (_, index) => {
+    const house = index + 1;
+    const point = housePoint(house);
+    const classes = ["water1168-node", "house", `component-${Math.abs(rootFor(house)) % 6}`];
+    if (currentEndpoints.has(house)) classes.push("current");
+    if (selectedWellHouses.has(house)) classes.push("has-well");
+    return `<g class="${classes.join(" ")}"><rect x="${point.x - 42}" y="${point.y - 32}" width="84" height="66" rx="12"></rect><path class="roof" d="M ${point.x - 37} ${point.y - 29} L ${point.x} ${point.y - 55} L ${point.x + 37} ${point.y - 29}"></path><text class="house" x="${point.x}" y="${point.y}">H${house}</text><text class="detail" x="${point.x}" y="${point.y + 21}">well $${escapeHtml(view.wells ? view.wells[index] : "—")} · R${escapeHtml(rootFor(house))}</text>${selectedWellHouses.has(house) ? `<text class="well-mark" x="${point.x + 34}" y="${point.y - 20}">💧</text>` : ""}</g>`;
+  }).join("");
+  const sourceClass = currentEndpoints.has(0) ? " current" : "";
+  const sourceNode = `<g class="water1168-node source${sourceClass}"><path d="M ${sourcePoint.x - 46} ${sourcePoint.y + 27} L ${sourcePoint.x - 35} ${sourcePoint.y - 27} L ${sourcePoint.x + 35} ${sourcePoint.y - 27} L ${sourcePoint.x + 46} ${sourcePoint.y + 27} Z"></path><path class="water" d="M ${sourcePoint.x - 29} ${sourcePoint.y + 3} Q ${sourcePoint.x - 14} ${sourcePoint.y - 10} ${sourcePoint.x} ${sourcePoint.y + 3} T ${sourcePoint.x + 29} ${sourcePoint.y + 3}"></path><text class="source-id" x="${sourcePoint.x}" y="${sourcePoint.y - 5}">0</text><text class="source-label" x="${sourcePoint.x}" y="${sourcePoint.y + 44}">${vi ? "NGUỒN NƯỚC ẢO" : "VIRTUAL WATER SOURCE"}</text></g>`;
+  const graphSummary = vi
+    ? `Nguồn nước ảo 0 và ${n} nhà; đã chọn ${view.acceptedCount || 0} trên ${n} cạnh MST; tổng ${view.totalCost || 0}.`
+    : `Virtual source 0 and ${n} houses; selected ${view.acceptedCount || 0} of ${n} MST edges; total ${view.totalCost || 0}.`;
+  const graphSvg = `<svg class="water1168-graph" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(graphSummary)}">${graphEdges}${sourceNode}${houseNodes}</svg>`;
+
+  const current = view.currentEdge;
+  let decisionClass = "waiting";
+  let decisionTitle = vi ? "Chờ cạnh tiếp theo" : "Waiting for the next edge";
+  let decisionNote = vi ? "Kruskal xử lý cạnh từ rẻ đến đắt." : "Kruskal processes edges from cheapest to most expensive.";
+  if (current) {
+    decisionTitle = `${edgeLabel(current)} · ${current.u} ↔ ${current.v} · $${current.cost}`;
+    decisionNote = vi ? "Chưa chạy find/union." : "Waiting for find/union.";
+    if (view.rootsBefore) {
+      if (view.unionChanged === true) {
+        decisionClass = "accepted";
+        decisionNote = vi ? `Khác root → chọn cạnh và cộng $${current.cost}.` : `Different roots → accept and add $${current.cost}.`;
+      } else if (view.unionChanged === false) {
+        decisionClass = "rejected";
+        decisionNote = vi ? "Cùng root → bỏ qua để tránh cycle." : "Same root → reject to avoid a cycle.";
+      } else if (view.rootsBefore.u === view.rootsBefore.v) {
+        decisionClass = "cycle";
+        decisionNote = vi ? "Cùng root: cạnh này sẽ tạo cycle." : "Same root: this edge would form a cycle.";
+      } else {
+        decisionClass = "ready";
+        decisionNote = vi ? "Khác root: cạnh này an toàn để chọn." : "Different roots: this edge is safe to select.";
+      }
+    }
+  }
+  const rootsHtml = view.rootsBefore
+    ? `<div class="water1168-roots"><span>find(${current.u}) = <b>R${view.rootsBefore.u}</b></span><strong>${view.rootsBefore.u === view.rootsBefore.v ? "=" : "≠"}</strong><span>find(${current.v}) = <b>R${view.rootsBefore.v}</b></span></div>`
+    : `<div class="water1168-rule"><code>well[i] ⇔ edge (0, i)</code><span>${vi ? "Một MST trên n+1 node cần n cạnh" : "An MST over n+1 nodes needs n edges"}</span></div>`;
+
+  const components = (view.groups || []).map((group) => {
+    const labels = (group.nodes || []).map((node) => node === 0 ? (vi ? "Nguồn 0" : "Source 0") : `H${node}`).join(" · ");
+    const hasSource = (group.nodes || []).includes(0);
+    return `<span class="${hasSource ? "source" : ""}"><b>R${escapeHtml(group.root)}</b><small>${escapeHtml(labels)}</small><em>${hasSource ? (vi ? "có nước" : "water-connected") : (vi ? "chưa có nước" : "not supplied")}</em></span>`;
+  }).join("");
+  const selectedWells = (view.acceptedEdges || []).filter((edge) => edge.kind === "well");
+  const selectedPipes = (view.acceptedEdges || []).filter((edge) => edge.kind === "pipe");
+  const selectedHtml = [...selectedWells, ...selectedPipes].map((edge) => `<span class="${edge.kind}"><b>${escapeHtml(edgeLabel(edge))}</b><small>${edge.u}↔${edge.v}</small><strong>$${edge.cost}</strong></span>`).join("") || `<em>${vi ? "Chưa chọn hạ tầng" : "No infrastructure selected yet"}</em>`;
+  const resultClass = view.complete ? "complete" : "building";
+
+  el.innerHTML = `<section class="water1168-viz">
+    <div class="water1168-phases">${phases}</div>
+    <section class="water1168-edge-lane"><header><div><strong>${view.sorted ? (vi ? "CẠNH ĐÃ SORT · RẺ → ĐẮT" : "SORTED EDGES · CHEAP → EXPENSIVE") : (vi ? "BIẾN ĐỔI THÀNH ĐỒ THỊ" : "GRAPH TRANSFORMATION")}</strong><small>${edges.length} / ${n + (view.pipes || []).length} ${vi ? "lựa chọn" : "options"}</small></div><span><i class="well"></i>${vi ? "giếng / cạnh ảo" : "well / virtual edge"}<i class="pipe"></i>${vi ? "ống thật" : "physical pipe"}</span></header><div>${edgeChips}</div></section>
+    <div class="water1168-layout"><section class="water1168-network"><header><strong>${vi ? "MẠNG CẤP NƯỚC" : "WATER NETWORK"}</strong><span>${vi ? "nét đứt cyan = giếng · nét liền = ống" : "dashed cyan = well · solid = pipe"}</span></header><div class="water1168-graph-scroll">${graphSvg}</div><div class="water1168-legend"><span><i class="pending"></i>${vi ? "chưa xét" : "pending"}</span><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="accepted"></i>${vi ? "đã chọn" : "accepted"}</span><span><i class="rejected"></i>${vi ? "cycle / bỏ" : "cycle / rejected"}</span></div></section>
+      <aside class="water1168-state"><section class="water1168-score ${resultClass}"><div><small>MST EDGES</small><strong>${view.acceptedCount || 0}<em>/${n}</em></strong></div><div><small>${vi ? "TỔNG CHI PHÍ" : "TOTAL COST"}</small><strong>$${view.totalCost || 0}</strong></div></section><section class="water1168-decision ${decisionClass}"><small>${current ? edgeKindLabel(current) : (vi ? "QUY TẮC" : "RULE")}</small><strong>${escapeHtml(decisionTitle)}</strong>${rootsHtml}<p>${escapeHtml(decisionNote)}</p></section><section class="water1168-answer ${resultClass}"><small>${vi ? "CHI PHÍ NHỎ NHẤT" : "MINIMUM COST"}</small><strong>${view.answer === null || view.answer === undefined ? "—" : `$${view.answer}`}</strong><span>${view.complete ? (vi ? "✓ mọi nhà nối với nguồn 0" : "✓ every house reaches source 0") : (vi ? "đang xây MST" : "building the MST")}</span></section></aside>
+    </div>
+    <section class="water1168-components"><header><strong>DSU COMPONENTS</strong><span>${(view.groups || []).length} components</span></header><div>${components}</div></section>
+    <section class="water1168-selected"><header><strong>${vi ? "HẠ TẦNG ĐÃ CHỌN" : "SELECTED INFRASTRUCTURE"}</strong><span>${selectedWells.length} wells · ${selectedPipes.length} pipes</span></header><div>${selectedHtml}</div></section>
+  </section>`;
+}
+
 function renderKruskalEffortView(step) {
   const view = step.kruskalEffortView;
   const el = $("treeView");
@@ -14249,6 +14390,128 @@ function renderMapSumView(step) {
   }
 }
 
+function renderBricks803View(step) {
+  const view = step.bricks803View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const grid = Array.isArray(view.workingGrid) ? view.workingGrid : [];
+  const original = Array.isArray(view.originalGrid) ? view.originalGrid : grid;
+  const phaseOrder = ["prepare", "build", "reverse", "done"];
+  const phaseIndex = Math.max(0, phaseOrder.indexOf(view.phase));
+  const phaseLabels = vi
+    ? ["1 · Xóa trước các hit", "2 · Xây DSU + roof", "3 · Khôi phục ngược", "4 · Kết quả"]
+    : ["1 · Pre-remove hits", "2 · Build DSU + roof", "3 · Restore backward", "4 · Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : String(cell);
+  const coordText = (cell) => cell === "roof"
+    ? (vi ? "mái ảo" : "virtual roof")
+    : Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
+  const stable = new Set((view.stableCells || []).map(keyOf));
+  const newlyStable = new Set((view.newlyStable || []).map(keyOf));
+  const activeKey = keyOf(view.activeCell);
+  const neighborKey = keyOf(view.activeNeighbor);
+  const restoredEvent = ["restore", "restore-union", "count"].includes(view.event);
+  const removed = new Set();
+  (view.hits || []).forEach((hit, index) => {
+    if (view.effective && view.effective[index] && grid[hit[0]] && grid[hit[0]][hit[1]] === 0) removed.add(keyOf(hit));
+  });
+
+  const columnLabels = Array.from({ length: cols }, (_, col) => `<span>${col}</span>`).join("");
+  const cells = [];
+  for (let row = 0; row < rows; row++) {
+    cells.push(`<span class="bricks803-row-label">${row}</span>`);
+    for (let col = 0; col < cols; col++) {
+      const key = `${row},${col}`;
+      const value = grid[row] ? grid[row][col] : 0;
+      const classes = ["bricks803-cell"];
+      let status = vi ? "ô rỗng" : "empty";
+      if (value === 1) {
+        classes.push(view.phase === "prepare" ? "brick" : stable.has(key) ? "stable" : "loose");
+        status = view.phase === "prepare"
+          ? (vi ? "brick chưa xây DSU" : "brick before DSU")
+          : stable.has(key) ? (vi ? "ổn định, nối roof" : "stable, roof-connected") : (vi ? "chưa nối roof" : "not roof-connected");
+      } else if (removed.has(key) || (original[row] && original[row][col] === 1)) {
+        classes.push("removed");
+        status = vi ? "brick đã bị xóa" : "removed brick";
+      } else {
+        classes.push("empty");
+      }
+      if (newlyStable.has(key)) classes.push("newly-stable");
+      if (key === neighborKey) classes.push("neighbor");
+      if (key === activeKey) classes.push(restoredEvent && value === 1 ? "restored" : "active");
+      const symbol = value === 1 ? "1" : classes.includes("removed") ? "×" : "·";
+      cells.push(`<div class="${classes.join(" ")}" aria-label="${escapeHtml(`(${row},${col}): ${status}`)}"><small>${row},${col}</small><strong>${symbol}</strong><em>${stable.has(key) ? "roof ✓" : value === 1 ? "brick" : classes.includes("removed") ? "hit" : "empty"}</em></div>`);
+    }
+  }
+
+  const hits = Array.isArray(view.hits) ? view.hits : [];
+  const statusLabels = vi
+    ? { pending: "chờ", removed: "đã xóa", skipped: "ô rỗng", processing: "đang xử lý", restored: "đã khôi phục", done: "xong" }
+    : { pending: "waiting", removed: "removed", skipped: "empty", processing: "processing", restored: "restored", done: "done" };
+  const hitTimeline = hits.length ? hits.map((hit, index) => {
+    const status = (view.hitStatus && view.hitStatus[index]) || "pending";
+    const answer = view.answers && view.answers[index] !== null && view.answers[index] !== undefined ? view.answers[index] : "—";
+    const classes = [status, index === view.activeHit ? "active" : ""];
+    return `<span class="${classes.join(" ")}"><small>#${index}</small><b>${escapeHtml(coordText(hit))}</b><em>${escapeHtml(statusLabels[status] || status)}</em><strong>${vi ? "rơi" : "fall"}: ${escapeHtml(answer)}</strong></span>`;
+  }).join("") : `<span class="empty">${vi ? "Không có hit" : "No hits"}</span>`;
+
+  const union = view.unionEdge;
+  const operation = union
+    ? `<div class="bricks803-union ${union.merged ? "merged" : "same"}"><small>UNION</small><strong>${escapeHtml(coordText(union.from))} ↔ ${escapeHtml(coordText(union.to))}</strong><span>${union.merged ? (vi ? "✓ gộp hai component" : "✓ components merged") : (vi ? "↷ đã cùng root" : "↷ already same root")}</span></div>`
+    : `<div class="bricks803-union idle"><small>${vi ? "THAO TÁC HIỆN TẠI" : "CURRENT OPERATION"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${vi ? "Theo dõi grid và roof size ở từng dòng code" : "Track the grid and roof size at each code line"}</span></div>`;
+
+  const components = (view.components || []).map((component) => {
+    const cellText = (component.cells || []).map(coordText).join(" ");
+    return `<span class="${component.roofConnected ? "roof" : "loose"}"><b>R${escapeHtml(component.root)}</b><small>${escapeHtml(cellText || "—")}</small><em>${component.roofConnected ? (vi ? "nối roof" : "roof-connected") : (vi ? "rời roof" : "detached")}</em></span>`;
+  }).join("") || `<span class="bricks803-empty-state">${vi ? "Chưa có component brick" : "No brick components yet"}</span>`;
+
+  const activeNodes = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (grid[row] && grid[row][col] === 1) activeNodes.push(row * cols + col);
+    }
+  }
+  activeNodes.push(view.roofNode);
+  const dsuNodes = activeNodes.map((node) => {
+    const parent = view.parent && view.parent[node] !== undefined ? view.parent[node] : "—";
+    const rootSize = view.size && parent === node ? view.size[node] : "—";
+    return `<span class="${node === view.roofNode ? "roof" : ""}"><small>${node === view.roofNode ? "ROOF" : `node ${node}`}</small><b>p=${escapeHtml(parent)}</b><em>size=${escapeHtml(rootSize)}</em></span>`;
+  }).join("");
+
+  const roofSize = Number(view.roofSize) || 1;
+  const before = view.roofBefore;
+  const after = view.roofAfter;
+  const formulaReady = Number.isFinite(before) && Number.isFinite(after);
+  const formula = formulaReady
+    ? `max(0, ${after} − ${before} − 1) = ${view.fallen}`
+    : "max(0, after − before − 1)";
+  const result = (view.answers || []).map((answer) => answer === null || answer === undefined ? "—" : answer).join(", ");
+  const eventLabel = vi
+    ? { copy: "Sao chép grid", remove: "Xóa hit", "skip-remove": "Hit ô rỗng", "init-dsu": "Tạo virtual roof", "build-union": "Xây component", before: "Đo roof trước", restore: "Khôi phục brick", "restore-union": "Union hàng xóm", "skip-restore": "Bỏ qua hit rỗng", count: "Tính số brick rơi", done: "Hoàn tất" }[view.event]
+    : { copy: "Copy grid", remove: "Remove hit", "skip-remove": "Empty-cell hit", "init-dsu": "Create virtual roof", "build-union": "Build component", before: "Measure roof before", restore: "Restore brick", "restore-union": "Union neighbor", "skip-restore": "Skip empty hit", count: "Count fallen bricks", done: "Complete" }[view.event];
+  const summary = vi
+    ? `Bài 803, pha ${view.phase}, thao tác ${eventLabel || view.event}, roof size ${roofSize}.`
+    : `Problem 803, ${view.phase} phase, ${eventLabel || view.event}, roof size ${roofSize}.`;
+
+  el.innerHTML = `<section class="bricks803-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="bricks803-phases">${phases}</div>
+    <section class="bricks803-hits"><header><strong>HIT TIMELINE</strong><span>${vi ? "xử lý xuôi → · khôi phục ←" : "remove forward → · restore backward ←"}</span></header><div>${hitTimeline}</div></section>
+    <section class="bricks803-action"><div><small>${vi ? "SỰ KIỆN" : "EVENT"}</small><strong>${escapeHtml(eventLabel || view.event || "—")}</strong></div><div><small>${vi ? "HIT HIỆN TẠI" : "CURRENT HIT"}</small><strong>${view.activeHit === null || view.activeHit === undefined ? "—" : `#${view.activeHit} ${escapeHtml(coordText(hits[view.activeHit]))}`}</strong></div>${operation}</section>
+    <div class="bricks803-main">
+      <section class="bricks803-grid-card"><header><strong>GRID ${rows} × ${cols}</strong><span>${vi ? "hàng 0 chạm virtual roof" : "row 0 touches the virtual roof"}</span></header><div class="bricks803-roof"><i></i><strong>VIRTUAL ROOF · node ${escapeHtml(view.roofNode)}</strong><span>size=${roofSize} · ${Math.max(0, roofSize - 1)} ${vi ? "brick ổn định" : "stable bricks"}</span></div><div class="bricks803-grid-scroll"><div class="bricks803-col-labels" style="--bricks803-cols:${cols}"><i></i>${columnLabels}</div><div class="bricks803-grid" style="--bricks803-cols:${cols}">${cells.join("")}</div></div><div class="bricks803-legend"><span><i class="stable"></i>${vi ? "nối roof" : "stable"}</span><span><i class="loose"></i>${vi ? "rời roof" : "loose"}</span><span><i class="removed"></i>${vi ? "đã xóa" : "removed"}</span><span><i class="active"></i>${vi ? "hit hiện tại" : "active hit"}</span><span><i class="restored"></i>${vi ? "vừa khôi phục" : "restored"}</span><span><i class="newly"></i>${vi ? "vừa nối roof" : "newly roof-connected"}</span></div></section>
+      <aside class="bricks803-side"><section class="bricks803-roof-metrics"><div><small>BEFORE</small><strong>${Number.isFinite(before) ? before : "—"}</strong></div><b>→</b><div><small>AFTER</small><strong>${Number.isFinite(after) ? after : "—"}</strong></div></section><section class="bricks803-formula ${formulaReady ? "ready" : "idle"}"><small>${vi ? "BRICK RƠI" : "FALLEN BRICKS"}</small><strong>${escapeHtml(formula)}</strong><span>${vi ? "−1 loại brick vừa khôi phục" : "−1 excludes the restored brick"}</span></section><section class="bricks803-answer"><small>ANSWER</small><strong>[${escapeHtml(result)}]</strong><span>${vi ? "null được hiển thị bằng —" : "pending values are shown as —"}</span></section></aside>
+    </div>
+    <section class="bricks803-components"><header><strong>DSU COMPONENTS</strong><span>${(view.components || []).length} ${vi ? "component brick" : "brick components"}</span></header><div>${components}</div></section>
+    <details class="bricks803-dsu"><summary>${vi ? "Parent / size (chỉ size tại root có ý nghĩa)" : "Parent / size (size is meaningful only at roots)"}</summary><div>${dsuNodes}</div></details>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -14343,6 +14606,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKruskalEffortView(step);
+  } else if (step.waterDistributionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWaterDistributionView(step);
+  } else if (step.bricks803View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBricks803View(step);
   } else if (step.parallelCoursesView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -15729,6 +16004,15 @@ async function ensureMonacoEditor() {
     fontLigatures: false,
     fontSize: 14,
     lineHeight: 21,
+    wordWrap: "on",
+    wrappingIndent: "same",
+    wrappingStrategy: "advanced",
+    scrollbar: {
+      horizontal: "hidden",
+      horizontalScrollbarSize: 0,
+      vertical: "auto",
+      verticalScrollbarSize: 10,
+    },
     minimap: { enabled: false },
     automaticLayout: true,
     fixedOverflowWidgets: true,
