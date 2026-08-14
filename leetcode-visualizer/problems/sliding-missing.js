@@ -232,69 +232,92 @@ module.exports = {
     const positions = [];
     const answer = [];
     const steps = [];
-    const occurrenceLabel = () => positions.length ? `[${positions.join(", ")}]` : "[]";
-    const answerLabel = () => answer.length ? `[${answer.join(", ")}]` : "[]";
+    const occurrenceTable = () => positions.length
+      ? `[${positions.map((index, occurrence) => `${occurrence + 1} → ${index}`).join(", ")}]`
+      : "[]";
+    const answerTable = () => answer.length
+      ? `[${answer.map((result, queryIndex) => `q${queryIndex + 1} → ${result}`).join(", ")}]`
+      : "[]";
+    const subLabels = () => nums.map((_, index) => {
+      const occurrence = positions.indexOf(index) + 1;
+      return occurrence ? `[${index}] · x #${occurrence}` : `[${index}]`;
+    });
     const snap = (title, line, note, extra = {}) => {
       const currentIndex = extra.currentIndex;
       const queryIndex = extra.queryIndex;
+      const occurrence = queryIndex === undefined ? undefined : queries[queryIndex];
       steps.push({
         title,
         arr: [...nums],
-        sub: nums.map((_, index) => `[${index}]`),
+        sub: subLabels(),
         highlight: currentIndex === undefined ? [] : [currentIndex],
         mark: extra.mark ?? [...positions],
         final: Boolean(extra.final),
         codeLines: [line],
         vars: [
-          { name: "x", value: x },
-          { name: "positions of x", value: occurrenceLabel() },
-          { name: "queries (1-based)", value: `[${queries.join(", ")}]` },
-          ...(queryIndex === undefined ? [] : [{ name: "current query", value: `queries[${queryIndex}] = ${queries[queryIndex]}` }]),
-          { name: "answer", value: answerLabel() },
+          { name: "phase", value: extra.phase || "1. Build positions" },
+          { name: "target x", value: x },
+          { name: "occurrence # → nums index", value: occurrenceTable() },
+          { name: "queries (q is 1-based)", value: `[${queries.join(", ")}]` },
+          ...(occurrence === undefined ? [] : [
+            { name: "current query", value: `q${queryIndex + 1} = ${occurrence}` },
+            { name: "lookup", value: extra.lookup || `positions[${occurrence - 1}]` },
+          ]),
+          { name: "answers so far", value: answerTable() },
         ],
         note,
       });
     };
 
-    snap(text("Khởi tạo positions = []", "Initialize positions = []"), 3,
-      text("positions sẽ lưu chỉ số 0-based của mọi lần xuất hiện của x.", "positions will store the zero-based index of every occurrence of x."));
+    snap(text("Pha 1: tạo bảng occurrence → index", "Phase 1: build the occurrence → index table"), 3,
+      text("Ta không trả lời query ngay. Trước hết, positions sẽ lưu index của từng lần gặp x theo đúng thứ tự.", "Do not answer queries yet. First, positions records the index of every x in encounter order."));
 
     for (let index = 0; index < nums.length; index++) {
-      snap(text(`Xét nums[${index}] = ${nums[index]}`, `Inspect nums[${index}] = ${nums[index]}`), 5,
-        text("Duyệt mảng một lần để xác định các lần xuất hiện của x.", "Scan the array once to locate occurrences of x."), { currentIndex: index });
-      if (nums[index] === x) {
+      const value = nums[index];
+      const matches = value === x;
+      snap(text(`So sánh nums[${index}] = ${value} với x = ${x}`, `Compare nums[${index}] = ${value} with x = ${x}`), 5,
+        matches
+          ? text("Hai giá trị bằng nhau: đây là một lần xuất hiện của x.", "The values match: this is an occurrence of x.")
+          : text("Không bằng x: bỏ qua phần tử này và tiếp tục quét.", "It is not x: skip this item and continue scanning."),
+        { currentIndex: index });
+      if (matches) {
         positions.push(index);
-        snap(text(`nums[${index}] == x → lưu vị trí ${index}`, `nums[${index}] == x → save position ${index}`), 6,
-          text(`Đây là lần xuất hiện thứ ${positions.length} của x; query ${positions.length} sẽ trả về index ${index}.`, `This is occurrence ${positions.length} of x; query ${positions.length} returns index ${index}.`),
+        snap(text(`Lần xuất hiện #${positions.length} của x nằm ở index ${index}`, `Occurrence #${positions.length} of x is at index ${index}`), 6,
+          text(`Bảng lookup nhận cặp ${positions.length} → ${index}. Nghĩa là query q = ${positions.length} sẽ trả về ${index}.`, `The lookup table receives ${positions.length} → ${index}. Therefore q = ${positions.length} returns ${index}.`),
           { currentIndex: index, mark: [...positions] });
       }
     }
 
-    snap(text("Khởi tạo answer = []", "Initialize answer = []"), 7,
-      text("Mỗi query q hỏi vị trí của lần xuất hiện thứ q (q là 1-based).", "Each query q asks for the position of occurrence q (q is one-based)."));
+    snap(text("Pha 2: trả lời từng query", "Phase 2: answer each query"), 7,
+      text("Query q là số thứ tự 1-based của lần xuất hiện. Vì positions là mảng 0-based, cần đọc positions[q − 1].", "Query q is a one-based occurrence number. Since positions is zero-based, read positions[q − 1]."),
+      { phase: "2. Answer queries" });
 
     for (let queryIndex = 0; queryIndex < queries.length; queryIndex++) {
       const occurrence = queries[queryIndex];
-      snap(text(`Xử lý query ${occurrence}`, `Process query ${occurrence}`), 8,
-        text("Dùng q - 1 vì positions là mảng 0-based.", "Use q - 1 because positions is zero-based."), { queryIndex });
+      const lookup = `q = ${occurrence} → positions[${occurrence - 1}]`;
+      snap(text(`Query ${queryIndex + 1}: cần lần xuất hiện thứ ${occurrence}`, `Query ${queryIndex + 1}: request occurrence ${occurrence}`), 8,
+        text(`${lookup}. Kiểm tra xem bảng có đủ ${occurrence} phần tử hay không.`, `${lookup}. Check whether the table contains at least ${occurrence} entries.`),
+        { queryIndex, lookup, phase: "2. Answer queries", mark: [] });
       const result = occurrence <= positions.length ? positions[occurrence - 1] : -1;
       answer.push(result);
-      snap(text(`answer.append(${result})`, `answer.append(${result})`), 9,
+      const resolvedLookup = result === -1 ? `${lookup} → out of range → -1` : `${lookup} = ${result}`;
+      snap(text(`Lưu đáp án ${result}`, `Save answer ${result}`), 9,
         result === -1
-          ? text(`Chỉ có ${positions.length} lần xuất hiện, nên query ${occurrence} không tồn tại → -1.`, `Only ${positions.length} occurrences exist, so query ${occurrence} is unavailable → -1.`)
-          : text(`positions[${occurrence - 1}] = ${result}, nên đây là đáp án cho query ${occurrence}.`, `positions[${occurrence - 1}] = ${result}, so this is the answer for query ${occurrence}.`),
-        { queryIndex, mark: result === -1 ? [...positions] : [result] });
+          ? text(`Bảng chỉ có ${positions.length} lần xuất hiện, nên lần thứ ${occurrence} không tồn tại → −1.`, `The table has only ${positions.length} occurrences, so occurrence ${occurrence} does not exist → −1.`)
+          : text(`Lần xuất hiện thứ ${occurrence} của x ở nums[${result}], nên kết quả là ${result}.`, `Occurrence ${occurrence} of x is at nums[${result}], so the result is ${result}.`),
+        { queryIndex, lookup: resolvedLookup, phase: "2. Answer queries", mark: result === -1 ? [...positions] : [result] });
     }
 
     snap(text(`return [${answer.join(", ")}]`, `return [${answer.join(", ")}]`), 10,
-      text("Tất cả query đã được trả lời bằng lookup O(1) trong positions.", "Every query has been answered by an O(1) lookup in positions."), { final: true });
+      text("Hoàn tất: pha 1 tạo bảng occurrence → index; pha 2 chỉ lookup bảng để trả lời query.", "Complete: phase 1 builds the occurrence → index table; phase 2 only looks up that table for each query."),
+      { phase: "Done", final: true });
     return { original: nums, x, queries, answer, steps };
   }
 
   Object.assign(module.exports, {
     3159: {
       id: 3159,
-      difficulty: "easy",
+      difficulty: "medium",
       slug: "find-occurrences-of-an-element-in-an-array",
       category,
       tags: arrayTag,
