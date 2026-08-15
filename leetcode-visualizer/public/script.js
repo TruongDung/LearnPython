@@ -14243,6 +14243,61 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderPascalTriangleView(step) {
+  const view = step.pascalTriangleView || {};
+  const vi = lang === "vi";
+  const committedRows = Array.isArray(view.rows) ? view.rows : [];
+  const allRows = committedRows.map((row) => ({ cells: row, working: false }));
+  if (Array.isArray(view.workingRow)) allRows.push({ cells: view.workingRow, working: true });
+  const active = view.active || {};
+  const parents = new Set((view.parents || []).map((cell) => `${cell.row}:${cell.col}`));
+  const phaseLabels = {
+    setup: vi ? "Khởi tạo" : "Initialize",
+    "start-row": vi ? "Tạo hàng" : "Create row",
+    "seed-edges": vi ? "Đặt hai biên" : "Set edges",
+    "sum-parents": vi ? "Cộng hai ô cha" : "Add parents",
+    "commit-row": vi ? "Chốt hàng" : "Commit row",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const triangleHtml = allRows.map(({ cells, working }, row) => {
+    const rowClasses = `pascal118-row${working ? " working" : ""}${active.row === row && active.col === null ? " active-row" : ""}`;
+    const cellsHtml = cells.map((value, col) => {
+      const key = `${row}:${col}`;
+      const classes = ["pascal118-cell"];
+      if (parents.has(key)) classes.push("parent");
+      if (active.row === row && active.col === col) classes.push("active");
+      if (value === null) classes.push("pending");
+      else if (col === 0 || col === cells.length - 1) classes.push("edge");
+      return `<span class="${classes.join(" ")}" title="row ${row}, col ${col}"><small>${row},${col}</small><strong>${value === null ? "?" : value}</strong></span>`;
+    }).join("");
+    return `<div class="${rowClasses}">${cellsHtml}</div>`;
+  }).join("") || `<p class="pascal118-empty">${vi ? "Tam giác đang rỗng" : "Triangle is empty"}</p>`;
+
+  let action = vi ? "Bắt đầu xây tam giác từ hàng 0." : "Start building the triangle from row 0.";
+  let detail = vi ? "" : "";
+  if (view.formula) {
+    const formula = view.formula;
+    action = `current[${formula.col}] = ${formula.leftParent} + ${formula.rightParent} = <b>${formula.result}</b>`;
+    detail = vi
+      ? `Hai ô tím ở hàng ${formula.row - 1} đi vào ô vàng ở hàng ${formula.row}.`
+      : `The two purple cells in row ${formula.row - 1} feed the yellow cell in row ${formula.row}.`;
+  } else if (view.phase === "seed-edges") {
+    action = vi ? "Hai cạnh của mọi hàng đều là 1" : "Both edges of every row are 1";
+    detail = vi ? "Chỉ các ô ở giữa mới cần cộng hai ô cha." : "Only inner cells need two-parent addition.";
+  } else if (view.phase === "commit-row") {
+    action = vi ? "Hàng hoàn chỉnh → dùng làm hàng cha kế tiếp" : "Completed row → becomes the next parent row";
+  } else if (view.phase === "done") {
+    action = vi ? `Đã tạo đủ ${view.numRows} hàng` : `Generated all ${view.numRows} rows`;
+  }
+
+  $("treeView").innerHTML = `<section class="pascal118-viz" role="img" aria-label="${vi ? "Trực quan hóa tam giác Pascal" : "Pascal triangle visualization"}">
+    <header><strong>PASCAL'S TRIANGLE</strong><span class="pascal118-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="pascal118-rule"><b>CORE RULE</b><strong>edge = 1 · inner = upper-left + upper-right</strong><span>${vi ? "Mỗi số bên trong nhận giá trị từ đúng hai ô cha phía trên." : "Every inner value comes from exactly two parent cells above."}</span></section>
+    <section class="pascal118-action"><small>${vi ? "ĐANG THỰC HIỆN" : "CURRENT ACTION"}</small><strong>${action}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ""}</section>
+    <section class="pascal118-triangle"><header><strong>${vi ? "TAM GIÁC ĐANG XÂY" : "TRIANGLE UNDER CONSTRUCTION"}</strong><span>${vi ? "tím = cha · vàng = đang tạo · xanh = cạnh = 1" : "purple = parents · yellow = current · green = edge = 1"}</span></header><div>${triangleHtml}</div></section>
+  </section>`;
+}
+
 function renderFibonacciView(step) {
   const view = step.fibonacciView || {};
   const vi = lang === "vi";
@@ -14657,6 +14712,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.pascalTriangleView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPascalTriangleView(step);
   } else if (step.fibonacciView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

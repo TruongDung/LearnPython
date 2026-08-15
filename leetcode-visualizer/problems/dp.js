@@ -13913,39 +13913,107 @@ function buildSteps1216(input, params) {
 
 /** LeetCode 118: Pascal's Triangle. */
 function buildSteps118(input) {
-  const numRows = Number(Array.isArray(input) ? input[0] : String(input).trim()) || 5;
+  const parsedRows = Number(Array.isArray(input) ? input[0] : String(input).trim());
+  const numRows = Number.isInteger(parsedRows) && parsedRows >= 0 ? parsedRows : 5;
   const steps = [];
   const triangle = [];
 
-  function gridSnap(o) {
-    const width = numRows;
-    const display = triangle.map((row) => {
-      const padded = [...row.map(String)];
-      while (padded.length < width) padded.push("");
-      return padded;
-    });
+  function snapshot({ title, codeLine, phase, workingRow = null, active = null, parents = [], formula = null, final = false, vars = [], note }) {
     steps.push({
-      title: o.title, arr: [],
-      grid: { dp: display.length ? display : [[""]], text1: "", text2: "", hlCell: o.hlCell || null, pathCells: o.pathCells || [], largeCells: true },
-      highlight: [], mark: [], final: o.final || false, codeLines: o.codeLines || [], vars: o.vars || [], note: o.note,
+      title,
+      arr: [],
+      highlight: [],
+      mark: [],
+      final,
+      codeLines: [codeLine],
+      vars,
+      note,
+      pascalTriangleView: {
+        numRows,
+        phase,
+        rows: triangle.map((row) => [...row]),
+        workingRow: workingRow ? [...workingRow] : null,
+        active,
+        parents,
+        formula,
+      },
     });
   }
 
-  gridSnap({ title: { vi: "Bắt đầu", en: "Start" }, codeLines: [3], vars: [{ name: "numRows", value: numRows }], note: { vi: "Mỗi hàng bắt đầu và kết thúc bằng 1. Ô trong = tổng 2 ô ngay trên nó.", en: "Each row starts and ends with 1. Interior cell = sum of the two cells above it." } });
+  snapshot({
+    title: { vi: "Khởi tạo tam giác rỗng", en: "Initialize an empty triangle" },
+    codeLine: 3,
+    phase: "setup",
+    vars: [{ name: "numRows", value: numRows }, { name: "triangle", value: "[]" }],
+    note: { vi: "Tam giác được xây từ trên xuống. Hai cạnh luôn là 1; ô ở giữa bằng tổng của hai ô cha ngay phía trên.", en: "Build the triangle from top to bottom. Both edges are always 1; an inner cell is the sum of its two parents directly above." },
+  });
 
   for (let row = 0; row < numRows; row++) {
-    const current = new Array(row + 1).fill(1);
-    for (let col = 1; col < row; col++) current[col] = triangle[row - 1][col - 1] + triangle[row - 1][col];
-    triangle.push(current);
-    gridSnap({
-      title: { vi: `Hàng ${row}: [${current.join(", ")}]`, en: `Row ${row}: [${current.join(", ")}]` },
-      hlCell: [row, 0],
-      codeLines: row < 2 ? [4, 5] : [4, 5, 6, 7],
-      vars: [{ name: "row", value: row }, { name: "current", value: `[${current.join(", ")}]` }],
-      note: { vi: row < 2 ? `Hàng ${row} toàn 1.` : `Ô trong = tổng 2 ô hàng ${row - 1}. Hai đầu vẫn là 1.`, en: row < 2 ? `Row ${row} is all 1s.` : `Interior = sum of two cells from row ${row - 1}. Ends stay 1.` },
+    let current = new Array(row + 1).fill(null);
+    snapshot({
+      title: { vi: `Bắt đầu hàng ${row}`, en: `Start row ${row}` },
+      codeLine: 4,
+      phase: "start-row",
+      workingRow: current,
+      active: { row, col: null },
+      vars: [{ name: "row", value: row }],
+      note: { vi: `Tạo vị trí cho ${row + 1} ô của hàng ${row}.`, en: `Create slots for the ${row + 1} cells in row ${row}.` },
+    });
+
+    current[0] = 1;
+    if (row > 0) current[row] = 1;
+    snapshot({
+      title: { vi: `Đặt hai biên hàng ${row} = 1`, en: `Set row ${row} edges to 1` },
+      codeLine: 5,
+      phase: "seed-edges",
+      workingRow: current,
+      active: { row, col: row === 0 ? 0 : null },
+      vars: [{ name: "current", value: `[${current.map((value) => value ?? "?").join(", ")}]` }],
+      note: row === 0
+        ? { vi: "Hàng đầu chỉ có một ô: 1.", en: "The first row has a single cell: 1." }
+        : { vi: "Ô đầu và ô cuối luôn bằng 1, vì chỉ có một đường đi tới cạnh của tam giác.", en: "The first and last cells are always 1 because there is only one path to either edge." },
+    });
+
+    for (let col = 1; col < row; col++) {
+      const leftParent = triangle[row - 1][col - 1];
+      const rightParent = triangle[row - 1][col];
+      current[col] = leftParent + rightParent;
+      snapshot({
+        title: { vi: `Ô (${row}, ${col}) = ${leftParent} + ${rightParent} = ${current[col]}`, en: `Cell (${row}, ${col}) = ${leftParent} + ${rightParent} = ${current[col]}` },
+        codeLine: 7,
+        phase: "sum-parents",
+        workingRow: current,
+        active: { row, col },
+        parents: [{ row: row - 1, col: col - 1 }, { row: row - 1, col }],
+        formula: { row, col, leftParent, rightParent, result: current[col] },
+        vars: [
+          { name: "left parent", value: `triangle[${row - 1}][${col - 1}] = ${leftParent}` },
+          { name: "right parent", value: `triangle[${row - 1}][${col}] = ${rightParent}` },
+          { name: `current[${col}]`, value: current[col] },
+        ],
+        note: { vi: `Hai ô tím ở hàng ${row - 1} là cha trái và cha phải. Cộng chúng để tạo ô vàng ở hàng ${row}.`, en: `The two purple cells in row ${row - 1} are the left and right parents. Add them to create the yellow cell in row ${row}.` },
+      });
+    }
+
+    triangle.push([...current]);
+    snapshot({
+      title: { vi: `Chốt hàng ${row}: [${current.join(", ")}]`, en: `Commit row ${row}: [${current.join(", ")}]` },
+      codeLine: 8,
+      phase: "commit-row",
+      active: { row, col: null },
+      vars: [{ name: "triangle", value: JSON.stringify(triangle) }],
+      note: { vi: `Hàng ${row} hoàn chỉnh; giờ nó có thể làm hàng cha cho hàng kế tiếp.`, en: `Row ${row} is complete and can now be the parent row for the next one.` },
     });
   }
-  gridSnap({ title: { vi: `Kết quả: ${numRows} hàng`, en: `Result: ${numRows} rows` }, final: true, codeLines: [8], vars: [{ name: "answer", value: JSON.stringify(triangle) }], note: { vi: `Tam giác Pascal ${numRows} hàng.`, en: `Pascal's triangle with ${numRows} rows.` } });
+
+  snapshot({
+    title: { vi: `Kết quả: ${numRows} hàng Pascal`, en: `Result: ${numRows} Pascal rows` },
+    codeLine: 9,
+    phase: "done",
+    final: true,
+    vars: [{ name: "answer", value: JSON.stringify(triangle) }],
+    note: { vi: `Trả về toàn bộ tam giác gồm ${numRows} hàng.`, en: `Return the complete triangle with ${numRows} rows.` },
+  });
   return { original: numRows, answer: triangle, steps };
 }
 

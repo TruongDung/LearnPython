@@ -32482,3 +32482,44 @@ html, body {
 [data-theme="light"] .cs70-stair.target { background: #fffbeb; border-color: #d97706; }
 [data-theme="light"] .cs70-register.filled { background: #ecfeff; border-color: #0891b2; }
 @media (max-width: 560px) { .cs70-viz { padding: 12px; } .cs70-rule { grid-template-columns: 1fr; } .cs70-rule b { grid-row: auto; width: max-content; } .cs70-stair { flex-basis: 62px; min-height: 72px; } }
+
+
+/* LeetCode 118 · Pascal's Triangle parent-sum construction */
+.pascal118-viz { display: grid; gap: 12px; padding: 16px; color: #e2e8f0; border: 1px solid rgba(148, 163, 184, .25); border-radius: 13px; background: radial-gradient(circle at top right, rgba(167, 139, 250, .14), transparent 40%), #0f172a; }
+.pascal118-viz > header, .pascal118-triangle > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pascal118-viz > header > strong { color: #ddd6fe; font: 800 15px/1 "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; }
+.pascal118-phase { padding: 5px 8px; border-radius: 6px; color: #e9d5ff; background: rgba(139, 92, 246, .18); font: 800 10px/1 "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+.pascal118-rule, .pascal118-action, .pascal118-triangle { min-width: 0; border: 1px solid #334155; border-radius: 10px; background: rgba(15, 23, 42, .74); }
+.pascal118-rule { display: grid; grid-template-columns: auto 1fr; gap: 3px 9px; align-items: center; padding: 10px 12px; border-left: 4px solid #8b5cf6; }
+.pascal118-rule b { grid-row: 1 / 3; padding: 4px 6px; border-radius: 5px; background: #6d28d9; color: #fff; font-size: 9px; }
+.pascal118-rule strong { color: #ddd6fe; font: 800 12px/1.35 "SFMono-Regular", Consolas, monospace; }
+.pascal118-rule span, .pascal118-action span, .pascal118-triangle > header span { color: #94a3b8; font-size: 10px; }
+.pascal118-action { display: grid; gap: 4px; padding: 11px 13px; border-left: 4px solid #f59e0b; }
+.pascal118-action small { color: #fcd34d; font: 800 9px/1 "SFMono-Regular", Consolas, monospace; }
+.pascal118-action strong { color: #f8fafc; font: 800 13px/1.5 "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+.pascal118-action strong b { color: #86efac; }
+.pascal118-triangle { padding: 10px; overflow-x: auto; overscroll-behavior-x: contain; }
+.pascal118-triangle > header { margin-bottom: 10px; min-width: 330px; }
+.pascal118-triangle > header strong { color: #cbd5e1; font-size: 10px; letter-spacing: .04em; }
+.pascal118-triangle > div { display: grid; justify-items: center; gap: 7px; min-width: 330px; padding: 4px 4px 9px; }
+.pascal118-row { display: flex; justify-content: center; gap: 7px; min-height: 54px; }
+.pascal118-row.working { padding: 4px; border: 1px dashed rgba(251, 191, 36, .42); border-radius: 9px; background: rgba(245, 158, 11, .05); }
+.pascal118-row.active-row { box-shadow: 0 0 0 2px rgba(251, 191, 36, .16); }
+.pascal118-cell { flex: 0 0 52px; min-height: 52px; display: grid; place-items: center; align-content: center; gap: 3px; border: 1px solid #475569; border-radius: 9px; background: #1e293b; }
+.pascal118-cell small { color: #64748b; font: 700 8px/1 "SFMono-Regular", Consolas, monospace; }
+.pascal118-cell strong { color: #f8fafc; font: 800 18px/1 "SFMono-Regular", Consolas, monospace; }
+.pascal118-cell.edge { border-color: rgba(52, 211, 153, .65); background: rgba(5, 150, 105, .13); }
+.pascal118-cell.edge strong { color: #86efac; }
+.pascal118-cell.parent { border-color: #a78bfa; background: rgba(109, 40, 217, .22); box-shadow: 0 0 0 2px rgba(167, 139, 250, .14); }
+.pascal118-cell.active { border-color: #fbbf24; background: rgba(217, 119, 6, .2); box-shadow: 0 0 0 2px rgba(251, 191, 36, .16); }
+.pascal118-cell.active strong { color: #fef3c7; }
+.pascal118-cell.pending { border-style: dashed; opacity: .62; }
+.pascal118-empty { margin: 0; padding: 18px; color: #94a3b8; text-align: center; }
+[data-theme="light"] .pascal118-viz { color: #0f172a; border-color: #cbd5e1; background: radial-gradient(circle at top right, #f3e8ff, transparent 40%), #fff; }
+[data-theme="light"] .pascal118-rule, [data-theme="light"] .pascal118-action, [data-theme="light"] .pascal118-triangle { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .pascal118-action strong, [data-theme="light"] .pascal118-cell strong { color: #0f172a; }
+[data-theme="light"] .pascal118-cell { border-color: #cbd5e1; background: #fff; }
+[data-theme="light"] .pascal118-cell.edge { background: #f0fdf4; border-color: #16a34a; }
+[data-theme="light"] .pascal118-cell.parent { background: #f5f3ff; border-color: #7c3aed; }
+[data-theme="light"] .pascal118-cell.active { background: #fffbeb; border-color: #d97706; }
+@media (max-width: 560px) { .pascal118-viz { padding: 12px; } .pascal118-rule { grid-template-columns: 1fr; } .pascal118-rule b { grid-row: auto; width: max-content; } .pascal118-cell { flex-basis: 44px; min-height: 46px; } }
