@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#0c0a1a" />
     <title>LeetCode Visualizer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><rect x='5' y='17' width='5' height='10' rx='1.5' fill='%23f8fafc'/><rect x='13' y='10' width='5' height='17' rx='1.5' fill='%23fbbf24'/><rect x='21' y='5' width='5' height='22' rx='1.5' fill='%23f8fafc'/></svg>" />
-    <link rel="stylesheet" href="style.css?v=20260813-lc211-word-dictionary" />
+    <link rel="stylesheet" href="style.css?v=20260814-water-1168-readable-wrap" />
   </head>
   <body>
     <div class="app">
@@ -60,6 +60,20 @@
       </section>
 
       <section id="catalog" class="catalog"></section>
+
+      <dialog id="trieLearnDialog" class="trie-learn-dialog" aria-labelledby="trieLearnTitle" aria-describedby="trieLearnIntro">
+        <div class="trie-learn-shell">
+          <header class="trie-learn-head">
+            <div>
+              <span id="trieLearnEyebrow" class="trie-learn-eyebrow">TRIE LEARNING MAP</span>
+              <h2 id="trieLearnTitle">Learn Trie</h2>
+              <p id="trieLearnIntro"></p>
+            </div>
+            <button id="trieLearnClose" class="trie-learn-close" type="button" aria-label="Close Trie learning guide">×</button>
+          </header>
+          <div id="trieLearnContent" class="trie-learn-content"></div>
+        </div>
+      </dialog>
 
       <section id="problemPanel" class="panel hidden">
         <div class="problem-head">
@@ -175,7 +189,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
-    <script src="script.js?v=20260813-lc211-word-dictionary"></script>
+    <script src="script.js?v=20260814-water-1168-readable-wrap"></script>
     <script>
       (() => {
         const removeDuplicatePrefixSumViews = () => {

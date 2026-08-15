@@ -1670,6 +1670,401 @@ function buildSteps1101(input, params) {
   return { input, answer, steps };
 }
 
+// ─── 1101 Approach 2: explicit UnionFind class + recursive path compression ───
+function parse1101Data(input, params = {}) {
+  const n = Number(params.n);
+  if (!Number.isInteger(n) || n < 2) throw new Error("n must be an integer greater than or equal to 2");
+  const raw = String(input).trim();
+  if (!raw) throw new Error("logs must not be empty");
+  const logs = raw.split(";").filter((part) => part.trim()).map((part) => {
+    const values = part.split(",").map((value) => value.trim());
+    if (values.length !== 3 || values.some((value) => value === "")) {
+      throw new Error("every log must contain timestamp,u,v");
+    }
+    const parsed = values.map(Number);
+    if (!parsed.every(Number.isInteger)) throw new Error("every log value must be an integer");
+    return parsed;
+  });
+  logs.forEach(([time, u, v]) => {
+    if (time < 0) throw new Error("timestamps must be non-negative");
+    if (u < 0 || u >= n || v < 0 || v >= n) throw new Error(`friend pair (${u},${v}) is outside 0..${n - 1}`);
+    if (u === v) throw new Error(`friend pair (${u},${v}) must contain two different people`);
+  });
+  return { n, logs };
+}
+
+function buildSteps1101ExplicitUnionFind(input, params = {}) {
+  const parsed = parse1101Data(input, params);
+  const n = parsed.n;
+  const logs = parsed.logs.map((log) => [...log]);
+  const root = Array.from({ length: n }, (_, index) => index);
+  const rank = new Array(n).fill(1);
+  const addedEdges = new Set();
+  const steps = [];
+  let count = n;
+  let answer = -1;
+  let currentLog = null;
+
+  const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+  function peekRoot(node) {
+    let current = node;
+    while (root[current] !== current) current = root[current];
+    return current;
+  }
+
+  function snapshot({ title, note, codeLine, event, highlight = [], currentEdge = null,
+    extraVars = [], final = false }) {
+    const groups = new Map();
+    for (let person = 0; person < n; person++) {
+      const personRoot = peekRoot(person);
+      if (!groups.has(personRoot)) groups.set(personRoot, []);
+      groups.get(personRoot).push(person);
+    }
+    const graphEdges = [...addedEdges].map((key) => {
+      const [u, v] = key.split("-").map(Number);
+      return { u, v, w: "" };
+    });
+    if (currentEdge && !addedEdges.has(edgeKey(currentEdge[0], currentEdge[1]))) {
+      graphEdges.push({ u: currentEdge[0], v: currentEdge[1], w: "?" });
+    }
+    const connectedNodes = [...groups.values()].filter((members) => members.length > 1).flat();
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      arr: [...root],
+      sub: [...rank],
+      highlight: [...highlight],
+      mark: Array.from({ length: n }, (_, person) => person).filter((person) => root[person] === person),
+      graph: {
+        nodes: Array.from({ length: n }, (_, person) => ({ id: person, label: String(person) })),
+        edges: graphEdges,
+        hlNodes: [...highlight],
+        hlEdges: currentEdge ? [[currentEdge[0], currentEdge[1]]] : [],
+        visitedNodes: connectedNodes,
+      },
+      vars: [
+        { name: "root", value: `[${root.join(", ")}]` },
+        { name: "rank", value: `[${rank.join(", ")}]` },
+        { name: "count", value: count },
+        ...extraVars,
+      ],
+      unionFind1101View: {
+        event,
+        n,
+        logs: logs.map((log) => [...log]),
+        currentLog: currentLog ? [...currentLog] : null,
+        root: [...root],
+        rank: [...rank],
+        count,
+        groups: [...groups.entries()].map(([groupRoot, members]) => ({ root: groupRoot, members: [...members] })),
+        acceptedEdges: graphEdges.filter((edge) => edge.w !== "?").map((edge) => ({ ...edge })),
+        currentEdge: currentEdge ? [...currentEdge] : null,
+      },
+      final,
+    });
+  }
+
+  function findVisual(x, label, depth = 0) {
+    const indent = "  ".repeat(depth);
+    snapshot({
+      title: { vi: `${indent}find(${x}): kiểm tra root[${x}]`, en: `${indent}find(${x}): check root[${x}]` },
+      note: root[x] === x
+        ? { vi: `${x} đang là root của chính nó.`, en: `${x} is currently its own root.` }
+        : { vi: `root[${x}] = ${root[x]}, tiếp tục đệ quy để tìm root cuối.`, en: `root[${x}] = ${root[x]}; recurse to find the final root.` },
+      codeLine: 10,
+      event: "find-check",
+      highlight: [x],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: label, value: x }, { name: "find depth", value: depth }],
+    });
+    if (root[x] === x) {
+      snapshot({
+        title: { vi: `${indent}find(${x}) → ${x}`, en: `${indent}find(${x}) → ${x}` },
+        note: { vi: "Điều kiện base case đúng, trả root hiện tại.", en: "The base case is true; return the current root." },
+        codeLine: 11,
+        event: "find-base",
+        highlight: [x],
+        currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+        extraVars: [{ name: `find(${x})`, value: x }],
+      });
+      return x;
+    }
+
+    const parentBefore = root[x];
+    snapshot({
+      title: { vi: `${indent}Gọi find(root[${x}]) = find(${parentBefore})`, en: `${indent}Call find(root[${x}]) = find(${parentBefore})` },
+      note: { vi: "Đi xuống parent trước, sau đó gán trực tiếp node hiện tại về root cuối.", en: "Follow the parent first, then point the current node directly to the final root." },
+      codeLine: 12,
+      event: "find-recurse",
+      highlight: [x, parentBefore],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: "x", value: x }, { name: "root[x] before", value: parentBefore }],
+    });
+    const foundRoot = findVisual(parentBefore, label, depth + 1);
+    root[x] = foundRoot;
+    snapshot({
+      title: { vi: `Path compression: root[${x}] = ${foundRoot}`, en: `Path compression: root[${x}] = ${foundRoot}` },
+      note: parentBefore === foundRoot
+        ? { vi: `${x} đã trỏ trực tiếp tới root nên mảng root không đổi.`, en: `${x} already pointed directly to the root, so the root array is unchanged.` }
+        : { vi: `Rút ngắn đường đi ${x} → ${parentBefore} → … → ${foundRoot} thành ${x} → ${foundRoot}.`, en: `Compress ${x} → ${parentBefore} → … → ${foundRoot} into ${x} → ${foundRoot}.` },
+      codeLine: 13,
+      event: "path-compress",
+      highlight: [x, foundRoot],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: "root_x", value: foundRoot }],
+    });
+    snapshot({
+      title: { vi: `find(${x}) trả ${foundRoot}`, en: `find(${x}) returns ${foundRoot}` },
+      note: { vi: "Trả root đã được cache sau path compression.", en: "Return the root cached by path compression." },
+      codeLine: 14,
+      event: "find-return",
+      highlight: [x, foundRoot],
+      currentEdge: currentLog ? [currentLog[1], currentLog[2]] : null,
+      extraVars: [{ name: `find(${x})`, value: foundRoot }],
+    });
+    return foundRoot;
+  }
+
+  function unionVisual(x, y) {
+    const rootX = findVisual(x, "x");
+    snapshot({
+      title: { vi: `root_x = ${rootX}`, en: `root_x = ${rootX}` },
+      note: { vi: `Lưu kết quả find(${x}) vào root_x.`, en: `Store find(${x}) in root_x.` },
+      codeLine: 17,
+      event: "root-x",
+      highlight: [x, rootX],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }],
+    });
+    const rootY = findVisual(y, "y");
+    snapshot({
+      title: { vi: `root_y = ${rootY}`, en: `root_y = ${rootY}` },
+      note: { vi: `Lưu kết quả find(${y}) vào root_y.`, en: `Store find(${y}) in root_y.` },
+      codeLine: 18,
+      event: "root-y",
+      highlight: [y, rootY],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }, { name: "root_y", value: rootY }],
+    });
+    snapshot({
+      title: rootX === rootY
+        ? { vi: `R${rootX} = R${rootY}: đã cùng nhóm`, en: `R${rootX} = R${rootY}: already one group` }
+        : { vi: `R${rootX} ≠ R${rootY}: cần union`, en: `R${rootX} ≠ R${rootY}: union is needed` },
+      note: rootX === rootY
+        ? { vi: "Không merge và không giảm count.", en: "Do not merge or decrement count." }
+        : { vi: "Hai root khác nhau, tiếp tục so sánh rank.", en: "The roots differ; compare their ranks next." },
+      codeLine: 19,
+      event: "compare-roots",
+      highlight: [rootX, rootY],
+      currentEdge: [x, y],
+      extraVars: [{ name: "root_x", value: rootX }, { name: "root_y", value: rootY }],
+    });
+    if (rootX === rootY) {
+      snapshot({
+        title: { vi: "return: bỏ qua cạnh dư", en: "return: skip the redundant edge" },
+        note: { vi: "Hai người đã kết nối gián tiếp nên trạng thái DSU giữ nguyên.", en: "The people are already indirectly connected, so the DSU remains unchanged." },
+        codeLine: 20,
+        event: "skip-union",
+        highlight: [x, y],
+        currentEdge: [x, y],
+      });
+      return false;
+    }
+
+    snapshot({
+      title: { vi: `So sánh rank[${rootX}] > rank[${rootY}]`, en: `Compare rank[${rootX}] > rank[${rootY}]` },
+      note: { vi: `${rank[rootX]} > ${rank[rootY]} là ${rank[rootX] > rank[rootY]}.`, en: `${rank[rootX]} > ${rank[rootY]} is ${rank[rootX] > rank[rootY]}.` },
+      codeLine: 21,
+      event: "rank-greater",
+      highlight: [rootX, rootY],
+      currentEdge: [x, y],
+    });
+    if (rank[rootX] > rank[rootY]) {
+      root[rootY] = rootX;
+      addedEdges.add(edgeKey(x, y));
+      snapshot({
+        title: { vi: `Gắn R${rootY} vào R${rootX}`, en: `Attach R${rootY} to R${rootX}` },
+        note: { vi: "Tree rank thấp hơn nối dưới tree rank cao hơn.", en: "Attach the lower-rank tree below the higher-rank tree." },
+        codeLine: 22,
+        event: "attach-y-to-x",
+        highlight: [rootX, rootY],
+        currentEdge: [x, y],
+      });
+    } else {
+      snapshot({
+        title: { vi: `So sánh rank[${rootX}] < rank[${rootY}]`, en: `Compare rank[${rootX}] < rank[${rootY}]` },
+        note: { vi: `${rank[rootX]} < ${rank[rootY]} là ${rank[rootX] < rank[rootY]}.`, en: `${rank[rootX]} < ${rank[rootY]} is ${rank[rootX] < rank[rootY]}.` },
+        codeLine: 23,
+        event: "rank-less",
+        highlight: [rootX, rootY],
+        currentEdge: [x, y],
+      });
+      if (rank[rootX] < rank[rootY]) {
+        root[rootX] = rootY;
+        addedEdges.add(edgeKey(x, y));
+        snapshot({
+          title: { vi: `Gắn R${rootX} vào R${rootY}`, en: `Attach R${rootX} to R${rootY}` },
+          note: { vi: "Tree rank thấp hơn nối dưới tree rank cao hơn.", en: "Attach the lower-rank tree below the higher-rank tree." },
+          codeLine: 24,
+          event: "attach-x-to-y",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+      } else {
+        snapshot({
+          title: { vi: `Hai rank bằng ${rank[rootX]}`, en: `Both ranks equal ${rank[rootX]}` },
+          note: { vi: "Có thể chọn một root; code giữ root_x làm root mới.", en: "Either root works; the code keeps root_x as the new root." },
+          codeLine: 25,
+          event: "equal-rank",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+        root[rootY] = rootX;
+        addedEdges.add(edgeKey(x, y));
+        snapshot({
+          title: { vi: `root[${rootY}] = ${rootX}`, en: `root[${rootY}] = ${rootX}` },
+          note: { vi: `Gắn R${rootY} vào R${rootX}.`, en: `Attach R${rootY} below R${rootX}.` },
+          codeLine: 26,
+          event: "attach-equal-rank",
+          highlight: [rootX, rootY],
+          currentEdge: [x, y],
+        });
+        rank[rootX] += 1;
+        snapshot({
+          title: { vi: `rank[${rootX}] tăng lên ${rank[rootX]}`, en: `rank[${rootX}] increases to ${rank[rootX]}` },
+          note: { vi: "Chỉ tăng rank khi merge hai tree có cùng rank.", en: "Increase rank only when merging two equal-rank trees." },
+          codeLine: 27,
+          event: "increase-rank",
+          highlight: [rootX],
+          currentEdge: [x, y],
+        });
+      }
+    }
+
+    count -= 1;
+    snapshot({
+      title: { vi: `count giảm: ${count + 1} → ${count}`, en: `count decreases: ${count + 1} → ${count}` },
+      note: { vi: "Một merge thành công luôn giảm số component đúng 1.", en: "Every successful merge decreases the component count by exactly one." },
+      codeLine: 28,
+      event: "decrement-count",
+      highlight: [x, y],
+      currentEdge: [x, y],
+      extraVars: [{ name: "merged", value: true }],
+    });
+    return true;
+  }
+
+  snapshot({
+    title: { vi: `Tạo UnionFind(${n})`, en: `Create UnionFind(${n})` },
+    note: { vi: "Cách 2 đóng gói root, rank và count trong một class riêng.", en: "Approach 2 encapsulates root, rank, and count in a dedicated class." },
+    codeLine: 38,
+    event: "construct-call",
+    extraVars: [{ name: "n", value: n }],
+  });
+  snapshot({ title: { vi: "Khởi tạo root", en: "Initialize root" }, note: { vi: "Ban đầu mỗi người là root riêng.", en: "Initially every person is a separate root." }, codeLine: 5, event: "init-root" });
+  snapshot({ title: { vi: "Khởi tạo rank = 1", en: "Initialize rank = 1" }, note: { vi: "Mỗi component ban đầu có rank 1.", en: "Every initial component has rank 1." }, codeLine: 6, event: "init-rank" });
+  snapshot({ title: { vi: `Khởi tạo count = ${n}`, en: `Initialize count = ${n}` }, note: { vi: "count theo dõi trực tiếp số component còn lại.", en: "count directly tracks the number of remaining components." }, codeLine: 7, event: "init-count" });
+
+  logs.sort((a, b) => a[0] - b[0]);
+  snapshot({
+    title: { vi: "Sort logs theo timestamp", en: "Sort logs by timestamp" },
+    note: { vi: logs.map(([time, u, v]) => `${time}:(${u},${v})`).join(" → "), en: logs.map(([time, u, v]) => `${time}:(${u},${v})`).join(" → ") },
+    codeLine: 39,
+    event: "sort-logs",
+    extraVars: [{ name: "logs", value: JSON.stringify(logs) }],
+  });
+
+  for (let index = 0; index < logs.length; index++) {
+    currentLog = logs[index];
+    const [time, u, v] = currentLog;
+    snapshot({
+      title: { vi: `Log #${index}: timestamp ${time}`, en: `Log #${index}: timestamp ${time}` },
+      note: { vi: `Lấy sự kiện tiếp theo theo thời gian: ${u} và ${v} trở thành bạn.`, en: `Read the next chronological event: ${u} and ${v} become friends.` },
+      codeLine: 40,
+      event: "loop-log",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "log", value: `[${time}, ${u}, ${v}]` }],
+    });
+    snapshot({
+      title: { vi: `time=${time}, u=${u}, v=${v}`, en: `time=${time}, u=${u}, v=${v}` },
+      note: { vi: "Unpack timestamp và hai người từ log.", en: "Unpack the timestamp and two people from the log." },
+      codeLine: 41,
+      event: "unpack-log",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "time", value: time }, { name: "u", value: u }, { name: "v", value: v }],
+    });
+    snapshot({
+      title: { vi: `Gọi uf.union(${u}, ${v})`, en: `Call uf.union(${u}, ${v})` },
+      note: { vi: "Union sẽ gọi recursive find cho cả hai đầu rồi merge theo rank nếu cần.", en: "Union recursively finds both roots, then merges by rank when needed." },
+      codeLine: 42,
+      event: "union-call",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    unionVisual(u, v);
+    snapshot({
+      title: { vi: "Gọi uf.get_count()", en: "Call uf.get_count()" },
+      note: { vi: "Đọc số component hiện tại từ object UnionFind.", en: "Read the current component count from the UnionFind object." },
+      codeLine: 33,
+      event: "get-count-call",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    snapshot({
+      title: { vi: `get_count() trả ${count}`, en: `get_count() returns ${count}` },
+      note: { vi: "Không cần quét lại root; count đã được cập nhật sau mỗi merge.", en: "No root scan is needed; count is maintained after every merge." },
+      codeLine: 34,
+      event: "get-count-return",
+      highlight: [u, v],
+      currentEdge: [u, v],
+    });
+    snapshot({
+      title: count === 1
+        ? { vi: "count == 1 → tất cả đã kết nối", en: "count == 1 → everyone is connected" }
+        : { vi: `count = ${count}, tiếp tục`, en: `count = ${count}; continue` },
+      note: count === 1
+        ? { vi: `Timestamp ${time} là thời điểm sớm nhất.`, en: `Timestamp ${time} is the earliest moment.` }
+        : { vi: "Vẫn còn nhiều component nên xử lý log kế tiếp.", en: "Multiple components remain, so process the next log." },
+      codeLine: 43,
+      event: "check-count",
+      highlight: [u, v],
+      currentEdge: [u, v],
+      extraVars: [{ name: "count == 1", value: count === 1 }],
+    });
+    if (count === 1) {
+      answer = time;
+      snapshot({
+        title: { vi: `Trả timestamp ${time}`, en: `Return timestamp ${time}` },
+        note: { vi: `Mọi người thuộc cùng một component tại thời điểm ${time}.`, en: `Everyone belongs to one component at timestamp ${time}.` },
+        codeLine: 44,
+        event: "return-time",
+        highlight: Array.from({ length: n }, (_, person) => person),
+        extraVars: [{ name: "answer", value: answer }],
+        final: true,
+      });
+      break;
+    }
+  }
+
+  if (answer === -1) {
+    currentLog = null;
+    snapshot({
+      title: { vi: "Không thể kết nối tất cả → -1", en: "Everyone never connects → -1" },
+      note: { vi: "Đã xử lý hết logs nhưng count vẫn lớn hơn 1.", en: "All logs were processed but count is still greater than one." },
+      codeLine: 45,
+      event: "return-negative-one",
+      extraVars: [{ name: "answer", value: -1 }],
+      final: true,
+    });
+  }
+
+  return { input, answer, steps };
+}
+
 // ─── 1319 DFS: Number of Operations to Make Network Connected ───
 // Line-by-line trace of the exact code2 shown to the user:
 //  1  from collections import defaultdict
@@ -3041,7 +3436,701 @@ function buildSteps721(input, params) {
   return { original: accounts, answer: result, steps };
 }
 
+// ─── 803: Bricks Falling When Hit ───
+function parse803Grid(input) {
+  const raw = String(input).trim();
+  let grid;
+  try {
+    grid = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;|]/).map((row) => {
+        const values = row.split(",").map((value) => value.trim());
+        if (values.some((value) => value === "")) throw new Error("empty grid value");
+        return values.map(Number);
+      });
+  } catch (error) {
+    throw new Error("grid must be a JSON matrix such as [[1,0],[1,1]]");
+  }
+  if (!Array.isArray(grid) || grid.length === 0 || !Array.isArray(grid[0]) || grid[0].length === 0) {
+    throw new Error("grid must be a non-empty matrix");
+  }
+  const cols = grid[0].length;
+  if (!grid.every((row) => Array.isArray(row) && row.length === cols && row.every((value) => value === 0 || value === 1))) {
+    throw new Error("grid must be rectangular and contain only 0 or 1");
+  }
+  if (grid.length > 12 || cols > 12) throw new Error("visualization supports grids up to 12 x 12");
+  return grid.map((row) => [...row]);
+}
+
+function parse803Hits(value) {
+  const raw = String(value).trim();
+  let hits;
+  try {
+    hits = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;|]/).filter(Boolean).map((pair) => {
+        const coordinates = pair.split(",").map((item) => item.trim());
+        if (coordinates.some((item) => item === "")) throw new Error("empty hit coordinate");
+        return coordinates.map(Number);
+      });
+  } catch (error) {
+    throw new Error("hits must be JSON coordinates such as [[1,0],[2,1]]");
+  }
+  if (!Array.isArray(hits) || !hits.every((hit) => Array.isArray(hit) && hit.length === 2 && hit.every(Number.isInteger))) {
+    throw new Error("every hit must contain exactly two integer coordinates");
+  }
+  if (hits.length > 50) throw new Error("visualization supports at most 50 hits");
+  return hits.map((hit) => [...hit]);
+}
+
+function parse803Data(input, hitsValue) {
+  const grid = parse803Grid(input);
+  const hits = parse803Hits(hitsValue);
+  const rows = grid.length;
+  const cols = grid[0].length;
+  hits.forEach(([row, col]) => {
+    if (row < 0 || row >= rows || col < 0 || col >= cols) {
+      throw new Error(`hit (${row},${col}) is outside the grid`);
+    }
+  });
+  return { grid, hits };
+}
+
+function buildSteps803(input, params = {}) {
+  const { grid: originalGrid, hits } = parse803Data(input, params.hits || "");
+  const rows = originalGrid.length;
+  const cols = originalGrid[0].length;
+
+  const work = originalGrid.map((row) => [...row]);
+  const effective = new Array(hits.length).fill(false);
+  const answers = new Array(hits.length).fill(null);
+  const hitStatus = new Array(hits.length).fill("pending");
+  const roof = rows * cols;
+  const parent = Array.from({ length: roof + 1 }, (_, index) => index);
+  const size = new Array(roof + 1).fill(1);
+  const steps = [];
+  const id = (row, col) => row * cols + col;
+  const coord = (cellId) => cellId === roof ? "roof" : [Math.floor(cellId / cols), cellId % cols];
+
+  function find(node) {
+    while (parent[node] !== node) {
+      parent[node] = parent[parent[node]];
+      node = parent[node];
+    }
+    return node;
+  }
+
+  function union(a, b) {
+    let rootA = find(a);
+    let rootB = find(b);
+    if (rootA === rootB) return { merged: false, rootA, rootB, root: rootA };
+    if (size[rootA] < size[rootB]) [rootA, rootB] = [rootB, rootA];
+    parent[rootB] = rootA;
+    size[rootA] += size[rootB];
+    return { merged: true, rootA, rootB, root: rootA };
+  }
+
+  function stableKeys() {
+    const stable = new Set();
+    const roofRoot = find(roof);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (work[row][col] === 1 && find(id(row, col)) === roofRoot) stable.add(`${row},${col}`);
+      }
+    }
+    return stable;
+  }
+
+  function componentSnapshot() {
+    const groups = new Map();
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (work[row][col] !== 1) continue;
+        const root = find(id(row, col));
+        if (!groups.has(root)) groups.set(root, []);
+        groups.get(root).push([row, col]);
+      }
+    }
+    return [...groups.entries()].map(([root, cells]) => ({ root, cells, roofConnected: find(root) === find(roof) }));
+  }
+
+  function pushStep({ title, note, codeLines, phase, event, activeHit = null, activeCell = null,
+    activeNeighbor = null, unionEdge = null, roofBefore = null, roofAfter = null,
+    fallen = null, newlyStable = [], vars = [], final = false }) {
+    const stable = stableKeys();
+    const step = {
+      title,
+      note,
+      codeLines,
+      arr: [...parent],
+      sub: [...size],
+      highlight: [activeCell, activeNeighbor].filter(Boolean).map(([row, col]) => id(row, col)),
+      mark: [find(roof)],
+      vars,
+      final,
+      bricks803View: {
+        phase,
+        event,
+        rows,
+        cols,
+        originalGrid: originalGrid.map((row) => [...row]),
+        workingGrid: work.map((row) => [...row]),
+        hits: hits.map((hit) => [...hit]),
+        effective: [...effective],
+        hitStatus: [...hitStatus],
+        answers: [...answers],
+        activeHit,
+        activeCell: activeCell ? [...activeCell] : null,
+        activeNeighbor: activeNeighbor ? [...activeNeighbor] : null,
+        unionEdge: unionEdge ? { ...unionEdge } : null,
+        stableCells: [...stable].map((key) => key.split(",").map(Number)),
+        newlyStable: newlyStable.map((cell) => [...cell]),
+        components: componentSnapshot(),
+        parent: [...parent],
+        size: [...size],
+        roofNode: roof,
+        roofSize: size[find(roof)],
+        roofBefore,
+        roofAfter,
+        fallen,
+      },
+    };
+    steps.push(step);
+  }
+
+  pushStep({
+    title: { vi: `Sao chép grid ${rows} × ${cols}`, en: `Copy the ${rows} × ${cols} grid` },
+    note: { vi: "Ta không mô phỏng brick rơi theo chiều xuôi. Trước tiên xóa mọi hit, sau đó khôi phục theo thứ tự ngược.", en: "Instead of simulating falling bricks forward, remove every hit first and restore them in reverse." },
+    codeLines: [3, 4, 5], phase: "prepare", event: "copy",
+    vars: [{ name: "rows, cols", value: `${rows}, ${cols}` }, { name: "hits", value: JSON.stringify(hits) }],
+  });
+
+  hits.forEach(([row, col], index) => {
+    const removed = work[row][col] === 1;
+    effective[index] = removed;
+    hitStatus[index] = removed ? "removed" : "skipped";
+    if (removed) work[row][col] = 0;
+    pushStep({
+      title: removed
+        ? { vi: `Hit #${index}: xóa brick (${row},${col})`, en: `Hit #${index}: remove brick (${row},${col})` }
+        : { vi: `Hit #${index}: (${row},${col}) đã rỗng`, en: `Hit #${index}: (${row},${col}) is already empty` },
+      note: removed
+        ? { vi: "Ghi nhớ hit này có hiệu lực để sau đó khôi phục trong reverse pass.", en: "Remember that this hit was effective so it can be restored during the reverse pass." }
+        : { vi: "Hit vào ô rỗng không làm brick nào rơi; đáp án của hit này sẽ là 0.", en: "Hitting an empty cell drops no bricks; this hit's answer will be 0." },
+      codeLines: [6, 7, 8, 9, 10], phase: "prepare", event: removed ? "remove" : "skip-remove",
+      activeHit: index, activeCell: [row, col], vars: [{ name: "removed", value: removed }, { name: `effective[${index}]`, value: removed }],
+    });
+  });
+
+  pushStep({
+    title: { vi: "Tạo DSU và virtual roof", en: "Create the DSU and virtual roof" },
+    note: { vi: `Node ${roof} là mái ảo. Component chứa roof đại diện cho mọi brick còn ổn định.`, en: `Node ${roof} is the virtual roof. Its component represents every currently stable brick.` },
+    codeLines: [12, 13, 14], phase: "build", event: "init-dsu",
+    vars: [{ name: "roof", value: roof }, { name: "DSU nodes", value: roof + 1 }],
+  });
+
+  function connectForBuild(a, b, cell, neighbor, codeLine, label) {
+    const result = union(a, b);
+    pushStep({
+      title: { vi: `${label}: ${result.merged ? "gộp hai component" : "đã cùng component"}`, en: `${label}: ${result.merged ? "merge two components" : "already connected"}` },
+      note: result.merged
+        ? { vi: `Union by size: root ${result.rootB} nối vào root ${result.rootA}.`, en: `Union by size: root ${result.rootB} attaches to root ${result.rootA}.` }
+        : { vi: "Hai node đã có cùng root nên DSU không thay đổi.", en: "Both nodes already share a root, so the DSU does not change." },
+      codeLines: [codeLine, 22, 23, 24, 25, 26, 27, 28], phase: "build", event: "build-union",
+      activeCell: cell, activeNeighbor: Array.isArray(neighbor) ? neighbor : null,
+      unionEdge: { from: coord(a), to: coord(b), merged: result.merged },
+      vars: [{ name: "merged", value: result.merged }, { name: "roof size", value: size[find(roof)] }],
+    });
+  }
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (work[row][col] !== 1) continue;
+      const cell = id(row, col);
+      if (row === 0) connectForBuild(cell, roof, [row, col], "roof", 37, `(${row},${col}) ↔ roof`);
+      if (row > 0 && work[row - 1][col] === 1) connectForBuild(cell, id(row - 1, col), [row, col], [row - 1, col], 38, `(${row},${col}) ↔ (${row - 1},${col})`);
+      if (col > 0 && work[row][col - 1] === 1) connectForBuild(cell, id(row, col - 1), [row, col], [row, col - 1], 39, `(${row},${col}) ↔ (${row},${col - 1})`);
+    }
+  }
+
+  for (let index = hits.length - 1; index >= 0; index--) {
+    const [row, col] = hits[index];
+    hitStatus[index] = "processing";
+    if (!effective[index]) {
+      answers[index] = 0;
+      hitStatus[index] = "done";
+      pushStep({
+        title: { vi: `Reverse hit #${index}: bỏ qua ô rỗng`, en: `Reverse hit #${index}: skip the empty cell` },
+        note: { vi: "Hit này không xóa brick ở lượt xuôi nên không có gì để khôi phục.", en: "This hit removed no brick in the forward pass, so there is nothing to restore." },
+        codeLines: [42, 43, 44], phase: "reverse", event: "skip-restore", activeHit: index, activeCell: [row, col],
+        vars: [{ name: `answer[${index}]`, value: 0 }],
+      });
+      continue;
+    }
+
+    const beforeStable = stableKeys();
+    const before = size[find(roof)];
+    pushStep({
+      title: { vi: `Reverse hit #${index}: roof size trước = ${before}`, en: `Reverse hit #${index}: roof size before = ${before}` },
+      note: { vi: "Kích thước này gồm virtual roof, vì vậy số brick ổn định hiện tại là roof size − 1.", en: "This size includes the virtual roof, so the current stable-brick count is roof size − 1." },
+      codeLines: [42, 45, 46], phase: "reverse", event: "before", activeHit: index, activeCell: [row, col], roofBefore: before,
+      vars: [{ name: "before", value: before }, { name: "stable bricks", value: before - 1 }],
+    });
+
+    work[row][col] = 1;
+    hitStatus[index] = "restored";
+    pushStep({
+      title: { vi: `Khôi phục brick (${row},${col})`, en: `Restore brick (${row},${col})` },
+      note: { vi: "Brick mới chưa chắc ổn định; phải union nó với roof hoặc các brick kề đang tồn tại.", en: "The restored brick is not necessarily stable yet; union it with the roof or existing neighbors." },
+      codeLines: [47, 48], phase: "reverse", event: "restore", activeHit: index, activeCell: [row, col], roofBefore: before,
+      vars: [{ name: `work[${row}][${col}]`, value: 1 }],
+    });
+
+    const cell = id(row, col);
+    const neighbors = [];
+    if (row === 0) neighbors.push({ node: roof, cell: "roof", line: 49 });
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nextRow = row + dr;
+      const nextCol = col + dc;
+      if (nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols && work[nextRow][nextCol] === 1) {
+        neighbors.push({ node: id(nextRow, nextCol), cell: [nextRow, nextCol], line: 53 });
+      }
+    }
+
+    for (const neighbor of neighbors) {
+      const stableBeforeUnion = stableKeys();
+      const result = union(cell, neighbor.node);
+      const stableAfterUnion = stableKeys();
+      const gained = [...stableAfterUnion].filter((key) => !stableBeforeUnion.has(key)).map((key) => key.split(",").map(Number));
+      pushStep({
+        title: { vi: `Union (${row},${col}) với ${neighbor.cell === "roof" ? "roof" : `(${neighbor.cell[0]},${neighbor.cell[1]})`}`, en: `Union (${row},${col}) with ${neighbor.cell === "roof" ? "roof" : `(${neighbor.cell[0]},${neighbor.cell[1]})`}` },
+        note: result.merged
+          ? { vi: gained.length ? `${gained.length} brick vừa nối được với roof.` : "Hai component vừa được gộp; chưa nối tới roof.", en: gained.length ? `${gained.length} brick(s) just became roof-connected.` : "Two components merged but are not roof-connected yet." }
+          : { vi: "Hai node đã cùng component.", en: "The nodes already share a component." },
+        codeLines: [neighbor.line, 22, 23, 24, 25, 26, 27, 28], phase: "reverse", event: "restore-union",
+        activeHit: index, activeCell: [row, col], activeNeighbor: Array.isArray(neighbor.cell) ? neighbor.cell : null,
+        unionEdge: { from: [row, col], to: neighbor.cell, merged: result.merged }, roofBefore: before, newlyStable: gained,
+        vars: [{ name: "merged", value: result.merged }, { name: "roof size", value: size[find(roof)] }],
+      });
+    }
+
+    const after = size[find(roof)];
+    const fallen = Math.max(0, after - before - 1);
+    answers[index] = fallen;
+    hitStatus[index] = "done";
+    const afterStable = stableKeys();
+    const newlyStable = [...afterStable].filter((key) => !beforeStable.has(key)).map((key) => key.split(",").map(Number));
+    pushStep({
+      title: { vi: `Hit #${index}: ${fallen} brick rơi`, en: `Hit #${index}: ${fallen} brick(s) fall` },
+      note: { vi: `after − before − 1 = ${after} − ${before} − 1 = ${fallen}. Trừ 1 vì brick vừa khôi phục không được tính là brick đã rơi.`, en: `after − before − 1 = ${after} − ${before} − 1 = ${fallen}. Subtract 1 because the restored brick itself is not counted as fallen.` },
+      codeLines: [54, 55], phase: "reverse", event: "count", activeHit: index, activeCell: [row, col],
+      roofBefore: before, roofAfter: after, fallen, newlyStable,
+      vars: [{ name: "before", value: before }, { name: "after", value: after }, { name: `answer[${index}]`, value: fallen }],
+    });
+  }
+
+  pushStep({
+    title: { vi: `Kết quả: [${answers.join(", ")}]`, en: `Result: [${answers.join(", ")}]` },
+    note: { vi: "Đảo thời gian biến bài toán brick rơi thành bài toán chỉ thêm cạnh vào DSU.", en: "Reversing time turns falling-brick deletions into DSU edge additions." },
+    codeLines: [57], phase: "done", event: "done", roofAfter: size[find(roof)], final: true,
+    vars: [{ name: "answer", value: `[${answers.join(", ")}]` }],
+  });
+
+  return { input, answer: answers, steps };
+}
+
+// ─── 1168: Optimize Water Distribution in a Village ───
+function parse1168Data(input, pipesValue) {
+  if (!Array.isArray(input) || input.length === 0 || !input.every((cost) => Number.isInteger(cost) && cost > 0)) {
+    throw new Error("wells must be a non-empty array of positive integers");
+  }
+  if (input.length > 12) throw new Error("visualization supports at most 12 houses");
+  const raw = String(pipesValue ?? "").trim();
+  if (!raw) throw new Error("pipes must be JSON or triples u,v,cost separated by semicolons");
+  let pipes;
+  try {
+    pipes = raw.startsWith("[")
+      ? JSON.parse(raw)
+      : raw.split(/[;|]/).filter((part) => part.trim()).map((part) => {
+        const values = part.split(",").map((value) => value.trim());
+        if (values.some((value) => value === "")) throw new Error("empty pipe value");
+        return values.map(Number);
+      });
+  } catch (error) {
+    throw new Error("pipes must be JSON such as [[1,2,1]] or u,v,cost triples separated by semicolons");
+  }
+  if (!Array.isArray(pipes) || !pipes.every((pipe) => Array.isArray(pipe) && pipe.length === 3 && pipe.every(Number.isInteger))) {
+    throw new Error("every pipe must contain exactly three integers: house1, house2, cost");
+  }
+  if (pipes.length > 50) throw new Error("visualization supports at most 50 pipes");
+  const n = input.length;
+  pipes.forEach(([u, v, cost]) => {
+    if (u < 1 || u > n || v < 1 || v > n) throw new Error(`pipe (${u},${v}) has a house outside 1..${n}`);
+    if (u === v) throw new Error(`pipe (${u},${v}) must connect two different houses`);
+    if (cost <= 0) throw new Error(`pipe (${u},${v}) must have a positive cost`);
+  });
+  return { n, wells: [...input], pipes: pipes.map((pipe) => [...pipe]) };
+}
+
+function buildSteps1168(input, params = {}) {
+  const { n, wells, pipes } = parse1168Data(input, params.pipes);
+  const edges = [];
+  const acceptedEdges = [];
+  const rejectedEdgeKeys = new Set();
+  const parent = Array.from({ length: n + 1 }, (_, node) => node);
+  const size = new Array(n + 1).fill(1);
+  const steps = [];
+  let totalCost = 0;
+
+  const copyEdge = (edge) => edge ? {
+    key: edge.key,
+    u: edge.u,
+    v: edge.v,
+    cost: edge.cost,
+    kind: edge.kind,
+    sourceIndex: edge.sourceIndex,
+    sortedIndex: edge.sortedIndex ?? -1,
+  } : null;
+
+  function rootWithoutCompression(node) {
+    let root = node;
+    while (parent[root] !== root) root = parent[root];
+    return root;
+  }
+
+  function find(node) {
+    while (parent[node] !== node) {
+      parent[node] = parent[parent[node]];
+      node = parent[node];
+    }
+    return node;
+  }
+
+  function union(u, v) {
+    let rootU = find(u);
+    let rootV = find(v);
+    if (rootU === rootV) return { merged: false, rootU, rootV };
+    if (size[rootU] < size[rootV]) [rootU, rootV] = [rootV, rootU];
+    parent[rootV] = rootU;
+    size[rootU] += size[rootV];
+    return { merged: true, rootU, rootV };
+  }
+
+  function componentSnapshot() {
+    const roots = parent.map((_, node) => rootWithoutCompression(node));
+    const groups = new Map();
+    roots.forEach((root, node) => {
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root).push(node);
+    });
+    return { roots, groups: [...groups.entries()].map(([root, nodes]) => ({ root, nodes })) };
+  }
+
+  function pushStep({ title, note, codeLines, phase, event, currentEdge = null, edgeIndex = -1,
+    rootsBefore = null, unionChanged = null, sorted = false, final = false, vars = [] }) {
+    const components = componentSnapshot();
+    steps.push({
+      title,
+      note,
+      codeLines,
+      arr: [...parent],
+      sub: [...size],
+      highlight: currentEdge ? [currentEdge.u, currentEdge.v] : [],
+      mark: acceptedEdges.flatMap((edge) => [edge.u, edge.v]),
+      vars,
+      final,
+      waterDistributionView: {
+        phase,
+        event,
+        n,
+        wells: [...wells],
+        pipes: pipes.map((pipe, index) => ({ u: pipe[0], v: pipe[1], cost: pipe[2], sourceIndex: index })),
+        edges: edges.map(copyEdge),
+        sorted,
+        currentEdge: copyEdge(currentEdge),
+        edgeIndex,
+        processedCount: Math.max(0, edgeIndex + 1),
+        acceptedEdges: acceptedEdges.map(copyEdge),
+        rejectedEdgeKeys: [...rejectedEdgeKeys],
+        parent: [...parent],
+        size: [...size],
+        roots: components.roots,
+        groups: components.groups,
+        rootsBefore: rootsBefore ? { ...rootsBefore } : null,
+        unionChanged,
+        acceptedCount: acceptedEdges.length,
+        totalCost,
+        complete: acceptedEdges.length === n,
+        answer: final ? totalCost : null,
+      },
+    });
+  }
+
+  pushStep({
+    title: { vi: `${n} ngôi nhà cần được cấp nước`, en: `${n} houses need a water supply` },
+    note: { vi: "Mỗi nhà có thể tự xây giếng hoặc nhận nước qua các đường ống. Ta cần chọn tổ hợp có tổng chi phí nhỏ nhất.", en: "Each house can build its own well or receive water through pipes. We need the minimum-cost combination." },
+    codeLines: [2, 3], phase: "transform", event: "init",
+    vars: [{ name: "n", value: n }, { name: "wells", value: `[${wells.join(", ")}]` }],
+  });
+
+  wells.forEach((cost, index) => {
+    const house = index + 1;
+    const edge = { key: `well-${house}`, u: 0, v: house, cost, kind: "well", sourceIndex: index, sortedIndex: -1 };
+    edges.push(edge);
+    pushStep({
+      title: { vi: `Giếng nhà ${house} → cạnh ảo (0,${house}) giá ${cost}`, en: `House ${house} well → virtual edge (0,${house}) costing ${cost}` },
+      note: { vi: "Node 0 là nguồn nước vô hạn. Chọn cạnh này trong MST đồng nghĩa xây giếng tại nhà tương ứng.", en: "Node 0 is an unlimited water source. Selecting this MST edge means building a well at that house." },
+      codeLines: [3], phase: "transform", event: "add-well", currentEdge: edge,
+      vars: [{ name: `well[${index}]`, value: cost }, { name: "virtual edge", value: `(0, ${house}, ${cost})` }],
+    });
+  });
+
+  pipes.forEach(([u, v, cost], index) => {
+    const edge = { key: `pipe-${index}-${u}-${v}`, u, v, cost, kind: "pipe", sourceIndex: index, sortedIndex: -1 };
+    edges.push(edge);
+    pushStep({
+      title: { vi: `Thêm ống P${index + 1}: ${u} ↔ ${v}, giá ${cost}`, en: `Add pipe P${index + 1}: ${u} ↔ ${v}, cost ${cost}` },
+      note: { vi: "Cạnh ống là lựa chọn truyền nước giữa hai ngôi nhà.", en: "A pipe edge is the option to carry water between two houses." },
+      codeLines: [4, 5], phase: "transform", event: "add-pipe", currentEdge: edge,
+      vars: [{ name: `pipes[${index}]`, value: `[${u}, ${v}, ${cost}]` }],
+    });
+  });
+
+  edges.sort((a, b) => a.cost - b.cost || a.u - b.u || a.v - b.v || a.sourceIndex - b.sourceIndex);
+  edges.forEach((edge, index) => { edge.sortedIndex = index; });
+  pushStep({
+    title: { vi: `Sort ${edges.length} cạnh theo chi phí tăng dần`, en: `Sort ${edges.length} edges by increasing cost` },
+    note: { vi: "Kruskal luôn thử lựa chọn rẻ nhất còn lại; cạnh giếng và cạnh ống được so sánh trong cùng một danh sách.", en: "Kruskal always tries the cheapest remaining option; well and pipe edges compete in one list." },
+    codeLines: [6], phase: "sort", event: "sorted", sorted: true,
+    vars: [{ name: "edges", value: edges.map((edge) => `${edge.kind === "well" ? "W" : "P"}${edge.sourceIndex + 1}:${edge.cost}`).join(" < ") }],
+  });
+
+  pushStep({
+    title: { vi: `Khởi tạo DSU cho node 0..${n}`, en: `Initialize DSU for nodes 0..${n}` },
+    note: { vi: "MST của n+1 node cần đúng n cạnh. Ban đầu mỗi node là một component riêng.", en: "An MST over n+1 nodes needs exactly n edges. Initially every node is its own component." },
+    codeLines: [7, 8, 26, 27], phase: "kruskal", event: "init-dsu", sorted: true,
+    vars: [{ name: "parent", value: `[${parent.join(", ")}]` }, { name: "needed edges", value: n }],
+  });
+
+  for (let index = 0; index < edges.length && acceptedEdges.length < n; index++) {
+    const edge = edges[index];
+    pushStep({
+      title: { vi: `Xét ${edge.kind === "well" ? `giếng W${edge.sourceIndex + 1}` : `ống P${edge.sourceIndex + 1}`} · giá ${edge.cost}`, en: `Consider ${edge.kind === "well" ? `well W${edge.sourceIndex + 1}` : `pipe P${edge.sourceIndex + 1}`} · cost ${edge.cost}` },
+      note: { vi: `Cạnh ${edge.u} ↔ ${edge.v} chỉ được chọn nếu hai đầu đang ở hai component khác nhau.`, en: `Edge ${edge.u} ↔ ${edge.v} is selected only when its endpoints belong to different components.` },
+      codeLines: [28], phase: "kruskal", event: "consider", currentEdge: edge, edgeIndex: index, sorted: true,
+      vars: [{ name: "cost, u, v", value: `${edge.cost}, ${edge.u}, ${edge.v}` }],
+    });
+
+    const rootU = find(edge.u);
+    const rootV = find(edge.v);
+    const rootsBefore = { u: rootU, v: rootV };
+    pushStep({
+      title: { vi: `find(${edge.u}) = R${rootU}, find(${edge.v}) = R${rootV}`, en: `find(${edge.u}) = R${rootU}, find(${edge.v}) = R${rootV}` },
+      note: rootU === rootV
+        ? { vi: "Hai đầu đã cùng component: chọn cạnh này sẽ tạo chu trình.", en: "Both endpoints already share a component: selecting this edge would create a cycle." }
+        : { vi: "Hai root khác nhau nên cạnh này có thể mở rộng MST.", en: "The roots differ, so this edge can extend the MST." },
+      codeLines: [10, 11, 12, 13, 14, 17, 18], phase: "kruskal", event: "find", currentEdge: edge, edgeIndex: index,
+      rootsBefore, unionChanged: null, sorted: true,
+      vars: [{ name: "root_u", value: rootU }, { name: "root_v", value: rootV }],
+    });
+
+    if (rootU === rootV) {
+      rejectedEdgeKeys.add(edge.key);
+      pushStep({
+        title: { vi: `Bỏ ${edge.kind === "well" ? "giếng" : "ống"}: tránh chu trình`, en: `Reject ${edge.kind}: avoid a cycle` },
+        note: { vi: `Không cộng chi phí ${edge.cost}; MST hiện tại vẫn có ${acceptedEdges.length}/${n} cạnh.`, en: `Do not add cost ${edge.cost}; the current MST still has ${acceptedEdges.length}/${n} edges.` },
+        codeLines: [18, 19], phase: "kruskal", event: "reject", currentEdge: edge, edgeIndex: index,
+        rootsBefore, unionChanged: false, sorted: true,
+        vars: [{ name: "accepted", value: false }, { name: "total", value: totalCost }],
+      });
+      continue;
+    }
+
+    const result = union(edge.u, edge.v);
+    acceptedEdges.push(edge);
+    totalCost += edge.cost;
+    pushStep({
+      title: { vi: `Chọn ${edge.kind === "well" ? `giếng W${edge.sourceIndex + 1}` : `ống P${edge.sourceIndex + 1}`} · tổng = ${totalCost}`, en: `Accept ${edge.kind === "well" ? `well W${edge.sourceIndex + 1}` : `pipe P${edge.sourceIndex + 1}`} · total = ${totalCost}` },
+      note: { vi: `Union by size: R${result.rootV} nối vào R${result.rootU}. MST có ${acceptedEdges.length}/${n} cạnh.`, en: `Union by size: R${result.rootV} attaches to R${result.rootU}. The MST has ${acceptedEdges.length}/${n} edges.` },
+      codeLines: [20, 21, 22, 23, 24, 29, 30, 31, 32, 33], phase: "kruskal", event: "accept", currentEdge: edge, edgeIndex: index,
+      rootsBefore, unionChanged: true, sorted: true,
+      vars: [{ name: "used", value: acceptedEdges.length }, { name: "total", value: totalCost }],
+    });
+  }
+
+  pushStep({
+    title: { vi: `Chi phí nhỏ nhất = ${totalCost}`, en: `Minimum cost = ${totalCost}` },
+    note: { vi: `Đã chọn ${acceptedEdges.filter((edge) => edge.kind === "well").length} giếng và ${acceptedEdges.filter((edge) => edge.kind === "pipe").length} ống để nối mọi nhà với nguồn nước ảo.`, en: `Selected ${acceptedEdges.filter((edge) => edge.kind === "well").length} well(s) and ${acceptedEdges.filter((edge) => edge.kind === "pipe").length} pipe(s) to connect every house to the virtual source.` },
+    codeLines: [34], phase: "done", event: "done", sorted: true, final: true,
+    vars: [{ name: "answer", value: totalCost }, { name: "MST edges", value: `${acceptedEdges.length}/${n}` }],
+  });
+
+  return { input, answer: totalCost, steps };
+}
+
 module.exports = {
+  1168: {
+    id: 1168,
+    difficulty: "hard",
+    premium: true,
+    slug: "optimize-water-distribution-in-a-village",
+    category: UF_CAT,
+    tags: [
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    ],
+    title: { vi: "Optimize Water Distribution in a Village", en: "Optimize Water Distribution in a Village" },
+    titleVi: { vi: "Tối ưu phân phối nước trong làng", en: "Optimize water distribution in a village" },
+    statement: {
+      vi: "Có n ngôi nhà. wells[i] là chi phí xây giếng tại nhà i+1; pipes[j]=[u,v,cost] là chi phí nối ống giữa hai nhà. Mỗi nhà phải nhận được nước trực tiếp từ giếng hoặc qua một chuỗi ống. Tìm tổng chi phí nhỏ nhất.",
+      en: "There are n houses. wells[i] is the cost to build a well at house i+1; pipes[j]=[u,v,cost] is the cost to connect two houses. Every house must receive water directly from a well or through pipes. Return the minimum total cost.",
+    },
+    defaultInput: [1, 2, 2],
+    inputKind: "positive",
+    inputLabel: { vi: "wells — chi phí giếng tại nhà 1..n", en: "wells — well cost for houses 1..n" },
+    extraParams: [{ key: "pipes", type: "string", label: { vi: "pipes: u,v,cost;... hoặc JSON", en: "pipes: u,v,cost;... or JSON" }, default: "1,2,1;2,3,1" }],
+    approach: [
+      { vi: "Thêm node ảo 0 đại diện nguồn nước vô hạn. Xây giếng tại nhà i trở thành cạnh (0,i) có trọng số wells[i-1].", en: "Add virtual node 0 as an unlimited water source. Building a well at house i becomes edge (0,i) weighted wells[i-1]." },
+      { vi: "Gộp cạnh giếng và cạnh ống, sort theo chi phí rồi chạy Kruskal. Chỉ chọn cạnh nối hai component khác nhau.", en: "Combine well and pipe edges, sort by cost, and run Kruskal. Select only edges joining different components." },
+      { vi: "Đồ thị có n+1 node nên MST cần n cạnh. Khi đủ n cạnh, mọi nhà đều nối tới ít nhất một giếng qua node 0.", en: "The graph has n+1 nodes, so its MST needs n edges. Once n edges are selected, every house reaches at least one well through node 0." },
+    ],
+    complexity: {
+      time: "O((n + p) log(n + p))",
+      space: "O(n + p)",
+      note: { vi: "Sort n cạnh giếng và p cạnh ống; các thao tác DSU gần O(1).", en: "Sort n well edges and p pipe edges; DSU operations are effectively O(1)." },
+    },
+    code: [
+      "class Solution:",
+      "    def minCostToSupplyWater(self, n, wells, pipes):",
+      "        edges = [(cost, 0, house) for house, cost in enumerate(wells, 1)]",
+      "        for u, v, cost in pipes:",
+      "            edges.append((cost, u, v))",
+      "        edges.sort()",
+      "        parent = list(range(n + 1))",
+      "        size = [1] * (n + 1)",
+      "",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "",
+      "        def union(x, y):",
+      "            root_x, root_y = find(x), find(y)",
+      "            if root_x == root_y:",
+      "                return False",
+      "            if size[root_x] < size[root_y]:",
+      "                root_x, root_y = root_y, root_x",
+      "            parent[root_y] = root_x",
+      "            size[root_x] += size[root_y]",
+      "            return True",
+      "",
+      "        total = 0",
+      "        used = 0",
+      "        for cost, u, v in edges:",
+      "            if union(u, v):",
+      "                total += cost",
+      "                used += 1",
+      "                if used == n:",
+      "                    break",
+      "        return total",
+    ],
+    builder: buildSteps1168,
+    liveArgs(input, params = {}) {
+      const { n, wells, pipes } = parse1168Data(input, params.pipes);
+      return [n, wells, pipes];
+    },
+  },
+  803: {
+    id: 803,
+    difficulty: "hard",
+    slug: "bricks-falling-when-hit",
+    category: UF_CAT,
+    title: { vi: "Bricks Falling When Hit", en: "Bricks Falling When Hit" },
+    titleVi: { vi: "Gạch rơi khi bị đập", en: "Bricks falling when hit" },
+    statement: {
+      vi: "Cho grid nhị phân và danh sách hits. Sau mỗi hit, xóa brick tại vị trí đó rồi đếm số brick không còn nối với hàng trên cùng và bị rơi.",
+      en: "Given a binary grid and a list of hits, remove the hit brick and count how many bricks are no longer connected to the top row and fall after each hit.",
+    },
+    defaultInput: "[[1,0,0,0],[1,1,1,0]]",
+    inputKind: "string",
+    inputLabel: { vi: "Grid JSON, ví dụ [[1,0,0,0],[1,1,1,0]]", en: "JSON grid, e.g. [[1,0,0,0],[1,1,1,0]]" },
+    extraParams: [{ key: "hits", type: "string", label: { vi: "hits JSON", en: "JSON hits" }, default: "[[1,0]]" }],
+    approach: [
+      { vi: "Xóa trước tất cả hit có hiệu lực trên bản sao grid; hit trùng hoặc hit ô rỗng được ghi nhận để trả 0.", en: "Remove every effective hit from a grid copy first; duplicate or empty-cell hits are tracked so they return 0." },
+      { vi: "Xây DSU trên grid còn lại và nối brick hàng đầu với virtual roof. Size component của roof cho biết số brick ổn định + 1.", en: "Build a DSU over the remaining grid and connect top-row bricks to a virtual roof. The roof component size equals stable bricks + 1." },
+      { vi: "Duyệt hits ngược, khôi phục từng brick và union 4 hướng. Số brick rơi = max(0, afterRoof − beforeRoof − 1).", en: "Process hits backward, restore each brick, and union four directions. Fallen bricks = max(0, afterRoof − beforeRoof − 1)." },
+    ],
+    complexity: {
+      time: "O((R·C + H)·α(R·C))",
+      space: "O(R·C + H)",
+      note: { vi: "Mỗi brick/cạnh được union số lần hằng số; α là inverse Ackermann gần như O(1).", en: "Every brick/edge is unioned a constant number of times; inverse Ackermann α is effectively constant." },
+    },
+    code: [
+      "class Solution:",
+      "    def hitBricks(self, grid, hits):",
+      "        rows, cols = len(grid), len(grid[0])",
+      "        work = [row[:] for row in grid]",
+      "        effective = []",
+      "        for r, c in hits:",
+      "            removed = work[r][c] == 1",
+      "            effective.append(removed)",
+      "            if removed:",
+      "                work[r][c] = 0",
+      "",
+      "        roof = rows * cols",
+      "        parent = list(range(roof + 1))",
+      "        size = [1] * (roof + 1)",
+      "",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "",
+      "        def union(a, b):",
+      "            root_a, root_b = find(a), find(b)",
+      "            if root_a == root_b: return",
+      "            if size[root_a] < size[root_b]:",
+      "                root_a, root_b = root_b, root_a",
+      "            parent[root_b] = root_a",
+      "            size[root_a] += size[root_b]",
+      "",
+      "        def index(r, c):",
+      "            return r * cols + c",
+      "",
+      "        for r in range(rows):",
+      "            for c in range(cols):",
+      "                if work[r][c] == 1:",
+      "                    cell = index(r, c)",
+      "                    if r == 0: union(cell, roof)",
+      "                    if r > 0 and work[r-1][c]: union(cell, index(r-1, c))",
+      "                    if c > 0 and work[r][c-1]: union(cell, index(r, c-1))",
+      "",
+      "        answer = [0] * len(hits)",
+      "        for i in range(len(hits)-1, -1, -1):",
+      "            if not effective[i]:",
+      "                continue",
+      "            r, c = hits[i]",
+      "            before = size[find(roof)]",
+      "            work[r][c] = 1",
+      "            cell = index(r, c)",
+      "            if r == 0: union(cell, roof)",
+      "            for dr, dc in ((-1,0),(1,0),(0,-1),(0,1)):",
+      "                nr, nc = r + dr, c + dc",
+      "                if 0 <= nr < rows and 0 <= nc < cols and work[nr][nc]:",
+      "                    union(cell, index(nr, nc))",
+      "            after = size[find(roof)]",
+      "            answer[i] = max(0, after - before - 1)",
+      "",
+      "        return answer",
+    ],
+    builder: buildSteps803,
+    liveArgs(input, params = {}) {
+      const { grid, hits } = parse803Data(input, params.hits || "");
+      return [grid, hits];
+    },
+  },
   684: {
     id: 684,
     difficulty: "medium",
@@ -3401,16 +4490,29 @@ module.exports = {
     defaultInput: "20,0,2;50,1,3;10,0,1;80,3,4;70,2,3",
     inputKind: "string",
     inputLabel: { vi: "Logs (t,a,b cách bởi ';')", en: "Logs (t,a,b separated by ';')" },
-    extraParams: [{ key: "n", label: { vi: "n (số người)", en: "n (number of people)" }, default: 5 }],
+    extraParams: [
+      { key: "n", label: { vi: "n (số người)", en: "n (number of people)" }, default: 5 },
+      {
+        key: "approach",
+        label: { vi: "Cách giải", en: "Approach" },
+        type: "select",
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: parent inline + iterative find", en: "Approach 1: inline parent + iterative find" } },
+          { value: "2", label: { vi: "Cách 2: class UnionFind + recursive find", en: "Approach 2: UnionFind class + recursive find" } },
+        ],
+      },
+    ],
     approach: [
-      { vi: "Sắp logs theo timestamp tăng dần.", en: "Sort logs by timestamp ascending." },
-      { vi: "Union-Find: lần lượt union từng cặp (a, b). Mỗi union giảm components đi 1.", en: "Union-Find: union each pair (a, b). Each merge decreases component count by 1." },
-      { vi: "Khi components = 1 → trả timestamp của log đó. Nếu không bao giờ về 1 → trả -1.", en: "When components = 1 → return that log's timestamp. If it never reaches 1 → return -1." },
+      { vi: "Cả hai cách đều sort logs theo timestamp tăng dần rồi thêm từng cạnh friendship vào DSU.", en: "Both approaches sort logs by timestamp and add friendship edges to the DSU one at a time." },
+      { vi: "Cách 1: dùng parent/components trực tiếp trong Solution và iterative find với path halving.", en: "Approach 1: keep parent/components directly in Solution and use iterative find with path halving." },
+      { vi: "Cách 2: đóng gói root, rank và count trong class UnionFind; recursive find thực hiện path compression rõ từng bước.", en: "Approach 2: encapsulate root, rank, and count in a UnionFind class; recursive find performs visible path compression." },
+      { vi: "Mỗi union thành công giảm component count đi 1. Khi count = 1, timestamp hiện tại là đáp án sớm nhất.", en: "Every successful union decreases the component count by one. When count = 1, the current timestamp is the earliest answer." },
     ],
     complexity: {
       time: "O(m log m + m·α(n))",
       space: "O(n)",
-      note: { vi: "m = số logs, sắp xếp O(m log m). Mỗi union/find gần O(1).", en: "m = number of logs, sort O(m log m). Each union/find near O(1)." },
+      note: { vi: "m = số logs; sort tốn O(m log m), còn find/union có amortized α(n).", en: "m is the number of logs; sorting costs O(m log m), while find/union take amortized α(n)." },
     },
     code: [
       "class Solution:",
@@ -3432,7 +4534,61 @@ module.exports = {
       "                return t",
       "        return -1",
     ],
+    code2: [
+      "from typing import List",
+      "",
+      "class UnionFind:",
+      "    def __init__(self, n):",
+      "        self.root = [i for i in range(n)]",
+      "        self.rank = [1 for _ in range(n)]",
+      "        self.count = n",
+      "",
+      "    def find(self, x):",
+      "        if x == self.root[x]:",
+      "            return x",
+      "        root_x = self.find(self.root[x])",
+      "        self.root[x] = root_x  # path compression",
+      "        return root_x",
+      "",
+      "    def union(self, x, y):",
+      "        root_x = self.find(x)",
+      "        root_y = self.find(y)",
+      "        if root_x == root_y:",
+      "            return",
+      "        if self.rank[root_x] > self.rank[root_y]:",
+      "            self.root[root_y] = root_x",
+      "        elif self.rank[root_x] < self.rank[root_y]:",
+      "            self.root[root_x] = root_y",
+      "        else:",
+      "            self.root[root_y] = root_x",
+      "            self.rank[root_x] += 1",
+      "        self.count -= 1",
+      "",
+      "    def is_connected(self, x, y):",
+      "        return self.find(x) == self.find(y)",
+      "",
+      "    def get_count(self):",
+      "        return self.count",
+      "",
+      "class Solution:",
+      "    def earliestAcq(self, logs: List[List[int]], n: int) -> int:",
+      "        uf = UnionFind(n)",
+      "        logs.sort(key=lambda x: x[0])",
+      "        for log in logs:",
+      "            time, u, v = log",
+      "            uf.union(u, v)",
+      "            if uf.get_count() == 1:",
+      "                return time",
+      "        return -1",
+    ],
+    codeLabel: { vi: "Cách 1: parent inline + iterative find", en: "Approach 1: inline parent + iterative find" },
+    code2Label: { vi: "Cách 2: class UnionFind + recursive path compression", en: "Approach 2: UnionFind class + recursive path compression" },
     builder: buildSteps1101,
+    builder2: buildSteps1101ExplicitUnionFind,
+    liveArgs(input, params = {}) {
+      const { n, logs } = parse1101Data(input, params);
+      return [logs, n];
+    },
   },
   1319: {
     id: 1319,

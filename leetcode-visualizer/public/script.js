@@ -338,6 +338,301 @@ function renderCatalog() {
       itemsEl.appendChild(guideBox);
     }
 
+    if (group.key === "trie") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🧭</span><span><strong>${lang === "vi" ? "Learn Suggestion" : "Learn Suggestion"}</strong><small>${lang === "vi" ? "8 loại Trie · 3 level · lộ trình phỏng vấn" : "8 Trie patterns · 3 levels · interview roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const patterns = [
+          { name: "Prefix Trie", note: vi ? "Prefix cơ bản · thay root · gợi ý tìm kiếm" : "Basic prefixes · root replacement · search suggestions", ids: [208, 648, 1268] },
+          { name: "String Trie", note: vi ? "Wildcard · từ điển · ghép nhiều từ" : "Wildcards · dictionaries · combined words", ids: [211, 676, 472] },
+          { name: "Binary Trie", note: vi ? "Bit 0/1 · Maximum XOR" : "Bits 0/1 · Maximum XOR", ids: [421, 1707, 1938, 2935] },
+          { name: "Trie + Backtracking", note: vi ? "DFS trên board · sinh hình vuông từ" : "Board DFS · build word squares", ids: [212, 425] },
+          { name: "Reverse Trie", note: vi ? "Đọc chuỗi ngược · palindrome" : "Read strings backward · palindromes", ids: [1032, 336] },
+          { name: "Prefix + Suffix", note: vi ? "Kết hợp tiền tố và hậu tố" : "Combine prefixes and suffixes", ids: [745, 3042, 3045] },
+          { name: "Counting / Aggregate", note: vi ? "Đếm prefix · cộng giá trị theo prefix" : "Count prefixes · aggregate values", ids: [677, 1804] },
+          { name: "Complete Prefix", note: vi ? "Mọi prefix đều phải tồn tại" : "Every prefix must exist", ids: [720, 1858, 3043] },
+        ];
+        const levels = [
+          {
+            tone: "green",
+            icon: "🟢",
+            title: vi ? "Level 1 — Phải biết" : "Level 1 — Must know",
+            problems: [
+              [208, "Implement Trie"], [211, "Design Add and Search Words"], [648, "Replace Words"],
+              [677, "Map Sum Pairs"], [720, "Longest Word"], [1268, "Search Suggestions"], [1804, "Implement Trie II"],
+            ],
+          },
+          {
+            tone: "yellow",
+            icon: "🟡",
+            title: vi ? "Level 2 — Muốn giỏi Trie" : "Level 2 — Become strong at Trie",
+            problems: [
+              [212, "Word Search II"], [421, "Maximum XOR"], [676, "Magic Dictionary"],
+              [745, "Prefix and Suffix Search"], [1032, "Stream of Characters"],
+              [1858, "Longest Word With All Prefixes"], [3043, "Longest Common Prefix"],
+            ],
+          },
+          {
+            tone: "red",
+            icon: "🔴",
+            title: vi ? "Level 3 — Nâng cao" : "Level 3 — Advanced",
+            problems: [
+              [336, "Palindrome Pairs"], [425, "Word Squares"], [472, "Concatenated Words"],
+              [1707, "Maximum XOR With an Element"], [1938, "Maximum Genetic Difference"],
+              [1948, "Delete Duplicate Folders"], [2935, "Maximum Strong Pair XOR II"],
+              [3045, "Prefix and Suffix Pairs II"],
+            ],
+          },
+        ];
+        const sequence = [208, 211, 648, 677, 720, 1268, 212, 421, 745, 1032, 1707];
+        const patternCards = patterns.map((pattern, index) => `<article class="trie-pattern-card"><span class="trie-pattern-number">${String(index + 1).padStart(2, "0")}</span><h4>${pattern.name}</h4><p>${pattern.note}</p><div>${pattern.ids.map((id) => `<a class="trie-problem-link" href="#leetcode-${id}" data-trie-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`).join("")}</div></article>`).join("");
+        const levelCards = levels.map((level) => `<article class="trie-level-card ${level.tone}"><h4><span>${level.icon}</span>${level.title}</h4><ul>${level.problems.map(([id, name]) => `<li><a class="trie-problem-row" href="#leetcode-${id}" data-trie-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`).join("")}</ul></article>`).join("");
+
+        $("trieLearnEyebrow").textContent = "TRIE LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Bạn chỉ cần nhớ 8 loại Trie" : "The 8 Trie patterns to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Không cần làm hết mọi bài. Hãy nhận diện đúng pattern trước, sau đó học theo level phỏng vấn."
+          : "You do not need to solve everything. Recognize the pattern first, then progress through the interview levels.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình học Trie" : "Close Trie learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "8 loại Trie cốt lõi" : "8 core Trie patterns"}</h3><p>${vi ? "Nhìn dạng bài để chọn đúng biến thể Trie." : "Use the problem shape to select the right Trie variant."}</p></div></div>
+            <div class="trie-pattern-grid">${patternCards}</div>
+          </section>
+          <section class="trie-learn-section">
+            <div class="trie-interview-note">⭐ <strong>${vi ? "Nếu mục tiêu là phỏng vấn:" : "If your goal is interviews:"}</strong> ${vi ? "không cần làm hết — chia thành 3 level." : "do not solve everything — use these 3 levels."}</div>
+            <div class="trie-level-grid">${levelCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>03</span><div><h3>${vi ? "Thứ tự học từ đầu" : "Recommended learning order"}</h3><p>${vi ? "Đi từ thao tác Trie cơ bản đến backtracking và Binary Trie." : "Move from basic Trie operations to backtracking and Binary Trie."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `<a class="trie-problem-link" href="#leetcode-${id}" data-trie-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-trie-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.trieProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
+    if (group.key === "sliding") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion sliding-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🪟</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "17 pattern Sliding Window · lộ trình phỏng vấn" : "17 Sliding Window patterns · interview roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const patterns = [
+          { name: "1. Fixed Size", problems: [[643, "Maximum Average Subarray I"], [1343, "Number of Sub-arrays of Size K and Average ≥ Threshold"], [1456, "Maximum Number of Vowels in a Substring of Given Length"], [2461, "Maximum Sum of Distinct Subarrays With Length K"], [1423, "Maximum Points You Can Obtain from Cards"], [1052, "Grumpy Bookstore Owner"], [567, "Permutation in String"], [438, "Find All Anagrams in a String"]] },
+          { name: "2. Longest Valid Window", problems: [[3, "Longest Substring Without Repeating Characters"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [1493, "Longest Subarray of 1's After Deleting One Element"], [2024, "Maximize the Confusion of an Exam"], [2958, "Length of Longest Subarray With at Most K Frequency"], [1208, "Get Equal Substrings Within Budget"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"]] },
+          { name: "3. Shortest Valid Window", problems: [[76, "Minimum Window Substring"], [209, "Minimum Size Subarray Sum"], [1234, "Replace the Substring for Balanced String"], [632, "Smallest Range Covering Elements from K Lists"]] },
+          { name: "4. Frequency / Character Counting", problems: [[3, "Longest Substring Without Repeating Characters"], [76, "Minimum Window Substring"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [438, "Find All Anagrams in a String"], [567, "Permutation in String"], [904, "Fruit Into Baskets"], [992, "Subarrays with K Different Integers"], [1358, "Number of Substrings Containing All Three Characters"], [2958, "Length of Longest Subarray With at Most K Frequency"]] },
+          { name: "5. At Most K", problems: [[159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [2024, "Maximize the Confusion of an Exam"], [2958, "Length of Longest Subarray With at Most K Frequency"], [992, "Subarrays with K Different Integers"]] },
+          { name: "6. Exactly K / Exactly Condition", problems: [[992, "Subarrays with K Different Integers"], [930, "Binary Subarrays With Sum"], [1248, "Count Number of Nice Subarrays"], [1358, "Number of Substrings Containing All Three Characters"]] },
+          { name: "7. Anagram / Permutation", problems: [[438, "Find All Anagrams in a String"], [567, "Permutation in String"], [76, "Minimum Window Substring"], [30, "Substring with Concatenation of All Words"]] },
+          { name: "8. Monotonic Deque", problems: [[239, "Sliding Window Maximum"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"], [862, "Shortest Subarray with Sum at Least K"], [1696, "Jump Game VI"], [2762, "Continuous Subarrays"]] },
+          { name: "9. Prefix Sum + Sliding Window", problems: [[209, "Minimum Size Subarray Sum"], [862, "Shortest Subarray with Sum at Least K"], [930, "Binary Subarrays With Sum"], [1248, "Count Number of Nice Subarrays"], [1703, "Minimum Adjacent Swaps for K Consecutive Ones"]] },
+          { name: "10. Sliding Window + Heap", problems: [[480, "Sliding Window Median"], [632, "Smallest Range Covering Elements from K Lists"]] },
+          { name: "11. Sliding Window + Two Deques", problems: [[1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"]] },
+          { name: "12. Sliding Window + Sort", problems: [[1838, "Frequency of the Most Frequent Element"], [2302, "Count Subarrays With Score Less Than K"]] },
+          { name: "13. Sliding Window + Binary Search", problems: [[1838, "Frequency of the Most Frequent Element"], [2513, "Minimize the Maximum of Two Arrays"]] },
+          { name: "14. Complement Window", problems: [[1423, "Maximum Points You Can Obtain from Cards"], [1658, "Minimum Operations to Reduce X to Zero"], [2516, "Take K of Each Character From Left and Right"]] },
+          { name: "15. String Sliding Window", problems: [[3, "Longest Substring Without Repeating Characters"], [30, "Substring with Concatenation of All Words"], [76, "Minimum Window Substring"], [159, "Longest Substring with At Most Two Distinct Characters"], [340, "Longest Substring with At Most K Distinct Characters"], [424, "Longest Repeating Character Replacement"], [438, "Find All Anagrams in a String"], [567, "Permutation in String"], [1208, "Get Equal Substrings Within Budget"], [1234, "Replace the Substring for Balanced String"], [1358, "Number of Substrings Containing All Three Characters"], [2024, "Maximize the Confusion of an Exam"]] },
+          { name: "16. Array Sliding Window", problems: [[209, "Minimum Size Subarray Sum"], [643, "Maximum Average Subarray I"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [1052, "Grumpy Bookstore Owner"], [1423, "Maximum Points You Can Obtain from Cards"], [1493, "Longest Subarray of 1's After Deleting One Element"], [1658, "Minimum Operations to Reduce X to Zero"], [1838, "Frequency of the Most Frequent Element"], [2461, "Maximum Sum of Distinct Subarrays With Length K"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
+          { name: "17. Advanced Sliding Window", problems: [[30, "Substring with Concatenation of All Words"], [76, "Minimum Window Substring"], [239, "Sliding Window Maximum"], [480, "Sliding Window Median"], [632, "Smallest Range Covering Elements from K Lists"], [862, "Shortest Subarray with Sum at Least K"], [992, "Subarrays with K Different Integers"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"], [1703, "Minimum Adjacent Swaps for K Consecutive Ones"], [1838, "Frequency of the Most Frequent Element"], [2302, "Count Subarrays With Score Less Than K"], [2444, "Count Subarrays With Fixed Bounds"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
+        ];
+        const sequence = [3, 209, 567, 438, 424, 904, 1004, 76, 239, 992, 1438, 862];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-sliding-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`;
+        const roadmapItem = (id) => supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-sliding-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`;
+        const patternCards = patterns.map((pattern, index) => `<details class="sliding-pattern-card" open><summary><span>${String(index + 1).padStart(2, "0")}</span><strong>${pattern.name.replace(/^\d+\.\s*/, "")}</strong><small>${pattern.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${pattern.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "SLIDING WINDOW LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "17 pattern Sliding Window cần nhớ" : "17 Sliding Window patterns to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Nhận diện loại cửa sổ trước: fixed, longest, shortest, frequency, deque hoặc kỹ thuật kết hợp."
+          : "Identify the window type first: fixed, longest, shortest, frequency, deque, or a combined technique.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Sliding Window" : "Close Sliding Window learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section sliding-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "17 nhóm bài cốt lõi" : "17 core problem groups"}</h3><p>${vi ? "Bấm tiêu đề để thu gọn; bài chưa có visualization được đánh dấu riêng." : "Select a heading to collapse it; unavailable visualizations are marked separately."}</p></div></div>
+            <div class="sliding-pattern-grid">${patternCards}</div>
+          </section>
+          <section class="trie-roadmap sliding-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Đi từ cửa sổ cơ bản đến frequency, deque và bài shortest nâng cao." : "Progress from basic windows to frequency, deque, and advanced shortest-window problems."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-sliding-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.slidingProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
+    if (group.key === "segment-tree") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion segment-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🌳</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "7 nhóm Segment Tree · lộ trình từ nền tảng đến DP" : "7 Segment Tree groups · foundation-to-DP roadmap"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🟢", name: vi ? "Nền tảng" : "Foundation", problems: [[303, "Range Sum Query - Immutable", 0], [307, "Range Sum Query - Mutable", 5]] },
+          { icon: "🟡", name: vi ? "Cốt lõi" : "Core", problems: [[315, "Count of Smaller Numbers After Self", 5], [673, "Number of Longest Increasing Subsequence", 4], [1649, "Create Sorted Array Through Instructions", 4]] },
+          { icon: "🟡", name: vi ? "Nén tọa độ" : "Coordinate Compression", problems: [[729, "My Calendar I", 0], [731, "My Calendar II", 0], [715, "Range Module", 5]] },
+          { icon: "🔴", name: "Lazy Propagation", problems: [[732, "My Calendar III", 5], [2569, "Handling Sum Queries After Update", 5]] },
+          { icon: "🔴", name: vi ? "Đếm" : "Counting", problems: [[327, "Count of Range Sum", 0], [493, "Reverse Pairs", 0]] },
+          { icon: "🔴", name: "Sweep Line", problems: [[699, "Falling Squares", 0], [850, "Rectangle Area II", 0]] },
+          { icon: "🔴", name: "DP", problems: [[2407, "Longest Increasing Subsequence II", 5]] },
+        ];
+        const sequence = [303, 307, 315, 673, 729, 731, 715, 732, 699, 850, 1649, 2407, 2569, 2926];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name, stars]) => {
+          const rating = stars ? `<small class="segment-stars" aria-label="${stars} stars">${"★".repeat(stars)}</small>` : "";
+          return supportedIds.has(id)
+            ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-segment-problem-id="${id}"><span>#${id}</span><b>${name}${rating}</b></a></li>`
+            : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}${rating}<em>${unavailableText}</em></b></span></li>`;
+        };
+        const roadmapItem = (id) => supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-segment-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`;
+        const groupCards = groups.map((item, index) => `<details class="sliding-pattern-card segment-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "SEGMENT TREE LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "7 nhóm Segment Tree cần nhớ" : "7 Segment Tree groups to remember";
+        $("trieLearnIntro").textContent = vi
+          ? "Đi từ range query cơ bản đến nén tọa độ, lazy propagation, counting, sweep line và DP."
+          : "Progress from basic range queries to compression, lazy propagation, counting, sweep line, and DP.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Segment Tree" : "Close Segment Tree learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section segment-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "7 nhóm bài cốt lõi" : "7 core problem groups"}</h3><p>${vi ? "Số sao thể hiện mức độ ưu tiên; bài chưa có visualization được đánh dấu riêng." : "Stars indicate priority; unavailable visualizations are marked separately."}</p></div></div>
+            <div class="sliding-pattern-grid segment-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap segment-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Học range sum trước, sau đó counting, calendar/lazy, sweep line và DP nâng cao." : "Start with range sums, then counting, calendar/lazy, sweep line, and advanced DP."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-segment-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.segmentProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
@@ -1043,6 +1338,7 @@ function renderCode() {
   const problemId = Number(problemData && problemData.id);
   if (split) {
     split.classList.toggle("problem-173-layout", problemId === 173);
+    split.classList.toggle("problem-677-layout", problemId === 677);
     split.classList.toggle("problem-642-layout", problemId === 642);
     split.classList.toggle("problem-648-layout", problemId === 648);
     split.classList.toggle("problem-211-layout", problemId === 211);
@@ -6909,6 +7205,49 @@ function renderReplaceWordsView(step) {
       <div class="rw-result-row">${resultHtml}</div>
     </div>
   </section>`;
+
+  if (Number(view.approach) === 2) {
+    const trieHeading = treeView.querySelector(".rw-trie-section header strong");
+    const trieHint = treeView.querySelector(".rw-trie-section header span");
+    const pathHeading = treeView.querySelector(".rw-path small");
+    if (trieHeading) trieHeading.textContent = vi ? "Nested dictionary" : "Nested dictionary";
+    if (trieHint) trieHint.textContent = vi ? "mỗi dict con là một Trie node; $ đánh dấu root" : "each child dict is a Trie node; $ marks a root";
+    if (pathHeading) pathHeading.textContent = vi ? "Đường đi dictionary" : "Dictionary path";
+
+    treeView.querySelectorAll(".rw-trie-node:not(.terminal) .rw-trie-meta").forEach((meta) => meta.remove());
+    const terminalData = trieNodes.filter((node) => node.isWord);
+    treeView.querySelectorAll(".rw-trie-node.terminal").forEach((group, index) => {
+      const rootWord = String((terminalData[index] && terminalData[index].sub) || "");
+      const shortened = rootWord.length > 14 ? `${rootWord.slice(0, 11)}...` : rootWord;
+      const texts = group.querySelectorAll(".rw-trie-meta text");
+      if (texts[0]) texts[0].textContent = `$ = \"${shortened}\"`;
+      if (texts[1]) texts[1].remove();
+    });
+  } else if (Number(view.approach) === 3) {
+    const testedPrefixes = Array.isArray(view.testedPrefixes) ? view.testedPrefixes : [];
+    const setTokens = roots.length
+      ? roots.map((root) => {
+        const active = root === prefix || root === foundRoot;
+        return `<span class="rw-root${active ? " active" : ""}">${escapeHtml(root)}</span>`;
+      }).join("")
+      : `<span class="rw-empty">∅</span>`;
+    const prefixTokens = testedPrefixes.length
+      ? testedPrefixes.map((item, index) => {
+        const isCurrent = index === testedPrefixes.length - 1;
+        const isMatch = roots.includes(item);
+        return `<span class="rw-root${isCurrent || isMatch ? " active" : ""}">${escapeHtml(item)}</span>`;
+      }).join("<i>→</i>")
+      : `<span class="rw-empty">${vi ? "Chưa thử prefix" : "No prefix tested"}</span>`;
+    const setSection = treeView.querySelector(".rw-trie-section");
+    if (setSection) {
+      setSection.innerHTML = `<header><strong>${vi ? "Set lookup" : "Set lookup"}</strong><span>${vi ? "không xây Trie; kiểm tra prefix in roots" : "no Trie; check prefix in roots"}</span></header>
+        <div class="rw-root-row">${setTokens}</div>`;
+    }
+    const workspacePath = treeView.querySelector(".rw-workspace .rw-path");
+    if (workspacePath) {
+      workspacePath.innerHTML = `<small>${vi ? "Các prefix đã thử" : "Tested prefixes"}</small><div>${prefixTokens}</div>`;
+    }
+  }
 }
 
 function renderPrefix2DView(step) {
@@ -11256,6 +11595,147 @@ function renderCyclicSortView(step) {
   </div>`;
 }
 
+function renderWaterDistributionView(step) {
+  const view = step.waterDistributionView || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const accepted = new Set((view.acceptedEdges || []).map((edge) => edge.key));
+  const rejected = new Set(view.rejectedEdgeKeys || []);
+  const currentKey = view.currentEdge ? view.currentEdge.key : null;
+  const phaseIndex = { transform: 0, sort: 1, kruskal: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Thêm nguồn ảo 0", "2 · Sort mọi lựa chọn", "3 · Kruskal + DSU", "4 · Hệ thống tối ưu"]
+    : ["1 · Add virtual source 0", "2 · Sort all options", "3 · Kruskal + DSU", "4 · Optimal network"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const edgeLabel = (edge) => `${edge.kind === "well" ? "W" : "P"}${edge.sourceIndex + 1}`;
+  const edgeKindLabel = (edge) => edge.kind === "well" ? (vi ? "GIẾNG" : "WELL") : (vi ? "ỐNG" : "PIPE");
+  const edgeChips = edges.map((edge, index) => {
+    const classes = [edge.kind];
+    if (accepted.has(edge.key)) classes.push("accepted");
+    if (rejected.has(edge.key)) classes.push("rejected");
+    if (edge.key === currentKey) classes.push("current");
+    return `<span class="${classes.join(" ")}"><small>#${view.sorted ? index + 1 : "·"} · ${edgeKindLabel(edge)}</small><b>${escapeHtml(edgeLabel(edge))}: ${edge.u}↔${edge.v}</b><strong>$${escapeHtml(edge.cost)}</strong></span>`;
+  }).join("") || `<em>${vi ? "Đang tạo danh sách cạnh..." : "Building the edge list..."}</em>`;
+
+  const maxHousesPerRow = 4;
+  const houseColumns = Math.max(1, Math.min(n, maxHousesPerRow));
+  const houseRows = Math.max(1, Math.ceil(n / maxHousesPerRow));
+  const width = 620;
+  const houseRowGap = 126;
+  const firstHouseY = 218;
+  const height = firstHouseY + (houseRows - 1) * houseRowGap + 76;
+  const sourcePoint = { x: width / 2, y: 48 };
+  const housePoint = (house) => {
+    const row = Math.floor((house - 1) / maxHousesPerRow);
+    const firstHouseInRow = row * maxHousesPerRow + 1;
+    const housesInRow = Math.min(maxHousesPerRow, n - row * maxHousesPerRow);
+    const column = house - firstHouseInRow;
+    const rowWidth = housesInRow <= 1 ? 0 : width - 130;
+    return {
+      x: housesInRow <= 1 ? width / 2 : 65 + column * (rowWidth / (housesInRow - 1)),
+      y: firstHouseY + row * houseRowGap,
+    };
+  };
+  const edgePriority = (edge) => edge.key === currentKey ? 3 : accepted.has(edge.key) ? 2 : rejected.has(edge.key) ? 0 : 1;
+  const orderedEdges = [...edges].sort((a, b) => edgePriority(a) - edgePriority(b));
+  const graphEdges = orderedEdges.map((edge) => {
+    const classes = ["water1168-edge", edge.kind];
+    if (accepted.has(edge.key)) classes.push("accepted");
+    if (rejected.has(edge.key)) classes.push("rejected");
+    if (edge.key === currentKey) classes.push("current");
+    let path;
+    let labelX;
+    let labelY;
+    if (edge.kind === "well") {
+      const target = housePoint(edge.v);
+      path = `M ${sourcePoint.x} ${sourcePoint.y + 22} L ${target.x} ${target.y - 28}`;
+      labelX = sourcePoint.x * 0.45 + target.x * 0.55;
+      labelY = sourcePoint.y * 0.45 + target.y * 0.55 - 7;
+    } else {
+      const from = housePoint(edge.u);
+      const to = housePoint(edge.v);
+      const middleX = (from.x + to.x) / 2;
+      const controlY = 145 - (edge.sourceIndex % 4) * 15;
+      path = `M ${from.x} ${from.y - 25} Q ${middleX} ${controlY} ${to.x} ${to.y - 25}`;
+      labelX = middleX;
+      labelY = (from.y + 2 * controlY + to.y) / 4 - 5;
+    }
+    const showLabel = accepted.has(edge.key) || edge.key === currentKey;
+    return `<g class="${classes.join(" ")}" aria-label="${escapeHtml(`${edgeKindLabel(edge)} ${edge.u} to ${edge.v}, cost ${edge.cost}`)}"><path d="${path}"></path>${showLabel ? `<text x="${labelX}" y="${labelY}">${escapeHtml(edgeLabel(edge))} · $${escapeHtml(edge.cost)}</text>` : ""}</g>`;
+  }).join("");
+
+  const selectedWellHouses = new Set((view.acceptedEdges || []).filter((edge) => edge.kind === "well").map((edge) => edge.v));
+  const currentEndpoints = new Set(view.currentEdge ? [view.currentEdge.u, view.currentEdge.v] : []);
+  const rootFor = (node) => view.roots && view.roots[node] !== undefined ? view.roots[node] : node;
+  const houseNodes = Array.from({ length: n }, (_, index) => {
+    const house = index + 1;
+    const point = housePoint(house);
+    const classes = ["water1168-node", "house", `component-${Math.abs(rootFor(house)) % 6}`];
+    if (currentEndpoints.has(house)) classes.push("current");
+    if (selectedWellHouses.has(house)) classes.push("has-well");
+    return `<g class="${classes.join(" ")}"><rect x="${point.x - 42}" y="${point.y - 32}" width="84" height="66" rx="12"></rect><path class="roof" d="M ${point.x - 37} ${point.y - 29} L ${point.x} ${point.y - 55} L ${point.x + 37} ${point.y - 29}"></path><text class="house" x="${point.x}" y="${point.y}">H${house}</text><text class="detail" x="${point.x}" y="${point.y + 21}">well $${escapeHtml(view.wells ? view.wells[index] : "—")} · R${escapeHtml(rootFor(house))}</text>${selectedWellHouses.has(house) ? `<text class="well-mark" x="${point.x + 34}" y="${point.y - 20}">💧</text>` : ""}</g>`;
+  }).join("");
+  const sourceClass = currentEndpoints.has(0) ? " current" : "";
+  const sourceNode = `<g class="water1168-node source${sourceClass}"><path d="M ${sourcePoint.x - 46} ${sourcePoint.y + 27} L ${sourcePoint.x - 35} ${sourcePoint.y - 27} L ${sourcePoint.x + 35} ${sourcePoint.y - 27} L ${sourcePoint.x + 46} ${sourcePoint.y + 27} Z"></path><path class="water" d="M ${sourcePoint.x - 29} ${sourcePoint.y + 3} Q ${sourcePoint.x - 14} ${sourcePoint.y - 10} ${sourcePoint.x} ${sourcePoint.y + 3} T ${sourcePoint.x + 29} ${sourcePoint.y + 3}"></path><text class="source-id" x="${sourcePoint.x}" y="${sourcePoint.y - 5}">0</text><text class="source-label" x="${sourcePoint.x}" y="${sourcePoint.y + 44}">${vi ? "NGUỒN NƯỚC ẢO" : "VIRTUAL WATER SOURCE"}</text></g>`;
+  const graphSummary = vi
+    ? `Nguồn nước ảo 0 và ${n} nhà; đã chọn ${view.acceptedCount || 0} trên ${n} cạnh MST; tổng ${view.totalCost || 0}.`
+    : `Virtual source 0 and ${n} houses; selected ${view.acceptedCount || 0} of ${n} MST edges; total ${view.totalCost || 0}.`;
+  const graphSvg = `<svg class="water1168-graph" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(graphSummary)}">${graphEdges}${sourceNode}${houseNodes}</svg>`;
+
+  const current = view.currentEdge;
+  let decisionClass = "waiting";
+  let decisionTitle = vi ? "Chờ cạnh tiếp theo" : "Waiting for the next edge";
+  let decisionNote = vi ? "Kruskal xử lý cạnh từ rẻ đến đắt." : "Kruskal processes edges from cheapest to most expensive.";
+  if (current) {
+    decisionTitle = `${edgeLabel(current)} · ${current.u} ↔ ${current.v} · $${current.cost}`;
+    decisionNote = vi ? "Chưa chạy find/union." : "Waiting for find/union.";
+    if (view.rootsBefore) {
+      if (view.unionChanged === true) {
+        decisionClass = "accepted";
+        decisionNote = vi ? `Khác root → chọn cạnh và cộng $${current.cost}.` : `Different roots → accept and add $${current.cost}.`;
+      } else if (view.unionChanged === false) {
+        decisionClass = "rejected";
+        decisionNote = vi ? "Cùng root → bỏ qua để tránh cycle." : "Same root → reject to avoid a cycle.";
+      } else if (view.rootsBefore.u === view.rootsBefore.v) {
+        decisionClass = "cycle";
+        decisionNote = vi ? "Cùng root: cạnh này sẽ tạo cycle." : "Same root: this edge would form a cycle.";
+      } else {
+        decisionClass = "ready";
+        decisionNote = vi ? "Khác root: cạnh này an toàn để chọn." : "Different roots: this edge is safe to select.";
+      }
+    }
+  }
+  const rootsHtml = view.rootsBefore
+    ? `<div class="water1168-roots"><span>find(${current.u}) = <b>R${view.rootsBefore.u}</b></span><strong>${view.rootsBefore.u === view.rootsBefore.v ? "=" : "≠"}</strong><span>find(${current.v}) = <b>R${view.rootsBefore.v}</b></span></div>`
+    : `<div class="water1168-rule"><code>well[i] ⇔ edge (0, i)</code><span>${vi ? "Một MST trên n+1 node cần n cạnh" : "An MST over n+1 nodes needs n edges"}</span></div>`;
+
+  const components = (view.groups || []).map((group) => {
+    const labels = (group.nodes || []).map((node) => node === 0 ? (vi ? "Nguồn 0" : "Source 0") : `H${node}`).join(" · ");
+    const hasSource = (group.nodes || []).includes(0);
+    return `<span class="${hasSource ? "source" : ""}"><b>R${escapeHtml(group.root)}</b><small>${escapeHtml(labels)}</small><em>${hasSource ? (vi ? "có nước" : "water-connected") : (vi ? "chưa có nước" : "not supplied")}</em></span>`;
+  }).join("");
+  const selectedWells = (view.acceptedEdges || []).filter((edge) => edge.kind === "well");
+  const selectedPipes = (view.acceptedEdges || []).filter((edge) => edge.kind === "pipe");
+  const selectedHtml = [...selectedWells, ...selectedPipes].map((edge) => `<span class="${edge.kind}"><b>${escapeHtml(edgeLabel(edge))}</b><small>${edge.u}↔${edge.v}</small><strong>$${edge.cost}</strong></span>`).join("") || `<em>${vi ? "Chưa chọn hạ tầng" : "No infrastructure selected yet"}</em>`;
+  const resultClass = view.complete ? "complete" : "building";
+
+  el.innerHTML = `<section class="water1168-viz">
+    <div class="water1168-phases">${phases}</div>
+    <section class="water1168-edge-lane"><header><div><strong>${view.sorted ? (vi ? "CẠNH ĐÃ SORT · RẺ → ĐẮT" : "SORTED EDGES · CHEAP → EXPENSIVE") : (vi ? "BIẾN ĐỔI THÀNH ĐỒ THỊ" : "GRAPH TRANSFORMATION")}</strong><small>${edges.length} / ${n + (view.pipes || []).length} ${vi ? "lựa chọn" : "options"}</small></div><span><i class="well"></i>${vi ? "giếng / cạnh ảo" : "well / virtual edge"}<i class="pipe"></i>${vi ? "ống thật" : "physical pipe"}</span></header><div>${edgeChips}</div></section>
+    <div class="water1168-layout"><section class="water1168-network"><header><strong>${vi ? "MẠNG CẤP NƯỚC" : "WATER NETWORK"}</strong><span>${vi ? "nét đứt cyan = giếng · nét liền = ống" : "dashed cyan = well · solid = pipe"}</span></header><div class="water1168-graph-scroll">${graphSvg}</div><div class="water1168-legend"><span><i class="pending"></i>${vi ? "chưa xét" : "pending"}</span><span><i class="current"></i>${vi ? "đang xét" : "current"}</span><span><i class="accepted"></i>${vi ? "đã chọn" : "accepted"}</span><span><i class="rejected"></i>${vi ? "cycle / bỏ" : "cycle / rejected"}</span></div></section>
+      <aside class="water1168-state"><section class="water1168-score ${resultClass}"><div><small>MST EDGES</small><strong>${view.acceptedCount || 0}<em>/${n}</em></strong></div><div><small>${vi ? "TỔNG CHI PHÍ" : "TOTAL COST"}</small><strong>$${view.totalCost || 0}</strong></div></section><section class="water1168-decision ${decisionClass}"><small>${current ? edgeKindLabel(current) : (vi ? "QUY TẮC" : "RULE")}</small><strong>${escapeHtml(decisionTitle)}</strong>${rootsHtml}<p>${escapeHtml(decisionNote)}</p></section><section class="water1168-answer ${resultClass}"><small>${vi ? "CHI PHÍ NHỎ NHẤT" : "MINIMUM COST"}</small><strong>${view.answer === null || view.answer === undefined ? "—" : `$${view.answer}`}</strong><span>${view.complete ? (vi ? "✓ mọi nhà nối với nguồn 0" : "✓ every house reaches source 0") : (vi ? "đang xây MST" : "building the MST")}</span></section></aside>
+    </div>
+    <section class="water1168-components"><header><strong>DSU COMPONENTS</strong><span>${(view.groups || []).length} components</span></header><div>${components}</div></section>
+    <section class="water1168-selected"><header><strong>${vi ? "HẠ TẦNG ĐÃ CHỌN" : "SELECTED INFRASTRUCTURE"}</strong><span>${selectedWells.length} wells · ${selectedPipes.length} pipes</span></header><div>${selectedHtml}</div></section>
+  </section>`;
+}
+
 function renderKruskalEffortView(step) {
   const view = step.kruskalEffortView;
   const el = $("treeView");
@@ -13541,14 +14021,21 @@ function renderWordSearchIIView(step) {
     if (c >= row.length) return `<div class="ws212-cell empty" aria-hidden="true"></div>`;
     const pathCell = pathMap.get(`${r},${c}`);
     const classes = ["ws212-cell"];
+    const isMarked = row[c] === "#";
     let state = "";
     if (pathCell) {
       classes.push(view.action === "found" ? "found-path" : "in-path");
       state = `${vi ? "bước" : "step"} ${pathCell.order}`;
     }
+    if (isMarked) {
+      classes.push("marked");
+      state = vi ? "đã khóa bằng #" : "locked with #";
+    }
     if (sameCell(view.current, r, c)) {
       classes.push("current");
-      state = vi ? "đang đứng" : "current";
+      state = view.action === "mark"
+        ? (vi ? "board[r][c] = '#'" : "board[r][c] = '#'")
+        : (vi ? "đang đứng" : "current");
     }
     if (sameCell(view.candidate, r, c) && view.action === "prune") {
       classes.push("pruned");
@@ -13556,7 +14043,7 @@ function renderWordSearchIIView(step) {
     }
     if (sameCell(view.restored, r, c)) {
       classes.push("restored");
-      state = "backtrack";
+      state = vi ? "khôi phục ký tự" : "character restored";
     }
     return `<div class="${classes.join(" ")}"><small>(${r},${c})</small><strong>${escapeHtml(row[c])}</strong><span>${escapeHtml(state)}</span>${pathCell ? `<b>${pathCell.order}</b>` : ""}</div>`;
   })).join("") : `<div class="ws212-empty">${vi ? "Board rỗng" : "Empty board"}</div>`;
@@ -13578,12 +14065,13 @@ function renderWordSearchIIView(step) {
     build: vi ? "GỘP PREFIX CHUNG" : "MERGE SHARED PREFIXES",
     start: vi ? "BẮT ĐẦU DFS" : "START DFS",
     match: vi ? "MATCH · ĐI TIẾP" : "MATCH · CONTINUE",
+    mark: vi ? "VISITED · ĐÁNH DẤU #" : "VISITED · MARK WITH #",
     prune: vi ? "PRUNE · RETURN NGAY" : "PRUNE · RETURN NOW",
     found: vi ? "FOUND · THÊM KẾT QUẢ" : "FOUND · ADD RESULT",
     backtrack: vi ? "BACKTRACK · KHÔI PHỤC" : "BACKTRACK · RESTORE",
     done: vi ? "HOÀN TẤT" : "COMPLETE",
   };
-  const actionClass = ["prune", "found", "backtrack", "done"].includes(view.action) ? view.action : "";
+  const actionClass = ["mark", "prune", "found", "backtrack", "done"].includes(view.action) ? view.action : "";
   const moveText = view.candidate
     ? `${view.direction || "start"} (${view.candidate.r},${view.candidate.c}) = '${boardRows[view.candidate.r]?.[view.candidate.c] || ""}'`
     : (vi ? "chưa chọn ô" : "no cell selected");
@@ -13755,6 +14243,275 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderMapSumView(step) {
+  const view = step.mapSumView || {};
+  const vi = lang === "vi";
+  const operations = Array.isArray(view.operations) ? view.operations : [];
+  const path = Array.isArray(view.path) ? view.path : [];
+  const values = Array.isArray(view.values) ? view.values : [];
+  const outputs = Array.isArray(view.outputs) ? view.outputs : [];
+  const operation = view.operation || null;
+  const target = String(view.target || "");
+  const phaseIndex = ["init", "operation"].includes(view.phase) ? 0
+    : view.phase === "delta" ? 1
+      : ["walk", "update"].includes(view.phase) ? 2
+        : 3;
+  const phaseLabels = vi
+    ? ["1 · Đọc thao tác", "2 · Tính delta", "3 · Đi Trie & cập nhật", "4 · Trả prefix sum"]
+    : ["1 · Read operation", "2 · Compute delta", "3 · Walk Trie & update", "4 · Return prefix sum"];
+  const phases = phaseLabels.map((label, index) => {
+    const skippedDelta = operation && operation.type === "sum" && index === 1;
+    const done = view.phase === "done" || index < phaseIndex || skippedDelta;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : "pending"}">${skippedDelta ? "↷" : done ? "✓" : index === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const operationHtml = operations.map((item, index) => {
+    const done = view.phase === "done" || index < view.opIndex;
+    const active = index === view.opIndex;
+    const kind = item.type === "insert" ? "insert" : "sum";
+    return `<span class="${kind}${active ? " active" : ""}${done ? " done" : ""}"><small>${index + 1}</small><strong>${escapeHtml(item.label)}</strong><em>${done ? "✓" : active ? "RUN" : "WAIT"}</em></span>`;
+  }).join("");
+
+  const targetHtml = [...target].map((char, index) => {
+    const classes = ["ms677-char"];
+    if (index === view.charIndex) classes.push("active");
+    if (index < view.charIndex || (view.event === "return-sum" && view.nodeFound)) classes.push("done");
+    if (index === view.charIndex && view.edgeFound === false) classes.push("missing");
+    return `<span class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong><em>${index === view.charIndex ? "char" : ""}</em></span>`;
+  }).join("") || `<span class="ms677-empty">${vi ? "Chưa có key/prefix" : "No key/prefix yet"}</span>`;
+
+  const pathHtml = path.map((node, index) => {
+    const current = node.prefix === view.currentPrefix;
+    const changed = view.change && node.prefix === view.change.prefix;
+    const score = changed ? `${view.change.before} → ${view.change.after}` : `Σ=${node.score}`;
+    const label = node.prefix === "" ? "ROOT" : `“${escapeHtml(node.prefix)}”`;
+    return `${index ? "<i>→</i>" : ""}<span class="${current ? "current" : ""}${changed ? " changed" : ""}"><small>${escapeHtml(node.char)}</small><strong>${label}</strong><em>${escapeHtml(score)}</em></span>`;
+  }).join("");
+
+  const valuesHtml = values.length
+    ? values.map((entry) => `<div><code>"${escapeHtml(entry.key)}"</code><strong>${entry.value}</strong></div>`).join("")
+    : `<div class="ms677-empty">${vi ? "values đang rỗng" : "values is empty"}</div>`;
+  const outputsHtml = outputs.length
+    ? outputs.map((output) => `<div><code>sum("${escapeHtml(output.prefix)}")</code><strong>${output.value}</strong></div>`).join("")
+    : `<div class="ms677-empty">${vi ? "Chưa gọi sum(prefix)" : "No sum(prefix) call yet"}</div>`;
+
+  const hasDelta = Number.isFinite(view.delta);
+  const deltaClass = !hasDelta ? "idle" : view.delta > 0 ? "positive" : view.delta < 0 ? "negative" : "zero";
+  const deltaFormula = hasDelta
+    ? `${view.newValue} − ${view.oldValue} = ${view.delta >= 0 ? "+" : ""}${view.delta}`
+    : "new − old";
+  const change = view.change;
+  const nodeScore = change
+    ? `${change.before} + (${view.delta}) = ${change.after}`
+    : path.length ? `Σ = ${path[path.length - 1].score}` : "Σ = 0";
+
+  let actionState = "inspect";
+  let actionLabel = vi ? "KHỞI TẠO" : "INITIALIZE";
+  let actionCode = "root = TrieNode()";
+  let actionDetail = vi ? "Mỗi node cache tổng Σ" : "Each node caches a sum Σ";
+  if (view.event === "operation-start") {
+    actionState = operation ? operation.type : "inspect";
+    actionLabel = operation && operation.type === "insert" ? "INSERT" : "SUM";
+    actionCode = operation ? operation.label : "—";
+    actionDetail = operation && operation.type === "insert"
+      ? (vi ? "overwrite cần delta" : "an overwrite requires delta")
+      : (vi ? "lookup prefix rồi đọc score" : "look up prefix, then read score");
+  } else if (view.event === "delta") {
+    actionState = "delta";
+    actionLabel = "DELTA";
+    actionCode = `delta = ${deltaFormula}`;
+    actionDetail = vi ? "truyền phần chênh lệch, không cộng lại toàn bộ value" : "propagate only the difference, not the full value";
+  } else if (["follow-edge", "create-edge", "query-edge"].includes(view.event)) {
+    actionState = view.event === "create-edge" ? "create" : "walk";
+    actionLabel = view.event === "create-edge" ? "CREATE EDGE" : "FOLLOW EDGE";
+    actionCode = `children['${escapeHtml(view.edgeChar || "")}'] → “${escapeHtml(view.currentPrefix || "ROOT")}”`;
+    actionDetail = view.event === "create-edge" ? (vi ? "tạo node mới với Σ=0" : "create a node with Σ=0") : (vi ? "node đã tồn tại" : "existing node");
+  } else if (view.event === "update-score") {
+    actionState = "update";
+    actionLabel = "UPDATE Σ";
+    actionCode = `score += delta → ${nodeScore}`;
+    actionDetail = vi ? `prefix “${view.currentPrefix}” nhận cùng delta` : `prefix “${view.currentPrefix}” receives the same delta`;
+  } else if (view.event === "missing-edge") {
+    actionState = "missing";
+    actionLabel = "MISSING EDGE";
+    actionCode = `children['${escapeHtml(view.edgeChar || "")}'] = None`;
+    actionDetail = vi ? "không có key khớp → return 0" : "no matching key → return 0";
+  } else if (view.event === "return-sum") {
+    actionState = view.nodeFound ? "return" : "missing";
+    actionLabel = "RETURN";
+    actionCode = view.nodeFound ? `node.score = ${view.result}` : "0";
+    actionDetail = vi ? "đọc cache tại node cuối prefix" : "read the cache at the final prefix node";
+  } else if (view.event === "done") {
+    actionState = "return";
+    actionLabel = "DONE";
+    actionCode = `[${outputs.map((output) => output.value).join(", ")}]`;
+    actionDetail = vi ? "tất cả kết quả sum(prefix)" : "all sum(prefix) results";
+  }
+
+  const resultText = view.result === undefined ? "—" : String(view.result);
+  const summary = vi
+    ? `MapSum: ${operation ? operation.label : "khởi tạo"}; prefix hiện tại ${view.currentPrefix || "root"}; kết quả ${resultText}.`
+    : `MapSum: ${operation ? operation.label : "initialize"}; current prefix ${view.currentPrefix || "root"}; result ${resultText}.`;
+
+  $("treeView").innerHTML = `<section class="ms677-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="ms677-phases">${phases}</div>
+    <section class="ms677-operations"><header><strong>OPERATION TIMELINE</strong><span>${vi ? "xanh = xong · cam = đang chạy" : "green = done · amber = running"}</span></header><div>${operationHtml}</div></section>
+    <section class="ms677-rule"><strong>NODE CACHE</strong><span>score(prefix) = Σ values[key] where key.startswith(prefix)</span></section>
+    <section class="ms677-action ${actionState}"><small>${escapeHtml(actionLabel)}</small><strong>${actionCode}</strong><span>${escapeHtml(actionDetail)}</span></section>
+    <div class="ms677-layout">
+      <section class="ms677-tree-card"><header><strong>MAPSUM TRIE · Σ ON EVERY NODE</strong><span>${vi ? "vòng xanh = key hoàn chỉnh · cam = path hiện tại" : "green ring = complete key · amber = current path"}</span></header><div id="ms677Tree" class="ms677-tree"></div></section>
+      <aside class="ms677-side">
+        <section class="ms677-target"><header><strong>${operation && operation.type === "insert" ? "KEY" : "PREFIX"}</strong><span>i = ${view.charIndex ?? "—"}</span></header><div>${targetHtml}</div></section>
+        <section class="ms677-delta ${deltaClass}"><small>OVERWRITE FORMULA</small><strong>${escapeHtml(deltaFormula)}</strong><span>${hasDelta ? `old=${view.oldValue} · new=${view.newValue}` : (vi ? "chỉ dùng cho insert" : "insert only")}</span></section>
+        <section class="ms677-node"><small>CURRENT NODE</small><strong>${view.currentPrefix ? `“${escapeHtml(view.currentPrefix)}”` : "ROOT"}</strong><code>${escapeHtml(nodeScore)}</code></section>
+        <section class="ms677-result ${view.result === undefined ? "idle" : view.nodeFound === false ? "missing" : "ready"}"><small>sum(prefix)</small><strong>${escapeHtml(resultText)}</strong><span>${view.result === undefined ? (vi ? "chờ query" : "waiting") : (vi ? "đọc trực tiếp node.score" : "read node.score directly")}</span></section>
+      </aside>
+    </div>
+    <section class="ms677-path"><header><strong>${vi ? "ĐƯỜNG PREFIX HIỆN TẠI" : "CURRENT PREFIX PATH"}</strong><span>ROOT → ${escapeHtml(view.currentPrefix || "...")}</span></header><div>${pathHtml}</div></section>
+    <div class="ms677-data">
+      <section><header><strong>VALUES HASH MAP</strong><span>${vi ? "key → giá trị mới nhất" : "key → latest value"}</span></header><div>${valuesHtml}</div></section>
+      <section><header><strong>SUM OUTPUTS</strong><span>${vi ? "theo thứ tự query" : "in query order"}</span></header><div>${outputsHtml}</div></section>
+    </div>
+  </section>`;
+  renderTree(step, "ms677Tree");
+  const mapSumSvg = $("ms677Tree").querySelector("svg.tree-svg");
+  if (mapSumSvg) {
+    const naturalWidth = Number(mapSumSvg.getAttribute("width"));
+    const naturalHeight = Number(mapSumSvg.getAttribute("height"));
+    mapSumSvg.classList.remove("tree-svg-fit");
+    if (Number.isFinite(naturalWidth) && naturalWidth > 0) {
+      mapSumSvg.style.setProperty("width", `${naturalWidth}px`, "important");
+      mapSumSvg.style.setProperty("min-width", `${naturalWidth}px`, "important");
+      mapSumSvg.style.setProperty("max-width", "none", "important");
+    }
+    if (Number.isFinite(naturalHeight) && naturalHeight > 0) {
+      mapSumSvg.style.setProperty("height", `${naturalHeight}px`, "important");
+    }
+  }
+}
+
+function renderBricks803View(step) {
+  const view = step.bricks803View || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const rows = Number(view.rows) || 0;
+  const cols = Number(view.cols) || 0;
+  const grid = Array.isArray(view.workingGrid) ? view.workingGrid : [];
+  const original = Array.isArray(view.originalGrid) ? view.originalGrid : grid;
+  const phaseOrder = ["prepare", "build", "reverse", "done"];
+  const phaseIndex = Math.max(0, phaseOrder.indexOf(view.phase));
+  const phaseLabels = vi
+    ? ["1 · Xóa trước các hit", "2 · Xây DSU + roof", "3 · Khôi phục ngược", "4 · Kết quả"]
+    : ["1 · Pre-remove hits", "2 · Build DSU + roof", "3 · Restore backward", "4 · Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const keyOf = (cell) => Array.isArray(cell) ? `${cell[0]},${cell[1]}` : String(cell);
+  const coordText = (cell) => cell === "roof"
+    ? (vi ? "mái ảo" : "virtual roof")
+    : Array.isArray(cell) ? `(${cell[0]},${cell[1]})` : "—";
+  const stable = new Set((view.stableCells || []).map(keyOf));
+  const newlyStable = new Set((view.newlyStable || []).map(keyOf));
+  const activeKey = keyOf(view.activeCell);
+  const neighborKey = keyOf(view.activeNeighbor);
+  const restoredEvent = ["restore", "restore-union", "count"].includes(view.event);
+  const removed = new Set();
+  (view.hits || []).forEach((hit, index) => {
+    if (view.effective && view.effective[index] && grid[hit[0]] && grid[hit[0]][hit[1]] === 0) removed.add(keyOf(hit));
+  });
+
+  const columnLabels = Array.from({ length: cols }, (_, col) => `<span>${col}</span>`).join("");
+  const cells = [];
+  for (let row = 0; row < rows; row++) {
+    cells.push(`<span class="bricks803-row-label">${row}</span>`);
+    for (let col = 0; col < cols; col++) {
+      const key = `${row},${col}`;
+      const value = grid[row] ? grid[row][col] : 0;
+      const classes = ["bricks803-cell"];
+      let status = vi ? "ô rỗng" : "empty";
+      if (value === 1) {
+        classes.push(view.phase === "prepare" ? "brick" : stable.has(key) ? "stable" : "loose");
+        status = view.phase === "prepare"
+          ? (vi ? "brick chưa xây DSU" : "brick before DSU")
+          : stable.has(key) ? (vi ? "ổn định, nối roof" : "stable, roof-connected") : (vi ? "chưa nối roof" : "not roof-connected");
+      } else if (removed.has(key) || (original[row] && original[row][col] === 1)) {
+        classes.push("removed");
+        status = vi ? "brick đã bị xóa" : "removed brick";
+      } else {
+        classes.push("empty");
+      }
+      if (newlyStable.has(key)) classes.push("newly-stable");
+      if (key === neighborKey) classes.push("neighbor");
+      if (key === activeKey) classes.push(restoredEvent && value === 1 ? "restored" : "active");
+      const symbol = value === 1 ? "1" : classes.includes("removed") ? "×" : "·";
+      cells.push(`<div class="${classes.join(" ")}" aria-label="${escapeHtml(`(${row},${col}): ${status}`)}"><small>${row},${col}</small><strong>${symbol}</strong><em>${stable.has(key) ? "roof ✓" : value === 1 ? "brick" : classes.includes("removed") ? "hit" : "empty"}</em></div>`);
+    }
+  }
+
+  const hits = Array.isArray(view.hits) ? view.hits : [];
+  const statusLabels = vi
+    ? { pending: "chờ", removed: "đã xóa", skipped: "ô rỗng", processing: "đang xử lý", restored: "đã khôi phục", done: "xong" }
+    : { pending: "waiting", removed: "removed", skipped: "empty", processing: "processing", restored: "restored", done: "done" };
+  const hitTimeline = hits.length ? hits.map((hit, index) => {
+    const status = (view.hitStatus && view.hitStatus[index]) || "pending";
+    const answer = view.answers && view.answers[index] !== null && view.answers[index] !== undefined ? view.answers[index] : "—";
+    const classes = [status, index === view.activeHit ? "active" : ""];
+    return `<span class="${classes.join(" ")}"><small>#${index}</small><b>${escapeHtml(coordText(hit))}</b><em>${escapeHtml(statusLabels[status] || status)}</em><strong>${vi ? "rơi" : "fall"}: ${escapeHtml(answer)}</strong></span>`;
+  }).join("") : `<span class="empty">${vi ? "Không có hit" : "No hits"}</span>`;
+
+  const union = view.unionEdge;
+  const operation = union
+    ? `<div class="bricks803-union ${union.merged ? "merged" : "same"}"><small>UNION</small><strong>${escapeHtml(coordText(union.from))} ↔ ${escapeHtml(coordText(union.to))}</strong><span>${union.merged ? (vi ? "✓ gộp hai component" : "✓ components merged") : (vi ? "↷ đã cùng root" : "↷ already same root")}</span></div>`
+    : `<div class="bricks803-union idle"><small>${vi ? "THAO TÁC HIỆN TẠI" : "CURRENT OPERATION"}</small><strong>${escapeHtml(view.event || "initialize")}</strong><span>${vi ? "Theo dõi grid và roof size ở từng dòng code" : "Track the grid and roof size at each code line"}</span></div>`;
+
+  const components = (view.components || []).map((component) => {
+    const cellText = (component.cells || []).map(coordText).join(" ");
+    return `<span class="${component.roofConnected ? "roof" : "loose"}"><b>R${escapeHtml(component.root)}</b><small>${escapeHtml(cellText || "—")}</small><em>${component.roofConnected ? (vi ? "nối roof" : "roof-connected") : (vi ? "rời roof" : "detached")}</em></span>`;
+  }).join("") || `<span class="bricks803-empty-state">${vi ? "Chưa có component brick" : "No brick components yet"}</span>`;
+
+  const activeNodes = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (grid[row] && grid[row][col] === 1) activeNodes.push(row * cols + col);
+    }
+  }
+  activeNodes.push(view.roofNode);
+  const dsuNodes = activeNodes.map((node) => {
+    const parent = view.parent && view.parent[node] !== undefined ? view.parent[node] : "—";
+    const rootSize = view.size && parent === node ? view.size[node] : "—";
+    return `<span class="${node === view.roofNode ? "roof" : ""}"><small>${node === view.roofNode ? "ROOF" : `node ${node}`}</small><b>p=${escapeHtml(parent)}</b><em>size=${escapeHtml(rootSize)}</em></span>`;
+  }).join("");
+
+  const roofSize = Number(view.roofSize) || 1;
+  const before = view.roofBefore;
+  const after = view.roofAfter;
+  const formulaReady = Number.isFinite(before) && Number.isFinite(after);
+  const formula = formulaReady
+    ? `max(0, ${after} − ${before} − 1) = ${view.fallen}`
+    : "max(0, after − before − 1)";
+  const result = (view.answers || []).map((answer) => answer === null || answer === undefined ? "—" : answer).join(", ");
+  const eventLabel = vi
+    ? { copy: "Sao chép grid", remove: "Xóa hit", "skip-remove": "Hit ô rỗng", "init-dsu": "Tạo virtual roof", "build-union": "Xây component", before: "Đo roof trước", restore: "Khôi phục brick", "restore-union": "Union hàng xóm", "skip-restore": "Bỏ qua hit rỗng", count: "Tính số brick rơi", done: "Hoàn tất" }[view.event]
+    : { copy: "Copy grid", remove: "Remove hit", "skip-remove": "Empty-cell hit", "init-dsu": "Create virtual roof", "build-union": "Build component", before: "Measure roof before", restore: "Restore brick", "restore-union": "Union neighbor", "skip-restore": "Skip empty hit", count: "Count fallen bricks", done: "Complete" }[view.event];
+  const summary = vi
+    ? `Bài 803, pha ${view.phase}, thao tác ${eventLabel || view.event}, roof size ${roofSize}.`
+    : `Problem 803, ${view.phase} phase, ${eventLabel || view.event}, roof size ${roofSize}.`;
+
+  el.innerHTML = `<section class="bricks803-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="bricks803-phases">${phases}</div>
+    <section class="bricks803-hits"><header><strong>HIT TIMELINE</strong><span>${vi ? "xử lý xuôi → · khôi phục ←" : "remove forward → · restore backward ←"}</span></header><div>${hitTimeline}</div></section>
+    <section class="bricks803-action"><div><small>${vi ? "SỰ KIỆN" : "EVENT"}</small><strong>${escapeHtml(eventLabel || view.event || "—")}</strong></div><div><small>${vi ? "HIT HIỆN TẠI" : "CURRENT HIT"}</small><strong>${view.activeHit === null || view.activeHit === undefined ? "—" : `#${view.activeHit} ${escapeHtml(coordText(hits[view.activeHit]))}`}</strong></div>${operation}</section>
+    <div class="bricks803-main">
+      <section class="bricks803-grid-card"><header><strong>GRID ${rows} × ${cols}</strong><span>${vi ? "hàng 0 chạm virtual roof" : "row 0 touches the virtual roof"}</span></header><div class="bricks803-roof"><i></i><strong>VIRTUAL ROOF · node ${escapeHtml(view.roofNode)}</strong><span>size=${roofSize} · ${Math.max(0, roofSize - 1)} ${vi ? "brick ổn định" : "stable bricks"}</span></div><div class="bricks803-grid-scroll"><div class="bricks803-col-labels" style="--bricks803-cols:${cols}"><i></i>${columnLabels}</div><div class="bricks803-grid" style="--bricks803-cols:${cols}">${cells.join("")}</div></div><div class="bricks803-legend"><span><i class="stable"></i>${vi ? "nối roof" : "stable"}</span><span><i class="loose"></i>${vi ? "rời roof" : "loose"}</span><span><i class="removed"></i>${vi ? "đã xóa" : "removed"}</span><span><i class="active"></i>${vi ? "hit hiện tại" : "active hit"}</span><span><i class="restored"></i>${vi ? "vừa khôi phục" : "restored"}</span><span><i class="newly"></i>${vi ? "vừa nối roof" : "newly roof-connected"}</span></div></section>
+      <aside class="bricks803-side"><section class="bricks803-roof-metrics"><div><small>BEFORE</small><strong>${Number.isFinite(before) ? before : "—"}</strong></div><b>→</b><div><small>AFTER</small><strong>${Number.isFinite(after) ? after : "—"}</strong></div></section><section class="bricks803-formula ${formulaReady ? "ready" : "idle"}"><small>${vi ? "BRICK RƠI" : "FALLEN BRICKS"}</small><strong>${escapeHtml(formula)}</strong><span>${vi ? "−1 loại brick vừa khôi phục" : "−1 excludes the restored brick"}</span></section><section class="bricks803-answer"><small>ANSWER</small><strong>[${escapeHtml(result)}]</strong><span>${vi ? "null được hiển thị bằng —" : "pending values are shown as —"}</span></section></aside>
+    </div>
+    <section class="bricks803-components"><header><strong>DSU COMPONENTS</strong><span>${(view.components || []).length} ${vi ? "component brick" : "brick components"}</span></header><div>${components}</div></section>
+    <details class="bricks803-dsu"><summary>${vi ? "Parent / size (chỉ size tại root có ý nghĩa)" : "Parent / size (size is meaningful only at roots)"}</summary><div>${dsuNodes}</div></details>
+  </section>`;
+}
+
 function renderStep() {
   const step = steps[stepIndex];
   if (!step) return;
@@ -13777,6 +14534,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.mapSumView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMapSumView(step);
   } else if (step.longestDupView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -13843,6 +14606,18 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderKruskalEffortView(step);
+  } else if (step.waterDistributionView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderWaterDistributionView(step);
+  } else if (step.bricks803View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBricks803View(step);
   } else if (step.parallelCoursesView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -15229,6 +16004,15 @@ async function ensureMonacoEditor() {
     fontLigatures: false,
     fontSize: 14,
     lineHeight: 21,
+    wordWrap: "on",
+    wrappingIndent: "same",
+    wrappingStrategy: "advanced",
+    scrollbar: {
+      horizontal: "hidden",
+      horizontalScrollbarSize: 0,
+      vertical: "auto",
+      verticalScrollbarSize: 10,
+    },
     minimap: { enabled: false },
     automaticLayout: true,
     fixedOverflowWidgets: true,
