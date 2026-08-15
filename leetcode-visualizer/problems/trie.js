@@ -3083,7 +3083,198 @@ function buildSteps642(input, params = {}) {
   return { original: typed, answer: `prefix="${prefix}"`, steps };
 }
 
+function buildSteps677(input) {
+  const operations = String(input ?? "").split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
+    const match = /^(insert|sum)\((.*)\)$/.exec(part);
+    if (!match) throw new Error(`Invalid operation: ${part}`);
+    if (match[1] === "sum") return { type: "sum", prefix: match[2].trim() };
+    const comma = match[2].lastIndexOf(",");
+    const key = match[2].slice(0, comma).trim();
+    const value = Number(match[2].slice(comma + 1).trim());
+    if (!key || comma < 0 || !Number.isFinite(value)) throw new Error(`Invalid insert: ${part}`);
+    return { type: "insert", key, value };
+  });
+  if (!operations.length) throw new Error("Enter at least one insert(...) or sum(...) operation");
+
+  let nextId = 0;
+  const makeNode = (label, parentId) => ({ id: nextId++, label, parentId, children: {}, prefixSum: 0, keyValue: null });
+  const root = makeNode("•", null);
+  const steps = [];
+  const outputs = [];
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function layout(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      const childXs = keys.map((key) => layout(node.children[key], depth + 1));
+      const x = childXs.length ? (childXs[0] + childXs[childXs.length - 1]) / 2 : nextX++;
+      const label = node.label === "•"
+        ? `• (Σ=${node.prefixSum})`
+        : `${node.label} (Σ=${node.prefixSum}${node.keyValue === null ? "" : `, val=${node.keyValue}`})`;
+      nodes.push({ id: node.id, label, x, y: depth, parentId: node.parentId, isWord: node.keyValue !== null, hl: (opts.highlight || []).includes(node.id) });
+      return x;
+    }
+    layout(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: [opts.line], vars: opts.vars || [], note: opts.note, final: Boolean(opts.final) });
+  }
+
+  snapshot({
+    title: { vi: "Khởi tạo MapSum Trie", en: "Initialize the MapSum Trie" }, line: 6, highlight: [root.id],
+    vars: [{ name: "invariant", value: "node.Σ = tổng value của mọi key đi qua node" }],
+    note: { vi: "Mỗi node lưu Σ (tổng của mọi key có prefix đi qua node). Node cuối của key còn lưu val riêng của key đó.", en: "Every node stores Σ: the total of all keys passing through that prefix. A key's terminal node also stores its own val." },
+  });
+
+  for (const operation of operations) {
+    if (operation.type === "insert") {
+      const { key, value } = operation;
+      let node = root;
+      const path = [root];
+      snapshot({ title: { vi: `insert("${key}", ${value}) bắt đầu`, en: `insert("${key}", ${value}) start` }, line: 8, highlight: [root.id], vars: [{ name: "operation", value: `insert(${key}, ${value})` }, { name: "path", value: "[root]" }], note: { vi: "Đi từ root theo từng ký tự của key, đồng thời lưu path để cập nhật Σ sau đó.", en: "Walk from root through each key character and retain the path so Σ can be updated afterward." } });
+      for (const ch of key) {
+        const created = !node.children[ch];
+        if (created) node.children[ch] = makeNode(ch, node.id);
+        node = node.children[ch];
+        path.push(node);
+        snapshot({ title: { vi: `${created ? "Tạo" : "Dùng lại"} cạnh '${ch}'`, en: `${created ? "Create" : "Reuse"} edge '${ch}'` }, line: created ? 12 : 14, highlight: path.map((item) => item.id), vars: [{ name: "operation", value: `insert(${key}, ${value})` }, { name: "prefix", value: key.slice(0, path.length - 1) }, { name: "node created", value: created ? "True" : "False" }], note: { vi: created ? `Prefix chưa có nên tạo node '${ch}'.` : `Prefix đã tồn tại nên dùng lại node '${ch}'.`, en: created ? `The prefix is new, so create node '${ch}'.` : `The prefix already exists, so reuse node '${ch}'.` } });
+      }
+      const previous = node.keyValue ?? 0;
+      const delta = value - previous;
+      snapshot({ title: { vi: `Tính delta = ${value} − ${previous} = ${delta}`, en: `Compute delta = ${value} − ${previous} = ${delta}` }, line: 16, highlight: path.map((item) => item.id), vars: [{ name: "old key value", value: previous }, { name: "new key value", value }, { name: "delta", value: delta }], note: { vi: "Quan trọng: insert cùng key là overwrite. Chỉ delta (new − old) mới được cộng vào Σ, không cộng cả value lần nữa.", en: "Important: inserting the same key overwrites it. Add only delta (new − old) to Σ, never the full new value again." } });
+      node.keyValue = value;
+      for (const pathNode of path) pathNode.prefixSum += delta;
+      snapshot({ title: { vi: `Cộng delta ${delta} lên mọi node của path`, en: `Add delta ${delta} to every path node` }, line: 19, highlight: path.map((item) => item.id), vars: [{ name: "terminal value", value: `${key} = ${value}` }, { name: "updated sums", value: path.map((item) => `${item.label}:Σ=${item.prefixSum}`).join(" | ") }], note: { vi: `Mọi prefix của "${key}" nhận cùng delta. Bây giờ node cuối có val=${value}; Σ ở prefix sẽ phản ánh overwrite đúng cách.`, en: `Every prefix of "${key}" receives the same delta. The terminal now has val=${value}; prefix Σ values reflect the overwrite correctly.` } });
+    } else {
+      const { prefix } = operation;
+      let node = root;
+      const path = [root];
+      snapshot({ title: { vi: `sum("${prefix}") bắt đầu`, en: `sum("${prefix}") start` }, line: 21, highlight: [root.id], vars: [{ name: "operation", value: `sum(${prefix})` }, { name: "meaning", value: `tổng của mọi key bắt đầu bằng "${prefix}"` }], note: { vi: "Chỉ cần đi đến node của prefix: Σ tại node đó đã là tổng cần tìm.", en: "Only walk to the prefix node: its stored Σ is already the required sum." } });
+      let missing = false;
+      for (const ch of prefix) {
+        if (!node.children[ch]) {
+          missing = true;
+          snapshot({ title: { vi: `Thiếu cạnh '${ch}' → sum = 0`, en: `Missing edge '${ch}' → sum = 0` }, line: 24, highlight: path.map((item) => item.id), vars: [{ name: "prefix read", value: prefix.slice(0, path.length - 1) }, { name: "result", value: 0 }], note: { vi: `Không có prefix "${prefix}" trong Trie nên không có key nào đóng góp → 0.`, en: `Prefix "${prefix}" is absent from the Trie, so no key contributes → 0.` } });
+          break;
+        }
+        node = node.children[ch];
+        path.push(node);
+        snapshot({ title: { vi: `Đi theo '${ch}'`, en: `Follow '${ch}'` }, line: 25, highlight: path.map((item) => item.id), vars: [{ name: "prefix read", value: prefix.slice(0, path.length - 1) }, { name: "current Σ", value: node.prefixSum }], note: { vi: `Đến node cho prefix "${prefix.slice(0, path.length - 1)}"; Σ hiện tại là tổng của mọi key dưới node này.`, en: `Reached the node for prefix "${prefix.slice(0, path.length - 1)}"; its Σ is the total of all keys below it.` } });
+      }
+      const result = missing ? 0 : node.prefixSum;
+      outputs.push(result);
+      if (!missing) snapshot({ title: { vi: `return Σ = ${result}`, en: `return Σ = ${result}` }, line: 26, highlight: path.map((item) => item.id), vars: [{ name: "sum result", value: result }, { name: "outputs", value: `[${outputs.join(", ")}]` }], note: { vi: `Σ tại node prefix "${prefix}" là ${result}, nên sum("${prefix}") = ${result}.`, en: `Σ at prefix node "${prefix}" is ${result}, so sum("${prefix}") = ${result}.` } });
+    }
+  }
+  steps[steps.length - 1].final = true;
+  return { original: String(input ?? ""), answer: outputs, steps };
+}
+
+function buildSteps720(input) {
+  const words = [...new Set(String(input ?? "").split(",").map((word) => word.trim()).filter(Boolean))].sort();
+  if (!words.length) throw new Error("Enter at least one comma-separated word");
+  let nextId = 0;
+  const makeNode = (label, parentId) => ({ id: nextId++, label, parentId, isWord: false, children: {} });
+  const root = makeNode("•", null);
+  const steps = [];
+  let best = "";
+
+  function snapshot(opts) {
+    const nodes = [];
+    let nextX = 0;
+    function layout(node, depth) {
+      const keys = Object.keys(node.children).sort();
+      const childXs = keys.map((key) => layout(node.children[key], depth + 1));
+      const x = childXs.length ? (childXs[0] + childXs[childXs.length - 1]) / 2 : nextX++;
+      nodes.push({ id: node.id, label: node.label, x, y: depth, parentId: node.parentId, isWord: node.isWord, hl: (opts.highlight || []).includes(node.id), isPruned: (opts.pruned || []).includes(node.id) });
+      return x;
+    }
+    layout(root, 0);
+    steps.push({ title: opts.title, arr: [], tree: { nodes }, highlight: [], mark: [], codeLines: [opts.line], vars: [{ name: "best", value: best || "''" }, ...(opts.vars || [])], note: opts.note, final: Boolean(opts.final) });
+  }
+
+  snapshot({ title: { vi: "Khởi tạo Trie", en: "Initialize Trie" }, line: 2, highlight: [root.id], vars: [{ name: "words", value: `[${words.join(", ")}]` }], note: { vi: "Chèn mọi word vào Trie. Vòng xanh ở node nghĩa là prefix đó tự nó là một word hợp lệ.", en: "Insert every word into the Trie. A green terminal ring means that prefix is itself a valid word." } });
+  for (const word of words) {
+    let node = root;
+    const path = [root.id];
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = makeNode(ch, node.id);
+      node = node.children[ch];
+      path.push(node.id);
+    }
+    node.isWord = true;
+    snapshot({ title: { vi: `Chèn và đánh dấu word "${word}"`, en: `Insert and mark word "${word}"` }, line: 7, highlight: path, vars: [{ name: "insert", value: word }, { name: "terminal", value: "isWord = True" }], note: { vi: `Đánh dấu node cuối của "${word}". Chỉ các node terminal mới cho phép DFS đi tiếp xuống con của chúng.`, en: `Mark the terminal node of "${word}". Only terminal nodes permit DFS to continue to their children.` } });
+  }
+
+  snapshot({ title: { vi: "Bắt đầu DFS từ root", en: "Start DFS at root" }, line: 17, highlight: [root.id], vars: [{ name: "rule", value: "chỉ đi từ node isWord=True sang child" }], note: { vi: "Root được xem là prefix rỗng hợp lệ. Từ đây, chỉ được đi vào child nếu child.isWord=True để bảo đảm mọi prefix của candidate đều tồn tại.", en: "Root is the valid empty prefix. From here, enter a child only when child.isWord=True, ensuring every candidate prefix exists." } });
+  function dfs(node, word, path) {
+    for (const ch of Object.keys(node.children).sort()) {
+      const child = node.children[ch];
+      const candidate = word + ch;
+      const candidatePath = [...path, child.id];
+      if (!child.isWord) {
+        snapshot({ title: { vi: `Không đi vào "${candidate}" — chưa là word`, en: `Do not enter "${candidate}" — not a word yet` }, line: 15, highlight: path, pruned: [child.id], vars: [{ name: "candidate", value: candidate }, { name: "decision", value: "prune: missing prefix word" }], note: { vi: `"${candidate}" chưa được đánh dấu isWord. Nếu đi tiếp, candidate sẽ thiếu một prefix, nên prune cả nhánh này.`, en: `"${candidate}" is not marked isWord. Continuing would create a candidate with a missing prefix, so prune this branch.` } });
+        continue;
+      }
+      const shouldUpdate = candidate.length > best.length || (candidate.length === best.length && candidate < best);
+      snapshot({ title: { vi: `Candidate hợp lệ: "${candidate}"`, en: `Valid candidate: "${candidate}"` }, line: 15, highlight: candidatePath, vars: [{ name: "candidate", value: candidate }, { name: "all prefixes valid", value: "True" }, { name: "comparison", value: `${candidate.length} vs ${best.length}` }], note: { vi: `Node "${candidate}" là word và mọi ancestor đã đi qua cũng là word → candidate hợp lệ. So sánh độ dài, rồi từ điển nếu hòa.`, en: `Node "${candidate}" is a word and every visited ancestor is a word → candidate is valid. Compare length, then lexicographic order on a tie.` } });
+      if (shouldUpdate) {
+        const previous = best || "''";
+        best = candidate;
+        snapshot({ title: { vi: `Cập nhật best: "${previous}" → "${best}"`, en: `Update best: "${previous}" → "${best}"` }, line: 11, highlight: candidatePath, vars: [{ name: "candidate", value: candidate }, { name: "best updated", value: best }], note: { vi: `"${candidate}" dài hơn best cũ, hoặc cùng độ dài nhưng đứng trước theo từ điển.`, en: `"${candidate}" is longer than the old best, or equally long but lexicographically earlier.` } });
+      } else {
+        snapshot({ title: { vi: `Giữ best "${best}"`, en: `Keep best "${best}"` }, line: 10, highlight: candidatePath, vars: [{ name: "candidate", value: candidate }, { name: "best kept", value: best }], note: { vi: `"${candidate}" không thắng theo độ dài / tie-break từ điển, nên best không đổi.`, en: `"${candidate}" does not win the length / lexicographic tie-break, so best stays unchanged.` } });
+      }
+      dfs(child, candidate, candidatePath);
+    }
+  }
+  dfs(root, "", [root.id]);
+  snapshot({ title: { vi: `return "${best}"`, en: `return "${best}"` }, line: 18, highlight: [], vars: [{ name: "longest buildable word", value: best || "''" }], note: { vi: `Kết quả là "${best}": mọi prefix của nó đều là word trong Trie.`, en: `The result is "${best}": every prefix of it is a word in the Trie.` }, final: true });
+  return { words, answer: best, steps };
+}
+
 module.exports = {
+  677: {
+    id: 677,
+    difficulty: "medium",
+    slug: "map-sum-pairs",
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Map Sum Pairs", en: "Map Sum Pairs" },
+    titleVi: { vi: "Tổng các cặp theo tiền tố", en: "Map sums by prefix" },
+    statement: { vi: "Lưu các cặp key–value. sum(prefix) trả về tổng value của mọi key bắt đầu bằng prefix. insert cùng key sẽ ghi đè value cũ.", en: "Store key–value pairs. sum(prefix) returns values of all keys starting with prefix. Reinserting a key overwrites its old value." },
+    defaultInput: "insert(apple,3);insert(app,2);sum(ap);insert(apple,2);sum(ap);sum(az)",
+    inputKind: "string",
+    inputLabel: { vi: "Thao tác: insert(key,value); sum(prefix)", en: "Operations: insert(key,value); sum(prefix)" },
+    extraParams: [],
+    approach: [
+      { vi: "Mỗi node Trie lưu prefixSum (Σ): tổng value của tất cả key đi qua node đó.", en: "Every Trie node stores prefixSum (Σ): the total values of all keys passing through it." },
+      { vi: "Khi overwrite key, tính delta = newValue − oldValue và cộng delta cho toàn bộ path; không cộng lại cả newValue.", en: "When overwriting a key, compute delta = newValue − oldValue and add delta along the whole path; never add the full newValue again." },
+      { vi: "sum(prefix) chỉ cần đi tới node của prefix rồi trả node.prefixSum.", en: "sum(prefix) only walks to the prefix node and returns node.prefixSum." },
+    ],
+    complexity: { time: "O(L)", space: "O(N·L)", note: { vi: "insert và sum đều duyệt tối đa L ký tự. Trie lưu các prefix khác nhau của N key.", en: "Both insert and sum traverse at most L characters. The Trie stores distinct prefixes of N keys." } },
+    code: ["class TrieNode:", "    def __init__(self):", "        self.children = {}; self.prefix_sum = 0; self.value = 0", "", "class MapSum:", "    def __init__(self):", "        self.root = TrieNode()", "", "    def insert(self, key, val):", "        node = self.root", "        path = [node]", "        for ch in key:", "            if ch not in node.children:", "                node.children[ch] = TrieNode()", "            node = node.children[ch]; path.append(node)", "        previous = node.value", "        delta = val - previous", "        node.value = val", "        for path_node in path:", "            path_node.prefix_sum += delta", "", "    def sum(self, prefix):", "        node = self.root", "        for ch in prefix:", "            if ch not in node.children: return 0", "            node = node.children[ch]", "        return node.prefix_sum"],
+    builder: buildSteps677,
+  },
+  720: {
+    id: 720,
+    difficulty: "medium",
+    slug: "longest-word-in-dictionary",
+    category: { key: "trie", vi: "Cây tiền tố (Trie)", en: "Trie" },
+    title: { vi: "Longest Word in Dictionary", en: "Longest Word in Dictionary" },
+    titleVi: { vi: "Từ dài nhất trong từ điển", en: "Longest buildable dictionary word" },
+    statement: { vi: "Trả về từ dài nhất có thể tạo bằng cách thêm từng ký tự, sao cho mọi prefix của từ cũng có trong words. Nếu hòa, chọn từ nhỏ hơn theo thứ tự từ điển.", en: "Return the longest word that can be built one character at a time with every prefix also in words. Break ties lexicographically." },
+    defaultInput: "w,wo,wor,worl,world,banana",
+    inputKind: "string",
+    inputLabel: { vi: "words (cách nhau bởi dấu phẩy)", en: "words (comma separated)" },
+    extraParams: [],
+    approach: [
+      { vi: "Chèn tất cả words vào Trie và đánh dấu node cuối bằng isWord.", en: "Insert all words into a Trie and mark terminal nodes with isWord." },
+      { vi: "DFS chỉ được đi từ một node sang child nếu child.isWord=True; nhờ đó mọi prefix của candidate đều hợp lệ.", en: "DFS may enter a child only when child.isWord=True; therefore every candidate prefix is valid." },
+      { vi: "Cập nhật best nếu candidate dài hơn, hoặc cùng độ dài nhưng nhỏ hơn theo thứ tự từ điển.", en: "Update best if a candidate is longer, or equally long but lexicographically smaller." },
+    ],
+    complexity: { time: "O(T)", space: "O(T)", note: { vi: "T là tổng số ký tự của mọi word. Xây Trie và DFS mỗi node tối đa một lần.", en: "T is the total number of characters across words. Building the Trie and DFS visit each node at most once." } },
+    code: ["class Solution:", "    def longestWord(self, words):", "        root = {}; end = '#'", "        for word in words:", "            node = root", "            for ch in word:", "                node = node.setdefault(ch, {})", "            node[end] = True", "        best = ''", "        def dfs(node, word):", "            nonlocal best", "            if len(word) > len(best) or (len(word) == len(best) and word < best):", "                best = word", "            for ch in sorted(key for key in node if key != end):", "                child = node[ch]", "                if end in child:", "                    dfs(child, word + ch)", "        dfs(root, '')", "        return best"],
+    builder: buildSteps720,
+  },
   642: {
     id: 642,
     difficulty: "hard",
