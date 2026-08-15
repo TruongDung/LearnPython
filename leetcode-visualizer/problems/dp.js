@@ -561,93 +561,94 @@ function buildSteps152(nums) {
  *  - dp[i] = dp[i-1] + dp[i-2].
  *  - The answer is dp[n].
  */
+function makeClimbingStairsView(n, approach, values, options = {}) {
+  const sources = options.sources || [];
+  const target = Number.isInteger(options.target) ? options.target : null;
+  return {
+    n,
+    approach,
+    phase: options.phase || "setup",
+    target,
+    sources,
+    formula: options.formula || null,
+    rolling: options.rolling || null,
+    stairs: values.map((ways, step) => ({
+      step,
+      ways,
+      state: step === target ? "target" : sources.includes(step) ? "source" : ways === null ? "future" : "known",
+    })),
+  };
+}
+
 function buildSteps70(input, params) {
   const n = input[0];
-  const approach = (params && params.approach) || 1;
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps70Optimized(n);
 
-  if (approach === 2) {
-    return buildSteps70Optimized(n);
-  }
-
-  const dp = new Array(n + 1).fill(0);
+  const values = new Array(n + 1).fill(null);
   const steps = [];
-
-  dp[0] = 1;
-  if (n >= 1) dp[1] = 1;
-
-  // Line 3: dp = [0] * (n+1)
-  steps.push({
-    title: { vi: "dp = [0] * (n+1)", en: "dp = [0] * (n+1)" },
-    arr: [...dp],
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [{ name: "n", value: n }, { name: "dp", value: `[${dp.join(",")}]` }],
-    note: { vi: `Khởi tạo dp. n = ${n}.`, en: `Initialize dp. n = ${n}.` },
+  const addStep = (step) => steps.push({
+    ...step,
+    arr: values.map((value) => value ?? 0),
+    climbingStairsView: makeClimbingStairsView(n, 1, values, step.view),
   });
 
-  // Line 4: dp[0] = 1
-  steps.push({
-    title: { vi: "dp[0] = 1", en: "dp[0] = 1" },
-    arr: [...dp],
-    highlight: [0],
-    mark: [],
-    codeLines: [4],
-    vars: [{ name: "dp[0]", value: 1 }, { name: "dp", value: `[${dp.join(",")}]` }],
-    note: { vi: `dp[0] = 1 (đứng tại bậc 0: 1 cách).`, en: `dp[0] = 1 (standing at step 0: 1 way).` },
+  addStep({
+    title: { vi: "Tạo bảng ways(0…n)", en: "Create the ways(0…n) table" },
+    highlight: [], mark: [], codeLines: [3],
+    vars: [{ name: "n", value: n }],
+    view: { phase: "setup" },
+    note: { vi: "ways(i) nghĩa là số cách đứng đúng ở bậc i. Các ô ? chưa được tính.", en: "ways(i) means the number of ways to stand exactly on step i. ? cells are not computed yet." },
   });
 
-  // Line 5: dp[1] = 1
-  if (n >= 1) {
-    steps.push({
-      title: { vi: "dp[1] = 1", en: "dp[1] = 1" },
-      arr: [...dp],
-      highlight: [1],
-      mark: [],
-      codeLines: [5],
-      vars: [{ name: "dp[1]", value: 1 }, { name: "dp", value: `[${dp.join(",")}]` }],
-      note: { vi: `dp[1] = 1 (1 cách leo tới bậc 1).`, en: `dp[1] = 1 (1 way to reach step 1).` },
-    });
-  }
+  values[0] = 1;
+  addStep({
+    title: { vi: "Base case: ways(0) = 1", en: "Base case: ways(0) = 1" },
+    highlight: [0], mark: [0], codeLines: [4],
+    vars: [{ name: "ways(0)", value: 1 }],
+    view: { phase: "base", target: 0 },
+    note: { vi: "Có đúng 1 cách ở bậc 0: chưa leo bước nào. Giá trị này là nền cho công thức.", en: "There is exactly 1 way to be at step 0: take no steps. It is the recurrence base." },
+  });
+
+  values[1] = 1;
+  addStep({
+    title: { vi: "Base case: ways(1) = 1", en: "Base case: ways(1) = 1" },
+    highlight: [1], mark: [1], codeLines: [5],
+    vars: [{ name: "ways(1)", value: 1 }],
+    view: { phase: "base", target: 1 },
+    note: { vi: "Để tới bậc 1 chỉ có một lựa chọn: leo 1 bậc.", en: "There is only one way to reach step 1: take one step." },
+  });
 
   for (let i = 2; i <= n; i++) {
-    // Line 6: for i in range(2, n+1)
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: [...dp],
-      highlight: [i],
-      mark: [],
-      codeLines: [6],
-      vars: [{ name: "i", value: i }, { name: "dp[i-1]", value: dp[i-1] }, { name: "dp[i-2]", value: dp[i-2] }],
-      note: { vi: `Tính dp[${i}]. Cần dp[${i-1}]=${dp[i-1]} và dp[${i-2}]=${dp[i-2]}.`, en: `Compute dp[${i}]. Need dp[${i-1}]=${dp[i-1]} and dp[${i-2}]=${dp[i-2]}.` },
-    });
-
-    // Line 7: dp[i] = dp[i-1] + dp[i-2]
-    dp[i] = dp[i - 1] + dp[i - 2];
-    steps.push({
-      title: { vi: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}`, en: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` },
-      arr: [...dp],
-      highlight: [i - 2, i - 1, i],
-      mark: [i],
-      codeLines: [7],
-      vars: [{ name: "dp[i] = dp[i-1]+dp[i-2]", value: `${dp[i-1]} + ${dp[i-2]} = ${dp[i]}` }, { name: "dp", value: `[${dp.join(",")}]` }],
-      note: { vi: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}.`, en: `dp[${i}] = ${dp[i-1]} + ${dp[i-2]} = ${dp[i]}.` },
+    const fromOneStep = values[i - 1];
+    const fromTwoSteps = values[i - 2];
+    values[i] = fromOneStep + fromTwoSteps;
+    addStep({
+      title: { vi: `Tính ways(${i}) = ${fromOneStep} + ${fromTwoSteps} = ${values[i]}`, en: `Compute ways(${i}) = ${fromOneStep} + ${fromTwoSteps} = ${values[i]}` },
+      highlight: [i - 2, i - 1, i], mark: [i], codeLines: [7],
+      vars: [
+        { name: "i", value: i },
+        { name: "from ways(i−1)", value: fromOneStep },
+        { name: "from ways(i−2)", value: fromTwoSteps },
+        { name: `ways(${i})`, value: values[i] },
+      ],
+      view: {
+        phase: "calculate", target: i, sources: [i - 2, i - 1],
+        formula: { target: i, oneStep: i - 1, twoSteps: i - 2, oneValue: fromOneStep, twoValue: fromTwoSteps, result: values[i] },
+      },
+      note: { vi: `Muốn đứng ở bậc ${i}, bước cuối hoặc đi từ bậc ${i - 1} bằng 1 bước, hoặc từ bậc ${i - 2} bằng 2 bước. Hai nhóm cách không trùng nhau nên cộng lại.`, en: `To stand on step ${i}, the last move comes from step ${i - 1} with 1 step or from step ${i - 2} with 2 steps. These groups do not overlap, so add them.` },
     });
   }
 
-  // Line 8: return dp[n]
-  steps.push({
-    title: { vi: `Kết quả: dp[${n}] = ${dp[n]}`, en: `Result: dp[${n}] = ${dp[n]}` },
-    arr: [...dp],
-    highlight: [],
-    mark: [n],
-    final: true,
-    codeLines: [8],
-    vars: [{ name: "answer", value: dp[n] }, { name: "dp", value: `[${dp.join(",")}]` }],
-    note: { vi: `Số cách leo tới bậc ${n} = ${dp[n]}.`, en: `Number of ways to reach step ${n} = ${dp[n]}.` },
+  addStep({
+    title: { vi: `Kết quả: ways(${n}) = ${values[n]}`, en: `Result: ways(${n}) = ${values[n]}` },
+    highlight: [n], mark: [n], final: true, codeLines: [8],
+    vars: [{ name: "answer", value: values[n] }],
+    view: { phase: "done", target: n },
+    note: { vi: `Ô cuối cùng chính là đáp án: có ${values[n]} cách leo tới bậc ${n}.`, en: `The final cell is the answer: there are ${values[n]} ways to reach step ${n}.` },
   });
 
-  return { n, answer: dp[n], steps };
+  return { n, answer: values[n], steps };
 }
 
 /**
@@ -655,120 +656,80 @@ function buildSteps70(input, params) {
  * Climbing stairs is Fibonacci-like: ways(n) = ways(n-1) + ways(n-2).
  */
 function buildSteps70Optimized(n) {
+  const values = new Array(n + 1).fill(null);
   const steps = [];
+  const addStep = (step) => steps.push({
+    ...step,
+    arr: values.map((value) => value ?? 0),
+    climbingStairsView: makeClimbingStairsView(n, 2, values, step.view),
+  });
 
   if (n <= 2) {
-    steps.push({
-      title: { vi: `n=${n} ≤ 2 → return ${n}`, en: `n=${n} ≤ 2 → return ${n}` },
-      arr: [n],
-      highlight: [0],
-      mark: [0],
-      final: true,
-      codeBlock: 2,
-      codeLines: [5],
+    values[n] = n;
+    addStep({
+      title: { vi: `n = ${n} ≤ 2 → trả về ${n}`, en: `n = ${n} ≤ 2 → return ${n}` },
+      highlight: [n], mark: [n], final: true, codeBlock: 2, codeLines: [5],
       vars: [{ name: "n", value: n }, { name: "answer", value: n }],
-      note: { vi: `n=${n} ≤ 2 → trả về ${n} trực tiếp.`, en: `n=${n} ≤ 2 → return ${n} directly.` },
+      view: { phase: "done", target: n },
+      note: { vi: `Với ${n} bậc, đáp án là ${n}: chỉ có thể bắt đầu bằng 1 bước, hoặc (khi n=2) một bước 2 bậc.`, en: `For ${n} steps, the answer is ${n}: start with a 1-step move, or (when n=2) take one 2-step move.` },
     });
     return { n, answer: n, steps };
   }
 
   let prev2 = 1;
   let prev1 = 2;
-  const history = [0, 1, 2];
-
-  // Line 6: prev2, prev1 = 1, 2
-  steps.push({
-    title: { vi: "prev2, prev1 = 1, 2", en: "prev2, prev1 = 1, 2" },
-    arr: [...history],
-    sub: ["—", "prev2", "prev1"],
-    highlight: [1, 2],
-    mark: [],
-    codeBlock: 2,
-    codeLines: [6],
-    vars: [{ name: "n", value: n }, { name: "prev2", value: 1 }, { name: "prev1", value: 2 }],
-    note: { vi: `prev2 = ways(1) = 1, prev1 = ways(2) = 2.`, en: `prev2 = ways(1) = 1, prev1 = ways(2) = 2.` },
+  values[1] = prev2;
+  values[2] = prev1;
+  addStep({
+    title: { vi: "Giữ 2 kết quả gần nhất", en: "Keep the 2 latest results" },
+    highlight: [1, 2], mark: [1, 2], codeBlock: 2, codeLines: [6],
+    vars: [{ name: "prev2 = ways(1)", value: prev2 }, { name: "prev1 = ways(2)", value: prev1 }],
+    view: { phase: "base", sources: [1, 2], rolling: { prev2: { step: 1, value: prev2 }, prev1: { step: 2, value: prev1 }, curr: null } },
+    note: { vi: "Không cần giữ cả bảng: công thức chỉ dùng hai kết quả ngay trước đó.", en: "The full table is unnecessary: the recurrence uses only the two immediately previous results." },
   });
 
   for (let i = 3; i <= n; i++) {
-    const curr = prev1 + prev2;
-    history.push(curr);
-
-    // Line 7: for i in range(3, n+1)
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: [...history].slice(0, -1),
-      sub: history.slice(0, -1).map((_, idx) => {
-        if (idx === i - 2) return "prev2";
-        if (idx === i - 1) return "prev1";
-        return idx === 0 ? "—" : `(${idx})`;
-      }),
-      highlight: [i - 2, i - 1],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [7],
-      vars: [{ name: "i", value: i }, { name: "prev2", value: prev2 }, { name: "prev1", value: prev1 }],
-      note: { vi: `Tính ways(${i}). prev2=${prev2}, prev1=${prev1}.`, en: `Compute ways(${i}). prev2=${prev2}, prev1=${prev1}.` },
+    const oldPrev2 = prev2;
+    const oldPrev1 = prev1;
+    const curr = oldPrev1 + oldPrev2;
+    values[i] = curr;
+    addStep({
+      title: { vi: `curr = ${oldPrev1} + ${oldPrev2} = ${curr}`, en: `curr = ${oldPrev1} + ${oldPrev2} = ${curr}` },
+      highlight: [i - 2, i - 1, i], mark: [i], codeBlock: 2, codeLines: [8],
+      vars: [{ name: "i", value: i }, { name: "curr", value: curr }],
+      view: {
+        phase: "calculate", target: i, sources: [i - 2, i - 1],
+        formula: { target: i, oneStep: i - 1, twoSteps: i - 2, oneValue: oldPrev1, twoValue: oldPrev2, result: curr },
+        rolling: { prev2: { step: i - 2, value: oldPrev2 }, prev1: { step: i - 1, value: oldPrev1 }, curr: { step: i, value: curr } },
+      },
+      note: { vi: `Tính ways(${i}) từ hai biến đang giữ: ${oldPrev1} + ${oldPrev2} = ${curr}.`, en: `Compute ways(${i}) from the two stored values: ${oldPrev1} + ${oldPrev2} = ${curr}.` },
     });
 
-    // Line 8: curr = prev1 + prev2
-    const subLabels = history.map((_, idx) => {
-      if (idx === i - 2) return "prev2";
-      if (idx === i - 1) return "prev1";
-      if (idx === i) return "curr";
-      return idx === 0 ? "—" : `(${idx})`;
-    });
-    steps.push({
-      title: { vi: `curr = ${prev1} + ${prev2} = ${curr}`, en: `curr = ${prev1} + ${prev2} = ${curr}` },
-      arr: [...history],
-      sub: subLabels,
-      highlight: [i - 2, i - 1, i],
-      mark: [i],
-      codeBlock: 2,
-      codeLines: [8],
-      vars: [{ name: "curr = prev1+prev2", value: `${prev1} + ${prev2} = ${curr}` }],
-      note: { vi: `ways(${i}) = ${prev1} + ${prev2} = ${curr}.`, en: `ways(${i}) = ${prev1} + ${prev2} = ${curr}.` },
-    });
-
-    // Line 9: prev2 = prev1
-    prev2 = prev1;
-    steps.push({
-      title: { vi: `prev2 = ${prev2}`, en: `prev2 = ${prev2}` },
-      arr: [...history],
-      sub: history.map((_, idx) => { if (idx === i - 1) return "prev2"; if (idx === i) return "curr"; return idx === 0 ? "—" : `(${idx})`; }),
-      highlight: [i - 1],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [9],
+    prev2 = oldPrev1;
+    addStep({
+      title: { vi: `Dịch prev2 ← ${prev2}`, en: `Shift prev2 ← ${prev2}` },
+      highlight: [i - 1], mark: [], codeBlock: 2, codeLines: [9],
       vars: [{ name: "prev2", value: prev2 }],
-      note: { vi: `prev2 ← ${prev2}.`, en: `prev2 ← ${prev2}.` },
+      view: { phase: "shift-prev2", sources: [i - 1], rolling: { prev2: { step: i - 1, value: prev2 }, prev1: { step: i - 1, value: oldPrev1 }, curr: { step: i, value: curr } } },
+      note: { vi: "Dịch cửa sổ sang phải: prev2 nhận giá trị cũ của prev1.", en: "Slide the window right: prev2 receives the old prev1 value." },
     });
 
-    // Line 10: prev1 = curr
     prev1 = curr;
-    steps.push({
-      title: { vi: `prev1 = ${prev1}`, en: `prev1 = ${prev1}` },
-      arr: [...history],
-      sub: history.map((_, idx) => { if (idx === i - 1) return "prev2"; if (idx === i) return "prev1"; return idx === 0 ? "—" : `(${idx})`; }),
-      highlight: [i],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [10],
+    addStep({
+      title: { vi: `Dịch prev1 ← ${prev1}`, en: `Shift prev1 ← ${prev1}` },
+      highlight: [i], mark: [], codeBlock: 2, codeLines: [10],
       vars: [{ name: "prev1", value: prev1 }],
-      note: { vi: `prev1 ← ${prev1}.`, en: `prev1 ← ${prev1}.` },
+      view: { phase: "shift-prev1", sources: [i], rolling: { prev2: { step: i - 1, value: prev2 }, prev1: { step: i, value: prev1 }, curr: null } },
+      note: { vi: "prev1 nhận kết quả mới. Lần lặp sau chỉ cần prev2 và prev1 này.", en: "prev1 receives the new result. The next iteration needs only this prev2 and prev1 pair." },
     });
   }
 
-  steps.push({
+  addStep({
     title: { vi: `Kết quả: ways(${n}) = ${prev1}`, en: `Result: ways(${n}) = ${prev1}` },
-    arr: [...history],
-    sub: history.map((_, idx) => { if (idx === n - 1) return "prev2"; if (idx === n) return "prev1"; return idx === 0 ? "—" : `(${idx})`; }),
-    highlight: [],
-    mark: [n],
-    final: true,
-    codeBlock: 2,
-    codeLines: [11],
+    highlight: [n], mark: [n], final: true, codeBlock: 2, codeLines: [11],
     vars: [{ name: "answer", value: prev1 }],
-    note: { vi: `ways(${n}) = ${prev1}. O(1) bộ nhớ.`, en: `ways(${n}) = ${prev1}. O(1) memory.` },
+    view: { phase: "done", target: n, rolling: { prev2: { step: n - 1, value: prev2 }, prev1: { step: n, value: prev1 }, curr: null } },
+    note: { vi: `ways(${n}) = ${prev1}. Ta chỉ dùng hai biến nên bộ nhớ phụ là O(1).`, en: `ways(${n}) = ${prev1}. Only two variables are used, so auxiliary space is O(1).` },
   });
 
   return { n, answer: prev1, steps };

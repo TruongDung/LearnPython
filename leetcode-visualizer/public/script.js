@@ -14243,6 +14243,64 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderClimbingStairsView(step) {
+  const view = step.climbingStairsView || {};
+  const vi = lang === "vi";
+  const stairs = Array.isArray(view.stairs) ? view.stairs : [];
+  const formula = view.formula;
+  const labels = {
+    setup: vi ? "Tạo bảng" : "Build table",
+    base: vi ? "Base case" : "Base case",
+    calculate: vi ? "Cộng 2 đường đi" : "Add 2 paths",
+    "shift-prev2": vi ? "Dịch prev2" : "Shift prev2",
+    "shift-prev1": vi ? "Dịch prev1" : "Shift prev1",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const stairHtml = stairs.map((stair) => {
+    const value = stair.ways === null ? "?" : stair.ways;
+    const status = stair.ways === null ? (vi ? "chưa tính" : "not computed") : (vi ? "đã biết" : "known");
+    return `<article class="cs70-stair ${stair.state}"><small>${vi ? "BẬC" : "STEP"} ${stair.step}</small><strong>${value}</strong><em>${status}</em></article>`;
+  }).join("");
+
+  let equation = vi ? "Mỗi bậc sẽ được tính dần." : "Each step is computed in order.";
+  let reason = vi ? "" : "";
+  if (formula) {
+    equation = `ways(${formula.target}) = ways(${formula.oneStep}) + ways(${formula.twoSteps}) = ${formula.oneValue} + ${formula.twoValue} = <b>${formula.result}</b>`;
+    reason = vi
+      ? `Bậc ${formula.target}: bước cuối đi từ bậc ${formula.oneStep} bằng 1 bước HOẶC bậc ${formula.twoSteps} bằng 2 bước.`
+      : `For step ${formula.target}: the last move comes from step ${formula.oneStep} with 1 step OR step ${formula.twoSteps} with 2 steps.`;
+  } else if (view.phase === "base") {
+    equation = view.target === 0
+      ? (vi ? "ways(0) = 1  →  có 1 cách: chưa leo bước nào" : "ways(0) = 1  →  one way: take no steps")
+      : (vi ? "ways(1) = 1  →  chỉ leo một bước 1" : "ways(1) = 1  →  take one 1-step move");
+  } else if (view.phase === "done") {
+    const target = Number.isInteger(view.target) ? view.target : view.n;
+    const result = stairs[target] ? stairs[target].ways : "?";
+    equation = `ways(${target}) = <b>${result}</b>`;
+    reason = vi ? "Đây là số cách để chạm đúng bậc đích." : "This is the number of ways to reach the target step.";
+  }
+
+  const rolling = view.rolling;
+  const rollingHtml = rolling ? [
+    ["prev2", rolling.prev2, vi ? "2 bậc trước" : "two steps back"],
+    ["prev1", rolling.prev1, vi ? "1 bậc trước" : "one step back"],
+    ["curr", rolling.curr, vi ? "kết quả mới" : "new result"],
+  ].map(([name, item, hint]) => `<article class="cs70-register ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `ways(${item.step})` : hint}</em></article>`).join("") : "";
+
+  const method = Number(view.approach) === 2
+    ? (vi ? "APPROACH 2 · chỉ giữ 2 biến" : "APPROACH 2 · keep only 2 variables")
+    : (vi ? "APPROACH 1 · bảng DP" : "APPROACH 1 · DP table");
+  const rollingSection = rollingHtml ? `<section class="cs70-rolling"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 2 giá trị" : "two-value window"}</span></header><div>${rollingHtml}</div></section>` : "";
+
+  $("treeView").innerHTML = `<section class="cs70-viz" role="img" aria-label="${vi ? "Trực quan hóa quy hoạch động leo cầu thang" : "Climbing stairs dynamic-programming visualization"}">
+    <header><strong>CLIMBING STAIRS</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || view.phase || "")}</span></header>
+    <section class="cs70-rule"><b>CORE RULE</b><strong>ways(i) = ways(i−1) + ways(i−2)</strong><span>${vi ? "Bước cuối chỉ có 2 lựa chọn: +1 hoặc +2." : "The final move has only 2 choices: +1 or +2."}</span></section>
+    <section class="cs70-action"><small>${escapeHtml(method)}</small><strong>${equation}</strong>${reason ? `<span>${escapeHtml(reason)}</span>` : ""}</section>
+    ${rollingSection}
+    <section class="cs70-table"><header><strong>${vi ? "BẢNG SỐ CÁCH ways(i)" : "WAYS(i) TABLE"}</strong><span>${vi ? "tím = 2 nguồn · vàng = ô đang tính · xanh = đã biết" : "purple = 2 sources · yellow = current target · green = known"}</span></header><div class="cs70-stairs">${stairHtml}</div></section>
+  </section>`;
+}
+
 function renderMapSumView(step) {
   const view = step.mapSumView || {};
   const vi = lang === "vi";
@@ -14534,6 +14592,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.climbingStairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderClimbingStairsView(step);
   } else if (step.mapSumView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
