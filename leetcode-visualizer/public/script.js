@@ -14243,6 +14243,71 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderFibonacciView(step) {
+  const view = step.fibonacciView || {};
+  const vi = lang === "vi";
+  const terms = Array.isArray(view.stairs) ? view.stairs : [];
+  const labels = {
+    base: vi ? "Base case" : "Base case",
+    preview: vi ? "Chuẩn bị cộng" : "Prepare addition",
+    calculate: vi ? "Cộng 2 số trước" : "Add 2 previous terms",
+    "shift-prev2": vi ? "Dịch prev2" : "Shift prev2",
+    "shift-prev1": vi ? "Dịch prev1" : "Shift prev1",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const termHtml = terms.map((term) => {
+    const value = term.ways === null ? "?" : term.ways;
+    const status = term.ways === null ? (vi ? "chưa tính" : "not computed") : (vi ? "đã biết" : "known");
+    return `<article class="cs70-stair ${term.state}"><small>F(${term.step})</small><strong>${value}</strong><em>${status}</em></article>`;
+  }).join("");
+
+  let equation = vi ? "Dãy được tính từ trái sang phải." : "The sequence is computed left to right.";
+  let reason = "";
+  if (view.formula) {
+    const formula = view.formula;
+    equation = `F(${formula.target}) = F(${formula.oneStep}) + F(${formula.twoSteps}) = ${formula.oneValue} + ${formula.twoValue} = <b>${formula.result}</b>`;
+    reason = vi
+      ? `Số Fibonacci mới bằng tổng của đúng hai số đứng ngay trước nó.`
+      : `Every new Fibonacci number is the sum of exactly the two preceding numbers.`;
+  } else if (view.phase === "base") {
+    equation = view.target === 0
+      ? "F(0) = <b>0</b>"
+      : "F(1) = <b>1</b>";
+    reason = vi ? "Đây là hai giá trị cơ sở của dãy Fibonacci." : "These are the two base values of the Fibonacci sequence.";
+  } else if (view.phase === "preview") {
+    const target = view.target;
+    equation = `F(${target}) = F(${target - 1}) + F(${target - 2})`;
+    reason = vi ? "Hai ô tím là hai số sẽ được cộng ở bước kế tiếp." : "The two purple cells are the terms that will be added next.";
+  } else if (view.phase === "done") {
+    const target = Number.isInteger(view.target) ? view.target : view.n;
+    const result = terms[target] ? terms[target].ways : "?";
+    equation = `F(${target}) = <b>${result}</b>`;
+    reason = vi ? "Ô cuối là số Fibonacci cần trả về." : "The final cell is the Fibonacci number to return.";
+  } else if (view.phase === "shift-prev2" || view.phase === "shift-prev1") {
+    equation = view.phase === "shift-prev2" ? "prev2 ← prev1" : "prev1 ← curr";
+    reason = vi ? "Dịch cửa sổ 2 biến để chuẩn bị cho số tiếp theo." : "Shift the two-variable window for the next number.";
+  }
+
+  const rolling = view.rolling;
+  const rollingHtml = rolling ? [
+    ["prev2", rolling.prev2, vi ? "2 số trước" : "two terms back"],
+    ["prev1", rolling.prev1, vi ? "số trước" : "previous term"],
+    ["curr", rolling.curr, vi ? "số mới" : "new term"],
+  ].map(([name, item, hint]) => `<article class="cs70-register ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `F(${item.step})` : hint}</em></article>`).join("") : "";
+  const method = Number(view.approach) === 2
+    ? (vi ? "APPROACH 2 · chỉ giữ 2 biến" : "APPROACH 2 · keep only 2 variables")
+    : (vi ? "APPROACH 1 · bảng DP" : "APPROACH 1 · DP table");
+  const rollingSection = rollingHtml ? `<section class="cs70-rolling"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 2 giá trị" : "two-value window"}</span></header><div>${rollingHtml}</div></section>` : "";
+
+  $("treeView").innerHTML = `<section class="cs70-viz" role="img" aria-label="${vi ? "Trực quan hóa số Fibonacci" : "Fibonacci-number visualization"}">
+    <header><strong>FIBONACCI NUMBER</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || view.phase || "")}</span></header>
+    <section class="cs70-rule"><b>CORE RULE</b><strong>F(i) = F(i−1) + F(i−2)</strong><span>${vi ? "Mỗi số mới là tổng của hai số liền trước." : "Each new term is the sum of its two previous terms."}</span></section>
+    <section class="cs70-action"><small>${escapeHtml(method)}</small><strong>${equation}</strong>${reason ? `<span>${escapeHtml(reason)}</span>` : ""}</section>
+    ${rollingSection}
+    <section class="cs70-table"><header><strong>${vi ? "BẢNG FIBONACCI F(i)" : "FIBONACCI TABLE F(i)"}</strong><span>${vi ? "tím = 2 nguồn · vàng = ô đang tính · xanh = đã biết" : "purple = 2 sources · yellow = current target · green = known"}</span></header><div class="cs70-stairs">${termHtml}</div></section>
+  </section>`;
+}
+
 function renderClimbingStairsView(step) {
   const view = step.climbingStairsView || {};
   const vi = lang === "vi";
@@ -14592,6 +14657,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.fibonacciView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderFibonacciView(step);
   } else if (step.climbingStairsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

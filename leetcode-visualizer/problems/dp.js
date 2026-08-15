@@ -1058,6 +1058,113 @@ function buildSteps300BinarySearch(nums) {
   return { original: [...nums], answer, chain: [], steps };
 }
 
+function attachFibonacciViews(n, approach, steps) {
+  return steps.map((step) => {
+    const line = (step.codeLines || [])[0];
+    const variableI = (step.vars || []).find((item) => item.name === "i");
+    let index = variableI ? Number(variableI.value) : n;
+    let knownThrough = 0;
+    let target = null;
+    let phase = "setup";
+
+    if (approach === 1) {
+      if (line === 3) {
+        knownThrough = 0;
+        phase = "base";
+        target = 0;
+      } else if (line === 5) {
+        knownThrough = 1;
+        phase = "base";
+        target = 1;
+      } else if (line === 6) {
+        knownThrough = index - 1;
+        phase = "preview";
+        target = index;
+      } else if (line === 7) {
+        knownThrough = index;
+        phase = "calculate";
+        target = index;
+      } else {
+        knownThrough = n;
+        phase = "done";
+        target = n;
+      }
+    } else if (n <= 1) {
+      knownThrough = n;
+      phase = "done";
+      target = n;
+    } else {
+      if (line === 6) {
+        knownThrough = 1;
+        phase = "base";
+      } else if (line === 7) {
+        index = step.arr.length;
+        knownThrough = index - 1;
+        phase = "preview";
+        target = index;
+      } else if (line === 8) {
+        index = step.arr.length - 1;
+        knownThrough = index;
+        phase = "calculate";
+        target = index;
+      } else if (line === 9 || line === 10) {
+        index = step.arr.length - 1;
+        knownThrough = index;
+        phase = line === 9 ? "shift-prev2" : "shift-prev1";
+      } else {
+        knownThrough = n;
+        phase = "done";
+        target = n;
+      }
+    }
+
+    let values = Array.from({ length: n + 1 }, (_, i) => (i <= knownThrough ? step.arr[i] : null));
+    if (approach === 2 && n <= 1) {
+      values = n === 0 ? [0] : [0, 1];
+    }
+    const sources = ["preview", "calculate"].includes(phase) ? [index - 2, index - 1] : [];
+    const formula = phase === "calculate" ? {
+      target: index,
+      oneStep: index - 1,
+      twoSteps: index - 2,
+      oneValue: values[index - 1],
+      twoValue: values[index - 2],
+      result: values[index],
+    } : null;
+    let rolling = null;
+    if (approach === 2 && n > 1) {
+      if (phase === "base") rolling = { prev2: { step: 0, value: 0 }, prev1: { step: 1, value: 1 }, curr: null };
+      else if (phase === "preview" || phase === "calculate") rolling = {
+        prev2: { step: index - 2, value: values[index - 2] },
+        prev1: { step: index - 1, value: values[index - 1] },
+        curr: phase === "calculate" ? { step: index, value: values[index] } : null,
+      };
+      else if (phase === "shift-prev2") rolling = { prev2: { step: index - 1, value: values[index - 1] }, prev1: { step: index - 1, value: values[index - 1] }, curr: { step: index, value: values[index] } };
+      else if (phase === "shift-prev1" || phase === "done") rolling = { prev2: { step: index - 1, value: values[index - 1] }, prev1: { step: index, value: values[index] }, curr: null };
+    }
+
+    return {
+      ...step,
+      fibonacciView: {
+        kind: "fibonacci",
+        symbol: "F",
+        n,
+        approach,
+        phase,
+        target,
+        sources,
+        formula,
+        rolling,
+        stairs: values.map((ways, stepIndex) => ({
+          step: stepIndex,
+          ways,
+          state: stepIndex === target ? "target" : sources.includes(stepIndex) ? "source" : ways === null ? "future" : "known",
+        })),
+      },
+    };
+  });
+}
+
 /**
  * Generate steps for LeetCode 509: Fibonacci Number.
  *
@@ -1167,7 +1274,7 @@ function buildSteps509(input, params) {
     },
   });
 
-  return { n, answer: dp[n], steps };
+  return { n, answer: dp[n], steps: attachFibonacciViews(n, 1, steps) };
 }
 
 /**
@@ -1195,7 +1302,7 @@ function buildSteps509Optimized(n) {
         en: `n=${n} ≤ 1 → return ${n} directly.`,
       },
     });
-    return { n, answer: n, steps };
+    return { n, answer: n, steps: attachFibonacciViews(n, 2, steps) };
   }
 
   let prev2 = 0;
@@ -1352,7 +1459,7 @@ function buildSteps509Optimized(n) {
     },
   });
 
-  return { n, answer: prev1, steps };
+  return { n, answer: prev1, steps: attachFibonacciViews(n, 2, steps) };
 }
 
 /**
