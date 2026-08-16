@@ -4299,6 +4299,7 @@ function buildSteps2791(input) {
     return letters.length ? letters.join("") : "∅";
   };
   const maskLabel = (mask) => `${mask} (${maskToLetters(mask)})`;
+  const maskBinary = (mask) => mask.toString(2).padStart(6, "0");
   const counterText = (counter) => {
     const entries = Object.keys(counter)
       .map(Number)
@@ -4308,6 +4309,11 @@ function buildSteps2791(input) {
       .map((mask) => `${maskToLetters(mask)}:${counter[mask]}`);
     return `{${entries.join(", ")}}`;
   };
+  const counterItems = (counter) => Object.keys(counter)
+    .map(Number)
+    .filter((mask) => counter[mask] > 0)
+    .sort((a, b) => a - b)
+    .map((mask) => ({ mask, odd: maskToLetters(mask), bits: maskBinary(mask), count: counter[mask] }));
 
   const masks = Array(n).fill(0);
   const order = [];
@@ -4339,8 +4345,8 @@ function buildSteps2791(input) {
   const makeTree = (active, processed, pairWith) => ({
     nodes: Array.from({ length: n }, (_, node) => ({
       id: node,
-      labelLines: [`${node}`, maskToLetters(masks[node])],
-      sub: node === 0 ? "root" : `edge '${s[node]}'`,
+      labelLines: [`node ${node}`, `m=${masks[node]}`, maskToLetters(masks[node])],
+      sub: node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`,
       x: xPos[node],
       y: depth[node],
       parentId: parent[node] === -1 ? null : parent[node],
@@ -4372,6 +4378,15 @@ function buildSteps2791(input) {
       { name: "seen", value: "{}" },
       { name: "ans", value: 0 },
     ],
+    palPathView: {
+      phase: "init",
+      current: { node: 0, mask: 0, odd: maskToLetters(0), bits: maskBinary(0), edge: "root" },
+      answerBefore: 0,
+      add: 0,
+      answerAfter: 0,
+      matches: [],
+      counter: [],
+    },
     note: {
       vi: "mask[node] lưu các chữ xuất hiện lẻ lần trên đường root → node. Root có mask 0 vì s[0] không là cạnh.",
       en: "mask[node] stores letters with odd parity on root → node. The root mask is 0 because s[0] is not an edge.",
@@ -4388,6 +4403,7 @@ function buildSteps2791(input) {
       .filter((item) => item.count > 0);
     const add = hits.reduce((sum, item) => sum + item.count, 0);
     const pairNodes = hits.flatMap((item) => item.nodes);
+    const currentEdge = node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`;
 
     steps.push({
       title: { vi: `Xét node ${node}`, en: `Process node ${node}` },
@@ -4404,6 +4420,22 @@ function buildSteps2791(input) {
         { name: "ans", value: `${answer} + ${add} = ${answer + add}` },
         { name: "seen before", value: counterText(seenByMask) },
       ],
+      palPathView: {
+        phase: "count",
+        current: { node, mask, odd: maskToLetters(mask), bits: maskBinary(mask), edge: currentEdge },
+        answerBefore: answer,
+        add,
+        answerAfter: answer + add,
+        matches: hits.map((item) => ({
+          mask: item.mask,
+          odd: maskToLetters(item.mask),
+          bits: maskBinary(item.mask),
+          count: item.count,
+          nodes: item.nodes,
+          kind: item.mask === mask ? "same" : "one-bit",
+        })),
+        counter: counterItems(seenByMask),
+      },
       note: {
         vi: add
           ? `Có ${add} node trước đó có mask bằng hoặc khác đúng 1 bit, nên các đường tới node ${node} có thể sắp thành palindrome.`
@@ -4432,6 +4464,15 @@ function buildSteps2791(input) {
         { name: "seen", value: counterText(seenByMask) },
         { name: "ans", value: answer },
       ],
+      palPathView: {
+        phase: "store",
+        current: { node, mask, odd: maskToLetters(mask), bits: maskBinary(mask), edge: currentEdge },
+        answerBefore: answer,
+        add: 0,
+        answerAfter: answer,
+        matches: [],
+        counter: counterItems(seenByMask),
+      },
       note: {
         vi: "Sau khi đếm cặp với các node cũ, mới lưu mask hiện tại để các node sau có thể ghép với nó.",
         en: "After counting pairs with earlier nodes, store this mask so later nodes can pair with it.",
@@ -4451,6 +4492,15 @@ function buildSteps2791(input) {
       { name: "answer", value: answer },
       { name: "seen", value: counterText(seenByMask) },
     ],
+    palPathView: {
+      phase: "done",
+      current: null,
+      answerBefore: answer,
+      add: 0,
+      answerAfter: answer,
+      matches: [],
+      counter: counterItems(seenByMask),
+    },
     note: {
       vi: `Tổng số đường đi có thể hoán vị thành palindrome là ${answer}.`,
       en: `The total number of paths that can be rearranged into a palindrome is ${answer}.`,

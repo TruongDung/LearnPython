@@ -30978,6 +30978,87 @@ html, body {
 [data-theme="light"] .md104-tree-svg .tree-annotation.md-current,
 [data-theme="light"] .md104-tree-svg .tree-annotation.md-next { stroke: #ffffff; }
 
+/* LeetCode 2791 — palindrome path masks */
+.tree-view:has(.pal2791-viz) { min-height: 0; padding: 0; overflow: visible; background: transparent; border: 0; }
+.pal2791-viz { display: grid; gap: 12px; color: #e2e8f0; }
+.pal2791-rule { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid rgba(45, 212, 191, .48); border-radius: 12px; background: linear-gradient(105deg, rgba(20, 184, 166, .17), rgba(59, 130, 246, .08)); }
+.pal2791-rule strong, .pal2791-phase span, .pal2791-current > span, .pal2791-formula span { color: #5eead4; font-size: 10px; font-weight: 850; letter-spacing: .08em; }
+.pal2791-rule code { color: #f0fdfa; font: 800 13px "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+.pal2791-rule span { color: #ccfbf1; font-size: 12px; }
+.pal2791-layout { display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(300px, .85fr); gap: 12px; align-items: start; }
+.pal2791-tree-card, .pal2791-phase, .pal2791-current, .pal2791-formula, .pal2791-matches, .pal2791-counter { border: 1px solid rgba(148, 163, 184, .24); border-radius: 12px; background: rgba(15, 23, 42, .68); }
+.pal2791-tree-card { min-width: 0; overflow: hidden; }
+.pal2791-tree-card header, .pal2791-matches header, .pal2791-counter header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid rgba(148, 163, 184, .18); }
+.pal2791-tree-card header strong, .pal2791-matches header strong, .pal2791-counter header strong { color: #f8fafc; font-size: 11px; letter-spacing: .06em; }
+.pal2791-tree-card header span, .pal2791-matches header span, .pal2791-counter header span { color: #94a3b8; font-size: 10px; text-align: right; }
+.pal2791-tree { min-height: 260px; overflow: auto; padding: 10px; }
+.pal2791-tree .tree-svg { display: block; margin: 0 auto; }
+.pal2791-tree .tree-sub { font-size: 9px; }
+.pal2791-tree .tree-annotation.md-current { fill: #f59e0b; font-weight: 900; paint-order: stroke fill; stroke: #0f172a; stroke-width: 7px; }
+.pal2791-tree .tree-annotation.md-next { fill: #38bdf8; font-weight: 900; paint-order: stroke fill; stroke: #0f172a; stroke-width: 7px; }
+.pal2791-tree .tree-annotation.md-return { fill: #22c55e; font-weight: 900; paint-order: stroke fill; stroke: #0f172a; stroke-width: 7px; }
+.pal2791-side { display: grid; gap: 8px; min-width: 0; }
+.pal2791-phase, .pal2791-current, .pal2791-formula { display: grid; gap: 4px; padding: 10px 12px; }
+.pal2791-phase { border-color: rgba(45, 212, 191, .5); background: rgba(20, 184, 166, .08); }
+.pal2791-phase strong { color: #ccfbf1; font-size: 15px; }
+.pal2791-current { border-left: 4px solid #f59e0b; }
+.pal2791-current strong { color: #fde68a; font: 900 28px "SFMono-Regular", Consolas, monospace; line-height: 1; }
+.pal2791-current code { color: #cbd5e1; font: 700 12px "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+.pal2791-current div { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal2791-current b { padding: 4px 7px; border: 1px solid rgba(245, 158, 11, .34); border-radius: 7px; background: rgba(245, 158, 11, .1); color: #fef3c7; font: 700 11px "SFMono-Regular", Consolas, monospace; }
+.pal2791-current.done { border-color: #22c55e; }
+.pal2791-current.done strong { color: #86efac; }
+.pal2791-formula { border-left: 4px solid #64748b; }
+.pal2791-formula.adds { border-left-color: #22c55e; background: rgba(34, 197, 94, .09); }
+.pal2791-formula strong { color: #f8fafc; font: 900 22px "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+.pal2791-formula.adds strong { color: #bbf7d0; }
+.pal2791-matches > div, .pal2791-counter > div { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px; }
+.pal2791-match { display: grid; gap: 2px; min-width: 122px; flex: 1 1 122px; padding: 8px 9px; border: 1px solid rgba(56, 189, 248, .38); border-radius: 9px; background: rgba(14, 165, 233, .1); }
+.pal2791-match.same { border-color: rgba(167, 139, 250, .5); background: rgba(139, 92, 246, .12); }
+.pal2791-match span { color: #bae6fd; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.pal2791-match.same span { color: #ddd6fe; }
+.pal2791-match strong { color: #f8fafc; font: 900 16px "SFMono-Regular", Consolas, monospace; }
+.pal2791-match code { color: #cbd5e1; font: 700 11px "SFMono-Regular", Consolas, monospace; }
+.pal2791-match small { color: #94a3b8; font-size: 10px; overflow-wrap: anywhere; }
+.pal2791-empty, .pal2791-counter-empty { width: 100%; padding: 10px; border: 1px dashed rgba(148, 163, 184, .35); border-radius: 9px; color: #94a3b8; text-align: center; font-size: 12px; }
+.pal2791-counter-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; min-width: 118px; padding: 7px 8px; border: 1px solid rgba(148, 163, 184, .28); border-radius: 8px; background: rgba(30, 41, 59, .72); }
+.pal2791-counter-item small { color: #94a3b8; font: 700 10px "SFMono-Regular", Consolas, monospace; }
+.pal2791-counter-item strong { color: #e2e8f0; font: 800 12px "SFMono-Regular", Consolas, monospace; }
+.pal2791-counter-item em { color: #86efac; font: 800 11px "SFMono-Regular", Consolas, monospace; font-style: normal; }
+[data-theme="light"] .pal2791-viz { color: #1e293b; }
+[data-theme="light"] .pal2791-rule { border-color: #5eead4; background: linear-gradient(105deg, #f0fdfa, #eff6ff); }
+[data-theme="light"] .pal2791-rule strong, [data-theme="light"] .pal2791-phase span, [data-theme="light"] .pal2791-current > span, [data-theme="light"] .pal2791-formula span { color: #0f766e; }
+[data-theme="light"] .pal2791-rule code { color: #134e4a; }
+[data-theme="light"] .pal2791-rule span { color: #475569; }
+[data-theme="light"] .pal2791-tree-card, [data-theme="light"] .pal2791-phase, [data-theme="light"] .pal2791-current, [data-theme="light"] .pal2791-formula, [data-theme="light"] .pal2791-matches, [data-theme="light"] .pal2791-counter { border-color: #cbd5e1; background: #ffffff; }
+[data-theme="light"] .pal2791-tree-card header strong, [data-theme="light"] .pal2791-matches header strong, [data-theme="light"] .pal2791-counter header strong, [data-theme="light"] .pal2791-phase strong, [data-theme="light"] .pal2791-formula strong { color: #0f172a; }
+[data-theme="light"] .pal2791-tree-card header span, [data-theme="light"] .pal2791-matches header span, [data-theme="light"] .pal2791-counter header span { color: #475569; }
+[data-theme="light"] .pal2791-tree .tree-annotation.md-current, [data-theme="light"] .pal2791-tree .tree-annotation.md-next, [data-theme="light"] .pal2791-tree .tree-annotation.md-return { stroke: #ffffff; }
+[data-theme="light"] .pal2791-tree .tree-annotation.md-current { fill: #b45309; }
+[data-theme="light"] .pal2791-tree .tree-annotation.md-next { fill: #0369a1; }
+[data-theme="light"] .pal2791-tree .tree-annotation.md-return { fill: #047857; }
+[data-theme="light"] .pal2791-current { border-left-color: #d97706; background: #fffbeb; }
+[data-theme="light"] .pal2791-current strong { color: #92400e; }
+[data-theme="light"] .pal2791-current code, [data-theme="light"] .pal2791-match code { color: #475569; }
+[data-theme="light"] .pal2791-current b { border-color: #f59e0b; background: #fef3c7; color: #92400e; }
+[data-theme="light"] .pal2791-formula { border-left-color: #94a3b8; }
+[data-theme="light"] .pal2791-formula.adds { border-left-color: #16a34a; background: #f0fdf4; }
+[data-theme="light"] .pal2791-formula.adds strong { color: #166534; }
+[data-theme="light"] .pal2791-match { border-color: #38bdf8; background: #f0f9ff; }
+[data-theme="light"] .pal2791-match.same { border-color: #8b5cf6; background: #faf5ff; }
+[data-theme="light"] .pal2791-match span { color: #0369a1; }
+[data-theme="light"] .pal2791-match.same span { color: #6d28d9; }
+[data-theme="light"] .pal2791-match strong, [data-theme="light"] .pal2791-counter-item strong { color: #0f172a; }
+[data-theme="light"] .pal2791-match small, [data-theme="light"] .pal2791-counter-item small { color: #475569; }
+[data-theme="light"] .pal2791-counter-item { border-color: #cbd5e1; background: #f8fafc; }
+[data-theme="light"] .pal2791-counter-item em { color: #15803d; }
+@media (max-width: 900px) { .pal2791-layout { grid-template-columns: 1fr; } }
+@media (max-width: 460px) {
+  .pal2791-rule, .pal2791-phase, .pal2791-current, .pal2791-formula { padding: 10px; }
+  .pal2791-formula strong { font-size: 18px; }
+  .pal2791-current strong { font-size: 24px; }
+}
+
 /* LeetCode 211 · WordDictionary Trie + wildcard DFS */
 .wd211-viz { display: grid; gap: 12px; color: #e2e8f0; }
 .wd211-phases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }

@@ -3583,6 +3583,81 @@ function renderTree(step, targetId = "treeView") {
     : treeHtml);
 }
 
+function renderPalindromePathView(step) {
+  const view = step.palPathView || {};
+  const vi = lang === "vi";
+  const current = view.current;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo mask" : "Initialize masks",
+    count: vi ? "Đếm cặp cho node hiện tại" : "Count pairs for current node",
+    store: vi ? "Lưu mask vào counter" : "Store mask in counter",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+  const matches = Array.isArray(view.matches) ? view.matches : [];
+  const counter = Array.isArray(view.counter) ? view.counter : [];
+  const matchHtml = matches.length
+    ? matches.map((item) => `<div class="pal2791-match ${item.kind === "same" ? "same" : "one-bit"}">
+        <span>${item.kind === "same" ? (vi ? "cùng mask" : "same mask") : (vi ? "khác 1 bit" : "one-bit diff")}</span>
+        <strong>${escapeHtml(item.odd)}</strong>
+        <code>${escapeHtml(item.bits)}</code>
+        <small>${vi ? "node" : "nodes"}: ${escapeHtml((item.nodes || []).join(", "))} · +${escapeHtml(item.count)}</small>
+      </div>`).join("")
+    : `<div class="pal2791-empty">${vi ? "Không có mask đã thấy nào khớp." : "No previously seen mask matches."}</div>`;
+  const counterHtml = counter.length
+    ? counter.map((item) => `<span class="pal2791-counter-item">
+        <small>${escapeHtml(item.bits)}</small>
+        <strong>${escapeHtml(item.odd)}</strong>
+        <em>×${escapeHtml(item.count)}</em>
+      </span>`).join("")
+    : `<span class="pal2791-counter-empty">∅</span>`;
+  const currentHtml = current
+    ? `<section class="pal2791-current">
+        <span>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</span>
+        <strong>${escapeHtml(current.node)}</strong>
+        <code>${escapeHtml(current.edge)}</code>
+        <div>
+          <b>mask = ${escapeHtml(current.mask)}</b>
+          <b>bits = ${escapeHtml(current.bits)}</b>
+          <b>${vi ? "lẻ" : "odd"} = ${escapeHtml(current.odd)}</b>
+        </div>
+      </section>`
+    : `<section class="pal2791-current done"><span>${vi ? "ĐÃ XONG" : "DONE"}</span><strong>${escapeHtml(view.answerAfter ?? 0)}</strong></section>`;
+  const summary = vi
+    ? `LeetCode 2791: node hiện tại ${current ? current.node : "xong"}, đáp án ${view.answerAfter ?? 0}.`
+    : `LeetCode 2791: current node ${current ? current.node : "done"}, answer ${view.answerAfter ?? 0}.`;
+
+  $("treeView").innerHTML = `<section class="pal2791-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <section class="pal2791-rule">
+      <strong>${vi ? "QUY TẮC PALINDROME" : "PALINDROME RULE"}</strong>
+      <code>mask[u] XOR mask[v] has 0 or 1 set bit</code>
+      <span>${vi ? "Node xanh là đã vào counter; node cam là node hiện tại; nhãn cạnh cho biết ký tự được XOR." : "Green nodes are already in the counter; amber is current; edge labels show the XOR letter."}</span>
+    </section>
+    <div class="pal2791-layout">
+      <section class="pal2791-tree-card">
+        <header><strong>${vi ? "CÂY MASK" : "MASK TREE"}</strong><span>${vi ? "node / mask số / chữ lẻ" : "node / numeric mask / odd letters"}</span></header>
+        <div id="pal2791Tree" class="pal2791-tree"></div>
+      </section>
+      <aside class="pal2791-side">
+        <section class="pal2791-phase"><span>${vi ? "PHA" : "PHASE"}</span><strong>${escapeHtml(phaseLabels[view.phase] || view.phase || "—")}</strong></section>
+        ${currentHtml}
+        <section class="pal2791-formula ${Number(view.add || 0) > 0 ? "adds" : ""}">
+          <span>${vi ? "CẬP NHẬT ĐÁP ÁN" : "ANSWER UPDATE"}</span>
+          <strong>${escapeHtml(view.answerBefore ?? 0)} + ${escapeHtml(view.add ?? 0)} = ${escapeHtml(view.answerAfter ?? 0)}</strong>
+        </section>
+        <section class="pal2791-matches">
+          <header><strong>${vi ? "MASK KHỚP TRONG COUNTER" : "MATCHING MASKS IN COUNTER"}</strong><span>${vi ? "mỗi dòng tạo thêm count cặp" : "each row contributes count pairs"}</span></header>
+          <div>${matchHtml}</div>
+        </section>
+        <section class="pal2791-counter">
+          <header><strong>COUNTER</strong><span>${vi ? "mask đã xử lý" : "processed masks"}</span></header>
+          <div>${counterHtml}</div>
+        </section>
+      </aside>
+    </div>
+  </section>`;
+  renderTree(step, "pal2791Tree");
+}
+
 function renderRecoverBstView(step) {
   const view = step.recoverBstView;
   const treeView = $("treeView");
@@ -15048,6 +15123,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderBstIteratorView(step);
+  } else if (step.palPathView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPalindromePathView(step);
   } else if (step.tree) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
