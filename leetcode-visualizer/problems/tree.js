@@ -4255,9 +4255,214 @@ function buildSteps114(input) {
   return { input, answer: order, steps };
 }
 
+function parsePalindromePathInput(input) {
+  const raw = String(input || "").trim();
+  const parts = raw.split("|").map((part) => part.trim());
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("Input format: parent array | s. Example: -1,0,0,1,1,2|acaabc");
+  }
+  const parent = parts[0].split(",").map((token) => {
+    const value = Number(token.trim());
+    if (!Number.isInteger(value)) throw new Error("parent must contain integers.");
+    return value;
+  });
+  const s = parts[1];
+  if (parent.length !== s.length) {
+    throw new Error("parent.length must equal s.length.");
+  }
+  if (parent[0] !== -1) {
+    throw new Error("parent[0] must be -1.");
+  }
+  for (let i = 1; i < parent.length; i++) {
+    if (parent[i] < 0 || parent[i] >= parent.length) {
+      throw new Error(`parent[${i}] is outside the node range.`);
+    }
+  }
+  if (!/^[a-z]+$/.test(s)) {
+    throw new Error("s must contain lowercase English letters only.");
+  }
+  return { parent, s };
+}
+
+function buildSteps2791(input) {
+  const { parent, s } = parsePalindromePathInput(input);
+  const n = parent.length;
+  const children = Array.from({ length: n }, () => []);
+  for (let node = 1; node < n; node++) children[parent[node]].push(node);
+
+  const bitName = (bit) => String.fromCharCode(97 + bit);
+  const maskToLetters = (mask) => {
+    const letters = [];
+    for (let bit = 0; bit < 26; bit++) {
+      if (mask & (1 << bit)) letters.push(bitName(bit));
+    }
+    return letters.length ? letters.join("") : "∅";
+  };
+  const maskLabel = (mask) => `${mask} (${maskToLetters(mask)})`;
+  const counterText = (counter) => {
+    const entries = Object.keys(counter)
+      .map(Number)
+      .filter((mask) => counter[mask] > 0)
+      .sort((a, b) => a - b)
+      .slice(0, 8)
+      .map((mask) => `${maskToLetters(mask)}:${counter[mask]}`);
+    return `{${entries.join(", ")}}`;
+  };
+
+  const masks = Array(n).fill(0);
+  const order = [];
+  (function dfsMask(node) {
+    order.push(node);
+    for (const child of children[node]) {
+      masks[child] = masks[node] ^ (1 << (s.charCodeAt(child) - 97));
+      dfsMask(child);
+    }
+  })(0);
+
+  const xPos = Array(n).fill(0);
+  let nextX = 0;
+  function assignX(node, depth) {
+    if (children[node].length === 0) {
+      xPos[node] = nextX++;
+    } else {
+      children[node].forEach((child) => assignX(child, depth + 1));
+      xPos[node] = children[node].reduce((sum, child) => sum + xPos[child], 0) / children[node].length;
+    }
+  }
+  assignX(0, 0);
+
+  const depth = Array(n).fill(0);
+  for (const node of order) {
+    for (const child of children[node]) depth[child] = depth[node] + 1;
+  }
+
+  const makeTree = (active, processed, pairWith) => ({
+    nodes: Array.from({ length: n }, (_, node) => ({
+      id: node,
+      labelLines: [`${node}`, maskToLetters(masks[node])],
+      sub: node === 0 ? "root" : `edge '${s[node]}'`,
+      x: xPos[node],
+      y: depth[node],
+      parentId: parent[node] === -1 ? null : parent[node],
+      hl: node === active,
+      isWord: processed.has(node) || node === active,
+    })),
+    annotations: Object.fromEntries(Array.from(processed).map((node) => [node, { label: "seen", kind: "md-return" }])
+      .concat(active === null ? [] : [[active, { label: "cur", kind: "md-current" }]])
+      .concat((pairWith || []).map((node) => [node, { label: "pairs", kind: "md-next" }]))),
+    showLevels: true,
+  });
+
+  const steps = [];
+  const processed = new Set();
+  const seenByMask = {};
+  const maskToNodes = {};
+  let answer = 0;
+
+  steps.push({
+    title: { vi: "Khởi tạo mask gốc", en: "Initialize root mask" },
+    arr: [],
+    tree: makeTree(0, processed, []),
+    highlight: [],
+    mark: [],
+    codeLines: [9, 10],
+    vars: [
+      { name: "parent", value: `[${parent.join(",")}]` },
+      { name: "s", value: `"${s}"` },
+      { name: "seen", value: "{}" },
+      { name: "ans", value: 0 },
+    ],
+    note: {
+      vi: "mask[node] lưu các chữ xuất hiện lẻ lần trên đường root → node. Root có mask 0 vì s[0] không là cạnh.",
+      en: "mask[node] stores letters with odd parity on root → node. The root mask is 0 because s[0] is not an edge.",
+    },
+  });
+
+  for (const node of order) {
+    const mask = masks[node];
+    const candidates = [mask];
+    for (let bit = 0; bit < 26; bit++) candidates.push(mask ^ (1 << bit));
+    const hits = candidates
+      .filter((candidate, index) => candidates.indexOf(candidate) === index)
+      .map((candidate) => ({ mask: candidate, count: seenByMask[candidate] || 0, nodes: maskToNodes[candidate] || [] }))
+      .filter((item) => item.count > 0);
+    const add = hits.reduce((sum, item) => sum + item.count, 0);
+    const pairNodes = hits.flatMap((item) => item.nodes);
+
+    steps.push({
+      title: { vi: `Xét node ${node}`, en: `Process node ${node}` },
+      arr: [],
+      tree: makeTree(node, processed, pairNodes),
+      highlight: [],
+      mark: [],
+      codeLines: [20, 21, 22, 23],
+      vars: [
+        { name: "mask", value: maskLabel(mask) },
+        { name: "same mask", value: seenByMask[mask] || 0 },
+        { name: "one-bit diff hits", value: hits.filter((item) => item.mask !== mask).map((item) => `${maskToLetters(item.mask)}:${item.count}`).join(", ") || "none" },
+        { name: "add", value: add },
+        { name: "ans", value: `${answer} + ${add} = ${answer + add}` },
+        { name: "seen before", value: counterText(seenByMask) },
+      ],
+      note: {
+        vi: add
+          ? `Có ${add} node trước đó có mask bằng hoặc khác đúng 1 bit, nên các đường tới node ${node} có thể sắp thành palindrome.`
+          : `Chưa có mask trước đó phù hợp với node ${node}.`,
+        en: add
+          ? `${add} earlier node(s) have the same mask or differ by one bit, so paths ending at node ${node} can be rearranged into a palindrome.`
+          : `No earlier mask matches node ${node}.`,
+      },
+    });
+
+    answer += add;
+    seenByMask[mask] = (seenByMask[mask] || 0) + 1;
+    if (!maskToNodes[mask]) maskToNodes[mask] = [];
+    maskToNodes[mask].push(node);
+    processed.add(node);
+
+    steps.push({
+      title: { vi: `Thêm mask của node ${node} vào counter`, en: `Add node ${node}'s mask to the counter` },
+      arr: [],
+      tree: makeTree(node, processed, []),
+      highlight: [],
+      mark: [],
+      codeLines: [24],
+      vars: [
+        { name: "seen[mask]", value: seenByMask[mask] },
+        { name: "seen", value: counterText(seenByMask) },
+        { name: "ans", value: answer },
+      ],
+      note: {
+        vi: "Sau khi đếm cặp với các node cũ, mới lưu mask hiện tại để các node sau có thể ghép với nó.",
+        en: "After counting pairs with earlier nodes, store this mask so later nodes can pair with it.",
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    arr: [],
+    tree: makeTree(null, processed, []),
+    highlight: [],
+    mark: [],
+    final: true,
+    codeLines: [25],
+    vars: [
+      { name: "answer", value: answer },
+      { name: "seen", value: counterText(seenByMask) },
+    ],
+    note: {
+      vi: `Tổng số đường đi có thể hoán vị thành palindrome là ${answer}.`,
+      en: `The total number of paths that can be rearranged into a palindrome is ${answer}.`,
+    },
+  });
+
+  return { input, answer, steps };
+}
+
 module.exports = {
   __meta: {
-    order: [114, 144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297],
+    order: [114, 144, 94, 145, 104, 102, 543, 110, 111, 124, 226, 100, 101, 113, 637, 199, 236, 1644, 1650, 1676, 366, 863, 156, 337, 116, 103, 314, 987, 297, 2791],
     label: {
       vi: "Tag Binary Tree",
       en: "Binary Tree tag",
@@ -5068,5 +5273,69 @@ module.exports = {
     complexity: { time: "O(n)", space: "O(n)", note: { vi: "Mỗi nút ghi/đọc 1 lần.", en: "Each node written/read once." } },
     code: ["class Codec:", "    def serialize(self, root):", "        res = []", "        def dfs(node):", "            if not node:", "                res.append('#'); return", "            res.append(str(node.val))", "            dfs(node.left); dfs(node.right)", "        dfs(root)", "        return ','.join(res)", "    def deserialize(self, data):", "        vals = iter(data.split(','))", "        def build():", "            v = next(vals)", "            if v == '#': return None", "            node = TreeNode(int(v))", "            node.left = build(); node.right = build()", "            return node", "        return build()"],
     builder: buildSteps297,
+  },
+  2791: {
+    id: 2791,
+    difficulty: "hard",
+    slug: "count-paths-that-can-form-a-palindrome-in-a-tree",
+    category: TREE_CAT,
+    tags: [{ key: "bit-manipulation", vi: "Bitmask", en: "Bitmask" }, { key: "hashmap", vi: "Hash Map", en: "Hash Map" }],
+    title: { vi: "Count Paths That Can Form a Palindrome in a Tree", en: "Count Paths That Can Form a Palindrome in a Tree" },
+    titleVi: { vi: "Đếm đường đi có thể tạo palindrome trong cây", en: "Count tree paths that can form a palindrome" },
+    statement: {
+      vi: "Cho cây gốc 0 bằng mảng parent và chuỗi s, trong đó s[i] là ký tự trên cạnh parent[i] → i. Đếm số cặp node (u, v), u < v, sao cho các ký tự trên đường u ↔ v có thể hoán vị thành palindrome. Nhập dạng parent|s.",
+      en: "Given a rooted tree at 0 as parent and string s, where s[i] labels edge parent[i] → i. Count pairs (u, v), u < v, whose path letters can be rearranged into a palindrome. Input as parent|s.",
+    },
+    defaultInput: "-1,0,0,1,1,2|acaabc",
+    inputKind: "string",
+    inputLabel: { vi: "parent|s", en: "parent|s" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Gán mask 26-bit cho mỗi node: bit bật nghĩa là chữ đó xuất hiện lẻ lần trên đường root → node.",
+        en: "Assign each node a 26-bit mask: an enabled bit means that letter appears an odd number of times on root → node.",
+      },
+      {
+        vi: "Đường u ↔ v có parity mask = mask[u] XOR mask[v]. Có thể thành palindrome khi XOR này có 0 hoặc 1 bit bật.",
+        en: "Path u ↔ v has parity mask = mask[u] XOR mask[v]. It can form a palindrome when this XOR has 0 or 1 enabled bit.",
+      },
+      {
+        vi: "Duyệt các mask, dùng Counter đếm các mask đã gặp: cộng seen[mask] và seen[mask XOR (1<<bit)] cho 26 bit.",
+        en: "Scan masks with a Counter of earlier masks: add seen[mask] and seen[mask XOR (1<<bit)] for all 26 bits.",
+      },
+    ],
+    complexity: { time: "O(26n)", space: "O(n)", note: { vi: "Mỗi node kiểm tra 27 mask.", en: "Each node checks 27 masks." } },
+    code: [
+      "from collections import Counter",
+      "",
+      "class Solution:",
+      "    def countPalindromePaths(self, parent, s):",
+      "        children = [[] for _ in parent]",
+      "        for node in range(1, len(parent)):",
+      "            children[parent[node]].append(node)",
+      "",
+      "        masks = [0] * len(parent)",
+      "        stack = [0]",
+      "        while stack:",
+      "            node = stack.pop()",
+      "            for child in children[node]:",
+      "                bit = 1 << (ord(s[child]) - ord('a'))",
+      "                masks[child] = masks[node] ^ bit",
+      "                stack.append(child)",
+      "",
+      "        ans = 0",
+      "        seen = Counter()",
+      "        for mask in masks:",
+      "            ans += seen[mask]",
+      "            for bit in range(26):",
+      "                ans += seen[mask ^ (1 << bit)]",
+      "            seen[mask] += 1",
+      "        return ans",
+    ],
+    liveArgs: (input) => {
+      const { parent, s } = parsePalindromePathInput(input);
+      return [parent, s];
+    },
+    builder: buildSteps2791,
   },
 };
