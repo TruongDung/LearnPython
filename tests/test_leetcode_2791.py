@@ -1,4 +1,4 @@
-from Leetcode.tree.Leetcode_2791 import Solution
+from Leetcode.tree.Leetcode_2791 import Solution  # pylint: disable=no-name-in-module
 
 
 def test_count_palindrome_paths_sample_1():
