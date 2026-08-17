@@ -165,13 +165,369 @@ module.exports = {
 (() => {
   const text = (vi, en) => ({ vi, en });
   function snapshot(steps, arr, opts) { steps.push({ title: opts.title, arr: [...arr], sub: opts.sub || arr.map((_, i) => `[${i}]`), highlight: opts.highlight || [], mark: opts.mark || [], final: Boolean(opts.final), codeLines: [opts.line], vars: opts.vars || [], note: opts.note }); }
-  function parseWords(raw) { const words = String(raw ?? "").split(",").map((word) => word.trim()).filter(Boolean); if (!words.length || new Set(words.map((word) => word.length)).size !== 1) throw new Error("words must be non-empty, comma-separated words of equal length"); return words; }
+  function parseWords(raw) {
+    const source = Array.isArray(raw) ? raw : String(raw ?? "").split(",");
+    const words = source.map((word) => String(word).trim()).filter(Boolean);
+    const widths = new Set(words.map((word) => word.length));
+    if (!words.length || widths.size !== 1 || words[0].length === 0) {
+      throw new Error("words must be non-empty, comma-separated words of equal length");
+    }
+    return words;
+  }
+
   function buildSteps30(input, params = {}) {
-    const s = String(input ?? ""); const words = parseWords(params.words); const width = words[0].length; const target = new Map(); words.forEach((word) => target.set(word, (target.get(word) || 0) + 1)); const chars = [...s]; const steps = []; const answer = [];
-    const snap = (title, line, left, right, note, extra = {}) => snapshot(steps, chars, { title, line, highlight: indices(left, right), mark: extra.mark, final: extra.final, note, vars: [{ name: "words", value: `[${words.join(", ")}]` }, { name: "need", value: mapText(target) }, { name: "window", value: extra.window || "{}" }, { name: "left", value: left }, { name: "right", value: right + 1 }, { name: "answer", value: `[${answer.join(", ")}]` }] });
-    snap(text("Tạo Counter cho words", "Build the word Counter"), 3, 0, -1, text("Mỗi từ phải xuất hiện đúng số lần trong một cửa sổ hợp lệ.", "Each word must occur the required number of times in a valid window."));
-    for (let offset = 0; offset < width; offset++) { let left = offset; let right = offset; const window = new Map(); snap(text(`Bắt đầu offset = ${offset}`, `Start offset = ${offset}`), 5, left, right - 1, text("Duyệt từng nhóm có độ dài bằng một từ.", "Scan groups exactly one word wide."), { window: mapText(window) }); while (right + width <= s.length) { const word = s.slice(right, right + width); snap(text(`Đọc ${JSON.stringify(word)} tại ${right}`, `Read ${JSON.stringify(word)} at ${right}`), 8, left, right + width - 1, text("Mở rộng cửa sổ thêm một từ.", "Extend the window by one word."), { window: mapText(window) }); right += width; if (!target.has(word)) { window.clear(); left = right; snap(text(`${JSON.stringify(word)} không thuộc words → reset`, `${JSON.stringify(word)} is not required → reset`), 10, left, right - 1, text("Không thể có phép nối hợp lệ đi qua từ này.", "No valid concatenation can cross this word."), { window: mapText(window) }); continue; } window.set(word, (window.get(word) || 0) + 1); snap(text(`window[${word}] = ${window.get(word)}`, `window[${word}] = ${window.get(word)}`), 11, left, right - 1, text("Ghi nhận từ mới trong cửa sổ.", "Record the incoming word in the window."), { window: mapText(window) }); while (window.get(word) > target.get(word)) { const removed = s.slice(left, left + width); window.set(removed, window.get(removed) - 1); left += width; snap(text(`${word} quá số lượng → bỏ ${removed}`, `${word} is overrepresented → remove ${removed}`), 12, left, right - 1, text("Thu hẹp đến khi tần suất của từ vừa thêm hợp lệ.", "Shrink until the incoming word has a valid frequency."), { window: mapText(window) }); } if (right - left === words.length * width) { answer.push(left); snap(text(`Đủ ${words.length} từ → lưu ${left}`, `Contains ${words.length} words → save ${left}`), 14, left, right - 1, text("Cửa sổ có đúng tổng độ dài và mọi tần suất đều khớp.", "The window has exactly the total length and all frequencies match."), { window: mapText(window), mark: indices(left, right - 1) }); } } }
-    snap(text(`return [${answer.join(", ")}]`, `return [${answer.join(", ")}]`), 15, 0, s.length - 1, text("Đây là mọi vị trí bắt đầu của phép nối các từ.", "These are all concatenation start positions."), { final: true }); return { original: s, words, answer, steps };
+    const s = String(input ?? "");
+    const words = parseWords(params.words);
+    const width = words[0].length;
+    const totalWidth = words.length * width;
+    const need = new Map();
+    words.forEach((word) => need.set(word, (need.get(word) || 0) + 1));
+
+    const chars = [...s];
+    const genericChars = chars.length <= 500 ? chars : [];
+    const steps = [];
+    const answer = [];
+    const completedOffsets = [];
+    const frameLimit = s.length <= 120 ? 1500 : s.length <= 500 ? 600 : 220;
+    let truncated = false;
+    let offset = null;
+    let left = 0;
+    let right = 0;
+    let window = new Map();
+    let activeStart = null;
+    let activeWord = null;
+    let removedStart = null;
+    let removedWord = null;
+    let discardStart = null;
+    let discardEnd = null;
+    let matchStart = null;
+
+    const range = (start, end) => Number.isInteger(start) && Number.isInteger(end) && start <= end
+      ? Array.from({ length: end - start + 1 }, (_, index) => start + index)
+      : [];
+    const mapObject = (map) => Object.fromEntries([...map.entries()]);
+    const resultIndices = () => answer.flatMap((start) => range(start, start + totalWidth - 1));
+    const push = ({ title, note, line, phase, event, final = false, decision = "" }) => {
+      if (!final && steps.length >= frameLimit) {
+        truncated = true;
+        return;
+      }
+      const windowWords = width > 0 ? Math.max(0, Math.floor((right - left) / width)) : 0;
+      const activeEnd = Number.isInteger(activeStart) ? Math.min(s.length - 1, activeStart + width - 1) : null;
+      steps.push({
+        title,
+        note,
+        codeLines: [line],
+        final,
+        arr: [...genericChars],
+        sub: genericChars.map((_, index) => `[${index}]`),
+        highlight: final ? [] : range(left, right - 1),
+        mark: resultIndices(),
+        vars: [
+          { name: "offset", value: offset ?? "-" },
+          { name: "word", value: activeWord ?? "-" },
+          { name: "left", value: left },
+          { name: "right", value: right },
+          { name: "window words", value: windowWords },
+          { name: "need", value: mapText(need) },
+          { name: "window", value: mapText(window) },
+          { name: "result", value: `[${answer.join(", ")}]` },
+        ],
+        substringConcatView: {
+          s,
+          words: [...words],
+          width,
+          totalWidth,
+          need: mapObject(need),
+          window: mapObject(window),
+          offset,
+          completedOffsets: [...completedOffsets],
+          left,
+          right,
+          windowWords,
+          activeStart,
+          activeEnd,
+          activeWord,
+          removedStart,
+          removedEnd: Number.isInteger(removedStart) ? removedStart + width - 1 : null,
+          removedWord,
+          discardStart,
+          discardEnd,
+          matchStart,
+          answer: [...answer],
+          phase,
+          event,
+          decision,
+          truncated,
+          final,
+        },
+      });
+    };
+    const clearTransient = () => {
+      removedStart = null;
+      removedWord = null;
+      discardStart = null;
+      discardEnd = null;
+      matchStart = null;
+    };
+
+    push({
+      title: text("need = Counter(words)", "need = Counter(words)"),
+      note: text("Đếm số lần bắt buộc của từng word; word trùng nhau phải được giữ đúng tần suất.", "Count each required word; duplicate words must keep their exact frequency."),
+      line: 3,
+      phase: "prepare",
+      event: "build-need",
+      decision: `need = ${mapText(need)}`,
+    });
+    push({
+      title: text("result = []", "result = []"),
+      note: text("result sẽ lưu mọi chỉ số bắt đầu của một phép nối hợp lệ.", "result stores every valid concatenation start index."),
+      line: 4,
+      phase: "prepare",
+      event: "init-result",
+    });
+    push({
+      title: text(`width = ${width}`, `width = ${width}`),
+      note: text("Mỗi lần right/left di chuyển đúng một word, không di chuyển từng ký tự.", "Each right/left move advances exactly one word, not one character."),
+      line: 5,
+      phase: "prepare",
+      event: "set-width",
+      decision: `len(words[0]) = ${width}`,
+    });
+    push({
+      title: text(`total_width = ${words.length} × ${width} = ${totalWidth}`, `total_width = ${words.length} × ${width} = ${totalWidth}`),
+      note: text("Cửa sổ chỉ MATCH khi có đúng tổng độ dài của toàn bộ words.", "The window MATCHES only at the exact combined length of all words."),
+      line: 6,
+      phase: "prepare",
+      event: "set-total",
+      decision: `${words.length} words × ${width} chars = ${totalWidth}`,
+    });
+
+    for (offset = 0; offset < width; offset++) {
+      left = offset;
+      right = offset;
+      window = new Map();
+      activeStart = null;
+      activeWord = null;
+      clearTransient();
+      push({
+        title: text(`offset = ${offset}`, `offset = ${offset}`),
+        note: text(`Lane ${offset} đọc các word bắt đầu tại ${offset}, ${offset + width}, ${offset + 2 * width}, ...`, `Lane ${offset} reads words starting at ${offset}, ${offset + width}, ${offset + 2 * width}, ...`),
+        line: 7,
+        phase: "offset",
+        event: "offset-start",
+      });
+      push({
+        title: text(`left = right = ${offset}`, `left = right = ${offset}`),
+        note: text("Hai con trỏ bắt đầu cùng vị trí nên cửa sổ đang rỗng.", "Both pointers start together, so the window is empty."),
+        line: 8,
+        phase: "offset",
+        event: "init-pointers",
+      });
+      push({
+        title: text("window = Counter()", "window = Counter()"),
+        note: text("Counter này chỉ đếm các word hiện nằm giữa left và right.", "This Counter tracks only words currently between left and right."),
+        line: 9,
+        phase: "offset",
+        event: "init-window",
+      });
+
+      while (right + width <= s.length) {
+        clearTransient();
+        push({
+          title: text(`${right} + ${width} ≤ ${s.length} → tiếp tục`, `${right} + ${width} ≤ ${s.length} → continue`),
+          note: text("Vẫn còn đủ ký tự để đọc trọn một word.", "Enough characters remain to read one complete word."),
+          line: 10,
+          phase: "read",
+          event: "loop-check",
+          decision: `${right + width} ≤ ${s.length}`,
+        });
+
+        activeStart = right;
+        activeWord = s.slice(right, right + width);
+        push({
+          title: text(`Đọc word = ${JSON.stringify(activeWord)}`, `Read word = ${JSON.stringify(activeWord)}`),
+          note: text(`Lấy s[${activeStart}:${activeStart + width}] theo đúng độ rộng ${width}.`, `Slice s[${activeStart}:${activeStart + width}] using word width ${width}.`),
+          line: 11,
+          phase: "read",
+          event: "read-word",
+        });
+
+        right += width;
+        push({
+          title: text(`right += ${width} → ${right}`, `right += ${width} → ${right}`),
+          note: text("right luôn trỏ ngay sau word vừa đọc.", "right always points just after the incoming word."),
+          line: 12,
+          phase: "read",
+          event: "advance-right",
+        });
+
+        const required = need.has(activeWord);
+        push({
+          title: required
+            ? text(`${JSON.stringify(activeWord)} có trong need`, `${JSON.stringify(activeWord)} is in need`)
+            : text(`${JSON.stringify(activeWord)} không có trong need`, `${JSON.stringify(activeWord)} is not in need`),
+          note: required
+            ? text("Word hợp lệ về loại; tiếp theo kiểm tra số lượng.", "The word type is valid; next check its count.")
+            : text("Không thể có đáp án nào băng qua word lạ này.", "No valid answer can cross this unknown word."),
+          line: 13,
+          phase: required ? "count" : "reset",
+          event: required ? "known-word" : "unknown-word",
+          decision: required ? "word ∈ need" : "word ∉ need",
+        });
+
+        if (!required) {
+          discardStart = left;
+          discardEnd = right - 1;
+          window.clear();
+          push({
+            title: text("window.clear()", "window.clear()"),
+            note: text("Xóa toàn bộ tần suất vì lane phải bắt đầu lại sau word lạ.", "Clear all frequencies because this lane must restart after the unknown word."),
+            line: 14,
+            phase: "reset",
+            event: "reset-clear",
+          });
+          left = right;
+          push({
+            title: text(`left = right = ${right}`, `left = right = ${right}`),
+            note: text("Vùng bị loại vẫn được tô đỏ ở frame này để thấy chính xác phần vừa reset.", "The discarded range remains red in this frame so the reset is explicit."),
+            line: 15,
+            phase: "reset",
+            event: "reset-left",
+          });
+          push({
+            title: text("continue", "continue"),
+            note: text("Bỏ qua các bước đếm/shrink/match và đọc word kế tiếp trong cùng offset.", "Skip count/shrink/match and read the next word in this offset."),
+            line: 16,
+            phase: "reset",
+            event: "reset-continue",
+          });
+          continue;
+        }
+
+        window.set(activeWord, (window.get(activeWord) || 0) + 1);
+        push({
+          title: text(`window[${activeWord}] = ${window.get(activeWord)}`, `window[${activeWord}] = ${window.get(activeWord)}`),
+          note: text(`Cần ${need.get(activeWord)} bản sao của ${activeWord}.`, `${need.get(activeWord)} copies of ${activeWord} are required.`),
+          line: 17,
+          phase: "count",
+          event: "add-word",
+          decision: `${window.get(activeWord)} / ${need.get(activeWord)}`,
+        });
+
+        let shrank = false;
+        while (window.get(activeWord) > need.get(activeWord)) {
+          shrank = true;
+          push({
+            title: text(`${activeWord}: ${window.get(activeWord)} > ${need.get(activeWord)} → SHRINK`, `${activeWord}: ${window.get(activeWord)} > ${need.get(activeWord)} → SHRINK`),
+            note: text("Word vừa thêm bị dư; dịch left cho đến khi tần suất hợp lệ.", "The incoming word is overrepresented; move left until its count is valid."),
+            line: 18,
+            phase: "shrink",
+            event: "over-count",
+            decision: `${window.get(activeWord)} > ${need.get(activeWord)}`,
+          });
+          removedStart = left;
+          removedWord = s.slice(left, left + width);
+          push({
+            title: text(`removed = ${JSON.stringify(removedWord)}`, `removed = ${JSON.stringify(removedWord)}`),
+            note: text(`Word trái nhất bắt đầu tại index ${removedStart}.`, `The leftmost word starts at index ${removedStart}.`),
+            line: 19,
+            phase: "shrink",
+            event: "pick-remove",
+          });
+          const nextCount = (window.get(removedWord) || 0) - 1;
+          if (nextCount > 0) window.set(removedWord, nextCount);
+          else window.delete(removedWord);
+          push({
+            title: text(`window[${removedWord}] giảm còn ${Math.max(0, nextCount)}`, `window[${removedWord}] decreases to ${Math.max(0, nextCount)}`),
+            note: text("Loại word trái nhất khỏi Counter của cửa sổ.", "Remove the leftmost word from the window Counter."),
+            line: 20,
+            phase: "shrink",
+            event: "remove-count",
+          });
+          left += width;
+          push({
+            title: text(`left += ${width} → ${left}`, `left += ${width} → ${left}`),
+            note: text("Cửa sổ mới bắt đầu sau word vừa loại.", "The new window starts after the removed word."),
+            line: 21,
+            phase: "shrink",
+            event: "advance-left",
+          });
+        }
+
+        push({
+          title: text(
+            `${activeWord}: ${window.get(activeWord) || 0} ≤ ${need.get(activeWord)} → ${shrank ? "dừng SHRINK" : "không cần SHRINK"}`,
+            `${activeWord}: ${window.get(activeWord) || 0} ≤ ${need.get(activeWord)} → ${shrank ? "stop SHRINK" : "no SHRINK needed"}`,
+          ),
+          note: shrank
+            ? text("Tần suất đã trở lại hợp lệ; tiếp tục kiểm tra tổng độ dài cửa sổ.", "The frequency is valid again; continue with the total window-length check.")
+            : text("Word vừa thêm không bị dư nên giữ nguyên left.", "The incoming word is not overrepresented, so left stays in place."),
+          line: 18,
+          phase: shrank ? "shrink" : "validate",
+          event: shrank ? "shrink-complete" : "count-within",
+          decision: `${window.get(activeWord) || 0} ≤ ${need.get(activeWord)}`,
+        });
+
+        const exactLength = right - left === totalWidth;
+        push({
+          title: exactLength
+            ? text(`${right} − ${left} = ${totalWidth} → MATCH`, `${right} − ${left} = ${totalWidth} → MATCH`)
+            : text(`${right} − ${left} = ${right - left}; cần ${totalWidth}`, `${right} − ${left} = ${right - left}; need ${totalWidth}`),
+          note: exactLength
+            ? text("Đúng số word và mọi count không vượt need, nên toàn bộ frequency khớp.", "The word count is exact and no count exceeds need, so all frequencies match.")
+            : text("Cửa sổ hợp lệ nhưng chưa chứa đủ toàn bộ words.", "The window is valid but does not yet contain all words."),
+          line: 22,
+          phase: exactLength ? "match" : "validate",
+          event: exactLength ? "match-check" : "incomplete",
+          decision: `${right - left} ${exactLength ? "=" : "≠"} ${totalWidth}`,
+        });
+        if (exactLength) {
+          answer.push(left);
+          matchStart = left;
+          push({
+            title: text(`result.append(${left})`, `result.append(${left})`),
+            note: text(`s[${left}:${right}] là phép nối hợp lệ; thứ tự word có thể bất kỳ.`, `s[${left}:${right}] is a valid concatenation; word order may be arbitrary.`),
+            line: 23,
+            phase: "match",
+            event: "save-match",
+            decision: `result = [${answer.join(", ")}]`,
+          });
+        }
+      }
+
+      activeStart = null;
+      activeWord = null;
+      clearTransient();
+      completedOffsets.push(offset);
+      push({
+        title: text(`Offset ${offset} hoàn tất`, `Offset ${offset} complete`),
+        note: text("Không còn đủ ký tự cho một word trọn vẹn trong lane này.", "This lane has no room for another complete word."),
+        line: 10,
+        phase: "offset",
+        event: "offset-complete",
+        decision: `${right + width} > ${s.length}`,
+      });
+    }
+
+    offset = null;
+    activeStart = null;
+    activeWord = null;
+    left = 0;
+    right = 0;
+    window = new Map();
+    clearTransient();
+    push({
+      title: text(`return [${answer.join(", ")}]`, `return [${answer.join(", ")}]`),
+      note: text("Đây là mọi vị trí bắt đầu tìm được từ tất cả word-width offsets.", "These are all start positions found across every word-width offset."),
+      line: 24,
+      phase: "done",
+      event: "done",
+      final: true,
+      decision: `result = [${answer.join(", ")}]`,
+    });
+
+    return { original: s, words, answer, steps };
   }
   function parsePoints(raw) { const points = String(raw ?? "").split(";").map((part) => part.trim()).filter(Boolean).map((part) => part.split(",").map((value) => Number(value.trim()))); if (points.length < 2 || points.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y)) || points.some((point, i) => i && point[0] <= points[i - 1][0])) throw new Error("points must be at least two strictly x-sorted x,y pairs separated by semicolons"); return points; }
   function buildSteps1499(input, params = {}) {
@@ -201,7 +557,68 @@ module.exports = {
   const hardTags = arrayTag;
   const hardStringTags = [stringTag[0], ...arrayTag];
   Object.assign(module.exports, {
-    30: { id: 30, difficulty: "hard", slug: "substring-with-concatenation-of-all-words", category, tags: hardStringTags, title: text("Substring with Concatenation of All Words", "Substring with Concatenation of All Words"), titleVi: text("Chuỗi con là phép nối của mọi từ", "Substring with Concatenation of All Words"), statement: text("Tìm mọi chỉ số bắt đầu nơi s chứa phép nối mỗi từ trong words đúng một lần, theo bất kỳ thứ tự nào.", "Find every start where s contains each word in words exactly once, in any order."), defaultInput: "barfoothefoobarman", inputKind: "string", inputLabel: text("Chuỗi s", "String s"), extraParams: [{ key: "words", type: "string", label: text("words (cách bởi dấu phẩy)", "words (comma separated)"), default: "foo,bar" }], complexity: { time: "O(|s|)", space: "O(words)", note: text("Duyệt theo từng offset của độ dài từ và duy trì tần suất cửa sổ.", "Scan each word-length offset while maintaining window frequencies.") }, code: ["class Solution:", "    def findSubstring(self, s, words):", "        need = Counter(words); result = []", "        width = len(words[0])", "        for offset in range(width):", "            left = right = offset; window = Counter()", "            while right + width <= len(s):", "                word = s[right:right+width]; right += width", "                if word not in need:", "                    window.clear(); left = right", "                else: window[word] += 1", "                while window[word] > need[word]:", "                    remove_left_word(); left += width", "                if right-left == len(words)*width:", "                    result.append(left)", "        return result"], builder: buildSteps30 },
+    30: {
+      id: 30,
+      difficulty: "hard",
+      slug: "substring-with-concatenation-of-all-words",
+      category,
+      tags: hardStringTags,
+      title: text("Substring with Concatenation of All Words", "Substring with Concatenation of All Words"),
+      titleVi: text("Chuỗi con là phép nối của mọi từ", "Substring with Concatenation of All Words"),
+      statement: text(
+        "Tìm mọi chỉ số bắt đầu nơi s chứa phép nối mỗi từ trong words đúng một lần, theo bất kỳ thứ tự nào.",
+        "Find every start where s contains each word in words exactly once, in any order.",
+      ),
+      defaultInput: "barfoothefoobarman",
+      inputKind: "string",
+      inputLabel: text("Chuỗi s", "String s"),
+      extraParams: [{
+        key: "words",
+        type: "string",
+        label: text("words (cách bởi dấu phẩy)", "words (comma separated)"),
+        default: "foo,bar",
+      }],
+      approach: [
+        text("Vì mọi word có cùng độ dài w, chia phép quét thành w offset độc lập; mỗi lane chỉ đọc trọn từng word.", "Because every word has width w, split the scan into w independent offsets; each lane reads complete words only."),
+        text("need đếm tần suất bắt buộc, window đếm các word trong [left, right). Word lạ làm RESET toàn bộ lane hiện tại.", "need stores required frequencies, while window counts words in [left, right). An unknown word RESETs the current lane."),
+        text("Nếu word vừa thêm bị dư, SHRINK từ trái. Khi right-left bằng tổng độ dài tất cả words, lưu left là một MATCH.", "If the incoming word is overrepresented, SHRINK from the left. When right-left equals the total concatenation width, save left as a MATCH."),
+      ],
+      complexity: {
+        time: "O(|s|)",
+        space: "O(words)",
+        note: text(
+          "Mỗi offset tiến left/right theo từng word; mỗi word được thêm và loại tối đa một lần.",
+          "Within each offset, left/right move by whole words; each word is added and removed at most once.",
+        ),
+      },
+      code: [
+        "class Solution:",
+        "    def findSubstring(self, s, words):",
+        "        need = Counter(words)",
+        "        result = []",
+        "        width = len(words[0])",
+        "        total_width = len(words) * width",
+        "        for offset in range(width):",
+        "            left = right = offset",
+        "            window = Counter()",
+        "            while right + width <= len(s):",
+        "                word = s[right:right + width]",
+        "                right += width",
+        "                if word not in need:",
+        "                    window.clear()",
+        "                    left = right",
+        "                    continue",
+        "                window[word] += 1",
+        "                while window[word] > need[word]:",
+        "                    removed = s[left:left + width]",
+        "                    window[removed] -= 1",
+        "                    left += width",
+        "                if right - left == total_width:",
+        "                    result.append(left)",
+        "        return result",
+      ],
+      builder: buildSteps30,
+    },
     1499: { id: 1499, difficulty: "hard", slug: "max-value-of-equation", category, tags: hardTags, title: text("Max Value of Equation", "Max Value of Equation"), titleVi: text("Giá trị lớn nhất của phương trình", "Max Value of Equation"), statement: text("Với points đã sắp xếp theo x, tìm max yᵢ + yⱼ + |xᵢ − xⱼ| khi |xᵢ − xⱼ| ≤ k.", "For x-sorted points, maximize yᵢ + yⱼ + |xᵢ − xⱼ| subject to |xᵢ − xⱼ| ≤ k."), defaultInput: "1,3;2,0;5,10;6,-10", inputKind: "string", inputLabel: text("points (x,y; x,y; ...)", "points (x,y; x,y; ...)"), extraParams: [{ key: "k", label: text("k (khoảng cách x tối đa)", "k (maximum x distance)"), default: 1 }], complexity: { time: "O(n)", space: "O(n)", note: text("Deque đơn điệu giữ các y−x tốt nhất còn nằm trong k.", "A monotonic deque retains the best in-range y−x candidates.") }, code: ["class Solution:", "    def findMaxValueOfEquation(self, points, k):", "        deque = []; answer = -inf", "        for i, (x, y) in enumerate(points):", "            while deque and x - points[deque[0]][0] > k:", "                deque.popleft()", "            if deque:", "                answer = max(answer, y + x + key(deque[0]))", "            while deque and key(deque[-1]) <= y - x:", "                deque.pop()", "            deque.append(i)", "        return answer"], builder: buildSteps1499 },
     995: { id: 995, difficulty: "hard", slug: "minimum-number-of-k-consecutive-bit-flips", category, tags: hardTags, title: text("Minimum Number of K Consecutive Bit Flips", "Minimum Number of K Consecutive Bit Flips"), titleVi: text("Số flip bit K liên tiếp ít nhất", "Minimum Number of K Consecutive Bit Flips"), statement: text("Lật chính xác k bit liên tiếp mỗi lần để biến mọi bit thành 1, với số lần ít nhất.", "Flip exactly k consecutive bits per move to make every bit 1 with the fewest moves."), defaultInput: [0, 1, 0], inputKind: "binary", inputLabel: text("nums (0 hoặc 1)", "nums (0 or 1)"), extraParams: [{ key: "k", label: text("k (độ dài flip)", "k (flip length)"), default: 1 }], complexity: { time: "O(n)", space: "O(n)", note: text("Parity và mảng đánh dấu cho biết các flip nào vẫn ảnh hưởng vị trí hiện tại.", "Parity and start markers track which prior flips still affect the current position.") }, code: ["class Solution:", "    def minKBitFlips(self, nums, k):", "        parity = answer = 0; started = [0]*len(nums)", "        for i in range(len(nums)):", "            if i >= k: parity ^= started[i-k]", "            if nums[i] == parity:", "                if i + k > len(nums): return -1", "                answer += 1", "                parity ^= 1; started[i] = 1", "        return answer"], builder: buildSteps995 },
     632: { id: 632, difficulty: "hard", slug: "smallest-range-covering-elements-from-k-lists", category, tags: hardTags, title: text("Smallest Range Covering Elements from K Lists", "Smallest Range Covering Elements from K Lists"), titleVi: text("Range nhỏ nhất chứa phần tử từ K list", "Smallest Range Covering Elements from K Lists"), statement: text("Tìm range nhỏ nhất chứa ít nhất một số từ mỗi list đã sắp xếp.", "Find the smallest range containing at least one number from every sorted list."), defaultInput: "4,10,15,24,26|0,9,12,20|5,18,22,30", inputKind: "string", inputLabel: text("Các list đã sắp xếp (cách bởi |)", "Sorted lists (pipe separated)"), extraParams: [], complexity: { time: "O(N log K)", space: "O(K)", note: text("Min-heap chứa một phần tử từ mỗi list; chỉ tiến list đang giữ minimum.", "A min-heap holds one item per list; advance only the list holding the minimum.") }, code: ["class Solution:", "    def smallestRange(self, nums):", "        heap = first_item_from_each_list(); current_max = max(heap)", "        best = [-inf, inf]", "        while True:", "            low, row, index = heappop(heap)", "            if current_max-low < best[1]-best[0]: best = [low, current_max]", "            if index + 1 == len(nums[row]): break", "            next_value = nums[row][index+1]; current_max = max(current_max, next_value)", "            heappush(heap, (next_value, row, index+1))", "        return best"], builder: buildSteps632 },

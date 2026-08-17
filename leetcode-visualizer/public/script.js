@@ -485,7 +485,7 @@ function renderCatalog() {
           { name: "16. Array Sliding Window", problems: [[209, "Minimum Size Subarray Sum"], [643, "Maximum Average Subarray I"], [904, "Fruit Into Baskets"], [1004, "Max Consecutive Ones III"], [1052, "Grumpy Bookstore Owner"], [1423, "Maximum Points You Can Obtain from Cards"], [1493, "Longest Subarray of 1's After Deleting One Element"], [1658, "Minimum Operations to Reduce X to Zero"], [1838, "Frequency of the Most Frequent Element"], [2461, "Maximum Sum of Distinct Subarrays With Length K"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
           { name: "17. Advanced Sliding Window", problems: [[30, "Substring with Concatenation of All Words"], [76, "Minimum Window Substring"], [239, "Sliding Window Maximum"], [480, "Sliding Window Median"], [632, "Smallest Range Covering Elements from K Lists"], [862, "Shortest Subarray with Sum at Least K"], [992, "Subarrays with K Different Integers"], [1438, "Longest Continuous Subarray With Absolute Diff ≤ Limit"], [1703, "Minimum Adjacent Swaps for K Consecutive Ones"], [1838, "Frequency of the Most Frequent Element"], [2302, "Count Subarrays With Score Less Than K"], [2444, "Count Subarrays With Fixed Bounds"], [2516, "Take K of Each Character From Left and Right"], [2762, "Continuous Subarrays"], [2962, "Count Subarrays Where Max Element Appears at Least K Times"]] },
         ];
-        const sequence = [3, 209, 567, 438, 424, 904, 1004, 76, 239, 992, 1438, 862];
+        const sequence = [3, 209, 567, 438, 424, 904, 1004, 76, 30, 239, 992, 1438, 862];
         const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
         const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
         const problemRow = ([id, name]) => supportedIds.has(id)
@@ -8083,6 +8083,170 @@ function renderTriangleCountView(step) {
     </div>
     <div class="tri-legend"><span><i class="tri-ptr-left"></i>left</span><span><i class="tri-ptr-right"></i>right</span><span><i class="tri-ptr-k"></i>k (cạnh lớn nhất)</span></div>
   </div>`;
+}
+
+// ---- LeetCode 30: word-sized, multi-offset sliding window ----
+function renderSubstringConcatView(step) {
+  const view = step.substringConcatView || {};
+  const s = String(view.s || "");
+  const chars = [...s];
+  const words = Array.isArray(view.words) ? view.words : [];
+  const width = Number(view.width) || 1;
+  const totalWidth = Number(view.totalWidth) || words.length * width;
+  const need = view.need || {};
+  const windowFreq = view.window || {};
+  const offset = Number.isInteger(view.offset) ? view.offset : null;
+  const left = Number.isInteger(view.left) ? view.left : 0;
+  const right = Number.isInteger(view.right) ? view.right : 0;
+  const answers = Array.isArray(view.answer) ? view.answer : [];
+  const completed = new Set(Array.isArray(view.completedOffsets) ? view.completedOffsets : []);
+  const vi = lang === "vi";
+  const inRange = (index, start, end) => Number.isInteger(start) && Number.isInteger(end) && index >= start && index <= end;
+  const answerAt = (index) => answers.some((start) => index >= start && index < start + totalWidth);
+  const phase = String(view.phase || "prepare");
+  const phaseIndex = phase === "prepare" ? 0
+    : phase === "offset" ? 1
+      : phase === "read" ? 2
+        : ["count", "validate"].includes(phase) ? 3
+          : ["reset", "shrink"].includes(phase) ? 4 : 5;
+  const phaseLabels = vi
+    ? ["Chuẩn bị", "Chọn offset", "Đọc word", "Đếm / kiểm tra", "Reset / shrink", "Match"]
+    : ["Prepare", "Choose offset", "Read word", "Count / validate", "Reset / shrink", "Match"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const charLimit = 180;
+  const charFocus = Number.isInteger(view.activeStart)
+    ? view.activeStart
+    : Number.isInteger(view.matchStart)
+      ? view.matchStart
+      : answers.length ? answers[answers.length - 1] : left;
+  const visibleCharStart = chars.length <= charLimit
+    ? 0
+    : Math.max(0, Math.min(chars.length - charLimit, charFocus - Math.floor(charLimit / 2)));
+  const visibleCharEnd = Math.min(chars.length, visibleCharStart + charLimit);
+  const visibleCharCells = chars.slice(visibleCharStart, visibleCharEnd).map((char, relativeIndex) => {
+    const index = visibleCharStart + relativeIndex;
+    const classes = ["sc30-char"];
+    if (index >= left && index < right && phase !== "done") classes.push("window");
+    if (inRange(index, view.activeStart, view.activeEnd)) classes.push("active-word");
+    if (inRange(index, view.removedStart, view.removedEnd)) classes.push("removed");
+    if (inRange(index, view.discardStart, view.discardEnd)) classes.push("discarded");
+    if (Number.isInteger(view.matchStart) && index >= view.matchStart && index < view.matchStart + totalWidth) classes.push("new-match");
+    if (answerAt(index)) classes.push("answer-range");
+    const pointers = [];
+    if (phase !== "done" && index === left) pointers.push("L");
+    if (phase !== "done" && index === right) pointers.push("R");
+    return `<div class="${classes.join(" ")}"><small>${index}</small><strong>${escapeHtml(char)}</strong>${pointers.length ? `<em>${pointers.join("/")}</em>` : ""}</div>`;
+  }).join("");
+  const charPrefix = visibleCharStart > 0 ? `<div class="sc30-ellipsis">…<small>0..${visibleCharStart - 1}</small></div>` : "";
+  const charSuffix = visibleCharEnd < chars.length ? `<div class="sc30-ellipsis">…<small>${visibleCharEnd}..${chars.length - 1}</small></div>` : "";
+  const charCells = `${charPrefix}${visibleCharCells}${charSuffix}`;
+  const endPointer = phase !== "done" && right === chars.length && visibleCharEnd === chars.length
+    ? `<div class="sc30-end-pointer"><small>${chars.length}</small><strong>R</strong></div>` : "";
+
+  const tokenCards = [];
+  if (offset !== null) {
+    const tokenCount = Math.max(0, Math.floor((s.length - offset) / width));
+    const tokenLimit = 80;
+    const tokenFocusStart = Number.isInteger(view.activeStart) ? view.activeStart : left;
+    const tokenFocus = Math.max(0, Math.floor((tokenFocusStart - offset) / width));
+    const firstToken = tokenCount <= tokenLimit
+      ? 0
+      : Math.max(0, Math.min(tokenCount - tokenLimit, tokenFocus - Math.floor(tokenLimit / 2)));
+    const lastToken = Math.min(tokenCount, firstToken + tokenLimit);
+    if (firstToken > 0) tokenCards.push(`<div class="sc30-ellipsis">…<small>word 0..${firstToken - 1}</small></div>`);
+    for (let tokenIndex = firstToken; tokenIndex < lastToken; tokenIndex++) {
+      const start = offset + tokenIndex * width;
+      const word = s.slice(start, start + width);
+      const classes = ["sc30-token"];
+      if (start >= left && start + width <= right) classes.push("window");
+      if (start === view.activeStart) classes.push("active");
+      if (start === view.removedStart) classes.push("removed");
+      if (inRange(start, view.discardStart, view.discardEnd)) classes.push("discarded");
+      if (Number.isInteger(view.matchStart) && start >= view.matchStart && start < view.matchStart + totalWidth) classes.push("new-match");
+      if (answers.some((answer) => start >= answer && start < answer + totalWidth)) classes.push("answer");
+      if (start === view.activeStart && !Object.prototype.hasOwnProperty.call(need, word)) classes.push("unknown");
+      const pointers = [
+        start === left ? "L" : "",
+        start + width === right ? "R" : "",
+      ].filter(Boolean).join(" · ");
+      tokenCards.push(`<div class="${classes.join(" ")}"><small>[${start}..${start + width - 1}]</small><strong>${escapeHtml(word)}</strong>${pointers ? `<em>${pointers}</em>` : ""}</div>`);
+    }
+    if (lastToken < tokenCount) tokenCards.push(`<div class="sc30-ellipsis">…<small>word ${lastToken}..${tokenCount - 1}</small></div>`);
+  }
+  const tokensHtml = tokenCards.length
+    ? tokenCards.join("")
+    : `<span class="sc30-empty">${vi ? "Chọn một offset để chia s thành các word chunk." : "Choose an offset to split s into word chunks."}</span>`;
+
+  const offsetLanes = Array.from({ length: width }, (_, lane) => {
+    const state = completed.has(lane) ? "done" : lane === offset ? "active" : "pending";
+    return `<span class="${state}"><small>offset</small><strong>${lane}</strong><em>${state === "done" ? "✓" : state === "active" ? "RUN" : "WAIT"}</em></span>`;
+  }).join("");
+
+  const frequencyWords = [...new Set([...Object.keys(need), ...Object.keys(windowFreq)])];
+  const frequencyRows = frequencyWords.map((word) => {
+    const required = Number(need[word] || 0);
+    const have = Number(windowFreq[word] || 0);
+    const status = have > required ? "over" : have === required && required > 0 ? "exact" : "missing";
+    const statusText = status === "over" ? (vi ? "DƯ" : "OVER") : status === "exact" ? (vi ? "ĐỦ" : "EXACT") : (vi ? "THIẾU" : "MISSING");
+    return `<div class="sc30-freq-row ${status}"><strong>${escapeHtml(word)}</strong><span><small>need</small><b>${required}</b></span><i>vs</i><span><small>window</small><b>${have}</b></span><em>${statusText}</em></div>`;
+  }).join("") || `<span class="sc30-empty">—</span>`;
+
+  const eventLabels = {
+    "build-need": vi ? "COUNTER" : "COUNTER",
+    "offset-start": "OFFSET",
+    "read-word": "READ",
+    "advance-right": "EXPAND",
+    "known-word": vi ? "HỢP LỆ" : "KNOWN",
+    "unknown-word": "UNKNOWN",
+    "reset-clear": "RESET",
+    "reset-left": "RESET L",
+    "add-word": "COUNT",
+    "over-count": "SHRINK",
+    "count-within": vi ? "KHÔNG SHRINK" : "NO SHRINK",
+    "shrink-complete": vi ? "SHRINK XONG" : "SHRINK DONE",
+    "pick-remove": "REMOVE",
+    "remove-count": "DECREMENT",
+    "advance-left": "MOVE L",
+    "match-check": "MATCH?",
+    "save-match": "MATCH ✓",
+    "offset-complete": vi ? "XONG OFFSET" : "OFFSET DONE",
+    done: "DONE",
+  };
+  const eventLabel = eventLabels[view.event] || String(view.event || "STEP").toUpperCase();
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const activeWordText = view.activeWord === null || view.activeWord === undefined ? "—" : JSON.stringify(view.activeWord);
+  const windowLength = Math.max(0, right - left);
+  const answerLimit = 80;
+  const visibleAnswers = answers.length <= answerLimit
+    ? answers
+    : [...answers.slice(0, answerLimit / 2), ...answers.slice(-answerLimit / 2)];
+  const answerChips = visibleAnswers.length
+    ? `${visibleAnswers.slice(0, answers.length > answerLimit ? answerLimit / 2 : visibleAnswers.length).map((start) => `<span class="${start === view.matchStart ? "new" : ""}"><b>${start}</b><small>s[${start}:${start + totalWidth}]</small></span>`).join("")}${answers.length > answerLimit ? `<span class="sc30-answer-summary"><b>…</b><small>${answers.length - answerLimit} ${vi ? "kết quả ẩn" : "hidden results"}</small></span>${visibleAnswers.slice(answerLimit / 2).map((start) => `<span class="${start === view.matchStart ? "new" : ""}"><b>${start}</b><small>s[${start}:${start + totalWidth}]</small></span>`).join("")}` : ""}`
+    : `<span class="sc30-answer-empty">${vi ? "Chưa có match" : "No match yet"}</span>`;
+
+  $("treeView").innerHTML = `<section class="sc30-viz" role="img" aria-label="LeetCode 30 sliding window visualization">
+    <div class="sc30-phases">${phases}</div>
+    <div class="sc30-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><b>${escapeHtml(eventLabel)}</b><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="sc30-formula">
+      <div><small>word width</small><strong>${width}</strong><span>${vi ? "mỗi bước nhảy" : "each pointer jump"}</span></div>
+      <b>×</b>
+      <div><small>words</small><strong>${words.length}</strong><span>[${words.map((word) => escapeHtml(word)).join(", ")}]</span></div>
+      <b>=</b>
+      <div class="total"><small>target window</small><strong>${totalWidth}</strong><span>${vi ? "ký tự" : "characters"}</span></div>
+    </section>
+    <section class="sc30-offsets"><header><strong>${vi ? "CÁC OFFSET LANE" : "OFFSET LANES"}</strong><span>${vi ? "Mỗi lane đọc word tại các index cùng modulo width" : "Each lane reads starts with the same modulo width"}</span></header><div>${offsetLanes}</div></section>
+    <section class="sc30-string"><header><strong>s = ${escapeHtml(JSON.stringify(s))}</strong><span>${vi ? "xanh=cửa sổ · vàng=word đang đọc · đỏ=reset/remove · lục=match" : "blue=window · gold=incoming word · red=reset/remove · green=match"}</span></header><div class="sc30-char-scroll"><div class="sc30-chars">${charCells}${endPointer}</div></div></section>
+    <section class="sc30-token-section"><header><strong>${vi ? `WORD CHUNKS · OFFSET ${offset ?? "—"}` : `WORD CHUNKS · OFFSET ${offset ?? "—"}`}</strong><span>right ${vi ? "là biên phải exclusive" : "is an exclusive boundary"}</span></header><div class="sc30-token-scroll"><div class="sc30-tokens">${tokensHtml}</div></div></section>
+    <div class="sc30-main">
+      <section class="sc30-frequencies"><header><strong>need vs window</strong><span>${vi ? "Tần suất phải khớp chính xác" : "Frequencies must match exactly"}</span></header><div>${frequencyRows}</div></section>
+      <section class="sc30-decision ${escapeHtml(String(view.phase || ""))}"><header><small>${eventLabel}</small><strong>${escapeHtml(view.decision || "—")}</strong></header><div class="sc30-metrics"><span><small>L</small><b>${left}</b></span><span><small>R</small><b>${right}</b></span><span><small>R−L</small><b>${windowLength}</b></span><span><small>${vi ? "word trong window" : "window words"}</small><b>${view.windowWords ?? 0}/${words.length}</b></span></div><footer><span>${vi ? "word hiện tại" : "incoming word"}</span><strong>${escapeHtml(activeWordText)}</strong></footer></section>
+    </div>
+    <section class="sc30-answers"><header><strong>result</strong><span>${vi ? "Chỉ số bắt đầu hợp lệ" : "Valid start indices"}${view.truncated ? ` · ${vi ? "timeline đã rút gọn cho input dài" : "timeline capped for long input"}` : ""}</span></header><div>${answerChips}</div></section>
+  </section>`;
 }
 
 // ---- Sliding-window frequency visualization (e.g. bai 2958: Length of
@@ -16109,6 +16273,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMultiSlotPodiumView(step);
+  } else if (step.substringConcatView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderSubstringConcatView(step);
   } else if (step.slidingFreqView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
