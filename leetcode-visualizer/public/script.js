@@ -14643,6 +14643,76 @@ function renderMapSumView(step) {
   }
 }
 
+function renderMaximumSubarrayView(step) {
+  const view = step.maximumSubarrayView || {};
+  const el = $("treeView");
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const n = nums.length;
+  const isDP = view.approach === "dp";
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const curHistory = Array.isArray(view.curHistory) ? view.curHistory : [];
+  const phase = view.phase || "init";
+  const phaseIndex = phase === "done" ? 3 : phase.startsWith("update") ? 2 : phase === "loop" ? 1 : 0;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Quét phần tử", "Cập nhật cur/dp · best", "Kết quả"]
+    : ["Initialize", "Scan element", "Update cur/dp · best", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const curIdx = view.i !== null && view.i !== undefined ? view.i : null;
+  const curStart = Number.isFinite(view.curStart) ? view.curStart : 0;
+  const curEnd = Number.isFinite(view.curEnd) ? view.curEnd : 0;
+  const bestL = Number.isFinite(view.bestL) ? view.bestL : 0;
+  const bestR = Number.isFinite(view.bestR) ? view.bestR : 0;
+  const curVal = Number.isFinite(view.cur) ? view.cur : (Number.isFinite(view.maxSum) ? view.maxSum : 0);
+  const bestVal = Number.isFinite(view.best) ? view.best : (Number.isFinite(view.maxSum) ? view.maxSum : 0);
+  const decision = view.decision;
+  const bestUpdated = view.bestUpdated || view.maxUpdated || false;
+
+  const maxAbs = Math.max(1, ...nums.map(Math.abs));
+  const cells = nums.map((val, index) => {
+    const classes = ["msa53-cell"];
+    const inCurrent = index >= curStart && index <= curEnd && phase !== "done" && phase !== "init";
+    const inBest = index >= bestL && index <= bestR;
+    if (inBest) classes.push("in-best");
+    if (inCurrent && !isDP) classes.push("in-current");
+    if (index === curIdx) classes.push("active");
+    if (val < 0) classes.push("negative");
+    const barH = Math.round((Math.abs(val) / maxAbs) * 100);
+    const dpVal = isDP ? (dp[index] !== null ? dp[index] : "·") : (curHistory[index] !== null ? curHistory[index] : "·");
+    return `<div class="${classes.join(" ")}"><small>[${index}]</small><div class="msa53-bar ${val < 0 ? "neg" : "pos"}" style="height:${barH}%"></div><strong>${escapeHtml(String(val))}</strong><em>${escapeHtml(String(dpVal))}</em></div>`;
+  }).join("");
+
+  const decisionClass = decision === "start-fresh" ? "fresh" : decision === "extend" ? "extend" : "idle";
+  const decisionLabel = decision === "start-fresh"
+    ? (vi ? "⚡ BẮT ĐẦU MỚI" : "⚡ START FRESH")
+    : decision === "extend"
+      ? (vi ? "→ MỞ RỘNG" : "→ EXTEND")
+      : (vi ? "—" : "—");
+  const formulaText = isDP
+    ? (curIdx !== null && curIdx > 0 ? `dp[${curIdx}] = max(dp[${curIdx - 1}]+nums[${curIdx}], nums[${curIdx}])` : "dp[0] = nums[0]")
+    : (curIdx !== null && curIdx > 0 ? `cur = max(nums[${curIdx}], cur+nums[${curIdx}])` : "cur = nums[0]");
+
+  const bestSubarray = nums.slice(bestL, bestR + 1);
+  const summary = vi
+    ? `#53 Maximum Subarray · ${isDP ? "DP Array" : "Kadane"} · best=${bestVal}`
+    : `#53 Maximum Subarray · ${isDP ? "DP Array" : "Kadane"} · best=${bestVal}`;
+
+  el.innerHTML = `<section class="msa53-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="msa53-phases">${phases}</div>
+    <section class="msa53-array"><header><strong>nums</strong><span>${vi ? "xanh = subarray hiện tại · vàng = best · dưới = " + (isDP ? "dp[i]" : "cur tại i") : "blue = current subarray · gold = best · below = " + (isDP ? "dp[i]" : "cur at i")}</span></header><div class="msa53-scroll"><div class="msa53-cells">${cells}</div></div></section>
+    <div class="msa53-dashboard">
+      <div class="msa53-formula"><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>${escapeHtml(formulaText)}</code></div>
+      <div class="msa53-decision ${decisionClass}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(decisionLabel)}</strong></div>
+      <div class="msa53-metrics"><div class="msa53-cur"><small>${isDP ? "dp[i]" : "cur"}</small><strong>${escapeHtml(String(isDP ? (curIdx !== null && dp[curIdx] !== null ? dp[curIdx] : "—") : curVal))}</strong></div><div class="msa53-best ${bestUpdated ? "updated" : ""}"><small>best</small><strong>${escapeHtml(String(bestVal))}${bestUpdated ? " 📈" : ""}</strong></div></div>
+    </div>
+    <section class="msa53-result"><header><strong>${vi ? "BEST SUBARRAY" : "BEST SUBARRAY"}</strong><span>[${bestL}..${bestR}]</span></header><div class="msa53-best-values">${bestSubarray.map((v) => `<span>${escapeHtml(String(v))}</span>`).join(" <b>+</b> ")} <b>=</b> <em>${escapeHtml(String(bestVal))}</em></div></section>
+  </section>`;
+}
+
 function renderBricks803View(step) {
   const view = step.bricks803View || {};
   const el = $("treeView");
@@ -15471,6 +15541,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFourSumPairsView(step);
+  } else if (step.maximumSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximumSubarrayView(step);
   } else {
     $("treeView").classList.add("hidden");
     $("gridView").classList.add("hidden");
