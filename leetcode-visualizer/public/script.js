@@ -14673,28 +14673,46 @@ function renderMaximumSubarrayView(step) {
   const bestUpdated = view.bestUpdated || view.maxUpdated || false;
 
   const maxAbs = Math.max(1, ...nums.map(Math.abs));
+  const isDone = phase === "done";
   const cells = nums.map((val, index) => {
     const classes = ["msa53-cell"];
-    const inCurrent = index >= curStart && index <= curEnd && phase !== "done" && phase !== "init";
+    const inCurrent = index >= curStart && index <= curEnd && !isDone && phase !== "init";
     const inBest = index >= bestL && index <= bestR;
     if (inBest) classes.push("in-best");
-    if (inCurrent && !isDP) classes.push("in-current");
+    if (inCurrent) classes.push("in-current");
     if (index === curIdx) classes.push("active");
     if (val < 0) classes.push("negative");
     const barH = Math.round((Math.abs(val) / maxAbs) * 100);
     const dpVal = isDP ? (dp[index] !== null ? dp[index] : "·") : (curHistory[index] !== null ? curHistory[index] : "·");
-    return `<div class="${classes.join(" ")}"><small>[${index}]</small><div class="msa53-bar ${val < 0 ? "neg" : "pos"}" style="height:${barH}%"></div><strong>${escapeHtml(String(val))}</strong><em>${escapeHtml(String(dpVal))}</em></div>`;
+    const bar = val < 0
+      ? `<i class="msa53-half up"></i><i class="msa53-zero"></i><i class="msa53-half down"><b class="msa53-bar neg" style="height:${barH}%"></b></i>`
+      : `<i class="msa53-half up"><b class="msa53-bar pos" style="height:${barH}%"></b></i><i class="msa53-zero"></i><i class="msa53-half down"></i>`;
+    return `<div class="${classes.join(" ")}"><small>[${index}]</small><div class="msa53-plot">${bar}</div><strong>${escapeHtml(String(val))}</strong><em>${escapeHtml(String(dpVal))}</em></div>`;
   }).join("");
 
-  const decisionClass = decision === "start-fresh" ? "fresh" : decision === "extend" ? "extend" : "idle";
-  const decisionLabel = decision === "start-fresh"
-    ? (vi ? "⚡ BẮT ĐẦU MỚI" : "⚡ START FRESH")
-    : decision === "extend"
-      ? (vi ? "→ MỞ RỘNG" : "→ EXTEND")
-      : (vi ? "—" : "—");
-  const formulaText = isDP
-    ? (curIdx !== null && curIdx > 0 ? `dp[${curIdx}] = max(dp[${curIdx - 1}]+nums[${curIdx}], nums[${curIdx}])` : "dp[0] = nums[0]")
-    : (curIdx !== null && curIdx > 0 ? `cur = max(nums[${curIdx}], cur+nums[${curIdx}])` : "cur = nums[0]");
+  let decisionClass = "idle";
+  let decisionLabel = vi ? "chờ bước tiếp" : "awaiting next step";
+  if (isDone) {
+    decisionClass = "final";
+    decisionLabel = vi ? `✓ TỔNG = ${bestVal}` : `✓ SUM = ${bestVal}`;
+  } else if (decision === "start-fresh") {
+    decisionClass = "fresh";
+    decisionLabel = vi ? "⚡ BẮT ĐẦU MỚI" : "⚡ START FRESH";
+  } else if (decision === "extend") {
+    decisionClass = "extend";
+    decisionLabel = vi ? "→ MỞ RỘNG" : "→ EXTEND";
+  }
+
+  let formulaText;
+  if (isDone) {
+    formulaText = isDP ? `return max_sum = ${bestVal}` : `return best = ${bestVal}`;
+  } else if (curIdx !== null && curIdx > 0) {
+    formulaText = isDP
+      ? `dp[${curIdx}] = max(dp[${curIdx - 1}]+nums[${curIdx}], nums[${curIdx}])`
+      : `cur = max(nums[${curIdx}], cur+nums[${curIdx}])`;
+  } else {
+    formulaText = isDP ? "dp[0] = nums[0]" : "cur = nums[0]";
+  }
 
   const bestSubarray = nums.slice(bestL, bestR + 1);
   const summary = vi
@@ -14707,7 +14725,7 @@ function renderMaximumSubarrayView(step) {
     <div class="msa53-dashboard">
       <div class="msa53-formula"><small>${vi ? "CÔNG THỨC" : "FORMULA"}</small><code>${escapeHtml(formulaText)}</code></div>
       <div class="msa53-decision ${decisionClass}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(decisionLabel)}</strong></div>
-      <div class="msa53-metrics"><div class="msa53-cur"><small>${isDP ? "dp[i]" : "cur"}</small><strong>${escapeHtml(String(isDP ? (curIdx !== null && dp[curIdx] !== null ? dp[curIdx] : "—") : curVal))}</strong></div><div class="msa53-best ${bestUpdated ? "updated" : ""}"><small>best</small><strong>${escapeHtml(String(bestVal))}${bestUpdated ? " 📈" : ""}</strong></div></div>
+      <div class="msa53-metrics"><div class="msa53-cur ${isDone ? "muted" : ""}"><small>${isDP ? "dp[i]" : "cur"}</small><strong>${escapeHtml(String(isDone ? "—" : (isDP ? (curIdx !== null && dp[curIdx] !== null ? dp[curIdx] : "—") : curVal)))}</strong></div><div class="msa53-best ${bestUpdated ? "updated" : ""} ${isDone ? "final" : ""}"><small>${isDP ? "max_sum" : "best"}</small><strong>${escapeHtml(String(bestVal))}${bestUpdated ? " 📈" : ""}</strong></div></div>
     </div>
     <section class="msa53-result"><header><strong>${vi ? "BEST SUBARRAY" : "BEST SUBARRAY"}</strong><span>[${bestL}..${bestR}]</span></header><div class="msa53-best-values">${bestSubarray.map((v) => `<span>${escapeHtml(String(v))}</span>`).join(" <b>+</b> ")} <b>=</b> <em>${escapeHtml(String(bestVal))}</em></div></section>
   </section>`;

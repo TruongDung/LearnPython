@@ -1774,10 +1774,15 @@ function buildSteps53DP(nums) {
   const n = nums.length;
   const dp = new Array(n).fill(null);
   const steps = [];
+  // starts[i] = index where the subarray represented by dp[i] begins, so the
+  // visualization can highlight the real range instead of a single cell.
+  const starts = new Array(n).fill(0);
   let maxSum = null;
   let bestIdx = 0;
 
   function push53dp(opts) {
+    const i = opts.i !== undefined ? opts.i : null;
+    const curEnd = opts.curEnd !== undefined ? opts.curEnd : i;
     steps.push({
       title: opts.title,
       note: opts.note,
@@ -1795,9 +1800,14 @@ function buildSteps53DP(nums) {
         event: opts.event,
         nums: [...nums],
         dp: dp.map((v) => (v === null ? null : v)),
-        i: opts.i !== undefined ? opts.i : null,
+        i,
+        curStart: curEnd === null ? 0 : starts[curEnd],
+        curEnd: curEnd === null ? 0 : curEnd,
         maxSum: maxSum !== null ? maxSum : null,
         bestIdx,
+        bestL: starts[bestIdx],
+        bestR: bestIdx,
+        best: maxSum !== null ? maxSum : null,
         decision: opts.decision || null,
         extend: opts.extend !== undefined ? opts.extend : null,
         oldMax: opts.oldMax !== undefined ? opts.oldMax : null,
@@ -1848,11 +1858,16 @@ function buildSteps53DP(nums) {
     });
 
     dp[i] = Math.max(extend, nums[i]);
+    starts[i] = restart ? i : starts[i - 1];
     push53dp({
       title: { vi: `dp[${i}] = max(${extend}, ${nums[i]}) = ${dp[i]}`, en: `dp[${i}] = max(${extend}, ${nums[i]}) = ${dp[i]}` },
       note: {
-        vi: restart ? `${extend} < ${nums[i]} → BẮT ĐẦU SUBARRAY MỚI. dp[${i}]=${dp[i]}.` : `${extend} ≥ ${nums[i]} → NỐI TIẾP. dp[${i}]=${dp[i]}.`,
-        en: restart ? `${extend} < ${nums[i]} → START NEW SUBARRAY. dp[${i}]=${dp[i]}.` : `${extend} ≥ ${nums[i]} → EXTEND. dp[${i}]=${dp[i]}.`,
+        vi: restart
+          ? `${extend} < ${nums[i]} → BẮT ĐẦU SUBARRAY MỚI tại ${i}. dp[${i}]=${dp[i]}.`
+          : `${extend} ≥ ${nums[i]} → NỐI TIẾP subarray từ ${starts[i]}. dp[${i}]=${dp[i]}.`,
+        en: restart
+          ? `${extend} < ${nums[i]} → START NEW SUBARRAY at ${i}. dp[${i}]=${dp[i]}.`
+          : `${extend} ≥ ${nums[i]} → EXTEND the subarray from ${starts[i]}. dp[${i}]=${dp[i]}.`,
       },
       codeLines: [8], phase: "update-dp", event: restart ? "start-fresh" : "extend", i,
       highlight: [i - 1, i], mark: [i],
@@ -1862,6 +1877,7 @@ function buildSteps53DP(nums) {
         { name: `nums[${i}]`, value: nums[i] },
         { name: `dp[${i}]`, value: dp[i] },
         { name: "decision", value: restart ? "start fresh" : "extend" },
+        { name: "subarray", value: `[${starts[i]}..${i}]` },
       ],
     });
 
@@ -1878,12 +1894,21 @@ function buildSteps53DP(nums) {
     });
   }
 
+  const bestStart = starts[bestIdx];
   push53dp({
     title: { vi: `Kết quả: max_sum = ${maxSum}`, en: `Result: max_sum = ${maxSum}` },
-    note: { vi: `Tổng lớn nhất = max(dp) = ${maxSum}, đạt tại dp[${bestIdx}].`, en: `Maximum sum = max(dp) = ${maxSum}, reached at dp[${bestIdx}].` },
+    note: {
+      vi: `Tổng lớn nhất = max(dp) = ${maxSum}, đạt tại dp[${bestIdx}]. Subarray: [${nums.slice(bestStart, bestIdx + 1).join(",")}] (vị trí ${bestStart}..${bestIdx}).`,
+      en: `Maximum sum = max(dp) = ${maxSum}, reached at dp[${bestIdx}]. Subarray: [${nums.slice(bestStart, bestIdx + 1).join(",")}] (indices ${bestStart}..${bestIdx}).`,
+    },
     codeLines: [10], phase: "done", event: "done",
-    mark: [bestIdx], final: true,
-    vars: [{ name: "max_sum", value: maxSum }, { name: `dp[${bestIdx}]`, value: maxSum }],
+    mark: Array.from({ length: bestIdx - bestStart + 1 }, (_, x) => bestStart + x),
+    curEnd: bestIdx, final: true,
+    vars: [
+      { name: "max_sum", value: maxSum },
+      { name: "subarray", value: `[${nums.slice(bestStart, bestIdx + 1).join(",")}]` },
+      { name: "indices", value: `${bestStart}..${bestIdx}` },
+    ],
   });
 
   return { original: [...nums], answer: maxSum, steps };
