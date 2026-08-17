@@ -424,36 +424,59 @@ function buildSteps152(nums) {
       ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
       : []
   );
-  const snapshot = () => ({
-    nums: [...nums],
-    phase,
-    i,
-    x,
-    prevMax,
-    prevMin,
-    maxBase,
-    minBase,
-    extendMax,
-    extendMin,
-    curMax,
-    curMin,
-    oldBest,
-    best,
-    maxStart,
-    maxEnd,
-    minStart,
-    minEnd,
-    bestStart,
-    bestEnd,
-    maxSource,
-    minSource,
-    swapped,
-    zeroReset,
-    bestUpdated,
-    maxHistory: [...maxHistory],
-    minHistory: [...minHistory],
-    bestHistory: [...bestHistory],
-  });
+  const rangeValues = (start, end) => indices(start, end).map((index) => nums[index]);
+  const nextNegativeIndex = (from) => {
+    for (let j = from; j < n; j++) if (nums[j] < 0) return j;
+    return null;
+  };
+  const snapshot = () => {
+    const upcomingNegative = phase === "done" ? null : nextNegativeIndex(i + 1);
+    return {
+      nums: [...nums],
+      phase,
+      i,
+      x,
+      prevMax,
+      prevMin,
+      prevMaxStart,
+      prevMinStart,
+      maxBase,
+      minBase,
+      maxBaseStart,
+      minBaseStart,
+      extendMax,
+      extendMin,
+      curMax,
+      curMin,
+      oldBest,
+      best,
+      maxStart,
+      maxEnd,
+      minStart,
+      minEnd,
+      bestStart,
+      bestEnd,
+      maxSource,
+      minSource,
+      maxPick: maxSource === "pending" ? null : maxSource === "restart" ? "restart" : "extend",
+      minPick: minSource === "pending" ? null : minSource === "restart" ? "restart" : "extend",
+      maxValues: rangeValues(maxStart, maxEnd),
+      minValues: rangeValues(minStart, minEnd),
+      bestValues: rangeValues(bestStart, bestEnd),
+      prevMaxValues: rangeValues(prevMaxStart, i - 1),
+      prevMinValues: rangeValues(prevMinStart, i - 1),
+      upcomingNegativeIndex: upcomingNegative,
+      upcomingNegativeValue: upcomingNegative === null ? null : nums[upcomingNegative],
+      minFlipPreview: upcomingNegative === null ? null : curMin * nums[upcomingNegative],
+      maxFlipPreview: upcomingNegative === null ? null : curMax * nums[upcomingNegative],
+      swapped,
+      zeroReset,
+      bestUpdated,
+      maxHistory: [...maxHistory],
+      minHistory: [...minHistory],
+      bestHistory: [...bestHistory],
+    };
+  };
   const addStep = ({ title, note, codeLine, vars = [], final = false }) => {
     steps.push({
       title,

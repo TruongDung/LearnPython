@@ -13620,21 +13620,24 @@ function renderMaximumProductView(step) {
   const phase = String(view.phase || "init");
   const i = Number.isInteger(view.i) ? view.i : 0;
   const x = view.x;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const product = (values) => (Array.isArray(values) && values.length ? values.join(" × ") : "—");
+  const inRange = (index, start, end) => Number.isInteger(start) && Number.isInteger(end) && index >= start && index <= end;
+  const maxReady = ["init", "max", "min", "best", "done"].includes(phase);
+  const minReady = ["init", "min", "best", "done"].includes(phase);
+
   const phaseIndex = phase === "done" || phase === "best" ? 4
     : phase === "min" ? 3
       : phase === "max" ? 2
         : ["sign", "swap"].includes(phase) ? 1 : 0;
   const labels = vi
-    ? ["Đọc x", "Kiểm tra dấu / swap", "Cập nhật max", "Cập nhật min", "Cập nhật best"]
-    : ["Read x", "Check sign / swap", "Update max", "Update min", "Update best"];
+    ? ["Đọc x", "Xét dấu", "Cập nhật MAX", "Cập nhật MIN", "Cập nhật BEST"]
+    : ["Read x", "Check sign", "Update MAX", "Update MIN", "Update BEST"];
   const phases = labels.map((label, index) => {
     const done = phase === "done" || index < phaseIndex;
     return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
   }).join("");
 
-  const inRange = (index, start, end) => Number.isInteger(start) && Number.isInteger(end) && index >= start && index <= end;
-  const maxReady = ["init", "max", "min", "best", "done"].includes(phase);
-  const minReady = ["init", "min", "best", "done"].includes(phase);
   const cells = nums.map((value, index) => {
     const classes = ["mps152-cell"];
     if (index === i && phase !== "done") classes.push("active");
@@ -13647,69 +13650,110 @@ function renderMaximumProductView(step) {
     if (maxReady && index === view.maxEnd) badges.push('<b class="max">MAX</b>');
     if (minReady && index === view.minEnd) badges.push('<b class="min">MIN</b>');
     if (index === view.bestEnd) badges.push('<b class="best">BEST</b>');
+    if (index === view.upcomingNegativeIndex) badges.push(`<b class="soon">${vi ? "ÂM SẮP TỚI" : "NEG NEXT"}</b>`);
     return `<div class="${classes.join(" ")}">
       <small>[${index}]</small><strong>${escapeHtml(String(value))}</strong>
-      <div><span>max ${escapeHtml(view.maxHistory[index] ?? "·")}</span><span>min ${escapeHtml(view.minHistory[index] ?? "·")}</span></div>
+      <div><span>max ${escapeHtml(display(view.maxHistory[index]))}</span><span>min ${escapeHtml(display(view.minHistory[index]))}</span></div>
       <em>${badges.join("")}</em>
     </div>`;
   }).join("");
 
-  const sourceText = (source, lane) => {
-    const labelsBySource = vi
-      ? { restart: "bắt đầu lại từ x", "previous-max": "nối từ max cũ", "previous-min": "nối từ min cũ", init: "khởi tạo", pending: "chưa cập nhật" }
-      : { restart: "restart from x", "previous-max": "extend old max", "previous-min": "extend old min", init: "initialize", pending: "not updated yet" };
-    return labelsBySource[source] || (vi ? `nhánh ${lane}` : `${lane} lane`);
-  };
-  const display = (value) => value === null || value === undefined ? "—" : String(value);
-  const laneHtml = (kind) => {
-    const isMax = kind === "max";
-    const ready = isMax ? maxReady : minReady;
-    const base = isMax ? view.maxBase : view.minBase;
-    const extended = isMax ? view.extendMax : view.extendMin;
-    const selected = isMax ? view.curMax : view.curMin;
-    const start = isMax ? view.maxStart : view.minStart;
-    const end = isMax ? view.maxEnd : view.minEnd;
-    const source = isMax ? view.maxSource : view.minSource;
-    const operation = isMax ? "max" : "min";
-    const title = isMax
-      ? (vi ? "MAX kết thúc tại i" : "MAX ending at i")
-      : (vi ? "MIN kết thúc tại i" : "MIN ending at i");
-    if (phase === "init") {
-      return `<section class="mps152-lane ${kind} active"><header><strong>${title}</strong><span>${isMax ? "lớn nhất" : "nhỏ nhất"}</span></header><div class="mps152-initial">${escapeHtml(String(selected))}</div><footer>nums[0..0]</footer></section>`;
-    }
-    return `<section class="mps152-lane ${kind} ${phase === kind ? "active" : ""}">
-      <header><strong>${title}</strong><span>${escapeHtml(sourceText(source, kind))}</span></header>
-      <div class="mps152-choice">
-        <span><small>${vi ? "BẮT ĐẦU LẠI" : "RESTART"}</small><b>${escapeHtml(display(x))}</b></span>
-        <i>${operation}</i>
-        <span><small>${vi ? "MỞ RỘNG" : "EXTEND"}</small><b>${escapeHtml(display(base))} × ${escapeHtml(display(x))} = ${escapeHtml(display(extended))}</b></span>
-        <em>→</em>
-        <span class="picked"><small>${vi ? "CHỌN" : "PICK"}</small><b>${ready ? escapeHtml(display(selected)) : "?"}</b></span>
-      </div>
-      <footer>${ready ? `nums[${start}..${end}]` : (vi ? "chờ dòng cập nhật" : "waiting for update line")}</footer>
-    </section>`;
-  };
+  // Step 1 explains the meaning of both DP states before any arithmetic.
+  const meaning = `<section class="mps152-meaning">
+    <div class="max"><small>cur_max</small><strong>${escapeHtml(display(view.curMax))}</strong><span>${vi ? "tích LỚN NHẤT của một subarray kết thúc đúng tại i" : "LARGEST product of a subarray ending exactly at i"}</span><code>${escapeHtml(maxReady ? `${product(view.maxValues)} = ${display(view.curMax)}` : "—")}</code></div>
+    <div class="min"><small>cur_min</small><strong>${escapeHtml(display(view.curMin))}</strong><span>${vi ? "tích NHỎ NHẤT kết thúc tại i — giữ để dùng khi gặp số âm" : "SMALLEST product ending at i — kept for a future negative"}</span><code>${escapeHtml(minReady ? `${product(view.minValues)} = ${display(view.curMin)}` : "—")}</code></div>
+  </section>`;
 
+  // Step 2 answers the real question: why keep a minimum at all?
+  const hasPreview = Number.isInteger(view.upcomingNegativeIndex) && minReady;
+  const minFlipsToBest = hasPreview && Number(view.minFlipPreview) > Number(view.maxFlipPreview);
+  const whyMin = `<section class="mps152-why ${minFlipsToBest ? "critical" : ""}">
+    <header><strong>${vi ? "VÌ SAO PHẢI GIỮ cur_min?" : "WHY KEEP cur_min?"}</strong><span>${vi ? "âm × âm = dương" : "negative × negative = positive"}</span></header>
+    ${hasPreview
+      ? `<div class="mps152-preview">
+          <span><small>cur_min</small><b>${escapeHtml(display(view.curMin))}</b></span><i>×</i>
+          <span><small>nums[${view.upcomingNegativeIndex}]</small><b>${escapeHtml(display(view.upcomingNegativeValue))}</b></span><em>=</em>
+          <span class="${minFlipsToBest ? "win" : ""}"><small>${vi ? "SẼ THÀNH" : "WILL BECOME"}</small><b>${escapeHtml(display(view.minFlipPreview))}</b></span>
+          <span class="versus"><small>${vi ? "nếu chỉ dùng cur_max" : "if only cur_max"}</small><b>${escapeHtml(display(view.maxFlipPreview))}</b></span>
+          <p>${minFlipsToBest
+            ? escapeHtml(vi ? `Tại index ${view.upcomingNegativeIndex}, cur_min hiện tại sẽ tạo tích lớn hơn cur_min bị bỏ qua. Đây chính là lý do phải lưu cả min.` : `At index ${view.upcomingNegativeIndex}, today's cur_min produces the larger product. That is exactly why min must be stored.`)
+            : escapeHtml(vi ? `Lần này cur_max thắng, nhưng cur_min vẫn phải giữ vì ta không biết trước dấu của các số sau.` : `cur_max wins this time, but cur_min must still be kept because future signs are unknown.`)}</p>
+        </div>`
+      : `<div class="mps152-preview none"><p>${escapeHtml(vi ? "Không còn số âm nào phía sau, nên cur_min không thể lật thành đáp án nữa." : "No negative numbers remain, so cur_min can no longer flip into the answer.")}</p></div>`}
+  </section>`;
+
+  // Step 3 makes the swap concrete instead of abstract.
   let signClass = "positive";
   let signTitle;
   let signDetail;
   if (view.zeroReset) {
     signClass = "zero";
-    signTitle = vi ? "x = 0 · RESET ĐOẠN" : "x = 0 · RESET SEGMENT";
-    signDetail = vi ? "Mọi tích nối qua đây bằng 0; max và min cùng khởi động lại." : "Every product crossing here is 0; max and min both restart.";
+    signTitle = vi ? "x = 0 → RESET" : "x = 0 → RESET";
+    signDetail = vi ? "Mọi tích đi qua 0 đều bằng 0, nên hai nhánh phải bắt đầu lại." : "Every product crossing zero becomes 0, so both lanes restart.";
   } else if (Number(x) < 0) {
     signClass = "negative";
-    signTitle = view.swapped ? (vi ? "ĐÃ SWAP MAX ↔ MIN" : "MAX ↔ MIN SWAPPED") : (vi ? "SỐ ÂM: CẦN SWAP" : "NEGATIVE: SWAP NEEDED");
-    signDetail = view.swapped
-      ? `${vi ? "max nhận min cũ" : "max gets old min"} ${display(view.prevMin)} · ${vi ? "min nhận max cũ" : "min gets old max"} ${display(view.prevMax)}`
-      : (vi ? "Âm × nhỏ nhất có thể thành dương lớn nhất." : "Negative × smallest can become the largest positive.");
+    signTitle = view.swapped ? (vi ? "ĐÃ ĐỔI VAI TRÒ" : "ROLES SWAPPED") : (vi ? "x < 0 → SẮP ĐỔI VAI TRÒ" : "x < 0 → ROLES WILL SWAP");
+    signDetail = vi
+      ? "Nhân số âm làm đảo thứ tự, nên nhánh MAX phải xuất phát từ min cũ."
+      : "Multiplying by a negative reverses order, so the MAX lane must start from the old min.";
   } else {
-    signTitle = vi ? "KHÔNG SWAP" : "NO SWAP";
-    signDetail = vi ? "x dương: max nối max, min nối min." : "Positive x: max extends max and min extends min.";
+    signTitle = vi ? "x > 0 → GIỮ NGUYÊN VAI TRÒ" : "x > 0 → ROLES UNCHANGED";
+    signDetail = vi ? "Số dương giữ thứ tự: MAX nối max cũ, MIN nối min cũ." : "A positive value preserves order: MAX extends old max, MIN extends old min.";
   }
+  const swapPanel = phase === "init" ? "" : `<section class="mps152-sign ${signClass} ${["sign", "swap"].includes(phase) ? "active" : ""}">
+    <div class="mps152-sign-head"><strong>${escapeHtml(signTitle)}</strong><span>${escapeHtml(signDetail)}</span></div>
+    <div class="mps152-sign-table">
+      <span class="head"></span><span class="head">${vi ? "trước" : "before"}</span><span class="head">${vi ? "nền của MAX" : "base of MAX"}</span><span class="head">${vi ? "nền của MIN" : "base of MIN"}</span>
+      <b>max</b><span>${escapeHtml(display(view.prevMax))}</span><span class="${view.swapped ? "" : "used"}">${view.swapped ? "—" : escapeHtml(display(view.prevMax))}</span><span class="${view.swapped ? "used" : ""}">${view.swapped ? escapeHtml(display(view.prevMax)) : "—"}</span>
+      <b>min</b><span>${escapeHtml(display(view.prevMin))}</span><span class="${view.swapped ? "used" : ""}">${view.swapped ? escapeHtml(display(view.prevMin)) : "—"}</span><span class="${view.swapped ? "" : "used"}">${view.swapped ? "—" : escapeHtml(display(view.prevMin))}</span>
+    </div>
+  </section>`;
 
-  const bestValues = nums.slice(view.bestStart, view.bestEnd + 1);
-  const bestExpression = bestValues.length ? `${bestValues.join(" × ")} = ${display(view.best)}` : display(view.best);
+  // Step 4 shows the two competing candidates with explicit WIN/LOSE text.
+  const laneHtml = (kind) => {
+    const isMax = kind === "max";
+    const ready = isMax ? maxReady : minReady;
+    const base = isMax ? view.maxBase : view.minBase;
+    const baseValues = isMax
+      ? (view.swapped ? view.prevMinValues : view.prevMaxValues)
+      : (view.swapped ? view.prevMaxValues : view.prevMinValues);
+    const extended = isMax ? view.extendMax : view.extendMin;
+    const selected = isMax ? view.curMax : view.curMin;
+    const start = isMax ? view.maxStart : view.minStart;
+    const end = isMax ? view.maxEnd : view.minEnd;
+    const picked = isMax ? view.maxPick : view.minPick;
+    const rule = isMax ? "max" : "min";
+    const title = isMax
+      ? (vi ? "MAX kết thúc tại i" : "MAX ending at i")
+      : (vi ? "MIN kết thúc tại i" : "MIN ending at i");
+    if (phase === "init") {
+      return `<section class="mps152-lane ${kind} active"><header><strong>${title}</strong><span>nums[0..0]</span></header><div class="mps152-initial">${escapeHtml(display(selected))}</div><footer>${vi ? "chỉ có một subarray" : "only one subarray"}</footer></section>`;
+    }
+    const winText = vi ? "CHỌN ✓" : "WIN ✓";
+    const loseText = vi ? "BỎ" : "LOSE";
+    return `<section class="mps152-lane ${kind} ${phase === kind ? "active" : ""}">
+      <header><strong>${title}</strong><code>${rule}(x, base × x)</code></header>
+      <div class="mps152-candidates">
+        <div class="${ready && picked === "restart" ? "won" : ready ? "lost" : ""}">
+          <small>A · ${vi ? "BẮT ĐẦU LẠI" : "RESTART"}</small>
+          <b>${escapeHtml(display(x))}</b>
+          <span>${escapeHtml(vi ? `chỉ lấy nums[${i}]` : `take only nums[${i}]`)}</span>
+          <em>${ready ? (picked === "restart" ? winText : loseText) : "?"}</em>
+        </div>
+        <div class="${ready && picked === "extend" ? "won" : ready ? "lost" : ""}">
+          <small>B · ${vi ? "NỐI TIẾP" : "EXTEND"}</small>
+          <b>${escapeHtml(display(base))} × ${escapeHtml(display(x))} = ${escapeHtml(display(extended))}</b>
+          <span>${escapeHtml(Array.isArray(baseValues) && baseValues.length ? `${product(baseValues)} × ${display(x)}` : vi ? "nối vào đoạn trước" : "append to previous run")}</span>
+          <em>${ready ? (picked === "extend" ? winText : loseText) : "?"}</em>
+        </div>
+      </div>
+      <footer><span>${ready ? `nums[${start}..${end}]` : (vi ? "chờ dòng cập nhật" : "waiting for update line")}</span><strong>${rule} = ${ready ? escapeHtml(display(selected)) : "?"}</strong></footer>
+    </section>`;
+  };
+
+  const bestExpression = Array.isArray(view.bestValues) && view.bestValues.length
+    ? `${product(view.bestValues)} = ${display(view.best)}`
+    : display(view.best);
   const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
   const summary = vi
     ? `Bài 152, index ${i}, cur max ${view.curMax}, cur min ${view.curMin}, best ${view.best}`
@@ -13717,13 +13761,14 @@ function renderMaximumProductView(step) {
 
   $("treeView").innerHTML = `<section class="mps152-viz" role="img" aria-label="${escapeHtml(summary)}">
     <div class="mps152-phases">${phases}</div>
-    <div class="mps152-rule"><span><b>cur_max</b>${vi ? "tích lớn nhất kết thúc đúng tại i" : "largest product ending exactly at i"}</span><span><b>cur_min</b>${vi ? "tích nhỏ nhất — dự trữ cho số âm sau" : "smallest product — saved for a later negative"}</span></div>
     <div class="mps152-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
-    <section class="mps152-array"><header><strong>nums + DP history</strong><span>${vi ? "vàng = best · xanh = max hiện tại · tím = min hiện tại" : "gold = best · blue = current max · purple = current min"}</span></header><div class="mps152-cells">${cells}</div></section>
-    <section class="mps152-sign ${signClass} ${phase === "sign" || phase === "swap" ? "active" : ""}"><strong>${escapeHtml(signTitle)}</strong><span>${escapeHtml(signDetail)}</span></section>
+    ${meaning}
+    <section class="mps152-array"><header><strong>nums + DP history</strong><span>${vi ? "vàng = best · xanh = đoạn của MAX · tím = đoạn của MIN" : "gold = best · blue = MAX run · purple = MIN run"}</span></header><div class="mps152-cells">${cells}</div></section>
+    ${swapPanel}
     <div class="mps152-lanes">${laneHtml("max")}${laneHtml("min")}</div>
+    ${whyMin}
     <section class="mps152-best ${view.bestUpdated ? "updated" : ""}">
-      <div><small>${vi ? "GLOBAL BEST" : "GLOBAL BEST"}</small><strong>${escapeHtml(display(view.best))}</strong><span>${view.bestUpdated ? (vi ? "BEST MỚI ✓" : "NEW BEST ✓") : (vi ? "giữ nguyên" : "unchanged")}</span></div>
+      <div><small>GLOBAL BEST</small><strong>${escapeHtml(display(view.best))}</strong><span>${view.bestUpdated ? (vi ? "BEST MỚI ✓" : "NEW BEST ✓") : (vi ? "giữ nguyên" : "unchanged")}</span></div>
       <code>${escapeHtml(bestExpression)}</code><em>nums[${escapeHtml(display(view.bestStart))}..${escapeHtml(display(view.bestEnd))}]</em>
     </section>
   </section>`;
