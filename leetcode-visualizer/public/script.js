@@ -657,6 +657,8 @@ function renderCatalog() {
       const metaRow = document.createElement("span");
       metaRow.className = "prob-meta";
       metaRow.appendChild(pid);
+      const tagsHover = createProblemTagsHover(p.tags);
+      if (tagsHover) metaRow.appendChild(tagsHover);
 
       const pname = document.createElement("span");
       pname.className = "pname";
@@ -759,6 +761,8 @@ function renderProblemSearchResults() {
     category.className = "search-result-category";
     category.textContent = pick(group);
     chip.append(pid, name, category);
+    const tagsHover = createProblemTagsHover(problem.tags);
+    if (tagsHover) chip.appendChild(tagsHover);
 
     if (problem.difficulty) {
       const difficulty = document.createElement("span");
@@ -872,6 +876,12 @@ function renderProblem() {
     diffEl.classList.add("hidden");
   }
 
+  const tagsEl = $("problemTags");
+  tagsEl.innerHTML = "";
+  const tagsHover = createProblemTagsHover(problemData.tags, true);
+  if (tagsHover) tagsEl.appendChild(tagsHover);
+  tagsEl.classList.toggle("hidden", !tagsHover);
+
   $("problemTitleVi").textContent = pick(problemData.titleVi);
   const statementEl = $("problemStatement");
   if (problemData.premium) {
@@ -979,6 +989,34 @@ function renderExtraParams() {
 function pick(field) {
   if (field && typeof field === "object") return field[lang] ?? field.en ?? field.vi;
   return field;
+}
+
+function createProblemTagsHover(tags, focusable = false) {
+  const values = Array.isArray(tags) ? tags.filter((tag) => tag && pick(tag)) : [];
+  if (!values.length) return null;
+
+  const labels = values.map((tag) => String(pick(tag)));
+  const wrapper = document.createElement("span");
+  wrapper.className = "problem-tags-hover";
+  wrapper.setAttribute("aria-label", `Tags: ${labels.join(", ")}`);
+  if (focusable) wrapper.tabIndex = 0;
+
+  const trigger = document.createElement("span");
+  trigger.className = "problem-tags-trigger";
+  trigger.setAttribute("aria-hidden", "true");
+
+  const tooltip = document.createElement("span");
+  tooltip.className = "problem-tags-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  values.forEach((tag) => {
+    const tagEl = document.createElement("span");
+    tagEl.className = `problem-tag problem-tag-${tag.key || "other"}`;
+    tagEl.textContent = pick(tag);
+    tooltip.appendChild(tagEl);
+  });
+
+  wrapper.append(trigger, tooltip);
+  return wrapper;
 }
 
 function escapeHtml(value) {
@@ -3623,12 +3661,17 @@ function renderPalindromePathView(step) {
 
   let focusHtml;
   if (phase === "build" && xorStep) {
+    const waitingForMask = xorStep.stage === "bit";
     focusHtml = `<section class="pal2791-xor">
       <small>${vi ? "TÍNH MASK" : "BUILD MASK"}</small>
       <div class="pal2791-xor-row"><span>mask[${escapeHtml(xorStep.parentNode)}]</span>${parityHtml(xorStep.parentParity)}</div>
-      <div class="pal2791-xor-op">XOR <b>'${escapeHtml(xorStep.letter)}'</b></div>
-      <div class="pal2791-xor-row result"><span>mask[${escapeHtml(current.node)}]</span>${parityHtml(current.parity, "highlight")}</div>
-      <p>${vi ? `Chỉ parity của '${xorStep.letter}' bị đảo, các chữ khác giữ nguyên.` : `Only '${xorStep.letter}' flips parity; every other letter is unchanged.`}</p>
+      <div class="pal2791-xor-op">bit('${escapeHtml(xorStep.letter)}') = 1 &lt;&lt; ${escapeHtml(xorStep.bitIndex ?? "?")} = <b>${escapeHtml(xorStep.bitValue ?? "?")}</b></div>
+      ${waitingForMask
+        ? `<div class="pal2791-xor-row result"><span>mask[${escapeHtml(current.node)}]</span><strong>${vi ? "chờ dòng 15" : "waiting for line 15"}</strong></div>`
+        : `<div class="pal2791-xor-op">XOR <b>'${escapeHtml(xorStep.letter)}'</b></div><div class="pal2791-xor-row result"><span>mask[${escapeHtml(current.node)}]</span>${parityHtml(current.parity, "highlight")}</div>`}
+      <p>${waitingForMask
+        ? (vi ? "Dòng 14 mới tính bit; mask của child chưa thay đổi." : "Line 14 only computes the bit; the child mask has not changed yet.")
+        : (vi ? `Dòng 15 đảo parity của '${xorStep.letter}' và lưu mask mới.` : `Line 15 flips '${xorStep.letter}' parity and stores the new mask.`)}</p>
     </section>`;
   } else if (phase === "rule") {
     focusHtml = `<section class="pal2791-cancel">
@@ -3646,7 +3689,9 @@ function renderPalindromePathView(step) {
       <small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small>
       <strong>node ${escapeHtml(current.node)}</strong>
       <code>${escapeHtml(current.edge)}</code>
-      ${parityHtml(current.parity, "highlight")}
+      ${current.pending
+        ? `<span class="pal2791-parity-empty">${vi ? "mask chưa được tính" : "mask not computed yet"}</span>`
+        : parityHtml(current.parity, "highlight")}
       <em>${vi ? "chữ lẻ" : "odd letters"}: ${escapeHtml(current.odd)} · popcount ${escapeHtml(current.popcount)}</em>
     </section>`;
   } else {
@@ -3658,12 +3703,21 @@ function renderPalindromePathView(step) {
 
   const lookupHtml = lookups.length
     ? `<section class="pal2791-lookups">
-        <header><strong>${vi ? "TRA COUNTER" : "COUNTER PROBES"}</strong><span>${vi ? `1 mask giống + ${lookups.length - 1} phép lật 1 chữ` : `1 equal mask + ${lookups.length - 1} one-letter flips`}</span></header>
-        <div>${lookups.map((item) => `<span class="pal2791-probe ${item.count > 0 ? "hit" : "miss"} ${item.kind}">
+        <header><strong>${vi ? "TRA COUNTER" : "COUNTER PROBES"}</strong><span>${view.lookupCaption
+          ? escapeHtml(view.lookupCaption)
+          : (vi ? `1 mask giống + ${lookups.length - 1} phép lật 1 chữ` : `1 equal mask + ${lookups.length - 1} one-letter flips`)}</span></header>
+        <div>${lookups.map((item) => {
+          const probeState = item.pending ? "pending" : item.count > 0 ? "hit" : "miss";
+          return `<span class="pal2791-probe ${probeState} ${item.kind}">
             <small>${item.kind === "exact" ? (vi ? "giống hệt" : "equal") : `flip '${escapeHtml(item.flipLetter)}'`}</small>
             <b>${escapeHtml(item.label)}</b>
-            <em>${item.count > 0 ? `+${escapeHtml(item.count)} → node ${escapeHtml((item.nodes || []).join(", "))}` : (vi ? "trượt" : "miss")}</em>
-          </span>`).join("")}</div>
+            <em>${item.pending
+              ? (vi ? "chờ thực thi dòng 23" : "waiting for line 23")
+              : item.count > 0
+                ? `+${escapeHtml(item.count)} → node ${escapeHtml((item.nodes || []).join(", "))}`
+                : (vi ? "trượt" : "miss")}</em>
+          </span>`;
+        }).join("")}</div>
         ${view.skippedFlips ? `<p class="pal2791-skip">${vi ? `Bỏ qua ${view.skippedFlips} phép lật còn lại: các chữ đó không có trong cây nên luôn trượt.` : `Skipped the other ${view.skippedFlips} flips: those letters never appear in the tree, so they always miss.`}</p>` : ""}
       </section>`
     : "";
@@ -3707,6 +3761,13 @@ function renderPalindromePathView(step) {
     <div class="pal2791-layout">
       <section class="pal2791-tree-card">
         <header><strong>${vi ? "CÂY PARITY" : "PARITY TREE"}</strong><span>${vi ? "mỗi node hiện các chữ xuất hiện LẺ lần từ root" : "each node shows letters with ODD parity from the root"}</span></header>
+        <div class="pal2791-tree-legend">
+          <span><i class="saved"></i>${vi ? "đã lưu trong counter" : "stored in counter"}</span>
+          <span><i class="current"></i>${vi ? "node đang xét" : "current node"}</span>
+          <span><i class="pair"></i>${vi ? "node ghép được" : "matching node"}</span>
+          <span><code>+c</code>${vi ? "chữ trên cạnh đi vào" : "incoming edge letter"}</span>
+          <span><code>odd:{ac}</code>${vi ? "các chữ đang lẻ" : "letters with odd parity"}</span>
+        </div>
         <div id="pal2791Tree" class="pal2791-tree"></div>
       </section>
       <aside class="pal2791-side">
@@ -13388,6 +13449,122 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+function renderMaximumProductView(step) {
+  const view = step.maxProductView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init");
+  const i = Number.isInteger(view.i) ? view.i : 0;
+  const x = view.x;
+  const phaseIndex = phase === "done" || phase === "best" ? 4
+    : phase === "min" ? 3
+      : phase === "max" ? 2
+        : ["sign", "swap"].includes(phase) ? 1 : 0;
+  const labels = vi
+    ? ["Đọc x", "Kiểm tra dấu / swap", "Cập nhật max", "Cập nhật min", "Cập nhật best"]
+    : ["Read x", "Check sign / swap", "Update max", "Update min", "Update best"];
+  const phases = labels.map((label, index) => {
+    const done = phase === "done" || index < phaseIndex;
+    return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const inRange = (index, start, end) => Number.isInteger(start) && Number.isInteger(end) && index >= start && index <= end;
+  const maxReady = ["init", "max", "min", "best", "done"].includes(phase);
+  const minReady = ["init", "min", "best", "done"].includes(phase);
+  const cells = nums.map((value, index) => {
+    const classes = ["mps152-cell"];
+    if (index === i && phase !== "done") classes.push("active");
+    if (value < 0) classes.push("negative");
+    if (value === 0) classes.push("zero");
+    if (inRange(index, view.bestStart, view.bestEnd)) classes.push("in-best");
+    if (maxReady && inRange(index, view.maxStart, view.maxEnd)) classes.push("in-max");
+    if (minReady && inRange(index, view.minStart, view.minEnd)) classes.push("in-min");
+    const badges = [];
+    if (maxReady && index === view.maxEnd) badges.push('<b class="max">MAX</b>');
+    if (minReady && index === view.minEnd) badges.push('<b class="min">MIN</b>');
+    if (index === view.bestEnd) badges.push('<b class="best">BEST</b>');
+    return `<div class="${classes.join(" ")}">
+      <small>[${index}]</small><strong>${escapeHtml(String(value))}</strong>
+      <div><span>max ${escapeHtml(view.maxHistory[index] ?? "·")}</span><span>min ${escapeHtml(view.minHistory[index] ?? "·")}</span></div>
+      <em>${badges.join("")}</em>
+    </div>`;
+  }).join("");
+
+  const sourceText = (source, lane) => {
+    const labelsBySource = vi
+      ? { restart: "bắt đầu lại từ x", "previous-max": "nối từ max cũ", "previous-min": "nối từ min cũ", init: "khởi tạo", pending: "chưa cập nhật" }
+      : { restart: "restart from x", "previous-max": "extend old max", "previous-min": "extend old min", init: "initialize", pending: "not updated yet" };
+    return labelsBySource[source] || (vi ? `nhánh ${lane}` : `${lane} lane`);
+  };
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const laneHtml = (kind) => {
+    const isMax = kind === "max";
+    const ready = isMax ? maxReady : minReady;
+    const base = isMax ? view.maxBase : view.minBase;
+    const extended = isMax ? view.extendMax : view.extendMin;
+    const selected = isMax ? view.curMax : view.curMin;
+    const start = isMax ? view.maxStart : view.minStart;
+    const end = isMax ? view.maxEnd : view.minEnd;
+    const source = isMax ? view.maxSource : view.minSource;
+    const operation = isMax ? "max" : "min";
+    const title = isMax
+      ? (vi ? "MAX kết thúc tại i" : "MAX ending at i")
+      : (vi ? "MIN kết thúc tại i" : "MIN ending at i");
+    if (phase === "init") {
+      return `<section class="mps152-lane ${kind} active"><header><strong>${title}</strong><span>${isMax ? "lớn nhất" : "nhỏ nhất"}</span></header><div class="mps152-initial">${escapeHtml(String(selected))}</div><footer>nums[0..0]</footer></section>`;
+    }
+    return `<section class="mps152-lane ${kind} ${phase === kind ? "active" : ""}">
+      <header><strong>${title}</strong><span>${escapeHtml(sourceText(source, kind))}</span></header>
+      <div class="mps152-choice">
+        <span><small>${vi ? "BẮT ĐẦU LẠI" : "RESTART"}</small><b>${escapeHtml(display(x))}</b></span>
+        <i>${operation}</i>
+        <span><small>${vi ? "MỞ RỘNG" : "EXTEND"}</small><b>${escapeHtml(display(base))} × ${escapeHtml(display(x))} = ${escapeHtml(display(extended))}</b></span>
+        <em>→</em>
+        <span class="picked"><small>${vi ? "CHỌN" : "PICK"}</small><b>${ready ? escapeHtml(display(selected)) : "?"}</b></span>
+      </div>
+      <footer>${ready ? `nums[${start}..${end}]` : (vi ? "chờ dòng cập nhật" : "waiting for update line")}</footer>
+    </section>`;
+  };
+
+  let signClass = "positive";
+  let signTitle;
+  let signDetail;
+  if (view.zeroReset) {
+    signClass = "zero";
+    signTitle = vi ? "x = 0 · RESET ĐOẠN" : "x = 0 · RESET SEGMENT";
+    signDetail = vi ? "Mọi tích nối qua đây bằng 0; max và min cùng khởi động lại." : "Every product crossing here is 0; max and min both restart.";
+  } else if (Number(x) < 0) {
+    signClass = "negative";
+    signTitle = view.swapped ? (vi ? "ĐÃ SWAP MAX ↔ MIN" : "MAX ↔ MIN SWAPPED") : (vi ? "SỐ ÂM: CẦN SWAP" : "NEGATIVE: SWAP NEEDED");
+    signDetail = view.swapped
+      ? `${vi ? "max nhận min cũ" : "max gets old min"} ${display(view.prevMin)} · ${vi ? "min nhận max cũ" : "min gets old max"} ${display(view.prevMax)}`
+      : (vi ? "Âm × nhỏ nhất có thể thành dương lớn nhất." : "Negative × smallest can become the largest positive.");
+  } else {
+    signTitle = vi ? "KHÔNG SWAP" : "NO SWAP";
+    signDetail = vi ? "x dương: max nối max, min nối min." : "Positive x: max extends max and min extends min.";
+  }
+
+  const bestValues = nums.slice(view.bestStart, view.bestEnd + 1);
+  const bestExpression = bestValues.length ? `${bestValues.join(" × ")} = ${display(view.best)}` : display(view.best);
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const summary = vi
+    ? `Bài 152, index ${i}, cur max ${view.curMax}, cur min ${view.curMin}, best ${view.best}`
+    : `Problem 152, index ${i}, current max ${view.curMax}, current min ${view.curMin}, best ${view.best}`;
+
+  $("treeView").innerHTML = `<section class="mps152-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="mps152-phases">${phases}</div>
+    <div class="mps152-rule"><span><b>cur_max</b>${vi ? "tích lớn nhất kết thúc đúng tại i" : "largest product ending exactly at i"}</span><span><b>cur_min</b>${vi ? "tích nhỏ nhất — dự trữ cho số âm sau" : "smallest product — saved for a later negative"}</span></div>
+    <div class="mps152-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="mps152-array"><header><strong>nums + DP history</strong><span>${vi ? "vàng = best · xanh = max hiện tại · tím = min hiện tại" : "gold = best · blue = current max · purple = current min"}</span></header><div class="mps152-cells">${cells}</div></section>
+    <section class="mps152-sign ${signClass} ${phase === "sign" || phase === "swap" ? "active" : ""}"><strong>${escapeHtml(signTitle)}</strong><span>${escapeHtml(signDetail)}</span></section>
+    <div class="mps152-lanes">${laneHtml("max")}${laneHtml("min")}</div>
+    <section class="mps152-best ${view.bestUpdated ? "updated" : ""}">
+      <div><small>${vi ? "GLOBAL BEST" : "GLOBAL BEST"}</small><strong>${escapeHtml(display(view.best))}</strong><span>${view.bestUpdated ? (vi ? "BEST MỚI ✓" : "NEW BEST ✓") : (vi ? "giữ nguyên" : "unchanged")}</span></div>
+      <code>${escapeHtml(bestExpression)}</code><em>nums[${escapeHtml(display(view.bestStart))}..${escapeHtml(display(view.bestEnd))}]</em>
+    </section>
+  </section>`;
+}
+
 function renderProductSubarrayView(step) {
   const view = step.productSubarrayView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -14713,6 +14890,333 @@ function renderMapSumView(step) {
   }
 }
 
+function renderElevator4027View(step) {
+  const view = step.elevator4027View || {};
+  const requests = Array.isArray(view.requests) ? view.requests : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "setup");
+  const transitionEvents = new Set(["next-loop", "already-served", "guard-pass", "travel", "wait", "arrive", "merge-mask", "improve", "reject", "write-dp", "write-parent"]);
+  const phaseIndex = phase === "setup" ? 0 : phase === "initialize" ? 1 : phase === "finish" ? 4 : transitionEvents.has(view.event) ? 3 : 2;
+  const phaseLabels = vi
+    ? ["Đọc input", "Singleton DP", "Duyệt subset", "Transition + chờ", "Route tối ưu"]
+    : ["Read input", "Singleton DP", "Scan subsets", "Transition + wait", "Optimal route"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const served = new Set(Array.isArray(view.served) ? view.served : []);
+  const maskBits = String(view.maskBits || "").padStart(requests.length, "0");
+  const bitCards = requests.map((request) => {
+    const on = served.has(request.id);
+    const classes = [on ? "on" : "off"];
+    if (request.id === view.last) classes.push("last");
+    if (request.id === view.next) classes.push("next");
+    return `<span class="${classes.join(" ")}"><small>bit ${request.id}</small><strong>${on ? "1" : "0"}</strong><em>#${request.id} · F${request.floor}</em></span>`;
+  }).join("");
+
+  const requestCards = requests.map((request) => {
+    const classes = [];
+    if (served.has(request.id)) classes.push("served");
+    if (request.id === view.last) classes.push("last");
+    if (request.id === view.next) classes.push("next");
+    const status = request.id === view.last
+      ? (vi ? "VỊ TRÍ HIỆN TẠI" : "CURRENT LAST")
+      : request.id === view.next
+        ? (vi ? "ĐANG THỬ" : "TRY NEXT")
+        : served.has(request.id) ? (vi ? "ĐÃ PHỤC VỤ" : "SERVED") : (vi ? "CHƯA PHỤC VỤ" : "PENDING");
+    return `<article class="${classes.join(" ")}"><header><strong>#${request.id}</strong><span>${escapeHtml(status)}</span></header><div><small>${vi ? "TẦNG" : "FLOOR"}</small><b>${request.floor}</b></div><div><small>${vi ? "XUẤT HIỆN" : "ARRIVAL"}</small><b>t=${request.arrival}</b></div></article>`;
+  }).join("");
+
+  const n = Number(view.n) || 1;
+  let floors;
+  if (n <= 15) {
+    floors = Array.from({ length: n }, (_, index) => n - 1 - index);
+  } else {
+    floors = [...new Set([n - 1, 0, view.start, ...requests.map((request) => request.floor)])].sort((a, b) => b - a);
+  }
+  const compressed = floors.length < n;
+  const elevatorFloor = Number.isInteger(view.last) && view.last >= 0 && requests[view.last]
+    ? requests[view.last].floor : view.start;
+  const floorRows = floors.map((floor, index) => {
+    const onFloor = requests.filter((request) => request.floor === floor);
+    const requestHtml = onFloor.map((request) => {
+      const classes = [];
+      if (served.has(request.id)) classes.push("served");
+      if (request.id === view.last) classes.push("last");
+      if (request.id === view.next) classes.push("next");
+      return `<b class="${classes.join(" ")}">#${request.id}<small>@${request.arrival}</small></b>`;
+    }).join("");
+    const gap = compressed && index < floors.length - 1 && floor - floors[index + 1] > 1
+      ? `<i class="elv4027-gap">⋮ ${floor - floors[index + 1] - 1} ${vi ? "tầng ẩn" : "hidden floor(s)"}</i>` : "";
+    return `<div class="elv4027-floor ${floor === elevatorFloor ? "elevator" : ""} ${floor === view.targetFloor ? "target" : ""}">
+      <span>F${floor}</span><i class="shaft"></i><strong>${floor === elevatorFloor ? "ELEVATOR" : ""}</strong><div>${requestHtml}</div>
+    </div>${gap}`;
+  }).join("");
+
+  const display = (value) => value === null || value === undefined || value === Infinity ? "—" : String(value);
+  const rows = Array.isArray(view.dpRows) ? view.dpRows : [];
+  const tableRows = rows.map((row) => {
+    const classes = [];
+    if (row.mask === view.mask && row.last === view.last) classes.push("active");
+    if (row.mask === view.newMask && row.last === view.next) classes.push("candidate");
+    if (row.mask === view.full) classes.push("full");
+    const servedText = (row.served || []).map((id) => `#${id}`).join(", ");
+    return `<tr class="${classes.join(" ")}"><td><code>${escapeHtml(row.maskBits)}</code><small>${escapeHtml(servedText)}</small></td><td>#${row.last} · F${row.floor}</td><td>${escapeHtml(display(row.time))}</td><td>${row.parent < 0 ? "START" : `#${row.parent}`}</td></tr>`;
+  }).join("") || `<tr><td colspan="4">${vi ? "Chưa có state hữu hạn" : "No finite state yet"}</td></tr>`;
+
+  const route = phase === "finish" && Array.isArray(view.finalRoute) && view.finalRoute.length
+    ? view.finalRoute
+    : Array.isArray(view.candidateRoute) && view.candidateRoute.length && view.improved
+      ? view.candidateRoute : Array.isArray(view.route) ? view.route : [];
+  const routeHtml = [`<span class="start"><small>START</small><strong>F${view.start}</strong><em>t=0</em></span>`]
+    .concat(route.map((item) => `<i>→</i><span class="request ${item.request === view.next ? "next" : ""}"><small>#${item.request} · arrival ${item.arrival}</small><strong>F${item.floor}</strong><em>t=${item.time}</em></span>`)).join("");
+
+  const hasTransition = Number.isFinite(view.travel) && Number.isFinite(view.targetFloor);
+  const wait = Number(view.wait) || 0;
+  const departureTime = phase === "initialize" ? 0 : view.currentTime;
+  const formula = hasTransition
+    ? `<div><small>${vi ? "DI CHUYỂN" : "TRAVEL"}</small><code>${display(departureTime)} + |${display(view.fromFloor)} − ${display(view.targetFloor)}| = ${display(view.reachedAt)}</code></div><b>max</b><div><small>REQUEST #${display(view.next)} ${vi ? "XUẤT HIỆN" : "ARRIVES"}</small><code>arrival = ${display(view.arrival)}</code></div><em>→</em><div class="result"><small>${vi ? "PHỤC VỤ LÚC" : "SERVE AT"}</small><strong>t=${display(view.candidateTime)}</strong><span>${wait > 0 ? `${vi ? "chờ" : "wait"} ${wait}s` : (vi ? "không chờ" : "no wait")}</span></div>`
+    : `<div class="elv4027-formula-empty">${vi ? "Chọn một state và request kế tiếp để xem công thức travel/wait." : "Select a state and next request to see the travel/wait formula."}</div>`;
+  const updateClass = view.improved === true ? "improved" : view.improved === false ? "rejected" : "idle";
+  const updateText = view.improved === true
+    ? (vi ? `CẬP NHẬT dp[${view.newMaskBits}][${view.next}]` : `UPDATE dp[${view.newMaskBits}][${view.next}]`)
+    : view.improved === false ? (vi ? "KHÔNG CẢI THIỆN" : "NO IMPROVEMENT") : (vi ? "CHỜ SO SÁNH" : "WAITING TO COMPARE");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const answer = view.answer === null || view.answer === undefined ? "—" : view.answer;
+
+  $("treeView").innerHTML = `<section class="elv4027-viz" role="img" aria-label="#4027 Elevator Requests III, answer ${escapeHtml(String(answer))}">
+    <div class="elv4027-phases">${phases}</div>
+    <div class="elv4027-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="elv4027-rule"><strong>dp[mask][last]</strong><span>${vi ? "thời gian sớm nhất đã phục vụ mask và dừng tại request last" : "earliest time after serving mask and stopping at request last"}</span><code>mask ${escapeHtml(maskBits)} · last ${view.last >= 0 ? `#${view.last}` : "—"} · t=${escapeHtml(display(view.currentTime))}</code></section>
+    <div class="elv4027-main">
+      <section class="elv4027-building"><header><strong>${vi ? "TRỤC TẦNG" : "FLOOR SHAFT"}</strong><span>${compressed ? (vi ? "chỉ hiện tầng quan trọng" : "important floors only") : (vi ? "đủ mọi tầng" : "all floors")}</span></header><div>${floorRows}</div></section>
+      <section class="elv4027-requests"><header><strong>REQUESTS</strong><span>${served.size}/${requests.length} ${vi ? "đã phục vụ" : "served"}</span></header><div>${requestCards}</div></section>
+    </div>
+    <section class="elv4027-mask"><header><strong>BITMASK</strong><code>${escapeHtml(maskBits)}</code></header><div>${bitCards}</div></section>
+    <section class="elv4027-formula ${hasTransition ? "ready" : "idle"}">${formula}</section>
+    <section class="elv4027-update ${updateClass}"><strong>${escapeHtml(updateText)}</strong><span>${view.improved === true ? `${display(view.candidateTime)} < ${display(view.previousBest)}` : view.improved === false ? `${display(view.candidateTime)} ≥ ${display(view.previousBest)}` : "candidate vs current best"}</span></section>
+    <div class="elv4027-bottom">
+      <section class="elv4027-table"><header><strong>DP STATES</strong><span>${rows.length}${view.truncated ? "+" : ""} ${vi ? "state gần nhất" : "recent states"}</span></header><div><table><thead><tr><th>mask</th><th>last</th><th>time</th><th>parent</th></tr></thead><tbody>${tableRows}</tbody></table></div></section>
+      <section class="elv4027-route"><header><strong>${phase === "finish" ? (vi ? "ROUTE TỐI ƯU" : "OPTIMAL ROUTE") : (vi ? "ROUTE HIỆN TẠI" : "CURRENT ROUTE")}</strong><span>${phase === "finish" ? `${vi ? "đáp án" : "answer"} = ${answer}s` : (vi ? "dựng từ parent" : "reconstructed from parent")}</span></header><div>${routeHtml}</div>${view.truncated ? `<p>${vi ? "Một số frame trung gian đã được rút gọn; kết quả DP vẫn đầy đủ." : "Some intermediate frames were capped; the DP result is still complete."}</p>` : ""}</section>
+    </div>
+  </section>`;
+}
+
+function renderAbsoluteSubarray1749View(step) {
+  const view = step.absoluteSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init-ending");
+  const i = Number.isInteger(view.i) ? view.i : 0;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const inRange = (index, left, right) => Number.isInteger(left) && Number.isInteger(right) && index >= left && index <= right;
+  const rangeText = (left, right) => Number.isInteger(left) && Number.isInteger(right) ? `[${left}..${right}]` : (vi ? "rỗng" : "empty");
+  const phaseIndex = phase.startsWith("init") ? 0 : phase === "scan" ? 1
+    : ["max-ending", "max-best"].includes(phase) ? 2
+      : ["min-ending", "min-best"].includes(phase) ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Khởi tạo 0", "Đọc x", "Kadane MAX", "Kadane MIN", "So sánh |sum|"]
+    : ["Initialize zero", "Read x", "MAX Kadane", "MIN Kadane", "Compare |sum|"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const maxHistory = Array.isArray(view.maxHistory) ? view.maxHistory : [];
+  const minHistory = Array.isArray(view.minHistory) ? view.minHistory : [];
+  const cells = nums.map((value, index) => {
+    const classes = ["mas1749-cell"];
+    if (inRange(index, view.maxL, view.maxR)) classes.push("positive-best");
+    if (inRange(index, view.minL, view.minR)) classes.push("negative-best");
+    if (inRange(index, view.maxEndingL, view.maxEndingR)) classes.push("current-max");
+    if (inRange(index, view.minEndingL, view.minEndingR)) classes.push("current-min");
+    if (inRange(index, view.selectedL, view.selectedR)) classes.push("selected");
+    if (index === i && phase !== "done") classes.push("active");
+    const tags = [];
+    if (inRange(index, view.maxL, view.maxR)) tags.push(`<b class="positive">${vi ? "DƯƠNG" : "POS"}</b>`);
+    if (inRange(index, view.minL, view.minR)) tags.push(`<b class="negative">${vi ? "ÂM" : "NEG"}</b>`);
+    if (inRange(index, view.selectedL, view.selectedR)) tags.push(`<b class="pick">${vi ? "CHỌN" : "PICK"}</b>`);
+    return `<div class="${classes.join(" ")}">
+      <small>[${index}]</small><strong>${escapeHtml(String(value))}</strong>
+      <div><span><i>max</i><b>${escapeHtml(display(maxHistory[index]))}</b></span><span><i>min</i><b>${escapeHtml(display(minHistory[index]))}</b></span></div>
+      <em>${tags.join("")}</em>
+    </div>`;
+  }).join("");
+
+  const lane = (kind) => {
+    const isMax = kind === "max";
+    const previous = isMax ? view.prevMaxEnding : view.prevMinEnding;
+    const extend = isMax ? view.extendMax : view.extendMin;
+    const current = isMax ? view.maxEnding : view.minEnding;
+    const reset = isMax ? view.maxReset : view.minReset;
+    const global = isMax ? view.maxSum : view.minSum;
+    const currentL = isMax ? view.maxEndingL : view.minEndingL;
+    const currentR = isMax ? view.maxEndingR : view.minEndingR;
+    const bestL = isMax ? view.maxL : view.minL;
+    const bestR = isMax ? view.maxR : view.minR;
+    const active = isMax ? ["max-ending", "max-best"].includes(phase) : ["min-ending", "min-best"].includes(phase);
+    return `<section class="mas1749-lane ${kind} ${active ? "active" : ""}">
+      <header><strong>${isMax ? "MAX lane" : "MIN lane"}</strong><span>${isMax ? (vi ? "tìm tổng dương lớn nhất" : "largest positive sum") : (vi ? "tìm tổng âm nhỏ nhất" : "smallest negative sum")}</span></header>
+      <div class="mas1749-choice">
+        <span class="${reset ? "picked" : ""}"><small>${vi ? "RESET RỖNG" : "RESET EMPTY"}</small><b>0</b></span>
+        <i>${isMax ? "max" : "min"}</i>
+        <span class="${extend !== null && !reset ? "picked" : ""}"><small>${vi ? "NỐI TIẾP" : "EXTEND"}</small><b>${escapeHtml(display(previous))} + ${escapeHtml(display(view.x))} = ${escapeHtml(display(extend))}</b></span>
+        <em>→</em><span class="result"><small>${isMax ? "max_ending" : "min_ending"}</small><b>${escapeHtml(display(current))}</b></span>
+      </div>
+      <footer><span>${vi ? "đoạn hiện tại" : "current range"}: ${escapeHtml(rangeText(currentL, currentR))}</span><strong>${isMax ? "max_sum" : "min_sum"}=${escapeHtml(display(global))} · ${escapeHtml(rangeText(bestL, bestR))}</strong></footer>
+    </section>`;
+  };
+
+  const positiveCandidate = Number(view.positiveCandidate) || 0;
+  const negativeCandidate = Number(view.negativeCandidate) || 0;
+  const winner = view.winner;
+  const selectedValues = Number.isInteger(view.selectedL) ? nums.slice(view.selectedL, view.selectedR + 1) : [];
+  const selectedSum = selectedValues.reduce((sum, value) => sum + value, 0);
+  const resultExpression = selectedValues.length
+    ? `|${selectedValues.join(" + ")}| = |${selectedSum}| = ${view.answer}`
+    : `|0| = ${view.answer ?? 0}`;
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+
+  $("treeView").innerHTML = `<section class="mas1749-viz" role="img" aria-label="#1749 Maximum Absolute Sum, answer ${escapeHtml(display(view.answer))}">
+    <div class="mas1749-phases">${phases}</div>
+    <div class="mas1749-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="mas1749-rule"><div><strong>MAX</strong><code>max_ending = max(0, max_ending + x)</code><span>${vi ? "reset khi tổng không dương" : "reset when sum is not positive"}</span></div><div><strong>MIN</strong><code>min_ending = min(0, min_ending + x)</code><span>${vi ? "reset khi tổng không âm" : "reset when sum is not negative"}</span></div></section>
+    <section class="mas1749-array"><header><strong>nums + Dual Kadane history</strong><span>${vi ? "xanh=DƯƠNG · tím/đỏ=ÂM · vàng=CHỌN" : "blue=POSITIVE · purple/red=NEGATIVE · gold=PICK"}</span></header><div class="mas1749-cells">${cells}</div></section>
+    <div class="mas1749-lanes">${lane("max")}${lane("min")}</div>
+    <section class="mas1749-meaning"><div><strong>${escapeHtml(display(view.maxSum))}</strong><span>${vi ? "tổng dương lớn nhất" : "largest positive sum"}</span></div><b>vs</b><div><strong>|${escapeHtml(display(view.minSum))}| = ${negativeCandidate}</strong><span>${vi ? "độ lớn của tổng âm nhỏ nhất" : "magnitude of smallest negative sum"}</span></div></section>
+    <div class="mas1749-candidates">
+      <section class="positive ${winner === "positive" ? "winner" : ""}"><small>+ max_sum</small><strong>${positiveCandidate}</strong><span>${escapeHtml(rangeText(view.maxL, view.maxR))}</span></section>
+      <b>VS</b>
+      <section class="negative ${winner === "negative" ? "winner" : ""}"><small>| min_sum |</small><strong>${negativeCandidate}</strong><span>${escapeHtml(rangeText(view.minL, view.minR))}</span></section>
+      <em>→</em>
+      <section class="answer ${winner ? "ready" : ""}"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}${winner ? ` · ${winner.toUpperCase()}` : ""}</small><strong>${escapeHtml(display(view.answer))}</strong><span>${winner ? escapeHtml(resultExpression) : (vi ? "đang tính..." : "calculating...")}</span></section>
+    </div>
+    <section class="mas1749-result"><header><strong>${vi ? "SUBARRAY ĐƯỢC CHỌN" : "SELECTED SUBARRAY"}</strong><span>${escapeHtml(rangeText(view.selectedL, view.selectedR))}</span></header><div>${selectedValues.length ? selectedValues.map((value) => `<b>${escapeHtml(String(value))}</b>`).join("<i>+</i>") : `<b class="empty">${vi ? "rỗng" : "empty"}</b>`}<em>${winner ? `|sum| = ${view.answer}` : "—"}</em></div></section>
+  </section>`;
+}
+
+function renderCircularMaximumSubarrayView(step) {
+  const view = step.circularSubarrayView || {};
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const vi = lang === "vi";
+  const phase = String(view.phase || "init-max");
+  const i = Number.isInteger(view.i) ? view.i : 0;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const inRange = (index, left, right) => Number.isInteger(left) && Number.isInteger(right) && index >= left && index <= right;
+  const inRanges = (index, ranges) => Array.isArray(ranges) && ranges.some(([left, right]) => inRange(index, left, right));
+  const formatRange = (range) => Array.isArray(range) ? `[${range[0]}..${range[1]}]` : "—";
+  const formatRanges = (ranges) => Array.isArray(ranges) && ranges.length ? ranges.map(formatRange).join(" + ") : (vi ? "rỗng" : "empty");
+
+  const phaseIndex = phase.startsWith("init") ? 0
+    : ["loop", "scan", "max-ending", "max-best", "min-ending", "min-best", "total"].includes(phase) ? 1
+      : phase === "guard" ? 2 : phase === "circular" ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Khởi tạo", "Dual Kadane", "Chặn toàn âm", "Ghép circular", "So sánh kết quả"]
+    : ["Initialize", "Dual Kadane", "All-negative guard", "Build circular", "Compare result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const showWrap = phase === "circular" || phase === "done";
+  const selectedRanges = Array.isArray(view.selectedRanges) ? view.selectedRanges : [];
+  const wrapRanges = Array.isArray(view.wrapRanges) ? view.wrapRanges : [];
+  const maxHistory = Array.isArray(view.maxHistory) ? view.maxHistory : [];
+  const minHistory = Array.isArray(view.minHistory) ? view.minHistory : [];
+  const totalHistory = Array.isArray(view.totalHistory) ? view.totalHistory : [];
+  const cells = nums.map((value, index) => {
+    const classes = ["msc918-cell"];
+    if (inRange(index, view.normalL, view.normalR)) classes.push("normal");
+    if (inRange(index, view.minL, view.minR)) classes.push("excluded");
+    if (showWrap && inRanges(index, wrapRanges)) classes.push("wrap");
+    if (inRanges(index, selectedRanges)) classes.push("selected");
+    if (index === i && phase !== "done") classes.push("active");
+    const badges = [];
+    if (inRange(index, view.normalL, view.normalR)) badges.push(`<b class="normal-tag">${vi ? "THƯỜNG" : "NORMAL"}</b>`);
+    if (inRange(index, view.minL, view.minR)) badges.push(`<b class="cut-tag">${vi ? "LOẠI" : "CUT"}</b>`);
+    if (showWrap && inRanges(index, wrapRanges)) badges.push(`<b class="wrap-tag">WRAP</b>`);
+    if (inRanges(index, selectedRanges)) badges.push(`<b class="pick-tag">${vi ? "CHỌN" : "PICK"}</b>`);
+    return `<div class="${classes.join(" ")}">
+      <small>[${index}]</small><strong>${escapeHtml(String(value))}</strong>
+      <dl><div><dt>max</dt><dd>${escapeHtml(display(maxHistory[index]))}</dd></div><div><dt>min</dt><dd>${escapeHtml(display(minHistory[index]))}</dd></div><div><dt>Σ</dt><dd>${escapeHtml(display(totalHistory[index]))}</dd></div></dl>
+      <em>${badges.join("")}</em>
+    </div>`;
+  }).join("");
+
+  const lane = (kind) => {
+    const isMax = kind === "max";
+    const restart = isMax ? view.restartMax : view.restartMin;
+    const extend = isMax ? view.extendMax : view.extendMin;
+    const current = isMax ? view.curMax : view.curMin;
+    const best = isMax ? view.maxSum : view.minSum;
+    const left = isMax ? view.curMaxStart : view.curMinStart;
+    const bestLeft = isMax ? view.normalL : view.minL;
+    const bestRight = isMax ? view.normalR : view.minR;
+    const active = isMax ? ["max-ending", "max-best"].includes(phase) : ["min-ending", "min-best"].includes(phase);
+    const operation = isMax ? "max" : "min";
+    const pickedRestart = restart !== null && extend !== null && (isMax ? restart > extend : restart < extend);
+    return `<section class="msc918-lane ${kind} ${active ? "active" : ""}">
+      <header><strong>${isMax ? "MAX Kadane" : "MIN Kadane"}</strong><span>${isMax ? (vi ? "đoạn giữ nguyên" : "ordinary segment") : (vi ? "đoạn cần loại" : "segment to exclude")}</span></header>
+      <div class="msc918-choice">
+        <span class="${pickedRestart ? "picked" : ""}"><small>${vi ? "BẮT ĐẦU" : "RESTART"}</small><b>${escapeHtml(display(restart))}</b></span>
+        <i>${operation}</i>
+        <span class="${restart !== null && !pickedRestart ? "picked" : ""}"><small>${vi ? "NỐI TIẾP" : "EXTEND"}</small><b>${escapeHtml(display(extend))}</b></span>
+        <em>→</em><span class="result"><small>${isMax ? "cur_max" : "cur_min"}</small><b>${escapeHtml(display(current))}</b></span>
+      </div>
+      <footer><span>${vi ? "đang kết thúc" : "ending now"}: [${escapeHtml(display(left))}..${i}]</span><strong>${isMax ? "max_sum" : "min_sum"}=${escapeHtml(display(best))} · [${bestLeft}..${bestRight}]</strong></footer>
+    </section>`;
+  };
+
+  const circularInvalid = Boolean(view.allNegative || view.wrapEmpty);
+  const normalRange = `[${display(view.normalL)}..${display(view.normalR)}]`;
+  const circularRange = formatRanges(wrapRanges);
+  const equation = view.circularSum === null || view.circularSum === undefined
+    ? `circular = total − min_sum = ${display(view.total)} − (${display(view.minSum)})`
+    : `circular = ${display(view.total)} − (${display(view.minSum)}) = ${display(view.circularSum)}`;
+  const selectedValues = selectedRanges.flatMap(([left, right]) => nums.slice(left, right + 1));
+  const guardResolved = phaseIndex >= 2;
+  const guardClass = !guardResolved ? "pending" : view.allNegative ? "invalid" : "valid";
+  const guardTitle = !guardResolved
+    ? (vi ? "○ Chờ kiểm tra trường hợp toàn số âm" : "○ Waiting for the all-negative check")
+    : view.allNegative
+      ? (vi ? "⛔ TOÀN SỐ ÂM — KHÔNG ĐƯỢC CHỌN PHẦN BÙ RỖNG" : "⛔ ALL NEGATIVE — EMPTY COMPLEMENT IS ILLEGAL")
+      : (vi ? "✓ Có phần tử không âm — được xét circular" : "✓ A nonnegative value exists — circular is allowed");
+  const guardText = !guardResolved
+    ? (vi ? "Sau Dual Kadane, dòng guard quyết định có được dùng total - min_sum hay không." : "After Dual Kadane, the guard decides whether total - min_sum is legal.")
+    : view.allNegative
+      ? (vi ? `total - min_sum sẽ loại cả mảng và tạo subarray rỗng. Trả max_sum = ${view.maxSum}.` : `total - min_sum would remove the whole array and create an empty subarray. Return max_sum = ${view.maxSum}.`)
+      : view.wrapEmpty
+        ? (vi ? "Đoạn MIN đang phủ cả mảng; ứng viên phần bù rỗng bị đánh dấu không hợp lệ." : "The MIN segment covers the whole array; its empty complement is marked invalid.")
+        : (vi ? "Ứng viên circular gồm đoạn cuối nối trực tiếp về đoạn đầu." : "The circular candidate joins the ending segment directly to the starting segment.");
+  const winnerLabel = view.winner === "wrap" ? "CIRCULAR" : view.winner ? "NORMAL" : (vi ? "CHƯA CHỌN" : "PENDING");
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+
+  $("treeView").innerHTML = `<section class="msc918-viz" role="img" aria-label="#918 Maximum Sum Circular Subarray, answer ${escapeHtml(display(view.answer))}">
+    <div class="msc918-phases">${phases}</div>
+    <div class="msc918-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="msc918-circle">
+      <header><strong>nums · ${vi ? "mảng vòng tròn" : "circular array"}</strong><span>${vi ? "xanh=NORMAL · tím/đỏ=LOẠI MIN · xanh lá=WRAP · vàng=CHỌN" : "blue=NORMAL · purple/red=CUT MIN · green=WRAP · gold=PICK"}</span></header>
+      <div class="msc918-seam"><b>nums[n−1]</b><i>↻</i><b>nums[0]</b><span>${vi ? "điểm nối cuối → đầu" : "end → start seam"}</span></div>
+      <div class="msc918-cells">${cells}</div>
+    </section>
+    <div class="msc918-lanes">${lane("max")}${lane("min")}</div>
+    <section class="msc918-guard ${guardClass}"><strong>${escapeHtml(guardTitle)}</strong><span>${escapeHtml(guardText)}</span></section>
+    <section class="msc918-complement ${phase === "circular" ? "active" : ""}">
+      <div><small>${vi ? "CẮT ĐOẠN MIN" : "CUT MIN SEGMENT"}</small><strong>[${view.minL}..${view.minR}] = ${escapeHtml(display(view.minSum))}</strong></div>
+      <code>${escapeHtml(equation)}</code>
+      <div><small>${vi ? "GHÉP HAI BIÊN" : "JOIN BOTH EDGES"}</small><strong>${escapeHtml(circularRange)}</strong></div>
+    </section>
+    <div class="msc918-candidates">
+      <section class="normal ${view.winner === "normal" || view.winner === "all-negative" ? "winner" : ""}"><small>NORMAL</small><strong>${escapeHtml(display(view.maxSum))}</strong><span>${escapeHtml(normalRange)}</span></section>
+      <b>VS</b>
+      <section class="circular ${view.winner === "wrap" ? "winner" : ""} ${circularInvalid ? "invalid" : ""}"><small>CIRCULAR</small><strong>${circularInvalid ? "INVALID" : escapeHtml(display(view.circularSum))}</strong><span>${escapeHtml(circularRange)}</span></section>
+      <em>→</em>
+      <section class="answer"><small>${vi ? "KẾT QUẢ" : "ANSWER"} · ${winnerLabel}</small><strong>${escapeHtml(display(view.answer))}</strong><span>${selectedValues.length ? `[${selectedValues.join(", ")}]` : (vi ? "đang tính..." : "calculating...")}</span></section>
+    </div>
+  </section>`;
+}
+
 function renderMaximumSubarrayView(step) {
   const view = step.maximumSubarrayView || {};
   const el = $("treeView");
@@ -15005,6 +15509,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.maxProductView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMaximumProductView(step);
   } else if (step.productSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
@@ -15629,6 +16139,24 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFourSumPairsView(step);
+  } else if (step.elevator4027View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderElevator4027View(step);
+  } else if (step.absoluteSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAbsoluteSubarray1749View(step);
+  } else if (step.circularSubarrayView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCircularMaximumSubarrayView(step);
   } else if (step.maximumSubarrayView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

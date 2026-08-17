@@ -378,178 +378,252 @@ function buildSteps746B(cost) {
  *  - result: the largest answer seen so far.
  */
 function buildSteps152(nums) {
+  if (!Array.isArray(nums) || nums.length === 0) {
+    throw new Error("nums must contain at least one integer.");
+  }
+
   const steps = [];
+  const n = nums.length;
   let curMax = nums[0];
   let curMin = nums[0];
-  let result = nums[0];
-  let bestEnd = 0;
+  let best = nums[0];
+  let maxStart = 0;
+  let minStart = 0;
+  let maxEnd = 0;
+  let minEnd = 0;
   let bestStart = 0;
-  let curMaxStart = 0;
-  let curMinStart = 0;
+  let bestEnd = 0;
+  let i = 0;
+  let x = nums[0];
+  let phase = "init";
+  let prevMax = null;
+  let prevMin = null;
+  let prevMaxStart = 0;
+  let prevMinStart = 0;
+  let maxBase = null;
+  let minBase = null;
+  let maxBaseStart = 0;
+  let minBaseStart = 0;
+  let extendMax = null;
+  let extendMin = null;
+  let maxSource = "init";
+  let minSource = "init";
+  let swapped = false;
+  let zeroReset = nums[0] === 0;
+  let oldBest = best;
+  let bestUpdated = true;
+  const maxHistory = Array(n).fill(null);
+  const minHistory = Array(n).fill(null);
+  const bestHistory = Array(n).fill(null);
+  maxHistory[0] = curMax;
+  minHistory[0] = curMin;
+  bestHistory[0] = best;
 
-  steps.push({
-    title: { vi: "Khởi tạo", en: "Initialize" },
-    arr: [...nums],
-    highlight: [0],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "curMax", value: curMax },
-      { name: "curMin", value: curMin },
-      { name: "result", value: result },
-    ],
-    note: {
-      vi: `Bắt đầu tại nums[0]=${nums[0]}: curMax=curMin=result=${nums[0]}.`,
-      en: `Start at nums[0]=${nums[0]}: curMax=curMin=result=${nums[0]}.`,
-    },
+  const indices = (start, end) => (
+    Number.isInteger(start) && Number.isInteger(end) && start <= end
+      ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+      : []
+  );
+  const snapshot = () => ({
+    nums: [...nums],
+    phase,
+    i,
+    x,
+    prevMax,
+    prevMin,
+    maxBase,
+    minBase,
+    extendMax,
+    extendMin,
+    curMax,
+    curMin,
+    oldBest,
+    best,
+    maxStart,
+    maxEnd,
+    minStart,
+    minEnd,
+    bestStart,
+    bestEnd,
+    maxSource,
+    minSource,
+    swapped,
+    zeroReset,
+    bestUpdated,
+    maxHistory: [...maxHistory],
+    minHistory: [...minHistory],
+    bestHistory: [...bestHistory],
   });
-
-  for (let i = 1; i < nums.length; i++) {
-    const x = nums[i];
-    const prevMax = curMax;
-    const prevMin = curMin;
-    const a = x;
-    const b = prevMax * x;
-    const c = prevMin * x;
-
-    // Sub-step 1a: x = nums[i]
+  const addStep = ({ title, note, codeLine, vars = [], final = false }) => {
     steps.push({
-      title: { vi: `x = nums[${i}] = ${x}`, en: `x = nums[${i}] = ${x}` },
+      title,
+      note,
+      codeLines: [codeLine],
+      final,
       arr: [...nums],
-      highlight: [i],
-      mark: [],
-      codeLines: [5],
+      highlight: Number.isInteger(i) ? [i] : [],
+      mark: indices(bestStart, bestEnd),
       vars: [
         { name: "i", value: i },
-        { name: "x = nums[i]", value: x },
+        { name: "x", value: x },
+        { name: "cur_max", value: curMax },
+        { name: "cur_min", value: curMin },
+        { name: "result", value: best },
+        ...vars,
       ],
+      maxProductView: snapshot(),
+    });
+  };
+
+  addStep({
+    title: { vi: `Khởi tạo bằng nums[0] = ${x}`, en: `Initialize from nums[0] = ${x}` },
+    note: {
+      vi: "Mọi subarray kết thúc tại index 0 chỉ có một lựa chọn. Vì vậy cur_max, cur_min và result đều bằng nums[0].",
+      en: "Every subarray ending at index 0 has one choice, so cur_max, cur_min, and result all equal nums[0].",
+    },
+    codeLine: 3,
+    vars: [{ name: "range", value: "[0..0]" }],
+  });
+
+  for (i = 1; i < n; i++) {
+    x = nums[i];
+    prevMax = curMax;
+    prevMin = curMin;
+    prevMaxStart = maxStart;
+    prevMinStart = minStart;
+    maxBase = prevMax;
+    minBase = prevMin;
+    maxBaseStart = prevMaxStart;
+    minBaseStart = prevMinStart;
+    extendMax = null;
+    extendMin = null;
+    maxSource = "pending";
+    minSource = "pending";
+    swapped = false;
+    zeroReset = x === 0;
+    oldBest = best;
+    bestUpdated = false;
+    phase = "loop";
+
+    addStep({
+      title: { vi: `Vòng lặp chuyển tới index ${i}`, en: `Loop advances to index ${i}` },
       note: {
-        vi: `Lấy phần tử tiếp theo: x = nums[${i}] = ${x}.`,
-        en: `Get next element: x = nums[${i}] = ${x}.`,
+        vi: `Dòng 4 bắt đầu xử lý mọi subarray phải kết thúc tại index ${i}.`,
+        en: `Line 4 starts processing every subarray that must end at index ${i}.`,
       },
+      codeLine: 4,
+      vars: [{ name: "previous max/min", value: `${prevMax} / ${prevMin}` }],
     });
 
-    // Sub-step 1b: compute candidates
-    steps.push({
-      title: { vi: `candidates = (${a}, ${b}, ${c})`, en: `candidates = (${a}, ${b}, ${c})` },
-      arr: [...nums],
-      highlight: [i],
-      mark: [],
-      codeLines: [6],
-      vars: [
-        { name: "a = x", value: a },
-        { name: "b = curMax × x", value: `${prevMax} × ${x} = ${b}` },
-        { name: "c = curMin × x", value: `${prevMin} × ${x} = ${c}` },
-      ],
-      note: {
-        vi: `3 ứng viên: a=${a} (bắt đầu lại), b=${prevMax}×${x}=${b} (mở rộng max), c=${prevMin}×${x}=${c} (mở rộng min).`,
-        en: `3 candidates: a=${a} (restart), b=${prevMax}×${x}=${b} (extend max), c=${prevMin}×${x}=${c} (extend min).`,
-      },
+    phase = "read";
+    addStep({
+      title: { vi: `Đọc x = nums[${i}] = ${x}`, en: `Read x = nums[${i}] = ${x}` },
+      note: zeroReset
+        ? { vi: "x = 0 sẽ chặn mọi tích trước đó: cả max và min kết thúc tại đây đều trở thành 0.", en: "x = 0 blocks every earlier product: both ending max and ending min become 0 here." }
+        : { vi: `Ta có thể bắt đầu lại từ ${x}, hoặc nối ${x} vào một tích kết thúc tại index ${i - 1}.`, en: `We can restart from ${x}, or append ${x} to a product ending at index ${i - 1}.` },
+      codeLine: 5,
     });
 
-    // Sub-step 2: curMax = max(a, b, c)
-    const newMax = Math.max(a, b, c);
-    const prevMaxStart = curMaxStart;
-    const prevMinStart = curMinStart;
-    curMax = newMax;
-    // Track where the current max subarray starts
-    if (curMax === a) {
-      curMaxStart = i; // restart: subarray starts at current index
-    } else if (curMax === c) {
-      curMaxStart = prevMinStart; // came from curMin path
+    phase = "sign";
+    addStep({
+      title: x < 0
+        ? { vi: `${x} < 0: max và min sắp đổi vai trò`, en: `${x} < 0: max and min will trade roles` }
+        : { vi: `${x} không âm: không cần đổi vai trò`, en: `${x} is nonnegative: no role swap` },
+      note: x < 0
+        ? { vi: "Nhân với số âm đảo thứ tự: tích nhỏ nhất có thể trở thành lớn nhất, và tích lớn nhất có thể trở thành nhỏ nhất.", en: "Multiplying by a negative reverses order: the smallest product can become the largest, and vice versa." }
+        : zeroReset
+          ? { vi: "0 không cần swap; bước cập nhật tiếp theo sẽ reset cả hai trạng thái về 0.", en: "Zero needs no swap; the next updates reset both states to 0." }
+          : { vi: "Với số dương, nhánh max tiếp tục từ max và nhánh min tiếp tục từ min.", en: "With a positive value, the max lane extends max and the min lane extends min." },
+      codeLine: 6,
+      vars: [{ name: "x < 0", value: x < 0 }],
+    });
+
+    if (x < 0) {
+      [maxBase, minBase] = [prevMin, prevMax];
+      [maxBaseStart, minBaseStart] = [prevMinStart, prevMaxStart];
+      swapped = true;
+      phase = "swap";
+      addStep({
+        title: { vi: `Swap: max-base=${maxBase}, min-base=${minBase}`, en: `Swap: max-base=${maxBase}, min-base=${minBase}` },
+        note: {
+          vi: `Dòng 7 đổi vai trò. Nhánh max nhận cur_min cũ ${prevMin}; nhánh min nhận cur_max cũ ${prevMax}.`,
+          en: `Line 7 swaps roles. The max lane receives old cur_min ${prevMin}; the min lane receives old cur_max ${prevMax}.`,
+        },
+        codeLine: 7,
+        vars: [{ name: "max base ← old min", value: maxBase }, { name: "min base ← old max", value: minBase }],
+      });
     }
-    // else curMax === b: stays at previous curMaxStart
-    steps.push({
-      title: { vi: `curMax = max(${a}, ${b}, ${c}) = ${curMax}`, en: `curMax = max(${a}, ${b}, ${c}) = ${curMax}` },
-      arr: [...nums],
-      highlight: [i],
-      mark: [],
-      codeLines: [7],
-      vars: [
-        { name: "curMax (new)", value: curMax },
-        { name: "from", value: curMax === a ? "nums[i] (restart)" : curMax === b ? "curMax×x (extend)" : "curMin×x (flip sign)" },
-      ],
-      note: {
-        vi: `curMax = max(${a}, ${b}, ${c}) = ${curMax}. ${curMax === c ? "Tích âm × âm → dương lớn!" : ""}`,
-        en: `curMax = max(${a}, ${b}, ${c}) = ${curMax}. ${curMax === c ? "Negative × negative → large positive!" : ""}`,
-      },
+
+    extendMax = maxBase * x;
+    const restartMax = x >= extendMax;
+    curMax = restartMax ? x : extendMax;
+    maxStart = restartMax ? i : maxBaseStart;
+    maxEnd = i;
+    maxSource = restartMax ? "restart" : swapped ? "previous-min" : "previous-max";
+    maxHistory[i] = curMax;
+    phase = "max";
+    addStep({
+      title: { vi: `cur_max = max(${x}, ${maxBase}×${x}) = ${curMax}`, en: `cur_max = max(${x}, ${maxBase}×${x}) = ${curMax}` },
+      note: restartMax
+        ? { vi: `Bắt đầu subarray mới tại index ${i} vì ${x} ≥ ${extendMax}.`, en: `Restart at index ${i} because ${x} ≥ ${extendMax}.` }
+        : { vi: `Mở rộng range [${maxBaseStart}..${i - 1}] vì ${extendMax} lớn hơn ${x}.`, en: `Extend range [${maxBaseStart}..${i - 1}] because ${extendMax} is larger than ${x}.` },
+      codeLine: 8,
+      vars: [{ name: "restart", value: x }, { name: "extend", value: `${maxBase} × ${x} = ${extendMax}` }, { name: "max range", value: `[${maxStart}..${maxEnd}]` }],
     });
 
-    // Sub-step 3: curMin = min(a, b, c)
-    const newMin = Math.min(a, b, c);
-    curMin = newMin;
-    // Track where the current min subarray starts
-    if (curMin === a) {
-      curMinStart = i; // restart
-    } else if (curMin === b) {
-      curMinStart = prevMaxStart; // came from curMax path
-    }
-    // else curMin === c: stays at previous curMinStart
-    steps.push({
-      title: { vi: `curMin = min(${a}, ${b}, ${c}) = ${curMin}`, en: `curMin = min(${a}, ${b}, ${c}) = ${curMin}` },
-      arr: [...nums],
-      highlight: [i],
-      mark: [],
-      codeLines: [8],
-      vars: [
-        { name: "curMin (new)", value: curMin },
-        { name: "why track min?", value: "negative × negative can become max later" },
-      ],
+    extendMin = minBase * x;
+    const restartMin = x <= extendMin;
+    curMin = restartMin ? x : extendMin;
+    minStart = restartMin ? i : minBaseStart;
+    minEnd = i;
+    minSource = restartMin ? "restart" : swapped ? "previous-max" : "previous-min";
+    minHistory[i] = curMin;
+    phase = "min";
+    addStep({
+      title: { vi: `cur_min = min(${x}, ${minBase}×${x}) = ${curMin}`, en: `cur_min = min(${x}, ${minBase}×${x}) = ${curMin}` },
       note: {
-        vi: `curMin = min(${a}, ${b}, ${c}) = ${curMin}. Giữ min vì số âm × số âm sau này có thể thành max!`,
-        en: `curMin = min(${a}, ${b}, ${c}) = ${curMin}. Keep min because neg × neg can become max later!`,
+        vi: `Giữ tích nhỏ nhất ${curMin} kết thúc tại i=${i}; một số âm phía sau có thể biến nó thành max lớn nhất.`,
+        en: `Keep the smallest product ${curMin} ending at i=${i}; a later negative can turn it into the largest max.`,
       },
+      codeLine: 9,
+      vars: [{ name: "restart", value: x }, { name: "extend", value: `${minBase} × ${x} = ${extendMin}` }, { name: "min range", value: `[${minStart}..${minEnd}]` }],
     });
 
-    // Sub-step 4: result = max(result, curMax)
-    let updated = false;
-    if (curMax > result) {
-      result = curMax;
+    oldBest = best;
+    if (curMax > best) {
+      best = curMax;
+      bestStart = maxStart;
       bestEnd = i;
-      bestStart = curMaxStart;
-      updated = true;
+      bestUpdated = true;
     }
-    steps.push({
-      title: { vi: `result = max(${result}, ${curMax}) = ${result}${updated ? " ✓" : ""}`, en: `result = max(${result}, ${curMax}) = ${result}${updated ? " ✓" : ""}` },
-      arr: [...nums],
-      highlight: [i],
-      mark: updated ? [i] : [],
-      codeLines: [9],
-      vars: [
-        { name: "result", value: result },
-        { name: "updated?", value: updated ? `YES (new max at i=${i})` : "no" },
-        { name: "curMax", value: curMax },
-        { name: "curMin", value: curMin },
-      ],
-      note: {
-        vi: updated
-          ? `curMax=${curMax} > result cũ → cập nhật result = ${result}. Tích lớn nhất hiện tại kết thúc tại i=${i}.`
-          : `curMax=${curMax} ≤ result=${result} → giữ nguyên.`,
-        en: updated
-          ? `curMax=${curMax} > old result → update result = ${result}. Best product ends at i=${i}.`
-          : `curMax=${curMax} ≤ result=${result} → unchanged.`,
-      },
+    bestHistory[i] = best;
+    phase = "best";
+    addStep({
+      title: { vi: `result = max(${oldBest}, ${curMax}) = ${best}${bestUpdated ? " ✓" : ""}`, en: `result = max(${oldBest}, ${curMax}) = ${best}${bestUpdated ? " ✓" : ""}` },
+      note: bestUpdated
+        ? { vi: `Tìm thấy best mới: nums[${bestStart}..${bestEnd}] có tích ${best}.`, en: `Found a new best: nums[${bestStart}..${bestEnd}] has product ${best}.` }
+        : { vi: `cur_max=${curMax} không vượt result cũ ${oldBest}, nên giữ best range [${bestStart}..${bestEnd}].`, en: `cur_max=${curMax} does not beat old result ${oldBest}, so keep best range [${bestStart}..${bestEnd}].` },
+      codeLine: 10,
+      vars: [{ name: "old result", value: oldBest }, { name: "updated", value: bestUpdated }, { name: "best range", value: `[${bestStart}..${bestEnd}]` }],
     });
   }
 
-  // Build mark array for the full best subarray range
-  const markRange = Array.from({ length: bestEnd - bestStart + 1 }, (_, k) => bestStart + k);
-
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums],
-    highlight: [],
-    mark: markRange,
-    final: true,
-    codeLines: [10],
-    vars: [{ name: "result", value: result }, { name: "subarray", value: `nums[${bestStart}..${bestEnd}]` }],
+  phase = "done";
+  i = n - 1;
+  x = nums[i];
+  bestUpdated = false;
+  addStep({
+    title: { vi: `Kết quả: ${best}`, en: `Result: ${best}` },
     note: {
-      vi: `Tích lớn nhất của một dãy con liên tiếp = ${result}.`,
-      en: `The maximum product of a contiguous subarray = ${result} (indices ${bestStart} to ${bestEnd}).`,
+      vi: `Maximum product subarray là nums[${bestStart}..${bestEnd}] = [${nums.slice(bestStart, bestEnd + 1).join(", ")}], tích = ${best}.`,
+      en: `The maximum product subarray is nums[${bestStart}..${bestEnd}] = [${nums.slice(bestStart, bestEnd + 1).join(", ")}], product = ${best}.`,
     },
+    codeLine: 11,
+    vars: [{ name: "best subarray", value: `[${nums.slice(bestStart, bestEnd + 1).join(", ")}]` }],
+    final: true,
   });
 
-  return { original: [...nums], answer: result, steps };
+  return { original: [...nums], answer: best, steps };
 }
 
 /**
@@ -1642,6 +1716,489 @@ function buildSteps1137Rolling(n) {
   });
 
   return { n, answer: c, steps };
+}
+
+/** LeetCode 1749: Maximum Absolute Sum of Any Subarray. */
+function buildSteps1749(nums) {
+  if (!Array.isArray(nums) || nums.length === 0 || nums.some((value) => !Number.isInteger(value))) {
+    throw new Error("nums must contain at least one integer.");
+  }
+
+  const steps = [];
+  const n = nums.length;
+  let phase = "init-ending";
+  let event = "init";
+  let i = 0;
+  let x = nums[0];
+  let maxEnding = 0;
+  let minEnding = 0;
+  let maxSum = 0;
+  let minSum = 0;
+  let maxEndingL = null;
+  let minEndingL = null;
+  let maxL = null;
+  let maxR = null;
+  let minL = null;
+  let minR = null;
+  let prevMaxEnding = null;
+  let prevMinEnding = null;
+  let extendMax = null;
+  let extendMin = null;
+  let maxReset = false;
+  let minReset = false;
+  let maxUpdated = false;
+  let minUpdated = false;
+  let answer = null;
+  let winner = null;
+  const maxHistory = Array(n).fill(null);
+  const minHistory = Array(n).fill(null);
+
+  const range = (left, right) => Number.isInteger(left) && Number.isInteger(right) && left <= right
+    ? Array.from({ length: right - left + 1 }, (_, offset) => left + offset) : [];
+  const selectedRange = () => {
+    if (winner === "positive") return [maxL, maxR];
+    if (winner === "negative") return [minL, minR];
+    return [null, null];
+  };
+  const snapshot = () => {
+    const [selectedL, selectedR] = selectedRange();
+    return {
+      nums: [...nums], phase, event, i, x,
+      prevMaxEnding, prevMinEnding, extendMax, extendMin,
+      maxEnding, minEnding, maxSum, minSum,
+      maxEndingL, maxEndingR: maxEndingL === null ? null : i,
+      minEndingL, minEndingR: minEndingL === null ? null : i,
+      maxL, maxR, minL, minR,
+      maxReset, minReset, maxUpdated, minUpdated,
+      maxHistory: [...maxHistory], minHistory: [...minHistory],
+      positiveCandidate: maxSum, negativeCandidate: -minSum,
+      winner, answer, selectedL, selectedR,
+    };
+  };
+  const push = ({ title, note, line, vars = [], final = false }) => {
+    const [selectedL, selectedR] = selectedRange();
+    const marked = winner ? range(selectedL, selectedR) : [];
+    steps.push({
+      title, note, codeLines: [line], final,
+      arr: [...nums], highlight: final ? [] : [i], mark: marked,
+      vars: [
+        { name: "i", value: i }, { name: "x", value: x },
+        { name: "max_ending", value: maxEnding }, { name: "max_sum", value: maxSum },
+        { name: "min_ending", value: minEnding }, { name: "min_sum", value: minSum }, ...vars,
+      ],
+      absoluteSubarrayView: snapshot(),
+    });
+  };
+
+  push({
+    title: { vi: "Khởi tạo max_ending = min_ending = 0", en: "Initialize max_ending = min_ending = 0" },
+    note: { vi: "0 đại diện subarray rỗng. MAX không giữ tổng âm; MIN không giữ tổng dương.", en: "Zero represents the empty subarray. MAX never keeps a negative sum; MIN never keeps a positive sum." },
+    line: 3,
+  });
+  phase = "init-global";
+  push({
+    title: { vi: "Khởi tạo max_sum = min_sum = 0", en: "Initialize max_sum = min_sum = 0" },
+    note: { vi: "Hai global best bắt đầu từ 0 vì đề cho phép subarray rỗng.", en: "Both global best values start at zero because an empty subarray is allowed." },
+    line: 4,
+  });
+
+  for (i = 0; i < n; i++) {
+    x = nums[i];
+    prevMaxEnding = maxEnding;
+    prevMinEnding = minEnding;
+    extendMax = prevMaxEnding + x;
+    extendMin = prevMinEnding + x;
+    maxReset = false;
+    minReset = false;
+    maxUpdated = false;
+    minUpdated = false;
+    phase = "scan";
+    event = "read";
+    push({
+      title: { vi: `i=${i}, x=nums[${i}]=${x}`, en: `i=${i}, x=nums[${i}]=${x}` },
+      note: { vi: "Cả hai lane thử nối x vào subarray đang kết thúc ở i-1.", en: "Both lanes try extending their subarray ending at i-1 with x." },
+      line: 5,
+      vars: [{ name: "MAX extend", value: extendMax }, { name: "MIN extend", value: extendMin }],
+    });
+
+    if (extendMax > 0) {
+      maxEnding = extendMax;
+      if (prevMaxEnding === 0) maxEndingL = i;
+    } else {
+      maxEnding = 0;
+      maxEndingL = null;
+      maxReset = true;
+    }
+    maxHistory[i] = maxEnding;
+    phase = "max-ending";
+    event = maxReset ? "reset-max" : "extend-max";
+    push({
+      title: { vi: `max_ending = max(0, ${extendMax}) = ${maxEnding}`, en: `max_ending = max(0, ${extendMax}) = ${maxEnding}` },
+      note: maxReset
+        ? { vi: `${extendMax} không dương → bỏ đoạn cũ và trở về subarray rỗng.`, en: `${extendMax} is not positive → discard the old segment and reset to the empty subarray.` }
+        : { vi: `Giữ đoạn dương [${maxEndingL}..${i}] có tổng ${maxEnding}.`, en: `Keep positive range [${maxEndingL}..${i}] with sum ${maxEnding}.` },
+      line: 6,
+    });
+
+    const oldMaxSum = maxSum;
+    if (maxEnding > maxSum) {
+      maxSum = maxEnding;
+      maxL = maxEndingL;
+      maxR = i;
+      maxUpdated = true;
+    }
+    phase = "max-best";
+    event = maxUpdated ? "new-max-best" : "keep-max-best";
+    push({
+      title: { vi: `max_sum = max(${oldMaxSum}, ${maxEnding}) = ${maxSum}${maxUpdated ? " ✓" : ""}`, en: `max_sum = max(${oldMaxSum}, ${maxEnding}) = ${maxSum}${maxUpdated ? " ✓" : ""}` },
+      note: maxUpdated
+        ? { vi: `Global MAX mới: [${maxL}..${maxR}] = ${maxSum}.`, en: `New global MAX: [${maxL}..${maxR}] = ${maxSum}.` }
+        : { vi: `Giữ global MAX = ${maxSum}${maxL === null ? " (rỗng)" : ` tại [${maxL}..${maxR}]`}.`, en: `Keep global MAX = ${maxSum}${maxL === null ? " (empty)" : ` at [${maxL}..${maxR}]`}.` },
+      line: 7,
+    });
+
+    if (extendMin < 0) {
+      minEnding = extendMin;
+      if (prevMinEnding === 0) minEndingL = i;
+    } else {
+      minEnding = 0;
+      minEndingL = null;
+      minReset = true;
+    }
+    minHistory[i] = minEnding;
+    phase = "min-ending";
+    event = minReset ? "reset-min" : "extend-min";
+    push({
+      title: { vi: `min_ending = min(0, ${extendMin}) = ${minEnding}`, en: `min_ending = min(0, ${extendMin}) = ${minEnding}` },
+      note: minReset
+        ? { vi: `${extendMin} không âm → bỏ đoạn cũ và trở về subarray rỗng.`, en: `${extendMin} is not negative → discard the old segment and reset to the empty subarray.` }
+        : { vi: `Giữ đoạn âm [${minEndingL}..${i}] có tổng ${minEnding}.`, en: `Keep negative range [${minEndingL}..${i}] with sum ${minEnding}.` },
+      line: 8,
+    });
+
+    const oldMinSum = minSum;
+    if (minEnding < minSum) {
+      minSum = minEnding;
+      minL = minEndingL;
+      minR = i;
+      minUpdated = true;
+    }
+    phase = "min-best";
+    event = minUpdated ? "new-min-best" : "keep-min-best";
+    push({
+      title: { vi: `min_sum = min(${oldMinSum}, ${minEnding}) = ${minSum}${minUpdated ? " ✓" : ""}`, en: `min_sum = min(${oldMinSum}, ${minEnding}) = ${minSum}${minUpdated ? " ✓" : ""}` },
+      note: minUpdated
+        ? { vi: `Global MIN mới: [${minL}..${minR}] = ${minSum}; trị tuyệt đối ${-minSum}.`, en: `New global MIN: [${minL}..${minR}] = ${minSum}; absolute value ${-minSum}.` }
+        : { vi: `Giữ global MIN = ${minSum}${minL === null ? " (rỗng)" : ` tại [${minL}..${minR}]`}.`, en: `Keep global MIN = ${minSum}${minL === null ? " (empty)" : ` at [${minL}..${minR}]`}.` },
+      line: 9,
+    });
+  }
+
+  i = n - 1;
+  x = nums[i];
+  answer = Math.max(maxSum, -minSum);
+  winner = answer === 0 ? "zero" : maxSum >= -minSum ? "positive" : "negative";
+  phase = "done";
+  event = "compare";
+  const [selectedL, selectedR] = selectedRange();
+  const selectedValues = selectedL === null ? [] : nums.slice(selectedL, selectedR + 1);
+  const selectedSum = selectedValues.reduce((sum, value) => sum + value, 0);
+  push({
+    title: { vi: `max(${maxSum}, |${minSum}|) = ${answer}`, en: `max(${maxSum}, |${minSum}|) = ${answer}` },
+    note: winner === "zero"
+      ? { vi: "Mọi lựa chọn tốt nhất có trị tuyệt đối 0; chọn subarray rỗng.", en: "The best absolute value is zero; choose the empty subarray." }
+      : { vi: `Chọn [${selectedL}..${selectedR}] = [${selectedValues.join(", ")}], tổng ${selectedSum}, trị tuyệt đối ${answer}.`, en: `Choose [${selectedL}..${selectedR}] = [${selectedValues.join(", ")}], sum ${selectedSum}, absolute value ${answer}.` },
+    line: 10,
+    vars: [{ name: "positive candidate", value: maxSum }, { name: "negative candidate", value: -minSum }, { name: "answer", value: answer }],
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 918: Maximum Sum Circular Subarray.
+ * Run max-Kadane and min-Kadane together. A wrapping answer keeps the two
+ * edge segments and removes one contiguous minimum-sum segment in the middle.
+ */
+function buildSteps918(nums) {
+  if (!Array.isArray(nums) || nums.length === 0 || nums.some((value) => !Number.isInteger(value))) {
+    throw new Error("nums must contain at least one integer.");
+  }
+
+  const n = nums.length;
+  const steps = [];
+  let i = 0;
+  let x = nums[0];
+  let phase = "init-max";
+  let event = "init";
+  let total = nums[0];
+  let curMax = nums[0];
+  let curMin = nums[0];
+  let maxSum = nums[0];
+  let minSum = nums[0];
+  let curMaxStart = 0;
+  let curMinStart = 0;
+  let maxL = 0;
+  let maxR = 0;
+  let minL = 0;
+  let minR = 0;
+  let prevCurMax = null;
+  let prevCurMin = null;
+  let restartMax = null;
+  let extendMax = null;
+  let restartMin = null;
+  let extendMin = null;
+  let maxUpdated = false;
+  let minUpdated = false;
+  let allNegative = false;
+  let circularSum = null;
+  let wrapEmpty = false;
+  let winner = null;
+  let answer = null;
+  const maxHistory = Array(n).fill(null);
+  const minHistory = Array(n).fill(null);
+  const totalHistory = Array(n).fill(null);
+  maxHistory[0] = curMax;
+  minHistory[0] = curMin;
+  totalHistory[0] = total;
+
+  const range = (left, right) => (
+    Number.isInteger(left) && Number.isInteger(right) && left <= right
+      ? Array.from({ length: right - left + 1 }, (_, offset) => left + offset)
+      : []
+  );
+  const wrapRanges = () => [
+    minL > 0 ? [0, minL - 1] : null,
+    minR < n - 1 ? [minR + 1, n - 1] : null,
+  ].filter(Boolean);
+  const selectedRanges = () => {
+    if (winner === "wrap") return wrapRanges();
+    if (winner === "normal" || winner === "all-negative") return [[maxL, maxR]];
+    return [];
+  };
+  const snapshot = () => ({
+    nums: [...nums], phase, event, i, x, total, curMax, curMin, maxSum, minSum,
+    prevCurMax, prevCurMin, restartMax, extendMax, restartMin, extendMin,
+    curMaxStart, curMaxEnd: i, curMinStart, curMinEnd: i,
+    normalL: maxL, normalR: maxR, minL, minR,
+    maxUpdated, minUpdated, allNegative, circularSum, wrapEmpty, winner, answer,
+    wrapRanges: wrapRanges().map((item) => [...item]),
+    selectedRanges: selectedRanges().map((item) => [...item]),
+    maxHistory: [...maxHistory], minHistory: [...minHistory], totalHistory: [...totalHistory],
+  });
+  const push = ({ title, note, line, vars = [], final = false }) => {
+    steps.push({
+      title, note, codeLines: [line], final,
+      arr: [...nums],
+      highlight: Number.isInteger(i) ? [i] : [],
+      mark: winner ? selectedRanges().flatMap(([left, right]) => range(left, right)) : range(maxL, maxR),
+      vars: [
+        { name: "i", value: i }, { name: "x", value: x },
+        { name: "total", value: total }, { name: "cur_max", value: curMax },
+        { name: "max_sum", value: maxSum }, { name: "cur_min", value: curMin },
+        { name: "min_sum", value: minSum }, ...vars,
+      ],
+      circularSubarrayView: snapshot(),
+    });
+  };
+
+  push({
+    title: { vi: `Khởi tạo total, cur_max, max_sum = ${nums[0]}`, en: `Initialize total, cur_max, max_sum = ${nums[0]}` },
+    note: {
+      vi: "Nhánh MAX là Kadane bình thường: tìm subarray liên tiếp tốt nhất không đi qua điểm nối cuối → đầu.",
+      en: "The MAX lane is ordinary Kadane: find the best contiguous subarray that does not cross the end-to-start seam.",
+    },
+    line: 3,
+    vars: [{ name: "normal range", value: "[0..0]" }],
+  });
+
+  phase = "init-min";
+  push({
+    title: { vi: `Khởi tạo cur_min, min_sum = ${nums[0]}`, en: `Initialize cur_min, min_sum = ${nums[0]}` },
+    note: {
+      vi: "Nhánh MIN tìm đoạn tệ nhất để loại bỏ. Phần còn lại ở hai đầu chính là một circular subarray.",
+      en: "The MIN lane finds the worst segment to remove. What remains at both edges is one circular subarray.",
+    },
+    line: 4,
+    vars: [{ name: "excluded range", value: "[0..0]" }],
+  });
+
+  for (i = 1; i < n; i++) {
+    x = nums[i];
+    prevCurMax = curMax;
+    prevCurMin = curMin;
+    restartMax = x;
+    extendMax = prevCurMax + x;
+    restartMin = x;
+    extendMin = prevCurMin + x;
+    maxUpdated = false;
+    minUpdated = false;
+    phase = "loop";
+    event = "loop";
+    push({
+      title: { vi: `Vòng lặp tới index ${i}`, en: `Loop advances to index ${i}` },
+      note: { vi: `Chuẩn bị xử lý nums[${i}] và cập nhật đồng thời nhánh MAX lẫn MIN.`, en: `Prepare nums[${i}] and update both the MAX and MIN lanes.` },
+      line: 5,
+    });
+
+    phase = "scan";
+    event = "read";
+    push({
+      title: { vi: `x = nums[${i}] = ${x}`, en: `x = nums[${i}] = ${x}` },
+      note: { vi: "Mỗi nhánh có hai lựa chọn: bắt đầu lại từ x hoặc nối x vào đoạn trước.", en: "Each lane has two choices: restart from x or extend the previous segment with x." },
+      line: 6,
+      vars: [{ name: "max choices", value: `${restartMax} / ${extendMax}` }, { name: "min choices", value: `${restartMin} / ${extendMin}` }],
+    });
+
+    const oldMaxStart = curMaxStart;
+    if (restartMax > extendMax) {
+      curMax = restartMax;
+      curMaxStart = i;
+      event = "restart-max";
+    } else {
+      curMax = extendMax;
+      curMaxStart = oldMaxStart;
+      event = "extend-max";
+    }
+    maxHistory[i] = curMax;
+    phase = "max-ending";
+    push({
+      title: { vi: `cur_max = max(${restartMax}, ${extendMax}) = ${curMax}`, en: `cur_max = max(${restartMax}, ${extendMax}) = ${curMax}` },
+      note: event === "restart-max"
+        ? { vi: `Bắt đầu MAX mới tại ${i}; nối tiếp chỉ được ${extendMax}.`, en: `Restart MAX at ${i}; extending gives only ${extendMax}.` }
+        : { vi: `Mở rộng MAX từ [${curMaxStart}..${i - 1}] tới ${i}.`, en: `Extend MAX from [${curMaxStart}..${i - 1}] through ${i}.` },
+      line: 7,
+      vars: [{ name: "max ending range", value: `[${curMaxStart}..${i}]` }],
+    });
+
+    const oldMaxSum = maxSum;
+    if (curMax > maxSum) {
+      maxSum = curMax;
+      maxL = curMaxStart;
+      maxR = i;
+      maxUpdated = true;
+    }
+    phase = "max-best";
+    event = maxUpdated ? "new-normal-best" : "keep-normal-best";
+    push({
+      title: { vi: `max_sum = max(${oldMaxSum}, ${curMax}) = ${maxSum}${maxUpdated ? " ✓" : ""}`, en: `max_sum = max(${oldMaxSum}, ${curMax}) = ${maxSum}${maxUpdated ? " ✓" : ""}` },
+      note: maxUpdated
+        ? { vi: `Normal best mới là nums[${maxL}..${maxR}], tổng ${maxSum}.`, en: `The new normal best is nums[${maxL}..${maxR}], sum ${maxSum}.` }
+        : { vi: `Giữ normal best [${maxL}..${maxR}] = ${maxSum}.`, en: `Keep normal best [${maxL}..${maxR}] = ${maxSum}.` },
+      line: 8,
+    });
+
+    const oldMinStart = curMinStart;
+    if (restartMin < extendMin) {
+      curMin = restartMin;
+      curMinStart = i;
+      event = "restart-min";
+    } else {
+      curMin = extendMin;
+      curMinStart = oldMinStart;
+      event = "extend-min";
+    }
+    minHistory[i] = curMin;
+    phase = "min-ending";
+    push({
+      title: { vi: `cur_min = min(${restartMin}, ${extendMin}) = ${curMin}`, en: `cur_min = min(${restartMin}, ${extendMin}) = ${curMin}` },
+      note: event === "restart-min"
+        ? { vi: `Bắt đầu MIN mới tại ${i}.`, en: `Restart MIN at ${i}.` }
+        : { vi: `Mở rộng MIN từ [${curMinStart}..${i - 1}] tới ${i}.`, en: `Extend MIN from [${curMinStart}..${i - 1}] through ${i}.` },
+      line: 9,
+      vars: [{ name: "min ending range", value: `[${curMinStart}..${i}]` }],
+    });
+
+    const oldMinSum = minSum;
+    if (curMin < minSum) {
+      minSum = curMin;
+      minL = curMinStart;
+      minR = i;
+      minUpdated = true;
+    }
+    phase = "min-best";
+    event = minUpdated ? "new-min-best" : "keep-min-best";
+    push({
+      title: { vi: `min_sum = min(${oldMinSum}, ${curMin}) = ${minSum}${minUpdated ? " ✓" : ""}`, en: `min_sum = min(${oldMinSum}, ${curMin}) = ${minSum}${minUpdated ? " ✓" : ""}` },
+      note: minUpdated
+        ? { vi: `Đoạn sẽ loại tốt nhất hiện tại: nums[${minL}..${minR}], tổng ${minSum}.`, en: `Current best segment to exclude: nums[${minL}..${minR}], sum ${minSum}.` }
+        : { vi: `Giữ đoạn MIN [${minL}..${minR}] = ${minSum}.`, en: `Keep MIN segment [${minL}..${minR}] = ${minSum}.` },
+      line: 10,
+    });
+
+    total += x;
+    totalHistory[i] = total;
+    phase = "total";
+    event = "add-total";
+    push({
+      title: { vi: `total += ${x} → ${total}`, en: `total += ${x} → ${total}` },
+      note: { vi: "total là tổng toàn bộ vòng tròn; sau cùng circular = total - min_sum.", en: "total is the whole circle sum; finally circular = total - min_sum." },
+      line: 11,
+    });
+  }
+
+  // The for-loop exits with i === n. Keep post-scan visualization anchored
+  // to the last real element so cur_max/cur_min ranges end at n - 1.
+  i = n - 1;
+  x = nums[i];
+  allNegative = maxSum < 0;
+  wrapEmpty = minL === 0 && minR === n - 1;
+  phase = "guard";
+  event = allNegative ? "all-negative" : "guard-pass";
+  push({
+    title: allNegative
+      ? { vi: `max_sum=${maxSum} < 0: mảng toàn số âm`, en: `max_sum=${maxSum} < 0: all values are negative` }
+      : { vi: `max_sum=${maxSum} ≥ 0: được phép xét circular`, en: `max_sum=${maxSum} ≥ 0: circular candidate is allowed` },
+    note: allNegative
+      ? { vi: "Không dùng total - min_sum: MIN là cả mảng, phần bù sẽ rỗng và cho 0 sai. Phải trả về phần tử âm lớn nhất.", en: "Do not use total - min_sum: MIN is the whole array, so its complement is empty and the resulting 0 is illegal. Return the largest negative element." }
+      : { vi: "Có ít nhất một giá trị không âm, tiếp tục tính ứng viên đi qua điểm nối cuối → đầu.", en: "At least one value is nonnegative, so compute the candidate crossing the end-to-start seam." },
+    line: 12,
+    vars: [{ name: "all_negative", value: allNegative }, { name: "normal best", value: maxSum }],
+  });
+
+  if (allNegative) {
+    winner = "all-negative";
+    answer = maxSum;
+    phase = "done";
+    event = "return-all-negative";
+    push({
+      title: { vi: `Trả về max_sum = ${answer}`, en: `Return max_sum = ${answer}` },
+      note: { vi: `Chọn nums[${maxL}..${maxR}] = [${nums.slice(maxL, maxR + 1).join(", ")}].`, en: `Choose nums[${maxL}..${maxR}] = [${nums.slice(maxL, maxR + 1).join(", ")}].` },
+      line: 13,
+      vars: [{ name: "answer", value: answer }],
+      final: true,
+    });
+    return { original: [...nums], answer, steps };
+  }
+
+  circularSum = total - minSum;
+  phase = "circular";
+  event = wrapEmpty ? "empty-complement" : "build-wrap";
+  push({
+    title: { vi: `circular_sum = ${total} - (${minSum}) = ${circularSum}`, en: `circular_sum = ${total} - (${minSum}) = ${circularSum}` },
+    note: wrapEmpty
+      ? { vi: "MIN phủ cả mảng nên phần bù rỗng; circular candidate này không được chọn.", en: "MIN covers the entire array, so the complement is empty; this circular candidate cannot be selected." }
+      : { vi: `Loại nums[${minL}..${minR}]; nối đoạn cuối với đoạn đầu để được tổng ${circularSum}.`, en: `Exclude nums[${minL}..${minR}]; join the ending and starting segments for sum ${circularSum}.` },
+    line: 14,
+    vars: [{ name: "excluded", value: `[${minL}..${minR}]` }, { name: "wrap ranges", value: wrapRanges().map(([l, r]) => `[${l}..${r}]`).join(" + ") || "empty" }],
+  });
+
+  winner = !wrapEmpty && circularSum > maxSum ? "wrap" : "normal";
+  answer = winner === "wrap" ? circularSum : maxSum;
+  phase = "done";
+  event = "compare";
+  push({
+    title: { vi: `max(${maxSum}, ${circularSum}) = ${answer} → ${winner === "wrap" ? "CIRCULAR" : "NORMAL"}`, en: `max(${maxSum}, ${circularSum}) = ${answer} → ${winner === "wrap" ? "CIRCULAR" : "NORMAL"}` },
+    note: winner === "wrap"
+      ? { vi: `Chọn hai đoạn biên ${wrapRanges().map(([l, r]) => `[${l}..${r}]`).join(" + ")} với tổng ${answer}.`, en: `Choose edge ranges ${wrapRanges().map(([l, r]) => `[${l}..${r}]`).join(" + ")} with sum ${answer}.` }
+      : { vi: `Chọn normal range [${maxL}..${maxR}] với tổng ${answer}.`, en: `Choose normal range [${maxL}..${maxR}] with sum ${answer}.` },
+    line: 15,
+    vars: [{ name: "normal", value: maxSum }, { name: "circular", value: circularSum }, { name: "winner", value: winner }, { name: "answer", value: answer }],
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
 }
 
 /**
@@ -14226,6 +14783,360 @@ function buildSteps486(inputNums) {
   return { original: nums, answer: winner, steps };
 }
 
+function parseRequests4027(raw) {
+  let requests = raw;
+  if (typeof raw === "string") {
+    const text = raw.trim();
+    if (!text) throw new Error("requests must not be empty.");
+    if (text.startsWith("[")) {
+      try {
+        requests = JSON.parse(text);
+      } catch (error) {
+        throw new Error("requests must be JSON or arrival,floor;arrival,floor.");
+      }
+    } else {
+      requests = text.split(";").map((part) => part.split(",").map((value) => Number(value.trim())));
+    }
+  }
+  if (!Array.isArray(requests) || requests.length === 0 || requests.length > 16) {
+    throw new Error("requests must contain between 1 and 16 pairs.");
+  }
+  const parsed = requests.map((request) => {
+    if (!Array.isArray(request) || request.length !== 2 || request.some((value) => !Number.isInteger(value))) {
+      throw new Error("Each request must be [arrival, floor].");
+    }
+    return [request[0], request[1]];
+  });
+  return parsed;
+}
+
+/** LeetCode 4027: Elevator Requests III — bitmask DP. */
+function buildSteps4027(input, params = {}) {
+  if (!Array.isArray(input) || input.length !== 2 || input.some((value) => !Number.isInteger(value))) {
+    throw new Error("Enter n,start as exactly two integers.");
+  }
+  const [n, start] = input;
+  const requests = parseRequests4027(params.requests);
+  if (n < 1 || n > 1_000_000_000) throw new Error("n must be between 1 and 1,000,000,000.");
+  if (start < 0 || start >= n) throw new Error("start must be a valid floor from 0 to n - 1.");
+  requests.forEach(([arrival, floor]) => {
+    if (arrival < 0 || arrival > 1_000_000_000) throw new Error("Every arrival must be between 0 and 1,000,000,000.");
+    if (floor < 0 || floor >= n) throw new Error("Every requested floor must be from 0 to n - 1.");
+  });
+
+  const m = requests.length;
+  const stateCount = 1 << m;
+  const full = stateCount - 1;
+  const INF = Number.POSITIVE_INFINITY;
+  const dp = new Float64Array(stateCount * m);
+  dp.fill(INF);
+  const parent = new Int16Array(stateCount * m);
+  parent.fill(-1);
+  const steps = [];
+  const rows = new Map();
+  const recentKeys = [];
+  const frameLimit = m <= 6 ? 900 : 350;
+  const detailed = m <= 6;
+  const at = (mask, last) => mask * m + last;
+  const bits = (mask) => mask.toString(2).padStart(m, "0");
+  const servedIds = (mask) => Array.from({ length: m }, (_, index) => index).filter((index) => (mask & (1 << index)) !== 0);
+  const touchRow = (mask, last) => {
+    const key = `${mask}:${last}`;
+    rows.set(key, {
+      mask, maskBits: bits(mask), served: servedIds(mask), last,
+      floor: requests[last][1], time: dp[at(mask, last)], parent: parent[at(mask, last)],
+    });
+    const old = recentKeys.indexOf(key);
+    if (old >= 0) recentKeys.splice(old, 1);
+    recentKeys.push(key);
+    while (recentKeys.length > 80) {
+      const dropped = recentKeys.shift();
+      rows.delete(dropped);
+    }
+  };
+  const routeFor = (mask, last) => {
+    const reversed = [];
+    let guard = 0;
+    while (last >= 0 && mask > 0 && guard <= m) {
+      reversed.push({ request: last, floor: requests[last][1], arrival: requests[last][0], time: dp[at(mask, last)] });
+      const previous = parent[at(mask, last)];
+      mask ^= 1 << last;
+      last = previous;
+      guard++;
+    }
+    return reversed.reverse();
+  };
+  const visibleRows = (activeMask, activeLast) => {
+    const keys = rows.size <= 36 ? [...rows.keys()] : recentKeys.slice(-35);
+    const activeKey = Number.isInteger(activeMask) && Number.isInteger(activeLast) ? `${activeMask}:${activeLast}` : null;
+    if (activeKey && rows.has(activeKey) && !keys.includes(activeKey)) keys.push(activeKey);
+    return keys.map((key) => ({ ...rows.get(key) })).sort((a, b) => a.mask - b.mask || a.last - b.last);
+  };
+
+  let phase = "setup";
+  let event = "read-input";
+  let mask = 0;
+  let last = -1;
+  let next = -1;
+  let newMask = 0;
+  let currentTime = 0;
+  let fromFloor = start;
+  let targetFloor = null;
+  let arrival = null;
+  let travel = null;
+  let reachedAt = null;
+  let wait = null;
+  let candidateTime = null;
+  let previousBest = null;
+  let improved = null;
+  let bestLast = -1;
+  let answer = null;
+  let finalRoute = [];
+  let truncated = false;
+
+  const snapshot = () => ({
+    n, start, requests: requests.map((request, id) => ({ id, arrival: request[0], floor: request[1] })),
+    phase, event, m, full, mask, maskBits: bits(mask), served: servedIds(mask), last, next,
+    newMask, newMaskBits: bits(newMask), currentTime, fromFloor, targetFloor, arrival,
+    travel, reachedAt, wait, candidateTime, previousBest, improved, bestLast, answer,
+    route: last >= 0 && mask ? routeFor(mask, last) : [],
+    candidateRoute: next >= 0 && newMask && Number.isFinite(dp[at(newMask, next)]) ? routeFor(newMask, next) : [],
+    finalRoute: finalRoute.map((item) => ({ ...item })),
+    dpRows: visibleRows(mask, last), truncated,
+  });
+  const push = ({ title, note, line, vars = [], final = false, force = false }) => {
+    if (!force && steps.length >= frameLimit - 1) {
+      truncated = true;
+      return;
+    }
+    steps.push({
+      title, note, codeLines: [line], final,
+      arr: requests.map((request) => request[1]), highlight: next >= 0 ? [next] : last >= 0 ? [last] : [], mark: servedIds(mask),
+      vars: [
+        { name: "mask", value: bits(mask) }, { name: "last", value: last },
+        { name: "next", value: next }, { name: "time", value: currentTime }, ...vars,
+      ],
+      elevator4027View: snapshot(),
+    });
+  };
+
+  push({
+    title: { vi: `Có ${m} request → ${stateCount} bitmask`, en: `${m} requests → ${stateCount} bitmasks` },
+    note: { vi: "Bit i bằng 1 nghĩa là request i đã được phục vụ.", en: "Bit i is 1 when request i has been served." },
+    line: 3,
+    vars: [{ name: "m", value: m }],
+  });
+  event = "set-infinity";
+  push({
+    title: { vi: "Đặt giá trị chưa đạt tới là ∞", en: "Use ∞ for unreachable states" },
+    note: { vi: "Mỗi trạng thái sẽ giữ thời gian nhỏ nhất, vì vậy khởi tạo bằng vô cực.", en: "Each state keeps its earliest time, so initialize it to infinity." },
+    line: 4,
+  });
+  event = "allocate-dp";
+  push({
+    title: { vi: `Tạo dp[${stateCount}][${m}]`, en: `Allocate dp[${stateCount}][${m}]` },
+    note: { vi: "dp[mask][last] = thời gian sớm nhất phục vụ mask và dừng tại last.", en: "dp[mask][last] = earliest time to serve mask and stop at last." },
+    line: 5,
+  });
+  event = "allocate-parent";
+  push({
+    title: { vi: "Tạo parent để dựng lại route", en: "Allocate parent to reconstruct the route" },
+    note: { vi: "parent lưu request đứng ngay trước last trên route tốt nhất.", en: "parent stores the request immediately before last on the best route." },
+    line: 6,
+  });
+
+  phase = "initialize";
+  for (let i = 0; i < m; i++) {
+    mask = 1 << i;
+    last = i;
+    next = i;
+    newMask = mask;
+    fromFloor = start;
+    targetFloor = requests[i][1];
+    arrival = requests[i][0];
+    travel = Math.abs(start - targetFloor);
+    reachedAt = travel;
+    wait = Math.max(0, arrival - reachedAt);
+    candidateTime = Math.max(reachedAt, arrival);
+    currentTime = candidateTime;
+    previousBest = INF;
+    improved = true;
+    event = "init-loop";
+    if (detailed) push({
+      title: { vi: `Khởi tạo singleton cho request #${i}`, en: `Initialize singleton for request #${i}` },
+      note: { vi: `Đi trực tiếp từ tầng ${start} tới tầng ${targetFloor}.`, en: `Travel directly from floor ${start} to floor ${targetFloor}.` },
+      line: 7,
+    });
+    dp[at(mask, i)] = candidateTime;
+    touchRow(mask, i);
+    event = "init-state";
+    push({
+      title: { vi: `dp[${bits(mask)}][${i}] = max(${travel}, ${arrival}) = ${candidateTime}`, en: `dp[${bits(mask)}][${i}] = max(${travel}, ${arrival}) = ${candidateTime}` },
+      note: wait > 0
+        ? { vi: `Đến tầng ${targetFloor} lúc ${reachedAt}, chờ ${wait} giây tới lúc request xuất hiện.`, en: `Reach floor ${targetFloor} at ${reachedAt}, then wait ${wait} second(s) for the request.` }
+        : { vi: `Request đã xuất hiện khi thang máy tới tầng ${targetFloor}.`, en: `The request has already arrived when the elevator reaches floor ${targetFloor}.` },
+      line: 8,
+      vars: [{ name: "arrival", value: arrival }, { name: "floor", value: targetFloor }],
+    });
+  }
+
+  phase = "subset";
+  for (let currentMask = 1; currentMask < stateCount; currentMask++) {
+    const hasReachable = Array.from({ length: m }, (_, index) => dp[at(currentMask, index)]).some(Number.isFinite);
+    if (!hasReachable) continue;
+    mask = currentMask;
+    next = -1;
+    newMask = mask;
+    event = "mask-loop";
+    if (detailed) push({
+      title: { vi: `Xét mask ${bits(mask)}`, en: `Process mask ${bits(mask)}` },
+      note: { vi: `Đã phục vụ: ${servedIds(mask).map((id) => `#${id}`).join(", ") || "chưa có"}.`, en: `Served: ${servedIds(mask).map((id) => `#${id}`).join(", ") || "none"}.` },
+      line: 9,
+    });
+    for (let currentLast = 0; currentLast < m; currentLast++) {
+      const timeAtState = dp[at(mask, currentLast)];
+      if (!Number.isFinite(timeAtState)) continue;
+      last = currentLast;
+      currentTime = timeAtState;
+      fromFloor = requests[last][1];
+      event = "last-loop";
+      if (detailed) push({
+        title: { vi: `State dp[${bits(mask)}][${last}] = ${currentTime}`, en: `State dp[${bits(mask)}][${last}] = ${currentTime}` },
+        note: { vi: `Thang máy đang ở tầng ${fromFloor} sau khi phục vụ request #${last}.`, en: `The elevator is at floor ${fromFloor} after serving request #${last}.` },
+        line: 10,
+      });
+      event = "reachable";
+      if (detailed) push({
+        title: { vi: "State đạt tới được, tiếp tục mở rộng", en: "The state is reachable; expand it" },
+        note: { vi: "Chỉ state có thời gian hữu hạn mới sinh transition.", en: "Only finite-time states generate transitions." },
+        line: 11,
+      });
+      for (let candidate = 0; candidate < m; candidate++) {
+        next = candidate;
+        targetFloor = requests[next][1];
+        arrival = requests[next][0];
+        newMask = mask | (1 << next);
+        event = "next-loop";
+        if (detailed) push({
+          title: { vi: `Thử request kế tiếp #${next}`, en: `Try request #${next} next` },
+          note: { vi: `Request #${next}: đến lúc ${arrival}, tầng ${targetFloor}.`, en: `Request #${next}: arrives at ${arrival}, floor ${targetFloor}.` },
+          line: 12,
+        });
+        if ((mask & (1 << next)) !== 0) {
+          event = "already-served";
+          if (detailed) push({
+            title: { vi: `Bỏ qua #${next}: bit đã là 1`, en: `Skip #${next}: its bit is already 1` },
+            note: { vi: "Không phục vụ lại request đã nằm trong mask.", en: "Do not serve a request already included in the mask." },
+            line: 13,
+          });
+          continue;
+        }
+        event = "guard-pass";
+        if (detailed) push({
+          title: { vi: `#${next} chưa được phục vụ`, en: `#${next} has not been served` },
+          note: { vi: "Tính thời gian di chuyển tới request này.", en: "Compute the travel time to this request." },
+          line: 13,
+        });
+        travel = Math.abs(fromFloor - targetFloor);
+        reachedAt = currentTime + travel;
+        wait = Math.max(0, arrival - reachedAt);
+        event = "travel";
+        if (detailed) push({
+          title: { vi: `travel = |${fromFloor} - ${targetFloor}| = ${travel}`, en: `travel = |${fromFloor} - ${targetFloor}| = ${travel}` },
+          note: { vi: `Rời lúc ${currentTime}, có thể tới tầng ${targetFloor} lúc ${reachedAt}.`, en: `Leave at ${currentTime}; the elevator can reach floor ${targetFloor} at ${reachedAt}.` },
+          line: 14,
+        });
+        candidateTime = Math.max(reachedAt, arrival);
+        event = wait > 0 ? "wait" : "arrive";
+        push({
+          title: { vi: `time = max(${reachedAt}, arrival ${arrival}) = ${candidateTime}`, en: `time = max(${reachedAt}, arrival ${arrival}) = ${candidateTime}` },
+          note: wait > 0
+            ? { vi: `Tới sớm nên phải chờ ${wait} giây.`, en: `Arrival is early, so wait ${wait} second(s).` }
+            : { vi: "Không phải chờ; request được phục vụ ngay khi tới.", en: "No waiting; the request is served immediately on arrival." },
+          line: 15,
+          vars: [{ name: "travel", value: travel }, { name: "arrival", value: arrival }, { name: "wait", value: wait }],
+        });
+        newMask = mask | (1 << next);
+        event = "merge-mask";
+        if (detailed) push({
+          title: { vi: `${bits(mask)} OR bit ${next} → ${bits(newMask)}`, en: `${bits(mask)} OR bit ${next} → ${bits(newMask)}` },
+          note: { vi: `Đánh dấu request #${next} đã được phục vụ.`, en: `Mark request #${next} as served.` },
+          line: 16,
+        });
+        previousBest = dp[at(newMask, next)];
+        improved = candidateTime < previousBest;
+        event = improved ? "improve" : "reject";
+        push({
+          title: improved
+            ? { vi: `${candidateTime} < ${Number.isFinite(previousBest) ? previousBest : "∞"}: cập nhật`, en: `${candidateTime} < ${Number.isFinite(previousBest) ? previousBest : "∞"}: update` }
+            : { vi: `${candidateTime} ≥ ${previousBest}: giữ state cũ`, en: `${candidateTime} ≥ ${previousBest}: keep the old state` },
+          note: improved
+            ? { vi: `Tìm được cách sớm hơn để tới dp[${bits(newMask)}][${next}].`, en: `Found an earlier way to reach dp[${bits(newMask)}][${next}].` }
+            : { vi: "Transition này không cải thiện thời gian tốt nhất.", en: "This transition does not improve the best time." },
+          line: 17,
+        });
+        if (!improved) continue;
+        dp[at(newMask, next)] = candidateTime;
+        touchRow(newMask, next);
+        event = "write-dp";
+        push({
+          title: { vi: `Ghi dp[${bits(newMask)}][${next}] = ${candidateTime}`, en: `Write dp[${bits(newMask)}][${next}] = ${candidateTime}` },
+          note: { vi: "Bảng bitmask nhận thời gian tốt hơn.", en: "The bitmask table receives the improved time." },
+          line: 18,
+        });
+        parent[at(newMask, next)] = last;
+        touchRow(newMask, next);
+        event = "write-parent";
+        push({
+          title: { vi: `parent[${bits(newMask)}][${next}] = ${last}`, en: `parent[${bits(newMask)}][${next}] = ${last}` },
+          note: { vi: `Route tốt nhất tới #${next} đi ngay sau #${last}.`, en: `The best route to #${next} comes immediately after #${last}.` },
+          line: 19,
+        });
+      }
+    }
+  }
+
+  phase = "finish";
+  mask = full;
+  next = -1;
+  newMask = full;
+  event = "full-mask";
+  push({
+    title: { vi: `full = ${bits(full)}: mọi request đã xong`, en: `full = ${bits(full)}: every request is served` },
+    note: { vi: "Chỉ xét các state có toàn bộ bit bằng 1.", en: "Only states with every bit equal to 1 are final." },
+    line: 20,
+  });
+  bestLast = 0;
+  for (let i = 1; i < m; i++) {
+    if (dp[at(full, i)] < dp[at(full, bestLast)]) bestLast = i;
+  }
+  last = bestLast;
+  currentTime = dp[at(full, bestLast)];
+  answer = currentTime;
+  finalRoute = routeFor(full, bestLast);
+  fromFloor = requests[bestLast][1];
+  event = "best-last";
+  push({
+    title: { vi: `Request cuối tốt nhất là #${bestLast}`, en: `The best final request is #${bestLast}` },
+    note: { vi: `Trong hàng full mask, cột #${bestLast} có thời gian nhỏ nhất ${answer}.`, en: `In the full-mask row, column #${bestLast} has the minimum time ${answer}.` },
+    line: 21,
+    vars: [{ name: "best_last", value: bestLast }],
+  });
+  event = "return";
+  push({
+    title: { vi: `Kết quả: ${answer} giây`, en: `Result: ${answer} seconds` },
+    note: truncated
+      ? { vi: `Đã rút gọn frame trung gian; route tối ưu vẫn được tính đầy đủ.`, en: `Intermediate frames were capped; the optimal route was still computed in full.` }
+      : { vi: `Route: tầng ${start} → ${finalRoute.map((item) => `${item.floor}@t${item.time}`).join(" → ")}.`, en: `Route: floor ${start} → ${finalRoute.map((item) => `${item.floor}@t${item.time}`).join(" → ")}.` },
+    line: 22,
+    vars: [{ name: "answer", value: answer }],
+    final: true,
+    force: true,
+  });
+
+  return { original: { n, start, requests: requests.map((request) => [...request]) }, answer, steps };
+}
+
 module.exports = {
   486: {
     id: 486,
@@ -14514,10 +15425,19 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 1406, 53, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
+    },
+    extraCategories: {
+      kadane: {
+        order: [53, 918, 1749, 152],
+        label: {
+          vi: "Thứ tự học Kadane được khuyến nghị",
+          en: "Recommended Kadane learning order",
+        },
+      },
     },
     guide: {
       vi: {
@@ -14532,6 +15452,8 @@ module.exports = {
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
+          { id: 918, name: "Maximum Sum Circular Subarray", pattern: "Kadane DP + circular complement" },
+          { id: 1749, name: "Maximum Absolute Sum of Any Subarray", pattern: "Dual Kadane / absolute sum" },
           { id: 152, name: "Maximum Product Subarray", pattern: "DP (max/min state)" },
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
           { id: 322, name: "Coin Change", pattern: "Unbounded Knapsack" },
@@ -14558,8 +15480,8 @@ module.exports = {
           },
           {
             title: "Giai đoạn 2 — DP trên mảng",
-            description: "Học Kadane và pattern theo dõi cả max/min. LIS dùng 1D DP, sau đó nâng cấp O(n log n).",
-            problems: [1406, 53, 152, 300],
+            description: "Học Kadane, phần bù trên mảng tròn và pattern theo dõi cả max/min. LIS dùng 1D DP, sau đó nâng cấp O(n log n).",
+            problems: [1406, 53, 918, 1749, 152, 300],
           },
           {
             title: "Giai đoạn 3 — Knapsack",
@@ -14597,6 +15519,8 @@ module.exports = {
           { id: 740, name: "Delete and Earn", pattern: "House Robber Transform" },
           { id: 1406, name: "Stone Game III", pattern: "Suffix DP / Game DP" },
           { id: 53, name: "Maximum Subarray", pattern: "Kadane DP" },
+          { id: 918, name: "Maximum Sum Circular Subarray", pattern: "Kadane DP + circular complement" },
+          { id: 1749, name: "Maximum Absolute Sum of Any Subarray", pattern: "Dual Kadane / absolute sum" },
           { id: 152, name: "Maximum Product Subarray", pattern: "DP (max/min state)" },
           { id: 300, name: "Longest Increasing Subsequence", pattern: "1D DP / Binary Search" },
           { id: 322, name: "Coin Change", pattern: "Unbounded Knapsack" },
@@ -14621,8 +15545,8 @@ module.exports = {
           },
           {
             title: "Stage 2 — Array DP",
-            description: "Learn Kadane and tracking both max/min state. LIS in 1D, then upgrade to O(n log n).",
-            problems: [1406, 53, 152, 300],
+            description: "Learn Kadane, the circular-complement trick, and tracking both max/min state. LIS in 1D, then upgrade to O(n log n).",
+            problems: [1406, 53, 918, 1749, 152, 300],
           },
           {
             title: "Stage 3 — Knapsack",
@@ -16367,6 +17291,7 @@ module.exports = {
     difficulty: "medium",
     slug: "maximum-subarray",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [{ key: "kadane", vi: "Kadane", en: "Kadane" }],
     title: { vi: "Maximum Subarray", en: "Maximum Subarray" },
     titleVi: { vi: "Dãy con liên tiếp có tổng lớn nhất", en: "Maximum contiguous subarray sum" },
     statement: {
@@ -16421,6 +17346,158 @@ module.exports = {
     codeLabel: { vi: "Cách 1: DP Array O(n) space", en: "Approach 1: DP Array O(n) space" },
     code2Label: { vi: "Cách 2: Kadane O(1) space", en: "Approach 2: Kadane O(1) space" },
     builder: buildSteps53,
+  },
+  918: {
+    id: 918,
+    difficulty: "medium",
+    slug: "maximum-sum-circular-subarray",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [{ key: "kadane", vi: "Kadane", en: "Kadane" }],
+    title: { vi: "Maximum Sum Circular Subarray", en: "Maximum Sum Circular Subarray" },
+    titleVi: { vi: "Dãy con vòng tròn có tổng lớn nhất", en: "Maximum-sum circular contiguous subarray" },
+    statement: {
+      vi: "Cho mảng số nguyên dạng vòng tròn nums, trả về tổng lớn nhất của một dãy con không rỗng. Dãy con có thể nối từ cuối mảng về đầu mảng, nhưng mỗi phần tử chỉ được dùng tối đa một lần.",
+      en: "Given a circular integer array nums, return the maximum possible sum of a non-empty subarray. The subarray may wrap from the end to the beginning, but each element can be used at most once.",
+    },
+    defaultInput: [5, -3, 5],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Chạy Kadane MAX để tìm đáp án bình thường không qua điểm nối cuối → đầu.", en: "Run MAX Kadane for the ordinary answer that does not cross the end-to-start seam." },
+      { vi: "Chạy Kadane MIN để tìm đoạn cần loại; phần bù ở hai đầu có tổng total - min_sum.", en: "Run MIN Kadane to find the segment to exclude; the two edge pieces sum to total - min_sum." },
+      { vi: "Nếu toàn số âm, phần bù của cả mảng là rỗng nên phải trả về max_sum thay vì 0.", en: "If every value is negative, excluding the whole array creates an illegal empty subarray, so return max_sum instead of 0." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Một lần quét cập nhật đồng thời tổng, Kadane lớn nhất và Kadane nhỏ nhất; chỉ dùng số biến cố định.",
+        en: "One scan updates the total, maximum Kadane state, and minimum Kadane state using only constant extra variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxSubarraySumCircular(self, nums):",
+      "        total = cur_max = max_sum = nums[0]",
+      "        cur_min = min_sum = nums[0]",
+      "        for i in range(1, len(nums)):",
+      "            x = nums[i]",
+      "            cur_max = max(x, cur_max + x)",
+      "            max_sum = max(max_sum, cur_max)",
+      "            cur_min = min(x, cur_min + x)",
+      "            min_sum = min(min_sum, cur_min)",
+      "            total += x",
+      "        if max_sum < 0:",
+      "            return max_sum",
+      "        circular_sum = total - min_sum",
+      "        return max(max_sum, circular_sum)",
+    ],
+    builder: buildSteps918,
+  },
+  1749: {
+    id: 1749,
+    difficulty: "medium",
+    slug: "maximum-absolute-sum-of-any-subarray",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [{ key: "kadane", vi: "Kadane", en: "Kadane" }],
+    title: { vi: "Maximum Absolute Sum of Any Subarray", en: "Maximum Absolute Sum of Any Subarray" },
+    titleVi: { vi: "Trị tuyệt đối lớn nhất của tổng dãy con", en: "Maximum absolute subarray sum" },
+    statement: {
+      vi: "Cho mảng số nguyên nums. Trả về trị tuyệt đối lớn nhất của tổng một dãy con liên tiếp; dãy con rỗng có tổng 0 cũng được phép.",
+      en: "Given an integer array nums, return the maximum absolute value of the sum of a contiguous subarray; the empty subarray with sum 0 is also allowed.",
+    },
+    defaultInput: [2, -5, 1, -4, 3, -2],
+    inputKind: "integer",
+    extraParams: [],
+    approach: [
+      { vi: "Chạy hai Kadane song song: max_ending tìm tổng dương lớn nhất kết thúc tại i, min_ending tìm tổng âm nhỏ nhất kết thúc tại i.", en: "Run two Kadane lanes: max_ending finds the largest positive sum ending at i, while min_ending finds the smallest negative sum ending at i." },
+      { vi: "Baseline 0 biểu diễn subarray rỗng: max_ending = max(0, max_ending + x), min_ending = min(0, min_ending + x).", en: "The zero baseline represents the empty subarray: max_ending = max(0, max_ending + x), min_ending = min(0, min_ending + x)." },
+      { vi: "Đáp án là max(max_sum, abs(min_sum)); lưu range của cả hai phía để chỉ ra dãy con thắng.", en: "The answer is max(max_sum, abs(min_sum)); track both ranges to identify the winning subarray." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(1)",
+      note: {
+        vi: "Duyệt nums một lần và chỉ giữ bốn trạng thái tổng; range bổ sung cũng chỉ dùng số biến cố định.",
+        en: "Scan nums once while keeping four sum states; range tracking also uses only constant extra variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def maxAbsoluteSum(self, nums):",
+      "        max_ending = min_ending = 0",
+      "        max_sum = min_sum = 0",
+      "        for i, x in enumerate(nums):",
+      "            max_ending = max(0, max_ending + x)",
+      "            max_sum = max(max_sum, max_ending)",
+      "            min_ending = min(0, min_ending + x)",
+      "            min_sum = min(min_sum, min_ending)",
+      "        return max(max_sum, -min_sum)",
+    ],
+    builder: buildSteps1749,
+  },
+  4027: {
+    id: 4027,
+    difficulty: "hard",
+    slug: "elevator-requests-iii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Elevator Requests III", en: "Elevator Requests III" },
+    titleVi: { vi: "Yêu cầu thang máy III", en: "Elevator Requests III" },
+    statement: {
+      vi: "Tòa nhà có n tầng đánh số 0..n-1. Thang máy bắt đầu ở tầng start lúc t=0. Mỗi request [arrival, floor] chỉ được phục vụ từ thời điểm arrival trở đi và được hoàn thành ngay khi thang máy có mặt tại floor. Mỗi giây thang máy đi lên, đi xuống một tầng hoặc đứng yên. Tìm thời gian nhỏ nhất để phục vụ tất cả request.",
+      en: "A building has floors 0..n-1. The elevator starts at floor start at time 0. Each request [arrival, floor] can only be served at or after arrival and is completed instantly whenever the elevator is on floor. Each second the elevator moves one floor up or down, or waits. Return the minimum time needed to serve every request.",
+    },
+    defaultInput: [9, 0],
+    inputKind: "nonneg",
+    inputLabel: { vi: "n, start — số tầng và tầng bắt đầu", en: "n, start — floor count and starting floor" },
+    extraParams: [
+      {
+        key: "requests",
+        type: "string",
+        label: { vi: "requests — arrival,floor;... hoặc JSON", en: "requests — arrival,floor;... or JSON" },
+        default: "0,8;6,5",
+      },
+    ],
+    approach: [
+      { vi: "Vì chỉ có tối đa 16 request, dùng bitmask: bit i = 1 nghĩa là request i đã được phục vụ.", en: "There are at most 16 requests, so use a bitmask where bit i = 1 means request i has been served." },
+      { vi: "dp[mask][last] là thời gian sớm nhất phục vụ toàn bộ mask và kết thúc tại request last.", en: "dp[mask][last] is the earliest time that serves mask and ends at request last." },
+      { vi: "Chuyển tới next tại thời gian max(dp + khoảng cách tầng, arrival[next]); phép max biểu diễn việc phải chờ nếu tới quá sớm.", en: "Transition to next at max(dp + floor distance, arrival[next]); the max accounts for waiting when the elevator arrives early." },
+      { vi: "Lưu parent cho mỗi state để dựng lại thứ tự phục vụ tối ưu.", en: "Store a parent for every state to reconstruct the optimal service order." },
+    ],
+    complexity: {
+      time: "O(2^m · m²)",
+      space: "O(2^m · m)",
+      note: {
+        vi: "m là số request (m ≤ 16). Có 2^m mask, m vị trí cuối và tối đa m transition cho mỗi state.",
+        en: "m is the request count (m ≤ 16). There are 2^m masks, m possible final requests, and up to m transitions per state.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def elevatorRequests(self, n, start, requests):",
+      "        m = len(requests)",
+      "        inf = float('inf')",
+      "        dp = [[inf] * m for _ in range(1 << m)]",
+      "        parent = [[-1] * m for _ in range(1 << m)]",
+      "        for i, (arrival, floor) in enumerate(requests):",
+      "            dp[1 << i][i] = max(abs(start - floor), arrival)",
+      "        for mask in range(1 << m):",
+      "            for last in range(m):",
+      "                if dp[mask][last] == inf: continue",
+      "                for nxt, (arrival, floor) in enumerate(requests):",
+      "                    if mask >> nxt & 1: continue",
+      "                    travel = abs(requests[last][1] - floor)",
+      "                    time = max(dp[mask][last] + travel, arrival)",
+      "                    new_mask = mask | (1 << nxt)",
+      "                    if time < dp[new_mask][nxt]:",
+      "                        dp[new_mask][nxt] = time",
+      "                        parent[new_mask][nxt] = last",
+      "        full = (1 << m) - 1",
+      "        best_last = min(range(m), key=lambda i: dp[full][i])",
+      "        return dp[full][best_last]",
+    ],
+    liveArgs: (input, params = {}) => [input[0], input[1], parseRequests4027(params.requests)],
+    builder: buildSteps4027,
   },
   746: {
     id: 746,
@@ -16491,6 +17568,7 @@ module.exports = {
     difficulty: "medium",
     slug: "maximum-product-subarray",
     category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    tags: [{ key: "kadane", vi: "Kadane", en: "Kadane" }],
     title: { vi: "Maximum Product Subarray", en: "Maximum Product Subarray" },
     titleVi: { vi: "Tích lớn nhất của dãy con liên tiếp", en: "Largest product of a contiguous subarray" },
     statement: {
@@ -16514,9 +17592,10 @@ module.exports = {
       "        cur_max = cur_min = result = nums[0]",
       "        for i in range(1, len(nums)):",
       "            x = nums[i]",
-      "            candidates = (x, cur_max * x, cur_min * x)",
-      "            cur_max = max(candidates)",
-      "            cur_min = min(candidates)",
+      "            if x < 0:",
+      "                cur_max, cur_min = cur_min, cur_max",
+      "            cur_max = max(x, cur_max * x)",
+      "            cur_min = min(x, cur_min * x)",
       "            result = max(result, cur_max)",
       "        return result",
     ],

@@ -4371,8 +4371,11 @@ function buildSteps2791(input) {
   const makeTree = (active, processed, partners, pathNodes) => ({
     nodes: Array.from({ length: n }, (_, node) => ({
       id: node,
-      labelLines: [`node ${node}`, `odd: ${oddText(masks[node])}`],
-      sub: node === 0 ? "root (mask 0)" : `'${s[node]}' from ${parent[node]}`,
+      // Keep each node on one measured line so the shared tree renderer can
+      // size a readable pill instead of squeezing variable text into a circle.
+      label: node === 0
+        ? `#0 · ROOT · odd:{${oddText(masks[node])}}`
+        : `#${node} · +${s[node]} · odd:{${oddText(masks[node])}}`,
       x: xPos[node],
       y: depth[node],
       parentId: parent[node] === -1 ? null : parent[node],
@@ -4380,10 +4383,9 @@ function buildSteps2791(input) {
       isWord: processed.has(node) || node === active,
     })),
     annotations: Object.fromEntries(
-      [...processed].map((node) => [node, { label: "in counter", kind: "md-return" }])
-        .concat((pathNodes || []).map((node) => [node, { label: "on path", kind: "md-next" }]))
-        .concat((partners || []).map((node) => [node, { label: "pairs ✓", kind: "md-next" }]))
-        .concat(active === null ? [] : [[active, { label: "current", kind: "md-current" }]]),
+      (pathNodes || []).map((node) => [node, { label: "PATH", kind: "md-next" }])
+        .concat((partners || []).map((node) => [node, { label: "PAIR ✓", kind: "md-next" }]))
+        .concat(active === null ? [] : [[active, { label: "CURRENT", kind: "md-current" }]]),
     ),
     showLevels: true,
   });
@@ -4621,7 +4623,412 @@ function buildSteps2791(input) {
     },
   });
 
-  return { input, answer, steps };
+  // Expand the compact teaching walkthrough into source-faithful debugger
+  // frames. Every executable frame highlights exactly one Python line and
+  // snapshots the state immediately after (or while entering) that line.
+  const debugSteps = [];
+  const allEdges = new Set(Array.from({ length: Math.max(0, n - 1) }, (_, index) => index + 1));
+  const allReady = new Set(Array.from({ length: n }, (_, node) => node));
+  const edgeText = (node) => node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`;
+  const childrenText = (lists) => `[${lists.map((list) => `[${list.join(",")}]`).join(", ")}]`;
+  const stackText = (stack) => `[${stack.join(", ")}]`;
+
+  const debugCurrent = (node, maskValues, ready) => {
+    const known = ready.has(node);
+    const mask = known ? maskValues[node] : null;
+    return {
+      node,
+      mask,
+      odd: known ? oddText(mask) : "?",
+      parity: known ? parityRow(mask) : [],
+      edge: edgeText(node),
+      popcount: known ? popcount(mask) : "?",
+      pending: !known,
+    };
+  };
+
+  const debugTree = ({
+    active = null,
+    processedSet = new Set(),
+    partners = [],
+    ready = allReady,
+    visibleEdges = allEdges,
+    maskValues = masks,
+  } = {}) => {
+    const tree = makeTree(active, processedSet, partners, []);
+    tree.nodes = tree.nodes.map((node) => {
+      const known = ready.has(node.id);
+      const mask = known ? maskValues[node.id] : null;
+      return {
+        ...node,
+        label: node.id === 0
+          ? `#0 · ROOT · odd:{${known ? oddText(mask) : "?"}}`
+          : `#${node.id} · +${s[node.id]} · odd:{${known ? oddText(mask) : "?"}}`,
+        parentId: node.id === 0 || visibleEdges.has(node.id) ? node.parentId : null,
+        hl: node.id === active,
+        isWord: processedSet.has(node.id),
+        isNull: !known,
+      };
+    });
+    tree.annotations = Object.fromEntries(
+      partners.map((node) => [node, { label: "PAIR ✓", kind: "md-next" }])
+        .concat(active === null ? [] : [[active, { label: "CURRENT", kind: "md-current" }]]),
+    );
+    return tree;
+  };
+
+  const emptyView = (phase, current, extra = {}) => ({
+    alphabet,
+    phase,
+    current,
+    answerBefore: 0,
+    add: 0,
+    answerAfter: 0,
+    lookups: [],
+    matches: [],
+    pairsFound: [],
+    totalPairs: 0,
+    recentPairs: [],
+    counter: [],
+    ...extra,
+  });
+
+  const pushDebug = ({ title, line = null, tree, vars = [], view, note, final = false }) => {
+    debugSteps.push({
+      title,
+      arr: [],
+      tree,
+      highlight: [],
+      mark: [],
+      codeLines: Number.isInteger(line) ? [line] : [],
+      vars,
+      palPathView: view,
+      note,
+      final,
+    });
+  };
+
+  const runtimeChildren = Array.from({ length: n }, () => []);
+  const visibleEdges = new Set();
+  const runtimeMasks = Array(n).fill(0);
+  const ready = new Set([0]);
+  const noProcessed = new Set();
+
+  pushDebug({
+    title: { vi: "Tạo danh sách con rỗng cho mỗi node", en: "Create an empty child list for every node" },
+    line: 5,
+    tree: debugTree({ ready, visibleEdges, maskValues: runtimeMasks }),
+    vars: [{ name: "children", value: childrenText(runtimeChildren) }, { name: "n", value: n }],
+    view: emptyView("idea", debugCurrent(0, runtimeMasks, ready)),
+    note: {
+      vi: "Dòng 5 tạo adjacency list. Chưa có cạnh nào được thêm nên các node con vẫn ở trạng thái chờ.",
+      en: "Line 5 creates the adjacency list. No edge has been added yet, so child nodes remain pending.",
+    },
+  });
+
+  for (let node = 1; node < n; node++) {
+    pushDebug({
+      title: { vi: `Vòng for chọn node ${node}`, en: `The for loop selects node ${node}` },
+      line: 6,
+      tree: debugTree({ active: node, ready, visibleEdges, maskValues: runtimeMasks }),
+      vars: [{ name: "node", value: node }, { name: `parent[${node}]`, value: parent[node] }, { name: "children", value: childrenText(runtimeChildren) }],
+      view: emptyView("idea", debugCurrent(node, runtimeMasks, ready)),
+      note: {
+        vi: `Dòng 6 chọn node ${node}; cạnh ${parent[node]} → ${node} chưa được ghi vào children.`,
+        en: `Line 6 selects node ${node}; edge ${parent[node]} → ${node} has not been stored yet.`,
+      },
+    });
+
+    runtimeChildren[parent[node]].push(node);
+    visibleEdges.add(node);
+    pushDebug({
+      title: { vi: `Thêm ${node} vào children[${parent[node]}]`, en: `Append ${node} to children[${parent[node]}]` },
+      line: 7,
+      tree: debugTree({ active: node, ready, visibleEdges, maskValues: runtimeMasks }),
+      vars: [{ name: "node", value: node }, { name: `children[${parent[node]}]`, value: `[${runtimeChildren[parent[node]].join(", ")}]` }, { name: "children", value: childrenText(runtimeChildren) }],
+      view: emptyView("idea", debugCurrent(node, runtimeMasks, ready)),
+      note: {
+        vi: `Dòng 7 lưu cạnh ${parent[node]} → ${node}; đường nối vừa xuất hiện trên cây.`,
+        en: `Line 7 stores edge ${parent[node]} → ${node}; the connection now appears in the tree.`,
+      },
+    });
+  }
+
+  pushDebug({
+    title: { vi: "Khởi tạo mọi mask bằng 0", en: "Initialize every mask to zero" },
+    line: 9,
+    tree: debugTree({ ready, visibleEdges, maskValues: runtimeMasks }),
+    vars: [{ name: "masks", value: `[${runtimeMasks.join(", ")}]` }],
+    view: emptyView("build", debugCurrent(0, runtimeMasks, ready)),
+    note: {
+      vi: "Dòng 9 cấp mảng masks. Chỉ mask của root đã có ý nghĩa; các node khác sẽ được tính khi duyệt cạnh.",
+      en: "Line 9 allocates masks. Only the root mask is meaningful yet; every other node is computed while traversing an edge.",
+    },
+  });
+
+  const runtimeStack = [0];
+  pushDebug({
+    title: { vi: "Đưa root 0 vào stack", en: "Push root 0 onto the stack" },
+    line: 10,
+    tree: debugTree({ active: 0, ready, visibleEdges, maskValues: runtimeMasks }),
+    vars: [{ name: "stack", value: stackText(runtimeStack) }, { name: "masks", value: `[${runtimeMasks.join(", ")}]` }],
+    view: emptyView("build", debugCurrent(0, runtimeMasks, ready)),
+    note: { vi: "Dòng 10 bắt đầu DFS lặp từ root.", en: "Line 10 starts iterative DFS from the root." },
+  });
+
+  while (runtimeStack.length) {
+    pushDebug({
+      title: { vi: `Kiểm tra while: stack còn ${runtimeStack.length} node`, en: `Check while: ${runtimeStack.length} node(s) remain` },
+      line: 11,
+      tree: debugTree({ active: runtimeStack[runtimeStack.length - 1], ready, visibleEdges, maskValues: runtimeMasks }),
+      vars: [{ name: "stack", value: stackText(runtimeStack) }, { name: "condition", value: "True" }],
+      view: emptyView("build", debugCurrent(runtimeStack[runtimeStack.length - 1], runtimeMasks, ready)),
+      note: { vi: "Stack chưa rỗng nên đi vào một vòng lặp DFS.", en: "The stack is not empty, so DFS enters another iteration." },
+    });
+
+    const node = runtimeStack.pop();
+    pushDebug({
+      title: { vi: `Pop node ${node} khỏi stack`, en: `Pop node ${node} from the stack` },
+      line: 12,
+      tree: debugTree({ active: node, ready, visibleEdges, maskValues: runtimeMasks }),
+      vars: [{ name: "node", value: node }, { name: "stack", value: stackText(runtimeStack) }],
+      view: emptyView("build", debugCurrent(node, runtimeMasks, ready)),
+      note: { vi: `Dòng 12 chọn node ${node} để duyệt các con.`, en: `Line 12 selects node ${node} so its children can be traversed.` },
+    });
+
+    for (const child of runtimeChildren[node]) {
+      pushDebug({
+        title: { vi: `Chọn child ${child} của node ${node}`, en: `Select child ${child} of node ${node}` },
+        line: 13,
+        tree: debugTree({ active: child, ready, visibleEdges, maskValues: runtimeMasks }),
+        vars: [{ name: "node", value: node }, { name: "child", value: child }, { name: `children[${node}]`, value: `[${runtimeChildren[node].join(", ")}]` }],
+        view: emptyView("build", debugCurrent(child, runtimeMasks, ready)),
+        note: { vi: `Dòng 13 bắt đầu xử lý cạnh ${node} → ${child}.`, en: `Line 13 begins processing edge ${node} → ${child}.` },
+      });
+
+      const bitIndex = letterBit(s[child]);
+      const bitValue = 1 << bitIndex;
+      pushDebug({
+        title: { vi: `Đổi '${s[child]}' thành bit ${bitIndex}`, en: `Convert '${s[child]}' to bit ${bitIndex}` },
+        line: 14,
+        tree: debugTree({ active: child, ready, visibleEdges, maskValues: runtimeMasks }),
+        vars: [{ name: "child", value: child }, { name: `s[${child}]`, value: `'${s[child]}'` }, { name: "bit", value: `${bitValue} (1 << ${bitIndex})` }],
+        view: emptyView("build", debugCurrent(child, runtimeMasks, ready), {
+          xorStep: {
+            stage: "bit",
+            parentNode: node,
+            parentParity: parityRow(runtimeMasks[node]),
+            letter: s[child],
+            bitIndex,
+            bitValue,
+          },
+        }),
+        note: { vi: `Dòng 14 tạo bit riêng cho chữ '${s[child]}': 1 << ${bitIndex} = ${bitValue}.`, en: `Line 14 creates the bit for '${s[child]}': 1 << ${bitIndex} = ${bitValue}.` },
+      });
+
+      runtimeMasks[child] = runtimeMasks[node] ^ bitValue;
+      ready.add(child);
+      pushDebug({
+        title: { vi: `Gán mask[${child}] = {${oddText(runtimeMasks[child])}}`, en: `Assign mask[${child}] = {${oddText(runtimeMasks[child])}}` },
+        line: 15,
+        tree: debugTree({ active: child, ready, visibleEdges, maskValues: runtimeMasks }),
+        vars: [{ name: `mask[${node}]`, value: oddText(runtimeMasks[node]) }, { name: "bit", value: bitValue }, { name: `mask[${child}]`, value: oddText(runtimeMasks[child]) }],
+        view: emptyView("build", debugCurrent(child, runtimeMasks, ready), {
+          xorStep: {
+            stage: "assign",
+            parentNode: node,
+            parentParity: parityRow(runtimeMasks[node]),
+            letter: s[child],
+            bitIndex,
+            bitValue,
+          },
+        }),
+        note: {
+          vi: `Dòng 15 XOR mask của cha với bit '${s[child]}', nên parity '${s[child]}' bị đảo và mask[${child}] = {${oddText(runtimeMasks[child])}}.`,
+          en: `Line 15 XORs the parent mask with '${s[child]}', flipping that parity and producing mask[${child}] = {${oddText(runtimeMasks[child])}}.`,
+        },
+      });
+
+      runtimeStack.push(child);
+      pushDebug({
+        title: { vi: `Push child ${child} vào stack`, en: `Push child ${child} onto the stack` },
+        line: 16,
+        tree: debugTree({ active: child, ready, visibleEdges, maskValues: runtimeMasks }),
+        vars: [{ name: "child", value: child }, { name: "stack", value: stackText(runtimeStack) }],
+        view: emptyView("build", debugCurrent(child, runtimeMasks, ready)),
+        note: { vi: `Dòng 16 lên lịch duyệt các con của node ${child}.`, en: `Line 16 schedules node ${child}'s children for traversal.` },
+      });
+    }
+  }
+
+  pushDebug({
+    title: { vi: "Stack rỗng — kết thúc DFS", en: "The stack is empty — DFS ends" },
+    line: 11,
+    tree: debugTree({ ready, visibleEdges, maskValues: runtimeMasks }),
+    vars: [{ name: "stack", value: "[]" }, { name: "condition", value: "False" }, { name: "masks", value: `[${runtimeMasks.join(", ")}]` }],
+    view: emptyView("build", null),
+    note: { vi: "Điều kiện dòng 11 là False; mask của mọi node đã hoàn tất.", en: "The condition on line 11 is false; every node mask is complete." },
+  });
+
+  pushDebug({
+    title: { vi: "Quy tắc nối hai root-mask", en: "How two root masks form one path mask" },
+    tree: debugTree({ ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+    vars: [{ name: "rule", value: "path(u,v) = mask[u] XOR mask[v]" }],
+    view: emptyView("rule", null),
+    note: {
+      vi: "Khung giải thích: đoạn root → LCA xuất hiện hai lần trong XOR nên triệt tiêu. Đây là ý tưởng, không phải một dòng Python riêng.",
+      en: "Concept frame: root → LCA appears twice in the XOR and cancels. This is an explanation, not a separate Python statement.",
+    },
+  });
+
+  pushDebug({
+    title: { vi: "Khởi tạo ans = 0", en: "Initialize ans = 0" },
+    line: 18,
+    tree: debugTree({ ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+    vars: [{ name: "ans", value: 0 }],
+    view: emptyView("count", null),
+    note: { vi: "Dòng 18 đặt bộ đếm số cặp về 0.", en: "Line 18 initializes the pair count to zero." },
+  });
+
+  pushDebug({
+    title: { vi: "Khởi tạo Counter seen rỗng", en: "Initialize an empty seen Counter" },
+    line: 19,
+    tree: debugTree({ ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+    vars: [{ name: "ans", value: 0 }, { name: "seen", value: "{}" }],
+    view: emptyView("count", null),
+    note: { vi: "Dòng 19 tạo Counter chứa mask của các node đã xử lý.", en: "Line 19 creates the Counter of masks from already processed nodes." },
+  });
+
+  const countFrames = steps.filter((step) => step.palPathView && step.palPathView.phase === "count");
+  const storeFrames = steps.filter((step) => step.palPathView && step.palPathView.phase === "store");
+  const debugProcessed = new Set();
+
+  for (let node = 0; node < n; node++) {
+    const countFrame = countFrames[node];
+    const storeFrame = storeFrames[node];
+    const sourceView = countFrame.palPathView;
+    const mask = masks[node];
+    let runningAnswer = sourceView.answerBefore;
+    const counterSnapshot = sourceView.counter.map((item) => ({ ...item, nodes: [...item.nodes], matched: false }));
+    const counterByMask = new Map(counterSnapshot.map((item) => [item.mask, item]));
+    const current = sourceView.current;
+    const pairsFor = (probeMask) => sourceView.pairsFound.filter((pair) => (masks[pair.u] ^ masks[pair.v]) === probeMask);
+    const viewForLookup = (lookup, add, pairsFound, caption, before = runningAnswer) => ({
+      ...sourceView,
+      answerBefore: before,
+      add,
+      answerAfter: before + add,
+      lookups: lookup ? [lookup] : [],
+      lookupCaption: caption,
+      skippedFlips: 0,
+      pairsFound,
+      matches: [],
+      counter: counterSnapshot.map((item) => ({
+        ...item,
+        nodes: [...item.nodes],
+        matched: Boolean(lookup && !lookup.pending && lookup.count > 0 && item.mask === lookup.mask),
+      })),
+    });
+
+    pushDebug({
+      title: { vi: `Vòng for chọn mask của node ${node}`, en: `The for loop selects node ${node}'s mask` },
+      line: 20,
+      tree: debugTree({ active: node, processedSet: debugProcessed, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+      vars: [{ name: "node index", value: node }, { name: "mask", value: `${mask} → {${oddText(mask)}}` }, { name: "ans", value: runningAnswer }],
+      view: viewForLookup(null, 0, [], ""),
+      note: { vi: `Dòng 20 lấy mask[${node}] = {${oddText(mask)}}. Chỉ các node trước ${node} đã có trong seen.`, en: `Line 20 reads mask[${node}] = {${oddText(mask)}}. Only nodes before ${node} are in seen.` },
+    });
+
+    const exactItem = counterByMask.get(mask);
+    const exactLookup = {
+      kind: "exact",
+      mask,
+      label: oddText(mask),
+      count: exactItem ? exactItem.count : 0,
+      nodes: exactItem ? [...exactItem.nodes] : [],
+    };
+    const exactPairs = pairsFor(0);
+    pushDebug({
+      title: { vi: `Cộng seen[mask] = ${exactLookup.count}`, en: `Add seen[mask] = ${exactLookup.count}` },
+      line: 21,
+      tree: debugTree({ active: node, processedSet: debugProcessed, partners: exactLookup.nodes, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+      vars: [{ name: "mask", value: oddText(mask) }, { name: "seen[mask]", value: exactLookup.count }, { name: "ans", value: `${runningAnswer} + ${exactLookup.count} = ${runningAnswer + exactLookup.count}` }],
+      view: viewForLookup(exactLookup, exactLookup.count, exactPairs, "same mask → XOR has 0 odd bits"),
+      note: exactLookup.count
+        ? { vi: `Dòng 21 tìm thấy ${exactLookup.count} mask giống hệt; XOR = 0 nên tạo palindrome chẵn.`, en: `Line 21 finds ${exactLookup.count} identical mask(s); XOR = 0, so they form even palindromes.` }
+        : { vi: "Dòng 21 không có mask giống hệt trong seen.", en: "Line 21 finds no identical mask in seen." },
+    });
+    runningAnswer += exactLookup.count;
+
+    for (let bit = 0; bit < 26; bit++) {
+      const ch = bitName(bit);
+      const probeMask = mask ^ (1 << bit);
+      const counterItem = counterByMask.get(probeMask);
+      const lookup = {
+        kind: "flip",
+        flipLetter: ch,
+        mask: probeMask,
+        label: oddText(probeMask),
+        count: counterItem ? counterItem.count : 0,
+        nodes: counterItem ? [...counterItem.nodes] : [],
+      };
+      const caption = `bit ${bit} ('${ch}') · probe {${oddText(probeMask)}}`;
+      pushDebug({
+        title: { vi: `Vòng bit chọn ${bit} ('${ch}')`, en: `The bit loop selects ${bit} ('${ch}')` },
+        line: 22,
+        tree: debugTree({ active: node, processedSet: debugProcessed, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+        vars: [{ name: "bit", value: `${bit} ('${ch}')` }, { name: "probe", value: `${probeMask} → {${oddText(probeMask)}}` }, { name: "ans", value: runningAnswer }],
+        view: viewForLookup({ ...lookup, pending: true }, 0, [], caption),
+        note: { vi: `Dòng 22 chọn bit ${bit}. Chưa đọc Counter; dòng 23 mới tra seen[mask XOR (1 << ${bit})].`, en: `Line 22 selects bit ${bit}. The Counter is not read until line 23 probes seen[mask XOR (1 << ${bit})].` },
+      });
+
+      const flipPairs = pairsFor(1 << bit);
+      pushDebug({
+        title: { vi: `Tra flip '${ch}': cộng ${lookup.count}`, en: `Probe flip '${ch}': add ${lookup.count}` },
+        line: 23,
+        tree: debugTree({ active: node, processedSet: debugProcessed, partners: lookup.nodes, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+        vars: [{ name: "bit", value: `${bit} ('${ch}')` }, { name: "seen[probe]", value: lookup.count }, { name: "ans", value: `${runningAnswer} + ${lookup.count} = ${runningAnswer + lookup.count}` }],
+        view: viewForLookup(lookup, lookup.count, flipPairs, caption),
+        note: lookup.count
+          ? { vi: `Dòng 23 tìm thấy ${lookup.count} mask lệch đúng chữ '${ch}', nên đường có đúng 1 chữ lẻ và vẫn tạo được palindrome.`, en: `Line 23 finds ${lookup.count} mask(s) differing only at '${ch}', so the path has exactly one odd letter and can form a palindrome.` }
+          : { vi: `Dòng 23 không tìm thấy probe {${oddText(probeMask)}} trong seen.`, en: `Line 23 does not find probe {${oddText(probeMask)}} in seen.` },
+      });
+      runningAnswer += lookup.count;
+    }
+
+    if (runningAnswer !== sourceView.answerAfter) {
+      throw new Error(`2791 debug answer drift at node ${node}: ${runningAnswer} != ${sourceView.answerAfter}`);
+    }
+
+    debugProcessed.add(node);
+    const storedView = {
+      ...storeFrame.palPathView,
+      answerBefore: runningAnswer,
+      add: 0,
+      answerAfter: runningAnswer,
+    };
+    pushDebug({
+      title: { vi: `Lưu mask của node ${node} vào seen`, en: `Store node ${node}'s mask in seen` },
+      line: 24,
+      tree: debugTree({ active: node, processedSet: debugProcessed, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+      vars: storeFrame.vars,
+      view: storedView,
+      note: storeFrame.note,
+    });
+  }
+
+  const finalFrame = steps[steps.length - 1];
+  pushDebug({
+    title: finalFrame.title,
+    line: 25,
+    tree: debugTree({ processedSet: debugProcessed, ready: allReady, visibleEdges: allEdges, maskValues: masks }),
+    vars: finalFrame.vars,
+    view: finalFrame.palPathView,
+    note: finalFrame.note,
+    final: true,
+  });
+
+  return { input, answer, steps: debugSteps };
 }
 
 module.exports = {

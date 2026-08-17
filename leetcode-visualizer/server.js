@@ -40,6 +40,7 @@ app.get("/api/problems", (req, res) => {
         titleVi: p.titleVi,
         difficulty: p.difficulty || null,
         premium: isPremium(p),
+        tags: Array.isArray(p.tags) ? p.tags : [],
       });
     }
   }
