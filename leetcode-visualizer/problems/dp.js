@@ -377,7 +377,7 @@ function buildSteps746B(cost) {
  *  - curMin: smallest product of subarray ending at i.
  *  - result: the largest answer seen so far.
  */
-function buildSteps152(nums) {
+function buildSteps152Swap(nums) {
   if (!Array.isArray(nums) || nums.length === 0) {
     throw new Error("nums must contain at least one integer.");
   }
@@ -432,6 +432,7 @@ function buildSteps152(nums) {
   const snapshot = () => {
     const upcomingNegative = phase === "done" ? null : nextNegativeIndex(i + 1);
     return {
+      approach: 1,
       nums: [...nums],
       phase,
       i,
@@ -647,6 +648,480 @@ function buildSteps152(nums) {
   });
 
   return { original: [...nums], answer: best, steps };
+}
+
+/**
+ * LeetCode 152, approach 2: compare the three candidates that can end at i.
+ * Every product ending at i is either nums[i] alone, the previous maximum
+ * times nums[i], or the previous minimum times nums[i]. Computing the tuple
+ * before assigning removes the classic bug where max_prev is overwritten
+ * before min_prev is derived, so no sign-based swap is needed.
+ */
+function buildSteps152Candidates(nums) {
+  if (!Array.isArray(nums) || nums.length === 0) {
+    throw new Error("nums must contain at least one integer.");
+  }
+
+  const steps = [];
+  const n = nums.length;
+  let maxPrev = nums[0];
+  let minPrev = nums[0];
+  let answer = nums[0];
+  let maxStart = 0;
+  let minStart = 0;
+  let bestStart = 0;
+  let bestEnd = 0;
+  let i = 0;
+  let x = nums[0];
+  let phase = "init";
+  let candidates = null;
+  let maxPickIndex = null;
+  let minPickIndex = null;
+  let prevMax = null;
+  let prevMin = null;
+  let oldAnswer = answer;
+  let answerUpdated = true;
+  const maxHistory = Array(n).fill(null);
+  const minHistory = Array(n).fill(null);
+  maxHistory[0] = maxPrev;
+  minHistory[0] = minPrev;
+
+  const indices = (start, end) => (
+    Number.isInteger(start) && Number.isInteger(end) && start <= end
+      ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+      : []
+  );
+  const rangeValues = (start, end) => indices(start, end).map((index) => nums[index]);
+  const nextNegativeIndex = (from) => {
+    for (let j = from; j < n; j++) if (nums[j] < 0) return j;
+    return null;
+  };
+  const addStep = ({ title, note, codeLine, vars = [], final = false }) => {
+    const upcoming = phase === "done" ? null : nextNegativeIndex(i + 1);
+    // Before the assignment line, max_prev/min_prev still describe index i-1.
+    const stateEnd = ["loop", "read", "candidates", "max", "min"].includes(phase) ? i - 1 : i;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 2,
+      final,
+      arr: [...nums],
+      highlight: Number.isInteger(i) ? [i] : [],
+      mark: indices(bestStart, bestEnd),
+      vars: [
+        { name: "i", value: i },
+        { name: "n (nums[i])", value: x },
+        { name: "max_prev", value: maxPrev },
+        { name: "min_prev", value: minPrev },
+        { name: "ans", value: answer },
+        ...vars,
+      ],
+      maxProductView: {
+        approach: 2,
+        nums: [...nums],
+        phase,
+        i,
+        x,
+        prevMax,
+        prevMin,
+        candidates,
+        maxPickIndex,
+        minPickIndex,
+        curMax: maxPrev,
+        curMin: minPrev,
+        best: answer,
+        oldBest: oldAnswer,
+        bestUpdated: answerUpdated,
+        maxStart,
+        maxEnd: stateEnd,
+        minStart,
+        minEnd: stateEnd,
+        bestStart,
+        bestEnd,
+        maxValues: rangeValues(maxStart, stateEnd),
+        minValues: rangeValues(minStart, stateEnd),
+        bestValues: rangeValues(bestStart, bestEnd),
+        upcomingNegativeIndex: upcoming,
+        upcomingNegativeValue: upcoming === null ? null : nums[upcoming],
+        minFlipPreview: upcoming === null ? null : minPrev * nums[upcoming],
+        maxFlipPreview: upcoming === null ? null : maxPrev * nums[upcoming],
+        zeroReset: x === 0,
+        maxHistory: [...maxHistory],
+        minHistory: [...minHistory],
+      },
+    });
+  };
+
+  addStep({
+    title: { vi: `max_prev = min_prev = ans = nums[0] = ${x}`, en: `max_prev = min_prev = ans = nums[0] = ${x}` },
+    note: {
+      vi: "Chỉ có một subarray kết thúc tại index 0, nên cả ba biến đều bằng nums[0].",
+      en: "Only one subarray ends at index 0, so all three variables equal nums[0].",
+    },
+    codeLine: 3,
+  });
+
+  for (i = 1; i < n; i++) {
+    x = nums[i];
+    prevMax = maxPrev;
+    prevMin = minPrev;
+    const prevMaxStart = maxStart;
+    const prevMinStart = minStart;
+    candidates = null;
+    maxPickIndex = null;
+    minPickIndex = null;
+    oldAnswer = answer;
+    answerUpdated = false;
+
+    phase = "loop";
+    addStep({
+      title: { vi: `Vòng lặp tới index ${i}`, en: `Loop advances to index ${i}` },
+      note: {
+        vi: `Xử lý mọi subarray bắt buộc kết thúc tại index ${i}.`,
+        en: `Process every subarray that must end at index ${i}.`,
+      },
+      codeLine: 4,
+    });
+
+    phase = "read";
+    addStep({
+      title: { vi: `n = nums[${i}] = ${x}`, en: `n = nums[${i}] = ${x}` },
+      note: {
+        vi: `Giá trị mới sẽ được nhân vào hai trạng thái cũ: max_prev=${prevMax}, min_prev=${prevMin}.`,
+        en: `The new value multiplies both previous states: max_prev=${prevMax}, min_prev=${prevMin}.`,
+      },
+      codeLine: 5,
+    });
+
+    const values = [x, prevMax * x, prevMin * x];
+    const starts = [i, prevMaxStart, prevMinStart];
+    // Python's max/min keep the first extreme element, so ties resolve left to right.
+    let maxIndex = 0;
+    let minIndex = 0;
+    for (let k = 1; k < 3; k++) {
+      if (values[k] > values[maxIndex]) maxIndex = k;
+      if (values[k] < values[minIndex]) minIndex = k;
+    }
+    candidates = [
+      { key: "alone", label: "n", expression: `${x}`, value: values[0] },
+      { key: "max-prev", label: "max_prev × n", expression: `${prevMax} × ${x}`, value: values[1] },
+      { key: "min-prev", label: "min_prev × n", expression: `${prevMin} × ${x}`, value: values[2] },
+    ];
+
+    phase = "candidates";
+    addStep({
+      title: { vi: `candidates = (${values.join(", ")})`, en: `candidates = (${values.join(", ")})` },
+      note: {
+        vi: "Tính cả ba ứng viên TRƯỚC khi gán, nên max_prev cũ không bị ghi đè khi tính min.",
+        en: "All three candidates are computed BEFORE assignment, so the old max_prev is not overwritten while deriving min.",
+      },
+      codeLine: 6,
+      vars: [{ name: "candidates", value: `(${values.join(", ")})` }],
+    });
+
+    maxPickIndex = maxIndex;
+    const maxCurr = values[maxIndex];
+    const maxCurrStart = starts[maxIndex];
+    phase = "max";
+    addStep({
+      title: { vi: `max_curr = max(candidates) = ${maxCurr}`, en: `max_curr = max(candidates) = ${maxCurr}` },
+      note: {
+        vi: `Ứng viên thắng là ${candidates[maxIndex].label}; subarray tương ứng là nums[${maxCurrStart}..${i}].`,
+        en: `The winning candidate is ${candidates[maxIndex].label}; its subarray is nums[${maxCurrStart}..${i}].`,
+      },
+      codeLine: 7,
+      vars: [{ name: "max_curr", value: maxCurr }, { name: "source", value: candidates[maxIndex].label }],
+    });
+
+    minPickIndex = minIndex;
+    const minCurr = values[minIndex];
+    const minCurrStart = starts[minIndex];
+    phase = "min";
+    addStep({
+      title: { vi: `min_curr = min(candidates) = ${minCurr}`, en: `min_curr = min(candidates) = ${minCurr}` },
+      note: {
+        vi: `min_curr dùng cùng bộ ba, lấy từ ${candidates[minIndex].label}; giữ lại để lật dấu khi gặp số âm sau.`,
+        en: `min_curr uses the same tuple, taken from ${candidates[minIndex].label}; it is kept to flip sign at a later negative.`,
+      },
+      codeLine: 8,
+      vars: [{ name: "min_curr", value: minCurr }, { name: "source", value: candidates[minIndex].label }],
+    });
+
+    maxPrev = maxCurr;
+    minPrev = minCurr;
+    maxStart = maxCurrStart;
+    minStart = minCurrStart;
+    maxHistory[i] = maxPrev;
+    minHistory[i] = minPrev;
+    phase = "assign";
+    addStep({
+      title: { vi: `max_prev = ${maxPrev}, min_prev = ${minPrev}`, en: `max_prev = ${maxPrev}, min_prev = ${minPrev}` },
+      note: {
+        vi: "Chỉ gán sau khi đã lấy cả max và min, đây là điểm giúp cách này không cần swap.",
+        en: "Assignment happens only after both max and min are taken, which is why this approach needs no swap.",
+      },
+      codeLine: 9,
+    });
+
+    oldAnswer = answer;
+    if (maxPrev > answer) {
+      answer = maxPrev;
+      bestStart = maxStart;
+      bestEnd = i;
+      answerUpdated = true;
+    }
+    phase = "best";
+    addStep({
+      title: { vi: `ans = max(${oldAnswer}, ${maxPrev}) = ${answer}${answerUpdated ? " ✓" : ""}`, en: `ans = max(${oldAnswer}, ${maxPrev}) = ${answer}${answerUpdated ? " ✓" : ""}` },
+      note: answerUpdated
+        ? { vi: `Best mới: nums[${bestStart}..${bestEnd}] có tích ${answer}.`, en: `New best: nums[${bestStart}..${bestEnd}] has product ${answer}.` }
+        : { vi: `max_curr=${maxPrev} không vượt ans=${answer}, giữ nguyên best.`, en: `max_curr=${maxPrev} does not beat ans=${answer}, so best is unchanged.` },
+      codeLine: 10,
+    });
+  }
+
+  phase = "done";
+  i = n - 1;
+  x = nums[i];
+  answerUpdated = false;
+  candidates = null;
+  maxPickIndex = null;
+  minPickIndex = null;
+  addStep({
+    title: { vi: `return ans = ${answer}`, en: `return ans = ${answer}` },
+    note: {
+      vi: `Kết quả là nums[${bestStart}..${bestEnd}] = [${nums.slice(bestStart, bestEnd + 1).join(", ")}], tích = ${answer}.`,
+      en: `The answer is nums[${bestStart}..${bestEnd}] = [${nums.slice(bestStart, bestEnd + 1).join(", ")}], product = ${answer}.`,
+    },
+    codeLine: 11,
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+/**
+ * LeetCode 152, approach 3: the same recurrence written as explicit DP tables.
+ * max_dp[i] and min_dp[i] store the best and worst products ending at i, which
+ * makes the O(n) memory cost visible before optimizing it away.
+ */
+function buildSteps152DP(nums) {
+  if (!Array.isArray(nums) || nums.length === 0) {
+    throw new Error("nums must contain at least one integer.");
+  }
+
+  const steps = [];
+  const n = nums.length;
+  const maxDp = Array(n).fill(null);
+  const minDp = Array(n).fill(null);
+  const maxStarts = Array(n).fill(0);
+  const minStarts = Array(n).fill(0);
+  let i = 0;
+  let x = nums[0];
+  let phase = "init";
+  let candidates = null;
+  let maxPickIndex = null;
+  let minPickIndex = null;
+  let answer = nums[0];
+  let bestStart = 0;
+  let bestEnd = 0;
+  let bestIndex = 0;
+
+  const indices = (start, end) => (
+    Number.isInteger(start) && Number.isInteger(end) && start <= end
+      ? Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+      : []
+  );
+  const rangeValues = (start, end) => indices(start, end).map((index) => nums[index]);
+  const addStep = ({ title, note, codeLine, vars = [], final = false }) => {
+    const maxStart = maxStarts[i] ?? 0;
+    const minStart = minStarts[i] ?? 0;
+    steps.push({
+      title,
+      note,
+      codeLines: [codeLine],
+      codeBlock: 3,
+      final,
+      arr: [...nums],
+      highlight: Number.isInteger(i) ? [i] : [],
+      mark: indices(bestStart, bestEnd),
+      vars: [
+        { name: "i", value: i },
+        { name: "x", value: x },
+        { name: "max_dp", value: `[${maxDp.map((value) => value === null ? "·" : value).join(", ")}]` },
+        { name: "min_dp", value: `[${minDp.map((value) => value === null ? "·" : value).join(", ")}]` },
+        ...vars,
+      ],
+      maxProductView: {
+        approach: 3,
+        nums: [...nums],
+        phase,
+        i,
+        x,
+        candidates,
+        maxPickIndex,
+        minPickIndex,
+        curMax: maxDp[i],
+        curMin: minDp[i],
+        prevMax: i > 0 ? maxDp[i - 1] : null,
+        prevMin: i > 0 ? minDp[i - 1] : null,
+        best: answer,
+        bestIndex,
+        bestStart,
+        bestEnd,
+        maxStart,
+        maxEnd: i,
+        minStart,
+        minEnd: i,
+        maxValues: maxDp[i] === null ? [] : rangeValues(maxStart, i),
+        minValues: minDp[i] === null ? [] : rangeValues(minStart, i),
+        bestValues: rangeValues(bestStart, bestEnd),
+        maxDp: [...maxDp],
+        minDp: [...minDp],
+        maxHistory: [...maxDp],
+        minHistory: [...minDp],
+        zeroReset: x === 0,
+      },
+    });
+  };
+
+  phase = "table";
+  addStep({
+    title: { vi: `n = len(nums) = ${n}`, en: `n = len(nums) = ${n}` },
+    note: {
+      vi: "Cách này lưu toàn bộ bảng DP thay vì hai biến, nên bộ nhớ là O(n).",
+      en: "This version stores full DP tables instead of two variables, so memory is O(n).",
+    },
+    codeLine: 3,
+  });
+  addStep({
+    title: { vi: "max_dp = [0] * n", en: "max_dp = [0] * n" },
+    note: {
+      vi: "max_dp[i] = tích LỚN NHẤT của một subarray kết thúc đúng tại i.",
+      en: "max_dp[i] = LARGEST product of a subarray ending exactly at i.",
+    },
+    codeLine: 4,
+  });
+  addStep({
+    title: { vi: "min_dp = [0] * n", en: "min_dp = [0] * n" },
+    note: {
+      vi: "min_dp[i] = tích NHỎ NHẤT kết thúc tại i, cần cho trường hợp nhân số âm.",
+      en: "min_dp[i] = SMALLEST product ending at i, needed when multiplying by a negative.",
+    },
+    codeLine: 5,
+  });
+
+  maxDp[0] = nums[0];
+  minDp[0] = nums[0];
+  phase = "base";
+  addStep({
+    title: { vi: `max_dp[0] = min_dp[0] = ${nums[0]}`, en: `max_dp[0] = min_dp[0] = ${nums[0]}` },
+    note: {
+      vi: "Base case: chỉ có một subarray kết thúc tại index 0.",
+      en: "Base case: only one subarray ends at index 0.",
+    },
+    codeLine: 6,
+  });
+
+  for (i = 1; i < n; i++) {
+    x = nums[i];
+    candidates = null;
+    maxPickIndex = null;
+    minPickIndex = null;
+    phase = "loop";
+    addStep({
+      title: { vi: `i = ${i}`, en: `i = ${i}` },
+      note: {
+        vi: `Tính ô max_dp[${i}] và min_dp[${i}] từ hai ô liền trước.`,
+        en: `Fill max_dp[${i}] and min_dp[${i}] from the two previous cells.`,
+      },
+      codeLine: 7,
+    });
+
+    phase = "read";
+    addStep({
+      title: { vi: `x = nums[${i}] = ${x}`, en: `x = nums[${i}] = ${x}` },
+      note: {
+        vi: `Ba ứng viên sẽ là x, max_dp[${i - 1}]×x và min_dp[${i - 1}]×x.`,
+        en: `The three candidates will be x, max_dp[${i - 1}]×x, and min_dp[${i - 1}]×x.`,
+      },
+      codeLine: 8,
+    });
+
+    const values = [x, maxDp[i - 1] * x, minDp[i - 1] * x];
+    const starts = [i, maxStarts[i - 1], minStarts[i - 1]];
+    let maxIndex = 0;
+    let minIndex = 0;
+    for (let k = 1; k < 3; k++) {
+      if (values[k] > values[maxIndex]) maxIndex = k;
+      if (values[k] < values[minIndex]) minIndex = k;
+    }
+    candidates = [
+      { key: "alone", label: "x", expression: `${x}`, value: values[0] },
+      { key: "max-prev", label: `max_dp[${i - 1}] × x`, expression: `${maxDp[i - 1]} × ${x}`, value: values[1] },
+      { key: "min-prev", label: `min_dp[${i - 1}] × x`, expression: `${minDp[i - 1]} × ${x}`, value: values[2] },
+    ];
+
+    maxDp[i] = values[maxIndex];
+    maxStarts[i] = starts[maxIndex];
+    maxPickIndex = maxIndex;
+    phase = "max";
+    addStep({
+      title: { vi: `max_dp[${i}] = ${maxDp[i]}`, en: `max_dp[${i}] = ${maxDp[i]}` },
+      note: {
+        vi: `Lấy từ ${candidates[maxIndex].label}, tương ứng nums[${maxStarts[i]}..${i}].`,
+        en: `Taken from ${candidates[maxIndex].label}, i.e. nums[${maxStarts[i]}..${i}].`,
+      },
+      codeLine: 9,
+    });
+
+    minDp[i] = values[minIndex];
+    minStarts[i] = starts[minIndex];
+    minPickIndex = minIndex;
+    phase = "min";
+    addStep({
+      title: { vi: `min_dp[${i}] = ${minDp[i]}`, en: `min_dp[${i}] = ${minDp[i]}` },
+      note: {
+        vi: `Lấy từ ${candidates[minIndex].label}; ô này là "dự trữ" cho số âm phía sau.`,
+        en: `Taken from ${candidates[minIndex].label}; this cell is the reserve for a later negative.`,
+      },
+      codeLine: 10,
+    });
+
+    if (maxDp[i] > answer) {
+      answer = maxDp[i];
+      bestIndex = i;
+      bestStart = maxStarts[i];
+      bestEnd = i;
+    }
+  }
+
+  phase = "done";
+  i = n - 1;
+  x = nums[i];
+  candidates = null;
+  maxPickIndex = null;
+  minPickIndex = null;
+  addStep({
+    title: { vi: `return max(max_dp) = ${answer}`, en: `return max(max_dp) = ${answer}` },
+    note: {
+      vi: `Đáp án là ô lớn nhất của max_dp: max_dp[${bestIndex}] = ${answer}, ứng với nums[${bestStart}..${bestEnd}].`,
+      en: `The answer is the largest cell of max_dp: max_dp[${bestIndex}] = ${answer}, matching nums[${bestStart}..${bestEnd}].`,
+    },
+    codeLine: 11,
+    vars: [{ name: "answer", value: answer }, { name: "argmax index", value: bestIndex }],
+    final: true,
+  });
+
+  return { original: [...nums], answer, steps };
+}
+
+function buildSteps152(nums, params) {
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps152Candidates(nums);
+  if (approach === 3) return buildSteps152DP(nums);
+  return buildSteps152Swap(nums);
 }
 
 /**
@@ -17600,15 +18075,35 @@ module.exports = {
     },
     defaultInput: [2, 3, -2, 4],
     inputKind: "integer", // số nguyên bất kỳ (cho phép âm và 0)
-    extraParams: [],
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Cách giải", en: "Approach" },
+        default: "1",
+        options: [
+          { value: "1", label: { vi: "Cách 1: Swap khi gặp số âm", en: "Approach 1: Swap on negative" } },
+          { value: "2", label: { vi: "Cách 2: So 3 ứng viên", en: "Approach 2: Three candidates" } },
+          { value: "3", label: { vi: "Cách 3: Bảng DP O(n)", en: "Approach 3: DP tables O(n)" } },
+        ],
+      },
+    ],
+    approach: [
+      { vi: "Cách 1 hoán đổi cur_max và cur_min khi x < 0, vì nhân số âm đảo thứ tự lớn/nhỏ.", en: "Approach 1 swaps cur_max and cur_min when x < 0, because multiplying by a negative reverses the order." },
+      { vi: "Cách 2 so trực tiếp ba ứng viên (n, max_prev×n, min_prev×n); tính tuple trước khi gán nên không cần swap và tránh lỗi ghi đè max_prev.", en: "Approach 2 compares the three candidates (n, max_prev×n, min_prev×n); computing the tuple before assigning avoids the swap and the classic overwrite bug." },
+      { vi: "Cách 3 viết cùng công thức truy hồi thành bảng max_dp/min_dp để thấy rõ đây là DP, đáp án là max(max_dp).", en: "Approach 3 writes the same recurrence as max_dp/min_dp tables to expose the DP structure; the answer is max(max_dp)." },
+    ],
     complexity: {
       time: "O(n)",
-      space: "O(1)",
+      space: "O(1) / O(n)",
       note: {
-        vi: "Duyệt mảng đúng một lần, mỗi bước chỉ cập nhật curMax/curMin/result nên O(n) thời gian và O(1) bộ nhớ.",
-        en: "A single pass updates curMax/curMin/result at each step, giving O(n) time and O(1) memory.",
+        vi: "Cả ba cách đều O(n) thời gian. Cách 1 và 2 dùng O(1) bộ nhớ; cách 3 dùng O(n) vì lưu hai bảng DP.",
+        en: "All three approaches run in O(n) time. Approaches 1 and 2 use O(1) memory; approach 3 uses O(n) for the two DP tables.",
       },
     },
+    codeLabel: { vi: "Cách 1: Swap khi gặp số âm · O(1)", en: "Approach 1: Swap on negative · O(1)" },
+    code2Label: { vi: "Cách 2: So 3 ứng viên · O(1)", en: "Approach 2: Three candidates · O(1)" },
+    code3Label: { vi: "Cách 3: Bảng DP max_dp/min_dp · O(n)", en: "Approach 3: max_dp/min_dp tables · O(n)" },
     code: [
       "class Solution:",
       "    def maxProduct(self, nums):",
@@ -17621,6 +18116,32 @@ module.exports = {
       "            cur_min = min(x, cur_min * x)",
       "            result = max(result, cur_max)",
       "        return result",
+    ],
+    code2: [
+      "class Solution:",
+      "    def maxProduct(self, nums: List[int]) -> int:",
+      "        max_prev = min_prev = ans = nums[0]",
+      "        for i in range(1, len(nums)):",
+      "            n = nums[i]",
+      "            candidates = (n, max_prev * n, min_prev * n)",
+      "            max_curr = max(candidates)",
+      "            min_curr = min(candidates)",
+      "            max_prev, min_prev = max_curr, min_curr",
+      "            ans = max(ans, max_curr)",
+      "        return ans",
+    ],
+    code3: [
+      "class Solution:",
+      "    def maxProduct(self, nums: List[int]) -> int:",
+      "        n = len(nums)",
+      "        max_dp = [0] * n",
+      "        min_dp = [0] * n",
+      "        max_dp[0] = min_dp[0] = nums[0]",
+      "        for i in range(1, n):",
+      "            x = nums[i]",
+      "            max_dp[i] = max(x, max_dp[i-1] * x, min_dp[i-1] * x)",
+      "            min_dp[i] = min(x, max_dp[i-1] * x, min_dp[i-1] * x)",
+      "        return max(max_dp)",
     ],
     builder: buildSteps152,
   },

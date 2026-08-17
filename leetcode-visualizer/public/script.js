@@ -13623,16 +13623,28 @@ function renderMaximumProductView(step) {
   const display = (value) => value === null || value === undefined ? "—" : String(value);
   const product = (values) => (Array.isArray(values) && values.length ? values.join(" × ") : "—");
   const inRange = (index, start, end) => Number.isInteger(start) && Number.isInteger(end) && index >= start && index <= end;
-  const maxReady = ["init", "max", "min", "best", "done"].includes(phase);
-  const minReady = ["init", "min", "best", "done"].includes(phase);
+  // Approach 1 hides values until its own update line runs; the other approaches
+  // always hold a valid previous state, and unset DP cells render as "—".
+  const swapApproach = (Number(view.approach) || 1) === 1;
+  const maxReady = swapApproach ? ["init", "max", "min", "best", "done"].includes(phase) : view.curMax !== null && view.curMax !== undefined;
+  const minReady = swapApproach ? ["init", "min", "best", "done"].includes(phase) : view.curMin !== null && view.curMin !== undefined;
 
+  const approachId = Number(view.approach) || 1;
   const phaseIndex = phase === "done" || phase === "best" ? 4
-    : phase === "min" ? 3
+    : ["min", "assign"].includes(phase) ? 3
       : phase === "max" ? 2
-        : ["sign", "swap"].includes(phase) ? 1 : 0;
-  const labels = vi
-    ? ["Đọc x", "Xét dấu", "Cập nhật MAX", "Cập nhật MIN", "Cập nhật BEST"]
-    : ["Read x", "Check sign", "Update MAX", "Update MIN", "Update BEST"];
+        : ["sign", "swap", "candidates"].includes(phase) ? 1 : 0;
+  const labels = approachId === 1
+    ? (vi
+      ? ["Đọc x", "Xét dấu", "Cập nhật MAX", "Cập nhật MIN", "Cập nhật BEST"]
+      : ["Read x", "Check sign", "Update MAX", "Update MIN", "Update BEST"])
+    : approachId === 2
+      ? (vi
+        ? ["Đọc n", "Tính 3 ứng viên", "max_curr", "min_curr", "Cập nhật ans"]
+        : ["Read n", "Build 3 candidates", "max_curr", "min_curr", "Update ans"])
+      : (vi
+        ? ["Khởi tạo bảng", "Tính 3 ứng viên", "max_dp[i]", "min_dp[i]", "max(max_dp)"]
+        : ["Init tables", "Build 3 candidates", "max_dp[i]", "min_dp[i]", "max(max_dp)"]);
   const phases = labels.map((label, index) => {
     const done = phase === "done" || index < phaseIndex;
     return `<span class="${done ? "done" : index === phaseIndex ? "active" : ""}">${done ? "✓" : index + 1}<b>${escapeHtml(label)}</b></span>`;
@@ -13751,24 +13763,74 @@ function renderMaximumProductView(step) {
     </section>`;
   };
 
+  // Approach 2 and 3 replace the swap story with one explicit 3-candidate comparison.
+  const approach = Number(view.approach) || 1;
+  const candidateList = Array.isArray(view.candidates) ? view.candidates : [];
+  const candidateNames = vi
+    ? { alone: "chỉ lấy phần tử hiện tại", "max-prev": "nối vào MAX trước đó", "min-prev": "nối vào MIN trước đó" }
+    : { alone: "take the current element alone", "max-prev": "extend the previous MAX", "min-prev": "extend the previous MIN" };
+  const triple = candidateList.length
+    ? `<section class="mps152-triple">
+        <header><strong>${vi ? "BỘ BA ỨNG VIÊN" : "THE THREE CANDIDATES"}</strong><span>${vi ? "tính hết trước, rồi mới lấy max và min" : "compute all first, then take max and min"}</span></header>
+        <div>${candidateList.map((candidate, index) => {
+          const isMax = index === view.maxPickIndex;
+          const isMin = index === view.minPickIndex;
+          const tags = [];
+          if (isMax) tags.push(`<b class="max">${vi ? "→ max_curr" : "→ max_curr"}</b>`);
+          if (isMin) tags.push(`<b class="min">${vi ? "→ min_curr" : "→ min_curr"}</b>`);
+          return `<div class="${[isMax ? "is-max" : "", isMin ? "is-min" : "", !isMax && !isMin ? "unused" : ""].filter(Boolean).join(" ")}">
+            <small>${index + 1} · ${escapeHtml(candidate.label || "")}</small>
+            <b>${escapeHtml(String(candidate.expression || ""))}</b>
+            <strong>${escapeHtml(display(candidate.value))}</strong>
+            <span>${escapeHtml(candidateNames[candidate.key] || "")}</span>
+            <em>${tags.join("") || (vi ? "không được chọn" : "not selected")}</em>
+          </div>`;
+        }).join("")}</div>
+        <footer>${escapeHtml(vi
+          ? "Cùng một bộ ba cho cả max và min, nên không cần luật swap theo dấu."
+          : "The same tuple feeds both max and min, so no sign-based swap rule is needed.")}</footer>
+      </section>`
+    : "";
+
+  const dpTable = approach === 3 && Array.isArray(view.maxDp)
+    ? `<section class="mps152-dp">
+        <header><strong>${vi ? "BẢNG DP" : "DP TABLES"}</strong><span>${vi ? "max_dp[i] và min_dp[i] = tích lớn nhất / nhỏ nhất kết thúc tại i" : "max_dp[i] and min_dp[i] = largest / smallest product ending at i"}</span></header>
+        <div class="mps152-dp-scroll"><table>
+          <tr><th>i</th>${nums.map((_, index) => `<th class="${index === i ? "active" : ""}">${index}</th>`).join("")}</tr>
+          <tr><th>nums</th>${nums.map((value, index) => `<td class="${index === i ? "active" : ""}">${escapeHtml(String(value))}</td>`).join("")}</tr>
+          <tr><th>max_dp</th>${view.maxDp.map((value, index) => `<td class="max ${index === i ? "active" : ""} ${index === view.bestIndex && value !== null ? "argmax" : ""}">${escapeHtml(display(value))}</td>`).join("")}</tr>
+          <tr><th>min_dp</th>${(view.minDp || []).map((value, index) => `<td class="min ${index === i ? "active" : ""}">${escapeHtml(display(value))}</td>`).join("")}</tr>
+        </table></div>
+        <footer>${escapeHtml(vi
+          ? `Đáp án = max(max_dp) = ô max_dp[${display(view.bestIndex)}] = ${display(view.best)}. Bộ nhớ O(n) là điểm khác duy nhất so với cách 2.`
+          : `Answer = max(max_dp) = cell max_dp[${display(view.bestIndex)}] = ${display(view.best)}. The O(n) memory is the only difference from approach 2.`)}</footer>
+      </section>`
+    : "";
+
   const bestExpression = Array.isArray(view.bestValues) && view.bestValues.length
     ? `${product(view.bestValues)} = ${display(view.best)}`
     : display(view.best);
   const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const approachLabels = vi
+    ? { 1: "CÁCH 1 · SWAP KHI ÂM", 2: "CÁCH 2 · 3 ỨNG VIÊN", 3: "CÁCH 3 · BẢNG DP" }
+    : { 1: "APPROACH 1 · SWAP ON NEGATIVE", 2: "APPROACH 2 · THREE CANDIDATES", 3: "APPROACH 3 · DP TABLES" };
   const summary = vi
-    ? `Bài 152, index ${i}, cur max ${view.curMax}, cur min ${view.curMin}, best ${view.best}`
-    : `Problem 152, index ${i}, current max ${view.curMax}, current min ${view.curMin}, best ${view.best}`;
+    ? `Bài 152, cách ${approach}, index ${i}, cur max ${view.curMax}, cur min ${view.curMin}, best ${view.best}`
+    : `Problem 152, approach ${approach}, index ${i}, current max ${view.curMax}, current min ${view.curMin}, best ${view.best}`;
+  const bestLabel = approach === 3 ? "max(max_dp)" : approach === 2 ? "ans" : "GLOBAL BEST";
 
   $("treeView").innerHTML = `<section class="mps152-viz" role="img" aria-label="${escapeHtml(summary)}">
+    <div class="mps152-approach approach-${approach}">${escapeHtml(approachLabels[approach] || approachLabels[1])}</div>
     <div class="mps152-phases">${phases}</div>
     <div class="mps152-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
     ${meaning}
-    <section class="mps152-array"><header><strong>nums + DP history</strong><span>${vi ? "vàng = best · xanh = đoạn của MAX · tím = đoạn của MIN" : "gold = best · blue = MAX run · purple = MIN run"}</span></header><div class="mps152-cells">${cells}</div></section>
-    ${swapPanel}
-    <div class="mps152-lanes">${laneHtml("max")}${laneHtml("min")}</div>
-    ${whyMin}
+    <section class="mps152-array"><header><strong>${approach === 3 ? "nums + max_dp/min_dp" : "nums + DP history"}</strong><span>${vi ? "vàng = best · xanh = đoạn của MAX · tím = đoạn của MIN" : "gold = best · blue = MAX run · purple = MIN run"}</span></header><div class="mps152-cells">${cells}</div></section>
+    ${approach === 1 ? swapPanel : ""}
+    ${approach === 1 ? `<div class="mps152-lanes">${laneHtml("max")}${laneHtml("min")}</div>` : triple}
+    ${dpTable}
+    ${approach === 3 ? "" : whyMin}
     <section class="mps152-best ${view.bestUpdated ? "updated" : ""}">
-      <div><small>GLOBAL BEST</small><strong>${escapeHtml(display(view.best))}</strong><span>${view.bestUpdated ? (vi ? "BEST MỚI ✓" : "NEW BEST ✓") : (vi ? "giữ nguyên" : "unchanged")}</span></div>
+      <div><small>${escapeHtml(bestLabel)}</small><strong>${escapeHtml(display(view.best))}</strong><span>${view.bestUpdated ? (vi ? "BEST MỚI ✓" : "NEW BEST ✓") : (vi ? "giữ nguyên" : "unchanged")}</span></div>
       <code>${escapeHtml(bestExpression)}</code><em>nums[${escapeHtml(display(view.bestStart))}..${escapeHtml(display(view.bestEnd))}]</em>
     </section>
   </section>`;
