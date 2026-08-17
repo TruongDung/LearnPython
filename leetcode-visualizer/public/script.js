@@ -3587,73 +3587,143 @@ function renderPalindromePathView(step) {
   const view = step.palPathView || {};
   const vi = lang === "vi";
   const current = view.current;
-  const phaseLabels = {
-    init: vi ? "Khởi tạo mask" : "Initialize masks",
-    count: vi ? "Đếm cặp cho node hiện tại" : "Count pairs for current node",
-    store: vi ? "Lưu mask vào counter" : "Store mask in counter",
-    done: vi ? "Hoàn tất" : "Complete",
+  const phase = view.phase || "idea";
+  const phaseOrder = ["idea", "build", "rule", "count", "store", "done"];
+  const phaseIndex = Math.max(0, phaseOrder.indexOf(phase));
+  const phaseLabels = vi
+    ? ["1 · Ý tưởng parity", "2 · Tính mask từ root", "3 · Quy tắc XOR", "4 · Đếm cặp", "5 · Lưu counter", "6 · Kết quả"]
+    : ["1 · Parity idea", "2 · Build masks", "3 · XOR rule", "4 · Count pairs", "5 · Store counter", "6 · Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}">${state === "done" ? "✓" : state === "active" ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // A letter-parity row is far easier to read than a raw 26-bit integer.
+  const parityHtml = (parity, extraClass) => {
+    if (!Array.isArray(parity) || !parity.length) return `<span class="pal2791-parity-empty">∅</span>`;
+    return `<span class="pal2791-parity ${extraClass || ""}">${parity.map((cell) => `<b class="${cell.odd ? "odd" : "even"}">${escapeHtml(cell.letter)}<i>${cell.odd ? "1" : "0"}</i></b>`).join("")}</span>`;
   };
-  const matches = Array.isArray(view.matches) ? view.matches : [];
+
+  const xorStep = view.xorStep;
+  const lookups = Array.isArray(view.lookups) ? view.lookups : [];
   const counter = Array.isArray(view.counter) ? view.counter : [];
-  const matchHtml = matches.length
-    ? matches.map((item) => `<div class="pal2791-match ${item.kind === "same" ? "same" : "one-bit"}">
-        <span>${item.kind === "same" ? (vi ? "cùng mask" : "same mask") : (vi ? "khác 1 bit" : "one-bit diff")}</span>
-        <strong>${escapeHtml(item.odd)}</strong>
-        <code>${escapeHtml(item.bits)}</code>
-        <small>${vi ? "node" : "nodes"}: ${escapeHtml((item.nodes || []).join(", "))} · +${escapeHtml(item.count)}</small>
-      </div>`).join("")
-    : `<div class="pal2791-empty">${vi ? "Không có mask đã thấy nào khớp." : "No previously seen mask matches."}</div>`;
+  const pairsFound = Array.isArray(view.pairsFound) ? view.pairsFound : [];
+  const allPairsList = Array.isArray(view.allPairsList) ? view.allPairsList : [];
+  const recentPairs = Array.isArray(view.recentPairs) ? view.recentPairs : [];
+
+  const ruleCard = `<section class="pal2791-rule">
+    <strong>${vi ? "QUY TẮC" : "RULE"}</strong>
+    <div class="pal2791-rule-cases">
+      <span class="even"><b>0</b>${vi ? "chữ lẻ → palindrome chẵn" : "odd letters → even palindrome"}<em>abba</em></span>
+      <span class="one"><b>1</b>${vi ? "chữ lẻ → chữ đó ở giữa" : "odd letter → it sits in the middle"}<em>aba</em></span>
+      <span class="bad"><b>≥2</b>${vi ? "chữ lẻ → không thể" : "odd letters → impossible"}<em>aabb✗</em></span>
+    </div>
+    <code>path(u,v) = mask[u] XOR mask[v]</code>
+  </section>`;
+
+  let focusHtml;
+  if (phase === "build" && xorStep) {
+    focusHtml = `<section class="pal2791-xor">
+      <small>${vi ? "TÍNH MASK" : "BUILD MASK"}</small>
+      <div class="pal2791-xor-row"><span>mask[${escapeHtml(xorStep.parentNode)}]</span>${parityHtml(xorStep.parentParity)}</div>
+      <div class="pal2791-xor-op">XOR <b>'${escapeHtml(xorStep.letter)}'</b></div>
+      <div class="pal2791-xor-row result"><span>mask[${escapeHtml(current.node)}]</span>${parityHtml(current.parity, "highlight")}</div>
+      <p>${vi ? `Chỉ parity của '${xorStep.letter}' bị đảo, các chữ khác giữ nguyên.` : `Only '${xorStep.letter}' flips parity; every other letter is unchanged.`}</p>
+    </section>`;
+  } else if (phase === "rule") {
+    focusHtml = `<section class="pal2791-cancel">
+      <small>${vi ? "ĐOẠN CHUNG TỰ TRIỆT TIÊU" : "SHARED PREFIX CANCELS"}</small>
+      <div class="pal2791-cancel-rows">
+        <span>root → u<i>= (root→LCA) + (LCA→u)</i></span>
+        <span>root → v<i>= (root→LCA) + (LCA→v)</i></span>
+        <b>XOR</b>
+        <span class="result">u ↔ v<i>= (LCA→u) + (LCA→v)</i></span>
+      </div>
+      <p>${vi ? "Đoạn root→LCA xuất hiện 2 lần nên parity của nó bằng 0 và biến mất." : "The root→LCA part appears twice, so its parity becomes 0 and disappears."}</p>
+    </section>`;
+  } else if (current) {
+    focusHtml = `<section class="pal2791-current">
+      <small>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</small>
+      <strong>node ${escapeHtml(current.node)}</strong>
+      <code>${escapeHtml(current.edge)}</code>
+      ${parityHtml(current.parity, "highlight")}
+      <em>${vi ? "chữ lẻ" : "odd letters"}: ${escapeHtml(current.odd)} · popcount ${escapeHtml(current.popcount)}</em>
+    </section>`;
+  } else {
+    focusHtml = `<section class="pal2791-current done">
+      <small>${vi ? "TỔNG SỐ ĐƯỜNG" : "TOTAL PATHS"}</small>
+      <strong>${escapeHtml(view.answerAfter ?? 0)}</strong>
+    </section>`;
+  }
+
+  const lookupHtml = lookups.length
+    ? `<section class="pal2791-lookups">
+        <header><strong>${vi ? "TRA COUNTER" : "COUNTER PROBES"}</strong><span>${vi ? `1 mask giống + ${lookups.length - 1} phép lật 1 chữ` : `1 equal mask + ${lookups.length - 1} one-letter flips`}</span></header>
+        <div>${lookups.map((item) => `<span class="pal2791-probe ${item.count > 0 ? "hit" : "miss"} ${item.kind}">
+            <small>${item.kind === "exact" ? (vi ? "giống hệt" : "equal") : `flip '${escapeHtml(item.flipLetter)}'`}</small>
+            <b>${escapeHtml(item.label)}</b>
+            <em>${item.count > 0 ? `+${escapeHtml(item.count)} → node ${escapeHtml((item.nodes || []).join(", "))}` : (vi ? "trượt" : "miss")}</em>
+          </span>`).join("")}</div>
+        ${view.skippedFlips ? `<p class="pal2791-skip">${vi ? `Bỏ qua ${view.skippedFlips} phép lật còn lại: các chữ đó không có trong cây nên luôn trượt.` : `Skipped the other ${view.skippedFlips} flips: those letters never appear in the tree, so they always miss.`}</p>` : ""}
+      </section>`
+    : "";
+
+  const pairsHtml = pairsFound.length
+    ? `<section class="pal2791-pairs">
+        <header><strong>${vi ? "CẶP PALINDROME VỪA TÌM" : "PALINDROME PAIRS JUST FOUND"}</strong><span>${pairsFound.length}</span></header>
+        <div>${pairsFound.map((pair) => `<span class="pal2791-pair ${pair.kind}">
+            <b>(${escapeHtml(pair.u)}, ${escapeHtml(pair.v)})</b>
+            <small>LCA ${escapeHtml(pair.lca)} · ${vi ? "chữ" : "letters"} "${escapeHtml(pair.letters)}"</small>
+            <em>→ "${escapeHtml(pair.palindrome)}"</em>
+            <i>${pair.xorPopcount === 0 ? (vi ? "0 chữ lẻ" : "0 odd") : `1 ${vi ? "chữ lẻ" : "odd"}: ${escapeHtml(pair.xorOdd)}`}</i>
+          </span>`).join("")}</div>
+      </section>`
+    : "";
+
+  const finalPairs = allPairsList.length ? allPairsList : recentPairs;
+  const summaryPairsHtml = phase === "done" && finalPairs.length
+    ? `<section class="pal2791-pairs all">
+        <header><strong>${vi ? "TẤT CẢ ĐƯỜNG PALINDROME" : "ALL PALINDROME PATHS"}</strong><span>${finalPairs.length}</span></header>
+        <div>${finalPairs.map((pair) => `<span class="pal2791-pair ${pair.kind}"><b>(${escapeHtml(pair.u)}, ${escapeHtml(pair.v)})</b><small>"${escapeHtml(pair.letters)}"</small><em>→ "${escapeHtml(pair.palindrome)}"</em></span>`).join("")}</div>
+      </section>`
+    : "";
+
   const counterHtml = counter.length
-    ? counter.map((item) => `<span class="pal2791-counter-item">
-        <small>${escapeHtml(item.bits)}</small>
+    ? counter.map((item) => `<span class="pal2791-counter-item ${item.matched ? "matched" : ""}">
+        ${parityHtml(item.parity)}
         <strong>${escapeHtml(item.odd)}</strong>
         <em>×${escapeHtml(item.count)}</em>
+        <small>node ${escapeHtml((item.nodes || []).join(", "))}</small>
       </span>`).join("")
-    : `<span class="pal2791-counter-empty">∅</span>`;
-  const currentHtml = current
-    ? `<section class="pal2791-current">
-        <span>${vi ? "NODE ĐANG XÉT" : "CURRENT NODE"}</span>
-        <strong>${escapeHtml(current.node)}</strong>
-        <code>${escapeHtml(current.edge)}</code>
-        <div>
-          <b>mask = ${escapeHtml(current.mask)}</b>
-          <b>bits = ${escapeHtml(current.bits)}</b>
-          <b>${vi ? "lẻ" : "odd"} = ${escapeHtml(current.odd)}</b>
-        </div>
-      </section>`
-    : `<section class="pal2791-current done"><span>${vi ? "ĐÃ XONG" : "DONE"}</span><strong>${escapeHtml(view.answerAfter ?? 0)}</strong></section>`;
+    : `<span class="pal2791-counter-empty">${vi ? "counter đang rỗng" : "counter is empty"}</span>`;
+
   const summary = vi
-    ? `LeetCode 2791: node hiện tại ${current ? current.node : "xong"}, đáp án ${view.answerAfter ?? 0}.`
-    : `LeetCode 2791: current node ${current ? current.node : "done"}, answer ${view.answerAfter ?? 0}.`;
+    ? `LeetCode 2791: pha ${phase}, node ${current ? current.node : "xong"}, đáp án ${view.answerAfter ?? 0}.`
+    : `LeetCode 2791: ${phase} phase, node ${current ? current.node : "done"}, answer ${view.answerAfter ?? 0}.`;
 
   $("treeView").innerHTML = `<section class="pal2791-viz" role="img" aria-label="${escapeHtml(summary)}">
-    <section class="pal2791-rule">
-      <strong>${vi ? "QUY TẮC PALINDROME" : "PALINDROME RULE"}</strong>
-      <code>mask[u] XOR mask[v] has 0 or 1 set bit</code>
-      <span>${vi ? "Node xanh là đã vào counter; node cam là node hiện tại; nhãn cạnh cho biết ký tự được XOR." : "Green nodes are already in the counter; amber is current; edge labels show the XOR letter."}</span>
-    </section>
+    <div class="pal2791-phases">${phases}</div>
+    ${ruleCard}
     <div class="pal2791-layout">
       <section class="pal2791-tree-card">
-        <header><strong>${vi ? "CÂY MASK" : "MASK TREE"}</strong><span>${vi ? "node / mask số / chữ lẻ" : "node / numeric mask / odd letters"}</span></header>
+        <header><strong>${vi ? "CÂY PARITY" : "PARITY TREE"}</strong><span>${vi ? "mỗi node hiện các chữ xuất hiện LẺ lần từ root" : "each node shows letters with ODD parity from the root"}</span></header>
         <div id="pal2791Tree" class="pal2791-tree"></div>
       </section>
       <aside class="pal2791-side">
-        <section class="pal2791-phase"><span>${vi ? "PHA" : "PHASE"}</span><strong>${escapeHtml(phaseLabels[view.phase] || view.phase || "—")}</strong></section>
-        ${currentHtml}
+        ${focusHtml}
         <section class="pal2791-formula ${Number(view.add || 0) > 0 ? "adds" : ""}">
-          <span>${vi ? "CẬP NHẬT ĐÁP ÁN" : "ANSWER UPDATE"}</span>
+          <small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small>
           <strong>${escapeHtml(view.answerBefore ?? 0)} + ${escapeHtml(view.add ?? 0)} = ${escapeHtml(view.answerAfter ?? 0)}</strong>
         </section>
-        <section class="pal2791-matches">
-          <header><strong>${vi ? "MASK KHỚP TRONG COUNTER" : "MATCHING MASKS IN COUNTER"}</strong><span>${vi ? "mỗi dòng tạo thêm count cặp" : "each row contributes count pairs"}</span></header>
-          <div>${matchHtml}</div>
-        </section>
         <section class="pal2791-counter">
-          <header><strong>COUNTER</strong><span>${vi ? "mask đã xử lý" : "processed masks"}</span></header>
+          <header><strong>COUNTER <code>seen</code></strong><span>${vi ? "mask đã lưu" : "stored masks"}</span></header>
           <div>${counterHtml}</div>
         </section>
       </aside>
     </div>
+    ${lookupHtml}
+    ${pairsHtml}
+    ${summaryPairsHtml}
   </section>`;
   renderTree(step, "pal2791Tree");
 }

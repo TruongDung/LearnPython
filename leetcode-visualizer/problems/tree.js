@@ -4291,171 +4291,291 @@ function buildSteps2791(input) {
   for (let node = 1; node < n; node++) children[parent[node]].push(node);
 
   const bitName = (bit) => String.fromCharCode(97 + bit);
-  const maskToLetters = (mask) => {
+  const letterBit = (ch) => ch.charCodeAt(0) - 97;
+  // Only letters that actually label an edge can ever appear in a mask, so the
+  // visualization shows a compact parity row over those letters instead of 26 bits.
+  const alphabet = [...new Set(s.slice(1).split(""))].sort();
+  const oddLetters = (mask) => {
     const letters = [];
-    for (let bit = 0; bit < 26; bit++) {
-      if (mask & (1 << bit)) letters.push(bitName(bit));
-    }
-    return letters.length ? letters.join("") : "∅";
+    for (let bit = 0; bit < 26; bit++) if (mask & (1 << bit)) letters.push(bitName(bit));
+    return letters;
   };
-  const maskLabel = (mask) => `${mask} (${maskToLetters(mask)})`;
-  const maskBinary = (mask) => mask.toString(2).padStart(6, "0");
-  const counterText = (counter) => {
-    const entries = Object.keys(counter)
-      .map(Number)
-      .filter((mask) => counter[mask] > 0)
-      .sort((a, b) => a - b)
-      .slice(0, 8)
-      .map((mask) => `${maskToLetters(mask)}:${counter[mask]}`);
-    return `{${entries.join(", ")}}`;
-  };
-  const counterItems = (counter) => Object.keys(counter)
-    .map(Number)
-    .filter((mask) => counter[mask] > 0)
-    .sort((a, b) => a - b)
-    .map((mask) => ({ mask, odd: maskToLetters(mask), bits: maskBinary(mask), count: counter[mask] }));
+  const oddText = (mask) => oddLetters(mask).join("") || "∅";
+  const parityRow = (mask) => alphabet.map((ch) => ({ letter: ch, odd: Boolean(mask & (1 << letterBit(ch))) }));
+  const popcount = (mask) => oddLetters(mask).length;
 
+  // depth + masks in index order so the walkthrough matches `for mask in masks`.
   const masks = Array(n).fill(0);
-  const order = [];
+  const depth = Array(n).fill(0);
+  const dfsOrder = [];
   (function dfsMask(node) {
-    order.push(node);
+    dfsOrder.push(node);
     for (const child of children[node]) {
-      masks[child] = masks[node] ^ (1 << (s.charCodeAt(child) - 97));
+      masks[child] = masks[node] ^ (1 << letterBit(s[child]));
+      depth[child] = depth[node] + 1;
       dfsMask(child);
     }
   })(0);
 
   const xPos = Array(n).fill(0);
   let nextX = 0;
-  function assignX(node, depth) {
+  (function assignX(node) {
     if (children[node].length === 0) {
       xPos[node] = nextX++;
-    } else {
-      children[node].forEach((child) => assignX(child, depth + 1));
-      xPos[node] = children[node].reduce((sum, child) => sum + xPos[child], 0) / children[node].length;
+      return;
     }
-  }
-  assignX(0, 0);
+    children[node].forEach(assignX);
+    xPos[node] = children[node].reduce((sum, child) => sum + xPos[child], 0) / children[node].length;
+  })(0);
 
-  const depth = Array(n).fill(0);
-  for (const node of order) {
-    for (const child of children[node]) depth[child] = depth[node] + 1;
+  // Real letters along u ↔ v, used to prove the pair really is a palindrome.
+  function pathLetters(u, v) {
+    const fromU = [];
+    const fromV = [];
+    let a = u;
+    let b = v;
+    while (depth[a] > depth[b]) { fromU.push(s[a]); a = parent[a]; }
+    while (depth[b] > depth[a]) { fromV.push(s[b]); b = parent[b]; }
+    while (a !== b) { fromU.push(s[a]); a = parent[a]; fromV.push(s[b]); b = parent[b]; }
+    return { letters: [...fromU, ...fromV.reverse()], lca: a };
   }
 
-  const makeTree = (active, processed, pairWith) => ({
+  function palindromeArrangement(letters) {
+    const counts = new Map();
+    for (const ch of letters) counts.set(ch, (counts.get(ch) || 0) + 1);
+    let middle = "";
+    let half = "";
+    for (const ch of [...counts.keys()].sort()) {
+      if (counts.get(ch) % 2) middle = ch;
+      half += ch.repeat(Math.floor(counts.get(ch) / 2));
+    }
+    return half + middle + [...half].reverse().join("");
+  }
+
+  const counterText = (counter) => {
+    const entries = Object.keys(counter).map(Number).filter((mask) => counter[mask] > 0)
+      .sort((a, b) => a - b).slice(0, 8).map((mask) => `${oddText(mask)}:${counter[mask]}`);
+    return `{${entries.join(", ")}}`;
+  };
+  const counterItems = (counter, nodesByMask, highlightMasks) => Object.keys(counter)
+    .map(Number).filter((mask) => counter[mask] > 0).sort((a, b) => a - b)
+    .map((mask) => ({
+      mask,
+      odd: oddText(mask),
+      parity: parityRow(mask),
+      count: counter[mask],
+      nodes: [...(nodesByMask[mask] || [])],
+      matched: Boolean(highlightMasks && highlightMasks.has(mask)),
+    }));
+
+  const makeTree = (active, processed, partners, pathNodes) => ({
     nodes: Array.from({ length: n }, (_, node) => ({
       id: node,
-      labelLines: [`node ${node}`, `m=${masks[node]}`, maskToLetters(masks[node])],
-      sub: node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`,
+      labelLines: [`node ${node}`, `odd: ${oddText(masks[node])}`],
+      sub: node === 0 ? "root (mask 0)" : `'${s[node]}' from ${parent[node]}`,
       x: xPos[node],
       y: depth[node],
       parentId: parent[node] === -1 ? null : parent[node],
       hl: node === active,
       isWord: processed.has(node) || node === active,
     })),
-    annotations: Object.fromEntries(Array.from(processed).map((node) => [node, { label: "seen", kind: "md-return" }])
-      .concat(active === null ? [] : [[active, { label: "cur", kind: "md-current" }]])
-      .concat((pairWith || []).map((node) => [node, { label: "pairs", kind: "md-next" }]))),
+    annotations: Object.fromEntries(
+      [...processed].map((node) => [node, { label: "in counter", kind: "md-return" }])
+        .concat((pathNodes || []).map((node) => [node, { label: "on path", kind: "md-next" }]))
+        .concat((partners || []).map((node) => [node, { label: "pairs ✓", kind: "md-next" }]))
+        .concat(active === null ? [] : [[active, { label: "current", kind: "md-current" }]]),
+    ),
     showLevels: true,
   });
 
   const steps = [];
   const processed = new Set();
   const seenByMask = {};
-  const maskToNodes = {};
+  const nodesByMask = {};
+  const allPairs = [];
   let answer = 0;
 
+  const baseView = (extra) => ({
+    alphabet,
+    answerBefore: answer,
+    add: 0,
+    answerAfter: answer,
+    lookups: [],
+    matches: [],
+    pairsFound: [],
+    totalPairs: allPairs.length,
+    recentPairs: allPairs.slice(-6),
+    counter: counterItems(seenByMask, nodesByMask, null),
+    ...extra,
+  });
+
   steps.push({
-    title: { vi: "Khởi tạo mask gốc", en: "Initialize root mask" },
+    title: { vi: "Ý tưởng: parity mask thay vì liệt kê mọi đường", en: "Idea: parity masks instead of listing every path" },
     arr: [],
-    tree: makeTree(0, processed, []),
+    tree: makeTree(0, processed, [], []),
     highlight: [],
     mark: [],
     codeLines: [9, 10],
     vars: [
       { name: "parent", value: `[${parent.join(",")}]` },
       { name: "s", value: `"${s}"` },
-      { name: "seen", value: "{}" },
-      { name: "ans", value: 0 },
+      { name: "letters in tree", value: alphabet.join("") || "∅" },
     ],
-    palPathView: {
-      phase: "init",
-      current: { node: 0, mask: 0, odd: maskToLetters(0), bits: maskBinary(0), edge: "root" },
-      answerBefore: 0,
-      add: 0,
-      answerAfter: 0,
-      matches: [],
-      counter: [],
-    },
+    palPathView: baseView({
+      phase: "idea",
+      current: { node: 0, mask: 0, odd: oddText(0), parity: parityRow(0), edge: "root", popcount: 0 },
+    }),
     note: {
-      vi: "mask[node] lưu các chữ xuất hiện lẻ lần trên đường root → node. Root có mask 0 vì s[0] không là cạnh.",
-      en: "mask[node] stores letters with odd parity on root → node. The root mask is 0 because s[0] is not an edge.",
+      vi: `Một dãy chữ hoán vị được thành palindrome khi có tối đa 1 chữ xuất hiện lẻ lần. Vì vậy chỉ cần lưu tính chẵn/lẻ (parity) của mỗi chữ, không cần lưu số lượng. mask[node] = tập chữ xuất hiện LẺ lần trên đường root → node. Cây này dùng ${alphabet.length} chữ: ${alphabet.join(", ")}.`,
+      en: `Letters can be rearranged into a palindrome when at most one letter occurs an odd number of times. So we only need each letter's parity, not its count. mask[node] = the set of letters appearing an ODD number of times on root → node. This tree uses ${alphabet.length} letters: ${alphabet.join(", ")}.`,
     },
   });
 
-  for (const node of order) {
-    const mask = masks[node];
-    const candidates = [mask];
-    for (let bit = 0; bit < 26; bit++) candidates.push(mask ^ (1 << bit));
-    const hits = candidates
-      .filter((candidate, index) => candidates.indexOf(candidate) === index)
-      .map((candidate) => ({ mask: candidate, count: seenByMask[candidate] || 0, nodes: maskToNodes[candidate] || [] }))
-      .filter((item) => item.count > 0);
-    const add = hits.reduce((sum, item) => sum + item.count, 0);
-    const pairNodes = hits.flatMap((item) => item.nodes);
-    const currentEdge = node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`;
-
+  for (const node of dfsOrder) {
+    if (node === 0) continue;
+    const bit = letterBit(s[node]);
     steps.push({
-      title: { vi: `Xét node ${node}`, en: `Process node ${node}` },
+      title: { vi: `mask[${node}] = mask[${parent[node]}] XOR '${s[node]}'`, en: `mask[${node}] = mask[${parent[node]}] XOR '${s[node]}'` },
       arr: [],
-      tree: makeTree(node, processed, pairNodes),
+      tree: makeTree(node, new Set(dfsOrder.slice(0, dfsOrder.indexOf(node))), [], []),
       highlight: [],
       mark: [],
-      codeLines: [20, 21, 22, 23],
+      codeLines: [14, 15],
       vars: [
-        { name: "mask", value: maskLabel(mask) },
-        { name: "same mask", value: seenByMask[mask] || 0 },
-        { name: "one-bit diff hits", value: hits.filter((item) => item.mask !== mask).map((item) => `${maskToLetters(item.mask)}:${item.count}`).join(", ") || "none" },
+        { name: `mask[${parent[node]}]`, value: oddText(masks[parent[node]]) },
+        { name: "edge letter", value: `'${s[node]}'` },
+        { name: `mask[${node}]`, value: oddText(masks[node]) },
+      ],
+      palPathView: baseView({
+        phase: "build",
+        current: { node, mask: masks[node], odd: oddText(masks[node]), parity: parityRow(masks[node]), edge: `${parent[node]} → ${node}: '${s[node]}'`, popcount: popcount(masks[node]) },
+        xorStep: {
+          parentNode: parent[node],
+          parentOdd: oddText(masks[parent[node]]),
+          parentParity: parityRow(masks[parent[node]]),
+          letter: s[node],
+          flipped: Boolean(masks[node] & (1 << bit)),
+        },
+      }),
+      note: {
+        vi: `Thêm cạnh '${s[node]}' chỉ đảo parity của đúng chữ đó: '${s[node]}' chuyển từ ${(masks[parent[node]] & (1 << bit)) ? "lẻ sang chẵn" : "chẵn sang lẻ"}. mask[${node}] = {${oddText(masks[node])}}.`,
+        en: `Adding edge '${s[node]}' flips only that letter's parity: '${s[node]}' goes from ${(masks[parent[node]] & (1 << bit)) ? "odd to even" : "even to odd"}. mask[${node}] = {${oddText(masks[node])}}.`,
+      },
+    });
+  }
+
+  steps.push({
+    title: { vi: "Vì sao XOR hai mask cho đúng parity của đường u ↔ v", en: "Why XOR of two masks gives the path parity" },
+    arr: [],
+    tree: makeTree(null, new Set(dfsOrder), [], []),
+    highlight: [],
+    mark: [],
+    codeLines: [18, 19],
+    vars: [{ name: "rule", value: "path(u,v) = mask[u] XOR mask[v]" }],
+    palPathView: baseView({ phase: "rule", current: null }),
+    note: {
+      vi: "Đường root → u và root → v cùng đi qua đoạn root → LCA. Khi XOR, đoạn chung đó xuất hiện 2 lần nên tự triệt tiêu, chỉ còn đúng các cạnh trên đường u ↔ v. Do đó chỉ cần tìm cặp mask có XOR chứa 0 hoặc 1 bit lẻ.",
+      en: "Both root → u and root → v share the root → LCA prefix. XOR makes that shared prefix appear twice and cancel, leaving exactly the edges on u ↔ v. So we just need mask pairs whose XOR has 0 or 1 odd bit.",
+    },
+  });
+
+  for (let node = 0; node < n; node++) {
+    const mask = masks[node];
+    const currentEdge = node === 0 ? "root" : `${parent[node]} → ${node}: '${s[node]}'`;
+    const currentInfo = { node, mask, odd: oddText(mask), parity: parityRow(mask), edge: currentEdge, popcount: popcount(mask) };
+
+    // Probe 1: identical mask (XOR = 0 bits). Probes 2..k: flip one used letter.
+    const lookups = [{
+      kind: "exact",
+      mask,
+      label: oddText(mask),
+      count: seenByMask[mask] || 0,
+      nodes: [...(nodesByMask[mask] || [])],
+    }];
+    for (const ch of alphabet) {
+      const probe = mask ^ (1 << letterBit(ch));
+      lookups.push({
+        kind: "flip",
+        flipLetter: ch,
+        mask: probe,
+        label: oddText(probe),
+        count: seenByMask[probe] || 0,
+        nodes: [...(nodesByMask[probe] || [])],
+      });
+    }
+    const add = lookups.reduce((sum, item) => sum + item.count, 0);
+    const matchedMasks = new Set(lookups.filter((item) => item.count > 0).map((item) => item.mask));
+    const partners = lookups.flatMap((item) => item.nodes);
+
+    const pairsFound = lookups.flatMap((item) => item.nodes.map((other) => {
+      const { letters, lca } = pathLetters(other, node);
+      const xor = masks[other] ^ mask;
+      return {
+        u: Math.min(other, node),
+        v: Math.max(other, node),
+        lca,
+        letters: letters.join(""),
+        xorOdd: oddText(xor),
+        xorPopcount: popcount(xor),
+        palindrome: palindromeArrangement(letters),
+        kind: item.kind === "exact" ? "even" : "one-odd",
+      };
+    }));
+
+    steps.push({
+      title: { vi: `Node ${node}: thử 1 mask giống + ${alphabet.length} mask lệch 1 chữ`, en: `Node ${node}: probe 1 equal mask + ${alphabet.length} one-letter flips` },
+      arr: [],
+      tree: makeTree(node, new Set(processed), partners, []),
+      highlight: [],
+      mark: [],
+      codeLines: [21, 22, 23],
+      vars: [
+        { name: "mask", value: oddText(mask) },
+        { name: "seen[mask]", value: seenByMask[mask] || 0 },
+        { name: "flip hits", value: lookups.filter((item) => item.kind === "flip" && item.count > 0).map((item) => `${item.flipLetter}:${item.count}`).join(", ") || "none" },
         { name: "add", value: add },
         { name: "ans", value: `${answer} + ${add} = ${answer + add}` },
-        { name: "seen before", value: counterText(seenByMask) },
       ],
-      palPathView: {
+      palPathView: baseView({
         phase: "count",
-        current: { node, mask, odd: maskToLetters(mask), bits: maskBinary(mask), edge: currentEdge },
-        answerBefore: answer,
+        current: currentInfo,
         add,
         answerAfter: answer + add,
-        matches: hits.map((item) => ({
+        lookups,
+        skippedFlips: 26 - alphabet.length,
+        pairsFound,
+        matches: lookups.filter((item) => item.count > 0).map((item) => ({
           mask: item.mask,
-          odd: maskToLetters(item.mask),
-          bits: maskBinary(item.mask),
+          odd: oddText(item.mask),
+          parity: parityRow(item.mask),
           count: item.count,
           nodes: item.nodes,
-          kind: item.mask === mask ? "same" : "one-bit",
+          kind: item.kind === "exact" ? "same" : "one-bit",
+          flipLetter: item.flipLetter || null,
         })),
-        counter: counterItems(seenByMask),
-      },
+        counter: counterItems(seenByMask, nodesByMask, matchedMasks),
+      }),
       note: {
         vi: add
-          ? `Có ${add} node trước đó có mask bằng hoặc khác đúng 1 bit, nên các đường tới node ${node} có thể sắp thành palindrome.`
-          : `Chưa có mask trước đó phù hợp với node ${node}.`,
+          ? `Tìm được ${add} node đã lưu ghép được với node ${node}: ${pairsFound.map((pair) => `(${pair.u},${pair.v}) "${pair.letters}" → "${pair.palindrome}"`).join("; ")}.`
+          : `Chưa có mask nào trong counter khớp, nên node ${node} chưa tạo được cặp. ${26 - alphabet.length} phép lật còn lại dùng chữ không có trong cây nên chắc chắn trượt.`,
         en: add
-          ? `${add} earlier node(s) have the same mask or differ by one bit, so paths ending at node ${node} can be rearranged into a palindrome.`
-          : `No earlier mask matches node ${node}.`,
+          ? `Found ${add} stored node(s) pairing with node ${node}: ${pairsFound.map((pair) => `(${pair.u},${pair.v}) "${pair.letters}" → "${pair.palindrome}"`).join("; ")}.`
+          : `No counter mask matches yet, so node ${node} forms no pair. The other ${26 - alphabet.length} flips use letters absent from the tree and always miss.`,
       },
     });
 
     answer += add;
+    allPairs.push(...pairsFound);
     seenByMask[mask] = (seenByMask[mask] || 0) + 1;
-    if (!maskToNodes[mask]) maskToNodes[mask] = [];
-    maskToNodes[mask].push(node);
+    if (!nodesByMask[mask]) nodesByMask[mask] = [];
+    nodesByMask[mask].push(node);
     processed.add(node);
 
     steps.push({
-      title: { vi: `Thêm mask của node ${node} vào counter`, en: `Add node ${node}'s mask to the counter` },
+      title: { vi: `Lưu mask của node ${node} vào counter`, en: `Store node ${node}'s mask in the counter` },
       arr: [],
-      tree: makeTree(node, processed, []),
+      tree: makeTree(node, new Set(processed), [], []),
       highlight: [],
       mark: [],
       codeLines: [24],
@@ -4464,26 +4584,22 @@ function buildSteps2791(input) {
         { name: "seen", value: counterText(seenByMask) },
         { name: "ans", value: answer },
       ],
-      palPathView: {
+      palPathView: baseView({
         phase: "store",
-        current: { node, mask, odd: maskToLetters(mask), bits: maskBinary(mask), edge: currentEdge },
-        answerBefore: answer,
-        add: 0,
-        answerAfter: answer,
-        matches: [],
-        counter: counterItems(seenByMask),
-      },
+        current: currentInfo,
+        counter: counterItems(seenByMask, nodesByMask, new Set([mask])),
+      }),
       note: {
-        vi: "Sau khi đếm cặp với các node cũ, mới lưu mask hiện tại để các node sau có thể ghép với nó.",
-        en: "After counting pairs with earlier nodes, store this mask so later nodes can pair with it.",
+        vi: `Đếm trước rồi lưu sau, nhờ vậy mỗi cặp (u, v) chỉ được tính đúng một lần và node không tự ghép với chính nó. Counter giờ có ${oddText(mask)} với số lượng ${seenByMask[mask]}.`,
+        en: `Counting before storing ensures each pair (u, v) is counted exactly once and no node pairs with itself. The counter now holds ${oddText(mask)} with count ${seenByMask[mask]}.`,
       },
     });
   }
 
   steps.push({
-    title: { vi: `Kết quả: ${answer}`, en: `Result: ${answer}` },
+    title: { vi: `Kết quả: ${answer} đường`, en: `Result: ${answer} paths` },
     arr: [],
-    tree: makeTree(null, processed, []),
+    tree: makeTree(null, processed, [], []),
     highlight: [],
     mark: [],
     final: true,
@@ -4492,18 +4608,16 @@ function buildSteps2791(input) {
       { name: "answer", value: answer },
       { name: "seen", value: counterText(seenByMask) },
     ],
-    palPathView: {
+    palPathView: baseView({
       phase: "done",
       current: null,
-      answerBefore: answer,
-      add: 0,
-      answerAfter: answer,
-      matches: [],
-      counter: counterItems(seenByMask),
-    },
+      totalPairs: allPairs.length,
+      recentPairs: allPairs.slice(-6),
+      allPairsList: allPairs.map((pair) => ({ ...pair })),
+    }),
     note: {
-      vi: `Tổng số đường đi có thể hoán vị thành palindrome là ${answer}.`,
-      en: `The total number of paths that can be rearranged into a palindrome is ${answer}.`,
+      vi: `Có ${answer} cặp (u, v) mà các chữ trên đường u ↔ v hoán vị được thành palindrome. Cách này chỉ mất O(26n) thay vì O(n²) khi thử mọi cặp.`,
+      en: `There are ${answer} pairs (u, v) whose path letters can be rearranged into a palindrome. This costs O(26n) instead of O(n²) for testing every pair.`,
     },
   });
 

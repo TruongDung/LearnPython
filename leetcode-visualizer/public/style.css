@@ -32642,3 +32642,78 @@ html, body {
 [data-theme="light"] .msa53-result { background: #f0fdf4; border-color: #16a34a; } [data-theme="light"] .msa53-best-values span { background: #dcfce7; border-color: #16a34a; color: #166534; } [data-theme="light"] .msa53-best-values em { color: #166534; }
 @media (max-width: 1100px) { .msa53-dashboard { grid-template-columns: minmax(0,1fr) minmax(0,1fr); } .msa53-metrics { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .msa53-viz { padding: 12px 8px; } .msa53-phases { grid-template-columns: repeat(2,1fr); } .msa53-dashboard { grid-template-columns: 1fr; } .msa53-metrics { grid-column: auto; } .msa53-array header span { text-align: left; } .msa53-cell { flex-basis: 48px; } .msa53-plot { height: 84px; } }
+
+/* LeetCode 2791 · Palindrome paths · clarity redesign */
+.pal2791-viz { display: grid; gap: 13px; padding: 16px; min-width: 0; max-width: 100%; box-sizing: border-box; color: #e2e8f0; background: radial-gradient(circle at top right, rgba(168,85,247,.1), transparent 34%), #0b1220; border: 1px solid #29364a; border-radius: 16px; }
+.pal2791-viz > * { min-width: 0; box-sizing: border-box; }
+.pal2791-phases { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 6px; }
+.pal2791-phases span { min-width: 0; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 4px; color: #94a3b8; background: rgba(15,23,42,.76); border: 1px solid #334155; border-radius: 9px; font-size: 10px; line-height: 1.25; text-align: center; overflow-wrap: anywhere; }
+.pal2791-phases span.active { color: #e9d5ff; background: rgba(168,85,247,.16); border-color: #a855f7; } .pal2791-phases span.done { color: #bbf7d0; background: rgba(34,197,94,.1); border-color: #22c55e; }
+.pal2791-rule { display: grid; gap: 8px; padding: 11px 12px; background: rgba(15,23,42,.72); border: 1px solid #29364a; border-radius: 11px; }
+.pal2791-rule > strong { color: #f8fafc; font-size: 11px; letter-spacing: .09em; }
+.pal2791-rule-cases { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+.pal2791-rule-cases span { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; padding: 7px 9px; background: #111c2f; border: 1px solid #334155; border-radius: 8px; color: #cbd5e1; font-size: 10px; line-height: 1.3; }
+.pal2791-rule-cases b { grid-row: 1 / 3; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; font: 700 12px Consolas,monospace; }
+.pal2791-rule-cases em { color: #94a3b8; font: 700 11px Consolas,monospace; font-style: normal; }
+.pal2791-rule-cases .even { border-color: #22c55e; } .pal2791-rule-cases .even b { background: rgba(34,197,94,.2); color: #86efac; }
+.pal2791-rule-cases .one { border-color: #f59e0b; } .pal2791-rule-cases .one b { background: rgba(245,158,11,.2); color: #fbbf24; }
+.pal2791-rule-cases .bad { border-color: #ef4444; } .pal2791-rule-cases .bad b { background: rgba(239,68,68,.2); color: #fca5a5; }
+.pal2791-rule > code { padding: 6px 9px; background: rgba(168,85,247,.1); border-left: 3px solid #a855f7; color: #e9d5ff; font: 12px Consolas,monospace; }
+.pal2791-parity { display: inline-flex; flex-wrap: wrap; gap: 3px; } .pal2791-parity b { display: grid; place-items: center; min-width: 22px; padding: 3px 4px; border: 1px solid #475569; border-radius: 5px; color: #94a3b8; font: 700 11px Consolas,monospace; }
+.pal2791-parity b i { font: 600 8px Consolas,monospace; font-style: normal; opacity: .75; }
+.pal2791-parity b.odd { color: #fde68a; background: rgba(245,158,11,.18); border-color: #f59e0b; } .pal2791-parity b.even { opacity: .55; }
+.pal2791-parity.highlight b.odd { box-shadow: 0 0 0 2px rgba(245,158,11,.22); }
+.pal2791-parity-empty { color: #64748b; font: 700 12px Consolas,monospace; }
+.pal2791-layout { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(240px,.85fr); gap: 11px; align-items: start; }
+.pal2791-tree-card, .pal2791-side > section { padding: 11px; background: rgba(15,23,42,.72); border: 1px solid #29364a; border-radius: 11px; }
+.pal2791-tree-card > header, .pal2791-counter header, .pal2791-lookups header, .pal2791-pairs header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 3px 9px; margin-bottom: 8px; }
+.pal2791-tree-card > header strong, .pal2791-counter header strong, .pal2791-lookups header strong, .pal2791-pairs header strong { color: #f8fafc; font-size: 11px; letter-spacing: .08em; }
+.pal2791-tree-card > header span, .pal2791-counter header span, .pal2791-lookups header span, .pal2791-pairs header span { color: #94a3b8; font-size: 10px; }
+.pal2791-counter header code { color: #d8b4fe; font: 11px Consolas,monospace; }
+.pal2791-tree { min-width: 0; overflow-x: auto; }
+.pal2791-side { display: grid; gap: 10px; align-content: start; }
+.pal2791-current, .pal2791-xor, .pal2791-cancel, .pal2791-formula { display: grid; gap: 6px; }
+.pal2791-current small, .pal2791-xor small, .pal2791-cancel small, .pal2791-formula small { color: #d8b4fe; font-size: 9px; letter-spacing: .1em; }
+.pal2791-current strong { color: #f8fafc; font-size: 15px; } .pal2791-current code { color: #cbd5e1; font: 11px Consolas,monospace; } .pal2791-current em { color: #94a3b8; font-size: 10px; font-style: normal; }
+.pal2791-current.done strong { color: #86efac; font: 700 30px Consolas,monospace; }
+.pal2791-xor-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; } .pal2791-xor-row span { color: #cbd5e1; font: 11px Consolas,monospace; } .pal2791-xor-row.result span { color: #fde68a; }
+.pal2791-xor-op { color: #a855f7; font: 700 11px Consolas,monospace; text-align: center; } .pal2791-xor-op b { color: #fbbf24; font-size: 13px; }
+.pal2791-xor p, .pal2791-cancel p { margin: 0; color: #94a3b8; font-size: 10px; line-height: 1.45; }
+.pal2791-cancel-rows { display: grid; gap: 4px; } .pal2791-cancel-rows span { display: grid; padding: 5px 8px; background: #111c2f; border: 1px solid #334155; border-radius: 7px; color: #cbd5e1; font: 10px Consolas,monospace; }
+.pal2791-cancel-rows span i { color: #94a3b8; font-size: 9px; font-style: normal; } .pal2791-cancel-rows > b { color: #a855f7; font-size: 11px; text-align: center; }
+.pal2791-cancel-rows span.result { border-color: #22c55e; background: rgba(34,197,94,.1); color: #bbf7d0; } .pal2791-cancel-rows span.result i { color: #86efac; }
+.pal2791-formula strong { color: #f8fafc; font: 700 16px Consolas,monospace; overflow-wrap: anywhere; } .pal2791-formula.adds { border-color: #22c55e !important; background: rgba(34,197,94,.1) !important; } .pal2791-formula.adds strong { color: #86efac; }
+.pal2791-counter > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal2791-counter-item { display: grid; gap: 3px; padding: 7px 8px; background: #111c2f; border: 1px solid #475569; border-radius: 8px; }
+.pal2791-counter-item strong { color: #e2e8f0; font: 700 12px Consolas,monospace; } .pal2791-counter-item em { color: #d8b4fe; font: 700 10px Consolas,monospace; font-style: normal; } .pal2791-counter-item small { color: #94a3b8; font-size: 9px; }
+.pal2791-counter-item.matched { border-color: #22c55e; background: rgba(34,197,94,.11); box-shadow: 0 0 0 2px rgba(34,197,94,.16); }
+.pal2791-counter-empty { color: #64748b; font-size: 11px; }
+.pal2791-lookups, .pal2791-pairs { padding: 11px; background: rgba(15,23,42,.72); border: 1px solid #29364a; border-radius: 11px; }
+.pal2791-lookups > div, .pal2791-pairs > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal2791-probe { display: grid; gap: 2px; min-width: 96px; padding: 6px 8px; background: #111c2f; border: 1px solid #475569; border-radius: 8px; }
+.pal2791-probe small { color: #94a3b8; font-size: 9px; } .pal2791-probe b { color: #e2e8f0; font: 700 12px Consolas,monospace; } .pal2791-probe em { font-size: 9px; font-style: normal; }
+.pal2791-probe.miss { opacity: .5; } .pal2791-probe.miss em { color: #94a3b8; }
+.pal2791-probe.hit { border-color: #22c55e; background: rgba(34,197,94,.12); } .pal2791-probe.hit em { color: #86efac; }
+.pal2791-probe.exact { border-left: 3px solid #a855f7; }
+.pal2791-skip { margin: 8px 0 0; color: #94a3b8; font-size: 10px; line-height: 1.45; }
+.pal2791-pair { display: grid; gap: 2px; min-width: 128px; padding: 7px 9px; background: #111c2f; border: 1px solid #475569; border-radius: 8px; }
+.pal2791-pair b { color: #f8fafc; font: 700 13px Consolas,monospace; } .pal2791-pair small { color: #94a3b8; font-size: 9px; } .pal2791-pair em { color: #bbf7d0; font: 700 12px Consolas,monospace; font-style: normal; } .pal2791-pair i { color: #94a3b8; font-size: 9px; font-style: normal; }
+.pal2791-pair.even { border-color: #22c55e; } .pal2791-pair.one-odd { border-color: #f59e0b; } .pal2791-pair.one-odd em { color: #fde68a; }
+.pal2791-pairs.all { border-color: #22c55e; background: rgba(34,197,94,.07); }
+[data-theme="light"] .pal2791-viz { color: #1e293b; background: radial-gradient(circle at top right, rgba(168,85,247,.08), transparent 34%), #f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .pal2791-phases span, [data-theme="light"] .pal2791-rule, [data-theme="light"] .pal2791-tree-card, [data-theme="light"] .pal2791-side > section, [data-theme="light"] .pal2791-lookups, [data-theme="light"] .pal2791-pairs { color: #334155; background: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .pal2791-phases span.active { color: #6b21a8; background: #f3e8ff; border-color: #7e22ce; } [data-theme="light"] .pal2791-phases span.done { color: #166534; background: #dcfce7; border-color: #16a34a; }
+[data-theme="light"] .pal2791-rule > strong, [data-theme="light"] .pal2791-tree-card > header strong, [data-theme="light"] .pal2791-counter header strong, [data-theme="light"] .pal2791-lookups header strong, [data-theme="light"] .pal2791-pairs header strong, [data-theme="light"] .pal2791-current strong, [data-theme="light"] .pal2791-formula strong, [data-theme="light"] .pal2791-probe b, [data-theme="light"] .pal2791-pair b, [data-theme="light"] .pal2791-counter-item strong { color: #0f172a; }
+[data-theme="light"] .pal2791-tree-card > header span, [data-theme="light"] .pal2791-counter header span, [data-theme="light"] .pal2791-lookups header span, [data-theme="light"] .pal2791-pairs header span, [data-theme="light"] .pal2791-current em, [data-theme="light"] .pal2791-current code, [data-theme="light"] .pal2791-xor p, [data-theme="light"] .pal2791-cancel p, [data-theme="light"] .pal2791-skip, [data-theme="light"] .pal2791-probe small, [data-theme="light"] .pal2791-pair small, [data-theme="light"] .pal2791-pair i, [data-theme="light"] .pal2791-counter-item small { color: #475569; }
+[data-theme="light"] .pal2791-rule-cases span, [data-theme="light"] .pal2791-counter-item, [data-theme="light"] .pal2791-probe, [data-theme="light"] .pal2791-pair, [data-theme="light"] .pal2791-cancel-rows span { color: #1e293b; background: #fff; border-color: #94a3b8; }
+[data-theme="light"] .pal2791-rule > code { background: #f3e8ff; border-color: #7e22ce; color: #5b21b6; }
+[data-theme="light"] .pal2791-parity b { color: #475569; border-color: #94a3b8; } [data-theme="light"] .pal2791-parity b.odd { color: #92400e; background: #fef3c7; border-color: #d97706; }
+[data-theme="light"] .pal2791-xor-op { color: #7e22ce; } [data-theme="light"] .pal2791-xor-op b { color: #b45309; } [data-theme="light"] .pal2791-xor-row.result span { color: #92400e; }
+[data-theme="light"] .pal2791-cancel-rows span.result { background: #f0fdf4; border-color: #16a34a; color: #166534; } [data-theme="light"] .pal2791-cancel-rows span.result i { color: #166534; }
+[data-theme="light"] .pal2791-formula.adds { background: #f0fdf4 !important; border-color: #16a34a !important; } [data-theme="light"] .pal2791-formula.adds strong { color: #166534; }
+[data-theme="light"] .pal2791-counter-item.matched, [data-theme="light"] .pal2791-probe.hit { background: #f0fdf4; border-color: #16a34a; } [data-theme="light"] .pal2791-probe.hit em { color: #166534; }
+[data-theme="light"] .pal2791-counter-item em { color: #6b21a8; } [data-theme="light"] .pal2791-pair em { color: #166534; } [data-theme="light"] .pal2791-pair.one-odd em { color: #92400e; }
+[data-theme="light"] .pal2791-current.done strong { color: #166534; } [data-theme="light"] .pal2791-pairs.all { background: #f0fdf4; border-color: #16a34a; }
+[data-theme="light"] .pal2791-current small, [data-theme="light"] .pal2791-xor small, [data-theme="light"] .pal2791-cancel small, [data-theme="light"] .pal2791-formula small { color: #6b21a8; }
+@media (max-width: 1100px) { .pal2791-phases { grid-template-columns: repeat(3, minmax(0,1fr)); } .pal2791-layout { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .pal2791-viz { padding: 12px 8px; } .pal2791-phases { grid-template-columns: repeat(2, minmax(0,1fr)); } .pal2791-rule-cases { grid-template-columns: 1fr; } }
