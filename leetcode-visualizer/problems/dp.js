@@ -10184,6 +10184,167 @@ function buildSteps1301(input) {
 }
 
 /**
+ * LeetCode 1690: Stone Game VII.
+ * Interval DP on the score difference. dp[i][j] = best (currentPlayer - opponent)
+ * difference achievable on stones[i..j]. Removing an end earns the sum of the
+ * remaining stones, then the opponent plays the smaller interval optimally:
+ *   dp[i][j] = max(sum(i+1,j) - dp[i+1][j], sum(i,j-1) - dp[i][j-1]).
+ * Answer = dp[0][n-1].
+ */
+function buildSteps1690(stones) {
+  if (!Array.isArray(stones) || stones.length < 1 || stones.some((v) => !Number.isInteger(v))) {
+    throw new Error("stones must be a non-empty integer array.");
+  }
+
+  const n = stones.length;
+  const steps = [];
+  const prefix = new Array(n + 1).fill(0);
+  const dp = Array.from({ length: n }, () => new Array(n).fill(null));
+
+  let phase = "prefix";
+  let i = null;
+  let j = null;
+  let length = null;
+  let sumLeft = null; // sum of stones[i+1..j]
+  let sumRight = null; // sum of stones[i..j-1]
+  let takeLeft = null;
+  let takeRight = null;
+  let decision = null;
+  let prefixK = null;
+  let answer = null;
+
+  const cloneDp = () => dp.map((row) => row.slice());
+  const snapshot = () => ({
+    stones: [...stones],
+    n,
+    prefix: [...prefix],
+    dp: cloneDp(),
+    phase,
+    i,
+    j,
+    length,
+    prefixK,
+    sumLeft,
+    sumRight,
+    takeLeft,
+    takeRight,
+    decision,
+    answer,
+  });
+  const push = ({ title, note, line, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      arr: [...stones],
+      highlight: Number.isInteger(i) && Number.isInteger(j) ? Array.from({ length: j - i + 1 }, (_, k) => i + k) : [],
+      mark: [],
+      vars,
+      stoneGame1690View: snapshot(),
+    });
+  };
+
+  const sum = (lo, hi) => prefix[hi + 1] - prefix[lo]; // inclusive stones[lo..hi]
+
+  push({
+    title: { vi: `n = ${n}`, en: `n = ${n}` },
+    note: {
+      vi: "Alice và Bob thay phiên bỏ một viên ở HAI ĐẦU. Người bỏ được cộng điểm bằng TỔNG các viên CÒN LẠI. Cả hai chơi tối ưu để tối đa hóa hiệu điểm của mình.",
+      en: "Alice and Bob alternately remove a stone from either END. The remover earns points equal to the SUM of the REMAINING stones. Both play optimally to maximize their score difference.",
+    },
+    line: 3,
+    vars: [{ name: "stones", value: `[${stones.join(",")}]` }],
+  });
+
+  phase = "prefix";
+  for (let k = 0; k < n; k++) {
+    prefix[k + 1] = prefix[k] + stones[k];
+    prefixK = k + 1;
+    push({
+      title: { vi: `prefix[${k + 1}] = ${prefix[k + 1]}`, en: `prefix[${k + 1}] = ${prefix[k + 1]}` },
+      note: {
+        vi: `Tổng tiền tố để tính nhanh tổng một đoạn: sum(l..r) = prefix[r+1] − prefix[l].`,
+        en: `Prefix sums let us compute any interval sum fast: sum(l..r) = prefix[r+1] − prefix[l].`,
+      },
+      line: 6,
+      vars: [{ name: "prefix", value: `[${prefix.join(",")}]` }],
+    });
+  }
+  prefixK = null;
+
+  // Base case: single stones have difference 0.
+  for (let d = 0; d < n; d++) dp[d][d] = 0;
+  i = null;
+  j = null;
+  phase = "base";
+  push({
+    title: { vi: "dp[i][i] = 0", en: "dp[i][i] = 0" },
+    note: {
+      vi: "Đoạn chỉ còn một viên: người tới lượt bỏ nó đi và chỉ nhận tổng phần còn lại (bằng 0), nên hiệu = 0.",
+      en: "A single-stone interval: the player removes it and earns the remaining sum (0), so the difference is 0.",
+    },
+    line: 7,
+    vars: [],
+  });
+
+  const cellCap = 120;
+  let pushed = 0;
+  for (length = 2; length <= n; length++) {
+    for (i = 0; i + length - 1 < n; i++) {
+      j = i + length - 1;
+      sumLeft = sum(i + 1, j); // remove stones[i], remaining stones[i+1..j]
+      sumRight = sum(i, j - 1); // remove stones[j], remaining stones[i..j-1]
+      takeLeft = sumLeft - dp[i + 1][j];
+      takeRight = sumRight - dp[i][j - 1];
+      dp[i][j] = Math.max(takeLeft, takeRight);
+      decision = takeLeft >= takeRight ? "left" : "right";
+      if (pushed < cellCap) {
+        phase = "cell";
+        push({
+          title: { vi: `dp[${i}][${j}] = ${dp[i][j]}`, en: `dp[${i}][${j}] = ${dp[i][j]}` },
+          note: decision === "left"
+            ? {
+              vi: `Bỏ viên TRÁI #${i} (${stones[i]}): nhận tổng còn lại sum(${i + 1}..${j})=${sumLeft}, rồi trừ đi dp[${i + 1}][${j}]=${dp[i + 1][j]} (đối thủ chơi tối ưu) → ${takeLeft}. Lớn hơn hoặc bằng phương án phải (${takeRight}).`,
+              en: `Remove LEFT #${i} (${stones[i]}): earn remaining sum(${i + 1}..${j})=${sumLeft}, then subtract dp[${i + 1}][${j}]=${dp[i + 1][j]} (opponent plays optimally) → ${takeLeft}. ≥ the right option (${takeRight}).`,
+            }
+            : {
+              vi: `Bỏ viên PHẢI #${j} (${stones[j]}): nhận tổng còn lại sum(${i}..${j - 1})=${sumRight}, rồi trừ dp[${i}][${j - 1}]=${dp[i][j - 1]} → ${takeRight}. Lớn hơn phương án trái (${takeLeft}).`,
+              en: `Remove RIGHT #${j} (${stones[j]}): earn remaining sum(${i}..${j - 1})=${sumRight}, then subtract dp[${i}][${j - 1}]=${dp[i][j - 1]} → ${takeRight}. > the left option (${takeLeft}).`,
+            },
+          line: 13,
+          vars: [
+            { name: "i", value: i }, { name: "j", value: j },
+            { name: "take_left", value: takeLeft }, { name: "take_right", value: takeRight },
+            { name: "dp[i][j]", value: dp[i][j] },
+          ],
+        });
+        pushed += 1;
+      }
+    }
+  }
+
+  i = 0;
+  j = n - 1;
+  length = n;
+  answer = dp[0][n - 1];
+  decision = null;
+  phase = "done";
+  push({
+    title: { vi: `return dp[0][${n - 1}] = ${answer}`, en: `return dp[0][${n - 1}] = ${answer}` },
+    note: {
+      vi: `Hiệu điểm tối ưu (Alice − Bob) trên toàn dãy là ${answer}.`,
+      en: `The optimal score difference (Alice − Bob) over the whole array is ${answer}.`,
+    },
+    line: 14,
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+
+  return { original: [...stones], answer, steps };
+}
+
+/**
  * LeetCode 1388: Pizza With 3n Slices.
  *
  * You have a circular pizza with 3n slices. Each round:
@@ -16169,7 +16330,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -18863,6 +19024,54 @@ module.exports = {
       "        return max(pick(slices[:-1]), pick(slices[1:]))",
     ],
     builder: buildSteps1388,
+  },
+  1690: {
+    id: 1690,
+    difficulty: "medium",
+    slug: "stone-game-vii",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game VII", en: "Stone Game VII" },
+    titleVi: { vi: "Trò chơi đá VII (interval DP hiệu điểm)", en: "Stone Game VII" },
+    statement: {
+      vi:
+        "Có dãy stones. Alice và Bob thay phiên (Alice trước) bỏ một viên ở đầu hoặc cuối; người bỏ được cộng điểm bằng TỔNG các viên còn lại. Cả hai chơi tối ưu để tối đa hóa hiệu điểm của mình. Trả về hiệu Alice − Bob.",
+      en:
+        "Given stones, Alice and Bob alternate (Alice first) removing a stone from either end; the remover earns the SUM of the remaining stones. Both play optimally to maximize their score difference. Return the Alice − Bob difference.",
+    },
+    defaultInput: [5, 3, 1, 4, 2],
+    inputKind: "integer",
+    inputLabel: { vi: "stones", en: "stones" },
+    extraParams: [],
+    approach: [
+      { vi: "dp[i][j] = hiệu điểm tốt nhất người tới lượt đạt được trên đoạn stones[i..j].", en: "dp[i][j] = best score difference the player to move can achieve on stones[i..j]." },
+      { vi: "Bỏ một đầu thì được cộng tổng phần còn lại, rồi đối thủ chơi tối ưu trên đoạn nhỏ hơn nên trừ đi dp của đoạn đó.", en: "Removing an end earns the remaining sum, then the opponent plays the smaller interval optimally, so subtract that dp." },
+      { vi: "dp[i][j] = max(sum(i+1,j) − dp[i+1][j], sum(i,j-1) − dp[i][j-1]); đáp án là dp[0][n-1].", en: "dp[i][j] = max(sum(i+1,j) − dp[i+1][j], sum(i,j-1) − dp[i][j-1]); the answer is dp[0][n-1]." },
+    ],
+    complexity: {
+      time: "O(n²)",
+      space: "O(n²)",
+      note: {
+        vi: "Điền bảng DP theo độ dài đoạn tăng dần; mỗi ô O(1) nhờ prefix sum.",
+        en: "Fill the DP table by increasing interval length; each cell is O(1) thanks to prefix sums.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def stoneGameVII(self, stones):",
+      "        n = len(stones)",
+      "        prefix = [0] * (n + 1)",
+      "        for k in range(n):",
+      "            prefix[k + 1] = prefix[k] + stones[k]",
+      "        dp = [[0] * n for _ in range(n)]",
+      "        for length in range(2, n + 1):",
+      "            for i in range(n - length + 1):",
+      "                j = i + length - 1",
+      "                take_left = prefix[j+1]-prefix[i+1] - dp[i+1][j]",
+      "                take_right = prefix[j]-prefix[i] - dp[i][j-1]",
+      "                dp[i][j] = max(take_left, take_right)",
+      "        return dp[0][n-1]",
+    ],
+    builder: buildSteps1690,
   },
   494: {
     id: 494,

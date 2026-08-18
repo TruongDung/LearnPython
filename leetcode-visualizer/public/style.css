@@ -33999,3 +33999,84 @@ html, body {
 [data-theme="light"] .pz1388-decision .take.won { background: #dcfce7; border-color: #16a34a; }
 [data-theme="light"] .pz1388-passes > div.winner,[data-theme="light"] .pz1388-passes > div.ans.ready { background: #dcfce7; border-color: #16a34a; }
 @media (max-width: 760px) { .pz1388-viz { padding: 11px 8px; } .pz1388-phases { grid-template-columns: repeat(3,minmax(0,1fr)); } .pz1388-debug { grid-template-columns: 1fr; } .pz1388-debug small { grid-row: auto; } .pz1388-decision .options { grid-template-columns: 1fr; } .pz1388-passes { grid-template-columns: 1fr; } }
+
+/* LeetCode 1690 · Stone Game VII — interval DP on score difference */
+.tree-view:has(.sg1690-viz) { min-height: 0; padding: 0; overflow: visible; background: transparent; border: 0; }
+.sg1690-viz { display: grid; gap: 12px; min-width: 0; padding: 16px; color: #e2e8f0; background: radial-gradient(circle at 4% 0,rgba(56,189,248,.12),transparent 30%),radial-gradient(circle at 97% 3%,rgba(139,92,246,.1),transparent 32%),#0b1220; border: 1px solid #29364a; border-radius: 15px; }
+.sg1690-viz * { box-sizing: border-box; }
+.sg1690-phases { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+.sg1690-phases span { min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px; color: #64748b; background: rgba(15,23,42,.74); border: 1px solid #334155; border-radius: 9px; font-size: 9px; text-align: center; overflow-wrap: anywhere; }
+.sg1690-phases i { font-style: normal; font-weight: 900; }
+.sg1690-phases b { font-weight: 750; }
+.sg1690-phases span.active { color: #bae6fd; background: rgba(56,189,248,.16); border-color: #38bdf8; }
+.sg1690-phases span.done { color: #bbf7d0; background: rgba(34,197,94,.1); border-color: #22c55e; }
+.sg1690-debug { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 3px 10px; align-items: center; padding: 9px 11px; background: rgba(15,23,42,.72); border-left: 4px solid #38bdf8; border-radius: 8px; }
+.sg1690-debug small { grid-row: 1 / span 2; color: #7dd3fc; font: 850 9px Consolas,monospace; letter-spacing: .07em; }
+.sg1690-debug strong { color: #f8fafc; font: 750 12px Consolas,monospace; overflow-wrap: anywhere; }
+.sg1690-debug span { color: #94a3b8; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.sg1690-row,.sg1690-prefix,.sg1690-dp,.sg1690-decision { min-width: 0; padding: 10px 11px; background: rgba(15,23,42,.56); border: 1px solid #334155; border-radius: 11px; }
+.sg1690-row header,.sg1690-prefix header,.sg1690-dp header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 10px; margin-bottom: 8px; }
+.sg1690-row header strong,.sg1690-prefix header strong,.sg1690-dp header strong { color: #f8fafc; font: 750 11px Consolas,monospace; }
+.sg1690-row header span,.sg1690-prefix header span,.sg1690-dp header span { color: #94a3b8; font-size: 9px; }
+.sg1690-stones,.sg1690-prefix-cells { display: flex; flex-wrap: wrap; gap: 6px; }
+.sg1690-stone { position: relative; flex: 0 0 54px; min-height: 58px; display: grid; place-items: center; align-content: center; gap: 2px; padding: 7px 5px 14px; background: #111c2f; border: 2px solid #334155; border-radius: 10px; }
+.sg1690-stone small { color: #94a3b8; font: 800 8px Consolas,monospace; }
+.sg1690-stone b { color: #f8fafc; font: 900 17px Consolas,monospace; }
+.sg1690-stone.in-interval { border-color: #f59e0b; background: rgba(245,158,11,.1); }
+.sg1690-stone.active { border-color: #38bdf8; background: rgba(56,189,248,.14); }
+.sg1690-stone.end-left { border-color: #38bdf8; box-shadow: inset 3px 0 #38bdf8; }
+.sg1690-stone.end-right { border-color: #a78bfa; box-shadow: inset -3px 0 #a78bfa; }
+.sg1690-stone em { position: absolute; bottom: 2px; padding: 1px 4px; border-radius: 999px; font: 900 6px Consolas,monospace; font-style: normal; }
+.sg1690-stone em.l { color: #082f49; background: #7dd3fc; }
+.sg1690-stone em.r { color: #2e1065; background: #c4b5fd; }
+.sg1690-prefix-cell { display: grid; place-items: center; gap: 1px; min-width: 42px; padding: 5px 6px; background: #111c2f; border: 1px solid #334155; border-radius: 7px; }
+.sg1690-prefix-cell small { color: #64748b; font: 700 7px Consolas,monospace; }
+.sg1690-prefix-cell b { color: #e2e8f0; font: 800 13px Consolas,monospace; }
+.sg1690-prefix-cell.active { border-color: #38bdf8; background: rgba(56,189,248,.12); }
+.sg1690-decision { border-left: 4px solid #38bdf8; }
+.sg1690-decision .options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.sg1690-decision .options > div { display: grid; gap: 3px; padding: 9px 10px; background: #111c2f; border: 2px solid #334155; border-radius: 9px; }
+.sg1690-decision small { color: #94a3b8; font: 850 8px Consolas,monospace; letter-spacing: .04em; }
+.sg1690-decision b { color: #f8fafc; font: 800 11px Consolas,monospace; overflow-wrap: anywhere; }
+.sg1690-decision .options > div > span { color: #94a3b8; font-size: 9px; line-height: 1.4; }
+.sg1690-decision em { width: max-content; padding: 2px 7px; border-radius: 999px; background: rgba(100,116,139,.18); color: #94a3b8; font: 900 8px Consolas,monospace; font-style: normal; }
+.sg1690-decision .left.won { border-color: #38bdf8; background: rgba(56,189,248,.12); }
+.sg1690-decision .right.won { border-color: #a78bfa; background: rgba(139,92,246,.12); }
+.sg1690-decision .won em { color: #052e16; background: #86efac; }
+.sg1690-decision .lost { opacity: .55; border-style: dashed; }
+.sg1690-dp-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.sg1690-dp table { border-collapse: separate; border-spacing: 3px; }
+.sg1690-dp th,.sg1690-dp td { min-width: 38px; padding: 5px 6px; background: #111c2f; border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; font: 800 11px Consolas,monospace; text-align: center; }
+.sg1690-dp th { color: #94a3b8; font-size: 9px; }
+.sg1690-dp th.active { color: #7dd3fc; border-color: #38bdf8; }
+.sg1690-dp td.void { background: transparent; border-color: transparent; }
+.sg1690-dp td.diag { color: #64748b; }
+.sg1690-dp td.cur { border-color: #f59e0b; background: rgba(245,158,11,.16); color: #fde68a; box-shadow: 0 0 0 2px rgba(245,158,11,.16); }
+.sg1690-dp td.left-src { border-color: #38bdf8; background: rgba(56,189,248,.12); }
+.sg1690-dp td.right-src { border-color: #a78bfa; background: rgba(139,92,246,.12); }
+.sg1690-dp td.answer { border-color: #22c55e; background: rgba(34,197,94,.2); color: #86efac; }
+.sg1690-answer { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 6px 12px; align-items: center; padding: 11px; background: rgba(15,23,42,.6); border: 1px solid #334155; border-radius: 11px; }
+.sg1690-answer.ready { border-color: #22c55e; background: rgba(34,197,94,.08); }
+.sg1690-answer > div { display: grid; gap: 1px; }
+.sg1690-answer small { color: #94a3b8; font: 850 8px Consolas,monospace; letter-spacing: .06em; }
+.sg1690-answer strong { color: #f8fafc; font: 900 24px Consolas,monospace; }
+.sg1690-answer.ready strong { color: #86efac; }
+.sg1690-answer em { color: #94a3b8; font: 750 10px Consolas,monospace; font-style: normal; text-align: right; }
+[data-theme="light"] .sg1690-viz { color: #1e293b; background: radial-gradient(circle at 4% 0,rgba(56,189,248,.07),transparent 30%),radial-gradient(circle at 97% 3%,rgba(139,92,246,.06),transparent 32%),#f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .sg1690-phases span,[data-theme="light"] .sg1690-debug,[data-theme="light"] .sg1690-row,[data-theme="light"] .sg1690-prefix,[data-theme="light"] .sg1690-dp,[data-theme="light"] .sg1690-decision,[data-theme="light"] .sg1690-stone,[data-theme="light"] .sg1690-prefix-cell,[data-theme="light"] .sg1690-decision .options > div,[data-theme="light"] .sg1690-dp th,[data-theme="light"] .sg1690-dp td,[data-theme="light"] .sg1690-answer { background-color: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .sg1690-phases span { color: #475569; }
+[data-theme="light"] .sg1690-phases span.active { color: #075985; background: #e0f2fe; border-color: #0284c7; }
+[data-theme="light"] .sg1690-phases span.done { color: #166534; background: #dcfce7; border-color: #16a34a; }
+[data-theme="light"] .sg1690-debug strong,[data-theme="light"] .sg1690-row header strong,[data-theme="light"] .sg1690-prefix header strong,[data-theme="light"] .sg1690-dp header strong,[data-theme="light"] .sg1690-stone b,[data-theme="light"] .sg1690-prefix-cell b,[data-theme="light"] .sg1690-decision b,[data-theme="light"] .sg1690-answer strong { color: #0f172a; }
+[data-theme="light"] .sg1690-debug span,[data-theme="light"] .sg1690-row header span,[data-theme="light"] .sg1690-prefix header span,[data-theme="light"] .sg1690-dp header span,[data-theme="light"] .sg1690-stone small,[data-theme="light"] .sg1690-prefix-cell small,[data-theme="light"] .sg1690-decision small,[data-theme="light"] .sg1690-decision .options > div > span,[data-theme="light"] .sg1690-dp td,[data-theme="light"] .sg1690-answer small,[data-theme="light"] .sg1690-answer em { color: #475569; }
+[data-theme="light"] .sg1690-dp th { color: #475569; }
+[data-theme="light"] .sg1690-stone.in-interval { background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .sg1690-dp td.cur { color: #92400e; background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .sg1690-dp td.left-src { background: #e0f2fe; border-color: #0284c7; }
+[data-theme="light"] .sg1690-dp td.right-src { background: #f3e8ff; border-color: #7e22ce; }
+[data-theme="light"] .sg1690-dp td.answer { background: #dcfce7; border-color: #16a34a; }
+[data-theme="light"] .sg1690-decision .left.won { background: #e0f2fe; border-color: #0284c7; }
+[data-theme="light"] .sg1690-decision .right.won { background: #f3e8ff; border-color: #7e22ce; }
+[data-theme="light"] .sg1690-answer.ready { background: #f0fdf4; border-color: #16a34a; }
+[data-theme="light"] .sg1690-answer.ready strong { color: #166534; }
+@media (max-width: 760px) { .sg1690-viz { padding: 11px 8px; } .sg1690-phases { grid-template-columns: repeat(2,minmax(0,1fr)); } .sg1690-debug { grid-template-columns: 1fr; } .sg1690-debug small { grid-row: auto; } .sg1690-decision .options { grid-template-columns: 1fr; } .sg1690-answer { grid-template-columns: 1fr; } .sg1690-answer em { text-align: left; } }

@@ -13618,6 +13618,119 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+// ---- LeetCode 1690: Stone Game VII — interval DP on the score difference ----
+function renderStoneGame1690View(step) {
+  const view = step.stoneGame1690View || {};
+  const vi = lang === "vi";
+  const stones = Array.isArray(view.stones) ? view.stones : [];
+  const prefix = Array.isArray(view.prefix) ? view.prefix : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const n = Number(view.n) || stones.length;
+  const phase = String(view.phase || "prefix");
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const phaseIndex = phase === "prefix" ? 0
+    : phase === "base" ? 1
+      : phase === "cell" ? 2 : 3;
+  const phaseLabels = vi
+    ? ["Prefix sum", "Base dp[i][i]", "Điền dp[i][j]", "Đáp án"]
+    : ["Prefix sums", "Base dp[i][i]", "Fill dp[i][j]", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const inInterval = (idx) => Number.isInteger(view.i) && Number.isInteger(view.j) && idx >= view.i && idx <= view.j;
+  const showInterval = ["cell", "done"].includes(phase);
+  const stoneCells = stones.map((value, index) => {
+    const classes = ["sg1690-stone"];
+    if (showInterval && inInterval(index)) classes.push("in-interval");
+    if (phase === "cell" && index === view.i) classes.push("end-left");
+    if (phase === "cell" && index === view.j) classes.push("end-right");
+    if (phase === "prefix" && index === view.prefixK - 1) classes.push("active");
+    const badges = [];
+    if (phase === "cell" && index === view.i) badges.push(`<em class="l">${vi ? "TRÁI" : "LEFT"}</em>`);
+    if (phase === "cell" && index === view.j) badges.push(`<em class="r">${vi ? "PHẢI" : "RIGHT"}</em>`);
+    return `<div class="${classes.join(" ")}"><small>#${index}</small><b>${escapeHtml(String(value))}</b>${badges.join("")}</div>`;
+  }).join("");
+
+  // Prefix sums row.
+  const prefixCells = prefix.map((value, index) => {
+    const cls = index === view.prefixK ? "active" : "";
+    return `<div class="sg1690-prefix-cell ${cls}"><small>p[${index}]</small><b>${escapeHtml(String(value))}</b></div>`;
+  }).join("");
+
+  // Triangular DP table (rows i, cols j; only i<=j meaningful).
+  let dpGrid = "";
+  if (n > 0) {
+    const header = `<tr><th></th>${Array.from({ length: n }, (_, j) => `<th class="${j === view.j ? "active" : ""}">j${j}</th>`).join("")}</tr>`;
+    const rows = [];
+    for (let r = 0; r < n; r++) {
+      const cells = [];
+      for (let c = 0; c < n; c++) {
+        if (c < r) {
+          cells.push(`<td class="void"></td>`);
+          continue;
+        }
+        const filled = dp[r] && dp[r][c] !== null && dp[r][c] !== undefined;
+        const classes = [];
+        if (r === view.i && c === view.j) classes.push("cur");
+        else if (phase === "cell" && r === view.i + 1 && c === view.j) classes.push("left-src");
+        else if (phase === "cell" && r === view.i && c === view.j - 1) classes.push("right-src");
+        if (r === 0 && c === n - 1 && phase === "done") classes.push("answer");
+        if (r === c) classes.push("diag");
+        cells.push(`<td class="${classes.join(" ")}">${filled ? escapeHtml(String(dp[r][c])) : (r === c ? "0" : "·")}</td>`);
+      }
+      rows.push(`<tr><th class="${r === view.i ? "active" : ""}">i${r}</th>${cells.join("")}</tr>`);
+    }
+    dpGrid = `<section class="sg1690-dp">
+      <header><strong>${vi ? "Bảng dp[i][j]" : "dp[i][j] table"}</strong><span>${vi ? "hiệu điểm tốt nhất trên đoạn [i..j]" : "best score difference on interval [i..j]"}</span></header>
+      <div class="sg1690-dp-scroll"><table>${header}${rows.join("")}</table></div>
+    </section>`;
+  }
+
+  // Decision card during a cell computation.
+  let decisionPanel = "";
+  if (phase === "cell" && Number.isInteger(view.i)) {
+    const chose = view.decision;
+    decisionPanel = `<section class="sg1690-decision">
+      <div class="options">
+        <div class="left ${chose === "left" ? "won" : "lost"}">
+          <small>${vi ? "BỎ viên TRÁI #" : "REMOVE LEFT #"}${view.i} (${escapeHtml(String(stones[view.i]))})</small>
+          <b>sum(${view.i + 1}..${view.j}) − dp[${view.i + 1}][${view.j}] = ${escapeHtml(display(view.sumLeft))} − ${escapeHtml(display(dp[view.i + 1] ? dp[view.i + 1][view.j] : null))} = ${escapeHtml(display(view.takeLeft))}</b>
+          <span>${vi ? "nhận tổng còn lại, rồi đối thủ chơi tối ưu" : "earn remaining sum, then opponent plays optimally"}</span>
+          <em>${chose === "left" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")}</em>
+        </div>
+        <div class="right ${chose === "right" ? "won" : "lost"}">
+          <small>${vi ? "BỎ viên PHẢI #" : "REMOVE RIGHT #"}${view.j} (${escapeHtml(String(stones[view.j]))})</small>
+          <b>sum(${view.i}..${view.j - 1}) − dp[${view.i}][${view.j - 1}] = ${escapeHtml(display(view.sumRight))} − ${escapeHtml(display(dp[view.i] ? dp[view.i][view.j - 1] : null))} = ${escapeHtml(display(view.takeRight))}</b>
+          <span>${vi ? "nhận tổng còn lại, rồi đối thủ chơi tối ưu" : "earn remaining sum, then opponent plays optimally"}</span>
+          <em>${chose === "right" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")}</em>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const answerReady = phase === "done";
+
+  $("treeView").innerHTML = `<section class="sg1690-viz" role="img" aria-label="LeetCode 1690 Stone Game VII visualization">
+    <div class="sg1690-phases">${phases}</div>
+    <div class="sg1690-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="sg1690-row">
+      <header><strong>stones</strong><span>${vi ? "vàng = đoạn [i..j] đang xét · TRÁI/PHẢI = hai đầu có thể bỏ" : "gold = current interval [i..j] · LEFT/RIGHT = removable ends"}</span></header>
+      <div class="sg1690-stones">${stoneCells}</div>
+    </section>
+    ${phase === "prefix" ? `<section class="sg1690-prefix"><header><strong>prefix</strong><span>sum(l..r) = prefix[r+1] − prefix[l]</span></header><div class="sg1690-prefix-cells">${prefixCells}</div></section>` : ""}
+    ${decisionPanel}
+    ${dpGrid}
+    <section class="sg1690-answer ${answerReady ? "ready" : ""}">
+      <div><small>${vi ? "HIỆU ĐIỂM (Alice − Bob)" : "SCORE DIFF (Alice − Bob)"}</small><strong>${escapeHtml(display(view.answer))}</strong></div>
+      <em>${answerReady ? (vi ? "dp[0][n-1]" : "dp[0][n-1]") : (vi ? "đang tính..." : "computing...")}</em>
+    </section>
+  </section>`;
+}
+
 // ---- LeetCode 1388: Pizza With 3n Slices — circular pick-n-non-adjacent DP ----
 function renderPizza1388View(step) {
   const view = step.pizza1388View || {};
@@ -16320,6 +16433,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.stoneGame1690View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderStoneGame1690View(step);
   } else if (step.pizza1388View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
