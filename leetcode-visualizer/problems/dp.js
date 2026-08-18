@@ -6689,8 +6689,8 @@ function buildSteps322(nums, params) {
       { name: "dp", value: `[∞] × ${amount + 1}` },
     ],
     note: {
-      en: `Initialize dp with ${amount + 1} elements, all set to infinity.`,
-      vi: `Khởi tạo dp với ${amount + 1} phần tử, tất cả bằng vô cực.`,
+      en: `Idea: dp[i] = fewest coins to make amount i. We fill dp from 0 up to ${amount}. Start with ∞ everywhere (∞ = "not reachable yet").`,
+      vi: `Ý tưởng: dp[i] = số xu ít nhất để tạo số tiền i. Ta điền dp từ 0 đến ${amount}. Ban đầu để ∞ ở mọi ô (∞ = "chưa tạo được").`,
     },
   });
 
@@ -6707,15 +6707,15 @@ function buildSteps322(nums, params) {
       { name: "dp[0]", value: 0 },
     ],
     note: {
-      en: `Base case: 0 coins needed to make amount 0.`,
-      vi: `Trường hợp cơ sở: cần 0 xu để tạo số tiền 0.`,
+      en: `Base case: making amount 0 needs 0 coins. Every other dp[i] will be built from this starting point.`,
+      vi: `Trường hợp cơ sở: tạo số tiền 0 cần 0 xu. Mọi dp[i] khác sẽ được xây dựng từ điểm khởi đầu này.`,
     },
   });
 
   for (let i = 1; i <= amount; i++) {
     // Line 5: for i in range(1, amount + 1)
     steps.push({
-      title: { vi: `for i = ${i}`, en: `for i = ${i}` },
+      title: { vi: `Tính dp[${i}] (số tiền = ${i})`, en: `Compute dp[${i}] (amount = ${i})` },
       arr: dp.slice(0, i + 1).map((v) => (v >= INF ? 0 : v)),
       sub: dp.slice(0, i + 1).map((v) => (v >= INF ? "∞" : String(v))),
       highlight: [i],
@@ -6726,47 +6726,37 @@ function buildSteps322(nums, params) {
         { name: "dp[i]", value: dp[i] >= INF ? "∞" : dp[i] },
       ],
       note: {
-        en: `Compute dp[${i}]: minimum coins to make amount ${i}.`,
-        vi: `Tính dp[${i}]: số xu ít nhất để tạo số tiền ${i}.`,
+        en: `Now compute dp[${i}] = fewest coins to make amount ${i}. We will try every coin and pick the best.`,
+        vi: `Bây giờ tính dp[${i}] = số xu ít nhất để tạo số tiền ${i}. Ta sẽ thử từng loại xu và chọn cách tốt nhất.`,
       },
     });
 
     for (const coin of coins) {
-      // Line 6: for coin in coins
-      steps.push({
-        title: { vi: `for coin = ${coin}`, en: `for coin = ${coin}` },
-        arr: dp.slice(0, i + 1).map((v) => (v >= INF ? 0 : v)),
-        sub: dp.slice(0, i + 1).map((v) => (v >= INF ? "∞" : String(v))),
-        highlight: [i],
-        mark: coin <= i ? [i - coin] : [],
-        codeLines: [6],
-        vars: [
-          { name: "i", value: i },
-          { name: "coin", value: coin },
-        ],
-        note: {
-          en: `Try coin = ${coin}.`,
-          vi: `Thử xu = ${coin}.`,
-        },
-      });
-
-      // Line 7: if coin <= i
+      // Lines 6-7: for coin in coins → if coin <= i (merged into one clear step)
       const canUse = coin <= i;
       steps.push({
-        title: { vi: `if ${coin} <= ${i}`, en: `if ${coin} <= ${i}` },
+        title: canUse
+          ? { vi: `Thử xu ${coin} (≤ ${i} ✓)`, en: `Try coin ${coin} (≤ ${i} ✓)` }
+          : { vi: `Thử xu ${coin} (> ${i}, bỏ qua)`, en: `Try coin ${coin} (> ${i}, skip)` },
         arr: dp.slice(0, i + 1).map((v) => (v >= INF ? 0 : v)),
         sub: dp.slice(0, i + 1).map((v) => (v >= INF ? "∞" : String(v))),
         highlight: [i],
         mark: canUse ? [i - coin] : [],
-        codeLines: [7],
+        codeLines: [6, 7],
         vars: [
-          { name: "coin", value: coin },
-          { name: "i", value: i },
-          { name: `coin <= i`, value: `${coin} <= ${i} → ${canUse}` },
+          { name: "i (đang tính)", value: i },
+          { name: "coin (đang thử)", value: coin },
+          { name: "coin ≤ i ?", value: `${coin} ≤ ${i} → ${canUse ? "Đúng" : "Sai"}` },
         ],
         note: canUse
-          ? { en: `${coin} <= ${i} → True. Check dp[${i}-${coin}] + 1.`, vi: `${coin} <= ${i} → True. Kiểm tra dp[${i}-${coin}] + 1.` }
-          : { en: `${coin} <= ${i} → False. Coin too large, skip.`, vi: `${coin} <= ${i} → False. Xu quá lớn, bỏ qua.` },
+          ? {
+              en: `Try coin ${coin}. Since ${coin} ≤ ${i}, we can use one ${coin}-coin, then add the best way to make the leftover ${i} − ${coin} = ${i - coin}. Source cell 📍 dp[${i - coin}], target cell 👉 dp[${i}].`,
+              vi: `Thử xu ${coin}. Vì ${coin} ≤ ${i}, ta có thể dùng 1 đồng xu ${coin}, rồi cộng thêm cách tốt nhất để tạo phần còn lại ${i} − ${coin} = ${i - coin}. Ô nguồn 📍 dp[${i - coin}], ô đích 👉 dp[${i}].`,
+            }
+          : {
+              en: `Try coin ${coin}. Since ${coin} > ${i}, this coin is bigger than the amount we need — skip it.`,
+              vi: `Thử xu ${coin}. Vì ${coin} > ${i}, xu này lớn hơn số tiền cần tạo — bỏ qua.`,
+            },
       });
 
       // Line 8: dp[i] = min(dp[i], dp[i-coin]+1) — only if canUse
@@ -6778,25 +6768,36 @@ function buildSteps322(nums, params) {
           dp[i] = candidate;
           updated = true;
         }
+        const srcTxt = dp[i - coin] >= INF ? "∞" : String(dp[i - coin]);
+        const candTxt = candidate >= INF ? "∞" : String(candidate);
+        const oldTxt = oldDpi >= INF ? "∞" : String(oldDpi);
+        const newTxt = dp[i] >= INF ? "∞" : String(dp[i]);
         steps.push({
-          title: { vi: `dp[${i}] = min(dp[${i}], dp[${i - coin}]+1)`, en: `dp[${i}] = min(dp[${i}], dp[${i - coin}]+1)` },
+          title: updated
+            ? { vi: `Cập nhật dp[${i}] = ${newTxt} ✓`, en: `Update dp[${i}] = ${newTxt} ✓` }
+            : { vi: `Giữ nguyên dp[${i}] = ${newTxt}`, en: `Keep dp[${i}] = ${newTxt}` },
           arr: dp.slice(0, i + 1).map((v) => (v >= INF ? 0 : v)),
           sub: dp.slice(0, i + 1).map((v) => (v >= INF ? "∞" : String(v))),
           highlight: [i],
           mark: [i - coin],
           codeLines: [8],
           vars: [
-            { name: "i", value: i },
-            { name: "coin", value: coin },
-            { name: `dp[${i - coin}]`, value: dp[i - coin] >= INF ? "∞" : dp[i - coin] },
-            { name: `dp[${i - coin}]+1`, value: candidate >= INF ? "∞" : candidate },
-            { name: `dp[${i}] (before)`, value: oldDpi >= INF ? "∞" : oldDpi },
-            { name: `dp[${i}] (after)`, value: dp[i] >= INF ? "∞" : dp[i] },
-            { name: "updated?", value: updated ? "YES" : "no" },
+            { name: "công thức", value: `dp[${i - coin}] + 1 xu` },
+            { name: `📍 dp[${i - coin}] (nguồn)`, value: srcTxt },
+            { name: "candidate = nguồn + 1", value: candTxt },
+            { name: `👉 dp[${i}] cũ`, value: oldTxt },
+            { name: `👉 dp[${i}] mới`, value: newTxt },
+            { name: "tốt hơn?", value: updated ? "CÓ → cập nhật" : "không" },
           ],
           note: updated
-            ? { en: `dp[${i}] = min(${oldDpi >= INF ? "∞" : oldDpi}, ${candidate >= INF ? "∞" : candidate}) = ${dp[i]}. Updated!`, vi: `dp[${i}] = min(${oldDpi >= INF ? "∞" : oldDpi}, ${candidate >= INF ? "∞" : candidate}) = ${dp[i]}. Cập nhật!` }
-            : { en: `dp[${i}] = min(${oldDpi >= INF ? "∞" : oldDpi}, ${candidate >= INF ? "∞" : candidate}) = ${dp[i] >= INF ? "∞" : dp[i]}. No improvement.`, vi: `dp[${i}] = min(${oldDpi >= INF ? "∞" : oldDpi}, ${candidate >= INF ? "∞" : candidate}) = ${dp[i] >= INF ? "∞" : dp[i]}. Không cải thiện.` },
+            ? {
+                en: `Candidate = dp[${i - coin}] + 1 = ${srcTxt} + 1 = ${candTxt}. That beats the old dp[${i}] = ${oldTxt}, so dp[${i}] becomes ${newTxt}.`,
+                vi: `Ứng viên = dp[${i - coin}] + 1 = ${srcTxt} + 1 = ${candTxt}. Nhỏ hơn dp[${i}] cũ = ${oldTxt}, nên dp[${i}] = ${newTxt}.`,
+              }
+            : {
+                en: `Candidate = dp[${i - coin}] + 1 = ${srcTxt} + 1 = ${candTxt}. It is not better than the current dp[${i}] = ${oldTxt}, so keep dp[${i}] = ${newTxt}.`,
+                vi: `Ứng viên = dp[${i - coin}] + 1 = ${srcTxt} + 1 = ${candTxt}. Không nhỏ hơn dp[${i}] hiện tại = ${oldTxt}, nên giữ nguyên dp[${i}] = ${newTxt}.`,
+              },
         });
       }
     }
@@ -6834,11 +6835,11 @@ function buildSteps322(nums, params) {
     ],
     note: {
       en: answer >= 0
-        ? `Minimum coins = ${answer}. Coins used: [${coinsUsed.join(", ")}] (sum = ${amount}).`
-        : `Cannot make amount ${amount} from coins [${coins.join(", ")}].`,
+        ? `Answer = dp[${amount}] = ${answer}. The fewest coins to make ${amount} is ${answer}, e.g. [${coinsUsed.join(", ")}] (sum = ${amount}).`
+        : `dp[${amount}] is still ∞, so amount ${amount} cannot be made from coins [${coins.join(", ")}] → return -1.`,
       vi: answer >= 0
-        ? `Số xu ít nhất = ${answer}. Xu dùng: [${coinsUsed.join(", ")}] (tổng = ${amount}).`
-        : `Không thể tạo được số tiền ${amount} từ các xu [${coins.join(", ")}].`,
+        ? `Đáp án = dp[${amount}] = ${answer}. Số xu ít nhất để tạo ${amount} là ${answer}, ví dụ [${coinsUsed.join(", ")}] (tổng = ${amount}).`
+        : `dp[${amount}] vẫn là ∞, nên không thể tạo số tiền ${amount} từ các xu [${coins.join(", ")}] → trả về -1.`,
     },
   });
 
