@@ -2880,31 +2880,87 @@ function buildSteps268(input) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
   const n = nums.length;
   const steps = [];
+  const bits = Math.max(1, n.toString(2).length);
+  const toBits = (value) => (value < 0 ? "-" : value.toString(2).padStart(bits, "0"));
+  const seen = new Set();
   let result = n;
-  steps.push({
-    title: { vi: `result = n = ${n}`, en: `result = n = ${n}` },
-    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [],
-    codeLines: [3],
-    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "n", value: n }, { name: "result", value: result }],
-    note: { vi: `Số thiếu ∈ [0, n]. XOR mọi index (0..n) và mọi giá trị → cặp trùng triệt tiêu, còn lại số thiếu. Bắt đầu result = n (vì index chạy 0..n-1).`, en: `The missing number ∈ [0, n]. XOR all indices (0..n) and all values → matching pairs cancel, leaving the missing one. Start result = n (indices only go 0..n-1).` },
-  });
-  for (let i = 0; i < n; i++) {
-    const prev = result;
-    result ^= i ^ nums[i];
+
+  const push = (opts) => {
+    const board = Array.from({ length: n + 1 }, (_, num) => ({
+      num,
+      canceled: seen.has(num),
+      current: num === opts.currentValue,
+      isResult: Boolean(opts.final) && num === result,
+    }));
     steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: Number.isInteger(opts.currentIndex) ? [opts.currentIndex] : [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeLines: [opts.line],
+      vars: opts.vars || [],
+      note: opts.note,
+      missingNumberView: {
+        nums: [...nums],
+        n,
+        phase: opts.phase || "fold",
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : -1,
+        pair: opts.pair || null,
+        result,
+        resultBits: toBits(result),
+        bits,
+        board,
+        answer: opts.final ? result : null,
+      },
+    });
+  };
+
+  push({
+    title: { vi: `result = n = ${n}`, en: `result = n = ${n}` },
+    line: 3,
+    phase: "init",
+    vars: [{ name: "nums", value: `[${nums.join(", ")}]` }, { name: "n", value: n }, { name: "result", value: result }],
+    note: {
+      vi: `Số thiếu nằm trong [0, ${n}]. XOR mọi index 0..${n} với mọi giá trị: cặp bằng nhau triệt tiêu, chỉ còn số thiếu. Khởi tạo result = n vì index chỉ chạy 0..${n - 1}.`,
+      en: `The missing number is in [0, ${n}]. XOR every index 0..${n} with every value: equal pairs cancel, leaving the missing number. Start result = n because indices only run 0..${n - 1}.`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    const previous = result;
+    result ^= i ^ nums[i];
+    seen.add(nums[i]);
+    push({
       title: { vi: `result ^= ${i} ^ ${nums[i]} → ${result}`, en: `result ^= ${i} ^ ${nums[i]} → ${result}` },
-      arr: [...nums], sub: nums.map((_, x) => `[${x}]`), highlight: [i], mark: [],
-      codeLines: [4, 5],
-      vars: [{ name: "i", value: i }, { name: "nums[i]", value: nums[i] }, { name: "result", value: result }],
-      note: { vi: `${prev} XOR index ${i} XOR giá trị ${nums[i]} = ${result}.`, en: `${prev} XOR index ${i} XOR value ${nums[i]} = ${result}.` },
+      line: 5,
+      phase: "fold",
+      currentIndex: i,
+      currentValue: nums[i],
+      pair: { index: i, value: nums[i], previous },
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+        { name: "result (bin)", value: `${result} = ${toBits(result)}₂` },
+      ],
+      note: {
+        vi: `Gộp index ${i} và giá trị ${nums[i]}. Trên bảng 0..${n}, số ${nums[i]} đã xuất hiện như một giá trị nên bị triệt tiêu với index cùng tên. result: ${previous} → ${result}.`,
+        en: `Fold in index ${i} and value ${nums[i]}. On the 0..${n} board, ${nums[i]} now appears as a value, so it cancels its matching index. result: ${previous} → ${result}.`,
+      },
     });
   }
-  steps.push({
+
+  push({
     title: { vi: `Đáp án: ${result}`, en: `Answer: ${result}` },
-    arr: [...nums], sub: nums.map((_, i) => `[${i}]`), highlight: [], mark: [], final: true,
-    codeLines: [6],
-    vars: [{ name: "answer", value: result }],
-    note: { vi: `Số bị thiếu = ${result}.`, en: `Missing number = ${result}.` },
+    line: 6,
+    phase: "done",
+    final: true,
+    vars: [{ name: "answer", value: result }, { name: "answer (bin)", value: `${toBits(result)}₂` }],
+    note: {
+      vi: `Mọi số trong [0, ${n}] đều bị triệt tiêu trừ ${result} — số duy nhất không xuất hiện như một giá trị. Vậy số bị thiếu = ${result}.`,
+      en: `Every number in [0, ${n}] cancels except ${result} — the only one that never appears as a value. So the missing number = ${result}.`,
+    },
   });
   return { original: nums, answer: result, steps };
 }

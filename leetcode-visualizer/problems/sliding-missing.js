@@ -1028,7 +1028,7 @@ module.exports = {
       },
       code: [
         "class Solution:",
-        "    def largestAlmostMissingInteger(self, nums, k):",
+        "    def largestInteger(self, nums, k):",
         "        n = len(nums)",
         "        count = Counter(nums)",
         "        if k == 1:",

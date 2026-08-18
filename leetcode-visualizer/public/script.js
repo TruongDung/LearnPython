@@ -14836,6 +14836,52 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderMissingNumberView(step) {
+  const view = step.missingNumberView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const board = Array.isArray(view.board) ? view.board : [];
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    fold: vi ? "Gộp XOR" : "Fold XOR",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  const cellsHtml = nums.map((value, index) => {
+    const classes = ["mn268-cell"];
+    if (index === view.currentIndex) classes.push("active");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${value}</strong></span>`;
+  }).join("") || `<span class="mn268-empty">${vi ? "mảng rỗng" : "empty array"}</span>`;
+
+  const boardHtml = board.map((cell) => {
+    const classes = ["mn268-board-cell"];
+    if (cell.isResult) classes.push("result");
+    else if (cell.current) classes.push("current");
+    else if (cell.canceled) classes.push("canceled");
+    return `<span class="${classes.join(" ")}"><strong>${cell.num}</strong><em>${cell.isResult ? (vi ? "còn lại" : "remains") : cell.canceled ? "✓" : ""}</em></span>`;
+  }).join("");
+
+  let action = "";
+  if (view.pair) {
+    action = `result ^= ${view.pair.index} ^ ${view.pair.value} : ${view.pair.previous} → <b>${view.result}</b>`;
+  } else if (view.phase === "init") {
+    action = `result = n = <b>${view.result}</b>`;
+  } else if (view.phase === "done") {
+    action = `${vi ? "số bị thiếu" : "missing number"} = <b>${view.result}</b>`;
+  }
+
+  const resultBox = `<section class="mn268-result"><small>result</small><strong>${view.result}</strong><code>${view.resultBits}₂</code></section>`;
+
+  $("treeView").innerHTML = `<section class="mn268-viz" role="img" aria-label="${vi ? "Trực quan hóa Missing Number bằng XOR" : "Missing Number XOR visualization"}">
+    <header><strong>MISSING NUMBER · XOR</strong><span class="mn268-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="mn268-rule"><b>CORE RULE</b><strong>a ^ a = 0 · a ^ 0 = a</strong><span>${vi ? `XOR mọi index 0..${view.n} và mọi giá trị → cặp bằng nhau triệt tiêu, còn lại số thiếu.` : `XOR every index 0..${view.n} and every value → equal pairs cancel, leaving the missing number.`}</span></section>
+    <section class="mn268-action"><small>${vi ? "PHÉP TÍNH" : "OPERATION"}</small><strong>${action}</strong></section>
+    ${resultBox}
+    <section class="mn268-panel"><header><strong>nums</strong><span>${vi ? "vàng = phần tử đang gộp" : "yellow = element being folded"}</span></header><div class="mn268-cells">${cellsHtml}</div></section>
+    <section class="mn268-panel"><header><strong>${vi ? `BẢNG 0..${view.n}` : `BOARD 0..${view.n}`}</strong><span>${vi ? "✓ = đã triệt tiêu · xanh = số còn lại" : "✓ = canceled · green = remaining"}</span></header><div class="mn268-board">${boardHtml}</div></section>
+  </section>`;
+}
+
 function renderAlmostMissingView(step) {
   const view = step.almostMissingView || {};
   const vi = lang === "vi";
@@ -15791,6 +15837,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.missingNumberView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMissingNumberView(step);
   } else if (step.almostMissingView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
