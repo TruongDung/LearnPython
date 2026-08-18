@@ -2876,8 +2876,10 @@ function buildSteps169(input) {
 }
 
 /** LeetCode 268: Missing Number — XOR of indices and values. */
-function buildSteps268(input) {
+function buildSteps268(input, params) {
   const nums = (Array.isArray(input) ? [...input] : String(input).split(",").map((s) => Number(s.trim())).filter((x) => !isNaN(x)));
+  const approach = Number(params && params.approach) || 1;
+  if (approach === 2) return buildSteps268Sum(nums);
   const n = nums.length;
   const steps = [];
   const bits = Math.max(1, n.toString(2).length);
@@ -2903,6 +2905,7 @@ function buildSteps268(input) {
       vars: opts.vars || [],
       note: opts.note,
       missingNumberView: {
+        method: "xor",
         nums: [...nums],
         n,
         phase: opts.phase || "fold",
@@ -2963,6 +2966,116 @@ function buildSteps268(input) {
     },
   });
   return { original: nums, answer: result, steps };
+}
+
+/** LeetCode 268 Approach 2: Missing Number — Gauss sum (expected − actual). */
+function buildSteps268Sum(nums) {
+  const n = nums.length;
+  const steps = [];
+  const expectedSum = (n * (n + 1)) / 2;
+  const summed = new Set();
+  let actualSum = 0;
+
+  const push = (opts) => {
+    const board = Array.from({ length: n + 1 }, (_, num) => ({
+      num,
+      canceled: summed.has(num),
+      current: num === opts.currentValue,
+      isResult: Boolean(opts.final) && num === opts.answer,
+    }));
+    steps.push({
+      title: opts.title,
+      arr: [...nums],
+      sub: nums.map((_, index) => `[${index}]`),
+      highlight: Number.isInteger(opts.currentIndex) ? [opts.currentIndex] : [],
+      mark: [],
+      final: Boolean(opts.final),
+      codeBlock: 2,
+      codeLines: [opts.line],
+      vars: opts.vars || [],
+      note: opts.note,
+      missingNumberView: {
+        method: "sum",
+        nums: [...nums],
+        n,
+        phase: opts.phase || "actual",
+        currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : -1,
+        expectedSum,
+        actualSum,
+        expectedReady: opts.expectedReady !== false,
+        actualReady: Boolean(opts.actualReady),
+        missing: opts.missing === undefined ? null : opts.missing,
+        board,
+        answer: opts.final ? opts.answer : null,
+      },
+    });
+  };
+
+  push({
+    title: { vi: `expected_sum = 0+1+…+${n} = ${expectedSum}`, en: `expected_sum = 0+1+…+${n} = ${expectedSum}` },
+    line: 3,
+    phase: "expected",
+    note: {
+      vi: `Nếu không thiếu số nào, tổng của 0..${n} phải bằng ${expectedSum} (công thức Gauss n·(n+1)/2).`,
+      en: `If nothing were missing, the sum of 0..${n} would be ${expectedSum} (Gauss formula n·(n+1)/2).`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    actualSum += nums[i];
+    summed.add(nums[i]);
+    push({
+      title: { vi: `actual_sum += ${nums[i]} → ${actualSum}`, en: `actual_sum += ${nums[i]} → ${actualSum}` },
+      line: 4,
+      phase: "actual",
+      currentIndex: i,
+      currentValue: nums[i],
+      vars: [
+        { name: "i", value: i },
+        { name: "num", value: nums[i] },
+        { name: "actual_sum", value: actualSum },
+      ],
+      note: {
+        vi: `Cộng dồn giá trị thực tế. Trên bảng 0..${n}, số ${nums[i]} đã có mặt trong nums.`,
+        en: `Accumulate the actual values. On the 0..${n} board, ${nums[i]} is present in nums.`,
+      },
+    });
+  }
+
+  const missing = expectedSum - actualSum;
+  push({
+    title: { vi: `missing = ${expectedSum} − ${actualSum} = ${missing}`, en: `missing = ${expectedSum} − ${actualSum} = ${missing}` },
+    line: 5,
+    phase: "diff",
+    actualReady: true,
+    missing,
+    vars: [
+      { name: "expected_sum", value: expectedSum },
+      { name: "actual_sum", value: actualSum },
+      { name: "missing_num", value: missing },
+    ],
+    note: {
+      vi: `Chênh lệch giữa tổng mong đợi và tổng thực tế chính là số bị thiếu: ${expectedSum} − ${actualSum} = ${missing}.`,
+      en: `The gap between the expected and actual sums is exactly the missing number: ${expectedSum} − ${actualSum} = ${missing}.`,
+    },
+  });
+
+  push({
+    title: { vi: `Đáp án: ${missing}`, en: `Answer: ${missing}` },
+    line: 6,
+    phase: "done",
+    final: true,
+    actualReady: true,
+    missing,
+    answer: missing,
+    vars: [{ name: "answer", value: missing }],
+    note: {
+      vi: `Số duy nhất trong [0, ${n}] không được cộng vào actual_sum là ${missing}.`,
+      en: `The only number in [0, ${n}] never added to actual_sum is ${missing}.`,
+    },
+  });
+
+  return { original: nums, answer: missing, steps };
 }
 
 function parseMatrix(input) {
@@ -7853,15 +7966,27 @@ module.exports = {
     category: { key: "array", vi: "Mảng", en: "Array" },
     title: { vi: "Missing Number", en: "Missing Number" },
     titleVi: { vi: "Số bị thiếu (XOR)", en: "The missing number (XOR)" },
-    statement: { vi: "Cho mảng chứa n số phân biệt trong [0, n], tìm số bị thiếu. Dùng XOR. Nhập cách nhau dấu phẩy.", en: "Given an array of n distinct numbers in [0, n], find the missing one. Use XOR. Enter comma-separated." },
+    statement: { vi: "Cho mảng chứa n số phân biệt trong [0, n], tìm số bị thiếu. Nhập cách nhau dấu phẩy.", en: "Given an array of n distinct numbers in [0, n], find the missing one. Enter comma-separated." },
     defaultInput: [3, 0, 1],
-    inputKind: "integer", inputLabel: { vi: "nums", en: "nums" }, extraParams: [],
+    inputKind: "integer", inputLabel: { vi: "nums", en: "nums" },
+    extraParams: [
+      {
+        key: "approach",
+        type: "select",
+        label: { vi: "Chọn Approach", en: "Select Approach" },
+        default: 1,
+        options: [
+          { value: 1, label: { vi: "1 — XOR O(1) space", en: "1 — XOR O(1) space" } },
+          { value: 2, label: { vi: "2 — Tổng Gauss", en: "2 — Gauss sum" } },
+        ],
+      },
+    ],
     approach: [
       { vi: "XOR mọi index 0..n và mọi giá trị.", en: "XOR all indices 0..n and all values." },
       { vi: "Cặp (index, giá trị) trùng nhau triệt tiêu.", en: "Matching (index, value) pairs cancel." },
       { vi: "Còn lại là số bị thiếu.", en: "What remains is the missing number." },
     ],
-    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Một lượt XOR.", en: "Single XOR pass." } },
+    complexity: { time: "O(n)", space: "O(1)", note: { vi: "Approach 1: một lượt XOR. Approach 2: tổng mong đợi trừ tổng thực tế.", en: "Approach 1: single XOR pass. Approach 2: expected sum minus actual sum." } },
     code: [
       "class Solution:",
       "    def missingNumber(self, nums):",
@@ -7870,6 +7995,16 @@ module.exports = {
       "            result ^= i ^ num",
       "        return result",
     ],
+    code2: [
+      "class Solution:",
+      "    def missingNumber(self, nums: List[int]) -> int:",
+      "        expected_sum = sum(range(len(nums) + 1))",
+      "        actual_sum = sum(nums)",
+      "        missing_num = expected_sum - actual_sum",
+      "        return missing_num",
+    ],
+    codeLabel: { vi: "Cách 1: XOR O(1) space", en: "Approach 1: XOR O(1) space" },
+    code2Label: { vi: "Cách 2: Tổng Gauss (expected − actual)", en: "Approach 2: Gauss sum (expected − actual)" },
     builder: buildSteps268,
   },
   31: {

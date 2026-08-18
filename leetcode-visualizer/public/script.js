@@ -14841,11 +14841,7 @@ function renderMissingNumberView(step) {
   const vi = lang === "vi";
   const nums = Array.isArray(view.nums) ? view.nums : [];
   const board = Array.isArray(view.board) ? view.board : [];
-  const phaseLabels = {
-    init: vi ? "Khởi tạo" : "Initialize",
-    fold: vi ? "Gộp XOR" : "Fold XOR",
-    done: vi ? "Hoàn tất" : "Complete",
-  };
+  const isSum = view.method === "sum";
 
   const cellsHtml = nums.map((value, index) => {
     const classes = ["mn268-cell"];
@@ -14853,6 +14849,9 @@ function renderMissingNumberView(step) {
     return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${value}</strong></span>`;
   }).join("") || `<span class="mn268-empty">${vi ? "mảng rỗng" : "empty array"}</span>`;
 
+  const boardHint = isSum
+    ? (vi ? "✓ = đã cộng vào actual · xanh = số còn lại" : "✓ = added to actual · green = remaining")
+    : (vi ? "✓ = đã triệt tiêu · xanh = số còn lại" : "✓ = canceled · green = remaining");
   const boardHtml = board.map((cell) => {
     const classes = ["mn268-board-cell"];
     if (cell.isResult) classes.push("result");
@@ -14861,6 +14860,41 @@ function renderMissingNumberView(step) {
     return `<span class="${classes.join(" ")}"><strong>${cell.num}</strong><em>${cell.isResult ? (vi ? "còn lại" : "remains") : cell.canceled ? "✓" : ""}</em></span>`;
   }).join("");
 
+  const numsPanel = `<section class="mn268-panel"><header><strong>nums</strong><span>${isSum ? (vi ? "vàng = phần tử đang cộng" : "yellow = element being added") : (vi ? "vàng = phần tử đang gộp" : "yellow = element being folded")}</span></header><div class="mn268-cells">${cellsHtml}</div></section>`;
+  const boardPanel = `<section class="mn268-panel"><header><strong>${vi ? `BẢNG 0..${view.n}` : `BOARD 0..${view.n}`}</strong><span>${boardHint}</span></header><div class="mn268-board">${boardHtml}</div></section>`;
+
+  if (isSum) {
+    const phaseLabels = {
+      expected: vi ? "Tổng mong đợi" : "Expected sum",
+      actual: vi ? "Tổng thực tế" : "Actual sum",
+      diff: vi ? "Lấy hiệu" : "Take the difference",
+      done: vi ? "Hoàn tất" : "Complete",
+    };
+    let action = "";
+    if (view.phase === "expected") action = `expected_sum = 0+1+…+${view.n} = <b>${view.expectedSum}</b>`;
+    else if (view.phase === "actual") action = `actual_sum = <b>${view.actualSum}</b>`;
+    else action = `missing = ${view.expectedSum} − ${view.actualSum} = <b>${view.missing}</b>`;
+    const accents = `<section class="mn268-sums">
+      <div class="mn268-sum expected"><small>expected_sum</small><strong>${view.expectedSum}</strong><em>Σ 0..${view.n}</em></div>
+      <div class="mn268-sum actual ${view.actualReady ? "ready" : ""}"><small>actual_sum</small><strong>${view.actualSum}</strong><em>Σ nums</em></div>
+      <div class="mn268-sum diff ${view.missing === null ? "" : "ready"}"><small>missing</small><strong>${view.missing === null ? "—" : view.missing}</strong><em>expected − actual</em></div>
+    </section>`;
+    $("treeView").innerHTML = `<section class="mn268-viz" role="img" aria-label="${vi ? "Trực quan hóa Missing Number bằng tổng Gauss" : "Missing Number Gauss-sum visualization"}">
+      <header><strong>MISSING NUMBER · SUM</strong><span class="mn268-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+      <section class="mn268-rule"><b>CORE RULE</b><strong>Σ(0..n) − Σ(nums) = missing</strong><span>${vi ? `Tổng đầy đủ của 0..${view.n} trừ tổng các giá trị có mặt để lộ số bị thiếu.` : `The full sum of 0..${view.n} minus the sum of present values reveals the missing number.`}</span></section>
+      <section class="mn268-action"><small>${vi ? "PHÉP TÍNH" : "OPERATION"}</small><strong>${action}</strong></section>
+      ${accents}
+      ${numsPanel}
+      ${boardPanel}
+    </section>`;
+    return;
+  }
+
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    fold: vi ? "Gộp XOR" : "Fold XOR",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
   let action = "";
   if (view.pair) {
     action = `result ^= ${view.pair.index} ^ ${view.pair.value} : ${view.pair.previous} → <b>${view.result}</b>`;
@@ -14869,7 +14903,6 @@ function renderMissingNumberView(step) {
   } else if (view.phase === "done") {
     action = `${vi ? "số bị thiếu" : "missing number"} = <b>${view.result}</b>`;
   }
-
   const resultBox = `<section class="mn268-result"><small>result</small><strong>${view.result}</strong><code>${view.resultBits}₂</code></section>`;
 
   $("treeView").innerHTML = `<section class="mn268-viz" role="img" aria-label="${vi ? "Trực quan hóa Missing Number bằng XOR" : "Missing Number XOR visualization"}">
@@ -14877,8 +14910,8 @@ function renderMissingNumberView(step) {
     <section class="mn268-rule"><b>CORE RULE</b><strong>a ^ a = 0 · a ^ 0 = a</strong><span>${vi ? `XOR mọi index 0..${view.n} và mọi giá trị → cặp bằng nhau triệt tiêu, còn lại số thiếu.` : `XOR every index 0..${view.n} and every value → equal pairs cancel, leaving the missing number.`}</span></section>
     <section class="mn268-action"><small>${vi ? "PHÉP TÍNH" : "OPERATION"}</small><strong>${action}</strong></section>
     ${resultBox}
-    <section class="mn268-panel"><header><strong>nums</strong><span>${vi ? "vàng = phần tử đang gộp" : "yellow = element being folded"}</span></header><div class="mn268-cells">${cellsHtml}</div></section>
-    <section class="mn268-panel"><header><strong>${vi ? `BẢNG 0..${view.n}` : `BOARD 0..${view.n}`}</strong><span>${vi ? "✓ = đã triệt tiêu · xanh = số còn lại" : "✓ = canceled · green = remaining"}</span></header><div class="mn268-board">${boardHtml}</div></section>
+    ${numsPanel}
+    ${boardPanel}
   </section>`;
 }
 
