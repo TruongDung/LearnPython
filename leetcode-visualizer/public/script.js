@@ -13618,6 +13618,119 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+// ---- LeetCode 1388: Pizza With 3n Slices — circular pick-n-non-adjacent DP ----
+function renderPizza1388View(step) {
+  const view = step.pizza1388View || {};
+  const vi = lang === "vi";
+  const slices = Array.isArray(view.slices) ? view.slices : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const picks = new Set(Array.isArray(view.picks) ? view.picks : []);
+  const total = Number(view.total) || slices.length;
+  const n = Number(view.n) || 0;
+  const phase = String(view.phase || "intro");
+  const offset = Number(view.offset) || 0;
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const phaseIndex = ["intro", "reduce"].includes(phase) ? 0
+    : phase === "pass-init" ? 1
+      : phase === "cell" ? 2
+        : phase === "pass-result" ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Quy về bài toán", "Bắt đầu lượt", "Điền dp[i][j]", "Kết quả lượt", "Đáp án"]
+    : ["Reduce problem", "Start pass", "Fill dp[i][j]", "Pass result", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // Circular slice ring rendered as a wrapping row; the dropped slice greyed out,
+  // the current pass subarray outlined, chosen slices (you) highlighted.
+  const inSub = (index) => phase !== "intro" && phase !== "reduce" && phase !== "final" && Number.isInteger(view.subLen)
+    ? index >= offset && index < offset + view.subLen
+    : false;
+  const activeOriginal = phase === "cell" && Number.isInteger(view.i) ? view.i - 1 + offset : null;
+  const ring = slices.map((value, index) => {
+    const classes = ["pz1388-slice"];
+    if (index === view.droppedIndex) classes.push("dropped");
+    if (inSub(index)) classes.push("in-sub");
+    if (index === activeOriginal) classes.push("active");
+    if (picks.has(index)) classes.push("you");
+    const badges = [];
+    if (index === view.droppedIndex) badges.push(`<em class="drop">${vi ? "BỎ" : "DROP"}</em>`);
+    if (picks.has(index)) badges.push(`<em class="you">${vi ? "BẠN" : "YOU"}</em>`);
+    return `<div class="${classes.join(" ")}"><small>#${index}</small><b>${escapeHtml(String(value))}</b>${badges.join("")}</div>`;
+  }).join("");
+
+  // DP grid (only during a pass). Rows i=0..m, cols j=0..n.
+  let dpGrid = "";
+  if (dp.length > 1 && ["pass-init", "cell", "pass-result"].includes(phase)) {
+    const m = dp.length - 1;
+    const header = `<tr><th></th>${Array.from({ length: n + 1 }, (_, j) => `<th class="${j === view.j ? "active" : ""}">j=${j}</th>`).join("")}</tr>`;
+    const rows = [];
+    for (let i = 0; i <= m; i++) {
+      const rowLabel = i === 0 ? "dp[0]" : `i=${i}<u>#${i - 1 + offset}</u>`;
+      const cells = [];
+      for (let j = 0; j <= n; j++) {
+        const filled = dp[i][j] !== null && dp[i][j] !== undefined;
+        const classes = [];
+        if (i === view.i && j === view.j) classes.push("cur");
+        else if (phase === "cell" && i === view.i - 1 && j === view.j) classes.push("skip-src");
+        else if (phase === "cell" && i === view.i - 2 && j === view.j - 1) classes.push("take-src");
+        if (i === m && j === n && phase === "pass-result") classes.push("answer");
+        cells.push(`<td class="${classes.join(" ")}">${escapeHtml(String(filled ? dp[i][j] : "·"))}</td>`);
+      }
+      rows.push(`<tr><th>${rowLabel}</th>${cells.join("")}</tr>`);
+    }
+    dpGrid = `<section class="pz1388-dp">
+      <header><strong>${vi ? `dp cho ${view.passLabel || "lượt"}` : `dp for ${view.passLabel || "pass"}`}</strong><span>dp[i][j] = ${vi ? "chọn j miếng không kề từ i miếng đầu" : "pick j non-adjacent from first i"}</span></header>
+      <div class="pz1388-dp-scroll"><table>${header}${rows.join("")}</table></div>
+    </section>`;
+  }
+
+  // Decision card during a cell computation.
+  let decisionPanel = "";
+  if (phase === "cell" && Number.isInteger(view.i)) {
+    const chose = view.decision;
+    decisionPanel = `<section class="pz1388-decision">
+      <div class="options">
+        <div class="skip ${chose === "skip" ? "won" : "lost"}">
+          <small>${vi ? "BỎ miếng này" : "SKIP this slice"}</small>
+          <b>dp[${view.i - 1}][${view.j}] = ${escapeHtml(display(view.skip))}</b>
+          <span>${vi ? "giữ kết quả không dùng miếng i" : "keep the result without slice i"}</span>
+          <em>${chose === "skip" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")}</em>
+        </div>
+        <div class="take ${chose === "take" ? "won" : "lost"}">
+          <small>${vi ? "LẤY miếng này" : "TAKE this slice"}</small>
+          <b>dp[${view.i - 2}][${view.j - 1}] + ${escapeHtml(display(view.val))} = ${escapeHtml(display(view.take))}</b>
+          <span>${vi ? "lấy miếng i nên phải bỏ miếng i-1 → dùng dp[i-2]" : "taking slice i forbids i-1 → use dp[i-2]"}</span>
+          <em>${chose === "take" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")}</em>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  // Pass tracker.
+  const passTracker = `<section class="pz1388-passes">
+    <div class="${view.pass === "A" ? "active" : ""} ${view.winner === "A" && phase === "final" ? "winner" : ""}"><small>Pass A · ${vi ? "bỏ miếng cuối" : "drop last"}</small><b>${escapeHtml(display(view.passABest))}</b></div>
+    <div class="${view.pass === "B" ? "active" : ""} ${view.winner === "B" && phase === "final" ? "winner" : ""}"><small>Pass B · ${vi ? "bỏ miếng đầu" : "drop first"}</small><b>${escapeHtml(display(view.passBBest))}</b></div>
+    <div class="ans ${phase === "final" ? "ready" : ""}"><small>max</small><b>${escapeHtml(display(view.answer))}</b></div>
+  </section>`;
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+
+  $("treeView").innerHTML = `<section class="pz1388-viz" role="img" aria-label="LeetCode 1388 Pizza With 3n Slices visualization">
+    <div class="pz1388-phases">${phases}</div>
+    <div class="pz1388-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="pz1388-ring">
+      <header><strong>${vi ? `Vòng tròn ${total} miếng · chọn ${n} miếng không kề` : `Circle of ${total} slices · pick ${n} non-adjacent`}</strong><span>${vi ? "xám = bỏ · viền = mảng con của lượt · lục = miếng bạn ăn" : "grey = dropped · outline = pass subarray · green = your slices"}</span></header>
+      <div class="pz1388-slices">${ring}</div>
+    </section>
+    ${decisionPanel}
+    ${dpGrid}
+    ${passTracker}
+  </section>`;
+}
+
 // ---- LeetCode 2140: Solving Questions With Brainpower — backward DP ----
 function renderBrainpower2140View(step) {
   const view = step.brainpower2140View || {};
@@ -16207,6 +16320,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.pizza1388View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderPizza1388View(step);
   } else if (step.brainpower2140View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

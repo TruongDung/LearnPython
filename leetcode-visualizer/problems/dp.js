@@ -10210,189 +10210,219 @@ function buildSteps1301(input) {
  * Answer of one pass = dp[len(arr)-1][n].
  */
 function buildSteps1388(slices) {
+  if (!Array.isArray(slices) || slices.length === 0 || slices.length % 3 !== 0 || slices.some((v) => !Number.isInteger(v) || v < 0)) {
+    throw new Error("slices count must be a positive multiple of 3 with non-negative integers.");
+  }
+
   const total = slices.length;
   const n = Math.floor(total / 3);
   const steps = [];
 
-  // Validation
-  if (total === 0 || total % 3 !== 0) {
+  // Shared view state, refreshed on every frame.
+  let phase = "intro";
+  let pass = null; // "A" | "B"
+  let passLabel = null;
+  let droppedIndex = null;
+  let offset = 0;
+  let subArr = [];
+  let dpSnap = [];
+  let ci = null;
+  let cj = null;
+  let curVal = null;
+  let skip = null;
+  let take = null;
+  let decision = null;
+  let picks = []; // original indices currently highlighted
+  let passABest = null;
+  let passBBest = null;
+  let answer = null;
+  let winner = null;
+
+  const cloneDp = (dp) => dp.map((row) => row.slice());
+  const snapshot = () => ({
+    slices: [...slices],
+    total,
+    n,
+    phase,
+    pass,
+    passLabel,
+    droppedIndex,
+    offset,
+    subLen: subArr.length,
+    dp: cloneDp(dpSnap),
+    i: ci,
+    j: cj,
+    val: curVal,
+    skip,
+    take: take === -Infinity ? null : take,
+    decision,
+    picks: [...picks],
+    passABest,
+    passBBest,
+    answer,
+    winner,
+  });
+  const push = ({ title, note, line, final = false, vars = [] }) => {
     steps.push({
-      title: { vi: "Đầu vào không hợp lệ", en: "Invalid input" },
+      title,
+      note,
+      codeLines: [line],
+      final,
       arr: [...slices],
       highlight: [],
-      mark: [],
-      final: true,
-      codeLines: [3],
-      vars: [{ name: "answer", value: 0 }],
-      note: {
-        vi: "Số miếng phải là bội của 3 (bài yêu cầu 3n miếng).",
-        en: "Slice count must be a multiple of 3 (problem states 3n slices).",
-      },
+      mark: [...picks],
+      vars,
+      pizza1388View: snapshot(),
     });
-    return { original: [...slices], answer: 0, steps };
-  }
+  };
 
-  // --- Intro ---
-  steps.push({
-    title: { vi: "Ý tưởng", en: "Idea" },
-    arr: [...slices],
-    highlight: [],
-    mark: [],
-    codeLines: [3, 4, 5, 6, 7],
-    vars: [
-      { name: "total slices", value: total },
-      { name: "n = total/3", value: n },
-    ],
+  push({
+    title: { vi: `n = ${total} / 3 = ${n}`, en: `n = ${total} / 3 = ${n}` },
     note: {
-      vi:
-        `Bạn được ${n} miếng trong ${total} = 3n miếng. Do Alice/Bob luôn ăn 2 miếng kề, ` +
-        `${n} miếng của bạn phải không kề nhau trong vòng tròn ban đầu. ` +
-        `Vòng tròn → chạy 2 lần bài tuyến tính: bỏ miếng cuối, và bỏ miếng đầu, lấy max.`,
-      en:
-        `You get ${n} slices out of ${total} = 3n. Because Alice/Bob always take the two neighbours, ` +
-        `your ${n} slices must be non-adjacent in the original circle. ` +
-        `Circular → run the linear version twice: drop last slice, then drop first, take the max.`,
+      vi: `Bạn chỉ ăn được ${n} trong ${total} miếng. Vì Alice/Bob luôn ăn hai miếng kề miếng bạn chọn, ${n} miếng của bạn PHẢI không kề nhau trên vòng tròn.`,
+      en: `You eat only ${n} of ${total} slices. Since Alice/Bob always take the two neighbours, your ${n} slices MUST be non-adjacent on the circle.`,
     },
+    line: 4,
+    vars: [{ name: "total", value: total }, { name: "n", value: n }],
   });
 
-  // --- Linear pass helper ---
-  // Returns { best, picks } where picks[] is the indices (into arr) that were chosen.
-  function linearPass(arr, passLabel, offset) {
-    const m = arr.length;
-    // dp[i][j] = max sum picking j non-adjacent from arr[0..i-1]. dp has m+1 rows.
-    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  phase = "reduce";
+  push({
+    title: { vi: "Quy về: chọn n miếng không kề trên vòng tròn", en: "Reduce: pick n non-adjacent on a circle" },
+    note: {
+      vi: "Vì là vòng tròn, miếng đầu và miếng cuối cũng kề nhau. Mẹo: chạy 2 lần trên mảng thẳng — Lượt A bỏ miếng cuối, Lượt B bỏ miếng đầu — rồi lấy max. Như vậy không bao giờ chọn cả đầu lẫn cuối.",
+      en: "On a circle the first and last slices are also neighbours. Trick: run two linear passes — Pass A drops the last slice, Pass B drops the first — then take the max. This prevents choosing both ends.",
+    },
+    line: 16,
+    vars: [],
+  });
 
-    // Pass intro
-    steps.push({
-      title: { vi: `${passLabel}: khởi tạo`, en: `${passLabel}: initialize` },
-      arr: [...slices],
-      highlight: arr.map((_, k) => k + offset),
-      mark: [],
-      codeLines: [10, 11, 12],
-      vars: [
-        { name: "pass", value: passLabel },
-        { name: "sub-array length", value: m },
-        { name: "pick n", value: n },
-      ],
+  // Linear DP pass on a subarray; returns { best, picks(original indices) }.
+  function linearPass(passId, label, dropped, arr, off) {
+    pass = passId;
+    passLabel = label;
+    droppedIndex = dropped;
+    offset = off;
+    subArr = arr;
+    const m = arr.length;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    dpSnap = dp;
+    ci = null;
+    cj = null;
+    curVal = null;
+    skip = null;
+    take = null;
+    decision = null;
+
+    phase = "pass-init";
+    push({
+      title: { vi: `${label}: bỏ miếng #${dropped}`, en: `${label}: drop slice #${dropped}` },
       note: {
-        vi: `${passLabel}: xét mảng con dài ${m}, cần chọn ${n} phần tử không kề nhau để tổng lớn nhất.`,
-        en: `${passLabel}: work on a subarray of length ${m}, pick ${n} non-adjacent elements to maximise the sum.`,
+        vi: `Xét mảng con dài ${m} (đã bỏ miếng #${dropped}). dp[i][j] = tổng lớn nhất khi chọn j miếng không kề từ ${m} miếng đầu.`,
+        en: `Work on a subarray of length ${m} (slice #${dropped} removed). dp[i][j] = best sum picking j non-adjacent from the first i slices.`,
       },
+      line: 8,
+      vars: [{ name: "pass", value: label }, { name: "sub length", value: m }, { name: "pick n", value: n }],
     });
 
-    // Fill DP with per-cell steps only for small grids; otherwise per-row.
-    const cellCap = 40; // cap the number of "compute" steps per pass
-    let cellStepsPushed = 0;
+    const cellCap = 70;
+    let pushed = 0;
     for (let i = 1; i <= m; i++) {
       const val = arr[i - 1];
       for (let j = 1; j <= n; j++) {
-        const skip = dp[i - 1][j];
-        const take = i >= 2 ? dp[i - 2][j - 1] + val : (j === 1 ? val : -Infinity);
-        // For j=1 and i=1, taking is fine (0 + val = val)
-        const takeVal = i === 1 ? (j === 1 ? val : -Infinity) : dp[i - 2][j - 1] + val;
-        dp[i][j] = Math.max(skip, takeVal);
-
-        if (cellStepsPushed < cellCap && (i <= 4 || i >= m - 1 || j === n)) {
-          const chose = takeVal > skip ? "take" : "skip";
-          steps.push({
-            title: { vi: `${passLabel}: dp[${i}][${j}]`, en: `${passLabel}: dp[${i}][${j}]` },
-            arr: [...slices],
-            highlight: [i - 1 + offset],
-            mark: [],
-            codeLines: [13, 14, 15, 16],
+        const skipVal = dp[i - 1][j];
+        const takeVal = i >= 2 ? dp[i - 2][j - 1] + val : (j === 1 ? val : -Infinity);
+        dp[i][j] = Math.max(skipVal, takeVal);
+        const chose = takeVal >= skipVal && Number.isFinite(takeVal) ? "take" : "skip";
+        if (pushed < cellCap) {
+          ci = i;
+          cj = j;
+          curVal = val;
+          skip = skipVal;
+          take = takeVal;
+          decision = chose;
+          dpSnap = dp;
+          phase = "cell";
+          push({
+            title: { vi: `${label}: dp[${i}][${j}] = ${dp[i][j]}`, en: `${label}: dp[${i}][${j}] = ${dp[i][j]}` },
+            note: chose === "take"
+              ? {
+                vi: `LẤY miếng #${i - 1 + off} (giá trị ${val}): take = dp[${i - 2}][${j - 1}] + ${val} = ${Number.isFinite(takeVal) ? takeVal : "-∞"} ≥ skip = ${skipVal}. Vì lấy miếng này nên phải bỏ miếng liền trước → dùng dp[i-2].`,
+                en: `TAKE slice #${i - 1 + off} (value ${val}): take = dp[${i - 2}][${j - 1}] + ${val} = ${Number.isFinite(takeVal) ? takeVal : "-∞"} ≥ skip = ${skipVal}. Taking it forbids the previous slice → use dp[i-2].`,
+              }
+              : {
+                vi: `BỎ miếng #${i - 1 + off}: skip = dp[${i - 1}][${j}] = ${skipVal} > take = ${Number.isFinite(takeVal) ? takeVal : "-∞"}.`,
+                en: `SKIP slice #${i - 1 + off}: skip = dp[${i - 1}][${j}] = ${skipVal} > take = ${Number.isFinite(takeVal) ? takeVal : "-∞"}.`,
+              },
+            line: chose === "take" ? 12 : 11,
             vars: [
-              { name: "i (in pass)", value: i },
-              { name: "j", value: j },
-              { name: "arr[i-1]", value: val },
-              { name: "skip = dp[i-1][j]", value: skip },
-              { name: "take = dp[i-2][j-1] + arr[i-1]", value: Number.isFinite(takeVal) ? takeVal : "-∞" },
+              { name: "i", value: i }, { name: "j", value: j }, { name: "arr[i-1]", value: val },
+              { name: "skip", value: skipVal }, { name: "take", value: Number.isFinite(takeVal) ? takeVal : "-∞" },
               { name: "dp[i][j]", value: dp[i][j] },
-              { name: "decision", value: chose },
             ],
-            note: {
-              vi:
-                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
-                `${chose === "take" ? `Cướp miếng thứ ${i - 1} (giá trị ${val}).` : "Bỏ miếng này."}`,
-              en:
-                `dp[${i}][${j}] = max(skip=${skip}, take=${Number.isFinite(takeVal) ? takeVal : "-∞"}) = ${dp[i][j]}. ` +
-                `${chose === "take" ? `Pick element ${i - 1} (value ${val}).` : "Skip this element."}`,
-            },
           });
-          cellStepsPushed += 1;
+          pushed += 1;
         }
       }
     }
 
     const best = dp[m][n];
-
-    // Trace back which indices were picked
-    const picks = [];
-    let ci = m;
-    let cj = n;
-    while (ci > 0 && cj > 0) {
-      const skip = dp[ci - 1][cj];
-      const takeVal = ci >= 2 ? dp[ci - 2][cj - 1] + arr[ci - 1] : (cj === 1 ? arr[ci - 1] : -Infinity);
-      if (takeVal >= skip) {
-        // pick arr[ci-1] (index offset within the sub-array + offset in original)
-        picks.push(ci - 1);
-        ci -= 2;
-        cj -= 1;
+    // Trace back the picked indices.
+    const chosen = [];
+    let ti = m;
+    let tj = n;
+    while (ti > 0 && tj > 0) {
+      const skipVal = dp[ti - 1][tj];
+      const takeVal = ti >= 2 ? dp[ti - 2][tj - 1] + arr[ti - 1] : (tj === 1 ? arr[ti - 1] : -Infinity);
+      if (Number.isFinite(takeVal) && takeVal >= skipVal) {
+        chosen.push(ti - 1);
+        ti -= 2;
+        tj -= 1;
       } else {
-        ci -= 1;
+        ti -= 1;
       }
     }
-    picks.reverse();
+    chosen.reverse();
+    const originalPicks = chosen.map((k) => k + off);
 
-    steps.push({
-      title: { vi: `${passLabel}: kết quả`, en: `${passLabel}: result` },
-      arr: [...slices],
-      highlight: [],
-      mark: picks.map((k) => k + offset),
-      codeLines: [14],
-      vars: [
-        { name: "pass", value: passLabel },
-        { name: "picks (original indices)", value: picks.map((k) => k + offset).join(",") },
-        { name: "best sum", value: best },
-      ],
+    ci = m;
+    cj = n;
+    picks = originalPicks;
+    if (passId === "A") passABest = best; else passBBest = best;
+    phase = "pass-result";
+    push({
+      title: { vi: `${label}: tổng = ${best}`, en: `${label}: sum = ${best}` },
       note: {
-        vi: `${passLabel} chọn ${picks.length} miếng ở vị trí gốc [${picks.map((k) => k + offset).join(", ")}], tổng = ${best}.`,
-        en: `${passLabel} picks ${picks.length} slices at original indices [${picks.map((k) => k + offset).join(", ")}], sum = ${best}.`,
+        vi: `${label} chọn ${chosen.length} miếng tại vị trí gốc [${originalPicks.join(", ")}], tổng = ${best}. dp[${m}][${n}] chính là ô góc dưới-phải.`,
+        en: `${label} picks ${chosen.length} slices at original indices [${originalPicks.join(", ")}], sum = ${best}. dp[${m}][${n}] is the bottom-right cell.`,
       },
+      line: 14,
+      vars: [{ name: "pass", value: label }, { name: "picks", value: `[${originalPicks.join(", ")}]` }, { name: "best", value: best }],
     });
 
-    return { best, picks: picks.map((k) => k + offset) };
+    return { best, picks: originalPicks };
   }
 
-  // --- Pass A: drop last slice ---
-  const passA = linearPass(slices.slice(0, total - 1), "Pass A (drop last)", 0);
-  // --- Pass B: drop first slice ---
-  const passB = linearPass(slices.slice(1), "Pass B (drop first)", 1);
+  const passA = linearPass("A", "Pass A", total - 1, slices.slice(0, total - 1), 0);
+  const passB = linearPass("B", "Pass B", 0, slices.slice(1), 1);
 
-  const answer = Math.max(passA.best, passB.best);
-  const winnerPicks = passA.best >= passB.best ? passA.picks : passB.picks;
-  const winnerLabel = passA.best >= passB.best ? "A" : "B";
-
-  steps.push({
-    title: { vi: "Kết quả cuối", en: "Final result" },
-    arr: [...slices],
-    highlight: [],
-    mark: winnerPicks,
-    final: true,
-    codeLines: [16],
-    vars: [
-      { name: "pass A best", value: passA.best },
-      { name: "pass B best", value: passB.best },
-      { name: "winner", value: `Pass ${winnerLabel}` },
-      { name: "answer", value: answer },
-    ],
+  answer = Math.max(passA.best, passB.best);
+  winner = passA.best >= passB.best ? "A" : "B";
+  picks = winner === "A" ? passA.picks : passB.picks;
+  pass = null;
+  droppedIndex = null;
+  ci = null;
+  cj = null;
+  phase = "final";
+  push({
+    title: { vi: `Đáp án = max(${passA.best}, ${passB.best}) = ${answer}`, en: `Answer = max(${passA.best}, ${passB.best}) = ${answer}` },
     note: {
-      vi:
-        `Đáp án = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
-        `Chọn từ Pass ${winnerLabel}: miếng tại vị trí gốc [${winnerPicks.join(", ")}].`,
-      en:
-        `Answer = max(Pass A = ${passA.best}, Pass B = ${passB.best}) = ${answer}. ` +
-        `Winning picks from Pass ${winnerLabel}: original indices [${winnerPicks.join(", ")}].`,
+      vi: `Chọn kết quả tốt hơn giữa hai lượt: Lượt ${winner} thắng với tổng ${answer}, các miếng bạn ăn ở vị trí [${picks.join(", ")}].`,
+      en: `Take the better of the two passes: Pass ${winner} wins with sum ${answer}; you eat slices at [${picks.join(", ")}].`,
     },
+    line: 16,
+    final: true,
+    vars: [{ name: "pass A", value: passA.best }, { name: "pass B", value: passB.best }, { name: "answer", value: answer }],
   });
 
   return { original: [...slices], answer, steps };
