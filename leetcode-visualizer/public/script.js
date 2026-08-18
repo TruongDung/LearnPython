@@ -3489,12 +3489,17 @@ function renderTree(step, targetId = "treeView") {
   const maxAnnotationHalfWidth = Math.max(0, ...nodes.flatMap((n) => (
     annotationItems(treeAnnotations[n.id]).map((item) => String(item.label ?? "").length * 6.6 / 2)
   )));
+  // Sub-labels are centered under the node; include their width so edge nodes
+  // (leftmost/rightmost) are not clipped by the SVG bounds.
+  const maxSubHalfWidth = Math.max(0, ...nodes.map((n) => (
+    n.sub !== undefined && n.sub !== null ? String(n.sub).length * 6 / 2 : 0
+  )));
   const colW = hasMultiLineLabels ? (isBstIteratorTree ? 96 : 84) : Math.max(60, maxHalfWidth * 2 + 14);
   const annotationExtra = Math.max(0, maxAnnotationLines - 1) * 14;
   const rowH = (hasMultiLineLabels ? (isBstIteratorTree ? 104 : 96) : 78) + (hasSubLabels ? 16 : 0) + annotationExtra;
   const naturalBasePad = hasMultiLineLabels
-    ? Math.max(44, maxAnnotationHalfWidth + 6)
-    : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6);
+    ? Math.max(44, maxAnnotationHalfWidth + 6, maxSubHalfWidth + 6)
+    : Math.max(34, maxHalfWidth + 4, maxAnnotationHalfWidth + 6, maxSubHalfWidth + 6);
   const basePad = Math.max(naturalBasePad, maxAnnotationLines ? r + 18 + annotationExtra : 0);
   const showLevelLabels = step.tree.showLevels !== false && maxY > 0;
   const configuredLevelGutter = Number(step.tree.levelLabelGutter);
