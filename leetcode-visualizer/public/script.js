@@ -13787,7 +13787,7 @@ function renderDeleteEarn740View(step) {
     const badges = [];
     if (phase === "done" && chosen.has(v)) badges.push(`<em class="take">${vi ? "LẤY" : "TAKE"}</em>`);
     if (view.phase === "dp-compute" && v === view.conflictLeft && view.decision === "take") badges.push(`<em class="skip">${vi ? "BỎ" : "SKIP"}</em>`);
-    return valueCells.push(`<div class="${classes.join(" ")}">
+    valueCells.push(`<div class="${classes.join(" ")}">
       <span class="de740-bar" style="height:${barHeight}px"></span>
       <b>${escapeHtml(String(e))}</b>
       <small>v=${v}</small>
