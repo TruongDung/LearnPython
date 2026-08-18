@@ -2691,7 +2691,7 @@ function buildSteps323(input, params) {
     },
     [], [],
     [{ name: "n", value: n }, { name: "components", value: components }, { name: "edges", value: edgesStr }],
-    [2, 3]
+    [3, 9]
   ));
 
   // ── Process each edge ──
@@ -2734,7 +2734,7 @@ function buildSteps323(input, params) {
         { name: "components", value: components },
         { name: "parent", value: `[${parent.join(",")}]` },
       ],
-      [5, 6, 7, 8]
+      alreadySame ? [10, 11, 12] : [10, 11, 12, 13, 14]
     ));
   }
 
@@ -2747,7 +2747,7 @@ function buildSteps323(input, params) {
     },
     [], [],
     [{ name: "answer", value: components }],
-    [9]
+    [15]
   );
   fs.final = true;
   steps.push(fs);
