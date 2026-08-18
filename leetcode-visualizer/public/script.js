@@ -13643,32 +13643,43 @@ function renderBrainpower2140View(step) {
     return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
   }).join("");
 
+  // While a question is being processed, show its reach: locked span + landing.
+  const reachPhases = ["read", "skip", "solve", "compare", "write"];
+  const showReach = reachPhases.includes(phase) && Number.isInteger(view.i);
+
   // Question cards row. Each shows points + brainpower, current pointer, locked range, chosen.
   const cards = questions.map((q, index) => {
     const classes = ["bp2140-q"];
     if (index === view.i && phase !== "done") classes.push("active");
-    if ((phase === "compare" || phase === "write") && inRange(index, view.lockedStart, view.lockedEnd)) classes.push("locked");
+    if (showReach && inRange(index, view.lockedStart, view.lockedEnd)) classes.push("locked");
+    if (showReach && view.jumpTarget < n && index === view.jumpTarget) classes.push("landing");
     if (phase === "done" && chosen.has(index)) classes.push("chosen");
     if (decisions[index] === "solve" && phase !== "done") classes.push("solved");
     const badges = [];
+    if (index === view.i && phase !== "done") badges.push(`<em class="here">i</em>`);
     if (phase === "done" && chosen.has(index)) badges.push(`<em class="take">${vi ? "GIẢI" : "SOLVE"}</em>`);
-    if ((phase === "compare" || phase === "write") && inRange(index, view.lockedStart, view.lockedEnd)) badges.push(`<em class="lock">${vi ? "KHÓA" : "LOCKED"}</em>`);
+    if (showReach && inRange(index, view.lockedStart, view.lockedEnd)) badges.push(`<em class="lock">🔒 ${vi ? "KHÓA" : "LOCKED"}</em>`);
+    if (showReach && view.jumpTarget < n && index === view.jumpTarget) badges.push(`<em class="land">${vi ? "ĐÍCH" : "LAND"}</em>`);
+    // dp value bound to this question index (dp is aligned by index).
+    const dpv = dp[index];
+    const dpChip = dpv !== null && dpv !== undefined ? `<u>dp[${index}]=${escapeHtml(String(dpv))}</u>` : "";
     return `<div class="${classes.join(" ")}">
       <small>#${index}</small>
       <b>${escapeHtml(String(q[0]))}<span>pts</span></b>
       <i>bp ${escapeHtml(String(q[1]))}</i>
+      ${dpChip}
       ${badges.join("")}
     </div>`;
   }).join("");
 
   // Jump arrow description for the active question.
   let jumpInfo = "";
-  if (["read", "skip", "solve", "compare", "write"].includes(phase) && Number.isInteger(view.i)) {
+  if (showReach) {
     const iv = view.i;
     const lockedText = view.lockedEnd !== null && view.lockedEnd >= view.lockedStart
-      ? (vi ? `khóa câu ${view.lockedStart}..${view.lockedEnd}` : `locks ${view.lockedStart}..${view.lockedEnd}`)
+      ? (vi ? `🔒 khóa câu ${view.lockedStart}..${view.lockedEnd} (${view.brainpower} câu)` : `🔒 locks questions ${view.lockedStart}..${view.lockedEnd} (${view.brainpower})`)
       : (vi ? "không khóa câu nào" : "locks nothing");
-    jumpInfo = `<div class="bp2140-jump"><span>${vi ? "nếu GIẢI câu" : "if SOLVE"} ${iv}</span><b>→ ${view.jumpTarget === n ? (vi ? "hết mảng (dp[" + n + "])" : "end (dp[" + n + "])") : `dp[${view.jumpTarget}]`}</b><i>${escapeHtml(lockedText)}</i></div>`;
+    jumpInfo = `<div class="bp2140-jump"><span>${vi ? "GIẢI câu" : "SOLVE"} ${iv} →</span><b>${view.jumpTarget === n ? (vi ? `nhảy tới HẾT (dp[${n}])` : `jump to END (dp[${n}])`) : (vi ? `nhảy tới câu ${view.jumpTarget}` : `jump to question ${view.jumpTarget}`)}</b><i>${escapeHtml(lockedText)}</i></div>`;
   }
 
   // dp table 0..n
@@ -13681,7 +13692,8 @@ function renderBrainpower2140View(step) {
     if (Number.isInteger(view.i) && v === view.i + 1 && ["skip", "compare", "write"].includes(phase)) classes.push("skip-src");
     if (Number.isInteger(view.jumpTarget) && v === view.jumpTarget && ["solve", "compare", "write"].includes(phase)) classes.push("jump-src");
     if (v === n) classes.push("base");
-    dpCells.push(`<div class="${classes.join(" ")}"><small>dp[${v}]</small><b>${filled ? escapeHtml(String(dp[v])) : "·"}</b></div>`);
+    const label = v === n ? (vi ? "dp[" + n + "]·HẾT" : "dp[" + n + "]·END") : `dp[${v}]`;
+    dpCells.push(`<div class="${classes.join(" ")}"><small>${label}</small><b>${filled ? escapeHtml(String(dp[v])) : "·"}</b></div>`);
   }
   const dpLine = dpCells.join("");
 
@@ -13719,7 +13731,7 @@ function renderBrainpower2140View(step) {
     <div class="bp2140-phases">${phases}</div>
     <div class="bp2140-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
     <section class="bp2140-board">
-      <header><strong>${vi ? "Danh sách câu hỏi" : "Questions"}</strong><span>${vi ? "pts = điểm · bp = brainpower (số câu bị khóa)" : "pts = points · bp = brainpower (locked count)"}</span></header>
+      <header><strong>${vi ? "Danh sách câu hỏi" : "Questions"}</strong><span>${vi ? "tím = đang xét · đỏ = bị khóa · lục = câu nhảy tới · dp[i] gắn trên mỗi câu" : "purple = current · red = locked · green = landing · dp[i] shown on each card"}</span></header>
       <div class="bp2140-cards">${cards}</div>
       ${jumpInfo}
     </section>
