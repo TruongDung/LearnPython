@@ -781,3 +781,269 @@ module.exports = {
     },
   });
 })();
+
+
+// LeetCode 3471 · Find the Largest Almost Missing Integer.
+// x is "almost missing" if it lies in exactly one size-k window. For 1 < k < n
+// only the first and last positions live in a single window, so the only
+// candidates are nums[0] and nums[n-1] (each must occur exactly once).
+(() => {
+  const text = (vi, en) => ({ vi, en });
+
+  function buildSteps3471(input, params = {}) {
+    const nums = Array.isArray(input) ? input.map(Number) : [];
+    const k = Number(params.k ?? 3);
+    if (!nums.length || nums.some((value) => !Number.isFinite(value))) {
+      throw new Error("nums must be a non-empty numeric array");
+    }
+    if (!Number.isInteger(k) || k < 1 || k > nums.length) {
+      throw new Error("k must be between 1 and nums.length");
+    }
+
+    const n = nums.length;
+    const windowCount = n - k + 1;
+    const caseType = k === 1 ? "k1" : k === n ? "kn" : "general";
+    const freq = new Map();
+    for (const value of nums) freq.set(value, (freq.get(value) || 0) + 1);
+    const occurrencesOf = (value) => nums.reduce((acc, item, index) => (item === value ? [...acc, index] : acc), []);
+    const freqList = () => [...freq.entries()].map(([value, count]) => ({ value, count }));
+
+    const steps = [];
+    const push = (opts) => {
+      steps.push({
+        title: opts.title,
+        arr: [...nums],
+        sub: nums.map((_, index) => `[${index}]`),
+        highlight: opts.highlight || [],
+        mark: opts.mark || [],
+        final: Boolean(opts.final),
+        codeLines: [opts.line],
+        vars: opts.vars || [],
+        note: opts.note,
+        almostMissingView: {
+          nums: [...nums],
+          k,
+          n,
+          windowCount,
+          caseType,
+          phase: opts.phase || "",
+          windowRange: opts.windowRange || null,
+          highlight: opts.highlight || [],
+          candidates: (opts.candidates || []).map((candidate) => ({ ...candidate, occurrences: [...candidate.occurrences] })),
+          activeCandidate: Number.isInteger(opts.activeCandidate) ? opts.activeCandidate : -1,
+          answer: opts.answer === undefined ? null : opts.answer,
+          freq: opts.freq || null,
+        },
+      });
+    };
+
+    push({
+      title: text(`n = ${n}, có ${windowCount} cửa sổ độ dài k = ${k}`, `n = ${n}, there are ${windowCount} windows of length k = ${k}`),
+      line: 3,
+      phase: "setup",
+      note: text(`Số cửa sổ độ dài k là n − k + 1 = ${windowCount}. "Almost missing" nghĩa là giá trị nằm trong ĐÚNG một cửa sổ.`, `The number of length-k windows is n − k + 1 = ${windowCount}. "Almost missing" means a value lies in EXACTLY one window.`),
+    });
+
+    push({
+      title: text("Đếm tần suất mỗi giá trị", "Count the frequency of each value"),
+      line: 4,
+      phase: "count",
+      freq: freqList(),
+      note: text("count[v] cho biết v xuất hiện bao nhiêu lần. Một giá trị lặp lại sẽ chạm nhiều cửa sổ nên khó 'almost missing'.", "count[v] tells how many times v appears. A repeated value touches several windows, so it can rarely be almost missing."),
+    });
+
+    if (caseType === "k1") {
+      push({
+        title: text("k = 1: mỗi cửa sổ chỉ là một phần tử", "k = 1: every window is a single element"),
+        line: 5,
+        phase: "k1",
+        note: text("Khi k = 1, giá trị nằm trong đúng một cửa sổ ⟺ nó xuất hiện đúng một lần trong nums.", "When k = 1, a value lies in exactly one window ⟺ it appears exactly once in nums."),
+      });
+      const singles = [...freq.entries()].filter(([, count]) => count === 1).map(([value]) => value);
+      const singleIndices = singles.flatMap((value) => occurrencesOf(value));
+      push({
+        title: text(`Các giá trị xuất hiện đúng 1 lần: [${singles.join(", ")}]`, `Values appearing exactly once: [${singles.join(", ")}]`),
+        line: 6,
+        phase: "k1",
+        freq: freqList(),
+        highlight: singleIndices,
+        mark: singleIndices,
+        note: singles.length
+          ? text("Chỉ những giá trị này là 'almost missing'.", "Only these values are almost missing.")
+          : text("Không có giá trị nào xuất hiện đúng một lần.", "No value appears exactly once."),
+      });
+      const answer = singles.length ? Math.max(...singles) : -1;
+      push({
+        title: text(`return ${answer}`, `return ${answer}`),
+        line: 7,
+        phase: "done",
+        final: true,
+        answer,
+        highlight: answer === -1 ? [] : occurrencesOf(answer),
+        mark: answer === -1 ? [] : occurrencesOf(answer),
+        note: answer === -1
+          ? text("Danh sách rỗng nên trả về −1.", "The list is empty, so return −1.")
+          : text(`Giá trị lớn nhất xuất hiện đúng một lần là ${answer}.`, `The largest value appearing exactly once is ${answer}.`),
+      });
+      return { original: nums, k, answer, steps };
+    }
+
+    if (caseType === "kn") {
+      push({
+        title: text("k = n: chỉ có duy nhất một cửa sổ", "k = n: there is only one window"),
+        line: 8,
+        phase: "kn",
+        windowRange: [0, n - 1],
+        highlight: nums.map((_, index) => index),
+        note: text("Cửa sổ duy nhất là cả mảng, nên MỌI giá trị phân biệt đều nằm trong đúng một cửa sổ.", "The single window is the whole array, so EVERY distinct value lies in exactly one window."),
+      });
+      const answer = Math.max(...nums);
+      push({
+        title: text(`return max(nums) = ${answer}`, `return max(nums) = ${answer}`),
+        line: 9,
+        phase: "done",
+        final: true,
+        answer,
+        windowRange: [0, n - 1],
+        highlight: occurrencesOf(answer),
+        mark: occurrencesOf(answer),
+        note: text(`Đáp án là phần tử lớn nhất: ${answer}.`, `The answer is the largest element: ${answer}.`),
+      });
+      return { original: nums, k, answer, steps };
+    }
+
+    // 1 < k < n
+    const candidates = [
+      { role: "start", index: 0, value: nums[0], occurrences: occurrencesOf(nums[0]), valid: null },
+      { role: "end", index: n - 1, value: nums[n - 1], occurrences: occurrencesOf(nums[n - 1]), valid: null },
+    ];
+    let answer = -1;
+
+    push({
+      title: text("Chỉ hai đầu mảng nằm trong đúng một cửa sổ", "Only the two ends live in exactly one window"),
+      line: 10,
+      phase: "general",
+      candidates,
+      windowRange: [0, k - 1],
+      highlight: [0, n - 1],
+      answer,
+      note: text(`Index 0 chỉ thuộc cửa sổ đầu [0..${k - 1}]; index ${n - 1} chỉ thuộc cửa sổ cuối [${n - k}..${n - 1}]. Mọi index ở giữa thuộc ≥ 2 cửa sổ. Vậy ứng viên duy nhất là nums[0] và nums[${n - 1}].`, `Index 0 belongs only to the first window [0..${k - 1}]; index ${n - 1} only to the last window [${n - k}..${n - 1}]. Every interior index belongs to ≥ 2 windows. So the only candidates are nums[0] and nums[${n - 1}].`),
+    });
+
+    candidates[0].valid = freq.get(nums[0]) === 1;
+    push({
+      title: text(`nums[0] = ${nums[0]} xuất hiện ${freq.get(nums[0])} lần`, `nums[0] = ${nums[0]} appears ${freq.get(nums[0])} time(s)`),
+      line: 11,
+      phase: "general",
+      candidates,
+      activeCandidate: 0,
+      highlight: candidates[0].occurrences,
+      mark: candidates[0].occurrences,
+      answer,
+      note: candidates[0].valid
+        ? text("Xuất hiện đúng một lần nên nó là 'almost missing'.", "It appears exactly once, so it is almost missing.")
+        : text("Xuất hiện nhiều hơn một lần nên nó chạm nhiều cửa sổ → loại.", "It appears more than once, so it touches multiple windows → rejected."),
+    });
+    if (candidates[0].valid) {
+      answer = Math.max(answer, nums[0]);
+      push({
+        title: text(`ans = max(${-1}, ${nums[0]}) = ${answer}`, `ans = max(${-1}, ${nums[0]}) = ${answer}`),
+        line: 12,
+        phase: "general",
+        candidates,
+        activeCandidate: 0,
+        highlight: [0],
+        mark: [0],
+        answer,
+        note: text("Nhận nums[0] làm ứng viên đáp án.", "Take nums[0] as an answer candidate."),
+      });
+    }
+
+    candidates[1].valid = freq.get(nums[n - 1]) === 1;
+    push({
+      title: text(`nums[${n - 1}] = ${nums[n - 1]} xuất hiện ${freq.get(nums[n - 1])} lần`, `nums[${n - 1}] = ${nums[n - 1]} appears ${freq.get(nums[n - 1])} time(s)`),
+      line: 13,
+      phase: "general",
+      candidates,
+      activeCandidate: 1,
+      highlight: candidates[1].occurrences,
+      mark: candidates[1].occurrences,
+      answer,
+      note: candidates[1].valid
+        ? text("Xuất hiện đúng một lần nên nó là 'almost missing'.", "It appears exactly once, so it is almost missing.")
+        : text("Xuất hiện nhiều hơn một lần nên bị loại.", "It appears more than once, so it is rejected."),
+    });
+    if (candidates[1].valid) {
+      const previous = answer;
+      answer = Math.max(answer, nums[n - 1]);
+      push({
+        title: text(`ans = max(${previous}, ${nums[n - 1]}) = ${answer}`, `ans = max(${previous}, ${nums[n - 1]}) = ${answer}`),
+        line: 14,
+        phase: "general",
+        candidates,
+        activeCandidate: 1,
+        highlight: [n - 1],
+        mark: [n - 1],
+        answer,
+        note: text("Cập nhật đáp án với nums cuối mảng.", "Update the answer with the last element."),
+      });
+    }
+
+    push({
+      title: text(`return ${answer}`, `return ${answer}`),
+      line: 15,
+      phase: "done",
+      final: true,
+      candidates,
+      answer,
+      highlight: answer === -1 ? [] : occurrencesOf(answer),
+      mark: answer === -1 ? [] : occurrencesOf(answer),
+      note: answer === -1
+        ? text("Không đầu nào xuất hiện đúng một lần → −1.", "Neither end appears exactly once → −1.")
+        : text(`Ứng viên hợp lệ lớn nhất là ${answer}.`, `The largest valid candidate is ${answer}.`),
+    });
+    return { original: nums, k, answer, steps };
+  }
+
+  Object.assign(module.exports, {
+    3471: {
+      id: 3471,
+      difficulty: "easy",
+      slug: "find-the-largest-almost-missing-integer",
+      category,
+      tags: arrayTag,
+      title: text("Find the Largest Almost Missing Integer", "Find the Largest Almost Missing Integer"),
+      titleVi: text("Tìm số 'almost missing' lớn nhất", "Find the Largest Almost Missing Integer"),
+      statement: text("Cho mảng nums và số k. Một giá trị là 'almost missing' nếu nó nằm trong đúng một subarray liên tiếp độ dài k. Trả về giá trị 'almost missing' lớn nhất, hoặc −1 nếu không có.", "Given nums and an integer k, a value is almost missing if it lies in exactly one contiguous subarray of length k. Return the largest almost missing value, or −1 if none exists."),
+      defaultInput: [3, 9, 2, 1, 7],
+      inputKind: "integer",
+      inputLabel: text("nums", "nums"),
+      extraParams: [
+        { key: "k", type: "number", label: text("k (độ dài cửa sổ)", "k (window length)"), default: 3 },
+      ],
+      complexity: {
+        time: "O(n)",
+        space: "O(n)",
+        note: text("Đếm tần suất một lần rồi chỉ xét vài trường hợp biên.", "Count frequencies once, then check only a few boundary cases."),
+      },
+      code: [
+        "class Solution:",
+        "    def largestAlmostMissingInteger(self, nums, k):",
+        "        n = len(nums)",
+        "        count = Counter(nums)",
+        "        if k == 1:",
+        "            singles = [v for v in nums if count[v] == 1]",
+        "            return max(singles) if singles else -1",
+        "        if k == n:",
+        "            return max(nums)",
+        "        ans = -1",
+        "        if count[nums[0]] == 1:",
+        "            ans = max(ans, nums[0])",
+        "        if count[nums[-1]] == 1:",
+        "            ans = max(ans, nums[-1])",
+        "        return ans",
+      ],
+      builder: buildSteps3471,
+    },
+  });
+})();

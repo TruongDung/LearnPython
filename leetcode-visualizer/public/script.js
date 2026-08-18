@@ -14836,6 +14836,77 @@ function renderClearStarsView(step) {
   </section>`;
 }
 
+function renderAlmostMissingView(step) {
+  const view = step.almostMissingView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const highlight = new Set(view.highlight || []);
+  const windowRange = view.windowRange;
+  const inWindow = (index) => Array.isArray(windowRange) && index >= windowRange[0] && index <= windowRange[1];
+  const caseLabels = {
+    k1: vi ? "k = 1" : "k = 1",
+    kn: vi ? "k = n" : "k = n",
+    general: vi ? "1 < k < n" : "1 < k < n",
+  };
+  const phaseLabels = {
+    setup: vi ? "Chuẩn bị" : "Setup",
+    count: vi ? "Đếm tần suất" : "Count frequency",
+    k1: vi ? "Trường hợp k = 1" : "Case k = 1",
+    kn: vi ? "Trường hợp k = n" : "Case k = n",
+    general: vi ? "Xét hai đầu" : "Check both ends",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  const cellsHtml = nums.map((value, index) => {
+    const classes = ["am3471-cell"];
+    if (highlight.has(index)) classes.push("hit");
+    if (inWindow(index)) classes.push("window");
+    if (index === 0 || index === nums.length - 1) classes.push("edge");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><strong>${value}</strong></span>`;
+  }).join("");
+
+  const windowNote = Array.isArray(windowRange)
+    ? `<p class="am3471-window-note">${vi ? "Cửa sổ đang xét" : "Current window"}: [${windowRange[0]}..${windowRange[1]}]</p>`
+    : "";
+
+  let freqSection = "";
+  if (Array.isArray(view.freq) && view.freq.length) {
+    const chips = view.freq.map((entry) => `<span class="am3471-freq ${entry.count === 1 ? "single" : "multi"}"><b>${entry.value}</b><em>×${entry.count}</em></span>`).join("");
+    freqSection = `<section class="am3471-panel"><header><strong>${vi ? "TẦN SUẤT" : "FREQUENCY"}</strong><span>${vi ? "xanh = xuất hiện đúng 1 lần" : "green = appears exactly once"}</span></header><div class="am3471-freqs">${chips}</div></section>`;
+  }
+
+  let candidateSection = "";
+  if (Array.isArray(view.candidates) && view.candidates.length) {
+    const cards = view.candidates.map((candidate, order) => {
+      const roleLabel = candidate.role === "start"
+        ? (vi ? "Đầu · nums[0]" : "Start · nums[0]")
+        : (vi ? `Cuối · nums[${view.n - 1}]` : `End · nums[${view.n - 1}]`);
+      const state = candidate.valid === null ? "pending" : candidate.valid ? "valid" : "invalid";
+      const active = order === view.activeCandidate ? " active" : "";
+      const status = candidate.valid === null
+        ? (vi ? "chưa xét" : "not checked")
+        : candidate.valid
+          ? (vi ? "hợp lệ (1 lần)" : "valid (once)")
+          : (vi ? `bị loại (${candidate.occurrences.length} lần)` : `rejected (${candidate.occurrences.length}×)`);
+      return `<article class="am3471-candidate ${state}${active}"><small>${roleLabel}</small><strong>${candidate.value}</strong><em>${status}</em><span>idx: [${candidate.occurrences.join(", ")}]</span></article>`;
+    }).join("");
+    candidateSection = `<section class="am3471-panel"><header><strong>${vi ? "ỨNG VIÊN" : "CANDIDATES"}</strong><span>${vi ? "chỉ hai đầu mảng" : "only the two ends"}</span></header><div class="am3471-candidates">${cards}</div></section>`;
+  }
+
+  const answerText = view.answer === null || view.answer === undefined
+    ? (vi ? "đang tính…" : "computing…")
+    : view.answer;
+
+  $("treeView").innerHTML = `<section class="am3471-viz" role="img" aria-label="${vi ? "Trực quan hóa almost missing integer" : "Almost missing integer visualization"}">
+    <header><strong>ALMOST MISSING INTEGER</strong><span class="am3471-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="am3471-rule"><b>${escapeHtml(caseLabels[view.caseType] || "")}</b><strong>${vi ? "'almost missing' = nằm trong ĐÚNG 1 cửa sổ độ dài k" : "almost missing = inside EXACTLY 1 window of length k"}</strong><span>${vi ? `số cửa sổ = n − k + 1 = ${view.windowCount}` : `windows = n − k + 1 = ${view.windowCount}`}</span></section>
+    <section class="am3471-panel"><header><strong>nums</strong><span>${vi ? "vàng = đang tô · xanh = hai đầu" : "yellow = highlighted · green = ends"}</span></header><div class="am3471-cells">${cellsHtml}</div>${windowNote}</section>
+    ${freqSection}
+    ${candidateSection}
+    <section class="am3471-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${answerText}</strong></section>
+  </section>`;
+}
+
 function renderPascalTriangleView(step) {
   const view = step.pascalTriangleView || {};
   const vi = lang === "vi";
@@ -15720,6 +15791,12 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.almostMissingView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderAlmostMissingView(step);
   } else if (step.pascalTriangleView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
