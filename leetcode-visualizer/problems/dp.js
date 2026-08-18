@@ -10184,6 +10184,145 @@ function buildSteps1301(input) {
 }
 
 /**
+ * LeetCode 2320: Count Number of Ways to Place Houses.
+ * One side of the street is a "no two adjacent" placement count = Fibonacci:
+ *   dp[i] = dp[i-1] (plot i empty) + dp[i-2] (plot i has a house → i-1 empty),
+ *   dp[0] = 1, dp[1] = 2.
+ * The two sides are independent, so the answer is dp[n]^2 (mod 1e9+7).
+ */
+function buildSteps2320(input) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1 || n > 46) {
+    throw new Error("n must be an integer between 1 and 46.");
+  }
+
+  const MOD = 1000000007;
+  const steps = [];
+  const dp = new Array(n + 1).fill(null);
+
+  let phase = "intro";
+  let i = null;
+  let emptyWays = null;
+  let houseWays = null;
+  let oneSide = null;
+  let answer = null;
+
+  const snapshot = () => ({
+    n,
+    dp: [...dp],
+    phase,
+    i,
+    emptyWays,
+    houseWays,
+    oneSide,
+    answer,
+  });
+  const push = ({ title, note, line, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      vars,
+      houses2320View: snapshot(),
+    });
+  };
+
+  push({
+    title: { vi: `n = ${n} ô mỗi bên đường`, en: `n = ${n} plots on each side` },
+    note: {
+      vi: "Hai bên đường độc lập nhau. Trên MỖI bên, không được đặt nhà ở hai ô liền kề. Đếm số cách một bên rồi bình phương.",
+      en: "The two sides are independent. On EACH side, no two houses may sit on adjacent plots. Count one side, then square it.",
+    },
+    line: 3,
+    vars: [{ name: "n", value: n }, { name: "MOD", value: "1e9+7" }],
+  });
+
+  dp[0] = 1;
+  i = 0;
+  phase = "init";
+  push({
+    title: { vi: "dp[0] = 1", en: "dp[0] = 1" },
+    note: {
+      vi: "dp[i] = số cách đặt nhà trên i ô đầu (một bên). Với 0 ô: đúng 1 cách (không đặt gì).",
+      en: "dp[i] = ways to place houses on the first i plots (one side). With 0 plots there is exactly 1 way (place nothing).",
+    },
+    line: 5,
+    vars: [{ name: "dp[0]", value: 1 }],
+  });
+
+  if (n >= 1) {
+    dp[1] = 2;
+    i = 1;
+    push({
+      title: { vi: "dp[1] = 2", en: "dp[1] = 2" },
+      note: {
+        vi: "Với 1 ô: hoặc để trống, hoặc đặt một nhà → 2 cách.",
+        en: "With 1 plot: leave it empty or place one house → 2 ways.",
+      },
+      line: 6,
+      vars: [{ name: "dp[1]", value: 2 }],
+    });
+  }
+
+  for (i = 2; i <= n; i++) {
+    emptyWays = dp[i - 1];
+    houseWays = dp[i - 2];
+    dp[i] = (emptyWays + houseWays) % MOD;
+    phase = "step";
+    push({
+      title: { vi: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${emptyWays} + ${houseWays} = ${dp[i]}`, en: `dp[${i}] = dp[${i - 1}] + dp[${i - 2}] = ${emptyWays} + ${houseWays} = ${dp[i]}` },
+      note: {
+        vi: `Ô thứ ${i}: nếu ĐỂ TRỐNG thì còn dp[${i - 1}]=${emptyWays} cách; nếu ĐẶT NHÀ thì ô ${i - 1} phải trống nên còn dp[${i - 2}]=${houseWays} cách. Cộng lại = ${dp[i]}.`,
+        en: `Plot ${i}: if EMPTY there are dp[${i - 1}]=${emptyWays} ways; if a HOUSE then plot ${i - 1} must be empty so dp[${i - 2}]=${houseWays} ways. Sum = ${dp[i]}.`,
+      },
+      line: 8,
+      vars: [
+        { name: "i", value: i },
+        { name: "empty → dp[i-1]", value: emptyWays },
+        { name: "house → dp[i-2]", value: houseWays },
+        { name: "dp[i]", value: dp[i] },
+      ],
+    });
+  }
+
+  emptyWays = null;
+  houseWays = null;
+  oneSide = dp[n];
+  // oneSide can be up to ~1e9, so oneSide*oneSide (~1e18) exceeds Number's safe
+  // integer range; use BigInt for the modular square to stay exact.
+  answer = Number((BigInt(oneSide) * BigInt(oneSide)) % BigInt(MOD));
+  i = n;
+  phase = "square";
+  push({
+    title: { vi: `Một bên: dp[${n}] = ${oneSide}`, en: `One side: dp[${n}] = ${oneSide}` },
+    note: {
+      vi: `Một bên đường có ${oneSide} cách. Hai bên độc lập nên tổng số cách = ${oneSide} × ${oneSide}.`,
+      en: `One side has ${oneSide} ways. The two sides are independent, so the total = ${oneSide} × ${oneSide}.`,
+    },
+    line: 9,
+    vars: [{ name: "one side", value: oneSide }],
+  });
+
+  phase = "done";
+  push({
+    title: { vi: `return ${oneSide}² mod (1e9+7) = ${answer}`, en: `return ${oneSide}² mod (1e9+7) = ${answer}` },
+    note: {
+      vi: `Đáp án = dp[${n}]² mod (10⁹+7) = ${answer}.`,
+      en: `Answer = dp[${n}]² mod (1e9+7) = ${answer}.`,
+    },
+    line: 9,
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+  });
+
+  return { original: [n], answer, steps };
+}
+
+/**
  * LeetCode 1690: Stone Game VII.
  * Interval DP on the score difference. dp[i][j] = best (currentPlayer - opponent)
  * difference achievable on stones[i..j]. Removing an end earns the sum of the
@@ -16330,7 +16469,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 1690, 2320, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -19072,6 +19211,51 @@ module.exports = {
       "        return dp[0][n-1]",
     ],
     builder: buildSteps1690,
+  },
+  2320: {
+    id: 2320,
+    difficulty: "medium",
+    slug: "count-number-of-ways-to-place-houses",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Count Number of Ways to Place Houses", en: "Count Number of Ways to Place Houses" },
+    titleVi: { vi: "Đếm số cách đặt nhà (Fibonacci² )", en: "Count ways to place houses" },
+    statement: {
+      vi:
+        "Một con đường có n ô ở mỗi bên. Không được đặt nhà trên hai ô liền kề CÙNG một bên; hai bên độc lập. Trả về số cách đặt nhà, chia lấy dư 10⁹+7.",
+      en:
+        "A street has n plots on each side. No two houses may be on adjacent plots on the SAME side; the two sides are independent. Return the number of ways to place houses, modulo 1e9+7.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    inputLabel: { vi: "n (1..46)", en: "n (1..46)" },
+    singleInput: true,
+    maxInput: 46,
+    extraParams: [],
+    approach: [
+      { vi: "Trên một bên, số cách đặt nhà không kề nhau trên i ô là dãy Fibonacci: dp[i] = dp[i-1] + dp[i-2].", en: "On one side, the count of no-two-adjacent placements over i plots is Fibonacci: dp[i] = dp[i-1] + dp[i-2]." },
+      { vi: "dp[i-1]: ô i để trống; dp[i-2]: ô i đặt nhà nên ô i-1 phải trống. Base: dp[0]=1, dp[1]=2.", en: "dp[i-1]: plot i empty; dp[i-2]: plot i has a house so plot i-1 is empty. Base: dp[0]=1, dp[1]=2." },
+      { vi: "Hai bên độc lập nên đáp án là dp[n]² mod (10⁹+7).", en: "The two sides are independent, so the answer is dp[n]² mod 1e9+7." },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Điền dãy Fibonacci một lần rồi bình phương; có thể tối ưu O(1) bộ nhớ bằng hai biến.",
+        en: "Fill the Fibonacci sequence once, then square; memory can be reduced to O(1) with two rolling variables.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def countHousePlacements(self, n):",
+      "        MOD = 10**9 + 7",
+      "        dp = [0] * (n + 1)",
+      "        dp[0] = 1",
+      "        dp[1] = 2",
+      "        for i in range(2, n + 1):",
+      "            dp[i] = (dp[i-1] + dp[i-2]) % MOD",
+      "        return (dp[n] * dp[n]) % MOD",
+    ],
+    builder: buildSteps2320,
   },
   494: {
     id: 494,

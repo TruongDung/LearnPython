@@ -13618,6 +13618,96 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+// ---- LeetCode 2320: Count Ways to Place Houses — Fibonacci per side, squared ----
+function renderHouses2320View(step) {
+  const view = step.houses2320View || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const phase = String(view.phase || "intro");
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const phaseIndex = phase === "intro" ? 0
+    : phase === "init" ? 1
+      : phase === "step" ? 2
+        : phase === "square" ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Ý tưởng", "Base dp[0],dp[1]", "Fibonacci dp[i]", "Một bên → ²", "Đáp án"]
+    : ["Idea", "Base dp[0],dp[1]", "Fibonacci dp[i]", "One side → ²", "Answer"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // dp strip 0..n
+  const dpCells = [];
+  for (let k = 0; k <= n; k++) {
+    const filled = dp[k] !== null && dp[k] !== undefined;
+    const classes = ["h2320-dp-cell"];
+    if (!filled) classes.push("pending");
+    if (k === view.i && phase !== "done") classes.push("cur");
+    if (phase === "step" && k === view.i - 1) classes.push("empty-src");
+    if (phase === "step" && k === view.i - 2) classes.push("house-src");
+    if ((phase === "square" || phase === "done") && k === n) classes.push("one-side");
+    dpCells.push(`<div class="${classes.join(" ")}"><small>dp[${k}]</small><b>${filled ? escapeHtml(String(dp[k])) : "·"}</b></div>`);
+  }
+  const dpLine = dpCells.join("");
+
+  // Branch cards during a Fibonacci step.
+  let branches = "";
+  if (phase === "step" && Number.isInteger(view.i)) {
+    const iv = view.i;
+    branches = `<section class="h2320-branches">
+      <div class="empty">
+        <small>${vi ? `Ô ${iv} ĐỂ TRỐNG` : `Plot ${iv} EMPTY`}</small>
+        <div class="plots">${Array.from({ length: Math.min(iv, 6) }, (_, k) => `<span class="${k === Math.min(iv, 6) - 1 ? "free" : ""}"></span>`).join("")}</div>
+        <b>dp[${iv - 1}] = ${escapeHtml(display(view.emptyWays))}</b>
+      </div>
+      <em>+</em>
+      <div class="house">
+        <small>${vi ? `Ô ${iv} ĐẶT NHÀ` : `Plot ${iv} HOUSE`}</small>
+        <div class="plots">${Array.from({ length: Math.min(iv, 6) }, (_, k) => { const last = Math.min(iv, 6) - 1; return `<span class="${k === last ? "house" : k === last - 1 ? "forced" : ""}"></span>`; }).join("")}</div>
+        <b>${vi ? "ô trước phải trống →" : "previous forced empty →"} dp[${iv - 2}] = ${escapeHtml(display(view.houseWays))}</b>
+      </div>
+      <em>=</em>
+      <div class="sum"><small>dp[${iv}]</small><b>${escapeHtml(display(dp[iv]))}</b></div>
+    </section>`;
+  }
+
+  // Two-sides square panel.
+  let squarePanel = "";
+  if (phase === "square" || phase === "done") {
+    squarePanel = `<section class="h2320-square ${phase === "done" ? "ready" : ""}">
+      <div class="side"><small>${vi ? "Bên A" : "Side A"}</small><b>${escapeHtml(display(view.oneSide))}</b></div>
+      <em>×</em>
+      <div class="side"><small>${vi ? "Bên B" : "Side B"}</small><b>${escapeHtml(display(view.oneSide))}</b></div>
+      <em>=</em>
+      <div class="total"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><b>${escapeHtml(display(view.answer))}</b></div>
+    </section>`;
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+
+  $("treeView").innerHTML = `<section class="h2320-viz" role="img" aria-label="LeetCode 2320 Count Ways to Place Houses visualization">
+    <div class="h2320-phases">${phases}</div>
+    <div class="h2320-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="h2320-street">
+      <header><strong>${vi ? "Con đường: n ô mỗi bên" : "Street: n plots each side"}</strong><span>${vi ? "không đặt nhà ở hai ô liền kề cùng bên" : "no houses on adjacent plots on the same side"}</span></header>
+      <div class="h2320-sides">
+        <div class="h2320-side">${Array.from({ length: n }, (_, k) => `<span></span>`).join("")}<i>${vi ? "bên A" : "side A"}</i></div>
+        <div class="h2320-road"></div>
+        <div class="h2320-side">${Array.from({ length: n }, (_, k) => `<span></span>`).join("")}<i>${vi ? "bên B" : "side B"}</i></div>
+      </div>
+    </section>
+    ${branches}
+    <section class="h2320-dp">
+      <header><strong>${vi ? "dp một bên (Fibonacci)" : "dp for one side (Fibonacci)"}</strong><span>dp[i] = dp[i-1] + dp[i-2]</span></header>
+      <div class="h2320-dp-cells">${dpLine}</div>
+    </section>
+    ${squarePanel}
+  </section>`;
+}
+
 // ---- LeetCode 1690: Stone Game VII — interval DP on the score difference ----
 function renderStoneGame1690View(step) {
   const view = step.stoneGame1690View || {};
@@ -16433,6 +16523,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.houses2320View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderHouses2320View(step);
   } else if (step.stoneGame1690View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -34080,3 +34080,72 @@ html, body {
 [data-theme="light"] .sg1690-answer.ready { background: #f0fdf4; border-color: #16a34a; }
 [data-theme="light"] .sg1690-answer.ready strong { color: #166534; }
 @media (max-width: 760px) { .sg1690-viz { padding: 11px 8px; } .sg1690-phases { grid-template-columns: repeat(2,minmax(0,1fr)); } .sg1690-debug { grid-template-columns: 1fr; } .sg1690-debug small { grid-row: auto; } .sg1690-decision .options { grid-template-columns: 1fr; } .sg1690-answer { grid-template-columns: 1fr; } .sg1690-answer em { text-align: left; } }
+
+/* LeetCode 2320 · Count Ways to Place Houses — Fibonacci per side, squared */
+.tree-view:has(.h2320-viz) { min-height: 0; padding: 0; overflow: visible; background: transparent; border: 0; }
+.h2320-viz { display: grid; gap: 12px; min-width: 0; padding: 16px; color: #e2e8f0; background: radial-gradient(circle at 4% 0,rgba(34,197,94,.12),transparent 30%),radial-gradient(circle at 97% 3%,rgba(14,165,233,.1),transparent 32%),#0b1220; border: 1px solid #29364a; border-radius: 15px; }
+.h2320-viz * { box-sizing: border-box; }
+.h2320-phases { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 6px; }
+.h2320-phases span { min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px; color: #64748b; background: rgba(15,23,42,.74); border: 1px solid #334155; border-radius: 9px; font-size: 9px; text-align: center; overflow-wrap: anywhere; }
+.h2320-phases i { font-style: normal; font-weight: 900; }
+.h2320-phases b { font-weight: 750; }
+.h2320-phases span.active { color: #bbf7d0; background: rgba(34,197,94,.16); border-color: #22c55e; }
+.h2320-phases span.done { color: #bbf7d0; background: rgba(34,197,94,.1); border-color: #22c55e; }
+.h2320-debug { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 3px 10px; align-items: center; padding: 9px 11px; background: rgba(15,23,42,.72); border-left: 4px solid #22c55e; border-radius: 8px; }
+.h2320-debug small { grid-row: 1 / span 2; color: #86efac; font: 850 9px Consolas,monospace; letter-spacing: .07em; }
+.h2320-debug strong { color: #f8fafc; font: 750 12px Consolas,monospace; overflow-wrap: anywhere; }
+.h2320-debug span { color: #94a3b8; font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.h2320-street,.h2320-dp,.h2320-branches,.h2320-square { min-width: 0; padding: 10px 11px; background: rgba(15,23,42,.56); border: 1px solid #334155; border-radius: 11px; }
+.h2320-street header,.h2320-dp header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 10px; margin-bottom: 8px; }
+.h2320-street header strong,.h2320-dp header strong { color: #f8fafc; font: 750 11px Consolas,monospace; }
+.h2320-street header span,.h2320-dp header span { color: #94a3b8; font-size: 9px; }
+.h2320-sides { display: grid; gap: 5px; }
+.h2320-side { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.h2320-side span { width: 22px; height: 22px; background: #111c2f; border: 1px solid #475569; border-radius: 5px; }
+.h2320-side i { margin-left: 6px; color: #94a3b8; font-size: 9px; font-style: normal; }
+.h2320-road { height: 6px; background: repeating-linear-gradient(90deg,#475569 0 10px,transparent 10px 20px); border-radius: 3px; }
+.h2320-dp-cells { display: flex; flex-wrap: wrap; gap: 5px; }
+.h2320-dp-cell { display: grid; place-items: center; gap: 1px; min-width: 48px; padding: 6px 7px; background: #111c2f; border: 1px solid #334155; border-radius: 7px; }
+.h2320-dp-cell small { color: #64748b; font: 700 8px Consolas,monospace; }
+.h2320-dp-cell b { color: #e2e8f0; font: 900 14px Consolas,monospace; }
+.h2320-dp-cell.pending b { color: #475569; }
+.h2320-dp-cell.cur { border-color: #22c55e; background: rgba(34,197,94,.14); box-shadow: 0 0 0 2px rgba(34,197,94,.16); }
+.h2320-dp-cell.empty-src { border-color: #38bdf8; background: rgba(56,189,248,.12); }
+.h2320-dp-cell.house-src { border-color: #f59e0b; background: rgba(245,158,11,.12); }
+.h2320-dp-cell.one-side { border-color: #a78bfa; background: rgba(139,92,246,.14); }
+.h2320-branches { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto auto; gap: 8px; align-items: center; }
+.h2320-branches > div { display: grid; gap: 4px; padding: 9px 10px; background: #111c2f; border: 2px solid #334155; border-radius: 9px; text-align: center; }
+.h2320-branches small { color: #94a3b8; font: 850 8px Consolas,monospace; }
+.h2320-branches b { color: #f8fafc; font: 800 10px Consolas,monospace; overflow-wrap: anywhere; }
+.h2320-branches > em { align-self: center; color: #64748b; font: 900 14px Consolas,monospace; font-style: normal; }
+.h2320-branches .empty { border-color: #38bdf8; }
+.h2320-branches .house { border-color: #f59e0b; }
+.h2320-branches .sum { border-color: #22c55e; }
+.h2320-branches .sum b { color: #86efac; font-size: 16px; }
+.h2320-branches .plots { display: flex; justify-content: center; gap: 3px; }
+.h2320-branches .plots span { width: 15px; height: 15px; background: #0b1220; border: 1px solid #475569; border-radius: 4px; }
+.h2320-branches .plots span.free { border-color: #38bdf8; }
+.h2320-branches .plots span.house { background: #f59e0b; border-color: #f59e0b; }
+.h2320-branches .plots span.forced { background: repeating-linear-gradient(135deg,rgba(239,68,68,.3) 0 4px,transparent 4px 8px); border-color: #ef4444; }
+.h2320-square { display: grid; grid-template-columns: repeat(5,auto); gap: 8px; justify-content: center; align-items: center; }
+.h2320-square > div { display: grid; gap: 2px; min-width: 78px; padding: 9px; background: #111c2f; border: 1px solid #334155; border-radius: 9px; text-align: center; }
+.h2320-square small { color: #94a3b8; font: 850 8px Consolas,monospace; }
+.h2320-square b { color: #f8fafc; font: 900 18px Consolas,monospace; }
+.h2320-square > em { color: #64748b; font: 900 16px Consolas,monospace; font-style: normal; }
+.h2320-square .total { border-left: 4px solid #22c55e; }
+.h2320-square.ready .total { border-color: #22c55e; background: rgba(34,197,94,.12); }
+.h2320-square.ready .total b { color: #86efac; }
+[data-theme="light"] .h2320-viz { color: #1e293b; background: radial-gradient(circle at 4% 0,rgba(34,197,94,.07),transparent 30%),radial-gradient(circle at 97% 3%,rgba(14,165,233,.06),transparent 32%),#f8fafc; border-color: #cbd5e1; }
+[data-theme="light"] .h2320-phases span,[data-theme="light"] .h2320-debug,[data-theme="light"] .h2320-street,[data-theme="light"] .h2320-dp,[data-theme="light"] .h2320-branches,[data-theme="light"] .h2320-square,[data-theme="light"] .h2320-side span,[data-theme="light"] .h2320-dp-cell,[data-theme="light"] .h2320-branches > div,[data-theme="light"] .h2320-square > div { background-color: #fff; border-color: #cbd5e1; }
+[data-theme="light"] .h2320-phases span { color: #475569; }
+[data-theme="light"] .h2320-phases span.active,[data-theme="light"] .h2320-phases span.done { color: #166534; background: #dcfce7; border-color: #16a34a; }
+[data-theme="light"] .h2320-debug small { color: #15803d; }
+[data-theme="light"] .h2320-debug strong,[data-theme="light"] .h2320-street header strong,[data-theme="light"] .h2320-dp header strong,[data-theme="light"] .h2320-dp-cell b,[data-theme="light"] .h2320-branches b,[data-theme="light"] .h2320-square b { color: #0f172a; }
+[data-theme="light"] .h2320-debug span,[data-theme="light"] .h2320-street header span,[data-theme="light"] .h2320-dp header span,[data-theme="light"] .h2320-dp-cell small,[data-theme="light"] .h2320-branches small,[data-theme="light"] .h2320-square small,[data-theme="light"] .h2320-side i { color: #475569; }
+[data-theme="light"] .h2320-dp-cell.cur { background: #dcfce7; border-color: #16a34a; }
+[data-theme="light"] .h2320-dp-cell.empty-src { background: #e0f2fe; border-color: #0284c7; }
+[data-theme="light"] .h2320-dp-cell.house-src { background: #fffbeb; border-color: #d97706; }
+[data-theme="light"] .h2320-dp-cell.one-side { background: #f3e8ff; border-color: #7e22ce; }
+[data-theme="light"] .h2320-branches .sum b,[data-theme="light"] .h2320-square.ready .total b { color: #166534; }
+[data-theme="light"] .h2320-square.ready .total { background: #dcfce7; border-color: #16a34a; }
+@media (max-width: 760px) { .h2320-viz { padding: 11px 8px; } .h2320-phases { grid-template-columns: repeat(3,minmax(0,1fr)); } .h2320-debug { grid-template-columns: 1fr; } .h2320-debug small { grid-row: auto; } .h2320-branches { grid-template-columns: 1fr; } .h2320-branches > em { text-align: center; } .h2320-square { grid-template-columns: 1fr; } .h2320-square > em { text-align: center; } }
