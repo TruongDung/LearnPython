@@ -3444,7 +3444,9 @@ function buildSteps337(input) {
     for (const node of step.tree.nodes) {
       if (node.isNull) continue;
       const state = computed.get(node.id);
-      if (state) node.labelLines = [String(node.label), `rob ${state.rob}`, `skip ${state.skip}`];
+      // Keep the circle clean (just the house value) and show the DP pair as a
+      // compact label underneath so nothing overlaps inside the node.
+      if (state) node.sub = `rob ${state.rob} · skip ${state.skip}`;
       if (node.id === currentId) node.hl = true;
       if (sources.has(node.id)) node.isWord = true; // reuse the green ring for source children
     }
