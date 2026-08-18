@@ -18058,6 +18058,17 @@ $("liveExitBtn") && $("liveExitBtn").addEventListener("click", () => {
   setLiveMode(false);
 });
 
+// Pressing ESC while the live editor is open behaves like clicking "Exit editor".
+// Monaco handles ESC for its own widgets (suggest/find) and stops propagation,
+// so this only fires when no such widget intercepts the key first.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !liveMode) return;
+  const exitButton = $("liveExitBtn");
+  if (!exitButton || exitButton.classList.contains("hidden")) return;
+  e.preventDefault();
+  exitButton.click();
+});
+
 $("liveRunBtn") && $("liveRunBtn").addEventListener("click", runLiveCode);
 
 function setLiveCopyButtonState(copied) {
