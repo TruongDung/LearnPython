@@ -5116,257 +5116,254 @@ function buildSteps688(input, params) {
  * dp[i] = max(dp[i-1], dp[i-2] + earn[i]) — can't take adjacent values.
  */
 function buildSteps740(nums) {
-  const steps = [];
-  const maxVal = Math.max(...nums);
-  const earn = new Array(maxVal + 1).fill(0);
-  for (const num of nums) earn[num] += num;
-
-  // Original input
-  const mapping = earn
-    .map((v, i) => (v > 0 ? `${i}→${v}` : null))
-    .filter(Boolean)
-    .join(", ");
-
-  steps.push({
-    title: { vi: "Đầu vào gốc", en: "Original input" },
-    arr: nums.slice(),
-    sub: nums.map((_, i) => String(i)),
-    highlight: nums.map((_, i) => i),
-    mark: [],
-    codeLines: [1, 2],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "maxVal", value: maxVal },
-    ],
-    note: {
-      vi: `Bắt đầu với mảng nums. Mỗi giá trị sẽ được cộng vào earn[] theo giá trị số tương ứng.`,
-      en: `Start with nums. Each value will be aggregated into earn[] by its numeric value.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Tính max_val", en: "Compute max_val" },
-    arr: nums.slice(),
-    sub: nums.map((_, i) => String(i)),
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [
-      { name: "maxVal", value: maxVal },
-    ],
-    note: {
-      vi: `max_val là giá trị lớn nhất trong nums, dùng để xác định kích thước của earn[].`,
-      en: `max_val is the largest value in nums, used to size the earn array.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Khởi tạo earn", en: "Initialize earn" },
-    arr: earn.slice(),
-    sub: earn.map((_, i) => String(i)),
-    highlight: earn.map((_, i) => i),
-    mark: [],
-    codeLines: [4],
-    vars: [
-      { name: "earn", value: `[${earn.join(",")}]` },
-    ],
-    note: {
-      vi: `Tạo mảng earn có độ dài max_val+1 và khởi tạo tất cả phần tử bằng 0.`,
-      en: `Create earn array of length max_val+1 and initialize all entries to 0.`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Bắt đầu lặp nums", en: "Start loop over nums" },
-    arr: earn.slice(),
-    sub: earn.map((_, i) => String(i)),
-    highlight: [],
-    mark: [],
-    codeLines: [5],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "earn", value: `[${earn.join(",")}]` },
-    ],
-    note: {
-      vi: `Bắt đầu lặp qua nums để xây earn[].`,
-      en: `Begin looping through nums to build earn[].`,
-    },
-  });
-
-  steps.push({
-    title: { vi: "Cập nhật earn[num]", en: "Update earn[num]" },
-    arr: earn.slice(),
-    sub: earn.map((_, i) => String(i)),
-    highlight: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
-    mark: earn.map((v, i) => (v > 0 ? i : -1)).filter((i) => i >= 0),
-    codeLines: [6],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "earn", value: `[${earn.join(",")}]` },
-      { name: "mapping", value: mapping },
-    ],
-    note: {
-      vi: `earn[num] += num với mỗi num trong nums để tổng hợp điểm của mỗi giá trị.`,
-      en: `earn[num] += num for each num in nums to aggregate the score for each value.`,
-    },
-  });
-
-  const nonzeroEarn = [];
-  for (let i = 0; i < earn.length; i++) {
-    if (earn[i] > 0) nonzeroEarn.push(i);
+  if (!Array.isArray(nums) || nums.length === 0 || nums.some((value) => !Number.isInteger(value) || value < 1)) {
+    throw new Error("nums must contain at least one positive integer.");
   }
 
-  steps.push({
-    title: { vi: "Chuyển sang House Robber", en: "House Robber idea" },
-    arr: earn.slice(),
-    sub: earn.map((_, i) => String(i)),
-    highlight: nonzeroEarn,
-    mark: nonzeroEarn,
-    codeLines: [4],
-    vars: [
-      { name: "nums", value: `[${nums.join(",")}]` },
-      { name: "earn", value: `[${earn.join(",")}]` },
-    ],
-    note: {
-      vi: `earn[v] = v × count(v). Chọn v thì mất v-1 và v+1 → giống House Robber trên mảng earn.`,
-      en: `earn[v] = v × count(v). Taking v removes v-1 and v+1 → same as House Robber on earn array.`,
-    },
+  const steps = [];
+  const n = nums.length;
+  const maxVal = Math.max(...nums);
+  const counts = new Array(maxVal + 1).fill(0);
+  const earn = new Array(maxVal + 1).fill(0);
+  const dp = new Array(maxVal + 1).fill(null);
+  const decisions = new Array(maxVal + 1).fill(null); // "take" | "skip" per dp index
+
+  let phase = "aggregate";
+  let activeNumIndex = null; // index into nums during bucket building
+  let activeValue = null; // current value/index on the earn line
+  let i = null; // current dp index
+  let take = null;
+  let skip = null;
+  let decision = null;
+  let answer = null;
+  let chosen = [];
+
+  const distinctValues = () => {
+    const set = [];
+    for (let v = 0; v <= maxVal; v++) if (counts[v] > 0) set.push(v);
+    return set;
+  };
+  // Reconstruct which values were actually taken by walking dp backwards.
+  const reconstruct = () => {
+    const picked = [];
+    let k = maxVal;
+    while (k >= 0) {
+      if (k === 0) {
+        if (earn[0] > 0 && (dp[0] || 0) > 0) picked.push(0);
+        break;
+      }
+      const prev = k >= 2 ? (dp[k - 2] || 0) : 0;
+      if (dp[k] !== null && earn[k] > 0 && dp[k] === prev + earn[k] && dp[k] !== (dp[k - 1] || 0)) {
+        picked.push(k);
+        k -= 2;
+      } else {
+        k -= 1;
+      }
+    }
+    return picked.reverse();
+  };
+
+  const snapshot = () => ({
+    nums: [...nums],
+    maxVal,
+    counts: [...counts],
+    earn: [...earn],
+    dp: [...dp],
+    decisions: [...decisions],
+    phase,
+    activeNumIndex,
+    activeValue,
+    i,
+    take,
+    skip,
+    decision,
+    chosen: [...chosen],
+    answer,
+    conflictLeft: phase === "dp-compute" && Number.isInteger(i) ? i - 1 : null,
+    baseIndex: phase === "dp-compute" && Number.isInteger(i) ? i - 2 : null,
   });
 
-  steps.push({
-    title: { vi: "Công thức DP", en: "DP formula" },
-    arr: earn.slice(),
-    sub: earn.map((_, i) => String(i)),
-    highlight: nonzeroEarn,
-    mark: nonzeroEarn,
-    codeLines: [5],
-    vars: [
-      { name: "earn", value: `[${earn.join(",")}]` },
-    ],
+  const push = ({ title, note, line, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      arr: [...nums],
+      highlight: [],
+      mark: [],
+      vars,
+      deleteEarn740View: snapshot(),
+    });
+  };
+
+  // ---- Phase 1: aggregate nums into earn[] by value ----
+  push({
+    title: { vi: `max_val = max(nums) = ${maxVal}`, en: `max_val = max(nums) = ${maxVal}` },
     note: {
-      vi: `dp[i] = max(dp[i-1], dp[i-2] + earn[i]).`,
-      en: `dp[i] = max(dp[i-1], dp[i-2] + earn[i]).`,
+      vi: "Giá trị lớn nhất quyết định độ dài của earn[] và dp[]. Ta sẽ làm việc trên trục GIÁ TRỊ chứ không phải trục vị trí.",
+      en: "The largest value sizes earn[] and dp[]. We work on the VALUE axis, not the position axis.",
     },
+    line: 3,
+    vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "max_val", value: maxVal }],
+  });
+  push({
+    title: { vi: `earn = [0] * ${maxVal + 1}`, en: `earn = [0] * ${maxVal + 1}` },
+    note: {
+      vi: "earn[v] sẽ là TỔNG điểm nếu ta lấy tất cả phần tử bằng v. Vì lấy một v là lấy hết mọi v (chúng không xung đột nhau).",
+      en: "earn[v] will be the TOTAL points from taking every element equal to v. Taking one v means taking all v (they never conflict).",
+    },
+    line: 4,
+    vars: [{ name: "earn", value: `[${earn.join(",")}]` }],
   });
 
-  // DP
-  const dp = new Array(maxVal + 1).fill(0);
+  phase = "aggregate-loop";
+  for (let k = 0; k < n; k++) {
+    activeNumIndex = k;
+    activeValue = nums[k];
+    push({
+      title: { vi: `num = nums[${k}] = ${nums[k]}`, en: `num = nums[${k}] = ${nums[k]}` },
+      note: {
+        vi: `Bỏ ${nums[k]} vào "thùng" giá trị ${nums[k]}.`,
+        en: `Drop ${nums[k]} into the bucket for value ${nums[k]}.`,
+      },
+      line: 5,
+      vars: [{ name: "num", value: nums[k] }],
+    });
+    counts[nums[k]] += 1;
+    earn[nums[k]] += nums[k];
+    push({
+      title: { vi: `earn[${nums[k]}] += ${nums[k]} → ${earn[nums[k]]}`, en: `earn[${nums[k]}] += ${nums[k]} → ${earn[nums[k]]}` },
+      note: {
+        vi: `Thùng ${nums[k]} giờ có ${counts[nums[k]]} phần tử, tổng điểm earn[${nums[k]}] = ${nums[k]} × ${counts[nums[k]]} = ${earn[nums[k]]}.`,
+        en: `Bucket ${nums[k]} now holds ${counts[nums[k]]} elements, so earn[${nums[k]}] = ${nums[k]} × ${counts[nums[k]]} = ${earn[nums[k]]}.`,
+      },
+      line: 6,
+      vars: [{ name: `earn[${nums[k]}]`, value: earn[nums[k]] }, { name: "count", value: counts[nums[k]] }],
+    });
+  }
+  activeNumIndex = null;
+
+  // Bridge frame: explain the House Robber reduction on the value line.
+  phase = "reduce";
+  activeValue = null;
+  const distinct = distinctValues();
+  const adjacentPair = distinct.find((v) => distinct.includes(v + 1));
+  push({
+    title: { vi: "Ý tưởng: House Robber trên trục giá trị", en: "Idea: House Robber on the value axis" },
+    note: adjacentPair !== undefined
+      ? {
+        vi: `Lấy giá trị v sẽ xóa v-1 và v+1. Ví dụ ${adjacentPair} và ${adjacentPair + 1} là hai giá trị liền kề → không thể lấy cả hai. Đây đúng là House Robber: không lấy hai ô cạnh nhau trên earn[].`,
+        en: `Taking value v deletes v-1 and v+1. For example ${adjacentPair} and ${adjacentPair + 1} are adjacent → cannot take both. That is exactly House Robber: no two neighboring cells of earn[].`,
+      }
+      : {
+        vi: "Lấy giá trị v sẽ xóa v-1 và v+1. Bài toán trở thành House Robber trên earn[]: không lấy hai ô cạnh nhau.",
+        en: "Taking value v deletes v-1 and v+1. This becomes House Robber on earn[]: never take two neighboring cells.",
+      },
+    line: 6,
+    vars: [{ name: "earn", value: `[${earn.join(",")}]` }],
+  });
+
+  // ---- Phase 2: DP over earn[] ----
+  phase = "dp-init";
+  push({
+    title: { vi: `dp = [0] * ${maxVal + 1}`, en: `dp = [0] * ${maxVal + 1}` },
+    note: {
+      vi: "dp[v] = điểm tối đa khi chỉ xét các giá trị từ 0 đến v.",
+      en: "dp[v] = the best points using only values from 0 to v.",
+    },
+    line: 7,
+    vars: [{ name: "dp", value: `[${dp.map((x) => (x === null ? 0 : x)).join(",")}]` }],
+  });
+
   dp[0] = earn[0];
-  if (maxVal >= 1) dp[1] = Math.max(earn[0], earn[1]);
-
-  steps.push({
-    title: { vi: "Tạo mảng dp", en: "Create dp array" },
-    arr: earn.slice(),
-    sub: dp.map((v) => String(v)),
-    highlight: [],
-    mark: [],
-    codeLines: [7],
-    vars: [
-      { name: "dp", value: `[${dp.join(",")}]` },
-    ],
+  decisions[0] = earn[0] > 0 ? "take" : "skip";
+  i = 0;
+  push({
+    title: { vi: `dp[0] = earn[0] = ${earn[0]}`, en: `dp[0] = earn[0] = ${earn[0]}` },
     note: {
-      vi: `Khởi tạo dp có độ dài max_val+1 với tất cả giá trị bằng 0.`,
-      en: `Initialize dp with length max_val+1 and all values 0.`,
+      vi: "Chỉ có giá trị 0, nên cứ lấy hết điểm của nó (0 không tồn tại trong nums dương nên thường bằng 0).",
+      en: "With only value 0 available, take all of its points (value 0 never appears for positive nums, so this is usually 0).",
     },
-  });
-
-  steps.push({
-    title: { vi: "Đặt dp[0]", en: "Set dp[0]" },
-    arr: earn.slice(),
-    sub: dp.map((v) => String(v)),
-    highlight: [0],
-    mark: [],
-    codeLines: [8],
-    vars: [
-      { name: "dp[0]", value: dp[0] },
-      { name: "earn[0]", value: earn[0] },
-    ],
-    note: {
-      vi: `dp[0] được gán earn[0] = ${earn[0]}.`,
-      en: `dp[0] is assigned earn[0] = ${earn[0]}.`,
-    },
+    line: 8,
+    vars: [{ name: "dp[0]", value: dp[0] }],
   });
 
   if (maxVal >= 1) {
-    steps.push({
-      title: { vi: "Đặt dp[1]", en: "Set dp[1]" },
-      arr: earn.slice(),
-      sub: dp.map((v) => String(v)),
-      highlight: [1],
-      mark: [],
-      codeLines: [9],
-      vars: [
-        { name: "dp[1]", value: dp[1] },
-        { name: "earn[0]", value: earn[0] },
-        { name: "earn[1]", value: earn[1] },
-      ],
+    dp[1] = Math.max(earn[0], earn[1]);
+    decisions[1] = earn[1] >= earn[0] ? "take" : "skip";
+    i = 1;
+    push({
+      title: { vi: `dp[1] = max(earn[0], earn[1]) = max(${earn[0]}, ${earn[1]}) = ${dp[1]}`, en: `dp[1] = max(earn[0], earn[1]) = max(${earn[0]}, ${earn[1]}) = ${dp[1]}` },
       note: {
-        vi: `dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
-        en: `dp[1] = max(earn[0], earn[1]) = ${dp[1]}.`,
+        vi: "Giá trị 0 và 1 liền kề nên chỉ được chọn một; lấy cái có điểm cao hơn.",
+        en: "Values 0 and 1 are adjacent, so pick only the higher-scoring one.",
       },
+      line: 9,
+      vars: [{ name: "dp[1]", value: dp[1] }, { name: "earn[0]", value: earn[0] }, { name: "earn[1]", value: earn[1] }],
     });
   }
 
-  for (let i = 2; i <= maxVal; i++) {
-    const skip = dp[i - 1];
-    const take = dp[i - 2] + earn[i];
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: earn.slice(),
-      sub: dp.map((v) => String(v)),
-      highlight: [i - 2, i - 1],
-      mark: [i],
-      codeLines: [10],
+  for (i = 2; i <= maxVal; i++) {
+    phase = "dp-loop";
+    skip = dp[i - 1];
+    take = dp[i - 2] + earn[i];
+    decision = null;
+    push({
+      title: { vi: `i = ${i}: xét giá trị ${i}`, en: `i = ${i}: consider value ${i}` },
+      note: {
+        vi: `Hai lựa chọn: BỎ giá trị ${i} (giữ dp[${i - 1}]=${skip}) hoặc LẤY giá trị ${i} (dp[${i - 2}]=${dp[i - 2]} + earn[${i}]=${earn[i]} = ${take}).`,
+        en: `Two options: SKIP value ${i} (keep dp[${i - 1}]=${skip}) or TAKE value ${i} (dp[${i - 2}]=${dp[i - 2]} + earn[${i}]=${earn[i]} = ${take}).`,
+      },
+      line: 10,
       vars: [
         { name: "i", value: i },
-        { name: "skip (dp[i-1])", value: skip },
-        { name: "take (dp[i-2] + earn[i])", value: take },
-        { name: "earn[i]", value: earn[i] },
+        { name: "skip = dp[i-1]", value: skip },
+        { name: "take = dp[i-2]+earn[i]", value: take },
       ],
-      note: {
-        vi: `Tiếp tục vòng lặp với i = ${i}. So sánh dp[i-1] và dp[i-2] + earn[i].`,
-        en: `Continue loop with i = ${i}. Compare dp[i-1] and dp[i-2] + earn[i].`,
-      },
     });
 
+    phase = "dp-compute";
     dp[i] = Math.max(skip, take);
-    const took = dp[i] === take;
-
-    steps.push({
-      title: { vi: `Tính dp[${i}]`, en: `Compute dp[${i}]` },
-      arr: earn.slice(),
-      sub: dp.map((v) => String(v)),
-      highlight: [i - 2, i - 1, i],
-      mark: [],
-      codeLines: [11],
+    decision = take > skip ? "take" : "skip";
+    decisions[i] = decision;
+    push({
+      title: { vi: `dp[${i}] = max(${skip}, ${take}) = ${dp[i]}`, en: `dp[${i}] = max(${skip}, ${take}) = ${dp[i]}` },
+      note: decision === "take"
+        ? {
+          vi: `LẤY giá trị ${i}: cộng earn[${i}]=${earn[i]} vào dp[${i - 2}]=${dp[i - 2]}. Chú ý phải bỏ qua giá trị ${i - 1} liền kề (đó là lý do dùng dp[${i - 2}] chứ không phải dp[${i - 1}]).`,
+          en: `TAKE value ${i}: add earn[${i}]=${earn[i]} to dp[${i - 2}]=${dp[i - 2]}. Note we must skip the adjacent value ${i - 1} (that is why we use dp[${i - 2}], not dp[${i - 1}]).`,
+        }
+        : {
+          vi: `BỎ giá trị ${i}: giữ nguyên dp[${i - 1}]=${skip} vì lấy ${i} không có lợi.`,
+          en: `SKIP value ${i}: keep dp[${i - 1}]=${skip} because taking ${i} is not worth it.`,
+        },
+      line: 11,
       vars: [
-        { name: "i", value: i },
-        { name: "skip (dp[i-1])", value: skip },
-        { name: "take (dp[i-2]+earn[i])", value: take },
         { name: "dp[i]", value: dp[i] },
-        { name: "decision", value: took ? "take" : "skip" },
+        { name: "decision", value: decision === "take" ? (`TAKE ${i}`) : (`SKIP ${i}`) },
       ],
-      note: {
-        vi: `dp[${i}] = max(skip=${skip}, take=${take}) = ${dp[i]} (${took ? `lấy giá trị ${i}` : `bỏ qua ${i}`}).`,
-        en: `dp[${i}] = max(skip=${skip}, take=${take}) = ${dp[i]} (${took ? `take value ${i}` : `skip ${i}`}).`,
-      },
     });
   }
 
-  const answer = dp[maxVal];
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: earn.slice(),
-    sub: dp.map((v) => String(v)),
-    highlight: [],
-    mark: [maxVal],
-    final: true,
-    codeLines: [12],
-    vars: [{ name: "answer", value: answer }],
+  phase = "done";
+  i = maxVal;
+  answer = dp[maxVal];
+  chosen = reconstruct();
+  const chosenPoints = chosen.map((v) => `earn[${v}]=${earn[v]}`).join(" + ") || "0";
+  push({
+    title: { vi: `return dp[${maxVal}] = ${answer}`, en: `return dp[${maxVal}] = ${answer}` },
     note: {
-      vi: `Điểm tối đa = dp[${maxVal}] = ${answer}.`,
-      en: `Maximum points = dp[${maxVal}] = ${answer}.`,
+      vi: chosen.length
+        ? `Điểm tối đa = ${answer}. Các giá trị được chọn: {${chosen.join(", ")}} → ${chosenPoints} = ${answer}. Không có hai giá trị nào liền kề.`
+        : `Điểm tối đa = ${answer}.`,
+      en: chosen.length
+        ? `Maximum points = ${answer}. Chosen values: {${chosen.join(", ")}} → ${chosenPoints} = ${answer}. No two chosen values are adjacent.`
+        : `Maximum points = ${answer}.`,
     },
+    line: 12,
+    final: true,
+    vars: [{ name: "answer", value: answer }, { name: "chosen values", value: `{${chosen.join(", ")}}` }],
   });
 
   return { original: [...nums], answer, steps };

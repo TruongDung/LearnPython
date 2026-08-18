@@ -13618,6 +13618,136 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+// ---- LeetCode 740: Delete and Earn — value-axis House Robber ----
+function renderDeleteEarn740View(step) {
+  const view = step.deleteEarn740View || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const counts = Array.isArray(view.counts) ? view.counts : [];
+  const earn = Array.isArray(view.earn) ? view.earn : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const decisions = Array.isArray(view.decisions) ? view.decisions : [];
+  const chosen = new Set(Array.isArray(view.chosen) ? view.chosen : []);
+  const maxVal = Number(view.maxVal) || 0;
+  const phase = String(view.phase || "aggregate");
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+
+  const phaseIndex = phase === "aggregate" || phase === "aggregate-loop" ? 0
+    : phase === "reduce" ? 1
+      : phase === "dp-init" ? 2
+        : ["dp-loop", "dp-compute"].includes(phase) ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Gom theo giá trị", "Quy về House Robber", "Khởi tạo dp", "Chạy dp", "Kết quả"]
+    : ["Bucket by value", "Reduce to House Robber", "Init dp", "Run dp", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // nums chips (aggregation source)
+  const numChips = nums.map((value, index) => {
+    const classes = ["de740-num"];
+    if (index === view.activeNumIndex) classes.push("active");
+    else if (Number.isInteger(view.activeNumIndex) && index < view.activeNumIndex) classes.push("done");
+    return `<span class="${classes.join(" ")}"><small>[${index}]</small><b>${escapeHtml(String(value))}</b></span>`;
+  }).join("");
+
+  // Value line 0..maxVal — this is the House Robber array.
+  const dpActive = ["dp-init", "dp-loop", "dp-compute", "done"].includes(phase);
+  const maxEarn = Math.max(1, ...earn.map((v) => Number(v) || 0));
+  const valueCells = [];
+  for (let v = 0; v <= maxVal; v++) {
+    const classes = ["de740-cell"];
+    const e = Number(earn[v]) || 0;
+    if (e === 0) classes.push("empty");
+    if (v === view.activeValue) classes.push("active");
+    if (v === view.i && dpActive && phase !== "done") classes.push("cursor");
+    if (view.phase === "dp-compute" && v === view.conflictLeft) classes.push("conflict");
+    if (view.phase === "dp-compute" && v === view.baseIndex) classes.push("base");
+    if (phase === "done" && chosen.has(v)) classes.push("chosen");
+    const barHeight = 6 + Math.round((e / maxEarn) * 46);
+    const badges = [];
+    if (phase === "done" && chosen.has(v)) badges.push(`<em class="take">${vi ? "LẤY" : "TAKE"}</em>`);
+    if (view.phase === "dp-compute" && v === view.conflictLeft && view.decision === "take") badges.push(`<em class="skip">${vi ? "BỎ" : "SKIP"}</em>`);
+    return valueCells.push(`<div class="${classes.join(" ")}">
+      <span class="de740-bar" style="height:${barHeight}px"></span>
+      <b>${escapeHtml(String(e))}</b>
+      <small>v=${v}</small>
+      ${counts[v] ? `<i>×${counts[v]}</i>` : ""}
+      ${badges.join("")}
+    </div>`);
+  }
+  const valueLine = valueCells.join("");
+
+  // dp line 0..maxVal
+  const dpCells = [];
+  for (let v = 0; v <= maxVal; v++) {
+    const classes = ["de740-dp-cell"];
+    const filled = dp[v] !== null && dp[v] !== undefined;
+    if (!filled) classes.push("pending");
+    if (v === view.i && phase !== "done") classes.push("cursor");
+    if (view.phase === "dp-compute" && v === view.baseIndex) classes.push("base");
+    if (view.phase === "dp-compute" && v === view.conflictLeft) classes.push("prev");
+    if (decisions[v] === "take" && filled) classes.push("take");
+    dpCells.push(`<div class="${classes.join(" ")}"><small>dp[${v}]</small><b>${filled ? escapeHtml(String(dp[v])) : "·"}</b></div>`);
+  }
+  const dpLine = dpCells.join("");
+
+  // Decision cards (only during dp loop/compute)
+  let decisionPanel = "";
+  if (["dp-loop", "dp-compute"].includes(view.phase) && Number.isInteger(view.i)) {
+    const iv = view.i;
+    const chose = view.decision;
+    decisionPanel = `<section class="de740-decision">
+      <header><strong>${vi ? `Xét giá trị ${iv}` : `Consider value ${iv}`}</strong><span>${vi ? "earn" : "earn"}[${iv}] = ${escapeHtml(display(earn[iv]))}</span></header>
+      <div class="de740-options">
+        <div class="skip ${chose === "skip" ? "won" : chose ? "lost" : ""}">
+          <small>${vi ? "BỎ giá trị " : "SKIP value "}${iv}</small>
+          <b>dp[${iv - 1}] = ${escapeHtml(display(view.skip))}</b>
+          <span>${vi ? "giữ nguyên đáp án trước đó" : "keep the previous answer"}</span>
+          <em>${chose ? (chose === "skip" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")) : "?"}</em>
+        </div>
+        <div class="take ${chose === "take" ? "won" : chose ? "lost" : ""}">
+          <small>${vi ? "LẤY giá trị " : "TAKE value "}${iv}</small>
+          <b>dp[${iv - 2}] + earn[${iv}] = ${escapeHtml(display(view.baseIndex !== null && dp[view.baseIndex] !== null ? dp[view.baseIndex] : (Number.isInteger(iv - 2) ? dp[iv - 2] : 0)))} + ${escapeHtml(display(earn[iv]))} = ${escapeHtml(display(view.take))}</b>
+          <span>${vi ? `phải bỏ giá trị ${iv - 1} liền kề → dùng dp[${iv - 2}]` : `must skip adjacent value ${iv - 1} → use dp[${iv - 2}]`}</span>
+          <em>${chose ? (chose === "take" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")) : "?"}</em>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const answerReady = phase === "done";
+  const chosenList = [...chosen];
+  const answerExpr = chosenList.length
+    ? `${chosenList.map((v) => escapeHtml(String(earn[v]))).join(" + ")} = ${escapeHtml(display(view.answer))}`
+    : display(view.answer);
+
+  $("treeView").innerHTML = `<section class="de740-viz" role="img" aria-label="LeetCode 740 Delete and Earn visualization">
+    <div class="de740-phases">${phases}</div>
+    <div class="de740-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="de740-agg ${phase === "aggregate" || phase === "aggregate-loop" ? "active" : ""}">
+      <header><strong>${vi ? "1 · Gom nums theo GIÁ TRỊ" : "1 · Bucket nums by VALUE"}</strong><span>${vi ? "earn[v] = v × số lần xuất hiện" : "earn[v] = v × how many times it appears"}</span></header>
+      <div class="de740-nums">${numChips || `<span class="de740-empty">—</span>`}</div>
+    </section>
+    <section class="de740-line">
+      <header><strong>${vi ? "2 · Trục giá trị earn[] = mảng House Robber" : "2 · Value axis earn[] = House Robber array"}</strong><span>${vi ? "cột = tổng điểm; lấy một cột thì bỏ hai cột kề" : "bars = total points; taking one bar blocks both neighbors"}</span></header>
+      <div class="de740-cells">${valueLine}</div>
+    </section>
+    ${decisionPanel}
+    <section class="de740-dp ${dpActive ? "active" : ""}">
+      <header><strong>${vi ? "3 · Bảng dp" : "3 · dp table"}</strong><span>dp[v] = max(dp[v-1], dp[v-2] + earn[v])</span></header>
+      <div class="de740-dp-cells">${dpLine}</div>
+    </section>
+    <section class="de740-answer ${answerReady ? "ready" : ""}">
+      <div><small>${vi ? "ĐIỂM TỐI ĐA" : "MAX POINTS"}</small><strong>${escapeHtml(display(view.answer))}</strong></div>
+      <code>${answerReady ? answerExpr : (vi ? "đang tính..." : "computing...")}</code>
+      <em>${answerReady && chosenList.length ? (vi ? `chọn giá trị {${chosenList.join(", ")}}` : `chosen values {${chosenList.join(", ")}}`) : ""}</em>
+    </section>
+  </section>`;
+}
+
 function renderMaximumProductView(step) {
   const view = step.maxProductView || {};
   const nums = Array.isArray(view.nums) ? view.nums : [];
@@ -15947,6 +16077,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.deleteEarn740View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderDeleteEarn740View(step);
   } else if (step.maxProductView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");
