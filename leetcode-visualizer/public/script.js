@@ -13618,6 +13618,124 @@ function renderMountainArrayView(step) {
   </div>`;
 }
 
+// ---- LeetCode 2140: Solving Questions With Brainpower — backward DP ----
+function renderBrainpower2140View(step) {
+  const view = step.brainpower2140View || {};
+  const vi = lang === "vi";
+  const questions = Array.isArray(view.questions) ? view.questions : [];
+  const dp = Array.isArray(view.dp) ? view.dp : [];
+  const decisions = Array.isArray(view.decisions) ? view.decisions : [];
+  const chosen = new Set(Array.isArray(view.chosen) ? view.chosen : []);
+  const n = Number(view.n) || questions.length;
+  const phase = String(view.phase || "init");
+  const display = (value) => value === null || value === undefined ? "—" : String(value);
+  const inRange = (idx, lo, hi) => Number.isInteger(lo) && Number.isInteger(hi) && idx >= lo && idx <= hi;
+
+  const phaseIndex = phase === "init" ? 0
+    : ["scan", "read"].includes(phase) ? 1
+      : ["skip", "solve", "compare"].includes(phase) ? 2
+        : phase === "write" ? 3 : 4;
+  const phaseLabels = vi
+    ? ["Khởi tạo dp", "Đọc câu i", "So sánh skip/solve", "Ghi dp[i]", "Kết quả"]
+    : ["Init dp", "Read question i", "Compare skip/solve", "Write dp[i]", "Result"];
+  const phases = phaseLabels.map((label, index) => {
+    const state = index < phaseIndex ? "done" : index === phaseIndex ? "active" : "pending";
+    return `<span class="${state}"><i>${state === "done" ? "✓" : state === "active" ? "▶" : index + 1}</i><b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  // Question cards row. Each shows points + brainpower, current pointer, locked range, chosen.
+  const cards = questions.map((q, index) => {
+    const classes = ["bp2140-q"];
+    if (index === view.i && phase !== "done") classes.push("active");
+    if ((phase === "compare" || phase === "write") && inRange(index, view.lockedStart, view.lockedEnd)) classes.push("locked");
+    if (phase === "done" && chosen.has(index)) classes.push("chosen");
+    if (decisions[index] === "solve" && phase !== "done") classes.push("solved");
+    const badges = [];
+    if (phase === "done" && chosen.has(index)) badges.push(`<em class="take">${vi ? "GIẢI" : "SOLVE"}</em>`);
+    if ((phase === "compare" || phase === "write") && inRange(index, view.lockedStart, view.lockedEnd)) badges.push(`<em class="lock">${vi ? "KHÓA" : "LOCKED"}</em>`);
+    return `<div class="${classes.join(" ")}">
+      <small>#${index}</small>
+      <b>${escapeHtml(String(q[0]))}<span>pts</span></b>
+      <i>bp ${escapeHtml(String(q[1]))}</i>
+      ${badges.join("")}
+    </div>`;
+  }).join("");
+
+  // Jump arrow description for the active question.
+  let jumpInfo = "";
+  if (["read", "skip", "solve", "compare", "write"].includes(phase) && Number.isInteger(view.i)) {
+    const iv = view.i;
+    const lockedText = view.lockedEnd !== null && view.lockedEnd >= view.lockedStart
+      ? (vi ? `khóa câu ${view.lockedStart}..${view.lockedEnd}` : `locks ${view.lockedStart}..${view.lockedEnd}`)
+      : (vi ? "không khóa câu nào" : "locks nothing");
+    jumpInfo = `<div class="bp2140-jump"><span>${vi ? "nếu GIẢI câu" : "if SOLVE"} ${iv}</span><b>→ ${view.jumpTarget === n ? (vi ? "hết mảng (dp[" + n + "])" : "end (dp[" + n + "])") : `dp[${view.jumpTarget}]`}</b><i>${escapeHtml(lockedText)}</i></div>`;
+  }
+
+  // dp table 0..n
+  const dpCells = [];
+  for (let v = 0; v <= n; v++) {
+    const classes = ["bp2140-dp-cell"];
+    const filled = dp[v] !== null && dp[v] !== undefined;
+    if (!filled) classes.push("pending");
+    if (v === view.i && phase !== "done") classes.push("cursor");
+    if (Number.isInteger(view.i) && v === view.i + 1 && ["skip", "compare", "write"].includes(phase)) classes.push("skip-src");
+    if (Number.isInteger(view.jumpTarget) && v === view.jumpTarget && ["solve", "compare", "write"].includes(phase)) classes.push("jump-src");
+    if (v === n) classes.push("base");
+    dpCells.push(`<div class="${classes.join(" ")}"><small>dp[${v}]</small><b>${filled ? escapeHtml(String(dp[v])) : "·"}</b></div>`);
+  }
+  const dpLine = dpCells.join("");
+
+  // Decision cards
+  let decisionPanel = "";
+  if (["skip", "solve", "compare", "write"].includes(view.phase) && Number.isInteger(view.i)) {
+    const iv = view.i;
+    const chose = view.decision;
+    decisionPanel = `<section class="bp2140-decision">
+      <div class="options">
+        <div class="skip ${chose === "skip" ? "won" : chose ? "lost" : ""}">
+          <small>${vi ? "BỎ câu " : "SKIP "}${iv}</small>
+          <b>dp[${iv + 1}] = ${escapeHtml(display(view.skip))}</b>
+          <span>${vi ? "sang thẳng câu kế tiếp" : "move to the next question"}</span>
+          <em>${chose ? (chose === "skip" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")) : "?"}</em>
+        </div>
+        <div class="solve ${chose === "solve" ? "won" : chose ? "lost" : ""}">
+          <small>${vi ? "GIẢI câu " : "SOLVE "}${iv}</small>
+          <b>${escapeHtml(display(view.points))} + dp[${display(view.jumpTarget)}] = ${escapeHtml(display(view.solve))}</b>
+          <span>${vi ? `nhảy qua ${escapeHtml(display(view.brainpower))} câu bị khóa` : `jump over ${escapeHtml(display(view.brainpower))} locked questions`}</span>
+          <em>${chose ? (chose === "solve" ? (vi ? "CHỌN ✓" : "WIN ✓") : (vi ? "bỏ" : "lose")) : "?"}</em>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  const activeLine = Array.isArray(step.codeLines) ? step.codeLines[0] : null;
+  const answerReady = phase === "done";
+  const chosenList = [...chosen];
+  const answerExpr = chosenList.length
+    ? `${chosenList.map((q) => escapeHtml(String(questions[q][0]))).join(" + ")} = ${escapeHtml(display(view.answer))}`
+    : display(view.answer);
+
+  $("treeView").innerHTML = `<section class="bp2140-viz" role="img" aria-label="LeetCode 2140 Solving Questions With Brainpower visualization">
+    <div class="bp2140-phases">${phases}</div>
+    <div class="bp2140-debug"><small>${vi ? "DÒNG" : "LINE"} ${activeLine ?? "—"}</small><strong>${escapeHtml(pick(step.title))}</strong><span>${escapeHtml(pick(step.note))}</span></div>
+    <section class="bp2140-board">
+      <header><strong>${vi ? "Danh sách câu hỏi" : "Questions"}</strong><span>${vi ? "pts = điểm · bp = brainpower (số câu bị khóa)" : "pts = points · bp = brainpower (locked count)"}</span></header>
+      <div class="bp2140-cards">${cards}</div>
+      ${jumpInfo}
+    </section>
+    ${decisionPanel}
+    <section class="bp2140-dp">
+      <header><strong>${vi ? "Bảng dp (điền từ phải sang trái)" : "dp table (filled right to left)"}</strong><span>dp[i] = max(dp[i+1], points + dp[i+bp+1])</span></header>
+      <div class="bp2140-dp-cells">${dpLine}</div>
+    </section>
+    <section class="bp2140-answer ${answerReady ? "ready" : ""}">
+      <div><small>${vi ? "ĐIỂM TỐI ĐA (dp[0])" : "MAX POINTS (dp[0])"}</small><strong>${escapeHtml(display(view.answer))}</strong></div>
+      <code>${answerReady ? answerExpr : (vi ? "đang tính..." : "computing...")}</code>
+      <em>${answerReady && chosenList.length ? (vi ? `giải câu {${chosenList.join(", ")}}` : `solve questions {${chosenList.join(", ")}}`) : ""}</em>
+    </section>
+  </section>`;
+}
+
 // ---- LeetCode 740: Delete and Earn — value-axis House Robber ----
 function renderDeleteEarn740View(step) {
   const view = step.deleteEarn740View || {};
@@ -16077,6 +16195,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderMountainArrayView(step);
+  } else if (step.brainpower2140View) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderBrainpower2140View(step);
   } else if (step.deleteEarn740View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

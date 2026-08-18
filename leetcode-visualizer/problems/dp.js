@@ -5110,6 +5110,225 @@ function buildSteps688(input, params) {
 
   return { n, k, answer: +answer.toFixed(5), steps };
 }
+
+/**
+ * LeetCode 2140: Solving Questions With Brainpower.
+ * Backward DP: solving question i earns points[i] but locks the next brainpower[i]
+ * questions, so the next reachable question is i + brainpower[i] + 1.
+ * dp[i] = max(dp[i+1], points[i] + dp[min(i + brainpower[i] + 1, n)]); answer = dp[0].
+ */
+function parseQuestions2140(raw) {
+  let rows = raw;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) throw new Error("questions must not be empty.");
+    if (trimmed.startsWith("[")) {
+      rows = JSON.parse(trimmed);
+    } else {
+      rows = trimmed.split(/[;\n]/).map((part) => part.split(",").map((value) => Number(value.trim())));
+    }
+  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error("questions must contain at least one pair.");
+  const questions = rows.map((row) => {
+    if (!Array.isArray(row) || row.length !== 2 || row.some((value) => !Number.isInteger(value) || value < 1)) {
+      throw new Error("each question must be [points, brainpower] with positive integers.");
+    }
+    return [row[0], row[1]];
+  });
+  return questions;
+}
+
+function buildSteps2140(input) {
+  const questions = parseQuestions2140(input);
+  const n = questions.length;
+  const steps = [];
+  const dp = new Array(n + 1).fill(null);
+  const decisions = new Array(n).fill(null); // "solve" | "skip"
+
+  let phase = "init";
+  let i = null;
+  let points = null;
+  let brainpower = null;
+  let skip = null;
+  let solve = null;
+  let jumpTarget = null;
+  let decision = null;
+  let answer = null;
+  let chosen = [];
+
+  const reconstruct = () => {
+    const picked = [];
+    let k = 0;
+    while (k < n) {
+      if (decisions[k] === "solve") {
+        picked.push(k);
+        k += questions[k][1] + 1;
+      } else {
+        k += 1;
+      }
+    }
+    return picked;
+  };
+
+  const snapshot = () => ({
+    questions: questions.map((q) => [...q]),
+    n,
+    dp: [...dp],
+    decisions: [...decisions],
+    phase,
+    i,
+    points,
+    brainpower,
+    skip,
+    solve,
+    jumpTarget,
+    lockedStart: phase === "compare" || phase === "write" ? (Number.isInteger(i) ? i + 1 : null) : null,
+    lockedEnd: (phase === "compare" || phase === "write") && Number.isInteger(jumpTarget) ? jumpTarget - 1 : null,
+    decision,
+    chosen: [...chosen],
+    answer,
+  });
+
+  const push = ({ title, note, line, final = false, vars = [] }) => {
+    steps.push({
+      title,
+      note,
+      codeLines: [line],
+      final,
+      arr: [],
+      highlight: [],
+      mark: [],
+      vars,
+      brainpower2140View: snapshot(),
+    });
+  };
+
+  push({
+    title: { vi: `n = len(questions) = ${n}`, en: `n = len(questions) = ${n}` },
+    note: {
+      vi: "Mỗi câu hỏi i cho points[i] điểm nhưng khóa brainpower[i] câu ngay sau nó.",
+      en: "Each question i gives points[i] but locks the next brainpower[i] questions.",
+    },
+    line: 3,
+    vars: [{ name: "n", value: n }],
+  });
+
+  dp[n] = 0;
+  push({
+    title: { vi: `dp = [0] * (n + 1)`, en: `dp = [0] * (n + 1)` },
+    note: {
+      vi: "dp[i] = điểm tối đa nếu bắt đầu xét từ câu i tới hết. dp[n] = 0 (không còn câu nào).",
+      en: "dp[i] = best points achievable starting from question i onward. dp[n] = 0 (no questions left).",
+    },
+    line: 4,
+    vars: [{ name: "dp", value: `[${dp.map((x) => (x === null ? "·" : x)).join(",")}]` }],
+  });
+
+  for (i = n - 1; i >= 0; i--) {
+    points = questions[i][0];
+    brainpower = questions[i][1];
+    jumpTarget = Math.min(i + brainpower + 1, n);
+    decision = null;
+    phase = "scan";
+    push({
+      title: { vi: `i = ${i} (duyệt ngược)`, en: `i = ${i} (scan backward)` },
+      note: {
+        vi: "Đi từ phải sang trái vì dp[i] cần dp của các câu PHÍA SAU (đã tính xong).",
+        en: "We go right to left because dp[i] depends on later questions that are already computed.",
+      },
+      line: 5,
+      vars: [{ name: "i", value: i }],
+    });
+
+    phase = "read";
+    push({
+      title: { vi: `points=${points}, brainpower=${brainpower}`, en: `points=${points}, brainpower=${brainpower}` },
+      note: {
+        vi: `Nếu giải câu ${i}: +${points} điểm nhưng bỏ qua ${brainpower} câu kế → câu tiếp theo có thể làm là ${jumpTarget === n ? "hết mảng" : jumpTarget}.`,
+        en: `Solving question ${i}: +${points} points but skip the next ${brainpower} → the next doable question is ${jumpTarget === n ? "end of array" : jumpTarget}.`,
+      },
+      line: 6,
+      vars: [{ name: "points", value: points }, { name: "brainpower", value: brainpower }],
+    });
+
+    skip = dp[i + 1];
+    phase = "skip";
+    push({
+      title: { vi: `skip = dp[${i + 1}] = ${skip}`, en: `skip = dp[${i + 1}] = ${skip}` },
+      note: {
+        vi: `BỎ câu ${i}: chuyển thẳng sang câu ${i + 1}, giữ điểm dp[${i + 1}] = ${skip}.`,
+        en: `SKIP question ${i}: move straight to question ${i + 1}, keeping dp[${i + 1}] = ${skip}.`,
+      },
+      line: 7,
+      vars: [{ name: "skip = dp[i+1]", value: skip }],
+    });
+
+    solve = points + dp[jumpTarget];
+    phase = "solve";
+    push({
+      title: { vi: `solve = ${points} + dp[${jumpTarget}] = ${solve}`, en: `solve = ${points} + dp[${jumpTarget}] = ${solve}` },
+      note: {
+        vi: `GIẢI câu ${i}: cộng ${points} rồi nhảy tới dp[min(${i}+${brainpower}+1, ${n})] = dp[${jumpTarget}] = ${dp[jumpTarget]}.`,
+        en: `SOLVE question ${i}: add ${points} then jump to dp[min(${i}+${brainpower}+1, ${n})] = dp[${jumpTarget}] = ${dp[jumpTarget]}.`,
+      },
+      line: 8,
+      vars: [{ name: "solve = points + dp[jump]", value: solve }, { name: "jump target", value: jumpTarget }],
+    });
+
+    phase = "compare";
+    push({
+      title: { vi: `So sánh: skip=${skip} vs solve=${solve}`, en: `Compare: skip=${skip} vs solve=${solve}` },
+      note: {
+        vi: `Nếu GIẢI, các câu ${i + 1}${jumpTarget - 1 >= i + 1 ? `..${jumpTarget - 1}` : ""} bị khóa (tô đỏ). Chọn phương án cho điểm cao hơn.`,
+        en: `If we SOLVE, questions ${i + 1}${jumpTarget - 1 >= i + 1 ? `..${jumpTarget - 1}` : ""} get locked (red). Pick the higher-scoring option.`,
+      },
+      line: 8,
+      vars: [{ name: "skip", value: skip }, { name: "solve", value: solve }],
+    });
+
+    dp[i] = Math.max(skip, solve);
+    decision = solve > skip ? "solve" : "skip";
+    decisions[i] = decision;
+    phase = "write";
+    push({
+      title: { vi: `dp[${i}] = max(${skip}, ${solve}) = ${dp[i]}`, en: `dp[${i}] = max(${skip}, ${solve}) = ${dp[i]}` },
+      note: decision === "solve"
+        ? {
+          vi: `GIẢI câu ${i}: dp[${i}] = ${dp[i]}. Đường đi tối ưu từ đây gồm câu ${i} rồi nhảy tới câu ${jumpTarget === n ? "(hết)" : jumpTarget}.`,
+          en: `SOLVE question ${i}: dp[${i}] = ${dp[i]}. The optimal path from here takes question ${i} then jumps to ${jumpTarget === n ? "the end" : `question ${jumpTarget}`}.`,
+        }
+        : {
+          vi: `BỎ câu ${i}: dp[${i}] = ${dp[i]} lấy từ dp[${i + 1}].`,
+          en: `SKIP question ${i}: dp[${i}] = ${dp[i]} taken from dp[${i + 1}].`,
+        },
+      line: 9,
+      vars: [{ name: "dp[i]", value: dp[i] }, { name: "decision", value: decision === "solve" ? `SOLVE ${i}` : `SKIP ${i}` }],
+    });
+  }
+
+  phase = "done";
+  i = 0;
+  answer = dp[0];
+  chosen = reconstruct();
+  const chosenPoints = chosen.map((q) => `${questions[q][0]}`).join(" + ") || "0";
+  push({
+    title: { vi: `return dp[0] = ${answer}`, en: `return dp[0] = ${answer}` },
+    note: {
+      vi: chosen.length
+        ? `Điểm tối đa = ${answer}. Chuỗi câu được giải: {${chosen.join(", ")}} → ${chosenPoints} = ${answer}.`
+        : `Điểm tối đa = ${answer}.`,
+      en: chosen.length
+        ? `Maximum points = ${answer}. Solved questions: {${chosen.join(", ")}} → ${chosenPoints} = ${answer}.`
+        : `Maximum points = ${answer}.`,
+    },
+    line: 10,
+    final: true,
+    vars: [{ name: "answer", value: answer }, { name: "solved", value: `{${chosen.join(", ")}}` }],
+  });
+
+  return { original: questions, answer, steps };
+}
+
 /**
  * LeetCode 740: Delete and Earn.
  * Reduce to House Robber: build earn[v] = v * count(v), then dp on earn[0..maxVal].
@@ -15920,7 +16139,7 @@ module.exports = {
   // Category metadata: recommended learning order + detailed guide.
   // Picked up by problems/index.js and exposed to server.js via CATEGORY_ORDER.
   __meta: {
-    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
+    order: [509, 70, 118, 338, 746, 198, 213, 256, 264, 740, 2140, 1406, 53, 918, 1749, 152, 300, 322, 518, 279, 139, 91, 1639, 62, 63, 64, 120, 931, 1937, 1143, 583, 5, 516, 1682, 1312, 72, 416, 474, 494, 1301, 1388, 3336, 188, 312, 1216, 1473],
     label: {
       vi: "Thứ tự học được khuyến nghị",
       en: "Recommended learning order",
@@ -17176,6 +17395,57 @@ module.exports = {
       },
     ],
     builder: buildSteps740,
+  },
+  2140: {
+    id: 2140,
+    difficulty: "medium",
+    slug: "solving-questions-with-brainpower",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Solving Questions With Brainpower", en: "Solving Questions With Brainpower" },
+    titleVi: { vi: "Giải câu hỏi với brainpower", en: "Solving questions with brainpower" },
+    statement: {
+      vi: "Cho questions[i] = [points_i, brainpower_i]. Giải câu i được points_i điểm nhưng phải bỏ qua brainpower_i câu ngay sau đó. Trả về số điểm tối đa.",
+      en: "Given questions[i] = [points_i, brainpower_i]. Solving question i earns points_i but forces you to skip the next brainpower_i questions. Return the maximum points.",
+    },
+    defaultInput: "3,2;4,3;4,4;2,5",
+    inputKind: "string",
+    inputLabel: { vi: "questions (mỗi câu points,brainpower; cách nhau bởi ;)", en: "questions (points,brainpower pairs separated by ;)" },
+    extraParams: [],
+    approach: [
+      {
+        vi: "Duyệt ngược từ câu cuối: dp[i] = điểm tối đa nếu bắt đầu từ câu i. dp[n] = 0.",
+        en: "Scan backward from the last question: dp[i] = best points starting at question i. dp[n] = 0.",
+      },
+      {
+        vi: "Giải câu i thì nhảy tới câu i + brainpower_i + 1; bỏ câu i thì sang câu i + 1.",
+        en: "Solving question i jumps to question i + brainpower_i + 1; skipping goes to question i + 1.",
+      },
+      {
+        vi: "dp[i] = max(dp[i+1], points_i + dp[min(i + brainpower_i + 1, n)]); đáp án là dp[0].",
+        en: "dp[i] = max(dp[i+1], points_i + dp[min(i + brainpower_i + 1, n)]); the answer is dp[0].",
+      },
+    ],
+    complexity: {
+      time: "O(n)",
+      space: "O(n)",
+      note: {
+        vi: "Mỗi câu hỏi được xử lý đúng một lần theo thứ tự ngược; mảng dp dài n+1.",
+        en: "Each question is processed once in reverse order; the dp array has length n+1.",
+      },
+    },
+    code: [
+      "class Solution:",
+      "    def mostPoints(self, questions):",
+      "        n = len(questions)",
+      "        dp = [0] * (n + 1)",
+      "        for i in range(n - 1, -1, -1):",
+      "            points, brainpower = questions[i]",
+      "            skip = dp[i + 1]",
+      "            solve = points + dp[min(i + brainpower + 1, n)]",
+      "            dp[i] = max(skip, solve)",
+      "        return dp[0]",
+    ],
+    builder: buildSteps2140,
   },
   276: {
     id: 276,
