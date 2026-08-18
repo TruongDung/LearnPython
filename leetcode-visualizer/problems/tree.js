@@ -3433,22 +3433,93 @@ function buildSteps156(input) {
 
 // ─── 337: House Robber III ───
 function buildSteps337(input) {
-  const root = parseTree(input); const steps = [];
-  steps.push(snapshot(root, {
-    title: { vi: "House Robber III (DP trên cây)", en: "House Robber III (tree DP)" },
-    codeLines: [2, 3], vars: [{ name: "state", value: "(rob, skip) per node" }],
-    note: { vi: `Mỗi nút trả về [rob, skip]. rob = node.val + skip(trái) + skip(phải). skip = max(con trái) + max(con phải). Không cướp 2 nhà nối trực tiếp.`, en: `Each node returns [rob, skip]. rob = node.val + skip(left) + skip(right). skip = max(left) + max(right). Cannot rob two directly-linked houses.` },
-  }));
+  const root = parseTree(input);
+  const steps = [];
+  const computed = new Map(); // nodeId → { rob, skip }
+
+  // Annotate every already-computed node with its (rob, skip) directly on the
+  // tree so the DP values visibly bubble up from the leaves to the root.
+  function decorate(step, currentId, sourceIds) {
+    const sources = new Set(sourceIds || []);
+    for (const node of step.tree.nodes) {
+      if (node.isNull) continue;
+      const state = computed.get(node.id);
+      if (state) node.labelLines = [String(node.label), `rob ${state.rob}`, `skip ${state.skip}`];
+      if (node.id === currentId) node.hl = true;
+      if (sources.has(node.id)) node.isWord = true; // reuse the green ring for source children
+    }
+    return step;
+  }
+
+  const intro = snapshot(root, {
+    title: { vi: "House Robber III · DP trên cây", en: "House Robber III · tree DP" },
+    codeLines: [2, 3],
+    vars: [
+      { name: "state mỗi nút", value: "(rob, skip)" },
+      { name: "rob", value: "cướp nút này" },
+      { name: "skip", value: "bỏ nút này" },
+    ],
+    note: {
+      vi: "Mỗi nút trả về 2 giá trị: rob = tiền lớn nhất nếu CƯỚP nút này, skip = tiền lớn nhất nếu BỎ nút này. Vì không được cướp 2 nhà nối trực tiếp, ta tính từ lá lên gốc (postorder).",
+      en: "Each node returns 2 values: rob = max money if we ROB this node, skip = max money if we SKIP it. Since two directly-linked houses cannot both be robbed, compute from leaves up to the root (postorder).",
+    },
+  });
+  decorate(intro, null, null);
+  steps.push(intro);
+
   function dfs(node) {
     if (!node) return [0, 0];
-    const [lr, ls] = dfs(node.left); const [rr, rs] = dfs(node.right);
+    const [lr, ls] = dfs(node.left);
+    const [rr, rs] = dfs(node.right);
     const rob = node.val + ls + rs;
-    const skip = Math.max(lr, ls) + Math.max(rr, rs);
-    steps.push(snapshot(root, { title: { vi: `Nút ${node.val}: rob=${rob}, skip=${skip}`, en: `Node ${node.val}: rob=${rob}, skip=${skip}` }, hlSet: new Set([node.id]), codeLines: [4, 5, 6], vars: [{ name: "node", value: node.val }, { name: "rob (cướp)", value: `${node.val}+${ls}+${rs} = ${rob}` }, { name: "skip (bỏ)", value: `${Math.max(lr, ls)}+${Math.max(rr, rs)} = ${skip}` }], note: { vi: `Cướp ${node.val} → phải bỏ 2 con. Bỏ ${node.val} → lấy max mỗi con.`, en: `Rob ${node.val} → must skip both children. Skip ${node.val} → take max of each child.` } }));
+    const bestLeft = Math.max(lr, ls);
+    const bestRight = Math.max(rr, rs);
+    const skip = bestLeft + bestRight;
+    computed.set(node.id, { rob, skip });
+
+    const sourceIds = [];
+    if (node.left) sourceIds.push(node.left.id);
+    if (node.right) sourceIds.push(node.right.id);
+
+    const step = snapshot(root, {
+      title: { vi: `Nút ${node.val}: rob=${rob}, skip=${skip}`, en: `Node ${node.val}: rob=${rob}, skip=${skip}` },
+      hlSet: new Set([node.id]),
+      codeLines: [8, 9],
+      vars: [
+        { name: "node.val", value: node.val },
+        { name: "rob = val + skip(L) + skip(R)", value: `${node.val} + ${ls} + ${rs} = ${rob}` },
+        { name: "skip = max(L) + max(R)", value: `${bestLeft} + ${bestRight} = ${skip}` },
+        { name: "trả về (rob, skip)", value: `(${rob}, ${skip})` },
+      ],
+      note: {
+        vi: `CƯỚP ${node.val}: bắt buộc bỏ 2 con → ${node.val} + skip(trái)=${ls} + skip(phải)=${rs} = ${rob}. BỎ ${node.val}: mỗi con tự do chọn tốt hơn → max(trái)=${bestLeft} + max(phải)=${bestRight} = ${skip}.`,
+        en: `ROB ${node.val}: must skip both children → ${node.val} + skip(left)=${ls} + skip(right)=${rs} = ${rob}. SKIP ${node.val}: each child picks its own best → max(left)=${bestLeft} + max(right)=${bestRight} = ${skip}.`,
+      },
+    });
+    decorate(step, node.id, sourceIds);
+    steps.push(step);
     return [rob, skip];
   }
-  const [r, s] = dfs(root); const answer = Math.max(r, s);
-  const fs = snapshot(root, { title: { vi: `Tối đa = ${answer}`, en: `Max = ${answer}` }, vars: [{ name: "answer", value: answer }], note: { vi: `Số tiền lớn nhất cướp được = max(${r}, ${s}) = ${answer}.`, en: `Maximum money robbed = max(${r}, ${s}) = ${answer}.` } }); fs.final = true; steps.push(fs);
+
+  const [r, s] = dfs(root);
+  const answer = Math.max(r, s);
+  const finalStep = snapshot(root, {
+    title: { vi: `Đáp án = max(${r}, ${s}) = ${answer}`, en: `Answer = max(${r}, ${s}) = ${answer}` },
+    hlSet: root ? new Set([root.id]) : undefined,
+    codeLines: [11],
+    vars: [
+      { name: "root rob", value: r },
+      { name: "root skip", value: s },
+      { name: "answer", value: answer },
+    ],
+    note: {
+      vi: `Tại gốc, lấy phương án tốt hơn: max(rob=${r}, skip=${s}) = ${answer}. Đây là số tiền lớn nhất cướp được.`,
+      en: `At the root, take the better option: max(rob=${r}, skip=${s}) = ${answer}. This is the maximum money that can be robbed.`,
+    },
+  });
+  decorate(finalStep, root ? root.id : null, null);
+  finalStep.final = true;
+  steps.push(finalStep);
   return { input, answer, steps };
 }
 
