@@ -16290,6 +16290,74 @@ function buildSteps4027(input, params = {}) {
 }
 
 /**
+ * LeetCode 879: Profitable Schemes.
+ * dp[i][j] = số kế hoạch dùng ≤ i thành viên và đạt lợi nhuận ≥ j (j chặn ở minProfit).
+ */
+function buildSteps879(input, params) {
+  const MOD = 1000000007;
+  const n = Math.max(1, Math.min(10, Number(Array.isArray(input) ? input[0] : input) || 5));
+  const minProfit = Math.max(0, Math.min(12, Number((params && params.minProfit) ?? 3)));
+  const group = String((params && params.group) ?? "2,2").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
+  const profit = String((params && params.profit) ?? "2,3").split(",").map((v) => Number(v.trim())).filter(Number.isFinite);
+  const crimes = group.map((g, i) => [g, profit[i] ?? 0]);
+
+  const dp = Array.from({ length: n + 1 }, () => new Array(minProfit + 1).fill(0));
+  for (let i = 0; i <= n; i++) dp[i][0] = 1;
+  const steps = [];
+  const text1 = Array.from({ length: n }, (_, i) => `≤${i + 1} người`);
+  const text2 = Array.from({ length: minProfit }, (_, j) => `lãi≥${j + 1}`);
+  const display = () => dp.map((row) => row.map((v) => String(v)));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: { dp: display(), text1, text2, hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `n=${n} người, minProfit=${minProfit}`, en: `n=${n} members, minProfit=${minProfit}` },
+    codeLines: [5],
+    caption: "dp[i][j] = số kế hoạch dùng ≤ i người, lợi nhuận ≥ j",
+    vars: [{ name: "n", value: n }, { name: "minProfit", value: minProfit }, { name: "crimes (người, lãi)", value: crimes.map((c) => `(${c[0]},${c[1]})`).join(" ") }],
+    note: {
+      vi: `dp[i][j] = số kế hoạch dùng KHÔNG QUÁ i thành viên và đạt lợi nhuận ÍT NHẤT j (j bị chặn ở ${minProfit}). Cơ sở: dp[i][0]=1 (không làm phi vụ nào cũng đạt lợi nhuận ≥ 0). Ta lần lượt đưa từng phi vụ vào.`,
+      en: `dp[i][j] = number of schemes using AT MOST i members and profit AT LEAST j (j capped at ${minProfit}). Base: dp[i][0]=1 (doing nothing already has profit ≥ 0). Add each crime one by one.`,
+    },
+  });
+
+  crimes.forEach(([m, p], idx) => {
+    for (let i = n; i >= m; i--) {
+      for (let j = minProfit; j >= 0; j--) {
+        dp[i][j] = (dp[i][j] + dp[i - m][Math.max(0, j - p)]) % MOD;
+      }
+    }
+    push({
+      title: { vi: `Thêm phi vụ ${idx + 1}: ${m} người, lãi ${p}`, en: `Add crime ${idx + 1}: ${m} members, profit ${p}` },
+      codeLines: [8, 9, 10],
+      hlCell: [n, minProfit],
+      caption: `Sau phi vụ (${m} người, lãi ${p}): dp[${n}][${minProfit}] = ${dp[n][minProfit]}`,
+      vars: [{ name: "phi vụ", value: `${m} người, lãi ${p}` }, { name: `dp[${n}][${minProfit}]`, value: dp[n][minProfit] }],
+      note: {
+        vi: `Xét phi vụ cần ${m} người, lãi ${p}. Với mỗi trạng thái (i người, lãi≥j) ta CỘNG thêm số cách nếu CHỌN phi vụ này: dp[i−${m}][max(0, j−${p})]. Duyệt i, j giảm dần để không dùng lại phi vụ này 2 lần.`,
+        en: `Consider a crime needing ${m} members, profit ${p}. For each state (i members, profit≥j) we ADD the ways when we TAKE this crime: dp[i−${m}][max(0, j−${p})]. Iterate i, j downward so this crime is not reused.`,
+      },
+    });
+  });
+
+  const answer = dp[n][minProfit];
+  push({
+    title: { vi: `Kết quả: dp[${n}][${minProfit}] = ${answer}`, en: `Result: dp[${n}][${minProfit}] = ${answer}` },
+    codeLines: [11], hlCell: [n, minProfit], final: true,
+    caption: `Đáp án = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Số kế hoạch "có lãi" (≤ ${n} người, lãi ≥ ${minProfit}) = ${answer} (mod 1e9+7).`, en: `Number of profitable schemes (≤ ${n} members, profit ≥ ${minProfit}) = ${answer} (mod 1e9+7).` },
+  });
+
+  return { original: { n, minProfit, group, profit }, answer, steps };
+}
+
+/**
  * LeetCode 471: Encode String with Shortest Length.
  * Interval DP: dp[i][j] = chuỗi mã hoá NGẮN NHẤT của s[i..j].
  */
@@ -17583,6 +17651,43 @@ function buildSteps673(nums) {
 }
 
 module.exports = {
+  879: {
+    id: 879,
+    difficulty: "hard",
+    slug: "profitable-schemes",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Profitable Schemes", en: "Profitable Schemes" },
+    titleVi: { vi: "Kế hoạch có lãi", en: "Profitable schemes" },
+    statement: {
+      vi: "Có n thành viên. Mỗi phi vụ i cần group[i] người và tạo lợi nhuận profit[i]; mỗi người chỉ tham gia 1 phi vụ. Đếm số nhóm phi vụ dùng ≤ n người và tổng lợi nhuận ≥ minProfit (mod 1e9+7).",
+      en: "There are n members. Crime i needs group[i] members and yields profit[i]; each member joins at most one crime. Count subsets using ≤ n members with total profit ≥ minProfit (mod 1e9+7).",
+    },
+    defaultInput: [5],
+    inputKind: "positive",
+    inputLabel: { vi: "n (số thành viên)", en: "n (members)" },
+    singleInput: true,
+    maxInput: 10,
+    extraParams: [
+      { key: "minProfit", type: "number", label: { vi: "minProfit", en: "minProfit" }, default: 3 },
+      { key: "group", type: "string", label: { vi: "group (người mỗi phi vụ)", en: "group (members per crime)" }, default: "2,2" },
+      { key: "profit", type: "string", label: { vi: "profit (lãi mỗi phi vụ)", en: "profit (per crime)" }, default: "2,3" },
+    ],
+    complexity: { time: "O(crimes × n × minProfit)", space: "O(n × minProfit)", note: { vi: "Knapsack 2 chiều, lợi nhuận chặn ở minProfit.", en: "2D knapsack, profit capped at minProfit." } },
+    code: [
+      "class Solution:",
+      "    def profitableSchemes(self, n, minProfit, group, profit):",
+      "        MOD = 10**9 + 7",
+      "        dp = [[0]*(minProfit+1) for _ in range(n+1)]",
+      "        for i in range(n+1): dp[i][0] = 1",
+      "        for m, p in zip(group, profit):",
+      "            for i in range(n, m-1, -1):",
+      "                for j in range(minProfit, -1, -1):",
+      "                    dp[i][j] = (dp[i][j] + dp[i-m][max(0, j-p)]) % MOD",
+      "                    # take this crime",
+      "        return dp[n][minProfit]",
+    ],
+    builder: buildSteps879,
+  },
   471: {
     id: 471,
     difficulty: "hard",
