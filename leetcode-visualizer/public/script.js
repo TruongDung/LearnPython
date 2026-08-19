@@ -12111,6 +12111,126 @@ function renderWaterDistributionView(step) {
   </section>`;
 }
 
+// ---- 1135 Connecting Cities renderer (Kruskal MST: edge queue + graph + DSU) ----
+function renderConnectCitiesView(step) {
+  const view = step.connectCitiesView || {};
+  const vi = lang === "vi";
+  const n = Number(view.n) || 0;
+  const edges = Array.isArray(view.edges) ? view.edges : [];
+  const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+  const roots = view.roots || {};
+  const currentKey = view.currentKey || null;
+  const cur = edges.find((e) => e.key === currentKey) || null;
+  const curNodes = new Set(cur ? [cur.u, cur.v] : []);
+  const compOf = (id) => Math.abs(Number(roots[id] ?? id)) % 6;
+
+  const phaseIndex = { build: 0, sort: 1, kruskal: 2, done: 3 }[view.phase] ?? 0;
+  const phaseLabels = vi
+    ? ["1 · Tạo cạnh", "2 · Sort chi phí", "3 · Kruskal + DSU", "4 · Hoàn tất MST"]
+    : ["1 · Build edges", "2 · Sort by cost", "3 · Kruskal + DSU", "4 · MST done"];
+  const phases = phaseLabels.map((label, i) => {
+    const cls = i < phaseIndex ? "done" : i === phaseIndex ? "active" : "pending";
+    return `<span class="${cls}">${i < phaseIndex ? "✓" : i === phaseIndex ? "▶" : "○"}<b>${escapeHtml(label)}</b></span>`;
+  }).join("");
+
+  const queue = edges.map((e) => {
+    const cls = ["cc-q-edge"];
+    if (e.state === "accept") cls.push("accepted");
+    else if (e.state === "reject") cls.push("rejected");
+    if (e.key === currentKey) cls.push("current");
+    const idxLabel = view.sorted && e.sortedIndex >= 0 ? `#${e.sortedIndex + 1}` : "·";
+    return `<span class="${cls.join(" ")}"><small>${idxLabel}</small><b>${e.u}–${e.v}</b><strong>${escapeHtml(e.w)}</strong></span>`;
+  }).join("") || `<em class="cc-empty">${vi ? "chưa có cạnh" : "no edges"}</em>`;
+
+  const size = Math.max(360, n * 56);
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size / 2 - 54;
+  const pos = {};
+  nodes.forEach((id, i) => {
+    const ang = (2 * Math.PI * i) / Math.max(1, n) - Math.PI / 2;
+    pos[id] = { x: cx + radius * Math.cos(ang), y: cy + radius * Math.sin(ang) };
+  });
+
+  const paintOrder = (e) => (e.key === currentKey ? 3 : e.state === "accept" ? 2 : e.state === "reject" ? 0 : 1);
+  const edgeSvg = [...edges].sort((a, b) => paintOrder(a) - paintOrder(b)).map((e) => {
+    const a = pos[e.u];
+    const b = pos[e.v];
+    if (!a || !b) return "";
+    const cls = ["cc-edge"];
+    if (e.state === "accept") cls.push("accepted");
+    else if (e.state === "reject") cls.push("rejected");
+    if (e.key === currentKey && e.state === "pending") cls.push("current");
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const wCls = e.state === "accept" ? "accept" : e.state === "reject" ? "reject" : "";
+    return `<line class="${cls.join(" ")}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"></line>`
+      + `<text class="cc-weight ${wCls}" x="${mx}" y="${my - 4}">${escapeHtml(e.w)}</text>`;
+  }).join("");
+
+  const nodeSvg = nodes.map((id) => {
+    const p = pos[id];
+    const cls = ["cc-node", `component-${compOf(id)}`];
+    if (curNodes.has(id)) cls.push("current");
+    return `<g class="${cls.join(" ")}"><circle cx="${p.x}" cy="${p.y}" r="23"></circle>`
+      + `<text class="cc-id" x="${p.x}" y="${p.y}" dy="0.35em">${escapeHtml(id)}</text>`
+      + `<text class="cc-root" x="${p.x}" y="${p.y + 37}">R${escapeHtml(roots[id] ?? id)}</text></g>`;
+  }).join("");
+
+  const graphSvg = `<svg class="cc-graph" viewBox="0 0 ${size} ${size}" role="img" aria-label="${vi ? "Đồ thị thành phố và cạnh MST" : "City graph with MST edges"}">${edgeSvg}${nodeSvg}</svg>`;
+
+  const rb = view.rootsBefore;
+  let decCls = "waiting";
+  let decTitle = vi ? "Chờ cạnh tiếp theo" : "Waiting for the next edge";
+  let decNote = vi ? "Kruskal xử lý cạnh từ rẻ đến đắt." : "Kruskal processes edges cheap → expensive.";
+  if (cur && rb) {
+    decTitle = `${cur.u} — ${cur.v} · ${vi ? "chi phí" : "cost"} ${cur.w}`;
+    if (view.decision === "accept") {
+      decCls = "accepted";
+      decNote = vi ? `R${rb.u} ≠ R${rb.v} → khác nhóm, union và cộng ${cur.w}.` : `R${rb.u} ≠ R${rb.v} → different groups, union and add ${cur.w}.`;
+    } else if (view.decision === "reject") {
+      decCls = "rejected";
+      decNote = vi ? `R${rb.u} = R${rb.v} → cùng nhóm, bỏ để tránh chu trình.` : `R${rb.u} = R${rb.v} → same group, skip to avoid a cycle.`;
+    } else {
+      decCls = rb.u === rb.v ? "cycle" : "ready";
+      decNote = rb.u === rb.v
+        ? (vi ? "Cùng nhóm: nối vào sẽ tạo chu trình." : "Same group: connecting would form a cycle.")
+        : (vi ? "Khác nhóm: cạnh này an toàn để chọn." : "Different groups: this edge is safe to take.");
+    }
+  }
+  const rootsLine = cur && rb
+    ? `<div class="cc-roots"><span>find(${cur.u}) = <b>R${rb.u}</b></span><strong>${rb.u === rb.v ? "=" : "≠"}</strong><span>find(${cur.v}) = <b>R${rb.v}</b></span></div>`
+    : "";
+
+  const scoreHtml = `<section class="cc-score ${view.complete ? "complete" : ""}">
+    <div><small>${vi ? "CẠNH MST" : "MST EDGES"}</small><strong>${view.used}<em>/${view.need}</em></strong></div>
+    <div><small>${vi ? "TỔNG CHI PHÍ" : "TOTAL COST"}</small><strong>${view.total}</strong></div>
+  </section>`;
+
+  const answerHtml = (view.answer === null || view.answer === undefined) ? ""
+    : `<section class="cc-decision ${view.answer === -1 ? "rejected" : "accepted"}"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer === -1 ? "-1" : view.answer}</strong><p>${view.answer === -1 ? (vi ? "Đồ thị không liên thông." : "The graph is disconnected.") : (vi ? "Tổng chi phí MST nhỏ nhất." : "Minimum total MST cost.")}</p></section>`;
+
+  const comps = (view.groups || []).map((g) => {
+    const k = Math.abs(g.root) % 6;
+    const labels = (g.nodes || []).join(" · ");
+    return `<span class="component-chip component-${k}"><b>R${escapeHtml(g.root)}</b><small>${escapeHtml(labels)}</small></span>`;
+  }).join("");
+
+  $("treeView").innerHTML = `<section class="cc-viz">
+    <div class="cc-phases">${phases}</div>
+    <section class="cc-queue"><header><strong>${view.sorted ? (vi ? "HÀNG ĐỢI CẠNH · RẺ → ĐẮT" : "EDGE QUEUE · CHEAP → EXPENSIVE") : (vi ? "DANH SÁCH CẠNH (chưa sort)" : "EDGE LIST (unsorted)")}</strong><span>${edges.length} ${vi ? "cạnh" : "edges"}</span></header><div>${queue}</div></section>
+    <div class="cc-main">
+      <section class="cc-graph-wrap">${graphSvg}</section>
+      <aside class="cc-side">
+        ${scoreHtml}
+        <section class="cc-decision ${decCls}"><small>${vi ? "QUYẾT ĐỊNH" : "DECISION"}</small><strong>${escapeHtml(decTitle)}</strong>${rootsLine}<p>${escapeHtml(decNote)}</p></section>
+        ${answerHtml}
+        <section class="cc-components"><header><strong>DSU ${vi ? "NHÓM" : "GROUPS"}</strong><span>${(view.groups || []).length}</span></header><div>${comps}</div></section>
+      </aside>
+    </div>
+  </section>`;
+}
+
 function renderKruskalEffortView(step) {
   const view = step.kruskalEffortView;
   const el = $("treeView");
@@ -17080,6 +17200,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderWaterDistributionView(step);
+  } else if (step.connectCitiesView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderConnectCitiesView(step);
   } else if (step.bricks803View) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

@@ -4051,66 +4051,88 @@ function buildSteps1135(input, params = {}) {
   const dsu = mstMakeDSU(n + 1);
   const steps = [];
 
-  const edges = connections
-    .map(([u, v, w], idx) => ({ u, v, w, idx, state: "pending" }))
-    .sort((a, b) => a.w - b.w || a.u - b.u || a.v - b.v);
+  // Two orderings over the SAME edge objects: input order (before sort) and
+  // cost-sorted order (Kruskal's queue). Mutating e.state is reflected in both.
+  const edgeObjs = connections.map(([u, v, w], idx) => ({ key: `e${idx}`, u, v, w, idx, sortedIndex: -1, state: "pending" }));
+  const sortedEdges = [...edgeObjs].sort((a, b) => a.w - b.w || a.u - b.u || a.v - b.v);
+  sortedEdges.forEach((e, i) => { e.sortedIndex = i; });
 
   let total = 0;
   let used = 0;
+  let answer = -1;
 
-  function makeGraph(hlEdges, hlNodes) {
+  function groupsFromRoots(roots) {
+    const map = new Map();
+    nodeIds.forEach((id) => {
+      const r = roots[id];
+      if (!map.has(r)) map.set(r, []);
+      map.get(r).push(id);
+    });
+    return [...map.entries()].map(([root, nodes]) => ({ root, nodes }));
+  }
+
+  function makeView(o) {
     const info = mstComponentInfo(dsu, nodeIds);
+    const list = o.order || sortedEdges;
     return {
-      nodes: nodeIds.map((id) => ({ id, label: String(id), sub: `R${info.roots[id]}` })),
-      edges: edges.map((e) => ({
-        u: e.u, v: e.v, w: e.w, undirected: true,
-        kind: e.state === "accept" ? "accept" : e.state === "reject" ? "reject" : undefined,
-      })),
-      hlNodes: hlNodes || [],
-      hlEdges: hlEdges || [],
-      visitedNodes: info.connected,
+      phase: o.phase,
+      n,
+      need: n - 1,
+      sorted: o.sorted !== false,
+      nodes: nodeIds.slice(),
+      edges: list.map((e) => ({ key: e.key, u: e.u, v: e.v, w: e.w, sortedIndex: e.sortedIndex, state: e.state })),
+      currentKey: o.currentKey || null,
+      roots: info.roots,
+      groups: groupsFromRoots(info.roots),
+      rootsBefore: o.rootsBefore || null,
+      decision: o.decision || null,
+      total,
+      used,
+      answer: o.final ? answer : null,
+      complete: used === n - 1,
     };
   }
 
-  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+  function push(o) {
     steps.push({
-      title, note, codeLines,
-      arr: [...dsu.parent], highlight: hlNodes, mark: [], vars, final,
-      graph: makeGraph(hlEdges, hlNodes),
+      title: o.title, note: o.note, codeLines: o.codeLines,
+      arr: [...dsu.parent], highlight: [], mark: [], vars: o.vars || [], final: o.final || false,
+      connectCitiesView: makeView(o),
     });
   }
 
   push({
     title: { vi: `${n} thành phố, ${connections.length} đường nối khả dĩ`, en: `${n} cities, ${connections.length} candidate roads` },
     note: { vi: "Cần nối tất cả thành phố với tổng chi phí nhỏ nhất — đúng bài Cây khung nhỏ nhất (MST) giải bằng Kruskal.", en: "Connect every city with minimum total cost — a Minimum Spanning Tree (MST) solved with Kruskal." },
-    codeLines: [1, 2],
+    codeLines: [1, 2], phase: "build", order: edgeObjs, sorted: false,
     vars: [{ name: "n", value: n }, { name: "connections", value: connections.length }],
   });
 
   push({
     title: { vi: "Sort cạnh theo chi phí tăng dần", en: "Sort edges by increasing cost" },
-    note: { vi: "Kruskal luôn thử cạnh rẻ nhất còn lại trước.", en: "Kruskal always tries the cheapest remaining edge first." },
-    codeLines: [3],
-    vars: [{ name: "edges", value: edges.map((e) => `(${e.u}-${e.v}:${e.w})`).join(" ≤ ") }],
+    note: { vi: "Kruskal luôn thử cạnh rẻ nhất còn lại trước. Hàng đợi cạnh giờ đã xếp từ rẻ → đắt.", en: "Kruskal always tries the cheapest remaining edge first. The edge queue is now ordered cheap → expensive." },
+    codeLines: [3], phase: "sort", sorted: true,
+    vars: [{ name: "edges", value: sortedEdges.map((e) => `(${e.u}-${e.v}:${e.w})`).join(" ≤ ") }],
   });
 
   push({
     title: { vi: `Khởi tạo DSU cho ${n} thành phố`, en: `Initialize DSU for ${n} cities` },
-    note: { vi: `Mỗi thành phố là một component riêng. MST cần đúng ${n - 1} cạnh.`, en: `Each city starts as its own component. An MST needs exactly ${n - 1} edges.` },
-    codeLines: [4],
+    note: { vi: `Mỗi thành phố là một component riêng (màu khác nhau). MST cần đúng ${n - 1} cạnh.`, en: `Each city starts as its own component (distinct colors). An MST needs exactly ${n - 1} edges.` },
+    codeLines: [4], phase: "kruskal",
     vars: [{ name: "parent", value: `[${nodeIds.join(", ")}]` }, { name: "need", value: `${n - 1} edges` }],
   });
 
-  for (const e of edges) {
+  for (const e of sortedEdges) {
     const ru = dsu.rootOf(e.u);
     const rv = dsu.rootOf(e.v);
     push({
       title: { vi: `Xét cạnh ${e.u} — ${e.v} (chi phí ${e.w})`, en: `Consider edge ${e.u} — ${e.v} (cost ${e.w})` },
       note: {
-        vi: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Cùng root → sẽ tạo chu trình." : "Khác root → an toàn để nối."}`,
-        en: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Same root → would form a cycle." : "Different roots → safe to connect."}`,
+        vi: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Cùng nhóm → sẽ tạo chu trình." : "Khác nhóm → an toàn để nối."}`,
+        en: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Same group → would form a cycle." : "Different groups → safe to connect."}`,
       },
-      codeLines: [12, 13], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+      codeLines: [12, 13], phase: "kruskal", currentKey: e.key,
+      rootsBefore: { u: ru, v: rv }, decision: "consider",
       vars: [{ name: "u,v,w", value: `${e.u}, ${e.v}, ${e.w}` }, { name: "find(u)", value: `R${ru}` }, { name: "find(v)", value: `R${rv}` }],
     });
 
@@ -4121,31 +4143,33 @@ function buildSteps1135(input, params = {}) {
       used += 1;
       push({
         title: { vi: `✓ Chọn ${e.u} — ${e.v}: total=${total}`, en: `✓ Take ${e.u} — ${e.v}: total=${total}` },
-        note: { vi: `Hai component khác nhau → union và cộng ${e.w}. Đã dùng ${used}/${n - 1} cạnh.`, en: `Different components → union and add ${e.w}. Used ${used}/${n - 1} edges.` },
-        codeLines: [14, 15, 16, 17], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        note: { vi: `Hai nhóm khác nhau → union và cộng ${e.w}. Đã dùng ${used}/${n - 1} cạnh.`, en: `Two different groups → union and add ${e.w}. Used ${used}/${n - 1} edges.` },
+        codeLines: [14, 15, 16, 17], phase: "kruskal", currentKey: e.key,
+        rootsBefore: { u: ru, v: rv }, decision: "accept",
         vars: [{ name: "total", value: total }, { name: "used", value: `${used}/${n - 1}` }],
       });
     } else {
       e.state = "reject";
       push({
         title: { vi: `✗ Bỏ ${e.u} — ${e.v} (chu trình)`, en: `✗ Skip ${e.u} — ${e.v} (cycle)` },
-        note: { vi: `Cùng root R${ru} → nối sẽ tạo chu trình, bỏ qua cạnh này.`, en: `Same root R${ru} → connecting would form a cycle, skip this edge.` },
-        codeLines: [14], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        note: { vi: `Cùng nhóm R${ru} → nối sẽ tạo chu trình, bỏ qua cạnh này.`, en: `Same group R${ru} → connecting would form a cycle, skip this edge.` },
+        codeLines: [14], phase: "kruskal", currentKey: e.key,
+        rootsBefore: { u: ru, v: rv }, decision: "reject",
         vars: [{ name: "decision", value: "cycle → skip" }],
       });
     }
     if (used === n - 1) break;
   }
 
-  const answer = used === n - 1 ? total : -1;
+  answer = used === n - 1 ? total : -1;
   push({
     title: answer === -1
       ? { vi: "Không thể nối tất cả thành phố → -1", en: "Cannot connect all cities → -1" }
       : { vi: `Chi phí nhỏ nhất = ${total}`, en: `Minimum cost = ${total}` },
     note: answer === -1
       ? { vi: `Chỉ dùng được ${used} cạnh (< ${n - 1}); đồ thị không liên thông.`, en: `Only ${used} edges usable (< ${n - 1}); the graph is disconnected.` }
-      : { vi: `MST dùng ${used} cạnh nối toàn bộ ${n} thành phố.`, en: `The MST uses ${used} edges connecting all ${n} cities.` },
-    codeLines: [18], final: true,
+      : { vi: `MST dùng ${used} cạnh (xanh) nối toàn bộ ${n} thành phố với tổng ${total}.`, en: `The MST uses ${used} edges (green) connecting all ${n} cities with total ${total}.` },
+    codeLines: [18], phase: "done", final: true,
     vars: [{ name: "answer", value: answer }, { name: "MST edges", value: `${used}/${n - 1}` }],
   });
 
