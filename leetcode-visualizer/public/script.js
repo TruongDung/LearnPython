@@ -724,6 +724,118 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "backtracking") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion backtracking-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🧭</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "11 nhóm Backtracking · subsets → CSP → hard" : "11 Backtracking groups · subsets → CSP → hard"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🧩", name: vi ? "1 · Subsets / Subsequences" : "1 · Subsets / Subsequences", problems: [
+            [78, "Subsets"], [90, "Subsets II"], [491, "Non-decreasing Subsequences"], [1079, "Letter Tile Possibilities"],
+          ] },
+          { icon: "🎯", name: vi ? "2 · Combinations" : "2 · Combinations", problems: [
+            [77, "Combinations"], [39, "Combination Sum"], [40, "Combination Sum II"], [216, "Combination Sum III"], [377, "Combination Sum IV"],
+          ] },
+          { icon: "🔀", name: vi ? "3 · Permutations" : "3 · Permutations", problems: [
+            [46, "Permutations"], [47, "Permutations II"], [60, "Permutation Sequence"],
+          ] },
+          { icon: "✂️", name: vi ? "4 · String Partitioning" : "4 · String Partitioning", problems: [
+            [131, "Palindrome Partitioning"], [93, "Restore IP Addresses"], [140, "Word Break II"], [1593, "Split String Into Max Unique Substrings"],
+          ] },
+          { icon: "🔧", name: vi ? "5 · Parentheses" : "5 · Parentheses", problems: [
+            [22, "Generate Parentheses"], [301, "Remove Invalid Parentheses"],
+          ] },
+          { icon: "🗺️", name: vi ? "6 · Word / Grid Search" : "6 · Word / Grid Search", problems: [
+            [79, "Word Search"], [212, "Word Search II"], [980, "Unique Paths III"], [1219, "Path with Maximum Gold"],
+          ] },
+          { icon: "♛", name: vi ? "7 · Constraint Satisfaction" : "7 · Constraint Satisfaction", problems: [
+            [37, "Sudoku Solver"], [51, "N-Queens"], [52, "N-Queens II"], [36, "Valid Sudoku"], [488, "Zuma Game"],
+          ] },
+          { icon: "📱", name: vi ? "8 · Phone / Letter Combinations" : "8 · Phone / Letter Combinations", problems: [
+            [17, "Letter Combinations of a Phone Number"], [784, "Letter Case Permutation"],
+          ] },
+          { icon: "⚖️", name: vi ? "9 · Partition / Array" : "9 · Partition / Array", problems: [
+            [698, "Partition to K Equal Sum Subsets"], [473, "Matchsticks to Square"], [1723, "Find Minimum Time to Finish All Jobs"], [2305, "Fair Distribution of Cookies"],
+          ] },
+          { icon: "🕸️", name: vi ? "10 · Graph / Path Backtracking" : "10 · Graph / Path Backtracking", problems: [
+            [797, "All Paths From Source to Target"], [980, "Unique Paths III"], [332, "Reconstruct Itinerary"], [1255, "Maximum Score Words Formed by Letters"],
+          ] },
+          { icon: "🔥", name: vi ? "11 · Hard / Advanced" : "11 · Hard / Advanced", problems: [
+            [37, "Sudoku Solver"], [51, "N-Queens"], [212, "Word Search II"], [301, "Remove Invalid Parentheses"], [489, "Robot Room Cleaner"],
+            [679, "24 Game"], [854, "K-Similar Strings"], [1079, "Letter Tile Possibilities"], [1219, "Path with Maximum Gold"],
+            [1255, "Maximum Score Words Formed by Letters"], [1593, "Split String Into Max Unique Substrings"], [1723, "Find Minimum Time to Finish All Jobs"], [2305, "Fair Distribution of Cookies"],
+          ] },
+        ];
+        const sequence = [78, 90, 77, 39, 40, 46, 17, 784, 131, 301, 79, 212, 51, 980];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-backtracking-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-backtracking-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "BACKTRACKING LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "11 nhóm Backtracking cần nhớ" : "11 Backtracking groups to master";
+        $("trieLearnIntro").textContent = vi
+          ? "Đi từ subsets/combinations/permutations, qua chia chuỗi, ngoặc, tìm kiếm trên lưới, đến CSP (Sudoku, N-Queens) và các bài phân hoạch / đồ thị khó."
+          : "Progress from subsets/combinations/permutations, through string partitioning, parentheses, and grid search, to CSP (Sudoku, N-Queens) and hard partition / graph problems.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình Backtracking" : "Close Backtracking learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "11 nhóm bài theo dạng" : "11 problem groups by pattern"}</h3><p>${vi ? "Cùng khung backtracking (choose → explore → un-choose), khác cách cắt tỉa và điều kiện." : "Same backtracking skeleton (choose → explore → un-choose), different pruning and constraints."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Nắm subsets/combinations/permutations trước, rồi ngoặc & chia chuỗi, tìm kiếm lưới, và cuối cùng là CSP." : "Master subsets/combinations/permutations first, then parentheses & partitioning, grid search, and finally CSP."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-backtracking-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.backtrackingProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
