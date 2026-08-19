@@ -16072,6 +16072,64 @@ function renderFibonacciView(step) {
   </section>`;
 }
 
+function renderTribonacciView(step) {
+  const view = step.tribonacciView || {};
+  const vi = lang === "vi";
+  const terms = Array.isArray(view.terms) ? view.terms : [];
+  const labels = {
+    base: vi ? "Base case" : "Base case",
+    calculate: vi ? "Cộng 3 số trước" : "Add 3 previous terms",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  const termHtml = terms.map((term) => {
+    const value = term.value === null ? "?" : term.value;
+    const status = term.value === null ? (vi ? "chưa tính" : "not computed") : (vi ? "đã biết" : "known");
+    return `<article class="cs70-stair ${term.state}"><small>T(${term.step})</small><strong>${value}</strong><em>${status}</em></article>`;
+  }).join("");
+
+  let equation = vi ? "Dãy được tính từ trái sang phải." : "The sequence is computed left to right.";
+  let reason = "";
+  if (view.formula) {
+    const f = view.formula;
+    equation = `T(${f.target}) = T(${f.s[2]}) + T(${f.s[1]}) + T(${f.s[0]}) = ${f.values[2]} + ${f.values[1]} + ${f.values[0]} = <b>${f.result}</b>`;
+    reason = vi
+      ? "Mỗi số Tribonacci mới bằng tổng của đúng ba số đứng ngay trước nó."
+      : "Every new Tribonacci number is the sum of exactly the three preceding numbers.";
+  } else if (view.phase === "base") {
+    equation = "T(0) = <b>0</b>,  T(1) = <b>1</b>,  T(2) = <b>1</b>";
+    reason = vi ? "Đây là ba giá trị cơ sở của dãy Tribonacci." : "These are the three base values of the Tribonacci sequence.";
+  } else if (view.phase === "done") {
+    const target = Number.isInteger(view.target) ? view.target : view.n;
+    const result = terms[target] ? terms[target].value : "?";
+    equation = `T(${target}) = <b>${result}</b>`;
+    reason = vi ? "Ô cuối là số Tribonacci cần trả về." : "The final cell is the Tribonacci number to return.";
+  }
+
+  const rolling = view.rolling;
+  const rollingHtml = rolling ? [
+    ["a", rolling.a, vi ? "3 số trước" : "three terms back"],
+    ["b", rolling.b, vi ? "2 số trước" : "two terms back"],
+    ["c", rolling.c, vi ? "số trước" : "previous term"],
+    ["next", rolling.next, vi ? "số mới" : "new term"],
+  ].map(([name, item, hint]) => `<article class="cs70-register ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `T(${item.step})` : hint}</em></article>`).join("") : "";
+
+  const method = Number(view.approach) === 2
+    ? (vi ? "APPROACH 2 · chỉ giữ 3 biến" : "APPROACH 2 · keep only 3 variables")
+    : (vi ? "APPROACH 1 · bảng DP" : "APPROACH 1 · DP table");
+  const rollingSection = rollingHtml
+    ? `<section class="cs70-rolling four"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 3 giá trị → số mới" : "three-value window → new term"}</span></header><div>${rollingHtml}</div></section>`
+    : "";
+
+  $("treeView").innerHTML = `<section class="cs70-viz" role="img" aria-label="${vi ? "Trực quan hóa số Tribonacci" : "Tribonacci-number visualization"}">
+    <header><strong>TRIBONACCI NUMBER</strong><span class="cs70-phase">${escapeHtml(labels[view.phase] || view.phase || "")}</span></header>
+    <section class="cs70-rule"><b>CORE RULE</b><strong>T(i) = T(i−1) + T(i−2) + T(i−3)</strong><span>${vi ? "Mỗi số mới là tổng của ba số liền trước." : "Each new term is the sum of its three previous terms."}</span></section>
+    <section class="cs70-action"><small>${escapeHtml(method)}</small><strong>${equation}</strong>${reason ? `<span>${escapeHtml(reason)}</span>` : ""}</section>
+    ${rollingSection}
+    <section class="cs70-table"><header><strong>${vi ? "BẢNG TRIBONACCI T(i)" : "TRIBONACCI TABLE T(i)"}</strong><span>${vi ? "tím = 3 nguồn · vàng = ô đang tính · xanh = đã biết" : "purple = 3 sources · yellow = current target · green = known"}</span></header><div class="cs70-stairs">${termHtml}</div></section>
+  </section>`;
+}
+
 function renderClimbingStairsView(step) {
   const view = step.climbingStairsView || {};
   const vi = lang === "vi";
@@ -16896,6 +16954,12 @@ function renderStep() {
     $("gridView").classList.add("hidden");
     $("bfsGridView").classList.add("hidden");
     renderFibonacciView(step);
+  } else if (step.tribonacciView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderTribonacciView(step);
   } else if (step.climbingStairsView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

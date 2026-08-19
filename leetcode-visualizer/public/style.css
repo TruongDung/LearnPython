@@ -32663,6 +32663,7 @@ html, body {
 .cs70-stair.target strong { color: #fef3c7; }
 .cs70-stair.future { opacity: .62; border-style: dashed; }
 .cs70-rolling > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.cs70-rolling.four > div { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .cs70-register { display: grid; gap: 3px; padding: 8px; border: 1px solid #475569; border-radius: 8px; background: #1e293b; text-align: center; }
 .cs70-register small { color: #c4b5fd; font: 800 10px/1 "SFMono-Regular", Consolas, monospace; }
 .cs70-register strong { color: #f8fafc; font: 800 19px/1 "SFMono-Regular", Consolas, monospace; }

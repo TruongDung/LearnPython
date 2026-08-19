@@ -2033,6 +2033,96 @@ function buildSteps509Optimized(n) {
 }
 
 /**
+ * Attach a clear, Fibonacci-style visualization to each #1137 step.
+ *
+ * The plain bar chart made it hard to see *which* three previous terms feed
+ * into the current one. This view mirrors the #509 / #70 "cs70" layout:
+ *   - a persistent core rule  T(i) = T(i-1) + T(i-2) + T(i-3)
+ *   - a per-step equation with the actual numbers being added
+ *   - a table where the 3 sources, the target, and known terms are colour-coded
+ *   - (approach 2) a live-memory window showing a, b, c and the new term.
+ */
+function attachTribonacciViews(n, approach, steps) {
+  const len = Math.max(n, 2) + 1;
+
+  return steps.map((step) => {
+    const iVar = (step.vars || []).find((item) => item.name === "i");
+    const hasI = iVar !== undefined;
+
+    let phase;
+    let target;
+    let knownThrough;
+
+    if (step.final) {
+      phase = "done";
+      target = n;
+      knownThrough = n;
+    } else if (hasI) {
+      phase = "calculate";
+      target = Number(iVar.value);
+      knownThrough = target;
+    } else {
+      phase = "base";
+      target = null;
+      knownThrough = Math.min(2, len - 1);
+    }
+
+    const values = Array.from({ length: len }, (_, i) => {
+      if (i > knownThrough) return null;
+      const v = step.arr ? step.arr[i] : undefined;
+      return v === undefined ? null : v;
+    });
+
+    const sources = phase === "calculate" ? [target - 3, target - 2, target - 1] : [];
+    const sourceSet = new Set(sources);
+
+    const formula = phase === "calculate"
+      ? {
+          target,
+          s: sources.slice(),
+          values: sources.map((idx) => values[idx]),
+          result: values[target],
+        }
+      : null;
+
+    let rolling = null;
+    if (approach === 2 && !(step.final && n <= 2)) {
+      const cell = (idx) => (idx >= 0 && idx < len && values[idx] !== null
+        ? { step: idx, value: values[idx] } : null);
+      if (phase === "base") {
+        rolling = { a: cell(0), b: cell(1), c: cell(2), next: null };
+      } else if (phase === "calculate") {
+        rolling = { a: cell(target - 3), b: cell(target - 2), c: cell(target - 1), next: cell(target) };
+      } else if (phase === "done" && n > 2) {
+        rolling = { a: cell(n - 2), b: cell(n - 1), c: cell(n), next: null };
+      }
+    }
+
+    return {
+      ...step,
+      tribonacciView: {
+        kind: "tribonacci",
+        symbol: "T",
+        n,
+        approach,
+        phase,
+        target,
+        sources,
+        formula,
+        rolling,
+        terms: values.map((value, stepIndex) => ({
+          step: stepIndex,
+          value,
+          state: stepIndex === target ? "target"
+            : sourceSet.has(stepIndex) ? "source"
+              : value === null ? "future" : "known",
+        })),
+      },
+    };
+  });
+}
+
+/**
  * Generate steps for LeetCode 1137: N-th Tribonacci Number.
  *
  *  - T(0) = 0, T(1) = 1, T(2) = 1.
@@ -2105,7 +2195,7 @@ function buildSteps1137(input, params) {
     },
   });
 
-  return { n, answer, steps };
+  return { n, answer, steps: attachTribonacciViews(n, 1, steps) };
 }
 
 /**
@@ -2117,11 +2207,11 @@ function buildSteps1137Rolling(n) {
 
   if (n === 0) {
     steps.push({ title: { vi: "n=0 → T(0)=0", en: "n=0 → T(0)=0" }, arr: [0], highlight: [0], mark: [0], final: true, codeBlock: 2, codeLines: [3, 4], vars: [{ name: "answer", value: 0 }], note: { vi: "Base case: T(0)=0.", en: "Base case: T(0)=0." } });
-    return { n, answer: 0, steps };
+    return { n, answer: 0, steps: attachTribonacciViews(n, 2, steps) };
   }
   if (n === 1 || n === 2) {
     steps.push({ title: { vi: `n=${n} → T(${n})=1`, en: `n=${n} → T(${n})=1` }, arr: n === 1 ? [0, 1] : [0, 1, 1], highlight: [n], mark: [n], final: true, codeBlock: 2, codeLines: [3, 4], vars: [{ name: "answer", value: 1 }], note: { vi: `Base case: T(${n})=1.`, en: `Base case: T(${n})=1.` } });
-    return { n, answer: 1, steps };
+    return { n, answer: 1, steps: attachTribonacciViews(n, 2, steps) };
   }
 
   let a = 0, b = 1, c = 1;
@@ -2211,7 +2301,7 @@ function buildSteps1137Rolling(n) {
     },
   });
 
-  return { n, answer: c, steps };
+  return { n, answer: c, steps: attachTribonacciViews(n, 2, steps) };
 }
 
 /** LeetCode 1749: Maximum Absolute Sum of Any Subarray. */
