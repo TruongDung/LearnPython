@@ -16290,6 +16290,186 @@ function buildSteps4027(input, params = {}) {
 }
 
 /**
+ * LeetCode 354: Russian Doll Envelopes. Sort (w asc, h desc) → LIS trên chiều cao.
+ */
+function buildSteps354(input) {
+  const envs = String(input).split(";").map((p) => p.trim()).filter(Boolean)
+    .map((p) => p.split(",").map((v) => Number(v.trim())))
+    .filter((e) => e.length === 2 && e.every(Number.isFinite))
+    .slice(0, 12);
+  // Sort: width ascending, height descending for equal width.
+  const sorted = [...envs].sort((a, b) => (a[0] - b[0]) || (b[1] - a[1]));
+  const n = sorted.length;
+  const heights = sorted.map((e) => e[1]);
+  const dp = new Array(n).fill(1);
+  const steps = [];
+  const labels = sorted.map((e) => `${e[0]}×${e[1]}`);
+
+  const push = (opts) => {
+    steps.push({
+      title: opts.title,
+      arr: [...heights],
+      sub: opts.sub || dp.map((v, i) => `${labels[i]}·L${v}`),
+      highlight: opts.highlight || [],
+      mark: opts.mark || [],
+      final: Boolean(opts.final),
+      codeLines: opts.codeLines || [],
+      vars: opts.vars || [],
+      note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `Sắp xếp: rộng tăng, cao giảm → [${labels.join(", ")}]`, en: `Sort: width asc, height desc → [${labels.join(", ")}]` },
+    codeLines: [3],
+    highlight: [],
+    note: {
+      vi: `Mẹo: sắp theo chiều RỘNG tăng dần; nếu rộng bằng nhau thì chiều CAO giảm dần (để 2 phong bì cùng rộng không thể lồng nhau → không bị đếm nhầm). Sau đó bài toán trở thành LIS NGHIÊM NGẶT trên dãy chiều cao: [${heights.join(", ")}]. dp[i] = chuỗi lồng dài nhất kết thúc tại i.`,
+      en: `Trick: sort by WIDTH ascending; for equal width sort HEIGHT descending (so same-width envelopes can't nest → no false counting). Then it becomes a STRICT LIS on heights: [${heights.join(", ")}]. dp[i] = longest nesting chain ending at i.`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      const extend = heights[j] < heights[i];
+      if (extend && dp[j] + 1 > dp[i]) dp[i] = dp[j] + 1;
+      push({
+        title: { vi: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "lồng được" : "không lồng"}`, en: `i=${i} (${labels[i]}), j=${j} (${labels[j]}) → ${extend ? "can nest" : "cannot"}` },
+        codeLines: extend ? [8, 9] : [8],
+        highlight: [i],
+        mark: extend ? [j] : [],
+        vars: [
+          { name: "i", value: `${labels[i]}` },
+          { name: "j", value: `${labels[j]}` },
+          { name: "cao[j] < cao[i]?", value: extend },
+          { name: `dp[${i}]`, value: dp[i] },
+        ],
+        note: {
+          vi: extend
+            ? `${labels[j]} lồng được vào ${labels[i]} (cao ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
+            : `${labels[j]} không lồng vào ${labels[i]} (cao ${heights[j]} ≥ ${heights[i]}) → bỏ qua.`,
+          en: extend
+            ? `${labels[j]} nests into ${labels[i]} (height ${heights[j]} < ${heights[i]}). dp[${i}] = max(dp[${i}], dp[${j}]+1) = ${dp[i]}.`
+            : `${labels[j]} cannot nest into ${labels[i]} (height ${heights[j]} ≥ ${heights[i]}) → skip.`,
+        },
+      });
+    }
+  }
+
+  const answer = n ? Math.max(...dp) : 0;
+  const bestIdx = dp.map((v, i) => (v === answer ? i : -1)).filter((i) => i >= 0);
+  push({
+    title: { vi: `Kết quả: max(dp) = ${answer}`, en: `Result: max(dp) = ${answer}` },
+    codeLines: [10],
+    highlight: bestIdx,
+    mark: bestIdx,
+    final: true,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Số phong bì lồng nhau nhiều nhất = ${answer}.`, en: `Maximum number of nested envelopes = ${answer}.` },
+  });
+
+  return { original: sorted, answer, steps };
+}
+
+/**
+ * LeetCode 1000: Minimum Cost to Merge Stones. Interval DP.
+ * Chỉ gộp được nếu (n-1) % (k-1) == 0.
+ */
+function buildSteps1000(input, params) {
+  const stones = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim()))).filter(Number.isFinite).slice(0, 10);
+  const k = Math.max(2, Math.min(5, Number((params && params.k) ?? 2)));
+  const n = stones.length;
+  const steps = [];
+  const prefix = new Array(n + 1).fill(0);
+  for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + stones[i];
+
+  // Feasibility.
+  if (n > 1 && (n - 1) % (k - 1) !== 0) {
+    steps.push({
+      title: { vi: "Không thể gộp về 1 đống", en: "Cannot merge into one pile" },
+      arr: [...stones],
+      sub: stones.map((_, i) => `[${i}]`),
+      highlight: [], mark: [], final: true, codeLines: [4],
+      vars: [{ name: "n", value: n }, { name: "k", value: k }, { name: "(n-1)%(k-1)", value: (n - 1) % (k - 1) }],
+      note: {
+        vi: `Mỗi lần gộp ${k} đống liền kề thành 1 → giảm đúng (k−1) đống. Để về 1 đống cần (n−1) chia hết cho (k−1). Ở đây (n−1)%(k−1) = ${(n - 1) % (k - 1)} ≠ 0 → trả về −1.`,
+        en: `Each merge turns k adjacent piles into 1 → reduces piles by (k−1). To reach one pile, (n−1) must be divisible by (k−1). Here (n−1)%(k−1) = ${(n - 1) % (k - 1)} ≠ 0 → return −1.`,
+      },
+    });
+    return { original: [...stones], answer: -1, steps };
+  }
+
+  // dp[i][j] = min cost to merge stones[i..j] into as few piles as possible.
+  const INF = Infinity;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const computed = Array.from({ length: n }, () => new Array(n).fill(false));
+  for (let i = 0; i < n; i++) computed[i][i] = true;
+  const labels = stones.map((v) => `${v}`);
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? (v === INF ? "∞" : String(v)) : (j < i ? "" : "·"))));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: { dp: display(), text1: labels.slice(1), text2: labels.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `stones=[${stones.join(", ")}], k=${k}`, en: `stones=[${stones.join(", ")}], k=${k}` },
+    codeLines: [5],
+    caption: "dp[i][j] = chi phí gộp stones[i..j] về ít đống nhất",
+    vars: [{ name: "stones", value: `[${stones.join(", ")}]` }, { name: "k", value: k }],
+    note: {
+      vi: `dp[i][j] = chi phí nhỏ nhất để gộp stones[i..j] về ít đống nhất. Gộp trước thành các nhóm rồi ghép k nhóm liền kề (chi phí = tổng đá của đoạn). Đường chéo dp[i][i]=0.`,
+      en: `dp[i][j] = min cost to merge stones[i..j] into as few piles as possible. Merge into groups first, then combine k adjacent groups (cost = sum of the segment). Diagonal dp[i][i]=0.`,
+    },
+  });
+
+  for (let len = 2; len <= n; len++) {
+    for (let i = 0; i + len - 1 < n; i++) {
+      const j = i + len - 1;
+      let best = INF;
+      let bestM = -1;
+      for (let mid = i; mid < j; mid += (k - 1)) {
+        const cand = dp[i][mid] + dp[mid + 1][j];
+        if (cand < best) { best = cand; bestM = mid; }
+      }
+      if ((j - i) % (k - 1) === 0) best += prefix[j + 1] - prefix[i];
+      dp[i][j] = best;
+      computed[i][j] = true;
+      const canMergeOne = (j - i) % (k - 1) === 0;
+      push({
+        title: { vi: `dp[${i}][${j}] = ${best === INF ? "∞" : best}`, en: `dp[${i}][${j}] = ${best === INF ? "∞" : best}` },
+        codeLines: [8, 9, 10],
+        hlCell: [i, j],
+        pathCells: bestM >= 0 ? [[i, bestM], [bestM + 1, j]] : [],
+        caption: `dp[${i}][${j}] = ${best === INF ? "∞" : best}${canMergeOne ? ` (+ tổng đoạn ${prefix[j + 1] - prefix[i]})` : ""}`,
+        vars: [
+          { name: "đoạn", value: `[${stones.slice(i, j + 1).join(", ")}]` },
+          { name: "gộp về 1 đống được?", value: canMergeOne },
+          { name: `dp[${i}][${j}]`, value: best === INF ? "∞" : best },
+        ],
+        note: {
+          vi: `Đoạn [${stones.slice(i, j + 1).join(",")}]: thử chia tại mid (bước k−1) để hai phần gộp tối ưu. ${canMergeOne ? `Đoạn này gộp được về 1 đống nên cộng thêm tổng đá của đoạn = ${prefix[j + 1] - prefix[i]}.` : `Chưa gộp về 1 đống nên chỉ lấy chi phí chia.`} → dp[${i}][${j}] = ${best === INF ? "∞" : best}.`,
+          en: `Segment [${stones.slice(i, j + 1).join(",")}]: try splitting at mid (step k−1) so both parts merge optimally. ${canMergeOne ? `This segment can merge into one pile, so add the segment sum = ${prefix[j + 1] - prefix[i]}.` : `Not yet mergeable into one pile, so take only the split cost.`} → dp[${i}][${j}] = ${best === INF ? "∞" : best}.`,
+        },
+      });
+    }
+  }
+
+  const answer = n <= 1 ? 0 : dp[0][n - 1];
+  push({
+    title: { vi: `Kết quả: dp[0][${n - 1}] = ${answer}`, en: `Result: dp[0][${n - 1}] = ${answer}` },
+    codeLines: [11], hlCell: [0, Math.max(0, n - 1)], final: true,
+    caption: `Đáp án = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Chi phí nhỏ nhất để gộp hết về 1 đống = ${answer}.`, en: `Minimum cost to merge everything into one pile = ${answer}.` },
+  });
+
+  return { original: [...stones], answer, steps };
+}
+
+/**
  * LeetCode 664: Strange Printer. Interval DP: dp[i][j] = số lượt in ít nhất cho s[i..j].
  */
 function buildSteps664(input) {
@@ -17220,6 +17400,71 @@ function buildSteps673(nums) {
 }
 
 module.exports = {
+  354: {
+    id: 354,
+    difficulty: "hard",
+    slug: "russian-doll-envelopes",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Russian Doll Envelopes", en: "Russian Doll Envelopes" },
+    titleVi: { vi: "Phong bì búp bê Nga", en: "Russian doll envelopes" },
+    statement: {
+      vi: "Cho các phong bì (rộng, cao). Phong bì A lồng vào B nếu rộng A < rộng B VÀ cao A < cao B. Tìm số phong bì lồng nhau nhiều nhất. Nhập: w,h; w,h; ...",
+      en: "Given envelopes (width, height). A fits into B if widthA < widthB AND heightA < heightB. Find the longest nesting chain. Enter: w,h; w,h; ...",
+    },
+    defaultInput: "5,4;6,4;6,7;2,3",
+    inputKind: "string",
+    inputLabel: { vi: "envelopes (w,h; ...)", en: "envelopes (w,h; ...)" },
+    extraParams: [],
+    complexity: { time: "O(n²)", space: "O(n)", note: { vi: "Sắp xếp rồi LIS O(n²) (có thể O(n log n)).", en: "Sort then O(n²) LIS (can be O(n log n))." } },
+    code: [
+      "class Solution:",
+      "    def maxEnvelopes(self, envelopes):",
+      "        envelopes.sort(key=lambda e: (e[0], -e[1]))",
+      "        n = len(envelopes)",
+      "        dp = [1] * n",
+      "        for i in range(n):",
+      "            for j in range(i):",
+      "                if envelopes[j][1] < envelopes[i][1]:",
+      "                    dp[i] = max(dp[i], dp[j] + 1)",
+      "        return max(dp) if n else 0",
+    ],
+    builder: buildSteps354,
+  },
+  1000: {
+    id: 1000,
+    difficulty: "hard",
+    slug: "minimum-cost-to-merge-stones",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Minimum Cost to Merge Stones", en: "Minimum Cost to Merge Stones" },
+    titleVi: { vi: "Chi phí gộp đá nhỏ nhất", en: "Minimum cost to merge stones" },
+    statement: {
+      vi: "Có n đống đá. Mỗi lần gộp ĐÚNG k đống liền kề thành 1 đống, chi phí = tổng số đá của k đống đó. Tìm chi phí nhỏ nhất để về 1 đống (không được thì −1).",
+      en: "Given n piles. Each move merges exactly k consecutive piles into one, costing the sum of those k piles. Find the min cost to reach one pile (−1 if impossible).",
+    },
+    defaultInput: [3, 2, 4, 1],
+    inputKind: "positive",
+    inputLabel: { vi: "stones", en: "stones" },
+    extraParams: [
+      { key: "k", type: "number", label: { vi: "k (số đống mỗi lần gộp)", en: "k (piles per merge)" }, default: 2 },
+    ],
+    complexity: { time: "O(n³/k)", space: "O(n²)", note: { vi: "Interval DP; điều kiện (n−1)%(k−1)=0.", en: "Interval DP; feasible when (n−1)%(k−1)=0." } },
+    code: [
+      "class Solution:",
+      "    def mergeStones(self, stones, k):",
+      "        n = len(stones)",
+      "        if (n - 1) % (k - 1) != 0: return -1",
+      "        prefix = [0]*(n+1)",
+      "        for i, v in enumerate(stones): prefix[i+1] = prefix[i] + v",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        for length in range(2, n+1):",
+      "            for i in range(n-length+1):",
+      "                j = i + length - 1",
+      "                dp[i][j] = min(dp[i][m] + dp[m+1][j] for m in range(i, j, k-1))",
+      "                if (j - i) % (k - 1) == 0: dp[i][j] += prefix[j+1] - prefix[i]",
+      "        return dp[0][n-1]",
+    ],
+    builder: buildSteps1000,
+  },
   664: {
     id: 664,
     difficulty: "hard",
