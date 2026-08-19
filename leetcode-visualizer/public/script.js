@@ -633,6 +633,97 @@ function renderCatalog() {
       itemsEl.appendChild(learnButton);
     }
 
+    if (group.key === "union-find") {
+      const learnButton = document.createElement("button");
+      learnButton.type = "button";
+      learnButton.className = "trie-learn-suggestion mst-learn-suggestion";
+      learnButton.setAttribute("aria-haspopup", "dialog");
+      learnButton.setAttribute("aria-controls", "trieLearnDialog");
+      learnButton.innerHTML = `<span class="trie-learn-suggestion-icon">🌲</span><span><strong>Learn Suggestion</strong><small>${lang === "vi" ? "Cây khung nhỏ nhất (MST) · Prim → Kruskal → nâng cao" : "Minimum Spanning Tree (MST) · Prim → Kruskal → advanced"}</small></span><b aria-hidden="true">→</b>`;
+
+      learnButton.addEventListener("click", () => {
+        const dialog = $("trieLearnDialog");
+        const content = $("trieLearnContent");
+        const closeButton = $("trieLearnClose");
+        if (!dialog || !content || !closeButton) return;
+        const vi = lang === "vi";
+        const groups = [
+          { icon: "🌱", name: vi ? "Nền tảng MST" : "MST foundation", problems: [
+            [1584, vi ? "Min Cost to Connect All Points — Prim + min-heap" : "Min Cost to Connect All Points — Prim + min-heap"],
+            [1135, vi ? "Connecting Cities — Kruskal + Union-Find" : "Connecting Cities — Kruskal + Union-Find"],
+          ] },
+          { icon: "🌿", name: vi ? "Biến đổi mô hình" : "Model transformation", problems: [
+            [1168, vi ? "Optimize Water Distribution — node ảo 0 + Kruskal" : "Optimize Water Distribution — virtual node 0 + Kruskal"],
+          ] },
+          { icon: "🌳", name: vi ? "Nâng cao" : "Advanced", problems: [
+            [1489, vi ? "Critical & Pseudo-Critical Edges — chạy Kruskal nhiều lần" : "Critical & Pseudo-Critical Edges — repeated Kruskal"],
+          ] },
+          { icon: "🧭", name: vi ? "Union-Find liên quan" : "Related Union-Find", problems: [
+            [1579, vi ? "Remove Max Edges — hai DSU (Alice/Bob)" : "Remove Max Edges — two DSUs (Alice/Bob)"],
+            [1627, vi ? "Graph Connectivity With Threshold — union bội số" : "Graph Connectivity With Threshold — union multiples"],
+          ] },
+        ];
+        const sequence = [1584, 1135, 1168, 1489];
+        const supportedIds = new Set((catalogData || []).flatMap((entry) => entry.problems || []).map((problem) => Number(problem.id)));
+        const unavailableText = vi ? "Chưa có trong visualizer" : "Not in visualizer yet";
+        const problemRow = ([id, name]) => (supportedIds.has(id)
+          ? `<li><a class="trie-problem-row" href="#leetcode-${id}" data-mst-problem-id="${id}"><span>#${id}</span><b>${name}</b></a></li>`
+          : `<li><span class="trie-problem-row unavailable" aria-disabled="true" title="${unavailableText}"><span>#${id}</span><b>${name}<em>${unavailableText}</em></b></span></li>`);
+        const roadmapItem = (id) => (supportedIds.has(id)
+          ? `<a class="trie-problem-link" href="#leetcode-${id}" data-mst-problem-id="${id}" aria-label="Load LeetCode ${id}">#${id}</a>`
+          : `<span class="trie-problem-link unavailable" aria-disabled="true" title="${unavailableText}">#${id}</span>`);
+        const groupCards = groups.map((item) => `<details class="sliding-pattern-card" open><summary><span>${item.icon}</span><strong>${item.name}</strong><small>${item.problems.length} ${vi ? "bài" : "problems"}</small></summary><ul>${item.problems.map(problemRow).join("")}</ul></details>`).join("");
+
+        $("trieLearnEyebrow").textContent = "SPANNING TREE (MST) LEARNING MAP";
+        $("trieLearnTitle").textContent = vi ? "Lộ trình Cây khung nhỏ nhất (MST)" : "Minimum Spanning Tree (MST) roadmap";
+        $("trieLearnIntro").textContent = vi
+          ? "Bắt đầu với hai thuật toán MST kinh điển (Prim, Kruskal), rồi học cách mô hình hóa bài toán về MST, cuối cùng là biến thể nâng cao."
+          : "Start with the two classic MST algorithms (Prim, Kruskal), then learn to model problems as an MST, and finish with an advanced variant.";
+        closeButton.setAttribute("aria-label", vi ? "Đóng lộ trình MST" : "Close MST learning guide");
+        content.innerHTML = `
+          <section class="trie-learn-section">
+            <div class="trie-learn-section-title"><span>01</span><div><h3>${vi ? "Nhóm bài theo kỹ thuật" : "Problems grouped by technique"}</h3><p>${vi ? "Cùng ý tưởng MST nhưng khác cách dựng cạnh và chạy Union-Find." : "Same MST idea, different ways to build edges and run Union-Find."}</p></div></div>
+            <div class="sliding-pattern-grid">${groupCards}</div>
+          </section>
+          <section class="trie-roadmap">
+            <div class="trie-learn-section-title"><span>02</span><div><h3>${vi ? "Thứ tự nên học" : "Recommended learning order"}</h3><p>${vi ? "Prim (1584) → Kruskal (1135) → mô hình hóa (1168) → phân loại cạnh (1489)." : "Prim (1584) → Kruskal (1135) → modeling (1168) → edge classification (1489)."}</p></div></div>
+            <div class="trie-roadmap-sequence">${sequence.map((id, index) => `${roadmapItem(id)}${index < sequence.length - 1 ? "<i>→</i>" : ""}`).join("")}</div>
+          </section>`;
+
+        let restoreFocus = learnButton;
+        const closeDialog = () => {
+          if (dialog.open && typeof dialog.close === "function") dialog.close();
+          else dialog.removeAttribute("open");
+        };
+        content.querySelectorAll("[data-mst-problem-id]").forEach((link) => {
+          link.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const problemId = link.dataset.mstProblemId;
+            restoreFocus = null;
+            closeDialog();
+            $("problemId").value = problemId;
+            await loadProblem();
+            const panel = $("problemPanel");
+            if (panel && !panel.classList.contains("hidden")) {
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+        });
+        closeButton.onclick = closeDialog;
+        dialog.onclick = (event) => {
+          if (event.target === dialog) closeDialog();
+        };
+        dialog.onclose = () => {
+          if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+          restoreFocus = null;
+        };
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+        closeButton.focus();
+      });
+      itemsEl.appendChild(learnButton);
+    }
+
     const hasOrder = !!group.recommendedOrderLabel;
     group.problems.forEach((p, idx) => {
       const chip = document.createElement("button");
