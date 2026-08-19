@@ -20777,6 +20777,45 @@ button:disabled {
   stroke: #f59e0b;
 }
 
+/* Committed MST / kept edges (green), rejected / removable edges (red dashed),
+   and pseudo-critical edges (purple). Shared by #1135, #1489, #1579, #1627. */
+.graph-edge.accept {
+  stroke: #10b981;
+  stroke-width: 3;
+}
+
+.graph-edge.reject {
+  stroke: #ef4444;
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+
+.graph-edge.pseudo {
+  stroke: #a855f7;
+  stroke-width: 3;
+}
+
+.graph-edge.critical {
+  stroke: #ef4444;
+  stroke-width: 3.5;
+}
+
+.graph-weight.accept {
+  fill: #6ee7b7;
+}
+
+.graph-weight.reject {
+  fill: #fca5a5;
+}
+
+.graph-weight.pseudo {
+  fill: #d8b4fe;
+}
+
+.graph-weight.critical {
+  fill: #fca5a5;
+}
+
 .graph-weight {
   fill: #94a3b8;
   font-family: "SFMono-Regular", Consolas, Menlo, monospace;

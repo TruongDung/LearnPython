@@ -3968,7 +3968,891 @@ function buildSteps1168(input, params = {}) {
   return { input, answer: totalCost, steps };
 }
 
+// ─── Shared helpers for MST / Union-Find graph visualizations ───
+// Used by #1135, #1489, #1579, #1627. All render through the reusable
+// `step.graph` circle-layout renderer in public/script.js.
+
+// Parse a matrix of integer rows from JSON ("[[1,2,5]]") or "a,b,c;a,b,c" text.
+function mstParseMatrix(raw, arity, label) {
+  const s = String(raw ?? "").trim();
+  if (!s) throw new Error(`${label} is required`);
+  let arr;
+  try {
+    arr = s.startsWith("[")
+      ? JSON.parse(s)
+      : s.split(/[;|]/).filter((part) => part.trim())
+        .map((part) => part.split(",").map((x) => Number(x.trim())));
+  } catch (error) {
+    throw new Error(`${label} must be JSON like [[...]] or rows separated by ";"`);
+  }
+  if (!Array.isArray(arr) || !arr.every((row) => Array.isArray(row) && row.length === arity && row.every(Number.isInteger))) {
+    throw new Error(`each ${label} entry must be exactly ${arity} integers`);
+  }
+  return arr.map((row) => row.map(Number));
+}
+
+// Minimal DSU with union-by-rank + path compression.
+function mstMakeDSU(size) {
+  const parent = Array.from({ length: size }, (_, i) => i);
+  const rank = new Array(size).fill(0);
+  function find(x) {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(x, y) {
+    const rx = find(x);
+    const ry = find(y);
+    if (rx === ry) return false;
+    if (rank[rx] < rank[ry]) parent[rx] = ry;
+    else if (rank[rx] > rank[ry]) parent[ry] = rx;
+    else { parent[ry] = rx; rank[rx] += 1; }
+    return true;
+  }
+  // Root without mutating parent (safe for display snapshots).
+  function rootOf(x) {
+    let r = x;
+    while (parent[r] !== r) r = parent[r];
+    return r;
+  }
+  return { parent, rank, find, union, rootOf };
+}
+
+// Roots for a list of node ids, plus the set of nodes that sit in a
+// component of size > 1 (used to color "connected" nodes green).
+function mstComponentInfo(dsu, nodeIds) {
+  const roots = {};
+  const counts = {};
+  nodeIds.forEach((id) => {
+    const r = dsu.rootOf(id);
+    roots[id] = r;
+    counts[r] = (counts[r] || 0) + 1;
+  });
+  const connected = nodeIds.filter((id) => counts[roots[id]] > 1);
+  const componentCount = new Set(nodeIds.map((id) => roots[id])).size;
+  return { roots, connected, componentCount };
+}
+
+// ─── 1135: Connecting Cities With Minimum Cost (Kruskal + Union Find) ───
+function buildSteps1135(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 12) throw new Error("visualization supports at most 12 cities");
+  const connections = mstParseMatrix(params.connections, 3, "connections");
+  if (connections.length > 40) throw new Error("visualization supports at most 40 connections");
+  connections.forEach(([u, v], index) => {
+    if (u < 1 || u > n || v < 1 || v > n) throw new Error(`connection ${index} references a city outside 1..${n}`);
+    if (u === v) throw new Error(`connection ${index} must join two different cities`);
+  });
+
+  const nodeIds = Array.from({ length: n }, (_, i) => i + 1);
+  const dsu = mstMakeDSU(n + 1);
+  const steps = [];
+
+  const edges = connections
+    .map(([u, v, w], idx) => ({ u, v, w, idx, state: "pending" }))
+    .sort((a, b) => a.w - b.w || a.u - b.u || a.v - b.v);
+
+  let total = 0;
+  let used = 0;
+
+  function makeGraph(hlEdges, hlNodes) {
+    const info = mstComponentInfo(dsu, nodeIds);
+    return {
+      nodes: nodeIds.map((id) => ({ id, label: String(id), sub: `R${info.roots[id]}` })),
+      edges: edges.map((e) => ({
+        u: e.u, v: e.v, w: e.w, undirected: true,
+        kind: e.state === "accept" ? "accept" : e.state === "reject" ? "reject" : undefined,
+      })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: info.connected,
+    };
+  }
+
+  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+    steps.push({
+      title, note, codeLines,
+      arr: [...dsu.parent], highlight: hlNodes, mark: [], vars, final,
+      graph: makeGraph(hlEdges, hlNodes),
+    });
+  }
+
+  push({
+    title: { vi: `${n} thành phố, ${connections.length} đường nối khả dĩ`, en: `${n} cities, ${connections.length} candidate roads` },
+    note: { vi: "Cần nối tất cả thành phố với tổng chi phí nhỏ nhất — đúng bài Cây khung nhỏ nhất (MST) giải bằng Kruskal.", en: "Connect every city with minimum total cost — a Minimum Spanning Tree (MST) solved with Kruskal." },
+    codeLines: [1, 2],
+    vars: [{ name: "n", value: n }, { name: "connections", value: connections.length }],
+  });
+
+  push({
+    title: { vi: "Sort cạnh theo chi phí tăng dần", en: "Sort edges by increasing cost" },
+    note: { vi: "Kruskal luôn thử cạnh rẻ nhất còn lại trước.", en: "Kruskal always tries the cheapest remaining edge first." },
+    codeLines: [3],
+    vars: [{ name: "edges", value: edges.map((e) => `(${e.u}-${e.v}:${e.w})`).join(" ≤ ") }],
+  });
+
+  push({
+    title: { vi: `Khởi tạo DSU cho ${n} thành phố`, en: `Initialize DSU for ${n} cities` },
+    note: { vi: `Mỗi thành phố là một component riêng. MST cần đúng ${n - 1} cạnh.`, en: `Each city starts as its own component. An MST needs exactly ${n - 1} edges.` },
+    codeLines: [4],
+    vars: [{ name: "parent", value: `[${nodeIds.join(", ")}]` }, { name: "need", value: `${n - 1} edges` }],
+  });
+
+  for (const e of edges) {
+    const ru = dsu.rootOf(e.u);
+    const rv = dsu.rootOf(e.v);
+    push({
+      title: { vi: `Xét cạnh ${e.u} — ${e.v} (chi phí ${e.w})`, en: `Consider edge ${e.u} — ${e.v} (cost ${e.w})` },
+      note: {
+        vi: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Cùng root → sẽ tạo chu trình." : "Khác root → an toàn để nối."}`,
+        en: `find(${e.u})=R${ru}, find(${e.v})=R${rv}. ${ru === rv ? "Same root → would form a cycle." : "Different roots → safe to connect."}`,
+      },
+      codeLines: [12, 13], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+      vars: [{ name: "u,v,w", value: `${e.u}, ${e.v}, ${e.w}` }, { name: "find(u)", value: `R${ru}` }, { name: "find(v)", value: `R${rv}` }],
+    });
+
+    if (ru !== rv) {
+      dsu.union(e.u, e.v);
+      e.state = "accept";
+      total += e.w;
+      used += 1;
+      push({
+        title: { vi: `✓ Chọn ${e.u} — ${e.v}: total=${total}`, en: `✓ Take ${e.u} — ${e.v}: total=${total}` },
+        note: { vi: `Hai component khác nhau → union và cộng ${e.w}. Đã dùng ${used}/${n - 1} cạnh.`, en: `Different components → union and add ${e.w}. Used ${used}/${n - 1} edges.` },
+        codeLines: [14, 15, 16, 17], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "total", value: total }, { name: "used", value: `${used}/${n - 1}` }],
+      });
+    } else {
+      e.state = "reject";
+      push({
+        title: { vi: `✗ Bỏ ${e.u} — ${e.v} (chu trình)`, en: `✗ Skip ${e.u} — ${e.v} (cycle)` },
+        note: { vi: `Cùng root R${ru} → nối sẽ tạo chu trình, bỏ qua cạnh này.`, en: `Same root R${ru} → connecting would form a cycle, skip this edge.` },
+        codeLines: [14], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "decision", value: "cycle → skip" }],
+      });
+    }
+    if (used === n - 1) break;
+  }
+
+  const answer = used === n - 1 ? total : -1;
+  push({
+    title: answer === -1
+      ? { vi: "Không thể nối tất cả thành phố → -1", en: "Cannot connect all cities → -1" }
+      : { vi: `Chi phí nhỏ nhất = ${total}`, en: `Minimum cost = ${total}` },
+    note: answer === -1
+      ? { vi: `Chỉ dùng được ${used} cạnh (< ${n - 1}); đồ thị không liên thông.`, en: `Only ${used} edges usable (< ${n - 1}); the graph is disconnected.` }
+      : { vi: `MST dùng ${used} cạnh nối toàn bộ ${n} thành phố.`, en: `The MST uses ${used} edges connecting all ${n} cities.` },
+    codeLines: [18], final: true,
+    vars: [{ name: "answer", value: answer }, { name: "MST edges", value: `${used}/${n - 1}` }],
+  });
+
+  return { input, answer, steps };
+}
+
+// ─── 1627: Graph Connectivity With Threshold (Union Find) ───
+function buildSteps1627(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 24) throw new Error("visualization supports at most 24 nodes");
+  const threshold = Number(params.threshold);
+  if (!Number.isInteger(threshold) || threshold < 0) throw new Error("threshold must be a non-negative integer");
+  const queries = mstParseMatrix(params.queries, 2, "queries");
+  if (queries.length > 20) throw new Error("visualization supports at most 20 queries");
+  queries.forEach(([a, b], index) => {
+    if (a < 1 || a > n || b < 1 || b > n) throw new Error(`query ${index} references a node outside 1..${n}`);
+  });
+
+  const nodeIds = Array.from({ length: n }, (_, i) => i + 1);
+  const dsu = mstMakeDSU(n + 1);
+  const steps = [];
+  const edges = [];
+  const edgeKeys = new Set();
+
+  function addEdge(u, v) {
+    const key = u < v ? `${u}-${v}` : `${v}-${u}`;
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push({ u, v });
+  }
+
+  function makeGraph(hlEdges, hlNodes) {
+    const info = mstComponentInfo(dsu, nodeIds);
+    return {
+      nodes: nodeIds.map((id) => ({ id, label: String(id), sub: `R${info.roots[id]}` })),
+      edges: edges.map((e) => ({ u: e.u, v: e.v, undirected: true, kind: "accept" })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: info.connected,
+    };
+  }
+
+  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+    steps.push({
+      title, note, codeLines,
+      arr: [...dsu.parent], highlight: hlNodes, mark: [], vars, final,
+      graph: makeGraph(hlEdges, hlNodes),
+    });
+  }
+
+  push({
+    title: { vi: `n=${n}, threshold=${threshold}, ${queries.length} truy vấn`, en: `n=${n}, threshold=${threshold}, ${queries.length} queries` },
+    note: {
+      vi: "Hai node x, y nối nhau nếu có ước chung z > threshold. Ta gom mọi node dùng Union-Find rồi trả lời từng truy vấn.",
+      en: "Two nodes x, y are connected if they share a common divisor z > threshold. Group all nodes with Union-Find, then answer each query.",
+    },
+    codeLines: [1, 2],
+    vars: [{ name: "n", value: n }, { name: "threshold", value: threshold }],
+  });
+
+  push({
+    title: { vi: `Khởi tạo DSU cho node 1..${n}`, en: `Initialize DSU for nodes 1..${n}` },
+    note: { vi: "Ban đầu mỗi node là một component riêng.", en: "Initially every node is its own component." },
+    codeLines: [3],
+    vars: [{ name: "parent", value: `[${nodeIds.join(", ")}]` }],
+  });
+
+  for (let z = threshold + 1; z <= n; z++) {
+    const multiples = [];
+    for (let m = 2 * z; m <= n; m += z) multiples.push(m);
+    if (multiples.length === 0) continue;
+    push({
+      title: { vi: `z = ${z}: nối ${z} với các bội số ${multiples.join(", ")}`, en: `z = ${z}: connect ${z} with multiples ${multiples.join(", ")}` },
+      note: { vi: `Mọi bội số của ${z} đều có ước chung ${z} (> ${threshold}) nên cùng một nhóm.`, en: `Every multiple of ${z} shares the divisor ${z} (> ${threshold}), so they belong to one group.` },
+      codeLines: [9, 10],
+      hlNodes: [z, ...multiples],
+      vars: [{ name: "z", value: z }, { name: "multiples", value: multiples.join(", ") }],
+    });
+    for (const m of multiples) {
+      const rz = dsu.rootOf(z);
+      const rm = dsu.rootOf(m);
+      const already = rz === rm;
+      addEdge(z, m);
+      dsu.union(z, m);
+      push({
+        title: { vi: `union(${z}, ${m})`, en: `union(${z}, ${m})` },
+        note: already
+          ? { vi: `${z} và ${m} đã cùng nhóm (R${rz}) — cạnh này chỉ củng cố liên thông.`, en: `${z} and ${m} were already in group R${rz} — this edge just reinforces connectivity.` }
+          : { vi: `Gộp nhóm của ${z} (R${rz}) và ${m} (R${rm}).`, en: `Merge the groups of ${z} (R${rz}) and ${m} (R${rm}).` },
+        codeLines: [11],
+        hlEdges: [[z, m]], hlNodes: [z, m],
+        vars: [{ name: "z, m", value: `${z}, ${m}` }, { name: "find(z), find(m)", value: `R${rz}, R${rm}` }],
+      });
+    }
+  }
+
+  const results = [];
+  queries.forEach(([a, b], index) => {
+    const ra = dsu.rootOf(a);
+    const rb = dsu.rootOf(b);
+    const connected = ra === rb;
+    results.push(connected);
+    push({
+      title: { vi: `Truy vấn ${index + 1}: ${a} ↔ ${b}? ${connected ? "TRUE" : "FALSE"}`, en: `Query ${index + 1}: ${a} ↔ ${b}? ${connected ? "TRUE" : "FALSE"}` },
+      note: {
+        vi: `find(${a})=R${ra}, find(${b})=R${rb}. ${connected ? "Cùng root → có đường đi." : "Khác root → không nối được."}`,
+        en: `find(${a})=R${ra}, find(${b})=R${rb}. ${connected ? "Same root → a path exists." : "Different roots → not connected."}`,
+      },
+      codeLines: [12], hlNodes: [a, b],
+      vars: [{ name: "a, b", value: `${a}, ${b}` }, { name: "result", value: String(connected) }],
+    });
+  });
+
+  push({
+    title: { vi: "Kết quả các truy vấn", en: "Query results" },
+    note: { vi: `answer = [${results.join(", ")}]`, en: `answer = [${results.join(", ")}]` },
+    codeLines: [12], final: true,
+    vars: [{ name: "answer", value: `[${results.join(", ")}]` }],
+  });
+
+  return { input, answer: results, steps };
+}
+
+// ─── 1579: Remove Max Number of Edges to Keep Graph Fully Traversable ───
+function buildSteps1579(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 16) throw new Error("visualization supports at most 16 nodes");
+  const raw = mstParseMatrix(params.edges, 3, "edges");
+  if (raw.length > 40) throw new Error("visualization supports at most 40 edges");
+  raw.forEach(([t, u, v], index) => {
+    if (![1, 2, 3].includes(t)) throw new Error(`edge ${index} type must be 1, 2, or 3`);
+    if (u < 1 || u > n || v < 1 || v > n) throw new Error(`edge ${index} references a node outside 1..${n}`);
+    if (u === v) throw new Error(`edge ${index} must join two different nodes`);
+  });
+
+  const nodeIds = Array.from({ length: n }, (_, i) => i + 1);
+  const edges = raw.map(([t, u, v], idx) => ({ t, u, v, idx, state: "pending" }));
+  const alice = mstMakeDSU(n + 1);
+  const bob = mstMakeDSU(n + 1);
+  let aliceComp = n;
+  let bobComp = n;
+  let used = 0;
+  const steps = [];
+
+  function makeGraph(hlEdges, hlNodes) {
+    return {
+      nodes: nodeIds.map((id) => ({ id, label: String(id), sub: `A${alice.rootOf(id)}·B${bob.rootOf(id)}` })),
+      edges: edges.map((e) => ({
+        u: e.u, v: e.v, w: `T${e.t}`, undirected: true,
+        kind: e.state === "accept" ? "accept" : e.state === "reject" ? "reject" : undefined,
+      })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: [],
+    };
+  }
+
+  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+    steps.push({
+      title, note, codeLines,
+      arr: [...alice.parent], sub: [...bob.parent], highlight: hlNodes, mark: [], vars, final,
+      graph: makeGraph(hlEdges, hlNodes),
+    });
+  }
+
+  const typeCount = (type) => edges.filter((e) => e.t === type).length;
+  push({
+    title: { vi: `n=${n}, ${edges.length} cạnh (T3:${typeCount(3)} T1:${typeCount(1)} T2:${typeCount(2)})`, en: `n=${n}, ${edges.length} edges (T3:${typeCount(3)} T1:${typeCount(1)} T2:${typeCount(2)})` },
+    note: {
+      vi: "T3 = cả Alice và Bob đi được, T1 = chỉ Alice, T2 = chỉ Bob. Cần giữ ít cạnh nhất để CẢ HAI vẫn liên thông, phần còn lại là số cạnh xóa được.",
+      en: "T3 = usable by both Alice and Bob, T1 = Alice only, T2 = Bob only. Keep the fewest edges so BOTH stay fully connected; the rest are removable.",
+    },
+    codeLines: [1, 2],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edges.length }],
+  });
+
+  push({
+    title: { vi: "Hai DSU riêng cho Alice và Bob", en: "Two separate DSUs for Alice and Bob" },
+    note: { vi: "Mỗi người có đồ thị riêng. Sub-label mỗi node hiển thị A(root Alice)·B(root Bob).", en: "Each person has their own graph. Each node's sub-label shows A(Alice root)·B(Bob root)." },
+    codeLines: [3, 4],
+    vars: [{ name: "aliceComp", value: aliceComp }, { name: "bobComp", value: bobComp }],
+  });
+
+  // Phase 1 — type-3 edges first (most valuable: help both).
+  push({
+    title: { vi: "Ưu tiên cạnh T3 (dùng chung)", en: "Prioritize T3 (shared) edges" },
+    note: { vi: "Cạnh T3 nối cho cả hai cùng lúc nên xét trước để tận dụng tối đa.", en: "A T3 edge connects both at once, so process these first to maximize sharing." },
+    codeLines: [17, 18],
+  });
+
+  for (const e of edges) {
+    if (e.t !== 3) continue;
+    const ra = alice.rootOf(e.u);
+    const rb = alice.rootOf(e.v);
+    if (ra !== rb) {
+      alice.union(e.u, e.v);
+      bob.union(e.u, e.v);
+      aliceComp -= 1;
+      bobComp -= 1;
+      used += 1;
+      e.state = "accept";
+      push({
+        title: { vi: `✓ Giữ T3 ${e.u}—${e.v}`, en: `✓ Keep T3 ${e.u}—${e.v}` },
+        note: { vi: `${e.u},${e.v} chưa cùng nhóm → union trong CẢ Alice và Bob. used=${used}.`, en: `${e.u},${e.v} not yet joined → union in BOTH Alice and Bob. used=${used}.` },
+        codeLines: [19, 20, 21], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "used", value: used }, { name: "aliceComp", value: aliceComp }, { name: "bobComp", value: bobComp }],
+      });
+    } else {
+      e.state = "reject";
+      push({
+        title: { vi: `✗ Xóa được T3 ${e.u}—${e.v}`, en: `✗ Removable T3 ${e.u}—${e.v}` },
+        note: { vi: `${e.u},${e.v} đã cùng nhóm (R${ra}) → cạnh thừa, có thể xóa.`, en: `${e.u},${e.v} already joined (R${ra}) → redundant, can be removed.` },
+        codeLines: [19], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "decision", value: "redundant → removable" }],
+      });
+    }
+  }
+
+  // Phase 2 — exclusive edges.
+  push({
+    title: { vi: "Xét cạnh riêng T1 (Alice) và T2 (Bob)", en: "Process exclusive T1 (Alice) and T2 (Bob) edges" },
+    note: { vi: "Chỉ giữ cạnh riêng nếu nó nối hai nhóm còn tách trong đồ thị của người đó.", en: "Keep an exclusive edge only if it joins two still-separate groups in that person's graph." },
+    codeLines: [22],
+  });
+
+  for (const e of edges) {
+    if (e.t === 3) continue;
+    const who = e.t === 1 ? alice : bob;
+    const label = e.t === 1 ? "Alice" : "Bob";
+    const ra = who.rootOf(e.u);
+    const rb = who.rootOf(e.v);
+    if (ra !== rb) {
+      who.union(e.u, e.v);
+      if (e.t === 1) aliceComp -= 1; else bobComp -= 1;
+      used += 1;
+      e.state = "accept";
+      push({
+        title: { vi: `✓ Giữ T${e.t} ${e.u}—${e.v} (${label})`, en: `✓ Keep T${e.t} ${e.u}—${e.v} (${label})` },
+        note: { vi: `Trong đồ thị ${label}, ${e.u},${e.v} khác nhóm → union. used=${used}.`, en: `In ${label}'s graph, ${e.u},${e.v} are in different groups → union. used=${used}.` },
+        codeLines: e.t === 1 ? [23, 24] : [25, 26], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "used", value: used }, { name: "aliceComp", value: aliceComp }, { name: "bobComp", value: bobComp }],
+      });
+    } else {
+      e.state = "reject";
+      push({
+        title: { vi: `✗ Xóa được T${e.t} ${e.u}—${e.v} (${label})`, en: `✗ Removable T${e.t} ${e.u}—${e.v} (${label})` },
+        note: { vi: `Trong đồ thị ${label}, ${e.u},${e.v} đã cùng nhóm → cạnh thừa.`, en: `In ${label}'s graph, ${e.u},${e.v} already joined → redundant.` },
+        codeLines: e.t === 1 ? [23] : [25], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "decision", value: "redundant → removable" }],
+      });
+    }
+  }
+
+  const aliceOk = aliceComp === 1;
+  const bobOk = bobComp === 1;
+  push({
+    title: { vi: `Kiểm tra liên thông: Alice ${aliceOk ? "✓" : "✗"} · Bob ${bobOk ? "✓" : "✗"}`, en: `Connectivity check: Alice ${aliceOk ? "✓" : "✗"} · Bob ${bobOk ? "✓" : "✗"}` },
+    note: {
+      vi: `Alice còn ${aliceComp} component, Bob còn ${bobComp}. Cả hai phải bằng 1 thì đồ thị mới đi hết được.`,
+      en: `Alice has ${aliceComp} component(s), Bob has ${bobComp}. Both must equal 1 for full traversability.`,
+    },
+    codeLines: [27, 28],
+    vars: [{ name: "aliceComp", value: aliceComp }, { name: "bobComp", value: bobComp }],
+  });
+
+  const answer = aliceOk && bobOk ? edges.length - used : -1;
+  push({
+    title: answer === -1
+      ? { vi: "Không thể đi hết → -1", en: "Not fully traversable → -1" }
+      : { vi: `Số cạnh xóa được tối đa = ${answer}`, en: `Max removable edges = ${answer}` },
+    note: answer === -1
+      ? { vi: "Ít nhất một người không liên thông toàn bộ nên không có đáp án.", en: "At least one person is not fully connected, so there is no valid answer." }
+      : { vi: `Giữ ${used} cạnh cần thiết, xóa ${edges.length} − ${used} = ${answer} cạnh thừa.`, en: `Keep ${used} necessary edges, remove ${edges.length} − ${used} = ${answer} redundant edges.` },
+    codeLines: [29], final: true,
+    vars: [{ name: "answer", value: answer }, { name: "used", value: used }],
+  });
+
+  return { input, answer, steps };
+}
+
+// ─── 1489: Find Critical and Pseudo-Critical Edges in MST (Kruskal, repeated) ───
+function buildSteps1489(input, params = {}) {
+  const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+  if (!Number.isInteger(n) || n < 1) throw new Error("n must be a positive integer");
+  if (n > 12) throw new Error("visualization supports at most 12 nodes");
+  const raw = mstParseMatrix(params.edges, 3, "edges");
+  if (raw.length > 30) throw new Error("visualization supports at most 30 edges");
+  raw.forEach(([u, v], index) => {
+    if (u < 0 || u >= n || v < 0 || v >= n) throw new Error(`edge ${index} references a node outside 0..${n - 1}`);
+    if (u === v) throw new Error(`edge ${index} must join two different nodes`);
+  });
+
+  const nodeIds = Array.from({ length: n }, (_, i) => i);
+  const edges = raw.map(([u, v, w], idx) => ({ u, v, w, idx, state: "pending" }));
+  const sorted = [...edges].sort((a, b) => a.w - b.w || a.u - b.u || a.v - b.v);
+  const steps = [];
+
+  // Run Kruskal, optionally excluding one edge index or force-including one first.
+  function mstWeight(exclude, include) {
+    const dsu = mstMakeDSU(n);
+    let weight = 0;
+    let count = 0;
+    if (include !== undefined && include >= 0) {
+      const e = edges[include];
+      if (dsu.union(e.u, e.v)) { weight += e.w; count += 1; }
+    }
+    for (const e of sorted) {
+      if (e.idx === exclude) continue;
+      if (dsu.union(e.u, e.v)) { weight += e.w; count += 1; }
+    }
+    return count === n - 1 ? weight : Infinity;
+  }
+
+  function makeGraph(hlEdges, hlNodes) {
+    return {
+      nodes: nodeIds.map((id) => ({ id, label: String(id) })),
+      edges: edges.map((e) => ({
+        u: e.u, v: e.v, w: `#${e.idx}:${e.w}`, undirected: true,
+        kind: e.state === "pending" ? undefined : e.state,
+      })),
+      hlNodes: hlNodes || [],
+      hlEdges: hlEdges || [],
+      visitedNodes: [],
+    };
+  }
+
+  function push({ title, note, codeLines, hlEdges = [], hlNodes = [], vars = [], final = false }) {
+    steps.push({
+      title, note, codeLines,
+      arr: [], highlight: hlNodes, mark: [], vars, final,
+      graph: makeGraph(hlEdges, hlNodes),
+    });
+  }
+
+  const base = mstWeight(undefined, undefined);
+
+  push({
+    title: { vi: `n=${n}, ${edges.length} cạnh — tìm cạnh then chốt & bán then chốt`, en: `n=${n}, ${edges.length} edges — find critical & pseudo-critical edges` },
+    note: {
+      vi: "Cạnh THEN CHỐT (critical): nếu bỏ đi thì MST nặng hơn hoặc không nối được. Cạnh BÁN THEN CHỐT (pseudo): có mặt trong MỘT MST nào đó nhưng không bắt buộc. Node đánh số từ 0. Đáp án là chỉ số cạnh.",
+      en: "A CRITICAL edge: removing it makes the MST heavier or disconnected. A PSEUDO-CRITICAL edge: appears in SOME MST but is not mandatory. Nodes are 0-indexed. The answer is edge indices.",
+    },
+    codeLines: [1, 2],
+    vars: [{ name: "n", value: n }, { name: "edges", value: edges.length }],
+  });
+
+  push({
+    title: { vi: "Sort cạnh theo trọng số tăng dần", en: "Sort edges by increasing weight" },
+    note: { vi: "Kruskal chuẩn để lấy trọng số MST cơ sở.", en: "Standard Kruskal to obtain the baseline MST weight." },
+    codeLines: [3, 4],
+    vars: [{ name: "sorted", value: sorted.map((e) => `#${e.idx}(${e.w})`).join(" ≤ ") }],
+  });
+
+  // Phase 1 — baseline MST (one step per sorted edge).
+  const baseDSU = mstMakeDSU(n);
+  let baseWeight = 0;
+  for (const e of sorted) {
+    const ru = baseDSU.rootOf(e.u);
+    const rv = baseDSU.rootOf(e.v);
+    if (ru !== rv) {
+      baseDSU.union(e.u, e.v);
+      baseWeight += e.w;
+      e.state = "accept";
+      push({
+        title: { vi: `MST cơ sở: chọn #${e.idx} (${e.u}-${e.v}, w=${e.w})`, en: `Baseline MST: take #${e.idx} (${e.u}-${e.v}, w=${e.w})` },
+        note: { vi: `Khác component → nhận. Trọng số cộng dồn = ${baseWeight}.`, en: `Different components → accept. Running weight = ${baseWeight}.` },
+        codeLines: [5], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "baseWeight", value: baseWeight }],
+      });
+    }
+  }
+  push({
+    title: { vi: `Trọng số MST cơ sở = ${base}`, en: `Baseline MST weight = ${base}` },
+    note: { vi: "Đây là mốc để so sánh khi bỏ/bắt buộc từng cạnh. Các cạnh xanh là MỘT MST hợp lệ.", en: "This is the reference for the exclude/include tests. Green edges form one valid MST." },
+    codeLines: [17],
+    vars: [{ name: "base", value: base }],
+  });
+
+  // Phase 2 — reset colours, then classify each original edge.
+  edges.forEach((e) => { e.state = "pending"; });
+  const critical = [];
+  const pseudo = [];
+
+  for (const e of edges) {
+    const withoutEdge = mstWeight(e.idx, undefined);
+    const isCritical = withoutEdge > base;
+    let withEdge = null;
+    if (!isCritical) withEdge = mstWeight(undefined, e.idx);
+
+    if (isCritical) {
+      e.state = "critical";
+      critical.push(e.idx);
+      push({
+        title: { vi: `Cạnh #${e.idx} (${e.u}-${e.v}): THEN CHỐT`, en: `Edge #${e.idx} (${e.u}-${e.v}): CRITICAL` },
+        note: {
+          vi: withoutEdge === Infinity
+            ? `Bỏ cạnh này → không thể nối hết đồ thị (MST = ∞ > ${base}). Bắt buộc phải giữ.`
+            : `Bỏ cạnh này → MST = ${withoutEdge} > ${base}. Nó có trong MỌI MST nên là then chốt.`,
+          en: withoutEdge === Infinity
+            ? `Remove it → the graph can't be spanned (MST = ∞ > ${base}). It must be kept.`
+            : `Remove it → MST = ${withoutEdge} > ${base}. It is in EVERY MST, so it is critical.`,
+        },
+        codeLines: [19, 20], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "MST without #" + e.idx, value: withoutEdge === Infinity ? "∞" : withoutEdge }, { name: "base", value: base }],
+      });
+    } else if (withEdge === base) {
+      e.state = "pseudo";
+      pseudo.push(e.idx);
+      push({
+        title: { vi: `Cạnh #${e.idx} (${e.u}-${e.v}): BÁN THEN CHỐT`, en: `Edge #${e.idx} (${e.u}-${e.v}): PSEUDO-CRITICAL` },
+        note: {
+          vi: `Bỏ vẫn ra ${base} (không then chốt), nhưng bắt buộc dùng vẫn ra MST = ${base} → nó thuộc MỘT MST tối ưu.`,
+          en: `Excluding it still gives ${base} (not critical), yet forcing it in also yields MST = ${base} → it belongs to SOME optimal MST.`,
+        },
+        codeLines: [21, 22], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "MST forcing #" + e.idx, value: withEdge }, { name: "base", value: base }],
+      });
+    } else {
+      e.state = "reject";
+      push({
+        title: { vi: `Cạnh #${e.idx} (${e.u}-${e.v}): không thuộc MST nào`, en: `Edge #${e.idx} (${e.u}-${e.v}): in no MST` },
+        note: {
+          vi: `Bỏ vẫn ra ${base}, nhưng bắt buộc dùng thì MST = ${withEdge} > ${base} → cạnh này quá đắt, không bao giờ tối ưu.`,
+          en: `Excluding gives ${base}, but forcing it gives MST = ${withEdge} > ${base} → too expensive, never optimal.`,
+        },
+        codeLines: [21], hlEdges: [[e.u, e.v]], hlNodes: [e.u, e.v],
+        vars: [{ name: "MST forcing #" + e.idx, value: withEdge }, { name: "base", value: base }],
+      });
+    }
+  }
+
+  push({
+    title: { vi: `Kết quả: critical=[${critical.join(", ")}], pseudo=[${pseudo.join(", ")}]`, en: `Result: critical=[${critical.join(", ")}], pseudo=[${pseudo.join(", ")}]` },
+    note: {
+      vi: `Đỏ = then chốt (mọi MST đều có), tím = bán then chốt (một MST có), xám = không bao giờ dùng.`,
+      en: `Red = critical (in every MST), purple = pseudo-critical (in some MST), gray = never used.`,
+    },
+    codeLines: [23], final: true,
+    vars: [{ name: "critical", value: `[${critical.join(", ")}]` }, { name: "pseudo", value: `[${pseudo.join(", ")}]` }],
+  });
+
+  return { input, answer: [critical, pseudo], steps };
+}
+
 module.exports = {
+  1489: {
+    id: 1489,
+    difficulty: "hard",
+    slug: "find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree",
+    category: UF_CAT,
+    tags: [
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Find Critical and Pseudo-Critical Edges in MST", en: "Find Critical and Pseudo-Critical Edges in Minimum Spanning Tree" },
+    titleVi: { vi: "Tìm cạnh then chốt & bán then chốt trong MST", en: "Find critical and pseudo-critical edges in the MST" },
+    statement: {
+      vi: "Cho đồ thị vô hướng n node (0..n-1) với edges[i] = [u, v, w]. Cạnh THEN CHỐT là cạnh có trong mọi MST (bỏ nó thì tổng MST tăng hoặc đồ thị đứt). Cạnh BÁN THEN CHỐT có trong một MST nào đó nhưng không phải mọi MST. Trả về [danh sách chỉ số then chốt, danh sách chỉ số bán then chốt].",
+      en: "Given an undirected graph on n nodes (0..n-1) with edges[i] = [u, v, w]. A CRITICAL edge appears in every MST (removing it increases the MST weight or disconnects the graph). A PSEUDO-CRITICAL edge appears in some MST but not all. Return [critical indices, pseudo-critical indices].",
+    },
+    defaultInput: [5],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n — số node (nhập 1 số)", en: "n — number of nodes (one number)" },
+    extraParams: [{
+      key: "edges", type: "string",
+      label: { vi: "edges: u,v,w;... hoặc JSON (node từ 0)", en: "edges: u,v,w;... or JSON (0-indexed)" },
+      default: "0,1,1;1,2,1;2,3,2;0,3,2;0,4,3;3,4,3;1,4,6",
+    }],
+    approach: [
+      { vi: "Tính trọng số MST cơ sở bằng Kruskal trên toàn bộ cạnh.", en: "Compute the baseline MST weight with Kruskal over all edges." },
+      { vi: "Với mỗi cạnh: chạy Kruskal khi BỎ cạnh đó. Nếu MST nặng hơn cơ sở (hoặc không nối được) → cạnh THEN CHỐT.", en: "For each edge: run Kruskal EXCLUDING it. If the MST is heavier than the baseline (or disconnected) → CRITICAL." },
+      { vi: "Nếu không then chốt: chạy Kruskal khi BẮT BUỘC dùng cạnh đó trước. Nếu vẫn ra đúng trọng số cơ sở → BÁN THEN CHỐT.", en: "If not critical: run Kruskal FORCING that edge first. If it still reaches the baseline weight → PSEUDO-CRITICAL." },
+      { vi: "Cạnh không rơi vào cả hai loại thì không bao giờ nằm trong MST tối ưu.", en: "An edge in neither class never belongs to an optimal MST." },
+    ],
+    complexity: {
+      time: "O(E² · α(n))",
+      space: "O(n + E)",
+      note: { vi: "Mỗi cạnh chạy Kruskal 1–2 lần (O(E)); tổng O(E²).", en: "Each edge runs Kruskal 1–2 times (O(E)); overall O(E²)." },
+    },
+    code: [
+      "class Solution:",
+      "    def findCriticalAndPseudoCriticalEdges(self, n, edges):",
+      "        order = sorted(range(len(edges)), key=lambda i: edges[i][2])",
+      "        def mst(skip=-1, force=-1):",
+      "            parent = list(range(n)); weight = count = 0",
+      "            def find(x):",
+      "                while parent[x] != x:",
+      "                    parent[x] = parent[parent[x]]; x = parent[x]",
+      "                return x",
+      "            if force >= 0:",
+      "                u, v, w = edges[force]; parent[find(u)] = find(v)",
+      "                weight += w; count += 1",
+      "            for i in order:",
+      "                if i == skip: continue",
+      "                u, v, w = edges[i]; ru, rv = find(u), find(v)",
+      "                if ru != rv:",
+      "                    parent[ru] = rv; weight += w; count += 1",
+      "            return weight if count == n - 1 else float('inf')",
+      "        base = mst()",
+      "        critical, pseudo = [], []",
+      "        for i in range(len(edges)):",
+      "            if mst(skip=i) > base:",
+      "                critical.append(i)",
+      "            elif mst(force=i) == base:",
+      "                pseudo.append(i)",
+      "        return [critical, pseudo]",
+    ],
+    builder: buildSteps1489,
+    liveArgs(input, params = {}) {
+      const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+      return [n, mstParseMatrix(params.edges, 3, "edges")];
+    },
+  },
+  1579: {
+    id: 1579,
+    difficulty: "hard",
+    slug: "remove-max-number-of-edges-to-keep-graph-fully-traversable",
+    category: UF_CAT,
+    tags: [
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "greedy", vi: "Tham lam", en: "Greedy" },
+    ],
+    title: { vi: "Remove Max Number of Edges to Keep Graph Fully Traversable", en: "Remove Max Number of Edges to Keep Graph Fully Traversable" },
+    titleVi: { vi: "Xóa nhiều cạnh nhất mà đồ thị vẫn đi hết (2 DSU)", en: "Remove max edges keeping the graph fully traversable (two DSUs)" },
+    statement: {
+      vi: "Đồ thị n node 1..n. edges[i] = [type, u, v]: type 1 = chỉ Alice đi, 2 = chỉ Bob đi, 3 = cả hai đi. Xóa nhiều cạnh nhất sao cho cả Alice và Bob vẫn đi được tới mọi node. Trả về số cạnh xóa được, hoặc -1 nếu không thể.",
+      en: "Graph on n nodes 1..n. edges[i] = [type, u, v]: type 1 = Alice only, 2 = Bob only, 3 = both. Remove the maximum edges so both Alice and Bob can still reach every node. Return the number removed, or -1 if impossible.",
+    },
+    defaultInput: [4],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n — số node (nhập 1 số)", en: "n — number of nodes (one number)" },
+    extraParams: [{
+      key: "edges", type: "string",
+      label: { vi: "edges: type,u,v;... hoặc JSON", en: "edges: type,u,v;... or JSON" },
+      default: "3,1,2;3,2,3;3,3,4;1,1,4;2,2,4",
+    }],
+    approach: [
+      { vi: "Cạnh loại 3 giúp cả hai nên xét trước: dùng chung một lần union cho cả Alice lẫn Bob.", en: "Type-3 edges help both, so process them first: a single union counts for both Alice and Bob." },
+      { vi: "Sau đó xét cạnh riêng: T1 union trong DSU Alice, T2 union trong DSU Bob. Chỉ giữ cạnh nối hai nhóm còn tách.", en: "Then process exclusive edges: T1 unions in Alice's DSU, T2 in Bob's. Keep only edges that join still-separate groups." },
+      { vi: "Cạnh không làm giảm số component là cạnh thừa → có thể xóa.", en: "Any edge that does not reduce the component count is redundant → removable." },
+      { vi: "Cuối cùng nếu cả hai DSU đều còn đúng 1 component thì đáp án = tổng cạnh − số cạnh đã giữ; ngược lại trả -1.", en: "Finally, if both DSUs collapse to a single component, the answer = total edges − edges kept; otherwise return -1." },
+    ],
+    complexity: {
+      time: "O(E · α(n))",
+      space: "O(n)",
+      note: { vi: "Mỗi cạnh được xử lý một lần với thao tác DSU gần O(1).", en: "Each edge is processed once with effectively O(1) DSU operations." },
+    },
+    code: [
+      "class Solution:",
+      "    def maxNumEdgesToRemove(self, n, edges):",
+      "        alice = list(range(n + 1))",
+      "        bob = list(range(n + 1))",
+      "        def find(p, x):",
+      "            while p[x] != x:",
+      "                p[x] = p[p[x]]",
+      "                x = p[x]",
+      "            return x",
+      "        def union(p, x, y):",
+      "            rx, ry = find(p, x), find(p, y)",
+      "            if rx == ry:",
+      "                return False",
+      "            p[rx] = ry",
+      "            return True",
+      "        used = 0",
+      "        for t, u, v in edges:",
+      "            if t == 3:",
+      "                if union(alice, u, v):",
+      "                    union(bob, u, v)",
+      "                    used += 1",
+      "        for t, u, v in edges:",
+      "            if t == 1 and union(alice, u, v):",
+      "                used += 1",
+      "            elif t == 2 and union(bob, u, v):",
+      "                used += 1",
+      "        a_ok = all(find(alice, i) == find(alice, 1) for i in range(1, n + 1))",
+      "        b_ok = all(find(bob, i) == find(bob, 1) for i in range(1, n + 1))",
+      "        return len(edges) - used if a_ok and b_ok else -1",
+    ],
+    builder: buildSteps1579,
+    liveArgs(input, params = {}) {
+      const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+      return [n, mstParseMatrix(params.edges, 3, "edges")];
+    },
+  },
+  1627: {
+    id: 1627,
+    difficulty: "hard",
+    slug: "graph-connectivity-with-threshold",
+    category: UF_CAT,
+    tags: [
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "math", vi: "Toán/Số học", en: "Math" },
+    ],
+    title: { vi: "Graph Connectivity With Threshold", en: "Graph Connectivity With Threshold" },
+    titleVi: { vi: "Liên thông đồ thị theo ngưỡng (Union-Find)", en: "Graph connectivity with threshold (Union-Find)" },
+    statement: {
+      vi: "Cho n thành phố 1..n. Hai thành phố x, y nối trực tiếp nếu có ước chung z với z > threshold. Với mỗi queries[i] = [a, b], cho biết a và b có liên thông không.",
+      en: "Given n cities 1..n. Two cities x, y are directly connected if they share a common divisor z with z > threshold. For each queries[i] = [a, b], report whether a and b are connected.",
+    },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n — số node (nhập 1 số)", en: "n — number of nodes (one number)" },
+    extraParams: [
+      { key: "threshold", type: "number", label: { vi: "threshold", en: "threshold" }, default: 1, min: 0 },
+      { key: "queries", type: "string", label: { vi: "queries: a,b;... hoặc JSON", en: "queries: a,b;... or JSON" }, default: "1,5;2,6;3,4;5,6" },
+    ],
+    approach: [
+      { vi: "Không cần xét từng cặp. Với mỗi z từ threshold+1 tới n, mọi bội số của z đều chia hết cho z (> threshold) nên cùng một nhóm.", en: "No need to test each pair. For each z from threshold+1 to n, all multiples of z are divisible by z (> threshold), so they share a group." },
+      { vi: "Dùng Union-Find: union(z, 2z), union(z, 3z), ... để gộp các bội số vào chung component.", en: "Use Union-Find: union(z, 2z), union(z, 3z), ... to merge multiples into one component." },
+      { vi: "Sau khi gộp xong, mỗi truy vấn [a, b] chỉ cần kiểm tra find(a) == find(b).", en: "After merging, each query [a, b] just checks find(a) == find(b)." },
+    ],
+    complexity: {
+      time: "O(n log n · α(n) + q)",
+      space: "O(n)",
+      note: { vi: "Tổng số lần union là O(n/2 + n/3 + …) ≈ O(n log n); mỗi truy vấn gần O(1).", en: "The union count is O(n/2 + n/3 + …) ≈ O(n log n); each query is effectively O(1)." },
+    },
+    code: [
+      "class Solution:",
+      "    def areConnected(self, n, threshold, queries):",
+      "        parent = list(range(n + 1))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        for z in range(threshold + 1, n + 1):",
+      "            for m in range(2 * z, n + 1, z):",
+      "                parent[find(z)] = find(m)",
+      "        return [find(a) == find(b) for a, b in queries]",
+    ],
+    builder: buildSteps1627,
+    liveArgs(input, params = {}) {
+      const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+      return [n, Number(params.threshold), mstParseMatrix(params.queries, 2, "queries")];
+    },
+  },
+  1135: {
+    id: 1135,
+    difficulty: "medium",
+    premium: true,
+    slug: "connecting-cities-with-minimum-cost",
+    category: UF_CAT,
+    tags: [
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
+      { key: "graph", vi: "Đồ thị", en: "Graph" },
+      { key: "union-find", vi: "Union-Find (DSU)", en: "Union-Find (DSU)" },
+    ],
+    title: { vi: "Connecting Cities With Minimum Cost", en: "Connecting Cities With Minimum Cost" },
+    titleVi: { vi: "Nối các thành phố với chi phí nhỏ nhất (MST - Kruskal)", en: "Connecting cities with minimum cost (MST - Kruskal)" },
+    statement: {
+      vi: "Có n thành phố (1..n) và danh sách connections[i] = [u, v, cost] là chi phí nối trực tiếp hai thành phố. Tìm chi phí nhỏ nhất để mọi thành phố liên thông. Nếu không thể, trả về -1.",
+      en: "There are n cities (1..n) and connections[i] = [u, v, cost] is the cost to directly connect two cities. Return the minimum cost so every city is connected; return -1 if impossible.",
+    },
+    defaultInput: [6],
+    inputKind: "positive",
+    singleInput: true,
+    inputLabel: { vi: "n — số thành phố (nhập 1 số)", en: "n — number of cities (one number)" },
+    extraParams: [{
+      key: "connections", type: "string",
+      label: { vi: "connections: u,v,cost;... hoặc JSON", en: "connections: u,v,cost;... or JSON" },
+      default: "1,2,3;1,3,4;2,3,1;3,4,2;4,5,5;5,6,2;4,6,6;2,5,7",
+    }],
+    approach: [
+      { vi: "Đây là bài Cây khung nhỏ nhất (MST): giữ toàn bộ thành phố liên thông với tổng trọng số nhỏ nhất.", en: "This is a Minimum Spanning Tree (MST): keep all cities connected with the least total weight." },
+      { vi: "Kruskal: sort mọi cạnh theo chi phí tăng dần rồi duyệt từ rẻ đến đắt.", en: "Kruskal: sort every edge by increasing cost, then scan from cheapest to most expensive." },
+      { vi: "Dùng Union-Find: chỉ chọn cạnh nối hai component khác nhau (find(u) ≠ find(v)); cạnh trong cùng component bị bỏ vì tạo chu trình.", en: "Use Union-Find: take an edge only when it joins two different components (find(u) ≠ find(v)); same-component edges are skipped as cycles." },
+      { vi: "MST của n node cần đúng n-1 cạnh. Nếu chọn đủ n-1 cạnh → trả tổng chi phí; nếu không → -1.", en: "An MST over n nodes needs exactly n-1 edges. If n-1 edges are chosen → return the total; otherwise → -1." },
+    ],
+    complexity: {
+      time: "O(E log E)",
+      space: "O(n + E)",
+      note: { vi: "Chi phí chính là sort E cạnh; các thao tác DSU gần O(1).", en: "The cost is dominated by sorting E edges; DSU operations are effectively O(1)." },
+    },
+    code: [
+      "class Solution:",
+      "    def minimumCost(self, n, connections):",
+      "        connections.sort(key=lambda c: c[2])",
+      "        parent = list(range(n + 1))",
+      "        def find(x):",
+      "            while parent[x] != x:",
+      "                parent[x] = parent[parent[x]]",
+      "                x = parent[x]",
+      "            return x",
+      "        total = 0",
+      "        used = 0",
+      "        for u, v, w in connections:",
+      "            ru, rv = find(u), find(v)",
+      "            if ru != rv:",
+      "                parent[ru] = rv",
+      "                total += w",
+      "                used += 1",
+      "        return total if used == n - 1 else -1",
+    ],
+    builder: buildSteps1135,
+    liveArgs(input, params = {}) {
+      const n = Array.isArray(input) ? Number(input[0]) : Number(input);
+      return [n, mstParseMatrix(params.connections, 3, "connections")];
+    },
+  },
   1168: {
     id: 1168,
     difficulty: "hard",
@@ -3976,6 +4860,7 @@ module.exports = {
     slug: "optimize-water-distribution-in-a-village",
     category: UF_CAT,
     tags: [
+      { key: "mst", vi: "Cây khung nhỏ nhất (MST)", en: "Minimum Spanning Tree" },
       { key: "graph", vi: "Đồ thị", en: "Graph" },
       { key: "greedy", vi: "Tham lam", en: "Greedy" },
     ],
