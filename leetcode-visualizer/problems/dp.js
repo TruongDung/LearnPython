@@ -16290,6 +16290,235 @@ function buildSteps4027(input, params = {}) {
 }
 
 /**
+ * LeetCode 664: Strange Printer. Interval DP: dp[i][j] = số lượt in ít nhất cho s[i..j].
+ */
+function buildSteps664(input) {
+  const s = String(input).replace(/[^\x21-\x7e]/g, "").slice(0, 12) || "aba";
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const computed = Array.from({ length: n }, () => new Array(n).fill(false));
+  for (let i = 0; i < n; i++) { dp[i][i] = 1; computed[i][i] = true; }
+  const steps = [];
+  const chars = [...s];
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j < i ? "" : "·"))));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: { dp: display(), text1: chars.slice(1), text2: chars.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `s = "${s}", dp[i][i] = 1`, en: `s = "${s}", dp[i][i] = 1` },
+    codeLines: [6],
+    caption: "dp[i][j] = số lượt in ít nhất cho đoạn s[i..j]",
+    vars: [{ name: "s", value: s }],
+    note: {
+      vi: `Máy in mỗi lượt in một dãy KÝ TỰ GIỐNG NHAU liên tiếp, đè lên vùng đã in. dp[i][j] = số lượt ít nhất để in s[i..j]. Cơ sở: một ký tự cần 1 lượt (đường chéo = 1).`,
+      en: `Each turn the printer prints a run of the SAME character over a region. dp[i][j] = min turns to print s[i..j]. Base: a single char needs 1 turn (diagonal = 1).`,
+    },
+  });
+
+  for (let len = 2; len <= n; len++) {
+    for (let i = 0; i + len - 1 < n; i++) {
+      const j = i + len - 1;
+      let best = dp[i][j - 1] + 1;
+      const src = [[i, j - 1]];
+      for (let k = i; k < j; k++) {
+        if (s[k] === s[j]) {
+          const cand = dp[i][k] + (k + 1 <= j - 1 ? dp[k + 1][j - 1] : 0);
+          if (cand < best) { best = cand; }
+        }
+      }
+      dp[i][j] = best;
+      computed[i][j] = true;
+      push({
+        title: { vi: `dp[${i}][${j}] ("${s.slice(i, j + 1)}") = ${best}`, en: `dp[${i}][${j}] ("${s.slice(i, j + 1)}") = ${best}` },
+        codeLines: [8, 10, 11],
+        hlCell: [i, j],
+        pathCells: src,
+        caption: `dp[${i}][${j}] = ${best} · đoạn "${s.slice(i, j + 1)}"`,
+        vars: [{ name: "đoạn", value: `"${s.slice(i, j + 1)}"` }, { name: `dp[${i}][${j}]`, value: best }],
+        note: {
+          vi: `In "${s.slice(i, j + 1)}": bắt đầu = dp[${i}][${j - 1}]+1 (in thêm ký tự '${s[j]}'). Nếu có k mà s[k]='${s[j]}', ta gộp lượt in → dp[${i}][k] + dp[k+1][${j - 1}]. Nhỏ nhất = ${best}.`,
+          en: `Print "${s.slice(i, j + 1)}": start = dp[${i}][${j - 1}]+1 (print extra '${s[j]}'). If some k has s[k]='${s[j]}', we merge a print → dp[${i}][k] + dp[k+1][${j - 1}]. Minimum = ${best}.`,
+        },
+      });
+    }
+  }
+
+  const answer = n ? dp[0][n - 1] : 0;
+  push({
+    title: { vi: `Kết quả: dp[0][${n - 1}] = ${answer}`, en: `Result: dp[0][${n - 1}] = ${answer}` },
+    codeLines: [12], hlCell: [0, n - 1], final: true,
+    caption: `Đáp án = ${answer} lượt in`,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Số lượt in ít nhất cho cả chuỗi "${s}" = ${answer}.`, en: `Minimum turns to print "${s}" = ${answer}.` },
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
+ * LeetCode 1563: Stone Game V. Interval DP: dp[i][j] = điểm tối đa Alice lấy trên stones[i..j].
+ */
+function buildSteps1563(input) {
+  const stones = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim()))).filter(Number.isFinite).slice(0, 10);
+  const n = stones.length;
+  const prefix = new Array(n + 1).fill(0);
+  for (let i = 0; i < n; i++) prefix[i + 1] = prefix[i] + stones[i];
+  const sum = (i, j) => prefix[j + 1] - prefix[i];
+  const dp = Array.from({ length: n }, () => new Array(n).fill(0));
+  const computed = Array.from({ length: n }, () => new Array(n).fill(false));
+  for (let i = 0; i < n; i++) computed[i][i] = true;
+  const steps = [];
+  const labels = stones.map((v) => `${v}`);
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? String(v) : (j < i ? "" : "·"))));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: { dp: display(), text1: labels.slice(1), text2: labels.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `stones = [${stones.join(", ")}], dp[i][i] = 0`, en: `stones = [${stones.join(", ")}], dp[i][i] = 0` },
+    codeLines: [4],
+    caption: "dp[i][j] = điểm tối đa Alice giành được trên stones[i..j]",
+    vars: [{ name: "stones", value: `[${stones.join(", ")}]` }],
+    note: {
+      vi: `Mỗi lượt Alice chia đoạn thành trái/phải; phần có TỔNG LỚN HƠN bị bỏ, Alice cộng tổng phần nhỏ hơn rồi chơi tiếp trên phần đó. Nếu bằng nhau, Alice chọn phần lợi hơn. dp[i][j] = điểm tối đa trên đoạn stones[i..j]. Một viên (i==j): 0 điểm.`,
+      en: `Each turn Alice splits into left/right; the side with the LARGER sum is discarded, Alice gains the smaller side's sum and continues there. On a tie she picks the better side. dp[i][j] = max score on stones[i..j]. A single stone (i==j): 0.`,
+    },
+  });
+
+  for (let len = 2; len <= n; len++) {
+    for (let i = 0; i + len - 1 < n; i++) {
+      const j = i + len - 1;
+      let best = 0;
+      let bestSplit = -1;
+      for (let k = i; k < j; k++) {
+        const left = sum(i, k);
+        const right = sum(k + 1, j);
+        let cand = 0;
+        if (left < right) cand = left + dp[i][k];
+        else if (right < left) cand = right + dp[k + 1][j];
+        else cand = left + Math.max(dp[i][k], dp[k + 1][j]);
+        if (cand > best) { best = cand; bestSplit = k; }
+      }
+      dp[i][j] = best;
+      computed[i][j] = true;
+      push({
+        title: { vi: `dp[${i}][${j}] = ${best}`, en: `dp[${i}][${j}] = ${best}` },
+        codeLines: [9, 10, 11],
+        hlCell: [i, j],
+        pathCells: bestSplit >= 0 ? [[i, bestSplit], [bestSplit + 1, j]] : [],
+        caption: `dp[${i}][${j}] = ${best} · đoạn [${stones.slice(i, j + 1).join(",")}]`,
+        vars: [
+          { name: "đoạn", value: `[${stones.slice(i, j + 1).join(", ")}]` },
+          { name: "chia tốt nhất tại k", value: bestSplit >= 0 ? `sau index ${bestSplit}` : "—" },
+          { name: `dp[${i}][${j}]`, value: best },
+        ],
+        note: {
+          vi: `Đoạn [${stones.slice(i, j + 1).join(",")}]: thử mọi chỗ chia k. Bên nhỏ hơn được giữ và cộng dp của bên đó. Điểm tối đa = ${best}${bestSplit >= 0 ? ` (chia sau vị trí ${bestSplit})` : ""}.`,
+          en: `Segment [${stones.slice(i, j + 1).join(",")}]: try every split k. The smaller side is kept and its dp is added. Max score = ${best}${bestSplit >= 0 ? ` (split after index ${bestSplit})` : ""}.`,
+        },
+      });
+    }
+  }
+
+  const answer = n ? dp[0][n - 1] : 0;
+  push({
+    title: { vi: `Kết quả: dp[0][${n - 1}] = ${answer}`, en: `Result: dp[0][${n - 1}] = ${answer}` },
+    codeLines: [12], hlCell: [0, Math.max(0, n - 1)], final: true,
+    caption: `Đáp án = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Điểm tối đa Alice giành được = ${answer}.`, en: `Alice's maximum score = ${answer}.` },
+  });
+
+  return { original: [...stones], answer, steps };
+}
+
+/**
+ * LeetCode 887: Super Egg Drop. dp[m][e] = số tầng tối đa kiểm tra được với m lần thử và e quả trứng.
+ */
+function buildSteps887(input, params) {
+  const k = Math.max(1, Math.min(6, Number(Array.isArray(input) ? input[0] : input) || 2));
+  const nFloors = Math.max(1, Math.min(60, Number((params && params.n) ?? 6)));
+  const maxMoves = nFloors; // upper bound
+  const dp = [new Array(k + 1).fill(0)];
+  const steps = [];
+  const push = (opts) => {
+    const rows = dp.length;
+    steps.push({
+      title: opts.title, arr: [],
+      grid: {
+        dp: dp.map((row) => row.map((v) => String(v))),
+        text1: Array.from({ length: rows - 1 }, (_, i) => `m=${i + 1}`),
+        text2: Array.from({ length: k }, (_, e) => `${e + 1} trứng`),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+        caption: opts.caption,
+      },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `n=${nFloors} tầng, k=${k} trứng`, en: `n=${nFloors} floors, k=${k} eggs` },
+    codeLines: [4],
+    caption: "dp[m][e] = số tầng tối đa xác định được với m lần thử và e trứng",
+    vars: [{ name: "n (tầng)", value: nFloors }, { name: "k (trứng)", value: k }],
+    note: {
+      vi: `Đảo bài toán: dp[m][e] = số tầng NHIỀU NHẤT có thể xác định chắc chắn với m lần thả và e quả trứng. Thả 1 lần: nếu vỡ → còn e−1 trứng, m−1 lần (các tầng dưới); nếu không vỡ → e trứng, m−1 lần (các tầng trên); cộng 1 tầng đang đứng. dp[m][e] = dp[m−1][e−1] + dp[m−1][e] + 1. Tìm m nhỏ nhất để dp[m][k] ≥ n.`,
+      en: `Flip the problem: dp[m][e] = the MOST floors we can determine with m drops and e eggs. One drop: if it breaks → e−1 eggs, m−1 drops (floors below); if not → e eggs, m−1 drops (floors above); plus the current floor. dp[m][e] = dp[m−1][e−1] + dp[m−1][e] + 1. Find the smallest m with dp[m][k] ≥ n.`,
+    },
+  });
+
+  let m = 0;
+  while (dp[m][k] < nFloors && m < maxMoves) {
+    m += 1;
+    dp[m] = new Array(k + 1).fill(0);
+    for (let e = 1; e <= k; e++) {
+      dp[m][e] = dp[m - 1][e - 1] + dp[m - 1][e] + 1;
+    }
+    push({
+      title: { vi: `m=${m}: dp[${m}][${k}] = ${dp[m][k]}`, en: `m=${m}: dp[${m}][${k}] = ${dp[m][k]}` },
+      codeLines: [9, 10],
+      hlCell: [m, k],
+      pathCells: [[m - 1, k - 1], [m - 1, k]],
+      caption: `dp[${m}][${k}] = ${dp[m][k]} ${dp[m][k] >= nFloors ? "≥" : "<"} n=${nFloors}`,
+      vars: [
+        { name: "m (lần thử)", value: m },
+        { name: `dp[${m}][${k}]`, value: dp[m][k] },
+        { name: "cần ≥", value: nFloors },
+      ],
+      note: {
+        vi: `Với ${m} lần thử: dp[${m}][${k}] = dp[${m - 1}][${k - 1}] + dp[${m - 1}][${k}] + 1 = ${dp[m][k]} tầng. ${dp[m][k] >= nFloors ? `Đã ≥ ${nFloors} → dừng, đáp án = ${m}.` : `Còn < ${nFloors} → tăng số lần thử.`}`,
+        en: `With ${m} drops: dp[${m}][${k}] = dp[${m - 1}][${k - 1}] + dp[${m - 1}][${k}] + 1 = ${dp[m][k]} floors. ${dp[m][k] >= nFloors ? `Now ≥ ${nFloors} → stop, answer = ${m}.` : `Still < ${nFloors} → increase drops.`}`,
+      },
+    });
+  }
+
+  const answer = m;
+  push({
+    title: { vi: `Kết quả: cần ${answer} lần thử`, en: `Result: need ${answer} drops` },
+    codeLines: [11], hlCell: [answer, k], final: true,
+    caption: `Đáp án = ${answer} lần thử (số lần tối thiểu trong trường hợp xấu nhất)`,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Số lần thả tối thiểu (trường hợp xấu nhất) để chắc chắn tìm được tầng tới hạn với ${k} trứng và ${nFloors} tầng = ${answer}.`,
+      en: `Minimum drops (worst case) to be sure of finding the critical floor with ${k} eggs and ${nFloors} floors = ${answer}.`,
+    },
+  });
+
+  return { original: { k, n: nFloors }, answer, steps };
+}
+
+/**
  * LeetCode 1155: Number of Dice Rolls With Target Sum.
  * dp[d][s] = số cách gieo d xúc xắc (mỗi mặt 1..k) để tổng = s.
  */
@@ -16991,6 +17220,113 @@ function buildSteps673(nums) {
 }
 
 module.exports = {
+  664: {
+    id: 664,
+    difficulty: "hard",
+    slug: "strange-printer",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Strange Printer", en: "Strange Printer" },
+    titleVi: { vi: "Máy in kỳ lạ", en: "Strange printer" },
+    statement: {
+      vi: "Máy in mỗi lượt in một dãy ký tự GIỐNG NHAU liên tiếp (đè lên vùng cũ). Tìm số lượt in ít nhất để in được chuỗi s.",
+      en: "Each turn the printer prints a run of the SAME character (over existing chars). Find the minimum turns to print string s.",
+    },
+    defaultInput: "aba",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    complexity: { time: "O(n³)", space: "O(n²)", note: { vi: "Interval DP trên chuỗi.", en: "Interval DP over the string." } },
+    code: [
+      "class Solution:",
+      "    def strangePrinter(self, s):",
+      "        n = len(s)",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        for i in range(n-1, -1, -1):",
+      "            dp[i][i] = 1",
+      "            for j in range(i+1, n):",
+      "                dp[i][j] = dp[i][j-1] + 1",
+      "                for k in range(i, j):",
+      "                    if s[k] == s[j]:",
+      "                        dp[i][j] = min(dp[i][j], dp[i][k] + (dp[k+1][j-1] if k+1 <= j-1 else 0))",
+      "        return dp[0][n-1] if n else 0",
+    ],
+    builder: buildSteps664,
+  },
+  1563: {
+    id: 1563,
+    difficulty: "hard",
+    slug: "stone-game-v",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Stone Game V", en: "Stone Game V" },
+    titleVi: { vi: "Trò chơi đá V", en: "Stone Game V" },
+    statement: {
+      vi: "Có dãy đá stones. Mỗi lượt Alice chia đoạn thành trái/phải; phần có tổng lớn hơn bị bỏ (nếu bằng nhau Alice chọn), Alice cộng tổng phần được giữ rồi chơi tiếp. Tìm tổng điểm tối đa của Alice.",
+      en: "Given stones. Each turn Alice splits a segment into left/right; the larger-sum side is discarded (ties: Alice chooses), she scores the kept side's sum and continues. Find Alice's maximum total.",
+    },
+    defaultInput: [6, 2, 3, 4, 5, 5],
+    inputKind: "integer",
+    inputLabel: { vi: "stones", en: "stones" },
+    extraParams: [],
+    complexity: { time: "O(n³)", space: "O(n²)", note: { vi: "Interval DP + tổng đoạn (prefix sum).", en: "Interval DP + segment sums (prefix)." } },
+    code: [
+      "class Solution:",
+      "    def stoneGameV(self, stones):",
+      "        n = len(stones)",
+      "        prefix = [0]*(n+1)",
+      "        for i, v in enumerate(stones):",
+      "            prefix[i+1] = prefix[i] + v",
+      "        dp = [[0]*n for _ in range(n)]",
+      "        for length in range(2, n+1):",
+      "            for i in range(n-length+1):",
+      "                j = i + length - 1",
+      "                for k in range(i, j):",
+      "                    left = prefix[k+1] - prefix[i]",
+      "                    right = prefix[j+1] - prefix[k+1]",
+      "                    if left < right:",
+      "                        cand = left + dp[i][k]",
+      "                    elif right < left:",
+      "                        cand = right + dp[k+1][j]",
+      "                    else:",
+      "                        cand = left + max(dp[i][k], dp[k+1][j])",
+      "                    dp[i][j] = max(dp[i][j], cand)",
+      "        return dp[0][n-1]",
+    ],
+    builder: buildSteps1563,
+  },
+  887: {
+    id: 887,
+    difficulty: "hard",
+    slug: "super-egg-drop",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Super Egg Drop", en: "Super Egg Drop" },
+    titleVi: { vi: "Thả trứng", en: "Super egg drop" },
+    statement: {
+      vi: "Có k quả trứng và n tầng. Tìm số lần thả tối thiểu (trường hợp xấu nhất) để chắc chắn xác định được tầng tới hạn f.",
+      en: "You have k eggs and n floors. Find the minimum number of drops (worst case) to certainly determine the critical floor f.",
+    },
+    defaultInput: [2],
+    inputKind: "positive",
+    inputLabel: { vi: "k (số trứng)", en: "k (eggs)" },
+    singleInput: true,
+    maxInput: 6,
+    extraParams: [
+      { key: "n", type: "number", label: { vi: "n (số tầng)", en: "n (floors)" }, default: 6 },
+    ],
+    complexity: { time: "O(k × answer)", space: "O(k × answer)", note: { vi: "dp[m][e] tăng m tới khi phủ n tầng.", en: "dp[m][e] increases m until it covers n floors." } },
+    code: [
+      "class Solution:",
+      "    def superEggDrop(self, k, n):",
+      "        # dp[m][e] = max floors solvable with m moves and e eggs",
+      "        dp = [[0]*(k+1) for _ in range(n+1)]",
+      "        m = 0",
+      "        while dp[m][k] < n:",
+      "            m += 1",
+      "            for e in range(1, k+1):",
+      "                dp[m][e] = dp[m-1][e-1] + dp[m-1][e] + 1",
+      "        return m",
+    ],
+    builder: buildSteps887,
+  },
   1155: {
     id: 1155,
     difficulty: "medium",
