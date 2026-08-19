@@ -16290,6 +16290,189 @@ function buildSteps4027(input, params = {}) {
 }
 
 /**
+ * LeetCode 471: Encode String with Shortest Length.
+ * Interval DP: dp[i][j] = chuỗi mã hoá NGẮN NHẤT của s[i..j].
+ */
+function buildSteps471(input) {
+  const s = String(input).replace(/[^a-zA-Z]/g, "").slice(0, 12) || "aaa";
+  const n = s.length;
+  const dp = Array.from({ length: n }, () => new Array(n).fill(""));
+  const computed = Array.from({ length: n }, () => new Array(n).fill(false));
+  const steps = [];
+  const chars = [...s];
+  const display = () => dp.map((row, i) => row.map((v, j) => (computed[i][j] ? v : (j < i ? "" : "·"))));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: { dp: display(), text1: chars.slice(1), text2: chars.slice(1), hlCell: opts.hlCell || null, pathCells: opts.pathCells || [], largeCells: true, caption: opts.caption },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  push({
+    title: { vi: `s = "${s}"`, en: `s = "${s}"` },
+    codeLines: [4],
+    caption: "dp[i][j] = chuỗi mã hoá ngắn nhất của s[i..j]",
+    vars: [{ name: "s", value: s }],
+    note: {
+      vi: `Mã hoá dạng k[chuỗi] nghĩa là lặp "chuỗi" k lần (vd "aaa" → "3[a]"). dp[i][j] = cách viết NGẮN NHẤT cho s[i..j]. Ta chỉ mã hoá nếu ngắn hơn chuỗi gốc.`,
+      en: `Encoding k[str] means repeat "str" k times (e.g. "aaa" → "3[a]"). dp[i][j] = SHORTEST representation of s[i..j]. We only encode if it is shorter than the raw substring.`,
+    },
+  });
+
+  for (let len = 1; len <= n; len++) {
+    for (let i = 0; i + len - 1 < n; i++) {
+      const j = i + len - 1;
+      const sub = s.slice(i, j + 1);
+      let bestStr = sub;
+      let via = "raw";
+      let splitCells = [];
+      // Split into two parts.
+      for (let k = i; k < j; k++) {
+        if (dp[i][k].length + dp[k + 1][j].length < bestStr.length) {
+          bestStr = dp[i][k] + dp[k + 1][j];
+          via = "split";
+          splitCells = [[i, k], [k + 1, j]];
+        }
+      }
+      // Repeat compression (only when the period divides the length evenly).
+      const pos = (sub + sub).indexOf(sub, 1);
+      if (pos > 0 && pos < sub.length && sub.length % pos === 0) {
+        const reps = sub.length / pos;
+        const cand = `${reps}[${dp[i][i + pos - 1]}]`;
+        if (cand.length < bestStr.length) {
+          bestStr = cand;
+          via = "repeat";
+          splitCells = [[i, i + pos - 1]];
+        }
+      }
+      dp[i][j] = bestStr;
+      computed[i][j] = true;
+      push({
+        title: { vi: `dp[${i}][${j}] = "${bestStr}"`, en: `dp[${i}][${j}] = "${bestStr}"` },
+        codeLines: via === "repeat" ? [15, 16, 17] : via === "split" ? [11, 12] : [9],
+        hlCell: [i, j],
+        pathCells: splitCells,
+        caption: `"${sub}" → "${bestStr}" (${via === "raw" ? "giữ nguyên" : via === "split" ? "ghép 2 phần" : "nén lặp"})`,
+        vars: [{ name: "đoạn", value: `"${sub}"` }, { name: "cách", value: via }, { name: `dp[${i}][${j}]`, value: `"${bestStr}"` }],
+        note: {
+          vi: via === "raw"
+            ? `Đoạn "${sub}" không rút gọn được → giữ nguyên "${bestStr}" (dài ${bestStr.length}).`
+            : via === "split"
+              ? `Ghép 2 phần đã mã hoá cho ngắn hơn: "${bestStr}" (dài ${bestStr.length}).`
+              : `"${sub}" là lặp của một mẫu → nén thành "${bestStr}" (dài ${bestStr.length}).`,
+          en: via === "raw"
+            ? `"${sub}" cannot be shortened → keep "${bestStr}" (length ${bestStr.length}).`
+            : via === "split"
+              ? `Concatenating two encoded parts is shorter: "${bestStr}" (length ${bestStr.length}).`
+              : `"${sub}" is a repetition of a pattern → compress to "${bestStr}" (length ${bestStr.length}).`,
+        },
+      });
+    }
+  }
+
+  const answer = n ? dp[0][n - 1] : "";
+  push({
+    title: { vi: `Kết quả: "${answer}"`, en: `Result: "${answer}"` },
+    codeLines: [18], hlCell: [0, Math.max(0, n - 1)], final: true,
+    caption: `Đáp án = "${answer}" (dài ${answer.length})`,
+    vars: [{ name: "answer", value: `"${answer}"` }],
+    note: { vi: `Chuỗi mã hoá ngắn nhất của "${s}" = "${answer}".`, en: `Shortest encoding of "${s}" = "${answer}".` },
+  });
+
+  return { original: s, answer, steps };
+}
+
+/**
+ * LeetCode 403: Frog Jump. dp[i][k] = ếch có thể đứng ở đá i với cú nhảy vừa rồi cỡ k.
+ */
+function buildSteps403(input) {
+  const stones = (Array.isArray(input) ? input.map(Number) : String(input).split(",").map((v) => Number(v.trim()))).filter(Number.isFinite).slice(0, 10);
+  const n = stones.length;
+  const posIndex = new Map(stones.map((s, i) => [s, i]));
+  const maxK = Math.max(1, n);
+  const dp = Array.from({ length: n }, () => new Array(maxK + 1).fill(0));
+  const steps = [];
+  const rowLabels = stones.map((s) => `đá ${s}`);
+  const display = () => dp.map((row) => row.map((v) => String(v)));
+  const push = (opts) => {
+    steps.push({
+      title: opts.title, arr: [],
+      grid: {
+        dp: display(),
+        text1: rowLabels.slice(1),
+        text2: Array.from({ length: maxK }, (_, k) => `k=${k + 1}`),
+        hlCell: opts.hlCell || null,
+        pathCells: opts.pathCells || [],
+        largeCells: true,
+        caption: opts.caption,
+      },
+      highlight: [], mark: [], final: Boolean(opts.final), codeLines: opts.codeLines || [], vars: opts.vars || [], note: opts.note,
+    });
+  };
+
+  const feasibleStart = n >= 2 && stones[1] === stones[0] + 1;
+  if (n >= 1) dp[0][0] = 1;
+  push({
+    title: { vi: `stones = [${stones.join(", ")}]`, en: `stones = [${stones.join(", ")}]` },
+    codeLines: [5],
+    caption: "dp[i][k] = 1 nếu tới được đá i bằng cú nhảy cỡ k",
+    vars: [{ name: "stones", value: `[${stones.join(", ")}]` }],
+    note: {
+      vi: `Ếch bắt đầu ở đá đầu tiên (dp[0][0]=1: chưa nhảy). Nếu cú trước cỡ k thì cú sau có thể cỡ k−1, k, hoặc k+1 (đều > 0). dp[i][k] = có tới được đá i bằng cú nhảy cỡ k hay không. ${feasibleStart ? "" : "Lưu ý: cú nhảy đầu bắt buộc là 1, nên đá thứ 2 phải cách đá đầu đúng 1 đơn vị."}`,
+      en: `The frog starts on the first stone (dp[0][0]=1: no jump yet). If the previous jump was size k, the next may be k−1, k, or k+1 (all > 0). dp[i][k] = whether stone i is reachable with a jump of size k. ${feasibleStart ? "" : "Note: the first jump must be 1, so the 2nd stone must be exactly 1 unit away."}`,
+    },
+  });
+
+  for (let i = 0; i < n; i++) {
+    const s = stones[i];
+    const enabled = [];
+    for (let k = 0; k <= maxK; k++) {
+      if (!dp[i][k]) continue;
+      for (const nk of [k - 1, k, k + 1]) {
+        if (nk > 0 && posIndex.has(s + nk)) {
+          const j = posIndex.get(s + nk);
+          if (j > i) { dp[j][nk] = 1; enabled.push([j, nk]); }
+        }
+      }
+    }
+    push({
+      title: { vi: `Từ đá ${s} (index ${i})`, en: `From stone ${s} (index ${i})` },
+      codeLines: [8, 9, 10],
+      hlCell: [i, dp[i].findIndex((v) => v === 1) < 0 ? 0 : dp[i].findIndex((v) => v === 1)],
+      pathCells: enabled,
+      caption: enabled.length ? `Từ đá ${s} nhảy tới: ${enabled.map(([j, nk]) => `đá ${stones[j]} (k=${nk})`).join(", ")}` : `Đá ${s} không mở được cú nhảy mới`,
+      vars: [
+        { name: "đá", value: `${s} (index ${i})` },
+        { name: "cỡ nhảy đang có", value: dp[i].map((v, k) => (v ? k : -1)).filter((k) => k >= 0).join(", ") || "—" },
+      ],
+      note: {
+        vi: enabled.length
+          ? `Đứng ở đá ${s} với các cỡ nhảy đã tới {${dp[i].map((v, k) => (v ? k : -1)).filter((k) => k >= 0).join(", ")}}. Với mỗi cỡ k, thử nhảy k−1/k/k+1 → mở được: ${enabled.map(([j, nk]) => `đá ${stones[j]} (cỡ ${nk})`).join(", ")}.`
+          : `Đá ${s} chưa tới được hoặc không nhảy tiếp được tới đá nào.`,
+        en: enabled.length
+          ? `Standing on stone ${s} with arrival jump sizes {${dp[i].map((v, k) => (v ? k : -1)).filter((k) => k >= 0).join(", ")}}. For each size k, try k−1/k/k+1 → unlocks: ${enabled.map(([j, nk]) => `stone ${stones[j]} (size ${nk})`).join(", ")}.`
+          : `Stone ${s} is not reachable or cannot jump to any further stone.`,
+      },
+    });
+  }
+
+  const answer = n <= 1 ? true : dp[n - 1].some((v) => v === 1);
+  push({
+    title: { vi: `Kết quả: ${answer ? "tới được đá cuối" : "KHÔNG tới được"}`, en: `Result: ${answer ? "can reach last stone" : "cannot reach"}` },
+    codeLines: [11], hlCell: [n - 1, 0], final: true,
+    caption: `Đáp án = ${answer}`,
+    vars: [{ name: "answer", value: answer }],
+    note: {
+      vi: `Đá cuối (${stones[n - 1]}) ${answer ? "CÓ" : "KHÔNG"} tới được bằng bất kỳ cỡ nhảy nào → trả về ${answer}.`,
+      en: `The last stone (${stones[n - 1]}) is ${answer ? "reachable" : "NOT reachable"} by any jump size → return ${answer}.`,
+    },
+  });
+
+  return { original: [...stones], answer, steps };
+}
+
+/**
  * LeetCode 354: Russian Doll Envelopes. Sort (w asc, h desc) → LIS trên chiều cao.
  */
 function buildSteps354(input) {
@@ -17400,6 +17583,75 @@ function buildSteps673(nums) {
 }
 
 module.exports = {
+  471: {
+    id: 471,
+    difficulty: "hard",
+    slug: "encode-string-with-shortest-length",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Encode String with Shortest Length", en: "Encode String with Shortest Length" },
+    titleVi: { vi: "Mã hoá chuỗi ngắn nhất", en: "Encode string with shortest length" },
+    statement: {
+      vi: "Mã hoá chuỗi s ngắn nhất theo dạng k[chuỗi] (lặp 'chuỗi' k lần). Chỉ mã hoá nếu làm chuỗi ngắn hơn.",
+      en: "Encode string s to the shortest form using k[str] (repeat 'str' k times). Only encode if it makes the string shorter.",
+    },
+    defaultInput: "aaaaa",
+    inputKind: "string",
+    inputLabel: { vi: "s", en: "s" },
+    extraParams: [],
+    complexity: { time: "O(n³)", space: "O(n²)", note: { vi: "Interval DP; mỗi ô là một chuỗi.", en: "Interval DP; each cell holds a string." } },
+    code: [
+      "class Solution:",
+      "    def encode(self, s):",
+      "        n = len(s)",
+      "        dp = [['']*n for _ in range(n)]",
+      "        for length in range(1, n+1):",
+      "            for i in range(n-length+1):",
+      "                j = i + length - 1",
+      "                sub = s[i:j+1]",
+      "                dp[i][j] = sub",
+      "                for k in range(i, j):",
+      "                    if len(dp[i][k]) + len(dp[k+1][j]) < len(dp[i][j]):",
+      "                        dp[i][j] = dp[i][k] + dp[k+1][j]",
+      "                pos = (sub + sub).find(sub, 1)",
+      "                if 0 <= pos < len(sub):",
+      "                    cand = str(len(sub)//pos) + '[' + dp[i][i+pos-1] + ']'",
+      "                    if len(cand) < len(dp[i][j]):",
+      "                        dp[i][j] = cand",
+      "        return dp[0][n-1]",
+    ],
+    builder: buildSteps471,
+  },
+  403: {
+    id: 403,
+    difficulty: "hard",
+    slug: "frog-jump",
+    category: { key: "dp", vi: "Quy hoạch động", en: "Dynamic Programming" },
+    title: { vi: "Frog Jump", en: "Frog Jump" },
+    titleVi: { vi: "Ếch nhảy qua sông", en: "Frog jump" },
+    statement: {
+      vi: "Con ếch nhảy qua sông trên các hòn đá ở vị trí stones (tăng dần). Cú nhảy đầu tiên cỡ 1. Nếu cú trước cỡ k thì cú sau cỡ k−1, k hoặc k+1 (>0). Hỏi ếch có tới được đá cuối không?",
+      en: "A frog crosses a river on stones at positions stones (increasing). The first jump is size 1. If the last jump was size k, the next is k−1, k, or k+1 (>0). Can the frog reach the last stone?",
+    },
+    defaultInput: [0, 1, 3, 5, 6, 8, 12, 17],
+    inputKind: "nonneg",
+    inputLabel: { vi: "stones (vị trí đá)", en: "stones (positions)" },
+    extraParams: [],
+    complexity: { time: "O(n²)", space: "O(n²)", note: { vi: "Mỗi đá lưu tập cỡ nhảy tới được.", en: "Each stone stores the set of arrival jump sizes." } },
+    code: [
+      "class Solution:",
+      "    def canCross(self, stones):",
+      "        pos = {s: i for i, s in enumerate(stones)}",
+      "        dp = [set() for _ in stones]",
+      "        dp[0].add(0)",
+      "        for i, s in enumerate(stones):",
+      "            for k in dp[i]:",
+      "                for nk in (k-1, k, k+1):",
+      "                    if nk > 0 and s + nk in pos:",
+      "                        dp[pos[s+nk]].add(nk)",
+      "        return len(dp[-1]) > 0",
+    ],
+    builder: buildSteps403,
+  },
   354: {
     id: 354,
     difficulty: "hard",
