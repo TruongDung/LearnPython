@@ -15475,6 +15475,222 @@ function renderCinemaSeatView(step) {
   </section>`;
 }
 
+function renderHouseRobberView(step) {
+  const view = step.houseRobberView || {};
+  const vi = lang === "vi";
+  const nums = Array.isArray(view.nums) ? view.nums : [];
+  const method = view.method || "dp";
+  const sources = new Set(view.sources || []);
+  const robbed = new Set(view.robbed || []);
+  const range = view.range;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    base: vi ? "Cơ sở" : "Base case",
+    compute: vi ? "Quyết định" : "Decision",
+    shift: vi ? "Dời biến" : "Shift",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  // Houses row.
+  const housesHtml = nums.map((money, idx) => {
+    const classes = ["hr198-house"];
+    if (Array.isArray(range) && (idx < range[0] || idx > range[1])) classes.push("outside");
+    if (idx === view.currentIndex) classes.push("current");
+    if (sources.has(idx)) classes.push("source");
+    if (robbed.has(idx)) classes.push("robbed");
+    return `<span class="${classes.join(" ")}"><small>${vi ? "nhà" : "house"} ${idx}</small><strong>${money}</strong><em>${robbed.has(idx) ? "💰" : ""}</em></span>`;
+  }).join("");
+
+  // Formula / registers / dp block per method.
+  let formulaHtml = "";
+  let extraHtml = "";
+  let ruleText = "";
+  let methodLabel = "";
+
+  if (method === "dp" || method === "circular") {
+    ruleText = "dp[i] = max(dp[i-1], dp[i-2] + nums[i])";
+    methodLabel = method === "circular"
+      ? (vi ? "VÒNG TRÒN · chạy 2 lần" : "CIRCULAR · run twice")
+      : (vi ? "APPROACH 1 · bảng dp" : "APPROACH 1 · dp table");
+    if (view.formula) {
+      const f = view.formula;
+      const skipCls = f.chosen === "skip" ? "chosen" : "";
+      const robCls = f.chosen === "rob" ? "chosen" : "";
+      formulaHtml = `<div class="hr198-formula">
+        <span class="hr198-opt ${skipCls}">${vi ? "BỎ" : "SKIP"}: dp[${f.skip.from}] = <b>${f.skip.value}</b></span>
+        <i>max</i>
+        <span class="hr198-opt ${robCls}">${vi ? "CƯỚP" : "ROB"}: dp[${f.rob.from}]+nums[${f.i}] = ${f.rob.value}+${f.rob.money} = <b>${f.rob.total}</b></span>
+        <em>→ dp[${f.i}] = ${f.result}</em>
+      </div>`;
+    }
+    if (Array.isArray(view.dp)) {
+      const dpHtml = view.dp.map((val, pos) => {
+        const classes = ["hr198-dp"];
+        if (pos === view.currentIndex) classes.push("current");
+        if (sources.has(pos)) classes.push("source");
+        if (val === null || val === undefined) classes.push("pending");
+        return `<span class="${classes.join(" ")}"><small>${pos}</small><strong>${val === null || val === undefined ? "·" : val}</strong></span>`;
+      }).join("");
+      extraHtml = `<section class="hr198-panel"><header><strong>dp</strong><span>${vi ? "tiền tối đa tới nhà i" : "max loot up to house i"}</span></header><div class="hr198-dps">${dpHtml}</div></section>`;
+    }
+    if (method === "circular") {
+      const passBadge = view.pass ? `<span class="hr198-pass ${view.pass === "A" ? "a" : "b"}">PASS ${view.pass}${range ? ` · [${range[0]}..${range[1]}]` : ""}</span>` : "";
+      const passInfo = (view.passA !== null || view.passB !== null)
+        ? `<div class="hr198-passes"><span>${vi ? "Pass A (bỏ nhà cuối)" : "Pass A (skip last)"}: <b>${view.passA ?? "?"}</b></span><span>${vi ? "Pass B (bỏ nhà đầu)" : "Pass B (skip first)"}: <b>${view.passB ?? "?"}</b></span></div>`
+        : "";
+      formulaHtml = `${passBadge}${passInfo}${formulaHtml}`;
+    }
+  } else if (method === "rolling") {
+    ruleText = "temp = max(max_rob, prev_rob + money)";
+    methodLabel = vi ? "APPROACH 2 · O(1) — prev_rob/max_rob" : "APPROACH 2 · O(1) — prev_rob/max_rob";
+    if (view.formula) {
+      const f = view.formula;
+      formulaHtml = `<div class="hr198-formula"><span class="hr198-opt chosen">temp = max(max_rob=${f.maxRob}, prev_rob+money=${f.prevRob}+${f.money}=${f.robVal}) = <b>${f.temp}</b></span></div>`;
+    }
+    if (view.rolling) {
+      const r = view.rolling;
+      const reg = (name, val, hint) => `<article class="hr198-reg ${val === null || val === undefined ? "empty" : "filled"}"><small>${name}</small><strong>${val === null || val === undefined ? "—" : val}</strong><em>${hint}</em></article>`;
+      extraHtml = `<section class="hr198-panel"><header><strong>${vi ? "BỘ NHỚ" : "MEMORY"}</strong><span>${vi ? "2 biến" : "2 variables"}</span></header><div class="hr198-regs">
+        ${reg("prev_rob", r.prevRob, vi ? "nhà trước-trước" : "two back")}
+        ${reg("max_rob", r.maxRob, vi ? "nhà trước" : "one back")}
+        ${reg("temp", r.temp, vi ? "giá trị mới" : "new value")}
+      </div></section>`;
+    }
+  }
+
+  const answerLine = view.answer === null || view.answer === undefined
+    ? ""
+    : `<section class="hr198-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}$</strong></section>`;
+
+  $("treeView").innerHTML = `<section class="hr198-viz" role="img" aria-label="${vi ? "Trực quan hóa House Robber" : "House Robber visualization"}">
+    <header><strong>HOUSE ROBBER</strong><span class="hr198-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="hr198-rule"><b>${escapeHtml(methodLabel)}</b><strong>${escapeHtml(ruleText)}</strong><span>${vi ? "không được cướp 2 nhà liền kề" : "cannot rob two adjacent houses"}</span></section>
+    <section class="hr198-panel"><header><strong>${vi ? "DÃY NHÀ" : "HOUSES"}</strong><span>${vi ? "vàng = đang xét · tím = 2 nguồn · 💰 = cướp" : "yellow = current · purple = sources · 💰 = robbed"}</span></header><div class="hr198-houses">${housesHtml}</div></section>
+    ${formulaHtml}
+    ${extraHtml}
+    ${answerLine}
+  </section>`;
+}
+
+function renderMinCostStairsView(step) {
+  const view = step.minCostStairsView || {};
+  const vi = lang === "vi";
+  const cost = Array.isArray(view.cost) ? view.cost : [];
+  const isRolling = view.method === "rolling";
+  const sources = new Set(view.sources || []);
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    compute: vi ? "Tính chi phí" : "Compute cost",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  // Cost stairs row (cost[i] for each stair).
+  const costHtml = cost.map((c, idx) => {
+    const classes = ["mcs746-cost"];
+    if (idx === view.currentIndex) classes.push("current");
+    if (sources.has(idx)) classes.push("source");
+    return `<span class="${classes.join(" ")}"><small>${vi ? "bậc" : "step"} ${idx}</small><strong>${c}</strong></span>`;
+  }).join("");
+
+  // Formula box.
+  let formulaHtml = "";
+  if (view.formula && !isRolling) {
+    const f = view.formula;
+    const aCls = f.chosen === "A" ? "chosen" : "";
+    const bCls = f.chosen === "B" ? "chosen" : "";
+    formulaHtml = `<div class="mcs746-formula">
+      <span class="mcs746-opt ${aCls}">${vi ? "từ bậc" : "from"} ${f.optA.fromStep}: ${f.optA.dp}+${f.optA.cost} = <b>${f.optA.total}</b></span>
+      <i>min</i>
+      <span class="mcs746-opt ${bCls}">${vi ? "từ bậc" : "from"} ${f.optB.fromStep}: ${f.optB.dp}+${f.optB.cost} = <b>${f.optB.total}</b></span>
+      <em>→ dp[${f.i}] = ${f.result}</em>
+    </div>`;
+  } else if (view.formula && isRolling) {
+    const f = view.formula;
+    formulaHtml = `<div class="mcs746-formula"><span class="mcs746-opt chosen">curr = cost[${f.i}] + min(prev1=${f.prev1}, prev2=${f.prev2}) = ${f.cost} + ${f.min} = <b>${f.result}</b></span></div>`;
+  }
+
+  // dp row (method dp) or rolling registers (method rolling).
+  let stateHtml = "";
+  if (isRolling && view.rolling) {
+    const r = view.rolling;
+    const reg = (name, item, hint) => `<article class="mcs746-reg ${item ? "filled" : "empty"}"><small>${name}</small><strong>${item ? item.value : "—"}</strong><em>${item ? `${vi ? "bậc" : "step"} ${item.step}` : hint}</em></article>`;
+    stateHtml = `<section class="mcs746-panel"><header><strong>${vi ? "BỘ NHỚ ĐANG GIỮ" : "LIVE MEMORY"}</strong><span>${vi ? "cửa sổ 2 biến" : "two-variable window"}</span></header><div class="mcs746-regs">
+      ${reg("prev2", r.prev2, vi ? "2 bậc trước" : "two back")}
+      ${reg("prev1", r.prev1, vi ? "1 bậc trước" : "one back")}
+      ${reg("curr", r.curr, vi ? "chi phí mới" : "new cost")}
+    </div></section>`;
+  } else if (Array.isArray(view.dp)) {
+    const dpHtml = view.dp.map((val, pos) => {
+      const classes = ["mcs746-dp"];
+      if (pos === view.currentIndex) classes.push("current");
+      if (sources.has(pos)) classes.push("source");
+      if (pos === view.n) classes.push("goal");
+      if (val === null || val === undefined) classes.push("pending");
+      return `<span class="${classes.join(" ")}"><small>${pos}${pos === view.n ? " ★" : ""}</small><strong>${val === null || val === undefined ? "?" : val}</strong></span>`;
+    }).join("");
+    stateHtml = `<section class="mcs746-panel"><header><strong>dp[0..${view.n}]</strong><span>${vi ? "★ = đỉnh cầu thang (đáp án)" : "★ = top of stairs (answer)"}</span></header><div class="mcs746-dps">${dpHtml}</div></section>`;
+  }
+
+  const methodLabel = isRolling
+    ? (vi ? "APPROACH 2 · O(1) — prev2/prev1" : "APPROACH 2 · O(1) — prev2/prev1")
+    : (vi ? "APPROACH 1 · bảng dp" : "APPROACH 1 · dp table");
+  const answerLine = view.answer === null || view.answer === undefined
+    ? ""
+    : `<section class="mcs746-answer"><small>${vi ? "ĐÁP ÁN" : "ANSWER"}</small><strong>${view.answer}</strong></section>`;
+
+  $("treeView").innerHTML = `<section class="mcs746-viz" role="img" aria-label="${vi ? "Trực quan hóa Min Cost Climbing Stairs" : "Min Cost Climbing Stairs visualization"}">
+    <header><strong>MIN COST CLIMBING STAIRS</strong><span class="mcs746-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="mcs746-rule"><b>${escapeHtml(methodLabel)}</b><strong>${isRolling ? "curr = cost[i] + min(prev1, prev2)" : "dp[i] = min(dp[i-1]+cost[i-1], dp[i-2]+cost[i-2])"}</strong><span>${vi ? "trả cost để rời một bậc; leo 1 hoặc 2 bậc; bắt đầu ở bậc 0/1 miễn phí" : "pay a step's cost to leave it; climb 1 or 2 steps; start free at step 0/1"}</span></section>
+    <section class="mcs746-panel"><header><strong>cost</strong><span>${vi ? "vàng = bậc đang xét · tím = 2 nguồn" : "yellow = current step · purple = 2 sources"}</span></header><div class="mcs746-costs">${costHtml}</div></section>
+    ${formulaHtml}
+    ${stateHtml}
+    ${answerLine}
+  </section>`;
+}
+
+function renderCountBitsView(step) {
+  const view = step.countBitsView || {};
+  const vi = lang === "vi";
+  const cells = Array.isArray(view.cells) ? view.cells : [];
+  const f = view.formula;
+  const phaseLabels = {
+    init: vi ? "Khởi tạo" : "Initialize",
+    compute: vi ? "Tính dp[i]" : "Compute dp[i]",
+    done: vi ? "Hoàn tất" : "Complete",
+  };
+
+  // Split binary into prefix (i>>1) + last bit, coloring the last bit.
+  let action = "";
+  if (f) {
+    const prefix = f.iBits.slice(0, -1) || "0";
+    const last = f.iBits.slice(-1);
+    action = `<span class="cb338-bits"><b>${prefix}</b><i class="last">${last}</i></span> = <span class="cb338-bits"><b>${prefix}</b></span>(=${f.half}, dp=${f.halfValue}) + <i class="cb338-lastbit">${f.lastBit}</i> → <b>dp[${f.i}] = ${f.result}</b>`;
+  } else if (view.phase === "done") {
+    action = `<b>[${(view.answer || []).join(", ")}]</b>`;
+  } else {
+    action = "dp[0] = 0";
+  }
+
+  const cellsHtml = cells.map((cell) => {
+    const classes = ["cb338-cell"];
+    if (cell.num === view.currentIndex) classes.push("current");
+    if (cell.num === view.sourceIndex) classes.push("source");
+    if (cell.value === null) classes.push("pending");
+    const bitsHtml = cell.binary.split("").map((bit, idx) => {
+      const isLast = idx === cell.binary.length - 1;
+      return `<span class="cb338-bit${bit === "1" ? " on" : ""}${isLast ? " last" : ""}">${bit}</span>`;
+    }).join("");
+    return `<article class="${classes.join(" ")}"><small>${cell.num}</small><div class="cb338-binary">${bitsHtml}</div><strong>${cell.value === null ? "?" : cell.value}</strong></article>`;
+  }).join("");
+
+  $("treeView").innerHTML = `<section class="cb338-viz" role="img" aria-label="${vi ? "Trực quan hóa Counting Bits" : "Counting Bits visualization"}">
+    <header><strong>COUNTING BITS</strong><span class="cb338-phase">${escapeHtml(phaseLabels[view.phase] || view.phase || "")}</span></header>
+    <section class="cb338-rule"><b>CORE RULE</b><strong>dp[i] = dp[i &gt;&gt; 1] + (i &amp; 1)</strong><span>${vi ? "bỏ bit cuối (i>>1) để lấy dp đã biết, rồi cộng lại bit cuối (i&1)" : "drop the last bit (i>>1) to reuse a known dp, then add back the last bit (i&1)"}</span></section>
+    <section class="cb338-action">${action}</section>
+    <section class="cb338-grid">${cellsHtml}</section>
+  </section>`;
+}
+
 function renderWordBreakView(step) {
   const view = step.wordBreakView || {};
   const vi = lang === "vi";
@@ -16620,6 +16836,24 @@ function renderStep() {
     $("bfsGridView").classList.add("hidden");
     $("liveVarsView").classList.remove("hidden");
     renderLiveVarsView(step);
+  } else if (step.houseRobberView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderHouseRobberView(step);
+  } else if (step.minCostStairsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderMinCostStairsView(step);
+  } else if (step.countBitsView) {
+    $("bars").classList.add("hidden");
+    $("treeView").classList.remove("hidden");
+    $("gridView").classList.add("hidden");
+    $("bfsGridView").classList.add("hidden");
+    renderCountBitsView(step);
   } else if (step.wordBreakView) {
     $("bars").classList.add("hidden");
     $("treeView").classList.remove("hidden");

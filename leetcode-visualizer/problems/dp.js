@@ -177,74 +177,84 @@ function buildSteps746(cost, params) {
   if (approach === 2) return buildSteps746B(cost);
 
   const n = cost.length;
-  const dp = new Array(n + 1).fill(0);
+  const dp = new Array(n + 1).fill(null);
   const steps = [];
 
-  // Line 3: dp = [0] * (n+1)
-  steps.push({
-    title: { vi: "dp = [0] * (n+1)", en: "dp = [0] * (n+1)" },
-    arr: [...dp],
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    vars: [{ name: "n", value: n }, { name: "cost", value: `[${cost.join(",")}]` }, { name: "dp", value: `[${dp.join(",")}]` }],
-    note: { vi: `dp[0]=dp[1]=0 vì được phép bắt đầu ở bậc 0 hoặc 1 miễn phí.`, en: `dp[0]=dp[1]=0 since you may start at step 0 or 1 for free.` },
-  });
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      minCostStairsView: {
+        method: "dp",
+        n,
+        cost: [...cost],
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sources: meta.sources || [],
+        formula: meta.formula || null,
+        dp: dp.map((v) => v),
+        rolling: null,
+        answer: meta.final ? dp[n] : null,
+      },
+    }));
+  };
 
-  // Line 4: dp[0] = dp[1] = 0 (already 0, just show)
-  steps.push({
+  dp[0] = 0;
+  if (n >= 1) dp[1] = 0;
+  push({ phase: "init", currentIndex: 1 }, {
     title: { vi: "dp[0] = dp[1] = 0 (bắt đầu miễn phí)", en: "dp[0] = dp[1] = 0 (start free)" },
-    arr: [...dp],
+    arr: dp.map((v) => v ?? 0),
     highlight: [0, 1],
     mark: [],
     codeLines: [4],
-    vars: [{ name: "dp[0]", value: 0 }, { name: "dp[1]", value: 0 }],
-    note: { vi: `Được phép bắt đầu ở bậc 0 hoặc 1 → chi phí = 0.`, en: `May start at step 0 or 1 → cost = 0.` },
+    vars: [{ name: "n", value: n }, { name: "cost", value: `[${cost.join(",")}]` }, { name: "dp[0]=dp[1]", value: 0 }],
+    note: {
+      vi: `dp[i] = chi phí nhỏ nhất để CHẠM tới bậc i. Được phép bắt đầu ở bậc 0 hoặc 1 miễn phí nên dp[0]=dp[1]=0. Đỉnh là bậc ${n}. Từ bậc i-1 (trả cost[i-1]) hoặc bậc i-2 (trả cost[i-2]).`,
+      en: `dp[i] = minimum cost to REACH step i. You may start at step 0 or 1 for free, so dp[0]=dp[1]=0. The top is step ${n}. Arrive from step i-1 (pay cost[i-1]) or step i-2 (pay cost[i-2]).`,
+    },
   });
 
   for (let i = 2; i <= n; i++) {
-    const optA = dp[i - 1] + cost[i - 1];
-    const optB = dp[i - 2] + cost[i - 2];
-
-    // Line 5: for i in range(2, n+1)
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: [...dp],
-      highlight: [i],
-      mark: [],
-      codeLines: [5],
-      vars: [{ name: "i", value: i }, { name: "dp[i-1]", value: dp[i-1] }, { name: "cost[i-1]", value: cost[i-1] }, { name: "dp[i-2]", value: dp[i-2] }, { name: "cost[i-2]", value: cost[i-2] }],
-      note: { vi: `Tính dp[${i}]: từ bậc ${i-1} (cost ${cost[i-1]}) hoặc bậc ${i-2} (cost ${cost[i-2]}).`, en: `Compute dp[${i}]: from step ${i-1} (cost ${cost[i-1]}) or step ${i-2} (cost ${cost[i-2]}).` },
-    });
-
-    // Line 6: dp[i] = min(dp[i-1]+cost[i-1], dp[i-2]+cost[i-2])
+    const optA = dp[i - 1] + cost[i - 1]; // from step i-1
+    const optB = dp[i - 2] + cost[i - 2]; // from step i-2
     dp[i] = Math.min(optA, optB);
-    steps.push({
+    const chosen = optA <= optB ? "A" : "B";
+    push({
+      phase: "compute",
+      currentIndex: i,
+      sources: [i - 2, i - 1],
+      formula: {
+        i,
+        optA: { fromStep: i - 1, dp: dp[i - 1], cost: cost[i - 1], total: optA },
+        optB: { fromStep: i - 2, dp: dp[i - 2], cost: cost[i - 2], total: optB },
+        chosen,
+        result: dp[i],
+      },
+    }, {
       title: { vi: `dp[${i}] = min(${optA}, ${optB}) = ${dp[i]}`, en: `dp[${i}] = min(${optA}, ${optB}) = ${dp[i]}` },
-      arr: [...dp],
+      arr: dp.map((v) => v ?? 0),
       highlight: [i - 2, i - 1, i],
       mark: [i],
       codeLines: [6],
       vars: [
-        { name: "dp[i-1]+cost[i-1]", value: `${dp[i-1]}+${cost[i-1]} = ${optA}` },
-        { name: "dp[i-2]+cost[i-2]", value: `${dp[i-2]}+${cost[i-2]} = ${optB}` },
-        { name: `dp[${i}] = min(${optA},${optB})`, value: dp[i] },
-        { name: "dp", value: `[${dp.join(",")}]` },
+        { name: "từ bậc i-1", value: `dp[${i - 1}] + cost[${i - 1}] = ${dp[i - 1]} + ${cost[i - 1]} = ${optA}` },
+        { name: "từ bậc i-2", value: `dp[${i - 2}] + cost[${i - 2}] = ${dp[i - 2]} + ${cost[i - 2]} = ${optB}` },
+        { name: `dp[${i}]`, value: dp[i] },
       ],
-      note: { vi: `dp[${i}] = min(${optA}, ${optB}) = ${dp[i]}.`, en: `dp[${i}] = min(${optA}, ${optB}) = ${dp[i]}.` },
+      note: {
+        vi: `Chạm bậc ${i} theo 2 cách: từ bậc ${i - 1} tốn ${optA}, hoặc từ bậc ${i - 2} tốn ${optB}. Chọn nhỏ hơn → dp[${i}] = ${dp[i]}.`,
+        en: `Reach step ${i} two ways: from step ${i - 1} costs ${optA}, or from step ${i - 2} costs ${optB}. Take the smaller → dp[${i}] = ${dp[i]}.`,
+      },
     });
   }
 
-  // Line 7: return dp[n]
-  steps.push({
+  push({ phase: "done", currentIndex: n, final: true }, {
     title: { vi: `Kết quả: dp[${n}] = ${dp[n]}`, en: `Result: dp[${n}] = ${dp[n]}` },
-    arr: [...dp],
+    arr: dp.map((v) => v ?? 0),
     highlight: [],
     mark: [n],
     final: true,
     codeLines: [7],
-    vars: [{ name: "answer", value: dp[n] }, { name: "dp", value: `[${dp.join(",")}]` }],
-    note: { vi: `Chi phí nhỏ nhất = dp[${n}] = ${dp[n]}.`, en: `Minimum cost = dp[${n}] = ${dp[n]}.` },
+    vars: [{ name: "answer", value: dp[n] }],
+    note: { vi: `Chi phí nhỏ nhất để lên đỉnh (bậc ${n}) = dp[${n}] = ${dp[n]}.`, en: `Minimum cost to reach the top (step ${n}) = dp[${n}] = ${dp[n]}.` },
   });
 
   return { cost: [...cost], answer: dp[n], steps };
@@ -259,111 +269,99 @@ function buildSteps746(cost, params) {
 function buildSteps746B(cost) {
   const n = cost.length;
   const steps = [];
-
-  const history = [cost[0], cost[1]];
   let prev2 = cost[0];
   let prev1 = cost[1];
 
-  // Line 3: prev2 = cost[0]
-  steps.push({
-    title: { vi: `prev2 = cost[0] = ${prev2}`, en: `prev2 = cost[0] = ${prev2}` },
-    arr: [...history],
-    sub: ["prev2", "·"],
-    highlight: [0],
-    mark: [],
-    codeBlock: 2,
-    codeLines: [3],
-    vars: [{ name: "n", value: n }, { name: "prev2", value: prev2 }],
-    note: { vi: `prev2 = cost[0] = ${prev2} (chi phí đứng trên bậc 0).`, en: `prev2 = cost[0] = ${prev2} (cost to stand on stair 0).` },
-  });
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      minCostStairsView: {
+        method: "rolling",
+        n,
+        cost: [...cost],
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sources: meta.sources || [],
+        formula: meta.formula || null,
+        dp: null,
+        rolling: meta.rolling || null,
+        answer: meta.final ? meta.answer : null,
+      },
+    }));
+  };
 
-  // Line 4: prev1 = cost[1]
-  steps.push({
-    title: { vi: `prev1 = cost[1] = ${prev1}`, en: `prev1 = cost[1] = ${prev1}` },
-    arr: [...history],
+  push({
+    phase: "init",
+    currentIndex: 1,
+    rolling: { prev2: { step: 0, value: prev2 }, prev1: { step: 1, value: prev1 }, curr: null },
+  }, {
+    title: { vi: `prev2 = cost[0] = ${prev2}, prev1 = cost[1] = ${prev1}`, en: `prev2 = cost[0] = ${prev2}, prev1 = cost[1] = ${prev1}` },
+    arr: [prev2, prev1],
     sub: ["prev2", "prev1"],
-    highlight: [1],
+    highlight: [0, 1],
     mark: [],
     codeBlock: 2,
-    codeLines: [4],
-    vars: [{ name: "prev2", value: prev2 }, { name: "prev1", value: prev1 }],
-    note: { vi: `prev1 = cost[1] = ${prev1} (chi phí đứng trên bậc 1).`, en: `prev1 = cost[1] = ${prev1} (cost to stand on stair 1).` },
+    codeLines: [5],
+    vars: [{ name: "n", value: n }, { name: "prev2 = cost[0]", value: prev2 }, { name: "prev1 = cost[1]", value: prev1 }],
+    note: {
+      vi: `Chỉ cần 2 biến: prev2 = chi phí nhỏ nhất để đứng trên bậc trước-trước, prev1 = bậc ngay trước. Bắt đầu prev2=cost[0], prev1=cost[1].`,
+      en: `Only two variables are needed: prev2 = min cost to stand two steps back, prev1 = one step back. Start with prev2=cost[0], prev1=cost[1].`,
+    },
   });
 
   for (let i = 2; i < n; i++) {
-    const curr = cost[i] + Math.min(prev1, prev2);
-    history.push(curr);
-
-    // Line 6: for i in range(2, n)
-    steps.push({
-      title: { vi: `Vòng lặp i=${i}`, en: `Loop i=${i}` },
-      arr: [...history].slice(0, -1),
-      sub: history.slice(0, -1).map((_, idx) => { if (idx === i - 2) return "prev2"; if (idx === i - 1) return "prev1"; return `c[${idx}]`; }),
-      highlight: [i - 2, i - 1],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [6],
-      vars: [{ name: "i", value: i }, { name: "cost[i]", value: cost[i] }, { name: "prev2", value: prev2 }, { name: "prev1", value: prev1 }],
-      note: { vi: `Xét bậc ${i}: cost[${i}]=${cost[i]}.`, en: `Consider stair ${i}: cost[${i}]=${cost[i]}.` },
-    });
-
-    // Line 7: curr = cost[i] + min(prev1, prev2)
-    const subLabels = history.map((_, idx) => { if (idx === i - 2) return "prev2"; if (idx === i - 1) return "prev1"; if (idx === i) return "curr"; return `c[${idx}]`; });
-    steps.push({
-      title: { vi: `curr = ${cost[i]} + min(${prev1},${prev2}) = ${curr}`, en: `curr = ${cost[i]} + min(${prev1},${prev2}) = ${curr}` },
-      arr: [...history],
-      sub: subLabels,
+    const minPrev = Math.min(prev1, prev2);
+    const curr = cost[i] + minPrev;
+    const oldPrev2 = prev2;
+    const oldPrev1 = prev1;
+    push({
+      phase: "compute",
+      currentIndex: i,
+      sources: [i - 2, i - 1],
+      formula: { i, cost: cost[i], prev1: oldPrev1, prev2: oldPrev2, min: minPrev, result: curr },
+      rolling: { prev2: { step: i - 2, value: oldPrev2 }, prev1: { step: i - 1, value: oldPrev1 }, curr: { step: i, value: curr } },
+    }, {
+      title: { vi: `curr = ${cost[i]} + min(${oldPrev1},${oldPrev2}) = ${curr}`, en: `curr = ${cost[i]} + min(${oldPrev1},${oldPrev2}) = ${curr}` },
+      arr: cost.map((c, idx) => (idx <= i ? c : 0)),
+      sub: cost.map((_, idx) => (idx === i ? "i" : idx === i - 1 ? "prev1" : idx === i - 2 ? "prev2" : `c[${idx}]`)),
       highlight: [i - 2, i - 1, i],
       mark: [i],
       codeBlock: 2,
       codeLines: [7],
-      vars: [{ name: "curr = cost[i]+min(prev1,prev2)", value: `${cost[i]} + min(${prev1},${prev2}) = ${cost[i]} + ${Math.min(prev1,prev2)} = ${curr}` }],
-      note: { vi: `curr = cost[${i}] + min(prev1, prev2) = ${cost[i]} + ${Math.min(prev1,prev2)} = ${curr}.`, en: `curr = cost[${i}] + min(prev1, prev2) = ${cost[i]} + ${Math.min(prev1,prev2)} = ${curr}.` },
+      vars: [
+        { name: "i", value: i },
+        { name: "cost[i]", value: cost[i] },
+        { name: "curr = cost[i] + min(prev1, prev2)", value: `${cost[i]} + min(${oldPrev1}, ${oldPrev2}) = ${cost[i]} + ${minPrev} = ${curr}` },
+      ],
+      note: {
+        vi: `Chi phí đứng trên bậc ${i} = cost[${i}] + min(prev1, prev2) = ${cost[i]} + ${minPrev} = ${curr}. Sau đó dời cửa sổ: prev2 ← prev1, prev1 ← curr.`,
+        en: `Cost to stand on step ${i} = cost[${i}] + min(prev1, prev2) = ${cost[i]} + ${minPrev} = ${curr}. Then shift the window: prev2 ← prev1, prev1 ← curr.`,
+      },
     });
-
-    // Line 8: prev2 = prev1
-    prev2 = prev1;
-    steps.push({
-      title: { vi: `prev2 = ${prev2}`, en: `prev2 = ${prev2}` },
-      arr: [...history],
-      sub: history.map((_, idx) => { if (idx === i - 1) return "prev2"; if (idx === i) return "curr"; return `c[${idx}]`; }),
-      highlight: [i - 1],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [8],
-      vars: [{ name: "prev2", value: prev2 }],
-      note: { vi: `prev2 ← ${prev2}.`, en: `prev2 ← ${prev2}.` },
-    });
-
-    // Line 9: prev1 = curr
+    prev2 = oldPrev1;
     prev1 = curr;
-    steps.push({
-      title: { vi: `prev1 = ${prev1}`, en: `prev1 = ${prev1}` },
-      arr: [...history],
-      sub: history.map((_, idx) => { if (idx === i - 1) return "prev2"; if (idx === i) return "prev1"; return `c[${idx}]`; }),
-      highlight: [i],
-      mark: [],
-      codeBlock: 2,
-      codeLines: [9],
-      vars: [{ name: "prev1", value: prev1 }],
-      note: { vi: `prev1 ← ${prev1}.`, en: `prev1 ← ${prev1}.` },
-    });
   }
 
   const answer = Math.min(prev1, prev2);
-
-  // Line 11: return min(prev1, prev2)
-  steps.push({
+  push({
+    phase: "done",
+    currentIndex: n,
+    final: true,
+    answer,
+    rolling: { prev2: { step: n - 2, value: prev2 }, prev1: { step: n - 1, value: prev1 }, curr: null },
+  }, {
     title: { vi: `Kết quả: min(${prev1},${prev2}) = ${answer}`, en: `Result: min(${prev1},${prev2}) = ${answer}` },
-    arr: [...history],
-    sub: history.map((_, idx) => { if (idx === n - 2) return "prev2"; if (idx === n - 1) return "prev1"; return `c[${idx}]`; }),
+    arr: [...cost],
+    sub: cost.map((_, idx) => (idx === n - 1 ? "prev1" : idx === n - 2 ? "prev2" : `c[${idx}]`)),
     highlight: [],
     mark: [n - 2, n - 1],
     final: true,
     codeBlock: 2,
-    codeLines: [11],
+    codeLines: [10],
     vars: [{ name: "answer", value: `min(${prev1}, ${prev2}) = ${answer}` }],
-    note: { vi: `min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}. O(1) bộ nhớ.`, en: `min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}. O(1) memory.` },
+    note: {
+      vi: `Từ đỉnh có thể nhảy xuống từ bậc ${n - 1} hoặc ${n - 2}, nên đáp án = min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}. Chỉ dùng O(1) bộ nhớ.`,
+      en: `The top can be reached from step ${n - 1} or ${n - 2}, so the answer = min(prev1, prev2) = min(${prev1}, ${prev2}) = ${answer}. Only O(1) memory is used.`,
+    },
   });
 
   return { cost: [...cost], answer, steps };
@@ -2982,198 +2980,96 @@ function buildSteps198(nums, params) {
   if (approach === 2) return buildSteps198B(nums);
 
   const n = nums.length;
-  const dp = new Array(n).fill(0);
+  const dp = new Array(n).fill(null);
   const steps = [];
 
-  steps.push({
-    title: { vi: `n = len(nums) = ${n}`, en: `n = len(nums) = ${n}` },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: [], mark: [],
-    codeLines: [3],
-    vars: [{ name: "nums", value: `[${nums.join(",")}]` }, { name: "rule", value: "không cướp 2 nhà liền kề" }],
-    note: {
-      vi:
-        `🏠 Bạn là tên trộm. Dãy nhà: [${nums.join(", ")}] (tiền mỗi nhà).\n` +
-        `⚠️ Luật: KHÔNG ĐƯỢC cướp 2 nhà LIỀN KỀ (hệ thống báo động).\n\n` +
-        `💡 Ý tưởng DP:\n` +
-        `dp[i] = tiền TỐI ĐA cướp được tính đến nhà i.\n` +
-        `Tại nhà i, có 2 lựa chọn:\n` +
-        `  ① BỎ QUA nhà i → dp[i] = dp[i-1] (giữ nguyên tiền cũ)\n` +
-        `  ② CƯỚP nhà i → dp[i] = dp[i-2] + nums[i] (tiền trước đó 2 nhà + nhà này)\n` +
-        `dp[i] = max(①, ②)`,
-      en:
-        `🏠 You are a robber. Houses: [${nums.join(", ")}] (money in each).\n` +
-        `⚠️ Rule: CANNOT rob 2 ADJACENT houses (alarm system).\n\n` +
-        `💡 DP Idea:\n` +
-        `dp[i] = MAXIMUM money robbed up to house i.\n` +
-        `At house i, 2 choices:\n` +
-        `  ① SKIP house i → dp[i] = dp[i-1] (keep previous best)\n` +
-        `  ② ROB house i → dp[i] = dp[i-2] + nums[i] (best before prev + this house)\n` +
-        `dp[i] = max(①, ②)`,
-    },
-  });
+  const robbedTrace = () => {
+    const houses = [];
+    let idx = n - 1;
+    while (idx >= 0) {
+      if (idx === 0 || dp[idx] !== dp[idx - 1]) { houses.push(idx); idx -= 2; }
+      else { idx -= 1; }
+    }
+    return houses;
+  };
 
-  steps.push({
-    title: { vi: `if n == 1: ${n === 1}`, en: `if n == 1: ${n === 1}` },
-    arr: [...nums],
-    sub: nums.map((_, i) => `[${i}]`),
-    highlight: n === 1 ? [0] : [],
-    mark: [],
-    codeLines: [4],
-    vars: [
-      { name: "n", value: n },
-      { name: "n == 1", value: n === 1 },
-    ],
-    note: {
-      vi: n === 1 ? `Chỉ có một nhà, đáp án là nums[0].` : `Có nhiều hơn một nhà, tiếp tục tạo bảng dp.`,
-      en: n === 1 ? `There is only one house, so the answer is nums[0].` : `There is more than one house, continue with the dp table.`,
-    },
-  });
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      houseRobberView: {
+        method: "dp",
+        nums: [...nums],
+        n,
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sources: meta.sources || [],
+        dp: dp.map((v) => v),
+        formula: meta.formula || null,
+        robbed: meta.final ? robbedTrace() : (meta.robbed || null),
+        answer: meta.final ? dp[n - 1] : null,
+      },
+    }));
+  };
 
   if (n === 1) {
-    steps.push({
-      title: { vi: `return nums[0] = ${nums[0]}`, en: `return nums[0] = ${nums[0]}` },
-      arr: [...nums],
-      sub: [`${nums[0]}`],
-      highlight: [0],
-      mark: [0],
-      final: true,
+    dp[0] = nums[0];
+    push({ phase: "done", currentIndex: 0, final: true }, {
+      title: { vi: `Chỉ 1 nhà → ${nums[0]}`, en: `Only 1 house → ${nums[0]}` },
+      arr: [...nums], sub: [`${nums[0]}`], highlight: [0], mark: [0], final: true,
       codeLines: [5],
       vars: [{ name: "answer", value: nums[0] }],
-      note: {
-        vi: `Không có nhà liền kề để so sánh, cướp nhà duy nhất.`,
-        en: `No adjacent choice exists, rob the only house.`,
-      },
+      note: { vi: "Không có nhà liền kề để so sánh, cướp nhà duy nhất.", en: "No adjacent choice exists, rob the only house." },
     });
     return { original: [...nums], answer: nums[0], steps };
   }
 
-  steps.push({
-    title: { vi: "dp = [0] * len(nums)", en: "dp = [0] * len(nums)" },
-    arr: [...nums],
-    sub: dp.map(() => "0"),
-    highlight: [],
-    mark: [],
-    codeLines: [6],
-    vars: [
-      { name: "dp", value: `[${dp.join(",")}]` },
-    ],
-    note: {
-      vi: `Tạo dp, trong đó dp[i] là số tiền tối đa có thể cướp từ nhà 0 đến nhà i.`,
-      en: `Create dp, where dp[i] is the maximum loot from house 0 through house i.`,
-    },
-  });
-
   dp[0] = nums[0];
-  steps.push({
-    title: { vi: `dp[0] = nums[0] = ${dp[0]}`, en: `dp[0] = nums[0] = ${dp[0]}` },
-    arr: [...nums],
-    sub: dp.map((v) => v || "·"),
-    highlight: [0],
-    mark: [],
-    codeLines: [7],
-    vars: [
-      { name: "dp[0]", value: `nums[0] = ${dp[0]} (chỉ có 1 nhà → cướp nó)` },
-      { name: "dp", value: `[${dp.join(",")}]` },
-    ],
-    note: {
-      vi: `Nếu chỉ xét nhà 0, tốt nhất là cướp nhà đó: dp[0] = ${nums[0]}.`,
-      en: `Considering only house 0, the best choice is to rob it: dp[0] = ${nums[0]}.`,
-    },
-  });
-
   dp[1] = Math.max(nums[0], nums[1]);
-  steps.push({
-    title: { vi: `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}`, en: `dp[1] = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` },
-    arr: [...nums],
-    sub: dp.map((v) => v || "·"),
-    highlight: [0, 1],
-    mark: [nums[1] > nums[0] ? 1 : 0],
+  push({ phase: "base", currentIndex: 1, sources: [0, 1] }, {
+    title: { vi: `dp[0]=${dp[0]}, dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}`, en: `dp[0]=${dp[0]}, dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}` },
+    arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [0, 1], mark: [],
     codeLines: [8],
-    vars: [
-      { name: "dp[1]", value: `max(nums[0], nums[1]) = max(${nums[0]}, ${nums[1]}) = ${dp[1]}` },
-      { name: "dp", value: `[${dp.join(",")}]` },
-    ],
+    vars: [{ name: "dp[0]", value: dp[0] }, { name: "dp[1]", value: dp[1] }],
     note: {
-      vi: `Trong hai nhà đầu, không được cướp cả hai, nên chọn nhà có tiền lớn hơn.`,
-      en: `Among the first two houses, both cannot be robbed, so choose the richer one.`,
+      vi: `🏠 Không được cướp 2 nhà liền kề. dp[i] = tiền tối đa tới nhà i. Base: dp[0]=nums[0]=${dp[0]}; hai nhà đầu chỉ chọn 1 → dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}.`,
+      en: `🏠 Cannot rob two adjacent houses. dp[i] = max loot up to house i. Base: dp[0]=nums[0]=${dp[0]}; among the first two pick one → dp[1]=max(${nums[0]},${nums[1]})=${dp[1]}.`,
     },
   });
 
-  // Fill DP.
   for (let i = 2; i < n; i++) {
     const skip = dp[i - 1];
     const rob = dp[i - 2] + nums[i];
-    steps.push({
-      title: { vi: `for i = ${i}`, en: `for i = ${i}` },
-      arr: [...nums],
-      sub: dp.map((v, idx) => idx < i ? String(v) : "·"),
-      highlight: [i],
-      mark: [],
-      codeLines: [9],
-      vars: [
-        { name: "i", value: i },
-        { name: "nums[i]", value: `${nums[i]}$` },
-        { name: "skip = dp[i-1]", value: skip },
-        { name: "rob = dp[i-2] + nums[i]", value: `${dp[i-2]} + ${nums[i]} = ${rob}` },
-      ],
-      note: {
-        vi: `Xét nhà ${i}. Nếu bỏ: dp[${i-1}] = ${skip}. Nếu cướp: dp[${i-2}] + nums[${i}] = ${rob}.`,
-        en: `Consider house ${i}. If skipped: dp[${i-1}] = ${skip}. If robbed: dp[${i-2}] + nums[${i}] = ${rob}.`,
-      },
-    });
-
     dp[i] = Math.max(skip, rob);
-    const robbed = dp[i] === rob;
-    steps.push({
+    const robbed = rob >= skip;
+    push({
+      phase: "compute",
+      currentIndex: i,
+      sources: [i - 2, i - 1],
+      formula: { i, skip: { from: i - 1, value: skip }, rob: { from: i - 2, value: dp[i - 2], money: nums[i], total: rob }, chosen: robbed ? "rob" : "skip", result: dp[i] },
+    }, {
       title: { vi: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "CƯỚP 💰" : "BỎ ✗"}`, en: `dp[${i}] = max(${skip}, ${rob}) = ${dp[i]} → ${robbed ? "ROB 💰" : "SKIP ✗"}` },
-      arr: [...nums],
-      sub: dp.map((v, idx) => idx <= i ? (idx === i ? (robbed ? `💰${v}` : `✗${v}`) : String(v)) : "·"),
-      highlight: [i],
-      mark: robbed ? [i - 2, i] : [i - 1],
+      arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [i - 2, i - 1, i], mark: robbed ? [i - 2, i] : [i - 1],
       codeLines: [10],
       vars: [
-        { name: "skip", value: skip },
-        { name: "rob", value: rob },
-        { name: "dp[i] = max(skip, rob)", value: dp[i] },
-        { name: "decision", value: robbed ? "ROB 💰" : "SKIP ✗" },
-        { name: "dp", value: `[${dp.join(",")}]` },
+        { name: "bỏ nhà i (dp[i-1])", value: skip },
+        { name: "cướp nhà i (dp[i-2]+nums[i])", value: `${dp[i - 2]} + ${nums[i]} = ${rob}` },
+        { name: `dp[${i}]`, value: dp[i] },
       ],
       note: {
-        vi: `dp[${i}] = max(①=${skip}, ②=${rob}) = ${dp[i]}. → ${robbed ? `CƯỚP nhà ${i}! 💰` : `Bỏ qua nhà ${i} (giữ tiền cũ tốt hơn).`}`,
-        en: `dp[${i}] = max(①=${skip}, ②=${rob}) = ${dp[i]}. → ${robbed ? `ROB house ${i}! 💰` : `SKIP house ${i} (keeping old loot is better).`}`,
+        vi: `Nhà ${i} (tiền ${nums[i]}): BỎ → dp[${i - 1}]=${skip}; CƯỚP → dp[${i - 2}]+nums[${i}]=${rob}. Chọn lớn hơn → dp[${i}]=${dp[i]} (${robbed ? "cướp" : "bỏ"}).`,
+        en: `House ${i} (money ${nums[i]}): SKIP → dp[${i - 1}]=${skip}; ROB → dp[${i - 2}]+nums[${i}]=${rob}. Take the larger → dp[${i}]=${dp[i]} (${robbed ? "rob" : "skip"}).`,
       },
     });
   }
 
-  // Trace back
-  const robbedHouses = [];
-  let idx = n - 1;
-  while (idx >= 0) {
-    if (idx === 0 || dp[idx] !== dp[idx - 1]) { robbedHouses.push(idx); idx -= 2; }
-    else { idx -= 1; }
-  }
-  robbedHouses.reverse();
-  const robbedSet = new Set(robbedHouses);
-
   const answer = dp[n - 1];
-  steps.push({
+  push({ phase: "done", currentIndex: n - 1, final: true }, {
     title: { vi: `Kết quả: ${answer}$ 💰`, en: `Result: $${answer} 💰` },
-    arr: [...nums],
-    sub: dp.map((v, i) => robbedSet.has(i) ? `💰${v}` : `✗ ${v}`),
-    highlight: [],
-    mark: robbedHouses,
-    final: true,
+    arr: [...nums], sub: dp.map((v) => (v === null ? "·" : String(v))), highlight: [], mark: robbedTrace(), final: true,
     codeLines: [11],
-    vars: [
-      { name: "answer", value: `${answer}$` },
-      { name: "robbed", value: `[${robbedHouses.join(",")}] = [${robbedHouses.map((j) => nums[j]).join("+")}] = ${answer}` },
-      { name: "dp", value: `[${dp.join(",")}]` },
-    ],
+    vars: [{ name: "answer", value: `${answer}$` }, { name: "robbed", value: `[${robbedTrace().join(", ")}]` }],
     note: {
-      vi: `🎉 Tối đa = ${answer}$. Cướp các nhà [${robbedHouses.join(", ")}] (giá trị ${robbedHouses.map((j) => nums[j]).join(" + ")} = ${answer}).\n💰 = đã cướp, ✗ = bỏ qua.`,
-      en: `🎉 Maximum = $${answer}. Rob houses [${robbedHouses.join(", ")}] (values ${robbedHouses.map((j) => nums[j]).join(" + ")} = ${answer}).\n💰 = robbed, ✗ = skipped.`,
+      vi: `🎉 Tối đa = ${answer}$. Cướp các nhà [${robbedTrace().join(", ")}] (${robbedTrace().map((j) => nums[j]).join(" + ")} = ${answer}).`,
+      en: `🎉 Maximum = $${answer}. Rob houses [${robbedTrace().join(", ")}] (${robbedTrace().map((j) => nums[j]).join(" + ")} = ${answer}).`,
     },
   });
 
@@ -3196,113 +3092,85 @@ function buildSteps198(nums, params) {
  */
 function buildSteps198B(nums) {
   const steps = [];
+  const n = nums.length;
   let prevRob = 0;
   let maxRob = 0;
+  const robbedFlags = new Array(n).fill(false);
 
-  // Track which houses got robbed for a final highlight (approximate: whenever
-  // maxRob strictly increased and the "rob" branch won, we mark that house).
-  const robbedFlags = new Array(nums.length).fill(false);
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      houseRobberView: {
+        method: "rolling",
+        nums: [...nums],
+        n,
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sources: [],
+        rolling: meta.rolling || null,
+        formula: meta.formula || null,
+        robbed: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
+        answer: meta.final ? maxRob : null,
+      },
+    }));
+  };
 
-  steps.push({
-    title: { vi: "Khởi tạo (O(1) space)", en: "Initialize (O(1) space)" },
-    arr: [...nums],
-    highlight: [],
-    mark: [],
-    codeLines: [3],
-    codeBlock: 2,
-    vars: [
-      { name: "prev_rob", value: prevRob },
-      { name: "max_rob", value: maxRob },
-    ],
+  push({ phase: "init", currentIndex: -1, rolling: { prevRob: 0, maxRob: 0, temp: null } }, {
+    title: { vi: "Khởi tạo prev_rob = max_rob = 0", en: "Initialize prev_rob = max_rob = 0" },
+    arr: [...nums], highlight: [], mark: [], codeLines: [4], codeBlock: 2,
+    vars: [{ name: "prev_rob", value: 0 }, { name: "max_rob", value: 0 }],
     note: {
-      vi:
-        `Cách 2 chỉ dùng 2 biến thay cho cả bảng dp:\n` +
-        `  max_rob  = tiền lớn nhất cướp được tới nhà hiện tại\n` +
-        `  prev_rob = tiền lớn nhất cướp được tới nhà TRƯỚC đó\n` +
-        `Với mỗi nhà current: temp = max(max_rob, prev_rob + current), rồi dời (prev_rob, max_rob) ← (max_rob, temp).`,
-      en:
-        `Approach 2 keeps only 2 variables instead of the whole dp array:\n` +
-        `  max_rob  = best loot up to the current house\n` +
-        `  prev_rob = best loot up to the house BEFORE that\n` +
-        `For each house current: temp = max(max_rob, prev_rob + current), then shift (prev_rob, max_rob) ← (max_rob, temp).`,
+      vi: "Chỉ giữ 2 biến thay cho cả bảng dp: max_rob = tiền tối đa tới nhà hiện tại, prev_rob = tới nhà trước đó. Mỗi nhà: temp = max(max_rob, prev_rob + tiền), rồi dời.",
+      en: "Keep only 2 variables instead of the dp array: max_rob = best up to the current house, prev_rob = up to the house before. Each house: temp = max(max_rob, prev_rob + money), then shift.",
     },
   });
 
-  for (let i = 0; i < nums.length; i++) {
+  for (let i = 0; i < n; i++) {
     const current = nums[i];
-    const skipVal = maxRob;
     const robVal = prevRob + current;
-    const temp = Math.max(skipVal, robVal);
-    const chose = robVal > skipVal ? "rob" : (robVal === skipVal ? "rob=skip" : "skip");
+    const temp = Math.max(maxRob, robVal);
+    const robbed = robVal > maxRob;
+    if (robbed) robbedFlags[i] = true;
 
-    // Track for the final visualization: if strictly robbing this house is
-    // better than skipping, mark it as robbed.
-    if (robVal > skipVal) robbedFlags[i] = true;
-
-    // 1) show the comparison BEFORE the shift
-    steps.push({
-      title: { vi: `Xét nhà ${i} (tiền = ${current})`, en: `House ${i} (money = ${current})` },
-      arr: [...nums],
-      highlight: [i],
-      mark: [],
-      codeLines: [5, 6],
-      codeBlock: 2,
+    push({
+      phase: "compute",
+      currentIndex: i,
+      formula: { i, money: current, prevRob, maxRob, robVal, temp, chosen: robbed ? "rob" : "skip" },
+      rolling: { prevRob, maxRob, temp },
+    }, {
+      title: { vi: `Nhà ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}`, en: `House ${i}: temp = max(${maxRob}, ${prevRob}+${current}) = ${temp}` },
+      arr: [...nums], highlight: [i], mark: [], codeLines: [6], codeBlock: 2,
       vars: [
-        { name: "i", value: i },
         { name: "current", value: current },
-        { name: "prev_rob", value: prevRob },
-        { name: "max_rob", value: maxRob },
-        { name: "prev_rob + current", value: robVal },
-        { name: "temp = max(...)", value: temp },
-        { name: "decision", value: chose },
+        { name: "bỏ (max_rob)", value: maxRob },
+        { name: "cướp (prev_rob + current)", value: `${prevRob} + ${current} = ${robVal}` },
+        { name: "temp", value: temp },
       ],
       note: {
-        vi: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Quyết định: ${chose === "skip" ? "bỏ nhà" : chose === "rob" ? "cướp nhà" : "cướp (bằng bỏ)"} ${i}.`,
-        en: `temp = max(max_rob=${maxRob}, prev_rob+current=${prevRob}+${current}=${robVal}) = ${temp}. Decision: ${chose === "skip" ? "skip" : chose === "rob" ? "rob" : "rob (tie)"} house ${i}.`,
+        vi: `Nhà ${i}: BỎ → max_rob=${maxRob}; CƯỚP → prev_rob+current=${prevRob}+${current}=${robVal}. temp = max = ${temp} (${robbed ? "cướp" : "bỏ"}).`,
+        en: `House ${i}: SKIP → max_rob=${maxRob}; ROB → prev_rob+current=${prevRob}+${current}=${robVal}. temp = max = ${temp} (${robbed ? "rob" : "skip"}).`,
       },
     });
 
-    // 2) apply the shift
     prevRob = maxRob;
     maxRob = temp;
-
-    steps.push({
-      title: { vi: `Dời (prev_rob, max_rob)`, en: `Shift (prev_rob, max_rob)` },
-      arr: [...nums],
-      highlight: [i],
-      mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
-      codeLines: [7],
-      codeBlock: 2,
-      vars: [
-        { name: "i", value: i },
-        { name: "prev_rob", value: prevRob },
-        { name: "max_rob", value: maxRob },
-      ],
-      note: {
-        vi: `Sau lần dời: prev_rob = ${prevRob}, max_rob = ${maxRob} (giá trị mới sau khi xử lý nhà ${i}).`,
-        en: `After the shift: prev_rob = ${prevRob}, max_rob = ${maxRob} (new value after processing house ${i}).`,
-      },
+    push({
+      phase: "shift",
+      currentIndex: i,
+      rolling: { prevRob, maxRob, temp: null },
+    }, {
+      title: { vi: `Dời: prev_rob=${prevRob}, max_rob=${maxRob}`, en: `Shift: prev_rob=${prevRob}, max_rob=${maxRob}` },
+      arr: [...nums], highlight: [i], mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0), codeLines: [7], codeBlock: 2,
+      vars: [{ name: "prev_rob", value: prevRob }, { name: "max_rob", value: maxRob }],
+      note: { vi: `Dời cửa sổ: prev_rob ← max_rob cũ, max_rob ← temp. Giờ max_rob=${maxRob}.`, en: `Shift the window: prev_rob ← old max_rob, max_rob ← temp. Now max_rob=${maxRob}.` },
     });
   }
 
   const answer = maxRob;
-  steps.push({
-    title: { vi: "Kết quả", en: "Result" },
-    arr: [...nums],
-    highlight: [],
-    mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0),
-    final: true,
-    codeLines: [8],
-    codeBlock: 2,
-    vars: [
-      { name: "prev_rob", value: prevRob },
-      { name: "max_rob", value: maxRob },
-      { name: "answer", value: answer },
-    ],
-    note: {
-      vi: `Sau khi duyệt xong: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ so với O(n) của cách 1.`,
-      en: `After the loop: max_rob = ${answer}. Uses O(1) memory vs O(n) in approach 1.`,
-    },
+  push({ phase: "done", currentIndex: n - 1, final: true, rolling: { prevRob, maxRob, temp: null } }, {
+    title: { vi: `Kết quả: ${answer}$`, en: `Result: $${answer}` },
+    arr: [...nums], highlight: [], mark: robbedFlags.map((v, k) => (v ? k : -1)).filter((k) => k >= 0), final: true, codeLines: [8], codeBlock: 2,
+    vars: [{ name: "answer", value: answer }],
+    note: { vi: `Sau khi duyệt hết: max_rob = ${answer}. Chỉ dùng O(1) bộ nhớ.`, en: `After the loop: max_rob = ${answer}. Only O(1) memory.` },
   });
 
   return { original: [...nums], answer, steps };
@@ -3331,6 +3199,19 @@ function buildSteps213(nums) {
       codeLines: [3],
       vars: [{ name: "answer", value: nums[0] }],
       note: { vi: `Chỉ có 1 nhà → cướp nó = ${nums[0]}.`, en: `Only 1 house → rob it = ${nums[0]}.` },
+      houseRobberView: {
+        method: "circular",
+        nums: [...nums],
+        n,
+        pass: null,
+        range: [0, 0],
+        dp: [nums[0]],
+        currentIndex: 0,
+        robbed: [0],
+        passA: null,
+        passB: null,
+        answer: nums[0],
+      },
     });
     return { original: [...nums], answer: nums[0], steps };
   }
@@ -3518,6 +3399,35 @@ function buildSteps213(nums) {
         `Answer = max(Pass A, Pass B) = max(${passA.result}, ${passB.result}) = ${answer}.\n` +
         `Pick Pass ${bestPass}: rob houses [${bestRobbed.join(", ")}] → [${bestRobbed.map((j) => nums[j]).join(" + ")}] = ${answer}.`,
     },
+  });
+
+  // Attach a shared "circular" House Robber panel to every step, derived from
+  // the step's own data (nums row, dp values in `sub`, robbed marks).
+  steps.forEach((step) => {
+    if (step.houseRobberView) return;
+    const sub = Array.isArray(step.sub) ? step.sub : [];
+    const dp = nums.map((_, i) => {
+      const value = sub[i];
+      return value !== undefined && value !== "" && Number.isFinite(Number(value)) ? Number(value) : null;
+    });
+    let lo = -1;
+    let hi = -1;
+    dp.forEach((value, i) => { if (value !== null) { if (lo === -1) lo = i; hi = i; } });
+    const titleEn = (step.title && step.title.en) || "";
+    const pass = titleEn.includes("Pass A") ? "A" : titleEn.includes("Pass B") ? "B" : null;
+    step.houseRobberView = {
+      method: "circular",
+      nums: [...nums],
+      n,
+      pass,
+      range: lo >= 0 ? [lo, hi] : null,
+      dp,
+      currentIndex: step.highlight && step.highlight.length ? step.highlight[step.highlight.length - 1] : -1,
+      robbed: step.mark || [],
+      passA: passA ? passA.result : null,
+      passB: passB ? passB.result : null,
+      answer: step.final ? answer : null,
+    };
   });
 
   return { original: [...nums], answer, steps };
@@ -15594,28 +15504,74 @@ function buildSteps338(input) {
   const n = Number(Array.isArray(input) ? input[0] : String(input).trim()) || 5;
   const steps = [];
   const dp = new Array(n + 1).fill(0);
-  const bin = (v) => v.toString(2);
-  steps.push({
+  const width = Math.max(1, n.toString(2).length);
+  const bin = (v) => v.toString(2).padStart(width, "0");
+
+  const push = (meta, step) => {
+    steps.push(Object.assign({}, step, {
+      countBitsView: {
+        n,
+        width,
+        phase: meta.phase || "",
+        currentIndex: Number.isInteger(meta.currentIndex) ? meta.currentIndex : -1,
+        sourceIndex: Number.isInteger(meta.sourceIndex) ? meta.sourceIndex : -1,
+        formula: meta.formula || null,
+        cells: Array.from({ length: n + 1 }, (_, num) => ({
+          num,
+          binary: bin(num),
+          value: num <= meta.knownThrough ? dp[num] : null,
+        })),
+        answer: meta.final ? [...dp] : null,
+      },
+    }));
+  };
+
+  push({ phase: "init", currentIndex: 0, knownThrough: 0 }, {
     title: { vi: "dp[0] = 0", en: "dp[0] = 0" },
     arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [0], mark: [],
     codeLines: [3],
-    vars: [{ name: "n", value: n }, { name: "dp", value: `[${dp.join(", ")}]` }],
+    vars: [{ name: "n", value: n }, { name: "dp[0]", value: 0 }],
     note: {
-      vi: `dp[i] = số bit 1 của i. Công thức: dp[i] = dp[i>>1] + (i&1) — bỏ bit cuối (i>>1) rồi cộng lại nếu bit cuối là 1.`,
-      en: `dp[i] = number of 1-bits in i. Formula: dp[i] = dp[i>>1] + (i&1) — drop the last bit (i>>1) then add it back if it was 1.`,
+      vi: `dp[i] = số bit 1 của i. Ý tưởng: bỏ bit cuối của i (dịch phải i>>1) thì được một số đã tính trước, rồi cộng lại bit cuối (i&1). dp[0] = 0.`,
+      en: `dp[i] = number of 1-bits in i. Idea: dropping i's last bit (right shift i>>1) gives an already-computed number; then add back the last bit (i&1). dp[0] = 0.`,
     },
   });
+
   for (let i = 1; i <= n; i++) {
-    dp[i] = dp[i >> 1] + (i & 1);
-    steps.push({
-      title: { vi: `dp[${i}] = dp[${i >> 1}] + ${i & 1} = ${dp[i]}`, en: `dp[${i}] = dp[${i >> 1}] + ${i & 1} = ${dp[i]}` },
-      arr: [...dp], sub: dp.map((_, x) => `${x}=${bin(x)}`), highlight: [i], mark: [i >> 1],
-      codeLines: [4, 5],
-      vars: [{ name: "i", value: `${i} (${bin(i)})` }, { name: "i>>1", value: `${i >> 1} (${bin(i >> 1)})` }, { name: "i&1", value: i & 1 }, { name: `dp[${i}]`, value: dp[i] }],
-      note: { vi: `${i} = ${bin(i)}. Bỏ bit cuối → ${i >> 1} = ${bin(i >> 1)} có dp=${dp[i >> 1]} bit. Bit cuối = ${i & 1}. Tổng = ${dp[i]}.`, en: `${i} = ${bin(i)}. Drop last bit → ${i >> 1} = ${bin(i >> 1)} with dp=${dp[i >> 1]} bits. Last bit = ${i & 1}. Total = ${dp[i]}.` },
+    const half = i >> 1;
+    const lastBit = i & 1;
+    dp[i] = dp[half] + lastBit;
+    push({
+      phase: "compute",
+      currentIndex: i,
+      sourceIndex: half,
+      knownThrough: i,
+      formula: { i, iBits: bin(i), half, halfBits: bin(half), halfValue: dp[half], lastBit, result: dp[i] },
+    }, {
+      title: { vi: `dp[${i}] = dp[${half}] + ${lastBit} = ${dp[i]}`, en: `dp[${i}] = dp[${half}] + ${lastBit} = ${dp[i]}` },
+      arr: [...dp], sub: dp.map((_, x) => `${x}=${bin(x)}`), highlight: [i], mark: [half],
+      codeLines: [5],
+      vars: [
+        { name: "i", value: `${i} = ${bin(i)}₂` },
+        { name: "i >> 1 (bỏ bit cuối)", value: `${half} = ${bin(half)}₂` },
+        { name: "i & 1 (bit cuối)", value: lastBit },
+        { name: `dp[${half}]`, value: dp[half] },
+        { name: `dp[${i}]`, value: dp[i] },
+      ],
+      note: {
+        vi: `${i} = ${bin(i)}₂. Bỏ bit cuối → ${half} = ${bin(half)}₂ (đã biết dp=${dp[half]}). Bit cuối = ${lastBit}. Vậy dp[${i}] = ${dp[half]} + ${lastBit} = ${dp[i]}.`,
+        en: `${i} = ${bin(i)}₂. Drop the last bit → ${half} = ${bin(half)}₂ (known dp=${dp[half]}). Last bit = ${lastBit}. So dp[${i}] = ${dp[half]} + ${lastBit} = ${dp[i]}.`,
+      },
     });
   }
-  steps.push({ title: { vi: `Kết quả: [${dp.join(", ")}]`, en: `Result: [${dp.join(", ")}]` }, arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [], mark: [], final: true, codeLines: [6], vars: [{ name: "answer", value: `[${dp.join(", ")}]` }], note: { vi: `Số bit 1 của 0..${n}.`, en: `1-bit counts for 0..${n}.` } });
+
+  push({ phase: "done", currentIndex: n, knownThrough: n, final: true }, {
+    title: { vi: `Kết quả: [${dp.join(", ")}]`, en: `Result: [${dp.join(", ")}]` },
+    arr: [...dp], sub: dp.map((_, i) => `${i}=${bin(i)}`), highlight: [], mark: [], final: true,
+    codeLines: [6],
+    vars: [{ name: "answer", value: `[${dp.join(", ")}]` }],
+    note: { vi: `Số bit 1 của mọi số từ 0 đến ${n}.`, en: `1-bit counts for every number from 0 to ${n}.` },
+  });
   return { original: n, answer: dp, steps };
 }
 
